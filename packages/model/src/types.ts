@@ -117,6 +117,13 @@ export interface Wall {
   topLevelId: Id | null;
   height: number;
   topOffset: number;
+  /**
+   * Base anexada ao piso do mesmo nível que cobre o ponto médio da parede: a base sobe até a face superior do piso.
+   * Ausente = false (arquivos antigos). A cota é calculada no engine (wallZRange), não aqui.
+   */
+  attachBottomToFloor?: boolean;
+  /** Topo anexado ao piso do nível `topLevelId` que cobre o ponto médio: o topo desce até a face inferior do piso. */
+  attachTopToFloor?: boolean;
   locationLine: LocationLine;
   /** Inverte qual lado é o externo (padrão: externo à esquerda de a→b). */
   flipped: boolean;

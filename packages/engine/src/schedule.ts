@@ -1,4 +1,5 @@
 import { totalThickness, wallType, wallsOnLevel, type Id, type Project, type Wall, type WallType } from '@hestia/model';
+import { csvDocument, csvText, formatDecimal } from './csv.ts';
 import { quantifyLevel, type WallQuantity } from './quantities.ts';
 import { resolveLevel } from './resolve.ts';
 
@@ -46,12 +47,6 @@ export interface WallSchedule {
 
 const layersSummary = (p: Project, t: WallType): string =>
   t.layers.map((l) => `${p.materials[l.materialId]?.name ?? l.materialId} ${formatDecimal(l.thickness * 100, 1)}`).join(' | ');
-
-/** Número com vírgula decimal e sem separador de milhar (formato do CSV). */
-function formatDecimal(v: number, decimals: number): string {
-  const x = Number(v.toFixed(decimals));
-  return (x === 0 ? 0 : x).toFixed(decimals).replace('.', ',');
-}
 
 function rowOf(p: Project, wall: Wall, levelName: string, q: WallQuantity): WallScheduleRow {
   const t = wallType(p, wall);
@@ -121,12 +116,6 @@ const CSV_HEADER = [
   'Camadas (cm)',
 ];
 
-/** Texto com ";", aspas ou quebra de linha vai entre aspas; texto que começa com =, +, -, @ ganha apóstrofo (evita fórmula no Excel). */
-const csvText = (s: string): string => {
-  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-};
-
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8.
  * Uma linha por parede, seguida de uma linha de total.
@@ -147,6 +136,5 @@ export function scheduleToCsv(rows: WallScheduleRow[], totals: WallScheduleTotal
     csvText(r.layersSummary),
   ]);
   const total = ['Total', '', '', '', n(totals.length, 2), '', n(totals.grossFaceArea, 2), n(totals.openingsArea, 2), n(totals.netFaceArea, 2), n(totals.volume, 3), ''];
-  const lines = [CSV_HEADER, ...body, total].map((cells) => cells.join(';'));
-  return `\uFEFF${lines.join('\r\n')}\r\n`;
+  return csvDocument([CSV_HEADER, ...body, total]);
 }

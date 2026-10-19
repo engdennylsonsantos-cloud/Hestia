@@ -23,6 +23,9 @@ export interface ResolvedFloor {
   layers: ResolvedFloorLayer[];
 }
 
+/** Pisos de todos os níveis do projeto (quem cruza níveis, como a parede anexada, usa esta lista). */
+export const resolveAllFloors = (p: Project): ResolvedFloor[] => p.levels.flatMap((l) => resolveFloors(p, l.id));
+
 /**
  * Geometria dos pisos de um nível. O piso não é recortado pelas paredes (como no Revit, a parede fica sobre o piso
  * e a planta desenha o piso atrás dela). Tipos ausentes ou contornos com menos de 3 pontos são ignorados: a

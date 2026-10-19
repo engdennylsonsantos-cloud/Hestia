@@ -21,8 +21,6 @@ import {
   openingSill,
   openingType,
   openingsOfWall,
-  wallBaseElevation,
-  wallMaxHeight,
   wallsOnLevel,
   wallType,
   type Id,
@@ -33,6 +31,8 @@ import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallF
 import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
 import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
+import { resolveAllFloors } from './floors.ts';
+import { wallZRange } from './wallZ.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
 const MIN_AREA = 1e-9;
@@ -357,6 +357,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
+  const floors = resolveAllFloors(p);
   for (const group of clusterWalls(frames, ends)) {
     const tol = p.settings?.joinTolerance;
     const freeOf = (f: WallFrame): Array<'a' | 'b'> =>
@@ -371,9 +372,10 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         if (st.kind === 'tee') throughIds.add(st.hostId);
       }
     }
+    const wz = new Map(group.map((f) => [f.wall.id, wallZRange(p, f.wall, floors)] as const));
     const items = group.flatMap((f) => {
-      const z0 = wallBaseElevation(p, f.wall);
-      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallMaxHeight(p, f.wall) }, throughIds.has(f.wall.id));
+      const { z0, height } = wz.get(f.wall.id)!;
+      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + height }, throughIds.has(f.wall.id));
     });
     items.forEach((it, i) => {
       it.uid = i;
@@ -389,8 +391,13 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
       }
     }
     const opens = group.flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
-    const heights = new Map(group.map((f) => [f.wall.id, wallMaxHeight(p, f.wall)] as const));
-    const zr = new Map(group.map((f) => [f.wall.id, { z0: wallBaseElevation(p, f.wall), z1: wallBaseElevation(p, f.wall) + wallMaxHeight(p, f.wall) }] as const));
+    const heights = new Map(group.map((f) => [f.wall.id, wz.get(f.wall.id)!.height] as const));
+    const zr = new Map(
+      group.map((f) => {
+        const { z0, height } = wz.get(f.wall.id)!;
+        return [f.wall.id, { z0, z1: z0 + height }] as const;
+      }),
+    );
     const retSig = [...returns].map(([k, v]) => `${k}=${v.map((x) => `${x.openingId}:${ringsOfShape(x.poly)}`).join('+')}`).join('\n');
     const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}\n--\n${retSig}`;
     let core = cache.get(key);
@@ -411,7 +418,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         length: f.length,
         sHi: f.sHi,
         sLo: f.sLo,
-        baseZ: wallBaseElevation(p, f.wall),
+        baseZ: wz.get(f.wall.id)!.z0,
         height: heights.get(f.wall.id)!,
         layers: withProfile(core.layers.get(f.wall.id) ?? [], f),
         membranes: membranesOf(f, ends.get(f.wall.id)!),

@@ -100,7 +100,9 @@ export class ModelScene {
         const f = frameOfWall(p, w.id);
         if (!f) continue;
         for (const o of openingsOfWall(p, w.id)) {
-          const grp = this.openingObject(p, o, f, wallBaseElevation(p, w), wallHeight(p, w), opt);
+          // Base e altura resolvidas (paredes anexadas a pisos mudam de cota); sem resolução, as do modelo.
+          const rw = lv.walls[w.id];
+          const grp = this.openingObject(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), opt);
           if (grp) this.model.add(grp);
         }
       }

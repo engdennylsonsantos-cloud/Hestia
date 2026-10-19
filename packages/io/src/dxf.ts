@@ -30,20 +30,31 @@ export interface DxfOpening {
 export interface DxfLevelGeometry {
   clusters: DxfCluster[];
   openings: DxfOpening[];
+  /** Pisos do nível: contorno e furos em planta; `typeCode` é o código do tipo (vira a camada `PISO_<código>`). */
+  floors?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
 
-/** Camada DXF de um material: `PAREDE_` + nome em maiúsculas, sem acentos nem símbolos. */
-export function dxfLayerOfMaterial(name: string): string {
-  const clean = name
+/** Texto para nome de camada: sem acentos, em maiúsculas, símbolos viram `_`. */
+function layerSafe(text: string): string {
+  return text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
-  return `PAREDE_${clean || 'SEM_NOME'}`;
+}
+
+/** Camada DXF de um material: `PAREDE_` + nome em maiúsculas, sem acentos nem símbolos. */
+export function dxfLayerOfMaterial(name: string): string {
+  return `PAREDE_${layerSafe(name) || 'SEM_NOME'}`;
+}
+
+/** Camada DXF de um tipo de piso: `PISO_` + código sem acentos nem símbolos (PS-01 vira PISO_PS_01). */
+export function dxfLayerOfFloor(typeCode: string): string {
+  return `PISO_${layerSafe(typeCode) || 'SEM_CODIGO'}`;
 }
 
 const EPS = 1e-9;
@@ -74,7 +85,7 @@ interface Shape {
   pts: DxfPoint[];
 }
 
-/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; por último, os vãos. */
+/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos e, por último, os vãos. */
 function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   const out: Shape[] = [];
   const push = (layer: string, polygons: DxfPolygons): void => {
@@ -92,6 +103,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     }
     push(DXF_LAYER_CONTOUR, c.silhouette);
   }
+  for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const o of geo.openings) out.push({ layer: DXF_LAYER_OPENINGS, pts: openingRect(o) });
   return out;
 }

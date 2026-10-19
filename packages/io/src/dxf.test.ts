@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate } from '@hestia/model';
-import { DXF_LAYER_CONTOUR, DXF_LAYER_OPENINGS, dxfLayerOfMaterial, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
+import { DXF_LAYER_CONTOUR, DXF_LAYER_OPENINGS, dxfLayerOfFloor, dxfLayerOfMaterial, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
 
 type Rec = { type: string; fields: Array<[number, string]> };
 
@@ -139,5 +139,50 @@ describe('exportDxf', () => {
     const bad = exportDxf(project, 'lv_0', { clusters: [{ regions: [], silhouette: [[[{ x: 0, y: 0 }, { x: 1, y: 1 }]]] }], openings: [] });
     expect(polylines(bad)).toEqual([]);
     expect(() => exportDxf(project, 'lv_99', geo)).toThrow('Nível ausente: lv_99');
+  });
+});
+
+describe('pisos no DXF', () => {
+  const square: DxfPoint[] = [
+    { x: 0, y: 0 },
+    { x: 4, y: 0 },
+    { x: 4, y: 3 },
+    { x: 0, y: 3 },
+  ];
+  const hole: DxfPoint[] = [
+    { x: 1, y: 1 },
+    { x: 2, y: 1 },
+    { x: 2, y: 2 },
+    { x: 1, y: 2 },
+  ];
+
+  it('código do tipo vira camada PISO_ sem acentos nem símbolos', () => {
+    expect(dxfLayerOfFloor('PS-01')).toBe('PISO_PS_01');
+    expect(dxfLayerOfFloor('Laje ção 12')).toBe('PISO_LAJE_CAO_12');
+    expect(dxfLayerOfFloor('  ')).toBe('PISO_SEM_CODIGO');
+  });
+
+  it('piso com furo vira polilinhas fechadas na camada do tipo, e entra na lista de camadas', () => {
+    const geo: DxfLevelGeometry = { clusters: [], openings: [], floors: [{ outline: square, holes: [hole], typeCode: 'PS-01' }] };
+    const text = exportDxf(project, 'lv_0', geo);
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual(['PISO_PS_01', 'PISO_PS_01']);
+    expect(polys.every((p) => p.closed)).toBe(true);
+    expect(polys.map((p) => p.pts.length)).toEqual([4, 4]);
+    expect(area(polys[0]!.pts) - area(polys[1]!.pts)).toBeCloseTo(11, 6);
+    expect(layerNames(text)).toContain('PISO_PS_01');
+  });
+
+  it('pisos de tipos diferentes vão para camadas diferentes; sem pisos o arquivo não muda', () => {
+    const geo: DxfLevelGeometry = {
+      clusters: [],
+      openings: [],
+      floors: [
+        { outline: square, holes: [], typeCode: 'PS-01' },
+        { outline: square, holes: [], typeCode: 'PS-02' },
+      ],
+    };
+    expect(polylines(exportDxf(project, 'lv_0', geo)).map((p) => p.layer)).toEqual(['PISO_PS_01', 'PISO_PS_02']);
+    expect(exportDxf(project, 'lv_0', { clusters: [], openings: [] })).toBe(exportDxf(project, 'lv_0', { clusters: [], openings: [], floors: [] }));
   });
 });

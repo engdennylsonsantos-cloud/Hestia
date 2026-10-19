@@ -1,6 +1,6 @@
 import { multiArea } from '@hestia/geom';
 import { bandVolume } from './profile.ts';
-import { profileHeightAt, profileMean, openingSill, openingType, openingsOfWall, wallHeight, wallLength, type Id, type Project } from '@hestia/model';
+import { profileHeightAt, profileMean, openingSill, openingType, openingsOfWall, wallLength, type Id, type Project } from '@hestia/model';
 import type { ResolvedLevel } from './types.ts';
 
 export interface LayerQuantity {
@@ -42,7 +42,8 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
     const w = p.elements[rw.wallId];
     if (!w || w.kind !== 'wall') continue;
     const profiled = w.topProfile && w.sag === 0 ? w.topProfile : null;
-    const H = profiled ? profileMean(profiled, wallLength(w)) : wallHeight(p, w);
+    // Altura resolvida (com a base e o topo anexados a piso); sem anexos é a altura do modelo.
+    const H = profiled ? profileMean(profiled, wallLength(w)) : rw.height;
     let total = 0;
     for (const l of rw.layers) {
       const vol = l.bands.reduce((s, b) => s + bandVolume(b), 0);

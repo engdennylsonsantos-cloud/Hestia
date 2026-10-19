@@ -69,8 +69,14 @@ const migrations: Record<number, Migration> = {
       settings: { showTags: false, debugJoins: false, detail: 'medium', ...((raw.settings as object) ?? {}) },
     };
   },
-  // v6 → v7: pisos (tipos de piso padrão).
-  6: (raw) => ({ ...raw, floorTypes: { ...Object.fromEntries(DEFAULT_FLOOR_TYPES.map((t) => [t.id, t])), ...((raw.floorTypes as object) ?? {}) } }),
+  // v6 → v7: pisos (tipos de piso padrão) e anexos de parede a piso (desligados nas paredes existentes).
+  6: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind === 'wall') elements[id] = { attachBottomToFloor: false, attachTopToFloor: false, ...e };
+    }
+    return { ...raw, elements, floorTypes: { ...Object.fromEntries(DEFAULT_FLOOR_TYPES.map((t) => [t.id, t])), ...((raw.floorTypes as object) ?? {}) } };
+  },
 };
 
 export class SchemaError extends Error {}

@@ -14,6 +14,8 @@ export function makeWall(w: WallInput): Omit<Wall, 'order'> {
     topLevelId: null,
     height: 2.8,
     topOffset: 0,
+    attachBottomToFloor: false,
+    attachTopToFloor: false,
     locationLine: 'wallCenter',
     flipped: false,
     noJoinStart: false,

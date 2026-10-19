@@ -1,6 +1,6 @@
 import polygonClipping from 'polygon-clipping';
 import * as ClipperLib from 'clipper-lib';
-import type { MultiPolygon, Polygon, Ring } from './polygon.ts';
+import { multiArea, type MultiPolygon, type Polygon, type Ring } from './polygon.ts';
 
 type Pair = [number, number];
 type PcRing = Pair[];
@@ -148,4 +148,14 @@ export function closeGaps(m: MultiPolygon, eps = 3e-6): MultiPolygon {
   };
   walk(tree);
   return out;
+}
+
+/**
+ * `closeGaps` que nunca perde área: o fechamento morfológico descarta anéis finos em zigue-zague (quase
+ * colineares), o que apagaria trechos reais de parede da silhueta. Se a área mudar além do ruído de
+ * micrômetros, devolve a entrada intacta.
+ */
+export function closeGapsSafe(m: MultiPolygon, eps = 3e-6, maxLoss = 2e-5): MultiPolygon {
+  const closed = closeGaps(m, eps);
+  return Math.abs(multiArea(closed) - multiArea(m)) <= maxLoss ? closed : m;
 }

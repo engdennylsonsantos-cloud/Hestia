@@ -7,7 +7,7 @@ import {
   intersection,
   multiArea,
   orientedRect,
-  closeGaps,
+  closeGapsSafe,
   multiPoints,
   union,
   type Box,
@@ -325,8 +325,8 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     layers.set(it.wallId, arr);
     if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }
-  const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGaps(union(...parts)) }));
-  const silhouette = closeGaps(union(...regions.map((r) => r.polygons)));
+  const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGapsSafe(union(...parts)) }));
+  const silhouette = closeGapsSafe(union(...regions.map((r) => r.polygons)));
   for (const arr of layers.values()) arr.sort((a, b) => a.layerIndex - b.layerIndex);
   return { layers, regions, silhouette };
 }

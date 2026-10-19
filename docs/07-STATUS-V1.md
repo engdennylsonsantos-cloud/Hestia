@@ -31,3 +31,18 @@ npm run check          # lint + tipos + testes
 npm run build:artifact # gera apps/web/dist/artifact.html
 npm run e2e            # fluxo no navegador (requer Chromium do Playwright)
 ```
+
+## Paredes · fechamento (checklist 100%)
+
+Todos os itens de `docs/paridade/paredes.md` estão feitos ou fora de escopo com motivo escrito (64 feitos, 17 fora de escopo, 0 bloqueantes). O gate libera pisos, lajes e telhados.
+
+Entregue neste ciclo: retorno de acabamento nos vãos e extremidades, faixas verticais (rodapé, barra de azulejo, friso), perfil superior (empena, inclinado, degraus), corte e elevação com as quatro elevações automáticas, membranas, abertura pura, símbolos de planta por família, etiquetas e depuração de junções, nível de detalhe, exportação DXF, ferramentas de edição (aparar em lote, cota digitada, colar alinhado entre níveis, espelhar por parede, mesmo tipo, trocar anfitriã, parede por retângulo), validação do modelo com painel de avisos, e correção da esquadria entre espessuras diferentes.
+
+Qualidade: casos dourados de geometria por junção (K2), varredura de ângulos de 5° a 175° (C10), testes de propriedade com 60 sementes (K3), desempenho de 500 paredes (K4), regressão visual por captura (K7: `node tests/e2e/visual-regression.mjs`).
+
+Descobertas do motor (decisão 0005 e abaixo):
+- polygon-clipping lança em entradas quase degeneradas e, em uniões grandes, às vezes devolve área menor sem avisar. Agora: plano B com Clipper quando lança; regiões e silhuetas do aglomerado saem de uma união única do Clipper; o fechamento de frestas nunca descarta área.
+- A conversão da árvore do Clipper perdia ilhas dentro de furos (corrigido).
+- Tolerância de translação nos testes de propriedade: 0,02% da área.
+
+Não verificado em navegador real: diálogo do perfil superior, aba Faixas, Ctrl+C/V, "Pegar parede", pré-visualização do retângulo, tecla H, aparência das etiquetas em todos os zooms.

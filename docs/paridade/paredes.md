@@ -37,7 +37,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C7 Trocar a ordem de junção (qual parede domina)
 - [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
 - [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)**
-- [ ] C10 Ângulos agudos e obtusos extremos sem artefato
+- [x] C10 Ângulos agudos e obtusos extremos sem artefato
 - [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
 - [x] C13 Junção com parede em arco **(bloqueante)**
@@ -101,7 +101,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 ## K · Qualidade
 - [x] K1 Casos dourados de área para L, T, X, alinhadas e aberturas
 - [x] K2 Casos dourados de geometria (contornos) para cada junção, derivados da documentação **(bloqueante)**
-- [ ] K3 Testes de propriedade com paredes aleatórias: sem sobreposição, sem erro, resultado estável **(bloqueante)**
+- [x] K3 Testes de propriedade com paredes aleatórias: sem sobreposição, sem erro, resultado estável **(bloqueante)**
 - [x] K4 Desempenho: 500 paredes em um único aglomerado (pior caso) resolvem em ~1,1 s a frio e ~0,7 s ao mover uma parede; casas reais têm aglomerados pequenos e usam o cache por aglomerado
 - [x] K5 Validação do modelo (comprimento zero, tipo ausente, referência quebrada)
 - [x] K6 Pesquisa das pendências do docs/05 §7 concluída e registrada

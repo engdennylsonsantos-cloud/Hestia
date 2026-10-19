@@ -46,8 +46,11 @@ export interface ToolEnv {
   options(): ToolOptions;
 }
 
-/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou furo num piso selecionado. */
-export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole';
+/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, furo num piso selecionado, ou perímetro externo da edificação. */
+export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
+
+/** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
+export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
 /** Quais capturas estão ligadas (Revit: Snaps). */
 export interface SnapOptions {
@@ -87,6 +90,15 @@ export interface ToolOptions {
   /** Deslocamento do topo do piso em relação ao nível (m). */
   floorOffset: number;
   floorMode: FloorMode;
+  /** Modo paredes: o piso avança por baixo do reboco até a face do núcleo. Ausente = falso. */
+  floorCore?: boolean;
+  /** Parede paralela: distância medida entre faces (padrão) ou entre eixos. */
+  offsetFrom?: 'axis' | 'face';
+  /** Tipo, deslocamento do topo (m), modo e inclinação (%) da ferramenta Laje e de "Definir inclinação". */
+  slabTypeId: Id;
+  slabOffset: number;
+  slabMode: SlabMode;
+  slabSlopePercent: number;
 }
 
 export interface PointerInfo {

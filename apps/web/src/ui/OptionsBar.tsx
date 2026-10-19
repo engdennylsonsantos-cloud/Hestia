@@ -3,6 +3,7 @@ import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, NumField } from './fields.tsx';
+import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import type { LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
@@ -83,14 +84,19 @@ export function OptionsBar(): ReactElement {
               <option value="rect">Retângulo (2 cantos)</option>
               <option value="walls">Área fechada por paredes</option>
               <option value="hole">Furo no piso selecionado</option>
+              <option value="perimetro">Perímetro externo da edificação</option>
             </select>
           </label>
+          {o.floorMode === 'walls' && (
+            <Check id="opt-floorcore" checked={o.floorCore === true} onChange={(v) => set({ floorCore: v })}>Estender até o núcleo</Check>
+          )}
           <label>
             Deslocamento do topo
             <NumField id="opt-flooroffset" value={o.floorOffset} onCommit={(v) => set({ floorOffset: v })} unit="m" />
           </label>
         </>
       )}
+      {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
       {(tool === 'door' || tool === 'window') && (
         <label>
           Tipo
@@ -117,6 +123,15 @@ export function OptionsBar(): ReactElement {
           </label>
           <Check id="opt-ocopy" checked={o.offsetCopy} onChange={(v) => set({ offsetCopy: v })}>Copiar</Check>
         </>
+      )}
+      {tool === 'parallel' && (
+        <label>
+          Distância entre
+          <select id="opt-offsetfrom" className="select" value={o.offsetFrom ?? 'face'} onChange={(e) => set({ offsetFrom: e.target.value as 'axis' | 'face' })}>
+            <option value="face">Faces (padrão)</option>
+            <option value="axis">Eixos</option>
+          </select>
+        </label>
       )}
       {tool === 'select' && (
         <>

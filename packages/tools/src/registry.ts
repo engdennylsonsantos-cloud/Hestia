@@ -9,12 +9,15 @@ import { SplitTool } from './splitTool.ts';
 import { SectionTool } from './sectionTool.ts';
 import { RehostTool } from './rehostTool.ts';
 import { FloorTool } from './floorTool.ts';
+import { SlabTool } from './slabTool.ts';
+import { SlopeTool } from './slabSlopeTool.ts';
+import { ParallelTool } from './parallelTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor'] },
-  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab'] },
+  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope'] },
   { title: 'Medir', tools: ['measure'] },
 ];
 
@@ -26,6 +29,10 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new WallTool(env);
     case 'floor':
       return new FloorTool(env);
+    case 'slab':
+      return new SlabTool(env);
+    case 'slope':
+      return new SlopeTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -42,6 +49,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new ArrayTool(env);
     case 'offset':
       return new OffsetTool(env);
+    case 'parallel':
+      return new ParallelTool(env);
     case 'trim':
       return new TrimTool(env);
     case 'align':
@@ -63,6 +72,8 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   select: 'Selecionar',
   wall: 'Parede',
   floor: 'Piso',
+  slab: 'Laje',
+  slope: 'Inclinação',
   door: 'Porta',
   window: 'Janela',
   move: 'Mover',
@@ -71,6 +82,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   mirror: 'Espelhar',
   array: 'Matriz',
   offset: 'Deslocar',
+  parallel: 'Parede paralela',
   trim: 'Aparar',
   align: 'Alinhar',
   joins: 'Junção',
@@ -84,6 +96,7 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   select: 'V',
   wall: 'W',
   floor: 'F',
+  slab: 'B',
   door: 'D',
   window: 'J',
   move: 'M',
@@ -92,6 +105,7 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   mirror: 'S',
   array: 'A',
   offset: 'O',
+  parallel: 'G',
   trim: 'T',
   align: 'L',
   joins: 'N',

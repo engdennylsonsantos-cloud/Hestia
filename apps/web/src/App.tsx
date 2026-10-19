@@ -15,6 +15,8 @@ import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from '.
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
+import { SlabTypeDialog } from './ui/dialogs/SlabTypeDialog.tsx';
+import { SlabScheduleDialog } from './ui/dialogs/SlabScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
 
 const narrow = (): boolean => window.innerWidth <= 900;
@@ -60,6 +62,10 @@ function Dialogs(): ReactElement | null {
       return arg ? <FloorTypeDialog typeId={arg} /> : null;
     case 'floorSchedule':
       return <FloorScheduleDialog />;
+    case 'slabType':
+      return arg ? <SlabTypeDialog typeId={arg} /> : null;
+    case 'slabSchedule':
+      return <SlabScheduleDialog />;
     case 'openingType':
       return arg ? <OpeningTypeDialog typeId={arg} /> : null;
     case 'materials':

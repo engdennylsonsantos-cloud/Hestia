@@ -1,15 +1,16 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isWall, newId, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isSlab, isWall, newId, type Id, type Project } from '@hestia/model';
 import { followingEnds } from './pick.ts';
 import { selectedFloors } from './floorPick.ts';
+import { selectedSlabs } from './slabPick.ts';
 import type { PreviewItem, ToolEnv } from './types.ts';
 
 /** Paredes dentro da seleção (aberturas selecionadas acompanham o anfitrião). */
 export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isWall(p.elements[id]));
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
 /** Paredes e pisos: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
-export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids)];
+export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids)];
 
 /** Mapa de novos IDs para copiar paredes, pisos e as aberturas hospedadas nas paredes copiadas. */
 export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
@@ -18,6 +19,7 @@ export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
     const e = p.elements[id];
     if (isWall(e)) map[id] = newId('w');
     else if (isFloor(e)) map[id] = newId('f');
+    else if (isSlab(e)) map[id] = newId('l');
   }
   for (const e of Object.values(p.elements)) {
     if (isOpening(e) && ids.includes(e.hostId)) map[e.id] = newId(e.kind === 'door' ? 'd' : 'j');
@@ -30,7 +32,7 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
   const out: PreviewItem[] = [];
   for (const id of wallIds) {
     const fl = p.elements[id];
-    if (isFloor(fl)) {
+    if (isFloor(fl) || isSlab(fl)) {
       out.push({ kind: 'polygon', ring: fl.boundary.map((q) => applyTransform(t, q)), dashed: true });
       continue;
     }

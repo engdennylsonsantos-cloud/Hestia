@@ -1,10 +1,11 @@
-import { isFloor, isOpening, isWall, newId, type Command, type Floor, type Id, type Opening, type Project, type Wall } from '@hestia/model';
+import { isFloor, isOpening, isSlab, isWall, newId, type Command, type Floor, type Id, type Opening, type Project, type Slab, type Wall } from '@hestia/model';
 
-/** Buffer de copiar/colar: paredes e as aberturas hospedadas nelas, e os pisos, como estavam ao copiar. */
+/** Buffer de copiar/colar: paredes e as aberturas hospedadas nelas, e os pisos e lajes, como estavam ao copiar. */
 export interface ClipBuffer {
   walls: Wall[];
   openings: Opening[];
   floors: Floor[];
+  slabs: Slab[];
 }
 
 /** Gerador de identificadores; injetável para teste. */
@@ -17,13 +18,14 @@ export type MintId = (prefix: string) => Id;
 export function clipboardFrom(p: Project, ids: Id[]): ClipBuffer | null {
   const hostIds = new Set(ids.filter((id) => isWall(p.elements[id])));
   const floors = ids.map((id) => p.elements[id]).filter(isFloor).map((f) => structuredClone(f));
-  if (hostIds.size === 0 && floors.length === 0) return null;
+  const slabs = ids.map((id) => p.elements[id]).filter(isSlab).map((s) => structuredClone(s));
+  if (hostIds.size === 0 && floors.length === 0 && slabs.length === 0) return null;
   const walls = [...hostIds].map((id) => structuredClone(p.elements[id] as Wall));
   const openings = Object.values(p.elements)
     .filter(isOpening)
     .filter((o) => hostIds.has(o.hostId))
     .map((o) => structuredClone(o));
-  return { walls, openings, floors };
+  return { walls, openings, floors, slabs };
 }
 
 /**
@@ -36,10 +38,18 @@ export function pasteAlignedCommand(
   clip: ClipBuffer,
   levelId: Id,
   mint: MintId = (prefix) => newId(prefix),
-): { command: Command; wallIds: Id[]; openingIds: Id[]; floorIds: Id[] } | null {
-  if (!p.levels.some((l) => l.id === levelId) || (clip.walls.length === 0 && clip.floors.length === 0)) return null;
+): { command: Command; wallIds: Id[]; openingIds: Id[]; floorIds: Id[]; slabIds: Id[] } | null {
+  if (!p.levels.some((l) => l.id === levelId) || (clip.walls.length === 0 && clip.floors.length === 0 && clip.slabs.length === 0)) return null;
   const commands: Command[] = [];
   const floorIds: Id[] = [];
+  const slabIds: Id[] = [];
+  for (const s of clip.slabs) {
+    const id = mint('l');
+    slabIds.push(id);
+    const { order: _order, ...rest } = s;
+    const typeId = p.slabTypes[s.typeId] ? s.typeId : (Object.keys(p.slabTypes)[0] ?? s.typeId);
+    commands.push({ type: 'addSlab', slab: { ...rest, id, levelId, typeId } });
+  }
   for (const f of clip.floors) {
     const id = mint('f');
     floorIds.push(id);
@@ -64,5 +74,5 @@ export function pasteAlignedCommand(
     openingIds.push(id);
     commands.push({ type: 'addOpening', opening: { ...o, id, hostId } });
   }
-  return { command: { type: 'batch', commands }, wallIds, openingIds, floorIds };
+  return { command: { type: 'batch', commands }, wallIds, openingIds, floorIds, slabIds };
 }

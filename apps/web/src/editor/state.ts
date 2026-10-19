@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
-import type { ToolId, ToolOptions } from '@hestia/tools';
+import { DEFAULT_SNAP, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -38,7 +38,39 @@ export interface UiState {
   ribbon: 'arquitetura' | 'modificar' | 'vista';
 }
 
+const SNAP_KEY = 'hestia.snap';
+const SNAP_FLAGS = Object.keys(DEFAULT_SNAP) as Array<keyof SnapOptions>;
+
+/** Capturas guardadas no navegador (preferência da tela, não do projeto). Sem armazenamento ou dado inválido: padrão. */
+function loadSnap(): SnapOptions {
+  try {
+    const raw = localStorage.getItem(SNAP_KEY);
+    if (!raw) return DEFAULT_SNAP;
+    const saved = JSON.parse(raw) as Partial<Record<keyof SnapOptions, unknown>>;
+    const out: SnapOptions = { ...DEFAULT_SNAP };
+    for (const k of SNAP_FLAGS) {
+      const v = saved[k];
+      if (typeof v === 'boolean') out[k] = v;
+    }
+    return out;
+  } catch {
+    return DEFAULT_SNAP;
+  }
+}
+
+/** Altera capturas (em parte ou todas) e guarda no navegador para sobreviver ao recarregamento. */
+export function setSnap(patch: Partial<SnapOptions>): void {
+  const snap: SnapOptions = { ...(useUi.getState().options.snap ?? DEFAULT_SNAP), ...patch };
+  useUi.setState((s) => ({ options: { ...s.options, snap } }));
+  try {
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snap));
+  } catch {
+    // Armazenamento indisponível (janela privada, dados bloqueados): a captura vale só nesta sessão.
+  }
+}
+
 export const DEFAULT_OPTIONS: ToolOptions = {
+  snap: loadSnap(),
   wallTypeId: 'wt_alv14',
   locationLine: 'wallCenter' as LocationLine,
   wallHeight: 2.8,
@@ -55,6 +87,10 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   floorTypeId: 'ft_ceram',
   floorOffset: 0,
   floorMode: 'poly',
+  slabTypeId: 'ls_mac12',
+  slabOffset: 0,
+  slabMode: 'poly',
+  slabSlopePercent: 2,
 };
 
 export const useUi = create<UiState>(() => ({

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { isFloor, isWall } from '@hestia/model';
+import { isFloor, isSlab, isWall } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -14,6 +14,7 @@ export function Browser(): ReactElement {
   const doors = Object.values(p.openingTypes).filter((t) => t.kind === 'door');
   const windows = Object.values(p.openingTypes).filter((t) => t.kind === 'window');
   const floorTypes = Object.values(p.floorTypes);
+  const slabTypes = Object.values(p.slabTypes);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   return (
@@ -118,6 +119,21 @@ export function Browser(): ReactElement {
                 />
               ))}
             </details>
+            <details open>
+              <summary>Lajes</summary>
+              {slabTypes.map((t) => (
+                <TypeRow
+                  key={t.id}
+                  kind="slab"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="slab"
+                  active={s.options.slabTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, slabTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'slabType', dialogArg: t.id })}
+                />
+              ))}
+            </details>
           </div>
         </details>
         <details open>
@@ -138,6 +154,10 @@ export function Browser(): ReactElement {
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'floorSchedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de pisos
               <span className="meta">{Object.values(p.elements).filter(isFloor).length}</span>
+            </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })}>
+              <Icon name="file" size={14} /> Tabela de lajes
+              <span className="meta">{Object.values(p.elements).filter(isSlab).length}</span>
             </button>
           </div>
         </details>

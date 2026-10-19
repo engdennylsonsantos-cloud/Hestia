@@ -389,3 +389,20 @@ svg { display: block; }
 .profile-stats > div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 4px; }
 .profile-stats dt { color: var(--fg-soft); }
 .profile-stats dd { margin: 0; font-family: var(--font-mono); }
+
+/* ---- Capturas (botão Snap da barra de status e seu popover) ---- */
+.snap-anchor { position: relative; display: inline-flex; flex-shrink: 0; margin-left: auto; }
+.snap-anchor + .issues-anchor { margin-left: 0; }
+.snap-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--fg); }
+.snap-btn:hover { background: var(--sheet); }
+.snap-btn[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent-soft); }
+.snap-count { color: var(--fg-soft); }
+.snap-pop { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 30; width: min(300px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; background: var(--sheet); color: var(--fg); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--shadow); padding: 10px 12px; font-size: 12px; text-align: left; }
+.snap-row { display: flex; flex-direction: column; gap: 1px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.snap-row:last-child { border-bottom: 0; }
+.snap-desc { color: var(--fg-soft); font-size: 11px; line-height: 1.35; padding-left: 22px; }
+.snap-actions { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+@media (max-width: 600px) {
+  .snap-count { display: none; }
+  .snap-pop { position: fixed; left: 16px; right: 16px; bottom: 36px; width: auto; }
+}

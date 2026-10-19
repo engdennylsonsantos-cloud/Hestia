@@ -2,12 +2,13 @@ import type { Id, Project, ProjectStore } from '@hestia/model';
 import { clipboardFrom, idsOfType, pasteAlignedCommand, selectedTypeId, type ClipBuffer } from '@hestia/tools';
 import { useUi } from './state.ts';
 
-/** "2 parede(s) e 1 piso": frase do status para o que foi copiado ou colado. */
-function describe(walls: number, floors: number): string {
+/** "2 parede(s), 1 piso e 1 laje": frase do status para o que foi copiado ou colado. */
+function describe(walls: number, floors: number, slabs: number): string {
   const parts: string[] = [];
   if (walls) parts.push(`${walls} parede(s)`);
   if (floors) parts.push(`${floors} piso(s)`);
-  return parts.join(' e ');
+  if (slabs) parts.push(`${slabs} laje(s)`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : (parts[0] ?? '');
 }
 
 /**
@@ -21,11 +22,11 @@ export class Transfer {
   copy(p: Project, ids: Id[]): boolean {
     const next = clipboardFrom(p, ids);
     if (!next) {
-      useUi.setState({ status: 'Selecione paredes para copiar.' });
+      useUi.setState({ status: 'Selecione paredes, pisos ou lajes para copiar.' });
       return false;
     }
     this.clip = next;
-    useUi.setState({ status: `${describe(next.walls.length, next.floors.length)} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
+    useUi.setState({ status: `${describe(next.walls.length, next.floors.length, next.slabs.length)} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
     return true;
   }
 
@@ -41,7 +42,7 @@ export class Transfer {
       return false;
     }
     store.exec(r.command, 'Colar alinhado');
-    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds], status: `${describe(r.wallIds.length, r.floorIds.length)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
+    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds, ...r.slabIds], status: `${describe(r.wallIds.length, r.floorIds.length, r.slabIds.length)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
     return true;
   }
 

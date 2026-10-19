@@ -4,6 +4,7 @@ import {
   FUNCTION_LABEL,
   isFloor,
   isOpening,
+  isSlab,
   isWall,
   newId,
   type DetailLevel,
@@ -24,6 +25,7 @@ import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
 import { FloorProperties } from './FloorProperties.tsx';
+import { SlabProperties } from './SlabProperties.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -297,18 +299,19 @@ export function Properties(): ReactElement {
   const walls = els.filter(isWall);
   const ops = els.filter(isOpening);
   const floors = els.filter(isFloor);
-  const count = walls.length + ops.length + floors.length;
+  const slabs = els.filter(isSlab);
+  const count = walls.length + ops.length + floors.length + slabs.length;
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
         <span>Propriedades</span>
         <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>
-          {walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : 'Vista'}
+          {walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : 'Vista'}
         </span>
       </div>
       <div className="panel-scroll">
-        {walls.length > 0 && ops.length === 0 && floors.length === 0 ? <WallProps walls={walls} /> : ops.length > 0 && walls.length === 0 && floors.length === 0 ? <OpeningProps items={ops} /> : floors.length > 0 && walls.length === 0 && ops.length === 0 ? <FloorProperties floors={floors} /> : count > 0 ? (
-          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura ou piso) para editar propriedades.</div>
+        {walls.length > 0 && ops.length === 0 && floors.length === 0 && slabs.length === 0 ? <WallProps walls={walls} /> : ops.length > 0 && walls.length === 0 && floors.length === 0 && slabs.length === 0 ? <OpeningProps items={ops} /> : floors.length > 0 && walls.length === 0 && ops.length === 0 && slabs.length === 0 ? <FloorProperties floors={floors} /> : slabs.length > 0 && walls.length === 0 && ops.length === 0 && floors.length === 0 ? <SlabProperties slabs={slabs} /> : count > 0 ? (
+          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso ou laje) para editar propriedades.</div>
         ) : <ViewProps />}
       </div>
     </aside>

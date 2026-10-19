@@ -5,16 +5,15 @@ import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
-  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor'] }],
+  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'slope'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
-    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
+    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'] },
     { title: 'Medir', tools: ['measure'] },
   ],
 };
 
 const SOON: Array<{ icon: string; label: string }> = [
-  { icon: 'floor', label: 'Laje' },
   { icon: 'roof', label: 'Telhado' },
   { icon: 'stairs', label: 'Escada' },
   { icon: 'room', label: 'Ambiente' },
@@ -136,6 +135,10 @@ export function Ribbon(): ReactElement {
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'floorSchedule', dialogArg: null })} title="Tabela de pisos com área, volume e exportação CSV">
                   <Icon name="file" size={22} />
                   <span>Tabela de pisos</span>
+                </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })} title="Tabela de lajes com área, volume por camada e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de lajes</span>
                 </button>
               </div>
               <div className="rgroup-title">Documentar</div>

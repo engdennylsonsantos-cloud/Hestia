@@ -12,3 +12,7 @@ export * from './selectionFilters.ts';
 export * from './enclosed.ts';
 export * from './floorPick.ts';
 export { FloorTool } from './floorTool.ts';
+export * from './slabPick.ts';
+export * from './slabSlope.ts';
+export { SlabTool } from './slabTool.ts';
+export { SlopeTool } from './slabSlopeTool.ts';

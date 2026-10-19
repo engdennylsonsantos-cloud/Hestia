@@ -8,7 +8,7 @@ function makeEnv() {
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: false, wallShape: 'arc',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 0.5,
-    rotateCopy: false, mirrorCopy: false, offsetCopy: true, floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly',
+    rotateCopy: false, mirrorCopy: false, offsetCopy: true, floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly', slabTypeId: 'ls_mac12', slabOffset: 0, slabMode: 'poly', slabSlopePercent: 2,
   };
   const env: ToolEnv = {
     project: () => store.project, levelId: () => 'lv_0', selection: () => selection, setSelection: (i) => { selection = i; },

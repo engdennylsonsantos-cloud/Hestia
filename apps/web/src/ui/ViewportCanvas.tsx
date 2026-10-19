@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type Viewport } from '@hestia/render';
-import { resolveFloors } from '@hestia/engine';
+import { resolveFloors, resolveSlabs } from '@hestia/engine';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -163,6 +163,7 @@ export function ViewportCanvas(): ReactElement {
             resolved,
             below,
             belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
+            belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
             viewport: v,
             theme,
             dark,

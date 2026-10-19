@@ -1,7 +1,7 @@
-import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Polygon, type Vec2 } from '@hestia/geom';
+import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { isFloor, makeFloor, type Floor, type Id, type Project } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
-import { enclosedRooms, roomAt } from './enclosed.ts';
+import { enclosedRooms, outerPerimeter, roomAt } from './enclosed.ts';
 import { ringAreaAbs, ringPerimeter, selectedFloors } from './floorPick.ts';
 import { parseNumber } from './numeric.ts';
 import type { FloorMode, PointerInfo } from './types.ts';
@@ -11,16 +11,18 @@ const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 const MODE_HINT: Record<FloorMode, string> = {
   poly: 'Piso: clique nos vértices. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Piso retangular: clique no primeiro canto e depois no canto oposto.',
-  walls: 'Piso por paredes: clique numa área fechada pelas paredes (face interna).',
+  walls: 'Piso por paredes: clique numa área fechada pelas paredes (face interna). Tab alterna para a face externa da edificação.',
   hole: 'Furo: clique nos vértices do contorno do furo, dentro do piso selecionado. Enter fecha.',
+  perimetro: 'Perímetro: clique numa parede (ou perto da casa) para criar o piso pela face externa da edificação.',
 };
 
 /** Retângulo com dois cantos opostos, em ordem de contorno. */
 const rectRing = (a: Vec2, c: Vec2): Vec2[] => [a, { x: c.x, y: a.y }, c, { x: a.x, y: c.y }];
 
 /**
- * Piso (Revit: Floor). Modos: contorno por cliques, retângulo, área fechada pelas paredes (face interna)
- * e furo num piso selecionado. A ferramenta só emite comandos (`addFloor`, `updateElements`).
+ * Piso (Revit: Floor). Modos: contorno por cliques, retângulo, área fechada pelas paredes (face interna, ou
+ * externa com Tab), furo num piso selecionado e perímetro externo da edificação. A ferramenta só emite comandos
+ * (`addFloor`, `updateElements`).
  */
 export class FloorTool extends ToolBase {
   readonly id = 'floor';
@@ -28,8 +30,12 @@ export class FloorTool extends ToolBase {
   readonly hint = MODE_HINT.poly;
   private pts: Vec2[] = [];
   private startPt: Vec2 | null = null;
-  /** Espaços fechados pelas paredes, recalculados só quando o projeto ou o nível muda. */
-  private rooms: { project: Project; levelId: Id; value: Polygon[] } | null = null;
+  /** Modo paredes: false = espaço fechado (padrão); true = contorno externo da edificação (Tab). */
+  private outside = false;
+  /** Última posição do ponteiro, para refazer a pré-visualização ao alternar com Tab. */
+  private last: PointerInfo | null = null;
+  /** Espaços fechados pelas paredes, recalculados só quando o projeto, o nível ou a extensão mudam. */
+  private rooms: { project: Project; levelId: Id; core: boolean; value: Polygon[] } | null = null;
 
   private mode(): FloorMode {
     return this.env.options().floorMode;
@@ -71,10 +77,20 @@ export class FloorTool extends ToolBase {
   private roomList(): Polygon[] {
     const p = this.env.project();
     const levelId = this.env.levelId();
-    if (this.rooms && this.rooms.project === p && this.rooms.levelId === levelId) return this.rooms.value;
-    const value = enclosedRooms(p, levelId);
-    this.rooms = { project: p, levelId, value };
+    const core = this.env.options().floorCore === true;
+    if (this.rooms && this.rooms.project === p && this.rooms.levelId === levelId && this.rooms.core === core) return this.rooms.value;
+    const value = enclosedRooms(p, levelId, core ? 'core' : 'finish');
+    this.rooms = { project: p, levelId, core, value };
     return value;
+  }
+
+  /** Região do modo paredes sob o cursor: o espaço fechado, ou (com Tab) a edificação que contém o ponto. [anel, furos...] */
+  private regionAt(at: Vec2): Polygon | null {
+    if (this.outside) {
+      const ring = outerPerimeter(this.env.project(), this.env.levelId(), at);
+      return ring ? [ring] : null;
+    }
+    return roomAt(this.roomList(), at);
   }
 
   /** Vértices que a captura deve aceitar além das paredes: o contorno em construção e, no furo, o piso alvo. */
@@ -84,21 +100,33 @@ export class FloorTool extends ToolBase {
 
   override move(p: PointerInfo): void {
     this.raw = p.raw;
+    this.last = p;
     this.items = [];
     if (this.mode() === 'walls') this.moveWalls(p);
     else if (this.mode() === 'rect') this.moveRect(p);
+    else if (this.mode() === 'perimetro') this.movePerimeter(p);
     else this.movePoly(p);
   }
 
   private moveWalls(p: PointerInfo): void {
-    const room = roomAt(this.roomList(), p.raw);
-    if (!room) {
-      this.env.say('Passe sobre um espaço fechado por paredes.');
+    const region = this.regionAt(p.raw);
+    if (!region) {
+      this.env.say(this.outside ? 'Aponte para a edificação (perto das paredes).' : 'Passe sobre um espaço fechado por paredes.');
       return;
     }
-    this.items.push({ kind: 'polygon', ring: room[0]! });
-    for (const h of room.slice(1)) this.items.push({ kind: 'polygon', ring: h, dashed: true });
-    this.env.say('Clique para criar o piso nesta área.');
+    this.items.push({ kind: 'polygon', ring: region[0]! });
+    for (const h of region.slice(1)) this.items.push({ kind: 'polygon', ring: h, dashed: true });
+    this.env.say(this.outside ? 'Clique para criar o piso pela face externa da edificação.' : 'Clique para criar o piso nesta área.');
+  }
+
+  private movePerimeter(p: PointerInfo): void {
+    const ring = outerPerimeter(this.env.project(), this.env.levelId(), p.raw);
+    if (!ring) {
+      this.env.say('Aponte para uma parede (ou perto da casa) para criar o perímetro.');
+      return;
+    }
+    this.items.push({ kind: 'polygon', ring });
+    this.env.say('Clique para criar o piso pela face externa da edificação.');
   }
 
   private moveRect(p: PointerInfo): void {
@@ -132,16 +160,34 @@ export class FloorTool extends ToolBase {
     this.raw = p.raw;
     if (this.mode() === 'walls') this.clickWalls(p);
     else if (this.mode() === 'rect') this.clickRect(p);
+    else if (this.mode() === 'perimetro') this.clickPerimeter(p);
     else this.clickPoly(p);
   }
 
+  /** Tab no modo paredes alterna entre o espaço fechado e a face externa da edificação. */
+  override tab(): void {
+    if (this.mode() !== 'walls') return;
+    this.outside = !this.outside;
+    this.env.say(this.outside ? 'Piso pela face externa da edificação. Tab volta ao espaço interno.' : MODE_HINT.walls);
+    if (this.last) this.move(this.last);
+  }
+
   private clickWalls(p: PointerInfo): void {
-    const room = roomAt(this.roomList(), p.raw);
-    if (!room) {
-      this.env.say('Não há área fechada por paredes neste ponto');
+    const region = this.regionAt(p.raw);
+    if (!region) {
+      this.env.say(this.outside ? 'Não há edificação neste ponto' : 'Não há área fechada por paredes neste ponto');
       return;
     }
-    this.commit(room[0]!, room.slice(1));
+    this.commit(region[0]!, region.slice(1));
+  }
+
+  private clickPerimeter(p: PointerInfo): void {
+    const ring = outerPerimeter(this.env.project(), this.env.levelId(), p.raw);
+    if (!ring) {
+      this.env.say('Não há parede perto deste ponto.');
+      return;
+    }
+    this.commit(ring);
   }
 
   private clickRect(p: PointerInfo): void {
@@ -218,7 +264,7 @@ export class FloorTool extends ToolBase {
   }
 
   /** Cria o piso no nível ativo com o tipo e o deslocamento das opções, e o deixa selecionado. */
-  private commit(boundary: Vec2[], holes: Vec2[][] = []): void {
+  private commit(boundary: Ring, holes: Ring[] = []): void {
     const o = this.env.options();
     const p = this.env.project();
     const typeId = p.floorTypes[o.floorTypeId] ? o.floorTypeId : Object.keys(p.floorTypes)[0];

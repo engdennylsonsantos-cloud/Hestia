@@ -10,7 +10,7 @@ import {
   type Vec2,
 } from '@hestia/geom';
 import { wallFaces, type WallFaces } from '@hestia/engine';
-import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { openingsOfWall, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
@@ -89,8 +89,11 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   };
 
   const ends: Vec2[] = [];
+  /** Paredes cujo eixo (corda) passa pela tolerância: só elas podem formar uma interseção ao alcance do cursor. */
+  const nearWalls: Wall[] = [];
   for (const w of walls) {
     ends.push(w.a, w.b);
+    if (dist(cursor, closestOnSegment(cursor, w.a, w.b)) <= tol) nearWalls.push(w);
     if (sn.axis) {
       for (const p of [w.a, w.b]) {
         const d = dist(cursor, p);
@@ -116,7 +119,8 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       }
     }
   }
-  for (const q of ctx.extraPoints ?? []) {
+  // Pontos extras (vértices de pisos, contorno em construção) não entram na captura exclusiva de paredes (aberturas).
+  for (const q of ctx.onWallsOnly ? [] : (ctx.extraPoints ?? [])) {
     const d = dist(cursor, q);
     if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
   }
@@ -149,9 +153,9 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     }
   }
   // Interseções de eixos.
-  for (let i = 0; sn.intersections && i < walls.length; i++) {
-    for (let j = i + 1; j < walls.length; j++) {
-      const p = intersectSegments(walls[i]!.a, walls[i]!.b, walls[j]!.a, walls[j]!.b);
+  for (let i = 0; sn.intersections && i < nearWalls.length; i++) {
+    for (let j = i + 1; j < nearWalls.length; j++) {
+      const p = intersectSegments(nearWalls[i]!.a, nearWalls[i]!.b, nearWalls[j]!.a, nearWalls[j]!.b);
       if (!p) continue;
       const d = dist(cursor, p);
       if (d <= tol) add({ point: p, kind: 'intersection', score: d });

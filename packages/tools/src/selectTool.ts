@@ -1,20 +1,21 @@
 import { boxOf, dist, dot, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isWall, type Floor, type Id } from '@hestia/model';
+import { isFloor, isOpening, isSlab, isWall, type Floor, type Id, type Slab } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { followingEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
 import { floorGripAt, floorIdsInBox, pickFloorAt, ringInsertAfter, ringMoveVertex, ringRemoveVertex, type FloorGrip } from './floorPick.ts';
+import { pickSlabAt, slabGripAt, slabIdsInBox, type SlabGrip } from './slabPick.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
-type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'floorgrip' | 'dragwait' | 'moving' | 'opening';
+type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'floorgrip' | 'slabgrip' | 'dragwait' | 'moving' | 'opening';
 
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -27,8 +28,9 @@ export class SelectTool extends ToolBase {
   private downPt: Vec2 = { x: 0, y: 0 };
   private grip: Grip | null = null;
   private floorGrip: FloorGrip | null = null;
-  /** Vértice de piso em foco (clicado com a alça): o Delete o remove. */
-  private focus: { floorId: Id; index: number } | null = null;
+  private slabGrip: SlabGrip | null = null;
+  /** Vértice de piso ou laje em foco (clicado com a alça): o Delete o remove. */
+  private focus: { id: Id; index: number } | null = null;
   private delta: Vec2 = { x: 0, y: 0 };
   private gripPt: Vec2 | null = null;
   private hover: Id | null = null;
@@ -39,6 +41,7 @@ export class SelectTool extends ToolBase {
     this.items = [];
     this.grip = null;
     this.floorGrip = null;
+    this.slabGrip = null;
     this.gripPt = null;
     this.delta = { x: 0, y: 0 };
     this.openingId = null;
@@ -62,15 +65,17 @@ export class SelectTool extends ToolBase {
     const hit = pickAt(pr, lv, at, mpp);
     if (hit) return hit;
     const f = pickFloorAt(pr, lv, at, mpp);
-    return f ? { id: f, kind: 'floor' } : null;
+    if (f) return { id: f, kind: 'floor' };
+    const sl = pickSlabAt(pr, lv, at, mpp);
+    return sl ? { id: sl, kind: 'slab' } : null;
   }
 
-  /** O único elemento selecionado, se for um piso. */
-  private singleFloor(): Floor | null {
+  /** O único elemento selecionado, se for um piso ou uma laje (ambos têm contorno editável por alças). */
+  private singleRing(): Floor | Slab | null {
     const sel = this.env.selection();
     if (sel.length !== 1) return null;
     const f = this.env.project().elements[sel[0]!];
-    return isFloor(f) ? f : null;
+    return isFloor(f) || isSlab(f) ? f : null;
   }
 
   override move(p: PointerInfo): void {
@@ -82,18 +87,19 @@ export class SelectTool extends ToolBase {
     this.items = this.hover ? [{ kind: 'highlight', ids: [this.hover] }] : [];
     const grip = gripAt(pr, this.env.selection(), p.raw, mpp);
     const fgrip = grip ? null : floorGripAt(pr, this.env.selection(), p.raw, mpp);
-    const at = grip?.at ?? fgrip?.at ?? null;
+    const sgrip = grip || fgrip ? null : slabGripAt(pr, this.env.selection(), p.raw, mpp);
+    const at = grip?.at ?? fgrip?.at ?? sgrip?.at ?? null;
     this.inf = at ? { point: at, kind: 'endpoint', guides: [] } : null;
-    const f = this.singleFloor();
+    const f = this.singleRing();
     if (f && this.mode === 'idle') {
-      // Alças do piso selecionado: vértices e meio das arestas (arrastar o meio insere um vértice).
+      // Alças do piso ou da laje selecionada: vértices e meio das arestas (arrastar o meio insere um vértice).
       const n = f.boundary.length;
       for (let i = 0; i < n; i++) {
         const a = f.boundary[i]!;
         const b = f.boundary[(i + 1) % n]!;
         this.items.push({ kind: 'point', at: a }, { kind: 'point', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
       }
-      if (this.focus?.floorId === f.id && f.boundary[this.focus.index]) this.items.push({ kind: 'highlight', ids: [f.id] });
+      if (this.focus?.id === f.id && f.boundary[this.focus.index]) this.items.push({ kind: 'highlight', ids: [f.id] });
     }
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
     const w = this.singleWall();
@@ -150,18 +156,18 @@ export class SelectTool extends ToolBase {
   /** Delete com vértice de piso em foco: remove o vértice (mantendo ao menos 3). Senão, o Delete exclui a seleção. */
   deleteKey(): boolean {
     const pr = this.env.project();
-    const f = this.focus ? pr.elements[this.focus.floorId] : undefined;
-    if (!this.focus || !isFloor(f) || !this.env.selection().includes(f.id) || this.focus.index >= f.boundary.length) {
+    const f = this.focus ? pr.elements[this.focus.id] : undefined;
+    if (!this.focus || !(isFloor(f) || isSlab(f)) || !this.env.selection().includes(f.id) || this.focus.index >= f.boundary.length) {
       this.focus = null;
       return false;
     }
     const ring = ringRemoveVertex(f.boundary, this.focus.index);
     if (!ring) {
-      this.env.say('Um piso precisa de ao menos 3 vértices.');
+      this.env.say(`${isSlab(f) ? 'Uma laje' : 'Um piso'} precisa de ao menos 3 vértices.`);
       return true;
     }
     this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: ring } });
-    this.focus = { floorId: f.id, index: Math.min(this.focus.index, ring.length - 1) };
+    this.focus = { id: f.id, index: Math.min(this.focus.index, ring.length - 1) };
     this.env.say('Vértice removido. Ctrl+Z desfaz.');
     return true;
   }
@@ -182,6 +188,13 @@ export class SelectTool extends ToolBase {
       this.floorGrip = fg;
       this.gripPt = fg.at;
       this.mode = 'floorgrip';
+      return;
+    }
+    const sg = slabGripAt(pr, sel, p.raw, mpp);
+    if (sg) {
+      this.slabGrip = sg;
+      this.gripPt = sg.at;
+      this.mode = 'slabgrip';
       return;
     }
     const hit = this.hitAt(p.raw);
@@ -254,6 +267,17 @@ export class SelectTool extends ToolBase {
         this.items.push({ kind: 'polygon', ring: this.floorRing(f, g, inf.point) });
         break;
       }
+      case 'slabgrip': {
+        const g = this.slabGrip;
+        const sl = g ? pr.elements[g.slabId] : undefined;
+        if (!g || !isSlab(sl)) break;
+        const others = g.kind === 'vertex' ? sl.boundary.filter((_, i) => i !== g.index) : sl.boundary;
+        const inf = this.snap(p, { extraPoints: others });
+        this.gripPt = inf.point;
+        this.items.push({ kind: 'polygon', ring: sl.boundary, dashed: true });
+        this.items.push({ kind: 'polygon', ring: g.kind === 'vertex' ? ringMoveVertex(sl.boundary, g.index, inf.point) : ringInsertAfter(sl.boundary, g.index, inf.point) });
+        break;
+      }
       case 'moving': {
         const els = selectedMovables(pr, this.env.selection());
         const inf = this.snap(p, { from: this.downPt, ignore: new Set(els) });
@@ -279,7 +303,7 @@ export class SelectTool extends ToolBase {
   up(p: PointerInfo): void {
     const pr = this.env.project();
     const mode = this.mode;
-    if (mode !== 'floorgrip') this.focus = null;
+    if (mode !== 'floorgrip' && mode !== 'slabgrip') this.focus = null;
     switch (mode) {
       case 'grip': {
         if (this.grip && this.gripPt) {
@@ -308,7 +332,20 @@ export class SelectTool extends ToolBase {
           this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: this.floorRing(f, g, this.gripPt) } });
         } else if (g.kind === 'vertex') {
           // Clique sem arrastar num vértice: fica em foco para o Delete.
-          this.focus = { floorId: f.id, index: g.index };
+          this.focus = { id: f.id, index: g.index };
+          this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
+        }
+        break;
+      }
+      case 'slabgrip': {
+        const g = this.slabGrip;
+        const sl = g ? pr.elements[g.slabId] : undefined;
+        if (!g || !isSlab(sl) || !this.gripPt) break;
+        if (dist(this.gripPt, g.at) > 1e-6) {
+          const ring = g.kind === 'vertex' ? ringMoveVertex(sl.boundary, g.index, this.gripPt) : ringInsertAfter(sl.boundary, g.index, this.gripPt);
+          this.env.exec({ type: 'updateElements', ids: [sl.id], patch: { boundary: ring } });
+        } else if (g.kind === 'vertex') {
+          this.focus = { id: sl.id, index: g.index };
           this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
         }
         break;
@@ -323,7 +360,7 @@ export class SelectTool extends ToolBase {
         break;
       }
       case 'window': {
-        const ids = [...idsInBox(pr, this.env.levelId(), this.downPt, p.raw), ...floorIdsInBox(pr, this.env.levelId(), this.downPt, p.raw)];
+        const ids = [...idsInBox(pr, this.env.levelId(), this.downPt, p.raw), ...floorIdsInBox(pr, this.env.levelId(), this.downPt, p.raw), ...slabIdsInBox(pr, this.env.levelId(), this.downPt, p.raw)];
         const cur = this.env.selection();
         this.env.setSelection(p.shift ? [...new Set([...cur, ...ids])] : ids);
         break;
@@ -352,7 +389,7 @@ export class SelectTool extends ToolBase {
     for (const id of this.env.selection()) {
       const e = pr.elements[id];
       if (isWall(e)) pts.push(e.a, e.b);
-      else if (isFloor(e)) pts.push(...e.boundary);
+      else if (isFloor(e) || isSlab(e)) pts.push(...e.boundary);
     }
     return pts.length ? boxOf(pts) : null;
   }

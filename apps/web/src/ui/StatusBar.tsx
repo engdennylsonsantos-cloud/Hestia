@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { useUi } from '../editor/state.ts';
 import { IssuesButton } from './IssuesButton.tsx';
+import { SnapButton } from './SnapButton.tsx';
 
 const SNAP: Record<string, string> = {
   endpoint: 'Extremidade do eixo',
@@ -27,6 +28,7 @@ export function StatusBar(): ReactElement {
       <span className="msg">{status}</span>
       {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
       {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}
+      <SnapButton />
       <IssuesButton />
     </footer>
   );

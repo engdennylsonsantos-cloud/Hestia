@@ -9,7 +9,7 @@ export function makeEnv(store = new ProjectStore(createEmptyProject())) {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
     rotateCopy: false, mirrorCopy: false, offsetCopy: true,
-    floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly',
+    floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly', slabTypeId: 'ls_mac12', slabOffset: 0, slabMode: 'poly', slabSlopePercent: 2,
   };
   const env: ToolEnv = {
     project: () => store.project,

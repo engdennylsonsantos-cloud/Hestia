@@ -1,5 +1,6 @@
 import { createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
+import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
@@ -77,6 +78,8 @@ const migrations: Record<number, Migration> = {
     }
     return { ...raw, elements, floorTypes: { ...Object.fromEntries(DEFAULT_FLOOR_TYPES.map((t) => [t.id, t])), ...((raw.floorTypes as object) ?? {}) } };
   },
+  // v7 → v8: lajes (tipos de laje padrão).
+  7: (raw) => ({ ...raw, slabTypes: { ...Object.fromEntries(DEFAULT_SLAB_TYPES.map((t) => [t.id, t])), ...((raw.slabTypes as object) ?? {}) } }),
 };
 
 export class SchemaError extends Error {}

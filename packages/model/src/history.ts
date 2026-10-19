@@ -143,6 +143,12 @@ export function labelOf(c: Command): string {
       return 'Editar tipo de piso';
     case 'deleteFloorType':
       return 'Excluir tipo de piso';
+    case 'addSlab':
+      return 'Criar laje';
+    case 'upsertSlabType':
+      return 'Editar tipo de laje';
+    case 'deleteSlabType':
+      return 'Excluir tipo de laje';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':

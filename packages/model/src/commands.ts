@@ -3,10 +3,13 @@ import { wallLength } from './queries.ts';
 import {
   isOpening,
   isFloor,
+  isSlab,
   isWall,
   type Element,
   type Floor,
   type FloorType,
+  type Slab,
+  type SlabType,
   type Id,
   type JoinConfig,
   type Level,
@@ -26,9 +29,12 @@ export type Command =
   | { type: 'addWall'; wall: Omit<Wall, 'order'> }
   | { type: 'addOpening'; opening: Opening }
   | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
+  | { type: 'addSlab'; slab: Omit<Slab, 'order'> }
+  | { type: 'upsertSlabType'; slabType: SlabType }
+  | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -80,8 +86,35 @@ function transformFloor(f: Floor, t: Transform): Floor {
   return { ...f, boundary: pts(f.boundary), holes: f.holes.map(pts) };
 }
 
+/** Move/gira/espelha uma laje: contorno, furos e a linha de inclinação (origem e direção). */
+function transformSlab(s: Slab, t: Transform): Slab {
+  const pts = (ring: Vec2[]): Vec2[] => {
+    const out = ring.map((q) => applyTransform(t, q));
+    return t.kind === 'mirror' ? out.reverse() : out;
+  };
+  let slope = s.slope;
+  if (slope) {
+    const o = applyTransform(t, slope.origin);
+    const e = applyTransform(t, { x: slope.origin.x + slope.dir.x, y: slope.origin.y + slope.dir.y });
+    const dx = e.x - o.x;
+    const dy = e.y - o.y;
+    const l = Math.hypot(dx, dy) || 1;
+    slope = { origin: o, dir: { x: dx / l, y: dy / l }, percent: slope.percent };
+  }
+  return { ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope };
+}
+
 function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }>): void {
   const idMap = c.copy?.idMap;
+  for (const s of c.ids.map((id) => p.elements[id]).filter(isSlab)) {
+    const next = transformSlab(s, c.transform);
+    if (idMap) {
+      const nid = idMap[s.id];
+      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
+    } else {
+      p.elements[s.id] = next;
+    }
+  }
   for (const f of c.ids.map((id) => p.elements[id]).filter(isFloor)) {
     const next = transformFloor(f, c.transform);
     if (idMap) {
@@ -135,6 +168,21 @@ export function applyCommand(p: Project, c: Command): void {
       if (Object.values(p.elements).some((e) => isFloor(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
       if (Object.keys(p.floorTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de piso');
       delete p.floorTypes[c.id];
+      break;
+    }
+    case 'addSlab': {
+      if (c.slab.boundary.length < 3) throw new Error('O contorno da laje precisa de ao menos 3 pontos');
+      if (!p.slabTypes[c.slab.typeId]) throw new Error('Tipo de laje inexistente');
+      p.elements[c.slab.id] = { ...c.slab, order: p.nextOrder++ };
+      break;
+    }
+    case 'upsertSlabType':
+      p.slabTypes[c.slabType.id] = c.slabType;
+      break;
+    case 'deleteSlabType': {
+      if (Object.values(p.elements).some((e) => isSlab(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.slabTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de laje');
+      delete p.slabTypes[c.id];
       break;
     }
     case 'addOpening': {
@@ -207,7 +255,7 @@ export function applyCommand(p: Project, c: Command): void {
     }
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
-      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
+      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e) || isSlab(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }

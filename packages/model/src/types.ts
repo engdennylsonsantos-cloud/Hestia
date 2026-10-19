@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -216,7 +216,42 @@ export interface Floor {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor;
+/** Tipo de laje: camadas do topo para baixo (regularização, estrutura). */
+export interface SlabType {
+  id: Id;
+  name: string;
+  code: string;
+  description: string;
+  layers: Layer[];
+  cost: number;
+}
+
+/** Inclinação da face superior: cota = topZ + percent/100 × distância de `origin` ao longo de `dir` (unitário). */
+export interface SlabSlope {
+  origin: Vec2;
+  dir: Vec2;
+  percent: number;
+}
+
+/**
+ * Laje (Revit: Floor estrutural / ArchiCAD: Slab). Mesma lógica do piso (contorno + furos, topo na cota do nível mais
+ * `heightOffset`, camadas descendo), com inclinação opcional da face superior e tipos próprios.
+ */
+export interface Slab {
+  id: Id;
+  kind: 'slab';
+  typeId: Id;
+  levelId: Id;
+  boundary: Vec2[];
+  holes: Vec2[][];
+  heightOffset: number;
+  slope: SlabSlope | null;
+  mark: string;
+  comments: string;
+  order: number;
+}
+
+export type Element = Wall | Opening | Floor | Slab;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -255,6 +290,7 @@ export interface Project {
   materials: Record<Id, Material>;
   wallTypes: Record<Id, WallType>;
   floorTypes: Record<Id, FloorType>;
+  slabTypes: Record<Id, SlabType>;
   openingTypes: Record<Id, OpeningType>;
   elements: Record<Id, Element>;
   nextOrder: number;
@@ -264,6 +300,7 @@ export interface Project {
   views: SectionView[];
 }
 
+export const isSlab = (e: Element | undefined): e is Slab => e?.kind === 'slab';
 export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';

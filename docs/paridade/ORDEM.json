@@ -10,12 +10,12 @@
     {
       "id": "pisos",
       "arquivo": "pisos.md",
-      "status": "em-andamento"
+      "status": "concluido"
     },
     {
       "id": "lajes",
       "arquivo": "lajes.md",
-      "status": "nao-iniciado"
+      "status": "em-andamento"
     },
     {
       "id": "telhados",

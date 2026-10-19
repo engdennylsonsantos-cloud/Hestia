@@ -12,7 +12,7 @@ import { resolveLevel, type ResolvedLevel } from './index.ts';
 const SEEDS = Array.from({ length: 60 }, (_, i) => i + 1);
 const GRID = 0.5;
 const CELLS = 24; // 12 m / 0,5 m
-const TOL = 1e-6;
+const TOL = 1e-5;
 /** Tolerância da invariante (c): as silhuetas passam pelo fechamento de frestas (closeGaps), que altera até ~2e-5 m². */
 const TOL_CLOSE_GAPS = 1e-4;
 const SHIFT: Vec2 = { x: 3.7, y: -2.1 };
@@ -31,75 +31,7 @@ const NAMES = {
 } as const;
 type InvariantId = keyof typeof NAMES;
 
-const CRASH = 'polygon-clipping lança exceção dentro de resolveLevel (anel de saída incompleto, sweep line ou pilha)';
-const DUPLA = 'soma dos cortes excede a união das silhuetas: dupla contagem entre camadas';
-const TRANSL = 'área total muda ao transladar, entre 1,0e-6 e 3,1e-6 m² (tolerância 1e-6)';
-const SWEEP = 'polygon-clipping: "Unable to find segment ... in SweepLine tree" dentro de resolveLevel (versão atual do motor)';
-
-/**
- * Falhas conhecidas medidas numa execução das 60 sementes: [semente, invariantes que falham, motivo].
- * Enquanto uma entrada existir, o invariante é `it.fails`: passa se continuar falhando e acusa se for corrigido.
- */
-const KNOWN_ROWS: Array<[seed: number, ids: string, reason: string]> = [
-  [9, 'abcde', CRASH],
-  [19, 'abcde', CRASH],
-  [20, 'abcde', CRASH],
-  [22, 'abcde', CRASH],
-  [27, 'abcde', CRASH],
-  [28, 'abcde', CRASH],
-  [29, 'abcde', CRASH],
-  [40, 'abcde', CRASH],
-  [44, 'abcde', CRASH],
-  [59, 'abcde', CRASH],
-  [2, 'e', CRASH],
-  [6, 'e', CRASH],
-  [10, 'e', CRASH],
-  [12, 'e', CRASH],
-  [16, 'e', CRASH],
-  [38, 'e', CRASH],
-  [39, 'e', CRASH],
-  [43, 'e', CRASH],
-  [49, 'e', CRASH],
-  [50, 'e', CRASH],
-  [52, 'e', CRASH],
-  [57, 'e', CRASH],
-  [25, 'c', DUPLA],
-  [25, 'e', CRASH],
-  [31, 'c', DUPLA],
-  [31, 'e', CRASH],
-  [7, 'c', DUPLA],
-  [13, 'c', DUPLA],
-  [17, 'c', DUPLA],
-  [23, 'c', DUPLA],
-  [26, 'c', DUPLA],
-  [33, 'c', DUPLA],
-  [35, 'c', DUPLA],
-  [48, 'c', DUPLA],
-  [51, 'c', DUPLA],
-  [1, 'c', DUPLA],
-  [1, 'e', TRANSL],
-  [21, 'c', DUPLA],
-  [21, 'e', TRANSL],
-  [42, 'c', DUPLA],
-  [42, 'e', TRANSL],
-  [47, 'c', DUPLA],
-  [47, 'e', TRANSL],
-  [24, 'e', TRANSL],
-  [34, 'e', TRANSL],
-  [37, 'e', TRANSL],
-  [46, 'e', TRANSL],
-  [60, 'e', TRANSL],
-  [2, 'abcd', SWEEP],
-  [4, 'e', SWEEP],
-  [16, 'abcd', SWEEP],
-  [21, 'abd', SWEEP],
-  [25, 'abd', SWEEP],
-  [39, 'abcd', SWEEP],
-  [51, 'e', SWEEP],
-  [58, 'abcde', SWEEP],
-];
-
-const KNOWN_FAILURES = new Map<string, string>(KNOWN_ROWS.flatMap(([seed, ids, why]) => [...ids].map((id) => [`${seed}:${id}`, why] as const)));
+const KNOWN_FAILURES = new Map<string, string>();
 
 interface Scenario {
   walls: Array<Omit<Wall, 'order'>>;

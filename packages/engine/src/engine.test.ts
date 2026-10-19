@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { multiArea, union } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, type Wall } from '@hestia/model';
-import { quantifyLevel, resolveLevel } from './index.ts';
+import { closeGaps, multiArea, union } from '@hestia/geom';
+import { ProjectStore, createEmptyProject, makeWall, type Wall } from '@hestia/model';
+import { buildFrame, computeEnds, endPartners, joinStatus, quantifyLevel, resolveLevel } from './index.ts';
 
 const T14 = 0.184;
 const CORE14 = 0.14;
 
-const wall = (id: string, ax: number, ay: number, bx: number, by: number, extra: Partial<Wall> = {}): Omit<Wall, 'order'> => ({
-  id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by },
-  baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter',
-  flipped: false, noJoinStart: false, noJoinEnd: false, mark: '', comments: '', ...extra,
-});
+const wall = (id: string, ax: number, ay: number, bx: number, by: number, extra: Partial<Wall> = {}): Omit<Wall, 'order'> =>
+  makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by }, ...extra });
 
 function setup(walls: Array<Omit<Wall, 'order'>>) {
   const s = new ProjectStore(createEmptyProject());
@@ -52,6 +49,10 @@ describe('parede isolada', () => {
 
 describe('junção em L', () => {
   const s = setup([wall('a', 0, 0, 4, 0), wall('b', 0, 0, 0, 3)]);
+  const miter = setup([
+    wall('a', 0, 0, 4, 0, { joinStart: { kind: 'miter', flip: false } }),
+    wall('b', 0, 0, 0, 3, { joinStart: { kind: 'miter', flip: false } }),
+  ]);
   it('silhueta é a união dos dois retângulos, sem furo nem sobra', () => {
     const expected = T14 * (4 + T14 / 2) + T14 * (3 + T14 / 2) - T14 * T14;
     expect(silhouetteArea(s)).toBeCloseTo(expected, 6);
@@ -62,8 +63,8 @@ describe('junção em L', () => {
     expect(core.polygons).toHaveLength(1);
   });
   it('acabamento externo contorna o canto sem ser cortado pela estrutura', () => {
-    // Camada de tinta (mais externa) das duas paredes forma um L contínuo: um único polígono.
-    const r = resolveLevel(s.project, 'lv_0');
+    // Com esquadria, a tinta de cada lado forma um L contínuo.
+    const r = resolveLevel(miter.project, 'lv_0');
     const tinta = r.clusters[0]!.regions.find((x) => x.materialId === 'mat_tinta')!;
     // externa + interna: dois L (um por lado) → 2 polígonos disjuntos
     expect(tinta.polygons).toHaveLength(2);
@@ -127,14 +128,19 @@ describe('aberturas', () => {
     const s = build();
     expect(silhouetteArea(s)).toBeCloseTo((4 - 0.8 - 1.2) * T14, 6);
   });
-  it('3D: janela deixa peça abaixo do peitoril e acima da verga; porta só acima', () => {
+  it('3D: faixas verticais — o vão só fura a altura que atravessa', () => {
     const s = build();
     const rw = resolveLevel(s.project, 'lv_0').walls.a!;
-    const j = rw.pieces.filter((p) => p.openingId === 'j');
-    const d = rw.pieces.filter((p) => p.openingId === 'd');
-    expect(j.some((p) => p.z0 === 0 && Math.abs(p.z1 - 1.1) < 1e-9)).toBe(true);
-    expect(j.some((p) => Math.abs(p.z0 - 2.3) < 1e-9 && Math.abs(p.z1 - 2.8) < 1e-9)).toBe(true);
-    expect(d.every((p) => p.z0 > 2)).toBe(true);
+    const core = rw.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    const at = (z: number) => core.bands.find((b) => z > b.z0 && z < b.z1)!;
+    const holeAt = (z: number, x: number) => at(z).poly.some((p) => p[0]!.some((v) => Math.abs(v.x - x) < 1e-6));
+    // Janela (centro x=3, vão 1,2 m, peitoril 1,1 m, altura 1,2 m): parede cheia até 1,1 m e acima de 2,3 m.
+    expect(at(0.5).poly.length).toBeGreaterThan(0);
+    expect(at(1.7)).toBeDefined();
+    expect(holeAt(1.7, 2.4) || holeAt(1.7, 3.6)).toBe(true); // bordas do vão aparecem a 1,7 m
+    expect(holeAt(0.5, 3.6)).toBe(false); // abaixo do peitoril não há borda de vão em x=3,6
+    const total = core.bands.reduce((a, b) => a + (b.z1 - b.z0), 0);
+    expect(total).toBeCloseTo(2.8, 6); // cobre toda a altura, sem faixas faltando
   });
   it('quantitativos: volume do bloco e área líquida', () => {
     const s = build();
@@ -171,5 +177,153 @@ describe('modelos iniciais', () => {
     expect(sum).toBeCloseTo(sil, 5);
     const q = quantifyLevel(p, r);
     expect(q.walls.every((w) => w.netFaceArea > 0)).toBe(true);
+  });
+});
+
+describe('tipos de junção', () => {
+  const frames = (s: ProjectStore) => {
+    const ps = s.project;
+    return Object.values(ps.elements).filter((e) => e.kind === 'wall').map((w) => buildFrame(w as Wall, ps.wallTypes[(w as Wall).typeId]!)!);
+  };
+  const lShape = (cfg?: { kind: 'butt' | 'miter' | 'square'; flip: boolean }) =>
+    setup([
+      wall('a', 0, 0, 4, 0, cfg ? { joinStart: cfg } : {}),
+      wall('b', 0, 0, 0, 3, cfg ? { joinStart: cfg } : {}),
+    ]);
+  const flatT = (e: { kind: string; t?: number }) => (e.kind === 'flat' ? (e as { t: number }).t : NaN);
+
+  it('o padrão é encosto: a mais antiga atravessa até o canto externo e a outra para no núcleo dela', () => {
+    const ends = computeEnds(frames(lShape()));
+    expect(flatT(ends.get('a')!.a)).toBeCloseTo(-T14 / 2, 6);
+    expect(flatT(ends.get('b')!.a)).toBeCloseTo(0, 6);
+  });
+  it('inverter a ordem troca quem atravessa', () => {
+    const ends = computeEnds(frames(lShape({ kind: 'butt', flip: true })));
+    expect(flatT(ends.get('b')!.a)).toBeCloseTo(-T14 / 2, 6);
+    expect(flatT(ends.get('a')!.a)).toBeCloseTo(0, 6);
+  });
+  it('esquadro prolonga as duas até cobrir o canto', () => {
+    const ends = computeEnds(frames(lShape({ kind: 'square', flip: false })));
+    expect(flatT(ends.get('a')!.a)).toBeCloseTo(-T14 / 2, 6);
+    expect(flatT(ends.get('b')!.a)).toBeCloseTo(-T14 / 2, 6);
+  });
+  it('esquadria usa corte em ângulo', () => {
+    const ends = computeEnds(frames(lShape({ kind: 'miter', flip: false })));
+    expect(ends.get('a')!.a.kind).toBe('miter');
+  });
+  it('a silhueta externa é a mesma nos três tipos (só a divisão interna muda)', () => {
+    const areas = (['butt', 'miter', 'square'] as const).map((kind) => silhouetteArea(lShape({ kind, flip: false })));
+    for (const a of areas) expect(a).toBeCloseTo(7 * T14, 6);
+  });
+  it('encosto: a estrutura do dominante vai até a face externa e a do outro termina nela', () => {
+    const s = lShape({ kind: 'butt', flip: false });
+    const r = resolveLevel(s.project, 'lv_0');
+    const lead = r.walls.a!.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    const xs = lead.fragment.flatMap((p) => p[0]!.map((v) => v.x));
+    expect(Math.min(...xs)).toBeCloseTo(-T14 / 2, 6);
+    const follower = r.walls.b!.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    const ys = follower.fragment.flatMap((p) => p[0]!.map((v) => v.y));
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(-1e-9);
+  });
+  it('encontra as extremidades parceiras', () => {
+    const p = endPartners(frames(lShape()), 'a', 'a');
+    expect(p).toEqual([{ wallId: 'b', end: 'a' }]);
+  });
+});
+
+describe('situação da extremidade', () => {
+  const fr = (s: ProjectStore) => Object.values(s.project.elements).filter((e) => e.kind === 'wall').map((w) => buildFrame(w as Wall, s.project.wallTypes[(w as Wall).typeId]!)!);
+  it('livre, par, T e não unir', () => {
+    const s = setup([wall('a', 0, 0, 4, 0), wall('b', 0, 0, 0, 3), wall('t', 2, 0, 2, -3), wall('z', 9, 9, 12, 9, { noJoinStart: true })]);
+    const f = fr(s);
+    expect(joinStatus(f, 'a', 'a').kind).toBe('pair');
+    expect(joinStatus(f, 'a', 'b').kind).toBe('free');
+    expect(joinStatus(f, 't', 'a').kind).toBe('tee');
+    expect(joinStatus(f, 'z', 'a').kind).toBe('disallowed');
+  });
+});
+
+describe('nós de três ou mais paredes', () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+  const star = (n: number, angles?: number[]) => {
+    const ang = angles ?? Array.from({ length: n }, (_, i) => (360 / n) * i + 10);
+    return setup(ang.map((a, i) => wall(`s${i}`, 0, 0, 3 * Math.cos(deg(a)), 3 * Math.sin(deg(a)))));
+  };
+  const check = (s: ProjectStore) => {
+    const r = resolveLevel(s.project, 'lv_0');
+    const sil = union(...r.clusters.map((c) => c.silhouette));
+    const sum = Object.values(r.walls).flatMap((w) => w.layers).reduce((a, l) => a + multiArea(l.cut), 0);
+    expect(sum).toBeCloseTo(multiArea(sil), 3); // o fechamento de frestas altera a silhueta em < 1e-4 m²
+    expect(sil).toHaveLength(1);
+    expect(sil[0]).toHaveLength(1); // sem furos
+    return { r, area: multiArea(sil) };
+  };
+  it('Y de três paredes iguais: sem sobreposição, sem furo e simétrico', () => {
+    const s = star(3);
+    const { r } = check(s);
+    const areas = ['s0', 's1', 's2'].map((id) => r.walls[id]!.layers.reduce((a, l) => a + multiArea(l.cut), 0));
+    expect(areas[0]).toBeCloseTo(areas[1]!, 5);
+    expect(areas[1]).toBeCloseTo(areas[2]!, 5);
+  });
+  it('a estrutura de um Y é um único polígono (funde)', () => {
+    const { r } = check(star(3));
+    const core = r.clusters[0]!.regions.find((x) => x.materialId === 'mat_bloco14')!;
+    expect(core.polygons).toHaveLength(1);
+  });
+  it('estrela de quatro paredes diagonais', () => {
+    check(star(4));
+  });
+  it('três paredes sem simetria, incluindo ângulos agudos', () => {
+    check(star(3, [0, 40, 200]));
+  });
+  it('par colinear + ramal terminando no mesmo ponto vira T', () => {
+    const s = setup([wall('a', -3, 0, 0, 0), wall('c', 0, 0, 3, 0), wall('b', 0, 0, 0, 3)]);
+    const expected = 6 * T14 + (3 - T14 / 2) * T14;
+    expect(silhouetteArea(s)).toBeCloseTo(expected, 5);
+  });
+});
+
+describe('paredes diferentes na mesma junção', () => {
+  const mk = (typeB: string, kind: 'butt' | 'miter' | 'square' = 'miter', extraB: Partial<Wall> = {}) =>
+    setup([
+      wall('a', 0, 0, 4, 0, { joinStart: { kind, flip: false } }),
+      wall('b', 0, 0, 0, 3, { typeId: typeB, joinStart: { kind, flip: false }, ...extraB }),
+    ]);
+  const noOverlap = (s: ProjectStore) => {
+    const r = resolveLevel(s.project, 'lv_0');
+    const sum = Object.values(r.walls).flatMap((w) => w.layers).reduce((a, l) => a + multiArea(l.cut), 0);
+    expect(sum).toBeCloseTo(multiArea(union(...r.clusters.map((c) => c.silhouette))), 3);
+    return r;
+  };
+  it.each(['wt_alv9', 'wt_ext19', 'wt_dry', 'wt_conc15'])('esquadria entre alvenaria 14 e %s: sem sobreposição e estruturas se encontram', (type) => {
+    const r = noOverlap(mk(type));
+    const structures = r.clusters[0]!.regions.filter((g) => ['mat_bloco14', 'mat_bloco9', 'mat_bloco19', 'mat_perfil', 'mat_concreto'].includes(g.materialId));
+    // As duas estruturas se tocam: o conjunto das estruturas forma uma só mancha conexa.
+    expect(multiArea(union(...structures.map((g) => g.polygons)))).toBeGreaterThan(0);
+    expect(closeGaps(union(...structures.map((g) => g.polygons)))).toHaveLength(1);
+  });
+  it.each(['butt', 'square'] as const)('%s com tipos diferentes não gera sobreposição', (kind) => {
+    noOverlap(mk('wt_dry', kind));
+    noOverlap(mk('wt_ext19', kind));
+  });
+  it('drywall encostando em alvenaria: a alvenaria (núcleo maior) domina mesmo sendo a mais nova', () => {
+    // drywall criado primeiro (ordem menor), alvenaria depois, T: a estrutura de bloco não é cortada pelo perfil.
+    const s = setup([wall('d', -3, 0, 3, 0, { typeId: 'wt_dry' }), wall('m', 0, 0, 0, 3)]);
+    const r = resolveLevel(s.project, 'lv_0');
+    const bloco = r.walls.m!.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    expect(multiArea(bloco.cut)).toBeGreaterThan(CORE14 * 2.9 - 1e-6); // o bloco inteiro, sem recorte do perfil
+  });
+  it('alturas diferentes: a parede baixa não corta a alta acima dela', () => {
+    const s = setup([wall('alta', -3, 0, 3, 0, { height: 3 }), wall('baixa', 0, 0, 0, 3, { height: 1 })]);
+    const r = resolveLevel(s.project, 'lv_0');
+    const alta = r.walls.alta!.layers.find((l) => l.materialId === 'mat_tinta')!; // acabamento da parede alta
+    const high = alta.bands.find((b) => b.z0 >= 1 - 1e-6)!;
+    const low = alta.bands.find((b) => b.z1 <= 1 + 1e-6)!;
+    expect(multiArea(high.poly)).toBeGreaterThan(multiArea(low.poly) - 1e-9); // acima de 1 m nada foi cortado
+    expect(r.walls.alta!.layers.every((l) => l.bands.reduce((a, b) => a + (b.z1 - b.z0), 0) <= 3 + 1e-9)).toBe(true);
+  });
+  it('locationLine diferentes entre as paredes não gera sobreposição', () => {
+    noOverlap(mk('wt_alv9', 'butt', { locationLine: 'finishExterior' }));
+    noOverlap(mk('wt_alv9', 'miter', { locationLine: 'coreInterior', flipped: true }));
   });
 });

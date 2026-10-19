@@ -31,13 +31,13 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C3 Cruzamento em X sem duplicar área
 - [x] C4 Paredes alinhadas contínuas, inclusive com espessuras diferentes
 - [x] C5 "Não unir" no início e no fim
-- [ ] C6 Escolha do tipo de junção no canto (encosto, esquadria, corte reto) **(bloqueante)**
-- [ ] C7 Trocar a ordem de junção (qual parede domina)
-- [ ] C8 Botões de "Permitir junção" e "Limpar junção" na interface
-- [ ] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)**
+- [x] C6 Escolha do tipo de junção no canto (encosto, esquadria, corte reto) **(bloqueante)**
+- [x] C7 Trocar a ordem de junção (qual parede domina)
+- [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
+- [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)**
 - [ ] C10 Ângulos agudos e obtusos extremos sem artefato
 - [ ] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
-- [ ] C12 Tipos de espessuras muito diferentes verificados em casos dourados
+- [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
 - [ ] C13 Junção com parede em arco **(bloqueante)**
 - [ ] C14 Paredes sobrepostas detectadas, com aviso
 - [ ] C15 Parede empilhada sobre outra (níveis diferentes)
@@ -63,7 +63,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 ## F · Edição
 - [x] F1 Selecionar (clique, janela, alças), mover, copiar, girar, espelhar, matriz, deslocar, aparar ao canto, alinhar, medir
 - [x] F2 Vizinhas acompanham ao mover e ao arrastar alças
-- [ ] F3 Dividir parede (ponto e com intervalo)
+- [x] F3 Dividir parede (ponto e com intervalo)
 - [ ] F4 Aparar e estender várias paredes de uma vez
 - [ ] F5 Editar o comprimento pela cota temporária
 - [ ] F6 Travar alinhamento e cotas que comandam

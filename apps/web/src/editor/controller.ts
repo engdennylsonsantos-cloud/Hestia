@@ -224,7 +224,7 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', e: 'measure' };
+    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure' };
     const id = map[k.toLowerCase()];
     if (id && !e.altKey) {
       this.setTool(id);

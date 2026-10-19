@@ -4,6 +4,7 @@ import {
   isWall,
   type Element,
   type Id,
+  type JoinConfig,
   type Level,
   type Material,
   type Opening,
@@ -12,6 +13,7 @@ import {
   type Wall,
   type WallType,
 } from './types.ts';
+import { splitWall } from './splitWall.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -19,7 +21,9 @@ export type Command =
   | { type: 'addOpening'; opening: Opening }
   | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
+  | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
+  | { type: 'splitWall'; id: Id; newId: Id; t: number; gap?: number; idMap?: Record<Id, Id> }
   | { type: 'deleteElements'; ids: Id[] }
   | { type: 'upsertWallType'; wallType: WallType }
   | { type: 'deleteWallType'; id: Id }
@@ -35,7 +39,8 @@ function transformWall(w: Wall, t: Transform): Wall {
   const a = applyTransform(t, w.a);
   const b = applyTransform(t, w.b);
   // Espelhar inverte o lado externo: sem trocar `flipped` a pilha de camadas sairia do lado errado.
-  return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped };
+  // Espelhar também inverte o lado para o qual o arco abaulava.
+  return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
 }
 
 /** Garante que a abertura continue dentro da parede depois de qualquer edição. */
@@ -114,8 +119,19 @@ export function applyCommand(p: Project, c: Command): void {
       }
       break;
     }
+    case 'setJoin':
+      for (const e of c.ends) {
+        const w = p.elements[e.wallId];
+        if (!isWall(w)) continue;
+        if (e.end === 'a') w.joinStart = { ...c.config };
+        else w.joinEnd = { ...c.config };
+      }
+      break;
     case 'transform':
       applyTransformCmd(p, c);
+      break;
+    case 'splitWall':
+      splitWall(p, c);
       break;
     case 'deleteElements':
       removeIds(p, c.ids);

@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, migrateProject, newId, openingsOfWall, wallsOnLevel, coreRange, totalThickness, SchemaError, type Wall } from './index.ts';
+import { ProjectStore, createEmptyProject, makeWall, migrateProject, newId, openingsOfWall, wallsOnLevel, coreRange, totalThickness, SchemaError, type Wall } from './index.ts';
 
-const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> => ({
-  id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by },
-  baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter',
-  flipped: false, noJoinStart: false, noJoinEnd: false, mark: '', comments: '',
-});
+const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
+  makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
 
 describe('comandos e histórico', () => {
   it('cria, desfaz e refaz', () => {

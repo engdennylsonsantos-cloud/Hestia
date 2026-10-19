@@ -1,5 +1,5 @@
 import { dist, len, norm, sub, v2, angleOf, add, mul, type Vec2 } from '@hestia/geom';
-import { totalThickness, type Wall } from '@hestia/model';
+import { makeWall, totalThickness, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
@@ -74,24 +74,16 @@ export class WallTool extends ToolBase {
   private commit(a: Vec2, b: Vec2): void {
     if (dist(a, b) < 0.01) return;
     const o = this.env.options();
-    const wall: Omit<Wall, 'order'> = {
+    const wall: Omit<Wall, 'order'> = makeWall({
       id: makeId('w'),
-      kind: 'wall',
       typeId: o.wallTypeId,
       levelId: this.env.levelId(),
       a,
       b,
-      baseOffset: 0,
-      topLevelId: null,
       height: o.wallHeight,
-      topOffset: 0,
       locationLine: o.locationLine,
       flipped: this.flip,
-      noJoinStart: false,
-      noJoinEnd: false,
-      mark: '',
-      comments: '',
-    };
+    });
     this.env.exec({ type: 'addWall', wall });
     this.count += 1;
   }

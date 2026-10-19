@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeWall, type Wall } from '@hestia/model';
 import { resolveLevel } from '@hestia/engine';
 import { buildLevelSolids } from './solids.ts';
 
-const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> => ({
-  id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by },
-  baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false,
-  noJoinStart: false, noJoinEnd: false, mark: '', comments: '',
-});
+const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
+  makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
 
 /** Volume por teorema da divergência sobre a malha: valida que a extrusão é fechada e bem orientada. */
 function volume(b: { positions: number[]; indices: number[] }): number {
@@ -29,8 +26,8 @@ describe('sólidos 3D', () => {
     const r = resolveLevel(s.project, 'lv_0');
     const solids = buildLevelSolids(r);
     const bloco = solids.batches.find((b) => b.materialId === 'mat_bloco14')!;
-    // Núcleos esquadrejados em diagonal: a área do L é exatamente comprimento × espessura de cada braço.
-    const core = 0.14 * 4 + 0.14 * 3;
+    // Encosto (padrão): a primeira parede atravessa até a face externa; a segunda para na linha de centro dela.
+    const core = 0.14 * (4 + 0.092) + 0.14 * (3 - 0.07);
     expect(Math.abs(volume(bloco))).toBeCloseTo(core * 2.8, 5);
   });
   it('porta deixa uma verga acima do vão', () => {

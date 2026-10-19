@@ -12,6 +12,7 @@ import { Tutorial } from './ui/Tutorial.tsx';
 import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
+import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
 
 const narrow = (): boolean => window.innerWidth <= 900;
@@ -57,6 +58,8 @@ function Dialogs(): ReactElement | null {
       return <StartDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
+    case 'schedule':
+      return <WallScheduleDialog />;
     default:
       return null;
   }

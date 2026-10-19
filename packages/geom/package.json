@@ -5,5 +5,12 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "dependencies": { "polygon-clipping": "^0.15.7", "earcut": "^3.0.0" }
+  "dependencies": {
+    "clipper-lib": "^6.4.2",
+    "earcut": "^3.0.0",
+    "polygon-clipping": "^0.15.7"
+  },
+  "devDependencies": {
+    "@types/clipper-lib": "^6.4.0"
+  }
 }

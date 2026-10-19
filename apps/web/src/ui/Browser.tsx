@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react';
-import { wallTypeUsage } from '@hestia/model';
+import { isWall } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
+import { TypeRow } from './TypeRow.tsx';
 
 /** Navegador de projeto: vistas, famílias (tipos) e materiais, como a árvore do Revit. */
 export function Browser(): ReactElement {
@@ -43,32 +44,46 @@ export function Browser(): ReactElement {
             <details open>
               <summary>Paredes</summary>
               {walls.map((t) => (
-                <button
+                <TypeRow
                   key={t.id}
-                  className={`leaf${s.options.wallTypeId === t.id ? ' on' : ''}`}
-                  title="Clique para usar este tipo ao desenhar. Duplo clique edita o tipo."
-                  onClick={() => useUi.setState({ options: { ...s.options, wallTypeId: t.id } })}
-                  onDoubleClick={() => useUi.setState({ dialog: 'wallType', dialogArg: t.id })}
-                >
-                  <Icon name="wall" size={14} /> {t.name}
-                  <span className="meta">{wallTypeUsage(p, t.id)}</span>
-                </button>
+                  kind="wall"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="wall"
+                  active={s.options.wallTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, wallTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'wallType', dialogArg: t.id })}
+                />
               ))}
             </details>
             <details>
               <summary>Portas</summary>
               {doors.map((t) => (
-                <button key={t.id} className={`leaf${s.options.doorTypeId === t.id ? ' on' : ''}`} onClick={() => useUi.setState({ options: { ...s.options, doorTypeId: t.id } })} onDoubleClick={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}>
-                  <Icon name="door" size={14} /> {t.name}
-                </button>
+                <TypeRow
+                  key={t.id}
+                  kind="door"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="door"
+                  active={s.options.doorTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, doorTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
+                />
               ))}
             </details>
             <details>
               <summary>Janelas</summary>
               {windows.map((t) => (
-                <button key={t.id} className={`leaf${s.options.windowTypeId === t.id ? ' on' : ''}`} onClick={() => useUi.setState({ options: { ...s.options, windowTypeId: t.id } })} onDoubleClick={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}>
-                  <Icon name="window" size={14} /> {t.name}
-                </button>
+                <TypeRow
+                  key={t.id}
+                  kind="window"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="window"
+                  active={s.options.windowTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, windowTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
+                />
               ))}
             </details>
           </div>
@@ -83,6 +98,10 @@ export function Browser(): ReactElement {
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'levels' })}>
               <Icon name="levels" size={14} /> Níveis
               <span className="meta">{p.levels.length}</span>
+            </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'schedule', dialogArg: null })}>
+              <Icon name="file" size={14} /> Tabela de paredes
+              <span className="meta">{Object.values(p.elements).filter(isWall).length}</span>
             </button>
           </div>
         </details>

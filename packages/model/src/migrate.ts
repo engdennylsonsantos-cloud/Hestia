@@ -4,7 +4,23 @@ import { SCHEMA_VERSION, type Project } from './types.ts';
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 
 /** migrations[n] leva a versão n para n+1. Cada mudança de esquema acrescenta uma entrada e um teste. */
-const migrations: Record<number, Migration> = {};
+const migrations: Record<number, Migration> = {
+  // v1 → v2: configuração de junção por extremidade e flecha de arco.
+  1: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind === 'wall') {
+        elements[id] = {
+          ...e,
+          joinStart: e.joinStart ?? { kind: 'butt', flip: false },
+          joinEnd: e.joinEnd ?? { kind: 'butt', flip: false },
+          sag: typeof e.sag === 'number' ? e.sag : 0,
+        };
+      }
+    }
+    return { ...raw, elements };
+  },
+};
 
 export class SchemaError extends Error {}
 

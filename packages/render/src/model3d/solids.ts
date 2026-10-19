@@ -82,11 +82,9 @@ export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
   for (const rw of Object.values(r.walls)) {
     for (const l of rw.layers) {
       const b = batch(l.materialId);
-      for (const poly of l.cut) extrudePolygon(b, poly, rw.baseZ, rw.baseZ + rw.height);
-    }
-    for (const pc of rw.pieces) {
-      const b = batch(pc.materialId);
-      for (const poly of pc.poly) extrudePolygon(b, poly, rw.baseZ + pc.z0, rw.baseZ + pc.z1);
+      for (const band of l.bands) {
+        for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1);
+      }
     }
   }
   return { batches: [...byMat.values()] };

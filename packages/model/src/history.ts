@@ -143,8 +143,12 @@ export function labelOf(c: Command): string {
       return 'Alterar propriedades';
     case 'setWallEnds':
       return 'Ajustar parede';
+    case 'setJoin':
+      return 'Alterar junção';
     case 'transform':
       return c.copy ? 'Copiar' : c.transform.kind === 'translate' ? 'Mover' : c.transform.kind === 'rotate' ? 'Girar' : 'Espelhar';
+    case 'splitWall':
+      return 'Dividir parede';
     case 'deleteElements':
       return 'Excluir';
     case 'upsertWallType':

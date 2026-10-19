@@ -135,7 +135,7 @@ export function StartDialog(): ReactElement {
 const KEYS: Array<[string, string]> = [
   ['V', 'Selecionar'], ['W', 'Parede'], ['D', 'Porta'], ['J', 'Janela'],
   ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
-  ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['E', 'Medir'],
+  ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'],
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],

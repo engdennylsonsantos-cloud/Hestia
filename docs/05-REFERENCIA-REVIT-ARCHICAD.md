@@ -134,3 +134,29 @@ O mesmo recurso explica por que a vista "some" elementos quando mal configurada 
    `tests/golden/revit/` ou `tests/golden/archicad/`. Licença educacional ou de avaliação serve.
 4. Diferenças **intencionais** em relação ao original viram **decisão registrada** em `docs/decisoes/`.
 5. O CI roda os casos dourados; qualquer divergência não registrada quebra o build.
+
+---
+
+## 9. Tipos de junção entre paredes (pesquisa de 19/10/2026)
+
+**Revit** `[DOC]` [About Wall Joins](https://help.autodesk.com/cloudhelp/2017/ENU/RevitLT-Model/files/GUID-6B18982C-1FBA-4E5C-AE30-6FAE4022CE35.htm) · [Change the Configuration of a Wall Join](https://help.autodesk.com/cloudhelp/2023/ENU/Revit-ArchDesign/files/GUID-19EAF7A9-331F-4271-94CC-43B76B13011E.htm)
+- Três configurações de canto: **Butt** (padrão: as camadas terminam retas onde as paredes se encontram), **Miter** (camadas terminam em ângulo, uma contra a outra) e **Square off** (a extremidade da parede é esquadrejada a 90°; indicada para encontros que não são retos).
+- Miter e Square off **não** valem entre a extremidade de uma parede e o **meio** de outra (T): só o encosto, em ordem fixa. Também não valem para paredes inclinadas.
+- Em Butt e Square off, **Previous/Next** percorre as ordens de junção possíveis (qual parede para na outra).
+- A ferramenta cobre junções de até 4 paredes; mais que isso, ou junções entre níveis, exigem o procedimento de junções complexas.
+- Desabilitar junção por extremidade (**Disallow Join**) existe; "Don't Clean Join" mostra as linhas entre as paredes.
+- Camadas de paredes que se juntam só se fundem quando têm o **mesmo material**; senão aparece uma linha. [Layer Join Cleanup](https://help.autodesk.com/cloudhelp/2014/ENU/Revit/files/GUID-798DE946-C683-4ACD-BA7C-040BF722F033.htm) `[DOC]`
+- Os materiais dentro do limite do núcleo se estendem até a camada de função Estrutura [1]. `[COM]`
+- Estrutura vertical: *Modify Vertical Structure* permite **dividir regiões**, atribuir camadas e mesclar regiões; **sweeps** adicionam e **reveals** subtraem perfis. [Modify the Vertical Structure of Walls](https://help.autodesk.com/cloudhelp/2020/ENU/Revit-Model/files/GUID-E11C1335-5CC2-4001-8563-021E01CCF829.htm) `[DOC]`
+
+**ArchiCAD** `[COM]`
+- Linha de referência de parede composta: seis posições (fora, centro, dentro, núcleo fora, núcleo centro, núcleo dentro), com deslocamento exceto em centro. [API Graphisoft](https://archicadapi.graphisoft.com/?p=1354)
+
+**Decisões do Hestia (docs/decisoes/0004):**
+1. Padrão = **encosto**, como o Revit. A mais antiga domina; "inverter ordem" troca.
+2. **Esquadria** pareia as camadas **a partir do núcleo** (a estrutura de uma parede encontra a da outra; acabamentos contornam o canto com a espessura própria de cada um). Se os acabamentos de uma parede são mais finos, eles terminam na face externa da outra.
+3. **Esquadro** `[?]`: implementado como extensão reta das duas paredes até cobrir o canto externo. A fonte descreve "esquadrejar a 90°" para encontros não retos; o detalhe visual precisa de confirmação.
+4. T (extremidade no meio da outra): sempre encosto, ordem fixa, como no Revit.
+5. Nó de 3 ou mais paredes: cada parede ocupa o setor limitado pelas semirretas que saem do nó pelos cantos entre faces vizinhas. Com um par colinear, o par atravessa e as demais encostam (T).
+6. **Desempate** de camadas de mesma prioridade e materiais diferentes: domina a parede de **núcleo mais espesso**, depois a mais antiga. Difere do Revit (só ordem de junção) para evitar que um drywall corte um bloco; a prioridade por camada continua prevalecendo.
+7. **Alturas diferentes**: a prioridade é resolvida por faixa vertical, só entre as paredes que existem naquela altura.

@@ -5,7 +5,7 @@ import type { ToolId, ToolOptions } from '@hestia/tools';
 
 export type ViewKind = 'plan' | '3d';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | null;
+export type DialogKind = 'wallType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | null;
 
 export interface UiState {
   tool: ToolId;

@@ -275,3 +275,54 @@ svg { display: block; }
   .ribbon { min-height: 62px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- tabela de paredes (quantitativos) ---- */
+.wsched-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 10px; }
+.wsched-bar label { color: var(--fg-soft); }
+.wsched-scroll { overflow: auto; max-width: 100%; border: 1px solid var(--line); border-radius: var(--r); background: var(--sheet); }
+.wsched { min-width: 880px; }
+.wsched th.num, .wsched td.num { text-align: right; }
+.wsched td.num { font-family: var(--font-mono); white-space: nowrap; }
+.wsched td.layers-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-soft); }
+.wsched .sortbtn { display: inline-flex; align-items: center; gap: 3px; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 500; color: var(--fg-faint); }
+.wsched .sortbtn:hover { color: var(--fg); }
+.wsched-h { margin: 14px 0 6px; font-size: 12px; font-weight: 600; color: var(--fg-soft); }
+.wsched-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-soft); font-size: 11.5px; }
+
+/* ---- editor de camadas: "mais" por linha (prioridade de junção) ---- */
+.fn-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.fn-cell .select { flex: 1; min-width: 0; width: auto; }
+.pbadge { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.ibtn.more { position: relative; }
+.ibtn.more svg { transition: transform 0.12s; }
+.ibtn.more.open svg { transform: rotate(90deg); }
+.ibtn.more.changed::after { content: ''; position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.layers tr.adv td { background: var(--chrome); padding: 6px 8px 8px; }
+.adv-panel { display: grid; gap: 6px; }
+.adv-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px; align-items: center; }
+.adv-row > label { color: var(--fg-soft); }
+.adv-ctl { display: inline-flex; align-items: center; gap: 6px; }
+.adv-panel .input::placeholder { color: var(--fg-faint); }
+.adv-help { margin: 0; color: var(--fg-soft); font-size: 11px; }
+@media (max-width: 700px) {
+  .adv-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- ações por tipo no navegador de projeto (TypeRow) ---- */
+.type-row { display: flex; align-items: center; }
+.type-row .leaf { flex: 1; min-width: 0; width: auto; }
+.type-actions { display: inline-flex; align-items: center; gap: 1px; padding-right: 6px; opacity: 0; transition: opacity 0.12s; }
+.type-row:hover .type-actions,
+.type-row.open .type-actions,
+.type-row:has(:focus-visible) .type-actions,
+.type-actions:focus-within { opacity: 1; }
+@media (hover: none) { .type-actions { opacity: 1; } }
+.type-act { padding: 2px 4px; color: var(--fg-soft); }
+.type-act:hover:not(:disabled) { color: var(--accent); }
+.type-act.danger:hover:not(:disabled) { color: var(--danger); }
+.type-act.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.type-act:disabled { opacity: 0.35; }
+.type-replace { display: grid; gap: 6px; margin: 2px 10px 6px 28px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--sheet); }
+.type-replace label { display: grid; gap: 3px; color: var(--fg-soft); font-size: 11.5px; }
+.type-replace .select { width: 100%; }
+.type-replace-btns { display: flex; gap: 6px; justify-content: flex-end; }

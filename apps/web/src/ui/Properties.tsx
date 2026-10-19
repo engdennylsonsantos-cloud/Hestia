@@ -1,10 +1,11 @@
 import { useMemo, type ReactElement } from 'react';
-import { quantifyLevel } from '@hestia/engine';
+import { joinStatus, levelFrames, quantifyLevel } from '@hestia/engine';
 import {
   FUNCTION_LABEL,
   isOpening,
   isWall,
   newId,
+  type JoinKind,
   openingSill,
   totalThickness,
   wallLength,
@@ -28,6 +29,42 @@ function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean 
 
 function patch(ids: Id[], p: Partial<Wall> | Partial<Opening>): void {
   editor.store.exec({ type: 'updateElements', ids, patch: p });
+}
+
+const JOIN_LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria', square: 'Esquadro' };
+
+function JoinRows({ wall }: { wall: Wall }): ReactElement {
+  const p = useProject();
+  const frames = useMemo(() => levelFrames(p, wall.levelId), [p, wall.levelId]);
+  const rows = (['a', 'b'] as const).map((end) => {
+    const st = joinStatus(frames, wall.id, end);
+    const label = end === 'a' ? 'Início' : 'Fim';
+    if (st.kind === 'pair') {
+      const partner = p.elements[st.partners[0]!.wallId];
+      const partnerEnd = st.partners[0]!.end;
+      const firstIsMe = !isWall(partner) || wall.order <= partner.order;
+      const src = firstIsMe ? wall : partner;
+      const srcEnd = firstIsMe ? end : partnerEnd;
+      const cfg = srcEnd === 'a' ? src.joinStart : src.joinEnd;
+      const ends = [{ wallId: wall.id, end }, ...st.partners];
+      const set = (kind: JoinKind, flip: boolean): void => editor.store.exec({ type: 'setJoin', ends, config: { kind, flip } });
+      return (
+        <div key={end}>
+          <Row label={`${label}: junção`} htmlFor={`p-join-${end}`}>
+            <select id={`p-join-${end}`} className="select" value={cfg.kind} onChange={(e) => set(e.target.value as JoinKind, cfg.flip)}>
+              {(Object.keys(JOIN_LABEL) as JoinKind[]).map((k) => <option key={k} value={k}>{JOIN_LABEL[k]}</option>)}
+            </select>
+          </Row>
+          {cfg.kind !== 'miter' && (
+            <Row label="Inverter ordem"><Check id={`p-joinflip-${end}`} checked={cfg.flip} onChange={(v) => set(cfg.kind, v)} /></Row>
+          )}
+        </div>
+      );
+    }
+    const text = st.kind === 'free' ? 'Livre' : st.kind === 'disallowed' ? 'Não unido' : st.kind === 'tee' ? 'Em T (encosto fixo)' : `Nó com ${st.partners.length + 1} paredes`;
+    return <Row key={end} label={`${label}: junção`}><span className="val soft">{text}</span></Row>;
+  });
+  return <>{rows}</>;
 }
 
 function WallProps({ walls }: { walls: Wall[] }): ReactElement {
@@ -110,6 +147,11 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         <Row label="Não unir no início"><Check id="p-nos" checked={noS.value} mixed={noS.mixed} onChange={(v) => patch(ids, { noJoinStart: v })} /></Row>
         <Row label="Não unir no fim"><Check id="p-noe" checked={noE.value} mixed={noE.mixed} onChange={(v) => patch(ids, { noJoinEnd: v })} /></Row>
       </Group>
+      {single && (
+        <Group title="Junções">
+          <JoinRows wall={single} />
+        </Group>
+      )}
       <Group title="Construção">
         {t ? (
           <>

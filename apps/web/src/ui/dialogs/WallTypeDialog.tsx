@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactElement } from 'react';
-import { FUNCTION_LABEL, coreRange, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType } from '@hestia/model';
+import { Fragment, useMemo, useState, type ReactElement } from 'react';
+import { FUNCTION_LABEL, coreRange, layerPriority, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
 import { SectionPreview } from './SectionPreview.tsx';
 
@@ -17,9 +18,11 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
   const [draft, setDraft] = useState<WallType | null>(src ? structuredClone(src) : null);
   const [tab, setTab] = useState<Tab>('estrutura');
   const [pick, setPick] = useState<number | null>(null);
+  const [adv, setAdv] = useState<number | null>(null);
   const [current, setCurrent] = useState(typeId);
   if (current !== typeId) {
     setCurrent(typeId);
+    setAdv(null);
     setDraft(p.wallTypes[typeId] ? structuredClone(p.wallTypes[typeId]!) : null);
   }
   const usage = useMemo(() => (draft ? wallTypeUsage(p, draft.id) : 0), [p, draft]);
@@ -27,21 +30,27 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const core = coreRange(draft);
   const setLayer = (i: number, patch: Partial<Layer>): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
+  const replaceLayer = (i: number, next: Layer): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? next : l)) });
   const move = (i: number, d: -1 | 1): void => {
     const j = i + d;
     if (j < 0 || j >= draft.layers.length) return;
     const ls = [...draft.layers];
     [ls[i], ls[j]] = [ls[j]!, ls[i]!];
     setDraft({ ...draft, layers: ls });
+    setAdv(null);
   };
   const insert = (): void => {
     const at = Math.max(0, Math.min(draft.layers.length, core.first + 1));
     const ls = [...draft.layers];
     ls.splice(at, 0, { function: 'substrate', materialId: 'mat_reboco', thickness: 0.01, wraps: true });
     setDraft({ ...draft, layers: ls });
+    setAdv(null);
   };
   const remove = (i: number): void => {
-    if (draft.layers.length > 1) setDraft({ ...draft, layers: draft.layers.filter((_, k) => k !== i) });
+    if (draft.layers.length > 1) {
+      setDraft({ ...draft, layers: draft.layers.filter((_, k) => k !== i) });
+      setAdv(null);
+    }
   };
   const ok = (): void => {
     editor.store.exec({ type: 'upsertWallType', wallType: draft }, 'Editar tipo de parede');
@@ -101,12 +110,16 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                     const m = p.materials[l.materialId];
                     const inCore = i >= core.first && i <= core.last;
                     return (
-                      <tr key={i} className={inCore ? 'core' : ''}>
+                      <Fragment key={i}>
+                      <tr className={inCore ? 'core' : ''}>
                         <td className="mono">{i + 1}</td>
                         <td>
-                          <select className="select" aria-label={`Função da camada ${i + 1}`} value={l.function} onChange={(e) => setLayer(i, { function: e.target.value as LayerFunction })}>
+                          <span className="fn-cell">
+                            <select className="select" aria-label={`Função da camada ${i + 1}`} value={l.function} onChange={(e) => setLayer(i, { function: e.target.value as LayerFunction })}>
                             {FUNCTIONS.map((f) => <option key={f} value={f}>{FUNCTION_LABEL[f]}</option>)}
                           </select>
+                            <span className="pbadge" title="Prioridade de junção efetiva">P{layerPriority(l)}</span>
+                          </span>
                         </td>
                         <td>
                           <button className="btn small" style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setPick(i)} title="Escolher material">
@@ -118,12 +131,21 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                         <td><input type="checkbox" aria-label={`Camada ${i + 1} envolve`} checked={l.wraps} onChange={(e) => setLayer(i, { wraps: e.target.checked })} /></td>
                         <td>
                           <span className="iconrow">
+                            <button id={`wt-layer-${i}-more`} className={`ibtn more${adv === i ? ' open' : ''}${l.priority !== undefined ? ' changed' : ''}`} aria-expanded={adv === i} aria-controls={adv === i ? `wt-layer-${i}-adv` : undefined} aria-label={`Opções avançadas da camada ${i + 1}`} title={l.priority !== undefined ? 'Mais (prioridade alterada)' : 'Mais'} onClick={() => setAdv(adv === i ? null : i)}><Icon name="chevron" size={14} /></button>
                             <button className="ibtn" onClick={() => move(i, -1)} aria-label="Subir camada" disabled={i === 0}><Icon name="up" size={14} /></button>
                             <button className="ibtn" onClick={() => move(i, 1)} aria-label="Descer camada" disabled={i === draft.layers.length - 1}><Icon name="down" size={14} /></button>
                             <button className="ibtn" onClick={() => remove(i)} aria-label="Remover camada" disabled={draft.layers.length <= 1}><Icon name="close" size={14} /></button>
                           </span>
                         </td>
                       </tr>
+                      {adv === i && (
+                        <tr id={`wt-layer-${i}-adv`} className="adv">
+                          <td colSpan={6}>
+                            <LayerAdvanced id={`wt-layer-${i}`} layer={l} onChange={(next) => replaceLayer(i, next)} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                     );
                   })}
                   <tr><td colSpan={6} style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Face interna</td></tr>

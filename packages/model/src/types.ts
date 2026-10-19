@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -52,6 +52,15 @@ export type LocationLine =
   | 'coreExterior'
   | 'coreInterior';
 
+/** Tipos de junção no canto entre duas paredes (docs/05 §9). */
+export type JoinKind = 'butt' | 'miter' | 'square';
+
+export interface JoinConfig {
+  kind: JoinKind;
+  /** Inverte qual parede domina (quem atravessa no encosto). Padrão: a mais antiga domina. */
+  flip: boolean;
+}
+
 export interface Level {
   id: Id;
   name: string;
@@ -75,6 +84,14 @@ export interface Wall {
   flipped: boolean;
   noJoinStart: boolean;
   noJoinEnd: boolean;
+  /** Configuração da junção na extremidade `a` / `b` (vale quando há outra parede no mesmo ponto). */
+  joinStart: JoinConfig;
+  joinEnd: JoinConfig;
+  /**
+   * Flecha do arco em metros: distância do meio do arco à corda, positiva à esquerda de a→b.
+   * 0 = parede reta. Limitada a metade da corda (arco de até 180°).
+   */
+  sag: number;
   mark: string;
   comments: string;
   /** Ordem de criação: desempata junções (docs/05 §1, ordem de junção). */

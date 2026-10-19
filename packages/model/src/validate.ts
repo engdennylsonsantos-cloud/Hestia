@@ -1,0 +1,206 @@
+import { cross, dist, dot, norm, sub, type Vec2 } from '@hestia/geom';
+import { wallBaseElevation, wallTopElevation } from './queries.ts';
+import { isOpening, isWall, type Element, type Id, type Opening, type Project, type Wall } from './types.ts';
+
+export type ValidationSeverity = 'error' | 'warning';
+
+export interface ValidationIssue {
+  severity: ValidationSeverity;
+  /** Código estável para filtrar e testar (ex.: 'wall-overlap'). */
+  code: string;
+  /** Mensagem em português do Brasil, pronta para a interface. */
+  message: string;
+  elementId?: string;
+}
+
+/** Abaixo disso a parede não tem direção definida. */
+const MIN_WALL_LENGTH = 0.001;
+/** Tolerância numérica para comparar posições ao longo da parede (1 µm). */
+const EPS = 1e-6;
+/** Trecho comum mínimo para duas paredes colineares serem consideradas sobrepostas (item C14). */
+const WALL_OVERLAP_MIN = 0.05;
+/** Ângulo máximo entre eixos para serem "praticamente colineares" (1°). */
+const COLLINEAR_ANGLE = (1 * Math.PI) / 180;
+/** Distância lateral máxima entre eixos para serem "praticamente colineares" (1 cm). */
+const COLLINEAR_OFFSET = 0.01;
+
+const label = (e: Element): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
+const fmt = (n: number): string => (Number.isFinite(n) ? n.toFixed(3) : String(n));
+
+function wallIssues(p: Project, w: Wall): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  const name = label(w);
+  const len = dist(w.a, w.b);
+  if (len < MIN_WALL_LENGTH) {
+    out.push({
+      severity: 'error',
+      code: 'wall-zero-length',
+      message: `Parede ${name} tem comprimento de ${fmt(len * 1000)} mm; o mínimo é 1 mm.`,
+      elementId: w.id,
+    });
+  }
+  if (!p.wallTypes[w.typeId]) {
+    out.push({
+      severity: 'error',
+      code: 'wall-type-missing',
+      message: `Parede ${name} usa o tipo "${w.typeId}", que não existe no projeto.`,
+      elementId: w.id,
+    });
+  }
+  const levelOk = p.levels.some((l) => l.id === w.levelId);
+  if (!levelOk) {
+    out.push({
+      severity: 'error',
+      code: 'level-missing',
+      message: `Parede ${name} está no nível "${w.levelId}", que não existe.`,
+      elementId: w.id,
+    });
+  }
+  const topOk = w.topLevelId === null || p.levels.some((l) => l.id === w.topLevelId);
+  if (!topOk) {
+    out.push({
+      severity: 'error',
+      code: 'top-level-missing',
+      message: `Parede ${name} tem topo no nível "${w.topLevelId}", que não existe.`,
+      elementId: w.id,
+    });
+  }
+  // A altura só é conferida quando os níveis de base e de topo existem; senão o cálculo usaria cota 0.
+  if (levelOk && topOk) {
+    const h = wallTopElevation(p, w) - wallBaseElevation(p, w);
+    if (!(h > 0)) {
+      out.push({
+        severity: 'error',
+        code: 'wall-height-invalid',
+        message: `Altura da parede ${name} é ${fmt(h)} m; precisa ser maior que zero.`,
+        elementId: w.id,
+      });
+    }
+  }
+  return out;
+}
+
+function openingIssues(p: Project, o: Opening): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  const name = label(o);
+  const host = p.elements[o.hostId];
+  const type = p.openingTypes[o.typeId];
+  if (!isWall(host)) {
+    out.push({
+      severity: 'error',
+      code: 'opening-host-missing',
+      message: `Abertura ${name} não tem parede anfitriã (hostId "${o.hostId}").`,
+      elementId: o.id,
+    });
+  }
+  if (!type) {
+    out.push({
+      severity: 'error',
+      code: 'opening-type-missing',
+      message: `Abertura ${name} usa o tipo "${o.typeId}", que não existe no projeto.`,
+      elementId: o.id,
+    });
+  }
+  if (isWall(host) && type) {
+    const L = dist(host.a, host.b);
+    const half = type.width / 2;
+    const start = o.offset - half;
+    const end = o.offset + half;
+    if (start < -EPS || end > L + EPS) {
+      out.push({
+        severity: 'warning',
+        code: 'opening-out-of-wall',
+        message: `Abertura ${name} não cabe na parede ${label(host)}: vão de ${fmt(start)} m a ${fmt(end)} m, parede com ${fmt(L)} m.`,
+        elementId: o.id,
+      });
+    }
+  }
+  return out;
+}
+
+/** Duas aberturas da mesma parede cujos vãos se cruzam (warning). */
+function openingOverlaps(p: Project, openings: Opening[]): ValidationIssue[] {
+  const byHost = new Map<Id, Array<{ o: Opening; lo: number; hi: number }>>();
+  for (const o of openings) {
+    const type = p.openingTypes[o.typeId];
+    if (!type || !isWall(p.elements[o.hostId])) continue;
+    const list = byHost.get(o.hostId) ?? [];
+    list.push({ o, lo: o.offset - type.width / 2, hi: o.offset + type.width / 2 });
+    byHost.set(o.hostId, list);
+  }
+  const out: ValidationIssue[] = [];
+  for (const [hostId, list] of byHost) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const x = list[i]!;
+        const y = list[j]!;
+        if (Math.min(x.hi, y.hi) - Math.max(x.lo, y.lo) > EPS) {
+          out.push({
+            severity: 'warning',
+            code: 'opening-overlap',
+            message: `Aberturas ${label(x.o)} e ${label(y.o)} se sobrepõem na parede ${hostId}.`,
+            elementId: y.o.id,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Comprimento do trecho comum de duas paredes colineares e distância lateral medida no meio desse trecho.
+ * Devolve null quando as paredes não são praticamente colineares ou não se sobrepõem.
+ */
+function collinearOverlap(A: Wall, B: Wall): { length: number } | null {
+  const uA = norm(sub(A.b, A.a));
+  const uB = norm(sub(B.b, B.a));
+  // Ângulo entre as retas (sentido ignorado: paredes em sentidos opostos também se sobrepõem).
+  const angle = Math.atan2(Math.abs(cross(uA, uB)), Math.abs(dot(uA, uB)));
+  if (angle >= COLLINEAR_ANGLE) return null;
+  const LA = dist(A.a, A.b);
+  const tB1 = dot(sub(B.a, A.a), uA);
+  const tB2 = dot(sub(B.b, A.a), uA);
+  const lo = Math.max(0, Math.min(tB1, tB2));
+  const hi = Math.min(LA, Math.max(tB1, tB2));
+  const length = hi - lo;
+  if (length <= WALL_OVERLAP_MIN) return null;
+  const mid: Vec2 = { x: A.a.x + uA.x * ((lo + hi) / 2), y: A.a.y + uA.y * ((lo + hi) / 2) };
+  const lateral = Math.abs(cross(uB, sub(mid, B.a)));
+  return lateral < COLLINEAR_OFFSET ? { length } : null;
+}
+
+/** Paredes colineares do mesmo nível com trechos em comum (item C14, warning). */
+function wallOverlaps(walls: Wall[]): ValidationIssue[] {
+  const valid = walls.filter((w) => dist(w.a, w.b) >= MIN_WALL_LENGTH);
+  const out: ValidationIssue[] = [];
+  for (let i = 0; i < valid.length; i++) {
+    for (let j = i + 1; j < valid.length; j++) {
+      const A = valid[i]!;
+      const B = valid[j]!;
+      if (A.levelId !== B.levelId) continue;
+      const hit = collinearOverlap(A, B);
+      if (!hit) continue;
+      out.push({
+        severity: 'warning',
+        code: 'wall-overlap',
+        message: `Paredes ${label(A)} e ${label(B)} se sobrepõem por ${Math.round(hit.length * 100)} cm no mesmo nível.`,
+        elementId: A.id,
+      });
+    }
+  }
+  return out;
+}
+
+/** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
+export function validateProject(p: Project): ValidationIssue[] {
+  const elements = Object.values(p.elements);
+  const walls = elements.filter(isWall);
+  const openings = elements.filter(isOpening);
+  return [
+    ...walls.flatMap((w) => wallIssues(p, w)),
+    ...openings.flatMap((o) => openingIssues(p, o)),
+    ...openingOverlaps(p, openings),
+    ...wallOverlaps(walls),
+  ];
+}

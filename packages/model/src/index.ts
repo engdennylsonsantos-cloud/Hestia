@@ -8,3 +8,5 @@ export * from './commands.ts';
 export * from './history.ts';
 export * from './migrate.ts';
 export * from './templates.ts';
+export * from './wall.ts';
+export * from './validate.ts';

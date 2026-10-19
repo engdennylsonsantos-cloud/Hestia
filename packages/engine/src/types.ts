@@ -9,16 +9,18 @@ export interface ResolvedLayer {
   fragment: MultiPolygon;
   /** Fragmento com os vãos recortados (planta). */
   cut: MultiPolygon;
+  /**
+   * Geometria por faixa de altura (3D e quantitativos): o vão só fura as faixas que ele atravessa e uma
+   * parede só corta a vizinha onde as duas existem na mesma altura.
+   */
+  bands: LayerBand[];
 }
 
-/** Pedaço de camada acima/abaixo de um vão, para o 3D. z relativo à base da parede. */
-export interface OpeningPiece {
-  openingId: Id;
-  layerIndex: number;
-  materialId: Id;
-  poly: MultiPolygon;
+/** Faixa vertical de uma camada com a mesma geometria em planta. z relativo à base da parede. */
+export interface LayerBand {
   z0: number;
   z1: number;
+  poly: MultiPolygon;
 }
 
 export interface ResolvedWall {
@@ -34,7 +36,6 @@ export interface ResolvedWall {
   baseZ: number;
   height: number;
   layers: ResolvedLayer[];
-  pieces: OpeningPiece[];
 }
 
 export interface Region {

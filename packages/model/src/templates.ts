@@ -2,6 +2,7 @@ import type { Command } from './commands.ts';
 import { createEmptyProject } from './defaults.ts';
 import { ProjectStore } from './history.ts';
 import type { Opening, Project, Wall } from './types.ts';
+import { makeWall } from './wall.ts';
 
 export type TemplateId = 'blank' | 'house2' | 'studio';
 
@@ -12,24 +13,8 @@ export const TEMPLATES: Array<{ id: TemplateId; name: string; description: strin
 ];
 
 let seq = 0;
-const wall = (a: [number, number], b: [number, number], typeId: string, id?: string): Omit<Wall, 'order'> => ({
-  id: id ?? `tw_${++seq}`,
-  kind: 'wall',
-  typeId,
-  levelId: 'lv_0',
-  a: { x: a[0], y: a[1] },
-  b: { x: b[0], y: b[1] },
-  baseOffset: 0,
-  topLevelId: null,
-  height: 2.8,
-  topOffset: 0,
-  locationLine: 'wallCenter',
-  flipped: false,
-  noJoinStart: false,
-  noJoinEnd: false,
-  mark: '',
-  comments: '',
-});
+const wall = (a: [number, number], b: [number, number], typeId: string, id?: string): Omit<Wall, 'order'> =>
+  makeWall({ id: id ?? `tw_${++seq}`, typeId, levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] } });
 
 const opening = (hostId: string, typeId: string, offset: number, kind: 'door' | 'window', extra: Partial<Opening> = {}): Opening => ({
   id: `to_${++seq}`,

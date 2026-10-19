@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, openingsOfWall, wallsOnLevel, type Id, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeWall, openingsOfWall, wallsOnLevel, type Id, type Wall } from '@hestia/model';
 import { infer, parseNumber, createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId, type ToolOptions } from './index.ts';
 
 function makeEnv(store = new ProjectStore(createEmptyProject())) {
@@ -45,7 +45,7 @@ describe('parseNumber', () => {
 describe('inferência', () => {
   it('extremidade vence a grade e alinhamento', () => {
     const { store } = makeEnv();
-    store.exec({ type: 'addWall', wall: { id: 'w', kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 3.03, y: 0 }, baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false, noJoinStart: false, noJoinEnd: false, mark: '', comments: '' } });
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 3.03, y: 0 } }) });
     const r = infer({ x: 3.0, y: 0.04 }, { project: store.project, levelId: 'lv_0', mpp: 0.01, gridStep: 0.1 });
     expect(r.kind).toBe('endpoint');
     expect(r.point.x).toBeCloseTo(3.03);

@@ -8,7 +8,7 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
   arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
-    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align'] },
+    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split'] },
     { title: 'Medir', tools: ['measure'] },
   ],
 };
@@ -110,6 +110,15 @@ export function Ribbon(): ReactElement {
                 <Toggle icon="cube" label="Arestas" on={s.edges} onClick={() => set({ edges: !s.edges })} />
               </div>
               <div className="rgroup-title">3D</div>
+            </div>
+            <div className="rgroup">
+              <div className="rgroup-tools">
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'schedule', dialogArg: null })} title="Tabela de paredes com quantitativos e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de paredes</span>
+                </button>
+              </div>
+              <div className="rgroup-title">Documentar</div>
             </div>
           </>
         )}

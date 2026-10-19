@@ -13,6 +13,8 @@ const P: Record<string, string> = {
   offset: 'M4 20L20 4M4 14L14 4M10 20L20 10',
   trim: 'M4 4v16h16M4 12h8M12 12l6-6',
   align: 'M4 3v18M8 7h12M8 12h8M8 17h10',
+  joins: 'M4 20V9h11M4 9l5-5M15 9v11M15 9l5 5',
+  split: 'M4 12h6M14 12h6M12 4v16',
   measure: 'M3 17L17 3l4 4L7 21zM8 12l2 2M11 9l2 2M14 6l2 2',
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',

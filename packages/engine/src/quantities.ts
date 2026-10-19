@@ -43,8 +43,7 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
     const H = wallHeight(p, w);
     let total = 0;
     for (const l of rw.layers) {
-      const pieceVol = rw.pieces.filter((x) => x.layerIndex === l.layerIndex).reduce((s, x) => s + multiArea(x.poly) * (x.z1 - x.z0), 0);
-      const vol = multiArea(l.cut) * H + pieceVol;
+      const vol = l.bands.reduce((s, b) => s + multiArea(b.poly) * (b.z1 - b.z0), 0);
       total += vol;
       layers.push({ wallId: rw.wallId, layerIndex: l.layerIndex, materialId: l.materialId, planArea: multiArea(l.cut), volume: vol });
       volumeByMaterial[l.materialId] = (volumeByMaterial[l.materialId] ?? 0) + vol;

@@ -158,3 +158,18 @@ describe('cache', () => {
     expect(multiArea(resolveLevel(s.project, 'lv_0').clusters[0]!.silhouette)).toBeGreaterThan(multiArea(r1.clusters[0]!.silhouette));
   });
 });
+
+describe('modelos iniciais', () => {
+  it.each(['house2', 'studio'] as const)('%s resolve, tem aberturas e nenhuma sobreposição de camadas', async (id) => {
+    const { buildTemplate } = await import('@hestia/model');
+    const p = buildTemplate(id);
+    const r = resolveLevel(p, 'lv_0');
+    expect(Object.keys(r.walls).length).toBeGreaterThan(5);
+    const layers = Object.values(r.walls).flatMap((w) => w.layers);
+    const sum = layers.reduce((a, l) => a + multiArea(l.cut), 0);
+    const sil = multiArea(union(...r.clusters.map((c) => c.silhouette)));
+    expect(sum).toBeCloseTo(sil, 5);
+    const q = quantifyLevel(p, r);
+    expect(q.walls.every((w) => w.netFaceArea > 0)).toBe(true);
+  });
+});

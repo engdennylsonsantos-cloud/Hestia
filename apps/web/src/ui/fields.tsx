@@ -1,0 +1,133 @@
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { parseNumber } from '@hestia/tools';
+
+const fmt = (v: number, decimals: number): string => v.toFixed(decimals).replace('.', ',');
+
+interface NumProps {
+  id?: string;
+  value: number | null;
+  onCommit: (v: number) => void;
+  decimals?: number;
+  unit?: string;
+  /** Multiplicador de exibição (ex.: 100 para metros → cm). */
+  scale?: number;
+  min?: number;
+  max?: number;
+  disabled?: boolean;
+  mixed?: boolean;
+  width?: number;
+  readOnly?: boolean;
+}
+
+/** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly }: NumProps): ReactElement {
+  const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
+  const [text, setText] = useState(show(value));
+  const [focus, setFocus] = useState(false);
+  useEffect(() => {
+    if (!focus) setText(show(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focus, mixed, scale, decimals]);
+  const commit = (): void => {
+    const n = parseNumber(text);
+    if (n === null) {
+      setText(show(value));
+      return;
+    }
+    let v = n / scale;
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    if (value === null || Math.abs(v - value) > 1e-9 || mixed) onCommit(v);
+    setText(fmt(v * scale, decimals));
+  };
+  return (
+    <span className="numwrap">
+      <input
+        id={id}
+        className={`input num${readOnly ? ' ro' : ''}${mixed ? ' mixed' : ''}`}
+        style={width ? { width } : undefined}
+        value={text}
+        placeholder={mixed ? 'variados' : ''}
+        disabled={disabled}
+        readOnly={readOnly}
+        inputMode="decimal"
+        onFocus={(e) => {
+          setFocus(true);
+          e.target.select();
+        }}
+        onBlur={() => {
+          setFocus(false);
+          commit();
+        }}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') {
+            setText(show(value));
+            (e.target as HTMLInputElement).blur();
+          }
+          e.stopPropagation();
+        }}
+      />
+      {unit ? <span className="unit">{unit}</span> : null}
+    </span>
+  );
+}
+
+export function TextField({ id, value, onCommit, placeholder, mixed, disabled }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; mixed?: boolean; disabled?: boolean }): ReactElement {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  return (
+    <input
+      id={id}
+      className={`input wide${mixed ? ' mixed' : ''}`}
+      value={mixed ? '' : text}
+      placeholder={mixed ? 'variados' : placeholder}
+      disabled={disabled}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => text !== value && onCommit(text)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        e.stopPropagation();
+      }}
+    />
+  );
+}
+
+export function Check({ id, checked, onChange, children, disabled, mixed }: { id?: string; checked: boolean; onChange: (v: boolean) => void; children?: ReactNode; disabled?: boolean; mixed?: boolean }): ReactElement {
+  return (
+    <label className="check">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        ref={(el) => {
+          if (el) el.indeterminate = !!mixed;
+        }}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {children}
+    </label>
+  );
+}
+
+export function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }): ReactElement {
+  return (
+    <div className="prow">
+      <label htmlFor={htmlFor} title={label}>
+        {label}
+      </label>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+export function Group({ title, children, open = true }: { title: string; children: ReactNode; open?: boolean }): ReactElement {
+  return (
+    <details className="pgroup" open={open}>
+      <summary>{title}</summary>
+      {children}
+    </details>
+  );
+}

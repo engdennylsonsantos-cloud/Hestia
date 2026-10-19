@@ -7,3 +7,4 @@ export * from './defaults.ts';
 export * from './commands.ts';
 export * from './history.ts';
 export * from './migrate.ts';
+export * from './templates.ts';

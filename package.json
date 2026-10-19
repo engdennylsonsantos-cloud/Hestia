@@ -3,7 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm run dev -w @hestia/web",
     "build": "npm run build -w @hestia/web",
@@ -15,6 +18,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "eslint": "^9.39.0",
+    "playwright-core": "^1.64.1",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.46.0",
     "vitest": "^3.2.0"

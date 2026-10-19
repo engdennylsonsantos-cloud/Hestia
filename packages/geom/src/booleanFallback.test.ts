@@ -25,6 +25,11 @@ describe('operações booleanas sem polygon-clipping', () => {
   it('interseção', () => {
     expect(multiArea(intersection(sq(0, 0, 1), sq(1, 0, 1)))).toBeCloseTo(2, 6);
   });
+  it('polígonos sobrepostos no mesmo operando somam em vez de se anular', () => {
+    const overlapped = [...sq(0, 0, 1), ...sq(1, 0, 1)]; // um multipolígono com dois quadrados que se sobrepõem
+    expect(multiArea(union(overlapped, sq(10, 0, 1)))).toBeCloseTo(6 + 4, 6);
+    expect(multiArea(difference(overlapped, sq(50, 0, 1)))).toBeCloseTo(6, 6); // a sobreposição não é contada duas vezes
+  });
   it('união de três operandos e vazio', () => {
     expect(multiArea(union(sq(0, 0, 1), sq(3, 0, 1), sq(6, 0, 1)))).toBeCloseTo(12, 6);
     expect(intersection(sq(0, 0, 1), sq(5, 0, 1))).toEqual([]);

@@ -1,6 +1,6 @@
 import polygonClipping from 'polygon-clipping';
 import * as ClipperLib from 'clipper-lib';
-import { multiArea, type MultiPolygon, type Polygon, type Ring } from './polygon.ts';
+import { multiArea, ringArea, type MultiPolygon, type Polygon, type Ring } from './polygon.ts';
 
 type Pair = [number, number];
 type PcRing = Pair[];
@@ -87,7 +87,7 @@ function fromTree(tree: ClipperLib.PolyTree): MultiPolygon {
       const poly: Polygon = [toRing(child.Contour())];
       for (const h of child.Childs()) {
         poly.push(toRing(h.Contour()));
-        h.Childs().forEach(walk);
+        walk(h);
       }
       out.push(poly);
     }
@@ -96,13 +96,44 @@ function fromTree(tree: ClipperLib.PolyTree): MultiPolygon {
   return out;
 }
 
-/** Operação booleana binária com Clipper; cada operando é lido por par-ímpar (furos pelo aninhamento). */
+/**
+ * Caminhos de um operando com orientação normalizada (externo anti-horário, furos horários) para a regra de
+ * enrolamento não-zero: polígonos sobrepostos dentro do mesmo operando somam (não se anulam, como na regra
+ * par-ímpar) e cada furo só vale dentro do seu próprio polígono.
+ */
+function operandPaths(m: MultiPolygon): Array<Array<{ X: number; Y: number }>> {
+  return m.flatMap((poly) =>
+    poly.map((ring, i) => {
+      const ccw = ringArea(ring) > 0;
+      const oriented = ccw === (i === 0) ? ring : [...ring].reverse();
+      return toClipPath(oriented);
+    }),
+  );
+}
+
+/**
+ * União de vários multipolígonos numa única chamada do Clipper (inteiros a 1 µm, enrolamento não-zero).
+ * Mais lenta que `union`, mas não perde área em silêncio: o polygon-clipping, em uniões grandes de peças quase
+ * coincidentes, às vezes devolve um resultado menor sem lançar erro (medido nas sementes 3, 9, 10 e 14 dos testes
+ * de propriedade). Use onde a área total importa: regiões e silhuetas do aglomerado.
+ */
+export function unionClipper(...ms: MultiPolygon[]): MultiPolygon {
+  const parts = ms.filter((m) => m.length > 0);
+  if (parts.length === 0) return [];
+  const clip = new ClipperLib.Clipper();
+  clip.AddPaths(parts.flatMap(operandPaths), ClipperLib.PolyType.ptSubject, true);
+  const tree = new ClipperLib.PolyTree();
+  clip.Execute(ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+  return fromTree(tree);
+}
+
+/** Operação booleana binária com Clipper (inteiros, não lança). */
 function clipperBinary(a: MultiPolygon, b: MultiPolygon, type: ClipperLib.ClipType): MultiPolygon {
   const clip = new ClipperLib.Clipper();
-  clip.AddPaths(a.flatMap((p) => p.map(toClipPath)), ClipperLib.PolyType.ptSubject, true);
-  clip.AddPaths(b.flatMap((p) => p.map(toClipPath)), ClipperLib.PolyType.ptClip, true);
+  clip.AddPaths(operandPaths(a), ClipperLib.PolyType.ptSubject, true);
+  clip.AddPaths(operandPaths(b), ClipperLib.PolyType.ptClip, true);
   const tree = new ClipperLib.PolyTree();
-  clip.Execute(type, tree, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftEvenOdd);
+  clip.Execute(type, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
   return fromTree(tree);
 }
 
@@ -140,7 +171,7 @@ export function closeGaps(m: MultiPolygon, eps = 3e-6): MultiPolygon {
         const poly: Polygon = [toRing(child.Contour())];
         for (const h of child.Childs()) {
           poly.push(toRing(h.Contour()));
-          h.Childs().forEach(walk);
+          walk(h);
         }
         out.push(poly);
       }
@@ -157,5 +188,7 @@ export function closeGaps(m: MultiPolygon, eps = 3e-6): MultiPolygon {
  */
 export function closeGapsSafe(m: MultiPolygon, eps = 3e-6, maxLoss = 2e-5): MultiPolygon {
   const closed = closeGaps(m, eps);
-  return Math.abs(multiArea(closed) - multiArea(m)) <= maxLoss ? closed : m;
+  const delta = multiArea(closed) - multiArea(m);
+  // Ganho = frestas coladas (esperado, micrômetros); perda = anéis finos descartados (inaceitável).
+  return delta >= -maxLoss && delta <= 1e-3 ? closed : m;
 }

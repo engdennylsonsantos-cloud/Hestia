@@ -64,8 +64,16 @@ carrega a geometria do fechamento. Piso/laje/telhado **não** têm essa função
 - **Mudar a linha de localização de uma parede existente não a move**; só muda a referência dali em diante.
 - Em parede simples, eixo da parede e do núcleo coincidem; em composta, geralmente não.
 
-**ArchiCAD** `[?]` — a busca não retornou a linha de referência da parede nem o lado de referência do composto.
-**Pendente:** ler a ajuda do ArchiCAD sobre *Reference Line* e *Composite reference side* antes da Fase 1.
+**ArchiCAD** `[ok]` (pesquisa de 19/10/2026, ver §7.1, item 1)
+- Parede composta tem **seis** posições de linha de referência: externa, centro, interna, núcleo externo, núcleo centro,
+  núcleo interno. Sem núcleo, as posições de núcleo ficam indisponíveis.
+  [API Graphisoft](https://archicadapi.graphisoft.com/?p=1354) `[DOC]` · [Graphisoft Help, Wall Reference Line (AC24)](https://help.graphisoft.com/AC/24/INT/_AC24_Help/040_ElementsVB/040_ElementsVB-7.htm) `[DOC]` (busca; página não lida)
+- Deslocamento: vale para as posições externa e interna; no centro não há deslocamento. `[COM]`
+  [Comunidade Graphisoft](https://community.graphisoft.com/t5/Modeling/Reference-Line-of-a-Composite-Wall/td-p/283348) `[COM]`
+- **Lado de referência do composto**: a primeira pele da lista é o lado externo. Desde o ArchiCAD 17 a face externa é um
+  conceito separado da linha de referência. `[COM]`
+  [Comunidade Graphisoft](https://community.graphisoft.com/t5/Modeling/Composites-which-side-is-quot-exterior-quot-which-is-quot/td-p/257669) `[COM]`
+- Ajustar a linha sem mover a parede: comando *Modify Wall Reference Line*. `[COM]`
 
 ## 4. Telhado
 
@@ -125,6 +133,22 @@ O mesmo recurso explica por que a vista "some" elementos quando mal configurada 
 | Tabelas e quantitativos por camada | 6 | agrupamento, campos calculados |
 | Perfis complexos do ArchiCAD | 1 | equivalente no Hestia |
 
+### 7.1 Resultados da pesquisa (19/10/2026)
+
+Graus: **confirmado em fonte oficial** (ajuda do fabricante ou documentação de API, lida pela busca), **consistente em fóruns** (vários relatos concordando, sem fonte oficial) e **não encontrado**. As páginas oficiais da Autodesk e da Graphisoft foram bloqueadas para leitura direta nesta sessão (403 do proxy de saída), então as conclusões de fonte oficial vêm dos trechos de busca dessas páginas, não da página inteira. Quando o item abaixo diz `[?]`, a pendência continua aberta.
+
+1. **Linha de referência da parede no ArchiCAD** `[ok]`. Seis posições confirmadas em fonte oficial (API). Lado de referência do composto (primeira pele = externa) e deslocamento só nas posições externa e interna: consistente em fóruns. Fontes: §3 acima.
+2. **Junção de paredes de tipos diferentes e *Disallow Join*** `[?]`. Confirmado em fonte oficial: o *Disallow Join* é por extremidade, e restaurar é selecionar a junção inteira e usar *Allow Join* ([Autodesk, Specify Wall Join Cleanup Options](https://help.autodesk.com/cloudhelp/2026/ENU/Revit-ArchDesign/files/GUID-130A65BC-8C57-4C31-8C07-F96041771539.htm)). *Previous/Next* percorre as ordens de junção no encosto e no esquadro: confirmado em fonte oficial ([Autodesk, Modify Wall Joins](https://help.autodesk.com/cloudhelp/2023/ENU/Revit-ArchDesign/files/GUID-7AFCACAC-9ED2-44A4-A30E-7D7ED16E01E5.htm)). **Ordem de junção em X (três ou mais paredes): não encontrado.** A ordem de prioridade por *Join Geometry* (primeira parede escolhida domina) aparece só em fórum, e não se aplica a *Disallow Join*.
+3. **Pisos: esboço, inclinação, direção do vão, bordas de laje** `[?]`. Confirmado em fonte oficial: direção do vão de piso estrutural (símbolo e linhas de direção, ajuda Revit 2023) e alça de forma nas bordas de laje ([Autodesk, Move a Floor Slab Edge](https://help.autodesk.com/cloudhelp/2016/ENU/Revit-Model/files/GUID-DFE33521-5EC8-4672-BF7E-EC28A808B066.htm)). Mais de uma direção de vão dentro de um mesmo piso não é suportada: consistente em fóruns (pedido de melhoria, não é documentação). Inclinação de piso: **não encontrado**. Direção por API: fórum, com ressalva de que deve ser definida em transação separada.
+4. **Hospedagem e *Wall Closure* da família** `[ok]`. Confirmado em fonte oficial: o retorno do acabamento no vão depende do *Wall Closure* da família da abertura; o modo (nenhum, interno, externo, ambos) é definido na parede (*Wrapping at Inserts*) e a família do vão pode substituí-lo ([Autodesk, About Layer Wrapping](https://help.autodesk.com/cloudhelp/2023/ENU/Revit-Model/files/GUID-69B6DC75-56A9-4F35-BE24-80048360E2BB.htm)). A posição do retorno vem de planos de referência marcados como *Wall Closure* na família: consistente em fóruns (relatos de 2004–2009).
+5. **Escadas por componente e por croqui: patamar e corrimão contínuo** `[?]`. Confirmado em fonte oficial: patamar automático quando há dois lances para o próximo nível, e corrimão gerado com o lance, ambos desligáveis ([Autodesk, Run Component Tool](https://help.autodesk.com/cloudhelp/2020/ENU/Revit-Model/files/GUID-26053199-6B08-44B9-907C-F5D9AA7CEC81.htm)). Corrimão contínuo entre escadas separadas: consistente em fórum que a junção não é possível, e a solução é editar um corrimão só. Regras de dimensionamento do patamar: **não encontrado**.
+6. **Fases e filtros de fase** `[ok]`. Confirmado em fonte oficial: gráficos de novo, temporário, demolido e existente, e status de filtro *Por categoria*, *Não exibir* ou *Sobrescrito* ([Autodesk, Define the Graphic Display for Phase Filters](https://help.autodesk.com/cloudhelp/2023/ENU/Revit-DocumentPresent/files/GUID-92CF3963-780B-42FA-BAED-1265E3E57CA7.htm)). Filtros padrão *Mostrar demolição* e *Mostrar concluído* ([Autodesk, About Phase Filters](https://help.autodesk.com/cloudhelp/2023/ENU/RevitLT-DocumentPresent/files/GUID-DB104358-4D5A-494E-ACAE-BB8B4E72E572.htm)). O fluxo "demolir alterando a fase de demolição, sem excluir" é consistente em fóruns. Os nomes dos filtros mudam entre versões.
+7. **Tabelas e quantitativos por camada** `[?]`. Confirmado em fonte oficial: a *Material Takeoff* lista materiais e subcomponentes de uma família ([Autodesk, Material Takeoff Schedules](https://knowledge.autodesk.com/support/revit/learn-explore/caas/CloudHelp/cloudhelp/2021/ENU/Revit-DocumentPresent/files/GUID-F8270A42-CA71-46C7-B145-85EC2CB8E4A1-htm.html)). Uma linha por camada, com área e volume próprios: consistente em fóruns e tutoriais. Volume por camada é aproximado por desempenho: relato da busca, não verificado na página. Armadilha conhecida: tabela de parede com campo de volume de material conta todas as camadas e infla a área: consistente em fórum. **Campos calculados em tabela de material: não encontrado** em fonte oficial.
+8. **Perfis complexos do ArchiCAD** `[?]`. Conceito confirmado em fonte oficial (ajuda AC17, AC18 e AC20): perfil complexo é a seção transversal do elemento, salvo como atributo e colocado na planta; pode ter material por superfície de componente ([Graphisoft, About Complex Profile Elements (AC18)](https://help.graphisoft.com/AC/18/INT/AC18Help/03_1_Elements_Virtual_Building/03_1_Elements_Virtual_Building-35.htm)). **Equivalente no Hestia: decisão de projeto, não pesquisa.** O Hestia não tem seção transversal de parede: o `topProfile` é perfil do topo em altura, e as faixas (`strips`) são acabamentos laterais. Não há conclusão que contradiga o código; a lacuna fica registrada.
+9. **Esquadro** `[?]` (§9, item 3). Definição confirmada em fonte oficial: *Square off* esquadreja a extremidade da parede a 90°, não vale para paredes inclinadas nem para o interior de outra parede, e é indicado para encontros não retos ([Autodesk, Change the Configuration of a Wall Join](https://help.autodesk.com/cloudhelp/2023/ENU/Revit-ArchDesign/files/GUID-19EAF7A9-331F-4271-94CC-43B76B13011E.htm)). Desenho do canto: **não encontrado**.
+
+**Contradições com o código atual:** nenhuma conclusão contradiz o código. O código segue a definição de esquadro (item 9) e o modo de fechamento do vão (item 4, `insertMode`). Há lacunas, não contradições: linha de referência sem deslocamento (`locationLine` é só enumeração, sem offset), fechamento do vão sem geometria vinda da família, e fases, escadas e pisos ainda não existem no modelo.
+
 ## 8. Como transformar referência em teste (obrigatório por ferramenta)
 
 1. **Ficha de comportamento** (esta página): o que acontece, em que condição, com fonte.
@@ -156,6 +180,7 @@ O mesmo recurso explica por que a vista "some" elementos quando mal configurada 
 1. Padrão = **encosto**, como o Revit. A mais antiga domina; "inverter ordem" troca.
 2. **Esquadria** pareia as camadas **a partir do núcleo** (a estrutura de uma parede encontra a da outra; acabamentos contornam o canto com a espessura própria de cada um). Se os acabamentos de uma parede são mais finos, eles terminam na face externa da outra.
 3. **Esquadro** `[?]`: implementado como extensão reta das duas paredes até cobrir o canto externo. A fonte descreve "esquadrejar a 90°" para encontros não retos; o detalhe visual precisa de confirmação.
+   Pesquisa de 19/10/2026 (§7.1, item 9): a definição está confirmada em fonte oficial (ajuda Autodesk, trecho de busca) e o código a segue, pois cada extremidade é cortada a 90° e prolongada até o canto externo. O desenho exato do canto **não foi encontrado**; continua `[?]`.
 4. T (extremidade no meio da outra): sempre encosto, ordem fixa, como no Revit.
 5. Nó de 3 ou mais paredes: cada parede ocupa o setor limitado pelas semirretas que saem do nó pelos cantos entre faces vizinhas. Com um par colinear, o par atravessa e as demais encostam (T).
 6. **Desempate** de camadas de mesma prioridade e materiais diferentes: domina a parede de **núcleo mais espesso**, depois a mais antiga. Difere do Revit (só ordem de junção) para evitar que um drywall corte um bloco; a prioridade por camada continua prevalecendo.

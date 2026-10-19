@@ -1,4 +1,5 @@
-import { ProjectStore, isOpening, isWall, wallTypeUsage, type Element, type Id, type Project } from '@hestia/model';
+import { fitBox, type Viewport } from '@hestia/render';
+import { ProjectStore, isOpening, isWall, openingType, wallTypeUsage, type Element, type Id, type Project } from '@hestia/model';
 
 /** Tipos que o navegador de projeto lista: parede, porta e janela. */
 export type TypeKind = 'wall' | 'door' | 'window';
@@ -81,6 +82,112 @@ export function replaceType(store: ProjectStore, kind: TypeKind, fromId: Id, toI
 
 export function replaceStatus(count: number, toName: string): string {
   return `${plural(count, 'instância substituída', 'instâncias substituídas')} por «${toName}».`;
+}
+
+interface Pt {
+  x: number;
+  y: number;
+}
+
+export interface Box {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Pontos de referência de uma parede: extremos e meio do arco (a flecha `sag` fica à esquerda de a→b). */
+function wallPoints(w: { a: Pt; b: Pt; sag: number }): Pt[] {
+  const dx = w.b.x - w.a.x;
+  const dy = w.b.y - w.a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const mid = { x: (w.a.x + w.b.x) / 2 + nx * w.sag, y: (w.a.y + w.b.y) / 2 + ny * w.sag };
+  return [w.a, w.b, mid];
+}
+
+/**
+ * Caixa que envolve as paredes e as aberturas dadas (aberturas: centro e as duas bordas do vão, sobre o eixo
+ * do hospedeiro). Null quando nenhum elemento tem geometria.
+ */
+export function boxOfElements(p: Project, ids: Id[]): Box | null {
+  const pts: Pt[] = [];
+  for (const id of ids) {
+    const e = p.elements[id];
+    if (isWall(e)) pts.push(...wallPoints(e));
+    else if (e && isOpening(e)) {
+      const host = p.elements[e.hostId];
+      if (!isWall(host)) continue;
+      const dx = host.b.x - host.a.x;
+      const dy = host.b.y - host.a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const hw = (p.openingTypes[e.typeId] ? openingType(p, e).width : 0) / 2;
+      const c = { x: host.a.x + ux * e.offset, y: host.a.y + uy * e.offset };
+      pts.push({ x: c.x - ux * hw, y: c.y - uy * hw }, { x: c.x + ux * hw, y: c.y + uy * hw }, c);
+    }
+  }
+  if (pts.length === 0) return null;
+  const xs = pts.map((q) => q.x);
+  const ys = pts.map((q) => q.y);
+  return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+}
+
+export interface WhereUsedTarget {
+  levelId: Id;
+  /** Instâncias do nível escolhido. */
+  ids: Id[];
+  /** Quantas ficaram em outros níveis. */
+  elsewhere: number;
+}
+
+/**
+ * Nível para "Onde é usado": o que tem mais instâncias do tipo (empate: o primeiro na ordem dos níveis).
+ * Null quando o tipo não tem instância em nenhum nível.
+ */
+export function whereUsedTarget(p: Project, kind: TypeKind, typeId: Id): WhereUsedTarget | null {
+  const all = instancesOfType(p, kind, typeId);
+  const byLevel = new Map<Id, Id[]>();
+  for (const id of all) {
+    const e = p.elements[id];
+    const lv = e ? levelOfElement(p, e) : undefined;
+    if (lv !== undefined) byLevel.set(lv, [...(byLevel.get(lv) ?? []), id]);
+  }
+  let best: { levelId: Id; ids: Id[] } | null = null;
+  for (const l of p.levels) {
+    const ids = byLevel.get(l.id);
+    if (ids && (!best || ids.length > best.ids.length)) best = { levelId: l.id, ids };
+  }
+  if (!best) return null;
+  return { levelId: best.levelId, ids: best.ids, elsewhere: all.length - best.ids.length };
+}
+
+/** O que o controller oferece para "Onde é usado" (um subconjunto de `Editor`). */
+export interface WhereUsedNav {
+  readonly project: Project;
+  viewport(): Viewport | null;
+  setViewport(v: Viewport): void;
+  selectLevel(levelId: Id): void;
+}
+
+/**
+ * "Onde é usado": vai ao nível com mais instâncias, enquadra essas instâncias e as seleciona. As de outros
+ * níveis são só contadas no status. Devolve a frase de status.
+ */
+export function whereUsed(nav: WhereUsedNav, kind: TypeKind, typeId: Id, name: string, select: (ids: Id[]) => void): string {
+  const target = whereUsedTarget(nav.project, kind, typeId);
+  if (!target) return `Nenhuma instância de «${name}» no projeto.`;
+  // O viewport é do canvas (mesmo tamanho em todos os níveis): lê antes de trocar de nível.
+  const current = nav.viewport();
+  nav.selectLevel(target.levelId);
+  select(target.ids);
+  const box = boxOfElements(nav.project, target.ids);
+  if (current && box) nav.setViewport(fitBox(current, box));
+  const levelName = nav.project.levels.find((l) => l.id === target.levelId)?.name ?? target.levelId;
+  const extra = target.elsewhere > 0 ? `, ${otherLevels(target.elsewhere)}` : '';
+  return `${plural(target.ids.length, 'instância', 'instâncias')} de «${name}» em ${levelName}${extra}.`;
 }
 
 /** Motivo pelo qual o tipo de parede não pode ser excluído; null quando pode. */

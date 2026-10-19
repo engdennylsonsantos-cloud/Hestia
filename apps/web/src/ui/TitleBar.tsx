@@ -1,6 +1,7 @@
 import { useRef, type ReactElement } from 'react';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { savePlanDxf } from '../editor/dxfExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
 
@@ -17,6 +18,15 @@ export function TitleBar(): ReactElement {
     const text = await f.text();
     const r = editor.openFromText(text, f.name);
     useUi.setState({ status: r.ok ? `Aberto: ${f.name}` : `Não foi possível abrir: ${r.error}` });
+  };
+  const exportDxf = async (): Promise<void> => {
+    const levelId = useUi.getState().levelId;
+    try {
+      const status = await savePlanDxf(editor.project, levelId, editor.resolved(levelId));
+      useUi.setState({ status });
+    } catch (e) {
+      useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
+    }
   };
   return (
     <header className="titlebar">
@@ -43,6 +53,9 @@ export function TitleBar(): ReactElement {
       <input ref={fileRef} id="file-open" type="file" accept=".json,.hestia,application/json" hidden onChange={(e) => { void open(e.target.files?.[0]); e.target.value = ''; }} />
       <button className="ibtn" onClick={() => void editor.save()} title="Exportar o projeto (Ctrl+S)">
         <Icon name="save" size={17} /> <span className="lbl-text">Salvar</span>
+      </button>
+      <button className="ibtn" onClick={() => void exportDxf()} title="Exportar a planta do nível atual em DXF (metros)">
+        <Icon name="plan" size={17} /> <span className="lbl-text">Exportar DXF</span>
       </button>
       <span className="sep" />
       <button className="ibtn" disabled={!store.canUndo} onClick={() => editor.undo()} title={store.undoLabel ? `Desfazer: ${store.undoLabel} (Ctrl+Z)` : 'Desfazer'}>

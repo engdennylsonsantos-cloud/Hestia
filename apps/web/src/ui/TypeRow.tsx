@@ -10,6 +10,7 @@ import {
   selectAllPlan,
   tryDeleteWallType,
   wallTypeDeleteBlock,
+  whereUsed,
   type TypeKind,
 } from '../editor/typeActions.ts';
 import { Icon } from './Icon.tsx';
@@ -36,6 +37,8 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   const panelId = useId();
   const [replacing, setReplacing] = useState(false);
   const [target, setTarget] = useState<Id>('');
+  /** Depois de substituir, pergunta se o tipo antigo (que ficou sem uso) deve ser excluído. */
+  const [askDelete, setAskDelete] = useState(false);
   const uses = instancesOfType(p, kind, typeId).length;
   const choices = compatibleTypes(p, kind, typeId);
   const chosen = choices.some((c) => c.id === target) ? target : (choices[0]?.id ?? '');
@@ -47,6 +50,11 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
     useUi.setState({ selection: plan.ids, status: plan.status });
   };
 
+  const showWhereUsed = (): void => {
+    const status = whereUsed(editor, kind, typeId, name, (ids) => useUi.setState({ selection: ids }));
+    useUi.setState({ status });
+  };
+
   const apply = (): void => {
     const to = choices.find((c) => c.id === chosen);
     if (!to) return;
@@ -54,6 +62,8 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
       const n = replaceType(editor.store, kind, typeId, to.id);
       useUi.setState({ status: replaceStatus(n, to.name) });
       setReplacing(false);
+      // Só pergunta se o tipo antigo pode mesmo ser excluído (o padrão do projeto não pode).
+      setAskDelete(kind === 'wall' && n > 0 && wallTypeDeleteBlock(editor.project, typeId) === null);
     } catch (e) {
       useUi.setState({ status: `Não foi possível substituir: ${errText(e)}` });
     }
@@ -68,6 +78,7 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
     // Se o tipo excluído era o escolhido para desenhar, volta ao padrão do projeto.
     const ui = useUi.getState();
     if (ui.options.wallTypeId === typeId) useUi.setState({ options: { ...ui.options, wallTypeId: editor.project.defaults.wallTypeId } });
+    setAskDelete(false);
     useUi.setState({ status: `Tipo «${name}» excluído.` });
   };
 
@@ -83,13 +94,25 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
       <div className={`type-row${replacing ? ' open' : ''}`}>
         <button className={`leaf${active ? ' on' : ''}`} title="Clique para usar este tipo ao desenhar. Duplo clique edita o tipo." onClick={onUse} onDoubleClick={onEdit}>
           <Icon name={icon} size={14} /> {name}
-          <span className="meta">{uses}</span>
+          <span className="meta" title={`${uses} ${uses === 1 ? 'uso' : 'usos'} no projeto`}>
+            {uses}
+          </span>
         </button>
         <div className="type-actions" role="group" aria-label={`Ações do tipo ${name}`}>
           <button
             type="button"
             className="ibtn type-act"
-            title="Selecionar todas as instâncias"
+            title={uses === 0 ? 'Este tipo não tem instâncias.' : 'Onde é usado: vai ao nível com mais instâncias, enquadra e seleciona'}
+            aria-label={`Onde é usado: ${name}`}
+            disabled={uses === 0}
+            onClick={showWhereUsed}
+          >
+            <Icon name="fit" size={13} />
+          </button>
+          <button
+            type="button"
+            className="ibtn type-act"
+            title="Selecionar as instâncias deste nível"
             aria-label={`Selecionar todas as instâncias de ${name}`}
             onClick={selectAll}
           >
@@ -139,6 +162,19 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
             </button>
             <button type="button" className="btn small" onClick={() => setReplacing(false)}>
               Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {askDelete ? (
+        <div className="type-replace" role="group" aria-label={`Excluir o tipo ${name}`}>
+          <span>Excluir o tipo «{name}», que ficou sem uso?</span>
+          <div className="type-replace-btns">
+            <button type="button" className="btn small danger" onClick={remove}>
+              Excluir tipo
+            </button>
+            <button type="button" className="btn small" onClick={() => setAskDelete(false)}>
+              Manter
             </button>
           </div>
         </div>

@@ -32,26 +32,79 @@ function fromPc(m: PcMulti): MultiPolygon {
 
 export const asMulti = (r: Ring): MultiPolygon => [[r]];
 
+/**
+ * polygon-clipping é exato, mas lança em entradas quase degeneradas (anéis que quase se tocam, arestas
+ * colineares com erro de micrômetros). Nesse caso refazemos a operação com Clipper, que trabalha em inteiros e
+ * nunca lança: o resultado perde a precisão abaixo de 1 µm, o que é irrelevante para paredes.
+ */
+function robust(exact: () => PcMulti, fallback: () => MultiPolygon): MultiPolygon {
+  try {
+    return fromPc(exact());
+  } catch {
+    return fallback();
+  }
+}
+
 export function union(...ms: MultiPolygon[]): MultiPolygon {
-  const parts = ms.filter((m) => m.length > 0).map(toPc);
+  const parts = ms.filter((m) => m.length > 0);
   if (parts.length === 0) return [];
-  const [first, ...rest] = parts;
-  return fromPc(polygonClipping.union(first!, ...rest));
+  const [first, ...rest] = parts.map(toPc);
+  return robust(
+    () => polygonClipping.union(first!, ...rest),
+    () => parts.slice(1).reduce((acc, m) => clipperBinary(acc, m, ClipperLib.ClipType.ctUnion), parts[0]!),
+  );
 }
 
 export function difference(a: MultiPolygon, ...bs: MultiPolygon[]): MultiPolygon {
   if (a.length === 0) return [];
-  const subs = bs.filter((m) => m.length > 0).map(toPc);
+  const subs = bs.filter((m) => m.length > 0);
   if (subs.length === 0) return a;
-  return fromPc(polygonClipping.difference(toPc(a), ...subs));
+  return robust(
+    () => polygonClipping.difference(toPc(a), ...subs.map(toPc)),
+    () => subs.reduce((acc, m) => clipperBinary(acc, m, ClipperLib.ClipType.ctDifference), a),
+  );
 }
 
 export function intersection(a: MultiPolygon, b: MultiPolygon): MultiPolygon {
   if (a.length === 0 || b.length === 0) return [];
-  return fromPc(polygonClipping.intersection(toPc(a), toPc(b)));
+  return robust(
+    () => polygonClipping.intersection(toPc(a), toPc(b)),
+    () => clipperBinary(a, b, ClipperLib.ClipType.ctIntersection),
+  );
 }
 
 const CLIP_SCALE = 1e6;
+
+const toClipPath = (r: Ring): Array<{ X: number; Y: number }> => r.map((v) => ({ X: Math.round(v.x * CLIP_SCALE), Y: Math.round(v.y * CLIP_SCALE) }));
+
+/** Resultado do Clipper (árvore) como multipolígono com furos. */
+function fromTree(tree: ClipperLib.PolyTree): MultiPolygon {
+  const out: MultiPolygon = [];
+  const toRing = (path: Array<{ X: number; Y: number }>): Ring => path.map((q) => ({ x: q.X / CLIP_SCALE, y: q.Y / CLIP_SCALE }));
+  const walk = (node: ClipperLib.PolyNode): void => {
+    for (const child of node.Childs()) {
+      if (child.IsHole()) continue;
+      const poly: Polygon = [toRing(child.Contour())];
+      for (const h of child.Childs()) {
+        poly.push(toRing(h.Contour()));
+        h.Childs().forEach(walk);
+      }
+      out.push(poly);
+    }
+  };
+  walk(tree);
+  return out;
+}
+
+/** Operação booleana binária com Clipper; cada operando é lido por par-ímpar (furos pelo aninhamento). */
+function clipperBinary(a: MultiPolygon, b: MultiPolygon, type: ClipperLib.ClipType): MultiPolygon {
+  const clip = new ClipperLib.Clipper();
+  clip.AddPaths(a.flatMap((p) => p.map(toClipPath)), ClipperLib.PolyType.ptSubject, true);
+  clip.AddPaths(b.flatMap((p) => p.map(toClipPath)), ClipperLib.PolyType.ptClip, true);
+  const tree = new ClipperLib.PolyTree();
+  clip.Execute(type, tree, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftEvenOdd);
+  return fromTree(tree);
+}
 
 /**
  * Fechamento morfológico (dilata e contrai por `eps` metros) com Clipper, que trabalha em inteiros.

@@ -1,8 +1,9 @@
 import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
-import { isWall, type Id } from '@hestia/model';
+import { isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, moveWalls, selectedOpenings, selectedWalls, slideOpenings } from './edit.ts';
+import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
 
@@ -187,11 +188,16 @@ export class RotateTool extends SelectionTool {
   }
 }
 
+/**
+ * Espelhar (Revit: Mirror - Pick Axis). Dois cliques definem o eixo; Tab alterna "Pegar parede":
+ * o primeiro clique numa parede existente usa a linha a→b dela como eixo e espelha na hora.
+ */
 export class MirrorTool extends SelectionTool {
   readonly id = 'mirror';
   readonly label = 'Espelhar';
-  readonly hint = 'Espelhar: clique em dois pontos para definir o eixo de simetria.';
+  readonly hint = 'Espelhar: clique em dois pontos para definir o eixo de simetria. Tab: pegar uma parede como eixo.';
   private p1: Vec2 | null = null;
+  private pickAxis = false;
 
   protected reset(): void {
     this.p1 = null;
@@ -201,8 +207,33 @@ export class MirrorTool extends SelectionTool {
     return this.p1 !== null;
   }
 
+  override tab(): void {
+    this.pickAxis = !this.pickAxis;
+    this.reset();
+    this.env.say(this.pickAxis ? 'Pegar parede: clique numa parede existente para usá-la como eixo.' : this.hint);
+  }
+
+  /** Parede sob o cursor (uma abertura conta como a parede que a hospeda). */
+  private wallUnder(p: Vec2): Id | null {
+    const pr = this.env.project();
+    const hit = pickAt(pr, this.env.levelId(), p, this.env.metersPerPixel());
+    if (!hit) return null;
+    const e = pr.elements[hit.id];
+    if (isWall(e)) return e.id;
+    return isOpening(e) ? e.hostId : null;
+  }
+
   override move(p: PointerInfo): void {
     this.items = [];
+    if (this.pickAxis) {
+      const id = this.wallUnder(p.raw);
+      const f = id ? frameOfWall(this.env.project(), id) : null;
+      if (!id || !f) return;
+      this.items.push({ kind: 'highlight', ids: [id] });
+      this.items.push({ kind: 'line', a: f.a, b: f.b, dashed: true });
+      this.items.push(...ghostBands(this.env.project(), this.walls(), { kind: 'mirror', a: f.a, b: f.b }));
+      return;
+    }
     const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.walls()) });
     if (!this.p1) {
       this.items.push({ kind: 'point', at: inf.point });
@@ -214,19 +245,35 @@ export class MirrorTool extends SelectionTool {
     }
   }
 
+  /** Aplica o espelho pelo eixo a→b às paredes, com cópia se a opção estiver marcada. */
+  private apply(a: Vec2, b: Vec2): void {
+    const walls = this.walls();
+    const t = { kind: 'mirror', a, b } as const;
+    if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, walls, t));
+    else this.env.exec({ type: 'transform', ids: walls, transform: t });
+    this.reset();
+    this.env.done();
+  }
+
   override click(p: PointerInfo): void {
+    if (this.pickAxis) {
+      const id = this.wallUnder(p.raw);
+      const f = id ? frameOfWall(this.env.project(), id) : null;
+      if (!f) {
+        this.env.say('Clique numa parede para usá-la como eixo.');
+        return;
+      }
+      if (dist(f.a, f.b) < 1e-4) return;
+      this.apply(f.a, f.b);
+      return;
+    }
     const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.walls()) });
     if (!this.p1) {
       this.p1 = inf.point;
       return;
     }
     if (dist(this.p1, inf.point) < 1e-4) return;
-    const walls = this.walls();
-    const t = { kind: 'mirror', a: this.p1, b: inf.point } as const;
-    if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, walls, t));
-    else this.env.exec({ type: 'transform', ids: walls, transform: t });
-    this.reset();
-    this.env.done();
+    this.apply(this.p1, inf.point);
   }
 }
 

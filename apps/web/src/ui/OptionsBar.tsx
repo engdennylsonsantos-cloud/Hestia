@@ -35,9 +35,10 @@ export function OptionsBar(): ReactElement {
           </label>
           <label>
             Forma
-            <select id="opt-shape" className="select" value={o.wallShape} onChange={(e) => set({ wallShape: e.target.value as 'line' | 'arc' })}>
+            <select id="opt-shape" className="select" value={o.wallShape} onChange={(e) => set({ wallShape: e.target.value as 'line' | 'arc' | 'rect' })}>
               <option value="line">Reta</option>
               <option value="arc">Arco (3 pontos)</option>
+              <option value="rect">Retângulo (2 cantos)</option>
             </select>
           </label>
           <label>

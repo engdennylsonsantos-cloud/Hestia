@@ -9,6 +9,7 @@ import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
 import { SectionPreview } from './SectionPreview.tsx';
 import { StripsTab, stripError } from './StripsTab.tsx';
+import { TypeParams } from './TypeParams.tsx';
 
 const FUNCTIONS = Object.keys(FUNCTION_LABEL) as LayerFunction[];
 const WRAP_OPTIONS: Array<[WrapMode, string]> = [['none', 'Não envolver'], ['both', 'Dos dois lados'], ['exterior', 'Só lado externo'], ['interior', 'Só lado interno']];
@@ -208,6 +209,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
           <>
             <div className="field-row"><label htmlFor="wt-code">Código</label><TextField id="wt-code" value={draft.code} onCommit={(v) => setDraft({ ...draft, code: v })} /></div>
             <div className="field-row"><label htmlFor="wt-desc">Descrição</label><TextField id="wt-desc" value={draft.description} onCommit={(v) => setDraft({ ...draft, description: v })} /></div>
+            <TypeParams type={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
           </>
         )}
       </Dialog>

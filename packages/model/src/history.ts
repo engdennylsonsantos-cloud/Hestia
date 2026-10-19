@@ -177,5 +177,7 @@ export function labelOf(c: Command): string {
       return 'Excluir vista';
     case 'batch':
       return 'Várias alterações';
+    case 'setOpeningHost':
+      return 'Trocar parede anfitriã';
   }
 }

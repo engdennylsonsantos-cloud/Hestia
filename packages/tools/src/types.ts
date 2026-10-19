@@ -51,8 +51,8 @@ export interface ToolOptions {
   locationLine: LocationLine;
   wallHeight: number;
   chain: boolean;
-  /** Forma da parede ao desenhar: reta ou arco por três pontos. */
-  wallShape: 'line' | 'arc';
+  /** Forma da parede ao desenhar: reta, arco por três pontos ou retângulo por dois cantos opostos. */
+  wallShape: 'line' | 'arc' | 'rect';
   doorTypeId: Id;
   windowTypeId: Id;
   orthoLock: boolean;

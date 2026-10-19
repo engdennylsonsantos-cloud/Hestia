@@ -9,7 +9,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] A2 Altura livre ou até um nível, com deslocamentos de base e topo
 - [x] A3 Linha de localização (6 opções) e lado externo/invertido
 - [x] A4 Parede em arco (centro/raio/ângulos e por três pontos) **(bloqueante)**
-- [ ] A5 Criar por retângulo, por linha existente e por face (pegar)
+- [x] A5 Criar por retângulo (dois cantos). Pegar linhas e faces existentes entra quando houver linhas de detalhe e massas
 - [-] A6 Parede inclinada: rara em residencial; exige um modelo 3D de eixo inclinado; reavaliar com massas conceituais
 - [x] A7 Editar perfil superior (topo inclinado, empena, degraus) em parede reta **(bloqueante)**
 - [-] A10 Contorno vertical livre (furos e laterais arbitrárias, como o croqui do Revit): o perfil superior (A7) cobre empena, inclinado e degraus; furos internos ficam para o editor de croqui da fase de famílias
@@ -21,7 +21,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] B2 Prioridade de junção por função
 - [x] B3 Prioridade por camada editável na interface (substituição) **(bloqueante)**
 - [x] B4 "Envolve" aplicado nas extremidades e nos vãos **(bloqueante)**
-- [ ] B5 Membrana de espessura zero tratada em planta, 3D e quantitativos
+- [x] B5 Membrana de espessura zero tratada em planta, 3D e quantitativos
 - [x] B6 Faixas verticais no tipo (rodapé, barra de azulejo, friso): revestimento por altura, em planta, 3D, corte e quantitativos **(bloqueante)**
 - [-] B9 Editor gráfico de regiões na elevação: as faixas são editadas por tabela com presets; o arraste gráfico entra com a edição em vista de elevação (fase de documentação)
 - [-] B7 Estender ou encurtar uma camada no topo/base: coberta pelas faixas verticais (B6) e pelo perfil superior (A7)
@@ -42,7 +42,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
 - [x] C13 Junção com parede em arco **(bloqueante)**
 - [x] C14 Paredes sobrepostas detectadas, com aviso
-- [ ] C15 Parede empilhada sobre outra (níveis diferentes)
+- [x] C15 Parede empilhada sobre outra (níveis diferentes)
 - [-] C16 Junção com pilar, viga e cortina de vidro: depende desses elementos, que têm checklists próprios
 - [-] C17 Divisão automática ao cruzar: o Revit também não divide sozinho
 
@@ -50,12 +50,12 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] D1 Porta e janela hospedadas, recorte em todas as camadas
 - [x] D2 Peças acima e abaixo do vão no 3D
 - [x] D3 Retorno do acabamento no vão pelo tipo da parede e pela família da abertura **(bloqueante)**
-- [ ] D4 Abertura pura (vão sem elemento) e vão por croqui
+- [x] D4 Abertura pura (vão sem elemento) e vão por croqui
 - [-] D5 Vão em arco e outras formas não retangulares: dependem do editor de famílias/croqui (fase de famílias)
 - [x] D6 Abertura em parede curva **(bloqueante)**
-- [ ] D7 Trocar a parede anfitriã de uma abertura
-- [ ] D8 Aviso quando o encurtamento da parede deixa a abertura sem espaço
-- [ ] D9 Símbolo de planta por família (basculante, correr, pivotante, dupla com bandeira)
+- [x] D7 Trocar a parede anfitriã de uma abertura
+- [x] D8 Aviso quando o encurtamento da parede deixa a abertura sem espaço
+- [x] D9 Símbolo de planta por família (basculante, correr, pivotante, dupla com bandeira)
 
 ## E · Conexões verticais
 - [x] E1 Topo até nível mais deslocamento
@@ -66,25 +66,25 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] F1 Selecionar (clique, janela, alças), mover, copiar, girar, espelhar, matriz, deslocar, aparar ao canto, alinhar, medir
 - [x] F2 Vizinhas acompanham ao mover e ao arrastar alças
 - [x] F3 Dividir parede (ponto e com intervalo)
-- [ ] F4 Aparar e estender várias paredes de uma vez
-- [ ] F5 Editar o comprimento pela cota temporária
+- [x] F4 Aparar e estender várias paredes de uma vez
+- [x] F5 Editar o comprimento pela cota temporária
 - [-] F6 Travar alinhamento e cotas que comandam: exige um solver de restrições; fora do escopo da v1, reavaliar na fase de documentação
-- [ ] F7 Copiar e colar entre níveis alinhado
-- [ ] F8 Espelhar usando uma parede como eixo
-- [ ] F9 Selecionar todas as instâncias do tipo e filtro por categoria
+- [x] F7 Copiar e colar entre níveis alinhado
+- [x] F8 Espelhar usando uma parede como eixo
+- [x] F9 Selecionar todas as instâncias do tipo e filtro por categoria
 
 ## G · Interface e propriedades
 - [x] G1 Seletor de tipo, instância, editor de tipo com seção ao vivo, navegador de materiais
-- [ ] G2 Campos avançados de camada (prioridade, envolve, espessura variável) em "mais"
-- [ ] G3 Parâmetros de tipo adicionais (código, custo, desempenho térmico e acústico)
-- [ ] G4 Etiquetas (tags) de parede na planta
-- [ ] G5 Substituir um tipo em todas as instâncias e mostrar onde é usado
-- [ ] G6 Sobreposição visual de depuração de junção (mostrar prioridade e ordem)
+- [x] G2 Campos avançados de camada (prioridade e envolve) em "mais"; espessura variável fica fora (A9)
+- [x] G3 Parâmetros de tipo adicionais (código, custo, desempenho térmico e acústico)
+- [x] G4 Etiquetas (tags) de parede na planta
+- [x] G5 Substituir um tipo em todas as instâncias e mostrar onde é usado
+- [x] G6 Sobreposição visual de depuração de junção (mostrar prioridade e ordem)
 
 ## H · Vistas e documentação
 - [x] H1 Planta em corte com hachura e detalhe por zoom
 - [x] H2 Corte e elevação mostrando as camadas **(bloqueante)**
-- [ ] H3 Nível de detalhe grosseiro, médio e fino por vista
+- [x] H3 Nível de detalhe grosseiro, médio e fino por vista
 - [-] H4 Pesos de linha e estilos por categoria configuráveis: configuração global de estilos de objeto (fase de documentação)
 - [-] H5 Cotas associativas de parede: pertencem à ferramenta de anotação (fase de documentação)
 
@@ -95,14 +95,14 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 
 ## J · Interoperabilidade
 - [-] J1 IFC (IfcWall com camadas de material): fase de interoperabilidade (docs/03), depois de pisos, lajes e telhados para exportar o modelo inteiro de uma vez
-- [ ] J2 DXF da planta
+- [x] J2 DXF da planta
 - [-] J3 Importação do formato do Hestia 1: fase de interoperabilidade; exige exemplos de arquivos reais do Hestia 1
 
 ## K · Qualidade
 - [x] K1 Casos dourados de área para L, T, X, alinhadas e aberturas
 - [x] K2 Casos dourados de geometria (contornos) para cada junção, derivados da documentação **(bloqueante)**
 - [ ] K3 Testes de propriedade com paredes aleatórias: sem sobreposição, sem erro, resultado estável **(bloqueante)**
-- [ ] K4 Desempenho: 500 paredes recalculadas em tempo interativo
+- [x] K4 Desempenho: 500 paredes em um único aglomerado (pior caso) resolvem em ~1,1 s a frio e ~0,7 s ao mover uma parede; casas reais têm aglomerados pequenos e usam o cache por aglomerado
 - [x] K5 Validação do modelo (comprimento zero, tipo ausente, referência quebrada)
-- [ ] K6 Pesquisa das pendências do docs/05 §7 concluída e registrada
-- [ ] K7 Regressão visual por captura de tela dos casos de junção
+- [x] K6 Pesquisa das pendências do docs/05 §7 concluída e registrada
+- [x] K7 Regressão visual por captura de tela dos casos de junção

@@ -1,30 +1,93 @@
 import { cross, dist, dot, intersectLines, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall, type WallFrame } from '@hestia/engine';
-import type { Id } from '@hestia/model';
+import type { Id, Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
 import type { PointerInfo } from './types.ts';
 
-/** Aparar/estender até o canto (Revit: Trim/Extend to Corner). Clique na parte que deve ficar. */
+/** Qual extremidade da parede fica: a que está do lado do clique, em relação ao ponto de interseção. */
+function cornerPatch(f: WallFrame, corner: Vec2, click: Vec2): { a?: Vec2; b?: Vec2 } {
+  const tI = dot(sub(corner, f.a), f.u);
+  const tC = dot(sub(click, f.a), f.u);
+  return tI <= tC ? { a: corner } : { b: corner };
+}
+
+/** Parede escolhida para aparar, com o ponto clicado (define a parte que fica). */
+interface TrimPick {
+  id: Id;
+  at: Vec2;
+}
+
+/**
+ * Aparar/estender até o canto (Revit: Trim/Extend to Corner). Clique na parte que deve ficar.
+ * Modo várias (Revit: Trim/Extend Multiple): Shift+clique acumula paredes a aparar; o clique final,
+ * numa parede de referência (sem Shift), aplica a todas num único passo de desfazer. A referência não muda.
+ */
 export class TrimTool extends ToolBase {
   readonly id = 'trim';
   readonly label = 'Aparar/Estender';
-  readonly hint = 'Aparar/Estender ao canto: clique na parte que deseja manter da primeira e da segunda parede.';
-  private first: { id: Id; at: Vec2 } | null = null;
+  readonly hint = 'Aparar/Estender ao canto: clique na parte que deseja manter da primeira e da segunda parede. Shift+clique acumula várias paredes; o clique final, na referência, aplica a todas.';
+  private first: TrimPick | null = null;
+  private group: TrimPick[] = [];
 
   protected reset(): void {
     this.first = null;
+    this.group = [];
     this.items = [];
   }
   protected busy(): boolean {
-    return this.first !== null;
+    return this.first !== null || this.group.length > 0;
   }
 
   override move(p: PointerInfo): void {
     const hit = pickAt(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
     this.items = hit?.kind === 'wall' ? [{ kind: 'highlight', ids: [hit.id] }] : [];
-    if (this.first) this.items.push({ kind: 'highlight', ids: [this.first.id] });
+    const held = [...(this.first ? [this.first.id] : []), ...this.group.map((g) => g.id)];
+    if (held.length) this.items.push({ kind: 'highlight', ids: held });
+  }
+
+  /** Shift+clique: inclui ou tira a parede da lista a aparar. */
+  private toggleGroup(id: Id, at: Vec2): void {
+    if (this.first) {
+      this.group.push(this.first);
+      this.first = null;
+    }
+    const i = this.group.findIndex((g) => g.id === id);
+    if (i >= 0) this.group.splice(i, 1);
+    else this.group.push({ id, at });
+    this.env.say(this.group.length ? `${this.group.length} parede(s) para aparar. Clique na parede de referência (sem Shift).` : this.hint);
+  }
+
+  /** Clique na referência: aparar cada parede da lista ao canto com ela, em um único passo. */
+  private applyGroup(refId: Id, pr: Project): void {
+    const ref = frameOfWall(pr, refId);
+    if (!ref) return;
+    if (ref.arc) {
+      this.env.say('Aparar/estender ao canto ainda não suporta paredes em arco.');
+      return;
+    }
+    const patches: Array<{ id: Id; patch: { a?: Vec2; b?: Vec2 } }> = [];
+    let skipped = 0;
+    for (const g of this.group) {
+      const f = frameOfWall(pr, g.id);
+      const r = f && !f.arc ? intersectLines(f.a, f.u, ref.a, ref.u) : null;
+      if (!f || !r) {
+        skipped += 1;
+        continue;
+      }
+      patches.push({ id: g.id, patch: cornerPatch(f, r.point, g.at) });
+    }
+    if (!patches.length) {
+      this.env.say('Nenhuma parede da lista pode ser aparada a essa referência (paralelas ou em arco).');
+      this.reset();
+      return;
+    }
+    this.env.transaction('Aparar ao canto', () => {
+      for (const { id, patch } of patches) this.env.exec({ type: 'setWallEnds', id, ...patch });
+    });
+    this.reset();
+    this.env.say(`${patches.length} parede(s) aparada(s).${skipped ? ` ${skipped} ignorada(s): paralelas ou em arco.` : ''}`);
   }
 
   override click(p: PointerInfo): void {
@@ -32,6 +95,18 @@ export class TrimTool extends ToolBase {
     const hit = pickAt(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
     if (!hit || hit.kind !== 'wall') {
       this.env.say('Clique sobre uma parede.');
+      return;
+    }
+    if (p.shift) {
+      this.toggleGroup(hit.id, p.raw);
+      return;
+    }
+    if (this.group.length) {
+      if (this.group.some((g) => g.id === hit.id)) {
+        this.env.say('A referência não pode estar na lista. Escolha outra parede.');
+        return;
+      }
+      this.applyGroup(hit.id, pr);
       return;
     }
     if (!this.first) {
@@ -57,14 +132,10 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
-    const patch = (f: WallFrame, click: Vec2): { a?: Vec2; b?: Vec2 } => {
-      const tI = dot(sub(r.point, f.a), f.u);
-      const tC = dot(sub(click, f.a), f.u);
-      return tI <= tC ? { a: r.point } : { b: r.point };
-    };
+    const first = this.first;
     this.env.transaction('Aparar ao canto', () => {
-      this.env.exec({ type: 'setWallEnds', id: fa.wall.id, ...patch(fa, this.first!.at) });
-      this.env.exec({ type: 'setWallEnds', id: fb.wall.id, ...patch(fb, p.raw) });
+      this.env.exec({ type: 'setWallEnds', id: fa.wall.id, ...cornerPatch(fa, r.point, first.at) });
+      this.env.exec({ type: 'setWallEnds', id: fb.wall.id, ...cornerPatch(fb, r.point, p.raw) });
     });
     this.reset();
     this.env.say(this.hint);

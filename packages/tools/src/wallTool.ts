@@ -1,4 +1,4 @@
-import { add, angleOf, arcFromSagitta, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
+import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
 import { exteriorOffset } from '@hestia/engine';
 import { makeWall, totalThickness, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
@@ -7,7 +7,10 @@ import type { PointerInfo } from './types.ts';
 
 const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
-/** Parede reta (dois pontos) ou em arco (início, fim e um ponto do arco). */
+/**
+ * Parede reta (dois pontos), em arco (início, fim e um ponto do arco) ou retângulo (dois cantos opostos:
+ * quatro paredes encadeadas, anti-horário, com o lado externo para fora).
+ */
 export class WallTool extends ToolBase {
   readonly id = 'wall';
   readonly label = 'Parede';
@@ -36,14 +39,26 @@ export class WallTool extends ToolBase {
     return this.env.options().wallShape === 'arc';
   }
 
+  private isRect(): boolean {
+    return this.env.options().wallShape === 'rect';
+  }
+
+  /**
+   * Lado externo à direita de a→b (`flipped`). Paredes de retângulo saem anti-horárias, então o externo
+   * padrão é o da direita (para fora); Tab inverte nos dois casos.
+   */
+  private sideFlip(): boolean {
+    return this.isRect() ? !this.flip : this.flip;
+  }
+
   override inputPrompt(): string | null {
-    if (!this.startPt) return null;
+    if (!this.startPt || this.isRect()) return null;
     return this.chordEnd ? 'Flecha do arco' : this.isArc() ? 'Comprimento da corda' : 'Comprimento';
   }
 
   override tab(): void {
     this.flip = !this.flip;
-    this.env.say(this.flip ? 'Lado externo à direita do sentido de desenho.' : 'Lado externo à esquerda do sentido de desenho.');
+    this.env.say(this.sideFlip() ? 'Lado externo à direita do sentido de desenho.' : 'Lado externo à esquerda do sentido de desenho.');
   }
 
   private band() {
@@ -53,11 +68,64 @@ export class WallTool extends ToolBase {
     if (!t) return { thickness: 0.15, sMid: 0 };
     const th = totalThickness(t);
     const ext = exteriorOffset(t, o.locationLine);
-    const sign = this.flip ? -1 : 1;
+    const sign = this.sideFlip() ? -1 : 1;
     return { thickness: th, sMid: sign * (ext - th / 2) };
   }
 
+  /** Quatro cantos do retângulo com o primeiro canto em `startPt` e o oposto em `c`, no sentido anti-horário. */
+  private rectCorners(c: Vec2): Vec2[] {
+    const a = this.startPt!;
+    const pts = [a, { x: c.x, y: a.y }, c, { x: a.x, y: c.y }];
+    let area = 0;
+    for (let i = 0; i < 4; i++) area += cross(pts[i]!, pts[(i + 1) % 4]!);
+    // Área com sinal positiva = anti-horário. Diagonal "de sinal misto" sai horária: inverte a ordem.
+    return area >= 0 ? pts : [pts[0]!, pts[3]!, pts[2]!, pts[1]!];
+  }
+
+  private moveRect(p: PointerInfo): void {
+    const inf = this.snap(p);
+    this.items = [];
+    const a = this.startPt;
+    if (!a) {
+      this.items.push({ kind: 'point', at: inf.point });
+      this.env.say(this.hint);
+      return;
+    }
+    const c = inf.point;
+    const pts = this.rectCorners(c);
+    const { thickness, sMid } = this.band();
+    for (let i = 0; i < 4; i++) this.items.push({ kind: 'wallBand', a: pts[i]!, b: pts[(i + 1) % 4]!, thickness, sMid });
+    this.items.push({ kind: 'label', at: c, text: `${fmt(Math.abs(c.x - a.x))} × ${fmt(Math.abs(c.y - a.y))}` });
+    this.env.say('Clique no canto oposto do retângulo.');
+  }
+
+  private clickRect(p: PointerInfo): void {
+    const inf = this.snap(p);
+    if (!this.startPt) {
+      this.startPt = inf.point;
+      this.first = inf.point;
+      this.count = 0;
+      return;
+    }
+    const a = this.startPt;
+    const c = inf.point;
+    if (Math.abs(c.x - a.x) < 0.01 || Math.abs(c.y - a.y) < 0.01) {
+      this.env.say('Retângulo muito estreito: afaste o canto oposto.');
+      return;
+    }
+    const pts = this.rectCorners(c);
+    this.env.transaction('Parede retangular', () => {
+      for (let i = 0; i < 4; i++) this.commit(pts[i]!, pts[(i + 1) % 4]!);
+    });
+    this.reset();
+    this.env.say('Retângulo criado. Clique em outro canto para desenhar outro, ou Esc para sair.');
+  }
+
   override move(p: PointerInfo): void {
+    if (this.isRect()) {
+      this.moveRect(p);
+      return;
+    }
     const inf = this.snap(p, { from: this.chordEnd ?? this.startPt ?? undefined });
     this.items = [];
     if (!this.startPt) {
@@ -96,7 +164,7 @@ export class WallTool extends ToolBase {
       b,
       height: o.wallHeight,
       locationLine: o.locationLine,
-      flipped: this.flip,
+      flipped: this.sideFlip(),
       sag,
     });
     this.env.exec({ type: 'addWall', wall });
@@ -116,6 +184,10 @@ export class WallTool extends ToolBase {
   }
 
   override click(p: PointerInfo): void {
+    if (this.isRect()) {
+      this.clickRect(p);
+      return;
+    }
     const inf = this.snap(p, { from: this.chordEnd ?? this.startPt ?? undefined });
     if (!this.startPt) {
       this.startPt = inf.point;
@@ -140,7 +212,7 @@ export class WallTool extends ToolBase {
   }
 
   override type(text: string): boolean {
-    if (!this.startPt) return false;
+    if (this.isRect() || !this.startPt) return false;
     const v = parseNumber(text);
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');

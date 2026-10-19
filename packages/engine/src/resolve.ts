@@ -193,6 +193,7 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
     sHi: f.sHi,
     sLo: f.sLo,
     leaves: t.leaves,
+    plan: t.plan,
     flipHand: o.flipHand,
     flipFacing: o.flipFacing,
     offset: o.offset,

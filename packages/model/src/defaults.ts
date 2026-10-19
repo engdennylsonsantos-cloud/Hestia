@@ -45,6 +45,11 @@ const wt = (id: string, name: string, code: string, description: string, layers:
   wrapInserts: 'both',
   wrapEnds: 'none',
   strips: [],
+  cost: 0,
+  thermalU: null,
+  acousticRw: null,
+  fireRating: null,
+  manufacturer: '',
 });
 
 export const DEFAULT_WALL_TYPES: WallType[] = [
@@ -91,14 +96,15 @@ const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId' | 'closur
 });
 
 export const DEFAULT_OPENING_TYPES: OpeningType[] = [
-  ot({ id: 'ot_p80', kind: 'door', name: 'Porta 80 x 210', width: 0.8, height: 2.1, sill: 0, leaves: 1 }),
-  ot({ id: 'ot_p90', kind: 'door', name: 'Porta 90 x 210', width: 0.9, height: 2.1, sill: 0, leaves: 1 }),
-  ot({ id: 'ot_p70', kind: 'door', name: 'Porta 70 x 210', width: 0.7, height: 2.1, sill: 0, leaves: 1 }),
-  ot({ id: 'ot_p160', kind: 'door', name: 'Porta dupla 160 x 210', width: 1.6, height: 2.1, sill: 0, leaves: 2 }),
-  ot({ id: 'ot_j120', kind: 'window', name: 'Janela 120 x 120', width: 1.2, height: 1.2, sill: 1.1, leaves: 2 }, 'mat_aluminio'),
-  ot({ id: 'ot_j150', kind: 'window', name: 'Janela 150 x 100', width: 1.5, height: 1.0, sill: 1.1, leaves: 2 }, 'mat_aluminio'),
-  ot({ id: 'ot_j60', kind: 'window', name: 'Janela 60 x 60', width: 0.6, height: 0.6, sill: 1.5, leaves: 1 }, 'mat_aluminio'),
-  ot({ id: 'ot_j200', kind: 'window', name: 'Janela 200 x 120', width: 2.0, height: 1.2, sill: 1.0, leaves: 2 }, 'mat_aluminio'),
+  ot({ id: 'ot_p80', kind: 'door', name: 'Porta 80 x 210', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p90', kind: 'door', name: 'Porta 90 x 210', width: 0.9, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p70', kind: 'door', name: 'Porta 70 x 210', width: 0.7, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p160', kind: 'door', name: 'Porta dupla 160 x 210', width: 1.6, height: 2.1, sill: 0, leaves: 2, plan: 'double' }),
+  ot({ id: 'ot_vao90', kind: 'door', name: 'Vão livre 90 x 210', width: 0.9, height: 2.1, sill: 0, leaves: 0, plan: 'swing' }),
+  ot({ id: 'ot_j120', kind: 'window', name: 'Janela 120 x 120', width: 1.2, height: 1.2, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_j150', kind: 'window', name: 'Janela 150 x 100', width: 1.5, height: 1.0, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_j60', kind: 'window', name: 'Janela 60 x 60', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'casement' }, 'mat_aluminio'),
+  ot({ id: 'ot_j200', kind: 'window', name: 'Janela 200 x 120', width: 2.0, height: 1.2, sill: 1.0, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>
@@ -117,7 +123,7 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),
     elements: {},
     nextOrder: 1,
-    settings: { joinTolerance: 0.02 },
+    settings: { joinTolerance: 0.02, showTags: false, debugJoins: false, detail: 'medium' },
     views: [],
     defaults: { wallTypeId: 'wt_alv14', doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', wallHeight: 2.8 },
   };

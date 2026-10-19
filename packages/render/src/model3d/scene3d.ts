@@ -130,6 +130,8 @@ export class ModelScene {
     const g = openingGeometry(p, o, f);
     const t = p.openingTypes[o.typeId];
     if (!t) return null;
+    // Vão livre: só o recorte da parede; sem folha nem caixilho.
+    if (g.kind === 'door' && g.leaves === 0) return null;
     const grp = new THREE.Group();
     const h = Math.min(g.height, H - g.sill);
     const frameMat = this.material(p.materials[t.frameMaterialId]);

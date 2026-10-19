@@ -1,7 +1,17 @@
 import { createEmptyProject } from './defaults.ts';
-import { SCHEMA_VERSION, type Project } from './types.ts';
+import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
+
+/**
+ * Símbolo de planta de um tipo de abertura anterior ao campo `plan`: porta de duas folhas é dupla; porta de uma folha
+ * é arco; janela de duas folhas é de correr; janela de uma folha é maxim-ar; janela sem folha é fixa.
+ */
+function planFromLegacy(t: Record<string, unknown>): PlanSymbol {
+  const leaves = t.leaves;
+  if (t.kind === 'window') return leaves === 2 ? 'sliding' : leaves === 1 ? 'casement' : 'fixed';
+  return leaves === 2 ? 'double' : 'swing';
+}
 
 /** migrations[n] leva a versão n para n+1. Cada mudança de esquema acrescenta uma entrada e um teste. */
 const migrations: Record<number, Migration> = {
@@ -37,11 +47,26 @@ const migrations: Record<number, Migration> = {
     for (const [id, t] of Object.entries(wt)) wt[id] = { strips: [], ...t };
     return { ...raw, wallTypes: wt };
   },
-  // v5 → v6: cortes e elevações; perfil superior das paredes.
+  // v5 → v6: cortes e elevações; perfil superior das paredes; custo e desempenho dos tipos de parede;
+  // símbolo de planta das aberturas (derivado das folhas, pois o arquivo antigo não o tinha); configurações de
+  // etiquetas, depuração de junção e nível de detalhe. Todos os defaults preservam a aparência anterior.
   5: (raw) => {
     const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
     for (const [id, e] of Object.entries(elements)) if (e.kind === 'wall') elements[id] = { topProfile: null, ...e };
-    return { ...raw, elements, views: Array.isArray(raw.views) ? raw.views : [] };
+    const wallTypes = { ...((raw.wallTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(wallTypes)) {
+      wallTypes[id] = { cost: 0, thermalU: null, acousticRw: null, fireRating: null, manufacturer: '', ...t };
+    }
+    const openingTypes = { ...((raw.openingTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(openingTypes)) openingTypes[id] = { plan: planFromLegacy(t), ...t };
+    return {
+      ...raw,
+      elements,
+      wallTypes,
+      openingTypes,
+      views: Array.isArray(raw.views) ? raw.views : [],
+      settings: { showTags: false, debugJoins: false, detail: 'medium', ...((raw.settings as object) ?? {}) },
+    };
   },
 };
 

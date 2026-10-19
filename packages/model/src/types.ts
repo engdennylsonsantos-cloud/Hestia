@@ -64,6 +64,16 @@ export interface WallType {
   /** Retorno dos acabamentos nas extremidades livres. */
   wrapEnds: WrapMode;
   strips: WallStrip[];
+  /** Custo por m² de face de parede (R$/m²). 0 quando não informado. */
+  cost: number;
+  /** Transmitância térmica U (W/m²K). null quando não informada. */
+  thermalU: number | null;
+  /** Isolamento acústico aéreo Rw (dB). null quando não informado. */
+  acousticRw: number | null;
+  /** Resistência ao fogo (minutos). null quando não informada. */
+  fireRating: number | null;
+  /** Fabricante ou sistema construtivo de referência. Texto livre. */
+  manufacturer: string;
 }
 
 export type LocationLine =
@@ -132,6 +142,12 @@ export interface Wall {
   order: number;
 }
 
+/**
+ * Família do símbolo de planta. Portas: arco com folha (swing), dupla, correr, pivotante.
+ * Janelas: fixa, basculante, maxim-ar (arco tracejado) e correr.
+ */
+export type PlanSymbol = 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement';
+
 export interface OpeningType {
   id: Id;
   kind: 'door' | 'window';
@@ -140,7 +156,10 @@ export interface OpeningType {
   height: number;
   /** Peitoril padrão (0 para porta). */
   sill: number;
-  leaves: 1 | 2;
+  /** Folhas. 0 = vão livre: só o recorte e a soleira, sem folha nem caixilho. */
+  leaves: 0 | 1 | 2;
+  /** Símbolo de planta da família. */
+  plan: PlanSymbol;
   frameMaterialId: Id;
   glassMaterialId: Id;
   /** Fechamento do vão (Revit: Wall Closure): substitui o retorno do tipo de parede quando não é 'inherit'. */
@@ -171,9 +190,17 @@ export interface ProjectDefaults {
   wallHeight: number;
 }
 
+/** Nível de detalhe da planta: grosseiro (um contorno por cluster), médio (atual) e fino (linhas e hachura sempre). */
+export type DetailLevel = 'coarse' | 'medium' | 'fine';
+
 export interface ProjectSettings {
   /** Distância (m) em que extremidades de paredes e pontos sobre outra parede contam como unidos. */
   joinTolerance: number;
+  /** Mostra o código do tipo de cada parede na planta. */
+  showTags: boolean;
+  /** Sobreposição de depuração: tipo e ordem de cada junção na planta. */
+  debugJoins: boolean;
+  detail: DetailLevel;
 }
 
 /** Vista de corte ou elevação: linha em planta + profundidade visível; o observador olha para a esquerda de a→b. */

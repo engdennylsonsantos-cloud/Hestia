@@ -7,12 +7,13 @@ import { AlignTool, MeasureTool, TrimTool } from './trimAlign.ts';
 import { JoinTool } from './joinTool.ts';
 import { SplitTool } from './splitTool.ts';
 import { SectionTool } from './sectionTool.ts';
+import { RehostTool } from './rehostTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section';
+export type ToolId = 'select' | 'wall' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window'] },
-  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split'] },
+  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
   { title: 'Medir', tools: ['measure'] },
 ];
 
@@ -48,6 +49,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new SplitTool(env);
     case 'measure':
       return new MeasureTool(env);
+    case 'rehost':
+      return new RehostTool(env);
     case 'section':
       return new SectionTool(env);
   }
@@ -70,6 +73,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   split: 'Dividir',
   measure: 'Medir',
   section: 'Corte',
+  rehost: 'Trocar anfitriã',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
@@ -89,4 +93,5 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   split: 'P',
   measure: 'E',
   section: 'K',
+  rehost: 'H',
 };

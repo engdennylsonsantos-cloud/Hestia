@@ -8,6 +8,8 @@ import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
+import { joinDebugLabels } from './joinDebug.ts';
+import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
 
 export interface PlanInput {
@@ -78,28 +80,46 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
+  // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
+  // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
+  const detail = p.settings.detail ?? 'medium';
+  const fine = detail === 'fine';
   for (const c of resolved.clusters) {
-    for (const r of c.regions) {
+    if (detail === 'coarse') {
+      fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
+    }
+    const regions = detail === 'coarse' ? [] : c.regions;
+    for (const r of regions) {
       const m = p.materials[r.materialId];
       const color = mix(m?.color ?? '#999999', fillBase, fillT);
       const polys = r.polygons;
       const thick = Math.max(0, ...polys.map((poly) => thicknessPx(poly, v.zoom)));
-      const hatch = m && m.hatch !== 'none' && thick >= 5 && v.zoom >= 40 ? { kind: m.hatch, color: mix(m.color, input.dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+      const hatchOn = m && m.hatch !== 'none' && (fine || (thick >= 5 && v.zoom >= 40));
+      const hatch = hatchOn ? { kind: m.hatch, color: mix(m.color, input.dark ? '#ffffff' : '#000000', 0.45) } : undefined;
       fills.push({ polygons: polys, color, alpha: 1, hatch });
-      // Linhas de interface entre materiais: só onde cabem sem virar mancha.
+      // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre).
       for (const poly of polys) {
-        if (thicknessPx(poly, v.zoom) < 1.6) continue;
+        if (!fine && thicknessPx(poly, v.zoom) < 1.6) continue;
         for (const ring of poly) strokes.push({ pts: ring, closed: true, widthPx: 1, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
       }
     }
     for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
   }
 
-  // Símbolos das aberturas.
-  for (const w of wallsOnLevel(p, input.levelId)) {
-    const f = frameOfWall(p, w.id);
-    if (!f) continue;
-    for (const o of openingsOfWall(p, w.id)) strokes.push(...openingSymbol(openingGeometry(p, o, f), theme));
+  // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino).
+  if (fine) {
+    for (const rw of Object.values(resolved.walls)) {
+      for (const m of rw.membranes) strokes.push({ pts: m.pts, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+    }
+  }
+
+  // Símbolos das aberturas (fora do grosseiro).
+  if (detail !== 'coarse') {
+    for (const w of wallsOnLevel(p, input.levelId)) {
+      const f = frameOfWall(p, w.id);
+      if (!f) continue;
+      for (const o of openingsOfWall(p, w.id)) strokes.push(...openingSymbol(openingGeometry(p, o, f), theme));
+    }
   }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
@@ -107,6 +127,10 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...marks.fills);
   strokes.push(...marks.strokes);
   labels.push(...marks.labels);
+
+  // Etiquetas de tipo (G4) e depuração de junção (G6), por configuração do projeto.
+  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom));
+  if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Hover e seleção.
   if (input.hover && !input.selection.includes(input.hover)) {

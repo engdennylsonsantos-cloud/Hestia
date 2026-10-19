@@ -8,7 +8,7 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
   arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
-    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split'] },
+    { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
     { title: 'Medir', tools: ['measure'] },
   ],
 };
@@ -73,6 +73,17 @@ export function Ribbon(): ReactElement {
               <div className="rgroup-title">{g.title}</div>
             </div>
           ))}
+        {tab === 'modificar' && (
+          <div className="rgroup">
+            <div className="rgroup-tools">
+              <button className="tbtn" onClick={() => editor.selectAllOfSelectedType()} title="Selecionar todas as instâncias do tipo da seleção (mesmo nível)">
+                <Icon name="sametype" size={22} />
+                <span>Mesmo tipo</span>
+              </button>
+            </div>
+            <div className="rgroup-title">Tipo</div>
+          </div>
+        )}
         {tab === 'arquitetura' && (
           <div className="rgroup">
             <div className="rgroup-tools">

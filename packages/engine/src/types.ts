@@ -1,5 +1,5 @@
 import type { MultiPolygon, Vec2 } from '@hestia/geom';
-import type { Id } from '@hestia/model';
+import type { Id, PlanSymbol } from '@hestia/model';
 
 export interface ResolvedLayer {
   layerIndex: number;
@@ -87,7 +87,10 @@ export interface OpeningGeometry {
   /** Faixa s da parede em que o vão está. */
   sHi: number;
   sLo: number;
-  leaves: 1 | 2;
+  /** 0 = vão livre: sem folha nem caixilho (só o recorte e a soleira). */
+  leaves: 0 | 1 | 2;
+  /** Família do símbolo de planta. */
+  plan: PlanSymbol;
   flipHand: boolean;
   flipFacing: boolean;
   /** Distância ao longo do eixo a partir de `a`. */

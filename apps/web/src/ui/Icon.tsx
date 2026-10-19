@@ -43,6 +43,8 @@ const P: Record<string, string> = {
   chevron: 'M9 6l6 6-6 6',
   section: 'M3 12h3M9 12h1.5M13.5 12h1.5M18 12h3M12 3v4M9 5l3-2 3 2M12 17v4M9 19l3 2 3-2',
   elevation: 'M3 20h18M5 20V6h14v14M9 20v-5h6v5M9 10h2M13 10h2',
+  sametype: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  rehost: 'M3 9h18v6H3zM8 9v6M16 9v6M5 19l4-3M19 19l-4-3',
 };
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }): ReactElement {

@@ -5,6 +5,7 @@ import {
   isOpening,
   isWall,
   newId,
+  type DetailLevel,
   type JoinKind,
   openingSill,
   totalThickness,
@@ -263,6 +264,15 @@ function ViewProps(): ReactElement {
         <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
+        <Row label="Etiquetas de parede"><Check id="v-tags" checked={p.settings.showTags} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showTags: v } })} /></Row>
+        <Row label="Depurar junções"><Check id="v-debugjoins" checked={p.settings.debugJoins} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { debugJoins: v } })} /></Row>
+        <Row label="Nível de detalhe" htmlFor="v-detail">
+          <select id="v-detail" className="select" value={p.settings.detail} onChange={(e) => editor.store.exec({ type: 'setSettings', patch: { detail: e.target.value as DetailLevel } })}>
+            <option value="coarse">Grosseiro</option>
+            <option value="medium">Médio</option>
+            <option value="fine">Fino</option>
+          </select>
+        </Row>
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'levels' })}>Editar níveis…</button></div>
       </Group>
       <Group title="3D" open={s.view === '3d'}>

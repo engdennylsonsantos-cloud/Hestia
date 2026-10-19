@@ -13,6 +13,7 @@ import {
   type TemplateId,
 } from '@hestia/model';
 import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { transfer } from './transfer.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
@@ -221,6 +222,7 @@ export class Editor {
       this.save();
       return true;
     }
+    if (mod && ui.view === 'plan' && /^[cv]$/i.test(k)) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
     if (mod) return false;
     if (ui.view === 'section') {
       if (k === 'Escape') {
@@ -267,7 +269,7 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section' };
+    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section', h: 'rehost' };
     const id = map[k.toLowerCase()];
     if (id && !e.altKey) {
       this.setTool(id);
@@ -337,6 +339,15 @@ export class Editor {
     this.store.exec({ type: 'deleteElements', ids });
     useUi.setState({ selection: [], status: 'Elementos excluídos.' });
   }
+
+  /** Copiar (Ctrl+C): paredes selecionadas e suas aberturas, em memória. */
+  copySelection(): boolean { return transfer.copy(this.project, useUi.getState().selection); }
+  /** Colar alinhado (Ctrl+V): mesmas coordenadas no nível dado. */
+  pasteAligned(levelId: Id): boolean { return transfer.paste(this.store, levelId); }
+  /** Seleciona todas as paredes e aberturas do nível ativo com o tipo dado. */
+  selectAllOfType(typeId: Id): number { return transfer.ofType(this.project, useUi.getState().levelId, typeId); }
+  /** "Mesmo tipo" (botão na aba Modificar). */
+  selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
 
   undo(): void {
     this.store.undo();

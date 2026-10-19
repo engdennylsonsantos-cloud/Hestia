@@ -1,11 +1,14 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { TEMPLATES, buildTemplate, isWall, newId, type OpeningType, type TemplateId } from '@hestia/model';
+import { TEMPLATES, buildTemplate, isWall, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
+
+const DOOR_PLANS: Array<[PlanSymbol, string]> = [['swing', 'Arco (folha)'], ['double', 'Dupla'], ['sliding', 'De correr'], ['pivot', 'Pivotante']];
+const WINDOW_PLANS: Array<[PlanSymbol, string]> = [['fixed', 'Fixa'], ['tilt', 'Basculante'], ['casement', 'Maxim-ar (arco tracejado)'], ['sliding', 'De correr']];
 
 export function LevelsDialog(): ReactElement {
   const p = useProject();
@@ -78,9 +81,16 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
       <div className="field-row"><label htmlFor="ot-s">Peitoril</label><NumField id="ot-s" value={d.sill} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ sill: v })} /></div>
       <div className="field-row">
         <label htmlFor="ot-l">Folhas</label>
-        <select id="ot-l" className="select" value={d.leaves} onChange={(e) => set({ leaves: e.target.value === '2' ? 2 : 1 })}>
+        <select id="ot-l" className="select" value={d.leaves} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
+          <option value="0">Vão livre (sem folha)</option>
           <option value="1">1 folha</option>
           <option value="2">2 folhas</option>
+        </select>
+      </div>
+      <div className="field-row">
+        <label htmlFor="ot-plan" title="Desenho do símbolo na planta">Símbolo na planta</label>
+        <select id="ot-plan" className="select" value={d.plan} onChange={(e) => set({ plan: e.target.value as PlanSymbol })}>
+          {(d.kind === 'door' ? DOOR_PLANS : WINDOW_PLANS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
       </div>
       <div className="field-row">

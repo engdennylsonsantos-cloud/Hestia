@@ -5,9 +5,13 @@ import { ToolBase } from './base.ts';
 import { moveWalls, selectedOpenings, selectedWalls, slideOpenings } from './edit.ts';
 import { ghostBands } from './edit.ts';
 import { connectedEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
+import { resizeWallCommands } from './lengthEdit.ts';
+import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
 type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening';
+
+const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
 export class SelectTool extends ToolBase {
   readonly id = 'select';
@@ -46,6 +50,56 @@ export class SelectTool extends ToolBase {
     this.items = this.hover ? [{ kind: 'highlight', ids: [this.hover] }] : [];
     const grip = gripAt(this.env.project(), this.env.selection(), p.raw, this.env.metersPerPixel());
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
+    // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
+    const w = this.singleWall();
+    if (w && this.mode === 'idle') {
+      const a = w.a;
+      const b = w.b;
+      this.items.push({ kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: fmtLen(dist(a, b)) });
+    }
+  }
+
+  /** A única seleção é uma parede (aberturas e pluralidades não entram na cota temporária). */
+  private singleWall() {
+    const sel = this.env.selection();
+    if (sel.length !== 1) return null;
+    const w = this.env.project().elements[sel[0]!];
+    return isWall(w) ? w : null;
+  }
+
+  override inputPrompt(): string | null {
+    if (this.mode !== 'idle') return null;
+    return this.singleWall() ? 'Comprimento' : null;
+  }
+
+  /** Enter sem valor digitado: abre o campo de cota (a mensagem indica como digitar). */
+  override confirm(): void {
+    if (this.mode === 'idle' && this.singleWall()) {
+      this.env.say('Comprimento: digite o valor em metros (aceita expressões) e Enter.');
+      return;
+    }
+    super.confirm();
+  }
+
+  /** Digitar o comprimento: mantém a extremidade `a` e move `b` ao longo do eixo; vizinhas em `b` acompanham. */
+  override type(text: string): boolean {
+    const w = this.singleWall();
+    if (!w) return false;
+    const v = parseNumber(text);
+    if (v === null) {
+      this.env.say('Valor inválido. Digite um número em metros.');
+      return false;
+    }
+    const r = resizeWallCommands(this.env.project(), this.env.levelId(), w.id, v);
+    if ('error' in r) {
+      this.env.say(r.error);
+      return false;
+    }
+    this.env.transaction('Alterar comprimento', () => {
+      for (const c of r.commands) this.env.exec(c);
+    });
+    this.env.say(`Comprimento alterado para ${fmtLen(v)}. Ctrl+Z desfaz.`);
+    return true;
   }
 
   down(p: PointerInfo): void {

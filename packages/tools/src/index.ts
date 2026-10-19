@@ -6,3 +6,6 @@ export * from './edit.ts';
 export * from './registry.ts';
 export { ToolBase } from './base.ts';
 export * from './wallGeom.ts';
+export * from './clipboard.ts';
+export * from './lengthEdit.ts';
+export * from './selectionFilters.ts';

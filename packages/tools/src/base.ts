@@ -64,6 +64,7 @@ export abstract class ToolBase implements Tool {
       mpp: this.env.metersPerPixel(),
       gridStep: this.env.gridStep(),
       orthoLock: this.env.options().orthoLock,
+      snap: this.env.options().snap,
       ...extra,
     };
   }

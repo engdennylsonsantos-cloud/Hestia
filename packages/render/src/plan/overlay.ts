@@ -29,6 +29,11 @@ export function snapMarker(inf: Inference, v: Viewport, theme: PlanTheme): Strok
   switch (inf.kind) {
     case 'endpoint':
       return [mk(squareAt(c, h), true)];
+    case 'face':
+      // Canto de face: quadrado com ponto central (diferencia do extremo do eixo).
+      return [mk(squareAt(c, h), true), mk([{ x: c.x - h * 0.2, y: c.y }, { x: c.x + h * 0.2, y: c.y }], false)];
+    case 'core':
+      return [mk([{ x: c.x, y: c.y - h * 1.2 }, { x: c.x + h * 1.2, y: c.y }, { x: c.x, y: c.y + h * 1.2 }, { x: c.x - h * 1.2, y: c.y }], true)];
     case 'midpoint':
       return [mk([{ x: c.x - h, y: c.y - h }, { x: c.x + h, y: c.y - h }, { x: c.x, y: c.y + h }], true)];
     case 'intersection':

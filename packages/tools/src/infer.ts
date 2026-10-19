@@ -9,9 +9,10 @@ import {
   v2,
   type Vec2,
 } from '@hestia/geom';
+import { wallFaces, type WallFaces } from '@hestia/engine';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
-import type { Guide, Inference, SnapKind } from './types.ts';
+import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
 export interface InferContext {
   project: Project;
@@ -30,6 +31,8 @@ export interface InferContext {
   onWallsOnly?: boolean;
   /** Pontos extras de captura (vértices de pisos, contorno em construção). */
   extraPoints?: Vec2[];
+  /** Capturas ligadas (padrão: DEFAULT_SNAP). */
+  snap?: SnapOptions;
 }
 
 const TOL_PX = 10;
@@ -44,15 +47,33 @@ interface Cand {
 
 const PRIORITY: Record<SnapKind, number> = {
   endpoint: 0,
-  intersection: 1,
-  midpoint: 2,
-  perpendicular: 3,
-  alignment: 4,
-  nearest: 5,
-  ortho: 6,
-  grid: 7,
+  face: 1,
+  core: 1.5,
+  intersection: 2,
+  midpoint: 3,
+  perpendicular: 4,
+  alignment: 5,
+  nearest: 6,
+  ortho: 7,
+  grid: 8,
   none: 9,
 };
+
+/** Faces das paredes por projeto e nível: o projeto é imutável (Immer), então a identidade serve de chave de cache. */
+const facesCache = new WeakMap<Project, Map<Id, WallFaces[]>>();
+function facesOf(p: Project, levelId: Id): WallFaces[] {
+  let byLevel = facesCache.get(p);
+  if (!byLevel) {
+    byLevel = new Map();
+    facesCache.set(p, byLevel);
+  }
+  let f = byLevel.get(levelId);
+  if (!f) {
+    f = wallFaces(p, levelId);
+    byLevel.set(levelId, f);
+  }
+  return f;
+}
 
 /**
  * Motor de inferência único (docs/01 §8): função pura que devolve o melhor ponto e as guias.
@@ -60,6 +81,7 @@ const PRIORITY: Record<SnapKind, number> = {
  */
 export function infer(cursor: Vec2, ctx: InferContext): Inference {
   const tol = TOL_PX * ctx.mpp;
+  const sn = { ...DEFAULT_SNAP, ...ctx.snap };
   const walls = wallsOnLevel(ctx.project, ctx.levelId).filter((w) => !ctx.ignore?.has(w.id));
   const cands: Cand[] = [];
   const add = (c: Cand): void => {
@@ -69,16 +91,19 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   const ends: Vec2[] = [];
   for (const w of walls) {
     ends.push(w.a, w.b);
-    for (const p of [w.a, w.b]) {
-      const d = dist(cursor, p);
-      if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
+    if (sn.axis) {
+      for (const p of [w.a, w.b]) {
+        const d = dist(cursor, p);
+        if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
+      }
+      const m = wallMid(w);
+      const dm = dist(cursor, m);
+      if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
     }
-    const m = wallMid(w);
-    const dm = dist(cursor, m);
-    if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
     const near = closestOnWall(w, cursor);
-    if (near.dist <= tol) add({ point: near.point, kind: 'nearest', score: near.dist + tol * 0.5, hostId: w.id });
-    if (ctx.from) {
+    // Sobre o eixo: também é o ponto de hospedagem de portas e janelas, por isso fica ligado com a captura de eixo.
+    if (sn.axis && near.dist <= tol) add({ point: near.point, kind: 'nearest', score: near.dist + tol * 0.5, hostId: w.id });
+    if (sn.perpendicular && ctx.from) {
       const ab = sub(w.b, w.a);
       const abLen = len(ab);
       const t = abLen > 1e-9 ? dot(sub(ctx.from, w.a), norm(ab)) : -1;
@@ -95,8 +120,36 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     const d = dist(cursor, q);
     if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
   }
+  // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
+  const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core'): void => {
+    for (const [a, b] of segs) {
+      if (dist(a, b) < 1e-9) continue;
+      for (const q of [a, b]) {
+        const d = dist(cursor, q);
+        if (d <= tol) add({ point: q, kind, score: d });
+      }
+      const mid = v2((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const dm = dist(cursor, mid);
+      if (dm <= tol) add({ point: mid, kind: 'midpoint', score: dm + tol * 0.1 });
+      const foot = closestOnSegment(cursor, a, b);
+      const df = dist(cursor, foot);
+      if (df <= tol) add({ point: foot, kind: 'nearest', score: df + tol * 0.5 });
+      if (sn.perpendicular && ctx.from) {
+        const pf = closestOnSegment(ctx.from, a, b);
+        const dp = dist(cursor, pf);
+        if (dp <= tol && dist(pf, ctx.from) > 1e-6) add({ point: pf, kind: 'perpendicular', score: dp, guides: [{ from: ctx.from, to: pf, kind: 'perpendicular' }] });
+      }
+    }
+  };
+  if (sn.faces || sn.core) {
+    for (const wf of facesOf(ctx.project, ctx.levelId)) {
+      if (ctx.ignore?.has(wf.wallId)) continue;
+      if (sn.faces) addSegs(wf.faces, 'face');
+      if (sn.core) addSegs(wf.core, 'core');
+    }
+  }
   // Interseções de eixos.
-  for (let i = 0; i < walls.length; i++) {
+  for (let i = 0; sn.intersections && i < walls.length; i++) {
     for (let j = i + 1; j < walls.length; j++) {
       const p = intersectSegments(walls[i]!.a, walls[i]!.b, walls[j]!.a, walls[j]!.b);
       if (!p) continue;
@@ -114,7 +167,7 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     if (Math.abs(cursor.x - r.x) <= tol && (!ax || Math.abs(cursor.x - r.x) < Math.abs(cursor.x - ax.x))) ax = r;
     if (Math.abs(cursor.y - r.y) <= tol && (!ay || Math.abs(cursor.y - r.y) < Math.abs(cursor.y - ay.y))) ay = r;
   }
-  if (ax || ay) {
+  if (sn.alignment && (ax || ay)) {
     const g = ctx.noGrid ? 0 : ctx.gridStep;
     const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
     const p = v2(ax ? ax.x : free(cursor.x), ay ? ay.y : free(cursor.y));
@@ -125,7 +178,7 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   }
 
   // Ortogonal a partir do ponto anterior: sempre ativo quando próximo, travado com Shift/opção.
-  if (ctx.from) {
+  if ((sn.alignment || ctx.orthoLock) && ctx.from) {
     const d = sub(cursor, ctx.from);
     const l = len(d);
     if (l > 1e-6) {
@@ -140,7 +193,7 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     }
   }
 
-  return pickBest(cands, cursor, [], ctx.noGrid ? undefined : ctx.gridStep);
+  return pickBest(cands, cursor, [], ctx.noGrid || !sn.grid ? undefined : ctx.gridStep);
 }
 
 function pickBest(cands: Cand[], cursor: Vec2, guides: Guide[], grid: number | undefined): Inference {

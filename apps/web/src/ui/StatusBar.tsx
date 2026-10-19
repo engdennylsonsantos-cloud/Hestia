@@ -3,7 +3,9 @@ import { useUi } from '../editor/state.ts';
 import { IssuesButton } from './IssuesButton.tsx';
 
 const SNAP: Record<string, string> = {
-  endpoint: 'Extremidade',
+  endpoint: 'Extremidade do eixo',
+  face: 'Canto da face',
+  core: 'Canto do núcleo',
   midpoint: 'Ponto médio',
   intersection: 'Interseção',
   perpendicular: 'Perpendicular',

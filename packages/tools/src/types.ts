@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project } from '@hestia/model';
 
-export type SnapKind = 'endpoint' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
+export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
 
 export interface Guide {
   from: Vec2;
@@ -49,7 +49,26 @@ export interface ToolEnv {
 /** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou furo num piso selecionado. */
 export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole';
 
+/** Quais capturas estão ligadas (Revit: Snaps). */
+export interface SnapOptions {
+  grid: boolean;
+  /** Pontas e pontos médios do eixo das paredes. */
+  axis: boolean;
+  /** Cantos, arestas e pontos médios das faces de acabamento (por dentro e por fora dos cômodos). */
+  faces: boolean;
+  /** Cantos e arestas das faces do núcleo. */
+  core: boolean;
+  intersections: boolean;
+  perpendicular: boolean;
+  /** Alinhamento com outros pontos e ortogonal. */
+  alignment: boolean;
+}
+
+export const DEFAULT_SNAP: SnapOptions = { grid: true, axis: true, faces: true, core: false, intersections: true, perpendicular: true, alignment: true };
+
 export interface ToolOptions {
+  /** Capturas ligadas; ausente = padrão. */
+  snap?: SnapOptions;
   wallTypeId: Id;
   locationLine: LocationLine;
   wallHeight: number;

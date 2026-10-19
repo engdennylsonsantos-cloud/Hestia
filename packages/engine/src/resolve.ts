@@ -45,8 +45,10 @@ interface Item {
   materialId: Id;
   priority: number;
   order: number;
-  /** Espessura do núcleo da parede: desempata camadas de mesma prioridade (a mais robusta domina). */
+  /** Espessura do núcleo da parede: desempata camadas de mesma prioridade entre paredes sem junção (a mais robusta domina). */
   coreT: number;
+  /** A parede atravessa um T (outra parede termina nela): em prioridade igual ela continua e a que chega para na face. */
+  through: boolean;
   /** Identificador estável dentro do cluster (chave de cache do pintor). */
   uid: number;
   /** Altura absoluta em que o item existe (camadas: a parede inteira; faixas: o intervalo da faixa). */
@@ -69,7 +71,7 @@ function flatT(f: WallFrame, which: 'a' | 'b', spec: EndSpec, sFace: number): nu
   return toLocal(f, endPoint(f, which, spec, sFace)).t;
 }
 
-function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z: { z0: number; z1: number }): Item[] {
+function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z: { z0: number; z1: number }, through: boolean): Item[] {
   const items: Item[] = [];
   const coreT = Math.round((coreSpan(f.type).to - coreSpan(f.type).from) * 1e6) / 1e6;
   const endWraps = new Map<number, MultiPolygon>();
@@ -86,6 +88,7 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
       priority,
       order: f.wall.order,
       coreT,
+      through,
       uid: 0,
       z0,
       z1,
@@ -124,7 +127,9 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
 
 /** Algoritmo do pintor por prioridade (docs/05 §1): quem tem prioridade maior corta quem tem menor. */
 function paint(items: Item[]): Map<Item, MultiPolygon> {
-  const sorted = [...items].sort((x, y) => x.priority - y.priority || y.coreT - x.coreT || x.order - y.order || x.layerIndex - y.layerIndex);
+  // Prioridade igual: a parede que atravessa um T vem primeiro (a que chega para na face dela, como no Revit);
+  // só depois valem o núcleo mais robusto e a ordem de criação (paredes sobrepostas sem junção).
+  const sorted = [...items].sort((x, y) => x.priority - y.priority || Number(y.through) - Number(x.through) || y.coreT - x.coreT || x.order - y.order || x.layerIndex - y.layerIndex);
   const result = new Map<Item, MultiPolygon>();
   const higher: Item[] = [];
   let i = 0;
@@ -207,7 +212,7 @@ const openingRect = (g: OpeningGeometry): MultiPolygon => [
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
-  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}|${ringsOfShape(i.shape)}`);
+  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}|${ringsOfShape(i.shape)}`);
   const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
@@ -359,9 +364,16 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         const k = joinStatus(frames, f.wall.id, w, tol).kind;
         return k === 'free' || k === 'disallowed';
       });
+    const throughIds = new Set<Id>();
+    for (const f of group) {
+      for (const w of ['a', 'b'] as const) {
+        const st = joinStatus(frames, f.wall.id, w, tol);
+        if (st.kind === 'tee') throughIds.add(st.hostId);
+      }
+    }
     const items = group.flatMap((f) => {
       const z0 = wallBaseElevation(p, f.wall);
-      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallMaxHeight(p, f.wall) });
+      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallMaxHeight(p, f.wall) }, throughIds.has(f.wall.id));
     });
     items.forEach((it, i) => {
       it.uid = i;

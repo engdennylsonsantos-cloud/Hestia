@@ -162,6 +162,8 @@ const KEYS: Array<[string, string]> = [
   ['Tab', 'Alterna opção (lado externo da parede, sentido da porta)'],
   ['Espaço', 'Inverte a dobradiça ao inserir porta; segurar e arrastar move a vista'],
   ['Shift', 'Trava em 0°/90° ao desenhar; soma à seleção'],
+  ['Alt (ao arrastar uma ponta)', 'Inverte quem acompanha: solta o canto simples, leva todas as paredes de um nó'],
+  ['Ctrl+C / Ctrl+V', 'Copiar e colar na mesma posição, inclusive em outro nível'],
   ['Del', 'Exclui a seleção'],
   ['Ctrl+Z / Ctrl+Y', 'Desfazer / Refazer'],
   ['Ctrl+S', 'Salvar'],

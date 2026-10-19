@@ -4,7 +4,7 @@ import { isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls, selectedOpenings, selectedWalls, slideOpenings } from './edit.ts';
 import { ghostBands } from './edit.ts';
-import { connectedEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
+import { followingEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
@@ -158,6 +158,13 @@ export class SelectTool extends ToolBase {
           const b = this.grip.end === 'b' ? inf.point : w.b;
           this.items.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: f.sMid, sag: w.sag });
         }
+        // Vizinhas que vão acompanhar (canto simples; Alt inverte): aparecem na prévia para não haver surpresa.
+        for (const c of followingEnds(pr, this.env.levelId(), this.grip.at, new Set([w.id]), p.alt)) {
+          const nw = pr.elements[c.wallId];
+          const nf = frameOfWall(pr, c.wallId);
+          if (!isWall(nw) || !nf) continue;
+          this.items.push({ kind: 'wallBand', a: c.end === 'a' ? inf.point : nw.a, b: c.end === 'b' ? inf.point : nw.b, thickness: nf.thickness, sMid: nf.sMid, sag: nw.sag });
+        }
         break;
       }
       case 'moving': {
@@ -197,7 +204,7 @@ export class SelectTool extends ToolBase {
           }
           if (g.end === 'mid') break;
           const exclude = new Set([g.wallId]);
-          const follow = connectedEnds(pr, this.env.levelId(), g.at, exclude);
+          const follow = followingEnds(pr, this.env.levelId(), g.at, exclude, p.alt);
           this.env.transaction('Ajustar parede', () => {
             this.env.exec({ type: 'setWallEnds', id: g.wallId, [g.end]: pt });
             for (const c of follow) this.env.exec({ type: 'setWallEnds', id: c.wallId, [c.end]: pt });
@@ -207,7 +214,7 @@ export class SelectTool extends ToolBase {
       }
       case 'moving': {
         const walls = selectedWalls(pr, this.env.selection());
-        if (walls.length && (this.delta.x || this.delta.y)) moveWalls(this.env, walls, this.delta);
+        if (walls.length && (this.delta.x || this.delta.y)) moveWalls(this.env, walls, this.delta, true, p.alt);
         break;
       }
       case 'opening': {

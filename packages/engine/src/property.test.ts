@@ -13,6 +13,9 @@ import { resolveLevel, type ResolvedLevel } from './index.ts';
 const FULL = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_FULL === '1';
 const SEEDS = Array.from({ length: FULL ? 60 : 15 }, (_, i) => i + 1);
 /** A repetição de estabilidade (d) custa uma resolução inteira: na execução rápida só nas primeiras sementes. */
+/** Aglomerados grandes custam muito mais que proporcionalmente: a execução rápida usa cenas menores. */
+const N_MIN = FULL ? 25 : 12;
+const N_MAX = FULL ? 40 : 20;
 const AGAIN_SEEDS = FULL ? SEEDS.length : 4;
 const GRID = 0.5;
 const CELLS = 24; // 12 m / 0,5 m
@@ -60,7 +63,7 @@ const int = (rnd: () => number, lo: number, hi: number): number => lo + Math.flo
 
 function scenario(seed: number): Scenario {
   const rnd = mulberry32(seed);
-  const n = int(rnd, 25, 40);
+  const n = int(rnd, N_MIN, N_MAX);
   const gridPoint = (): Vec2 => ({ x: int(rnd, 0, CELLS) * GRID, y: int(rnd, 0, CELLS) * GRID });
   const walls: Array<Omit<Wall, 'order'>> = [];
   while (walls.length < n) {
@@ -158,11 +161,11 @@ function caseOf(seed: number): Case {
 }
 
 describe('gerador', () => {
-  it('cada semente gera 25 a 40 paredes dentro de 12 × 12 m, com 0 a 6 aberturas', () => {
+  it('cada semente gera N_MIN a N_MAX paredes dentro de 12 × 12 m, com 0 a 6 aberturas', () => {
     for (const seed of SEEDS) {
       const sc = scenario(seed);
-      expect(sc.walls.length, `semente ${seed}`).toBeGreaterThanOrEqual(25);
-      expect(sc.walls.length, `semente ${seed}`).toBeLessThanOrEqual(40);
+      expect(sc.walls.length, `semente ${seed}`).toBeGreaterThanOrEqual(N_MIN);
+      expect(sc.walls.length, `semente ${seed}`).toBeLessThanOrEqual(N_MAX);
       expect(sc.openings.length, `semente ${seed}`).toBeLessThanOrEqual(6);
       for (const w of sc.walls) {
         for (const p of [w.a, w.b]) {

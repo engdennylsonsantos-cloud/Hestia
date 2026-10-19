@@ -63,6 +63,19 @@ export function connectedEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id
   return out;
 }
 
+/**
+ * Quem acompanha uma extremidade movida. Padrão: só em canto simples (exatamente uma outra parede termina ali),
+ * como o Revit mantém o canto de duas paredes ligado. Num nó de 3 ou mais paredes (ex.: ramal chegando num canto)
+ * a parede se solta sozinha, para não arrastar a casa junto. `invert` (Alt) troca o comportamento: num canto simples
+ * solta, num nó leva todas.
+ */
+export function followingEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id>, invert = false, tol = 0.02): Array<{ wallId: Id; end: 'a' | 'b' }> {
+  const all = connectedEnds(p, levelId, pt, exclude, tol);
+  const wallsHere = new Set(all.map((c) => c.wallId));
+  const simple = wallsHere.size === 1;
+  return simple !== invert ? all : [];
+}
+
 export function idsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {
   const box = boxOf([a, b]);
   const crossing = b.x < a.x;

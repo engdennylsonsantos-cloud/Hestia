@@ -1,6 +1,6 @@
 import { add, len, mul, norm, sub } from '@hestia/geom';
 import { isWall, type Command, type Id, type Project } from '@hestia/model';
-import { connectedEnds } from './pick.ts';
+import { followingEnds } from './pick.ts';
 
 /** Comprimento mínimo aceito pela cota temporária (mesmo limite da ferramenta Parede). */
 export const MIN_EDIT_LENGTH = 0.01;
@@ -19,7 +19,7 @@ export function resizeWallCommands(p: Project, levelId: Id, wallId: Id, length: 
   const d = sub(w.b, w.a);
   if (len(d) < 1e-9) return { error: 'A parede não tem direção definida.' };
   const newB = add(w.a, mul(norm(d), length));
-  const follow = connectedEnds(p, levelId, w.b, new Set([wallId]));
+  const follow = followingEnds(p, levelId, w.b, new Set([wallId]));
   const commands: Command[] = [{ type: 'setWallEnds', id: wallId, b: newB }];
   for (const c of follow) {
     commands.push(c.end === 'a' ? { type: 'setWallEnds', id: c.wallId, a: newB } : { type: 'setWallEnds', id: c.wallId, b: newB });

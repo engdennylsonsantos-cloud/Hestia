@@ -1,7 +1,7 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { isOpening, isWall, newId, type Id, type Project } from '@hestia/model';
-import { connectedEnds } from './pick.ts';
+import { followingEnds } from './pick.ts';
 import type { PreviewItem, ToolEnv } from './types.ts';
 
 /** Paredes dentro da seleção (aberturas selecionadas acompanham o anfitrião). */
@@ -33,10 +33,10 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
 }
 
 /**
- * Move paredes. Paredes não selecionadas que terminam num ponto movido acompanham a extremidade
- * (como no Revit: o vizinho se estica), tudo num único passo de desfazer.
+ * Move paredes. Num canto simples, a parede não selecionada que termina no ponto movido acompanha a extremidade
+ * (como no Revit: o vizinho se estica); em nó de 3 ou mais paredes ela fica (ver `followingEnds`). Um passo de desfazer.
  */
-export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true): void {
+export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, invert = false): void {
   const p = env.project();
   const exclude = new Set(wallIds);
   const followers = new Map<Id, { a?: Vec2; b?: Vec2 }>();
@@ -45,7 +45,7 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true): 
       const w = p.elements[id];
       if (!isWall(w)) continue;
       for (const pt of [w.a, w.b]) {
-        for (const c of connectedEnds(p, env.levelId(), pt, exclude)) {
+        for (const c of followingEnds(p, env.levelId(), pt, exclude, invert)) {
           const other = p.elements[c.wallId];
           if (!isWall(other)) continue;
           const cur = followers.get(c.wallId) ?? {};

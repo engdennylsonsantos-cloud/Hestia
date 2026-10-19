@@ -1,4 +1,5 @@
 import { cross, dist, dot, norm, sub, type Vec2 } from '@hestia/geom';
+import { unjoinedEndIssues } from './validateJoins.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { isOpening, isWall, type Element, type Id, type Opening, type Project, type Wall } from './types.ts';
@@ -208,5 +209,6 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...openings.flatMap((o) => openingIssues(p, o)),
     ...openingOverlaps(p, openings),
     ...wallOverlaps(walls),
+    ...unjoinedEndIssues(p, walls),
   ];
 }

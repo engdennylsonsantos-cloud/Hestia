@@ -113,6 +113,17 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
+  // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
+  for (const w of wallsOnLevel(p, input.levelId)) {
+    for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
+      if (!off) continue;
+      const r = 5 / v.zoom;
+      const ring: Vec2[] = Array.from({ length: 12 }, (_, i) => ({ x: pt.x + Math.cos((i * Math.PI) / 6) * r, y: pt.y + Math.sin((i * Math.PI) / 6) * r }));
+      strokes.push({ pts: ring, closed: true, widthPx: 1.4, color: theme.guide, alpha: 0.95 });
+      strokes.push({ pts: [{ x: pt.x - r * 0.7, y: pt.y - r * 0.7 }, { x: pt.x + r * 0.7, y: pt.y + r * 0.7 }], closed: false, widthPx: 1.4, color: theme.guide, alpha: 0.95 });
+    }
+  }
+
   // Símbolos das aberturas (fora do grosseiro).
   if (detail !== 'coarse') {
     for (const w of wallsOnLevel(p, input.levelId)) {

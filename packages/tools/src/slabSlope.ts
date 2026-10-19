@@ -1,9 +1,15 @@
-import { add, dist, mul, norm, rotate, sub, type Vec2 } from '@hestia/geom';
+import { add, boxOf, dist, mul, norm, rotate, sub, type Vec2 } from '@hestia/geom';
 import type { SlabSlope } from '@hestia/model';
 import type { PreviewItem } from './types.ts';
 
 /** Maior inclinação aceita, em módulo (100 % = 45°). */
 export const SLOPE_LIMIT = 100;
+
+/** Comprimento da seta do caimento: um quarto da diagonal da caixa da laje, entre 0,5 m e 3 m. */
+export function slopeArrowLength(boundary: Vec2[]): number {
+  const b = boxOf(boundary);
+  return Math.min(3, Math.max(0.5, Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 4));
+}
 
 /** Percentual para texto: "5,0 %". */
 export const fmtPercent = (v: number): string => `${v.toFixed(1).replace('.', ',')} %`;

@@ -6,6 +6,7 @@ import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpening
 import { followingEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
 import { floorGripAt, floorIdsInBox, pickFloorAt, ringInsertAfter, ringMoveVertex, ringRemoveVertex, type FloorGrip } from './floorPick.ts';
 import { pickSlabAt, slabGripAt, slabIdsInBox, type SlabGrip } from './slabPick.ts';
+import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
@@ -100,6 +101,8 @@ export class SelectTool extends ToolBase {
         this.items.push({ kind: 'point', at: a }, { kind: 'point', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
       }
       if (this.focus?.id === f.id && f.boundary[this.focus.index]) this.items.push({ kind: 'highlight', ids: [f.id] });
+      // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.
+      if (isSlab(f) && f.slope) this.items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary)));
     }
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
     const w = this.singleWall();

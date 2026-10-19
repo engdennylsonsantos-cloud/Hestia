@@ -1,9 +1,9 @@
-import { boxOf, dist, type Vec2 } from '@hestia/geom';
+import { dist, type Vec2 } from '@hestia/geom';
 import { isSlab, type Slab } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { selectedSlabs } from './slabPick.ts';
-import { fmtPercent, slopeError, slopeFrom, slopePreview } from './slabSlope.ts';
+import { fmtPercent, slopeArrowLength, slopeError, slopeFrom, slopePreview } from './slabSlope.ts';
 import type { PointerInfo } from './types.ts';
 
 /**
@@ -47,12 +47,6 @@ export class SlopeTool extends ToolBase {
     return this.env.options().slabSlopePercent;
   }
 
-  /** Comprimento da seta da prévia: um quarto da diagonal da laje, entre 0,5 m e 3 m. */
-  private arrowLength(s: Slab): number {
-    const b = boxOf(s.boundary);
-    return Math.min(3, Math.max(0.5, Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 4));
-  }
-
   override move(p: PointerInfo): void {
     this.raw = p.raw;
     this.items = [];
@@ -62,7 +56,7 @@ export class SlopeTool extends ToolBase {
     this.items.push({ kind: 'highlight', ids: [s.id] });
     if (this.origin && this.dirPt) {
       const slope = slopeFrom(this.origin, this.dirPt, this.percent());
-      if (slope) this.items.push(...slopePreview(slope, this.arrowLength(s)));
+      if (slope) this.items.push(...slopePreview(slope, slopeArrowLength(s.boundary)));
       return;
     }
     if (this.origin) this.items.push({ kind: 'line', a: this.origin, b: inf.point, dashed: true });

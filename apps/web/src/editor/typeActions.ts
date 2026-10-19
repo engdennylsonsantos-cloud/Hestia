@@ -122,7 +122,7 @@ export function boxOfElements(p: Project, ids: Id[]): Box | null {
   for (const id of ids) {
     const e = p.elements[id];
     if (isWall(e)) pts.push(...wallPoints(e));
-    else if (isFloor(e)) pts.push(...e.boundary);
+    else if (isFloor(e) || isSlab(e)) pts.push(...e.boundary);
     else if (e && isOpening(e)) {
       const host = p.elements[e.hostId];
       if (!isWall(host)) continue;

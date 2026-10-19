@@ -7,6 +7,8 @@ export class OrbitCamera {
   azimuth = -Math.PI / 4;
   elevation = 0.5;
   distance = 14;
+  /** Altura da área de desenho em px CSS (define a escala do pan). */
+  private viewHeightPx = 600;
 
   constructor() {
     this.camera.up.set(0, 0, 1);
@@ -15,6 +17,7 @@ export class OrbitCamera {
 
   setAspect(w: number, h: number): void {
     this.camera.aspect = Math.max(1e-3, w / Math.max(1, h));
+    this.viewHeightPx = Math.max(1, h);
     this.camera.updateProjectionMatrix();
   }
 
@@ -35,13 +38,32 @@ export class OrbitCamera {
     this.apply();
   }
 
+  /**
+   * Desloca a vista no plano da tela: a cena segue o cursor em qualquer ângulo.
+   * Eixos da câmera: direita = normalizado(cross(frente, Z)), cima = cross(direita, frente).
+   * Escala: a altura visível na distância do alvo é 2·d·tan(fov/2), que cobre viewHeightPx.
+   */
   pan(dxPx: number, dyPx: number): void {
-    const k = this.distance * 0.0016;
-    const right = new THREE.Vector3(-Math.sin(this.azimuth), Math.cos(this.azimuth), 0);
-    const forward = new THREE.Vector3(Math.cos(this.azimuth), Math.sin(this.azimuth), 0);
-    this.target.addScaledVector(right, -dxPx * k);
-    this.target.addScaledVector(forward, dyPx * k);
+    const { right, up } = this.screenAxes();
+    const unitsPerPx = (2 * this.distance * Math.tan((this.camera.fov * Math.PI) / 360)) / this.viewHeightPx;
+    // Arrastar para a direita/baixo move o alvo para a esquerda/cima, de modo que a cena acompanha o cursor.
+    this.target.addScaledVector(right, -dxPx * unitsPerPx);
+    this.target.addScaledVector(up, dyPx * unitsPerPx);
     this.apply();
+  }
+
+  /** Base da tela (direita, cima) a partir de azimute e elevação; sem degeneração para elevação alta. */
+  private screenAxes(): { right: THREE.Vector3; up: THREE.Vector3 } {
+    const ca = Math.cos(this.azimuth);
+    const sa = Math.sin(this.azimuth);
+    const ce = Math.cos(this.elevation);
+    const se = Math.sin(this.elevation);
+    // Direita horizontal: igual a normalizado(cross(frente, Z)) para |elevação| < 90°, e nunca nula.
+    const right = new THREE.Vector3(-sa, ca, 0);
+    // Frente: da câmera para o alvo.
+    const forward = new THREE.Vector3(-ce * ca, -ce * sa, -se);
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    return { right, up };
   }
 
   zoom(delta: number): void {

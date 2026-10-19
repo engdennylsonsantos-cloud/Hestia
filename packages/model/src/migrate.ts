@@ -1,4 +1,5 @@
 import { createEmptyProject } from './defaults.ts';
+import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
@@ -68,6 +69,8 @@ const migrations: Record<number, Migration> = {
       settings: { showTags: false, debugJoins: false, detail: 'medium', ...((raw.settings as object) ?? {}) },
     };
   },
+  // v6 → v7: pisos (tipos de piso padrão).
+  6: (raw) => ({ ...raw, floorTypes: { ...Object.fromEntries(DEFAULT_FLOOR_TYPES.map((t) => [t.id, t])), ...((raw.floorTypes as object) ?? {}) } }),
 };
 
 export class SchemaError extends Error {}

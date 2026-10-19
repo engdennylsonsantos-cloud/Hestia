@@ -49,7 +49,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const [d, setD] = useState<OpeningType | null>(src ? { ...src } : null);
   if (!d) return null;
   const set = (patch: Partial<OpeningType>): void => setD({ ...d, ...patch });
-  const used = Object.values(p.elements).filter((e) => e.kind !== 'wall' && e.typeId === d.id).length;
+  const used = Object.values(p.elements).filter((e) => (e.kind === 'door' || e.kind === 'window') && e.typeId === d.id).length;
   const ok = (): void => {
     editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura');
     close();

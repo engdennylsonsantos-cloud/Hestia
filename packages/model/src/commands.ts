@@ -2,8 +2,11 @@ import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import { wallLength } from './queries.ts';
 import {
   isOpening,
+  isFloor,
   isWall,
   type Element,
+  type Floor,
+  type FloorType,
   type Id,
   type JoinConfig,
   type Level,
@@ -22,7 +25,10 @@ import { setOpeningHost } from './openingHost.ts';
 export type Command =
   | { type: 'addWall'; wall: Omit<Wall, 'order'> }
   | { type: 'addOpening'; opening: Opening }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> }
+  | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
+  | { type: 'upsertFloorType'; floorType: FloorType }
+  | { type: 'deleteFloorType'; id: Id }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -65,8 +71,26 @@ function removeIds(p: Project, ids: Id[]): void {
   for (const id of doomed) delete p.elements[id];
 }
 
+/** Move/gira/espelha um piso; espelhar inverte o sentido do contorno (a orientação não importa ao motor, mas fica estável). */
+function transformFloor(f: Floor, t: Transform): Floor {
+  const pts = (ring: Vec2[]): Vec2[] => {
+    const out = ring.map((q) => applyTransform(t, q));
+    return t.kind === 'mirror' ? out.reverse() : out;
+  };
+  return { ...f, boundary: pts(f.boundary), holes: f.holes.map(pts) };
+}
+
 function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }>): void {
   const idMap = c.copy?.idMap;
+  for (const f of c.ids.map((id) => p.elements[id]).filter(isFloor)) {
+    const next = transformFloor(f, c.transform);
+    if (idMap) {
+      const nid = idMap[f.id];
+      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
+    } else {
+      p.elements[f.id] = next;
+    }
+  }
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {
     const next = transformWall(w, c.transform);
@@ -98,6 +122,21 @@ export function applyCommand(p: Project, c: Command): void {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };
       break;
+    case 'addFloor': {
+      if (c.floor.boundary.length < 3) throw new Error('O contorno do piso precisa de ao menos 3 pontos');
+      if (!p.floorTypes[c.floor.typeId]) throw new Error('Tipo de piso inexistente');
+      p.elements[c.floor.id] = { ...c.floor, order: p.nextOrder++ };
+      break;
+    }
+    case 'upsertFloorType':
+      p.floorTypes[c.floorType.id] = c.floorType;
+      break;
+    case 'deleteFloorType': {
+      if (Object.values(p.elements).some((e) => isFloor(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.floorTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de piso');
+      delete p.floorTypes[c.id];
+      break;
+    }
     case 'addOpening': {
       const host = p.elements[c.opening.hostId];
       if (!isWall(host)) throw new Error('Abertura precisa de uma parede anfitriã');
@@ -168,7 +207,7 @@ export function applyCommand(p: Project, c: Command): void {
     }
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
-      if (Object.values(p.elements).some((e) => isWall(e) && e.levelId === c.id)) throw new Error('Nível em uso');
+      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }

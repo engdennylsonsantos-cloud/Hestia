@@ -137,6 +137,12 @@ export function labelOf(c: Command): string {
   switch (c.type) {
     case 'addWall':
       return 'Criar parede';
+    case 'addFloor':
+      return 'Criar piso';
+    case 'upsertFloorType':
+      return 'Editar tipo de piso';
+    case 'deleteFloorType':
+      return 'Excluir tipo de piso';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':

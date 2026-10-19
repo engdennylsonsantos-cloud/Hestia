@@ -2,11 +2,35 @@
   "regra": "Um elemento só abre o próximo quando pelo menos `limiar` dos itens do seu checklist estiver resolvido (feito ou fora de escopo justificado) e todos os itens (bloqueante) estiverem feitos.",
   "limiar": 0.95,
   "elementos": [
-    { "id": "paredes", "arquivo": "paredes.md", "status": "em-andamento" },
-    { "id": "pisos", "arquivo": "pisos.md", "status": "nao-iniciado" },
-    { "id": "lajes", "arquivo": "lajes.md", "status": "nao-iniciado" },
-    { "id": "telhados", "arquivo": "telhados.md", "status": "nao-iniciado" },
-    { "id": "escadas", "arquivo": "escadas.md", "status": "nao-iniciado" },
-    { "id": "ambientes", "arquivo": "ambientes.md", "status": "nao-iniciado" }
+    {
+      "id": "paredes",
+      "arquivo": "paredes.md",
+      "status": "concluido"
+    },
+    {
+      "id": "pisos",
+      "arquivo": "pisos.md",
+      "status": "em-andamento"
+    },
+    {
+      "id": "lajes",
+      "arquivo": "lajes.md",
+      "status": "nao-iniciado"
+    },
+    {
+      "id": "telhados",
+      "arquivo": "telhados.md",
+      "status": "nao-iniciado"
+    },
+    {
+      "id": "escadas",
+      "arquivo": "escadas.md",
+      "status": "nao-iniciado"
+    },
+    {
+      "id": "ambientes",
+      "arquivo": "ambientes.md",
+      "status": "nao-iniciado"
+    }
   ]
 }

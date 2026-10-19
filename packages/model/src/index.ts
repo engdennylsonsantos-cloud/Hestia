@@ -11,3 +11,4 @@ export * from './templates.ts';
 export * from './wall.ts';
 export * from './validate.ts';
 export * from './profile.ts';
+export * from './floor.ts';

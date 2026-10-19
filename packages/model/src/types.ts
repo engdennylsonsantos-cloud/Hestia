@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -181,7 +181,35 @@ export interface Opening {
   mark: string;
 }
 
-export type Element = Wall | Opening;
+/** Tipo de piso: camadas do topo para baixo (acabamento, contrapiso, estrutura). `wraps` não é usado. */
+export interface FloorType {
+  id: Id;
+  name: string;
+  code: string;
+  description: string;
+  layers: Layer[];
+  /** Custo por m² (R$), informativo. */
+  cost: number;
+}
+
+/**
+ * Piso (Revit: Floor). Contorno fechado em planta (sentido qualquer) com furos. O topo do piso fica na cota do
+ * nível mais `heightOffset`; as camadas descem a partir dele (a primeira camada é a de cima).
+ */
+export interface Floor {
+  id: Id;
+  kind: 'floor';
+  typeId: Id;
+  levelId: Id;
+  boundary: Vec2[];
+  holes: Vec2[][];
+  heightOffset: number;
+  mark: string;
+  comments: string;
+  order: number;
+}
+
+export type Element = Wall | Opening | Floor;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -219,6 +247,7 @@ export interface Project {
   levels: Level[];
   materials: Record<Id, Material>;
   wallTypes: Record<Id, WallType>;
+  floorTypes: Record<Id, FloorType>;
   openingTypes: Record<Id, OpeningType>;
   elements: Record<Id, Element>;
   nextOrder: number;
@@ -228,5 +257,6 @@ export interface Project {
   views: SectionView[];
 }
 
+export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';

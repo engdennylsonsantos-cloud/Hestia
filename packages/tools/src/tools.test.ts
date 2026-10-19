@@ -128,13 +128,13 @@ describe('seleção e edição', () => {
   it('seleção por janela da esquerda para a direita contém', () => {
     const { env, sel } = house();
     const s = tool('select', env);
-    s.down(P(-1, -1)); s.drag(P(5, 1)); s.up(P(5, 1));
+    s.down!(P(-1, -1)); s.drag!(P(5, 1)); s.up!(P(5, 1));
     expect(sel()).toHaveLength(1); // só a primeira parede está totalmente dentro
   });
   it('janela da direita para a esquerda cruza', () => {
     const { env, sel } = house();
     const s = tool('select', env);
-    s.down(P(5, 1)); s.drag(P(-1, -1)); s.up(P(-1, -1));
+    s.down!(P(5, 1)); s.drag!(P(-1, -1)); s.up!(P(-1, -1));
     expect(sel()).toHaveLength(2);
   });
   it('mover leva a vizinha junto pela extremidade comum', () => {

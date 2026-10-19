@@ -1,0 +1,29 @@
+import { createEmptyProject } from './defaults.ts';
+import { SCHEMA_VERSION, type Project } from './types.ts';
+
+type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
+
+/** migrations[n] leva a versão n para n+1. Cada mudança de esquema acrescenta uma entrada e um teste. */
+const migrations: Record<number, Migration> = {};
+
+export class SchemaError extends Error {}
+
+/** Valida e migra um JSON qualquer para o esquema atual. Lança SchemaError se inválido. */
+export function migrateProject(raw: unknown): Project {
+  if (!raw || typeof raw !== 'object') throw new SchemaError('Arquivo inválido');
+  let obj = raw as Record<string, unknown>;
+  let v = typeof obj.schemaVersion === 'number' ? obj.schemaVersion : NaN;
+  if (!Number.isFinite(v)) throw new SchemaError('Arquivo sem versão de esquema');
+  if (v > SCHEMA_VERSION) throw new SchemaError(`Arquivo de versão ${v} é mais novo que este programa (${SCHEMA_VERSION})`);
+  while (v < SCHEMA_VERSION) {
+    const m = migrations[v];
+    if (!m) throw new SchemaError(`Sem migração da versão ${v}`);
+    obj = m(obj);
+    v += 1;
+    obj.schemaVersion = v;
+  }
+  const base = createEmptyProject();
+  const p = obj as Partial<Project>;
+  if (!p.elements || !p.wallTypes || !p.levels || !p.materials || !p.openingTypes) throw new SchemaError('Arquivo incompleto');
+  return { ...base, ...p, defaults: { ...base.defaults, ...(p.defaults ?? {}) } } as Project;
+}

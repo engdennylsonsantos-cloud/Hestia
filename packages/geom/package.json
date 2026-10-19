@@ -1,0 +1,9 @@
+{
+  "name": "@hestia/geom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": { "polygon-clipping": "^0.15.7", "earcut": "^3.0.0" }
+}

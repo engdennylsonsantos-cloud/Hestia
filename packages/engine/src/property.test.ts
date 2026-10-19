@@ -9,7 +9,11 @@ import { resolveLevel, type ResolvedLevel } from './index.ts';
  * Estes testes não alteram o motor.
  */
 
-const SEEDS = Array.from({ length: 60 }, (_, i) => i + 1);
+/** Execução rápida: 15 sementes. `VITE_FULL=1 npx vitest run packages/engine/src/property.test.ts` roda as 60 (~15 min). */
+const FULL = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_FULL === '1';
+const SEEDS = Array.from({ length: FULL ? 60 : 15 }, (_, i) => i + 1);
+/** A repetição de estabilidade (d) custa uma resolução inteira: na execução rápida só nas primeiras sementes. */
+const AGAIN_SEEDS = FULL ? SEEDS.length : 4;
 const GRID = 0.5;
 const CELLS = 24; // 12 m / 0,5 m
 const TOL = 1e-5;
@@ -200,6 +204,7 @@ describe.each(SEEDS)('propriedades, semente %i', (seed) => {
   });
 
   check('d', () => {
+    if (seed > AGAIN_SEEDS) return;
     const snap = (r: ResolvedLevel) => ({ layers: layerCutAreas(r), total: totalArea(r) });
     expect(snap(caseOf(seed).again()), `semente ${seed}`).toEqual(snap(caseOf(seed).r()));
   });

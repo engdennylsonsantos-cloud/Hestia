@@ -126,7 +126,9 @@ describe('aberturas', () => {
   };
   it('recorta todas as camadas em planta', () => {
     const s = build();
-    expect(silhouetteArea(s)).toBeCloseTo((4 - 0.8 - 1.2) * T14, 6);
+    // + retornos de acabamento nos dois vãos (reboco e tinta nos dois lados, até a metade da espessura)
+    const returns = 2 * 4 * (0.022 * (T14 / 2));
+    expect(silhouetteArea(s)).toBeCloseTo((4 - 0.8 - 1.2) * T14 + returns, 5);
   });
   it('3D: faixas verticais — o vão só fura a altura que atravessa', () => {
     const s = build();
@@ -375,7 +377,7 @@ describe('paredes em arco', () => {
     const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
     const before = silhouetteArea(s);
     s.exec({ type: 'addOpening', opening: { id: 'd', kind: 'door', typeId: 'ot_p80', hostId: 'c', offset: 2.3, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
-    expect(before - silhouetteArea(s)).toBeCloseTo(0.8 * T14, 2);
+    expect(before - silhouetteArea(s)).toBeCloseTo(0.8 * T14 - 4 * 0.022 * (T14 / 2), 2); // vão menos os retornos
   });
   it('quantitativo usa o comprimento do arco', () => {
     const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
@@ -403,5 +405,108 @@ describe('tolerância de junção', () => {
     const frames2 = (s: ProjectStore) => Object.values(s.project.elements).filter((e) => e.kind === 'wall').map((w) => buildFrame(w as Wall, s.project.wallTypes[(w as Wall).typeId]!)!);
     expect(kind(build(0.02))).toBe('free');
     expect(kind(build(0.05))).toBe('pair');
+  });
+});
+
+describe('retorno de acabamento (wrapping)', () => {
+  const withWindow = (wt: Partial<{ wrapInserts: 'none' | 'interior' | 'exterior' | 'both'; wrapEnds: 'none' | 'interior' | 'exterior' | 'both' }>, closure?: 'inherit' | 'none' | 'interior' | 'exterior' | 'both') => {
+    const s = setup([wall('a', 0, 0, 4, 0)]);
+    s.exec({ type: 'upsertWallType', wallType: { ...s.project.wallTypes.wt_alv14!, ...wt } });
+    if (closure) s.exec({ type: 'upsertOpeningType', openingType: { ...s.project.openingTypes.ot_j120!, closure } });
+    s.exec({ type: 'addOpening', opening: { id: 'j', kind: 'window', typeId: 'ot_j120', hostId: 'a', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    return s;
+  };
+  const base = (4 - 1.2) * T14;
+  it('sem retorno o vão é só um recorte', () => {
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }))).toBeCloseTo(base, 5);
+  });
+  it('dos dois lados: reboco e tinta voltam até a metade da espessura', () => {
+    expect(silhouetteArea(withWindow({ wrapInserts: 'both' }))).toBeCloseTo(base + 4 * 0.022 * (T14 / 2), 5);
+  });
+  it('de um lado só: o retorno atravessa a espessura inteira', () => {
+    expect(silhouetteArea(withWindow({ wrapInserts: 'exterior' }))).toBeCloseTo(base + 2 * 0.022 * T14, 5);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'interior' }))).toBeCloseTo(base + 2 * 0.022 * T14, 5);
+  });
+  it('o fechamento da família da abertura substitui o da parede', () => {
+    expect(silhouetteArea(withWindow({ wrapInserts: 'both' }, 'none'))).toBeCloseTo(base, 5);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base + 4 * 0.022 * (T14 / 2), 5);
+  });
+  it('3D: o retorno só existe na altura do vão', () => {
+    const s = withWindow({ wrapInserts: 'both' });
+    const layers = resolveLevel(s.project, 'lv_0').walls.a!.layers;
+    const reboco = layers.find((l) => l.layerIndex === 1)!; // reboco externo (2 cm), envolve
+    const area = (z: number) => multiArea(reboco.bands.find((b) => z > b.z0 && z < b.z1)!.poly);
+    expect(reboco.bands).toHaveLength(3); // abaixo do peitoril, no vão, acima da verga
+    const lost = 1.2 * 0.02; // área da camada removida pelo vão
+    const kept = 2 * 0.02 * (T14 / 2); // retorno desta camada (dois cantos) até a metade da espessura
+    expect(area(0.5) - area(1.7)).toBeCloseTo(lost - kept, 5);
+    expect(area(0.5)).toBeCloseTo(area(2.5), 9);
+  });
+  it('extremidades livres: os acabamentos contornam a ponta', () => {
+    const s = setup([wall('a', 0, 0, 4, 0)]);
+    s.exec({ type: 'upsertWallType', wallType: { ...s.project.wallTypes.wt_alv14!, wrapEnds: 'both' } });
+    expect(silhouetteArea(s)).toBeCloseTo(4 * T14 + 2 * 0.022 * T14, 5);
+  });
+  it('extremidade ligada a outra parede não recebe retorno', () => {
+    const s = setup([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)]);
+    for (const id of ['wt_alv14']) s.exec({ type: 'upsertWallType', wallType: { ...s.project.wallTypes[id]!, wrapEnds: 'both' } });
+    const free = silhouetteArea(s);
+    const noWrap = setup([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)]);
+    // só as duas pontas livres (a em x=0 e b em y=3) ganham retorno
+    expect(free).toBeCloseTo(silhouetteArea(noWrap) + 2 * 0.022 * T14, 5);
+  });
+});
+
+describe('prioridade por camada (substituição)', () => {
+  it('uma camada com prioridade 1 atravessa a estrutura da parede que cruza', () => {
+    // Dois tipos iguais cruzando em X. Sem substituição, o bloco de 'h' (mais antigo) vence a tinta de 'v'.
+    const plain = setup([wall('h', -2, 0, 2, 0), wall('v', 0, -2, 0, 2)]);
+    const baseCore = coreArea(plain);
+    // Tipo variante: a tinta externa e interna de 'v' passam a ter prioridade 0 (mais forte que a estrutura).
+    const s = setup([wall('h', -2, 0, 2, 0), wall('v', 0, -2, 0, 2, { typeId: 'wt_forte' })]);
+    const base = s.project.wallTypes.wt_alv14!;
+    s.exec({ type: 'upsertWallType', wallType: { ...base, id: 'wt_forte', name: 'forte', layers: base.layers.map((l) => (l.function === 'finish2' ? { ...l, priority: 0 } : l)) } });
+    s.exec({ type: 'updateElements', ids: ['v'], patch: { typeId: 'wt_forte' } });
+    expect(coreArea(s)).toBeLessThan(baseCore - 1e-6); // a tinta de v cortou o bloco de h no cruzamento
+  });
+});
+
+describe('faixas verticais (rodapé, barra de azulejo)', () => {
+  const withStrips = (strips: Array<{ side: 'exterior' | 'interior'; material: string; t: number; z0: number; z1: number }>, walls: Array<Omit<Wall, 'order'>> = [wall('a', 0, 0, 4, 0)]) => {
+    const s = setup(walls);
+    const base = s.project.wallTypes.wt_alv14!;
+    s.exec({ type: 'upsertWallType', wallType: { ...base, strips: strips.map((x, i) => ({ id: `st${i}`, name: `f${i}`, side: x.side, materialId: x.material, thickness: x.t, z0: x.z0, z1: x.z1 })) } });
+    return s;
+  };
+  const vol = (s: ProjectStore, mat: string) => quantifyLevel(s.project, resolveLevel(s.project, 'lv_0')).volumeByMaterial[mat] ?? 0;
+  it('rodapé baixo não aparece em planta mas existe no 3D e nos quantitativos', () => {
+    const s = withStrips([{ side: 'interior', material: 'mat_madeira', t: 0.02, z0: 0, z1: 0.1 }]);
+    expect(silhouetteArea(s)).toBeCloseTo(4 * T14, 6);
+    expect(vol(s, 'mat_madeira')).toBeCloseTo(4 * 0.02 * 0.1, 6);
+  });
+  it('barra de azulejo alta aparece em planta fora da face externa', () => {
+    const s = withStrips([{ side: 'exterior', material: 'mat_ceramica', t: 0.01, z0: 0, z1: 1.5 }]);
+    expect(silhouetteArea(s)).toBeCloseTo(4 * (T14 + 0.01), 6);
+    expect(vol(s, 'mat_ceramica')).toBeCloseTo(4 * 0.01 * 1.5, 6);
+    const r = resolveLevel(s.project, 'lv_0');
+    const ys = r.walls.a!.layers.filter((l) => l.layerIndex < 0).flatMap((l) => l.cut.flatMap((p) => p[0]!.map((v) => v.y)));
+    expect(Math.max(...ys)).toBeCloseTo(T14 / 2 + 0.01, 6); // exterior à esquerda (y>0)
+  });
+  it('a faixa é cortada pela porta (mesma altura) e pelo trecho do vão acima do peitoril', () => {
+    const s = withStrips([{ side: 'exterior', material: 'mat_ceramica', t: 0.01, z0: 0, z1: 1.5 }]);
+    s.exec({ type: 'addOpening', opening: { id: 'd', kind: 'door', typeId: 'ot_p80', hostId: 'a', offset: 1, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    s.exec({ type: 'addOpening', opening: { id: 'j', kind: 'window', typeId: 'ot_j120', hostId: 'a', offset: 3, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    const expected = 4 * 0.01 * 1.5 - 0.8 * 0.01 * 1.5 - 1.2 * 0.01 * (1.5 - 1.1);
+    expect(vol(s, 'mat_ceramica')).toBeCloseTo(expected, 6);
+  });
+  it('em um canto, as faixas das duas paredes não se sobrepõem', () => {
+    const s = withStrips([{ side: 'exterior', material: 'mat_ceramica', t: 0.01, z0: 0, z1: 1.5 }], [wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)]);
+    const r = resolveLevel(s.project, 'lv_0');
+    const sum = Object.values(r.walls).flatMap((w) => w.layers).reduce((a, l) => a + multiArea(l.cut), 0);
+    expect(sum).toBeCloseTo(multiArea(union(...r.clusters.map((c) => c.silhouette))), 3);
+  });
+  it('altura da faixa limitada pela parede', () => {
+    const s = withStrips([{ side: 'interior', material: 'mat_madeira', t: 0.02, z0: 2.5, z1: 5 }]);
+    expect(vol(s, 'mat_madeira')).toBeCloseTo(4 * 0.02 * 0.3, 6);
   });
 });

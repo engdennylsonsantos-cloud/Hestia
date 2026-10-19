@@ -22,6 +22,23 @@ const migrations: Record<number, Migration> = {
   },
   // v2 → v3: configurações do projeto (tolerância de junção).
   2: (raw) => ({ ...raw, settings: { joinTolerance: 0.02, ...((raw.settings as object) ?? {}) } }),
+  // v3 → v4: retorno de acabamentos (tipos de parede) e fechamento do vão (tipos de abertura).
+  // Projetos antigos não tinham retorno: preservamos a geometria com 'none'/'inherit'.
+  3: (raw) => {
+    const wt = { ...((raw.wallTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(wt)) wt[id] = { wrapInserts: 'none', wrapEnds: 'none', ...t };
+    const ot = { ...((raw.openingTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(ot)) ot[id] = { closure: 'inherit', ...t };
+    return { ...raw, wallTypes: wt, openingTypes: ot };
+  },
+  // v4 → v5: faixas verticais nos tipos de parede.
+  4: (raw) => {
+    const wt = { ...((raw.wallTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(wt)) wt[id] = { strips: [], ...t };
+    return { ...raw, wallTypes: wt };
+  },
+  // v5 → v6: cortes e elevações.
+  5: (raw) => ({ ...raw, views: Array.isArray(raw.views) ? raw.views : [] }),
 };
 
 export class SchemaError extends Error {}

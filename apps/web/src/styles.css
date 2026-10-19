@@ -326,3 +326,37 @@ svg { display: block; }
 .type-replace label { display: grid; gap: 3px; color: var(--fg-soft); font-size: 11.5px; }
 .type-replace .select { width: 100%; }
 .type-replace-btns { display: flex; gap: 6px; justify-content: flex-end; }
+
+/* ---- aba "Faixas" do tipo de parede (rodapé, barra de azulejo, friso) ---- */
+.strips-help { padding: 0 0 8px; }
+.strips-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.strips-scroll { overflow-x: auto; max-width: 100%; }
+.strips-table { min-width: 640px; }
+.strips-table td .input.wide { min-width: 120px; }
+.strips-empty { color: var(--fg-faint); }
+.strip-mat { width: 100%; display: flex; align-items: center; gap: 6px; text-align: left; }
+.strip-mat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip-err td { padding: 0 4px 4px; color: var(--danger); font-size: 11.5px; border-bottom: 1px solid var(--line); }
+.strips-foot { margin-top: 8px; }
+
+/* ---- avisos de validação na barra de status (IssuesButton) ---- */
+.issues-anchor { position: relative; margin-left: auto; display: inline-flex; flex-shrink: 0; }
+.issues-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--warn); }
+.issues-btn.err { color: var(--danger); }
+.issues-btn:hover { background: var(--sheet); }
+.issues-btn[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent-soft); }
+.issues-ok { margin-left: auto; font-size: 11px; color: var(--ok); white-space: nowrap; }
+.issues-pop { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 30; width: min(380px, calc(100vw - 32px)); max-height: 50vh; overflow: auto; background: var(--sheet); color: var(--fg); border: 1px solid var(--line-strong); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px 0; font-size: 12px; text-align: left; }
+.issues-pop:focus { outline: none; }
+.issues-group + .issues-group { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.issues-group h3 { margin: 4px 12px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-soft); }
+.issues-group.error h3 { color: var(--danger); }
+.issues-group.warning h3 { color: var(--warn); }
+.issues-group ul { list-style: none; margin: 0; padding: 0; }
+.issues-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 6px 12px; }
+.issues-item + .issues-item { border-top: 1px solid var(--line); }
+.issues-msg { flex: 1; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.issues-item .chiplink { flex-shrink: 0; font-size: 12px; }
+@media (max-width: 700px) {
+  .issues-pop { position: fixed; left: 16px; right: 16px; bottom: 34px; width: auto; }
+}

@@ -10,6 +10,7 @@ import {
   orientedRect,
   ringArea,
   closeGaps,
+  multiPoints,
   union,
   type Box,
   type MultiPolygon,
@@ -18,6 +19,7 @@ import {
 } from '@hestia/geom';
 import {
   coreSpan,
+  FUNCTION_PRIORITY,
   layerPriority,
   layerSpans,
   openingSill,
@@ -32,10 +34,12 @@ import {
   type Project,
 } from '@hestia/model';
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
-import { computeEnds, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
+import { computeEnds, joinStatus, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
+import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
 const MIN_AREA = 1e-9;
+const EPS_Z = 1e-6;
 const CLUSTER_PAD = 0.02;
 
 interface Item {
@@ -46,6 +50,14 @@ interface Item {
   order: number;
   /** Espessura do núcleo da parede: desempata camadas de mesma prioridade (a mais robusta domina). */
   coreT: number;
+  /** Identificador estável dentro do cluster (chave de cache do pintor). */
+  uid: number;
+  /** Altura absoluta em que o item existe (camadas: a parede inteira; faixas: o intervalo da faixa). */
+  z0: number;
+  z1: number;
+  /** Aparece na planta (a faixa só aparece se atravessar o plano de corte). */
+  inPlan: boolean;
+  thickness: number;
   shape: MultiPolygon;
   box: Box;
 }
@@ -104,8 +116,40 @@ function layerQuad(f: WallFrame, ends: WallEnds, s1: number, s2: number): Ring {
   return [pointAt(f, 0, lo), pointAt(f, f.length, lo), pointAt(f, f.length, hi), pointAt(f, 0, hi)];
 }
 
-function buildItems(f: WallFrame, ends: WallEnds): Item[] {
+/** Altura (relativa à base) do plano de corte da planta: faixas que não o atravessam não aparecem em planta. */
+const PLAN_CUT = 1.2;
+
+function flatT(f: WallFrame, which: 'a' | 'b', spec: EndSpec, sFace: number): number {
+  if (spec.kind === 'flat') return spec.t;
+  return toLocal(f, endPoint(f, which, spec, sFace)).t;
+}
+
+function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z: { z0: number; z1: number }): Item[] {
   const items: Item[] = [];
+  const coreT = Math.round((coreSpan(f.type).to - coreSpan(f.type).from) * 1e6) / 1e6;
+  const endWraps = new Map<number, MultiPolygon>();
+  if (f.type.wrapEnds !== 'none') {
+    for (const which of freeEnds) {
+      for (const r of endReturns(f, which, f.type.wrapEnds)) endWraps.set(r.layerIndex, [...(endWraps.get(r.layerIndex) ?? []), ...r.poly]);
+    }
+  }
+  const mk = (layerIndex: number, materialId: Id, priority: number, thickness: number, shape: MultiPolygon, z0: number, z1: number): void => {
+    items.push({
+      wallId: f.wall.id,
+      layerIndex,
+      materialId,
+      priority,
+      order: f.wall.order,
+      coreT,
+      uid: 0,
+      z0,
+      z1,
+      inPlan: z0 <= z.z0 + PLAN_CUT + EPS_Z && z1 >= z.z0 + PLAN_CUT - EPS_Z,
+      thickness,
+      shape,
+      box: boxOf(shape.flatMap((p) => p[0] ?? [])),
+    });
+  };
   for (const sp of layerSpans(f.type)) {
     if (sp.layer.thickness < 1e-6) continue;
     const ring = layerQuad(f, ends, sAtDepth(f, sp.from), sAtDepth(f, sp.to));
@@ -114,17 +158,22 @@ function buildItems(f: WallFrame, ends: WallEnds): Item[] {
       if (e.kind === 'flat' && e.clip) shape = intersection(shape, [[e.clip]]);
     }
     if (shape.length === 0) continue;
-    items.push({
-      wallId: f.wall.id,
-      layerIndex: sp.index,
-      materialId: sp.layer.materialId,
-      priority: layerPriority(sp.layer),
-      order: f.wall.order,
-      coreT: Math.round((coreSpan(f.type).to - coreSpan(f.type).from) * 1e6) / 1e6,
-      shape,
-      box: boxOf(shape.flatMap((p) => p[0] ?? [])),
-    });
+    const wrap = endWraps.get(sp.index);
+    if (wrap) shape = [...shape, ...wrap];
+    mk(sp.index, sp.layer.materialId, layerPriority(sp.layer), sp.layer.thickness, shape, z.z0, z.z1);
   }
+  // Faixas verticais (rodapé, barra de azulejo): fora da espessura da parede, com prioridade de acabamento.
+  (f.type.strips ?? []).forEach((st, k) => {
+    const z0 = z.z0 + Math.max(0, st.z0);
+    const z1 = Math.min(z.z1, z.z0 + st.z1);
+    if (z1 - z0 < EPS_Z || st.thickness < 1e-6) return;
+    const sFace = st.side === 'exterior' ? f.sExt : f.sInt;
+    const outward = st.side === 'exterior' ? f.sign : -f.sign;
+    const ta = flatT(f, 'a', ends.a, sFace);
+    const tb = flatT(f, 'b', ends.b, sFace);
+    const ring = layerQuad(f, { a: { kind: 'flat', t: ta }, b: { kind: 'flat', t: tb } }, sFace, sFace + outward * st.thickness);
+    mk(-(k + 1), st.materialId, FUNCTION_PRIORITY.finish2, st.thickness, [[ring]], z0, z1);
+  });
   return items;
 }
 
@@ -212,7 +261,7 @@ const openingRect = (g: OpeningGeometry): MultiPolygon => [
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
-  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${ringsOfShape(i.shape)}`);
+  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}|${ringsOfShape(i.shape)}`);
   const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
@@ -229,16 +278,19 @@ interface ZRange {
   z1: number;
 }
 
-const EPS_Z = 1e-6;
 const sigOf = (m: MultiPolygon): string => ringsOfShape(m);
 
-/** Pontos de quebra vertical: bases, topos e limites dos vãos de todas as paredes do cluster. */
-function breakpoints(zr: Map<Id, ZRange>, opens: OpeningGeometry[]): number[] {
+/** Pontos de quebra vertical: bases, topos, limites das faixas e dos vãos de todas as paredes do cluster. */
+function breakpoints(items: Item[], zr: Map<Id, ZRange>, opens: OpeningGeometry[]): number[] {
   const set = new Set<number>();
   const add = (z: number): void => void set.add(Math.round(z / EPS_Z) * EPS_Z);
   for (const r of zr.values()) {
     add(r.z0);
     add(r.z1);
+  }
+  for (const i of items) {
+    add(i.z0);
+    add(i.z1);
   }
   for (const g of opens) {
     const w = zr.get(g.hostId);
@@ -248,43 +300,58 @@ function breakpoints(zr: Map<Id, ZRange>, opens: OpeningGeometry[]): number[] {
   return [...set].sort((a, b) => a - b);
 }
 
-function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRange>): ClusterCore {
+type Returns = Map<string, Array<{ openingId: Id; poly: MultiPolygon }>>;
+
+function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRange>, returns: Returns): ClusterCore {
   const paintCache = new Map<string, Map<Item, MultiPolygon>>();
-  const paintFor = (active: Set<Id>): Map<Item, MultiPolygon> => {
-    const key = [...active].sort().join('|');
+  const paintFor = (active: Item[]): Map<Item, MultiPolygon> => {
+    const key = active.map((i) => i.uid).sort((x, y) => x - y).join(',');
     let m = paintCache.get(key);
     if (!m) {
-      m = paint(items.filter((i) => active.has(i.wallId)));
+      m = paint(active);
       paintCache.set(key, m);
     }
     return m;
   };
-  const allWalls = new Set(items.map((i) => i.wallId));
-  const plan = paintFor(allWalls);
+  const plan = paintFor(items.filter((i) => i.inPlan));
+  // Retornos de acabamento não podem invadir paredes vizinhas (vão perto de um canto ou de um T).
+  const clipReturn = (poly: MultiPolygon, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
+    const box = boxOf(multiPoints(poly));
+    const subs: MultiPolygon[] = [];
+    for (const i of items) {
+      if (i.wallId === wallId || !boxesOverlap(i.box, box)) continue;
+      const f = painted.get(i);
+      if (f && f.length) subs.push(f);
+    }
+    return subs.length ? difference(poly, ...subs) : poly;
+  };
   const layers = new Map<Id, ResolvedLayer[]>();
   const byMaterial = new Map<Id, MultiPolygon[]>();
   const bandsOf = new Map<Item, LayerBand[]>();
 
-  // Faixas verticais: cada uma resolve a prioridade só entre as paredes que existem naquela altura.
-  const zs = breakpoints(zr, opens);
+  // Faixas verticais: cada uma resolve a prioridade só entre os itens que existem naquela altura.
+  const zs = breakpoints(items, zr, opens);
   for (let k = 0; k + 1 < zs.length; k++) {
     const za = zs[k]!;
     const zb = zs[k + 1]!;
     if (zb - za < EPS_Z) continue;
     const mid = (za + zb) / 2;
-    const active = new Set<Id>();
-    for (const [id, r] of zr) if (r.z0 <= za + EPS_Z && r.z1 >= zb - EPS_Z) active.add(id);
-    if (active.size === 0) continue;
+    const active = items.filter((i) => i.z0 <= za + EPS_Z && i.z1 >= zb - EPS_Z);
+    if (active.length === 0) continue;
     const painted = paintFor(active);
-    for (const it of items) {
-      if (!active.has(it.wallId)) continue;
+    for (const it of active) {
       const frag = painted.get(it);
       if (!frag || frag.length === 0) continue;
       const w = zr.get(it.wallId)!;
       const holes = opens
         .filter((g) => g.hostId === it.wallId && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height)
         .map(openingRect);
-      const poly = holes.length ? difference(frag, ...holes) : frag;
+      let poly = holes.length ? difference(frag, ...holes) : frag;
+      // Retorno do acabamento no vão: só nas faixas de altura que o vão atravessa.
+      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) {
+        const g = opens.find((x) => x.openingId === r.openingId);
+        if (g && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height) poly = [...poly, ...clipReturn(r.poly, it.wallId, painted)];
+      }
       if (poly.length === 0) continue;
       const list = bandsOf.get(it) ?? [];
       const prev = list[list.length - 1];
@@ -297,14 +364,20 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
   }
 
   for (const it of items) {
-    const fragment = plan.get(it)!;
-    if (fragment.length === 0) continue;
-    const rects = opens.filter((g) => g.hostId === it.wallId).map(openingRect);
-    const cut = rects.length ? difference(fragment, ...rects) : fragment;
+    const fragment = it.inPlan ? (plan.get(it) ?? []) : [];
+    if (it.inPlan && fragment.length === 0) continue;
+    let cut = fragment;
+    if (fragment.length) {
+      const rects = opens.filter((g) => g.hostId === it.wallId).map(openingRect);
+      cut = rects.length ? difference(fragment, ...rects) : fragment;
+      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) cut = [...cut, ...clipReturn(r.poly, it.wallId, plan)];
+    }
+    const bands = bandsOf.get(it) ?? [];
+    if (!fragment.length && bands.length === 0) continue;
     const arr = layers.get(it.wallId) ?? [];
-    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, fragment, cut, bands: bandsOf.get(it) ?? [] });
+    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, fragment, cut, bands });
     layers.set(it.wallId, arr);
-    byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
+    if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }
   const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGaps(union(...parts)) }));
   const silhouette = closeGaps(union(...regions.map((r) => r.polygons)));
@@ -334,14 +407,37 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
   for (const group of clusterWalls(frames, ends)) {
-    const items = group.flatMap((f) => buildItems(f, ends.get(f.wall.id)!));
+    const tol = p.settings?.joinTolerance;
+    const freeOf = (f: WallFrame): Array<'a' | 'b'> =>
+      (['a', 'b'] as const).filter((w) => {
+        const k = joinStatus(frames, f.wall.id, w, tol).kind;
+        return k === 'free' || k === 'disallowed';
+      });
+    const items = group.flatMap((f) => {
+      const z0 = wallBaseElevation(p, f.wall);
+      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallHeight(p, f.wall) });
+    });
+    items.forEach((it, i) => {
+      it.uid = i;
+    });
+    const returns: Returns = new Map();
+    for (const f of group) {
+      for (const o of openingsOfWall(p, f.wall.id)) {
+        const ot = openingType(p, o);
+        for (const r of insertReturns(f, o.offset, ot.width, insertMode(f.type, ot))) {
+          const key = `${f.wall.id}|${r.layerIndex}`;
+          returns.set(key, [...(returns.get(key) ?? []), { openingId: o.id, poly: r.poly }]);
+        }
+      }
+    }
     const opens = group.flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
     const heights = new Map(group.map((f) => [f.wall.id, wallHeight(p, f.wall)] as const));
     const zr = new Map(group.map((f) => [f.wall.id, { z0: wallBaseElevation(p, f.wall), z1: wallBaseElevation(p, f.wall) + wallHeight(p, f.wall) }] as const));
-    const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}`;
+    const retSig = [...returns].map(([k, v]) => `${k}=${v.map((x) => `${x.openingId}:${ringsOfShape(x.poly)}`).join('+')}`).join('\n');
+    const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}\n--\n${retSig}`;
     let core = cache.get(key);
     if (!core) {
-      core = solveCluster(items, opens, zr);
+      core = solveCluster(items, opens, zr, returns);
       if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
       cache.set(key, core);
     }

@@ -42,6 +42,9 @@ const wt = (id: string, name: string, code: string, description: string, layers:
   code,
   description,
   layers,
+  wrapInserts: 'both',
+  wrapEnds: 'none',
+  strips: [],
 });
 
 export const DEFAULT_WALL_TYPES: WallType[] = [
@@ -80,10 +83,11 @@ export const DEFAULT_WALL_TYPES: WallType[] = [
   ]),
 ];
 
-const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId'>, frame = 'mat_madeira'): OpeningType => ({
+const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId' | 'closure'>, frame = 'mat_madeira'): OpeningType => ({
   ...o,
   frameMaterialId: frame,
   glassMaterialId: 'mat_vidro',
+  closure: 'inherit',
 });
 
 export const DEFAULT_OPENING_TYPES: OpeningType[] = [
@@ -114,6 +118,7 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     elements: {},
     nextOrder: 1,
     settings: { joinTolerance: 0.02 },
+    views: [],
     defaults: { wallTypeId: 'wt_alv14', doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', wallHeight: 2.8 },
   };
 }

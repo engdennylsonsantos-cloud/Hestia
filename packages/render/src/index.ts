@@ -8,3 +8,4 @@ export * from './plan/gpuPlan.ts';
 export * from './model3d/solids.ts';
 export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
+export * from './section/build.ts';

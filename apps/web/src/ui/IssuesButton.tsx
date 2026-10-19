@@ -1,0 +1,116 @@
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import type { ValidationIssue } from '@hestia/model';
+import { editor } from '../editor/controller.ts';
+import { groupIssues, issueTarget, summarize, worstSeverity } from '../editor/issuesView.ts';
+import { useIssues } from '../editor/useIssues.ts';
+import { useUi } from '../editor/state.ts';
+
+/** Seleciona o elemento do aviso e leva a vista até ele. Troca de nível só quando preciso. */
+function goTo(issue: ValidationIssue): void {
+  const t = issueTarget(editor.project, issue);
+  if (!t) {
+    useUi.setState({ status: 'Este elemento não existe mais.' });
+    return;
+  }
+  const ui = useUi.getState();
+  // selectLevel limpa a seleção, volta à planta e reinicia a ferramenta; por isso só é usado quando o nível muda.
+  if (t.levelId && t.levelId !== ui.levelId) editor.selectLevel(t.levelId);
+  else if (ui.view !== 'plan') editor.setView('plan');
+  useUi.setState({ selection: [t.elementId] });
+  const v = editor.viewport();
+  if (t.center && v) editor.setViewport({ ...v, cx: t.center.x, cy: t.center.y });
+}
+
+/** Botão de avisos da barra de status, com popover de lista agrupada por severidade. */
+export function IssuesButton(): ReactElement {
+  const issues = useIssues();
+  const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  const popId = useId();
+
+  const summary = summarize(issues);
+  const groups = groupIssues(issues);
+  const showPop = open && groups.length > 0;
+
+  // Fecha com clique fora e com Esc. Esc é capturado antes do atalho global de cancelar ferramenta (listener da janela).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent): void => {
+      const target = e.target;
+      if (target instanceof Node && anchor.current && !anchor.current.contains(target)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+
+  // Ao abrir, o foco vai para o primeiro botão "Ir para" (ou para o próprio popover).
+  useEffect(() => {
+    if (!showPop) return;
+    const first = pop.current?.querySelector<HTMLButtonElement>('button');
+    (first ?? pop.current)?.focus();
+  }, [showPop]);
+
+  if (!summary) return <span className="issues-ok">✓ Modelo sem avisos</span>;
+
+  const choose = (issue: ValidationIssue): void => {
+    goTo(issue);
+    setOpen(false);
+    trigger.current?.focus();
+  };
+
+  const severity = worstSeverity(issues);
+  return (
+    <div className="issues-anchor" ref={anchor} aria-live="off">
+      <button
+        ref={trigger}
+        type="button"
+        className={`issues-btn${severity === 'error' ? ' err' : ''}`}
+        aria-haspopup="dialog"
+        aria-expanded={showPop}
+        aria-controls={showPop ? popId : undefined}
+        onClick={() => setOpen((o) => !o)}
+        title="Ver avisos de validação do modelo"
+      >
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3.5 2.5 20h19L12 3.5Z" />
+          <path d="M12 10v4.5M12 17h.01" />
+        </svg>
+        <span>{summary}</span>
+      </button>
+      {showPop && (
+        <div id={popId} ref={pop} role="dialog" aria-label="Avisos de validação" className="issues-pop" tabIndex={-1}>
+          {groups.map((g) => (
+            <section key={g.severity} className={`issues-group ${g.severity}`}>
+              <h3>{g.title} ({g.items.length})</h3>
+              <ul>
+                {g.items.map((issue, i) => (
+                  <li key={`${issue.code}-${issue.elementId ?? ''}-${i}`} className="issues-item">
+                    <span className="issues-msg">{issue.message}</span>
+                    {issue.elementId && (
+                      <button type="button" className="chiplink" onClick={() => choose(issue)} aria-label={`Ir para o elemento: ${issue.message}`}>
+                        Ir para
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

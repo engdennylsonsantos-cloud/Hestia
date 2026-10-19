@@ -11,6 +11,7 @@ import {
   type Opening,
   type OpeningType,
   type Project,
+  type SectionView,
   type Wall,
   type WallType,
 } from './types.ts';
@@ -35,6 +36,9 @@ export type Command =
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
+  | { type: 'addView'; view: SectionView }
+  | { type: 'updateView'; id: Id; patch: Partial<Omit<SectionView, 'id'>> }
+  | { type: 'deleteView'; id: Id }
   | { type: 'batch'; commands: Command[] };
 
 function transformWall(w: Wall, t: Transform): Wall {
@@ -174,6 +178,19 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'setSettings':
       p.settings = { ...p.settings, ...c.patch };
+      break;
+    case 'addView':
+      if (p.views.some((v) => v.id === c.view.id)) throw new Error('Vista já existe');
+      p.views.push(c.view);
+      break;
+    case 'updateView': {
+      const v = p.views.find((x) => x.id === c.id);
+      if (!v) throw new Error('Vista inexistente');
+      Object.assign(v, c.patch);
+      break;
+    }
+    case 'deleteView':
+      p.views = p.views.filter((v) => v.id !== c.id);
       break;
     case 'batch':
       for (const sub of c.commands) applyCommand(p, sub);

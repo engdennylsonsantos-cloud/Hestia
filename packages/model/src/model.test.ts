@@ -86,3 +86,20 @@ describe('migração de esquema', () => {
     expect(m.schemaVersion).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('vistas de corte', () => {
+  it('cria, altera, desfaz e migra v5 sem vistas', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addView', view: { id: 'v1', name: 'Corte AA', kind: 'section', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, depth: 5 } });
+    s.exec({ type: 'updateView', id: 'v1', patch: { depth: 8 } });
+    expect(s.project.views[0]!.depth).toBe(8);
+    s.undo();
+    expect(s.project.views[0]!.depth).toBe(5);
+    s.exec({ type: 'deleteView', id: 'v1' });
+    expect(s.project.views).toHaveLength(0);
+    const raw = JSON.parse(JSON.stringify(createEmptyProject()));
+    raw.schemaVersion = 5;
+    delete raw.views;
+    expect(migrateProject(raw).views).toEqual([]);
+  });
+});

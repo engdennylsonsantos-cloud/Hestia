@@ -1,0 +1,84 @@
+import { describe, expect, it } from 'vitest';
+import { ProjectStore, createEmptyProject, makeWall, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { groupIssues, issueTarget, summarize, worstSeverity } from './issuesView.ts';
+
+const err = (code: string, elementId?: string): ValidationIssue => ({ severity: 'error', code, message: `erro ${code}`, ...(elementId ? { elementId } : {}) });
+const warn = (code: string, elementId?: string): ValidationIssue => ({ severity: 'warning', code, message: `aviso ${code}`, ...(elementId ? { elementId } : {}) });
+
+describe('resumo do botão', () => {
+  it('vazio quando não há avisos', () => {
+    expect(summarize([])).toBe('');
+  });
+
+  it('conta erros e avisos separados por ponto médio', () => {
+    expect(summarize([err('a'), warn('b'), err('c'), warn('d'), warn('e')])).toBe('2 erros · 3 avisos');
+  });
+
+  it('usa o singular para uma unidade', () => {
+    expect(summarize([err('a'), warn('b')])).toBe('1 erro · 1 aviso');
+    expect(summarize([err('a')])).toBe('1 erro');
+    expect(summarize([warn('a')])).toBe('1 aviso');
+  });
+
+  it('omite a categoria que não tem itens', () => {
+    expect(summarize([warn('a'), warn('b'), warn('c'), warn('d')])).toBe('4 avisos');
+  });
+});
+
+describe('agrupamento por severidade', () => {
+  it('põe erros antes de avisos, mesmo quando vêm depois na lista', () => {
+    const groups = groupIssues([warn('w1'), err('e1'), warn('w2')]);
+    expect(groups.map((g) => g.severity)).toEqual(['error', 'warning']);
+    expect(groups.map((g) => g.title)).toEqual(['Erros', 'Avisos']);
+    expect(groups[0]!.items.map((i) => i.code)).toEqual(['e1']);
+  });
+
+  it('mantém a ordem original dentro de cada grupo', () => {
+    const groups = groupIssues([warn('w1'), warn('w2'), warn('w3')]);
+    expect(groups[0]!.items.map((i) => i.code)).toEqual(['w1', 'w2', 'w3']);
+  });
+
+  it('omite grupos vazios', () => {
+    expect(groupIssues([warn('w')]).map((g) => g.severity)).toEqual(['warning']);
+    expect(groupIssues([])).toEqual([]);
+  });
+});
+
+describe('gravidade mais alta', () => {
+  it('é null sem avisos, erro quando há algum erro, aviso no caso contrário', () => {
+    expect(worstSeverity([])).toBeNull();
+    expect(worstSeverity([warn('a')])).toBe('warning');
+    expect(worstSeverity([warn('a'), err('b')])).toBe('error');
+  });
+});
+
+describe('destino de "Ir para"', () => {
+  const build = (): Project => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w0', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 2 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_1', a: { x: 1, y: 1 }, b: { x: 5, y: 1 } }) });
+    const door: Opening = { id: 'o0', kind: 'door', typeId: 'ot_p80', hostId: 'w1', offset: 1, flipHand: false, flipFacing: false, sillOverride: null, mark: '' };
+    s.exec({ type: 'addOpening', opening: door });
+    return s.project;
+  };
+
+  it('parede: nível da parede e ponto médio', () => {
+    expect(issueTarget(build(), warn('x', 'w0'))).toEqual({ elementId: 'w0', levelId: 'lv_0', center: { x: 2, y: 1 } });
+  });
+
+  it('abertura: nível e centro vêm da parede anfitriã, e a seleção é a própria abertura', () => {
+    expect(issueTarget(build(), warn('x', 'o0'))).toEqual({ elementId: 'o0', levelId: 'lv_1', center: { x: 3, y: 1 } });
+  });
+
+  it('aviso sem elemento, ou com elemento que não existe mais, não tem destino', () => {
+    expect(issueTarget(build(), warn('x'))).toBeNull();
+    expect(issueTarget(build(), warn('x', 'nao_existe'))).toBeNull();
+  });
+
+  it('parede em nível inexistente: seleciona, mas sem trocar de nível', () => {
+    const p = build();
+    const orphan: Wall = { ...makeWall({ id: 'w2', typeId: 'wt_alv14', levelId: 'lv_9', a: { x: 0, y: 5 }, b: { x: 3, y: 5 } }), order: 99 };
+    const withOrphan: Project = { ...p, elements: { ...p.elements, w2: orphan } };
+    expect(issueTarget(withOrphan, warn('x', 'w2'))).toEqual({ elementId: 'w2', levelId: null, center: { x: 1.5, y: 5 } });
+  });
+});

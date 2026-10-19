@@ -169,6 +169,12 @@ export function labelOf(c: Command): string {
       return 'Padrões do projeto';
     case 'setSettings':
       return 'Configurações do projeto';
+    case 'addView':
+      return 'Criar vista';
+    case 'updateView':
+      return 'Alterar vista';
+    case 'deleteView':
+      return 'Excluir vista';
     case 'batch':
       return 'Várias alterações';
   }

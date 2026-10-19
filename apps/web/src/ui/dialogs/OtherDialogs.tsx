@@ -84,6 +84,16 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
         </select>
       </div>
       <div className="field-row">
+        <label htmlFor="ot-clos" title="Substitui o retorno de acabamento definido no tipo de parede">Fechamento do vão</label>
+        <select id="ot-clos" className="select" value={d.closure} onChange={(e) => set({ closure: e.target.value as OpeningType['closure'] })}>
+          <option value="inherit">Seguir o tipo de parede</option>
+          <option value="none">Sem retorno</option>
+          <option value="both">Retorno dos dois lados</option>
+          <option value="exterior">Só lado externo</option>
+          <option value="interior">Só lado interno</option>
+        </select>
+      </div>
+      <div className="field-row">
         <label htmlFor="ot-fm">Material do caixilho</label>
         <select id="ot-fm" className="select" value={d.frameMaterialId} onChange={(e) => set({ frameMaterialId: e.target.value })}>
           {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}

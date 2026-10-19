@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 6;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -35,6 +35,23 @@ export interface Layer {
   priority?: number;
 }
 
+/** Em que lados os acabamentos "envolvem" (retornam) nos vãos e nas extremidades da parede. */
+export type WrapMode = 'none' | 'interior' | 'exterior' | 'both';
+
+/**
+ * Faixa vertical aplicada sobre uma face da parede (Revit: sweeps/reveals): rodapé, barra de azulejo, friso.
+ * Fica FORA da espessura da parede, entre as alturas z0 e z1 acima da base.
+ */
+export interface WallStrip {
+  id: Id;
+  name: string;
+  side: 'exterior' | 'interior';
+  materialId: Id;
+  thickness: number;
+  z0: number;
+  z1: number;
+}
+
 export interface WallType {
   id: Id;
   name: string;
@@ -42,6 +59,11 @@ export interface WallType {
   code: string;
   /** Camadas da face EXTERNA para a INTERNA. */
   layers: Layer[];
+  /** Retorno dos acabamentos nos vãos (docs/05 §2); a família da abertura pode substituir. */
+  wrapInserts: WrapMode;
+  /** Retorno dos acabamentos nas extremidades livres. */
+  wrapEnds: WrapMode;
+  strips: WallStrip[];
 }
 
 export type LocationLine =
@@ -109,6 +131,8 @@ export interface OpeningType {
   leaves: 1 | 2;
   frameMaterialId: Id;
   glassMaterialId: Id;
+  /** Fechamento do vão (Revit: Wall Closure): substitui o retorno do tipo de parede quando não é 'inherit'. */
+  closure: 'inherit' | WrapMode;
 }
 
 export interface Opening {
@@ -140,6 +164,16 @@ export interface ProjectSettings {
   joinTolerance: number;
 }
 
+/** Vista de corte ou elevação: linha em planta + profundidade visível; o observador olha para a esquerda de a→b. */
+export interface SectionView {
+  id: Id;
+  name: string;
+  kind: 'section' | 'elevation';
+  a: Vec2;
+  b: Vec2;
+  depth: number;
+}
+
 export interface Project {
   schemaVersion: number;
   name: string;
@@ -151,6 +185,8 @@ export interface Project {
   nextOrder: number;
   defaults: ProjectDefaults;
   settings: ProjectSettings;
+  /** Cortes e elevações do projeto (aparecem na árvore de vistas). */
+  views: SectionView[];
 }
 
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';

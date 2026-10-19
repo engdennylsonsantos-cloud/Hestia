@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type ReactElement } from 'react';
-import { FUNCTION_LABEL, coreRange, layerPriority, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType } from '@hestia/model';
+import { FUNCTION_LABEL, coreRange, layerPriority, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType, type WrapMode } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -8,9 +8,11 @@ import { Dialog } from './Dialog.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
 import { SectionPreview } from './SectionPreview.tsx';
+import { StripsTab, stripError } from './StripsTab.tsx';
 
 const FUNCTIONS = Object.keys(FUNCTION_LABEL) as LayerFunction[];
-type Tab = 'estrutura' | 'graficos' | 'identidade';
+const WRAP_OPTIONS: Array<[WrapMode, string]> = [['none', 'Não envolver'], ['both', 'Dos dois lados'], ['exterior', 'Só lado externo'], ['interior', 'Só lado interno']];
+type Tab = 'estrutura' | 'faixas' | 'graficos' | 'identidade';
 
 export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
@@ -18,6 +20,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
   const [draft, setDraft] = useState<WallType | null>(src ? structuredClone(src) : null);
   const [tab, setTab] = useState<Tab>('estrutura');
   const [pick, setPick] = useState<number | null>(null);
+  const [stripPick, setStripPick] = useState<number | null>(null);
   const [adv, setAdv] = useState<number | null>(null);
   const [current, setCurrent] = useState(typeId);
   if (current !== typeId) {
@@ -29,6 +32,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
   if (!draft) return null;
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const core = coreRange(draft);
+  const stripsInvalid = draft.strips.some((s) => stripError(s) !== null);
   const setLayer = (i: number, patch: Partial<Layer>): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
   const replaceLayer = (i: number, next: Layer): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? next : l)) });
   const move = (i: number, d: -1 | 1): void => {
@@ -53,6 +57,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
     }
   };
   const ok = (): void => {
+    if (stripsInvalid) return;
     editor.store.exec({ type: 'upsertWallType', wallType: draft }, 'Editar tipo de parede');
     close();
   };
@@ -84,7 +89,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
             <button className="btn danger" disabled={usage > 0 || draft.id === p.defaults.wallTypeId} title={usage > 0 ? 'Há paredes usando este tipo' : 'Excluir tipo'} onClick={del}>Excluir</button>
             <span style={{ flex: 1 }} />
             <button className="btn" onClick={close}>Cancelar</button>
-            <button className="btn primary" onClick={ok}>OK</button>
+            <button className="btn primary" onClick={ok} disabled={stripsInvalid} title={stripsInvalid ? 'Corrija as faixas inválidas' : undefined}>OK</button>
           </>
         }
       >
@@ -94,6 +99,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
         </div>
         <div className="dtabs">
           {tabBtn('estrutura', 'Estrutura')}
+          {tabBtn('faixas', 'Faixas')}
           {tabBtn('graficos', 'Gráficos')}
           {tabBtn('identidade', 'Identidade')}
         </div>
@@ -153,6 +159,18 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
               </table>
               <div className="total"><span>Espessura total</span><strong>{(totalThickness(draft) * 100).toFixed(1).replace('.', ',')} cm</strong></div>
               <button className="btn small" onClick={insert}>+ Inserir camada</button>
+              <div className="field-row" style={{ marginTop: 10 }}>
+                <label htmlFor="wt-wrap-ins" title="Camadas marcadas em “Envolve” voltam para dentro do vão, cobrindo a lateral">Retorno nos vãos</label>
+                <select id="wt-wrap-ins" className="select" value={draft.wrapInserts} onChange={(e) => setDraft({ ...draft, wrapInserts: e.target.value as WrapMode })}>
+                  {WRAP_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </div>
+              <div className="field-row">
+                <label htmlFor="wt-wrap-end" title="Camadas marcadas em “Envolve” contornam as pontas livres da parede">Retorno nas pontas</label>
+                <select id="wt-wrap-end" className="select" value={draft.wrapEnds} onChange={(e) => setDraft({ ...draft, wrapEnds: e.target.value as WrapMode })}>
+                  {WRAP_OPTIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </div>
             </div>
             <div>
               <SectionPreview type={draft} materials={p.materials} />
@@ -161,6 +179,9 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
               </p>
             </div>
           </div>
+        )}
+        {tab === 'faixas' && (
+          <StripsTab strips={draft.strips} materials={p.materials} onChange={(strips) => setDraft({ ...draft, strips })} onPickMaterial={setStripPick} />
         )}
         {tab === 'graficos' && (
           <div>
@@ -198,6 +219,16 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
             setPick(null);
           }}
           onClose={() => setPick(null)}
+        />
+      )}
+      {stripPick !== null && (
+        <MaterialsDialog
+          pickFor={draft.strips[stripPick]?.materialId ?? null}
+          onPick={(id) => {
+            setDraft({ ...draft, strips: draft.strips.map((s, k) => (k === stripPick ? { ...s, materialId: id } : s)) });
+            setStripPick(null);
+          }}
+          onClose={() => setStripPick(null)}
         />
       )}
     </>

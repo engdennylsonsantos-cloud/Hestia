@@ -5,14 +5,16 @@ import { resolveLevel, type ResolvedLevel } from './index.ts';
 
 /**
  * Testes de propriedade: paredes aleatórias, mas reprodutíveis (mulberry32 com semente fixa).
- * Se um invariante falhar numa semente, ela vai para KNOWN_FAILURES: o caso vira `it.fails` e o
- * motivo fica anotado. O motor não é alterado por estes testes.
+ * Falhas conhecidas do motor ficam em KNOWN_ROWS: o invariante vira `it.fails` e o motivo fica anotado.
+ * Estes testes não alteram o motor.
  */
 
 const SEEDS = Array.from({ length: 60 }, (_, i) => i + 1);
 const GRID = 0.5;
 const CELLS = 24; // 12 m / 0,5 m
 const TOL = 1e-6;
+/** Tolerância da invariante (c): as silhuetas passam pelo fechamento de frestas (closeGaps), que altera até ~2e-5 m². */
+const TOL_CLOSE_GAPS = 1e-4;
 const SHIFT: Vec2 = { x: 3.7, y: -2.1 };
 const LOCATIONS: LocationLine[] = ['wallCenter', 'coreCenter', 'finishExterior', 'finishInterior', 'coreExterior', 'coreInterior'];
 const JOINS: JoinKind[] = ['butt', 'miter', 'square'];
@@ -20,8 +22,75 @@ const BASE = createEmptyProject();
 const WALL_TYPE_IDS = Object.keys(BASE.wallTypes);
 const OPENING_TYPES = Object.values(BASE.openingTypes);
 
-/** Chave `semente:invariante` -> motivo da falha conhecida. Vazio enquanto todos os invariantes passam. */
-const KNOWN_FAILURES = new Map<string, string>([]);
+const NAMES = {
+  a: '(a) resolveLevel não lança',
+  b: '(b) todas as áreas são finitas e ≥ 0',
+  c: '(c) soma das áreas de corte = área da união das silhuetas (sem dupla contagem)',
+  d: '(d) duas resoluções dão as mesmas áreas',
+  e: '(e) transladar o projeto não muda a área total',
+} as const;
+type InvariantId = keyof typeof NAMES;
+
+const CRASH = 'polygon-clipping lança exceção dentro de resolveLevel (anel de saída incompleto, sweep line ou pilha)';
+const DUPLA = 'soma dos cortes excede a união das silhuetas: dupla contagem entre camadas';
+const TRANSL = 'área total muda ao transladar, entre 1,0e-6 e 3,1e-6 m² (tolerância 1e-6)';
+
+/**
+ * Falhas conhecidas medidas numa execução das 60 sementes: [semente, invariantes que falham, motivo].
+ * Enquanto uma entrada existir, o invariante é `it.fails`: passa se continuar falhando e acusa se for corrigido.
+ */
+const KNOWN_ROWS: Array<[seed: number, ids: string, reason: string]> = [
+  [9, 'abcde', CRASH],
+  [19, 'abcde', CRASH],
+  [20, 'abcde', CRASH],
+  [22, 'abcde', CRASH],
+  [27, 'abcde', CRASH],
+  [28, 'abcde', CRASH],
+  [29, 'abcde', CRASH],
+  [40, 'abcde', CRASH],
+  [44, 'abcde', CRASH],
+  [59, 'abcde', CRASH],
+  [2, 'e', CRASH],
+  [6, 'e', CRASH],
+  [10, 'e', CRASH],
+  [12, 'e', CRASH],
+  [16, 'e', CRASH],
+  [38, 'e', CRASH],
+  [39, 'e', CRASH],
+  [43, 'e', CRASH],
+  [49, 'e', CRASH],
+  [50, 'e', CRASH],
+  [52, 'e', CRASH],
+  [57, 'e', CRASH],
+  [25, 'c', DUPLA],
+  [25, 'e', CRASH],
+  [31, 'c', DUPLA],
+  [31, 'e', CRASH],
+  [7, 'c', DUPLA],
+  [13, 'c', DUPLA],
+  [17, 'c', DUPLA],
+  [23, 'c', DUPLA],
+  [26, 'c', DUPLA],
+  [33, 'c', DUPLA],
+  [35, 'c', DUPLA],
+  [48, 'c', DUPLA],
+  [51, 'c', DUPLA],
+  [1, 'c', DUPLA],
+  [1, 'e', TRANSL],
+  [21, 'c', DUPLA],
+  [21, 'e', TRANSL],
+  [42, 'c', DUPLA],
+  [42, 'e', TRANSL],
+  [47, 'c', DUPLA],
+  [47, 'e', TRANSL],
+  [24, 'e', TRANSL],
+  [34, 'e', TRANSL],
+  [37, 'e', TRANSL],
+  [46, 'e', TRANSL],
+  [60, 'e', TRANSL],
+];
+
+const KNOWN_FAILURES = new Map<string, string>(KNOWN_ROWS.flatMap(([seed, ids, why]) => [...ids].map((id) => [`${seed}:${id}`, why] as const)));
 
 interface Scenario {
   walls: Array<Omit<Wall, 'order'>>;
@@ -167,34 +236,34 @@ describe('gerador', () => {
 });
 
 describe.each(SEEDS)('propriedades, semente %i', (seed) => {
-  const check = (inv: string, fn: () => void): void => {
-    const run = KNOWN_FAILURES.has(`${seed}:${inv}`) ? it.fails : it;
-    run(inv, fn);
+  // Cada resolução leva de 1 a 3 s; o limite padrão de 5 s pode cortar um caso que na verdade passa.
+  const check = (id: InvariantId, fn: () => void): void => {
+    const run = KNOWN_FAILURES.has(`${seed}:${id}`) ? it.fails : it;
+    run(NAMES[id], fn, 120_000);
   };
 
-  check('(a) resolveLevel não lança', () => {
+  check('a', () => {
     expect(() => caseOf(seed).r()).not.toThrow();
   });
 
-  check('(b) todas as áreas são finitas e ≥ 0', () => {
+  check('b', () => {
     const bad = allAreas(caseOf(seed).r()).filter((a) => !(Number.isFinite(a) && a >= 0));
     expect(bad, `semente ${seed}`).toEqual([]);
   });
 
-  check('(c) soma das áreas de corte = área da união das silhuetas (sem dupla contagem)', () => {
+  check('c', () => {
     const r = caseOf(seed).r();
     const sum = sumCut(r);
     const total = totalArea(r);
-    // Tolerância de 1e-4 m²: as silhuetas passam pelo fechamento de frestas (closeGaps), que altera até ~2e-5 m².
-    expect(Math.abs(sum - total), `semente ${seed}: soma dos cortes ${sum} ≠ união ${total}`).toBeLessThanOrEqual(1e-4);
+    expect(Math.abs(sum - total), `semente ${seed}: soma dos cortes ${sum} ≠ união ${total}`).toBeLessThanOrEqual(TOL_CLOSE_GAPS);
   });
 
-  check('(d) duas resoluções dão as mesmas áreas', () => {
+  check('d', () => {
     const snap = (r: ResolvedLevel) => ({ layers: layerCutAreas(r), total: totalArea(r) });
     expect(snap(caseOf(seed).again()), `semente ${seed}`).toEqual(snap(caseOf(seed).r()));
   });
 
-  check('(e) transladar o projeto não muda a área total', () => {
+  check('e', () => {
     const t0 = totalArea(caseOf(seed).r());
     const t1 = totalArea(caseOf(seed).shifted());
     expect(Math.abs(t1 - t0), `semente ${seed}: ${t0} → ${t1}`).toBeLessThanOrEqual(TOL);

@@ -39,7 +39,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
 - [x] C13 Junção com parede em arco **(bloqueante)**
-- [x] C14 Paredes sobrepostas detectadas, com aviso
+- [ ] C14 Paredes sobrepostas detectadas, com aviso
 - [ ] C15 Parede empilhada sobre outra (níveis diferentes)
 - [ ] C16 Junção com pilar, viga e cortina de vidro
 - [-] C17 Divisão automática ao cruzar: o Revit também não divide sozinho
@@ -69,7 +69,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [ ] F6 Travar alinhamento e cotas que comandam
 - [ ] F7 Copiar e colar entre níveis alinhado
 - [ ] F8 Espelhar usando uma parede como eixo
-- [x] F9 Selecionar todas as instâncias do tipo e filtro por categoria
+- [ ] F9 Selecionar todas as instâncias do tipo e filtro por categoria
 
 ## G · Interface e propriedades
 - [x] G1 Seletor de tipo, instância, editor de tipo com seção ao vivo, navegador de materiais

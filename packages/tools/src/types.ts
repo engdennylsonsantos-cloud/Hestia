@@ -46,6 +46,9 @@ export interface ToolEnv {
   options(): ToolOptions;
 }
 
+/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou furo num piso selecionado. */
+export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole';
+
 export interface ToolOptions {
   wallTypeId: Id;
   locationLine: LocationLine;
@@ -61,6 +64,10 @@ export interface ToolOptions {
   rotateCopy: boolean;
   mirrorCopy: boolean;
   offsetCopy: boolean;
+  floorTypeId: Id;
+  /** Deslocamento do topo do piso em relação ao nível (m). */
+  floorOffset: number;
+  floorMode: FloorMode;
 }
 
 export interface PointerInfo {
@@ -95,6 +102,8 @@ export interface Tool {
   preview(): PreviewItem[];
   /** Inferência corrente, para o desenho de guias e marcadores. */
   inference(): Inference | null;
+  /** Delete com um vértice de piso em foco: remove o vértice e devolve true; false deixa o Delete excluir a seleção. */
+  deleteKey?(): boolean;
   /** Rótulo do campo numérico pendente (ex.: "Comprimento"), ou null se a ferramenta não espera valor. */
   inputPrompt(): string | null;
 }

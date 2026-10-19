@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pointInPolygon, type Vec2 } from '@hestia/geom';
+import { multiArea, pointInPolygon, type Vec2 } from '@hestia/geom';
 import { resolveFloors, resolveLevel } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeFloor, makeWall, type DetailLevel, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
@@ -79,12 +79,15 @@ describe('piso na planta (D1)', () => {
     expect(floorFill(p, 'fine', 10).fills[0]!.hatch?.kind).toBe('diagonal');
   });
 
-  it('contorno fino de 1 px com os furos como contorno interno', () => {
+  it('contorno como faixa preenchida (fica atrás das paredes), com o furo também contornado', () => {
     const p = floorProject('ft_ceram', { holes: [HOLE] });
     const ops = floorFill(p, 'medium');
-    expect(ops.strokes).toHaveLength(2);
-    for (const st of ops.strokes) expect(st.widthPx).toBe(1);
-    expect(ops.strokes[1]!.pts).toEqual(HOLE);
+    expect(ops.strokes).toHaveLength(0); // traços são desenhados depois dos preenchimentos: não servem ao contorno
+    expect(ops.fills).toHaveLength(2); // preenchimento + faixa do contorno
+    const band = ops.fills[1]!.polygons;
+    expect(band.length).toBeGreaterThan(0);
+    // A faixa é fina: bem menos área que o piso.
+    expect(multiArea(band)).toBeLessThan(multiArea(ops.fills[0]!.polygons) * 0.1);
   });
 
   it('etiqueta com código e área só com etiquetas ligadas, no centroide', () => {

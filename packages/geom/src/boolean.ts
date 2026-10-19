@@ -192,3 +192,13 @@ export function closeGapsSafe(m: MultiPolygon, eps = 3e-6, maxLoss = 2e-5): Mult
   // Ganho = frestas coladas (esperado, micrômetros); perda = anéis finos descartados (inaceitável).
   return delta >= -maxLoss && delta <= 1e-3 ? closed : m;
 }
+
+/** Dilata (delta > 0) ou contrai (delta < 0) um multipolígono com Clipper, cantos em esquadria. Furos acompanham. */
+export function offsetMulti(m: MultiPolygon, delta: number): MultiPolygon {
+  if (m.length === 0) return [];
+  const co = new ClipperLib.ClipperOffset(2, 0.25 * CLIP_SCALE * Math.abs(delta));
+  co.AddPaths(m.flatMap((_, i) => operandPaths([m[i]!])), ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
+  const tree = new ClipperLib.PolyTree();
+  co.Execute(tree, delta * CLIP_SCALE);
+  return fromTree(tree);
+}

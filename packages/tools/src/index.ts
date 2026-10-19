@@ -9,3 +9,6 @@ export * from './wallGeom.ts';
 export * from './clipboard.ts';
 export * from './lengthEdit.ts';
 export * from './selectionFilters.ts';
+export * from './enclosed.ts';
+export * from './floorPick.ts';
+export { FloorTool } from './floorTool.ts';

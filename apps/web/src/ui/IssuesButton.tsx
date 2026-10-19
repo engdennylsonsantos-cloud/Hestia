@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import type { ValidationIssue } from '@hestia/model';
+import { fitBox } from '@hestia/render';
 import { editor } from '../editor/controller.ts';
 import { groupIssues, issueTarget, summarize, worstSeverity } from '../editor/issuesView.ts';
 import { useIssues } from '../editor/useIssues.ts';
@@ -18,7 +19,9 @@ function goTo(issue: ValidationIssue): void {
   else if (ui.view !== 'plan') editor.setView('plan');
   useUi.setState({ selection: [t.elementId] });
   const v = editor.viewport();
-  if (t.center && v) editor.setViewport({ ...v, cx: t.center.x, cy: t.center.y });
+  // Piso: enquadra a caixa do contorno; parede e abertura: centraliza no ponto médio.
+  if (t.box && v) editor.setViewport(fitBox(v, t.box));
+  else if (t.center && v) editor.setViewport({ ...v, cx: t.center.x, cy: t.center.y });
 }
 
 /** Botão de avisos da barra de status, com popover de lista agrupada por severidade. */

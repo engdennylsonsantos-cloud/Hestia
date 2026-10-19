@@ -1,4 +1,4 @@
-import { multiArea, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { lineIntervals, resolveFloors, type ResolvedFloor } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
@@ -70,7 +70,10 @@ export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: bool
     const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     out.fills.push({ polygons: f.polygon, color, alpha: 1, hatch });
     if (detail !== 'coarse') {
-      for (const ring of f.polygon.flat()) out.strokes.push({ pts: ring, closed: true, widthPx: 1, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
+      // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
+      // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima).
+      const band = difference(f.polygon, offsetMulti(f.polygon, -1.5 / v.zoom));
+      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
     }
     if (p.settings.showTags) {
       const code = p.floorTypes[f.typeId]?.code;

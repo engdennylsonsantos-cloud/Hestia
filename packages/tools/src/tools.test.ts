@@ -8,7 +8,7 @@ function makeEnv(store = new ProjectStore(createEmptyProject())) {
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
-    rotateCopy: false, mirrorCopy: false, offsetCopy: true,
+    rotateCopy: false, mirrorCopy: false, offsetCopy: true, floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly',
   };
   const env: ToolEnv = {
     project: () => store.project,

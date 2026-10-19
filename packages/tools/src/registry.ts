@@ -8,11 +8,12 @@ import { JoinTool } from './joinTool.ts';
 import { SplitTool } from './splitTool.ts';
 import { SectionTool } from './sectionTool.ts';
 import { RehostTool } from './rehostTool.ts';
+import { FloorTool } from './floorTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
+export type ToolId = 'select' | 'wall' | 'floor' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
   { title: 'Medir', tools: ['measure'] },
 ];
@@ -23,6 +24,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new SelectTool(env);
     case 'wall':
       return new WallTool(env);
+    case 'floor':
+      return new FloorTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -59,6 +62,7 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
 export const TOOL_LABEL: Record<ToolId, string> = {
   select: 'Selecionar',
   wall: 'Parede',
+  floor: 'Piso',
   door: 'Porta',
   window: 'Janela',
   move: 'Mover',
@@ -79,6 +83,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   select: 'V',
   wall: 'W',
+  floor: 'F',
   door: 'D',
   window: 'J',
   move: 'M',

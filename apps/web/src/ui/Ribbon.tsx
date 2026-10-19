@@ -5,7 +5,7 @@ import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
-  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window'] }],
+  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
     { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'trim', 'align', 'joins', 'split', 'rehost'] },
@@ -14,7 +14,6 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
 };
 
 const SOON: Array<{ icon: string; label: string }> = [
-  { icon: 'floor', label: 'Piso' },
   { icon: 'floor', label: 'Laje' },
   { icon: 'roof', label: 'Telhado' },
   { icon: 'stairs', label: 'Escada' },
@@ -133,6 +132,10 @@ export function Ribbon(): ReactElement {
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'schedule', dialogArg: null })} title="Tabela de paredes com quantitativos e exportação CSV">
                   <Icon name="file" size={22} />
                   <span>Tabela de paredes</span>
+                </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'floorSchedule', dialogArg: null })} title="Tabela de pisos com área, volume e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de pisos</span>
                 </button>
               </div>
               <div className="rgroup-title">Documentar</div>

@@ -28,6 +28,8 @@ export interface InferContext {
   noGrid?: boolean;
   /** Candidato exclusivo: só pontos sobre paredes. */
   onWallsOnly?: boolean;
+  /** Pontos extras de captura (vértices de pisos, contorno em construção). */
+  extraPoints?: Vec2[];
 }
 
 const TOL_PX = 10;
@@ -88,6 +90,10 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
         }
       }
     }
+  }
+  for (const q of ctx.extraPoints ?? []) {
+    const d = dist(cursor, q);
+    if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
   }
   // Interseções de eixos.
   for (let i = 0; i < walls.length; i++) {

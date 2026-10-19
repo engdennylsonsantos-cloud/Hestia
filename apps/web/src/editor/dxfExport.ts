@@ -1,17 +1,19 @@
 import { levelFrames, openingGeometry, type ResolvedLevel } from '@hestia/engine';
 import { exportDxf, type DxfLevelGeometry } from '@hestia/io';
-import { openingsOfWall, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, openingsOfWall, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
- * Geometria do nível para o DXF: regiões e contornos já resolvidos pelo engine (`editor.resolved`), mais o
- * retângulo de cada vão. O io não importa o engine, então a montagem fica aqui, no web.
+ * Geometria do nível para o DXF: regiões e contornos já resolvidos pelo engine (`editor.resolved`), o retângulo de
+ * cada vão e o contorno de cada piso (com furos, na camada do código do tipo). O io não importa o engine, então a
+ * montagem fica aqui, no web.
  */
 export function dxfGeometryOf(p: Project, levelId: Id, resolved: ResolvedLevel): DxfLevelGeometry {
   const openings = levelFrames(p, levelId).flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
   return {
     clusters: resolved.clusters,
     openings: openings.map((g) => ({ center: g.center, u: g.u, width: g.width, thickness: g.thickness })),
+    floors: floorsOnLevel(p, levelId).map((f) => ({ outline: f.boundary, holes: f.holes, typeCode: p.floorTypes[f.typeId]?.code ?? '' })),
   };
 }
 

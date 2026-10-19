@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { TOOL_LABEL } from '@hestia/tools';
+import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, NumField } from './fields.tsx';
@@ -55,6 +55,40 @@ export function OptionsBar(): ReactElement {
           </label>
           <Check id="opt-chain" checked={o.chain} onChange={(v) => set({ chain: v })}>Encadear</Check>
           <Check id="opt-ortho" checked={o.orthoLock} onChange={(v) => set({ orthoLock: v })}>Travar em 0°/90°</Check>
+        </>
+      )}
+      {tool === 'floor' && (
+        <>
+          <label>
+            Tipo
+            <select id="opt-floortype" className="select" value={o.floorTypeId} onChange={(e) => set({ floorTypeId: e.target.value })}>
+              {Object.values(p.floorTypes).map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Modo
+            <select
+              id="opt-floormode"
+              className="select"
+              value={o.floorMode}
+              onChange={(e) => {
+                // Trocar o modo reinicia o desenho em andamento (o modo é lido pela ferramenta a cada passo).
+                useUi.setState({ options: { ...useUi.getState().options, floorMode: e.target.value as FloorMode } });
+                editor.setTool('floor');
+              }}
+            >
+              <option value="poly">Contorno por pontos</option>
+              <option value="rect">Retângulo (2 cantos)</option>
+              <option value="walls">Área fechada por paredes</option>
+              <option value="hole">Furo no piso selecionado</option>
+            </select>
+          </label>
+          <label>
+            Deslocamento do topo
+            <NumField id="opt-flooroffset" value={o.floorOffset} onCommit={(v) => set({ floorOffset: v })} unit="m" />
+          </label>
         </>
       )}
       {(tool === 'door' || tool === 'window') && (

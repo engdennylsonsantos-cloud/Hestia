@@ -5,7 +5,7 @@ import type { ToolId, ToolOptions } from '@hestia/tools';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -52,6 +52,9 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   rotateCopy: false,
   mirrorCopy: true,
   offsetCopy: true,
+  floorTypeId: 'ft_ceram',
+  floorOffset: 0,
+  floorMode: 'poly',
 };
 
 export const useUi = create<UiState>(() => ({

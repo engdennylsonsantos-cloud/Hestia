@@ -4,10 +4,14 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import {
   compatibleTypes,
+  duplicateFloorType,
+  floorTypeDeleteBlock,
   instancesOfType,
+  renameFloorType,
   replaceStatus,
   replaceType,
   selectAllPlan,
+  tryDeleteFloorType,
   tryDeleteWallType,
   wallTypeDeleteBlock,
   whereUsed,
@@ -39,10 +43,14 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   const [target, setTarget] = useState<Id>('');
   /** Depois de substituir, pergunta se o tipo antigo (que ficou sem uso) deve ser excluído. */
   const [askDelete, setAskDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState(name);
   const uses = instancesOfType(p, kind, typeId).length;
   const choices = compatibleTypes(p, kind, typeId);
   const chosen = choices.some((c) => c.id === target) ? target : (choices[0]?.id ?? '');
-  const deleteBlock = kind === 'wall' ? wallTypeDeleteBlock(p, typeId) : null;
+  /** Tipos de parede e de piso podem ser excluídos aqui; portas e janelas não. */
+  const deletable = kind === 'wall' || kind === 'floor';
+  const deleteBlock = kind === 'wall' ? wallTypeDeleteBlock(p, typeId) : kind === 'floor' ? floorTypeDeleteBlock(p, typeId) : null;
   const replaceBlock = choices.length === 0 ? 'Não há outro tipo compatível.' : uses === 0 ? 'Este tipo não tem instâncias.' : null;
 
   const selectAll = (): void => {
@@ -63,23 +71,52 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
       useUi.setState({ status: replaceStatus(n, to.name) });
       setReplacing(false);
       // Só pergunta se o tipo antigo pode mesmo ser excluído (o padrão do projeto não pode).
-      setAskDelete(kind === 'wall' && n > 0 && wallTypeDeleteBlock(editor.project, typeId) === null);
+      setAskDelete(deletable && n > 0 && (kind === 'wall' ? wallTypeDeleteBlock(editor.project, typeId) : floorTypeDeleteBlock(editor.project, typeId)) === null);
     } catch (e) {
       useUi.setState({ status: `Não foi possível substituir: ${errText(e)}` });
     }
   };
 
   const remove = (): void => {
-    const r = tryDeleteWallType(editor.store, typeId);
+    const r = kind === 'floor' ? tryDeleteFloorType(editor.store, typeId) : tryDeleteWallType(editor.store, typeId);
     if (!r.ok) {
       useUi.setState({ status: `Não foi possível excluir «${name}»: ${r.error}` });
       return;
     }
     // Se o tipo excluído era o escolhido para desenhar, volta ao padrão do projeto.
     const ui = useUi.getState();
-    if (ui.options.wallTypeId === typeId) useUi.setState({ options: { ...ui.options, wallTypeId: editor.project.defaults.wallTypeId } });
+    if (kind === 'floor' && ui.options.floorTypeId === typeId) {
+      useUi.setState({ options: { ...ui.options, floorTypeId: Object.keys(editor.project.floorTypes)[0] ?? ui.options.floorTypeId } });
+    } else if (kind === 'wall' && ui.options.wallTypeId === typeId) {
+      useUi.setState({ options: { ...ui.options, wallTypeId: editor.project.defaults.wallTypeId } });
+    }
     setAskDelete(false);
     useUi.setState({ status: `Tipo «${name}» excluído.` });
+  };
+
+  const duplicate = (): void => {
+    const id = duplicateFloorType(editor.store, typeId);
+    useUi.setState({ status: id ? `Tipo «${name}» duplicado. Duplo clique na cópia para editar.` : 'Não foi possível duplicar este tipo.' });
+  };
+
+  const applyRename = (): void => {
+    const r = renameFloorType(editor.store, typeId, newName);
+    if (!r.ok) {
+      useUi.setState({ status: r.error });
+      return;
+    }
+    setRenaming(false);
+    useUi.setState({ status: `Tipo renomeado para «${newName.trim()}».` });
+  };
+
+  const onRenameKey = (e: KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyRename();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      setRenaming(false);
+    }
   };
 
   const onPanelKey = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -130,7 +167,27 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
           >
             <Icon name="rotate" size={13} />
           </button>
-          {kind === 'wall' ? (
+          {kind === 'floor' ? (
+            <>
+              <button type="button" className="ibtn type-act" title="Duplicar tipo" aria-label={`Duplicar tipo ${name}`} onClick={duplicate}>
+                <Icon name="plus" size={13} />
+              </button>
+              <button
+                type="button"
+                className={`ibtn type-act${renaming ? ' on' : ''}`}
+                title="Renomear tipo"
+                aria-label={`Renomear tipo ${name}`}
+                aria-expanded={renaming}
+                onClick={() => {
+                  setNewName(name);
+                  setRenaming((v) => !v);
+                }}
+              >
+                <Icon name="edit" size={13} />
+              </button>
+            </>
+          ) : null}
+          {deletable ? (
             <button
               type="button"
               className="ibtn type-act danger"
@@ -144,6 +201,22 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
           ) : null}
         </div>
       </div>
+      {renaming ? (
+        <div className="type-replace" role="group" aria-label={`Renomear o tipo ${name}`}>
+          <label>
+            <span>Novo nome</span>
+            <input className="input" aria-label="Novo nome do tipo" value={newName} autoFocus onChange={(e) => setNewName(e.target.value)} onKeyDown={onRenameKey} />
+          </label>
+          <div className="type-replace-btns">
+            <button type="button" className="btn small primary" onClick={applyRename}>
+              Renomear
+            </button>
+            <button type="button" className="btn small" onClick={() => setRenaming(false)}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
       {replacing ? (
         <div id={panelId} className="type-replace" onKeyDown={onPanelKey}>
           <label>

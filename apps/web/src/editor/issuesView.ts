@@ -1,4 +1,4 @@
-import { isOpening, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { isFloor, isOpening, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
 
 export interface IssueGroup {
   severity: ValidationSeverity;
@@ -13,6 +13,8 @@ export interface IssueTarget {
   levelId: Id | null;
   /** Ponto médio da parede; null quando o elemento não está ligado a uma parede. */
   center: { x: number; y: number } | null;
+  /** Caixa do piso (contorno): a vista enquadra a caixa em vez do ponto. Só existe para pisos. */
+  box?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
 const TITLE: Record<ValidationSeverity, string> = { error: 'Erros', warning: 'Avisos' };
@@ -50,6 +52,18 @@ export function issueTarget(p: Project, issue: ValidationIssue): IssueTarget | n
   if (!id) return null;
   const el = p.elements[id];
   if (!el) return null;
+  if (isFloor(el)) {
+    const xs = el.boundary.map((q) => q.x);
+    const ys = el.boundary.map((q) => q.y);
+    if (xs.length === 0) return null;
+    const box = { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+    return {
+      elementId: id,
+      levelId: p.levels.some((l) => l.id === el.levelId) ? el.levelId : null,
+      center: { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 },
+      box,
+    };
+  }
   const host = isOpening(el) ? p.elements[el.hostId] : undefined;
   const wall = isWall(el) ? el : isWall(host) ? host : null;
   const levelExists = wall !== null && p.levels.some((l) => l.id === wall.levelId);

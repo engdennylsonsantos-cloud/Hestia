@@ -1,8 +1,8 @@
 import { fitBox, type Viewport } from '@hestia/render';
-import { ProjectStore, isOpening, isWall, openingType, wallTypeUsage, type Element, type Id, type Project } from '@hestia/model';
+import { ProjectStore, isFloor, isOpening, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
 
-/** Tipos que o navegador de projeto lista: parede, porta e janela. */
-export type TypeKind = 'wall' | 'door' | 'window';
+/** Tipos que o navegador de projeto lista: parede, porta, janela e piso. */
+export type TypeKind = 'wall' | 'door' | 'window' | 'floor';
 
 export interface TypeChoice {
   id: Id;
@@ -21,6 +21,7 @@ export function levelOfElement(p: Project, e: Element): Id | undefined {
 
 function usesType(e: Element, kind: TypeKind, typeId: Id): boolean {
   if (kind === 'wall') return isWall(e) && e.typeId === typeId;
+  if (kind === 'floor') return isFloor(e) && e.typeId === typeId;
   return isOpening(e) && e.kind === kind && e.typeId === typeId;
 }
 
@@ -62,7 +63,9 @@ export function compatibleTypes(p: Project, kind: TypeKind, typeId: Id): TypeCho
   const list =
     kind === 'wall'
       ? Object.values(p.wallTypes).filter((t) => t.id !== typeId)
-      : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
+      : kind === 'floor'
+        ? Object.values(p.floorTypes).filter((t) => t.id !== typeId)
+        : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
   return list.map((t) => ({ id: t.id, name: t.name }));
 }
 
@@ -116,6 +119,7 @@ export function boxOfElements(p: Project, ids: Id[]): Box | null {
   for (const id of ids) {
     const e = p.elements[id];
     if (isWall(e)) pts.push(...wallPoints(e));
+    else if (isFloor(e)) pts.push(...e.boundary);
     else if (e && isOpening(e)) {
       const host = p.elements[e.hostId];
       if (!isWall(host)) continue;
@@ -209,3 +213,58 @@ export function tryDeleteWallType(store: ProjectStore, typeId: Id): DeleteResult
     return { ok: false, error: e instanceof Error ? e.message : 'Falha desconhecida.' };
   }
 }
+
+/** Pisos que usam o tipo (em todos os níveis). */
+export const floorTypeUsage = (p: Project, typeId: Id): number => instancesOfType(p, 'floor', typeId).length;
+
+/** Motivo pelo qual o tipo de piso não pode ser excluído; null quando pode. */
+export function floorTypeDeleteBlock(p: Project, typeId: Id): string | null {
+  if (Object.keys(p.floorTypes).length <= 1) return 'É o único tipo de piso do projeto.';
+  const uso = floorTypeUsage(p, typeId);
+  if (uso > 0) return `Em uso por ${plural(uso, 'piso', 'pisos')}.`;
+  return null;
+}
+
+/** Exclui o tipo de piso (o comando recusa se estiver em uso), devolvendo o erro em vez de lançá-lo. */
+export function tryDeleteFloorType(store: ProjectStore, typeId: Id): DeleteResult {
+  try {
+    store.exec({ type: 'deleteFloorType', id: typeId });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Falha desconhecida.' };
+  }
+}
+
+/** Cópia do tipo de piso com id novo e nome "(cópia)". Devolve o id criado. */
+export function duplicateFloorType(store: ProjectStore, typeId: Id): Id | null {
+  const src = store.project.floorTypes[typeId];
+  if (!src) return null;
+  const copy: FloorType = { ...structuredClone(src), id: newId('ft'), name: `${src.name} (cópia)` };
+  store.exec({ type: 'upsertFloorType', floorType: copy }, 'Duplicar tipo de piso');
+  return copy.id;
+}
+
+/** Renomeia o tipo de piso; nome vazio não é aceito. */
+export function renameFloorType(store: ProjectStore, typeId: Id, name: string): DeleteResult {
+  const clean = name.trim();
+  const src = store.project.floorTypes[typeId];
+  if (!src) return { ok: false, error: 'Tipo inexistente.' };
+  if (!clean) return { ok: false, error: 'Dê um nome ao tipo.' };
+  store.exec({ type: 'upsertFloorType', floorType: { ...src, name: clean } }, 'Renomear tipo de piso');
+  return { ok: true };
+}
+
+/**
+ * Validação do tipo de piso antes de salvar: ao menos uma camada, espessura maior que zero em toda camada
+ * (só a membrana pode ter zero) e nome. Devolve a mensagem do primeiro problema, ou null se está pronto.
+ */
+export function floorTypeError(t: Pick<FloorType, 'name' | 'layers'>): string | null {
+  if (!t.name.trim()) return 'Dê um nome ao tipo.';
+  if (t.layers.length === 0) return 'O tipo precisa de ao menos uma camada.';
+  const bad = t.layers.findIndex((l) => l.function !== 'membrane' && !(l.thickness > 0));
+  if (bad >= 0) return `Camada ${bad + 1}: a espessura precisa ser maior que zero (só membrana pode ser zero).`;
+  return null;
+}
+
+/** Tipo de piso das opções ao abrir um projeto: mantém o escolhido se existir no projeto, senão o primeiro. */
+export const keptFloorType = (p: Project, current: Id): Id => (p.floorTypes[current] ? current : (Object.keys(p.floorTypes)[0] ?? current));

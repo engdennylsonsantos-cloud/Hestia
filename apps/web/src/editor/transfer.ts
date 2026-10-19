@@ -2,6 +2,14 @@ import type { Id, Project, ProjectStore } from '@hestia/model';
 import { clipboardFrom, idsOfType, pasteAlignedCommand, selectedTypeId, type ClipBuffer } from '@hestia/tools';
 import { useUi } from './state.ts';
 
+/** "2 parede(s) e 1 piso": frase do status para o que foi copiado ou colado. */
+function describe(walls: number, floors: number): string {
+  const parts: string[] = [];
+  if (walls) parts.push(`${walls} parede(s)`);
+  if (floors) parts.push(`${floors} piso(s)`);
+  return parts.join(' e ');
+}
+
 /**
  * Copiar e colar alinhado (área de transferência em memória) e seleção por tipo ("Mesmo tipo").
  * Fica fora do controlador só para que ele apenas repasse as ações (limite de linhas por arquivo).
@@ -17,7 +25,7 @@ export class Transfer {
       return false;
     }
     this.clip = next;
-    useUi.setState({ status: `${next.walls.length} parede(s) copiada(s). Ctrl+V cola alinhado no nível ativo.` });
+    useUi.setState({ status: `${describe(next.walls.length, next.floors.length)} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
     return true;
   }
 
@@ -33,7 +41,7 @@ export class Transfer {
       return false;
     }
     store.exec(r.command, 'Colar alinhado');
-    useUi.setState({ selection: [...r.wallIds, ...r.openingIds], status: `${r.wallIds.length} parede(s) colada(s) no mesmo lugar. Ctrl+Z desfaz.` });
+    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds], status: `${describe(r.wallIds.length, r.floorIds.length)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
     return true;
   }
 

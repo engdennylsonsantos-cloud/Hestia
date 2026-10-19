@@ -14,6 +14,7 @@ import {
 } from '@hestia/model';
 import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
+import { keptFloorType } from './typeActions.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
@@ -251,10 +252,9 @@ export class Editor {
       return true;
     }
     if (k === 'Delete' || k === 'Backspace') {
-      if (ui.selection.length) {
-        this.deleteSelection();
-        return true;
-      }
+      // Vértice de piso em foco: a ferramenta o remove antes de a seleção ser excluída.
+      if (this.tool.deleteKey?.()) return true;
+      if (ui.selection.length) { this.deleteSelection(); return true; }
     }
     if (k === 'Tab') {
       this.tool.tab();
@@ -269,13 +269,12 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section', h: 'rehost' };
+    const map: Record<string, ToolId> = { v: 'select', w: 'wall', f: 'floor', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section', h: 'rehost' };
     const id = map[k.toLowerCase()];
     if (id && !e.altKey) {
       this.setTool(id);
       return true;
     }
-    if (k === 'F' || k === 'f') return false;
     return false;
   }
 
@@ -375,7 +374,7 @@ export class Editor {
     this.fileName = name;
     this.resolveCache.clear();
     this.viewports.clear();
-    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId } });
+    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId) } });
     this.setTool('select');
   }
 

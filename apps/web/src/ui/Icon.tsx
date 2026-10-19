@@ -35,7 +35,7 @@ const P: Record<string, string> = {
   close: 'M6 6l12 12M18 6L6 18',
   file: 'M6 3h9l4 4v14H6zM14 3v5h5',
   help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01',
-  floor: 'M3 15l9 4 9-4-9-4zM3 11l9 4 9-4',
+  floor: 'M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9M7 14.5h3M14 14.5h3M8 18h2M14 18h2',
   roof: 'M3 14l9-9 9 9M6 12v8h12v-8',
   stairs: 'M3 20h5v-5h5v-5h5V5h3',
   room: 'M4 4h16v16H4zM9 9h6v6H9z',

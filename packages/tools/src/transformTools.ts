@@ -2,7 +2,7 @@ import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@h
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
 import { isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
-import { copyWalls, ghostBands, moveWalls, selectedOpenings, selectedWalls, slideOpenings } from './edit.ts';
+import { copyWalls, ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
@@ -12,14 +12,15 @@ const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
 
 /** Base das ferramentas que exigem seleção prévia. */
 abstract class SelectionTool extends ToolBase {
-  protected walls(): Id[] {
-    return selectedWalls(this.env.project(), this.env.selection());
+  /** Paredes e pisos selecionados: entram em mover, copiar, girar, espelhar e matriz. */
+  protected movables(): Id[] {
+    return selectedMovables(this.env.project(), this.env.selection());
   }
   protected openings(): Id[] {
     return selectedOpenings(this.env.project(), this.env.selection());
   }
   protected hasSelection(): boolean {
-    return this.walls().length + this.openings().length > 0;
+    return this.movables().length + this.openings().length > 0;
   }
   override start(): void {
     this.reset();
@@ -60,34 +61,34 @@ export class MoveTool extends SelectionTool {
 
   override move(p: PointerInfo): void {
     this.items = [];
-    const walls = this.walls();
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(walls) });
+    const els = this.movables();
+    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(els) });
     if (!this.base) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
     }
     const d = sub(inf.point, this.base);
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
-    this.items.push(...ghostBands(this.env.project(), walls, { kind: 'translate', d }));
+    this.items.push(...ghostBands(this.env.project(), els, { kind: 'translate', d }));
     this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
   }
 
   private apply(d: Vec2): void {
     if (len(d) < 1e-6) return;
-    const walls = this.walls();
+    const els = this.movables();
     if (this.copy) {
       this.env.transaction('Copiar', () => {
-        if (walls.length) copyWalls(this.env, walls, { kind: 'translate', d });
+        if (els.length) copyWalls(this.env, els, { kind: 'translate', d });
       });
-    } else if (walls.length) {
-      moveWalls(this.env, walls, d);
+    } else if (els.length) {
+      moveWalls(this.env, els, d);
     } else {
       slideOpenings(this.env, this.openings(), d);
     }
   }
 
   override click(p: PointerInfo): void {
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (!this.base) {
       this.base = inf.point;
       return;
@@ -145,7 +146,7 @@ export class RotateTool extends SelectionTool {
 
   override move(p: PointerInfo): void {
     this.items = [];
-    const inf = this.snap(p, { from: this.center ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.center ?? undefined, ignore: new Set(this.movables()) });
     if (!this.center) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -153,23 +154,23 @@ export class RotateTool extends SelectionTool {
     this.items.push({ kind: 'line', a: this.center, b: inf.point, dashed: true });
     if (this.ref) {
       const ang = this.angleTo(p.raw);
-      this.items.push(...ghostBands(this.env.project(), this.walls(), { kind: 'rotate', about: this.center, angle: ang }));
+      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'rotate', about: this.center, angle: ang }));
       this.items.push({ kind: 'label', at: p.raw, text: `${deg(ang).toFixed(1).replace('.', ',')}°` });
     }
   }
 
   private commit(angle: number): void {
     if (!this.center || Math.abs(angle) < 1e-6) return;
-    const walls = this.walls();
+    const els = this.movables();
     const t = { kind: 'rotate', about: this.center, angle } as const;
-    if (this.env.options().rotateCopy) this.env.transaction('Girar e copiar', () => copyWalls(this.env, walls, t));
-    else this.env.exec({ type: 'transform', ids: walls, transform: t });
+    if (this.env.options().rotateCopy) this.env.transaction('Girar e copiar', () => copyWalls(this.env, els, t));
+    else this.env.exec({ type: 'transform', ids: els, transform: t });
     this.reset();
     this.env.done();
   }
 
   override click(p: PointerInfo): void {
-    const inf = this.snap(p, { from: this.center ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.center ?? undefined, ignore: new Set(this.movables()) });
     if (!this.center) {
       this.center = inf.point;
     } else if (!this.ref) {
@@ -231,26 +232,26 @@ export class MirrorTool extends SelectionTool {
       if (!id || !f) return;
       this.items.push({ kind: 'highlight', ids: [id] });
       this.items.push({ kind: 'line', a: f.a, b: f.b, dashed: true });
-      this.items.push(...ghostBands(this.env.project(), this.walls(), { kind: 'mirror', a: f.a, b: f.b }));
+      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'mirror', a: f.a, b: f.b }));
       return;
     }
-    const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.movables()) });
     if (!this.p1) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
     }
     this.items.push({ kind: 'line', a: this.p1, b: inf.point, dashed: true });
     if (dist(this.p1, inf.point) > 1e-6) {
-      this.items.push(...ghostBands(this.env.project(), this.walls(), { kind: 'mirror', a: this.p1, b: inf.point }));
+      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'mirror', a: this.p1, b: inf.point }));
     }
   }
 
   /** Aplica o espelho pelo eixo a→b às paredes, com cópia se a opção estiver marcada. */
   private apply(a: Vec2, b: Vec2): void {
-    const walls = this.walls();
+    const els = this.movables();
     const t = { kind: 'mirror', a, b } as const;
-    if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, walls, t));
-    else this.env.exec({ type: 'transform', ids: walls, transform: t });
+    if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, els, t));
+    else this.env.exec({ type: 'transform', ids: els, transform: t });
     this.reset();
     this.env.done();
   }
@@ -267,7 +268,7 @@ export class MirrorTool extends SelectionTool {
       this.apply(f.a, f.b);
       return;
     }
-    const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.movables()) });
     if (!this.p1) {
       this.p1 = inf.point;
       return;
@@ -298,13 +299,13 @@ export class ArrayTool extends SelectionTool {
   private ghosts(d: Vec2): void {
     const n = Math.max(2, this.env.options().arrayCount);
     for (let i = 1; i < n; i++) {
-      this.items.push(...ghostBands(this.env.project(), this.walls(), { kind: 'translate', d: mul(d, i) }));
+      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'translate', d: mul(d, i) }));
     }
   }
 
   override move(p: PointerInfo): void {
     this.items = [];
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (!this.base) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -318,16 +319,16 @@ export class ArrayTool extends SelectionTool {
   private commit(d: Vec2): void {
     if (len(d) < 1e-6) return;
     const n = Math.max(2, this.env.options().arrayCount);
-    const walls = this.walls();
+    const els = this.movables();
     this.env.transaction('Matriz', () => {
-      for (let i = 1; i < n; i++) copyWalls(this.env, walls, { kind: 'translate', d: mul(d, i) });
+      for (let i = 1; i < n; i++) copyWalls(this.env, els, { kind: 'translate', d: mul(d, i) });
     });
     this.reset();
     this.env.done();
   }
 
   override click(p: PointerInfo): void {
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.walls()) });
+    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (!this.base) {
       this.base = inf.point;
       return;

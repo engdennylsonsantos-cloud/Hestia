@@ -13,6 +13,8 @@ import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
+import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
+import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
 
 const narrow = (): boolean => window.innerWidth <= 900;
@@ -54,6 +56,10 @@ function Dialogs(): ReactElement | null {
   switch (d) {
     case 'wallType':
       return arg ? <WallTypeDialog typeId={arg} /> : null;
+    case 'floorType':
+      return arg ? <FloorTypeDialog typeId={arg} /> : null;
+    case 'floorSchedule':
+      return <FloorScheduleDialog />;
     case 'openingType':
       return arg ? <OpeningTypeDialog typeId={arg} /> : null;
     case 'materials':

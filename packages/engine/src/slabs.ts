@@ -1,5 +1,8 @@
-import type { MultiPolygon, Vec2 } from '@hestia/geom';
+import type { MultiPolygon } from '@hestia/geom';
 import { levelElevation, slabPolygon, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
+
+/** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
+export { slabRiseAt } from '@hestia/model';
 
 export interface ResolvedSlabLayer {
   layerIndex: number;
@@ -21,12 +24,6 @@ export interface ResolvedSlab {
   layers: ResolvedSlabLayer[];
 }
 
-/** Acréscimo de cota da face superior no ponto `p` por causa da inclinação (0 sem inclinação). */
-export function slabRiseAt(slope: SlabSlope | null, p: Vec2): number {
-  if (!slope) return 0;
-  return ((slope.percent / 100) * ((p.x - slope.origin.x) * slope.dir.x + (p.y - slope.origin.y) * slope.dir.y));
-}
-
 /** Geometria das lajes de um nível (não recortadas pelas paredes, como os pisos). */
 export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
   const out: ResolvedSlab[] = [];
@@ -45,3 +42,6 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
   }
   return out;
 }
+
+/** Lajes de todos os níveis do projeto (a parede anexada cruza níveis, como com os pisos). */
+export const resolveAllSlabs = (p: Project): ResolvedSlab[] => p.levels.flatMap((l) => resolveSlabs(p, l.id));

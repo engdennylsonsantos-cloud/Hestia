@@ -111,7 +111,7 @@ describe('G5 · arquivo', () => {
     const legacy = JSON.parse(JSON.stringify({ ...p, schemaVersion: 6, elements: {} })) as Record<string, unknown>;
     delete legacy.floorTypes;
     const m = migrateProject(legacy);
-    expect(m.schemaVersion).toBe(7);
+    expect(m.schemaVersion).toBe(8);
     expect(Object.keys(m.floorTypes).sort()).toEqual(DEFAULT_FLOOR_TYPES.map((t) => t.id).sort());
     expect(m.floorTypes.ft_ceram!.layers).toHaveLength(4);
   });

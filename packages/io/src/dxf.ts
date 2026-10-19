@@ -32,6 +32,8 @@ export interface DxfLevelGeometry {
   openings: DxfOpening[];
   /** Pisos do nível: contorno e furos em planta; `typeCode` é o código do tipo (vira a camada `PISO_<código>`). */
   floors?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
+  /** Lajes do nível: contorno e furos em planta; `typeCode` vira a camada `LAJE_<código>`. A inclinação não aparece na planta. */
+  slabs?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -55,6 +57,11 @@ export function dxfLayerOfMaterial(name: string): string {
 /** Camada DXF de um tipo de piso: `PISO_` + código sem acentos nem símbolos (PS-01 vira PISO_PS_01). */
 export function dxfLayerOfFloor(typeCode: string): string {
   return `PISO_${layerSafe(typeCode) || 'SEM_CODIGO'}`;
+}
+
+/** Camada DXF de um tipo de laje: `LAJE_` + código sem acentos nem símbolos (LJ-12 vira LAJE_LJ_12). */
+export function dxfLayerOfSlab(typeCode: string): string {
+  return `LAJE_${layerSafe(typeCode) || 'SEM_CODIGO'}`;
 }
 
 const EPS = 1e-9;
@@ -85,7 +92,7 @@ interface Shape {
   pts: DxfPoint[];
 }
 
-/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos e, por último, os vãos. */
+/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes e, por último, os vãos. */
 function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   const out: Shape[] = [];
   const push = (layer: string, polygons: DxfPolygons): void => {
@@ -104,6 +111,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     push(DXF_LAYER_CONTOUR, c.silhouette);
   }
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
+  for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
   for (const o of geo.openings) out.push({ layer: DXF_LAYER_OPENINGS, pts: openingRect(o) });
   return out;
 }

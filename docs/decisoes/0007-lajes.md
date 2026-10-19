@@ -7,4 +7,5 @@
 | 3 | Inclinação por linha de origem, direção e percentual: cota = topo + percentual × distância ao longo da direção | Caimento de cobertura e de varanda; cobre o uso real sem cota por vértice |
 | 4 | Topo da laje na cota do nível mais deslocamento (padrão 0); camadas descem a partir dele | Igual ao piso (decisão 0006) |
 | 5 | A laje não é recortada pelas paredes e a planta a desenha atrás delas | Igual ao piso |
-| 6 | Volume e área consideram a inclinação (altura média no centroide da fatia) | Quantitativo coerente com o 3D |
+| 6 | A espessura das camadas é vertical e constante; volume = área em planta × espessura; a área real da face superior = área em planta / cos(atan(inclinação)) | Quantitativo coerente com o 3D; o caimento só altera a área de face (impermeabilização, revestimento) |
+| 7 | Aviso `slab-floor-overlap` só quando laje e piso se cruzam também em cota (mais de 1 mm) | O piso de acabamento sobre a laje é o uso correto e não deve gerar aviso |

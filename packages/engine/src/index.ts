@@ -13,3 +13,5 @@ export * from './floorSchedule.ts';
 export * from './wallZ.ts';
 export * from './faces.ts';
 export * from './slabs.ts';
+export * from './slabQuantities.ts';
+export * from './slabSchedule.ts';

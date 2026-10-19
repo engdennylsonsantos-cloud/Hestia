@@ -4,21 +4,21 @@ import { isFloor, type Floor, type Project } from './types.ts';
 import type { ValidationIssue } from './validate.ts';
 
 /** Área líquida abaixo disso é zero (1 mm²). */
-const ZERO_AREA = 1e-6;
+export const ZERO_AREA = 1e-6;
 /** Sobreposição mínima entre dois pisos do mesmo nível para avisar (1 cm²). */
-const OVERLAP_MIN = 1e-4;
+export const OVERLAP_MIN = 1e-4;
 /** Distância (1 mm) para um vértice de furo contar como sobre o contorno. */
 const ON_EDGE = 1e-3;
 
 const label = (f: Floor): string => (f.mark ? `"${f.mark}" (${f.id})` : `"${f.id}"`);
 
 /** Área em m² com vírgula decimal; abaixo de 1 dm² mostra cm². */
-function fmtArea(m2: number): string {
+export function fmtArea(m2: number): string {
   return m2 < 0.01 ? `${Math.round(m2 * 1e4)} cm²` : `${m2.toFixed(2).replace('.', ',')} m²`;
 }
 
 /** Arestas não vizinhas que se tocam ou cruzam (vértice compartilhado entre arestas não vizinhas também conta). */
-function selfIntersects(ring: Ring): boolean {
+export function selfIntersects(ring: Ring): boolean {
   const n = ring.length;
   for (let i = 0; i < n; i++) {
     for (let j = i + 2; j < n; j++) {
@@ -40,7 +40,7 @@ const distToRing = (pt: Vec2, ring: Ring): number => {
  * Furo fora do contorno: algum vértice do furo cai fora do contorno, ou uma aresta do furo cruza uma aresta do
  * contorno em um ponto que não é vértice do furo (o vértice sobre a linha do contorno é permitido).
  */
-function holeOutside(boundary: Ring, hole: Ring): boolean {
+export function holeOutside(boundary: Ring, hole: Ring): boolean {
   const inside = (pt: Vec2): boolean => pointInRing(pt, boundary) || distToRing(pt, boundary) < ON_EDGE;
   if (hole.some((v) => !inside(v))) return true;
   const n = hole.length;

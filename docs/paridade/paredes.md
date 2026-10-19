@@ -8,7 +8,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] A1 Parede reta por dois pontos, encadeada, com medida digitada
 - [x] A2 Altura livre ou até um nível, com deslocamentos de base e topo
 - [x] A3 Linha de localização (6 opções) e lado externo/invertido
-- [ ] A4 Parede em arco (centro/raio/ângulos e por três pontos) **(bloqueante)**
+- [x] A4 Parede em arco (centro/raio/ângulos e por três pontos) **(bloqueante)**
 - [ ] A5 Criar por retângulo, por linha existente e por face (pegar)
 - [ ] A6 Parede inclinada
 - [ ] A7 Editar perfil (contorno vertical livre) **(bloqueante)**
@@ -36,10 +36,10 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
 - [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)**
 - [ ] C10 Ângulos agudos e obtusos extremos sem artefato
-- [ ] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
+- [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
-- [ ] C13 Junção com parede em arco **(bloqueante)**
-- [ ] C14 Paredes sobrepostas detectadas, com aviso
+- [x] C13 Junção com parede em arco **(bloqueante)**
+- [x] C14 Paredes sobrepostas detectadas, com aviso
 - [ ] C15 Parede empilhada sobre outra (níveis diferentes)
 - [ ] C16 Junção com pilar, viga e cortina de vidro
 - [-] C17 Divisão automática ao cruzar: o Revit também não divide sozinho
@@ -50,7 +50,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [ ] D3 Retorno do acabamento no vão pelo tipo da parede e pela família da abertura **(bloqueante)**
 - [ ] D4 Abertura pura (vão sem elemento) e vão por croqui
 - [ ] D5 Vão em arco e outras formas não retangulares
-- [ ] D6 Abertura em parede curva **(bloqueante)**
+- [x] D6 Abertura em parede curva **(bloqueante)**
 - [ ] D7 Trocar a parede anfitriã de uma abertura
 - [ ] D8 Aviso quando o encurtamento da parede deixa a abertura sem espaço
 - [ ] D9 Símbolo de planta por família (basculante, correr, pivotante, dupla com bandeira)
@@ -69,7 +69,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [ ] F6 Travar alinhamento e cotas que comandam
 - [ ] F7 Copiar e colar entre níveis alinhado
 - [ ] F8 Espelhar usando uma parede como eixo
-- [ ] F9 Selecionar todas as instâncias do tipo e filtro por categoria
+- [x] F9 Selecionar todas as instâncias do tipo e filtro por categoria
 
 ## G · Interface e propriedades
 - [x] G1 Seletor de tipo, instância, editor de tipo com seção ao vivo, navegador de materiais
@@ -88,8 +88,8 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 
 ## I · Quantitativos
 - [x] I1 Volume e área por camada e por material, sem dupla contagem nos cantos
-- [ ] I2 Tabela de paredes com colunas, filtros e totais **(bloqueante)**
-- [ ] I3 Exportação CSV
+- [x] I2 Tabela de paredes com colunas, filtros e totais **(bloqueante)**
+- [x] I3 Exportação CSV
 
 ## J · Interoperabilidade
 - [ ] J1 IFC (IfcWall com camadas de material)

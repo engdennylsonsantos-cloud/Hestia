@@ -1,8 +1,9 @@
-import { cross, dist, dot, intersectLines, mul, add, perp, type Vec2 } from '@hestia/geom';
+import { arcTangentAt as arcTan, cross, dist, dot, intersectLines, mul, add, perp, type Vec2 } from '@hestia/geom';
 import { coreSpan } from '@hestia/model';
-import { pointAt, type WallFrame } from './frame.ts';
+import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 
-const JOIN_TOL = 0.02;
+/** Tolerância padrão de junção (m); o projeto pode sobrescrever (Project.settings.joinTolerance). */
+export const DEFAULT_JOIN_TOL = 0.02;
 /** ~2° — abaixo disso as paredes são consideradas colineares. */
 const COLLINEAR_SIN = 0.035;
 const MITER_LIMIT = 6;
@@ -60,7 +61,8 @@ const sideOf = (r: EndRef, towards: Vec2): MiterSide => {
   // começa a `core.from` dela; senão, a face do canto é a interna do tipo e o núcleo termina a `T - core.to`.
   const cornerIsExterior = sigma > 0 === r.f.sign > 0;
   const outerToCore = Math.max(0, cornerIsExterior ? core.from : r.f.thickness - core.to);
-  return { o: r.o, u: r.f.u, n: r.f.n, sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore };
+  const u = r.which === 'a' ? r.dir : { x: -r.dir.x, y: -r.dir.y }; // tangente a→b NA extremidade
+  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore };
 };
 
 const flatAt = (r: EndRef, ext: number): EndSpec => ({ kind: 'flat', t: r.which === 'a' ? -ext : r.f.length + ext });
@@ -87,18 +89,41 @@ function miterPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void {
   setEnd(out, b, { kind: 'miter', self: sb, other: sa });
 }
 
+/** Ponto em que o eixo do ramal (tangente na extremidade) encontra a linha de centro da parede atravessada. */
+function centerlineHit(branch: EndRef, through: WallFrame): Vec2 | null {
+  const o = branch.o;
+  const d = branch.dir;
+  if (!through.arc) {
+    const den = dot(d, through.n);
+    if (Math.abs(den) < 0.05) return null;
+    const lam = (through.sMid - dot(sub2(o, through.a), through.n)) / den;
+    return { x: o.x + d.x * lam, y: o.y + d.y * lam };
+  }
+  // Círculo da linha de centro: |o + λd − C|² = ρ².
+  const rho = through.arc.radius + through.arc.k * through.sMid;
+  const w = sub2(o, through.arc.center);
+  const bq = dot(w, d);
+  const disc = bq * bq - (dot(w, w) - rho * rho);
+  if (disc < 0) return null;
+  const sq = Math.sqrt(disc);
+  const l1 = -bq - sq;
+  const l2 = -bq + sq;
+  const lam = Math.abs(l1) <= Math.abs(l2) ? l1 : l2;
+  return { x: o.x + d.x * lam, y: o.y + d.y * lam };
+}
+
 /** Ramal que termina no meio de outra parede: o fim vai até a linha de centro da parede atravessada. */
 function toCenterline(branch: EndRef, through: WallFrame): EndSpec | null {
-  const den = dot(branch.f.u, through.n);
-  if (Math.abs(den) < 0.05) return null;
-  const t = (through.sMid + dot(sub2(through.a, branch.f.a), through.n)) / den;
+  const hit = centerlineHit(branch, through);
+  if (!hit) return null;
+  const t = toLocal(branch.f, hit).t;
   if (branch.which === 'a') return { kind: 'flat', t: Math.min(t, branch.f.length - 0.01) };
   return { kind: 'flat', t: Math.max(t, 0.01) };
 }
 
 const sub2 = (p: Vec2, q: Vec2): Vec2 => ({ x: p.x - q.x, y: p.y - q.y });
 
-function groupEnds(refs: EndRef[]): EndRef[][] {
+function groupEnds(refs: EndRef[], tol: number): EndRef[][] {
   const parent = refs.map((_, i) => i);
   const find = (i: number): number => {
     let r = i;
@@ -108,7 +133,7 @@ function groupEnds(refs: EndRef[]): EndRef[][] {
   for (let i = 0; i < refs.length; i++) {
     for (let j = i + 1; j < refs.length; j++) {
       if (refs[i]!.f === refs[j]!.f) continue;
-      if (dist(refs[i]!.o, refs[j]!.o) <= JOIN_TOL) parent[find(i)] = find(j);
+      if (dist(refs[i]!.o, refs[j]!.o) <= tol) parent[find(i)] = find(j);
     }
   }
   const groups = new Map<number, EndRef[]>();
@@ -158,15 +183,15 @@ function joinPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void {
 }
 
 /** Extremidades de outras paredes no mesmo ponto: serve à interface (alterar a junção dos dois lados). */
-export function endPartners(frames: WallFrame[], wallId: string, which: 'a' | 'b'): Array<{ wallId: string; end: 'a' | 'b' }> {
+export function endPartners(frames: WallFrame[], wallId: string, which: 'a' | 'b', tol = DEFAULT_JOIN_TOL): Array<{ wallId: string; end: 'a' | 'b' }> {
   const me = frames.find((f) => f.wall.id === wallId);
   if (!me) return [];
   const o = which === 'a' ? me.a : me.b;
   const out: Array<{ wallId: string; end: 'a' | 'b' }> = [];
   for (const f of frames) {
     if (f === me) continue;
-    if (dist(f.a, o) <= JOIN_TOL) out.push({ wallId: f.wall.id, end: 'a' });
-    if (dist(f.b, o) <= JOIN_TOL) out.push({ wallId: f.wall.id, end: 'b' });
+    if (dist(f.a, o) <= tol) out.push({ wallId: f.wall.id, end: 'a' });
+    if (dist(f.b, o) <= tol) out.push({ wallId: f.wall.id, end: 'b' });
   }
   return out;
 }
@@ -250,24 +275,24 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
   starNode(out, g);
 }
 
-function findTee(r: EndRef, frames: WallFrame[]): WallFrame | null {
+function findTee(r: EndRef, frames: WallFrame[], tol: number): WallFrame | null {
   let best: { g: WallFrame; sd: number } | null = null;
   for (const g of frames) {
     if (g === r.f) continue;
-    const rel = sub2(r.o, g.a);
-    const t = dot(rel, g.u);
-    const sd = Math.abs(dot(rel, g.n) - g.sMid);
-    if (t < -JOIN_TOL || t > g.length + JOIN_TOL) continue;
-    if (sd > g.thickness / 2 + JOIN_TOL) continue;
-    if (Math.abs(cross(r.dir, g.u)) < 0.1) continue;
+    const loc = toLocal(g, r.o);
+    const sd = Math.abs(loc.s - g.sMid);
+    if (loc.t < -tol || loc.t > g.length + tol) continue;
+    if (sd > g.thickness / 2 + tol) continue;
+    const gt = g.arc ? arcTan(g.arc, loc.t) : g.u;
+    if (Math.abs(cross(r.dir, gt)) < 0.1) continue;
     if (!best || sd < best.sd) best = { g, sd };
   }
   return best ? best.g : null;
 }
 
 /** Fim isolado que cai dentro de outra parede vira junção em T. */
-function tryTee(out: Map<string, WallEnds>, r: EndRef, frames: WallFrame[]): void {
-  const host = findTee(r, frames);
+function tryTee(out: Map<string, WallEnds>, r: EndRef, frames: WallFrame[], tol: number): void {
+  const host = findTee(r, frames, tol);
   if (!host) return;
   const spec = toCenterline(r, host);
   if (spec) setEnd(out, r, spec);
@@ -284,39 +309,40 @@ export type JoinStatus =
   | { kind: 'tee'; hostId: string };
 
 /** Situação de uma extremidade de parede, para a interface mostrar o que se pode configurar. */
-export function joinStatus(frames: WallFrame[], wallId: string, which: 'a' | 'b'): JoinStatus {
+export function joinStatus(frames: WallFrame[], wallId: string, which: 'a' | 'b', tol = DEFAULT_JOIN_TOL): JoinStatus {
   const f = frames.find((x) => x.wall.id === wallId);
   if (!f) return { kind: 'free' };
   if (which === 'a' ? f.wall.noJoinStart : f.wall.noJoinEnd) return { kind: 'disallowed' };
-  const partners = endPartners(frames, wallId, which).filter((p) => {
+  const partners = endPartners(frames, wallId, which, tol).filter((p) => {
     const other = frames.find((x) => x.wall.id === p.wallId)!;
     return !(p.end === 'a' ? other.wall.noJoinStart : other.wall.noJoinEnd);
   });
   if (partners.length === 1) return { kind: 'pair', partners };
   if (partners.length > 1) return { kind: 'node', partners };
   const o = which === 'a' ? f.a : f.b;
-  const host = findTee({ f, which, o, dir: which === 'a' ? f.u : { x: -f.u.x, y: -f.u.y } }, frames);
+  const tg = endTangent(f, which);
+  const host = findTee({ f, which, o, dir: which === 'a' ? tg : { x: -tg.x, y: -tg.y } }, frames, tol);
   return host ? { kind: 'tee', hostId: host.wall.id } : { kind: 'free' };
 }
 
 /** Calcula como cada fim de parede é cortado, levando em conta as demais paredes do nível. */
-export function computeEnds(frames: WallFrame[]): Map<string, WallEnds> {
+export function computeEnds(frames: WallFrame[], tol = DEFAULT_JOIN_TOL): Map<string, WallEnds> {
   const out = new Map<string, WallEnds>();
   for (const f of frames) {
     out.set(f.wall.id, { a: { kind: 'flat', t: 0 }, b: { kind: 'flat', t: f.length } });
   }
   const refs: EndRef[] = [];
   for (const f of frames) {
-    if (!f.wall.noJoinStart) refs.push({ f, which: 'a', o: pointAt(f, 0, 0), dir: f.u });
-    if (!f.wall.noJoinEnd) refs.push({ f, which: 'b', o: pointAt(f, f.length, 0), dir: { x: -f.u.x, y: -f.u.y } });
+    if (!f.wall.noJoinStart) refs.push({ f, which: 'a', o: pointAt(f, 0, 0), dir: endTangent(f, 'a') });
+    if (!f.wall.noJoinEnd) refs.push({ f, which: 'b', o: pointAt(f, f.length, 0), dir: ((u) => ({ x: -u.x, y: -u.y }))(endTangent(f, 'b')) });
   }
   const grouped = new Set<EndRef>();
-  for (const g of groupEnds(refs)) {
+  for (const g of groupEnds(refs, tol)) {
     if (g.length >= 2) {
       g.forEach((r) => grouped.add(r));
       resolveNode(out, g);
     }
   }
-  for (const r of refs) if (!grouped.has(r)) tryTee(out, r, frames);
+  for (const r of refs) if (!grouped.has(r)) tryTee(out, r, frames, tol);
   return out;
 }

@@ -34,6 +34,13 @@ export function OptionsBar(): ReactElement {
             </select>
           </label>
           <label>
+            Forma
+            <select id="opt-shape" className="select" value={o.wallShape} onChange={(e) => set({ wallShape: e.target.value as 'line' | 'arc' })}>
+              <option value="line">Reta</option>
+              <option value="arc">Arco (3 pontos)</option>
+            </select>
+          </label>
+          <label>
             Linha de localização
             <select id="opt-loc" className="select" value={o.locationLine} onChange={(e) => set({ locationLine: e.target.value as LocationLine })}>
               {(Object.keys(LOCATION_LABEL) as LocationLine[]).map((k) => (

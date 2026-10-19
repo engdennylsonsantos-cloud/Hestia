@@ -1,4 +1,5 @@
 import {
+  arcSample,
   boxOf,
   boxesOverlap,
   difference,
@@ -30,7 +31,7 @@ import {
   type Opening,
   type Project,
 } from '@hestia/model';
-import { buildFrame, pointAt, sAtDepth, type WallFrame } from './frame.ts';
+import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
 import { computeEnds, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
@@ -51,11 +52,22 @@ interface Item {
 
 const ringsOfShape = (m: MultiPolygon): string => m.map((p) => p.map((r) => r.map((v) => `${round(v.x)},${round(v.y)}`).join(';')).join('|')).join('/');
 
+/** Em paredes curvas, leva o ponto à circunferência da camada (os cortes usam a tangente: erro de milímetros). */
+function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
+  if (!f.arc) return p;
+  const c = f.arc.center;
+  const rho = f.arc.radius + f.arc.k * s;
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  const l = Math.hypot(dx, dy);
+  return l < 1e-9 ? p : { x: c.x + (dx / l) * rho, y: c.y + (dy / l) * rho };
+}
+
 function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: number): Vec2 {
   if (spec.kind === 'flat') return pointAt(f, spec.t, s);
   const d = spec.self.sigma > 0 ? spec.self.sHi - s : s - spec.self.sLo;
   const p = miterPoint(spec.self, spec.other, Math.max(0, Math.min(d, spec.self.sHi - spec.self.sLo)));
-  return p ?? pointAt(f, which === 'a' ? 0 : f.length, s);
+  return p ? onLayerCircle(f, p, s) : pointAt(f, which === 'a' ? 0 : f.length, s);
 }
 
 function isSimple(q: Ring): boolean {
@@ -73,9 +85,20 @@ function crossing(q: Ring): boolean {
   return hit(0, 2) || hit(1, 3);
 }
 
+/** Camada de parede curva: contorno com as bordas externa e interna amostradas ao longo do arco. */
+function arcLayerRing(f: WallFrame, ends: WallEnds, lo: number, hi: number): Ring {
+  const pa = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'a', ends.a, hi)] as const;
+  const pb = [endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi)] as const;
+  const t = (p: Vec2): number => toLocal(f, p).t;
+  const loPts = arcSample(f.arc!, t(pa[0]), t(pb[0]), lo);
+  const hiPts = arcSample(f.arc!, t(pb[1]), t(pa[1]), hi);
+  return [pa[0], ...loPts.slice(1, -1), pb[0], pb[1], ...hiPts.slice(1, -1), pa[1]];
+}
+
 function layerQuad(f: WallFrame, ends: WallEnds, s1: number, s2: number): Ring {
   const lo = Math.min(s1, s2);
   const hi = Math.max(s1, s2);
+  if (f.arc) return arcLayerRing(f, ends, lo, hi);
   const quad = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi), endPoint(f, 'a', ends.a, hi)];
   if (isSimple(quad)) return quad;
   return [pointAt(f, 0, lo), pointAt(f, f.length, lo), pointAt(f, f.length, hi), pointAt(f, 0, hi)];
@@ -134,7 +157,11 @@ function paint(items: Item[]): Map<Item, MultiPolygon> {
 function clusterWalls(frames: WallFrame[], ends: Map<string, WallEnds>): WallFrame[][] {
   const boxes = frames.map((f) => {
     const e = ends.get(f.wall.id)!;
-    const pts = [f.sHi, f.sLo].flatMap((s) => [endPoint(f, 'a', e.a, s), endPoint(f, 'b', e.b, s)]);
+    const pts = [f.sHi, f.sLo].flatMap((s) => [
+      endPoint(f, 'a', e.a, s),
+      endPoint(f, 'b', e.b, s),
+      ...(f.arc ? arcSample(f.arc, 0, f.length, s, 0.05) : []),
+    ]);
     return expandBox(boxOf(pts), CLUSTER_PAD);
   });
   const parent = frames.map((_, i) => i);
@@ -163,8 +190,8 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
     hostId: o.hostId,
     kind: o.kind,
     center: pointAt(f, o.offset, f.sMid),
-    u: f.u,
-    n: f.n,
+    u: tangentAt(f, o.offset),
+    n: normalAt(f, o.offset),
     width: t.width,
     height: t.height,
     sill: openingSill(t, o),
@@ -304,7 +331,7 @@ export function levelFrames(p: Project, levelId: Id): WallFrame[] {
 export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = sharedCache): ResolvedLevel {
   const walls = wallsOnLevel(p, levelId);
   const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
-  const ends = computeEnds(frames);
+  const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
   for (const group of clusterWalls(frames, ends)) {
     const items = group.flatMap((f) => buildItems(f, ends.get(f.wall.id)!));

@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -135,6 +135,11 @@ export interface ProjectDefaults {
   wallHeight: number;
 }
 
+export interface ProjectSettings {
+  /** Distância (m) em que extremidades de paredes e pontos sobre outra parede contam como unidos. */
+  joinTolerance: number;
+}
+
 export interface Project {
   schemaVersion: number;
   name: string;
@@ -145,6 +150,7 @@ export interface Project {
   elements: Record<Id, Element>;
   nextOrder: number;
   defaults: ProjectDefaults;
+  settings: ProjectSettings;
 }
 
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';

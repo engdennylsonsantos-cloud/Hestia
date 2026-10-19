@@ -167,6 +167,8 @@ export function labelOf(c: Command): string {
       return 'Renomear projeto';
     case 'setDefaults':
       return 'Padrões do projeto';
+    case 'setSettings':
+      return 'Configurações do projeto';
     case 'batch':
       return 'Várias alterações';
   }

@@ -1,4 +1,5 @@
-import { applyTransform, dist, type Transform, type Vec2 } from '@hestia/geom';
+import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
+import { wallLength } from './queries.ts';
 import {
   isOpening,
   isWall,
@@ -33,6 +34,7 @@ export type Command =
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
+  | { type: 'setSettings'; patch: Partial<Project['settings']> }
   | { type: 'batch'; commands: Command[] };
 
 function transformWall(w: Wall, t: Transform): Wall {
@@ -47,7 +49,7 @@ function transformWall(w: Wall, t: Transform): Wall {
 export function clampOffset(p: Project, o: Opening, wall: Wall): number {
   const t = p.openingTypes[o.typeId];
   const half = (t?.width ?? 0.8) / 2;
-  const l = dist(wall.a, wall.b);
+  const l = wallLength(wall);
   return Math.max(Math.min(half, l / 2), Math.min(o.offset, l - Math.min(half, l / 2)));
 }
 
@@ -169,6 +171,9 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'setDefaults':
       p.defaults = { ...p.defaults, ...c.patch };
+      break;
+    case 'setSettings':
+      p.settings = { ...p.settings, ...c.patch };
       break;
     case 'batch':
       for (const sub of c.commands) applyCommand(p, sub);

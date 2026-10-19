@@ -4,13 +4,13 @@ import {
   dot,
   intersectSegments,
   len,
-  mid,
   norm,
   sub,
   v2,
   type Vec2,
 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { closestOnWall, wallMid } from './wallGeom.ts';
 import type { Guide, Inference, SnapKind } from './types.ts';
 
 export interface InferContext {
@@ -71,12 +71,11 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       const d = dist(cursor, p);
       if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
     }
-    const m = mid(w.a, w.b);
+    const m = wallMid(w);
     const dm = dist(cursor, m);
     if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
-    const c = closestOnSegment(cursor, w.a, w.b);
-    const dc = dist(cursor, c);
-    if (dc <= tol) add({ point: c, kind: 'nearest', score: dc + tol * 0.5, hostId: w.id });
+    const near = closestOnWall(w, cursor);
+    if (near.dist <= tol) add({ point: near.point, kind: 'nearest', score: near.dist + tol * 0.5, hostId: w.id });
     if (ctx.from) {
       const ab = sub(w.b, w.a);
       const abLen = len(ab);
@@ -156,11 +155,10 @@ function pickBest(cands: Cand[], cursor: Vec2, guides: Guide[], grid: number | u
 export function hostUnder(cursor: Vec2, p: Project, levelId: Id, mpp: number): { wallId: Id; offset: number; point: Vec2 } | null {
   let best: { wallId: Id; offset: number; point: Vec2; d: number } | null = null;
   for (const w of wallsOnLevel(p, levelId)) {
-    const c = closestOnSegment(cursor, w.a, w.b);
-    const d = dist(cursor, c);
+    const near = closestOnWall(w, cursor);
     const half = 0.3 + 10 * mpp;
-    if (d > half) continue;
-    if (!best || d < best.d) best = { wallId: w.id, offset: dist(w.a, c), point: c, d };
+    if (near.dist > half) continue;
+    if (!best || near.dist < best.d) best = { wallId: w.id, offset: near.t, point: near.point, d: near.dist };
   }
   return best ? { wallId: best.wallId, offset: best.offset, point: best.point } : null;
 }

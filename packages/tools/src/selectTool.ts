@@ -1,4 +1,4 @@
-import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
+import { boxOf, dist, dot, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
@@ -89,14 +89,20 @@ export class SelectTool extends ToolBase {
         if (!this.grip) break;
         const w = pr.elements[this.grip.wallId];
         if (!isWall(w)) break;
+        const f = frameOfWall(pr, w.id);
+        if (this.grip.end === 'mid') {
+          // Alça do meio do arco: o arco passa a atravessar o cursor.
+          this.gripPt = p.raw;
+          if (f) this.items.push({ kind: 'wallBand', a: w.a, b: w.b, thickness: f.thickness, sMid: f.sMid, sag: sagFromThreePoints(w.a, p.raw, w.b) });
+          break;
+        }
         const other = this.grip.end === 'a' ? w.b : w.a;
         const inf = this.snap(p, { from: other, ignore: new Set([w.id]) });
         this.gripPt = inf.point;
-        const f = frameOfWall(pr, w.id);
         if (f) {
           const a = this.grip.end === 'a' ? inf.point : w.a;
           const b = this.grip.end === 'b' ? inf.point : w.b;
-          this.items.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: f.sMid });
+          this.items.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: f.sMid, sag: w.sag });
         }
         break;
       }
@@ -130,6 +136,12 @@ export class SelectTool extends ToolBase {
         if (this.grip && this.gripPt) {
           const g = this.grip;
           const pt = this.gripPt;
+          const wall = pr.elements[g.wallId];
+          if (g.end === 'mid' && isWall(wall)) {
+            this.env.exec({ type: 'updateElements', ids: [g.wallId], patch: { sag: sagFromThreePoints(wall.a, pt, wall.b) } });
+            break;
+          }
+          if (g.end === 'mid') break;
           const exclude = new Set([g.wallId]);
           const follow = connectedEnds(pr, this.env.levelId(), g.at, exclude);
           this.env.transaction('Ajustar parede', () => {

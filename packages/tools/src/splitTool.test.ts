@@ -7,7 +7,7 @@ function makeEnv(store = new ProjectStore(createEmptyProject())) {
   let finished = 0;
   const messages: string[] = [];
   const options: ToolOptions = {
-    wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true,
+    wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
     rotateCopy: false, mirrorCopy: false, offsetCopy: true,
   };
@@ -141,7 +141,7 @@ describe('ferramenta Dividir', () => {
   it('parede curva não é dividida e a mensagem explica o motivo', () => {
     const { store, env, messages } = oneWall({ sag: 0.5 });
     const t = tool('split', env);
-    clickAt(t, 3, 0.02);
+    clickAt(t, 3, 0.5); // o meio do arco fica a uma flecha da corda
     expect(walls(store)).toHaveLength(1);
     expect(messages.at(-1)).toBe('Dividir parede curva ainda não é suportado.');
   });

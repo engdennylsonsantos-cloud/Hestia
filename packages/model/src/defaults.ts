@@ -113,6 +113,7 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),
     elements: {},
     nextOrder: 1,
+    settings: { joinTolerance: 0.02 },
     defaults: { wallTypeId: 'wt_alv14', doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', wallHeight: 2.8 },
   };
 }

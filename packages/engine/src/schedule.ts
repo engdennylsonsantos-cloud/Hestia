@@ -121,7 +121,7 @@ const CSV_HEADER = [
   'Camadas (cm)',
 ];
 
-/** Texto com ';' , aspas ou quebra de linha vai entre aspas; fórmula não sai do CSV (Excel). */
+/** Texto com ";", aspas ou quebra de linha vai entre aspas; texto que começa com =, +, -, @ ganha apóstrofo (evita fórmula no Excel). */
 const csvText = (s: string): string => {
   const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
   return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;

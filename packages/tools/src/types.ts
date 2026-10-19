@@ -21,7 +21,7 @@ export interface Inference {
 export type PreviewItem =
   | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean }
   | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean }
-  | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number }
+  | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
   | { kind: 'highlight'; ids: Id[] };
@@ -49,6 +49,8 @@ export interface ToolOptions {
   locationLine: LocationLine;
   wallHeight: number;
   chain: boolean;
+  /** Forma da parede ao desenhar: reta ou arco por três pontos. */
+  wallShape: 'line' | 'arc';
   doorTypeId: Id;
   windowTypeId: Id;
   orthoLock: boolean;

@@ -327,3 +327,81 @@ describe('paredes diferentes na mesma junção', () => {
     noOverlap(mk('wt_alv9', 'miter', { locationLine: 'coreInterior', flipped: true }));
   });
 });
+
+describe('paredes em arco', () => {
+  const arcWall = (id: string, ax: number, ay: number, bx: number, by: number, sag: number, extra: Partial<Wall> = {}) =>
+    wall(id, ax, ay, bx, by, { sag, ...extra });
+  it('a área da parede é o comprimento do eixo vezes a espessura', () => {
+    const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
+    const len = 2.5 * 2 * Math.asin(0.8);
+    expect(silhouetteArea(s)).toBeCloseTo(len * T14, 2);
+    expect(coreArea(s)).toBeCloseTo(len * CORE14, 2);
+  });
+  it('o eixo coincide com as extremidades e a camada externa fica à esquerda', () => {
+    const s = setup([arcWall('c', 0, 0, 4, 0, 1, { locationLine: 'finishExterior' })]);
+    const r = resolveLevel(s.project, 'lv_0');
+    const pts = r.walls.c!.layers.flatMap((l) => l.cut.flatMap((p) => p[0]!));
+    // finishExterior: a face externa (esquerda) está sobre o eixo; a parede fica do lado do centro.
+    const maxY = Math.max(...pts.map((v) => v.y));
+    expect(maxY).toBeCloseTo(1, 2);
+  });
+  it('arco para o outro lado (flecha negativa) espelha o resultado', () => {
+    const a = setup([arcWall('c', 0, 0, 4, 0, 1)]);
+    const b = setup([arcWall('c', 0, 0, 4, 0, -1)]);
+    expect(silhouetteArea(a)).toBeCloseTo(silhouetteArea(b), 6);
+  });
+  it('canto entre reta e arco: sem sobreposição em encosto, esquadria e esquadro', () => {
+    for (const kind of ['butt', 'miter', 'square'] as const) {
+      const s = setup([
+        wall('r', -3, 0, 0, 0, { joinEnd: { kind, flip: false } }),
+        arcWall('c', 0, 0, 3, 0, 0.8, { joinStart: { kind, flip: false } }),
+      ]);
+      const r = resolveLevel(s.project, 'lv_0');
+      const sum = Object.values(r.walls).flatMap((w) => w.layers).reduce((a, l) => a + multiArea(l.cut), 0);
+      expect(sum).toBeCloseTo(multiArea(union(...r.clusters.map((c) => c.silhouette))), 3);
+      expect(r.clusters).toHaveLength(1);
+    }
+  });
+  it('T de uma reta num arco: o ramal termina na linha de centro do arco', () => {
+    const arc = arcWall('c', -2, 0, 2, 0, 1); // r=2,5 centro (0,-1,5)
+    const s = setup([arc, wall('b', 0, 0.5, 0, 3)]);
+    const f = buildFrame(s.project.elements.c as Wall, s.project.wallTypes.wt_alv14!)!;
+    const ends = computeEnds([f, buildFrame(s.project.elements.b as Wall, s.project.wallTypes.wt_alv14!)!]);
+    // o ramal parte do ponto (0,0.5) sobre a flecha do arco (apex em y=1): termina no apex, em y=1
+    const e = ends.get('b')!.a;
+    expect(e.kind).toBe('flat');
+  });
+  it('porta em parede curva recorta a faixa do vão', () => {
+    const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
+    const before = silhouetteArea(s);
+    s.exec({ type: 'addOpening', opening: { id: 'd', kind: 'door', typeId: 'ot_p80', hostId: 'c', offset: 2.3, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    expect(before - silhouetteArea(s)).toBeCloseTo(0.8 * T14, 2);
+  });
+  it('quantitativo usa o comprimento do arco', () => {
+    const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
+    const q = quantifyLevel(s.project, resolveLevel(s.project, 'lv_0'));
+    expect(q.walls[0]!.length).toBeCloseTo(2.5 * 2 * Math.asin(0.8), 6);
+  });
+  it('espelhar inverte a flecha e a mesma parede copiada tem área idêntica', () => {
+    const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
+    s.exec({ type: 'transform', ids: ['c'], transform: { kind: 'mirror', a: { x: 0, y: 2 }, b: { x: 1, y: 2 } }, copy: { idMap: { c: 'c2' } } });
+    expect((s.project.elements.c2 as Wall).sag).toBeCloseTo(-1);
+    const r = resolveLevel(s.project, 'lv_0');
+    const area = (id: string) => r.walls[id]!.layers.reduce((a, l) => a + multiArea(l.cut), 0);
+    expect(area('c2')).toBeCloseTo(area('c'), 6);
+  });
+});
+
+describe('tolerância de junção', () => {
+  it('extremidades afastadas só se unem se a tolerância do projeto alcançar a distância', () => {
+    const build = (tol: number) => {
+      const s = setup([wall('a', 0, 0, 4, 0), wall('b', 4.03, 0.03, 4.03, 3)]);
+      s.exec({ type: 'setSettings', patch: { joinTolerance: tol } });
+      return s;
+    };
+    const kind = (s: ProjectStore) => joinStatus(frames2(s), 'a', 'b', s.project.settings.joinTolerance).kind;
+    const frames2 = (s: ProjectStore) => Object.values(s.project.elements).filter((e) => e.kind === 'wall').map((w) => buildFrame(w as Wall, s.project.wallTypes[(w as Wall).typeId]!)!);
+    expect(kind(build(0.02))).toBe('free');
+    expect(kind(build(0.05))).toBe('pair');
+  });
+});

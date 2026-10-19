@@ -1,4 +1,4 @@
-import { dist } from '@hestia/geom';
+import { arcFromSagitta, dist } from '@hestia/geom';
 import { isOpening, isWall, type Id, type Opening, type OpeningType, type Project, type Wall, type WallType } from './types.ts';
 
 export const getWall = (p: Project, id: Id): Wall | undefined => {
@@ -27,7 +27,11 @@ export const openingType = (p: Project, o: Opening): OpeningType => {
   return t;
 };
 
-export const wallLength = (w: Wall): number => dist(w.a, w.b);
+/** Arco do eixo, ou null se a parede for reta. */
+export const wallArc = (w: Wall) => arcFromSagitta(w.a, w.b, w.sag);
+
+/** Comprimento do eixo (comprimento de arco nas paredes curvas). */
+export const wallLength = (w: Wall): number => wallArc(w)?.length ?? dist(w.a, w.b);
 
 export const levelElevation = (p: Project, levelId: Id): number =>
   p.levels.find((l) => l.id === levelId)?.elevation ?? 0;

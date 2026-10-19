@@ -14,6 +14,7 @@ import {
   type LocationLine,
   type Opening,
   type Wall,
+  wallArc,
 } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -36,8 +37,9 @@ const JOIN_LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadri
 function JoinRows({ wall }: { wall: Wall }): ReactElement {
   const p = useProject();
   const frames = useMemo(() => levelFrames(p, wall.levelId), [p, wall.levelId]);
+  const tol = p.settings.joinTolerance;
   const rows = (['a', 'b'] as const).map((end) => {
-    const st = joinStatus(frames, wall.id, end);
+    const st = joinStatus(frames, wall.id, end, tol);
     const label = end === 'a' ? 'Início' : 'Fim';
     if (st.kind === 'pair') {
       const partner = p.elements[st.partners[0]!.wallId];
@@ -80,6 +82,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
   const flipped = common(walls, (w) => w.flipped);
   const noS = common(walls, (w) => w.noJoinStart);
   const noE = common(walls, (w) => w.noJoinEnd);
+  const sag = common(walls, (w) => w.sag);
   const mark = common(walls, (w) => w.mark);
   const comments = common(walls, (w) => w.comments);
   const single = walls.length === 1 ? walls[0]! : null;
@@ -143,6 +146,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
             {(Object.keys(LOCATION_LABEL) as LocationLine[]).map((k) => <option key={k} value={k}>{LOCATION_LABEL[k]}</option>)}
           </select>
         </Row>
+        <Row label="Flecha do arco" htmlFor="p-sag"><NumField id="p-sag" value={sag.value} mixed={sag.mixed} onCommit={(v) => patch(ids, { sag: v })} unit="m" /></Row>
         <Row label="Inverter lado externo"><Check id="p-flip" checked={flipped.value} mixed={flipped.mixed} onChange={(v) => patch(ids, { flipped: v })} /></Row>
         <Row label="Não unir no início"><Check id="p-nos" checked={noS.value} mixed={noS.mixed} onChange={(v) => patch(ids, { noJoinStart: v })} /></Row>
         <Row label="Não unir no fim"><Check id="p-noe" checked={noE.value} mixed={noE.mixed} onChange={(v) => patch(ids, { noJoinEnd: v })} /></Row>
@@ -171,6 +175,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         {single ? (
           <>
             <Row label="Comprimento"><span className="val">{fmt(wallLength(single), 3)} m</span></Row>
+            {wallArc(single) && <Row label="Raio do eixo"><span className="val">{fmt(wallArc(single)!.radius, 3)} m</span></Row>}
             <Row label="Área líquida"><span className="val">{fmt(q?.netFaceArea ?? 0)} m²</span></Row>
             <Row label="Volume"><span className="val">{fmt(q?.volume ?? 0, 3)} m³</span></Row>
           </>
@@ -263,6 +268,7 @@ function ViewProps(): ReactElement {
         <Row label="Arestas"><Check id="v-edges" checked={s.edges} onChange={(v) => useUi.setState({ edges: v })} /></Row>
       </Group>
       <Group title="Padrões do projeto" open={false}>
+        <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
         <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>
       </Group>
       <div className="hint">Selecione um elemento para ver e editar suas propriedades. Mudar o <em>tipo</em> altera todas as instâncias; mudar a <em>instância</em> altera só a selecionada.</div>

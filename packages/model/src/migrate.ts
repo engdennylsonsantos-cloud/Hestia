@@ -20,6 +20,8 @@ const migrations: Record<number, Migration> = {
     }
     return { ...raw, elements };
   },
+  // v2 → v3: configurações do projeto (tolerância de junção).
+  2: (raw) => ({ ...raw, settings: { joinTolerance: 0.02, ...((raw.settings as object) ?? {}) } }),
 };
 
 export class SchemaError extends Error {}
@@ -41,5 +43,5 @@ export function migrateProject(raw: unknown): Project {
   const base = createEmptyProject();
   const p = obj as Partial<Project>;
   if (!p.elements || !p.wallTypes || !p.levels || !p.materials || !p.openingTypes) throw new SchemaError('Arquivo incompleto');
-  return { ...base, ...p, defaults: { ...base.defaults, ...(p.defaults ?? {}) } } as Project;
+  return { ...base, ...p, defaults: { ...base.defaults, ...(p.defaults ?? {}) }, settings: { ...base.settings, ...(p.settings ?? {}) } } as Project;
 }

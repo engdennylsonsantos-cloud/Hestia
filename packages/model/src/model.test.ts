@@ -70,3 +70,19 @@ describe('arquivo', () => {
     expect(newId('w')).not.toBe(newId('w'));
   });
 });
+
+describe('migração de esquema', () => {
+  it('migra um arquivo v1 (sem junções, flecha e configurações) para o atual', () => {
+    const p = createEmptyProject('antigo');
+    const raw = JSON.parse(JSON.stringify(p));
+    raw.schemaVersion = 1;
+    delete raw.settings;
+    raw.elements = { w: { id: 'w', kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 3, y: 0 }, baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false, noJoinStart: false, noJoinEnd: false, mark: '', comments: '', order: 1 } };
+    const m = migrateProject(raw);
+    const w = m.elements.w as Wall;
+    expect(w.joinStart).toEqual({ kind: 'butt', flip: false });
+    expect(w.sag).toBe(0);
+    expect(m.settings.joinTolerance).toBeCloseTo(0.02);
+    expect(m.schemaVersion).toBeGreaterThanOrEqual(3);
+  });
+});

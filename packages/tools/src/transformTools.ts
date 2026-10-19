@@ -1,5 +1,5 @@
-import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
-import { frameOfWall } from '@hestia/engine';
+import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@hestia/geom';
+import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
 import { isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, moveWalls, selectedOpenings, selectedWalls, slideOpenings } from './edit.ts';
@@ -298,7 +298,7 @@ export class ArrayTool extends SelectionTool {
   }
 }
 
-/** Deslocar: copia ou move uma parede paralelamente, para o lado do cursor. */
+/** Deslocar: copia ou move uma parede paralelamente, para o lado do cursor (concêntrico nas curvas). */
 export class OffsetTool extends ToolBase {
   readonly id = 'offset';
   readonly label = 'Deslocar';
@@ -311,24 +311,25 @@ export class OffsetTool extends ToolBase {
     return false;
   }
 
-  private target(p: Vec2): { id: Id; d: Vec2 } | null {
+  private target(p: Vec2): { id: Id; d: Vec2; arc: { a: Vec2; b: Vec2; sag: number } | null } | null {
     const pr = this.env.project();
     let best: { id: Id; dist: number; n: Vec2; side: number } | null = null;
     for (const e of Object.values(pr.elements)) {
       if (!isWall(e) || e.levelId !== this.env.levelId()) continue;
       const f = frameOfWall(pr, e.id);
       if (!f) continue;
-      const rel = sub(p, f.a);
-      const t = rel.x * f.u.x + rel.y * f.u.y;
-      if (t < 0 || t > f.length) continue;
-      const s = rel.x * f.n.x + rel.y * f.n.y;
-      const dd = Math.abs(s - f.sMid);
-      if (!best || dd < best.dist) best = { id: e.id, dist: dd, n: f.n, side: s - f.sMid };
+      const l = toLocal(f, p);
+      if (l.t < 0 || l.t > f.length) continue;
+      const dd = Math.abs(l.s - f.sMid);
+      const n = f.arc ? normalAt(f, l.t) : f.n;
+      if (!best || dd < best.dist) best = { id: e.id, dist: dd, n, side: l.s - f.sMid };
     }
     if (!best || best.dist > 5) return null;
     const dist0 = this.env.options().offsetDistance;
     const sign = best.side >= 0 ? 1 : -1;
-    return { id: best.id, d: mul(best.n, sign * dist0) };
+    const w = pr.elements[best.id];
+    const arc = isWall(w) && Math.abs(w.sag) > 1e-6 ? offsetArc(w.a, w.b, w.sag, sign * dist0) : null;
+    return { id: best.id, d: mul(best.n, sign * dist0), arc };
   }
 
   override move(p: PointerInfo): void {
@@ -337,14 +338,26 @@ export class OffsetTool extends ToolBase {
     const t = this.target(p.raw);
     if (!t) return;
     this.items.push({ kind: 'highlight', ids: [t.id] });
-    this.items.push(...ghostBands(this.env.project(), [t.id], { kind: 'translate', d: t.d }));
+    const f = frameOfWall(this.env.project(), t.id);
+    if (t.arc && f) this.items.push({ kind: 'wallBand', a: t.arc.a, b: t.arc.b, thickness: f.thickness, sMid: f.sMid, sag: t.arc.sag });
+    else this.items.push(...ghostBands(this.env.project(), [t.id], { kind: 'translate', d: t.d }));
   }
 
   override click(p: PointerInfo): void {
     const t = this.target(p.raw);
     if (!t) return;
-    if (this.env.options().offsetCopy) this.env.transaction('Deslocar e copiar', () => copyWalls(this.env, [t.id], { kind: 'translate', d: t.d }));
-    else moveWalls(this.env, [t.id], t.d);
+    const copy = this.env.options().offsetCopy;
+    if (!t.arc) {
+      if (copy) this.env.transaction('Deslocar e copiar', () => copyWalls(this.env, [t.id], { kind: 'translate', d: t.d }));
+      else moveWalls(this.env, [t.id], t.d);
+      return;
+    }
+    const patch = { a: t.arc.a, b: t.arc.b, sag: t.arc.sag };
+    if (copy) {
+      this.env.transaction('Deslocar e copiar', () => {
+        const [nid] = copyWalls(this.env, [t.id], { kind: 'translate', d: { x: 0, y: 0 } });
+        if (nid) this.env.exec({ type: 'updateElements', ids: [nid], patch });
+      });
+    } else this.env.exec({ type: 'updateElements', ids: [t.id], patch });
   }
 }
-

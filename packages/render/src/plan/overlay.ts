@@ -1,4 +1,4 @@
-import { orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
 import type { Guide, Inference, PreviewItem } from '@hestia/tools';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -56,7 +56,13 @@ export function guideStrokes(guides: Guide[], theme: PlanTheme): StrokeOp[] {
   }));
 }
 
-function bandRing(a: Vec2, b: Vec2, thickness: number, sMid: number): Vec2[] {
+function bandRing(a: Vec2, b: Vec2, thickness: number, sMid: number, sag = 0): Vec2[] {
+  const arc = arcFromSagitta(a, b, sag);
+  if (arc) {
+    const lo = arcSample(arc, 0, arc.length, sMid - thickness / 2);
+    const hi = arcSample(arc, arc.length, 0, sMid + thickness / 2);
+    return [...lo, ...hi];
+  }
   const u = norm(sub(b, a));
   const n = perp(u);
   const lo = sMid - thickness / 2;
@@ -78,10 +84,12 @@ export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanThe
         o.strokes.push({ pts: it.ring, closed: true, widthPx: 1.5, color: theme.accent, alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
         break;
       case 'wallBand': {
-        const ring = bandRing(it.a, it.b, it.thickness, it.sMid);
+        const ring = bandRing(it.a, it.b, it.thickness, it.sMid, it.sag);
+        const arcAxis = arcFromSagitta(it.a, it.b, it.sag ?? 0);
+        const axis = arcAxis ? arcSample(arcAxis, 0, arcAxis.length) : [it.a, it.b];
         o.fills.push({ polygons: [[ring]], color: theme.accent, alpha: 0.18 });
         o.strokes.push({ pts: ring, closed: true, widthPx: 1.5, color: theme.accent, alpha: 0.95 });
-        o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 1, color: theme.accent, alpha: 0.7, dash: [8, 5] });
+        o.strokes.push({ pts: axis, closed: false, widthPx: 1, color: theme.accent, alpha: 0.7, dash: [8, 5] });
         break;
       }
       case 'label':

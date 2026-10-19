@@ -26,7 +26,8 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
     if (!f) continue;
     const a = applyTransform(t, f.a);
     const b = applyTransform(t, f.b);
-    out.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: t.kind === 'mirror' ? -f.sMid : f.sMid });
+    const sag = f.wall.sag;
+    out.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: t.kind === 'mirror' ? -f.sMid : f.sMid, sag: t.kind === 'mirror' ? -sag : sag });
   }
   return out;
 }

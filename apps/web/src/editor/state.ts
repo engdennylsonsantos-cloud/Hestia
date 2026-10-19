@@ -41,6 +41,7 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   locationLine: 'wallCenter' as LocationLine,
   wallHeight: 2.8,
   chain: true,
+  wallShape: 'line',
   doorTypeId: 'ot_p80',
   windowTypeId: 'ot_j120',
   orthoLock: false,

@@ -46,6 +46,11 @@ export class TrimTool extends ToolBase {
     const fa = frameOfWall(pr, this.first.id);
     const fb = frameOfWall(pr, hit.id);
     if (!fa || !fb) return;
+    if (fa.arc || fb.arc) {
+      this.env.say('Aparar/estender ao canto ainda não suporta paredes em arco.');
+      this.reset();
+      return;
+    }
     const r = intersectLines(fa.a, fa.u, fb.a, fb.u);
     if (!r) {
       this.env.say('As paredes são paralelas: não há canto.');
@@ -110,6 +115,10 @@ export class AlignTool extends ToolBase {
     }
     const f = frameOfWall(pr, hit.id);
     if (!f) return;
+    if (f.arc) {
+      this.env.say('Alinhar ainda não suporta paredes em arco.');
+      return;
+    }
     if (!this.ref) {
       const face = this.nearestFace(f, p.raw);
       this.ref = { id: hit.id, n: f.n, at: face.point };

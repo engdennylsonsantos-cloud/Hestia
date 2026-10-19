@@ -39,7 +39,7 @@ export class JoinTool extends ToolBase {
         const at = end === 'a' ? f.a : f.b;
         const d = dist(at, p);
         if (d > tol || (best && d >= best.d)) continue;
-        const st = joinStatus(frames, f.wall.id, end);
+        const st = joinStatus(frames, f.wall.id, end, pr.settings.joinTolerance);
         if (st.kind !== 'pair') continue;
         const ends = [{ wallId: f.wall.id, end }, ...st.partners];
         const other = pr.elements[st.partners[0]!.wallId];

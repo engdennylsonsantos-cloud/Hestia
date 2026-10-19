@@ -1,4 +1,5 @@
 import { dist, boxesOverlap, boxOf, intersectSegments, type Vec2 } from '@hestia/geom';
+import { wallMid } from './wallGeom.ts';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry, toLocal } from '@hestia/engine';
 
@@ -31,7 +32,8 @@ export function pickAt(p: Project, levelId: Id, at: Vec2, mpp: number): Hit | nu
 
 export interface Grip {
   wallId: Id;
-  end: 'a' | 'b';
+  /** 'mid' é a alça do meio do arco (muda a flecha). */
+  end: 'a' | 'b' | 'mid';
   at: Vec2;
 }
 
@@ -42,6 +44,10 @@ export function gripAt(p: Project, ids: Id[], at: Vec2, mpp: number): Grip | nul
     if (!w || w.kind !== 'wall') continue;
     if (dist(w.a, at) <= tol) return { wallId: id, end: 'a', at: w.a };
     if (dist(w.b, at) <= tol) return { wallId: id, end: 'b', at: w.b };
+    if (Math.abs(w.sag) > 1e-6) {
+      const m = wallMid(w);
+      if (dist(m, at) <= tol) return { wallId: id, end: 'mid', at: m };
+    }
   }
   return null;
 }

@@ -42,6 +42,14 @@ IFC de entrada e saída, importador do Hestia 1, salvar na nuvem, link de compar
 Plugins e scripting, famílias paramétricas gerais, colaboração em tempo real, IA generativa de layout,
 instalações (hidráulica/elétrica), renderização fotorrealista.
 
+## Regra de passagem entre elementos
+
+Um elemento só abre o próximo quando **pelo menos 95%** dos itens do seu checklist (`docs/paridade/`) estiverem resolvidos
+(feitos, ou fora de escopo com motivo escrito) **e** todos os itens marcados *(bloqueante)* estiverem feitos.
+A regra é verificada por `scripts/check-parity.mjs`, que roda no `npm run lint` e no CI: marcar "pisos" como
+em andamento com "paredes" abaixo do limiar quebra o build. Ordem: paredes, pisos, lajes, telhados, escadas, ambientes.
+`npm run parity` mostra o percentual de cada elemento.
+
 ## Critérios permanentes
 - Nenhum arquivo acima de ~400 linhas.
 - Toda função de modelo com teste; toda mudança de esquema com migração.

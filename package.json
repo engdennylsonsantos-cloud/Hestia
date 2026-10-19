@@ -11,11 +11,12 @@
     "dev": "npm run dev -w @hestia/web",
     "build": "npm run build -w @hestia/web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint . && node scripts/check-boundaries.mjs",
+    "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-parity.mjs",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "node tests/e2e/flow.mjs",
-    "build:artifact": "npm run build && node scripts/make-artifact.mjs"
+    "build:artifact": "npm run build && node scripts/make-artifact.mjs",
+    "parity": "node scripts/check-parity.mjs --report"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

@@ -39,12 +39,21 @@ export function ViewportCanvas(): ReactElement {
   const dprRef = useRef(1);
 
   // ---- inicialização: GPU primeiro, CPU só sem suporte ----
+  const bootRef = useRef<(prefer: 'auto' | 'webgl2' | 'cpu') => Promise<void>>(async () => {});
   useEffect(() => {
     let cancelled = false;
     const el = host.current!;
-    void (async () => {
-      const forceCpu = new URLSearchParams(location.search).get('cpu') === '1';
-      const res = forceCpu ? null : await createGpu(() => document.createElement('canvas'), new URLSearchParams(location.search).get('gl') === '1' ? 'webgl2' : 'auto');
+    const qs = new URLSearchParams(location.search);
+    const teardown = (): void => {
+      gpuRef.current?.gpu.dispose();
+      gpuRef.current?.canvas.remove();
+      cpuRef.current?.remove();
+      gpuRef.current = null;
+      cpuRef.current = null;
+    };
+    const boot = async (prefer: 'auto' | 'webgl2' | 'cpu'): Promise<void> => {
+      teardown();
+      const res = prefer === 'cpu' ? null : await createGpu(() => document.createElement('canvas'), prefer);
       if (cancelled) return;
       const rect = el.getBoundingClientRect();
       if (res) {
@@ -52,6 +61,10 @@ export function ViewportCanvas(): ReactElement {
         el.prepend(res.canvas);
         res.gpu.renderer.shadowMap.enabled = true;
         gpuRef.current = res;
+        res.gpu.onLost((reason) => {
+          useUi.setState({ status: `GPU reiniciada (${reason}). Trocando para WebGL2.` });
+          void boot(res.gpu.backend === 'webgpu' ? 'webgl2' : 'cpu');
+        });
         useUi.setState({ gpu: res.gpu.backend });
       } else {
         const c = document.createElement('canvas');
@@ -60,9 +73,15 @@ export function ViewportCanvas(): ReactElement {
         cpuRef.current = c;
         useUi.setState({ gpu: 'cpu' });
       }
+      modelKey.current = '';
       setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
       setReady(true);
-    })();
+      useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+    };
+    bootRef.current = boot;
+    // WebGPU só quando pedido (?gpu=webgpu) até ser validado em GPU real; o padrão é WebGL2 (docs/decisoes/0003).
+    const prefer = qs.get('cpu') === '1' ? 'cpu' : qs.get('gpu') === 'webgpu' ? 'auto' : 'webgl2';
+    void boot(prefer);
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
       setSize({ w: Math.round(r.width), h: Math.round(r.height) });
@@ -71,9 +90,17 @@ export function ViewportCanvas(): ReactElement {
     return () => {
       cancelled = true;
       ro.disconnect();
-      gpuRef.current?.gpu.dispose();
+      teardown();
     };
   }, []);
+
+  const safeRender = (g: { gpu: GpuContext }, scene: Parameters<GpuContext['render']>[0], camera: Parameters<GpuContext['render']>[1]): void => {
+    try {
+      g.gpu.render(scene, camera);
+    } catch {
+      if (g.gpu.backend === 'webgpu') void bootRef.current('webgl2');
+    }
+  };
 
   // ---- desenho ----
   const render = useCallback(() => {
@@ -101,7 +128,7 @@ export function ViewportCanvas(): ReactElement {
       g.gpu.renderer.shadowMap.enabled = st.shadows;
       g.gpu.setSize(w, h, dpr);
       m.orbit.setAspect(w, h);
-      g.gpu.render(m.scene, m.orbit.camera);
+      safeRender(g, m.scene, m.orbit.camera);
       setLabels([]);
       return;
     }
@@ -128,7 +155,7 @@ export function ViewportCanvas(): ReactElement {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
       plan.current.setDrawList(dl, v);
-      g.gpu.render(plan.current.scene, plan.current.camera);
+      safeRender(g, plan.current.scene, plan.current.camera);
     } else if (cpuRef.current) {
       const c = cpuRef.current;
       if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {

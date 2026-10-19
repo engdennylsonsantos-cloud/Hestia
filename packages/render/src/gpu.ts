@@ -7,6 +7,8 @@ export interface GpuContext {
   renderer: THREE.WebGLRenderer;
   setSize(w: number, h: number, dpr: number): void;
   render(scene: THREE.Scene, camera: THREE.Camera): void;
+  /** Chamado se o dispositivo de GPU for perdido (driver reiniciou, aba em segundo plano, etc.). */
+  onLost(cb: (reason: string) => void): void;
   dispose(): void;
 }
 
@@ -29,14 +31,19 @@ async function tryWebGpu(canvas: HTMLCanvasElement): Promise<GpuContext | null> 
       r.dispose();
       return null; // o three caiu sozinho para WebGL: seguimos o caminho WebGL2 padrão, com canvas novo
     }
-    return wrap(r, 'webgpu');
+    const ctx = wrap(r, 'webgpu');
+    const dev = (r.backend as unknown as { device?: { lost?: Promise<{ message?: string }> } } | undefined)?.device;
+    dev?.lost?.then((info) => lostCbs.get(ctx)?.(info?.message ?? 'dispositivo perdido'));
+    return ctx;
   } catch {
     return null;
   }
 }
 
+const lostCbs = new WeakMap<GpuContext, (reason: string) => void>();
+
 function wrap(r: THREE.WebGLRenderer, backend: Backend): GpuContext {
-  return {
+  const ctx: GpuContext = {
     backend,
     renderer: r,
     setSize(w, h, dpr) {
@@ -46,10 +53,18 @@ function wrap(r: THREE.WebGLRenderer, backend: Backend): GpuContext {
     render(scene, camera) {
       r.render(scene, camera);
     },
+    onLost(cb) {
+      lostCbs.set(ctx, cb);
+      r.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        cb('contexto WebGL perdido');
+      });
+    },
     dispose() {
       r.dispose();
     },
   };
+  return ctx;
 }
 
 export interface GpuResult {

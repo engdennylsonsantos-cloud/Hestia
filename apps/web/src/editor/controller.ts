@@ -13,7 +13,7 @@ import {
   type TemplateId,
 } from '@hestia/model';
 import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
-import { fitBox, levelBox, panBy, zoomAt, type Viewport } from '@hestia/render';
+import { fitBox, levelBox, panBy, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
@@ -64,7 +64,7 @@ export class Editor {
     exec: (c) => this.store.exec(c),
     transaction: (l, fn) => this.store.transaction(l, fn),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
-    gridStep: () => 0.1,
+    gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
     say: (m) => useUi.setState({ status: m }),
     done: () => this.setTool('select'),
     options: () => useUi.getState().options,
@@ -129,7 +129,6 @@ export class Editor {
   }
 
   setTool(id: ToolId): void {
-    this.tool.cancel?.();
     this.tool = createTool(id, this.env);
     useUi.setState({ tool: id, typed: '', prompt: null, hover: null });
     this.tool.start();
@@ -174,7 +173,8 @@ export class Editor {
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;
     if (mod && (k === 'z' || k === 'Z')) {
-      e.shiftKey ? this.redo() : this.undo();
+      if (e.shiftKey) this.redo();
+      else this.undo();
       return true;
     }
     if (mod && (k === 'y' || k === 'Y')) {
@@ -260,7 +260,7 @@ export class Editor {
 
   selectLevel(id: Id): void {
     useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan' });
-    this.tool.cancel();
+    this.setTool('select');
   }
 
   setView(v: 'plan' | '3d'): void {

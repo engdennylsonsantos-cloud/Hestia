@@ -24,18 +24,17 @@ export function Tutorial(): ReactElement | null {
     editor.markTutorialSeen();
     useUi.setState({ tutorial: false });
   };
+  const shown = now === -1 ? steps.length : now + 1;
   return (
     <div className="tutorial" role="region" aria-label="Primeiros passos">
-      <h3>{now === -1 ? 'Tudo certo!' : 'Primeiros passos'}</h3>
-      <ol>
-        {steps.map(([t, d], i) => (
-          <li key={i} className={d ? 'done' : i === now ? 'now' : ''}>
-            <span className="dot" />
-            <span>{t}</span>
-          </li>
+      <span className="step-count">{now === -1 ? 'Concluído' : `Passo ${shown} de ${steps.length}`}</span>
+      <span className="step-text">{now === -1 ? 'Você usou as ferramentas principais. Explore os demais tipos e o 3D.' : steps[now]![0]}</span>
+      <span className="dots" aria-hidden="true">
+        {steps.map(([, d], i) => (
+          <span key={i} className={`pip${d ? ' done' : i === now ? ' now' : ''}`} />
         ))}
-      </ol>
-      <div><button className="btn small" onClick={close}>{now === -1 ? 'Concluir' : 'Dispensar'}</button></div>
+      </span>
+      <button className="btn small" onClick={close}>{now === -1 ? 'Concluir' : 'Dispensar'}</button>
     </div>
   );
 }

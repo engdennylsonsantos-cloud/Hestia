@@ -110,7 +110,9 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     if (Math.abs(cursor.y - r.y) <= tol && (!ay || Math.abs(cursor.y - r.y) < Math.abs(cursor.y - ay.y))) ay = r;
   }
   if (ax || ay) {
-    const p = v2(ax ? ax.x : cursor.x, ay ? ay.y : cursor.y);
+    const g = ctx.noGrid ? 0 : ctx.gridStep;
+    const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
+    const p = v2(ax ? ax.x : free(cursor.x), ay ? ay.y : free(cursor.y));
     const guides: Guide[] = [];
     if (ax) guides.push({ from: ax, to: p, kind: 'alignment' });
     if (ay) guides.push({ from: ay, to: p, kind: 'alignment' });
@@ -123,7 +125,9 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     const l = len(d);
     if (l > 1e-6) {
       const horiz = Math.abs(d.y) <= Math.abs(d.x);
-      const snapped = horiz ? v2(cursor.x, ctx.from.y) : v2(ctx.from.x, cursor.y);
+      const g = ctx.noGrid ? 0 : ctx.gridStep;
+      const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
+      const snapped = horiz ? v2(free(cursor.x), ctx.from.y) : v2(ctx.from.x, free(cursor.y));
       const off = horiz ? Math.abs(d.y) : Math.abs(d.x);
       if (ctx.orthoLock || off <= tol * 0.7) {
         add({ point: snapped, kind: 'ortho', score: ctx.orthoLock ? 0 : off + tol * 0.4, guides: [{ from: ctx.from, to: snapped, kind: 'ortho' }] });

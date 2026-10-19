@@ -40,7 +40,7 @@ export class ModelScene {
     this.ground.position.z = -0.03;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
-    this.grid = new THREE.GridHelper(120, 120, 0xb9b3a6, 0xcfcabd);
+    this.grid = new THREE.GridHelper(100, 100, 0xb9b3a6, 0xcfcabd);
     this.grid.rotation.x = Math.PI / 2;
     this.grid.position.z = -0.02;
     (this.grid.material as THREE.Material).transparent = true;
@@ -106,7 +106,9 @@ export class ModelScene {
     this.boxCache = new THREE.Box3().setFromObject(this.model);
     this.ground.material = this.ground.material as THREE.Material;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(opt.dark ? 0x2a2f36 : 0xe3dfd6);
-    this.scene.background = new THREE.Color(opt.dark ? 0x14171b : 0xdfe7ee);
+    const bg = new THREE.Color(opt.dark ? 0x14171b : 0xdfe7ee);
+    this.scene.background = bg;
+    this.scene.fog = new THREE.Fog(bg, 60, 170);
     this.sun.castShadow = opt.shadows;
     if (!this.boxCache.isEmpty()) {
       const c = this.boxCache.getCenter(new THREE.Vector3());

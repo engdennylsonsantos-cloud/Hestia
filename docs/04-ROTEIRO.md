@@ -1,0 +1,48 @@
+# 04 · Roteiro
+
+Cada fase termina em algo **utilizável**. Pronto = testes passando + usado de verdade num mini-projeto.
+
+## Fase 0 · Fundação
+Monorepo, CI (lint, typecheck, testes, clippy), pacotes vazios com fronteiras, esquema versionado, comandos com
+desfazer/refazer, canvas 2D em GPU com pan e zoom, detecção WebGPU/WebGL2.
+**Pronto:** desenhar e desfazer uma linha; CI verde.
+
+## Fase 1 · Núcleo da parede
+Tipo de parede em camadas, parede reta e em arco, linha de localização, junções L/T/X por prioridade,
+motor de inferência, contrato de ferramenta, painel de propriedades (instância + tipo), editor de tipo com seção.
+**Pronto:** desenhar o perímetro de uma casa com paredes compostas; junções corretas; testes dourados.
+
+## Fase 2 · Aberturas e edição
+Porta e janela hospedadas, vão sem elemento, mover/copiar/girar/espelhar/alinhar/aparar/matriz/deslocar.
+**Pronto:** planta completa de uma casa simples só com paredes e aberturas.
+
+## Fase 3 · 3D e níveis
+Vista 3D em GPU acompanhando o modelo, níveis, árvore de projeto, abas de vistas, cotas e texto.
+**Pronto:** casa de dois níveis navegável em 2D e 3D, sem engasgos.
+
+## Fase 4 · Ambiente, piso, forro
+Ambiente por circuito fechado, pisos por três formas, forro, quadro de áreas, tabelas.
+**Pronto:** quadro de áreas correto a partir do modelo.
+
+## Fase 5 · Laje e telhado
+Laje por croqui, telhado por contorno com inclinação por lado, anexar topo de parede ao telhado.
+**Pronto:** casa com cobertura de duas e quatro águas.
+
+## Fase 6 · Documentação
+Corte e elevação, pranchas, escalas e pesos de linha, exportação PDF/DXF, quantitativos por camada.
+**Pronto:** prancha impressa a partir do projeto.
+
+## Fase 7 · Escada, estrutura, extras
+Escada (trajetória e croqui), pilar/viga/sapata, guarda-corpo, cortina de vidro, lote e zoneamento.
+
+## Fase 8 · Interoperabilidade e nuvem
+IFC de entrada e saída, importador do Hestia 1, salvar na nuvem, link de compartilhamento.
+
+## Fora da v1
+Plugins e scripting, famílias paramétricas gerais, colaboração em tempo real, IA generativa de layout,
+instalações (hidráulica/elétrica), renderização fotorrealista.
+
+## Critérios permanentes
+- Nenhum arquivo acima de ~400 linhas.
+- Toda função de modelo com teste; toda mudança de esquema com migração.
+- Antes de cada fase: ler o documento do elemento correspondente e fechar as decisões em aberto.

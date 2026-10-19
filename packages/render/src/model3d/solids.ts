@@ -1,5 +1,5 @@
 import { ringArea, triangulate, type Polygon, type Ring } from '@hestia/geom';
-import { bandTopAt, type LayerBand, type ResolvedLevel } from '@hestia/engine';
+import { bandTopAt, type LayerBand, type ResolvedFloor, type ResolvedLevel } from '@hestia/engine';
 import type { Id } from '@hestia/model';
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
@@ -79,20 +79,22 @@ export interface LevelSolids {
   batches: SolidBatch[];
 }
 
+/** Lote do material `m` dentro do mapa, criado na primeira vez. */
+function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
+  let b = byMat.get(m);
+  if (!b) {
+    b = { materialId: m, positions: [], normals: [], indices: [] };
+    byMat.set(m, b);
+  }
+  return b;
+}
+
 /** Sólidos de todas as camadas das paredes do nível, por material. */
 export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
   const byMat = new Map<Id, SolidBatch>();
-  const batch = (m: Id): SolidBatch => {
-    let b = byMat.get(m);
-    if (!b) {
-      b = { materialId: m, positions: [], normals: [], indices: [] };
-      byMat.set(m, b);
-    }
-    return b;
-  };
   for (const rw of Object.values(r.walls)) {
     for (const l of rw.layers) {
-      const b = batch(l.materialId);
+      const b = batchOf(byMat, l.materialId);
       for (const band of l.bands) {
         const topAt = band.slope ? slopeTop(band, rw.baseZ) : undefined;
         for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1, topAt);
@@ -100,6 +102,18 @@ export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
     }
   }
   return { batches: [...byMat.values()] };
+}
+
+/** Sólidos dos pisos: uma extrusão por camada entre as cotas absolutas (furos incluídos), agrupada por material. */
+export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
+  const byMat = new Map<Id, SolidBatch>();
+  for (const f of floors) {
+    for (const l of f.layers) {
+      const b = batchOf(byMat, l.materialId);
+      for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+    }
+  }
+  return [...byMat.values()];
 }
 
 const slopeTop = (band: LayerBand, baseZ: number) => (x: number, y: number): number => baseZ + bandTopAt(band, { x, y });

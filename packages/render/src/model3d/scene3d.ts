@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { frameOfWall, openingGeometry, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveFloors, type ResolvedLevel } from '@hestia/engine';
 import { wallBaseElevation, wallHeight, wallsOnLevel, openingsOfWall, type Material, type Project } from '@hestia/model';
 import { OrbitCamera } from './orbit.ts';
-import { buildLevelSolids } from './solids.ts';
+import { buildFloorSolids, buildLevelSolids } from './solids.ts';
 
 export interface Scene3DOptions {
   edges: boolean;
@@ -10,7 +10,7 @@ export interface Scene3DOptions {
   dark: boolean;
 }
 
-/** Cena 3D do modelo: paredes por camada com material, esquadrias, luz e chão. */
+/** Cena 3D do modelo: paredes e pisos por camada com material, esquadrias, luz e chão. */
 export class ModelScene {
   readonly scene = new THREE.Scene();
   readonly orbit = new OrbitCamera();
@@ -80,7 +80,9 @@ export class ModelScene {
     const edgeMat = new THREE.LineBasicMaterial({ color: opt.dark ? 0xd7dde5 : 0x1c2026, transparent: true, opacity: 0.5 });
     for (const lv of levels) {
       const solids = buildLevelSolids(lv);
-      for (const b of solids.batches) {
+      // Pisos do nível: uma malha por material, com os furos (D2).
+      const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId))];
+      for (const b of batches) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
         g.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));

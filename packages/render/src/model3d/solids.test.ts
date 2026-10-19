@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, type Wall } from '@hestia/model';
-import { resolveLevel } from '@hestia/engine';
-import { buildLevelSolids } from './solids.ts';
+import { ProjectStore, createEmptyProject, floorTypeThickness, makeFloor, makeWall, type FloorType, type Wall } from '@hestia/model';
+import { resolveFloors, resolveLevel } from '@hestia/engine';
+import { buildFloorSolids, buildLevelSolids } from './solids.ts';
 
 const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
@@ -54,5 +54,52 @@ describe('perfil superior no 3D', () => {
     expect(meshVol).toBeCloseTo(quantifyLevel(s.project, r).walls[0]!.volume, 3);
     const maxZ = Math.max(...solids.batches.flatMap((b) => b.positions.filter((_, i) => i % 3 === 2)));
     expect(maxZ).toBeCloseTo(4.5, 6);
+  });
+});
+
+describe('sólidos de piso (D2)', () => {
+  const RECT = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }];
+  const HOLE = [{ x: 2, y: 1.5 }, { x: 4, y: 1.5 }, { x: 4, y: 2.5 }, { x: 2, y: 2.5 }];
+  const TRES: FloorType = {
+    id: 'ft_tres',
+    name: 'Três camadas',
+    code: 'PS-T',
+    description: 'teste',
+    cost: 0,
+    layers: [
+      { function: 'finish1', materialId: 'mat_ceramica', thickness: 0.01, wraps: false },
+      { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.03, wraps: false },
+      { function: 'structure', materialId: 'mat_concreto', thickness: 0.1, wraps: false },
+    ],
+  };
+
+  it('volume do piso com furo = área líquida × espessura total', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f', typeId: 'ft_ceram', levelId: 'lv_0', boundary: RECT, holes: [HOLE] }) });
+    const batches = buildFloorSolids(resolveFloors(s.project, 'lv_0'));
+    const total = batches.reduce((sum, b) => sum + volume(b), 0);
+    const net = 6 * 4 - 2 * 1;
+    expect(total).toBeCloseTo(net * floorTypeThickness(s.project.floorTypes.ft_ceram!), 6);
+  });
+
+  it('três camadas contíguas: uma malha por material, cada uma entre a face de cima e a de baixo da camada', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'upsertFloorType', floorType: TRES });
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f', typeId: 'ft_tres', levelId: 'lv_0', boundary: RECT }) });
+    const batches = buildFloorSolids(resolveFloors(s.project, 'lv_0'));
+    expect(batches.map((b) => b.materialId)).toEqual(['mat_ceramica', 'mat_argamassa', 'mat_concreto']);
+    const range = (b: { positions: number[] }) => {
+      const zs = b.positions.filter((_, i) => i % 3 === 2);
+      return [Math.min(...zs), Math.max(...zs)];
+    };
+    const [c, a, k] = batches.map(range) as [number[], number[], number[]];
+    expect(c[1]).toBeCloseTo(0, 6);
+    expect(c[0]).toBeCloseTo(-0.01, 6);
+    expect(a[1]).toBeCloseTo(c[0]!, 6);
+    expect(a[0]).toBeCloseTo(-0.04, 6);
+    expect(k[1]).toBeCloseTo(a[0]!, 6);
+    expect(k[0]).toBeCloseTo(-0.14, 6);
+    const total = batches.reduce((sum, b) => sum + volume(b), 0);
+    expect(total).toBeCloseTo(24 * 0.14, 6);
   });
 });

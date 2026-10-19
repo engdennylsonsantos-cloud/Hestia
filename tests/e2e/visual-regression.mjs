@@ -20,6 +20,7 @@ await page.goto(pathToFileURL(path.resolve('apps/web/dist/index.html')).href + '
 await page.waitForFunction(() => window.__hestia);
 
 const W = (id, a, b, extra = {}) => ({ id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false, noJoinStart: false, noJoinEnd: false, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, sag: 0, topProfile: null, mark: '', comments: '', ...extra });
+const F = (id, boundary, extra = {}) => ({ id, kind: 'floor', typeId: 'ft_ceram', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, mark: '', comments: '', ...extra });
 const M = { kind: 'miter', flip: false };
 const S = { kind: 'square', flip: false };
 const CASES = {
@@ -33,14 +34,21 @@ const CASES = {
   'sala-com-arco': [W('a', [0, 0], [0, 4]), W('b', [0, 4], [4, 4]), W('c', [4, 4], [4, 0], { sag: 1.2 }), W('d', [4, 0], [0, 0])],
 };
 
+// D1/D4: pisos entram por addFloor (kind floor); paredes por addWall.
+const FLOOR_CASES = {
+  'piso-retangulo': [F('p1', [[0, 0], [6, 0], [6, 4], [0, 4]])],
+  'piso-com-furo': [F('p2', [[0, 0], [6, 0], [6, 4], [0, 4]], { holes: [[{ x: 2, y: 1.5 }, { x: 4, y: 1.5 }, { x: 4, y: 2.5 }, { x: 2, y: 2.5 }]] })],
+  'piso-L': [F('p3', [[0, 0], [4, 0], [4, 1], [1, 1], [1, 4], [0, 4]])],
+};
+
 let failed = 0;
-for (const [name, walls] of Object.entries(CASES)) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES })) {
   await page.evaluate((ws) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec({ type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
     editor.zoomExtents();
-  }, walls);
+  }, items);
   await page.waitForTimeout(250);
   const canvas = page.locator('.canvas-wrap canvas').first();
   const shot = await canvas.screenshot();

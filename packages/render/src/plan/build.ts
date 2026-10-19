@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -8,6 +8,7 @@ import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
+import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -17,6 +18,8 @@ export interface PlanInput {
   levelId: Id;
   resolved: ResolvedLevel;
   below: ResolvedLevel | null;
+  /** Pisos do nível abaixo (referência apagada, D4); sem ele, só as paredes do subpavimento aparecem. */
+  belowFloors?: ResolvedFloor[];
   viewport: Viewport;
   theme: PlanTheme;
   dark: boolean;
@@ -80,10 +83,21 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
+  if (input.below && input.belowFloors) {
+    const bf = belowFloorOps(input.belowFloors, theme);
+    fills.push(...bf.fills);
+    strokes.push(...bf.strokes);
+  }
+
   // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
   // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
   const detail = p.settings.detail ?? 'medium';
   const fine = detail === 'fine';
+  // Pisos antes das paredes: a parede cobre o piso onde se encontram (decisão 0006).
+  const fl = floorFills(p, input.levelId, theme, input.dark, detail, v);
+  fills.push(...fl.fills);
+  strokes.push(...fl.strokes);
+  labels.push(...fl.labels);
   for (const c of resolved.clusters) {
     if (detail === 'coarse') {
       fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
@@ -143,7 +157,11 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
-  // Hover e seleção.
+  // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
+  const fsel = floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  fills.push(...fsel.fills);
+  strokes.push(...fsel.strokes);
+  labels.push(...fsel.labels);
   if (input.hover && !input.selection.includes(input.hover)) {
     fills.push(...elementHighlight(p, resolved, [input.hover], theme.select, 0.16));
   }

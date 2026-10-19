@@ -1,6 +1,7 @@
 import { intersection, orientedRect, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
+import { resolveFloors } from './floors.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
 
 /**
@@ -25,7 +26,9 @@ export interface SectionRegion {
 
 /** Elemento visto além do plano de corte; a lista vem ordenada do mais longe ao mais perto (pintor). */
 export interface SectionBeyond {
-  wallId: Id;
+  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`). */
+  wallId?: Id;
+  floorId?: Id;
   materialId: Id;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
@@ -118,6 +121,39 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
 
   for (const levelId of levelIds) {
     const resolved = resolveLevel(p, levelId);
+    // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto.
+    for (const f of resolveFloors(p, levelId)) {
+      const inSlab = intersection(f.polygon, slab);
+      for (const layer of f.layers) {
+        for (const poly of f.polygon) {
+          for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
+            const lo = Math.max(0, t0);
+            const hi = Math.min(length, t1);
+            if (hi - lo < EPS_T) continue;
+            const list = cutBy.get(layer.materialId) ?? [];
+            list.push([rect(lo, hi, layer.z0, layer.z1)]);
+            cutBy.set(layer.materialId, list);
+            grow(layer.z0, layer.z1);
+          }
+        }
+        for (const sp of inSlab) {
+          const outer = sp[0];
+          if (!outer || outer.length < 3) continue;
+          const ts = outer.map(along);
+          const tMin = Math.max(0, Math.min(...ts));
+          const tMax = Math.min(length, Math.max(...ts));
+          if (tMax - tMin < EPS_T) continue;
+          beyond.push({
+            floorId: f.floorId,
+            materialId: layer.materialId,
+            layerIndex: layer.layerIndex,
+            depth: Math.max(0, Math.min(...outer.map(dist))),
+            polygons: [[rect(tMin, tMax, layer.z0, layer.z1)]],
+          });
+          grow(layer.z0, layer.z1);
+        }
+      }
+    }
     for (const w of wallsOnLevel(p, levelId)) {
       const rw = resolved.walls[w.id];
       if (!rw) continue;

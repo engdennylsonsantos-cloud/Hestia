@@ -15,12 +15,12 @@
     {
       "id": "lajes",
       "arquivo": "lajes.md",
-      "status": "em-andamento"
+      "status": "concluido"
     },
     {
       "id": "telhados",
       "arquivo": "telhados.md",
-      "status": "nao-iniciado"
+      "status": "em-andamento"
     },
     {
       "id": "escadas",

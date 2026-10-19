@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -124,6 +124,8 @@ export interface Wall {
   attachBottomToFloor?: boolean;
   /** Topo anexado ao piso do nível `topLevelId` que cobre o ponto médio: o topo desce até a face inferior do piso. */
   attachTopToFloor?: boolean;
+  /** Topo ajustado à face inferior do telhado que cobre a parede (empenas e frontões); cálculo no engine. */
+  attachTopToRoof?: boolean;
   locationLine: LocationLine;
   /** Inverte qual lado é o externo (padrão: externo à esquerda de a→b). */
   flipped: boolean;
@@ -251,7 +253,56 @@ export interface Slab {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab;
+/** Tipo de telhado: camadas do topo para baixo (telha, ripamento, estrutura), espessura medida na vertical. */
+export interface RoofType {
+  id: Id;
+  name: string;
+  code: string;
+  description: string;
+  layers: Layer[];
+  cost: number;
+}
+
+export type RoofShape = 'shed' | 'gable' | 'hip' | 'free';
+
+/**
+ * Água de telhado definida pelo usuário (forma 'free'): polígono em planta e plano inclinado. A cota da face
+ * superior em p é z0 + percent/100 × projeção de (p − origin) sobre `up` (direção de subida, unitária); z0 é relativa
+ * à cota do beiral (nível + heightOffset do telhado).
+ */
+export interface RoofPlaneDef {
+  polygon: Vec2[];
+  origin: Vec2;
+  up: Vec2;
+  percent: number;
+  z0: number;
+}
+
+/**
+ * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). `boundary` é o contorno do beiral em planta (já com o balanço);
+ * a cota do beiral é o nível + `heightOffset`. As águas vêm da forma: 'shed' (uma água subindo na direção `dir`),
+ * 'gable' (duas águas, cumeeira paralela a `dir` passando pelo meio do contorno), 'hip' (quatro águas ou mais:
+ * a altura é `slopePercent` × distância à aresta mais próxima; contorno convexo) ou 'free' (águas em `planes`).
+ */
+export interface Roof {
+  id: Id;
+  kind: 'roof';
+  typeId: Id;
+  levelId: Id;
+  boundary: Vec2[];
+  holes: Vec2[][];
+  heightOffset: number;
+  shape: RoofShape;
+  slopePercent: number;
+  /** Direção unitária: subida da água ('shed') ou eixo da cumeeira ('gable'). Ignorada em 'hip' e 'free'. */
+  dir: Vec2;
+  planes: RoofPlaneDef[];
+  mark: string;
+  comments: string;
+  order: number;
+}
+
+export type Element = Wall | Opening | Floor | Slab | Roof;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -291,6 +342,7 @@ export interface Project {
   wallTypes: Record<Id, WallType>;
   floorTypes: Record<Id, FloorType>;
   slabTypes: Record<Id, SlabType>;
+  roofTypes: Record<Id, RoofType>;
   openingTypes: Record<Id, OpeningType>;
   elements: Record<Id, Element>;
   nextOrder: number;
@@ -300,6 +352,7 @@ export interface Project {
   views: SectionView[];
 }
 
+export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';
 export const isSlab = (e: Element | undefined): e is Slab => e?.kind === 'slab';
 export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';

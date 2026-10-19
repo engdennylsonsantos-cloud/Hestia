@@ -1,6 +1,7 @@
-import { createEmptyProject } from './defaults.ts';
+import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
+import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
@@ -80,6 +81,12 @@ const migrations: Record<number, Migration> = {
   },
   // v7 → v8: lajes (tipos de laje padrão).
   7: (raw) => ({ ...raw, slabTypes: { ...Object.fromEntries(DEFAULT_SLAB_TYPES.map((t) => [t.id, t])), ...((raw.slabTypes as object) ?? {}) } }),
+  // v8 → v9: telhados (tipos padrão e materiais de cobertura).
+  8: (raw) => ({
+    ...raw,
+    roofTypes: { ...Object.fromEntries(DEFAULT_ROOF_TYPES.map((t) => [t.id, t])), ...((raw.roofTypes as object) ?? {}) },
+    materials: { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => ['mat_telha_ceramica', 'mat_fibrocimento', 'mat_telha_metalica'].includes(m.id)).map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) },
+  }),
 };
 
 export class SchemaError extends Error {}

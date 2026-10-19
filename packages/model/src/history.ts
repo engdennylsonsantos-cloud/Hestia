@@ -149,6 +149,12 @@ export function labelOf(c: Command): string {
       return 'Editar tipo de laje';
     case 'deleteSlabType':
       return 'Excluir tipo de laje';
+    case 'addRoof':
+      return 'Criar telhado';
+    case 'upsertRoofType':
+      return 'Editar tipo de telhado';
+    case 'deleteRoofType':
+      return 'Excluir tipo de telhado';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':

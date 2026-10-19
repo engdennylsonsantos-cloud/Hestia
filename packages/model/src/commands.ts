@@ -4,11 +4,14 @@ import {
   isOpening,
   isFloor,
   isSlab,
+  isRoof,
   isWall,
   type Element,
   type Floor,
   type FloorType,
   type Slab,
+  type Roof,
+  type RoofType,
   type SlabType,
   type Id,
   type JoinConfig,
@@ -30,11 +33,14 @@ export type Command =
   | { type: 'addOpening'; opening: Opening }
   | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
   | { type: 'addSlab'; slab: Omit<Slab, 'order'> }
+  | { type: 'addRoof'; roof: Omit<Roof, 'order'> }
+  | { type: 'upsertRoofType'; roofType: RoofType }
+  | { type: 'deleteRoofType'; id: Id }
   | { type: 'upsertSlabType'; slabType: SlabType }
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -104,8 +110,38 @@ function transformSlab(s: Slab, t: Transform): Slab {
   return { ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope };
 }
 
+/** Move/gira/espelha um telhado: contorno, furos, direção e águas livres (origem e direção de subida). */
+function transformRoof(r: Roof, t: Transform): Roof {
+  const pts = (ring: Vec2[]): Vec2[] => {
+    const out = ring.map((q) => applyTransform(t, q));
+    return t.kind === 'mirror' ? out.reverse() : out;
+  };
+  const dirOf = (o: Vec2, d: Vec2): Vec2 => {
+    const e = applyTransform(t, { x: o.x + d.x, y: o.y + d.y });
+    const a = applyTransform(t, o);
+    const l = Math.hypot(e.x - a.x, e.y - a.y) || 1;
+    return { x: (e.x - a.x) / l, y: (e.y - a.y) / l };
+  };
+  return {
+    ...r,
+    boundary: pts(r.boundary),
+    holes: r.holes.map(pts),
+    dir: dirOf(r.boundary[0] ?? { x: 0, y: 0 }, r.dir),
+    planes: r.planes.map((pl) => ({ ...pl, polygon: pts(pl.polygon), origin: applyTransform(t, pl.origin), up: dirOf(pl.origin, pl.up) })),
+  };
+}
+
 function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }>): void {
   const idMap = c.copy?.idMap;
+  for (const r of c.ids.map((id) => p.elements[id]).filter(isRoof)) {
+    const next = transformRoof(r, c.transform);
+    if (idMap) {
+      const nid = idMap[r.id];
+      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
+    } else {
+      p.elements[r.id] = next;
+    }
+  }
   for (const s of c.ids.map((id) => p.elements[id]).filter(isSlab)) {
     const next = transformSlab(s, c.transform);
     if (idMap) {
@@ -185,6 +221,21 @@ export function applyCommand(p: Project, c: Command): void {
       delete p.slabTypes[c.id];
       break;
     }
+    case 'addRoof': {
+      if (c.roof.boundary.length < 3) throw new Error('O contorno do telhado precisa de ao menos 3 pontos');
+      if (!p.roofTypes[c.roof.typeId]) throw new Error('Tipo de telhado inexistente');
+      p.elements[c.roof.id] = { ...c.roof, order: p.nextOrder++ };
+      break;
+    }
+    case 'upsertRoofType':
+      p.roofTypes[c.roofType.id] = c.roofType;
+      break;
+    case 'deleteRoofType': {
+      if (Object.values(p.elements).some((e) => isRoof(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.roofTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de telhado');
+      delete p.roofTypes[c.id];
+      break;
+    }
     case 'addOpening': {
       const host = p.elements[c.opening.hostId];
       if (!isWall(host)) throw new Error('Abertura precisa de uma parede anfitriã');
@@ -255,7 +306,7 @@ export function applyCommand(p: Project, c: Command): void {
     }
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
-      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e) || isSlab(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
+      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }

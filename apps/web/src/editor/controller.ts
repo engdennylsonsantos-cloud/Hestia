@@ -294,10 +294,33 @@ export class Editor {
     }
   }
 
-  /** Baixa o arquivo; em ambientes que bloqueiam download, copia o JSON para a área de transferência. */
+  /**
+   * Salva o projeto. Dentro de um artefato do claude.ai o download direto é bloqueado, então usa a
+   * capacidade `downloads` (o viewer confirma). Fora dele, baixa o arquivo; em último caso copia o JSON.
+   */
   async save(): Promise<void> {
     const text = this.serialize();
     const name = `${this.project.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto'}.hestia.json`;
+    safeSet(STORAGE_KEY, text);
+    type Dl = { save(r: { filename: string; data: string }): Promise<unknown> };
+    const host = (window as unknown as { claude?: { use?: (n: string) => Promise<Dl | null> } }).claude;
+    if (host?.use) {
+      try {
+        const dl = await host.use('downloads');
+        if (dl) {
+          await dl.save({ filename: name, data: text });
+          this.store.markSaved();
+          useUi.setState({ status: `Salvo como ${name}.` });
+          return;
+        }
+      } catch (e) {
+        const code = (e as { code?: string }).code;
+        if (code === 'declined') {
+          useUi.setState({ status: 'Salvamento cancelado. O projeto continua guardado neste navegador.' });
+          return;
+        }
+      }
+    }
     let downloaded = false;
     try {
       const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -312,13 +335,12 @@ export class Editor {
     } catch {
       downloaded = false;
     }
-    safeSet(STORAGE_KEY, text);
     this.store.markSaved();
     try {
       await navigator.clipboard.writeText(text);
-      useUi.setState({ status: downloaded ? `Salvo como ${name} e copiado para a área de transferência.` : 'JSON do projeto copiado para a área de transferência.' });
+      useUi.setState({ status: downloaded ? `Arquivo ${name} gerado e JSON copiado.` : 'JSON do projeto copiado para a área de transferência.' });
     } catch {
-      useUi.setState({ status: downloaded ? `Arquivo ${name} gerado.` : 'Não foi possível baixar. O projeto foi salvo neste navegador.' });
+      useUi.setState({ status: downloaded ? `Arquivo ${name} gerado.` : 'Não foi possível baixar. O projeto está guardado neste navegador.' });
     }
   }
 

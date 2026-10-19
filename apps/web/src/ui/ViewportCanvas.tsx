@@ -4,16 +4,31 @@ import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 
+/** Escuro se o usuário escolheu escuro, ou se o tema do host/sistema for escuro. */
 export function useDark(): boolean {
   const theme = useUi((s) => s.theme);
-  const [sys, setSys] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const read = (): boolean => {
+    if (theme !== 'system') return theme === 'dark';
+    const attr = document.documentElement.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+  const [dark, setDark] = useState(read);
   useEffect(() => {
+    setDark(read());
     const mq = matchMedia('(prefers-color-scheme: dark)');
-    const on = (): void => setSys(mq.matches);
+    const on = (): void => setDark(read());
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return theme === 'dark' || (theme === 'system' && sys);
+    const mo = new MutationObserver(on);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => {
+      mq.removeEventListener('change', on);
+      mo.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
+  return dark;
 }
 
 interface Pt {

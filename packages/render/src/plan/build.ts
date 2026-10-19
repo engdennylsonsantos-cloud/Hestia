@@ -111,6 +111,11 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
       const e = p.elements[id];
       if (!isWall(e)) continue;
       for (const ring of ringsOf(wallUnion(resolved, id))) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+      if (input.selection.length === 1) {
+        // Cota temporária: comprimento do eixo, como no Revit ao selecionar.
+        const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
+        labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: `${len.toFixed(3).replace('.', ',')} m`, dy: -12, tone: 'info' });
+      }
       const half = 4.5 / v.zoom;
       for (const pt of [e.a, e.b]) {
         const sq: Vec2[] = [

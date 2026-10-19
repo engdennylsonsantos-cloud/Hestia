@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { editor, useProject } from './editor/controller.ts';
 import { useUi } from './editor/state.ts';
 import { Browser } from './ui/Browser.tsx';
@@ -13,6 +13,8 @@ import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
+
+const narrow = (): boolean => window.innerWidth <= 900;
 
 function ViewTabs(): ReactElement {
   const p = useProject();
@@ -29,10 +31,10 @@ function ViewTabs(): ReactElement {
         <Icon name="cube" size={14} /> Modelo 3D
       </button>
       <span style={{ flex: 1 }} />
-      <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
+      <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
         <Icon name="edit" size={16} />
       </button>
-      <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
+      <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen, ...(narrow() && !s.rightOpen ? { leftOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
         <Icon name="levels" size={16} />
       </button>
     </div>
@@ -66,10 +68,14 @@ export function App(): ReactElement {
   const theme = useUi((s) => s.theme);
   const dialog = useUi((s) => s.dialog);
 
+  // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
+  const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'system') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
+    if (theme === 'system') {
+      if (hostTheme.current) root.setAttribute('data-theme', hostTheme.current);
+      else root.removeAttribute('data-theme');
+    } else root.setAttribute('data-theme', theme);
   }, [theme]);
 
   useEffect(() => {

@@ -35,14 +35,14 @@ export function TitleBar(): ReactElement {
       {store.dirty ? <span className="dirty" title="Alterações ainda não exportadas">●</span> : null}
       <span className="sep" />
       <button className="ibtn" onClick={() => useUi.setState({ dialog: 'start' })} title="Novo projeto a partir de um modelo">
-        <Icon name="file" size={17} /> Novo
+        <Icon name="file" size={17} /> <span className="lbl-text">Novo</span>
       </button>
       <button className="ibtn" onClick={() => fileRef.current?.click()} title="Abrir arquivo .hestia.json">
-        <Icon name="open" size={17} /> Abrir
+        <Icon name="open" size={17} /> <span className="lbl-text">Abrir</span>
       </button>
       <input ref={fileRef} id="file-open" type="file" accept=".json,.hestia,application/json" hidden onChange={(e) => { void open(e.target.files?.[0]); e.target.value = ''; }} />
       <button className="ibtn" onClick={() => void editor.save()} title="Exportar o projeto (Ctrl+S)">
-        <Icon name="save" size={17} /> Salvar
+        <Icon name="save" size={17} /> <span className="lbl-text">Salvar</span>
       </button>
       <span className="sep" />
       <button className="ibtn" disabled={!store.canUndo} onClick={() => editor.undo()} title={store.undoLabel ? `Desfazer: ${store.undoLabel} (Ctrl+Z)` : 'Desfazer'}>

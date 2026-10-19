@@ -261,6 +261,11 @@ svg { display: block; }
 .tutorial .pip.now { border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---- telas estreitas: painéis viram gavetas ---- */
+@media (max-width: 700px) {
+  .lbl-text { display: none; }
+  .proj-name { min-width: 60px; max-width: 120px; }
+  .ribbon { min-height: 62px; }
+}
 @media (max-width: 900px) {
   .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }
   .side { position: absolute; z-index: 20; top: 0; bottom: 0; box-shadow: var(--shadow); }

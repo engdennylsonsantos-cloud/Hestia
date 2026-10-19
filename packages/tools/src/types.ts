@@ -24,7 +24,9 @@ export type PreviewItem =
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
-  | { kind: 'highlight'; ids: Id[] };
+  | { kind: 'highlight'; ids: Id[] }
+  /** Linha de corte ou elevação com a seta do lado de visão (a pré-visualização usa `dashed`). */
+  | { kind: 'sectionLine'; a: Vec2; b: Vec2; dashed?: boolean; label?: string; elevation?: boolean };
 
 export interface ToolEnv {
   project(): Project;

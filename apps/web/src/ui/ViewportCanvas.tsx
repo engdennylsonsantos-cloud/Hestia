@@ -3,6 +3,7 @@ import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawP
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
+import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 
 /** Escuro se o usuário escolheu escuro, ou se o tema do host/sistema for escuro. */
 export function useDark(): boolean {
@@ -152,20 +153,23 @@ export function ViewportCanvas(): ReactElement {
     const idx = p.levels.findIndex((l) => l.id === st.levelId);
     const below = st.showUnderlay && idx > 0 ? editor.resolved(p.levels[idx - 1]!.id) : null;
     const tool = editor.activeTool;
-    const dl = buildPlanDrawList({
-      project: p,
-      levelId: st.levelId,
-      resolved,
-      below,
-      viewport: v,
-      theme,
-      dark,
-      selection: st.selection,
-      hover: st.hover,
-      preview: tool.preview(),
-      inference: tool.inference(),
-      showGrid: st.showGrid,
-    });
+    const dl =
+      st.view === 'section'
+        ? (buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] })
+        : buildPlanDrawList({
+            project: p,
+            levelId: st.levelId,
+            resolved,
+            below,
+            viewport: v,
+            theme,
+            dark,
+            selection: st.selection,
+            hover: st.hover,
+            preview: tool.preview(),
+            inference: tool.inference(),
+            showGrid: st.showGrid,
+          });
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
@@ -187,7 +191,7 @@ export function ViewportCanvas(): ReactElement {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame.current);
-  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.shadows, ui.edges, ui.tool]);
+  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.shadows, ui.edges, ui.tool]);
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
@@ -240,7 +244,8 @@ export function ViewportCanvas(): ReactElement {
       drag.current = { mode: panBtn ? 'pan' : 'orbit', start: s, last: s, moved: false };
       return;
     }
-    if (panBtn) {
+    // Na vista de corte não há ferramentas: o botão esquerdo também arrasta a vista.
+    if (panBtn || view === 'section') {
       drag.current = { mode: 'pan', start: s, last: s, moved: false };
       return;
     }
@@ -257,7 +262,7 @@ export function ViewportCanvas(): ReactElement {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (view === 'plan') {
+      if (view !== '3d') {
         editor.pan(mid.x - gesture.current.mid.x, mid.y - gesture.current.mid.y);
         editor.zoomWheel(mid, -(d - gesture.current.dist) * 2.4);
       } else {
@@ -283,6 +288,7 @@ export function ViewportCanvas(): ReactElement {
       d.last = s;
       return;
     }
+    if (view === 'section') return;
     const v = editor.viewport();
     if (!v) return;
     const inf = info(e, s);
@@ -328,7 +334,7 @@ export function ViewportCanvas(): ReactElement {
   }, []);
 
   const v = editor.viewport();
-  const cursorCss = ui.view === '3d' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
+  const cursorCss = ui.view !== 'plan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
   return (
     <div
       ref={host}
@@ -341,7 +347,7 @@ export function ViewportCanvas(): ReactElement {
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="labels" aria-hidden="true">
-        {ui.view === 'plan' && v
+        {ui.view !== '3d' && v
           ? labels.map((l, i) => {
               const sp = worldToScreen(v, l.at);
               return (
@@ -359,10 +365,11 @@ export function ViewportCanvas(): ReactElement {
         </div>
       )}
       <div className="cornerbtns">
-        <button className="ibtn" title="Enquadrar tudo" onClick={() => (ui.view === 'plan' ? editor.zoomExtents() : (model.current.fit(), useUi.setState((x) => ({ previewTick: x.previewTick + 1 }))))}>
+        <button className="ibtn" title="Enquadrar tudo" onClick={() => (ui.view !== '3d' ? editor.zoomExtents() : (model.current.fit(), useUi.setState((x) => ({ previewTick: x.previewTick + 1 }))))}>
           <Icon name="fit" size={18} />
         </button>
       </div>
+      {ui.view === 'section' ? <SectionBadge /> : null}
       {ui.view === 'plan' && ui.prompt ? (
         <div className="typebox" role="status">
           <span className="cap">{ui.prompt}</span>

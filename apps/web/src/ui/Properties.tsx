@@ -20,6 +20,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
+import { ProfileRow } from './ProfileRow.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -140,6 +141,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         ) : (
           <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
         )}
+        <ProfileRow key={ids.join(',')} walls={walls} />
         <Row label="Linha de localização" htmlFor="p-loc">
           <select id="p-loc" className="select" value={loc.mixed ? '' : loc.value} onChange={(e) => e.target.value && patch(ids, { locationLine: e.target.value as LocationLine })}>
             {loc.mixed && <option value="">variados</option>}

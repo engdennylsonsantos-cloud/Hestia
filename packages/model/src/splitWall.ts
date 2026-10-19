@@ -1,6 +1,7 @@
 import { dist, lerp } from '@hestia/geom';
 import type { Command } from './commands.ts';
 import { DEFAULT_JOIN } from './wall.ts';
+import { splitProfile } from './profile.ts';
 import { isOpening, isWall, type Opening, type Project, type Wall } from './types.ts';
 
 const EPS = 1e-9;
@@ -51,8 +52,10 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
 
   const joinEnd = { ...w.joinEnd };
   const noJoinEnd = w.noJoinEnd;
+  const [profL, profR] = w.topProfile ? splitProfile(w.topProfile, lo, hi) : [null, null];
   const right: Wall = {
     ...w,
+    topProfile: profR,
     id: c.newId,
     a: cutEnd,
     b,
@@ -65,6 +68,7 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
   p.elements[c.newId] = right;
 
   w.b = cutStart;
+  w.topProfile = profL;
   w.joinEnd = { ...DEFAULT_JOIN };
   w.noJoinEnd = false;
 }

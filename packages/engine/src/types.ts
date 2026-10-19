@@ -21,6 +21,11 @@ export interface LayerBand {
   z0: number;
   z1: number;
   poly: MultiPolygon;
+  /**
+   * Topo inclinado (perfil superior da parede): a altura relativa em `p` é h0 + (h1−h0)·(d·(p−o) − t0)/(t1 − t0).
+   * Nesse caso `z1` é a maior altura da faixa (para caixas e limites).
+   */
+  slope?: { o: Vec2; d: Vec2; t0: number; t1: number; h0: number; h1: number };
 }
 
 export interface ResolvedWall {
@@ -36,6 +41,15 @@ export interface ResolvedWall {
   baseZ: number;
   height: number;
   layers: ResolvedLayer[];
+  /** Camadas de espessura zero (membranas, barreiras): linhas no limite entre camadas, em planta e nos quantitativos. */
+  membranes: Membrane[];
+}
+
+export interface Membrane {
+  layerIndex: number;
+  materialId: Id;
+  /** Linha da membrana entre as duas extremidades da parede (reta; parede curva não desenha membrana). */
+  pts: Vec2[];
 }
 
 export interface Region {

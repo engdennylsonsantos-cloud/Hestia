@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { resolveLevel, type ResolvedLevel } from '@hestia/engine';
+import { computeSection, resolveLevel, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
   buildTemplate,
@@ -13,8 +13,9 @@ import {
   type TemplateId,
 } from '@hestia/model';
 import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
-import { fitBox, levelBox, panBy, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
+import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
+import { elevationCommand, type PlanBox } from './elevations.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -43,6 +44,7 @@ export class Editor {
   private tool: Tool;
   private viewports = new Map<Id, Viewport>();
   private resolveCache = new Map<Id, { project: Project; value: ResolvedLevel }>();
+  private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
 
@@ -75,23 +77,39 @@ export class Editor {
   }
 
   // ---------- vistas ----------
+  /** Chave do viewport: cada planta tem o seu; cada corte ou elevação tem o próprio. */
+  private viewKey(): Id {
+    const st = useUi.getState();
+    return st.view === 'section' ? `sec:${st.sectionId}` : st.levelId;
+  }
+
   viewport(): Viewport | null {
-    return this.viewports.get(useUi.getState().levelId) ?? null;
+    return this.viewports.get(this.viewKey()) ?? null;
   }
 
   setViewport(v: Viewport): void {
-    this.viewports.set(useUi.getState().levelId, v);
+    this.viewports.set(this.viewKey(), v);
     useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
   }
 
+  /** Caixa para enquadrar a vista atual: o nível na planta, o corte na vista de corte. */
+  private frameBox(): PlanBox | null {
+    const st = useUi.getState();
+    if (st.view === 'section') {
+      const r = this.sectionOf(st.sectionId);
+      return r ? sectionBox(r) : null;
+    }
+    return levelBox(this.project, st.levelId);
+  }
+
   ensureViewport(width: number, height: number): Viewport {
-    const id = useUi.getState().levelId;
+    const id = this.viewKey();
     const cur = this.viewports.get(id);
     if (cur && cur.width === width && cur.height === height) return cur;
     const base: Viewport = cur ?? { cx: 5, cy: 3.5, zoom: 60, width, height };
     const v = { ...base, width, height };
     if (!cur) {
-      const box = levelBox(this.project, id);
+      const box = this.frameBox();
       if (box) Object.assign(v, fitBox(v, box));
     }
     this.viewports.set(id, v);
@@ -101,8 +119,20 @@ export class Editor {
   zoomExtents(): void {
     const v = this.viewport();
     if (!v) return;
-    const box = levelBox(this.project, useUi.getState().levelId);
+    const box = this.frameBox();
     this.setViewport(box ? fitBox(v, box) : { ...v, cx: 5, cy: 3.5, zoom: 60 });
+  }
+
+  /** Corte calculado de uma vista, cacheado enquanto o projeto não muda (equivale a um useMemo por projeto). */
+  sectionOf(id: Id | null): SectionResult | null {
+    if (!id) return null;
+    const view = this.project.views.find((x) => x.id === id);
+    if (!view) return null;
+    const hit = this.sectionCache.get(id);
+    if (hit && hit.project === this.project) return hit.value;
+    const value = computeSection(this.project, { a: view.a, b: view.b, depth: view.depth });
+    this.sectionCache.set(id, { project: this.project, value });
+    return value;
   }
 
   zoomWheel(screen: { x: number; y: number }, deltaY: number): void {
@@ -128,11 +158,17 @@ export class Editor {
     return this.tool;
   }
 
-  setTool(id: ToolId): void {
+  private activate(id: ToolId): void {
     this.tool = createTool(id, this.env);
     useUi.setState({ tool: id, typed: '', prompt: null, hover: null });
     this.tool.start();
     this.bump();
+  }
+
+  setTool(id: ToolId): void {
+    // Ferramentas de desenho são da planta: escolher uma delas na vista de corte volta à planta.
+    if (useUi.getState().view === 'section') useUi.setState({ view: 'plan', sectionId: null });
+    this.activate(id);
   }
 
   bump(): void {
@@ -186,6 +222,13 @@ export class Editor {
       return true;
     }
     if (mod) return false;
+    if (ui.view === 'section') {
+      if (k === 'Escape') {
+        this.closeSection();
+        return true;
+      }
+      return false;
+    }
     if (ui.view === '3d') return false;
     if (k === 'Escape') {
       if (ui.typed) useUi.setState({ typed: '' });
@@ -224,7 +267,7 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure' };
+    const map: Record<string, ToolId> = { v: 'select', w: 'wall', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section' };
     const id = map[k.toLowerCase()];
     if (id && !e.altKey) {
       this.setTool(id);
@@ -242,6 +285,50 @@ export class Editor {
     if (keep.length !== sel.length) useUi.setState({ selection: keep });
     const lv = useUi.getState().levelId;
     if (!p.levels.some((l) => l.id === lv)) useUi.setState({ levelId: p.levels[0]?.id ?? 'lv_0' });
+    const st = useUi.getState();
+    if (st.view === 'section' && !p.views.some((v) => v.id === st.sectionId)) useUi.setState({ view: 'plan', sectionId: null });
+  }
+
+  // ---------- cortes e elevações ----------
+  /** Abre um corte ou elevação na área central, com viewport próprio. */
+  openSection(id: Id): void {
+    if (!this.project.views.some((v) => v.id === id)) return;
+    // Ao abrir, enquadra de novo: descarta o viewport guardado desta vista.
+    this.viewports.delete(`sec:${id}`);
+    useUi.setState({ view: 'section', sectionId: id, selection: [], hover: null });
+    this.activate('select');
+  }
+
+  /** Volta à planta do nível ativo. */
+  closeSection(): void {
+    if (useUi.getState().view !== 'section') return;
+    useUi.setState({ view: 'plan', sectionId: null, hover: null });
+    this.activate('select');
+  }
+
+  renameView(id: Id, name: string): boolean {
+    const clean = name.trim();
+    if (!clean) return false;
+    this.store.exec({ type: 'updateView', id, patch: { name: clean } });
+    return true;
+  }
+
+  deleteView(id: Id): void {
+    const v = this.project.views.find((x) => x.id === id);
+    if (!v) return;
+    this.store.exec({ type: 'deleteView', id });
+    useUi.setState({ status: `${v.name} excluído. Ctrl+Z desfaz.` });
+  }
+
+  /** Gera (ou atualiza) as quatro elevações do nível ativo, em um único passo de desfazer. */
+  generateElevations(): void {
+    const box = levelBox(this.project, useUi.getState().levelId);
+    if (!box) {
+      useUi.setState({ status: 'Não há paredes neste nível para gerar elevações.' });
+      return;
+    }
+    this.store.exec(elevationCommand(this.project.views, box, newId), 'Gerar elevações');
+    useUi.setState({ status: 'Elevações Norte, Sul, Leste e Oeste geradas. Ctrl+Z desfaz.' });
   }
 
   deleteSelection(): void {
@@ -259,7 +346,7 @@ export class Editor {
   }
 
   selectLevel(id: Id): void {
-    useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan' });
+    useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan', sectionId: null });
     this.setTool('select');
   }
 
@@ -277,7 +364,7 @@ export class Editor {
     this.fileName = name;
     this.resolveCache.clear();
     this.viewports.clear();
-    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId } });
+    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId } });
     this.setTool('select');
   }
 

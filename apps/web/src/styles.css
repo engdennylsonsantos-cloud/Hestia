@@ -360,3 +360,32 @@ svg { display: block; }
 @media (max-width: 700px) {
   .issues-pop { position: fixed; left: 16px; right: 16px; bottom: 34px; width: auto; }
 }
+
+/* ---- vista de corte e elevação ---- */
+.section-badge { position: absolute; left: 10px; top: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); padding: 3px 4px 3px 9px; color: var(--accent); font-family: var(--font-ui); font-size: 12px; }
+.section-badge .section-name { min-width: 0; font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.section-badge .section-kind { color: var(--fg-soft); font-size: 11px; white-space: nowrap; }
+.section-badge .ibtn { background: var(--sheet); }
+.tree-empty { margin: 2px 10px 6px 28px; color: var(--fg-faint); font-size: 11.5px; line-height: 1.4; }
+.view-rename { margin: 2px 10px 4px 28px; width: calc(100% - 38px); font-size: 12px; }
+
+/* ---- perfil superior da parede (diálogo e linha de propriedades) ---- */
+.profile-cell { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+.profile-cell .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-note { padding: 0 10px 4px; color: var(--fg-soft); font-size: 11.5px; line-height: 1.4; }
+.profile-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.profile-table { table-layout: auto; }
+.profile-table .input.num { width: 72px; }
+.profile-actions { margin-top: 6px; }
+.profile-error { margin: 8px 0 0; font-size: 12px; }
+.profile-hint { padding: 6px 0 0; font-size: 11.5px; }
+.profile-svg { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r); width: 100%; height: auto; display: block; }
+.profile-svg .profile-straight { fill: none; stroke: var(--fg-faint); stroke-dasharray: 4 3; stroke-width: 1; }
+.profile-svg .profile-fill { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.profile-svg .profile-dot { fill: var(--accent); }
+.profile-svg .profile-ground { stroke: var(--fg-soft); stroke-width: 1; }
+.profile-svg .profile-tick { fill: var(--fg-faint); font-size: 10px; font-family: var(--font-mono); }
+.profile-stats { margin: 10px 0 0; display: grid; gap: 4px; }
+.profile-stats > div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 4px; }
+.profile-stats dt { color: var(--fg-soft); }
+.profile-stats dd { margin: 0; font-family: var(--font-mono); }

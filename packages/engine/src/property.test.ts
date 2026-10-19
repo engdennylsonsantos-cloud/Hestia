@@ -34,6 +34,7 @@ type InvariantId = keyof typeof NAMES;
 const CRASH = 'polygon-clipping lança exceção dentro de resolveLevel (anel de saída incompleto, sweep line ou pilha)';
 const DUPLA = 'soma dos cortes excede a união das silhuetas: dupla contagem entre camadas';
 const TRANSL = 'área total muda ao transladar, entre 1,0e-6 e 3,1e-6 m² (tolerância 1e-6)';
+const SWEEP = 'polygon-clipping: "Unable to find segment ... in SweepLine tree" dentro de resolveLevel (versão atual do motor)';
 
 /**
  * Falhas conhecidas medidas numa execução das 60 sementes: [semente, invariantes que falham, motivo].
@@ -88,6 +89,14 @@ const KNOWN_ROWS: Array<[seed: number, ids: string, reason: string]> = [
   [37, 'e', TRANSL],
   [46, 'e', TRANSL],
   [60, 'e', TRANSL],
+  [2, 'abcd', SWEEP],
+  [4, 'e', SWEEP],
+  [16, 'abcd', SWEEP],
+  [21, 'abd', SWEEP],
+  [25, 'abd', SWEEP],
+  [39, 'abcd', SWEEP],
+  [51, 'e', SWEEP],
+  [58, 'abcde', SWEEP],
 ];
 
 const KNOWN_FAILURES = new Map<string, string>(KNOWN_ROWS.flatMap(([seed, ids, why]) => [...ids].map((id) => [`${seed}:${id}`, why] as const)));

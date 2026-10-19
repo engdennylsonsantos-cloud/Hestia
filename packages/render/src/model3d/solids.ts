@@ -1,5 +1,5 @@
 import { ringArea, triangulate, type Polygon, type Ring } from '@hestia/geom';
-import type { ResolvedLevel } from '@hestia/engine';
+import { bandTopAt, type LayerBand, type ResolvedLevel } from '@hestia/engine';
 import type { Id } from '@hestia/model';
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
@@ -25,7 +25,7 @@ function push(b: SolidBatch, v: number[], n: [number, number, number], tris: num
 }
 
 /** Extrusão vertical de um polígono com furos entre z0 e z1. */
-export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: number): void {
+export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: number, topAt?: (x: number, y: number) => number): void {
   if (z1 - z0 < 1e-6 || !poly[0]) return;
   const rings = poly.map((r, i) => oriented(r, i === 0));
   const norm: Polygon = rings;
@@ -33,7 +33,7 @@ export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: num
   const top: number[] = [];
   const bottom: number[] = [];
   for (let i = 0; i < m.positions.length; i += 2) {
-    top.push(m.positions[i]!, m.positions[i + 1]!, z1);
+    top.push(m.positions[i]!, m.positions[i + 1]!, topAt ? topAt(m.positions[i]!, m.positions[i + 1]!) : z1);
     bottom.push(m.positions[i]!, m.positions[i + 1]!, z0);
   }
   const up: number[] = [];
@@ -47,7 +47,16 @@ export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: num
     up.push(a, bb, c);
     down.push(a, c, bb);
   }
-  push(b, top, [0, 0, 1], up);
+  let topN: [number, number, number] = [0, 0, 1];
+  if (topAt) {
+    // Plano do topo: gradiente por diferenças finitas (o topo inclinado é linear por construção).
+    const o = poly[0]![0]!;
+    const gx = topAt(o.x + 1, o.y) - topAt(o.x, o.y);
+    const gy = topAt(o.x, o.y + 1) - topAt(o.x, o.y);
+    const l = Math.hypot(gx, gy, 1);
+    topN = [-gx / l, -gy / l, 1 / l];
+  }
+  push(b, top, topN, up);
   push(b, bottom, [0, 0, -1], down);
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
@@ -59,7 +68,9 @@ export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: num
       if (L < 1e-9) continue;
       const nx = dy / L;
       const ny = -dx / L;
-      push(b, [p.x, p.y, z0, q.x, q.y, z0, q.x, q.y, z1, p.x, p.y, z1], [nx, ny, 0], [0, 1, 2, 0, 2, 3]);
+      const zp = topAt ? topAt(p.x, p.y) : z1;
+      const zq = topAt ? topAt(q.x, q.y) : z1;
+      push(b, [p.x, p.y, z0, q.x, q.y, z0, q.x, q.y, zq, p.x, p.y, zp], [nx, ny, 0], [0, 1, 2, 0, 2, 3]);
     }
   }
 }
@@ -83,9 +94,12 @@ export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
     for (const l of rw.layers) {
       const b = batch(l.materialId);
       for (const band of l.bands) {
-        for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1);
+        const topAt = band.slope ? slopeTop(band, rw.baseZ) : undefined;
+        for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1, topAt);
       }
     }
   }
   return { batches: [...byMat.values()] };
 }
+
+const slopeTop = (band: LayerBand, baseZ: number) => (x: number, y: number): number => baseZ + bandTopAt(band, { x, y });

@@ -20,6 +20,7 @@ const narrow = (): boolean => window.innerWidth <= 900;
 function ViewTabs(): ReactElement {
   const p = useProject();
   const s = useUi();
+  const sectionTab = p.views.find((v) => v.id === s.sectionId);
   return (
     <div className="viewtabs" role="tablist" aria-label="Vistas abertas">
       <button className="ibtn" style={{ display: 'none' }} aria-hidden="true" />
@@ -31,6 +32,11 @@ function ViewTabs(): ReactElement {
       <button role="tab" aria-selected={s.view === '3d'} className={`vtab${s.view === '3d' ? ' on' : ''}`} onClick={() => editor.setView('3d')}>
         <Icon name="cube" size={14} /> Modelo 3D
       </button>
+      {s.view === 'section' && sectionTab ? (
+        <button role="tab" aria-selected className="vtab on">
+          <Icon name={sectionTab.kind === 'section' ? 'section' : 'elevation'} size={14} /> {sectionTab.name}
+        </button>
+      ) : null}
       <span style={{ flex: 1 }} />
       <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
         <Icon name="edit" size={16} />

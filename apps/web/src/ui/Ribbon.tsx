@@ -90,12 +90,18 @@ export function Ribbon(): ReactElement {
           <>
             <div className="rgroup">
               <div className="rgroup-tools">
-                <button className="tbtn" onClick={() => (s.view === 'plan' ? editor.zoomExtents() : useUi.setState({ previewTick: s.previewTick + 1 }))} title="Enquadrar tudo">
+                <button className="tbtn" onClick={() => (s.view === '3d' ? useUi.setState({ previewTick: s.previewTick + 1 }) : editor.zoomExtents())} title="Enquadrar tudo">
                   <Icon name="fit" size={22} />
                   <span>Enquadrar</span>
                 </button>
               </div>
               <div className="rgroup-title">Navegar</div>
+            </div>
+            <div className="rgroup">
+              <div className="rgroup-tools">
+                <ToolButton id="section" />
+              </div>
+              <div className="rgroup-title">Cortes</div>
             </div>
             <div className="rgroup">
               <div className="rgroup-tools">

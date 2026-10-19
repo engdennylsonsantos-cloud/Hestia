@@ -3,7 +3,7 @@ import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
 import type { ToolId, ToolOptions } from '@hestia/tools';
 
-export type ViewKind = 'plan' | '3d';
+export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
 export type DialogKind = 'wallType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | null;
 
@@ -11,6 +11,8 @@ export interface UiState {
   tool: ToolId;
   view: ViewKind;
   levelId: Id;
+  /** Vista de corte ou elevação aberta quando `view` é 'section'. */
+  sectionId: Id | null;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -56,6 +58,7 @@ export const useUi = create<UiState>(() => ({
   tool: 'select',
   view: 'plan',
   levelId: 'lv_0',
+  sectionId: null,
   selection: [],
   hover: null,
   options: DEFAULT_OPTIONS,

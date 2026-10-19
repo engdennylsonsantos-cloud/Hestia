@@ -6,8 +6,9 @@ import { ArrayTool, MirrorTool, MoveTool, OffsetTool, RotateTool } from './trans
 import { AlignTool, MeasureTool, TrimTool } from './trimAlign.ts';
 import { JoinTool } from './joinTool.ts';
 import { SplitTool } from './splitTool.ts';
+import { SectionTool } from './sectionTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure';
+export type ToolId = 'select' | 'wall' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window'] },
@@ -47,6 +48,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new SplitTool(env);
     case 'measure':
       return new MeasureTool(env);
+    case 'section':
+      return new SectionTool(env);
   }
 }
 
@@ -66,6 +69,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   joins: 'Junção',
   split: 'Dividir',
   measure: 'Medir',
+  section: 'Corte',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
@@ -84,4 +88,5 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   joins: 'N',
   split: 'P',
   measure: 'E',
+  section: 'K',
 };

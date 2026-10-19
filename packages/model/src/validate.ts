@@ -1,4 +1,5 @@
 import { cross, dist, dot, norm, sub, type Vec2 } from '@hestia/geom';
+import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { isOpening, isWall, type Element, type Id, type Opening, type Project, type Wall } from './types.ts';
 
@@ -46,6 +47,11 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
       message: `Parede ${name} usa o tipo "${w.typeId}", que não existe no projeto.`,
       elementId: w.id,
     });
+  }
+  if (w.topProfile) {
+    const err = profileError(w.topProfile);
+    if (err) out.push({ severity: 'error', code: 'wall-profile-invalid', message: `Parede ${name}: perfil superior inválido — ${err}.`, elementId: w.id });
+    if (w.sag !== 0) out.push({ severity: 'warning', code: 'wall-profile-arc', message: `Parede ${name} é curva: o perfil superior só vale em parede reta e foi ignorado.`, elementId: w.id });
   }
   const levelOk = p.levels.some((l) => l.id === w.levelId);
   if (!levelOk) {

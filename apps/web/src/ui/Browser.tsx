@@ -4,6 +4,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { TypeRow } from './TypeRow.tsx';
+import { ViewRow } from './ViewRow.tsx';
 
 /** Navegador de projeto: vistas, famílias (tipos) e materiais, como a árvore do Revit. */
 export function Browser(): ReactElement {
@@ -12,6 +13,8 @@ export function Browser(): ReactElement {
   const walls = Object.values(p.wallTypes);
   const doors = Object.values(p.openingTypes).filter((t) => t.kind === 'door');
   const windows = Object.values(p.openingTypes).filter((t) => t.kind === 'window');
+  const sections = p.views.filter((v) => v.kind === 'section');
+  const elevations = p.views.filter((v) => v.kind === 'elevation');
   return (
     <aside className="side right" aria-label="Navegador de projeto">
       <div className="panel-head">
@@ -34,6 +37,19 @@ export function Browser(): ReactElement {
               <summary>3D</summary>
               <button className={`leaf${s.view === '3d' ? ' on' : ''}`} onClick={() => editor.setView('3d')}>
                 <Icon name="cube" size={14} /> Modelo 3D
+              </button>
+            </details>
+            <details open>
+              <summary>Cortes</summary>
+              {sections.length === 0 ? <p className="tree-empty">Nenhum corte. Use a ferramenta Corte (K) na planta.</p> : sections.map((v) => <ViewRow key={v.id} view={v} />)}
+            </details>
+            <details open>
+              <summary>Elevações</summary>
+              {elevations.map((v) => (
+                <ViewRow key={v.id} view={v} />
+              ))}
+              <button className="leaf" onClick={() => editor.generateElevations()} title="Cria Norte, Sul, Leste e Oeste em volta das paredes do nível ativo. Substitui as elevações com o mesmo nome.">
+                <Icon name="plus" size={14} /> Gerar elevações
               </button>
             </details>
           </div>

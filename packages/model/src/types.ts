@@ -89,6 +89,12 @@ export interface Level {
   elevation: number;
 }
 
+/** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */
+export interface ProfilePoint {
+  t: number;
+  h: number;
+}
+
 export interface Wall {
   id: Id;
   kind: 'wall';
@@ -114,6 +120,12 @@ export interface Wall {
    * 0 = parede reta. Limitada a metade da corda (arco de até 180°).
    */
   sag: number;
+  /**
+   * Perfil superior editado (Revit: Editar perfil, só o contorno de cima): topo poligonal por altura em função de `t`
+   * (empena, topo inclinado, degraus — dois pontos com o mesmo `t` fazem um degrau). Fora do intervalo dos pontos o
+   * topo se mantém na altura do ponto mais próximo. `null` = topo reto por `height`/nível. Só em parede reta.
+   */
+  topProfile: ProfilePoint[] | null;
   mark: string;
   comments: string;
   /** Ordem de criação: desempata junções (docs/05 §1, ordem de junção). */

@@ -37,8 +37,12 @@ const migrations: Record<number, Migration> = {
     for (const [id, t] of Object.entries(wt)) wt[id] = { strips: [], ...t };
     return { ...raw, wallTypes: wt };
   },
-  // v5 → v6: cortes e elevações.
-  5: (raw) => ({ ...raw, views: Array.isArray(raw.views) ? raw.views : [] }),
+  // v5 → v6: cortes e elevações; perfil superior das paredes.
+  5: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) if (e.kind === 'wall') elements[id] = { topProfile: null, ...e };
+    return { ...raw, elements, views: Array.isArray(raw.views) ? raw.views : [] };
+  },
 };
 
 export class SchemaError extends Error {}

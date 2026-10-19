@@ -4,18 +4,14 @@ import {
   boxesOverlap,
   difference,
   expandBox,
-  intersectSegments,
   intersection,
   multiArea,
   orientedRect,
-  ringArea,
   closeGaps,
   multiPoints,
   union,
   type Box,
   type MultiPolygon,
-  type Ring,
-  type Vec2,
 } from '@hestia/geom';
 import {
   coreSpan,
@@ -26,7 +22,7 @@ import {
   openingType,
   openingsOfWall,
   wallBaseElevation,
-  wallHeight,
+  wallMaxHeight,
   wallsOnLevel,
   wallType,
   type Id,
@@ -34,7 +30,8 @@ import {
   type Project,
 } from '@hestia/model';
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
-import { computeEnds, joinStatus, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
+import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
+import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
@@ -63,58 +60,6 @@ interface Item {
 }
 
 const ringsOfShape = (m: MultiPolygon): string => m.map((p) => p.map((r) => r.map((v) => `${round(v.x)},${round(v.y)}`).join(';')).join('|')).join('/');
-
-/** Em paredes curvas, leva o ponto à circunferência da camada (os cortes usam a tangente: erro de milímetros). */
-function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
-  if (!f.arc) return p;
-  const c = f.arc.center;
-  const rho = f.arc.radius + f.arc.k * s;
-  const dx = p.x - c.x;
-  const dy = p.y - c.y;
-  const l = Math.hypot(dx, dy);
-  return l < 1e-9 ? p : { x: c.x + (dx / l) * rho, y: c.y + (dy / l) * rho };
-}
-
-function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: number): Vec2 {
-  if (spec.kind === 'flat') return pointAt(f, spec.t, s);
-  const d = spec.self.sigma > 0 ? spec.self.sHi - s : s - spec.self.sLo;
-  const p = miterPoint(spec.self, spec.other, Math.max(0, Math.min(d, spec.self.sHi - spec.self.sLo)));
-  return p ? onLayerCircle(f, p, s) : pointAt(f, which === 'a' ? 0 : f.length, s);
-}
-
-function isSimple(q: Ring): boolean {
-  return Math.abs(ringArea(q)) >= MIN_AREA && !crossing(q);
-}
-
-/** Quadrilátero com arestas opostas cruzadas = camada "torcida" por esquadro mal condicionado. */
-function crossing(q: Ring): boolean {
-  const hit = (i: number, j: number): boolean => {
-    const p = intersectSegments(q[i]!, q[(i + 1) % 4]!, q[j]!, q[(j + 1) % 4]!);
-    if (!p) return false;
-    // Tocar num vértice compartilhado não é cruzamento.
-    return !q.some((v) => Math.abs(v.x - p.x) < 1e-9 && Math.abs(v.y - p.y) < 1e-9);
-  };
-  return hit(0, 2) || hit(1, 3);
-}
-
-/** Camada de parede curva: contorno com as bordas externa e interna amostradas ao longo do arco. */
-function arcLayerRing(f: WallFrame, ends: WallEnds, lo: number, hi: number): Ring {
-  const pa = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'a', ends.a, hi)] as const;
-  const pb = [endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi)] as const;
-  const t = (p: Vec2): number => toLocal(f, p).t;
-  const loPts = arcSample(f.arc!, t(pa[0]), t(pb[0]), lo);
-  const hiPts = arcSample(f.arc!, t(pb[1]), t(pa[1]), hi);
-  return [pa[0], ...loPts.slice(1, -1), pb[0], pb[1], ...hiPts.slice(1, -1), pa[1]];
-}
-
-function layerQuad(f: WallFrame, ends: WallEnds, s1: number, s2: number): Ring {
-  const lo = Math.min(s1, s2);
-  const hi = Math.max(s1, s2);
-  if (f.arc) return arcLayerRing(f, ends, lo, hi);
-  const quad = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi), endPoint(f, 'a', ends.a, hi)];
-  if (isSimple(quad)) return quad;
-  return [pointAt(f, 0, lo), pointAt(f, f.length, lo), pointAt(f, f.length, hi), pointAt(f, 0, hi)];
-}
 
 /** Altura (relativa à base) do plano de corte da planta: faixas que não o atravessam não aparecem em planta. */
 const PLAN_CUT = 1.2;
@@ -415,7 +360,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
       });
     const items = group.flatMap((f) => {
       const z0 = wallBaseElevation(p, f.wall);
-      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallHeight(p, f.wall) });
+      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + wallMaxHeight(p, f.wall) });
     });
     items.forEach((it, i) => {
       it.uid = i;
@@ -431,8 +376,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
       }
     }
     const opens = group.flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
-    const heights = new Map(group.map((f) => [f.wall.id, wallHeight(p, f.wall)] as const));
-    const zr = new Map(group.map((f) => [f.wall.id, { z0: wallBaseElevation(p, f.wall), z1: wallBaseElevation(p, f.wall) + wallHeight(p, f.wall) }] as const));
+    const heights = new Map(group.map((f) => [f.wall.id, wallMaxHeight(p, f.wall)] as const));
+    const zr = new Map(group.map((f) => [f.wall.id, { z0: wallBaseElevation(p, f.wall), z1: wallBaseElevation(p, f.wall) + wallMaxHeight(p, f.wall) }] as const));
     const retSig = [...returns].map(([k, v]) => `${k}=${v.map((x) => `${x.openingId}:${ringsOfShape(x.poly)}`).join('+')}`).join('\n');
     const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}\n--\n${retSig}`;
     let core = cache.get(key);
@@ -455,7 +400,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         sLo: f.sLo,
         baseZ: wallBaseElevation(p, f.wall),
         height: heights.get(f.wall.id)!,
-        layers: core.layers.get(f.wall.id) ?? [],
+        layers: withProfile(core.layers.get(f.wall.id) ?? [], f),
+        membranes: membranesOf(f, ends.get(f.wall.id)!),
       };
       out.walls[f.wall.id] = rw;
     }

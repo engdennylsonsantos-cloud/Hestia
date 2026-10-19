@@ -6,3 +6,4 @@ export * from './quantities.ts';
 export * from './schedule.ts';
 export * from './wrap.ts';
 export * from './section.ts';
+export * from './profile.ts';

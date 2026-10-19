@@ -1,5 +1,6 @@
 import { intersection, orientedRect, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { bandTopAt } from './profile.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
 
 /**
@@ -61,10 +62,11 @@ export interface SectionResult {
   levels: SectionLevelMark[];
 }
 
-const rect = (t0: number, t1: number, z0: number, z1: number): Ring => [
+/** Retângulo (t0..t1, z0..z1); com `zb` diferente de `z1` o topo é inclinado (trapézio de `z1` em t0 a `zb` em t1). */
+const rect = (t0: number, t1: number, z0: number, z1: number, zb = z1): Ring => [
   { x: t0, y: z0 },
   { x: t1, y: z0 },
-  { x: t1, y: z1 },
+  { x: t1, y: zb },
   { x: t0, y: z1 },
 ];
 
@@ -129,7 +131,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
               const hi = Math.min(length, t1);
               if (hi - lo < EPS_T) continue;
               const list = cutBy.get(layer.materialId) ?? [];
-              list.push([rect(lo, hi, z0, z1)]);
+              const at = (t: number): number => (band.slope ? rw.baseZ + bandTopAt(band, { x: line.a.x + d.x * t, y: line.a.y + d.y * t }) : z1);
+              list.push([rect(lo, hi, z0, at(lo), at(hi))]);
               cutBy.set(layer.materialId, list);
               grow(z0, z1);
             }
@@ -141,12 +144,17 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             const tMin = Math.max(0, Math.min(...ts));
             const tMax = Math.min(length, Math.max(...ts));
             if (tMax - tMin < EPS_T) continue;
+            const topAtVertex = (t: number): number => {
+              if (!band.slope) return z1;
+              const v = outer[ts.indexOf(t)] ?? outer[0]!;
+              return rw.baseZ + bandTopAt(band, v);
+            };
             beyond.push({
               wallId: w.id,
               materialId: layer.materialId,
               layerIndex: layer.layerIndex,
               depth: Math.max(0, Math.min(...outer.map(dist))),
-              polygons: [[rect(tMin, tMax, z0, z1)]],
+              polygons: [[rect(tMin, tMax, z0, topAtVertex(Math.min(...ts)), topAtVertex(Math.max(...ts)))]],
             });
             grow(z0, z1);
           }

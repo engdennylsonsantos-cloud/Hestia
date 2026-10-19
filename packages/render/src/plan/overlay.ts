@@ -1,5 +1,6 @@
 import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
 import type { Guide, Inference, PreviewItem } from '@hestia/tools';
+import { sectionMarkOps } from './sectionMarks.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -101,6 +102,13 @@ export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanThe
       case 'highlight':
         o.fills.push(...highlight(it.ids));
         break;
+      case 'sectionLine': {
+        const m = sectionMarkOps(it, v, theme);
+        o.fills.push(...m.fills);
+        o.strokes.push(...m.strokes);
+        o.labels.push(...m.labels);
+        break;
+      }
     }
   }
   return o;

@@ -21,6 +21,7 @@ export function makeWall(w: WallInput): Omit<Wall, 'order'> {
     joinStart: DEFAULT_JOIN,
     joinEnd: DEFAULT_JOIN,
     sag: 0,
+    topProfile: null,
     mark: '',
     comments: '',
     ...w,

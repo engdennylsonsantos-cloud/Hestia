@@ -41,3 +41,18 @@ describe('sólidos 3D', () => {
     expect(Math.abs(volume(bloco))).toBeCloseTo(full - hole, 5);
   });
 });
+
+describe('perfil superior no 3D', () => {
+  it('a malha da empena é fechada: volume da malha = volume dos quantitativos, e a cumeeira está na altura do perfil', async () => {
+    const { quantifyLevel } = await import('@hestia/engine');
+    const s = new ProjectStore(createEmptyProject());
+    const w = wall('g', 0, 0, 6, 0);
+    s.exec({ type: 'addWall', wall: { ...w, topProfile: [{ t: 0, h: 2.8 }, { t: 3, h: 4.5 }, { t: 6, h: 2.8 }] } });
+    const r = resolveLevel(s.project, 'lv_0');
+    const solids = buildLevelSolids(r);
+    const meshVol = solids.batches.reduce((sum, b) => sum + volume(b), 0);
+    expect(meshVol).toBeCloseTo(quantifyLevel(s.project, r).walls[0]!.volume, 3);
+    const maxZ = Math.max(...solids.batches.flatMap((b) => b.positions.filter((_, i) => i % 3 === 2)));
+    expect(maxZ).toBeCloseTo(4.5, 6);
+  });
+});

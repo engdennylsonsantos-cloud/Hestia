@@ -1,5 +1,6 @@
 import { multiArea } from '@hestia/geom';
-import { openingSill, openingType, openingsOfWall, wallHeight, wallLength, type Id, type Project } from '@hestia/model';
+import { bandVolume } from './profile.ts';
+import { profileHeightAt, profileMean, openingSill, openingType, openingsOfWall, wallHeight, wallLength, type Id, type Project } from '@hestia/model';
 import type { ResolvedLevel } from './types.ts';
 
 export interface LayerQuantity {
@@ -40,10 +41,11 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
   for (const rw of Object.values(r.walls)) {
     const w = p.elements[rw.wallId];
     if (!w || w.kind !== 'wall') continue;
-    const H = wallHeight(p, w);
+    const profiled = w.topProfile && w.sag === 0 ? w.topProfile : null;
+    const H = profiled ? profileMean(profiled, wallLength(w)) : wallHeight(p, w);
     let total = 0;
     for (const l of rw.layers) {
-      const vol = l.bands.reduce((s, b) => s + multiArea(b.poly) * (b.z1 - b.z0), 0);
+      const vol = l.bands.reduce((s, b) => s + bandVolume(b), 0);
       total += vol;
       layers.push({ wallId: rw.wallId, layerIndex: l.layerIndex, materialId: l.materialId, planArea: multiArea(l.cut), volume: vol });
       volumeByMaterial[l.materialId] = (volumeByMaterial[l.materialId] ?? 0) + vol;
@@ -51,10 +53,15 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
       const thick = (l.layerIndex >= 0 ? wt?.layers[l.layerIndex]?.thickness : wt?.strips[-l.layerIndex - 1]?.thickness) ?? 0;
       if (thick > 0) faceAreaByMaterial[l.materialId] = (faceAreaByMaterial[l.materialId] ?? 0) + vol / thick;
     }
+    for (const m of rw.membranes) {
+      const len = Math.hypot(m.pts[1]!.x - m.pts[0]!.x, m.pts[1]!.y - m.pts[0]!.y);
+      faceAreaByMaterial[m.materialId] = (faceAreaByMaterial[m.materialId] ?? 0) + len * H;
+    }
     const gross = wallLength(w) * H;
     const openings = openingsOfWall(p, w.id).reduce((s, o) => {
       const t = openingType(p, o);
-      const clipped = Math.max(0, Math.min(t.height, H - openingSill(t, o)));
+      const top = profiled ? profileHeightAt(profiled, o.offset) : H;
+      const clipped = Math.max(0, Math.min(t.height, top - openingSill(t, o)));
       return s + t.width * clipped;
     }, 0);
     walls.push({ wallId: w.id, length: wallLength(w), height: H, grossFaceArea: gross, openingsArea: openings, netFaceArea: gross - openings, volume: total });

@@ -41,6 +41,8 @@ const P: Record<string, string> = {
   room: 'M4 4h16v16H4zM9 9h6v6H9z',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
   chevron: 'M9 6l6 6-6 6',
+  section: 'M3 12h3M9 12h1.5M13.5 12h1.5M18 12h3M12 3v4M9 5l3-2 3 2M12 17v4M9 19l3 2 3-2',
+  elevation: 'M3 20h18M5 20V6h14v14M9 20v-5h6v5M9 10h2M13 10h2',
 };
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }): ReactElement {

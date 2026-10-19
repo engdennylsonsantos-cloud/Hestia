@@ -20,6 +20,8 @@ export interface MiterSide {
   sigma: 1 | -1;
   /** Espessura dos acabamentos entre a face externa do canto e o núcleo (pareia núcleo com núcleo). */
   outerToCore: number;
+  /** Profundidades (da face externa do canto) dos limites entre camadas do tipo, de 0 até a espessura total. */
+  bounds: number[];
 }
 
 export type EndSpec =
@@ -38,6 +40,19 @@ interface EndRef {
   o: Vec2;
   /** Direção unitária saindo do nó para dentro da parede. */
   dir: Vec2;
+}
+
+/**
+ * Profundidades em que a linha de esquadria muda de direção: limites de camada dos dois lados (os do vizinho
+ * mapeados pelo pareamento núcleo-com-núcleo) e os pontos em que o pareamento satura nas faces do vizinho.
+ * Cada camada segue a cadeia por esses vértices, então os dois lados compartilham arestas exatas.
+ */
+export function miterBreaks(self: MiterSide, other: MiterSide): number[] {
+  const shift = self.outerToCore - other.outerToCore;
+  const T = self.sHi - self.sLo;
+  const To = other.sHi - other.sLo;
+  const all = [...self.bounds, ...other.bounds.map((b) => b + shift), shift, To + shift];
+  return [...new Set(all.map((d) => Math.round(d * 1e7) / 1e7).filter((d) => d > 1e-7 && d < T - 1e-7))].sort((a, b) => a - b);
 }
 
 const sOfDepth = (m: MiterSide, d: number): number => (m.sigma > 0 ? m.sHi - d : m.sLo + d);
@@ -62,7 +77,11 @@ const sideOf = (r: EndRef, towards: Vec2): MiterSide => {
   const cornerIsExterior = sigma > 0 === r.f.sign > 0;
   const outerToCore = Math.max(0, cornerIsExterior ? core.from : r.f.thickness - core.to);
   const u = r.which === 'a' ? r.dir : { x: -r.dir.x, y: -r.dir.y }; // tangente a→b NA extremidade
-  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore };
+  const T = r.f.thickness;
+  const cum = [0];
+  for (const l of r.f.type.layers) cum.push(cum[cum.length - 1]! + l.thickness);
+  const bounds = cornerIsExterior ? cum : cum.map((c) => T - c).reverse();
+  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore, bounds };
 };
 
 const flatAt = (r: EndRef, ext: number): EndSpec => ({ kind: 'flat', t: r.which === 'a' ? -ext : r.f.length + ext });

@@ -1,4 +1,5 @@
 import { arcFromSagitta, dist } from '@hestia/geom';
+import { profileMax } from './profile.ts';
 import { isOpening, isWall, type Id, type Opening, type OpeningType, type Project, type Wall, type WallType } from './types.ts';
 
 export const getWall = (p: Project, id: Id): Wall | undefined => {
@@ -44,6 +45,9 @@ export function wallTopElevation(p: Project, w: Wall): number {
 }
 
 export const wallHeight = (p: Project, w: Wall): number => Math.max(0.01, wallTopElevation(p, w) - wallBaseElevation(p, w));
+
+/** Altura máxima: a do perfil superior, quando há, senão a altura reta. */
+export const wallMaxHeight = (p: Project, w: Wall): number => (w.topProfile && w.sag === 0 ? profileMax(w.topProfile) : wallHeight(p, w));
 
 export const openingSill = (t: OpeningType, o: Opening): number => o.sillOverride ?? t.sill;
 

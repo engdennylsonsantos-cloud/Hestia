@@ -6,6 +6,7 @@ import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
+import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
 
@@ -100,6 +101,12 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     if (!f) continue;
     for (const o of openingsOfWall(p, w.id)) strokes.push(...openingSymbol(openingGeometry(p, o, f), theme));
   }
+
+  // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
+  const marks = sectionMarksOf(p.views, v, theme);
+  fills.push(...marks.fills);
+  strokes.push(...marks.strokes);
+  labels.push(...marks.labels);
 
   // Hover e seleção.
   if (input.hover && !input.selection.includes(input.hover)) {

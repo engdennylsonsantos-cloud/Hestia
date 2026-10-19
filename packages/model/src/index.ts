@@ -10,3 +10,4 @@ export * from './migrate.ts';
 export * from './templates.ts';
 export * from './wall.ts';
 export * from './validate.ts';
+export * from './profile.ts';

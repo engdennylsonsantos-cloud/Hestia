@@ -2,6 +2,7 @@ import { intersection, orientedRect, union, type MultiPolygon, type Polygon, typ
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors } from './floors.ts';
+import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
 
 /**
@@ -26,9 +27,10 @@ export interface SectionRegion {
 
 /** Elemento visto além do plano de corte; a lista vem ordenada do mais longe ao mais perto (pintor). */
 export interface SectionBeyond {
-  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`). */
+  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, ou de laje, com `slabId`). */
   wallId?: Id;
   floorId?: Id;
+  slabId?: Id;
   materialId: Id;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
@@ -71,6 +73,14 @@ const rect = (t0: number, t1: number, z0: number, z1: number, zb = z1): Ring => 
   { x: t1, y: z0 },
   { x: t1, y: zb },
   { x: t0, y: z1 },
+];
+
+/** Camada de laje entre as cotas de base (b0 em t0, b1 em t1) e de topo (u0 em t0, u1 em t1): trapézio se inclinada. */
+const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
+  { x: t0, y: b0 },
+  { x: t1, y: b1 },
+  { x: t1, y: u1 },
+  { x: t0, y: u0 },
 ];
 
 /** Intervalos de `t` em que a reta a + t·d (d unitário, n sua normal) está dentro do polígono (par-ímpar, serve a furos). */
@@ -151,6 +161,44 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             polygons: [[rect(tMin, tMax, layer.z0, layer.z1)]],
           });
           grow(layer.z0, layer.z1);
+        }
+      }
+    }
+    // Lajes (D3): como os pisos, mas com inclinação; cada cota (base e topo) soma a subida no ponto da linha de corte.
+    for (const sl of resolveSlabs(p, levelId)) {
+      const inView = intersection(sl.polygon, slab);
+      for (const layer of sl.layers) {
+        for (const poly of sl.polygon) {
+          for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
+            const lo = Math.max(0, t0);
+            const hi = Math.min(length, t1);
+            if (hi - lo < EPS_T) continue;
+            const rl = slabRiseAt(sl.slope, { x: line.a.x + d.x * lo, y: line.a.y + d.y * lo });
+            const rh = slabRiseAt(sl.slope, { x: line.a.x + d.x * hi, y: line.a.y + d.y * hi });
+            const list = cutBy.get(layer.materialId) ?? [];
+            list.push([slabQuad(lo, hi, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)]);
+            cutBy.set(layer.materialId, list);
+            grow(layer.z0 + Math.min(rl, rh), layer.z1 + Math.max(rl, rh));
+          }
+        }
+        for (const sp of inView) {
+          const outer = sp[0];
+          if (!outer || outer.length < 3) continue;
+          const ts = outer.map(along);
+          const tMin = Math.max(0, Math.min(...ts));
+          const tMax = Math.min(length, Math.max(...ts));
+          if (tMax - tMin < EPS_T) continue;
+          // Cota de cada extremo: a do vértice da laje que tem o menor e o maior t (trapézio entre as duas).
+          const rl = slabRiseAt(sl.slope, outer[ts.indexOf(Math.min(...ts))]!);
+          const rh = slabRiseAt(sl.slope, outer[ts.indexOf(Math.max(...ts))]!);
+          beyond.push({
+            slabId: sl.slabId,
+            materialId: layer.materialId,
+            layerIndex: layer.layerIndex,
+            depth: Math.max(0, Math.min(...outer.map(dist))),
+            polygons: [[slabQuad(tMin, tMax, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)]],
+          });
+          grow(layer.z0 + Math.min(rl, rh), layer.z1 + Math.max(rl, rh));
         }
       }
     }

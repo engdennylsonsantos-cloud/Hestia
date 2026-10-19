@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, floorTypeThickness, makeFloor, makeWall, type FloorType, type Wall } from '@hestia/model';
-import { resolveFloors, resolveLevel } from '@hestia/engine';
-import { buildFloorSolids, buildLevelSolids } from './solids.ts';
+import { ProjectStore, createEmptyProject, floorTypeThickness, makeFloor, makeSlab, makeWall, type FloorType, type Slab, type Wall } from '@hestia/model';
+import { resolveFloors, resolveLevel, resolveSlabs } from '@hestia/engine';
+import { buildFloorSolids, buildLevelSolids, buildSlabSolids, type SolidBatch } from './solids.ts';
 
 const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
@@ -101,5 +101,69 @@ describe('sólidos de piso (D2)', () => {
     expect(k[0]).toBeCloseTo(-0.14, 6);
     const total = batches.reduce((sum, b) => sum + volume(b), 0);
     expect(total).toBeCloseTo(24 * 0.14, 6);
+  });
+});
+
+describe('sólidos de laje (D2)', () => {
+  const RECT = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }];
+  const HOLE = [{ x: 2, y: 1.5 }, { x: 4, y: 1.5 }, { x: 4, y: 2.5 }, { x: 2, y: 2.5 }];
+  /** Inclinação de 10% ao longo de x, origem em x = 0: topo 0 em x = 0 e 0,60 em x = 6. */
+  const SLOPE = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 10 };
+  const THICK = 0.17; // ls_mac15
+
+  function slabBatches(extra: Partial<Slab> = {}): SolidBatch[] {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSlab', slab: makeSlab({ id: 's', typeId: 'ls_mac15', levelId: 'lv_0', boundary: RECT, ...extra }) });
+    return buildSlabSolids(resolveSlabs(s.project, 'lv_0'));
+  }
+
+  it('volume da laje inclinada 10% com furo = área líquida × espessura (a espessura vertical é constante)', () => {
+    const batches = slabBatches({ holes: [HOLE], slope: SLOPE });
+    const total = batches.reduce((sum, b) => sum + volume(b), 0);
+    expect(total).toBeCloseTo((6 * 4 - 2 * 1) * THICK, 6);
+  });
+
+  it('laje horizontal: o mesmo volume e as cotas planas de -0,17 a 0', () => {
+    const batches = slabBatches({ holes: [HOLE] });
+    expect(batches.reduce((sum, b) => sum + volume(b), 0)).toBeCloseTo((6 * 4 - 2 * 1) * THICK, 6);
+    const zs = batches.flatMap((b) => b.positions.filter((_, i) => i % 3 === 2));
+    expect(Math.min(...zs)).toBeCloseTo(-THICK, 6);
+    expect(Math.max(...zs)).toBeCloseTo(0, 6);
+  });
+
+  it('laje inclinada: topo sobe até 0,60 e a base vai de -0,17 a 0,43; nada fica fora da faixa', () => {
+    const batches = slabBatches({ slope: SLOPE });
+    const zs = batches.flatMap((b) => b.positions.filter((_, i) => i % 3 === 2));
+    expect(Math.max(...zs)).toBeCloseTo(0.6, 6);
+    expect(Math.min(...zs)).toBeCloseTo(-THICK, 6);
+  });
+
+  it('normais do topo coerentes: a componente z é positiva e o plano tem caimento de 10% em x', () => {
+    const batches = slabBatches({ holes: [HOLE], slope: SLOPE });
+    const top = batches.flatMap((b) => {
+      const out: number[][] = [];
+      for (let i = 0; i < b.normals.length; i += 3) {
+        const n = [b.normals[i]!, b.normals[i + 1]!, b.normals[i + 2]!];
+        if (n[2]! > 0) out.push(n);
+      }
+      return out;
+    });
+    expect(top.length).toBeGreaterThan(0);
+    for (const [nx, ny, nz] of top) {
+      expect(nz).toBeGreaterThan(0);
+      expect(ny).toBeCloseTo(0, 9);
+      expect(nx! / nz!).toBeCloseTo(-0.1, 9);
+    }
+  });
+
+  it('sem inclinação, topo e base têm normal vertical (±z) e a malha segue planos horizontais', () => {
+    const batches = slabBatches();
+    for (const b of batches) {
+      for (let i = 0; i < b.normals.length; i += 3) {
+        if (Math.abs(b.normals[i + 2]!) < 0.5) continue; // faces laterais
+        expect(Math.abs(b.normals[i]!)).toBeLessThan(1e-9);
+        expect(Math.abs(b.normals[i + 1]!)).toBeLessThan(1e-9);
+      }
+    }
   });
 });

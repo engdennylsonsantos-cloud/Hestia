@@ -1,5 +1,5 @@
 import { ringArea, triangulate, type Polygon, type Ring } from '@hestia/geom';
-import { bandTopAt, type LayerBand, type ResolvedFloor, type ResolvedLevel } from '@hestia/engine';
+import { bandTopAt, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedSlab } from '@hestia/engine';
 import type { Id } from '@hestia/model';
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
@@ -24,17 +24,29 @@ function push(b: SolidBatch, v: number[], n: [number, number, number], tris: num
   for (const t of tris) b.indices.push(base + t);
 }
 
-/** Extrusão vertical de um polígono com furos entre z0 e z1. */
-export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: number, topAt?: (x: number, y: number) => number): void {
+/**
+ * Extrusão vertical de um polígono com furos entre z0 e z1. Com `topAt`/`bottomAt` (cota por ponto, planos
+ * inclinados), o topo e a base seguem essas funções em vez de z1 e z0; a espessura vertical é a mesma em todo lugar.
+ */
+export function extrudePolygon(
+  b: SolidBatch,
+  poly: Polygon,
+  z0: number,
+  z1: number,
+  topAt?: (x: number, y: number) => number,
+  bottomAt?: (x: number, y: number) => number,
+): void {
   if (z1 - z0 < 1e-6 || !poly[0]) return;
   const rings = poly.map((r, i) => oriented(r, i === 0));
   const norm: Polygon = rings;
   const m = triangulate(norm);
   const top: number[] = [];
   const bottom: number[] = [];
+  const zTop = (x: number, y: number): number => (topAt ? topAt(x, y) : z1);
+  const zBot = (x: number, y: number): number => (bottomAt ? bottomAt(x, y) : z0);
   for (let i = 0; i < m.positions.length; i += 2) {
-    top.push(m.positions[i]!, m.positions[i + 1]!, topAt ? topAt(m.positions[i]!, m.positions[i + 1]!) : z1);
-    bottom.push(m.positions[i]!, m.positions[i + 1]!, z0);
+    top.push(m.positions[i]!, m.positions[i + 1]!, zTop(m.positions[i]!, m.positions[i + 1]!));
+    bottom.push(m.positions[i]!, m.positions[i + 1]!, zBot(m.positions[i]!, m.positions[i + 1]!));
   }
   const up: number[] = [];
   const down: number[] = [];
@@ -47,17 +59,23 @@ export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: num
     up.push(a, bb, c);
     down.push(a, c, bb);
   }
+  // Normais dos planos (lineares por construção): com z = g·p + c, a de cima é (-gx, -gy, 1) e a de baixo (gx, gy, -1).
+  const o = poly[0]![0]!;
+  const gradient = (at: (x: number, y: number) => number): [number, number] => [at(o.x + 1, o.y) - at(o.x, o.y), at(o.x, o.y + 1) - at(o.x, o.y)];
   let topN: [number, number, number] = [0, 0, 1];
   if (topAt) {
-    // Plano do topo: gradiente por diferenças finitas (o topo inclinado é linear por construção).
-    const o = poly[0]![0]!;
-    const gx = topAt(o.x + 1, o.y) - topAt(o.x, o.y);
-    const gy = topAt(o.x, o.y + 1) - topAt(o.x, o.y);
+    const [gx, gy] = gradient(topAt);
     const l = Math.hypot(gx, gy, 1);
     topN = [-gx / l, -gy / l, 1 / l];
   }
+  let bottomN: [number, number, number] = [0, 0, -1];
+  if (bottomAt) {
+    const [gx, gy] = gradient(bottomAt);
+    const l = Math.hypot(gx, gy, 1);
+    bottomN = [gx / l, gy / l, -1 / l];
+  }
   push(b, top, topN, up);
-  push(b, bottom, [0, 0, -1], down);
+  push(b, bottom, bottomN, down);
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
       const p = ring[i]!;
@@ -68,9 +86,7 @@ export function extrudePolygon(b: SolidBatch, poly: Polygon, z0: number, z1: num
       if (L < 1e-9) continue;
       const nx = dy / L;
       const ny = -dx / L;
-      const zp = topAt ? topAt(p.x, p.y) : z1;
-      const zq = topAt ? topAt(q.x, q.y) : z1;
-      push(b, [p.x, p.y, z0, q.x, q.y, z0, q.x, q.y, zq, p.x, p.y, zp], [nx, ny, 0], [0, 1, 2, 0, 2, 3]);
+      push(b, [p.x, p.y, zBot(p.x, p.y), q.x, q.y, zBot(q.x, q.y), q.x, q.y, zTop(q.x, q.y), p.x, p.y, zTop(p.x, p.y)], [nx, ny, 0], [0, 1, 2, 0, 2, 3]);
     }
   }
 }
@@ -111,6 +127,24 @@ export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
     for (const l of f.layers) {
       const b = batchOf(byMat, l.materialId);
       for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+    }
+  }
+  return [...byMat.values()];
+}
+
+/**
+ * Sólidos das lajes (D2): uma extrusão por camada, por material, com furos. Com inclinação, topo e base da camada
+ * seguem o mesmo plano (a subida de `slabRiseAt`), então a espessura vertical fica constante.
+ */
+export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
+  const byMat = new Map<Id, SolidBatch>();
+  for (const s of slabs) {
+    const sl = s.slope;
+    for (const l of s.layers) {
+      const b = batchOf(byMat, l.materialId);
+      const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
+      const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;
+      for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
     }
   }
   return [...byMat.values()];

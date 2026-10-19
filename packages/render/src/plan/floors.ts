@@ -14,7 +14,7 @@ export interface FloorOps {
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
 /** Área em m² com vírgula decimal, como nas demais etiquetas da planta. */
-const fmtArea = (a: number, digits: number): string => `${a.toFixed(digits).replace('.', ',')} m²`;
+export const fmtArea = (a: number, digits: number): string => `${a.toFixed(digits).replace('.', ',')} m²`;
 
 /** Centroide de um anel (fórmula da área); cai na média dos vértices quando a área é zero. */
 function ringCentroid(r: Ring): Vec2 {
@@ -85,17 +85,24 @@ export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: bool
   return out;
 }
 
+/** Peça de piso ou laje para destaque: id e contorno em planta (furos incluídos). */
+export interface OutlinedPart {
+  id: Id;
+  polygon: MultiPolygon;
+}
+
 /**
- * Destaque de seleção e de hover dos pisos (depois das paredes, como o das paredes): azul translúcido; selecionado
- * ganha contorno de 2 px, quadradinhos nos vértices e a área no centroide (quando a etiqueta de tipo não a mostra).
+ * Destaque de seleção e de hover de peças (pisos e lajes): azul translúcido; selecionado ganha contorno de 2 px,
+ * quadradinhos nos vértices e, quando `areaLabel` está ligado, a área no centroide (a etiqueta de tipo já a mostra
+ * com as etiquetas ligadas).
  */
-export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
+export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hover: Id | null, areaLabel: boolean, theme: PlanTheme, v: Viewport): FloorOps {
   const out = empty();
   const sel = new Set(selection);
   const half = 4.5 / v.zoom;
-  for (const f of resolveFloors(p, levelId)) {
-    const isSel = sel.has(f.floorId);
-    const isHover = !isSel && hover === f.floorId;
+  for (const f of parts) {
+    const isSel = sel.has(f.id);
+    const isHover = !isSel && hover === f.id;
     if (!isSel && !isHover) continue;
     out.fills.push({ polygons: f.polygon, color: theme.select, alpha: isSel ? 0.26 : 0.16 });
     if (!isSel) continue;
@@ -112,8 +119,7 @@ export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hove
         out.strokes.push({ pts: sq, closed: true, widthPx: 1.6, color: theme.select, alpha: 1 });
       }
     }
-    // Com a etiqueta de tipo ligada, a área já vai nela: não duplicar no mesmo ponto.
-    if (!p.settings.showTags) {
+    if (areaLabel) {
       const at = labelPoint(f.polygon);
       if (at) out.labels.push({ at, text: fmtArea(multiArea(f.polygon), 2), dy: -12, tone: 'info' });
     }
@@ -121,8 +127,14 @@ export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hove
   return out;
 }
 
+/** Destaque dos pisos do nível (D1). */
+export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
+  const parts = resolveFloors(p, levelId).map((f) => ({ id: f.floorId, polygon: f.polygon }));
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+}
+
 /** Pisos do nível abaixo, como referência apagada (D4): mesma linguagem do subpavimento das paredes. */
-export function belowFloorOps(floors: ResolvedFloor[], theme: PlanTheme): FloorOps {
+export function belowFloorOps(floors: Array<Pick<ResolvedFloor, 'polygon'>>, theme: PlanTheme): FloorOps {
   const out = empty();
   for (const f of floors) {
     out.fills.push({ polygons: f.polygon, color: theme.underlay, alpha: 0.22 });

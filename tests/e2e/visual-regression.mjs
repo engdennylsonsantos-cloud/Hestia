@@ -21,6 +21,7 @@ await page.waitForFunction(() => window.__hestia);
 
 const W = (id, a, b, extra = {}) => ({ id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false, noJoinStart: false, noJoinEnd: false, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, sag: 0, topProfile: null, mark: '', comments: '', ...extra });
 const F = (id, boundary, extra = {}) => ({ id, kind: 'floor', typeId: 'ft_ceram', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, mark: '', comments: '', ...extra });
+const SL = (id, boundary, extra = {}) => ({ id, kind: 'slab', typeId: 'ls_mac15', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, slope: null, mark: '', comments: '', ...extra });
 const M = { kind: 'miter', flip: false };
 const S = { kind: 'square', flip: false };
 const CASES = {
@@ -41,12 +42,19 @@ const FLOOR_CASES = {
   'piso-L': [F('p3', [[0, 0], [4, 0], [4, 1], [1, 1], [1, 4], [0, 4]])],
 };
 
+// D1/D2/D3: lajes entram por addSlab (kind slab); a inclinada cai 5 % ao longo de x.
+const SLAB_CASES = {
+  'laje-retangulo': [SL('l1', [[0, 0], [6, 0], [6, 4], [0, 4]])],
+  'laje-com-furo': [SL('l2', [[0, 0], [6, 0], [6, 4], [0, 4]], { holes: [[{ x: 2, y: 1.5 }, { x: 4, y: 1.5 }, { x: 4, y: 2.5 }, { x: 2, y: 2.5 }]] })],
+  'laje-inclinada': [SL('l3', [[0, 0], [6, 0], [6, 4], [0, 4]], { slope: { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 5 } })],
+};
+
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES })) {
   await page.evaluate((ws) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
     editor.zoomExtents();
   }, items);
   await page.waitForTimeout(250);

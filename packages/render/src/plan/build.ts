@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -9,6 +9,7 @@ import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
 import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
+import { slabFills, slabSelectionOps } from './slabs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -20,6 +21,8 @@ export interface PlanInput {
   below: ResolvedLevel | null;
   /** Pisos do nível abaixo (referência apagada, D4); sem ele, só as paredes do subpavimento aparecem. */
   belowFloors?: ResolvedFloor[];
+  /** Lajes do nível abaixo, apagadas como os pisos (D1/D4); o app preenche, sem ele nada aparece. */
+  belowSlabs?: ResolvedSlab[];
   viewport: Viewport;
   theme: PlanTheme;
   dark: boolean;
@@ -88,12 +91,21 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     fills.push(...bf.fills);
     strokes.push(...bf.strokes);
   }
+  if (input.below && input.belowSlabs) {
+    const bs = belowFloorOps(input.belowSlabs, theme);
+    fills.push(...bs.fills);
+    strokes.push(...bs.strokes);
+  }
 
   // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
   // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
   const detail = p.settings.detail ?? 'medium';
   const fine = detail === 'fine';
-  // Pisos antes das paredes: a parede cobre o piso onde se encontram (decisão 0006).
+  // Lajes antes dos pisos (a laje fica por baixo do piso); pisos antes das paredes (decisão 0006).
+  const sl = slabFills(p, input.levelId, theme, input.dark, detail, v);
+  fills.push(...sl.fills);
+  strokes.push(...sl.strokes);
+  labels.push(...sl.labels);
   const fl = floorFills(p, input.levelId, theme, input.dark, detail, v);
   fills.push(...fl.fills);
   strokes.push(...fl.strokes);
@@ -162,6 +174,10 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...fsel.fills);
   strokes.push(...fsel.strokes);
   labels.push(...fsel.labels);
+  const lsel = slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  fills.push(...lsel.fills);
+  strokes.push(...lsel.strokes);
+  labels.push(...lsel.labels);
   if (input.hover && !input.selection.includes(input.hover)) {
     fills.push(...elementHighlight(p, resolved, [input.hover], theme.select, 0.16));
   }

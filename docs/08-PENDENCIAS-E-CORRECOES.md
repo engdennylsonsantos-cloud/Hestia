@@ -552,7 +552,7 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 - **Medições da suíte completa** (`npm run test:completo`, 110 arquivos, tudo na mesma árvore de trabalho com outros agentes):
   - antes: 486 s, 1 erro `Timeout calling "onTaskUpdate"`, código 1;
   - só cessão em `property.test.ts`: 473 s sem timeout, depois 492 s **com** timeout (curvas, outro arquivo, sem cessão);
-  - cessão global (a correção): 470 s e 490 s, **0 timeouts** nas duas execuções com ela (e a versão final com `setTimeout`).
+  - cessão global (a correção): 470 s, 490 s e 479 s, **0 timeouts** em três execuções (a última já com `setTimeout`, a versão final).
 - **Risco residual**: um único teste síncrono acima de 60 s ainda estoura. O maior medido é de 39 s (`curvas.test.ts`).
 - **Código 1 que sobra não é infra**: as reprovações atuais são geometria em andamento de outros agentes (junções em
   curvas, `floorExtend`, `roofTool`, semente 38 da invariante (c)). Não foram mascaradas.

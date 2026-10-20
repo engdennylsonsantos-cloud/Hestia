@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { add, dist, multiArea, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, type JoinKind, type LocationLine, type Opening, type Project, type Wall } from '@hestia/model';
 import { resolveLevel, type ResolvedLevel } from './index.ts';
@@ -143,6 +143,13 @@ interface Case {
   /** Mesmo projeto deslocado por SHIFT. */
   shifted: () => ResolvedLevel;
 }
+
+/**
+ * Cede o event loop depois de cada teste (I-1b). Cada resolução é síncrona e leva de 1 a 15 s; entre os testes
+ * só há microtasks, então a resposta do vitest ao `onTaskUpdate` fica na fila do worker. Passando de 60 s sem
+ * processá-la, o birpc dá `Timeout calling "onTaskUpdate"` e a suíte sai 1 sem falha de asserção.
+ */
+afterEach(() => new Promise<void>((resolve) => setImmediate(resolve)));
 
 const cases = new Map<number, Case>();
 function caseOf(seed: number): Case {

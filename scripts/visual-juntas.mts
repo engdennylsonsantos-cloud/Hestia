@@ -197,7 +197,57 @@ const CENARIOS: Cenario[] = [
     no: O,
   },
   {
-    id: '10-L-curva',
+    id: '10-L60',
+    nome: 'L 60° (ângulo interno): grossa + fina',
+    nota: 'ângulo interno 60° entre as paredes (braço da fina a 120°)',
+    pecas: [
+      { id: 'g', typeId: GROSSA, a: O, b: P4 },
+      { id: 'f', typeId: FINA, a: P4, b: polar(P4, 120, 3) },
+    ],
+    juntas: [
+      { id: 'g', lados: ['end'] },
+      { id: 'f', lados: ['start'] },
+    ],
+    no: P4,
+  },
+  {
+    id: '11-L75',
+    nome: 'L 75° (ângulo interno): grossa + fina',
+    nota: 'ângulo interno 75° entre as paredes (braço da fina a 105°)',
+    pecas: [
+      { id: 'g', typeId: GROSSA, a: O, b: P4 },
+      { id: 'f', typeId: FINA, a: P4, b: polar(P4, 105, 3) },
+    ],
+    juntas: [
+      { id: 'g', lados: ['end'] },
+      { id: 'f', lados: ['start'] },
+    ],
+    no: P4,
+  },
+  {
+    id: '12-T45',
+    nome: 'T oblíquo 45°: grossa passante + fina chegando a 45°',
+    nota: 'ramal a 45° da passante; corte oblíquo na face de cada camada',
+    pecas: [
+      { id: 'g', typeId: GROSSA, a: { x: -2, y: 0 }, b: { x: 2, y: 0 } },
+      { id: 'f', typeId: FINA, a: O, b: polar(O, 45, 3) },
+    ],
+    juntas: [{ id: 'f', lados: ['start'] }],
+    no: O,
+  },
+  {
+    id: '13-T120',
+    nome: 'T oblíquo 120°: grossa passante + fina chegando a 120°',
+    nota: 'ramal a 120° da passante (lado esquerdo); corte oblíquo na face de cada camada',
+    pecas: [
+      { id: 'g', typeId: GROSSA, a: { x: -2, y: 0 }, b: { x: 2, y: 0 } },
+      { id: 'f', typeId: FINA, a: O, b: polar(O, 120, 3) },
+    ],
+    juntas: [{ id: 'f', lados: ['start'] }],
+    no: O,
+  },
+  {
+    id: '14-L-curva',
     nome: 'L 90° com parede grossa curva (sag 0,5 m) + fina',
     nota: 'grossa de 4 m com flecha 0,5 m (arco para dentro do L)',
     pecas: [

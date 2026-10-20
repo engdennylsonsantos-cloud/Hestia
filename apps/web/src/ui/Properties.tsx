@@ -86,6 +86,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
   const top = common(walls, (w) => w.topLevelId ?? '');
   const height = common(walls, (w) => w.height);
   const topOff = common(walls, (w) => w.topOffset);
+  const attachRoof = common(walls, (w) => w.attachTopToRoof ?? false);
   const loc = common(walls, (w) => w.locationLine);
   const flipped = common(walls, (w) => w.flipped);
   const noS = common(walls, (w) => w.noJoinStart);
@@ -143,6 +144,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         ) : (
           <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
         )}
+        <Row label="Topo ajustado ao telhado"><Check id="p-attachroof" checked={attachRoof.value} mixed={attachRoof.mixed} onChange={(v) => patch(ids, { attachTopToRoof: v })} /></Row>
         <ProfileRow key={ids.join(',')} walls={walls} />
         <Row label="Linha de localização" htmlFor="p-loc">
           <select id="p-loc" className="select" value={loc.mixed ? '' : loc.value} onChange={(e) => e.target.value && patch(ids, { locationLine: e.target.value as LocationLine })}>

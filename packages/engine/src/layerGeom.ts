@@ -1,5 +1,5 @@
 import { arcSample, intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
-import { layerSpans } from '@hestia/model';
+import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
 import { clipBandsToProfile } from './profile.ts';
@@ -93,9 +93,8 @@ export function membranesOf(f: WallFrame, ends: WallEnds): Membrane[] {
     });
 }
 
-/** Perfil superior (só parede reta): recorta as faixas de cada camada pelo topo poligonal. */
-export function withProfile(layers: ResolvedLayer[], f: WallFrame): ResolvedLayer[] {
-  const pts = f.wall.topProfile;
+/** Perfil superior (só parede reta): recorta as faixas de cada camada pelo topo poligonal (do modelo ou do telhado). */
+export function withProfile(layers: ResolvedLayer[], f: WallFrame, pts: ProfilePoint[] | null | undefined = f.wall.topProfile): ResolvedLayer[] {
   if (!pts || f.wall.sag !== 0 || pts.length < 2) return layers;
   return layers.map((l) => ({ ...l, bands: clipBandsToProfile(l.bands, f.a, f.u, f.length, pts) }));
 }

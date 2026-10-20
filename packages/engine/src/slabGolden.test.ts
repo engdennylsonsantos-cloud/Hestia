@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyTransform, multiArea, type Transform, type Vec2 } from '@hestia/geom';
-import { DEFAULT_SLAB_TYPES, ProjectStore, createEmptyProject, makeSlab, migrateProject, type Project, type Slab } from '@hestia/model';
+import { DEFAULT_SLAB_TYPES, ProjectStore, SCHEMA_VERSION, createEmptyProject, makeSlab, migrateProject, type Project, type Slab } from '@hestia/model';
 import { quantifySlabs, resolveSlabs, slabRiseAt } from './index.ts';
 
 /**
@@ -167,7 +167,7 @@ describe('G5 · arquivo', () => {
     const legacy = JSON.parse(JSON.stringify({ ...createEmptyProject(), schemaVersion: 7 })) as Record<string, unknown>;
     delete legacy.slabTypes;
     const m = migrateProject(legacy);
-    expect(m.schemaVersion).toBe(8);
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.keys(m.slabTypes).sort()).toEqual(DEFAULT_SLAB_TYPES.map((t) => t.id).sort());
     expect(m.slabTypes.ls_cobertura!.layers).toHaveLength(3);
   });

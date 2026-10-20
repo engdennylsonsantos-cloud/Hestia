@@ -153,7 +153,7 @@ export function StartDialog(): ReactElement {
 }
 
 const KEYS: Array<[string, string]> = [
-  ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['D', 'Porta'], ['J', 'Janela'],
+  ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['U', 'Telhado'], ['D', 'Porta'], ['J', 'Janela'],
   ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
   ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'], ['K', 'Corte (duas marcas na planta)'],
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],

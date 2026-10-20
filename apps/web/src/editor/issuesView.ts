@@ -1,4 +1,4 @@
-import { isFloor, isOpening, isSlab, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isSlab, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
 
 export interface IssueGroup {
   severity: ValidationSeverity;
@@ -13,7 +13,7 @@ export interface IssueTarget {
   levelId: Id | null;
   /** Ponto médio da parede; null quando o elemento não está ligado a uma parede. */
   center: { x: number; y: number } | null;
-  /** Caixa do piso ou da laje (contorno): a vista enquadra a caixa em vez do ponto. Só existe para pisos e lajes. */
+  /** Caixa do piso, da laje ou do telhado (contorno): a vista enquadra a caixa em vez do ponto. Só existe para essas famílias. */
   box?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
@@ -52,7 +52,7 @@ export function issueTarget(p: Project, issue: ValidationIssue): IssueTarget | n
   if (!id) return null;
   const el = p.elements[id];
   if (!el) return null;
-  if (isFloor(el) || isSlab(el)) {
+  if (isFloor(el) || isSlab(el) || isRoof(el)) {
     const xs = el.boundary.map((q) => q.x);
     const ys = el.boundary.map((q) => q.y);
     if (xs.length === 0) return null;

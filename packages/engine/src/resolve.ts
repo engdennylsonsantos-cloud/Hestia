@@ -33,6 +33,7 @@ import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
 import { resolveAllSlabs } from './slabs.ts';
+import { resolveAllRoofs } from './roofs.ts';
 import { wallZRange } from './wallZ.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
@@ -360,6 +361,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
   const floors = resolveAllFloors(p);
   const slabs = resolveAllSlabs(p);
+  const roofs = resolveAllRoofs(p);
   for (const group of clusterWalls(frames, ends)) {
     const tol = p.settings?.joinTolerance;
     const freeOf = (f: WallFrame): Array<'a' | 'b'> =>
@@ -374,7 +376,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         if (st.kind === 'tee') throughIds.add(st.hostId);
       }
     }
-    const wz = new Map(group.map((f) => [f.wall.id, wallZRange(p, f.wall, floors, slabs)] as const));
+    const wz = new Map(group.map((f) => [f.wall.id, wallZRange(p, f.wall, floors, slabs, roofs)] as const));
     const items = group.flatMap((f) => {
       const { z0, height } = wz.get(f.wall.id)!;
       return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + height }, throughIds.has(f.wall.id));
@@ -422,7 +424,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         sLo: f.sLo,
         baseZ: wz.get(f.wall.id)!.z0,
         height: heights.get(f.wall.id)!,
-        layers: withProfile(core.layers.get(f.wall.id) ?? [], f),
+        layers: withProfile(core.layers.get(f.wall.id) ?? [], f, wz.get(f.wall.id)!.profile),
         membranes: membranesOf(f, ends.get(f.wall.id)!),
       };
       out.walls[f.wall.id] = rw;

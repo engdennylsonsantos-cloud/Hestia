@@ -34,10 +34,17 @@ export interface DxfLevelGeometry {
   floors?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
   /** Lajes do nível: contorno e furos em planta; `typeCode` vira a camada `LAJE_<código>`. A inclinação não aparece na planta. */
   slabs?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
+  /**
+   * Telhados do nível: contorno do beiral (POLYLINE fechada na camada `TELHADO_<código>`) e segmentos de cumeeira,
+   * espigão e rincão em planta (LINE na camada `TELHADO_CUMEEIRA`, todos juntos). Quem monta a geometria é o engine.
+   */
+  roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
+/** Camada das linhas de cumeeira, espigão e rincão (LINE). */
+export const DXF_LAYER_ROOF_RIDGE = 'TELHADO_CUMEEIRA';
 
 /** Texto para nome de camada: sem acentos, em maiúsculas, símbolos viram `_`. */
 function layerSafe(text: string): string {
@@ -62,6 +69,11 @@ export function dxfLayerOfFloor(typeCode: string): string {
 /** Camada DXF de um tipo de laje: `LAJE_` + código sem acentos nem símbolos (LJ-12 vira LAJE_LJ_12). */
 export function dxfLayerOfSlab(typeCode: string): string {
   return `LAJE_${layerSafe(typeCode) || 'SEM_CODIGO'}`;
+}
+
+/** Camada DXF do contorno de um tipo de telhado: `TELHADO_` + código (TL-01 vira TELHADO_TL_01). */
+export function dxfLayerOfRoof(typeCode: string): string {
+  return `TELHADO_${layerSafe(typeCode) || 'SEM_CODIGO'}`;
 }
 
 const EPS = 1e-9;
@@ -92,7 +104,18 @@ interface Shape {
   pts: DxfPoint[];
 }
 
-/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes e, por último, os vãos. */
+interface Line {
+  layer: string;
+  a: DxfPoint;
+  b: DxfPoint;
+}
+
+/** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE). */
+function linesOf(geo: DxfLevelGeometry): Line[] {
+  return (geo.roofs ?? []).flatMap((r) => r.ridges.map(([a, b]) => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })));
+}
+
+/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes, os telhados e, por último, os vãos. */
 function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   const out: Shape[] = [];
   const push = (layer: string, polygons: DxfPolygons): void => {
@@ -112,6 +135,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   }
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
+  for (const r of geo.roofs ?? []) push(dxfLayerOfRoof(r.typeCode), [[r.outline]]);
   for (const o of geo.openings) out.push({ layer: DXF_LAYER_OPENINGS, pts: openingRect(o) });
   return out;
 }
@@ -124,8 +148,9 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
 export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
-  const layers = [...new Set(['0', ...shapes.map((s) => s.layer)])].sort();
-  const all = shapes.flatMap((s) => s.pts);
+  const lines = linesOf(geo);
+  const layers = [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
+  const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b])];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
 
@@ -195,6 +220,16 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
     }
     rec(0, 'SEQEND');
     rec(8, s.layer);
+  }
+  for (const l of lines) {
+    rec(0, 'LINE');
+    rec(8, l.layer);
+    rec(10, fmt(l.a.x));
+    rec(20, fmt(l.a.y));
+    rec(30, '0.000000');
+    rec(11, fmt(l.b.x));
+    rec(21, fmt(l.b.y));
+    rec(31, '0.000000');
   }
   rec(0, 'ENDSEC');
   rec(0, 'EOF');

@@ -148,6 +148,10 @@ export function Ribbon(): ReactElement {
                   <Icon name="file" size={22} />
                   <span>Tabela de lajes</span>
                 </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })} title="Tabela de telhados com áreas, cumeeira, beiral, volume e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de telhados</span>
+                </button>
               </div>
               <div className="rgroup-title">Documentar</div>
             </div>

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { quantifyRoofs, resolveRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
+import { quantifyRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { FUNCTION_LABEL, roofTypeThickness, type Id, type Roof, type RoofShape } from '@hestia/model';
 import { roofSlopeError, degToPercent, percentToDeg } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';

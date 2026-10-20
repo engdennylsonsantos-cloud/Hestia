@@ -1,6 +1,8 @@
 import { arcPointAt, pointInMulti, type Vec2 } from '@hestia/geom';
-import { slabRiseAt, wallArc, wallBaseElevation, wallMaxHeight, type Id, type Project, type Wall } from '@hestia/model';
+import { profileMax, slabRiseAt, wallArc, wallBaseElevation, wallMaxHeight, type Id, type Project, type ProfilePoint, type Wall } from '@hestia/model';
 import { resolveAllFloors, type ResolvedFloor } from './floors.ts';
+import { resolveAllRoofs, type ResolvedRoof } from './roofs.ts';
+import { roofWallProfile } from './roofWall.ts';
 import { resolveAllSlabs, type ResolvedSlab } from './slabs.ts';
 
 /** Cota absoluta da base e altura máxima de uma parede, já com os anexos a piso. */
@@ -9,6 +11,8 @@ export interface WallZ {
   z0: number;
   /** Altura máxima (o perfil superior, quando há, define a maior altura). */
   height: number;
+  /** Perfil superior vindo do telhado (attachTopToRoof), relativo à base; ausente nas demais paredes. */
+  profile?: ProfilePoint[];
 }
 
 /** Folga mínima para uma parede anexada continuar com altura (1 cm). */
@@ -49,14 +53,24 @@ function facesAt(levelId: Id, at: Vec2, floors: ResolvedFloor[], slabs: Resolved
  * Sem piso, ou se o ajuste deixasse a parede sem altura, o ajuste é ignorado. Parede com perfil superior não
  * recebe o topo anexado (o perfil já define o topo); a base anexada move o perfil junto. Sem os flags, devolve
  * exatamente a base e a altura do modelo.
+ * Com `attachTopToRoof` (decisão 0008, item 6), o topo vai para a face inferior do telhado ao longo do eixo (`roofWallProfile`);
+ * só vale se o eixo estiver coberto em toda a extensão, senão a parede segue as regras de piso e de altura normal.
+ * `roofs` vem do engine (resolveAllRoofs); sem ele, é resolvido aqui.
  */
-export function wallZRange(p: Project, w: Wall, floors: ResolvedFloor[] = resolveAllFloors(p), slabs: ResolvedSlab[] = resolveAllSlabs(p)): WallZ {
+export function wallZRange(
+  p: Project,
+  w: Wall,
+  floors: ResolvedFloor[] = resolveAllFloors(p),
+  slabs: ResolvedSlab[] = resolveAllSlabs(p),
+  roofs?: ResolvedRoof[],
+): WallZ {
   const base = wallBaseElevation(p, w);
   const height = wallMaxHeight(p, w);
   const profiled = Boolean(w.topProfile && w.sag === 0);
   const wantsBottom = w.attachBottomToFloor === true;
+  const wantsRoof = w.attachTopToRoof === true;
   const wantsTop = w.attachTopToFloor === true && w.topLevelId !== null && !profiled;
-  if (!wantsBottom && !wantsTop) return { z0: base, height };
+  if (!wantsBottom && !wantsTop && !wantsRoof) return { z0: base, height };
   const mid = axisMid(w);
   let z0 = base;
   let top = base + height;
@@ -66,6 +80,10 @@ export function wallZRange(p: Project, w: Wall, floors: ResolvedFloor[] = resolv
       const z = Math.max(...tops);
       if (z < top - MIN_HEIGHT) z0 = z;
     }
+  }
+  if (wantsRoof) {
+    const profile = roofWallProfile(w, roofs ?? resolveAllRoofs(p), z0);
+    if (profile) return { z0, height: profileMax(profile), profile };
   }
   if (wantsTop && w.topLevelId !== null) {
     const bottoms = facesAt(w.topLevelId, mid, floors, slabs).bottoms;

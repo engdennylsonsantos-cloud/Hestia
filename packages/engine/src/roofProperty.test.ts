@@ -73,7 +73,7 @@ function resolveCase(c: ReturnType<typeof randomCases>[number]): { p: Project; r
 function internalSamples(r: ResolvedRoof): Array<{ p: Vec2; zs: number[] }> {
   const out: Array<{ p: Vec2; zs: number[] }> = [];
   for (const l of r.lines) {
-    if (l.kind === 'eave') continue;
+    if (l.kind === 'eave' || l.kind === 'gable') continue;
     for (const k of [0.1, 0.3, 0.5, 0.7, 0.9]) {
       const q = { x: l.a.x + (l.b.x - l.a.x) * k, y: l.a.y + (l.b.y - l.a.y) * k };
       const zs = r.planes.filter((pl) => planeHas(pl.polygon, q)).map((pl) => pl.z0 + (pl.percent / 100) * ((q.x - pl.origin.x) * pl.up.x + (q.y - pl.origin.y) * pl.up.y));

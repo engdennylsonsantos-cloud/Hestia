@@ -92,6 +92,31 @@ export function boundaryDistance(m: MultiPolygon, p: Vec2): number {
 export const planeHas = (m: MultiPolygon, p: Vec2): boolean => pointInMulti(p, m) || boundaryDistance(m, p) <= EDGE_TOL;
 
 /**
+ * Trechos de p–q que coincidem com arestas de B colineares à reta (dentro de 1e-7 e com sobreposição de comprimento),
+ * em ordem de p para q. Quem decide o que o trecho significa é quem chama.
+ */
+export function segmentOverlaps(p: Vec2, q: Vec2, B: MultiPolygon): Array<[Vec2, Vec2]> {
+  const out: Array<[Vec2, Vec2]> = [];
+  const L = dist(p, q);
+  if (L < 1e-9) return out;
+  const u = { x: (q.x - p.x) / L, y: (q.y - p.y) / L };
+  for (const rb of B) {
+    for (const ringB of rb) {
+      ringB.forEach((r, j) => {
+        const s = ringB[(j + 1) % ringB.length]!;
+        if (Math.abs(cross(u, sub(r, p))) > EDGE_TOL || Math.abs(cross(u, sub(s, p))) > EDGE_TOL) return;
+        const tr = dot(sub(r, p), u);
+        const ts = dot(sub(s, p), u);
+        const lo = Math.max(0, Math.min(tr, ts));
+        const hi = Math.min(L, Math.max(tr, ts));
+        if (hi - lo > EDGE_TOL) out.push([{ x: p.x + u.x * lo, y: p.y + u.y * lo }, { x: p.x + u.x * hi, y: p.y + u.y * hi }]);
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Trechos de borda em comum entre duas áreas: segmentos colineares que se sobrepõem (mesma reta, dentro de 1e-7).
  * Cada par de arestas colineares dá um trecho; quem decide se é divisa interna é quem chama.
  */
@@ -99,27 +124,7 @@ export function collinearOverlaps(A: MultiPolygon, B: MultiPolygon): Array<[Vec2
   const out: Array<[Vec2, Vec2]> = [];
   for (const ra of A) {
     for (const ringA of ra) {
-      ringA.forEach((p, i) => {
-        const q = ringA[(i + 1) % ringA.length]!;
-        const L = dist(p, q);
-        if (L < 1e-9) return;
-        const u = { x: (q.x - p.x) / L, y: (q.y - p.y) / L };
-        for (const rb of B) {
-          for (const ringB of rb) {
-            ringB.forEach((r, j) => {
-              const s = ringB[(j + 1) % ringB.length]!;
-              const offR = Math.abs(cross(u, sub(r, p)));
-              const offS = Math.abs(cross(u, sub(s, p)));
-              if (offR > EDGE_TOL || offS > EDGE_TOL) return;
-              const tr = dot(sub(r, p), u);
-              const ts = dot(sub(s, p), u);
-              const lo = Math.max(0, Math.min(tr, ts));
-              const hi = Math.min(L, Math.max(tr, ts));
-              if (hi - lo > EDGE_TOL) out.push([{ x: p.x + u.x * lo, y: p.y + u.y * lo }, { x: p.x + u.x * hi, y: p.y + u.y * hi }]);
-            });
-          }
-        }
-      });
+      ringA.forEach((p, i) => out.push(...segmentOverlaps(p, ringA[(i + 1) % ringA.length]!, B)));
     }
   }
   return out;

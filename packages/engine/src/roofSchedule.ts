@@ -34,6 +34,10 @@ export interface RoofScheduleRow {
   ridgeLength: number;
   /** Comprimento 3D do beiral (m). */
   eaveLength: number;
+  /** Comprimento em planta das empenas, arestas sem inclinação (m). */
+  gableLength: number;
+  /** Arestas que definem inclinação; null nas águas livres e na extrusão. */
+  slopedEdges: number | null;
 }
 
 export interface RoofScheduleTotals {
@@ -43,6 +47,7 @@ export interface RoofScheduleTotals {
   volume: number;
   ridgeLength: number;
   eaveLength: number;
+  gableLength: number;
 }
 
 export interface RoofSchedule {
@@ -78,6 +83,8 @@ function rowOf(p: Project, q: RoofQuantity): RoofScheduleRow {
     volume: q.volume,
     ridgeLength: q.ridgeLength,
     eaveLength: q.eaveLength,
+    gableLength: q.gableLength,
+    slopedEdges: q.slopedEdges,
   };
 }
 
@@ -103,8 +110,9 @@ export function sumRoofRows(rows: RoofScheduleRow[]): RoofScheduleTotals {
       volume: t.volume + r.volume,
       ridgeLength: t.ridgeLength + r.ridgeLength,
       eaveLength: t.eaveLength + r.eaveLength,
+      gableLength: t.gableLength + r.gableLength,
     }),
-    { count: 0, planArea: 0, faceArea: 0, volume: 0, ridgeLength: 0, eaveLength: 0 },
+    { count: 0, planArea: 0, faceArea: 0, volume: 0, ridgeLength: 0, eaveLength: 0, gableLength: 0 },
   );
 }
 
@@ -120,6 +128,8 @@ const CSV_HEADER = [
   'Volume (m³)',
   'Cumeeira (m)',
   'Beiral (m)',
+  'Empena (m)',
+  'Arestas com inclinação',
 ];
 
 /**
@@ -140,7 +150,23 @@ export function roofScheduleToCsv(rows: RoofScheduleRow[], totals: RoofScheduleT
     n(r.volume, 3),
     n(r.ridgeLength, 2),
     n(r.eaveLength, 2),
+    n(r.gableLength, 2),
+    r.slopedEdges === null ? '' : String(r.slopedEdges),
   ]);
-  const total = ['Total', '', '', '', '', '', n(totals.planArea, 2), n(totals.faceArea, 2), n(totals.volume, 3), n(totals.ridgeLength, 2), n(totals.eaveLength, 2)];
+  const total = [
+    'Total',
+    '',
+    '',
+    '',
+    '',
+    '',
+    n(totals.planArea, 2),
+    n(totals.faceArea, 2),
+    n(totals.volume, 3),
+    n(totals.ridgeLength, 2),
+    n(totals.eaveLength, 2),
+    n(totals.gableLength, 2),
+    '',
+  ];
   return csvDocument([CSV_HEADER, ...body, total]);
 }

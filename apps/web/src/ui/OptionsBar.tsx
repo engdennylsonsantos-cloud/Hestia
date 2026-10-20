@@ -98,7 +98,7 @@ export function OptionsBar(): ReactElement {
         </>
       )}
       {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
-      {tool === 'roof' && <RoofOptionsBar />}
+      {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar tool={tool} />}
       {(tool === 'door' || tool === 'window') && (
         <label>
           Tipo

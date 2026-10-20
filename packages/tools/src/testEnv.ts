@@ -1,10 +1,11 @@
 import { ProjectStore, createEmptyProject, wallsOnLevel, type Id, type Wall } from '@hestia/model';
-import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId, type ToolOptions } from './index.ts';
+import { createTool, type PointerInfo, type RoofEdgeSel, type Tool, type ToolEnv, type ToolId, type ToolOptions } from './index.ts';
 
 /** Ambiente de teste das ferramentas (usado pelos *.test.ts do pacote; não é exportado no índice). */
 export function makeEnv(store = new ProjectStore(createEmptyProject())) {
   let selection: Id[] = [];
   let finished = 0;
+  let roofEdge: RoofEdgeSel | null = null;
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
@@ -23,6 +24,8 @@ export function makeEnv(store = new ProjectStore(createEmptyProject())) {
     say: () => {},
     done: () => { finished += 1; },
     options: () => options,
+    roofEdge: () => roofEdge,
+    setRoofEdge: (sel) => { roofEdge = sel; },
   };
   return { store, env, options, done: () => finished, sel: () => selection };
 }

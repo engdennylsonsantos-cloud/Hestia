@@ -1,7 +1,8 @@
 import { add, dist, dot, mid, norm, pointInMulti, sub, type Vec2 } from '@hestia/geom';
 import type { Roof } from '@hestia/model';
-import { collinearOverlaps, perpOf, unitOf } from './roofGeom.ts';
+import { collinearOverlaps, perpOf, segmentOverlaps } from './roofGeom.ts';
 import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
+import { extrusionLines } from './roofExtrusion.ts';
 
 /** Afastamento (1e-5 m) do ponto médio de uma divisa para testar de que lado está cada água. */
 const SIDE_OFFSET = 1e-5;
@@ -16,7 +17,7 @@ const gradientOf = (pl: ResolvedRoofPlane): Vec2 => ({ x: (pl.percent / 100) * p
  * divisa é um pico: cumeeira quando a divisa é horizontal, espigão quando não é. Se as duas sobem, é um rincão.
  * Quando uma sobe e a outra desce não há pico nem vale: cumeeira se horizontal, senão espigão.
  */
-function sharedKind(A: ResolvedRoofPlane, B: ResolvedRoofPlane, p: Vec2, q: Vec2): RoofLine['kind'] | null {
+export function sharedKind(A: ResolvedRoofPlane, B: ResolvedRoofPlane, p: Vec2, q: Vec2): RoofLine['kind'] | null {
   const l = norm(sub(q, p));
   const n = perpOf(l);
   const m = mid(p, q);
@@ -34,19 +35,19 @@ function sharedKind(A: ResolvedRoofPlane, B: ResolvedRoofPlane, p: Vec2, q: Vec2
 }
 
 /**
- * Linhas notáveis do telhado em planta. O contorno do beiral vira 'eave' (no telhado de uma água, a aresta mais alta
- * vira 'ridge'); cada divisa entre duas águas vira 'ridge', 'hip' ou 'valley' conforme `sharedKind`. Furos não geram linha.
+ * Linhas do contorno: cada aresta vira `kinds[i]` ('eave' com água, 'gable' empena) nos trechos em que uma água a
+ * toca. Trecho sem água não gera linha (a aresta foi cortada pela junção de outro telhado).
  */
-export function roofLines(r: Roof, planes: ResolvedRoofPlane[]): RoofLine[] {
-  const out: RoofLine[] = [];
-  const b = r.boundary;
-  const dirU = unitOf(r.dir);
-  const top = r.shape === 'shed' && dirU ? Math.max(...b.map((v) => dot(v, dirU))) : null;
-  b.forEach((a, i) => {
-    const c = b[(i + 1) % b.length]!;
-    const high = top !== null && dirU !== null && Math.abs(dot(a, dirU) - top) < 1e-9 && Math.abs(dot(c, dirU) - top) < 1e-9;
-    out.push({ kind: high ? 'ridge' : 'eave', a, b: c });
+function boundaryLines(boundary: Vec2[], kinds: RoofLine['kind'][], planes: ResolvedRoofPlane[]): RoofLine[] {
+  return boundary.flatMap((a, i) => {
+    const c = boundary[(i + 1) % boundary.length]!;
+    return planes.flatMap((pl) => segmentOverlaps(a, c, pl.polygon)).map(([p, q]): RoofLine => ({ kind: kinds[i] ?? 'eave', a: p, b: q }));
   });
+}
+
+/** Divisas entre águas do mesmo telhado: cumeeira, espigão ou rincão conforme `sharedKind`. */
+export function interiorLines(planes: ResolvedRoofPlane[]): RoofLine[] {
+  const out: RoofLine[] = [];
   for (let i = 0; i < planes.length; i++) {
     for (let j = i + 1; j < planes.length; j++) {
       const A = planes[i]!;
@@ -59,4 +60,13 @@ export function roofLines(r: Roof, planes: ResolvedRoofPlane[]): RoofLine[] {
     }
   }
   return out;
+}
+
+/**
+ * Linhas notáveis do telhado em planta: contorno ('eave' ou 'gable' por aresta, conforme `kinds`) e divisas entre águas
+ * ('ridge', 'hip' ou 'valley'). Furos não geram linha. Extrusão tem as suas (agente de extrusão).
+ */
+export function roofLines(r: Roof, planes: ResolvedRoofPlane[], kinds: RoofLine['kind'][]): RoofLine[] {
+  if (r.shape === 'extrusion') return extrusionLines(r);
+  return [...boundaryLines(r.boundary, kinds, planes), ...interiorLines(planes)];
 }

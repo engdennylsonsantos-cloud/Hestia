@@ -10,7 +10,7 @@ import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
 import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
-import { roofFills, roofFootprint, roofSelectionOps } from './roofs.ts';
+import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -26,6 +26,12 @@ export interface PlanInput {
   belowSlabs?: ResolvedSlab[];
   /** Telhados do nível abaixo, apagados como as lajes (D4); sem eles, nada aparece. */
   belowRoofs?: ResolvedRoof[];
+  /**
+   * Planta de cobertura (D6): telhados do nível opacos (alpha 1) e os de `belowRoofs` também, só o preenchimento;
+   * paredes só como contorno fino por cima; sem pisos, lajes ou aberturas; cota da cumeeira sempre visível. O app
+   * liga o modo (ex.: uma vista "Cobertura"); sem ele a planta é a de sempre.
+   */
+  roofPlanMode?: boolean;
   viewport: Viewport;
   theme: PlanTheme;
   dark: boolean;
@@ -81,47 +87,59 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
 
   if (input.showGrid) strokes.push(...gridStrokes(v, theme));
 
-  // Pavimento abaixo como subpiso apagado (underlay).
+  // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
+  // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
+  const detail = p.settings.detail ?? 'medium';
+  const fine = detail === 'fine';
+  // Planta de cobertura (D6): sem traços por baixo nem paredes preenchidas; os telhados cobrem o que está embaixo.
+  const rp = input.roofPlanMode === true;
+
+  // Pavimento abaixo como subpiso apagado (underlay); na planta de cobertura, só o preenchimento.
   if (input.below) {
     for (const c of input.below.clusters) {
       fills.push({ polygons: c.silhouette, color: theme.underlay, alpha: 0.22 });
-      for (const r of ringsOf(c.silhouette)) strokes.push({ pts: r, closed: true, widthPx: 1, color: theme.underlay, alpha: 0.7 });
+      if (!rp) for (const r of ringsOf(c.silhouette)) strokes.push({ pts: r, closed: true, widthPx: 1, color: theme.underlay, alpha: 0.7 });
     }
   }
 
   if (input.below && input.belowFloors) {
     const bf = belowFloorOps(input.belowFloors, theme);
     fills.push(...bf.fills);
-    strokes.push(...bf.strokes);
+    if (!rp) strokes.push(...bf.strokes);
   }
   if (input.below && input.belowSlabs) {
     const bs = belowFloorOps(input.belowSlabs, theme);
     fills.push(...bs.fills);
-    strokes.push(...bs.strokes);
+    if (!rp) strokes.push(...bs.strokes);
   }
   if (input.below && input.belowRoofs) {
-    const br = belowFloorOps(
-      input.belowRoofs.map((r) => ({ polygon: roofFootprint(r) })),
-      theme,
-    );
-    fills.push(...br.fills);
-    strokes.push(...br.strokes);
+    if (rp) {
+      // Telhados de baixo opacos: só o preenchimento; as linhas e cotas do nível de baixo não aparecem por cima.
+      fills.push(...roofOps(input.belowRoofs, p, theme, input.dark, detail, v, { planMode: true }).fills);
+    } else {
+      const br = belowFloorOps(
+        input.belowRoofs.map((r) => ({ polygon: roofFootprint(r) })),
+        theme,
+      );
+      fills.push(...br.fills);
+      strokes.push(...br.strokes);
+    }
   }
 
-  // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
-  // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
-  const detail = p.settings.detail ?? 'medium';
-  const fine = detail === 'fine';
   // Lajes antes dos pisos (a laje fica por baixo do piso); pisos antes das paredes (decisão 0006).
   const sl = slabFills(p, input.levelId, theme, input.dark, detail, v);
   fills.push(...sl.fills);
-  strokes.push(...sl.strokes);
-  labels.push(...sl.labels);
+  if (!rp) {
+    strokes.push(...sl.strokes);
+    labels.push(...sl.labels);
+  }
   const fl = floorFills(p, input.levelId, theme, input.dark, detail, v);
   fills.push(...fl.fills);
-  strokes.push(...fl.strokes);
-  labels.push(...fl.labels);
-  for (const c of resolved.clusters) {
+  if (!rp) {
+    strokes.push(...fl.strokes);
+    labels.push(...fl.labels);
+  }
+  for (const c of rp ? [] : resolved.clusters) {
     if (detail === 'coarse') {
       fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
     }
@@ -144,14 +162,14 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino).
-  if (fine) {
+  if (fine && !rp) {
     for (const rw of Object.values(resolved.walls)) {
       for (const m of rw.membranes) strokes.push({ pts: m.pts, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }
 
   // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
-  for (const w of wallsOnLevel(p, input.levelId)) {
+  for (const w of rp ? [] : wallsOnLevel(p, input.levelId)) {
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
       if (!off) continue;
       const r = 5 / v.zoom;
@@ -162,7 +180,7 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Símbolos das aberturas (fora do grosseiro).
-  if (detail !== 'coarse') {
+  if (detail !== 'coarse' && !rp) {
     for (const w of wallsOnLevel(p, input.levelId)) {
       const f = frameOfWall(p, w.id);
       if (!f) continue;
@@ -171,10 +189,14 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
-  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v);
+  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, { planMode: rp });
   fills.push(...rf.fills);
   strokes.push(...rf.strokes);
   labels.push(...rf.labels);
+  // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
+  if (rp) {
+    for (const c of resolved.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8 });
+  }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
   const marks = sectionMarksOf(p.views, v, theme);

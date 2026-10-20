@@ -97,9 +97,13 @@ describe('C1 · quando o topo não se ajusta', () => {
     expect(zOf(p)).toEqual({ z0: 0, height: 3 });
   });
 
-  it('eixo que sai do telhado: cobertura parcial não vale e a parede mantém a altura normal', () => {
+  it('eixo que sai do telhado: só o trecho coberto segue o telhado (sobe a 4,105 m na cumeeira); x de 7 a 10 fica em 3 m', () => {
+    // Telhado de x −1 a 7: o eixo de x 0 a 10 está sob ele até x = 7. Depois, altura normal, com degrau em x = 7.
     const p = build([wall({ b: { x: 10, y: 0 } })], [{ dir: { x: 0, y: 1 } }]);
-    expect(zOf(p)).toEqual({ z0: 0, height: 3 });
+    const z = zOf(p);
+    expect(z.profile).toBeDefined();
+    expect(z.profile!.some((pt) => Math.abs(pt.t - 10) < 1e-6 && Math.abs(pt.h - 3) < 1e-6)).toBe(true);
+    expect(z.height).toBeCloseTo(4.105, 6);
   });
 
   it('telhado de outro nível não conta quando a parede não sobe até ele', () => {

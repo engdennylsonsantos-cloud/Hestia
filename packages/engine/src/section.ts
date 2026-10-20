@@ -1,4 +1,4 @@
-import { intersection, orientedRect, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, intersection, orientedRect, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors } from './floors.ts';
@@ -310,6 +310,17 @@ function convexHull(pts: Vec2[]): Ring {
 }
 
 /**
+ * Corte esquadro (Revit: Rafter Cut 'square') no beiral: a base da camada recua ao longo da água, de modo que o corte
+ * fica perpendicular ao plano. Com G = % / 100 e T a espessura vertical da camada, o deslocamento ao longo da subida é
+ * s = G·T/(1+G²); o comprimento do corte (perpendicular ao plano) é T·cos θ. Para 100 % e T = 10 cm: s = 5,00 cm e
+ * corte de 7,07 cm.
+ */
+export function squareCutRun(percent: number, thickness: number): number {
+  const g = percent / 100;
+  return (g * thickness) / (1 + g * g);
+}
+
+/**
  * Telhados no corte e na elevação (D3), como as lajes. Por água e por camada, a faixa vertical de cada ponto p vai de
  * top(p) − below − thickness a top(p) − below. No corte, a linha dá intervalos de t dentro da água e cada faixa é um
  * quadrilátero (topo e base são lineares em t). Além do plano, cada triângulo da água projeta-se em (t, z) com
@@ -325,6 +336,10 @@ export function sectionOfRoofs(roofs: ResolvedRoof[], line: SectionLine): RoofSe
   const at = (t: number): Vec2 => ({ x: line.a.x + d.x * t, y: line.a.y + d.y * t });
   for (const r of roofs) {
     const layers = r.layers.filter((l) => l.thickness > 1e-9);
+    // Corte esquadro só nas extremidades sobre uma aresta de beiral (linha 'eave'); prumo (padrão) não muda nada.
+    const square = r.rafterCut === 'square';
+    const eaves = r.lines.filter((l) => l.kind === 'eave');
+    const onEave = (v: Vec2): boolean => square && eaves.some((l) => Math.hypot(closestOnSegment(v, l.a, l.b).x - v.x, closestOnSegment(v, l.a, l.b).y - v.y) < 1e-6);
     for (const pl of r.planes) {
       const cuts = pl.polygon
         .flatMap((poly) => lineIntervals(poly, line.a, d, n))
@@ -333,10 +348,21 @@ export function sectionOfRoofs(roofs: ResolvedRoof[], line: SectionLine): RoofSe
       const view = intersection(pl.polygon, slab);
       for (const l of layers) {
         const top = (v: Vec2): number => planeZ(pl, v) - l.below;
+        const G = pl.percent / 100;
+        const run = square ? squareCutRun(pl.percent, l.thickness) : 0;
+        // Cosseno entre a seção e a subida da água: no corte esquadro, a base desloca s / cos ao longo da seção.
+        const c = d.x * pl.up.x + d.y * pl.up.y;
         for (const [lo, hi] of cuts) {
           const u0 = top(at(lo));
           const u1 = top(at(hi));
-          out.cut.push({ materialId: l.materialId, polygon: [slabQuad(lo, hi, u0 - l.thickness, u1 - l.thickness, u0, u1)] });
+          let bl: Vec2 = { x: lo, y: u0 - l.thickness };
+          let br: Vec2 = { x: hi, y: u1 - l.thickness };
+          if (square && Math.abs(c) > 1e-9) {
+            const k = run / c;
+            if (c > 0 && lo + k < hi && onEave(at(lo))) bl = { x: lo + k, y: top(at(lo + k)) - l.thickness };
+            if (c < 0 && hi + k > lo && onEave(at(hi))) br = { x: hi + k, y: top(at(hi + k)) - l.thickness };
+          }
+          out.cut.push({ materialId: l.materialId, polygon: [[bl, br, { x: hi, y: u1 }, { x: lo, y: u0 }]] });
           out.zMin = Math.min(out.zMin, u0 - l.thickness, u1 - l.thickness);
           out.zMax = Math.max(out.zMax, u0, u1);
         }
@@ -351,10 +377,9 @@ export function sectionOfRoofs(roofs: ResolvedRoof[], line: SectionLine): RoofSe
             const pts = [0, 1, 2].flatMap((k) => {
               const j = mesh.indices[i + k]!;
               const v = { x: mesh.positions[2 * j]!, y: mesh.positions[2 * j + 1]! };
-              return [
-                { x: along(v), y: top(v) },
-                { x: along(v), y: top(v) - l.thickness },
-              ];
+              // Corte esquadro no beiral: a base recua s ao longo da subida (projeta-se em s·cos e sobe G·s).
+              const base = square && onEave(v) ? { x: along(v) + run * c, y: top(v) + G * run - l.thickness } : { x: along(v), y: top(v) - l.thickness };
+              return [{ x: along(v), y: top(v) }, base];
             });
             const hull = convexHull(pts);
             if (hull.length >= 3) parts.push([[hull]]);

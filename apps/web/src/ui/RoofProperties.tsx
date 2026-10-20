@@ -1,11 +1,16 @@
 import type { ReactElement } from 'react';
 import { quantifyRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { FUNCTION_LABEL, roofTypeThickness, type Id, type Roof, type RoofShape } from '@hestia/model';
-import { roofSlopeError, degToPercent, percentToDeg } from '@hestia/tools';
+import { defaultExtrusionProfile } from '@hestia/engine';
+import { roofShapePatch, roofSlopeError, degToPercent, percentToDeg } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
-import { Group, NumField, Row, TextField } from './fields.tsx';
+import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
+import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { RoofEdgeSection, RoofEdgeTable } from './RoofEdgeProps.tsx';
+import { RoofPlanesSection } from './RoofPlanesProps.tsx';
+import { RoofProfileRow } from './RoofProfileRow.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -15,8 +20,9 @@ function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean 
   return { value: first, mixed: items.some((x) => get(x) !== first) };
 }
 
+/** Alteração pelas Propriedades: guardada pelo motor (não aplica se a alteração deixar o telhado sem águas). */
 function patch(ids: Id[], p: Partial<Roof>): void {
-  editor.store.exec({ type: 'updateElements', ids, patch: p });
+  applyRoofPatch(editor.store, ids, p);
 }
 
 /** Ângulo do eixo da cumeeira (ou da subida) em graus, entre 0° e 180°. */
@@ -31,9 +37,12 @@ const rotatedDir = (r: Roof, deg: number): { x: number; y: number } => {
   return { x: r.dir.x * Math.cos(t) - r.dir.y * Math.sin(t), y: r.dir.x * Math.sin(t) + r.dir.y * Math.cos(t) };
 };
 
+const SHAPE_OPTIONS: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'free', 'extrusion'];
+
 /**
- * Propriedades de um ou mais telhados (tipo, nível, cota do beiral, forma, inclinação, direção da cumeeira, camadas,
- * quantitativos e identidade). O balanço do beiral é definido ao criar e não se edita depois; o contorno se edita pelas alças.
+ * Propriedades de um ou mais telhados: tipo, nível, cota do beiral, forma (predefinições por aresta ou águas livres),
+ * inclinação, cumeeira, beiral e acabamentos, camadas, quantitativos e identidade. Com uma aresta escolhida na planta,
+ * mostra a seção "Aresta N"; a tabela de arestas lista todas. O contorno se edita pelas alças na planta.
  */
 export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
   const p = useProject();
@@ -45,8 +54,14 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
   const slope = common(roofs, (r) => r.slopePercent);
   const mark = common(roofs, (r) => r.mark);
   const comments = common(roofs, (r) => r.comments);
+  const joinOthers = common(roofs, (r) => r.joinOthers);
+  const rafterCut = common(roofs, (r) => r.rafterCut);
+  const fascia = common(roofs, (r) => r.eave.fascia);
+  const fasciaHeight = common(roofs, (r) => r.eave.fasciaHeight);
+  const gutter = common(roofs, (r) => r.eave.gutter);
+  const soffit = common(roofs, (r) => r.eave.soffit);
   const type = typeId.mixed ? null : p.roofTypes[typeId.value];
-  const hasRidge = roofs.some((r) => r.shape === 'gable' || r.shape === 'shed');
+  const hasRidge = single !== null && (single.shape === 'gable' || single.shape === 'shed');
   const quantities = quantifyRoofs(p, roofs[0]!.levelId);
   const picked = roofs.map((r) => quantities.roofs.find((q) => q.roofId === r.id)).filter((q): q is NonNullable<typeof q> => q !== undefined);
   const sum = (f: (q: (typeof picked)[number]) => number): number => picked.reduce((s, q) => s + f(q), 0);
@@ -59,7 +74,9 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
   const planes = sum((q) => q.planes.length);
   const resolved = picked.length > 0 && picked.some((q) => q.planes.length > 0);
   const freeRoof = single?.shape === 'free' ? single : null;
-  const freePlanes = freeRoof ? (picked.find((q) => q.roofId === freeRoof.id)?.planes ?? []) : [];
+  const roofEdge = useUi((s) => s.roofEdge);
+  const edgeSel = single && roofEdge && roofEdge.roofId === single.id && roofEdge.index < single.boundary.length ? roofEdge : null;
+  const edgeCapable = single !== null && single.shape !== 'free' && single.shape !== 'extrusion';
 
   const setSlope = (v: number): void => {
     const err = roofSlopeError(v);
@@ -67,7 +84,25 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       useUi.setState({ status: err });
       return;
     }
-    patch(ids, { slopePercent: v });
+    // Por arestas: a inclinação nova vale para as arestas que definem inclinação (cada uma se ajusta na planta).
+    for (const r of roofs) patch([r.id], { slopePercent: v, ...(r.shape === 'edges' ? { edgeSlopes: r.edgeSlopes.map((x) => (x === null ? null : v)) } : {}) });
+  };
+
+  const setShape = (v: RoofShape): void => {
+    editor.store.transaction('Forma do telhado', () => {
+      for (const r of roofs) {
+        // Por extrusão: começa com o perfil padrão (arco de 1 m) se o telhado ainda não tem um; a água é conferida pelo motor.
+        const next: Partial<Roof> = v === 'extrusion' ? { shape: 'extrusion', profile: r.profile.length >= 2 ? r.profile : defaultExtrusionProfile(r.boundary, r.dir) } : roofShapePatch(r, v);
+        if (Object.keys(next).length) patch([r.id], next);
+      }
+    });
+  };
+
+  /** Acabamentos do beiral: cada telhado guarda o seu, então a alteração vai telhado a telhado numa transação. */
+  const setEave = (change: Partial<Roof['eave']>): void => {
+    editor.store.transaction('Acabamento do beiral', () => {
+      for (const r of roofs) editor.store.exec({ type: 'updateElements', ids: [r.id], patch: { eave: { ...r.eave, ...change } } });
+    });
   };
 
   return (
@@ -93,12 +128,11 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       </Group>
       <Group title="Forma">
         <Row label="Forma" htmlFor="p-rshape">
-          <select id="p-rshape" className="select" value={shape.mixed ? '' : shape.value} onChange={(e) => e.target.value && patch(ids, { shape: e.target.value as RoofShape })} aria-label="Forma do telhado">
+          <select id="p-rshape" className="select" value={shape.mixed ? '' : shape.value} onChange={(e) => e.target.value && setShape(e.target.value as RoofShape)} aria-label="Forma do telhado">
             {shape.mixed && <option value="">variadas</option>}
-            {shape.value === 'free' && <option value="free">{ROOF_SHAPE_LABEL.free}</option>}
-            <option value="shed">{ROOF_SHAPE_LABEL.shed}</option>
-            <option value="gable">{ROOF_SHAPE_LABEL.gable}</option>
-            <option value="hip">{ROOF_SHAPE_LABEL.hip}</option>
+            {SHAPE_OPTIONS.map((s) => (
+              <option key={s} value={s}>{ROOF_SHAPE_LABEL[s]}</option>
+            ))}
           </select>
         </Row>
         <Row label="Inclinação" htmlFor="p-rslope">
@@ -107,7 +141,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         <Row label="Inclinação (°)" htmlFor="p-rdeg">
           <NumField id="p-rdeg" value={percentToDeg(slope.value)} mixed={slope.mixed} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => setSlope(degToPercent(v))} />
         </Row>
-        {hasRidge && single && single.shape !== 'hip' ? (
+        {hasRidge && single ? (
           <>
             <Row label={single.shape === 'shed' ? 'Subida (°)' : 'Cumeeira (°)'} htmlFor="p-rdir">
               <NumField id="p-rdir" value={axisDeg(single)} decimals={1} unit="°" onCommit={(v) => patch(ids, { dir: { x: Math.cos((v * Math.PI) / 180), y: Math.sin((v * Math.PI) / 180) } })} />
@@ -117,17 +151,43 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
             </div>
           </>
         ) : (
-          <div className="hint">{freeRoof ? 'Águas livres: a forma vem da lista de águas, somente leitura nesta versão.' : single?.shape === 'hip' ? 'Quatro águas: sem cumeeira editável.' : 'Selecione um telhado para editar a direção da cumeeira.'}</div>
+          <div className="hint">
+            {freeRoof ? 'Águas livres: cada água tem inclinação e subida próprias (lista abaixo).'
+              : single?.shape === 'edges' ? 'Por arestas: inclinação só nas arestas que a definem. Escolha uma aresta na planta para editá-la.'
+              : single?.shape === 'extrusion' ? 'Telhado por extrusão: o perfil (altura por transversal) se edita pelo botão abaixo.'
+              : single ? 'Forma de uma água, duas águas ou quatro águas: troque por Por arestas para editar cada aresta.'
+              : 'Selecione um telhado para editar a direção da cumeeira.'}
+          </div>
         )}
-        {freeRoof && (
-          <>
-            {freePlanes.length === 0 && <div className="hint">Sem águas resolvidas para este telhado.</div>}
-            {freePlanes.map((pl, i) => (
-              <Row key={i} label={`Água ${i + 1}`}><span className="val">{fmt(pl.percent, 1)} % · área {fmt(pl.faceArea)} m²</span></Row>
-            ))}
-          </>
-        )}
-        <div className="hint">O balanço do beiral foi definido na criação e não se edita depois. O contorno se ajusta pelas alças na planta.</div>
+        {single?.shape === 'extrusion' && <RoofProfileRow key={single.id} roof={single} />}
+        <div className="hint">O balanço do beiral se define por aresta na planta. O contorno se ajusta pelas alças.</div>
+      </Group>
+      {edgeSel && single && <RoofEdgeSection roof={single} index={edgeSel.index} />}
+      {edgeCapable && single && <RoofEdgeTable roof={single} />}
+      {freeRoof && <RoofPlanesSection roof={freeRoof} />}
+      <Group title="Beiral e acabamentos">
+        <Row label="Unir telhados" htmlFor="p-rjoin">
+          <Check id="p-rjoin" checked={joinOthers.value} mixed={joinOthers.mixed} onChange={(v) => patch(ids, { joinOthers: v })}>Unir telhados que se sobrepõem</Check>
+        </Row>
+        <Row label="Corte do caibro" htmlFor="p-rcut">
+          <select id="p-rcut" className="select" value={rafterCut.mixed ? '' : rafterCut.value} onChange={(e) => e.target.value && patch(ids, { rafterCut: e.target.value as Roof['rafterCut'] })} aria-label="Corte do caibro">
+            {rafterCut.mixed && <option value="">variados</option>}
+            <option value="plumb">Prumo</option>
+            <option value="square">Esquadro</option>
+          </select>
+        </Row>
+        <Row label="Testeira" htmlFor="p-rfascia">
+          <Check id="p-rfascia" checked={fascia.value} mixed={fascia.mixed} onChange={(v) => setEave({ fascia: v })}>Testeira</Check>
+        </Row>
+        <Row label="Altura da testeira" htmlFor="p-rfh">
+          <NumField id="p-rfh" value={fasciaHeight.value} mixed={fasciaHeight.mixed} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => setEave({ fasciaHeight: v })} />
+        </Row>
+        <Row label="Calha" htmlFor="p-rgutter">
+          <Check id="p-rgutter" checked={gutter.value} mixed={gutter.mixed} onChange={(v) => setEave({ gutter: v })}>Calha</Check>
+        </Row>
+        <Row label="Forro de beiral" htmlFor="p-rsoffit">
+          <Check id="p-rsoffit" checked={soffit.value} mixed={soffit.mixed} onChange={(v) => setEave({ soffit: v })}>Forro de beiral</Check>
+        </Row>
       </Group>
       <Group title="Construção">
         {type ? (

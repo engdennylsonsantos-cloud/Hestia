@@ -35,16 +35,19 @@ export interface DxfLevelGeometry {
   /** Lajes do nível: contorno e furos em planta; `typeCode` vira a camada `LAJE_<código>`. A inclinação não aparece na planta. */
   slabs?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
   /**
-   * Telhados do nível: contorno do beiral (POLYLINE fechada na camada `TELHADO_<código>`) e segmentos de cumeeira,
-   * espigão e rincão em planta (LINE na camada `TELHADO_CUMEEIRA`, todos juntos). Quem monta a geometria é o engine.
+   * Telhados do nível: contorno do beiral (POLYLINE fechada na camada `TELHADO_<código>`), segmentos de cumeeira,
+   * espigão e rincão em planta (LINE na camada `TELHADO_CUMEEIRA`, todos juntos) e de empena (LINE na camada
+   * `TELHADO_EMPENA`). Quem monta a geometria é o engine.
    */
-  roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
+  roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; gables?: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
 /** Camada das linhas de cumeeira, espigão e rincão (LINE). */
 export const DXF_LAYER_ROOF_RIDGE = 'TELHADO_CUMEEIRA';
+/** Camada das linhas de empena (aresta sem inclinação, LINE), separada da cumeeira. */
+export const DXF_LAYER_ROOF_GABLE = 'TELHADO_EMPENA';
 
 /** Texto para nome de camada: sem acentos, em maiúsculas, símbolos viram `_`. */
 function layerSafe(text: string): string {
@@ -112,7 +115,10 @@ interface Line {
 
 /** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE). */
 function linesOf(geo: DxfLevelGeometry): Line[] {
-  return (geo.roofs ?? []).flatMap((r) => r.ridges.map(([a, b]) => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })));
+  return (geo.roofs ?? []).flatMap((r) => [
+    ...r.ridges.map(([a, b]) => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
+    ...(r.gables ?? []).map(([a, b]) => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
+  ]);
 }
 
 /** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes, os telhados e, por último, os vãos. */

@@ -35,7 +35,9 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(r.levelId).toBe('lv_0');
     expect(r.boundary).toHaveLength(4);
     expect(polygonArea([r.boundary])).toBeCloseTo(24, 6);
-    expect(r.shape).toBe('gable');
+    // A forma da barra (duas águas, padrão) vira predefinições por aresta: lados longos definem, curtos são empenas.
+    expect(r.shape).toBe('edges');
+    expect(r.edgeSlopes).toEqual([30, null, 30, null]);
     expect(r.slopePercent).toBe(30);
     expect(r.heightOffset).toBe(2.8);
     expect(ctx.sel()).toEqual([r.id]);
@@ -117,7 +119,9 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     clickAt(t, 6, 4);
     const r = roofs(ctx.store.project)[0]!;
     expect(r.heightOffset).toBe(3.2);
-    expect(r.shape).toBe('shed');
+    expect(r.shape).toBe('edges');
+    // Uma água sobe no eixo curto (y): só a aresta mais baixa (y = 0) define inclinação.
+    expect(r.edgeSlopes).toEqual([15, null, null, null]);
     expect(r.slopePercent).toBe(15);
     expect(r.typeId).toBe('rt_fibro');
   });

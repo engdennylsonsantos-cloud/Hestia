@@ -1,8 +1,9 @@
 import { asMulti, difference, dot, multiArea, sub, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { levelElevation, roofsOnLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { levelElevation, roofsOnLevel, type Id, type Project, type RafterCut, type Roof, type RoofEave, type RoofType } from '@hestia/model';
 import { planeHas, WATER_MIN_AREA } from './roofGeom.ts';
+import { joinRoofs, type JoinItem } from './roofJoin.ts';
 import { roofLines } from './roofLines.ts';
-import { waterPlanes } from './roofShapes.ts';
+import { boundaryKindsOf, waterPlanesOf } from './roofShapes.ts';
 
 /** Água resolvida: região em planta e plano da face superior (cota absoluta z0 em `origin`, subida `up`, `percent`). */
 export interface ResolvedRoofPlane {
@@ -15,9 +16,9 @@ export interface ResolvedRoofPlane {
   z0: number;
 }
 
-/** Linha notável do telhado em planta (para desenho e quantitativos). */
+/** Linha notável do telhado em planta (para desenho e quantitativos). 'gable' é a empena (aresta sem inclinação). */
 export interface RoofLine {
-  kind: 'ridge' | 'hip' | 'valley' | 'eave';
+  kind: 'ridge' | 'hip' | 'valley' | 'eave' | 'gable';
   a: Vec2;
   b: Vec2;
 }
@@ -40,6 +41,22 @@ export interface ResolvedRoof {
   layers: ResolvedRoofLayer[];
   /** Cota absoluta do beiral (nível + deslocamento). */
   eaveZ: number;
+  /** Área em planta (m²) cortada das águas pela junção com outro telhado do nível; sai da planta e do volume. */
+  joinedArea: number;
+  /** Motivo de o telhado não ter águas (contorno que o cálculo não fecha); ausente quando há águas. */
+  problem?: string;
+  /** Acabamentos do beiral (testeira, calha, forro) do telhado; sem ele, nada é desenhado no beiral. */
+  eave?: RoofEave;
+  /** Corte das camadas no beiral: 'plumb' (vertical, padrão) ou 'square' (perpendicular à água). */
+  rafterCut?: RafterCut;
+  /** Balanço médio das arestas de beiral (as que têm água), m; base da largura do forro. */
+  eaveOverhang?: number;
+}
+
+/** Balanço médio das arestas de beiral (as que têm água); 0 quando não há nenhuma. */
+function eaveOverhangOf(r: Roof): number {
+  const over = boundaryKindsOf(r).flatMap((k, i) => (k === 'eave' ? [r.edgeOverhangs[i] ?? 0] : []));
+  return over.length ? over.reduce((a, b) => a + b, 0) / over.length : 0;
 }
 
 /** Cota absoluta da face superior de uma água em p (a água define o plano, sem conferir se p está dentro). */
@@ -54,31 +71,55 @@ export function roofTopAt(r: ResolvedRoof, p: Vec2): number | null {
 /** Espessura vertical total do telhado (soma das camadas). */
 export const roofThickness = (r: ResolvedRoof): number => r.layers.reduce((s, l) => s + l.thickness, 0);
 
-/** Um telhado: águas da forma menos os furos, linhas notáveis e camadas (espessura > 0). Sem tipo ou contorno válido, null. */
-function resolveOne(p: Project, r: Roof): ResolvedRoof | null {
+/** Telhado antes da junção: águas da forma menos os furos. Sem tipo ou contorno de três pontos, null. */
+type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string };
+
+function baseOf(p: Project, r: Roof): Base | null {
   const type = p.roofTypes[r.typeId];
   if (!type || r.boundary.length < 3) return null;
   const eaveZ = levelElevation(p, r.levelId) + r.heightOffset;
+  const water = waterPlanesOf(r, eaveZ);
   const holes = r.holes.filter((h) => h.length >= 3).map((h): MultiPolygon => asMulti(h));
-  const planes = waterPlanes(r, eaveZ)
+  const planes = water.planes
     .map((pl) => ({ ...pl, polygon: holes.length ? difference(pl.polygon, ...holes) : pl.polygon }))
     .filter((pl) => multiArea(pl.polygon) > WATER_MIN_AREA);
+  return { roof: r, type, eaveZ, planes, joinOthers: r.joinOthers === true, joinedArea: 0, ...(water.problem ? { problem: water.problem } : {}) };
+}
+
+/** Telhado resolvido depois da junção: linhas do próprio telhado mais as divisas que recebe da junção. */
+function finish(b: Base, joinLines: ResolvedRoof['lines']): ResolvedRoof {
   const layers: ResolvedRoofLayer[] = [];
   let below = 0;
-  type.layers.forEach((l, i) => {
+  b.type.layers.forEach((l, i) => {
     if (l.thickness < 1e-6) return;
     layers.push({ layerIndex: i, materialId: l.materialId, thickness: l.thickness, below });
     below += l.thickness;
   });
-  return { roofId: r.id, typeId: r.typeId, levelId: r.levelId, planes, lines: roofLines(r, planes), layers, eaveZ };
+  const r = b.roof;
+  return {
+    roofId: r.id,
+    typeId: r.typeId,
+    levelId: r.levelId,
+    planes: b.planes,
+    lines: [...roofLines(r, b.planes, boundaryKindsOf(r)), ...joinLines],
+    layers,
+    eaveZ: b.eaveZ,
+    joinedArea: b.joinedArea,
+    eave: r.eave,
+    rafterCut: r.rafterCut,
+    eaveOverhang: eaveOverhangOf(r),
+    ...(b.problem ? { problem: b.problem } : {}),
+  };
 }
 
-/** Águas, linhas e camadas dos telhados de um nível (ordem de criação). */
+/** Águas, linhas e camadas dos telhados de um nível (ordem de criação), com a junção entre os que se unem. */
 export function resolveRoofs(p: Project, levelId: Id): ResolvedRoof[] {
-  return roofsOnLevel(p, levelId).flatMap((r) => {
-    const rr = resolveOne(p, r);
-    return rr ? [rr] : [];
+  const bases = roofsOnLevel(p, levelId).flatMap((r) => {
+    const b = baseOf(p, r);
+    return b ? [b] : [];
   });
+  const joined = joinRoofs(bases);
+  return bases.map((b, k) => finish(b, joined[k]!));
 }
 
 /** Telhados de todos os níveis do projeto (a parede anexada cruza níveis, como com lajes). */

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactElement } from 'react';
 import { editor, useProject } from './editor/controller.ts';
+import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
 import { Browser } from './ui/Browser.tsx';
 import { Icon } from './ui/Icon.tsx';
@@ -115,7 +116,7 @@ export function App(): ReactElement {
       const t = e.target as HTMLElement | null;
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
       if (dialog || typing) return;
-      if (editor.key(e)) e.preventDefault();
+      if (roofEdgeKey(e.key, editor.store) || editor.key(e)) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

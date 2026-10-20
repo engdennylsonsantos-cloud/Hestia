@@ -43,20 +43,19 @@ describe('quantitativos de telhado: casos à mão, 8 x 6 a 30 %', () => {
     expect(q.ridgeLength).toBeCloseTo(8, 9);
     expect(q.ridgeHeight).toBeCloseTo(0.9, 9);
     expect(q.planes.map((x) => x.faceArea)).toEqual([24 * SLOPE, 24 * SLOPE].map((v) => expect.closeTo(v, 6)));
-    // Beiral: duas arestas de 8 m em z 0 e as arestas de empena (6 m em planta, 0,9 m de desnível) partidas em duas águas:
-    // 2 × 8 + 2 × 2 × √(3² + 0,9²) = 16 + 4 × √9,81 = 16 + 4 × 3,13209 = 28,5284.
-    expect(q.eaveLength).toBeCloseTo(16 + 4 * Math.sqrt(9.81), 6);
-    expect(q.eaveLength).toBeCloseTo(28.5284, 3);
+    // Beiral: as duas arestas longas de 8 m, em z 0. As empenas (6 m, perpendiculares à cumeeira) não são beiral.
+    expect(q.eaveLength).toBeCloseTo(16, 9);
+    expect(q.gableLength).toBeCloseTo(12, 9);
   });
 
-  it('uma água com dir (0,1): cumeeira no beiral alto (8 m a 1,80 m); beiral 8 + 2 × √(6² + 1,8²) = 20,5284', () => {
+  it('uma água com dir (0,1): sem cumeeira (o lado alto é empena a 1,80 m); beiral de 8 m; empenas de 20 m em planta', () => {
     const q = quantifyRoofs(build([{ shape: 'shed', dir: { x: 0, y: 1 } }]), 'lv_0').roofs[0]!;
     expect(q.planes).toHaveLength(1);
-    expect(q.ridgeLength).toBeCloseTo(8, 9);
-    expect(q.ridgeHeight).toBeCloseTo(1.8, 9);
+    expect(q.ridgeLength).toBeCloseTo(0, 9);
+    expect(q.ridgeHeight).toBeNull();
     expect(q.maxHeight).toBeCloseTo(1.8, 9);
-    expect(q.eaveLength).toBeCloseTo(8 + 2 * Math.sqrt(39.24), 6);
-    expect(q.eaveLength).toBeCloseTo(20.5284, 3);
+    expect(q.eaveLength).toBeCloseTo(8, 9);
+    expect(q.gableLength).toBeCloseTo(20, 9);
   });
 
   it('volume por camada e por material: telha 48 × 0,015 = 0,72 m³; madeira 48 × 0,08 = 3,84 m³', () => {

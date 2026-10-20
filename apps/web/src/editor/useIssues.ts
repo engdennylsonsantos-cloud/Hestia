@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { validateProject, type ValidationIssue } from '@hestia/model';
+import { roofWallIssues } from '@hestia/engine';
+import { validateProject, type Project, type ValidationIssue } from '@hestia/model';
 import { useProject } from './controller.ts';
+
+/** Avisos do projeto: os de validação e os de parede que ultrapassa ou fica fora do telhado (C2). */
+const allIssues = (p: Project): ValidationIssue[] => [...validateProject(p), ...roofWallIssues(p)];
 
 /** Acima deste número de elementos a validação espera o modelo parar de mudar. */
 const LARGE_MODEL = 2000;
@@ -15,12 +19,12 @@ export function useIssues(): ValidationIssue[] {
   const project = useProject();
   const large = Object.keys(project.elements).length > LARGE_MODEL;
 
-  const immediate = useMemo(() => (large ? null : validateProject(project)), [project, large]);
+  const immediate = useMemo(() => (large ? null : allIssues(project)), [project, large]);
 
   const [settled, setSettled] = useState<ValidationIssue[]>([]);
   useEffect(() => {
     if (!large) return;
-    const timer = setTimeout(() => setSettled(validateProject(project)), SETTLE_MS);
+    const timer = setTimeout(() => setSettled(allIssues(project)), SETTLE_MS);
     return () => clearTimeout(timer);
   }, [project, large]);
 

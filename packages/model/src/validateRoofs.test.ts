@@ -82,11 +82,9 @@ describe('validação de telhados', () => {
     expect(got.map((i) => i.code)).toEqual(['roof-plane-degenerate', 'roof-plane-degenerate', 'roof-plane-degenerate']);
   });
 
-  it('quatro águas com contorno côncavo é aviso (use águas livres)', () => {
+  it('quatro águas com contorno côncavo é válido: o cálculo por esqueleto cobre o L (sem aviso)', () => {
     const L = [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 6 }, { x: 0, y: 6 }];
-    const issues = issuesOf(raw(roof('r1', { shape: 'hip', boundary: L })));
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ severity: 'warning', code: 'roof-hip-nonconvex' });
+    expect(issuesOf(raw(roof('r1', { shape: 'hip', boundary: L })))).toEqual([]);
   });
 
   it('dois telhados do mesmo nível sobrepostos por mais de 1 cm² geram aviso; vizinhos que só se encostam não', () => {

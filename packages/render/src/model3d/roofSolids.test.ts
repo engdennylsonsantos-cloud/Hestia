@@ -23,6 +23,7 @@ function hip(): ResolvedRoof {
     typeId: 'rt_ceramica',
     levelId: 'lv_0',
     eaveZ: EAVE,
+    joinedArea: 0,
     layers: LAYERS,
     planes: [
       { polygon: [[[P(0, 0), P(8, 0), P(5, 3), P(3, 3)]]], origin: P(0, 0), up: P(0, 1), percent: 30, z0: EAVE },
@@ -41,6 +42,7 @@ function gable(): ResolvedRoof {
     typeId: 'rt_ceramica',
     levelId: 'lv_0',
     eaveZ: EAVE,
+    joinedArea: 0,
     layers: LAYERS,
     planes: [
       { polygon: [[[P(0, 0), P(8, 0), P(8, 3), P(0, 3)]]], origin: P(0, 0), up: P(0, 1), percent: 30, z0: EAVE },

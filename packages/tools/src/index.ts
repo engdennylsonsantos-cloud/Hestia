@@ -19,3 +19,6 @@ export { SlopeTool } from './slabSlopeTool.ts';
 export * from './roofGeom.ts';
 export * from './roofPick.ts';
 export { RoofTool } from './roofTool.ts';
+export * from './roofEdges.ts';
+export * from './roofCheck.ts';
+export { RoofArrowTool } from './roofArrowTool.ts';

@@ -2,13 +2,16 @@ import { dist, dot, multiArea, mid, sub, type Vec2 } from '@hestia/geom';
 import { roofPlanArea, type Id, type Project, type Roof, type RoofShape } from '@hestia/model';
 import { crossingParams, planeHas } from './roofGeom.ts';
 import { planeZ, resolveRoofs, roofThickness, type ResolvedRoof, type ResolvedRoofPlane, type RoofLine } from './roofs.ts';
+import { edgeSlopesOf } from './roofShapes.ts';
 
 /**
- * Quantitativos dos telhados de um nível. Área em planta = contorno menos furos. Área real de uma água =
- * área da água em planta / cos(atan(percentual / 100)). Volume de uma camada = área em planta × espessura vertical
- * (a camada acompanha a inclinação, como nas lajes). Comprimentos em 3D: cada trecho de linha tem comprimento em
- * planta `L` e desnível `Δz` = (percentual / 100) × dot(trecho, direção de subida) da água que contém o trecho;
- * comprimento 3D = √(L² + Δz²). Cumeeira horizontal tem Δz = 0 e vale o comprimento em planta.
+ * Quantitativos dos telhados de um nível. Área em planta = contorno menos furos e menos a parte unida a outro telhado.
+ * Área real de uma água = área da água em planta / cos(atan(percentual / 100)). Volume de uma camada = área em planta ×
+ * espessura vertical (a camada acompanha a inclinação, como nas lajes). Comprimentos em 3D: cada trecho de linha tem
+ * comprimento em planta `L` e desnível `Δz` = (percentual / 100) × dot(trecho, direção de subida) da água que contém o
+ * trecho; comprimento 3D = √(L² + Δz²). Cumeeira horizontal tem Δz = 0 e vale o comprimento em planta.
+ * Empena (aresta sem inclinação): comprimento em planta; área = trapézio vertical sob a água vizinha, medido a partir
+ * da cota do beiral (aproximação do frontão: a água é plana em cada trecho, então a área é exata para essa altura).
  */
 
 export interface RoofPlaneQuantity {
@@ -37,7 +40,7 @@ export interface RoofQuantity {
   levelId: Id;
   shape: RoofShape;
   mark: string;
-  /** Área líquida em planta: contorno menos furos (m²). */
+  /** Área líquida em planta: contorno menos furos e menos a parte unida a outro telhado (m²). */
   planArea: number;
   /** Soma das áreas reais das águas (m²). */
   faceArea: number;
@@ -58,6 +61,12 @@ export interface RoofQuantity {
   valleyLength: number;
   /** Comprimento 3D do beiral (m). */
   eaveLength: number;
+  /** Comprimento em planta das empenas, arestas sem inclinação (m). */
+  gableLength: number;
+  /** Área das empenas (m²): frontão vertical sob as águas vizinhas, a partir da cota do beiral. */
+  gableArea: number;
+  /** Arestas que definem inclinação (beirais); null nas águas livres e na extrusão. */
+  slopedEdges: number | null;
   /** Cota máxima das cumeeiras (m, absoluta); null sem cumeeira. */
   ridgeHeight: number | null;
   /** Cota máxima da face superior (m, absoluta). */
@@ -82,7 +91,10 @@ const slopeFactor = (percent: number): number => 1 / Math.cos(Math.atan(Math.abs
 
 const ringLength = (r: Vec2[]): number => r.reduce((s, q, i) => s + dist(q, r[(i + 1) % r.length]!), 0);
 
-/** Comprimento 3D de um segmento: trechos separados onde ele cruza as águas, cada um com a água que o contém. */
+/**
+ * Comprimento 3D de um segmento: trechos separados onde ele cruza as águas, cada um com a água que o contém. `planes` vem
+ * com as águas do próprio telhado antes das de outros telhados do nível (a junção pode pôr uma divisa na borda de outro).
+ */
 export function segmentLength3D(a: Vec2, b: Vec2, planes: ResolvedRoofPlane[]): number {
   const ts = crossingParams(a, b, planes.flatMap((pl) => pl.polygon));
   const ab = sub(b, a);
@@ -107,14 +119,33 @@ function lineHeights(l: RoofLine, planes: ResolvedRoofPlane[]): number[] {
   return pl ? [planeZ(pl, l.a), planeZ(pl, l.b)] : [];
 }
 
-function sumKind(r: ResolvedRoof, kind: RoofLine['kind']): number {
-  return r.lines.filter((l) => l.kind === kind).reduce((s, l) => s + segmentLength3D(l.a, l.b, r.planes), 0);
+function sumKind(r: ResolvedRoof, kind: RoofLine['kind'], planes: ResolvedRoofPlane[]): number {
+  return r.lines.filter((l) => l.kind === kind).reduce((s, l) => s + segmentLength3D(l.a, l.b, planes), 0);
 }
 
-function quantifyOne(p: Project, rr: ResolvedRoof): RoofQuantity {
+/** Área das empenas: para cada trecho de empena, o trapézio entre a cota do beiral e a água que o toca. */
+function gableAreaOf(rr: ResolvedRoof): number {
+  return rr.lines
+    .filter((l) => l.kind === 'gable')
+    .reduce((s, l) => {
+      const pl = rr.planes.find((x) => planeHas(x.polygon, mid(l.a, l.b)));
+      if (!pl) return s;
+      const h = (planeZ(pl, l.a) - rr.eaveZ + planeZ(pl, l.b) - rr.eaveZ) / 2;
+      return s + dist(l.a, l.b) * Math.max(0, h);
+    }, 0);
+}
+
+/** Arestas que definem inclinação na forma (null nas águas livres e na extrusão, que não têm uma lista por aresta). */
+function slopedEdgesOf(r: Roof): number | null {
+  if (r.shape === 'free' || r.shape === 'extrusion') return null;
+  return edgeSlopesOf(r).filter((s) => s !== null && s > 0).length;
+}
+
+/** Quantitativos de um telhado; `planes` tem as águas do próprio telhado primeiro, depois as dos outros do nível. */
+function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]): RoofQuantity {
   const r = p.elements[rr.roofId] as Roof;
-  const planArea = roofPlanArea(r);
-  const planes: RoofPlaneQuantity[] = rr.planes.map((pl) => {
+  const planArea = roofPlanArea(r) - rr.joinedArea;
+  const planesQ: RoofPlaneQuantity[] = rr.planes.map((pl) => {
     const area = multiArea(pl.polygon);
     return { planArea: area, faceArea: area * slopeFactor(pl.percent), percent: pl.percent };
   });
@@ -127,7 +158,7 @@ function quantifyOne(p: Project, rr: ResolvedRoof): RoofQuantity {
     planArea,
     volume: planArea * l.thickness,
   }));
-  const heights = rr.lines.filter((l) => l.kind === 'ridge').flatMap((l) => lineHeights(l, rr.planes));
+  const heights = rr.lines.filter((l) => l.kind === 'ridge').flatMap((l) => lineHeights(l, planes));
   const tops = rr.planes.flatMap((pl) => pl.polygon.flatMap((poly) => poly.flatMap((ring) => ring.map((v) => planeZ(pl, v)))));
   return {
     roofId: rr.roofId,
@@ -136,16 +167,19 @@ function quantifyOne(p: Project, rr: ResolvedRoof): RoofQuantity {
     shape: r.shape,
     mark: r.mark,
     planArea,
-    faceArea: planes.reduce((s, x) => s + x.faceArea, 0),
-    planes,
+    faceArea: planesQ.reduce((s, x) => s + x.faceArea, 0),
+    planes: planesQ,
     perimeter: ringLength(r.boundary),
     holesPerimeter: r.holes.reduce((s, h) => s + (h.length >= 3 ? ringLength(h) : 0), 0),
     thickness,
     volume: layers.reduce((s, l) => s + l.volume, 0),
-    ridgeLength: sumKind(rr, 'ridge'),
-    hipLength: sumKind(rr, 'hip'),
-    valleyLength: sumKind(rr, 'valley'),
-    eaveLength: sumKind(rr, 'eave'),
+    ridgeLength: sumKind(rr, 'ridge', planes),
+    hipLength: sumKind(rr, 'hip', planes),
+    valleyLength: sumKind(rr, 'valley', planes),
+    eaveLength: sumKind(rr, 'eave', planes),
+    gableLength: rr.lines.filter((l) => l.kind === 'gable').reduce((s, l) => s + dist(l.a, l.b), 0),
+    gableArea: gableAreaOf(rr),
+    slopedEdges: slopedEdgesOf(r),
     ridgeHeight: heights.length ? Math.max(...heights) : null,
     maxHeight: tops.length ? Math.max(...tops) : rr.eaveZ,
     layers,
@@ -154,7 +188,11 @@ function quantifyOne(p: Project, rr: ResolvedRoof): RoofQuantity {
 
 /** Quantitativos dos telhados de um nível. Telhado sem tipo válido ou contorno de menos de 3 pontos não entra. */
 export function quantifyRoofs(p: Project, levelId: Id): RoofQuantities {
-  const roofs = resolveRoofs(p, levelId).map((rr) => quantifyOne(p, rr));
+  const resolved = resolveRoofs(p, levelId);
+  const roofs = resolved.map((rr) => {
+    const others = resolved.filter((o) => o !== rr).flatMap((o) => o.planes);
+    return quantifyOne(p, rr, [...rr.planes, ...others]);
+  });
   const volumeByMaterial: Record<Id, number> = {};
   for (const r of roofs) for (const l of r.layers) volumeByMaterial[l.materialId] = (volumeByMaterial[l.materialId] ?? 0) + l.volume;
   return {

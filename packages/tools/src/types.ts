@@ -44,6 +44,15 @@ export interface ToolEnv {
   done(): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
+  /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */
+  roofEdge?(): RoofEdgeSel | null;
+  setRoofEdge?(sel: RoofEdgeSel | null): void;
+}
+
+/** Aresta do contorno de um telhado selecionado: `index` é a aresta de boundary[index] a boundary[index+1]. */
+export interface RoofEdgeSel {
+  roofId: Id;
+  index: number;
 }
 
 /** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, furo num piso selecionado, ou perímetro externo da edificação. */
@@ -52,8 +61,8 @@ export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
 /** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
 export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
-/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, ou pelo perímetro externo das paredes (com balanço). */
-export type RoofMode = 'poly' | 'rect' | 'paredes';
+/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, pelo perímetro externo das paredes (com balanço), ou abertura (furo) no telhado selecionado. 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
+export type RoofMode = 'poly' | 'rect' | 'paredes' | 'hole' | 'extrusao';
 
 /** Quais capturas estão ligadas (Revit: Snaps). */
 export interface SnapOptions {

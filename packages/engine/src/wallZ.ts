@@ -54,7 +54,7 @@ function facesAt(levelId: Id, at: Vec2, floors: ResolvedFloor[], slabs: Resolved
  * recebe o topo anexado (o perfil já define o topo); a base anexada move o perfil junto. Sem os flags, devolve
  * exatamente a base e a altura do modelo.
  * Com `attachTopToRoof` (decisão 0008, item 6), o topo vai para a face inferior do telhado ao longo do eixo (`roofWallProfile`);
- * só vale se o eixo estiver coberto em toda a extensão, senão a parede segue as regras de piso e de altura normal.
+ * só o trecho coberto pelo telhado segue a face inferior; o trecho sem telhado fica na altura normal (`roofWallProfile`).
  * `roofs` vem do engine (resolveAllRoofs); sem ele, é resolvido aqui.
  */
 export function wallZRange(
@@ -82,7 +82,7 @@ export function wallZRange(
     }
   }
   if (wantsRoof) {
-    const profile = roofWallProfile(w, roofs ?? resolveAllRoofs(p), z0);
+    const profile = roofWallProfile(w, roofs ?? resolveAllRoofs(p), z0, base + height);
     if (profile) return { z0, height: profileMax(profile), profile };
   }
   if (wantsTop && w.topLevelId !== null) {

@@ -13,8 +13,10 @@ import { SlabTool } from './slabTool.ts';
 import { SlopeTool } from './slabSlopeTool.ts';
 import { ParallelTool } from './parallelTool.ts';
 import { RoofTool } from './roofTool.ts';
+import { RoofExtrusionTool } from './roofExtrusionTool.ts';
+import { RoofArrowTool } from './roofArrowTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof'] },
@@ -36,6 +38,10 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new SlopeTool(env);
     case 'roof':
       return new RoofTool(env);
+    case 'roofarrow':
+      return new RoofArrowTool(env);
+    case 'roofextrusion':
+      return new RoofExtrusionTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -78,6 +84,8 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   slab: 'Laje',
   roof: 'Telhado',
   slope: 'Inclinação',
+  roofarrow: 'Seta de inclinação',
+  roofextrusion: 'Telhado por extrusão',
   door: 'Porta',
   window: 'Janela',
   move: 'Mover',

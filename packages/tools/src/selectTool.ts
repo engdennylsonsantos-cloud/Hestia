@@ -6,13 +6,15 @@ import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpening
 import { followingEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
 import { floorGripAt, floorIdsInBox, pickFloorAt, ringInsertAfter, ringMoveVertex, ringRemoveVertex, type FloorGrip } from './floorPick.ts';
 import { pickSlabAt, slabGripAt, slabIdsInBox, type SlabGrip } from './slabPick.ts';
-import { pickRoofAt, roofGripAt, roofIdsInBox, type RoofGrip } from './roofPick.ts';
+import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofGripAt, roofIdsInBox, type RoofGrip } from './roofPick.ts';
+import { roofRingPatch } from './roofEdges.ts';
+import { commitRoofPatch } from './roofCheck.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { parseNumber } from './numeric.ts';
-import type { PointerInfo } from './types.ts';
+import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
-type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'floorgrip' | 'slabgrip' | 'roofgrip' | 'dragwait' | 'moving' | 'opening';
+type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'floorgrip' | 'slabgrip' | 'roofgrip' | 'roofedge' | 'dragwait' | 'moving' | 'opening';
 
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
@@ -32,6 +34,8 @@ export class SelectTool extends ToolBase {
   private floorGrip: FloorGrip | null = null;
   private slabGrip: SlabGrip | null = null;
   private roofGrip: RoofGrip | null = null;
+  /** Aresta de telhado pressionada (ainda sem arrasto: vira seleção de aresta no soltar). */
+  private roofEdgeDown: RoofEdgeSel | null = null;
   /** Vértice de piso ou laje em foco (clicado com a alça): o Delete o remove. */
   private focus: { id: Id; index: number } | null = null;
   private delta: Vec2 = { x: 0, y: 0 };
@@ -46,6 +50,7 @@ export class SelectTool extends ToolBase {
     this.floorGrip = null;
     this.slabGrip = null;
     this.roofGrip = null;
+    this.roofEdgeDown = null;
     this.gripPt = null;
     this.delta = { x: 0, y: 0 };
     this.openingId = null;
@@ -110,6 +115,8 @@ export class SelectTool extends ToolBase {
       // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.
       if (isSlab(f) && f.slope) this.items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary)));
     }
+    // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
+    this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
     const w = this.singleWall();
     if (w && this.mode === 'idle') {
@@ -175,7 +182,7 @@ export class SelectTool extends ToolBase {
       this.env.say(`${isSlab(f) ? 'Uma laje' : isRoof(f) ? 'Um telhado' : 'Um piso'} precisa de ao menos 3 vértices.`);
       return true;
     }
-    this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: ring } });
+    if (isRoof(f)) commitRoofPatch(this.env, [f.id], roofRingPatch(f, ring, { kind: 'remove', vertex: this.focus.index })); else this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: ring } });
     this.focus = { id: f.id, index: Math.min(this.focus.index, ring.length - 1) };
     this.env.say('Vértice removido. Ctrl+Z desfaz.');
     return true;
@@ -213,6 +220,8 @@ export class SelectTool extends ToolBase {
       this.mode = 'roofgrip';
       return;
     }
+    const re = roofEdgeAt(pr, sel, p.raw, mpp);
+    if (re) { this.roofEdgeDown = re; this.mode = 'roofedge'; return; }
     const hit = this.hitAt(p.raw);
     if (hit && sel.includes(hit.id)) {
       if (hit.kind === 'door' || hit.kind === 'window') {
@@ -234,6 +243,7 @@ export class SelectTool extends ToolBase {
     const moved = dist(p.raw, this.downPt) > 4 * mpp;
     const pr = this.env.project();
     if (this.mode === 'pending' && moved) this.mode = 'window';
+    if (this.mode === 'roofedge' && moved) this.mode = 'dragwait';
     if (this.mode === 'dragwait' && moved) this.mode = 'moving';
     this.items = [];
     switch (this.mode) {
@@ -331,6 +341,7 @@ export class SelectTool extends ToolBase {
     const pr = this.env.project();
     const mode = this.mode;
     if (mode !== 'floorgrip' && mode !== 'slabgrip' && mode !== 'roofgrip') this.focus = null;
+    if (mode !== 'roofedge') this.env.setRoofEdge?.(null);
     switch (mode) {
       case 'grip': {
         if (this.grip && this.gripPt) {
@@ -383,11 +394,16 @@ export class SelectTool extends ToolBase {
         if (!g || !isRoof(r) || !this.gripPt) break;
         if (dist(this.gripPt, g.at) > 1e-6) {
           const ring = g.kind === 'vertex' ? ringMoveVertex(r.boundary, g.index, this.gripPt) : ringInsertAfter(r.boundary, g.index, this.gripPt);
-          this.env.exec({ type: 'updateElements', ids: [r.id], patch: { boundary: ring } });
+          commitRoofPatch(this.env, [r.id], roofRingPatch(r, ring, g.kind === 'vertex' ? null : { kind: 'insert', edge: g.index }));
         } else if (g.kind === 'vertex') {
           this.focus = { id: r.id, index: g.index };
           this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
         }
+        break;
+      }
+      case 'roofedge': {
+        const re = this.roofEdgeDown;
+        if (re) { this.env.setSelection([re.roofId]); this.env.setRoofEdge?.(re); this.env.say(`Aresta ${re.index + 1} selecionada: Propriedades define a inclinação e o balanço; I alterna "define inclinação".`); }
         break;
       }
       case 'moving': {

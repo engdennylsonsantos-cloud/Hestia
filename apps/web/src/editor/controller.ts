@@ -65,7 +65,7 @@ export class Editor {
     project: () => this.store.project,
     levelId: () => useUi.getState().levelId,
     selection: () => useUi.getState().selection,
-    setSelection: (ids) => useUi.setState({ selection: ids }),
+    setSelection: (ids) => useUi.setState({ selection: ids, roofEdge: ids.length === 1 && useUi.getState().roofEdge?.roofId === ids[0] ? useUi.getState().roofEdge : null }),
     exec: (c) => this.store.exec(c),
     transaction: (l, fn) => this.store.transaction(l, fn),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
@@ -73,6 +73,7 @@ export class Editor {
     say: (m) => useUi.setState({ status: m }),
     done: () => this.setTool('select'),
     options: () => useUi.getState().options,
+    roofEdge: () => useUi.getState().roofEdge, setRoofEdge: (sel) => useUi.setState({ roofEdge: sel }),
   };
 
   get project(): Project {

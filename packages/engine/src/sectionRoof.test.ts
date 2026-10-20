@@ -26,6 +26,7 @@ function gable(eaveZ = EAVE): ResolvedRoof {
     typeId: 'rt_ceramica',
     levelId: 'lv_0',
     eaveZ,
+    joinedArea: 0,
     layers: LAYERS,
     planes: [
       { polygon: [[sq(0, 0, 8, 3)]], origin: { x: 0, y: 0 }, up: { x: 0, y: 1 }, percent: 30, z0: eaveZ },
@@ -42,6 +43,7 @@ function shed(): ResolvedRoof {
     typeId: 'rt_ceramica',
     levelId: 'lv_0',
     eaveZ: EAVE,
+    joinedArea: 0,
     layers: LAYERS,
     planes: [{ polygon: [[[{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 8, y: 6 }, { x: 0, y: 6 }]]], origin: { x: 0, y: 0 }, up: { x: 0, y: 1 }, percent: 30, z0: EAVE }],
     lines: [],

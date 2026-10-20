@@ -10,21 +10,26 @@ const MODES: Array<[RoofMode, string]> = [
   ['poly', 'Contorno por pontos'],
   ['rect', 'Retângulo (2 cantos)'],
   ['paredes', 'Pelas paredes (com balanço)'],
+  ['extrusao', 'Por extrusão (perfil)'],
+  ['hole', 'Abertura no telhado selecionado'],
 ];
 
-const SHAPES: RoofShape[] = ['shed', 'gable', 'hip'];
+/** Predefinições por aresta (Revit: Define Slope): cada forma preenche as arestas que definem inclinação. Extrusão tem perfil. */
+const SHAPES: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'extrusion'];
 
 /**
  * Opções da ferramenta Telhado: tipo, modo, forma, inclinação (% e graus, convertidos entre si), balanço do beiral e
  * cota do beiral. Cota "Automática" usa a altura da parede mais alta do nível (2,8 m sem paredes).
  */
-export function RoofOptionsBar(): ReactElement {
+export function RoofOptionsBar({ tool }: { tool: 'roof' | 'roofextrusion' }): ReactElement {
   const p = useProject();
   const o = useUi((s) => s.options);
   const levelId = useUi((s) => s.levelId);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...useUi.getState().options, ...patch } });
   const slope = o.roofSlope ?? 30;
   const offsetAuto = roofAutoOffset(p, levelId);
+  // O modo "extrusao" só vale com a ferramenta própria ativa; na ferramenta Telhado o seletor mostra o contorno.
+  const modeValue: RoofMode = tool === 'roofextrusion' ? 'extrusao' : o.roofMode === 'extrusao' ? 'poly' : (o.roofMode ?? 'poly');
   return (
     <>
       <label>
@@ -40,11 +45,12 @@ export function RoofOptionsBar(): ReactElement {
         <select
           id="opt-roofmode"
           className="select"
-          value={o.roofMode ?? 'poly'}
+          value={modeValue}
           onChange={(e) => {
             // Trocar o modo reinicia o desenho em andamento (o modo é lido pela ferramenta a cada passo).
+            // "Por extrusão" é a ferramenta própria (roofextrusion); os demais modos ficam na ferramenta Telhado.
             set({ roofMode: e.target.value as RoofMode });
-            editor.setTool('roof');
+            editor.setTool(e.target.value === 'extrusao' ? 'roofextrusion' : 'roof');
           }}
         >
           {MODES.map(([id, label]) => (
@@ -81,7 +87,7 @@ export function RoofOptionsBar(): ReactElement {
           Automática
         </button>
       )}
-      <span className="hint">Tab troca o eixo da cumeeira.</span>
+      <span className="hint">Tab troca o eixo da cumeeira. Depois de criado, cada aresta se edita na planta.</span>
     </>
   );
 }

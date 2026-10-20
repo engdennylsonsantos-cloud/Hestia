@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
-import { DEFAULT_SNAP, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { DEFAULT_SNAP, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -36,6 +36,8 @@ export interface UiState {
   snapKind: string;
   seen3d: boolean;
   ribbon: 'arquitetura' | 'modificar' | 'vista';
+  /** Aresta de telhado escolhida na planta (seção "Aresta N" em Propriedades). */
+  roofEdge: RoofEdgeSel | null;
 }
 
 const SNAP_KEY = 'hestia.snap';
@@ -126,4 +128,5 @@ export const useUi = create<UiState>(() => ({
   snapKind: '',
   seen3d: false,
   ribbon: 'arquitetura',
+  roofEdge: null,
 }));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea, type Vec2 } from '@hestia/geom';
 import { resolveLevel, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeRoof, type DetailLevel, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeRoof, makeWall, type DetailLevel, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { mix } from './color.ts';
 import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps, waterTone } from './roofs.ts';
@@ -24,6 +24,7 @@ function gable(extra: Partial<ResolvedRoof> = {}): ResolvedRoof {
     typeId: 'rt_ceramica',
     levelId: 'lv_0',
     eaveZ: 2.8,
+    joinedArea: 0,
     layers: LAYERS,
     planes: [
       { polygon: [[[P(0, 0), P(8, 0), P(8, 3), P(0, 3)]]], origin: P(0, 0), up: P(0, 1), percent: 30, z0: 2.8 },
@@ -167,7 +168,8 @@ describe('seleção e hover de telhado (D1)', () => {
     const ops1 = roofSelectionOps(p, 'lv_0', [real[0]!.roofId], null, LIGHT, VIEW(100));
     expect(ops1.fills[0]).toMatchObject({ color: LIGHT.select, alpha: 0.26 });
     expect(ops1.strokes.some((s) => s.widthPx === 2)).toBe(true);
-    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`]);
+    // área real e, com o telhado selecionado, o percentual de cada aresta que define inclinação (A11)
+    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`, '30 %', '30 %', '30 %', '30 %']);
   });
 
   it('hover: só o azul translúcido', () => {
@@ -214,5 +216,90 @@ describe('subpavimento com telhados (D4)', () => {
     const i = dl.fills.findIndex((f) => f.color === LIGHT.underlay && f.alpha === 0.22);
     expect(i).toBeGreaterThanOrEqual(0);
     expect(dl.fills[i]!.polygons).toEqual(roofFootprint(below));
+  });
+});
+
+/** Telhado por contorno (forma 'edges') com as inclinações por aresta, resolvido pelo motor real. */
+function edgesProject(boundary: Vec2[], edgeSlopes: Array<number | null>): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary, heightOffset: 2.8, shape: 'edges', edgeSlopes }) });
+  return s.project;
+}
+const L_BOUNDARY = [P(-0.3, -0.3), P(8.3, -0.3), P(8.3, 3.3), P(4.3, 3.3), P(4.3, 6.3), P(-0.3, 6.3)];
+const RECT_BOUNDARY = [P(-0.3, -0.3), P(8.3, -0.3), P(8.3, 6.3), P(-0.3, 6.3)];
+
+describe('aresta de empena e símbolo "define inclinação" (A10/A11)', () => {
+  it('empena (kind gable): tracejado longo e um traço perpendicular no meio', () => {
+    const o = ops([gable({ lines: [{ kind: 'gable', a: P(0, 0), b: P(8, 0) }] })]);
+    const dashed = o.strokes.filter((s) => s.dash);
+    expect(dashed).toHaveLength(1);
+    expect(dashed[0]!.dash).toEqual([12, 5]);
+    expect(dashed[0]!.pts).toEqual([P(0, 0), P(8, 0)]);
+    const tick = o.strokes.find((s) => !s.dash && s.pts.length === 2 && s.pts[0]!.x === 4 && s.widthPx === 1.6)!;
+    expect(tick.pts[0]!.y).toBeCloseTo(-0.06, 9);
+    expect(tick.pts[1]!.y).toBeCloseTo(0.06, 9);
+  });
+
+  it('selecionado em L com as 6 arestas definindo inclinação: 6 triângulos cheios na cor de destaque, cada um com "30 %"', () => {
+    const p = edgesProject(L_BOUNDARY, [30, 30, 30, 30, 30, 30]);
+    const o = roofSelectionOps(p, 'lv_0', ['r'], null, LIGHT, VIEW(100));
+    const filled = o.fills.filter((f) => f.color === LIGHT.accent);
+    expect(filled).toHaveLength(6);
+    for (const f of filled) expect(f.polygons[0]![0]!).toHaveLength(3);
+    expect(o.labels.filter((l) => l.text === '30 %')).toHaveLength(6);
+  });
+
+  it('aresta sem inclinação (null): triângulo vazado e cinza, sem triângulo cheio; a empena fica tracejada no contorno', () => {
+    const p = edgesProject(RECT_BOUNDARY, [30, null, 30, null]);
+    const o = roofSelectionOps(p, 'lv_0', ['r'], null, LIGHT, VIEW(100));
+    expect(o.fills.filter((f) => f.color === LIGHT.accent)).toHaveLength(2);
+    expect(o.strokes.filter((s) => s.closed && s.pts.length === 3 && s.color === LIGHT.inkSoft)).toHaveLength(2);
+    expect(o.strokes.some((s) => s.dash && s.color === LIGHT.select)).toBe(true);
+  });
+
+  it('o símbolo só aparece com o telhado selecionado', () => {
+    const p = edgesProject(L_BOUNDARY, [30, 30, 30, 30, 30, 30]);
+    const o = roofSelectionOps(p, 'lv_0', [], null, LIGHT, VIEW(100));
+    expect(o.fills.some((f) => f.color === LIGHT.accent)).toBe(false);
+    expect(o.labels.some((l) => l.text === '30 %')).toBe(false);
+  });
+});
+
+describe('cota da cumeeira e planta de cobertura (D6)', () => {
+  it('cota absoluta da cumeeira no ponto médio, só com etiquetas ligadas', () => {
+    expect(ops([gable()]).labels.some((l) => l.text.startsWith('▲'))).toBe(false);
+    const o = roofOps([gable()], projectWithRoof(true), LIGHT, false, 'medium', VIEW(100));
+    const rd = o.labels.find((l) => l.text.startsWith('▲'))!;
+    expect(rd.text).toBe('▲ +3,70');
+    expect(rd.at).toEqual(P(4, 3));
+  });
+
+  it('planta de cobertura: água opaca (alpha 1) e cota da cumeeira mesmo sem etiquetas', () => {
+    const o = roofOps([gable()], createEmptyProject(), LIGHT, false, 'medium', VIEW(100), { planMode: true });
+    expect(o.fills.filter((f) => f.alpha !== 1)).toHaveLength(0);
+    expect(o.labels.map((l) => l.text)).toContain('▲ +3,70');
+  });
+
+  it('roofPlanMode na lista: telhado opaco, paredes só como contorno fino por cima, sem traços de piso por baixo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'a', typeId: 'wt_alv14', levelId: 'lv_0', a: P(0, 0), b: P(8, 0) }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'b', typeId: 'wt_alv14', levelId: 'lv_0', a: P(8, 0), b: P(8, 6) }) });
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [P(-0.3, -0.3), P(8.3, -0.3), P(8.3, 6.3), P(-0.3, 6.3)], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: P(1, 0) }) });
+    const p = s.project;
+    const dl = buildPlanDrawList(input(p, { roofPlanMode: true }));
+    expect(dl.fills.filter((f) => f.alpha < 1)).toHaveLength(0);
+    expect(dl.labels.some((l) => /^▲ \+\d,\d\d$/.test(l.text))).toBe(true);
+    // paredes: contorno fino de 1 px, e nenhum contorno grosso de parede (2,2 px fechado) sobra
+    expect(dl.strokes.some((st) => st.widthPx === 1 && st.closed && st.color === LIGHT.inkSoft && st.alpha === 0.8)).toBe(true);
+    expect(dl.strokes.some((st) => st.widthPx === 2.2 && st.closed)).toBe(false);
+  });
+
+  it('roofPlanMode: os telhados de baixo entram opacos, só o preenchimento (sem a faixa apagada)', () => {
+    const p = projectWithRoof();
+    const below = gable();
+    const dl = buildPlanDrawList(input(p, { roofPlanMode: true, below: resolveLevel(p, 'lv_0', new Map()), belowRoofs: [below] }));
+    const planeFill = dl.fills.find((f) => JSON.stringify(f.polygons) === JSON.stringify(below.planes[0]!.polygon));
+    expect(planeFill?.alpha).toBe(1);
+    expect(dl.fills.some((f) => f.color === LIGHT.underlay && f.alpha === 0.22)).toBe(false);
   });
 });

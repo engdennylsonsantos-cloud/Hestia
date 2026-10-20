@@ -41,10 +41,10 @@ describe('telhado de uma água (shed)', () => {
     expect(roofTopAt(r, { x: 9, y: 3 })).toBeNull();
   });
 
-  it('a aresta alta é cumeeira (8 m); as outras são beiral', () => {
-    expect(ML(r.lines, 'ridge')).toHaveLength(1);
-    expect(sum(ML(r.lines, 'ridge').map(len))).toBeCloseTo(8, 9);
-    expect(ML(r.lines, 'eave')).toHaveLength(3);
+  it('a aresta alta é empena (sem cumeeira); a de baixo é beiral e as laterais são empenas', () => {
+    expect(ML(r.lines, 'ridge')).toHaveLength(0);
+    expect(ML(r.lines, 'eave')).toHaveLength(1);
+    expect(ML(r.lines, 'gable')).toHaveLength(3);
   });
 });
 
@@ -64,7 +64,8 @@ describe('telhado de duas águas (gable)', () => {
     const ridges = ML(r.lines, 'ridge');
     expect(ridges).toHaveLength(1);
     expect(sum(ridges.map(len))).toBeCloseTo(8, 9);
-    expect(ML(r.lines, 'eave')).toHaveLength(4);
+    expect(ML(r.lines, 'eave')).toHaveLength(2);
+    expect(sum(ML(r.lines, 'gable').map(len))).toBeCloseTo(12, 9);
   });
 });
 
@@ -91,7 +92,7 @@ describe('telhado de quatro águas (hip)', () => {
     hips.forEach((h) => expect(len(h)).toBeCloseTo(Math.sqrt(18), 9));
   });
 
-  it('contorno não convexo não gera águas (a validação avisa)', () => {
+  it('contorno não convexo (L) em quatro águas: uma água por aresta que define (seis), sem motivo de falha; área 33 m²', () => {
     const L: Vec2[] = [
       { x: 0, y: 0 },
       { x: 8, y: 0 },
@@ -100,9 +101,11 @@ describe('telhado de quatro águas (hip)', () => {
       { x: 3, y: 6 },
       { x: 0, y: 6 },
     ];
-    const bad = one({ shape: 'hip', slopePercent: 30, boundary: L });
-    expect(bad.planes).toEqual([]);
-    expect(ML(bad.lines, 'eave')).toHaveLength(6);
+    const got = one({ shape: 'hip', slopePercent: 30, boundary: L });
+    expect(got.problem).toBeUndefined();
+    expect(got.planes).toHaveLength(6);
+    expect(sum(got.planes.map((pl) => multiArea(pl.polygon)))).toBeCloseTo(33, 6);
+    expect(ML(got.lines, 'valley')).toHaveLength(1);
   });
 });
 

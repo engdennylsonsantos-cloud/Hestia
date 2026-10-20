@@ -40,6 +40,7 @@ const P: Record<string, string> = {
   slab: 'M3 8h18v4H3zM3 12h18v5H3zM7 17v2M12 17v2M17 17v2M7 8V5M12 8V5M17 8V5',
   slope: 'M3 17L21 9M21 9v4M21 9h-4M3 20h18M3 17v3',
   roof: 'M3 14l9-9 9 9M6 12v8h12v-8',
+  roofarrow: 'M3 14l9-9 9 9M6 12v8h12v-8M12 17v-4M10.5 14.5L12 13l1.5 1.5',
   stairs: 'M3 20h5v-5h5v-5h5V5h3',
   room: 'M4 4h16v16H4zM9 9h6v6H9z',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',

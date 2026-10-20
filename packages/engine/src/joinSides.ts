@@ -39,13 +39,15 @@ export function miterBreaks(self: MiterSide, other: MiterSide): number[] {
 
 export const sOfDepth = (m: MiterSide, d: number): number => (m.sigma > 0 ? m.sHi - d : m.sLo + d);
 
-/** Ponto da aresta de fim da camada, na fronteira à profundidade `d` (medida da face externa do canto). */
-export function miterPoint(self: MiterSide, other: MiterSide, d: number): Vec2 | null {
-  const dd = pairDepth(self, other, d);
-  const sA = sOfDepth(self, d);
-  const sB = sOfDepth(other, dd);
+/** Interseção da face da `self` em `sA` com a face da `other` em `sB` (coordenadas s de cada parede). */
+export function crossAt(self: MiterSide, sA: number, other: MiterSide, sB: number): Vec2 | null {
   const r = intersectLines(add(self.o, mul(self.n, sA)), self.u, add(other.o, mul(other.n, sB)), other.u);
   return r ? r.point : null;
+}
+
+/** Ponto da aresta de fim da camada, na fronteira à profundidade `d` (medida da face externa do canto). */
+export function miterPoint(self: MiterSide, other: MiterSide, d: number): Vec2 | null {
+  return crossAt(self, sOfDepth(self, d), other, sOfDepth(other, pairDepth(self, other, d)));
 }
 
 /** Lado do canto de uma extremidade: `sigma` escolhe qual face é a externa do canto (ver `sideOf`). */
@@ -84,9 +86,10 @@ export const sub2 = (p: Vec2, q: Vec2): Vec2 => ({ x: p.x - q.x, y: p.y - q.y })
 
 /**
  * Corte em degraus que pareia camada com camada (docs/08 §5.4, passos 2 e 3). As quebras de profundidade são as
- * mesmas da esquadria (`miterBreaks`), então os dois lados do canto produzem os mesmos vértices; cada faixa recebe um
- * corte reto perpendicular ao eixo, no `t` do ponto pareado de uma das suas fronteiras: `low` (a faixa fica com a
- * célula do canto — é a parede que domina a junção) ou `high` (a faixa para na face da vizinha).
+ * mesmas da esquadria (`miterBreaks`), então os dois lados do canto produzem os mesmos vértices. Cada faixa corta ao
+ * longo de uma face da vizinha, à profundidade pareada de uma das suas fronteiras: `low` (a faixa fica com a célula
+ * do canto — é a parede que domina a junção) ou `high` (a faixa para na face da vizinha). A 90° esse corte é
+ * perpendicular ao eixo; em ângulo ele acompanha a face oblíqua da vizinha, sem deixar triângulo vazio.
  *
  * É a versão em degraus da diagonal da esquadria: onde ela corta em ângulo, aqui cada camada para numa face de
  * camada do vizinho. Devolve null quando o ponto pareado cai fora do limite em volta da ponta (junção mal
@@ -96,15 +99,29 @@ export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'l
   const T = self.sHi - self.sLo;
   const breaks = [0, ...miterBreaks(self, other), T];
   const endT = r.which === 'a' ? 0 : r.f.length;
+  const ok = (t: number | null): t is number => t !== null && Number.isFinite(t) && Math.abs(t - endT) <= cap;
   const runs: StepRun[] = [];
   for (let k = 0; k < breaks.length - 1; k++) {
     const d0 = breaks[k]!;
     const d1 = breaks[k + 1]!;
-    const p = miterPoint(self, other, Math.max(0, Math.min(edge === 'low' ? d0 : d1, T)));
-    if (!p) return null;
-    const t = toLocal(r.f, p).t;
-    if (!Number.isFinite(t) || Math.abs(t - endT) > cap) return null;
-    runs.push({ s: Math.min(sOfDepth(self, d0), sOfDepth(self, d1)), t });
+    // A faixa corta ao longo da face da outra parede, à profundidade pareada da borda que a limita (`low`: d0;
+    // `high`: d1). Os dois pontos da faixa ficam nessa mesma linha: a 90° ela é perpendicular ao eixo, como antes.
+    const dEdge = Math.max(0, Math.min(edge === 'low' ? d0 : d1, T));
+    const sOther = sOfDepth(other, pairDepth(self, other, dEdge));
+    const tAtS = (s: number): number | null => {
+      const p = crossAt(self, s, other, sOther);
+      return p ? toLocal(r.f, p).t : null;
+    };
+    const sA = sOfDepth(self, d0);
+    const sB = sOfDepth(self, d1);
+    const sLow = Math.min(sA, sB);
+    const sHigh = Math.max(sA, sB);
+    const tEdge = tAtS(edge === 'low' ? sA : sB);
+    const tLow = tAtS(sLow);
+    const tHigh = tAtS(sHigh);
+    if (!ok(tEdge) || !ok(tLow) || !ok(tHigh)) return null;
+    if (Math.abs(tHigh - tLow) < 1e-9) runs.push({ s: sLow, t: tEdge });
+    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh });
   }
   runs.sort((x, y) => x.s - y.s);
   return runs.length ? { kind: 'steps', runs } : null;
@@ -133,16 +150,30 @@ export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
     }
     return best;
   };
+  // Posição na extremidade do ramal, limitada como antes (o corte não sai do ramal).
+  const clampT = (t: number): number => (r.which === 'a' ? Math.min(t, r.f.length - 0.01) : Math.max(t, 0.01));
   const runs: StepRun[] = [];
   for (const sp of layerSpans(r.f.type)) {
     if (sp.layer.thickness < 1e-6) continue;
     const d = faceFor(layerPriority(sp.layer));
-    const hit = intersectLines(pointAt(host, 0, fromHi ? nearS - d : nearS + d), host.u, r.o, r.dir);
+    const face = pointAt(host, 0, fromHi ? nearS - d : nearS + d);
+    const hit = intersectLines(face, host.u, r.o, r.dir);
     if (!hit) return null;
-    let t = toLocal(r.f, hit.point).t;
-    if (!Number.isFinite(t)) return null;
-    t = r.which === 'a' ? Math.min(t, r.f.length - 0.01) : Math.max(t, 0.01);
-    runs.push({ s: Math.min(sAtDepth(r.f, sp.from), sAtDepth(r.f, sp.to)), t });
+    const tAxis = toLocal(r.f, hit.point).t;
+    if (!Number.isFinite(tAxis)) return null;
+    // A face da hospedeira corta a camada do ramal nas duas bordas dela (s menor e s maior): o corte é oblíquo quando
+    // o ramal não é perpendicular à hospedeira (T oblíquo), e reto (o mesmo `tAxis`) quando é.
+    const sLo = Math.min(sAtDepth(r.f, sp.from), sAtDepth(r.f, sp.to));
+    const sHi = Math.max(sAtDepth(r.f, sp.from), sAtDepth(r.f, sp.to));
+    const tOnEdge = (s: number): number | null => {
+      const q = intersectLines(face, host.u, pointAt(r.f, 0, s), r.f.u);
+      return q ? toLocal(r.f, q.point).t : null;
+    };
+    const tLo = tOnEdge(sLo);
+    const tHi = tOnEdge(sHi);
+    if (tLo === null || tHi === null || !Number.isFinite(tLo) || !Number.isFinite(tHi)) return null;
+    if (Math.abs(tHi - tLo) < 1e-9) runs.push({ s: sLo, t: clampT(tAxis) });
+    else runs.push({ s: sLo, s1: sHi, t: clampT(tLo), t1: clampT(tHi) });
   }
   if (runs.length === 0) return null;
   runs.sort((x, y) => x.s - y.s);

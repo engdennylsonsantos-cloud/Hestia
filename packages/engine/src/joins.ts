@@ -3,7 +3,7 @@ import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 import type { EndRef, WallEnds } from './joinTypes.ts';
 import { flatEnd, setEnd, both, buttAgainst } from './joinSides.ts';
 import { joinPair, toCenterline } from './joinPair.ts';
-import { starNode } from './joinNode.ts';
+import { nodeOfWalls } from './joinNode.ts';
 
 export type { EndSpec, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
 export { miterBreaks, miterPoint } from './joinSides.ts';
@@ -76,7 +76,7 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
     });
     return;
   }
-  starNode(out, g);
+  nodeOfWalls(out, g);
 }
 
 function findTee(r: EndRef, frames: WallFrame[], tol: number): WallFrame | null {

@@ -19,10 +19,16 @@ export interface MiterSide {
   bounds: number[];
 }
 
-/** Faixa de espessura com o seu próprio corte: `s` é a borda de `s` menor da faixa, `t` a posição do corte. */
+/**
+ * Faixa de espessura com o seu próprio corte: a faixa vai de `s` (borda de `s` menor) até `s1`, e o corte vai
+ * linearmente de `t` em `s` até `t1` em `s1`. Sem `t1` (ou `s1`) o corte é reto, na posição `t` (perpendicular ao
+ * eixo quando o pareamento é a 90°). Oblíquo quando o corte acompanha a face da outra parede (docs/08 §5.4 passo 3).
+ */
 export interface StepRun {
   s: number;
+  s1?: number;
   t: number;
+  t1?: number;
 }
 
 /**

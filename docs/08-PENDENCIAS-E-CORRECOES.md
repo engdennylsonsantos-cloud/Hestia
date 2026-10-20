@@ -7,7 +7,7 @@ Estado em que foi escrito: branch `claude/trusting-lamport-28zmit`, sobre `4ca0d
 na seção 2. Nada de geometria foi alterado nesta rodada — só instrumentação, testes e scripts.
 
 Atualização (rodada seguinte, sobre `8e50504`): **J-1 corrigido em encosto e T** (passos 3–4 do §5.4, ver §5.7),
-esquadro mantido com aviso; **J-2 implementado e revertido** (§6.4) — segue aberto. Guardas que documentavam o
+esquadro pareado por face na decisão 0009 #13 (aviso e lote "Quinas em esquadria" removidos); **J-2 implementado e revertido** (§6.4) — segue aberto. Guardas que documentavam o
 defeito foram invertidas (§7.4) e dois testes que fixavam a geometria antiga foram justificados: `golden.test.ts`
 ("L em encosto") e `render/model3d/solids.test.ts` (volume do bloco).
 
@@ -18,7 +18,7 @@ defeito foram invertidas (§7.4) e dois testes que fixavam a geometria antiga fo
 | ID | Defeito | Severidade | Estado | Onde |
 |---|---|---|---|---|
 | **P-1** | `difference()` entrava em laço no polygon-clipping (~10 s por tentativa sem limite) quando as coordenadas são transladadas; a resolução da semente 24 transladada custava 339 s | **alta** (trava a interface) | **corrigido** (`clipReturn` vai direto ao Clipper + memoização; seed 24 transladada: 339 s → 1,1 s) | `resolve.ts`, `boolean.ts` |
-| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | **corrigido em encosto e T** (degras por camada, §5.4 passos 3–4: no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` cai de 0,004004 para 0); **passo 2 (nó de 3+) revertido**: pareamento por lado deixou frestas de ~2 mm, ver §6.4; no **esquadro** o defeito fica, com aviso (decisão 0009 #10) | `joinSides.ts`, `joinPair.ts`, `layerGeom.ts` |
+| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | **corrigido em encosto, esquadro e T** (degras por camada, §5.4 passos 3–4: no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` cai de 0,004004 para 0); **passo 2 (nó de 3+) revertido**: pareamento por lado deixou frestas de ~2 mm, ver §6.4; no **esquadro** (quina de 90°, o mesmo caso) pareia por face como o encosto (decisão 0009 #13; antes era plano único com aviso) | `joinSides.ts`, `joinPair.ts`, `layerGeom.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | medido, **não corrigido**: o pareamento por lado foi implementado e revertido (§6.4) — falta fechar as frestas no meio da espessura | `joins.ts` (`starNode`) |
 | **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | **corrigido** (campo `raw` em `ResolvedLayer`; guardas sobre `raw`, com teste negativo em encosto e esquadro, §7.4) | `quinas.test.ts`, `types.ts`, `clipReturn.ts` |
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
@@ -279,8 +279,8 @@ e o resultado tem de ser **bit a bit igual** ao atual.
    por prioridade de camada); decisão 0009 ganhou os itens 11 e 12.
 4. **`square`.** Não tem conserto por pareamento: um corte reto é um plano só e não pode respeitar limites de
    camada e cobrir o canto externo ao mesmo tempo. As opções são (i) manter e **avisar**, ou (ii) redefinir o que
-   "esquadro" significa. Recomendo (i) — ver seção 8. — **mantido com aviso** (decisão 0009 #10); a guarda de
-   sobreposição continua acusando em `square` de propósito.
+   "esquadro" significa. Recomendo (i) — ver seção 8. — **superado** (decisão 0009 #13): o esquadro passou a parear
+   por face, como o encosto; o plano único fica só para o par sem pareamento possível.
 
 ### 5.5 Critérios de aceitação
 
@@ -292,7 +292,7 @@ e o resultado tem de ser **bit a bit igual** ao atual.
 - Total na caixa continua idêntico ao da esquadria (nada pode sumir). → **0,056640 m² nos três tipos**.
 - Os cinco invariantes das 15 sementes seguem verdes. → verdes (`npm test`).
 - Sobreposição em `raw` do acabamento da fina com o bloco da grossa na caixa do canto: **0,004004 → 0** em `butt`
-  (esquadria 0; esquadro 0,008360, inalterado).
+  (esquadria 0; esquadro 0,008360 com plano único; 0 depois do pareamento do esquadro, decisão 0009 #13).
 
 ### 5.6 Aviso importante de acoplamento
 
@@ -324,8 +324,9 @@ a sobreposição em `raw` vai a zero e o pintor deixa de ter trabalho.
 **Parede curva e ângulo agudo** ficam com o comportamento anterior: `stairSpec` devolve `null` quando o ponto pareado
 sai do limite em volta da ponta e `buttAgainst` devolve `null` para arco. Nada de novo é aplicado a arco.
 
-**Esquadro** continua um plano só; o pareamento não tem como respeitá-lo (passo 4). O aviso e o comando em lote da
-decisão 0009 #10 continuam sendo o caminho do usuário.
+**Esquadro** pareia por face como o encosto (decisão 0009 #13): é o mesmo ramo de `pairSpecs`, com os mesmos degraus.
+Só o par sem pareamento possível (parede curva, degrau fora do limite) cai no plano único (`flatSquare`). O aviso e o
+comando em lote saíram do código, porque não há mais quina a corrigir.
 
 **Efeito nos dourados e no 3D.** `golden.test.ts` "L em encosto": o contorno da estrutura passa a ser o mesmo da
 esquadria (antes a dominante ia até a face externa da outra e o núcleo da fina até a linha de centro). A silhueta
@@ -465,7 +466,7 @@ defeito. O defeito maior está entre substratos (reboco x argamassa).
 **Testes negativos (teste do teste):** cada guarda tem um teste com `butt` e outro com `square` que afirma área
 > 1e-4 (sem `skip` nem `it.fails`), marcado com `// J-1: ... inverter ao corrigir`. Quando J-1 estiver corrigido, a
 asserção vira `< 1e-6`. — **feito em `butt`**: as guardas de encosto passaram a exigir `< 1e-6`; as de `square`
-continuam exigindo `> 1e-4` de propósito (o esquadro não pareia; quem sinaliza é o aviso, 0009 #10).
+exigiam `> 1e-4` enquanto o esquadro era plano único; depois do pareamento do esquadro (0009 #13) passam a exigir `< 1e-6`.
 
 **Redistribuição do §5.1 sobre `raw`** (`juncoesAcabamento.test.ts`, caixa do canto `[3.88; -0.15; 4.12; 0.15]`): a
 área do acabamento da fina que cai sobre o bloco da grossa é **0** em esquadria, **0,004004 m²** em encosto e
@@ -488,7 +489,8 @@ sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
 
 ## 8. Decisões que precisam do dono do projeto
 
-1. **Aviso de quina em esquadro.** `buttCornerFinishPairs` filtra `join !== 'butt'`
+1. **Aviso de quina em esquadro. Superado** (decisão 0009 #13): o esquadro pareia por face como o encosto, o aviso e o
+   lote saíram do código. Pergunta original, para registro: `buttCornerFinishPairs` filtra `join !== 'butt'`
    (`packages/model/src/validateJoins.ts:72,76`), então quina em **esquadro** com acabamento é **silenciosa**,
    apesar de ter 74% do canto comendo o acabamento da fina. Estender o aviso ao esquadro também faz o comando em
    lote "Quinas em esquadria" passar a corrigir essas quinas (a lista é compartilhada). É desejável? **Decidido: sim**
@@ -562,7 +564,7 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 | 3 | **T-1**: guardas sobre geometria pré-pintura (7.2a) | feito (7.4): `raw`, com teste negativo | 1 h |
 | 4 | **J-1/J-2**: `EndSpec` por lado + nó por vizinho angular (5.4) | corrige o defeito visual de junção | 4–6 h |
 |  | ↳ passo 1 (tipos por lado) | feito (`8e50504`) | — |
-|  | ↳ passos 3–4 (encosto/T por face; esquadro com aviso) | feito (§5.7) | — |
+|  | ↳ passos 3–4 (encosto/T/esquadro por face; sem aviso) | feito (§5.7) | — |
 |  | ↳ passo 2 (nó de 3+) | implementado e revertido; falta fechar as frestas (§6.4) | 2–4 h |
 | 5 | **I-1b**: ruído do vitest / CI (9.3) | libera a suíte completa em CI | 2 h |
 | 6 | Decisões da seção 8 | fecham o escopo | — |
@@ -575,9 +577,9 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 - **P-1**: o snap de entrada fabrica contato exato; o polygon-clipping entra em laço nos retornos de acabamento
   da semente transladada (339 s). Corrigido: retornos vão direto ao Clipper, com memoização. O snap não foi tocado.
 - **J-1**: encosto e esquadro cortavam todas as camadas com um escalar e deixavam o núcleo comer o acabamento (75% e
-  74% da área do canto). **Encosto e T corrigidos**: pareamento por face em degraus (`steps`/`stairSpec`/`buttAgainst`)
+  74% da área do canto). **Encosto, esquadro e T corrigidos**: pareamento por face em degraus (`steps`/`stairSpec`/`buttAgainst`)
   — no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` de 0,004004
-  para 0. O **esquadro** fica como está, com aviso (é um plano só).
+  para 0. O **esquadro** pareia por face como o encosto (decisão 0009 #13); o aviso e o lote saíram.
 - **J-2**: nó de 3+ paredes ignora a configuração e aperta o núcleo da grossa. Implementado por vizinho angular e
   revertido: cada parede só pode usar o pareamento em meia espessura, e a troca de dono no meio deixa frestas de
   ~2 mm (§6.4). Segue aberto, com três caminhos medidos.

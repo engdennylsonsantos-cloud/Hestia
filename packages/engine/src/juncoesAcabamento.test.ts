@@ -357,13 +357,16 @@ function sobreposicaoRaw(kind: JoinKind): number {
 }
 
 describe('redistribuição do §5.1 sobre raw (T-1)', () => {
-  it('esquadria e encosto: zero; esquadro: positivo (encosto passou a parear por face)', () => {
+  it('esquadria, encosto e esquadro: zero (os três pareiam camada com camada por face)', () => {
     const medidas = { miter: sobreposicaoRaw('miter'), butt: sobreposicaoRaw('butt'), square: sobreposicaoRaw('square') };
     console.log(`\n--- sobreposição raw acabamento da fina x bloco da grossa, caixa do canto (m²): ${JSON.stringify(medidas)}`);
-    // J-1 corrigido: o encosto pareia camada com camada, como a esquadria.
+    // Antes o esquadro era um plano só e sobrava 0,008360 m² de sobreposição (decisão 0009 #10, superada pelo #11).
+    // Agora esquadro a 90° pareia por face como o encosto (docs/08 §5.4 passo 3): a sobreposição vai a zero.
+    // Mesmo efeito no acabamento da fina na caixa do canto (medido no cenário L acima): 0,006372 m² em encosto e em
+    // esquadro, contra ~0,0017 m² com o corte reto antigo (docs/08 §5.1) e 0,006776 m² em esquadria. Os dois agora
+    // fazem o mesmo degrau, então a caixa sai idêntica nos dois.
     expect(medidas.miter).toBeLessThan(1e-6);
     expect(medidas.butt).toBeLessThan(1e-6);
-    // O esquadro é um plano só: continua com sobreposição, sinalizada pelo aviso (decisão 0009 #10).
-    expect(medidas.square).toBeGreaterThan(1e-4);
+    expect(medidas.square).toBeLessThan(1e-6);
   });
 });

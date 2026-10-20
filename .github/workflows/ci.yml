@@ -13,7 +13,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
+      - run: npm run check
       - run: npm run build
+
+  # Desempenho: limites relativos a uma tarefa-base, rodados isolados. Não bloqueia o merge enquanto a
+  # medida em runner compartilhado não estiver estável (ver docs/08 §9); o resultado aparece no job.
+  perf:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:perf

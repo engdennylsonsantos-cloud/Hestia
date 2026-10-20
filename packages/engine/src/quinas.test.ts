@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { difference, intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallType, wallsOnLevel, type JoinKind, type Project, type Wall } from '@hestia/model';
+import { ProjectStore, buildTemplate, createEmptyProject, makeWall, wallType, wallsOnLevel, type JoinKind, type Project, type Wall } from '@hestia/model';
 import { resolveLevel } from './index.ts';
 
 /** Ponto dentro da ponta que o encosto deixava exposta: o núcleo da parede que passa chega à face externa da outra. */
@@ -43,11 +43,10 @@ function paresNaoEstrutura(kind: JoinKind): Array<{ nome: string; area: number }
 }
 
 describe('quinas externas (decisão 0009)', () => {
-  it('a casa padrão tem as quatro quinas externas em esquadria e nenhum aviso de encosto', () => {
+  it('a casa padrão tem as quatro quinas externas em esquadria', () => {
     const p = buildTemplate('house2');
     const corners = wallsOnLevel(p, 'lv_0').filter((w) => ['h_w', 'h_n', 'h_e', 'h_s'].includes(w.id));
     for (const w of corners) expect([w.joinStart.kind, w.joinEnd.kind].includes('miter'), w.id).toBe(true);
-    expect(validateProject(p).filter((i) => i.code === 'wall-corner-butt-finish')).toEqual([]);
   });
 
   it('a quina externa da casa padrão não deixa o núcleo da parede que passa na face externa', () => {
@@ -57,7 +56,7 @@ describe('quinas externas (decisão 0009)', () => {
     expect(pointInMulti(CAP, bloco.cut)).toBe(false);
   });
 
-  it('o mesmo canto em encosto já não deixa o núcleo aparecer (J-1 corrigido); em esquadro ainda deixa', () => {
+  it('o mesmo canto em encosto ou em esquadro não deixa o núcleo aparecer (J-1 corrigido)', () => {
     const p = buildTemplate('house2');
     const hw = { ...p.elements['h_w']! } as typeof p.elements['h_w'];
     const hs = { ...p.elements['h_s']! } as typeof p.elements['h_s'];
@@ -72,39 +71,22 @@ describe('quinas externas (decisão 0009)', () => {
       };
       return resolveLevel(q, 'lv_0', new Map()).walls['h_w']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
     };
-    // O encosto pareia por face (docs/08 §5.4 passo 3): a ponta do núcleo para na face do outro núcleo.
+    // Encosto e esquadro pareiam por face (docs/08 §5.4 passo 3; decisão 0009 #11): a ponta do núcleo para na face do
+    // outro núcleo, e o esquadro a 90° faz o mesmo.
     expect(pointInMulti(CAP, com('butt').cut)).toBe(false);
-    // O esquadro é um plano só e não consegue respeitar as camadas: continua com a ponta exposta (decisão 0009 #10).
-    expect(pointInMulti(CAP, com('square').cut)).toBe(true);
-  });
-
-  it('aviso de quina em encosto: 90° com acabamento sim, T e paredes colineares não', () => {
-    const s = new ProjectStore(createEmptyProject());
-    const W = (id: string, a: [number, number], b: [number, number]) => makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] } });
-    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0]) });
-    s.exec({ type: 'addWall', wall: W('b', [4, 0], [4, 3]) });
-    expect(validateProject(s.project).filter((i) => i.code === 'wall-corner-butt-finish')).toHaveLength(1);
-    const t = new ProjectStore(createEmptyProject());
-    t.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0]) });
-    t.exec({ type: 'addWall', wall: W('c', [2, 0], [2, 3]) });
-    expect(validateProject(t.project).filter((i) => i.code === 'wall-corner-butt-finish')).toEqual([]);
-    const c = new ProjectStore(createEmptyProject());
-    c.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0]) });
-    c.exec({ type: 'addWall', wall: W('d', [4, 0], [8, 0]) });
-    expect(validateProject(c.project).filter((i) => i.code === 'wall-corner-butt-finish')).toEqual([]);
+    expect(pointInMulti(CAP, com('square').cut)).toBe(false);
   });
 
   it('L em esquadria entre parede de 19 cm e de 14 cm: o acabamento da fina para na face da grossa', () => {
     for (const par of paresNaoEstrutura('miter')) expect(par.area, par.nome).toBeLessThan(1e-6);
   });
-  // Encosto pareado por face: a guarda fica verde (era o defeito J-1). O esquadro é um plano só, não pareia, e a
-  // guarda continua acusando — é o que o aviso de quina em esquadro (decisão 0009 #10) sinaliza ao usuário.
+  // Encosto e esquadro pareados por face: a guarda fica verde (era o defeito J-1). O esquadro a 90° é o mesmo caso
+  // que o encosto (decisão 0009 #10, superada pelo #11): a guarda tem de ficar zerada nos dois.
   it('butt: a guarda acabamento/substrato x acabamento/substrato fica zerada (encosto pareado por face)', () => {
     for (const par of paresNaoEstrutura('butt')) expect(par.area, par.nome).toBeLessThan(1e-6);
   });
-  it('square: a guarda acabamento/substrato x acabamento/substrato continua reportando sobreposição', () => {
-    const maior = Math.max(...paresNaoEstrutura('square').map((par) => par.area));
-    expect(maior).toBeGreaterThan(1e-4);
+  it('square: a guarda acabamento/substrato x acabamento/substrato fica zerada (esquadro pareado por face)', () => {
+    for (const par of paresNaoEstrutura('square')) expect(par.area, par.nome).toBeLessThan(1e-6);
   });
   it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina não descem abaixo da face do núcleo da grossa (y = 0,091)', () => {
     const s = new ProjectStore(createEmptyProject());
@@ -219,24 +201,15 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
     });
   }
 
-  // Teste do teste (T-1, §7.3): o esquadro não pareia, então a guarda tem de acusar sobreposição sobre raw.
-  it('square: a guarda do núcleo cheio (caixa de 0,5 m) reporta área do acabamento da fina dentro dele', () => {
-    const c = CASES[0]!;
-    const { caixa, finas } = referencia(build(c, 'square'), c);
-    expect(maiorSobreposicao(finas, caixa)).toBeGreaterThan(1e-4);
-  });
-  it('square: a guarda da estrutura da grossa (raw) reporta área do acabamento da fina dentro dela', () => {
-    const c = CASES[0]!;
-    const { nucleo, finas } = referencia(build(c, 'square'), c);
-    expect(maiorSobreposicao(finas, nucleo)).toBeGreaterThan(1e-4);
-  });
-  // J-1 corrigido: no encosto pareado as duas guardas de núcleo ficam zeradas.
-  for (const alvo of ['caixa', 'nucleo'] as const) {
-    it(`butt: a guarda do ${alvo === 'caixa' ? 'núcleo cheio (caixa de 0,5 m)' : 'estrutura da grossa (raw)'} fica zerada`, () => {
-      const c = CASES[0]!;
-      const { caixa, nucleo, finas } = referencia(build(c, 'butt'), c);
-      expect(maiorSobreposicao(finas, alvo === 'caixa' ? caixa : nucleo)).toBeLessThan(1e-6);
-    });
+  // J-1 corrigido: no encosto e no esquadro pareados as duas guardas de núcleo ficam zeradas.
+  for (const kind of ['butt', 'square'] as const) {
+    for (const alvo of ['caixa', 'nucleo'] as const) {
+      it(`${kind}: a guarda do ${alvo === 'caixa' ? 'núcleo cheio (caixa de 0,5 m)' : 'estrutura da grossa (raw)'} fica zerada`, () => {
+        const c = CASES[0]!;
+        const { caixa, nucleo, finas } = referencia(build(c, kind), c);
+        expect(maiorSobreposicao(finas, alvo === 'caixa' ? caixa : nucleo)).toBeLessThan(1e-6);
+      });
+    }
   }
 
   it('caso do usuário: o bloco da grossa contém o ponto (0,06; 0,08) (o núcleo não recua por causa da fina)', () => {
@@ -270,24 +243,12 @@ describe('campo raw da camada (T-1)', () => {
     expect(multiArea(intersection(bloco14.raw, bloco19.raw))).toBeLessThan(1e-9);
   });
 
-  it('no esquadro o pintor ainda recorta: o raw do bloco da fina é maior que o cut e os raws se sobrepõem', () => {
-    // O esquadro é um plano só (decisão 0009 #10): a sobreposição continua e é o aviso que a sinaliza.
+  it('no esquadro pareado o pintor também não recorta: raw e cut coincidem e os raws não se sobrepõem', () => {
+    // Esquadro a 90° pareia por face como o encosto (decisão 0009 #11): nada sobra para o pintor resolver.
     const r = resolveLevel(lQuatroMetros('square'), 'lv_0', new Map());
     const bloco14 = r.walls['f']!.layers.find((l) => l.materialId === 'mat_bloco14')!;
     const bloco19 = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
-    expect(multiArea(bloco14.raw)).toBeGreaterThan(multiArea(bloco14.cut) + 1e-3);
-    expect(multiArea(intersection(bloco14.raw, bloco19.raw))).toBeGreaterThan(1e-3);
-  });
-});
-
-describe('aviso de quina em esquadro (decisão 0009 #10)', () => {
-  it('casa padrão com as quatro quinas em esquadro: quatro avisos, todos dizendo esquadro', () => {
-    const p = buildTemplate('house2');
-    const sq = { kind: 'square' as const, flip: false };
-    const elements = { ...p.elements };
-    for (const id of ['h_w', 'h_n', 'h_e', 'h_s']) elements[id] = { ...(p.elements[id] as Wall), joinStart: sq, joinEnd: sq };
-    const issues = validateProject({ ...p, elements }).filter((i) => i.code === 'wall-corner-butt-finish');
-    expect(issues).toHaveLength(4);
-    for (const i of issues) expect(i.message).toContain('em esquadro,');
+    expect(multiArea(bloco14.raw)).toBeCloseTo(multiArea(bloco14.cut), 9);
+    expect(multiArea(intersection(bloco14.raw, bloco19.raw))).toBeLessThan(1e-9);
   });
 });

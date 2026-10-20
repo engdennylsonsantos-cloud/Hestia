@@ -45,6 +45,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C15 Parede empilhada sobre outra (níveis diferentes)
 - [-] C16 Junção com pilar, viga e cortina de vidro: depende desses elementos, que têm checklists próprios
 - [-] C17 Divisão automática ao cruzar: o Revit também não divide sozinho
+- [x] C18 Quina em encosto e em esquadro pareia por face, em degraus, sem aviso nem lote de correção (docs/08 §5.7; decisão 0009 #11 e #13)
 
 ## D · Aberturas hospedadas
 - [x] D1 Porta e janela hospedadas, recorte em todas as camadas

@@ -22,18 +22,27 @@ function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
 /** Face da extremidade que vale para `s`: a metade de s maior usa `hi`, a de s menor usa `lo`. */
 export const sideAt = (f: WallFrame, spec: EndSpec, s: number): SideSpec => (s >= f.sMid ? spec.hi : spec.lo);
 
+/** Posição do corte de uma faixa na espessura `s` (linear entre `t` e `t1` quando a faixa é oblíqua). */
+export function runT(r: StepRun, s: number): number {
+  if (r.t1 === undefined || r.s1 === undefined || r.s1 === r.s) return r.t;
+  const f = (s - r.s) / (r.s1 - r.s);
+  if (f <= 0) return r.t;
+  if (f >= 1) return r.t1;
+  return r.t + (r.t1 - r.t) * f;
+}
+
 /**
  * Posição do corte em degraus para a espessura `s`. `edge` diz qual borda da faixa está sendo cortada: a de baixo
  * (`low`, faixa que começa em `s`) ou a de cima (`high`, faixa que termina em `s`) — as duas camadas que dividem a
  * mesma fronteira têm cortes diferentes, e é justamente esse degrau que o pareamento por face usa.
  */
 function stepT(runs: readonly StepRun[], s: number, edge: 'low' | 'high'): number {
-  let t = runs[0]!.t;
+  let run = runs[0]!;
   for (const r of runs) {
     if (edge === 'low' ? r.s > s + 1e-12 : r.s >= s - 1e-12) break;
-    t = r.t;
+    run = r;
   }
-  return t;
+  return runT(run, s);
 }
 
 /** Ponto da extremidade em `s` segundo uma face (corte reto, esquadria contra o vizinho ou degraus por camada). */
@@ -52,12 +61,12 @@ export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: numbe
 /** Vértices intermediários da linha de uma face entre s=lo e s=hi, em ordem crescente de s. */
 function sideChain(f: WallFrame, side: SideSpec, lo: number, hi: number): Vec2[] {
   if (side.kind === 'steps') {
-    // Cada troca de faixa é um degrau: o vértice de baixo (corte anterior) e o de cima (corte seguinte).
+    // Cada troca de faixa é um degrau: o vértice de baixo (fim do corte anterior) e o de cima (início do seguinte).
     const out: Vec2[] = [];
     for (let i = 1; i < side.runs.length; i++) {
       const r = side.runs[i]!;
       if (r.s <= lo + 1e-9 || r.s >= hi - 1e-9) continue;
-      out.push(pointAt(f, side.runs[i - 1]!.t, r.s), pointAt(f, r.t, r.s));
+      out.push(pointAt(f, runT(side.runs[i - 1]!, r.s), r.s), pointAt(f, r.t, r.s));
     }
     return out;
   }

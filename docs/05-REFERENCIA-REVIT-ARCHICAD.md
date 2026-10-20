@@ -179,7 +179,7 @@ Graus: **confirmado em fonte oficial** (ajuda do fabricante ou documentação de
 **Decisões do Hestia (docs/decisoes/0004):**
 1. Padrão = **encosto**, como o Revit. A mais antiga domina; "inverter ordem" troca.
 2. **Esquadria** pareia as camadas **a partir do núcleo** (a estrutura de uma parede encontra a da outra; acabamentos contornam o canto com a espessura própria de cada um). Se os acabamentos de uma parede são mais finos, eles terminam na face externa da outra.
-3. **Esquadro** `[?]`: implementado como extensão reta das duas paredes até cobrir o canto externo. A fonte descreve "esquadrejar a 90°" para encontros não retos; o detalhe visual precisa de confirmação.
+3. **Esquadro** `[?]`: implementado como encosto com pareamento por face, em degraus (decisão 0009 #13; antes era extensão reta das duas paredes até cobrir o canto externo, que agora é só o fallback de par sem pareamento). A fonte descreve "esquadrejar a 90°" para encontros não retos; o detalhe visual precisa de confirmação.
    Pesquisa de 19/10/2026 (§7.1, item 9): a definição está confirmada em fonte oficial (ajuda Autodesk, trecho de busca) e o código a segue, pois cada extremidade é cortada a 90° e prolongada até o canto externo. O desenho exato do canto **não foi encontrado**; continua `[?]`.
 4. T (extremidade no meio da outra): sempre encosto, ordem fixa, como no Revit.
 5. Nó de 3 ou mais paredes: cada parede ocupa o setor limitado pelas semirretas que saem do nó pelos cantos entre faces vizinhas. Com um par colinear, o par atravessa e as demais encostam (T).

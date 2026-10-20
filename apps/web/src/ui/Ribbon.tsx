@@ -85,17 +85,6 @@ export function Ribbon(): ReactElement {
         {tab === 'modificar' && (
           <div className="rgroup">
             <div className="rgroup-tools">
-              <button className="tbtn" onClick={() => editor.miterAllCorners()} title="Troca as quinas em encosto ou esquadro com acabamento por esquadria, em todos os níveis (Ctrl+Z desfaz)">
-                <Icon name="joins" size={22} />
-                <span>Quinas em esquadria</span>
-              </button>
-            </div>
-            <div className="rgroup-title">Junção</div>
-          </div>
-        )}
-        {tab === 'modificar' && (
-          <div className="rgroup">
-            <div className="rgroup-tools">
               <MoveLevelButton />
             </div>
             <div className="rgroup-title">Nível</div>

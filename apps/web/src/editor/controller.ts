@@ -16,7 +16,6 @@ import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } fr
 import { transfer } from './transfer.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
-import { miterCorners } from './cornerActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
@@ -336,11 +335,6 @@ export class Editor {
   selectAllOfType(typeId: Id): number { return transfer.ofType(this.project, useUi.getState().levelId, typeId); }
   /** "Mesmo tipo" (botão na aba Modificar). */
   selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
-
-  /** Quinas em encosto ou esquadro com acabamento viram esquadria em todos os níveis (um passo de desfazer). Devolve a contagem. */
-  miterAllCorners(): number { return miterCorners(this.store); }
-  /** "Corrigir" de um aviso `wall-corner-butt-finish`: as quinas em encosto desta parede viram esquadria. */
-  miterWallCorners(wallId: Id): number { return miterCorners(this.store, wallId); }
 
   undo(): void {
     this.store.undo();

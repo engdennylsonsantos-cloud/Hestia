@@ -66,21 +66,31 @@ export interface PairSpecs {
 }
 
 /**
+ * Corte do esquadro quando o pareamento não é possível (parede curva ou degrau fora do limite): um plano só por parede,
+ * prolongado até cobrir o canto externo. Só cobre o canto; não respeita os limites das camadas (docs/08 §5.4 passo 4).
+ */
+function flatSquare(lead: EndRef, follower: EndRef): PairSpecs {
+  return {
+    lead: flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f)),
+    follower: flatAt(follower, capExt(outerExtension(follower, lead), lead.f, follower.f)),
+  };
+}
+
+/**
  * Especificações de corte do par (lead, follower) segundo o tipo de junção. `null` quando o par não tem pareamento
- * possível (parede curva, ângulo agudo demais ou degrau fora do limite) — quem chama decide o corte alternativo.
+ * possível e o tipo não tem corte alternativo próprio (encosto: quem chama aplica a linha de centro; esquadria mal
+ * condicionada: mantém o corte que já estava).
+ *
+ * Encosto e esquadro pareiam do mesmo jeito, por face, em degraus (docs/08 §5.4 passo 3; decisão 0009 #11): a
+ * dominante fica com as células do canto (é ela que atravessa até o canto externo) e a outra para nas faces das
+ * camadas dela. Esquadro a 90° é o mesmo caso que encosto; o plano único (`flatSquare`) só entra quando o par não
+ * admite pareamento (parede curva, degrau fora do limite).
  */
 export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
   const { lead, follower, kind } = pairRoles(a, b);
   const cap = MITER_LIMIT * Math.max(0.05, lead.f.thickness, follower.f.thickness);
   const sa = sideOf(lead, follower.dir);
   const sb = sideOf(follower, lead.dir);
-  if (kind === 'square') {
-    // Esquadro: um plano só por parede, prolongado até cobrir o canto externo; não pareia camada com camada.
-    return {
-      lead: flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f)),
-      follower: flatAt(follower, capExt(outerExtension(follower, lead), lead.f, follower.f)),
-    };
-  }
   if (kind === 'miter') {
     const ok = (s: MiterSide, o: MiterSide, ref: EndRef): boolean => {
       const t = s.sHi - s.sLo;
@@ -96,13 +106,13 @@ export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
       follower: { kind: 'miter', self: sb, other: sa },
     };
   }
-  // Encosto pareado por face (docs/08 §5.4 passo 3): a dominante fica com as células do canto (é ela que atravessa
-  // até o canto externo) e a outra para nas faces das camadas dela, em degraus. Antes a ponta do seguidor ia até a
-  // linha de centro e o núcleo da dominante comia o acabamento dela (J-1).
-  if (lead.f.arc || follower.f.arc) return null;
-  const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
-  const followSteps = stairSpec(follower, sb, sa, 'high', cap);
-  return leadSteps && followSteps ? { lead: leadSteps, follower: followSteps } : null;
+  // Encosto e esquadro: pareamento por face. Só não cabe em parede curva ou quando o degrau sai do limite.
+  if (!lead.f.arc && !follower.f.arc) {
+    const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
+    const followSteps = stairSpec(follower, sb, sa, 'high', cap);
+    if (leadSteps && followSteps) return { lead: leadSteps, follower: followSteps };
+  }
+  return kind === 'square' ? flatSquare(lead, follower) : null;
 }
 
 /** Junção de duas paredes segundo a configuração da mais antiga (docs/05 §9). */
@@ -120,5 +130,5 @@ export function joinPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void
     const spec = toCenterline(follower, lead.f);
     if (spec) setEnd(out, follower, both(spec));
   }
-  // Esquadria mal condicionada ou esquadro sem extensão: mantém o corte reto que já estava.
+  // Esquadria mal condicionada (ângulo agudo demais): mantém o corte reto que já estava.
 }

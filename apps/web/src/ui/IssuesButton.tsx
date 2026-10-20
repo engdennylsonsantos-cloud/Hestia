@@ -74,13 +74,6 @@ export function IssuesButton(): ReactElement {
     trigger.current?.focus();
   };
 
-  /** Quina em encosto ou esquadro com acabamento: troca as quinas desta parede por esquadria e fecha a lista. */
-  const fix = (wallId: string): void => {
-    editor.miterWallCorners(wallId);
-    setOpen(false);
-    trigger.current?.focus();
-  };
-
   const severity = worstSeverity(issues);
   return (
     <div className="issues-anchor" ref={anchor} aria-live="off">
@@ -112,11 +105,6 @@ export function IssuesButton(): ReactElement {
                     {issue.elementId && (
                       <button type="button" className="chiplink" onClick={() => choose(issue)} aria-label={`Ir para o elemento: ${issue.message}`}>
                         Ir para
-                      </button>
-                    )}
-                    {issue.code === 'wall-corner-butt-finish' && issue.elementId && (
-                      <button type="button" className="chiplink" onClick={() => fix(issue.elementId!)} aria-label={`Corrigir a quina: ${issue.message}`}>
-                        Corrigir
                       </button>
                     )}
                   </li>

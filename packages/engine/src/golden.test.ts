@@ -55,13 +55,12 @@ describe('K2 · contornos dourados por junção', () => {
     expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
   });
 
-  it('L em corte reto (esquadro): cada parede avança até a face externa da outra', () => {
+  it('L em esquadro (90°): pareia por face como o encosto, então o núcleo é o da esquadria (decisão 0009 #11)', () => {
     const r = level([wall('a', A, B, { joinEnd: square }), wall('b', B, C, { joinStart: square })]);
     expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
-    // Cada parede vai até a face externa da outra; entre estruturas vale a união (decisão 0004, item 7).
-    expect(shape(material(r, 'mat_bloco14'))).toEqual(
-      expected([[0, -0.07], [3.93, -0.07], [3.93, -0.092], [4.07, -0.092], [4.07, -0.07], [4.092, -0.07], [4.092, 0.07], [4.07, 0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]),
-    );
+    // Antes o esquadro era um corte reto: cada parede ia até a face externa da outra e o núcleo se sobrepunha ao
+    // acabamento. Agora os degraus caem nas fronteiras do núcleo, como no encosto e na esquadria.
+    expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
   });
 
   it('T: o ramal vai até a face da parede atravessada e o núcleo é contínuo', () => {

@@ -192,7 +192,6 @@ describe('tipos de junção', () => {
       wall('a', 0, 0, 4, 0, cfg ? { joinStart: cfg } : {}),
       wall('b', 0, 0, 0, 3, cfg ? { joinStart: cfg } : {}),
     ]);
-  const flatT = (e: { hi: { kind: string; t?: number } }) => (e.hi.kind === 'flat' ? e.hi.t! : NaN);
   /** Degraus do pareamento por face (encosto): corte de cada faixa de espessura. */
   const stepsOf = (e: { hi: { kind: string; runs?: Array<{ s: number; t: number }> } }) => {
     if (e.hi.kind !== 'steps') throw new Error(`esperava corte em degraus, veio ${e.hi.kind}`);
@@ -220,10 +219,14 @@ describe('tipos de junção', () => {
     expect(cutAt(ends.get('b')!.a, -CORE14 / 2)).toBeCloseTo(-CORE14 / 2, 6);
     expect(cutAt(ends.get('a')!.a, -CORE14 / 2)).toBeCloseTo(CORE14 / 2, 6);
   });
-  it('esquadro prolonga as duas até cobrir o canto', () => {
-    const ends = computeEnds(frames(lShape({ kind: 'square', flip: false })));
-    expect(flatT(ends.get('a')!.a)).toBeCloseTo(-T14 / 2, 6);
-    expect(flatT(ends.get('b')!.a)).toBeCloseTo(-T14 / 2, 6);
+  it('esquadro pareia por face como o encosto: mesmos degraus, nenhum plano único a 90°', () => {
+    // Decisão 0009 #11 (superou o #10): esquadro a 90° é encosto com pareamento por face (docs/08 §5.4 passo 3).
+    const sq = computeEnds(frames(lShape({ kind: 'square', flip: false })));
+    const butt = computeEnds(frames(lShape()));
+    expect(sq.get('a')!.a.hi.kind).toBe('steps');
+    expect(sq.get('b')!.a.hi.kind).toBe('steps');
+    expect(stepsOf(sq.get('a')!.a)).toEqual(stepsOf(butt.get('a')!.a));
+    expect(stepsOf(sq.get('b')!.a)).toEqual(stepsOf(butt.get('b')!.a));
   });
   it('esquadria usa corte em ângulo', () => {
     const ends = computeEnds(frames(lShape({ kind: 'miter', flip: false })));
@@ -279,11 +282,17 @@ describe('nós de três ou mais paredes', () => {
     return { r, area: multiArea(sil) };
   };
   it('Y de três paredes iguais: sem sobreposição, sem furo e simétrico', () => {
-    const s = star(3);
-    const { r } = check(s);
-    const areas = ['s0', 's1', 's2'].map((id) => r.walls[id]!.layers.reduce((a, l) => a + multiArea(l.cut), 0));
-    expect(areas[0]).toBeCloseTo(areas[1]!, 5);
-    expect(areas[1]).toBeCloseTo(areas[2]!, 5);
+    // Simetria por material, não por parede: no empate de prioridade o pintor dá a faixa sobreposta à parede mais antiga.
+    const porMaterial = (r: ReturnType<typeof resolveLevel>) => {
+      const m = new Map<string, number>();
+      for (const w of Object.values(r.walls)) for (const l of w.layers) m.set(l.materialId, (m.get(l.materialId) ?? 0) + multiArea(l.cut));
+      return m;
+    };
+    // Y e suas duas rotações de 120° (mesmas paredes, ângulos trocados).
+    const [ref, ...outras] = [[10, 130, 250], [130, 250, 10], [250, 10, 130]].map((ang) => porMaterial(check(star(3, ang)).r));
+    for (const m of outras) {
+      for (const k of new Set([...ref!.keys(), ...m.keys()])) expect(Math.abs((ref!.get(k) ?? 0) - (m.get(k) ?? 0))).toBeLessThan(1e-5);
+    }
   });
   it('a estrutura de um Y é um único polígono (funde)', () => {
     const { r } = check(star(3));

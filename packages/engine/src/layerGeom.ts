@@ -1,4 +1,4 @@
-import { intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
+import { dot, intersectSegments, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { planeHit, pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint } from './joinSides.ts';
@@ -8,10 +8,10 @@ import type { Membrane, ResolvedLayer } from './types.ts';
 
 const MIN_AREA = 1e-9;
 /**
- * Passo (m, em t) do grid que amostra as faces de arco. Global ao arco: duas camadas que dividem a mesma face recebem
- * os mesmos vértices. Flecha de corda ≤ 0,2 mm para raios ≥ 1,4 m.
+ * Passo (m, em t) do grid que amostra uma face de arco de raio R: flecha de corda ≤ 0,3 mm, isto é, passo² / (8R) ≤ 3e-4,
+ * limitado a [0,05; 0,5] m. O passo depende só da parede, então as camadas vizinhas leem a mesma grade.
  */
-const ARC_GRID = 0.04;
+const passoDoArco = (R: number): number => Math.min(0.5, Math.max(0.05, Math.sqrt(8 * R * 3e-4)));
 
 /** Face da extremidade que vale para `s`: a metade de s maior usa `hi`, a de s menor usa `lo`. */
 export const sideAt = (f: WallFrame, spec: EndSpec, s: number): SideSpec => (s >= f.sMid ? spec.hi : spec.lo);
@@ -62,7 +62,26 @@ export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: numbe
 }
 
 /** Vértices intermediários da linha de uma face entre s=lo e s=hi, em ordem crescente de s. */
-function sideChain(f: WallFrame, side: SideSpec, lo: number, hi: number): Vec2[] {
+/**
+ * Costura plana: os pontos compartilhados da reta que caem entre as duas pontas da camada, da ponta de `lo` para a de
+ * `hi`. Todas as camadas das duas paredes leem a mesma lista, então as costuras coincidem vértice a vértice.
+ */
+function planeChain(f: WallFrame, which: 'a' | 'b', side: Extract<SideSpec, { kind: 'plane' }>, lo: number, hi: number): Vec2[] {
+  const a = pointOnSide(f, which, side, lo, 'low');
+  const b = pointOnSide(f, which, side, hi, 'high');
+  const d = sub(side.q, side.p);
+  const ll = dot(d, d);
+  const lam = (x: Vec2): number => dot(sub(x, side.p), d) / ll;
+  const la = lam(a);
+  const lb = lam(b);
+  const x0 = Math.min(la, lb);
+  const x1 = Math.max(la, lb);
+  const dentro = side.pts.filter((x) => lam(x) > x0 + 1e-9 && lam(x) < x1 - 1e-9).sort((u, v) => lam(u) - lam(v));
+  return la <= lb ? dentro : dentro.reverse();
+}
+
+function sideChain(f: WallFrame, side: SideSpec, lo: number, hi: number, which: 'a' | 'b'): Vec2[] {
+  if (side.kind === 'plane') return planeChain(f, which, side, lo, hi);
   if (side.kind === 'steps') {
     // Cada troca de faixa é um degrau: o vértice de baixo (fim do corte anterior) e o de cima (início do seguinte).
     const out: Vec2[] = [];
@@ -95,7 +114,7 @@ function sideChain(f: WallFrame, side: SideSpec, lo: number, hi: number): Vec2[]
 function endPolyline(f: WallFrame, which: 'a' | 'b', spec: EndSpec, lo: number, hi: number): Vec2[] {
   const piece = (side: SideSpec, a: number, b: number): Vec2[] => [
     pointOnSide(f, which, side, a, 'low'),
-    ...sideChain(f, side, a, b),
+    ...sideChain(f, side, a, b, which),
     pointOnSide(f, which, side, b, 'high'),
   ];
   if (spec.hi === spec.lo) return piece(spec.hi, lo, hi);
@@ -145,10 +164,11 @@ function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number
   });
   const out = pts.map((p, i) => ({ t: ts[i]!, p }));
   // A grade só cobre o alcance da parede (pontas degeneradas podem cair longe e não podem gerar milhões de pontos).
+  const passo = passoDoArco(f.arc!.radius);
   const gLo = Math.max(tMin, -2);
   const gHi = Math.min(tMax, f.length + 2);
-  for (let k = Math.ceil(gLo / ARC_GRID); k * ARC_GRID < gHi; k++) {
-    const t = k * ARC_GRID;
+  for (let k = Math.ceil(gLo / passo); k * passo < gHi; k++) {
+    const t = k * passo;
     if (t > tMin && !intervalos.some(([a, b]) => t > a - 1e-9 && t < b + 1e-9)) out.push({ t, p: pointAt(f, t, s) });
   }
   out.sort((x, y) => x.t - y.t);

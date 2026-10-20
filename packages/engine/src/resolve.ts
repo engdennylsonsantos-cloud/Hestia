@@ -4,7 +4,6 @@ import {
   boxesOverlap,
   difference,
   expandBox,
-  intersection,
   multiArea,
   orientedRect,
   closeGapsSafe,
@@ -106,10 +105,6 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
     if (sp.layer.thickness < 1e-6) continue;
     const ring = layerQuad(f, ends, sAtDepth(f, sp.from), sAtDepth(f, sp.to));
     let shape: MultiPolygon = [[ring]];
-    for (const e of [ends.a, ends.b]) {
-      if (e.clip) shape = intersection(shape, [[e.clip]]);
-    }
-    if (shape.length === 0) continue;
     const wrap = endWraps.get(sp.index);
     if (wrap) shape = [...shape, ...wrap];
     mk(sp.index, sp.layer.materialId, layerPriority(sp.layer), sp.layer.thickness, shape, z.z0, z.z1);

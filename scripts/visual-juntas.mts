@@ -14,7 +14,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { multiArea, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { closeGapsSafe, multiArea, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, type JoinKind, type Project, type Wall } from '@hestia/model';
 import { resolveLevel, type ResolvedLevel } from '@hestia/engine';
 
@@ -133,7 +133,7 @@ const CENARIOS: Cenario[] = [
   {
     id: '06-Y120',
     nome: 'Y: 3 grossas iguais a 120°',
-    nota: 'nó de 3 paredes: starNode, configuração não lida',
+    nota: 'nó de 3+ paredes: corte reto no nó, o pintor resolve; só a lacuna angular maior que 180° usa a junção de par (nodeOfWalls)',
     pecas: [
       { id: 'a', typeId: GROSSA, a: O, b: polar(O, 90, 3) },
       { id: 'b', typeId: GROSSA, a: O, b: polar(O, 210, 3) },
@@ -149,7 +149,7 @@ const CENARIOS: Cenario[] = [
   {
     id: '07-NO3',
     nome: 'nó de 3: grossa (0°) + fina (90°) + fina (225°)',
-    nota: 'nó de 3 paredes: starNode, configuração não lida',
+    nota: 'nó de 3+ paredes: corte reto no nó, o pintor resolve; só a lacuna angular maior que 180° usa a junção de par (nodeOfWalls)',
     pecas: [
       { id: 'g', typeId: GROSSA, a: O, b: P4 },
       { id: 'f1', typeId: FINA, a: O, b: { x: 0, y: 3 } },
@@ -165,7 +165,7 @@ const CENARIOS: Cenario[] = [
   {
     id: '08-arm-0-60-120',
     nome: 'nó de 3 paredes a 0°, 60° e 120°',
-    nota: 'nó de 3 paredes: starNode, configuração não lida',
+    nota: 'nó de 3+ paredes: corte reto no nó, o pintor resolve; só a lacuna angular maior que 180° usa a junção de par (nodeOfWalls)',
     pecas: [
       { id: 'g', typeId: GROSSA, a: O, b: P4 },
       { id: 'f1', typeId: FINA, a: O, b: polar(O, 60, 3) },
@@ -181,7 +181,7 @@ const CENARIOS: Cenario[] = [
   {
     id: '09-X4',
     nome: 'X: 4 paredes a partir do centro (45°, 135°, 225°, 315°)',
-    nota: 'nó de 4 paredes: starNode, configuração não lida',
+    nota: 'nó de 3+ paredes: corte reto no nó, o pintor resolve; só a lacuna angular maior que 180° usa a junção de par (nodeOfWalls)',
     pecas: [
       { id: 'a', typeId: GROSSA, a: O, b: polar(O, 45, 3) },
       { id: 'b', typeId: FINA, a: O, b: polar(O, 135, 3) },
@@ -305,7 +305,8 @@ interface Checagem {
 function checar(c: Cenario, kind: JoinKind): Checagem {
   const res = resolveLevel(montar(c, kind), 'lv_0', new Map());
   const camadas = c.pecas.flatMap((p) => res.walls[p.id]?.layers.filter((l) => l.cut.length > 0) ?? []);
-  const silhueta = union(...camadas.map((l) => l.cut));
+  // Fendas de grade (< 20 µm) entre camadas inclinadas não aparecem em nenhuma saída: o motor também as fecha.
+  const silhueta = closeGapsSafe(union(...camadas.map((l) => l.cut)), 2e-5, 1e-4);
   const externos = silhueta.length;
   const buracos = silhueta.reduce((s, poly) => s + Math.max(0, poly.length - 1), 0);
   const areaSilh = multiArea(silhueta);

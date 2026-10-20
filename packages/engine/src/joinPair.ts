@@ -1,5 +1,5 @@
 import { dist, dot, type Vec2 } from '@hestia/geom';
-import { toLocal, type WallFrame } from './frame.ts';
+import { planeHit, toLocal, type WallFrame } from './frame.ts';
 import type { JoinKind } from '@hestia/model';
 import type { EndRef, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
 import { both, crossAt, miterPoint, setEnd, sOfDepth, sideOf, stairSpec, sub2 } from './joinSides.ts';
@@ -102,7 +102,13 @@ function planeSpecs(lead: EndRef, follower: EndRef, sa: MiterSide, sb: MiterSide
   const K = crossAt(sa, sOfDepth(sa, Ta), sb, sOfDepth(sb, Tb));
   const dentro = (p: Vec2 | null): p is Vec2 => p !== null && dist(p, lead.o) <= cap;
   if (!dentro(O) || !dentro(K) || dist(O, K) < 1e-6) return { lead: flatNo(lead), follower: flatNo(follower) };
-  const plano: SideSpec = { kind: 'plane', p: O, q: K };
+  const cruzamentos = (f: WallFrame, m: MiterSide, near: Vec2): Vec2[] =>
+    m.bounds.flatMap((d) => {
+      const x = planeHit(f, sOfDepth(m, d), O, K, near);
+      return x ? [x] : [];
+    });
+  const pts = [...cruzamentos(lead.f, sa, lead.o), ...cruzamentos(follower.f, sb, lead.o)];
+  const plano: SideSpec = { kind: 'plane', p: O, q: K, pts };
   return { lead: plano, follower: plano };
 }
 

@@ -76,7 +76,9 @@ export function sideFacing(r: EndRef, sigma: 1 | -1): MiterSide {
 /** Lado do canto voltado para o vizinho `towards`: a face externa do canto é a afastada dele. */
 export function sideOf(r: EndRef, towards: Vec2): MiterSide {
   // Se o vizinho está à esquerda desta parede, a face externa do canto é a da direita (s menor).
-  const sigma: 1 | -1 = dot(r.f.n, towards) > 0 ? -1 : 1;
+  // A normal é a do ponto do nó (tangente da extremidade): em arco, `r.f.n` é a do início e erraria o lado.
+  const u = r.which === 'a' ? r.dir : { x: -r.dir.x, y: -r.dir.y };
+  const sigma: 1 | -1 = dot(perp(u), towards) > 0 ? -1 : 1;
   return sideFacing(r, sigma);
 }
 

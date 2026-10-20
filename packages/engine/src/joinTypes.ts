@@ -58,17 +58,20 @@ export type SideSpec =
   | { kind: 'flat'; t: number }
   | { kind: 'miter'; self: MiterSide; other: MiterSide }
   | { kind: 'steps'; runs: StepRun[] }
-  /** Corte plano: cada camada termina na reta p→q (mesma reta para as duas paredes do canto curvo). */
-  | { kind: 'plane'; p: Vec2; q: Vec2 };
+  /**
+   * Corte plano: cada camada termina na reta p→q (mesma reta para as duas paredes do canto curvo). `pts` são os pontos
+   * onde as fronteiras de camada das duas paredes cruzam a reta: cada parede os inclui na sua costura, para que as
+   * costuras tenham os mesmos vértices (sem junção em T, sem fresta).
+   */
+  | { kind: 'plane'; p: Vec2; q: Vec2; pts: Vec2[] };
 
 /**
  * Como cada face de uma extremidade é cortada (docs/08 §5.4). `hi` vale para a metade de s maior, `lo` para a de s
- * menor; hoje as duas são o mesmo objeto. `clip` recorta cada camada num setor (nós de 3+ paredes).
+ * menor; hoje as duas são o mesmo objeto.
  */
 export interface EndSpec {
   hi: SideSpec;
   lo: SideSpec;
-  clip?: Vec2[];
 }
 
 export interface WallEnds {

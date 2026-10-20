@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { intersection, multiArea, pointInMulti, type Vec2 } from '@hestia/geom';
+import { intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallType, wallsOnLevel, type JoinKind, type Wall } from '@hestia/model';
 import { resolveLevel } from './index.ts';
 
@@ -76,5 +76,36 @@ describe('quinas externas (decisão 0009)', () => {
         expect(multiArea(intersection(a.cut, b.cut)), `${a.materialId} x ${b.materialId}`).toBeLessThan(1e-6);
       }
     }
+  });
+  it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina param na face do acabamento da grossa (y = 0,121)', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 3 } }) });
+    const p = s.project;
+    const miter: JoinKind = 'miter';
+    const q = {
+      ...p,
+      elements: {
+        ...p.elements,
+        g: { ...p.elements['g']!, joinEnd: { kind: miter, flip: false } },
+        f: { ...p.elements['f']!, joinStart: { kind: miter, flip: false } },
+      },
+    } as typeof p;
+    const r = resolveLevel(q, 'lv_0', new Map());
+    const retangulo = (x0: number, y0: number, x1: number, y1: number): MultiPolygon => [
+      [[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]],
+    ];
+    // Face do acabamento da grossa no ambiente: y = 0,121 (meia espessura de 0,242).
+    const FACE_G = 0.121;
+    // Camadas 0 e 1 da fina (tinta e reboco do lado do ambiente, x = 3,908 a 3,930): não podem descer abaixo da face.
+    const finaAcabamento = r.walls['f']!.layers.filter((l) => l.layerIndex >= 0 && l.layerIndex <= 1);
+    expect(finaAcabamento.length).toBe(2);
+    for (const a of finaAcabamento) {
+      expect(multiArea(intersection(a.cut, retangulo(3.9, -1, 3.95, FACE_G - 1e-6))), a.materialId).toBeLessThan(1e-9);
+    }
+    // O canto é coberto pelo acabamento da grossa (ceramica + argamassa) até a face da fina: sem vazio na quina.
+    const grossaAcabamento = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && l.layerIndex <= 1);
+    const cobertura = grossaAcabamento.reduce((soma, l) => soma + multiArea(intersection(l.cut, retangulo(3.908, 0.091, 3.93, FACE_G))), 0);
+    expect(cobertura).toBeCloseTo(0.022 * 0.03, 6);
   });
 });

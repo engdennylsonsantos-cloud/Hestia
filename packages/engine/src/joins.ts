@@ -1,4 +1,4 @@
-import { arcTangentAt as arcTan, cross, dist, dot, intersectLines, mul, add, perp, type Vec2 } from '@hestia/geom';
+import { arcTangentAt as arcTan, cross, dist, dot, intersectLines, intersection, mul, add, perp, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { coreSpan } from '@hestia/model';
 import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 
@@ -20,6 +20,8 @@ export interface MiterSide {
   sigma: 1 | -1;
   /** Espessura dos acabamentos entre a face externa do canto e o núcleo (pareia núcleo com núcleo). */
   outerToCore: number;
+  /** Profundidade (da face externa do canto) em que o núcleo termina; o acabamento do ambiente fica além dela. */
+  coreEnd: number;
   /** Profundidades (da face externa do canto) dos limites entre camadas do tipo, de 0 até a espessura total. */
   bounds: number[];
 }
@@ -57,11 +59,45 @@ export function miterBreaks(self: MiterSide, other: MiterSide): number[] {
 
 const sOfDepth = (m: MiterSide, d: number): number => (m.sigma > 0 ? m.sHi - d : m.sLo + d);
 
+/** Espessura do acabamento do lado do ambiente (a parte da parede além do núcleo). */
+const finishOf = (m: MiterSide): number => m.sHi - m.sLo - m.coreEnd;
+
+/**
+ * Profundidade no vizinho que a camada de profundidade `d` encontra. Paredes de tipos diferentes pareiam a partir do
+ * núcleo (docs/05 §1: a estrutura se encontra com a estrutura). Acabamentos de espessuras diferentes (docs/05 §2):
+ * o mais fino termina na face externa do outro; o mais grosso contorna o canto e para no núcleo do outro.
+ * Mesma espessura de acabamento: pareamento direto, como antes.
+ */
+function depthOnOther(self: MiterSide, other: MiterSide, d: number): number {
+  const T = other.sHi - other.sLo;
+  const dd = Math.max(0, Math.min(d - self.outerToCore + other.outerToCore, T));
+  const fs = finishOf(self);
+  const fo = finishOf(other);
+  if (Math.abs(fs - fo) < 1e-9) return dd;
+  if (fs < fo) return d > self.coreEnd + 1e-9 ? T : Math.min(dd, other.coreEnd);
+  return Math.min(dd, other.coreEnd);
+}
+
+/**
+ * Acabamento mais fino em esquadria (docs/05 §2): a camada do lado do ambiente da parede fina termina no plano da face
+ * do acabamento da grossa. Corta a parte da camada que passa desse plano (o canto fica para a grossa).
+ */
+export function finishClip(shape: MultiPolygon, spec: EndSpec, s: number): MultiPolygon {
+  if (spec.kind !== 'miter') return shape;
+  const m = spec.self;
+  const o = spec.other;
+  const d = m.sigma > 0 ? m.sHi - s : s - m.sLo;
+  if (finishOf(m) >= finishOf(o) - 1e-9 || d <= m.coreEnd + 1e-9) return shape;
+  const face = add(o.o, mul(o.n, sOfDepth(o, o.sHi - o.sLo)));
+  const out = mul(o.n, -o.sigma);
+  const L = 10;
+  const ring = [mul(o.u, L), mul(o.u, -L), add(mul(o.u, -L), mul(out, L)), add(mul(o.u, L), mul(out, L))].map((v) => add(face, v));
+  return intersection(shape, [[ring]]);
+}
+
 /** Ponto da aresta de fim da camada, na fronteira à profundidade `d` (medida da face externa do canto). */
 export function miterPoint(self: MiterSide, other: MiterSide, d: number): Vec2 | null {
-  // Paredes de tipos diferentes: as camadas se pareiam a partir do núcleo (docs/05 §1: a estrutura
-  // se encontra com a estrutura; os acabamentos contornam o canto, cada um com a sua espessura).
-  const dd = Math.max(0, Math.min(d - self.outerToCore + other.outerToCore, other.sHi - other.sLo));
+  const dd = depthOnOther(self, other, d);
   const sA = sOfDepth(self, d);
   const sB = sOfDepth(other, dd);
   const r = intersectLines(add(self.o, mul(self.n, sA)), self.u, add(other.o, mul(other.n, sB)), other.u);
@@ -81,7 +117,8 @@ const sideOf = (r: EndRef, towards: Vec2): MiterSide => {
   const cum = [0];
   for (const l of r.f.type.layers) cum.push(cum[cum.length - 1]! + l.thickness);
   const bounds = cornerIsExterior ? cum : cum.map((c) => T - c).reverse();
-  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore, bounds };
+  const coreEnd = outerToCore + (core.to - core.from);
+  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore, coreEnd, bounds };
 };
 
 const flatAt = (r: EndRef, ext: number): EndSpec => ({ kind: 'flat', t: r.which === 'a' ? -ext : r.f.length + ext });

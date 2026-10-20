@@ -28,7 +28,7 @@ import {
   type Project,
 } from '@hestia/model';
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
-import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
+import { computeEnds, finishClip, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
 import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
@@ -104,8 +104,10 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
     if (sp.layer.thickness < 1e-6) continue;
     const ring = layerQuad(f, ends, sAtDepth(f, sp.from), sAtDepth(f, sp.to));
     let shape: MultiPolygon = [[ring]];
+    const sMid = sAtDepth(f, (sp.from + sp.to) / 2);
     for (const e of [ends.a, ends.b]) {
       if (e.kind === 'flat' && e.clip) shape = intersection(shape, [[e.clip]]);
+      shape = finishClip(shape, e, sMid);
     }
     if (shape.length === 0) continue;
     const wrap = endWraps.get(sp.index);
@@ -127,7 +129,7 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
   return items;
 }
 
-/** Algoritmo do pintor por prioridade (docs/05 §1): quem tem prioridade maior corta quem tem menor. */
+/** Algoritmo do pintor por prioridade (docs/05 §1): o menor número de prioridade é aceito primeiro e corta os demais. */
 function paint(items: Item[]): Map<Item, MultiPolygon> {
   // Prioridade igual: a parede que atravessa um T vem primeiro (a que chega para na face dela, como no Revit);
   // só depois valem o núcleo mais robusto e a ordem de criação (paredes sobrepostas sem junção).

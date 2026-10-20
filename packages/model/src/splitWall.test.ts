@@ -62,14 +62,14 @@ describe('dividir parede', () => {
   });
 
   it('herda junções: a original recebe encosto na ponta nova e a nova herda a ponta antiga', () => {
-    const s = setup({ joinStart: { kind: 'miter', flip: true }, noJoinEnd: true, joinEnd: { kind: 'square', flip: true } });
+    const s = setup({ joinStart: { kind: 'miter', flip: true }, noJoinEnd: true, joinEnd: { kind: 'butt', flip: true } });
     s.exec({ type: 'splitWall', id: 'w', newId: 'w2', t: 2 });
     expect(el(s, 'w').joinStart).toEqual({ kind: 'miter', flip: true });
     expect(el(s, 'w').noJoinStart).toBe(false);
     expect(el(s, 'w').joinEnd).toEqual(DEFAULT_JOIN);
     expect(el(s, 'w').noJoinEnd).toBe(false);
     expect(el(s, 'w2').joinStart).toEqual(DEFAULT_JOIN);
-    expect(el(s, 'w2').joinEnd).toEqual({ kind: 'square', flip: true });
+    expect(el(s, 'w2').joinEnd).toEqual({ kind: 'butt', flip: true });
     expect(el(s, 'w2').noJoinEnd).toBe(true);
   });
 

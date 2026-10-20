@@ -99,7 +99,7 @@ function tProjeto(theta: number): Project {
 
 const ANGULOS = [30, 45, 60, 75, 90, 105, 120, 135, 150];
 const ANGULOS_T = [45, 60, 75, 105, 120, 135];
-const TIPOS: JoinKind[] = ['butt', 'square'];
+const TIPOS: JoinKind[] = ['butt', 'miter'];
 
 const perimetro = (ring: Ring): number => ring.reduce((s, q, i) => {
   const r = ring[(i + 1) % ring.length]!;
@@ -166,7 +166,7 @@ function sobreposicaoAcabamentoNucleo(p: Project, seguidora: string, dominante: 
   return maior;
 }
 
-describe('junção em ângulo: L (grossa 19 + fina 14), butt e square', () => {
+describe('junção em ângulo: L (grossa 19 + fina 14), butt e miter', () => {
   for (const theta of ANGULOS) {
     for (const kind of TIPOS) {
       for (const ordem of ['gf', 'fg'] as const) {

@@ -16,7 +16,7 @@ import { buildFrame, pointAt, resolveLevel, toLocal, type WallFrame } from './in
 
 const GROSSA = 'wt_ext19';
 const FINA = 'wt_alv14';
-const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
+const KINDS: JoinKind[] = ['miter', 'butt'];
 const TOL_AREA = 1e-5;
 const TOL_RAW = 1e-6;
 const TOL_PONTA = 1e-6;

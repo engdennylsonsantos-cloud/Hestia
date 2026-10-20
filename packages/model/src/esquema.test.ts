@@ -62,3 +62,28 @@ describe('migração 5 → 6', () => {
     expect(p.wallTypes.wt_alv14).toMatchObject({ cost: 0, thermalU: null, manufacturer: '' });
   });
 });
+
+describe('migração 10 → 11 (Esquadro removido)', () => {
+  /** Projeto v10 com uma parede de junção esquadro (ponta inicial) e uma em esquadria (ponta final). */
+  function legacyV10(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown> & { elements: Record<string, unknown> };
+    p.schemaVersion = 10;
+    const base = { id: 'w', kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, noJoinStart: false, noJoinEnd: false };
+    p.elements = {
+      w: { ...base, joinStart: { kind: 'square', flip: true }, joinEnd: { kind: 'miter', flip: false } },
+    };
+    return p;
+  }
+
+  it('junção esquadro vira encosto e mantém a ordem (flip)', () => {
+    const m = migrateProject(legacyV10());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    const w = m.elements.w as unknown as { joinStart: unknown; joinEnd: unknown };
+    expect(w.joinStart).toEqual({ kind: 'butt', flip: true });
+  });
+  it('esquadria e encosto já salvos não mudam', () => {
+    const m = migrateProject(legacyV10());
+    const w = m.elements.w as unknown as { joinEnd: unknown };
+    expect(w.joinEnd).toEqual({ kind: 'miter', flip: false });
+  });
+});

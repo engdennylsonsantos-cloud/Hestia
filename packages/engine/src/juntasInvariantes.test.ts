@@ -12,7 +12,7 @@ import { resolveLevel } from './index.ts';
  *  - sobreposição: a soma das áreas de `cut` é a área da união (as camadas não se sobrepõem), tolerância de grade 1e-5.
  */
 
-const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
+const KINDS: JoinKind[] = ['miter', 'butt'];
 const G = 'wt_ext19';
 const F = 'wt_alv14';
 const rad = (d: number): number => (d * Math.PI) / 180;
@@ -152,7 +152,7 @@ function areaSilhueta(segs: Seg[], kind: JoinKind): number {
 }
 
 describe('a silhueta externa não depende da configuração (sem ponta para fora nem entalhe)', () => {
-  // O canto externo é o mesmo nas três junções (a dominante chega ao ponto de encontro das faces externas), então
+  // O canto externo é o mesmo nas duas junções (a dominante chega ao ponto de encontro das faces externas), então
   // a união das camadas tem a mesma área; uma ponta que sobra além da outra parede ou um entalhe aparecem aqui.
   for (const [ta, tb] of [[F, F], [G, F], [F, G]] as const) {
     for (const virada of [5, 10, 20, 30, 45, 60, 90, 120, 135, 150]) {
@@ -162,7 +162,7 @@ describe('a silhueta externa não depende da configuração (sem ponta para fora
           { id: 'f', type: tb, a: P(4, 0), b: P(4 + 3 * Math.cos(rad(virada)), 3 * Math.sin(rad(virada))) },
         ];
         const ref = areaSilhueta(segs, 'miter');
-        for (const kind of ['butt', 'square'] as const) expect(Math.abs(areaSilhueta(segs, kind) - ref), kind).toBeLessThan(5e-4);
+        expect(Math.abs(areaSilhueta(segs, 'butt') - ref)).toBeLessThan(5e-4);
       });
     }
   }
@@ -173,7 +173,7 @@ describe('a silhueta externa não depende da configuração (sem ponta para fora
         { id: 'f', type: F, a: P(0, 0), b: P(3 * Math.cos(rad(virada)), 3 * Math.sin(rad(virada))) },
       ];
       const ref = areaSilhueta(segs, 'miter');
-      for (const kind of ['butt', 'square'] as const) expect(Math.abs(areaSilhueta(segs, kind) - ref), kind).toBeLessThan(5e-4);
+      expect(Math.abs(areaSilhueta(segs, 'butt') - ref)).toBeLessThan(5e-4);
     });
   }
 });

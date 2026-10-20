@@ -13,7 +13,6 @@ type W = Omit<Wall, 'order'>;
 const wall = (id: string, a: [number, number], b: [number, number], extra: Partial<Wall> = {}): W =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, ...extra });
 const miter = { kind: 'miter', flip: false } as const;
-const square = { kind: 'square', flip: false } as const;
 
 function level(walls: W[]) {
   const s = new ProjectStore(createEmptyProject());
@@ -52,14 +51,6 @@ describe('K2 · contornos dourados por junção', () => {
     const r = level([wall('a', A, B, { joinEnd: miter }), wall('b', B, C, { joinStart: miter })]);
     expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
     // Núcleo com canto externo em (4,07; −0,07) e interno em (3,93; 0,07).
-    expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
-  });
-
-  it('L em esquadro (90°): pareia por face como o encosto, então o núcleo é o da esquadria (decisão 0009 #11)', () => {
-    const r = level([wall('a', A, B, { joinEnd: square }), wall('b', B, C, { joinStart: square })]);
-    expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
-    // Antes o esquadro era um corte reto: cada parede ia até a face externa da outra e o núcleo se sobrepunha ao
-    // acabamento. Agora os degraus caem nas fronteiras do núcleo, como no encosto e na esquadria.
     expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
   });
 

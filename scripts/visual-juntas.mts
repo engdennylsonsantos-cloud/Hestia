@@ -1,7 +1,7 @@
 /**
  * Ferramenta visual das junções de parede (acabamento/recorte por camada).
  *
- * Para cada cenário × configuração de junção (miter / butt / square) resolve o nível `lv_0`, desenha o `cut` de
+ * Para cada cenário × configuração de junção (miter / butt) resolve o nível `lv_0`, desenha o `cut` de
  * cada camada de cada parede num SVG (uma imagem por cenário, três painéis lado a lado, ampliando só a caixa de
  * 0,8 m em volta do nó) e imprime uma tabela de checagem numérica:
  *   - anéis externos da silhueta (união de todas as camadas): > 1 é FALHA (o desenho ficou em pedaços);
@@ -24,7 +24,7 @@ const OUT =
 
 const GROSSA = 'wt_ext19';
 const FINA = 'wt_alv14';
-const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
+const KINDS: JoinKind[] = ['miter', 'butt'];
 const TOL = 1e-5;
 
 const S = 600; // px por metro

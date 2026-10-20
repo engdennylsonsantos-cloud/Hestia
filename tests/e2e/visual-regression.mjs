@@ -23,11 +23,9 @@ const W = (id, a, b, extra = {}) => ({ id, kind: 'wall', typeId: 'wt_alv14', lev
 const F = (id, boundary, extra = {}) => ({ id, kind: 'floor', typeId: 'ft_ceram', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, mark: '', comments: '', ...extra });
 const SL = (id, boundary, extra = {}) => ({ id, kind: 'slab', typeId: 'ls_mac15', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, slope: null, mark: '', comments: '', ...extra });
 const M = { kind: 'miter', flip: false };
-const S = { kind: 'square', flip: false };
 const CASES = {
   'L-encosto': [W('a', [0, 0], [4, 0]), W('b', [4, 0], [4, 3])],
   'L-esquadria': [W('a', [0, 0], [4, 0], { joinEnd: M }), W('b', [4, 0], [4, 3], { joinStart: M })],
-  'L-esquadro': [W('a', [0, 0], [4, 0], { joinEnd: S }), W('b', [4, 0], [4, 3], { joinStart: S })],
   T: [W('a', [0, 0], [4, 0]), W('c', [2, 0], [2, 3])],
   X: [W('a', [0, 0], [4, 0]), W('c', [2, -2], [2, 2])],
   'L-14-com-9-esquadria': [W('a', [0, 0], [4, 0], { joinEnd: M }), W('b', [4, 0], [4, 3], { typeId: 'wt_alv9', joinStart: M })],

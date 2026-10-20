@@ -17,7 +17,7 @@ const TOL = 1e-5;
 const O: Vec2 = { x: 0, y: 0 };
 /** Caixa em volta do nó (x0, y0, x1, y1), em metros. */
 const CAIXA = [-0.15, -0.15, 0.15, 0.15] as const;
-const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
+const KINDS: JoinKind[] = ['miter', 'butt'];
 
 type Parede = Omit<Wall, 'order'>;
 
@@ -105,7 +105,7 @@ describe('nós de três ou mais paredes (J-2)', () => {
     });
   });
 
-  describe('nó com lacuna reflexa (paredes a 0°, 60°, 120°; mistura de alvenaria 14 e externa 19; área por material muda entre miter e butt/square)', () => {
+  describe('nó com lacuna reflexa (paredes a 0°, 60°, 120°; mistura de alvenaria 14 e externa 19; área por material muda entre miter e butt)', () => {
     // Lacuna de 240° entre 120° e 0°: canto externo ali, que a junção de par cobre conforme a configuração.
     const montarReflexo = (kind: JoinKind): Parede[] => [
       parede('b', O, ponto(0), EXT19, comJuncao(kind)),
@@ -117,12 +117,9 @@ describe('nós de três ou mais paredes (J-2)', () => {
       conferirSilhueta(resolver(montarReflexo(kind)));
     });
 
-    it('a área por material na caixa muda entre miter e butt, e butt = square', () => {
+    it('a área por material na caixa muda entre miter e butt', () => {
       const porKind = new Map(KINDS.map((k) => [k, porMaterial(resolver(montarReflexo(k)))] as const));
       expect(diferenca(porKind.get('miter')!, porKind.get('butt')!)).toBeGreaterThan(1e-6);
-      expect(diferenca(porKind.get('miter')!, porKind.get('square')!)).toBeGreaterThan(1e-6);
-      // Esquadro é encosto pareado por projeto: as duas geometrias são idênticas.
-      expect(diferenca(porKind.get('butt')!, porKind.get('square')!)).toBeLessThan(1e-9);
     });
   });
 

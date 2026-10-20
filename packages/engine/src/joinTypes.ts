@@ -57,7 +57,9 @@ export interface Chord {
 export type SideSpec =
   | { kind: 'flat'; t: number }
   | { kind: 'miter'; self: MiterSide; other: MiterSide }
-  | { kind: 'steps'; runs: StepRun[] };
+  | { kind: 'steps'; runs: StepRun[] }
+  /** Corte plano: cada camada termina na reta p→q (mesma reta para as duas paredes do canto curvo). */
+  | { kind: 'plane'; p: Vec2; q: Vec2 };
 
 /**
  * Como cada face de uma extremidade é cortada (docs/08 §5.4). `hi` vale para a metade de s maior, `lo` para a de s

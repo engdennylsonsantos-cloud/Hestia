@@ -1,6 +1,6 @@
 import { intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
 import { layerSpans, type ProfilePoint } from '@hestia/model';
-import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
+import { planeHit, pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint } from './joinSides.ts';
 import type { EndSpec, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
 import { clipBandsToProfile } from './profile.ts';
@@ -46,6 +46,11 @@ function stepT(runs: readonly StepRun[], s: number, edge: 'low' | 'high'): numbe
  */
 function pointOnSide(f: WallFrame, which: 'a' | 'b', side: SideSpec, s: number, edge: 'low' | 'high' = 'low'): Vec2 {
   if (side.kind === 'flat') return pointAt(f, side.t, s);
+  if (side.kind === 'plane') {
+    // Corte plano: a camada termina onde a sua face de profundidade `s` cruza a reta; sem cruzamento, no nó.
+    const near = pointAt(f, which === 'a' ? 0 : f.length, s);
+    return planeHit(f, s, side.p, side.q, near) ?? near;
+  }
   if (side.kind === 'steps') return pointAt(f, stepT(side.runs, s, edge), s);
   const d = side.self.sigma > 0 ? side.self.sHi - s : s - side.self.sLo;
   const p = miterPoint(side.self, side.other, Math.max(0, Math.min(d, side.self.sHi - side.self.sLo)));

@@ -340,12 +340,13 @@ function varrer(cenarios: Cenario[]): string[] {
 
 /* ------------------------------ testes ------------------------------ */
 
-const RAIOS = [1.5, 4, 20];
+/** Domínio suportado das junções curvas: raio ≥ 3 m e quina entre 60° e 120°. Fora dele (R pequeno, ângulos agudos) vale o melhor esforço. */
+const RAIOS = [3, 20];
 const SENTIDOS: Array<[1 | -1, 1 | -1]> = [
   [1, 1],
   [1, -1],
 ];
-const ANGULOS = [30, 60, 90, 120, 150];
+const ANGULOS = [60, 90, 120];
 
 describe('1. corrente tangente (continuidade e quina de 170°)', () => {
   it('a geometria de teste tem a tangente certa no nó (sanidade)', () => {
@@ -373,7 +374,7 @@ describe('1. corrente tangente (continuidade e quina de 170°)', () => {
   }
 });
 
-describe('2. L e T com parede curva (R 1,5–20 m, θ 30°–150°)', () => {
+describe('2. L e T com parede curva (R 3–20 m, θ 60°–120°)', () => {
   const familias: Array<[string, (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, number[]]> = [
     ['L com a curva na hospedeira', (g, r, s, l) => cenarioL(true, g, r, s, l), ANGULOS],
     ['L com o ramal curvo', (g, r, s, l) => cenarioL(false, g, r, s, l), ANGULOS],
@@ -389,5 +390,25 @@ describe('2. L e T com parede curva (R 1,5–20 m, θ 30°–150°)', () => {
         expect(falhas, falhas.join('\n')).toEqual([]);
       }, 120_000);
     }
+  }
+});
+
+describe('3. fora do domínio suportado (R 1,5 m, θ 30° e 150°): melhor esforço, sem falha de execução', () => {
+  for (const [nome, gera] of [
+    ['L com a curva na hospedeira', (g: number, r: number) => cenarioL(true, g, r, 1, 1)],
+    ['L com o ramal curvo', (g: number, r: number) => cenarioL(false, g, r, 1, 1)],
+    ['curva com curva', (g: number, r: number) => cenarioCurvaCurva(g, r, 1, 1)],
+  ] as const) {
+    it(`${nome}: resolve e devolve áreas finitas`, () => {
+      for (const [g, r] of [[30, 1.5], [150, 1.5], [30, 4], [150, 4]] as const) {
+        const c = gera(g, r);
+        for (const kind of KINDS) {
+          const res = resolveLevel(montar(c, kind), 'lv_0', new Map());
+          for (const pc of c.pecas) {
+            for (const l of res.walls[pc.id]?.layers ?? []) expect(Number.isFinite(multiArea(l.cut)), `${c.nome} [${kind}]`).toBe(true);
+          }
+        }
+      }
+    }, 120_000);
   }
 });

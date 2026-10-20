@@ -104,6 +104,11 @@ export function faceCurve(f: WallFrame, s: number): Curve {
  * tangente, a interseção é a mesma vista dos dois lados do canto: o pareamento de duas paredes curvas e de uma
  * curva com uma reta depende disso (qualquer erro vira fresta ou sobreposição entre os dois anéis).
  */
+/** Ponto em que a face de profundidade `s` (reta ou arco) cruza a reta p→q, o mais perto de `near`; null se não cruza. */
+export function planeHit(f: WallFrame, s: number, p: Vec2, q: Vec2, near: Vec2): Vec2 | null {
+  return intersectCurves(faceCurve(f, s), { kind: 'line', p, d: norm(sub(q, p)) }, near);
+}
+
 export function intersectCurves(g: Curve, h: Curve, near: Vec2): Vec2 | null {
   if (g.kind === 'line' && h.kind === 'line') {
     const r = intersectLines(g.p, g.d, h.p, h.d);

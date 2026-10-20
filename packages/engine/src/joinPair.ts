@@ -2,7 +2,7 @@ import { dist, dot, type Vec2 } from '@hestia/geom';
 import { toLocal, type WallFrame } from './frame.ts';
 import type { JoinKind } from '@hestia/model';
 import type { EndRef, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
-import { both, miterPoint, setEnd, sideOf, stairSpec, sub2 } from './joinSides.ts';
+import { both, crossAt, miterPoint, setEnd, sOfDepth, sideOf, stairSpec, sub2 } from './joinSides.ts';
 
 const MITER_LIMIT = 6;
 
@@ -86,11 +86,32 @@ function flatSquare(lead: EndRef, follower: EndRef): PairSpecs {
  * camadas dela. Esquadro a 90° é o mesmo caso que encosto; o plano único (`flatSquare`) só entra quando o par não
  * admite pareamento (parede curva, degrau fora do limite).
  */
+/** Corte reto perpendicular no nó (a extremidade de cada parede está em t = 0 ou t = L). */
+const flatNo = (r: EndRef): SideSpec => ({ kind: 'flat', t: r.which === 'a' ? 0 : r.f.length });
+
+/**
+ * Canto com parede curva, qualquer tipo de junção: as duas paredes são cortadas pela MESMA reta, a que passa por O
+ * (interseção das faces externas) e K (interseção das faces internas). A silhueta fica exata para qualquer par de
+ * tipos e curvatura; a camada não é pareada com a da outra (aceito: canto curvo é raro). Sem O ou K dentro do limite
+ * (continuidade tangente: as faces são paralelas/tangentes), corte reto no nó nas duas paredes, que é exato nesse caso.
+ */
+function planeSpecs(lead: EndRef, follower: EndRef, sa: MiterSide, sb: MiterSide, cap: number): PairSpecs {
+  const Ta = sa.sHi - sa.sLo;
+  const Tb = sb.sHi - sb.sLo;
+  const O = crossAt(sa, sOfDepth(sa, 0), sb, sOfDepth(sb, 0));
+  const K = crossAt(sa, sOfDepth(sa, Ta), sb, sOfDepth(sb, Tb));
+  const dentro = (p: Vec2 | null): p is Vec2 => p !== null && dist(p, lead.o) <= cap;
+  if (!dentro(O) || !dentro(K) || dist(O, K) < 1e-6) return { lead: flatNo(lead), follower: flatNo(follower) };
+  const plano: SideSpec = { kind: 'plane', p: O, q: K };
+  return { lead: plano, follower: plano };
+}
+
 export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
   const { lead, follower, kind } = pairRoles(a, b);
   const cap = MITER_LIMIT * Math.max(0.05, lead.f.thickness, follower.f.thickness);
   const sa = sideOf(lead, follower.dir);
   const sb = sideOf(follower, lead.dir);
+  if (lead.f.arc || follower.f.arc) return planeSpecs(lead, follower, sa, sb, cap);
   if (kind === 'miter') {
     const ok = (s: MiterSide, o: MiterSide, ref: EndRef): boolean => {
       const t = s.sHi - s.sLo;

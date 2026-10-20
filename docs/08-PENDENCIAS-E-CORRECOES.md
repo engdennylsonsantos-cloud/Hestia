@@ -12,7 +12,7 @@ na seção 2. Nada de geometria foi alterado nesta rodada — só instrumentaç�
 
 | ID | Defeito | Severidade | Estado | Onde |
 |---|---|---|---|---|
-| **P-1** | `difference()` entra em laço no polygon-clipping e custa ~30 s por tentativa; a resolução do nível passa de 1,2 s para 20 min quando as coordenadas não são redondas | **alta** (trava a interface) | diagnosticado, **não corrigido** | `boolean.ts`, `resolve.ts` |
+| **P-1** | `difference()` entrava em laço no polygon-clipping (~10 s por tentativa sem limite) quando as coordenadas são transladadas; a resolução da semente 24 transladada custava 339 s | **alta** (trava a interface) | **corrigido** (`clipReturn` vai direto ao Clipper + memoização; seed 24 transladada: 339 s → 1,1 s) | `resolve.ts`, `boolean.ts` |
 | **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | medido, **não corrigido**; aviso e lote cobrem o esquadro (§8.1, **decidido: sim**) | `joins.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | medido, **não corrigido** | `joins.ts` (`starNode`) |
 | **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | provado, **não corrigido** | `quinas.test.ts` |
@@ -75,7 +75,7 @@ O caso real do motor que estoura, congelado: `a` = 2 polígonos (8 pontos), `bs`
 - É `.ts` e não `.json` de propósito: o repositório **não tem `@types/node`** e `packages/*/src` entra no
   `tsconfig` — ler arquivo com `node:fs` quebra o `typecheck` do CI. Importar o JSON também não serve: o TS
   inferiria um tipo literal gigante.
-- Três testes: (1) o caso resolve em < 1 s com área de referência `0.002319941982005247 m²`; (2) tabela de
+- Três testes: (1) o caso resolve em < 1 s com área de referência `0.002319941982005247 m²` (desde a correção do P-1 mede `differenceClipper`, o caminho que `clipReturn` usa); (2) tabela de
   diagnóstico por grade de snap; (3) `it.fails` guardando o defeito atual — **quando a correção entrar, esse
   teste passa a falhar de propósito** e deve ser removido ou convertido em `it`.
 
@@ -93,77 +93,100 @@ máquina. A variável agora é injetada no `env` do filho, então funciona em qu
 
 ---
 
-## 4. P-1 · Laço do sweep line (desempenho)
+## 4. P-1 · Laço do sweep line (desempenho) — corrigido
 
 ### 4.1 Sintoma
 
-`resolveLevel` de um cenário com 30 paredes / 140 itens / 6 vãos:
+`resolveLevel` de um cenário com 30 paredes / 140 itens / 6 vãos (semente 24 de `property.test.ts`, modo completo).
+Medido sem nenhum limite de polygon-clipping (produção):
 
-| caso | sem limite | com limite (3000) |
+| caso | antes (código original) | depois |
 |---|---|---|
-| coordenadas originais (semente 24) | 9,0 s | ~9 s |
-| **transladado** por `{3.7, −2.1}` | **1239 s** (e 857 s numa 2ª medição) | **23,2 s** (suíte inteira de 5 testes) |
+| coordenadas originais (R) | 2,1 s, 0 falhas | 1,5 s, 0 falhas |
+| **transladado** por `{3.7, −2.1}` (S) | **339 s**, 32 falhas, ~10,5 s cada | **1,1 s**, 0 falhas |
 
-O gatilho é a **translação**: qualquer coordenada não redonda. Isso é o que acontece quando alguém arrasta uma
-parede para um ponto livre no editor — não é artefato de teste.
-
-O sintoma visível ao usuário é **travar a interface por ~20 minutos**.
+O sintoma visível ao usuário é travar a interface por minutos. O doc anterior dizia 1239 s; nesta rodada a mesma
+semente deu 339 s (outra máquina). O gatilho é a **translação**: coordenadas não redondas.
 
 ### 4.2 Causa
 
-`resolve.ts` chama `clipReturn` (linha 271, chamado nas linhas 306 e 326) dentro do laço de faixas de altura:
-`difference(retornoDeAcabamento, ...33ShapesPintados)`. Em 32 dessas chamadas o polygon-clipping entra em laço e
-só lança depois de percorrer **1e6 segmentos de sweep line** (~30 s cada); o `robust()` de `boolean.ts` então cai
-no Clipper, que responde em ~88 ms.
+`resolve.ts` chama `clipReturn` dentro do laço de faixas de altura e na planta: `difference(retornoDeAcabamento,
+...paredesPintadas)`. O operando é pequeno (2 retângulos contra ~33 polígonos). As 32 falhas da semente 24
+transladada vêm **todas** dessa chamada. Mensagem: `Infinite loop when passing sweep line over endpoints
+(too many sweep line segments)`. O `robust()` cai no Clipper só depois de 1e6 segmentos.
 
-O laço é induzido pelo **snap de entrada** `SNAP = 1e7` em `toPc` (`boolean.ts:11,14`): ele arredonda tudo em
-1e-7 m antes da operação exata, fazendo quadriláteros vizinhos se tocarem/sobreporem exatamente.
+O `SNAP = 1e7` de `toPc` cria o contato vértice-sobre-aresta que o sweep line não resolve. Isso fica como está
+(decisão: não mexer no snap, ver 4.4).
 
-Evidência (reproduzida nesta rodada, ver `booleanSweep.test.ts`):
+**Correção de premissa (medida):**
+- O laço aparece só na **transladada**; a semente original não tem nenhuma falha em produção.
+- O limite `POLYGON_CLIPPING_MAX_SWEEPLINE_SEGMENTS=3000` do script rápido **não serve para contar falhas**: com ele,
+  a semente original mostra 20 "falhas", mas todas são sweeps legítimos grandes que passam com 1e6. O número de
+  falhas e o tempo só são confiáveis no limite de produção.
+- Trocar a grade do snap continua sendo loteria (1e6 passa, 1e7 falha, 1e8 passa, 1e9 falha; §4.2 antigo).
 
-| grade | resultado |
-|---|---|
-| 1e-6 | passa (~41–92 ms) |
-| **1e-7 (atual)** | **estoura** — `Infinite loop when passing sweep line over endpoints (too many sweep line segments)` |
-| 1e-8 | estoura, outra mensagem: `Unable to find segment #11766 … in SweepLine tree` |
-| 1e-9 | estoura, mesma mensagem do dump |
-| sem snap (1e-12) | passa (~21–68 ms) |
+### 4.3 O que a correção faz
 
-Remover vértices colineares **não** resolve (testado em 1e-8…1e-12, nenhum vértice removido muda o resultado), e
-não existem vértices quase coincidentes a 1e-6 — o contato é **vértice-sobre-aresta**, não vértice-sobre-vértice.
-Foi por isso que a tentativa anterior de pré-arredondar `layerQuad` falhou.
+1. **`differenceClipper(a, ...bs)`** (`boolean.ts`): diferença direto pelo Clipper, com o mesmo `reduce` de
+   `clipperBinary` que o fallback de `difference` já usava. A saída é idêntica à do fallback.
+2. **`clipReturn` usa `differenceClipper`** (`resolve.ts`, `clipOf`). Retornos de acabamento são pequenos e não
+   precisam da precisão sub-micrométrica do polygon-clipping (a do Clipper é de 1 µm).
+3. **Memoização de `clipReturn`** por (retorno, conjunto pintado). O mapa de tinta é o cache de `paintFor` (um por
+   conjunto ativo), então a identidade do mapa é a identidade do conjunto. A chave do retorno é o objeto
+   `{ poly }` (não `(parede, camada, vão)`, porque `insertReturns` pode gerar mais de um retorno por camada e
+   vão). Vive só dentro de `solveCluster`, então não cresce entre clusters.
+4. **Telemetria barata** (`booleanStats()` / `resetBooleanStats()`): chamadas por operação, tentativas exatas,
+   falhas, tempo, vértices de entrada, motivo do erro e `clipperDirect`. Sem efeito no resultado.
 
-### 4.3 O que a correção **não** precisa fazer
+**Não aplicado (e por quê):**
+- **Pré-check genérico vértice-sobre-aresta** (4.4-b, tentado e removido). Com tolerância de 1 unidade de snap
+  (1e-7 m) mandava 30% das chamadas para o Clipper, e na análise de falsos positivos a maioria dava certo no
+  polygon-clipping. Como as falhas vêm de `clipReturn`, ir direto ao Clipper lá resolve sem tocar as outras
+  chamadas. Removido: não altera áreas nem custa tempo fora do caso patológico.
+- **Baixar `POLYGON_CLIPPING_MAX_SWEEPLINE_SEGMENTS` em produção** (4.4-d): não feito. Não há medida do maior número
+  de segmentos de um sweep legítimo, então não há base para escolher um valor. Com ele, um laço custaria
+  `limite/1e6 × 10 s`.
 
-A correção geométrica nunca esteve errada: com o limite baixo, a semente 24 **passa nos cinco invariantes**
-(a não lança, b áreas válidas, c soma dos cortes = união, d reprodutível, e translação preserva a área). O Clipper
-cobre o caso. Portanto o alvo é **tempo e robustez**, não resultado.
+### 4.4 Medições
 
-### 4.4 Correções candidatas
+Código original (`6a5dfbc`) versus código novo. Produção = sem variáveis `POLYGON_CLIPPING_*`.
 
-| # | Correção | Prós | Contras | Veredito |
-|---|---|---|---|---|
-| a | Trocar/reduzir o snap de `toPc` (1e-6 ou sem snap) | simples, o dado apoia (1e-6 e 1e-12 passam) | muda estabilidade de coordenadas: dedupe, `sigOf`, dourados e reprodutibilidade; área pode mudar em outros casos | **não recomendado como primeira medida** |
-| b | Detectar cedo o contato exato e ir **direto ao Clipper** | preserva a precisão nos casos normais; ataca só o caso patológico; determinístico | exige pré-check correto (`ponto-sobre-aresta`, O(n log n)) e teste do preditor | **recomendado** |
-| c | Memoizar `clipReturn` (como `paintFor` já faz com `paint`) | colapsa as 32 repetições em 1; ganho em produção, não só em teste | não elimina o custo de uma tentativa patológica; precisa de chave estável | **recomendado (complementar)** |
-| d | Baixar `POLYGON_CLIPPING_MAX_SWEEPLINE_SEGMENTS` em produção | o pior caso fica proporcional ao limite (`limite/1e6 × 30 s`) | empurra operações legítimas grandes para o Clipper (perde precisão sub-micrométrica); hoje **não se sabe** quantas são | **válvula de segurança, decidir com telemetria** |
+| medida | antes | depois |
+|---|---|---|
+| semente 24 transladada, produção | 339 s, 32 falhas do sweep | 1,1 s, 0 falhas |
+| semente 24 original, produção | 2,1 s | 1,5 s |
+| `npm run test:rapido:esquadria` (wall) | 11,5 s | 4,8 s |
+| `booleanSweep` teste 1 (fixture = chamada de `clipReturn`; antes medido com `difference`, cap 3000) | 104 ms | 14,9 ms |
+| 60 sementes, produção: falhas do sweep (R+S) | não medido para as 60 no código original (semente 24: 32, só na S) | 1 (semente 45 R, ver 4.5) |
+| 60 sementes, produção: chamadas `difference` (R+S) | não medido | 22272, das quais 1237 diretas ao Clipper (`clipperDirect`) |
+| 60 sementes, produção: maior diferença de área total | — | 2,7e-5 m² (tol `max(5e-5, 2e-4·t0)` ≥ 6,7e-3) |
+| 60 sementes, produção: áreas fora da tolerância | — | 0 |
 
-### 4.5 Ordem de execução recomendada
+Os 60 instantâneos de área foram comparados com `baseline.json` (código original, cap 3000, modo completo). A
+base é com cap 3000, então a diferença mistura o efeito da correção (retornos em Clipper, ~1 µm) com o efeito do
+cap; não foram separados. Maior diferença: 2,7e-5 m², dentro da tolerância. Semente 24 transladada: 27,0419119 m²
+(original em produção, 32 retornos pelo fallback) contra 27,0419126 m² (nova): diferença 7e-7 m².
 
-1. **Telemetria primeiro** (barata, sem mudar resultado): contar em `robust()` quantas chamadas caem no fallback e
-   por quê; logar o número de vértices/segmentos da entrada. Serve para dimensionar (d) e provar (c).
-2. **Pré-check (b)**: antes da tentativa exata, procurar vértice sobre aresta não-adjacente depois do snap. Se
-   houver, ir direto ao Clipper. Critério: o caso do fixture deixa de gastar a tentativa condenada.
-3. **Memoização (c)** de `clipReturn` por (parede, material, assinatura do polígono, conjunto ativo).
-4. **Só então** avaliar (a) e (d), com os números da telemetria.
+**Dourados:** `golden.test.ts`, `floorGolden`, `roofGolden`, `slabGolden`, `roofEdgesGolden` passam (53 testes).
+Nenhum arquivo dourado foi alterado.
+
+### 4.5 Pendências do P-1
+
+- **Uma falha residual** (semente 45, lado R): `Unable to complete output ring starting at` em uma chamada de
+  `difference` que não é `clipReturn`. Cai no Clipper como antes, sem laço, custo normal. Não investigado a
+  origem.
+- **`resolve.ts` está em 420 linhas de código** (limite do eslint). Qualquer mudança futura nele deve extrair o
+  bloco de retornos (`clipOf`/`clipReturn`/memo) para um arquivo próprio, por exemplo `clipReturn.ts`.
+- O teste 3 de `booleanSweep` (`it.fails` do snap 1e-7) segue verde: ele registra que o **polygon-clipping**
+  continua laçando nesse snap. A correção não muda o polygon-clipping, só deixa de chamá-lo nos retornos.
 
 ### 4.6 Critérios de aceitação
 
-- `npm run test:rapido:esquadria` ≤ 10 s (hoje 19–31 s) **e** os 5 invariantes verdes.
-- Semente 24 transladada ≤ 15 s (hoje 1239 s sem limite; 23,2 s com limite).
-- `booleanSweep.test.ts` teste 1 ≤ 100 ms e área igual a `0.002319941982005247 m²` (tol 1e-6).
-- Nenhuma área de nenhuma semente muda além de `max(5e-5, 2e-4·t0)` (tolerância já usada no invariante (e)).
-- **Nenhum** arquivo dourado muda sem justificativa escrita.
+- `npm run test:rapido:esquadria` ≤ 10 s — **4,8 s**, 5 testes verdes.
+- Semente 24 transladada ≤ 15 s — **1,1 s** (produção).
+- `booleanSweep.test.ts` teste 1 ≤ 100 ms e área `0.002319941982005247 m²` — **14,9 ms**, área exata.
+- Nenhuma área de nenhuma semente muda além de `max(5e-5, 2e-4·t0)` — **0 de 60** (maior 2,7e-5 m²).
+- Nenhum arquivo dourado muda sem justificativa — **nenhum mudou**; os 53 testes dourados passam.
 
 ---
 
@@ -412,8 +435,8 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 
 | Ordem | Tarefa | Por quê | Orçamento |
 |---|---|---|---|
-| 1 | Telemetria do `robust()` (4.5.1) | dimensiona o resto com número em vez de palpite | 30 min |
-| 2 | **P-1**: pré-check + memoização (4.5.2, 4.5.3) | destrava 20 min → segundos; pré-requisito dos demais | 3–4 h |
+| 1 | Telemetria do `robust()` (seção 4.3, item 4) | dimensiona o resto com número em vez de palpite | feito |
+| 2 | **P-1**: `clipReturn` direto ao Clipper + memoização (seção 4) | feito: 339 s → 1,1 s; pré-requisito dos demais | feito |
 | 3 | **T-1**: guardas sobre geometria pré-pintura (7.2a) | sem guarda confiável não se valida J-1 | 1 h |
 | 4 | **J-1/J-2**: `EndSpec` por lado + nó por vizinho angular (5.4) | corrige o defeito visual de junção | 4–6 h |
 | 5 | **I-1b**: ruído do vitest / CI (9.3) | libera a suíte completa em CI | 2 h |
@@ -424,8 +447,8 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 
 ## 12. Resumo em uma frase por defeito
 
-- **P-1**: o snap de entrada fabrica contato exato; o polygon-clipping entra em laço; 32 dessas tentativas custam
-  20 min. Corrigir com pré-check + memoização, não mexendo no snap.
+- **P-1**: o snap de entrada fabrica contato exato; o polygon-clipping entra em laço nos retornos de acabamento
+  da semente transladada (339 s). Corrigido: retornos vão direto ao Clipper, com memoização. O snap não foi tocado.
 - **J-1**: encosto e esquadro cortam todas as camadas com um escalar e deixam o núcleo comer o acabamento (75% e
   74% da área do canto). Corrigir com pareamento por face, e o esquadro provavelmente só com aviso.
 - **J-2**: nó de 3+ paredes ignora a configuração e aperta o núcleo da grossa. Corrigir junto com J-1.

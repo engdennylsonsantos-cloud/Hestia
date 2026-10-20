@@ -30,7 +30,7 @@ const env = (globalThis as unknown as GeoEnv).process.env;
 env.POLYGON_CLIPPING_MAX_SWEEPLINE_SEGMENTS = '3000';
 env.POLYGON_CLIPPING_MAX_QUEUE_SIZE = '3000';
 
-const { difference, multiArea } = await import('./index.ts');
+const { differenceClipper, multiArea } = await import('./index.ts');
 
 type Par = [number, number];
 type PcMulti = Par[][][];
@@ -60,8 +60,10 @@ function snapMulti(m: MultiPolygon, g: number): PcMulti {
 
 describe('sweep line do polygon-clipping', () => {
   it('o caso real do motor resolve sem travar o sweep line', () => {
+    // O fixture é a chamada de `clipReturn` (retorno de acabamento menos as paredes pintadas): o motor agora a faz
+    // direto pelo Clipper (`differenceClipper`), então este teste mede esse caminho.
     const t0 = performance.now();
-    const out = difference(a!, ...bs);
+    const out = differenceClipper(a!, ...bs);
     const wallMs = performance.now() - t0;
 
     // Medido no dump: ~30 s com o cap padrão de 1e6 segmentos; com 3000, a tentativa condenada morre em ms.

@@ -32,24 +32,105 @@ function fromPc(m: PcMulti): MultiPolygon {
 
 export const asMulti = (r: Ring): MultiPolygon => [[r]];
 
+/** Operação booleana pública (chaves da telemetria). */
+export type BoolOp = 'union' | 'difference' | 'intersection';
+
+/**
+ * Telemetria do plano A (polygon-clipping) e do plano B (Clipper). Contadores e cronômetros de `performance.now`
+ * por chamada: custo desprezível comparado à operação, e nenhum efeito no resultado.
+ */
+export interface BooleanStats {
+  /** Chamadas que chegaram ao polygon-clipping (sem atalhos triviais de vazio). */
+  calls: Record<BoolOp, number>;
+  /** Tentativas exatas feitas (polygon-clipping), e as que lançaram (cada uma cai no Clipper). */
+  exactTries: number;
+  exactFails: number;
+  /** Diferenças pedidas direto ao Clipper (`differenceClipper`), sem tentar o polygon-clipping. */
+  clipperDirect: number;
+  /** Tempo (ms) somado nas tentativas que lançaram e nas que deram certo. */
+  failMs: number;
+  okMs: number;
+  /** Vértices de entrada somados nas tentativas que lançaram. */
+  failVertices: number;
+  /** Motivo do erro do polygon-clipping (sem números) → quantas quedas para o Clipper. */
+  failReasons: Record<string, number>;
+}
+
+const emptyStats = (): BooleanStats => ({
+  calls: { union: 0, difference: 0, intersection: 0 },
+  exactTries: 0,
+  exactFails: 0,
+  clipperDirect: 0,
+  failMs: 0,
+  okMs: 0,
+  failVertices: 0,
+  failReasons: {},
+});
+
+let stats = emptyStats();
+
+/** Cópia da telemetria acumulada desde o último `resetBooleanStats`. */
+export function booleanStats(): BooleanStats {
+  return { ...stats, calls: { ...stats.calls }, failReasons: { ...stats.failReasons } };
+}
+
+export function resetBooleanStats(): void {
+  stats = emptyStats();
+}
+
+/** Motivo estável do erro: sem números, `#`, `[` ou `(` (o polygon-clipping põe coordenadas na mensagem). */
+const reasonOf = (e: unknown): string => {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.replace(/[#[(].*$/, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'erro sem mensagem';
+};
+
+const vertexCount = (m: PcMulti): number => m.reduce((s, p) => s + p.reduce((t, r) => t + r.length, 0), 0);
+
 /**
  * polygon-clipping é exato, mas lança em entradas quase degeneradas (anéis que quase se tocam, arestas
  * colineares com erro de micrômetros). Nesse caso refazemos a operação com Clipper, que trabalha em inteiros e
  * nunca lança: o resultado perde a precisão abaixo de 1 µm, o que é irrelevante para paredes.
  */
-function robust(exact: () => PcMulti, fallback: () => MultiPolygon): MultiPolygon {
+function robust(op: BoolOp, ops: PcMulti[], exact: () => PcMulti, fallback: () => MultiPolygon): MultiPolygon {
+  stats.calls[op]++;
+  const t0 = performance.now();
   try {
-    return fromPc(exact());
-  } catch {
+    const out = fromPc(exact());
+    stats.exactTries++;
+    stats.okMs += performance.now() - t0;
+    return out;
+  } catch (e) {
+    stats.exactTries++;
+    stats.exactFails++;
+    stats.failMs += performance.now() - t0;
+    stats.failVertices += ops.reduce((s, m) => s + vertexCount(m), 0);
+    const reason = reasonOf(e);
+    stats.failReasons[reason] = (stats.failReasons[reason] ?? 0) + 1;
     return fallback();
   }
+}
+
+/**
+ * Diferença direto pelo Clipper (plano B), sem tentar o polygon-clipping. Mesmo resultado que o fallback de
+ * `difference`: `clipperBinary` em sequência sobre cada subtraendo. Para subtrações pequenas e de precisão de
+ * parede (retornos de acabamento no vão), evita o sweep line do polygon-clipping, que pode entrar em laço.
+ */
+export function differenceClipper(a: MultiPolygon, ...bs: MultiPolygon[]): MultiPolygon {
+  if (a.length === 0) return [];
+  const subs = bs.filter((m) => m.length > 0);
+  if (subs.length === 0) return a;
+  stats.clipperDirect++;
+  return subs.reduce((acc, m) => clipperBinary(acc, m, ClipperLib.ClipType.ctDifference), a);
 }
 
 export function union(...ms: MultiPolygon[]): MultiPolygon {
   const parts = ms.filter((m) => m.length > 0);
   if (parts.length === 0) return [];
-  const [first, ...rest] = parts.map(toPc);
+  const pcs = parts.map(toPc);
+  const [first, ...rest] = pcs;
   return robust(
+    'union',
+    pcs,
     () => polygonClipping.union(first!, ...rest),
     () => parts.slice(1).reduce((acc, m) => clipperBinary(acc, m, ClipperLib.ClipType.ctUnion), parts[0]!),
   );
@@ -59,16 +140,22 @@ export function difference(a: MultiPolygon, ...bs: MultiPolygon[]): MultiPolygon
   if (a.length === 0) return [];
   const subs = bs.filter((m) => m.length > 0);
   if (subs.length === 0) return a;
+  const pcs = [toPc(a), ...subs.map(toPc)];
   return robust(
-    () => polygonClipping.difference(toPc(a), ...subs.map(toPc)),
-    () => subs.reduce((acc, m) => clipperBinary(acc, m, ClipperLib.ClipType.ctDifference), a),
+    'difference',
+    pcs,
+    () => polygonClipping.difference(pcs[0]!, ...pcs.slice(1)),
+    () => differenceClipper(a, ...subs),
   );
 }
 
 export function intersection(a: MultiPolygon, b: MultiPolygon): MultiPolygon {
   if (a.length === 0 || b.length === 0) return [];
+  const pcs = [toPc(a), toPc(b)];
   return robust(
-    () => polygonClipping.intersection(toPc(a), toPc(b)),
+    'intersection',
+    pcs,
+    () => polygonClipping.intersection(pcs[0]!, pcs[1]!),
     () => clipperBinary(a, b, ClipperLib.ClipType.ctIntersection),
   );
 }

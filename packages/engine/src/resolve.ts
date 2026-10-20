@@ -3,6 +3,7 @@ import {
   boxOf,
   boxesOverlap,
   difference,
+  differenceClipper,
   expandBox,
   intersection,
   multiArea,
@@ -268,7 +269,7 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
   };
   const plan = paintFor(items.filter((i) => i.inPlan));
   // Retornos de acabamento não podem invadir paredes vizinhas (vão perto de um canto ou de um T).
-  const clipReturn = (poly: MultiPolygon, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
+  const clipOf = (poly: MultiPolygon, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
     const box = boxOf(multiPoints(poly));
     const subs: MultiPolygon[] = [];
     for (const i of items) {
@@ -276,7 +277,16 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
       const f = painted.get(i);
       if (f && f.length) subs.push(f);
     }
-    return subs.length ? difference(poly, ...subs) : poly;
+    return differenceClipper(poly, ...subs);
+  };
+  // Memo por (retorno, conjunto pintado): `painted` é o mapa do cache de tinta, então a identidade do mapa é a
+  // identidade do conjunto ativo; `r` é único por (parede, camada, vão). Vive só nesta resolução de cluster.
+  const retMemo = new Map<{ poly: MultiPolygon }, Map<Map<Item, MultiPolygon>, MultiPolygon>>();
+  const clipReturn = (r: { poly: MultiPolygon }, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
+    const byPaint = retMemo.get(r) ?? new Map<Map<Item, MultiPolygon>, MultiPolygon>();
+    retMemo.set(r, byPaint);
+    if (!byPaint.has(painted)) byPaint.set(painted, clipOf(r.poly, wallId, painted));
+    return byPaint.get(painted)!;
   };
   const layers = new Map<Id, ResolvedLayer[]>();
   const byMaterial = new Map<Id, MultiPolygon[]>();
@@ -303,7 +313,7 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
       // Retorno do acabamento no vão: só nas faixas de altura que o vão atravessa.
       for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) {
         const g = opens.find((x) => x.openingId === r.openingId);
-        if (g && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height) poly = [...poly, ...clipReturn(r.poly, it.wallId, painted)];
+        if (g && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height) poly = [...poly, ...clipReturn(r, it.wallId, painted)];
       }
       if (poly.length === 0) continue;
       const list = bandsOf.get(it) ?? [];
@@ -323,7 +333,7 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     if (fragment.length) {
       const rects = opens.filter((g) => g.hostId === it.wallId).map(openingRect);
       cut = rects.length ? difference(fragment, ...rects) : fragment;
-      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) cut = [...cut, ...clipReturn(r.poly, it.wallId, plan)];
+      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) cut = [...cut, ...clipReturn(r, it.wallId, plan)];
     }
     const bands = bandsOf.get(it) ?? [];
     if (!fragment.length && bands.length === 0) continue;

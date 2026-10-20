@@ -145,4 +145,39 @@ describe('nós de três ou mais paredes (J-2)', () => {
     const r = resolver([0, 72, 144, 216, 288].map((g, i) => parede(`p${i}`, O, ponto(g))));
     conferirSilhueta(r);
   });
+
+  describe('X de quatro braços com tipos mistos (dois pares colineares, sem parede passante)', () => {
+    // 45° e 225° são colineares (grossa 19), 135° e 315° também (alvenaria 14): nenhum braço é ramal de parede que passa.
+    const montarX4 = (kind: JoinKind): Parede[] => [
+      parede('a', O, ponto(45), EXT19, comJuncao(kind)),
+      parede('b', O, ponto(135), ALV14, comJuncao(kind)),
+      parede('c', O, ponto(225), EXT19, comJuncao(kind)),
+      parede('d', O, ponto(315), ALV14, comJuncao(kind)),
+    ];
+
+    it.each(KINDS)('kind %s: um anel, sem furo, camadas somam a silhueta', (kind) => {
+      conferirSilhueta(resolver(montarX4(kind)));
+    });
+  });
+
+  describe('nó de três braços a 0°, 60° e 120° com tipos mistos (lacuna reflexa de 240°)', () => {
+    const montar0_60_120 = (kind: JoinKind): Parede[] => [
+      parede('g', O, ponto(0, 3), EXT19, comJuncao(kind)),
+      parede('f1', O, ponto(60), ALV14, comJuncao(kind)),
+      parede('f2', O, ponto(120), ALV14, comJuncao(kind)),
+    ];
+
+    it.each(KINDS)('kind %s: um anel, sem furo, camadas somam a silhueta', (kind) => {
+      conferirSilhueta(resolver(montar0_60_120(kind)));
+    });
+  });
+
+  describe('nó de cinco braços com tipos mistos e configuração de junção', () => {
+    const montar5 = (kind: JoinKind): Parede[] =>
+      [0, 72, 144, 216, 288].map((g, i) => parede(`p${i}`, O, ponto(g), i % 2 ? ALV14 : EXT19, comJuncao(kind)));
+
+    it.each(KINDS)('kind %s: um anel, sem furo, camadas somam a silhueta', (kind) => {
+      conferirSilhueta(resolver(montar5(kind)));
+    });
+  });
 });

@@ -66,7 +66,7 @@ export interface PairSpecs {
 }
 
 /**
- * Corte do esquadro quando o pareamento não é possível (parede curva ou degrau fora do limite): um plano só por parede,
+ * Corte do esquadro quando o pareamento não é possível (degrau fora do limite): um plano só por parede,
  * prolongado até cobrir o canto externo. Só cobre o canto; não respeita os limites das camadas (docs/08 §5.4 passo 4).
  */
 function flatSquare(lead: EndRef, follower: EndRef): PairSpecs {
@@ -106,12 +106,11 @@ export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
       follower: { kind: 'miter', self: sb, other: sa },
     };
   }
-  // Encosto e esquadro: pareamento por face. Só não cabe em parede curva ou quando o degrau sai do limite.
-  if (!lead.f.arc && !follower.f.arc) {
-    const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
-    const followSteps = stairSpec(follower, sb, sa, 'high', cap);
-    if (leadSteps && followSteps) return { lead: leadSteps, follower: followSteps };
-  }
+  // Encosto e esquadro: pareamento por face, também com parede curva (as faces de arco são circunferências). Só
+  // não cabe quando o degrau sai do limite.
+  const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
+  const followSteps = stairSpec(follower, sb, sa, 'high', cap);
+  if (leadSteps && followSteps) return { lead: leadSteps, follower: followSteps };
   return kind === 'square' ? flatSquare(lead, follower) : null;
 }
 

@@ -27,22 +27,22 @@ function gridProject(n: number): Project {
 }
 
 const BASE_ITERS = 30_000_000;
-let sumidouro = 0;
-/** Trabalho fixo de CPU (sem alocação), o mesmo a cada chamada. */
+/** Trabalho fixo de CPU (sem alocação), o mesmo a cada chamada: devolve um checksum determinístico. */
 function tarefaBase(): number {
   let h = 0;
   for (let i = 0; i < BASE_ITERS; i++) h = (Math.imul(h ^ i, 0x9e3779b1) + i) | 0;
   return h;
 }
-/** Menor de três execuções: descarta as que caíram em pico de carga. */
-function baseMs(): number {
+/** Menor de três execuções (descarta as que caíram em pico de carga) e o checksum, que confere que é o mesmo trabalho. */
+function baseMs(): { ms: number; h: number } {
   let melhor = Infinity;
+  let h = 0;
   for (let k = 0; k < 3; k++) {
     const t = performance.now();
-    sumidouro ^= tarefaBase();
+    h = tarefaBase();
     melhor = Math.min(melhor, performance.now() - t);
   }
-  return melhor;
+  return { ms: melhor, h };
 }
 
 /**
@@ -56,6 +56,7 @@ describe('desempenho da captura com o cache de faces', () => {
     const p = gridProject(200);
     expect(wallsOnLevel(p, 'lv_0')).toHaveLength(200);
     const base = baseMs();
+    expect(base.h).toBe(baseMs().h);
     const t0 = performance.now();
     for (let k = 0; k < 500; k++) {
       // Cursor percorrendo perto das faces das paredes: caminho com mais candidatos.
@@ -64,8 +65,8 @@ describe('desempenho da captura com o cache de faces', () => {
       infer({ x, y }, { project: p, levelId: 'lv_0', mpp: MPP, gridStep: 0.1 });
     }
     const ms = performance.now() - t0;
-    const razao = ms / base;
-    console.log(`captura: base ${base.toFixed(0)} ms · 500 infer ${ms.toFixed(0)} ms (razão ${razao.toFixed(1)})`);
+    const razao = ms / base.ms;
+    console.log(`captura: base ${base.ms.toFixed(0)} ms · 500 infer ${ms.toFixed(0)} ms (razão ${razao.toFixed(1)})`);
     expect(razao).toBeLessThan(LIMITE_RAZAO);
   });
 });

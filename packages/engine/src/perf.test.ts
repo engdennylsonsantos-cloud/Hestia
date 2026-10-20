@@ -18,22 +18,22 @@ const BASE_ITERS = 30_000_000;
  */
 const LIMITE_FRIO = 60;
 const LIMITE_QUENTE = 40;
-let sumidouro = 0;
-/** Trabalho fixo de CPU (sem alocação), o mesmo a cada chamada. */
+/** Trabalho fixo de CPU (sem alocação), o mesmo a cada chamada: devolve um checksum determinístico. */
 function tarefaBase(): number {
   let h = 0;
   for (let i = 0; i < BASE_ITERS; i++) h = (Math.imul(h ^ i, 0x9e3779b1) + i) | 0;
   return h;
 }
-/** Menor de três execuções: descarta as que caíram em pico de carga. */
-function baseMs(): number {
+/** Menor de três execuções (descarta as que caíram em pico de carga) e o checksum, que confere que é o mesmo trabalho. */
+function baseMs(): { ms: number; h: number } {
   let melhor = Infinity;
+  let h = 0;
   for (let k = 0; k < 3; k++) {
     const t = performance.now();
-    sumidouro ^= tarefaBase();
+    h = tarefaBase();
     melhor = Math.min(melhor, performance.now() - t);
   }
-  return melhor;
+  return { ms: melhor, h };
 }
 
 /**
@@ -57,20 +57,21 @@ describe('K4 · desempenho', () => {
   it('500 paredes: resolução completa e recálculo depois de mover uma parede', () => {
     const s = build();
     expect(Object.keys(s.project.elements)).toHaveLength(500);
-    const base1 = baseMs();
+    const b1 = baseMs();
     const cold = performance.now();
     const r = resolveLevel(s.project, 'lv_0');
     const coldMs = performance.now() - cold;
     expect(Object.keys(r.walls)).toHaveLength(500);
     s.exec({ type: 'transform', ids: ['w0'], transform: { kind: 'translate', d: { x: 0, y: 0.5 } } });
-    const base2 = baseMs();
+    const b2 = baseMs();
+    expect(b2.h).toBe(b1.h);
     const warm = performance.now();
     resolveLevel(s.project, 'lv_0');
     const warmMs = performance.now() - warm;
-    const razaoFrio = coldMs / base1;
-    const razaoQuente = warmMs / base2;
+    const razaoFrio = coldMs / b1.ms;
+    const razaoQuente = warmMs / b2.ms;
     console.log(
-      `K4: base ${base1.toFixed(0)}/${base2.toFixed(0)} ms · a frio ${coldMs.toFixed(0)} ms (razão ${razaoFrio.toFixed(1)}) · ` +
+      `K4: base ${b1.ms.toFixed(0)}/${b2.ms.toFixed(0)} ms · a frio ${coldMs.toFixed(0)} ms (razão ${razaoFrio.toFixed(1)}) · ` +
         `depois de mover uma ${warmMs.toFixed(0)} ms (razão ${razaoQuente.toFixed(1)})`,
     );
     expect(razaoFrio).toBeLessThan(LIMITE_FRIO);

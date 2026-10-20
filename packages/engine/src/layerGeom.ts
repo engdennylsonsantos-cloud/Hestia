@@ -1,4 +1,4 @@
-import { arcSample, intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
+import { intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
 import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint } from './joinSides.ts';
@@ -7,17 +7,11 @@ import { clipBandsToProfile } from './profile.ts';
 import type { Membrane, ResolvedLayer } from './types.ts';
 
 const MIN_AREA = 1e-9;
-
-/** Em paredes curvas, leva o ponto à circunferência da camada (os cortes usam a tangente: erro de milímetros). */
-function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
-  if (!f.arc) return p;
-  const c = f.arc.center;
-  const rho = f.arc.radius + f.arc.k * s;
-  const dx = p.x - c.x;
-  const dy = p.y - c.y;
-  const l = Math.hypot(dx, dy);
-  return l < 1e-9 ? p : { x: c.x + (dx / l) * rho, y: c.y + (dy / l) * rho };
-}
+/**
+ * Passo (m, em t) do grid que amostra as faces de arco. Global ao arco: duas camadas que dividem a mesma face recebem
+ * os mesmos vértices. Flecha de corda ≤ 0,2 mm para raios ≥ 1,4 m.
+ */
+const ARC_GRID = 0.04;
 
 /** Face da extremidade que vale para `s`: a metade de s maior usa `hi`, a de s menor usa `lo`. */
 export const sideAt = (f: WallFrame, spec: EndSpec, s: number): SideSpec => (s >= f.sMid ? spec.hi : spec.lo);
@@ -45,13 +39,17 @@ function stepT(runs: readonly StepRun[], s: number, edge: 'low' | 'high'): numbe
   return runT(run, s);
 }
 
-/** Ponto da extremidade em `s` segundo uma face (corte reto, esquadria contra o vizinho ou degraus por camada). */
+/**
+ * Ponto da extremidade em `s` segundo uma face (corte reto, esquadria contra o vizinho ou degraus por camada). Em arco a
+ * esquadria é a interseção exata da circunferência com a face do vizinho (`crossAt`), então o ponto não precisa de
+ * correção: é o mesmo que o vizinho calcula para o mesmo canto.
+ */
 function pointOnSide(f: WallFrame, which: 'a' | 'b', side: SideSpec, s: number, edge: 'low' | 'high' = 'low'): Vec2 {
   if (side.kind === 'flat') return pointAt(f, side.t, s);
   if (side.kind === 'steps') return pointAt(f, stepT(side.runs, s, edge), s);
   const d = side.self.sigma > 0 ? side.self.sHi - s : s - side.self.sLo;
   const p = miterPoint(side.self, side.other, Math.max(0, Math.min(d, side.self.sHi - side.self.sLo)));
-  return p ? onLayerCircle(f, p, s) : pointAt(f, which === 'a' ? 0 : f.length, s);
+  return p ?? pointAt(f, which === 'a' ? 0 : f.length, s);
 }
 
 export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: number): Vec2 {
@@ -118,14 +116,51 @@ function crossing(q: Ring): boolean {
   return hit(0, 2) || hit(1, 3);
 }
 
-/** Camada de parede curva: contorno com as bordas externa e interna amostradas ao longo do arco. */
+/**
+ * Vértices de uma face de arco à profundidade `s`, ordenados por t: as pontas que qualquer camada dessa face pode usar
+ * (os dois lados, faixas alta e baixa) e um grid global de comprimento. Duas camadas que dividem a face leem a mesma
+ * lista, então as cordas da borda comum são idênticas dos dois lados.
+ */
+function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number; p: Vec2 }> {
+  const pts: Vec2[] = [];
+  for (const which of ['a', 'b'] as const) {
+    const spec = ends[which];
+    for (const side of [spec.lo, spec.hi]) for (const edge of ['low', 'high'] as const) pts.push(pointOnSide(f, which, side, s, edge));
+  }
+  const ts = pts.map((p) => toLocal(f, p).t);
+  const tMin = Math.min(...ts);
+  const tMax = Math.max(...ts);
+  const out = pts.map((p, i) => ({ t: ts[i]!, p }));
+  for (let k = Math.ceil(tMin / ARC_GRID); k * ARC_GRID < tMax; k++) {
+    const t = k * ARC_GRID;
+    if (t > tMin) out.push({ t, p: pointAt(f, t, s) });
+  }
+  out.sort((x, y) => x.t - y.t);
+  return out.filter((q, i) => i === 0 || q.t - out[i - 1]!.t > 1e-9);
+}
+
+/** Vértices intermediários da face de arco à profundidade `s`, de `from` até `to` (pontas excluídas). */
+function arcEdge(f: WallFrame, ends: WallEnds, s: number, from: Vec2, to: Vec2): Vec2[] {
+  const t0 = toLocal(f, from).t;
+  const t1 = toLocal(f, to).t;
+  const lo = Math.min(t0, t1) + 1e-9;
+  const hi = Math.max(t0, t1) - 1e-9;
+  const inside = arcBoundary(f, ends, s).filter((q) => q.t > lo && q.t < hi).map((q) => q.p);
+  return t0 <= t1 ? inside : inside.reverse();
+}
+
+/**
+ * Camada de parede curva: o contorno segue as cadeias das duas extremidades (com as quebras de esquadria e os degraus
+ * de cada face, como na reta) e as faces de arco entre elas, pelo mesmo grid de `arcBoundary`.
+ */
 function arcLayerRing(f: WallFrame, ends: WallEnds, lo: number, hi: number): Ring {
-  const pa = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'a', ends.a, hi)] as const;
-  const pb = [endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi)] as const;
-  const t = (p: Vec2): number => toLocal(f, p).t;
-  const loPts = arcSample(f.arc!, t(pa[0]), t(pb[0]), lo);
-  const hiPts = arcSample(f.arc!, t(pb[1]), t(pa[1]), hi);
-  return [pa[0], ...loPts.slice(1, -1), pb[0], pb[1], ...hiPts.slice(1, -1), pa[1]];
+  const aLine = endPolyline(f, 'a', ends.a, lo, hi);
+  const bLine = endPolyline(f, 'b', ends.b, lo, hi);
+  const aLo = aLine[0]!;
+  const aHi = aLine[aLine.length - 1]!;
+  const bLo = bLine[0]!;
+  const bHi = bLine[bLine.length - 1]!;
+  return [aLo, ...arcEdge(f, ends, lo, aLo, bLo), ...bLine, ...arcEdge(f, ends, hi, bHi, aHi), ...aLine.slice(1).reverse()];
 }
 
 export function layerQuad(f: WallFrame, ends: WallEnds, s1: number, s2: number): Ring {

@@ -1,4 +1,4 @@
-import { arcFromSagitta, arcLocal, arcPointAt, arcTangentAt, dot, len as vlen, norm, perp, sub, type Arc, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, arcLocal, arcPointAt, arcTangentAt, dist, dot, intersectLines, len as vlen, norm, perp, sub, type Arc, type Vec2 } from '@hestia/geom';
 import { coreSpan, totalThickness, type LocationLine, type Wall, type WallType } from '@hestia/model';
 
 /**
@@ -88,4 +88,62 @@ export function toLocal(f: WallFrame, p: Vec2): { t: number; s: number } {
   if (f.arc) return arcLocal(f.arc, p);
   const r = sub(p, f.a);
   return { t: dot(r, f.u), s: dot(r, f.n) };
+}
+
+/** Curva de uma face de parede: reta (ponto e direção unitária) ou circunferência (centro e raio). */
+export type Curve = { kind: 'line'; p: Vec2; d: Vec2 } | { kind: 'circle'; c: Vec2; r: number };
+
+/** Face à profundidade `s`: reta paralela ao eixo, ou circunferência de raio R + k·s no arco. */
+export function faceCurve(f: WallFrame, s: number): Curve {
+  if (f.arc) return { kind: 'circle', c: f.arc.center, r: f.arc.radius + f.arc.k * s };
+  return { kind: 'line', p: { x: f.a.x + f.n.x * s, y: f.a.y + f.n.y * s }, d: f.u };
+}
+
+/**
+ * Interseção exata de duas curvas de face (reta ou círculo), a que fica mais perto de `near` (o nó). Em vez da
+ * tangente, a interseção é a mesma vista dos dois lados do canto: o pareamento de duas paredes curvas e de uma
+ * curva com uma reta depende disso (qualquer erro vira fresta ou sobreposição entre os dois anéis).
+ */
+export function intersectCurves(g: Curve, h: Curve, near: Vec2): Vec2 | null {
+  if (g.kind === 'line' && h.kind === 'line') {
+    const r = intersectLines(g.p, g.d, h.p, h.d);
+    return r ? r.point : null;
+  }
+  if (g.kind === 'line' && h.kind === 'circle') return nearest(lineCircle(g, h), near);
+  if (g.kind === 'circle' && h.kind === 'line') return nearest(lineCircle(h, g), near);
+  if (g.kind === 'circle' && h.kind === 'circle') return nearest(circleCircle(g, h), near);
+  return null;
+}
+
+const nearest = (pts: Vec2[], near: Vec2): Vec2 | null => {
+  let best: Vec2 | null = null;
+  for (const p of pts) if (!best || dist(p, near) < dist(best, near)) best = p;
+  return best;
+};
+
+function lineCircle(l: Extract<Curve, { kind: 'line' }>, c: Extract<Curve, { kind: 'circle' }>): Vec2[] {
+  const w = sub(l.p, c.c);
+  const b = dot(l.d, w);
+  const disc = b * b - (dot(w, w) - c.r * c.r);
+  if (disc < 0) return [];
+  const sq = Math.sqrt(disc);
+  return [-b - sq, -b + sq].map((k) => ({ x: l.p.x + l.d.x * k, y: l.p.y + l.d.y * k }));
+}
+
+function circleCircle(g: Extract<Curve, { kind: 'circle' }>, h: Extract<Curve, { kind: 'circle' }>): Vec2[] {
+  const dv = sub(h.c, g.c);
+  const d = Math.hypot(dv.x, dv.y);
+  if (d < 1e-12) return [];
+  const a = (g.r * g.r - h.r * h.r + d * d) / (2 * d);
+  const h2 = g.r * g.r - a * a;
+  if (h2 < 0) return [];
+  const hh = Math.sqrt(h2);
+  const ux = dv.x / d;
+  const uy = dv.y / d;
+  const bx = g.c.x + ux * a;
+  const by = g.c.y + uy * a;
+  return [
+    { x: bx - uy * hh, y: by + ux * hh },
+    { x: bx + uy * hh, y: by - ux * hh },
+  ];
 }

@@ -1,4 +1,4 @@
-import type { Vec2 } from '@hestia/geom';
+import type { Arc, Vec2 } from '@hestia/geom';
 import type { WallFrame } from './frame.ts';
 
 /** Dados do vizinho necessários para esquadrejar uma camada contra ele (tudo em números → cache estável). */
@@ -17,6 +17,8 @@ export interface MiterSide {
   coreEnd: number;
   /** Profundidades (da face externa do canto) dos limites entre camadas do tipo, de 0 até a espessura total. */
   bounds: number[];
+  /** Arco da parede que tem esta extremidade (null se reta): as faces são circunferências, não retas. */
+  arc: Pick<Arc, 'center' | 'radius' | 'k'> | null;
 }
 
 /**

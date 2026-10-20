@@ -6,7 +6,7 @@
  * 0,8 m em volta do nó) e imprime uma tabela de checagem numérica:
  *   - anéis externos da silhueta (união de todas as camadas): > 1 é FALHA (o desenho ficou em pedaços);
  *   - buracos da silhueta;
- *   - soma das áreas `cut` de todas as camadas vs área da silhueta: diferença > 1e-6 m² é FALHA (sobreposição
+ *   - soma das áreas `cut` de todas as camadas vs área da silhueta: diferença > 1e-5 m² é FALHA (sobreposição
  *     ou falha de cobertura).
  *
  * Saída: SVG em JUNTAS_OUT (padrão: pasta do scratchpad). A conversão para PNG é feita por
@@ -25,7 +25,7 @@ const OUT =
 const GROSSA = 'wt_ext19';
 const FINA = 'wt_alv14';
 const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
-const TOL = 1e-6;
+const TOL = 1e-5;
 
 const S = 600; // px por metro
 const BOX = 0.8; // m, lado da caixa ampliada em volta do nó

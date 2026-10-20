@@ -34,8 +34,8 @@ const codes = (issues: ValidationIssue[]): string[] => issues.map((i) => i.code)
 const find = (issues: ValidationIssue[], code: string): ValidationIssue[] => issues.filter((i) => i.code === code);
 
 describe('validação: paredes', () => {
-  it('modelo válido não gera problemas', () => {
-    expect(validateProject(build([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)]))).toEqual([]);
+  it('modelo válido não gera problemas; quina em encosto com acabamento gera só o aviso de esquadria', () => {
+    expect(codes(validateProject(build([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)])))).toEqual(['wall-corner-butt-finish']);
   });
 
   it('comprimento zero é erro', () => {

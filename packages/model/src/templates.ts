@@ -43,6 +43,18 @@ function house2(cmds: Command[]): void {
     wall([4, 2.4], [10, 2.4], IN, 'h_i3'),
     wall([7, 0], [7, 2.4], IN, 'h_i4'),
   ];
+  // Quinas externas em esquadria: em encosto, a parede que passa deixa o núcleo e o acabamento interno da outra
+  // aparecerem na quina externa (ver docs/decisoes/0009). Esquadria faz as camadas se encontrarem na diagonal.
+  const M = { kind: 'miter' as const, flip: false };
+  const corner = (a: Omit<Wall, 'order'>, aEnd: 'joinStart' | 'joinEnd', b: Omit<Wall, 'order'>, bEnd: 'joinStart' | 'joinEnd') => {
+    a[aEnd] = M;
+    b[bEnd] = M;
+  };
+  const [hw, hn, he, hs] = ws as [Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>];
+  corner(hw!, 'joinEnd', hn!, 'joinStart');
+  corner(hn!, 'joinEnd', he!, 'joinStart');
+  corner(he!, 'joinEnd', hs!, 'joinStart');
+  corner(hs!, 'joinEnd', hw!, 'joinStart');
   for (const w of ws) cmds.push({ type: 'addWall', wall: w });
   const os: Opening[] = [
     opening('h_s', 'ot_p90', 4.5, 'door'),
@@ -71,6 +83,16 @@ function studio(cmds: Command[]): void {
     wall([4, 0], [4, 2.2], 'wt_alv9', 's_i1'),
     wall([4, 2.2], [6, 2.2], 'wt_alv9', 's_i2'),
   ];
+  // Quinas externas em esquadria (decisão 0009), como na casa.
+  const M = { kind: 'miter' as const, flip: false };
+  const [sw, sn, se, ss] = ws as [Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>];
+  sw!.joinEnd = M; sn!.joinStart = M;
+  sn!.joinEnd = M; se!.joinStart = M;
+  se!.joinEnd = M; ss!.joinStart = M;
+  ss!.joinEnd = M; sw!.joinStart = M;
+  // Quina interna (divisória com a parede do banheiro encontra a parede da sala).
+  const [si1, si2] = ws.slice(4) as [Omit<Wall, 'order'>, Omit<Wall, 'order'>];
+  si1!.joinEnd = M; si2!.joinStart = M;
   for (const w of ws) cmds.push({ type: 'addWall', wall: w });
   const os: Opening[] = [
     opening('s_s', 'ot_p90', 4.2, 'door'),

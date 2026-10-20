@@ -1,4 +1,4 @@
-import { arcFromSagitta, arcTangentAt, multiArea, norm, ringArea, union, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, arcPointAt, arcTangentAt, multiArea, norm, ringArea, union, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, type JoinKind, type Project, type Wall } from '@hestia/model';
 import { resolveLevel } from '@hestia/engine';
 
@@ -17,7 +17,18 @@ const arc = arcFromSagitta(A, N, sag);
 const tN = arc ? arcTangentAt(arc, arc.length) : norm({ x: N.x - A.x, y: N.y - A.y });
 const dNo = girar({ x: -tN.x, y: -tN.y }, lado * graus);
 const B = { x: N.x + dNo.x * 3, y: N.y + dNo.y * 3 };
-const pecas = [
+const TMODE = !!process.env.TMODE;
+const cT = c, A2: Vec2 = { x: -c / 2, y: 0 }, B2: Vec2 = { x: c / 2, y: 0 };
+const sagT = sentido * h;
+const arcT = arcFromSagitta(A2, B2, sagT)!;
+const M = arcPointAt(arcT, arcT.length / 2, 0);
+const tM = arcTangentAt(arcT, arcT.length / 2);
+const dRam = girar(tM, lado * graus);
+const pecasT = [
+  { id: 'g', typeId: GROSSA, a: A2, b: B2, sag: sagT, lado: null as null },
+  { id: 'f', typeId: FINA, a: M, b: { x: M.x + dRam.x * 3, y: M.y + dRam.y * 3 }, sag: 0, lado: 'start' as const },
+];
+const pecas = TMODE ? pecasT : [
   { id: 'g', typeId: GROSSA, a: A, b: N, sag, lado: 'end' as const },
   { id: 'f', typeId: FINA, a: N, b: B, sag: 0, lado: 'start' as const },
 ];

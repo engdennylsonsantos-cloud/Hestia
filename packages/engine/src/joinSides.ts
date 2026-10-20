@@ -1,7 +1,7 @@
 import { coreSpan, layerPriority, layerSpans } from '@hestia/model';
 import { add, dot, mul, perp, type Vec2 } from '@hestia/geom';
-import { faceCurve, intersectCurves, sAtDepth, toLocal, type Curve, type WallFrame } from './frame.ts';
-import type { EndRef, EndSpec, MiterSide, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
+import { faceCurve, intersectCurves, pointAt, sAtDepth, toLocal, type Curve, type WallFrame } from './frame.ts';
+import type { Chord, EndRef, EndSpec, MiterSide, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
 
 /**
  * Pareamento em duas pontas (decisão 0009): profundidade em `to` que a camada de profundidade `d` de `from` encontra.
@@ -70,7 +70,7 @@ export function sideFacing(r: EndRef, sigma: 1 | -1): MiterSide {
   const bounds = cornerIsExterior ? cum : cum.map((c) => T - c).reverse();
   const coreEnd = outerToCore + (core.to - core.from);
   const arc = r.f.arc ? { center: r.f.arc.center, radius: r.f.arc.radius, k: r.f.arc.k } : null;
-  return { o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore, coreEnd, bounds, arc };
+  return { wallId: r.f.wall.id, o: r.o, u, n: perp(u), sHi: r.f.sHi, sLo: r.f.sLo, sigma, outerToCore, coreEnd, bounds, arc };
 }
 
 /** Lado do canto voltado para o vizinho `towards`: a face externa do canto é a afastada dele. */
@@ -86,7 +86,19 @@ export const flatEnd = (t: number): EndSpec => both({ kind: 'flat', t });
 
 export function setEnd(out: Map<string, WallEnds>, r: EndRef, spec: EndSpec): void {
   const e = out.get(r.f.wall.id);
-  if (e) e[r.which] = spec;
+  if (!e) return;
+  e[r.which] = spec;
+  // Cada degrau sobre a face de arco de outra parede deixa uma corda nela: a outra parede a usa na sua grade.
+  for (const side of new Set([spec.hi, spec.lo])) {
+    if (side.kind !== 'steps') continue;
+    for (const run of side.runs) {
+      if (run.on === undefined || run.s1 === undefined || run.host === undefined) continue;
+      const host = out.get(run.host);
+      if (!host) continue;
+      const chord: Chord = { s: run.on, p: pointAt(r.f, run.t, run.s), q: pointAt(r.f, run.t1 ?? run.t, run.s1) };
+      host.cordas = [...(host.cordas ?? []), chord];
+    }
+  }
 }
 
 export const sub2 = (p: Vec2, q: Vec2): Vec2 => ({ x: p.x - q.x, y: p.y - q.y });
@@ -128,8 +140,8 @@ export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'l
     const tHigh = tAtS(sHigh);
     if (!ok(tEdge) || !ok(tLow) || !ok(tHigh)) return null;
     // Faixa que corta a face de arco da outra parede: a corda entre os dois pontos fica registrada em `on`.
-    if (Math.abs(tHigh - tLow) < 1e-9 && !other.arc) runs.push({ s: sLow, t: tEdge, on: sOther });
-    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh, on: sOther });
+    if (Math.abs(tHigh - tLow) < 1e-9 && !other.arc) runs.push({ s: sLow, t: tEdge, on: sOther, host: other.wallId });
+    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh, on: sOther, host: other.wallId });
   }
   runs.sort((x, y) => x.s - y.s);
   return runs.length ? { kind: 'steps', runs } : null;
@@ -180,8 +192,8 @@ export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
     if (!r.f.arc && !host.arc && Math.abs(tHi - tLo) < 1e-9) {
       const tAxis = tOn(axis);
       if (tAxis === null || !Number.isFinite(tAxis)) return null;
-      runs.push({ s: sLo, t: clampT(tAxis), on: faceS });
-    } else runs.push({ s: sLo, s1: sHi, t: clampT(tLo), t1: clampT(tHi), on: faceS });
+      runs.push({ s: sLo, t: clampT(tAxis), on: faceS, host: host.wall.id });
+    } else runs.push({ s: sLo, s1: sHi, t: clampT(tLo), t1: clampT(tHi), on: faceS, host: host.wall.id });
   }
   if (runs.length === 0) return null;
   runs.sort((x, y) => x.s - y.s);

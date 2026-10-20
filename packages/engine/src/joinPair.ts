@@ -1,7 +1,7 @@
 import { dist, dot, type Vec2 } from '@hestia/geom';
-import { pointAt, toLocal, type WallFrame } from './frame.ts';
+import { toLocal, type WallFrame } from './frame.ts';
 import type { JoinKind } from '@hestia/model';
-import type { Chord, EndRef, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
+import type { EndRef, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
 import { both, miterPoint, setEnd, sideOf, stairSpec, sub2 } from './joinSides.ts';
 
 const MITER_LIMIT = 6;
@@ -118,24 +118,13 @@ export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
   return kind === 'square' ? flatSquare(lead, follower) : null;
 }
 
-/**
- * Cordas que a parede `f` (dona do corte `spec`) deixa sobre as faces da outra: cada faixa em degraus que corta uma face
- * de arco vira uma corda entre os seus dois pontos (ver `Chord`).
- */
-function cordasOf(spec: SideSpec, f: WallFrame): Chord[] {
-  if (spec.kind !== 'steps') return [];
-  return spec.runs.flatMap((r) =>
-    r.on === undefined || r.s1 === undefined ? [] : [{ s: r.on, p: pointAt(f, r.t, r.s), q: pointAt(f, r.t1 ?? r.t, r.s1) }],
-  );
-}
-
 /** Junção de duas paredes segundo a configuração da mais antiga (docs/05 §9). */
 export function joinPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void {
   const { lead, follower, kind } = pairRoles(a, b);
   const specs = pairSpecs(a, b);
   if (specs) {
-    setEnd(out, lead, { ...both(specs.lead), cordas: cordasOf(specs.follower, follower.f) });
-    setEnd(out, follower, { ...both(specs.follower), cordas: cordasOf(specs.lead, lead.f) });
+    setEnd(out, lead, both(specs.lead));
+    setEnd(out, follower, both(specs.follower));
     return;
   }
   if (kind === 'butt') {

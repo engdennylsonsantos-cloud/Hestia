@@ -3,6 +3,8 @@ import type { WallFrame } from './frame.ts';
 
 /** Dados do vizinho necessários para esquadrejar uma camada contra ele (tudo em números → cache estável). */
 export interface MiterSide {
+  /** Id da parede desta extremidade. */
+  wallId: string;
   /** Ponto onde o eixo desta parede termina na junção. */
   o: Vec2;
   u: Vec2;
@@ -33,6 +35,8 @@ export interface StepRun {
   t1?: number;
   /** Profundidade (na outra parede) da face sobre a qual a faixa corta; só em degraus com a outra parede. */
   on?: number;
+  /** Id da outra parede (dona da face `on`). */
+  host?: string;
 }
 
 /**
@@ -63,13 +67,13 @@ export interface EndSpec {
   hi: SideSpec;
   lo: SideSpec;
   clip?: Vec2[];
-  /** Cordas que a outra parede deixa sobre as faces de arco desta extremidade (ver `Chord`). */
-  cordas?: Chord[];
 }
 
 export interface WallEnds {
   a: EndSpec;
   b: EndSpec;
+  /** Cordas que as outras paredes deixam sobre as faces de arco desta parede (ver `Chord`). */
+  cordas?: Chord[];
 }
 
 /** Extremidade de uma parede dentro de um nó: o ponto, a direção saindo do nó para dentro da parede. */

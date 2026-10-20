@@ -128,7 +128,7 @@ function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number
     const spec = ends[which];
     for (const side of [spec.lo, spec.hi]) for (const edge of ['low', 'high'] as const) pts.push(pointOnSide(f, which, side, s, edge));
   }
-  const cordas = [...(ends.a.cordas ?? []), ...(ends.b.cordas ?? [])].filter((c) => Math.abs(c.s - s) < 1e-9);
+  const cordas = (ends.cordas ?? []).filter((c) => Math.abs(c.s - s) < 1e-9);
   for (const c of cordas) pts.push(c.p, c.q);
   const ts = pts.map((p) => toLocal(f, p).t);
   const tMin = Math.min(...ts);

@@ -18,7 +18,8 @@
     "build:artifact": "npm run build && node scripts/make-artifact.mjs",
     "parity": "node scripts/check-parity.mjs --report",
     "test:rapido": "vitest run --exclude \"**/property.test.ts\" --exclude \"**/perf.test.ts\"",
-    "test:completo": "VITE_FULL=1 vitest run"
+    "test:rapido:esquadria": "node scripts/test-esquadria.mjs",
+    "test:completo": "node scripts/completo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

@@ -41,7 +41,7 @@ function patch(ids: Id[], p: Partial<Wall> | Partial<Opening>): void {
   editor.store.exec({ type: 'updateElements', ids, patch: p });
 }
 
-const JOIN_LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria', square: 'Esquadro' };
+const JOIN_LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria' };
 
 function JoinRows({ wall }: { wall: Wall }): ReactElement {
   const p = useProject();

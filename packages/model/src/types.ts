@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -84,8 +84,8 @@ export type LocationLine =
   | 'coreExterior'
   | 'coreInterior';
 
-/** Tipos de junção no canto entre duas paredes (docs/05 §9). */
-export type JoinKind = 'butt' | 'miter' | 'square';
+/** Tipos de junção no canto entre duas paredes (docs/05 §9): encosto (padrão) e esquadria. */
+export type JoinKind = 'butt' | 'miter';
 
 export interface JoinConfig {
   kind: JoinKind;

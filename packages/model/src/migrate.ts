@@ -126,6 +126,20 @@ const migrations: Record<number, Migration> = {
     }
     return { ...raw, elements };
   },
+  // v10 → v11: o tipo 'square' (Esquadro) saiu; tinha a mesma geometria do encosto. Vira 'butt', com a mesma ordem (flip).
+  10: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind !== 'wall') continue;
+      const w = { ...e };
+      for (const end of ['joinStart', 'joinEnd'] as const) {
+        const cfg = w[end] as { kind?: unknown } | undefined;
+        if (cfg?.kind === 'square') w[end] = { ...cfg, kind: 'butt' };
+      }
+      elements[id] = w;
+    }
+    return { ...raw, elements };
+  },
 };
 
 export class SchemaError extends Error {}

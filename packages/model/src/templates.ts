@@ -2,7 +2,7 @@ import type { Command } from './commands.ts';
 import { createEmptyProject } from './defaults.ts';
 import { ProjectStore } from './history.ts';
 import type { Opening, Project, Wall } from './types.ts';
-import { makeWall } from './wall.ts';
+import { DEFAULT_JOIN, makeWall } from './wall.ts';
 
 export type TemplateId = 'blank' | 'house2' | 'studio';
 
@@ -43,9 +43,9 @@ function house2(cmds: Command[]): void {
     wall([4, 2.4], [10, 2.4], IN, 'h_i3'),
     wall([7, 0], [7, 2.4], IN, 'h_i4'),
   ];
-  // Quinas externas em esquadria: em encosto, a parede que passa deixa o núcleo e o acabamento interno da outra
-  // aparecerem na quina externa (ver docs/decisoes/0009). Esquadria faz as camadas se encontrarem na diagonal.
-  const M = { kind: 'miter' as const, flip: false };
+  // Quinas externas em encosto, o padrão: pareia por face e não deixa o núcleo de uma parede aparecer na quina da
+  // outra (docs/decisoes/0009 #11).
+  const M = { ...DEFAULT_JOIN };
   const corner = (a: Omit<Wall, 'order'>, aEnd: 'joinStart' | 'joinEnd', b: Omit<Wall, 'order'>, bEnd: 'joinStart' | 'joinEnd') => {
     a[aEnd] = M;
     b[bEnd] = M;
@@ -83,8 +83,8 @@ function studio(cmds: Command[]): void {
     wall([4, 0], [4, 2.2], 'wt_alv9', 's_i1'),
     wall([4, 2.2], [6, 2.2], 'wt_alv9', 's_i2'),
   ];
-  // Quinas externas em esquadria (decisão 0009), como na casa.
-  const M = { kind: 'miter' as const, flip: false };
+  // Quinas externas em encosto, como na casa (decisão 0009 #11).
+  const M = { ...DEFAULT_JOIN };
   const [sw, sn, se, ss] = ws as [Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>, Omit<Wall, 'order'>];
   sw!.joinEnd = M; sn!.joinStart = M;
   sn!.joinEnd = M; se!.joinStart = M;

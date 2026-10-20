@@ -66,25 +66,11 @@ export interface PairSpecs {
 }
 
 /**
- * Corte do esquadro quando o pareamento não é possível (degrau fora do limite): um plano só por parede,
- * prolongado até cobrir o canto externo. Só cobre o canto; não respeita os limites das camadas (docs/08 §5.4 passo 4).
- */
-function flatSquare(lead: EndRef, follower: EndRef): PairSpecs {
-  return {
-    lead: flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f)),
-    follower: flatAt(follower, capExt(outerExtension(follower, lead), lead.f, follower.f)),
-  };
-}
-
-/**
  * Especificações de corte do par (lead, follower) segundo o tipo de junção. `null` quando o par não tem pareamento
- * possível e o tipo não tem corte alternativo próprio (encosto: quem chama aplica a linha de centro; esquadria mal
- * condicionada: mantém o corte que já estava).
+ * possível (encosto: quem chama aplica a linha de centro; esquadria mal condicionada: mantém o corte que já estava).
  *
- * Encosto e esquadro pareiam do mesmo jeito, por face, em degraus (docs/08 §5.4 passo 3; decisão 0009 #11): a
- * dominante fica com as células do canto (é ela que atravessa até o canto externo) e a outra para nas faces das
- * camadas dela. Esquadro a 90° é o mesmo caso que encosto; o plano único (`flatSquare`) só entra quando o par não
- * admite pareamento (parede curva, degrau fora do limite).
+ * Encosto pareia por face, em degraus (docs/08 §5.4 passo 3; decisão 0009 #11): a dominante fica com as células do
+ * canto (é ela que atravessa até o canto externo) e a outra para nas faces das camadas dela.
  */
 /** Corte reto perpendicular no nó (a extremidade de cada parede está em t = 0 ou t = L). */
 const flatNo = (r: EndRef): SideSpec => ({ kind: 'flat', t: r.which === 'a' ? 0 : r.f.length });
@@ -137,12 +123,12 @@ export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
     // face (a circunferência corta a reta longe do nó), como encosto.
     if (!lead.f.arc && !follower.f.arc) return null;
   }
-  // Encosto e esquadro: pareamento por face, também com parede curva (as faces de arco são circunferências). Só
-  // não cabe quando o degrau sai do limite.
+  // Encosto: pareamento por face, também com parede curva (as faces de arco são circunferências). Só não cabe quando
+  // o degrau sai do limite.
   const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
   const followSteps = stairSpec(follower, sb, sa, 'high', cap);
   if (leadSteps && followSteps) return { lead: leadSteps, follower: followSteps };
-  return kind === 'square' ? flatSquare(lead, follower) : null;
+  return null;
 }
 
 /** Junção de duas paredes segundo a configuração da mais antiga (docs/05 §9). */

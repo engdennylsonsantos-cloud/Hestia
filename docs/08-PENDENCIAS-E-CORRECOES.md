@@ -4,12 +4,14 @@ Documento de trabalho: o que está quebrado, o que já foi medido, como corrigir
 funcionou. Escrito para ser retomado em outra máquina sem depender da conversa que o gerou.
 
 Estado em que foi escrito: branch `claude/zealous-hamilton-iayjlf`, em `659eea8`, árvore limpa. Este documento foi
-atualizado sem alterar código e sem rodar testes; os números vêm das medições registradas nas seções indicadas.
+atualizado sem alterar código; os números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
-Atualização (2026-10-20, sobre `94248c1`, J-1 encosto/T): **J-2 resolvido** com `nodeOfWalls` (§6.3; o pareamento por
+Atualização (2026-10-20, sobre `84480c1`; árvore sem alterações antes desta edição): **CV-1 corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120° em L, T e correntes tangentes; 23 testes em `curvas.test.ts`), com corte plano pelas faces (§6.5; decisão 0010 #7). Fora desse domínio, **CV-2** (limitação conhecida) e **CV-3** (código de arco sem uso, limpeza) ficam abertos. Dois bugs achados no caminho (`sideOf` e amostragem de arco) foram corrigidos (§6.5). Medido nesta rodada: `npx vitest run` com 111 arquivos e 1520 testes (~26 s), lint e typecheck limpos, `npm run visual:juntas` com os 14 cenários × 3 tipos sem falha numérica (§9.5, §10).
+
+Atualização anterior (2026-10-20, sobre `94248c1`, J-1 encosto/T): **J-2 resolvido** com `nodeOfWalls` (§6.3; o pareamento por
 lado foi descartado, §6.4); **J-1 corrigido também no esquadro**, que pareia por face (decisão 0009 #13); **O-1**
 (contorno da edificação) corrigido (§5.8); **I-1b corrigido** (§9.5); **I-3 tratado**: os testes de tempo saíram do
-`npm test` (§9.5); **CV-1** (paredes curvas) **segue em aberto** (§6.5). Decisões desta rodada: `docs/decisoes/0010`.
+`npm test` (§9.5); **CV-1** (paredes curvas) **segue em aberto** nessa data (§6.5; resolvido na atualização acima). Decisões desta rodada: `docs/decisoes/0010`.
 Guardas que documentavam o defeito foram invertidas (§7.4); dois testes que fixavam a geometria antiga foram
 justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts` (volume do bloco).
 
@@ -23,7 +25,9 @@ justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts
 | **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | **corrigido em encosto, esquadro e T** (§5.7: no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` cai de 0,004004 para 0; o esquadro pareia por face, decisão 0009 #13) | `joinSides.ts`, `joinPair.ts`, `layerGeom.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | **resolvido** com `nodeOfWalls` (§6.3): no nó NO o bloco da grossa vai de 0,024983 para 0,028500 m²; a configuração de junção vale no canto externo (lacuna angular > 180°) | `joinNode.ts` |
 | **O-1** | Contorno da edificação com fresta triangular de ~2 mm × 13 cm em cada canto de um retângulo em encosto com pontas em escada | **média** | **corrigido** (contorno real da camada, §5.8) | `faces.ts`, `enclosed.ts` |
-| **CV-1** | Parede curva: curva com curva, raio muito fechado (R = 1,5 m) e ângulos extremos não fecham; L de 90° e T com curva já fecham | a classificar | **em aberto** (§6.5) | `frame.ts`, `layerGeom.ts`, `curvas.test.ts` |
+| **CV-1** | Parede curva: curva com curva, raio muito fechado (R = 1,5 m) e ângulos extremos não fechavam; L de 90° e T com curva já fechavam | a classificar | **corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120°: L, T e correntes tangentes; 23 testes em `curvas.test.ts`), com corte plano pelas faces (§6.5) | `frame.ts`, `layerGeom.ts`, `joinPair.ts`, `curvas.test.ts` |
+| **CV-2** | Parede curva **fora do domínio** (R < 3 m, quina de 30° ou 150°): resolve com áreas finitas, mas pode sobrar ponta de poucos centímetros ou anel extra | a classificar | **aberto** (limitação conhecida, §6.5) | idem CV-1 |
+| **CV-3** | Código de arco sem uso nos pares com arco: `Chord`, `WallEnds.cordas` e pareamento em degraus para arco em `stairSpec`; segue ativo só no T com hospedeira curva | limpeza | **pendente** (remoção futura, §6.5) | `joinTypes.ts`, `joinSides.ts`, `layerGeom.ts` |
 | **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | **corrigido** (campo `raw` em `ResolvedLayer`; guardas sobre `raw`, com teste negativo em encosto e esquadro, §7.4) | `quinas.test.ts`, `types.ts`, `clipReturn.ts` |
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
 | **I-1b** | Suíte completa saía com código 1 por ruído do vitest (`Timeout calling "onTaskUpdate"`) mesmo com tudo passando | **alta para CI** | **corrigido** (`tests/vitestSetup.ts` cede o event loop após cada teste; 0 timeouts em três execuções, §9.5). Risco residual: um teste síncrono acima de 60 s | infra do vitest |
@@ -344,12 +348,10 @@ ou mais forte. No T 19×14: tinta em y = 0,121 (face da cerâmica), reboco em 0,
 0,091 (face do bloco). A área visível não muda (o `cut` é o mesmo, porque o pintor já devolvia o canto ao bloco), mas
 a sobreposição em `raw` vai a zero e o pintor deixa de ter trabalho.
 
-**Parede curva e ângulo agudo** ficam com o comportamento anterior: `stairSpec` devolve `null` quando o ponto pareado
-sai do limite em volta da ponta e `buttAgainst` devolve `null` para arco. O tratamento de curva que está em andamento
-é descrito em §6.5, não aqui.
+**Ângulo agudo** fica com o comportamento anterior: `stairSpec` devolve `null` quando o ponto pareado sai do limite em volta da ponta. **Parede curva** não passa por esse ramo: canto com arco usa o corte plano pelas faces (§6.5), e o T com hospedeira ou ramal curvo usa `buttAgainst`, que corta pelo círculo da face da camada (antes devolvia `null` para arco).
 
 **Esquadro** pareia por face como o encosto (decisão 0009 #13): é o mesmo ramo de `pairSpecs`, com os mesmos degraus.
-Só o par sem pareamento possível (parede curva, degrau fora do limite) cai no plano único (`flatSquare`). O aviso e o
+Só o par sem pareamento possível (degrau fora do limite) cai no plano único (`flatSquare`). Parede curva não chega a esse caso: canto com arco vai para o corte plano (§6.5). O aviso e o
 comando em lote saíram do código, porque não há mais quina a corrigir.
 
 **Efeito nos dourados e no 3D.** `golden.test.ts` "L em encosto": o contorno da estrutura passa a ser o mesmo da
@@ -466,27 +468,35 @@ O caminho adotado (§6.3) não pareia por lado e não mexe na topologia do anel:
 **Estado do código:** `starNode` e `SECTOR_OVERLAP` foram removidos com `nodeOfWalls`. `pairSpecs`/`pairRoles` seguem
 exportados de `joinPair.ts`, usados por `joinPair` e pelo ramo de canto externo do nó.
 
-### 6.5 Paredes curvas: em aberto (CV-1)
+### 6.5 Paredes curvas: resolvido no domínio suportado (CV-1)
 
-Estado verificado em `659eea8`. Trabalho em andamento de outro agente; **não tratar como resolvido**.
+Estado medido em 2026-10-20 sobre `84480c1`. Decisão em `docs/decisoes/0010-juncoes-pareadas-nos-e-curvas.md`, item 7.
 
 | caso | estado |
 |---|---|
-| L de 90° com parede curva (esquadria, encosto e esquadro) | fecha: um anel, sem furo |
-| T com passante curva ou ramal curvo | fecha: um anel, sem furo |
-| curva com curva | **não fecha** |
-| raio muito fechado (R = 1,5 m) | **não fecha** |
-| ângulos extremos | **não fecha** |
+| L com curva na hospedeira, ramal curvo ou curva com curva (raio ≥ 3 m, quina de 60° a 120°) | fecha: um anel, sem furo |
+| T com passante curva ou ramal curvo (quina de 60° a 120°) | fecha |
+| correntes tangentes: reta→arco, arco→reta, arco→arco em C e em S (raios 3 e 50 m; continuidade e quina de 10°; tipos iguais e diferentes; dois sentidos) | fecha |
+| fora do domínio: R < 3 m, quina de 30° ou 150° | melhor esforço (CV-2) |
 
-**Onde está o código:** `frame.ts` (`faceCurve`, `intersectCurves`), `layerGeom.ts` (`arcLayerRing`) e as cordas em
-`WallEnds.cordas`. Testes em `packages/engine/src/curvas.test.ts`, que é o teste mais demorado medido (39 s, §9.5).
-`npm run visual:juntas` tem cenário de curva.
+**Como fecha.** Em canto de duas paredes em que pelo menos uma é arco (miter, butt e square), as duas são cortadas pela mesma reta: `O`, interseção das faces externas, e `K`, interseção das faces internas. As duas pontas terminam exatamente em `O` e `K`, então a silhueta é exata para qualquer par de tipos, sem ponta, buraco ou anel extra. O pareamento por camada é abandonado nesses cantos: as camadas só são cortadas pelo plano (`SideSpec` `'plane'`, com `p`, `q` e `pts`; `joinPair.ts` `planeSpecs`; `frame.ts` `planeHit`, `faceCurve`, `intersectCurves`; `layerGeom.ts` `planeChain`).
 
-**O que não foi feito:** a causa dos três casos que não fecham não foi investigada nesta rodada.
+Sem `O` ou `K` (faces tangentes na continuidade exata, ângulos agudos com raio pequeno), o corte é reto e perpendicular no ponto do nó: exato na continuidade tangente. O T com hospedeira ou ramal curvo continua em `buttAgainst` (interseção com o círculo da face da camada). Paredes retas não mudaram.
 
-**Critério de fechamento proposto:** cada caso da tabela passa nas invariantes de `juntasInvariantes.test.ts` (fresta
-aberta abaixo de 2e-5 m², um anel só, sem furo, soma × união abaixo de 1e-5) e ganha teste dourado. Enquanto isso,
-a paridade de paredes em arco fica parcial (`docs/paridade/paredes.md`, C13).
+**Bugs achados no caminho (corrigidos):**
+
+- `sideOf` (`joinSides.ts`) usava a normal do início do arco (`r.f.n`) em vez da normal do ponto do nó (perpendicular à tangente da extremidade). Isso trocava o lado externo em arcos de varredura grande.
+- Amostragem de arco com passo fixo de 0,04 m gerava ~2600 vértices por parede em R = 20 m, e resolver arco com arco levava ~14 s. Agora o passo é adaptativo, `passoDoArco(R) = clamp(sqrt(8·R·3e-4), 0,05, 0,5)` m (flecha máxima de 0,3 mm), com grade global por parede compartilhada pelas camadas vizinhas (`layerGeom.ts`). As 12 resoluções arco-arco caíram de ~49 s para 576 ms (máximo 187 ms).
+
+**Limitação fora do domínio (CV-2).** Com R < 3 m, ou quina de 30° ou 150°, a resolução é de melhor esforço: resolve, com áreas finitas, mas pode sobrar ponta de poucos centímetros ou anel extra. Não é garantido por teste.
+
+**Código sem uso (CV-3).** `Chord`, `WallEnds.cordas` e o pareamento em degraus para arco em `stairSpec` deixaram de ser usados nos pares com arco. Continuam ativos só no T com hospedeira curva. A remoção fica como limpeza futura.
+
+**Verificação.**
+
+- `packages/engine/src/curvas.test.ts`: 23 testes, 5 s, cobrindo o domínio da tabela acima.
+- `npm run visual:juntas`: 14 cenários × 3 tipos, cada um com um anel, zero furos e soma × união < 1e-5. É a checagem numérica; a conferência da imagem não foi registrada nesta rodada (§10).
+- O critério de fechamento proposto antes exigia também um teste dourado por caso. Nenhum dourado de curva foi registrado nesta rodada.
 
 ---
 
@@ -587,11 +597,11 @@ sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
    canto externo. Onde não há canto externo (NO, Y), a configuração não muda a área. **Pergunta aberta:** a
    interface deve esconder ou avisar a configuração nesses casos, já que ela não produz efeito ali?
 3. **Limite do sweep line em produção (4.4-d).** Só decidir com a telemetria de 4.5.1 na mão.
-4. **`main` está atrás.** O trabalho vive em `claude/zealous-hamilton-iayjlf`. P-1, J-1 e J-2 estão fechados; **pergunta
-   aberta:** a mescla em `main` espera as paredes curvas (§6.5) ou sai antes?
+4. **`main` está atrás.** O trabalho vive em `claude/zealous-hamilton-iayjlf`. P-1, J-1, J-2 e CV-1 (no domínio suportado) estão fechados; **pergunta
+   aberta:** a mescla em `main` sai com o CV-2 (curvas fora do domínio) como limitação conhecida, ou espera mais trabalho?
 5. **CI.** `.github/workflows/ci.yml` roda `npm run check` como portão. `npm run test:perf` e `npm run test:completo`
    rodam em jobs com `continue-on-error`. Falta: tirar o `continue-on-error` do job `completo` quando a suíte completa
-   estiver verde (§9.5 e §6.5).
+   estiver verde (§9.5; na medição de agora, está verde, §10).
 6. **Esquadro na interface. Decidido: manter por ora** (decisão do dono do projeto, `docs/decisoes/0010` #1). Em quina
    de 90° a geometria é a do encosto; reavaliar se a opção deve sair da interface.
 
@@ -645,10 +655,9 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
   - antes: 486 s, 1 erro `Timeout calling "onTaskUpdate"`, código 1;
   - só cessão em `property.test.ts`: 473 s sem timeout, depois 492 s **com** timeout (curvas, outro arquivo, sem cessão);
   - cessão global (a correção): 470 s, 490 s e 479 s, **0 timeouts** em três execuções (a última já com `setTimeout`, a versão final).
-- **Risco residual**: um único teste síncrono acima de 60 s ainda estoura. O maior medido é de 39 s (`curvas.test.ts`).
-- **Código 1 que sobra não é infra**: as reprovações atuais são geometria em andamento (junções em curvas, §6.5;
-  `floorExtend`, `roofTool`, semente 38 da invariante (c)). Não foram mascaradas.
-- **Suíte sem `curvas.test.ts`** (`npm test`): 110 arquivos, 1458 testes, ~28 s.
+- **Risco residual**: um único teste síncrono acima de 60 s ainda estoura. Antes do §6.5 o maior medido era de 39 s (`curvas.test.ts`); esse arquivo agora roda em 5 s (23 testes). Não há medida por teste nesta rodada.
+- **Código 1 que sobra não é infra**: na medição de agora (`npx vitest run`) não houve reprovação. As que estavam listadas antes (junções em curvas, §6.5; `floorExtend`, `roofTool`, semente 38 da invariante (c)) não aparecem nessa medição.
+- **Suíte completa, medida nesta rodada** (`npx vitest run`, com `curvas.test.ts`): 111 arquivos, 1520 testes, ~26 s. A medição anterior, sem `curvas.test.ts`, era 110 arquivos, 1458 testes, ~28 s.
 - **Desempenho (I-3)**: `perf.test.ts` e o teste de tempo de `snapFaces` saíram do `npm test` (`*perf.test.ts` excluído em
   `vitest.config.ts`) e rodam em `npm run test:perf` (`vitest.perf.config.ts`, sem paralelismo entre arquivos). Os limites
   são razões contra uma tarefa-base cronometrada no mesmo processo. K4 sem regressão: `10aa3aa` quente 645–774 ms,
@@ -663,9 +672,9 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 | **K4** (`packages/engine/src/perf.test.ts`) | Medido sem regressão (§9.5): `10aa3aa` 645–774 ms, HEAD 589–789 ms. O 1768 ms veio de carga concorrente. Falta rodar `npm run test:perf` no HEAD final para confirmar o limite relativo |
 | **captura de faces** (`snapFaces.test.ts`) | 1241 ms isolado e 2117 ms dentro da suíte antes de sair do `npm test`: é **contenção**, não regressão. Falta rodar `npm run test:perf` no HEAD final |
 | **`build:artifact`** | `npm run build:artifact` (`scripts/make-artifact.mjs`) nunca foi executado. Verificar que o artefato publica |
-| **`npm test` / `npm run check`** | `npm test` sem `curvas.test.ts` foi medido (110 arquivos, 1458 testes, ~28 s; §9.5). O `npm run check` com curvas não foi reexecutado: as reprovações de curva são trabalho em andamento (§6.5) |
-| **Nó após `nodeOfWalls`** | Os dourados e os testes de nó (`golden.test.ts`, `nos.test.ts`) não foram reconferidos depois da troca do nó (§6.3). Rodar `npm test` no HEAD final |
-| **Visual das junções** | `npm run visual:juntas` gera PNG, mas não há conferência visual registrada nesta rodada. Olhar os cenários de nó e de curva antes de dar o J-2 por visualmente fechado |
+| **`npm test` / `npm run check`** | Nesta rodada, medidos separadamente: `npx vitest run` (111 arquivos, 1520 testes, ~26 s), lint e typecheck limpos. `npm test` e `npm run check` como comandos únicos não constam nesta rodada |
+| **Nó após `nodeOfWalls`** | Reconferido pela suíte inteira nesta rodada (`npx vitest run`, 1520 testes, que inclui `golden.test.ts` e `nos.test.ts`) |
+| **Visual das junções** | `npm run visual:juntas` nesta rodada: 14 cenários × 3 tipos sem falha numérica (um anel, zero furos, soma × união < 1e-5). Não há conferência da imagem registrada. Olhar os cenários de nó e de curva antes de dar o J-2 e o CV-1 por visualmente fechados |
 
 ---
 
@@ -683,7 +692,9 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 | 5 | **O-1**: contorno da edificação pelo contorno real (5.8) | feito (`659eea8`) | feito |
 | 6 | **I-1b**: ruído do vitest / CI (9.3) | feito (cessão do event loop, §9.5) | feito |
 | 7 | **I-3**: testes de tempo fora do `npm test` (§9.5) | tratado; falta rodar `test:perf` no HEAD final (§10) | 1 h |
-| 8 | **CV-1**: paredes curvas (§6.5) | em aberto: curva com curva, raio fechado e ângulos extremos | a estimar |
+| 8 | **CV-1**: paredes curvas (§6.5) | feito no domínio suportado (raio ≥ 3 m, quina de 60° a 120°) | feito |
+|  | ↳ CV-2: fora do domínio (R < 3 m, quina de 30° ou 150°) | aberto (limitação conhecida) | a estimar |
+|  | ↳ CV-3: remover o código de arco sem uso | limpeza futura | a estimar |
 | 9 | Decisões da seção 8 | fecham o escopo (pergunta aberta: interface do nó; mescla com `main`) | — |
 | 10 | Itens da seção 10 | verificação final | 1 h |
 
@@ -702,8 +713,7 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
   de pareamento por lado (§6.4) foi descartada por frestas de ~2 mm.
 - **O-1**: o contorno da edificação usava as faces de acabamento e abria fresta de ~2 mm × 13 cm nos cantos em escada.
   Corrigido com o contorno real da camada (§5.8).
-- **CV-1**: paredes curvas. L de 90° e T com curva fecham; curva com curva, raio de 1,5 m e ângulos extremos não
-  fecham. **Em aberto** (§6.5).
+- **CV-1**: paredes curvas. **Corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120°) com corte plano pelas faces, que dá silhueta exata para qualquer par de tipos (0010 #7). Fora do domínio, **CV-2** (limitação conhecida); código de arco sem uso, **CV-3** (§6.5).
 - **T-1**: as guardas de quina testavam uma interseção que é zero por construção. Corrigido: `ResolvedLayer.raw`
   (forma antes do pintor), guardas sobre `raw` e teste negativo em encosto e esquadro (7.4).
 - **I-1/I-2**: os scripts de verificação rápida funcionam no Windows e o filtro de semente casa exato.

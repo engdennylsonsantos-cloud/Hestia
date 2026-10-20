@@ -37,10 +37,10 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C7 Trocar a ordem de junção (qual parede domina)
 - [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
 - [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)** — `nodeOfWalls`: cortes retos no ponto do nó e pintor por prioridade, sem fresta quando nenhuma lacuna passa de 180°; a configuração de junção vale no canto externo (docs/08 §6.3; 0010 #3)
-- [x] C10 Ângulos agudos e obtusos extremos sem artefato — retas: L e T de 45° a 135° nos três tipos (`juntasInvariantes.test.ts`); ângulos de parede curva em aberto (C13)
+- [x] C10 Ângulos agudos e obtusos extremos sem artefato — retas: L e T de 45° a 135° nos três tipos (`juntasInvariantes.test.ts`); ângulos de parede curva dentro do domínio de C13 (fora dele, CV-2)
 - [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
-- [~] C13 Junção com parede em arco **(bloqueante)** — parcial: L de 90° com parede curva (esquadria, encosto e esquadro) e T com passante ou ramal curvo fecham com um anel e sem furo; curva com curva, raio de 1,5 m e ângulos extremos ainda não fecham (docs/08 §6.5; CV-1 em aberto)
+- [x] C13 Junção com parede em arco **(bloqueante)** — L, T e correntes tangentes dentro do domínio suportado: raio ≥ 3 m e quina de 60° a 120° (23 testes em `curvas.test.ts`; corte plano pelas faces, 0010 #7; docs/08 §6.5). Fora desse domínio (R < 3 m, quina de 30° ou 150°) a junção é de melhor esforço: pode sobrar ponta de poucos centímetros ou anel extra (CV-2, docs/08 §6.5)
 - [x] C14 Paredes sobrepostas detectadas, com aviso
 - [x] C15 Parede empilhada sobre outra (níveis diferentes)
 - [-] C16 Junção com pilar, viga e cortina de vidro: depende desses elementos, que têm checklists próprios

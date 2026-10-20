@@ -210,3 +210,41 @@ describe('seleção e edição', () => {
     expect(b.a.y).toBeCloseTo(0);
   });
 });
+
+describe('quinas ao encadear paredes (decisão 0009)', () => {
+  it('L com acabamento: a parede nova e a vizinha saem em esquadria na quina', () => {
+    const { store, env } = makeEnv();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0); clickAt(t, 4, 0); clickAt(t, 4, 3);
+    t.cancel();
+    const [a, b] = walls(store) as [Wall, Wall];
+    expect(a.joinEnd.kind).toBe('miter');
+    expect(b.joinStart.kind).toBe('miter');
+    expect(a.joinStart.kind).toBe('butt');
+    expect(b.joinEnd.kind).toBe('butt');
+  });
+
+  it('o desenho de L é um só passo de desfazer: a segunda parede sai junto com as junções', () => {
+    const { store, env } = makeEnv();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0); clickAt(t, 4, 0); clickAt(t, 4, 3);
+    t.cancel();
+    store.undo();
+    expect(walls(store)).toHaveLength(1);
+    expect(walls(store)[0]!.joinEnd.kind).toBe('butt');
+  });
+
+  it('T e paredes colineares continuam em encosto', () => {
+    const { store, env } = makeEnv();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0); clickAt(t, 4, 0);
+    t.cancel();
+    const t2 = tool('wall', env);
+    clickAt(t2, 2, 0); clickAt(t2, 2, 3); // T: começa no meio da parede
+    t2.cancel();
+    const t3 = tool('wall', env);
+    clickAt(t3, 4, 0); clickAt(t3, 8, 0); // colinear
+    t3.cancel();
+    expect(walls(store).every((w) => w.joinStart.kind === 'butt' && w.joinEnd.kind === 'butt')).toBe(true);
+  });
+});

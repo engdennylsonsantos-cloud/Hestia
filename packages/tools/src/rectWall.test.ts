@@ -109,3 +109,42 @@ describe('parede por retângulo (A5)', () => {
     expect(walls(store)[0]!.flipped).toBe(false);
   });
 });
+
+describe('quinas em esquadria ao desenhar (decisão 0009)', () => {
+  /** Tipo sem acabamento, para o caso em que a regra não deve valer. */
+  function bareRect() {
+    const ctx = rectOpts();
+    const base = ctx.store.project.wallTypes['wt_alv14']!;
+    ctx.store.exec({ type: 'upsertWallType', wallType: { ...base, id: 'wt_bare', layers: base.layers.filter((l) => l.function === 'structure') } });
+    ctx.options.wallTypeId = 'wt_bare';
+    return ctx;
+  }
+  const kinds = (ws: Wall[]) => ws.map((w) => [w.joinStart.kind, w.joinEnd.kind]);
+
+  it('retângulo com acabamento: os quatro cantos saem em esquadria', () => {
+    const { store, env } = rectOpts();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 3);
+    const ws = walls(store);
+    expect(ws).toHaveLength(4);
+    for (const w of ws) expect([w.joinStart.kind, w.joinEnd.kind]).toEqual(['miter', 'miter']);
+  });
+
+  it('retângulo com acabamento: um só passo de desfazer remove paredes e junções', () => {
+    const { store, env } = rectOpts();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 3);
+    store.undo();
+    expect(walls(store)).toHaveLength(0);
+  });
+
+  it('retângulo sem acabamento continua em encosto', () => {
+    const { store, env } = bareRect();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 3);
+    expect(kinds(walls(store)).every((k) => k[0] === 'butt' && k[1] === 'butt')).toBe(true);
+  });
+});

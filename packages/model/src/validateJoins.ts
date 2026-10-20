@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { totalThickness } from './wallType.ts';
 import type { ValidationIssue } from './validate.ts';
-import type { Project, Wall } from './types.ts';
+import type { Id, Project, Wall } from './types.ts';
 
 /** Distância de um ponto ao segmento a–b. */
 function distToSegment(pt: Vec2, a: Vec2, b: Vec2): number {
@@ -42,9 +42,25 @@ export function unjoinedEndIssues(p: Project, walls: Wall[]): ValidationIssue[] 
 }
 
 
-/** Quina em encosto (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada. */
-export function butCornerFinishIssues(p: Project, walls: Wall[]): ValidationIssue[] {
-  const out: ValidationIssue[] = [];
+/** Uma ponta de parede: id da parede e lado ('a' inicial, 'b' final). */
+export interface WallEndRef {
+  wallId: Id;
+  end: 'a' | 'b';
+}
+
+/** Quina de duas paredes: as duas pontas coincidem, formam 70°–110° e estão em encosto. */
+export interface ButtCornerPair {
+  a: WallEndRef;
+  b: WallEndRef;
+}
+
+/**
+ * Quinas em encosto (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada.
+ * Regra única do aviso `wall-corner-butt-finish`; o comando em lote e a ferramenta de parede usam a mesma lista.
+ * Cada par de paredes aparece uma vez, na ordem em que o validador o encontra (a primeira parede é `a`).
+ */
+export function buttCornerFinishPairs(p: Project, walls: Wall[]): ButtCornerPair[] {
+  const out: ButtCornerPair[] = [];
   const ends = (w: Wall): Array<{ pt: Vec2; dir: Vec2; kind: 'a' | 'b'; join: string }> => [
     { pt: w.a, dir: { x: w.b.x - w.a.x, y: w.b.y - w.a.y }, kind: 'a', join: w.joinStart.kind },
     { pt: w.b, dir: { x: w.a.x - w.b.x, y: w.a.y - w.b.y }, kind: 'b', join: w.joinEnd.kind },
@@ -67,15 +83,25 @@ export function butCornerFinishIssues(p: Project, walls: Wall[]): ValidationIssu
           const key = [a.id, b.id].sort().join('|');
           if (seen.has(key)) continue;
           seen.add(key);
-          out.push({
-            severity: 'warning',
-            code: 'wall-corner-butt-finish',
-            message: `Quina entre "${a.mark || a.id}" e "${b.mark || b.id}" em encosto, com acabamento: o núcleo de uma parede pode aparecer na quina e o acabamento da outra fica aparado. Use esquadria (ferramenta Junção, tecla N).`,
-            elementId: a.id,
-          });
+          out.push({ a: { wallId: a.id, end: ea.kind }, b: { wallId: b.id, end: eb.kind } });
         }
       }
     }
   }
   return out;
+}
+
+/** Quina em encosto (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada. */
+export function butCornerFinishIssues(p: Project, walls: Wall[]): ValidationIssue[] {
+  const byId = new Map(walls.map((w) => [w.id, w]));
+  return buttCornerFinishPairs(p, walls).map(({ a, b }) => {
+    const wa = byId.get(a.wallId)!;
+    const wb = byId.get(b.wallId)!;
+    return {
+      severity: 'warning' as const,
+      code: 'wall-corner-butt-finish',
+      message: `Quina entre "${wa.mark || wa.id}" e "${wb.mark || wb.id}" em encosto, com acabamento: o núcleo de uma parede pode aparecer na quina e o acabamento da outra fica aparado. Use esquadria (ferramenta Junção, tecla N).`,
+      elementId: a.wallId,
+    };
+  });
 }

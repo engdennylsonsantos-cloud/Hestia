@@ -2,6 +2,7 @@ import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThree
 import { exteriorOffset } from '@hestia/engine';
 import { makeWall, totalThickness, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import { cornerMiterCommands } from './cornerFix.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
@@ -167,7 +168,11 @@ export class WallTool extends ToolBase {
       flipped: this.sideFlip(),
       sag,
     });
-    this.env.exec({ type: 'addWall', wall });
+    // Quina em L com acabamento (regra do aviso wall-corner-butt-finish): a parede nova e a vizinha vão para esquadria.
+    this.env.transaction('Criar parede', () => {
+      this.env.exec({ type: 'addWall', wall });
+      for (const cmd of cornerMiterCommands(this.env.project(), wall.levelId, wall.id)) this.env.exec(cmd);
+    });
     this.count += 1;
   }
 

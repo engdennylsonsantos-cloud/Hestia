@@ -46,7 +46,8 @@ for (const x of cortes) {
     if (pts.length) console.log(x.w, x.li, x.mat, pts.map((p) => `(${p.x.toFixed(4)},${p.y.toFixed(4)})`).join(' '));
   }
 }
-import { buildFrame, pointAt, toLocal, wallType as wt } from '@hestia/engine';
+import { buildFrame, pointAt, toLocal } from '@hestia/engine';
+import { wallType as wt } from '@hestia/model';
 const frames = new Map(pecas.map((p) => [p.id, buildFrame(proj.elements[p.id] as Wall, wt(proj, proj.elements[p.id] as Wall))!]));
 const fora = (x: string, y: string, noP: Vec2 = N): number => {
   const fx = frames.get(x)!, fy = frames.get(y)!;

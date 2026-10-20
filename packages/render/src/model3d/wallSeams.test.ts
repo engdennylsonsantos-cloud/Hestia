@@ -13,11 +13,9 @@ const addDoor = (s: ProjectStore, hostId: string, offset: number) => s.exec({ ty
 /** Anel canônico: vértices arredondados, início no menor vértice e sentido fixo; independe de rotação e orientação. */
 function canonRing(r: Ring): string {
   const pts = r.map((v) => `${Math.round(v.x * 1e6)},${Math.round(v.y * 1e6)}`);
-  const n = pts.length;
   const fwd = pts.map((_, i) => [...pts.slice(i), ...pts.slice(0, i)].join(';'));
   const bwd = [...pts].reverse();
   const back = bwd.map((_, i) => [...bwd.slice(i), ...bwd.slice(0, i)].join(';'));
-  void n;
   return [...fwd, ...back].sort()[0]!;
 }
 const canonPoly = (p: Polygon): string => p.map(canonRing).sort().join('|');
@@ -159,7 +157,7 @@ describe('topo inclinado e rodapé', () => {
   });
 
   it('rodapé (faixa de layerIndex negativo) não se funde com as camadas da parede e tem volume próprio', () => {
-    const { r, s } = setupWall((st) => {
+    const { s } = setupWall((st) => {
       st.exec({ type: 'addWall', wall: wall('a', 0, 0, 4, 0) });
       const base = st.project.wallTypes.wt_alv14!;
       st.exec({ type: 'upsertWallType', wallType: { ...base, strips: [{ id: 'st0', name: 'rodapé', side: 'interior', materialId: 'mat_madeira', thickness: 0.02, z0: 0, z1: 0.1 }] } });

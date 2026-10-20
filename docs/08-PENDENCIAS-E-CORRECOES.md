@@ -6,7 +6,9 @@ funcionou. Escrito para ser retomado em outra máquina sem depender da conversa 
 Estado em que foi escrito: branch `claude/zealous-hamilton-iayjlf`, em `659eea8`, árvore limpa. Este documento foi
 atualizado sem alterar código; os números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
-Atualização (2026-10-20, sobre `84480c1`; árvore sem alterações antes desta edição): **CV-1 corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120° em L, T e correntes tangentes; 23 testes em `curvas.test.ts`), com corte plano pelas faces (§6.5; decisão 0010 #7). Fora desse domínio, **CV-2** (limitação conhecida) e **CV-3** (código de arco sem uso, limpeza) ficam abertos. Dois bugs achados no caminho (`sideOf` e amostragem de arco) foram corrigidos (§6.5). Medido nesta rodada: `npx vitest run` com 111 arquivos e 1520 testes (~26 s), lint e typecheck limpos, `npm run visual:juntas` com os 14 cenários × 3 tipos sem falha numérica (§9.5, §10).
+Atualização (2026-10-20, esta rodada): **o tipo Esquadro (`square`) foi removido** por decisão do dono do projeto, porque tinha a mesma geometria do encosto (`pairSpecs` o tratava no mesmo ramo; L 19×14: acabamento da fina 0,006372 m² nos dois). Restam Encosto (`butt`) e Esquadria (`miter`). Toda junção criada nasce em encosto, e os modelos de casa (`house2`, `studio`) usam o padrão; `SCHEMA_VERSION` 10 → 11 migra `square` para `butt` preservando `flip`. **Achado e correção O-2** (bolsão triangular na silhueta do aglomerado, semente 18 do teste (c)): §5.9. Decisões: `docs/decisoes/0010` #1 e #8; `0009` #3 e #13 e `0004` #1 e #7 marcadas como superadas.
+
+Atualização anterior (2026-10-20, sobre `84480c1`; árvore sem alterações antes desta edição): **CV-1 corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120° em L, T e correntes tangentes; 23 testes em `curvas.test.ts`), com corte plano pelas faces (§6.5; decisão 0010 #7). Fora desse domínio, **CV-2** (limitação conhecida) e **CV-3** (código de arco sem uso, limpeza) ficam abertos. Dois bugs achados no caminho (`sideOf` e amostragem de arco) foram corrigidos (§6.5). Medido nesta rodada: `npx vitest run` com 111 arquivos e 1520 testes (~26 s), lint e typecheck limpos, `npm run visual:juntas` com os 14 cenários × 2 tipos (esquadria e encosto) sem falha numérica (§9.5, §10).
 
 Atualização anterior (2026-10-20, sobre `94248c1`, J-1 encosto/T): **J-2 resolvido** com `nodeOfWalls` (§6.3; o pareamento por
 lado foi descartado, §6.4); **J-1 corrigido também no esquadro**, que pareia por face (decisão 0009 #13); **O-1**
@@ -22,13 +24,14 @@ justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts
 | ID | Defeito | Severidade | Estado | Onde |
 |---|---|---|---|---|
 | **P-1** | `difference()` entrava em laço no polygon-clipping (~10 s por tentativa sem limite) quando as coordenadas são transladadas; a resolução da semente 24 transladada custava 339 s | **alta** (trava a interface) | **corrigido** (`clipReturn` vai direto ao Clipper + memoização; seed 24 transladada: 339 s → 1,1 s) | `resolve.ts`, `boolean.ts` |
-| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | **corrigido em encosto, esquadro e T** (§5.7: no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` cai de 0,004004 para 0; o esquadro pareia por face, decisão 0009 #13) | `joinSides.ts`, `joinPair.ts`, `layerGeom.ts` |
+| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | **corrigido em encosto e T** (§5.7: no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` cai de 0,004004 para 0). O esquadro, que também pareava por face (decisão 0009 #13), foi **removido** (decisão 0010 #1) | `joinSides.ts`, `joinPair.ts`, `layerGeom.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | **resolvido** com `nodeOfWalls` (§6.3): no nó NO o bloco da grossa vai de 0,024983 para 0,028500 m²; a configuração de junção vale no canto externo (lacuna angular > 180°) | `joinNode.ts` |
 | **O-1** | Contorno da edificação com fresta triangular de ~2 mm × 13 cm em cada canto de um retângulo em encosto com pontas em escada | **média** | **corrigido** (contorno real da camada, §5.8) | `faces.ts`, `enclosed.ts` |
+| **O-2** | Bolsão triangular fechado de 0,0287 m² na silhueta do aglomerado, entre três paredes que se cruzam, preenchido sem camada cobrindo (semente 18 do teste de propriedade (c), modo completo) | a classificar | **corrigido**: a silhueta passa a ser `closeGapsSafe(unionClipper(todos os cortes))` (§5.9) | `resolve.ts` |
 | **CV-1** | Parede curva: curva com curva, raio muito fechado (R = 1,5 m) e ângulos extremos não fechavam; L de 90° e T com curva já fechavam | a classificar | **corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120°: L, T e correntes tangentes; 23 testes em `curvas.test.ts`), com corte plano pelas faces (§6.5) | `frame.ts`, `layerGeom.ts`, `joinPair.ts`, `curvas.test.ts` |
 | **CV-2** | Parede curva **fora do domínio** (R < 3 m, quina de 30° ou 150°): resolve com áreas finitas, mas pode sobrar ponta de poucos centímetros ou anel extra | a classificar | **aberto** (limitação conhecida, §6.5) | idem CV-1 |
 | **CV-3** | Código de arco sem uso nos pares com arco: `Chord`, `WallEnds.cordas` e pareamento em degraus para arco em `stairSpec`; segue ativo só no T com hospedeira curva | limpeza | **pendente** (remoção futura, §6.5) | `joinTypes.ts`, `joinSides.ts`, `layerGeom.ts` |
-| **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | **corrigido** (campo `raw` em `ResolvedLayer`; guardas sobre `raw`, com teste negativo em encosto e esquadro, §7.4) | `quinas.test.ts`, `types.ts`, `clipReturn.ts` |
+| **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | **corrigido** (campo `raw` em `ResolvedLayer`; guardas sobre `raw`, com teste negativo em encosto, §7.4) | `quinas.test.ts`, `types.ts`, `clipReturn.ts` |
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
 | **I-1b** | Suíte completa saía com código 1 por ruído do vitest (`Timeout calling "onTaskUpdate"`) mesmo com tudo passando | **alta para CI** | **corrigido** (`tests/vitestSetup.ts` cede o event loop após cada teste; 0 timeouts em três execuções, §9.5). Risco residual: um teste síncrono acima de 60 s | infra do vitest |
 | **I-2** | Filtro `--seed` do script rápido casava por prefixo (`--seed 4` rodava 40–49) | média | **corrigido** (lookahead) | `scripts/test-esquadria.mjs` |
@@ -94,7 +97,7 @@ O caso real do motor que estoura, congelado: `a` = 2 polígonos (8 pontos), `bs`
 
 ### 3.3 `packages/engine/src/juncoesAcabamento.test.ts`
 
-Mede a junção por tipo: área por material numa caixa em volta do canto, para L (`miter`/`butt`/`square`), T e nó
+Mede a junção por tipo: área por material numa caixa em volta do canto, para L (`miter`/`butt`; o `square` saiu, 0010 #1), T e nó
 de 3 paredes. Só asserções fracas (finito, ≥ 0, total = soma das linhas) — é medição, não veredito. **Imprime as
 tabelas em todo `npm test`**; se incomodar, gate os `console.log` atrás de uma variável de ambiente.
 
@@ -110,9 +113,9 @@ Gera os cenários de junção (L, T, Y, nós, X e curva) em SVG, converte em PNG
 soma × união das camadas. A checagem numérica não substitui olhar a imagem: é ela que mostra a forma e quem é dono
 de cada faixa.
 
-### 3.6 `packages/engine/src/juntasInvariantes.test.ts` (93 testes)
+### 3.6 `packages/engine/src/juntasInvariantes.test.ts` (95 testes)
 
-Casas fechadas (retângulo, L, hexágono, pentágono, triângulo); L de 45° a 135° nos três tipos de parede; T de 45°
+Casas fechadas (retângulo, L, hexágono, pentágono, triângulo); L de 45° a 135° nos dois tipos de parede (esquadria e encosto); T de 45°
 a 135°; Y; nó 19+14+14; X. Invariantes em cada caso:
 
 - fresta aberta depois do fecho de 1,5 mm < 2e-5 m²;
@@ -239,6 +242,8 @@ L de 19 cm (`wt_ext19`) com 14 cm (`wt_alv14`), caixa de quina de 0,072000 m² (
 | tinta (finish2) | 0,001038 | 0,000540 | 0,000180 |
 | **total na caixa** | **0,056640** | **0,056640** | **0,056640** |
 
+A coluna esquadro é de antes da remoção do tipo (decisão 0010 #1).
+
 Conclusões:
 
 1. **Nada some** — o total é idêntico; o canto troca de dono.
@@ -265,7 +270,7 @@ Todos cortam a extremidade com **um escalar** e deixam a sobreposição para o p
 | caminho | como corta | pareia? |
 |---|---|---|
 | `miter` (`joins.ts:202-209`) | cadeia por `pairDepth` | sim |
-| `square` (`joins.ts:211-215`) | `outerExtension` calculado em profundidade **0** e aplicado a todas as camadas | não (hoje pareia, §5.7) |
+| `square` (`joins.ts:211-215`, removido, 0010 #1) | `outerExtension` calculado em profundidade **0** e aplicado a todas as camadas | não (hoje pareia, §5.7) |
 | `butt` (`joins.ts:216-222`) | a ponta do seguidor vai até a **linha de centro** da dominante | não (hoje pareia, §5.7) |
 | `tee` (`tryTee` → `toCenterline`, `joins.ts:335`) | idem: linha de centro da hospedeira | não (hoje pareia, §5.7) |
 | nó de 3+ (`starNode`, removido) | setor a partir das **faces externas** | substituído por `nodeOfWalls` (§6.3) |
@@ -304,9 +309,9 @@ e o resultado tem de ser **bit a bit igual** ao atual.
    deliberado e tem aviso próprio; mudar exige atualizar a decisão, não só o código. — **feito** (§5.7): `SideSpec`
    novo `steps` + `stairSpec` (encosto, pareamento por profundidade) e `buttAgainst` (T e par colinear, pareamento
    por prioridade de camada); decisão 0009 ganhou os itens 11 e 12.
-4. **`square`.** Não tem conserto por corte escalar: um corte reto é um plano só e não pode respeitar limites de
+4. **`square`.** Não tinha conserto por corte escalar: um corte reto é um plano só e não pode respeitar limites de
    camada e cobrir o canto externo ao mesmo tempo. — **feito** (decisão 0009 #13): o esquadro passou a parear por
-   face, como o encosto, com os mesmos degraus; o plano único (`flatSquare`) fica só para o par sem pareamento possível.
+   face, como o encosto, com os mesmos degraus. **Superado:** o tipo foi removido (decisão 0010 #1), porque em 90° era o encosto; `flatSquare` saiu de `joinPair.ts`.
 
 ### 5.5 Critérios de aceitação
 
@@ -318,7 +323,7 @@ e o resultado tem de ser **bit a bit igual** ao atual.
 - Total na caixa continua idêntico ao da esquadria (nada pode sumir). → **0,056640 m² nos três tipos**.
 - Os cinco invariantes das 15 sementes seguem verdes. → verdes (`npm test`).
 - Sobreposição em `raw` do acabamento da fina com o bloco da grossa na caixa do canto: **0,004004 → 0** em `butt`
-  (esquadria 0; esquadro 0,008360 com plano único; 0 depois do pareamento do esquadro, decisão 0009 #13).
+  (esquadria 0; o esquadro era 0,008360 com plano único e 0 depois do pareamento, decisão 0009 #13; o tipo foi removido, 0010 #1).
 
 ### 5.6 Aviso importante de acoplamento
 
@@ -350,9 +355,7 @@ a sobreposição em `raw` vai a zero e o pintor deixa de ter trabalho.
 
 **Ângulo agudo** fica com o comportamento anterior: `stairSpec` devolve `null` quando o ponto pareado sai do limite em volta da ponta. **Parede curva** não passa por esse ramo: canto com arco usa o corte plano pelas faces (§6.5), e o T com hospedeira ou ramal curvo usa `buttAgainst`, que corta pelo círculo da face da camada (antes devolvia `null` para arco).
 
-**Esquadro** pareia por face como o encosto (decisão 0009 #13): é o mesmo ramo de `pairSpecs`, com os mesmos degraus.
-Só o par sem pareamento possível (degrau fora do limite) cai no plano único (`flatSquare`). Parede curva não chega a esse caso: canto com arco vai para o corte plano (§6.5). O aviso e o
-comando em lote saíram do código, porque não há mais quina a corrigir.
+**Esquadro** pareou por face como o encosto (decisão 0009 #13), no mesmo ramo de `pairSpecs` e com os mesmos degraus, e depois foi **removido** (decisão 0010 #1): em 90° era o encosto. O plano único (`flatSquare`) saiu de `joinPair.ts`; parede curva segue no corte plano (§6.5). O aviso e o comando em lote saíram do código antes, porque não havia mais quina a corrigir.
 
 **Efeito nos dourados e no 3D.** `golden.test.ts` "L em encosto": o contorno da estrutura passa a ser o mesmo da
 esquadria (antes a dominante ia até a face externa da outra e o núcleo da fina até a linha de centro). A silhueta
@@ -372,6 +375,18 @@ quadrilátero e abria uma fresta triangular de ~2 mm × 13 cm em cada canto.
 **Correção:** `wallFaces` (`packages/engine/src/faces.ts`) expõe `outline` = `layerQuad(f, e, sLo, sHi)`, o contorno
 real da parede, e `outlinePieces` usa esse contorno (commit `659eea8`). Coberto por `juntasInvariantes.test.ts`
 (casas fechadas: um anel, sem furo, fresta aberta abaixo de 2e-5 m²).
+
+### 5.9 O-2 · Bolsão triangular na silhueta do aglomerado — corrigido
+
+**Sintoma.** Na semente 18 do teste de propriedade (c), em modo completo (`VITE_FULL=1`), a silhueta do aglomerado (`silhouette` em `packages/engine/src/resolve.ts`) tinha um bolsão triangular fechado de **0,0287 m²** entre três paredes que se cruzam. O bolsão estava preenchido, e nenhuma camada o cobria.
+
+**Causa (medida).** A silhueta era a união das regiões por material (união de uniões por material), e essa união descartava o furo: o bolsão ficava preenchido. A união direta de todos os cortes o mantinha. O defeito já existia e foi exposto pelo commit `f8b4c8f`, que mudou a geometria dos cruzamentos (achado por bisect: `f8b4c8f` é o primeiro commit ruim).
+
+**Correção.** A silhueta passa a ser `closeGapsSafe(unionClipper(todos os cortes))`.
+
+**Verificação.**
+- Semente 18 do teste (c) passa. Motor: 44 arquivos, 673 testes.
+- `npm run test:completo` (60 sementes): 7 min 18 s, sem timeout do vitest. A única reprovação era a semente 18 (c), agora corrigida.
 
 ---
 
@@ -433,7 +448,7 @@ junção não altera a área. Efeitos secundários:
 
 | critério original | estado |
 |---|---|
-| área por material no nó muda entre `miter`, `butt` e `square` | **revisado**: só vale quando há canto externo (lacuna > 180°). No NO não há, e a área é a mesma nos três tipos |
+| área por material no nó muda entre `miter` e `butt` (o `square` saiu, 0010 #1) | **revisado**: só vale quando há canto externo (lacuna > 180°). No NO não há, e a área é a mesma nos três tipos |
 | bloco da grossa no nó ≥ 0,0280 m² | **atendido**: 0,028500 m² |
 | nenhuma camada de acabamento das finas no bloco cheio da grossa | verificado pela invariante soma × união < 1e-5 (sem sobreposição entre camadas) de `juntasInvariantes.test.ts` |
 | nenhum dourado muda sem justificativa | **não reconferido** nesta rodada de documentação: rodar `npm test` no HEAD final (§10) |
@@ -479,7 +494,7 @@ Estado medido em 2026-10-20 sobre `84480c1`. Decisão em `docs/decisoes/0010-jun
 | correntes tangentes: reta→arco, arco→reta, arco→arco em C e em S (raios 3 e 50 m; continuidade e quina de 10°; tipos iguais e diferentes; dois sentidos) | fecha |
 | fora do domínio: R < 3 m, quina de 30° ou 150° | melhor esforço (CV-2) |
 
-**Como fecha.** Em canto de duas paredes em que pelo menos uma é arco (miter, butt e square), as duas são cortadas pela mesma reta: `O`, interseção das faces externas, e `K`, interseção das faces internas. As duas pontas terminam exatamente em `O` e `K`, então a silhueta é exata para qualquer par de tipos, sem ponta, buraco ou anel extra. O pareamento por camada é abandonado nesses cantos: as camadas só são cortadas pelo plano (`SideSpec` `'plane'`, com `p`, `q` e `pts`; `joinPair.ts` `planeSpecs`; `frame.ts` `planeHit`, `faceCurve`, `intersectCurves`; `layerGeom.ts` `planeChain`).
+**Como fecha.** Em canto de duas paredes em que pelo menos uma é arco (miter e butt), as duas são cortadas pela mesma reta: `O`, interseção das faces externas, e `K`, interseção das faces internas. As duas pontas terminam exatamente em `O` e `K`, então a silhueta é exata para qualquer par de tipos, sem ponta, buraco ou anel extra. O pareamento por camada é abandonado nesses cantos: as camadas só são cortadas pelo plano (`SideSpec` `'plane'`, com `p`, `q` e `pts`; `joinPair.ts` `planeSpecs`; `frame.ts` `planeHit`, `faceCurve`, `intersectCurves`; `layerGeom.ts` `planeChain`).
 
 Sem `O` ou `K` (faces tangentes na continuidade exata, ângulos agudos com raio pequeno), o corte é reto e perpendicular no ponto do nó: exato na continuidade tangente. O T com hospedeira ou ramal curvo continua em `buttAgainst` (interseção com o círculo da face da camada). Paredes retas não mudaram.
 
@@ -495,7 +510,7 @@ Sem `O` ou `K` (faces tangentes na continuidade exata, ângulos agudos com raio 
 **Verificação.**
 
 - `packages/engine/src/curvas.test.ts`: 23 testes, 5 s, cobrindo o domínio da tabela acima.
-- `npm run visual:juntas`: 14 cenários × 3 tipos, cada um com um anel, zero furos e soma × união < 1e-5. É a checagem numérica; a conferência da imagem não foi registrada nesta rodada (§10).
+- `npm run visual:juntas`: 14 cenários × 2 tipos (esquadria e encosto), cada um com um anel, zero furos e soma × união < 1e-5. É a checagem numérica; a conferência da imagem não foi registrada nesta rodada (§10).
 - O critério de fechamento proposto antes exigia também um teste dourado por caso. Nenhum dourado de curva foi registrado nesta rodada.
 
 ---
@@ -530,7 +545,7 @@ Recomendo **(a)** para as guardas de quina e **(b)** para o teste de nó, onde o
 
 ### 7.3 Critérios de aceitação
 
-- Com a junção deliberadamente quebrada (ex.: forçar `square` onde a guarda espera `miter`), a guarda **falha**.
+- Com a junção deliberadamente quebrada (ex.: forçar `butt` onde a guarda espera `miter`), a guarda **falha**.
   Esse é o teste do teste: hoje ela passaria.
 - As guardas continuam verdes no estado correto.
 
@@ -550,7 +565,7 @@ depois da extração; depois os testes de T-1 somaram 9, total 464). `resolve.ts
 
 **Guardas reescritas** (`quinas.test.ts`), medidas sobre `raw`:
 
-| guarda | cenário | esquadria (miter) | encosto (butt) | esquadro (square) |
+| guarda | cenário | esquadria (miter) | encosto (butt) | esquadro (square, removido em 0010 #1) |
 |---|---|---|---|---|
 | acabamento/substrato da fina x acabamento/substrato da grossa (todos os pares) | L 4 m, canto em (4,0) | **0,0** | **4,0e-4** m² (reboco x argamassa) | **4,0e-4** m² |
 | acabamento da fina dentro do núcleo cheio da grossa (caixa de 0,5 m) | L 19×14, caso do usuário | **0,0** | **1,98e-3** m² | **3,80e-3** m² |
@@ -562,10 +577,9 @@ Desvio: a primeira guarda foi **ampliada** de "tinta/cerâmica x tinta/cerâmica
 estruturais". Só tinta e cerâmica dão **2,0e-5** m² em encosto, abaixo do limiar de 1e-4, então não pegariam o
 defeito. O defeito maior está entre substratos (reboco x argamassa).
 
-**Testes negativos (teste do teste):** cada guarda tem um teste com `butt` e outro com `square` que afirma área
-> 1e-4 (sem `skip` nem `it.fails`), marcado com `// J-1: ... inverter ao corrigir`. Quando J-1 estiver corrigido, a
-asserção vira `< 1e-6`. — **feito em `butt`**: as guardas de encosto passaram a exigir `< 1e-6`; as de `square`
-exigiam `> 1e-4` enquanto o esquadro era plano único; depois do pareamento do esquadro (0009 #13) passam a exigir `< 1e-6`.
+**Testes negativos (teste do teste):** cada guarda tem um teste com `butt` e outro com `square` que afirmava área
+> 1e-4 (sem `skip` nem `it.fails`), marcado com `// J-1: ... inverter ao corrigir`. Quando J-1 estivesse corrigido, a
+asserção virava `< 1e-6`. — **feito**: as guardas de encosto passaram a exigir `< 1e-6`; as de `square` exigiam `> 1e-4` enquanto o esquadro era plano único, e depois do pareamento (0009 #13) passaram a exigir `< 1e-6`. Com o tipo removido (0010 #1), sobra só o teste em `butt`.
 
 **Redistribuição do §5.1 sobre `raw`** (`juncoesAcabamento.test.ts`, caixa do canto `[3.88; -0.15; 4.12; 0.15]`): a
 área do acabamento da fina que cai sobre o bloco da grossa é **0** em esquadria, **0,004004 m²** em encosto e
@@ -578,7 +592,7 @@ exigiam `> 1e-4` enquanto o esquadro era plano único; depois do pareamento do e
 de `raw` com áreas iguais; no encosto o bloco da fina tem `raw` 0,420000 m² e `cut` 0,407260 m², e os dois raws se
 sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
 
-> Depois do pareamento por face (§5.7) esse teste usa `square` para mostrar o pintor recortando; no `butt` o `raw` do
+> Esse teste usava `square` para mostrar o pintor recortando; o caso saiu com o esquadro (0010 #1). No `butt` o `raw` do
 > bloco da fina é igual ao `cut` (0,407260 m²) e os dois raws não se sobrepõem.
 
 **Critérios de §7.3:** atendidos. Com a junção quebrada de propósito, as guardas acusam (acima); no estado correto
@@ -602,8 +616,9 @@ sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
 5. **CI.** `.github/workflows/ci.yml` roda `npm run check` como portão. `npm run test:perf` e `npm run test:completo`
    rodam em jobs com `continue-on-error`. Falta: tirar o `continue-on-error` do job `completo` quando a suíte completa
    estiver verde (§9.5; na medição de agora, está verde, §10).
-6. **Esquadro na interface. Decidido: manter por ora** (decisão do dono do projeto, `docs/decisoes/0010` #1). Em quina
-   de 90° a geometria é a do encosto; reavaliar se a opção deve sair da interface.
+6. **Esquadro na interface. Decidido e feito: removido** (decisão do dono do projeto, `docs/decisoes/0010` #1). Em quina
+   de 90° a geometria era a do encosto, então a opção não tinha efeito próprio.
+7. **Posicionamento de uma janela no `studio`.** Com o padrão de criação em encosto (0010 #8), o modelo `studio` muda −0,00135 m² (−0,04%). A diferença vem de uma janela cujo offset foi ajustado até terminar exatamente numa quina; sem essa janela a diferença é zero. Não é defeito da mudança. **Pendência:** revisar o posicionamento dessa janela no modelo.
 
 ---
 
@@ -674,7 +689,7 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 | **`build:artifact`** | `npm run build:artifact` (`scripts/make-artifact.mjs`) nunca foi executado. Verificar que o artefato publica |
 | **`npm test` / `npm run check`** | Nesta rodada, medidos separadamente: `npx vitest run` (111 arquivos, 1520 testes, ~26 s), lint e typecheck limpos. `npm test` e `npm run check` como comandos únicos não constam nesta rodada |
 | **Nó após `nodeOfWalls`** | Reconferido pela suíte inteira nesta rodada (`npx vitest run`, 1520 testes, que inclui `golden.test.ts` e `nos.test.ts`) |
-| **Visual das junções** | `npm run visual:juntas` nesta rodada: 14 cenários × 3 tipos sem falha numérica (um anel, zero furos, soma × união < 1e-5). Não há conferência da imagem registrada. Olhar os cenários de nó e de curva antes de dar o J-2 e o CV-1 por visualmente fechados |
+| **Visual das junções** | `npm run visual:juntas` nesta rodada: 14 cenários × 2 tipos (esquadria e encosto) sem falha numérica (um anel, zero furos, soma × união < 1e-5). Não há conferência da imagem registrada. Olhar os cenários de nó e de curva antes de dar o J-2 e o CV-1 por visualmente fechados |
 
 ---
 
@@ -687,7 +702,7 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 | 3 | **T-1**: guardas sobre geometria pré-pintura (7.2a) | feito (7.4): `raw`, com teste negativo | feito |
 | 4 | **J-1/J-2**: `EndSpec` por lado + nó (5.4) | corrige o defeito visual de junção | feito |
 |  | ↳ passo 1 (tipos por lado) | feito (`8e50504`) | — |
-|  | ↳ passos 3–4 (encosto/T/esquadro por face; sem aviso) | feito (§5.7) | — |
+|  | ↳ passos 3–4 (encosto e T por face; esquadro depois removido, 0010 #1; sem aviso) | feito (§5.7) | — |
 |  | ↳ passo 2 (nó de 3+) | resolvido por `nodeOfWalls` (§6.3); pareamento por lado descartado (§6.4) | feito |
 | 5 | **O-1**: contorno da edificação pelo contorno real (5.8) | feito (`659eea8`) | feito |
 | 6 | **I-1b**: ruído do vitest / CI (9.3) | feito (cessão do event loop, §9.5) | feito |
@@ -705,17 +720,18 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 - **P-1**: o snap de entrada fabrica contato exato; o polygon-clipping entra em laço nos retornos de acabamento
   da semente transladada (339 s). Corrigido: retornos vão direto ao Clipper, com memoização. O snap não foi tocado.
 - **J-1**: encosto e esquadro cortavam todas as camadas com um escalar e deixavam o núcleo comer o acabamento (75% e
-  74% da área do canto). **Encosto, esquadro e T corrigidos**: pareamento por face em degraus (`steps`/`stairSpec`/`buttAgainst`)
+  74% da área do canto). **Encosto e T corrigidos**: pareamento por face em degraus (`steps`/`stairSpec`/`buttAgainst`)
   — no L 19×14 o acabamento da fina na caixa vai de 0,001676 para 0,006372 m² e a sobreposição em `raw` de 0,004004
-  para 0. O **esquadro** pareia por face como o encosto (decisão 0009 #13); o aviso e o lote saíram.
+  para 0. O **esquadro** pareou por face (decisão 0009 #13) e foi removido (decisão 0010 #1); o aviso e o lote tinham saído antes.
 - **J-2**: nó de 3+ paredes ignorava a configuração e apertava o núcleo da grossa. **Resolvido** com `nodeOfWalls`:
   as paredes do nó cortam retas no ponto do nó e o pintor decide; a configuração vale no canto externo. A tentativa
   de pareamento por lado (§6.4) foi descartada por frestas de ~2 mm.
 - **O-1**: o contorno da edificação usava as faces de acabamento e abria fresta de ~2 mm × 13 cm nos cantos em escada.
   Corrigido com o contorno real da camada (§5.8).
+- **O-2**: a silhueta do aglomerado tinha um bolsão fechado de 0,0287 m² entre três paredes (semente 18 de (c), modo completo). A união por material descartava o furo; corrigido com `closeGapsSafe(unionClipper(todos os cortes))` (§5.9).
 - **CV-1**: paredes curvas. **Corrigido no domínio suportado** (raio ≥ 3 m e quina de 60° a 120°) com corte plano pelas faces, que dá silhueta exata para qualquer par de tipos (0010 #7). Fora do domínio, **CV-2** (limitação conhecida); código de arco sem uso, **CV-3** (§6.5).
 - **T-1**: as guardas de quina testavam uma interseção que é zero por construção. Corrigido: `ResolvedLayer.raw`
-  (forma antes do pintor), guardas sobre `raw` e teste negativo em encosto e esquadro (7.4).
+  (forma antes do pintor), guardas sobre `raw` e teste negativo em encosto (7.4; o esquadro saiu, 0010 #1).
 - **I-1/I-2**: os scripts de verificação rápida funcionam no Windows e o filtro de semente casa exato.
 - **I-1b**: o código 1 sem falha de teste (ruído do birpc) foi corrigido por cessão do event loop (`tests/vitestSetup.ts`).
 - **I-3**: os testes de tempo saíram do `npm test` e rodam em `npm run test:perf`; K4 não tem regressão medida.

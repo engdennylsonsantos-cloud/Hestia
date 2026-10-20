@@ -124,9 +124,10 @@ const nearest = (pts: Vec2[], near: Vec2): Vec2 | null => {
 function lineCircle(l: Extract<Curve, { kind: 'line' }>, c: Extract<Curve, { kind: 'circle' }>): Vec2[] {
   const w = sub(l.p, c.c);
   const b = dot(l.d, w);
-  const disc = b * b - (dot(w, w) - c.r * c.r);
-  if (disc < 0) return [];
-  const sq = Math.sqrt(disc);
+  // Reta tangente à circunferência (continuidade reta→arco): o discriminante pode dar −1e-16 por arredondamento.
+  const raw = b * b - (dot(w, w) - c.r * c.r);
+  if (raw < -1e-10) return [];
+  const sq = Math.sqrt(Math.max(0, raw));
   return [-b - sq, -b + sq].map((k) => ({ x: l.p.x + l.d.x * k, y: l.p.y + l.d.y * k }));
 }
 
@@ -136,8 +137,8 @@ function circleCircle(g: Extract<Curve, { kind: 'circle' }>, h: Extract<Curve, {
   if (d < 1e-12) return [];
   const a = (g.r * g.r - h.r * h.r + d * d) / (2 * d);
   const h2 = g.r * g.r - a * a;
-  if (h2 < 0) return [];
-  const hh = Math.sqrt(h2);
+  if (h2 < -1e-10) return [];
+  const hh = Math.sqrt(Math.max(0, h2));
   const ux = dv.x / d;
   const uy = dv.y / d;
   const bx = g.c.x + ux * a;

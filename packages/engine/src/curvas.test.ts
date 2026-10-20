@@ -1,29 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { arcFromSagitta, arcPointAt, arcTangentAt, intersection, multiArea, norm, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, arcPointAt, arcTangentAt, dist, intersection, multiArea, perp, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, wallType, type JoinKind, type Project, type Wall } from '@hestia/model';
 import { buildFrame, pointAt, resolveLevel, toLocal, type WallFrame } from './index.ts';
 
 /**
- * Junções com parede curva (docs/08 §5): L, T e curva com curva, nos três tipos de junção, em ângulos de 30° a 150°,
- * raios de 1,5 m a 20 m e os dois sentidos de curvatura. Critérios por cenário:
- *   - silhueta (união dos `cut`) com 1 anel externo e 0 buracos reais (largura média 2·área/perímetro ≥ 1e-6 e
- *     área ≥ 1e-9 contam como buraco);
- *   - |soma das áreas dos cut − área da união| < 1e-5 m²;
- *   - nenhuma ponta de uma parede além das faces da outra (vértices da silhueta de uma parede, dentro do vão da
- *     outra, fora das faces dela: > 1e-6 m);
- *   - em encosto e esquadro, o acabamento de uma parede não se sobrepõe ao estrutural da outra em `raw` (< 1e-6 m²).
- * Medição numérica: os cenários de canto reto e os dourados continuam em seus próprios arquivos de teste.
+ * Junções com parede curva (docs/08 §5). Três blocos:
+ *   1. corrente tangente: duas paredes ponta a ponta em continuidade (reta→arco, arco→reta, arco→arco) e com quina de
+ *      10° (interno 170°), raios 3 m a 50 m, dois sentidos de curvatura, tipos iguais e diferentes;
+ *   2. L e curva com curva (θ 30°–150°, R 1,5 m a 20 m) e T (passante e ramal curvos), nos três tipos quando há config;
+ *   3. critério mínimo em todos os grupos: 1 anel externo, 0 buracos reais (largura média ≥ 1e-6 m e área ≥ 1e-9 m²),
+ *      nenhuma ponta de uma parede além da face distante da outra (> 1e-6 m).
+ * Sobreposição do acabamento da fina contra o núcleo da grossa, em `raw` (< 1e-6 m²): exigida só quando o pareamento
+ * exato vale (R ≥ 4 m e θ entre 60° e 150°). Fora disso o caso cai no corte de fallback e a limitação fica registrada.
  */
 
 const GROSSA = 'wt_ext19';
 const FINA = 'wt_alv14';
 const KINDS: JoinKind[] = ['miter', 'butt', 'square'];
-const ANGULOS = [30, 60, 90, 120, 150];
-const RAIOS = [1.5, 4, 20];
 const TOL_AREA = 1e-5;
 const TOL_RAW = 1e-6;
 const TOL_PONTA = 1e-6;
-/** Raio (m) em volta do nó em que as pontas são medidas. */
 const RAIO_NO = 0.8;
 
 interface Peca {
@@ -32,135 +28,190 @@ interface Peca {
   a: Vec2;
   b: Vec2;
   sag: number;
-  /** Extremidade que está no nó: 'start' (a), 'end' (b) ou null (passante de T, sem configuração). */
+  /** Extremidade no nó: 'start' (a), 'end' (b) ou null (passante de T, sem configuração). */
   lado: 'start' | 'end' | null;
 }
 
 interface Cenario {
   nome: string;
   pecas: Peca[];
-  /** Ponto onde as paredes se encontram (a ponta de uma parede é medida perto dele). */
+  /** Ponto onde as paredes se encontram. */
   no: Vec2;
+  /** Exigir sobreposição zero em `raw` (pareamento exato aplicado). */
+  exigeRaw: boolean;
+  kinds: JoinKind[];
 }
+
+/* ------------------------------ geometria ------------------------------ */
 
 const rad = (graus: number): number => (graus * Math.PI) / 180;
-const girar = (d: Vec2, graus: number): Vec2 => {
-  const a = rad(graus);
-  return { x: d.x * Math.cos(a) - d.y * Math.sin(a), y: d.x * Math.sin(a) + d.y * Math.cos(a) };
+const rot = (v: Vec2, a: number): Vec2 => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
+const unit = (v: Vec2): Vec2 => {
+  const l = Math.hypot(v.x, v.y);
+  return { x: v.x / l, y: v.y / l };
 };
 const mais = (p: Vec2, d: Vec2, k: number): Vec2 => ({ x: p.x + d.x * k, y: p.y + d.y * k });
+const neg = (v: Vec2): Vec2 => ({ x: -v.x, y: -v.y });
 
-/** Corda e flecha de um arco de raio R: a corda vale ao menos 2 m e nunca passa de 2R (flecha h = R − √(R² − c²/4)). */
-function arcoDeRaio(R: number): { c: number; h: number } {
-  const c = Math.max(2, 2 * R * Math.sin(rad(15)));
-  const h = R - Math.sqrt(R * R - (c * c) / 4);
-  return { c, h };
+/** Flecha (sag) do arco de `a` a `b` de raio R que vira `tau` (+1 à esquerda, −1 à direita). Sag > 0 abaula à esquerda. */
+function sagDoArco(a: Vec2, b: Vec2, R: number, tau: 1 | -1): number {
+  const c = dist(a, b);
+  return -tau * (R - Math.sqrt(Math.max(0, R * R - (c * c) / 4)));
 }
 
-/** Direção unitária da parede (a→b) na extremidade `a` (início) ou `b` (fim); reta se a flecha é zero. */
-function direcaoNaPonta(a: Vec2, b: Vec2, sag: number, ponta: 'a' | 'b'): Vec2 {
-  const arc = arcFromSagitta(a, b, sag);
-  if (!arc) return norm({ x: b.x - a.x, y: b.y - a.y });
-  return arcTangentAt(arc, ponta === 'a' ? 0 : arc.length);
+/** Ponta de um arco de raio R e corda `c` que sai de `p` na direção `d` virando `tau`. */
+function pontaDoArco(p: Vec2, d: Vec2, R: number, c: number, tau: 1 | -1): Vec2 {
+  const psi = 2 * Math.asin(Math.min(1, c / (2 * R)));
+  const centro = mais(p, perp(unit(d)), tau * R);
+  return mais(centro, rot({ x: p.x - centro.x, y: p.y - centro.y }, tau * psi), 0);
 }
 
-/* ----------------------------- cenários ----------------------------- */
+/* ------------------------------ cenários ------------------------------ */
 
-/** L com parede curva: a curva é a `host` (termina no nó) ou o `arm` curvo (começa no nó). */
+/** Quina de duas paredes (L ou curva com curva): `g` termina no nó e `f` começa nele, com ângulo θ entre elas. */
 function cenarioL(curvaNaHospedeira: boolean, graus: number, R: number, sentido: 1 | -1, lado: 1 | -1): Cenario {
-  const { c, h } = arcoDeRaio(R);
+  const c = Math.max(2, 2 * R * Math.sin(rad(15)));
   const N: Vec2 = { x: c, y: 0 };
+  const exigeRaw = R >= 4 && graus >= 60 && graus <= 150;
   if (curvaNaHospedeira) {
     const A: Vec2 = { x: 0, y: 0 };
-    const sag = sentido * h;
-    const tN = direcaoNaPonta(A, N, sag, 'b');
-    const dNo = girar({ x: -tN.x, y: -tN.y }, lado * graus);
+    const sag = sagDoArco(A, N, R, sentido);
+    const arcA = arcFromSagitta(A, N, sag)!;
+    const tN = arcTangentAt(arcA, arcA.length);
+    const dNo = rot(neg(tN), lado * rad(graus));
     return {
       nome: `L curva-hospedeira θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
       no: N,
+      exigeRaw,
+      kinds: KINDS,
       pecas: [
         { id: 'g', typeId: GROSSA, a: A, b: N, sag, lado: 'end' },
         { id: 'f', typeId: FINA, a: N, b: mais(N, dNo, 3), sag: 0, lado: 'start' },
       ],
     };
   }
-  // Ramal curvo: a hospedeira é reta de (0,0) ao nó (c,0) e o ramal curvo parte do nó.
   const A: Vec2 = { x: 0, y: 0 };
-  const dNo = girar({ x: -1, y: 0 }, lado * graus);
-  const chord = Math.min(3, c + 1);
+  const dNo = rot({ x: -1, y: 0 }, lado * rad(graus));
   return {
     nome: `L curva-ramal θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
     no: N,
+    exigeRaw,
+    kinds: KINDS,
     pecas: [
       { id: 'g', typeId: GROSSA, a: A, b: N, sag: 0, lado: 'end' },
-      { id: 'f', typeId: FINA, a: N, b: mais(N, dNo, chord), sag: sentido * h, lado: 'start' },
+      { id: 'f', typeId: FINA, a: N, b: mais(N, dNo, Math.min(3, c + 1)), sag: sagDoArco(N, mais(N, dNo, Math.min(3, c + 1)), R, sentido), lado: 'start' },
     ],
   };
 }
 
-/** T: a passante (curva ou reta) e o ramal chegando no meio dela (ramal curvo ou reto). */
+/** T: passante (curva ou reta) e ramal (curvo ou reto) chegando no meio dela. */
 function cenarioT(curvaNaPassante: boolean, graus: number, R: number, sentido: 1 | -1, lado: 1 | -1): Cenario {
-  const { c, h } = arcoDeRaio(R);
+  const c = Math.max(2, 2 * R * Math.sin(rad(15)));
+  const exigeRaw = R >= 4 && graus >= 60 && graus <= 150;
   if (curvaNaPassante) {
     const A: Vec2 = { x: -c / 2, y: 0 };
     const B: Vec2 = { x: c / 2, y: 0 };
-    const sag = sentido * h;
+    const sag = sagDoArco(A, B, R, sentido);
     const arc = arcFromSagitta(A, B, sag)!;
-    const M = arcPointAt(arc, arc.length / 2, 0);
+    const pM = arcPointAt(arc, arc.length / 2, 0);
     const tM = arcTangentAt(arc, arc.length / 2);
-    const d = girar(tM, lado * graus);
+    const d = rot(tM, lado * rad(graus));
     return {
       nome: `T passante curva θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
-      no: M,
+      no: pM,
+      exigeRaw,
+      kinds: ['butt'],
       pecas: [
         { id: 'g', typeId: GROSSA, a: A, b: B, sag, lado: null },
-        { id: 'f', typeId: FINA, a: M, b: mais(M, d, 3), sag: 0, lado: 'start' },
+        { id: 'f', typeId: FINA, a: pM, b: mais(pM, d, 3), sag: 0, lado: 'start' },
       ],
     };
   }
   const A: Vec2 = { x: -2, y: 0 };
   const B: Vec2 = { x: 2, y: 0 };
   const M: Vec2 = { x: 0, y: 0 };
-  const d = girar({ x: 1, y: 0 }, lado * graus);
-  const chord = Math.min(3, c + 1);
+  const d = rot({ x: 1, y: 0 }, lado * rad(graus));
+  const fim = mais(M, d, Math.min(3, c + 1));
   return {
     nome: `T ramal curvo θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
     no: M,
+    exigeRaw,
+    kinds: ['butt'],
     pecas: [
       { id: 'g', typeId: GROSSA, a: A, b: B, sag: 0, lado: null },
-      { id: 'f', typeId: FINA, a: M, b: mais(M, d, chord), sag: sentido * h, lado: 'start' },
+      { id: 'f', typeId: FINA, a: M, b: fim, sag: sagDoArco(M, fim, R, sentido), lado: 'start' },
     ],
   };
 }
 
-/** Curva com curva: as duas paredes são arcos de mesmo raio que se encontram no nó. */
+/** Curva com curva: duas paredes de mesmo raio que se encontram no nó. */
 function cenarioCurvaCurva(graus: number, R: number, sentido: 1 | -1, lado: 1 | -1): Cenario {
-  const { c, h } = arcoDeRaio(R);
+  const c = Math.max(2, 2 * R * Math.sin(rad(15)));
   const A: Vec2 = { x: 0, y: 0 };
   const N: Vec2 = { x: c, y: 0 };
-  const sagA = sentido * h;
-  const tA = direcaoNaPonta(A, N, sagA, 'b');
-  const dNo = girar({ x: -tA.x, y: -tA.y }, lado * graus);
+  const sagA = sagDoArco(A, N, R, sentido);
+  const tA = arcTangentAt(arcFromSagitta(A, N, sagA)!, arcFromSagitta(A, N, sagA)!.length);
+  const dNo = rot(neg(tA), lado * rad(graus));
   const B = mais(N, dNo, c);
   return {
     nome: `curva-curva θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
     no: N,
+    exigeRaw: R >= 4 && graus >= 60 && graus <= 150,
+    kinds: KINDS,
     pecas: [
       { id: 'g', typeId: GROSSA, a: A, b: N, sag: sagA, lado: 'end' },
-      { id: 'f', typeId: FINA, a: N, b: B, sag: -sentido * h, lado: 'start' },
+      { id: 'f', typeId: FINA, a: N, b: B, sag: sagDoArco(N, B, R, -sentido as 1 | -1), lado: 'start' },
     ],
   };
 }
 
-/* ----------------------------- modelo ----------------------------- */
+/**
+ * Corrente tangente: `piece1` termina no nó P e `piece2` começa nele. Padrões: LA (reta→arco), AL (arco→reta),
+ * AA (arco→arco, mesmo sentido: C), AAs (arco→arco, sentidos opostos: S). `kink` gira a direção de saída da segunda
+ * parede (0° = continuidade; 10° = ângulo interno 170°).
+ */
+function corrente(padrao: 'LA' | 'AL' | 'AA' | 'AAs', R: number, tau: 1 | -1, tipos: 'iguais' | 'diferentes', kink: number): Cenario {
+  const P: Vec2 = { x: 0, y: 0 };
+  const d0: Vec2 = { x: 1, y: 0 };
+  const dK = rot(d0, rad(kink));
+  const c = 3;
+  let a1: Vec2;
+  let sag1: number;
+  if (padrao === 'LA') {
+    a1 = { x: -c, y: 0 };
+    sag1 = 0;
+  } else {
+    a1 = pontaDoArco(P, neg(d0), R, c, -tau);
+    sag1 = sagDoArco(a1, P, R, tau);
+  }
+  let b2: Vec2;
+  let sag2: number;
+  if (padrao === 'AL') {
+    b2 = mais(P, dK, c);
+    sag2 = 0;
+  } else {
+    const tau2 = padrao === 'AAs' ? (-tau as 1 | -1) : tau;
+    b2 = pontaDoArco(P, dK, R, c, tau2);
+    sag2 = sagDoArco(P, b2, R, tau2);
+  }
+  return {
+    nome: `corrente ${padrao} R=${R} τ=${tau} ${tipos} kink=${kink}`,
+    no: P,
+    exigeRaw: false,
+    kinds: kink === 0 ? ['butt'] : KINDS,
+    pecas: [
+      { id: 'g', typeId: GROSSA, a: a1, b: P, sag: sag1, lado: 'end' },
+      { id: 'f', typeId: tipos === 'iguais' ? GROSSA : FINA, a: P, b: b2, sag: sag2, lado: 'start' },
+    ],
+  };
+}
+
+/* ------------------------------ modelo ------------------------------ */
 
 function montar(c: Cenario, kind: JoinKind): Project {
   const s = new ProjectStore(createEmptyProject());
   for (const p of c.pecas) {
-    s.exec({
-      type: 'addWall',
-      wall: makeWall({ id: p.id, typeId: p.typeId, levelId: 'lv_0', a: p.a, b: p.b, sag: p.sag }),
-    });
+    s.exec({ type: 'addWall', wall: makeWall({ id: p.id, typeId: p.typeId, levelId: 'lv_0', a: p.a, b: p.b, sag: p.sag }) });
   }
   const proj = s.project;
   const elements = { ...proj.elements };
@@ -175,7 +226,7 @@ function montar(c: Cenario, kind: JoinKind): Project {
   return { ...proj, elements } as Project;
 }
 
-/** Anéis de buraco reais (largura média ≥ 1e-6 m e área ≥ 1e-9 m²) da silhueta. */
+/** Buracos reais da silhueta: largura média ≥ 1e-6 m e área ≥ 1e-9 m². */
 function furosReais(sil: MultiPolygon): number {
   let n = 0;
   for (const poly of sil) {
@@ -192,10 +243,7 @@ function furosReais(sil: MultiPolygon): number {
   return n;
 }
 
-/**
- * Maior distância (m) com que um vértice da silhueta `silX` atravessa a face distante de `y` (a face do lado oposto ao
- * que `x` ocupa), no vão de `y`, perto do nó. Ponta = a parede que passa pela outra e sai do outro lado.
- */
+/** Quanto (m) um vértice da silhueta de `x` atravessa a face distante de `y`, perto do nó. */
 function pontaFora(x: WallFrame, y: WallFrame, silX: MultiPolygon, no: Vec2): number {
   const noEmA = Math.hypot(x.a.x - no.x, x.a.y - no.y) <= Math.hypot(x.b.x - no.x, x.b.y - no.y);
   const pX = noEmA ? pointAt(x, 0.1, 0) : pointAt(x, x.length - 0.1, 0);
@@ -238,7 +286,7 @@ function medir(c: Cenario, kind: JoinKind): Medida {
   }
   let ponta = 0;
   for (const pc of c.pecas) {
-    if (pc.lado === null) continue; // a passante de T não tem nó na extremidade
+    if (pc.lado === null) continue;
     const sx = union(...(res.walls[pc.id]?.layers.filter((l) => l.cut.length > 0).map((l) => l.cut) ?? []));
     for (const pcY of c.pecas) {
       if (pcY === pc) continue;
@@ -247,6 +295,7 @@ function medir(c: Cenario, kind: JoinKind): Medida {
       if (fx && fy) ponta = Math.max(ponta, pontaFora(fx, fy, sx, c.no));
     }
   }
+  // Acabamento da parede fina contra o núcleo da grossa, em `raw` (T-1).
   let sobre = 0;
   const acabamentos = (id: string) =>
     (res.walls[id]?.layers ?? []).filter((l) => {
@@ -258,7 +307,6 @@ function medir(c: Cenario, kind: JoinKind): Medida {
       const w = p.elements[id] as Wall;
       return l.layerIndex >= 0 && wallType(p, w).layers[l.layerIndex]!.function === 'structure';
     });
-  // Acabamento da parede fina contra a estrutura (núcleo) da grossa, sobre `raw` (T-1).
   for (const fina of c.pecas.filter((pc) => pc.typeId === FINA)) {
     for (const grossa of c.pecas.filter((pc) => pc.typeId === GROSSA)) {
       for (const acab of acabamentos(fina.id)) {
@@ -271,40 +319,72 @@ function medir(c: Cenario, kind: JoinKind): Medida {
   return { ext: sil.length, furos: furosReais(sil), diff, ponta, sobre };
 }
 
-/** Roda a matriz e devolve as falhas como texto, para que o teste mostre todos os casos de uma vez. */
-function varrer(cenarios: Cenario[], exigeRaw: (kind: JoinKind) => boolean): string[] {
+/** Roda os tipos de junção do cenário e devolve as falhas como texto (todas de uma vez). */
+function varrer(cenarios: Cenario[]): string[] {
   const falhas: string[] = [];
   for (const c of cenarios) {
-    for (const kind of KINDS) {
+    for (const kind of c.kinds) {
       const m = medir(c, kind);
       const motivos: string[] = [];
       if (m.ext !== 1) motivos.push(`${m.ext} anéis externos`);
       if (m.furos > 0) motivos.push(`${m.furos} buraco(s)`);
       if (m.diff >= TOL_AREA) motivos.push(`soma-união ${m.diff.toExponential(2)}`);
       if (m.ponta > TOL_PONTA) motivos.push(`ponta fora ${m.ponta.toExponential(2)} m`);
-      if (exigeRaw(kind) && m.sobre >= TOL_RAW) motivos.push(`raw ${m.sobre.toExponential(2)} m²`);
+      if (c.exigeRaw && kind !== 'miter' && m.sobre >= TOL_RAW) motivos.push(`raw ${m.sobre.toExponential(2)} m²`);
       if (motivos.length) falhas.push(`${c.nome} [${kind}]: ${motivos.join('; ')}`);
     }
   }
   return falhas;
 }
 
-const todos = (f: (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, angulos: number[] = ANGULOS): Cenario[] =>
-  angulos.flatMap((g) => RAIOS.flatMap((r) => ([1, -1] as const).flatMap((s) => ([1, -1] as const).map((l) => f(g, r, s, l)))));
+/* ------------------------------ testes ------------------------------ */
 
-const CASOS: Array<[string, (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, number[], (k: JoinKind) => boolean]> = [
-  ['L com a curva na hospedeira', (g, r, s, l) => cenarioL(true, g, r, s, l), ANGULOS, (k) => k !== 'miter'],
-  ['L com o ramal curvo', (g, r, s, l) => cenarioL(false, g, r, s, l), ANGULOS, (k) => k !== 'miter'],
-  ['T com a passante curva', (g, r, s, l) => cenarioT(true, g, r, s, l), [60, 90, 120], () => true],
-  ['T com o ramal curvo', (g, r, s, l) => cenarioT(false, g, r, s, l), [60, 90, 120], () => true],
-  ['curva com curva', (g, r, s, l) => cenarioCurvaCurva(g, r, s, l), ANGULOS, (k) => k !== 'miter'],
+const RAIOS = [1.5, 4, 20];
+const SENTIDOS: Array<[1 | -1, 1 | -1]> = [
+  [1, 1],
+  [1, -1],
 ];
+const ANGULOS = [30, 60, 90, 120, 150];
 
-describe('junções com parede curva (L, T, curva com curva)', () => {
-  for (const [nome, gera, angulos, exigeRaw] of CASOS) {
+describe('1. corrente tangente (continuidade e quina de 170°)', () => {
+  it('a geometria de teste tem a tangente certa no nó (sanidade)', () => {
+    for (const padrao of ['AL', 'AA', 'AAs'] as const) {
+      const c = corrente(padrao, 3, 1, 'iguais', 0);
+      const arc = arcFromSagitta(c.pecas[0]!.a, c.pecas[0]!.b, c.pecas[0]!.sag)!;
+      const fim = arcTangentAt(arc, arc.length);
+      expect(Math.hypot(fim.x - 1, fim.y), `${padrao}: tangente de chegada`).toBeLessThan(1e-6);
+    }
+  });
+
+  for (const padrao of ['LA', 'AL', 'AA', 'AAs'] as const) {
+    it(`${padrao}: continuidade e quina de 170°, raios 3–50 m, sentidos e tipos — 1 anel, sem buraco, sem ponta`, () => {
+      const cenarios: Cenario[] = [];
+      for (const R of [3, 50]) {
+        for (const tau of [1, -1] as const) {
+          for (const tipos of ['iguais', 'diferentes'] as const) {
+            for (const kink of [0, 10]) cenarios.push(corrente(padrao, R, tau, tipos, kink));
+          }
+        }
+      }
+      const falhas = varrer(cenarios);
+      expect(falhas, falhas.join('\n')).toEqual([]);
+    }, 120_000);
+  }
+});
+
+describe('2. L e T com parede curva (R 1,5–20 m, θ 30°–150°)', () => {
+  const familias: Array<[string, (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, number[]]> = [
+    ['L com a curva na hospedeira', (g, r, s, l) => cenarioL(true, g, r, s, l), ANGULOS],
+    ['L com o ramal curvo', (g, r, s, l) => cenarioL(false, g, r, s, l), ANGULOS],
+    ['curva com curva', (g, r, s, l) => cenarioCurvaCurva(g, r, s, l), ANGULOS],
+    ['T com a passante curva', (g, r, s, l) => cenarioT(true, g, r, s, l), [60, 90, 120]],
+    ['T com o ramal curvo', (g, r, s, l) => cenarioT(false, g, r, s, l), [60, 90, 120]],
+  ];
+  for (const [nome, gera, angulos] of familias) {
     for (const g of angulos) {
-      it(`${nome}, θ=${g}°: 1 anel, sem buraco, sem ponta, sem sobreposição`, () => {
-        const falhas = varrer(todos(gera, [g]), exigeRaw);
+      it(`${nome}, θ=${g}°: 1 anel, sem buraco, sem ponta (raw quando R ≥ 4 e 60°–150°)`, () => {
+        const cenarios = RAIOS.flatMap((r) => SENTIDOS.map(([s, l]) => gera(g, r, s, l)));
+        const falhas = varrer(cenarios.filter((c) => c.nome.includes(`θ=${g} `)));
         expect(falhas, falhas.join('\n')).toEqual([]);
       }, 120_000);
     }

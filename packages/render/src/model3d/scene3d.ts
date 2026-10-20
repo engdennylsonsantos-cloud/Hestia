@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { frameOfWall, openingGeometry, resolveFloors, resolveSlabs, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, type ResolvedLevel } from '@hestia/engine';
 import { wallBaseElevation, wallHeight, wallsOnLevel, openingsOfWall, type Material, type Project } from '@hestia/model';
 import { OrbitCamera } from './orbit.ts';
-import { buildFloorSolids, buildLevelSolids, buildSlabSolids } from './solids.ts';
+import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids } from './solids.ts';
 
 export interface Scene3DOptions {
   edges: boolean;
@@ -80,8 +80,8 @@ export class ModelScene {
     const edgeMat = new THREE.LineBasicMaterial({ color: opt.dark ? 0xd7dde5 : 0x1c2026, transparent: true, opacity: 0.5 });
     for (const lv of levels) {
       const solids = buildLevelSolids(lv);
-      // Pisos e lajes do nível: uma malha por material, com os furos e a inclinação das lajes (D2).
-      const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId)), ...buildSlabSolids(resolveSlabs(p, lv.levelId))];
+      // Pisos, lajes e telhados do nível: uma malha por material, com os furos e as inclinações (D2).
+      const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId)), ...buildSlabSolids(resolveSlabs(p, lv.levelId)), ...buildRoofSolids(resolveRoofs(p, lv.levelId))];
       for (const b of batches) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));

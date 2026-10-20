@@ -1,8 +1,9 @@
-import { intersection, orientedRect, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { intersection, orientedRect, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors } from './floors.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
+import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
 
 /**
@@ -27,10 +28,11 @@ export interface SectionRegion {
 
 /** Elemento visto além do plano de corte; a lista vem ordenada do mais longe ao mais perto (pintor). */
 export interface SectionBeyond {
-  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, ou de laje, com `slabId`). */
+  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, de laje, com `slabId`, ou de telhado, com `roofId`). */
   wallId?: Id;
   floorId?: Id;
   slabId?: Id;
+  roofId?: Id;
   materialId: Id;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
@@ -105,17 +107,23 @@ export function lineIntervals(poly: Polygon, a: Vec2, d: Vec2, n: Vec2): Array<[
 
 const EPS_T = 1e-6;
 
-export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p.levels.map((l) => l.id)): SectionResult {
+/** Eixo do corte: comprimento, direção `d`, normal `n` e a região de visão (`depth` além da linha). */
+export function sectionFrame(line: SectionLine): { length: number; d: Vec2; n: Vec2; slab: MultiPolygon } {
   const dx = line.b.x - line.a.x;
   const dy = line.b.y - line.a.y;
   const length = Math.hypot(dx, dy);
-  const empty: SectionResult = { length, zMin: 0, zMax: 3, cut: [], silhouette: [], beyond: [], openings: [], levels: [] };
-  if (length < 1e-6) return empty;
-  const d = { x: dx / length, y: dy / length };
+  const k = length || 1;
+  const d = { x: dx / k, y: dy / k };
   const n = { x: -d.y, y: d.x };
   const cx = line.a.x + d.x * (length / 2) + n.x * (line.depth / 2);
   const cy = line.a.y + d.y * (length / 2) + n.y * (line.depth / 2);
-  const slab: MultiPolygon = [[orientedRect(cx, cy, d.x, d.y, length / 2, line.depth / 2)]];
+  return { length, d, n, slab: [[orientedRect(cx, cy, d.x, d.y, length / 2, line.depth / 2)]] };
+}
+
+export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p.levels.map((l) => l.id)): SectionResult {
+  const { length, d, n, slab } = sectionFrame(line);
+  const empty: SectionResult = { length, zMin: 0, zMax: 3, cut: [], silhouette: [], beyond: [], openings: [], levels: [] };
+  if (length < 1e-6) return empty;
 
   const cutBy = new Map<Id, Polygon[]>();
   const beyond: SectionBeyond[] = [];
@@ -202,6 +210,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         }
       }
     }
+    // Telhados (D3): como as lajes, por água e por camada (cada faixa segue a cota da água menos `below`).
+    const rf = sectionOfRoofs(resolveRoofs(p, levelId), line);
+    for (const c of rf.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
+    beyond.push(...rf.beyond);
+    grow(rf.zMin, rf.zMax);
     for (const w of wallsOnLevel(p, levelId)) {
       const rw = resolved.walls[w.id];
       if (!rw) continue;
@@ -261,11 +274,103 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     }
   }
 
-  beyond.sort((x, y) => y.depth - x.depth || x.layerIndex - y.layerIndex);
+  // Telhado: as camadas projetam na mesma área (a face é inclinada), então a de cima (índice menor) desenha por último.
+  beyond.sort((x, y) => y.depth - x.depth || (x.roofId || y.roofId ? y.layerIndex - x.layerIndex : x.layerIndex - y.layerIndex));
   openings.sort((x, y) => y.depth - x.depth);
   const cut: SectionRegion[] = [...cutBy].map(([materialId, polys]) => ({ materialId, polygons: union(...polys.map((q): MultiPolygon => [q])) }));
   const silhouette = union(...cut.map((c) => c.polygons));
   const levels = p.levels.map((l) => ({ levelId: l.id, name: l.name, z: l.elevation }));
   if (!isFinite(zMin)) return { ...empty, levels };
   return { length, zMin, zMax, cut, silhouette, beyond, openings, levels };
+}
+
+/** Telhado no corte (D3): quadriláteros da linha de corte por material e, além do plano, as faixas por camada. */
+export interface RoofSection {
+  cut: Array<{ materialId: Id; polygon: Polygon }>;
+  beyond: SectionBeyond[];
+  /** Cotas extremas (Infinity/-Infinity sem telhado na linha). */
+  zMin: number;
+  zMax: number;
+}
+
+/** Envoltória convexa (cadeia monótona), anel anti-horário; com menos de 3 vértices, pontos colineares. */
+function convexHull(pts: Vec2[]): Ring {
+  const s = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const chain = (seq: Vec2[]): Vec2[] => {
+    const h: Vec2[] = [];
+    for (const q of seq) {
+      while (h.length >= 2 && cross(h[h.length - 2]!, h[h.length - 1]!, q) <= 0) h.pop();
+      h.push(q);
+    }
+    h.pop();
+    return h;
+  };
+  return [...chain(s), ...chain([...s].reverse())];
+}
+
+/**
+ * Telhados no corte e na elevação (D3), como as lajes. Por água e por camada, a faixa vertical de cada ponto p vai de
+ * top(p) − below − thickness a top(p) − below. No corte, a linha dá intervalos de t dentro da água e cada faixa é um
+ * quadrilátero (topo e base são lineares em t). Além do plano, cada triângulo da água projeta-se em (t, z) com
+ * seis pontos (topo e base); a envoltória convexa de cada um e a união delas é a silhueta da camada (exata para
+ * águas convexas, que é o caso das formas predefinidas).
+ */
+export function sectionOfRoofs(roofs: ResolvedRoof[], line: SectionLine): RoofSection {
+  const out: RoofSection = { cut: [], beyond: [], zMin: Infinity, zMax: -Infinity };
+  const { length, d, n, slab } = sectionFrame(line);
+  if (length < 1e-6) return out;
+  const along = (v: Vec2): number => (v.x - line.a.x) * d.x + (v.y - line.a.y) * d.y;
+  const dist = (v: Vec2): number => (v.x - line.a.x) * n.x + (v.y - line.a.y) * n.y;
+  const at = (t: number): Vec2 => ({ x: line.a.x + d.x * t, y: line.a.y + d.y * t });
+  for (const r of roofs) {
+    const layers = r.layers.filter((l) => l.thickness > 1e-9);
+    for (const pl of r.planes) {
+      const cuts = pl.polygon
+        .flatMap((poly) => lineIntervals(poly, line.a, d, n))
+        .map(([t0, t1]): [number, number] => [Math.max(0, t0), Math.min(length, t1)])
+        .filter(([lo, hi]) => hi - lo >= EPS_T);
+      const view = intersection(pl.polygon, slab);
+      for (const l of layers) {
+        const top = (v: Vec2): number => planeZ(pl, v) - l.below;
+        for (const [lo, hi] of cuts) {
+          const u0 = top(at(lo));
+          const u1 = top(at(hi));
+          out.cut.push({ materialId: l.materialId, polygon: [slabQuad(lo, hi, u0 - l.thickness, u1 - l.thickness, u0, u1)] });
+          out.zMin = Math.min(out.zMin, u0 - l.thickness, u1 - l.thickness);
+          out.zMax = Math.max(out.zMax, u0, u1);
+        }
+        const parts: MultiPolygon[] = [];
+        let depth = Infinity;
+        for (const piece of view) {
+          const outer = piece[0];
+          if (!outer || outer.length < 3) continue;
+          depth = Math.min(depth, ...outer.map(dist));
+          const mesh = triangulate(piece);
+          for (let i = 0; i < mesh.indices.length; i += 3) {
+            const pts = [0, 1, 2].flatMap((k) => {
+              const j = mesh.indices[i + k]!;
+              const v = { x: mesh.positions[2 * j]!, y: mesh.positions[2 * j + 1]! };
+              return [
+                { x: along(v), y: top(v) },
+                { x: along(v), y: top(v) - l.thickness },
+              ];
+            });
+            const hull = convexHull(pts);
+            if (hull.length >= 3) parts.push([[hull]]);
+          }
+        }
+        if (!parts.length) continue;
+        const polygons = union(...parts);
+        out.beyond.push({ roofId: r.roofId, materialId: l.materialId, layerIndex: l.layerIndex, depth: Math.max(0, depth), polygons });
+        for (const ring of polygons.flat()) {
+          for (const v of ring) {
+            out.zMin = Math.min(out.zMin, v.y);
+            out.zMax = Math.max(out.zMax, v.y);
+          }
+        }
+      }
+    }
+  }
+  return out;
 }

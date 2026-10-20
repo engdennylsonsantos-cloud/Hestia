@@ -1,0 +1,48 @@
+import { levelElevation } from './queries.ts';
+import { isFloor, isRoof, isSlab, isWall, type Element, type Floor, type Id, type Project, type Roof, type Slab, type Wall } from './types.ts';
+
+/**
+ * Como manter o elemento ao trocar de nível: `elevation` preserva a cota absoluta (compensa o deslocamento);
+ * `offset` preserva o deslocamento relativo ao nível e leva a cota junto.
+ */
+export type LevelKeep = 'elevation' | 'offset';
+
+export interface SetElementLevel {
+  ids: Id[];
+  levelId: Id;
+  keep: LevelKeep;
+}
+
+/** Elementos com nível próprio. Aberturas não têm: acompanham a parede anfitriã. */
+export const hasLevel = (e: Element | undefined): e is Wall | Floor | Slab | Roof => isWall(e) || isFloor(e) || isSlab(e) || isRoof(e);
+
+/** Nível de um elemento com nível próprio; null para abertura ou id inexistente. */
+export function elementLevelId(e: Element | undefined): Id | null {
+  return hasLevel(e) ? e.levelId : null;
+}
+
+/**
+ * Troca o nível de paredes, pisos, lajes e telhados (lógica do comando `setElementLevel`).
+ * Valida tudo antes de mexer: nível inexistente, elemento inexistente ou abertura lançam erro e nada muda.
+ * Com `keep: 'elevation'`, a cota absoluta fica igual: a parede ganha `baseOffset += cotaAntiga − cotaNova`
+ * (o topo vinculado a um nível continua no mesmo nível, com o mesmo deslocamento) e os demais ganham
+ * `heightOffset += cotaAntiga − cotaNova`. Com `keep: 'offset'`, só o nível muda.
+ */
+export function applyElementLevel(p: Project, c: SetElementLevel): void {
+  const target = p.levels.find((l) => l.id === c.levelId);
+  if (!target) throw new Error(`Nível inexistente: ${c.levelId}`);
+  const ids = [...new Set(c.ids)];
+  for (const id of ids) {
+    const e = p.elements[id];
+    if (!e) throw new Error(`Elemento inexistente: ${id}`);
+    if (!hasLevel(e)) throw new Error(`Abertura não tem nível próprio; ela acompanha a parede (${id})`);
+  }
+  for (const id of ids) {
+    const e = p.elements[id];
+    if (!hasLevel(e)) continue;
+    const delta = c.keep === 'elevation' ? levelElevation(p, e.levelId) - target.elevation : 0;
+    e.levelId = target.id;
+    if (isWall(e)) e.baseOffset += delta;
+    else e.heightOffset += delta;
+  }
+}

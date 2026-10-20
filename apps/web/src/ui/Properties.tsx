@@ -4,6 +4,7 @@ import {
   FUNCTION_LABEL,
   isFloor,
   isOpening,
+  isRoof,
   isSlab,
   isWall,
   newId,
@@ -22,9 +23,11 @@ import {
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { LevelField } from './LevelField.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
 import { FloorProperties } from './FloorProperties.tsx';
+import { RoofProperties } from './RoofProperties.tsx';
 import { SlabProperties } from './SlabProperties.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
@@ -79,7 +82,6 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
   const p = useProject();
   const ids = walls.map((w) => w.id);
   const typeId = common(walls, (w) => w.typeId);
-  const level = common(walls, (w) => w.levelId);
   const base = common(walls, (w) => w.baseOffset);
   const top = common(walls, (w) => w.topLevelId ?? '');
   const height = common(walls, (w) => w.height);
@@ -127,17 +129,12 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         </div>
       </div>
       <Group title="Restrições">
-        <Row label="Nível base" htmlFor="p-level">
-          <select id="p-level" className="select" value={level.mixed ? '' : level.value} onChange={(e) => e.target.value && patch(ids, { levelId: e.target.value })}>
-            {level.mixed && <option value="">variados</option>}
-            {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </Row>
+        <LevelField ids={ids} label="Nível base" />
         <Row label="Desloc. da base" htmlFor="p-base"><NumField id="p-base" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} unit="m" /></Row>
-        <Row label="Restrição de topo" htmlFor="p-top">
+        <Row label="Nível superior" htmlFor="p-top">
           <select id="p-top" className="select" value={top.mixed ? '' : top.value} onChange={(e) => patch(ids, { topLevelId: e.target.value || null })}>
             {top.mixed && <option value="">variados</option>}
-            <option value="">Altura livre</option>
+            <option value="">Não vinculado</option>
             {p.levels.map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}
           </select>
         </Row>
@@ -300,18 +297,24 @@ export function Properties(): ReactElement {
   const ops = els.filter(isOpening);
   const floors = els.filter(isFloor);
   const slabs = els.filter(isSlab);
-  const count = walls.length + ops.length + floors.length + slabs.length;
+  const roofs = els.filter(isRoof);
+  const count = walls.length + ops.length + floors.length + slabs.length + roofs.length;
+  const kinds = [walls, ops, floors, slabs, roofs].filter((g) => g.length > 0).length;
+  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : 'Vista';
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
         <span>Propriedades</span>
-        <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>
-          {walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : 'Vista'}
-        </span>
+        <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>
       </div>
       <div className="panel-scroll">
-        {walls.length > 0 && ops.length === 0 && floors.length === 0 && slabs.length === 0 ? <WallProps walls={walls} /> : ops.length > 0 && walls.length === 0 && floors.length === 0 && slabs.length === 0 ? <OpeningProps items={ops} /> : floors.length > 0 && walls.length === 0 && ops.length === 0 && slabs.length === 0 ? <FloorProperties floors={floors} /> : slabs.length > 0 && walls.length === 0 && ops.length === 0 && floors.length === 0 ? <SlabProperties slabs={slabs} /> : count > 0 ? (
-          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso ou laje) para editar propriedades.</div>
+        {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
+          : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />
+          : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
+          : kinds === 1 && slabs.length > 0 ? <SlabProperties slabs={slabs} />
+          : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
+          : count > 0 ? (
+          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje ou telhado) para editar propriedades.</div>
         ) : <ViewProps />}
       </div>
     </aside>

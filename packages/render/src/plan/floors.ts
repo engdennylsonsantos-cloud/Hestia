@@ -85,10 +85,11 @@ export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: bool
   return out;
 }
 
-/** Peça de piso ou laje para destaque: id e contorno em planta (furos incluídos). */
+/** Peça de piso, laje ou telhado para destaque: id e contorno em planta (furos incluídos); `area` substitui a área em planta (telhado: real). */
 export interface OutlinedPart {
   id: Id;
   polygon: MultiPolygon;
+  area?: number;
 }
 
 /**
@@ -121,7 +122,7 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
     }
     if (areaLabel) {
       const at = labelPoint(f.polygon);
-      if (at) out.labels.push({ at, text: fmtArea(multiArea(f.polygon), 2), dy: -12, tone: 'info' });
+      if (at) out.labels.push({ at, text: fmtArea(f.area ?? multiArea(f.polygon), 2), dy: -12, tone: 'info' });
     }
   }
   return out;

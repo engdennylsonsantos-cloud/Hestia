@@ -5,6 +5,7 @@ import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
+import { LevelField } from './LevelField.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -43,7 +44,6 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
   const p = useProject();
   const ids = slabs.map((s) => s.id);
   const typeId = common(slabs, (s) => s.typeId);
-  const level = common(slabs, (s) => s.levelId);
   const offset = common(slabs, (s) => s.heightOffset);
   const percent = common(slabs, (s) => s.slope?.percent ?? null);
   const hasSlope = slabs.some((s) => s.slope !== null);
@@ -51,7 +51,6 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
   const comments = common(slabs, (s) => s.comments);
   const single = slabs.length === 1 ? slabs[0]! : null;
   const type = typeId.mixed ? null : p.slabTypes[typeId.value];
-  const levelName = level.mixed ? 'variados' : (p.levels.find((l) => l.id === level.value)?.name ?? level.value);
   const planArea = slabs.reduce((s, x) => s + slabArea(x), 0);
   const trueArea = slabs.reduce((s, x) => s + realArea(x), 0);
   const perimeter = slabs.reduce((s, x) => s + ringPerimeter(x.boundary), 0);
@@ -72,7 +71,7 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
         </div>
       </div>
       <Group title="Restrições">
-        <Row label="Nível"><span className="val soft">{levelName}</span></Row>
+        <LevelField ids={ids} />
         <Row label="Desloc. do topo" htmlFor="p-soff">
           <NumField id="p-soff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
         </Row>

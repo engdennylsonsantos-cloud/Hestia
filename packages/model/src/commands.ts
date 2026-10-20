@@ -26,6 +26,7 @@ import {
 } from './types.ts';
 import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
+import { applyElementLevel, type SetElementLevel } from './elementLevel.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -59,7 +60,8 @@ export type Command =
   | { type: 'updateView'; id: Id; patch: Partial<Omit<SectionView, 'id'>> }
   | { type: 'deleteView'; id: Id }
   | { type: 'batch'; commands: Command[] }
-  | { type: 'setOpeningHost'; id: Id; hostId: Id; offset: number };
+  | { type: 'setOpeningHost'; id: Id; hostId: Id; offset: number }
+  | ({ type: 'setElementLevel' } & SetElementLevel);
 
 function transformWall(w: Wall, t: Transform): Wall {
   const a = applyTransform(t, w.a);
@@ -337,6 +339,9 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'setOpeningHost':
       setOpeningHost(p, c);
+      break;
+    case 'setElementLevel':
+      applyElementLevel(p, c);
       break;
   }
 }

@@ -12,11 +12,12 @@ import { FloorTool } from './floorTool.ts';
 import { SlabTool } from './slabTool.ts';
 import { SlopeTool } from './slabSlopeTool.ts';
 import { ParallelTool } from './parallelTool.ts';
+import { RoofTool } from './roofTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope'] },
   { title: 'Medir', tools: ['measure'] },
 ];
@@ -33,6 +34,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new SlabTool(env);
     case 'slope':
       return new SlopeTool(env);
+    case 'roof':
+      return new RoofTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -73,6 +76,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   wall: 'Parede',
   floor: 'Piso',
   slab: 'Laje',
+  roof: 'Telhado',
   slope: 'Inclinação',
   door: 'Porta',
   window: 'Janela',
@@ -97,6 +101,7 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   wall: 'W',
   floor: 'F',
   slab: 'B',
+  roof: 'U',
   door: 'D',
   window: 'J',
   move: 'M',

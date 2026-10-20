@@ -16,3 +16,5 @@ export * from './slabs.ts';
 export * from './slabQuantities.ts';
 export * from './slabSchedule.ts';
 export * from './roofs.ts';
+export * from './roofQuantities.ts';
+export * from './roofSchedule.ts';

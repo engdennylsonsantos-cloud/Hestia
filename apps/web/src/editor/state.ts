@@ -5,7 +5,7 @@ import { DEFAULT_SNAP, type SnapOptions, type ToolId, type ToolOptions } from '@
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -91,6 +91,12 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   slabOffset: 0,
   slabMode: 'poly',
   slabSlopePercent: 2,
+  roofTypeId: 'rt_ceramica',
+  roofMode: 'poly',
+  roofShape: 'gable',
+  roofSlope: 30,
+  roofOverhang: 0.5,
+  roofOffset: null,
 };
 
 export const useUi = create<UiState>(() => ({

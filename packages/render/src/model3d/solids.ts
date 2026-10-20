@@ -1,5 +1,5 @@
 import { ringArea, triangulate, type Polygon, type Ring } from '@hestia/geom';
-import { bandTopAt, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedSlab } from '@hestia/engine';
+import { bandTopAt, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import type { Id } from '@hestia/model';
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
@@ -145,6 +145,27 @@ export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
       const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
       const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;
       for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
+    }
+  }
+  return [...byMat.values()];
+}
+
+/**
+ * Sólidos dos telhados (D2): por água e por camada, uma extrusão cujo topo segue o plano da água menos `below` e cuja
+ * base está `thickness` abaixo, na vertical. Empenas não entram aqui: a parede ajusta o topo no motor.
+ */
+export function buildRoofSolids(roofs: ResolvedRoof[]): SolidBatch[] {
+  const byMat = new Map<Id, SolidBatch>();
+  for (const r of roofs) {
+    for (const pl of r.planes) {
+      for (const l of r.layers) {
+        if (l.thickness < 1e-6) continue;
+        const b = batchOf(byMat, l.materialId);
+        const topAt = (x: number, y: number): number => planeZ(pl, { x, y }) - l.below;
+        const bottomAt = (x: number, y: number): number => topAt(x, y) - l.thickness;
+        // z0 = 0 e z1 = espessura só passam pelo guarda de extrusão; a cota vem de topAt e bottomAt.
+        for (const poly of pl.polygon) extrudePolygon(b, poly, 0, l.thickness, topAt, bottomAt);
+      }
     }
   }
   return [...byMat.values()];

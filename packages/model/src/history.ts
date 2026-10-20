@@ -197,5 +197,7 @@ export function labelOf(c: Command): string {
       return 'Várias alterações';
     case 'setOpeningHost':
       return 'Trocar parede anfitriã';
+    case 'setElementLevel':
+      return 'Mudar de nível';
   }
 }

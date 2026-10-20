@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedSlab } from '@hestia/engine';
+import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -10,6 +10,7 @@ import { sectionMarksOf } from './sectionMarks.ts';
 import { openingSymbol } from './symbols.ts';
 import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
+import { roofFills, roofFootprint, roofSelectionOps } from './roofs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -23,6 +24,8 @@ export interface PlanInput {
   belowFloors?: ResolvedFloor[];
   /** Lajes do nível abaixo, apagadas como os pisos (D1/D4); o app preenche, sem ele nada aparece. */
   belowSlabs?: ResolvedSlab[];
+  /** Telhados do nível abaixo, apagados como as lajes (D4); sem eles, nada aparece. */
+  belowRoofs?: ResolvedRoof[];
   viewport: Viewport;
   theme: PlanTheme;
   dark: boolean;
@@ -96,6 +99,14 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     fills.push(...bs.fills);
     strokes.push(...bs.strokes);
   }
+  if (input.below && input.belowRoofs) {
+    const br = belowFloorOps(
+      input.belowRoofs.map((r) => ({ polygon: roofFootprint(r) })),
+      theme,
+    );
+    fills.push(...br.fills);
+    strokes.push(...br.strokes);
+  }
 
   // Nível de detalhe (H3): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem símbolos;
   // médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
@@ -159,6 +170,12 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
+  // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
+  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v);
+  fills.push(...rf.fills);
+  strokes.push(...rf.strokes);
+  labels.push(...rf.labels);
+
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
   const marks = sectionMarksOf(p.views, v, theme);
   fills.push(...marks.fills);
@@ -178,6 +195,10 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...lsel.fills);
   strokes.push(...lsel.strokes);
   labels.push(...lsel.labels);
+  const rsel = roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  fills.push(...rsel.fills);
+  strokes.push(...rsel.strokes);
+  labels.push(...rsel.labels);
   if (input.hover && !input.selection.includes(input.hover)) {
     fills.push(...elementHighlight(p, resolved, [input.hover], theme.select, 0.16));
   }

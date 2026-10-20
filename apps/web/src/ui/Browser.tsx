@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { isFloor, isSlab, isWall } from '@hestia/model';
+import { isFloor, isRoof, isSlab, isWall } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -15,6 +15,7 @@ export function Browser(): ReactElement {
   const windows = Object.values(p.openingTypes).filter((t) => t.kind === 'window');
   const floorTypes = Object.values(p.floorTypes);
   const slabTypes = Object.values(p.slabTypes);
+  const roofTypes = Object.values(p.roofTypes);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   return (
@@ -134,6 +135,21 @@ export function Browser(): ReactElement {
                 />
               ))}
             </details>
+            <details open>
+              <summary>Telhados</summary>
+              {roofTypes.map((t) => (
+                <TypeRow
+                  key={t.id}
+                  kind="roof"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="roof"
+                  active={s.options.roofTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, roofTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'roofType', dialogArg: t.id })}
+                />
+              ))}
+            </details>
           </div>
         </details>
         <details open>
@@ -158,6 +174,10 @@ export function Browser(): ReactElement {
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de lajes
               <span className="meta">{Object.values(p.elements).filter(isSlab).length}</span>
+            </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })}>
+              <Icon name="file" size={14} /> Tabela de telhados
+              <span className="meta">{Object.values(p.elements).filter(isRoof).length}</span>
             </button>
           </div>
         </details>

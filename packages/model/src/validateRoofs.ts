@@ -1,0 +1,131 @@
+import { boxOf, boxesOverlap, intersection, multiArea, ringArea, type Box, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { roofPolygon, roofPlanArea } from './roof.ts';
+import { isRoof, type Project, type Roof } from './types.ts';
+import type { ValidationIssue } from './validate.ts';
+import { OVERLAP_MIN, ZERO_AREA, fmtArea, holeOutside, selfIntersects } from './validateFloors.ts';
+
+/** Erro de módulo do vetor de direção (a direção tem que ser unitária). */
+const DIR_TOLERANCE = 1e-3;
+/** Percentual de inclinação máximo em módulo (300 %, ou seja, cerca de 71°). */
+const MAX_PERCENT = 300;
+
+const label = (r: Roof): string => (r.mark ? `"${r.mark}" (${r.id})` : `"${r.id}"`);
+
+/** Contorno convexo (anti-horário ou horário): todas as curvas viram para o mesmo lado. */
+function isConvex(ring: Vec2[]): boolean {
+  const n = ring.length;
+  let sign = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % n]!;
+    const c = ring[(i + 2) % n]!;
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-12) continue;
+    if (sign === 0) sign = Math.sign(cross);
+    else if (Math.sign(cross) !== sign) return false;
+  }
+  return true;
+}
+
+/** Motivo de inclinação inválida das formas com uma inclinação única, ou null. */
+function slopeProblem(r: Roof): string | null {
+  if (r.shape === 'free') return null;
+  if (!Number.isFinite(r.slopePercent)) return 'o percentual não é um número';
+  if (r.slopePercent <= 0) return `o percentual ${r.slopePercent} precisa ser maior que zero`;
+  if (r.slopePercent > MAX_PERCENT) return `o percentual ${r.slopePercent} passa de ${MAX_PERCENT} %`;
+  return null;
+}
+
+/** Direção não unitária nas formas que a usam (uma água e duas águas), ou null. */
+function dirProblem(r: Roof): string | null {
+  if (r.shape !== 'shed' && r.shape !== 'gable') return null;
+  if (![r.dir.x, r.dir.y].every(Number.isFinite)) return 'a direção não é um número finito';
+  const len = Math.hypot(r.dir.x, r.dir.y);
+  if (Math.abs(len - 1) > DIR_TOLERANCE) return `a direção não é unitária (comprimento ${len.toFixed(3).replace('.', ',')})`;
+  return null;
+}
+
+/** Águas livres com polígono de menos de 3 pontos, área zero ou direção de subida nula. */
+function planeProblems(r: Roof, name: string): ValidationIssue[] {
+  if (r.shape !== 'free') return [];
+  const out: ValidationIssue[] = [];
+  const push = (code: string, message: string): void => void out.push({ severity: 'error', code, message, elementId: r.id });
+  r.planes.forEach((pl, k) => {
+    const water = `água livre ${k + 1} do telhado ${name}`;
+    if (pl.polygon.length < 3) return push('roof-plane-degenerate', `A ${water} tem ${pl.polygon.length} ponto(s); o mínimo é 3.`);
+    const area = Math.abs(ringArea(pl.polygon));
+    if (area <= ZERO_AREA) return push('roof-plane-degenerate', `A ${water} tem área de ${fmtArea(area)}; precisa ser maior que zero.`);
+    if (!(Math.hypot(pl.up.x, pl.up.y) > 1e-9)) push('roof-plane-degenerate', `A ${water} não tem direção de subida.`);
+    if (!Number.isFinite(pl.percent) || Math.abs(pl.percent) > MAX_PERCENT) {
+      push('roof-slope-invalid', `Inclinação da ${water} inválida: o percentual ${pl.percent} não é finito ou passa de ${MAX_PERCENT} %.`);
+    }
+  });
+  return out;
+}
+
+function roofIssuesOf(p: Project, r: Roof): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  const name = label(r);
+  const push = (severity: ValidationIssue['severity'], code: string, message: string): void => void out.push({ severity, code, message, elementId: r.id });
+  if (r.boundary.length < 3) push('error', 'roof-few-points', `Telhado ${name} tem ${r.boundary.length} ponto(s) no contorno; o mínimo é 3.`);
+  r.holes.forEach((h, k) => {
+    if (h.length < 3) push('error', 'roof-few-points', `Furo ${k + 1} do telhado ${name} tem ${h.length} ponto(s); o mínimo é 3.`);
+  });
+  if (!p.roofTypes[r.typeId]) push('error', 'roof-type-missing', `Telhado ${name} usa o tipo "${r.typeId}", que não existe no projeto.`);
+  if (!p.levels.some((l) => l.id === r.levelId)) push('error', 'roof-level-missing', `Telhado ${name} está no nível "${r.levelId}", que não existe.`);
+  const slope = slopeProblem(r);
+  if (slope) push('error', 'roof-slope-invalid', `Inclinação do telhado ${name} inválida: ${slope}.`);
+  const dir = dirProblem(r);
+  if (dir) push('error', 'roof-slope-invalid', `Direção do telhado ${name} inválida: ${dir}.`);
+  out.push(...planeProblems(r, name));
+  if (r.boundary.length < 3) return out;
+
+  if (selfIntersects(r.boundary)) push('error', 'roof-self-intersect', `O contorno do telhado ${name} se cruza consigo mesmo.`);
+  r.holes.forEach((h, k) => {
+    if (h.length >= 3 && selfIntersects(h)) push('error', 'roof-self-intersect', `O furo ${k + 1} do telhado ${name} se cruza consigo mesmo.`);
+  });
+  const area = roofPlanArea(r);
+  if (area <= ZERO_AREA) push('error', 'roof-zero-area', `Telhado ${name} tem área em planta de ${fmtArea(area)}; precisa ser maior que zero.`);
+  r.holes.forEach((h, k) => {
+    if (h.length >= 3 && holeOutside(r.boundary, h)) push('error', 'roof-hole-outside', `O furo ${k + 1} do telhado ${name} está fora do contorno.`);
+  });
+  if (r.shape === 'hip' && !isConvex(r.boundary)) {
+    push('warning', 'roof-hip-nonconvex', `Telhado ${name} tem contorno não convexo: quatro águas automáticas não se aplicam. Use águas livres.`);
+  }
+  return out;
+}
+
+/** Área comum (m²) de duas áreas; 0 quando as caixas nem se tocam. */
+function commonArea(a: MultiPolygon, boxA: Box, b: MultiPolygon, boxB: Box): number {
+  return boxesOverlap(boxA, boxB) ? multiArea(intersection(a, b)) : 0;
+}
+
+/** Telhados do mesmo nível com área em planta em comum acima de 1 cm² (warning). Só contornos válidos. */
+function roofOverlaps(roofs: Roof[]): ValidationIssue[] {
+  const shapes = roofs
+    .filter((r) => r.boundary.length >= 3 && !selfIntersects(r.boundary))
+    .map((r) => ({ r, poly: [roofPolygon(r)], box: boxOf(roofPolygon(r).flat()) }));
+  const out: ValidationIssue[] = [];
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      const a = shapes[i]!;
+      const b = shapes[j]!;
+      if (a.r.levelId !== b.r.levelId) continue;
+      const common = commonArea(a.poly, a.box, b.poly, b.box);
+      if (common <= OVERLAP_MIN) continue;
+      out.push({
+        severity: 'warning',
+        code: 'roof-overlap',
+        message: `Telhados ${label(a.r)} e ${label(b.r)} se sobrepõem no mesmo nível: ${fmtArea(common)} em comum.`,
+        elementId: a.r.id,
+      });
+    }
+  }
+  return out;
+}
+
+/** Problemas dos telhados do projeto: geometria, inclinação, águas livres, tipo, nível, forma e sobreposição. */
+export function roofIssues(p: Project): ValidationIssue[] {
+  const roofs = Object.values(p.elements).filter(isRoof);
+  return [...roofs.flatMap((r) => roofIssuesOf(p, r)), ...roofOverlaps(roofs)];
+}

@@ -4,6 +4,7 @@ import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
+import { LevelField } from './LevelField.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -22,13 +23,11 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
   const p = useProject();
   const ids = floors.map((f) => f.id);
   const typeId = common(floors, (f) => f.typeId);
-  const level = common(floors, (f) => f.levelId);
   const offset = common(floors, (f) => f.heightOffset);
   const mark = common(floors, (f) => f.mark);
   const comments = common(floors, (f) => f.comments);
   const single = floors.length === 1 ? floors[0]! : null;
   const type = typeId.mixed ? null : p.floorTypes[typeId.value];
-  const levelName = level.mixed ? 'variados' : (p.levels.find((l) => l.id === level.value)?.name ?? level.value);
   const area = floors.reduce((s, f) => s + floorArea(f), 0);
   const perimeter = floors.reduce((s, f) => s + ringPerimeter(f.boundary), 0);
 
@@ -48,7 +47,7 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
         </div>
       </div>
       <Group title="Restrições">
-        <Row label="Nível"><span className="val soft">{levelName}</span></Row>
+        <LevelField ids={ids} />
         <Row label="Desloc. do topo" htmlFor="p-foff">
           <NumField id="p-foff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
         </Row>

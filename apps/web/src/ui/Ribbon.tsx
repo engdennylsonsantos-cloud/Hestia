@@ -3,9 +3,10 @@ import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/too
 import { editor } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
+import { MoveLevelButton } from './MoveLevel.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
-  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'slope'] }],
+  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'slope'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
     { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'] },
@@ -14,7 +15,6 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
 };
 
 const SOON: Array<{ icon: string; label: string }> = [
-  { icon: 'roof', label: 'Telhado' },
   { icon: 'stairs', label: 'Escada' },
   { icon: 'room', label: 'Ambiente' },
 ];
@@ -80,6 +80,14 @@ export function Ribbon(): ReactElement {
               </button>
             </div>
             <div className="rgroup-title">Tipo</div>
+          </div>
+        )}
+        {tab === 'modificar' && (
+          <div className="rgroup">
+            <div className="rgroup-tools">
+              <MoveLevelButton />
+            </div>
+            <div className="rgroup-title">Nível</div>
           </div>
         )}
         {tab === 'arquitetura' && (

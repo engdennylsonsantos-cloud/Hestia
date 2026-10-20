@@ -1,5 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
-import type { Command, Id, LocationLine, Project } from '@hestia/model';
+import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
 
@@ -52,6 +52,9 @@ export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
 /** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
 export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
+/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, ou pelo perímetro externo das paredes (com balanço). */
+export type RoofMode = 'poly' | 'rect' | 'paredes';
+
 /** Quais capturas estão ligadas (Revit: Snaps). */
 export interface SnapOptions {
   grid: boolean;
@@ -99,6 +102,14 @@ export interface ToolOptions {
   slabOffset: number;
   slabMode: SlabMode;
   slabSlopePercent: number;
+  /** Telhado: tipo, modo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
+  roofTypeId?: Id;
+  roofMode?: RoofMode;
+  roofShape?: RoofShape;
+  roofSlope?: number;
+  roofOverhang?: number;
+  /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */
+  roofOffset?: number | null;
 }
 
 export interface PointerInfo {

@@ -18,6 +18,7 @@ import {
   type TypeKind,
 } from '../editor/typeActions.ts';
 import { duplicateSlabType, renameSlabType, slabTypeDeleteBlock, tryDeleteSlabType } from '../editor/slabTypeActions.ts';
+import { duplicateRoofType, renameRoofType, roofTypeDeleteBlock, tryDeleteRoofType } from '../editor/roofTypeActions.ts';
 import { Icon } from './Icon.tsx';
 
 interface TypeRowProps {
@@ -33,11 +34,12 @@ interface TypeRowProps {
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : 'falha desconhecida');
 
-/** Motivo pelo qual o tipo não pode ser excluído (parede, piso ou laje); null quando pode ou não é excluível (porta, janela). */
+/** Motivo pelo qual o tipo não pode ser excluído (parede, piso, laje ou telhado); null quando pode ou não é excluível (porta, janela). */
 function deleteBlockOf(p: Project, kind: TypeKind, typeId: Id): string | null {
   if (kind === 'wall') return wallTypeDeleteBlock(p, typeId);
   if (kind === 'floor') return floorTypeDeleteBlock(p, typeId);
   if (kind === 'slab') return slabTypeDeleteBlock(p, typeId);
+  if (kind === 'roof') return roofTypeDeleteBlock(p, typeId);
   return null;
 }
 
@@ -58,7 +60,7 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   const choices = compatibleTypes(p, kind, typeId);
   const chosen = choices.some((c) => c.id === target) ? target : (choices[0]?.id ?? '');
   /** Tipos de parede, piso e laje podem ser excluídos aqui; portas e janelas não. */
-  const deletable = kind === 'wall' || kind === 'floor' || kind === 'slab';
+  const deletable = kind === 'wall' || kind === 'floor' || kind === 'slab' || kind === 'roof';
   const deleteBlock = deleteBlockOf(p, kind, typeId);
   const replaceBlock = choices.length === 0 ? 'Não há outro tipo compatível.' : uses === 0 ? 'Este tipo não tem instâncias.' : null;
 
@@ -87,7 +89,7 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   };
 
   const remove = (): void => {
-    const r = kind === 'floor' ? tryDeleteFloorType(editor.store, typeId) : kind === 'slab' ? tryDeleteSlabType(editor.store, typeId) : tryDeleteWallType(editor.store, typeId);
+    const r = kind === 'floor' ? tryDeleteFloorType(editor.store, typeId) : kind === 'slab' ? tryDeleteSlabType(editor.store, typeId) : kind === 'roof' ? tryDeleteRoofType(editor.store, typeId) : tryDeleteWallType(editor.store, typeId);
     if (!r.ok) {
       useUi.setState({ status: `Não foi possível excluir «${name}»: ${r.error}` });
       return;
@@ -98,6 +100,8 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
       useUi.setState({ options: { ...ui.options, floorTypeId: Object.keys(editor.project.floorTypes)[0] ?? ui.options.floorTypeId } });
     } else if (kind === 'slab' && ui.options.slabTypeId === typeId) {
       useUi.setState({ options: { ...ui.options, slabTypeId: Object.keys(editor.project.slabTypes)[0] ?? ui.options.slabTypeId } });
+    } else if (kind === 'roof' && ui.options.roofTypeId === typeId) {
+      useUi.setState({ options: { ...ui.options, roofTypeId: Object.keys(editor.project.roofTypes)[0] ?? ui.options.roofTypeId } });
     } else if (kind === 'wall' && ui.options.wallTypeId === typeId) {
       useUi.setState({ options: { ...ui.options, wallTypeId: editor.project.defaults.wallTypeId } });
     }
@@ -106,12 +110,12 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   };
 
   const duplicate = (): void => {
-    const id = kind === 'slab' ? duplicateSlabType(editor.store, typeId) : duplicateFloorType(editor.store, typeId);
+    const id = kind === 'slab' ? duplicateSlabType(editor.store, typeId) : kind === 'roof' ? duplicateRoofType(editor.store, typeId) : duplicateFloorType(editor.store, typeId);
     useUi.setState({ status: id ? `Tipo «${name}» duplicado. Duplo clique na cópia para editar.` : 'Não foi possível duplicar este tipo.' });
   };
 
   const applyRename = (): void => {
-    const r = kind === 'slab' ? renameSlabType(editor.store, typeId, newName) : renameFloorType(editor.store, typeId, newName);
+    const r = kind === 'slab' ? renameSlabType(editor.store, typeId, newName) : kind === 'roof' ? renameRoofType(editor.store, typeId, newName) : renameFloorType(editor.store, typeId, newName);
     if (!r.ok) {
       useUi.setState({ status: r.error });
       return;
@@ -178,7 +182,7 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
           >
             <Icon name="rotate" size={13} />
           </button>
-          {kind === 'floor' || kind === 'slab' ? (
+          {kind === 'floor' || kind === 'slab' || kind === 'roof' ? (
             <>
               <button type="button" className="ibtn type-act" title="Duplicar tipo" aria-label={`Duplicar tipo ${name}`} onClick={duplicate}>
                 <Icon name="plus" size={13} />

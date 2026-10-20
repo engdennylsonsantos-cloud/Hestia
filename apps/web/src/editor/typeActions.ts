@@ -1,8 +1,8 @@
 import { fitBox, type Viewport } from '@hestia/render';
-import { ProjectStore, isFloor, isOpening, isSlab, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
+import { ProjectStore, isFloor, isOpening, isRoof, isSlab, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
 
-/** Tipos que o navegador de projeto lista: parede, porta, janela, piso e laje. */
-export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab';
+/** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje e telhado. */
+export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof';
 
 export interface TypeChoice {
   id: Id;
@@ -23,6 +23,7 @@ function usesType(e: Element, kind: TypeKind, typeId: Id): boolean {
   if (kind === 'wall') return isWall(e) && e.typeId === typeId;
   if (kind === 'floor') return isFloor(e) && e.typeId === typeId;
   if (kind === 'slab') return isSlab(e) && e.typeId === typeId;
+  if (kind === 'roof') return isRoof(e) && e.typeId === typeId;
   return isOpening(e) && e.kind === kind && e.typeId === typeId;
 }
 
@@ -68,7 +69,9 @@ export function compatibleTypes(p: Project, kind: TypeKind, typeId: Id): TypeCho
         ? Object.values(p.floorTypes).filter((t) => t.id !== typeId)
         : kind === 'slab'
           ? Object.values(p.slabTypes).filter((t) => t.id !== typeId)
-          : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
+          : kind === 'roof'
+            ? Object.values(p.roofTypes).filter((t) => t.id !== typeId)
+            : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
   return list.map((t) => ({ id: t.id, name: t.name }));
 }
 
@@ -122,7 +125,7 @@ export function boxOfElements(p: Project, ids: Id[]): Box | null {
   for (const id of ids) {
     const e = p.elements[id];
     if (isWall(e)) pts.push(...wallPoints(e));
-    else if (isFloor(e) || isSlab(e)) pts.push(...e.boundary);
+    else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
     else if (e && isOpening(e)) {
       const host = p.elements[e.hostId];
       if (!isWall(host)) continue;

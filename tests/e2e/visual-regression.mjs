@@ -49,12 +49,21 @@ const SLAB_CASES = {
   'laje-inclinada': [SL('l3', [[0, 0], [6, 0], [6, 4], [0, 4]], { slope: { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 5 } })],
 };
 
+// D1/D2/D3: telhados entram por addRoof (kind roof), sobre quatro paredes de 8 × 6 m (beiral com balanço de 0,30 m).
+const R = (id, shape, dir, extra = {}) => ({ id, kind: 'roof', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [[-0.3, -0.3], [8.3, -0.3], [8.3, 6.3], [-0.3, 6.3]].map(([x, y]) => ({ x, y })), holes: [], heightOffset: 2.8, shape, slopePercent: 30, dir, planes: [], mark: '', comments: '', ...extra });
+const HOUSE = [W('h1', [0, 0], [8, 0]), W('h2', [8, 0], [8, 6]), W('h3', [8, 6], [0, 6]), W('h4', [0, 6], [0, 0])];
+const ROOF_CASES = {
+  'telhado-duas-aguas': [...HOUSE, R('t1', 'gable', { x: 1, y: 0 })],
+  'telhado-quatro-aguas': [...HOUSE, R('t1', 'hip', { x: 1, y: 0 })],
+  'telhado-uma-agua': [...HOUSE, R('t1', 'shed', { x: 1, y: 0 })],
+};
+
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES })) {
   await page.evaluate((ws) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
     editor.zoomExtents();
   }, items);
   await page.waitForTimeout(250);

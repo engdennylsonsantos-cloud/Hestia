@@ -4,7 +4,7 @@
 // que não entende a atribuição `VAR=valor comando` — a suíte de 60 sementes nunca rodava por ali.
 // Aqui a variável é injetada pelo próprio Node no `env` do filho, então funciona em qualquer shell.
 //
-// ATENÇÃO: a suíte inteira leva ~15 min (60 sementes × 5 casos). NUNCA rode sem filtro para
+// ATENÇÃO: a suíte inteira leva ~8 min (60 sementes × 5 casos, medido em 470–490 s nesta máquina). NUNCA rode sem filtro para
 // diagnóstico. Para um caso único existe `npm run test:rapido:esquadria` (semente 24, com o cap de
 // diagnóstico do polygon-clipping), ou `npm run test:completo -- -t "semente 24"`.
 //
@@ -52,7 +52,7 @@ const args = [...ARGS_PADRAO, ...extras];
 const env = { ...process.env, VITE_FULL: '1' };
 
 // Cabeçalho curto: avisa do custo e mostra exatamente o que vai rodar.
-console.log('[completo] VITE_FULL=1 → suíte inteira (60 sementes). Leva ~15 min; para um caso único use `npm run test:rapido:esquadria`.');
+console.log('[completo] VITE_FULL=1 → suíte inteira (60 sementes). Leva ~8 min; para um caso único use `npm run test:rapido:esquadria`.');
 console.log(`[completo] vitest: ${cli}`);
 console.log(`[completo] comando: node ${['vitest', ...args].join(' ')}`);
 

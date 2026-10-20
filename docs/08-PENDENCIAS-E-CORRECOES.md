@@ -542,6 +542,25 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 `npm run test:completo` sai 0 com 60 sementes verdes, e o run inteiro termina em tempo compatível com o CI
 (< 15 min).
 
+### 9.5 Resolução (medida em 2026-10-20)
+
+- **Causa confirmada**: testes síncronos de geometria (1 a 39 s cada) e o worker sem cessão do event loop entre eles.
+  A resposta do vitest ao `onTaskUpdate` fica na fila; passando de 60 s (timeout fixo do birpc, não configurável no
+  modo `forks` do vitest 3.2.7), o erro sai como erro não tratado e o run sai 1.
+- **Correção**: `tests/vitestSetup.ts` (carregado por `setupFiles` em `vitest.config.ts`) cede o event loop com
+  `setTimeout(0)` depois de cada teste, em todos os arquivos.
+- **Medições da suíte completa** (`npm run test:completo`, 110 arquivos, tudo na mesma árvore de trabalho com outros agentes):
+  - antes: 486 s, 1 erro `Timeout calling "onTaskUpdate"`, código 1;
+  - só cessão em `property.test.ts`: 473 s sem timeout, depois 492 s **com** timeout (curvas, outro arquivo, sem cessão);
+  - cessão global (a correção): 470 s e 490 s, **0 timeouts** nas duas execuções com ela (e a versão final com `setTimeout`).
+- **Risco residual**: um único teste síncrono acima de 60 s ainda estoura. O maior medido é de 39 s (`curvas.test.ts`).
+- **Código 1 que sobra não é infra**: as reprovações atuais são geometria em andamento de outros agentes (junções em
+  curvas, `floorExtend`, `roofTool`, semente 38 da invariante (c)). Não foram mascaradas.
+- **Desempenho (I-3)**: `perf.test.ts` e o teste de tempo de `snapFaces` saíram do `npm test` (`*perf.test.ts` excluído em
+  `vitest.config.ts`) e rodam em `npm run test:perf` (`vitest.perf.config.ts`, sem paralelismo entre arquivos). Os limites
+  são razões contra uma tarefa-base cronometrada no mesmo processo. K4 sem regressão: `10aa3aa` quente 645–774 ms,
+  HEAD 589–673 ms. O 1768 ms do relatório veio de carga concorrente.
+
 ---
 
 ## 10. Itens não verificados nesta rodada

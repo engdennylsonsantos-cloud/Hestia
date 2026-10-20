@@ -8,4 +8,4 @@ import { afterEach } from 'vitest';
  * sem processá-la, o birpc dá `Timeout calling "onTaskUpdate"` e o run sai 1 sem falha de asserção. Um yield
  * macrotask por teste zera o acúmulo entre testes; um único teste síncrono de mais de 60 s ainda estoura.
  */
-afterEach(() => new Promise<void>((resolve) => setImmediate(resolve)));
+afterEach(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));

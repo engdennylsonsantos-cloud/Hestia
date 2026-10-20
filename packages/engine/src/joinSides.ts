@@ -1,6 +1,6 @@
 import { coreSpan, layerPriority, layerSpans } from '@hestia/model';
 import { add, dot, mul, perp, type Vec2 } from '@hestia/geom';
-import { faceCurve, intersectCurves, pointAt, sAtDepth, toLocal, type Curve, type WallFrame } from './frame.ts';
+import { faceCurve, intersectCurves, normalAt, pointAt, sAtDepth, toLocal, type Curve, type WallFrame } from './frame.ts';
 import type { Chord, EndRef, EndSpec, MiterSide, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
 
 /**
@@ -155,7 +155,9 @@ export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'l
  */
 export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
   const loc = toLocal(host, r.o);
-  const fromHi = loc.s >= host.sMid;
+  // De que lado da hospedeira o ramal vem: pela posição do nó; sobre o eixo, pelo lado para onde o ramal segue.
+  const lado = Math.abs(loc.s - host.sMid) > 1e-6 ? loc.s - host.sMid : dot(r.dir, normalAt(host, loc.t));
+  const fromHi = lado >= 0;
   const nearS = fromHi ? host.sHi : host.sLo;
   const spans = layerSpans(host.type).filter((sp) => sp.layer.thickness >= 1e-6);
   const distanceOf = (s: number): number => Math.abs(nearS - s);

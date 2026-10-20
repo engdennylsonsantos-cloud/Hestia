@@ -181,7 +181,7 @@ function corrente(padrao: 'LA' | 'AL' | 'AA' | 'AAs', R: number, tau: 1 | -1, ti
     a1 = { x: -c, y: 0 };
     sag1 = 0;
   } else {
-    a1 = pontaDoArco(P, neg(d0), R, c, -tau);
+    a1 = pontaDoArco(P, neg(d0), R, c, (-tau) as 1 | -1);
     sag1 = sagDoArco(a1, P, R, tau);
   }
   let b2: Vec2;

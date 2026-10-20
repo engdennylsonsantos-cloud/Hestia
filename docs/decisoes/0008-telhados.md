@@ -9,3 +9,9 @@
 | 5 | Camadas com espessura vertical constante, como as lajes | Quantitativo coerente (volume = área em planta × espessura × 1; área real = planta / cos) |
 | 6 | O topo da parede se ajusta ao telhado reaproveitando o perfil superior já existente (recorte por faixas) | Menos código, empenas corretas, mesmas quantidades |
 | 7 | Telhado por extrusão de perfil, mansardas e contorno não convexo com quatro águas automáticas ficam para o v2 | Esqueleto reto de polígonos côncavos é um projeto à parte |
+| 8 | Inclinação por aresta (forma `edges`): cada aresta do contorno define inclinação (percentual) ou não (empena vertical); as águas vêm do esqueleto reto com pesos | É o que o Revit faz ("Define Slope"); cobre contornos côncavos, furos, 3, 10 ou mais águas. Aresta sem inclinação = peso 0 |
+| 9 | `shed`, `gable` e `hip` viram predefinições que preenchem `edgeSlopes`; `free` e `extrusion` ficam à parte | Um só caminho de cálculo para as formas comuns |
+| 10 | Telhados do mesmo nível se unem (`joinOthers`): na sobreposição vale a maior cota, com a divisa (rincão) no encontro dos planos | Equivale ao Join Roof do Revit para alas que encontram o corpo principal |
+| 11 | Telhado por extrusão: perfil `{t, z}` extrudado ao longo de `dir` e recortado pelo contorno | Cobre arco, mansarda, dente de serra; arcos viram trechos retos |
+| 12 | Acabamentos do beiral (testeira, calha, forro) e corte de caibro (prumo/esquadro) são propriedades do telhado | Revit: Fascia, Gutter, Soffit e Rafter Cut |
+| 13 | A ferramenta nunca "some": contorno que o motor não resolve mostra o motivo na hora e não cria o telhado | Falha silenciosa foi o erro do telhado em L |

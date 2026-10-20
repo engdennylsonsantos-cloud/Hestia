@@ -1,11 +1,31 @@
 import { multiArea, type Polygon, type Vec2 } from '@hestia/geom';
-import { isRoof, type Id, type Layer, type Project, type Roof, type RoofType } from './types.ts';
+import { isRoof, type Id, type Layer, type Project, type Roof, type RoofEave, type RoofType } from './types.ts';
+
+export const DEFAULT_EAVE: RoofEave = { fascia: false, fasciaHeight: 0.2, gutter: false, soffit: false };
 
 type RoofInput = { id: Id; typeId: Id; levelId: Id; boundary: Vec2[] } & Partial<Omit<Roof, 'order' | 'kind'>>;
 
 /** Constrói um telhado com os campos padrão (duas águas de 30%, cumeeira ao longo de x); `order` vem do comando addRoof. */
 export function makeRoof(r: RoofInput): Omit<Roof, 'order'> {
-  return { kind: 'roof', holes: [], heightOffset: 0, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 }, planes: [], mark: '', comments: '', ...r };
+  const n = r.boundary.length;
+  return {
+    kind: 'roof',
+    holes: [],
+    heightOffset: 0,
+    shape: 'gable',
+    slopePercent: 30,
+    dir: { x: 1, y: 0 },
+    planes: [],
+    edgeSlopes: Array.from({ length: n }, () => 30),
+    edgeOverhangs: Array.from({ length: n }, () => 0),
+    profile: [],
+    joinOthers: true,
+    rafterCut: 'plumb',
+    eave: DEFAULT_EAVE,
+    mark: '',
+    comments: '',
+    ...r,
+  };
 }
 
 export const roofsOnLevel = (p: Project, levelId: Id): Roof[] =>

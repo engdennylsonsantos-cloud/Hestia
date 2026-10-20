@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 
 export type Id = string;
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -263,7 +263,25 @@ export interface RoofType {
   cost: number;
 }
 
-export type RoofShape = 'shed' | 'gable' | 'hip' | 'free';
+export type RoofShape = 'shed' | 'gable' | 'hip' | 'free' | 'edges' | 'extrusion';
+
+/** Corte das camadas no beiral (Revit: Rafter Cut): prumo (vertical) ou esquadro (perpendicular ao plano). */
+export type RafterCut = 'plumb' | 'square';
+
+/** Acabamentos do beiral: testeira (fascia), calha e forro de beiral. */
+export interface RoofEave {
+  fascia: boolean;
+  /** Altura da testeira (m), medida na vertical a partir da face inferior do telhado no beiral. */
+  fasciaHeight: number;
+  gutter: boolean;
+  soffit: boolean;
+}
+
+/** Perfil da extrusão (forma 'extrusion'): altura z da face superior em função de t, coordenada ao longo da transversal ao eixo. */
+export interface RoofProfilePoint {
+  t: number;
+  z: number;
+}
 
 /**
  * Água de telhado definida pelo usuário (forma 'free'): polígono em planta e plano inclinado. A cota da face
@@ -297,6 +315,21 @@ export interface Roof {
   /** Direção unitária: subida da água ('shed') ou eixo da cumeeira ('gable'). Ignorada em 'hip' e 'free'. */
   dir: Vec2;
   planes: RoofPlaneDef[];
+  /**
+   * Forma 'edges' (Revit: telhado por contorno): uma entrada por aresta de `boundary` (aresta i vai de boundary[i] a
+   * boundary[i+1]). Número = a aresta DEFINE inclinação (percentual, > 0: gera uma água); null = não define (empena
+   * vertical). As águas e a cumeeira saem do esqueleto reto com pesos. Formas 'shed', 'gable' e 'hip' derivam deste
+   * vetor; 'free' e 'extrusion' ignoram-no.
+   */
+  edgeSlopes: Array<number | null>;
+  /** Balanço do beiral por aresta (m), informativo e usado ao recriar o contorno; mesmo comprimento de `boundary`. */
+  edgeOverhangs: number[];
+  /** Forma 'extrusion': perfil (altura em função de t) extrudado ao longo de `dir` (t cresce na transversal à esquerda de dir). */
+  profile: RoofProfilePoint[];
+  /** Telhados do mesmo nível que se sobrepõem se unem: vale a maior cota (Revit: Join Roof). */
+  joinOthers: boolean;
+  rafterCut: RafterCut;
+  eave: RoofEave;
   mark: string;
   comments: string;
   order: number;

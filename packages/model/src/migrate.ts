@@ -87,6 +87,45 @@ const migrations: Record<number, Migration> = {
     roofTypes: { ...Object.fromEntries(DEFAULT_ROOF_TYPES.map((t) => [t.id, t])), ...((raw.roofTypes as object) ?? {}) },
     materials: { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => ['mat_telha_ceramica', 'mat_fibrocimento', 'mat_telha_metalica'].includes(m.id)).map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) },
   }),
+  // v9 → v10: telhados com inclinação por aresta, extrusão, junção e acabamentos de beiral.
+  // Deriva `edgeSlopes` da forma antiga: hip = todas as arestas; gable = só as perpendiculares à cumeeira... as paralelas a
+  // `dir` definem inclinação e as outras (empenas) não; shed = só a aresta mais baixa em relação a `dir`.
+  9: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind !== 'roof') continue;
+      const b = (e.boundary as Array<{ x: number; y: number }>) ?? [];
+      const dir = (e.dir as { x: number; y: number }) ?? { x: 1, y: 0 };
+      const pct = typeof e.slopePercent === 'number' ? e.slopePercent : 30;
+      const n = b.length;
+      const mid = (i: number): { x: number; y: number } => ({ x: (b[i]!.x + b[(i + 1) % n]!.x) / 2, y: (b[i]!.y + b[(i + 1) % n]!.y) / 2 });
+      const proj = (q: { x: number; y: number }): number => q.x * dir.x + q.y * dir.y;
+      let edgeSlopes: Array<number | null> = b.map(() => pct);
+      if (e.shape === 'gable') {
+        edgeSlopes = b.map((_, i) => {
+          const a = b[i]!;
+          const c = b[(i + 1) % n]!;
+          const l = Math.hypot(c.x - a.x, c.y - a.y) || 1;
+          const along = Math.abs(((c.x - a.x) * dir.x + (c.y - a.y) * dir.y) / l);
+          return along > 0.7 ? pct : null;
+        });
+      } else if (e.shape === 'shed' && n > 0) {
+        let low = 0;
+        for (let i = 1; i < n; i++) if (proj(mid(i)) < proj(mid(low))) low = i;
+        edgeSlopes = b.map((_, i) => (i === low ? pct : null));
+      }
+      elements[id] = {
+        edgeSlopes,
+        edgeOverhangs: b.map(() => 0),
+        profile: [],
+        joinOthers: true,
+        rafterCut: 'plumb',
+        eave: { fascia: false, fasciaHeight: 0.2, gutter: false, soffit: false },
+        ...e,
+      };
+    }
+    return { ...raw, elements };
+  },
 };
 
 export class SchemaError extends Error {}

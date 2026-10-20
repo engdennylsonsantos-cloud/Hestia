@@ -8,6 +8,8 @@ export const ROOF_SHAPE_LABEL: Record<RoofShape, string> = {
   gable: 'Duas águas',
   hip: 'Quatro águas',
   free: 'Águas livres',
+  edges: 'Por arestas',
+  extrusion: 'Por extrusão',
 };
 
 /** Um telhado na tabela. Unidades: m, m² e m³. */

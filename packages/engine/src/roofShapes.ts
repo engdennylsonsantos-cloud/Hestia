@@ -101,5 +101,9 @@ export function waterPlanes(r: Roof, eaveZ: number): ResolvedRoofPlane[] {
       return hipPlanes(r.boundary, r.slopePercent, eaveZ);
     case 'free':
       return freePlanes(r.boundary, r.planes, eaveZ);
+    // 'edges' e 'extrusion': resolvidos pelo esqueleto reto e pelo perfil (agentes de motor); até lá, sem águas.
+    case 'edges':
+    case 'extrusion':
+      return [];
   }
 }

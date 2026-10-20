@@ -50,7 +50,7 @@ const SLAB_CASES = {
 };
 
 // D1/D2/D3: telhados entram por addRoof (kind roof), sobre quatro paredes de 8 × 6 m (beiral com balanço de 0,30 m).
-const R = (id, shape, dir, extra = {}) => ({ id, kind: 'roof', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [[-0.3, -0.3], [8.3, -0.3], [8.3, 6.3], [-0.3, 6.3]].map(([x, y]) => ({ x, y })), holes: [], heightOffset: 2.8, shape, slopePercent: 30, dir, planes: [], mark: '', comments: '', ...extra });
+const R = (id, shape, dir, extra = {}) => ({ id, kind: 'roof', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [[-0.3, -0.3], [8.3, -0.3], [8.3, 6.3], [-0.3, 6.3]].map(([x, y]) => ({ x, y })), holes: [], heightOffset: 2.8, shape, slopePercent: 30, dir, planes: [], edgeSlopes: [30, 30, 30, 30], edgeOverhangs: [0.3, 0.3, 0.3, 0.3], profile: [], joinOthers: true, rafterCut: 'plumb', eave: { fascia: false, fasciaHeight: 0.2, gutter: false, soffit: false }, mark: '', comments: '', ...extra });
 const HOUSE = [W('h1', [0, 0], [8, 0]), W('h2', [8, 0], [8, 6]), W('h3', [8, 6], [0, 6]), W('h4', [0, 6], [0, 0])];
 // Telhado por contorno (forma 'edges'): inclinação explícita por aresta (null = empena), beiral com balanço de 0,30 m.
 // As paredes seguem o contorno sem balanço; cada aresta da planta vira uma parede.

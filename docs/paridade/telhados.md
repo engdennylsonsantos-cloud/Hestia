@@ -9,14 +9,14 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 - [x] A2 Contorno pelas paredes: perímetro externo mais balanço de beiral **(bloqueante)**
 - [x] A3 Formas: uma água, duas águas e quatro águas, com inclinação em % ou graus **(bloqueante)**
 - [x] A4 Direção da cumeeira (duas águas) e do caimento (uma água) editáveis **(bloqueante)**
-- [ ] A5 Seta de inclinação e águas livres editadas na tela **(bloqueante)**
+- [ ] A5 Seta de inclinação e águas livres editadas na tela **(bloqueante)** — parcial: há a ferramenta de seta e a lista de águas; falta desenhar o polígono próprio de cada água
 - [x] A6 Cumeeira, espigões e rincões calculados pelo encontro das águas **(bloqueante)**
 - [x] A7 Furos (claraboia, shaft)
 - [x] A8 Edição do contorno por alças e do beiral
-- [ ] A9 Telhado por extrusão de perfil (arco, mansarda, dente de serra) **(bloqueante)**
-- [ ] A10 Contorno qualquer (L, T, U, com furos) com inclinação por aresta (Define Slope) e empena por aresta sem inclinação, esqueleto reto com pesos **(bloqueante)**
-- [ ] A11 Edição por aresta na planta: ligar/desligar "define inclinação", inclinação e balanço por aresta, vértices **(bloqueante)**
-- [ ] A12 A ferramenta nunca some: contorno inválido mostra o motivo e não cria **(bloqueante)**
+- [x] A9 Telhado por extrusão de perfil (arco, mansarda, dente de serra) **(bloqueante)**
+- [x] A10 Contorno qualquer (L, T, U, com furos) com inclinação por aresta (Define Slope) e empena por aresta sem inclinação, esqueleto reto com pesos **(bloqueante)**
+- [x] A11 Edição por aresta na planta: ligar/desligar "define inclinação", inclinação e balanço por aresta, vértices **(bloqueante)**
+- [x] A12 A ferramenta nunca some: contorno inválido mostra o motivo e não cria **(bloqueante)**
 
 ## B · Camadas e tipos
 - [x] B1 Tipo de telhado com camadas (telha, ripa, estrutura), espessura vertical **(bloqueante)**
@@ -26,10 +26,10 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 
 ## C · Relação com paredes
 - [x] C1 Topo da parede se ajusta ao telhado (empenas e frontões) **(bloqueante)**
-- [ ] C2 Aviso de parede que ultrapassa o telhado ou fica fora dele; topo ajustado só no trecho coberto **(bloqueante)**
-- [ ] C4 Junção de telhados (Join Roof) e abertura/claraboia no telhado **(bloqueante)**
-- [ ] C5 Acabamentos do beiral: testeira, calha, forro, e corte de caibro prumo/esquadro
-- [ ] D6 Cota da cumeeira, etiqueta de inclinação e planta de cobertura
+- [x] C2 Aviso de parede que ultrapassa o telhado ou fica fora dele; topo ajustado só no trecho coberto **(bloqueante)**
+- [x] C4 Junção de telhados (Join Roof) e abertura/claraboia no telhado **(bloqueante)**
+- [x] C5 Acabamentos do beiral: testeira, calha, forro, e corte de caibro prumo/esquadro (corte de caibro no corte; no 3D as camadas continuam cortadas na vertical)
+- [x] D6 Cota da cumeeira, etiqueta de inclinação e planta de cobertura
 - [x] C3 Telhados sobrepostos detectados, com aviso
 
 ## D · Vistas

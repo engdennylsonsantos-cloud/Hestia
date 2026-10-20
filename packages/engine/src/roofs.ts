@@ -78,7 +78,13 @@ function baseOf(p: Project, r: Roof): Base | null {
   const type = p.roofTypes[r.typeId];
   if (!type || r.boundary.length < 3) return null;
   const eaveZ = levelElevation(p, r.levelId) + r.heightOffset;
-  const water = waterPlanesOf(r, eaveZ);
+  // Nunca lança: um telhado malformado (arquivo antigo ou campo ausente) vira `problem`, não uma tela em branco.
+  let water: ReturnType<typeof waterPlanesOf>;
+  try {
+    water = waterPlanesOf(r, eaveZ);
+  } catch (e) {
+    water = { planes: [], problem: `telhado inválido: ${e instanceof Error ? e.message : 'erro desconhecido'}` };
+  }
   const holes = r.holes.filter((h) => h.length >= 3).map((h): MultiPolygon => asMulti(h));
   const planes = water.planes
     .map((pl) => ({ ...pl, polygon: holes.length ? difference(pl.polygon, ...holes) : pl.polygon }))

@@ -18,7 +18,8 @@ export function dxfGeometryOf(p: Project, levelId: Id, resolved: ResolvedLevel):
     // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
     roofs: resolveRoofs(p, levelId).map((r) => ({
       outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
-      ridges: r.lines.filter((l) => l.kind !== 'eave').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+      ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+      gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
       typeCode: p.roofTypes[r.typeId]?.code ?? '',
     })),
   };

@@ -188,7 +188,7 @@ function settle(sim: Sim): void {
 
 /** Roda o frente de onda até todos os anéis se encerrarem. */
 export function runSim(sim: Sim): void {
-  for (let it = 0; it < 200000; it++) {
+  for (let it = 0; it < 20000; it++) {
     if (sim.rings.length === 0) return;
     const ev = nextEvent(sim.rings, sim.T);
     if (!ev) throw new SkeletonFail('frente de onda sem eventos: geometria não converge');

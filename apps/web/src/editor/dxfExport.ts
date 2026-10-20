@@ -1,4 +1,4 @@
-import { levelFrames, openingGeometry, type ResolvedLevel } from '@hestia/engine';
+import { levelFrames, openingGeometry, resolveRoofs, type ResolvedLevel } from '@hestia/engine';
 import { exportDxf, type DxfLevelGeometry } from '@hestia/io';
 import { floorsOnLevel, openingsOfWall, slabsOnLevel, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
@@ -15,6 +15,12 @@ export function dxfGeometryOf(p: Project, levelId: Id, resolved: ResolvedLevel):
     openings: openings.map((g) => ({ center: g.center, u: g.u, width: g.width, thickness: g.thickness })),
     floors: floorsOnLevel(p, levelId).map((f) => ({ outline: f.boundary, holes: f.holes, typeCode: p.floorTypes[f.typeId]?.code ?? '' })),
     slabs: slabsOnLevel(p, levelId).map((s) => ({ outline: s.boundary, holes: s.holes, typeCode: p.slabTypes[s.typeId]?.code ?? '' })),
+    // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
+    roofs: resolveRoofs(p, levelId).map((r) => ({
+      outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
+      ridges: r.lines.filter((l) => l.kind !== 'eave').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+      typeCode: p.roofTypes[r.typeId]?.code ?? '',
+    })),
   };
 }
 

@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { totalThickness } from './wallType.ts';
 import type { ValidationIssue } from './validate.ts';
-import type { Id, Project, Wall } from './types.ts';
+import type { Id, JoinKind, Project, Wall } from './types.ts';
 
 /** Distância de um ponto ao segmento a–b. */
 function distToSegment(pt: Vec2, a: Vec2, b: Vec2): number {
@@ -48,20 +48,24 @@ export interface WallEndRef {
   end: 'a' | 'b';
 }
 
-/** Quina de duas paredes: as duas pontas coincidem, formam 70°–110° e estão em encosto. */
+/** Quina de duas paredes: as duas pontas coincidem, formam 70°–110° e estão em encosto ou esquadro (nenhuma em esquadria). */
 export interface ButtCornerPair {
   a: WallEndRef;
   b: WallEndRef;
 }
 
+/** Junção que deixa a quina sem esquadria: encosto ou esquadro. */
+const noMiter = (j: JoinKind): boolean => j === 'butt' || j === 'square';
+
 /**
- * Quinas em encosto (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada.
+ * Quinas em encosto ou esquadro (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece
+ * aparada. Esquadro a 90° degenera em encosto (docs/08 §5.1 item 3), por isso segue a mesma regra.
  * Regra única do aviso `wall-corner-butt-finish`; o comando em lote e a ferramenta de parede usam a mesma lista.
  * Cada par de paredes aparece uma vez, na ordem em que o validador o encontra (a primeira parede é `a`).
  */
 export function buttCornerFinishPairs(p: Project, walls: Wall[]): ButtCornerPair[] {
   const out: ButtCornerPair[] = [];
-  const ends = (w: Wall): Array<{ pt: Vec2; dir: Vec2; kind: 'a' | 'b'; join: string }> => [
+  const ends = (w: Wall): Array<{ pt: Vec2; dir: Vec2; kind: 'a' | 'b'; join: JoinKind }> => [
     { pt: w.a, dir: { x: w.b.x - w.a.x, y: w.b.y - w.a.y }, kind: 'a', join: w.joinStart.kind },
     { pt: w.b, dir: { x: w.a.x - w.b.x, y: w.a.y - w.b.y }, kind: 'b', join: w.joinEnd.kind },
   ];
@@ -69,11 +73,11 @@ export function buttCornerFinishPairs(p: Project, walls: Wall[]): ButtCornerPair
   const seen = new Set<string>();
   for (const a of walls) {
     for (const ea of ends(a)) {
-      if (ea.join !== 'butt') continue;
+      if (!noMiter(ea.join)) continue;
       for (const b of walls) {
         if (b.id === a.id || b.levelId !== a.levelId) continue;
         for (const eb of ends(b)) {
-          if (eb.join !== 'butt' || dist(ea.pt, eb.pt) > 1e-6) continue;
+          if (!noMiter(eb.join) || dist(ea.pt, eb.pt) > 1e-6) continue;
           const la = Math.hypot(ea.dir.x, ea.dir.y);
           const lb = Math.hypot(eb.dir.x, eb.dir.y);
           if (la < 1e-9 || lb < 1e-9) continue;
@@ -91,16 +95,23 @@ export function buttCornerFinishPairs(p: Project, walls: Wall[]): ButtCornerPair
   return out;
 }
 
-/** Quina em encosto (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada. */
+/** Nome do tipo de quina na mensagem: encosto, esquadro, ou os dois quando as pontas são diferentes. */
+function cornerKindLabel(ka: JoinKind, kb: JoinKind): string {
+  if (ka !== kb) return 'encosto ou esquadro';
+  return ka === 'square' ? 'esquadro' : 'encosto';
+}
+
+/** Quina em encosto ou esquadro (ângulo reto, sem esquadria) onde pelo menos uma parede tem acabamento: a ponta aparece aparada. */
 export function butCornerFinishIssues(p: Project, walls: Wall[]): ValidationIssue[] {
   const byId = new Map(walls.map((w) => [w.id, w]));
+  const joinOf = (w: Wall, end: 'a' | 'b'): JoinKind => (end === 'a' ? w.joinStart : w.joinEnd).kind;
   return buttCornerFinishPairs(p, walls).map(({ a, b }) => {
     const wa = byId.get(a.wallId)!;
     const wb = byId.get(b.wallId)!;
     return {
       severity: 'warning' as const,
       code: 'wall-corner-butt-finish',
-      message: `Quina entre "${wa.mark || wa.id}" e "${wb.mark || wb.id}" em encosto, com acabamento: o núcleo de uma parede pode aparecer na quina e o acabamento da outra fica aparado. Use esquadria (ferramenta Junção, tecla N).`,
+      message: `Quina entre "${wa.mark || wa.id}" e "${wb.mark || wb.id}" em ${cornerKindLabel(joinOf(wa, a.end), joinOf(wb, b.end))}, com acabamento: o núcleo de uma parede pode aparecer na quina e o acabamento da outra fica aparado. Use esquadria (ferramenta Junção, tecla N).`,
       elementId: a.wallId,
     };
   });

@@ -74,7 +74,7 @@ export function IssuesButton(): ReactElement {
     trigger.current?.focus();
   };
 
-  /** Quina em encosto com acabamento: troca as quinas desta parede por esquadria e fecha a lista. */
+  /** Quina em encosto ou esquadro com acabamento: troca as quinas desta parede por esquadria e fecha a lista. */
   const fix = (wallId: string): void => {
     editor.miterWallCorners(wallId);
     setOpen(false);

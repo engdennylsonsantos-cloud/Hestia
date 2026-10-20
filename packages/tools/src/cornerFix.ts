@@ -3,7 +3,7 @@ import { buttCornerFinishPairs, isWall, type Command, type Id, type Project } fr
 export type SetJoinCommand = Extract<Command, { type: 'setJoin' }>;
 
 /**
- * Comandos `setJoin` que trocam para esquadria as quinas em encosto com acabamento (aviso `wall-corner-butt-finish`).
+ * Comandos `setJoin` que trocam para esquadria as quinas em encosto ou esquadro com acabamento (aviso `wall-corner-butt-finish`).
  * `levelId` limita a um nível; `wallId` limita às quinas que tocam essa parede (botão "Corrigir" do aviso).
  * Sem argumentos, vale para o projeto todo. Idempotente: quinas já em esquadria não entram na lista.
  */

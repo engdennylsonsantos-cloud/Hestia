@@ -186,3 +186,15 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
     expect(pointInMulti({ x: 0.06, y: 0.08 }, bloco.cut)).toBe(true);
   });
 });
+
+describe('aviso de quina em esquadro (decisão 0009 #10)', () => {
+  it('casa padrão com as quatro quinas em esquadro: quatro avisos, todos dizendo esquadro', () => {
+    const p = buildTemplate('house2');
+    const sq = { kind: 'square' as const, flip: false };
+    const elements = { ...p.elements };
+    for (const id of ['h_w', 'h_n', 'h_e', 'h_s']) elements[id] = { ...(p.elements[id] as Wall), joinStart: sq, joinEnd: sq };
+    const issues = validateProject({ ...p, elements }).filter((i) => i.code === 'wall-corner-butt-finish');
+    expect(issues).toHaveLength(4);
+    for (const i of issues) expect(i.message).toContain('em esquadro,');
+  });
+});

@@ -13,7 +13,7 @@ na seção 2. Nada de geometria foi alterado nesta rodada — só instrumentaç�
 | ID | Defeito | Severidade | Estado | Onde |
 |---|---|---|---|---|
 | **P-1** | `difference()` entra em laço no polygon-clipping e custa ~30 s por tentativa; a resolução do nível passa de 1,2 s para 20 min quando as coordenadas não são redondas | **alta** (trava a interface) | diagnosticado, **não corrigido** | `boolean.ts`, `resolve.ts` |
-| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | medido, **não corrigido** | `joins.ts` |
+| **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | medido, **não corrigido**; aviso e lote cobrem o esquadro (§8.1, **decidido: sim**) | `joins.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | medido, **não corrigido** | `joins.ts` (`starNode`) |
 | **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | provado, **não corrigido** | `quinas.test.ts` |
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
@@ -346,7 +346,8 @@ Recomendo **(a)** para as guardas de quina e **(b)** para o teste de nó, onde o
 1. **Aviso de quina em esquadro.** `buttCornerFinishPairs` filtra `join !== 'butt'`
    (`packages/model/src/validateJoins.ts:72,76`), então quina em **esquadro** com acabamento é **silenciosa**,
    apesar de ter 74% do canto comendo o acabamento da fina. Estender o aviso ao esquadro também faz o comando em
-   lote "Quinas em esquadria" passar a corrigir essas quinas (a lista é compartilhada). É desejável? Decidir.
+   lote "Quinas em esquadria" passar a corrigir essas quinas (a lista é compartilhada). É desejável? **Decidido: sim**
+   (decisão 0009 #10): o aviso e o lote cobrem o esquadro; a 90° ele degenera em encosto.
 2. **Aviso para nó de 3+ paredes.** Hoje não existe; e como a configuração é ignorada ali, o usuário não tem nem
    como corrigir pela UI. Ou se implementa o pareamento (5.4 passo 2), ou se avisa que não há o que fazer.
 3. **Limite do sweep line em produção (4.4-d).** Só decidir com a telemetria de 4.5.1 na mão.

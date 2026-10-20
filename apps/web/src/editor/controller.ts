@@ -337,7 +337,7 @@ export class Editor {
   /** "Mesmo tipo" (botão na aba Modificar). */
   selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
 
-  /** Quinas em encosto com acabamento viram esquadria em todos os níveis (um passo de desfazer). Devolve a contagem. */
+  /** Quinas em encosto ou esquadro com acabamento viram esquadria em todos os níveis (um passo de desfazer). Devolve a contagem. */
   miterAllCorners(): number { return miterCorners(this.store); }
   /** "Corrigir" de um aviso `wall-corner-butt-finish`: as quinas em encosto desta parede viram esquadria. */
   miterWallCorners(wallId: Id): number { return miterCorners(this.store, wallId); }

@@ -93,3 +93,56 @@ describe('cornerMiterCommands (quinas em encosto com acabamento)', () => {
     expect(cornerMiterCommands(s.project, undefined, 'zz')).toEqual([]);
   });
 });
+
+describe('cornerMiterCommands (quinas em esquadro com acabamento, decisão 0009 #10)', () => {
+  const SQ = { kind: 'square' as const, flip: false };
+  const MITER_ENDS = { type: 'setJoin', config: { kind: 'miter', flip: false } };
+
+  it('esquadro 90° com acabamento vira setJoin em esquadria nas duas pontas', () => {
+    const s = store();
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('b', [4, 0], [4, 3], { joinStart: SQ }) });
+    expect(cornerMiterCommands(s.project)).toEqual([{ ...MITER_ENDS, ends: [{ wallId: 'a', end: 'b' }, { wallId: 'b', end: 'a' }] }]);
+  });
+
+  it('esquadro com encosto do outro lado também converte', () => {
+    const s = store();
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('b', [4, 0], [4, 3]) });
+    expect(cornerMiterCommands(s.project)).toHaveLength(1);
+  });
+
+  it('esquadro sem acabamento em nenhuma das paredes não gera comandos', () => {
+    const s = store();
+    s.exec({ type: 'upsertWallType', wallType: bareType(s) });
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { typeId: 'wt_bare', joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('b', [4, 0], [4, 3], { typeId: 'wt_bare', joinStart: SQ }) });
+    expect(cornerMiterCommands(s.project)).toEqual([]);
+  });
+
+  it('esquadro com ângulo de 45° não entra', () => {
+    const s = store();
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('b', [4, 0], [1, 3], { joinStart: SQ }) });
+    expect(cornerMiterCommands(s.project)).toEqual([]);
+  });
+
+  it('T e colineares com esquadro não entram', () => {
+    const s = store();
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('c', [2, 0], [2, 3], { joinStart: SQ }) });
+    s.exec({ type: 'addWall', wall: W('d', [4, 0], [8, 0], { joinStart: SQ }) });
+    expect(cornerMiterCommands(s.project)).toEqual([]);
+  });
+
+  it('lote em esquadro: aplicar zera o aviso e a segunda chamada devolve lista vazia (idempotente)', () => {
+    const s = store();
+    s.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0], { joinEnd: SQ }) });
+    s.exec({ type: 'addWall', wall: W('b', [4, 0], [4, 3], { joinStart: SQ }) });
+    for (const c of cornerMiterCommands(s.project)) s.exec(c);
+    expect(s.project.elements['a']).toMatchObject({ joinEnd: { kind: 'miter' } });
+    expect(s.project.elements['b']).toMatchObject({ joinStart: { kind: 'miter' } });
+    expect(validateProject(s.project).filter((i) => i.code === 'wall-corner-butt-finish')).toEqual([]);
+    expect(cornerMiterCommands(s.project)).toEqual([]);
+  });
+});

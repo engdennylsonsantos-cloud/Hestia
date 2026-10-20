@@ -1,7 +1,7 @@
 import { cross, dist, dot, arcTangentAt as arcTan } from '@hestia/geom';
 import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 import type { EndRef, WallEnds } from './joinTypes.ts';
-import { flatEnd, setEnd, both } from './joinSides.ts';
+import { flatEnd, setEnd, both, buttAgainst } from './joinSides.ts';
 import { joinPair, toCenterline } from './joinPair.ts';
 import { starNode } from './joinNode.ts';
 
@@ -71,7 +71,7 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
     const through = g[pair[0]]!.f;
     g.forEach((r, i) => {
       if (i === pair![0] || i === pair![1]) return;
-      const spec = toCenterline(r, through);
+      const spec = buttAgainst(r, through) ?? toCenterline(r, through);
       if (spec) setEnd(out, r, both(spec));
     });
     return;
@@ -98,7 +98,7 @@ function findTee(r: EndRef, frames: WallFrame[], tol: number): WallFrame | null 
 function tryTee(out: Map<string, WallEnds>, r: EndRef, frames: WallFrame[], tol: number): void {
   const host = findTee(r, frames, tol);
   if (!host) return;
-  const spec = toCenterline(r, host);
+  const spec = buttAgainst(r, host) ?? toCenterline(r, host);
   if (spec) setEnd(out, r, both(spec));
 }
 

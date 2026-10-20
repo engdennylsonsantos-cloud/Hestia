@@ -1,6 +1,7 @@
-import { coreSpan } from '@hestia/model';
+import { coreSpan, layerPriority, layerSpans } from '@hestia/model';
 import { add, dot, intersectLines, mul, perp, type Vec2 } from '@hestia/geom';
-import type { EndRef, EndSpec, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
+import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
+import type { EndRef, EndSpec, MiterSide, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
 
 /**
  * Pareamento em duas pontas (decisão 0009): profundidade em `to` que a camada de profundidade `d` de `from` encontra.
@@ -80,3 +81,70 @@ export function setEnd(out: Map<string, WallEnds>, r: EndRef, spec: EndSpec): vo
 }
 
 export const sub2 = (p: Vec2, q: Vec2): Vec2 => ({ x: p.x - q.x, y: p.y - q.y });
+
+/**
+ * Corte em degraus que pareia camada com camada (docs/08 §5.4, passos 2 e 3). As quebras de profundidade são as
+ * mesmas da esquadria (`miterBreaks`), então os dois lados do canto produzem os mesmos vértices; cada faixa recebe um
+ * corte reto perpendicular ao eixo, no `t` do ponto pareado de uma das suas fronteiras: `low` (a faixa fica com a
+ * célula do canto — é a parede que domina a junção) ou `high` (a faixa para na face da vizinha).
+ *
+ * É a versão em degraus da diagonal da esquadria: onde ela corta em ângulo, aqui cada camada para numa face de
+ * camada do vizinho. Devolve null quando o ponto pareado cai fora do limite em volta da ponta (junção mal
+ * condicionada) — quem chama decide o corte alternativo.
+ */
+export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'low' | 'high', cap: number): SideSpec | null {
+  const T = self.sHi - self.sLo;
+  const breaks = [0, ...miterBreaks(self, other), T];
+  const endT = r.which === 'a' ? 0 : r.f.length;
+  const runs: StepRun[] = [];
+  for (let k = 0; k < breaks.length - 1; k++) {
+    const d0 = breaks[k]!;
+    const d1 = breaks[k + 1]!;
+    const p = miterPoint(self, other, Math.max(0, Math.min(edge === 'low' ? d0 : d1, T)));
+    if (!p) return null;
+    const t = toLocal(r.f, p).t;
+    if (!Number.isFinite(t) || Math.abs(t - endT) > cap) return null;
+    runs.push({ s: Math.min(sOfDepth(self, d0), sOfDepth(self, d1)), t });
+  }
+  runs.sort((x, y) => x.s - y.s);
+  return runs.length ? { kind: 'steps', runs } : null;
+}
+
+/**
+ * Ponta do ramal encostado na parede que passa (docs/08 §5.4 passo 3): cada camada do ramal para na face da camada
+ * correspondente da hospedeira — a primeira que ele encontra, vinda da face do lado em que está, com prioridade igual
+ * ou mais forte. Antes a ponta ia até a linha de centro, e o núcleo da hospedeira comia o acabamento do ramal.
+ * Parede curva devolve null: o cálculo por camada supõe eixos retos e o chamador fica com o corte na linha de centro.
+ */
+export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
+  if (host.arc || r.f.arc) return null;
+  const loc = toLocal(host, r.o);
+  const fromHi = loc.s >= host.sMid;
+  const nearS = fromHi ? host.sHi : host.sLo;
+  const spans = layerSpans(host.type).filter((sp) => sp.layer.thickness >= 1e-6);
+  const distanceOf = (s: number): number => Math.abs(nearS - s);
+  // Distância da face encontrada até a face mais próxima da camada com prioridade igual ou mais forte.
+  const faceFor = (priority: number): number => {
+    let best = host.thickness;
+    for (const sp of spans) {
+      if (layerPriority(sp.layer) > priority) continue;
+      const d = Math.min(distanceOf(sAtDepth(host, sp.from)), distanceOf(sAtDepth(host, sp.to)));
+      if (d < best) best = d;
+    }
+    return best;
+  };
+  const runs: StepRun[] = [];
+  for (const sp of layerSpans(r.f.type)) {
+    if (sp.layer.thickness < 1e-6) continue;
+    const d = faceFor(layerPriority(sp.layer));
+    const hit = intersectLines(pointAt(host, 0, fromHi ? nearS - d : nearS + d), host.u, r.o, r.dir);
+    if (!hit) return null;
+    let t = toLocal(r.f, hit.point).t;
+    if (!Number.isFinite(t)) return null;
+    t = r.which === 'a' ? Math.min(t, r.f.length - 0.01) : Math.max(t, 0.01);
+    runs.push({ s: Math.min(sAtDepth(r.f, sp.from), sAtDepth(r.f, sp.to)), t });
+  }
+  if (runs.length === 0) return null;
+  runs.sort((x, y) => x.s - y.s);
+  return { kind: 'steps', runs };
+}

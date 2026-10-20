@@ -2,7 +2,7 @@ import { arcSample, intersectSegments, ringArea, type Ring, type Vec2 } from '@h
 import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint } from './joinSides.ts';
-import type { EndSpec, SideSpec, WallEnds } from './joinTypes.ts';
+import type { EndSpec, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
 import { clipBandsToProfile } from './profile.ts';
 import type { Membrane, ResolvedLayer } from './types.ts';
 
@@ -22,9 +22,24 @@ function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
 /** Face da extremidade que vale para `s`: a metade de s maior usa `hi`, a de s menor usa `lo`. */
 export const sideAt = (f: WallFrame, spec: EndSpec, s: number): SideSpec => (s >= f.sMid ? spec.hi : spec.lo);
 
-/** Ponto da extremidade em `s` segundo uma face (corte reto ou esquadria contra o vizinho). */
-function pointOnSide(f: WallFrame, which: 'a' | 'b', side: SideSpec, s: number): Vec2 {
+/**
+ * Posição do corte em degraus para a espessura `s`. `edge` diz qual borda da faixa está sendo cortada: a de baixo
+ * (`low`, faixa que começa em `s`) ou a de cima (`high`, faixa que termina em `s`) — as duas camadas que dividem a
+ * mesma fronteira têm cortes diferentes, e é justamente esse degrau que o pareamento por face usa.
+ */
+function stepT(runs: readonly StepRun[], s: number, edge: 'low' | 'high'): number {
+  let t = runs[0]!.t;
+  for (const r of runs) {
+    if (edge === 'low' ? r.s > s + 1e-12 : r.s >= s - 1e-12) break;
+    t = r.t;
+  }
+  return t;
+}
+
+/** Ponto da extremidade em `s` segundo uma face (corte reto, esquadria contra o vizinho ou degraus por camada). */
+function pointOnSide(f: WallFrame, which: 'a' | 'b', side: SideSpec, s: number, edge: 'low' | 'high' = 'low'): Vec2 {
   if (side.kind === 'flat') return pointAt(f, side.t, s);
+  if (side.kind === 'steps') return pointAt(f, stepT(side.runs, s, edge), s);
   const d = side.self.sigma > 0 ? side.self.sHi - s : s - side.self.sLo;
   const p = miterPoint(side.self, side.other, Math.max(0, Math.min(d, side.self.sHi - side.self.sLo)));
   return p ? onLayerCircle(f, p, s) : pointAt(f, which === 'a' ? 0 : f.length, s);
@@ -35,7 +50,17 @@ export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: numbe
 }
 
 /** Vértices intermediários da linha de uma face entre s=lo e s=hi, em ordem crescente de s. */
-function sideChain(side: SideSpec, lo: number, hi: number): Vec2[] {
+function sideChain(f: WallFrame, side: SideSpec, lo: number, hi: number): Vec2[] {
+  if (side.kind === 'steps') {
+    // Cada troca de faixa é um degrau: o vértice de baixo (corte anterior) e o de cima (corte seguinte).
+    const out: Vec2[] = [];
+    for (let i = 1; i < side.runs.length; i++) {
+      const r = side.runs[i]!;
+      if (r.s <= lo + 1e-9 || r.s >= hi - 1e-9) continue;
+      out.push(pointAt(f, side.runs[i - 1]!.t, r.s), pointAt(f, r.t, r.s));
+    }
+    return out;
+  }
   if (side.kind !== 'miter') return [];
   const m = side.self;
   const dOf = (s: number): number => (m.sigma > 0 ? m.sHi - s : s - m.sLo);
@@ -56,7 +81,11 @@ function sideChain(side: SideSpec, lo: number, hi: number): Vec2[] {
  * de s maior usa `hi`; uma camada que cruza o meio parte ali (dois pontos coincidentes são fundidos).
  */
 function endPolyline(f: WallFrame, which: 'a' | 'b', spec: EndSpec, lo: number, hi: number): Vec2[] {
-  const piece = (side: SideSpec, a: number, b: number): Vec2[] => [pointOnSide(f, which, side, a), ...sideChain(side, a, b), pointOnSide(f, which, side, b)];
+  const piece = (side: SideSpec, a: number, b: number): Vec2[] => [
+    pointOnSide(f, which, side, a, 'low'),
+    ...sideChain(f, side, a, b),
+    pointOnSide(f, which, side, b, 'high'),
+  ];
   if (spec.hi === spec.lo) return piece(spec.hi, lo, hi);
   const mid = f.sMid;
   if (hi <= mid) return piece(spec.lo, lo, hi);

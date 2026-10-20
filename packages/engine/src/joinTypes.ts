@@ -19,10 +19,20 @@ export interface MiterSide {
   bounds: number[];
 }
 
-/** Corte de UMA face da extremidade: reto na posição `t` do eixo, ou em esquadria contra o vizinho `other`. */
+/** Faixa de espessura com o seu próprio corte: `s` é a borda de `s` menor da faixa, `t` a posição do corte. */
+export interface StepRun {
+  s: number;
+  t: number;
+}
+
+/**
+ * Corte de UMA face da extremidade: reto na posição `t` do eixo, em esquadria contra o vizinho `other`, ou em
+ * degraus (pareamento por face, docs/08 §5.4): cada faixa de espessura para na face da camada correspondente.
+ */
 export type SideSpec =
   | { kind: 'flat'; t: number }
-  | { kind: 'miter'; self: MiterSide; other: MiterSide };
+  | { kind: 'miter'; self: MiterSide; other: MiterSide }
+  | { kind: 'steps'; runs: StepRun[] };
 
 /**
  * Como cada face de uma extremidade é cortada (docs/08 §5.4). `hi` vale para a metade de s maior, `lo` para a de s

@@ -193,16 +193,32 @@ describe('tipos de junção', () => {
       wall('b', 0, 0, 0, 3, cfg ? { joinStart: cfg } : {}),
     ]);
   const flatT = (e: { hi: { kind: string; t?: number } }) => (e.hi.kind === 'flat' ? e.hi.t! : NaN);
+  /** Degraus do pareamento por face (encosto): corte de cada faixa de espessura. */
+  const stepsOf = (e: { hi: { kind: string; runs?: Array<{ s: number; t: number }> } }) => {
+    if (e.hi.kind !== 'steps') throw new Error(`esperava corte em degraus, veio ${e.hi.kind}`);
+    return e.hi.runs!;
+  };
+  /** Corte da faixa de espessura que começa em `s`. */
+  const cutAt = (e: { hi: { kind: string; runs?: Array<{ s: number; t: number }> } }, s: number): number => {
+    let t = stepsOf(e)[0]!.t;
+    for (const r of stepsOf(e)) if (r.s <= s + 1e-9) t = r.t;
+    return t;
+  };
 
-  it('o padrão é encosto: a mais antiga atravessa até o canto externo e a outra para no núcleo dela', () => {
+  it('o padrão é encosto pareado: a mais antiga fica com o canto e a outra para nas faces das camadas dela', () => {
     const ends = computeEnds(frames(lShape()));
-    expect(flatT(ends.get('a')!.a)).toBeCloseTo(-T14 / 2, 6);
-    expect(flatT(ends.get('b')!.a)).toBeCloseTo(0, 6);
+    // A dominante fica com as células do canto: o núcleo dela começa no próprio plano.
+    expect(cutAt(ends.get('a')!.a, -CORE14 / 2)).toBeCloseTo(-CORE14 / 2, 6);
+    // O seguidor para nas faces da dominante: núcleo na face do núcleo, tinta na face externa.
+    expect(cutAt(ends.get('b')!.a, -CORE14 / 2)).toBeCloseTo(CORE14 / 2, 6);
+    expect(cutAt(ends.get('b')!.a, -T14 / 2)).toBeCloseTo(T14 / 2, 6);
+    // Do outro lado ele se recolhe sob o canto, para não entrar no núcleo da dominante.
+    expect(cutAt(ends.get('b')!.a, CORE14 / 2)).toBeCloseTo(-CORE14 / 2, 6);
   });
-  it('inverter a ordem troca quem atravessa', () => {
+  it('inverter a ordem troca quem fica com o canto', () => {
     const ends = computeEnds(frames(lShape({ kind: 'butt', flip: true })));
-    expect(flatT(ends.get('b')!.a)).toBeCloseTo(-T14 / 2, 6);
-    expect(flatT(ends.get('a')!.a)).toBeCloseTo(0, 6);
+    expect(cutAt(ends.get('b')!.a, -CORE14 / 2)).toBeCloseTo(-CORE14 / 2, 6);
+    expect(cutAt(ends.get('a')!.a, -CORE14 / 2)).toBeCloseTo(CORE14 / 2, 6);
   });
   it('esquadro prolonga as duas até cobrir o canto', () => {
     const ends = computeEnds(frames(lShape({ kind: 'square', flip: false })));
@@ -217,15 +233,17 @@ describe('tipos de junção', () => {
     const areas = (['butt', 'miter', 'square'] as const).map((kind) => silhouetteArea(lShape({ kind, flip: false })));
     for (const a of areas) expect(a).toBeCloseTo(7 * T14, 6);
   });
-  it('encosto: a estrutura do dominante vai até a face externa e a do outro termina nela', () => {
+  it('encosto: cada núcleo para na face do núcleo do vizinho e nenhuma ponta fica exposta na face externa', () => {
     const s = lShape({ kind: 'butt', flip: false });
     const r = resolveLevel(s.project, 'lv_0');
     const lead = r.walls.a!.layers.find((l) => l.materialId === 'mat_bloco14')!;
     const xs = lead.fragment.flatMap((p) => p[0]!.map((v) => v.x));
-    expect(Math.min(...xs)).toBeCloseTo(-T14 / 2, 6);
+    // O núcleo da dominante fica com o canto, mas para na própria face (antes ia até a face externa -T14/2 e
+    // aparecia na quina): nas duas pontas o acabamento dela cobre a faixa de -T14/2 a -CORE14/2.
+    expect(Math.min(...xs)).toBeCloseTo(-CORE14 / 2, 6);
     const follower = r.walls.b!.layers.find((l) => l.materialId === 'mat_bloco14')!;
     const ys = follower.fragment.flatMap((p) => p[0]!.map((v) => v.y));
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(-1e-9);
+    expect(Math.min(...ys)).toBeCloseTo(CORE14 / 2, 6);
   });
   it('encontra as extremidades parceiras', () => {
     const p = endPartners(frames(lShape()), 'a', 'a');

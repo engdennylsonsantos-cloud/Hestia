@@ -357,12 +357,13 @@ function sobreposicaoRaw(kind: JoinKind): number {
 }
 
 describe('redistribuição do §5.1 sobre raw (T-1)', () => {
-  it('esquadria: zero; encosto e esquadro: positivo (medido sobre raw)', () => {
+  it('esquadria e encosto: zero; esquadro: positivo (encosto passou a parear por face)', () => {
     const medidas = { miter: sobreposicaoRaw('miter'), butt: sobreposicaoRaw('butt'), square: sobreposicaoRaw('square') };
     console.log(`\n--- sobreposição raw acabamento da fina x bloco da grossa, caixa do canto (m²): ${JSON.stringify(medidas)}`);
+    // J-1 corrigido: o encosto pareia camada com camada, como a esquadria.
     expect(medidas.miter).toBeLessThan(1e-6);
-    // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
-    expect(medidas.butt).toBeGreaterThan(1e-4);
+    expect(medidas.butt).toBeLessThan(1e-6);
+    // O esquadro é um plano só: continua com sobreposição, sinalizada pelo aviso (decisão 0009 #10).
     expect(medidas.square).toBeGreaterThan(1e-4);
   });
 });

@@ -57,15 +57,25 @@ describe('quinas externas (decisão 0009)', () => {
     expect(pointInMulti(CAP, bloco.cut)).toBe(false);
   });
 
-  it('o mesmo canto em encosto deixa o núcleo aparecer (o caso que motivou a correção)', () => {
+  it('o mesmo canto em encosto já não deixa o núcleo aparecer (J-1 corrigido); em esquadro ainda deixa', () => {
     const p = buildTemplate('house2');
-    const butt: JoinKind = 'butt';
-    const hw = { ...p.elements['h_w']!, joinStart: { kind: butt, flip: false }, joinEnd: { kind: butt, flip: false } } as typeof p.elements['h_w'];
-    const hs = { ...p.elements['h_s']!, joinStart: { kind: butt, flip: false }, joinEnd: { kind: butt, flip: false } } as typeof p.elements['h_s'];
-    const q = { ...p, elements: { ...p.elements, h_w: hw, h_s: hs } };
-    const r = resolveLevel(q, 'lv_0', new Map());
-    const bloco = r.walls['h_w']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
-    expect(pointInMulti(CAP, bloco.cut)).toBe(true);
+    const hw = { ...p.elements['h_w']! } as typeof p.elements['h_w'];
+    const hs = { ...p.elements['h_s']! } as typeof p.elements['h_s'];
+    const com = (kind: JoinKind) => {
+      const q = {
+        ...p,
+        elements: {
+          ...p.elements,
+          h_w: { ...hw, joinStart: { kind, flip: false }, joinEnd: { kind, flip: false } },
+          h_s: { ...hs, joinStart: { kind, flip: false }, joinEnd: { kind, flip: false } },
+        },
+      };
+      return resolveLevel(q, 'lv_0', new Map()).walls['h_w']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
+    };
+    // O encosto pareia por face (docs/08 §5.4 passo 3): a ponta do núcleo para na face do outro núcleo.
+    expect(pointInMulti(CAP, com('butt').cut)).toBe(false);
+    // O esquadro é um plano só e não consegue respeitar as camadas: continua com a ponta exposta (decisão 0009 #10).
+    expect(pointInMulti(CAP, com('square').cut)).toBe(true);
   });
 
   it('aviso de quina em encosto: 90° com acabamento sim, T e paredes colineares não', () => {
@@ -87,14 +97,15 @@ describe('quinas externas (decisão 0009)', () => {
   it('L em esquadria entre parede de 19 cm e de 14 cm: o acabamento da fina para na face da grossa', () => {
     for (const par of paresNaoEstrutura('miter')) expect(par.area, par.nome).toBeLessThan(1e-6);
   });
-  // Teste do teste (T-1, §7.3): com encosto ou esquadro a mesma guarda tem de acusar sobreposição.
-  for (const kind of ['butt', 'square'] as const) {
-    it(`${kind}: a guarda acabamento/substrato x acabamento/substrato reporta sobreposição medida sobre raw`, () => {
-      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
-      const maior = Math.max(...paresNaoEstrutura(kind).map((par) => par.area));
-      expect(maior).toBeGreaterThan(1e-4);
-    });
-  }
+  // Encosto pareado por face: a guarda fica verde (era o defeito J-1). O esquadro é um plano só, não pareia, e a
+  // guarda continua acusando — é o que o aviso de quina em esquadro (decisão 0009 #10) sinaliza ao usuário.
+  it('butt: a guarda acabamento/substrato x acabamento/substrato fica zerada (encosto pareado por face)', () => {
+    for (const par of paresNaoEstrutura('butt')) expect(par.area, par.nome).toBeLessThan(1e-6);
+  });
+  it('square: a guarda acabamento/substrato x acabamento/substrato continua reportando sobreposição', () => {
+    const maior = Math.max(...paresNaoEstrutura('square').map((par) => par.area));
+    expect(maior).toBeGreaterThan(1e-4);
+  });
   it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina não descem abaixo da face do núcleo da grossa (y = 0,091)', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
@@ -208,20 +219,23 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
     });
   }
 
-  // Teste do teste (T-1, §7.3): a junção quebrada de propósito tem de acusar sobreposição sobre raw, nas duas guardas
-  // de núcleo, no cenário do usuário. A área medida é o valor da guarda (sem skip nem it.fails).
-  for (const kind of ['butt', 'square'] as const) {
-    it(`${kind}: a guarda do núcleo cheio (caixa de 0,5 m) reporta área do acabamento da fina dentro dele`, () => {
-      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
+  // Teste do teste (T-1, §7.3): o esquadro não pareia, então a guarda tem de acusar sobreposição sobre raw.
+  it('square: a guarda do núcleo cheio (caixa de 0,5 m) reporta área do acabamento da fina dentro dele', () => {
+    const c = CASES[0]!;
+    const { caixa, finas } = referencia(build(c, 'square'), c);
+    expect(maiorSobreposicao(finas, caixa)).toBeGreaterThan(1e-4);
+  });
+  it('square: a guarda da estrutura da grossa (raw) reporta área do acabamento da fina dentro dela', () => {
+    const c = CASES[0]!;
+    const { nucleo, finas } = referencia(build(c, 'square'), c);
+    expect(maiorSobreposicao(finas, nucleo)).toBeGreaterThan(1e-4);
+  });
+  // J-1 corrigido: no encosto pareado as duas guardas de núcleo ficam zeradas.
+  for (const alvo of ['caixa', 'nucleo'] as const) {
+    it(`butt: a guarda do ${alvo === 'caixa' ? 'núcleo cheio (caixa de 0,5 m)' : 'estrutura da grossa (raw)'} fica zerada`, () => {
       const c = CASES[0]!;
-      const { caixa, finas } = referencia(build(c, kind), c);
-      expect(maiorSobreposicao(finas, caixa)).toBeGreaterThan(1e-4);
-    });
-    it(`${kind}: a guarda da estrutura da grossa (raw) reporta área do acabamento da fina dentro dela`, () => {
-      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
-      const c = CASES[0]!;
-      const { nucleo, finas } = referencia(build(c, kind), c);
-      expect(maiorSobreposicao(finas, nucleo)).toBeGreaterThan(1e-4);
+      const { caixa, nucleo, finas } = referencia(build(c, 'butt'), c);
+      expect(maiorSobreposicao(finas, alvo === 'caixa' ? caixa : nucleo)).toBeLessThan(1e-6);
     });
   }
 
@@ -247,9 +261,18 @@ describe('campo raw da camada (T-1)', () => {
     }
   });
 
-  it('camada cortada pelo pintor: no encosto o raw do bloco da fina é maior que o cut, e os dois raws se sobrepõem', () => {
-    // Os dois blocos são estrutura de mesma prioridade: o pintor dá o canto ao bloco da grossa (núcleo mais espesso).
+  it('no encosto pareado o pintor já não recorta o bloco da fina: raw e cut coincidem e os raws não se sobrepõem', () => {
+    // Cada núcleo para na face do outro (docs/08 §5.4 passo 3), então não sobra área para o pintor resolver.
     const r = resolveLevel(lQuatroMetros('butt'), 'lv_0', new Map());
+    const bloco14 = r.walls['f']!.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    const bloco19 = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
+    expect(multiArea(bloco14.raw)).toBeCloseTo(multiArea(bloco14.cut), 9);
+    expect(multiArea(intersection(bloco14.raw, bloco19.raw))).toBeLessThan(1e-9);
+  });
+
+  it('no esquadro o pintor ainda recorta: o raw do bloco da fina é maior que o cut e os raws se sobrepõem', () => {
+    // O esquadro é um plano só (decisão 0009 #10): a sobreposição continua e é o aviso que a sinaliza.
+    const r = resolveLevel(lQuatroMetros('square'), 'lv_0', new Map());
     const bloco14 = r.walls['f']!.layers.find((l) => l.materialId === 'mat_bloco14')!;
     const bloco19 = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
     expect(multiArea(bloco14.raw)).toBeGreaterThan(multiArea(bloco14.cut) + 1e-3);

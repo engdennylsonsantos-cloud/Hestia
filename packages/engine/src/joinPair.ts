@@ -1,7 +1,8 @@
 import { dist, dot, type Vec2 } from '@hestia/geom';
 import { toLocal, type WallFrame } from './frame.ts';
+import type { JoinKind } from '@hestia/model';
 import type { EndRef, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
-import { both, miterPoint, setEnd, sideOf, sub2 } from './joinSides.ts';
+import { both, miterPoint, setEnd, sideOf, stairSpec, sub2 } from './joinSides.ts';
 
 const MITER_LIMIT = 6;
 
@@ -51,44 +52,73 @@ function outerExtension(a: EndRef, b: EndRef): number {
 
 const capExt = (ext: number, ...f: WallFrame[]): number => Math.min(ext, MITER_LIMIT * Math.max(0.05, ...f.map((x) => x.thickness)));
 
-function miterPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void {
-  const sa = sideOf(a, b.dir);
-  const sb = sideOf(b, a.dir);
-  const limit = MITER_LIMIT * Math.max(a.f.thickness, b.f.thickness, 0.05);
-  const ok = (s: MiterSide, o: MiterSide, ref: EndRef): boolean => {
-    const t = s.sHi - s.sLo;
-    for (const d of [0, t]) {
-      const p = miterPoint(s, o, d);
-      if (!p || dist(p, ref.o) > limit) return false;
-    }
-    return true;
-  };
-  if (!ok(sa, sb, a) || !ok(sb, sa, b)) return; // ângulo agudo demais: mantém corte reto
-  setEnd(out, a, both({ kind: 'miter', self: sa, other: sb }));
-  setEnd(out, b, both({ kind: 'miter', self: sb, other: sa }));
+/** Papéis de uma junção de duas paredes: o tipo vem da mais antiga e `flip` troca quem domina (docs/05 §9). */
+export function pairRoles(a: EndRef, b: EndRef): { lead: EndRef; follower: EndRef; kind: JoinKind } {
+  const [first, second] = a.f.wall.order <= b.f.wall.order ? [a, b] : [b, a];
+  const cfg = first.which === 'a' ? first.f.wall.joinStart : first.f.wall.joinEnd;
+  return { lead: cfg.flip ? second : first, follower: cfg.flip ? first : second, kind: cfg.kind };
+}
+
+/** Corte das duas pontas de um par de paredes, usado pela junção de duas paredes e por cada lado de um nó. */
+export interface PairSpecs {
+  lead: SideSpec;
+  follower: SideSpec;
+}
+
+/**
+ * Especificações de corte do par (lead, follower) segundo o tipo de junção. `null` quando o par não tem pareamento
+ * possível (parede curva, ângulo agudo demais ou degrau fora do limite) — quem chama decide o corte alternativo.
+ */
+export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
+  const { lead, follower, kind } = pairRoles(a, b);
+  const cap = MITER_LIMIT * Math.max(0.05, lead.f.thickness, follower.f.thickness);
+  const sa = sideOf(lead, follower.dir);
+  const sb = sideOf(follower, lead.dir);
+  if (kind === 'square') {
+    // Esquadro: um plano só por parede, prolongado até cobrir o canto externo; não pareia camada com camada.
+    return {
+      lead: flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f)),
+      follower: flatAt(follower, capExt(outerExtension(follower, lead), lead.f, follower.f)),
+    };
+  }
+  if (kind === 'miter') {
+    const ok = (s: MiterSide, o: MiterSide, ref: EndRef): boolean => {
+      const t = s.sHi - s.sLo;
+      for (const d of [0, t]) {
+        const p = miterPoint(s, o, d);
+        if (!p || dist(p, ref.o) > cap) return false;
+      }
+      return true;
+    };
+    if (!ok(sa, sb, lead) || !ok(sb, sa, follower)) return null; // ângulo agudo demais: mantém corte reto
+    return {
+      lead: { kind: 'miter', self: sa, other: sb },
+      follower: { kind: 'miter', self: sb, other: sa },
+    };
+  }
+  // Encosto pareado por face (docs/08 §5.4 passo 3): a dominante fica com as células do canto (é ela que atravessa
+  // até o canto externo) e a outra para nas faces das camadas dela, em degraus. Antes a ponta do seguidor ia até a
+  // linha de centro e o núcleo da dominante comia o acabamento dela (J-1).
+  if (lead.f.arc || follower.f.arc) return null;
+  const leadSteps = stairSpec(lead, sa, sb, 'low', cap);
+  const followSteps = stairSpec(follower, sb, sa, 'high', cap);
+  return leadSteps && followSteps ? { lead: leadSteps, follower: followSteps } : null;
 }
 
 /** Junção de duas paredes segundo a configuração da mais antiga (docs/05 §9). */
 export function joinPair(out: Map<string, WallEnds>, a: EndRef, b: EndRef): void {
-  const [first, second] = a.f.wall.order <= b.f.wall.order ? [a, b] : [b, a];
-  const cfg = first.which === 'a' ? first.f.wall.joinStart : first.f.wall.joinEnd;
-  const lead = cfg.flip ? second : first;
-  const follower = cfg.flip ? first : second;
-  switch (cfg.kind) {
-    case 'miter':
-      miterPair(out, a, b);
-      return;
-    case 'square':
-      // Esquadro: cada extremidade é cortada a 90° e prolongada até cobrir o canto externo.
-      setEnd(out, a, both(flatAt(a, capExt(outerExtension(a, b), a.f, b.f))));
-      setEnd(out, b, both(flatAt(b, capExt(outerExtension(b, a), a.f, b.f))));
-      return;
-    case 'butt': {
-      // Encosto: a parede dominante atravessa até o canto externo; a outra para no núcleo dela.
-      setEnd(out, lead, both(flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f))));
-      const spec = toCenterline(follower, lead.f);
-      if (spec) setEnd(out, follower, both(spec));
-      return;
-    }
+  const { lead, follower, kind } = pairRoles(a, b);
+  const specs = pairSpecs(a, b);
+  if (specs) {
+    setEnd(out, lead, both(specs.lead));
+    setEnd(out, follower, both(specs.follower));
+    return;
   }
+  if (kind === 'butt') {
+    // Parede curva (ou degrau fora do limite): a dominante atravessa até o canto externo e a outra para no eixo.
+    setEnd(out, lead, both(flatAt(lead, capExt(outerExtension(lead, follower), lead.f, follower.f))));
+    const spec = toCenterline(follower, lead.f);
+    if (spec) setEnd(out, follower, both(spec));
+  }
+  // Esquadria mal condicionada ou esquadro sem extensão: mantém o corte reto que já estava.
 }

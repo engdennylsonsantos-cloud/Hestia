@@ -26,8 +26,9 @@ describe('sólidos 3D', () => {
     const r = resolveLevel(s.project, 'lv_0');
     const solids = buildLevelSolids(r);
     const bloco = solids.batches.find((b) => b.materialId === 'mat_bloco14')!;
-    // Encosto (padrão): a primeira parede atravessa até a face externa; a segunda para na linha de centro dela.
-    const core = 0.14 * (4 + 0.092) + 0.14 * (3 - 0.07);
+    // Encosto pareado por face (docs/08 §5.4 passo 3): a dominante fica com o canto até a própria face do núcleo e a
+    // segunda para nela — antes a dominante ia até a face externa (4,092) e a segunda subia até a linha de centro.
+    const core = 0.14 * (4 + 0.07) + 0.14 * (3 - 0.07);
     expect(Math.abs(volume(bloco))).toBeCloseTo(core * 2.8, 5);
   });
   it('porta deixa uma verga acima do vão', () => {

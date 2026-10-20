@@ -38,13 +38,14 @@ const B: [number, number] = [4, 0];
 const C: [number, number] = [4, 3];
 
 describe('K2 · contornos dourados por junção', () => {
-  it('L em encosto (padrão): a primeira parede passa e a segunda para na face dela', () => {
+  it('L em encosto (padrão): cada núcleo para na face do outro e a silhueta externa não muda', () => {
     const r = level([wall('a', A, B), wall('b', B, C)]);
     expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
-    // Núcleo: a parede A inteira até a face externa de B, e B sobe a partir da face interna de A.
-    expect(shape(material(r, 'mat_bloco14'))).toEqual(
-      expected([[0, -0.07], [4.092, -0.07], [4.092, 0.07], [4.07, 0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]),
-    );
+    // Encosto pareado por face (docs/08 §5.4 passo 3): o núcleo de cada parede para na face do núcleo da outra, então
+    // o contorno da estrutura é o mesmo da esquadria — o degrau do pareamento cai exatamente na fronteira do núcleo.
+    // Antes a dominante ia até a face externa da outra (4,092) e o núcleo da fina subia até a linha de centro (0,07),
+    // deixando a ponta da grossa exposta na quina.
+    expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
   });
 
   it('L em esquadria: núcleo e acabamentos cortados na diagonal do canto', () => {

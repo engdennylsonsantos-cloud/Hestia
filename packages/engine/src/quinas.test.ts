@@ -77,7 +77,7 @@ describe('quinas externas (decisão 0009)', () => {
       }
     }
   });
-  it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina param na face do acabamento da grossa (y = 0,121)', () => {
+  it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina não descem abaixo da face do núcleo da grossa (y = 0,091)', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
     s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 3 } }) });
@@ -95,17 +95,94 @@ describe('quinas externas (decisão 0009)', () => {
     const retangulo = (x0: number, y0: number, x1: number, y1: number): MultiPolygon => [
       [[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]],
     ];
-    // Face do acabamento da grossa no ambiente: y = 0,121 (meia espessura de 0,242).
+    // Face do núcleo da grossa no ambiente: y = 0,091 (núcleo de -0,099 a 0,091; o acabamento dela ocupa 0,091 a 0,121).
+    // Pelo pareamento em duas pontas (decisão 0009) o acabamento da fina termina na diagonal entre essa face e a face
+    // do acabamento (0,091 em x = 3,930 até 0,111 em x = 3,910): nada dele desce abaixo de 0,091.
+    const FACE_NUCLEO = 0.091;
     const FACE_G = 0.121;
-    // Camadas 0 e 1 da fina (tinta e reboco do lado do ambiente, x = 3,908 a 3,930): não podem descer abaixo da face.
+    // Camadas 0 e 1 da fina (tinta e reboco do lado do ambiente, x = 3,908 a 3,930): não podem entrar no núcleo da grossa.
     const finaAcabamento = r.walls['f']!.layers.filter((l) => l.layerIndex >= 0 && l.layerIndex <= 1);
     expect(finaAcabamento.length).toBe(2);
     for (const a of finaAcabamento) {
-      expect(multiArea(intersection(a.cut, retangulo(3.9, -1, 3.95, FACE_G - 1e-6))), a.materialId).toBeLessThan(1e-9);
+      expect(multiArea(intersection(a.cut, retangulo(3.9, -1, 3.95, FACE_NUCLEO - 1e-6))), a.materialId).toBeLessThan(1e-9);
     }
-    // O canto é coberto pelo acabamento da grossa (ceramica + argamassa) até a face da fina: sem vazio na quina.
+    // Sem vazio na quina: a caixa 0,022 x 0,03 é dividida pela diagonal entre o acabamento da grossa (ceramica +
+    // argamassa, abaixo) e o da fina (tinta + reboco, acima). Sem sobreposição (teste acima), a soma é a caixa inteira.
+    // Antes a grossa cobria a caixa sozinha porque a fina parava em y = 0,121; agora a fina avança até a diagonal.
     const grossaAcabamento = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && l.layerIndex <= 1);
-    const cobertura = grossaAcabamento.reduce((soma, l) => soma + multiArea(intersection(l.cut, retangulo(3.908, 0.091, 3.93, FACE_G))), 0);
+    const caixa = retangulo(3.908, 0.091, 3.93, FACE_G);
+    const cobertura = [...grossaAcabamento, ...finaAcabamento].reduce((soma, l) => soma + multiArea(intersection(l.cut, caixa)), 0);
     expect(cobertura).toBeCloseTo(0.022 * 0.03, 6);
+  });
+});
+
+/**
+ * Acabamentos de espessuras diferentes em esquadria (decisão 0009, pareamento em duas pontas): nenhuma camada que não
+ * seja de estrutura da parede fina entra no núcleo da grossa, em qualquer orientação nem no canto interno.
+ */
+describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa (decisão 0009)', () => {
+  type Pt = [number, number];
+  const rot90 = ([x, y]: Pt): Pt => [-y, x];
+  const mirror = ([x, y]: Pt): Pt => [-x, y];
+  const BASE_GROSSA: Pt[] = [[0, 0], [0, 7]];
+  const BASE_FINA: Pt[] = [[10, 0], [0, 0]];
+  const CASES: Array<{ name: string; grossa: Pt[]; fina: Pt[]; flipped: boolean }> = [
+    { name: 'caso do usuário (19 vertical, 14 horizontal)', grossa: BASE_GROSSA, fina: BASE_FINA, flipped: false },
+    { name: 'girado 90°', grossa: BASE_GROSSA.map(rot90), fina: BASE_FINA.map(rot90), flipped: false },
+    { name: 'espelhado', grossa: BASE_GROSSA.map(mirror), fina: BASE_FINA.map(mirror), flipped: false },
+    { name: 'papéis trocados (19 horizontal, 14 vertical)', grossa: [[10, 0], [0, 0]], fina: [[0, 0], [0, 7]], flipped: false },
+    { name: 'canto interno (faces externas dos tipos voltadas para dentro)', grossa: BASE_GROSSA, fina: BASE_FINA, flipped: true },
+  ];
+  const build = (c: (typeof CASES)[number]) => {
+    const s = new ProjectStore(createEmptyProject());
+    const miter: JoinKind = 'miter';
+    const at = ([a, b]: Pt[]) => ({ a: { x: a![0], y: a![1] }, b: { x: b![0], y: b![1] } });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', flipped: c.flipped, ...at(c.grossa) }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', flipped: c.flipped, ...at(c.fina) }) });
+    const p = s.project;
+    return {
+      ...p,
+      elements: {
+        ...p.elements,
+        g: { ...p.elements['g']!, joinStart: { kind: miter, flip: false }, joinEnd: { kind: miter, flip: false } },
+        f: { ...p.elements['f']!, joinStart: { kind: miter, flip: false }, joinEnd: { kind: miter, flip: false } },
+      },
+    } as typeof p;
+  };
+
+  for (const c of CASES) {
+    it(`${c.name}: nenhuma camada de acabamento da fina tem área dentro do núcleo cheio da grossa`, () => {
+      const q = build(c);
+      const r = resolveLevel(q, 'lv_0', new Map());
+      const fnOf = (id: string, layerIndex: number) => wallType(q, q.elements[id] as Wall).layers[layerIndex]!.function;
+      // Eixo da grossa a partir do canto (0,0); s mede a largura do núcleo perpendicular a ele.
+      const far = c.grossa.find(([x, y]) => x !== 0 || y !== 0)!;
+      const len = Math.hypot(far[0], far[1]);
+      const u: Vec2 = { x: far[0] / len, y: far[1] / len };
+      const n: Vec2 = { x: -u.y, y: u.x };
+      const proj = (v: Vec2, e: Vec2): number => v.x * e.x + v.y * e.y;
+      const at = (t: number, s: number): Vec2 => ({ x: t * u.x + s * n.x, y: t * u.y + s * n.y });
+      // Faixa do núcleo da grossa, medida no bloco inteiro (o bloco da grossa tem a face do núcleo a s = sLo..sHi).
+      const nucleo = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('g', l.layerIndex) === 'structure').flatMap((l) => l.cut.flatMap((poly) => poly.flat()));
+      const sLo = Math.min(...nucleo.map((v) => proj(v, n)));
+      const sHi = Math.max(...nucleo.map((v) => proj(v, n)));
+      // Retângulo cheio do núcleo, do eixo do canto até 0,5 m, do lado da grossa: a parede fina passa pelo canto e
+      // o lado oposto (t < 0) é o corpo dela, não o núcleo da grossa. Também não pega a ponta livre das paredes.
+      const caixa: MultiPolygon = [[[at(0, sLo), at(0.5, sLo), at(0.5, sHi), at(0, sHi)]]];
+      const nucleoReal: MultiPolygon = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('g', l.layerIndex) === 'structure').flatMap((l) => l.cut);
+      const finas = r.walls['f']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('f', l.layerIndex) !== 'structure');
+      expect(finas.length).toBeGreaterThan(0);
+      for (const l of finas) {
+        expect(multiArea(intersection(l.cut, caixa)), `${l.materialId} dentro do núcleo cheio da grossa`).toBeLessThan(1e-6);
+        expect(multiArea(intersection(l.cut, nucleoReal)), `${l.materialId} dentro do bloco da grossa`).toBeLessThan(1e-6);
+      }
+    });
+  }
+
+  it('caso do usuário: o bloco da grossa contém o ponto (0,06; 0,08) (o núcleo não recua por causa da fina)', () => {
+    const q = build(CASES[0]!);
+    const r = resolveLevel(q, 'lv_0', new Map());
+    const bloco = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
+    expect(pointInMulti({ x: 0.06, y: 0.08 }, bloco.cut)).toBe(true);
   });
 });

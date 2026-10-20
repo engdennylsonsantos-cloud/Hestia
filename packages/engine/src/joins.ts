@@ -1,4 +1,4 @@
-import { arcTangentAt as arcTan, cross, dist, dot, intersectLines, intersection, mul, add, perp, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { arcTangentAt as arcTan, cross, dist, dot, intersectLines, mul, add, perp, type Vec2 } from '@hestia/geom';
 import { coreSpan } from '@hestia/model';
 import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 
@@ -45,59 +45,44 @@ interface EndRef {
 }
 
 /**
- * Profundidades em que a linha de esquadria muda de direção: limites de camada dos dois lados (os do vizinho
- * mapeados pelo pareamento núcleo-com-núcleo) e os pontos em que o pareamento satura nas faces do vizinho.
- * Cada camada segue a cadeia por esses vértices, então os dois lados compartilham arestas exatas.
+ * Pareamento em duas pontas (decisão 0009): profundidade em `to` que a camada de profundidade `d` de `from` encontra.
+ * O acabamento externo pareia pela distância ao início do núcleo; o interno, pela distância ao fim do núcleo; o
+ * núcleo varia linearmente entre os dois. Assim o acabamento da parede fina termina nas linhas da grossa e o núcleo
+ * da grossa vai até a face do próprio núcleo. Os dois sentidos usam esta mesma função (é a inversa um do outro),
+ * então os dois lados do canto produzem os mesmos vértices. Saturado nas faces de `to`.
+ */
+function pairDepth(from: MiterSide, to: MiterSide, d: number): number {
+  let dd: number;
+  if (d <= from.outerToCore) dd = to.outerToCore + (d - from.outerToCore);
+  else if (d < from.coreEnd) dd = to.outerToCore + ((d - from.outerToCore) * (to.coreEnd - to.outerToCore)) / (from.coreEnd - from.outerToCore);
+  else dd = to.coreEnd + (d - from.coreEnd);
+  return Math.max(0, Math.min(dd, to.sHi - to.sLo));
+}
+
+/**
+ * Profundidades em que a linha de esquadria muda de direção: limites de camada dos dois lados (os do vizinho levados
+ * a este pelo pareamento), as dobras do pareamento (início e fim do núcleo) e os pontos em que ele satura nas faces
+ * do vizinho. Cada camada segue a cadeia por esses vértices, então os dois lados compartilham arestas exatas.
  */
 export function miterBreaks(self: MiterSide, other: MiterSide): number[] {
-  const shift = self.outerToCore - other.outerToCore;
   const T = self.sHi - self.sLo;
   const To = other.sHi - other.sLo;
-  const all = [...self.bounds, ...other.bounds.map((b) => b + shift), shift, To + shift];
+  const all = [
+    ...self.bounds,
+    ...other.bounds.map((b) => pairDepth(other, self, b)),
+    self.outerToCore,
+    self.coreEnd,
+    pairDepth(other, self, 0),
+    pairDepth(other, self, To),
+  ];
   return [...new Set(all.map((d) => Math.round(d * 1e7) / 1e7).filter((d) => d > 1e-7 && d < T - 1e-7))].sort((a, b) => a - b);
 }
 
 const sOfDepth = (m: MiterSide, d: number): number => (m.sigma > 0 ? m.sHi - d : m.sLo + d);
 
-/** Espessura do acabamento do lado do ambiente (a parte da parede além do núcleo). */
-const finishOf = (m: MiterSide): number => m.sHi - m.sLo - m.coreEnd;
-
-/**
- * Profundidade no vizinho que a camada de profundidade `d` encontra. Paredes de tipos diferentes pareiam a partir do
- * núcleo (docs/05 §1: a estrutura se encontra com a estrutura). Acabamentos de espessuras diferentes (docs/05 §2):
- * o mais fino termina na face externa do outro; o mais grosso contorna o canto e para no núcleo do outro.
- * Mesma espessura de acabamento: pareamento direto, como antes.
- */
-function depthOnOther(self: MiterSide, other: MiterSide, d: number): number {
-  const T = other.sHi - other.sLo;
-  const dd = Math.max(0, Math.min(d - self.outerToCore + other.outerToCore, T));
-  const fs = finishOf(self);
-  const fo = finishOf(other);
-  if (Math.abs(fs - fo) < 1e-9) return dd;
-  if (fs < fo) return d > self.coreEnd + 1e-9 ? T : Math.min(dd, other.coreEnd);
-  return Math.min(dd, other.coreEnd);
-}
-
-/**
- * Acabamento mais fino em esquadria (docs/05 §2): a camada do lado do ambiente da parede fina termina no plano da face
- * do acabamento da grossa. Corta a parte da camada que passa desse plano (o canto fica para a grossa).
- */
-export function finishClip(shape: MultiPolygon, spec: EndSpec, s: number): MultiPolygon {
-  if (spec.kind !== 'miter') return shape;
-  const m = spec.self;
-  const o = spec.other;
-  const d = m.sigma > 0 ? m.sHi - s : s - m.sLo;
-  if (finishOf(m) >= finishOf(o) - 1e-9 || d <= m.coreEnd + 1e-9) return shape;
-  const face = add(o.o, mul(o.n, sOfDepth(o, o.sHi - o.sLo)));
-  const out = mul(o.n, -o.sigma);
-  const L = 10;
-  const ring = [mul(o.u, L), mul(o.u, -L), add(mul(o.u, -L), mul(out, L)), add(mul(o.u, L), mul(out, L))].map((v) => add(face, v));
-  return intersection(shape, [[ring]]);
-}
-
 /** Ponto da aresta de fim da camada, na fronteira à profundidade `d` (medida da face externa do canto). */
 export function miterPoint(self: MiterSide, other: MiterSide, d: number): Vec2 | null {
-  const dd = depthOnOther(self, other, d);
+  const dd = pairDepth(self, other, d);
   const sA = sOfDepth(self, d);
   const sB = sOfDepth(other, dd);
   const r = intersectLines(add(self.o, mul(self.n, sA)), self.u, add(other.o, mul(other.n, sB)), other.u);

@@ -192,7 +192,7 @@ describe('tipos de junção', () => {
       wall('a', 0, 0, 4, 0, cfg ? { joinStart: cfg } : {}),
       wall('b', 0, 0, 0, 3, cfg ? { joinStart: cfg } : {}),
     ]);
-  const flatT = (e: { kind: string; t?: number }) => (e.kind === 'flat' ? (e as { t: number }).t : NaN);
+  const flatT = (e: { hi: { kind: string; t?: number } }) => (e.hi.kind === 'flat' ? e.hi.t! : NaN);
 
   it('o padrão é encosto: a mais antiga atravessa até o canto externo e a outra para no núcleo dela', () => {
     const ends = computeEnds(frames(lShape()));
@@ -211,7 +211,7 @@ describe('tipos de junção', () => {
   });
   it('esquadria usa corte em ângulo', () => {
     const ends = computeEnds(frames(lShape({ kind: 'miter', flip: false })));
-    expect(ends.get('a')!.a.kind).toBe('miter');
+    expect(ends.get('a')!.a.hi.kind).toBe('miter');
   });
   it('a silhueta externa é a mesma nos três tipos (só a divisão interna muda)', () => {
     const areas = (['butt', 'miter', 'square'] as const).map((kind) => silhouetteArea(lShape({ kind, flip: false })));
@@ -371,7 +371,7 @@ describe('paredes em arco', () => {
     const ends = computeEnds([f, buildFrame(s.project.elements.b as Wall, s.project.wallTypes.wt_alv14!)!]);
     // o ramal parte do ponto (0,0.5) sobre a flecha do arco (apex em y=1): termina no apex, em y=1
     const e = ends.get('b')!.a;
-    expect(e.kind).toBe('flat');
+    expect(e.hi.kind).toBe('flat');
   });
   it('porta em parede curva recorta a faixa do vão', () => {
     const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);

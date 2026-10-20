@@ -1,7 +1,8 @@
 import { arcSample, intersectSegments, ringArea, type Ring, type Vec2 } from '@hestia/geom';
 import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
-import { miterBreaks, miterPoint, type EndSpec, type WallEnds } from './joins.ts';
+import { miterBreaks, miterPoint } from './joinSides.ts';
+import type { EndSpec, SideSpec, WallEnds } from './joinTypes.ts';
 import { clipBandsToProfile } from './profile.ts';
 import type { Membrane, ResolvedLayer } from './types.ts';
 
@@ -18,28 +19,50 @@ function onLayerCircle(f: WallFrame, p: Vec2, s: number): Vec2 {
   return l < 1e-9 ? p : { x: c.x + (dx / l) * rho, y: c.y + (dy / l) * rho };
 }
 
-export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: number): Vec2 {
-  if (spec.kind === 'flat') return pointAt(f, spec.t, s);
-  const d = spec.self.sigma > 0 ? spec.self.sHi - s : s - spec.self.sLo;
-  const p = miterPoint(spec.self, spec.other, Math.max(0, Math.min(d, spec.self.sHi - spec.self.sLo)));
+/** Face da extremidade que vale para `s`: a metade de s maior usa `hi`, a de s menor usa `lo`. */
+export const sideAt = (f: WallFrame, spec: EndSpec, s: number): SideSpec => (s >= f.sMid ? spec.hi : spec.lo);
+
+/** Ponto da extremidade em `s` segundo uma face (corte reto ou esquadria contra o vizinho). */
+function pointOnSide(f: WallFrame, which: 'a' | 'b', side: SideSpec, s: number): Vec2 {
+  if (side.kind === 'flat') return pointAt(f, side.t, s);
+  const d = side.self.sigma > 0 ? side.self.sHi - s : s - side.self.sLo;
+  const p = miterPoint(side.self, side.other, Math.max(0, Math.min(d, side.self.sHi - side.self.sLo)));
   return p ? onLayerCircle(f, p, s) : pointAt(f, which === 'a' ? 0 : f.length, s);
 }
 
-/** Vértices intermediários da linha de esquadria entre as fronteiras s=lo e s=hi, em ordem crescente de s. */
-function chainBetween(spec: EndSpec, lo: number, hi: number): Vec2[] {
-  if (spec.kind !== 'miter') return [];
-  const m = spec.self;
+export function endPoint(f: WallFrame, which: 'a' | 'b', spec: EndSpec, s: number): Vec2 {
+  return pointOnSide(f, which, sideAt(f, spec, s), s);
+}
+
+/** Vértices intermediários da linha de uma face entre s=lo e s=hi, em ordem crescente de s. */
+function sideChain(side: SideSpec, lo: number, hi: number): Vec2[] {
+  if (side.kind !== 'miter') return [];
+  const m = side.self;
   const dOf = (s: number): number => (m.sigma > 0 ? m.sHi - s : s - m.sLo);
   const d1 = Math.min(dOf(lo), dOf(hi));
   const d2 = Math.max(dOf(lo), dOf(hi));
-  const ds = miterBreaks(m, spec.other).filter((d) => d > d1 + 1e-7 && d < d2 - 1e-7);
+  const ds = miterBreaks(m, side.other).filter((d) => d > d1 + 1e-7 && d < d2 - 1e-7);
   const pts = ds.flatMap((d) => {
-    const p = miterPoint(m, spec.other, d);
+    const p = miterPoint(m, side.other, d);
     return p ? [{ d, p }] : [];
   });
   // s crescente = d decrescente quando a face externa do canto é a de s maior.
   pts.sort((x, y) => (m.sigma > 0 ? y.d - x.d : x.d - y.d));
   return pts.map((q) => q.p);
+}
+
+/**
+ * Linha da extremidade entre s=lo e s=hi (crescente), incluindo as pontas. A faixa da metade de s menor usa `lo`, a
+ * de s maior usa `hi`; uma camada que cruza o meio parte ali (dois pontos coincidentes são fundidos).
+ */
+function endPolyline(f: WallFrame, which: 'a' | 'b', spec: EndSpec, lo: number, hi: number): Vec2[] {
+  const piece = (side: SideSpec, a: number, b: number): Vec2[] => [pointOnSide(f, which, side, a), ...sideChain(side, a, b), pointOnSide(f, which, side, b)];
+  if (spec.hi === spec.lo) return piece(spec.hi, lo, hi);
+  const mid = f.sMid;
+  if (hi <= mid) return piece(spec.lo, lo, hi);
+  if (lo >= mid) return piece(spec.hi, lo, hi);
+  const out = [...piece(spec.lo, lo, mid), ...piece(spec.hi, mid, hi)];
+  return out.filter((p, i) => i === 0 || Math.hypot(p.x - out[i - 1]!.x, p.y - out[i - 1]!.y) > 1e-9);
 }
 
 function isSimple(q: Ring): boolean {
@@ -71,16 +94,17 @@ export function layerQuad(f: WallFrame, ends: WallEnds, s1: number, s2: number):
   const lo = Math.min(s1, s2);
   const hi = Math.max(s1, s2);
   if (f.arc) return arcLayerRing(f, ends, lo, hi);
-  const quad = [endPoint(f, 'a', ends.a, lo), endPoint(f, 'b', ends.b, lo), endPoint(f, 'b', ends.b, hi), endPoint(f, 'a', ends.a, hi)];
+  const aLine = endPolyline(f, 'a', ends.a, lo, hi);
+  const bLine = endPolyline(f, 'b', ends.b, lo, hi);
+  const quad = [aLine[0]!, bLine[0]!, bLine[bLine.length - 1]!, aLine[aLine.length - 1]!];
   if (isSimple(quad)) {
     // Em esquadria entre tipos diferentes a linha do canto tem quebras: a camada acompanha a cadeia inteira.
-    const aMid = chainBetween(ends.a, lo, hi);
-    const bMid = chainBetween(ends.b, lo, hi);
+    const aMid = aLine.slice(1, -1);
+    const bMid = bLine.slice(1, -1);
     return aMid.length || bMid.length ? [quad[0]!, quad[1]!, ...bMid, quad[2]!, quad[3]!, ...aMid.reverse()] : quad;
   }
   return [pointAt(f, 0, lo), pointAt(f, f.length, lo), pointAt(f, f.length, hi), pointAt(f, 0, hi)];
 }
-
 
 /** Membranas (camadas de espessura zero) como linhas entre as extremidades já esquadrejadas. */
 export function membranesOf(f: WallFrame, ends: WallEnds): Membrane[] {
@@ -98,4 +122,3 @@ export function withProfile(layers: ResolvedLayer[], f: WallFrame, pts: ProfileP
   if (!pts || f.wall.sag !== 0 || pts.length < 2) return layers;
   return layers.map((l) => ({ ...l, bands: clipBandsToProfile(l.bands, f.a, f.u, f.length, pts) }));
 }
-

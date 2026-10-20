@@ -28,7 +28,8 @@ import {
 } from '@hestia/model';
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
 import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
-import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
+import { endPoint, layerQuad, membranesOf, sideAt, withProfile } from './layerGeom.ts';
+import { flatEnd } from './joinSides.ts';
 import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
@@ -69,7 +70,8 @@ const ringsOfShape = (m: MultiPolygon): string => m.map((p) => p.map((r) => r.ma
 const PLAN_CUT = 1.2;
 
 function flatT(f: WallFrame, which: 'a' | 'b', spec: EndSpec, sFace: number): number {
-  if (spec.kind === 'flat') return spec.t;
+  const side = sideAt(f, spec, sFace);
+  if (side.kind === 'flat') return side.t;
   return toLocal(f, endPoint(f, which, spec, sFace)).t;
 }
 
@@ -105,7 +107,7 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
     const ring = layerQuad(f, ends, sAtDepth(f, sp.from), sAtDepth(f, sp.to));
     let shape: MultiPolygon = [[ring]];
     for (const e of [ends.a, ends.b]) {
-      if (e.kind === 'flat' && e.clip) shape = intersection(shape, [[e.clip]]);
+      if (e.clip) shape = intersection(shape, [[e.clip]]);
     }
     if (shape.length === 0) continue;
     const wrap = endWraps.get(sp.index);
@@ -121,7 +123,7 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
     const outward = st.side === 'exterior' ? f.sign : -f.sign;
     const ta = flatT(f, 'a', ends.a, sFace);
     const tb = flatT(f, 'b', ends.b, sFace);
-    const ring = layerQuad(f, { a: { kind: 'flat', t: ta }, b: { kind: 'flat', t: tb } }, sFace, sFace + outward * st.thickness);
+    const ring = layerQuad(f, { a: flatEnd(ta), b: flatEnd(tb) }, sFace, sFace + outward * st.thickness);
     mk(-(k + 1), st.materialId, FUNCTION_PRIORITY.finish2, st.thickness, [[ring]], z0, z1);
   });
   return items;

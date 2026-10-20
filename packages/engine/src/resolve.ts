@@ -321,7 +321,9 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }
   const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGapsSafe(unionClipper(...parts)) }));
-  const silhouette = closeGapsSafe(unionClipper(...regions.map((r) => r.polygons)));
+  // Silhueta direto dos cortes de todas as camadas: unir antes por material e depois as regiões descartava pequenos bolsões
+  // fechados entre paredes que se cruzam (semente 18 dos testes de propriedade: 0,029 m² preenchidos sem camada nenhuma).
+  const silhouette = closeGapsSafe(unionClipper(...[...byMaterial.values()].flat()));
   for (const arr of layers.values()) arr.sort((a, b) => a.layerIndex - b.layerIndex);
   return { layers, regions, silhouette };
 }

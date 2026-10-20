@@ -22,3 +22,4 @@ export { RoofTool } from './roofTool.ts';
 export * from './roofEdges.ts';
 export * from './roofCheck.ts';
 export { RoofArrowTool } from './roofArrowTool.ts';
+export * from './attachRoofTool.ts';

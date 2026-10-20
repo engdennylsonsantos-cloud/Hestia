@@ -49,6 +49,8 @@ const P: Record<string, string> = {
   elevation: 'M3 20h18M5 20V6h14v14M9 20v-5h6v5M9 10h2M13 10h2',
   sametype: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   rehost: 'M3 9h18v6H3zM8 9v6M16 9v6M5 19l4-3M19 19l-4-3',
+  attachroof: 'M3 8l9-5 9 5M5 8v12h14V8M9 14h6M12 11v6',
+  detachroof: 'M3 8l9-5 9 5M5 8v12h14V8M4 4l16 16',
 };
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }): ReactElement {

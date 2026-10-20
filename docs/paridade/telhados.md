@@ -29,6 +29,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 - [x] C2 Aviso de parede que ultrapassa o telhado ou fica fora dele; topo ajustado só no trecho coberto **(bloqueante)**
 - [x] C4 Junção de telhados (Join Roof) e abertura/claraboia no telhado **(bloqueante)**
 - [x] C5 Acabamentos do beiral: testeira, calha, forro, e corte de caibro prumo/esquadro (corte de caibro no corte; no 3D as camadas continuam cortadas na vertical)
+- [x] C6 Anexar/desanexar topo da parede ao telhado pelo comando (3D e planta): paredes, depois clique no telhado; a parede guarda o telhado escolhido. No 3D o clique usa o raio contra as malhas, mas o teste só cobre o raio; conferir no navegador
 - [x] D6 Cota da cumeeira, etiqueta de inclinação e planta de cobertura
 - [x] C3 Telhados sobrepostos detectados, com aviso
 

@@ -22,7 +22,8 @@ interface AxisRoofs {
 /** Eixo reto da parede contra os telhados dos níveis dela (base e topo). Parede curva ou de comprimento nulo, null. */
 function axisRoofs(w: Wall, roofs: ResolvedRoof[]): AxisRoofs | null {
   const topLevel = w.topLevelId ?? w.levelId;
-  const rs = roofs.filter((r) => r.levelId === w.levelId || r.levelId === topLevel);
+  // Com telhado escolhido (attachTopRoofId), só esse telhado conta; sem escolha, qualquer telhado do nível.
+  const rs = roofs.filter((r) => (r.levelId === w.levelId || r.levelId === topLevel) && (!w.attachTopRoofId || r.roofId === w.attachTopRoofId));
   const L = dist(w.a, w.b);
   if (L < 1e-9) return null;
   const u = { x: (w.b.x - w.a.x) / L, y: (w.b.y - w.a.y) / L };

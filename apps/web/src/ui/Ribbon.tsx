@@ -10,6 +10,7 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
   modificar: [
     { title: 'Seleção', tools: ['select'] },
     { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'] },
+    { title: 'Anexar', tools: ['attachroof', 'detachroof'] },
     { title: 'Medir', tools: ['measure'] },
   ],
 };

@@ -18,6 +18,7 @@ export * from './slabSchedule.ts';
 export * from './roofs.ts';
 export * from './roofQuantities.ts';
 export * from './roofSchedule.ts';
+export * from './roofWall.ts';
 export * from './roofWallIssues.ts';
 export * from './roofProfilePresets.ts';
 export * from './roofExtrusion.ts';

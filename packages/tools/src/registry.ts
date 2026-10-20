@@ -15,12 +15,13 @@ import { ParallelTool } from './parallelTool.ts';
 import { RoofTool } from './roofTool.ts';
 import { RoofExtrusionTool } from './roofExtrusionTool.ts';
 import { RoofArrowTool } from './roofArrowTool.ts';
+import { AttachRoofTool, DetachRoofTool } from './attachRoofTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof'] },
-  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope'] },
+  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Medir', tools: ['measure'] },
 ];
 
@@ -42,6 +43,10 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new RoofArrowTool(env);
     case 'roofextrusion':
       return new RoofExtrusionTool(env);
+    case 'attachroof':
+      return new AttachRoofTool(env);
+    case 'detachroof':
+      return new DetachRoofTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -102,6 +107,8 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   measure: 'Medir',
   section: 'Corte',
   rehost: 'Trocar anfitriã',
+  attachroof: 'Anexar topo',
+  detachroof: 'Desanexar topo',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {

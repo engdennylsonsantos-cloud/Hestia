@@ -15,3 +15,4 @@
 | 11 | Telhado por extrusão: perfil `{t, z}` extrudado ao longo de `dir` e recortado pelo contorno | Cobre arco, mansarda, dente de serra; arcos viram trechos retos |
 | 12 | Acabamentos do beiral (testeira, calha, forro) e corte de caibro (prumo/esquadro) são propriedades do telhado | Revit: Fascia, Gutter, Soffit e Rafter Cut |
 | 13 | A ferramenta nunca "some": contorno que o motor não resolve mostra o motivo na hora e não cria o telhado | Falha silenciosa foi o erro do telhado em L |
+| 14 | Anexar topo é um comando de duas etapas (paredes, depois telhado) que grava `attachTopToRoof` e o telhado escolhido em `attachTopRoofId` (opcional; ausente = qualquer telhado que cubra o eixo, como antes). No 3D o clique vira o (x, y) da superfície sob o cursor e a ferramenta acha o telhado pela planta, sem id por malha | Revit: Attach Top/Base. As malhas são agrupadas por material, então não há id por malha; a planta já tem o telhado sob o ponto |

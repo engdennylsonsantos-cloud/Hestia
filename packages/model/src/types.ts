@@ -126,6 +126,11 @@ export interface Wall {
   attachTopToFloor?: boolean;
   /** Topo ajustado à face inferior do telhado que cobre a parede (empenas e frontões); cálculo no engine. */
   attachTopToRoof?: boolean;
+  /**
+   * Telhado escolhido para o topo anexado (comando Anexar topo). Ausente = qualquer telhado que cubra o eixo, como antes.
+   * Se o telhado não existir mais, a parede fica na altura normal e o aviso C2 aparece.
+   */
+  attachTopRoofId?: Id;
   locationLine: LocationLine;
   /** Inverte qual lado é o externo (padrão: externo à esquerda de a→b). */
   flipped: boolean;

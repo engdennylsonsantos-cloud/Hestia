@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -222,6 +222,11 @@ export function ViewportCanvas(): ReactElement {
     const r = host.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  /** Ponto do plano (m) da superfície 3D sob o cursor; null se o raio não atinge o modelo. */
+  const pick3dAt = (s: Pt): Pt | null => {
+    const r = host.current!.getBoundingClientRect();
+    return pickModelPoint(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
+  };
   const info = (e: RPointerEvent, s: Pt): { raw: Pt; shift: boolean; ctrl: boolean; alt: boolean } => {
     const v = editor.viewport() as Viewport;
     return { raw: screenToWorld(v, s), shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey };
@@ -282,6 +287,7 @@ export function ViewportCanvas(): ReactElement {
       if (d.mode === 'orbit') model.current.orbit.orbit(s.x - d.last.x, s.y - d.last.y);
       else if (d.mode === 'pan') model.current.orbit.pan(s.x - d.last.x, s.y - d.last.y);
       if (d.mode !== 'none') {
+        if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
         d.last = s;
         useUi.setState((st) => ({ previewTick: st.previewTick + 1 }));
       }
@@ -318,6 +324,12 @@ export function ViewportCanvas(): ReactElement {
       const inf = info(e, s);
       editor.pointer('up', inf);
       if (!d.moved) editor.pointer('click', inf);
+    }
+    // Clique sem arrasto na vista 3D, com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
+    if (d.mode === 'orbit' && !d.moved && useUi.getState().view === '3d' && editor.activeTool.pick3d) {
+      const hit = pick3dAt(s);
+      if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
+      else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
     }
     drag.current = { mode: 'none', start: s, last: s, moved: false };
   };

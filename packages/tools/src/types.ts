@@ -135,6 +135,8 @@ export interface Tool {
   readonly label: string;
   /** Texto de ajuda para a barra de status. */
   readonly hint: string;
+  /** Aceita clique na vista 3D: o ponto entregue é o (x, y) da superfície sob o cursor (`pickModelPoint`). */
+  readonly pick3d?: boolean;
   start(): void;
   /** Atualiza a pré-visualização. */
   move(p: PointerInfo): void;

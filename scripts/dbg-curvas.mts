@@ -66,3 +66,17 @@ const fora = (x: string, y: string, noP: Vec2 = N): number => {
   return pior;
 };
 console.log('protrusion g->f', fora('g', 'f').toExponential(2), 'f->g', fora('f', 'g').toExponential(2));
+const fg = frames.get('g')!;
+console.log('arc', fg.arc && { c: fg.arc.center, r: fg.arc.radius, k: fg.arc.k, len: fg.arc.length }, 'sLo', fg.sLo, 'sHi', fg.sHi, 'sign', fg.sign);
+const vq = { x: 2.0807, y: 0.0902 };
+if (fg.arc) console.log('radius of vertex', Math.hypot(vq.x - fg.arc.center.x, vq.y - fg.arc.center.y), 's on host', toLocal(fg, vq));
+import { computeEnds } from '@hestia/engine';
+const ends = computeEnds([...frames.values()]);
+for (const id of ['g', 'f']) { const e = ends.get(id)!; console.log('ends', id, 'a', e.a.hi.kind, e.a.lo.kind, 'b', e.b.hi.kind, e.b.lo.kind, 'cordas', (e.a.cordas ?? []).length, (e.b.cordas ?? []).length); }
+const eg = ends.get('g')!.b.hi; if (eg.kind === 'miter') console.log('miter g.b other.u', eg.other.u, 'self.u', eg.self.u, 'sigma', eg.self.sigma, 'self sHi/sLo', eg.self.sHi, eg.self.sLo, 'self.outerToCore', eg.self.outerToCore, 'coreEnd', eg.self.coreEnd, 'other outerToCore', eg.other.outerToCore, 'other coreEnd', eg.other.coreEnd, 'other sigma', eg.other.sigma);
+import { intersectCurves, faceCurve } from '@hestia/engine';
+const fgg = frames.get('g')!, ffg = frames.get('f')!;
+for (const sG of [fgg.sHi, fgg.sLo]) for (const sF of [ffg.sHi, ffg.sLo]) {
+  const cg = faceCurve(fgg, sG), cf = faceCurve(ffg, sF);
+  console.log('host s', sG.toFixed(4), 'arm s', sF.toFixed(4), 'curves', JSON.stringify(cg).slice(0, 120), JSON.stringify(cf).slice(0, 120), 'X', intersectCurves(cg, cf, N));
+}

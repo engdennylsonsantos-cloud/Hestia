@@ -100,11 +100,15 @@ export function pairSpecs(a: EndRef, b: EndRef): PairSpecs | null {
       }
       return true;
     };
-    if (!ok(sa, sb, lead) || !ok(sb, sa, follower)) return null; // ângulo agudo demais: mantém corte reto
-    return {
-      lead: { kind: 'miter', self: sa, other: sb },
-      follower: { kind: 'miter', self: sb, other: sa },
-    };
+    if (ok(sa, sb, lead) && ok(sb, sa, follower)) {
+      return {
+        lead: { kind: 'miter', self: sa, other: sb },
+        follower: { kind: 'miter', self: sb, other: sa },
+      };
+    }
+    // Ângulo agudo demais para a esquadria. Reta: mantém o corte reto. Com parede curva o canto cai no pareamento por
+    // face (a circunferência corta a reta longe do nó), como encosto.
+    if (!lead.f.arc && !follower.f.arc) return null;
   }
   // Encosto e esquadro: pareamento por face, também com parede curva (as faces de arco são circunferências). Só
   // não cabe quando o degrau sai do limite.

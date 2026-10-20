@@ -1,10 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallType, wallsOnLevel, type JoinKind, type Wall } from '@hestia/model';
+import { difference, intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallType, wallsOnLevel, type JoinKind, type Project, type Wall } from '@hestia/model';
 import { resolveLevel } from './index.ts';
 
 /** Ponto dentro da ponta que o encosto deixava exposta: o núcleo da parede que passa chega à face externa da outra. */
 const CAP: Vec2 = { x: -0.05, y: -0.118 };
+
+/** Cenário L 4 m: grossa 19 (0,0)-(4,0), fina 14 (4,0)-(4,3), canto em (4,0), as duas pontas do canto em `kind`. */
+function lQuatroMetros(kind: JoinKind): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 3 } }) });
+  const p = s.project;
+  return {
+    ...p,
+    elements: {
+      ...p.elements,
+      g: { ...p.elements['g']!, joinEnd: { kind, flip: false } },
+      f: { ...p.elements['f']!, joinStart: { kind, flip: false } },
+    },
+  } as Project;
+}
+
+/**
+ * Guarda acabamento/substrato x acabamento/substrato (T-1): área de sobreposição de cada par (camada não estrutural da
+ * fina, camada não estrutural da grossa), medida sobre `raw` (forma antes do pintor). Sobre `cut` a interseção é zero
+ * por construção: o pintor já separou as camadas. Só tinta e cerâmica davam 2e-5 m² em encosto; com reboco e argamassa
+ * o par chega a 4e-4 m², então a guarda inclui o substrato.
+ */
+function paresNaoEstrutura(kind: JoinKind): Array<{ nome: string; area: number }> {
+  const q = lQuatroMetros(kind);
+  const r = resolveLevel(q, 'lv_0', new Map());
+  const acabamentos = (id: string) => {
+    const t = wallType(q, q.elements[id] as Wall);
+    return r.walls[id]!.layers.filter((l) => l.layerIndex < 0 || t.layers[l.layerIndex]!.function !== 'structure');
+  };
+  const fina = acabamentos('f');
+  const grossa = acabamentos('g');
+  expect(fina.length).toBeGreaterThan(0);
+  expect(grossa.length).toBeGreaterThan(0);
+  return fina.flatMap((a) => grossa.map((b) => ({ nome: `${a.materialId} x ${b.materialId}`, area: multiArea(intersection(a.raw, b.raw)) })));
+}
 
 describe('quinas externas (decisão 0009)', () => {
   it('a casa padrão tem as quatro quinas externas em esquadria e nenhum aviso de encosto', () => {
@@ -49,34 +85,16 @@ describe('quinas externas (decisão 0009)', () => {
   });
 
   it('L em esquadria entre parede de 19 cm e de 14 cm: o acabamento da fina para na face da grossa', () => {
-    const s = new ProjectStore(createEmptyProject());
-    s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
-    s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 3 } }) });
-    const p = s.project;
-    const miter: JoinKind = 'miter';
-    const q = {
-      ...p,
-      elements: {
-        ...p.elements,
-        g: { ...p.elements['g']!, joinEnd: { kind: miter, flip: false } },
-        f: { ...p.elements['f']!, joinStart: { kind: miter, flip: false } },
-      },
-    } as typeof p;
-    const r = resolveLevel(q, 'lv_0', new Map());
-    const acabamentos = (id: string) => {
-      const t = wallType(q, q.elements[id] as Wall);
-      return r.walls[id]!.layers.filter((l) => l.layerIndex < 0 || ['finish1', 'finish2'].includes(t.layers[l.layerIndex]!.function));
-    };
-    const fina = acabamentos('f');
-    const grossa = acabamentos('g');
-    expect(fina.length).toBeGreaterThan(0);
-    expect(grossa.length).toBeGreaterThan(0);
-    for (const a of fina) {
-      for (const b of grossa) {
-        expect(multiArea(intersection(a.cut, b.cut)), `${a.materialId} x ${b.materialId}`).toBeLessThan(1e-6);
-      }
-    }
+    for (const par of paresNaoEstrutura('miter')) expect(par.area, par.nome).toBeLessThan(1e-6);
   });
+  // Teste do teste (T-1, §7.3): com encosto ou esquadro a mesma guarda tem de acusar sobreposição.
+  for (const kind of ['butt', 'square'] as const) {
+    it(`${kind}: a guarda acabamento/substrato x acabamento/substrato reporta sobreposição medida sobre raw`, () => {
+      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
+      const maior = Math.max(...paresNaoEstrutura(kind).map((par) => par.area));
+      expect(maior).toBeGreaterThan(1e-4);
+    });
+  }
   it('L em esquadria 19 cm x 14 cm: a tinta e o substrato da fina não descem abaixo da face do núcleo da grossa (y = 0,091)', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
@@ -119,6 +137,7 @@ describe('quinas externas (decisão 0009)', () => {
 /**
  * Acabamentos de espessuras diferentes em esquadria (decisão 0009, pareamento em duas pontas): nenhuma camada que não
  * seja de estrutura da parede fina entra no núcleo da grossa, em qualquer orientação nem no canto interno.
+ * As guardas medem sobre `raw` (T-1): `cut` já vem recortado pelo pintor e a interseção com ele dá zero por construção.
  */
 describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa (decisão 0009)', () => {
   type Pt = [number, number];
@@ -133,9 +152,8 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
     { name: 'papéis trocados (19 horizontal, 14 vertical)', grossa: [[10, 0], [0, 0]], fina: [[0, 0], [0, 7]], flipped: false },
     { name: 'canto interno (faces externas dos tipos voltadas para dentro)', grossa: BASE_GROSSA, fina: BASE_FINA, flipped: true },
   ];
-  const build = (c: (typeof CASES)[number]) => {
+  const build = (c: (typeof CASES)[number], kind: JoinKind = 'miter') => {
     const s = new ProjectStore(createEmptyProject());
-    const miter: JoinKind = 'miter';
     const at = ([a, b]: Pt[]) => ({ a: { x: a![0], y: a![1] }, b: { x: b![0], y: b![1] } });
     s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', flipped: c.flipped, ...at(c.grossa) }) });
     s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', flipped: c.flipped, ...at(c.fina) }) });
@@ -144,38 +162,66 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
       ...p,
       elements: {
         ...p.elements,
-        g: { ...p.elements['g']!, joinStart: { kind: miter, flip: false }, joinEnd: { kind: miter, flip: false } },
-        f: { ...p.elements['f']!, joinStart: { kind: miter, flip: false }, joinEnd: { kind: miter, flip: false } },
+        g: { ...p.elements['g']!, joinStart: { kind, flip: false }, joinEnd: { kind, flip: false } },
+        f: { ...p.elements['f']!, joinStart: { kind, flip: false }, joinEnd: { kind, flip: false } },
       },
     } as typeof p;
   };
+  /**
+   * Referência do canto sobre `raw`: a caixa cheia do núcleo da grossa (0,5 m a partir do canto, entre as faces do
+   * núcleo) e a estrutura real da grossa (raw) nessa mesma zona. Eixo da grossa a partir do canto (0,0).
+   */
+  const referencia = (q: Project, c: (typeof CASES)[number]) => {
+    const r = resolveLevel(q, 'lv_0', new Map());
+    const fnOf = (id: string, layerIndex: number) => wallType(q, q.elements[id] as Wall).layers[layerIndex]!.function;
+    const far = c.grossa.find(([x, y]) => x !== 0 || y !== 0)!;
+    const len = Math.hypot(far[0], far[1]);
+    const u: Vec2 = { x: far[0] / len, y: far[1] / len };
+    const n: Vec2 = { x: -u.y, y: u.x };
+    const proj = (v: Vec2, e: Vec2): number => v.x * e.x + v.y * e.y;
+    const at = (t: number, s: number): Vec2 => ({ x: t * u.x + s * n.x, y: t * u.y + s * n.y });
+    const estrutura = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('g', l.layerIndex) === 'structure');
+    const nucleoRaw = estrutura.flatMap((l) => l.raw);
+    const ss = nucleoRaw.flatMap((poly) => poly.flat()).map((v) => proj(v, n));
+    const sLo = Math.min(...ss);
+    const sHi = Math.max(...ss);
+    // Retângulo cheio do núcleo, do eixo do canto até 0,5 m, do lado da grossa: a parede fina passa pelo canto e
+    // o lado oposto (t < 0) é o corpo dela, não o núcleo da grossa. Também não pega a ponta livre das paredes.
+    const caixa: MultiPolygon = [[[at(0, sLo), at(0.5, sLo), at(0.5, sHi), at(0, sHi)]]];
+    const zona: MultiPolygon = [[[at(0, sLo - 1), at(0.5, sLo - 1), at(0.5, sHi + 1), at(0, sHi + 1)]]];
+    const nucleo = intersection(nucleoRaw, zona);
+    const finas = r.walls['f']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('f', l.layerIndex) !== 'structure');
+    return { caixa, nucleo, finas };
+  };
+  /** Maior área de `raw` de cada camada dentro de `alvo` (0 sem camadas): é o valor que a guarda compara com 1e-6. */
+  const maiorSobreposicao = (camadas: Array<{ raw: MultiPolygon }>, alvo: MultiPolygon): number =>
+    Math.max(0, ...camadas.map((l) => (alvo.length ? multiArea(intersection(l.raw, alvo)) : 0)));
 
   for (const c of CASES) {
     it(`${c.name}: nenhuma camada de acabamento da fina tem área dentro do núcleo cheio da grossa`, () => {
-      const q = build(c);
-      const r = resolveLevel(q, 'lv_0', new Map());
-      const fnOf = (id: string, layerIndex: number) => wallType(q, q.elements[id] as Wall).layers[layerIndex]!.function;
-      // Eixo da grossa a partir do canto (0,0); s mede a largura do núcleo perpendicular a ele.
-      const far = c.grossa.find(([x, y]) => x !== 0 || y !== 0)!;
-      const len = Math.hypot(far[0], far[1]);
-      const u: Vec2 = { x: far[0] / len, y: far[1] / len };
-      const n: Vec2 = { x: -u.y, y: u.x };
-      const proj = (v: Vec2, e: Vec2): number => v.x * e.x + v.y * e.y;
-      const at = (t: number, s: number): Vec2 => ({ x: t * u.x + s * n.x, y: t * u.y + s * n.y });
-      // Faixa do núcleo da grossa, medida no bloco inteiro (o bloco da grossa tem a face do núcleo a s = sLo..sHi).
-      const nucleo = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('g', l.layerIndex) === 'structure').flatMap((l) => l.cut.flatMap((poly) => poly.flat()));
-      const sLo = Math.min(...nucleo.map((v) => proj(v, n)));
-      const sHi = Math.max(...nucleo.map((v) => proj(v, n)));
-      // Retângulo cheio do núcleo, do eixo do canto até 0,5 m, do lado da grossa: a parede fina passa pelo canto e
-      // o lado oposto (t < 0) é o corpo dela, não o núcleo da grossa. Também não pega a ponta livre das paredes.
-      const caixa: MultiPolygon = [[[at(0, sLo), at(0.5, sLo), at(0.5, sHi), at(0, sHi)]]];
-      const nucleoReal: MultiPolygon = r.walls['g']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('g', l.layerIndex) === 'structure').flatMap((l) => l.cut);
-      const finas = r.walls['f']!.layers.filter((l) => l.layerIndex >= 0 && fnOf('f', l.layerIndex) !== 'structure');
+      const { caixa, nucleo, finas } = referencia(build(c), c);
       expect(finas.length).toBeGreaterThan(0);
       for (const l of finas) {
-        expect(multiArea(intersection(l.cut, caixa)), `${l.materialId} dentro do núcleo cheio da grossa`).toBeLessThan(1e-6);
-        expect(multiArea(intersection(l.cut, nucleoReal)), `${l.materialId} dentro do bloco da grossa`).toBeLessThan(1e-6);
+        expect(multiArea(intersection(l.raw, caixa)), `${l.materialId} dentro do núcleo cheio da grossa`).toBeLessThan(1e-6);
+        expect(multiArea(intersection(l.raw, nucleo)), `${l.materialId} dentro da estrutura (raw) da grossa`).toBeLessThan(1e-6);
       }
+    });
+  }
+
+  // Teste do teste (T-1, §7.3): a junção quebrada de propósito tem de acusar sobreposição sobre raw, nas duas guardas
+  // de núcleo, no cenário do usuário. A área medida é o valor da guarda (sem skip nem it.fails).
+  for (const kind of ['butt', 'square'] as const) {
+    it(`${kind}: a guarda do núcleo cheio (caixa de 0,5 m) reporta área do acabamento da fina dentro dele`, () => {
+      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
+      const c = CASES[0]!;
+      const { caixa, finas } = referencia(build(c, kind), c);
+      expect(maiorSobreposicao(finas, caixa)).toBeGreaterThan(1e-4);
+    });
+    it(`${kind}: a guarda da estrutura da grossa (raw) reporta área do acabamento da fina dentro dela`, () => {
+      // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
+      const c = CASES[0]!;
+      const { nucleo, finas } = referencia(build(c, kind), c);
+      expect(maiorSobreposicao(finas, nucleo)).toBeGreaterThan(1e-4);
     });
   }
 
@@ -184,6 +230,30 @@ describe('L 19 x 14 em esquadria: acabamentos da fina fora do núcleo da grossa 
     const r = resolveLevel(q, 'lv_0', new Map());
     const bloco = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
     expect(pointInMulti({ x: 0.06, y: 0.08 }, bloco.cut)).toBe(true);
+  });
+});
+
+/** Campo `raw` de ResolvedLayer (T-1): a forma da camada antes do pintor, base das guardas de sobreposição. */
+describe('campo raw da camada (T-1)', () => {
+  it('parede sem junção: o cut cabe inteiro dentro do raw e as áreas são iguais', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    const r = resolveLevel(s.project, 'lv_0', new Map());
+    const camadas = r.walls['w']!.layers;
+    expect(camadas.length).toBeGreaterThan(0);
+    for (const l of camadas) {
+      expect(multiArea(difference(l.cut, l.raw)), `${l.materialId}: cut fora do raw`).toBeLessThan(1e-9);
+      expect(multiArea(l.raw), l.materialId).toBeCloseTo(multiArea(l.cut), 9);
+    }
+  });
+
+  it('camada cortada pelo pintor: no encosto o raw do bloco da fina é maior que o cut, e os dois raws se sobrepõem', () => {
+    // Os dois blocos são estrutura de mesma prioridade: o pintor dá o canto ao bloco da grossa (núcleo mais espesso).
+    const r = resolveLevel(lQuatroMetros('butt'), 'lv_0', new Map());
+    const bloco14 = r.walls['f']!.layers.find((l) => l.materialId === 'mat_bloco14')!;
+    const bloco19 = r.walls['g']!.layers.find((l) => l.materialId === 'mat_bloco19')!;
+    expect(multiArea(bloco14.raw)).toBeGreaterThan(multiArea(bloco14.cut) + 1e-3);
+    expect(multiArea(intersection(bloco14.raw, bloco19.raw))).toBeGreaterThan(1e-3);
   });
 });
 

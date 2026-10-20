@@ -24,7 +24,8 @@ import { resolveLevel } from './index.ts';
  * ARMADILHA: `intersection(camadaA.cut, camadaB.cut)` NÃO serve de métrica. `cut` já vem recortado pelo pintor
  * (`paint` em resolve.ts ordena por prioridade crescente e subtrai de cada camada as de prioridade menor já aceitas),
  * então duas camadas de prioridades diferentes têm interseção ZERO por construção. As guardas nesse sentido em
- * quinas.test.ts (linhas ~74-78 e ~175-177) são vacuamente verdadeiras; o teste do fim deste arquivo demonstra isso.
+ * quinas.test.ts eram vacuamente verdadeiras (T-1, corrigido: agora medem sobre `raw`, a forma antes do pintor). O
+ * teste do fim deste arquivo demonstra a vacuidade da métrica antiga e confere a nova.
  */
 
 const GROSSA = 'wt_ext19';
@@ -316,6 +317,8 @@ describe('a métrica antiga (interseção entre camadas) é vacuamente zero', ()
     expect(blocoNaCaixa).toBeGreaterThan(0);
     const comArea = acabamentos.filter((l) => multiArea(intersection(l.cut, caixa)) > 0);
     expect(comArea.length).toBeGreaterThan(0);
+    // A mesma pergunta sobre `raw` (forma antes do pintor) tem resposta: em esquadria, nada da fina entra no bloco da grossa.
+    for (const a of comArea) expect(multiArea(intersection(a.raw, bloco.raw)), a.materialId).toBeLessThan(1e-6);
     const linhas: string[] = [
       '\n--- vacuidade da métrica antiga (L 19x14 em esquadria, caixa da quina)',
       `    bloco da grossa: prioridade ${bloco.priority}, área dentro da caixa ${fmt(blocoNaCaixa)} m²`,
@@ -334,5 +337,32 @@ describe('a métrica antiga (interseção entre camadas) é vacuamente zero', ()
       expect(cruzada, `${a.materialId} x ${bloco.materialId}`).toBeLessThan(1e-6);
     }
     console.log(linhas.join('\n'));
+  });
+});
+
+/**
+ * Redistribuição do §5.1 medida sobre `raw` (T-1): área do acabamento da fina que cai sobre o bloco da grossa, dentro
+ * da caixa do canto. Sobre `cut` essa área some do acabamento da fina e aparece no bloco; sobre `raw` ela continua
+ * na fina e aparece como sobreposição com o bloco da grossa.
+ */
+function sobreposicaoRaw(kind: JoinKind): number {
+  const p = montar(L, kind);
+  const r = resolveLevel(p, 'lv_0', new Map());
+  const caixa = retangulo(L.caixa);
+  const bloco = r.walls['g']!.layers.find((l) => l.materialId === BLOCO_GROSSA)!;
+  const tipoFina = wallType(p, p.elements['f'] as Wall);
+  return r.walls['f']!.layers
+    .filter((l) => l.layerIndex >= 0 && tipoFina.layers[l.layerIndex]!.function !== 'structure')
+    .reduce((soma, l) => soma + multiArea(intersection(intersection(l.raw, bloco.raw), caixa)), 0);
+}
+
+describe('redistribuição do §5.1 sobre raw (T-1)', () => {
+  it('esquadria: zero; encosto e esquadro: positivo (medido sobre raw)', () => {
+    const medidas = { miter: sobreposicaoRaw('miter'), butt: sobreposicaoRaw('butt'), square: sobreposicaoRaw('square') };
+    console.log(`\n--- sobreposição raw acabamento da fina x bloco da grossa, caixa do canto (m²): ${JSON.stringify(medidas)}`);
+    expect(medidas.miter).toBeLessThan(1e-6);
+    // J-1: hoje encosto/esquadro deixam o acabamento da fina entrar no núcleo; inverter ao corrigir
+    expect(medidas.butt).toBeGreaterThan(1e-4);
+    expect(medidas.square).toBeGreaterThan(1e-4);
   });
 });

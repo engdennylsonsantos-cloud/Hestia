@@ -3,14 +3,12 @@ import {
   boxOf,
   boxesOverlap,
   difference,
-  differenceClipper,
   expandBox,
   intersection,
   multiArea,
   orientedRect,
   closeGapsSafe,
   unionClipper,
-  multiPoints,
   type Box,
   type MultiPolygon,
 } from '@hestia/geom';
@@ -31,6 +29,7 @@ import {
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
 import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
 import { endPoint, layerQuad, membranesOf, withProfile } from './layerGeom.ts';
+import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
 import { resolveAllSlabs } from './slabs.ts';
@@ -268,26 +267,8 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     return m;
   };
   const plan = paintFor(items.filter((i) => i.inPlan));
-  // Retornos de acabamento não podem invadir paredes vizinhas (vão perto de um canto ou de um T).
-  const clipOf = (poly: MultiPolygon, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
-    const box = boxOf(multiPoints(poly));
-    const subs: MultiPolygon[] = [];
-    for (const i of items) {
-      if (i.wallId === wallId || !boxesOverlap(i.box, box)) continue;
-      const f = painted.get(i);
-      if (f && f.length) subs.push(f);
-    }
-    return differenceClipper(poly, ...subs);
-  };
-  // Memo por (retorno, conjunto pintado): `painted` é o mapa do cache de tinta, então a identidade do mapa é a
-  // identidade do conjunto ativo; `r` é único por (parede, camada, vão). Vive só nesta resolução de cluster.
-  const retMemo = new Map<{ poly: MultiPolygon }, Map<Map<Item, MultiPolygon>, MultiPolygon>>();
-  const clipReturn = (r: { poly: MultiPolygon }, wallId: Id, painted: Map<Item, MultiPolygon>): MultiPolygon => {
-    const byPaint = retMemo.get(r) ?? new Map<Map<Item, MultiPolygon>, MultiPolygon>();
-    retMemo.set(r, byPaint);
-    if (!byPaint.has(painted)) byPaint.set(painted, clipOf(r.poly, wallId, painted));
-    return byPaint.get(painted)!;
-  };
+  // Retornos de acabamento não invadem paredes vizinhas (ver clipReturn.ts).
+  const clipReturn = makeReturnClipper(items);
   const layers = new Map<Id, ResolvedLayer[]>();
   const byMaterial = new Map<Id, MultiPolygon[]>();
   const bandsOf = new Map<Item, LayerBand[]>();
@@ -338,7 +319,7 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     const bands = bandsOf.get(it) ?? [];
     if (!fragment.length && bands.length === 0) continue;
     const arr = layers.get(it.wallId) ?? [];
-    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, fragment, cut, bands });
+    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, fragment, cut, bands, raw: it.shape });
     layers.set(it.wallId, arr);
     if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }

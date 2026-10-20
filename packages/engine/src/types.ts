@@ -14,6 +14,15 @@ export interface ResolvedLayer {
    * parede só corta a vizinha onde as duas existem na mesma altura.
    */
   bands: LayerBand[];
+  /**
+   * Forma de origem da camada ANTES do pintor: a esquadria (pontas da parede) e os envolvimentos já aplicados, mas
+   * sem o recorte por prioridade (outras paredes, acabamentos) nem o dos vãos. O perfil superior não entra: ele só
+   * recorta as faixas do 3D (`withProfile`). É a base das guardas de sobreposição (docs/08 §7): `cut` já vem
+   * recortado pelo pintor, então a interseção entre `cut` de duas camadas é zero por construção.
+   * Uma camada tem uma só forma para a altura inteira da parede (só as faixas verticais são itens próprios, e cada
+   * uma tem o seu `raw`). Planta e 3D não o usam.
+   */
+  raw: MultiPolygon;
 }
 
 /** Faixa vertical de uma camada com a mesma geometria em planta. z relativo à base da parede. */

@@ -15,7 +15,7 @@ na seção 2. Nada de geometria foi alterado nesta rodada — só instrumentaç�
 | **P-1** | `difference()` entrava em laço no polygon-clipping (~10 s por tentativa sem limite) quando as coordenadas são transladadas; a resolução da semente 24 transladada custava 339 s | **alta** (trava a interface) | **corrigido** (`clipReturn` vai direto ao Clipper + memoização; seed 24 transladada: 339 s → 1,1 s) | `resolve.ts`, `boolean.ts` |
 | **J-1** | Acabamento cortado pelo núcleo em **encosto** e **esquadro**: 75% e 74% da área do canto que em esquadria é do acabamento da fina passa para o bloco da grossa | **alta** (visual) | medido, **não corrigido**; aviso e lote cobrem o esquadro (§8.1, **decidido: sim**) | `joins.ts` |
 | **J-2** | Nó de **3+ paredes** ignora a configuração de junção e aperta o núcleo da parede grossa | **média** (visual + UI enganosa) | medido, **não corrigido** | `joins.ts` (`starNode`) |
-| **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | provado, **não corrigido** | `quinas.test.ts` |
+| **T-1** | Guardas de sobreposição vacuamente verdadeiras: `intersection(x.cut, y.cut)` é sempre 0 | **média** (teste que não testa) | **corrigido** (campo `raw` em `ResolvedLayer`; guardas sobre `raw`, com teste negativo em encosto e esquadro, §7.4) | `quinas.test.ts`, `types.ts`, `clipReturn.ts` |
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
 | **I-1b** | Suíte completa sai com código 1 por ruído do vitest (`Timeout calling "onTaskUpdate"`) mesmo com tudo passando | **alta para CI** | **aberto** | infra do vitest |
 | **I-2** | Filtro `--seed` do script rápido casava por prefixo (`--seed 4` rodava 40–49) | média | **corrigido** (lookahead) | `scripts/test-esquadria.mjs` |
@@ -362,6 +362,50 @@ Recomendo **(a)** para as guardas de quina e **(b)** para o teste de nó, onde o
   Esse é o teste do teste: hoje ela passaria.
 - As guardas continuam verdes no estado correto.
 
+### 7.4 Correção aplicada (T-1 corrigido)
+
+**Campo:** `ResolvedLayer.raw` (`types.ts`), igual ao `shape` do `Item` em `buildItems` (`resolve.ts`), que é o
+mesmo objeto, sem cópia: esquadria e envolvimentos aplicados, sem o recorte do pintor nem o dos vãos. O perfil
+superior não entra, porque só recorta as faixas do 3D (`withProfile`). **Uma forma por camada**, para a altura
+inteira da parede: as camadas não se partem por altura (só as faixas verticais são itens próprios, e cada uma tem o
+seu `raw`), então não foi preciso escolher entre "raw da faixa maior" e "união". Nenhum golden precisou de ajuste: o campo é enumerável (sem propriedade oculta) e as suítes do engine,
+render, tools e web passaram sem mudar golden. Planta, 3D e quantitativos não o leem (só os testes de T-1).
+
+**Extração (antes do campo, sem mudar comportamento):** `clipOf` e o memo de `clipReturn` foram para
+`packages/engine/src/clipReturn.ts` (`makeReturnClipper`). A suíte do engine ficou igual (455 testes verdes antes e
+depois da extração; depois os testes de T-1 somaram 9, total 464). `resolve.ts` caiu de **402** para **385** linhas de código
+(contagem do eslint com `skipBlankLines` e `skipComments`; o limite é 420, então não estava no limite exato).
+
+**Guardas reescritas** (`quinas.test.ts`), medidas sobre `raw`:
+
+| guarda | cenário | esquadria (miter) | encosto (butt) | esquadro (square) |
+|---|---|---|---|---|
+| acabamento/substrato da fina x acabamento/substrato da grossa (todos os pares) | L 4 m, canto em (4,0) | **0,0** | **4,0e-4** m² (reboco x argamassa) | **4,0e-4** m² |
+| acabamento da fina dentro do núcleo cheio da grossa (caixa de 0,5 m) | L 19×14, caso do usuário | **0,0** | **1,98e-3** m² | **3,80e-3** m² |
+| acabamento da fina dentro da estrutura (raw) da grossa, mesma zona | L 19×14, caso do usuário | **0,0** | **1,98e-3** m² | **3,80e-3** m² |
+
+Com `cut`, as mesmas três guardas davam **0** em esquadria, encosto e esquadro (a vacuidade de §7.1).
+
+Desvio: a primeira guarda foi **ampliada** de "tinta/cerâmica x tinta/cerâmica" para "todas as camadas não
+estruturais". Só tinta e cerâmica dão **2,0e-5** m² em encosto, abaixo do limiar de 1e-4, então não pegariam o
+defeito. O defeito maior está entre substratos (reboco x argamassa).
+
+**Testes negativos (teste do teste):** cada guarda tem um teste com `butt` e outro com `square` que afirma área
+> 1e-4 (sem `skip` nem `it.fails`), marcado com `// J-1: ... inverter ao corrigir`. Quando J-1 estiver corrigido, a
+asserção vira `< 1e-6`.
+
+**Redistribuição do §5.1 sobre `raw`** (`juncoesAcabamento.test.ts`, caixa do canto `[3.88; -0.15; 4.12; 0.15]`): a
+área do acabamento da fina que cai sobre o bloco da grossa é **0** em esquadria, **0,004004 m²** em encosto e
+**0,008360 m²** em esquadro. Sobre `cut` esses valores aparecem como redistribuição (o acabamento da fina perde
+0,005100 m² em encosto, §5.1), e `cut x cut` continua **0** nos três casos.
+
+**Unidade do campo** (`quinas.test.ts`, `describe('campo raw da camada (T-1)')`): parede sem junção tem `cut` dentro
+de `raw` com áreas iguais; no encosto o bloco da fina tem `raw` 0,420000 m² e `cut` 0,407260 m², e os dois raws se
+sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
+
+**Critérios de §7.3:** atendidos. Com a junção quebrada de propósito, as guardas acusam (acima); no estado correto
+(esquadria) elas passam.
+
 ---
 
 ## 8. Decisões que precisam do dono do projeto
@@ -437,7 +481,7 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 |---|---|---|---|
 | 1 | Telemetria do `robust()` (seção 4.3, item 4) | dimensiona o resto com número em vez de palpite | feito |
 | 2 | **P-1**: `clipReturn` direto ao Clipper + memoização (seção 4) | feito: 339 s → 1,1 s; pré-requisito dos demais | feito |
-| 3 | **T-1**: guardas sobre geometria pré-pintura (7.2a) | sem guarda confiável não se valida J-1 | 1 h |
+| 3 | **T-1**: guardas sobre geometria pré-pintura (7.2a) | feito (7.4): `raw`, com teste negativo | 1 h |
 | 4 | **J-1/J-2**: `EndSpec` por lado + nó por vizinho angular (5.4) | corrige o defeito visual de junção | 4–6 h |
 | 5 | **I-1b**: ruído do vitest / CI (9.3) | libera a suíte completa em CI | 2 h |
 | 6 | Decisões da seção 8 | fecham o escopo | — |
@@ -452,7 +496,7 @@ Recomendo (1) e, se não bastar, (3) como contrato explícito do CI.
 - **J-1**: encosto e esquadro cortam todas as camadas com um escalar e deixam o núcleo comer o acabamento (75% e
   74% da área do canto). Corrigir com pareamento por face, e o esquadro provavelmente só com aviso.
 - **J-2**: nó de 3+ paredes ignora a configuração e aperta o núcleo da grossa. Corrigir junto com J-1.
-- **T-1**: as guardas de quina testam uma interseção que é zero por construção. Corrigir testando a geometria
-  pré-pintura.
+- **T-1**: as guardas de quina testavam uma interseção que é zero por construção. Corrigido: `ResolvedLayer.raw`
+  (forma antes do pintor), guardas sobre `raw` e teste negativo em encosto e esquadro (7.4).
 - **I-1/I-2**: os scripts de verificação rápida agora funcionam no Windows; o ruído do vitest na suíte completa
   ainda derruba o código de saída.

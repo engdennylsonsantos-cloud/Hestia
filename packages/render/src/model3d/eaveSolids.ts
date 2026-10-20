@@ -16,7 +16,6 @@ const SOFFIT_T = 0.01;
 const EPS_IN = 1e-4;
 /** Extensão (m) da faixa além das pontas da aresta: os planos de corte das esquadrias aparam o excesso. */
 const REACH = 1;
-const EPS = 1e-9;
 
 export interface EaveSolids {
   batches: SolidBatch[];
@@ -163,11 +162,61 @@ function bandOfPiece(E: Piece, s0: number, s1: number, h0: Half, h1: Half): Vec2
   return poly.length >= 3 ? poly : [];
 }
 
-/** Cota da água projetada sobre a linha do beiral: a calha e o forro seguem o beiral mesmo com linha inclinada. */
-const onEave = (E: Piece, x: number, y: number): number => {
-  const q = vadd(E.a, vscale(E.t, vdot(vsub({ x, y }, E.a), E.t)));
-  return planeZ(E.plane!, q);
-};
+/** Pé da projeção de (x, y) sobre a linha de `E`. */
+const footOn = (E: Piece, x: number, y: number): Vec2 => vadd(E.a, vscale(E.t, vdot(vsub({ x, y }, E.a), E.t)));
+
+/** Aresta de beiral cujo trecho contém o pé `q` (sobre a mesma linha); `E` quando nenhuma contém. */
+function ownerAt(eaves: Piece[], E: Piece, q: Vec2): Piece {
+  const f = footOn(E, q.x, q.y);
+  return (
+    eaves.find((o) => {
+      const u = vdot(vsub(f, o.a), o.t);
+      const off = vlen(vsub(vsub(f, o.a), vscale(o.t, u)));
+      return off < 1e-9 && u >= -1e-9 && u <= vlen(vsub(o.b, o.a)) + 1e-9;
+    }) ?? E
+  );
+}
+
+/**
+ * Cotas de calha e forro: a cota do beiral (água) sob o pé da projeção, de `owner`, a aresta de beiral que contém a faixa
+ * do pedaço. Dentro de um pedaço a cota é linear (um só dono), então o triângulo interpola certo; entre pedaços vizinhos
+ * a cota é a mesma na esquadria.
+ */
+const topOwner = (E: Piece, owner: Piece, T: number, dz: number) => (x: number, y: number): number =>
+  planeZ(owner.plane!, footOn(E, x, y)) - T + dz;
+
+/** Posições (m, ao longo de `E`) das pontas das arestas colineares: onde a água sob o pé da projeção muda. */
+function cutsOf(E: Piece, eaves: Piece[]): number[] {
+  const len = vlen(vsub(E.b, E.a));
+  const out: number[] = [];
+  for (const o of eaves) {
+    if (o === E || Math.abs(o.t.x * E.t.y - o.t.y * E.t.x) > 1e-9) continue;
+    if (Math.abs(vdot(vsub(o.a, E.a), vperp(E.t))) > 1e-9) continue;
+    for (const X of [o.a, o.b]) {
+      const c = vdot(vsub(X, E.a), E.t);
+      if (c > -REACH + 1e-9 && c < len + REACH - 1e-9) out.push(c);
+    }
+  }
+  return out;
+}
+
+/**
+ * Faixa de uma aresta de beiral entre s0 e s1 (vazia se não sobra), cortada nas pontas das arestas colineares. Cada pedaço
+ * devolve a água que o domina (a de `ownerAt` no centro do pedaço).
+ */
+function bandPieces(E: Piece, eaves: Piece[], s0: number, s1: number, h0: Half, h1: Half): Array<{ poly: Vec2[]; owner: Piece }> {
+  const poly = bandOfPiece(E, s0, s1, h0, h1);
+  if (!poly.length) return [];
+  let parts: Vec2[][] = [poly];
+  for (const c of cutsOf(E, eaves)) {
+    const V = vadd(E.a, vscale(E.t, c));
+    parts = parts.flatMap((q) => [clipHalf(q, { V, w: E.t }), clipHalf(q, { V, w: vscale(E.t, -1) })]).filter((q) => q.length >= 3);
+  }
+  return parts.map((q) => {
+    const cen = { x: q.reduce((a, v) => a + v.x, 0) / q.length, y: q.reduce((a, v) => a + v.y, 0) / q.length };
+    return { poly: q, owner: ownerAt(eaves, E, cen) };
+  });
+}
 
 /** Material da testeira: o da camada estrutural do tipo (ou a de topo, sem estrutural), escurecido 35 %. */
 function fasciaMaterialOf(p: Project, r: ResolvedRoof): Material | undefined {
@@ -210,6 +259,7 @@ export function buildEaveSolids(p: Project, roofs: ResolvedRoof[]): EaveSolids {
     const links = linksOf(ps);
     const T = roofThickness(r);
     const eaves = ps.map((piece, i) => ({ piece, i })).filter((x) => x.piece.plane);
+    const eaveList = eaves.map((x) => x.piece);
     /** Faixa de uma aresta de beiral entre as profundidades s0 e s1, com as duas esquadrias de suas pontas (vazia se não sobra). */
     const band = (E: Piece, i: number, s0: number, s1: number): Vec2[] => bandOfPiece(E, s0, s1, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1));
     if (eave.fascia) {
@@ -235,10 +285,11 @@ export function buildEaveSolids(p: Project, roofs: ResolvedRoof[]): EaveSolids {
       ];
       for (const { piece: E, i } of eaves) {
         for (const [s0, s1, dzTop] of regions) {
-          const top = (x: number, y: number): number => onEave(E, x, y) - T + dzTop;
-          const bottom = (x: number, y: number): number => onEave(E, x, y) - T - GUTTER_H;
-          const poly = band(E, i, s0, s1);
-          if (poly.length) extrudePolygon(b, [poly], 0, 1, top, bottom);
+          for (const { poly, owner } of bandPieces(E, eaveList, s0, s1, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
+            const top = topOwner(E, owner, T, dzTop);
+            const bottom = topOwner(E, owner, T, -GUTTER_H);
+            extrudePolygon(b, [poly], 0, 1, top, bottom);
+          }
         }
       }
     }
@@ -247,10 +298,11 @@ export function buildEaveSolids(p: Project, roofs: ResolvedRoof[]): EaveSolids {
       if (width > 0) {
         const b = batchOf(byMat, 'mat_gesso');
         for (const { piece: E, i } of eaves) {
-          const top = (x: number, y: number): number => onEave(E, x, y) - T;
-          const bottom = (x: number, y: number): number => top(x, y) - SOFFIT_T;
-          const poly = band(E, i, 0, width);
-          if (poly.length) extrudePolygon(b, [poly], 0, 1, top, bottom);
+          for (const { poly, owner } of bandPieces(E, eaveList, 0, width, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
+            const top = topOwner(E, owner, T, 0);
+            const bottom = topOwner(E, owner, T, -SOFFIT_T);
+            extrudePolygon(b, [poly], 0, 1, top, bottom);
+          }
         }
       }
     }

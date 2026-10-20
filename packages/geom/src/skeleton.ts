@@ -4,6 +4,7 @@ import { SkeletonFail } from './skeletonCore.ts';
 import { setup } from './skeletonSetup.ts';
 import { runSim } from './skeletonRun.ts';
 import { buildOutput } from './skeletonFaces.ts';
+import { DISCONTINUOUS_REASON, hasHeightJump } from './skeletonContinuity.ts';
 
 export interface SkeletonInput {
   outer: Vec2[];            // anel externo, sentido qualquer, sem repetir o 1º ponto
@@ -39,6 +40,15 @@ export function weightedSkeleton(input: SkeletonInput): SkeletonResult {
     const sum = out.faces.reduce((s, f) => s + Math.abs(ringArea(f.polygon)), 0);
     if (Math.abs(sum - net) > 1e-6 * Math.max(net, 1)) {
       throw new SkeletonFail('caso não suportado: a soma das águas não confere com a área do polígono');
+    }
+    // Soma certa não garante superfície contínua. Caso típico: vértice reentrante (ângulo > 180°) entre uma aresta
+    // com inclinação (cota 0 nesse vértice, pois é beiral) e uma empena (sem água). Só a água do beiral chega ao vértice
+    // com cota 0, e meio plano não cobre um ângulo > 180°; as outras águas dão cota > 0 ali. Sem solução contínua com
+    // águas planas, o resultado vira ok:false com motivo (nunca um telhado silenciosamente partido). Medido em 400
+    // contornos: todo contorno com esse vértice falha; a falha também ocorre em poucos casos com dois nulos no mesmo
+    // vértice reentrante (não analisados).
+    if (hasHeightJump([input.outer, ...input.holes], input.weights, out.faces)) {
+      throw new SkeletonFail(DISCONTINUOUS_REASON);
     }
     return { faces: out.faces, arcs: out.arcs, ok: true };
   } catch (e) {

@@ -25,8 +25,13 @@ const GUTTER_DEPTH = 0.1;
 const FLOOR_FROM = 0.01;
 const FLOOR_TO = 0.09;
 const FLOOR_DROP = 0.07;
-/** Tolerância de cota e de posição (m), a do enunciado. */
+/** Tolerância de posição e de coincidência de vértices (m), a do enunciado. */
 const TOL = 1e-6;
+/**
+ * Tolerância de cota em amostras (m): a amostra é deslocada até 3,5e-5 m para não cair sobre a esquadria, e lá a cota de
+ * uma água e da outra difere por inclinação × distância (até ~1e-5 m). A coincidência exata fica com a topologia (TOL).
+ */
+const HTOL = 2e-5;
 /** Distância (m) abaixo da qual um ponto amostrado cai na borda e é descartado (a faixa é ambígua ali). */
 const NEAR_EDGE = 2e-4;
 
@@ -323,6 +328,8 @@ function expected(c: Ctx, mat: Mat, h: Hit): 0 | 1 | null {
 /** Amostras: ao longo de cada aresta (dentro e fora, em várias profundidades) e uma grade em volta de cada vértice. */
 function samplesOf(c: Ctx): Vec2[] {
   const out: Vec2[] = [];
+  // Deslocamento irracional: a grade não cai exatamente sobre as esquadrias (retas por vértices), onde a cobertura é ambígua.
+  const J = P(1.7e-5, 3.1e-5);
   const depths = [-0.12, -0.1007, -0.0993, -0.0907, -0.06, -0.035, -0.0255, -0.0247, -0.0213, -0.0118, -0.003, -0.0007, 0.0007, 0.003, 0.0118, 0.0213, 0.0247, 0.0255, 0.035, 0.06, 0.0907, 0.0993, 0.1007, 0.12];
   const n = c.bnd.length;
   c.bnd.forEach((a, i) => {
@@ -331,12 +338,12 @@ function samplesOf(c: Ctx): Vec2[] {
     for (let k = 0; k <= 16; k++) {
       const u = 0.03 + (0.94 * k) / 16;
       const base = P(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
-      for (const s of depths) out.push(P(base.x + nIn.x * s, base.y + nIn.y * s));
+      for (const s of depths) out.push(P(base.x + nIn.x * s + J.x, base.y + nIn.y * s + J.y));
     }
   });
   for (const V of c.bnd) {
     for (let i = -20; i <= 20; i++) {
-      for (let j = -20; j <= 20; j++) out.push(P(V.x + i * 0.0065, V.y + j * 0.0065));
+      for (let j = -20; j <= 20; j++) out.push(P(V.x + i * 0.0065 + J.x, V.y + j * 0.0065 + J.y));
     }
   }
   return out;
@@ -361,11 +368,14 @@ function sampleFailures(c: Ctx): string[] {
       else if (e === 1) {
         if (mat === 'fascia') {
           const want = topOn(c.r, q) - c.T;
-          if (Number.isFinite(want) && Math.abs(zs[0]! - want) > TOL) fails.push(`[${cat}/fascia/height] ${at} z ${zs[0]!.toFixed(6)} ≠ água ${want.toFixed(6)}`);
+          if (Number.isFinite(want) && Math.abs(zs[0]! - want) > HTOL) fails.push(`[${cat}/fascia/height] ${at} z ${zs[0]!.toFixed(6)} ≠ água ${want.toFixed(6)}`);
         } else if (h.seg !== null) {
-          const floor = h.dmin > FLOOR_FROM + 5e-4 && h.dmin < FLOOR_TO - 5e-4;
+          // Limites de faixa (piso e parede externa) são pulados: a amostra cai a menos de 1e-4 m deles.
+          const edgeOf = (d: number): boolean => Math.abs(h.dmin - d) < 1e-4;
+          if (edgeOf(FLOOR_FROM) || edgeOf(FLOOR_TO)) continue;
+          const floor = h.dmin > FLOOR_FROM && h.dmin < FLOOR_TO;
           const want = topOn(c.r, h.foot) - c.T - (floor ? FLOOR_DROP : 0);
-          if (Number.isFinite(want) && Math.abs(zs[0]! - want) > TOL) fails.push(`[seg/gutter/height] ${at} z ${zs[0]!.toFixed(6)} ≠ beiral ${want.toFixed(6)}`);
+          if (Number.isFinite(want) && Math.abs(zs[0]! - want) > HTOL) fails.push(`[seg/gutter/height] ${at} z ${zs[0]!.toFixed(6)} ≠ beiral ${want.toFixed(6)}`);
         }
       }
     }
@@ -403,9 +413,18 @@ function topologyFailures(c: Ctx, mat: Mat): string[] {
       // Tolerância de 2e-5 m: a faixa do gerador tem 1e-5 m de folga (SIDE_MARGIN) além da profundidade nominal.
       return depths.some((d) => Math.abs(dep - d) < 2e-5) && u > -1e-6 && u < L + 1e-6;
     });
+  // Degrau: duas arestas abertas com os mesmos extremos em planta e cotas diferentes, num vértice do contorno (esquadria
+  // entre duas águas de inclinações diferentes; a esquadria em planta é exata, a cota muda pela água).
+  const open = [...counts.values()].filter((e) => e.n === 1);
+  const flat = (v: V3): string => `${Math.round(v.x * 1e6)},${Math.round(v.y * 1e6)}`;
+  const isStep = (e: { p: V3; q: V3 }): boolean => {
+    const twin = open.find((o) => o !== e && ((flat(o.p) === flat(e.p) && flat(o.q) === flat(e.q)) || (flat(o.p) === flat(e.q) && flat(o.q) === flat(e.p))));
+    const atCorner = c.bnd.some((V) => [e.p, e.q].some((w) => Math.hypot(w.x - V.x, w.y - V.y) < 2e-6));
+    return !!twin && atCorner && (Math.abs(twin.p.z - e.p.z) > 1e-6 || Math.abs(twin.q.z - e.q.z) > 1e-6);
+  };
   for (const e of counts.values()) {
     if (e.n >= 3) fails.push(`[${mat}/overlap-edge] aresta em (${e.p.x.toFixed(4)}, ${e.p.y.toFixed(4)}) com ${e.n} faces`);
-    if (e.n !== 1) continue;
+    if (e.n !== 1 || isStep(e)) continue;
     const m = P((e.p.x + e.q.x) / 2, (e.p.y + e.q.y) / 2);
     const onRing = ringDist(m, allowed) < 2e-6;
     const onCut = c.gableSegs.some(([a, b]) => lineDist(m, a, b) < 2e-6);

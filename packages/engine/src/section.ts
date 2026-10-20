@@ -1,6 +1,7 @@
 import { closestOnSegment, intersection, orientedRect, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
+import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
@@ -219,7 +220,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
       const rw = resolved.walls[w.id];
       if (!rw) continue;
       for (const layer of rw.layers) {
-        for (const band of layer.bands) {
+        // Faixas fundidas em prismas (bandFuse): sem contorno horizontal falso entre faixas da mesma região.
+        for (const band of fuseBands(layer.bands)) {
           const z0 = rw.baseZ + band.z0;
           const z1 = rw.baseZ + band.z1;
           for (const poly of band.poly) {

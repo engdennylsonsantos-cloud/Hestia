@@ -143,3 +143,37 @@ describe('T e nós', () => {
     { id: 'd', type: F, a: P(0, 0), b: P(0, -3) },
   ]);
 });
+
+/** Área da silhueta (união das camadas, fechada como o motor faz) de um cenário em uma configuração. */
+function areaSilhueta(segs: Seg[], kind: JoinKind): number {
+  const r = resolveLevel(build(segs, kind), 'lv_0', new Map());
+  const polys: MultiPolygon = Object.values(r.walls).flatMap((w) => w.layers.flatMap((l) => l.cut));
+  return multiArea(closeGapsSafe(union(...polys.map((poly) => [poly] as MultiPolygon)), 2e-5, 1e-4));
+}
+
+describe('a silhueta externa não depende da configuração (sem ponta para fora nem entalhe)', () => {
+  // O canto externo é o mesmo nas três junções (a dominante chega ao ponto de encontro das faces externas), então
+  // a união das camadas tem a mesma área; uma ponta que sobra além da outra parede ou um entalhe aparecem aqui.
+  for (const [ta, tb] of [[F, F], [G, F], [F, G]] as const) {
+    for (const virada of [5, 10, 20, 30, 45, 60, 90, 120, 135, 150]) {
+      it(`L ${ta}+${tb} com virada de ${virada}°`, () => {
+        const segs: Seg[] = [
+          { id: 'g', type: ta, a: P(0, 0), b: P(4, 0) },
+          { id: 'f', type: tb, a: P(4, 0), b: P(4 + 3 * Math.cos(rad(virada)), 3 * Math.sin(rad(virada))) },
+        ];
+        const ref = areaSilhueta(segs, 'miter');
+        for (const kind of ['butt', 'square'] as const) expect(Math.abs(areaSilhueta(segs, kind) - ref), kind).toBeLessThan(5e-4);
+      });
+    }
+  }
+  for (const virada of [90, 60, 120]) {
+    it(`T com ramal a ${virada}°`, () => {
+      const segs: Seg[] = [
+        { id: 'g', type: G, a: P(-2, 0), b: P(2, 0) },
+        { id: 'f', type: F, a: P(0, 0), b: P(3 * Math.cos(rad(virada)), 3 * Math.sin(rad(virada))) },
+      ];
+      const ref = areaSilhueta(segs, 'miter');
+      for (const kind of ['butt', 'square'] as const) expect(Math.abs(areaSilhueta(segs, kind) - ref), kind).toBeLessThan(5e-4);
+    });
+  }
+});

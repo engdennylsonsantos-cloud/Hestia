@@ -139,7 +139,10 @@ function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number
     return [Math.min(a, b), Math.max(a, b)] as const;
   });
   const out = pts.map((p, i) => ({ t: ts[i]!, p }));
-  for (let k = Math.ceil(tMin / ARC_GRID); k * ARC_GRID < tMax; k++) {
+  // A grade só cobre o alcance da parede (pontas degeneradas podem cair longe e não podem gerar milhões de pontos).
+  const gLo = Math.max(tMin, -2);
+  const gHi = Math.min(tMax, f.length + 2);
+  for (let k = Math.ceil(gLo / ARC_GRID); k * ARC_GRID < gHi; k++) {
     const t = k * ARC_GRID;
     if (t > tMin && !intervalos.some(([a, b]) => t > a - 1e-9 && t < b + 1e-9)) out.push({ t, p: pointAt(f, t, s) });
   }

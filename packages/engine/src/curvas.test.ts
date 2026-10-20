@@ -63,7 +63,8 @@ function sagDoArco(a: Vec2, b: Vec2, R: number, tau: 1 | -1): number {
 function pontaDoArco(p: Vec2, d: Vec2, R: number, c: number, tau: 1 | -1): Vec2 {
   const psi = 2 * Math.asin(Math.min(1, c / (2 * R)));
   const centro = mais(p, perp(unit(d)), tau * R);
-  return mais(centro, rot({ x: p.x - centro.x, y: p.y - centro.y }, tau * psi), 0);
+  const v = rot({ x: p.x - centro.x, y: p.y - centro.y }, tau * psi);
+  return { x: centro.x + v.x, y: centro.y + v.y };
 }
 
 /* ------------------------------ cenários ------------------------------ */

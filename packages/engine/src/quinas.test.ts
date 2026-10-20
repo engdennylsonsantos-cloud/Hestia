@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pointInMulti, type Vec2 } from '@hestia/geom';
-import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallsOnLevel, type JoinKind } from '@hestia/model';
+import { intersection, multiArea, pointInMulti, type Vec2 } from '@hestia/geom';
+import { ProjectStore, buildTemplate, createEmptyProject, makeWall, validateProject, wallType, wallsOnLevel, type JoinKind, type Wall } from '@hestia/model';
 import { resolveLevel } from './index.ts';
 
 /** Ponto dentro da ponta que o encosto deixava exposta: o núcleo da parede que passa chega à face externa da outra. */
@@ -46,5 +46,35 @@ describe('quinas externas (decisão 0009)', () => {
     c.exec({ type: 'addWall', wall: W('a', [0, 0], [4, 0]) });
     c.exec({ type: 'addWall', wall: W('d', [4, 0], [8, 0]) });
     expect(validateProject(c.project).filter((i) => i.code === 'wall-corner-butt-finish')).toEqual([]);
+  });
+
+  it('L em esquadria entre parede de 19 cm e de 14 cm: o acabamento da fina para na face da grossa', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'g', typeId: 'wt_ext19', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'f', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 3 } }) });
+    const p = s.project;
+    const miter: JoinKind = 'miter';
+    const q = {
+      ...p,
+      elements: {
+        ...p.elements,
+        g: { ...p.elements['g']!, joinEnd: { kind: miter, flip: false } },
+        f: { ...p.elements['f']!, joinStart: { kind: miter, flip: false } },
+      },
+    } as typeof p;
+    const r = resolveLevel(q, 'lv_0', new Map());
+    const acabamentos = (id: string) => {
+      const t = wallType(q, q.elements[id] as Wall);
+      return r.walls[id]!.layers.filter((l) => l.layerIndex < 0 || ['finish1', 'finish2'].includes(t.layers[l.layerIndex]!.function));
+    };
+    const fina = acabamentos('f');
+    const grossa = acabamentos('g');
+    expect(fina.length).toBeGreaterThan(0);
+    expect(grossa.length).toBeGreaterThan(0);
+    for (const a of fina) {
+      for (const b of grossa) {
+        expect(multiArea(intersection(a.cut, b.cut)), `${a.materialId} x ${b.materialId}`).toBeLessThan(1e-6);
+      }
+    }
   });
 });

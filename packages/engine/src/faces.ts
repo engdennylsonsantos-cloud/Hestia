@@ -2,7 +2,7 @@ import type { Vec2 } from '@hestia/geom';
 import { coreSpan, type Id, type Project } from '@hestia/model';
 import { sAtDepth } from './frame.ts';
 import { computeEnds } from './joins.ts';
-import { endPoint } from './layerGeom.ts';
+import { endPoint, layerQuad } from './layerGeom.ts';
 import { levelFrames } from './resolve.ts';
 
 export type Seg = [Vec2, Vec2];
@@ -14,6 +14,8 @@ export interface WallFaces {
   faces: Seg[];
   /** Arestas das faces do núcleo (estrutura). */
   core: Seg[];
+  /** Contorno real da parede inteira (todas as camadas), com as cadeias e degraus das pontas e os arcos. */
+  outline: Vec2[];
 }
 
 /**
@@ -31,6 +33,7 @@ export function wallFaces(p: Project, levelId: Id): WallFaces[] {
     const sCore = [sAtDepth(f, cs.from), sAtDepth(f, cs.to)];
     const sides = f.arc ? [] : [line(f.sHi), line(f.sLo)];
     const core = f.arc ? [] : sCore.map(line);
-    return { wallId: f.wall.id, faces: [...sides, cap('a'), cap('b')], core };
+    const outline = layerQuad(f, e, f.sLo, f.sHi);
+    return { wallId: f.wall.id, faces: [...sides, cap('a'), cap('b')], core, outline };
   });
 }

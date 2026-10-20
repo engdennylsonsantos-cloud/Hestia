@@ -29,14 +29,14 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 
 ## C · Junções
 - [x] C1 Canto em L com esquadria por camada
-- [x] C2 T com ramal até a linha de centro
+- [x] C2 T com ramal até a face da camada correspondente da parede que passa (docs/08 §5.7; antes ia até a linha de centro)
 - [x] C3 Cruzamento em X sem duplicar área
 - [x] C4 Paredes alinhadas contínuas, inclusive com espessuras diferentes
 - [x] C5 "Não unir" no início e no fim
 - [x] C6 Escolha do tipo de junção no canto (encosto, esquadria, corte reto) **(bloqueante)**
 - [x] C7 Trocar a ordem de junção (qual parede domina)
 - [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
-- [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)**
+- [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)** — exato em área (setores), mas o nó ainda ignora a configuração de junção e aperta o núcleo da grossa: J-2 aberto, ver docs/08 §6.4
 - [x] C10 Ângulos agudos e obtusos extremos sem artefato
 - [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados

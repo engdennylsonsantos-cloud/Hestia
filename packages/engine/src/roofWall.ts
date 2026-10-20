@@ -1,4 +1,4 @@
-import { cross, dist, dot, intersectSegments, sub, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, arcPointAt, cross, dist, dot, intersectSegments, sub, type Vec2 } from '@hestia/geom';
 import type { ProfilePoint, Wall } from '@hestia/model';
 import { roofThickness, roofTopAt, type ResolvedRoof } from './roofs.ts';
 
@@ -10,6 +10,10 @@ const DELTA = 1e-6;
 const STEP = 1e-3;
 /** Tolerância (m) para um vértice de telhado contar como sobre o eixo da parede. */
 const ON_AXIS = 1e-7;
+/** Passo máximo (m) ao longo do arco de uma parede curva para amostrar a face inferior do telhado. */
+const ARC_STEP = 0.25;
+/** Precisão (m) do ponto em que o arco entra ou sai do telhado. */
+const ARC_EPS = 1e-6;
 
 /** Eixo da parede com os telhados que o cobrem: comprimento, pontos de quebra e face inferior do telhado em cada t. */
 interface AxisRoofs {
@@ -19,16 +23,23 @@ interface AxisRoofs {
   bottomAt: (t: number) => number | null;
 }
 
-/** Eixo reto da parede contra os telhados dos níveis dela (base e topo). Parede curva ou de comprimento nulo, null. */
+/**
+ * Eixo da parede (reta ou curva) contra os telhados dos níveis dela (base e topo): comprimento, quebras e face inferior.
+ * Reta: quebras exatas nas bordas. Curva (sag ≠ 0): o eixo é o arco; quebras por amostragem a cada ARC_STEP e pelos
+ * pontos em que o arco entra ou sai do telhado. Arco degenerado ou comprimento nulo, null.
+ */
 function axisRoofs(w: Wall, roofs: ResolvedRoof[]): AxisRoofs | null {
   const topLevel = w.topLevelId ?? w.levelId;
   // Com telhado escolhido (attachTopRoofId), só esse telhado conta; sem escolha, qualquer telhado do nível.
   const rs = roofs.filter((r) => (r.levelId === w.levelId || r.levelId === topLevel) && (!w.attachTopRoofId || r.roofId === w.attachTopRoofId));
-  const L = dist(w.a, w.b);
+  const arc = w.sag !== 0 ? arcFromSagitta(w.a, w.b, w.sag) : null;
+  if (w.sag !== 0 && !arc) return null;
+  const L = arc ? arc.length : dist(w.a, w.b);
   if (L < 1e-9) return null;
   const u = { x: (w.b.x - w.a.x) / L, y: (w.b.y - w.a.y) / L };
+  const pointAt = (t: number): Vec2 => (arc ? arcPointAt(arc, t) : { x: w.a.x + u.x * t, y: w.a.y + u.y * t });
   const bottomAt = (t: number): number | null => {
-    const p = { x: w.a.x + u.x * t, y: w.a.y + u.y * t };
+    const p = pointAt(t);
     let z: number | null = null;
     for (const r of rs) {
       const top = roofTopAt(r, p);
@@ -38,7 +49,36 @@ function axisRoofs(w: Wall, roofs: ResolvedRoof[]): AxisRoofs | null {
     }
     return z;
   };
-  return { L, bps: breakpoints(w, rs, L, u), bottomAt };
+  const bps = arc ? curveBreakpoints(L, (t) => bottomAt(t) !== null) : breakpoints(w, rs, L, u);
+  return { L, bps, bottomAt };
+}
+
+/**
+ * Quebras de um arco de comprimento L: amostras a cada ARC_STEP e, entre duas amostras de cobertura diferente, o ponto
+ * em que o arco entra ou sai do telhado (bissecção até ARC_EPS). Entre quebras a face inferior varia pouco, então o
+ * mínimo e o trecho sem telhado saem das quebras como no eixo reto. Um trecho coberto menor que ARC_STEP entre duas
+ * amostras sem telhado pode passar sem ser amostrado.
+ */
+function curveBreakpoints(L: number, covered: (t: number) => boolean): number[] {
+  const n = Math.max(1, Math.ceil(L / ARC_STEP));
+  const out: number[] = [0];
+  for (let i = 0; i < n; i++) {
+    const a = (L * i) / n;
+    const b = (L * (i + 1)) / n;
+    if (covered(a) !== covered(b)) {
+      const inside = covered(a);
+      let lo = a;
+      let hi = b;
+      while (hi - lo > ARC_EPS) {
+        const m = (lo + hi) / 2;
+        if (covered(m) === inside) lo = m;
+        else hi = m;
+      }
+      out.push((lo + hi) / 2);
+    }
+    out.push(b);
+  }
+  return out;
 }
 
 /**
@@ -89,9 +129,11 @@ export interface RoofAxisReport {
   minBottom: number | null;
 }
 
-/** Relatório de cobertura do eixo (parede reta); null em parede curva ou de comprimento nulo. */
+/**
+ * Relatório de cobertura do eixo (reta ou curva, medido ao longo do arco): o aviso usa este relatório. Null só em parede
+ * de comprimento nulo ou arco degenerado.
+ */
 export function roofAxisReport(w: Wall, roofs: ResolvedRoof[]): RoofAxisReport | null {
-  if (w.sag !== 0) return null;
   const ax = axisRoofs(w, roofs);
   if (!ax) return null;
   const { L, bps, bottomAt } = ax;

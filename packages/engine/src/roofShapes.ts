@@ -7,8 +7,9 @@ import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
 
 /**
  * Inclinação por aresta de cada forma (decisão 0008, item 9; mesma regra da migração 9→10): 'hip' = todas as arestas;
- * 'gable' = as paralelas a `dir` (beiradas), as demais são empenas; 'shed' = só a aresta mais baixa em relação a `dir`;
- * 'edges' = o vetor guardado. Nulo = a aresta não define inclinação. Águas livres e extrusão não usam esta lista.
+ * 'gable' = as que fazem até 45° com `dir` (cos > 0,7, beiradas), as demais são empenas; se nenhuma aresta é paralela a
+ * `dir`, a cumeeira segue as arestas e validateRoofs avisa (roof-ridge-off-edges); 'shed' = só a aresta mais baixa em
+ * relação a `dir`; 'edges' = o vetor guardado. Nulo = a aresta não define inclinação. Águas livres e extrusão não usam esta lista.
  */
 export function edgeSlopesOf(r: Roof): Array<number | null> {
   const b = r.boundary;

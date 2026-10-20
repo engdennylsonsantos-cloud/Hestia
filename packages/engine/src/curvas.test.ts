@@ -258,11 +258,11 @@ function medir(c: Cenario, kind: JoinKind): Medida {
       const w = p.elements[id] as Wall;
       return l.layerIndex >= 0 && wallType(p, w).layers[l.layerIndex]!.function === 'structure';
     });
-  for (const pc of c.pecas) {
-    for (const pcY of c.pecas) {
-      if (pcY === pc) continue;
-      for (const acab of acabamentos(pc.id)) {
-        for (const est of estrutura(pcY.id)) {
+  // Acabamento da parede fina contra a estrutura (núcleo) da grossa, sobre `raw` (T-1).
+  for (const fina of c.pecas.filter((pc) => pc.typeId === FINA)) {
+    for (const grossa of c.pecas.filter((pc) => pc.typeId === GROSSA)) {
+      for (const acab of acabamentos(fina.id)) {
+        for (const est of estrutura(grossa.id)) {
           if (acab.raw.length && est.raw.length) sobre += multiArea(intersection(acab.raw, est.raw));
         }
       }

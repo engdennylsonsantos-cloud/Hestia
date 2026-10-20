@@ -7,5 +7,7 @@ export default defineConfig({
     // (vitest.perf.config.ts), isolados, porque medem tempo e reprovam por contenção com a suíte paralela.
     exclude: [...configDefaults.exclude, '**/*perf.test.ts'],
     environment: 'node',
+    // Cede o event loop entre os testes para não estourar o timeout do birpc (I-1b; ver tests/vitestSetup.ts).
+    setupFiles: ['tests/vitestSetup.ts'],
   },
 });

@@ -118,8 +118,9 @@ function crossing(q: Ring): boolean {
 
 /**
  * Vértices de uma face de arco à profundidade `s`, ordenados por t: as pontas que qualquer camada dessa face pode usar
- * (os dois lados, faixas alta e baixa) e um grid global de comprimento. Duas camadas que dividem a face leem a mesma
- * lista, então as cordas da borda comum são idênticas dos dois lados.
+ * (os dois lados, faixas alta e baixa), as cordas que a outra parede deixa sobre ela (`Chord`) e um grid global de
+ * comprimento, sem vértices dentro de uma corda. Duas camadas que dividem a face leem a mesma lista, então as cordas da
+ * borda comum são idênticas dos dois lados.
  */
 function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number; p: Vec2 }> {
   const pts: Vec2[] = [];
@@ -127,13 +128,20 @@ function arcBoundary(f: WallFrame, ends: WallEnds, s: number): Array<{ t: number
     const spec = ends[which];
     for (const side of [spec.lo, spec.hi]) for (const edge of ['low', 'high'] as const) pts.push(pointOnSide(f, which, side, s, edge));
   }
+  const cordas = [...(ends.a.cordas ?? []), ...(ends.b.cordas ?? [])].filter((c) => Math.abs(c.s - s) < 1e-9);
+  for (const c of cordas) pts.push(c.p, c.q);
   const ts = pts.map((p) => toLocal(f, p).t);
   const tMin = Math.min(...ts);
   const tMax = Math.max(...ts);
+  const intervalos = cordas.map((c) => {
+    const a = toLocal(f, c.p).t;
+    const b = toLocal(f, c.q).t;
+    return [Math.min(a, b), Math.max(a, b)] as const;
+  });
   const out = pts.map((p, i) => ({ t: ts[i]!, p }));
   for (let k = Math.ceil(tMin / ARC_GRID); k * ARC_GRID < tMax; k++) {
     const t = k * ARC_GRID;
-    if (t > tMin) out.push({ t, p: pointAt(f, t, s) });
+    if (t > tMin && !intervalos.some(([a, b]) => t > a - 1e-9 && t < b + 1e-9)) out.push({ t, p: pointAt(f, t, s) });
   }
   out.sort((x, y) => x.t - y.t);
   return out.filter((q, i) => i === 0 || q.t - out[i - 1]!.t > 1e-9);

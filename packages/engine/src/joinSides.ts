@@ -127,8 +127,9 @@ export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'l
     const tLow = tAtS(sLow);
     const tHigh = tAtS(sHigh);
     if (!ok(tEdge) || !ok(tLow) || !ok(tHigh)) return null;
-    if (Math.abs(tHigh - tLow) < 1e-9) runs.push({ s: sLow, t: tEdge });
-    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh });
+    // Faixa que corta a face de arco da outra parede: a corda entre os dois pontos fica registrada em `on`.
+    if (Math.abs(tHigh - tLow) < 1e-9 && !other.arc) runs.push({ s: sLow, t: tEdge, on: sOther });
+    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh, on: sOther });
   }
   runs.sort((x, y) => x.s - y.s);
   return runs.length ? { kind: 'steps', runs } : null;
@@ -163,7 +164,8 @@ export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
   for (const sp of layerSpans(r.f.type)) {
     if (sp.layer.thickness < 1e-6) continue;
     const d = faceFor(layerPriority(sp.layer));
-    const face = faceCurve(host, fromHi ? nearS - d : nearS + d);
+    const faceS = fromHi ? nearS - d : nearS + d;
+    const face = faceCurve(host, faceS);
     // A face da hospedeira corta a camada do ramal nas duas bordas dela (s menor e s maior): o corte é oblíquo quando
     // o ramal não é perpendicular à hospedeira (T oblíquo), e reto (o mesmo ponto do eixo) quando é.
     const sLo = Math.min(sAtDepth(r.f, sp.from), sAtDepth(r.f, sp.to));
@@ -175,11 +177,11 @@ export function buttAgainst(r: EndRef, host: WallFrame): SideSpec | null {
     const tLo = tOn(faceCurve(r.f, sLo));
     const tHi = tOn(faceCurve(r.f, sHi));
     if (tLo === null || tHi === null || !Number.isFinite(tLo) || !Number.isFinite(tHi)) return null;
-    if (!r.f.arc && Math.abs(tHi - tLo) < 1e-9) {
+    if (!r.f.arc && !host.arc && Math.abs(tHi - tLo) < 1e-9) {
       const tAxis = tOn(axis);
       if (tAxis === null || !Number.isFinite(tAxis)) return null;
-      runs.push({ s: sLo, t: clampT(tAxis) });
-    } else runs.push({ s: sLo, s1: sHi, t: clampT(tLo), t1: clampT(tHi) });
+      runs.push({ s: sLo, t: clampT(tAxis), on: faceS });
+    } else runs.push({ s: sLo, s1: sHi, t: clampT(tLo), t1: clampT(tHi), on: faceS });
   }
   if (runs.length === 0) return null;
   runs.sort((x, y) => x.s - y.s);

@@ -31,6 +31,19 @@ export interface StepRun {
   s1?: number;
   t: number;
   t1?: number;
+  /** Profundidade (na outra parede) da face sobre a qual a faixa corta; só em degraus com a outra parede. */
+  on?: number;
+}
+
+/**
+ * Corda de uma face de arco: a outra parede corta esta face entre os pontos p e q, na profundidade `s` (desta parede).
+ * A face de arco vira polilinha com grade; a corda entra na lista da face e a grade não passa dentro dela, para que a
+ * camada da outra parede e a desta coincidam exatamente (sem fresta entre a corda e a polilinha).
+ */
+export interface Chord {
+  s: number;
+  p: Vec2;
+  q: Vec2;
 }
 
 /**
@@ -50,6 +63,8 @@ export interface EndSpec {
   hi: SideSpec;
   lo: SideSpec;
   clip?: Vec2[];
+  /** Cordas que a outra parede deixa sobre as faces de arco desta extremidade (ver `Chord`). */
+  cordas?: Chord[];
 }
 
 export interface WallEnds {

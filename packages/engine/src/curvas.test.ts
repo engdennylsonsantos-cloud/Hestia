@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { arcFromSagitta, arcPointAt, arcTangentAt, intersection, multiArea, norm, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, wallType, type JoinKind, type Project, type Wall } from '@hestia/model';
-import { buildFrame, resolveLevel, toLocal, type WallFrame } from './index.ts';
+import { buildFrame, pointAt, resolveLevel, toLocal, type WallFrame } from './index.ts';
 
 /**
  * Junções com parede curva (docs/08 §5): L, T e curva com curva, nos três tipos de junção, em ângulos de 30° a 150°,
@@ -23,6 +23,8 @@ const RAIOS = [1.5, 4, 20];
 const TOL_AREA = 1e-5;
 const TOL_RAW = 1e-6;
 const TOL_PONTA = 1e-6;
+/** Raio (m) em volta do nó em que as pontas são medidas. */
+const RAIO_NO = 0.8;
 
 interface Peca {
   id: string;
@@ -30,13 +32,15 @@ interface Peca {
   a: Vec2;
   b: Vec2;
   sag: number;
-  /** Extremidade que está no nó: 'start' (a) ou 'end' (b). */
-  lado: 'start' | 'end';
+  /** Extremidade que está no nó: 'start' (a), 'end' (b) ou null (passante de T, sem configuração). */
+  lado: 'start' | 'end' | null;
 }
 
 interface Cenario {
   nome: string;
   pecas: Peca[];
+  /** Ponto onde as paredes se encontram (a ponta de uma parede é medida perto dele). */
+  no: Vec2;
 }
 
 const rad = (graus: number): number => (graus * Math.PI) / 180;
@@ -73,6 +77,7 @@ function cenarioL(curvaNaHospedeira: boolean, graus: number, R: number, sentido:
     const dNo = girar({ x: -tN.x, y: -tN.y }, lado * graus);
     return {
       nome: `L curva-hospedeira θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
+      no: N,
       pecas: [
         { id: 'g', typeId: GROSSA, a: A, b: N, sag, lado: 'end' },
         { id: 'f', typeId: FINA, a: N, b: mais(N, dNo, 3), sag: 0, lado: 'start' },
@@ -85,6 +90,7 @@ function cenarioL(curvaNaHospedeira: boolean, graus: number, R: number, sentido:
   const chord = Math.min(3, c + 1);
   return {
     nome: `L curva-ramal θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
+    no: N,
     pecas: [
       { id: 'g', typeId: GROSSA, a: A, b: N, sag: 0, lado: 'end' },
       { id: 'f', typeId: FINA, a: N, b: mais(N, dNo, chord), sag: sentido * h, lado: 'start' },
@@ -105,8 +111,9 @@ function cenarioT(curvaNaPassante: boolean, graus: number, R: number, sentido: 1
     const d = girar(tM, lado * graus);
     return {
       nome: `T passante curva θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
+      no: M,
       pecas: [
-        { id: 'g', typeId: GROSSA, a: A, b: B, sag, lado: 'start' },
+        { id: 'g', typeId: GROSSA, a: A, b: B, sag, lado: null },
         { id: 'f', typeId: FINA, a: M, b: mais(M, d, 3), sag: 0, lado: 'start' },
       ],
     };
@@ -118,8 +125,9 @@ function cenarioT(curvaNaPassante: boolean, graus: number, R: number, sentido: 1
   const chord = Math.min(3, c + 1);
   return {
     nome: `T ramal curvo θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
+    no: M,
     pecas: [
-      { id: 'g', typeId: GROSSA, a: A, b: B, sag: 0, lado: 'start' },
+      { id: 'g', typeId: GROSSA, a: A, b: B, sag: 0, lado: null },
       { id: 'f', typeId: FINA, a: M, b: mais(M, d, chord), sag: sentido * h, lado: 'start' },
     ],
   };
@@ -136,6 +144,7 @@ function cenarioCurvaCurva(graus: number, R: number, sentido: 1 | -1, lado: 1 | 
   const B = mais(N, dNo, c);
   return {
     nome: `curva-curva θ=${graus} R=${R} sentido=${sentido} lado=${lado}`,
+    no: N,
     pecas: [
       { id: 'g', typeId: GROSSA, a: A, b: N, sag: sagA, lado: 'end' },
       { id: 'f', typeId: FINA, a: N, b: B, sag: -sentido * h, lado: 'start' },
@@ -183,20 +192,27 @@ function furosReais(sil: MultiPolygon): number {
   return n;
 }
 
-/** Maior distância (m) com que um vértice da parede `x` passa das faces da parede `y`, no vão de `y`. */
-function pontaFora(x: WallFrame, y: WallFrame, silX: MultiPolygon): number {
+/**
+ * Maior distância (m) com que um vértice da silhueta `silX` atravessa a face distante de `y` (a face do lado oposto ao
+ * que `x` ocupa), no vão de `y`, perto do nó. Ponta = a parede que passa pela outra e sai do outro lado.
+ */
+function pontaFora(x: WallFrame, y: WallFrame, silX: MultiPolygon, no: Vec2): number {
+  const noEmA = Math.hypot(x.a.x - no.x, x.a.y - no.y) <= Math.hypot(x.b.x - no.x, x.b.y - no.y);
+  const pX = noEmA ? pointAt(x, 0.1, 0) : pointAt(x, x.length - 0.1, 0);
+  const sigma = Math.sign(toLocal(y, pX).s - toLocal(y, no).s);
+  if (sigma === 0) return 0;
   let pior = 0;
   for (const poly of silX) {
     for (const ring of poly) {
       for (const p of ring as Ring) {
+        if (Math.hypot(p.x - no.x, p.y - no.y) > RAIO_NO) continue;
         const l = toLocal(y, p);
         if (l.t <= 1e-6 || l.t >= y.length - 1e-6) continue;
-        const fora = Math.max(l.s - Math.max(y.sExt, y.sInt), Math.min(y.sExt, y.sInt) - l.s, 0);
-        pior = Math.max(pior, fora);
+        pior = Math.max(pior, sigma > 0 ? y.sLo - l.s : l.s - y.sHi);
       }
     }
   }
-  return pior;
+  return Math.max(0, pior);
 }
 
 interface Medida {
@@ -222,12 +238,13 @@ function medir(c: Cenario, kind: JoinKind): Medida {
   }
   let ponta = 0;
   for (const pc of c.pecas) {
+    if (pc.lado === null) continue; // a passante de T não tem nó na extremidade
     const sx = union(...(res.walls[pc.id]?.layers.filter((l) => l.cut.length > 0).map((l) => l.cut) ?? []));
     for (const pcY of c.pecas) {
       if (pcY === pc) continue;
       const fx = frames.get(pc.id);
       const fy = frames.get(pcY.id);
-      if (fx && fy) ponta = Math.max(ponta, pontaFora(fx, fy, sx));
+      if (fx && fy) ponta = Math.max(ponta, pontaFora(fx, fy, sx, c.no));
     }
   }
   let sobre = 0;
@@ -275,29 +292,21 @@ function varrer(cenarios: Cenario[], exigeRaw: (kind: JoinKind) => boolean): str
 const todos = (f: (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, angulos: number[] = ANGULOS): Cenario[] =>
   angulos.flatMap((g) => RAIOS.flatMap((r) => ([1, -1] as const).flatMap((s) => ([1, -1] as const).map((l) => f(g, r, s, l)))));
 
+const CASOS: Array<[string, (g: number, r: number, s: 1 | -1, l: 1 | -1) => Cenario, number[], (k: JoinKind) => boolean]> = [
+  ['L com a curva na hospedeira', (g, r, s, l) => cenarioL(true, g, r, s, l), ANGULOS, (k) => k !== 'miter'],
+  ['L com o ramal curvo', (g, r, s, l) => cenarioL(false, g, r, s, l), ANGULOS, (k) => k !== 'miter'],
+  ['T com a passante curva', (g, r, s, l) => cenarioT(true, g, r, s, l), [60, 90, 120], () => true],
+  ['T com o ramal curvo', (g, r, s, l) => cenarioT(false, g, r, s, l), [60, 90, 120], () => true],
+  ['curva com curva', (g, r, s, l) => cenarioCurvaCurva(g, r, s, l), ANGULOS, (k) => k !== 'miter'],
+];
+
 describe('junções com parede curva (L, T, curva com curva)', () => {
-  it('L com a curva na hospedeira: 1 anel, sem buraco, sem ponta, sem sobreposição (encosto e esquadro)', () => {
-    const falhas = varrer(todos((g, r, s, l) => cenarioL(true, g, r, s, l)), (k) => k !== 'miter');
-    expect(falhas, falhas.join('\n')).toEqual([]);
-  }, 300_000);
-
-  it('L com o ramal curvo: 1 anel, sem buraco, sem ponta, sem sobreposição (encosto e esquadro)', () => {
-    const falhas = varrer(todos((g, r, s, l) => cenarioL(false, g, r, s, l)), (k) => k !== 'miter');
-    expect(falhas, falhas.join('\n')).toEqual([]);
-  }, 300_000);
-
-  it('T com a passante curva: 1 anel, sem buraco, sem ponta, sem sobreposição', () => {
-    const falhas = varrer(todos((g, r, s, l) => cenarioT(true, g, r, s, l), [60, 90, 120]), () => true);
-    expect(falhas, falhas.join('\n')).toEqual([]);
-  }, 300_000);
-
-  it('T com o ramal curvo: 1 anel, sem buraco, sem ponta, sem sobreposição', () => {
-    const falhas = varrer(todos((g, r, s, l) => cenarioT(false, g, r, s, l), [60, 90, 120]), () => true);
-    expect(falhas, falhas.join('\n')).toEqual([]);
-  }, 300_000);
-
-  it('curva com curva: 1 anel, sem buraco, sem ponta, sem sobreposição', () => {
-    const falhas = varrer(todos((g, r, s, l) => cenarioCurvaCurva(g, r, s, l)), (k) => k !== 'miter');
-    expect(falhas, falhas.join('\n')).toEqual([]);
-  }, 300_000);
+  for (const [nome, gera, angulos, exigeRaw] of CASOS) {
+    for (const g of angulos) {
+      it(`${nome}, θ=${g}°: 1 anel, sem buraco, sem ponta, sem sobreposição`, () => {
+        const falhas = varrer(todos(gera, [g]), exigeRaw);
+        expect(falhas, falhas.join('\n')).toEqual([]);
+      }, 120_000);
+    }
+  }
 });

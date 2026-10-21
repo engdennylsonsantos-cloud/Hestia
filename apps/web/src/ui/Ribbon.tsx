@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
 import { isStair, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
+import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
 
@@ -154,6 +154,7 @@ export function Ribbon(): ReactElement {
               <div className="rgroup-tools">
                 <Toggle icon="grid" label="Grade" on={s.showGrid} onClick={() => set({ showGrid: !s.showGrid })} />
                 <Toggle icon="layers" label="Subpavimento" on={s.showUnderlay} onClick={() => set({ showUnderlay: !s.showUnderlay })} title="Mostrar o pavimento abaixo, apagado" />
+                <Toggle icon="roof" label="Mostrar projeção da cobertura" on={s.showRoofProjection} onClick={toggleRoofProjection} title="Mostrar a projeção tracejada da cobertura acima do corte (decisão 0013)" />
               </div>
               <div className="rgroup-title">Planta</div>
             </div>

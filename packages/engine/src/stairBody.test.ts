@@ -243,15 +243,18 @@ describe('leque e arco: peças disjuntas, fundos planos, sem peça abaixo de bas
   const cases: Array<[string, ReturnType<typeof generateFanRun>, number]> = [
     // 16 espelhos em 2,80 m: h = 0,175 m, abaixo do espelho máximo de 0,18 m (com menos espelhos há erro de norma).
     ['leque de 90°', generateFanRun({ center: v(0, 0), innerRadius: 1.0, outerRadius: 2.2, startAngle: 0, endAngle: Math.PI / 2, risers: N }), N - 1],
-    // Acima de 180° o croqui (stairRunSteps) já devolve degraus sobrepostos: fora deste teste (defeito do croqui).
     ['arco de 180°', generateFanRun({ center: v(0, 0), innerRadius: 1.0, outerRadius: 1.8, startAngle: 0, endAngle: Math.PI, risers: N }), N - 1],
+    // Acima de 180°: três trechos de arco por limite (decisão 0011 §4: ordem dos espelhos pela linha média).
+    ['arco de 270°', generateFanRun({ center: v(0, 0), innerRadius: 1.0, outerRadius: 1.8, startAngle: 0, endAngle: (3 * Math.PI) / 2, risers: N }), N - 1],
   ];
   for (const [name, run, treads] of cases) {
     it(`${name}: ${treads} degraus com áreas > 0, sem sobreposição em planta e sem fundo abaixo de baseZ`, () => {
       const st = resolveStair([{ id: 'curva', kind: 'run', ...run }]);
       expect(st.issues.filter((i) => i.severity === 'error')).toEqual([]);
       const { pieces } = stairBody(st);
-      expect(pieces.filter((p) => p.kind === 'tread').length).toBeGreaterThanOrEqual(treads);
+      // Cada degrau k (1..N−1) aparece em pelo menos uma peça; o corte pelo piso base pode dividir um degrau em duas.
+      const indices = new Set(pieces.filter((p) => p.kind === 'tread').map((p) => p.index));
+      expect([...indices].sort((a, b) => a - b)).toEqual(Array.from({ length: treads }, (_, k) => k + 1));
       let sum = 0;
       for (const p of pieces) {
         const area = multiArea([[p.polygon]]);

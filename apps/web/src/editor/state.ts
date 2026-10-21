@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
 import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { safeGet, safeSet } from './storage.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -73,6 +74,28 @@ export function setSnap(patch: Partial<SnapOptions>): void {
   }
 }
 
+/**
+ * Projeção tracejada da cobertura acima do corte (decisão 0013 §2): preferência da tela, não do projeto, como a captura.
+ * Guardada no navegador; sem armazenamento ou valor inválido, vale ligada (padrão).
+ */
+export const ROOF_PROJECTION_KEY = 'hestia.roofProjection';
+
+/** Lê a preferência guardada. Ausente, inválida ou armazenamento indisponível: ligada. */
+export function readRoofProjection(): boolean {
+  return safeGet(ROOF_PROJECTION_KEY) !== 'false';
+}
+
+/** Liga ou desliga a projeção da cobertura e guarda a escolha. Sem armazenamento, vale só nesta sessão. */
+export function setRoofProjection(on: boolean): void {
+  useUi.setState({ showRoofProjection: on });
+  safeSet(ROOF_PROJECTION_KEY, on ? 'true' : 'false');
+}
+
+/** Alterna a projeção da cobertura (alternador da faixa, aba Vista, e a caixa de Propriedades usam o mesmo estado). */
+export function toggleRoofProjection(): void {
+  setRoofProjection(!useUi.getState().showRoofProjection);
+}
+
 export const DEFAULT_OPTIONS: ToolOptions = {
   snap: loadSnap(),
   wallTypeId: 'wt_alv14',
@@ -122,7 +145,7 @@ export const useUi = create<UiState>(() => ({
   dialogArg: null,
   showGrid: true,
   showUnderlay: true,
-  showRoofProjection: true,
+  showRoofProjection: readRoofProjection(),
   shadows: true,
   edges: true,
   leftOpen: typeof window === 'undefined' || window.innerWidth > 900,

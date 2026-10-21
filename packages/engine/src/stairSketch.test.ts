@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asMulti, intersection, multiArea, ringArea, type Vec2 } from '@hestia/geom';
+import { generateFanRun } from './stairGenerators.ts';
+import { SAMPLE_TOL } from './stairSketchGeom.ts';
 import {
   autoPath,
   distributeRisers,
@@ -171,6 +173,44 @@ describe('degraus', () => {
     expect(r.footprint).toEqual([]);
     expect(codes(r.issues)).toEqual(['stair-riser-not-spanning']);
   });
+});
+
+describe('leque acima de 180° (ordem dos espelhos e degraus disjuntos)', () => {
+  // 16 espelhos radiais entre r = 1,0 e r = 1,8. A região entre o 1º e o último espelho é um setor anular de ângulo θ:
+  // área θ·(r2² − r1²)/2. A amostragem por corda (SAMPLE_TOL) subestima cada arco em no máximo (2/3)·tol·comprimento.
+  const R1 = 1.0;
+  const R2 = 1.8;
+  const cases: Array<[string, number]> = [
+    ['90°', 90],
+    ['180°', 180],
+    ['270°', 270],
+    ['330° (o gerador recusa 360°)', 330],
+    ['270° no sentido horário', -270],
+  ];
+  for (const [name, deg] of cases) {
+    it(`${name}: 15 degraus com áreas > 0, disjuntos; soma = união = setor entre o 1º e o último espelho`, () => {
+      const th = (deg * Math.PI) / 180;
+      const run = generateFanRun({ center: v(0, 0), innerRadius: R1, outerRadius: R2, startAngle: 0, endAngle: th, risers: 16 });
+      const r = stairRunSteps(run, { baseZ: 0, riserHeight: 0.175 });
+      expect(r.issues).toEqual([]);
+      expect(r.treads).toHaveLength(15);
+      r.treads.forEach((t, k) => {
+        expect(ringArea(t.polygon)).toBeGreaterThan(0);
+        expect(t.z).toBeCloseTo(0.175 * (k + 1), 12);
+      });
+      const sum = r.treads.reduce((s, t) => s + area(t.polygon), 0);
+      expect(sum).toBeCloseTo(multiArea(r.footprint), 6);
+      for (let i = 0; i < r.treads.length; i++) {
+        for (let j = i + 1; j < r.treads.length; j++) {
+          const common = intersection(asMulti(r.treads[i]!.polygon), asMulti(r.treads[j]!.polygon));
+          expect(multiArea(common)).toBeLessThan(1e-9);
+        }
+      }
+      const sector = (Math.abs(th) * (R2 * R2 - R1 * R1)) / 2;
+      const samplingTol = ((2 / 3) * SAMPLE_TOL * Math.abs(th) * (R1 + R2)) + 1e-9;
+      expect(Math.abs(multiArea(r.footprint) - sector)).toBeLessThanOrEqual(samplingTol);
+    });
+  }
 });
 
 describe('códigos de erro (um teste por código, mensagem exata)', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate } from '@hestia/model';
 import {
+  type DxfSymbolPath,
   DXF_LAYER_CONTOUR,
   DXF_LAYER_OPENINGS,
   DXF_LAYER_OPENING_ABOVE,
@@ -306,5 +307,56 @@ describe('vista da planta no DXF (camadas de projeção, decisão 0013 §4)', ()
   it('o tipo DASHED só aparece na tabela quando alguma camada o usa', () => {
     const above = exportDxf(project, 'lv_0', { ...base, wallOutlines: [{ state: 'projection-below', polygons: [[square]] }] });
     expect(ltypeNames(above)).toEqual(['CONTINUOUS']);
+  });
+});
+
+describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
+  const base: DxfLevelGeometry = { clusters: [], openings: [] };
+  // Porta de uma folha: a folha (2 pontos) e o arco de giro (19 pontos), como o símbolo da tela.
+  const leaf: DxfSymbolPath = { pts: [{ x: 1, y: 0 }, { x: 1.8, y: 0 }], closed: false };
+  const arc: DxfSymbolPath = { pts: Array.from({ length: 19 }, (_, i) => ({ x: 1 + 0.8 * Math.cos((i * Math.PI) / 36), y: 0.8 * Math.sin((i * Math.PI) / 36) })), closed: false };
+  const at = (state: 'cut' | 'projection-above' | 'projection-below' | 'beyond', symbol?: DxfSymbolPath[]) => ({
+    center: { x: 1, y: 0 },
+    u: { x: 1, y: 0 },
+    width: 0.8,
+    thickness: 0.14,
+    state,
+    ...(symbol ? { symbol } : {}),
+  });
+
+  it('porta acima do corte: folha e arco na camada ABERTURA_ACIMA, sem retângulo e sem vão em ABERTURAS', () => {
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('projection-above', [leaf, arc])] });
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_ABOVE, DXF_LAYER_OPENING_ABOVE]);
+    expect(polys.map((p) => p.pts.length)).toEqual([2, 19]);
+    expect(polys.every((p) => !p.closed)).toBe(true);
+    expect(linetypeOf(text, DXF_LAYER_OPENING_ABOVE)).toBe('DASHED');
+    expect(text).not.toContain('\r\nABERTURAS\r\n');
+  });
+
+  it('sem símbolo, a projeção sai como retângulo fechado, como antes', () => {
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below')] });
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_BELOW]);
+    expect(polys[0]!.closed && polys[0]!.pts.length === 4).toBe(true);
+  });
+
+  it('o vão de corte ignora o símbolo: continua retângulo em ABERTURAS', () => {
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [leaf, arc])] });
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS]);
+    expect(polys[0]!.pts).toHaveLength(4);
+  });
+
+  it('traço tracejado dentro de camada contínua (arco do maxim-ar, soleira) leva o tipo DASHED na entidade', () => {
+    const dashedArc: DxfSymbolPath = { ...arc, dashed: true };
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, dashedArc])] });
+    expect(linetypeOf(text, DXF_LAYER_OPENING_BELOW)).toBe('CONTINUOUS');
+    expect(ltypeNames(text)).toEqual(['CONTINUOUS', 'DASHED']);
+    const entities = records(text).filter((r) => r.type === 'POLYLINE');
+    const types = entities.map((r) => r.fields.some(([c, v]) => c === 6 && v === 'DASHED'));
+    expect(types).toEqual([false, true]);
+    // sem traço tracejado, o arquivo não ganha tipo DASHED
+    expect(ltypeNames(exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, arc])] }))).toEqual(['CONTINUOUS']);
   });
 });

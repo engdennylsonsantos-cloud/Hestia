@@ -18,6 +18,7 @@ import {
   between,
   chainBroken,
   makePoly,
+  midlinePoly,
   orderBy,
   pointAtLength,
   polyLength,
@@ -176,22 +177,14 @@ function radialRisers(w: RadialWalk, n: number): StairCurve[] {
   return out;
 }
 
-/** Linha média dos limites (pontos médios por fração de comprimento), amostrada em K passos. */
+/** Espelhos igualmente espaçados em comprimento ao longo da linha média dos limites (`midlinePoly`). */
 function walkRisers(run: StairRunSketch, n: number): StairCurve[] {
   const L = sampleChain(run.boundaryLeft);
   const R = sampleChain(run.boundaryRight);
   if (L.length === 0 || R.length === 0) return [];
-  const Lp = makePoly(L);
-  const Rp = makePoly(R);
-  const K = 200;
-  const walkPts: Vec2[] = [];
-  for (let k = 0; k <= K; k++) {
-    const f = k / K;
-    pushDistinct(walkPts, mid(pointAtLength(Lp, f * polyLength(Lp)), pointAtLength(Rp, f * polyLength(Rp))));
-  }
-  const W = makePoly(walkPts);
+  const W = midlinePoly(makePoly(L), makePoly(R));
+  if (!W) return [];
   const total = polyLength(W);
-  if (total < 1e-9) return [];
   const all = [...L, ...R];
   const xs = all.map((p) => p.x);
   const ys = all.map((p) => p.y);

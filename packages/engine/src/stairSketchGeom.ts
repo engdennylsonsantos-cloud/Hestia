@@ -282,23 +282,6 @@ export function midOf(p: Poly): Vec2 {
   return pointAtLength(p, polyLength(p) / 2);
 }
 
-/** Eixo de subida: perpendicular ao vetor do ponto médio direito ao esquerdo (esquerdo fica à esquerda). */
-export function boundaryAxis(run: StairRunSketch): Vec2 | null {
-  const mL = chainMid(run.boundaryLeft);
-  const mR = chainMid(run.boundaryRight);
-  if (!mL || !mR) return null;
-  const v = sub(mL, mR);
-  if (len(v) < 1e-9) return null;
-  const w = norm(v);
-  return { x: w.y, y: -w.x };
-}
-
-function chainMid(cs: StairCurve[]): Vec2 | null {
-  const first = cs[0];
-  const last = cs[cs.length - 1];
-  return first && last ? mid(first.a, last.b) : null;
-}
-
 /** Comprimento na caminhada (path) em que ela cruza o espelho; se não cruza, o do ponto mais próximo. */
 function pathParam(path: Poly, geom: Poly): number {
   const hits = crossings(geom, path);
@@ -318,16 +301,47 @@ function pathParam(path: Poly, geom: Poly): number {
 }
 
 /**
- * Índices (em `run.risers`) na ordem de subida. Com `byPath` e caminhada válida, pela posição do cruzamento na
- * caminhada; senão, pela projeção do ponto médio sobre o eixo dos limites.
+ * Linha média entre os dois limites: pontos médios (L(f), R(f)) para f = 0..1 por fração de comprimento de cada limite.
+ * Não usa o ponto médio das cordas: para um arco acima de 180° a corda inverte de lado. Sem orientação de subida.
  */
+export function midlinePoly(L: Poly, R: Poly, steps = 200): Poly | null {
+  if (L.pts.length < 2 || R.pts.length < 2) return null;
+  const lt = polyLength(L);
+  const rt = polyLength(R);
+  const pts: Vec2[] = [];
+  for (let k = 0; k <= steps; k++) {
+    const f = k / steps;
+    pushDistinct(pts, mid(pointAtLength(L, f * lt), pointAtLength(R, f * rt)));
+  }
+  const W = makePoly(pts);
+  return polyLength(W) >= 1e-9 ? W : null;
+}
+
+/**
+ * Linha média orientada na direção de subida: o limite esquerdo fica à esquerda de quem sobe (decisão 0011 §1), ou seja,
+ * L − R = λ·perp(d) com λ > 0 no meio dos limites. A orientação é local, no meio: vale para qualquer varredura.
+ */
+function ascentWalk(P: Prepared): Poly | null {
+  const W = midlinePoly(P.L, P.R);
+  if (!W) return null;
+  const v = sub(pointAtLength(P.L, polyLength(P.L) / 2), pointAtLength(P.R, polyLength(P.R) / 2));
+  if (len(v) < 1e-9) return W;
+  const d = { x: v.y / len(v), y: -v.x / len(v) };
+  const total = polyLength(W);
+  const delta = total * 1e-3;
+  const s = total / 2;
+  const t = sub(pointAtLength(W, s + delta), pointAtLength(W, s - delta));
+  return dot(t, d) >= 0 ? W : makePoly([...W.pts].reverse());
+}
+
+/** Índices (em `run.risers`) na ordem de subida. Com `byPath` e caminhada válida, pela posição do cruzamento na
+ * caminhada; senão, pelo comprimento ao longo da linha média orientada (vale para qualquer varredura). */
 export function orderBy(P: Prepared, run: StairRunSketch, byPath: boolean): number[] {
   const path = byPath && run.path.length > 0 ? makePoly(sampleChain(run.path)) : null;
-  const usePath = path !== null && path.pts.length >= 2;
-  const axis = usePath ? null : (boundaryAxis(run) ?? { x: 1, y: 0 });
+  const guide = path && path.pts.length >= 2 ? path : ascentWalk(P);
   const keyed = P.risers.map((g) => ({
     i: g.index,
-    k: path && usePath ? pathParam(path, g.geom) : dot(midOf(g.geom), axis!),
+    k: guide ? pathParam(guide, g.geom) : midOf(g.geom).x,
   }));
   keyed.sort((x, y) => x.k - y.k || x.i - y.i);
   return keyed.map((o) => o.i);

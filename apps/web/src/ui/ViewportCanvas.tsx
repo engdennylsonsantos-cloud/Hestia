@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, planViewOf, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
+import type { Id, Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -159,7 +160,8 @@ export function ViewportCanvas(): ReactElement {
     const dl =
       st.view === 'section'
         ? (buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] })
-        : buildPlanDrawList({
+        : withHiddenSelection(
+            buildPlanDrawList({
             project: p,
             levelId: st.levelId,
             resolved,
@@ -177,7 +179,12 @@ export function ViewportCanvas(): ReactElement {
             showGrid: st.showGrid,
             // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
             ...{ showRoofProjection: st.showRoofProjection },
-          });
+          }),
+            p,
+            st.levelId,
+            st.selection,
+            theme,
+          );
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);

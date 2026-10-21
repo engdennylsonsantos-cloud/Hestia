@@ -33,10 +33,10 @@ describe('caixa e pontos da escada', () => {
 describe('edição em transação única', () => {
   it('alterar vários campos de uma escada volta com um só desfazer', () => {
     const store = withStair();
-    patchStairs(store, ['st1'], { baseOffset: 0.2, topOffset: -0.1, mark: 'E-01', openSlab: false }, 'Editar escada');
-    expect(store.project.elements.st1).toMatchObject({ baseOffset: 0.2, topOffset: -0.1, mark: 'E-01', openSlab: false });
+    patchStairs(store, ['st1'], { baseOffset: 0.2, topOffset: -0.1, mark: 'E-01', openingMode: 'none' }, 'Editar escada');
+    expect(store.project.elements.st1).toMatchObject({ baseOffset: 0.2, topOffset: -0.1, mark: 'E-01', openingMode: 'none' });
     store.undo();
-    expect(store.project.elements.st1).toMatchObject({ baseOffset: 0, topOffset: 0, mark: '', openSlab: true });
+    expect(store.project.elements.st1).toMatchObject({ baseOffset: 0, topOffset: 0, mark: '', openingMode: 'headroom' });
   });
 
   it('lista vazia não grava nada', () => {

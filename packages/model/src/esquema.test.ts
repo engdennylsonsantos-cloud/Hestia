@@ -118,7 +118,7 @@ describe('migração 11 → 12 (escadas)', () => {
         id: 'st1',
         typeId: 'stt_piso_espelho',
         levelId: 'lv_0',
-        openSlab: false,
+        openingMode: 'none',
         components: [
           {
             id: 'r1',
@@ -136,7 +136,7 @@ describe('migração 11 → 12 (escadas)', () => {
     const original: Project = s.project;
     const back = migrateProject(JSON.parse(JSON.stringify(original)));
     expect(back).toEqual(original);
-    expect(back.elements.st1).toMatchObject({ kind: 'stair', openSlab: false, typeId: 'stt_piso_espelho' });
+    expect(back.elements.st1).toMatchObject({ kind: 'stair', openingMode: 'none', typeId: 'stt_piso_espelho' });
   });
 });
 
@@ -152,7 +152,7 @@ describe('migração 12 → 13 (face inferior da escada)', () => {
   it('todo tipo de escada existente ganha face lisa', () => {
     const m = migrateProject(legacyV12());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(13);
+    expect(SCHEMA_VERSION).toBe(14);
     for (const t of Object.values(m.stairTypes)) expect(t.undersideStyle).toBe('smooth');
   });
 
@@ -181,5 +181,53 @@ describe('migração 12 → 13 (face inferior da escada)', () => {
     p.stairTypes.stt_monolitica = { ...p.stairTypes.stt_monolitica!, undersideStyle: 'stepped' };
     const back = migrateProject(JSON.parse(JSON.stringify(p)));
     expect(back.stairTypes.stt_monolitica!.undersideStyle).toBe('stepped');
+  });
+});
+
+describe('migração 13 → 14 (abertura da laje)', () => {
+  /** Projeto no formato da versão 13: escadas com `openSlab` e sem os campos de abertura. */
+  function legacyV13(): Record<string, unknown> {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st_on', typeId: 'stt_monolitica', levelId: 'lv_0' }) });
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st_off', typeId: 'stt_monolitica', levelId: 'lv_0' }) });
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st_none', typeId: 'stt_monolitica', levelId: 'lv_0' }) });
+    const p = JSON.parse(JSON.stringify(s.project)) as Record<string, unknown> & { elements: Record<string, Record<string, unknown>> };
+    for (const id of ['st_on', 'st_off', 'st_none']) {
+      const e = p.elements[id]!;
+      delete e.openingMode;
+      delete e.openingHeadroom;
+      delete e.openingMargin;
+      delete e.openingRect;
+    }
+    p.elements.st_on!.openSlab = true;
+    p.elements.st_off!.openSlab = false;
+    delete p.elements.st_none!.openSlab;
+    p.schemaVersion = 13;
+    return p;
+  }
+
+  it('"Abrir laje" ligada vira pé-direito livre; desligada vira sem abertura', () => {
+    const m = migrateProject(legacyV13());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(m.elements.st_on).toMatchObject({ openingMode: 'headroom' });
+    expect(m.elements.st_off).toMatchObject({ openingMode: 'none' });
+  });
+
+  it('escada sem o campo (arquivo antigo) segue ligada; todas ganham os campos de folga e retângulo', () => {
+    const m = migrateProject(legacyV13());
+    expect(m.elements.st_none).toMatchObject({ openingMode: 'headroom' });
+    for (const id of ['st_on', 'st_off', 'st_none']) {
+      expect(m.elements[id]).toMatchObject({ openingHeadroom: null, openingMargin: 0.05, openingRect: false });
+    }
+  });
+
+  it('o campo `openSlab` sai do arquivo', () => {
+    const m = migrateProject(legacyV13());
+    for (const id of ['st_on', 'st_off', 'st_none']) expect(m.elements[id]).not.toHaveProperty('openSlab');
+  });
+
+  it('ida e volta depois da migração preserva o projeto', () => {
+    const m = migrateProject(legacyV13());
+    expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
   });
 });

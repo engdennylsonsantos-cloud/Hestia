@@ -1,4 +1,4 @@
-import { ringArea, triangulate, type Polygon, type Ring } from '@hestia/geom';
+import { ringArea, triangulate, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import type { Id } from '@hestia/model';
 
@@ -37,6 +37,39 @@ export function extrudePolygon(
   bottomAt?: (x: number, y: number) => number,
 ): void {
   if (z1 - z0 < 1e-6 || !poly[0]) return;
+  extrudeCaps(b, poly, z0, z1, topAt, bottomAt);
+  const zBot = (x: number, y: number): number => (bottomAt ? bottomAt(x, y) : z0);
+  const zTop = (x: number, y: number): number => (topAt ? topAt(x, y) : z1);
+  for (const ring of poly.map((r, i) => oriented(r, i === 0))) {
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i]!;
+      const q = ring[(i + 1) % ring.length]!;
+      pushWall(b, p, q, zBot(p.x, p.y), zBot(q.x, q.y), zTop(p.x, p.y), zTop(q.x, q.y));
+    }
+  }
+}
+
+/**
+ * Parede vertical entre p e q, com cota de fundo (bp, bq) e de topo (tp, tq) em cada extremo. O anel deve andar no
+ * sentido anti-horário: a normal aponta para fora, à direita de p→q.
+ */
+export function pushWall(b: SolidBatch, p: Vec2, q: Vec2, bp: number, bq: number, tp: number, tq: number): void {
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const L = Math.hypot(dx, dy);
+  if (L < 1e-9) return;
+  push(b, [p.x, p.y, bp, q.x, q.y, bq, q.x, q.y, tq, p.x, p.y, tp], [dy / L, -dx / L, 0], [0, 1, 2, 0, 2, 3]);
+}
+
+/** Topo e base de uma extrusão (sem as paredes): a triangulação do polígono com furos, na cota de cada ponto. */
+export function extrudeCaps(
+  b: SolidBatch,
+  poly: Polygon,
+  z0: number,
+  z1: number,
+  topAt?: (x: number, y: number) => number,
+  bottomAt?: (x: number, y: number) => number,
+): void {
   const rings = poly.map((r, i) => oriented(r, i === 0));
   const norm: Polygon = rings;
   const m = triangulate(norm);
@@ -76,19 +109,6 @@ export function extrudePolygon(
   }
   push(b, top, topN, up);
   push(b, bottom, bottomN, down);
-  for (const ring of rings) {
-    for (let i = 0; i < ring.length; i++) {
-      const p = ring[i]!;
-      const q = ring[(i + 1) % ring.length]!;
-      const dx = q.x - p.x;
-      const dy = q.y - p.y;
-      const L = Math.hypot(dx, dy);
-      if (L < 1e-9) continue;
-      const nx = dy / L;
-      const ny = -dx / L;
-      push(b, [p.x, p.y, zBot(p.x, p.y), q.x, q.y, zBot(q.x, q.y), q.x, q.y, zTop(q.x, q.y), p.x, p.y, zTop(p.x, p.y)], [nx, ny, 0], [0, 1, 2, 0, 2, 3]);
-    }
-  }
 }
 
 export interface LevelSolids {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asMulti, difference, intersection, multiArea, orientedRect, union, v2, intersectLines, triangulate, applyTransform, pointInMulti } from './index.ts';
+import { asMulti, difference, intersection, multiArea, orientedRect, union, v2, intersectLines, triangulate, applyTransform, pointInMulti, convexHull, minAreaRect } from './index.ts';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) =>
   asMulti([v2(x0, y0), v2(x1, y0), v2(x1, y1), v2(x0, y1)]);
@@ -123,5 +123,43 @@ describe('arco por flecha', () => {
     expect(sagFromThreePoints(a, v2(2, 1), b)).toBeCloseTo(1, 6);
     expect(sagFromThreePoints(a, v2(2, -1), b)).toBeCloseTo(-1, 6);
     expect(sagFromThreePoints(a, v2(2, 0), b)).toBe(0);
+  });
+});
+
+describe('retângulo de menor área', () => {
+  /** Ponto dentro ou na borda de um anel convexo anti-horário (tolerância 1e-9). */
+  const inConvex = (p: { x: number; y: number }, r: Array<{ x: number; y: number }>): boolean =>
+    r.every((a, i) => {
+      const b = r[(i + 1) % r.length]!;
+      return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x) >= -1e-9;
+    });
+  const ringArea = (r: Array<{ x: number; y: number }>): number => {
+    let s = 0;
+    for (let i = 0; i < r.length; i++) {
+      const p = r[i]!;
+      const q = r[(i + 1) % r.length]!;
+      s += p.x * q.y - q.x * p.y;
+    }
+    return Math.abs(s) / 2;
+  };
+  it('fecho convexo de um L tem o contorno sem o recorte', () => {
+    const l = [v2(0, 0), v2(2, 0), v2(2, 1), v2(1, 1), v2(1, 2), v2(0, 2)];
+    expect(ringArea(convexHull(l))).toBeCloseTo(3.5, 9);
+  });
+  it('retângulo alinhado: o próprio retângulo', () => {
+    const r = minAreaRect([v2(0, 0), v2(3, 0), v2(3, 1), v2(0, 1)]);
+    expect(ringArea(r)).toBeCloseTo(3, 9);
+  });
+  it('losango girado: o retângulo alinhado a um lado é menor que a caixa dos eixos', () => {
+    const d = [v2(0, -1), v2(2, 0), v2(0, 1), v2(-2, 0)];
+    const r = minAreaRect(d);
+    expect(ringArea(r)).toBeCloseTo(6.4, 9); // alinhado a um lado: (8/√5)·(4/√5) = 32/5; caixa dos eixos daria 8
+    for (const p of d) expect(inConvex(p, r)).toBe(true);
+  });
+  it('contém todos os pontos de um L (região côncava)', () => {
+    const l = [v2(0, 0), v2(2, 0), v2(2, 1), v2(1, 1), v2(1, 2), v2(0, 2)];
+    const r = minAreaRect(l);
+    for (const p of l) expect(inConvex(p, r)).toBe(true);
+    expect(ringArea(r)).toBeGreaterThanOrEqual(3.5 - 1e-9);
   });
 });

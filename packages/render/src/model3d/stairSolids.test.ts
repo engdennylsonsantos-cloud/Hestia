@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import { generateLShape, pieceVolume, resolveStairsOnLevel, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
 import { DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type StairLanding, type StairRun } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
@@ -170,5 +171,105 @@ describe('sólidos de escada (3D, decisões 0011 §1 e 0012)', () => {
   it('escada sem degraus não gera malha', () => {
     const empty = { ...straightStair(), steps: [], risers: [] };
     expect(buildStairSolids([empty as ResolvedStair])).toEqual([]);
+  });
+});
+
+/** Arestas que o 3D desenha no lote (EdgesGeometry 28°, como em scene3d.ts): [xa, ya, za, xb, yb, zb] por segmento. */
+function drawnEdges(b: SolidBatch): number[][] {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
+  g.setIndex(b.indices);
+  const pos = new THREE.EdgesGeometry(g, 28).getAttribute('position') as THREE.BufferAttribute;
+  const out: number[][] = [];
+  for (let i = 0; i < pos.count; i += 2) out.push([pos.getX(i), pos.getY(i), pos.getZ(i), pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1)]);
+  g.dispose();
+  return out;
+}
+
+/** Arestas sem par no sentido oposto (malha aberta ou com emenda), com a tolerância de 1e-4 m do desenho. */
+function unmatchedEdges(b: SolidBatch): number {
+  const key = (k: number): string => [0, 1, 2].map((c) => Math.round(b.positions[k * 3 + c]! * 1e4)).join(',');
+  const count = new Map<string, number>();
+  for (let t = 0; t < b.indices.length; t += 3)
+    for (let j = 0; j < 3; j++) {
+      const a = key(b.indices[t + j]!);
+      const c = key(b.indices[t + ((j + 1) % 3)]!);
+      if (a !== c) count.set(`${a}|${c}`, (count.get(`${a}|${c}`) ?? 0) + 1);
+    }
+  let open = 0;
+  for (const [k, n] of count) {
+    const [a, c] = k.split('|');
+    if (count.get(`${c}|${a}`) !== n) open++;
+  }
+  return open;
+}
+
+/** Escada reta de referência (decisão 0012 §4): largura 1,20; passo 0,28; h 0,175; 16 espelhos; profundidade 0,20. */
+const REF = { W: 1.2, P: 0.28, H: 0.175, N: 16, sd: 0.2 };
+const refStair = (undersideStyle: 'smooth' | 'stepped' = 'smooth'): ResolvedStair =>
+  straightStair({ risers: REF.N, tread: REF.P, riserH: REF.H, width: REF.W, type: { ...MONO, structuralDepth: REF.sd, undersideStyle } });
+
+describe('arestas do lance monolítico (3D): só quebras reais de geometria', () => {
+  it('corte pelo piso base: o degrau 2 não tem aresta sobre a linha de corte acima do piso, nem no topo nem na lateral', () => {
+    const s = refStair();
+    const pieces = stairBody(s, { slabThickness: 0.15 }).pieces;
+    // Peça do degrau 2 com fundo plano em baseZ: a borda da frente dela é a linha de corte (y*).
+    const flat = pieces.find((p) => p.kind === 'tread' && p.index === 2 && p.bottom.a === 0 && p.bottom.b === 0)!;
+    const yCut = Math.max(...flat.polygon.map((p) => p.y));
+    const edges = drawnEdges(buildStairSolids([s])[0]!);
+    const alongCut = edges.filter(([, ya, , , yb]) => Math.abs(ya! - yCut) < 1e-4 && Math.abs(yb! - yCut) < 1e-4);
+    // Sobra só a quina do fundo com o piso base (mudança real de 32° entre o plano e o piso).
+    expect(alongCut.filter(([, , za, , , zb]) => za! > 1e-4 || zb! > 1e-4)).toEqual([]);
+    expect(alongCut).toHaveLength(1);
+    expect(Math.abs(alongCut[0]![2]!)).toBeLessThan(1e-4);
+  });
+
+  it('o topo do degrau 2 continua desenhado nas quinas reais com o piso e com o espelho', () => {
+    const edges = drawnEdges(buildStairSolids([refStair()])[0]!);
+    const onTop = (y: number) => edges.some(([xa, ya, za, xb, yb, zb]) => Math.abs(ya! - y) < 1e-4 && Math.abs(yb! - y) < 1e-4 && Math.abs(za! - 2 * REF.H) < 1e-4 && Math.abs(zb! - 2 * REF.H) < 1e-4 && Math.abs(xa! - xb!) > 1);
+    expect(onTop(2 * REF.P)).toBe(true);
+    expect(onTop(3 * REF.P)).toBe(true);
+  });
+
+  it('face lateral: arestas verticais só nas quinas de espelho (piso de baixo até o piso de cima), nunca no interior', () => {
+    const s = refStair();
+    const pieces = stairBody(s, { slabThickness: 0.15 }).pieces;
+    // Quina da frente da chegada: é a face de topo da chegada, e não um espelho.
+    const yEnd = Math.max(...pieces.map((p) => Math.max(...p.polygon.map((v) => v.y))));
+    const lateral = drawnEdges(buildStairSolids([s])[0]!).filter(
+      ([xa, ya, za, xb, yb, zb]) => Math.abs(xa! - xb!) < 1e-4 && Math.abs(ya! - yb!) < 1e-4 && Math.abs(za! - zb!) > 1e-4 && (Math.abs(xa!) < 1e-4 || Math.abs(xa! - REF.W) < 1e-4),
+    );
+    expect(lateral.length).toBeGreaterThan(0);
+    for (const [, ya, za, , , zb] of lateral) {
+      const y = ya!;
+      const zLo = Math.min(za!, zb!);
+      const zHi = Math.max(za!, zb!);
+      if (Math.abs(y - yEnd) < 1e-4) continue;
+      const k = Math.round(y / REF.P);
+      expect(Math.abs(y - k * REF.P)).toBeLessThan(1e-4);
+      expect(Math.abs(zLo - (k - 1) * REF.H)).toBeLessThan(1e-4);
+      expect(zHi).toBeLessThanOrEqual(k * REF.H + 1e-4);
+    }
+  });
+
+  it('volume inalterado: malha da referência = Σ volumes das peças, nos dois estilos de fundo', () => {
+    for (const undersideStyle of ['smooth', 'stepped'] as const) {
+      const s = refStair(undersideStyle);
+      expect(Math.abs(total(buildStairSolids([s])) - piecesVolume(s))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('volume inalterado no lance montado da referência: degraus e espelhos (área × espessura)', () => {
+    const s = straightStair({ risers: REF.N, tread: REF.P, riserH: REF.H, width: REF.W, type: { ...ASSEMBLED } });
+    const expected = (REF.N - 1) * REF.W * REF.P * ASSEMBLED.treadThickness + REF.N * REF.W * ASSEMBLED.riserThickness * REF.H;
+    expect(Math.abs(total(buildStairSolids([s])) - expected)).toBeLessThan(1e-9);
+  });
+
+  it('sem buracos: cada aresta da malha tem uma face vizinha no sentido oposto (guarda contra paredes cortadas errado)', () => {
+    for (const undersideStyle of ['smooth', 'stepped'] as const) {
+      expect(unmatchedEdges(buildStairSolids([refStair(undersideStyle)])[0]!)).toBe(0);
+    }
+    expect(unmatchedEdges(buildStairSolids([straightStair({ risers: REF.N, tread: REF.P, riserH: REF.H, width: REF.W, type: { ...ASSEMBLED } })])[0]!)).toBe(0);
   });
 });

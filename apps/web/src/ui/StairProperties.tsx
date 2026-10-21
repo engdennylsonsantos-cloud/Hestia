@@ -1,6 +1,6 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
-import { levelAbove, validateProject, type Id, type Project, type Stair, type ValidationIssue } from '@hestia/model';
+import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type ValidationIssue } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
@@ -17,7 +17,7 @@ function issuesOf(p: Project, id: Id): ValidationIssue[] {
 }
 
 /**
- * Propriedades de uma ou mais escadas: tipo, níveis e deslocamentos (editáveis), "Abrir laje", quantitativos calculados
+ * Propriedades de uma ou mais escadas: tipo, níveis, deslocamentos e abertura da laje (editáveis), quantitativos calculados
  * (só leitura, de uma escada só) e avisos com "Ir para". Cada alteração é uma transação, com um passo de desfazer.
  */
 export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
@@ -28,12 +28,17 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   const top = commonOf(stairs, (s) => s.topLevelId ?? '');
   const topOff = commonOf(stairs, (s) => s.topOffset);
   const height = commonOf(stairs, (s) => s.height);
-  const openSlab = commonOf(stairs, (s) => s.openSlab);
+  const openingMode = commonOf(stairs, (s) => s.openingMode);
+  const openingHeadroom = commonOf(stairs, (s) => s.openingHeadroom);
+  const openingMargin = commonOf(stairs, (s) => s.openingMargin);
+  const openingRect = commonOf(stairs, (s) => s.openingRect);
   const mark = commonOf(stairs, (s) => s.mark);
   const comments = commonOf(stairs, (s) => s.comments);
   const single = stairs.length === 1 ? stairs[0]! : null;
   const type = typeId.mixed ? null : p.stairTypes[typeId.value];
   const noLevelAbove = single ? levelAbove(p, single.levelId) === null : false;
+  const noOpening = !openingMode.mixed && openingMode.value === 'none';
+  const headroomOff = !openingMode.mixed && openingMode.value !== 'headroom';
 
   const quantities = useMemo(() => {
     if (!single) return null;
@@ -80,7 +85,28 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         {!top.mixed && top.value === '' && noLevelAbove && (
           <Row label="Altura" htmlFor="p-sheight"><NumField id="p-sheight" value={height.value} mixed={height.mixed} min={0.1} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} unit="m" /></Row>
         )}
-        <Row label="Abrir laje"><Check id="p-sopen" checked={openSlab.value} mixed={openSlab.mixed} onChange={(v) => patch(ids, { openSlab: v })} /></Row>
+        <Row label="Abertura da laje" htmlFor="p-sopenmode">
+          <select id="p-sopenmode" className="select" value={openingMode.mixed ? '' : openingMode.value} onChange={(e) => e.target.value && patch(ids, { openingMode: e.target.value as StairOpeningMode })}>
+            {openingMode.mixed && <option value="">variados</option>}
+            <option value="headroom">Pé-direito livre</option>
+            <option value="full">Contorno completo</option>
+            <option value="none">Sem abertura</option>
+          </select>
+        </Row>
+        <Row label="Pé-direito livre (m)" htmlFor="p-sopenh">
+          <NumField
+            id="p-sopenh"
+            value={openingHeadroom.value}
+            mixed={openingHeadroom.mixed}
+            disabled={headroomOff}
+            placeholder={type ? fmt(type.minHeadroom) : undefined}
+            min={0}
+            onCommit={(v) => patch(ids, { openingHeadroom: v })}
+            onClear={() => patch(ids, { openingHeadroom: null })}
+          />
+        </Row>
+        <Row label="Folga lateral (m)" htmlFor="p-sopenm"><NumField id="p-sopenm" value={openingMargin.value} mixed={openingMargin.mixed} disabled={noOpening} min={0} onCommit={(v) => patch(ids, { openingMargin: v })} /></Row>
+        <Row label="Furo retangular" htmlFor="p-sopenrect"><Check id="p-sopenrect" checked={openingRect.value} mixed={openingRect.mixed} disabled={noOpening} onChange={(v) => patch(ids, { openingRect: v })} /></Row>
       </Group>
       <Group title="Dimensões">
         {single && quantities ? (

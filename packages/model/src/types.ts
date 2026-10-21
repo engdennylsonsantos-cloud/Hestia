@@ -2,7 +2,7 @@ import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType, StairUndersideStyle } from './stairTypes.ts';
 

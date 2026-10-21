@@ -1,5 +1,8 @@
 import type { Id, Stair, StairType } from './types.ts';
 
+/** Folga lateral padrão em volta do furo da laje (m), decisão 0011 §6. */
+export const DEFAULT_STAIR_OPENING_MARGIN = 0.05;
+
 type StairInput = { id: Id; typeId: Id; levelId: Id } & Partial<Omit<Stair, 'order' | 'kind'>>;
 
 /** Constrói uma escada com os campos padrão (decisão 0011 §2); `order` é atribuído pelo comando addStair. */
@@ -11,7 +14,10 @@ export function makeStair(s: StairInput): Omit<Stair, 'order'> {
     topOffset: 0,
     height: 2.8,
     components: [],
-    openSlab: true,
+    openingMode: 'headroom',
+    openingHeadroom: null,
+    openingMargin: DEFAULT_STAIR_OPENING_MARGIN,
+    openingRect: false,
     mark: '',
     comments: '',
     ...s,

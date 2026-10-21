@@ -2,7 +2,7 @@ import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
-import { DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
@@ -148,6 +148,23 @@ const migrations: Record<number, Migration> = {
     const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
     for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { undersideStyle: 'smooth', ...t };
     return { ...raw, stairTypes };
+  },
+  // v13 → v14: "Abrir laje" (booleano) vira o modo da abertura: ligada = pé-direito livre (furo de antes, com o mínimo do
+  // tipo), desligada = sem furo. Os campos novos entram com o padrão (decisão 0011 §6).
+  13: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind !== 'stair') continue;
+      const { openSlab, ...rest } = e;
+      elements[id] = {
+        openingMode: openSlab === false ? 'none' : 'headroom',
+        openingHeadroom: null,
+        openingMargin: DEFAULT_STAIR_OPENING_MARGIN,
+        openingRect: false,
+        ...rest,
+      };
+    }
+    return { ...raw, elements };
   },
 };
 

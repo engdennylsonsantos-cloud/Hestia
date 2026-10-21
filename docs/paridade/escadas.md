@@ -24,7 +24,7 @@ Fonte: [docs/escadas](../escadas/) (Revit 2026: Stair by Component e croqui; Arc
 - [x] B4 Nível de base e de topo, deslocamentos e altura; altura do espelho = altura ÷ nº de espelhos **(bloqueante)**
 
 ## C · Relação com o modelo e avisos
-- [x] C1 Furo derivado na laje e no piso do nível de topo (recalcula ao mover a escada; opção "Abrir laje") **(bloqueante)**
+- [x] C1 Furo derivado na laje e no piso do nível de topo (recalcula ao mover a escada; abertura por escada: pé-direito livre, contorno completo ou sem abertura, folga lateral e furo retangular; decisão 0011 §6) **(bloqueante)**
 - [x] C2 Avisos de norma (2e+p, espelho, piso, patamar a cada 3,20 m, folga de cabeça, leque) no painel de avisos com "Ir para"
 - [x] C3 Aviso de largura do lance menor que a mínima do tipo e de altura do espelho acima do máximo **(bloqueante)**
 - [-] C4 Corrimão e guarda-corpo na escada: etapa própria "guarda-corpo" (decisão do dono, 2026-10-21)

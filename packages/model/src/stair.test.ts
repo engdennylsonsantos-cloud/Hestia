@@ -63,7 +63,10 @@ describe('makeStair e tipos padrão', () => {
       topOffset: 0,
       height: 2.8,
       components: [],
-      openSlab: true,
+      openingMode: 'headroom',
+      openingHeadroom: null,
+      openingMargin: 0.05,
+      openingRect: false,
       mark: '',
       comments: '',
     });

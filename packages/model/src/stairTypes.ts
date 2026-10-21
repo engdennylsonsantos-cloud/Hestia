@@ -42,6 +42,9 @@ export interface StairLanding {
  * cada patamar sai da base e do número de espelhos dos lances anteriores. Base = nível + baseOffset; topo = nível de
  * topo + topOffset (o nível de topo padrão é o imediatamente acima); sem nível acima, o topo é base + height.
  */
+/** Modo da abertura da laje (decisão 0011 §6). */
+export type StairOpeningMode = 'headroom' | 'full' | 'none';
+
 export interface Stair {
   id: Id;
   kind: 'stair';
@@ -54,8 +57,17 @@ export interface Stair {
   /** Altura usada só quando não há nível acima e o topo não é explícito. */
   height: number;
   components: Array<StairRun | StairLanding>;
-  /** "Abrir laje": a laje do nível de topo recebe furo automático (padrão ligada). */
-  openSlab: boolean;
+  /**
+   * Abertura da laje do nível de topo (decisão 0011 §6): 'headroom' = o furo tira os degraus que não deixam o pé-direito
+   * livre (`openingHeadroom`); 'full' = o furo é a projeção inteira da escada (degraus e patamares); 'none' = sem furo.
+   */
+  openingMode: StairOpeningMode;
+  /** Pé-direito livre do furo (m) no modo 'headroom'; null = o mínimo do tipo (`minHeadroom`). */
+  openingHeadroom: number | null;
+  /** Folga lateral (m) em volta do furo: a região cresce por essa distância em todo o contorno. */
+  openingMargin: number;
+  /** Furo retangular: o retângulo de menor área que envolve a região (depois da folga). */
+  openingRect: boolean;
   mark: string;
   comments: string;
   /** Ordem de criação. */

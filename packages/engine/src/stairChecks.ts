@@ -34,7 +34,9 @@ export function topCovers(p: Project, levelId: Id): TopCover[] {
 /**
  * Folga de cabeça (decisão 0011 §1 item 10): para cada degrau ou patamar sob uma laje ou piso do nível de topo, a folga
  * é a cota da face inferior menos a cota do topo do degrau (no pior ponto da sobreposição). Se a menor for menor que
- * `minHeadroom` do tipo, um aviso. Com "Abrir laje" ligada, o furo já tira os degraus altos da laje: sem aviso.
+ * `minHeadroom` do tipo, um aviso. Com a abertura ligada, o furo já tira da laje os degraus com folga até o pé-direito
+ * do modo (`openingHeadroom`, ou o mínimo do tipo): o que sobra tem folga maior, então sem aviso. Com `openingHeadroom`
+ * abaixo do mínimo do tipo, os degraus entre os dois valores ficam sob a laje e avisam.
  */
 export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[]): StairIssueItem | null {
   let worst: { h: number; ci: number } | null = null;

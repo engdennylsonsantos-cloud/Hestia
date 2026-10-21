@@ -34,7 +34,7 @@ const state = () => page.evaluate(() => {
       id: s.id,
       levelId: s.levelId,
       topLevelId: s.topLevelId,
-      openSlab: s.openSlab,
+      openingMode: s.openingMode,
       generatedBy: s.generatedBy ?? s.components.find((c) => c.generatedBy)?.generatedBy ?? null,
       runs: s.components.filter((c) => c.kind === 'run').length,
       landings: s.components.filter((c) => c.kind === 'landing').length,
@@ -272,7 +272,7 @@ try {
     const s = await state();
     const reta = s.stairs.find((x) => x.generatedBy === 'straight');
     rep.check('escada reta selecionada', s.selection.length === 1 && s.selection[0] === reta?.id, JSON.stringify(s.selection));
-    rep.check('"Abrir laje" marcado', await page.locator('#p-sopen').isChecked());
+    rep.check('abertura da laje "Pé-direito livre"', (await page.locator('#p-sopenmode').inputValue()) === 'headroom');
     rep.check('campos de tipo, níveis e deslocamentos', (await page.locator('#prop-stairtype').count()) === 1 && (await page.locator('#p-sbase').count()) === 1 && (await page.locator('#p-stopoff').count()) === 1);
     const n = await propValue('Nº de espelhos');
     rep.check(`quantitativo "Nº de espelhos" = ${N_RETA}`, n === String(N_RETA), `${n}`);
@@ -284,8 +284,8 @@ try {
     await shot('propriedades-escada.png', page.locator('body'));
   });
 
-  await rep.step('10 · "Abrir laje" desligado remove o furo; ligado o recria', async () => {
-    await page.locator('#p-sopen').uncheck();
+  await rep.step('10 · Abertura "Sem abertura" remove o furo; "Pé-direito livre" o recria', async () => {
+    await page.locator('#p-sopenmode').selectOption('none');
     await page.waitForTimeout(200);
     let h = await slabHoles('lv_1');
     rep.check('desligado: laje inteira (≈ 70 m², sem furo)', Math.abs(h.area - 70) < 0.5 && h.holes.length === 0, `${h.area.toFixed(3)} m²`);
@@ -294,7 +294,7 @@ try {
     await goLevel(/Térreo/);
     await clickWorld(page, 7.2, 4.5);
     await page.waitForTimeout(200);
-    await page.locator('#p-sopen').check();
+    await page.locator('#p-sopenmode').selectOption('headroom');
     await page.waitForTimeout(200);
     h = await slabHoles('lv_1');
     rep.check('ligado de novo: furo volta', 70 - h.area > 1.0, `${(70 - h.area).toFixed(2)} m² retirados`);

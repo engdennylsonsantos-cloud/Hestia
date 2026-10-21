@@ -300,7 +300,7 @@ export class StairTool extends ToolBase {
       this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);
       return;
     }
-    const r = createStairFromComponents(this.env, components, { ...this.creationOptions(), openSlab: true });
+    const r = createStairFromComponents(this.env, components, this.creationOptions());
     if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
     this.env.done();
     this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);

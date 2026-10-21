@@ -18,10 +18,11 @@ automático; (3) guarda-corpo fica para a etapa própria; (4) perfil de norma ab
 | 8 | Tipo da escada (`StairType`): espelho máx. 0,18 m, piso mín. 0,28 m, largura mín. do lance 0,80 m, estilo do lance (`monolithic` ou `assembled`), profundidade estrutural (monolítico, padrão 0,20 m), espessura do piso (assembled, 0,03 m) e do espelho (assembled, 0,02 m), nariz (0,015 m, só 3D/quantitativo), espessura do patamar (0,15 m), pé-direito livre mínimo (2,10 m), material. Sem apoios laterais nem central na v1 | Revit A10–A13 simplificado; apoios (stringer/carriage) ficam para depois (fora de escopo v1) |
 | 9 | Regras do tipo (espelho máx., piso mín.) valem só para o lance CALCULADO (gerador); no croqui livre elas não bloqueiam, mas a altura real do espelho continua limitada pelo máximo do tipo | Revit A10 + B4 |
 | 10 | Perfil de norma (avisos, nunca bloqueio): espelho 0,16–0,18 m, piso 0,28–0,32 m, 2e+p entre 0,63 e 0,64 m (interseção NBR 9050 × NBR 9077), degraus iguais no lance (dif. > 5 mm entre lances é aviso), patamar a cada 3,20 m de desnível e comprimento ≥ 1,20 m, largura ≥ largura mínima do tipo, folga de cabeça ≥ pé-direito livre do tipo (2,10 m), degraus do leque com piso ≥ 0,28 m a 0,55 m da borda interna. Valores em um perfil editável em `Project.settings` | Divergências normativas: não bloquear |
-| 11 | Furo na laje e no piso do nível de topo é DERIVADO (não guardado): união das projeções dos degraus (e patamares) cuja cota de topo fica acima de `cotaTopo − espessuraDaLaje − folgaMínima` (a escada ainda não passou pela laje com folga de cabeça). Recalcula sozinho ao mover a escada. Opção na escada "Abrir laje" (padrão ligada) | Dono: furo automático. Fora de paridade (Revit e ArchiCAD pedem Shaft/Solid Element Operations) |
+| 11 | Furo na laje e no piso do nível de topo é DERIVADO (não guardado): união das projeções dos degraus (e patamares) cuja cota de topo fica acima de `cotaTopo − espessuraDaLaje − folgaMínima` (a escada ainda não passou pela laje com folga de cabeça). Recalcula sozinho ao mover a escada. O modo de abertura por escada é o item 15 (substitui o "Abrir laje" booleano) | Dono: furo automático. Fora de paridade (Revit e ArchiCAD pedem Shaft/Solid Element Operations) |
 | 12 | Guarda-corpo/corrimão: fora desta etapa (etapa própria "guarda-corpo") | Dono |
 | 13 | Escada de vários andares, IFC e apoios (stringer/carriage): fora desta etapa | Dono |
 | 14 | A conversão de lance gerado em croqui é livre (o gerador só preenche o croqui); o lance guarda `generatedBy` para saber a origem, sem vínculo paramétrico depois da edição manual. Diferença consciente em relação ao Revit (conversão irreversível) | Menos atrito; sem regra paramétrica a manter |
+| 15 | Abertura da laje por escada (§6): modo **pé-direito livre** (padrão; folga `openingHeadroom`, ou o mínimo do tipo), **contorno completo** (projeção inteira, degraus e patamares) ou **sem abertura**; folga lateral `openingMargin` (0,05 m) e furo retangular `openingRect` (envolvente de menor área). Tudo derivado. Substitui o booleano `openSlab` (migração 13 → 14: ligado = pé-direito livre, desligado = sem abertura) | Dono: abertura configurável por escada, com o furo sempre derivado |
 
 ## 2 · Modelo de dados (packages/model)
 
@@ -43,7 +44,10 @@ export interface Stair {
   id: Id; kind: 'stair'; levelId: Id; typeId: Id;
   topLevelId: Id | null; baseOffset: number; topOffset: number; height: number;
   components: Array<StairRun | StairLanding>;
-  openSlab: boolean;            // "Abrir laje" (padrão true)
+  openingMode: 'headroom' | 'full' | 'none';  // abertura da laje (padrão 'headroom'; decisão 15)
+  openingHeadroom: number | null;             // pé-direito livre do furo; null = minHeadroom do tipo
+  openingMargin: number;                      // folga lateral em volta do furo (padrão 0,05 m)
+  openingRect: boolean;                       // furo = retângulo envolvente de menor área (padrão false)
   mark: string; comments: string; order: number;
 }
 export interface StairType { id: Id; name: string; maxRiser: number; minTread: number; minRunWidth: number;
@@ -89,3 +93,19 @@ Invariantes (testes de propriedade): degraus disjuntos; união dos degraus = reg
 ## 5 · Geradores
 `straight(start, dir, width, risers, tread)`; `lshape`, `ushape` (patamar automático = largura do lance); `winder` (espelhos radiais). Todos
 devolvem `StairRun[]`/`StairLanding[]`. Regra do piso calculado: p = clamp(0,63 − 2h; pisoMín; 0,32); comprimento do lance = (N−1)·p.
+
+## 6 · Abertura da laje (decisão 15; engine: `stairOpenings.ts`)
+
+Por escada, `openingMode` escolhe a região que a laje (e o piso) do nível de topo perde. Tudo é derivado a cada resolução; nada é gravado no elemento da laje.
+
+1. **`headroom` (pé-direito livre, padrão).** Usa `H = openingHeadroom ?? type.minHeadroom`. Degrau (ou patamar) de cota de topo `z` sai da laje quando `z + H ≥ cotaFaceInferior`, com `cotaFaceInferior = cotaTopo − espessuraDaLaje`, ou seja, quando a folga do degrau (`face inferior − z`) é ≤ H. A cota de referência é a do topo do degrau: o piso é plano, então o nariz (a quina da frente) e o resto do degrau estão na mesma cota. A espessura é a da laje ou piso que cobre a planta da escada (a maior; 0,15 m se nenhuma). Com H = 2,10 m (padrão) o resultado é o da decisão 11, sem mudança.
+2. **`full` (contorno completo).** A região é o `footprint` da escada resolvida: união de todos os degraus e patamares, sem olhar a cota.
+3. **`none`.** Sem furo.
+4. **Folga lateral.** Com `openingMargin > 0`, a região cresce por offset positivo (`offsetMulti`, cantos em esquadria). Para uma região retangular de L × W, a área cresce `2(L + W)·m + 4m²`.
+5. **Furo retangular.** Com `openingRect`, a região (já com a folga) vira o retângulo de menor área que a envolve: fecho convexo e um lado do retângulo alinhado a cada aresta do fecho (`minAreaRect`, `@hestia/geom`). Com a região retangular, ele coincide com ela; com L, a área fica entre a região e a caixa dos eixos.
+
+Efeitos colaterais:
+- O aviso `stair-headroom` (`stairChecks.ts`) não muda: com o furo, sobra só o que tem folga maior que H; com H abaixo do mínimo do tipo, os degraus entre os dois valores ficam sob a laje e avisam.
+- Limitação: a face inferior é plana (`topo − espessura`), como antes. Laje inclinada usa a cota plana no furo, mas o aviso de folga usa a cota real; podem divergir.
+- A barra de opções da ferramenta não expõe a abertura: a escada criada recebe o padrão e o ajuste é feito em Propriedades.
+- `render/src/model3d/stairSolids.ts` tem uma cópia de `thicknessUnder` (espessura do furo) que precisa ficar sincronizada com `stairOpenings.ts` (fora do escopo desta etapa; registrado).

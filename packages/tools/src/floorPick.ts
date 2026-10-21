@@ -1,4 +1,4 @@
-import { boxOf, dist, intersectSegments, pointInMulti, pointInRing, ringArea, type Vec2 } from '@hestia/geom';
+import { boxOf, dist, intersectSegments, pointInMulti, ringArea, type Vec2 } from '@hestia/geom';
 import { resolveFloors } from '@hestia/engine';
 import { floorsOnLevel, isFloor, type Floor, type Id, type Project } from '@hestia/model';
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ringArea } from '@hestia/geom';
 import { resolveLevel, resolveStairs, resolveStairsOnLevel } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairRun } from '@hestia/model';
 import { buildStairSolids } from '../model3d/stairSolids.ts';
@@ -9,6 +10,17 @@ import type { Viewport } from '../viewport.ts';
 const N = 17;
 const P = 0.28;
 const W = 1;
+
+/** Volume por teorema da divergência (malha fechada e bem orientada), como em solids.test.ts. */
+function meshVolume(b: { positions: number[]; indices: number[] }): number {
+  let v = 0;
+  const p = (k: number) => [b.positions[k * 3]!, b.positions[k * 3 + 1]!, b.positions[k * 3 + 2]!] as const;
+  for (let i = 0; i < b.indices.length; i += 3) {
+    const [p0, p1, p2] = [p(b.indices[i]!), p(b.indices[i + 1]!), p(b.indices[i + 2]!)];
+    v += (p0[0] * (p1[1] * p2[2] - p1[2] * p2[1]) - p0[1] * (p1[0] * p2[2] - p1[2] * p2[0]) + p0[2] * (p1[0] * p2[1] - p1[1] * p2[0])) / 6;
+  }
+  return Math.abs(v);
+}
 
 /** Lance reto de N espelhos subindo em +x (croqui do motor): limites em y = ±W/2, espelhos verticais em x = k·P. */
 function run(): StairRun {
@@ -89,5 +101,13 @@ describe('escadas do projeto na planta e no 3D (integração com o motor)', () =
     const batches = buildStairSolids(resolveStairs(p));
     expect(batches.map((b) => b.materialId)).toEqual(['mat_concreto']);
     expect(batches[0]!.indices.length).toBeGreaterThan(0);
+  });
+
+  it('volume da malha monolítica do motor = Σ área dos degraus × profundidade estrutural (sem espelho nem patamar)', () => {
+    const [st] = resolveStairs(project());
+    const sd = st!.type.structuralDepth;
+    const areaSum = st!.steps.reduce((s, step) => s + Math.abs(ringArea(step.polygon)), 0);
+    const [b] = buildStairSolids([st!]);
+    expect(Math.abs(meshVolume(b!) - areaSum * sd)).toBeLessThan(1e-9);
   });
 });

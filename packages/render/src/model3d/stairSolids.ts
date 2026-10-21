@@ -1,13 +1,11 @@
 import { add, mul, norm, perp, sub, type Ring, type Vec2 } from '@hestia/geom';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from '@hestia/engine';
 import type { Id } from '@hestia/model';
+import { riserPoints } from '../stairRisers.ts';
 import { extrudePolygon, type SolidBatch } from './solids.ts';
 
 /** Tolerância (m) para reconhecer a cota de um degrau igual à de um espelho. */
 const Z_TOL = 1e-9;
-
-/** Pontos do espelho: a polilinha quando houver (espelho curvo), senão a corda. */
-export const riserPoints = (r: ResolvedStairRiser): Vec2[] => (r.points.length >= 2 ? r.points : [r.a, r.b]);
 
 /** Centroide simples (média dos vértices): basta para degraus, que são polígonos quase convexos. */
 const centroid = (r: Ring): Vec2 => ({ x: r.reduce((s, p) => s + p.x, 0) / r.length, y: r.reduce((s, p) => s + p.y, 0) / r.length });

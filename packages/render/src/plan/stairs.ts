@@ -4,6 +4,7 @@ import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 /** Cota de corte da planta, em m acima da base do lance (convenção de planta: 1,20 m). */
@@ -14,13 +15,6 @@ export const STAIR_RISER_WIDTH_PX = 1.4;
 export const STAIR_DASH: [number, number] = [6, 3];
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
-
-/** Pontos do espelho: a polilinha quando houver (espelho curvo), senão a corda. */
-export const riserPoints = (r: ResolvedStairRiser): Vec2[] => (r.points.length >= 2 ? r.points : [r.a, r.b]);
-
-/** Espelhos na ordem de subida: componente (lance, patamar...) e, dentro dele, o índice. */
-export const risersInClimbOrder = (s: ResolvedStair): ResolvedStairRiser[] =>
-  [...s.risers].sort((p, q) => p.componentIndex - q.componentIndex || p.index - q.index);
 
 /** Ponto a meio comprimento da polilinha (ponto médio do espelho). */
 export function polyMid(pts: Vec2[]): Vec2 {

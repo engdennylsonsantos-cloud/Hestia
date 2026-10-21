@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { pointInMulti, type Vec2 } from '@hestia/geom';
-import { resolveLevel } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeFloor, makeRoof, makeSlab, makeWall, type Opening, type Project, type ViewRange } from '@hestia/model';
+import { resolveLevel, viewRangeWarnings } from '@hestia/engine';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeSlab, makeStair, makeWall, viewRangeOf, type Id, type Opening, type Project, type ViewRange } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { stairFills, STAIR_RISER_WIDTH_PX } from './stairs.ts';
-import { LIGHT, type StrokeOp } from './types.ts';
+import { hiddenSelectionOps, planViewOf } from './view.ts';
+import { DARK, LIGHT, type PlanTheme, type StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
 const VIEW: Viewport = { cx: 8, cy: 6, zoom: 100, width: 800, height: 600 };
@@ -267,5 +268,111 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
     const o = ops();
     expect(risers(o)).toHaveLength(N);
     expect(dashed(treads(o))).toHaveLength(3);
+  });
+});
+
+describe('seleção de elemento oculto: contorno fantasma (decisão 0013 §4)', () => {
+  /** Planta como a tela a monta: a lista de desenho mais o contorno fantasma dos selecionados fora do intervalo. */
+  const drawSel = (p: Project, sel: Id[], theme: PlanTheme = LIGHT) => {
+    const dl = draw(p, { selection: sel, theme });
+    return { ...dl, strokes: [...dl.strokes, ...hiddenSelectionOps(p, 'lv_0', planViewOf(p, 'lv_0'), sel, theme)] };
+  };
+  /** Traços do fantasma: tracejado de 5 px na cor de seleção (o destaque comum não é tracejado). */
+  const ghosts = (dl: DrawList): StrokeOp[] => dl.strokes.filter((s) => s.closed && s.dash?.[0] === 5);
+  const near = (ops: StrokeOp[], x: number, y: number, r: number): StrokeOp[] => ops.filter((s) => s.pts.every((q) => Math.hypot(q.x - x, q.y - y) <= r));
+  const xs = (s: StrokeOp): number[] => s.pts.map((q) => q.x);
+
+  /** Lance reto de 10 espelhos subindo em +x, como em stairsBuild.test.ts. */
+  const run = () => {
+    const ln = (ax: number, ay: number, bx: number, by: number) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag: 0 });
+    const N = 10;
+    const P = 0.28;
+    return {
+      id: 'r1',
+      kind: 'run' as const,
+      boundaryLeft: [ln(0, 0.5, (N + 1) * P, 0.5)],
+      boundaryRight: [ln(0, -0.5, (N + 1) * P, -0.5)],
+      risers: Array.from({ length: N }, (_, i) => ln((i + 1) * P, -1, (i + 1) * P, 1)),
+      path: [],
+      generatedBy: 'straight' as const,
+    };
+  };
+
+  it('parede oculta selecionada: contorno tracejado fino na cor de seleção, sem preenchimento', () => {
+    const dl = drawSel(scene(), ['w_oculta']);
+    const g = near(ghosts(dl), 1.5, 12, 2);
+    expect(g).toHaveLength(1);
+    expect(g[0]).toMatchObject({ closed: true, widthPx: 1, color: LIGHT.select, dash: [5, 3] });
+    expect(filled(dl, 1.5, 12)).toBe(false);
+  });
+
+  it('sem seleção não há fantasma; a planta fica igual à de antes', () => {
+    const p = scene();
+    expect(ghosts(draw(p))).toHaveLength(0);
+    expect(ghosts(drawSel(p, []))).toHaveLength(0);
+  });
+
+  it('abertura oculta (peitoril 2,40): o vão aparece tracejado sobre a parede; a parede segue inteira', () => {
+    const dl = drawSel(scene(), ['j_240']);
+    const g = near(ghosts(dl), 1.5, 4, 0.7);
+    expect(g).toHaveLength(1);
+    const w = Math.max(...xs(g[0]!)) - Math.min(...xs(g[0]!));
+    expect(w).toBeGreaterThan(1);
+    expect(w).toBeLessThan(1.4);
+    expect(filled(dl, 1.5, 4)).toBe(true);
+  });
+
+  it('telhado oculto selecionado: pegada tracejada, sem preenchimento sobre o telhado', () => {
+    const dl = drawSel(scene(), ['r']);
+    const g = near(ghosts(dl), 12, 2, 3);
+    expect(g).toHaveLength(1);
+    expect(filled(dl, 12, 2)).toBe(false);
+  });
+
+  it('laje oculta selecionada: contorno tracejado da laje', () => {
+    const dl = drawSel(scene(), ['l_alta']);
+    expect(near(ghosts(dl), 17.5, 1.5, 2.5)).toHaveLength(1);
+    expect(filled(dl, 17.5, 1.5)).toBe(false);
+  });
+
+  it('piso oculto (face superior a 3,00 m, acima do topo): contorno tracejado', () => {
+    const s = new ProjectStore(scene());
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f_alta', typeId: 'ft_ceram', levelId: 'lv_0', boundary: [P(16, 12), P(19, 12), P(19, 14), P(16, 14)], heightOffset: 3 }) });
+    const dl = drawSel(s.project, ['f_alta']);
+    expect(near(ghosts(dl), 17.5, 13, 2)).toHaveLength(1);
+    expect(filled(dl, 17.5, 13)).toBe(false);
+  });
+
+  it('escada oculta (base a 2,50 m): pegada tracejada, sem preenchimento', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st_alta', typeId: defaultStairTypeId, levelId: 'lv_0', baseOffset: 2.5, components: [run()] }) });
+    const dl = drawSel(s.project, ['st_alta']);
+    const g = ghosts(dl);
+    expect(g.length).toBeGreaterThan(0);
+    expect(g.every((st) => st.pts.every((q) => q.x >= -0.01 && q.x <= 3.2))).toBe(true);
+  });
+
+  it('visível ou de outro nível não ganha fantasma: a seleção comum continua como era', () => {
+    const dl = drawSel(scene(), ['w_09', 'porta']);
+    expect(ghosts(dl)).toHaveLength(0);
+    expect(dl.fills.some((f) => f.color === LIGHT.select && f.alpha === 0.26)).toBe(true);
+  });
+
+  it('seleção mista: só o oculto ganha fantasma; o visível segue com o destaque próprio', () => {
+    const dl = drawSel(scene(), ['w_oculta', 'w_09']);
+    expect(ghosts(dl)).toHaveLength(1);
+    expect(near(ghosts(dl), 1.5, 12, 2)).toHaveLength(1);
+  });
+
+  it('"Selecionar" do aviso: cada elemento oculto da vista ganha o seu contorno', () => {
+    const p = scene();
+    const hiddenIds = viewRangeWarnings(p, 'lv_0', viewRangeOf(p, 'lv_0')).filter((w) => w.kind === 'hidden').flatMap((w) => w.ids);
+    expect(hiddenIds.sort()).toEqual(['j_240', 'l_alta', 'r', 'w_oculta']);
+    expect(hiddenSelectionOps(p, 'lv_0', planViewOf(p, 'lv_0'), hiddenIds, LIGHT)).toHaveLength(hiddenIds.length);
+  });
+
+  it('tema escuro: o fantasma usa a cor de seleção do tema escuro', () => {
+    const dl = drawSel(scene(), ['w_oculta'], DARK);
+    expect(ghosts(dl).some((s) => s.color === DARK.select)).toBe(true);
   });
 });

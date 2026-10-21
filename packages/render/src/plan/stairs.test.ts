@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
-import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, STAIR_RISER_WIDTH_PX } from './stairs.ts';
+import type { ResolvedStairStep } from '@hestia/engine';
+import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, STAIR_RISER_WIDTH_PX, treadNumber } from './stairs.ts';
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -97,5 +98,32 @@ describe('escada na planta (decisão 0011 §1)', () => {
     const sel = stairSelectionOps(PROJECT, [s], [s.id], null, LIGHT, VIEW);
     expect(sel.fills.some((f) => f.color === LIGHT.select && f.alpha === 0.26)).toBe(true);
     expect(sel.strokes.some((st) => st.closed && st.widthPx === 2 && st.color === LIGHT.select)).toBe(true);
+  });
+});
+
+describe('numeração contínua dos degraus (decisão 0011 §1 item 6)', () => {
+  const numbers = (labels: ReturnType<typeof ops>['labels']) => labels.map((l) => l.text).filter((t) => t !== 'SOBE');
+
+  it('escada reta de 16 espelhos: rótulos 1..15 (degrau k alcança o espelho k+1)', () => {
+    const s = straightStair({ risers: 16, tread: P, riserH: H, width: 1 });
+    expect(numbers(ops('fine', s).labels)).toEqual(Array.from({ length: 15 }, (_, i) => String(i + 1)));
+  });
+
+  it('o número é a cota: com a base em 0,30 m, o 1º degrau ainda é o 1 e o 9º é o 9', () => {
+    const s = straightStair({ risers: 16, tread: P, riserH: H, width: 1, baseZ: 0.3 });
+    expect(treadNumber(s, s.steps[0]!)).toBe(1);
+    expect(treadNumber(s, s.steps[8]!)).toBe(9);
+  });
+
+  it('degrau de um 2º lance: o index do lance reinicia em 1, mas o número segue a cota (9 depois de um patamar de 8)', () => {
+    const s = straightStair({ risers: 16, tread: P, riserH: H, width: 1 });
+    const second: ResolvedStairStep = { ...s.steps[0]!, componentIndex: 2, index: 1, z: s.baseZ + 9 * H };
+    expect(second.index).toBe(1);
+    expect(treadNumber(s, second)).toBe(9);
+  });
+
+  it('sem altura real do espelho, o número cai no índice do lance', () => {
+    const s = { ...straightStair({ risers: 4, tread: P, riserH: H, width: 1 }), riserHeight: 0 };
+    expect(treadNumber(s, s.steps[1]!)).toBe(2);
   });
 });

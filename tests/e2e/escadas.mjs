@@ -5,6 +5,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { clickWorld, launch, makeReporter, openApp } from './helpers.mjs';
+import { checkShot } from './visual.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/escadas';
 mkdirSync(OUT, { recursive: true });
@@ -19,6 +20,8 @@ const rep = makeReporter();
 const browser = await launch();
 const { page, errors } = await openApp(browser);
 const shot = (name, target) => (target ?? page.locator('.canvas-wrap')).screenshot({ path: path.join(OUT, name) });
+// Captura determinística da planta/3D comparada com tests/e2e/baseline (G6); as de corpo inteiro (status, relógio) seguem com `shot`.
+const snap = (name) => checkShot(rep, page.locator('.canvas-wrap'), name, { out: OUT });
 const statusText = () => page.locator('footer.statusbar .msg').innerText();
 const counter = () => page.locator('.stair-counter').innerText();
 
@@ -111,7 +114,7 @@ try {
     rep.check('10 paredes no Térreo', s.walls === 10, `${s.walls}`);
     rep.check('dois níveis: Térreo 0 m, Pavimento 2 a 3 m', s.levels === 'Térreo@0, Pavimento 2@3', s.levels);
     await fixPlanView();
-    await shot('00-casa.png');
+    await snap('00-casa');
   });
 
   await rep.step('2 · Laje retangular no Pavimento 2 cobrindo a casa (para ver o furo)', async () => {
@@ -125,7 +128,7 @@ try {
     const h = await slabHoles('lv_1');
     rep.check('uma laje no Pavimento 2', h.slabs === 1, `${h.slabs}`);
     rep.check('área ≈ 70 m² (10 × 7), sem furo', Math.abs(h.area - 70) < 0.5 && h.holes.length === 0, `${h.area.toFixed(3)} m², ${h.holes.length} furos`);
-    await shot('01-nivel2-laje.png');
+    await snap('01-nivel2-laje');
   });
 
   await rep.step('3 · Escada reta (Q, forma Reta): clique no 1º espelho e na direção', async () => {
@@ -147,7 +150,7 @@ try {
     rep.check('1 escada no projeto, gerada como Reta', s.stairs.length === 1 && !!reta, `${s.stairs.length} escada(s)`);
     rep.check(`${N_RETA} linhas de espelho no modelo`, reta?.risers === N_RETA, `${reta?.risers}`);
     rep.check('nível de topo automático (o Pavimento 2)', reta?.topLevelId === null && reta?.runs === 1, JSON.stringify({ topo: reta?.topLevelId, lances: reta?.runs }));
-    await shot('planta-reta.png');
+    await snap('planta-reta');
   });
 
   await rep.step('4 · Escada em L (forma Em L)', async () => {
@@ -162,7 +165,7 @@ try {
     const l = s.stairs.find((x) => x.generatedBy === 'lshape');
     rep.check('2 escadas no projeto', s.stairs.length === 2, `${s.stairs.length}`);
     rep.check(`L: 2 lances, 1 patamar e ${N_RETA} espelhos`, l?.runs === 2 && l?.landings === 1 && l?.risers === N_RETA, JSON.stringify(l));
-    await shot('planta-L.png');
+    await snap('planta-L');
   });
 
   await rep.step('5 · Escada em U (forma Em U)', async () => {
@@ -177,7 +180,7 @@ try {
     const u = s.stairs.find((x) => x.generatedBy === 'ushape');
     rep.check('3 escadas no projeto', s.stairs.length === 3, `${s.stairs.length}`);
     rep.check(`U: 2 lances, 1 patamar e ${N_RETA} espelhos`, u?.runs === 2 && u?.landings === 1 && u?.risers === N_RETA, JSON.stringify(u));
-    await shot('planta-U.png');
+    await snap('planta-U');
   });
 
   await rep.step('6 · Furo derivado na laje do Pavimento 2 sobre a escada reta', async () => {
@@ -198,11 +201,11 @@ try {
     const fora = h.holes.every((b) => b.maxX < 12);
     rep.check('L e U (fora da laje) não furam a laje', fora, `${h.holes.length} furo(s)`);
     await goLevel(/Pavimento 2/);
-    await shot('planta-nivel2-furo.png');
+    await snap('planta-nivel2-furo');
     await page.getByRole('tab', { name: /Modelo 3D/ }).click();
     await page.waitForTimeout(1500);
     rep.check('vista 3D ativa', (await state()).view === '3d');
-    await shot('3d-escada.png');
+    await snap('3d-escada');
     await goLevel(/Térreo/);
   });
 
@@ -251,7 +254,7 @@ try {
     rep.check('"Escada criada: 6 espelhos"', /Escada criada: 6 espelhos/.test(msg), msg.slice(0, 110));
     const s = await state();
     rep.check('4 escadas; a do croqui tem 6 espelhos e não é gerada', s.stairs.length === 4 && s.stairs.some((x) => x.risers === 6 && x.generatedBy === null), `${s.stairs.length} escadas`);
-    await shot('escada-croqui-concluida.png');
+    await snap('escada-croqui-concluida');
   });
 
   await rep.step('8 · Desfazer (Ctrl+Z) e refazer (Ctrl+Y) a escada do croqui', async () => {
@@ -290,7 +293,7 @@ try {
     let h = await slabHoles('lv_1');
     rep.check('desligado: laje inteira (≈ 70 m², sem furo)', Math.abs(h.area - 70) < 0.5 && h.holes.length === 0, `${h.area.toFixed(3)} m²`);
     await goLevel(/Pavimento 2/);
-    await shot('nivel2-furo-desligado.png');
+    await snap('nivel2-furo-desligado');
     await goLevel(/Térreo/);
     await clickWorld(page, 7.2, 4.5);
     await page.waitForTimeout(200);
@@ -336,7 +339,7 @@ try {
     rep.check('vista de corte aberta', (await state()).view === 'section');
     const r = await page.evaluate((id) => { const x = window.__hestia.editor.sectionOf(id); return x ? { cortes: x.cut.length, alcance: x.beyond.length } : null; }, sec.id);
     rep.check('o corte tem regiões cortadas', !!r && r.cortes > 0, JSON.stringify(r));
-    await shot('corte-escada.png');
+    await snap('corte-escada');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
     rep.check('Esc volta à planta', (await state()).view === 'plan');

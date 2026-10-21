@@ -6,6 +6,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { clickWorld, launch, makeReporter, openApp } from './helpers.mjs';
+import { checkShot } from './visual.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/escadas';
 mkdirSync(OUT, { recursive: true });
@@ -215,7 +216,9 @@ try {
         await page.evaluate(({ x, y, az }) => { const o = window.__hestia3d; o.target.set(x, y, 0.3); o.distance = 2.6; o.azimuth = az; o.elevation = 0.35; o.apply(); }, { x: s.x, y: s.y, az });
         await page.mouse.move(400, 300); await page.mouse.wheel(0, 1);
         await page.waitForTimeout(500);
-        await shot(`close-${s.g}-${name}.png`);
+        // G6: os close-ups da escada em L (d e f) são comparados com a baseline; os demais seguem só como imagem.
+        if (s.g === 'lshape' && (name === 'd' || name === 'f')) await checkShot(rep, page.locator('.canvas-wrap'), `close-${s.g}-${name}`, { out: OUT });
+        else await shot(`close-${s.g}-${name}.png`);
       }
     }
     await goLevel(/Térreo/);

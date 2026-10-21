@@ -76,6 +76,7 @@ export interface StairType { id: Id; name: string; maxRiser: number; minTread: n
 | `stair-width-min` | "A largura do lance (X m) é menor que a mínima do tipo (Y m)." | "Actual run width is less than minimum…" |
 | `stair-tread-min` | "O piso (X m) é menor que o mínimo do tipo (Y m)." (só lance gerado) | A22 (regra: atual ≥ mínimo) |
 | `stair-landing-open` | "O contorno do patamar deve ser um laço fechado." | B7 |
+| `stair-top-not-above` | "O nível de topo deve estar acima do nível da escada." | Decisão 7 (regra do modelo, `validateStairs.ts`, não do croqui): cota do topo ≤ cota da base + 1 mm. Erro bloqueante: o motor não deve gerar degraus, espelhos nem furo (pendente: `resolveStairs` ainda gera o patamar nesse caso) |
 Erros de geometria (`error`) impedem gerar degraus do lance; os de norma e tipo são `warning`.
 
 ## 4 · Algoritmo do degrau (engine: `stairSketch.ts`, função pura)

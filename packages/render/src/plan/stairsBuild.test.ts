@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { resolveLevel, pieceVolume, resolveStairs, resolveStairsOnLevel, stairBody } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairRun } from '@hestia/model';
+import {
+  generateLShape,
+  generateStraightRun,
+  generateUShape,
+  pieceVolume,
+  resolveLevel,
+  resolveStairs,
+  resolveStairsOnLevel,
+  stairBody,
+  type StairComponentSketch,
+} from '@hestia/engine';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
 import { buildStairSolids } from '../model3d/stairSolids.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
+import { stairFills } from './stairs.ts';
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -110,5 +121,73 @@ describe('escadas do projeto na planta e no 3D (integração com o motor)', () =
     const piecesSum = stairBody(st!, { slabThickness: 0.15 }).pieces.reduce((s, piece) => s + pieceVolume(piece), 0);
     const [b] = buildStairSolids([st!]);
     expect(Math.abs(meshVolume(b!) - piecesSum)).toBeLessThan(1e-9);
+  });
+});
+
+/** Componentes do croqui (engine) com id, como a escada guarda no modelo. */
+function toModel(cs: StairComponentSketch[]): Array<StairRun | StairLanding> {
+  return cs.map((c, i) => (c.kind === 'run' ? { id: `r_${i}`, kind: 'run', ...c.run } : { id: `p_${i}`, kind: 'landing', boundary: c.landing.boundary }));
+}
+
+/** Escada com o croqui dado: topo no pavimento 2 (3,00 m) menos 0,20 m, como nos testes de sólidos. */
+function stairProject(components: Array<StairRun | StairLanding>, baseOffset = 0): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({
+    type: 'addStair',
+    stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', baseOffset, topOffset: -0.2, height: 2.8, components }),
+  });
+  return s.project;
+}
+
+/** Números dos degraus rotulados na planta, na ordem em que saem (o SOBE e a etiqueta do tipo ficam de fora). */
+function treadLabels(p: Project): number[] {
+  const [st] = resolveStairsOnLevel(p, 'lv_0');
+  const { labels } = stairFills(p, [st!], LIGHT, false, 'fine', VIEW);
+  return labels.map((l) => l.text).filter((t) => /^\d+$/.test(t)).map(Number);
+}
+
+const range = (a: number, b: number): number[] => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+describe('numeração contínua dos degraus na planta (decisão 0011 §1 item 6)', () => {
+  const P = 0.28;
+
+  it('L com patamar, 8 + 8 espelhos: lance 1 = 1..7, o patamar não recebe rótulo, lance 2 = 9..15', () => {
+    const comps = generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
+    const p = stairProject(toModel(comps));
+    expect(resolveStairsOnLevel(p, 'lv_0')[0]!.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+  });
+
+  it('U com patamar, 8 + 8 espelhos: mesma regra (1..7 e 9..15)', () => {
+    const comps = generateUShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
+    const p = stairProject(toModel(comps));
+    expect(resolveStairsOnLevel(p, 'lv_0')[0]!.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+  });
+
+  it('L com a base do lance em 0,30 m (baseOffset): a numeração segue a cota, igual à da base no piso', () => {
+    const comps = generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
+    const p = stairProject(toModel(comps), 0.3);
+    const [st] = resolveStairsOnLevel(p, 'lv_0');
+    expect(st!.baseZ).toBeCloseTo(0.3, 9);
+    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+  });
+
+  it('lance 1 com erro de croqui (espelho repetido): sem degraus nele, mas o 2º lance segue em 9 pela cota, não em 1', () => {
+    const comps = generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
+    const first = comps[0]!;
+    if (first.kind !== 'run') throw new Error('o 1º componente do L é um lance');
+    first.run.risers[7] = first.run.risers[6]!;
+    const p = stairProject(toModel(comps));
+    const [st] = resolveStairsOnLevel(p, 'lv_0');
+    expect(st!.issues).toContainEqual(expect.objectContaining({ severity: 'error', componentIndex: 0 }));
+    expect(st!.riserCount).toBe(16);
+    expect(treadLabels(p)).toEqual(range(9, 15));
+  });
+
+  it('reta de 16 espelhos pelo gerador (como no app): rótulos 1..15', () => {
+    const sk = generateStraightRun({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risers: 16, tread: P });
+    const p = stairProject([{ id: 'run', kind: 'run', ...sk }]);
+    expect(treadLabels(p)).toEqual(range(1, 15));
   });
 });

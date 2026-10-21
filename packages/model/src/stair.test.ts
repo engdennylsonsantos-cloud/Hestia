@@ -292,15 +292,49 @@ describe('validação da escada', () => {
     expect(stairCodes(s.project)).toEqual(['stair-top-level-missing']);
   });
 
-  it('topo abaixo ou na base é erro', () => {
+  it('topo abaixo do nível da escada é erro', () => {
     const s = projectWithLevels();
     addStair(s, { levelId: PAV2, topLevelId: TERREO });
-    expect(stairCodes(s.project)).toEqual(['stair-top-below-base']);
+    expect(stairCodes(s.project)).toEqual(['stair-top-not-above']);
   });
 
-  it('sem nível acima, altura zero ou negativa é erro de topo abaixo da base', () => {
+  it('topo explícito no mesmo nível da escada é erro (altura zero)', () => {
+    const s = projectWithLevels();
+    addStair(s, { levelId: PAV2, topLevelId: PAV2 });
+    expect(stairCodes(s.project)).toEqual(['stair-top-not-above']);
+  });
+
+  it('offset de topo que zera a altura é erro', () => {
+    const s = projectWithLevels();
+    addStair(s, { topLevelId: PAV2, topOffset: -3 });
+    expect(stairCodes(s.project)).toEqual(['stair-top-not-above']);
+  });
+
+  it('altura de 1 mm ou menos conta como não acima; acima de 1 mm é aceita', () => {
+    const fino = projectWithLevels();
+    addStair(fino, { topLevelId: PAV2, topOffset: -3 + 0.0005 });
+    expect(stairCodes(fino.project)).toEqual(['stair-top-not-above']);
+    const ok = projectWithLevels();
+    addStair(ok, { topLevelId: PAV2, topOffset: -3 + 0.002 });
+    expect(stairCodes(ok.project)).toEqual([]);
+  });
+
+  it('sem nível acima, altura zero ou negativa é erro de topo não acima', () => {
     const s = projectWithLevels();
     addStair(s, { levelId: COBERTURA, height: 0 });
-    expect(stairCodes(s.project)).toEqual(['stair-top-below-base']);
+    expect(stairCodes(s.project)).toEqual(['stair-top-not-above']);
+    const n = projectWithLevels();
+    addStair(n, { levelId: COBERTURA, height: -1 });
+    expect(stairCodes(n.project)).toEqual(['stair-top-not-above']);
+  });
+
+  it('a mensagem é a da decisão 0011 §3', () => {
+    const s = projectWithLevels();
+    addStair(s, { levelId: PAV2, topLevelId: TERREO });
+    expect(validateProject(s.project).find((i) => i.code === 'stair-top-not-above')).toMatchObject({
+      severity: 'error',
+      message: 'O nível de topo deve estar acima do nível da escada.',
+      elementId: 'st1',
+    });
   });
 });

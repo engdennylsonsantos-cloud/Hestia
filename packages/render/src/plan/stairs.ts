@@ -1,5 +1,5 @@
 import { add, dist, lerp, mul, norm, perp, rotate, sub, union, type Vec2 } from '@hestia/geom';
-import { sampleChain, type ResolvedStair, type ResolvedStairRiser } from '@hestia/engine';
+import { sampleChain, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep } from '@hestia/engine';
 import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -25,6 +25,17 @@ export const STAIR_RISER_WIDTH_PX = 1.4;
 export const STAIR_DASH: [number, number] = [6, 3];
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
+
+/**
+ * Número visível do degrau na planta (decisão 0011 §1 item 6): o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`.
+ * É contínuo na escada: o `index` do motor reinicia em cada lance, e o 1º degrau depois de um patamar segue o último
+ * espelho anterior (o patamar não recebe rótulo, mas ocupa esse número). Usa a cota, não a contagem, então um lance
+ * com erro de croqui ainda conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
+ */
+export function treadNumber(s: ResolvedStair, st: ResolvedStairStep): number {
+  if (!(s.riserHeight > 0)) return st.index;
+  return Math.round((st.z - s.baseZ) / s.riserHeight);
+}
 
 /** Ponto a meio comprimento da polilinha (ponto médio do espelho). */
 export function polyMid(pts: Vec2[]): Vec2 {
@@ -133,7 +144,7 @@ const beside = (u: Vec2): { dx: number; dy: number } => ({ dx: -16 * u.y, dy: -1
  * Escadas do nível na planta (decisão 0011 §1). Preenchimento dos degraus e patamares com a cor do material do tipo
  * (mesma regra dos pisos); contorno de cada degrau (tracejado acima da cota de corte); linha de cada espelho; símbolo
  * de corte e seta de subida "SOBE" pela caminhada (explícita, se válida, senão automática). No grosseiro, só o preenchimento do contorno. No fino,
- * número de cada degrau. Com etiquetas ligadas, o código do tipo no centroide.
+ * número de cada degrau (`treadNumber`: contínuo na escada, o espelho que o degrau alcança). Com etiquetas ligadas, o código do tipo no centroide.
  *
  * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e o que está acima do topo não sai:
  * degrau ou espelho com topo acima de `view.topZ` é omitido. Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
@@ -173,7 +184,7 @@ export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme
       for (const st of s.steps) {
         if (st.kind !== 'tread') continue;
         const at = labelPoint([[st.polygon]]);
-        if (at) out.labels.push({ at, text: String(st.index) });
+        if (at) out.labels.push({ at, text: String(treadNumber(s, st)) });
       }
     }
     if (p.settings.showTags) {

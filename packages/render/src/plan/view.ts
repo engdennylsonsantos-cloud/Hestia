@@ -1,6 +1,19 @@
-import { difference, union, type MultiPolygon } from '@hestia/geom';
-import { classifyLevelEntries, resolveLevel, type OpeningGeometry, type ResolvedLevel, type ViewClass } from '@hestia/engine';
-import { levelElevation, viewRangeOf, wallsOnLevel, type Id, type Project, type ViewRange } from '@hestia/model';
+import { difference, orientedRect, union, type MultiPolygon } from '@hestia/geom';
+import {
+  classifyLevelEntries,
+  frameOfWall,
+  openingGeometry,
+  resolveFloors,
+  resolveLevel,
+  resolveRoofs,
+  resolveSlabs,
+  resolveStairsOnLevel,
+  type OpeningGeometry,
+  type ResolvedLevel,
+  type ViewClass,
+} from '@hestia/engine';
+import { isOpening, isWall, levelElevation, viewRangeOf, wallsOnLevel, type Id, type Project, type ViewRange } from '@hestia/model';
+import { roofFootprint } from './roofs.ts';
 import { openingSymbol } from './symbols.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
@@ -119,4 +132,45 @@ export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, t
   if (cls === 'projection-above') return openingSymbol(g, theme).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
   if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft });
   return openingSymbol(g, theme);
+}
+
+/**
+ * Contorno fantasma dos elementos selecionados que estão fora do intervalo de vista (decisão 0013 §4). O aviso "Selecionar"
+ * põe os ocultos na seleção, mas a planta não os desenha; aqui cada um ganha o contorno da sua categoria, sem
+ * preenchimento e em tracejado fino na cor de seleção. Parede: o contorno inteiro (a geometria da vista não resolve as
+ * ocultas, então elas são resolvidas à parte, como contorno); abertura: o vão sobre a parede; piso, laje, telhado e escada:
+ * a pegada, a mesma que a planta usa para o destaque. Elementos visíveis ou de outro nível não entram.
+ */
+export function hiddenSelectionOps(p: Project, levelId: Id, view: PlanView, selection: readonly Id[], theme: PlanTheme): StrokeOp[] {
+  const ids = selection.filter((id) => view.hidden.has(id));
+  if (ids.length === 0) return [];
+  const style: OutlineStyle = { widthPx: 1, color: theme.select, alpha: 0.9, dash: [5, 3] };
+  const out: StrokeOp[] = [];
+  const addRings = (m: MultiPolygon): void => {
+    for (const ring of m.flat()) out.push({ pts: ring, closed: true, ...style });
+  };
+  const wallIds = ids.filter((id) => isWall(p.elements[id]));
+  if (wallIds.length > 0) {
+    // Mesmo corte da vista; as ocultas entram como contorno (`outlineWalls`), então o `fragment` é a parede inteira.
+    const geo = resolveLevel(p, levelId, undefined, { cutZ: view.cutZ, planOpenings: new Set<Id>(), outlineWalls: new Set<Id>(wallIds) });
+    for (const id of wallIds) addRings(union(...(geo.walls[id]?.layers ?? []).map((l) => l.fragment)));
+  }
+  const footprints = new Map<Id, MultiPolygon>();
+  for (const f of resolveFloors(p, levelId)) footprints.set(f.floorId, f.polygon);
+  for (const s of resolveSlabs(p, levelId)) footprints.set(s.slabId, s.polygon);
+  for (const r of resolveRoofs(p, levelId)) footprints.set(r.roofId, roofFootprint(r));
+  for (const s of resolveStairsOnLevel(p, levelId)) footprints.set(s.id, s.footprint);
+  for (const id of ids) {
+    const e = p.elements[id];
+    if (isOpening(e)) {
+      const f = frameOfWall(p, e.hostId);
+      if (!f) continue;
+      const g = openingGeometry(p, e, f);
+      out.push({ pts: orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2 + 0.02), closed: true, ...style });
+      continue;
+    }
+    const m = footprints.get(id);
+    if (m) addRings(m);
+  }
+  return out;
 }

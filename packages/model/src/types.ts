@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 import type { ViewRange } from './viewRange.ts';
+import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 16;
@@ -103,6 +104,8 @@ export interface Level {
   elevation: number;
   /** Intervalo de vista da planta deste nível (decisão 0013). Cotas relativas à elevação. */
   viewRange: ViewRange;
+  /** Gráficos da planta deste nível (decisão 0015); ausente = padrão. */
+  graphics?: ViewGraphics;
 }
 
 /** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */
@@ -396,6 +399,10 @@ export interface Project {
   settings: ProjectSettings;
   /** Cortes e elevações do projeto (aparecem na árvore de vistas). */
   views: SectionView[];
+  /** Pesos de linha, estilo por categoria e detalhe por escala (decisão 0015); ausente = padrão. */
+  graphics?: ProjectGraphics;
+  /** Gráficos do modelo 3D (decisão 0015); ausente = padrão. */
+  view3d?: View3DSettings;
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

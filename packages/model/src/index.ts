@@ -18,5 +18,6 @@ export * from './roof.ts';
 export * from './stair.ts';
 export * from './stairTypes.ts';
 export * from './viewRange.ts';
+export * from './graphics.ts';
 export * from './level.ts';
 export * from './elementLevel.ts';

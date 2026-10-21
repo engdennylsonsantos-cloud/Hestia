@@ -32,16 +32,3 @@ export * from './stairs.ts';
 export * from './stairOpenings.ts';
 export * from './stairQuantities.ts';
 export * from './stairSchedule.ts';
-// Croqui de escada (decisão 0011 §3-§4): validação, degraus, patamar e distribuição de espelhos.
-export {
-  distributeRisers,
-  stairLandingPolygon,
-  stairRunSteps,
-  trimRisers,
-  validateRunSketch,
-  STAIR_SKETCH_MESSAGES,
-  type StairLandingSketch,
-  type StairRunSketch,
-  type StairRunStepsResult,
-  type StairSketchIssue,
-} from './stairSketch.ts';

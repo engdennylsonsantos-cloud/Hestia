@@ -1,5 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
+import type { StairToolOptions, StairTone } from './stairSketchState.ts';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
 
@@ -19,8 +20,8 @@ export interface Inference {
 
 /** O que a ferramenta mostra antes do clique (docs/03 §5: pré-visualização sempre). */
 export type PreviewItem =
-  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean }
-  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean }
+  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone }
+  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: StairTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
@@ -119,6 +120,8 @@ export interface ToolOptions {
   roofOverhang?: number;
   /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */
   roofOffset?: number | null;
+  /** Escada por croqui: tipo, sub-modo, primitiva, N para distribuir e cotas da criação. Ausente = padrão. */
+  stair?: StairToolOptions;
 }
 
 export interface PointerInfo {

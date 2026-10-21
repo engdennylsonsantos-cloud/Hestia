@@ -1,4 +1,4 @@
-import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
+import { applyTransform, type Transform } from '@hestia/geom';
 import { sampleChain, sampleCurve, stairRunSteps } from '@hestia/engine';
 import type { Stair, StairCurve, StairLanding, StairRun } from '@hestia/model';
 import type { PreviewItem } from './types.ts';
@@ -67,6 +67,3 @@ export function componentsPreview(cs: Array<StairRun | StairLanding>, dashed = f
     dashed,
   );
 }
-
-/** Ponto da prévia de uma alça ou de um vértice (indicador). */
-export const pointItem = (at: Vec2): PreviewItem => ({ kind: 'point', at });

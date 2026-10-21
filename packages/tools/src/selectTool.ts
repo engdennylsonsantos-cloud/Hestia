@@ -1,6 +1,6 @@
 import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isSlab, isWall, type Id } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
@@ -12,6 +12,8 @@ import { commitRoofPatch } from './roofCheck.ts';
 import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
+import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
+import { stairHandlePreview } from './stairGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
 type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge';
@@ -19,7 +21,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -66,6 +68,8 @@ export class SelectTool extends ToolBase {
     const mpp = this.env.metersPerPixel();
     const hit = pickAt(pr, lv, at, mpp);
     if (hit) return hit;
+    const st = pickStairAt(pr, lv, at, mpp);
+    if (st) return { id: st, kind: 'stair' };
     const f = pickFloorAt(pr, lv, at, mpp);
     if (f) return { id: f, kind: 'floor' };
     const sl = pickSlabAt(pr, lv, at, mpp);
@@ -83,7 +87,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()));
     // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
     this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
@@ -255,6 +259,7 @@ export class SelectTool extends ToolBase {
           ...floorIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...slabIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
         const cur = this.env.selection();
         this.env.setSelection(p.shift ? [...new Set([...cur, ...ids])] : ids);
@@ -284,6 +289,7 @@ export class SelectTool extends ToolBase {
     for (const id of this.env.selection()) {
       const e = pr.elements[id];
       if (isWall(e)) pts.push(e.a, e.b);
+      else if (isStair(e)) pts.push(...stairEndpoints(e));
       else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
     }
     return pts.length ? boxOf(pts) : null;

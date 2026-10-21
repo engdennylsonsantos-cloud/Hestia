@@ -16,11 +16,12 @@ import { RoofTool } from './roofTool.ts';
 import { RoofExtrusionTool } from './roofExtrusionTool.ts';
 import { RoofArrowTool } from './roofArrowTool.ts';
 import { AttachRoofTool, DetachRoofTool } from './attachRoofTool.ts';
+import { StairTool } from './stairTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Medir', tools: ['measure'] },
 ];
@@ -47,6 +48,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new AttachRoofTool(env);
     case 'detachroof':
       return new DetachRoofTool(env);
+    case 'stair':
+      return new StairTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -109,6 +112,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   rehost: 'Trocar anfitriã',
   attachroof: 'Anexar topo',
   detachroof: 'Desanexar topo',
+  stair: 'Escada',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {

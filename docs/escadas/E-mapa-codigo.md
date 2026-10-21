@@ -235,6 +235,26 @@ Fora do corte: `PAREDE_PROJECAO_ACIMA` (tracejada), `PAREDE_PROJECAO_ABAIXO`, `P
 Pisos e lajes usam `resolveFloors` e `resolveSlabs` (com o furo derivado). A projeção do telhado sai sempre (divergência da §0, item 4).
 Testes: `packages/io/src/dxf.test.ts` e `apps/web/src/editor/dxfExport.test.ts`.
 
+### 6.4 Larguras de linha (decisão 0015 §2 item 7)
+Cada camada leva o código 370 (centésimos de mm, arredondado ao valor DXF válido mais próximo; empate vai ao maior). O peso vem da
+categoria e da escala da vista: `lineWeightsOf` (`dxfExport.ts`) usa `lineWeightMm` com `graphicsOf` e `levelGraphicsOf`, e as substituições
+`cutWeight`/`projectionWeight` da vista valem. Papel de cada camada em `dxfLineRoleOf` (`dxf.ts`):
+
+| Camada | Categoria | Peso |
+|---|---|---|
+| `PAREDE_<material>`, `PAREDE_CONTORNO` | parede | corte |
+| `PAREDE_PROJECAO_ACIMA`, `PAREDE_PROJECAO_ABAIXO`, `PAREDE_ALEM` | parede | projeção |
+| `ABERTURAS` | janela (portas e janelas saem juntas nesta camada) | corte |
+| `ABERTURA_ACIMA`, `ABERTURA_ABAIXO`, `ABERTURA_ALEM` | janela | projeção |
+| `PISO_<código>` / `LAJE_<código>` | piso / laje | corte |
+| `TELHADO_<código>`, `TELHADO_CUMEEIRA`, `TELHADO_EMPENA` / `TELHADO_PROJECAO` | telhado | corte / projeção |
+| `ESCADA`, `ESCADA_ESPELHO`, `ESCADA_POSTE` / `ESCADA_ACIMA` | escada | corte / projeção |
+| `ESCADA_SETA`, `ESCADA_CORTE` | anotação (marca de escada) | 0 |
+| `0` (sem categoria) | — | -3 (padrão) |
+
+Categoria oculta na vista (`overrides[cat].visible === false`) não sai no DXF. Sem `lineWeights` na geometria, a tabela não tem 370 e
+o arquivo é o de antes. Testes: `packages/io/src/dxfLineWeights.test.ts` e o bloco "larguras de linha no DXF" de `apps/web/src/editor/dxfExport.test.ts`.
+
 ---
 
 ## 7. Corte e elevação

@@ -47,8 +47,6 @@ function straight(n: number, spacing: number, width = 1.2): StairRun {
   };
 }
 
-};
-
 /** Retângulo de (x0,y0) a (x1,y1), em volta. */
 const box = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [v(x0, y0), v(x1, y0), v(x1, y1), v(x0, y1)];
 

@@ -1,6 +1,6 @@
 import { asMulti, dot, intersection, type Vec2 } from '@hestia/geom';
 import type { Roof, RoofPlaneDef } from '@hestia/model';
-import { extrusionPlanes } from './roofExtrusion.ts';
+import { extrusionEdgeKinds, extrusionPlanes } from './roofExtrusion.ts';
 import { unitOf } from './roofGeom.ts';
 import { skeletonPlanes, type WaterSolution } from './roofSkeleton.ts';
 import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
@@ -44,9 +44,13 @@ export function edgeSlopesOf(r: Roof): Array<number | null> {
   }
 }
 
-/** Tipo de cada aresta do contorno: 'eave' (beiral, com água) ou 'gable' (empena). Águas livres e extrusão: todas beiral. */
+/**
+ * Tipo de cada aresta do contorno: 'eave' (beiral, com água) ou 'gable' (empena). Águas livres: todas beiral. Extrusão:
+ * as extremidades com seção acima do beiral são empenas (`extrusionEdgeKinds`).
+ */
 export function boundaryKindsOf(r: Roof): Array<Extract<RoofLine['kind'], 'eave' | 'gable'>> {
-  if (r.shape === 'free' || r.shape === 'extrusion') return r.boundary.map(() => 'eave');
+  if (r.shape === 'free') return r.boundary.map(() => 'eave');
+  if (r.shape === 'extrusion') return extrusionEdgeKinds(r);
   const slopes = edgeSlopesOf(r);
   return r.boundary.map((_, i) => {
     const s = slopes[i];

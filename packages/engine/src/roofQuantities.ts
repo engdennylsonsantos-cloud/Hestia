@@ -1,6 +1,7 @@
 import { dist, dot, multiArea, mid, sub, type Vec2 } from '@hestia/geom';
 import { roofPlanArea, type Id, type Project, type Roof, type RoofShape } from '@hestia/model';
 import { crossingParams, planeHas } from './roofGeom.ts';
+import { extrusionGableArea } from './roofExtrusion.ts';
 import { planeZ, resolveRoofs, roofThickness, type ResolvedRoof, type ResolvedRoofPlane, type RoofLine } from './roofs.ts';
 import { edgeSlopesOf } from './roofShapes.ts';
 
@@ -12,6 +13,8 @@ import { edgeSlopesOf } from './roofShapes.ts';
  * trecho; comprimento 3D = √(L² + Δz²). Cumeeira horizontal tem Δz = 0 e vale o comprimento em planta.
  * Empena (aresta sem inclinação): comprimento em planta; área = trapézio vertical sob a água vizinha, medido a partir
  * da cota do beiral (aproximação do frontão: a água é plana em cada trecho, então a área é exata para essa altura).
+ * Extrusão: as extremidades que cortam o eixo com seção acima do beiral são empenas (comprimento em planta, como acima);
+ * a área é a seção do perfil na extremidade, integrada ao longo da aresta.
  */
 
 export interface RoofPlaneQuantity {
@@ -178,7 +181,8 @@ function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]):
     valleyLength: sumKind(rr, 'valley', planes),
     eaveLength: sumKind(rr, 'eave', planes),
     gableLength: rr.lines.filter((l) => l.kind === 'gable').reduce((s, l) => s + dist(l.a, l.b), 0),
-    gableArea: gableAreaOf(rr),
+    // Extrusão: a empena é a seção do perfil na extremidade (integral exata); as outras formas usam o trapézio por trecho.
+    gableArea: r.shape === 'extrusion' ? extrusionGableArea(r) : gableAreaOf(rr),
     slopedEdges: slopedEdgesOf(r),
     ridgeHeight: heights.length ? Math.max(...heights) : null,
     maxHeight: tops.length ? Math.max(...tops) : rr.eaveZ,

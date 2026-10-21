@@ -8,9 +8,12 @@ export interface ContinuityFace {
   polygon: Vec2[];
 }
 
-/** Motivo devolvido quando a superfície não fecha (ok:false); o engine o mostra como aviso do telhado. */
-export const DISCONTINUOUS_REASON =
-  'superfície do telhado descontínua: contorno côncavo com aresta de empena encostando em beiral no canto reentrante; não há superfície contínua nesse canto';
+/** Degrau da superfície: vértice (planta) onde as águas que se encontram têm cotas diferentes. `dz` em metros. */
+export interface SkeletonStep {
+  x: number;
+  y: number;
+  dz: number;
+}
 
 /** Tolerância de cota entre águas que se encontram num mesmo ponto de planta (metros). */
 const HEIGHT_TOL = 1e-6;
@@ -44,21 +47,27 @@ function onBoundary(p: Vec2, R: Vec2[]): boolean {
 }
 
 /**
- * Verdadeiro se a superfície tem salto em algum vértice de água: todas as águas que contêm ou tocam (fronteira,
- * inclusive T-junção) um vértice de água precisam dar a mesma cota ali. Um salto em aresta comum entre duas águas
- * aparece nas cotas de seus vértices extremos; um salto que começa numa T-junção aparece na própria T-junção.
+ * Degraus da superfície: em cada vértice de água, as águas que contêm ou tocam o ponto (inclusive T-junção) devem dar
+ * a mesma cota. Onde não dão, o vértice vira degrau, com a diferença máxima entre essas cotas. Vértices repetidos
+ * (vistos por mais de uma água) aparecem uma vez. Lista vazia = superfície contínua.
  */
-export function hasHeightJump(rings: Vec2[][], weights: number[][], faces: ContinuityFace[]): boolean {
+export function findSteps(rings: Vec2[][], weights: number[][], faces: ContinuityFace[]): SkeletonStep[] {
+  const out: SkeletonStep[] = [];
+  const done: Vec2[] = [];
   for (const f of faces) {
     for (const v of f.polygon) {
-      let ref: number | null = null;
+      if (done.some((q) => Math.hypot(q.x - v.x, q.y - v.y) <= EDGE_TOL)) continue;
+      done.push(v);
+      let lo = Infinity;
+      let hi = -Infinity;
       for (const g of faces) {
         if (!pointInRing(v, g.polygon) && !onBoundary(v, g.polygon)) continue;
         const z = waterHeightAt(rings, weights, g.ring, g.edge, v);
-        if (ref === null) ref = z;
-        else if (Math.abs(z - ref) > HEIGHT_TOL) return true;
+        lo = Math.min(lo, z);
+        hi = Math.max(hi, z);
       }
+      if (hi - lo > HEIGHT_TOL) out.push({ x: v.x, y: v.y, dz: hi - lo });
     }
   }
-  return false;
+  return out;
 }

@@ -159,11 +159,19 @@ function vertexJump(outer: Vec2[], w: number[], faces: SkeletonFace[]): boolean 
   return false;
 }
 
-type Verdict = 'ok' | 'ok-false' | 'silent';
+/**
+ * ok: contínuo e sem degrau. stepped: descontínuo e com degrau reportado (aviso, não falha).
+ * silent: descontínuo sem degrau reportado (falha silenciosa). false-step: degrau reportado mas superfície contínua.
+ * ok-false: o solver recusou por outro motivo.
+ */
+type Verdict = 'ok' | 'stepped' | 'silent' | 'false-step' | 'ok-false';
 
 function judge(outer: Vec2[], w: number[], r: SkeletonResult): Verdict {
   if (!r.ok) return 'ok-false';
-  return pairJump(outer, w, r.faces) || vertexJump(outer, w, r.faces) ? 'silent' : 'ok';
+  const stepped = (r.steps?.length ?? 0) > 0;
+  const jump = pairJump(outer, w, r.faces) || vertexJump(outer, w, r.faces);
+  if (!jump) return stepped ? 'false-step' : 'ok';
+  return stepped ? 'stepped' : 'silent';
 }
 
 const CASES = (() => {
@@ -185,8 +193,8 @@ describe('continuidade da superfície do telhado (contornos côncavos)', () => {
     expect(CASES.some((c) => c.slopes.every((s) => s !== null))).toBe(true);
   });
 
-  it('nenhum contorno com ok:true tem superfície descontínua (falhas silenciosas = 0)', () => {
-    const tally = { ok: 0, 'ok-false': 0, silent: 0 };
+  it('todo contorno descontínuo sai com ok:true e tem pelo menos um vértice em steps (falhas silenciosas = 0)', () => {
+    const tally: Record<Verdict, number> = { ok: 0, stepped: 0, silent: 0, 'false-step': 0, 'ok-false': 0 };
     const silentSamples: string[] = [];
     for (const c of CASES) {
       const w = c.slopes.map(weightOf);
@@ -198,11 +206,13 @@ describe('continuidade da superfície do telhado (contornos côncavos)', () => {
       }
     }
     const total = CASES.length;
+    const pct = (n: number): string => ((100 * n) / total).toFixed(1);
     console.log(
-      `[continuidade] n=${total} ok=${tally.ok} ok:false=${tally['ok-false']} (${((100 * tally['ok-false']) / total).toFixed(1)}%) ` +
-        `falhas silenciosas=${tally.silent} (${((100 * tally.silent) / total).toFixed(1)}%)`,
+      `[continuidade] n=${total} contínuos=${tally.ok} com degrau (descontínuos avisados)=${tally.stepped} (${pct(tally.stepped)}%) ` +
+        `ok:false=${tally['ok-false']} falhas silenciosas=${tally.silent} (${pct(tally.silent)}%) degrau sem descontinuidade=${tally['false-step']}`,
     );
     expect(silentSamples).toEqual([]);
+    expect(tally['false-step']).toBe(0);
   });
 
   it('contornos côncavos sem nenhuma empena continuam contínuos (regressão)', () => {
@@ -215,27 +225,29 @@ describe('continuidade da superfície do telhado (contornos côncavos)', () => {
     }
   });
 
-  it('caso fixo da auditoria: vértice (1;6) com cotas 0, 0,6 e 0,6 não pode sair como ok:true', () => {
+  it('caso fixo da auditoria: ok:true, a geometria não muda e o vértice (1;6) aparece em steps com degrau de 0,6 m', () => {
     const ring = [v2(2, 5), v2(0, 5), v2(0, 7), v2(3, 7), v2(1, 6)];
     const slopes = [60, 60, null, 60, null];
     const w = slopes.map(weightOf);
     const res = weightedSkeleton({ outer: ring, holes: [], weights: [w] });
-    // Pelo vértice (1;6): a água da aresta (3;7)-(1;6) dá cota 0 e as águas (0;5)-(0;7) e (2;5)-(0;5) dão 0,6. O ângulo
-    // reentrante (>180°) não cabe numa única água com cota 0 nesse canto, então não há superfície contínua.
-    expect(res.ok).toBe(false);
-    expect(res.reason).toMatch(/superfície do telhado descontínua/);
+    expect(res.ok).toBe(true);
+    expect(res.faces.length).toBeGreaterThan(0);
+    const step = (res.steps ?? []).find((s) => Math.hypot(s.x - 1, s.y - 6) < 1e-6);
+    expect(step).toBeDefined();
+    expect(step!.dz).toBeCloseTo(0.6, 6);
   });
 
-  it('caso fixo da auditoria: pontos (1,025; 5,975) e (1,025; 6,025) distam 5 cm e não podem ter Δz > 0,6×0,05', () => {
+  it('caso fixo da auditoria: pontos (1,025; 5,975) e (1,025; 6,025) a 5 cm têm Δz acima do limite, e o degrau é reportado', () => {
     const ring = [v2(2, 5), v2(0, 5), v2(0, 7), v2(3, 7), v2(1, 6)];
     const slopes = [60, 60, null, 60, null];
     const w = slopes.map(weightOf);
     const res = weightedSkeleton({ outer: ring, holes: [], weights: [w] });
-    if (!res.ok) return;
+    expect(res.ok).toBe(true);
     const a = faceAt(res.faces, v2(1.025, 5.975));
     const b = faceAt(res.faces, v2(1.025, 6.025));
     expect(a && b).toBeTruthy();
     const dz = Math.abs(planeZ(ring, w, a!.edge, v2(1.025, 5.975)) - planeZ(ring, w, b!.edge, v2(1.025, 6.025)));
-    expect(dz).toBeLessThanOrEqual(0.6 * 0.05 * 1.01 + 1e-6);
+    expect(dz).toBeGreaterThan(0.6 * 0.05 * 1.01 + 1e-6);
+    expect((res.steps ?? []).length).toBeGreaterThan(0);
   });
 });

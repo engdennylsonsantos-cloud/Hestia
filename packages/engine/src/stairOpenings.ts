@@ -1,4 +1,4 @@
-import { asMulti, boxOf, boxesOverlap, difference, minAreaRect, multiPoints, offsetMulti, union, type MultiPolygon, type Polygon } from '@hestia/geom';
+import { asMulti, boxOf, boxesOverlap, difference, minAreaRect, multiPoints, offsetMulti, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
 
@@ -51,15 +51,31 @@ export function stairOpeningsOnLevel(p: Project, levelId: Id): StairOpening[] {
   });
 }
 
+/** Lados do polígono do disco do caracol no furo 'full' (decisão 0014 §11). */
+const SPIRAL_DISK_SIDES = 48;
+
+/**
+ * Disco do caracol (decisão 0014 §11): polígono de 48 lados de raio `rOuter`, centrado em `center`. Inclui o miolo do poste,
+ * porque a projeção inteira do caracol é o disco do limite externo.
+ */
+export function spiralDiskRegion(center: Vec2, rOuter: number): MultiPolygon {
+  const ring = Array.from({ length: SPIRAL_DISK_SIDES }, (_, i) => {
+    const a = (2 * Math.PI * i) / SPIRAL_DISK_SIDES;
+    return { x: center.x + rOuter * Math.cos(a), y: center.y + rOuter * Math.sin(a) };
+  });
+  return [[ring]];
+}
+
 /**
  * Região do furo de uma escada numa laje ou piso com face inferior em `undersideZ` (decisão 0011 §6): o modo escolhido
  * (`openingMode`), depois a folga lateral (`openingMargin`, offset positivo) e, se `openingRect`, o retângulo de menor área
- * que envolve tudo. Vazia com o modo 'none' ou sem degraus que peçam furo. O modo 'full' não depende da cota.
+ * que envolve tudo. Vazia com o modo 'none' ou sem degraus que peçam furo. O modo 'full' não depende da cota: é a projeção
+ * da escada, e no caracol (decisão 0014 §11) é o disco de raio externo.
  */
 export function stairOpeningRegion(s: Stair, r: ResolvedStair, undersideZ: number): MultiPolygon {
   if (s.openingMode === 'none') return [];
-  let region: MultiPolygon =
-    s.openingMode === 'full' ? r.footprint : stairHoleRegion(r, undersideZ, s.openingHeadroom ?? r.type.minHeadroom);
+  const full: MultiPolygon = r.spiral ? spiralDiskRegion(r.spiral.center, r.spiral.rOuter) : r.footprint;
+  let region: MultiPolygon = s.openingMode === 'full' ? full : stairHoleRegion(r, undersideZ, s.openingHeadroom ?? r.type.minHeadroom);
   if (region.length === 0) return [];
   if (s.openingMargin > 0) region = offsetMulti(region, s.openingMargin);
   if (s.openingRect) region = asMulti(minAreaRect(multiPoints(region)));

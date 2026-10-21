@@ -1,6 +1,6 @@
 import { add, mul, norm, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import { pieceBottomZ, stairBody, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type StairBodyPiece } from '@hestia/engine';
-import type { Id } from '@hestia/model';
+import type { Id, StairType } from '@hestia/model';
 import { riserPoints } from '../stairRisers.ts';
 import { extrudeCaps, pushWall, type SolidBatch } from './solids.ts';
 
@@ -84,11 +84,12 @@ function bottomOf(piece: StairBodyPiece): (x: number, y: number) => number {
   return (x, y) => Math.min(pieceBottomZ(piece, x, y), piece.zTop - MIN_PIECE_THICKNESS);
 }
 
-/** Corpo da escada para a extrusão: polígono da planta, fundo por ponto e topo (constante). */
+/** Corpo da escada para a extrusão: polígono da planta, fundo por ponto, topo (constante) e material da peça. */
 interface Body {
   polygon: Ring;
   bot: (x: number, y: number) => number;
   top: number;
+  materialId: Id;
 }
 
 /** Trechos de [loA, hiA] fora de [loB, hiB], para cotas de um mesmo ponto da aresta: a parte de baixo e a de cima. */
@@ -144,20 +145,24 @@ function extrudeBodies(b: SolidBatch, input: Body[]): void {
   });
 }
 
-/** Peças do lance monolítico (decisão 0012) como corpos: topo plano e fundo em rampa ou plano. */
-const monolithicBodies = (pieces: StairBodyPiece[]): Body[] => pieces.map((p) => ({ polygon: p.polygon, bot: bottomOf(p), top: p.zTop }));
+/**
+ * Peças do lance monolítico (decisão 0012) e do poste (decisão 0014 §8) como corpos: topo plano e fundo em rampa ou plano.
+ * O poste central (`post`) vai no material `postMaterialId`; os degraus e patamares, no material do tipo.
+ */
+const monolithicBodies = (pieces: StairBodyPiece[], type: StairType): Body[] =>
+  pieces.map((p) => ({ polygon: p.polygon, bot: bottomOf(p), top: p.zTop, materialId: p.kind === 'post' ? type.postMaterialId : type.materialId }));
 
 /**
  * Corpos do lance montado: cada degrau e patamar é um prisma de topo em `z` e base `treadThickness` (ou
  * `landingThickness`) abaixo; cada espelho é o prisma de `riserThickness` atrás da linha, de `z0` a `z1`.
  */
 function assembledBodies(s: ResolvedStair): Body[] {
-  const { treadThickness, landingThickness, riserThickness } = s.type;
+  const { treadThickness, landingThickness, riserThickness, materialId } = s.type;
   const bodies: Body[] = s.steps.map((st) => {
     const z0 = st.z - (st.kind === 'landing' ? landingThickness : treadThickness);
-    return { polygon: st.polygon, bot: () => z0, top: st.z };
+    return { polygon: st.polygon, bot: () => z0, top: st.z, materialId };
   });
-  if (riserThickness > 0) for (const r of s.risers) bodies.push({ polygon: riserSlab(s, r, riserThickness), bot: () => r.z0, top: r.z1 });
+  if (riserThickness > 0) for (const r of s.risers) bodies.push({ polygon: riserSlab(s, r, riserThickness), bot: () => r.z0, top: r.z1, materialId });
   return bodies;
 }
 
@@ -231,11 +236,13 @@ function splitTJunctions(b: SolidBatch): void {
 }
 
 /**
- * Sólidos das escadas (3D), por material do tipo (decisão 0011 §1). Lance monolítico (decisão 0012): o corpo são as
+ * Sólidos das escadas (3D), por material (decisão 0011 §1). Lance monolítico (decisão 0012): o corpo são as
  * peças de `stairBody` (degraus, patamares e chegada), cada uma com topo plano e fundo plano ou em rampa; os espelhos
  * são a face de trás das peças, então não há placas. As paredes entre peças vizinhas só existem onde a face está
  * exposta, e os vértices soltos sobre as arestas são inseridos (`extrudeBodies`, `splitTJunctions`). Lance montado:
  * degrau de `z − treadThickness` a `z`; espelho de `riserThickness` atrás da linha; patamar de `landingThickness`.
+ * Poste (decisão 0014 §8): degraus soltos (sem espelho) no material do tipo, e o poste central (cilindro de 24 faces) no
+ * `postMaterialId`; cada material vai ao seu lote, e cada peça fecha as próprias paredes onde expostas.
  * Escada com erro (issue `error`) ou sem degraus não gera malha. `arrivalTopOf` dá a cota do topo da chegada de cada
  * escada (`stairArrivalTopZ`, a face inferior da laje que cobre o último espelho); `null` ou sem callback: topo − 0,15 m.
  */
@@ -243,9 +250,15 @@ export function buildStairSolids(stairs: ResolvedStair[], arrivalTopOf: (s: Reso
   const byMat = new Map<Id, SolidBatch>();
   for (const s of stairs) {
     if (s.steps.length === 0 || s.issues.some((i) => i.severity === 'error')) continue;
-    const b = batchOf(byMat, s.type.materialId);
-    const bodies = s.type.runStyle === 'monolithic' ? monolithicBodies(stairBody(s, { arrivalTopZ: arrivalTopOf(s) ?? undefined }).pieces) : assembledBodies(s);
-    extrudeBodies(b, bodies);
+    const bodies =
+      s.type.runStyle === 'monolithic' || s.type.runStyle === 'post'
+        ? monolithicBodies(stairBody(s, { arrivalTopZ: arrivalTopOf(s) ?? undefined }).pieces, s.type)
+        : assembledBodies(s);
+    // Um lote por material: cada chamada de `extrudeBodies` só pareia paredes entre peças do mesmo material (cada peça fecha o próprio corpo).
+    const byBodyMaterial = new Map<Id, Body[]>();
+    for (const body of bodies) byBodyMaterial.set(body.materialId, [...(byBodyMaterial.get(body.materialId) ?? []), body]);
+    if (byBodyMaterial.size === 0) batchOf(byMat, s.type.materialId);
+    for (const [materialId, list] of byBodyMaterial) extrudeBodies(batchOf(byMat, materialId), list);
   }
   const batches = [...byMat.values()];
   for (const b of batches) splitTJunctions(b);

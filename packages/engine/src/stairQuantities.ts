@@ -1,4 +1,4 @@
-import { dist, multiArea, type Vec2 } from '@hestia/geom';
+import { dist, multiArea, ringArea, type Vec2 } from '@hestia/geom';
 import type { Id, StairRunStyle } from '@hestia/model';
 import { pieceVolume, stairBody, type StairBodyPiece } from './stairBody.ts';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from './stairs.ts';
@@ -20,9 +20,12 @@ export interface StairRunQuantity {
  * - monolítico: soma dos volumes das peças de `stairBody` (decisão 0012 §2): degraus e patamares, com o fundo liso ou
  *   escalonado e o corte pelo piso base. A chegada (`arrival`) fica sob a laje de cima e não entra no volume da escada.
  *   Escada com erro de croqui tem volume zero no monolítico;
+ * - poste (decisão 0014 §8): degraus em fatia (com a sobreposição) mais o poste central (`post`), separados em
+ *   `volumeRun` e `volumePost`;
  * - piso e espelho: degraus × espessura do piso + comprimento dos espelhos × altura do espelho × espessura do espelho
  *   + patamares × espessura do patamar.
- * O nariz não entra no volume (só 3D e quantitativo de nariz, quando houver).
+ * O nariz não entra no volume (só 3D e quantitativo de nariz, quando houver). `volumeByMaterial` separa o volume por
+ * material: degraus, patamares e espelhos no material do tipo; poste no `postMaterialId`.
  */
 export interface StairQuantities {
   stairId: Id;
@@ -52,8 +55,14 @@ export interface StairQuantities {
   volumeRisers: number;
   /** Volume dos patamares (m³). */
   volumeLandings: number;
-  /** Volume total (m³). */
+  /** Volume do poste central (m³), só no estilo poste; 0 nos demais. */
+  volumePost: number;
+  /** Área em planta do poste central (m²), só no estilo poste; 0 nos demais. */
+  postPlanArea: number;
+  /** Volume total (m³): degraus + espelhos + patamares + poste. */
   volume: number;
+  /** Volume por material (m³). Degraus, patamares e espelhos no material do tipo; poste no `postMaterialId`. */
+  volumeByMaterial: Record<Id, number>;
   runs: StairRunQuantity[];
 }
 
@@ -87,13 +96,19 @@ export function stairQuantities(s: ResolvedStair): StairQuantities {
   const treadMean = treadCount ? runs.reduce((acc, r) => acc + r.treadMean * r.treadCount, 0) / treadCount : 0;
 
   const monolithic = s.type.runStyle === 'monolithic';
-  // Monolítico: volume das peças de corpo (a chegada fica fora). Piso e espelho: espessuras do tipo.
-  const body: StairBodyPiece[] = monolithic ? stairBody(s).pieces : [];
+  const post = s.type.runStyle === 'post';
+  // Monolítico e poste: volume das peças de corpo (a chegada fica fora; o poste tem peça própria). Piso e espelho: espessuras do tipo.
+  const body: StairBodyPiece[] = monolithic || post ? stairBody(s).pieces : [];
   const bodyVolume = (kind: StairBodyPiece['kind']): number =>
     body.reduce((acc, p) => (p.kind === kind ? acc + pieceVolume(p) : acc), 0);
-  const volumeRun = monolithic ? bodyVolume('tread') : treadArea * s.type.treadThickness;
-  const volumeRisers = monolithic ? 0 : riserLength * s.riserHeight * s.type.riserThickness;
-  const volumeLandings = monolithic ? bodyVolume('landing') : landingArea * s.type.landingThickness;
+  const volumeRun = monolithic || post ? bodyVolume('tread') : treadArea * s.type.treadThickness;
+  const volumeRisers = monolithic || post ? 0 : riserLength * s.riserHeight * s.type.riserThickness;
+  const volumeLandings = monolithic ? bodyVolume('landing') : post ? 0 : landingArea * s.type.landingThickness;
+  const volumePost = post ? bodyVolume('post') : 0;
+  const postPlanArea = body.reduce((acc, p) => (p.kind === 'post' ? acc + Math.abs(ringArea(p.polygon)) : acc), 0);
+  const volumeByMaterial: Record<Id, number> = {};
+  volumeByMaterial[s.type.materialId] = volumeRun + volumeRisers + volumeLandings;
+  if (post) volumeByMaterial[s.type.postMaterialId] = (volumeByMaterial[s.type.postMaterialId] ?? 0) + volumePost;
 
   return {
     stairId: s.id,
@@ -111,7 +126,10 @@ export function stairQuantities(s: ResolvedStair): StairQuantities {
     volumeRun,
     volumeRisers,
     volumeLandings,
-    volume: volumeRun + volumeRisers + volumeLandings,
+    volumePost,
+    postPlanArea,
+    volume: volumeRun + volumeRisers + volumeLandings + volumePost,
+    volumeByMaterial,
     runs,
   };
 }

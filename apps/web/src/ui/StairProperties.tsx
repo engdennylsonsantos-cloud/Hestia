@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
-import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type ValidationIssue } from '@hestia/model';
+import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
+import { regenSpiralComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
@@ -10,6 +11,8 @@ import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+/** Um grau em radianos: os ângulos do caracol são guardados em rad e mostrados em graus. */
+const DEG = Math.PI / 180;
 
 /** Avisos e erros de uma escada: os de norma e de croqui (engine) e os de referência do modelo (tipo, nível, topo). */
 function issuesOf(p: Project, id: Id): ValidationIssue[] {
@@ -39,6 +42,20 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   const noLevelAbove = single ? levelAbove(p, single.levelId) === null : false;
   const noOpening = !openingMode.mixed && openingMode.value === 'none';
   const headroomOff = !openingMode.mixed && openingMode.value !== 'headroom';
+  // Caracol: só para uma escada com lance `spiral` (os campos regeneram o croqui; ver `regenSpiralComponents`).
+  const spiral = useMemo(() => (single ? spiralOfStair(single) : null), [single]);
+  const spiralNums = useMemo(() => (single && spiral ? spiralInfo(p, single, spiral.sp) : null), [p, single, spiral]);
+
+  /** Regenera o caracol com as mudanças de um campo, em UM passo de desfazer. Erro vai para a barra de status. */
+  const editSpiral = (changes: Partial<StairSpiralParams>): void => {
+    if (!single || !spiral) return;
+    const r = regenSpiralComponents(p, single, spiral.part, { ...spiral.sp, ...changes });
+    if ('error' in r) {
+      useUi.setState({ status: `Caracol: ${r.error}` });
+      return;
+    }
+    patchStairs(editor.store, [single.id], { components: r.components }, 'Editar caracol');
+  };
 
   const quantities = useMemo(() => {
     if (!single) return null;
@@ -108,6 +125,36 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         <Row label="Folga lateral (m)" htmlFor="p-sopenm"><NumField id="p-sopenm" value={openingMargin.value} mixed={openingMargin.mixed} disabled={noOpening} min={0} onCommit={(v) => patch(ids, { openingMargin: v })} /></Row>
         <Row label="Furo retangular" htmlFor="p-sopenrect"><Check id="p-sopenrect" checked={openingRect.value} mixed={openingRect.mixed} disabled={noOpening} onChange={(v) => patch(ids, { openingRect: v })} /></Row>
       </Group>
+      {spiral && spiralNums && (
+        <Group title="Caracol">
+          <Row label="Raio interno (m)" htmlFor="p-spin">
+            <NumField id="p-spin" value={spiral.sp.rInner} min={0.05} onCommit={(v) => editSpiral({ rInner: v })} unit="m" />
+          </Row>
+          <Row label="Raio externo (m)" htmlFor="p-spout">
+            <NumField id="p-spout" value={spiral.sp.rOuter} min={0.05} onCommit={(v) => editSpiral({ rOuter: v })} unit="m" />
+          </Row>
+          <Row label="Ângulo inicial (°)" htmlFor="p-spstart">
+            <NumField id="p-spstart" value={spiral.sp.startAngle / DEG} decimals={1} onCommit={(v) => editSpiral({ startAngle: v * DEG })} />
+          </Row>
+          <Row label="Varredura (°)" htmlFor="p-spsweep">
+            <NumField
+              id="p-spsweep"
+              value={Math.abs(spiral.sp.sweep) / DEG}
+              decimals={1}
+              min={30}
+              max={720}
+              onCommit={(v) => editSpiral({ sweep: (spiral.sp.sweep < 0 ? -1 : 1) * v * DEG })}
+            />
+          </Row>
+          <Row label="Sentido"><span className="val">{spiral.sp.sweep < 0 ? 'horário' : 'anti-horário'}</span></Row>
+          {Math.abs(spiral.sp.sweep) > 2 * Math.PI && (
+            <>
+              <Row label="Espelhos por volta"><span className="val">{fmt(spiralNums.perTurn, 1)}</span></Row>
+              <Row label="Folga entre voltas"><span className="val">{fmt(spiralNums.headroom)} m</span></Row>
+            </>
+          )}
+        </Group>
+      )}
       <Group title="Dimensões">
         {single && quantities ? (
           <>
@@ -138,7 +185,11 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
         <Row label="Marca" htmlFor="p-smk"><TextField id="p-smk" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-scm"><TextField id="p-scm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>
-      {type && <div className="hint">{type.runStyle === 'monolithic' ? 'Estilo monolítico.' : 'Estilo de piso e espelho.'} Espelho máximo {fmt(type.maxRiser * 100, 0)} cm.</div>}
+      {type && (
+        <div className="hint">
+          {type.runStyle === 'monolithic' ? 'Estilo monolítico.' : type.runStyle === 'post' ? 'Estilo de poste central, sem espelho.' : 'Estilo de piso e espelho.'} Espelho máximo {fmt(type.maxRiser * 100, 0)} cm.
+        </div>
+      )}
     </>
   );
 }

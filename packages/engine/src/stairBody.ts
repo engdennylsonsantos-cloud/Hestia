@@ -1,4 +1,4 @@
-import { add, mid, mul, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
+import { add, asMulti, dist, dot, intersection, mid, mul, perp, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { StairType } from '@hestia/model';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from './stairs.ts';
 import { clipByLevel, ringMoments, type BottomPlane } from './stairBodyGeom.ts';
@@ -6,10 +6,11 @@ import { clipByLevel, ringMoments, type BottomPlane } from './stairBodyGeom.ts';
 /**
  * Peça do corpo da escada (decisão 0012 §2). `bottom` é o fundo plano: cota z = a·x + b·y + c. Degrau de escada
  * escalonada e patamar têm fundo plano (a = b = 0). Degraus divididos pelo piso base repetem `kind`, `componentIndex`
- * e `index`.
+ * e `index`. `post` é o poste central do caracol de estilo poste (decisão 0014 §8): cilindro de `rInner`, do piso base
+ * até o topo do último degrau, em polígono de 24 lados (`index` 0).
  */
 export interface StairBodyPiece {
-  kind: 'tread' | 'landing' | 'arrival';
+  kind: 'tread' | 'landing' | 'arrival' | 'post';
   componentIndex: number;
   index: number;
   polygon: Ring;
@@ -23,6 +24,10 @@ export const STAIR_ARRIVAL_MAX_LENGTH = 0.3;
 export const STAIR_ARRIVAL_SLAB_DEFAULT = 0.15;
 
 const EPS = 1e-9;
+/** Tolerância (m) para reconhecer a cota de um degrau igual à de outro. */
+const Z_TOL = 1e-9;
+/** Lados do polígono do poste central (decisão 0014 §8). Inscrito no raio interno: área 1,1% menor que π·r². */
+export const SPIRAL_POST_SIDES = 24;
 
 /** Frente da chegada (decisão 0012 §2): o último espelho `a`→`b` e o sentido de subida `u` (unitário). */
 export interface StairArrivalFrame {
@@ -56,6 +61,7 @@ export function pieceVolume(piece: StairBodyPiece): number {
 export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; arrivalTopZ?: number } = {}): { pieces: StairBodyPiece[] } {
   if (stair.issues.some((i) => i.severity === 'error')) return { pieces: [] };
   const type = stair.type as StairType & { undersideStyle?: 'smooth' | 'stepped' };
+  if (type.runStyle === 'post') return { pieces: postPieces(stair, type) };
   if (type.runStyle !== 'monolithic') return { pieces: assembledPieces(stair) };
   const arrivalTop = opts.arrivalTopZ ?? stair.topZ - (opts.slabThickness ?? STAIR_ARRIVAL_SLAB_DEFAULT);
   return { pieces: monolithicPieces(stair, type, arrivalTop) };
@@ -96,6 +102,90 @@ function assembledPieces(stair: ResolvedStair): StairBodyPiece[] {
     zTop: st.z,
     bottom: { a: 0, b: 0, c: st.z - (st.kind === 'tread' ? treadThickness : landingThickness) },
   }));
+}
+
+/** Centróide simples (média dos vértices), para decidir o lado de um espelho. */
+const centroidOf = (r: Ring): Vec2 => ({ x: r.reduce((s, p) => s + p.x, 0) / r.length, y: r.reduce((s, p) => s + p.y, 0) / r.length });
+
+/** Anel de maior área de uma união (um só anel, sem furos, no degrau estendido). Vazio = o próprio degrau. */
+function largestRing(parts: MultiPolygon): Ring | null {
+  let best: Ring | null = null;
+  let bestArea = 0;
+  for (const poly of parts) {
+    const outer = poly[0];
+    if (!outer) continue;
+    const a = Math.abs(ringArea(outer));
+    if (a > bestArea) {
+      best = outer;
+      bestArea = a;
+    }
+  }
+  return best;
+}
+
+/**
+ * Degrau k do estilo poste estendido sobre o seguinte (decisão 0014 §8): o degrau k ocupa também a faixa de `ov` atrás do
+ * espelho k+1, do lado do degrau k+1, cortada pelo degrau k+1 (portanto pelos limites do lance). A faixa mede-se
+ * perpendicular ao espelho k+1, então em caracol vale `ov` no raio da caminhada. Sem degrau seguinte, o polígono é o próprio.
+ */
+function overlappedTread(stair: ResolvedStair, st: ResolvedStairStep, byNumber: Map<number, ResolvedStairRiser>, num: number, ov: number): Ring {
+  const h = stair.riserHeight;
+  const front = byNumber.get(num + 1);
+  const next = stair.steps.find((x) => x.kind === 'tread' && Math.abs(x.z - (st.z + h)) < Z_TOL);
+  if (!(ov > EPS) || !front || !next) return st.polygon;
+  const L = dist(front.a, front.b);
+  if (!(L > EPS)) return st.polygon;
+  const dir = mul(sub(front.b, front.a), 1 / L);
+  let n = perp(dir);
+  if (dot(n, sub(centroidOf(next.polygon), mid(front.a, front.b))) < 0) n = mul(n, -1);
+  // Faixa de largura ov a partir do espelho, com margem de um comprimento de espelho ao longo dele (o degrau a corta).
+  const ext = mul(dir, L);
+  const band: Ring = [sub(front.a, ext), add(front.b, ext), add(add(front.b, ext), mul(n, ov)), add(sub(front.a, ext), mul(n, ov))];
+  const over = intersection(asMulti(next.polygon), asMulti(band));
+  if (over.length === 0) return st.polygon;
+  const merged = largestRing(union(asMulti(st.polygon), over));
+  return merged ?? st.polygon;
+}
+
+/** Cilindro do poste central em polígono de `SPIRAL_POST_SIDES` lados, inscrito no raio `r` (sentido anti-horário). */
+function postRing(center: Vec2, r: number): Ring {
+  return Array.from({ length: SPIRAL_POST_SIDES }, (_, i) => {
+    const a = (2 * Math.PI * i) / SPIRAL_POST_SIDES;
+    return { x: center.x + r * Math.cos(a), y: center.y + r * Math.sin(a) };
+  });
+}
+
+/**
+ * Estilo poste (decisão 0014 §8): cada degrau é uma fatia de `treadThickness` (topo em zk, fundo plano em zk − t), estendida
+ * sobre o seguinte por `treadOverlap` (`overlappedTread`), sem espelho. O poste central é a peça `post` (cilindro de
+ * `rInner`, do piso base ao topo do último degrau). Sem chegada. Sem caracol (`spiral`), não há poste, só os degraus.
+ */
+function postPieces(stair: ResolvedStair, type: StairType): StairBodyPiece[] {
+  const h = stair.riserHeight;
+  const t = type.treadThickness;
+  const ov = type.treadOverlap;
+  const baseZ = stair.baseZ;
+  const treads = stair.steps.filter((st) => st.kind === 'tread');
+  if (!(h > 0) || !(t > 0) || treads.length === 0) return [];
+  const byNumber = riserByNumber(stair, h);
+  const pieces: StairBodyPiece[] = [];
+  for (const st of treads) {
+    const num = Math.round((st.z - baseZ) / h);
+    const polygon = overlappedTread(stair, st, byNumber, num, ov);
+    pieces.push(...fit('tread', st.componentIndex, st.index, polygon, st.z, { a: 0, b: 0, c: st.z - t }, baseZ));
+  }
+  if (stair.spiral) {
+    const top = Math.max(...treads.map((st) => st.z));
+    pieces.push({
+      kind: 'post',
+      componentIndex: stair.spiral.componentIndex,
+      index: 0,
+      polygon: postRing(stair.spiral.center, stair.spiral.rInner),
+      zTop: top,
+      bottom: { a: 0, b: 0, c: baseZ },
+    });
+  }
+  return pieces;
 }
 
 /** Degrau de escada monolítica antes do corte pelo piso base: fundo sem limite inferior, espessura T e nº do espelho de trás. */

@@ -40,6 +40,15 @@ export interface ResolvedStairRiser {
   z1: number;
 }
 
+/** Caracol do croqui da escada (decisão 0014 §2): centro e raios do primeiro lance com parâmetros `spiral`. */
+export interface ResolvedSpiral {
+  /** Índice do componente (lance) que é o caracol. */
+  componentIndex: number;
+  center: Vec2;
+  rInner: number;
+  rOuter: number;
+}
+
 /** Escada resolvida (decisão 0011 §4): cotas, altura real do espelho, degraus, espelhos, pegada e avisos. */
 export interface ResolvedStair {
   id: Id;
@@ -60,6 +69,8 @@ export interface ResolvedStair {
   footprint: MultiPolygon;
   /** Erros de croqui e de geometria, mais os avisos de norma. */
   issues: StairIssueItem[];
+  /** Caracol (decisão 0014): presente quando um lance tem os parâmetros `spiral`; ausente nos demais. */
+  spiral?: ResolvedSpiral;
 }
 
 const sketchIssues = (s: Stair, ci: number, list: Array<{ code: string; severity: 'error' | 'warning'; message: string }>): StairIssueItem[] =>
@@ -153,6 +164,9 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
     issues,
   };
   rs.issues.push(...stairNormIssues(rs));
+  const spiralIndex = s.components.findIndex((c) => c.kind === 'run' && spiralParamsOf(c) !== undefined);
+  const sp = spiralIndex >= 0 ? spiralParamsOf(s.components[spiralIndex]!) : undefined;
+  if (sp) rs.spiral = { componentIndex: spiralIndex, center: sp.center, rInner: sp.rInner, rOuter: sp.rOuter };
   s.components.forEach((c, ci) => {
     if (c.kind !== 'run' || !isSpiralRun(c)) return;
     const sp = spiralParamsOf(c);

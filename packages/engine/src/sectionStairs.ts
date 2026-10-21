@@ -12,8 +12,9 @@ import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './se
  * o bloco vira um retângulo sobre o intervalo que a linha atravessa. Os espelhos do montado são lâminas de
  * `riserThickness` atrás da linha de espelho. Estilo monolítico: as peças de `stairBody` (degraus, patamares e espelho
  * de chegada, cada uma com topo plano em `zTop` e fundo plano ou linear, `zFundo(x, y) = a·x + b·y + c`). No corte, o
- * fundo é linear ao longo da linha, então cada intervalo vira um trapézio de `zFundo` a `zTop`. Além do plano, cada
- * bloco e peça projeta-se em (t, z).
+ * fundo é linear ao longo da linha, então cada intervalo vira um trapézio de `zFundo` a `zTop`. Estilo poste (decisão
+ * 0014 §8): as mesmas peças, degraus sem espelho e o poste central (fundo plano no piso base), que vira retângulo, no
+ * material `postMaterialId`. Além do plano, cada bloco e peça projeta-se em (t, z).
  */
 export interface StairSection {
   cut: Array<{ materialId: Id; polygon: Polygon }>;
@@ -92,11 +93,13 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
       out.zMax = Math.max(out.zMax, z1);
     };
 
-    // Monolítico: cada peça de `stairBody` tem fundo linear (ou plano) e topo plano; no corte, o trapézio vai de zFundo
-    // a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças convexas).
-    if (s.type.runStyle === 'monolithic') {
+    // Monolítico e poste: cada peça de `stairBody` tem fundo linear (ou plano) e topo plano; no corte, o trapézio vai de
+    // zFundo a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças
+    // convexas). O poste (peça `post`) sai com o material do poste.
+    if (s.type.runStyle === 'monolithic' || s.type.runStyle === 'post') {
       const arrivalTopZ = stairArrivalTopZ(p, s) ?? undefined;
       for (const piece of stairBody(s, { arrivalTopZ }).pieces) {
+        const pieceMaterial = piece.kind === 'post' ? s.type.postMaterialId : materialId;
         for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {
           const lo = Math.max(0, t0);
           const hi = Math.min(length, t1);
@@ -109,7 +112,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
             { x: hi, y: piece.zTop },
             { x: lo, y: piece.zTop },
           ];
-          out.cut.push({ materialId, polygon: [ring] });
+          out.cut.push({ materialId: pieceMaterial, polygon: [ring] });
           grow(Math.min(f0, f1), piece.zTop);
         }
         for (const sp of intersection([[piece.polygon]], slab)) {
@@ -128,7 +131,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
           const zLow = Math.min(...pts.map((q) => q.y));
           out.beyond.push({
             stairId: s.id,
-            materialId,
+            materialId: pieceMaterial,
             layerIndex: 0,
             depth: Math.max(0, Math.min(...outer.map(dist2))),
             polygons: [[hull]],

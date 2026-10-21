@@ -72,7 +72,7 @@ function caracolItems(plan: SpiralPlan, cur: Vec2): PreviewItem[] {
  */
 export class StairRunTool extends ToolBase {
   readonly id = 'stairrun';
-  readonly label = 'Escada (reta, L, U, leque, caracol)';
+  readonly label = 'Escada (reta/L/U/caracol)';
   readonly hint = START_HINT;
   private origin: Vec2 | null = null;
   /** Estado do caracol em criação (só usado na forma `spiral`). */
@@ -166,7 +166,7 @@ export class StairRunTool extends ToolBase {
   }
 
   /** Backspace (e Delete) no caracol volta um passo: da varredura ao raio, do raio ao centro. Fora dele, nada. */
-  override deleteKey(): boolean {
+  deleteKey(): boolean {
     if (!this.spiralOn || this.origin === null) return false;
     if (this.sp.start !== null) {
       this.sp = emptySpiral(this.sp.cursor);

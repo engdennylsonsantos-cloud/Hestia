@@ -116,7 +116,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   attachroof: 'Anexar topo',
   detachroof: 'Desanexar topo',
   stair: 'Escada',
-  stairrun: 'Escada (reta/L/U)',
+  stairrun: 'Escada (reta/L/U/caracol)',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {

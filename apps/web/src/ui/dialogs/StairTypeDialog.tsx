@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { stairTypeUsage, type StairRunStyle, type StairType, type StairUndersideStyle } from '@hestia/model';
+import { stairTypeIssue, stairTypeUsage, type StairRunStyle, type StairType, type StairUndersideStyle } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { keptStairType } from '../../editor/stairActions.ts';
@@ -8,13 +8,13 @@ import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
 import { StairSectionPreview } from './StairSectionPreview.tsx';
 
-const STYLE_LABEL: Record<StairRunStyle, string> = { monolithic: 'Monolítico (concreto)', assembled: 'Piso e espelho (montado)' };
+const STYLE_LABEL: Record<StairRunStyle, string> = { monolithic: 'Monolítico (concreto)', assembled: 'Piso e espelho (montado)', post: 'Poste central' };
 const UNDERSIDE_LABEL: Record<StairUndersideStyle, string> = { smooth: 'Lisa', stepped: 'Escalonada' };
 
 /**
  * Editor de tipo de escada (campos do `StairType`, decisão 0011 §1 item 8). O estilo decide a espessura: monolítico usa
  * a espessura estrutural (perpendicular à rampa) e a face inferior (decisão 0012); montado usa a espessura do piso e do
- * espelho. O campo que não se aplica fica em zero.
+ * espelho; poste central (decisão 0014 §8) usa a espessura do degrau, a sobreposição e o material do poste, sem espelho.
  */
 export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
@@ -27,15 +27,18 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   }
   if (!draft) return null;
   const usage = stairTypeUsage(p, draft.id);
-  const error = stairTypeError(draft);
+  const error = stairTypeError(draft) ?? stairTypeIssue(draft);
   const mono = draft.runStyle === 'monolithic';
+  const post = draft.runStyle === 'post';
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const set = (patch: Partial<StairType>): void => setDraft({ ...draft, ...patch });
   const setStyle = (runStyle: StairRunStyle): void =>
     set(
       runStyle === 'monolithic'
         ? { runStyle, structuralDepth: draft.structuralDepth || 0.2, treadThickness: 0, riserThickness: 0 }
-        : { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.03, riserThickness: draft.riserThickness || 0.02 },
+        : runStyle === 'post'
+          ? { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.05, riserThickness: 0, treadOverlap: draft.treadOverlap || 0.025 }
+          : { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.03, riserThickness: draft.riserThickness || 0.02 },
     );
   const ok = (): void => {
     if (error) return;
@@ -97,6 +100,17 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
                 <label htmlFor="stt-underside">Face inferior</label>
                 <select id="stt-underside" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
                   {(Object.keys(UNDERSIDE_LABEL) as StairUndersideStyle[]).map((k) => <option key={k} value={k}>{UNDERSIDE_LABEL[k]}</option>)}
+                </select>
+              </div>
+            </>
+          ) : post ? (
+            <>
+              <div className="field-row"><label htmlFor="stt-tt">Espessura do degrau (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-overlap">Sobreposição dos degraus (cm)</label><NumField id="stt-overlap" value={draft.treadOverlap} scale={100} decimals={1} min={0} onCommit={(v) => set({ treadOverlap: v })} /></div>
+              <div className="field-row">
+                <label htmlFor="stt-post-mat">Material do poste</label>
+                <select id="stt-post-mat" className="select" value={draft.postMaterialId} onChange={(e) => set({ postMaterialId: e.target.value })}>
+                  {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
             </>

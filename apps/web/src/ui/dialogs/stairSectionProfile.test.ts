@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STAIR_TYPES, type StairType } from '@hestia/model';
-import { stairSectionProfile } from './stairSectionProfile.ts';
+import { stairPostTreads, stairSectionProfile } from './stairSectionProfile.ts';
 
 const mono = (over: Partial<StairType> = {}): StairType => ({ ...DEFAULT_STAIR_TYPES[0]!, ...over });
 /** Distância perpendicular de um ponto à reta que passa por a e b. */
@@ -49,5 +49,35 @@ describe('perfil de corte da prévia', () => {
     const pts = stairSectionProfile(DEFAULT_STAIR_TYPES[1]!);
     expect(pts.at(-1)).toEqual([3 * 0.28, 0]);
     expect(pts).toHaveLength(8);
+  });
+
+  it('estilo poste não tem contorno único: o perfil contínuo fica vazio e a prévia usa os degraus soltos', () => {
+    expect(stairSectionProfile(DEFAULT_STAIR_TYPES[3]!)).toEqual([]);
+  });
+});
+
+describe('prévia do estilo poste (degraus soltos)', () => {
+  const post = { ...DEFAULT_STAIR_TYPES[3]!, minTread: 0.28, maxRiser: 0.175, treadThickness: 0.05, treadOverlap: 0.025 };
+
+  it('um polígono por degrau, sem espelho: cada degrau tem só a espessura do degrau em altura', () => {
+    const polys = stairPostTreads(post, 3);
+    expect(polys).toHaveLength(3);
+    for (const poly of polys) {
+      const ys = poly.map((q) => q[1]);
+      expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(0.05, 9);
+    }
+  });
+
+  it('o degrau i fica a (i+1)·espelho do chão, e a ponta avança a sobreposição sobre o seguinte', () => {
+    const polys = stairPostTreads(post, 3);
+    for (let i = 0; i < 3; i++) {
+      expect(Math.max(...polys[i]!.map((q) => q[1]))).toBeCloseTo((i + 1) * 0.175, 9);
+    }
+    expect(Math.max(...polys[0]!.map((q) => q[0]))! - Math.min(...polys[1]!.map((q) => q[0]))!).toBeCloseTo(0.025, 9);
+  });
+
+  it('sobreposição negativa ou ausente não encolhe o degrau', () => {
+    const polys = stairPostTreads({ ...post, treadOverlap: -1 }, 2);
+    expect(Math.max(...polys[0]!.map((q) => q[0]))).toBeCloseTo(0.28, 9);
   });
 });

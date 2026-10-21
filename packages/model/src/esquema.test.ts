@@ -152,7 +152,7 @@ describe('migração 12 → 13 (face inferior da escada)', () => {
   it('todo tipo de escada existente ganha face lisa', () => {
     const m = migrateProject(legacyV12());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(15);
+    expect(SCHEMA_VERSION).toBe(16);
     for (const t of Object.values(m.stairTypes)) expect(t.undersideStyle).toBe('smooth');
   });
 
@@ -228,6 +228,72 @@ describe('migração 13 → 14 (abertura da laje)', () => {
 
   it('ida e volta depois da migração preserva o projeto', () => {
     const m = migrateProject(legacyV13());
+    expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+});
+
+describe('migração 15 → 16 (escada caracol)', () => {
+  /** Projeto no formato da versão 15: tipos de escada sem sobreposição e poste, sem os dois caracol e sem aço. */
+  function legacyV15(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown> & {
+      stairTypes: Record<string, Record<string, unknown>>;
+      materials: Record<string, Record<string, unknown>>;
+    };
+    p.schemaVersion = 15;
+    for (const t of Object.values(p.stairTypes)) {
+      delete t.treadOverlap;
+      delete t.postMaterialId;
+    }
+    delete p.stairTypes.stt_caracol_monolitica;
+    delete p.stairTypes.stt_caracol_poste;
+    delete p.materials.mat_aco;
+    return p;
+  }
+
+  it('todo tipo existente ganha sobreposição e material do poste padrão', () => {
+    const m = migrateProject(legacyV15());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(SCHEMA_VERSION).toBe(16);
+    for (const id of ['stt_monolitica', 'stt_piso_espelho']) {
+      expect(m.stairTypes[id]).toMatchObject({ treadOverlap: 0.025, postMaterialId: 'mat_aco' });
+    }
+  });
+
+  it('os dois tipos caracol entram com os valores padrão e o material aço entra', () => {
+    const m = migrateProject(legacyV15());
+    expect(m.stairTypes.stt_caracol_monolitica).toEqual(DEFAULT_STAIR_TYPES.find((t) => t.id === 'stt_caracol_monolitica'));
+    expect(m.stairTypes.stt_caracol_poste).toEqual(DEFAULT_STAIR_TYPES.find((t) => t.id === 'stt_caracol_poste'));
+    expect(m.stairTypes.stt_caracol_poste).toMatchObject({ runStyle: 'post', treadThickness: 0.05, riserThickness: 0 });
+    expect(m.materials.mat_aco).toMatchObject({ name: 'Aço' });
+  });
+
+  it('ids existentes são preservados e nenhum tipo some; os demais campos ficam como estavam', () => {
+    const raw = legacyV15();
+    const ids = Object.keys(raw.stairTypes as object);
+    const m = migrateProject(raw);
+    for (const id of ids) expect(m.stairTypes[id]).toBeDefined();
+    expect(m.stairTypes.stt_piso_espelho).toEqual({ ...DEFAULT_STAIR_TYPES[1]! });
+  });
+
+  it('tipo do usuário com o mesmo id de um caracol padrão não é sobrescrito; o campo novo recebe o padrão', () => {
+    const custom = { ...DEFAULT_STAIR_TYPES[3]!, name: 'Poste da obra', maxRiser: 0.17 };
+    delete (custom as Partial<typeof custom>).treadOverlap;
+    delete (custom as Partial<typeof custom>).postMaterialId;
+    const raw = legacyV15();
+    (raw.stairTypes as Record<string, unknown>)[custom.id] = custom;
+    const m = migrateProject(raw);
+    expect(m.stairTypes[custom.id]).toEqual({ ...custom, treadOverlap: 0.025, postMaterialId: 'mat_aco' });
+  });
+
+  it('um material aço já salvo no arquivo é preservado', () => {
+    const raw = legacyV15();
+    (raw.materials as Record<string, unknown>).mat_aco = { id: 'mat_aco', name: 'Aço da obra', color: '#000000', hatch: 'solid', gloss: 0, opacity: 1, cost: 1, unit: 'm3' };
+    const m = migrateProject(raw);
+    expect(m.materials.mat_aco).toMatchObject({ name: 'Aço da obra', color: '#000000' });
+  });
+
+  it('ida e volta depois da migração preserva o projeto', () => {
+    const m = migrateProject(legacyV15());
     expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
   });
 });

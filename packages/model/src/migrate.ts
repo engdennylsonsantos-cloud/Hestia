@@ -2,7 +2,7 @@ import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
-import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
 
@@ -174,6 +174,19 @@ const migrations: Record<number, Migration> = {
       ? (raw.levels as Array<Record<string, unknown>>).map((l) => ({ ...l, viewRange: l.viewRange ?? { ...DEFAULT_VIEW_RANGE } }))
       : raw.levels,
   }),
+  // v15 → v16: escada caracol (decisão 0014 §8). Tipos existentes ganham a sobreposição e o material do poste padrão; os
+  // dois tipos caracol entram e o material aço entra se faltar. Nada do arquivo com o mesmo id é sobrescrito.
+  15: (raw) => {
+    const own = (raw.stairTypes as Record<string, Record<string, unknown>>) ?? {};
+    const stairTypes = {
+      ...Object.fromEntries(DEFAULT_STAIR_TYPES.filter((t) => ['stt_caracol_monolitica', 'stt_caracol_poste'].includes(t.id)).map((t) => [t.id, t])),
+      ...Object.fromEntries(
+        Object.entries(own).map(([id, t]) => [id, { treadOverlap: DEFAULT_STAIR_TREAD_OVERLAP, postMaterialId: DEFAULT_STAIR_POST_MATERIAL_ID, ...t }]),
+      ),
+    };
+    const materials = { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => m.id === 'mat_aco').map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) };
+    return { ...raw, stairTypes, materials };
+  },
 };
 
 export class SchemaError extends Error {}

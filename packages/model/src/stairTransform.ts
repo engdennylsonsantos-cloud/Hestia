@@ -1,5 +1,5 @@
 import { applyTransform, type Transform } from '@hestia/geom';
-import type { Stair, StairCurve, StairLanding, StairRun } from './stairTypes.ts';
+import type { Stair, StairCurve, StairLanding, StairRun, StairSpiralParams } from './stairTypes.ts';
 
 /** Espelhar inverte o sentido do arco (flecha negada), como nas paredes; mover e girar mantêm a flecha. */
 const mapCurve = (t: Transform, c: StairCurve): StairCurve => ({
@@ -9,6 +9,18 @@ const mapCurve = (t: Transform, c: StairCurve): StairCurve => ({
 });
 
 const mapChain = (t: Transform, chain: StairCurve[]): StairCurve[] => chain.map((c) => mapCurve(t, c));
+
+/**
+ * Parâmetros do caracol acompanham o croqui (decisão 0014 §2): o centro é transformado como ponto; mover mantém os
+ * ângulos; girar soma o ângulo; espelhar reflete o ângulo inicial em torno do eixo e inverte o sentido da varredura.
+ */
+function mapSpiral(t: Transform, sp: StairSpiralParams): StairSpiralParams {
+  const center = applyTransform(t, sp.center);
+  if (t.kind === 'translate') return { ...sp, center };
+  if (t.kind === 'rotate') return { ...sp, center, startAngle: sp.startAngle + t.angle };
+  const axis = Math.atan2(t.b.y - t.a.y, t.b.x - t.a.x);
+  return { ...sp, center, startAngle: 2 * axis - sp.startAngle, sweep: -sp.sweep };
+}
 
 function mapComponent(t: Transform, c: StairRun | StairLanding): StairRun | StairLanding {
   if (c.kind === 'landing') return { ...c, boundary: mapChain(t, c.boundary) };
@@ -20,6 +32,7 @@ function mapComponent(t: Transform, c: StairRun | StairLanding): StairRun | Stai
     boundaryRight: mapChain(t, mirror ? c.boundaryLeft : c.boundaryRight),
     risers: mapChain(t, c.risers),
     path: mapChain(t, c.path),
+    ...(c.spiral ? { spiral: mapSpiral(t, c.spiral) } : {}),
   };
 }
 

@@ -29,6 +29,7 @@ export const DEFAULT_MATERIALS: Material[] = [
   mat('mat_gesso', 'Placa de gesso', '#ece9e2', 'none', { cost: 44 }),
   mat('mat_la', 'Lã mineral', '#e5d27a', 'dots', { cost: 28 }),
   mat('mat_perfil', 'Perfil de aço', '#9aa0a6', 'cross', { cost: 20 }),
+  mat('mat_aco', 'Aço', '#7b8189', 'solid', { gloss: 0.6, unit: 'm3' }),
   mat('mat_madeira', 'Madeira', '#a9794a', 'diagonal', { cost: 150 }),
   mat('mat_vidro', 'Vidro', '#a9d6e5', 'none', { gloss: 0.9, opacity: 0.35, cost: 220 }),
   mat('mat_aluminio', 'Alumínio', '#b8bdc2', 'solid', { gloss: 0.7, unit: 'm' }),

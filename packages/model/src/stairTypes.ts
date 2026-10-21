@@ -10,7 +10,21 @@ export interface StairCurve {
 }
 
 /** Origem do lance gerado (preenchida pelo gerador; sem vínculo paramétrico depois da edição manual). */
-export type StairGenerator = 'straight' | 'lshape' | 'ushape' | 'winder';
+export type StairGenerator = 'straight' | 'lshape' | 'ushape' | 'winder' | 'spiral';
+
+/**
+ * Parâmetros do croqui caracol (decisão 0014 §2). Metadado opcional do lance: as alças (centro, raios, ângulo inicial e
+ * varredura) regeneram o croqui. Editar o croqui à mão descarta `spiral`. `sweep` em radianos, com sinal (+ anti-horário).
+ */
+export interface StairSpiralParams {
+  center: Vec2;
+  rInner: number;
+  rOuter: number;
+  /** Ângulo do primeiro espelho (rad, a partir do eixo x). */
+  startAngle: number;
+  /** Varredura (rad, com sinal): do primeiro ao último espelho; + anti-horário. */
+  sweep: number;
+}
 
 /**
  * Lance (Revit: Stair Run por croqui). É o croqui único do lance: limites esquerdo e direito, linhas de espelho e
@@ -28,6 +42,8 @@ export interface StairRun {
   /** Caminhada (cadeia) do primeiro ao último espelho; vazia = automática. */
   path: StairCurve[];
   generatedBy?: StairGenerator;
+  /** Parâmetros do caracol (só quando `generatedBy` é 'spiral'); ausente nos demais lances. */
+  spiral?: StairSpiralParams;
 }
 
 /** Patamar (Revit: Landing por croqui): laço fechado de retas e arcos, plano, sem vínculo paramétrico com o lance. */
@@ -74,7 +90,11 @@ export interface Stair {
   order: number;
 }
 
-export type StairRunStyle = 'monolithic' | 'assembled';
+/**
+ * Estilo do lance: monolítico (laje de concreto), montado (piso e espelho) ou poste (caracol com poste central: degraus
+ * em balanço presos ao poste, sem espelho).
+ */
+export type StairRunStyle = 'monolithic' | 'assembled' | 'post';
 
 /** Face inferior do lance monolítico (Revit: Underside Surface): lisa (rampa contínua) ou escalonada (dente de serra). */
 export type StairUndersideStyle = 'smooth' | 'stepped';
@@ -104,8 +124,15 @@ export interface StairType {
   structuralDepth: number;
   /** Espessura do piso do lance montado (m). */
   treadThickness: number;
-  /** Espessura do espelho do lance montado (m). */
+  /** Espessura do espelho do lance montado (m). Zero no estilo poste (sem espelho). */
   riserThickness: number;
+  /**
+   * Sobreposição (m) entre degraus consecutivos do estilo poste: o degrau avança sobre o seguinte em planta. Não pode ser
+   * negativa em nenhum estilo; no poste, precisa ser menor que `treadThickness` (regra de `stairTypeIssue`).
+   */
+  treadOverlap: number;
+  /** Material do poste central (estilo poste). */
+  postMaterialId: Id;
   /** Nariz (m): só 3D e quantitativo. */
   nosing: number;
   /** Espessura do patamar (m). */

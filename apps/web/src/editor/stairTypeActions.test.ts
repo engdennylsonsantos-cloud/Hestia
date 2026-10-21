@@ -16,7 +16,7 @@ describe('tipos de escada: uso, substituição e exclusão', () => {
   it('lista as escadas do tipo e os tipos compatíveis (outros tipos de escada)', () => {
     const p = withStair().project;
     expect(instancesOfType(p, 'stair', 'stt_monolitica')).toEqual(['st1']);
-    expect(compatibleTypes(p, 'stair', 'stt_monolitica').map((t) => t.id)).toEqual(['stt_piso_espelho']);
+    expect(compatibleTypes(p, 'stair', 'stt_monolitica').map((t) => t.id).sort()).toEqual(['stt_caracol_monolitica', 'stt_caracol_poste', 'stt_piso_espelho']);
   });
 
   it('bloqueia a exclusão do tipo em uso e do único tipo', () => {

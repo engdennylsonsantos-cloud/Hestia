@@ -8,6 +8,8 @@ import {
   levelAbove,
   makeLevel,
   makeStair,
+  migrateProject,
+  stairTypeIssue,
   stairBaseZ,
   stairTopLevel,
   stairTopZ,
@@ -73,11 +75,17 @@ describe('makeStair e tipos padrão', () => {
     });
   });
 
-  it('há dois tipos iniciais com os valores do item 8', () => {
-    expect(DEFAULT_STAIR_TYPES.map((t) => t.name)).toEqual(['Escada monolítica concreto', 'Escada de piso e espelho']);
+  it('há quatro tipos iniciais: os dois do item 8 e os dois caracol (decisão 0014 §8)', () => {
+    expect(DEFAULT_STAIR_TYPES.map((t) => t.name)).toEqual([
+      'Escada monolítica concreto',
+      'Escada de piso e espelho',
+      'Escada caracol monolítica',
+      'Escada caracol com poste central',
+    ]);
     for (const t of DEFAULT_STAIR_TYPES) {
-      expect(t).toMatchObject({ maxRiser: 0.18, minTread: 0.28, minRunWidth: 0.8, nosing: 0.015, landingThickness: 0.15, minHeadroom: 2.1 });
+      expect(t).toMatchObject({ maxRiser: 0.18, minTread: 0.28, nosing: 0.015, landingThickness: 0.15, minHeadroom: 2.1 });
     }
+    for (const t of DEFAULT_STAIR_TYPES.slice(0, 2)) expect(t.minRunWidth).toBe(0.8);
     expect(DEFAULT_STAIR_TYPES[0]).toMatchObject({ runStyle: 'monolithic', undersideStyle: 'smooth', structuralDepth: 0.2, materialId: 'mat_concreto' });
     expect(DEFAULT_STAIR_TYPES[1]!.undersideStyle).toBe('smooth');
     expect(DEFAULT_STAIR_TYPES[1]).toMatchObject({ runStyle: 'assembled', treadThickness: 0.03, riserThickness: 0.02, materialId: 'mat_madeira' });
@@ -143,6 +151,8 @@ describe('comandos de escada', () => {
     const s = projectWithLevels();
     s.exec({ type: 'deleteStairType', id: 'stt_piso_espelho' });
     expect(s.project.stairTypes.stt_piso_espelho).toBeUndefined();
+    s.exec({ type: 'deleteStairType', id: 'stt_caracol_monolitica' });
+    s.exec({ type: 'deleteStairType', id: 'stt_caracol_poste' });
     expect(() => s.exec({ type: 'deleteStairType', id: defaultStairTypeId })).toThrow('ao menos um tipo de escada');
   });
 
@@ -336,5 +346,90 @@ describe('validação da escada', () => {
       message: 'O nível de topo deve estar acima do nível da escada.',
       elementId: 'st1',
     });
+  });
+});
+
+describe('escada caracol: tipos, poste e metadado do croqui', () => {
+  it('caracol monolítico e caracol com poste têm os valores da decisão 0014', () => {
+    expect(DEFAULT_STAIR_TYPES[2]).toMatchObject({ id: 'stt_caracol_monolitica', runStyle: 'monolithic', structuralDepth: 0.15, undersideStyle: 'smooth', minRunWidth: 0.8, materialId: 'mat_concreto' });
+    expect(DEFAULT_STAIR_TYPES[3]).toMatchObject({ id: 'stt_caracol_poste', runStyle: 'post', treadThickness: 0.05, treadOverlap: 0.025, riserThickness: 0, landingThickness: 0.15, minRunWidth: 0.6, materialId: 'mat_aco', postMaterialId: 'mat_aco' });
+  });
+
+  it('os tipos iniciais guardam sobreposição e material do poste padrão', () => {
+    for (const t of DEFAULT_STAIR_TYPES) expect(t).toMatchObject({ treadOverlap: 0.025, postMaterialId: 'mat_aco' });
+    expect(createEmptyProject().materials.mat_aco).toMatchObject({ name: 'Aço' });
+  });
+
+  it('upsertStairType aceita os três estilos com valores válidos', () => {
+    const s = projectWithLevels();
+    s.exec({ type: 'upsertStairType', stairType: { ...DEFAULT_STAIR_TYPES[1]!, id: 'stt_t_mont', runStyle: 'assembled' } });
+    s.exec({ type: 'upsertStairType', stairType: { ...DEFAULT_STAIR_TYPES[0]!, id: 'stt_t_mono', runStyle: 'monolithic' } });
+    s.exec({ type: 'upsertStairType', stairType: { ...DEFAULT_STAIR_TYPES[3]!, id: 'stt_t_post', treadOverlap: 0 } });
+    expect(s.project.stairTypes.stt_t_mont?.runStyle).toBe('assembled');
+    expect(s.project.stairTypes.stt_t_mono?.runStyle).toBe('monolithic');
+    expect(s.project.stairTypes.stt_t_post).toMatchObject({ runStyle: 'post', treadOverlap: 0 });
+  });
+
+  it('upsertStairType rejeita estilo desconhecido, sobreposição negativa ou nula no poste, e não guarda o tipo', () => {
+    const s = projectWithLevels();
+    const base = { ...DEFAULT_STAIR_TYPES[3]!, id: 'stt_ruim' };
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, runStyle: 'spiralx' as never } })).toThrow('Estilo de escada desconhecido');
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, treadOverlap: -0.01 } })).toThrow('não pode ser negativa');
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, treadOverlap: NaN } })).toThrow('não pode ser negativa');
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, treadThickness: 0 } })).toThrow('espessura do degrau');
+    expect(s.project.stairTypes.stt_ruim).toBeUndefined();
+  });
+
+  it('no poste, a sobreposição precisa ser menor que a espessura do degrau; nos outros estilos não é conferida contra ela', () => {
+    expect(stairTypeIssue({ runStyle: 'post', treadThickness: 0.05, treadOverlap: 0.05 })).toMatch(/menor que a espessura/);
+    expect(stairTypeIssue({ runStyle: 'post', treadThickness: 0.05, treadOverlap: 0.049 })).toBeNull();
+    expect(stairTypeIssue({ runStyle: 'assembled', treadThickness: 0.03, treadOverlap: 0.1 })).toBeNull();
+    expect(stairTypeIssue({ runStyle: 'monolithic', treadThickness: 0, treadOverlap: 0 })).toBeNull();
+  });
+
+  it('o metadado spiral do lance sobrevive a salvar e abrir; o lance sem spiral continua sem a chave', () => {
+    const s = projectWithLevels();
+    const spiral = { center: { x: 2, y: 3 }, rInner: 0.1, rOuter: 1, startAngle: 0.5, sweep: -2 * Math.PI };
+    s.exec({
+      type: 'addStair',
+      stair: makeStair({ id: 'st1', typeId: 'stt_caracol_poste', levelId: TERREO, components: [{ ...run('r1'), generatedBy: 'spiral', spiral }, run('r2')] }),
+    });
+    const back = migrateProject(JSON.parse(JSON.stringify(s.project)));
+    expect(back).toEqual(s.project);
+    const [a, b] = stairOf(back).components as StairRun[];
+    expect(a!.spiral).toEqual(spiral);
+    expect(a!.generatedBy).toBe('spiral');
+    expect(b).not.toHaveProperty('spiral');
+  });
+
+  it('mover o caracol leva o centro do spiral junto; girar soma o ângulo; espelhar reflete e inverte a varredura', () => {
+    const s = projectWithLevels();
+    const spiral = { center: { x: 2, y: 0 }, rInner: 0.1, rOuter: 1, startAngle: 0, sweep: Math.PI };
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: 'stt_caracol_poste', levelId: TERREO, components: [{ ...run('r1'), generatedBy: 'spiral', spiral }] }) });
+    const spOf = (): StairRun['spiral'] => (stairOf(s.project).components[0] as StairRun).spiral;
+
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'translate', d: { x: 1, y: 1 } } });
+    expect(spOf()).toEqual({ ...spiral, center: { x: 3, y: 1 } });
+
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'rotate', about: { x: 0, y: 0 }, angle: Math.PI / 2 } });
+    const girado = spOf()!;
+    expect(girado.center.x).toBeCloseTo(-1, 9);
+    expect(girado.center.y).toBeCloseTo(3, 9);
+    expect(girado.startAngle).toBeCloseTo(Math.PI / 2, 9);
+    expect(girado.sweep).toBeCloseTo(Math.PI, 9);
+
+    // Desfaz mover e girar: volta ao centro (2, 0), ângulo 0, varredura π. Espelhar no eixo y: centro (-2, 0).
+    s.undo();
+    s.undo();
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'mirror', a: { x: 0, y: 0 }, b: { x: 0, y: 1 } } });
+    const espelhado = spOf()!;
+    expect(espelhado.center.x).toBeCloseTo(-2, 9);
+    expect(espelhado.center.y).toBeCloseTo(0, 9);
+    expect(espelhado.startAngle).toBeCloseTo(Math.PI, 9);
+    expect(espelhado.sweep).toBeCloseTo(-Math.PI, 9);
+    // O primeiro espelho, que estava em (3, 0), tem de cair em (-3, 0): é o ponto do ângulo inicial refletido.
+    const pFirst = { x: espelhado.center.x + espelhado.rOuter * Math.cos(espelhado.startAngle), y: espelhado.center.y + espelhado.rOuter * Math.sin(espelhado.startAngle) };
+    expect(pFirst.x).toBeCloseTo(-3, 9);
+    expect(pFirst.y).toBeCloseTo(0, 9);
   });
 });

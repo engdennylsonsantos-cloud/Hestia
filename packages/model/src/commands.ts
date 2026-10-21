@@ -31,6 +31,7 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
+import { stairTypeIssue } from './stair.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
@@ -261,9 +262,12 @@ export function applyCommand(p: Project, c: Command): void {
       p.elements[c.stair.id] = { ...c.stair, order: p.nextOrder++ };
       break;
     }
-    case 'upsertStairType':
+    case 'upsertStairType': {
+      const issue = stairTypeIssue(c.stairType);
+      if (issue) throw new Error(issue);
       p.stairTypes[c.stairType.id] = c.stairType;
       break;
+    }
     case 'deleteStairType': {
       if (Object.values(p.elements).some((e) => isStair(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
       if (Object.keys(p.stairTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de escada');

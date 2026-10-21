@@ -3,9 +3,9 @@ import type { Stair, StairType } from './stairTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
-export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType, StairUndersideStyle } from './stairTypes.ts';
+export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';

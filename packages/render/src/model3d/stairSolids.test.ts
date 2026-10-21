@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { generateLShape, generateStraightRun, pieceVolume, resolveStairsOnLevel, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
+import { generateLShape, generateStraightRun, pieceVolume, resolveStairsOnLevel, stairArrivalTopZ, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
 import { DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type StairLanding, type StairRun } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
-import { buildStairSolids, riserSlab, stairSlabThickness } from './stairSolids.ts';
+import { buildStairSolids, riserSlab } from './stairSolids.ts';
 import type { SolidBatch } from './solids.ts';
 
 /** Volume por teorema da divergência (malha fechada e bem orientada), como em solids.test.ts. */
@@ -153,13 +153,24 @@ describe('sólidos de escada (3D, decisões 0011 §1 e 0012)', () => {
     expect(batches.map((b) => b.materialId)).toEqual([ASSEMBLED.materialId]);
   });
 
-  it('a espessura de chegada vem do callback (padrão 0,15 m quando não há laje sobre a escada)', () => {
+  it('o topo da chegada vem do callback (padrão: sem laje sobre a escada, topo − 0,15 m; stairArrivalTopZ dá null)', () => {
     const s = straightStair({ risers: N, tread: P, riserH: H, width: W, type: MONO });
     const withDefault = total(buildStairSolids([s]));
-    const withSame = total(buildStairSolids([s], () => 0.15));
+    const withSame = total(buildStairSolids([s], () => s.topZ - 0.15));
     expect(Math.abs(withDefault - withSame)).toBeLessThan(1e-12);
     const ph = new ProjectStore(createEmptyProject()).project;
-    expect(stairSlabThickness(ph, s)).toBe(0.15);
+    expect(stairArrivalTopZ(ph, s)).toBeNull();
+  });
+
+  it('um topo de chegada mais baixo (laje mais baixa) entra na malha: a chegada perde volume, igual às peças com essa cota', () => {
+    const s = straightStair({ risers: N, tread: P, riserH: H, width: W, type: MONO });
+    const low = s.topZ - 0.3;
+    const withLow = total(buildStairSolids([s], () => low));
+    expect(withLow).toBeLessThan(total(buildStairSolids([s])));
+    const expected = stairBody(s, { arrivalTopZ: low }).pieces.reduce((acc, p) => acc + pieceVolume(p), 0);
+    // A borda cortada pela cota da laje fica com a folga mínima do fundo (0,1 mm, MIN_PIECE_THICKNESS): erro ~1e-5 m³.
+    expect(Math.abs(withLow - expected)).toBeLessThan(1e-4);
+    expect(unmatchedEdges(buildStairSolids([s], () => low)[0]!)).toBe(0);
   });
 
   it('escada com erro não gera malha', () => {

@@ -19,7 +19,6 @@ import {
   type StairRun,
 } from '@hestia/model';
 import {
-  STAIR_OPENING_DEFAULT_THICKNESS,
   quantifyFloors,
   quantifySlabs,
   resolveFloors,
@@ -164,8 +163,7 @@ describe('furo de escada na laje do nível de topo (decisão 0011, item 11)', ()
     expect(multiArea(resolveSlabs(pt, 'lv_1')[0]!.polygon)).toBeCloseTo(14 - 13 * TREAD_AREA, 9);
   });
 
-  it('sem laje ou piso sobre a escada não há o que furar; a espessura padrão (0,15 m) é só da chegada do render', () => {
-    expect(STAIR_OPENING_DEFAULT_THICKNESS).toBe(0.15);
+  it('sem laje ou piso sobre a escada não há o que furar', () => {
     expect(resolveSlabs(build().project, 'lv_1')).toEqual([]);
     expect(resolveFloors(build().project, 'lv_1')).toEqual([]);
   });

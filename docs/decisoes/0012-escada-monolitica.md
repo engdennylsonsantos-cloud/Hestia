@@ -26,10 +26,10 @@ fundo `zFundo(x, y) = a·x + b·y + c`):
   `a = h·dx/|d|²`, `b = h·dy/|d|²`, `c = z0 − a·m_k.x − b·m_k.y`. Espessura média do degrau `h/2 + T`.
 - **tread k, escalonado:** fundo PLANO em `z = zk − h − T` (`a = b = 0`). Dois degraus vizinhos se sobrepõem em `T` na vertical.
 - **corte pelo piso base:** nenhuma peça desce abaixo de `baseZ` (a escada apoia no piso): peça com o plano inteiro abaixo de `baseZ` ganha fundo plano `baseZ`;
-  peça cujo plano cruza `baseZ` é DIVIDIDA pelo polígono em duas (uma de fundo plano em `baseZ`, outra com o plano). Piso base de cada lance depois de um patamar NÃO é cortado (só o lance que parte do nível de base).
-- **landing (patamar):** `polygon` = contorno; `zTop = z` do patamar; fundo plano em `zTop − (h + T)` onde `T` é o da rampa anterior.
-- **arrival (chegada):** só quando o último componente é um lance e o topo encontra o nível de topo: faixa atrás da última linha de espelho, comprimento `min(p_último, 0,30)`,
-  largura = comprimento do último espelho, `zTop = topZ − slabThickness` (a laje cobre acima), fundo contínuo com o do último degrau (liso: mesmo plano estendido; escalonado: plano `zTop_último − h − T`). Garante que a face do último espelho é contínua até a laje.
+  peça cujo plano cruza `baseZ` é DIVIDIDA pelo polígono em duas (uma de fundo plano em `baseZ`, outra com o plano). O corte vale para TODAS as peças de qualquer lance (degraus, patamares e chegada), não só para o lance que parte do nível de base (`fit`, em `stairBody.ts`).
+- **landing (patamar):** `polygon` = contorno; `zTop = z` do patamar; fundo plano em `zTop − (h + T)` onde `T` é o da rampa anterior (sem rampa anterior, o da seguinte). Também é cortado pelo piso base.
+- **arrival (chegada):** só quando o último degrau é de um lance monolítico que sobe até o espelho de topo (nº N) e os espelhos N−1 e N existem (`stairArrivalFrame`): faixa atrás da última linha de espelho, comprimento `min(p_último, 0,30)`,
+  largura = comprimento do último espelho, fundo contínuo com o do último degrau (liso: mesmo plano estendido; escalonado: plano `zTop_último − h − T`). Topo: `arrivalTopZ` (opção de `stairBody`), a cota da face inferior da laje ou do piso do nível de topo que cobre o último espelho (ver §5); a parte da faixa cujo fundo fica acima desse topo é cortada. Sem `arrivalTopZ`, o topo é `topZ − slabThickness` (padrão `STAIR_ARRIVAL_SLAB_DEFAULT` = 0,15 m). Garante que a face do último espelho é contínua até a laje.
 - **placas de espelho (estilo piso e espelho):** como hoje (`ResolvedStairRiser` com `riserThickness`).
 
 Volume monolítico = Σ `área × (zTop − zFundo(centroide))` (exato porque o fundo é um plano). Exemplo de referência (lance reto, largura w, passo p, N espelhos):
@@ -44,3 +44,53 @@ degrau liso = `w·p·(h/2 + T)`; degrau escalonado = `w·p·(h + T)`; patamar = 
 - Reta, w = 1,20, p = 0,28, h = 0,175, N = 16, `structuralDepth` 0,15: `T = 0,15/cosθ` (cosθ = 0,28/√(0,28²+0,175²)); volume liso e escalonado conforme as fórmulas; sem peça com `zFundo` < `baseZ`.
 - Estanqueidade: o corte longitudinal pelo eixo da escada (liso e escalonado) é UM polígono conexo sem furos; não há fresta vertical entre peças vizinhas; entre o último degrau e o patamar o corte é contínuo; entre o último degrau e a laje de cima também (com laje de 0,15).
 - L e U: patamar à cota certa e contínuo com as duas rampas; fan e curva: peças com fundo plano (aproximação) sem sobreposição de área em planta.
+
+## 5 · Estado final (código em 2026-10-21)
+
+Onde está: `packages/engine/src/stairBody.ts` (peças), `stairBodyGeom.ts` (corte por plano), `stairArrival.ts` (topo da chegada),
+`packages/render/src/model3d/stairSolids.ts` (malha 3D), `stairQuantities.ts` (volumes) e `sectionStairs.ts` (corte).
+
+**Estilos da face inferior.** `undersideStyle`: `smooth` (padrão) e `stepped`, só no monolítico. O editor de tipo tem "Face inferior: Lisa |
+Escalonada" (`StairTypeDialog.tsx`) e a prévia da seção mostra o estilo (`StairSectionPreview.tsx`).
+
+**Espessura T.** `T = structuralDepth ÷ cosθ`, com `cosθ = p ÷ √(p² + h²)`, calculado para cada degrau (`treadOf`) a partir dos pontos
+médios dos espelhos de trás e da frente. Exemplo: profundidade 0,20 m, p = 0,28 m, h = 0,175 m, T = 0,236 m.
+
+**Patamar.** Cota = base + (nº do último espelho do lance anterior) × h. Fundo plano em `h + T` abaixo do topo, com o T da rampa anterior
+(ou da seguinte, se não houver).
+
+**Chegada.**
+- Frente: o último espelho do lance; comprimento `min(p, 0,30 m)`; largura = comprimento do espelho.
+- Topo, versão com `arrivalTopZ` (em andamento, não commitada): `stairArrivalTopZ` (`stairArrival.ts`) devolve a face inferior da laje ou
+  do piso do nível de topo que cobre a faixa à frente do último espelho (2 cm de profundidade). Se mais de um cobre, vale a menor (a mesma
+  regra do furo, §6 da decisão 0011); laje inclinada usa a menor cota da face inferior (`coverUnderside`). Sem cobertura, devolve null.
+- Topo, versão atual sem `arrivalTopZ`: `topZ − slabThickness`, com `STAIR_ARRIVAL_SLAB_DEFAULT` = 0,15 m.
+- Consumidores hoje: a malha 3D usa a espessura da laje de cima (`stairSlabThickness`, a maior das lajes e pisos que cobrem a planta da
+  escada; 0,15 m sem cobertura). O corte (`sectionStairs.ts`) chama `stairBody(s)` sem opções, então usa 0,15 m. O quantitativo não tem a
+  chegada no volume (ver abaixo). Pendente: ligar `arrivalTopZ` ao 3D e ao corte.
+
+**Arestas do 3D (`stairSolids.ts`).** O corpo é uma peça de `stairBody` por degrau, patamar ou chegada, com topo plano e fundo por ponto
+(o plano, limitado a `topo − 0,1 mm`, para a espessura nunca zerar). Duas funções deixam a malha limpa:
+- `extrudeBodies`: a parede lateral de cada aresta sai só onde a face está exposta. Uma aresta que dois corpos dividem com sentidos
+  opostos (espelho entre degraus, corte pelo piso base) não tem parede nessa parte: as duas paredes coincidentes são internas e se
+  cancelam no volume. Se a ordem das cotas muda entre os extremos da aresta, nada é cortado.
+- `splitTJunctions`: insere nos triângulos os vértices de outras faces que caem sobre uma aresta (T-junction), sem mudar a superfície.
+  Assim cada aresta desenhada casa com a da face vizinha e o desenho de arestas não marca emendas.
+- O que continua desenhado: a quina entre o fundo e o piso base (mudança real de plano para o piso) e as quinas do topo com o espelho
+  e com o piso (teste "corte pelo piso base" e "topo do degrau 2" em `stairSolids.test.ts`).
+
+**Volumes de referência.**
+- Reta com o tipo padrão (profundidade 0,20 m, liso), w = 1,20, p = 0,28, h = 0,175, 16 espelhos: 15 degraus, volume de 1,5763 m³ com o
+  corte pelo piso base (1,6297 m³ sem o corte). Teste: `stairQuantities.test.ts`. A referência do §4 usa 0,15 m, e o `stairBody.test.ts`
+  confere as integrais com esse valor.
+- Patamar de 1,44 m² em L com lances de 8 espelhos (0,20 m): 1,44 × (h + T) = 0,592 m³ (`stairBody.test.ts`, "L: patamar à cota 8h").
+- Piso e espelho, mesma reta: 0,2184 m³ (0,1512 de pisos + 0,0672 de espelhos).
+- O quantitativo da monolítica soma só degraus e patamares: a chegada fica de fora do volume (`stairQuantities.ts`), mas entra na malha 3D
+  e no corte. Essa diferença é intencional no código; confirmar com o dono se a chegada deve contar no volume.
+
+**Limitações.**
+- Leque e arco: cada degrau tem um plano de fundo ajustado pelos pontos médios dos espelhos de trás e da frente. A face inferior real de um
+  leque ou de uma curva não é plana, então é aproximação. Os testes do leque (90°, 180° e 270°, `stairBody.test.ts`) conferem disjunção,
+  áreas e cota não abaixo de `baseZ`, não a exatidão do fundo.
+- Escalonado no leque e na curva: fundo plano por degrau, igual ao caso reto.
+- Chegada: a cota da laje que cobre o último espelho ainda não chega ao 3D nem ao corte (ver acima); hoje eles usam a espessura.

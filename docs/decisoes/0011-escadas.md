@@ -11,13 +11,13 @@ automático; (3) guarda-corpo fica para a etapa própria; (4) perfil de norma ab
 | 1 | **O croqui é a representação única do lance.** Um lance é: limite esquerdo, limite direito, linhas de espelho e linha de caminhada (opcional). Os geradores (reto, L, U, leque) só produzem esse croqui; o modo croqui o deixa livre (retas e arcos) | Mesmo comportamento do Revit (Create Sketch) com um só motor de geometria; croqui livre desde o primeiro dia |
 | 2 | Patamar é croqui também: contorno fechado de retas e arcos, plano, na cota do último espelho do lance anterior. Liga-se ao lance só por ordem (a sequência de componentes), sem vínculo paramétrico | Revit: `CreateSketchedLanding` exige laço fechado; "sem relação automática" (B7) |
 | 3 | Sequência de componentes: a escada guarda `components` em ordem (lance, patamar, lance...). A cota de um patamar é a base + (nº de espelhos dos lances anteriores) × altura do espelho | Sem cota explícita no patamar; nada a dessincronizar |
-| 4 | Altura do espelho real h = H ÷ N, com H = cota do topo − cota da base e N = total de linhas de espelho de todos os lances. O nº desejado é `ceil(H / espelhoMáximo)` (hipótese do relatório A5: confirmar no experimento E1 do Revit). Aviso/erro quando h > espelho máximo do tipo ou N ≠ nº desejado | Revit B4/A5 |
+| 4 | Altura do espelho real h = H ÷ N, com H = cota do topo − cota da base e N = nº de linhas de espelho DISTINTAS de todos os lances. Uma linha de emenda entre dois lances consecutivos sem patamar (mesmas pontas, nas duas ordens, tolerância 1 mm) conta uma vez e pertence ao lance anterior (`sharesRiser`, em `stairs.ts`). O nº desejado é `ceil(H / espelhoMáximo)` (hipótese do relatório A5: confirmar no experimento E1 do Revit). Erro `stair-riser-too-high` quando h > espelho máximo do tipo; aviso `stair-risers-count` quando N ≠ nº desejado (`stairIssues.ts`) | Revit B4/A5 |
 | 5 | Espelhos que ultrapassam um limite são APARADOS ao limite; erro quando toca/ao longo do limite, cruza outro espelho, cruza o limite mais de uma vez ou tem as duas pontas no mesmo limite em escada com dois limites (mensagens no §3) | Revit B6/B14 |
-| 6 | Convenção de degraus: N espelhos dão N−1 degraus dentro do lance. O espelho k (1..N) vai da cota base+(k−1)h até base+kh; o degrau k (entre os espelhos k e k+1) tem o topo em base+kh; o último espelho encosta no piso superior (ou no patamar). Opções "começa com espelho"/"termina com espelho" ficam fixas em ligado na v1 | Revit B4 (pisos = espelhos − 1) |
-| 7 | Cota de base = elevação do nível da escada + `baseOffset`; cota do topo = elevação do nível de topo + `topOffset`. O nível de topo padrão é o nível imediatamente acima (`levelAbove`); sem nível acima, vale `height` (padrão = pé-direito de parede padrão) | Revit: Base/Top Level + Offsets |
-| 8 | Tipo da escada (`StairType`): espelho máx. 0,18 m, piso mín. 0,28 m, largura mín. do lance 0,80 m, estilo do lance (`monolithic` ou `assembled`), profundidade estrutural (monolítico, padrão 0,20 m), espessura do piso (assembled, 0,03 m) e do espelho (assembled, 0,02 m), nariz (0,015 m, só 3D/quantitativo), espessura do patamar (0,15 m), pé-direito livre mínimo (2,10 m), material. Sem apoios laterais nem central na v1 | Revit A10–A13 simplificado; apoios (stringer/carriage) ficam para depois (fora de escopo v1) |
+| 6 | Convenção de degraus: N espelhos dão N−1 degraus dentro do lance. O espelho k (1..N) vai da cota base+(k−1)h até base+kh; o degrau k (entre os espelhos k e k+1) tem o topo em base+kh; o último espelho encosta no piso superior (ou no patamar). Opções "começa com espelho"/"termina com espelho" ficam fixas em ligado na v1. Numeração na planta: contínua pela cota (§7) | Revit B4 (pisos = espelhos − 1) |
+| 7 | Cota de base = elevação do nível da escada + `baseOffset`; cota do topo = elevação do nível de topo + `topOffset`. O nível de topo padrão é o nível imediatamente acima (`levelAbove`); sem nível acima, vale `height` (padrão = pé-direito de parede padrão). Topo até 1 mm acima da base ou abaixo dela: erro `stair-top-not-above` (regra do modelo, `validateStairs.ts`); a escada não gera degraus, espelhos nem furo (§3) | Revit: Base/Top Level + Offsets |
+| 8 | Tipo da escada (`StairType`): espelho máx. 0,18 m, piso mín. 0,28 m, largura mín. do lance 0,80 m, estilo do lance (`monolithic` ou `assembled`), profundidade estrutural (monolítico, padrão 0,20 m; perpendicular à rampa, decisão 0012), face inferior `undersideStyle` lisa (`smooth`, padrão) ou escalonada (`stepped`), só monolítico, espessura do piso (assembled, 0,03 m) e do espelho (assembled, 0,02 m), nariz (0,015 m, só 3D/quantitativo), espessura do patamar (0,15 m), pé-direito livre mínimo (2,10 m), material. Sem apoios laterais nem central na v1 | Revit A10–A13 simplificado; apoios (stringer/carriage) ficam para depois (fora de escopo v1) |
 | 9 | Regras do tipo (espelho máx., piso mín.) valem só para o lance CALCULADO (gerador); no croqui livre elas não bloqueiam, mas a altura real do espelho continua limitada pelo máximo do tipo | Revit A10 + B4 |
-| 10 | Perfil de norma (avisos, nunca bloqueio): espelho 0,16–0,18 m, piso 0,28–0,32 m, 2e+p entre 0,63 e 0,64 m (interseção NBR 9050 × NBR 9077), degraus iguais no lance (dif. > 5 mm entre lances é aviso), patamar a cada 3,20 m de desnível e comprimento ≥ 1,20 m, largura ≥ largura mínima do tipo, folga de cabeça ≥ pé-direito livre do tipo (2,10 m), degraus do leque com piso ≥ 0,28 m a 0,55 m da borda interna. Valores em um perfil editável em `Project.settings` | Divergências normativas: não bloquear |
+| 10 | Perfil de norma (avisos, nunca bloqueio): espelho 0,16–0,18 m, piso 0,28–0,32 m, 2e+p entre 0,63 e 0,64 m (interseção NBR 9050 × NBR 9077), degraus iguais (piso entre espelhos consecutivos de um lance reto que varia mais de 5 mm é aviso `stair-uneven`; leque não avisa), patamar a cada 3,20 m de desnível e comprimento ≥ 1,20 m, largura ≥ largura mínima do tipo, folga de cabeça ≥ pé-direito livre do tipo (2,10 m), degraus do leque com piso ≥ 0,28 m a 0,55 m da borda interna (**pendente**: não implementado). Valores em `DEFAULT_STAIR_NORMS` (`stairNorms.ts`), constante do engine passada a `stairNormIssues`; **não são editáveis no projeto** (`Project.settings` não tem campos de norma: pendente) | Divergências normativas: não bloquear |
 | 11 | Furo na laje e no piso do nível de topo é DERIVADO (não guardado) e é POR ELEMENTO: cada laje ou piso do nível de topo recebe a união das projeções dos degraus (e patamares) cuja folga até a face inferior DAQUELE elemento é ≤ `folgaMínima` (a escada ainda não passou pela laje com folga de cabeça); regra completa no §6. Recalcula sozinho ao mover a escada. O modo de abertura por escada é o item 15 (substitui o "Abrir laje" booleano) | Dono: furo automático. Fora de paridade (Revit e ArchiCAD pedem Shaft/Solid Element Operations) |
 | 12 | Guarda-corpo/corrimão: fora desta etapa (etapa própria "guarda-corpo") | Dono |
 | 13 | Escada de vários andares, IFC e apoios (stringer/carriage): fora desta etapa | Dono |
@@ -51,14 +51,18 @@ export interface Stair {
   mark: string; comments: string; order: number;
 }
 export interface StairType { id: Id; name: string; maxRiser: number; minTread: number; minRunWidth: number;
-  runStyle: 'monolithic' | 'assembled'; structuralDepth: number; treadThickness: number; riserThickness: number;
+  runStyle: 'monolithic' | 'assembled'; undersideStyle: 'smooth' | 'stepped' /* decisão 0012 */; structuralDepth: number; treadThickness: number; riserThickness: number;
   nosing: number; landingThickness: number; minHeadroom: number; materialId: Id; /* + campos de catálogo como os outros tipos */ }
 ```
 `DEFAULT_STAIR_TYPES` (Escada monolítica concreto; Escada de piso e espelho); `makeStair`; comandos `addStair`, `updateStair`
 (via `updateElements`), `upsertStairType`, `deleteStairType` (bloqueado se em uso), `setLevel...` como os demais; migração
-`SCHEMA_VERSION` 11 → 12 (projetos sem escadas ganham `stairTypes` padrão); `levelAbove(project, levelId)` em `queries.ts`.
+`SCHEMA_VERSION` 11 → 12 (projetos sem escadas ganham `stairTypes` padrão); `levelAbove(project, levelId)` em `queries.ts`. Cadeia até a versão atual (15):
+12 → 13 (`undersideStyle: 'smooth'`, decisão 0012), 13 → 14 (abertura da laje, §6), 14 → 15 (intervalo de vista, decisão 0013).
 
-## 3 · Validação do croqui (engine: `stairSketch.ts`) — códigos e mensagens (pt-BR)
+## 3 · Validação do croqui e da escada — códigos e mensagens (pt-BR)
+
+Origem no código: croqui em `stairSketchGeom.ts` e `stairSketchValidate.ts`; tipo e norma em `stairIssues.ts` e `stairChecks.ts`;
+topo em `validateStairs.ts` (modelo).
 
 | Código | Mensagem | Origem (Revit) |
 |---|---|---|
@@ -74,16 +78,21 @@ export interface StairType { id: Id; name: string; maxRiser: number; minTread: n
 | `stair-risers-count` | "O nº de espelhos (N) difere do nº desejado (D): adicione/remova espelhos ou ajuste a altura." | "Actual Number of Risers is different…" |
 | `stair-riser-too-high` | "A altura real do espelho (X m) excede a máxima do tipo (Y m)." | "Computed actual riser height…" |
 | `stair-width-min` | "A largura do lance (X m) é menor que a mínima do tipo (Y m)." | "Actual run width is less than minimum…" |
-| `stair-tread-min` | "O piso (X m) é menor que o mínimo do tipo (Y m)." (só lance gerado) | A22 (regra: atual ≥ mínimo) |
+| `stair-tread-min` | "O piso (X m) é menor que o mínimo do tipo (Y m)." (só lance gerado) | A22 (regra: atual ≥ mínimo). **Não implementado**: nenhum código emite este aviso; o gerador já usa o piso mínimo (`treadFor`), então o caso não surge no lance gerado |
 | `stair-landing-open` | "O contorno do patamar deve ser um laço fechado." | B7 |
-| `stair-top-not-above` | "O nível de topo deve estar acima do nível da escada." | Decisão 7 (regra do modelo, `validateStairs.ts`, não do croqui): cota do topo ≤ cota da base + 1 mm. Erro bloqueante: o motor não deve gerar degraus, espelhos nem furo (pendente: `resolveStairs` ainda gera o patamar nesse caso) |
-Erros de geometria (`error`) impedem gerar degraus do lance; os de norma e tipo são `warning`.
+| `stair-top-not-above` | "O nível de topo deve estar acima do nível da escada." | Decisão 7 (regra do modelo, `validateStairs.ts`, não do croqui): cota do topo ≤ cota da base + 1 mm. Erro: o motor não gera degraus, espelhos nem furo (`resolveStairs` com altura 0; testes em `stairTopAbove.test.ts`) |
+
+Severidade: erros de croqui (acima) deixam sem degraus só o lance afetado. `stair-riser-too-high` e `stair-top-not-above` são erros da
+escada: na malha 3D e no corpo monolítico (`stairBody`, `buildStairSolids`) qualquer erro da escada zera o corpo, e o volume da
+monolítica sai zero. Os de norma, `stair-width-min` e `stair-headroom` são `warning`.
 
 ## 4 · Algoritmo do degrau (engine: `stairSketch.ts`, função pura)
 
 `stairRunSteps(run, { baseZ, riserHeight })` →
-1. Amostrar arcos em polilinhas (flecha máx. 0,3 mm). Ordenar os espelhos: pela caminhada (posição da interseção ao longo dela) se
-   existir; senão pela projeção do ponto médio sobre a direção do 1º ao último limite. Aparar cada espelho ao interior dos limites.
+1. Amostrar arcos em polilinhas (flecha máx. 0,3 mm). Ordenar os espelhos: pela caminhada explícita (posição da interseção ao longo
+   dela) se existir; senão pelo comprimento ao longo da linha média dos limites (`midlinePoly`, em `stairSketchGeom.ts`: pontos
+   médios de L(f) e R(f), com f a fração de comprimento de cada limite, orientada para a subida). Por isso vale acima de 180°: a corda
+   de um arco inverte de lado, a linha média não. Aparar cada espelho ao interior dos limites.
 2. Degrau k (k = 1..N−1) = polígono limitado pelo espelho k, o trecho do limite direito entre os pontos de k e k+1, o espelho k+1
    (invertido) e o trecho do limite esquerdo; topo em `baseZ + k·h`. Espelho k = segmento aparado com base em `baseZ + (k−1)h` e topo
    em `baseZ + k·h`.
@@ -93,7 +102,8 @@ Invariantes (testes de propriedade): degraus disjuntos; união dos degraus = reg
 
 ## 5 · Geradores
 `straight(start, dir, width, risers, tread)`; `lshape`, `ushape` (patamar automático = largura do lance); `winder` (espelhos radiais). Todos
-devolvem `StairRun[]`/`StairLanding[]`. Regra do piso calculado: p = clamp(0,63 − 2h; pisoMín; 0,32); comprimento do lance = (N−1)·p.
+devolvem `StairRun[]`/`StairLanding[]`. Regra do piso calculado: p = clamp(0,63 − 2h; pisoMín; 0,32); comprimento do lance = (N−1)·p. O leque (`generateFanRun`) recusa
+varredura ≥ 360° (`RangeError`) e divide arcos acima de 90° em trechos.
 
 ## 6 · Abertura da laje (decisão 15; engine: `stairOpenings.ts`)
 
@@ -141,3 +151,20 @@ Efeitos colaterais:
   fica na cota errada. A cópia de `thicknessUnder` em `stairSlabThickness` deixou de ser a regra do furo: o comentário dela
   ainda cita `thicknessUnder` de `stairOpenings.ts`, que não existe mais.
 - A barra de opções da ferramenta não expõe a abertura: a escada criada recebe o padrão e o ajuste é feito em Propriedades.
+
+## 7 · Numeração na planta e Pegar linhas (estado atual)
+
+**Numeração dos degraus** (`treadNumber` em `packages/render/src/plan/stairs.ts`). O rótulo do degrau é `k = round((zTopo − baseZ) ÷ h)`,
+ou seja, o espelho que ele alcança. A numeração é contínua na escada e não reinicia em cada lance. O patamar não tem rótulo e ocupa o
+número do último espelho do lance anterior, então o primeiro degrau depois dele segue esse número. Exemplo (`stairsBuild.test.ts`): L com
+8 + 8 espelhos, lance 1 = 1 a 7, patamar sem rótulo, lance 2 = 9 a 15. Um lance com erro de croqui não altera a numeração dos seguintes,
+porque a referência é a cota. Sem altura real do espelho, vale o índice do degrau no lance.
+
+**Pegar linhas** (A8, `docs/paridade/escadas.md`). Método de desenho na barra da ferramenta Escada (`StairOptionsBar.tsx`), ao lado de
+Linha e Arco, sobre os sub-modos Limites, Espelhos e Caminhada; no Patamar não vale (`setPick` recusa). O clique pega a linha sob o
+cursor: parede (eixo, faces ou núcleo, conforme a captura), linha de outra escada (a que está em edição fica de fora) ou aresta de laje
+ou de piso. Com "Deslocamento (m)", a linha é afastada para o lado do cursor. "Corrente" pega a cadeia conectada de uma vez, até as
+pontas ou até fechar o laço; só entram curvas do mesmo grupo (cada limite, a caminhada, cada espelho isolado, cada anel de laje ou
+piso). Tab alterna linha e arco e sai de "Pegar linhas", como qualquer escolha de primitiva. Delete e Ctrl+Z desfazem a última pegada
+(`undoPick`); Ctrl+Y refaz (`redoPick`). Pegar não valida: o erro de croqui é o de `analyzeDraft`, como no desenho. Código:
+`packages/tools/src/stairPickLines.ts` (`pickLinesOf`, `chainAt`, `offsetChain`), `stairTool.ts` e `stairDraw.ts`.

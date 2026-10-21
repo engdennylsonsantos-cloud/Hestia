@@ -173,7 +173,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     beyond.push(...rf.beyond);
     grow(rf.zMin, rf.zMax);
     // Escadas (decisão 0011 §6) das que nascem neste nível: degraus, patamares e espelhos (`sectionStairs.ts`).
-    const sk = sectionOfStairs(resolveStairsOnLevel(p, levelId), line);
+    const sk = sectionOfStairs(resolveStairsOnLevel(p, levelId), line, p);
     for (const c of sk.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
     beyond.push(...sk.beyond);
     grow(sk.zMin, sk.zMax);

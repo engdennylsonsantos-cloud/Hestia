@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { wallBaseElevation, wallHeight, wallsOnLevel, openingsOfWall, type Material, type Project } from '@hestia/model';
 import { OrbitCamera } from './orbit.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
-import { buildStairSolids, stairSlabThickness } from './stairSolids.ts';
+import { buildStairSolids } from './stairSolids.ts';
 import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids } from './solids.ts';
 
 export interface Scene3DOptions {
@@ -87,8 +87,8 @@ export class ModelScene {
       const roofs = resolveRoofs(p, lv.levelId);
       const eave = buildEaveSolids(p, roofs);
       // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
-      // monolítica fica sob a laje do nível de topo (decisão 0012 §2), então recebe a espessura dela.
-      const stairSolids = buildStairSolids(stairs.filter((s) => s.levelId === lv.levelId), (s) => stairSlabThickness(p, s));
+      // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
+      const stairSolids = buildStairSolids(stairs.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s));
       const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId)), ...buildSlabSolids(resolveSlabs(p, lv.levelId)), ...buildRoofSolids(roofs), ...eave.batches, ...stairSolids];
       for (const b of batches) {
         const g = new THREE.BufferGeometry();

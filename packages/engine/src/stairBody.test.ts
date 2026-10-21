@@ -190,6 +190,28 @@ describe('monolítica reta de referência (w 1,20; p 0,28; h 0,175; N 16; profun
     expect(stairBody(smooth, { slabThickness: 0.2 }).pieces.find((p) => p.kind === 'arrival')!.zTop).toBeCloseTo(2.6, 9);
   });
 
+  it('arrivalTopZ tem prioridade sobre slabThickness (cota absoluta); sem nenhum dos dois, topo − 0,15 m', () => {
+    const arrivalZ = (opts?: { slabThickness?: number; arrivalTopZ?: number }): number => stairBody(smooth, opts).pieces.find((p) => p.kind === 'arrival')!.zTop;
+    expect(arrivalZ({ arrivalTopZ: 2.5, slabThickness: 0.2 })).toBeCloseTo(2.5, 9);
+    expect(arrivalZ({ arrivalTopZ: 2.5 })).toBeCloseTo(2.5, 9);
+    expect(arrivalZ({})).toBeCloseTo(2.65, 9);
+  });
+
+  it('a cota da chegada só mexe na chegada: degraus e patamares saem iguais (os quantitativos não mudam)', () => {
+    const body = (opts?: { arrivalTopZ: number }) => stairBody(smooth, opts).pieces.filter((p) => p.kind !== 'arrival');
+    expect(body({ arrivalTopZ: 2.4 })).toEqual(body());
+  });
+
+  it('profundidade estrutural 0,10 m: a chegada é cortada na cota do topo, sem fundo acima dela (espessura nunca negativa)', () => {
+    const thin = resolveStair([straight(N, P)], MONO, { structuralDepth: 0.1, undersideStyle: 'smooth' });
+    const arrival = stairBody(thin).pieces.find((p) => p.kind === 'arrival')!;
+    expect(arrival.zTop).toBeCloseTo(2.65, 9);
+    for (const q of arrival.polygon) expect(pieceBottomZ(arrival, q.x, q.y)).toBeLessThanOrEqual(arrival.zTop + 1e-9);
+    const area = multiArea([[arrival.polygon]]);
+    expect(area).toBeGreaterThan(0);
+    expect(area).toBeLessThan(W * P);
+  });
+
   it('estanqueidade (liso): o corte longitudinal não tem fresta em nenhum espelho, do 2º ao da chegada', () => {
     const { pieces } = stairBody(smooth);
     for (let j = 2; j <= N; j++) expectSealed(pieces, riserMid(smooth, 0, j), v(1, 0));

@@ -1,5 +1,6 @@
 import { add, dot, intersection, mul, norm, perp, sub, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import type { Id } from '@hestia/model';
+import type { Id, Project } from '@hestia/model';
+import { stairArrivalTopZ } from './stairArrival.ts';
 import { stairBody, type StairBodyPiece } from './stairBody.ts';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import type { SectionBeyond } from './section.ts';
@@ -72,8 +73,11 @@ function convexHull(pts: Vec2[]): Ring {
 /** Sentido do fundo de uma peça monolítica: zFundo(x, y) = a·x + b·y + c. */
 const bottomAt = (piece: StairBodyPiece, v: Vec2): number => piece.bottom.a * v.x + piece.bottom.b * v.y + piece.bottom.c;
 
-/** Corte e projeção das escadas do nível para a linha de corte (ou de elevação, com `depth` grande). */
-export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): StairSection {
+/**
+ * Corte e projeção das escadas do nível para a linha de corte (ou de elevação, com `depth` grande). `p` dá a cota do topo
+ * da chegada monolítica (a face inferior da laje que cobre o último espelho, `stairArrivalTopZ`).
+ */
+export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: Project): StairSection {
   const out: StairSection = { cut: [], beyond: [], zMin: Infinity, zMax: -Infinity };
   const { length, d, n, slab } = sectionFrame(line);
   if (length < 1e-6 || stairs.length === 0) return out;
@@ -91,7 +95,8 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): Sta
     // Monolítico: cada peça de `stairBody` tem fundo linear (ou plano) e topo plano; no corte, o trapézio vai de zFundo
     // a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças convexas).
     if (s.type.runStyle === 'monolithic') {
-      for (const piece of stairBody(s).pieces) {
+      const arrivalTopZ = stairArrivalTopZ(p, s) ?? undefined;
+      for (const piece of stairBody(s, { arrivalTopZ }).pieces) {
         for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {
           const lo = Math.max(0, t0);
           const hi = Math.min(length, t1);

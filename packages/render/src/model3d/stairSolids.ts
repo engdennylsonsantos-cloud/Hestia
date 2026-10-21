@@ -1,30 +1,13 @@
-import { add, intersection, mul, multiArea, norm, perp, ringArea, sub, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import {
-  STAIR_OPENING_DEFAULT_THICKNESS,
-  pieceBottomZ,
-  stairBody,
-  type ResolvedStair,
-  type ResolvedStairRiser,
-  type ResolvedStairStep,
-  type StairBodyPiece,
-} from '@hestia/engine';
-import {
-  floorPolygon,
-  floorsOnLevel,
-  floorTypeThickness,
-  slabPolygon,
-  slabsOnLevel,
-  slabTypeThickness,
-  type Id,
-  type Project,
-} from '@hestia/model';
+import { add, mul, norm, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
+import { pieceBottomZ, stairBody, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type StairBodyPiece } from '@hestia/engine';
+import type { Id } from '@hestia/model';
 import { riserPoints } from '../stairRisers.ts';
 import { extrudeCaps, pushWall, type SolidBatch } from './solids.ts';
 
 /** Tolerância (m) para reconhecer a cota de um degrau igual à de um espelho. */
 const Z_TOL = 1e-9;
 
-/** Tolerância (m, m²) das comparações de área na cobertura da escada pela laje. */
+/** Tolerância (m, m²) das comparações de cota e de área (sinal de diferenças e sobreposições). */
 const EPS = 1e-9;
 
 /** Espessura mínima (m) de uma peça monolítica: o fundo nunca alcança o topo (decisão 0012 §2). */
@@ -75,25 +58,6 @@ export function riserSlab(s: ResolvedStair, r: ResolvedStairRiser, t: number): R
   const side = behindSide(s, r, mid, n0);
   const off = pts.map((p, i) => add(p, mul(ns[i]!, side * t)));
   return [...pts, ...off.reverse()];
-}
-
-/**
- * Espessura (m) da laje ou do piso do nível de topo que cobre a planta da escada: a maior, como o furo da laje
- * (`thicknessUnder` de stairOpenings.ts, que não é exportada; mantenha as duas em sincronia). Sem cobertura, o padrão.
- */
-export function stairSlabThickness(p: Project, s: ResolvedStair): number {
-  if (!s.topLevelId) return STAIR_OPENING_DEFAULT_THICKNESS;
-  const covers = (polygon: Polygon): boolean => multiArea(intersection([polygon], s.footprint)) > EPS;
-  const thicknesses: number[] = [];
-  for (const sl of slabsOnLevel(p, s.topLevelId)) {
-    const t = p.slabTypes[sl.typeId];
-    if (t && covers(slabPolygon(sl))) thicknesses.push(slabTypeThickness(t));
-  }
-  for (const f of floorsOnLevel(p, s.topLevelId)) {
-    const t = p.floorTypes[f.typeId];
-    if (t && covers(floorPolygon(f))) thicknesses.push(floorTypeThickness(t));
-  }
-  return thicknesses.length ? Math.max(...thicknesses) : STAIR_OPENING_DEFAULT_THICKNESS;
 }
 
 /** Lote do material `m` dentro do mapa, criado na primeira vez. */
@@ -272,18 +236,15 @@ function splitTJunctions(b: SolidBatch): void {
  * são a face de trás das peças, então não há placas. As paredes entre peças vizinhas só existem onde a face está
  * exposta, e os vértices soltos sobre as arestas são inseridos (`extrudeBodies`, `splitTJunctions`). Lance montado:
  * degrau de `z − treadThickness` a `z`; espelho de `riserThickness` atrás da linha; patamar de `landingThickness`.
- * Escada com erro (issue `error`) ou sem degraus não gera malha. `slabThicknessOf` dá a espessura da laje de chegada de
- * cada escada (padrão: 0,15 m).
+ * Escada com erro (issue `error`) ou sem degraus não gera malha. `arrivalTopOf` dá a cota do topo da chegada de cada
+ * escada (`stairArrivalTopZ`, a face inferior da laje que cobre o último espelho); `null` ou sem callback: topo − 0,15 m.
  */
-export function buildStairSolids(
-  stairs: ResolvedStair[],
-  slabThicknessOf: (s: ResolvedStair) => number = () => STAIR_OPENING_DEFAULT_THICKNESS,
-): SolidBatch[] {
+export function buildStairSolids(stairs: ResolvedStair[], arrivalTopOf: (s: ResolvedStair) => number | null = () => null): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const s of stairs) {
     if (s.steps.length === 0 || s.issues.some((i) => i.severity === 'error')) continue;
     const b = batchOf(byMat, s.type.materialId);
-    const bodies = s.type.runStyle === 'monolithic' ? monolithicBodies(stairBody(s, { slabThickness: slabThicknessOf(s) }).pieces) : assembledBodies(s);
+    const bodies = s.type.runStyle === 'monolithic' ? monolithicBodies(stairBody(s, { arrivalTopZ: arrivalTopOf(s) ?? undefined }).pieces) : assembledBodies(s);
     extrudeBodies(b, bodies);
   }
   const batches = [...byMat.values()];

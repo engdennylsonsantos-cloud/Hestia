@@ -2,12 +2,6 @@ import { asMulti, boxOf, boxesOverlap, difference, minAreaRect, multiPoints, off
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
 
-/**
- * Espessura (m) da chegada monolítica quando nenhuma laje ou piso cobre a escada (`stairSlabThickness`, no render). O furo
- * não usa mais este valor: cada laje ou piso fura pela própria face inferior (decisão 0011, §6).
- */
-export const STAIR_OPENING_DEFAULT_THICKNESS = 0.15;
-
 /** Tolerância de cota e de área (m, m²) nas comparações do furo. */
 const EPS = 1e-9;
 

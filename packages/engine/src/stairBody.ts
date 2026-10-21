@@ -1,4 +1,4 @@
-import { add, mid, mul, ringArea, sub, type Ring } from '@hestia/geom';
+import { add, mid, mul, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import type { StairType } from '@hestia/model';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from './stairs.ts';
 import { clipByLevel, ringMoments, type BottomPlane } from './stairBodyGeom.ts';
@@ -19,10 +19,19 @@ export interface StairBodyPiece {
 
 /** Comprimento máximo da chegada, atrás do último espelho (m). */
 export const STAIR_ARRIVAL_MAX_LENGTH = 0.3;
-/** Espessura da laje de cima usada quando o chamador não informa (m). */
+/** Espessura da laje de cima usada quando nenhuma laje ou piso cobre o último espelho (m): topo = topZ − este valor. */
 export const STAIR_ARRIVAL_SLAB_DEFAULT = 0.15;
 
 const EPS = 1e-9;
+
+/** Frente da chegada (decisão 0012 §2): o último espelho `a`→`b` e o sentido de subida `u` (unitário). */
+export interface StairArrivalFrame {
+  a: Vec2;
+  b: Vec2;
+  u: Vec2;
+  /** Comprimento da chegada atrás do último espelho: min(p, 0,30 m). */
+  length: number;
+}
 
 /** Cota do fundo da peça no ponto (x, y). */
 export function pieceBottomZ(piece: StairBodyPiece, x: number, y: number): number {
@@ -39,12 +48,42 @@ export function pieceVolume(piece: StairBodyPiece): number {
  * Corpo da escada resolvida. Monolítico: fundo liso (rampa) ou escalonado (dente de serra), conforme `undersideStyle`
  * do tipo (padrão liso); nenhuma peça desce abaixo do piso base. Piso e espelho: degraus com espessura `treadThickness`
  * e patamares com `landingThickness`, sem chegada. Escada com erro: sem peças.
+ *
+ * Chegada (monolítico): o topo é `opts.arrivalTopZ` (cota absoluta, em geral a face inferior da laje que cobre o último
+ * espelho, `stairArrivalTopZ`). Sem ele, vale `topZ − opts.slabThickness` (padrão 0,15 m). Com `arrivalTopZ`, a parte da
+ * chegada cujo fundo fica acima desse topo é cortada, então a peça nunca tem espessura negativa.
  */
-export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number } = {}): { pieces: StairBodyPiece[] } {
+export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; arrivalTopZ?: number } = {}): { pieces: StairBodyPiece[] } {
   if (stair.issues.some((i) => i.severity === 'error')) return { pieces: [] };
   const type = stair.type as StairType & { undersideStyle?: 'smooth' | 'stepped' };
   if (type.runStyle !== 'monolithic') return { pieces: assembledPieces(stair) };
-  return { pieces: monolithicPieces(stair, type, opts.slabThickness ?? STAIR_ARRIVAL_SLAB_DEFAULT) };
+  const arrivalTop = opts.arrivalTopZ ?? stair.topZ - (opts.slabThickness ?? STAIR_ARRIVAL_SLAB_DEFAULT);
+  return { pieces: monolithicPieces(stair, type, arrivalTop) };
+}
+
+/**
+ * Frente da chegada (decisão 0012 §2): o último espelho e o sentido de subida. Só existe quando o último degrau é de um
+ * lance monolítico que sobe até o espelho de topo (nº N) e o espelho N − 1 também existe; caso contrário, null.
+ */
+export function stairArrivalFrame(stair: ResolvedStair): StairArrivalFrame | null {
+  const h = stair.riserHeight;
+  const N = stair.riserCount;
+  if (stair.type.runStyle !== 'monolithic' || !(h > 0) || stair.steps.length === 0) return null;
+  const lastStep = stair.steps[stair.steps.length - 1]!;
+  if (lastStep.kind !== 'tread' || Math.round((lastStep.z - stair.baseZ) / h) !== N - 1) return null;
+  const byNumber = riserByNumber(stair, h);
+  const top = byNumber.get(N);
+  const prevTop = byNumber.get(N - 1);
+  if (!top || !prevTop) return null;
+  const dv = sub(mid(top.a, top.b), mid(prevTop.a, prevTop.b));
+  const pl = Math.hypot(dv.x, dv.y);
+  if (!(pl > EPS)) return null;
+  return { a: top.a, b: top.b, u: mul(dv, 1 / pl), length: Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH) };
+}
+
+/** Espelhos pelo nº global, derivado da cota da base do espelho (z0 = base + (nº − 1)·h): cada linha de emenda existe uma vez. */
+function riserByNumber(stair: ResolvedStair, h: number): Map<number, ResolvedStairRiser> {
+  return new Map<number, ResolvedStairRiser>(stair.risers.map((r) => [Math.round((r.z0 - stair.baseZ) / h) + 1, r]));
 }
 
 function assembledPieces(stair: ResolvedStair): StairBodyPiece[] {
@@ -70,16 +109,15 @@ interface Tread {
   num: number;
 }
 
-function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideStyle?: 'smooth' | 'stepped' }, slab: number): StairBodyPiece[] {
+function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideStyle?: 'smooth' | 'stepped' }, arrivalTop: number): StairBodyPiece[] {
   const h = stair.riserHeight;
   const sd = type.structuralDepth;
   const stepped = type.undersideStyle === 'stepped';
   const baseZ = stair.baseZ;
   if (!(h > 0) || stair.steps.length === 0) return [];
 
-  // Espelhos pelo nº global, derivado da cota da base do espelho (z0 = base + (nº − 1)·h): cada linha de emenda existe uma
-  // vez, e degraus de lances vizinhos usam a mesma linha.
-  const byNumber = new Map<number, ResolvedStairRiser>(stair.risers.map((r) => [Math.round((r.z0 - baseZ) / h) + 1, r]));
+  // Degraus de lances vizinhos usam a mesma linha de espelho (pelo nº global).
+  const byNumber = riserByNumber(stair, h);
   const built = stair.steps.map((st) => (st.kind === 'tread' ? treadOf(st, byNumber, h, sd, stepped, baseZ) : null));
   const treads = built.filter((t): t is Tread => t !== null);
 
@@ -102,24 +140,26 @@ function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideSty
     pieces.push(...fit('landing', st.componentIndex, st.index, st.polygon, st.z, plane, baseZ));
   });
 
-  // Chegada: só quando o último degrau da escada é do último lance e o espelho de topo (nº N) encontra o nível de topo.
-  const N = stair.riserCount;
+  // Chegada: faixa atrás do último espelho, sob o último degrau (mesmo plano). O topo é `arrivalTop` (decisão 0012 §2);
+  // a parte cujo fundo fica acima dele é cortada (a laje cobre). Sem último degrau de lance que sobe até o espelho N, não há.
   const lastStep = stair.steps[stair.steps.length - 1]!;
   const lastTread = lastStep.kind === 'tread' ? built[stair.steps.length - 1] : null;
-  const top = byNumber.get(N);
-  const prevTop = byNumber.get(N - 1);
-  if (lastTread && lastTread.num === N - 1 && top && prevTop) {
-    const dv = sub(mid(top.a, top.b), mid(prevTop.a, prevTop.b));
-    const pl = Math.hypot(dv.x, dv.y);
-    if (pl > EPS) {
-      const u = mul(dv, 1 / pl);
-      const L = Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH);
-      const ring: Ring = [top.a, top.b, add(top.b, mul(u, L)), add(top.a, mul(u, L))];
-      const polygon = ringArea(ring) < 0 ? ring.reverse() : ring;
-      pieces.push(...fit('arrival', lastStep.componentIndex, 1, polygon, stair.topZ - slab, lastTread.plane, baseZ));
+  const frame = stairArrivalFrame(stair);
+  if (lastTread && frame && arrivalTop > baseZ + EPS) {
+    const { a, b, u, length } = frame;
+    const ring: Ring = [a, b, add(b, mul(u, length)), add(a, mul(u, length))];
+    const polygon = ringArea(ring) < 0 ? ring.reverse() : ring;
+    for (const part of partBelow(polygon, lastTread.plane, arrivalTop)) {
+      pieces.push(...fit('arrival', lastStep.componentIndex, 1, part, arrivalTop, lastTread.plane, baseZ));
     }
   }
   return pieces;
+}
+
+/** Partes do anel onde o fundo `plane` fica em z ≤ `level` (topo da chegada). Fundo horizontal: tudo ou nada. */
+function partBelow(ring: Ring, plane: BottomPlane, level: number): Ring[] {
+  if (plane.a === 0 && plane.b === 0) return plane.c <= level + EPS ? [ring] : [];
+  return clipByLevel(ring, plane, level, 'below');
 }
 
 /** Degrau (kind 'tread') com fundo ao longo de `d` entre os espelhos de trás e da frente, `T` abaixo do topo (decisão 0012 §2). */

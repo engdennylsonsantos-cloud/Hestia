@@ -46,6 +46,12 @@ export interface PlanTheme {
   guide: string;
   select: string;
   underlay: string;
+  /** Prévia da escada por tom (limites, espelhos, caminhada, patamar e degraus calculados). */
+  stairBoundary: string;
+  stairRiser: string;
+  stairPath: string;
+  stairLanding: string;
+  stairTread: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -58,6 +64,11 @@ export const LIGHT: PlanTheme = {
   guide: '#c2410c',
   select: '#1d6fe0',
   underlay: '#b7bec7',
+  stairBoundary: '#2563eb',
+  stairRiser: '#ea580c',
+  stairPath: '#15803d',
+  stairLanding: '#7e22ce',
+  stairTread: '#64748b',
 };
 
 export const DARK: PlanTheme = {
@@ -70,4 +81,9 @@ export const DARK: PlanTheme = {
   guide: '#fb923c',
   select: '#5aa2ff',
   underlay: '#4b5560',
+  stairBoundary: '#60a5fa',
+  stairRiser: '#fb923c',
+  stairPath: '#4ade80',
+  stairLanding: '#c084fc',
+  stairTread: '#94a3b8',
 };

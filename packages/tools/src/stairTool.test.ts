@@ -399,3 +399,36 @@ describe('ferramenta Escada: edição, seleção e comandos de modelo', () => {
     expect(r.risers[0]!.a).toEqual({ x: 1, y: 1 });
   });
 });
+
+describe('ferramenta Escada: refresh() atualiza a análise sem zerar o croqui (barra de opções)', () => {
+  it('mudar o deslocamento do topo recalcula desired e riserHeight e mantém os limites e espelhos já desenhados', () => {
+    const ctx = setup();
+    const t = tool('stair', ctx.env) as StairTool;
+    boundaries(t);
+    risers(t, [0, 1, 2]);
+    const before = t.status();
+    expect(before.desired).toBe(17);
+    expect(before.riserHeight).toBeCloseTo(1, 9); // H = 3 m, dividido pelos 3 espelhos
+    ctx.options.stair = { ...ctx.options.stair, topOffset: -1 }; // H = 2 m
+    t.refresh();
+    const after = t.status();
+    expect(after.desired).toBe(12);
+    expect(after.riserHeight).toBeCloseTo(2 / 3, 9);
+    expect(after.created).toBe(3);
+    expect(after.phase).toBe(before.phase);
+    expect(t.preview().filter((i) => i.kind === 'line' && i.tone === 'riser')).toHaveLength(3);
+    expect(t.preview().some((i) => i.kind === 'line' && i.tone === 'boundary')).toBe(true);
+  });
+
+  it('o traçado em curso sobrevive ao refresh: Esc ainda cancela só a cadeia (não descarta a ferramenta)', () => {
+    const ctx = setup();
+    const t = tool('stair', ctx.env) as StairTool;
+    boundaries(t);
+    clickAt(t, 2.5, -1);
+    ctx.options.stair = { ...ctx.options.stair, topOffset: -1 };
+    t.refresh();
+    t.cancel();
+    expect(ctx.last()).toMatch(/Cadeia cancelada/);
+    expect(ctx.done()).toBe(0);
+  });
+});

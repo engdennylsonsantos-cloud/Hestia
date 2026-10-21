@@ -18,10 +18,8 @@ function act(fn: (t: StairTool) => void): void {
 function setStairOpt(patch: Partial<StairToolOptions>): void {
   const o = useUi.getState().options;
   useUi.setState({ options: { ...o, stair: { ...o.stair, ...patch } } });
-  act((t) => {
-    const cur = t.status().submode;
-    if (cur !== 'concluir') t.setSubmode(cur);
-  });
+  // `refresh` mantém o traçado em curso e a fase do croqui; só a análise e a prévia mudam.
+  act((t) => t.refresh());
 }
 
 const ERROR_COLOR = 'var(--danger, #b42318)';

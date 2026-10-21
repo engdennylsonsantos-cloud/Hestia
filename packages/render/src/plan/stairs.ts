@@ -1,6 +1,6 @@
 import { add, dist, lerp, mul, norm, perp, rotate, sub, type Vec2 } from '@hestia/geom';
-import type { ResolvedStair, ResolvedStairRiser } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { sampleChain, type ResolvedStair, type ResolvedStairRiser } from '@hestia/engine';
+import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
@@ -76,7 +76,27 @@ function cutSymbol(c: StairCut, zoom: number, color: string): StrokeOp {
   return { pts, closed: false, widthPx: STAIR_RISER_WIDTH_PX, color, alpha: 1 };
 }
 
-/** Seta de subida: a caminhada (pontos médios em ordem) com ponta de 7 px no último espelho. */
+/**
+ * Caminhada da seta de subida, do primeiro ao último espelho, por lance: a caminhada explícita do lance (quando tem)
+ * ou os pontos médios dos espelhos em ordem de subida. Um lance só tem espelhos resolvidos quando o croqui é válido
+ * (o motor valida a caminhada), então a explícita usada aqui já foi aceita. Lances sem espelho resolvido não entram.
+ */
+export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRiser[]): Vec2[] {
+  const model = p.elements[s.id];
+  const components = isStair(model) ? model.components : [];
+  const byComponent = new Map<number, ResolvedStairRiser[]>();
+  for (const r of risers) byComponent.set(r.componentIndex, [...(byComponent.get(r.componentIndex) ?? []), r]);
+  const out: Vec2[] = [];
+  for (const [ci, rs] of [...byComponent].sort((x, y) => x[0] - y[0])) {
+    const c = components[ci];
+    const explicit = c?.kind === 'run' && c.path.length > 0 ? sampleChain(c.path) : [];
+    const walk = explicit.length >= 2 ? explicit : rs.map((r) => polyMid(riserPoints(r)));
+    out.push(...walk);
+  }
+  return out;
+}
+
+/** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px no último espelho. */
 function climbArrow(pts: Vec2[], zoom: number, color: string): StrokeOp[] {
   if (pts.length < 2) return [];
   const tip = pts[pts.length - 1]!;
@@ -102,7 +122,7 @@ const beside = (u: Vec2): { dx: number; dy: number } => ({ dx: -16 * u.y, dy: -1
 /**
  * Escadas do nível na planta (decisão 0011 §1). Preenchimento dos degraus e patamares com a cor do material do tipo
  * (mesma regra dos pisos); contorno de cada degrau (tracejado acima da cota de corte); linha de cada espelho; símbolo
- * de corte e seta de subida "SOBE" pela caminhada automática. No grosseiro, só o preenchimento do contorno. No fino,
+ * de corte e seta de subida "SOBE" pela caminhada (explícita, se válida, senão automática). No grosseiro, só o preenchimento do contorno. No fino,
  * número de cada degrau. Com etiquetas ligadas, o código do tipo no centroide.
  */
 export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport): FloorOps {
@@ -122,11 +142,11 @@ export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme
     }
     const risers = risersInClimbOrder(s);
     for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, widthPx: STAIR_RISER_WIDTH_PX, color: theme.ink, alpha: 1 });
-    const mids = risers.map((r) => polyMid(riserPoints(r)));
-    out.strokes.push(...climbArrow(mids, v.zoom, theme.ink));
-    if (mids.length >= 2) {
-      const u = norm(sub(mids[1]!, mids[0]!));
-      out.labels.push({ at: mids[0]!, text: 'SOBE', ...beside(u) });
+    const walk = climbWalk(p, s, risers);
+    out.strokes.push(...climbArrow(walk, v.zoom, theme.ink));
+    if (walk.length >= 2) {
+      const u = norm(sub(walk[1]!, walk[0]!));
+      out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u) });
     }
     const cut = stairCut(s, risers, v.zoom);
     if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink));

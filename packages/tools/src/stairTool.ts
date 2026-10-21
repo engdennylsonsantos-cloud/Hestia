@@ -275,8 +275,11 @@ export class StairTool extends ToolBase {
     };
   }
 
-  /** Recalcula a análise, os degraus e a prévia. Chamado após cada mudança do croqui. */
-  private refresh(): void {
+  /**
+   * Recalcula a análise (altura, nº desejado, contador, issues), os degraus e a prévia. Não zera o traçado em curso nem a
+   * fase do croqui: é o que a barra chama quando muda tipo, nível de topo, deslocamentos ou altura.
+   */
+  refresh(): void {
     this.report = analyzeDraft(this.st.parts, this.limits());
     this.treads = treadItems(this.st.parts, this.report.riserHeight);
     this.items = buildItems(this.st, this.cursor, this.treads, this.report);

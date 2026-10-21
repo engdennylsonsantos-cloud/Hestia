@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ProjectStore, createEmptyProject, makeWall, openingSill, openingsOfWall, type Wall } from '@hestia/model';
 import { bandVolume, fuseBands, quantifyLevel, resolveLevel, type LayerBand, type ResolvedLevel, type ResolvedWall } from '@hestia/engine';
 import type { Polygon, Ring } from '@hestia/geom';
-import { buildLevelSolids } from './solids.ts';
+import { buildLevelSolids, type SolidBatch } from './solids.ts';
 
 const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
@@ -171,3 +171,113 @@ describe('topo inclinado e rodapé', () => {
     for (const l of rw.layers) expect(Math.abs(volOf(fuseBands(l.bands)) - volOf(l.bands))).toBeLessThan(1e-9);
   });
 });
+
+/** Arestas que o 3D desenha (EdgesGeometry, 28°) de um conjunto de lotes, como pares de pontos. */
+function drawnEdges(batches: SolidBatch[]): Array<[{ x: number; y: number; z: number }, { x: number; y: number; z: number }]> {
+  const out: Array<[{ x: number; y: number; z: number }, { x: number; y: number; z: number }]> = [];
+  for (const b of batches) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
+    g.setIndex(b.indices);
+    const pos = new THREE.EdgesGeometry(g, 28).getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i += 2) out.push([{ x: pos.getX(i), y: pos.getY(i), z: pos.getZ(i) }, { x: pos.getX(i + 1), y: pos.getY(i + 1), z: pos.getZ(i + 1) }]);
+    g.dispose();
+  }
+  return out;
+}
+
+/** Arestas de triângulo em número ímpar (sem par): a malha não fecha. Vértices arredondados a 1e-6 m. */
+function unpairedEdges(b: SolidBatch): number {
+  const key = (i: number): string => [0, 1, 2].map((k) => Math.round(b.positions[i * 3 + k]! * 1e6)).join(',');
+  const cnt = new Map<string, number>();
+  for (let t = 0; t < b.indices.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const a = key(b.indices[t + k]!);
+      const c = key(b.indices[t + ((k + 1) % 3)]!);
+      const e = a < c ? `${a}|${c}` : `${c}|${a}`;
+      cnt.set(e, (cnt.get(e) ?? 0) + 1);
+    }
+  let n = 0;
+  for (const c of cnt.values()) if (c % 2) n++;
+  return n;
+}
+
+/** Volume do lote pela divergência (exato só com malha fechada). */
+function meshVolume(b: SolidBatch): number {
+  const P = (i: number): number[] => [b.positions[i * 3]!, b.positions[i * 3 + 1]!, b.positions[i * 3 + 2]!];
+  let v = 0;
+  for (let t = 0; t < b.indices.length; t += 3) {
+    const [p, q, w] = [P(b.indices[t]!), P(b.indices[t + 1]!), P(b.indices[t + 2]!)];
+    v += (p[0]! * (q[1]! * w[2]! - q[2]! * w[1]!) - p[1]! * (q[0]! * w[2]! - q[2]! * w[0]!) + p[2]! * (q[0]! * w[1]! - q[1]! * w[0]!)) / 6;
+  }
+  return v;
+}
+
+/** Volume das faixas de todas as paredes do nível, por material (camadas de mesmo material somadas). */
+function bandVolumeByMaterial(r: ResolvedLevel): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const rw of Object.values(r.walls))
+    for (const l of rw.layers) out.set(l.materialId, (out.get(l.materialId) ?? 0) + fuseBands(l.bands).reduce((acc, b) => acc + bandVolume(b), 0));
+  return out;
+}
+
+describe('faces limpas: o vão não prolonga arestas pela altura da parede', () => {
+  const addAt = (s: ProjectStore, id: string, kind: 'window' | 'door', typeId: string, offset: number) =>
+    s.exec({ type: 'addOpening', opening: { id, kind, typeId, hostId: 'a', offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+
+  it('parede reta 6 m × 2,8 m com 2 janelas e 1 porta: só as arestas das extremidades são verticais de altura total', () => {
+    const { r } = setupWall((s) => {
+      s.exec({ type: 'addWall', wall: wall('a', 0, 0, 6, 0) });
+      addAt(s, 'j1', 'window', 'ot_j200', 1.5);
+      addAt(s, 'j2', 'window', 'ot_j200', 3.2);
+      addAt(s, 'd1', 'door', 'ot_p80', 5.0);
+    });
+    const H = r.walls['a']!.height;
+    const full = drawnEdges(buildLevelSolids(r).batches).filter(
+      ([p, q]) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-4 && Math.abs(Math.abs(p.z - q.z) - H) < 1e-3,
+    );
+    expect(full.length).toBeGreaterThan(0);
+    expect(full.every(([p]) => Math.min(Math.abs(p.x), Math.abs(p.x - 6)) < 1e-3)).toBe(true);
+  });
+});
+
+describe('faces limpas: malha fechada e volume igual ao das faixas nas paredes de teste', () => {
+  const cases: Record<string, (s: ProjectStore) => void> = {
+    'reta com 2 janelas e porta': (s) => {
+      s.exec({ type: 'addWall', wall: wall('a', 0, 0, 6, 0) });
+      s.exec({ type: 'addOpening', opening: { id: 'j1', kind: 'window', typeId: 'ot_j200', hostId: 'a', offset: 1.5, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+      s.exec({ type: 'addOpening', opening: { id: 'j2', kind: 'window', typeId: 'ot_j200', hostId: 'a', offset: 3.2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+      s.exec({ type: 'addOpening', opening: { id: 'd1', kind: 'door', typeId: 'ot_p80', hostId: 'a', offset: 5.0, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    },
+    'esquina em L': (s) => {
+      s.exec({ type: 'addWall', wall: wall('a', 0, 0, 4, 0) });
+      s.exec({ type: 'addWall', wall: wall('b', 4, 0, 4, 3) });
+      addWin(s, 'a', 1.5);
+      addWin(s, 'b', 1.0);
+    },
+    'T (parede apoiada em outra)': (s) => {
+      s.exec({ type: 'addWall', wall: wall('a', 0, 0, 6, 0) });
+      s.exec({ type: 'addWall', wall: wall('b', 3, 0, 3, 4) });
+      addWin(s, 'b', 1.0);
+      addWin(s, 'a', 4.5);
+    },
+    'topo inclinado (empena)': (s) => {
+      s.exec({ type: 'addWall', wall: { ...wall('g', 0, 0, 6, 0), topProfile: [{ t: 0, h: 2.8 }, { t: 3, h: 4.5 }, { t: 6, h: 2.8 }] } });
+      addWin(s, 'g', 1.5);
+    },
+  };
+  for (const [name, build] of Object.entries(cases)) {
+    it(`${name}: todo lote fecha e o volume por material bate com as faixas (1e-9 relativo)`, () => {
+      const { r } = setupWall(build);
+      const batches = buildLevelSolids(r).batches;
+      for (const b of batches) expect(unpairedEdges(b)).toBe(0);
+      const want = bandVolumeByMaterial(r);
+      for (const b of batches) {
+        const v = want.get(b.materialId)!;
+        expect(Math.abs(meshVolume(b) - v) / v).toBeLessThan(1e-9);
+      }
+    });
+  }
+});
+

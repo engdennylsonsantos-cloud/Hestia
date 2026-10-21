@@ -104,6 +104,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
  * Corte unido: se uma das origens está selecionada, a região inteira é realçada (o motor não separa as origens).
  */
 function highlightOps(s: SectionResult, hl: { selection: Id[]; hover: Id | null }, theme: PlanTheme, fills: FillOp[], strokes: StrokeOp[]): void {
+  if (hl.selection.length === 0 && hl.hover === null) return;
   const selected = new Set(hl.selection);
   for (const item of sectionItems(s)) {
     if (item.owners.some((o) => selected.has(o.id))) {

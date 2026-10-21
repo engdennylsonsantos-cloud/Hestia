@@ -30,3 +30,11 @@ Decidido em 2026-10-21 com o dono: selecionar elementos pela vista 3D (paredes, 
 - As arestas do realce têm 1 px: o WebGL não tem espessura de linha, e a versão grossa exigiria linhas com geometria própria.
 - O picking testa todos os triângulos do raio (custo linear no modelo). Sem BVH; se ficar lento em modelos grandes, o próximo passo é um BVH por lote.
 - Sem seleção por janela no 3D (arrastar com o botão esquerdo continua orbitando).
+
+## 7 · Seleção em cortes e elevações (vista `section`)
+- Contrato: `pickSection(result, point, tolerance = 0): { id, kind } | null` (`packages/render/src/section/pick.ts`). O ponto é (t, z), em metros. Testa só os polígonos visíveis do motor (`cut`, `openings`, `beyond`); o que está totalmente oculto não é selecionável (intencional). Devolve id e categoria (parede, porta, janela, piso, laje, telhado ou escada).
+- Ordem: do mais perto ao mais longe (profundidade). Em empate: corte, vão, além e, por fim, a ordem do motor (a mesma da oclusão). Primeiro vale o interior; se nenhum item contém o ponto, vale a borda a `tolerance`. A vista passa 4 px convertidos pelo zoom (`4 / zoom`, em `apps/web/src/editor/sectionPick.ts`).
+- Corte unido: o motor une por material e não dá o polígono de cada origem. Com várias origens (por exemplo, paredes do mesmo tipo cortadas pela mesma linha), o id é o primeiro de `sources`. Limitação conhecida: a seleção pode apontar para o vizinho do mesmo material. A correção é o motor passar o polígono de cada origem (fora deste escopo).
+- Clique sem arrasto, botão esquerdo, sem Espaço, na vista de corte: `clickSelect3d` (o mesmo caminho do 3D e da planta, com Shift/Ctrl). Arrastar continua movendo a vista. Delete e Backspace excluem a seleção; Esc fecha o corte, como antes.
+- Cursor sobre um elemento: cursor `pointer` e contorno fraco (`highlight.hover`). Não é gravado no projeto.
+- Realce: `buildSectionDrawList({ highlight: { selection, hover } })` adiciona, por último na lista, o preenchimento a 0,25 e o contorno na cor de seleção do tema sobre as partes visíveis do selecionado. O cursor só ganha contorno (0,55), e não aparece sobre um item já selecionado. Num corte unido, se uma origem está selecionada, a região inteira é realçada.

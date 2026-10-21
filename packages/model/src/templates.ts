@@ -3,12 +3,14 @@ import { createEmptyProject } from './defaults.ts';
 import { ProjectStore } from './history.ts';
 import type { Opening, Project, Wall } from './types.ts';
 import { DEFAULT_JOIN, makeWall } from './wall.ts';
+import { casaAltoPadrao } from './templateCasaAltoPadrao.ts';
 
-export type TemplateId = 'blank' | 'house2' | 'studio';
+export type TemplateId = 'blank' | 'house2' | 'studio' | 'house-premium';
 
 export const TEMPLATES: Array<{ id: TemplateId; name: string; description: string; area: string }> = [
   { id: 'blank', name: 'Em branco', description: 'Dois níveis e os tipos de parede padrão.', area: '—' },
   { id: 'house2', name: 'Casa térrea, 2 quartos', description: 'Sala e cozinha integradas, banheiro e dois quartos.', area: '70 m²' },
+  { id: 'house-premium', name: 'Casa de alto padrão, 2 pavimentos', description: 'Garagem, sala em L, cozinha, varanda gourmet, três suítes e home office.', area: '330 m²' },
   { id: 'studio', name: 'Quitinete', description: 'Ambiente único com banheiro, para testar rápido.', area: '27 m²' },
 ];
 
@@ -109,6 +111,7 @@ export function buildTemplate(id: TemplateId): Project {
   const cmds: Command[] = [];
   if (id === 'house2') house2(cmds);
   if (id === 'studio') studio(cmds);
+  if (id === 'house-premium') casaAltoPadrao(cmds);
   for (const c of cmds) store.exec(c);
   const p = store.project;
   return p;

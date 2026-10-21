@@ -17,7 +17,7 @@ Regra padrão (Z = elevação do nível; top/cut/bottom/depth absolutos = Z + va
 2. `z0 ≤ cut ≤ z1` → `cut`.
 3. `z0 > cut` (inteiro entre corte e topo) → `projection` ACIMA do corte (desenho tracejado).
 4. `z1 < cut` e `z1 ≥ bottom` → `projection` ABAIXO do corte (desenho normal, mais leve, sem hachura).
-5. `z1 < bottom` e `z1 ≥ depth` → `beyond` (estilo "além": cinza claro, tracejado fino).
+5. `z1 < bottom` e `z1 ≥ depth` → `beyond` (estilo "além": cinza claro, traço contínuo fino).
 Categorias com intervalo estendido para baixo (Revit): piso, laje e escada nunca viram `hidden` nem `beyond` por estarem abaixo da base (tratam `bottom = −∞`).
 Exceção de produto: a projeção tracejada da cobertura (contorno do telhado acima do corte) continua sendo opção da planta ("Mostrar projeção da cobertura",
 padrão ligada), independente do topo, porque é prática de projeto brasileira; a planta de cobertura (D6) não muda.
@@ -42,6 +42,9 @@ padrão ligada), independente do topo, porque é prática de projeto brasileira;
 - Aviso de vista (`viewRangeWarnings`): "N elemento(s) fora do intervalo de vista" por categoria, listados nas propriedades da vista (Revit mostra isso aos
   poucos; aqui avisamos).
 - DXF de planta e tabelas usam a mesma classificação onde desenham a planta; cortes, elevações e 3D não dependem do intervalo.
+  No DXF, o que está fora do corte vai para camadas de projeção (`PAREDE_PROJECAO_ACIMA`/`ABAIXO`, `PAREDE_ALEM`, `ABERTURA_ACIMA`/`ABAIXO`/`ALEM`,
+  `TELHADO_PROJECAO`, `ESCADA_ACIMA`; as acima do corte são tracejadas); o oculto não sai; a escada usa a cota de corte e o topo da vista;
+  pisos e lajes fora do intervalo não saem. A projeção do telhado sai como na tela (padrão ligado).
 
 ## 5 · Interface
 Propriedades da vista (nível ativo): Topo, Plano de corte, Base, Profundidade (m, relativos ao nível), Direção (Baixo | Cima [em breve]), botão "Restaurar padrão",

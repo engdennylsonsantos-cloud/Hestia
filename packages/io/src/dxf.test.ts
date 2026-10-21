@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate } from '@hestia/model';
-import { DXF_LAYER_CONTOUR, DXF_LAYER_OPENINGS, dxfLayerOfFloor, dxfLayerOfMaterial, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
+import {
+  DXF_LAYER_CONTOUR,
+  DXF_LAYER_OPENINGS,
+  DXF_LAYER_OPENING_ABOVE,
+  DXF_LAYER_OPENING_BELOW,
+  DXF_LAYER_OPENING_BEYOND,
+  DXF_LAYER_ROOF_PROJECTION,
+  DXF_LAYER_STAIR,
+  DXF_LAYER_STAIR_ABOVE,
+  DXF_LAYER_STAIR_CUT,
+  DXF_LAYER_WALL_ABOVE,
+  DXF_LAYER_WALL_BELOW,
+  DXF_LAYER_WALL_BEYOND,
+  dxfLayerOfFloor,
+  dxfLayerOfMaterial,
+  exportDxf,
+  type DxfLevelGeometry,
+  type DxfPoint,
+} from './dxf.ts';
 
 type Rec = { type: string; fields: Array<[number, string]> };
 
@@ -184,5 +202,109 @@ describe('pisos no DXF', () => {
     };
     expect(polylines(exportDxf(project, 'lv_0', geo)).map((p) => p.layer)).toEqual(['PISO_PS_01', 'PISO_PS_02']);
     expect(exportDxf(project, 'lv_0', { clusters: [], openings: [] })).toBe(exportDxf(project, 'lv_0', { clusters: [], openings: [], floors: [] }));
+  });
+});
+
+/** Tipo de linha de uma camada na tabela LAYER (código 6), ou undefined se a camada não existe. */
+const linetypeOf = (text: string, name: string): string | undefined => {
+  const r = records(text).find((x) => x.type === 'LAYER' && x.fields.some(([c, v]) => c === 2 && v === name));
+  return r?.fields.find(([c]) => c === 6)?.[1];
+};
+
+/** Nomes dos tipos de linha da tabela LTYPE. */
+const ltypeNames = (text: string): string[] => records(text).filter((r) => r.type === 'LTYPE').map((r) => r.fields.find(([c]) => c === 2)?.[1] ?? '');
+
+describe('vista da planta no DXF (camadas de projeção, decisão 0013 §4)', () => {
+  const square: DxfPoint[] = [
+    { x: 0, y: 0 },
+    { x: 4, y: 0 },
+    { x: 4, y: 0.14 },
+    { x: 0, y: 0.14 },
+  ];
+  const base: DxfLevelGeometry = { clusters: [], openings: [] };
+
+  it('sem projeções, a tabela de tipos de linha só tem CONTINUOUS (o arquivo é o de antes)', () => {
+    const text = exportDxf(project, 'lv_0', base);
+    expect(ltypeNames(text)).toEqual(['CONTINUOUS']);
+    expect(linetypeOf(text, DXF_LAYER_OPENINGS)).toBeUndefined();
+  });
+
+  it('parede acima do corte vai para PAREDE_PROJECAO_ACIMA, tracejada; abaixo e "além" em linha contínua clara', () => {
+    const geo: DxfLevelGeometry = {
+      ...base,
+      wallOutlines: [
+        { state: 'projection-above', polygons: [[square]] },
+        { state: 'projection-below', polygons: [[square]] },
+        { state: 'beyond', polygons: [[square]] },
+      ],
+    };
+    const text = exportDxf(project, 'lv_0', geo);
+    expect(ltypeNames(text)).toEqual(['CONTINUOUS', 'DASHED']);
+    expect(linetypeOf(text, DXF_LAYER_WALL_ABOVE)).toBe('DASHED');
+    expect(linetypeOf(text, DXF_LAYER_WALL_BELOW)).toBe('CONTINUOUS');
+    expect(linetypeOf(text, DXF_LAYER_WALL_BEYOND)).toBe('CONTINUOUS');
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_WALL_ABOVE, DXF_LAYER_WALL_BELOW, DXF_LAYER_WALL_BEYOND]);
+    expect(polys.every((p) => p.closed && p.pts.length === 4)).toBe(true);
+  });
+
+  it('parede de projeção não entra na camada de corte do material nem no contorno', () => {
+    const geo: DxfLevelGeometry = { ...base, wallOutlines: [{ state: 'projection-above', polygons: [[square]] }] };
+    const layers = polylines(exportDxf(project, 'lv_0', geo)).map((p) => p.layer);
+    expect(layers).toEqual([DXF_LAYER_WALL_ABOVE]);
+  });
+
+  it('vãos por estado: corte em ABERTURAS, acima em ABERTURA_ACIMA (tracejada), abaixo e além em camadas leves', () => {
+    const o = (state: 'cut' | 'projection-above' | 'projection-below' | 'beyond', x: number) => ({
+      center: { x, y: 0 },
+      u: { x: 1, y: 0 },
+      width: 0.8,
+      thickness: 0.14,
+      state,
+    });
+    const geo: DxfLevelGeometry = { ...base, openings: [o('cut', 1), o('projection-above', 3), o('projection-below', 5), o('beyond', 7)] };
+    const text = exportDxf(project, 'lv_0', geo);
+    expect(polylines(text).map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS, DXF_LAYER_OPENING_ABOVE, DXF_LAYER_OPENING_BELOW, DXF_LAYER_OPENING_BEYOND]);
+    expect(linetypeOf(text, DXF_LAYER_OPENING_ABOVE)).toBe('DASHED');
+    expect(linetypeOf(text, DXF_LAYER_OPENINGS)).toBe('CONTINUOUS');
+  });
+
+  it('vão sem estado vale o corte (ABERTURAS), como antes', () => {
+    const geo: DxfLevelGeometry = { ...base, openings: [{ center: { x: 1, y: 0 }, u: { x: 1, y: 0 }, width: 0.8, thickness: 0.14 }] };
+    expect(polylines(exportDxf(project, 'lv_0', geo)).map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS]);
+  });
+
+  it('projeção de telhado fora do intervalo vai para TELHADO_PROJECAO, tracejada', () => {
+    const text = exportDxf(project, 'lv_0', { ...base, roofProjections: [[square]] });
+    expect(polylines(text).map((p) => p.layer)).toEqual([DXF_LAYER_ROOF_PROJECTION]);
+    expect(linetypeOf(text, DXF_LAYER_ROOF_PROJECTION)).toBe('DASHED');
+  });
+
+  it('degraus acima da cota de corte vão para ESCADA_ACIMA (tracejada) e o símbolo de corte é polilinha aberta', () => {
+    const tread: DxfPoint[] = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const zig: DxfPoint[] = [
+      { x: 0, y: 2 },
+      { x: 0.5, y: 2.05 },
+      { x: 1, y: 2 },
+    ];
+    const geo: DxfLevelGeometry = { ...base, stairs: [{ outlines: [tread], outlinesAbove: [tread], risers: [], arrow: [], cut: zig }] };
+    const text = exportDxf(project, 'lv_0', geo);
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_STAIR, DXF_LAYER_STAIR_ABOVE, DXF_LAYER_STAIR_CUT]);
+    expect(polys[0]!.closed && polys[1]!.closed).toBe(true);
+    expect(polys[2]!.closed).toBe(false);
+    expect(polys[2]!.pts).toHaveLength(3);
+    expect(linetypeOf(text, DXF_LAYER_STAIR_ABOVE)).toBe('DASHED');
+    expect(linetypeOf(text, DXF_LAYER_STAIR_CUT)).toBe('CONTINUOUS');
+  });
+
+  it('o tipo DASHED só aparece na tabela quando alguma camada o usa', () => {
+    const above = exportDxf(project, 'lv_0', { ...base, wallOutlines: [{ state: 'projection-below', polygons: [[square]] }] });
+    expect(ltypeNames(above)).toEqual(['CONTINUOUS']);
   });
 });

@@ -395,8 +395,13 @@ produto antes de código.
   `dxfLayerOfFloor` (`PISO_<código>`), `dxfLayerOfSlab` (`LAJE_<código>`), `dxfLayerOfRoof` (`TELHADO_<código>`); constantes
   `DXF_LAYER_CONTOUR`, `DXF_LAYER_OPENINGS`, `DXF_LAYER_ROOF_RIDGE`, `DXF_LAYER_ROOF_GABLE`. `exportDxf(project, levelId, geo)`
   (linha 154).
-- `apps/web/src/editor/dxfExport.ts`: `dxfGeometryOf(p, levelId, resolved)` monta `DxfLevelGeometry`. Lê `holes` cru, o que
-  já é um ponto de atenção (seção 3.3).
+- Vista da planta (decisão 0013 §4): fora do corte, as camadas de projeção são `PAREDE_PROJECAO_ACIMA` (tracejada),
+  `PAREDE_PROJECAO_ABAIXO`, `PAREDE_ALEM`; vãos `ABERTURA_ACIMA` (tracejada), `ABERTURA_ABAIXO`, `ABERTURA_ALEM` (`ABERTURAS` é o
+  corte); `TELHADO_PROJECAO` (tracejada); escada `ESCADA_ACIMA` (degraus acima da cota de corte, tracejados) e `ESCADA_CORTE`
+  (símbolo de corte, polilinha aberta). Constantes `DXF_LAYER_*`; estado `DxfViewState` (sem `hidden`, que não sai). O tipo de
+  linha `DASHED` entra na tabela LTYPE só quando uma camada o usa.
+- `apps/web/src/editor/dxfExport.ts`: `dxfGeometryOf(p, levelId)` monta `DxfLevelGeometry` a partir de `planViewOf` (render), a
+  mesma vista da tela. Lê `holes` cru, o que já é um ponto de atenção (seção 3.3).
 - Escada: campo `stairs?` em `DxfLevelGeometry` e camada `ESCADA_<código>` (proposta). Teste de modelo:
   `packages/io/src/dxfSlabs.test.ts`.
 

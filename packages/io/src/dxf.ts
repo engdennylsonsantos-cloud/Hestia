@@ -15,12 +15,21 @@ export interface DxfCluster {
   silhouette: DxfPolygons;
 }
 
+/**
+ * Estado de um elemento na vista da planta (decisão 0013 §2), sem o `hidden`: quem monta a geometria não manda os ocultos.
+ * `cut` atravessa o plano de corte (camadas normais). Os demais ficam fora do corte, dentro do intervalo, e saem em camadas
+ * de projeção próprias: acima do corte (tracejado), abaixo do corte, ou "além" (abaixo da base, na profundidade).
+ */
+export type DxfViewState = 'cut' | 'projection-above' | 'projection-below' | 'beyond';
+
 /** Vão em planta: retângulo com `width` ao longo de `u` (vetor unitário) e `thickness` na perpendicular. */
 export interface DxfOpening {
   center: DxfPoint;
   u: DxfPoint;
   width: number;
   thickness: number;
+  /** Estado na vista. Ausente vale `cut` (vão de corte, na camada `ABERTURAS`). */
+  state?: DxfViewState;
 }
 
 /**
@@ -30,6 +39,13 @@ export interface DxfOpening {
 export interface DxfLevelGeometry {
   clusters: DxfCluster[];
   openings: DxfOpening[];
+  /**
+   * Paredes fora do corte e dentro do intervalo: o contorno inteiro, sem furos, na camada de projeção do estado
+   * (`PAREDE_PROJECAO_ACIMA`, `PAREDE_PROJECAO_ABAIXO` ou `PAREDE_ALEM`). Não entram nos clusters.
+   */
+  wallOutlines?: Array<{ state: Exclude<DxfViewState, 'cut'>; polygons: DxfPolygons }>;
+  /** Projeção (contorno) dos telhados fora do intervalo, tracejada na camada `TELHADO_PROJECAO`. */
+  roofProjections?: DxfPolygons;
   /** Pisos do nível: contorno e furos em planta; `typeCode` é o código do tipo (vira a camada `PISO_<código>`). */
   floors?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
   /** Lajes do nível: contorno e furos em planta; `typeCode` vira a camada `LAJE_<código>`. A inclinação não aparece na planta. */
@@ -41,22 +57,62 @@ export interface DxfLevelGeometry {
    */
   roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; gables?: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
   /**
-   * Escadas do nível: contornos dos degraus e patamares (POLYLINE fechada na camada `ESCADA`), linhas de espelho (LINE em
-   * `ESCADA_ESPELHO`) e seta de subida (LINE em `ESCADA_SETA`: haste e as duas pontas). Quem monta a geometria é o engine.
+   * Escadas do nível: contornos dos degraus e patamares até a cota de corte (POLYLINE fechada na camada `ESCADA`),
+   * os que estão acima dela e até o topo do intervalo (`outlinesAbove`, camada `ESCADA_ACIMA`, tracejada), linhas de espelho
+   * (LINE em `ESCADA_ESPELHO`), seta de subida (LINE em `ESCADA_SETA`: haste e as duas pontas) e o símbolo de corte
+   * (POLYLINE aberta em `ESCADA_CORTE`), quando o plano de corte cruza a escada. Quem monta a geometria é o engine.
    */
-  stairs?: Array<{ outlines: DxfPoint[][]; risers: Array<[DxfPoint, DxfPoint]>; arrow: Array<[DxfPoint, DxfPoint]> }>;
+  stairs?: Array<{
+    outlines: DxfPoint[][];
+    outlinesAbove?: DxfPoint[][];
+    risers: Array<[DxfPoint, DxfPoint]>;
+    arrow: Array<[DxfPoint, DxfPoint]>;
+    cut?: DxfPoint[];
+  }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
+/** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS`. */
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
+/** Vãos acima do corte (peitoril acima do plano): tracejados, a parede fica inteira. */
+export const DXF_LAYER_OPENING_ABOVE = 'ABERTURA_ACIMA';
+/** Vãos abaixo do corte e acima da base: contorno leve, a parede fica inteira. */
+export const DXF_LAYER_OPENING_BELOW = 'ABERTURA_ABAIXO';
+/** Vãos "além" (abaixo da base, dentro da profundidade): contorno leve. */
+export const DXF_LAYER_OPENING_BEYOND = 'ABERTURA_ALEM';
+/** Paredes inteiras acima do corte (projeção): contorno tracejado. */
+export const DXF_LAYER_WALL_ABOVE = 'PAREDE_PROJECAO_ACIMA';
+/** Paredes abaixo do corte (projeção): contorno leve. */
+export const DXF_LAYER_WALL_BELOW = 'PAREDE_PROJECAO_ABAIXO';
+/** Paredes "além" (fora do intervalo na base): contorno leve. */
+export const DXF_LAYER_WALL_BEYOND = 'PAREDE_ALEM';
+/** Projeção da cobertura de telhados fora do intervalo: contorno tracejado. */
+export const DXF_LAYER_ROOF_PROJECTION = 'TELHADO_PROJECAO';
 /** Camada das linhas de cumeeira, espigão e rincão (LINE). */
 export const DXF_LAYER_ROOF_RIDGE = 'TELHADO_CUMEEIRA';
 /** Camada das linhas de empena (aresta sem inclinação, LINE), separada da cumeeira. */
 export const DXF_LAYER_ROOF_GABLE = 'TELHADO_EMPENA';
-/** Escadas: contorno dos degraus e patamares (POLYLINE), linhas de espelho e seta de subida (LINE). */
+/** Escadas: contorno dos degraus e patamares até a cota de corte (POLYLINE), linhas de espelho e seta de subida (LINE). */
 export const DXF_LAYER_STAIR = 'ESCADA';
+/** Degraus e patamares acima da cota de corte e até o topo: contorno tracejado (POLYLINE). */
+export const DXF_LAYER_STAIR_ABOVE = 'ESCADA_ACIMA';
 export const DXF_LAYER_STAIR_RISER = 'ESCADA_ESPELHO';
 export const DXF_LAYER_STAIR_ARROW = 'ESCADA_SETA';
+/** Símbolo de corte da escada: polilinha aberta em zigue-zague, só quando o plano de corte cruza a escada. */
+export const DXF_LAYER_STAIR_CUT = 'ESCADA_CORTE';
+
+/** Camada de cada estado de vão e de parede fora do corte. */
+const OPENING_LAYER: Record<DxfViewState, string> = {
+  cut: DXF_LAYER_OPENINGS,
+  'projection-above': DXF_LAYER_OPENING_ABOVE,
+  'projection-below': DXF_LAYER_OPENING_BELOW,
+  beyond: DXF_LAYER_OPENING_BEYOND,
+};
+const WALL_LAYER: Record<Exclude<DxfViewState, 'cut'>, string> = {
+  'projection-above': DXF_LAYER_WALL_ABOVE,
+  'projection-below': DXF_LAYER_WALL_BELOW,
+  beyond: DXF_LAYER_WALL_BEYOND,
+};
 
 /** Texto para nome de camada: sem acentos, em maiúsculas, símbolos viram `_`. */
 function layerSafe(text: string): string {
@@ -114,6 +170,8 @@ function openingRect(o: DxfOpening): DxfPoint[] {
 interface Shape {
   layer: string;
   pts: DxfPoint[];
+  /** Polilinha fechada (padrão); a aberta só serve ao símbolo de corte da escada. */
+  closed?: boolean;
 }
 
 interface Line {
@@ -122,7 +180,29 @@ interface Line {
   b: DxfPoint;
 }
 
-/** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE). */
+/** Tipo de linha de uma camada: contínua, ou tracejada nas camadas de projeção acima do corte. */
+type LineType = 'CONTINUOUS' | 'DASHED';
+
+interface LayerStyle {
+  linetype: LineType;
+  /** Cor ACI: 7 (preto/branco) é o padrão; 8 (cinza) para as camadas de projeção leves. */
+  color: number;
+}
+
+/** Camadas com tipo de linha ou cor próprios. As demais são contínuas e de cor 7, como sempre foram. */
+const LAYER_STYLE: Record<string, LayerStyle> = {
+  [DXF_LAYER_OPENING_ABOVE]: { linetype: 'DASHED', color: 7 },
+  [DXF_LAYER_OPENING_BELOW]: { linetype: 'CONTINUOUS', color: 8 },
+  [DXF_LAYER_OPENING_BEYOND]: { linetype: 'CONTINUOUS', color: 8 },
+  [DXF_LAYER_WALL_ABOVE]: { linetype: 'DASHED', color: 7 },
+  [DXF_LAYER_WALL_BELOW]: { linetype: 'CONTINUOUS', color: 8 },
+  [DXF_LAYER_WALL_BEYOND]: { linetype: 'CONTINUOUS', color: 8 },
+  [DXF_LAYER_ROOF_PROJECTION]: { linetype: 'DASHED', color: 7 },
+  [DXF_LAYER_STAIR_ABOVE]: { linetype: 'DASHED', color: 7 },
+};
+const styleOf = (layer: string): LayerStyle => LAYER_STYLE[layer] ?? { linetype: 'CONTINUOUS', color: 7 };
+
+/** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE), e as de espelho e seta das escadas. */
 function linesOf(geo: DxfLevelGeometry): Line[] {
   const roof = (geo.roofs ?? []).flatMap((r) => [
     ...r.ridges.map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
@@ -135,7 +215,10 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
   return [...roof, ...stair];
 }
 
-/** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes, os telhados e, por último, os vãos. */
+/**
+ * Polilinhas do nível: por cluster, as regiões de material e depois o contorno; depois as projeções de parede, os pisos,
+ * as lajes, os telhados (e a projeção dos fora do intervalo), as escadas e, por último, os vãos.
+ */
 function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   const out: Shape[] = [];
   const push = (layer: string, polygons: DxfPolygons): void => {
@@ -153,24 +236,33 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     }
     push(DXF_LAYER_CONTOUR, c.silhouette);
   }
+  for (const w of geo.wallOutlines ?? []) push(WALL_LAYER[w.state], w.polygons);
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
   for (const r of geo.roofs ?? []) push(dxfLayerOfRoof(r.typeCode), [[r.outline]]);
-  for (const s of geo.stairs ?? []) for (const o of s.outlines) push(DXF_LAYER_STAIR, [[o]]);
-  for (const o of geo.openings) out.push({ layer: DXF_LAYER_OPENINGS, pts: openingRect(o) });
+  if (geo.roofProjections) push(DXF_LAYER_ROOF_PROJECTION, geo.roofProjections);
+  for (const s of geo.stairs ?? []) {
+    for (const o of s.outlines) push(DXF_LAYER_STAIR, [[o]]);
+    for (const o of s.outlinesAbove ?? []) push(DXF_LAYER_STAIR_ABOVE, [[o]]);
+    if (s.cut && s.cut.length >= 2) out.push({ layer: DXF_LAYER_STAIR_CUT, pts: s.cut, closed: false });
+  }
+  for (const o of geo.openings) out.push({ layer: OPENING_LAYER[o.state ?? 'cut'], pts: openingRect(o) });
   return out;
 }
 
 /**
  * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6), uma camada por material
- * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos.
- * Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do AutoCAD R14.
+ * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos de corte. Elementos fora do
+ * corte entram nas camadas de projeção (`PAREDE_PROJECAO_*`, `ABERTURA_*`, `ESCADA_ACIMA`, `TELHADO_PROJECAO`), com tipo de
+ * linha tracejado quando estão acima do corte. Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
+ * AutoCAD R14. A tabela de tipos de linha só leva `DASHED` quando alguma camada o usa, então o arquivo sem projeções é o mesmo.
  */
 export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
   const layers = [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
+  const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED');
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b])];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
@@ -202,7 +294,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   rec(2, 'TABLES');
   rec(0, 'TABLE');
   rec(2, 'LTYPE');
-  rec(70, 1);
+  rec(70, dashed ? 2 : 1);
   rec(0, 'LTYPE');
   rec(2, 'CONTINUOUS');
   rec(70, 0);
@@ -210,16 +302,29 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   rec(72, 65);
   rec(73, 0);
   rec(40, '0.0');
+  if (dashed) {
+    // Traço de 0,25 m e espaço de 0,125 m (unidades do desenho, em metros).
+    rec(0, 'LTYPE');
+    rec(2, 'DASHED');
+    rec(70, 0);
+    rec(3, 'Dashed line');
+    rec(72, 65);
+    rec(73, 2);
+    rec(40, '0.375');
+    rec(49, '0.25');
+    rec(49, '-0.125');
+  }
   rec(0, 'ENDTAB');
   rec(0, 'TABLE');
   rec(2, 'LAYER');
   rec(70, layers.length);
   for (const name of layers) {
+    const style = styleOf(name);
     rec(0, 'LAYER');
     rec(2, name);
     rec(70, 0);
-    rec(62, 7);
-    rec(6, 'CONTINUOUS');
+    rec(62, style.color);
+    rec(6, style.linetype);
   }
   rec(0, 'ENDTAB');
   rec(0, 'ENDSEC');
@@ -232,7 +337,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
     rec(66, 1);
     rec(10, '0.000000');
     rec(20, '0.000000');
-    rec(70, 1);
+    rec(70, s.closed === false ? 0 : 1);
     for (const p of s.pts) {
       rec(0, 'VERTEX');
       rec(8, s.layer);

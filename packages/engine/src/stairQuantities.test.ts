@@ -41,15 +41,44 @@ const only = (p: Project): ResolvedStair => {
 const MONO = 'stt_monolitica';
 const ASSEMBLED = 'stt_piso_espelho';
 
+/** Referência da escada reta: w = 1,20; p = 0,28; h = 0,175 m. Tipo monolítico padrão: profundidade estrutural 0,20 m. */
+const W = 1.2;
+const P = 0.28;
+const H = 0.175;
+/** Espessura vertical equivalente T = 0,20 ÷ cosθ, cosθ = p / √(p² + h²) (decisão 0012 §2). */
+const T = (0.2 * Math.hypot(P, H)) / P;
+
+/** Integração de Simpson de `fn` em [a, b] (referência independente do código). */
+function simpson(fn: (x: number) => number, a: number, b: number, n = 2000): number {
+  const step = (b - a) / n;
+  let s = fn(a) + fn(b);
+  for (let i = 1; i < n; i++) s += fn(a + i * step) * (i % 2 ? 4 : 2);
+  return (s * step) / 3;
+}
+
+/**
+ * Volume monolítico liso de degraus com topos em `tops` (decisão 0012 §2): sem corte, cada degrau vale w·p·(h/2 + T);
+ * descontado o material abaixo do piso base (0 m), integrado em x ao longo do degrau (fundo rampa de `top − h − T`).
+ */
+function monoVolume(tops: number[]): number {
+  const unclamped = tops.length * W * P * (H / 2 + T);
+  const below = tops.reduce(
+    (acc, top) => acc + W * simpson((x) => Math.max(0, -(top - H - T + (H / P) * x)), 0, P),
+    0,
+  );
+  return unclamped - below;
+}
+
 /*
  * Escada reta de referência: 16 espelhos a cada 0,28 m, largura 1,20 m, H = 2,80 m.
  *   N = 16 espelhos, h = 2,80 ÷ 16 = 0,175 m; 15 degraus de 0,28 × 1,20 = 0,336 m² cada.
  *   Área dos degraus = 15 × 0,336 = 5,04 m² (= área em planta). Comprimento dos espelhos = 16 × 1,20 = 19,20 m.
- *   Monolítico (profundidade 0,20 m): 5,04 × 0,20 = 1,008 m³.
+ *   Monolítico liso (decisão 0012): 15 × w·p·(h/2 + T) = 1,6297 m³ sem corte; o degrau 1 e parte do 2 ficam abaixo do
+ *   piso base e saem: 1,5763 m³ (antes 1,008 m³, pela área × profundidade).
  *   Piso e espelho: 5,04 × 0,03 = 0,1512 m³ de pisos; 19,20 × 0,175 × 0,02 = 0,0672 m³ de espelhos; total 0,2184 m³.
  */
 describe('quantitativos da escada reta de referência', () => {
-  it('monolítica: contagens, geometria e volume 1,008 m³', () => {
+  it('monolítica: contagens, geometria e volume 1,5763 m³ (liso, corte pelo piso base)', () => {
     const q = stairQuantities(only(project([straight(16, 0.28)], MONO)));
     expect(q).toMatchObject({ runStyle: 'monolithic', riserCount: 16, treadCount: 15, landingArea: 0 });
     expect(q.width).toBeCloseTo(1.2, 9);
@@ -58,10 +87,12 @@ describe('quantitativos da escada reta de referência', () => {
     expect(q.planArea).toBeCloseTo(5.04, 9);
     expect(q.treadArea).toBeCloseTo(5.04, 9);
     expect(q.riserLength).toBeCloseTo(19.2, 9);
-    expect(q.volumeRun).toBeCloseTo(1.008, 9);
+    const tops = Array.from({ length: 15 }, (_, k) => (k + 1) * H);
+    expect(q.volumeRun).toBeCloseTo(monoVolume(tops), 6);
+    expect(q.volumeRun).toBeCloseTo(1.5763, 4);
     expect(q.volumeRisers).toBe(0);
     expect(q.volumeLandings).toBe(0);
-    expect(q.volume).toBeCloseTo(1.008, 9);
+    expect(q.volume).toBeCloseTo(q.volumeRun, 9);
   });
 
   it('piso e espelho: volume 0,2184 m³ (pisos 0,1512 + espelhos 0,0672)', () => {
@@ -86,15 +117,19 @@ describe('quantitativos com patamar', () => {
   // Dois lances de 8 espelhos (7 degraus cada) ligados por um patamar de 1,20 × 1,20 m a 1,40 m (8 × 0,175 m).
   const twoRuns = [straight(8, 0.28), rect(2.46, 3.66, 1.2), straight(8, 0.28, 1.2, 3.66)];
 
-  it('área dos degraus de 14 × 0,336 m²; patamar de 1,44 m² entra no volume pela espessura de 0,15 m', () => {
+  it('área dos degraus de 14 × 0,336 m²; patamar de 1,44 m² entra no volume pela espessura h + T (decisão 0012)', () => {
     const q = stairQuantities(only(project(twoRuns, MONO)));
     expect(q.riserCount).toBe(16);
     expect(q.treadCount).toBe(14);
     expect(q.treadArea).toBeCloseTo(14 * 0.336, 9);
     expect(q.landingArea).toBeCloseTo(1.44, 9);
     expect(q.planArea).toBeCloseTo(14 * 0.336 + 1.44, 9);
-    expect(q.volumeLandings).toBeCloseTo(1.44 * 0.15, 9);
-    expect(q.volume).toBeCloseTo(14 * 0.336 * 0.2 + 1.44 * 0.15, 9);
+    // Patamar à cota 8h: fundo em 8h − (h + T) = 1,40 − 0,4108 m, bem acima do piso base.
+    expect(q.volumeLandings).toBeCloseTo(1.44 * (H + T), 9);
+    // Degraus do 1º lance (1 a 7) com o corte pelo piso base; degraus do 2º lance (9 a 15) sem corte.
+    const tops = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15].map((k) => k * H);
+    expect(q.volumeRun).toBeCloseTo(monoVolume(tops), 6);
+    expect(q.volume).toBeCloseTo(monoVolume(tops) + 1.44 * (H + T), 6);
   });
 
   it('por lance: dois lances com 7 degraus cada e piso médio de 0,28 m', () => {

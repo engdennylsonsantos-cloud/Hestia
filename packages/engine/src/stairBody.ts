@@ -144,10 +144,10 @@ function treadOf(st: ResolvedStairStep, rs: ResolvedStairRiser[], h: number, sd:
   // T = profundidade estrutural ÷ cosθ, cosθ = p / √(p² + h²) (decisão 0012 §2, item 2).
   const T = p > EPS ? (sd * Math.hypot(p, h)) / p : sd;
   const zBack = st.z - h - T;
-  const plane: BottomPlane =
-    stepped || p <= EPS
-      ? { a: 0, b: 0, c: zBack }
-      : { a: (h * d.x) / (p * p), b: (h * d.y) / (p * p), c: zBack - ((h * d.x) / (p * p)) * back.x - ((h * d.y) / (p * p)) * back.y };
+  // Liso: plano que vale zBack em `back` e sobe h ao longo de `d` (gradiente = h·d ÷ p²).
+  const a = (h * d.x) / (p * p);
+  const b = (h * d.y) / (p * p);
+  const plane: BottomPlane = stepped || p <= EPS ? { a: 0, b: 0, c: zBack } : { a, b, c: zBack - a * back.x - b * back.y };
   return { ci: st.componentIndex, index: st.index, polygon: st.polygon, zTop: st.z, T, plane, atBase };
 }
 

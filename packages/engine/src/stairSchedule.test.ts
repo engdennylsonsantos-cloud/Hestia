@@ -47,7 +47,8 @@ describe('tabela de escadas', () => {
     expect(a!.treadMean).toBeCloseTo(0.28, 9);
     expect(a!.width).toBeCloseTo(1.2, 9);
     expect(a!.planArea).toBeCloseTo(5.04, 9);
-    expect(a!.volume).toBeCloseTo(1.008, 9);
+    // Monolítico liso (decisão 0012): 1,5763 m³ com o corte pelo piso base (ver stairQuantities.test.ts).
+    expect(a!.volume).toBeCloseTo(1.5763, 4);
     expect(b).toMatchObject({ mark: 'E;2', typeCode: 'ES-02', baseLevelName: 'Pavimento 2', topLevelId: null, topLevelName: '' });
     expect(b!.volume).toBeCloseTo(0.2184, 9);
   });
@@ -55,8 +56,8 @@ describe('tabela de escadas', () => {
   it('totais fecham com a soma das linhas', () => {
     expect(schedule.totals.count).toBe(2);
     expect(schedule.totals.planArea).toBeCloseTo(10.08, 9);
-    expect(schedule.totals.volume).toBeCloseTo(1.2264, 9);
-    expect(sumStairRows(schedule.rows.slice(0, 1)).volume).toBeCloseTo(1.008, 9);
+    expect(schedule.totals.volume).toBeCloseTo(1.7947, 4);
+    expect(sumStairRows(schedule.rows.slice(0, 1)).volume).toBeCloseTo(1.5763, 4);
   });
 
   it('filtra por tipo e por nível de base, separadamente e juntos', () => {
@@ -80,11 +81,11 @@ describe('CSV da tabela de escadas', () => {
   });
 
   it('decimal com vírgula; marca com ";" entre aspas; nível de topo vazio sem nível acima', () => {
-    expect(lines[1]).toBe('E1;Escada monolítica concreto;ES-01;Térreo;Pavimento 2;16;0,175;0,280;1,20;5,04;1,008');
+    expect(lines[1]).toBe('E1;Escada monolítica concreto;ES-01;Térreo;Pavimento 2;16;0,175;0,280;1,20;5,04;1,576');
     expect(lines[2]).toBe('"E;2";Escada de piso e espelho;ES-02;Pavimento 2;;16;0,175;0,280;1,20;5,04;0,218');
   });
 
   it('a linha de total traz a área em planta e o volume somados', () => {
-    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '', '10,08', '1,226'].join(';'));
+    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '', '10,08', '1,795'].join(';'));
   });
 });

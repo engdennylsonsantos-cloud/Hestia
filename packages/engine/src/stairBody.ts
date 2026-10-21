@@ -77,8 +77,9 @@ function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideSty
   const baseZ = stair.baseZ;
   if (!(h > 0) || stair.steps.length === 0) return [];
 
-  // Espelhos pelo nº global (cada linha de emenda existe uma vez): degraus de lances vizinhos usam a mesma linha.
-  const byNumber = new Map<number, ResolvedStairRiser>(stair.risers.map((r) => [r.number, r]));
+  // Espelhos pelo nº global, derivado da cota da base do espelho (z0 = base + (nº − 1)·h): cada linha de emenda existe uma
+  // vez, e degraus de lances vizinhos usam a mesma linha.
+  const byNumber = new Map<number, ResolvedStairRiser>(stair.risers.map((r) => [Math.round((r.z0 - baseZ) / h) + 1, r]));
   const built = stair.steps.map((st) => (st.kind === 'tread' ? treadOf(st, byNumber, h, sd, stepped, baseZ) : null));
   const treads = built.filter((t): t is Tread => t !== null);
 

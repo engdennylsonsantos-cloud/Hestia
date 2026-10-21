@@ -144,6 +144,25 @@ export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, t
 export function hiddenSelectionOps(p: Project, levelId: Id, view: PlanView, selection: readonly Id[], theme: PlanTheme): StrokeOp[] {
   const ids = selection.filter((id) => view.hidden.has(id));
   if (ids.length === 0) return [];
+  // A planta chama esta função a cada quadro (pan, zoom, hover) enquanto há um oculto selecionado. O resultado depende
+  // só da vista (um objeto por projeto e nível), dos ids e da cor: guarda-se por vista e o quadro seguinte reaproveita.
+  const key = `${levelId}|${theme.select}|${ids.join(',')}`;
+  const memoOf = ghostMemo.get(view) ?? new Map<string, StrokeOp[]>();
+  ghostMemo.set(view, memoOf);
+  const hit = memoOf.get(key);
+  if (hit) return hit;
+  const out = ghostOps(p, levelId, view, ids, theme);
+  if (memoOf.size >= GHOST_MEMO_LIMIT) memoOf.delete(memoOf.keys().next().value as string);
+  memoOf.set(key, out);
+  return out;
+}
+
+/** Contornos fantasma por vista (ver `hiddenSelectionOps`): até `GHOST_MEMO_LIMIT` seleções por vista. */
+const ghostMemo = new WeakMap<PlanView, Map<string, StrokeOp[]>>();
+const GHOST_MEMO_LIMIT = 8;
+
+/** Contorno fantasma dos ocultos `ids` (já filtrados): sem memo, ver `hiddenSelectionOps`. */
+function ghostOps(p: Project, levelId: Id, view: PlanView, ids: Id[], theme: PlanTheme): StrokeOp[] {
   const style: OutlineStyle = { widthPx: 1, color: theme.select, alpha: 0.9, dash: [5, 3] };
   const out: StrokeOp[] = [];
   const addRings = (m: MultiPolygon): void => {

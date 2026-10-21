@@ -29,9 +29,10 @@ const PRIMITIVES: Array<[StairPrimitive, string]> = [
 ];
 
 /**
- * Barra da ferramenta Escada (croqui): tipo, sub-modos (Limites, Espelhos, Caminhada, Patamar, Concluir), primitiva
- * (Tab alterna), "Distribuir N espelhos", o contador de espelhos, a 1ª mensagem do croqui e, fora da edição, nível de
- * topo, deslocamentos e altura (esta só quando não há nível acima).
+ * Barra da ferramenta Escada (croqui): tipo, sub-modos (Limites, Espelhos, Caminhada, Patamar, Concluir), método de
+ * desenho (Linha, Arco ou Pegar linhas; Tab alterna linha e arco), com Corrente e Deslocamento quando se pega linhas,
+ * "Distribuir N espelhos", o contador de espelhos, a 1ª mensagem do croqui e, fora da edição, nível de topo,
+ * deslocamentos e altura (esta só quando não há nível acima).
  */
 export function StairOptionsBar(): ReactElement | null {
   const p = useProject();
@@ -72,13 +73,27 @@ export function StairOptionsBar(): ReactElement | null {
           ))}
         </select>
       </label>
-      <div className="stair-prim" role="group" aria-label="Primitiva" style={{ display: 'flex', gap: 4 }}>
+      <div className="stair-prim" role="group" aria-label="Método de desenho" style={{ display: 'flex', gap: 4 }}>
         {PRIMITIVES.map(([id, label]) => (
-          <button key={id} className={`btn small${st.primitive === id ? ' primary' : ''}`} aria-pressed={st.primitive === id} onClick={() => act((t) => t.setPrimitive(id))} title="Tab alterna linha e arco">
+          <button key={id} className={`btn small${!st.picking && st.primitive === id ? ' primary' : ''}`} aria-pressed={!st.picking && st.primitive === id} onClick={() => act((t) => t.setPrimitive(id))} title="Tab alterna linha e arco">
             {label}
           </button>
         ))}
+        <button className={`btn small${st.picking ? ' primary' : ''}`} aria-pressed={st.picking} onClick={() => act((t) => t.setPick(!st.picking))} title="Pega a parede (eixo, faces ou núcleo conforme a captura), a linha de escada ou a aresta de laje ou piso sob o cursor">
+          Pegar linhas
+        </button>
       </div>
+      {st.picking && (
+        <>
+          <button className={`btn small${opts.pickChain ? ' primary' : ''}`} aria-pressed={!!opts.pickChain} onClick={() => setStairOpt({ pickChain: !opts.pickChain })} title="Pega a cadeia de segmentos conectados até as pontas (ou o laço inteiro)">
+            Corrente
+          </button>
+          <label>
+            Deslocamento (m)
+            <NumField id="opt-stairoffset" value={opts.pickOffset ?? 0} min={0} onCommit={(v) => setStairOpt({ pickOffset: v })} unit="m" />
+          </label>
+        </>
+      )}
       <label>
         Espelhos
         <NumField id="opt-stairn" value={opts.distributeCount ?? st.desired} decimals={0} min={1} onCommit={(v) => setStairOpt({ distributeCount: Math.max(1, Math.round(v)) })} />

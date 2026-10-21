@@ -13,6 +13,7 @@ import {
 } from '@hestia/model';
 import { resolveStairs, resolveStairsOnLevel, type ResolvedStair } from './stairs.ts';
 import { stairIssueList } from './stairChecks.ts';
+import { generateWinderL, type StairComponentSketch } from './stairGenerators.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: v(ax, ay), b: v(bx, by), sag: 0 });
@@ -72,6 +73,8 @@ const only = (p: Project): ResolvedStair => {
 };
 
 const treads = (rs: ResolvedStair): ResolvedStair['steps'] => rs.steps.filter((s) => s.kind === 'tread');
+/** Nº global dos espelhos (z0 = base + (nº − 1)·h), na ordem de criação dos lances. */
+const numbersOf = (rs: ResolvedStair): number[] => rs.risers.map((r) => Math.round((r.z0 - rs.baseZ) / rs.riserHeight) + 1);
 const area = (ring: Vec2[]): number => Math.abs(ringArea(ring));
 
 describe('escada reta de referência', () => {
@@ -172,6 +175,69 @@ describe('cotas, patamar e níveis', () => {
     expect(resolveStairsOnLevel(s.project, 'lv_0').map((r) => r.id)).toEqual(['a']);
     expect(resolveStairsOnLevel(s.project, 'lv_1').map((r) => r.id)).toEqual(['b']);
     expect(resolveStairs(s.project).map((r) => r.id)).toEqual(['a', 'b']);
+  });
+});
+
+/** Componentes do croqui dos geradores (sem id) em componentes da escada. */
+const asComponents = (list: StairComponentSketch[]): Array<StairRun | StairLanding> =>
+  list.map((c, i) =>
+    c.kind === 'run'
+      ? { id: `c${i}`, kind: 'run' as const, ...c.run }
+      : { id: `c${i}`, kind: 'landing' as const, boundary: c.landing.boundary },
+  );
+
+describe('lances sem patamar: a linha de emenda conta uma vez (N, cotas e numeração)', () => {
+  it('dois lances retos encostados (N1 + N2 − 1 espelhos): altura real = H/N e cotas em passo h', () => {
+    // Lance 1: espelhos em x = 0..1,12 (5). Lance 2 começa no último espelho do 1º (x = 1,12) e tem 4 espelhos.
+    const r1 = straight(5, 0.28, 1.2, 0, 0.5, 0);
+    const r2 = straight(4, 0.28, 1.2, 1.12, 0, 0.5);
+    // Topo em 1,40 m (pavimento de 3 m com topOffset −1,6 m): H = 1,40 m, N = 8, h = 0,175 m.
+    const rs = only(projectWith([r1, r2], { topOffset: -1.6 }));
+    expect(rs.riserCount).toBe(8);
+    expect(rs.riserHeight).toBeCloseTo(1.4 / 8, 12);
+    expect(rs.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(numbersOf(rs)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    treads(rs).forEach((t, k) => expect(t.z).toBeCloseTo((k + 1) * rs.riserHeight, 12));
+    // Degrau 1 do lance 2 fica em base + N1·h (o espelho de emenda é o 5º).
+    const first2 = treads(rs).find((t) => t.componentIndex === 1 && t.index === 1)!;
+    expect(first2.z).toBeCloseTo(5 * rs.riserHeight, 12);
+  });
+
+  it('winder de 90° (lance, leque de 3 espelhos, lance): N = N1 + W + N2 − 2 e cotas em passo h', () => {
+    // Topo em 2,80 m (padrão): H = 2,80 m, N = 16, h = 0,175 m.
+    const h = 0.175;
+    const comps = generateWinderL({ start: v(0, 0), dir: v(1, 0), width: 1.2, risersFirst: 8, risersSecond: 7, tread: 0.28, turn: 'left' });
+    const rs = only(projectWith(asComponents(comps)));
+    const N = 8 + 3 + 7 - 2;
+    expect(rs.riserCount).toBe(N);
+    expect(rs.riserHeight).toBeCloseTo(2.8 / N, 12);
+    expect(rs.riserHeight).toBeCloseTo(h, 12);
+    expect(rs.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    // Espelhos distintos, numerados 1..N, cada um com z0 = (nº − 1)·h e z1 = nº·h.
+    expect(numbersOf(rs)).toEqual(Array.from({ length: N }, (_, k) => k + 1));
+    for (const r of rs.risers) {
+      const n = Math.round(r.z0 / h) + 1;
+      expect(r.z0).toBeCloseTo((n - 1) * h, 9);
+      expect(r.z1).toBeCloseTo(n * h, 9);
+    }
+    // Cotas dos degraus estritamente crescentes com passo h, na ordem da escada: 1·h … (N−1)·h.
+    const tops = treads(rs).map((t) => t.z);
+    expect(tops).toHaveLength(N - 1);
+    tops.forEach((z, k) => expect(z).toBeCloseTo((k + 1) * h, 9));
+    // Degrau 1 do 2º lance (componente 2): base + (N1 + W − 1)·h, o leque começa em (N1 − 1)·h.
+    expect(treads(rs).find((t) => t.componentIndex === 2 && t.index === 1)!.z).toBeCloseTo((8 + 3 - 1) * h, 9);
+    expect(rs.risers.find((r) => r.componentIndex === 1 && r.index === 1)).toBeUndefined();
+    expect(rs.risers.find((r) => r.componentIndex === 0 && r.index === 8)!.z1).toBeCloseTo(8 * h, 9);
+  });
+
+  it('winder em sentido horário: mesma contagem e cotas', () => {
+    // Topo em 1,75 m: H = 1,75 m, N = 5 + 3 + 4 − 2 = 10, h = 0,175 m.
+    const comps = generateWinderL({ start: v(0, 0), dir: v(1, 0), width: 1.2, risersFirst: 5, risersSecond: 4, tread: 0.28, turn: 'right' });
+    const rs = only(projectWith(asComponents(comps), { topOffset: -1.25 }));
+    expect(rs.riserCount).toBe(10);
+    expect(rs.riserHeight).toBeCloseTo(0.175, 12);
+    treads(rs).forEach((t, k) => expect(t.z).toBeCloseTo((k + 1) * 0.175, 9));
+    expect(numbersOf(rs)).toEqual(Array.from({ length: 10 }, (_, k) => k + 1));
   });
 });
 

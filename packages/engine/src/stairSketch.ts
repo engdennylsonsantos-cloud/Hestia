@@ -4,7 +4,6 @@ import {
   asMulti,
   dist,
   len,
-  mid,
   mul,
   perp,
   ringArea,

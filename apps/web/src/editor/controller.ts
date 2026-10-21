@@ -12,7 +12,7 @@ import {
   type Project,
   type TemplateId,
 } from '@hestia/model';
-import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
@@ -200,11 +200,13 @@ export class Editor {
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;
     if (mod && (k === 'z' || k === 'Z')) {
+      if (this.stairPickHistory(e.shiftKey)) return true;
       if (e.shiftKey) this.redo();
       else this.undo();
       return true;
     }
     if (mod && (k === 'y' || k === 'Y')) {
+      if (this.stairPickHistory(true)) return true;
       this.redo();
       return true;
     }
@@ -339,6 +341,15 @@ export class Editor {
   selectAllOfType(typeId: Id): number { return transfer.ofType(this.project, useUi.getState().levelId, typeId); }
   /** "Mesmo tipo" (botão na aba Modificar). */
   selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
+
+  /** Ctrl+Z / Ctrl+Y no croqui da escada: desfaz ou refaz a última linha pegada. Sem pegada, vale o histórico do modelo. */
+  private stairPickHistory(redo: boolean): boolean {
+    const t = this.tool;
+    if (!isStairTool(t)) return false;
+    const done = redo ? t.redoPick() : t.undoPick();
+    if (done) this.bump();
+    return done;
+  }
 
   undo(): void {
     this.store.undo();

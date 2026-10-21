@@ -25,14 +25,13 @@ export interface ResolvedStairStep {
 }
 
 /**
- * Espelho de um lance. `number` é o nº global do espelho na escada (1..N, contando cada linha uma vez); `index` é a
- * posição dele no croqui do lance dono (`componentIndex`). O espelho de emenda entre dois lances sem patamar pertence
- * ao lance anterior: o lance seguinte começa no 2º espelho do seu croqui. z0/z1 são cotas absolutas da base e do topo.
+ * Espelho de um lance. `index` é a posição dele no croqui do lance dono (`componentIndex`). O nº global do espelho na
+ * escada (1..N, cada linha de emenda contada uma vez) vale z0 = base + (nº − 1)·h. O espelho de emenda entre dois lances
+ * sem patamar pertence ao lance anterior: o lance seguinte começa no 2º espelho do seu croqui. z0/z1 são cotas absolutas.
  */
 export interface ResolvedStairRiser {
   componentIndex: number;
   index: number;
-  number: number;
   a: Vec2;
   b: Vec2;
   points: Vec2[];
@@ -123,7 +122,7 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
       for (const t of res.treads) steps.push({ componentIndex: ci, kind: 'tread', index: t.index, polygon: t.polygon, z: t.z });
       for (const r of res.risers) {
         if (shared[ci] && r.index === 1) continue;
-        risers.push({ componentIndex: ci, index: r.index, number: g0 + r.index, a: r.a, b: r.b, points: r.points, z0: r.z0, z1: r.z1 });
+        risers.push({ componentIndex: ci, index: r.index, a: r.a, b: r.b, points: r.points, z0: r.z0, z1: r.z1 });
       }
     } else {
       // Escada sem altura não gera patamar (ele alimentaria o footprint e o furo derivado).

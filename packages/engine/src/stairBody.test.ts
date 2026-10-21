@@ -5,6 +5,7 @@ import {
   generateFanRun,
   generateLShape,
   generateUShape,
+  generateWinderL,
   pieceBottomZ,
   pieceVolume,
   resolveStairs,
@@ -280,6 +281,52 @@ describe('piso e espelho: peças como antes', () => {
       expect(p.bottom.b).toBe(0);
       expect(p.bottom.c).toBeCloseTo(p.zTop - (p.kind === 'tread' ? 0.03 : 0.15), 9);
     }
+  });
+});
+
+describe('winder sem patamar (espelho de emenda conta uma vez): volume e estanqueidade na junção', () => {
+  // Lance 1: 8 espelhos (7 degraus); leque de 3 espelhos (2 degraus); lance 2: 7 espelhos (6 degraus).
+  // N = 8 + 3 + 7 − 2 = 16 linhas distintas; H = 2,80 m ⇒ h = 0,175 m. Degraus retos com profundidade p = 0,28 m.
+  const SD = 0.15;
+  const T = tFor(SD);
+  const comps = generateWinderL({ start: v(0, 0), dir: v(1, 0), width: W, risersFirst: 8, risersSecond: 7, tread: P, turn: 'left' });
+  const WIN = resolveStair(fromSketch(comps), MONO, { structuralDepth: SD, undersideStyle: 'smooth' });
+  const { pieces } = stairBody(WIN);
+
+  /** Ponto médio do espelho de nº global `n` (1..N). */
+  const midOfNumber = (n: number): Vec2 => {
+    const r = WIN.risers.find((x) => Math.round((x.z0 - WIN.baseZ) / WIN.riserHeight) + 1 === n)!;
+    return mid(r.a, r.b);
+  };
+
+  it('N = 16 linhas distintas (a emenda não conta duas vezes) e altura real = H ÷ N = 0,175 m', () => {
+    expect(WIN.riserCount).toBe(16);
+    expect(WIN.riserHeight).toBeCloseTo(2.8 / 16, 12);
+    expect(WIN.risers.map((r) => Math.round((r.z0 - WIN.baseZ) / WIN.riserHeight) + 1)).toEqual(Array.from({ length: 16 }, (_, k) => k + 1));
+    expect(WIN.issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('volume dos degraus retos de cada lance = integral de referência (lance 1 cortado pelo piso base; lance 2 com a cota 9h)', () => {
+    const tops1 = Array.from({ length: 7 }, (_, k) => (k + 1) * H);
+    const tops2 = Array.from({ length: 6 }, (_, k) => (9 + k + 1) * H);
+    const volume = (ci: number): number => pieces.filter((p) => p.kind === 'tread' && p.componentIndex === ci).reduce((s, p) => s + pieceVolume(p), 0);
+    expect(volume(0)).toBeCloseTo(runVolume(tops1, T, false), 6);
+    expect(volume(2)).toBeCloseTo(runVolume(tops2, T, false), 6);
+    // O leque tem volume positivo (aproximação com fundo plano).
+    expect(volume(1)).toBeGreaterThan(0);
+  });
+
+  it('estanqueidade do corte longitudinal em todos os espelhos, inclusive as duas emendas (2º ao 16º, e a chegada)', () => {
+    for (let j = 2; j <= 16; j++) expectSealed(pieces, midOfNumber(j), norm(sub(midOfNumber(j), midOfNumber(j - 1))));
+  });
+
+  it('sem sobreposição em planta entre peças, e nenhum fundo abaixo de baseZ', () => {
+    let sum = 0;
+    for (const p of pieces) {
+      sum += multiArea([[p.polygon]]);
+      for (const q of p.polygon) expect(pieceBottomZ(p, q.x, q.y)).toBeGreaterThanOrEqual(-1e-6);
+    }
+    expect(multiArea(union(...pieces.map((p) => asMulti(p.polygon))))).toBeCloseTo(sum, 6);
   });
 });
 

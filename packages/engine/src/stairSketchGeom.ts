@@ -10,7 +10,6 @@ import {
   len,
   mid,
   mul,
-  norm,
   sub,
   type Vec2,
 } from '@hestia/geom';

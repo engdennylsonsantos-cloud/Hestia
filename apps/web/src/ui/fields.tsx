@@ -17,10 +17,14 @@ interface NumProps {
   mixed?: boolean;
   width?: number;
   readOnly?: boolean;
+  /** Texto mostrado quando o campo está vazio (ex.: o valor herdado do tipo). */
+  placeholder?: string;
+  /** Campo vazio confirmado: o valor volta a "nenhum" (null). Sem ele, campo vazio não grava nada. */
+  onClear?: () => void;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear }: NumProps): ReactElement {
   const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -29,6 +33,10 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, focus, mixed, scale, decimals]);
   const commit = (): void => {
+    if (onClear && text.trim() === '') {
+      if (text !== show(value)) onClear();
+      return;
+    }
     const n = parseNumber(text);
     if (n === null) {
       setText(show(value));
@@ -47,7 +55,7 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
         className={`input num${readOnly ? ' ro' : ''}${mixed ? ' mixed' : ''}`}
         style={width ? { width } : undefined}
         value={text}
-        placeholder={mixed ? 'variados' : ''}
+        placeholder={mixed ? 'variados' : placeholder ?? ''}
         disabled={disabled}
         readOnly={readOnly}
         inputMode="decimal"

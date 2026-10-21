@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -7,17 +7,22 @@ import { mix } from './color.ts';
 import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
-import { openingSymbol } from './symbols.ts';
 import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
+import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
+import { openingViewOps, planViewOf, wallOutlineOps, type PlanView } from './view.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
 
 export interface PlanInput {
   project: Project;
   levelId: Id;
+  /**
+   * Geometria do nível pelo padrão (sem intervalo de vista). A planta normal não a usa: refaz a geometria do nível com o
+   * intervalo de vista (`planViewOf`). Só a planta de cobertura (`roofPlanMode`) a usa, como antes.
+   */
   resolved: ResolvedLevel;
   below: ResolvedLevel | null;
   /** Pisos do nível abaixo (referência apagada, D4); sem ele, só as paredes do subpavimento aparecem. */
@@ -29,9 +34,14 @@ export interface PlanInput {
   /**
    * Planta de cobertura (D6): telhados do nível opacos (alpha 1) e os de `belowRoofs` também, só o preenchimento;
    * paredes só como contorno fino por cima; sem pisos, lajes ou aberturas; cota da cumeeira sempre visível. O app
-   * liga o modo (ex.: uma vista "Cobertura"); sem ele a planta é a de sempre.
+   * liga o modo (ex.: uma vista "Cobertura"); sem ele a planta é a de sempre. Não usa o intervalo de vista.
    */
   roofPlanMode?: boolean;
+  /**
+   * Projeção da cobertura (decisão 0013 §2): contorno tracejado dos telhados que estão fora do intervalo de vista. Padrão
+   * ligado; independe do topo. Não afeta a planta de cobertura.
+   */
+  showRoofProjection?: boolean;
   viewport: Viewport;
   theme: PlanTheme;
   dark: boolean;
@@ -57,16 +67,22 @@ function thicknessPx(poly: Ring[], zoom: number): number {
   return per > 0 ? ((2 * Math.abs(ringArea(outer))) / per) * zoom : 0;
 }
 
-function wallUnion(resolved: ResolvedLevel, id: Id): MultiPolygon {
-  const rw = resolved.walls[id];
-  return rw ? union(...rw.layers.map((l) => l.cut)) : [];
+/**
+ * Forma da parede na planta: as camadas cortadas (`cut`) ou, para parede só de contorno, os fragmentos inteiros
+ * (`fragment`, sem as aberturas).
+ */
+function wallUnion(geo: ResolvedLevel, id: Id, outline = false): MultiPolygon {
+  const rw = geo.walls[id];
+  if (!rw) return [];
+  return outline ? union(...rw.layers.map((l) => l.fragment)) : union(...rw.layers.map((l) => l.cut));
 }
 
-function elementHighlight(p: Project, resolved: ResolvedLevel, ids: Id[], color: string, alpha: number): FillOp[] {
+function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: string, alpha: number, view: PlanView | null): FillOp[] {
   const out: FillOp[] = [];
   for (const id of ids) {
+    if (view?.hidden.has(id)) continue;
     const e = p.elements[id];
-    if (isWall(e)) out.push({ polygons: wallUnion(resolved, id), color, alpha });
+    if (isWall(e)) out.push({ polygons: wallUnion(geo, id, view?.outlineWalls.has(id) === true), color, alpha });
     else if (isOpening(e)) {
       const f = frameOfWall(p, e.hostId);
       if (!f) continue;
@@ -78,7 +94,7 @@ function elementHighlight(p: Project, resolved: ResolvedLevel, ids: Id[], color:
 }
 
 export function buildPlanDrawList(input: PlanInput): PlanDrawList {
-  const { project: p, resolved, viewport: v, theme } = input;
+  const { project: p, viewport: v, theme } = input;
   const fills: FillOp[] = [];
   const strokes: StrokeOp[] = [];
   const labels: LabelOp[] = [];
@@ -93,6 +109,11 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   const fine = detail === 'fine';
   // Planta de cobertura (D6): sem traços por baixo nem paredes preenchidas; os telhados cobrem o que está embaixo.
   const rp = input.roofPlanMode === true;
+  // Intervalo de vista do nível (decisão 0013): o que está fora dele não sai, e o corte da geometria é o da vista.
+  // A planta de cobertura segue a geometria padrão, como antes.
+  const view: PlanView | null = rp ? null : planViewOf(p, input.levelId);
+  const geo: ResolvedLevel = view ? view.geo : input.resolved;
+  const hidden = view?.hidden;
 
   // Pavimento abaixo como subpiso apagado (underlay); na planta de cobertura, só o preenchimento.
   if (input.below) {
@@ -112,6 +133,13 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     fills.push(...bs.fills);
     if (!rp) strokes.push(...bs.strokes);
   }
+  // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
+  const stairs = resolveStairsOnLevel(p, input.levelId).filter((s) => !hidden?.has(s.id));
+  if (input.below) {
+    const bst = belowStairOps(resolveStairsOnLevel(p, input.below.levelId), theme);
+    fills.push(...bst.fills);
+    if (!rp) strokes.push(...bst.strokes);
+  }
   if (input.below && input.belowRoofs) {
     if (rp) {
       // Telhados de baixo opacos: só o preenchimento; as linhas e cotas do nível de baixo não aparecem por cima.
@@ -127,19 +155,26 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Lajes antes dos pisos (a laje fica por baixo do piso); pisos antes das paredes (decisão 0006).
-  const sl = slabFills(p, input.levelId, theme, input.dark, detail, v);
+  const sl = slabFills(p, input.levelId, theme, input.dark, detail, v, hidden);
   fills.push(...sl.fills);
   if (!rp) {
     strokes.push(...sl.strokes);
     labels.push(...sl.labels);
   }
-  const fl = floorFills(p, input.levelId, theme, input.dark, detail, v);
+  const fl = floorFills(p, input.levelId, theme, input.dark, detail, v, hidden);
   fills.push(...fl.fills);
   if (!rp) {
     strokes.push(...fl.strokes);
     labels.push(...fl.labels);
   }
-  for (const c of rp ? [] : resolved.clusters) {
+  // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
+  const sts = stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined);
+  fills.push(...sts.fills);
+  if (!rp) {
+    strokes.push(...sts.strokes);
+    labels.push(...sts.labels);
+  }
+  for (const c of rp ? [] : geo.clusters) {
     if (detail === 'coarse') {
       fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
     }
@@ -160,16 +195,20 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
     for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
   }
+  // Paredes fora do corte (decisão 0013 §4): contorno; projeção acima tracejada, abaixo e "além" em linha clara.
+  if (view) strokes.push(...wallOutlineOps(view, theme));
 
-  // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino).
+  // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino, paredes cortadas).
   if (fine && !rp) {
-    for (const rw of Object.values(resolved.walls)) {
+    for (const [id, rw] of Object.entries(geo.walls)) {
+      if (view?.cls.get(id) !== 'cut') continue;
       for (const m of rw.membranes) strokes.push({ pts: m.pts, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }
 
   // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
   for (const w of rp ? [] : wallsOnLevel(p, input.levelId)) {
+    if (hidden?.has(w.id)) continue;
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
       if (!off) continue;
       const r = 5 / v.zoom;
@@ -179,23 +218,23 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
-  // Símbolos das aberturas (fora do grosseiro).
+  // Símbolos das aberturas (fora do grosseiro): cortadas, tracejadas acima do corte, leves abaixo; as ocultas saem.
   if (detail !== 'coarse' && !rp) {
     for (const w of wallsOnLevel(p, input.levelId)) {
       const f = frameOfWall(p, w.id);
       if (!f) continue;
-      for (const o of openingsOfWall(p, w.id)) strokes.push(...openingSymbol(openingGeometry(p, o, f), theme));
+      for (const o of openingsOfWall(p, w.id)) strokes.push(...openingViewOps(openingGeometry(p, o, f), view?.cls.get(o.id), theme));
     }
   }
 
   // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
-  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, { planMode: rp });
+  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, { planMode: rp, hidden, showProjection: input.showRoofProjection !== false });
   fills.push(...rf.fills);
   strokes.push(...rf.strokes);
   labels.push(...rf.labels);
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
   if (rp) {
-    for (const c of resolved.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8 });
+    for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8 });
   }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
@@ -205,31 +244,35 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   labels.push(...marks.labels);
 
   // Etiquetas de tipo (G4) e depuração de junção (G6), por configuração do projeto.
-  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom));
+  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  const fsel = floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  const fsel = floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
   fills.push(...fsel.fills);
   strokes.push(...fsel.strokes);
   labels.push(...fsel.labels);
-  const lsel = slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  const lsel = slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
   fills.push(...lsel.fills);
   strokes.push(...lsel.strokes);
   labels.push(...lsel.labels);
-  const rsel = roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v);
+  const rsel = roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
   fills.push(...rsel.fills);
   strokes.push(...rsel.strokes);
   labels.push(...rsel.labels);
+  const ssel = stairSelectionOps(p, stairs, input.selection, input.hover, theme, v);
+  fills.push(...ssel.fills);
+  strokes.push(...ssel.strokes);
+  labels.push(...ssel.labels);
   if (input.hover && !input.selection.includes(input.hover)) {
-    fills.push(...elementHighlight(p, resolved, [input.hover], theme.select, 0.16));
+    fills.push(...elementHighlight(p, geo, [input.hover], theme.select, 0.16, view));
   }
   if (input.selection.length) {
-    fills.push(...elementHighlight(p, resolved, input.selection, theme.select, 0.26));
+    fills.push(...elementHighlight(p, geo, input.selection, theme.select, 0.26, view));
     for (const id of input.selection) {
       const e = p.elements[id];
-      if (!isWall(e)) continue;
-      for (const ring of ringsOf(wallUnion(resolved, id))) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+      if (!isWall(e) || hidden?.has(id)) continue;
+      for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
       if (input.selection.length === 1) {
         // Cota temporária: comprimento do eixo, como no Revit ao selecionar.
         const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
@@ -250,7 +293,7 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Pré-visualização, guias e marcador de captura.
-  const ov = previewOverlay(input.preview, v, theme, (ids) => elementHighlight(p, resolved, ids, theme.accent, 0.2));
+  const ov = previewOverlay(input.preview, v, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view));
   fills.push(...ov.fills);
   strokes.push(...ov.strokes);
   labels.push(...ov.labels);

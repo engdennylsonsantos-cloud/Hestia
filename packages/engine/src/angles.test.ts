@@ -9,7 +9,7 @@ import { resolveLevel } from './index.ts';
  * (a silhueta cabe na caixa das paredes com folga de uma espessura) e sem dupla contagem entre camadas.
  */
 const ANGLES = [5, 10, 20, 35, 60, 90, 120, 150, 170, 175];
-const KINDS: JoinKind[] = ['butt', 'miter', 'square'];
+const KINDS: JoinKind[] = ['butt', 'miter'];
 const TYPES: Array<[string, string]> = [['wt_alv14', 'wt_alv14'], ['wt_alv14', 'wt_alv9'], ['wt_ext19', 'wt_dry']];
 
 describe.each(TYPES)('C10 · ângulos, tipos %s + %s', (t1, t2) => {

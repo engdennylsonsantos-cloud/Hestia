@@ -95,4 +95,19 @@ describe('validação de telhados', () => {
     const otherLevel = build([roof('r1'), roof('r2', { boundary: rect(6, 0, 14, 6), levelId: 'lv_1' })]);
     expect(issuesOf(otherLevel)).toEqual([]);
   });
+
+  it('cumeeira de duas águas sem aresta paralela a dir (± 5°) é aviso: a cumeeira acompanha as arestas', () => {
+    const a = (40 * Math.PI) / 180;
+    const got = issuesOf(build([roof('r1', { dir: { x: Math.cos(a), y: Math.sin(a) } })]));
+    expect(got).toEqual([expect.objectContaining({ severity: 'warning', code: 'roof-ridge-off-edges', elementId: 'r1' })]);
+    expect(got[0]!.message).toContain('a cumeeira acompanha as arestas do contorno: nenhuma aresta é paralela à direção informada');
+  });
+
+  it('cumeeira com aresta paralela a dir (até 5° de folga), direção padrão e formas que não usam cumeeira não avisam', () => {
+    const a = (3 * Math.PI) / 180;
+    expect(issuesOf(build([roof('r1', { dir: { x: Math.cos(a), y: Math.sin(a) } })]))).toEqual([]);
+    expect(issuesOf(build([roof('r1', { dir: { x: 0, y: 1 } })]))).toEqual([]);
+    expect(codes(raw(roof('r1', { shape: 'hip', dir: { x: Math.cos(0.7), y: Math.sin(0.7) } })))).toEqual([]);
+    expect(codes(raw(roof('r1', { shape: 'shed', dir: { x: Math.cos(0.7), y: Math.sin(0.7) } })))).toEqual([]);
+  });
 });

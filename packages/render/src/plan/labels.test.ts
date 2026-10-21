@@ -59,11 +59,9 @@ describe('depuração de junção (G6)', () => {
     expect(labels[0]!.at).toEqual({ x: 4, y: 0 });
     expect(labels[0]!.text).toBe('B·1');
   });
-  it('L com esquadria e esquadro na parede mais antiga', () => {
+  it('L com esquadria na parede mais antiga', () => {
     const miter = joinDebugLabels(withWalls([wall('a', [0, 0], [4, 0], 1, { joinEnd: { kind: 'miter', flip: false } }), wall('b', [4, 0], [4, 3], 2)]), 'lv_0');
     expect(miter.map((l) => l.text)).toEqual(['E·1']);
-    const square = joinDebugLabels(withWalls([wall('a', [0, 0], [4, 0], 1, { joinEnd: { kind: 'square', flip: false } }), wall('b', [4, 0], [4, 3], 2)]), 'lv_0');
-    expect(square.map((l) => l.text)).toEqual(['Q·1']);
   });
   it('inverter a ordem (flip) troca a parede dominante', () => {
     const labels = joinDebugLabels(withWalls([wall('a', [0, 0], [4, 0], 1, { joinEnd: { kind: 'butt', flip: true } }), wall('b', [4, 0], [4, 3], 2)]), 'lv_0');

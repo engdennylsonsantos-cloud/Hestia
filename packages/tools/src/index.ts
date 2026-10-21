@@ -6,7 +6,6 @@ export * from './edit.ts';
 export * from './registry.ts';
 export { ToolBase } from './base.ts';
 export * from './wallGeom.ts';
-export * from './cornerFix.ts';
 export * from './clipboard.ts';
 export * from './lengthEdit.ts';
 export * from './selectionFilters.ts';
@@ -23,3 +22,27 @@ export { RoofTool } from './roofTool.ts';
 export * from './roofEdges.ts';
 export * from './roofCheck.ts';
 export { RoofArrowTool } from './roofArrowTool.ts';
+export * from './attachRoofTool.ts';
+export * from './stairSketchState.ts';
+export * from './stairStroke.ts';
+export * from './stairPick.ts';
+export * from './stairCommands.ts';
+export { StairTool, isStairTool, type StairStatus } from './stairTool.ts';
+export * from './stairRunPlan.ts';
+export { StairRunTool } from './stairRunTool.ts';
+export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';
+export * from './stairRunTypes.ts';
+export {
+  discardSpiralOnEdit,
+  planSpiralRun,
+  regenSpiralComponents,
+  SPIRAL_DEFAULT_INNER,
+  SPIRAL_MIN_SWEEP,
+  spiralInfo,
+  spiralOfStair,
+  type SpiralInfo,
+  type SpiralPlan,
+  type SpiralPlanInput,
+  type StairComponent,
+} from './stairSpiralRun.ts';
+export { spiralGripAt, spiralHandles, spiralHandlePoints, spiralHold, type SpiralGrip, type SpiralHandle } from './stairSpiralGrips.ts';

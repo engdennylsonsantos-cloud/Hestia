@@ -43,11 +43,12 @@ export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme): 
  * preenchimentos seguintes). Com etiquetas ligadas, código e área. Com inclinação, seta de caimento e percentual
  * (fora do grosseiro).
  */
-export function slabFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport): FloorOps {
+export function slabFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
   for (const s of resolveSlabs(p, levelId)) {
+    if (hidden?.has(s.slabId)) continue;
     const layer = structuralLayer(p, s);
     const m = layer ? p.materials[layer.materialId] : undefined;
     const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6);
@@ -72,7 +73,9 @@ export function slabFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
 }
 
 /** Destaque de seleção e de hover das lajes (D1), no mesmo padrão dos pisos. */
-export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
-  const parts = resolveSlabs(p, levelId).map((s) => ({ id: s.slabId, polygon: s.polygon }));
+export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+  const parts = resolveSlabs(p, levelId)
+    .filter((s) => !hidden?.has(s.slabId))
+    .map((s) => ({ id: s.slabId, polygon: s.polygon }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
 }

@@ -155,6 +155,12 @@ export function labelOf(c: Command): string {
       return 'Editar tipo de telhado';
     case 'deleteRoofType':
       return 'Excluir tipo de telhado';
+    case 'addStair':
+      return 'Criar escada';
+    case 'upsertStairType':
+      return 'Editar tipo de escada';
+    case 'deleteStairType':
+      return 'Excluir tipo de escada';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':
@@ -181,6 +187,8 @@ export function labelOf(c: Command): string {
       return 'Editar nível';
     case 'deleteLevel':
       return 'Excluir nível';
+    case 'setLevelViewRange':
+      return 'Alterar intervalo de vista';
     case 'setProjectName':
       return 'Renomear projeto';
     case 'setDefaults':

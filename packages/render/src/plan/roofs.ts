@@ -155,6 +155,10 @@ export interface RoofOpsOptions {
    * A PlanInput liga por `roofPlanMode`.
    */
   planMode?: boolean;
+  /** Telhados fora do intervalo de vista (decisão 0013): não têm águas desenhadas. */
+  hidden?: ReadonlySet<Id>;
+  /** Contorno tracejado dos telhados `hidden` (projeção da cobertura, opção independente do topo). */
+  showProjection?: boolean;
 }
 
 /**
@@ -213,17 +217,29 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   return out;
 }
 
-/** Telhados do nível na planta (D1), antes das etiquetas e depois das paredes e aberturas. */
+/**
+ * Telhados do nível na planta (D1), antes das etiquetas e depois das paredes e aberturas. Os `hidden` (fora do intervalo
+ * de vista) saem; com `showProjection`, cada um deixa o contorno do beiral tracejado (projeção da cobertura).
+ */
 export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}): FloorOps {
-  return roofOps(resolveRoofs(p, levelId), p, theme, dark, detail, v, opts);
+  const all = resolveRoofs(p, levelId);
+  const hidden = opts.hidden;
+  const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts);
+  if (opts.showProjection === true) {
+    for (const r of all) {
+      if (!hidden?.has(r.roofId)) continue;
+      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+    }
+  }
+  return out;
 }
 
 /**
  * Destaque de seleção e de hover dos telhados (D1), no padrão das lajes; a área é a real. Telhado selecionado: contorno
  * sólido nas arestas com inclinação, tracejado nas empenas, e o símbolo "define inclinação" de cada aresta (A11).
  */
-export function roofSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
-  const roofs = resolveRoofs(p, levelId);
+export function roofSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+  const roofs = resolveRoofs(p, levelId).filter((r) => !hidden?.has(r.roofId));
   const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r) }));
   const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).

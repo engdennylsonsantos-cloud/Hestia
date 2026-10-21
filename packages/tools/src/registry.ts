@@ -15,12 +15,15 @@ import { ParallelTool } from './parallelTool.ts';
 import { RoofTool } from './roofTool.ts';
 import { RoofExtrusionTool } from './roofExtrusionTool.ts';
 import { RoofArrowTool } from './roofArrowTool.ts';
+import { AttachRoofTool, DetachRoofTool } from './attachRoofTool.ts';
+import { StairTool } from './stairTool.ts';
+import { StairRunTool } from './stairRunTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof'] },
-  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'stairrun'] },
+  { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Medir', tools: ['measure'] },
 ];
 
@@ -42,6 +45,14 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new RoofArrowTool(env);
     case 'roofextrusion':
       return new RoofExtrusionTool(env);
+    case 'attachroof':
+      return new AttachRoofTool(env);
+    case 'detachroof':
+      return new DetachRoofTool(env);
+    case 'stair':
+      return new StairTool(env);
+    case 'stairrun':
+      return new StairRunTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -102,6 +113,10 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   measure: 'Medir',
   section: 'Corte',
   rehost: 'Trocar anfitriã',
+  attachroof: 'Anexar topo',
+  detachroof: 'Desanexar topo',
+  stair: 'Escada',
+  stairrun: 'Escada (reta/L/U/caracol)',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
@@ -126,4 +141,6 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   measure: 'E',
   section: 'K',
   rehost: 'H',
+  stair: 'I',
+  stairrun: 'Q',
 };

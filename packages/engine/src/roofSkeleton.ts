@@ -1,4 +1,4 @@
-import { ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type Vec2 } from '@hestia/geom';
+import { ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
 import { perpOf, unitOf } from './roofGeom.ts';
 import type { ResolvedRoofPlane } from './roofs.ts';
 
@@ -16,6 +16,8 @@ export function setWeightedSkeleton(fn: WeightedSkeleton | null): void {
 export interface WaterSolution {
   planes: ResolvedRoofPlane[];
   problem?: string;
+  /** Vértices reentrantes com degrau na superfície (empena encostando em beiral), em planta e em m; ausente quando contínua. */
+  steps?: SkeletonStep[];
 }
 
 /** Peso de uma aresta: percentual / 100 quando ela define inclinação; null, zero ou inválido vira 0 (empena). */
@@ -79,5 +81,6 @@ export function skeletonPlanes(boundary: Vec2[], holes: Vec2[][], edgeSlopes: Ar
     up.y = zeroPos(up.y);
     planes.push({ polygon: [[f.polygon]], origin: a, up, percent: slope, z0: eaveZ });
   }
-  return planes.length ? { planes } : { planes, problem: 'o contorno não gerou águas' };
+  const steps = res.steps && res.steps.length > 0 ? { steps: res.steps } : {};
+  return planes.length ? { planes, ...steps } : { planes, problem: 'o contorno não gerou águas' };
 }

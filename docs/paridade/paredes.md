@@ -1,6 +1,6 @@
 # Paridade · Paredes (inclui aberturas hospedadas)
 
-Legenda: `[x]` feito e testado · `[ ]` pendente · `[-]` fora de escopo, com o motivo na própria linha.
+Legenda: `[x]` feito e testado · `[~]` parcial, com o que falta na própria linha · `[ ]` pendente · `[-]` fora de escopo, com o motivo na própria linha.
 Itens marcados **(bloqueante)** precisam estar feitos antes de abrir o próximo elemento.
 Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem fonte lá vira `[?]` no 05 antes de ser codificado.
 
@@ -33,18 +33,20 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 - [x] C3 Cruzamento em X sem duplicar área
 - [x] C4 Paredes alinhadas contínuas, inclusive com espessuras diferentes
 - [x] C5 "Não unir" no início e no fim
-- [x] C6 Escolha do tipo de junção no canto (encosto, esquadria, corte reto) **(bloqueante)**
+- [x] C6 Escolha do tipo de junção no canto (encosto e esquadria; o esquadro foi removido, 0010 #1) **(bloqueante)**
 - [x] C7 Trocar a ordem de junção (qual parede domina)
 - [x] C8 Botões de "Permitir junção" e "Limpar junção" na interface (propriedades da parede e ferramenta Junção)
-- [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)** — exato em área (setores), mas o nó ainda ignora a configuração de junção e aperta o núcleo da grossa: J-2 aberto, ver docs/08 §6.4
-- [x] C10 Ângulos agudos e obtusos extremos sem artefato
+- [x] C9 Nó de 3 ou mais paredes sem par colinear resolvido de forma exata **(bloqueante)** — `nodeOfWalls`: cortes retos no ponto do nó e pintor por prioridade, sem fresta quando nenhuma lacuna passa de 180°; a configuração de junção vale no canto externo (docs/08 §6.3; 0010 #3)
+- [x] C10 Ângulos agudos e obtusos extremos sem artefato — retas: L e T de 45° a 135° nos dois tipos, encosto e esquadria (`juntasInvariantes.test.ts`); ângulos de parede curva dentro do domínio de C13 (fora dele, CV-2)
 - [x] C11 Tolerância de junção configurável e por distância real **(bloqueante)**
 - [x] C12 Tipos de espessuras muito diferentes verificados em casos dourados
-- [x] C13 Junção com parede em arco **(bloqueante)**
+- [x] C13 Junção com parede em arco **(bloqueante)** — L, T e correntes tangentes dentro do domínio suportado: raio ≥ 3 m e quina de 60° a 120° (23 testes em `curvas.test.ts`; corte plano pelas faces, 0010 #7; docs/08 §6.5). Fora desse domínio (R < 3 m, quina de 30° ou 150°) a junção é de melhor esforço: pode sobrar ponta de poucos centímetros ou anel extra (CV-2, docs/08 §6.5)
 - [x] C14 Paredes sobrepostas detectadas, com aviso
 - [x] C15 Parede empilhada sobre outra (níveis diferentes)
 - [-] C16 Junção com pilar, viga e cortina de vidro: depende desses elementos, que têm checklists próprios
 - [-] C17 Divisão automática ao cruzar: o Revit também não divide sozinho
+- [x] C18 Quina em encosto pareia por face, em degraus, sem aviso nem lote de correção (docs/08 §5.7; decisão 0009 #11). O esquadro, que pareava do mesmo jeito, foi removido (0010 #1)
+- [x] C19 Junção oblíqua em L e T (30° a 150°) sem triângulo vazio; 90° igual ao caso reto anterior (`obliquas.test.ts`; 0010 #2)
 
 ## D · Aberturas hospedadas
 - [x] D1 Porta e janela hospedadas, recorte em todas as camadas

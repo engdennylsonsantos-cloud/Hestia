@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { TEMPLATES, buildTemplate, isWall, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
+import { TEMPLATES, buildTemplate, isWall, makeLevel, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -37,7 +37,7 @@ export function LevelsDialog(): ReactElement {
       </table>
       {err ? <p className="error" role="alert">{err}</p> : null}
       <p>
-        <button className="btn small" onClick={() => run(() => editor.store.exec({ type: 'upsertLevel', level: { id: newId('lv'), name: `Pavimento ${p.levels.length + 1}`, elevation: (p.levels[p.levels.length - 1]?.elevation ?? 0) + 3 } }))}>+ Novo nível</button>
+        <button className="btn small" onClick={() => run(() => editor.store.exec({ type: 'upsertLevel', level: makeLevel({ id: newId('lv'), name: `Pavimento ${p.levels.length + 1}`, elevation: (p.levels[p.levels.length - 1]?.elevation ?? 0) + 3 }) }))}>+ Novo nível</button>
       </p>
     </Dialog>
   );
@@ -156,10 +156,11 @@ const KEYS: Array<[string, string]> = [
   ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['U', 'Telhado'], ['D', 'Porta'], ['J', 'Janela'],
   ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
   ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'], ['K', 'Corte (duas marcas na planta)'],
+  ['I', 'Escada (croqui: limites, espelhos, caminhada, patamar)'], ['Q', 'Escada reta, em L, em U ou com leque'],
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],
-  ['Tab', 'Alterna opção (lado externo da parede, sentido da porta)'],
+  ['Tab', 'Alterna opção (lado externo da parede, sentido da porta, linha e arco no croqui da escada)'],
   ['Espaço', 'Inverte a dobradiça ao inserir porta; segurar e arrastar move a vista'],
   ['Shift', 'Trava em 0°/90° ao desenhar; soma à seleção'],
   ['Alt (ao arrastar uma ponta)', 'Inverte quem acompanha: solta o canto simples, leva todas as paredes de um nó'],

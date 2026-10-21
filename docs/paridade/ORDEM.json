@@ -20,12 +20,12 @@
     {
       "id": "telhados",
       "arquivo": "telhados.md",
-      "status": "em-andamento"
+      "status": "concluido"
     },
     {
       "id": "escadas",
       "arquivo": "escadas.md",
-      "status": "nao-iniciado"
+      "status": "em-andamento"
     },
     {
       "id": "ambientes",

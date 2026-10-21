@@ -2,13 +2,26 @@ import type { Id, Project, ProjectStore } from '@hestia/model';
 import { clipboardFrom, idsOfType, pasteAlignedCommand, selectedTypeId, type ClipBuffer } from '@hestia/tools';
 import { useUi } from './state.ts';
 
-/** "2 parede(s), 1 piso, 1 laje e 1 telhado": frase do status para o que foi copiado ou colado. */
-function describe(walls: number, floors: number, slabs: number, roofs: number): string {
+/** Contagens do buffer copiado (ausente em buffers antigos = nenhuma escada). */
+const counts = (c: ClipBuffer): Counts => ({ walls: c.walls.length, floors: c.floors.length, slabs: c.slabs.length, roofs: c.roofs.length, stairs: c.stairs?.length ?? 0 });
+
+/** Contagem por categoria do que foi copiado ou colado. */
+interface Counts {
+  walls: number;
+  floors: number;
+  slabs: number;
+  roofs: number;
+  stairs: number;
+}
+
+/** "2 parede(s), 1 piso, 1 laje e 1 escada": frase do status para o que foi copiado ou colado. */
+function describe(c: Counts): string {
   const parts: string[] = [];
-  if (walls) parts.push(`${walls} parede(s)`);
-  if (floors) parts.push(`${floors} piso(s)`);
-  if (slabs) parts.push(`${slabs} laje(s)`);
-  if (roofs) parts.push(`${roofs} telhado(s)`);
+  if (c.walls) parts.push(`${c.walls} parede(s)`);
+  if (c.floors) parts.push(`${c.floors} piso(s)`);
+  if (c.slabs) parts.push(`${c.slabs} laje(s)`);
+  if (c.roofs) parts.push(`${c.roofs} telhado(s)`);
+  if (c.stairs) parts.push(`${c.stairs} escada(s)`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : (parts[0] ?? '');
 }
 
@@ -23,11 +36,11 @@ export class Transfer {
   copy(p: Project, ids: Id[]): boolean {
     const next = clipboardFrom(p, ids);
     if (!next) {
-      useUi.setState({ status: 'Selecione paredes, pisos, lajes ou telhados para copiar.' });
+      useUi.setState({ status: 'Selecione paredes, pisos, lajes, telhados ou escadas para copiar.' });
       return false;
     }
     this.clip = next;
-    useUi.setState({ status: `${describe(next.walls.length, next.floors.length, next.slabs.length, next.roofs.length)} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
+    useUi.setState({ status: `${describe(counts(next))} copiado(s). Ctrl+V cola alinhado no nível ativo.` });
     return true;
   }
 
@@ -43,11 +56,12 @@ export class Transfer {
       return false;
     }
     store.exec(r.command, 'Colar alinhado');
-    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds, ...r.slabIds, ...r.roofIds], status: `${describe(r.wallIds.length, r.floorIds.length, r.slabIds.length, r.roofIds.length)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
+    const pasted: Counts = { walls: r.wallIds.length, floors: r.floorIds.length, slabs: r.slabIds.length, roofs: r.roofIds.length, stairs: r.stairIds.length };
+    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds, ...r.slabIds, ...r.roofIds, ...r.stairIds], status: `${describe(pasted)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
     return true;
   }
 
-  /** Seleciona paredes e aberturas do nível com o tipo dado. Devolve quantas foram selecionadas. */
+  /** Seleciona os elementos (paredes, aberturas, pisos, lajes, telhados e escadas) do nível com o tipo dado. Devolve quantos. */
   ofType(p: Project, levelId: Id, typeId: Id): number {
     const ids = idsOfType(p, levelId, typeId);
     useUi.setState({ selection: ids, status: ids.length ? `${ids.length} elemento(s) do mesmo tipo selecionado(s).` : 'Nenhum elemento deste tipo neste nível.' });

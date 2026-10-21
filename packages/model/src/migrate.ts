@@ -2,7 +2,9 @@ import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
+import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
+import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -125,6 +127,65 @@ const migrations: Record<number, Migration> = {
       };
     }
     return { ...raw, elements };
+  },
+  // v10 → v11: o tipo 'square' (Esquadro) saiu; tinha a mesma geometria do encosto. Vira 'butt', com a mesma ordem (flip).
+  10: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind !== 'wall') continue;
+      const w = { ...e };
+      for (const end of ['joinStart', 'joinEnd'] as const) {
+        const cfg = w[end] as { kind?: unknown } | undefined;
+        if (cfg?.kind === 'square') w[end] = { ...cfg, kind: 'butt' };
+      }
+      elements[id] = w;
+    }
+    return { ...raw, elements };
+  },
+  // v11 → v12: escadas (tipos padrão; projetos antigos não têm escadas nem tipos de escada).
+  11: (raw) => ({ ...raw, stairTypes: { ...Object.fromEntries(DEFAULT_STAIR_TYPES.map((t) => [t.id, t])), ...((raw.stairTypes as object) ?? {}) } }),
+  // v12 → v13: face inferior dos tipos de escada. Tipos existentes ganham 'smooth' (a face lisa é a que já era desenhada).
+  12: (raw) => {
+    const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { undersideStyle: 'smooth', ...t };
+    return { ...raw, stairTypes };
+  },
+  // v13 → v14: "Abrir laje" (booleano) vira o modo da abertura: ligada = pé-direito livre (furo de antes, com o mínimo do
+  // tipo), desligada = sem furo. Os campos novos entram com o padrão (decisão 0011 §6).
+  13: (raw) => {
+    const elements = { ...((raw.elements as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, e] of Object.entries(elements)) {
+      if (e.kind !== 'stair') continue;
+      const { openSlab, ...rest } = e;
+      elements[id] = {
+        openingMode: openSlab === false ? 'none' : 'headroom',
+        openingHeadroom: null,
+        openingMargin: DEFAULT_STAIR_OPENING_MARGIN,
+        openingRect: false,
+        ...rest,
+      };
+    }
+    return { ...raw, elements };
+  },
+  // v14 → v15: intervalo de vista por nível (decisão 0013). Níveis antigos ganham o padrão (topo 2,30 m, corte 1,20 m, base 0).
+  14: (raw) => ({
+    ...raw,
+    levels: Array.isArray(raw.levels)
+      ? (raw.levels as Array<Record<string, unknown>>).map((l) => ({ ...l, viewRange: l.viewRange ?? { ...DEFAULT_VIEW_RANGE } }))
+      : raw.levels,
+  }),
+  // v15 → v16: escada caracol (decisão 0014 §8). Tipos existentes ganham a sobreposição e o material do poste padrão; os
+  // dois tipos caracol entram e o material aço entra se faltar. Nada do arquivo com o mesmo id é sobrescrito.
+  15: (raw) => {
+    const own = (raw.stairTypes as Record<string, Record<string, unknown>>) ?? {};
+    const stairTypes = {
+      ...Object.fromEntries(DEFAULT_STAIR_TYPES.filter((t) => ['stt_caracol_monolitica', 'stt_caracol_poste'].includes(t.id)).map((t) => [t.id, t])),
+      ...Object.fromEntries(
+        Object.entries(own).map(([id, t]) => [id, { treadOverlap: DEFAULT_STAIR_TREAD_OVERLAP, postMaterialId: DEFAULT_STAIR_POST_MATERIAL_ID, ...t }]),
+      ),
+    };
+    const materials = { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => m.id === 'mat_aco').map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) };
+    return { ...raw, stairTypes, materials };
   },
 };
 

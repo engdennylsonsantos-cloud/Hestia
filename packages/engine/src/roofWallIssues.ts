@@ -15,7 +15,8 @@ const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 /**
  * Avisos entre paredes e telhados (docs/paridade/telhados C2). `wall-roof-uncovered`: parede anexada ao telhado cujo eixo
  * está fora do telhado em parte (ou todo). `wall-roof-pierce`: parede sem anexo que fica mais alta que a face inferior
- * do telhado num ponto do eixo coberto (atravessa o telhado). Parede curva não entra. O motor calcula; a interface junta.
+ * do telhado num ponto do eixo coberto (atravessa o telhado). Parede curva entra pela face inferior amostrada ao longo do
+ * arco (≤ 0,25 m); fica na altura normal, sem topo ajustado. O motor calcula; a interface junta.
  */
 export function roofWallIssues(p: Project): ValidationIssue[] {
   const roofs = resolveAllRoofs(p);

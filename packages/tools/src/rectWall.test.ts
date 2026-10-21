@@ -110,7 +110,7 @@ describe('parede por retângulo (A5)', () => {
   });
 });
 
-describe('quinas em esquadria ao desenhar (decisão 0009)', () => {
+describe('quinas ao desenhar ficam em encosto, sem troca automática (decisão 0009 #13)', () => {
   /** Tipo sem acabamento, para o caso em que a regra não deve valer. */
   function bareRect() {
     const ctx = rectOpts();
@@ -121,14 +121,16 @@ describe('quinas em esquadria ao desenhar (decisão 0009)', () => {
   }
   const kinds = (ws: Wall[]) => ws.map((w) => [w.joinStart.kind, w.joinEnd.kind]);
 
-  it('retângulo com acabamento: os quatro cantos saem em esquadria', () => {
+  // Antes o desenho trocava as quinas com acabamento por esquadria (decisão 0009 #8). Agora o encosto pareia por face
+  // (docs/08 §5.7), então a quina nasce como foi escolhida: encosto, sem reescrever a junção.
+  it('retângulo com acabamento: os quatro cantos ficam em encosto', () => {
     const { store, env } = rectOpts();
     const t = tool('wall', env);
     clickAt(t, 0, 0);
     clickAt(t, 4, 3);
     const ws = walls(store);
     expect(ws).toHaveLength(4);
-    for (const w of ws) expect([w.joinStart.kind, w.joinEnd.kind]).toEqual(['miter', 'miter']);
+    for (const w of ws) expect([w.joinStart.kind, w.joinEnd.kind]).toEqual(['butt', 'butt']);
   });
 
   it('retângulo com acabamento: um só passo de desfazer remove paredes e junções', () => {

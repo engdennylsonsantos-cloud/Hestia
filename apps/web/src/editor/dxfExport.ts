@@ -1,38 +1,168 @@
-import { levelFrames, openingGeometry, resolveRoofs, type ResolvedLevel } from '@hestia/engine';
-import { exportDxf, type DxfLevelGeometry } from '@hestia/io';
-import { floorsOnLevel, openingsOfWall, slabsOnLevel, type Id, type Project } from '@hestia/model';
+import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
+import { levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type ViewClass } from '@hestia/engine';
+import { climbWalk, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { exportDxf, type DxfLevelGeometry, type DxfOpening, type DxfPoint, type DxfViewState } from '@hestia/io';
+import { openingsOfWall, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
+type StairDxf = NonNullable<DxfLevelGeometry['stairs']>[number];
+
+/** Tolerância (m) nas comparações de cota, como na tela (a borda exata conta como dentro). */
+const EPS = 1e-9;
+
 /**
- * Geometria do nível para o DXF: regiões e contornos já resolvidos pelo engine (`editor.resolved`), o retângulo de
- * cada vão, o contorno de cada piso e de cada laje (com furos, na camada do código do tipo). O io não importa o engine, então a
- * montagem fica aqui, no web.
+ * Zoom usado no símbolo de corte da escada: `stairCut` dá 8 px de avanço em cada lado; com zoom 80 são 0,10 m, em metros.
+ * Os dentes do zigue-zague seguem `cutSymbol` da planta (4 px de amplitude, zoom 80: 0,05 m).
  */
-export function dxfGeometryOf(p: Project, levelId: Id, resolved: ResolvedLevel): DxfLevelGeometry {
-  const openings = levelFrames(p, levelId).flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
+const STAIR_CUT_ZOOM = 80;
+
+/**
+ * Seta de subida ao longo da caminhada `pts` (do primeiro ao último espelho, como a tela): um LINE por trecho da haste e,
+ * no fim, as duas pontas a 30° da última direção, de 0,20 m ou um quarto do comprimento total (o menor). Pontos repetidos
+ * e vértices no meio de um trecho reto saem (os pontos médios de um lance reto são colineares: a seta fica um só trecho,
+ * como antes). Vazia sem comprimento.
+ */
+export function arrowOfPath(pts: DxfPoint[]): Array<[DxfPoint, DxfPoint]> {
+  const distinct = pts.filter((q, i) => i === 0 || Math.hypot(q.x - pts[i - 1]!.x, q.y - pts[i - 1]!.y) > 1e-9);
+  const path = distinct.filter((q, i) => {
+    if (i === 0 || i === distinct.length - 1) return true;
+    const a = distinct[i - 1]!;
+    const c = distinct[i + 1]!;
+    const ux = q.x - a.x;
+    const uy = q.y - a.y;
+    const vx = c.x - q.x;
+    const vy = c.y - q.y;
+    const straight = Math.abs(ux * vy - uy * vx) < 1e-9 && ux * vx + uy * vy > 0;
+    return !straight;
+  });
+  if (path.length < 2) return [];
+  const shaft: Array<[DxfPoint, DxfPoint]> = [];
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]!;
+    const b = path[i]!;
+    shaft.push([a, b]);
+    total += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  const tip = path[path.length - 1]!;
+  const before = path[path.length - 2]!;
+  const dx = tip.x - before.x;
+  const dy = tip.y - before.y;
+  const len = Math.hypot(dx, dy);
+  const bx = -dx / len;
+  const by = -dy / len;
+  const L = Math.min(0.2, total * 0.25);
+  const c = Math.cos(Math.PI / 6);
+  const s = Math.sin(Math.PI / 6);
+  // Gira a direção de volta de ±30° para as duas pontas.
+  const barb = (sg: 1 | -1): DxfPoint => ({ x: tip.x + (bx * c - sg * by * s) * L, y: tip.y + (sg * bx * s + by * c) * L });
+  return [...shaft, [tip, barb(1)], [tip, barb(-1)]];
+}
+
+/** Seta de subida de um só trecho de `a` a `b` (haste e duas pontas). Caso particular de `arrowOfPath`. */
+export function stairArrow(a: DxfPoint, b: DxfPoint): Array<[DxfPoint, DxfPoint]> {
+  return arrowOfPath([a, b]);
+}
+
+/** Símbolo de corte em zigue-zague de oito dentes, em metros (espelha `cutSymbol` da planta). */
+function cutSymbolDxf(c: StairCut): DxfPoint[] {
+  const teeth = 8;
+  const amp = 4 / STAIR_CUT_ZOOM;
+  return Array.from({ length: teeth + 1 }, (_, j) => {
+    const s = -c.half + (2 * c.half * j) / teeth;
+    const k = j % 2 === 0 ? -amp : amp;
+    return { x: c.at.x + c.across.x * s + c.walk.x * k, y: c.at.y + c.across.y * s + c.walk.y * k };
+  });
+}
+
+/**
+ * Escada resolvida em geometria de DXF, na vista do nível (decisão 0013 §4): degraus até o topo do intervalo, divididos
+ * pela cota de corte (cheios até ela, tracejados acima); espelhos e seta só até o topo; símbolo de corte quando o plano
+ * cruza a escada. A seta segue a caminhada da tela (`climbWalk`: a explícita do lance, senão os pontos médios). Caracol:
+ * o poste (círculo de `rInner`, `spiralPostRing`) na cota de corte ou abaixo, senão acima (tracejado, como os degraus).
+ */
+export function stairDxf(p: Project, r: ResolvedStair, view: { cutZ: number; topZ: number }): StairDxf {
+  const risers = risersInClimbOrder(r).filter((k) => k.z1 <= view.topZ + EPS);
+  const steps = r.steps.filter((st) => st.z <= view.topZ + EPS);
+  const outline = (st: (typeof steps)[number]): DxfPoint[] => st.polygon.map((q) => ({ x: q.x, y: q.y }));
+  const cut = stairCut(r, risers, STAIR_CUT_ZOOM, view.cutZ);
+  const walk: Vec2[] = climbWalk(p, r, risers);
+  const posts = [...spiralByComponent(p, r).values()].map((sp) => ({ pts: spiralPostRing(sp.center, sp.rInner), above: r.baseZ > view.cutZ + EPS }));
   return {
-    clusters: resolved.clusters,
-    openings: openings.map((g) => ({ center: g.center, u: g.u, width: g.width, thickness: g.thickness })),
-    floors: floorsOnLevel(p, levelId).map((f) => ({ outline: f.boundary, holes: f.holes, typeCode: p.floorTypes[f.typeId]?.code ?? '' })),
-    slabs: slabsOnLevel(p, levelId).map((s) => ({ outline: s.boundary, holes: s.holes, typeCode: p.slabTypes[s.typeId]?.code ?? '' })),
-    // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
-    roofs: resolveRoofs(p, levelId).map((r) => ({
-      outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
-      ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
-      gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
-      typeCode: p.roofTypes[r.typeId]?.code ?? '',
-    })),
+    outlines: steps.filter((st) => st.z <= view.cutZ + EPS).map(outline),
+    outlinesAbove: steps.filter((st) => st.z > view.cutZ + EPS).map(outline),
+    risers: risers.map((k): [DxfPoint, DxfPoint] => [k.a, k.b]),
+    arrow: arrowOfPath(walk),
+    cut: cut ? cutSymbolDxf(cut) : undefined,
+    ...(posts.length > 0 ? { posts } : {}),
   };
 }
 
-/** Texto DXF da planta do nível. */
-export function planDxf(p: Project, levelId: Id, resolved: ResolvedLevel): string {
-  return exportDxf(p, levelId, dxfGeometryOf(p, levelId, resolved));
+/**
+ * Estado de um elemento para o DXF, a partir da vista da tela: `null` quando está fora do intervalo (não sai). Sem
+ * classificação, vale o corte (o vão desenhado como antes).
+ */
+function dxfStateOf(cls: ViewClass | undefined): DxfViewState | null {
+  if (cls === undefined || cls === 'cut') return 'cut';
+  if (cls === 'hidden') return null;
+  return cls;
+}
+
+/**
+ * Geometria do nível para o DXF, na mesma vista da planta na tela (decisão 0013 §4, `planViewOf`): paredes e aberturas
+ * pela geometria com o plano de corte da vista, paredes fora do corte como contorno de projeção, pisos, lajes, telhados e
+ * escadas com a cota de corte e o topo do intervalo. O que está fora do intervalo não sai, exceto a projeção do telhado
+ * (a tela a mostra tracejada por padrão). O io não importa o engine, então a montagem fica aqui, no web.
+ */
+export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
+  const view: PlanView = planViewOf(p, levelId);
+  const { hidden } = view;
+  const openings: DxfOpening[] = levelFrames(p, levelId).flatMap((f) =>
+    openingsOfWall(p, f.wall.id).flatMap((o) => {
+      const state = dxfStateOf(view.cls.get(o.id));
+      if (state === null) return [];
+      const g = openingGeometry(p, o, f);
+      // Projeção: o símbolo de planta da família (o mesmo da tela); o corte fica como retângulo, na camada ABERTURAS.
+      const symbol = state === 'cut' ? undefined : openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
+      return [{ center: g.center, u: g.u, width: g.width, thickness: g.thickness, state, symbol }];
+    }),
+  );
+  const roofs = resolveRoofs(p, levelId);
+  return {
+    clusters: view.geo.clusters,
+    openings,
+    wallOutlines: view.outlines.map((o) => ({ state: o.cls, polygons: o.shape })),
+    roofProjections: roofs.filter((r) => hidden.has(r.roofId)).flatMap((r) => roofFootprint(r)),
+    floors: resolveFloors(p, levelId)
+      .filter((f) => !hidden.has(f.floorId))
+      .flatMap((f) => f.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' }))),
+    slabs: resolveSlabs(p, levelId)
+      .filter((s) => !hidden.has(s.slabId))
+      .flatMap((s) => s.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' }))),
+    // Escadas: degraus e patamares (contorno), espelhos, seta de subida e símbolo de corte, com a cota de corte da vista.
+    stairs: resolveStairsOnLevel(p, levelId)
+      .filter((s) => !hidden.has(s.id))
+      .map((s) => stairDxf(p, s, { cutZ: view.cutZ, topZ: view.topZ })),
+    // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
+    roofs: roofs
+      .filter((r) => !hidden.has(r.roofId))
+      .map((r) => ({
+        outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
+        ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+        gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+        typeCode: p.roofTypes[r.typeId]?.code ?? '',
+      })),
+  };
+}
+
+/** Texto DXF da planta do nível, na vista do intervalo. */
+export function planDxf(p: Project, levelId: Id): string {
+  return exportDxf(p, levelId, dxfGeometryOf(p, levelId));
 }
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */
-export function savePlanDxf(p: Project, levelId: Id, resolved: ResolvedLevel): Promise<string> {
+export function savePlanDxf(p: Project, levelId: Id): Promise<string> {
   const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
   const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).replace(/[^\w\- ]+/g, '').trim() || 'nivel';
-  return saveText(`${base}-${level}.dxf`, planDxf(p, levelId, resolved));
+  return saveText(`${base}-${level}.dxf`, planDxf(p, levelId));
 }

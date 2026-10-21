@@ -1,6 +1,7 @@
 import { arcFromSagitta, dist } from '@hestia/geom';
 import { profileMax } from './profile.ts';
-import { isOpening, isWall, type Id, type Opening, type OpeningType, type Project, type Wall, type WallType } from './types.ts';
+import { DEFAULT_VIEW_RANGE, type ViewRange } from './viewRange.ts';
+import { isOpening, isStair, isWall, type Id, type Level, type Opening, type OpeningType, type Project, type Stair, type Wall, type WallType } from './types.ts';
 
 export const getWall = (p: Project, id: Id): Wall | undefined => {
   const e = p.elements[id];
@@ -37,6 +38,10 @@ export const wallLength = (w: Wall): number => wallArc(w)?.length ?? dist(w.a, w
 export const levelElevation = (p: Project, levelId: Id): number =>
   p.levels.find((l) => l.id === levelId)?.elevation ?? 0;
 
+/** Intervalo de vista do nível; o padrão se o nível não existir. */
+export const viewRangeOf = (p: Project, levelId: Id): ViewRange =>
+  p.levels.find((l) => l.id === levelId)?.viewRange ?? { ...DEFAULT_VIEW_RANGE };
+
 export const wallBaseElevation = (p: Project, w: Wall): number => levelElevation(p, w.levelId) + w.baseOffset;
 
 export function wallTopElevation(p: Project, w: Wall): number {
@@ -64,3 +69,34 @@ export const materialUsage = (p: Project, materialId: Id): number => {
   }
   return n;
 };
+
+/** Nível de menor elevação estritamente acima do nível dado, ou null (sem nível acima ou nível inexistente). */
+export function levelAbove(p: Project, levelId: Id): Level | null {
+  const base = p.levels.find((l) => l.id === levelId);
+  if (!base) return null;
+  let best: Level | null = null;
+  for (const l of p.levels) if (l.elevation > base.elevation && (!best || l.elevation < best.elevation)) best = l;
+  return best;
+}
+
+/** Nível de topo efetivo da escada: o explícito (topLevelId) ou o imediatamente acima; null se não houver. */
+export function stairTopLevel(p: Project, s: Stair): Level | null {
+  if (s.topLevelId !== null) return p.levels.find((l) => l.id === s.topLevelId) ?? null;
+  return levelAbove(p, s.levelId);
+}
+
+/** Cota absoluta da base da escada: elevação do nível + baseOffset. */
+export const stairBaseZ = (p: Project, s: Stair): number => levelElevation(p, s.levelId) + s.baseOffset;
+
+/** Cota absoluta do topo: elevação do nível de topo + topOffset; sem nível de topo, base + height. */
+export function stairTopZ(p: Project, s: Stair): number {
+  const top = stairTopLevel(p, s);
+  return top ? top.elevation + s.topOffset : stairBaseZ(p, s) + s.height;
+}
+
+export const stairs = (p: Project): Stair[] => Object.values(p.elements).filter(isStair).sort((a, b) => a.order - b.order);
+
+export const stairsOnLevel = (p: Project, levelId: Id): Stair[] => stairs(p).filter((s) => s.levelId === levelId);
+
+/** Quantas escadas usam o tipo de escada. */
+export const stairTypeUsage = (p: Project, typeId: Id): number => stairs(p).filter((s) => s.typeId === typeId).length;

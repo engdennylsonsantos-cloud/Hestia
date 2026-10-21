@@ -202,7 +202,7 @@ const L: Cenario = {
   ],
   caixa: [3.88, -0.15, 4.12, 0.15],
   fina: 'f',
-  kinds: ['miter', 'butt', 'square'],
+  kinds: ['miter', 'butt'],
 };
 
 /**
@@ -225,8 +225,8 @@ const T: Cenario = {
 
 /**
  * 3. Nó de 3 paredes: grossa (0,0)-(4,0), fina (0,0)-(0,3) e outra fina (0,0)-(-2,-2), as três começando em (0,0).
- * Sem par colinear, resolveNode cai em starNode, que não lê joinStart/joinEnd de ninguém: as três configurações
- * devem medir exatamente a mesma coisa (não asseveramos igualdade — só registramos na tabela).
+ * Sem par colinear, resolveNode cai em nodeOfWalls; como nenhuma lacuna angular passa de 180°, nenhuma junção de par
+ * é usada e as três configurações devem medir exatamente a mesma coisa (não asseveramos igualdade — só registramos na tabela).
  */
 const NO: Cenario = {
   nome: 'nó de 3: grossa 19 (0,0)-(4,0) + fina 14 (0,0)-(0,3) + fina 14 (0,0)-(-2,-2)',
@@ -242,8 +242,8 @@ const NO: Cenario = {
   ],
   caixa: [-0.15, -0.15, 0.15, 0.15],
   fina: 'f1',
-  kinds: ['miter', 'butt', 'square'],
-  nota: 'nó de 3 paredes: starNode não lê a configuração de junção (só resolveNode com 2 paredes lê)',
+  kinds: ['miter', 'butt'],
+  nota: 'nó de 3 paredes: nodeOfWalls não lê a configuração de junção (sem lacuna > 180°, só joinPair lê)',
 };
 
 function conferirFraco(c: Cenario, medidas: Medida[]): void {
@@ -287,7 +287,7 @@ describe('T 19 x 14: a configuração de junção é ignorada (sempre encosto)',
   });
 });
 
-describe('nó de 3 paredes: a configuração de junção não chega ao starNode', () => {
+describe('nó de 3 paredes: a configuração de junção não chega ao nodeOfWalls', () => {
   const medidas = NO.kinds.map((kind) => medir(NO, kind));
 
   it('mede a caixa do nó nas três configurações', () => {
@@ -357,13 +357,12 @@ function sobreposicaoRaw(kind: JoinKind): number {
 }
 
 describe('redistribuição do §5.1 sobre raw (T-1)', () => {
-  it('esquadria e encosto: zero; esquadro: positivo (encosto passou a parear por face)', () => {
-    const medidas = { miter: sobreposicaoRaw('miter'), butt: sobreposicaoRaw('butt'), square: sobreposicaoRaw('square') };
+  it('esquadria e encosto: zero (os dois pareiam camada com camada por face)', () => {
+    const medidas = { miter: sobreposicaoRaw('miter'), butt: sobreposicaoRaw('butt') };
     console.log(`\n--- sobreposição raw acabamento da fina x bloco da grossa, caixa do canto (m²): ${JSON.stringify(medidas)}`);
-    // J-1 corrigido: o encosto pareia camada com camada, como a esquadria.
+    // Encosto pareia por face (docs/08 §5.4 passo 3; decisão 0009 #11): a sobreposição vai a zero. Na caixa do canto
+    // (cenário L acima) o encosto mede 0,006372 m², contra 0,006776 m² em esquadria.
     expect(medidas.miter).toBeLessThan(1e-6);
     expect(medidas.butt).toBeLessThan(1e-6);
-    // O esquadro é um plano só: continua com sobreposição, sinalizada pelo aviso (decisão 0009 #10).
-    expect(medidas.square).toBeGreaterThan(1e-4);
   });
 });

@@ -4,7 +4,6 @@ import {
   boxesOverlap,
   difference,
   expandBox,
-  intersection,
   multiArea,
   orientedRect,
   closeGapsSafe,
@@ -59,6 +58,8 @@ interface Item {
   z1: number;
   /** Aparece na planta (a faixa só aparece se atravessar o plano de corte). */
   inPlan: boolean;
+  /** Parede fora do corte que a planta quer só como contorno (`PlanResolveOptions.outlineWalls`). */
+  outline: boolean;
   thickness: number;
   shape: MultiPolygon;
   box: Box;
@@ -69,13 +70,38 @@ const ringsOfShape = (m: MultiPolygon): string => m.map((p) => p.map((r) => r.ma
 /** Altura (relativa à base) do plano de corte da planta: faixas que não o atravessam não aparecem em planta. */
 const PLAN_CUT = 1.2;
 
+/**
+ * Opções de planta do nível (decisão 0013 §4). Omitidas, valem as regras de sempre: o corte fica 1,20 m acima da base de
+ * cada parede e todas as aberturas furam a parede. A planta da vista passa as três. Só mudam a geometria de planta
+ * (`fragment`, `cut`, regiões e silhueta); 3D, quantitativos e cortes seguem a resolução padrão, em cache à parte.
+ */
+export interface PlanResolveOptions {
+  /** Cota absoluta do plano de corte (m). Parede ou faixa que o atravessa entra na planta cortada. */
+  cutZ?: number;
+  /** Aberturas que furam a parede na planta; as demais deixam a parede inteira. Omitido: todas. */
+  planOpenings?: ReadonlySet<Id>;
+  /**
+   * Paredes que não atravessam o corte e aparecem só como contorno (projeção ou "além"). A geometria delas fica em
+   * `fragment`, pintada só entre si, com `cut` vazio: não entram em regiões nem na silhueta.
+   */
+  outlineWalls?: ReadonlySet<Id>;
+}
+
 function flatT(f: WallFrame, which: 'a' | 'b', spec: EndSpec, sFace: number): number {
   const side = sideAt(f, spec, sFace);
   if (side.kind === 'flat') return side.t;
   return toLocal(f, endPoint(f, which, spec, sFace)).t;
 }
 
-function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z: { z0: number; z1: number }, through: boolean): Item[] {
+function buildItems(
+  f: WallFrame,
+  ends: WallEnds,
+  freeEnds: Array<'a' | 'b'>,
+  z: { z0: number; z1: number },
+  through: boolean,
+  planCut: number,
+  outlineWall: boolean,
+): Item[] {
   const items: Item[] = [];
   const coreT = Math.round((coreSpan(f.type).to - coreSpan(f.type).from) * 1e6) / 1e6;
   const endWraps = new Map<number, MultiPolygon>();
@@ -96,7 +122,8 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
       uid: 0,
       z0,
       z1,
-      inPlan: z0 <= z.z0 + PLAN_CUT + EPS_Z && z1 >= z.z0 + PLAN_CUT - EPS_Z,
+      inPlan: z0 <= planCut + EPS_Z && z1 >= planCut - EPS_Z,
+      outline: outlineWall && !(z0 <= planCut + EPS_Z && z1 >= planCut - EPS_Z),
       thickness,
       shape,
       box: boxOf(shape.flatMap((p) => p[0] ?? [])),
@@ -106,10 +133,6 @@ function buildItems(f: WallFrame, ends: WallEnds, freeEnds: Array<'a' | 'b'>, z:
     if (sp.layer.thickness < 1e-6) continue;
     const ring = layerQuad(f, ends, sAtDepth(f, sp.from), sAtDepth(f, sp.to));
     let shape: MultiPolygon = [[ring]];
-    for (const e of [ends.a, ends.b]) {
-      if (e.clip) shape = intersection(shape, [[e.clip]]);
-    }
-    if (shape.length === 0) continue;
     const wrap = endWraps.get(sp.index);
     if (wrap) shape = [...shape, ...wrap];
     mk(sp.index, sp.layer.materialId, layerPriority(sp.layer), sp.layer.thickness, shape, z.z0, z.z1);
@@ -216,7 +239,7 @@ const openingRect = (g: OpeningGeometry): MultiPolygon => [
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
-  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}|${ringsOfShape(i.shape)}`);
+  const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}:${i.outline ? 1 : 0}|${ringsOfShape(i.shape)}`);
   const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
@@ -257,7 +280,7 @@ function breakpoints(items: Item[], zr: Map<Id, ZRange>, opens: OpeningGeometry[
 
 type Returns = Map<string, Array<{ openingId: Id; poly: MultiPolygon }>>;
 
-function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRange>, returns: Returns): ClusterCore {
+function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRange>, returns: Returns, planOpen: (id: Id) => boolean): ClusterCore {
   const paintCache = new Map<string, Map<Item, MultiPolygon>>();
   const paintFor = (active: Item[]): Map<Item, MultiPolygon> => {
     const key = active.map((i) => i.uid).sort((x, y) => x - y).join(',');
@@ -269,6 +292,8 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     return m;
   };
   const plan = paintFor(items.filter((i) => i.inPlan));
+  // Paredes só de contorno (fora do corte) pintam só entre si: não cortam as paredes que o corte atravessa.
+  const outlinePaint = paint(items.filter((i) => i.outline));
   // Retornos de acabamento não invadem paredes vizinhas (ver clipReturn.ts).
   const clipReturn = makeReturnClipper(items);
   const layers = new Map<Id, ResolvedLayer[]>();
@@ -310,14 +335,16 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
   }
 
   for (const it of items) {
-    const fragment = it.inPlan ? (plan.get(it) ?? []) : [];
+    const fragment = it.inPlan ? (plan.get(it) ?? []) : it.outline ? (outlinePaint.get(it) ?? []) : [];
     if (it.inPlan && fragment.length === 0) continue;
     let cut = fragment;
-    if (fragment.length) {
-      const rects = opens.filter((g) => g.hostId === it.wallId).map(openingRect);
+    if (it.inPlan && fragment.length) {
+      // Só as aberturas que furam a parede na planta; o retorno do vão sai junto com o seu vão.
+      const rects = opens.filter((g) => g.hostId === it.wallId && planOpen(g.openingId)).map(openingRect);
       cut = rects.length ? difference(fragment, ...rects) : fragment;
-      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) cut = [...cut, ...clipReturn(r, it.wallId, plan)];
+      for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) if (planOpen(r.openingId)) cut = [...cut, ...clipReturn(r, it.wallId, plan)];
     }
+    if (it.outline) cut = [];
     const bands = bandsOf.get(it) ?? [];
     if (!fragment.length && bands.length === 0) continue;
     const arr = layers.get(it.wallId) ?? [];
@@ -326,6 +353,9 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }
   const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGapsSafe(unionClipper(...parts)) }));
+  // Silhueta pela união das regiões por material. Unir todos os cortes numa só operação do Clipper foi tentado (semente 18
+  // dos testes de propriedade: um bolsão fechado de 0,029 m² entre três paredes que se cruzam fica preenchido nesta união),
+  // mas em outras sementes essa união única preencheu ambientes inteiros (até 8,9 m² a mais): o erro de 0,1% é o menor.
   const silhouette = closeGapsSafe(unionClipper(...regions.map((r) => r.polygons)));
   for (const arr of layers.values()) arr.sort((a, b) => a.layerIndex - b.layerIndex);
   return { layers, regions, silhouette };
@@ -347,8 +377,12 @@ export function levelFrames(p: Project, levelId: Id): WallFrame[] {
     .filter((f): f is WallFrame => f !== null);
 }
 
-export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = sharedCache): ResolvedLevel {
+export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = sharedCache, opts: PlanResolveOptions = {}): ResolvedLevel {
   const walls = wallsOnLevel(p, levelId);
+  const planOpenSet = opts.planOpenings;
+  const planOpen = (id: Id): boolean => !planOpenSet || planOpenSet.has(id);
+  // Chave das opções de planta: só o que muda a geometria de planta (o corte já entra pelo `inPlan` dos itens).
+  const planSig = planOpenSet ? `open:${[...planOpenSet].sort().join(',')}` : 'open:*';
   const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
@@ -372,7 +406,9 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
     const wz = new Map(group.map((f) => [f.wall.id, wallZRange(p, f.wall, floors, slabs, roofs)] as const));
     const items = group.flatMap((f) => {
       const { z0, height } = wz.get(f.wall.id)!;
-      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + height }, throughIds.has(f.wall.id));
+      // Sem `cutZ`, o corte fica 1,20 m acima da base desta parede (como antes).
+      const planCut = opts.cutZ ?? z0 + PLAN_CUT;
+      return buildItems(f, ends.get(f.wall.id)!, freeOf(f), { z0, z1: z0 + height }, throughIds.has(f.wall.id), planCut, opts.outlineWalls?.has(f.wall.id) === true);
     });
     items.forEach((it, i) => {
       it.uid = i;
@@ -396,10 +432,10 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
       }),
     );
     const retSig = [...returns].map(([k, v]) => `${k}=${v.map((x) => `${x.openingId}:${ringsOfShape(x.poly)}`).join('+')}`).join('\n');
-    const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}\n--\n${retSig}`;
+    const key = `${clusterKey(items, opens)}\n--\n${[...zr].map(([k, v]) => `${k}:${round(v.z0)}:${round(v.z1)}`).join(',')}\n--\n${retSig}\n--\n${planSig}`;
     let core = cache.get(key);
     if (!core) {
-      core = solveCluster(items, opens, zr, returns);
+      core = solveCluster(items, opens, zr, returns, planOpen);
       if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
       cache.set(key, core);
     }

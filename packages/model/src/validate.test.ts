@@ -34,8 +34,8 @@ const codes = (issues: ValidationIssue[]): string[] => issues.map((i) => i.code)
 const find = (issues: ValidationIssue[], code: string): ValidationIssue[] => issues.filter((i) => i.code === code);
 
 describe('validação: paredes', () => {
-  it('modelo válido não gera problemas; quina em encosto com acabamento gera só o aviso de esquadria', () => {
-    expect(codes(validateProject(build([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)])))).toEqual(['wall-corner-butt-finish']);
+  it('modelo válido não gera problemas; quina em encosto com acabamento não gera aviso (docs/08 §5.7: pareia por face)', () => {
+    expect(codes(validateProject(build([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)])))).toEqual([]);
   });
 
   it('comprimento zero é erro', () => {
@@ -208,60 +208,5 @@ describe('validação: cobertura das regras', () => {
     expect(find(issues, 'wall-height-invalid')).toHaveLength(1);
     expect(find(issues, 'opening-host-missing')).toHaveLength(1);
     expect(find(issues, 'wall-overlap')).toHaveLength(1);
-  });
-});
-
-describe('aviso de quina em esquadro (decisão 0009 #10)', () => {
-  const SQ = { kind: 'square' as const, flip: false };
-  const MI = { kind: 'miter' as const, flip: false };
-  const cornerIssues = (p: Project): ValidationIssue[] => find(validateProject(p), 'wall-corner-butt-finish');
-
-  /** Projeto com um tipo sem acabamento (só a estrutura do PA-14), para o caso sem finish/substrate. */
-  function bareBuild(walls: Array<Omit<Wall, 'order'>>): Project {
-    const s = new ProjectStore(createEmptyProject());
-    const base = s.project.wallTypes['wt_alv14']!;
-    s.exec({ type: 'upsertWallType', wallType: { ...base, id: 'wt_bare', layers: base.layers.filter((l) => l.function === 'structure') } });
-    for (const w of walls) s.exec({ type: 'addWall', wall: w });
-    return s.project;
-  }
-
-  it('esquadro 90° com acabamento avisa, e a mensagem diz esquadro', () => {
-    const issues = cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: SQ }), wall('b', 4, 0, 4, 3, { joinStart: SQ })]));
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ severity: 'warning', elementId: 'a' });
-    expect(issues[0]!.message).toContain('em esquadro,');
-  });
-
-  it('encosto de um lado e esquadro do outro avisa, e a mensagem diz encosto ou esquadro', () => {
-    const issues = cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: SQ }), wall('b', 4, 0, 4, 3)]));
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.message).toContain('em encosto ou esquadro,');
-  });
-
-  it('encosto puro continua dizendo encosto', () => {
-    const issues = cornerIssues(build([wall('a', 0, 0, 4, 0), wall('b', 4, 0, 4, 3)]));
-    expect(issues).toHaveLength(1);
-    expect(issues[0]!.message).toContain('em encosto,');
-  });
-
-  it('esquadria em uma das pontas tira a quina da lista', () => {
-    expect(cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: MI }), wall('b', 4, 0, 4, 3, { joinStart: SQ })]))).toEqual([]);
-  });
-
-  it('esquadro sem acabamento em nenhuma das paredes não avisa', () => {
-    const p = bareBuild([wall('a', 0, 0, 4, 0, { typeId: 'wt_bare', joinEnd: SQ }), wall('b', 4, 0, 4, 3, { typeId: 'wt_bare', joinStart: SQ })]);
-    expect(cornerIssues(p)).toEqual([]);
-  });
-
-  it('esquadro fora de 70°–110° não avisa (ângulo de 45°)', () => {
-    expect(cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: SQ }), wall('b', 4, 0, 1, 3, { joinStart: SQ })]))).toEqual([]);
-  });
-
-  it('T com esquadro não avisa', () => {
-    expect(cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: SQ }), wall('c', 2, 0, 2, 3, { joinStart: SQ })]))).toEqual([]);
-  });
-
-  it('paredes colineares com esquadro não avisam', () => {
-    expect(cornerIssues(build([wall('a', 0, 0, 4, 0, { joinEnd: SQ }), wall('d', 4, 0, 8, 0, { joinStart: SQ })]))).toEqual([]);
   });
 });

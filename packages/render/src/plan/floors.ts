@@ -59,11 +59,12 @@ export function labelPoint(m: MultiPolygon): Vec2 | null {
  * contorno fino de 1 px com os furos. No grosseiro só o preenchimento chapado. Com etiquetas ligadas, o código do
  * tipo e a área no centroide.
  */
-export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport): FloorOps {
+export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
   for (const f of resolveFloors(p, levelId)) {
+    if (hidden?.has(f.floorId)) continue;
     const top = f.layers[0];
     const m = top ? p.materials[top.materialId] : undefined;
     const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74);
@@ -129,8 +130,10 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
 }
 
 /** Destaque dos pisos do nível (D1). */
-export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
-  const parts = resolveFloors(p, levelId).map((f) => ({ id: f.floorId, polygon: f.polygon }));
+export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+  const parts = resolveFloors(p, levelId)
+    .filter((f) => !hidden?.has(f.floorId))
+    .map((f) => ({ id: f.floorId, polygon: f.polygon }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
 }
 

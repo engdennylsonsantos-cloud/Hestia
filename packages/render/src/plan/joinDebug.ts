@@ -3,8 +3,8 @@ import type { Id, JoinKind, Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import type { LabelOp } from './types.ts';
 
-/** Letra de cada tipo de junção de canto (B encosto, E esquadria, Q esquadro). */
-const JOIN_LETTER: Record<JoinKind, string> = { butt: 'B', miter: 'E', square: 'Q' };
+/** Letra de cada tipo de junção de canto (B encosto, E esquadria). */
+const JOIN_LETTER: Record<JoinKind, string> = { butt: 'B', miter: 'E' };
 /** Mesmo critério do motor: ângulo entre as paredes abaixo de ~2° conta como colinear. */
 const COLLINEAR_SIN = 0.035;
 const DY = -10;
@@ -18,7 +18,7 @@ const cross = (p: Vec2, q: Vec2): number => p.x * q.y - p.y * q.x;
 const dot = (p: Vec2, q: Vec2): number => p.x * q.x + p.y * q.y;
 
 /**
- * Depuração de junção (G6): em cada extremidade com junção, uma etiqueta com a letra do tipo (B, E, Q; T, X ou ★ nó;
+ * Depuração de junção (G6): em cada extremidade com junção, uma etiqueta com a letra do tipo (B, E; T, X ou ★ nó;
  * N para "não unir") e a ordem de criação da parede dominante. Em par, domina a mais antiga, salvo `flip`.
  * Em T, domina a parede atravessada. Em nó de três ou mais, mostra a mais antiga do grupo.
  */

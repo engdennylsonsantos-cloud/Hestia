@@ -1,4 +1,4 @@
-import { asMulti, difference, dot, multiArea, sub, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { asMulti, difference, dot, multiArea, sub, type MultiPolygon, type SkeletonStep, type Vec2 } from '@hestia/geom';
 import { levelElevation, roofsOnLevel, type Id, type Project, type RafterCut, type Roof, type RoofEave, type RoofType } from '@hestia/model';
 import { planeHas, WATER_MIN_AREA } from './roofGeom.ts';
 import { joinRoofs, type JoinItem } from './roofJoin.ts';
@@ -45,6 +45,8 @@ export interface ResolvedRoof {
   joinedArea: number;
   /** Motivo de o telhado não ter águas (contorno que o cálculo não fecha); ausente quando há águas. */
   problem?: string;
+  /** Degraus da superfície (vértices reentrantes, em planta e em m); ausente quando a superfície é contínua. */
+  steps?: SkeletonStep[];
   /** Acabamentos do beiral (testeira, calha, forro) do telhado; sem ele, nada é desenhado no beiral. */
   eave?: RoofEave;
   /** Corte das camadas no beiral: 'plumb' (vertical, padrão) ou 'square' (perpendicular à água). */
@@ -72,7 +74,7 @@ export function roofTopAt(r: ResolvedRoof, p: Vec2): number | null {
 export const roofThickness = (r: ResolvedRoof): number => r.layers.reduce((s, l) => s + l.thickness, 0);
 
 /** Telhado antes da junção: águas da forma menos os furos. Sem tipo ou contorno de três pontos, null. */
-type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string };
+type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string; steps?: SkeletonStep[] };
 
 function baseOf(p: Project, r: Roof): Base | null {
   const type = p.roofTypes[r.typeId];
@@ -89,7 +91,16 @@ function baseOf(p: Project, r: Roof): Base | null {
   const planes = water.planes
     .map((pl) => ({ ...pl, polygon: holes.length ? difference(pl.polygon, ...holes) : pl.polygon }))
     .filter((pl) => multiArea(pl.polygon) > WATER_MIN_AREA);
-  return { roof: r, type, eaveZ, planes, joinOthers: r.joinOthers === true, joinedArea: 0, ...(water.problem ? { problem: water.problem } : {}) };
+  return {
+    roof: r,
+    type,
+    eaveZ,
+    planes,
+    joinOthers: r.joinOthers === true,
+    joinedArea: 0,
+    ...(water.problem ? { problem: water.problem } : {}),
+    ...(water.steps ? { steps: water.steps } : {}),
+  };
 }
 
 /** Telhado resolvido depois da junção: linhas do próprio telhado mais as divisas que recebe da junção. */
@@ -115,6 +126,7 @@ function finish(b: Base, joinLines: ResolvedRoof['lines']): ResolvedRoof {
     rafterCut: r.rafterCut,
     eaveOverhang: eaveOverhangOf(r),
     ...(b.problem ? { problem: b.problem } : {}),
+    ...(b.steps ? { steps: b.steps } : {}),
   };
 }
 

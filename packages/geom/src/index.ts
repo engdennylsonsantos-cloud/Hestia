@@ -6,3 +6,4 @@ export * from './triangulate.ts';
 export * from './transform.ts';
 export * from './arc.ts';
 export * from './skeleton.ts';
+export * from './openingSymbol.ts';

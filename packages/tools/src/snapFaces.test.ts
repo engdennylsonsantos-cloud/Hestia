@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeFloor, makeWall, wallsOnLevel, type Project } from '@hestia/model';
+import { makeFloor, type Project } from '@hestia/model';
 import { infer, type InferContext } from './infer.ts';
 import { DEFAULT_SNAP } from './types.ts';
 import { drawWall, makeEnv, tool, walls } from './testEnv.ts';
@@ -112,34 +112,7 @@ describe('captura de faces de acabamento (motor de inferência)', () => {
   });
 });
 
-/** Projeto com n paredes horizontais de 4 m, em grade de 20 colunas (200 paredes para n = 200). */
-function gridProject(n: number): Project {
-  const store = new ProjectStore(createEmptyProject());
-  for (let i = 0; i < n; i++) {
-    const col = i % 20;
-    const row = Math.floor(i / 20);
-    const x = col * 6;
-    const y = row * 4;
-    store.exec({ type: 'addWall', wall: makeWall({ id: `w${i}`, typeId: 'wt_alv14', levelId: 'lv_0', a: { x, y }, b: { x: x + 4, y } }) });
-  }
-  return store.project;
-}
-
-describe('desempenho da captura com o cache de faces', () => {
-  it('projeto de 200 paredes: 500 chamadas a infer em menos de 1,5 s', () => {
-    const p = gridProject(200);
-    expect(wallsOnLevel(p, 'lv_0')).toHaveLength(200);
-    const t0 = performance.now();
-    for (let k = 0; k < 500; k++) {
-      // Cursor percorrendo perto das faces das paredes: caminho com mais candidatos.
-      const x = (k % 97) * 0.25;
-      const y = (k % 10) * 4 + (k % 3 === 0 ? 0.092 : 0.5);
-      infer({ x, y }, { project: p, levelId: 'lv_0', mpp: MPP, gridStep: 0.1 });
-    }
-    const ms = performance.now() - t0;
-    expect(ms).toBeLessThan(1500);
-  });
-});
+// O teste de tempo da captura (500 chamadas a infer em 200 paredes) está em snapFaces.perf.test.ts.
 
 describe('pisos do nível como captura (ferramentas que usam ToolBase.ctx)', () => {
   it('a ferramenta Parede captura o vértice de um piso existente do nível', () => {

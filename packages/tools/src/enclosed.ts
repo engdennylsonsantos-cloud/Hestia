@@ -70,16 +70,12 @@ export function enclosedRegionAt(p: Project, levelId: Id, at: Vec2): Polygon | n
 }
 
 /**
- * Contorno de uma parede para a edificação: as duas faces de acabamento com as esquadrias das pontas
- * (as duas primeiras arestas de `wallFaces` são as faces sHi e sLo). Arcos e paredes sem junção usam a faixa reta.
+ * Contorno de cada parede para a edificação: o `outline` de `wallFaces` (esquadria, encosto, T, degraus das pontas e
+ * arcos). Só cai na faixa reta se `wallFaces` não tiver a parede.
  */
 function outlinePieces(p: Project, levelId: Id, frames: WallFrame[]): Ring[] {
-  const faces = new Map(wallFaces(p, levelId).map((w) => [w.wallId, w.faces] as const));
-  return frames.map((f) => {
-    const fs = faces.get(f.wall.id);
-    if (!f.arc && fs && fs.length >= 2) return [fs[0]![0], fs[0]![1], fs[1]![1], fs[1]![0]];
-    return bandRing(f, f.sHi, f.sLo);
-  });
+  const outlines = new Map(wallFaces(p, levelId).map((w) => [w.wallId, w.outline] as const));
+  return frames.map((f) => outlines.get(f.wall.id) ?? bandRing(f, f.sHi, f.sLo));
 }
 
 /** Projeto é imutável (Immer): a identidade serve de chave, como no cache de faces da captura. */

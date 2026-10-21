@@ -192,7 +192,10 @@ describe('integração com o motor (resolveRoofs real)', () => {
   });
 
   it('a lista completa desenha o telhado depois das paredes e pisos, e o subpavimento apagado vem antes', () => {
-    const p = projectWithRoof();
+    // O beiral está em 2,80 m, acima do topo padrão (2,30 m): com o topo subido, o telhado entra na vista (decisão 0013).
+    const s = new ProjectStore(projectWithRoof());
+    s.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 3.5 } });
+    const p = s.project;
     const dl = buildPlanDrawList(input(p, { belowRoofs: [gable()], below: resolveLevel(p, 'lv_0', new Map()) }));
     const roofIdx = dl.fills.findIndex((f) => f.alpha === 0.55);
     const underIdx = dl.fills.findIndex((f) => f.color === LIGHT.underlay && f.alpha === 0.22);

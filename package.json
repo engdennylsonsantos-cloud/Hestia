@@ -15,11 +15,14 @@
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "node tests/e2e/flow.mjs",
+    "test:visual": "node tests/e2e/escadas.mjs && node tests/e2e/vista-planta.mjs && node tests/e2e/escadas-closeup.mjs",
     "build:artifact": "npm run build && node scripts/make-artifact.mjs",
     "parity": "node scripts/check-parity.mjs --report",
-    "test:rapido": "vitest run --exclude \"**/property.test.ts\" --exclude \"**/perf.test.ts\"",
+    "test:rapido": "vitest run --exclude \"**/property.test.ts\" --exclude \"**/*perf.test.ts\"",
     "test:rapido:esquadria": "node scripts/test-esquadria.mjs",
-    "test:completo": "node scripts/completo.mjs"
+    "test:completo": "node scripts/completo.mjs",
+    "visual:juntas": "vite-node scripts/visual-juntas.mts && node scripts/visual-juntas.shot.mjs",
+    "test:perf": "vitest run --config vitest.perf.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

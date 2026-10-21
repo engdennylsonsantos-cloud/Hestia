@@ -187,12 +187,11 @@ describe('tipos de junção', () => {
     const ps = s.project;
     return Object.values(ps.elements).filter((e) => e.kind === 'wall').map((w) => buildFrame(w as Wall, ps.wallTypes[(w as Wall).typeId]!)!);
   };
-  const lShape = (cfg?: { kind: 'butt' | 'miter' | 'square'; flip: boolean }) =>
+  const lShape = (cfg?: { kind: 'butt' | 'miter'; flip: boolean }) =>
     setup([
       wall('a', 0, 0, 4, 0, cfg ? { joinStart: cfg } : {}),
       wall('b', 0, 0, 0, 3, cfg ? { joinStart: cfg } : {}),
     ]);
-  const flatT = (e: { hi: { kind: string; t?: number } }) => (e.hi.kind === 'flat' ? e.hi.t! : NaN);
   /** Degraus do pareamento por face (encosto): corte de cada faixa de espessura. */
   const stepsOf = (e: { hi: { kind: string; runs?: Array<{ s: number; t: number }> } }) => {
     if (e.hi.kind !== 'steps') throw new Error(`esperava corte em degraus, veio ${e.hi.kind}`);
@@ -220,17 +219,12 @@ describe('tipos de junção', () => {
     expect(cutAt(ends.get('b')!.a, -CORE14 / 2)).toBeCloseTo(-CORE14 / 2, 6);
     expect(cutAt(ends.get('a')!.a, -CORE14 / 2)).toBeCloseTo(CORE14 / 2, 6);
   });
-  it('esquadro prolonga as duas até cobrir o canto', () => {
-    const ends = computeEnds(frames(lShape({ kind: 'square', flip: false })));
-    expect(flatT(ends.get('a')!.a)).toBeCloseTo(-T14 / 2, 6);
-    expect(flatT(ends.get('b')!.a)).toBeCloseTo(-T14 / 2, 6);
-  });
   it('esquadria usa corte em ângulo', () => {
     const ends = computeEnds(frames(lShape({ kind: 'miter', flip: false })));
     expect(ends.get('a')!.a.hi.kind).toBe('miter');
   });
-  it('a silhueta externa é a mesma nos três tipos (só a divisão interna muda)', () => {
-    const areas = (['butt', 'miter', 'square'] as const).map((kind) => silhouetteArea(lShape({ kind, flip: false })));
+  it('a silhueta externa é a mesma nos dois tipos (só a divisão interna muda)', () => {
+    const areas = (['butt', 'miter'] as const).map((kind) => silhouetteArea(lShape({ kind, flip: false })));
     for (const a of areas) expect(a).toBeCloseTo(7 * T14, 6);
   });
   it('encosto: cada núcleo para na face do núcleo do vizinho e nenhuma ponta fica exposta na face externa', () => {
@@ -279,11 +273,17 @@ describe('nós de três ou mais paredes', () => {
     return { r, area: multiArea(sil) };
   };
   it('Y de três paredes iguais: sem sobreposição, sem furo e simétrico', () => {
-    const s = star(3);
-    const { r } = check(s);
-    const areas = ['s0', 's1', 's2'].map((id) => r.walls[id]!.layers.reduce((a, l) => a + multiArea(l.cut), 0));
-    expect(areas[0]).toBeCloseTo(areas[1]!, 5);
-    expect(areas[1]).toBeCloseTo(areas[2]!, 5);
+    // Simetria por material, não por parede: no empate de prioridade o pintor dá a faixa sobreposta à parede mais antiga.
+    const porMaterial = (r: ReturnType<typeof resolveLevel>) => {
+      const m = new Map<string, number>();
+      for (const w of Object.values(r.walls)) for (const l of w.layers) m.set(l.materialId, (m.get(l.materialId) ?? 0) + multiArea(l.cut));
+      return m;
+    };
+    // Y e suas duas rotações de 120° (mesmas paredes, ângulos trocados).
+    const [ref, ...outras] = [[10, 130, 250], [130, 250, 10], [250, 10, 130]].map((ang) => porMaterial(check(star(3, ang)).r));
+    for (const m of outras) {
+      for (const k of new Set([...ref!.keys(), ...m.keys()])) expect(Math.abs((ref!.get(k) ?? 0) - (m.get(k) ?? 0))).toBeLessThan(1e-5);
+    }
   });
   it('a estrutura de um Y é um único polígono (funde)', () => {
     const { r } = check(star(3));
@@ -304,7 +304,7 @@ describe('nós de três ou mais paredes', () => {
 });
 
 describe('paredes diferentes na mesma junção', () => {
-  const mk = (typeB: string, kind: 'butt' | 'miter' | 'square' = 'miter', extraB: Partial<Wall> = {}) =>
+  const mk = (typeB: string, kind: 'butt' | 'miter' = 'miter', extraB: Partial<Wall> = {}) =>
     setup([
       wall('a', 0, 0, 4, 0, { joinStart: { kind, flip: false } }),
       wall('b', 0, 0, 0, 3, { typeId: typeB, joinStart: { kind, flip: false }, ...extraB }),
@@ -322,9 +322,9 @@ describe('paredes diferentes na mesma junção', () => {
     expect(multiArea(union(...structures.map((g) => g.polygons)))).toBeGreaterThan(0);
     expect(closeGaps(union(...structures.map((g) => g.polygons)))).toHaveLength(1);
   });
-  it.each(['butt', 'square'] as const)('%s com tipos diferentes não gera sobreposição', (kind) => {
-    noOverlap(mk('wt_dry', kind));
-    noOverlap(mk('wt_ext19', kind));
+  it('encosto com tipos diferentes não gera sobreposição', () => {
+    noOverlap(mk('wt_dry', 'butt'));
+    noOverlap(mk('wt_ext19', 'butt'));
   });
   it('drywall encostando em alvenaria: a alvenaria (núcleo maior) domina mesmo sendo a mais nova', () => {
     // drywall criado primeiro (ordem menor), alvenaria depois, T: a estrutura de bloco não é cortada pelo perfil.
@@ -370,8 +370,8 @@ describe('paredes em arco', () => {
     const b = setup([arcWall('c', 0, 0, 4, 0, -1)]);
     expect(silhouetteArea(a)).toBeCloseTo(silhouetteArea(b), 6);
   });
-  it('canto entre reta e arco: sem sobreposição em encosto, esquadria e esquadro', () => {
-    for (const kind of ['butt', 'miter', 'square'] as const) {
+  it('canto entre reta e arco: sem sobreposição em encosto e esquadria', () => {
+    for (const kind of ['butt', 'miter'] as const) {
       const s = setup([
         wall('r', -3, 0, 0, 0, { joinEnd: { kind, flip: false } }),
         arcWall('c', 0, 0, 3, 0, 0.8, { joinStart: { kind, flip: false } }),

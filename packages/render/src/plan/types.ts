@@ -25,7 +25,8 @@ export interface LabelOp {
   /** Deslocamento em pixels a partir do ponto. */
   dx?: number;
   dy?: number;
-  tone?: 'info' | 'accent';
+  /** 'soft': rótulo mais claro (degrau acima do corte, decisão 0014 §1 item 9). */
+  tone?: 'info' | 'accent' | 'soft';
 }
 
 /** Lista de desenho neutra: tanto o renderizador de GPU quanto o de CPU a consomem. */
@@ -46,6 +47,12 @@ export interface PlanTheme {
   guide: string;
   select: string;
   underlay: string;
+  /** Prévia da escada por tom (limites, espelhos, caminhada, patamar e degraus calculados). */
+  stairBoundary: string;
+  stairRiser: string;
+  stairPath: string;
+  stairLanding: string;
+  stairTread: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -58,6 +65,11 @@ export const LIGHT: PlanTheme = {
   guide: '#c2410c',
   select: '#1d6fe0',
   underlay: '#b7bec7',
+  stairBoundary: '#2563eb',
+  stairRiser: '#ea580c',
+  stairPath: '#15803d',
+  stairLanding: '#7e22ce',
+  stairTread: '#64748b',
 };
 
 export const DARK: PlanTheme = {
@@ -70,4 +82,9 @@ export const DARK: PlanTheme = {
   guide: '#fb923c',
   select: '#5aa2ff',
   underlay: '#4b5560',
+  stairBoundary: '#60a5fa',
+  stairRiser: '#fb923c',
+  stairPath: '#4ade80',
+  stairLanding: '#c084fc',
+  stairTread: '#94a3b8',
 };

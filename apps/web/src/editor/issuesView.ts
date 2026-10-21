@@ -1,4 +1,5 @@
-import { isFloor, isOpening, isRoof, isSlab, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { stairBox, stairPoints } from './stairActions.ts';
 
 export interface IssueGroup {
   severity: ValidationSeverity;
@@ -13,7 +14,7 @@ export interface IssueTarget {
   levelId: Id | null;
   /** Ponto médio da parede; null quando o elemento não está ligado a uma parede. */
   center: { x: number; y: number } | null;
-  /** Caixa do piso, da laje ou do telhado (contorno): a vista enquadra a caixa em vez do ponto. Só existe para essas famílias. */
+  /** Caixa do piso, da laje, do telhado ou da escada (contorno): a vista enquadra a caixa em vez do ponto. Só existe para essas famílias. */
   box?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
@@ -62,6 +63,17 @@ export function issueTarget(p: Project, issue: ValidationIssue): IssueTarget | n
       levelId: p.levels.some((l) => l.id === el.levelId) ? el.levelId : null,
       center: { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 },
       box,
+    };
+  }
+  if (isStair(el)) {
+    const box = stairBox(el);
+    const pts = stairPoints(el);
+    const center = box ? { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 } : null;
+    return {
+      elementId: id,
+      levelId: p.levels.some((l) => l.id === el.levelId) ? el.levelId : null,
+      center: pts.length ? center : null,
+      ...(box ? { box } : {}),
     };
   }
   const host = isOpening(el) ? p.elements[el.hostId] : undefined;

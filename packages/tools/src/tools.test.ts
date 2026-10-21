@@ -211,15 +211,17 @@ describe('seleção e edição', () => {
   });
 });
 
-describe('quinas ao encadear paredes (decisão 0009)', () => {
-  it('L com acabamento: a parede nova e a vizinha saem em esquadria na quina', () => {
+describe('quinas ao encadear paredes (decisão 0009 #13)', () => {
+  // Antes a quina em L com acabamento saía em esquadria ao desenhar (#8). Agora o encosto pareia por face, então a
+  // quina fica como foi escolhida e as duas paredes não são reescritas.
+  it('L com acabamento: a parede nova e a vizinha ficam em encosto na quina', () => {
     const { store, env } = makeEnv();
     const t = tool('wall', env);
     clickAt(t, 0, 0); clickAt(t, 4, 0); clickAt(t, 4, 3);
     t.cancel();
     const [a, b] = walls(store) as [Wall, Wall];
-    expect(a.joinEnd.kind).toBe('miter');
-    expect(b.joinStart.kind).toBe('miter');
+    expect(a.joinEnd.kind).toBe('butt');
+    expect(b.joinStart.kind).toBe('butt');
     expect(a.joinStart.kind).toBe('butt');
     expect(b.joinEnd.kind).toBe('butt');
   });

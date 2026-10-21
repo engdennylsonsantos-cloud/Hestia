@@ -4,6 +4,8 @@ import { SkeletonFail } from './skeletonCore.ts';
 import { setup } from './skeletonSetup.ts';
 import { runSim } from './skeletonRun.ts';
 import { buildOutput } from './skeletonFaces.ts';
+import { findSteps, type SkeletonStep } from './skeletonContinuity.ts';
+export type { SkeletonStep } from './skeletonContinuity.ts';
 
 export interface SkeletonInput {
   outer: Vec2[];            // anel externo, sentido qualquer, sem repetir o 1º ponto
@@ -21,7 +23,8 @@ export interface SkeletonArc {
   a: Vec2; b: Vec2; za: number; zb: number;   // segmento do esqueleto (cumeeira/espigão/rincão) com as alturas nas pontas
   faces: [number, number];  // índices (em `faces`) das duas águas que ele separa
 }
-export interface SkeletonResult { faces: SkeletonFace[]; arcs: SkeletonArc[]; ok: boolean; reason?: string }
+/** `steps`: vértices onde as águas se encontram em cotas diferentes (degrau); geometria devolvida não muda. */
+export interface SkeletonResult { faces: SkeletonFace[]; arcs: SkeletonArc[]; ok: boolean; reason?: string; steps?: SkeletonStep[] }
 
 /**
  * Esqueleto reto com pesos de um polígono simples com furos.
@@ -40,7 +43,14 @@ export function weightedSkeleton(input: SkeletonInput): SkeletonResult {
     if (Math.abs(sum - net) > 1e-6 * Math.max(net, 1)) {
       throw new SkeletonFail('caso não suportado: a soma das águas não confere com a área do polígono');
     }
-    return { faces: out.faces, arcs: out.arcs, ok: true };
+    // Soma certa não garante superfície contínua. Caso típico: vértice reentrante (ângulo > 180°) entre uma aresta
+    // com inclinação (cota 0 nesse vértice, pois é beiral) e uma empena (sem água). Só a água do beiral chega ao vértice
+    // com cota 0, e meio plano não cobre um ângulo > 180°; as outras águas dão cota > 0 ali. Não há superfície contínua
+    // com águas planas nesse caso: a geometria é devolvida como está e os vértices com degrau vão em `steps`, para o
+    // engine avisar (aviso não bloqueante). Medido em 400 contornos: todo contorno com esse vértice tem degrau; a
+    // falha também ocorre em poucos casos com dois nulos no mesmo vértice reentrante (não analisados).
+    const steps = findSteps([input.outer, ...input.holes], input.weights, out.faces);
+    return { faces: out.faces, arcs: out.arcs, ok: true, steps };
   } catch (e) {
     const reason =
       e instanceof SkeletonFail ? e.message : `falha interna do esqueleto: ${e instanceof Error ? e.message : String(e)}`;

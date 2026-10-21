@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, migrateProject, newId, openingsOfWall, wallsOnLevel, coreRange, totalThickness, SchemaError, type Opening, type Wall } from './index.ts';
+import { ProjectStore, createEmptyProject, makeLevel, makeWall, migrateProject, newId, openingsOfWall, wallsOnLevel, coreRange, totalThickness, SchemaError, type Opening, type Wall } from './index.ts';
 
 const wall = (id: string, ax: number, ay: number, bx: number, by: number): Omit<Wall, 'order'> =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: ax, y: ay }, b: { x: bx, y: by } });
@@ -142,7 +142,7 @@ describe('trocar a parede anfitriã de uma abertura (D7)', () => {
 
   it('recusa parede de outro nível', () => {
     const s = setup();
-    s.exec({ type: 'upsertLevel', level: { id: 'lv_1', name: 'Pav. 1', elevation: 3 } });
+    s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_1', name: 'Pav. 1', elevation: 3 }) });
     s.exec({ type: 'addWall', wall: { ...wall('C', 0, 0, 4, 0), levelId: 'lv_1' } });
     expect(() => s.exec({ type: 'setOpeningHost', id: 'd', hostId: 'C', offset: 1 })).toThrow('mesmo nível');
   });

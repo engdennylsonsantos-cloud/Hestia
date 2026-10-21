@@ -1,4 +1,4 @@
-import { type Vec2 } from './vec.ts';
+import { v2, type Vec2 } from './vec.ts';
 
 /** Anel simples (sem repetir o primeiro ponto no fim). */
 export type Ring = Vec2[];
@@ -91,3 +91,65 @@ export function orientedRect(cx: number, cy: number, ux: number, uy: number, hal
     { x: cx - ux * halfAlong + vx * halfAcross, y: cy - uy * halfAlong + vy * halfAcross },
   ];
 }
+
+/** Fecho convexo (cadeia monótona de Andrew), anti-horário, sem pontos colineares nas arestas. */
+export function convexHull(points: Vec2[]): Ring {
+  const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+  const uniq = pts.filter((p, i) => i === 0 || p.x !== pts[i - 1]!.x || p.y !== pts[i - 1]!.y);
+  if (uniq.length < 3) return uniq;
+  const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const half = (list: Vec2[]): Ring => {
+    const h: Ring = [];
+    for (const p of list) {
+      while (h.length >= 2 && cross(h[h.length - 2]!, h[h.length - 1]!, p) <= 0) h.pop();
+      h.push(p);
+    }
+    h.pop();
+    return h;
+  };
+  return [...half(uniq), ...half([...uniq].reverse())];
+}
+
+/**
+ * Retângulo orientado de menor área que envolve os pontos (rotating calipers por arestas do fecho: o mínimo de área
+ * ocorre com um lado alinhado a uma aresta do fecho). Anel de 4 vértices. Sem área (pontos colineares ou um só),
+ * devolve a caixa alinhada aos eixos.
+ */
+export function minAreaRect(points: Vec2[]): Ring {
+  const hull = convexHull(points);
+  if (hull.length < 3) {
+    const b = boxOf(points);
+    return [v2(b.minX, b.minY), v2(b.maxX, b.minY), v2(b.maxX, b.maxY), v2(b.minX, b.maxY)];
+  }
+  let best: { area: number; ring: Ring } | null = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i]!;
+    const c = hull[(i + 1) % hull.length]!;
+    const len = Math.hypot(c.x - a.x, c.y - a.y);
+    if (len === 0) continue;
+    const ux = (c.x - a.x) / len;
+    const uy = (c.y - a.y) / len;
+    const vx = -uy;
+    const vy = ux;
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const p of hull) {
+      const pu = p.x * ux + p.y * uy;
+      const pv = p.x * vx + p.y * vy;
+      if (pu < minU) minU = pu;
+      if (pu > maxU) maxU = pu;
+      if (pv < minV) minV = pv;
+      if (pv > maxV) maxV = pv;
+    }
+    const area = (maxU - minU) * (maxV - minV);
+    if (best && area >= best.area) continue;
+    const at = (pu: number, pv: number): Vec2 => v2(pu * ux + pv * vx, pu * uy + pv * vy);
+    best = { area, ring: [at(minU, minV), at(maxU, minV), at(maxU, maxV), at(minU, maxV)] };
+  }
+  if (best) return best.ring;
+  const b = boxOf(hull);
+  return [v2(b.minX, b.minY), v2(b.maxX, b.minY), v2(b.maxX, b.maxY), v2(b.minX, b.maxY)];
+}
+

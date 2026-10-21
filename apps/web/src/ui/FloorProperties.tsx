@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { FUNCTION_LABEL, floorArea, floorTypeThickness, type Floor, type Id } from '@hestia/model';
+import { quantifyFloors } from '@hestia/engine';
+import { FUNCTION_LABEL, floorArea, floorTypeThickness, type Floor, type Id, type Project } from '@hestia/model';
 import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -18,6 +19,12 @@ function patch(ids: Id[], p: Partial<Floor>): void {
   editor.store.exec({ type: 'updateElements', ids, patch: p });
 }
 
+/** Área líquida resolvida (com as aberturas de escada) de cada piso; o que não resolve cai na área crua. */
+function resolvedAreas(p: Project, floors: Floor[]): Map<Id, number> {
+  const levels = [...new Set(floors.map((f) => f.levelId))];
+  return new Map(levels.flatMap((levelId) => quantifyFloors(p, levelId).floors.map((q) => [q.floorId, q.area] as const)));
+}
+
 /** Propriedades de um ou mais pisos selecionados (tipo, deslocamento, marca, área e perímetro). */
 export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
   const p = useProject();
@@ -28,7 +35,9 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
   const comments = common(floors, (f) => f.comments);
   const single = floors.length === 1 ? floors[0]! : null;
   const type = typeId.mixed ? null : p.floorTypes[typeId.value];
-  const area = floors.reduce((s, f) => s + floorArea(f), 0);
+  const resolved = resolvedAreas(p, floors);
+  const areaOf = (f: Floor): number => resolved.get(f.id) ?? floorArea(f);
+  const area = floors.reduce((s, f) => s + areaOf(f), 0);
   const perimeter = floors.reduce((s, f) => s + ringPerimeter(f.boundary), 0);
 
   return (
@@ -70,7 +79,7 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
       <Group title="Dimensões">
         {single ? (
           <>
-            <Row label="Área líquida"><span className="val">{fmt(floorArea(single))} m²</span></Row>
+            <Row label="Área líquida"><span className="val">{fmt(areaOf(single))} m²</span></Row>
             <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(single.boundary))} m</span></Row>
             <Row label="Furos"><span className="val">{single.holes.length}</span></Row>
           </>

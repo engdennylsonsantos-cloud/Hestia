@@ -1,0 +1,125 @@
+import type { Id, Stair, StairRunStyle, StairType } from './types.ts';
+
+/** Estilos de lance aceitos (decisão 0014 §8). */
+export const STAIR_RUN_STYLES: readonly StairRunStyle[] = ['monolithic', 'assembled', 'post'];
+
+/** Sobreposição padrão entre degraus do estilo poste (m), decisão 0014 §8. */
+export const DEFAULT_STAIR_TREAD_OVERLAP = 0.025;
+
+/** Material padrão do poste central (e dos degraus do caracol de aço). */
+export const DEFAULT_STAIR_POST_MATERIAL_ID: Id = 'mat_aco';
+
+/** Folga lateral padrão em volta do furo da laje (m), decisão 0011 §6. */
+export const DEFAULT_STAIR_OPENING_MARGIN = 0.05;
+
+type StairInput = { id: Id; typeId: Id; levelId: Id } & Partial<Omit<Stair, 'order' | 'kind'>>;
+
+/** Constrói uma escada com os campos padrão (decisão 0011 §2); `order` é atribuído pelo comando addStair. */
+export function makeStair(s: StairInput): Omit<Stair, 'order'> {
+  return {
+    kind: 'stair',
+    topLevelId: null,
+    baseOffset: 0,
+    topOffset: 0,
+    height: 2.8,
+    components: [],
+    openingMode: 'headroom',
+    openingHeadroom: null,
+    openingMargin: DEFAULT_STAIR_OPENING_MARGIN,
+    openingRect: false,
+    mark: '',
+    comments: '',
+    ...s,
+  };
+}
+
+/** Valores comuns aos tipos iniciais (decisão 0011 §1, item 8; decisão 0014 §8 para sobreposição e poste). */
+const COMMON = {
+  maxRiser: 0.18,
+  minTread: 0.28,
+  minRunWidth: 0.8,
+  nosing: 0.015,
+  landingThickness: 0.15,
+  minHeadroom: 2.1,
+  cost: 0,
+  treadOverlap: DEFAULT_STAIR_TREAD_OVERLAP,
+  postMaterialId: DEFAULT_STAIR_POST_MATERIAL_ID,
+} as const;
+
+/**
+ * Tipos de escada iniciais. Estilo monolítico usa a profundidade estrutural; o montado usa piso e espelho; o poste usa
+ * degraus em balanço (sem espelho) presos ao poste central. As escadas caracol usam a regra do caracol em `stairChecks`.
+ */
+export const DEFAULT_STAIR_TYPES: StairType[] = [
+  {
+    ...COMMON,
+    id: 'stt_monolitica',
+    name: 'Escada monolítica concreto',
+    code: 'ES-01',
+    description: 'Lance monolítico de concreto armado com patamares de concreto',
+    runStyle: 'monolithic',
+    undersideStyle: 'smooth',
+    structuralDepth: 0.2,
+    treadThickness: 0,
+    riserThickness: 0,
+    materialId: 'mat_concreto',
+  },
+  {
+    ...COMMON,
+    id: 'stt_piso_espelho',
+    name: 'Escada de piso e espelho',
+    code: 'ES-02',
+    description: 'Lance de degraus de madeira (piso e espelho) sobre estrutura',
+    runStyle: 'assembled',
+    undersideStyle: 'smooth',
+    structuralDepth: 0,
+    treadThickness: 0.03,
+    riserThickness: 0.02,
+    materialId: 'mat_madeira',
+  },
+  {
+    ...COMMON,
+    id: 'stt_caracol_monolitica',
+    name: 'Escada caracol monolítica',
+    code: 'ES-03',
+    description: 'Caracol monolítico de concreto armado, com face inferior lisa',
+    runStyle: 'monolithic',
+    undersideStyle: 'smooth',
+    structuralDepth: 0.15,
+    minRunWidth: 0.8,
+    treadThickness: 0,
+    riserThickness: 0,
+    materialId: 'mat_concreto',
+  },
+  {
+    ...COMMON,
+    id: 'stt_caracol_poste',
+    name: 'Escada caracol com poste central',
+    code: 'ES-04',
+    description: 'Caracol de degraus de aço em balanço presos a poste central de aço, sem espelho',
+    runStyle: 'post',
+    undersideStyle: 'smooth',
+    structuralDepth: 0,
+    minRunWidth: 0.6,
+    treadThickness: 0.05,
+    riserThickness: 0,
+    materialId: 'mat_aco',
+  },
+];
+
+/**
+ * Regras do tipo que o modelo confere ao salvar (`upsertStairType`): estilo conhecido; sobreposição não negativa; e, no
+ * estilo poste, espessura do degrau positiva e sobreposição menor que ela. Devolve a 1ª mensagem, ou null.
+ */
+export function stairTypeIssue(t: Pick<StairType, 'runStyle' | 'treadThickness' | 'treadOverlap'>): string | null {
+  if (!STAIR_RUN_STYLES.includes(t.runStyle)) return 'Estilo de escada desconhecido.';
+  if (!(t.treadOverlap >= 0)) return 'A sobreposição dos degraus não pode ser negativa.';
+  if (t.runStyle === 'post') {
+    if (!(t.treadThickness > 0)) return 'Escada com poste central: a espessura do degrau precisa ser maior que zero.';
+    if (!(t.treadOverlap < t.treadThickness)) return 'A sobreposição dos degraus precisa ser menor que a espessura do degrau.';
+  }
+  return null;
+}
+
+/** Tipo usado por padrão quando o projeto não escolhe outro. */
+export const defaultStairTypeId: Id = 'stt_monolitica';

@@ -1,5 +1,5 @@
 import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
-import type { Guide, Inference, PreviewItem } from '@hestia/tools';
+import type { Guide, Inference, PreviewItem, StairTone } from '@hestia/tools';
 import { sectionMarkOps } from './sectionMarks.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -77,17 +77,41 @@ function bandRing(a: Vec2, b: Vec2, thickness: number, sMid: number, sag = 0): V
   return [p(a, lo), p(b, lo), p(b, hi), p(a, hi)];
 }
 
-/** Pré-visualização da ferramenta ativa. */
+/** Cor de um tom da prévia da escada; sem tom, a cor de destaque da ferramenta. */
+export function toneColor(tone: StairTone | undefined, theme: PlanTheme): string {
+  switch (tone) {
+    case 'boundary':
+      return theme.stairBoundary;
+    case 'riser':
+      return theme.stairRiser;
+    case 'path':
+      return theme.stairPath;
+    case 'landing':
+      return theme.stairLanding;
+    case 'tread':
+      return theme.stairTread;
+    default:
+      return theme.accent;
+  }
+}
+
+/** Pré-visualização da ferramenta ativa. Itens com tom (escada) usam a cor do tom; os demais, a de destaque. */
 export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanTheme, highlight: (ids: string[]) => FillOp[]): Overlay {
   const o: Overlay = { fills: [], strokes: [], labels: [] };
   for (const it of items) {
     switch (it.kind) {
       case 'line':
-        o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 1.5, color: theme.accent, alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
+        o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 1.5, color: toneColor(it.tone, theme), alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
         break;
       case 'polygon':
-        o.fills.push({ polygons: [[it.ring]], color: theme.accent, alpha: 0.14 });
-        o.strokes.push({ pts: it.ring, closed: true, widthPx: 1.5, color: theme.accent, alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
+        if (it.tone === 'tread') {
+          // Degraus calculados: preenchimento translúcido e contorno fino, sem competir com os limites e espelhos.
+          o.fills.push({ polygons: [[it.ring]], color: theme.stairTread, alpha: 0.2 });
+          o.strokes.push({ pts: it.ring, closed: true, widthPx: 1, color: theme.stairTread, alpha: 0.9, dash: it.dashed ? [7, 5] : undefined });
+          break;
+        }
+        o.fills.push({ polygons: [[it.ring]], color: toneColor(it.tone, theme), alpha: 0.14 });
+        o.strokes.push({ pts: it.ring, closed: true, widthPx: 1.5, color: toneColor(it.tone, theme), alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
         break;
       case 'wallBand': {
         const ring = bandRing(it.a, it.b, it.thickness, it.sMid, it.sag);

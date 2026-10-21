@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, planViewOf, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
+import type { Id, Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -38,6 +39,12 @@ interface Pt {
   y: number;
 }
 
+/** Planta com o contorno fantasma dos selecionados fora do intervalo de vista (decisão 0013 §4): a planta não os desenha. */
+function withHiddenSelection(dl: PlanDrawList, p: Project, levelId: Id, selection: Id[], theme: PlanTheme): PlanDrawList {
+  const ghosts = hiddenSelectionOps(p, levelId, planViewOf(p, levelId), selection, theme);
+  return ghosts.length ? { ...dl, strokes: [...dl.strokes, ...ghosts] } : dl;
+}
+
 /** Desenha o plano (GPU ou CPU) e o 3D, e traduz o ponteiro em chamadas ao editor. */
 export function ViewportCanvas(): ReactElement {
   const host = useRef<HTMLDivElement>(null);
@@ -45,6 +52,8 @@ export function ViewportCanvas(): ReactElement {
   const cpuRef = useRef<HTMLCanvasElement | null>(null);
   const plan = useRef(new PlanScene());
   const model = useRef(new ModelScene());
+  // Gancho de depuração (?debug=1): câmera orbital do 3D para os testes no navegador.
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3d?: unknown }).__hestia3d = model.current.orbit;
   const modelKey = useRef('');
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [labels, setLabels] = useState<LabelOp[]>([]);
@@ -157,23 +166,31 @@ export function ViewportCanvas(): ReactElement {
     const dl =
       st.view === 'section'
         ? (buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] })
-        : buildPlanDrawList({
-            project: p,
-            levelId: st.levelId,
-            resolved,
-            below,
-            belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
-            belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
-            belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
-            viewport: v,
+        : withHiddenSelection(
+            buildPlanDrawList({
+                project: p,
+                levelId: st.levelId,
+                resolved,
+                below,
+                belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
+                belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
+                belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
+                viewport: v,
+                theme,
+                dark,
+                selection: st.selection,
+                hover: st.hover,
+                preview: tool.preview(),
+                inference: tool.inference(),
+                showGrid: st.showGrid,
+                // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
+                ...{ showRoofProjection: st.showRoofProjection },
+            }),
+            p,
+            st.levelId,
+            st.selection,
             theme,
-            dark,
-            selection: st.selection,
-            hover: st.hover,
-            preview: tool.preview(),
-            inference: tool.inference(),
-            showGrid: st.showGrid,
-          });
+          );
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
@@ -195,7 +212,7 @@ export function ViewportCanvas(): ReactElement {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame.current);
-  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.shadows, ui.edges, ui.tool]);
+  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.showRoofProjection, ui.shadows, ui.edges, ui.tool]);
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
@@ -221,6 +238,11 @@ export function ViewportCanvas(): ReactElement {
   const local = (e: { clientX: number; clientY: number }): Pt => {
     const r = host.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  /** Ponto do plano (m) da superfície 3D sob o cursor; null se o raio não atinge o modelo. */
+  const pick3dAt = (s: Pt): Pt | null => {
+    const r = host.current!.getBoundingClientRect();
+    return pickModelPoint(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
   };
   const info = (e: RPointerEvent, s: Pt): { raw: Pt; shift: boolean; ctrl: boolean; alt: boolean } => {
     const v = editor.viewport() as Viewport;
@@ -282,6 +304,7 @@ export function ViewportCanvas(): ReactElement {
       if (d.mode === 'orbit') model.current.orbit.orbit(s.x - d.last.x, s.y - d.last.y);
       else if (d.mode === 'pan') model.current.orbit.pan(s.x - d.last.x, s.y - d.last.y);
       if (d.mode !== 'none') {
+        if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
         d.last = s;
         useUi.setState((st) => ({ previewTick: st.previewTick + 1 }));
       }
@@ -319,6 +342,12 @@ export function ViewportCanvas(): ReactElement {
       editor.pointer('up', inf);
       if (!d.moved) editor.pointer('click', inf);
     }
+    // Clique sem arrasto na vista 3D, com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
+    if (d.mode === 'orbit' && !d.moved && useUi.getState().view === '3d' && editor.activeTool.pick3d) {
+      const hit = pick3dAt(s);
+      if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
+      else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
+    }
     drag.current = { mode: 'none', start: s, last: s, moved: false };
   };
 
@@ -355,7 +384,7 @@ export function ViewportCanvas(): ReactElement {
           ? labels.map((l, i) => {
               const sp = worldToScreen(v, l.at);
               return (
-                <span key={i} className="dim-label" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
+                <span key={i} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
                   {l.text}
                 </span>
               );

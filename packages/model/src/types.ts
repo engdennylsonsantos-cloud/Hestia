@@ -1,7 +1,11 @@
 import type { Vec2 } from '@hestia/geom';
+import type { Stair, StairType } from './stairTypes.ts';
+import type { ViewRange } from './viewRange.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 16;
+
+export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -84,8 +88,8 @@ export type LocationLine =
   | 'coreExterior'
   | 'coreInterior';
 
-/** Tipos de junção no canto entre duas paredes (docs/05 §9). */
-export type JoinKind = 'butt' | 'miter' | 'square';
+/** Tipos de junção no canto entre duas paredes (docs/05 §9): encosto (padrão) e esquadria. */
+export type JoinKind = 'butt' | 'miter';
 
 export interface JoinConfig {
   kind: JoinKind;
@@ -97,6 +101,8 @@ export interface Level {
   id: Id;
   name: string;
   elevation: number;
+  /** Intervalo de vista da planta deste nível (decisão 0013). Cotas relativas à elevação. */
+  viewRange: ViewRange;
 }
 
 /** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */
@@ -126,6 +132,11 @@ export interface Wall {
   attachTopToFloor?: boolean;
   /** Topo ajustado à face inferior do telhado que cobre a parede (empenas e frontões); cálculo no engine. */
   attachTopToRoof?: boolean;
+  /**
+   * Telhado escolhido para o topo anexado (comando Anexar topo). Ausente = qualquer telhado que cubra o eixo, como antes.
+   * Se o telhado não existir mais, a parede fica na altura normal e o aviso C2 aparece.
+   */
+  attachTopRoofId?: Id;
   locationLine: LocationLine;
   /** Inverte qual lado é o externo (padrão: externo à esquerda de a→b). */
   flipped: boolean;
@@ -335,7 +346,7 @@ export interface Roof {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab | Roof;
+export type Element = Wall | Opening | Floor | Slab | Roof | Stair;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -376,6 +387,8 @@ export interface Project {
   floorTypes: Record<Id, FloorType>;
   slabTypes: Record<Id, SlabType>;
   roofTypes: Record<Id, RoofType>;
+  /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
+  stairTypes: Record<Id, StairType>;
   openingTypes: Record<Id, OpeningType>;
   elements: Record<Id, Element>;
   nextOrder: number;
@@ -390,3 +403,4 @@ export const isSlab = (e: Element | undefined): e is Slab => e?.kind === 'slab';
 export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
+export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';

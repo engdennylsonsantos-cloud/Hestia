@@ -4,8 +4,8 @@ import type { JoinKind } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import type { PointerInfo } from './types.ts';
 
-const ORDER: JoinKind[] = ['butt', 'miter', 'square'];
-const LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria', square: 'Esquadro' };
+const ORDER: JoinKind[] = ['butt', 'miter'];
+const LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria' };
 
 interface Node {
   at: Vec2;
@@ -14,11 +14,11 @@ interface Node {
   flip: boolean;
 }
 
-/** Ferramenta Junção (Revit: Wall Joins): clique num canto para alternar encosto, esquadria e esquadro. */
+/** Ferramenta Junção (Revit: Wall Joins): clique num canto para alternar encosto e esquadria. */
 export class JoinTool extends ToolBase {
   readonly id = 'joins';
   readonly label = 'Junção';
-  readonly hint = 'Junção: clique num canto de duas paredes para alternar Encosto, Esquadria e Esquadro. Tab inverte qual parede domina.';
+  readonly hint = 'Junção: clique num canto de duas paredes para alternar Encosto e Esquadria. Tab inverte qual parede domina.';
   private node: Node | null = null;
 
   protected reset(): void {

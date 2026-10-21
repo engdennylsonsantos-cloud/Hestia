@@ -1,0 +1,31 @@
+# Decisão 0014 · Escada caracol (helicoidal)
+
+Fonte: docs/escadas/F-caracol.md (Revit 2026, ArchiCAD 29, NBR 9050:2020 6.8.6, IT 11 SP, IBC/IRC como comparação). Decidido em 2026-10-21 com o dono:
+dois estilos na primeira entrega (monolítico e poste central, ambos no mesmo tipo de escada); recomendações abaixo adotadas.
+
+## 1 · Decisões
+| # | Decisão |
+|---|---|
+| 1 | O caracol é um **gerador** de croqui (`generatedBy: 'spiral'`), como reto/L/U/leque: limites internos e externos em cadeias de arcos de até 90° e espelhos radiais. Sem engine nova de degraus: `stairRunSteps` já serve (ordenação pela linha média, acima de 180°, decisão 0011 §4) |
+| 2 | **Parâmetros** guardados no lance como metadado `StairRun.spiral?: { center: Vec2; rInner: number; rOuter: number; startAngle: number; sweep: number /* rad, com sinal: + anti-horário */ }`. Editar o croqui à mão descarta `spiral` (vira croqui livre, como o leque). Com `spiral` presente há alças: centro, raio externo, raio interno, ângulo inicial e ângulo final (varredura) que regeneram o croqui |
+| 3 | **Varredura** |sweep| ≤ 4π (duas voltas) na v1; o gerador do leque continua recusando ≥ 2π, o caracol aceita até 4π. Acima de 2π o lance se sobrepõe em planta: a validação `stair-riser-crossing` e `stair-riser-same-location` passa a comparar também a COTA: dois espelhos radiais no mesmo ângulo só conflitam se o ângulo coincide E a diferença de cota entre eles é < altura do espelho (voltas diferentes têm cotas diferentes) |
+| 4 | **Raios:** `rInner` padrão 0,10 m (poste central; mínimo 0,05 m para os limites não se tocarem), `rOuter` padrão 1,00 m, largura `rOuter − rInner` ≥ largura mínima do tipo (0,80 m). Número de espelhos N pela altura como nos demais (`ceil(H/espelhoMáx)`), ângulo por degrau `Δ = |sweep|/(N−1)` |
+| 5 | **Caminhada:** linha média dos limites (raio `(rInner+rOuter)/2`), do primeiro ao último espelho (padrão do croqui) |
+| 6 | **Piso do caracol (avisos, nunca bloqueio, como o perfil de norma 0011 §1.10):** (a) piso medido a 0,55 m da borda interna (NBR 9050:2020 6.8.6) ≥ 0,28 m: `r = rInner + 0,55`, `p = r·Δ`; (b) piso na borda estreita ≥ 0,07 m (IT 11 SP, espiral) — aviso informativo; (c) 2e+p entre 0,63 e 0,64 m no raio da caminhada (aviso, mesmo perfil); (d) espelho ≤ máximo do tipo. Aviso informativo fixo no painel: "Escada caracol não serve de saída de emergência (RS: RT 11 5.7.1.2; SP: só mezanino e área privativa)" |
+| 7 | **Folga entre voltas (`stair-spiral-headroom`, aviso):** quando |sweep| > 2π, a folga vertical no mesmo ângulo = `(n − 1)·h − Tv`, com `n = 2π/Δ` espelhos por volta, medida no espelho de trás do degrau de cima, e `Tv` = espessura vertical do corpo (monolítico: `T = structuralDepth/cosθ`; poste: `treadThickness`) ≥ `minHeadroom` do tipo (2,10 m). Mensagem: "A folga entre voltas (X m) é menor que o mínimo (Y m): aumente o nº de espelhos por volta, o pé-direito ou a profundidade livre." Com h = 0,175 e T = 0,236 m, `(n − 1)·0,175 − 0,236 ≥ 2,10` exige n ≥ 15 espelhos por volta (≈ 24° por degrau); com 14, a folga é 2,04 m e avisa |
+| 8 | **Estilos (campo do tipo `runStyle`):** `'monolithic'` (laje helicoidal; fundo liso ou escalonado como hoje, por peça de setor, com T medido no raio da caminhada), `'assembled'` (piso e espelho, como hoje) e novo `'post'` (**poste central**: degraus em fatia presos ao poste, em balanço, SEM espelho; espessura `treadThickness` — padrão 0,05 m; sobreposição entre degraus consecutivos `treadOverlap` — padrão 0,025 m; poste cilindro de raio `rInner` com material `postMaterialId`, da cota de base até a cota de topo do último degrau; degrau com material do tipo). Novos campos do tipo: `treadOverlap`, `postMaterialId` (migração 15 → 16 acrescenta valores padrão; tipos novos `Escada caracol monolítica` e `Escada caracol com poste central` em `DEFAULT_STAIR_TYPES`) |
+| 9 | **Planta:** volta de baixo cheia, voltas de cima tracejadas (regra do plano de corte da decisão 0013, cota `nível + cut`); numeração contínua (round((zTopo−baseZ)/h)); poste = círculo de `rInner` com contorno e preenchimento do material; zigue-zague do símbolo de corte na caminhada |
+| 10 | **Corte/elevação, 3D, DXF, quantitativos:** pelas peças de `stairBody` (setores, fundo plano por peça); poste central = cilindro no 3D (24 faces) e retângulo no corte; volume = Σ pieceVolume (+ poste no estilo `post`); DXF: camada `ESCADA_POSTE` para o poste |
+| 11 | **Furo da laje:** modo `headroom` já resulta nos setores anulares do alto (regra por elemento 0011 §6); modo `full` = círculo de `rOuter` (união da pegada) |
+| 12 | **Ferramenta:** forma "Caracol" na ferramenta `stairrun` (Q), estilo Centro-extremos: 1º clique = centro; 2º = raio externo e ângulo inicial (arraste); 3º = ângulo final (o mouse gira e a varredura pode passar de 360°, acumulando voltas, com pré-visualização e contador de espelhos). Campos digitáveis na barra: raio interno, raio externo, varredura (°), sentido (horário/anti-horário). Enter confirma |
+
+## 2 · Fora desta etapa
+Corrimão/guarda-corpo, apoio lateral (stringer), escada helicoidal com patamar intermediário, mais de 2 voltas, e perfil de norma editável no projeto.
+
+## 3 · Critérios de aceitação
+- Gerador: 90°, 180°, 270°, 360°, 540°, 720°, sentidos horário e anti-horário: soma das áreas dos degraus = área da região entre o 1º e o último espelho (sem sobreposição em planta dentro da mesma volta), N−1 degraus, cotas estritamente crescentes com passo h.
+- Validação: voltas sobrepostas em planta NÃO geram erro de cruzamento (cota separa); espelhos no mesmo ângulo e mesma cota geram; folga entre voltas calculada pela fórmula do item 7 ((n − 1)·h − Tv, no espelho de trás do degrau de cima) e conferida em teste com h = 0,175, T = 0,236: 15 espelhos por volta passa; 14, 13 e 12 avisam.
+- Corpo: volume = Σ pieceVolume; estanqueidade do corte (liso e escalonado) na primeira volta; poste cilíndrico presente apenas no estilo `post`; nenhuma peça abaixo de baseZ.
+- Planta: a volta superior sai tracejada e a inferior cheia com corte a 1,20 m; numeração 1..N−1 contínua.
+- Ferramenta: criar por 3 cliques com varredura de 270° e de 540°; digitar valores na barra; alças alteram raio e varredura e regeneram.
+- Interface: editor de tipo com `treadOverlap` e material do poste apenas no estilo `post`.

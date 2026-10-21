@@ -1,23 +1,22 @@
 import type { ReactElement } from 'react';
 import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
-import { editor } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
+import { isStair, type Id, type Project } from '@hestia/model';
+import { editor, useProject } from '../editor/controller.ts';
+import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
-  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope'] }],
+  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] }],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
     { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'] },
+    { title: 'Anexar', tools: ['attachroof', 'detachroof'] },
     { title: 'Medir', tools: ['measure'] },
   ],
 };
 
-const SOON: Array<{ icon: string; label: string }> = [
-  { icon: 'stairs', label: 'Escada' },
-  { icon: 'room', label: 'Ambiente' },
-];
+const SOON: Array<{ icon: string; label: string }> = [{ icon: 'room', label: 'Ambiente' }];
 
 function ToolButton({ id }: { id: ToolId }): ReactElement {
   const active = useUi((s) => s.tool === id);
@@ -40,9 +39,39 @@ function Toggle({ icon, label, on, onClick, title }: { icon: string; label: stri
   );
 }
 
+/** Grupo "Escada" da aba Modificar: aparece com escada selecionada (editar croqui, tipo, tabela). */
+function StairGroup({ stairs }: { stairs: Array<{ id: Id; typeId: Id }> }): ReactElement {
+  const one = stairs.length === 1 ? stairs[0] : undefined;
+  return (
+    <div className="rgroup">
+      <div className="rgroup-tools">
+        <button className="tbtn" disabled={!one} onClick={() => editor.setTool('stair')} title="Editar o croqui da escada selecionada (só uma)">
+          <Icon name="stair" size={22} />
+          <span>Editar croqui</span>
+        </button>
+        <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairType', dialogArg: stairs[0]!.typeId })} title="Abre o tipo da escada selecionada">
+          <Icon name="file" size={22} />
+          <span>Tipos de escada</span>
+        </button>
+        <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })} title="Tabela de escadas com quantitativos e exportação CSV">
+          <Icon name="file" size={22} />
+          <span>Tabela de escadas</span>
+        </button>
+      </div>
+      <div className="rgroup-title">Escada</div>
+    </div>
+  );
+}
+
+/** Escadas da seleção (para o grupo da aba Modificar). */
+const stairsIn = (p: Project, ids: Id[]): Array<{ id: Id; typeId: Id }> =>
+  ids.map((id) => p.elements[id]).filter(isStair).map((e) => ({ id: e.id, typeId: e.typeId }));
+
 export function Ribbon(): ReactElement {
   const tab = useUi((s) => s.ribbon);
   const s = useUi();
+  const p = useProject();
+  const selStairs = stairsIn(p, s.selection);
   const set = (p: Partial<typeof s>): void => useUi.setState(p);
   const tabs: Array<[typeof tab, string]> = [
     ['arquitetura', 'Arquitetura'],
@@ -82,17 +111,7 @@ export function Ribbon(): ReactElement {
             <div className="rgroup-title">Tipo</div>
           </div>
         )}
-        {tab === 'modificar' && (
-          <div className="rgroup">
-            <div className="rgroup-tools">
-              <button className="tbtn" onClick={() => editor.miterAllCorners()} title="Troca as quinas em encosto ou esquadro com acabamento por esquadria, em todos os níveis (Ctrl+Z desfaz)">
-                <Icon name="joins" size={22} />
-                <span>Quinas em esquadria</span>
-              </button>
-            </div>
-            <div className="rgroup-title">Junção</div>
-          </div>
-        )}
+        {tab === 'modificar' && selStairs.length > 0 && <StairGroup stairs={selStairs} />}
         {tab === 'modificar' && (
           <div className="rgroup">
             <div className="rgroup-tools">
@@ -135,6 +154,7 @@ export function Ribbon(): ReactElement {
               <div className="rgroup-tools">
                 <Toggle icon="grid" label="Grade" on={s.showGrid} onClick={() => set({ showGrid: !s.showGrid })} />
                 <Toggle icon="layers" label="Subpavimento" on={s.showUnderlay} onClick={() => set({ showUnderlay: !s.showUnderlay })} title="Mostrar o pavimento abaixo, apagado" />
+                <Toggle icon="roof" label="Mostrar projeção da cobertura" on={s.showRoofProjection} onClick={toggleRoofProjection} title="Mostrar a projeção tracejada da cobertura acima do corte (decisão 0013)" />
               </div>
               <div className="rgroup-title">Planta</div>
             </div>
@@ -162,6 +182,10 @@ export function Ribbon(): ReactElement {
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })} title="Tabela de telhados com áreas, cumeeira, beiral, volume e exportação CSV">
                   <Icon name="file" size={22} />
                   <span>Tabela de telhados</span>
+                </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })} title="Tabela de escadas com espelhos, piso, área, volume e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de escadas</span>
                 </button>
               </div>
               <div className="rgroup-title">Documentar</div>

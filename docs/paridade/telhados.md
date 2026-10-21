@@ -9,7 +9,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 - [x] A2 Contorno pelas paredes: perímetro externo mais balanço de beiral **(bloqueante)**
 - [x] A3 Formas: uma água, duas águas e quatro águas, com inclinação em % ou graus **(bloqueante)**
 - [x] A4 Direção da cumeeira (duas águas) e do caimento (uma água) editáveis **(bloqueante)**
-- [ ] A5 Seta de inclinação e águas livres editadas na tela **(bloqueante)** — parcial: há a ferramenta de seta e a lista de águas; falta desenhar o polígono próprio de cada água
+- [-] A5 Seta de inclinação e águas livres editadas na tela: fora de escopo da v1 por decisão do dono (2026-10-21). Ficam a ferramenta de seta e a lista de águas; o polígono próprio de cada água não entra na v1
 - [x] A6 Cumeeira, espigões e rincões calculados pelo encontro das águas **(bloqueante)**
 - [x] A7 Furos (claraboia, shaft)
 - [x] A8 Edição do contorno por alças e do beiral
@@ -26,9 +26,10 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 
 ## C · Relação com paredes
 - [x] C1 Topo da parede se ajusta ao telhado (empenas e frontões) **(bloqueante)**
-- [x] C2 Aviso de parede que ultrapassa o telhado ou fica fora dele; topo ajustado só no trecho coberto **(bloqueante)**
+- [x] C2 Aviso de parede que ultrapassa o telhado ou fica fora dele; topo ajustado só no trecho coberto **(bloqueante)** Parede curva fica na altura normal e recebe o mesmo aviso (face inferior amostrada ao longo do arco, passo ≤ 0,25 m).
 - [x] C4 Junção de telhados (Join Roof) e abertura/claraboia no telhado **(bloqueante)**
 - [x] C5 Acabamentos do beiral: testeira, calha, forro, e corte de caibro prumo/esquadro (corte de caibro no corte; no 3D as camadas continuam cortadas na vertical)
+- [x] C6 Anexar/desanexar topo da parede ao telhado pelo comando (3D e planta): paredes, depois clique no telhado; a parede guarda o telhado escolhido. No 3D o clique usa o raio contra as malhas, mas o teste só cobre o raio; conferir no navegador
 - [x] D6 Cota da cumeeira, etiqueta de inclinação e planta de cobertura
 - [x] C3 Telhados sobrepostos detectados, com aviso
 
@@ -54,7 +55,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 - [x] F6 Nível base e nível superior editáveis na parede; "Mover para o nível…" para qualquer elemento
 
 ## G · Qualidade
-- [x] G1 Validação: contorno inválido, inclinação inválida, água degenerada, contorno não convexo em quatro águas, tipo ausente **(bloqueante)**
+- [x] G1 Validação: contorno inválido, inclinação inválida, água degenerada, cumeeira sem aresta paralela (aviso), tipo ausente **(bloqueante)**. Contorno côncavo em quatro águas não tem validação própria: o esqueleto reto o calcula (medidos em decisão 0008, item 3).
 - [x] G2 Painel de avisos com "Ir para"
 - [x] G3 Casos dourados de áreas, volumes, cumeeira e alturas **(bloqueante)**
 - [x] G4 Testes de propriedade (contornos convexos aleatórios: altura contínua entre águas, sem exceção)

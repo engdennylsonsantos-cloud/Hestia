@@ -13,7 +13,6 @@ type W = Omit<Wall, 'order'>;
 const wall = (id: string, a: [number, number], b: [number, number], extra: Partial<Wall> = {}): W =>
   makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, ...extra });
 const miter = { kind: 'miter', flip: false } as const;
-const square = { kind: 'square', flip: false } as const;
 
 function level(walls: W[]) {
   const s = new ProjectStore(createEmptyProject());
@@ -53,15 +52,6 @@ describe('K2 · contornos dourados por junção', () => {
     expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
     // Núcleo com canto externo em (4,07; −0,07) e interno em (3,93; 0,07).
     expect(shape(material(r, 'mat_bloco14'))).toEqual(expected([[0, -0.07], [4.07, -0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]));
-  });
-
-  it('L em corte reto (esquadro): cada parede avança até a face externa da outra', () => {
-    const r = level([wall('a', A, B, { joinEnd: square }), wall('b', B, C, { joinStart: square })]);
-    expect(shape(silhouette(r))).toEqual(expected([[0, -0.092], [4.092, -0.092], [4.092, 3], [3.908, 3], [3.908, 0.092], [0, 0.092]]));
-    // Cada parede vai até a face externa da outra; entre estruturas vale a união (decisão 0004, item 7).
-    expect(shape(material(r, 'mat_bloco14'))).toEqual(
-      expected([[0, -0.07], [3.93, -0.07], [3.93, -0.092], [4.07, -0.092], [4.07, -0.07], [4.092, -0.07], [4.092, 0.07], [4.07, 0.07], [4.07, 3], [3.93, 3], [3.93, 0.07], [0, 0.07]]),
-    );
   });
 
   it('T: o ramal vai até a face da parede atravessada e o núcleo é contínuo', () => {

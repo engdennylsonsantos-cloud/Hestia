@@ -12,14 +12,14 @@ import {
   type Project,
   type TemplateId,
 } from '@hestia/model';
-import { createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
-import { miterCorners } from './cornerActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
+import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
@@ -200,11 +200,13 @@ export class Editor {
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;
     if (mod && (k === 'z' || k === 'Z')) {
+      if (this.stairPickHistory(e.shiftKey)) return true;
       if (e.shiftKey) this.redo();
       else this.undo();
       return true;
     }
     if (mod && (k === 'y' || k === 'Y')) {
+      if (this.stairPickHistory(true)) return true;
       this.redo();
       return true;
     }
@@ -242,7 +244,11 @@ export class Editor {
     }
     if (k === 'Delete' || k === 'Backspace') {
       // Vértice de piso em foco: a ferramenta o remove antes de a seleção ser excluída.
-      if (this.tool.deleteKey?.()) return true;
+      if (this.tool.deleteKey?.()) {
+        // Repinta a barra da ferramenta (contador de espelhos, aviso) sem esperar o próximo clique.
+        this.bump();
+        return true;
+      }
       if (ui.selection.length) { this.deleteSelection(); return true; }
     }
     if (k === 'Tab') {
@@ -258,8 +264,7 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', f: 'floor', b: 'slab', u: 'roof', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', g: 'parallel', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section', h: 'rehost' };
-    const id = map[k.toLowerCase()];
+    const id = toolForKey(k);
     if (id && !e.altKey) {
       this.setTool(id);
       return true;
@@ -337,10 +342,14 @@ export class Editor {
   /** "Mesmo tipo" (botão na aba Modificar). */
   selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
 
-  /** Quinas em encosto ou esquadro com acabamento viram esquadria em todos os níveis (um passo de desfazer). Devolve a contagem. */
-  miterAllCorners(): number { return miterCorners(this.store); }
-  /** "Corrigir" de um aviso `wall-corner-butt-finish`: as quinas em encosto desta parede viram esquadria. */
-  miterWallCorners(wallId: Id): number { return miterCorners(this.store, wallId); }
+  /** Ctrl+Z / Ctrl+Y no croqui da escada: desfaz ou refaz a última linha pegada. Sem pegada, vale o histórico do modelo. */
+  private stairPickHistory(redo: boolean): boolean {
+    const t = this.tool;
+    if (!isStairTool(t)) return false;
+    const done = redo ? t.redoPick() : t.undoPick();
+    if (done) this.bump();
+    return done;
+  }
 
   undo(): void {
     this.store.undo();

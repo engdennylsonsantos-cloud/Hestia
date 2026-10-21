@@ -3,7 +3,7 @@ import { endTangent, pointAt, toLocal, type WallFrame } from './frame.ts';
 import type { EndRef, WallEnds } from './joinTypes.ts';
 import { flatEnd, setEnd, both, buttAgainst } from './joinSides.ts';
 import { joinPair, toCenterline } from './joinPair.ts';
-import { starNode } from './joinNode.ts';
+import { nodeOfWalls } from './joinNode.ts';
 
 export type { EndSpec, MiterSide, SideSpec, WallEnds } from './joinTypes.ts';
 export { miterBreaks, miterPoint } from './joinSides.ts';
@@ -58,15 +58,13 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
     return;
   }
   // 3+ paredes: procura um par colinear (parede "passante" dividida no nó).
-  let pair: [number, number] | null = null;
-  for (let i = 0; i < g.length && !pair; i++) {
+  const pares: Array<[number, number]> = [];
+  for (let i = 0; i < g.length; i++) {
     for (let j = i + 1; j < g.length; j++) {
-      if (Math.abs(cross(g[i]!.dir, g[j]!.dir)) < COLLINEAR_SIN && dot(g[i]!.dir, g[j]!.dir) < 0) {
-        pair = [i, j];
-        break;
-      }
+      if (Math.abs(cross(g[i]!.dir, g[j]!.dir)) < COLLINEAR_SIN && dot(g[i]!.dir, g[j]!.dir) < 0) pares.push([i, j]);
     }
   }
+  const pair = pares.length === 1 ? pares[0]! : null;
   if (pair) {
     const through = g[pair[0]]!.f;
     g.forEach((r, i) => {
@@ -76,7 +74,7 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
     });
     return;
   }
-  starNode(out, g);
+  nodeOfWalls(out, g);
 }
 
 function findTee(r: EndRef, frames: WallFrame[], tol: number): WallFrame | null {

@@ -53,6 +53,33 @@ function edgeProblems(r: Roof, name: string): ValidationIssue[] {
   return out;
 }
 
+/** Ângulo (graus) até o qual uma aresta conta como paralela à cumeeira de duas águas. */
+const RIDGE_PARALLEL_DEG = 5;
+
+/**
+ * Cumeeira de duas águas ('gable') sem nenhuma aresta do contorno paralela a `dir` (± 5°): a cumeeira segue as arestas do
+ * contorno, não a direção informada. Aviso, não erro: o telhado continua calculado. Só com direção unitária.
+ */
+function ridgeProblems(r: Roof, name: string): ValidationIssue[] {
+  if (r.shape !== 'gable' || dirProblem(r)) return [];
+  const sinTol = Math.sin((RIDGE_PARALLEL_DEG * Math.PI) / 180);
+  const n = r.boundary.length;
+  const parallel = r.boundary.some((a, i) => {
+    const c = r.boundary[(i + 1) % n]!;
+    const l = Math.hypot(c.x - a.x, c.y - a.y);
+    return l > 1e-12 && Math.abs(((c.x - a.x) * r.dir.y - (c.y - a.y) * r.dir.x) / l) <= sinTol;
+  });
+  if (parallel) return [];
+  return [
+    {
+      severity: 'warning',
+      code: 'roof-ridge-off-edges',
+      message: `Telhado ${name}: a cumeeira acompanha as arestas do contorno: nenhuma aresta é paralela à direção informada.`,
+      elementId: r.id,
+    },
+  ];
+}
+
 /** Águas livres com polígono de menos de 3 pontos, área zero ou direção de subida nula. */
 function planeProblems(r: Roof, name: string): ValidationIssue[] {
   if (r.shape !== 'free') return [];
@@ -98,6 +125,7 @@ function roofIssuesOf(p: Project, r: Roof): ValidationIssue[] {
   r.holes.forEach((h, k) => {
     if (h.length >= 3 && holeOutside(r.boundary, h)) push('error', 'roof-hole-outside', `O furo ${k + 1} do telhado ${name} está fora do contorno.`);
   });
+  out.push(...ridgeProblems(r, name));
   return out;
 }
 

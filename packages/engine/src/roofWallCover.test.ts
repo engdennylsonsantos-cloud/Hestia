@@ -106,3 +106,39 @@ describe('C2 · avisos entre paredes e telhados', () => {
     expect(roofWallIssues(p)).toEqual([]);
   });
 });
+
+describe('C2 · parede curva sob o telhado: aviso pela face inferior amostrada ao longo do arco', () => {
+  // Quatro águas 10 x 6 a 30 %, beiral em 3 m. Parede de (0; 3) a (10; 3): a corda passa pelo meio do telhado.
+  function buildHip(walls: Array<Omit<Wall, 'order'>>): Project {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r1', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: rect(0, 0, 10, 6), shape: 'hip', slopePercent: 30, heightOffset: 3 }) });
+    for (const w of walls) s.exec({ type: 'addWall', wall: w });
+    return s.project;
+  }
+  const hipWall = (id: string, extra: Partial<Wall>): Omit<Wall, 'order'> =>
+    makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 3 }, b: { x: 10, y: 3 }, height: 4.5, attachTopToRoof: false, ...extra });
+
+  it('reta e curva com a mesma corda e a mesma altura dão o mesmo aviso de atravessamento', () => {
+    const straight = buildHip([hipWall('w1', { sag: 0 })]);
+    const curved = buildHip([hipWall('w1', { sag: 0.5 })]);
+    expect(roofWallIssues(straight).map((i) => i.code)).toEqual(['wall-roof-pierce']);
+    expect(roofWallIssues(curved).map((i) => i.code)).toEqual(['wall-roof-pierce']);
+  });
+
+  it('curva sem anexo abaixo da face inferior não avisa', () => {
+    expect(roofWallIssues(buildHip([hipWall('w1', { sag: 0.5, height: 2.5 })]))).toEqual([]);
+  });
+
+  it('curva anexada totalmente sob o telhado não avisa', () => {
+    const p = buildHip([hipWall('w1', { a: { x: 2, y: 3 }, b: { x: 8, y: 3 }, sag: 0.5, attachTopToRoof: true, height: 3 })]);
+    expect(roofWallIssues(p)).toEqual([]);
+  });
+
+  it('curva anexada com trecho fora do telhado: aviso wall-roof-uncovered e topo na altura normal (sem perfil)', () => {
+    const p = buildHip([hipWall('w1', { a: { x: -2, y: 3 }, b: { x: 4, y: 3 }, sag: 0.5, attachTopToRoof: true, height: 3 })]);
+    expect(roofWallIssues(p).map((i) => i.code)).toEqual(['wall-roof-uncovered']);
+    const z = wallZRange(p, p.elements.w1 as Wall);
+    expect(z.profile).toBeUndefined();
+    expect(z).toEqual({ z0: 0, height: 3 });
+  });
+});

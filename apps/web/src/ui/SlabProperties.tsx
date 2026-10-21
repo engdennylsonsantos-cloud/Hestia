@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
-import { slabRiseAt } from '@hestia/engine';
-import { FUNCTION_LABEL, slabArea, slabTypeThickness, type Id, type Slab } from '@hestia/model';
+import { quantifySlabs, slabRiseAt } from '@hestia/engine';
+import { FUNCTION_LABEL, slabArea, slabTypeThickness, type Id, type Project, type Slab } from '@hestia/model';
 import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -27,10 +27,16 @@ function setPercent(slabs: Slab[], percent: number): void {
 }
 
 /** Área real da face superior: a área em planta vezes sqrt(1 + g²), com g o gradiente do caimento (percentual / 100). */
-export const realArea = (s: Slab): number => {
+export const realArea = (s: Slab, planArea: number = slabArea(s)): number => {
   const g = (s.slope?.percent ?? 0) / 100;
-  return slabArea(s) * Math.sqrt(1 + g * g);
+  return planArea * Math.sqrt(1 + g * g);
 };
+
+/** Área em planta resolvida (com as aberturas de escada) de cada laje; a que não resolve cai na área crua. */
+export function resolvedPlanAreas(p: Project, slabs: Slab[]): Map<Id, number> {
+  const levels = [...new Set(slabs.map((s) => s.levelId))];
+  return new Map(levels.flatMap((levelId) => quantifySlabs(p, levelId).slabs.map((q) => [q.slabId, q.planArea] as const)));
+}
 
 /** Variação da cota do topo ao longo do contorno (m): zero sem inclinação. */
 export const topVariation = (s: Slab): number => {
@@ -51,8 +57,10 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
   const comments = common(slabs, (s) => s.comments);
   const single = slabs.length === 1 ? slabs[0]! : null;
   const type = typeId.mixed ? null : p.slabTypes[typeId.value];
-  const planArea = slabs.reduce((s, x) => s + slabArea(x), 0);
-  const trueArea = slabs.reduce((s, x) => s + realArea(x), 0);
+  const resolved = resolvedPlanAreas(p, slabs);
+  const planOf = (x: Slab): number => resolved.get(x.id) ?? slabArea(x);
+  const planArea = slabs.reduce((s, x) => s + planOf(x), 0);
+  const trueArea = slabs.reduce((s, x) => s + realArea(x, planOf(x)), 0);
   const perimeter = slabs.reduce((s, x) => s + ringPerimeter(x.boundary), 0);
 
   return (
@@ -109,8 +117,8 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
       <Group title="Dimensões">
         {single ? (
           <>
-            <Row label="Área em planta"><span className="val">{fmt(slabArea(single))} m²</span></Row>
-            <Row label="Área real"><span className="val">{fmt(realArea(single))} m²</span></Row>
+            <Row label="Área em planta"><span className="val">{fmt(planOf(single))} m²</span></Row>
+            <Row label="Área real"><span className="val">{fmt(realArea(single, planOf(single)))} m²</span></Row>
             <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(single.boundary))} m</span></Row>
             <Row label="Furos"><span className="val">{single.holes.length}</span></Row>
           </>

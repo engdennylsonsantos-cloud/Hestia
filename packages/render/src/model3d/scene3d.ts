@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { wallBaseElevation, wallHeight, wallsOnLevel, openingsOfWall, type Material, type Project } from '@hestia/model';
 import { OrbitCamera } from './orbit.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
+import { buildStairSolids } from './stairSolids.ts';
 import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids } from './solids.ts';
 
 export interface Scene3DOptions {
@@ -79,12 +80,16 @@ export class ModelScene {
   update(p: Project, levels: ResolvedLevel[], opt: Scene3DOptions): void {
     this.clearModel();
     const edgeMat = new THREE.LineBasicMaterial({ color: opt.dark ? 0xd7dde5 : 0x1c2026, transparent: true, opacity: 0.5 });
+    const stairs = resolveStairs(p);
     for (const lv of levels) {
       const solids = buildLevelSolids(lv);
       // Pisos, lajes e telhados do nível: uma malha por material, com os furos e as inclinações (D2); o beiral (C5) à parte.
       const roofs = resolveRoofs(p, lv.levelId);
       const eave = buildEaveSolids(p, roofs);
-      const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId)), ...buildSlabSolids(resolveSlabs(p, lv.levelId)), ...buildRoofSolids(roofs), ...eave.batches];
+      // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
+      // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
+      const stairSolids = buildStairSolids(stairs.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s));
+      const batches = [...solids.batches, ...buildFloorSolids(resolveFloors(p, lv.levelId)), ...buildSlabSolids(resolveSlabs(p, lv.levelId)), ...buildRoofSolids(roofs), ...eave.batches, ...stairSolids];
       for (const b of batches) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));

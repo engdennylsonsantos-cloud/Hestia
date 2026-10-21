@@ -1,6 +1,8 @@
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
+import { DEFAULT_STAIR_TYPES } from './stair.ts';
+import { makeLevel } from './level.ts';
 import { SCHEMA_VERSION, type Layer, type Material, type OpeningType, type Project, type WallType } from './types.ts';
 
 const mat = (id: string, name: string, color: string, hatch: Material['hatch'], extra: Partial<Material> = {}): Material => ({
@@ -27,6 +29,7 @@ export const DEFAULT_MATERIALS: Material[] = [
   mat('mat_gesso', 'Placa de gesso', '#ece9e2', 'none', { cost: 44 }),
   mat('mat_la', 'Lã mineral', '#e5d27a', 'dots', { cost: 28 }),
   mat('mat_perfil', 'Perfil de aço', '#9aa0a6', 'cross', { cost: 20 }),
+  mat('mat_aco', 'Aço', '#7b8189', 'solid', { gloss: 0.6, unit: 'm3' }),
   mat('mat_madeira', 'Madeira', '#a9794a', 'diagonal', { cost: 150 }),
   mat('mat_vidro', 'Vidro', '#a9d6e5', 'none', { gloss: 0.9, opacity: 0.35, cost: 220 }),
   mat('mat_aluminio', 'Alumínio', '#b8bdc2', 'solid', { gloss: 0.7, unit: 'm' }),
@@ -121,14 +124,15 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     schemaVersion: SCHEMA_VERSION,
     name,
     levels: [
-      { id: 'lv_0', name: 'Térreo', elevation: 0 },
-      { id: 'lv_1', name: 'Pavimento 2', elevation: 3 },
+      makeLevel({ id: 'lv_0', name: 'Térreo', elevation: 0 }),
+      makeLevel({ id: 'lv_1', name: 'Pavimento 2', elevation: 3 }),
     ],
     materials: toRecord(DEFAULT_MATERIALS),
     wallTypes: toRecord(DEFAULT_WALL_TYPES),
     floorTypes: toRecord(DEFAULT_FLOOR_TYPES),
     slabTypes: toRecord(DEFAULT_SLAB_TYPES),
     roofTypes: toRecord(DEFAULT_ROOF_TYPES),
+    stairTypes: toRecord(DEFAULT_STAIR_TYPES),
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),
     elements: {},
     nextOrder: 1,

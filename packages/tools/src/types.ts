@@ -1,5 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
+import type { StairToolOptions, StairTone } from './stairSketchState.ts';
+import type { StairRunToolOptions } from './stairRunPlan.ts';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
 
@@ -19,8 +21,8 @@ export interface Inference {
 
 /** O que a ferramenta mostra antes do clique (docs/03 §5: pré-visualização sempre). */
 export type PreviewItem =
-  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean }
-  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean }
+  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone }
+  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: StairTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
@@ -119,6 +121,10 @@ export interface ToolOptions {
   roofOverhang?: number;
   /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */
   roofOffset?: number | null;
+  /** Escada por croqui: tipo, sub-modo, primitiva, N para distribuir e cotas da criação. Ausente = padrão. */
+  stair?: StairToolOptions;
+  /** Escada reta, em L, em U ou com leque, criada pronta por cliques (ferramenta `stairrun`). Ausente = reta, 1,20 m, giro à esquerda. */
+  stairRun?: StairRunToolOptions;
 }
 
 export interface PointerInfo {
@@ -135,6 +141,8 @@ export interface Tool {
   readonly label: string;
   /** Texto de ajuda para a barra de status. */
   readonly hint: string;
+  /** Aceita clique na vista 3D: o ponto entregue é o (x, y) da superfície sob o cursor (`pickModelPoint`). */
+  readonly pick3d?: boolean;
   start(): void;
   /** Atualiza a pré-visualização. */
   move(p: PointerInfo): void;

@@ -22,6 +22,13 @@ export interface DxfCluster {
  */
 export type DxfViewState = 'cut' | 'projection-above' | 'projection-below' | 'beyond';
 
+/** Traço do símbolo de planta de um vão: polilinha aberta ou fechada; `dashed` põe o tracejado no próprio traço. */
+export interface DxfSymbolPath {
+  pts: DxfPoint[];
+  closed: boolean;
+  dashed?: boolean;
+}
+
 /** Vão em planta: retângulo com `width` ao longo de `u` (vetor unitário) e `thickness` na perpendicular. */
 export interface DxfOpening {
   center: DxfPoint;
@@ -30,6 +37,11 @@ export interface DxfOpening {
   thickness: number;
   /** Estado na vista. Ausente vale `cut` (vão de corte, na camada `ABERTURAS`). */
   state?: DxfViewState;
+  /**
+   * Símbolo de planta do vão (folhas, arcos, caixilho; o mesmo da tela, `openingSymbolPaths` do geom). Só sai nas camadas
+   * de projeção: o vão de corte continua como retângulo em `ABERTURAS`. Sem ele, a projeção sai como retângulo.
+   */
+  symbol?: DxfSymbolPath[];
 }
 
 /**
@@ -59,7 +71,8 @@ export interface DxfLevelGeometry {
   /**
    * Escadas do nível: contornos dos degraus e patamares até a cota de corte (POLYLINE fechada na camada `ESCADA`),
    * os que estão acima dela e até o topo do intervalo (`outlinesAbove`, camada `ESCADA_ACIMA`, tracejada), linhas de espelho
-   * (LINE em `ESCADA_ESPELHO`), seta de subida (LINE em `ESCADA_SETA`: haste e as duas pontas) e o símbolo de corte
+   * (LINE em `ESCADA_ESPELHO`), seta de subida (LINE em `ESCADA_SETA`: um trecho por segmento da caminhada e as duas pontas
+   * no fim; a caminhada é a explícita do lance, quando há, senão os pontos médios dos espelhos) e o símbolo de corte
    * (POLYLINE aberta em `ESCADA_CORTE`), quando o plano de corte cruza a escada. Quem monta a geometria é o engine.
    */
   stairs?: Array<{
@@ -74,11 +87,11 @@ export interface DxfLevelGeometry {
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 /** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS`. */
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
-/** Vãos acima do corte (peitoril acima do plano): tracejados, a parede fica inteira. */
+/** Vãos acima do corte (peitoril acima do plano): símbolo tracejado, a parede fica inteira. */
 export const DXF_LAYER_OPENING_ABOVE = 'ABERTURA_ACIMA';
-/** Vãos abaixo do corte e acima da base: contorno leve, a parede fica inteira. */
+/** Vãos abaixo do corte e acima da base: símbolo leve, a parede fica inteira. */
 export const DXF_LAYER_OPENING_BELOW = 'ABERTURA_ABAIXO';
-/** Vãos "além" (abaixo da base, dentro da profundidade): contorno leve. */
+/** Vãos "além" (abaixo da base, dentro da profundidade): símbolo leve. */
 export const DXF_LAYER_OPENING_BEYOND = 'ABERTURA_ALEM';
 /** Paredes inteiras acima do corte (projeção): contorno tracejado. */
 export const DXF_LAYER_WALL_ABOVE = 'PAREDE_PROJECAO_ACIMA';
@@ -170,8 +183,10 @@ function openingRect(o: DxfOpening): DxfPoint[] {
 interface Shape {
   layer: string;
   pts: DxfPoint[];
-  /** Polilinha fechada (padrão); a aberta só serve ao símbolo de corte da escada. */
+  /** Polilinha fechada (padrão); a aberta serve ao símbolo de corte da escada e aos traços abertos dos vãos. */
   closed?: boolean;
+  /** Tracejado no próprio traço (além da camada, quando a camada é contínua). */
+  dashed?: boolean;
 }
 
 interface Line {
@@ -246,7 +261,14 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     for (const o of s.outlinesAbove ?? []) push(DXF_LAYER_STAIR_ABOVE, [[o]]);
     if (s.cut && s.cut.length >= 2) out.push({ layer: DXF_LAYER_STAIR_CUT, pts: s.cut, closed: false });
   }
-  for (const o of geo.openings) out.push({ layer: OPENING_LAYER[o.state ?? 'cut'], pts: openingRect(o) });
+  for (const o of geo.openings) {
+    const state = o.state ?? 'cut';
+    if (state === 'cut' || !o.symbol) {
+      out.push({ layer: OPENING_LAYER[state], pts: openingRect(o) });
+      continue;
+    }
+    for (const s of o.symbol) out.push({ layer: OPENING_LAYER[state], pts: s.pts, closed: s.closed, dashed: s.dashed === true });
+  }
   return out;
 }
 
@@ -254,7 +276,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
  * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6), uma camada por material
  * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos de corte. Elementos fora do
  * corte entram nas camadas de projeção (`PAREDE_PROJECAO_*`, `ABERTURA_*`, `ESCADA_ACIMA`, `TELHADO_PROJECAO`), com tipo de
- * linha tracejado quando estão acima do corte. Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
+ * linha tracejado quando estão acima do corte; os vãos de projeção saem com o símbolo de planta (`DxfOpening.symbol`). Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
  * AutoCAD R14. A tabela de tipos de linha só leva `DASHED` quando alguma camada o usa, então o arquivo sem projeções é o mesmo.
  */
 export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
@@ -262,7 +284,8 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
   const layers = [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
-  const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED');
+  // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
+  const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b])];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
@@ -334,6 +357,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   for (const s of shapes) {
     rec(0, 'POLYLINE');
     rec(8, s.layer);
+    if (s.dashed) rec(6, 'DASHED');
     rec(66, 1);
     rec(10, '0.000000');
     rec(20, '0.000000');

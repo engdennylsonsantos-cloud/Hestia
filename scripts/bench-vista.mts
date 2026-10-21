@@ -156,6 +156,10 @@ function benchProject(name: string, p: Project): void {
   let edit = 0;
   for (const level of p.levels) {
     const id = level.id;
+    if (wallsOnLevel(p, id).length === 0) {
+      console.log(`\n  nível ${id} (${level.name}): sem paredes, pulado`);
+      continue;
+    }
     const idx = p.levels.indexOf(level);
     const below = idx > 0 ? p.levels[idx - 1]!.id : null;
     const pBase = p;

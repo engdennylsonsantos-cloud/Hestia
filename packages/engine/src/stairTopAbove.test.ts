@@ -85,4 +85,41 @@ describe('escada com topo não acima da base', () => {
     expect(validateProject(p).some((i) => i.code === 'stair-top-not-above')).toBe(false);
     expect(resolveStairs(p)[0]!.riserHeight).toBeCloseTo(3 / 4, 12);
   });
+
+  it('5. patamar em L com topo igual à base: sem degraus, sem patamar e sem furo (footprint vazio)', () => {
+    // Patamar em L (fechado) depois do lance; topo no mesmo nível que a base: altura zero.
+    const L: StairCurve[] = [ln(0, 1, 1, 1), ln(1, 1, 1, 2), ln(1, 2, 0, 2), ln(0, 2, 0, 1)];
+    const p = projectWith({
+      levelId: 'lv_0',
+      topLevelId: 'lv_0',
+      topOffset: 0,
+      components: [run, { id: 'pat', kind: 'landing', boundary: L }],
+    });
+    expectNoGeometry(p);
+    const r = resolveStairs(p)[0]!;
+    expect(r.steps).toEqual([]);
+    expect(r.footprint).toEqual([]);
+  });
+
+  it('6. altura entre 0 e 1 mm (0,5 mm): não é altura, sem degraus, espelhos nem patamar', () => {
+    const L: StairCurve[] = [ln(0, 1, 1, 1), ln(1, 1, 1, 2), ln(1, 2, 0, 2), ln(0, 2, 0, 1)];
+    const p = projectWith({
+      levelId: 'lv_0',
+      topLevelId: 'lv_1',
+      baseOffset: 3 - 0.0005,
+      topOffset: 0,
+      components: [run, { id: 'pat', kind: 'landing', boundary: L }],
+    });
+    expectNoGeometry(p);
+    const r = resolveStairs(p)[0]!;
+    expect(r.steps).toEqual([]);
+    expect(r.footprint).toEqual([]);
+  });
+
+  it('7. altura de 1 mm exata também não gera geometria (o limite é estritamente maior)', () => {
+    const p = projectWith({ levelId: 'lv_0', topLevelId: 'lv_1', baseOffset: 3 - 0.001, topOffset: 0 });
+    const r = resolveStairs(p)[0]!;
+    expect(r.riserHeight).toBe(0);
+    expect(r.steps).toEqual([]);
+  });
 });

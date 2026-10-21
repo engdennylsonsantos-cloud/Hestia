@@ -297,3 +297,55 @@ describe('arestas do lance monolítico (3D): só quebras reais de geometria', ()
     expect(unmatchedEdges(buildStairSolids([straightStair({ risers: REF.N, tread: REF.P, riserH: REF.H, width: REF.W, type: { ...ASSEMBLED } })])[0]!)).toBe(0);
   });
 });
+
+describe('monolítico com face inferior escalonada (3D, decisão 0012 §1 e §2): malha fechada, volume e arestas reais', () => {
+  // Geometria (decisão 0012 §2): degrau k (1..N−1) entre os espelhos k e k+1, topo em k·h e fundo plano em (k−1)·h − T.
+  // Na linha de espelho m (y = m·P) a face lateral exposta tem duas partes: o espelho [(m−1)h, mh] e o degrau de fundo
+  // [(m−2)h − T, (m−1)h − T] (do fundo do degrau anterior ao fundo do seguinte). O corte pelo piso base (baseZ) prende o fundo.
+  const T = (REF.sd * Math.hypot(REF.P, REF.H)) / REF.P;
+  const stepped = (baseZ = 0): ResolvedStair => straightStair({ risers: REF.N, tread: REF.P, riserH: REF.H, width: REF.W, baseZ, type: { ...MONO, structuralDepth: REF.sd, undersideStyle: 'stepped' } });
+  const steppedL = (): ResolvedStair => {
+    const base = lStair();
+    return { ...base, type: { ...base.type, undersideStyle: 'stepped' } };
+  };
+
+  it('malha fechada: nenhuma aresta sem par (reta, reta com base em 0,30 m e L com patamar)', () => {
+    for (const s of [stepped(), stepped(0.3), steppedL()]) expect(unmatchedEdges(buildStairSolids([s])[0]!)).toBe(0);
+  });
+
+  it('volume da malha = Σ volumes das peças de stairBody (reta, reta com base em 0,30 m e L com patamar)', () => {
+    for (const s of [stepped(), stepped(0.3), steppedL()]) expect(Math.abs(total(buildStairSolids([s])) - piecesVolume(s))).toBeLessThan(1e-9);
+  });
+
+  it('face lateral: arestas verticais só nas linhas de espelho, no espelho exposto ou no degrau de fundo até o do seguinte', () => {
+    const s = stepped();
+    const pieces = stairBody(s, { slabThickness: 0.15 }).pieces;
+    // Quina da frente da chegada (fora do critério, como no liso): é a face de topo da chegada.
+    const yEnd = Math.max(...pieces.map((p) => Math.max(...p.polygon.map((v) => v.y))));
+    const lateral = drawnEdges(buildStairSolids([s])[0]!).filter(
+      ([xa, ya, za, xb, yb, zb]) => Math.abs(xa! - xb!) < 1e-4 && Math.abs(ya! - yb!) < 1e-4 && Math.abs(za! - zb!) > 1e-4 && (Math.abs(xa!) < 1e-4 || Math.abs(xa! - REF.W) < 1e-4),
+    );
+    expect(lateral.length).toBeGreaterThan(0);
+    for (const [, ya, za, , , zb] of lateral) {
+      const y = ya!;
+      if (Math.abs(y - yEnd) < 1e-4) continue;
+      const m = Math.round(y / REF.P);
+      expect(Math.abs(y - m * REF.P)).toBeLessThan(1e-4);
+      const lo = Math.min(za!, zb!);
+      const hi = Math.max(za!, zb!);
+      const inRiser = lo >= (m - 1) * REF.H - 1e-4 && hi <= m * REF.H + 1e-4;
+      const inUnder = lo >= (m - 2) * REF.H - T - 1e-4 && hi <= (m - 1) * REF.H - T + 1e-4;
+      expect(inRiser || inUnder, `aresta em y=${y.toFixed(4)}, z ${lo.toFixed(4)}..${hi.toFixed(4)}`).toBe(true);
+    }
+  });
+
+  it('o degrau de fundo é aresta real: no fim do degrau 4 (y = 5·P), do fundo 3 (3h − T) ao fundo 4 (4h − T)', () => {
+    const lateral = drawnEdges(buildStairSolids([stepped()])[0]!);
+    const found = lateral.some(
+      ([xa, ya, za, xb, yb, zb]) =>
+        Math.abs(xa!) < 1e-4 && Math.abs(xb!) < 1e-4 && Math.abs(ya! - 5 * REF.P) < 1e-4 && Math.abs(yb! - 5 * REF.P) < 1e-4 &&
+        Math.abs(Math.min(za!, zb!) - (3 * REF.H - T)) < 1e-4 && Math.abs(Math.max(za!, zb!) - (4 * REF.H - T)) < 1e-4,
+    );
+    expect(found).toBe(true);
+  });
+});

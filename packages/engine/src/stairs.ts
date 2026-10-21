@@ -1,5 +1,6 @@
 import { asMulti, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import {
+  STAIR_MIN_HEIGHT,
   stairBaseZ,
   stairs,
   stairsOnLevel,
@@ -67,7 +68,8 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
   const topZ = stairTopZ(p, s);
   const H = topZ - baseZ;
   const N = s.components.reduce((n, c) => n + (c.kind === 'run' ? c.risers.length : 0), 0);
-  const h = N > 0 && H > 0 ? H / N : 0;
+  // Topo a STAIR_MIN_HEIGHT ou menos acima da base: escada inválida (`stair-top-not-above`), sem peça nenhuma.
+  const h = N > 0 && H > STAIR_MIN_HEIGHT ? H / N : 0;
   const issues: StairIssueItem[] = [];
   const steps: ResolvedStairStep[] = [];
   const risers: ResolvedStairRiser[] = [];
@@ -87,6 +89,8 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
         risers.push({ componentIndex: ci, index: r.index, a: r.a, b: r.b, points: r.points, z0: r.z0, z1: r.z1 });
       }
     } else {
+      // Escada sem altura não gera patamar (ele alimentaria o footprint e o furo derivado).
+      if (h <= 0) return;
       const lp = stairLandingPolygon({ boundary: c.boundary });
       issues.push(...sketchIssues(s, ci, lp.issues));
       if (lp.polygon) {

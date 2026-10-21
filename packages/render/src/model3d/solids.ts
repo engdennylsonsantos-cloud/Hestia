@@ -304,8 +304,11 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
     if (!zs.some((q) => Math.abs(q - z) < Z_EPS)) zs.push(z);
   };
 
-  for (const band of bands) {
-    if (band.poly.length === 0) continue;
+  for (const raw of bands) {
+    // Espículas de largura zero (anéis que voltam sobre si) vêm das booleanas do motor: a união as cancela.
+    const poly = union(raw.poly);
+    if (poly.length === 0) continue;
+    const band: LayerBand = { ...raw, poly };
     const z0 = baseZ + band.z0;
     const flatTop = baseZ + band.z1;
     const slope = band.slope;

@@ -3,7 +3,7 @@ import { multiArea, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeRoof, type Project, type Roof, type RoofProfilePoint } from '@hestia/model';
 import { quantifyRoofs, resolveRoofs, roofTopAt, type ResolvedRoof, type RoofLine } from './index.ts';
 import { defaultExtrusionProfile, extrusionFrame, extrusionLines, extrusionPlanes } from './roofExtrusion.ts';
-import { presetArco, presetDenteSerra } from './roofProfilePresets.ts';
+import { presetArco, presetDenteSerra, presetMansarda, shiftProfile } from './roofProfilePresets.ts';
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
   { x: x0, y: y0 },
@@ -18,6 +18,8 @@ const ARC_LEN = 2 * 8.5 * Math.asin(4 / 8.5);
 const lines = (ls: RoofLine[], kind: RoofLine['kind']): RoofLine[] => ls.filter((l) => l.kind === kind);
 const len = (l: RoofLine): number => Math.hypot(l.b.x - l.a.x, l.b.y - l.a.y);
 const sum = (xs: number[]): number => xs.reduce((s, x) => s + x, 0);
+/** Área sob um perfil linear por trechos com z ≥ 0 (regra do trapézio, exata nesse caso). */
+const underProfile = (pts: RoofProfilePoint[]): number => pts.slice(1).reduce((s, q, i) => s + ((q.t - pts[i]!.t) * (q.z + pts[i]!.z)) / 2, 0);
 
 /** Projeto com um telhado por extrusão (addRoof, como na aplicação) e o telhado resolvido. */
 function resolved(boundary: Vec2[], profile: RoofProfilePoint[], extra: Partial<Roof> = {}): { p: Project; rr: ResolvedRoof } {
@@ -65,7 +67,10 @@ describe('uma água: perfil de 0 a 2 m em 8 m de transversal', () => {
   it('a água não tem linhas além do beiral (nenhum vértice interno, nenhuma cumeeira)', () => {
     expect(lines(rr.lines, 'ridge')).toHaveLength(0);
     expect(lines(rr.lines, 'valley')).toHaveLength(0);
-    expect(lines(rr.lines, 'eave')).toHaveLength(4);
+    // As extremidades (x = 0 e x = 10) têm seção de 2 m no fim do perfil: são empenas. Antes contavam como beirais
+    // (defeito corrigido: 4 beirais), então esta asserção mudou de 4 para 2 beirais e 2 empenas.
+    expect(lines(rr.lines, 'eave')).toHaveLength(2);
+    expect(lines(rr.lines, 'gable')).toHaveLength(2);
   });
 });
 
@@ -102,8 +107,11 @@ describe('arco de raio 8,5 (largura 8, flecha 1) sobre 10 m de comprimento', () 
     expect(q.planArea).toBeCloseTo(80, 9);
     expect(q.faceArea).toBeCloseTo(ARC_LEN * 10, 1);
     expect(q.ridgeLength).toBeCloseTo(10, 9);
-    // Beiral em 3D: os dois lados de 10 m (planos) e as duas bordas de 8 m que seguem o arco (≈ 2 × 8,33 m).
-    expect(q.eaveLength).toBeCloseTo(20 + 2 * ARC_LEN, 1);
+    // Beiral: só os dois lados de 10 m, em z 0. As extremidades (8 m, seguem o arco) são empenas: antes entravam no
+    // beiral (20 + 2 × 8,33 m), defeito corrigido. Empena em planta: 2 × 8 m; frontão: a seção do arco nas duas pontas.
+    expect(q.eaveLength).toBeCloseTo(20, 9);
+    expect(q.gableLength).toBeCloseTo(16, 9);
+    expect(q.gableArea).toBeCloseTo(2 * underProfile(profile), 9);
     expect(q.maxHeight).toBeCloseTo(1, 9);
     expect(q.ridgeHeight).toBeCloseTo(1, 9);
   });
@@ -177,8 +185,47 @@ describe('perfil padrão', () => {
     expect(q[12]!.t).toBeCloseTo(0, 12);
   });
 
-  it('vértices do perfil fora do contorno não geram linha, só o beiral', () => {
+  it('vértices do perfil fora do contorno não geram cumeeira nem rincão', () => {
     const r: Roof = { ...makeRoof({ id: 'x', typeId: 't', levelId: 'l', boundary: B10x8, shape: 'extrusion', dir: { x: 1, y: 0 }, profile: [{ t: -5, z: 0 }, { t: -1, z: 1 }] }), order: 0 };
-    expect(extrusionLines(r).filter((l) => l.kind !== 'eave')).toHaveLength(0);
+    expect(extrusionLines(r).filter((l) => l.kind === 'ridge' || l.kind === 'valley')).toHaveLength(0);
+    // A faixa plana a 1 m cobre as extremidades (t de 0 a 8): são empenas de 1 m. Antes eram beirais (defeito corrigido).
+    expect(extrusionLines(r).filter((l) => l.kind === 'gable')).toHaveLength(2);
+    expect(extrusionLines(r).filter((l) => l.kind === 'eave')).toHaveLength(2);
+  });
+});
+
+describe('extremidades: empena só com seção acima do beiral', () => {
+  it('mansarda (4 trechos): beirais de 10 m nos lados; extremidades de 8 m são empenas com frontão de 9 m² cada', () => {
+    const profile = shiftProfile(presetMansarda(8, 1, 2, 2.5), extrusionFrame(B10x8, { x: 1, y: 0 })!.tMin);
+    const { p, rr } = resolved(B10x8, profile);
+    expect(lines(rr.lines, 'eave')).toHaveLength(2);
+    expect(lines(rr.lines, 'gable')).toHaveLength(2);
+    const q = quantifyRoofs(p, 'lv_0').roofs[0]!;
+    expect(q.eaveLength).toBeCloseTo(20, 9);
+    expect(q.gableLength).toBeCloseTo(16, 9);
+    // Trapézios do perfil: 1 + 3,5 + 3,5 + 1 = 9 m² por extremidade.
+    expect(q.gableArea).toBeCloseTo(18, 9);
+  });
+
+  it('dente de serra (3 dentes de 2 m de altura): extremidades são empenas, com a área dos dentes (6 m² cada)', () => {
+    const boundary = rect(0, 0, 10, 6);
+    const { p, rr } = resolved(boundary, presetDenteSerra(6, 3, 2));
+    expect(lines(rr.lines, 'gable')).toHaveLength(2);
+    expect(lines(rr.lines, 'eave')).toHaveLength(2);
+    const q = quantifyRoofs(p, 'lv_0').roofs[0]!;
+    expect(q.eaveLength).toBeCloseTo(20, 9);
+    expect(q.gableLength).toBeCloseTo(12, 9);
+    expect(q.gableArea).toBeCloseTo(12, 9);
+  });
+
+  it('perfil rente à cota do beiral sob a extremidade (seção zero no trecho dela): a extremidade é beiral, sem empena', () => {
+    // Contorno 10 x 2: a extremidade cobre t de 0 a 2, onde o perfil fica em z 0 (sobe só depois de t = 2, fora do contorno).
+    const { p, rr } = resolved(rect(0, 0, 10, 2), [{ t: 0, z: 0 }, { t: 2, z: 0 }, { t: 6, z: 2 }]);
+    expect(lines(rr.lines, 'gable')).toHaveLength(0);
+    const q = quantifyRoofs(p, 'lv_0').roofs[0]!;
+    expect(q.gableLength).toBeCloseTo(0, 9);
+    expect(q.gableArea).toBeCloseTo(0, 9);
+    // Beiral em z 0: os dois lados de 10 m e as duas extremidades de 2 m, todos planos.
+    expect(q.eaveLength).toBeCloseTo(24, 9);
   });
 });

@@ -79,7 +79,7 @@ const memo = new WeakMap<Project, Map<string, PlanView>>();
 
 const OUTLINE_CLASSES: OutlineClass[] = ['projection-above', 'projection-below', 'beyond'];
 
-/** Elemento do modelo que pertence a uma categoria de gráficos, ou null (ex.: parede de outro nível). */
+/** Ids dos elementos do nível cuja categoria está oculta na vista (paredes, aberturas, pisos, lajes, telhados e escadas). */
 function categoryHiddenIds(p: Project, levelId: Id, hiddenCats: HiddenCats): Set<Id> {
   const out = new Set<Id>();
   if (hiddenCats.size === 0) return out;
@@ -120,7 +120,7 @@ function computePlanView(p: Project, levelId: Id, partial: PartialStructure, hid
     cls.set(id, 'hidden');
     hidden.add(id);
   }
-  // Paredes ocultas pela categoria saem da geometria inteira (as juntas e a silhueta são as do nível sem elas).
+  // Parede oculta pela categoria: a geometria do nível sai sem nenhuma parede (nada delas aparece, nem juntas nem silhueta).
   const walls0 = hiddenCats.has('wall')
     ? ({ levelId, walls: {}, clusters: [] } as ResolvedLevel)
     : resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls });

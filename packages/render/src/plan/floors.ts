@@ -3,6 +3,7 @@ import { lineIntervals, resolveFloors, type ResolvedFloor } from '@hestia/engine
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
+import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 
 export interface FloorOps {
@@ -59,7 +60,16 @@ export function labelPoint(m: MultiPolygon): Vec2 | null {
  * contorno fino de 1 px com os furos. No grosseiro só o preenchimento chapado. Com etiquetas ligadas, o código do
  * tipo e a área no centroide.
  */
-export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+export function floorFills(
+  p: Project,
+  levelId: Id,
+  theme: PlanTheme,
+  dark: boolean,
+  detail: DetailLevel,
+  v: Viewport,
+  hidden?: ReadonlySet<Id>,
+  paint: PlanPaint = defaultPaint('floor', v.zoom),
+): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
@@ -67,14 +77,15 @@ export function floorFills(p: Project, levelId: Id, theme: PlanTheme, dark: bool
     if (hidden?.has(f.floorId)) continue;
     const top = f.layers[0];
     const m = top ? p.materials[top.materialId] : undefined;
-    const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
+    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     out.fills.push({ polygons: f.polygon, color, alpha: 1, hatch });
     if (detail !== 'coarse') {
       // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
-      // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima).
-      const band = difference(f.polygon, offsetMulti(f.polygon, -1.5 / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
+      // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima). A espessura é a
+      // do corte do piso (decisão 0015 §2.1).
+      const band = difference(f.polygon, offsetMulti(f.polygon, -paint.cutPx / v.zoom));
+      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
     }
     if (p.settings.showTags) {
       const code = p.floorTypes[f.typeId]?.code;

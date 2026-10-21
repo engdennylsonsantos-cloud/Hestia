@@ -121,6 +121,3 @@ export function paintOps(ops: Ops, pt: PlanPaint, paper: string): Ops {
   const strokes = pt.halftone ? ops.strokes.map((s) => ({ ...s, color: mix(s.color, paper, 0.5) })) : ops.strokes;
   return { fills, strokes, labels: ops.labels };
 }
-
-/** Categorias de elementos do modelo que a vista pode ocultar (paredes, aberturas e lajes/pisos/telhados/escadas). */
-export type HiddenCategories = ReadonlySet<GraphicsCategory>;

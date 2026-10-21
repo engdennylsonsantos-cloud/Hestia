@@ -5,6 +5,7 @@ import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
+import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 /**
@@ -19,8 +20,6 @@ export interface StairView {
   topZ: number;
 }
 
-/** Espessura (px) das linhas de espelho, do símbolo de corte e da seta. */
-export const STAIR_RISER_WIDTH_PX = 1.4;
 /** Traço (px) do tracejado dos degraus acima da cota de corte. */
 export const STAIR_DASH: [number, number] = [6, 3];
 
@@ -85,8 +84,8 @@ export function stairCut(s: ResolvedStair, risers: ResolvedStairRiser[], zoom: n
   return null;
 }
 
-/** Símbolo de corte: zigue-zague curto que cruza a caminhada na cota de corte (oito dentes). */
-function cutSymbol(c: StairCut, zoom: number, color: string): StrokeOp {
+/** Símbolo de corte: zigue-zague curto que cruza a caminhada na cota de corte (oito dentes), na espessura `widthPx`. */
+function cutSymbol(c: StairCut, zoom: number, color: string, widthPx: number): StrokeOp {
   const teeth = 8;
   const amp = 4 / zoom;
   const pts: Vec2[] = [];
@@ -94,7 +93,7 @@ function cutSymbol(c: StairCut, zoom: number, color: string): StrokeOp {
     const s = -c.half + (2 * c.half * j) / teeth;
     pts.push(add(add(c.at, mul(c.across, s)), mul(c.walk, j % 2 === 0 ? -amp : amp)));
   }
-  return { pts, closed: false, widthPx: STAIR_RISER_WIDTH_PX, color, alpha: 1 };
+  return { pts, closed: false, widthPx, color, alpha: 1 };
 }
 
 /**
@@ -117,24 +116,24 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
   return out;
 }
 
-/** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px no último espelho. */
-function climbArrow(pts: Vec2[], zoom: number, color: string): StrokeOp[] {
+/** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px no último espelho, na espessura `widthPx`. */
+function climbArrow(pts: Vec2[], zoom: number, color: string, widthPx: number): StrokeOp[] {
   if (pts.length < 2) return [];
   const tip = pts[pts.length - 1]!;
   const back = mul(norm(sub(tip, pts[pts.length - 2]!)), -1);
   const head = 7 / zoom;
   const wing = (a: number): Vec2 => add(tip, mul(rotate(back, a), head));
-  const style = { widthPx: STAIR_RISER_WIDTH_PX, color, alpha: 0.9 };
+  const style = { widthPx, color, alpha: 0.9 };
   return [
     { pts, closed: false, ...style },
     { pts: [wing(Math.PI / 6), tip, wing(-Math.PI / 6)], closed: false, ...style },
   ];
 }
 
-/** Contorno de um degrau ou patamar: tracejado quando o topo fica acima da cota de corte. */
-function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number): StrokeOp {
+/** Contorno de um degrau ou patamar (linha fina, `widthPx`): tracejado quando o topo fica acima da cota de corte. */
+function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number, widthPx: number): StrokeOp {
   const above = z > cutZ + 1e-9;
-  return { pts: polygon, closed: true, widthPx: 1, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
+  return { pts: polygon, closed: true, widthPx, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
 }
 
 /** Desloca a etiqueta 16 px para um lado da seta (perpendicular ao primeiro trecho), para não cruzar a linha. */
@@ -214,15 +213,15 @@ function treadLabelAt(st: ResolvedStairStep, steps: ResolvedStairStep[], spirals
  * preenchimento (material do poste); o monolítico e o demais mostram só o contorno. Acima da cota de corte (base do lance),
  * tracejado e sem preenchimento, como os degraus.
  */
-function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, SpiralParams>, cutZ: number, fillBase: string, dark: boolean, lineColor: string): FloorOps {
+function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, SpiralParams>, cutZ: number, fillBase: string, dark: boolean, lineColor: string, paint: PlanPaint): FloorOps {
   const out = empty();
   const above = s.baseZ > cutZ + EPS;
   const pm = p.materials[s.type.postMaterialId];
-  const color = mix(pm?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74);
+  const color = surfaceColor(pm?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
   for (const sp of spirals.values()) {
     const ring = spiralPostRing(sp.center, sp.rInner);
     if (!above && s.type.runStyle === 'post') out.fills.push({ polygons: [[ring]], color, alpha: 1 });
-    out.strokes.push(outlineOps(ring, s.baseZ, lineColor, cutZ));
+    out.strokes.push(outlineOps(ring, s.baseZ, lineColor, cutZ, paint.projPx));
   }
   return out;
 }
@@ -240,7 +239,16 @@ function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, Spir
  * baixo (`aboveFill`); o rótulo de cima sai para dentro do setor (`treadLabelAt`) e, acima do corte, em tom claro
  * (`tone: 'soft'`); o poste é um círculo (`postOps`).
  */
-export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, view?: StairView): FloorOps {
+export function stairFills(
+  p: Project,
+  stairs: ResolvedStair[],
+  theme: PlanTheme,
+  dark: boolean,
+  detail: DetailLevel,
+  v: Viewport,
+  view?: StairView,
+  paint: PlanPaint = defaultPaint('stair', v.zoom),
+): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const lineColor = mix(theme.ink, fillBase, 0.35);
@@ -250,9 +258,9 @@ export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme
     if (s.baseZ > topZ + 1e-9) continue;
     const steps = s.steps.filter((st) => st.z <= topZ + 1e-9);
     const m = p.materials[s.type.materialId];
-    const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74);
+    const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
     const spirals = spiralByComponent(p, s);
-    const post = postOps(p, s, spirals, cutZ, fillBase, dark, lineColor);
+    const post = postOps(p, s, spirals, cutZ, fillBase, dark, lineColor, paint);
     if (detail === 'coarse') {
       if (steps.length === 0 && s.steps.length > 0) continue;
       const footprint = steps.length === s.steps.length ? s.footprint : union(...steps.map((st) => [[st.polygon]]));
@@ -265,20 +273,20 @@ export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme
     for (const st of steps) {
       const fill = st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
-      out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ));
+      out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, paint.projPx));
     }
     out.fills.push(...post.fills);
     out.strokes.push(...post.strokes);
     const risers = risersInClimbOrder(s).filter((r) => r.z1 <= topZ + 1e-9);
-    for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, widthPx: STAIR_RISER_WIDTH_PX, color: theme.ink, alpha: 1 });
+    for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, widthPx: paint.cutPx, color: theme.ink, alpha: 1 });
     const walk = climbWalk(p, s, risers);
-    out.strokes.push(...climbArrow(walk, v.zoom, theme.ink));
+    out.strokes.push(...climbArrow(walk, v.zoom, theme.ink, paint.cutPx));
     if (walk.length >= 2) {
       const u = norm(sub(walk[1]!, walk[0]!));
       out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u) });
     }
     const cut = stairCut(s, risers, v.zoom, cutZ);
-    if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink));
+    if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink, paint.cutPx));
     if (detail === 'fine') {
       // Só os degraus dentro do topo da vista: os de cima não saem, nem o rótulo (decisão 0013 §4).
       for (const st of steps) {

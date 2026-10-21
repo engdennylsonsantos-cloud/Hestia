@@ -4,6 +4,7 @@ import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
@@ -16,9 +17,9 @@ export function structuralLayer(p: Project, s: ResolvedSlab): ResolvedSlabLayer 
 
 /**
  * Seta de caimento: segmento de 80 px centrado no ponto, na direção `dir` da inclinação (para onde a face sobe), com
- * cabeça de 7 px.
+ * cabeça de 7 px e espessura `widthPx` (a do corte da categoria).
  */
-export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme): StrokeOp[] {
+export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme, widthPx: number): StrokeOp[] {
   const k = Math.hypot(dir.x, dir.y) || 1;
   const u = { x: dir.x / k, y: dir.y / k };
   const half = 40 / v.zoom;
@@ -29,7 +30,7 @@ export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme): 
     x: tip.x + head * (back.x * Math.cos(a) - back.y * Math.sin(a)),
     y: tip.y + head * (back.x * Math.sin(a) + back.y * Math.cos(a)),
   });
-  const style = { widthPx: 1.4, color: theme.ink, alpha: 0.9 };
+  const style = { widthPx, color: theme.ink, alpha: 0.9 };
   return [
     { pts: [{ x: at.x - u.x * half, y: at.y - u.y * half }, tip], closed: false, ...style },
     { pts: [wing(Math.PI / 6), tip, wing(-Math.PI / 6)], closed: false, ...style },
@@ -43,7 +44,16 @@ export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme): 
  * preenchimentos seguintes). Com etiquetas ligadas, código e área. Com inclinação, seta de caimento e percentual
  * (fora do grosseiro).
  */
-export function slabFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+export function slabFills(
+  p: Project,
+  levelId: Id,
+  theme: PlanTheme,
+  dark: boolean,
+  detail: DetailLevel,
+  v: Viewport,
+  hidden?: ReadonlySet<Id>,
+  paint: PlanPaint = defaultPaint('slab', v.zoom),
+): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
@@ -51,15 +61,15 @@ export function slabFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
     if (hidden?.has(s.slabId)) continue;
     const layer = structuralLayer(p, s);
     const m = layer ? p.materials[layer.materialId] : undefined;
-    const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
+    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     out.fills.push({ polygons: s.polygon, color, alpha: 1, hatch });
     const at = labelPoint(s.polygon);
     if (detail !== 'coarse') {
-      const band = difference(s.polygon, offsetMulti(s.polygon, -1.5 / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
+      const band = difference(s.polygon, offsetMulti(s.polygon, -paint.cutPx / v.zoom));
+      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
       if (s.slope && at) {
-        out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme));
+        out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
         out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });
       }
     }

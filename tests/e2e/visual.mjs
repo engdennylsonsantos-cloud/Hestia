@@ -21,7 +21,7 @@ const paeth = (a, b, c) => {
 };
 
 /** Decodifica um PNG de 8 bits sem entrelaçamento para RGBA (Buffer de w·h·4 bytes). */
-function decodePng(buf) {
+export function decodePng(buf) {
   if (!buf.subarray(0, 8).equals(SIG)) throw new Error('não é PNG');
   let w = 0, h = 0, depth = 0, ctype = -1, interlace = 0;
   const idat = [];
@@ -77,7 +77,7 @@ const chunk = (type, data) => {
 };
 
 /** Codifica RGBA (w·h·4 bytes) em PNG de 8 bits, filtro 0. */
-function encodePng(w, h, rgba) {
+export function encodePng(w, h, rgba) {
   const stride = w * 4;
   const raw = Buffer.alloc((stride + 1) * h);
   for (let y = 0; y < h; y++) rgba.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);

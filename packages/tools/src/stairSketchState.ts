@@ -35,6 +35,10 @@ export interface StairToolOptions {
   topOffset?: number;
   height?: number;
   topLevelId?: Id | null;
+  /** Pegar linhas: deslocamento perpendicular da linha pega, em m (o lado é o do cursor). Ausente = 0. */
+  pickOffset?: number;
+  /** Pegar linhas: pega a cadeia de segmentos conectados de uma vez (opção "Corrente"). Ausente = falso. */
+  pickChain?: boolean;
 }
 
 /** Croqui de um lance em edição: os mesmos campos do `StairRun`, sem o `kind`. */

@@ -14,12 +14,12 @@ export function activeTone(sub: StairSubmode): StairTone {
 }
 
 /**
- * Prévia da ferramenta: componentes (cada camada com o seu tom), degraus calculados, o traçado em curso (tracejado)
- * e o contador ao cursor (em Espelhos, ou quando já há espelhos).
+ * Prévia da ferramenta: componentes (cada camada com o seu tom), degraus calculados, a linha que "Pegar linhas" pegaria
+ * (`picks`: destaque e resultado), o traçado em curso (tracejado) e o contador ao cursor (em Espelhos, ou quando já há espelhos).
  */
-export function buildItems(st: DrawState, q: Vec2, treads: PreviewItem[], rep: DraftReport): PreviewItem[] {
+export function buildItems(st: DrawState, q: Vec2, treads: PreviewItem[], rep: DraftReport, picks: PreviewItem[] = []): PreviewItem[] {
   const tone = activeTone(st.submode);
-  const items: PreviewItem[] = [...partsPreview(st.parts), ...treads];
+  const items: PreviewItem[] = [...partsPreview(st.parts), ...treads, ...picks];
   items.push(...chainItems(st.stroke.chain, tone, true));
   for (const c of strokePreview(st.stroke, q)) items.push(...curveItems(c, tone, true));
   if (st.submode === 'espelhos' || rep.created > 0) items.push({ kind: 'label', at: q, text: counterText(rep) });
@@ -27,7 +27,10 @@ export function buildItems(st: DrawState, q: Vec2, treads: PreviewItem[], rep: D
 }
 
 /** Dica do sub-modo (o que fazer agora), com o contador em Espelhos. */
-export function hintText(st: Pick<DrawState, 'submode' | 'phase'>, rep: DraftReport): string {
+export function hintText(st: Pick<DrawState, 'submode' | 'phase' | 'pick'>, rep: DraftReport): string {
+  if (st.pick && st.submode !== 'patamar') {
+    return 'Pegar linhas: passe sobre uma parede, linha de escada ou aresta de laje ou piso e clique. Corrente pega a cadeia; Deslocamento afasta a linha.';
+  }
   switch (st.submode) {
     case 'limites':
       return st.phase === 'left' ? 'Limite esquerdo: clique os pontos; Enter fecha e passa ao direito.' : 'Limite direito: clique os pontos; Enter fecha e passa a Espelhos.';

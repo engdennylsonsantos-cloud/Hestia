@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { generateStraightRun, resolveStairsOnLevel } from '@hestia/engine';
+import { generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
+import { openingSymbolPaths } from '@hestia/geom';
 import { dxfLayerOfMaterial } from '@hestia/io';
 import { ProjectStore, buildTemplate, makeFloor, makeSlab, makeStair, makeWall, type Opening, type Project, type StairRun, type ViewRange } from '@hestia/model';
-import { planDxf, stairArrow } from './dxfExport.ts';
+import { climbWalk, risersInClimbOrder } from '@hestia/render';
+import { arrowOfPath, planDxf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -239,5 +241,104 @@ describe('escadas no DXF (camadas ESCADA, ESCADA_ESPELHO e ESCADA_SETA)', () => 
     // as pontas ficam atrás da ponta da seta (y menor que 2)
     for (const [, end] of arrow.slice(1)) expect(end.y).toBeLessThan(2);
     expect(stairArrow(a, a)).toEqual([]);
+  });
+});
+
+/** Segmentos LINE de uma camada do DXF (ponto inicial e final). */
+function linesIn(text: string, layer: string): Array<{ a: { x: number; y: number }; b: { x: number; y: number } }> {
+  const lines = text.split('\r\n');
+  const out: Array<{ a: { x: number; y: number }; b: { x: number; y: number } }> = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    if (lines[i]!.trim() !== '0' || lines[i + 1]!.trim() !== 'LINE') continue;
+    const fields = new Map<string, string>();
+    for (let j = i + 2; j + 1 < lines.length && lines[j]!.trim() !== '0'; j += 2) fields.set(lines[j]!.trim(), lines[j + 1]!.trim());
+    if (fields.get('8') !== layer) continue;
+    out.push({ a: { x: Number(fields.get('10')), y: Number(fields.get('20')) }, b: { x: Number(fields.get('11')), y: Number(fields.get('21')) } });
+  }
+  return out;
+}
+
+/** Porta numa parede que começa em 1,50 m, acima do corte padrão (1,20 m): o vão inteiro fica acima do corte. */
+function doorAboveCut(): Project {
+  const store = new ProjectStore(buildTemplate('blank'));
+  const { wallTypeId, doorTypeId } = store.project.defaults;
+  store.exec({ type: 'addWall', wall: makeWall({ id: 'wAlto', typeId: wallTypeId, levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, baseOffset: 1.5 }) });
+  const door: Opening = { id: 'dAlta', kind: 'door', typeId: doorTypeId, hostId: 'wAlto', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' };
+  store.exec({ type: 'addOpening', opening: door });
+  return store.project;
+}
+
+/** Lance reto de 5 espelhos em +x com caminhada explícita em arco (flecha 0,3 m), como o do teste da seta na planta. */
+function curvedRunStair(): Project {
+  const store = new ProjectStore(buildTemplate('blank'));
+  const N = 5;
+  const P = 0.28;
+  const ln = (ax: number, ay: number, bx: number, by: number) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag: 0 });
+  const x1 = (N + 1) * P;
+  const run: StairRun = {
+    id: 'r_curva',
+    kind: 'run',
+    boundaryLeft: [ln(0, 0.5, x1, 0.5)],
+    boundaryRight: [ln(0, -0.5, x1, -0.5)],
+    risers: Array.from({ length: N }, (_, i) => ln((i + 1) * P, -1, (i + 1) * P, 1)),
+    path: [{ a: { x: P, y: 0 }, b: { x: N * P, y: 0 }, sag: 0.3 }],
+  };
+  store.exec({ type: 'addStair', stair: makeStair({ id: 'st_curva', typeId: 'stt_monolitica', levelId: 'lv_0', components: [run] }) });
+  return store.project;
+}
+
+describe('símbolo dos vãos de projeção: o mesmo da planta', () => {
+  it('porta acima do corte: folha e arco em ABERTURA_ACIMA (tracejada), iguais aos da tela, sem retângulo', () => {
+    const p = doorAboveCut();
+    const text = planDxf(p, 'lv_0');
+    const above = polylinesOf(text).filter((x) => x.layer === 'ABERTURA_ACIMA');
+    const frame = levelFrames(p, 'lv_0').find((f) => f.wall.id === 'wAlto')!;
+    const screen = openingSymbolPaths(openingGeometry(p, p.elements['dAlta'] as Opening, frame));
+    expect(screen.map((s) => s.pts.length)).toEqual([2, 19]);
+    expect(above).toHaveLength(screen.length);
+    screen.forEach((s, i) => {
+      expect(above[i]!.closed).toBe(s.closed);
+      s.pts.forEach((q, j) => {
+        expect(above[i]!.pts[j]!.x).toBeCloseTo(q.x, 5);
+        expect(above[i]!.pts[j]!.y).toBeCloseTo(q.y, 5);
+      });
+    });
+    // o vão não cai nas camadas de corte, e a camada de projeção é tracejada
+    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURAS')).toHaveLength(0);
+    expect(text).toContain('\r\nDASHED\r\n');
+  });
+
+  it('escada com caminhada explícita curva: a seta segue a caminhada da tela, não a corda entre os pontos médios', () => {
+    const p = curvedRunStair();
+    const [s] = resolveStairsOnLevel(p, 'lv_0');
+    expect(s!.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const walk = climbWalk(p, s!, risersInClimbOrder(s!).filter((k) => k.z1 <= 2.3 + 1e-9));
+    const arrow = linesIn(planDxf(p, 'lv_0'), 'ESCADA_SETA');
+    // haste (um trecho por segmento da caminhada) e as duas pontas no fim
+    const shaft = arrow.slice(0, -2);
+    expect(shaft.length).toBeGreaterThan(2);
+    expect(shaft[0]!.a.x).toBeCloseTo(walk[0]!.x, 5);
+    expect(shaft[0]!.a.y).toBeCloseTo(walk[0]!.y, 5);
+    expect(shaft.at(-1)!.b.x).toBeCloseTo(walk.at(-1)!.x, 5);
+    expect(shaft.at(-1)!.b.y).toBeCloseTo(walk.at(-1)!.y, 5);
+    // a flecha de 0,3 m aparece na haste: a corda entre o primeiro e o último espelho ficaria em y = 0
+    expect(Math.max(...shaft.flatMap((seg) => [Math.abs(seg.a.y), Math.abs(seg.b.y)]))).toBeGreaterThan(0.1);
+  });
+});
+
+describe('arrowOfPath (seta sobre a caminhada)', () => {
+  it('vértices colineares saem: uma haste reta continua com um trecho e duas pontas', () => {
+    expect(arrowOfPath([{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }])).toHaveLength(3);
+  });
+
+  it('caminhada em L: um trecho de haste por lado, pontas no fim atrás do último trecho', () => {
+    const arrow = arrowOfPath([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]);
+    expect(arrow).toHaveLength(4);
+    for (const [, end] of arrow.slice(2)) expect(end.y).toBeLessThan(1);
+  });
+
+  it('menos de dois pontos distintos não tem seta', () => {
+    expect(arrowOfPath([{ x: 0, y: 0 }])).toEqual([]);
+    expect(arrowOfPath([{ x: 0, y: 0 }, { x: 0, y: 0 }])).toEqual([]);
   });
 });

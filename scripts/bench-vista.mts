@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { classifyLevelEntries, resolveFloors, resolveLevel, resolveRoofs, resolveSlabs, type PlanResolveOptions, type ResolvedLevel } from '@hestia/engine';
 import { createEmptyProject, isOpening, levelElevation, makeFloor, makeLevel, makeWall, migrateProject, ProjectStore, viewRangeOf, wallsOnLevel, type Command, type Id, type Opening, type Project } from '@hestia/model';
-import { buildPlanDrawList, LIGHT, planViewOf, type PlanInput } from '@hestia/render';
+import { buildPlanDrawList, hiddenSelectionOps, LIGHT, planViewOf, type PlanInput } from '@hestia/render';
 
 const RUNS = Number(process.env.BENCH_RUNS ?? 20);
 const WARM = 3;
@@ -102,6 +102,16 @@ function syntheticProject(): Project {
   }
   store.exec({ type: 'batch', commands: cmds });
   return store.project;
+}
+
+/**
+ * Cópia do projeto com uma parede a mais no nível, acima do topo do intervalo (oculta). Serve para medir a seleção de um
+ * elemento oculto, que a planta redesenha a cada quadro (pan, zoom, hover) pelo contorno fantasma.
+ */
+function withHiddenWall(p: Project, levelId: Id): { project: Project; id: Id } {
+  const w = wallsOnLevel(p, levelId)[0]!;
+  const id = `${levelId}_oculta`;
+  return { project: { ...p, elements: { ...p.elements, [id]: { ...w, id, baseOffset: 2.5 } } }, id };
 }
 
 /** Cópia do projeto com um ponto de uma parede do nível deslocado `k` mm: geometria nova, cache sem acerto. */
@@ -186,6 +196,12 @@ function benchProject(name: string, p: Project): void {
       const b = below ? { levelId: below, resolved: resolveLevel(q, below) } : null;
       return buildPlanDrawList(planInput(q, id, r, b));
     })]);
+    // Redesenho com um elemento oculto selecionado (o contorno fantasma de `withHiddenSelection`, a cada quadro).
+    const hid = withHiddenWall(pBase, id);
+    const hidView = planViewOf(hid.project, id);
+    rows.push(['9 contorno fantasma (oculta selecionada), redesenho', measure(() => hiddenSelectionOps(hid.project, id, hidView, [hid.id], LIGHT))]);
+    // Entrada do nível abaixo que o app refaz a cada quadro (pisos, lajes e telhados do subpavimento).
+    if (below) rows.push(['10 pisos, lajes e telhados do nível abaixo, por quadro', measure(() => [resolveFloors(pBase, below), resolveSlabs(pBase, below), resolveRoofs(pBase, below)])]);
     console.log(`\n  nível ${id} (${level.name}, cota ${level.elevation} m)`);
     for (const [label, s] of rows) console.log(`    ${label.padEnd(52)} ${fmt(s)}`);
   }

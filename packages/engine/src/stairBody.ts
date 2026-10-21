@@ -59,15 +59,15 @@ function assembledPieces(stair: ResolvedStair): StairBodyPiece[] {
   }));
 }
 
-/** Degrau antes do corte pelo piso base: fundo sem limite inferior, espessura T da rampa e nível de base do lance. */
+/** Degrau de escada monolítica antes do corte pelo piso base: fundo sem limite inferior, espessura T e nº do espelho de trás. */
 interface Tread {
   ci: number;
-  index: number;
   polygon: Ring;
   zTop: number;
   T: number;
   plane: BottomPlane;
-  atBase: boolean;
+  /** Nº global do espelho de trás: o topo do degrau é num·h acima da base; o da frente é num + 1. */
+  num: number;
 }
 
 function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideStyle?: 'smooth' | 'stepped' }, slab: number): StairBodyPiece[] {
@@ -77,21 +77,10 @@ function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideSty
   const baseZ = stair.baseZ;
   if (!(h > 0) || stair.steps.length === 0) return [];
 
-  // Espelhos de cada lance, em ordem de subida; `before` = nº de espelhos dos lances anteriores (cota da base do lance).
-  const runCis = [...new Set(stair.risers.map((r) => r.componentIndex))].sort((a, b) => a - b);
-  const runs = new Map<number, ResolvedStairRiser[]>(
-    runCis.map((ci) => [ci, stair.risers.filter((r) => r.componentIndex === ci).sort((x, y) => x.index - y.index)]),
-  );
-  const landingSteps = stair.steps.filter((s) => s.kind === 'landing');
-  const cis = [...new Set([...runCis, ...landingSteps.map((s) => s.componentIndex)])].sort((a, b) => a - b);
-  const before = (ci: number): number => runCis.filter((c) => c < ci).reduce((n, c) => n + runs.get(c)!.length, 0);
-
-  const treads: Tread[] = [];
-  for (const st of stair.steps) {
-    if (st.kind !== 'tread') continue;
-    const t = treadOf(st, runs.get(st.componentIndex) ?? [], h, sd, stepped, before(st.componentIndex) === 0);
-    if (t) treads.push(t);
-  }
+  // Espelhos pelo nº global (cada linha de emenda existe uma vez): degraus de lances vizinhos usam a mesma linha.
+  const byNumber = new Map<number, ResolvedStairRiser>(stair.risers.map((r) => [r.number, r]));
+  const built = stair.steps.map((st) => (st.kind === 'tread' ? treadOf(st, byNumber, h, sd, stepped, baseZ) : null));
+  const treads = built.filter((t): t is Tread => t !== null);
 
   // T da rampa anterior (decisão 0012 §2); sem rampa anterior, o da rampa seguinte.
   const rampT = (ci: number): number => {
@@ -100,43 +89,50 @@ function monolithicPieces(stair: ResolvedStair, type: StairType & { undersideSty
     return prev.length ? prev[prev.length - 1]!.T : next.length ? next[0]!.T : sd;
   };
 
+  // Corte pelo piso base vale para todo degrau e patamar: só corta quando o fundo fica abaixo de baseZ (nunca acima).
   const pieces: StairBodyPiece[] = [];
-  for (const ci of cis) {
-    if (runs.has(ci)) {
-      for (const t of treads.filter((x) => x.ci === ci)) {
-        pieces.push(...fit('tread', ci, t.index, t.polygon, t.zTop, t.plane, t.atBase, baseZ));
-      }
-      continue;
+  stair.steps.forEach((st, i) => {
+    if (st.kind === 'tread') {
+      const t = built[i];
+      if (t) pieces.push(...fit('tread', st.componentIndex, st.index, t.polygon, t.zTop, t.plane, baseZ));
+      return;
     }
-    const lp = landingSteps.find((s) => s.componentIndex === ci)!;
-    const plane = { a: 0, b: 0, c: lp.z - h - rampT(ci) };
-    pieces.push(...fit('landing', ci, lp.index, lp.polygon, lp.z, plane, before(ci) === 0, baseZ));
-  }
+    const plane = { a: 0, b: 0, c: st.z - h - rampT(st.componentIndex) };
+    pieces.push(...fit('landing', st.componentIndex, st.index, st.polygon, st.z, plane, baseZ));
+  });
 
-  // Chegada: só quando o último componente é um lance com pelo menos dois espelhos (decisão 0012 §2).
-  const lastCi = cis[cis.length - 1];
-  const lastRun = lastCi !== undefined ? runs.get(lastCi) : undefined;
-  if (lastCi !== undefined && lastRun && lastRun.length >= 2) {
-    const prevRiser = lastRun[lastRun.length - 2]!;
-    const lastRiser = lastRun[lastRun.length - 1]!;
-    const dv = sub(mid(lastRiser.a, lastRiser.b), mid(prevRiser.a, prevRiser.b));
+  // Chegada: só quando o último degrau da escada é do último lance e o espelho de topo (nº N) encontra o nível de topo.
+  const N = stair.riserCount;
+  const lastStep = stair.steps[stair.steps.length - 1]!;
+  const lastTread = lastStep.kind === 'tread' ? built[stair.steps.length - 1] : null;
+  const top = byNumber.get(N);
+  const prevTop = byNumber.get(N - 1);
+  if (lastTread && lastTread.num === N - 1 && top && prevTop) {
+    const dv = sub(mid(top.a, top.b), mid(prevTop.a, prevTop.b));
     const pl = Math.hypot(dv.x, dv.y);
-    const last = treads.find((t) => t.ci === lastCi && t.index === lastRun.length - 1);
-    if (pl > EPS && last) {
+    if (pl > EPS) {
       const u = mul(dv, 1 / pl);
       const L = Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH);
-      const ring: Ring = [lastRiser.a, lastRiser.b, add(lastRiser.b, mul(u, L)), add(lastRiser.a, mul(u, L))];
+      const ring: Ring = [top.a, top.b, add(top.b, mul(u, L)), add(top.a, mul(u, L))];
       const polygon = ringArea(ring) < 0 ? ring.reverse() : ring;
-      pieces.push(...fit('arrival', lastCi, 1, polygon, stair.topZ - slab, last.plane, last.atBase, baseZ));
+      pieces.push(...fit('arrival', lastStep.componentIndex, 1, polygon, stair.topZ - slab, lastTread.plane, baseZ));
     }
   }
   return pieces;
 }
 
-/** Degrau k (índice `st.index`) entre os espelhos k e k+1 do lance: fundo a `T` abaixo do topo, ao longo de `d`. */
-function treadOf(st: ResolvedStairStep, rs: ResolvedStairRiser[], h: number, sd: number, stepped: boolean, atBase: boolean): Tread | null {
-  const rb = rs[st.index - 1];
-  const rf = rs[st.index];
+/** Degrau (kind 'tread') com fundo ao longo de `d` entre os espelhos de trás e da frente, `T` abaixo do topo (decisão 0012 §2). */
+function treadOf(
+  st: ResolvedStairStep,
+  byNumber: Map<number, ResolvedStairRiser>,
+  h: number,
+  sd: number,
+  stepped: boolean,
+  baseZ: number,
+): Tread | null {
+  const num = Math.round((st.z - baseZ) / h);
+  const rb = byNumber.get(num);
+  const rf = byNumber.get(num + 1);
   if (!rb || !rf) return null;
   const back = mid(rb.a, rb.b);
   const d = sub(mid(rf.a, rf.b), back);
@@ -148,12 +144,12 @@ function treadOf(st: ResolvedStairStep, rs: ResolvedStairRiser[], h: number, sd:
   const a = (h * d.x) / (p * p);
   const b = (h * d.y) / (p * p);
   const plane: BottomPlane = stepped || p <= EPS ? { a: 0, b: 0, c: zBack } : { a, b, c: zBack - a * back.x - b * back.y };
-  return { ci: st.componentIndex, index: st.index, polygon: st.polygon, zTop: st.z, T, plane, atBase };
+  return { ci: st.componentIndex, polygon: st.polygon, zTop: st.z, T, plane, num };
 }
 
 /**
- * Peça com o fundo `plane`, cortada pelo piso base quando o lance parte de `baseZ` (decisão 0012 §2): plano inteiro
- * abaixo de `baseZ` vira fundo plano em `baseZ`; plano que cruza `baseZ` é dividido em duas peças.
+ * Peça com o fundo `plane`, cortada pelo piso base (decisão 0012 §2): plano inteiro abaixo de `baseZ` vira fundo plano em
+ * `baseZ`; plano que cruza `baseZ` é dividido em duas peças. Peça acima do piso base sai inalterada.
  */
 function fit(
   kind: StairBodyPiece['kind'],
@@ -162,12 +158,10 @@ function fit(
   polygon: Ring,
   zTop: number,
   plane: BottomPlane,
-  cut: boolean,
   baseZ: number,
 ): StairBodyPiece[] {
   const piece = (poly: Ring, bottom: BottomPlane): StairBodyPiece => ({ kind, componentIndex, index, polygon: poly, zTop, bottom });
   const flat = (): BottomPlane => ({ a: 0, b: 0, c: baseZ });
-  if (!cut) return [piece(polygon, plane)];
   const vals = polygon.map((p) => plane.a * p.x + plane.b * p.y + plane.c);
   if (Math.min(...vals) >= baseZ - EPS) return [piece(polygon, plane)];
   if (Math.max(...vals) <= baseZ + EPS) return [piece(polygon, flat())];

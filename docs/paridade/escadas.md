@@ -55,4 +55,4 @@ Fonte: [docs/escadas](../escadas/) (Revit 2026: Stair by Component e croqui; Arc
 - [x] G3 Casos dourados de alturas, nº de degraus, áreas e volumes **(bloqueante)**
 - [x] G4 Testes de propriedade (degraus disjuntos, união = região entre espelhos, cotas crescentes, sem exceção)
 - [x] G5 Migração de arquivo v11 → v12 e ida e volta
-- [ ] G6 Regressão visual por captura — o teste de navegador `tests/e2e/escadas.mjs` (13 passos) gera imagens para inspeção, mas ainda não compara com baseline
+- [x] G6 Regressão visual por captura — `npm run test:visual` (após `npm run build`) compara as capturas determinísticas de `escadas.mjs`, `vista-planta.mjs` e `escadas-closeup.mjs` com `tests/e2e/baseline/` (`tests/e2e/visual.mjs`, tolerância 0,5% de pixels por captura; `UPDATE_BASELINE=1` regrava)

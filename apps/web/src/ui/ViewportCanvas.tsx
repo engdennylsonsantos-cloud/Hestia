@@ -39,6 +39,12 @@ interface Pt {
   y: number;
 }
 
+/** Planta com o contorno fantasma dos selecionados fora do intervalo de vista (decisão 0013 §4): a planta não os desenha. */
+function withHiddenSelection(dl: PlanDrawList, p: Project, levelId: Id, selection: Id[], theme: PlanTheme): PlanDrawList {
+  const ghosts = hiddenSelectionOps(p, levelId, planViewOf(p, levelId), selection, theme);
+  return ghosts.length ? { ...dl, strokes: [...dl.strokes, ...ghosts] } : dl;
+}
+
 /** Desenha o plano (GPU ou CPU) e o 3D, e traduz o ponteiro em chamadas ao editor. */
 export function ViewportCanvas(): ReactElement {
   const host = useRef<HTMLDivElement>(null);
@@ -162,24 +168,24 @@ export function ViewportCanvas(): ReactElement {
         ? (buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] })
         : withHiddenSelection(
             buildPlanDrawList({
-            project: p,
-            levelId: st.levelId,
-            resolved,
-            below,
-            belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
-            belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
-            belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
-            viewport: v,
-            theme,
-            dark,
-            selection: st.selection,
-            hover: st.hover,
-            preview: tool.preview(),
-            inference: tool.inference(),
-            showGrid: st.showGrid,
-            // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
-            ...{ showRoofProjection: st.showRoofProjection },
-          }),
+                project: p,
+                levelId: st.levelId,
+                resolved,
+                below,
+                belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
+                belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
+                belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
+                viewport: v,
+                theme,
+                dark,
+                selection: st.selection,
+                hover: st.hover,
+                preview: tool.preview(),
+                inference: tool.inference(),
+                showGrid: st.showGrid,
+                // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
+                ...{ showRoofProjection: st.showRoofProjection },
+            }),
             p,
             st.levelId,
             st.selection,

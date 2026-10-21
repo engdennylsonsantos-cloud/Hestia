@@ -1,14 +1,28 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { stairLandingPolygon } from '@hestia/engine';
+import type { StairCurve } from '@hestia/model';
 import { copyCurve, lastRun, partsFromComponents, componentsFromParts, type RunDraft, type StairPart, type StairSubmode } from './stairSketchState.ts';
-import { CONNECT_TOL, emptyStroke, strokeClick, strokeUndo, type Stroke, type StrokeEvent } from './stairStroke.ts';
+import { CONNECT_TOL, chainEnd, emptyStroke, strokeClick, strokeUndo, type Stroke, type StrokeEvent } from './stairStroke.ts';
+import { reverseCurve } from './stairPickLines.ts';
 
-/** Estado do desenho: sub-modo, lado do limite, componentes do croqui e o traçado em curso. */
+/** Estado do desenho: sub-modo, lado do limite, componentes do croqui, o traçado em curso e se "Pegar linhas" está ligado. */
 export interface DrawState {
   submode: StairSubmode;
   phase: 'left' | 'right';
   parts: StairPart[];
   stroke: Stroke;
+  /** Pegar linhas: o clique pega a linha sob o cursor em vez de desenhar (vale para limites, espelhos e caminhada). */
+  pick: boolean;
+}
+
+/**
+ * Uma pegada, para desfazer: as curvas que entraram, e onde (a cadeia em curso, ou os espelhos de um lance).
+ * Desfazer tira exatamente estas curvas (por identidade); refazer as põe de volta no fim da mesma camada.
+ */
+export interface PickOp {
+  layer: 'chain' | 'risers';
+  items: StairCurve[];
+  run?: RunDraft;
 }
 
 /** Um clique no sub-modo atual. Devolve a mensagem para a barra de status, se houver. */
@@ -175,4 +189,41 @@ export function writeRun(st: DrawState): RunDraft {
   const fresh: RunDraft = { boundaryLeft: [], boundaryRight: [], risers: [], path: [] };
   st.parts.push({ kind: 'run', run: fresh });
   return fresh;
+}
+
+/**
+ * Pegar linhas: as curvas já deslocadas entram no croqui como se fossem desenhadas. Limites e caminhada vão para a cadeia
+ * em curso (Enter fecha, como sempre); espelhos saem direto, um por curva. Não valida o croqui: quem aponta erro é
+ * `analyzeDraft` (validateRunSketch). Só recusa o que não tem onde entrar (sub-modo errado, espelho sem limites).
+ */
+export function pickInto(st: DrawState, curves: StairCurve[]): { op: PickOp; msg: string } | { error: string } {
+  const n = curves.length;
+  if (st.submode === 'espelhos') {
+    const run = lastRun(st.parts);
+    if (!run || run.boundaryLeft.length === 0 || run.boundaryRight.length === 0) {
+      st.stroke = emptyStroke(st.stroke.prim);
+      return { error: 'Desenhe os limites antes dos espelhos.' };
+    }
+    run.risers.push(...curves);
+    st.stroke = emptyStroke(st.stroke.prim);
+    return { op: { layer: 'risers', items: curves, run }, msg: `${n} espelho${n > 1 ? 's' : ''} pego${n > 1 ? 's' : ''}.` };
+  }
+  if (st.submode !== 'limites' && st.submode !== 'caminhada') return { error: 'Pegar linhas vale para limites, espelhos e caminhada.' };
+  if (st.submode === 'caminhada' && !lastRun(st.parts)?.risers.length) return { error: 'Desenhe os espelhos antes da caminhada.' };
+  const base = st.stroke.chain;
+  const items = orientAfter(curves, base.length ? chainEnd(st.stroke) : null);
+  st.stroke = { ...emptyStroke(st.stroke.prim), chain: [...base, ...items], last: items[items.length - 1]!.b };
+  return { op: { layer: 'chain', items }, msg: `${n} linha${n > 1 ? 's' : ''} pega${n > 1 ? 's' : ''}. Enter fecha o ${st.submode === 'limites' ? 'limite' : 'caminho'}.` };
+}
+
+/**
+ * Com uma cadeia em curso, a pegada começa onde ela termina: inverte a curva ou a ordem inteira quando a pegada chega
+ * pelo outro lado. Sem cadeia, mantém o sentido que a seleção deu.
+ */
+function orientAfter(curves: StairCurve[], end: Vec2 | null): StairCurve[] {
+  if (!end) return curves;
+  const first = curves[0]!;
+  const last = curves[curves.length - 1]!;
+  if (dist(first.a, end) <= dist(last.b, end)) return curves;
+  return curves.slice().reverse().map(reverseCurve);
 }

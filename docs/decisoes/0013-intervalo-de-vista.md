@@ -49,3 +49,8 @@ padrão ligada), independente do topo, porque é prática de projeto brasileira;
 ## 5 · Interface
 Propriedades da vista (nível ativo): Topo, Plano de corte, Base, Profundidade (m, relativos ao nível), Direção (Baixo | Cima [em breve]), botão "Restaurar padrão",
 lista de avisos. Campos inválidos mostram a mensagem de `viewRangeIssues` e não são gravados.
+- "Selecionar" de um aviso põe os elementos na seleção; os ocultos (que a planta não desenha) ganham um contorno fantasma: tracejado fino na cor
+  de seleção, sem preenchimento (`hiddenSelectionOps`; paredes pelo contorno, aberturas pelo vão, pisos/lajes/telhados/escadas pela pegada).
+- "Mostrar projeção da cobertura" (padrão ligada) é preferência da tela, não do projeto: guardada no navegador em `localStorage`
+  (`hestia.roofProjection`, "true"/"false"), como a captura, com leitura e gravação tolerantes a armazenamento indisponível. Não entra no projeto
+  nem no desfazer. Alternador na faixa (Vista › Planta) e na aba Vista de Propriedades, com o mesmo estado.

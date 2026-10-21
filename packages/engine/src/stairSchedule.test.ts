@@ -69,7 +69,7 @@ describe('tabela de escadas', () => {
 
 describe('CSV da tabela de escadas', () => {
   const text = stairScheduleToCsv(schedule.rows, schedule.totals);
-  const lines = text.replace(/^﻿/, '').split('\r\n').filter((l) => l.length > 0);
+  const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('BOM UTF-8, separador ";", cabeçalho, uma linha por escada e total', () => {
     expect(text.startsWith('﻿')).toBe(true);

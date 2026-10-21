@@ -5,7 +5,10 @@ export interface FillOp {
   polygons: MultiPolygon;
   color: string;
   alpha: number;
-  hatch?: { kind: HatchKind; color: string };
+  /** Hachura por cima do preenchimento; `alpha` (0..1) é a transparência da categoria (decisão 0015 §2.4). */
+  hatch?: { kind: HatchKind; color: string; alpha?: number };
+  /** Faixa de contorno do elemento (não é superfície): fica no estilo arame e não sofre a transparência da categoria. */
+  contour?: boolean;
 }
 
 export interface StrokeOp {

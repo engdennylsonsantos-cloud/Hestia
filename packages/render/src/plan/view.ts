@@ -1,5 +1,6 @@
 import { difference, orientedRect, union, type MultiPolygon } from '@hestia/geom';
 import {
+  applyPartialStructure,
   classifyLevelEntries,
   frameOfWall,
   openingGeometry,
@@ -12,7 +13,21 @@ import {
   type ResolvedLevel,
   type ViewClass,
 } from '@hestia/engine';
-import { isOpening, isWall, levelElevation, viewRangeOf, wallsOnLevel, type Id, type Project, type ViewRange } from '@hestia/model';
+import {
+  GRAPHICS_CATEGORIES,
+  isOpening,
+  isWall,
+  levelElevation,
+  levelGraphicsOf,
+  openingsOfWall,
+  viewRangeOf,
+  wallsOnLevel,
+  type GraphicsCategory,
+  type Id,
+  type PartialStructure,
+  type Project,
+  type ViewRange,
+} from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
 import { openingSymbol } from './symbols.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
@@ -44,16 +59,47 @@ export interface PlanView {
   outlineWalls: ReadonlySet<Id>;
   /** Contornos das paredes fora do corte, por estado (ver `wallOutlineOps`). */
   outlines: OutlineShape[];
-  /** Geometria do nível para a planta, resolvida com o corte e as aberturas da vista. */
+  /** Geometria do nível para a planta, resolvida com o corte, as aberturas da vista e a exibição parcial de estrutura. */
   geo: ResolvedLevel;
+  /**
+   * Elementos ocultos pela substituição de visibilidade da categoria (decisão 0015 §2.4). Também estão em `hidden`, então
+   * somem da seleção, das etiquetas e do desenho; só o contorno fantasma (`hiddenSelectionOps`) os deixa de fora, porque
+   * o usuário os ocultou de propósito e não por estarem fora do intervalo.
+   */
+  categoryHidden: ReadonlySet<Id>;
+  /** Exibição parcial de estrutura aplicada a `geo` (decisão 0015 §2.5). */
+  partial: PartialStructure;
 }
 
-/** Uma vista por projeto e nível: o projeto é imutável (cada edição cria outro objeto), então o cache não envelhece. */
-const memo = new WeakMap<Project, Map<Id, PlanView>>();
+/**
+ * Vista por projeto, nível, exibição parcial e categorias ocultas: o projeto é imutável (cada edição cria outro objeto),
+ * então o cache não envelhece. A chave inclui só o que muda a resolução; pan, zoom e hover reaproveitam a vista.
+ */
+const memo = new WeakMap<Project, Map<string, PlanView>>();
 
 const OUTLINE_CLASSES: OutlineClass[] = ['projection-above', 'projection-below', 'beyond'];
 
-function computePlanView(p: Project, levelId: Id): PlanView {
+/** Elemento do modelo que pertence a uma categoria de gráficos, ou null (ex.: parede de outro nível). */
+function categoryHiddenIds(p: Project, levelId: Id, hiddenCats: HiddenCats): Set<Id> {
+  const out = new Set<Id>();
+  if (hiddenCats.size === 0) return out;
+  const add = (c: GraphicsCategory, id: Id): void => {
+    if (hiddenCats.has(c)) out.add(id);
+  };
+  for (const w of wallsOnLevel(p, levelId)) {
+    add('wall', w.id);
+    for (const o of openingsOfWall(p, w.id)) add(o.kind, o.id);
+  }
+  for (const f of resolveFloors(p, levelId)) add('floor', f.floorId);
+  for (const s of resolveSlabs(p, levelId)) add('slab', s.slabId);
+  for (const r of resolveRoofs(p, levelId)) add('roof', r.roofId);
+  for (const s of resolveStairsOnLevel(p, levelId)) add('stair', s.id);
+  return out;
+}
+
+type HiddenCats = ReadonlySet<GraphicsCategory>;
+
+function computePlanView(p: Project, levelId: Id, partial: PartialStructure, hiddenCats: HiddenCats): PlanView {
   const range = viewRangeOf(p, levelId);
   const elevation = levelElevation(p, levelId);
   const cutZ = elevation + range.cut;
@@ -61,14 +107,24 @@ function computePlanView(p: Project, levelId: Id): PlanView {
   const hidden = new Set<Id>();
   const cutOpenings = new Set<Id>();
   const outlineWalls = new Set<Id>();
-  // Mesma classificação de `openingsCrossingCut` (aberturas `cut`), numa só passada pelo nível.
+  const categoryHidden = categoryHiddenIds(p, levelId, hiddenCats);
+  // Mesma classificação de `openingsCrossingCut` (aberturas `cut`), numa só passada pelo nível. Categoria oculta vira `hidden`.
   for (const e of classifyLevelEntries(p, levelId, range)) {
-    cls.set(e.id, e.cls);
-    if (e.cls === 'hidden') hidden.add(e.id);
-    if (e.category === 'opening' && e.cls === 'cut') cutOpenings.add(e.id);
-    if (e.category === 'wall' && e.cls !== 'cut' && e.cls !== 'hidden') outlineWalls.add(e.id);
+    const cl: ViewClass = categoryHidden.has(e.id) ? 'hidden' : e.cls;
+    cls.set(e.id, cl);
+    if (cl === 'hidden') hidden.add(e.id);
+    if (e.category === 'opening' && cl === 'cut') cutOpenings.add(e.id);
+    if (e.category === 'wall' && cl !== 'cut' && cl !== 'hidden') outlineWalls.add(e.id);
   }
-  const geo = resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls });
+  for (const id of categoryHidden) {
+    cls.set(id, 'hidden');
+    hidden.add(id);
+  }
+  // Paredes ocultas pela categoria saem da geometria inteira (as juntas e a silhueta são as do nível sem elas).
+  const walls0 = hiddenCats.has('wall')
+    ? ({ levelId, walls: {}, clusters: [] } as ResolvedLevel)
+    : resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls });
+  const geo = applyPartialStructure(p, walls0, partial);
   // Silhueta cortada: o contorno das paredes fora do corte não deve riscá-la.
   const cutSilhouette = union(...geo.clusters.map((c) => c.silhouette));
   const walls = wallsOnLevel(p, levelId);
@@ -84,20 +140,23 @@ function computePlanView(p: Project, levelId: Id): PlanView {
     if (cutSilhouette.length > 0) shape = difference(shape, cutSilhouette);
     outlines.push({ cls: c, shape });
   }
-  return { range, cutZ, topZ: elevation + range.top, cls, hidden, outlineWalls, outlines, geo };
+  return { range, cutZ, topZ: elevation + range.top, cls, hidden, outlineWalls, outlines, geo, categoryHidden, partial };
 }
 
-/** Vista da planta do nível (memorizada por projeto). */
+/** Vista da planta do nível (memorizada por projeto, nível, exibição parcial e categorias ocultas). */
 export function planViewOf(p: Project, levelId: Id): PlanView {
-  let byLevel = memo.get(p);
-  if (!byLevel) {
-    byLevel = new Map();
-    memo.set(p, byLevel);
+  const g = levelGraphicsOf(p, levelId);
+  const hiddenCats = new Set(GRAPHICS_CATEGORIES.filter((c) => !g.overrides[c].visible));
+  const key = `${levelId}|${g.partialStructure}|${[...hiddenCats].join(',')}`;
+  let byKey = memo.get(p);
+  if (!byKey) {
+    byKey = new Map();
+    memo.set(p, byKey);
   }
-  let view = byLevel.get(levelId);
+  let view = byKey.get(key);
   if (!view) {
-    view = computePlanView(p, levelId);
-    byLevel.set(levelId, view);
+    view = computePlanView(p, levelId, g.partialStructure, hiddenCats);
+    byKey.set(key, view);
   }
   return view;
 }
@@ -107,13 +166,13 @@ type OutlineStyle = Omit<StrokeOp, 'pts' | 'closed'>;
 /**
  * Contorno das paredes fora do corte (decisão 0013 §4): projeção acima do corte tracejada e fina; abaixo do corte e
  * "além", linha fina clara (a "além", mais clara ainda). Sem preenchimento. A parte que cai sobre a silhueta cortada já
- * saiu em `computePlanView`.
+ * saiu em `computePlanView`. `projPx`: largura de projeção da parede (decisão 0015 §2.1).
  */
-export function wallOutlineOps(view: PlanView, theme: PlanTheme): StrokeOp[] {
+export function wallOutlineOps(view: PlanView, theme: PlanTheme, projPx: number): StrokeOp[] {
   const styles: Record<OutlineClass, OutlineStyle> = {
-    'projection-above': { widthPx: 1, color: theme.inkSoft, alpha: 1, dash: [6, 3] },
-    'projection-below': { widthPx: 1, color: theme.inkSoft, alpha: 0.8 },
-    beyond: { widthPx: 1, color: theme.underlay, alpha: 0.9 },
+    'projection-above': { widthPx: projPx, color: theme.inkSoft, alpha: 1, dash: [6, 3] },
+    'projection-below': { widthPx: projPx, color: theme.inkSoft, alpha: 0.8 },
+    beyond: { widthPx: projPx, color: theme.underlay, alpha: 0.9 },
   };
   const out: StrokeOp[] = [];
   for (const o of view.outlines) {
@@ -123,15 +182,16 @@ export function wallOutlineOps(view: PlanView, theme: PlanTheme): StrokeOp[] {
 }
 
 /**
- * Símbolo de uma abertura conforme o estado na vista (decisão 0013 §4). `cut`, ou sem classificação: símbolo normal.
- * `projection-above` (peitoril acima do corte): tracejado sobre a parede inteira. `projection-below` e `beyond`: símbolo
- * leve, na cor de traço secundária. `hidden`: nada.
+ * Símbolo de uma abertura conforme o estado na vista (decisão 0013 §4). `cut`, ou sem classificação: símbolo normal, com
+ * a espessura de corte. `projection-above` (peitoril acima do corte): tracejado sobre a parede inteira. `projection-below`
+ * e `beyond`: símbolo leve, na cor de traço secundária. Os dois últimos e o tracejado usam a espessura de projeção.
+ * `hidden`: nada. `widths` vem de `PlanPaint` da categoria (porta ou janela), em px de tela.
  */
-export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, theme: PlanTheme): StrokeOp[] {
+export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, theme: PlanTheme, widths: { cutPx: number; projPx: number }): StrokeOp[] {
   if (cls === 'hidden') return [];
-  if (cls === 'projection-above') return openingSymbol(g, theme).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
-  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft });
-  return openingSymbol(g, theme);
+  if (cls === 'projection-above') return openingSymbol(g, theme, widths.projPx).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
+  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft }, widths.projPx);
+  return openingSymbol(g, theme, widths.cutPx);
 }
 
 /**
@@ -142,7 +202,8 @@ export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, t
  * a pegada, a mesma que a planta usa para o destaque. Elementos visíveis ou de outro nível não entram.
  */
 export function hiddenSelectionOps(p: Project, levelId: Id, view: PlanView, selection: readonly Id[], theme: PlanTheme): StrokeOp[] {
-  const ids = selection.filter((id) => view.hidden.has(id));
+  // Ocultos pela categoria (substituição da vista) ficam de fora: o fantasma é do intervalo de vista (decisão 0013).
+  const ids = selection.filter((id) => view.hidden.has(id) && !view.categoryHidden.has(id));
   if (ids.length === 0) return [];
   // A planta chama esta função a cada quadro (pan, zoom, hover) enquanto há um oculto selecionado. O resultado depende
   // só da vista (um objeto por projeto e nível), dos ids e da cor: guarda-se por vista e o quadro seguinte reaproveita.
@@ -171,7 +232,7 @@ function ghostOps(p: Project, levelId: Id, view: PlanView, ids: Id[], theme: Pla
   const wallIds = ids.filter((id) => isWall(p.elements[id]));
   if (wallIds.length > 0) {
     // Mesmo corte da vista; as ocultas entram como contorno (`outlineWalls`), então o `fragment` é a parede inteira.
-    const geo = resolveLevel(p, levelId, undefined, { cutZ: view.cutZ, planOpenings: new Set<Id>(), outlineWalls: new Set<Id>(wallIds) });
+    const geo = applyPartialStructure(p, resolveLevel(p, levelId, undefined, { cutZ: view.cutZ, planOpenings: new Set<Id>(), outlineWalls: new Set<Id>(wallIds) }), view.partial);
     for (const id of wallIds) addRings(union(...(geo.walls[id]?.layers ?? []).map((l) => l.fragment)));
   }
   const footprints = new Map<Id, MultiPolygon>();

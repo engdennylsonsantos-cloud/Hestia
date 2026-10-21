@@ -7,14 +7,21 @@ import { ModelScene, sunDirection } from './scene3d.ts';
 import { buildFloorSolids, buildLevelSolids } from './solids.ts';
 
 const curve = (ax: number, ay: number, bx: number, by: number, sag = 0) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag });
-const run = (id: string): StairRun => ({
-  id,
-  kind: 'run',
-  boundaryLeft: [curve(0, 0, 0, 3, 0.2)],
-  boundaryRight: [curve(1, 0, 1, 3)],
-  risers: [curve(0, 0, 1, 0)],
-  path: [],
-});
+/** Lance reto de 17 espelhos de 0,28 m (cota de 3 m = 0,176 m por espelho, dentro da norma): gera degraus. */
+const lanceReto = (): StairRun => {
+  const n = 17;
+  const sp = 0.28;
+  const y0 = 1;
+  const y1 = 2;
+  return {
+    id: 'r1',
+    kind: 'run',
+    boundaryLeft: [curve(-0.5, y1, (n - 1) * sp + 0.5, y1)],
+    boundaryRight: [curve(-0.5, y0, (n - 1) * sp + 0.5, y0)],
+    risers: Array.from({ length: n }, (_, k) => curve(k * sp, y0, k * sp, y1)),
+    path: [],
+  };
+};
 
 /** Sala 4 × 3 m: porta na parede a, janela na c e piso. Opcionalmente, telhado e escada (para as categorias). */
 function casa(extra: { telhado?: boolean; escada?: boolean } = {}): Project {
@@ -40,7 +47,7 @@ function casa(extra: { telhado?: boolean; escada?: boolean } = {}): Project {
   s.exec({ type: 'addOpening', opening: janela });
   s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f', typeId: 'ft_ceram', levelId: 'lv_0', boundary: pts }) });
   if (extra.telhado) s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r1', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: pts, heightOffset: 0.2 }) });
-  if (extra.escada) s.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [run('r1')] }) });
+  if (extra.escada) s.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [lanceReto()] }) });
   return s.project;
 }
 
@@ -73,6 +80,9 @@ function malhas(ms: ModelScene): THREE.Mesh[] {
   });
   return out;
 }
+
+/** Material de uma malha (um só: as malhas do modelo não usam arrays de materiais). */
+const materialOf = (m: THREE.Mesh): THREE.Material => m.material as THREE.Material;
 
 /** Linhas de arestas do modelo. */
 function linhas(ms: ModelScene): THREE.LineSegments[] {
@@ -228,7 +238,7 @@ describe('exibição por categoria (substituições)', () => {
     const ms = cena(p);
     const translucidas = malhas(ms).filter((m) => (m.material as THREE.MeshStandardMaterial).opacity === 0.4);
     expect(translucidas).toHaveLength(lotesParede(p));
-    expect(translucidas.every((m) => m.material.transparent)).toBe(true);
+    expect(translucidas.every((m) => materialOf(m).transparent)).toBe(true);
     // O vidro da janela tem opacidade própria (< 1) e não entra na categoria da parede: continua com a sua.
     expect(malhas(ms).some((m) => (m.material as THREE.MeshStandardMaterial).opacity < 1 && (m.material as THREE.MeshStandardMaterial).opacity !== 0.4)).toBe(true);
   });
@@ -314,8 +324,8 @@ describe('cache de materiais e limpeza', () => {
   it('a categoria com substituição ganha material próprio (não o do padrão)', () => {
     const p = comVista(casa(), { overrides: { ...defaultsOverrides(), wall: { visible: true, transparency: 0.5, halftone: false } } });
     const ms = cena(p);
-    const paredes = new Set(malhas(ms).filter((m) => m.material.transparent).map((m) => m.material));
-    const outras = malhas(ms).filter((m) => !m.material.transparent).map((m) => m.material);
+    const paredes = new Set(malhas(ms).filter((m) => materialOf(m).transparent).map((m) => materialOf(m)));
+    const outras = malhas(ms).filter((m) => !materialOf(m).transparent).map((m) => materialOf(m));
     expect(paredes.size).toBeGreaterThan(0);
     expect(outras.every((m) => !paredes.has(m))).toBe(true);
   });

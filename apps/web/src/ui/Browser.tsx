@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { isFloor, isRoof, isSlab, isWall } from '@hestia/model';
+import { isFloor, isRoof, isSlab, isStair, isWall } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -16,6 +16,7 @@ export function Browser(): ReactElement {
   const floorTypes = Object.values(p.floorTypes);
   const slabTypes = Object.values(p.slabTypes);
   const roofTypes = Object.values(p.roofTypes);
+  const stairTypes = Object.values(p.stairTypes);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   return (
@@ -150,6 +151,21 @@ export function Browser(): ReactElement {
                 />
               ))}
             </details>
+            <details open>
+              <summary>Escadas</summary>
+              {stairTypes.map((t) => (
+                <TypeRow
+                  key={t.id}
+                  kind="stair"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="stair"
+                  active={s.options.stair?.typeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, stair: { ...st.options.stair, typeId: t.id } } }))}
+                  onEdit={() => useUi.setState({ dialog: 'stairType', dialogArg: t.id })}
+                />
+              ))}
+            </details>
           </div>
         </details>
         <details open>
@@ -178,6 +194,10 @@ export function Browser(): ReactElement {
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de telhados
               <span className="meta">{Object.values(p.elements).filter(isRoof).length}</span>
+            </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })}>
+              <Icon name="file" size={14} /> Tabela de escadas
+              <span className="meta">{Object.values(p.elements).filter(isStair).length}</span>
             </button>
           </div>
         </details>

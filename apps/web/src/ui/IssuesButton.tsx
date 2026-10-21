@@ -50,7 +50,7 @@ export function IssuesButton(): ReactElement {
   if (!summary) return <span className="issues-ok">✓ Modelo sem avisos</span>;
 
   const choose = (issue: ValidationIssue): void => {
-    goTo(issue);
+    goToIssue(issue);
     setOpen(false);
     trigger.current?.focus();
   };

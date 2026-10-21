@@ -6,6 +6,7 @@ import {
   isOpening,
   isRoof,
   isSlab,
+  isStair,
   isWall,
   newId,
   type DetailLevel,
@@ -29,6 +30,7 @@ import { ProfileRow } from './ProfileRow.tsx';
 import { FloorProperties } from './FloorProperties.tsx';
 import { RoofProperties } from './RoofProperties.tsx';
 import { SlabProperties } from './SlabProperties.tsx';
+import { StairProperties } from './StairProperties.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -300,9 +302,10 @@ export function Properties(): ReactElement {
   const floors = els.filter(isFloor);
   const slabs = els.filter(isSlab);
   const roofs = els.filter(isRoof);
-  const count = walls.length + ops.length + floors.length + slabs.length + roofs.length;
-  const kinds = [walls, ops, floors, slabs, roofs].filter((g) => g.length > 0).length;
-  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : 'Vista';
+  const stairs = els.filter(isStair);
+  const count = walls.length + ops.length + floors.length + slabs.length + roofs.length + stairs.length;
+  const kinds = [walls, ops, floors, slabs, roofs, stairs].filter((g) => g.length > 0).length;
+  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : 'Vista';
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
@@ -315,8 +318,9 @@ export function Properties(): ReactElement {
           : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
           : kinds === 1 && slabs.length > 0 ? <SlabProperties slabs={slabs} />
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
+          : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : count > 0 ? (
-          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje ou telhado) para editar propriedades.</div>
+          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado ou escada) para editar propriedades.</div>
         ) : <ViewProps />}
       </div>
     </aside>

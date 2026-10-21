@@ -185,7 +185,7 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
     expect(stairsOf(l)).toHaveLength(0);
     expect(l.last()).toBe('Esta forma precisa de ao menos 4 espelhos; a altura dá 3.');
 
-    const w = setup({ shape: 'winder' }, { topLevelId: 'lv_1', topOffset: -2.1 });
+    const w = setup({ shape: 'winder' }, { topLevelId: 'lv_1', topOffset: -2.3 });
     draw(tool('stairrun', w.env), [0, 0], [0, 5]);
     expect(stairsOf(w)).toHaveLength(0);
     expect(w.last()).toBe('Esta forma precisa de ao menos 5 espelhos; a altura dá 4.');

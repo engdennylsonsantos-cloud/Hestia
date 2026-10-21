@@ -56,3 +56,18 @@ export function stairTypeError(t: Pick<StairType, 'name' | 'maxRiser' | 'minTrea
   if (t.runStyle === 'assembled' && !(t.treadThickness > 0 && t.riserThickness > 0)) return 'Escada montada: a espessura do piso e do espelho precisa ser maior que zero.';
   return null;
 }
+
+/**
+ * Cria a cópia do tipo e aplica a cópia às escadas dadas, em UM passo de desfazer (como o painel de paredes).
+ * Devolve o id da cópia, ou null se o tipo não existe.
+ */
+export function duplicateStairTypeFor(store: ProjectStore, ids: Id[], typeId: Id): Id | null {
+  const src = store.project.stairTypes[typeId];
+  if (!src) return null;
+  const copy: StairType = { ...structuredClone(src), id: newId('stt'), name: `${src.name} (cópia)` };
+  store.transaction('Duplicar tipo de escada', () => {
+    store.exec({ type: 'upsertStairType', stairType: copy });
+    if (ids.length) store.exec({ type: 'updateElements', ids, patch: { typeId: copy.id } });
+  });
+  return copy.id;
+}

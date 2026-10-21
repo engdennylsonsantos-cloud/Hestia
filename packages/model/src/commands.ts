@@ -31,6 +31,7 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
+import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -60,6 +61,7 @@ export type Command =
   | { type: 'upsertOpeningType'; openingType: OpeningType }
   | { type: 'upsertLevel'; level: Level }
   | { type: 'deleteLevel'; id: Id }
+  | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
@@ -341,6 +343,16 @@ export function applyCommand(p: Project, c: Command): void {
       // Escada também conta pelo nível de topo explícito; o topo automático segue o nível acima e não prende o nível.
       if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
+      break;
+    }
+    case 'setLevelViewRange': {
+      const l = p.levels.find((x) => x.id === c.levelId);
+      if (!l) throw new Error('Nível inexistente');
+      // Sem normalização silenciosa: um valor que quebra a ordem topo ≥ corte ≥ base ≥ profundidade é recusado.
+      const next: ViewRange = { ...l.viewRange, ...c.patch };
+      const issues = viewRangeIssues(next);
+      if (issues.length > 0) throw new Error(issues.join(' '));
+      l.viewRange = next;
       break;
     }
     case 'setProjectName':

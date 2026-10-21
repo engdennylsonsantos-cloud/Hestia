@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, type Opening } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeWall, type Opening } from '@hestia/model';
 import { idsOfCategory, idsOfType, selectedTypeId } from './selectionFilters.ts';
 
 /** lv_0: parede A (tipo alv14) com porta; parede B (tipo outro) com janela. lv_1: parede C (alv14). */
@@ -7,7 +7,7 @@ function build() {
   const s = new ProjectStore(createEmptyProject());
   const base = s.project.wallTypes.wt_alv14!;
   s.exec({ type: 'upsertWallType', wallType: { ...structuredClone(base), id: 'wt_b', name: 'Outro' } });
-  s.exec({ type: 'upsertLevel', level: { id: 'lv_1', name: 'Pav. 1', elevation: 3 } });
+  s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_1', name: 'Pav. 1', elevation: 3 }) });
   const wall = (id: string, typeId: string, levelId: string, ax: number, ay: number) =>
     makeWall({ id, typeId, levelId, a: { x: ax, y: ay }, b: { x: ax + 4, y: ay } });
   s.exec({ type: 'addWall', wall: wall('A', 'wt_alv14', 'lv_0', 0, 0) });

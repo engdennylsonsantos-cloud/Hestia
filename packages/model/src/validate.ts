@@ -6,7 +6,8 @@ import { roofIssues } from './validateRoofs.ts';
 import { stairIssues } from './validateStairs.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
-import { isOpening, isWall, type Element, type Id, type Opening, type Project, type Wall } from './types.ts';
+import { viewRangeIssues } from './viewRange.ts';
+import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 
 export type ValidationSeverity = 'error' | 'warning';
 
@@ -203,12 +204,23 @@ function wallOverlaps(walls: Wall[]): ValidationIssue[] {
   return out;
 }
 
+/** Intervalo de vista de cada nível (decisão 0013): uma mensagem por violação. */
+function levelIssues(l: Level): ValidationIssue[] {
+  const problems = l.viewRange ? viewRangeIssues(l.viewRange) : ['Falta o intervalo de vista do nível.'];
+  return problems.map((message) => ({
+    severity: 'error' as const,
+    code: 'level-view-range-invalid',
+    message: `Nível "${l.name}" (${l.id}): ${message}`,
+  }));
+}
+
 /** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
 export function validateProject(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
   const walls = elements.filter(isWall);
   const openings = elements.filter(isOpening);
   return [
+    ...p.levels.flatMap((l) => levelIssues(l)),
     ...walls.flatMap((w) => wallIssues(p, w)),
     ...openings.flatMap((o) => openingIssues(p, o)),
     ...openingOverlaps(p, openings),

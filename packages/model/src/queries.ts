@@ -1,5 +1,6 @@
 import { arcFromSagitta, dist } from '@hestia/geom';
 import { profileMax } from './profile.ts';
+import { DEFAULT_VIEW_RANGE, type ViewRange } from './viewRange.ts';
 import { isOpening, isStair, isWall, type Id, type Level, type Opening, type OpeningType, type Project, type Stair, type Wall, type WallType } from './types.ts';
 
 export const getWall = (p: Project, id: Id): Wall | undefined => {
@@ -36,6 +37,10 @@ export const wallLength = (w: Wall): number => wallArc(w)?.length ?? dist(w.a, w
 
 export const levelElevation = (p: Project, levelId: Id): number =>
   p.levels.find((l) => l.id === levelId)?.elevation ?? 0;
+
+/** Intervalo de vista do nível; o padrão se o nível não existir. */
+export const viewRangeOf = (p: Project, levelId: Id): ViewRange =>
+  p.levels.find((l) => l.id === levelId)?.viewRange ?? { ...DEFAULT_VIEW_RANGE };
 
 export const wallBaseElevation = (p: Project, w: Wall): number => levelElevation(p, w.levelId) + w.baseOffset;
 

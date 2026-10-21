@@ -187,6 +187,8 @@ export function labelOf(c: Command): string {
       return 'Editar nível';
     case 'deleteLevel':
       return 'Excluir nível';
+    case 'setLevelViewRange':
+      return 'Alterar intervalo de vista';
     case 'setProjectName':
       return 'Renomear projeto';
     case 'setDefaults':

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, makeWall, stairsOnLevel, wallsOnLevel, type StairLanding, type StairRun, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeLevel, makeStair, makeWall, stairsOnLevel, wallsOnLevel, type StairLanding, type StairRun, type Wall } from '@hestia/model';
 import { Transfer } from './transfer.ts';
 import { useUi } from './state.ts';
 
 function setup() {
   const s = new ProjectStore(createEmptyProject());
-  s.exec({ type: 'upsertLevel', level: { id: 'lv_1', name: 'Pav. 1', elevation: 3 } });
+  s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_1', name: 'Pav. 1', elevation: 3 }) });
   s.exec({ type: 'addWall', wall: makeWall({ id: 'A', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
   s.exec({ type: 'addWall', wall: makeWall({ id: 'B', typeId: 'wt_alv14', levelId: 'lv_1', a: { x: 0, y: 9 }, b: { x: 2, y: 9 } }) });
   useUi.setState({ selection: ['A'], levelId: 'lv_0' });

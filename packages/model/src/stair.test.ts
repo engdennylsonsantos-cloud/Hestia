@@ -6,6 +6,7 @@ import {
   defaultStairTypeId,
   elementLevelId,
   levelAbove,
+  makeLevel,
   makeStair,
   stairBaseZ,
   stairTopLevel,
@@ -39,7 +40,7 @@ const run = (id: string): StairRun => ({
 /** Projeto com três níveis: térreo (0 m), pavimento 2 (3 m) e cobertura (6 m). */
 function projectWithLevels(): ProjectStore {
   const s = new ProjectStore(createEmptyProject());
-  s.exec({ type: 'upsertLevel', level: { id: COBERTURA, name: 'Cobertura', elevation: 6 } });
+  s.exec({ type: 'upsertLevel', level: makeLevel({ id: COBERTURA, name: 'Cobertura', elevation: 6 }) });
   return s;
 }
 

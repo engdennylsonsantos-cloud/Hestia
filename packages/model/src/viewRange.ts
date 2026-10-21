@@ -20,9 +20,13 @@ export const DEFAULT_VIEW_RANGE: ViewRange = { top: 2.3, cut: 1.2, bottom: 0, de
 /** Mensagens de validação (pt-BR) na ordem das regras: topo ≥ corte ≥ base ≥ profundidade. */
 export function viewRangeIssues(v: ViewRange): string[] {
   const out: string[] = [];
-  if (!(v.top >= v.cut)) out.push('O topo do intervalo de vista deve estar acima ou no plano de corte.');
-  if (!(v.cut >= v.bottom)) out.push('O plano de corte deve estar acima ou na base do intervalo de vista.');
-  if (!(v.depth <= v.bottom)) out.push('A profundidade de vista deve estar abaixo ou na base do intervalo de vista.');
+  const finite = [v.top, v.cut, v.bottom, v.depth].every((x) => typeof x === 'number' && Number.isFinite(x));
+  if (!finite) out.push('As cotas do intervalo de vista devem ser números finitos, em metros.');
+  else {
+    if (!(v.top >= v.cut)) out.push('O topo do intervalo de vista deve estar acima ou no plano de corte.');
+    if (!(v.cut >= v.bottom)) out.push('O plano de corte deve estar acima ou na base do intervalo de vista.');
+    if (!(v.depth <= v.bottom)) out.push('A profundidade de vista deve estar abaixo ou na base do intervalo de vista.');
+  }
   if (v.direction !== 'down' && v.direction !== 'up') out.push('A direção da vista deve ser "down" ou "up".');
   return out;
 }

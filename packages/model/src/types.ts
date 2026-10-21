@@ -1,8 +1,9 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
+import type { ViewRange } from './viewRange.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType, StairUndersideStyle } from './stairTypes.ts';
 
@@ -100,6 +101,8 @@ export interface Level {
   id: Id;
   name: string;
   elevation: number;
+  /** Intervalo de vista da planta deste nível (decisão 0013). Cotas relativas à elevação. */
+  viewRange: ViewRange;
 }
 
 /** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */

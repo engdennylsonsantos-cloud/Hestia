@@ -4,6 +4,7 @@ import {
   ProjectStore,
   createEmptyProject,
   defaultStairTypeId,
+  makeLevel,
   makeStair,
   type Project,
   type StairCurve,
@@ -147,7 +148,7 @@ describe('cotas, patamar e níveis', () => {
 
   it('nível de topo explícito (topLevelId) vale sobre o nível imediatamente acima', () => {
     const s = new ProjectStore(createEmptyProject());
-    s.exec({ type: 'upsertLevel', level: { id: 'lv_2', name: 'Cobertura', elevation: 6 } });
+    s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_2', name: 'Cobertura', elevation: 6 }) });
     s.exec({
       type: 'addStair',
       stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', topLevelId: 'lv_2', topOffset: 0, components: [straight(34, 0.28)] }),

@@ -4,6 +4,7 @@ import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
+import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -166,6 +167,13 @@ const migrations: Record<number, Migration> = {
     }
     return { ...raw, elements };
   },
+  // v14 → v15: intervalo de vista por nível (decisão 0013). Níveis antigos ganham o padrão (topo 2,30 m, corte 1,20 m, base 0).
+  14: (raw) => ({
+    ...raw,
+    levels: Array.isArray(raw.levels)
+      ? (raw.levels as Array<Record<string, unknown>>).map((l) => ({ ...l, viewRange: l.viewRange ?? { ...DEFAULT_VIEW_RANGE } }))
+      : raw.levels,
+  }),
 };
 
 export class SchemaError extends Error {}

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { TEMPLATES, buildTemplate, isWall, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
+import { TEMPLATES, buildTemplate, isWall, makeLevel, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -37,7 +37,7 @@ export function LevelsDialog(): ReactElement {
       </table>
       {err ? <p className="error" role="alert">{err}</p> : null}
       <p>
-        <button className="btn small" onClick={() => run(() => editor.store.exec({ type: 'upsertLevel', level: { id: newId('lv'), name: `Pavimento ${p.levels.length + 1}`, elevation: (p.levels[p.levels.length - 1]?.elevation ?? 0) + 3 } }))}>+ Novo nível</button>
+        <button className="btn small" onClick={() => run(() => editor.store.exec({ type: 'upsertLevel', level: makeLevel({ id: newId('lv'), name: `Pavimento ${p.levels.length + 1}`, elevation: (p.levels[p.levels.length - 1]?.elevation ?? 0) + 3 }) }))}>+ Novo nível</button>
       </p>
     </Dialog>
   );

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, openingsOfWall, wallsOnLevel, type Opening, type Wall } from '@hestia/model';
+import { ProjectStore, makeLevel, openingsOfWall, wallsOnLevel, type Opening, type Wall } from '@hestia/model';
 import { clipboardFrom, pasteAlignedCommand } from './clipboard.ts';
 import { drawWall, makeEnv, tool } from './testEnv.ts';
 
 /** Projeto com dois níveis; lv_1 é o destino. Paredes: uma reta com porta, outra em L. */
 function build() {
   const ctx = makeEnv();
-  ctx.store.exec({ type: 'upsertLevel', level: { id: 'lv_1', name: 'Pav. 1', elevation: 3 } });
+  ctx.store.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_1', name: 'Pav. 1', elevation: 3 }) });
   drawWall(ctx.env, [0, 0], [4, 0]);
   drawWall(ctx.env, [4, 0], [4, 3]);
   const d = tool('door', ctx.env);

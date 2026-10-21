@@ -16,6 +16,9 @@ import type { Region, ResolvedCluster, ResolvedLevel, ResolvedWall } from './typ
  * A silhueta e as regiões de cada conjunto de paredes são recalculadas pela mesma regra de `resolve.ts` (união dos `cut`
  * das camadas restantes por material; silhueta = união das regiões). Os conjuntos sem paredes alteradas são reaproveitados.
  *
+ * Fora do alcance desta função: pisos, lajes e telhados (são resolvidos à parte, em `resolveAllFloors/Slabs/Roofs`, e não
+ * entram no `ResolvedLevel`) e a lista de faces de captura (`wallFaces`, usada pelo snap, não pelo desenho).
+ *
  * Limitação: as camadas que ficam mantêm o recorte que as camadas removidas faziam sobre elas (o pintor não é refeito, e a
  * silhueta é só a união dos cortes restantes). Com a prioridade padrão, `noFinishes` é exato: acabamento (4 e 5) não corta
  * nenhuma camada que fica (1 a 3). `coreOnly` é exato nas bibliotecas padrão (só estrutura no núcleo). Não é exato em dois

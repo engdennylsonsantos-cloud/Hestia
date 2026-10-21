@@ -113,16 +113,18 @@ export const DEFAULT_LINE_WEIGHTS: ReadonlyArray<readonly [number, number, numbe
 
 /**
  * Pesos padrão por categoria, na escolha do Hestia (NBR 6492 A.1: corte com hachura = larga; projeção, janela/porta e
- * escada simplificadas = larga/estreita; escolha dependente da escala, ver 0015 §2).
+ * escada simplificadas = larga/estreita; escolha dependente da escala, ver 0015 §2). Calibrados para que os traços da
+ * planta fiquem perto dos de antes (px fixos) num zoom de ~45 px/m, 1:100: laje, telhado e escada de corte subiram/desceram
+ * de peso para casar a faixa de contorno (1,5 px), o espigão (1,6 px) e o espelho (1,4 px).
  */
 export const DEFAULT_CATEGORY_STYLES: Record<GraphicsCategory, CategoryLineStyle> = {
   wall: { cutWeight: 5, projectionWeight: 2 },
   door: { cutWeight: 3, projectionWeight: 2 },
   window: { cutWeight: 3, projectionWeight: 2 },
   floor: { cutWeight: 4, projectionWeight: 1 },
-  slab: { cutWeight: 5, projectionWeight: 1 },
-  roof: { cutWeight: 5, projectionWeight: 2 },
-  stair: { cutWeight: 3, projectionWeight: 2 },
+  slab: { cutWeight: 4, projectionWeight: 1 },
+  roof: { cutWeight: 4, projectionWeight: 2 },
+  stair: { cutWeight: 4, projectionWeight: 2 },
 };
 
 export const DEFAULT_PROJECT_GRAPHICS: ProjectGraphics = {

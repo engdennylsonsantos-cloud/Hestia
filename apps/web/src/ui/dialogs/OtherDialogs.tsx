@@ -156,6 +156,7 @@ const KEYS: Array<[string, string]> = [
   ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['U', 'Telhado'], ['D', 'Porta'], ['J', 'Janela'],
   ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
   ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'], ['K', 'Corte (duas marcas na planta)'],
+  ['I', 'Escada (croqui: limites, espelhos, caminhada, patamar)'], ['Q', 'Escada reta, em L, em U ou com leque'],
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],

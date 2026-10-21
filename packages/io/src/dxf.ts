@@ -40,6 +40,11 @@ export interface DxfLevelGeometry {
    * `TELHADO_EMPENA`). Quem monta a geometria é o engine.
    */
   roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; gables?: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
+  /**
+   * Escadas do nível: contornos dos degraus e patamares (POLYLINE fechada na camada `ESCADA`), linhas de espelho (LINE em
+   * `ESCADA_ESPELHO`) e seta de subida (LINE em `ESCADA_SETA`: haste e as duas pontas). Quem monta a geometria é o engine.
+   */
+  stairs?: Array<{ outlines: DxfPoint[][]; risers: Array<[DxfPoint, DxfPoint]>; arrow: Array<[DxfPoint, DxfPoint]> }>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -48,6 +53,10 @@ export const DXF_LAYER_OPENINGS = 'ABERTURAS';
 export const DXF_LAYER_ROOF_RIDGE = 'TELHADO_CUMEEIRA';
 /** Camada das linhas de empena (aresta sem inclinação, LINE), separada da cumeeira. */
 export const DXF_LAYER_ROOF_GABLE = 'TELHADO_EMPENA';
+/** Escadas: contorno dos degraus e patamares (POLYLINE), linhas de espelho e seta de subida (LINE). */
+export const DXF_LAYER_STAIR = 'ESCADA';
+export const DXF_LAYER_STAIR_RISER = 'ESCADA_ESPELHO';
+export const DXF_LAYER_STAIR_ARROW = 'ESCADA_SETA';
 
 /** Texto para nome de camada: sem acentos, em maiúsculas, símbolos viram `_`. */
 function layerSafe(text: string): string {
@@ -115,10 +124,15 @@ interface Line {
 
 /** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE). */
 function linesOf(geo: DxfLevelGeometry): Line[] {
-  return (geo.roofs ?? []).flatMap((r) => [
-    ...r.ridges.map(([a, b]) => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
-    ...(r.gables ?? []).map(([a, b]) => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
+  const roof = (geo.roofs ?? []).flatMap((r) => [
+    ...r.ridges.map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
+    ...(r.gables ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
   ]);
+  const stair = (geo.stairs ?? []).flatMap((s) => [
+    ...s.risers.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_RISER, a, b })),
+    ...s.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_ARROW, a, b })),
+  ]);
+  return [...roof, ...stair];
 }
 
 /** Polilinhas fechadas do nível: por cluster, as regiões de material e depois o contorno; depois os pisos, as lajes, os telhados e, por último, os vãos. */
@@ -142,6 +156,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
   for (const r of geo.roofs ?? []) push(dxfLayerOfRoof(r.typeCode), [[r.outline]]);
+  for (const s of geo.stairs ?? []) for (const o of s.outlines) push(DXF_LAYER_STAIR, [[o]]);
   for (const o of geo.openings) out.push({ layer: DXF_LAYER_OPENINGS, pts: openingRect(o) });
   return out;
 }

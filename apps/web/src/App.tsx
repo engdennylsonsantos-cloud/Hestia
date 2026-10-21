@@ -21,6 +21,8 @@ import { SlabScheduleDialog } from './ui/dialogs/SlabScheduleDialog.tsx';
 import { RoofTypeDialog } from './ui/dialogs/RoofTypeDialog.tsx';
 import { RoofScheduleDialog } from './ui/dialogs/RoofScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
+import { StairTypeDialog } from './ui/dialogs/StairTypeDialog.tsx';
+import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
 
 const narrow = (): boolean => window.innerWidth <= 900;
 
@@ -73,6 +75,10 @@ function Dialogs(): ReactElement | null {
       return arg ? <RoofTypeDialog typeId={arg} /> : null;
     case 'roofSchedule':
       return <RoofScheduleDialog />;
+    case 'stairType':
+      return arg ? <StairTypeDialog typeId={arg} /> : null;
+    case 'stairSchedule':
+      return <StairScheduleDialog />;
     case 'openingType':
       return arg ? <OpeningTypeDialog typeId={arg} /> : null;
     case 'materials':

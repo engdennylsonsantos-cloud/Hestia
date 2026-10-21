@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { multiArea, type Vec2 } from '@hestia/geom';
+import { multiArea, union, type Vec2 } from '@hestia/geom';
 import {
+  DEFAULT_STAIR_TYPES,
   ProjectStore,
   createEmptyProject,
   defaultStairTypeId,
@@ -9,6 +10,7 @@ import {
   type StairCurve,
   type StairLanding,
   type StairRun,
+  type StairType,
 } from '@hestia/model';
 import { computeSection, lineIntervals, resolveStairs, type SectionResult } from './index.ts';
 
@@ -44,16 +46,32 @@ function landingRect(x0: number, x1: number): StairLanding {
 }
 
 /** Térreo (0 m) e pavimento 2 a 2,80 m; escada `st1` no térreo com topo no pavimento 2. */
-function build(components: Array<StairRun | StairLanding>, typeId = defaultStairTypeId): Project {
+function build(components: Array<StairRun | StairLanding>, typeId = defaultStairTypeId, type?: StairType): Project {
   const base = createEmptyProject();
-  const store = new ProjectStore({ ...base, levels: base.levels.map((l) => (l.id === 'lv_1' ? { ...l, elevation: 2.8 } : l)) });
+  const withType: Project = type ? { ...base, stairTypes: { ...base.stairTypes, [type.id]: type } } : base;
+  const store = new ProjectStore({ ...withType, levels: withType.levels.map((l) => (l.id === 'lv_1' ? { ...l, elevation: 2.8 } : l)) });
   store.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId, levelId: 'lv_0', components }) });
   return store.project;
 }
 
+/** Tipo monolítico com profundidade estrutural e face inferior dados (decisão 0012). */
+const monolithicType = (structuralDepth: number, undersideStyle: 'smooth' | 'stepped'): StairType => ({
+  ...DEFAULT_STAIR_TYPES[0]!,
+  id: `stt_test_${structuralDepth}_${undersideStyle}`,
+  structuralDepth,
+  undersideStyle,
+});
+
 /** 16 espelhos a cada 0,28 m a partir de x = 0 (h = 2,80 ÷ 16 = 0,175 m; 15 degraus). */
 const SIXTEEN = Array.from({ length: 16 }, (_, k) => k * 0.28);
 const H = 0.175;
+const P = 0.28;
+/** Cosseno entre a rampa e a horizontal: cosθ = p / √(p² + h²). */
+const COS = P / Math.hypot(P, H);
+/** Espessura vertical equivalente de uma profundidade estrutural perpendicular à rampa: T = d / cosθ. */
+const vertical = (structuralDepth: number): number => structuralDepth / COS;
+/** Laje de cima (m): o espelho de chegada termina nesta distância abaixo do nível de topo. */
+const SLAB = 0.15;
 const CONCRETE = 'mat_concreto';
 
 /** Intervalos de z (cota) em que o corte do material cobre a vertical de abscissa t (t = distância ao longo da linha). */
@@ -68,8 +86,14 @@ const coveredAt = (r: SectionResult, materialId: string, t: number, z: number): 
 /** Linha longitudinal sobre o eixo do lance: a = (−1, 0), b = (6, 0); t = x + 1. */
 const LONG = { a: v(-1, 0), b: v(6, 0), depth: 2 };
 
-describe('escada no corte longitudinal (monolítica, 16 espelhos, h 0,175, piso 0,28, estrutural 0,20)', () => {
-  const p = build([runAt(SIXTEEN)]);
+/** Os polígonos de corte de um material, unidos: quantas partes e quantos furos há. */
+const cutShape = (r: SectionResult, materialId: string) => {
+  const shape = union(...r.cut.filter((c) => c.materialId === materialId).map((c) => c.polygons));
+  return { parts: shape.length, holes: shape.map((poly) => poly.length - 1) };
+};
+
+describe('escada monolítica no corte longitudinal (liso, 16 espelhos, h 0,175, piso 0,28, estrutural 0,20)', () => {
+  const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })]);
 
   it('o motor resolve a escada com 15 degraus e h = 0,175', () => {
     const [r] = resolveStairs(p);
@@ -92,65 +116,136 @@ describe('escada no corte longitudinal (monolítica, 16 espelhos, h 0,175, piso 
     expect(after).toBeCloseTo(2 * H, 6);
   });
 
-  it('a hachura (material do corte) cobre a profundidade estrutural de 0,20 m sob cada degrau', () => {
+  it('fundo liso: no meio de cada degrau a espessura vertical é h/2 + T (T = 0,20 / cosθ)', () => {
     const r = computeSection(p, LONG);
-    for (let k = 1; k <= 15; k++) {
+    for (let k = 2; k <= 15; k++) {
       const t = (k - 1) * 0.28 + 0.14 + 1;
       const hit = zIntervalsAt(r, CONCRETE, t).filter(([, hi]) => Math.abs(hi - k * H) < 1e-6);
       expect(hit).toHaveLength(1);
       const [z0, z1] = hit[0]!;
-      expect(z1 - z0).toBeCloseTo(0.2, 6);
-      expect(z1).toBeCloseTo(k * H, 6);
+      expect(z1 - z0).toBeCloseTo(H / 2 + vertical(0.2), 6);
     }
   });
 
-  it('o corte não sai do conjunto da escada: nada abaixo de −0,20 m nem acima do último degrau', () => {
+  it('o primeiro degrau tem o fundo no piso base (a rampa abaixo de 0 é cortada): espessura h', () => {
     const r = computeSection(p, LONG);
-    expect(r.zMin).toBeCloseTo(H - 0.2, 6);
-    expect(r.zMax).toBeCloseTo(15 * H, 6);
+    const hit = zIntervalsAt(r, CONCRETE, 0.14 + 1).filter(([, hi]) => Math.abs(hi - H) < 1e-6);
+    expect(hit).toHaveLength(1);
+    expect(hit[0]![0]).toBeCloseTo(0, 6);
+  });
+
+  it('nada abaixo do piso base: a escada apoia no nível de base e o topo chega ao último degrau', () => {
+    const r = computeSection(p, LONG);
+    expect(r.zMin).toBeCloseTo(0, 6);
+    expect(r.zMax).toBeGreaterThanOrEqual(15 * H - 1e-6);
+    for (const c of r.cut.filter((x) => x.materialId === CONCRETE)) {
+      for (const ring of c.polygons.flat()) for (const q of ring) expect(q.y).toBeGreaterThanOrEqual(-1e-6);
+    }
+  });
+
+  it('o corte longitudinal pelo eixo é UM polígono sem furos (sem fresta entre peças)', () => {
+    const r = computeSection(p, LONG);
+    expect(cutShape(r, CONCRETE)).toEqual({ parts: 1, holes: [0] });
+  });
+
+  it('a peça de chegada fecha o último espelho até a laje de cima (0,15 m abaixo do topo)', () => {
+    const r = computeSection(p, LONG);
+    const topZ = 2.8;
+    // arrival: faixa de x = 4,20 a 4,48 (t = 5,20 a 5,48), termina em topZ − laje
+    expect(coveredAt(r, CONCRETE, 5.34, topZ - SLAB - 0.01)).toBe(true);
+    expect(coveredAt(r, CONCRETE, 5.34, topZ - SLAB + 0.01)).toBe(false);
+    const top = Math.max(...zIntervalsAt(r, CONCRETE, 5.34).map(([, z1]) => z1));
+    expect(top).toBeCloseTo(topZ - SLAB, 6);
   });
 });
 
-describe('corte transversal', () => {
-  it('o retângulo do degrau tem a largura do lance (1,20 m) e a espessura estrutural', () => {
-    const p = build([runAt(SIXTEEN)]);
+describe('corte transversal (monolítico)', () => {
+  it('o degrau 5 corta como retângulo: largura do lance (1,20 m) × espessura média h/2 + T', () => {
+    const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })]);
     // degrau 5: x de 1,12 a 1,40; a linha corta o lance no meio, de y = −1 a y = 1 (t = y + 1)
     const xc = 4 * 0.28 + 0.14;
     const r = computeSection(p, { a: v(xc, -1), b: v(xc, 1), depth: 2 });
     const cut = r.cut.filter((c) => c.materialId === CONCRETE);
     expect(cut).toHaveLength(1);
-    expect(multiArea(cut[0]!.polygons)).toBeCloseTo(1.2 * 0.2, 6);
+    const thickness = H / 2 + vertical(0.2);
+    expect(multiArea(cut[0]!.polygons)).toBeCloseTo(1.2 * thickness, 6);
     const ts = cut[0]!.polygons.flat(2).map((q) => q.x);
     expect(Math.min(...ts)).toBeCloseTo(0.4, 6);
     expect(Math.max(...ts)).toBeCloseTo(1.6, 6);
     const zs = cut[0]!.polygons.flat(2).map((q) => q.y);
-    expect(Math.min(...zs)).toBeCloseTo(5 * H - 0.2, 6);
+    expect(Math.min(...zs)).toBeCloseTo(5 * H - thickness, 6);
     expect(Math.max(...zs)).toBeCloseTo(5 * H, 6);
   });
 });
 
-describe('elevação', () => {
-  it('sem corte: cada degrau aparece além do plano como contorno (15 entradas, depth = 2,40 m)', () => {
-    const p = build([runAt(SIXTEEN)]);
+describe('profundidade estrutural e face inferior (decisão 0012)', () => {
+  const xc = 4 * 0.28 + 0.14;
+  const transverse = { a: v(xc, -1), b: v(xc, 1), depth: 2 };
+
+  it('0,15 m perpendicular à rampa: liso com T = 0,15 / cosθ', () => {
+    const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })], 'stt_test_0.15_smooth', monolithicType(0.15, 'smooth'));
+    const r = computeSection(p, transverse);
+    const cut = r.cut.filter((c) => c.materialId === CONCRETE);
+    const thickness = H / 2 + vertical(0.15);
+    expect(multiArea(cut[0]!.polygons)).toBeCloseTo(1.2 * thickness, 6);
+  });
+
+  it('escalonado: cada degrau tem espessura vertical h + T, com fundo plano em zk − h − T', () => {
+    const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })], 'stt_test_0.15_stepped', monolithicType(0.15, 'stepped'));
+    const r = computeSection(p, transverse);
+    const cut = r.cut.filter((c) => c.materialId === CONCRETE);
+    const thickness = H + vertical(0.15);
+    expect(multiArea(cut[0]!.polygons)).toBeCloseTo(1.2 * thickness, 6);
+    const zs = cut[0]!.polygons.flat(2).map((q) => q.y);
+    expect(Math.min(...zs)).toBeCloseTo(5 * H - thickness, 6);
+    expect(Math.max(...zs)).toBeCloseTo(5 * H, 6);
+  });
+
+  it('escalonado no corte longitudinal: a banda é contínua, com faixas de espessura h + T', () => {
+    const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })], 'stt_test_0.2_stepped', monolithicType(0.2, 'stepped'));
+    const r = computeSection(p, LONG);
+    expect(cutShape(r, CONCRETE)).toEqual({ parts: 1, holes: [0] });
+    const t = 4 * 0.28 + 0.14 + 1;
+    const hit = zIntervalsAt(r, CONCRETE, t).filter(([, hi]) => Math.abs(hi - 5 * H) < 1e-6);
+    expect(hit).toHaveLength(1);
+    expect(hit[0]![1] - hit[0]![0]).toBeCloseTo(H + vertical(0.2), 6);
+  });
+});
+
+describe('patamar (L): patamar à cota certa e contínuo com as duas rampas', () => {
+  // 8 espelhos em x = 0..1,96 (rampa 1); patamar de 1,96 a 3,00 (cota 8·h = 1,40); 8 espelhos em x = 3,00..4,96 (rampa 2)
+  const run1 = SIXTEEN.slice(0, 8);
+  const run2 = Array.from({ length: 8 }, (_, k) => 3.0 + k * 0.28);
+  const p = build([runAt(run1, { ext0: 0, ext1: 0 }), landingRect(1.96, 3.0), runAt(run2, { ext0: 0, ext1: 0 })]);
+
+  it('o patamar tem topo em 8·h = 1,40 e fundo plano em 1,40 − (h + T)', () => {
+    const r = computeSection(p, LONG);
+    const z = 8 * H;
+    const bottom = z - (H + vertical(0.2));
+    expect(coveredAt(r, CONCRETE, 2.5 + 1, z - 0.02)).toBe(true);
+    expect(coveredAt(r, CONCRETE, 2.5 + 1, z + 0.01)).toBe(false);
+    expect(coveredAt(r, CONCRETE, 2.5 + 1, bottom + 0.01)).toBe(true);
+    expect(coveredAt(r, CONCRETE, 2.5 + 1, bottom - 0.01)).toBe(false);
+  });
+
+  it('o corte longitudinal com patamar é UM polígono sem furos (rampa, patamar e rampa)', () => {
+    const r = computeSection(p, LONG);
+    expect(cutShape(r, CONCRETE)).toEqual({ parts: 1, holes: [0] });
+  });
+});
+
+describe('elevação (monolítico)', () => {
+  it('sem corte: cada peça aparece além do plano, com o topo na cota da peça e depth = 2,40 m no degrau mais próximo', () => {
+    const p = build([runAt(SIXTEEN, { ext0: 0, ext1: 0 })]);
     const r = computeSection(p, { a: v(-1, -3), b: v(6, -3), depth: 6 });
     expect(r.cut).toHaveLength(0);
     const beyond = r.beyond.filter((b) => b.stairId === 'st1');
-    expect(beyond).toHaveLength(15);
-    expect(Math.min(...beyond.map((b) => b.depth))).toBeCloseTo(2.4, 6);
     expect(beyond.every((b) => b.materialId === CONCRETE)).toBe(true);
-  });
-
-  it('montado: os espelhos aparecem como lâminas finas (2 cm) além do plano', () => {
-    const p = build([runAt(SIXTEEN)], 'stt_piso_espelho');
-    const r = computeSection(p, { a: v(-1, -3), b: v(6, -3), depth: 6 });
-    const beyond = r.beyond.filter((b) => b.stairId === 'st1');
-    // 15 pisos (0,03 m de espessura) e 16 espelhos (0,02 m)
-    expect(beyond).toHaveLength(31);
-    const widths = beyond.map((b) => {
-      const ts = b.polygons.flat(2).map((q) => q.x);
-      return Math.max(...ts) - Math.min(...ts);
-    });
-    expect(widths.filter((w) => Math.abs(w - 0.02) < 1e-6)).toHaveLength(16);
+    expect(Math.min(...beyond.map((b) => b.depth))).toBeCloseTo(2.4, 6);
+    const tops = beyond.map((b) => Math.max(...b.polygons.flat(2).map((q) => q.y)));
+    const hasTop = (z: number): boolean => tops.some((t) => Math.abs(t - z) < 1e-6);
+    for (let k = 1; k <= 15; k++) expect(hasTop(k * H)).toBe(true);
+    expect(hasTop(2.8 - SLAB)).toBe(true);
   });
 });
 
@@ -167,16 +262,18 @@ describe('espelhos montados no corte longitudinal', () => {
   });
 });
 
-describe('patamar', () => {
-  it('o patamar corta de z − 0,15 até z (cota do último espelho do lance anterior)', () => {
-    // 8 espelhos em x = 0..1,96; patamar de 2,06 a 2,90; 8 espelhos em x = 3,00..4,96
-    const run2 = Array.from({ length: 8 }, (_, k) => 3.0 + k * 0.28);
-    const p = build([runAt(SIXTEEN.slice(0, 8), { ext1: 0.1 }), landingRect(2.06, 2.9), runAt(run2, { ext0: 0.1 })]);
-    const r = computeSection(p, LONG);
-    const z = 8 * H;
-    expect(coveredAt(r, CONCRETE, 3.5, z - 0.05)).toBe(true);
-    expect(coveredAt(r, CONCRETE, 3.5, z - 0.16)).toBe(false);
-    expect(coveredAt(r, CONCRETE, 3.5, z + 0.01)).toBe(false);
+describe('elevação do montado', () => {
+  it('montado: os espelhos aparecem como lâminas finas (2 cm) além do plano', () => {
+    const p = build([runAt(SIXTEEN)], 'stt_piso_espelho');
+    const r = computeSection(p, { a: v(-1, -3), b: v(6, -3), depth: 6 });
+    const beyond = r.beyond.filter((b) => b.stairId === 'st1');
+    // 15 pisos (0,03 m de espessura) e 16 espelhos (0,02 m)
+    expect(beyond).toHaveLength(31);
+    const widths = beyond.map((b) => {
+      const ts = b.polygons.flat(2).map((q) => q.x);
+      return Math.max(...ts) - Math.min(...ts);
+    });
+    expect(widths.filter((w) => Math.abs(w - 0.02) < 1e-6)).toHaveLength(16);
   });
 });
 

@@ -1,5 +1,6 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, StairRunStyle } from '@hestia/model';
+import { pieceVolume, stairBody, type StairBodyPiece } from './stairBody.ts';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from './stairs.ts';
 
 /** Quantitativos de um lance (componente de tipo lance, agrupado pelo índice do componente). */
@@ -16,7 +17,9 @@ export interface StairRunQuantity {
 
 /**
  * Quantitativos de uma escada, a partir da geometria resolvida. Unidades: m, m² e m³. O volume segue o estilo do tipo:
- * - monolítico: degraus × profundidade estrutural + patamares × espessura do patamar;
+ * - monolítico: soma dos volumes das peças de `stairBody` (decisão 0012 §2): degraus e patamares, com o fundo liso ou
+ *   escalonado e o corte pelo piso base. A chegada (`arrival`) fica sob a laje de cima e não entra no volume da escada.
+ *   Escada com erro de croqui tem volume zero no monolítico;
  * - piso e espelho: degraus × espessura do piso + comprimento dos espelhos × altura do espelho × espessura do espelho
  *   + patamares × espessura do patamar.
  * O nariz não entra no volume (só 3D e quantitativo de nariz, quando houver).
@@ -84,9 +87,13 @@ export function stairQuantities(s: ResolvedStair): StairQuantities {
   const treadMean = treadCount ? runs.reduce((acc, r) => acc + r.treadMean * r.treadCount, 0) / treadCount : 0;
 
   const monolithic = s.type.runStyle === 'monolithic';
-  const volumeRun = treadArea * (monolithic ? s.type.structuralDepth : s.type.treadThickness);
+  // Monolítico: volume das peças de corpo (a chegada fica fora). Piso e espelho: espessuras do tipo.
+  const body: StairBodyPiece[] = monolithic ? stairBody(s).pieces : [];
+  const bodyVolume = (kind: StairBodyPiece['kind']): number =>
+    body.reduce((acc, p) => (p.kind === kind ? acc + pieceVolume(p) : acc), 0);
+  const volumeRun = monolithic ? bodyVolume('tread') : treadArea * s.type.treadThickness;
   const volumeRisers = monolithic ? 0 : riserLength * s.riserHeight * s.type.riserThickness;
-  const volumeLandings = landingArea * s.type.landingThickness;
+  const volumeLandings = monolithic ? bodyVolume('landing') : landingArea * s.type.landingThickness;
 
   return {
     stairId: s.id,

@@ -90,7 +90,8 @@ describe('sólidos de escada (3D, decisões 0011 §1 e 0012)', () => {
       const s = straightStair({ risers: N, tread: P, riserH: H, width: W, baseZ, type: { ...MONO, undersideStyle } });
       const [b] = buildStairSolids([s]);
       const zs = b!.positions.filter((_, i) => i % 3 === 2);
-      expect(Math.min(...zs)).toBeGreaterThanOrEqual(baseZ - 1e-9);
+      // Tolerância de 1e-6 m: os vértices do corte pelo piso base vêm da divisão do polígono no engine (~3e-8 m de erro).
+      expect(Math.min(...zs)).toBeGreaterThanOrEqual(baseZ - 1e-6);
     }
   });
 

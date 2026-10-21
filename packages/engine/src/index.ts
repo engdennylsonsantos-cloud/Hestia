@@ -32,5 +32,6 @@ export * from './stairIssues.ts';
 export * from './stairs.ts';
 export * from './stairOpenings.ts';
 export * from './stairChecks.ts';
+export * from './stairBody.ts';
 export * from './stairQuantities.ts';
 export * from './stairSchedule.ts';

@@ -278,8 +278,9 @@ export interface SpiralNormInput {
  * espelhos no raio r é 2·r·sen(Δ/2) (a mesma medida do degrau em `stairBody`):
  * - `stair-spiral-tread`: piso a 0,55 m da borda interna abaixo de 0,28 m;
  * - `stair-spiral-narrow` (informativo): piso na borda estreita (interna) abaixo de 0,07 m;
- * - `stair-spiral-headroom`: com |sweep| > 2π, folga entre voltas n·h − Tv abaixo da folga mínima do tipo, com n = 2π ÷ Δ
- *   espelhos por volta e Tv = T monolítico (`structuralDepth` ÷ cosθ, no raio da caminhada) ou `treadThickness` (outros);
+ * - `stair-spiral-headroom`: com |sweep| > 2π, folga entre voltas (n−1)·h − Tv abaixo da folga mínima do tipo, com n = 2π ÷ Δ
+ *   espelhos por volta; a folga mínima é a do espelho de trás do degrau de cima (decisão 0014 §1 item 7), e
+ *   Tv = T monolítico (`structuralDepth` ÷ cosθ, no raio da caminhada) ou `treadThickness` (outros);
  * - `stair-spiral-exit`: aviso fixo de saída de emergência (sempre).
  * O 2e+p no raio da caminhada já sai de `stair-blondel` (regra do leque).
  */
@@ -325,7 +326,7 @@ export function spiralNormIssues(
       ? (p > EPS ? (rs.type.structuralDepth * Math.hypot(p, h)) / p : rs.type.structuralDepth)
       : rs.type.treadThickness;
     const perTurn = (2 * Math.PI) / step;
-    const folga = perTurn * h - tv;
+    const folga = (perTurn - 1) * h - tv;
     if (folga < rs.type.minHeadroom - EPS) {
       out.push(
         makeStairIssue(

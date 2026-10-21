@@ -260,8 +260,9 @@ describe('stairSpiral: lance do caracol no projeto (resolveStairs)', () => {
 
 /**
  * Família de referência da decisão 0014 §1 item 7: com h = 0,175 m e corda do degrau no raio da caminhada de 0,28 m,
- * T = 0,236 m (monolítico, p = 0,28). Com n espelhos por volta, a folga é n·h − T: 14 → 2,21 m (ok), 13 → 2,04 m,
- * 12 → 1,86 m (avisa), 15 → 2,39 m (ok). O mínimo é 14 espelhos por volta para 2,10 m.
+ * T = 0,236 m (monolítico, p = 0,28). Com n espelhos por volta, a folga (decisão 0014 §1 item 7) é (n−1)·h − T:
+ * 15 → 2,21 m (ok), 14 → 2,04 m (avisa), 13 → 1,86 m (avisa), 12 → 1,69 m (avisa). O mínimo é 15 espelhos por volta
+ * (≈ 24° por degrau) para 2,10 m.
  */
 function referenceFamily(nPerTurn: number, turns: number): { run: SpiralRunSketch; H: number } {
   const step = TWO_PI / nPerTurn;
@@ -292,24 +293,24 @@ describe('stairSpiral: avisos de norma (formato dos demais, nunca erro)', () => 
   }
   const warnings = (rs: ResolvedStair, code: string) => rs.issues.filter((i) => i.code === code);
 
-  it('folga entre voltas: 14 espelhos por volta (2,21 m) não avisa; 13 (2,04 m) e 12 (1,86 m) avisam', () => {
-    const ok = referenceFamily(14, 2);
+  it('folga entre voltas: 15 espelhos por volta (2,21 m) não avisa; 14 (2,04 m), 13 (1,86 m) e 12 (1,69 m) avisam', () => {
+    const ok = referenceFamily(15, 2);
     expect(warnings(resolveOf(ok.run, ok.H), 'stair-spiral-headroom')).toEqual([]);
-    const n13 = referenceFamily(13, 2);
-    const w13 = warnings(resolveOf(n13.run, n13.H), 'stair-spiral-headroom');
-    expect(w13).toHaveLength(1);
-    expect(w13[0]!.severity).toBe('warning');
-    expect(w13[0]!.message).toBe(
+    const n14 = referenceFamily(14, 2);
+    const w14 = warnings(resolveOf(n14.run, n14.H), 'stair-spiral-headroom');
+    expect(w14).toHaveLength(1);
+    expect(w14[0]!.severity).toBe('warning');
+    expect(w14[0]!.message).toBe(
       'A folga entre voltas (2,04 m) é menor que o mínimo (2,10 m): aumente o nº de espelhos por volta, o pé-direito ou a profundidade livre.',
     );
+    const n13 = referenceFamily(13, 2);
+    expect(warnings(resolveOf(n13.run, n13.H), 'stair-spiral-headroom')[0]!.message).toContain('(1,86 m)');
     const n12 = referenceFamily(12, 2);
-    expect(warnings(resolveOf(n12.run, n12.H), 'stair-spiral-headroom')[0]!.message).toContain('(1,86 m)');
-    const n15 = referenceFamily(15, 2);
-    expect(warnings(resolveOf(n15.run, n15.H), 'stair-spiral-headroom')).toEqual([]);
+    expect(warnings(resolveOf(n12.run, n12.H), 'stair-spiral-headroom')[0]!.message).toContain('(1,69 m)');
   });
 
-  it('a folga usa a espessura do degrau (treadThickness) no estilo montado: 12 espelhos → 2,10 − 0,03 = 2,07 m', () => {
-    const { run, H: total } = referenceFamily(12, 2);
+  it('a folga usa a espessura do degrau (treadThickness) no estilo montado: 13 espelhos → 12 × 0,175 − 0,03 = 2,07 m', () => {
+    const { run, H: total } = referenceFamily(13, 2);
     const w = warnings(resolveOf(run, total, 'stt_piso_espelho'), 'stair-spiral-headroom');
     expect(w).toHaveLength(1);
     expect(w[0]!.message).toContain('(2,07 m)');

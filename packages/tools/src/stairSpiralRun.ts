@@ -103,7 +103,7 @@ export interface SpiralInfo {
   riserHeight: number;
   /** Espelhos por volta: 2π ÷ Δ. */
   perTurn: number;
-  /** Folga entre voltas (m): n·h − Tv. */
+  /** Folga entre voltas (m): (n−1)·h − Tv, no espelho de trás do degrau de cima. */
   headroom: number;
   minHeadroom: number;
 }
@@ -126,7 +126,7 @@ export function spiralInfo(p: Project, s: Stair, sp: SpiralParams): SpiralInfo |
   const rm = (sp.rInner + sp.rOuter) / 2;
   const chord = 2 * rm * Math.sin(step / 2);
   const tv = type.runStyle === 'monolithic' ? (chord > 1e-9 ? (type.structuralDepth * Math.hypot(chord, h)) / chord : type.structuralDepth) : type.treadThickness;
-  return { risers: N, riserHeight: h, perTurn, headroom: perTurn * h - tv, minHeadroom: type.minHeadroom };
+  return { risers: N, riserHeight: h, perTurn, headroom: (perTurn - 1) * h - tv, minHeadroom: type.minHeadroom };
 }
 
 /**

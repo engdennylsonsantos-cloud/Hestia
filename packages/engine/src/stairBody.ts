@@ -1,4 +1,4 @@
-import { add, asMulti, dist, dot, intersection, mid, mul, perp, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { add, asMulti, dist, dot, intersection, mid, mul, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import type { StairType } from '@hestia/model';
 import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from './stairs.ts';
 import { clipByLevel, ringMoments, type BottomPlane } from './stairBodyGeom.ts';
@@ -107,20 +107,58 @@ function assembledPieces(stair: ResolvedStair): StairBodyPiece[] {
 /** Centróide simples (média dos vértices), para decidir o lado de um espelho. */
 const centroidOf = (r: Ring): Vec2 => ({ x: r.reduce((s, p) => s + p.x, 0) / r.length, y: r.reduce((s, p) => s + p.y, 0) / r.length });
 
-/** Anel de maior área de uma união (um só anel, sem furos, no degrau estendido). Vazio = o próprio degrau. */
-function largestRing(parts: MultiPolygon): Ring | null {
-  let best: Ring | null = null;
-  let bestArea = 0;
-  for (const poly of parts) {
-    const outer = poly[0];
-    if (!outer) continue;
-    const a = Math.abs(ringArea(outer));
-    if (a > bestArea) {
-      best = outer;
-      bestArea = a;
+/** Anel no sentido anti-horário (a área é positiva). */
+const counterClockwise = (r: Ring): Ring => (ringArea(r) > 0 ? r : [...r].reverse());
+
+/**
+ * Dois vértices são o mesmo ponto (1 µm). A operação booleana arredonda para 1e-7 m, então o vértice do espelho que volta
+ * do recorte não é idêntico ao original: a comparação exata falharia.
+ */
+const sameVertex = (p: Vec2, q: Vec2): boolean => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6;
+
+/** Ponto sobre o segmento a→b (tolerância de 1 µm na distância à reta e nas pontas). */
+function onSegment(v: Vec2, a: Vec2, b: Vec2): boolean {
+  const d = sub(b, a);
+  const L2 = d.x * d.x + d.y * d.y;
+  const w = sub(v, a);
+  const t = (w.x * d.x + w.y * d.y) / L2;
+  const off = Math.abs(w.x * d.y - w.y * d.x) / Math.sqrt(L2);
+  return off < 1e-6 && t > -1e-9 && t < 1 + 1e-9;
+}
+
+/**
+ * Junta dois anéis anti-horários pela aresta compartilhada: o anel 1 tem X→Y; o anel 2 tem a mesma aresta de Y a X, com
+ * pontos colineares entre as pontas (a operação de recorte pode deixar um vértice no meio do espelho). Sem booleana, pois
+ * os vértices da aresta são os do espelho aparado. Null se não há a aresta.
+ */
+function joinAlongEdge(r1: Ring, r2: Ring): Ring | null {
+  const n1 = r1.length;
+  const n2 = r2.length;
+  for (let i = 0; i < n1; i++) {
+    const X = r1[i]!;
+    const Y = r1[(i + 1) % n1]!;
+    for (let s = 0; s < n2; s++) {
+      if (!sameVertex(r2[s]!, Y)) continue;
+      // Do vértice Y de r2 (s) para a frente, pontos sobre a aresta até X (t).
+      let t = (s + 1) % n2;
+      let found = false;
+      for (let steps = 1; steps < n2; steps++) {
+        if (sameVertex(r2[t]!, X)) {
+          found = true;
+          break;
+        }
+        if (!onSegment(r2[t]!, Y, X)) break;
+        t = (t + 1) % n2;
+      }
+      if (!found) continue;
+      // r1 de Y (i+1) até X (i); depois o resto de r2, de depois de X (t+1) até antes de Y (s).
+      const out: Ring = [];
+      for (let k = 0; k < n1; k++) out.push(r1[(i + 1 + k) % n1]!);
+      for (let u = (t + 1) % n2; u !== s; u = (u + 1) % n2) out.push(r2[u]!);
+      return out;
     }
   }
-  return best;
+  return null;
 }
 
 /**
@@ -141,10 +179,14 @@ function overlappedTread(stair: ResolvedStair, st: ResolvedStairStep, byNumber: 
   // Faixa de largura ov a partir do espelho, com margem de um comprimento de espelho ao longo dele (o degrau a corta).
   const ext = mul(dir, L);
   const band: Ring = [sub(front.a, ext), add(front.b, ext), add(add(front.b, ext), mul(n, ov)), add(sub(front.a, ext), mul(n, ov))];
-  const over = intersection(asMulti(next.polygon), asMulti(band));
-  if (over.length === 0) return st.polygon;
-  const merged = largestRing(union(asMulti(st.polygon), over));
-  return merged ?? st.polygon;
+  // A parte do degrau seguinte dentro da faixa encosta no espelho k+1: junta-se pela aresta, sem booleana.
+  let ring = counterClockwise(st.polygon);
+  for (const poly of intersection(asMulti(next.polygon), asMulti(band))) {
+    const outer = poly[0];
+    if (!outer) continue;
+    ring = joinAlongEdge(ring, counterClockwise(outer)) ?? ring;
+  }
+  return ring;
 }
 
 /** Cilindro do poste central em polígono de `SPIRAL_POST_SIDES` lados, inscrito no raio `r` (sentido anti-horário). */

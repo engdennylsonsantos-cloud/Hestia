@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { asMulti, intersection, multiArea, pointInRing, ringArea, type Vec2 } from '@hestia/geom';
 import { DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, makeStair, stairs, type Project, type Stair, type StairRun, type StairType } from '@hestia/model';
-import { pieceBottomZ, pieceVolume, stairBody, type ResolvedStair, type StairBodyPiece } from './stairBody.ts';
+import { pieceBottomZ, pieceVolume, stairBody, type StairBodyPiece } from './stairBody.ts';
 import { stairQuantities } from './stairQuantities.ts';
 import { stairOpeningRegion } from './stairOpenings.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
 import type { SectionLine } from './sectionGeom.ts';
 import { generateSpiralRun } from './stairSpiral.ts';
-import { resolveStairs } from './stairs.ts';
+import { resolveStairs, type ResolvedStair } from './stairs.ts';
 
 /**
  * Caracol (decisão 0014): corpo monolítico por volta (270°, 540°, 720°), estilo poste (360°), quantitativos por material,
@@ -219,6 +219,30 @@ describe.each(CASES)('caracol monolítico de $sweepDeg° ($risers espelhos)', ({
   });
 });
 
+describe('caracol monolítico com face inferior escalonada (540°): fundo plano por degrau, volume = área × (h + T)', () => {
+  const st = spiralStair({ sweepDeg: 540, risers: 16, typeExtra: { undersideStyle: 'stepped' } });
+  const pieces = stairBody(st).pieces.filter((p) => p.kind === 'tread');
+
+  it('todo degrau inteiro tem fundo plano (a = b = 0) e volume = área × (h + T)', () => {
+    let checked = 0;
+    for (const p of pieces) {
+      const fullStep = st.steps.find((s) => s.kind === 'tread' && s.index === p.index)!;
+      const whole = Math.abs(multiArea([[p.polygon]]) - multiArea([[fullStep.polygon]])) < 1e-9;
+      // Peça cortada pelo piso base tem fundo em baseZ (c = 0): fica fora da fórmula do degrau inteiro.
+      if (!whole || p.bottom.c <= 1e-9) continue;
+      expect(p.bottom.a).toBe(0);
+      expect(p.bottom.b).toBe(0);
+      expect(Math.abs(pieceVolume(p) / (multiArea([[p.polygon]]) * (H + treadT(st, p.index))) - 1)).toBeLessThan(1e-9);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+
+  it('degraus cortados pelo piso base ficam com fundo em baseZ; nenhum vértice abaixo dele', () => {
+    for (const p of pieces) for (const q of p.polygon) expect(pieceBottomZ(p, q.x, q.y)).toBeGreaterThanOrEqual(-1e-6);
+  });
+});
+
 describe('caracol monolítico: folga entre voltas (540° e 720°, tipo com profundidade 0,15 m)', () => {
   // Folga entre degraus de voltas vizinhas: no espelho de trás do degrau de baixo, (n−1)·h − T; no espelho da frente, n·h − T
   // (decisão 0014 §7). O fundo é o plano pelos pontos médios, então a quina do espelho de trás fica um pouco abaixo do ponto
@@ -367,8 +391,9 @@ describe('furo de caracol no modo full: disco de raio externo (48 lados), com o 
     expect(ring).toHaveLength(48);
     for (const q of ring) expect(Math.hypot(q.x, q.y)).toBeCloseTo(R_OUT, 9);
     expect(Math.abs(multiArea(region) - polyDisk(R_OUT))).toBeLessThan(1e-9);
-    // Miolo: o centro (onde fica o poste) está dentro do furo.
-    expect(multiArea(region)).toBeGreaterThan(multiArea([[st.footprint[0]?.[0] ?? []]]));
+    // Miolo: o disco contém a pegada inteira dos degraus e o centro (onde fica o poste), que a pegada não cobre.
+    expect(multiArea(region)).toBeGreaterThan(multiArea(st.footprint));
+    expect(region[0]![0]!.length).toBe(48);
   });
 
   it('o modo headroom não usa o disco: a região fica menor que o disco externo', () => {

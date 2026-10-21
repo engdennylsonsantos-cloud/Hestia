@@ -197,7 +197,7 @@ describe('edição do croqui e propriedades do caracol', () => {
     expect(info!.risers).toBe(16);
     expect(info!.riserHeight).toBeCloseTo(0.175, 6);
     expect(info!.perTurn).toBeCloseTo(10, 6);
-    expect(info!.headroom).toBeCloseTo(1.58, 1);
+    expect(info!.headroom).toBeCloseTo(1.406, 2);
     expect(info!.minHeadroom).toBeCloseTo(2.1, 9);
   });
 

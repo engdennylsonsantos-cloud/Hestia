@@ -463,12 +463,12 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     expect(layerTable(planDxf(p, 'lv_0')).get('PAREDE_PROJECAO_ACIMA')).toBe(9);
   });
 
-  it('piso (peso de corte 4) e laje (peso de corte 5) a 1:100: 0,35 e 0,50 mm', () => {
+  it('piso e laje (peso de corte 4 nos dois) a 1:100: 0,35 mm', () => {
     const p = vistaPlan().project;
     const floor = dxfLayerOfFloor(p.floorTypes['ft_ceram']!.code);
     const slab = dxfLayerOfSlab(p.slabTypes['ls_mac12']!.code);
     expect(layerTable(planDxf(p, 'lv_0')).get(floor)).toBe(35);
-    expect(layerTable(planDxf(p, 'lv_1')).get(slab)).toBe(50);
+    expect(layerTable(planDxf(p, 'lv_1')).get(slab)).toBe(35);
   });
 
   it('substituição da vista vale sobre o peso do projeto: parede de corte 9 (2,0 mm a 1:100) e janela de projeção 8 (1,4 mm)', () => {
@@ -507,6 +507,6 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     const w = lineWeightsOf(lPlan().project, 'lv_0', geo);
     expect(w.ESCADA_SETA).toBe(0);
     expect(w.ESCADA_CORTE).toBe(0);
-    expect(w.ESCADA).toBe(25);
+    expect(w.ESCADA).toBe(35);
   });
 });

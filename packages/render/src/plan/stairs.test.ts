@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import type { ResolvedStairStep } from '@hestia/engine';
-import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, STAIR_RISER_WIDTH_PX, treadNumber } from './stairs.ts';
+import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
+import { defaultPaint } from './style.ts';
+
+/** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
+const RISER_PX = defaultPaint('stair', 100).cutPx;
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -17,7 +21,7 @@ const stair = () => straightStair({ risers: N, tread: P, riserH: H, width: 1 });
 const ops = (detail: DetailLevel = 'medium', s = stair()) => stairFills(PROJECT, [s], LIGHT, false, detail, VIEW);
 
 /** Linhas de espelho: abertas, de dois pontos, sem tracejado (o único tipo de traço com 2 pontos). */
-const risersOf = (strokes: ReturnType<typeof ops>['strokes']) => strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === STAIR_RISER_WIDTH_PX);
+const risersOf = (strokes: ReturnType<typeof ops>['strokes']) => strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === RISER_PX);
 
 describe('escada na planta (decisão 0011 §1)', () => {
   it('uma linha de espelho por espelho (N = 10)', () => {

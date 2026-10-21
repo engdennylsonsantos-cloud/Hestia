@@ -5,6 +5,7 @@ import { ProjectStore, createEmptyProject, makeFloor, makeSlab, type DetailLevel
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { mix } from './color.ts';
 import { slabFills, slabSelectionOps, structuralLayer } from './slabs.ts';
+import { defaultPaint } from './style.ts';
 import { DARK, LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -96,7 +97,7 @@ describe('laje na planta (D1)', () => {
   it('laje inclinada: seta de caimento na direção da inclinação, no centro, e o percentual', () => {
     const p = slabProject({ slope: { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 5 } });
     const ops = slabOps(p);
-    const arrow = ops.strokes.filter((st) => st.widthPx === 1.4);
+    const arrow = ops.strokes.filter((st) => st.widthPx === defaultPaint('slab', 100).cutPx);
     expect(arrow).toHaveLength(2);
     // haste: de x = 3 - 0,4 a x = 3 + 0,4 (40 px a 100 px/m), no centro (3, 2); a ponta aponta para +x
     const shaft = arrow[0]!.pts;

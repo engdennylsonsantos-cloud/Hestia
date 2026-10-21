@@ -4,7 +4,11 @@ import { resolveLevel, viewRangeWarnings } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeSlab, makeStair, makeWall, viewRangeOf, type Id, type Opening, type Project, type ViewRange } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
-import { stairFills, STAIR_RISER_WIDTH_PX } from './stairs.ts';
+import { stairFills } from './stairs.ts';
+import { defaultPaint } from './style.ts';
+
+/** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
+const RISER_PX = defaultPaint('stair', 100).cutPx;
 import { hiddenSelectionOps, planViewOf } from './view.ts';
 import { DARK, LIGHT, type PlanTheme, type StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -162,7 +166,7 @@ describe('paredes fora do corte: contorno, sem preenchimento (decisão 0013 §4)
     const ring = ringAt(dl, 8);
     expect(ring).toHaveLength(1);
     expect(ring[0]!.color).toBe(LIGHT.inkSoft);
-    expect(ring[0]!.widthPx).toBe(1);
+    expect(ring[0]!.widthPx).toBe(defaultPaint('wall', 100).projPx);
     expect(ring[0]!.dash).toBeUndefined();
   });
 
@@ -172,7 +176,7 @@ describe('paredes fora do corte: contorno, sem preenchimento (decisão 0013 §4)
     const ring = ringAt(dl, 10);
     expect(ring).toHaveLength(1);
     expect(ring[0]!.dash).toEqual([6, 3]);
-    expect(ring[0]!.widthPx).toBe(1);
+    expect(ring[0]!.widthPx).toBe(defaultPaint('wall', 100).projPx);
   });
 
   it('parede acima do topo (começa a 2,50): oculta, nem contorno nem preenchimento', () => {
@@ -241,7 +245,7 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   const PROJECT = createEmptyProject();
   const stair = () => straightStair({ risers: N, tread: 0.28, riserH: H, width: 1 });
   const ops = (view?: { cutZ: number; topZ: number }) => stairFills(PROJECT, [stair()], LIGHT, false, 'medium', VZ, view);
-  const risers = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === STAIR_RISER_WIDTH_PX);
+  const risers = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === RISER_PX);
   const treads = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => s.closed);
 
   it('corte baixo (0,50 m) e topo (1,00 m): degraus acima do topo saem; acima do corte, tracejados; espelhos acima do topo saem', () => {

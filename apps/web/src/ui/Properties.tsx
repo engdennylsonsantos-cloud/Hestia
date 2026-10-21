@@ -281,7 +281,7 @@ function ViewRangeGroup({ levelId }: { levelId: Id }): ReactElement {
         </select>
       </Row>
       {error && <div className="vr-error" role="alert">{error}</div>}
-      <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreViewRangeDefault(editor.store, levelId).error)}>Restaurar padrão</button></div>
+      <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreViewRangeDefault(editor.store, levelId).error)}>Restaurar intervalo padrão</button></div>
       {warnings.length === 0 ? (
         <div className="hint">Nenhum elemento fora do intervalo de vista.</div>
       ) : (

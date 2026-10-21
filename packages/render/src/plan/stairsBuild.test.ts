@@ -14,6 +14,7 @@ import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type P
 import { buildStairSolids } from '../model3d/stairSolids.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { stairFills } from './stairs.ts';
+import { defaultPaint } from './style.ts';
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -89,7 +90,7 @@ describe('escadas do projeto na planta e no 3D (integração com o motor)', () =
     s.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 3.5 } });
     const dl = draw(s.project, 'lv_0');
     expect(dl.labels.map((l) => l.text)).toContain('SOBE');
-    const lines = dl.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === 1.4);
+    const lines = dl.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === defaultPaint('stair', 100).cutPx);
     expect(lines.length).toBeGreaterThanOrEqual(N);
     expect(dl.strokes.some((s) => s.closed && s.dash)).toBe(true);
   });

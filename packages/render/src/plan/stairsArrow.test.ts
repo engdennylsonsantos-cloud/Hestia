@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { generateFanRun, generateLShape, resolveStairsOnLevel, type StairComponentSketch } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
-import { polyMid, stairFills, STAIR_RISER_WIDTH_PX } from './stairs.ts';
+import { polyMid, stairFills } from './stairs.ts';
+import { defaultPaint } from './style.ts';
+
+/** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
+const RISER_PX = defaultPaint('stair', 100).cutPx;
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 import type { Vec2 } from '@hestia/geom';
@@ -42,7 +46,7 @@ function arrowOf(p: Project) {
   const [st] = resolveStairsOnLevel(p, 'lv_0');
   expect(st!.issues.filter((i) => i.severity === 'error')).toEqual([]);
   const ops = stairFills(p, [st!], LIGHT, false, 'medium', VIEW).strokes;
-  const arrow = ops.filter((s) => !s.closed && s.widthPx === STAIR_RISER_WIDTH_PX && s.alpha === 0.9);
+  const arrow = ops.filter((s) => !s.closed && s.widthPx === RISER_PX && s.alpha === 0.9);
   expect(arrow).toHaveLength(2);
   return { st: st!, shaft: arrow[0]!, head: arrow[1]! };
 }

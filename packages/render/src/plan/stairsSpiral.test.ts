@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { generateSpiralRun, resolveStairsOnLevel, type ResolvedStair } from '@hestia/engine';
 import { intersection, multiArea, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
-import { SPIRAL_POST_SIDES, spiralByComponent, spiralPostRing, stairFills, STAIR_RISER_WIDTH_PX } from './stairs.ts';
+import { SPIRAL_POST_SIDES, spiralByComponent, spiralPostRing, stairFills } from './stairs.ts';
+import { defaultPaint } from './style.ts';
+
+/** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
+const RISER_PX = defaultPaint('stair', 100).cutPx;
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 import type { StrokeOp, FillOp } from './types.ts';
@@ -97,7 +101,7 @@ describe('caracol de 540° na planta (decisão 0014 §1 item 9)', () => {
   });
 
   it('seta: a caminhada explícita (arcos) sai amostrada do 1º ao último espelho; a ponta sai do último trecho', () => {
-    const shaft = ops.strokes.find((s) => !s.closed && s.widthPx === STAIR_RISER_WIDTH_PX && s.alpha === 0.9 && s.pts.length > 3)!;
+    const shaft = ops.strokes.find((s) => !s.closed && s.widthPx === RISER_PX && s.alpha === 0.9 && s.pts.length > 3)!;
     const head = ops.strokes.find((s) => !s.closed && s.alpha === 0.9 && s.pts.length === 3)!;
     const rm = (RIN + ROUT) / 2;
     expect(Math.hypot(shaft.pts[0]!.x - rm, shaft.pts[0]!.y)).toBeLessThan(1e-6);

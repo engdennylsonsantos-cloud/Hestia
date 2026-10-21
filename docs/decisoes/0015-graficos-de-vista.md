@@ -19,10 +19,10 @@ gráficos por categoria; nível de detalhe por vista; exibição parcial de estr
 1. **Largura da linha** = `lineWeightMm(tabela, peso, escala)`: peso 1–16 na coluna 1:50 (escala ≤ 50), 1:100 (≤ 100) ou 1:200 (> 100); em pixels de tela
    `paperMmToPx(mm, zoom, escala)` = `mm·zoom·escala/1000` (mínimo 1 px). Peso de corte para o contorno cortado, de projeção para o que está acima/abaixo
    do corte (decisão 0013). Pesos padrão por categoria (escolha do Hestia, NBR 6492 A.1: contorno cortado com hachura = larga; projeção, abertura e escada
-   simplificadas = larga/estreita): parede 5/2, porta e janela 3/2, piso 4/1, laje 5/1, telhado 5/2, escada 3/2.
+   simplificadas = larga/estreita): parede 5/2, porta e janela 3/2, piso 4/1, laje 4/1, telhado 4/2, escada 4/2 (laje, telhado e escada calibrados para manter a planta atual a ~45 px/m em 1:100; com zoom fixo, 1:50 fica mais fino em px que 1:100: a espessura é em papel).
 2. **Detalhe** (`detailOf`): fino até 1:50, médio até 1:200, grosso acima (escolha do Hestia, editável; o Revit não publica o arranjo de fábrica `[NÃO
    ENCONTRADO]`). Efeito: grosso = só contornos das paredes (sem camadas), médio = camadas principais e símbolos de abertura, fino = todas as camadas,
-   numeração de degraus e rótulos. O campo `Project.settings.detail` atual vira o padrão do projeto (migrado para `byScale` só se o dono pedir).
+   numeração de degraus e rótulos. O campo `Project.settings.detail` continua valendo para níveis sem gráficos salvos (padrão do projeto); só quando o nível tem `Level.graphics` o detalhe é o da vista (`byScale` ou fixo).
 3. **Estilo visual (planta):** hiddenLine = aparência atual (preenchimento do papel + contornos); wireframe = só contornos, sem preenchimento nem hachura;
    shaded = preenchimento pela cor do material (opaco) e contornos. **3D:** wireframe = só arestas; hiddenLine = faces brancas com arestas; shaded = cores do
    material com luz simples; consistentColors = cores do material sem iluminação; realistic = como hoje (luz solar, sombras opcionais, brilho). Ray Trace não

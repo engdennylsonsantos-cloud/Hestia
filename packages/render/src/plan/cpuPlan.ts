@@ -16,6 +16,8 @@ function hatchPattern(ctx: CanvasRenderingContext2D, kind: string, color: string
   g.fillStyle = color;
   g.lineWidth = 1;
   g.beginPath();
+  // `solid` (alumínio, telha metálica): o padrão é só a cor da hachura, cobrindo a célula inteira (decisão 0015 §2.8).
+  if (kind === 'solid') g.fillRect(0, 0, 8, 8);
   if (kind === 'diagonal' || kind === 'cross') {
     g.moveTo(0, 8);
     g.lineTo(8, 0);
@@ -55,7 +57,7 @@ function drawFill(ctx: CanvasRenderingContext2D, f: FillOp, v: Viewport): void {
   if (f.hatch) {
     const pat = hatchPattern(ctx, f.hatch.kind, f.hatch.color);
     if (pat) {
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = f.hatch.alpha ?? 1;
       ctx.fillStyle = pat;
       ctx.fill('evenodd');
     }

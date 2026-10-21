@@ -84,7 +84,7 @@ try {
     await page.waitForTimeout(250);
     const antes = await range();
     rep.check('desfazer: topo volta a 2,30', antes.top === 2.3, JSON.stringify(antes));
-    await page.getByRole('button', { name: /Restaurar padrão/ }).click();
+    await page.getByRole('button', { name: /Restaurar intervalo padrão/ }).click();
     await page.waitForTimeout(250);
     const r = await range();
     rep.check('restaurar: padrão', r.top === 2.3 && r.cut === 1.2 && r.bottom === 0, JSON.stringify(r));

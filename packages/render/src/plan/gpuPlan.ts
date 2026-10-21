@@ -27,6 +27,8 @@ function hatchTexture(kind: string): THREE.Texture | null {
   g.fillStyle = '#ffffff';
   g.lineWidth = 3;
   g.beginPath();
+  // `solid`: textura cheia; a cor da hachura entra pelo material (cor × textura), como nos demais padrões (decisão 0015 §2.8).
+  if (kind === 'solid') g.fillRect(0, 0, 64, 64);
   if (kind === 'diagonal' || kind === 'cross') {
     for (let k = -64; k <= 64; k += 16) {
       g.moveTo(k, 64);
@@ -141,7 +143,7 @@ export class PlanScene {
     };
     for (const f of dl.fills) {
       const pass: Array<{ hatch?: string; color: string; alpha: number }> = [{ color: f.color, alpha: f.alpha }];
-      if (f.hatch) pass.push({ hatch: f.hatch.kind, color: f.hatch.color, alpha: 1 });
+      if (f.hatch) pass.push({ hatch: f.hatch.kind, color: f.hatch.color, alpha: f.hatch.alpha ?? 1 });
       for (const ps of pass) {
         for (const poly of f.polygons) {
           const m = tri(poly);

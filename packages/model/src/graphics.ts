@@ -1,4 +1,4 @@
-import type { DetailLevel } from './types.ts';
+import type { DetailLevel, Id, Project } from './types.ts';
 
 /**
  * Gráficos de vista (decisão 0015): pesos de linha por escala, estilo por categoria, estilo visual, visibilidade e
@@ -158,4 +158,34 @@ export function detailOf(g: Pick<ViewGraphics, 'detail' | 'scale'>, pg: ProjectG
 /** Largura em pixels de tela de uma linha de `mm` de papel numa vista de `zoom` px/m na escala 1:`scale` (mínimo 1 px). */
 export function paperMmToPx(mm: number, zoom: number, scale: number): number {
   return Math.max(1, (mm * zoom * scale) / 1000);
+}
+
+const mergeOverrides = (saved: Partial<Record<GraphicsCategory, Partial<CategoryOverride>>> | undefined): Record<GraphicsCategory, CategoryOverride> => {
+  const out = defaultOverrides();
+  for (const c of GRAPHICS_CATEGORIES) out[c] = { ...out[c], ...(saved?.[c] ?? {}) };
+  return out;
+};
+
+/** Gráficos do projeto com os padrões aplicados (qualquer subconjunto salvo vale). */
+export function graphicsOf(p: Pick<Project, 'graphics'>): ProjectGraphics {
+  const g = p.graphics;
+  const categories = { ...DEFAULT_CATEGORY_STYLES };
+  for (const c of GRAPHICS_CATEGORIES) categories[c] = { ...categories[c], ...(g?.categories?.[c] ?? {}) };
+  return {
+    lineWeights: g?.lineWeights?.length ? g.lineWeights : DEFAULT_LINE_WEIGHTS,
+    categories,
+    detailByScale: { ...DEFAULT_PROJECT_GRAPHICS.detailByScale, ...(g?.detailByScale ?? {}) },
+  };
+}
+
+/** Gráficos da planta de um nível com os padrões aplicados. Nível inexistente: o padrão. */
+export function levelGraphicsOf(p: Pick<Project, 'levels'>, levelId: Id): ViewGraphics {
+  const g = p.levels.find((l) => l.id === levelId)?.graphics;
+  return { ...DEFAULT_VIEW_GRAPHICS, ...(g ?? {}), overrides: mergeOverrides(g?.overrides) };
+}
+
+/** Gráficos do 3D com os padrões aplicados. */
+export function view3dOf(p: Pick<Project, 'view3d'>): View3DSettings {
+  const g = p.view3d;
+  return { ...DEFAULT_VIEW_3D, ...(g ?? {}), overrides: mergeOverrides(g?.overrides) };
 }

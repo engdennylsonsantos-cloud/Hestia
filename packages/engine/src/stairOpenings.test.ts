@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { difference, multiArea, pointInMulti, type Vec2 } from '@hestia/geom';
+import { difference, intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import {
   DEFAULT_SLAB_TYPES,
   ProjectStore,
@@ -26,7 +26,9 @@ import {
   resolveSlabs,
   resolveStairs,
   stairHoleRegion,
-  stairHolesForLevel,
+  coverUnderside,
+  stairHolesFor,
+  stairOpeningsOnLevel,
   type ResolvedStair,
 } from './index.ts';
 
@@ -87,6 +89,8 @@ const TREAD_AREA = 0.28 * 1.2;
 const HOLE_AREA = 12 * TREAD_AREA;
 
 const onLevel = (p: Project, levelId: string) => resolveSlabs(p, levelId);
+/** Furo que a laje do pavimento 2 perde para a escada, dentro do contorno cru `ring`. */
+const holeOf = (p: Project, ring: Vec2[] = SLAB_RING): MultiPolygon => difference([[ring]], resolveSlabs(p, 'lv_1')[0]!.polygon);
 
 describe('furo de escada na laje do nível de topo (decisão 0011, item 11)', () => {
   const p = build({ slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
@@ -126,7 +130,7 @@ describe('furo de escada na laje do nível de topo (decisão 0011, item 11)', ()
 
   it('a laje do térreo, onde a escada começa, não fura', () => {
     const ps = build({ slabs: [{ id: 's0', boundary: SLAB_RING, levelId: 'lv_0' }] }).project;
-    expect(stairHolesForLevel(ps, 'lv_0')).toEqual([]);
+    expect(stairOpeningsOnLevel(ps, 'lv_0')).toEqual([]);
     expect(resolveSlabs(ps, 'lv_0')[0]!.polygon).toEqual([slabPolygon(ps.elements.s0 as Slab)]);
   });
 
@@ -144,7 +148,7 @@ describe('furo de escada na laje do nível de topo (decisão 0011, item 11)', ()
   it('abertura "none" não fura; o contorno volta a ser o cru', () => {
     const store = build({ slabs: [{ id: 's1', boundary: SLAB_RING }] });
     store.exec({ type: 'updateElements', ids: ['st1'], patch: { openingMode: 'none' } });
-    expect(stairHolesForLevel(store.project, 'lv_1')).toEqual([]);
+    expect(stairOpeningsOnLevel(store.project, 'lv_1')).toEqual([]);
     expect(resolveSlabs(store.project, 'lv_1')[0]!.polygon).toEqual([slabPolygon(store.project.elements.s1 as Slab)]);
     expect(quantifySlabs(store.project, 'lv_1').slabs[0]!.planArea).toBeCloseTo(14, 9);
   });
@@ -160,10 +164,10 @@ describe('furo de escada na laje do nível de topo (decisão 0011, item 11)', ()
     expect(multiArea(resolveSlabs(pt, 'lv_1')[0]!.polygon)).toBeCloseTo(14 - 13 * TREAD_AREA, 9);
   });
 
-  it('sem laje ou piso sobre a escada, usa a espessura padrão de 0,15 m', () => {
+  it('sem laje ou piso sobre a escada não há o que furar; a espessura padrão (0,15 m) é só da chegada do render', () => {
     expect(STAIR_OPENING_DEFAULT_THICKNESS).toBe(0.15);
-    const region = stairHolesForLevel(build().project, 'lv_1');
-    expect(multiArea(region)).toBeCloseTo(HOLE_AREA, 9);
+    expect(resolveSlabs(build().project, 'lv_1')).toEqual([]);
+    expect(resolveFloors(build().project, 'lv_1')).toEqual([]);
   });
 });
 
@@ -174,14 +178,14 @@ describe('stairHoleRegion (função pura sobre a escada resolvida)', () => {
     return list[0]!;
   };
 
-  it('com laje de 0,17 m, a região é a união dos degraus de cota ≥ topo − 0,17 − 2,10', () => {
+  it('com face inferior em 2,63 m (laje de 0,17 m), a região é a união dos degraus de cota ≥ face − 2,10', () => {
     const st = only(build().project);
-    expect(multiArea(stairHoleRegion(st, 0.17))).toBeCloseTo(HOLE_AREA, 9);
+    expect(multiArea(stairHoleRegion(st, UPPER - 0.17))).toBeCloseTo(HOLE_AREA, 9);
   });
 
   it('sem degrau alto o bastante, a região é vazia', () => {
     const st = only(build().project);
-    expect(stairHoleRegion(st, -2)).toEqual([]);
+    expect(stairHoleRegion(st, UPPER + 2)).toEqual([]);
   });
 });
 
@@ -206,9 +210,9 @@ describe('abertura da laje por modo (decisão 0011, §6)', () => {
     const padrao = build({ slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
     const nulo = build({ stair: { openingHeadroom: null }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
     const alto = build({ stair: { openingHeadroom: 3 }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
-    expect(multiArea(stairHolesForLevel(padrao, 'lv_1'))).toBeCloseTo(HOLE_AREA, 9);
-    expect(multiArea(stairHolesForLevel(nulo, 'lv_1'))).toBeCloseTo(HOLE_AREA, 9);
-    expect(multiArea(stairHolesForLevel(alto, 'lv_1'))).toBeCloseTo(15 * TREAD_AREA, 9);
+    expect(multiArea(holeOf(padrao))).toBeCloseTo(HOLE_AREA, 9);
+    expect(multiArea(holeOf(nulo))).toBeCloseTo(HOLE_AREA, 9);
+    expect(multiArea(holeOf(alto))).toBeCloseTo(15 * TREAD_AREA, 9);
     expect(pointInMulti(v(0.7, 0), slabOf(alto))).toBe(false); // degrau 3 agora também sai da laje
   });
 
@@ -216,22 +220,22 @@ describe('abertura da laje por modo (decisão 0011, §6)', () => {
     const p = build({ stair: { openingMode: 'full' }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
     const r = resolveStairs(p)[0]!;
     expect(multiArea(r.footprint)).toBeCloseTo(15 * TREAD_AREA, 9);
-    expect(multiArea(stairHolesForLevel(p, 'lv_1'))).toBeCloseTo(multiArea(r.footprint), 9);
+    expect(multiArea(holeOf(p))).toBeCloseTo(multiArea(r.footprint), 9);
     expect(pointInMulti(v(0.7, 0), slabOf(p))).toBe(false); // degrau 3, que o pé-direito livre deixava na laje
     expect(pointInMulti(v(0.7, 0.9), slabOf(p))).toBe(true);
   });
 
   it('sem abertura: nenhum furo e a laje sai inteira (≈ 14 m²)', () => {
     const p = build({ stair: { openingMode: 'none' }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
-    expect(stairHolesForLevel(p, 'lv_1')).toEqual([]);
+    expect(stairOpeningsOnLevel(p, 'lv_1')).toEqual([]);
     expect(multiArea(slabOf(p))).toBeCloseTo(14, 9);
   });
 
   it('folga lateral de 0,05 m: a área cresce perímetro × folga + 4 × folga² (retângulo 3,36 × 1,20 m)', () => {
     const p = build({ stair: { openingMargin: 0.05 }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
     const perimeter = 2 * (3.36 + 1.2);
-    expect(multiArea(stairHolesForLevel(p, 'lv_1'))).toBeCloseTo(HOLE_AREA + perimeter * 0.05 + 4 * 0.05 * 0.05, 6);
-    expect(multiArea(stairHolesForLevel(p, 'lv_1'))).toBeCloseTo(4.498, 6);
+    expect(multiArea(holeOf(p))).toBeCloseTo(HOLE_AREA + perimeter * 0.05 + 4 * 0.05 * 0.05, 6);
+    expect(multiArea(holeOf(p))).toBeCloseTo(4.498, 6);
   });
 });
 
@@ -254,7 +258,8 @@ describe('cenário L com patamar (decisão 0011, §2 e §6)', () => {
     };
     return [a, landing, b];
   }
-  const L = (stair: Setup['stair'] = {}) => build({ components: lShape(), stair, slabs: [{ id: 's1', boundary: box(-1, -1, 5, 4) }] }).project;
+  const RING_L = box(-1, -1, 5, 4);
+  const L = (stair: Setup['stair'] = {}) => build({ components: lShape(), stair, slabs: [{ id: 's1', boundary: RING_L }] }).project;
   /** 4 degraus do lance A (topo ≥ 0,53 m), o patamar (1,20 × 1,20 m) e os 7 degraus do lance B. */
   const HOLE_L = 4 * TREAD_AREA + 1.44 + 7 * TREAD_AREA;
   /** Todos os 14 degraus e o patamar. */
@@ -269,7 +274,7 @@ describe('cenário L com patamar (decisão 0011, §2 e §6)', () => {
   });
 
   it('pé-direito livre: o patamar sai da laje e os degraus baixos do lance A ficam', () => {
-    const hole = stairHolesForLevel(L(), 'lv_1');
+    const hole = holeOf(L(), RING_L);
     expect(pointInMulti(v(2.56, 0), hole)).toBe(true); // patamar, cota 1,40 m
     expect(pointInMulti(v(0.14, 0), hole)).toBe(false); // degrau 1 (topo 0,175 m)
     expect(pointInMulti(v(0.98, 0), hole)).toBe(true); // degrau 4 (topo 0,70 m)
@@ -277,15 +282,15 @@ describe('cenário L com patamar (decisão 0011, §2 e §6)', () => {
   });
 
   it('contorno completo: a projeção inteira (14 degraus e o patamar)', () => {
-    expect(multiArea(stairHolesForLevel(L({ openingMode: 'full' }), 'lv_1'))).toBeCloseTo(FOOT_L, 9);
+    expect(multiArea(holeOf(L({ openingMode: 'full' }), RING_L))).toBeCloseTo(FOOT_L, 9);
   });
 
   it('retângulo: o envolvente de menor área contém a região e não passa da caixa dos eixos (3,16 × 3,16 m)', () => {
     for (const mode of ['full', 'headroom'] as const) {
       const p = L({ openingMode: mode, openingRect: true });
-      const hole = stairHolesForLevel(p, 'lv_1');
+      const hole = holeOf(p, RING_L);
       const foot = resolveStairs(p)[0]!.footprint;
-      const region = mode === 'full' ? foot : stairHolesForLevel(L(), 'lv_1');
+      const region = mode === 'full' ? foot : holeOf(L(), RING_L);
       expect(multiArea(difference(region, hole))).toBeLessThan(1e-9);
       expect(multiArea(hole)).toBeLessThan(3.16 * 3.16 + 1e-9);
       expect(multiArea(hole)).toBeGreaterThanOrEqual(multiArea(region) - 1e-9);
@@ -295,5 +300,165 @@ describe('cenário L com patamar (decisão 0011, §2 e §6)', () => {
   it('a laje que sobra é a laje crua menos o furo do L', () => {
     const p = L();
     expect(multiArea(resolveSlabs(p, 'lv_1')[0]!.polygon)).toBeCloseTo(6 * 5 - HOLE_L, 9);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Furo por elemento: cada laje e piso do nível de topo fura pela própria face inferior (decisão 0011, §6).
+
+/** Divisa em x entre as duas metades: o degrau i ocupa (i−1)·0,28 a i·0,28, então 2,52 m é o fim do degrau 9. */
+const SPLIT_X = 2.52;
+const LEFT = box(-1, -1, SPLIT_X, 1);
+const RIGHT = box(SPLIT_X, -1, 6, 1);
+const SLAB_15: SlabType = {
+  id: 'ls_15',
+  name: 'Laje 15 cm',
+  code: 'LJ-15C',
+  description: 'Laje maciça de 15 cm',
+  layers: [{ function: 'structure', materialId: 'mat_concreto', thickness: 0.15, wraps: false }],
+  cost: 0,
+};
+
+const slabAt = (p: Project, id: string) => resolveSlabs(p, 'lv_1').find((s) => s.slabId === id)!.polygon;
+const floorAt = (p: Project, id: string) => resolveFloors(p, 'lv_1').find((f) => f.floorId === id)!.polygon;
+/** Área que o furo tira do contorno cru `ring` (o resolvido é sempre um subconjunto dele). */
+const lost = (ring: Vec2[], polygon: MultiPolygon): number => multiArea(difference([[ring]], polygon));
+/** Área dos degraus cujo topo fica a menos de 2,10 m da face inferior `underside`, dentro de `ring` (o que o furo deve tirar). */
+function expectedLost(p: Project, ring: Vec2[], underside: number, headroom = 2.1): number {
+  const treads = resolveStairs(p)[0]!.steps.filter((s) => s.kind === 'tread');
+  return treads.filter((s) => underside - s.z <= headroom + 1e-9).reduce((a, s) => a + multiArea(intersection([[s.polygon]], [[ring]])), 0);
+}
+
+describe('furo por elemento: duas lajes do pavimento 2 com cotas diferentes (decisão 0011, §6)', () => {
+  it('laje alta (+0,60 m) tira só os degraus 7 a 9 da metade esquerda; a de 0 m tira os degraus 10 a 15 da direita', () => {
+    const p = build({
+      slabTypes: [SLAB_15],
+      slabs: [
+        { id: 'hi', typeId: 'ls_15', boundary: LEFT, heightOffset: 0.6 },
+        { id: 'lo', typeId: 'ls_15', boundary: RIGHT },
+      ],
+    }).project;
+    expect(lost(LEFT, slabAt(p, 'hi'))).toBeCloseTo(3 * TREAD_AREA, 9);
+    expect(lost(RIGHT, slabAt(p, 'lo'))).toBeCloseTo(6 * TREAD_AREA, 9);
+    expect(lost(LEFT, slabAt(p, 'hi'))).toBeCloseTo(expectedLost(p, LEFT, UPPER + 0.6 - 0.15), 9);
+    expect(lost(RIGHT, slabAt(p, 'lo'))).toBeCloseTo(expectedLost(p, RIGHT, UPPER - 0.15), 9);
+    expect(pointInMulti(v(1.26, 0), slabAt(p, 'hi'))).toBe(true); // degrau 5, topo 0,875 m: folga 2,375 m, fica na laje alta
+    expect(pointInMulti(v(2.1, 0), slabAt(p, 'hi'))).toBe(false); // degrau 8, topo 1,40 m: folga 1,85 m, sai
+    expect(pointInMulti(v(2.66, 0), slabAt(p, 'lo'))).toBe(false); // degrau 10, sai da laje de 0 m
+  });
+
+  it('laje baixa (−0,30 m) tira também os degraus 2 e 3: 2 a 9 da metade esquerda, não só 4 a 9', () => {
+    const p = build({
+      slabTypes: [SLAB_15],
+      slabs: [
+        { id: 'lo', typeId: 'ls_15', boundary: LEFT, heightOffset: -0.3 },
+        { id: 'ref', typeId: 'ls_15', boundary: RIGHT },
+      ],
+    }).project;
+    expect(lost(LEFT, slabAt(p, 'lo'))).toBeCloseTo(8 * TREAD_AREA, 9);
+    expect(lost(RIGHT, slabAt(p, 'ref'))).toBeCloseTo(6 * TREAD_AREA, 9);
+  });
+
+  it('piso (+0,60 m) e laje (0 m) no mesmo nível: cada um com o seu furo', () => {
+    const p = build({
+      slabTypes: [SLAB_15],
+      slabs: [{ id: 'lo', typeId: 'ls_15', boundary: RIGHT }],
+      floors: [{ id: 'fl', typeId: 'ft_laje12', boundary: LEFT, heightOffset: 0.6 }],
+    }).project;
+    expect(lost(LEFT, floorAt(p, 'fl'))).toBeCloseTo(3 * TREAD_AREA, 9);
+    expect(lost(RIGHT, slabAt(p, 'lo'))).toBeCloseTo(6 * TREAD_AREA, 9);
+  });
+});
+
+describe('furo por elemento: modos, inclinação e cotas extremas (decisão 0011, §6)', () => {
+  const finite = (poly: MultiPolygon): boolean => poly.flat(2).every((q) => Number.isFinite(q.x) && Number.isFinite(q.y));
+
+  it('modo "full" com duas lajes: cada uma perde a sua parte da pegada, sem olhar a cota', () => {
+    for (const offset of [0.6, 0]) {
+      const p = build({
+        stair: { openingMode: 'full' },
+        slabTypes: [SLAB_15],
+        slabs: [
+          { id: 'hi', typeId: 'ls_15', boundary: LEFT, heightOffset: offset },
+          { id: 'lo', typeId: 'ls_15', boundary: RIGHT },
+        ],
+      }).project;
+      expect(lost(LEFT, slabAt(p, 'hi'))).toBeCloseTo(9 * TREAD_AREA, 9);
+      expect(lost(RIGHT, slabAt(p, 'lo'))).toBeCloseTo(6 * TREAD_AREA, 9);
+    }
+  });
+
+  it('modo "none" com duas lajes de cotas diferentes: nenhuma perde nada', () => {
+    const p = build({
+      stair: { openingMode: 'none' },
+      slabTypes: [SLAB_15],
+      slabs: [
+        { id: 'hi', typeId: 'ls_15', boundary: LEFT, heightOffset: 0.6 },
+        { id: 'lo', typeId: 'ls_15', boundary: RIGHT },
+      ],
+    }).project;
+    expect(stairOpeningsOnLevel(p, 'lv_1')).toEqual([]);
+    expect(multiArea(slabAt(p, 'hi'))).toBeCloseTo(multiArea([[LEFT]]), 9);
+    expect(multiArea(slabAt(p, 'lo'))).toBeCloseTo(multiArea([[RIGHT]]), 9);
+  });
+
+  it('pé-direito livre com openingHeadroom de 3,00 m: a laje alta (face 3,25 m) perde os degraus 2 a 9 da metade esquerda', () => {
+    const p = build({
+      stair: { openingHeadroom: 3 },
+      slabTypes: [SLAB_15],
+      slabs: [
+        { id: 'hi', typeId: 'ls_15', boundary: LEFT, heightOffset: 0.6 },
+        { id: 'lo', typeId: 'ls_15', boundary: RIGHT },
+      ],
+    }).project;
+    // Limite: 3,25 − 3,00 = 0,25 m. Degrau k tem topo k·0,175: entram os de k ≥ 2 (0,35 m); a metade esquerda vai do 1 ao 9.
+    expect(lost(LEFT, slabAt(p, 'hi'))).toBeCloseTo(8 * TREAD_AREA, 9);
+    expect(lost(LEFT, slabAt(p, 'hi'))).toBeCloseTo(expectedLost(p, LEFT, UPPER + 0.6 - 0.15, 3), 9);
+    // Lajes de 2,65 m: limite −0,35 m, todos os degraus da metade direita (10 a 15) entram.
+    expect(lost(RIGHT, slabAt(p, 'lo'))).toBeCloseTo(6 * TREAD_AREA, 9);
+  });
+
+  it('laje inclinada: o furo usa a menor cota da face inferior do contorno (conservador), então é o mesmo de uma laje plana nela', () => {
+    const slope = { origin: v(-1, 0), dir: v(1, 0), percent: 5 }; // face superior sobe 5 % no sentido +x: 0,35 m em x = 6
+    const inclined = build({ slabTypes: [SLAB_15], slabs: [{ id: 'inc', typeId: 'ls_15', boundary: SLAB_RING, slope }] }).project;
+    const flat = build({ slabTypes: [SLAB_15], slabs: [{ id: 'flat', typeId: 'ls_15', boundary: SLAB_RING }] }).project;
+    const poly = slabAt(inclined, 'inc');
+    expect(finite(poly)).toBe(true);
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(12 * TREAD_AREA, 9); // degraus 4 a 15, como com a face inferior em 2,65 m
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(lost(SLAB_RING, slabAt(flat, 'flat')), 9);
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(expectedLost(inclined, SLAB_RING, UPPER - 0.15), 9);
+  });
+
+  it('laje com face superior abaixo do topo de alguns degraus (−0,30 m): sem NaN, degraus 2 a 15 saem', () => {
+    const p = build({ slabTypes: [SLAB_15], slabs: [{ id: 'low', typeId: 'ls_15', boundary: SLAB_RING, heightOffset: -0.3 }] }).project;
+    const poly = slabAt(p, 'low');
+    expect(finite(poly)).toBe(true);
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(14 * TREAD_AREA, 9); // degrau 15 (topo 2,625 m) passa da face superior 2,50 m
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(expectedLost(p, SLAB_RING, UPPER - 0.3 - 0.15), 9);
+  });
+
+  it('laje abaixo de todos os degraus (−2,00 m): sem exceção, a escada inteira sai e a laje fica com a área que sobra', () => {
+    const p = build({ slabTypes: [SLAB_15], slabs: [{ id: 'deep', typeId: 'ls_15', boundary: SLAB_RING, heightOffset: -2 }] }).project;
+    const poly = slabAt(p, 'deep');
+    expect(finite(poly)).toBe(true);
+    expect(lost(SLAB_RING, poly)).toBeCloseTo(15 * TREAD_AREA, 9);
+  });
+
+  it('a união cresce quando a face inferior desce: o furo a 3,25 m está contido no furo a 2,65 m', () => {
+    const p = build({ slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
+    const openings = stairOpeningsOnLevel(p, 'lv_1');
+    const high = stairHolesFor(openings, UPPER + 0.6 - 0.15);
+    const low = stairHolesFor(openings, UPPER - 0.15);
+    expect(multiArea(high)).toBeCloseTo(9 * TREAD_AREA, 9); // degraus 7 a 15
+    expect(multiArea(low)).toBeCloseTo(12 * TREAD_AREA, 9); // degraus 4 a 15
+    expect(multiArea(difference(high, low))).toBeLessThan(1e-9);
+  });
+
+  it('coverUnderside: sem inclinação é a face inferior; com inclinação, a menor cota do contorno', () => {
+    const ring = SLAB_RING;
+    expect(coverUnderside(2.65, null, [ring])).toBe(2.65);
+    expect(coverUnderside(2.65, { origin: v(-1, 0), dir: v(1, 0), percent: 5 }, [ring])).toBeCloseTo(2.65, 12);
+    expect(coverUnderside(2.65, { origin: v(-1, 0), dir: v(1, 0), percent: -5 }, [ring])).toBeCloseTo(2.65 - 0.35, 12);
+    expect(coverUnderside(2.65, { origin: v(6, 0), dir: v(-1, 0), percent: 5 }, [ring])).toBeCloseTo(2.65, 12);
   });
 });

@@ -1,6 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
 import { levelElevation, slabPolygon, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
-import { cutStairOpenings, stairHolesForLevel } from './stairOpenings.ts';
+import { coverUnderside, cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
 /** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
 export { slabRiseAt } from '@hestia/model';
@@ -26,17 +26,16 @@ export interface ResolvedSlab {
 }
 
 /**
- * Geometria das lajes de um nível (não recortadas pelas paredes, como os pisos). Os furos de escada do nível de topo
- * (`stairHolesForLevel`) são subtraídos do contorno; uma laje inteiramente coberta por eles não entra.
+ * Geometria das lajes de um nível (não recortadas pelas paredes, como os pisos). Os furos de escada do nível de topo são
+ * calculados por laje, pela cota da face inferior dela (`stairHolesFor`, decisão 0011 §6), e subtraídos só do próprio
+ * contorno; uma laje inteiramente coberta por eles não entra.
  */
 export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
-  const openings = stairHolesForLevel(p, levelId);
+  const openings = stairOpeningsOnLevel(p, levelId);
   const out: ResolvedSlab[] = [];
   for (const s of slabsOnLevel(p, levelId)) {
     const type = p.slabTypes[s.typeId];
     if (!type || s.boundary.length < 3) continue;
-    const polygon = cutStairOpenings([slabPolygon(s)], openings);
-    if (polygon.length === 0) continue;
     const topZ = levelElevation(p, s.levelId) + s.heightOffset;
     let z = topZ;
     const layers: ResolvedSlabLayer[] = [];
@@ -45,7 +44,11 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
       layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
       z -= l.thickness;
     });
-    out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon, topZ, bottomZ: z, slope: s.slope, layers });
+    const bottomZ = z;
+    const underside = coverUnderside(bottomZ, s.slope, slabPolygon(s));
+    const polygon = cutStairOpenings([slabPolygon(s)], stairHolesFor(openings, underside));
+    if (polygon.length === 0) continue;
+    out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon, topZ, bottomZ, slope: s.slope, layers });
   }
   return out;
 }

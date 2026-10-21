@@ -1,28 +1,38 @@
 import {
   chainBroken,
   makePoly,
-  orderBy,
   polyDist,
   prepareRun,
   PATH_TOL,
   sampleChain,
   sketchIssue,
   TOUCH_TOL,
+  walkOf,
   type Prepared,
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
 import { dist, type Vec2 } from '@hestia/geom';
+import { spiralSweepOf } from './stairSpiral.ts';
+
+/**
+ * Opções do croqui. `sweep`: varredura (rad, com sinal) de um caracol, que separa os espelhos por volta (`turnsOf`). Sem
+ * ela, vale a do metadado `spiral` do lance, se houver (decisão 0014 §1 item 2); croqui livre não tem varredura.
+ */
+export interface RunSketchOptions {
+  sweep?: number;
+}
 
 /**
  * Valida o croqui de um lance (decisão 0011 §3). Só erros de geometria: espelho que passa do limite é aparado
- * e não gera erro. Códigos e textos: `STAIR_SKETCH_MESSAGES`.
+ * e não gera erro. Códigos e textos: `STAIR_SKETCH_MESSAGES`. Com `sweep` (caracol), espelhos de voltas diferentes não
+ * se comparam em planta (decisão 0014 §1 item 3).
  */
-export function validateRunSketch(run: StairRunSketch): StairSketchIssue[] {
-  return validatePrepared(run, prepareRun(run));
+export function validateRunSketch(run: StairRunSketch, opts: RunSketchOptions = {}): StairSketchIssue[] {
+  return validatePrepared(run, prepareRun(run), opts.sweep ?? spiralSweepOf(run));
 }
 
-export function validatePrepared(run: StairRunSketch, P: Prepared): StairSketchIssue[] {
+export function validatePrepared(run: StairRunSketch, P: Prepared, sweep?: number): StairSketchIssue[] {
   const out: StairSketchIssue[] = [];
   if (chainBroken(run.boundaryLeft)) out.push(sketchIssue('stair-boundary-gap'));
   if (chainBroken(run.boundaryRight)) out.push(sketchIssue('stair-boundary-gap'));
@@ -30,9 +40,24 @@ export function validatePrepared(run: StairRunSketch, P: Prepared): StairSketchI
     out.push(sketchIssue('stair-boundaries-touch'));
   }
   checkRisers(P, out);
-  checkRiserPairs(P, out);
+  checkRiserPairs(P, out, sweep !== undefined ? turnsOf(run, P, sweep) : undefined);
   if (run.path.length > 0) checkPath(run, P, out);
   return out;
+}
+
+/**
+ * Volta de cada espelho (por índice do vetor) num caracol de varredura `sweep` (decisão 0014 §1 item 3). Com k a posição
+ * do espelho na ordem de subida, o ângulo acumulado é k·|sweep|/(N−1) e a volta é floor(ângulo ÷ 2π). Espelhos de voltas
+ * diferentes têm cotas diferentes (um degrau de altura h por espelho, pelo menos), por isso não se comparam em planta.
+ * A volta vizinha na emenda (espelhos consecutivos) fica nesse caso: a diferença de cota é h, nunca menor que h.
+ */
+export function turnsOf(run: StairRunSketch, P: Prepared, sweep: number): Map<number, number> {
+  const turn = new Map<number, number>();
+  const n = P.risers.length;
+  if (n < 2 || !(sweep !== 0) || !Number.isFinite(sweep)) return turn;
+  const step = Math.abs(sweep) / (n - 1);
+  walkOf(P, run, true).order.forEach((i, k) => turn.set(i, Math.floor((k * step) / (2 * Math.PI) + 1e-9)));
+  return turn;
 }
 
 function checkRisers(P: Prepared, out: StairSketchIssue[]): void {
@@ -48,17 +73,23 @@ function checkRisers(P: Prepared, out: StairSketchIssue[]): void {
   }
 }
 
-/** Pares de espelhos que ligam os dois limites: mesma posição, ou que se tocam/cruzam depois de aparados. */
-function checkRiserPairs(P: Prepared, out: StairSketchIssue[]): void {
+/**
+ * Pares de espelhos que ligam os dois limites: mesma posição, ou que se tocam/cruzam depois de aparados. Com `turn`
+ * (caracol), só se comparam espelhos da mesma volta.
+ */
+function checkRiserPairs(P: Prepared, out: StairSketchIssue[], turn?: Map<number, number>): void {
   const spanning = P.risers.filter((g) => g.spans && g.trimmed);
   for (let i = 0; i < spanning.length; i++) {
     for (let j = i + 1; j < spanning.length; j++) {
-      const A = spanning[i]!.trimmed!;
-      const B = spanning[j]!.trimmed!;
+      const ga = spanning[i]!;
+      const gb = spanning[j]!;
+      if (turn && turn.get(ga.index) !== turn.get(gb.index)) continue;
+      const A = ga.trimmed!;
+      const B = gb.trimmed!;
       const sameA = dist(A[0]!, B[0]!) <= TOUCH_TOL;
       const sameB = dist(A[A.length - 1]!, B[B.length - 1]!) <= TOUCH_TOL;
-      if (sameA && sameB) out.push(sketchIssue('stair-riser-same-location', spanning[i]!.index));
-      else if (polyDist(A, B) <= TOUCH_TOL) out.push(sketchIssue('stair-riser-crossing', spanning[i]!.index));
+      if (sameA && sameB) out.push(sketchIssue('stair-riser-same-location', ga.index));
+      else if (polyDist(A, B) <= TOUCH_TOL) out.push(sketchIssue('stair-riser-crossing', ga.index));
     }
   }
 }
@@ -70,7 +101,7 @@ function checkPath(run: StairRunSketch, P: Prepared, out: StairSketchIssue[]): v
     return;
   }
   // Primeiro e último espelho pela ordem dos limites (a caminhada ainda não define a ordem aqui).
-  const order = orderBy(P, run, false);
+  const order = walkOf(P, run, false).order;
   if (order.length === 0) return;
   const first = P.risers[order[0]!]!;
   const last = P.risers[order[order.length - 1]!]!;

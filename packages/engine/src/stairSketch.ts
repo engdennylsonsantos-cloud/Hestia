@@ -16,9 +16,9 @@ import {
 import {
   between,
   chainBroken,
+  crossingsAll,
   makePoly,
   midlinePoly,
-  orderBy,
   pointAtLength,
   polyLength,
   prepareRun,
@@ -26,15 +26,19 @@ import {
   segAt,
   sampleChain,
   sketchIssue,
+  walkOf,
   CHAIN_TOL,
+  type Poly,
   type Prepared,
   type RiserGeom,
+  type RiserWalk,
   type StairCurve,
   type StairLandingSketch,
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
 import { validatePrepared } from './stairSketchValidate.ts';
+import { spiralSweepOf } from './stairSpiral.ts';
 
 export {
   autoPath,
@@ -48,13 +52,15 @@ export {
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
-export { validateRunSketch } from './stairSketchValidate.ts';
+export { validateRunSketch, type RunSketchOptions } from './stairSketchValidate.ts';
 
 export interface StairRunStepsOptions {
   /** Cota de base do lance (m). */
   baseZ: number;
   /** Altura real do espelho h = H ÷ N (m). */
   riserHeight: number;
+  /** Varredura (rad, com sinal) de um caracol. Sem ela, vale a do metadado `spiral` do lance, se houver. */
+  sweep?: number;
 }
 
 export interface StairRunStepsResult {
@@ -70,9 +76,11 @@ export interface StairRunStepsResult {
 /** Degraus e espelhos do lance (decisão 0011 §4). Com erro de validação, devolve listas vazias e os erros. */
 export function stairRunSteps(run: StairRunSketch, opts: StairRunStepsOptions): StairRunStepsResult {
   const P = prepareRun(run);
-  const issues = validatePrepared(run, P);
+  const issues = validatePrepared(run, P, opts.sweep ?? spiralSweepOf(run));
   if (issues.some((i) => i.severity === 'error')) return { treads: [], risers: [], footprint: [], issues };
-  const ordered = orderBy(P, run, true).map((i) => P.risers[i]!);
+  const walk = walkOf(P, run, true);
+  const ordered = walk.order.map((i) => P.risers[i]!);
+  const bounds = ordered.map((g) => boundsOf(P, g, walk));
   const { baseZ, riserHeight: h } = opts;
   const risers = ordered.map((g, k) => {
     const pts = trimmedOf(g);
@@ -89,7 +97,7 @@ export function stairRunSteps(run: StairRunSketch, opts: StairRunStepsOptions): 
   for (let k = 0; k + 1 < ordered.length; k++) {
     treads.push({
       index: k + 1,
-      polygon: treadRing(P, ordered[k]!, ordered[k + 1]!),
+      polygon: treadRing(P, ordered[k]!, ordered[k + 1]!, bounds[k]!, bounds[k + 1]!),
       z: baseZ + (k + 1) * h,
     });
   }
@@ -101,14 +109,47 @@ function trimmedOf(g: RiserGeom): Vec2[] {
   return g.trimmed ?? g.full.pts;
 }
 
+/** Parâmetros (comprimento de arco) de um espelho nos dois limites. */
+interface Bounds {
+  l: number;
+  r: number;
+}
+
+/**
+ * Onde o espelho está em cada limite. Em caracol de mais de uma volta, o espelho cruza cada limite uma vez por volta, no
+ * mesmo ponto em planta: pega-se o cruzamento cuja posição na caminhada é a do espelho (fração `s ÷ total`, que vale para
+ * os dois limites porque têm a mesma varredura). Num lance de uma volta há um só cruzamento e nada muda.
+ */
+function boundsOf(P: Prepared, g: RiserGeom, walk: RiserWalk): Bounds {
+  const f = walk.total > 0 ? (walk.s[g.index] ?? 0) / walk.total : 0;
+  return {
+    l: boundaryParam(P.L, g, f, g.hitsL[0]!.sb),
+    r: boundaryParam(P.R, g, f, g.hitsR[0]!.sb),
+  };
+}
+
+function boundaryParam(poly: Poly, g: RiserGeom, f: number, fallback: number): number {
+  const target = f * polyLength(poly);
+  let best = fallback;
+  let bestD = Infinity;
+  for (const h of crossingsAll(g.full, poly)) {
+    const d = Math.abs(h.sb - target);
+    if (d < bestD) {
+      bestD = d;
+      best = h.sb;
+    }
+  }
+  return best;
+}
+
 /** Anel do degrau entre o espelho A (k) e B (k+1): A, limite direito até B, B invertido, limite esquerdo até A. */
-function treadRing(P: Prepared, A: RiserGeom, B: RiserGeom): Ring {
+function treadRing(P: Prepared, A: RiserGeom, B: RiserGeom, bA: Bounds, bB: Bounds): Ring {
   const ring: Ring = [];
   const pushAll = (pts: Vec2[]): void => pts.forEach((p) => pushDistinct(ring, p));
   pushAll(trimmedOf(A));
-  pushAll(between(P.R, A.hitsR[0]!.sb, B.hitsR[0]!.sb));
+  pushAll(between(P.R, bA.r, bB.r));
   pushAll([...trimmedOf(B)].reverse());
-  pushAll(between(P.L, B.hitsL[0]!.sb, A.hitsL[0]!.sb));
+  pushAll(between(P.L, bB.l, bA.l));
   while (ring.length > 1 && dist(ring[0]!, ring[ring.length - 1]!) <= CHAIN_TOL) ring.pop();
   if (ringArea(ring) < 0) ring.reverse();
   return ring;

@@ -161,17 +161,26 @@ export function segmentHit(
   return { point: add(p1, mul(d, tc)), t: tc, u: uc };
 }
 
-/** Cruzamentos de `A` com `B` (pontos distintos). `s` vem de `A`, `sb` de `B`. */
-export function crossings(A: Poly, B: Poly): Hit[] {
+/**
+ * Todos os cruzamentos de `A` com `B`, sem tirar os que caem no mesmo ponto. Um caracol de mais de 360° passa pelo mesmo
+ * ponto em planta uma vez por volta: o `sb` distingue as voltas. `s` vem de `A`, `sb` de `B`.
+ */
+export function crossingsAll(A: Poly, B: Poly): Hit[] {
   const out: Hit[] = [];
   for (let i = 0; i < segCount(A); i++) {
     for (let j = 0; j < segCount(B); j++) {
       const h = segmentHit(A.pts[i]!, A.pts[i + 1]!, B.pts[j]!, B.pts[j + 1]!);
       if (!h) continue;
-      const hit: Hit = { p: h.point, s: A.cum[i]! + h.t * segLen(A, i), sb: B.cum[j]! + h.u * segLen(B, j) };
-      if (!out.some((o) => dist(o.p, hit.p) <= TOUCH_TOL)) out.push(hit);
+      out.push({ p: h.point, s: A.cum[i]! + h.t * segLen(A, i), sb: B.cum[j]! + h.u * segLen(B, j) });
     }
   }
+  return out;
+}
+
+/** Cruzamentos de `A` com `B` (pontos distintos). `s` vem de `A`, `sb` de `B`. */
+export function crossings(A: Poly, B: Poly): Hit[] {
+  const out: Hit[] = [];
+  for (const hit of crossingsAll(A, B)) if (!out.some((o) => dist(o.p, hit.p) <= TOUCH_TOL)) out.push(hit);
   return out;
 }
 
@@ -281,9 +290,11 @@ export function midOf(p: Poly): Vec2 {
   return pointAtLength(p, polyLength(p) / 2);
 }
 
-/** Comprimento na caminhada (path) em que ela cruza o espelho; se não cruza, o do ponto mais próximo. */
-function pathParam(path: Poly, geom: Poly): number {
-  const hits = crossings(geom, path);
+/**
+ * Comprimento na caminhada (path) em que ela cruza o espelho (`hits` = cruzamentos de `geom` com `path`): o 1º; se não
+ * cruza, o do ponto mais próximo.
+ */
+function pathParam(path: Poly, geom: Poly, hits: Hit[]): number {
   if (hits.length > 0) return Math.min(...hits.map((h) => h.sb));
   const m = midOf(geom);
   let best = Infinity;
@@ -333,17 +344,76 @@ function ascentWalk(P: Prepared): Poly | null {
   return dot(t, d) >= 0 ? W : makePoly([...W.pts].reverse());
 }
 
-/** Índices (em `run.risers`) na ordem de subida. Com `byPath` e caminhada válida, pela posição do cruzamento na
- * caminhada; senão, pelo comprimento ao longo da linha média orientada (vale para qualquer varredura). */
-export function orderBy(P: Prepared, run: StairRunSketch, byPath: boolean): number[] {
+/** Ordem de subida dos espelhos (`order`, índices do vetor) e a posição `s` de cada um na caminhada (por índice). */
+export interface RiserWalk {
+  order: number[];
+  s: number[];
+  /** Comprimento da caminhada usada (0 sem caminhada). */
+  total: number;
+}
+
+/**
+ * Ordem de subida. Com `byPath` e caminhada válida, a caminhada explícita; senão, a linha média orientada (vale para
+ * qualquer varredura). Cada espelho cruza a caminhada uma vez, salvo no caracol de mais de uma volta, em que cruza uma
+ * vez por volta (no mesmo ponto em planta). Nesse caso a posição do espelho é a do cruzamento mais próximo de um múltiplo
+ * do passo uniforme L÷(N−1) (`uniformWalk`), que é a varredura de um caracol. Sem isso, vale o 1º cruzamento.
+ */
+export function walkOf(P: Prepared, run: StairRunSketch, byPath: boolean): RiserWalk {
   const path = byPath && run.path.length > 0 ? makePoly(sampleChain(run.path)) : null;
   const guide = path && path.pts.length >= 2 ? path : ascentWalk(P);
-  const keyed = P.risers.map((g) => ({
-    i: g.index,
-    k: guide ? pathParam(guide, g.geom) : midOf(g.geom).x,
-  }));
+  if (!guide) {
+    const keyed = P.risers.map((g) => ({ i: g.index, k: midOf(g.geom).x }));
+    keyed.sort((x, y) => x.k - y.k || x.i - y.i);
+    return { order: keyed.map((o) => o.i), s: [], total: 0 };
+  }
+  const total = polyLength(guide);
+  const hits = P.risers.map((g) => crossingsAll(g.geom, guide));
+  const multi = hits.some((hs) => hs.some((h1) => hs.some((h2) => Math.abs(h1.sb - h2.sb) > TOUCH_TOL)));
+  const uniform = multi ? uniformWalk(P, hits, total) : null;
+  if (uniform) return uniform;
+  const keyed = P.risers.map((g, j) => ({ i: g.index, k: pathParam(guide, g.geom, hits[j]!) }));
   keyed.sort((x, y) => x.k - y.k || x.i - y.i);
-  return keyed.map((o) => o.i);
+  const s: number[] = [];
+  for (const o of keyed) s[o.i] = o.k;
+  return { order: keyed.map((o) => o.i), s, total };
+}
+
+/**
+ * Espelhos de um caracol de várias voltas: o espelho de ordem k cai em s = k·L÷(N−1). Cada cruzamento de espelho com a
+ * caminhada que cai a até um quarto do passo de um múltiplo do passo é candidato a essa posição; atribui-se pela menor
+ * folga, uma vez por espelho e uma vez por ordem. Null se não sobrar uma atribuição completa.
+ */
+function uniformWalk(P: Prepared, hits: Hit[][], total: number): RiserWalk | null {
+  const N = P.risers.length;
+  if (N < 2 || !(total > 0)) return null;
+  const step = total / (N - 1);
+  const cands: Array<{ i: number; k: number; s: number; r: number }> = [];
+  P.risers.forEach((g, j) => {
+    for (const h of hits[j]!) {
+      const k = Math.round(h.sb / step);
+      if (k < 0 || k > N - 1) continue;
+      const r = Math.abs(h.sb - k * step);
+      if (r <= step / 4) cands.push({ i: g.index, k, s: h.sb, r });
+    }
+  });
+  cands.sort((x, y) => x.r - y.r || x.i - y.i || x.k - y.k);
+  const byRiser = new Map<number, { k: number; s: number }>();
+  const taken = new Set<number>();
+  for (const c of cands) {
+    if (byRiser.has(c.i) || taken.has(c.k)) continue;
+    byRiser.set(c.i, { k: c.k, s: c.s });
+    taken.add(c.k);
+  }
+  if (byRiser.size !== N) return null;
+  const order = [...byRiser.entries()].sort((a, b) => a[1].k - b[1].k).map(([i]) => i);
+  const s: number[] = [];
+  for (const [i, c] of byRiser) s[i] = c.s;
+  return { order, s, total };
+}
+
+/** Índices (em `run.risers`) na ordem de subida (ver `walkOf`). */
+export function orderBy(P: Prepared, run: StairRunSketch, byPath: boolean): number[] {
+  return walkOf(P, run, byPath).order;
 }
 
 /** Índices dos espelhos (em `run.risers`) na ordem de subida (pela caminhada, se houver). */

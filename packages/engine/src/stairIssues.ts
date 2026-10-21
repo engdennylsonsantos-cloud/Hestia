@@ -260,3 +260,83 @@ export function stairNormIssues(rs: ResolvedStair, norms: StairNorms = DEFAULT_S
   landingChecks(rs, norms, out);
   return out;
 }
+
+/** Aviso fixo de todo lance de caracol (decisão 0014 §1 item 6, e): não é saída de emergência (RT 11 e IT 11 SP). */
+export const SPIRAL_EXIT_MESSAGE =
+  'Escada caracol não serve de saída de emergência (RS: RT 11 5.7.1.2; SP: só mezanino e área privativa).';
+
+/** Parâmetros do caracol para os avisos: varredura (rad), raios e nº de espelhos (N) do lance. */
+export interface SpiralNormInput {
+  sweep: number;
+  rInner: number;
+  rOuter: number;
+  risers: number;
+}
+
+/**
+ * Avisos de norma do caracol (decisão 0014 §1 itens 6 e 7), sempre avisos. Δ = |sweep| ÷ (N−1); a corda entre dois
+ * espelhos no raio r é 2·r·sen(Δ/2) (a mesma medida do degrau em `stairBody`):
+ * - `stair-spiral-tread`: piso a 0,55 m da borda interna abaixo de 0,28 m;
+ * - `stair-spiral-narrow` (informativo): piso na borda estreita (interna) abaixo de 0,07 m;
+ * - `stair-spiral-headroom`: com |sweep| > 2π, folga entre voltas n·h − Tv abaixo da folga mínima do tipo, com n = 2π ÷ Δ
+ *   espelhos por volta e Tv = T monolítico (`structuralDepth` ÷ cosθ, no raio da caminhada) ou `treadThickness` (outros);
+ * - `stair-spiral-exit`: aviso fixo de saída de emergência (sempre).
+ * O 2e+p no raio da caminhada já sai de `stair-blondel` (regra do leque).
+ */
+export function spiralNormIssues(
+  rs: ResolvedStair,
+  componentIndex: number,
+  sp: SpiralNormInput | undefined,
+  norms: StairNorms = DEFAULT_STAIR_NORMS,
+): StairIssueItem[] {
+  const out: StairIssueItem[] = [makeStairIssue(rs.id, 'stair-spiral-exit', 'warning', SPIRAL_EXIT_MESSAGE, componentIndex)];
+  const h = rs.riserHeight;
+  if (!sp || !(h > 0) || !(sp.risers >= 2) || !(Math.abs(sp.sweep) > 0)) return out;
+  const step = Math.abs(sp.sweep) / (sp.risers - 1);
+  const chord = (r: number): number => 2 * r * Math.sin(step / 2);
+
+  const atTread = chord(sp.rInner + norms.spiralTreadAt);
+  if (atTread < norms.spiralTreadMin - EPS) {
+    out.push(
+      makeStairIssue(
+        rs.id,
+        'stair-spiral-tread',
+        'warning',
+        `O piso a ${num(norms.spiralTreadAt, 2)} m da borda interna (${num(atTread, 2)} m) é menor que o mínimo de ${num(norms.spiralTreadMin, 2)} m.`,
+        componentIndex,
+      ),
+    );
+  }
+  const narrow = chord(sp.rInner);
+  if (narrow < norms.spiralNarrowMin - EPS) {
+    out.push(
+      makeStairIssue(
+        rs.id,
+        'stair-spiral-narrow',
+        'warning',
+        `O piso na borda estreita (${num(narrow, 3)} m) é menor que o mínimo de ${num(norms.spiralNarrowMin, 2)} m (informativo).`,
+        componentIndex,
+      ),
+    );
+  }
+  if (Math.abs(sp.sweep) > 2 * Math.PI + EPS) {
+    const p = chord((sp.rInner + sp.rOuter) / 2);
+    const tv = rs.type.runStyle === 'monolithic'
+      ? (p > EPS ? (rs.type.structuralDepth * Math.hypot(p, h)) / p : rs.type.structuralDepth)
+      : rs.type.treadThickness;
+    const perTurn = (2 * Math.PI) / step;
+    const folga = perTurn * h - tv;
+    if (folga < rs.type.minHeadroom - EPS) {
+      out.push(
+        makeStairIssue(
+          rs.id,
+          'stair-spiral-headroom',
+          'warning',
+          `A folga entre voltas (${num(folga, 2)} m) é menor que o mínimo (${num(rs.type.minHeadroom, 2)} m): aumente o nº de espelhos por volta, o pé-direito ou a profundidade livre.`,
+          componentIndex,
+        ),
+      );
+    }
+  }
+  return out;
+}

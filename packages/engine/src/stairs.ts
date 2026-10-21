@@ -11,8 +11,9 @@ import {
   type Stair,
   type StairType,
 } from '@hestia/model';
-import { makeStairIssue, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
+import { makeStairIssue, spiralNormIssues, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
 import { orderRisers, stairLandingPolygon, stairRunSteps, trimRisers, type StairRunSketch } from './stairSketch.ts';
+import { isSpiralRun, spiralParamsOf } from './stairSpiral.ts';
 
 /** Degrau (kind 'tread', index 1..N−1 no lance) ou patamar (kind 'landing', index sequencial na escada, a partir de 1). */
 export interface ResolvedStairStep {
@@ -152,6 +153,11 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
     issues,
   };
   rs.issues.push(...stairNormIssues(rs));
+  s.components.forEach((c, ci) => {
+    if (c.kind !== 'run' || !isSpiralRun(c)) return;
+    const sp = spiralParamsOf(c);
+    rs.issues.push(...spiralNormIssues(rs, ci, sp && { sweep: sp.sweep, rInner: sp.rInner, rOuter: sp.rOuter, risers: c.risers.length }));
+  });
   return rs;
 }
 

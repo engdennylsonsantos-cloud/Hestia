@@ -27,6 +27,7 @@ export * from './roofProfilePresets.ts';
 export * from './roofExtrusion.ts';
 export * from './stairSketch.ts';
 export * from './stairGenerators.ts';
+export * from './stairSpiral.ts';
 export * from './stairNorms.ts';
 export * from './stairIssues.ts';
 export * from './stairs.ts';

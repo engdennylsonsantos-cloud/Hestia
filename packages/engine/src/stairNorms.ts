@@ -18,6 +18,11 @@ export interface StairNorms {
   maxRiseBetweenLandings: number;
   /** Menor dimensão do patamar (m). */
   landingMinLength: number;
+  /** Caracol (decisão 0014 §1 item 6): piso medido a `spiralTreadAt` m da borda interna, mínimo `spiralTreadMin` (m). */
+  spiralTreadAt: number;
+  spiralTreadMin: number;
+  /** Caracol: piso na borda estreita (interna), mínimo informativo (m). */
+  spiralNarrowMin: number;
 }
 
 export const DEFAULT_STAIR_NORMS: StairNorms = {
@@ -29,4 +34,7 @@ export const DEFAULT_STAIR_NORMS: StairNorms = {
   blondelMax: 0.64,
   maxRiseBetweenLandings: 3.2,
   landingMinLength: 1.2,
+  spiralTreadAt: 0.55,
+  spiralTreadMin: 0.28,
+  spiralNarrowMin: 0.07,
 };

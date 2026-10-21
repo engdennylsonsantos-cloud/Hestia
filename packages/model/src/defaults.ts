@@ -1,6 +1,7 @@
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
+import { DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type Layer, type Material, type OpeningType, type Project, type WallType } from './types.ts';
 
 const mat = (id: string, name: string, color: string, hatch: Material['hatch'], extra: Partial<Material> = {}): Material => ({
@@ -129,6 +130,7 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     floorTypes: toRecord(DEFAULT_FLOOR_TYPES),
     slabTypes: toRecord(DEFAULT_SLAB_TYPES),
     roofTypes: toRecord(DEFAULT_ROOF_TYPES),
+    stairTypes: toRecord(DEFAULT_STAIR_TYPES),
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),
     elements: {},
     nextOrder: 1,

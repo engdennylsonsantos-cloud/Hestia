@@ -2,6 +2,7 @@ import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
+import { DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
@@ -140,6 +141,8 @@ const migrations: Record<number, Migration> = {
     }
     return { ...raw, elements };
   },
+  // v11 → v12: escadas (tipos padrão; projetos antigos não têm escadas nem tipos de escada).
+  11: (raw) => ({ ...raw, stairTypes: { ...Object.fromEntries(DEFAULT_STAIR_TYPES.map((t) => [t.id, t])), ...((raw.stairTypes as object) ?? {}) } }),
 };
 
 export class SchemaError extends Error {}

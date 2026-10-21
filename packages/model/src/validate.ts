@@ -3,6 +3,7 @@ import { unjoinedEndIssues } from './validateJoins.ts';
 import { floorIssues } from './validateFloors.ts';
 import { slabIssues } from './validateSlabs.ts';
 import { roofIssues } from './validateRoofs.ts';
+import { stairIssues } from './validateStairs.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { isOpening, isWall, type Element, type Id, type Opening, type Project, type Wall } from './types.ts';
@@ -216,5 +217,6 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...floorIssues(p),
     ...slabIssues(p),
     ...roofIssues(p),
+    ...stairIssues(p),
   ];
 }

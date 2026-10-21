@@ -1,20 +1,20 @@
-import { boxOf, dist, dot, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
+import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isSlab, isWall, type Floor, type Id, type Roof, type Slab } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isSlab, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
-import { followingEnds, gripAt, idsInBox, pickAt, type Grip } from './pick.ts';
-import { floorGripAt, floorIdsInBox, pickFloorAt, ringInsertAfter, ringMoveVertex, ringRemoveVertex, type FloorGrip } from './floorPick.ts';
-import { pickSlabAt, slabGripAt, slabIdsInBox, type SlabGrip } from './slabPick.ts';
-import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofGripAt, roofIdsInBox, type RoofGrip } from './roofPick.ts';
+import { idsInBox, pickAt } from './pick.ts';
+import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
+import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
+import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
-import { slopeArrowLength, slopePreview } from './slabSlope.ts';
-import { resizeWallCommands } from './lengthEdit.ts';
 import { parseNumber } from './numeric.ts';
+import { resizeWallCommands } from './lengthEdit.ts';
+import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
-type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'floorgrip' | 'slabgrip' | 'roofgrip' | 'roofedge' | 'dragwait' | 'moving' | 'opening';
+type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge';
 
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
@@ -30,28 +30,21 @@ export class SelectTool extends ToolBase {
   readonly hint = 'Clique para selecionar. Arraste para janela (esq→dir contém, dir→esq cruza). Shift soma à seleção.';
   private mode: Mode = 'idle';
   private downPt: Vec2 = { x: 0, y: 0 };
-  private grip: Grip | null = null;
-  private floorGrip: FloorGrip | null = null;
-  private slabGrip: SlabGrip | null = null;
-  private roofGrip: RoofGrip | null = null;
+  /** Alça pressionada (parede, piso, laje ou telhado); as alças em si estão em selectGrips.ts. */
+  private hold: GripHold | null = null;
   /** Aresta de telhado pressionada (ainda sem arrasto: vira seleção de aresta no soltar). */
   private roofEdgeDown: RoofEdgeSel | null = null;
-  /** Vértice de piso ou laje em foco (clicado com a alça): o Delete o remove. */
-  private focus: { id: Id; index: number } | null = null;
+  /** Vértice de piso, laje ou telhado em foco (clicado com a alça): o Delete o remove. */
+  private focus: GripFocus | null = null;
   private delta: Vec2 = { x: 0, y: 0 };
-  private gripPt: Vec2 | null = null;
   private hover: Id | null = null;
   private openingId: Id | null = null;
 
   protected reset(): void {
     this.mode = 'idle';
     this.items = [];
-    this.grip = null;
-    this.floorGrip = null;
-    this.slabGrip = null;
-    this.roofGrip = null;
+    this.hold = null;
     this.roofEdgeDown = null;
-    this.gripPt = null;
     this.delta = { x: 0, y: 0 };
     this.openingId = null;
   }
@@ -81,40 +74,16 @@ export class SelectTool extends ToolBase {
     return rf ? { id: rf, kind: 'roof' } : null;
   }
 
-  /** O único elemento selecionado, se for um piso, uma laje ou um telhado (todos têm contorno editável por alças). */
-  private singleRing(): Floor | Slab | Roof | null {
-    const sel = this.env.selection();
-    if (sel.length !== 1) return null;
-    const f = this.env.project().elements[sel[0]!];
-    return isFloor(f) || isSlab(f) || isRoof(f) ? f : null;
-  }
-
   override move(p: PointerInfo): void {
     this.raw = p.raw;
     const pr = this.env.project();
-    const mpp = this.env.metersPerPixel();
     const hit = this.hitAt(p.raw);
     this.hover = hit?.id ?? null;
     this.items = this.hover ? [{ kind: 'highlight', ids: [this.hover] }] : [];
-    const grip = gripAt(pr, this.env.selection(), p.raw, mpp);
-    const fgrip = grip ? null : floorGripAt(pr, this.env.selection(), p.raw, mpp);
-    const sgrip = grip || fgrip ? null : slabGripAt(pr, this.env.selection(), p.raw, mpp);
-    const rgrip = grip || fgrip || sgrip ? null : roofGripAt(pr, this.env.selection(), p.raw, mpp);
-    const at = grip?.at ?? fgrip?.at ?? sgrip?.at ?? rgrip?.at ?? null;
-    this.inf = at ? { point: at, kind: 'endpoint', guides: [] } : null;
-    const f = this.singleRing();
-    if (f && this.mode === 'idle') {
-      // Alças do piso ou da laje selecionada: vértices e meio das arestas (arrastar o meio insere um vértice).
-      const n = f.boundary.length;
-      for (let i = 0; i < n; i++) {
-        const a = f.boundary[i]!;
-        const b = f.boundary[(i + 1) % n]!;
-        this.items.push({ kind: 'point', at: a }, { kind: 'point', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
-      }
-      if (this.focus?.id === f.id && f.boundary[this.focus.index]) this.items.push({ kind: 'highlight', ids: [f.id] });
-      // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.
-      if (isSlab(f) && f.slope) this.items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary)));
-    }
+    const grip = gripHoldAt(this.env, p.raw);
+    this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
+    // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus));
     // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
     this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
@@ -193,31 +162,10 @@ export class SelectTool extends ToolBase {
     const mpp = this.env.metersPerPixel();
     this.downPt = p.raw;
     const sel = this.env.selection();
-    const grip = gripAt(pr, sel, p.raw, mpp);
-    if (grip) {
-      this.grip = grip;
+    const hold = gripHoldAt(this.env, p.raw);
+    if (hold) {
+      this.hold = hold;
       this.mode = 'grip';
-      return;
-    }
-    const fg = floorGripAt(pr, sel, p.raw, mpp);
-    if (fg) {
-      this.floorGrip = fg;
-      this.gripPt = fg.at;
-      this.mode = 'floorgrip';
-      return;
-    }
-    const sg = slabGripAt(pr, sel, p.raw, mpp);
-    if (sg) {
-      this.slabGrip = sg;
-      this.gripPt = sg.at;
-      this.mode = 'slabgrip';
-      return;
-    }
-    const rg = roofGripAt(pr, sel, p.raw, mpp);
-    if (rg) {
-      this.roofGrip = rg;
-      this.gripPt = rg.at;
-      this.mode = 'roofgrip';
       return;
     }
     const re = roofEdgeAt(pr, sel, p.raw, mpp);
@@ -231,11 +179,6 @@ export class SelectTool extends ToolBase {
       return;
     }
     this.mode = 'pending';
-  }
-
-  /** Contorno de um piso com a alça `g` levada até `pt` (vértice movido, ou vértice novo na aresta). */
-  private floorRing(f: Floor, g: FloorGrip, pt: Vec2): Vec2[] {
-    return g.kind === 'vertex' ? ringMoveVertex(f.boundary, g.index, pt) : ringInsertAfter(f.boundary, g.index, pt);
   }
 
   drag(p: PointerInfo): void {
@@ -254,65 +197,7 @@ export class SelectTool extends ToolBase {
         break;
       }
       case 'grip': {
-        if (!this.grip) break;
-        const w = pr.elements[this.grip.wallId];
-        if (!isWall(w)) break;
-        const f = frameOfWall(pr, w.id);
-        if (this.grip.end === 'mid') {
-          // Alça do meio do arco: o arco passa a atravessar o cursor.
-          this.gripPt = p.raw;
-          if (f) this.items.push({ kind: 'wallBand', a: w.a, b: w.b, thickness: f.thickness, sMid: f.sMid, sag: sagFromThreePoints(w.a, p.raw, w.b) });
-          break;
-        }
-        const other = this.grip.end === 'a' ? w.b : w.a;
-        const inf = this.snap(p, { from: other, ignore: new Set([w.id]) });
-        this.gripPt = inf.point;
-        if (f) {
-          const a = this.grip.end === 'a' ? inf.point : w.a;
-          const b = this.grip.end === 'b' ? inf.point : w.b;
-          this.items.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: f.sMid, sag: w.sag });
-        }
-        // Vizinhas que vão acompanhar (canto simples; Alt inverte): aparecem na prévia para não haver surpresa.
-        for (const c of followingEnds(pr, this.env.levelId(), this.grip.at, new Set([w.id]), p.alt)) {
-          const nw = pr.elements[c.wallId];
-          const nf = frameOfWall(pr, c.wallId);
-          if (!isWall(nw) || !nf) continue;
-          this.items.push({ kind: 'wallBand', a: c.end === 'a' ? inf.point : nw.a, b: c.end === 'b' ? inf.point : nw.b, thickness: nf.thickness, sMid: nf.sMid, sag: nw.sag });
-        }
-        break;
-      }
-      case 'floorgrip': {
-        const g = this.floorGrip;
-        const f = g ? pr.elements[g.floorId] : undefined;
-        if (!g || !isFloor(f)) break;
-        // Snap aos outros vértices do próprio piso (o vértice arrastado não se captura a si mesmo).
-        const others = g.kind === 'vertex' ? f.boundary.filter((_, i) => i !== g.index) : f.boundary;
-        const inf = this.snap(p, { extraPoints: others });
-        this.gripPt = inf.point;
-        this.items.push({ kind: 'polygon', ring: f.boundary, dashed: true });
-        this.items.push({ kind: 'polygon', ring: this.floorRing(f, g, inf.point) });
-        break;
-      }
-      case 'slabgrip': {
-        const g = this.slabGrip;
-        const sl = g ? pr.elements[g.slabId] : undefined;
-        if (!g || !isSlab(sl)) break;
-        const others = g.kind === 'vertex' ? sl.boundary.filter((_, i) => i !== g.index) : sl.boundary;
-        const inf = this.snap(p, { extraPoints: others });
-        this.gripPt = inf.point;
-        this.items.push({ kind: 'polygon', ring: sl.boundary, dashed: true });
-        this.items.push({ kind: 'polygon', ring: g.kind === 'vertex' ? ringMoveVertex(sl.boundary, g.index, inf.point) : ringInsertAfter(sl.boundary, g.index, inf.point) });
-        break;
-      }
-      case 'roofgrip': {
-        const g = this.roofGrip;
-        const r = g ? pr.elements[g.roofId] : undefined;
-        if (!g || !isRoof(r)) break;
-        const others = g.kind === 'vertex' ? r.boundary.filter((_, i) => i !== g.index) : r.boundary;
-        const inf = this.snap(p, { extraPoints: others });
-        this.gripPt = inf.point;
-        this.items.push({ kind: 'polygon', ring: r.boundary, dashed: true });
-        this.items.push({ kind: 'polygon', ring: g.kind === 'vertex' ? ringMoveVertex(r.boundary, g.index, inf.point) : ringInsertAfter(r.boundary, g.index, inf.point) });
+        if (this.hold) this.items.push(...this.hold.drag(p, (extra) => this.snap(p, extra).point));
         break;
       }
       case 'moving': {
@@ -340,65 +225,14 @@ export class SelectTool extends ToolBase {
   up(p: PointerInfo): void {
     const pr = this.env.project();
     const mode = this.mode;
-    if (mode !== 'floorgrip' && mode !== 'slabgrip' && mode !== 'roofgrip') this.focus = null;
+    const hold = this.hold;
+    if (mode !== 'grip' || !hold?.keepsFocus) this.focus = null;
     if (mode !== 'roofedge') this.env.setRoofEdge?.(null);
     switch (mode) {
       case 'grip': {
-        if (this.grip && this.gripPt) {
-          const g = this.grip;
-          const pt = this.gripPt;
-          const wall = pr.elements[g.wallId];
-          if (g.end === 'mid' && isWall(wall)) {
-            this.env.exec({ type: 'updateElements', ids: [g.wallId], patch: { sag: sagFromThreePoints(wall.a, pt, wall.b) } });
-            break;
-          }
-          if (g.end === 'mid') break;
-          const exclude = new Set([g.wallId]);
-          const follow = followingEnds(pr, this.env.levelId(), g.at, exclude, p.alt);
-          this.env.transaction('Ajustar parede', () => {
-            this.env.exec({ type: 'setWallEnds', id: g.wallId, [g.end]: pt });
-            for (const c of follow) this.env.exec({ type: 'setWallEnds', id: c.wallId, [c.end]: pt });
-          });
-        }
-        break;
-      }
-      case 'floorgrip': {
-        const g = this.floorGrip;
-        const f = g ? pr.elements[g.floorId] : undefined;
-        if (!g || !isFloor(f) || !this.gripPt) break;
-        if (dist(this.gripPt, g.at) > 1e-6) {
-          this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: this.floorRing(f, g, this.gripPt) } });
-        } else if (g.kind === 'vertex') {
-          // Clique sem arrastar num vértice: fica em foco para o Delete.
-          this.focus = { id: f.id, index: g.index };
-          this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
-        }
-        break;
-      }
-      case 'slabgrip': {
-        const g = this.slabGrip;
-        const sl = g ? pr.elements[g.slabId] : undefined;
-        if (!g || !isSlab(sl) || !this.gripPt) break;
-        if (dist(this.gripPt, g.at) > 1e-6) {
-          const ring = g.kind === 'vertex' ? ringMoveVertex(sl.boundary, g.index, this.gripPt) : ringInsertAfter(sl.boundary, g.index, this.gripPt);
-          this.env.exec({ type: 'updateElements', ids: [sl.id], patch: { boundary: ring } });
-        } else if (g.kind === 'vertex') {
-          this.focus = { id: sl.id, index: g.index };
-          this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
-        }
-        break;
-      }
-      case 'roofgrip': {
-        const g = this.roofGrip;
-        const r = g ? pr.elements[g.roofId] : undefined;
-        if (!g || !isRoof(r) || !this.gripPt) break;
-        if (dist(this.gripPt, g.at) > 1e-6) {
-          const ring = g.kind === 'vertex' ? ringMoveVertex(r.boundary, g.index, this.gripPt) : ringInsertAfter(r.boundary, g.index, this.gripPt);
-          commitRoofPatch(this.env, [r.id], roofRingPatch(r, ring, g.kind === 'vertex' ? null : { kind: 'insert', edge: g.index }));
-        } else if (g.kind === 'vertex') {
-          this.focus = { id: r.id, index: g.index };
-          this.env.say('Vértice em foco: Delete o remove (mínimo de 3).');
-        }
+        hold?.release(p, (f) => {
+          this.focus = f;
+        });
         break;
       }
       case 'roofedge': {

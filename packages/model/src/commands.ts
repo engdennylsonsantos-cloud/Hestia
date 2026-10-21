@@ -5,6 +5,7 @@ import {
   isFloor,
   isSlab,
   isRoof,
+  isStair,
   isWall,
   type Element,
   type Floor,
@@ -14,6 +15,8 @@ import {
   type RoofType,
   type SlabType,
   type Id,
+  type Stair,
+  type StairType,
   type JoinConfig,
   type Level,
   type Material,
@@ -26,7 +29,8 @@ import {
 } from './types.ts';
 import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
-import { applyElementLevel, type SetElementLevel } from './elementLevel.ts';
+import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
+import { transformStair } from './stairTransform.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -37,11 +41,14 @@ export type Command =
   | { type: 'addRoof'; roof: Omit<Roof, 'order'> }
   | { type: 'upsertRoofType'; roofType: RoofType }
   | { type: 'deleteRoofType'; id: Id }
+  | { type: 'addStair'; stair: Omit<Stair, 'order'> }
+  | { type: 'upsertStairType'; stairType: StairType }
+  | { type: 'deleteStairType'; id: Id }
   | { type: 'upsertSlabType'; slabType: SlabType }
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> | Partial<Stair> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -144,6 +151,15 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
       p.elements[r.id] = next;
     }
   }
+  for (const st of c.ids.map((id) => p.elements[id]).filter(isStair)) {
+    const next = transformStair(st, c.transform);
+    if (idMap) {
+      const nid = idMap[st.id];
+      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
+    } else {
+      p.elements[st.id] = next;
+    }
+  }
   for (const s of c.ids.map((id) => p.elements[id]).filter(isSlab)) {
     const next = transformSlab(s, c.transform);
     if (idMap) {
@@ -238,6 +254,20 @@ export function applyCommand(p: Project, c: Command): void {
       delete p.roofTypes[c.id];
       break;
     }
+    case 'addStair': {
+      if (!p.stairTypes[c.stair.typeId]) throw new Error('Tipo de escada inexistente');
+      p.elements[c.stair.id] = { ...c.stair, order: p.nextOrder++ };
+      break;
+    }
+    case 'upsertStairType':
+      p.stairTypes[c.stairType.id] = c.stairType;
+      break;
+    case 'deleteStairType': {
+      if (Object.values(p.elements).some((e) => isStair(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.stairTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de escada');
+      delete p.stairTypes[c.id];
+      break;
+    }
     case 'addOpening': {
       const host = p.elements[c.opening.hostId];
       if (!isWall(host)) throw new Error('Abertura precisa de uma parede anfitriã');
@@ -308,7 +338,8 @@ export function applyCommand(p: Project, c: Command): void {
     }
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
-      if (Object.values(p.elements).some((e) => (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e)) && e.levelId === c.id)) throw new Error('Nível em uso');
+      // Escada também conta pelo nível de topo explícito; o topo automático segue o nível acima e não prende o nível.
+      if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }

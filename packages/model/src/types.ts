@@ -1,7 +1,10 @@
 import type { Vec2 } from '@hestia/geom';
+import type { Stair, StairType } from './stairTypes.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
+
+export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType } from './stairTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -340,7 +343,7 @@ export interface Roof {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab | Roof;
+export type Element = Wall | Opening | Floor | Slab | Roof | Stair;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -381,6 +384,8 @@ export interface Project {
   floorTypes: Record<Id, FloorType>;
   slabTypes: Record<Id, SlabType>;
   roofTypes: Record<Id, RoofType>;
+  /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
+  stairTypes: Record<Id, StairType>;
   openingTypes: Record<Id, OpeningType>;
   elements: Record<Id, Element>;
   nextOrder: number;
@@ -395,3 +400,4 @@ export const isSlab = (e: Element | undefined): e is Slab => e?.kind === 'slab';
 export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
+export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';

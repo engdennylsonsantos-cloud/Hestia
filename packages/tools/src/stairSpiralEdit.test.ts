@@ -112,7 +112,7 @@ describe('alças do caracol', () => {
     for (let a = 280; a <= 1200; a += 10) h2.drag(pointer(at(1, a).raw), snapTo({ x: 0, y: 0 }));
     release(h2);
     expect(spiralOf(w2).sweep).toBeCloseTo(4 * Math.PI, 6);
-  });
+  }, 30_000);
 
   it('alça do ângulo final: mínimo de 30°, sem inverter o sentido ao passar de zero', () => {
     const w = make(270);

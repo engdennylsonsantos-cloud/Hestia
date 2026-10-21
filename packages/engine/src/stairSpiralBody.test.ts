@@ -246,7 +246,7 @@ describe('caracol monolítico com face inferior escalonada (540°): fundo plano 
 describe('caracol monolítico: folga entre voltas (540° e 720°, tipo com profundidade 0,15 m)', () => {
   // Folga entre degraus de voltas vizinhas: no espelho de trás do degrau de baixo, (n−1)·h − T; no espelho da frente, n·h − T
   // (decisão 0014 §7). O fundo é o plano pelos pontos médios, então a quina do espelho de trás fica um pouco abaixo do ponto
-  // médio: a folga mínima medida é (n−1)·h − T menos até ~0,1 m. A fórmula da decisão (n·h − T) fica na quina da frente.
+  // médio: a folga mínima medida é (n−1)·h − T menos até ~0,1 m. A folga da decisão 0014 §7 é (n−1)·h − T (espelho de trás); n·h − T é a da quina da frente.
   for (const [sweepDeg, risers] of [
     [540, 16],
     [720, 17],

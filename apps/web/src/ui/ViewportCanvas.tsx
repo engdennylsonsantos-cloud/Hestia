@@ -384,7 +384,7 @@ export function ViewportCanvas(): ReactElement {
           ? labels.map((l, i) => {
               const sp = worldToScreen(v, l.at);
               return (
-                <span key={i} className="dim-label" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
+                <span key={i} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
                   {l.text}
                 </span>
               );

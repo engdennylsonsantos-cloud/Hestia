@@ -38,7 +38,7 @@ Par: `A-pesquisa.md` (ferramentas do Revit e do ArchiCAD).
 | `packages/render/src/section/build.ts` | Cortes e elevações (`buildSectionDrawList`) | Sem `detail` (0 ocorrências) |
 | `apps/web/src/editor/state.ts` | Estado da UI, `useUi` (11–44 e 131–160); preferências no navegador (46–97) | Ver §7 |
 | `apps/web/src/ui/Ribbon.tsx` | Faixa Vista: grupos Navegar (145), Cortes (151), Planta (159), 3D (166), Documentar (191) | Sem `detail`, sem escala |
-| `apps/web/src/ui/Properties.tsx` | Aba Vista (`ViewProps`, 305–335): Grade 313, Subpavimento 314, Projeção 315, Etiquetas 316, Depurar 317, Nível de detalhe 318–323, 3D 328–331, Padrões 332–335 | Única tela do `detail` |
+| `apps/web/src/ui/Properties.tsx` | Aba Vista (`ViewProps`, 299–335): Grade 313, Subpavimento 314, Projeção 315, Etiquetas 316, Depurar 317, Nível de detalhe 318–323, 3D 328–331, Padrões 332–335 | Única tela do `detail` |
 | `apps/web/src/ui/ViewportCanvas.tsx` | Decide claro/escuro (`useDark`, 11–34); reconstrói o 3D pela chave `version|dark|shadows|edges` (144–148); chama `buildPlanDrawList` (170–198) | Ponto de ligação |
 | `apps/web/src/ui/TitleBar.tsx` | Botão de tema: sistema → claro → escuro (12–15, 71–72) | |
 | `apps/web/src/App.tsx` | Aplica `data-theme` no `<html>` (102–113) | Preserva o valor do host em "sistema" |
@@ -112,7 +112,7 @@ Os traços são desenhados em espessura de tela. Não há tradução para milím
 
 ### 3.3 Cores e temas
 
-- **Fonte da cor.** `Material.color` (`types.ts:17`, "Cor de aparência (3D e preenchimento de planta)"). Um só valor para as duas vistas.
+- **Fonte da cor.** `Material.color` (`types.ts:19`, "Cor de aparência (3D e preenchimento de planta)"). Um só valor para as duas vistas.
 - **Mistura com o papel.** A planta não usa a cor do material direto. Ela mistura com o papel (`mix`) com fração fixa:
 
 | Elemento | Claro | Escuro | Arquivo:linha |
@@ -219,13 +219,13 @@ Padrão `medium` (`defaults.ts:138`, `migrate.ts:73`). Projetos antigos recebem 
 
 Não há na faixa: nível de detalhe, escala, estilo visual, etiquetas, pesos, hachura, tema.
 
-### 6.2 Aba Vista em Propriedades (`apps/web/src/ui/Properties.tsx:305–335`)
+### 6.2 Aba Vista em Propriedades (`apps/web/src/ui/Properties.tsx:299–335`)
 
-Aparece quando nada está selecionado (`Properties.tsx:~376`, ramo `: <ViewProps />`).
+Aparece quando nada está selecionado (`Properties.tsx:369`, ramo `: <ViewProps />`).
 
 | Controle | Linha | Escopo | Onde é salvo |
 |---|---|---|---|
-| Nível (seletor) | 309–311 | sessão | `ui.levelId` |
+| Nível (seletor) | 307–311 | sessão | `ui.levelId` |
 | Elevação | 312 | leitura | `Level.elevation` |
 | Grade | 313 | global | `ui.showGrid` (sem persistência) |
 | Subpavimento | 314 | global | `ui.showUnderlay` (sem persistência) |
@@ -233,8 +233,8 @@ Aparece quando nada está selecionado (`Properties.tsx:~376`, ramo `: <ViewProps
 | Etiquetas de parede | 316 | projeto | `settings.showTags` (undo: sim) |
 | Depurar junções | 317 | projeto | `settings.debugJoins` |
 | Nível de detalhe | 318–323 | **projeto** | `settings.detail` (undo: sim) |
-| Editar níveis | 324 | diálogo | — |
-| Intervalo de vista (só na planta) | 326 | nível | `Level.viewRange` |
+| Editar níveis | 325 | diálogo | — |
+| Intervalo de vista (só na planta) | 327 | nível | `Level.viewRange` |
 | Sombras | 329 | global | `ui.shadows` (sem persistência) |
 | Arestas | 330 | global | `ui.edges` (sem persistência) |
 | Tolerância de junção | 333 | projeto | `settings.joinTolerance` |

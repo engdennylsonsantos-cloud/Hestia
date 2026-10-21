@@ -1,5 +1,5 @@
 import type { PartialStructure, Project } from '@hestia/model';
-import type { ResolvedLevel } from './resolve.ts';
+import type { ResolvedLevel } from './types.ts';
 
 /**
  * Exibição parcial de estrutura (decisão 0015 §2.5): devolve o nível com as camadas de parede filtradas (`noFinishes` sem

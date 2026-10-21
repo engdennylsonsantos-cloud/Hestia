@@ -23,6 +23,8 @@ import { RoofScheduleDialog } from './ui/dialogs/RoofScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
 import { StairTypeDialog } from './ui/dialogs/StairTypeDialog.tsx';
 import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
+import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
+import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
 
 const narrow = (): boolean => window.innerWidth <= 900;
 
@@ -91,6 +93,10 @@ function Dialogs(): ReactElement | null {
       return <ShortcutsDialog />;
     case 'schedule':
       return <WallScheduleDialog />;
+    case 'graphicsVisibility':
+      return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
+    case 'lineWeights':
+      return <LineWeightsDialog />;
     default:
       return null;
   }

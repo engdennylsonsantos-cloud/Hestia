@@ -7,6 +7,7 @@ import { stairIssues } from './validateStairs.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { viewRangeIssues } from './viewRange.ts';
+import { graphicsIssues, graphicsOf, levelGraphicsOf, view3dOf } from './graphics.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 
 export type ValidationSeverity = 'error' | 'warning';
@@ -214,12 +215,25 @@ function levelIssues(l: Level): ValidationIssue[] {
   }));
 }
 
+/** Gráficos salvos com valor inválido (decisão 0015): uma mensagem por violação, com o nome do nível ou "Vista 3D". */
+function graphicsProblems(p: Project): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  const add = (prefix: string, msgs: string[]): void => {
+    for (const m of msgs) out.push({ severity: 'error', code: 'graphics-invalid', message: `${prefix}${m}` });
+  };
+  add('Gráficos do projeto: ', graphicsIssues(graphicsOf(p)));
+  for (const l of p.levels) add(`Nível "${l.name}" (${l.id}): `, graphicsIssues(levelGraphicsOf(p, l.id)));
+  add('Vista 3D: ', graphicsIssues(view3dOf(p)));
+  return out;
+}
+
 /** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
 export function validateProject(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
   const walls = elements.filter(isWall);
   const openings = elements.filter(isOpening);
   return [
+    ...graphicsProblems(p),
     ...p.levels.flatMap((l) => levelIssues(l)),
     ...walls.flatMap((w) => wallIssues(p, w)),
     ...openings.flatMap((o) => openingIssues(p, o)),

@@ -179,6 +179,9 @@ export function Browser(): ReactElement {
               <Icon name="levels" size={14} /> Níveis
               <span className="meta">{p.levels.length}</span>
             </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'lineWeights', dialogArg: null })} title="Tabela de pesos de linha por escala, pesos por categoria e limites de detalhe (decisão 0015)">
+              <Icon name="file" size={14} /> Pesos de linha
+            </button>
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'schedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de paredes
               <span className="meta">{Object.values(p.elements).filter(isWall).length}</span>

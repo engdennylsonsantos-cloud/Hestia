@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, planViewOf, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -141,17 +141,19 @@ export function ViewportCanvas(): ReactElement {
     if (st.view === '3d') {
       if (!g) return;
       const m = model.current;
-      const key = `${editor.store.version}|${dark}|${st.shadows}|${st.edges}`;
+      // Sombras e arestas são da vista 3D no projeto (decisão 0015 §1): a chave inclui a versão do projeto.
+      const v3 = view3dOf(p);
+      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
         const levels = p.levels.map((l) => editor.resolved(l.id));
-        m.update(p, levels, { edges: st.edges, shadows: st.shadows, dark });
+        m.update(p, levels, { edges: v3.edges, shadows: v3.shadows, dark });
         if (!st.seen3d) {
           m.fit();
           useUi.setState({ seen3d: true });
         }
       }
-      g.gpu.renderer.shadowMap.enabled = st.shadows;
+      g.gpu.renderer.shadowMap.enabled = v3.shadows;
       g.gpu.setSize(w, h, dpr);
       m.orbit.setAspect(w, h);
       safeRender(g, m.scene, m.orbit.camera);
@@ -212,7 +214,7 @@ export function ViewportCanvas(): ReactElement {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame.current);
-  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.showRoofProjection, ui.shadows, ui.edges, ui.tool]);
+  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.showRoofProjection, ui.tool]);
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());

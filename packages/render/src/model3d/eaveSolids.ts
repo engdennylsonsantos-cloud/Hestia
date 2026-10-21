@@ -232,7 +232,7 @@ function fasciaMaterialOf(p: Project, r: ResolvedRoof): Material | undefined {
 function batchOf(byMat: Map<Id, SolidBatch>, id: Id): SolidBatch {
   let b = byMat.get(id);
   if (!b) {
-    b = { materialId: id, positions: [], normals: [], indices: [] };
+    b = { materialId: id, category: 'roof', positions: [], normals: [], indices: [] };
     byMat.set(id, b);
   }
   return b;

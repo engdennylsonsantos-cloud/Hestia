@@ -27,6 +27,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
 import { setRoofProjection, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { LevelGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
@@ -325,10 +326,8 @@ function ViewProps(): ReactElement {
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'levels' })}>Editar níveis…</button></div>
       </Group>
       {s.view === 'plan' && <ViewRangeGroup key={s.levelId} levelId={s.levelId} />}
-      <Group title="3D" open={s.view === '3d'}>
-        <Row label="Sombras"><Check id="v-shadows" checked={s.shadows} onChange={(v) => useUi.setState({ shadows: v })} /></Row>
-        <Row label="Arestas"><Check id="v-edges" checked={s.edges} onChange={(v) => useUi.setState({ edges: v })} /></Row>
-      </Group>
+      {s.view === 'plan' && <LevelGraphicsGroup key={s.levelId} levelId={s.levelId} />}
+      {s.view === '3d' && <View3DGroup />}
       <Group title="Padrões do projeto" open={false}>
         <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
         <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>

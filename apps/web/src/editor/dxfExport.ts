@@ -1,8 +1,8 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
 import { levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type ViewClass } from '@hestia/engine';
 import { climbWalk, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
-import { exportDxf, type DxfLevelGeometry, type DxfOpening, type DxfPoint, type DxfViewState } from '@hestia/io';
-import { openingsOfWall, type Id, type Project } from '@hestia/model';
+import { dxfLayersOf, dxfLineRoleOf, dxfLineWeight, exportDxf, type DxfLevelGeometry, type DxfOpening, type DxfPoint, type DxfViewState } from '@hestia/io';
+import { graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 type StairDxf = NonNullable<DxfLevelGeometry['stairs']>[number];
@@ -109,17 +109,45 @@ function dxfStateOf(cls: ViewClass | undefined): DxfViewState | null {
 }
 
 /**
+ * Largura de linha (centésimos de mm) de cada camada da planta: o peso da categoria na escala da vista (decisão 0015 §2
+ * item 7). Corte e projeção usam o peso próprio; a substituição da vista (`overrides[cat].cutWeight` e `projectionWeight`)
+ * vale sobre o do projeto. A escala da vista entra pela tabela `lineWeightMm`. Marcas de escada saem com 0.
+ */
+export function lineWeightsOf(p: Project, levelId: Id, geo: DxfLevelGeometry): Record<string, number> {
+  const pg = graphicsOf(p);
+  const vg = levelGraphicsOf(p, levelId);
+  const out: Record<string, number> = {};
+  for (const layer of dxfLayersOf(p, geo)) {
+    const role = dxfLineRoleOf(layer);
+    if (role === undefined) continue;
+    if (role === 'annotation') {
+      out[layer] = 0;
+      continue;
+    }
+    const over = vg.overrides[role.category];
+    const base = pg.categories[role.category];
+    const weight = role.view === 'cut' ? (over.cutWeight ?? base.cutWeight) : (over.projectionWeight ?? base.projectionWeight);
+    out[layer] = dxfLineWeight(lineWeightMm(pg.lineWeights, weight, vg.scale) * 100);
+  }
+  return out;
+}
+
+/**
  * Geometria do nível para o DXF, na mesma vista da planta na tela (decisão 0013 §4, `planViewOf`): paredes e aberturas
  * pela geometria com o plano de corte da vista, paredes fora do corte como contorno de projeção, pisos, lajes, telhados e
  * escadas com a cota de corte e o topo do intervalo. O que está fora do intervalo não sai, exceto a projeção do telhado
- * (a tela a mostra tracejada por padrão). O io não importa o engine, então a montagem fica aqui, no web.
+ * (a tela a mostra tracejada por padrão). Categoria oculta na vista (`overrides[cat].visible === false`, decisão 0015 §2
+ * item 4) não sai. Cada camada leva a largura de linha da categoria na escala da vista (`lineWeightsOf`). O io não importa
+ * o engine, então a montagem fica aqui, no web.
  */
 export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
   const view: PlanView = planViewOf(p, levelId);
   const { hidden } = view;
+  const vg = levelGraphicsOf(p, levelId);
+  const shown = (c: GraphicsCategory): boolean => vg.overrides[c].visible !== false;
   const openings: DxfOpening[] = levelFrames(p, levelId).flatMap((f) =>
     openingsOfWall(p, f.wall.id).flatMap((o) => {
-      const state = dxfStateOf(view.cls.get(o.id));
+      const state = shown(o.kind) ? dxfStateOf(view.cls.get(o.id)) : null;
       if (state === null) return [];
       const g = openingGeometry(p, o, f);
       // Projeção: o símbolo de planta da família (o mesmo da tela); o corte fica como retângulo, na camada ABERTURAS.
@@ -128,31 +156,40 @@ export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
     }),
   );
   const roofs = resolveRoofs(p, levelId);
-  return {
-    clusters: view.geo.clusters,
+  const geo: DxfLevelGeometry = {
+    clusters: shown('wall') ? view.geo.clusters : [],
     openings,
-    wallOutlines: view.outlines.map((o) => ({ state: o.cls, polygons: o.shape })),
-    roofProjections: roofs.filter((r) => hidden.has(r.roofId)).flatMap((r) => roofFootprint(r)),
-    floors: resolveFloors(p, levelId)
-      .filter((f) => !hidden.has(f.floorId))
-      .flatMap((f) => f.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' }))),
-    slabs: resolveSlabs(p, levelId)
-      .filter((s) => !hidden.has(s.slabId))
-      .flatMap((s) => s.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' }))),
+    wallOutlines: shown('wall') ? view.outlines.map((o) => ({ state: o.cls, polygons: o.shape })) : [],
+    roofProjections: shown('roof') ? roofs.filter((r) => hidden.has(r.roofId)).flatMap((r) => roofFootprint(r)) : [],
+    floors: shown('floor')
+      ? resolveFloors(p, levelId)
+          .filter((f) => !hidden.has(f.floorId))
+          .flatMap((f) => f.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' })))
+      : [],
+    slabs: shown('slab')
+      ? resolveSlabs(p, levelId)
+          .filter((s) => !hidden.has(s.slabId))
+          .flatMap((s) => s.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' })))
+      : [],
     // Escadas: degraus e patamares (contorno), espelhos, seta de subida e símbolo de corte, com a cota de corte da vista.
-    stairs: resolveStairsOnLevel(p, levelId)
-      .filter((s) => !hidden.has(s.id))
-      .map((s) => stairDxf(p, s, { cutZ: view.cutZ, topZ: view.topZ })),
+    stairs: shown('stair')
+      ? resolveStairsOnLevel(p, levelId)
+          .filter((s) => !hidden.has(s.id))
+          .map((s) => stairDxf(p, s, { cutZ: view.cutZ, topZ: view.topZ }))
+      : [],
     // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
-    roofs: roofs
-      .filter((r) => !hidden.has(r.roofId))
-      .map((r) => ({
-        outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
-        ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
-        gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
-        typeCode: p.roofTypes[r.typeId]?.code ?? '',
-      })),
+    roofs: shown('roof')
+      ? roofs
+          .filter((r) => !hidden.has(r.roofId))
+          .map((r) => ({
+            outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
+            ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+            gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+            typeCode: p.roofTypes[r.typeId]?.code ?? '',
+          }))
+      : [],
   };
+  return { ...geo, lineWeights: lineWeightsOf(p, levelId, geo) };
 }
 
 /** Texto DXF da planta do nível, na vista do intervalo. */

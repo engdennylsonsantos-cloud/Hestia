@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
 import { openingSymbolPaths } from '@hestia/geom';
-import { dxfLayerOfMaterial } from '@hestia/io';
-import { ProjectStore, buildTemplate, makeFloor, makeSlab, makeStair, makeWall, type Opening, type Project, type StairRun, type ViewRange } from '@hestia/model';
+import { dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, type DxfLevelGeometry } from '@hestia/io';
+import {
+  ProjectStore,
+  buildTemplate,
+  makeFloor,
+  makeSlab,
+  makeStair,
+  makeWall,
+  type CategoryOverride,
+  type GraphicsCategory,
+  type Opening,
+  type Project,
+  type StairRun,
+  type ViewGraphics,
+  type ViewRange,
+} from '@hestia/model';
 import { climbWalk, planViewOf, risersInClimbOrder } from '@hestia/render';
-import { arrowOfPath, planDxf, stairArrow } from './dxfExport.ts';
+import { arrowOfPath, lineWeightsOf, planDxf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -384,5 +398,115 @@ describe('arrowOfPath (seta sobre a caminhada)', () => {
   it('menos de dois pontos distintos não tem seta', () => {
     expect(arrowOfPath([{ x: 0, y: 0 }])).toEqual([]);
     expect(arrowOfPath([{ x: 0, y: 0 }, { x: 0, y: 0 }])).toEqual([]);
+  });
+});
+
+/** Tabela LAYER do texto DXF: camada e código 370 (`undefined` = a entrada não tem 370). */
+function layerTable(text: string): Map<string, number | undefined> {
+  const recs: Array<{ type: string; fields: Array<[string, string]> }> = [];
+  const lines = text.split('\r\n');
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = lines[i]!.trim();
+    const value = lines[i + 1]!.trim();
+    if (code === '0') recs.push({ type: value, fields: [] });
+    else recs.at(-1)?.fields.push([code, value]);
+  }
+  const out = new Map<string, number | undefined>();
+  for (const r of recs) {
+    if (r.type !== 'LAYER') continue;
+    const field = (code: string): string | undefined => r.fields.find(([c]) => c === code)?.[1];
+    const name = field('2');
+    if (name === undefined) continue;
+    const w = field('370');
+    out.set(name, w === undefined ? undefined : Number(w));
+  }
+  return out;
+}
+
+/** Gráficos salvos de uma vista, parciais como no projeto (o leitor completa com o padrão). */
+type SavedLevelGraphics = { scale?: number; overrides?: Partial<Record<GraphicsCategory, Partial<CategoryOverride>>> };
+
+/** Cópia do projeto com os gráficos salvos na vista. O comando de edição não faz parte deste teste. */
+function withLevelGraphics(p: Project, levelId: string, g: SavedLevelGraphics): Project {
+  const q = structuredClone(p);
+  q.levels = q.levels.map((l) => (l.id === levelId ? { ...l, graphics: g as ViewGraphics } : l));
+  return q;
+}
+
+/** Camadas de material das paredes do tipo padrão (`PAREDE_<material>`). */
+const wallMaterialLayers = (p: Project): string[] =>
+  p.wallTypes[p.defaults.wallTypeId]!.layers.map((l) => dxfLayerOfMaterial(p.materials[l.materialId]!.name));
+
+describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
+  it('a escala muda o 370 da parede cortada: 1:50 = 0,7 mm (70), 1:100 = 0,5 (50), 1:200 = 0,35 (35)', () => {
+    const p = lPlan().project;
+    const layers = wallMaterialLayers(p);
+    expect(layers.length).toBeGreaterThan(0);
+    for (const [scale, want] of [
+      [50, 70],
+      [100, 50],
+      [200, 35],
+    ] as const) {
+      const table = layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0'));
+      for (const layer of layers) expect(table.get(layer)).toBe(want);
+    }
+  });
+
+  it('ABERTURAS (portas e janelas juntas) leva o peso de corte da janela, 3: 0,35 / 0,25 / 0,18 mm', () => {
+    const p = lPlan().project;
+    const weights = [50, 100, 200].map((scale) => layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0')).get('ABERTURAS'));
+    expect(weights).toEqual([35, 25, 18]);
+  });
+
+  it('projeção da parede a 1:200 (0,10 mm) sai com 9, o valor DXF válido mais próximo', () => {
+    const p = withLevelGraphics(vistaPlan().project, 'lv_0', { scale: 200 });
+    expect(layerTable(planDxf(p, 'lv_0')).get('PAREDE_PROJECAO_ACIMA')).toBe(9);
+  });
+
+  it('piso (peso de corte 4) e laje (peso de corte 5) a 1:100: 0,35 e 0,50 mm', () => {
+    const p = vistaPlan().project;
+    const floor = dxfLayerOfFloor(p.floorTypes['ft_ceram']!.code);
+    const slab = dxfLayerOfSlab(p.slabTypes['ls_mac12']!.code);
+    expect(layerTable(planDxf(p, 'lv_0')).get(floor)).toBe(35);
+    expect(layerTable(planDxf(p, 'lv_1')).get(slab)).toBe(50);
+  });
+
+  it('substituição da vista vale sobre o peso do projeto: parede de corte 9 (2,0 mm a 1:100) e janela de projeção 8 (1,4 mm)', () => {
+    const p = withLevelGraphics(vistaPlan().project, 'lv_0', { overrides: { wall: { cutWeight: 9 }, window: { projectionWeight: 8 } } });
+    const table = layerTable(planDxf(p, 'lv_0'));
+    for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(200);
+    expect(table.get('ABERTURA_ACIMA')).toBe(140);
+    // O corte da janela não foi substituído: segue 3 (0,25 mm a 1:100).
+    expect(table.get('ABERTURAS')).toBe(25);
+  });
+
+  it('categoria oculta na vista não sai: parede, porta e piso somem; as janelas (outra categoria) ficam', () => {
+    const walls = layerTable(planDxf(withLevelGraphics(vistaPlan().project, 'lv_0', { overrides: { wall: { visible: false } } }), 'lv_0'));
+    expect([...walls.keys()].some((n) => n.startsWith('PAREDE_'))).toBe(false);
+    expect(walls.has('ABERTURA_ACIMA')).toBe(true);
+
+    const doors = layerTable(planDxf(withLevelGraphics(lPlan().project, 'lv_0', { overrides: { door: { visible: false } } }), 'lv_0'));
+    expect(doors.has('ABERTURAS')).toBe(false);
+    expect(wallMaterialLayers(lPlan().project).every((l) => doors.has(l))).toBe(true);
+
+    const vista = vistaPlan().project;
+    const floors = layerTable(planDxf(withLevelGraphics(vista, 'lv_0', { overrides: { floor: { visible: false } } }), 'lv_0'));
+    expect(floors.has(dxfLayerOfFloor(vista.floorTypes['ft_ceram']!.code))).toBe(false);
+  });
+
+  it('camada sem categoria ("0") sai com 370 -3, e toda entrada da tabela tem 370', () => {
+    const table = layerTable(planDxf(lPlan().project, 'lv_0'));
+    expect(table.get('0')).toBe(-3);
+    for (const [, w] of table) expect(w).toBeDefined();
+  });
+
+  it('marcas de escada (seta e símbolo de corte) saem com 0; a escada tem o peso de corte da categoria (3 = 0,25 mm)', () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 1, y: 0 };
+    const geo: DxfLevelGeometry = { clusters: [], openings: [], stairs: [{ outlines: [[a, b, { x: 1, y: 1 }]], risers: [], arrow: [[a, b]], cut: [a, b] }] };
+    const w = lineWeightsOf(lPlan().project, 'lv_0', geo);
+    expect(w.ESCADA_SETA).toBe(0);
+    expect(w.ESCADA_CORTE).toBe(0);
+    expect(w.ESCADA).toBe(25);
   });
 });

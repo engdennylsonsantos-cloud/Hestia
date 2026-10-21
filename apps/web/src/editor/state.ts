@@ -6,7 +6,7 @@ import { safeGet, safeSet } from './storage.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'graphicsVisibility' | 'lineWeights' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -28,8 +28,6 @@ export interface UiState {
   showUnderlay: boolean;
   /** Projeção tracejada do contorno da cobertura acima do corte (opção da planta, decisão 0013 §2). */
   showRoofProjection: boolean;
-  shadows: boolean;
-  edges: boolean;
   leftOpen: boolean;
   rightOpen: boolean;
   tutorial: boolean;
@@ -146,8 +144,6 @@ export const useUi = create<UiState>(() => ({
   showGrid: true,
   showUnderlay: true,
   showRoofProjection: readRoofProjection(),
-  shadows: true,
-  edges: true,
   leftOpen: typeof window === 'undefined' || window.innerWidth > 900,
   rightOpen: typeof window === 'undefined' || window.innerWidth > 900,
   tutorial: false,

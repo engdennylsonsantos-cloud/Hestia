@@ -1,10 +1,12 @@
 import { ringArea, triangulate, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
-import type { Id } from '@hestia/model';
+import type { GraphicsCategory, Id } from '@hestia/model';
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
 export interface SolidBatch {
   materialId: Id;
+  /** Categoria gráfica da peça (visibilidade, transparência e meio-tom da vista 3D, decisão 0015 §2.4). */
+  category: GraphicsCategory;
   positions: number[];
   normals: number[];
   indices: number[];
@@ -115,11 +117,11 @@ export interface LevelSolids {
   batches: SolidBatch[];
 }
 
-/** Lote do material `m` dentro do mapa, criado na primeira vez. */
-function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
+/** Lote do material `m` (e da categoria `cat`) dentro do mapa, criado na primeira vez. */
+function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): SolidBatch {
   let b = byMat.get(m);
   if (!b) {
-    b = { materialId: m, positions: [], normals: [], indices: [] };
+    b = { materialId: m, category: cat, positions: [], normals: [], indices: [] };
     byMat.set(m, b);
   }
   return b;
@@ -130,7 +132,7 @@ export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
   const byMat = new Map<Id, SolidBatch>();
   for (const rw of Object.values(r.walls)) {
     for (const l of rw.layers) {
-      const b = batchOf(byMat, l.materialId);
+      const b = batchOf(byMat, l.materialId, 'wall');
       for (const band of fuseBands(l.bands)) {
         const topAt = band.slope ? slopeTop(band, rw.baseZ) : undefined;
         for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1, topAt);
@@ -145,7 +147,7 @@ export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const f of floors) {
     for (const l of f.layers) {
-      const b = batchOf(byMat, l.materialId);
+      const b = batchOf(byMat, l.materialId, 'floor');
       for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
     }
   }
@@ -161,7 +163,7 @@ export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
   for (const s of slabs) {
     const sl = s.slope;
     for (const l of s.layers) {
-      const b = batchOf(byMat, l.materialId);
+      const b = batchOf(byMat, l.materialId, 'slab');
       const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
       const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;
       for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
@@ -180,7 +182,7 @@ export function buildRoofSolids(roofs: ResolvedRoof[]): SolidBatch[] {
     for (const pl of r.planes) {
       for (const l of r.layers) {
         if (l.thickness < 1e-6) continue;
-        const b = batchOf(byMat, l.materialId);
+        const b = batchOf(byMat, l.materialId, 'roof');
         const topAt = (x: number, y: number): number => planeZ(pl, { x, y }) - l.below;
         const bottomAt = (x: number, y: number): number => topAt(x, y) - l.thickness;
         // z0 = 0 e z1 = espessura só passam pelo guarda de extrusão; a cota vem de topAt e bottomAt.

@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
 import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
-import { isStair, type Id, type Project } from '@hestia/model';
+import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { editView3D } from '../editor/graphicsActions.ts';
 import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
@@ -72,7 +73,13 @@ export function Ribbon(): ReactElement {
   const s = useUi();
   const p = useProject();
   const selStairs = stairsIn(p, s.selection);
+  const v3 = view3dOf(p);
   const set = (p: Partial<typeof s>): void => useUi.setState(p);
+  /** Alternadores da vista 3D gravam no projeto (um passo de desfazer cada). Recusa do comando: a mensagem vai para a barra de estado. */
+  const toggleView3D = (key: 'shadows' | 'edges', label: string): void => {
+    const r = editView3D(editor.store, key === 'shadows' ? { shadows: !v3.shadows } : { edges: !v3.edges }, label);
+    if (!r.ok) useUi.setState({ status: r.error ?? 'Não foi possível alterar a vista 3D.' });
+  };
   const tabs: Array<[typeof tab, string]> = [
     ['arquitetura', 'Arquitetura'],
     ['modificar', 'Modificar'],
@@ -160,8 +167,8 @@ export function Ribbon(): ReactElement {
             </div>
             <div className="rgroup">
               <div className="rgroup-tools">
-                <Toggle icon="sun" label="Sombras" on={s.shadows} onClick={() => set({ shadows: !s.shadows })} />
-                <Toggle icon="cube" label="Arestas" on={s.edges} onClick={() => set({ edges: !s.edges })} />
+                <Toggle icon="sun" label="Sombras" on={v3.shadows} onClick={() => toggleView3D('shadows', 'Alternar sombras do 3D')} title="Sombras projetadas no 3D (gravado no projeto, desfazível)" />
+                <Toggle icon="cube" label="Arestas" on={v3.edges} onClick={() => toggleView3D('edges', 'Alternar arestas do 3D')} title="Arestas e silhuetas no 3D (gravado no projeto, desfazível)" />
               </div>
               <div className="rgroup-title">3D</div>
             </div>

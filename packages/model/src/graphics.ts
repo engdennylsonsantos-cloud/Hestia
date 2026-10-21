@@ -8,13 +8,31 @@ import type { DetailLevel, Id, Project } from './types.ts';
 /** Categorias com estilo gráfico próprio (Revit: Object Styles; ArchiCAD: regras de substituição). */
 export type GraphicsCategory = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
 export const GRAPHICS_CATEGORIES: readonly GraphicsCategory[] = ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair'];
+/** Nome da categoria nas mensagens de validação (pt-BR). */
+export const GRAPHICS_CATEGORY_LABELS: Record<GraphicsCategory, string> = {
+  wall: 'parede',
+  door: 'porta',
+  window: 'janela',
+  floor: 'piso',
+  slab: 'laje',
+  roof: 'telhado',
+  stair: 'escada',
+};
 
 /** Estilo visual (Revit: Visual Styles). Planta aceita wireframe, hiddenLine e shaded; o 3D aceita todos. */
 export type VisualStyle = 'wireframe' | 'hiddenLine' | 'shaded' | 'consistentColors' | 'realistic';
 export const PLAN_VISUAL_STYLES: readonly VisualStyle[] = ['wireframe', 'hiddenLine', 'shaded'];
+export const VISUAL_STYLES: readonly VisualStyle[] = [...PLAN_VISUAL_STYLES, 'consistentColors', 'realistic'];
 
 /** Exibição parcial de estrutura (ArchiCAD: Partial Structure Display). */
 export type PartialStructure = 'entire' | 'noFinishes' | 'coreOnly';
+export const PARTIAL_STRUCTURES: readonly PartialStructure[] = ['entire', 'noFinishes', 'coreOnly'];
+
+/**
+ * Patch parcial para os comandos de gráficos: cada campo é opcional, em qualquer profundidade. O comando mescla o patch
+ * no valor efetivo atual (getters abaixo) e grava o resultado completo.
+ */
+export type DeepPartial<T> = T extends ReadonlyArray<unknown> ? T : T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 /** Estilo de linha por categoria: índices de peso de 1 a 16 (Revit), um para o corte e um para a projeção. */
 export interface CategoryLineStyle {
@@ -132,14 +150,19 @@ export const DEFAULT_VIEW_GRAPHICS: ViewGraphics = {
   overrides: defaultOverrides(),
 };
 
+/**
+ * Padrão da vista 3D. O sol padrão é a posição que o 3D tinha antes da decisão 0015: luz em `c + r·(0,7; −0,5; 1,1)`
+ * (c = centro do modelo, r = max(8, diagonal)). Essa direção é azimute −35,54° = 324,46° e elevação 51,97°; o padrão
+ * usa esses valores (com 2 casas), e a diferença para a posição antiga fica abaixo de 0,01 m num modelo de 8 m.
+ */
 export const DEFAULT_VIEW_3D: View3DSettings = {
   style: 'realistic',
   partialStructure: 'entire',
   overrides: defaultOverrides(),
   shadows: true,
   edges: true,
-  sunAzimuth: 315,
-  sunElevation: 55,
+  sunAzimuth: 324.46,
+  sunElevation: 51.97,
   background: null,
 };
 
@@ -172,7 +195,8 @@ export function graphicsOf(p: Pick<Project, 'graphics'>): ProjectGraphics {
   const categories = { ...DEFAULT_CATEGORY_STYLES };
   for (const c of GRAPHICS_CATEGORIES) categories[c] = { ...categories[c], ...(g?.categories?.[c] ?? {}) };
   return {
-    lineWeights: g?.lineWeights?.length ? g.lineWeights : DEFAULT_LINE_WEIGHTS,
+    // Tabela salva vazia não cai no padrão em silêncio: a validação a aponta.
+    lineWeights: g?.lineWeights ?? DEFAULT_LINE_WEIGHTS,
     categories,
     detailByScale: { ...DEFAULT_PROJECT_GRAPHICS.detailByScale, ...(g?.detailByScale ?? {}) },
   };
@@ -188,4 +212,97 @@ export function levelGraphicsOf(p: Pick<Project, 'levels'>, levelId: Id): ViewGr
 export function view3dOf(p: Pick<Project, 'view3d'>): View3DSettings {
   const g = p.view3d;
   return { ...DEFAULT_VIEW_3D, ...(g ?? {}), overrides: mergeOverrides(g?.overrides) };
+}
+
+const WEIGHT_RULE = 'deve ser um número inteiro de 1 a 16.';
+const PARTIAL_MSG = 'A exibição parcial deve ser entire, noFinishes ou coreOnly.';
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const DETAIL_OPTIONS: readonly string[] = ['byScale', 'coarse', 'medium', 'fine'];
+const isWeight = (x: unknown): boolean => typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= 16;
+const isShare = (x: unknown): boolean => typeof x === 'number' && x >= 0 && x <= 1;
+const isHex = (x: unknown): boolean => typeof x === 'string' && HEX_COLOR.test(x);
+
+function projectIssues(g: ProjectGraphics): string[] {
+  const out: string[] = [];
+  const table: unknown = g.lineWeights;
+  if (!Array.isArray(table) || table.length !== 16) out.push('A tabela de pesos de linha deve ter 16 linhas (pesos 1 a 16).');
+  else
+    table.forEach((row: unknown, i: number) => {
+      const n = i + 1;
+      if (!Array.isArray(row) || row.length !== 3) out.push(`Peso ${n} da tabela de pesos deve ter 3 colunas (1:50, 1:100 e 1:200).`);
+      else if (row.some((mm: unknown) => !(typeof mm === 'number' && Number.isFinite(mm) && mm > 0)))
+        out.push(`Peso ${n} da tabela de pesos: a espessura deve ser um número maior que zero, em mm de papel.`);
+    });
+  for (const c of GRAPHICS_CATEGORIES) {
+    const s = g.categories?.[c];
+    const n = GRAPHICS_CATEGORY_LABELS[c];
+    if (!isWeight(s?.cutWeight)) out.push(`Peso de corte de "${n}" ${WEIGHT_RULE}`);
+    if (!isWeight(s?.projectionWeight)) out.push(`Peso de projeção de "${n}" ${WEIGHT_RULE}`);
+  }
+  const { fineMax, mediumMax } = g.detailByScale;
+  if (!Number.isFinite(fineMax) || !Number.isFinite(mediumMax)) out.push('Os limites de detalhe devem ser números finitos.');
+  else if (!(fineMax > 0) || fineMax > mediumMax) out.push('O limite do detalhe fino deve ser maior que zero e não maior que o do médio.');
+  return out;
+}
+
+function overrideIssues(o: Record<GraphicsCategory, CategoryOverride>): string[] {
+  const out: string[] = [];
+  for (const c of GRAPHICS_CATEGORIES) {
+    const v: Partial<CategoryOverride> = o?.[c] ?? {};
+    const n = GRAPHICS_CATEGORY_LABELS[c];
+    if (typeof v.visible !== 'boolean') out.push(`Visibilidade de "${n}" deve ser sim ou não.`);
+    if (!isShare(v.transparency)) out.push(`Transparência de "${n}" deve ser um número de 0 a 1.`);
+    if (typeof v.halftone !== 'boolean') out.push(`Meio-tom de "${n}" deve ser sim ou não.`);
+    if (v.cutWeight !== undefined && !isWeight(v.cutWeight)) out.push(`Peso de corte de "${n}" ${WEIGHT_RULE}`);
+    if (v.projectionWeight !== undefined && !isWeight(v.projectionWeight)) out.push(`Peso de projeção de "${n}" ${WEIGHT_RULE}`);
+    if (v.color !== undefined && !isHex(v.color)) out.push(`Cor de "${n}" deve estar no formato #rrggbb.`);
+  }
+  return out;
+}
+
+function viewIssues(g: ViewGraphics): string[] {
+  const out: string[] = [];
+  if (!Number.isInteger(g.scale) || g.scale < 1 || g.scale > 5000) out.push('A escala deve ser um denominador inteiro de 1 a 5000 (100 = 1:100).');
+  if (!DETAIL_OPTIONS.includes(g.detail)) out.push('O detalhe deve ser "byScale", "coarse", "medium" ou "fine".');
+  if (!PLAN_VISUAL_STYLES.includes(g.style)) out.push('O estilo visual da planta deve ser wireframe, hiddenLine ou shaded.');
+  if (!PARTIAL_STRUCTURES.includes(g.partialStructure)) out.push(PARTIAL_MSG);
+  return [...out, ...overrideIssues(g.overrides)];
+}
+
+function view3dIssues(g: View3DSettings): string[] {
+  const out: string[] = [];
+  if (!VISUAL_STYLES.includes(g.style)) out.push('O estilo visual da vista 3D deve ser wireframe, hiddenLine, shaded, consistentColors ou realistic.');
+  if (!PARTIAL_STRUCTURES.includes(g.partialStructure)) out.push(PARTIAL_MSG);
+  out.push(...overrideIssues(g.overrides));
+  if (typeof g.shadows !== 'boolean') out.push('Sombras devem ser sim ou não.');
+  if (typeof g.edges !== 'boolean') out.push('Arestas devem ser sim ou não.');
+  if (!Number.isFinite(g.sunAzimuth)) out.push('O azimute do sol deve ser um número finito, em graus.');
+  if (!(Number.isFinite(g.sunElevation) && g.sunElevation >= 0 && g.sunElevation <= 90)) out.push('A elevação do sol deve estar entre 0 e 90 graus.');
+  if (g.background !== null && !isHex(g.background)) out.push('A cor de fundo deve estar no formato #rrggbb, ou ser null para o padrão do tema.');
+  return out;
+}
+
+/**
+ * Problemas de um gráfico já com os padrões aplicados (use os getters). Sem prefixo de nível: quem chama acrescenta o contexto.
+ * Projeto e 3D são reconhecidos pelos campos `lineWeights` e `sunElevation`; o resto é a planta de um nível.
+ */
+export function graphicsIssues(g: ProjectGraphics | ViewGraphics | View3DSettings): string[] {
+  if ('lineWeights' in g) return projectIssues(g);
+  if ('sunElevation' in g) return view3dIssues(g);
+  return viewIssues(g);
+}
+
+function sameData(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  const keys = (r: Record<string, unknown>): string[] => Object.keys(r).filter((k) => r[k] !== undefined);
+  const ka = keys(ra);
+  return ka.length === keys(rb).length && ka.every((k) => sameData(ra[k], rb[k]));
+}
+
+/** Verdadeiro quando a planta de um nível (já com os padrões) é igual ao padrão do Hestia. */
+export function isDefaultLevelGraphics(g: ViewGraphics): boolean {
+  return sameData(g, DEFAULT_VIEW_GRAPHICS);
 }

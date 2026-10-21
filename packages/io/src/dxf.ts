@@ -1,4 +1,4 @@
-import type { Id, Project } from '@hestia/model';
+import type { GraphicsCategory, Id, Project } from '@hestia/model';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
 export interface DxfPoint {
@@ -85,6 +85,12 @@ export interface DxfLevelGeometry {
     /** Poste central de cada caracol do lance: anel de 24 a 48 lados e se fica acima da cota de corte. */
     posts?: Array<{ pts: DxfPoint[]; above: boolean }>;
   }>;
+  /**
+   * Largura de linha de cada camada, em centésimos de mm (código 370 da tabela LAYER; arredondada ao valor DXF válido).
+   * Ausente: a tabela não leva 370 e o arquivo é o de antes. Presente: a camada sem entrada sai com -3 (padrão).
+   * Quem monta a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
+   */
+  lineWeights?: Partial<Record<string, number>>;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -222,6 +228,60 @@ const LAYER_STYLE: Record<string, LayerStyle> = {
 };
 const styleOf = (layer: string): LayerStyle => LAYER_STYLE[layer] ?? { linetype: 'CONTINUOUS', color: 7 };
 
+/** Larguras de linha válidas do DXF (código 370, em centésimos de mm). */
+export const DXF_LINE_WEIGHTS: readonly number[] = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
+/** Largura padrão do DXF (-3): a camada sem entrada em `lineWeights` sai com ela e não passa pelo arredondamento. */
+export const DXF_LINE_WEIGHT_DEFAULT = -3;
+
+/** Arredonda uma largura em centésimos de mm ao valor DXF válido mais próximo (empate: o maior; fora de 0 a 211, o limite). */
+export function dxfLineWeight(centi: number): number {
+  let best = DXF_LINE_WEIGHTS[0]!;
+  for (const w of DXF_LINE_WEIGHTS) if (Math.abs(w - centi) <= Math.abs(best - centi)) best = w;
+  return best;
+}
+
+/**
+ * Papel de uma camada na largura de linha (decisão 0015 §2 item 7): a categoria gráfica e se o peso é o de corte ou o de
+ * projeção. `annotation` são as marcas de escada (seta e símbolo de corte), que saem com 0 (estreita).
+ */
+export type DxfLineRole = { category: GraphicsCategory; view: 'cut' | 'projection' } | 'annotation';
+
+const cut = (category: GraphicsCategory): DxfLineRole => ({ category, view: 'cut' });
+const projection = (category: GraphicsCategory): DxfLineRole => ({ category, view: 'projection' });
+
+/** Papel das camadas com nome fixo. As de material, piso, laje e telhado do tipo são pelo prefixo (`dxfLineRoleOf`). */
+const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
+  [DXF_LAYER_CONTOUR, cut('wall')],
+  // Portas e janelas saem juntas: a camada leva o peso da janela (o DXF não separa os dois).
+  [DXF_LAYER_OPENINGS, cut('window')],
+  [DXF_LAYER_OPENING_ABOVE, projection('window')],
+  [DXF_LAYER_OPENING_BELOW, projection('window')],
+  [DXF_LAYER_OPENING_BEYOND, projection('window')],
+  [DXF_LAYER_WALL_ABOVE, projection('wall')],
+  [DXF_LAYER_WALL_BELOW, projection('wall')],
+  [DXF_LAYER_WALL_BEYOND, projection('wall')],
+  [DXF_LAYER_ROOF_PROJECTION, projection('roof')],
+  [DXF_LAYER_ROOF_RIDGE, cut('roof')],
+  [DXF_LAYER_ROOF_GABLE, cut('roof')],
+  [DXF_LAYER_STAIR, cut('stair')],
+  [DXF_LAYER_STAIR_ABOVE, projection('stair')],
+  [DXF_LAYER_STAIR_RISER, cut('stair')],
+  [DXF_LAYER_STAIR_POST, cut('stair')],
+  [DXF_LAYER_STAIR_ARROW, 'annotation'],
+  [DXF_LAYER_STAIR_CUT, 'annotation'],
+]);
+
+/** Papel de uma camada pelo nome. `undefined` = sem categoria (sai com -3). `PAREDE_<material>` é corte de parede. */
+export function dxfLineRoleOf(layer: string): DxfLineRole | undefined {
+  const fixed = FIXED_LINE_ROLE.get(layer);
+  if (fixed !== undefined) return fixed;
+  if (layer.startsWith('PAREDE_')) return cut('wall');
+  if (layer.startsWith('PISO_')) return cut('floor');
+  if (layer.startsWith('LAJE_')) return cut('slab');
+  if (layer.startsWith('TELHADO_')) return cut('roof');
+  return undefined;
+}
+
 /** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE), e as de espelho e seta das escadas. */
 function linesOf(geo: DxfLevelGeometry): Line[] {
   const roof = (geo.roofs ?? []).flatMap((r) => [
@@ -278,18 +338,30 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   return out;
 }
 
+/** Camadas da tabela LAYER: `0` e as das polilinhas e das linhas, sem repetição e em ordem. */
+function layerNamesOf(shapes: Shape[], lines: Line[]): string[] {
+  return [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
+}
+
+/** Nomes das camadas que `exportDxf` põe na tabela LAYER para esta geometria (a base de `lineWeights`). */
+export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
+  return layerNamesOf(shapesOf(project, geo), linesOf(geo));
+}
+
 /**
  * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6), uma camada por material
  * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos de corte. Elementos fora do
  * corte entram nas camadas de projeção (`PAREDE_PROJECAO_*`, `ABERTURA_*`, `ESCADA_ACIMA`, `TELHADO_PROJECAO`), com tipo de
  * linha tracejado quando estão acima do corte; os vãos de projeção saem com o símbolo de planta (`DxfOpening.symbol`). Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
  * AutoCAD R14. A tabela de tipos de linha só leva `DASHED` quando alguma camada o usa, então o arquivo sem projeções é o mesmo.
+ * Com `geo.lineWeights`, cada camada leva o código 370 (largura arredondada ao valor DXF válido; sem entrada, -3); sem ele, a
+ * tabela não tem 370.
  */
 export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
-  const layers = [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
+  const layers = layerNamesOf(shapes, lines);
   // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
   const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b])];
@@ -354,6 +426,10 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
     rec(70, 0);
     rec(62, style.color);
     rec(6, style.linetype);
+    if (geo.lineWeights) {
+      const w = geo.lineWeights[name];
+      rec(370, w === undefined ? DXF_LINE_WEIGHT_DEFAULT : dxfLineWeight(w));
+    }
   }
   rec(0, 'ENDTAB');
   rec(0, 'ENDSEC');

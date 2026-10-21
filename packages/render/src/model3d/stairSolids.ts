@@ -64,7 +64,7 @@ export function riserSlab(s: ResolvedStair, r: ResolvedStairRiser, t: number): R
 function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
   let b = byMat.get(m);
   if (!b) {
-    b = { materialId: m, positions: [], normals: [], indices: [] };
+    b = { materialId: m, category: 'stair', positions: [], normals: [], indices: [] };
     byMat.set(m, b);
   }
   return b;

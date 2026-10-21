@@ -189,6 +189,16 @@ export function labelOf(c: Command): string {
       return 'Excluir nível';
     case 'setLevelViewRange':
       return 'Alterar intervalo de vista';
+    case 'setProjectGraphics':
+      return 'Alterar gráficos do projeto';
+    case 'setLevelGraphics':
+      return 'Alterar gráficos da vista';
+    case 'resetLevelGraphics':
+      return 'Restaurar gráficos da vista';
+    case 'setView3D':
+      return 'Alterar a vista 3D';
+    case 'resetView3D':
+      return 'Restaurar a vista 3D';
     case 'setProjectName':
       return 'Renomear projeto';
     case 'setDefaults':

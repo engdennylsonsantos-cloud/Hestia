@@ -210,7 +210,7 @@ try {
       return st.map((s) => { const r = s.components.find((c) => c.kind === 'run').risers; const x = r.map((q) => (q.a.x + q.b.x) / 2), y = r.map((q) => (q.a.y + q.b.y) / 2); return { g: s.components.find((c) => c.generatedBy)?.generatedBy, x: x[0], y: y[0] }; });
     });
     console.log(JSON.stringify(pos));
-    await page.evaluate(() => { const ids = Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'stair').map((e) => e.id); window.__hestia.useUi.setState({ selection: [], theme: 'dark', edges: true }); });
+    await page.evaluate(() => { const ids = Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'stair').map((e) => e.id); window.__hestia.useUi.setState({ selection: [], theme: 'dark' }); });
     for (const s of pos.filter((q) => q.g === 'lshape')) {
       for (const [az, name] of [[-2.0,'c'],[-2.6,'d'],[2.0,'e'],[2.6,'f'],[3.14,'g']]) {
         await page.evaluate(({ x, y, az }) => { const o = window.__hestia3d; o.target.set(x, y, 0.3); o.distance = 2.6; o.azimuth = az; o.elevation = 0.35; o.apply(); }, { x: s.x, y: s.y, az });

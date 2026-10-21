@@ -33,6 +33,14 @@ import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLeve
 import { transformStair } from './stairTransform.ts';
 import { stairTypeIssue } from './stair.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
+import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
+import {
+  applyLevelGraphics,
+  applyProjectGraphics,
+  applyView3D,
+  resetLevelGraphics,
+  resetView3D,
+} from './graphicsCommands.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -63,6 +71,11 @@ export type Command =
   | { type: 'upsertLevel'; level: Level }
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
+  | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
+  | { type: 'setLevelGraphics'; levelId: Id; patch: DeepPartial<ViewGraphics> }
+  | { type: 'resetLevelGraphics'; levelId: Id }
+  | { type: 'setView3D'; patch: DeepPartial<View3DSettings> }
+  | { type: 'resetView3D' }
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
@@ -359,6 +372,21 @@ export function applyCommand(p: Project, c: Command): void {
       l.viewRange = next;
       break;
     }
+    case 'setProjectGraphics':
+      applyProjectGraphics(p, c.patch);
+      break;
+    case 'setLevelGraphics':
+      applyLevelGraphics(p, c.levelId, c.patch);
+      break;
+    case 'resetLevelGraphics':
+      resetLevelGraphics(p, c.levelId);
+      break;
+    case 'setView3D':
+      applyView3D(p, c.patch);
+      break;
+    case 'resetView3D':
+      resetView3D(p);
+      break;
     case 'setProjectName':
       p.name = c.name;
       break;

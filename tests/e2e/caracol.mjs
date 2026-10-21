@@ -111,7 +111,7 @@ try {
   });
 
   await rep.step('5 · 3D em close-up (monolítico e poste), modo escuro com arestas', async () => {
-    await page.evaluate(() => window.__hestia.useUi.setState({ selection: [], theme: 'dark', edges: true }));
+    await page.evaluate(() => window.__hestia.useUi.setState({ selection: [], theme: 'dark' }));
     await page.getByRole('tab', { name: /Modelo 3D/ }).click();
     await page.waitForTimeout(1500);
     const pos = await stairs();

@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -11,6 +11,7 @@ import { openingSymbol } from './symbols.ts';
 import { belowFloorOps, floorFills, floorSelectionOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
+import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -112,6 +113,13 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     fills.push(...bs.fills);
     if (!rp) strokes.push(...bs.strokes);
   }
+  // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência.
+  const stairs = resolveStairsOnLevel(p, input.levelId);
+  if (input.below) {
+    const bst = belowStairOps(resolveStairsOnLevel(p, input.below.levelId), theme);
+    fills.push(...bst.fills);
+    if (!rp) strokes.push(...bst.strokes);
+  }
   if (input.below && input.belowRoofs) {
     if (rp) {
       // Telhados de baixo opacos: só o preenchimento; as linhas e cotas do nível de baixo não aparecem por cima.
@@ -138,6 +146,13 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   if (!rp) {
     strokes.push(...fl.strokes);
     labels.push(...fl.labels);
+  }
+  // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
+  const sts = stairFills(p, stairs, theme, input.dark, detail, v);
+  fills.push(...sts.fills);
+  if (!rp) {
+    strokes.push(...sts.strokes);
+    labels.push(...sts.labels);
   }
   for (const c of rp ? [] : resolved.clusters) {
     if (detail === 'coarse') {
@@ -221,6 +236,10 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...rsel.fills);
   strokes.push(...rsel.strokes);
   labels.push(...rsel.labels);
+  const ssel = stairSelectionOps(p, stairs, input.selection, input.hover, theme, v);
+  fills.push(...ssel.fills);
+  strokes.push(...ssel.strokes);
+  labels.push(...ssel.labels);
   if (input.hover && !input.selection.includes(input.hover)) {
     fills.push(...elementHighlight(p, resolved, [input.hover], theme.select, 0.16));
   }

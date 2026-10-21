@@ -1,5 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
 import { floorPolygon, floorsOnLevel, levelElevation, type Id, type Project } from '@hestia/model';
+import { cutStairOpenings, stairHolesForLevel } from './stairOpenings.ts';
 
 /** Camada resolvida do piso: o mesmo polígono em planta, entre as cotas absolutas z0 e z1. */
 export interface ResolvedFloorLayer {
@@ -32,10 +33,13 @@ export const resolveAllFloors = (p: Project): ResolvedFloor[] => p.levels.flatMa
  * validação do modelo é quem avisa.
  */
 export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
+  const openings = stairHolesForLevel(p, levelId);
   const out: ResolvedFloor[] = [];
   for (const f of floorsOnLevel(p, levelId)) {
     const type = p.floorTypes[f.typeId];
     if (!type || f.boundary.length < 3) continue;
+    const polygon = cutStairOpenings([floorPolygon(f)], openings);
+    if (polygon.length === 0) continue;
     const topZ = levelElevation(p, f.levelId) + f.heightOffset;
     let z = topZ;
     const layers: ResolvedFloorLayer[] = [];
@@ -46,7 +50,7 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
       layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
       z -= l.thickness;
     });
-    out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon: [floorPolygon(f)], topZ, bottomZ: z, layers });
+    out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ: z, layers });
   }
   return out;
 }

@@ -1,4 +1,5 @@
-import { boxOf, closestOnSegment, dist, intersectSegments, pointInRing, type Vec2 } from '@hestia/geom';
+import { boxOf, closestOnSegment, dist, intersectSegments, pointInMulti, type Vec2 } from '@hestia/geom';
+import { resolveSlabs } from '@hestia/engine';
 import { isSlab, slabsOnLevel, type Id, type Project, type Slab } from '@hestia/model';
 
 /** Lajes entre os selecionados. */
@@ -19,14 +20,19 @@ function onBoundary(s: Slab, at: Vec2, tol: number): boolean {
   return rings.some((r) => r.some((a, i) => distToEdge(at, a, r[(i + 1) % r.length]!) <= tol));
 }
 
-/** Laje sob o cursor: dentro do contorno (menos furos) ou sobre a borda. A mais recente vence. */
+/**
+ * Laje sob o cursor: dentro da geometria resolvida (contorno menos furos e aberturas de escada) ou sobre a borda do
+ * contorno cru. A mais recente vence.
+ */
 export function pickSlabAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
   const tol = 4 * mpp;
   const slabs = slabsOnLevel(p, levelId);
+  const shape = new Map(resolveSlabs(p, levelId).map((r) => [r.slabId, r.polygon] as const));
   for (let i = slabs.length - 1; i >= 0; i--) {
     const s = slabs[i]!;
     if (onBoundary(s, at, tol)) return s.id;
-    if (pointInRing(at, s.boundary) && !s.holes.some((h) => pointInRing(at, h))) return s.id;
+    const poly = shape.get(s.id);
+    if (poly && pointInMulti(at, poly)) return s.id;
   }
   return null;
 }

@@ -63,7 +63,6 @@ const ringLength = (r: Vec2[]): number => r.reduce((s, p, i) => s + dist(p, r[(i
 const slopeFactor = (percent: number): number => 1 / Math.cos(Math.atan(Math.abs(percent) / 100));
 
 function quantifySlab(rs: ResolvedSlab): { slab: SlabQuantity; layers: SlabLayerQuantity[] } {
-  const poly = rs.polygon[0]!;
   const planArea = multiArea(rs.polygon);
   const slopePercent = rs.slope?.percent ?? 0;
   const faceArea = planArea * slopeFactor(slopePercent);
@@ -78,8 +77,9 @@ function quantifySlab(rs: ResolvedSlab): { slab: SlabQuantity; layers: SlabLayer
     levelId: rs.levelId,
     planArea,
     faceArea,
-    perimeter: ringLength(poly[0]!),
-    holesPerimeter: poly.slice(1).reduce((s, h) => s + ringLength(h), 0),
+    // Com furo de escada a laje pode virar mais de um polígono: soma o contorno de todos e de todos os furos.
+    perimeter: rs.polygon.reduce((s, poly) => s + ringLength(poly[0]!), 0),
+    holesPerimeter: rs.polygon.reduce((s, poly) => s + poly.slice(1).reduce((t, h) => t + ringLength(h), 0), 0),
     thickness: rs.topZ - rs.bottomZ,
     slopePercent,
     volume,

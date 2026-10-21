@@ -1,5 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
 import { levelElevation, slabPolygon, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
+import { cutStairOpenings, stairHolesForLevel } from './stairOpenings.ts';
 
 /** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
 export { slabRiseAt } from '@hestia/model';
@@ -24,12 +25,18 @@ export interface ResolvedSlab {
   layers: ResolvedSlabLayer[];
 }
 
-/** Geometria das lajes de um nível (não recortadas pelas paredes, como os pisos). */
+/**
+ * Geometria das lajes de um nível (não recortadas pelas paredes, como os pisos). Os furos de escada do nível de topo
+ * (`stairHolesForLevel`) são subtraídos do contorno; uma laje inteiramente coberta por eles não entra.
+ */
 export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
+  const openings = stairHolesForLevel(p, levelId);
   const out: ResolvedSlab[] = [];
   for (const s of slabsOnLevel(p, levelId)) {
     const type = p.slabTypes[s.typeId];
     if (!type || s.boundary.length < 3) continue;
+    const polygon = cutStairOpenings([slabPolygon(s)], openings);
+    if (polygon.length === 0) continue;
     const topZ = levelElevation(p, s.levelId) + s.heightOffset;
     let z = topZ;
     const layers: ResolvedSlabLayer[] = [];
@@ -38,7 +45,7 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
       layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
       z -= l.thickness;
     });
-    out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon: [slabPolygon(s)], topZ, bottomZ: z, slope: s.slope, layers });
+    out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon, topZ, bottomZ: z, slope: s.slope, layers });
   }
   return out;
 }

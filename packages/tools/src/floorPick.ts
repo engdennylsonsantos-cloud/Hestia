@@ -1,4 +1,5 @@
-import { boxOf, dist, intersectSegments, pointInRing, ringArea, type Vec2 } from '@hestia/geom';
+import { boxOf, dist, intersectSegments, pointInMulti, pointInRing, ringArea, type Vec2 } from '@hestia/geom';
+import { resolveFloors } from '@hestia/engine';
 import { floorsOnLevel, isFloor, type Floor, type Id, type Project } from '@hestia/model';
 
 /** Pisos entre os selecionados. */
@@ -12,14 +13,19 @@ export interface FloorGrip {
   at: Vec2;
 }
 
-/** Piso sob o cursor: dentro do contorno (menos furos) ou sobre a borda. O mais recente vence. */
+/**
+ * Piso sob o cursor: dentro da geometria resolvida (contorno menos furos e aberturas de escada) ou sobre a borda do
+ * contorno cru. O mais recente vence.
+ */
 export function pickFloorAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
   const tol = 4 * mpp;
   const floors = floorsOnLevel(p, levelId);
+  const shape = new Map(resolveFloors(p, levelId).map((r) => [r.floorId, r.polygon] as const));
   for (let i = floors.length - 1; i >= 0; i--) {
     const f = floors[i]!;
     if (onBoundary(f, at, tol)) return f.id;
-    if (pointInRing(at, f.boundary) && !f.holes.some((h) => pointInRing(at, h))) return f.id;
+    const poly = shape.get(f.id);
+    if (poly && pointInMulti(at, poly)) return f.id;
   }
   return null;
 }

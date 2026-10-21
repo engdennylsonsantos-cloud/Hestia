@@ -1,20 +1,25 @@
-import { levelFrames, openingGeometry, resolveRoofs, type ResolvedLevel } from '@hestia/engine';
+import { levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, type ResolvedLevel } from '@hestia/engine';
 import { exportDxf, type DxfLevelGeometry } from '@hestia/io';
-import { floorsOnLevel, openingsOfWall, slabsOnLevel, type Id, type Project } from '@hestia/model';
+import { openingsOfWall, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
  * Geometria do nível para o DXF: regiões e contornos já resolvidos pelo engine (`editor.resolved`), o retângulo de
- * cada vão, o contorno de cada piso e de cada laje (com furos, na camada do código do tipo). O io não importa o engine, então a
- * montagem fica aqui, no web.
+ * cada vão, o contorno de cada piso e de cada laje (com furos, na camada do código do tipo). Pisos e lajes saem da geometria
+ * resolvida (com as aberturas de escada); cada polígono resolvido vira um contorno com os seus furos. O io não importa o
+ * engine, então a montagem fica aqui, no web.
  */
 export function dxfGeometryOf(p: Project, levelId: Id, resolved: ResolvedLevel): DxfLevelGeometry {
   const openings = levelFrames(p, levelId).flatMap((f) => openingsOfWall(p, f.wall.id).map((o) => openingGeometry(p, o, f)));
   return {
     clusters: resolved.clusters,
     openings: openings.map((g) => ({ center: g.center, u: g.u, width: g.width, thickness: g.thickness })),
-    floors: floorsOnLevel(p, levelId).map((f) => ({ outline: f.boundary, holes: f.holes, typeCode: p.floorTypes[f.typeId]?.code ?? '' })),
-    slabs: slabsOnLevel(p, levelId).map((s) => ({ outline: s.boundary, holes: s.holes, typeCode: p.slabTypes[s.typeId]?.code ?? '' })),
+    floors: resolveFloors(p, levelId).flatMap((f) =>
+      f.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' })),
+    ),
+    slabs: resolveSlabs(p, levelId).flatMap((s) =>
+      s.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' })),
+    ),
     // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
     roofs: resolveRoofs(p, levelId).map((r) => ({
       outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],

@@ -48,7 +48,6 @@ export interface FloorQuantities {
 const ringLength = (r: Vec2[]): number => r.reduce((s, p, i) => s + dist(p, r[(i + 1) % r.length]!), 0);
 
 function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: FloorLayerQuantity[] } {
-  const poly = rf.polygon[0]!;
   const area = multiArea(rf.polygon);
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
@@ -60,8 +59,9 @@ function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: Floor
     typeId: rf.typeId,
     levelId: rf.levelId,
     area,
-    perimeter: ringLength(poly[0]!),
-    holesPerimeter: poly.slice(1).reduce((s, h) => s + ringLength(h), 0),
+    // Com furo de escada o piso pode virar mais de um polígono: soma o contorno de todos e de todos os furos.
+    perimeter: rf.polygon.reduce((s, poly) => s + ringLength(poly[0]!), 0),
+    holesPerimeter: rf.polygon.reduce((s, poly) => s + poly.slice(1).reduce((t, h) => t + ringLength(h), 0), 0),
     thickness: rf.topZ - rf.bottomZ,
     volume,
     layers,

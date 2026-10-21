@@ -25,7 +25,8 @@ export interface LabelOp {
   /** Deslocamento em pixels a partir do ponto. */
   dx?: number;
   dy?: number;
-  tone?: 'info' | 'accent';
+  /** 'soft': rótulo mais claro (degrau acima do corte, decisão 0014 §1 item 9). */
+  tone?: 'info' | 'accent' | 'soft';
 }
 
 /** Lista de desenho neutra: tanto o renderizador de GPU quanto o de CPU a consomem. */

@@ -73,7 +73,8 @@ export interface DxfLevelGeometry {
    * os que estão acima dela e até o topo do intervalo (`outlinesAbove`, camada `ESCADA_ACIMA`, tracejada), linhas de espelho
    * (LINE em `ESCADA_ESPELHO`), seta de subida (LINE em `ESCADA_SETA`: um trecho por segmento da caminhada e as duas pontas
    * no fim; a caminhada é a explícita do lance, quando há, senão os pontos médios dos espelhos) e o símbolo de corte
-   * (POLYLINE aberta em `ESCADA_CORTE`), quando o plano de corte cruza a escada. Quem monta a geometria é o engine.
+   * (POLYLINE aberta em `ESCADA_CORTE`), quando o plano de corte cruza a escada. Caracol: `posts`, o círculo do poste
+   * (POLYLINE fechada em `ESCADA_POSTE`; acima do corte, em `ESCADA_ACIMA`). Quem monta a geometria é o engine.
    */
   stairs?: Array<{
     outlines: DxfPoint[][];
@@ -81,6 +82,8 @@ export interface DxfLevelGeometry {
     risers: Array<[DxfPoint, DxfPoint]>;
     arrow: Array<[DxfPoint, DxfPoint]>;
     cut?: DxfPoint[];
+    /** Poste central de cada caracol do lance: anel de 24 a 48 lados e se fica acima da cota de corte. */
+    posts?: Array<{ pts: DxfPoint[]; above: boolean }>;
   }>;
 }
 
@@ -113,6 +116,8 @@ export const DXF_LAYER_STAIR_RISER = 'ESCADA_ESPELHO';
 export const DXF_LAYER_STAIR_ARROW = 'ESCADA_SETA';
 /** Símbolo de corte da escada: polilinha aberta em zigue-zague, só quando o plano de corte cruza a escada. */
 export const DXF_LAYER_STAIR_CUT = 'ESCADA_CORTE';
+/** Poste central do caracol: círculo fechado (POLYLINE) de 24 a 48 lados, abaixo ou na cota de corte. */
+export const DXF_LAYER_STAIR_POST = 'ESCADA_POSTE';
 
 /** Camada de cada estado de vão e de parede fora do corte. */
 const OPENING_LAYER: Record<DxfViewState, string> = {
@@ -259,6 +264,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   for (const s of geo.stairs ?? []) {
     for (const o of s.outlines) push(DXF_LAYER_STAIR, [[o]]);
     for (const o of s.outlinesAbove ?? []) push(DXF_LAYER_STAIR_ABOVE, [[o]]);
+    for (const post of s.posts ?? []) out.push({ layer: post.above ? DXF_LAYER_STAIR_ABOVE : DXF_LAYER_STAIR_POST, pts: post.pts });
     if (s.cut && s.cut.length >= 2) out.push({ layer: DXF_LAYER_STAIR_CUT, pts: s.cut, closed: false });
   }
   for (const o of geo.openings) {

@@ -11,6 +11,7 @@ import {
   DXF_LAYER_STAIR,
   DXF_LAYER_STAIR_ABOVE,
   DXF_LAYER_STAIR_CUT,
+  DXF_LAYER_STAIR_POST,
   DXF_LAYER_WALL_ABOVE,
   DXF_LAYER_WALL_BELOW,
   DXF_LAYER_WALL_BEYOND,
@@ -358,5 +359,39 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     expect(types).toEqual([false, true]);
     // sem traço tracejado, o arquivo não ganha tipo DASHED
     expect(ltypeNames(exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, arc])] }))).toEqual(['CONTINUOUS']);
+  });
+});
+
+describe('poste de caracol no DXF (decisão 0014 §1 item 10)', () => {
+  const base: DxfLevelGeometry = { clusters: [], openings: [] };
+  const ring = (n: number, r: number): DxfPoint[] => Array.from({ length: n }, (_, i) => ({ x: r * Math.cos((2 * Math.PI * i) / n), y: r * Math.sin((2 * Math.PI * i) / n) }));
+  const tread: DxfPoint[] = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+    { x: 1, y: 1 },
+    { x: 0, y: 1 },
+  ];
+
+  it('poste na cota de corte ou abaixo vai para ESCADA_POSTE, como polilinha fechada de 48 lados', () => {
+    const geo: DxfLevelGeometry = { ...base, stairs: [{ outlines: [tread], risers: [], arrow: [], posts: [{ pts: ring(48, 0.1), above: false }] }] };
+    const polys = polylines(exportDxf(project, 'lv_0', geo));
+    const post = polys.filter((p) => p.layer === DXF_LAYER_STAIR_POST);
+    expect(post).toHaveLength(1);
+    expect(post[0]!.closed).toBe(true);
+    expect(post[0]!.pts).toHaveLength(48);
+    expect(DXF_LAYER_STAIR_POST).toBe('ESCADA_POSTE');
+  });
+
+  it('poste acima do corte vai para ESCADA_ACIMA (tracejado), não para ESCADA_POSTE', () => {
+    const geo: DxfLevelGeometry = { ...base, stairs: [{ outlines: [], risers: [], arrow: [], posts: [{ pts: ring(24, 0.1), above: true }] }] };
+    const text = exportDxf(project, 'lv_0', geo);
+    expect(polylines(text).map((p) => p.layer)).toEqual([DXF_LAYER_STAIR_ABOVE]);
+    expect(text).not.toContain(DXF_LAYER_STAIR_POST);
+    expect(linetypeOf(text, DXF_LAYER_STAIR_ABOVE)).toBe('DASHED');
+  });
+
+  it('sem poste (escada reta), a camada ESCADA_POSTE não aparece', () => {
+    const geo: DxfLevelGeometry = { ...base, stairs: [{ outlines: [tread], risers: [], arrow: [] }] };
+    expect(exportDxf(project, 'lv_0', geo)).not.toContain(DXF_LAYER_STAIR_POST);
   });
 });

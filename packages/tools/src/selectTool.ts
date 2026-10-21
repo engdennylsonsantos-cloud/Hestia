@@ -14,6 +14,7 @@ import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
 import { stairHandlePreview } from './stairGrips.ts';
+import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
 type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge';
@@ -87,7 +88,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()));
     // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
     this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.

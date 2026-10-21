@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
 import { levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type ViewClass } from '@hestia/engine';
-import { climbWalk, planViewOf, risersInClimbOrder, roofFootprint, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { climbWalk, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import { exportDxf, type DxfLevelGeometry, type DxfOpening, type DxfPoint, type DxfViewState } from '@hestia/io';
 import { openingsOfWall, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
@@ -78,7 +78,8 @@ function cutSymbolDxf(c: StairCut): DxfPoint[] {
 /**
  * Escada resolvida em geometria de DXF, na vista do nível (decisão 0013 §4): degraus até o topo do intervalo, divididos
  * pela cota de corte (cheios até ela, tracejados acima); espelhos e seta só até o topo; símbolo de corte quando o plano
- * cruza a escada. A seta segue a caminhada da tela (`climbWalk`: a explícita do lance, senão os pontos médios).
+ * cruza a escada. A seta segue a caminhada da tela (`climbWalk`: a explícita do lance, senão os pontos médios). Caracol:
+ * o poste (círculo de `rInner`, `spiralPostRing`) na cota de corte ou abaixo, senão acima (tracejado, como os degraus).
  */
 export function stairDxf(p: Project, r: ResolvedStair, view: { cutZ: number; topZ: number }): StairDxf {
   const risers = risersInClimbOrder(r).filter((k) => k.z1 <= view.topZ + EPS);
@@ -86,12 +87,14 @@ export function stairDxf(p: Project, r: ResolvedStair, view: { cutZ: number; top
   const outline = (st: (typeof steps)[number]): DxfPoint[] => st.polygon.map((q) => ({ x: q.x, y: q.y }));
   const cut = stairCut(r, risers, STAIR_CUT_ZOOM, view.cutZ);
   const walk: Vec2[] = climbWalk(p, r, risers);
+  const posts = [...spiralByComponent(p, r).values()].map((sp) => ({ pts: spiralPostRing(sp.center, sp.rInner), above: r.baseZ > view.cutZ + EPS }));
   return {
     outlines: steps.filter((st) => st.z <= view.cutZ + EPS).map(outline),
     outlinesAbove: steps.filter((st) => st.z > view.cutZ + EPS).map(outline),
     risers: risers.map((k): [DxfPoint, DxfPoint] => [k.a, k.b]),
     arrow: arrowOfPath(walk),
     cut: cut ? cutSymbolDxf(cut) : undefined,
+    ...(posts.length > 0 ? { posts } : {}),
   };
 }
 

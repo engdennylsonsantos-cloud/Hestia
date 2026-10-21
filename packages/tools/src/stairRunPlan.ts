@@ -12,8 +12,11 @@ import {
 import type { Id, StairGenerator } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
-/** Formas da ferramenta Escada por cliques (decisão 0011 §5). Os valores são os nomes dos geradores do modelo. */
-export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder'] as const;
+/**
+ * Formas da ferramenta Escada por cliques (decisão 0011 §5; caracol, decisão 0014 §1 item 12). Os valores de reta, L, U e
+ * leque são os nomes dos geradores do modelo; `spiral` é o caracol (gerador `generateSpiralRun`, `stairSpiralRun.ts`).
+ */
+export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder', 'spiral'] as const;
 export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number];
 
 export const STAIR_RUN_SHAPE_LABEL: Record<StairRunShape, string> = {
@@ -21,9 +24,10 @@ export const STAIR_RUN_SHAPE_LABEL: Record<StairRunShape, string> = {
   lshape: 'Em L',
   ushape: 'Em U',
   winder: 'Com leque',
+  spiral: 'Caracol',
 };
 
-/** Opções da ferramenta Escada reta/L/U (`ToolOptions.stairRun`). */
+/** Opções da ferramenta Escada reta/L/U/leque/caracol (`ToolOptions.stairRun`). */
 export interface StairRunToolOptions {
   /** Tipo de escada; ausente ou inexistente = o padrão do projeto. */
   typeId?: Id;
@@ -34,12 +38,23 @@ export interface StairRunToolOptions {
   turn: 'left' | 'right';
   /** Profundidade do patamar (L e U), a partir do último espelho do 1º lance. Padrão = largura. */
   landingDepth?: number;
+  /** Caracol: raio interno (m). Ausente = 0,10 m. */
+  spiralInner?: number;
+  /** Caracol: raio externo digitado (m). Ausente = o 2º clique define o raio (campo vazio; sugestão 1,00 m). */
+  spiralOuter?: number;
+  /** Caracol: varredura digitada (graus, em módulo; o sentido vem de `spiralSense`). Ausente = o 3º clique define. */
+  spiralSweep?: number;
+  /** Caracol: sentido da varredura digitada. Ausente = anti-horário. */
+  spiralSense?: 'ccw' | 'cw';
 }
 
 export const DEFAULT_STAIR_RUN_OPTIONS: StairRunToolOptions = { shape: 'straight', width: 1.2, turn: 'left' };
 
-/** Espelhos mínimos por forma: L e U têm dois lances de 2; o leque precisa de 5 (ver `planStairRun`). */
-export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5 };
+/**
+ * Espelhos mínimos por forma: L e U têm dois lances de 2; o leque precisa de 5 (ver `planStairRun`); o caracol, 2 (um
+ * degrau; a forma é validada pelo gerador de caracol).
+ */
+export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5, spiral: 2 };
 
 /** Winder: espelhos do 1º lance reto; espelhos radiais do leque (padrão do gerador); o resto vai ao último lance. */
 export const WINDER_FIRST_RISERS = 2;
@@ -76,6 +91,7 @@ export type StairRunPlanResult = StairRunPlan | { error: string };
  */
 export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const { shape, width, turn } = i.options;
+  if (shape === 'spiral') return { error: 'O caracol é planejado por planSpiralRun (3 cliques).' };
   const landingDepth = i.options.landingDepth ?? width;
   if (!(width > 0)) return { error: 'A largura do lance deve ser positiva.' };
   if (shape === 'lshape' && !(landingDepth >= width)) return { error: 'O patamar da escada em L deve ter profundidade ≥ largura do lance.' };

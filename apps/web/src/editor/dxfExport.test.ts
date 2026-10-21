@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
+import { generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
 import { openingSymbolPaths } from '@hestia/geom';
 import { dxfLayerOfMaterial } from '@hestia/io';
 import { ProjectStore, buildTemplate, makeFloor, makeSlab, makeStair, makeWall, type Opening, type Project, type StairRun, type ViewRange } from '@hestia/model';
-import { climbWalk, risersInClimbOrder } from '@hestia/render';
+import { climbWalk, planViewOf, risersInClimbOrder } from '@hestia/render';
 import { arrowOfPath, planDxf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
@@ -328,6 +328,45 @@ describe('símbolo dos vãos de projeção: o mesmo da planta', () => {
     expect(shaft.at(-1)!.b.y).toBeCloseTo(walk.at(-1)!.y, 5);
     // a flecha de 0,3 m aparece na haste: a corda entre o primeiro e o último espelho ficaria em y = 0
     expect(Math.max(...shaft.flatMap((seg) => [Math.abs(seg.a.y), Math.abs(seg.b.y)]))).toBeGreaterThan(0.1);
+  });
+});
+
+describe('caracol no DXF (decisão 0014 §1 item 10)', () => {
+  /** Caracol de 540° (19 espelhos) no térreo, com o tipo de poste central, como o app o cria. */
+  function spiralStore(): ProjectStore {
+    const store = new ProjectStore(buildTemplate('blank'));
+    const sk = generateSpiralRun({ center: { x: 0, y: 0 }, rInner: 0.1, rOuter: 1, startAngle: 0, sweep: (540 * Math.PI) / 180, risers: 19 });
+    const run: StairRun = { id: 'r1', kind: 'run', ...sk };
+    store.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: 'stt_caracol_poste', levelId: 'lv_0', components: [run] }) });
+    return store;
+  }
+
+  it('volta de baixo em ESCADA e volta de cima em ESCADA_ACIMA, na cota de corte e no topo da vista', () => {
+    const p = spiralStore().project;
+    const [st] = resolveStairsOnLevel(p, 'lv_0');
+    const view = planViewOf(p, 'lv_0');
+    const steps = st!.steps.filter((k) => k.z <= view.topZ + 1e-9);
+    const polys = polylinesOf(planDxf(p, 'lv_0'));
+    // Com 540° e topo de 2,30 m, há degraus dos dois lados da cota de corte (senão o teste não prova nada).
+    expect(steps.filter((k) => k.z <= view.cutZ + 1e-9).length).toBeGreaterThan(0);
+    expect(steps.filter((k) => k.z > view.cutZ + 1e-9).length).toBeGreaterThan(0);
+    expect(polys.filter((x) => x.layer === 'ESCADA')).toHaveLength(steps.filter((k) => k.z <= view.cutZ + 1e-9).length);
+    expect(polys.filter((x) => x.layer === 'ESCADA_ACIMA')).toHaveLength(steps.filter((k) => k.z > view.cutZ + 1e-9).length);
+  });
+
+  it('o poste sai em ESCADA_POSTE: círculo fechado de 48 lados, de raio rInner', () => {
+    const polys = polylinesOf(planDxf(spiralStore().project, 'lv_0'));
+    const post = polys.filter((x) => x.layer === 'ESCADA_POSTE');
+    expect(post).toHaveLength(1);
+    expect(post[0]!.closed).toBe(true);
+    expect(post[0]!.pts).toHaveLength(48);
+    for (const q of post[0]!.pts) expect(Math.hypot(q.x, q.y)).toBeCloseTo(0.1, 5);
+  });
+
+  it('a seta segue a caminhada em arcos (muitos trechos de haste), com as duas pontas; o corte sai na cota de 1,20 m', () => {
+    const text = planDxf(spiralStore().project, 'lv_0');
+    expect((text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? []).length).toBeGreaterThan(19);
+    expect(polylinesOf(text).filter((x) => x.layer === 'ESCADA_CORTE')).toHaveLength(1);
   });
 });
 

@@ -31,3 +31,18 @@ export { StairTool, isStairTool, type StairStatus } from './stairTool.ts';
 export * from './stairRunPlan.ts';
 export { StairRunTool } from './stairRunTool.ts';
 export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';
+export * from './stairRunTypes.ts';
+export {
+  discardSpiralOnEdit,
+  planSpiralRun,
+  regenSpiralComponents,
+  SPIRAL_DEFAULT_INNER,
+  SPIRAL_MIN_SWEEP,
+  spiralInfo,
+  spiralOfStair,
+  type SpiralInfo,
+  type SpiralPlan,
+  type SpiralPlanInput,
+  type StairComponent,
+} from './stairSpiralRun.ts';
+export { spiralGripAt, spiralHandles, spiralHandlePoints, spiralHold, type SpiralGrip, type SpiralHandle } from './stairSpiralGrips.ts';

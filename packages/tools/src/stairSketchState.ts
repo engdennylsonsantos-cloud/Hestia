@@ -1,5 +1,5 @@
 import { dist } from '@hestia/geom';
-import { newId, type Id, type StairCurve, type StairGenerator, type StairLanding, type StairRun } from '@hestia/model';
+import { newId, type Id, type StairCurve, type StairGenerator, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
 import { stairLandingPolygon, trimRisers, validateRunSketch, type StairRunSketch, type StairSketchIssue } from '@hestia/engine';
 
 /** Sub-modos do croqui (Revit: Boundary, Riser, Stair Path, Landing, Finish). A ordem é a dos botões da barra. */
@@ -45,6 +45,8 @@ export interface StairToolOptions {
 export interface RunDraft {
   id?: Id;
   generatedBy?: StairGenerator;
+  /** Parâmetros do caracol (decisão 0014 §2): as alças e a validação de voltas sobrepostas precisam deles. */
+  spiral?: StairSpiralParams;
   boundaryLeft: StairCurve[];
   boundaryRight: StairCurve[];
   risers: StairCurve[];
@@ -100,6 +102,7 @@ export function partsFromComponents(cs: Array<StairRun | StairLanding>): StairPa
       path: copyChain(c.path),
     };
     if (c.generatedBy) run.generatedBy = c.generatedBy;
+    if (c.spiral) run.spiral = copySpiral(c.spiral);
     return { kind: 'run', run };
   });
 }
@@ -117,9 +120,12 @@ export function componentsFromParts(parts: StairPart[]): Array<StairRun | StairL
       path: copyChain(p.run.path),
     };
     if (p.run.generatedBy) out.generatedBy = p.run.generatedBy;
+    if (p.run.spiral) out.spiral = copySpiral(p.run.spiral);
     return out;
   });
 }
+
+const copySpiral = (sp: StairSpiralParams): StairSpiralParams => ({ ...sp, center: { ...sp.center } });
 
 /** Último componente, se for um lance (o lance em edição). */
 export function lastRun(parts: StairPart[]): RunDraft | null {
@@ -133,6 +139,8 @@ export const runSketch = (r: RunDraft): StairRunSketch => ({
   boundaryRight: r.boundaryRight,
   risers: r.risers,
   path: r.path,
+  // O motor lê a varredura do metadado `spiral` (validação por voltas e degraus do caracol).
+  ...(r.spiral ? { spiral: r.spiral } : {}),
 });
 
 /** Nº de espelhos desejado: ceil(H ÷ espelho máximo), com folga para erro de ponto flutuante (2,8 ÷ 0,175 = 16). */

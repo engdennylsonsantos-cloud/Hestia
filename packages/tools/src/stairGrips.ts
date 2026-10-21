@@ -5,6 +5,7 @@ import { updateStairComponents } from './stairCommands.ts';
 import { stairEndpoints } from './stairPick.ts';
 import { componentsPreview } from './stairPreview.ts';
 import { CONNECT_TOL } from './stairStroke.ts';
+import { discardSpiralOnEdit } from './stairSpiralRun.ts';
 import type { PreviewItem, ToolEnv } from './types.ts';
 
 /** Cadeia de um componente: limites, espelhos (soltos), caminhada, ou o contorno do patamar. */
@@ -136,7 +137,9 @@ export function stairHold(env: ToolEnv, g: StairGrip): GripHold {
     release(): void {
       const s = env.project().elements[g.stairId];
       if (!isStair(s) || dist(point, g.at) < 1e-9) return;
-      const r = updateStairComponents(env, g.stairId, applyStairGrip(s.components, g, point));
+      // Alça comum = edição à mão: se mudar limite ou espelho de um caracol, ele perde `spiral` (decisão 0014 §2).
+      const next = discardSpiralOnEdit(s.components, applyStairGrip(s.components, g, point));
+      const r = updateStairComponents(env, g.stairId, next);
       env.say('error' in r ? `Não é possível mover a alça: ${r.error}` : 'Alça ajustada. Ctrl+Z desfaz.');
     },
   };

@@ -38,9 +38,9 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
     const t = tool('stairrun', ctx.env);
     expect(t).toBeInstanceOf(StairRunTool);
     expect(t.id).toBe('stairrun');
-    expect(t.label).toBe('Escada (reta/L/U)');
-    expect(STAIR_RUN_SHAPES).toEqual(['straight', 'lshape', 'ushape', 'winder']);
-    expect(Object.values(STAIR_RUN_SHAPE_LABEL)).toEqual(['Reta', 'Em L', 'Em U', 'Com leque']);
+    expect(t.label).toBe('Escada (reta, L, U, leque, caracol)');
+    expect(STAIR_RUN_SHAPES).toEqual(['straight', 'lshape', 'ushape', 'winder', 'spiral']);
+    expect(Object.values(STAIR_RUN_SHAPE_LABEL)).toEqual(['Reta', 'Em L', 'Em U', 'Com leque', 'Caracol']);
   });
 
   it('reta com H = 2,80 m: 16 espelhos de 0,175 m e 15 degraus, sem erros; o 1º clique é o centro do 1º espelho', () => {

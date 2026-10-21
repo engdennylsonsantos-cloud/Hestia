@@ -222,6 +222,7 @@ Regras e testes em `docs/decisoes/0011-escadas.md` §6 e `stairOpenings.test.ts`
 | `DXF_LAYER_STAIR_RISER` | `ESCADA_ESPELHO` | uma LINE por espelho |
 | `DXF_LAYER_STAIR_ARROW` | `ESCADA_SETA` | LINE da seta de subida (um trecho por segmento, mais as duas pontas) |
 | `DXF_LAYER_STAIR_CUT` | `ESCADA_CORTE` | POLYLINE aberta do símbolo de corte, quando o plano corta a escada |
+| `DXF_LAYER_STAIR_POST` | `ESCADA_POSTE` | POLYLINE fechada de 48 lados do poste central do caracol (raio `rInner`), na cota de corte ou abaixo; acima dela, vai para `ESCADA_ACIMA` |
 
 Estilo: `LAYER_STYLE` em `dxf.ts`; só `ESCADA_ACIMA` tem linetype tracejado. `DxfLevelGeometry.stairs` (`dxf.ts`) recebe a geometria.
 

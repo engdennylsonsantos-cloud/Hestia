@@ -23,6 +23,7 @@ import { chainEnd, emptyStroke, strokeBusy, typedPoint } from './stairStroke.ts'
 import { createStairFromComponents, draftStair, stairLimits, stairTypeId, updateStairComponents, type StairCreateOptions } from './stairCommands.ts';
 import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto, undoStroke, type DrawState, type PickOp } from './stairDraw.ts';
 import { chainAt, leftSide, nearestPickLine, offsetChain, PICK_PX, pickLinesOf } from './stairPickLines.ts';
+import { discardSpiralOnEdit } from './stairSpiralRun.ts';
 import { activeTone, buildItems, hintText, warningText } from './stairView.ts';
 import { DEFAULT_SNAP, type PointerInfo, type PreviewItem, type Tool } from './types.ts';
 
@@ -462,7 +463,10 @@ export class StairTool extends ToolBase {
   private finish(): void {
     const components = componentsFromParts(this.st.parts);
     if (this.stairId) {
-      const r = updateStairComponents(this.env, this.stairId, components);
+      // Editar limites ou espelhos à mão descarta o caracol (`spiral`); o generatedBy fica como origem (decisão 0011 §1, 14).
+      const cur = this.env.project().elements[this.stairId];
+      const kept = discardSpiralOnEdit(isStair(cur) ? cur.components : [], components);
+      const r = updateStairComponents(this.env, this.stairId, kept);
       if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
       this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
       this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);

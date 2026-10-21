@@ -102,7 +102,9 @@ interface Half {
 /**
  * Esquadria de uma ponta de beiral (V), pelo lado da aresta (E):
  * - outra aresta de beiral com a mesma água, ou com água de outra inclinação e cantos: bissetor do ângulo em planta
- *   (esquadria de faces verticais, sem fresta nem sobreposição entre as duas faixas);
+ *   (esquadria de faces verticais, sem fresta nem sobreposição entre as duas faixas). Com inclinações diferentes a
+ *   cota da testeira muda pela água sobre a esquadria: o degrau é a diferença entre as duas águas (a esquadria em planta
+ *   continua exata; a coincidência de cota só existe quando as águas têm a mesma inclinação);
  * - outra aresta de beiral colinear com água de outra inclinação (mudança de água sobre a aresta): o espigão/rincão, a
  *   reta onde as duas águas têm a mesma cota (a esquadria pelo ângulo 3D, sem corte reto);
  * - empena (ou sem vizinho): a reta da própria empena (o beiral termina no plano da empena, sem sobrar nem faltar).

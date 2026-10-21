@@ -51,11 +51,12 @@ const PA14 = 'wt_alv14';
 const PA09 = 'wt_alv9';
 
 /** Parede reta de a até b. Com `noTopo` false (térreo), o topo fica anexado à face inferior da laje do lv_1. */
-function parede(id: Id, a: [number, number], b: [number, number], typeId: Id, levelId: Id, noTopo = false): Command {
+function parede(id: Id, a: [number, number], b: [number, number], typeId: Id, levelId: Id, noTopo = false, altura?: number): Command {
   const topo = noTopo ? {} : { topLevelId: 'lv_1', attachTopToFloor: true };
+  const h = altura === undefined ? {} : { height: altura };
   return {
     type: 'addWall',
-    wall: makeWall({ id, typeId, levelId, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, ...topo }),
+    wall: makeWall({ id, typeId, levelId, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, ...topo, ...h }),
   };
 }
 
@@ -75,8 +76,9 @@ const PAREDES: Command[] = [
   parede('T-I-02', [0, 5.5], [5.5, 5.5], PA14, TERREO),
   parede('T-I-03', [0, 9.5], [5.5, 9.5], PA09, TERREO),
   parede('T-I-04', [0, 11.5], [5.5, 11.5], PA14, TERREO),
-  // Fecha a passagem sob o lance da escada (pé-direito abaixo de 2,10 m) pelo lado do hall.
-  parede('T-I-05', [6.7, 2.0], [6.7, 5.9], PA09, TERREO),
+  // Fecha a passagem sob o lance da escada (pé-direito abaixo de 2,10 m) pelo lado do hall. Topo fixo em 2,83 m, sem
+  // anexar à laje: o ponto médio (6,7; 3,95) cai na borda do vazio da escada, onde não há laje para anexar.
+  parede('T-I-05', [6.7, 2.0], [6.7, 5.9], PA09, TERREO, true, 2.83),
   parede('T-I-06', [5.5, 6.56], [8.9, 6.56], PA09, TERREO),
   parede('T-I-07', [8.9, 0], [8.9, 10.4], PA09, TERREO),
   parede('T-I-08', [8.9, 2.0], [10.8, 2.0], PA09, TERREO),
@@ -84,7 +86,8 @@ const PAREDES: Command[] = [
   parede('T-I-10', [5.5, 10.4], [8.9, 10.4], PA09, TERREO),
   parede('T-I-11', [8.9, 10.4], [11.75, 10.4], PA09, TERREO),
 
-  // Pavimento 2 (lv_1), topo no beiral (2,80 m acima do piso).
+  // Pavimento 2 (lv_1), topo no beiral (2,80 m acima do piso). Suítes: SUÍTE MASTER no canto nordeste (quarto com banheiro
+  // e closet 3, a oeste); SUÍTE 3 no sudeste (quarto com banheiro e closet da suíte 3, a oeste); SUÍTE 2 no noroeste.
   parede('S-EXT-O', [0, 0], [0, 14], EXT, PAV2, true),
   parede('S-EXT-S', [11.75, 0], [0, 0], EXT, PAV2, true),
   parede('S-EXT-L', [11.75, 14], [11.75, 0], EXT, PAV2, true),
@@ -94,10 +97,12 @@ const PAREDES: Command[] = [
   parede('S-I-03', [5.5, 3.2], [6.7, 3.2], PA14, PAV2, true),
   parede('S-I-04', [6.7, 3.2], [8.9, 3.2], PA14, PAV2, true),
   parede('S-I-05', [6.7, 3.2], [6.7, 6.56], PA09, PAV2, true),
+  // Parede entre o banheiro e o closet da SUÍTE 3 (oeste) e o quarto da SUÍTE 3 (leste).
   parede('S-I-06', [8.9, 0], [8.9, 6.56], PA14, PAV2, true),
   parede('S-I-07', [6.7, 6.56], [11.75, 6.56], PA09, PAV2, true),
   parede('S-I-08', [0, 7.76], [11.75, 7.76], PA09, PAV2, true),
   parede('S-I-09', [5.5, 7.76], [5.5, 14], PA09, PAV2, true),
+  // Entre closet 3 e banheiro 3 (oeste) e a SUÍTE MASTER (leste).
   parede('S-I-10', [8.0, 7.76], [8.0, 14], PA09, PAV2, true),
   parede('S-I-11', [0, 11.5], [5.5, 11.5], PA14, PAV2, true),
   parede('S-I-12', [2.8, 11.5], [2.8, 14], PA14, PAV2, true),
@@ -133,11 +138,11 @@ const ABERTURAS_TERREO: Abertura[] = [
 /** Portas e janelas do pavimento 2 (B, seção 3.2). S8 com offset 3,99: o B dá 4,24, mas o vão 11,40–12,10 é 3,99. */
 const ABERTURAS_PAV2: Abertura[] = [
   ['S1', 'S-I-01', 'ot_p80', 2.0, 'P-07', true],
-  ['S2', 'S-I-07', 'ot_p90', 3.5, 'P-08', true],
+  ['S2', 'S-I-07', 'ot_p90', 3.5, 'P-08', true], // corredor → quarto da SUÍTE 3 (sul)
   ['S3', 'S-I-06', 'ot_p80', 1.6, 'P-09'],
   ['S4', 'S-I-06', 'ot_p80', 4.8, 'P-10'],
   ['S5', 'S-I-08', 'ot_p80', 1.5, 'P-11'],
-  ['S6', 'S-I-08', 'ot_p80', 9.6, 'P-12'],
+  ['S6', 'S-I-08', 'ot_p80', 9.6, 'P-12'], // corredor → SUÍTE MASTER (norte)
   ['S7', 'S-I-10', 'ot_p80', 1.04, 'P-13'],
   ['S8', 'S-I-10', 'ot_p70', 3.99, 'P-14'],
   ['S9', 'S-I-11', 'ot_p70', 1.4, 'P-15'],
@@ -271,7 +276,8 @@ function escada(): Command {
   };
   return {
     type: 'addStair',
-    stair: makeStair({ id: 'ES-01', typeId: 'stt_monolitica', levelId: TERREO, components: [run], openingMode: 'headroom', openingMargin: 0.05, mark: 'ES-01' }),
+    // Folga 0 no furo (B pedia 0,05): com 0,05 o vazio invade 4 cm do banheiro da SUÍTE 3. Ver C-montagem.md, 3.2.
+    stair: makeStair({ id: 'ES-01', typeId: 'stt_monolitica', levelId: TERREO, components: [run], openingMode: 'headroom', openingMargin: 0, mark: 'ES-01' }),
   };
 }
 

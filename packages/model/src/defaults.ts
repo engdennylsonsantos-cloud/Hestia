@@ -97,6 +97,35 @@ export const DEFAULT_WALL_TYPES: WallType[] = [
   ]),
 ];
 
+/**
+ * Padrões da esquadria (campos opcionais do `OpeningType`). Reproduzem as espessuras que o 3D usava fixas no código,
+ * então um tipo sem os campos (arquivo antigo) tem a mesma aparência de antes.
+ */
+export const OPENING_FRAME_DEFAULTS = { frameWidth: 0.05, frameDepth: 0.09, doorLeaf: 0.04, windowLeaf: 0.03, glass: 0.012 } as const;
+
+/** Espessuras da esquadria de um tipo, com o padrão onde o campo falta ou é inválido. */
+export interface OpeningFrame {
+  frameWidth: number;
+  frameDepth: number;
+  leafThickness: number;
+  glassThickness: number;
+}
+
+const positiveOr = (v: number | undefined, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback);
+
+/**
+ * Espessuras da esquadria de um tipo. `wallThickness` é a espessura da parede que o vão corta: a profundidade do batente
+ * é o padrão (ou o valor do tipo) limitado a ela, para o batente não sair do outro lado da parede.
+ */
+export function openingFrame(t: OpeningType, wallThickness: number): OpeningFrame {
+  return {
+    frameWidth: positiveOr(t.frameWidth, OPENING_FRAME_DEFAULTS.frameWidth),
+    frameDepth: Math.min(positiveOr(t.frameDepth, OPENING_FRAME_DEFAULTS.frameDepth), wallThickness),
+    leafThickness: positiveOr(t.leafThickness, t.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf),
+    glassThickness: positiveOr(t.glassThickness, OPENING_FRAME_DEFAULTS.glass),
+  };
+}
+
 const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId' | 'closure'>, frame = 'mat_madeira'): OpeningType => ({
   ...o,
   frameMaterialId: frame,

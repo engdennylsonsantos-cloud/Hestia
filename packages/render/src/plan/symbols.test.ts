@@ -50,9 +50,9 @@ describe('símbolo por família de planta', () => {
     expect(s).toHaveLength(4);
     expect(s.filter((x) => x.closed)).toHaveLength(2);
   });
-  it('porta pivotante: círculo do eixo, folha e arco', () => {
+  it('porta pivotante: círculo do eixo, folha aberta e dois arcos (um por banda)', () => {
     const s = openingSymbol(geom({ kind: 'door', plan: 'pivot', leaves: 1 }), LIGHT);
-    expect(s).toHaveLength(3);
+    expect(s).toHaveLength(4);
     expect(s[0]!.closed).toBe(true);
   });
   it('janela fixa: duas faces, plano médio e duas ombreiras', () => {

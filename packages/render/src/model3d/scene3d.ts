@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
-import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
+import { openingFrame, openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
 import { OrbitCamera } from './orbit.ts';
@@ -328,7 +328,7 @@ export class ModelScene {
     const g = openingGeometry(p, o, f);
     const t = p.openingTypes[o.typeId];
     if (!t) return null;
-    // Vão livre: só o recorte da parede; sem folha nem caixilho.
+    // Vão livre de porta: só o recorte da parede; sem folha nem caixilho.
     if (g.kind === 'door' && g.leaves === 0) return null;
     const grp = new THREE.Group();
     const h = Math.min(g.height, H - g.sill);
@@ -341,17 +341,31 @@ export class ModelScene {
       const box = new THREE.BoxGeometry(w, d, hh).translate(x, 0, z);
       this.draw(grp, box, m, cat, edges, [{ id: o.id, start: 0, count: box.index?.count ?? 0 }]);
     };
-    const jamb = 0.05;
-    const depth = Math.min(g.thickness, 0.09);
-    add(jamb, depth, h, -g.width / 2 + jamb / 2, h / 2, frameMat);
-    add(jamb, depth, h, g.width / 2 - jamb / 2, h / 2, frameMat);
-    add(g.width, depth, jamb, 0, h - jamb / 2, frameMat);
-    if (g.kind === 'window') {
+    // Espessuras do tipo (campos opcionais; ausentes valem o padrão, que é o que o 3D usava fixo).
+    const { frameWidth: jamb, frameDepth: depth, leafThickness: leaf, glassThickness: glassT } = openingFrame(t, g.thickness);
+    if (g.kind === 'window' && g.leaves === 0) {
+      // Janela sem folha: só a soleira, sem caixilho nem vidro (a planta também desenha só a soleira).
       add(g.width, depth, jamb, 0, jamb / 2, frameMat);
-      add(g.width - jamb * 2, 0.012, h - jamb * 2, 0, h / 2, glassMat);
-      if (g.leaves === 2) add(0.04, depth, h - jamb * 2, 0, h / 2, frameMat);
+    } else if (g.kind === 'window') {
+      add(jamb, depth, h, -g.width / 2 + jamb / 2, h / 2, frameMat);
+      add(jamb, depth, h, g.width / 2 - jamb / 2, h / 2, frameMat);
+      add(g.width, depth, jamb, 0, h - jamb / 2, frameMat);
+      add(g.width, depth, jamb, 0, jamb / 2, frameMat);
+      add(g.width - jamb * 2, glassT, h - jamb * 2, 0, h / 2, glassMat);
+      // Montantes entre as folhas: n folhas, n - 1 montantes igualmente espaçados.
+      const inner = g.width - jamb * 2;
+      for (let i = 1; i < g.leaves; i++) add(leaf, depth, h - jamb * 2, -inner / 2 + (i * inner) / g.leaves, h / 2, frameMat);
     } else {
-      add(g.width - jamb * 2, 0.04, h - jamb, 0, (h - jamb) / 2, frameMat);
+      add(jamb, depth, h, -g.width / 2 + jamb / 2, h / 2, frameMat);
+      add(jamb, depth, h, g.width / 2 - jamb / 2, h / 2, frameMat);
+      add(g.width, depth, jamb, 0, h - jamb / 2, frameMat);
+      const leafW = g.width - jamb * 2;
+      if (g.leaves === 2) {
+        // Porta dupla: duas folhas, cada uma com metade do vão livre, encostadas no centro.
+        for (const x of [-leafW / 4, leafW / 4]) add(leafW / 2, leaf, h - jamb, x, (h - jamb) / 2, frameMat);
+      } else {
+        add(leafW, leaf, h - jamb, 0, (h - jamb) / 2, frameMat);
+      }
     }
     grp.rotation.z = Math.atan2(g.u.y, g.u.x);
     grp.position.set(g.center.x, g.center.y, baseZ + g.sill);

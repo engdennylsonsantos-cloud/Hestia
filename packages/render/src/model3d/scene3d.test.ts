@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { resolveFloors, resolveLevel, type ResolvedLevel } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeStair, makeWall, type Opening, type Project, type StairRun, type View3DSettings } from '@hestia/model';
+import { DEFAULT_OPENING_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeStair, makeWall, type Opening, type OpeningType, type Project, type StairRun, type View3DSettings } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import { ModelScene, sunDirection } from './scene3d.ts';
 import { buildFloorSolids, buildLevelSolids } from './solids.ts';
@@ -345,3 +345,82 @@ function defaultsOverrides(): Record<'wall' | 'door' | 'window' | 'floor' | 'sla
   const ok = { visible: true, transparency: 0, halftone: false };
   return { wall: ok, door: ok, window: ok, floor: ok, slab: ok, roof: ok, stair: ok };
 }
+
+describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
+  const pecas = (ms: ModelScene, kind: 'door' | 'window'): THREE.Mesh[] => malhas(ms).filter((m) => m.userData.kind === kind);
+  const medida = (m: THREE.Mesh): THREE.Vector3 => {
+    m.geometry.computeBoundingBox();
+    return m.geometry.boundingBox!.getSize(new THREE.Vector3());
+  };
+  const centroDa = (m: THREE.Mesh): THREE.Vector3 => {
+    m.geometry.computeBoundingBox();
+    return m.geometry.boundingBox!.getCenter(new THREE.Vector3());
+  };
+  /** Folhas de porta: peças de altura entre 1 m e 2,10 m (menos que as ombreiras, que têm a altura do vão). */
+  const folhas = (ms: ModelScene): THREE.Mesh[] => pecas(ms, 'door').filter((m) => medida(m).z < 2.1 - 1e-6 && medida(m).z > 1);
+  /** Porta da parede 'a' (casa) com o tipo dado. */
+  const comTipo = (p: Project, tipo: OpeningType, id = 'd1'): Project => ({ ...p, openingTypes: { ...p.openingTypes, [tipo.id]: tipo }, elements: { ...p.elements, [id]: { ...(p.elements[id] as Opening), typeId: tipo.id } } });
+
+  it('porta de 1 folha: batente de 5 cm, folha de 4 cm de espessura com a largura do vão livre', () => {
+    const ms = cena(casa());
+    const portas = pecas(ms, 'door');
+    expect(portas).toHaveLength(4);
+    const [f] = folhas(ms);
+    expect(f).toBeDefined();
+    expect(medida(f!).x).toBeCloseTo(0.8 - 0.1, 6);
+    expect(medida(f!).y).toBeCloseTo(0.04, 6);
+    expect(portas.filter((m) => Math.abs(medida(m).x - 0.05) < 1e-6)).toHaveLength(2);
+  });
+
+  it('porta dupla: duas folhas, cada uma com metade do vão livre, centros em ±1/4 do vão livre', () => {
+    const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_p160')!);
+    const ms = cena(p);
+    expect(pecas(ms, 'door')).toHaveLength(5);
+    const dupla = folhas(ms);
+    expect(dupla).toHaveLength(2);
+    const xs = dupla.map((m) => centroDa(m).x).sort((a, b) => a - b);
+    expect(xs[0]!).toBeCloseTo(-(1.6 - 0.1) / 4, 6);
+    expect(xs[1]!).toBeCloseTo((1.6 - 0.1) / 4, 6);
+    for (const m of dupla) expect(medida(m).x).toBeCloseTo((1.6 - 0.1) / 2, 6);
+  });
+
+  it('janela de 2 folhas: caixilho, vidro e um montante central com a espessura da folha da janela', () => {
+    const ms = cena(casa());
+    const janelas = pecas(ms, 'window');
+    expect(janelas).toHaveLength(6);
+    const montante = janelas.find((m) => Math.abs(centroDa(m).x) < 1e-6 && medida(m).z > 0.5 && medida(m).x < 0.1)!;
+    expect(montante).toBeDefined();
+    // Padrão de janela: 3 cm (`OPENING_FRAME_DEFAULTS.windowLeaf`).
+    expect(medida(montante).x).toBeCloseTo(0.03, 6);
+  });
+
+  it('janela sem folha: só a soleira (sem caixilho nem vidro), como a planta', () => {
+    const p = casa();
+    const sem = comTipo(p, { ...p.openingTypes.ot_j120!, id: 'ot_j0', leaves: 0 }, 'j1');
+    const janelas = pecas(cena(sem), 'window');
+    expect(janelas).toHaveLength(1);
+    expect(medida(janelas[0]!).x).toBeCloseTo(1.2, 6);
+    expect(medida(janelas[0]!).z).toBeCloseTo(0.05, 6);
+  });
+
+  it('espessuras do tipo: largura do perfil, folha e vidro vêm do tipo; a profundidade do batente é limitada à parede', () => {
+    const p = casa();
+    const tipo = { ...p.openingTypes.ot_p80!, id: 'ot_fino', frameWidth: 0.08, frameDepth: 0.2, leafThickness: 0.02 };
+    const ms = cena(comTipo(p, tipo));
+    const portas = pecas(ms, 'door');
+    expect(portas.filter((m) => Math.abs(medida(m).x - 0.08) < 1e-6)).toHaveLength(2);
+    expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.02, 6);
+    // Profundidade pedida 0,20 m, mas a parede tem 0,14 m: o batente fica com 0,14 m.
+    expect(medida(portas[0]!).y).toBeCloseTo(0.14, 6);
+    const vidro = comTipo(p, { ...p.openingTypes.ot_j120!, id: 'ot_vid', glassThickness: 0.02 }, 'j1');
+    expect(pecas(cena(vidro), 'window').some((m) => Math.abs(medida(m).y - 0.02) < 1e-6)).toBe(true);
+  });
+
+  it('sem os campos novos, as espessuras são as de antes (batente 5 cm, folha 4 cm, vidro 1,2 cm, profundidade 9 cm)', () => {
+    const ms = cena(casa());
+    expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.04, 6);
+    expect(pecas(ms, 'window').some((m) => Math.abs(medida(m).y - 0.012) < 1e-6)).toBe(true);
+    // Ombreiras e verga da porta têm a profundidade de 9 cm (parede de 14 cm, o padrão de 9 cm vale).
+    expect(pecas(ms, 'door').filter((m) => Math.abs(medida(m).y - 0.09) < 1e-6)).toHaveLength(3);
+  });
+});

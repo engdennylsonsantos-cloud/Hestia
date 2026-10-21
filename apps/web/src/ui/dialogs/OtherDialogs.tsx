@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { TEMPLATES, buildTemplate, isWall, makeLevel, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
+import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -7,7 +7,8 @@ import { Dialog } from './Dialog.tsx';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
-const DOOR_PLANS: Array<[PlanSymbol, string]> = [['swing', 'Arco (folha)'], ['double', 'Dupla'], ['sliding', 'De correr'], ['pivot', 'Pivotante']];
+// "Dupla" é o giro com 2 folhas (ver `normalize` em geom/openingSymbol.ts): escolhê-la põe 2 folhas.
+const DOOR_PLANS: Array<[PlanSymbol, string]> = [['swing', 'Arco (folha)'], ['double', 'Dupla (2 folhas)'], ['sliding', 'De correr'], ['pivot', 'Pivotante']];
 const WINDOW_PLANS: Array<[PlanSymbol, string]> = [['fixed', 'Fixa'], ['tilt', 'Basculante'], ['casement', 'Maxim-ar (arco tracejado)'], ['sliding', 'De correr']];
 
 export function LevelsDialog(): ReactElement {
@@ -89,7 +90,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
       </div>
       <div className="field-row">
         <label htmlFor="ot-plan" title="Desenho do símbolo na planta">Símbolo na planta</label>
-        <select id="ot-plan" className="select" value={d.plan} onChange={(e) => set({ plan: e.target.value as PlanSymbol })}>
+        <select id="ot-plan" className="select" value={d.plan} onChange={(e) => { const plan = e.target.value as PlanSymbol; set(plan === 'double' ? { plan, leaves: 2 } : { plan }); }}>
           {(d.kind === 'door' ? DOOR_PLANS : WINDOW_PLANS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
       </div>
@@ -109,6 +110,14 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
           {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
       </div>
+      {/* Espessuras da esquadria (cm). Campos vazios no tipo valem o padrão mostrado; a profundidade do batente é limitada à parede. */}
+      <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
+        <legend style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Esquadria</legend>
+        <div className="field-row"><label htmlFor="ot-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="ot-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameWidth: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-fd" title="Profundidade do batente na espessura da parede (limitada a ela)">Profundidade do batente</label><NumField id="ot-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-lt">Espessura da folha</label><NumField id="ot-lt" value={d.leafThickness ?? (d.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ leafThickness: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-gt">Espessura do vidro</label><NumField id="ot-gt" value={d.glassThickness ?? OPENING_FRAME_DEFAULTS.glass} scale={100} decimals={1} unit="cm" min={0.001} onCommit={(v) => set({ glassThickness: v })} /></div>
+      </fieldset>
     </Dialog>
   );
 }

@@ -187,6 +187,15 @@ export interface OpeningType {
   glassMaterialId: Id;
   /** Fechamento do vão (Revit: Wall Closure): substitui o retorno do tipo de parede quando não é 'inherit'. */
   closure: 'inherit' | WrapMode;
+  /*
+   * Esquadria (m). Opcionais: arquivos antigos não os têm e a leitura usa o padrão (`openingFrame`, em defaults.ts).
+   * Largura do perfil do batente e do caixilho; profundidade do batente na parede (limitada à espessura da parede);
+   * espessura da folha; espessura do vidro.
+   */
+  frameWidth?: number;
+  frameDepth?: number;
+  leafThickness?: number;
+  glassThickness?: number;
 }
 
 export interface Opening {

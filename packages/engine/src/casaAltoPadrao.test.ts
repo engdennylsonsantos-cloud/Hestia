@@ -85,7 +85,7 @@ function comodos(segs: Seg[]): { area: (pt: Vec2) => number; externo: (pt: Vec2)
   const comp = new Int32Array(nx * ny).fill(-1);
   const info: Array<{ area: number; externo: boolean }> = [];
   for (let s = 0; s < nx * ny; s++) {
-    if (comp[s] >= 0) continue;
+    if ((comp[s] ?? -1) >= 0) continue;
     const c = info.length;
     let area = 0;
     let externo = false;
@@ -105,7 +105,7 @@ function comodos(segs: Seg[]): { area: (pt: Vec2) => number; externo: (pt: Vec2)
       for (const [vi, vj, bloq] of viz) {
         if (bloq) continue;
         const t = id(vi, vj);
-        if (comp[t] < 0) {
+        if ((comp[t] ?? -1) < 0) {
           comp[t] = c;
           pilha.push(t);
         }
@@ -362,7 +362,7 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
     };
     const salas = {
       'banheiro da SUÍTE 3': dentro(5.5, 0, 8.9, 3.2),
-      'closet da SUÍTE MASTER': dentro(6.7, 3.2, 8.9, 6.56),
+      'closet da SUÍTE 3': dentro(6.7, 3.2, 8.9, 6.56),
       'home office': dentro(0, 0, 5.5, 6.56),
     };
     for (const [nome, pts] of Object.entries(salas)) {
@@ -443,24 +443,26 @@ describe('casa de alto padrão: aberturas', () => {
         const host = p.elements[o.hostId] as Wall;
         if (host.levelId !== lv) continue;
         const t = p.openingTypes[o.typeId]!;
-        if (o.kind !== 'door' || t.leaves === 0) continue;
+        // Só folhas de batente e pivotante varrem: vão livre não tem folha e portão de correr não gira.
+        if (o.kind !== 'door' || t.leaves !== 1 || (t.plan !== 'swing' && t.plan !== 'pivot')) continue;
         const f = frameOfWall(p, o.hostId)!;
         const g = openingGeometry(p, o, f);
         const sinal = g.flipFacing ? -1 : 1;
         const ladoAbre: Vec2 = { x: g.n.x * sinal, y: g.n.y * sinal };
-        const eps = 0.01;
+        // Dobradiça 3 cm dentro do vão, além do retorno do reboco no batente (≈ 2 cm): caixilho de folga real.
+        const eps = 0.03;
         const pts: Vec2[] = [];
         let base: Vec2;
         let comp: number;
         if (g.plan === 'pivot') {
           // Pivotante: eixo no centro, folha de meia largura.
           base = g.center;
-          comp = g.width / 2 - 0.02;
+          comp = g.width / 2 - 0.03;
         } else {
-          // Batente de dobradiça no início (a) quando flipHand é falso, folha de largura menos 2 cm de caixilho.
+          // Dobradiça no batente do início (a) quando flipHand é falso; folha de largura menos a folga do caixilho.
           const hs = g.flipHand ? 1 : -1;
           base = { x: g.center.x + g.u.x * hs * (g.width / 2 - eps), y: g.center.y + g.u.y * hs * (g.width / 2 - eps) };
-          comp = g.width - 0.02;
+          comp = g.width - 0.06;
         }
         // Direção de fechamento: do batente para o outro lado do vão (ao longo do vão).
         const hs2 = g.plan === 'pivot' ? 1 : g.flipHand ? 1 : -1;

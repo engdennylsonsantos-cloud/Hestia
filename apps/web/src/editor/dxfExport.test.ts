@@ -129,7 +129,11 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     const p = vistaPlan().project;
     const text = planDxf(p, 'lv_0');
     const above = polylinesOf(text).filter((x) => x.layer === 'ABERTURA_ACIMA');
-    expect(above).toHaveLength(1);
+    // o símbolo da janela (caixilho, ombreiras, folhas) sai inteiro, não um retângulo só
+    const wp = p.elements['jAlta'] as Opening;
+    const wf = levelFrames(p, 'lv_0').find((f) => f.wall.id === wp.hostId)!;
+    expect(above).toHaveLength(openingSymbolPaths(openingGeometry(p, wp, wf)).length);
+    expect(above.length).toBeGreaterThan(1);
     // o vão de 1,50 não aparece nas camadas de corte
     expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURAS')).toHaveLength(1);
     // a parede com a janela alta é igual à mesma parede sem janela (furo nenhum)
@@ -268,10 +272,11 @@ function doorAboveCut(): Project {
   return store.project;
 }
 
-/** Lance reto de 5 espelhos em +x com caminhada explícita em arco (flecha 0,3 m), como o do teste da seta na planta. */
+/** Lance reto em +x com caminhada explícita em arco (flecha 0,3 m), como o do teste da seta na planta. */
 function curvedRunStair(): Project {
   const store = new ProjectStore(buildTemplate('blank'));
-  const N = 5;
+  // 17 espelhos subindo 3 m (0,18 m cada, o máximo do tipo): com menos, o espelho passa do máximo e o motor recusa.
+  const N = 17;
   const P = 0.28;
   const ln = (ax: number, ay: number, bx: number, by: number) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag: 0 });
   const x1 = (N + 1) * P;

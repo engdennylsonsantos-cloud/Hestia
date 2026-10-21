@@ -4,7 +4,7 @@ import type { StairCurve } from '@hestia/model';
 import { chainAt, leftSide, nearestPickLine, offsetChain, offsetCurve, type PickLine } from './stairPickLines.ts';
 
 const line = (a: Vec2, b: Vec2): StairCurve => ({ a, b, sag: 0 });
-const L = (owner: string, group: string, c: StairCurve): PickLine => ({ owner: owner as never, group, curve: c });
+const L = (owner: string, group: string, c: StairCurve): PickLine => ({ owner, group, curve: c });
 
 describe('deslocamento de curvas (stairPickLines)', () => {
   it('reta: paralela ao lado esquerdo do sentido a→b com d > 0, e à direita com d < 0', () => {
@@ -62,11 +62,13 @@ describe('corrente (stairPickLines)', () => {
     ];
     const r = chainAt(lines, 1);
     expect(r.closed).toBe(false);
+    // A linha pega (8→4) mantém o sentido dela; as vizinhas saem no sentido que a cadeia tem a partir dela.
     expect(r.curves.map((c) => [c.a.x, c.b.x])).toEqual([
-      [0, 4],
-      [4, 8],
-      [8, 12],
+      [12, 8],
+      [8, 4],
+      [4, 0],
     ]);
+    for (let i = 1; i < r.curves.length; i++) expect(dist(r.curves[i - 1]!.b, r.curves[i]!.a)).toBeLessThan(1e-12);
   });
 
   it('um laço fechado é reconhecido e a junta de fechamento sai contínua', () => {

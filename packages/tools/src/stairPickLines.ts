@@ -125,6 +125,7 @@ function addRing(out: PickLine[], owner: Id, group: string, ring: Vec2[]): void 
 
 /** Distância de um ponto a uma curva (reta, ou arco amostrado com erro de corda de 0,3 mm). */
 export function distToCurve(c: StairCurve, at: Vec2): number {
+  if (Math.abs(c.sag) < 1e-9) return dist(at, closestOnSegment(at, c.a, c.b));
   const pts = sampleCurve(c);
   if (pts.length === 1) return dist(pts[0]!, at);
   let best = Infinity;

@@ -160,7 +160,7 @@ const KEYS: Array<[string, string]> = [
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],
-  ['Tab', 'Alterna opção (lado externo da parede, sentido da porta)'],
+  ['Tab', 'Alterna opção (lado externo da parede, sentido da porta, linha e arco no croqui da escada)'],
   ['Espaço', 'Inverte a dobradiça ao inserir porta; segurar e arrastar move a vista'],
   ['Shift', 'Trava em 0°/90° ao desenhar; soma à seleção'],
   ['Alt (ao arrastar uma ponta)', 'Inverte quem acompanha: solta o canto simples, leva todas as paredes de um nó'],

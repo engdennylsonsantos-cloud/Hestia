@@ -12,7 +12,7 @@ Fonte: [docs/escadas](../escadas/) (Revit 2026: Stair by Component e croqui; Arc
 - [x] A5 Gerador de lance reto (início, direção, largura, nº de espelhos, piso pela regra 2e+p) **(bloqueante)**
 - [x] A6 Geradores em L e em U com patamar automático (largura do lance)
 - [x] A7 Gerador de leque (espelhos radiais; na ferramenta, forma "Com leque" = winder de 90°)
-- [ ] A8 Pegar linhas (paredes, linhas, arestas) com deslocamento e corrente por Tab no croqui — não implementado: o croqui usa linha e arco com captura nas faces e nos pontos já desenhados
+- [x] A8 Pegar linhas no croqui (Pick Lines): método "Pegar linhas" na barra sobre Limites, Espelhos ou Caminhada; o clique pega a parede (eixo, faces ou núcleo conforme a captura), a linha de outra escada ou a aresta de laje ou piso sob o cursor, com prévia do destaque e do resultado; "Deslocamento (m)" afasta a linha para o lado do cursor; arco de parede vira arco do croqui; "Corrente" pega a cadeia conectada de uma vez (Tab segue alternando linha e arco, então a corrente é a opção da barra); Delete e Ctrl+Z desfazem a última pegada e Ctrl+Y refaz; o erro de croqui continua sendo só o do validateRunSketch. Fora desta entrega: patamar não pega linhas e arcos de faces de parede não encadeiam em juntas com parede reta
 - [x] A9 Distribuir N espelhos ao longo da caminhada (acelerador além do Revit)
 - [x] A10 Editar o croqui da escada pronta e converter lance gerado em croqui **(bloqueante)**
 - [x] A11 Edição por alças na planta (limites, espelhos, caminhada, patamar)

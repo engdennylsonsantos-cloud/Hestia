@@ -375,4 +375,16 @@ describe('seleção de elemento oculto: contorno fantasma (decisão 0013 §4)', 
     const dl = drawSel(scene(), ['w_oculta'], DARK);
     expect(ghosts(dl).some((s) => s.color === DARK.select)).toBe(true);
   });
+
+  it('redesenho com o mesmo projeto, vista e seleção: o contorno fantasma não é refeito (memo por vista)', () => {
+    const p = scene();
+    const view = planViewOf(p, 'lv_0');
+    const first = hiddenSelectionOps(p, 'lv_0', view, ['w_oculta'], LIGHT);
+    expect(hiddenSelectionOps(p, 'lv_0', view, ['w_oculta'], LIGHT)).toBe(first);
+    // outra seleção ou outra cor é outro resultado; e uma edição (outro projeto, outra vista) não reaproveita
+    expect(hiddenSelectionOps(p, 'lv_0', view, ['w_oculta', 'j_240'], LIGHT)).not.toBe(first);
+    expect(hiddenSelectionOps(p, 'lv_0', view, ['w_oculta'], DARK)).not.toEqual(first);
+    const edited = scene();
+    expect(hiddenSelectionOps(edited, 'lv_0', planViewOf(edited, 'lv_0'), ['w_oculta'], LIGHT)).not.toBe(first);
+  });
 });

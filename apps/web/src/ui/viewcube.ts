@@ -41,6 +41,11 @@ const FACE_LABEL: Record<Face, string> = {
   left: 'ESQUERDA',
 };
 
+/** Vetor de três componentes a partir de uma função do índice do eixo. */
+function vec3(f: (axis: number) => number): [number, number, number] {
+  return [f(0), f(1), f(2)];
+}
+
 /** Face de um sinal num eixo (0 = x, 1 = y, 2 = z). */
 function faceOf(axis: number, s: number): Face {
   if (axis === 0) return s > 0 ? 'right' : 'left';
@@ -131,7 +136,7 @@ export function cellSign(face: Face, row: number, col: number): Sign3 {
   const f = FACE_FRAME[face];
   const su = col - 1;
   const sv = 1 - row;
-  return [0, 1, 2].map((i) => f.n[i]! + su * f.r[i]! + sv * f.u[i]!) as unknown as Sign3;
+  return vec3((i) => f.n[i]! + su * f.r[i]! + sv * f.u[i]!) as Sign3;
 }
 
 /** Meio lado do cubo em px (o cubo tem 104 px de lado; é a mesma constante de `--vc-half` no CSS). */
@@ -142,7 +147,7 @@ export function cellCenter(face: Face, row: number, col: number): [number, numbe
   const f = FACE_FRAME[face];
   const su = col - 1;
   const sv = 1 - row;
-  return [0, 1, 2].map((i) => f.n[i]! + (2 / 3) * (su * f.r[i]! + sv * f.u[i]!)) as unknown as [number, number, number];
+  return vec3((i) => f.n[i]! + (2 / 3) * (su * f.r[i]! + sv * f.u[i]!));
 }
 
 /**
@@ -171,10 +176,10 @@ export function zoneAtPoint(azimuth: number, elevation: number, x: number, y: nu
   }
   if (lo > hi + 1e-9) return null;
   const c = hi;
-  const sign = [0, 1, 2].map((i) => {
+  const sign = vec3((i) => {
     const v = base[i]! + c * dv[i]!;
     return Math.abs(v) > 1 / 3 + 1e-9 ? (v > 0 ? 1 : -1) : 0;
-  }) as unknown as Sign3;
+  }) as Sign3;
   return zoneById(zoneId(sign));
 }
 

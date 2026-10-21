@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ringArea } from '@hestia/geom';
-import { resolveLevel, resolveStairs, resolveStairsOnLevel } from '@hestia/engine';
+import { resolveLevel, pieceVolume, resolveStairs, resolveStairsOnLevel, stairBody } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairRun } from '@hestia/model';
 import { buildStairSolids } from '../model3d/stairSolids.ts';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
@@ -103,11 +102,10 @@ describe('escadas do projeto na planta e no 3D (integração com o motor)', () =
     expect(batches[0]!.indices.length).toBeGreaterThan(0);
   });
 
-  it('volume da malha monolítica do motor = Σ área dos degraus × profundidade estrutural (sem espelho nem patamar)', () => {
+  it('volume da malha monolítica do motor = Σ volumes das peças de stairBody (decisão 0012)', () => {
     const [st] = resolveStairs(project());
-    const sd = st!.type.structuralDepth;
-    const areaSum = st!.steps.reduce((s, step) => s + Math.abs(ringArea(step.polygon)), 0);
+    const piecesSum = stairBody(st!, { slabThickness: 0.15 }).pieces.reduce((s, piece) => s + pieceVolume(piece), 0);
     const [b] = buildStairSolids([st!]);
-    expect(Math.abs(meshVolume(b!) - areaSum * sd)).toBeLessThan(1e-9);
+    expect(Math.abs(meshVolume(b!) - piecesSum)).toBeLessThan(1e-9);
   });
 });

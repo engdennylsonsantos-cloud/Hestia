@@ -262,6 +262,10 @@ Hierarquia qualitativa que as fontes confirmam: **corte mais grosso que projeç�
 
 ## 6. Prompt de busca refinado (para a próxima rodada, com acesso a fontes)
 
+> **Resultado desta rodada:** [`C-relatorio-pesquisa.md`](C-relatorio-pesquisa.md) (coleta de 2026-10-21). Fecha (a), (b), (c, com
+> ressalva), (e), (f) e (g); seguem em aberto a Tabela 6/7 da NBR 16861, a tabela oficial de pesos do template do Revit, a escala
+> padrão de Detail Level e o nome do `.rte` instalado.
+
 > Preciso dos valores numéricos oficiais, com a fonte, para estes itens:
 > (a) NBR 16861:2020, seção 3.2.1: tabela de larguras de linha nominais (mm), com a razão entre as séries e a recomendação de uso por tipo de linha. Quero o texto da tabela, não resumo.
 > (b) NBR 6492:2021: exigências de espessura de linha por tipo de elemento em cortes, projeções e cotas, e qualquer valor por escala (1:50, 1:100, 1:200).

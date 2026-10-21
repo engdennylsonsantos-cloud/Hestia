@@ -1,15 +1,18 @@
 import { add, dot, intersection, mul, norm, perp, sub, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { Id } from '@hestia/model';
+import { stairBody, type StairBodyPiece } from './stairBody.ts';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import type { SectionBeyond } from './section.ts';
 import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
 
 /**
- * Escadas no corte e na elevação (decisão 0011 §6). Cada degrau e patamar é um bloco em planta entre as cotas z0 e z1
- * (degrau: z − profundidade até z; patamar: z − `landingThickness` até z). No plano de corte, o bloco vira um
- * retângulo sobre o intervalo que a linha atravessa, e a união dos blocos forma o "dente de serra" do lance. Os espelhos
- * do tipo montado são lâminas de `riserThickness` atrás da linha de espelho; no monolítico a espessura é 0 e o espelho
- * é a face do próprio bloco. Além do plano, cada bloco e lâmina projeta-se em (t, z) como os pisos e as lajes.
+ * Escadas no corte e na elevação (decisões 0011 §6 e 0012). Estilo montado: cada degrau e patamar é um bloco em planta
+ * entre as cotas z0 e z1 (degrau: z − `treadThickness` até z; patamar: z − `landingThickness` até z). No plano de corte,
+ * o bloco vira um retângulo sobre o intervalo que a linha atravessa. Os espelhos do montado são lâminas de
+ * `riserThickness` atrás da linha de espelho. Estilo monolítico: as peças de `stairBody` (degraus, patamares e espelho
+ * de chegada, cada uma com topo plano em `zTop` e fundo plano ou linear, `zFundo(x, y) = a·x + b·y + c`). No corte, o
+ * fundo é linear ao longo da linha, então cada intervalo vira um trapézio de `zFundo` a `zTop`. Além do plano, cada
+ * bloco e peça projeta-se em (t, z).
  */
 export interface StairSection {
   cut: Array<{ materialId: Id; polygon: Polygon }>;
@@ -50,9 +53,24 @@ export function riserBoards(risers: ResolvedStairRiser[], rt: number): StairBloc
   return out;
 }
 
-/** Profundidade do degrau (m): estrutural no monolítico, espessura do piso no montado. */
-const treadDepthOf = (runStyle: 'monolithic' | 'assembled', structuralDepth: number, treadThickness: number): number =>
-  runStyle === 'monolithic' ? structuralDepth : treadThickness;
+/** Envoltória convexa (cadeia monótona), anel anti-horário; com menos de 3 vértices, pontos colineares. */
+function convexHull(pts: Vec2[]): Ring {
+  const s = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const chain = (seq: Vec2[]): Vec2[] => {
+    const h: Vec2[] = [];
+    for (const q of seq) {
+      while (h.length >= 2 && cross(h[h.length - 2]!, h[h.length - 1]!, q) <= 0) h.pop();
+      h.push(q);
+    }
+    h.pop();
+    return h;
+  };
+  return [...chain(s), ...chain([...s].reverse())];
+}
+
+/** Sentido do fundo de uma peça monolítica: zFundo(x, y) = a·x + b·y + c. */
+const bottomAt = (piece: StairBodyPiece, v: Vec2): number => piece.bottom.a * v.x + piece.bottom.b * v.y + piece.bottom.c;
 
 /** Corte e projeção das escadas do nível para a linha de corte (ou de elevação, com `depth` grande). */
 export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): StairSection {
@@ -61,14 +79,67 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): Sta
   if (length < 1e-6 || stairs.length === 0) return out;
   const along = (v: Vec2): number => (v.x - line.a.x) * d.x + (v.y - line.a.y) * d.y;
   const dist2 = (v: Vec2): number => (v.x - line.a.x) * n.x + (v.y - line.a.y) * n.y;
+  const at = (t: number): Vec2 => ({ x: line.a.x + d.x * t, y: line.a.y + d.y * t });
 
   for (const s of stairs) {
     const materialId = s.type.materialId;
-    const depth = treadDepthOf(s.type.runStyle, s.type.structuralDepth, s.type.treadThickness);
+    const grow = (z0: number, z1: number): void => {
+      out.zMin = Math.min(out.zMin, z0);
+      out.zMax = Math.max(out.zMax, z1);
+    };
+
+    // Monolítico: cada peça de `stairBody` tem fundo linear (ou plano) e topo plano; no corte, o trapézio vai de zFundo
+    // a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças convexas).
+    if (s.type.runStyle === 'monolithic') {
+      for (const piece of stairBody(s).pieces) {
+        for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {
+          const lo = Math.max(0, t0);
+          const hi = Math.min(length, t1);
+          if (hi - lo < EPS_T) continue;
+          const f0 = bottomAt(piece, at(lo));
+          const f1 = bottomAt(piece, at(hi));
+          const ring: Ring = [
+            { x: lo, y: f0 },
+            { x: hi, y: f1 },
+            { x: hi, y: piece.zTop },
+            { x: lo, y: piece.zTop },
+          ];
+          out.cut.push({ materialId, polygon: [ring] });
+          grow(Math.min(f0, f1), piece.zTop);
+        }
+        for (const sp of intersection([[piece.polygon]], slab)) {
+          const outer = sp[0];
+          if (!outer || outer.length < 3) continue;
+          const ts = outer.map(along);
+          const tMin = Math.max(0, Math.min(...ts));
+          const tMax = Math.min(length, Math.max(...ts));
+          if (tMax - tMin < EPS_T) continue;
+          const pts: Vec2[] = outer.flatMap((v) => [
+            { x: along(v), y: piece.zTop },
+            { x: along(v), y: bottomAt(piece, v) },
+          ]);
+          const hull = convexHull(pts);
+          if (hull.length < 3) continue;
+          const zLow = Math.min(...pts.map((q) => q.y));
+          out.beyond.push({
+            stairId: s.id,
+            materialId,
+            layerIndex: 0,
+            depth: Math.max(0, Math.min(...outer.map(dist2))),
+            polygons: [[hull]],
+          });
+          grow(zLow, piece.zTop);
+        }
+      }
+    }
+
+    // Montado: bloco de degrau ou patamar (espessura do piso e do patamar), como nos pisos.
     const blocks: StairBlock[] = [];
-    for (const st of s.steps) {
-      const t = st.kind === 'landing' ? s.type.landingThickness : depth;
-      if (t > EPS_T) blocks.push({ ring: st.polygon, z0: st.z - t, z1: st.z });
+    if (s.type.runStyle === 'assembled') {
+      for (const st of s.steps) {
+        const t = st.kind === 'landing' ? s.type.landingThickness : s.type.treadThickness;
+        if (t > EPS_T) blocks.push({ ring: st.polygon, z0: st.z - t, z1: st.z });
+      }
     }
     blocks.push(...riserBoards(s.risers, s.type.riserThickness));
 
@@ -79,8 +150,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): Sta
         const hi = Math.min(length, t1);
         if (hi - lo < EPS_T) continue;
         out.cut.push({ materialId, polygon: [rect(lo, hi, b.z0, b.z1)] });
-        out.zMin = Math.min(out.zMin, b.z0);
-        out.zMax = Math.max(out.zMax, b.z1);
+        grow(b.z0, b.z1);
       }
       // Além do plano (dentro da visão): projeção do bloco, do mais longe ao mais perto pelo `depth`.
       for (const sp of intersection([[b.ring]], slab)) {
@@ -97,8 +167,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine): Sta
           depth: Math.max(0, Math.min(...outer.map(dist2))),
           polygons: [[rect(tMin, tMax, b.z0, b.z1)]],
         });
-        out.zMin = Math.min(out.zMin, b.z0);
-        out.zMax = Math.max(out.zMax, b.z1);
+        grow(b.z0, b.z1);
       }
     }
   }

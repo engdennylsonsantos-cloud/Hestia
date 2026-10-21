@@ -2,9 +2,9 @@ import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
-export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType } from './stairTypes.ts';
+export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairType, StairUndersideStyle } from './stairTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';

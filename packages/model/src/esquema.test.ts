@@ -139,3 +139,47 @@ describe('migração 11 → 12 (escadas)', () => {
     expect(back.elements.st1).toMatchObject({ kind: 'stair', openSlab: false, typeId: 'stt_piso_espelho' });
   });
 });
+
+describe('migração 12 → 13 (face inferior da escada)', () => {
+  /** Projeto no formato da versão 12: tipos de escada sem `undersideStyle`. */
+  function legacyV12(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown> & { stairTypes: Record<string, Record<string, unknown>> };
+    p.schemaVersion = 12;
+    for (const t of Object.values(p.stairTypes)) delete t.undersideStyle;
+    return p;
+  }
+
+  it('todo tipo de escada existente ganha face lisa', () => {
+    const m = migrateProject(legacyV12());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(SCHEMA_VERSION).toBe(13);
+    for (const t of Object.values(m.stairTypes)) expect(t.undersideStyle).toBe('smooth');
+  });
+
+  it('preserva os demais campos do tipo e os tipos padrão continuam os mesmos', () => {
+    const custom = { ...DEFAULT_STAIR_TYPES[0]!, name: 'Minha escada', maxRiser: 0.17 };
+    delete (custom as Partial<typeof custom>).undersideStyle;
+    const m = migrateProject({ ...legacyV12(), stairTypes: { [custom.id]: custom } });
+    expect(m.stairTypes[custom.id]).toEqual({ ...custom, undersideStyle: 'smooth' });
+  });
+
+  it('face escalonada já salva no arquivo é preservada', () => {
+    const custom = { ...DEFAULT_STAIR_TYPES[0]!, undersideStyle: 'stepped' as const };
+    const m = migrateProject({ ...legacyV12(), stairTypes: { [custom.id]: custom } });
+    expect(m.stairTypes[custom.id]!.undersideStyle).toBe('stepped');
+  });
+
+  it('projeto já na versão 13 não muda na migração', () => {
+    const p = createEmptyProject();
+    p.stairTypes.stt_monolitica = { ...p.stairTypes.stt_monolitica!, undersideStyle: 'stepped' };
+    const raw = JSON.parse(JSON.stringify(p)) as Project;
+    expect(migrateProject(raw)).toEqual(p);
+  });
+
+  it('ida e volta de JSON preserva a face inferior escalonada', () => {
+    const p = createEmptyProject();
+    p.stairTypes.stt_monolitica = { ...p.stairTypes.stt_monolitica!, undersideStyle: 'stepped' };
+    const back = migrateProject(JSON.parse(JSON.stringify(p)));
+    expect(back.stairTypes.stt_monolitica!.undersideStyle).toBe('stepped');
+  });
+});

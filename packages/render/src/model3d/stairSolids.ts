@@ -1,11 +1,33 @@
-import { add, mul, norm, perp, sub, type Ring, type Vec2 } from '@hestia/geom';
-import type { ResolvedStair, ResolvedStairRiser, ResolvedStairStep } from '@hestia/engine';
-import type { Id } from '@hestia/model';
+import { add, intersection, mul, multiArea, norm, perp, sub, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import {
+  STAIR_OPENING_DEFAULT_THICKNESS,
+  stairBody,
+  type ResolvedStair,
+  type ResolvedStairRiser,
+  type ResolvedStairStep,
+  type StairBodyPiece,
+} from '@hestia/engine';
+import {
+  floorPolygon,
+  floorsOnLevel,
+  floorTypeThickness,
+  slabPolygon,
+  slabsOnLevel,
+  slabTypeThickness,
+  type Id,
+  type Project,
+} from '@hestia/model';
 import { riserPoints } from '../stairRisers.ts';
 import { extrudePolygon, type SolidBatch } from './solids.ts';
 
 /** Tolerância (m) para reconhecer a cota de um degrau igual à de um espelho. */
 const Z_TOL = 1e-9;
+
+/** Tolerância (m, m²) das comparações de área na cobertura da escada pela laje. */
+const EPS = 1e-9;
+
+/** Espessura mínima (m) de uma peça monolítica: o fundo nunca alcança o topo (decisão 0012 §2). */
+const MIN_PIECE_THICKNESS = 1e-4;
 
 /** Centroide simples (média dos vértices): basta para degraus, que são polígonos quase convexos. */
 const centroid = (r: Ring): Vec2 => ({ x: r.reduce((s, p) => s + p.x, 0) / r.length, y: r.reduce((s, p) => s + p.y, 0) / r.length });
@@ -48,6 +70,25 @@ export function riserSlab(s: ResolvedStair, r: ResolvedStairRiser, t: number): R
   return [...pts, ...off.reverse()];
 }
 
+/**
+ * Espessura (m) da laje ou do piso do nível de topo que cobre a planta da escada: a maior, como o furo da laje
+ * (`thicknessUnder` de stairOpenings.ts, que não é exportada; mantenha as duas em sincronia). Sem cobertura, o padrão.
+ */
+export function stairSlabThickness(p: Project, s: ResolvedStair): number {
+  if (!s.topLevelId) return STAIR_OPENING_DEFAULT_THICKNESS;
+  const covers = (polygon: Polygon): boolean => multiArea(intersection([polygon], s.footprint)) > EPS;
+  const thicknesses: number[] = [];
+  for (const sl of slabsOnLevel(p, s.topLevelId)) {
+    const t = p.slabTypes[sl.typeId];
+    if (t && covers(slabPolygon(sl))) thicknesses.push(slabTypeThickness(t));
+  }
+  for (const f of floorsOnLevel(p, s.topLevelId)) {
+    const t = p.floorTypes[f.typeId];
+    if (t && covers(floorPolygon(f))) thicknesses.push(floorTypeThickness(t));
+  }
+  return thicknesses.length ? Math.max(...thicknesses) : STAIR_OPENING_DEFAULT_THICKNESS;
+}
+
 /** Lote do material `m` dentro do mapa, criado na primeira vez. */
 function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
   let b = byMat.get(m);
@@ -59,25 +100,42 @@ function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
 }
 
 /**
- * Sólidos das escadas (3D), por material do tipo (decisão 0011 §1). Lance monolítico: cada degrau é um prisma de
- * `z − structuralDepth` a `z`; o espelho tem espessura `riserThickness` (se > 0) entre z0 e z1. Lance montado: degrau
- * de `z − treadThickness` a `z`; espelho de `riserThickness` atrás da linha. Patamar: prisma de `z − landingThickness`
- * a `z`, em qualquer estilo. Escada com erro (issue `error`) ou sem degraus não gera malha. Os prismas não se
- * sobrepõem em planta nem em altura (o espelho fica acima do degrau de trás), então volume = Σ área × espessura.
+ * Peça do lance monolítico: topo plano em `zTop` e fundo no plano `a·x + b·y + c`, limitado a `zTop − 1e-4` para a
+ * espessura nunca ser nula ou negativa. A extrusão recebe a menor cota do fundo só para passar pelo guarda de altura.
  */
-export function buildStairSolids(stairs: ResolvedStair[]): SolidBatch[] {
+function extrudePiece(b: SolidBatch, piece: StairBodyPiece): void {
+  const { a, b: slope, c } = piece.bottom;
+  const top = piece.zTop;
+  const bottomAt = (x: number, y: number): number => Math.min(a * x + slope * y + c, top - MIN_PIECE_THICKNESS);
+  const zMin = Math.min(...piece.polygon.map((p) => bottomAt(p.x, p.y)));
+  extrudePolygon(b, [piece.polygon], zMin, top, undefined, bottomAt);
+}
+
+/**
+ * Sólidos das escadas (3D), por material do tipo (decisão 0011 §1). Lance monolítico (decisão 0012): o corpo são as
+ * peças de `stairBody` (degraus, patamares e chegada), cada uma com topo plano e fundo plano ou em rampa; os espelhos
+ * são a face de trás das peças, então não há placas. Lance montado: degrau de `z − treadThickness` a `z`; espelho de
+ * `riserThickness` atrás da linha; patamar de `landingThickness`. Escada com erro (issue `error`) ou sem degraus não
+ * gera malha. `slabThicknessOf` dá a espessura da laje de chegada de cada escada (padrão: 0,15 m).
+ */
+export function buildStairSolids(
+  stairs: ResolvedStair[],
+  slabThicknessOf: (s: ResolvedStair) => number = () => STAIR_OPENING_DEFAULT_THICKNESS,
+): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const s of stairs) {
     if (s.steps.length === 0 || s.issues.some((i) => i.severity === 'error')) continue;
     const b = batchOf(byMat, s.type.materialId);
-    const monolithic = s.type.runStyle === 'monolithic';
+    if (s.type.runStyle === 'monolithic') {
+      for (const piece of stairBody(s, { slabThickness: slabThicknessOf(s) }).pieces) extrudePiece(b, piece);
+      continue;
+    }
     for (const st of s.steps) {
       if (st.kind === 'landing') {
         extrudePolygon(b, [st.polygon], st.z - s.type.landingThickness, st.z);
         continue;
       }
-      const depth = monolithic ? s.type.structuralDepth : s.type.treadThickness;
-      extrudePolygon(b, [st.polygon], st.z - depth, st.z);
+      extrudePolygon(b, [st.polygon], st.z - s.type.treadThickness, st.z);
     }
     if (s.type.riserThickness > 0) {
       for (const r of s.risers) extrudePolygon(b, [riserSlab(s, r, s.type.riserThickness)], r.z0, r.z1);

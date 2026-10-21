@@ -64,6 +64,9 @@ export interface Stair {
 
 export type StairRunStyle = 'monolithic' | 'assembled';
 
+/** Face inferior do lance monolítico (Revit: Underside Surface): lisa (rampa contínua) ou escalonada (dente de serra). */
+export type StairUndersideStyle = 'smooth' | 'stepped';
+
 /**
  * Tipo de escada (Revit: Stair Type). Regras de espelho/piso valem para o lance calculado; no croqui livre elas não
  * bloqueiam. Campos de estilo que não se aplicam ao estilo escolhido ficam em 0 (ex.: `treadThickness` no monolítico).
@@ -80,7 +83,12 @@ export interface StairType {
   /** Largura mínima do lance (m). */
   minRunWidth: number;
   runStyle: StairRunStyle;
-  /** Profundidade estrutural do lance monolítico (m). */
+  /**
+   * Face inferior do lance monolítico (só vale para `runStyle: 'monolithic'`): lisa ou escalonada. Não se aplica ao
+   * estilo montado, mas o campo existe sempre (o montado guarda 'smooth', sem uso).
+   */
+  undersideStyle: StairUndersideStyle;
+  /** Espessura estrutural do lance monolítico, PERPENDICULAR à rampa (m), medida a partir dos cantos internos dos degraus. */
   structuralDepth: number;
   /** Espessura do piso do lance montado (m). */
   treadThickness: number;

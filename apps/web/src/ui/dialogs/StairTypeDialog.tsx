@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { stairTypeUsage, type StairRunStyle, type StairType } from '@hestia/model';
+import { stairTypeUsage, type StairRunStyle, type StairType, type StairUndersideStyle } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { keptStairType } from '../../editor/stairActions.ts';
@@ -9,10 +9,12 @@ import { Dialog } from './Dialog.tsx';
 import { StairSectionPreview } from './StairSectionPreview.tsx';
 
 const STYLE_LABEL: Record<StairRunStyle, string> = { monolithic: 'Monolítico (concreto)', assembled: 'Piso e espelho (montado)' };
+const UNDERSIDE_LABEL: Record<StairUndersideStyle, string> = { smooth: 'Lisa', stepped: 'Escalonada' };
 
 /**
  * Editor de tipo de escada (campos do `StairType`, decisão 0011 §1 item 8). O estilo decide a espessura: monolítico usa
- * a profundidade estrutural; montado usa a espessura do piso e do espelho. O campo que não se aplica fica em zero.
+ * a espessura estrutural (perpendicular à rampa) e a face inferior (decisão 0012); montado usa a espessura do piso e do
+ * espelho. O campo que não se aplica fica em zero.
  */
 export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
@@ -89,7 +91,15 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
           <div className="field-row"><label htmlFor="stt-tread">Piso mínimo (cm)</label><NumField id="stt-tread" value={draft.minTread} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minTread: v })} /></div>
           <div className="field-row"><label htmlFor="stt-width">Largura mínima do lance (cm)</label><NumField id="stt-width" value={draft.minRunWidth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minRunWidth: v })} /></div>
           {mono ? (
-            <div className="field-row"><label htmlFor="stt-depth">Profundidade estrutural (cm)</label><NumField id="stt-depth" value={draft.structuralDepth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ structuralDepth: v })} /></div>
+            <>
+              <div className="field-row"><label htmlFor="stt-depth">Espessura estrutural (perpendicular à rampa) (cm)</label><NumField id="stt-depth" value={draft.structuralDepth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ structuralDepth: v })} /></div>
+              <div className="field-row">
+                <label htmlFor="stt-underside">Face inferior</label>
+                <select id="stt-underside" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
+                  {(Object.keys(UNDERSIDE_LABEL) as StairUndersideStyle[]).map((k) => <option key={k} value={k}>{UNDERSIDE_LABEL[k]}</option>)}
+                </select>
+              </div>
+            </>
           ) : (
             <>
               <div className="field-row"><label htmlFor="stt-tt">Espessura do piso (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>

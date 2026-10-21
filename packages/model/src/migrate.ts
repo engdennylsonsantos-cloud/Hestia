@@ -143,6 +143,12 @@ const migrations: Record<number, Migration> = {
   },
   // v11 → v12: escadas (tipos padrão; projetos antigos não têm escadas nem tipos de escada).
   11: (raw) => ({ ...raw, stairTypes: { ...Object.fromEntries(DEFAULT_STAIR_TYPES.map((t) => [t.id, t])), ...((raw.stairTypes as object) ?? {}) } }),
+  // v12 → v13: face inferior dos tipos de escada. Tipos existentes ganham 'smooth' (a face lisa é a que já era desenhada).
+  12: (raw) => {
+    const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { undersideStyle: 'smooth', ...t };
+    return { ...raw, stairTypes };
+  },
 };
 
 export class SchemaError extends Error {}

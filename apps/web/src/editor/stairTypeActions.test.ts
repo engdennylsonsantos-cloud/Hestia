@@ -70,3 +70,24 @@ describe('validação do tipo de escada', () => {
     expect(stairTypeError({ ...monolithic(), name: '  ' })).toMatch(/nome/);
   });
 });
+
+describe('face inferior do tipo de escada', () => {
+  it('duplicar e renomear mantêm a face escalonada', () => {
+    const store = withStair();
+    store.exec({ type: 'upsertStairType', stairType: { ...monolithic(), id: 'stt_esc', undersideStyle: 'stepped' } });
+    const copy = duplicateStairType(store, 'stt_esc')!;
+    expect(store.project.stairTypes[copy]!.undersideStyle).toBe('stepped');
+    expect(renameStairType(store, copy, 'Lance B')).toEqual({ ok: true });
+    expect(store.project.stairTypes[copy]).toMatchObject({ name: 'Lance B', undersideStyle: 'stepped' });
+  });
+
+  it('duplicar para as escadas selecionadas copia a face e desfaz em um passo', () => {
+    const store = withStair();
+    store.exec({ type: 'upsertStairType', stairType: { ...monolithic(), id: 'stt_esc', undersideStyle: 'stepped' } });
+    store.exec({ type: 'updateElements', ids: ['st1'], patch: { typeId: 'stt_esc' } });
+    const copy = duplicateStairTypeFor(store, ['st1'], 'stt_esc')!;
+    expect(store.project.stairTypes[copy]!.undersideStyle).toBe('stepped');
+    store.undo();
+    expect(store.project.stairTypes[copy]).toBeUndefined();
+  });
+});

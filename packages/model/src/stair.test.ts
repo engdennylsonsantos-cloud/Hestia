@@ -74,7 +74,8 @@ describe('makeStair e tipos padrão', () => {
     for (const t of DEFAULT_STAIR_TYPES) {
       expect(t).toMatchObject({ maxRiser: 0.18, minTread: 0.28, minRunWidth: 0.8, nosing: 0.015, landingThickness: 0.15, minHeadroom: 2.1 });
     }
-    expect(DEFAULT_STAIR_TYPES[0]).toMatchObject({ runStyle: 'monolithic', structuralDepth: 0.2, materialId: 'mat_concreto' });
+    expect(DEFAULT_STAIR_TYPES[0]).toMatchObject({ runStyle: 'monolithic', undersideStyle: 'smooth', structuralDepth: 0.2, materialId: 'mat_concreto' });
+    expect(DEFAULT_STAIR_TYPES[1]!.undersideStyle).toBe('smooth');
     expect(DEFAULT_STAIR_TYPES[1]).toMatchObject({ runStyle: 'assembled', treadThickness: 0.03, riserThickness: 0.02, materialId: 'mat_madeira' });
   });
 
@@ -117,6 +118,14 @@ describe('comandos de escada', () => {
     expect(s.project.stairTypes.stt_nova?.name).toBe('Escada de teste');
     s.undo();
     expect(s.project.stairTypes.stt_nova).toBeUndefined();
+  });
+
+  it('upsertStairType aceita a face inferior escalonada e a guarda', () => {
+    const s = projectWithLevels();
+    s.exec({ type: 'upsertStairType', stairType: { ...DEFAULT_STAIR_TYPES[0]!, id: 'stt_esc', undersideStyle: 'stepped' } });
+    expect(s.project.stairTypes.stt_esc?.undersideStyle).toBe('stepped');
+    s.undo();
+    expect(s.project.stairTypes.stt_esc).toBeUndefined();
   });
 
   it('deleteStairType é bloqueado enquanto há escada usando o tipo', () => {

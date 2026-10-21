@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { POLE_ELEVATION, cameraBasis } from '@hestia/render';
 import {
   CUBE_FACES,
+  CUBE_HALF_PX,
   CUBE_ZONES,
   FACE_NORMAL_CSS,
   applyMatrixValues,
+  cellCenter,
   cellSign,
   cubeMatrix,
   cubeMatrixValues,
@@ -12,6 +14,7 @@ import {
   turnAzimuth,
   viewForZone,
   worldToCss,
+  zoneAtPoint,
   zoneById,
   zoneId,
   type Face,
@@ -208,6 +211,48 @@ describe('orientação do cubo (matriz CSS)', () => {
     const north = applyMatrixValues(m, worldToCss([0, 1, 0]));
     expect(north[0]).toBeCloseTo(1, 9);
     expect(north[1]).toBeCloseTo(0, 9);
+  });
+});
+
+describe('clique por ponto (zoneAtPoint)', () => {
+  const H = CUBE_HALF_PX;
+  const FACE_N: Record<Face, [number, number, number]> = {
+    front: [0, -1, 0],
+    back: [0, 1, 0],
+    right: [1, 0, 0],
+    left: [-1, 0, 0],
+    top: [0, 0, 1],
+    bottom: [0, 0, -1],
+  };
+
+  it('o centro de cada célula visível cai na própria zona, em qualquer vista', () => {
+    let checked = 0;
+    for (const [az, el] of VIEWS) {
+      const { toCamera: d, right: r, up: u } = cameraBasis(az, el);
+      for (const f of CUBE_FACES) {
+        const n = FACE_N[f];
+        if (n[0] * d.x + n[1] * d.y + n[2] * d.z <= 1e-6) continue; // face de costas: não se vê
+        for (let row = 0; row < 3; row++)
+          for (let col = 0; col < 3; col++) {
+            const w = cellCenter(f, row, col);
+            const x = H * (w[0] * r.x + w[1] * r.y + w[2] * r.z);
+            const y = -H * (w[0] * u.x + w[1] * u.y + w[2] * u.z);
+            expect(zoneAtPoint(az, el, x, y)?.id, `${f} ${row}${col} az ${az} el ${el}`).toBe(zoneId(cellSign(f, row, col)));
+            checked++;
+          }
+      }
+    }
+    expect(checked).toBeGreaterThan(300);
+  });
+
+  it('fora da silhueta do cubo não há zona', () => {
+    for (const [az, el] of VIEWS) expect(zoneAtPoint(az, el, 2 * H, 0)).toBeNull();
+  });
+
+  it('o centro da tela na vista padrão é o canto de frente, direita e topo; de frente, a face frente', () => {
+    expect(zoneAtPoint(-Math.PI / 4, 0.5, 0, 0)?.id).toBe('top-front-right');
+    expect(zoneAtPoint(-Math.PI / 2, 0, 0, 0)?.id).toBe('front');
+    expect(zoneAtPoint(-Math.PI / 4, 0, 0, 0)?.id).toBe('front-right');
   });
 });
 

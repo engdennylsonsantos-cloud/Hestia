@@ -134,6 +134,50 @@ export function cellSign(face: Face, row: number, col: number): Sign3 {
   return [0, 1, 2].map((i) => f.n[i]! + su * f.r[i]! + sv * f.u[i]!) as unknown as Sign3;
 }
 
+/** Meio lado do cubo em px (o cubo tem 104 px de lado; é a mesma constante de `--vc-half` no CSS). */
+export const CUBE_HALF_PX = 52;
+
+/** Centro de uma célula no espaço do cubo (cubo de lado 2, centrado na origem), para os testes e a projeção. */
+export function cellCenter(face: Face, row: number, col: number): [number, number, number] {
+  const f = FACE_FRAME[face];
+  const su = col - 1;
+  const sv = 1 - row;
+  return [0, 1, 2].map((i) => f.n[i]! + (2 / 3) * (su * f.r[i]! + sv * f.u[i]!)) as unknown as [number, number, number];
+}
+
+/**
+ * Zona sob um ponto da tela, sem depender do teste de acerto do navegador (que falha em costuras de faces giradas).
+ * `x`, `y` em px a partir do centro do cubo (y para baixo). Projeção ortogonal: pega a superfície do cubo mais próxima
+ * da câmera nesse ponto e classifica por terços de cada face (a mesma grade de `cellSign`). Null fora do cubo.
+ */
+export function zoneAtPoint(azimuth: number, elevation: number, x: number, y: number, half = CUBE_HALF_PX): CubeZone | null {
+  const { toCamera: d, right: r, up: u } = cameraBasis(azimuth, elevation);
+  const a = x / half; // componente na direção da tela (p·direita)
+  const b = -y / half; // componente para cima (p·cima)
+  const dv = [d.x, d.y, d.z];
+  const base = [0, 1, 2].map((i) => a * [r.x, r.y, r.z][i]! + b * [u.x, u.y, u.z][i]!);
+  // p = base + c·d deve ficar no cubo [−1, 1]³; o ponto da frente é o maior c admissível.
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (let i = 0; i < 3; i++) {
+    if (Math.abs(dv[i]!) < 1e-9) {
+      if (Math.abs(base[i]!) > 1 + 1e-9) return null;
+      continue;
+    }
+    const t1 = (-1 - base[i]!) / dv[i]!;
+    const t2 = (1 - base[i]!) / dv[i]!;
+    lo = Math.max(lo, Math.min(t1, t2));
+    hi = Math.min(hi, Math.max(t1, t2));
+  }
+  if (lo > hi + 1e-9) return null;
+  const c = hi;
+  const sign = [0, 1, 2].map((i) => {
+    const v = base[i]! + c * dv[i]!;
+    return Math.abs(v) > 1 / 3 + 1e-9 ? (v > 0 ? 1 : -1) : 0;
+  }) as unknown as Sign3;
+  return zoneById(zoneId(sign));
+}
+
 /** Células 3×3 de cada face, cada uma com a zona que ela representa. A mesma aresta aparece em duas faces. */
 export function faceCells(face: Face): { row: number; col: number; zone: CubeZone }[] {
   const out: { row: number; col: number; zone: CubeZone }[] = [];

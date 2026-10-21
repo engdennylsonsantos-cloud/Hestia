@@ -156,7 +156,8 @@ function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: number): vo
     const py = pos[p * 3 + 1]! - ay;
     const pz = pos[p * 3 + 2]! - az;
     const t = (px * dx + py * dy + pz * dz) / l2;
-    if (t <= 1e-9 || t >= 1 - 1e-9) return false;
+    // Um ponto quase coincidente com um extremo não divide a aresta (vértices duplicados de arcos, 1e-9 m de diferença).
+    if (t * t * l2 < 1e-12 || (1 - t) * (1 - t) * l2 < 1e-12 || t <= 0 || t >= 1) return false;
     const ex = px - t * dx;
     const ey = py - t * dy;
     const ez = pz - t * dz;

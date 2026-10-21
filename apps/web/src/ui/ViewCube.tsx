@@ -1,7 +1,17 @@
-import { useRef, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
+import { useState, type CSSProperties, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { HOME_VIEW, type ModelScene } from '@hestia/render';
 import { useUi } from '../editor/state.ts';
-import { CUBE_FACES, FACE_TRANSFORM, cubeMatrix, faceCells, turnAzimuth, viewForZone, type CubeZone } from './viewcube.ts';
+import {
+  CUBE_FACES,
+  CUBE_HALF_PX,
+  FACE_TRANSFORM,
+  cubeMatrix,
+  faceCells,
+  turnAzimuth,
+  viewForZone,
+  zoneAtPoint,
+  type CubeZone,
+} from './viewcube.ts';
 
 /** Distância (px) a partir da qual um toque no cubo vira arrasto (órbita) e não clique. */
 const DRAG_PX = 4;
@@ -14,25 +24,31 @@ interface ViewCubeProps {
 const FACES = CUBE_FACES.map((face) => ({ face, cells: faceCells(face) }));
 
 /**
- * ViewCube: cubo em CSS 3D sobre a vista 3D, com as 26 zonas clicáveis (6 faces, 12 arestas, 8 cantos). Gira com a
- * câmera; arrastar sobre ele orbita; clicar numa zona anima a câmera até a vista dela. Não cria um renderizador WebGL.
+ * ViewCube: cubo em CSS 3D sobre a vista 3D, com as 26 zonas (6 faces, 12 arestas, 8 cantos). Gira com a câmera.
+ * O palco resolve o ponteiro pela geometria do cubo (`zoneAtPoint`), e não pelo teste de acerto do navegador, que
+ * falha em costuras de faces giradas. Arrastar sobre o cubo orbita; clicar numa zona anima até a vista dela. As células
+ * são botões para o teclado (Tab e Enter). Não cria um renderizador WebGL.
  */
 export function ViewCube({ model }: ViewCubeProps): ReactElement {
   const orbit = model.orbit;
   // Lê a câmera a cada redesenho (arrasto, animação e Início mudam o contador de desenho).
   useUi((s) => s.previewTick);
+  const [hover, setHover] = useState<CubeZone | null>(null);
   const redraw = (): void => useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
-  // Um arrasto sobre o cubo não pode virar clique na zona sob o ponteiro ao soltar.
-  const suppressClick = useRef(false);
-
   const go = (v: { azimuth: number; elevation: number }): void => {
     orbit.animateTo(v);
     redraw();
   };
 
+  /** Zona sob o ponteiro: o centro do palco é o centro do cubo. */
+  const zoneAt = (stage: HTMLElement, ev: { clientX: number; clientY: number }): CubeZone | null => {
+    const r = stage.getBoundingClientRect();
+    return zoneAtPoint(orbit.azimuth, orbit.elevation, ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2), CUBE_HALF_PX);
+  };
+
   const onStagePointerDown = (e: RPointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0) return;
-    suppressClick.current = false;
+    const stage = e.currentTarget;
     const start = { x: e.clientX, y: e.clientY };
     let last = start;
     let moved = false;
@@ -43,23 +59,26 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
       last = { x: ev.clientX, y: ev.clientY };
       redraw();
     };
-    const up = (): void => {
+    const finish = (): void => {
       window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('pointercancel', up);
-      suppressClick.current = moved;
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', finish);
+    };
+    const onUp = (ev: PointerEvent): void => {
+      finish();
+      if (moved) return;
+      const z = zoneAt(stage, ev);
+      if (z) go(viewForZone(z.sign, orbit.azimuth));
     };
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', finish);
   };
 
-  const onZone = (zone: CubeZone) => (): void => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
-    go(viewForZone(zone.sign, orbit.azimuth));
+  const onStagePointerMove = (e: RPointerEvent<HTMLDivElement>): void => {
+    if (e.buttons !== 0) return; // com botão apertado é arrasto, tratado pelo listener da janela
+    const z = zoneAt(e.currentTarget, e);
+    setHover((h) => (h?.id === z?.id ? h : z));
   };
 
   const turn = (dir: 1 | -1) => (): void => go({ azimuth: turnAzimuth(orbit.azimuth, dir), elevation: orbit.elevation });
@@ -72,11 +91,19 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
     redraw();
   };
 
+  const cubeStyle = { transform: cubeMatrix(orbit.azimuth, orbit.elevation), '--vc-half': `${CUBE_HALF_PX}px` } as CSSProperties;
+
   return (
-    // O ponteiro não chega ao canvas por baixo: ele captura o ponteiro (e o clique iria para o canvas, não para o botão).
+    // O ponteiro não chega ao canvas por baixo: sem isso o canvas captura o ponteiro e o clique nos botões some.
     <div className="viewcube" role="group" aria-label="Controle da vista 3D" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="vc-stage" onPointerDown={onStagePointerDown}>
-        <div className="vc-cube" style={{ transform: cubeMatrix(orbit.azimuth, orbit.elevation) }}>
+      <div
+        className="vc-stage"
+        title={hover ? hover.name : 'Clique numa zona para ir à vista; arraste para girar a vista'}
+        onPointerDown={onStagePointerDown}
+        onPointerMove={onStagePointerMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <div className="vc-cube" style={cubeStyle}>
           {FACES.map(({ face, cells }) => (
             <div key={face} className={`vc-face vc-face--${face}`} style={{ transform: FACE_TRANSFORM[face] }}>
               {cells.map(({ row, col, zone }) => (
@@ -85,11 +112,11 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
                   type="button"
                   data-testid="viewcube"
                   data-face={zone.id}
-                  className={`vc-cell vc-cell--${zone.kind}`}
+                  className={`vc-cell vc-cell--${zone.kind}${hover?.id === zone.id ? ' is-hover' : ''}`}
                   style={{ gridRow: row + 1, gridColumn: col + 1 }}
                   aria-label={zone.name}
                   title={zone.name}
-                  onClick={onZone(zone)}
+                  onClick={() => go(viewForZone(zone.sign, orbit.azimuth))}
                 >
                   {zone.label}
                 </button>

@@ -24,6 +24,8 @@ Orientação solar (hemisfério sul): a fachada sul é a menos insolada (sol do 
 
 ### Térreo (≈ 96 m² de piso coberto, mais garagem e varanda)
 
+Nota: as dimensões desta seção são o programa de partida. Quando divergirem, vale o partido de `B-projeto-planta.md` (seções 1.1, 2 e 3), que é a versão que fecha as coordenadas. Diferenças principais: a escada tem 1,20 m de largura, a garagem 5,50 × 5,50 m, e a cozinha e a varanda mudam de forma para caber na caixa de 12 × 14 m.
+
 | Ambiente | Área alvo (m²) | Dimensão mínima (m) | Dimensões propostas (m) | Justificativa |
 |---|---|---|---|---|
 | Garagem coberta (2 vagas) | 27–30 | 5,00 × 5,50 por vaga | 5,50 × 5,20 (duas vagas lado a lado, 2,75 m cada, no vão de 5,50) | Porta de acesso ao hall e à cozinha |
@@ -34,7 +36,7 @@ Orientação solar (hemisfério sul): a fachada sul é a menos insolada (sol do 
 | Área de serviço | 4–6 | 1,50 de lado | 2,40 × 1,60 | Ligada à cozinha, acesso pelo corredor de serviço |
 | Lavabo | 2–3 | 1,00 × 1,50 | 1,50 × 1,40 | Perto do hall, sem porta visível da sala |
 | Varanda gourmet coberta | 20–25 | 2,50 de profundidade | 6,50 × 3,00 (sob a laje do pavimento 2) | Sol do norte com cobertura; ligada à sala de jantar e à cozinha |
-| Escada em L | ≈ 12 de projeção | largura 1,10 m | ver B | Ligação hall → pavimento 2 |
+| Escada em L | ≈ 12 de projeção | largura 1,20 m | ver B, seção 4.4 | Ligação hall → pavimento 2 |
 
 ### Pavimento 2 (≈ 80 m² de piso)
 
@@ -94,7 +96,7 @@ Os valores abaixo vêm das normas do próprio app (`packages/engine/src/stairNor
 
 ## 5. Catálogo: o que o app tem e o que falta
 
-O catálogo está em `packages/model/src/defaults.ts`, `wallType.ts`, `floor.ts`, `slab.ts`, `roof.ts` e `stairTypes.ts`. Detalhes completos (ids, espessuras, símbolos) estão em `B-projeto-planta.md`, seção 0.
+O catálogo está em `packages/model/src/defaults.ts`, `wallType.ts`, `floor.ts`, `slab.ts`, `roof.ts` e `stairTypes.ts`. Os tipos usados no partido (ids e espessuras) estão em `B-projeto-planta.md`, seção 2, e os tipos novos propostos, na seção 7.
 
 Faltam para este projeto:
 

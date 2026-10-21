@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveLevel } from '@hestia/engine';
+import { generateStraightRun, resolveLevel } from '@hestia/engine';
 import { dxfLayerOfMaterial } from '@hestia/io';
-import { ProjectStore, buildTemplate, makeWall, type Opening } from '@hestia/model';
-import { planDxf } from './dxfExport.ts';
+import { ProjectStore, buildTemplate, makeStair, makeWall, type Opening, type StairRun } from '@hestia/model';
+import { planDxf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -49,5 +49,42 @@ describe('planDxf com o engine real', () => {
     const text = planDxf(p, 'lv_0', resolveLevel(p, 'lv_0'));
     expect(text).not.toContain('\r\nPOLYLINE\r\n');
     expect(text.endsWith('\r\n0\r\nEOF\r\n')).toBe(true);
+  });
+});
+
+describe('escadas no DXF (camadas ESCADA, ESCADA_ESPELHO e ESCADA_SETA)', () => {
+  it('um lance reto com 5 espelhos: 4 degraus fechados, 5 espelhos e a seta de subida', () => {
+    const store = new ProjectStore(buildTemplate('blank'));
+    const sketch = generateStraightRun({ start: { x: 0.6, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risers: 5, tread: 0.28 });
+    const run: StairRun = { id: 'r1', kind: 'run', ...sketch };
+    store.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: 'stt_monolitica', levelId: 'lv_0', components: [run] }) });
+    const p = store.project;
+    const text = planDxf(p, 'lv_0', resolveLevel(p, 'lv_0'));
+
+    // Conta registros de entidade (0/POLYLINE ou 0/LINE seguido da camada), não ocorrências do nome da camada.
+    const polylines = text.match(/\r\n0\r\nPOLYLINE\r\n8\r\nESCADA\r\n/g) ?? [];
+    expect(polylines).toHaveLength(4);
+    const risers = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_ESPELHO\r\n/g) ?? [];
+    expect(risers).toHaveLength(5);
+    // seta: haste e duas pontas
+    const arrow = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? [];
+    expect(arrow).toHaveLength(3);
+    expect(text.endsWith('\r\n0\r\nEOF\r\n')).toBe(true);
+  });
+
+  it('sem escada, nenhuma camada de escada aparece', () => {
+    const p = buildTemplate('blank');
+    const text = planDxf(p, 'lv_0', resolveLevel(p, 'lv_0'));
+    expect(text).not.toContain('ESCADA');
+  });
+
+  it('a seta sai do primeiro espelho e aponta para o último (no sentido da subida)', () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 0, y: 2 };
+    const arrow = stairArrow(a, b);
+    expect(arrow[0]).toEqual([a, b]);
+    // as pontas ficam atrás da ponta da seta (y menor que 2)
+    for (const [, end] of arrow.slice(1)) expect(end.y).toBeLessThan(2);
+    expect(stairArrow(a, a)).toEqual([]);
   });
 });

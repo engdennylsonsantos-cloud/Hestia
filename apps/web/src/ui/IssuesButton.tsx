@@ -3,7 +3,6 @@ import type { ValidationIssue } from '@hestia/model';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { groupIssues, summarize, worstSeverity } from '../editor/issuesView.ts';
 import { useIssues } from '../editor/useIssues.ts';
-import { useUi } from '../editor/state.ts';
 
 /** Botão de avisos da barra de status, com popover de lista agrupada por severidade. */
 export function IssuesButton(): ReactElement {

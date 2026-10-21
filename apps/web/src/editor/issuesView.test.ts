@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeStair, makeWall, type Opening, type Project, type StairRun, type ValidationIssue, type Wall } from '@hestia/model';
 import { groupIssues, issueTarget, summarize, worstSeverity } from './issuesView.ts';
 
 const err = (code: string, elementId?: string): ValidationIssue => ({ severity: 'error', code, message: `erro ${code}`, ...(elementId ? { elementId } : {}) });
@@ -80,5 +80,19 @@ describe('destino de "Ir para"', () => {
     const orphan: Wall = { ...makeWall({ id: 'w2', typeId: 'wt_alv14', levelId: 'lv_9', a: { x: 0, y: 5 }, b: { x: 3, y: 5 } }), order: 99 };
     const withOrphan: Project = { ...p, elements: { ...p.elements, w2: orphan } };
     expect(issueTarget(withOrphan, warn('x', 'w2'))).toEqual({ elementId: 'w2', levelId: null, center: { x: 1.5, y: 5 } });
+  });
+});
+
+describe('Ir para: escada', () => {
+  it('aponta para o nível da escada e enquadra a caixa dos limites e espelhos', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const c = (ax: number, ay: number, bx: number, by: number) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag: 0 });
+    const run: StairRun = { id: 'r1', kind: 'run', boundaryLeft: [c(2, 0, 2, 3)], boundaryRight: [c(3, 0, 3, 3)], risers: [c(2, 1, 3, 1)], path: [] };
+    store.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: 'stt_monolitica', levelId: 'lv_0', components: [run] }) });
+    const t = issueTarget(store.project, { severity: 'warning', code: 'x', message: 'aviso', elementId: 'st1' });
+    expect(t).not.toBeNull();
+    expect(t!.levelId).toBe('lv_0');
+    expect(t!.box).toEqual({ minX: 2, minY: 0, maxX: 3, maxY: 3 });
+    expect(t!.center).toEqual({ x: 2.5, y: 1.5 });
   });
 });

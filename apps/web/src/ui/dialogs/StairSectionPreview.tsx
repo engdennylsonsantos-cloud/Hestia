@@ -12,9 +12,10 @@ export function StairSectionPreview({ type }: { type: StairType }): ReactElement
   const mono = type.runStyle === 'monolithic';
   const d = mono ? Math.max(type.structuralDepth, 0) : 0;
   // Perfil dos degraus (y para cima, chão em y = 0).
-  const top: Array<[number, number]> = [[0, 0]];
+  type Pt = [number, number];
+  const top: Pt[] = [[0, 0]];
   for (let i = 0; i < n; i++) top.push([i * t, (i + 1) * r], [(i + 1) * t, (i + 1) * r]);
-  const body = mono ? [...top, [n * t, n * r - d], [0, -d]] : [...top, [n * t, 0]];
+  const body: Pt[] = mono ? [...top, [n * t, n * r - d], [0, -d]] : [...top, [n * t, 0]];
   const pad = 0.25;
   const xs = body.map((q) => q[0]);
   const ys = body.map((q) => q[1]);

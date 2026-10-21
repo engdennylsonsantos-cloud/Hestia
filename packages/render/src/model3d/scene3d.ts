@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
-import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
+import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
+import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
 import { OrbitCamera } from './orbit.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
-import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type SolidBatch } from './solids.ts';
+import { disposeHighlight, highlightOf, type HighlightStyle } from './highlight3d.ts';
+import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
 
 /**
  * Opções herdadas. A vista 3D lê arestas e sombras de `view3dOf(p)` (decisão 0015 §2.2): `edges` e `shadows` são
@@ -37,6 +39,14 @@ export function sunDirection(azimuth: number, elevation: number): THREE.Vector3 
 const isLineStyle = (s: VisualStyle): boolean => s === 'hiddenLine' || s === 'wireframe';
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
+/** Sobreposição de realce (seleção ou elemento sob o cursor) e a chave que a identifica, para não refazê-la à toa. */
+interface Highlight {
+  key: string;
+  obj: THREE.Object3D;
+}
+/** Ranhuras do realce: a seleção (`sel`) e o elemento sob o cursor (`hov`). */
+type HighlightSlot = 'sel' | 'hov';
+
 /** Estado de uma atualização: a vista 3D, o tema e as arestas e sombras efetivas desta vista. */
 interface Frame3D {
   view: View3DSettings;
@@ -52,6 +62,12 @@ export class ModelScene {
   readonly scene = new THREE.Scene();
   readonly orbit = new OrbitCamera();
   private model = new THREE.Group();
+  /** Sobreposições de realce, fora do modelo: não entram nas malhas do modelo nem no picking por faixas. */
+  private highlightLayer = new THREE.Object3D();
+  /** Malhas só de picking no wireframe (fora do modelo; ver `buildPickLayer`) e as peças que as originam nesta atualização. */
+  private pickLayer = new THREE.Object3D();
+  private pickSources: Array<{ geo: THREE.BufferGeometry; owner: THREE.Object3D; kind: GraphicsCategory; ranges: ElementRange[] }> = [];
+  private hl: Record<HighlightSlot, Highlight | null> = { sel: null, hov: null };
   /** Materiais por chave (estilo, tema, categoria, transparência, meio-tom, material). Os que a última atualização não usou saem. */
   private mats = new Map<string, THREE.Material>();
   private used = new Set<string>();
@@ -63,6 +79,8 @@ export class ModelScene {
 
   constructor() {
     this.scene.add(this.model);
+    this.scene.add(this.pickLayer);
+    this.scene.add(this.highlightLayer);
     const hemi = new THREE.HemisphereLight(0xf4f7fb, 0xb9b2a4, 1.25);
     hemi.position.set(0, 0, 1);
     this.scene.add(hemi);
@@ -143,19 +161,36 @@ export class ModelScene {
   }
 
   /**
-   * Desenha uma peça: a malha, quando o estilo tem faces, e as arestas, quando `edges`. No wireframe a geometria serve só
-   * para as arestas (que são cópias), então é descartada.
+   * Desenha uma peça: a malha, quando o estilo tem faces, e as arestas, quando `edges`. A malha leva `userData.kind`
+   * (categoria) e `userData.ranges` (faixas dos elementos, decisão 0016), que é o que o picking lê. No wireframe não há
+   * faces na cena (decisão 0015): a geometria vai para a lista de picking, montada à parte no fim (`buildPickLayer`).
    */
-  private draw(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: Material | undefined, cat: GraphicsCategory, edges: boolean): void {
-    const faces = this.frame.view.style !== 'wireframe';
-    if (faces) {
+  private draw(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: Material | undefined, cat: GraphicsCategory, edges: boolean, ranges: ElementRange[]): void {
+    if (this.frame.view.style !== 'wireframe') {
       const mesh = new THREE.Mesh(geo, this.faceMaterial(m, cat));
       mesh.castShadow = this.frame.shadows;
       mesh.receiveShadow = this.frame.shadows;
+      mesh.userData = { kind: cat, ranges };
       parent.add(mesh);
-    }
+    } else this.pickSources.push({ geo, owner: parent, kind: cat, ranges });
     if (edges) parent.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, EDGE_ANGLE), this.edgeMaterial()));
-    if (!faces) geo.dispose();
+  }
+
+  /**
+   * Malhas só de picking no wireframe: sem cor nem profundidade (não aparecem), na transformação do grupo de origem. Fora do
+   * modelo (`pickLayer`), para o modelo continuar sem malhas nesse estilo.
+   */
+  private buildPickLayer(): void {
+    this.model.updateMatrixWorld(true);
+    const pick = this.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    for (const s of this.pickSources) {
+      const mesh = new THREE.Mesh(s.geo, pick);
+      mesh.matrixAutoUpdate = false;
+      mesh.matrix.copy(s.owner.matrixWorld);
+      mesh.userData = { kind: s.kind, ranges: s.ranges };
+      this.pickLayer.add(mesh);
+    }
+    this.pickSources = [];
   }
 
   private clearModel(): void {
@@ -166,6 +201,43 @@ export class ModelScene {
         g?.dispose();
       });
     }
+    for (const ch of [...this.pickLayer.children]) {
+      this.pickLayer.remove(ch);
+      ch.traverse((o) => {
+        const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+        g?.dispose();
+      });
+    }
+    this.pickSources = [];
+  }
+
+  /**
+   * Realce na vista 3D (decisão 0016 §4): a seleção (preenchimento 0,35, arestas firmes) e o elemento sob o cursor
+   * (0,15, se não for da seleção). Só refaz a sobreposição que mudou; a malha do modelo não é reconstruída.
+   */
+  highlight(selection: readonly Id[], hover: Id | null): void {
+    const color = this.frame.dark ? DARK.select : LIGHT.select;
+    this.setHighlight('sel', selection, { color, fill: 0.35, edges: 1 });
+    this.setHighlight('hov', hover && !selection.includes(hover) ? [hover] : [], { color, fill: 0.15, edges: 0.6 });
+  }
+
+  private setHighlight(slot: HighlightSlot, ids: readonly Id[], style: HighlightStyle): void {
+    const key = `${String(style.color)}|${ids.join(',')}`;
+    const cur = this.hl[slot];
+    if (cur?.key === key) return;
+    if (cur) this.dropHighlight(slot);
+    if (!ids.length) return;
+    const obj = highlightOf(this.scene, ids, style);
+    this.highlightLayer.add(obj);
+    this.hl[slot] = { key, obj };
+  }
+
+  private dropHighlight(slot: HighlightSlot): void {
+    const cur = this.hl[slot];
+    if (!cur) return;
+    this.highlightLayer.remove(cur.obj);
+    disposeHighlight(cur.obj);
+    this.hl[slot] = null;
   }
 
   update(p: Project, levels: ResolvedLevel[], opt: Scene3DOptions): void {
@@ -178,6 +250,9 @@ export class ModelScene {
     };
     this.used = new Set();
     this.clearModel();
+    // O realce guarda cópias dos triângulos: com o modelo refeito, refaz-se (a seleção e o cursor são lidos de novo).
+    this.dropHighlight('sel');
+    this.dropHighlight('hov');
     const shown = (c: GraphicsCategory): boolean => view.overrides[c].visible;
     const stairs = resolveStairs(p);
     for (const lv0 of levels) {
@@ -202,7 +277,7 @@ export class ModelScene {
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
         g.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
         g.setIndex(b.indices);
-        this.draw(this.model, g, p.materials[b.materialId] ?? eave.materials[b.materialId], b.category, this.frame.edges);
+        this.draw(this.model, g, p.materials[b.materialId] ?? eave.materials[b.materialId], b.category, this.frame.edges, b.ids);
       }
       for (const w of wallsOnLevel(p, lv.levelId)) {
         const f = frameOfWall(p, w.id);
@@ -215,8 +290,9 @@ export class ModelScene {
         }
       }
     }
+    this.buildPickLayer();
     this.boxCache = new THREE.Box3().setFromObject(this.model);
-    const bg = new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
+    const bg =new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
     this.ground.visible = view.style !== 'wireframe';
     this.ground.receiveShadow = this.frame.shadows;
     (this.ground.material as THREE.MeshStandardMaterial).color.set(opt.dark ? 0x2a2f36 : 0xe3dfd6);
@@ -259,8 +335,10 @@ export class ModelScene {
     const edges = isLineStyle(this.frame.view.style);
     const frameMat = p.materials[t.frameMaterialId];
     const glassMat = p.materials[t.glassMaterialId];
+    // Cada peça da esquadria é um elemento inteiro: a faixa cobre a geometria toda (decisão 0016).
     const add = (w: number, d: number, hh: number, x: number, z: number, m: Material | undefined): void => {
-      this.draw(grp, new THREE.BoxGeometry(w, d, hh).translate(x, 0, z), m, cat, edges);
+      const box = new THREE.BoxGeometry(w, d, hh).translate(x, 0, z);
+      this.draw(grp, box, m, cat, edges, [{ id: o.id, start: 0, count: box.index?.count ?? 0 }]);
     };
     const jamb = 0.05;
     const depth = Math.min(g.thickness, 0.09);
@@ -276,6 +354,8 @@ export class ModelScene {
     }
     grp.rotation.z = Math.atan2(g.u.y, g.u.x);
     grp.position.set(g.center.x, g.center.y, baseZ + g.sill);
+    grp.userData.elementId = o.id;
+    for (const c of grp.children) c.userData.elementId = o.id;
     return grp;
   }
 
@@ -293,6 +373,8 @@ export class ModelScene {
 
   dispose(): void {
     this.clearModel();
+    this.dropHighlight('sel');
+    this.dropHighlight('hov');
     for (const m of this.mats.values()) m.dispose();
     this.mats.clear();
     this.ground.geometry.dispose();

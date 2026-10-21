@@ -21,6 +21,7 @@ import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type View
 import { useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
+import { selectionAfterClick } from './selectionClick.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -223,7 +224,18 @@ export class Editor {
       }
       return false;
     }
-    if (ui.view === '3d') return false;
+    // Vista 3D: sem ferramentas de desenho. Esc limpa a seleção e Delete a exclui, como na planta (decisão 0016 §5).
+    if (ui.view === '3d') {
+      if (k === 'Escape' && ui.selection.length) {
+        this.clickSelect3d(null, false);
+        return true;
+      }
+      if ((k === 'Delete' || k === 'Backspace') && ui.selection.length) {
+        this.deleteSelection();
+        return true;
+      }
+      return false;
+    }
     if (k === 'Escape') {
       if (ui.typed) useUi.setState({ typed: '' });
       else this.tool.cancel();
@@ -273,6 +285,17 @@ export class Editor {
   }
 
   // ---------- seleção e edição ----------
+  /**
+   * Clique na vista 3D (sem arrasto, decisão 0016 §3): o elemento sob o cursor vai para a seleção comum da planta, a da
+   * árvore e a das propriedades. `hit` null é o vazio. Com `additive` (Shift/Ctrl), entra ou sai da seleção.
+   */
+  clickSelect3d(hit: Id | null, additive: boolean): void {
+    const ui = useUi.getState();
+    const next = selectionAfterClick(ui.selection, hit, additive);
+    useUi.setState({ selection: next, roofEdge: next.length === 1 && ui.roofEdge?.roofId === next[0] ? ui.roofEdge : null });
+    this.bump();
+  }
+
   private pruneSelection(): void {
     const sel = useUi.getState().selection;
     const p = this.store.project;
@@ -364,7 +387,8 @@ export class Editor {
   }
 
   setView(v: 'plan' | '3d'): void {
-    useUi.setState({ view: v });
+    // O cursor sob a planta e o sob o 3D são de vistas diferentes: o realce de um não vale no outro.
+    useUi.setState({ view: v, hover: null });
   }
 
   // ---------- arquivo ----------

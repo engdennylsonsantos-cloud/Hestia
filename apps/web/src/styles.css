@@ -206,6 +206,23 @@ svg { display: block; }
 .typebox .buf:empty::after { content: '…'; color: var(--fg-faint); }
 .cornerbtns { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; }
 .cornerbtns .ibtn { background: var(--panel); border-color: var(--line-strong); }
+/* ViewCube (vista 3D): cubo em CSS 3D ortogonal abaixo do botão de enquadrar; zonas de no mínimo 28 px. */
+.viewcube { position: absolute; right: 10px; top: 48px; z-index: 2; width: 168px; display: grid; justify-items: center; gap: 4px; user-select: none; -webkit-user-select: none; }
+.vc-stage { width: 152px; height: 152px; display: grid; place-items: center; touch-action: none; cursor: grab; }
+.vc-stage:active { cursor: grabbing; }
+.vc-cube { --vc-half: 52px; position: relative; width: 104px; height: 104px; transform-style: preserve-3d; }
+.vc-face { position: absolute; inset: 0; display: grid; grid-template-columns: 28px 48px 28px; grid-template-rows: 28px 48px 28px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.vc-cell { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 1px solid var(--line-strong); background: var(--panel); color: var(--fg-soft); font-size: 8px; font-weight: 700; line-height: 1; letter-spacing: 0.02em; cursor: pointer; box-sizing: border-box; }
+.vc-cell--face { background: var(--sheet); color: var(--fg); }
+.vc-cell:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.vc-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
+.vc-tools { display: flex; align-items: center; gap: 4px; }
+.vc-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--fg); border-radius: var(--r); font-size: 11px; cursor: pointer; }
+.vc-btn svg { width: 16px; height: 16px; }
+.vc-btn--wide { min-width: 88px; }
+.vc-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.vc-btn[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.vc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .cpu-note { position: absolute; left: 12px; top: 10px; background: var(--panel); border: 1px solid var(--warn); color: var(--warn); border-radius: 4px; padding: 3px 8px; font-size: 11px; }
 
 /* ---- barra de status ---- */

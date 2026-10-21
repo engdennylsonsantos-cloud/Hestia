@@ -1,4 +1,4 @@
-import { closestOnSegment, intersection, orientedRect, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
@@ -6,9 +6,10 @@ import { resolveFloors } from './floors.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
-import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
+import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
+import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
 
 export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
 
@@ -18,21 +19,42 @@ export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts'
  * Convenção do desenho: x = distância ao longo da linha (a→b), y = cota (z absoluta). O observador olha para a
  * normal à esquerda da linha; assim x cresce para a direita. Uma elevação é o mesmo cálculo com a linha fora da
  * construção e `depth` grande, onde nada é cortado e tudo é projetado.
+ *
+ * Linha oculta (como Revit e Archicad): todo elemento opaco (paredes, pisos, lajes, telhados, escadas e aberturas, com
+ * caixilho, folha e vidro) esconde o que está atrás dele. O resultado traz só a parte visível de cada item (ver
+ * `sectionOcclusion.ts`); o plano de corte é o mais próximo, então o cortado oculta tudo o que está além.
  */
-export interface SectionRegion {
-  materialId: Id;
-  /** Polígonos em (t, z). */
-  polygons: MultiPolygon;
-}
 
-/** Elemento visto além do plano de corte; a lista vem ordenada do mais longe ao mais perto (pintor). */
-export interface SectionBeyond {
-  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, de laje, com `slabId`, de telhado, com `roofId`, ou de escada, com `stairId`: degrau, patamar ou espelho). */
+/**
+ * Origem de um item da seção: o elemento do modelo de onde ele veio. Preenchido o campo do tipo de origem (parede,
+ * piso, laje, telhado, escada ou abertura); os demais ficam ausentes.
+ */
+export interface SectionOrigin {
   wallId?: Id;
   floorId?: Id;
   slabId?: Id;
   roofId?: Id;
   stairId?: Id;
+  openingId?: Id;
+}
+
+/**
+ * Material cortado no plano de corte, unido por material. `polygons` é a parte visível em (t, z); `sources` lista os
+ * elementos de origem que contribuíram (sem repetição) para que a seleção ache o elemento de volta.
+ */
+export interface SectionRegion extends SectionOrigin {
+  materialId: Id;
+  /** Polígonos em (t, z), já sem o que está na frente. */
+  polygons: MultiPolygon;
+  sources: SectionOrigin[];
+}
+
+/**
+ * Camada de elemento visto além do plano de corte (parede, piso, laje, telhado ou escada). `polygons` é só a parte
+ * visível em (t, z); `depth` é a distância do plano ao ponto mais próximo do item inteiro (ordem de oclusão).
+ * A lista vem do mais longe ao mais perto (ordem de pintura) e não traz itens totalmente ocultos.
+ */
+export interface SectionBeyond extends SectionOrigin {
   materialId: Id;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
@@ -40,6 +62,7 @@ export interface SectionBeyond {
   polygons: MultiPolygon;
 }
 
+/** Vão de porta ou janela. `t0..z1` é a caixa do vão; `polygons` é a parte visível (sem o que está na frente). */
 export interface SectionOpening {
   openingId: Id;
   kind: 'door' | 'window';
@@ -50,6 +73,7 @@ export interface SectionOpening {
   depth: number;
   /** O plano de corte atravessa o vão. */
   cut: boolean;
+  polygons: MultiPolygon;
 }
 
 export interface SectionLevelMark {
@@ -62,12 +86,29 @@ export interface SectionResult {
   length: number;
   zMin: number;
   zMax: number;
+  /** Cortes por material, visíveis (depth 0). */
   cut: SectionRegion[];
+  /** União das regiões visíveis de cortes, paredes, pisos, lajes, telhados e escadas (não inclui os vãos). */
   silhouette: MultiPolygon;
+  /** Além do plano, visível, do mais longe ao mais perto. */
   beyond: SectionBeyond[];
+  /** Vãos visíveis, do mais longe ao mais perto. */
   openings: SectionOpening[];
   levels: SectionLevelMark[];
 }
+
+/** Origens distintas (por valor), na ordem da primeira aparição. */
+const uniqueOrigins = (list: SectionOrigin[]): SectionOrigin[] => {
+  const seen = new Set<string>();
+  const out: SectionOrigin[] = [];
+  for (const o of list) {
+    const key = JSON.stringify(o);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(o);
+  }
+  return out;
+};
 
 /** Camada de laje entre as cotas de base (b0 em t0, b1 em t1) e de topo (u0 em t0, u1 em t1): trapézio se inclinada. */
 const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
@@ -82,7 +123,14 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   const empty: SectionResult = { length, zMin: 0, zMax: 3, cut: [], silhouette: [], beyond: [], openings: [], levels: [] };
   if (length < 1e-6) return empty;
 
-  const cutBy = new Map<Id, Polygon[]>();
+  // Cortes por material (união depois, antes da oclusão); cada polígono guarda a origem para `sources`.
+  const cutBy = new Map<Id, Array<{ polygon: Polygon; origin: SectionOrigin }>>();
+  const addCut = (materialId: Id, polygon: Polygon, origin: SectionOrigin): void => {
+    const list = cutBy.get(materialId) ?? [];
+    list.push({ polygon, origin });
+    cutBy.set(materialId, list);
+  };
+  // Além e vãos ainda sem oclusão (projeção completa): a oclusão e a parte visível vêm no fim.
   const beyond: SectionBeyond[] = [];
   const openings: SectionOpening[] = [];
   let zMin = Infinity;
@@ -105,9 +153,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             const lo = Math.max(0, t0);
             const hi = Math.min(length, t1);
             if (hi - lo < EPS_T) continue;
-            const list = cutBy.get(layer.materialId) ?? [];
-            list.push([rect(lo, hi, layer.z0, layer.z1)]);
-            cutBy.set(layer.materialId, list);
+            addCut(layer.materialId, [rect(lo, hi, layer.z0, layer.z1)], { floorId: f.floorId });
             grow(layer.z0, layer.z1);
           }
         }
@@ -140,9 +186,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             if (hi - lo < EPS_T) continue;
             const rl = slabRiseAt(sl.slope, { x: line.a.x + d.x * lo, y: line.a.y + d.y * lo });
             const rh = slabRiseAt(sl.slope, { x: line.a.x + d.x * hi, y: line.a.y + d.y * hi });
-            const list = cutBy.get(layer.materialId) ?? [];
-            list.push([slabQuad(lo, hi, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)]);
-            cutBy.set(layer.materialId, list);
+            addCut(layer.materialId, [slabQuad(lo, hi, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)], { slabId: sl.slabId });
             grow(layer.z0 + Math.min(rl, rh), layer.z1 + Math.max(rl, rh));
           }
         }
@@ -153,28 +197,28 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
           const tMin = Math.max(0, Math.min(...ts));
           const tMax = Math.min(length, Math.max(...ts));
           if (tMax - tMin < EPS_T) continue;
-          // Cota de cada extremo: a do vértice da laje que tem o menor e o maior t (trapézio entre as duas).
-          const rl = slabRiseAt(sl.slope, outer[ts.indexOf(Math.min(...ts))]!);
-          const rh = slabRiseAt(sl.slope, outer[ts.indexOf(Math.max(...ts))]!);
+          // Laje plana: retângulo. Inclinada: projeção exata do prisma (a cota sobe linear sobre o contorno).
+          const rise = (v: Vec2): number => slabRiseAt(sl.slope, v);
+          const zs = outer.map(rise);
           beyond.push({
             slabId: sl.slabId,
             materialId: layer.materialId,
             layerIndex: layer.layerIndex,
             depth: Math.max(0, Math.min(...outer.map(dist))),
-            polygons: [[slabQuad(tMin, tMax, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)]],
+            polygons: sl.slope ? prismProjection(outer, along, (v) => layer.z0 + rise(v), (v) => layer.z1 + rise(v)) : [[rect(tMin, tMax, layer.z0, layer.z1)]],
           });
-          grow(layer.z0 + Math.min(rl, rh), layer.z1 + Math.max(rl, rh));
+          grow(layer.z0 + Math.min(...zs), layer.z1 + Math.max(...zs));
         }
       }
     }
     // Telhados (D3): como as lajes, por água e por camada (cada faixa segue a cota da água menos `below`).
     const rf = sectionOfRoofs(resolveRoofs(p, levelId), line);
-    for (const c of rf.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
+    for (const c of rf.cut) addCut(c.materialId, c.polygon, { roofId: c.roofId });
     beyond.push(...rf.beyond);
     grow(rf.zMin, rf.zMax);
     // Escadas (decisão 0011 §6) das que nascem neste nível: degraus, patamares e espelhos (`sectionStairs.ts`).
     const sk = sectionOfStairs(resolveStairsOnLevel(p, levelId), line, p);
-    for (const c of sk.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
+    for (const c of sk.cut) addCut(c.materialId, c.polygon, { stairId: c.stairId });
     beyond.push(...sk.beyond);
     grow(sk.zMin, sk.zMax);
     for (const w of wallsOnLevel(p, levelId)) {
@@ -190,10 +234,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
               const lo = Math.max(0, t0);
               const hi = Math.min(length, t1);
               if (hi - lo < EPS_T) continue;
-              const list = cutBy.get(layer.materialId) ?? [];
               const at = (t: number): number => (band.slope ? rw.baseZ + bandTopAt(band, { x: line.a.x + d.x * t, y: line.a.y + d.y * t }) : z1);
-              list.push([rect(lo, hi, z0, at(lo), at(hi))]);
-              cutBy.set(layer.materialId, list);
+              addCut(layer.materialId, [rect(lo, hi, z0, at(lo), at(hi))], { wallId: w.id });
               grow(z0, z1);
             }
           }
@@ -204,17 +246,13 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             const tMin = Math.max(0, Math.min(...ts));
             const tMax = Math.min(length, Math.max(...ts));
             if (tMax - tMin < EPS_T) continue;
-            const topAtVertex = (t: number): number => {
-              if (!band.slope) return z1;
-              const v = outer[ts.indexOf(t)] ?? outer[0]!;
-              return rw.baseZ + bandTopAt(band, v);
-            };
             beyond.push({
               wallId: w.id,
               materialId: layer.materialId,
               layerIndex: layer.layerIndex,
               depth: Math.max(0, Math.min(...outer.map(dist))),
-              polygons: [[rect(tMin, tMax, z0, topAtVertex(Math.min(...ts)), topAtVertex(Math.max(...ts)))]],
+              // Topo plano: retângulo; topo inclinado: projeção exata do prisma (como as lajes inclinadas).
+              polygons: band.slope ? prismProjection(outer, along, () => z0, (v) => rw.baseZ + bandTopAt(band, v)) : [[rect(tMin, tMax, z0, z1)]],
             });
             grow(z0, z1);
           }
@@ -232,24 +270,56 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         const t1 = Math.min(length, Math.max(...ts));
         if (t1 - t0 < EPS_T) continue;
         const z0 = rw.baseZ + g.sill;
-        openings.push({ openingId: o.id, kind: g.kind, t0, t1, z0, z1: z0 + g.height, depth: Math.max(0, Math.min(...foot.map(dist))), cut: crossing });
+        openings.push({ openingId: o.id, kind: g.kind, t0, t1, z0, z1: z0 + g.height, depth: Math.max(0, Math.min(...foot.map(dist))), cut: crossing, polygons: [[rect(t0, t1, z0, z0 + g.height)]] });
       }
     }
   }
 
+  // Linha oculta: corte (depth 0), vãos e o além numa só ordem do mais perto ao mais longe; cada um vê o que sobra.
+  type Ref = { cut: SectionRegion } | { beyond: SectionBeyond } | { opening: SectionOpening };
+  const refs: Ref[] = [];
+  const items: OcclusionItem[] = [];
+  for (const [materialId, list] of cutBy) {
+    const region: SectionRegion = {
+      materialId,
+      polygons: union(...list.map((c): MultiPolygon => [c.polygon])),
+      sources: uniqueOrigins(list.map((c) => c.origin)),
+    };
+    refs.push({ cut: region });
+    items.push({ depth: 0, rank: OCCLUSION_RANK.cut, polygons: region.polygons });
+  }
+  for (const b of beyond) {
+    refs.push({ beyond: b });
+    items.push({ depth: b.depth, rank: OCCLUSION_RANK.beyond, polygons: b.polygons });
+  }
+  for (const o of openings) {
+    refs.push({ opening: o });
+    items.push({ depth: o.depth, rank: OCCLUSION_RANK.opening, polygons: o.polygons });
+  }
+  const visible = visibleParts(items);
+  const cut: SectionRegion[] = [];
+  const beyondVisible: SectionBeyond[] = [];
+  const openingsVisible: SectionOpening[] = [];
+  refs.forEach((ref, i) => {
+    const polygons = visible[i]!;
+    if (polygons.length === 0) return;
+    if ('cut' in ref) cut.push({ ...ref.cut, polygons });
+    else if ('beyond' in ref) beyondVisible.push({ ...ref.beyond, polygons });
+    else openingsVisible.push({ ...ref.opening, polygons });
+  });
   // Telhado: as camadas projetam na mesma área (a face é inclinada), então a de cima (índice menor) desenha por último.
-  beyond.sort((x, y) => y.depth - x.depth || (x.roofId || y.roofId ? y.layerIndex - x.layerIndex : x.layerIndex - y.layerIndex));
-  openings.sort((x, y) => y.depth - x.depth);
-  const cut: SectionRegion[] = [...cutBy].map(([materialId, polys]) => ({ materialId, polygons: union(...polys.map((q): MultiPolygon => [q])) }));
-  const silhouette = union(...cut.map((c) => c.polygons));
+  beyondVisible.sort((x, y) => y.depth - x.depth || (x.roofId || y.roofId ? y.layerIndex - x.layerIndex : x.layerIndex - y.layerIndex));
+  openingsVisible.sort((x, y) => y.depth - x.depth);
+  const silhouette = unionClipper(...cut.map((c) => c.polygons), ...beyondVisible.map((b) => b.polygons));
   const levels = p.levels.map((l) => ({ levelId: l.id, name: l.name, z: l.elevation }));
   if (!isFinite(zMin)) return { ...empty, levels };
-  return { length, zMin, zMax, cut, silhouette, beyond, openings, levels };
+  return { length, zMin, zMax, cut, silhouette, beyond: beyondVisible, openings: openingsVisible, levels };
 }
 
 /** Telhado no corte (D3): quadriláteros da linha de corte por material e, além do plano, as faixas por camada. */
 export interface RoofSection {
-  cut: Array<{ materialId: Id; polygon: Polygon }>;
+  /** Corte por água e camada, com o telhado de origem (`roofId`). */
+  cut: Array<{ materialId: Id; polygon: Polygon; roofId: Id }>;
   beyond: SectionBeyond[];
   /** Cotas extremas (Infinity/-Infinity sem telhado na linha). */
   zMin: number;
@@ -325,7 +395,7 @@ export function sectionOfRoofs(roofs: ResolvedRoof[], line: SectionLine): RoofSe
             if (c > 0 && lo + k < hi && onEave(at(lo))) bl = { x: lo + k, y: top(at(lo + k)) - l.thickness };
             if (c < 0 && hi + k > lo && onEave(at(hi))) br = { x: hi + k, y: top(at(hi + k)) - l.thickness };
           }
-          out.cut.push({ materialId: l.materialId, polygon: [[bl, br, { x: hi, y: u1 }, { x: lo, y: u0 }]] });
+          out.cut.push({ materialId: l.materialId, polygon: [[bl, br, { x: hi, y: u1 }, { x: lo, y: u0 }]], roofId: r.roofId });
           out.zMin = Math.min(out.zMin, u0 - l.thickness, u1 - l.thickness);
           out.zMax = Math.max(out.zMax, u0, u1);
         }

@@ -2,7 +2,7 @@ import { add, mul, norm, perp, ringArea, sub, type Ring, type Vec2 } from '@hest
 import { pieceBottomZ, stairBody, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type StairBodyPiece } from '@hestia/engine';
 import type { Id, StairType } from '@hestia/model';
 import { riserPoints } from '../stairRisers.ts';
-import { extrudeCaps, pushWall, type SolidBatch } from './solids.ts';
+import { extrudeCaps, ofElement, pushWall, type SolidBatch } from './solids.ts';
 
 /** Tolerância (m) para reconhecer a cota de um degrau igual à de um espelho. */
 const Z_TOL = 1e-9;
@@ -64,7 +64,7 @@ export function riserSlab(s: ResolvedStair, r: ResolvedStairRiser, t: number): R
 function batchOf(byMat: Map<Id, SolidBatch>, m: Id): SolidBatch {
   let b = byMat.get(m);
   if (!b) {
-    b = { materialId: m, category: 'stair', positions: [], normals: [], indices: [] };
+    b = { materialId: m, category: 'stair', positions: [], normals: [], indices: [], ids: [] };
     byMat.set(m, b);
   }
   return b;
@@ -210,6 +210,8 @@ function splitTJunctions(b: SolidBatch): void {
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
+  /** Índice de saída de cada triângulo de entrada (as faixas dos elementos se remapeiam por ele). */
+  const firstOut: number[] = [];
   const emit = (tri: [V, V, V], n: number[]): void => {
     for (const v of tri) {
       indices.push(positions.length / 3);
@@ -218,6 +220,7 @@ function splitTJunctions(b: SolidBatch): void {
     }
   };
   for (let i = 0; i < b.indices.length; i += 3) {
+    firstOut.push(indices.length);
     const [i0, i1, i2] = [b.indices[i]!, b.indices[i + 1]!, b.indices[i + 2]!];
     const n = [b.normals[i0 * 3]!, b.normals[i0 * 3 + 1]!, b.normals[i0 * 3 + 2]!];
     const [A, B, C] = [corner(i0), corner(i1), corner(i2)];
@@ -230,6 +233,11 @@ function splitTJunctions(b: SolidBatch): void {
     const O: V = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3];
     for (let k = 0; k < poly.length; k++) emit([O, poly[k]!, poly[(k + 1) % poly.length]!], n);
   }
+  firstOut.push(indices.length);
+  b.ids = b.ids.map((r) => {
+    const start = firstOut[r.start / 3]!;
+    return { id: r.id, start, count: firstOut[(r.start + r.count) / 3]! - start };
+  });
   b.positions = positions;
   b.normals = normals;
   b.indices = indices;
@@ -258,7 +266,10 @@ export function buildStairSolids(stairs: ResolvedStair[], arrivalTopOf: (s: Reso
     const byBodyMaterial = new Map<Id, Body[]>();
     for (const body of bodies) byBodyMaterial.set(body.materialId, [...(byBodyMaterial.get(body.materialId) ?? []), body]);
     if (byBodyMaterial.size === 0) batchOf(byMat, s.type.materialId);
-    for (const [materialId, list] of byBodyMaterial) extrudeBodies(batchOf(byMat, materialId), list);
+    for (const [materialId, list] of byBodyMaterial) {
+      const b = batchOf(byMat, materialId);
+      ofElement(b, s.id, () => extrudeBodies(b, list));
+    }
   }
   const batches = [...byMat.values()];
   for (const b of batches) splitTJunctions(b);

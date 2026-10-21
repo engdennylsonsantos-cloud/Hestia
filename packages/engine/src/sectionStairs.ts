@@ -17,7 +17,8 @@ import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './se
  * material `postMaterialId`. Além do plano, cada bloco e peça projeta-se em (t, z).
  */
 export interface StairSection {
-  cut: Array<{ materialId: Id; polygon: Polygon }>;
+  /** Corte por escada: material e a escada de origem (`stairId`). */
+  cut: Array<{ materialId: Id; polygon: Polygon; stairId: Id }>;
   beyond: SectionBeyond[];
   /** Cotas extremas (Infinity/−Infinity sem escada na linha). */
   zMin: number;
@@ -112,7 +113,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
             { x: hi, y: piece.zTop },
             { x: lo, y: piece.zTop },
           ];
-          out.cut.push({ materialId: pieceMaterial, polygon: [ring] });
+          out.cut.push({ materialId: pieceMaterial, polygon: [ring], stairId: s.id });
           grow(Math.min(f0, f1), piece.zTop);
         }
         for (const sp of intersection([[piece.polygon]], slab)) {
@@ -157,7 +158,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
         const lo = Math.max(0, t0);
         const hi = Math.min(length, t1);
         if (hi - lo < EPS_T) continue;
-        out.cut.push({ materialId, polygon: [rect(lo, hi, b.z0, b.z1)] });
+        out.cut.push({ materialId, polygon: [rect(lo, hi, b.z0, b.z1)], stairId: s.id });
         grow(b.z0, b.z1);
       }
       // Além do plano (dentro da visão): projeção do bloco, do mais longe ao mais perto pelo `depth`.

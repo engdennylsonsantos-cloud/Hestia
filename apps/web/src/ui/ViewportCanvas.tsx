@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, planViewOf, pickModelPoint, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
+import { ViewCube } from './ViewCube.tsx';
 
 /** Escuro se o usuário escolheu escuro, ou se o tema do host/sistema for escuro. */
 export function useDark(): boolean {
@@ -153,8 +154,12 @@ export function ViewportCanvas(): ReactElement {
           useUi.setState({ seen3d: true });
         }
       }
+      // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).
+      m.highlight(st.selection, st.hover);
       g.gpu.renderer.shadowMap.enabled = v3.shadows;
       g.gpu.setSize(w, h, dpr);
+      // Animação da câmera (ViewCube, Início): avança a cada quadro e pede o próximo enquanto anima.
+      if (m.orbit.step(performance.now())) useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
       m.orbit.setAspect(w, h);
       safeRender(g, m.scene, m.orbit.camera);
       setLabels([]);
@@ -218,7 +223,8 @@ export function ViewportCanvas(): ReactElement {
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
-  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false });
+  /** `pick`: o ponteiro foi o botão esquerdo sem Espaço, então um clique sem arrasto na vista 3D escolhe um elemento (Shift pode ser pan). */
+  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
   const gesture = useRef<{ dist: number; mid: Pt } | null>(null);
   const spaceDown = useRef(false);
 
@@ -246,6 +252,26 @@ export function ViewportCanvas(): ReactElement {
     const r = host.current!.getBoundingClientRect();
     return pickModelPoint(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
   };
+  /** Elemento (parede, abertura, piso, laje, telhado, escada) sob o cursor na vista 3D; null no vazio (decisão 0016). */
+  const elementAt3d = (s: Pt) => {
+    const r = host.current!.getBoundingClientRect();
+    return pickElement(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
+  };
+  /**
+   * Realce ao passar o cursor sobre o 3D. Um raio por quadro (não por evento de ponteiro): o último ponto ganha.
+   */
+  const hover3d = useRef<{ at: Pt | null; frame: number }>({ at: null, frame: 0 });
+  const pickHover3d = (s: Pt): void => {
+    hover3d.current.at = s;
+    if (hover3d.current.frame) return;
+    hover3d.current.frame = requestAnimationFrame(() => {
+      hover3d.current.frame = 0;
+      const at = hover3d.current.at;
+      if (!at || useUi.getState().view !== '3d') return;
+      const id = elementAt3d(at)?.id ?? null;
+      if (useUi.getState().hover !== id) useUi.setState({ hover: id });
+    });
+  };
   const info = (e: RPointerEvent, s: Pt): { raw: Pt; shift: boolean; ctrl: boolean; alt: boolean } => {
     const v = editor.viewport() as Viewport;
     return { raw: screenToWorld(v, s), shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey };
@@ -269,16 +295,18 @@ export function ViewportCanvas(): ReactElement {
       return;
     }
     if (view === '3d') {
-      drag.current = { mode: panBtn ? 'pan' : 'orbit', start: s, last: s, moved: false };
+      drag.current = { mode: panBtn ? 'pan' : 'orbit', start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current };
+      // Ao pressionar, o realce some: enquanto arrasta, o cursor orbita e não destaca.
+      if (useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
     // Na vista de corte não há ferramentas: o botão esquerdo também arrasta a vista.
     if (panBtn || view === 'section') {
-      drag.current = { mode: 'pan', start: s, last: s, moved: false };
+      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: false };
       return;
     }
     if (!editor.viewport()) return;
-    drag.current = { mode: 'tool', start: s, last: s, moved: false };
+    drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false };
     editor.pointer('down', info(e, s));
   };
 
@@ -309,7 +337,7 @@ export function ViewportCanvas(): ReactElement {
         if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
         d.last = s;
         useUi.setState((st) => ({ previewTick: st.previewTick + 1 }));
-      }
+      } else pickHover3d(s);
       return;
     }
     if (d.mode === 'pan') {
@@ -344,13 +372,20 @@ export function ViewportCanvas(): ReactElement {
       editor.pointer('up', inf);
       if (!d.moved) editor.pointer('click', inf);
     }
-    // Clique sem arrasto na vista 3D, com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
-    if (d.mode === 'orbit' && !d.moved && useUi.getState().view === '3d' && editor.activeTool.pick3d) {
-      const hit = pick3dAt(s);
-      if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
-      else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
+    // Clique sem arrasto na vista 3D. Com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
+    // Sem essa ferramenta (seleção): seleciona o elemento sob o cursor; Shift/Ctrl acrescenta ou alterna (decisão 0016 §3).
+    if (!d.moved && d.pick && useUi.getState().view === '3d') {
+      if (editor.activeTool.pick3d) {
+        if (d.mode === 'orbit') {
+          const hit = pick3dAt(s);
+          if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
+          else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
+        }
+      } else {
+        editor.clickSelect3d(elementAt3d(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+      }
     }
-    drag.current = { mode: 'none', start: s, last: s, moved: false };
+    drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };
   };
 
   const onWheel = (e: WheelEvent): void => {
@@ -368,8 +403,14 @@ export function ViewportCanvas(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Saiu do canvas: o realce do 3D some (o da planta não é tocado). */
+  const onLeave = (): void => {
+    if (useUi.getState().view === '3d' && useUi.getState().hover) useUi.setState({ hover: null });
+  };
+
   const v = editor.viewport();
-  const cursorCss = ui.view !== 'plan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
+  // Sobre um elemento do 3D, o cursor vira mão (pointer); no vazio, a mão de arrastar a vista.
+  const cursorCss = ui.view === '3d' ? (ui.hover ? 'pointer' : 'grab') : ui.view !== 'plan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
   return (
     <div
       ref={host}
@@ -379,6 +420,7 @@ export function ViewportCanvas(): ReactElement {
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onUp}
+      onPointerLeave={onLeave}
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="labels" aria-hidden="true">
@@ -404,6 +446,7 @@ export function ViewportCanvas(): ReactElement {
           <Icon name="fit" size={18} />
         </button>
       </div>
+      {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
       {ui.view === 'section' ? <SectionBadge /> : null}
       {ui.view === 'plan' && ui.prompt ? (
         <div className="typebox" role="status">

@@ -2,7 +2,7 @@ import { dist, pointInMulti, type Vec2 } from '@hestia/geom';
 import { planeZ, roofThickness, type ResolvedRoof, type ResolvedRoofPlane } from '@hestia/engine';
 import type { Id, Material, Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
-import { extrudePolygon, type SolidBatch } from './solids.ts';
+import { extrudePolygon, ofElement, type SolidBatch } from './solids.ts';
 
 /** Espessura da testeira (m). */
 export const FASCIA_THICKNESS = 0.025;
@@ -232,7 +232,7 @@ function fasciaMaterialOf(p: Project, r: ResolvedRoof): Material | undefined {
 function batchOf(byMat: Map<Id, SolidBatch>, id: Id): SolidBatch {
   let b = byMat.get(id);
   if (!b) {
-    b = { materialId: id, category: 'roof', positions: [], normals: [], indices: [] };
+    b = { materialId: id, category: 'roof', positions: [], normals: [], indices: [], ids: [] };
     byMat.set(id, b);
   }
   return b;
@@ -270,12 +270,14 @@ export function buildEaveSolids(p: Project, roofs: ResolvedRoof[]): EaveSolids {
       if (m) materials[id] = m;
       const b = batchOf(byMat, id);
       const h = eave.fasciaHeight;
-      for (const { piece: E, i } of eaves) {
-        const top = (x: number, y: number): number => planeZ(E.plane!, { x, y }) - T;
-        const bottom = (x: number, y: number): number => top(x, y) - h;
-        const poly = band(E, i, 0, FASCIA_THICKNESS);
-        if (poly.length) extrudePolygon(b, [poly], 0, 1, top, bottom);
-      }
+      ofElement(b, r.roofId, () => {
+        for (const { piece: E, i } of eaves) {
+          const top = (x: number, y: number): number => planeZ(E.plane!, { x, y }) - T;
+          const bottom = (x: number, y: number): number => top(x, y) - h;
+          const poly = band(E, i, 0, FASCIA_THICKNESS);
+          if (poly.length) extrudePolygon(b, [poly], 0, 1, top, bottom);
+        }
+      });
     }
     // Calha: três regiões do U (parede interna, fundo, parede externa), com a cota do beiral e o fundo a GUTTER_H abaixo.
     if (eave.gutter) {
@@ -285,27 +287,31 @@ export function buildEaveSolids(p: Project, roofs: ResolvedRoof[]): EaveSolids {
         [-(GUTTER_W - GUTTER_WALL), -GUTTER_WALL, GUTTER_WALL - GUTTER_H],
         [-GUTTER_W, -(GUTTER_W - GUTTER_WALL), 0],
       ];
-      for (const { piece: E, i } of eaves) {
-        for (const [s0, s1, dzTop] of regions) {
-          for (const { poly, owner } of bandPieces(E, eaveList, s0, s1, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
-            const top = topOwner(E, owner, T, dzTop);
-            const bottom = topOwner(E, owner, T, -GUTTER_H);
-            extrudePolygon(b, [poly], 0, 1, top, bottom);
+      ofElement(b, r.roofId, () => {
+        for (const { piece: E, i } of eaves) {
+          for (const [s0, s1, dzTop] of regions) {
+            for (const { poly, owner } of bandPieces(E, eaveList, s0, s1, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
+              const top = topOwner(E, owner, T, dzTop);
+              const bottom = topOwner(E, owner, T, -GUTTER_H);
+              extrudePolygon(b, [poly], 0, 1, top, bottom);
+            }
           }
         }
-      }
+      });
     }
     if (eave.soffit) {
       const width = Math.max(0, (r.eaveOverhang ?? 0) - T);
       if (width > 0) {
         const b = batchOf(byMat, 'mat_gesso');
-        for (const { piece: E, i } of eaves) {
-          for (const { poly, owner } of bandPieces(E, eaveList, 0, width, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
-            const top = topOwner(E, owner, T, 0);
-            const bottom = topOwner(E, owner, T, -SOFFIT_T);
-            extrudePolygon(b, [poly], 0, 1, top, bottom);
+        ofElement(b, r.roofId, () => {
+          for (const { piece: E, i } of eaves) {
+            for (const { poly, owner } of bandPieces(E, eaveList, 0, width, halfAt(ps, links, i, 0), halfAt(ps, links, i, 1))) {
+              const top = topOwner(E, owner, T, 0);
+              const bottom = topOwner(E, owner, T, -SOFFIT_T);
+              extrudePolygon(b, [poly], 0, 1, top, bottom);
+            }
           }
-        }
+        });
       }
     }
   }

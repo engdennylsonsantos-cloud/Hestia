@@ -1,4 +1,4 @@
-import { orientedRect, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { convexHull, orientedRect, triangulate, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 
 /**
  * Primitivas do corte e da elevação, compartilhadas por `section.ts`, `sectionRoof*` e `sectionStairs.ts` (sem ciclo
@@ -21,6 +21,27 @@ export const rect = (t0: number, t1: number, z0: number, z1: number, zb = z1): R
   { x: t1, y: zb },
   { x: t0, y: z1 },
 ];
+
+/**
+ * Projeção em (t, z) de um prisma vertical cujo contorno em planta é `outer` e cujas faces de baixo e de cima são
+ * `zb(v)` e `zt(v)` nos vértices (lineares entre eles). Cada triângulo do contorno projeta-se no fecho convexo dos seus
+ * seis vértices (base e topo), e a união é a projeção exata. Para faces planas, `rect` basta e é mais barato.
+ */
+export function prismProjection(outer: Ring, along: (v: Vec2) => number, zb: (v: Vec2) => number, zt: (v: Vec2) => number): MultiPolygon {
+  const mesh = triangulate([outer]);
+  const parts: MultiPolygon[] = [];
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const pts: Vec2[] = [];
+    for (let k = 0; k < 3; k++) {
+      const j = mesh.indices[i + k]!;
+      const v = { x: mesh.positions[2 * j]!, y: mesh.positions[2 * j + 1]! };
+      pts.push({ x: along(v), y: zb(v) }, { x: along(v), y: zt(v) });
+    }
+    const hull = convexHull(pts);
+    if (hull.length >= 3) parts.push([[hull]]);
+  }
+  return unionClipper(...parts);
+}
 
 /** Intervalos de `t` em que a reta a + t·d (d unitário, n sua normal) está dentro do polígono (par-ímpar, serve a furos). */
 export function lineIntervals(poly: Polygon, a: Vec2, d: Vec2, n: Vec2): Array<[number, number]> {

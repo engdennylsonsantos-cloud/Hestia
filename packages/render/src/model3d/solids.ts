@@ -1,6 +1,16 @@
-import { ringArea, triangulate, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { difference, multiArea, pointInMulti, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
+
+/**
+ * Faixa de `indices` de um lote que pertence a um elemento: `indices[start .. start + count)`, sempre múltiplo de 3
+ * (triângulos inteiros). Um elemento pode ter várias faixas no mesmo lote (uma por camada ou por peça).
+ */
+export interface ElementRange {
+  id: Id;
+  start: number;
+  count: number;
+}
 
 /** Malha de um material: vértices próprios por face (sombreamento chapado, arestas nítidas). */
 export interface SolidBatch {
@@ -10,6 +20,15 @@ export interface SolidBatch {
   positions: number[];
   normals: number[];
   indices: number[];
+  /** Elemento de cada faixa de `indices` (picking e realce na vista 3D, decisão 0016). */
+  ids: ElementRange[];
+}
+
+/** Registra as faixas de `indices` que `fn` acrescenta ao lote `b` como pertencentes ao elemento `id`. */
+export function ofElement(b: SolidBatch, id: Id, fn: () => void): void {
+  const start = b.indices.length;
+  fn();
+  if (b.indices.length > start) b.ids.push({ id, start, count: b.indices.length - start });
 }
 
 function oriented(r: Ring, ccw: boolean): Ring {
@@ -113,6 +132,172 @@ export function extrudeCaps(
   push(b, bottom, bottomN, down);
 }
 
+/** Tolerância (m) para duas arestas de planta estarem sobre a mesma reta; e (m) para cotas iguais. */
+const LINE_EPS = 1e-6;
+const Z_EPS = 1e-9;
+
+/** Triângulos com a normal voltada para `n` (a ordem dos vértices é corrigida pelo produto vetorial). */
+function emitFace(b: SolidBatch, poly: MultiPolygon, to3: (u: number, v: number) => [number, number, number], n: [number, number, number]): void {
+  for (const p of poly) {
+    if (!p[0]) continue;
+    const m = triangulate(p);
+    const v: number[] = [];
+    for (let i = 0; i < m.positions.length; i += 2) v.push(...to3(m.positions[i]!, m.positions[i + 1]!));
+    const tris: number[] = [];
+    for (let i = 0; i < m.indices.length; i += 3) {
+      const a = m.indices[i]!;
+      let bb = m.indices[i + 1]!;
+      let c = m.indices[i + 2]!;
+      const ax = v[a * 3]!;
+      const ay = v[a * 3 + 1]!;
+      const az = v[a * 3 + 2]!;
+      const ux = v[bb * 3]! - ax;
+      const uy = v[bb * 3 + 1]! - ay;
+      const uz = v[bb * 3 + 2]! - az;
+      const wx = v[c * 3]! - ax;
+      const wy = v[c * 3 + 1]! - ay;
+      const wz = v[c * 3 + 2]! - az;
+      const cr = (uy * wz - uz * wy) * n[0] + (uz * wx - ux * wz) * n[1] + (ux * wy - uy * wx) * n[2];
+      if (Math.abs(cr) < 1e-18) continue;
+      if (cr < 0) [bb, c] = [c, bb];
+      tris.push(a, bb, c);
+    }
+    push(b, v, n, tris);
+  }
+}
+
+/** União que pula a booleana quando há no máximo uma região (o caso comum de uma face só). */
+const unionAll = (ms: MultiPolygon[]): MultiPolygon => {
+  const parts = ms.filter((m) => m.length > 0);
+  if (parts.length === 0) return [];
+  return parts.length === 1 ? parts[0]! : union(...parts);
+};
+
+/** Reta de planta com as faces voltadas para +m (`plus`) e para -m (`minus`), em coordenadas (s, z). */
+interface PlanLine {
+  m: Vec2;
+  c: number;
+  plus: MultiPolygon[];
+  minus: MultiPolygon[];
+}
+
+/**
+ * Sólido de uma camada de parede a partir das suas faixas (já fundidas). Em vez de um prisma por faixa, cada face
+ * lateral vira UMA região em (s, z) sobre a reta de planta, e as faces coplanares de faixas vizinhas se unem nela:
+ * a parede fica inteira de base a topo, e o vão só aparece como furo na face (contorno dele, sem prolongamento).
+ *
+ * Faces voltadas para +m e -m numa mesma reta são subtraídas uma da outra: uma aresta compartilhada por duas
+ * peças da camada é interna e some. Topo e base são as áreas planas expostas de cada cota; topo inclinado segue
+ * o plano do perfil. O volume é o das faixas (mesmos polígonos, nenhuma área criada ou perdida).
+ */
+function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
+  const lines: PlanLine[] = [];
+  const flatTops: Array<{ z: number; poly: MultiPolygon }> = [];
+  const bottoms: Array<{ z: number; poly: MultiPolygon }> = [];
+  const zs: number[] = [];
+  const addZ = (z: number): void => {
+    if (!zs.some((q) => Math.abs(q - z) < Z_EPS)) zs.push(z);
+  };
+
+  for (const band of bands) {
+    if (band.poly.length === 0) continue;
+    const z0 = baseZ + band.z0;
+    const flatTop = baseZ + band.z1;
+    const slope = band.slope;
+    const topAt = slope ? (x: number, y: number): number => baseZ + bandTopAt(band, { x, y }) : undefined;
+    const zTop = (x: number, y: number): number => (topAt ? topAt(x, y) : flatTop);
+    bottoms.push({ z: z0, poly: band.poly });
+    addZ(z0);
+    if (slope) {
+      // Plano do perfil: z = gx·x + gy·y + c, com g = k·d (k = Δh/Δt). A normal aponta para cima.
+      const k = (slope.h1 - slope.h0) / (slope.t1 - slope.t0);
+      const gx = k * slope.d.x;
+      const gy = k * slope.d.y;
+      const l = Math.hypot(gx, gy, 1);
+      emitFace(b, band.poly, (x, y) => [x, y, zTop(x, y)], [-gx / l, -gy / l, 1 / l]);
+    } else {
+      flatTops.push({ z: flatTop, poly: band.poly });
+      addZ(flatTop);
+    }
+
+    for (const poly of band.poly) {
+      for (const ring of poly.map((r, i) => oriented(r, i === 0))) {
+        for (let i = 0; i < ring.length; i++) {
+          const p = ring[i]!;
+          const q = ring[(i + 1) % ring.length]!;
+          const dx = q.x - p.x;
+          const dy = q.y - p.y;
+          const L = Math.hypot(dx, dy);
+          if (L < 1e-9) continue;
+          // Normal para fora: à direita de p→q (anéis externos anti-horários, furos horários).
+          let nx = dy / L;
+          let ny = -dx / L;
+          let plus = true;
+          if (nx < -1e-12 || (Math.abs(nx) <= 1e-12 && ny < 0)) {
+            nx = -nx;
+            ny = -ny;
+            plus = false;
+          }
+          const m: Vec2 = { x: nx, y: ny };
+          const c = nx * p.x + ny * p.y;
+          const onLine = (ln: PlanLine): boolean =>
+            Math.abs(ln.m.x * ny - ln.m.y * nx) < LINE_EPS &&
+            Math.abs(ln.m.x * p.x + ln.m.y * p.y - ln.c) < LINE_EPS &&
+            Math.abs(ln.m.x * q.x + ln.m.y * q.y - ln.c) < LINE_EPS;
+          let ln = lines.find(onLine);
+          if (!ln) {
+            ln = { m, c, plus: [], minus: [] };
+            lines.push(ln);
+          }
+          // Coordenadas da reta: s ao longo de d = (-m.y, m.x); z de topo nas duas pontas.
+          const sp = -ln.m.y * p.x + ln.m.x * p.y;
+          const sq = -ln.m.y * q.x + ln.m.x * q.y;
+          const tp = zTop(p.x, p.y);
+          const tq = zTop(q.x, q.y);
+          const [sLo, sHi, tLo, tHi] = sp <= sq ? [sp, sq, tp, tq] : [sq, sp, tq, tp];
+          if (sHi - sLo < 1e-9 || (tLo - z0 < Z_EPS && tHi - z0 < Z_EPS)) continue;
+          const ring2: Ring = [
+            { x: sLo, y: z0 },
+            { x: sHi, y: z0 },
+            { x: sHi, y: tHi },
+            { x: sLo, y: tLo },
+          ];
+          (plus ? ln.plus : ln.minus).push([[ring2]]);
+          if ((globalThis as any).__DBG && Math.abs(ln.c - 0.092) < 1e-6 && plus) console.log('DBG PUSH', sLo.toFixed(3), sHi.toFixed(3), 'z0', z0.toFixed(3), 'tLo', tLo.toFixed(3), 'tHi', tHi.toFixed(3), 'band', band.z0, band.z1);
+        }
+      }
+    }
+  }
+
+  // Faces laterais: por reta, a parte voltada para +m menos a voltada para -m (as arestas compartilhadas somem).
+  for (const ln of lines) {
+    const pl = unionAll(ln.plus);
+    const mi = unionAll(ln.minus);
+    const d: Vec2 = { x: -ln.m.y, y: ln.m.x };
+    if ((globalThis as any).__DBG && Math.abs(ln.m.y - 1) < 1e-6 && Math.abs(ln.c - 0.092) < 1e-6) {
+      const sumA = ln.plus.reduce((a, mm) => a + multiArea(mm), 0);
+      const U = unionAll(ln.plus);
+      console.log('DBG AREA sum', sumA.toFixed(9), 'union', multiArea(U).toFixed(9), 'polys', U.length, 'rings', U.map((pp) => pp.length));
+      const sl = U.flatMap((pp) => pp.map((r) => r.filter((v) => Math.abs(v.x + 0.52) < 0.01 && v.y < 1.01 && v.y > 0.99)));
+      console.log('DBG near-0.52 vertices', JSON.stringify(sl));
+      const inside = (sx: number, sz: number): boolean => pointInMulti({ x: sx, y: sz }, U);
+      for (const [sx, sz] of [[-0.521, 1.5], [-0.51, 1.5], [-1, 1.5], [-0.51, 0.5], [-0.521, 0.5], [-4.19, 1.5], [-4.19, 0.5]] as const) console.log('DBG PT', sx, sz, inside(sx, sz));
+      console.log('DBG ringsOf0', JSON.stringify(U[0]!.map((r) => r.map((v) => [+v.x.toFixed(3), +v.y.toFixed(3)]))));
+    }
+    const to3 = (s: number, z: number): [number, number, number] => [ln.c * ln.m.x + s * d.x, ln.c * ln.m.y + s * d.y, z];
+    if (pl.length) emitFace(b, mi.length ? difference(pl, mi) : pl, to3, [ln.m.x, ln.m.y, 0]);
+    if (mi.length) emitFace(b, pl.length ? difference(mi, pl) : mi, to3, [-ln.m.x, -ln.m.y, 0]);
+  }
+
+  // Topo e base planos: em cada cota, o que é topo de uma faixa e não tem faixa por cima (e o simétrico na base).
+  for (const Z of zs) {
+    const tops = unionAll(flatTops.filter((f) => Math.abs(f.z - Z) < Z_EPS).map((f) => f.poly));
+    const bots = unionAll(bottoms.filter((f) => Math.abs(f.z - Z) < Z_EPS).map((f) => f.poly));
+    emitFace(b, tops.length && bots.length ? difference(tops, bots) : tops, (x, y) => [x, y, Z], [0, 0, 1]);
+    emitFace(b, bots.length && tops.length ? difference(bots, tops) : bots, (x, y) => [x, y, Z], [0, 0, -1]);
+  }
+}
+
 export interface LevelSolids {
   batches: SolidBatch[];
 }
@@ -121,7 +306,7 @@ export interface LevelSolids {
 function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): SolidBatch {
   let b = byMat.get(m);
   if (!b) {
-    b = { materialId: m, category: cat, positions: [], normals: [], indices: [] };
+    b = { materialId: m, category: cat, positions: [], normals: [], indices: [], ids: [] };
     byMat.set(m, b);
   }
   return b;
@@ -133,10 +318,7 @@ export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
   for (const rw of Object.values(r.walls)) {
     for (const l of rw.layers) {
       const b = batchOf(byMat, l.materialId, 'wall');
-      for (const band of fuseBands(l.bands)) {
-        const topAt = band.slope ? slopeTop(band, rw.baseZ) : undefined;
-        for (const poly of band.poly) extrudePolygon(b, poly, rw.baseZ + band.z0, rw.baseZ + band.z1, topAt);
-      }
+      ofElement(b, rw.wallId, () => extrudeLayer(b, fuseBands(l.bands), rw.baseZ));
     }
   }
   return { batches: [...byMat.values()] };
@@ -148,7 +330,9 @@ export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
   for (const f of floors) {
     for (const l of f.layers) {
       const b = batchOf(byMat, l.materialId, 'floor');
-      for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+      ofElement(b, f.floorId, () => {
+        for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+      });
     }
   }
   return [...byMat.values()];
@@ -166,7 +350,9 @@ export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
       const b = batchOf(byMat, l.materialId, 'slab');
       const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
       const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;
-      for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
+      ofElement(b, s.slabId, () => {
+        for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
+      });
     }
   }
   return [...byMat.values()];
@@ -186,11 +372,11 @@ export function buildRoofSolids(roofs: ResolvedRoof[]): SolidBatch[] {
         const topAt = (x: number, y: number): number => planeZ(pl, { x, y }) - l.below;
         const bottomAt = (x: number, y: number): number => topAt(x, y) - l.thickness;
         // z0 = 0 e z1 = espessura só passam pelo guarda de extrusão; a cota vem de topAt e bottomAt.
-        for (const poly of pl.polygon) extrudePolygon(b, poly, 0, l.thickness, topAt, bottomAt);
+        ofElement(b, r.roofId, () => {
+          for (const poly of pl.polygon) extrudePolygon(b, poly, 0, l.thickness, topAt, bottomAt);
+        });
       }
     }
   }
   return [...byMat.values()];
 }
-
-const slopeTop = (band: LayerBand, baseZ: number) => (x: number, y: number): number => baseZ + bandTopAt(band, { x, y });

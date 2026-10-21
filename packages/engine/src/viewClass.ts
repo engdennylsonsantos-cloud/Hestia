@@ -5,7 +5,6 @@ import {
   isOpening,
   isRoof,
   isSlab,
-  isStair,
   isWall,
   levelElevation,
   openingSill,

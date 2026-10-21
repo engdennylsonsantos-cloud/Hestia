@@ -1,5 +1,5 @@
-import { useMemo, type ReactElement } from 'react';
-import { joinStatus, levelFrames, quantifyLevel } from '@hestia/engine';
+import { useMemo, useState, type ReactElement } from 'react';
+import { joinStatus, levelFrames, quantifyLevel, viewRangeWarnings } from '@hestia/engine';
 import {
   FUNCTION_LABEL,
   isFloor,
@@ -13,15 +13,18 @@ import {
   type JoinKind,
   openingSill,
   totalThickness,
+  viewRangeOf,
   wallLength,
   wallType,
   type Id,
   type LocationLine,
   type Opening,
+  type ViewRange,
   type Wall,
   wallArc,
 } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
@@ -253,6 +256,46 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
   );
 }
 
+/**
+ * Intervalo de vista do nível ativo (decisão 0013 §5): cotas relativas ao nível, direção, restaurar padrão e avisos.
+ * Cada edição é um comando; se o comando recusar (ordem topo ≥ corte ≥ base ≥ profundidade), a mensagem aparece e nada é gravado.
+ * Keyed por nível na chamada: trocar de nível zera a mensagem de erro.
+ */
+function ViewRangeGroup({ levelId }: { levelId: Id }): ReactElement {
+  const p = useProject();
+  const range = viewRangeOf(p, levelId);
+  const warnings = useMemo(() => viewRangeWarnings(p, levelId, range), [p, levelId, range]);
+  const [error, setError] = useState<string | null>(null);
+  const edit = (patch: Partial<ViewRange>): void => setError(editViewRange(editor.store, levelId, patch).error);
+  return (
+    <Group title="Intervalo de vista">
+      <Row label="Topo" htmlFor="vr-top"><NumField id="vr-top" value={range.top} unit="m" onCommit={(v) => edit({ top: v })} /></Row>
+      <Row label="Plano de corte" htmlFor="vr-cut"><NumField id="vr-cut" value={range.cut} unit="m" onCommit={(v) => edit({ cut: v })} /></Row>
+      <Row label="Base" htmlFor="vr-bottom"><NumField id="vr-bottom" value={range.bottom} unit="m" onCommit={(v) => edit({ bottom: v })} /></Row>
+      <Row label="Profundidade" htmlFor="vr-depth"><NumField id="vr-depth" value={range.depth} unit="m" onCommit={(v) => edit({ depth: v })} /></Row>
+      <Row label="Direção da vista" htmlFor="vr-dir">
+        <select id="vr-dir" className="select" value={range.direction} onChange={(e) => edit({ direction: e.target.value as ViewRange['direction'] })}>
+          <option value="down">Para baixo</option>
+          <option value="up" disabled>Para cima (em breve)</option>
+        </select>
+      </Row>
+      {error && <div className="vr-error" role="alert">{error}</div>}
+      <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreViewRangeDefault(editor.store, levelId).error)}>Restaurar padrão</button></div>
+      {warnings.length === 0 ? (
+        <div className="hint">Nenhum elemento fora do intervalo de vista.</div>
+      ) : (
+        warnings.map((w) => (
+          <div className="prow" key={`${w.category}-${w.kind}`}>
+            <span className="vr-msg">{w.message}</span>
+            {/* Seleciona os elementos afetados (mesmo nível da vista). Os ocultos não são desenhados: aparecem só nas propriedades. */}
+            <button className="chiplink" onClick={() => useUi.setState({ selection: w.ids })}>Selecionar</button>
+          </div>
+        ))
+      )}
+    </Group>
+  );
+}
+
 function ViewProps(): ReactElement {
   const p = useProject();
   const s = useUi();
@@ -269,6 +312,7 @@ function ViewProps(): ReactElement {
         <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
+        <Row label="Mostrar projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => useUi.setState({ showRoofProjection: v })} /></Row>
         <Row label="Etiquetas de parede"><Check id="v-tags" checked={p.settings.showTags} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showTags: v } })} /></Row>
         <Row label="Depurar junções"><Check id="v-debugjoins" checked={p.settings.debugJoins} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { debugJoins: v } })} /></Row>
         <Row label="Nível de detalhe" htmlFor="v-detail">
@@ -280,6 +324,7 @@ function ViewProps(): ReactElement {
         </Row>
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'levels' })}>Editar níveis…</button></div>
       </Group>
+      {s.view === 'plan' && <ViewRangeGroup key={s.levelId} levelId={s.levelId} />}
       <Group title="3D" open={s.view === '3d'}>
         <Row label="Sombras"><Check id="v-shadows" checked={s.shadows} onChange={(v) => useUi.setState({ shadows: v })} /></Row>
         <Row label="Arestas"><Check id="v-edges" checked={s.edges} onChange={(v) => useUi.setState({ edges: v })} /></Row>

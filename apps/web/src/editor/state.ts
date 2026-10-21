@@ -25,6 +25,8 @@ export interface UiState {
   dialogArg: string | null;
   showGrid: boolean;
   showUnderlay: boolean;
+  /** Projeção tracejada do contorno da cobertura acima do corte (opção da planta, decisão 0013 §2). */
+  showRoofProjection: boolean;
   shadows: boolean;
   edges: boolean;
   leftOpen: boolean;
@@ -120,6 +122,7 @@ export const useUi = create<UiState>(() => ({
   dialogArg: null,
   showGrid: true,
   showUnderlay: true,
+  showRoofProjection: true,
   shadows: true,
   edges: true,
   leftOpen: typeof window === 'undefined' || window.innerWidth > 900,

@@ -45,6 +45,8 @@ export function ViewportCanvas(): ReactElement {
   const cpuRef = useRef<HTMLCanvasElement | null>(null);
   const plan = useRef(new PlanScene());
   const model = useRef(new ModelScene());
+  // Gancho de depuração (?debug=1): câmera orbital do 3D para os testes no navegador.
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3d?: unknown }).__hestia3d = model.current.orbit;
   const modelKey = useRef('');
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [labels, setLabels] = useState<LabelOp[]>([]);
@@ -173,6 +175,8 @@ export function ViewportCanvas(): ReactElement {
             preview: tool.preview(),
             inference: tool.inference(),
             showGrid: st.showGrid,
+            // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
+            ...{ showRoofProjection: st.showRoofProjection },
           });
     if (g) {
       g.gpu.setSize(w, h, dpr);
@@ -195,7 +199,7 @@ export function ViewportCanvas(): ReactElement {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame.current);
-  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.shadows, ui.edges, ui.tool]);
+  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.showRoofProjection, ui.shadows, ui.edges, ui.tool]);
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());

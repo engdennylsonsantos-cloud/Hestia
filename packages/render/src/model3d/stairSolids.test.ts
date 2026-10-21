@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { generateLShape, pieceVolume, resolveStairsOnLevel, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
+import { generateLShape, generateStraightRun, pieceVolume, resolveStairsOnLevel, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
 import { DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type StairLanding, type StairRun } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import { buildStairSolids, riserSlab, stairSlabThickness } from './stairSolids.ts';
@@ -250,6 +250,30 @@ describe('arestas do lance monolítico (3D): só quebras reais de geometria', ()
       expect(Math.abs(y - k * REF.P)).toBeLessThan(1e-4);
       expect(Math.abs(zLo - (k - 1) * REF.H)).toBeLessThan(1e-4);
       expect(zHi).toBeLessThanOrEqual(k * REF.H + 1e-4);
+    }
+  });
+
+  it('referência pelo croqui padrão do motor (generateStraightRun, como no app): lateral abaixo de 0,40 m só nas quinas de espelho', () => {
+    // Mesmo caminho do app: gerador de lance reto, resolveStairsOnLevel e o tipo padrão (liso, profundidade 0,20).
+    // Espelho j (de 1 a N) em y = (j−1)·p; o degrau entre os espelhos j e j+1 começa em (j−1)·h e sobe até j·h.
+    const sk = generateStraightRun({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: REF.W, risers: REF.N, tread: REF.P });
+    const store = new ProjectStore(createEmptyProject());
+    store.exec({
+      type: 'addStair',
+      stair: makeStair({ id: 'st1', typeId: DEFAULT_STAIR_TYPES[0]!.id, levelId: 'lv_0', topOffset: -0.2, height: 2.8, components: [{ id: 'run', kind: 'run', ...sk }] }),
+    });
+    const [rs] = resolveStairsOnLevel(store.project, 'lv_0');
+    expect(rs!.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    const lowLateral = drawnEdges(buildStairSolids([rs!])[0]!).filter(
+      ([xa, ya, za, xb, yb, zb]) =>
+        Math.abs(xa! - xb!) < 1e-4 && Math.abs(ya! - yb!) < 1e-4 && Math.abs(za! - zb!) > 1e-4 && Math.abs(Math.abs(xa!) - REF.W / 2) < 1e-4 && Math.min(za!, zb!) < 0.4,
+    );
+    expect(lowLateral.length).toBeGreaterThan(0);
+    for (const [, ya, za, , , zb] of lowLateral) {
+      const k = Math.round(ya! / REF.P);
+      expect(Math.abs(ya! - k * REF.P)).toBeLessThan(1e-4);
+      expect(Math.abs(Math.min(za!, zb!) - k * REF.H)).toBeLessThan(1e-4);
+      expect(Math.max(za!, zb!)).toBeLessThanOrEqual((k + 1) * REF.H + 1e-4);
     }
   });
 

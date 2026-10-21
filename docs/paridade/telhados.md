@@ -9,7 +9,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Roof by Footprint; 
 - [x] A2 Contorno pelas paredes: perímetro externo mais balanço de beiral **(bloqueante)**
 - [x] A3 Formas: uma água, duas águas e quatro águas, com inclinação em % ou graus **(bloqueante)**
 - [x] A4 Direção da cumeeira (duas águas) e do caimento (uma água) editáveis **(bloqueante)**
-- [ ] A5 Seta de inclinação e águas livres editadas na tela **(bloqueante)** — parcial: há a ferramenta de seta e a lista de águas; falta desenhar o polígono próprio de cada água
+- [-] A5 Seta de inclinação e águas livres editadas na tela: fora de escopo da v1 por decisão do dono (2026-10-21). Ficam a ferramenta de seta e a lista de águas; o polígono próprio de cada água não entra na v1
 - [x] A6 Cumeeira, espigões e rincões calculados pelo encontro das águas **(bloqueante)**
 - [x] A7 Furos (claraboia, shaft)
 - [x] A8 Edição do contorno por alças e do beiral

@@ -42,7 +42,7 @@ export interface SectionOrigin {
  * Material cortado no plano de corte, unido por material. `polygons` é a parte visível em (t, z); `sources` lista os
  * elementos de origem que contribuíram (sem repetição) para que a seleção ache o elemento de volta.
  */
-export interface SectionRegion extends SectionOrigin {
+export interface SectionRegion {
   materialId: Id;
   /** Polígonos em (t, z), já sem o que está na frente. */
   polygons: MultiPolygon;
@@ -95,6 +95,24 @@ export interface SectionResult {
   /** Vãos visíveis, do mais longe ao mais perto. */
   openings: SectionOpening[];
   levels: SectionLevelMark[];
+}
+
+/**
+ * Peças de uma mesma camada da mesma parede, piso ou laje, na mesma profundidade, viram um item só (união): a parede
+ * dividida em trechos pelas aberturas não deixa emendas falsas no desenho, e há menos itens na oclusão. Peças em
+ * profundidades diferentes ficam separadas, pois a ordem é por profundidade; escadas e telhados não se agrupam.
+ */
+function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
+  const byKey = new Map<string, SectionBeyond[]>();
+  list.forEach((b, i) => {
+    // Escadas e telhados ficam peça a peça (cada degrau, espelho e água é um item); paredes, pisos e lajes agrupam.
+    const merge = b.wallId !== undefined || b.floorId !== undefined || b.slabId !== undefined;
+    const key = merge ? [b.wallId, b.floorId, b.slabId, b.materialId, b.layerIndex, b.depth.toFixed(6)].join('|') : `#${i}`;
+    const group = byKey.get(key);
+    if (group) group.push(b);
+    else byKey.set(key, [b]);
+  });
+  return [...byKey.values()].map((g) => (g.length === 1 ? g[0]! : { ...g[0]!, polygons: unionClipper(...g.map((b) => b.polygons)) }));
 }
 
 /** Origens distintas (por valor), na ordem da primeira aparição. */
@@ -288,7 +306,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     refs.push({ cut: region });
     items.push({ depth: 0, rank: OCCLUSION_RANK.cut, polygons: region.polygons });
   }
-  for (const b of beyond) {
+  for (const b of groupBeyond(beyond)) {
     refs.push({ beyond: b });
     items.push({ depth: b.depth, rank: OCCLUSION_RANK.beyond, polygons: b.polygons });
   }

@@ -123,7 +123,7 @@ describe('telhado no corte (D3)', () => {
 });
 
 describe('telhado no corte com o motor real (computeSection)', () => {
-  it('duas águas criadas por addRoof: corte transversal dá V invertido até beiral + 0,90 e silhueta de 6 m', () => {
+  it('duas águas criadas por addRoof: corte transversal dá o perfil até beiral + 0,90, com silhueta do corte de 6 m', () => {
     const st = new ProjectStore(createEmptyProject());
     st.exec({
       type: 'addRoof',
@@ -133,6 +133,7 @@ describe('telhado no corte com o motor real (computeSection)', () => {
     const eave = st.project.levels.find((l) => l.id === 'lv_0')!.elevation + 2.8;
     expect(r.zMax).toBeCloseTo(eave + 0.9, 6);
     expect(multiArea(r.silhouette)).toBeCloseTo(6 * 0.095, 6);
-    expect(r.beyond.some((b) => b.roofId === 'r')).toBe(true);
+    // o telhado é extrudado ao longo de x: o que está além do plano tem o mesmo perfil do corte e fica oculto por ele
+    expect(r.beyond.some((b) => b.roofId === 'r')).toBe(false);
   });
 });

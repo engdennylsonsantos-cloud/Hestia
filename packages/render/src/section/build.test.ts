@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { computeSection } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type StairCurve, type StairRun } from '@hestia/model';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, makeWall, type StairCurve, type StairRun } from '@hestia/model';
 import { LIGHT } from '../plan/types.ts';
 import { buildSectionDrawList, type SectionInput } from './build.ts';
 
@@ -53,3 +53,45 @@ describe('desenho do corte com escada', () => {
     expect(thin.length).toBeGreaterThanOrEqual(15);
   });
 });
+
+/** Caixa de 6 × 4 m com janela em cada face e uma parede interna; vista de fora (y = −2). */
+function boxProject() {
+  const store = new ProjectStore(createEmptyProject());
+  const walls = [
+    ['frente', v(0, 0), v(6, 0)],
+    ['fundo', v(6, 4), v(0, 4)],
+    ['leste', v(6, 0), v(6, 4)],
+    ['oeste', v(0, 4), v(0, 0)],
+    ['interna', v(0, 2), v(6, 2)],
+  ] as const;
+  for (const [id, a, b] of walls) store.exec({ type: 'addWall', wall: makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a, b, height: 3 }) });
+  for (const host of ['frente', 'fundo', 'interna']) {
+    store.exec({ type: 'addOpening', opening: { id: `j_${host}`, kind: 'window', typeId: 'ot_j120', hostId: host, offset: 3, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+  }
+  return store.project;
+}
+
+describe('desenho do corte com linha oculta', () => {
+  const GLASS = '#bfe3f5';
+  const box = (): SectionInput => {
+    const project = boxProject();
+    return { project, section: computeSection(project, { a: v(0, -2), b: v(6, -2), depth: 8 }), viewport: { cx: 3, cy: 1.5, zoom: 60, width: 800, height: 600 }, theme: LIGHT, dark: false, showGrid: false };
+  };
+
+  it('a janela de trás e a da parede interna não são pintadas: só o vidro da face voltada ao observador', () => {
+    const draw = buildSectionDrawList(box());
+    expect(draw.fills.filter((f) => f.color === GLASS)).toHaveLength(1);
+  });
+
+  it('o corte é pintado por último, sobre o que está além', () => {
+    const input = stairCut();
+    const draw = buildSectionDrawList(input);
+    const last = draw.fills.slice(-input.section.cut.length).map((f) => f.polygons);
+    expect(last).toEqual(input.section.cut.map((c) => c.polygons));
+  });
+});
+
+/** Corte transversal de uma escada: tem material cortado e itens além, para testar a ordem de pintura. */
+function stairCut(): SectionInput {
+  return input({ a: v(-1, 0), b: v(6, 0), depth: 2 });
+}

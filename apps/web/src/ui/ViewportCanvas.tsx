@@ -3,7 +3,7 @@ import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawP
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
+import { clickSelect3d, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
@@ -382,7 +382,7 @@ export function ViewportCanvas(): ReactElement {
           else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
         }
       } else {
-        editor.clickSelect3d(elementAt3d(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+        clickSelect3d(elementAt3d(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
     drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };

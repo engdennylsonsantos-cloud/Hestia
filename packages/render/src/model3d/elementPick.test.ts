@@ -210,3 +210,102 @@ describe('pickElement (vista 3D)', () => {
     expect(hit?.id).toBe('a');
   });
 });
+
+/** Malhas de sobreposição de realce: transparentes e sem gravar profundidade (o modelo não tem nenhuma assim por padrão). */
+function realces(ms: ModelScene): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  ms.scene.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh && m.material && (m.material as THREE.Material).transparent && (m.material as THREE.Material).depthWrite === false) out.push(m);
+  });
+  return out;
+}
+
+/** Malhas do modelo (o grupo principal da cena), sem as de picking e as de realce. */
+function malhasDoModelo(ms: ModelScene): number {
+  const grupo = ms.scene.children.find((c): c is THREE.Group => c instanceof THREE.Group)!;
+  let n = 0;
+  grupo.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) n++;
+  });
+  return n;
+}
+
+describe('realce na vista 3D (decisão 0016 §4)', () => {
+  it('a seleção e o cursor são sobreposições: as malhas do modelo não mudam de número', () => {
+    const ms = cena(casa({ piso: true }));
+    const antes = malhasDoModelo(ms);
+    ms.highlight(['a', 'd1'], 'b');
+    expect(malhasDoModelo(ms)).toBe(antes);
+    ms.highlight([], null);
+    expect(malhasDoModelo(ms)).toBe(antes);
+  });
+
+  it('o realce não é acertado pelo picking: com a parede b realçada, o centro da parede a continua a', () => {
+    const ms = cena(casa());
+    ms.highlight(['b'], null);
+    expect(pickElement(ms.scene, deCima(3, 0), { x: 0, y: 0 })?.id).toBe('a');
+  });
+
+  it('seleção: opacidade 0,35; cursor: 0,15; quem está nos dois ganha só a da seleção', () => {
+    const ms = cena(casa());
+    const opacidades = (): number[] => realces(ms).map((m) => (m.material as THREE.MeshBasicMaterial).opacity).sort();
+    ms.highlight(['a'], null);
+    expect(opacidades()).toEqual([0.35]);
+    ms.highlight(['a'], 'b');
+    expect(opacidades()).toEqual([0.15, 0.35]);
+    ms.highlight(['a'], 'a');
+    expect(opacidades()).toEqual([0.35]);
+  });
+
+  it('o realce cobre o elemento: a caixa da sobreposição é a da parede (e a da porta, a da porta)', () => {
+    const ms = cena(casa());
+    ms.highlight(['a'], null);
+    // A parede a vai de x 0 a 4 (com a espessura de 14 cm nas pontas de canto); y em torno de 0; z de 0 a 2,8 m.
+    const caixa = new THREE.Box3().setFromObject(realces(ms)[0]!);
+    expect(caixa.min.x).toBeGreaterThan(-0.15);
+    expect(caixa.max.x).toBeLessThan(4.15);
+    expect(Math.abs(caixa.min.y)).toBeLessThan(0.1);
+    expect(caixa.max.z).toBeCloseTo(2.8, 2);
+    ms.highlight(['d1'], null);
+    const porta = new THREE.Box3().setFromObject(realces(ms)[0]!);
+    expect(porta.max.x - porta.min.x).toBeLessThan(1.2);
+    expect(porta.max.z).toBeLessThan(2.3);
+  });
+
+  it('reconstrói só a sobreposição que mudou: a da seleção fica a mesma ao mudar o cursor', () => {
+    const ms = cena(casa());
+    ms.highlight(['a'], null);
+    const sel = realces(ms)[0];
+    ms.highlight(['a'], 'c');
+    expect(realces(ms)).toContain(sel);
+    ms.highlight(['a', 'b'], null);
+    expect(realces(ms)).not.toContain(sel);
+  });
+
+  it('refazer o modelo apaga o realce (ele guardava a geometria antiga)', () => {
+    const p = casa();
+    const ms = cena(p);
+    ms.highlight(['a'], null);
+    expect(realces(ms)).toHaveLength(1);
+    ms.update(p, niveis(p), { edges: false, shadows: false, dark: false });
+    expect(realces(ms)).toHaveLength(0);
+    ms.highlight(['a'], null);
+    expect(realces(ms)).toHaveLength(1);
+  });
+
+  it('no wireframe, o realce usa as faixas da camada de picking e também aparece', () => {
+    const ms = cena(casa(), 'wireframe');
+    ms.highlight(['a'], null);
+    expect(realces(ms)).toHaveLength(1);
+    expect(pickElement(ms.scene, deCima(3, 0), { x: 0, y: 0 })?.id).toBe('a');
+  });
+
+  it('a cor do realce segue o tema: o azul claro no tema claro e o escuro no tema escuro', () => {
+    const p = casa();
+    const ms = new ModelScene();
+    ms.update(p, niveis(p), { edges: false, shadows: false, dark: true });
+    ms.highlight(['a'], null);
+    expect((realces(ms)[0]!.material as THREE.MeshBasicMaterial).color.getHexString()).toBe(new THREE.Color('#5aa2ff').getHexString());
+  });
+});

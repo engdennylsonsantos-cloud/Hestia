@@ -1,4 +1,4 @@
-import { difference, multiArea, pointInMulti, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 
@@ -136,6 +136,60 @@ export function extrudeCaps(
 const LINE_EPS = 1e-6;
 const Z_EPS = 1e-9;
 
+/**
+ * Divide as arestas dos triângulos da camada nos vértices da própria camada que caem sobre elas (T-junctions). Uma
+ * aresta longa de um triângulo pode passar por um vértice de outra face (ou de um canto de vão na mesma cota), e a
+ * face vizinha usa os pedaços: sem isso a malha tem arestas sem par. O vértice novo leva a normal da face que o
+ * recebe, então o sombreamento continua chapado.
+ */
+function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: number): void {
+  const pos = b.positions;
+  const onSeg = (p: number, x: number, y: number): boolean => {
+    const ax = pos[x * 3]!;
+    const ay = pos[x * 3 + 1]!;
+    const az = pos[x * 3 + 2]!;
+    const dx = pos[y * 3]! - ax;
+    const dy = pos[y * 3 + 1]! - ay;
+    const dz = pos[y * 3 + 2]! - az;
+    const l2 = dx * dx + dy * dy + dz * dz;
+    const px = pos[p * 3]! - ax;
+    const py = pos[p * 3 + 1]! - ay;
+    const pz = pos[p * 3 + 2]! - az;
+    const t = (px * dx + py * dy + pz * dz) / l2;
+    if (t <= 1e-9 || t >= 1 - 1e-9) return false;
+    const ex = px - t * dx;
+    const ey = py - t * dy;
+    const ez = pz - t * dz;
+    return ex * ex + ey * ey + ez * ez < 1e-14;
+  };
+  const pts: number[] = [];
+  for (let i = firstVert; i < pos.length / 3; i++) pts.push(i);
+  const stack: number[][] = [];
+  for (let t = firstTri; t < b.indices.length; t += 3) stack.push([b.indices[t]!, b.indices[t + 1]!, b.indices[t + 2]!]);
+  const out: number[][] = [];
+  while (stack.length) {
+    const t = stack.pop()!;
+    let split = false;
+    for (let e = 0; e < 3 && !split; e++) {
+      const x = t[e]!;
+      const y = t[(e + 1) % 3]!;
+      const z = t[(e + 2) % 3]!;
+      for (const q of pts) {
+        if (q === x || q === y || q === z || !onSeg(q, x, y)) continue;
+        const k = pos.length / 3;
+        pos.push(pos[q * 3]!, pos[q * 3 + 1]!, pos[q * 3 + 2]!);
+        b.normals.push(b.normals[x * 3]!, b.normals[x * 3 + 1]!, b.normals[x * 3 + 2]!);
+        stack.push([x, k, z], [k, y, z]);
+        split = true;
+        break;
+      }
+    }
+    if (!split) out.push(t);
+  }
+  b.indices.length = firstTri;
+  for (const t of out) b.indices.push(t[0]!, t[1]!, t[2]!);
+}
+
 /** Triângulos com a normal voltada para `n` (a ordem dos vértices é corrigida pelo produto vetorial). */
 function emitFace(b: SolidBatch, poly: MultiPolygon, to3: (u: number, v: number) => [number, number, number], n: [number, number, number]): void {
   for (const p of poly) {
@@ -191,6 +245,8 @@ interface PlanLine {
  * o plano do perfil. O volume é o das faixas (mesmos polígonos, nenhuma área criada ou perdida).
  */
 function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
+  const firstTri = b.indices.length;
+  const firstVert = b.positions.length / 3;
   const lines: PlanLine[] = [];
   const flatTops: Array<{ z: number; poly: MultiPolygon }> = [];
   const bottoms: Array<{ z: number; poly: MultiPolygon }> = [];
@@ -263,7 +319,6 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
             { x: sLo, y: tLo },
           ];
           (plus ? ln.plus : ln.minus).push([[ring2]]);
-          if ((globalThis as any).__DBG && Math.abs(ln.c - 0.092) < 1e-6 && plus) console.log('DBG PUSH', sLo.toFixed(3), sHi.toFixed(3), 'z0', z0.toFixed(3), 'tLo', tLo.toFixed(3), 'tHi', tHi.toFixed(3), 'band', band.z0, band.z1);
         }
       }
     }
@@ -274,16 +329,6 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
     const pl = unionAll(ln.plus);
     const mi = unionAll(ln.minus);
     const d: Vec2 = { x: -ln.m.y, y: ln.m.x };
-    if ((globalThis as any).__DBG && Math.abs(ln.m.y - 1) < 1e-6 && Math.abs(ln.c - 0.092) < 1e-6) {
-      const sumA = ln.plus.reduce((a, mm) => a + multiArea(mm), 0);
-      const U = unionAll(ln.plus);
-      console.log('DBG AREA sum', sumA.toFixed(9), 'union', multiArea(U).toFixed(9), 'polys', U.length, 'rings', U.map((pp) => pp.length));
-      const sl = U.flatMap((pp) => pp.map((r) => r.filter((v) => Math.abs(v.x + 0.52) < 0.01 && v.y < 1.01 && v.y > 0.99)));
-      console.log('DBG near-0.52 vertices', JSON.stringify(sl));
-      const inside = (sx: number, sz: number): boolean => pointInMulti({ x: sx, y: sz }, U);
-      for (const [sx, sz] of [[-0.521, 1.5], [-0.51, 1.5], [-1, 1.5], [-0.51, 0.5], [-0.521, 0.5], [-4.19, 1.5], [-4.19, 0.5]] as const) console.log('DBG PT', sx, sz, inside(sx, sz));
-      console.log('DBG ringsOf0', JSON.stringify(U[0]!.map((r) => r.map((v) => [+v.x.toFixed(3), +v.y.toFixed(3)]))));
-    }
     const to3 = (s: number, z: number): [number, number, number] => [ln.c * ln.m.x + s * d.x, ln.c * ln.m.y + s * d.y, z];
     if (pl.length) emitFace(b, mi.length ? difference(pl, mi) : pl, to3, [ln.m.x, ln.m.y, 0]);
     if (mi.length) emitFace(b, pl.length ? difference(mi, pl) : mi, to3, [-ln.m.x, -ln.m.y, 0]);
@@ -296,6 +341,7 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
     emitFace(b, tops.length && bots.length ? difference(tops, bots) : tops, (x, y) => [x, y, Z], [0, 0, 1]);
     emitFace(b, bots.length && tops.length ? difference(bots, tops) : bots, (x, y) => [x, y, Z], [0, 0, -1]);
   }
+  splitTJunctions(b, firstTri, firstVert);
 }
 
 export interface LevelSolids {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { intersection, multiArea, unionClipper, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeWall, totalThickness, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeWall, type Project } from '@hestia/model';
 import { computeSection, type SectionResult } from './index.ts';
 
 /**

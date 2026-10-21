@@ -30,7 +30,9 @@ describe('corte e elevação com pisos (D3)', () => {
     const thick = floorTypeThickness(s.project.floorTypes.ft_ceram!);
     // y = 2 cruza o furo entre x = 2 e x = 4
     const r = computeSection(s.project, { a: { x: -1, y: 2 }, b: { x: 7, y: 2 }, depth: 2 });
-    expect(multiArea(r.silhouette)).toBeCloseTo((6 - 2) * thick, 6);
+    expect(r.cut.reduce((acc, c) => acc + multiArea(c.polygons), 0)).toBeCloseTo((6 - 2) * thick, 6);
+    // além do plano, a face do furo (o reveal, no lado do observador) aparece pelo vão: a silhueta fica cheia
+    expect(multiArea(r.silhouette)).toBeCloseTo(6 * thick, 6);
   });
 
   it('linha de corte que não toca o piso não o inclui', () => {

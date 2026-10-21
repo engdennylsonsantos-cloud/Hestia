@@ -31,8 +31,6 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
   };
 
   const onStagePointerDown = (e: RPointerEvent<HTMLDivElement>): void => {
-    // O canvas por baixo não deve iniciar a órbita nem a ferramenta: o arrasto aqui é do cubo.
-    e.stopPropagation();
     if (e.button !== 0) return;
     suppressClick.current = false;
     const start = { x: e.clientX, y: e.clientY };
@@ -75,7 +73,8 @@ export function ViewCube({ model }: ViewCubeProps): ReactElement {
   };
 
   return (
-    <div className="viewcube" role="group" aria-label="Controle da vista 3D">
+    // O ponteiro não chega ao canvas por baixo: ele captura o ponteiro (e o clique iria para o canvas, não para o botão).
+    <div className="viewcube" role="group" aria-label="Controle da vista 3D" onPointerDown={(e) => e.stopPropagation()}>
       <div className="vc-stage" onPointerDown={onStagePointerDown}>
         <div className="vc-cube" style={{ transform: cubeMatrix(orbit.azimuth, orbit.elevation) }}>
           {FACES.map(({ face, cells }) => (

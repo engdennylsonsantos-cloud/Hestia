@@ -3,6 +3,7 @@ import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
 import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
+import { selectionAfterClick } from './selectionClick.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -92,6 +93,27 @@ export function setRoofProjection(on: boolean): void {
 /** Alterna a projeção da cobertura (alternador da faixa, aba Vista, e a caixa de Propriedades usam o mesmo estado). */
 export function toggleRoofProjection(): void {
   setRoofProjection(!useUi.getState().showRoofProjection);
+}
+
+/**
+ * Clique na vista 3D (sem arrasto, decisão 0016 §3): o elemento sob o cursor vai para a seleção comum (planta, árvore e
+ * propriedades). `hit` null é o vazio. Com `additive` (Shift/Ctrl), entra ou sai da seleção.
+ */
+export function clickSelect3d(hit: Id | null, additive: boolean): void {
+  const ui = useUi.getState();
+  const next = selectionAfterClick(ui.selection, hit, additive);
+  useUi.setState({ selection: next, roofEdge: next.length === 1 && ui.roofEdge?.roofId === next[0] ? ui.roofEdge : null });
+}
+
+/**
+ * Teclas da vista 3D (sem ferramentas de desenho, decisão 0016 §5): Esc limpa a seleção; Delete e Backspace a excluem
+ * por `remove`. Devolve se a tecla foi consumida (sem seleção, nada é consumido).
+ */
+export function key3d(k: string, selection: readonly Id[], remove: () => void): boolean {
+  if (!selection.length || !['Escape', 'Delete', 'Backspace'].includes(k)) return false;
+  if (k === 'Escape') clickSelect3d(null, false);
+  else remove();
+  return true;
 }
 
 export const DEFAULT_OPTIONS: ToolOptions = {

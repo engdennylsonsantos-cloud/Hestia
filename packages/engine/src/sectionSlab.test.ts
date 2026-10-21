@@ -42,7 +42,9 @@ describe('corte com lajes (D3)', () => {
   it('corte perpendicular à inclinação: faixa retangular na cota do ponto de corte (x = 3 → +0,30)', () => {
     const s = storeWithSlab({ slope: SLOPE_X });
     const r = computeSection(s.project, { a: { x: 3, y: -1 }, b: { x: 3, y: 5 }, depth: 2 });
-    expect(multiArea(r.silhouette)).toBeCloseTo(4 * THICK, 6);
+    expect(r.cut.reduce((acc, c) => acc + multiArea(c.polygons), 0)).toBeCloseTo(4 * THICK, 6);
+    // silhueta = corte + a laje que desce atrás do plano (visível sob a faixa de corte): cotas de 0,10 − 0,17 a 0,30
+    expect(multiArea(r.silhouette)).toBeCloseTo(4 * (0.3 - (0.1 - THICK)), 6);
     // o observador olha para -x: a parte além do plano (x entre 1 e 3) fica mais baixa, a 0,10 de subida
     expect(r.zMax).toBeCloseTo(0.3, 6);
     expect(r.zMin).toBeCloseTo(0.1 - THICK, 6);
@@ -56,7 +58,9 @@ describe('corte com lajes (D3)', () => {
     const s = storeWithSlab({ holes: [HOLE] });
     // y = 2 cruza o furo entre x = 2 e x = 4
     const r = computeSection(s.project, { a: { x: -1, y: 2 }, b: { x: 7, y: 2 }, depth: 2 });
-    expect(multiArea(r.silhouette)).toBeCloseTo((6 - 2) * THICK, 6);
+    expect(r.cut.reduce((acc, c) => acc + multiArea(c.polygons), 0)).toBeCloseTo((6 - 2) * THICK, 6);
+    // o reveal do furo, além do plano, é visível pelo vão e preenche a silhueta
+    expect(multiArea(r.silhouette)).toBeCloseTo(6 * THICK, 6);
   });
 
   it('linha de corte que não toca a laje não a inclui', () => {

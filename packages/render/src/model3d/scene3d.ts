@@ -181,6 +181,7 @@ export class ModelScene {
    * modelo (`pickLayer`), para o modelo continuar sem malhas nesse estilo.
    */
   private buildPickLayer(): void {
+    if (!this.pickSources.length) return;
     this.model.updateMatrixWorld(true);
     const pick = this.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
     for (const s of this.pickSources) {

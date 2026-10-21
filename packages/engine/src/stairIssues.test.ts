@@ -12,7 +12,8 @@ import {
 } from '@hestia/model';
 import { DEFAULT_STAIR_NORMS } from './stairNorms.ts';
 import { minWidth, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
-import { resolveStairs, stairIssueList, stairValidationIssues } from './stairs.ts';
+import { resolveStairs } from './stairs.ts';
+import { stairIssueList, stairValidationIssues } from './stairChecks.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: v(ax, ay), b: v(bx, by), sag: 0 });

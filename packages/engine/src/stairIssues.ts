@@ -1,4 +1,4 @@
-import { dist, lerp, type Vec2 } from '@hestia/geom';
+import { cross, dist, lerp, norm, sub, type Vec2 } from '@hestia/geom';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import { DEFAULT_STAIR_NORMS, type StairNorms } from './stairNorms.ts';
 
@@ -139,7 +139,40 @@ function riserChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]
   }
 }
 
-/** Lance a lance: largura, piso médio, Blondel e desnível sem patamar. */
+/** Diferença máxima (m) entre pisos consecutivos de um lance reto (decisão 0011 §1 item 10). */
+const TREAD_EVEN_TOL = 0.005;
+/** Seno máximo do ângulo entre dois espelhos para contar como paralelos (~0,06°). */
+const PARALLEL_SIN = 1e-3;
+
+/**
+ * Degraus iguais (`stair-uneven`): num lance de espelhos paralelos, o piso entre pares de espelhos consecutivos não pode
+ * variar mais de 5 mm. Em leque os espelhos não são paralelos e a variação do piso é esperada: não avisa.
+ *
+ * Alturas entre lances: não se checam. A altura do espelho é uma só por escada (h = H ÷ N, decisão 0011 §1 item 4),
+ * então todo espelho de todo lance tem a mesma altura por construção. Se o modelo passar a aceitar altura por lance,
+ * a comparação entra aqui, por `componentIndex`.
+ */
+function evenTreadCheck(rs: ResolvedStair, ci: number, risers: ResolvedStairRiser[], out: StairIssueItem[]): void {
+  if (risers.length < 3) return;
+  const u0 = norm(sub(risers[0]!.b, risers[0]!.a));
+  if (!risers.every((r) => Math.abs(cross(u0, norm(sub(r.b, r.a)))) < PARALLEL_SIN)) return;
+  const mids = risers.map((r) => arcMid(r.points));
+  const treads = mids.slice(1).map((m, i) => dist(mids[i]!, m));
+  const spread = Math.max(...treads) - Math.min(...treads);
+  if (spread > TREAD_EVEN_TOL + EPS) {
+    out.push(
+      makeStairIssue(
+        rs.id,
+        'stair-uneven',
+        'warning',
+        `Degraus desiguais: o piso entre espelhos consecutivos varia ${Math.round(spread * 1000)} mm (máximo ${Math.round(TREAD_EVEN_TOL * 1000)} mm).`,
+        ci,
+      ),
+    );
+  }
+}
+
+/** Lance a lance: largura, piso médio, Blondel, desnível sem patamar e degraus iguais. */
 function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {
   const h = rs.riserHeight;
   for (const [ci, risers] of risersByRun(rs.risers)) {
@@ -155,6 +188,7 @@ function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]):
         ),
       );
     }
+    evenTreadCheck(rs, ci, risers, out);
     if (risers.length >= 2) {
       const mids = risers.map((r) => arcMid(r.points));
       let sum = 0;

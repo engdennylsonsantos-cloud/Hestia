@@ -19,6 +19,7 @@ import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { useUi } from './state.ts';
+import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
@@ -257,8 +258,7 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const map: Record<string, ToolId> = { v: 'select', w: 'wall', f: 'floor', b: 'slab', u: 'roof', d: 'door', j: 'window', m: 'move', c: 'copy', r: 'rotate', s: 'mirror', a: 'array', o: 'offset', g: 'parallel', t: 'trim', l: 'align', n: 'joins', p: 'split', e: 'measure', k: 'section', h: 'rehost' };
-    const id = map[k.toLowerCase()];
+    const id = toolForKey(k);
     if (id && !e.altKey) {
       this.setTool(id);
       return true;

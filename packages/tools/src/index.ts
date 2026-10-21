@@ -28,4 +28,6 @@ export * from './stairStroke.ts';
 export * from './stairPick.ts';
 export * from './stairCommands.ts';
 export { StairTool, isStairTool, type StairStatus } from './stairTool.ts';
+export * from './stairRunPlan.ts';
+export { StairRunTool } from './stairRunTool.ts';
 export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';

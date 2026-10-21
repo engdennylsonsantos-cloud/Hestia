@@ -5,6 +5,8 @@ import { useUi } from '../editor/state.ts';
 import { Check, NumField } from './fields.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { RoofOptionsBar } from './RoofOptionsBar.tsx';
+import { StairOptionsBar } from './StairOptionsBar.tsx';
+import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
 import type { LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
@@ -99,6 +101,8 @@ export function OptionsBar(): ReactElement {
       )}
       {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
       {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar tool={tool} />}
+      {tool === 'stair' && <StairOptionsBar />}
+      {tool === 'stairrun' && <StairRunOptionsBar />}
       {(tool === 'door' || tool === 'window') && (
         <label>
           Tipo

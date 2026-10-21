@@ -6,6 +6,11 @@ import { resolveFloors } from './floors.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
+import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
+import { resolveStairsOnLevel } from './stairs.ts';
+import { sectionOfStairs } from './sectionStairs.ts';
+
+export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
 
 /**
  * Corte e elevação a partir da geometria já resolvida em faixas (bands).
@@ -14,13 +19,6 @@ import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
  * normal à esquerda da linha; assim x cresce para a direita. Uma elevação é o mesmo cálculo com a linha fora da
  * construção e `depth` grande, onde nada é cortado e tudo é projetado.
  */
-export interface SectionLine {
-  a: Vec2;
-  b: Vec2;
-  /** Profundidade visível além do plano de corte. */
-  depth: number;
-}
-
 export interface SectionRegion {
   materialId: Id;
   /** Polígonos em (t, z). */
@@ -29,11 +27,12 @@ export interface SectionRegion {
 
 /** Elemento visto além do plano de corte; a lista vem ordenada do mais longe ao mais perto (pintor). */
 export interface SectionBeyond {
-  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, de laje, com `slabId`, ou de telhado, com `roofId`). */
+  /** Parede de origem (ausente quando o item é uma camada de piso, que traz `floorId`, de laje, com `slabId`, de telhado, com `roofId`, ou de escada, com `stairId`: degrau, patamar ou espelho). */
   wallId?: Id;
   floorId?: Id;
   slabId?: Id;
   roofId?: Id;
+  stairId?: Id;
   materialId: Id;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
@@ -70,14 +69,6 @@ export interface SectionResult {
   levels: SectionLevelMark[];
 }
 
-/** Retângulo (t0..t1, z0..z1); com `zb` diferente de `z1` o topo é inclinado (trapézio de `z1` em t0 a `zb` em t1). */
-const rect = (t0: number, t1: number, z0: number, z1: number, zb = z1): Ring => [
-  { x: t0, y: z0 },
-  { x: t1, y: z0 },
-  { x: t1, y: zb },
-  { x: t0, y: z1 },
-];
-
 /** Camada de laje entre as cotas de base (b0 em t0, b1 em t1) e de topo (u0 em t0, u1 em t1): trapézio se inclinada. */
 const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
   { x: t0, y: b0 },
@@ -85,41 +76,6 @@ const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1
   { x: t1, y: u1 },
   { x: t0, y: u0 },
 ];
-
-/** Intervalos de `t` em que a reta a + t·d (d unitário, n sua normal) está dentro do polígono (par-ímpar, serve a furos). */
-export function lineIntervals(poly: Polygon, a: Vec2, d: Vec2, n: Vec2): Array<[number, number]> {
-  const ts: number[] = [];
-  for (const ring of poly) {
-    for (let i = 0; i < ring.length; i++) {
-      const p = ring[i]!;
-      const q = ring[(i + 1) % ring.length]!;
-      const sp = (p.x - a.x) * n.x + (p.y - a.y) * n.y;
-      const sq = (q.x - a.x) * n.x + (q.y - a.y) * n.y;
-      if (sp <= 0 === sq <= 0) continue;
-      const k = sp / (sp - sq);
-      ts.push((p.x + (q.x - p.x) * k - a.x) * d.x + (p.y + (q.y - p.y) * k - a.y) * d.y);
-    }
-  }
-  ts.sort((x, y) => x - y);
-  const out: Array<[number, number]> = [];
-  for (let i = 0; i + 1 < ts.length; i += 2) out.push([ts[i]!, ts[i + 1]!]);
-  return out;
-}
-
-const EPS_T = 1e-6;
-
-/** Eixo do corte: comprimento, direção `d`, normal `n` e a região de visão (`depth` além da linha). */
-export function sectionFrame(line: SectionLine): { length: number; d: Vec2; n: Vec2; slab: MultiPolygon } {
-  const dx = line.b.x - line.a.x;
-  const dy = line.b.y - line.a.y;
-  const length = Math.hypot(dx, dy);
-  const k = length || 1;
-  const d = { x: dx / k, y: dy / k };
-  const n = { x: -d.y, y: d.x };
-  const cx = line.a.x + d.x * (length / 2) + n.x * (line.depth / 2);
-  const cy = line.a.y + d.y * (length / 2) + n.y * (line.depth / 2);
-  return { length, d, n, slab: [[orientedRect(cx, cy, d.x, d.y, length / 2, line.depth / 2)]] };
-}
 
 export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p.levels.map((l) => l.id)): SectionResult {
   const { length, d, n, slab } = sectionFrame(line);
@@ -216,6 +172,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     for (const c of rf.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
     beyond.push(...rf.beyond);
     grow(rf.zMin, rf.zMax);
+    // Escadas (decisão 0011 §6) das que nascem neste nível: degraus, patamares e espelhos (`sectionStairs.ts`).
+    const sk = sectionOfStairs(resolveStairsOnLevel(p, levelId), line);
+    for (const c of sk.cut) cutBy.set(c.materialId, [...(cutBy.get(c.materialId) ?? []), c.polygon]);
+    beyond.push(...sk.beyond);
+    grow(sk.zMin, sk.zMax);
     for (const w of wallsOnLevel(p, levelId)) {
       const rw = resolved.walls[w.id];
       if (!rw) continue;

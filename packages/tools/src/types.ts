@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
+import type { StairRunToolOptions } from './stairRunPlan.ts';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'none';
 
@@ -122,6 +123,8 @@ export interface ToolOptions {
   roofOffset?: number | null;
   /** Escada por croqui: tipo, sub-modo, primitiva, N para distribuir e cotas da criação. Ausente = padrão. */
   stair?: StairToolOptions;
+  /** Escada reta, em L, em U ou com leque, criada pronta por cliques (ferramenta `stairrun`). Ausente = reta, 1,20 m, giro à esquerda. */
+  stairRun?: StairRunToolOptions;
 }
 
 export interface PointerInfo {

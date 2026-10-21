@@ -1,7 +1,8 @@
 /**
  * Perfil de norma das escadas (decisão 0011 §1 item 10): faixas de espelho, piso e Blondel (interseção NBR 9050 ×
  * NBR 9077), patamar a cada desnível máximo e comprimento mínimo do patamar. Só geram avisos, nunca bloqueiam.
- * A folga de cabeça vem do tipo (`StairType.minHeadroom`) e ainda não tem aviso próprio.
+ * A folga de cabeça vem do tipo (`StairType.minHeadroom`); o aviso `stair-headroom` depende da geometria das lajes do
+ * nível de topo e fica em `stairChecks.ts`.
  */
 export interface StairNorms {
   /** Espelho mínimo e máximo (m). */

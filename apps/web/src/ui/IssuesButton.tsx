@@ -1,28 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import type { ValidationIssue } from '@hestia/model';
-import { fitBox } from '@hestia/render';
-import { editor } from '../editor/controller.ts';
-import { groupIssues, issueTarget, summarize, worstSeverity } from '../editor/issuesView.ts';
+import { goToIssue } from '../editor/goToIssue.ts';
+import { groupIssues, summarize, worstSeverity } from '../editor/issuesView.ts';
 import { useIssues } from '../editor/useIssues.ts';
 import { useUi } from '../editor/state.ts';
-
-/** Seleciona o elemento do aviso e leva a vista até ele. Troca de nível só quando preciso. */
-function goTo(issue: ValidationIssue): void {
-  const t = issueTarget(editor.project, issue);
-  if (!t) {
-    useUi.setState({ status: 'Este elemento não existe mais.' });
-    return;
-  }
-  const ui = useUi.getState();
-  // selectLevel limpa a seleção, volta à planta e reinicia a ferramenta; por isso só é usado quando o nível muda.
-  if (t.levelId && t.levelId !== ui.levelId) editor.selectLevel(t.levelId);
-  else if (ui.view !== 'plan') editor.setView('plan');
-  useUi.setState({ selection: [t.elementId] });
-  const v = editor.viewport();
-  // Piso: enquadra a caixa do contorno; parede e abertura: centraliza no ponto médio.
-  if (t.box && v) editor.setViewport(fitBox(v, t.box));
-  else if (t.center && v) editor.setViewport({ ...v, cx: t.center.x, cy: t.center.y });
-}
 
 /** Botão de avisos da barra de status, com popover de lista agrupada por severidade. */
 export function IssuesButton(): ReactElement {

@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
-import { DEFAULT_SNAP, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -99,6 +99,8 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   roofSlope: 30,
   roofOverhang: 0.5,
   roofOffset: null,
+  stair: { primitive: 'line', baseOffset: 0, topOffset: 0, height: 2.8, topLevelId: null },
+  stairRun: DEFAULT_STAIR_RUN_OPTIONS,
 };
 
 export const useUi = create<UiState>(() => ({

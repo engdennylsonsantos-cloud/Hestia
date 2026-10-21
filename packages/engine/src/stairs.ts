@@ -9,7 +9,6 @@ import {
   type Project,
   type Stair,
   type StairType,
-  type ValidationIssue,
 } from '@hestia/model';
 import { makeStairIssue, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
 import { stairLandingPolygon, stairRunSteps } from './stairSketch.ts';
@@ -130,14 +129,4 @@ export function resolveStairs(p: Project): ResolvedStair[] {
 /** Escadas cujo nível (`levelId`) é o dado. */
 export function resolveStairsOnLevel(p: Project, levelId: Id): ResolvedStair[] {
   return resolveList(p, stairsOnLevel(p, levelId));
-}
-
-/** Avisos e erros de todas as escadas do projeto, no formato de `StairIssueItem`. */
-export function stairIssueList(p: Project): StairIssueItem[] {
-  return resolveStairs(p).flatMap((r) => r.issues);
-}
-
-/** Os mesmos avisos no formato do painel (`ValidationIssue`, com `elementId` = id da escada). */
-export function stairValidationIssues(p: Project): ValidationIssue[] {
-  return stairIssueList(p).map((i) => ({ severity: i.severity, code: i.code, message: i.message, elementId: i.stairId }));
 }

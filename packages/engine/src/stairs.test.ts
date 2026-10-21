@@ -10,7 +10,8 @@ import {
   type StairLanding,
   type StairRun,
 } from '@hestia/model';
-import { resolveStairs, resolveStairsOnLevel, stairIssueList, type ResolvedStair } from './stairs.ts';
+import { resolveStairs, resolveStairsOnLevel, type ResolvedStair } from './stairs.ts';
+import { stairIssueList } from './stairChecks.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: v(ax, ay), b: v(bx, by), sag: 0 });

@@ -145,11 +145,10 @@ modos `full`/`none`, inclinação, face inferior abaixo do topo dos degraus, uni
 Efeitos colaterais:
 - O aviso `stair-headroom` (`stairChecks.ts`) não muda: usa a cota real de cada elemento, no ponto de menor folga. Com o furo por
   elemento, o que sobra sob cada elemento tem folga maior que H, então não avisa (salvo H abaixo do mínimo do tipo).
-- Pendente (próxima etapa, não feito): a **chegada monolítica** ainda depende da laje de forma global. `stairSlabThickness`
-  (`packages/render/src/model3d/stairSolids.ts`, chamada em `scene3d.ts`) usa a maior espessura das lajes e pisos que cobrem a escada,
-  e `stairBody.ts` (`slabThickness`, topo da chegada = `topZ − slabThickness`) assume uma única laje. Com offsets diferentes, a chegada
-  fica na cota errada. A cópia de `thicknessUnder` em `stairSlabThickness` deixou de ser a regra do furo: o comentário dela
-  ainda cita `thicknessUnder` de `stairOpenings.ts`, que não existe mais.
+- A **chegada monolítica** usa a mesma face inferior do furo: `stairArrivalTopZ` (`stairArrival.ts`) devolve a menor face inferior das
+  lajes e pisos do nível de topo que cobrem a faixa à frente do último espelho, e o 3D (`scene3d.ts`), o corte (`sectionStairs.ts`) e
+  `stairBody` (opção `arrivalTopZ`) recebem esse valor. Sem cobertura, vale `topZ − 0,15 m`. A antiga espessura global
+  (`stairSlabThickness`, `STAIR_OPENING_DEFAULT_THICKNESS`) foi removida. Detalhes na decisão 0012 §2 e §5.
 - A barra de opções da ferramenta não expõe a abertura: a escada criada recebe o padrão e o ajuste é feito em Propriedades.
 
 ## 7 · Numeração na planta e Pegar linhas (estado atual)

@@ -29,7 +29,7 @@ fundo `zFundo(x, y) = a·x + b·y + c`):
   peça cujo plano cruza `baseZ` é DIVIDIDA pelo polígono em duas (uma de fundo plano em `baseZ`, outra com o plano). O corte vale para TODAS as peças de qualquer lance (degraus, patamares e chegada), não só para o lance que parte do nível de base (`fit`, em `stairBody.ts`).
 - **landing (patamar):** `polygon` = contorno; `zTop = z` do patamar; fundo plano em `zTop − (h + T)` onde `T` é o da rampa anterior (sem rampa anterior, o da seguinte). Também é cortado pelo piso base.
 - **arrival (chegada):** só quando o último degrau é de um lance monolítico que sobe até o espelho de topo (nº N) e os espelhos N−1 e N existem (`stairArrivalFrame`): faixa atrás da última linha de espelho, comprimento `min(p_último, 0,30)`,
-  largura = comprimento do último espelho, fundo contínuo com o do último degrau (liso: mesmo plano estendido; escalonado: plano `zTop_último − h − T`). Topo: `arrivalTopZ` (opção de `stairBody`), a cota da face inferior da laje ou do piso do nível de topo que cobre o último espelho (ver §5); a parte da faixa cujo fundo fica acima desse topo é cortada. Sem `arrivalTopZ`, o topo é `topZ − slabThickness` (padrão `STAIR_ARRIVAL_SLAB_DEFAULT` = 0,15 m). Garante que a face do último espelho é contínua até a laje.
+  largura = comprimento do último espelho, fundo contínuo com o do último degrau (liso: mesmo plano estendido; escalonado: plano `zTop_último − h − T`). `zTop` = a menor face inferior (`stairArrivalTopZ`, `stairArrival.ts`) das lajes e pisos do nível de topo que cobrem a faixa de 2 cm à frente do último espelho. Face inferior = nível + `heightOffset` − espessura total do tipo (a mesma do furo); laje inclinada usa `coverUnderside`. Sem cobertura, `zTop = topZ − 0,15 m` (`STAIR_ARRIVAL_SLAB_DEFAULT`). A chegada é cortada em `z ≤ zTop`: com profundidade estrutural baixa, o canto distante teria espessura negativa (antes da correção). Garante que a face do último espelho é contínua até a laje.
 - **placas de espelho (estilo piso e espelho):** como hoje (`ResolvedStairRiser` com `riserThickness`).
 
 Volume monolítico = Σ `área × (zTop − zFundo(centroide))` (exato porque o fundo é um plano). Exemplo de referência (lance reto, largura w, passo p, N espelhos):
@@ -61,13 +61,11 @@ médios dos espelhos de trás e da frente. Exemplo: profundidade 0,20 m, p = 0,2
 
 **Chegada.**
 - Frente: o último espelho do lance; comprimento `min(p, 0,30 m)`; largura = comprimento do espelho.
-- Topo, versão com `arrivalTopZ` (em andamento, não commitada): `stairArrivalTopZ` (`stairArrival.ts`) devolve a face inferior da laje ou
-  do piso do nível de topo que cobre a faixa à frente do último espelho (2 cm de profundidade). Se mais de um cobre, vale a menor (a mesma
-  regra do furo, §6 da decisão 0011); laje inclinada usa a menor cota da face inferior (`coverUnderside`). Sem cobertura, devolve null.
-- Topo, versão atual sem `arrivalTopZ`: `topZ − slabThickness`, com `STAIR_ARRIVAL_SLAB_DEFAULT` = 0,15 m.
-- Consumidores hoje: a malha 3D usa a espessura da laje de cima (`stairSlabThickness`, a maior das lajes e pisos que cobrem a planta da
-  escada; 0,15 m sem cobertura). O corte (`sectionStairs.ts`) chama `stairBody(s)` sem opções, então usa 0,15 m. O quantitativo não tem a
-  chegada no volume (ver abaixo). Pendente: ligar `arrivalTopZ` ao 3D e ao corte.
+- Topo (`zTop`): `stairArrivalTopZ` (`stairArrival.ts`) = a menor face inferior das lajes e pisos do nível de topo que cobrem a faixa de
+  2 cm à frente do último espelho. Face inferior = nível + `heightOffset` − espessura total do tipo (a do furo, §6 da decisão 0011);
+  laje inclinada usa `coverUnderside`. Sem cobertura, `topZ − 0,15 m` (`STAIR_ARRIVAL_SLAB_DEFAULT`). A chegada é cortada em `z ≤ zTop`.
+- Consumidores: a malha 3D (`scene3d.ts` → `buildStairSolids` com `stairArrivalTopZ`) e o corte (`sectionStairs.ts`, com
+  `stairArrivalTopZ`) usam o mesmo topo. O quantitativo não tem a chegada no volume: ela fica sob a laje de cima (`stairQuantities.ts`).
 
 **Arestas do 3D (`stairSolids.ts`).** O corpo é uma peça de `stairBody` por degrau, patamar ou chegada, com topo plano e fundo por ponto
 (o plano, limitado a `topo − 0,1 mm`, para a espessura nunca zerar). Duas funções deixam a malha limpa:
@@ -85,12 +83,12 @@ médios dos espelhos de trás e da frente. Exemplo: profundidade 0,20 m, p = 0,2
   confere as integrais com esse valor.
 - Patamar de 1,44 m² em L com lances de 8 espelhos (0,20 m): 1,44 × (h + T) = 0,592 m³ (`stairBody.test.ts`, "L: patamar à cota 8h").
 - Piso e espelho, mesma reta: 0,2184 m³ (0,1512 de pisos + 0,0672 de espelhos).
-- O quantitativo da monolítica soma só degraus e patamares: a chegada fica de fora do volume (`stairQuantities.ts`), mas entra na malha 3D
-  e no corte. Essa diferença é intencional no código; confirmar com o dono se a chegada deve contar no volume.
+- O quantitativo da monolítica soma só degraus e patamares: a chegada fica sob a laje de cima e não entra no volume
+  (`stairQuantities.ts`), mas entra na malha 3D e no corte.
 
 **Limitações.**
 - Leque e arco: cada degrau tem um plano de fundo ajustado pelos pontos médios dos espelhos de trás e da frente. A face inferior real de um
   leque ou de uma curva não é plana, então é aproximação. Os testes do leque (90°, 180° e 270°, `stairBody.test.ts`) conferem disjunção,
   áreas e cota não abaixo de `baseZ`, não a exatidão do fundo.
 - Escalonado no leque e na curva: fundo plano por degrau, igual ao caso reto.
-- Chegada: a cota da laje que cobre o último espelho ainda não chega ao 3D nem ao corte (ver acima); hoje eles usam a espessura.
+- Chegada: o topo depende da laje ou do piso que cobre a faixa à frente do último espelho; sem cobertura, usa a regra `topZ − 0,15 m`.

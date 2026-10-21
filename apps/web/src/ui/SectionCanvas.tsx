@@ -6,13 +6,14 @@ import { Icon } from './Icon.tsx';
 
 /**
  * Quadro da vista de corte ou elevação: a mesma lista de desenho da planta, desenhada pelo mesmo canvas.
- * Só leitura: não há ferramentas nesta vista; o cálculo do corte é cacheado pelo controlador por projeto.
+ * Sem ferramentas nesta vista; o cálculo do corte é cacheado pelo controlador por projeto. Seleção e cursor realçam o
+ * desenho (decisão 0016).
  */
 export function buildSectionFrame(v: Viewport, dark: boolean): PlanDrawList | null {
   const st = useUi.getState();
   const section = editor.sectionOf(st.sectionId);
   if (!section) return null;
-  return buildSectionDrawList({ project: editor.project, section, viewport: v, theme: dark ? DARK : LIGHT, dark, showGrid: st.showGrid });
+  return buildSectionDrawList({ project: editor.project, section, viewport: v, theme: dark ? DARK : LIGHT, dark, showGrid: st.showGrid, highlight: { selection: st.selection, hover: st.hover } });
 }
 
 /** Nome da vista aberta, no canto, com saída para a planta. */

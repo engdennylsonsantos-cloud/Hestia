@@ -221,6 +221,11 @@ export class Editor {
         this.closeSection();
         return true;
       }
+      // Delete e Backspace excluem a seleção, como na planta e na 3D (decisão 0016 §5).
+      if ((k === 'Delete' || k === 'Backspace') && ui.selection.length) {
+        this.deleteSelection();
+        return true;
+      }
       return false;
     }
     if (ui.view === '3d') return key3d(k, ui.selection, () => this.deleteSelection());

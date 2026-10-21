@@ -276,6 +276,39 @@ const unionAll = (ms: MultiPolygon[]): MultiPolygon => {
   return parts.length === 1 ? parts[0]! : union(...parts);
 };
 
+/**
+ * Solda os vértices de planta da camada que estão a menos de `WELD_EPS` uns dos outros (faixas de cotas diferentes
+ * recortam o mesmo arco em pontos a 0,1 mm, e a tampa e a face lateral usariam pontos diferentes). O primeiro vértice
+ * de cada grupo é o representante; anéis que perdem vértices repetidos saem limpos pela união depois.
+ */
+const WELD_EPS = 5e-4;
+function weldBands(bands: LayerBand[]): LayerBand[] {
+  const reps: Vec2[] = [];
+  const grid = new Map<string, number[]>();
+  const rep = (v: Vec2): Vec2 => {
+    const ix = Math.floor(v.x / WELD_EPS);
+    const iy = Math.floor(v.y / WELD_EPS);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (const r of grid.get(`${ix + dx},${iy + dy}`) ?? []) {
+          const w = reps[r]!;
+          if (Math.hypot(w.x - v.x, w.y - v.y) < WELD_EPS) return w;
+        }
+    reps.push(v);
+    const k = `${ix},${iy}`;
+    const list = grid.get(k);
+    if (list) list.push(reps.length - 1);
+    else grid.set(k, [reps.length - 1]);
+    return v;
+  };
+  return bands.map((b) => ({
+    ...b,
+    poly: b.poly.map((p) =>
+      p.map((ring) => ring.map(rep).filter((v, i, a) => v !== a[(i + a.length - 1) % a.length])),
+    ),
+  }));
+}
+
 /** Reta de planta com as faces voltadas para +m (`plus`) e para -m (`minus`), em coordenadas (s, z). */
 interface PlanLine {
   m: Vec2;
@@ -304,9 +337,11 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
     if (!zs.some((q) => Math.abs(q - z) < Z_EPS)) zs.push(z);
   };
 
-  for (const raw of bands) {
-    // Espículas de largura zero (anéis que voltam sobre si) vêm das booleanas do motor: a união as cancela.
-    const poly = union(raw.poly);
+  // Solda, limpa (a união cancela espículas e cria vértices de interseção) e solda de novo: os vértices novos da
+  // união também podem ficar a 0,1 mm de vizinhos de outra faixa.
+  const cleaned = weldBands(weldBands(bands).map((b) => ({ ...b, poly: union(b.poly) })));
+  for (const raw of cleaned) {
+    const poly = raw.poly;
     if (poly.length === 0) continue;
     const band: LayerBand = { ...raw, poly };
     const z0 = baseZ + band.z0;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, pickSection, planViewOf, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
@@ -272,6 +272,30 @@ export function ViewportCanvas(): ReactElement {
       if (useUi.getState().hover !== id) useUi.setState({ hover: id });
     });
   };
+  /**
+   * Elemento sob o cursor na vista de corte ou elevação (decisão 0016). A tolerância são 4 px de tela, convertidos às
+   * unidades do desenho (metros) pelo zoom da vista. Null fora do desenho ou no vazio.
+   */
+  const pickSectionAt = (s: Pt) => {
+    const v = editor.viewport();
+    const result = editor.sectionOf(useUi.getState().sectionId);
+    if (!v || !result) return null;
+    const w = screenToWorld(v, s);
+    return pickSection(result, w, 4 / v.zoom);
+  };
+  /** Realce ao passar o cursor sobre o corte: um pick por quadro, como no 3D. */
+  const hoverSection = useRef<{ at: Pt | null; frame: number }>({ at: null, frame: 0 });
+  const pickHoverSection = (s: Pt): void => {
+    hoverSection.current.at = s;
+    if (hoverSection.current.frame) return;
+    hoverSection.current.frame = requestAnimationFrame(() => {
+      hoverSection.current.frame = 0;
+      const at = hoverSection.current.at;
+      if (!at || useUi.getState().view !== 'section') return;
+      const id = pickSectionAt(at)?.id ?? null;
+      if (useUi.getState().hover !== id) useUi.setState({ hover: id });
+    });
+  };
   const info = (e: RPointerEvent, s: Pt): { raw: Pt; shift: boolean; ctrl: boolean; alt: boolean } => {
     const v = editor.viewport() as Viewport;
     return { raw: screenToWorld(v, s), shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey };
@@ -300,9 +324,10 @@ export function ViewportCanvas(): ReactElement {
       if (useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
-    // Na vista de corte não há ferramentas: o botão esquerdo também arrasta a vista.
+    // Na vista de corte não há ferramentas: o botão esquerdo arrasta a vista e, sem arrasto, seleciona (decisão 0016).
     if (panBtn || view === 'section') {
-      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: false };
+      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && !panBtn && e.button === 0 };
+      if (view === 'section' && useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
     if (!editor.viewport()) return;
@@ -341,11 +366,16 @@ export function ViewportCanvas(): ReactElement {
       return;
     }
     if (d.mode === 'pan') {
+      if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
       editor.pan(s.x - d.last.x, s.y - d.last.y);
       d.last = s;
       return;
     }
-    if (view === 'section') return;
+    if (view === 'section') {
+      // Sem botão pressionado: realce do elemento sob o cursor (decisão 0016).
+      if (d.mode === 'none') pickHoverSection(s);
+      return;
+    }
     const v = editor.viewport();
     if (!v) return;
     const inf = info(e, s);
@@ -385,6 +415,10 @@ export function ViewportCanvas(): ReactElement {
         clickSelect3d(elementAt3d(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
+    // Clique sem arrasto no corte ou na elevação: mesmo caminho da seleção do 3D (clickSelect3d = selectionAfterClick).
+    if (!d.moved && d.pick && useUi.getState().view === 'section') {
+      clickSelect3d(pickSectionAt(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+    }
     drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };
   };
 
@@ -403,14 +437,15 @@ export function ViewportCanvas(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Saiu do canvas: o realce do 3D some (o da planta não é tocado). */
+  /** Saiu do canvas: o realce do 3D e o do corte somem (o da planta não é tocado). */
   const onLeave = (): void => {
-    if (useUi.getState().view === '3d' && useUi.getState().hover) useUi.setState({ hover: null });
+    const vw = useUi.getState().view;
+    if ((vw === '3d' || vw === 'section') && useUi.getState().hover) useUi.setState({ hover: null });
   };
 
   const v = editor.viewport();
   // Sobre um elemento do 3D, o cursor vira mão (pointer); no vazio, a mão de arrastar a vista.
-  const cursorCss = ui.view === '3d' ? (ui.hover ? 'pointer' : 'grab') : ui.view !== 'plan' ? 'grab' : ui.tool === 'select' ? 'default' : 'crosshair';
+  const cursorCss = ui.view === '3d' ? (ui.hover ? 'pointer' : 'grab') : ui.view === 'section' ? (ui.hover ? 'pointer' : 'grab') : ui.tool === 'select' ? 'default' : 'crosshair';
   return (
     <div
       ref={host}

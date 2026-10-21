@@ -13,14 +13,14 @@ export interface SectionPick {
   kind: GraphicsCategory;
 }
 
-/** Item visível de um corte ou elevação, com os elementos que o originaram (o dono ou, no corte unido, as origens). */
+/** Item visível de um corte ou elevação, com os elementos que o originaram. */
 export interface SectionItem {
   /** Distância do plano (0 no corte). */
   depth: number;
   /** Empate na mesma profundidade: corte (0), vão (1), além (2). Mesma ordem da oclusão no motor. */
   rank: number;
   polygons: MultiPolygon;
-  /** Donos do item, na ordem de `sources` do motor. Vazio só se o motor não trouxer origem (não é pickable). */
+  /** Donos do item: um para parede, piso, laje, telhado, escada e vão; no corte unido, as origens de `sources`. */
   owners: SectionPick[];
   box: Box;
 }
@@ -28,7 +28,7 @@ export interface SectionItem {
 /** Ordem de empate da oclusão no motor (`OCCLUSION_RANK` em sectionOcclusion.ts): corte, vão, além. */
 const RANK = { cut: 0, opening: 1, beyond: 2 } as const;
 
-const CATEGORY_OF: Array<[keyof SectionOrigin, GraphicsCategory]> = [
+const OWNER_FIELDS: Array<[Exclude<keyof SectionOrigin, 'openingId'>, GraphicsCategory]> = [
   ['wallId', 'wall'],
   ['floorId', 'floor'],
   ['slabId', 'slab'],
@@ -36,10 +36,9 @@ const CATEGORY_OF: Array<[keyof SectionOrigin, GraphicsCategory]> = [
   ['stairId', 'stair'],
 ];
 
-/** Id e categoria de uma origem. A categoria de uma abertura vem do tipo (porta ou janela), não da origem. */
-export function ownerOf(o: SectionOrigin, openingKind?: GraphicsCategory): SectionPick | null {
-  if (o.openingId !== undefined) return { id: o.openingId, kind: openingKind ?? 'window' };
-  for (const [field, kind] of CATEGORY_OF) {
+/** Dono de uma origem do motor (parede, piso, laje, telhado ou escada); null se a origem não traz id. */
+export function ownerOf(o: SectionOrigin): SectionPick | null {
+  for (const [field, kind] of OWNER_FIELDS) {
     const id = o[field];
     if (id !== undefined) return { id, kind };
   }
@@ -47,32 +46,30 @@ export function ownerOf(o: SectionOrigin, openingKind?: GraphicsCategory): Secti
 }
 
 /**
- * Itens visíveis do corte, na ordem do picking: do mais perto ao mais longe (profundidade), e em empate corte antes de
- * vão antes do além. É a inversa da ordem de pintura de `buildSectionDrawList`, que pinta o mais longe por último...
- * não: pinta o mais longe primeiro e o corte por último; por isso aqui o corte vem primeiro.
+ * Itens visíveis do corte, na ordem do picking: do mais perto ao mais longe (profundidade); em empate, corte antes de
+ * vão e vão antes do além; por fim, a ordem da lista do motor. É a ordem de oclusão do motor, então o que está na
+ * frente vem primeiro (a pintura faz o inverso: o mais longe primeiro e o corte por último).
  */
 export function sectionItems(s: SectionResult): SectionItem[] {
   const items: Array<SectionItem & { order: number }> = [];
-  const push = (item: Omit<SectionItem, 'box'>): void => {
-    if (item.polygons.length === 0 || item.owners.length === 0) return;
-    items.push({ ...item, box: boxOf(item.polygons.flatMap((p) => p.flatMap((r) => r))), order: items.length });
+  const push = (depth: number, rank: number, polygons: MultiPolygon, owners: SectionPick[]): void => {
+    if (polygons.length === 0 || owners.length === 0) return;
+    items.push({ depth, rank, polygons, owners, box: boxOf(polygons.flatMap((p) => p.flatMap((r) => r))), order: items.length });
   };
   for (const r of s.cut) {
-    const owners = r.sources.map((o) => ownerOf(o)).filter((o): o is SectionPick => o !== null);
-    push({ depth: 0, rank: RANK.cut, polygons: r.polygons, owners: uniquePicks(owners) });
+    const owners = uniquePicks(r.sources.map(ownerOf).filter((o): o is SectionPick => o !== null));
+    push(0, RANK.cut, r.polygons, owners);
   }
-  for (const o of s.openings) {
-    push({ depth: o.depth, rank: RANK.opening, polygons: o.polygons, owners: [{ id: o.openingId, kind: o.kind === 'door' ? 'door' : 'window' }] });
-  }
+  for (const o of s.openings) push(o.depth, RANK.opening, o.polygons, [{ id: o.openingId, kind: o.kind === 'door' ? 'door' : 'window' }]);
   for (const b of s.beyond) {
     const owner = ownerOf(b);
-    push({ depth: b.depth, rank: RANK.beyond, polygons: b.polygons, owners: owner ? [owner] : [] });
+    push(b.depth, RANK.beyond, b.polygons, owner ? [owner] : []);
   }
   items.sort((x, y) => x.depth - y.depth || x.rank - y.rank || x.order - y.order);
-  return items.map(({ order: _order, ...item }) => item);
+  return items;
 }
 
-/** Donos sem repetição (por id e categoria), na ordem da primeira aparição. */
+/** Donos sem repetição (por categoria e id), na ordem da primeira aparição. */
 function uniquePicks(list: SectionPick[]): SectionPick[] {
   const seen = new Set<string>();
   return list.filter((o) => {
@@ -89,30 +86,33 @@ function distanceToBoundary(p: Vec2, m: MultiPolygon): number {
   for (const poly of m) {
     for (const ring of poly) {
       for (let i = 0; i < ring.length; i++) {
-        const a = ring[i]!;
-        const b = ring[(i + 1) % ring.length]!;
-        const c = closestOnSegment(p, a, b);
-        const d = Math.hypot(p.x - c.x, p.y - c.y);
-        if (d < best) best = d;
+        const c = closestOnSegment(p, ring[i]!, ring[(i + 1) % ring.length]!);
+        best = Math.min(best, Math.hypot(p.x - c.x, p.y - c.y));
       }
     }
   }
   return best;
 }
 
+/** Interior de um item: caixa envolvente primeiro (barato), depois o teste exato com furos. */
+function containsPoint(it: SectionItem, p: Vec2): boolean {
+  const b = it.box;
+  if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) return false;
+  return pointInMulti(p, it.polygons);
+}
+
 /**
- * Elemento sob o ponto (t, z) do corte ou da elevação. Testa os polígonos visíveis do mais perto ao mais longe:
- * primeiro o interior (o que está visível sob o ponto ganha), depois, se nada contém o ponto, a borda a `tolerance`
- * (unidades do desenho: o chamador converte 4 px com `4 / zoom`). Itens totalmente ocultos não entram (não são
- * pickable, intencional).
+ * Elemento sob o ponto (t, z) do corte ou da elevação. Duas passagens sobre os itens visíveis, cada uma do mais perto
+ * ao mais longe: primeiro o interior (o que está visível sob o ponto ganha); se nenhum contém o ponto, a borda a
+ * `tolerance` (unidades do desenho: o chamador converte os 4 px com `4 / zoom`). Itens totalmente ocultos não entram:
+ * não são selecionáveis, intencional.
  *
- * Corte unido: um material pode unir várias origens num único polígono, e o motor não dá o polígono de cada uma.
- * Nesse caso o id é a primeira de `sources` (limitação documentada: a seleção pode apontar para a origem vizinha
- * do mesmo material).
+ * Corte unido: o motor une por material e não dá o polígono de cada origem, então, com várias origens, o id é a
+ * primeira de `sources` (limitação documentada na decisão 0016).
  */
 export function pickSection(s: SectionResult, point: Vec2, tolerance = 0): SectionPick | null {
   const items = sectionItems(s);
-  const inside = items.find((it) => contains(it, point));
+  const inside = items.find((it) => containsPoint(it, point));
   if (inside) return inside.owners[0]!;
   if (tolerance <= 0) return null;
   const near = items.find((it) => {
@@ -121,10 +121,4 @@ export function pickSection(s: SectionResult, point: Vec2, tolerance = 0): Secti
     return distanceToBoundary(point, it.polygons) <= tolerance;
   });
   return near ? near.owners[0]! : null;
-}
-
-function contains(it: SectionItem, p: Vec2): boolean {
-  const b = it.box;
-  if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) return false;
-  return pointInMulti(p, it.polygons);
 }

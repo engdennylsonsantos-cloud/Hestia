@@ -1,9 +1,10 @@
 import type { MultiPolygon, Ring } from '@hestia/geom';
 import { lineIntervals, type SectionResult } from '@hestia/engine';
-import type { Project } from '@hestia/model';
+import type { Id, Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
 import type { Viewport } from '../viewport.ts';
+import { sectionItems } from './pick.ts';
 
 export interface SectionInput {
   project: Project;
@@ -12,6 +13,8 @@ export interface SectionInput {
   theme: PlanTheme;
   dark: boolean;
   showGrid: boolean;
+  /** Seleção e cursor (decisão 0016): realçados por cima do desenho. Sem ele, o desenho é o de sempre. */
+  highlight?: { selection: Id[]; hover: Id | null };
 }
 
 /** Caixilho de vidro (opaco na linha oculta, como o dono decidiu) e folha de porta: cores fixas do desenho. */
@@ -89,7 +92,27 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra).
   for (const ring of ringsOf(s.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
 
+  if (input.highlight) highlightOps(s, input.highlight, theme, fills, strokes);
+
   return { background: theme.bg, fills, strokes, labels };
+}
+
+/**
+ * Realce por seleção e por cursor (decisão 0016, seção "Seleção em cortes e elevações"). Um item selecionado (ou cujo
+ * dono está selecionado) ganha contorno na cor de seleção e preenchimento translúcido (0,25) sobre as partes visíveis.
+ * O item sob o cursor, se não estiver selecionado, ganha só um contorno fraco. Vai por último, por cima do desenho.
+ * Corte unido: se uma das origens está selecionada, a região inteira é realçada (o motor não separa as origens).
+ */
+function highlightOps(s: SectionResult, hl: { selection: Id[]; hover: Id | null }, theme: PlanTheme, fills: FillOp[], strokes: StrokeOp[]): void {
+  const selected = new Set(hl.selection);
+  for (const item of sectionItems(s)) {
+    if (item.owners.some((o) => selected.has(o.id))) {
+      fills.push({ polygons: item.polygons, color: theme.select, alpha: 0.25 });
+      for (const ring of ringsOf(item.polygons)) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+    } else if (hl.hover !== null && item.owners.some((o) => o.id === hl.hover)) {
+      for (const ring of ringsOf(item.polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1.5, color: theme.select, alpha: 0.55 });
+    }
+  }
 }
 
 /** Caixa para enquadrar o desenho, com folga lateral e vertical. */

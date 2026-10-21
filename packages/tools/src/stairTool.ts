@@ -296,14 +296,14 @@ export class StairTool extends ToolBase {
     if (this.stairId) {
       const r = updateStairComponents(this.env, this.stairId, components);
       if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
+      this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
       this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);
-      this.env.done();
       return;
     }
     const r = createStairFromComponents(this.env, components, { ...this.creationOptions(), openSlab: true });
     if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
-    this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);
     this.env.done();
+    this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);
   }
 }
 

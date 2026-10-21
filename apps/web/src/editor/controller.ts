@@ -242,7 +242,11 @@ export class Editor {
     }
     if (k === 'Delete' || k === 'Backspace') {
       // Vértice de piso em foco: a ferramenta o remove antes de a seleção ser excluída.
-      if (this.tool.deleteKey?.()) return true;
+      if (this.tool.deleteKey?.()) {
+        // Repinta a barra da ferramenta (contador de espelhos, aviso) sem esperar o próximo clique.
+        this.bump();
+        return true;
+      }
       if (ui.selection.length) { this.deleteSelection(); return true; }
     }
     if (k === 'Tab') {

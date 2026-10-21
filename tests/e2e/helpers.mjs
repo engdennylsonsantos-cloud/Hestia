@@ -30,8 +30,9 @@ export async function launch() {
 }
 
 /**
- * Relatório: cada passo tem verificações (`check`). Um passo com verificação falha, ou que lança exceção, para a execução
- * (os seguintes não rodam) e o `summary` mostra onde parou. Capturas de tela são responsabilidade do roteiro.
+ * Relatório: cada passo tem verificações (`check`). Um passo com verificação falha, ou que lança exceção, é registrado e a
+ * execução segue (para mostrar todos os problemas de uma vez); o `summary` lista cada passo e o código de saída é 1 se
+ * qualquer um falhou. Capturas de tela são responsabilidade do roteiro.
  */
 export function makeReporter() {
   const steps = [];
@@ -52,7 +53,6 @@ export function makeReporter() {
       if (bad.length) {
         cur.status = 'FAIL';
         cur.error = bad.map((c) => `${c.name}${c.extra ? ` (${c.extra})` : ''}`).join('; ');
-        throw new StepFailed(name, cur.error);
       }
     },
     check(name, ok, extra = '') {
@@ -68,12 +68,6 @@ export function makeReporter() {
   };
 }
 
-export class StepFailed extends Error {
-  constructor(step, detail) {
-    super(`passo "${step}": ${detail}`);
-    this.name = 'StepFailed';
-  }
-}
 
 /** Coordenadas de tela (da página) de um ponto de mundo, pela vista atual da planta. Lê o viewport do editor. */
 export async function worldToPage(page, x, y) {

@@ -1,146 +1,163 @@
-# A. Programa da casa de alto padrão (2 pavimentos)
+# A. Programa da casa de alto padrão (2 pavimentos), v2
 
-Documento de programa e pesquisa. Fica fora do código: nenhum arquivo do app é alterado por ele.
-Projeto de exemplo para o Hestia, usando só os elementos que o app já tem.
+Documento de programa e pesquisa do projeto de exemplo do Hestia. Não altera código. Esta versão substitui a v1 e acompanha `B-projeto-planta.md` (v2).
 
-## 1. Terreno e implantação
+## 1. Terreno e pegada (correção da v1)
 
-| Item | Valor adotado | Observação |
+| Item | Valor | Observação |
 |---|---|---|
-| Terreno | 15,00 m × 30,00 m (450 m²) | Lote de meio de quadra |
-| Fachada | Sul (rua) | Norte ao fundo |
-| Recuo frontal | 5,00 m | Prática usual; confirmar no zoneamento local |
-| Recuo lateral (leste e oeste) | 1,50 m | Prática usual |
-| Recuo de fundo (norte) | 3,00 m | Prática usual |
-| Área edificável em planta | 12,00 m × 14,00 m (168 m²) | Cabe com folga: largura 15 − 2×1,5 = 12 m; profundidade 30 − 5 − 3 = 22 m |
+| Terreno | 15,00 × 30,00 m (450 m²) | Lote de meio de quadra; fachada para a rua ao sul |
+| Recuo frontal | 5,00 m | prática usual; confirmar no zoneamento local |
+| Recuos laterais | 1,50 m cada | prática usual |
+| Recuo de fundo | 3,00 m | prática usual |
+| **Largura útil entre recuos** | **15,00 − 2 × 1,50 = 12,00 m** | é o limite horizontal, medido de face a face |
+| Profundidade útil | 30,00 − 5,00 − 3,00 = 22,00 m | |
 
-Implantação: a casa fica encostada nos recuos laterais de 1,50 m (12 m de largura útil), recuada 5 m da rua e com 14 m de profundidade. Sobram 8 m de quintal ao fundo (30 − 5 − 14 − 3 = 8 m). A garagem fica na frente, no térreo, com porta para a rua.
+**Correção em relação à v1 e ao pedido de 13 × 15 m:** com recuo lateral de 1,50 m, a largura máxima é 12,00 m de face a face. A v1 tinha 12,00 m de eixo a eixo, o que dá 12,24 m de face a face e estoura o recuo em 0,24 m. Um pedido de 13 m de largura é inviável com esses recuos.
 
-Orientação solar (hemisfério sul): a fachada sul é a menos insolada (sol do norte chega pelo lado oposto). Fachada norte recebe sol durante todo o inverno; por isso a varanda gourmet e as salas de maior permanência ficam no lado norte, nos fundos. Dormitórios ficam a leste (sol da manhã), e o oeste recebe sol de tarde, quente no verão; por isso o oeste leva aberturas pequenas e, se houver quarto ali, proteção solar.
+**Pegada adotada:** 11,75 m de eixo a eixo (x) × 14,00 m (y). Com as paredes externas de 0,242 m, a casa tem 11,99 m × 14,24 m, dentro do recuo de 12,00 m. Profundidade: 5,00 + 14,24 + 3,00 = 22,24 m, dentro dos 22 m úteis.
 
-## 2. Programa de necessidades
+Implantação: casa encostada no recuo lateral oeste. Fachada sul na rua, com garagem e portão no térreo. A varanda gourmet fica dentro da caixa, no nordeste, com a face norte aberta.
 
-Área útil e área de piso estimadas. Área de piso = área interna dos cômodos com paredes de 14 cm (interna) e 19 cm (externa) descontadas.
+Orientação solar (hemisfério sul): a fachada norte recebe sol de inverno. A sala e a varanda ficam ao norte. Os dormitórios ficam a leste e ao norte; o oeste recebe sol de tarde e tem poucas aberturas.
 
-### Térreo (≈ 96 m² de piso coberto, mais garagem e varanda)
+## 2. Programa de necessidades (áreas medidas no partido)
 
-Nota: as dimensões desta seção são o programa de partida. Quando divergirem, vale o partido de `B-projeto-planta.md` (seções 1.1, 2 e 3), que é a versão que fecha as coordenadas. Diferenças principais: a escada tem 1,20 m de largura, a garagem 5,50 × 5,50 m, e a cozinha e a varanda mudam de forma para caber na caixa de 12 × 14 m.
+Áreas são da planta de `B-projeto-planta.md`, calculadas pelas coordenadas (eixo a eixo, sem descontar espessura de parede).
 
-| Ambiente | Área alvo (m²) | Dimensão mínima (m) | Dimensões propostas (m) | Justificativa |
-|---|---|---|---|---|
-| Garagem coberta (2 vagas) | 27–30 | 5,00 × 5,50 por vaga | 5,50 × 5,20 (duas vagas lado a lado, 2,75 m cada, no vão de 5,50) | Porta de acesso ao hall e à cozinha |
-| Hall de entrada | 8–10 | 1,50 de lado | 3,00 × 2,80 | Ponto de distribuição do térreo |
-| Sala de estar e jantar (integradas) | 35–45 | 3,50 de lado | 6,50 × 6,00 | Setor social; a escada fica no hall, sem cortar a sala |
-| Cozinha | 12–16 | 2,40 de lado | 3,50 × 3,20 | Setor de serviço ligado à sala de jantar e à garagem |
-| Despensa | 2–3 | — | 1,20 × 1,60 | Ligada à cozinha, sem janela (ventilação mecânica ou porta com vão) |
-| Área de serviço | 4–6 | 1,50 de lado | 2,40 × 1,60 | Ligada à cozinha, acesso pelo corredor de serviço |
-| Lavabo | 2–3 | 1,00 × 1,50 | 1,50 × 1,40 | Perto do hall, sem porta visível da sala |
-| Varanda gourmet coberta | 20–25 | 2,50 de profundidade | 6,50 × 3,00 (sob a laje do pavimento 2) | Sol do norte com cobertura; ligada à sala de jantar e à cozinha |
-| Escada em L | ≈ 12 de projeção | largura 1,20 m | ver B, seção 4.4 | Ligação hall → pavimento 2 |
+### Térreo (164,5 m² de planta, incluindo garagem e varanda)
 
-### Pavimento 2 (≈ 80 m² de piso)
+| Ambiente | Área (m²) | Meta (m²) | Situação |
+|---|---|---|---|
+| Garagem coberta (2 vagas) | 30,25 | 27–30 | ok; largura útil interna 5,26 m (≥ 5,0 m) |
+| Cozinha | 22,00 | 12–20 | acima da meta; integra com jantar e garagem |
+| Despensa | 11,00 | 2–3 | acima da meta; funciona como depósito de compras |
+| Área de serviço | 13,75 | 4–6 | acima da meta; janelas em duas faces |
+| Vestíbulo de entrada | 6,80 | — | acesso à escada e ao lavabo |
+| Hall de circulação | 10,03 | — | liga vestíbulo, sala e jantar |
+| Escada reta (17 espelhos) | 5,47 | — | ver seção 4.2 |
+| Lavabo | 3,80 | 2–3 | pouco acima; porta para o vestíbulo |
+| Sala de jantar | 13,06 | 12–16 | integrada à cozinha, sala e varanda |
+| Sala de estar | 25,84 | 25–40 | em L, integrada à jantar |
+| Varanda gourmet coberta | 22,50 | ≥ 20 | atende ao pedido de ≥ 20 m² |
 
-| Ambiente | Área alvo (m²) | Dimensão mínima (m) | Dimensões propostas (m) | Justificativa |
-|---|---|---|---|---|
-| Suíte master (quarto + closet + banheiro) | 18–24 | quarto ≥ 3,20 de lado | quarto 3,80 × 4,20; closet 1,80 × 2,40; banheiro 2,20 × 2,40 | Leste, sol da manhã |
-| Suíte 2 | 12–14 | quarto ≥ 2,80 de lado | 3,30 × 3,80 com banheiro 1,60 × 2,40 | Leste, sol da manhã |
-| Suíte 3 | 11–13 | quarto ≥ 2,80 de lado | 3,30 × 3,60 com banheiro 1,60 × 2,20 | Nordeste; também recebe sol da manhã |
-| Sala íntima / home office | 9–12 | 2,80 de lado | 3,20 × 3,40 | Norte, com janela de peitoril alto |
-| Varanda da suíte master | 4–6 | 1,50 de profundidade | 2,40 × 1,80 | Sobre a varanda gourmet, com acesso pela suíte |
-| Circulação (hall íntimo e corredor) | — | corredor ≥ 1,10 m | corredor 1,10–1,20 m | Liga escada, suítes e sala íntima |
+### Pavimento 2 (164,5 m²)
 
-### Cobertura
+| Ambiente | Área (m²) | Meta (m²) | Situação |
+|---|---|---|---|
+| Suíte master (quarto) | 18,70 | 18–24 | ok; acesso pelo corredor |
+| Banheiro da master | 10,88 | ≥ 8 | ok; acesso pelo quarto |
+| Closet da master | 7,39 | ≥ 6 | ok; acesso pelo quarto |
+| Suíte 2 (quarto) | 20,57 | 12–14 | acima da meta; banheiro e closet acessados do quarto |
+| Banheiro da suíte 2 | 7,00 | — | ok |
+| Closet da suíte 2 | 6,75 | — | ok |
+| Suíte 3 | 23,40 | 11–13 | acima da meta |
+| Banheiro da suíte 3 | 10,00 | — | ok |
+| Closet da suíte 3 | 5,60 | — | abaixo de 6 m²; aceito como armário embutido |
+| Home office / sala íntima | 36,08 | 9–12 | acima da meta; dá para o oeste e não é passagem |
+| Corredor íntimo | 14,10 | ≥ 1,20 m de largura | recebe a escada e distribui todos os quartos |
+| Varanda da master (sacada) | ≈ 3,3 | — | ⚠ na fachada sul, sobre o recuo frontal (a confirmar) |
 
-4 águas com beirais de 0,60–0,80 m. Platibanda parcial no lado da rua, se o recuo permitir.
+## 3. Zoneamento
 
-## 3. Zoneamento (setorização)
+- **Setor social:** vestíbulo, hall, sala de estar, sala de jantar e varanda gourmet. A entrada leva direto ao hall, e o hall abre para a sala e para a jantar.
+- **Setor íntimo:** suítes, banheiros, closets e home office no pavimento 2. O acesso sobe pela escada e segue pelo corredor íntimo.
+- **Setor de serviço:** cozinha, despensa, área de serviço e garagem. Ficam no lado oeste, com acesso próprio pela garagem e pela área de serviço.
 
-- **Setor social:** hall, sala de estar e jantar, lavabo, varanda gourmet. Recebe visitas e é o centro de distribuição, com acesso visível da rua.
-- **Setor íntimo:** suítes, sala íntima e banheiros do pavimento 2. Fica no pavimento superior, longe da rua e do acesso de visitantes, e ligado à escada por um corredor curto.
-- **Setor de serviço:** cozinha, despensa, área de serviço, garagem. Fica junto à garagem e ao fundo, com acesso próprio ao quintal.
-
-Fonte: literatura de setorização da habitação brasileira (social, íntimo, serviço). Pesquisa em SciELO, Arquitetura e Lugar e artigos de programa residencial (ver seção 7). A proporção média encontrada em estudo de apartamentos (SIGraDi 2006) foi de cerca de 33% social, 47% íntimo e 20% serviço, mas ela é só uma referência, não um padrão.
+Literatura de setorização: social, íntimo e serviço (ver seção 6). Circulação social e íntima separadas; o serviço não passa pela sala.
 
 ## 4. Requisitos de projeto adotados
 
-### 4.1 Circulação e acessos
+### 4.1 Circulação e portas
 
-- Corredores: 1,10 m (alto padrão), mínimo 0,90 m em trechos curtos.
-- Portas de banheiro: 0,70–0,80 m; suíte master: 0,90 m; hall e portas principais: 0,90 m.
-- Vão livre entre sala e jantar: 2,40 m, sem porta.
+- Corredor íntimo: 1,20 m. Hall de circulação: 2,20 m. Vestíbulo: 3,40 m.
+- Passagem principal da entrada à sala: 2,20 m livres, sem passar sob pé-direito inferior a 2,10 m.
+- Portas: 0,80 m (quartos e áreas de serviço), 0,70 m (banheiros), 0,90 m (suíte master e entrada social), 1,20 m pivotante (entrada da rua).
+- Vãos livres entre espaços sociais: 1,40 m (cozinha ↔ jantar), 1,80 m (hall ↔ sala e hall ↔ jantar), 2,40 m (sala ↔ jantar e sala ↔ varanda).
 
 ### 4.2 Escada
 
-Os valores abaixo vêm das normas do próprio app (`packages/engine/src/stairNorms.ts`) e dos tipos de escada (`packages/model/src/stairTypes.ts`):
+Escada reta de 17 espelhos e 1,20 m de largura, junto à parede oeste do hall.
 
-| Parâmetro | Valor adotado | Fonte |
+| Parâmetro | Valor | Fonte |
 |---|---|---|
-| Espelho | 0,16 a 0,18 m (alvo 0,175 m) | Padrão do app (riserMin/riserMax) |
-| Piso | 0,28 a 0,32 m (alvo 0,30 m) | Padrão do app (treadMin/treadMax) |
-| 2e + p | 0,63 a 0,64 m | Padrão do app (blondelMin/blondelMax). Uma fonte consultada cita 0,63–0,65 m (NBR 9050); ver seção 6 |
-| Largura | 1,10 m (alto padrão) | Escolha de projeto. NBR 9077 cita 1,10 m para rotas de saída, não para escada privativa; 0,80–0,90 m é o mínimo residencial |
-| Patamar | obrigatório a cada 3,20 m de desnível ou na mudança de direção, com lado ≥ 1,20 m | Padrão do app (maxRiseBetweenLandings, landingMinLength) |
-| Pé-direito livre | ≥ 2,10 m sob o lance | minHeadroom do tipo. A fonte consultada cita 2,00 m (NBR 9077); o app usa 2,10 m, mais conservador |
+| Espelho | 3,00 / 17 = 0,176 m (faixa 0,16 a 0,18) | `packages/engine/src/stairNorms.ts` |
+| Piso | 0,285 m (faixa 0,28 a 0,32) | idem |
+| 2e + p | 2 × 0,176 + 0,285 = 0,637 m (faixa 0,63 a 0,64) | idem |
+| Número de pisos | 16 (espelhos 17) | 16 × 0,285 = 4,56 m de projeção |
+| Largura | 1,20 m (faixa do alto padrão) | escolha de projeto |
+| Patamar | não exigido: desnível 3,00 m < 3,20 m | `maxRiseBetweenLandings` |
+| Pé-direito livre | ≥ 2,10 m | `minHeadroom` |
+
+Nota: a conta de 17 × 0,285 = 4,5 m, citada em pedido anterior, confunde espelhos com pisos. Com 17 espelhos há 16 pisos, e a projeção é 4,56 m.
 
 ### 4.3 Portas e janelas
 
-- Portas: 0,80 m (quartos e áreas de serviço), 0,70 m (banheiros), 0,90 m (suíte master, hall), 1,60 m dupla (sala de estar ↔ hall, se desejado).
-- Janelas: peitoril 1,00–1,10 m em salas e dormitórios; 1,50 m em banheiros; 1,10 m na cozinha; janelões de piso a teto (peitoril 0,00) na sala e na varanda. O catálogo não tem janelão de piso a teto, ver seção 5.
-- Iluminação e ventilação: área de abertura ≥ 1/6 da área do piso do cômodo (1/8 é o mínimo em algumas leituras municipais). Não consegui confirmar o texto do Código de Obras de São Paulo para este número (ver seção 6).
+- Portas: ver seção 4.1.
+- Janelas: peitoril 1,10 m na sala, cozinha e dormitórios; 1,50 m nos banheiros e lavabo; 0,00 m em janelão e porta-janela.
+- Ventilação e iluminação: área de abertura ≥ 1/6 da área do piso, com base no critério da v1 (ver seção 6, item de pesquisa). Os valores por cômodo estão no B, seção 5.3.
 
-### 4.4 Pé-direito
+### 4.4 Pé-direito e laje
 
-- Térreo: 3,00 m de cota de piso a cota de piso do pavimento 2 (elevação de 3,00 m).
-- Laje do pavimento 2: 0,15 a 0,20 m entra no pé-direito. Com o tipo de piso "Cerâmico sobre contrapiso" (0,19 m), o pé-direito livre do térreo fica ≈ 2,81 m.
-- Pavimento 2: pé-direito livre ≈ 2,80 m (laje de cobertura de 0,15 m).
+- Pavimento 3,00 m de piso a piso (térreo 0,00 e pavimento 2 3,00).
+- Laje do pavimento 2: 0,17 m (`ls_mac15`, laje maciça 15 cm com regularização). Pé-direito livre do térreo: 3,00 − 0,17 = 2,83 m.
 
-## 5. Catálogo: o que o app tem e o que falta
+### 4.5 Garagem
 
-O catálogo está em `packages/model/src/defaults.ts`, `wallType.ts`, `floor.ts`, `slab.ts`, `roof.ts` e `stairTypes.ts`. Os tipos usados no partido (ids e espessuras) estão em `B-projeto-planta.md`, seção 2, e os tipos novos propostos, na seção 7.
+Duas vagas lado a lado, cada uma com 2,63 m de largura útil. A largura interna da garagem é 5,26 m, acima de 5,0 m. O portão de 4,50 m fica centralizado, com 0,50 m de folga para cada lado.
 
-Faltam para este projeto:
+## 5. Catálogo: tipos que faltam
 
-1. **Janela de 2,40 m** (correr, 2 folhas, peitoril 0,00, altura 2,20 m): usada para a sala de estar em janelão e no vão da varanda gourmet. Hoje a maior janela tem 2,00 m.
-2. **Porta-janela de correr de 2,40 m** (altura 2,20 m, peitoril 0,00): acesso da sala à varanda gourmet.
-3. **Porta de 1,20 m pivotante** (ou dupla, com `plan: 'pivot'`): entrada social do hall, mais larga que o `ot_p160` com uma folha.
-4. **Vão livre 2,40 m** (`leaves: 0`, altura 2,40 m): abertura sem porta entre sala de estar e sala de jantar. O catálogo tem só `ot_vao90`.
-5. **Janela fixa de 1,20 m** (`plan: 'fixed'`, 2 folhas fixas ou vidro fixo, peitoril 1,50 m): o catálogo não tem tipo com símbolo `fixed`, embora o símbolo exista em `packages/geom/src/openingSymbol.ts`.
-6. **Portão de garagem 4,50 × 2,20 m** (`kind: 'door'`, `leaves: 2`, `plan: 'sliding'`): acesso da rua às duas vagas. O catálogo tem só portas de 0,70 a 1,60 m.
+Para este projeto, faltam os tipos abaixo. Os tipos já existentes (`ot_p70`, `ot_p80`, `ot_p90`, `ot_j60`, `ot_j120`, `ot_j150`, `ot_j200`, `ot_vao90`, `ot_p160`) bastam para o restante.
 
-Como adicionar: duas formas.
+| id sugerido | Nome | Tipo | Largura × altura | Peitoril | Folhas | Símbolo | Uso |
+|---|---|---|---|---|---|---|---|
+| `ot_pv120` | Porta 120 × 210 pivotante | door | 1,20 × 2,10 | 0,00 | 1 | `pivot` | entrada da rua |
+| `ot_portao450` | Portão de garagem 4,50 × 2,20 | door | 4,50 × 2,20 | 0,00 | 2 | `sliding` | garagem |
+| `ot_vao140` | Vão livre 1,40 × 2,40 | door | 1,40 × 2,40 | 0,00 | 0 | `swing` | cozinha ↔ jantar |
+| `ot_vao180` | Vão livre 1,80 × 2,40 | door | 1,80 × 2,40 | 0,00 | 0 | `swing` | hall ↔ sala, hall ↔ jantar |
+| `ot_vao240` | Vão livre 2,40 × 2,40 | door | 2,40 × 2,40 | 0,00 | 0 | `swing` | sala ↔ jantar, jantar ↔ varanda, sala ↔ varanda |
+| `ot_j240x220` | Janelão 2,40 × 2,20 | window | 2,40 × 2,20 | 0,00 | 2 | `sliding` | sala e jantar (piso a teto) |
+| `ot_j240x160` | Janela 2,40 × 1,60 | window | 2,40 × 1,60 | 1,10 | 2 | `sliding` | cozinha, suíte 2 |
+| `ot_j240x140` | Janela 2,40 × 1,40 | window | 2,40 × 1,40 | 1,10 | 2 | `sliding` | home office, suíte 3, master |
+| `ot_j60x100` | Janela 0,60 × 1,00 | window | 0,60 × 1,00 | 1,50 | 1 | `casement` | lavabo |
+| `ot_pj240` | Porta-janela de correr 2,40 × 2,20 | door | 2,40 × 2,20 | 0,00 | 2 | `sliding` | suíte master → sacada |
 
-- No projeto (recomendado para este exemplo): pelo comando `upsertOpeningType` (`packages/model/src/commands.ts`). O tipo fica em `project.openingTypes` e vai junto com o arquivo `.hestia.json`.
-- No padrão (afeta todo projeto novo): acrescentar em `DEFAULT_OPENING_TYPES` em `packages/model/src/defaults.ts`, usando a função `ot(...)`. Exige atualizar `SCHEMA_VERSION` apenas se o formato mudar; acrescentar um tipo não muda o formato.
+Total: 10 tipos novos. Opcional: parede PA-14 hidráulica (`wt_alv14h`), com as mesmas camadas de `wt_alv14`, para marcar as paredes de tubulação.
+
+Como criar:
+
+1. **No projeto (recomendado para este exemplo):** comando `upsertOpeningType` (`packages/model/src/commands.ts`). Cada tipo precisa de `id`, `kind`, `name`, `width`, `height`, `sill`, `leaves`, `plan`, `frameMaterialId` (`mat_aluminio` nas janelas e `mat_madeira` nas portas), `glassMaterialId` (`mat_vidro`) e `closure: 'inherit'`. O tipo fica em `project.openingTypes`.
+2. **No padrão (afeta todo projeto novo):** acrescentar em `DEFAULT_OPENING_TYPES` (`packages/model/src/defaults.ts`), com a função `ot(...)`. Acrescentar tipos não muda o formato do arquivo.
 
 ## 6. Pesquisa: o que foi confirmado e o que não foi
 
-Fontes consultadas em 2026-10-21. Os acessos diretos a textos oficiais (Lei 16.642/2017 e Decreto 57.776/2017) falharam por indisponibilidade de rede; os números abaixo vêm de fontes secundárias ou das normas do próprio app.
+Os textos oficiais não foram acessados nesta pesquisa: os domínios da legislação municipal de São Paulo (`saopaulo.sp.leg.br` e `legisweb.com.br`) não resolveram pela rede. Os números abaixo vêm de fontes secundárias ou das normas do próprio app.
 
 | Tema | O que foi confirmado | Status |
 |---|---|---|
-| Código de Obras SP | COESP (Decreto 32.329/1992) foi revogado. Vigora a Lei 16.642/2017 (COE), regulamentada pelo Decreto 57.776/2017 | Confirmado (referência legal) |
-| Iluminação/ventilação SP | Anexo I, item 5 da Lei 16.642 trata do tema. Os percentuais 1/6 e 1/8 não foram confirmados no texto | **A confirmar** |
-| Área mínima de dormitório | Não confirmada (fonte antiga cita 5 m², não serve) | **A confirmar** |
-| NBR 9050 porta | Vão livre mínimo 0,80 m, altura livre 2,10 m (citação em laudo da AGU) | Confirmado por fonte secundária |
-| NBR 9050 corredor | Divergência: 0,90 m (restrito) × 1,20 m (rota acessível). Adotado 1,10 m | Divergente |
-| NBR 9077 | 1,10 m é largura de rota de saída de emergência, não de escada privativa | Confirmado por fonte secundária |
-| Blondel | 0,63–0,64 m (app) × 0,63–0,65 m (fonte NBR 9050) | Divergente; usar 0,63–0,64 (do app) |
-| Patamar a cada 3,20 m | Confirmado por fonte secundária e igual ao app | Confirmado |
-| Pé-direito de escada 2,00 m (NBR 9077) | Citado em fonte; app e programa usam 2,10 m | Adotado 2,10 m (mais conservador) |
-| NBR 15575 (iluminação natural) | Não se achou razão fixa; critério é por iluminância. Crítica do IPT ao critério da norma | Informativo |
-| Setorização social/íntimo/serviço | Confirmado por literatura brasileira | Confirmado |
-| Insolação | Não se achou regra textual. Adotada a prática usual para hemisfério sul (norte = sol de inverno, leste = manhã, oeste = tarde) | Prática de projeto, não norma |
-| Neufert (porta de banheiro 0,70, suíte, pé-direito 2,10) | Não foi possível acessar o livro nem tabelas confiáveis | **Não confirmado** |
-| Prumadas | Agrupar molhados e alinhar prumadas reduz custo e pontos de vazamento | Prática, fonte geral |
+| Código de Obras SP | o COESP (Decreto 32.329/1992) foi revogado. Vale a Lei 16.642/2017 (COE), regulamentada pelo Decreto 57.776/2017 | referência legal confirmada; texto não acessado |
+| Iluminação e ventilação (SP) | o tema está no Anexo I, item 5 da Lei 16.642. O índice de 1/6 não foi confirmado no texto | **a confirmar** |
+| Área mínima de dormitório | não confirmada | **a confirmar** |
+| NBR 9050, porta | vão livre mínimo de 0,80 m e altura livre de 2,10 m (laudo da AGU) | confirmado por fonte secundária |
+| NBR 9050, corredor | divergência: 0,90 m (restrito) × 1,20 m (rota acessível). Adotado 1,20 m no corredor íntimo | divergente; 1,20 m é o valor conservador |
+| NBR 9077 | 1,10 m é a largura de rota de saída de emergência, não de escada privativa | confirmado por fonte secundária |
+| Blondel | 0,63–0,64 m (app) × 0,63–0,65 m (fonte) | divergente; usei a faixa do app |
+| Patamar a cada 3,20 m | confirmado por fonte e igual ao app | confirmado |
+| Pé-direito de escada | 2,00 m (NBR 9077, citado em fonte); app e projeto usam 2,10 m | adotado 2,10 m |
+| Setorização social, íntimo e serviço | confirmado por literatura brasileira (SciELO; SIGraDi 2006) | confirmado |
+| Insolação | não há regra textual confirmada; adotada a prática de hemisfério sul | prática de projeto |
+| Neufert (porta de banheiro, suíte, pé-direito) | não consultado diretamente | **não confirmado** |
+| Prumadas | agrupar molhados e alinhar prumadas reduz custo e risco | prática geral |
 
-Conclusão: os valores de **espelho, piso, 2e+p, patamar, pé-direito de 2,10 m e largura de escada** estão amarrados às normas do app. Os valores de **área de janela (1/6), áreas mínimas de dormitório e dimensões Neufert** não puderam ser verificados e ficam marcados como a confirmar. O projeto usa valores conservadores para eles.
+Conclusão: espelho, piso, 2e+p, patamar, pé-direito de escada e largura da escada estão amarrados às normas do app. Os índices de janela, as áreas mínimas por cômodo e as dimensões do Neufert não foram verificados e precisam ser confirmados antes de qualquer uso em obra.
 
 ## 7. Referências
 
-- ABNT NBR 9050 (acessibilidade). Citada por laudo da AGU e por artigos de programa.
-- ABNT NBR 9077 (saídas de emergência). Largura de 1,10 m refere-se a rotas de saída.
-- ABNT NBR 15575 (desempenho de edificações habitacionais). Critério de iluminação por iluminância (ver crítica do IPT em revista.ipt.br).
-- Lei Municipal 16.642/2017 e Decreto 57.776/2017 (São Paulo, COE). Texto não acessado nesta pesquisa.
-- Literatura de setorização: SciELO (AC, v. 20, n. 2); SIGraDi 2006 (apartamentos, proporções); Arquitetura e Lugar (2024–2025).
+- ABNT NBR 9050 (acessibilidade), citada por laudo da AGU.
+- ABNT NBR 9077 (saídas de emergência).
+- ABNT NBR 15575 (desempenho de edificações habitacionais).
+- Lei Municipal 16.642/2017 e Decreto 57.776/2017 (São Paulo, COE). Não acessados nesta pesquisa.
+- Literatura de setorização: SciELO (Acta Scientiarum, v. 20, n. 2); SIGraDi 2006; *Arquitetura e Lugar* (2024–2025).
 - Neufert, *A Arte de Projetar em Arquitetura*. Não consultado diretamente.
-- Código do app: `packages/engine/src/stairNorms.ts`, `packages/model/src/stairTypes.ts`, `packages/model/src/defaults.ts`, `packages/model/src/templates.ts`.
+- Código do app: `packages/engine/src/stairNorms.ts`, `packages/model/src/stairTypes.ts`, `packages/model/src/defaults.ts`, `packages/model/src/templates.ts`, `packages/geom/src/openingSymbol.ts`.

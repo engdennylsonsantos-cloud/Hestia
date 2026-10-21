@@ -28,9 +28,10 @@ function longestFree(lo: number, hi: number, blocked: Array<[number, number]>): 
  * Etiqueta com o código do tipo em cada parede do nível (G4). A etiqueta vai ao ponto médio do maior trecho livre
  * do eixo, deslocado ao longo da parede para não cair sobre um vão (com folga do tamanho do texto).
  */
-export function wallTagLabels(p: Project, levelId: Id, zoom: number): LabelOp[] {
+export function wallTagLabels(p: Project, levelId: Id, zoom: number, hidden?: ReadonlySet<Id>): LabelOp[] {
   const out: LabelOp[] = [];
   for (const f of levelFrames(p, levelId)) {
+    if (hidden?.has(f.wall.id)) continue;
     const code = wallType(p, f.wall).code;
     if (!code) continue;
     const halfText = (code.length * CHAR_PX) / 2 / zoom + PAD_PX / zoom;

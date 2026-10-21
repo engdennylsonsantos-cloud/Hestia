@@ -73,7 +73,10 @@ describe('escadas do projeto na planta e no 3D (integração com o motor)', () =
   });
 
   it('a planta do nível da escada traz a seta SOBE, o corte e os espelhos; degraus acima de 1,20 m tracejados', () => {
-    const dl = draw(project(), 'lv_0');
+    // A escada sobe até ~2,98 m, acima do topo padrão (2,30 m): com o topo subido, todos os espelhos entram na vista.
+    const s = new ProjectStore(project());
+    s.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 3.5 } });
+    const dl = draw(s.project, 'lv_0');
     expect(dl.labels.map((l) => l.text)).toContain('SOBE');
     const lines = dl.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === 1.4);
     expect(lines.length).toBeGreaterThanOrEqual(N);

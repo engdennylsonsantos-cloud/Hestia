@@ -1,4 +1,4 @@
-import { add, dist, lerp, mul, norm, perp, rotate, sub, type Vec2 } from '@hestia/geom';
+import { add, dist, lerp, mul, norm, perp, rotate, sub, union, type Vec2 } from '@hestia/geom';
 import { sampleChain, type ResolvedStair, type ResolvedStairRiser } from '@hestia/engine';
 import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
@@ -7,8 +7,18 @@ import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
-/** Cota de corte da planta, em m acima da base do lance (convenção de planta: 1,20 m). */
+/**
+ * Cota de corte padrão, em m acima da base do lance (1,20 m, como o corte padrão do intervalo de vista). A planta usa a
+ * cota absoluta da vista (`StairView`); sem ela, vale esta, relativa à base de cada escada.
+ */
 export const STAIR_CUT_HEIGHT = 1.2;
+
+/** Cotas absolutas da vista para as escadas (decisão 0013 §4): plano de corte e topo do intervalo. */
+export interface StairView {
+  cutZ: number;
+  topZ: number;
+}
+
 /** Espessura (px) das linhas de espelho, do símbolo de corte e da seta. */
 export const STAIR_RISER_WIDTH_PX = 1.4;
 /** Traço (px) do tracejado dos degraus acima da cota de corte. */
@@ -46,10 +56,10 @@ const chord = (r: ResolvedStairRiser): number => dist(r.a, r.b);
 
 /**
  * Corte da planta: o primeiro trecho da caminhada automática (pontos médios dos espelhos em ordem de subida) que cruza
- * a cota `baseZ + STAIR_CUT_HEIGHT`. Null quando o lance não chega a essa cota (ou não tem dois espelhos).
+ * a cota `cutZ` (absoluta; por padrão `baseZ + STAIR_CUT_HEIGHT`). Null quando o lance não chega a essa cota (ou não
+ * tem dois espelhos): o símbolo de corte só aparece onde o plano cruza a escada.
  */
-export function stairCut(s: ResolvedStair, risers: ResolvedStairRiser[], zoom: number): StairCut | null {
-  const cutZ = s.baseZ + STAIR_CUT_HEIGHT;
+export function stairCut(s: ResolvedStair, risers: ResolvedStairRiser[], zoom: number, cutZ: number = s.baseZ + STAIR_CUT_HEIGHT): StairCut | null {
   const mids = risers.map((r) => polyMid(riserPoints(r)));
   for (let i = 0; i + 1 < risers.length; i++) {
     const h0 = (risers[i]!.z0 + risers[i]!.z1) / 2;
@@ -111,8 +121,8 @@ function climbArrow(pts: Vec2[], zoom: number, color: string): StrokeOp[] {
 }
 
 /** Contorno de um degrau ou patamar: tracejado quando o topo fica acima da cota de corte. */
-function outlineOps(s: ResolvedStair, polygon: Vec2[], z: number, color: string): StrokeOp {
-  const above = z > s.baseZ + STAIR_CUT_HEIGHT + 1e-9;
+function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number): StrokeOp {
+  const above = z > cutZ + 1e-9;
   return { pts: polygon, closed: true, widthPx: 1, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
 }
 
@@ -124,23 +134,32 @@ const beside = (u: Vec2): { dx: number; dy: number } => ({ dx: -16 * u.y, dy: -1
  * (mesma regra dos pisos); contorno de cada degrau (tracejado acima da cota de corte); linha de cada espelho; símbolo
  * de corte e seta de subida "SOBE" pela caminhada (explícita, se válida, senão automática). No grosseiro, só o preenchimento do contorno. No fino,
  * número de cada degrau. Com etiquetas ligadas, o código do tipo no centroide.
+ *
+ * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e o que está acima do topo não sai:
+ * degrau ou espelho com topo acima de `view.topZ` é omitido. Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
  */
-export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport): FloorOps {
+export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, view?: StairView): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const lineColor = mix(theme.ink, fillBase, 0.35);
   for (const s of stairs) {
+    const cutZ = view?.cutZ ?? s.baseZ + STAIR_CUT_HEIGHT;
+    const topZ = view?.topZ ?? Infinity;
+    if (s.baseZ > topZ + 1e-9) continue;
+    const steps = s.steps.filter((st) => st.z <= topZ + 1e-9);
     const m = p.materials[s.type.materialId];
     const color = mix(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74);
     if (detail === 'coarse') {
-      out.fills.push({ polygons: s.footprint, color, alpha: 1 });
+      if (steps.length === 0 && s.steps.length > 0) continue;
+      const footprint = steps.length === s.steps.length ? s.footprint : union(...steps.map((st) => [[st.polygon]]));
+      out.fills.push({ polygons: footprint, color, alpha: 1 });
       continue;
     }
-    for (const st of s.steps) {
+    for (const st of steps) {
       out.fills.push({ polygons: [[st.polygon]], color, alpha: 1 });
-      out.strokes.push(outlineOps(s, st.polygon, st.z, lineColor));
+      out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ));
     }
-    const risers = risersInClimbOrder(s);
+    const risers = risersInClimbOrder(s).filter((r) => r.z1 <= topZ + 1e-9);
     for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, widthPx: STAIR_RISER_WIDTH_PX, color: theme.ink, alpha: 1 });
     const walk = climbWalk(p, s, risers);
     out.strokes.push(...climbArrow(walk, v.zoom, theme.ink));
@@ -148,7 +167,7 @@ export function stairFills(p: Project, stairs: ResolvedStair[], theme: PlanTheme
       const u = norm(sub(walk[1]!, walk[0]!));
       out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u) });
     }
-    const cut = stairCut(s, risers, v.zoom);
+    const cut = stairCut(s, risers, v.zoom, cutZ);
     if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink));
     if (detail === 'fine') {
       for (const st of s.steps) {

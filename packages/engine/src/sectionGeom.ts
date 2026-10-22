@@ -15,6 +15,14 @@ export interface SectionLine {
 export const EPS_T = 1e-6;
 
 /** Retângulo (t0..t1, z0..z1); com `zb` diferente de `z1` o topo é inclinado (trapézio de `z1` em t0 a `zb` em t1). */
+/** Quadrilátero de uma laje inclinada no corte: base (b0 a b1) e topo (u0 a u1) nas duas extremidades t0 e t1. */
+export const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
+  { x: t0, y: b0 },
+  { x: t1, y: b1 },
+  { x: t1, y: u1 },
+  { x: t0, y: u0 },
+];
+
 export const rect = (t0: number, t1: number, z0: number, z1: number, zb = z1): Ring => [
   { x: t0, y: z0 },
   { x: t1, y: z0 },

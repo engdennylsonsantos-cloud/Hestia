@@ -62,7 +62,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 ## E · Conexões verticais
 - [x] E1 Topo até nível mais deslocamento
 - [-] E2 Anexar topo e base a laje, piso e telhado: entra no checklist de pisos, lajes e telhados, que é quem hospeda o comando
-- [ ] E3 Parede cortada por piso e laje conforme as regras de junção: quantitativos já seguem a prioridade de camada (0023 P7); planta, corte e 3D pendentes (ver pisos C6 e lajes C8)
+- [ ] E3 Parede cortada por piso e laje conforme as regras de junção: quantitativos já seguem a prioridade de camada (0023 P7); planta, corte e 3D ainda não recortam a parede (P7b cortou só piso e laje; ver pisos C6 e lajes C8)
 
 ## F · Edição
 - [x] F1 Selecionar (clique, janela, alças), mover, copiar, girar, espelhar, matriz, deslocar, aparar ao canto, alinhar, medir

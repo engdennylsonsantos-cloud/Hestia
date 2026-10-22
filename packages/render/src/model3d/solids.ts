@@ -1,5 +1,5 @@
 import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
+import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
 
@@ -389,16 +389,21 @@ export function clearWallLayerCache(): void {
   wallLayerStats = { hits: 0, misses: 0 };
 }
 
-/** Sólidos dos pisos: uma extrusão por camada entre as cotas absolutas (furos incluídos), agrupada por material. */
-export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
+/**
+ * Sólidos dos pisos: uma extrusão por camada entre as cotas absolutas (furos incluídos), agrupada por material. Com a
+ * junção resolvida (`jl`, decisão 0023 §3, P7b), cada camada é extrudada só nas partes em que ela existe: sem faces
+ * coincidentes sobrepostas (z-fighting) e com o volume que os quantitativos líquidos reportam.
+ */
+export function buildFloorSolids(floors: ResolvedFloor[], jl?: JunctionLevel): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const f of floors) {
     // Membrana não tem volume nem sólido (decisão 0023 §5): fica só na planta e no corte.
     for (const l of f.layers) {
       if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'floor');
+      const parts = layerPartsOf(jl?.elements.get(f.floorId), l.layerIndex, [{ poly: f.polygon, z0: l.z0, z1: l.z1 }]);
       ofElement(b, f.floorId, () => {
-        for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+        for (const part of parts) for (const poly of part.poly) extrudePolygon(b, poly, part.z0, part.z1);
       });
     }
   }
@@ -426,17 +431,21 @@ export function buildCeilingSolids(ceilings: ResolvedCeiling[]): SolidBatch[] {
  * Sólidos das lajes (D2): uma extrusão por camada, por material, com furos. Com inclinação, topo e base da camada
  * seguem o mesmo plano (a subida de `slabRiseAt`), então a espessura vertical fica constante.
  */
-export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
+export function buildSlabSolids(slabs: ResolvedSlab[], jl?: JunctionLevel): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const s of slabs) {
     const sl = s.slope;
     for (const l of s.layers) {
       if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'slab');
-      const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
-      const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;
+      // Laje com caimento não entra na junção: a parte é a camada inteira, como antes.
+      const parts = layerPartsOf(jl?.elements.get(s.slabId), l.layerIndex, [{ poly: s.polygon, z0: l.z0, z1: l.z1 }]);
       ofElement(b, s.slabId, () => {
-        for (const poly of s.polygon) extrudePolygon(b, poly, l.z0, l.z1, topAt, bottomAt);
+        for (const part of parts) {
+          const topAt = sl ? (x: number, y: number): number => part.z1 + slabRiseAt(sl, { x, y }) : undefined;
+          const bottomAt = sl ? (x: number, y: number): number => part.z0 + slabRiseAt(sl, { x, y }) : undefined;
+          for (const poly of part.poly) extrudePolygon(b, poly, part.z0, part.z1, topAt, bottomAt);
+        }
       });
     }
   }

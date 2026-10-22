@@ -1,5 +1,5 @@
 import { boxOf, multiPoints, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { resolveFloors, resolveSlabs } from '@hestia/engine';
+import { junctionLevel, resolveFloors, resolveSlabs } from '@hestia/engine';
 import { slabRiseAt, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { floorOpsOf, type FloorOps } from './floors.ts';
@@ -35,14 +35,15 @@ export function floorAndSlabOps(
   paint: { floor: PlanPaint; slab: PlanPaint },
 ): SurfaceOps[] {
   const list: Array<SurfaceOps & { top: number }> = [];
+  const jl = junctionLevel(p, levelId);
   for (const s of resolveSlabs(p, levelId)) {
     if (hidden?.has(s.slabId)) continue;
     const top = s.topZ + slabRiseAt(s.slope, contourMid(s.polygon));
-    list.push({ top, ops: slabOpsOf(p, s, theme, dark, detail, v, paint.slab), paint: paint.slab });
+    list.push({ top, ops: slabOpsOf(p, s, theme, dark, detail, v, paint.slab, jl.elements.get(s.slabId)), paint: paint.slab });
   }
   for (const f of resolveFloors(p, levelId)) {
     if (hidden?.has(f.floorId)) continue;
-    list.push({ top: f.topZ, ops: floorOpsOf(p, f, theme, dark, detail, v, paint.floor), paint: paint.floor });
+    list.push({ top: f.topZ, ops: floorOpsOf(p, f, theme, dark, detail, v, paint.floor, jl.elements.get(f.floorId)), paint: paint.floor });
   }
   return list.sort((a, b) => a.top - b.top).map(({ ops, paint: pt }) => ({ ops, paint: pt }));
 }

@@ -85,6 +85,17 @@ const ROOF_CASES = {
 const RM = (id, extra = {}) => ({ id, kind: 'room', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 4, y: 3 }, heightOffset: 0, floorFinish: '', wallFinish: '', ceilingFinish: '', ...extra });
 const ROOM_CASES = { 'ambiente-sala': [...wallsOf(RECT_WALLS), RM('r1')] };
 
+// P7b (decisão 0023 §3, §10): junção piso/laje × parede. A parede com base abaixo do topo do piso ou da laje entra na
+// faixa deles; a camada que perde prioridade sai onde a outra a vence. Sem sobreposição, nada muda (os 21 casos acima).
+const JUNCTION_CASES = {
+  // (a) piso pelo núcleo ("Estender até o núcleo", `walls-core`) em L; as paredes descem 0,10 m abaixo do nível.
+  'junc-piso-L-nucleo': [...wallsOf(L_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pj1', L_WALLS, { outlineSource: { mode: 'walls-core', seed: { x: 2, y: 1.5 }, linked: true } })],
+  // (b) laje pelo perímetro externo (8 × 6 m) com parede interna de base 0,10 m abaixo do topo da laje.
+  'junc-laje-perimetro-parede': [...wallsOf(RECT_WALLS), W('div', [4, 0], [4, 6], { baseOffset: -0.1 }), SL('ls1', RECT_WALLS, { outlineSource: { mode: 'perimeter', seed: { x: 2, y: 2 }, linked: true } })],
+  // (c) parede embutida no piso: a parede atravessa o piso 6 × 4 m e tem base 0,10 m abaixo do topo dele.
+  'junc-parede-embutida-piso': [W('e1', [-1, 2], [7, 2], { baseOffset: -0.1 }), F('pe1', [[0, 0], [6, 0], [6, 4], [0, 4]])],
+};
+
 // Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas
 // no desenho seguinte ao layout. A espera pede duas medidas iguais seguidas do canvas, que a vista do editor tenha o mesmo
 // tamanho, e dois quadros de animação. Assim o enquadramento sai sempre com a área final.
@@ -112,7 +123,7 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
   await page.evaluate(([ws, v]) => {
     const { editor } = window.__hestia;

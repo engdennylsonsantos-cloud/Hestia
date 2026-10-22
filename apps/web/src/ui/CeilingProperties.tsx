@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react';
 import { ceilingArea, ceilingTypeThickness, FUNCTION_LABEL, type Ceiling, type Id, type Project } from '@hestia/model';
+import { ceilingOutline } from '@hestia/engine';
 import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { CeilingOutlineGroup } from './CeilingOutlineGroup.tsx';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
 
@@ -34,8 +36,10 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
   const comments = common(ceilings, (c) => c.comments);
   const single = ceilings.length === 1 ? ceilings[0]! : null;
   const type = typeId.mixed ? null : p.ceilingTypes[typeId.value];
-  const area = ceilings.reduce((s, c) => s + ceilingArea(c), 0);
-  const perimeter = ceilings.reduce((s, c) => s + ringPerimeter(c.boundary), 0);
+  /** Contorno efetivo: o do ambiente quando o forro acompanha (o gravado, caso contrário). */
+  const eff = (c: Ceiling) => ceilingOutline(p, c);
+  const area = ceilings.reduce((s, c) => s + ceilingArea(eff(c)), 0);
+  const perimeter = ceilings.reduce((s, c) => s + ringPerimeter(eff(c).boundary), 0);
 
   return (
     <>
@@ -59,6 +63,7 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
         </Row>
         {single ? <Row label="Face inferior"><span className="val">{fmt(single.heightOffset - (p.ceilingTypes[single.typeId] ? ceilingTypeThickness(p.ceilingTypes[single.typeId]!) : 0))} m</span></Row> : null}
       </Group>
+      <CeilingOutlineGroup ceilings={ceilings} />
       <Group title="Construção" open={false}>
         {type ? (
           <>
@@ -77,9 +82,9 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
       <Group title="Dimensões">
         {single ? (
           <>
-            <Row label="Área"><span className="val">{fmt(ceilingArea(single))} m²</span></Row>
-            <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(single.boundary))} m</span></Row>
-            <Row label="Furos"><span className="val">{single.holes.length}</span></Row>
+            <Row label="Área"><span className="val">{fmt(ceilingArea(eff(single)))} m²</span></Row>
+            <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(eff(single).boundary))} m</span></Row>
+            <Row label="Furos"><span className="val">{eff(single).holes.length}</span></Row>
             {roomLabel(p, single) ? <Row label="Ambiente"><span className="val">{roomLabel(p, single)}</span></Row> : null}
           </>
         ) : (

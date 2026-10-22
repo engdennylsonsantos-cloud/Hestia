@@ -1,6 +1,7 @@
 import { dist, sagFromThreePoints, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isRoof, isSlab, isWall, type Id, type Project } from '@hestia/model';
+import { ceilingOutline } from '@hestia/engine';
+import { isCeiling, isFloor, isRoof, isSlab, isWall, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
@@ -8,7 +9,8 @@ import { slabGripAt } from './slabPick.ts';
 import { roofGripAt } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
-import { commitOutlineBoundary } from './outlineEdit.ts';
+import { ceilingGripAt } from './ceilingPick.ts';
+import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { stairGripAt, stairHold } from './stairGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
@@ -61,6 +63,15 @@ const SLAB_OWNER: RingOwner = {
     return isSlab(s) ? s.boundary : null;
   },
   commit: (env, id, ring) => commitBoundary(env, id, ring),
+};
+
+/** Forro: o contorno efetivo (o do ambiente quando acompanha), para a alça cair onde o forro está. */
+const CEILING_OWNER: RingOwner = {
+  boundary: (p, id) => {
+    const c = p.elements[id];
+    return isCeiling(c) ? ceilingOutline(p, c).boundary : null;
+  },
+  commit: (env, id, ring) => commitCeilingBoundary(env, id, ring),
 };
 
 const ROOF_OWNER: RingOwner = {
@@ -173,6 +184,11 @@ const slabGrip: GripProvider = (env, at) => {
   return g ? ringHold(env, SLAB_OWNER, g.slabId, g) : null;
 };
 
+const ceilingGrip: GripProvider = (env, at) => {
+  const g = ceilingGripAt(env.project(), env.selection(), at, env.metersPerPixel());
+  return g ? ringHold(env, CEILING_OWNER, g.ceilingId, g) : null;
+};
+
 const roofGrip: GripProvider = (env, at) => {
   const g = roofGripAt(env.project(), env.selection(), at, env.metersPerPixel());
   return g ? ringHold(env, ROOF_OWNER, g.roofId, g) : null;
@@ -191,7 +207,7 @@ const stairGrip: GripProvider = (env, at) => {
 };
 
 /** Registro de provedores de alça, em ordem de prioridade (o primeiro que acerta vence). */
-export const gripProviders: GripProvider[] = [wallGrip, spiralGrip, stairGrip, floorGrip, slabGrip, roofGrip];
+export const gripProviders: GripProvider[] = [wallGrip, spiralGrip, stairGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
 
 /** Alça sob o cursor entre os elementos selecionados, por ordem de `gripProviders`. */
 export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {

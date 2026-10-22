@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { multiArea } from '@hestia/geom';
+import { multiArea, union } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeWall, totalThickness } from '@hestia/model';
 import { computeSection } from './index.ts';
 
@@ -48,5 +48,17 @@ describe('corte e elevação', () => {
     const r = computeSection(s.project, { a: { x: 0, y: 2 }, b: { x: 6, y: 2 }, depth: 4 });
     // a normal à esquerda de (0,2)→(6,2) aponta para +y, longe da parede
     expect(r.beyond).toHaveLength(0);
+  });
+
+  it('corte unido por material: a união das peças por origem cobre a mesma área da região', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'a', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 1, y: 0 }, b: { x: 1, y: 4 }, height: 3 }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'b', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 4 }, height: 3 }) });
+    const r = computeSection(s.project, { a: { x: -1, y: 2 }, b: { x: 7, y: 2 }, depth: 2 });
+    const region = r.cut.find((c) => c.parts && c.parts.length > 1)!;
+    expect(region.sources.map((o) => o.wallId)).toEqual(['a', 'b']);
+    const areaRegion = multiArea(region.polygons);
+    const areaParts = multiArea(union(...region.parts!.map((p) => p.polygons)));
+    expect(Math.abs(areaParts - areaRegion)).toBeLessThanOrEqual(1e-6 * areaRegion);
   });
 });

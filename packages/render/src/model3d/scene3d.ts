@@ -4,6 +4,7 @@ import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, 
 import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
 import { OrbitCamera } from './orbit.ts';
+import { firstSurfaceDistance } from './pick3d.ts';
 import { openingPieces } from './openingParts.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
@@ -79,6 +80,8 @@ export class ModelScene {
   private boxCache = new THREE.Box3();
 
   constructor() {
+    // O zoom da órbita não atravessa as paredes do modelo (a cena fornece a primeira superfície sobre o eixo de visão).
+    this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
     this.scene.add(this.highlightLayer);
@@ -295,6 +298,8 @@ export class ModelScene {
     }
     this.buildPickLayer();
     this.boxCache = new THREE.Box3().setFromObject(this.model);
+    this.orbit.sceneRadius = this.boxCache.isEmpty() ? 0 : this.boxCache.getSize(new THREE.Vector3()).length() / 2;
+    this.orbit.apply();
     const bg =new THREE.Color(view.background ?? (opt.dark ? BACKGROUND.dark : BACKGROUND.light));
     this.ground.visible = view.style !== 'wireframe';
     this.ground.receiveShadow = this.frame.shadows;

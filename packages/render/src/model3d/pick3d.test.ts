@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { pickModelPoint } from './pick3d.ts';
+import { firstSurfaceDistance, pickModelPoint } from './pick3d.ts';
 
 /** Câmera de cima (olhando para −z) sobre o ponto (2, 3). */
 function topCamera(): THREE.PerspectiveCamera {
@@ -41,5 +41,26 @@ describe('pickModelPoint (vista 3D)', () => {
     scene.add(low, high);
     const hit = pickModelPoint(scene, topCamera(), { x: 0, y: 0 });
     expect(hit).not.toBeNull();
+  });
+});
+
+describe('firstSurfaceDistance: distância à primeira parede no eixo (zoom)', () => {
+  const wallAt3 = (): THREE.Mesh => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 4, 4), new THREE.MeshBasicMaterial());
+    m.position.set(3, 0, 2);
+    return m;
+  };
+
+  it('mede até a face mais próxima da origem, na direção dada', () => {
+    const root = new THREE.Group();
+    root.add(wallAt3());
+    expect(firstSurfaceDistance(root, new THREE.Vector3(0, 0, 2), new THREE.Vector3(1, 0, 0))).toBeCloseTo(2.9, 6);
+  });
+
+  it('sem nada na direção, devolve null; o chão (PlaneGeometry) não conta', () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial()));
+    expect(firstSurfaceDistance(root, new THREE.Vector3(0, 0, 2), new THREE.Vector3(1, 0, 0))).toBeNull();
+    expect(firstSurfaceDistance(new THREE.Group(), new THREE.Vector3(0, 0, 2), new THREE.Vector3(0, 0, 1))).toBeNull();
   });
 });

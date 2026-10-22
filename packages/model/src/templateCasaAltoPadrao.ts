@@ -80,7 +80,9 @@ const PAREDES: Command[] = [
   // DEC-3 (C-montagem §5): afastada 0,154 m para leste, de x = 6,7 para x = 6,854, para a largura livre entre faces
   // ficar em 1,20 m, igual à largura do lance (face de T-I-01 em 5,5 + 0,092 = 5,592; face desta em 6,854 − 0,062 = 6,792).
   parede('T-I-05', [6.854, 2.0], [6.854, 5.9], PA09, TERREO, true, 2.83),
-  parede('T-I-06', [5.5, 6.56], [8.9, 6.56], PA09, TERREO),
+  // DEC-4 (C-montagem §5): afastada 0,07 m para o norte (de y = 6,56 para 6,63). A face sul (6,568) fica 8 mm acima do último
+  // espelho do lance (y = 6,56), que agora está em x 5,592 a 6,792.
+  parede('T-I-06', [5.5, 6.63], [8.9, 6.63], PA09, TERREO),
   parede('T-I-07', [8.9, 0], [8.9, 10.4], PA09, TERREO),
   parede('T-I-08', [8.9, 2.0], [10.8, 2.0], PA09, TERREO),
   parede('T-I-09', [10.8, 0], [10.8, 2.0], PA09, TERREO),
@@ -95,12 +97,13 @@ const PAREDES: Command[] = [
   parede('S-EXT-N', [0, 14], [11.75, 14], EXT, PAV2, true),
   parede('S-I-01', [0, 6.56], [5.5, 6.56], PA09, PAV2, true),
   parede('S-I-02', [5.5, 0], [5.5, 6.56], PA14, PAV2, true),
-  parede('S-I-03', [5.5, 3.2], [6.7, 3.2], PA14, PAV2, true),
-  parede('S-I-04', [6.7, 3.2], [8.9, 3.2], PA14, PAV2, true),
-  parede('S-I-05', [6.7, 3.2], [6.7, 6.56], PA09, PAV2, true),
+  // S-I-03, S-I-04, S-I-05 e S-I-07 acompanham o lance (DEC-4): x 6,854, a mesma face de T-I-05 (1,20 m livres com o lance).
+  parede('S-I-03', [5.5, 3.2], [6.854, 3.2], PA14, PAV2, true),
+  parede('S-I-04', [6.854, 3.2], [8.9, 3.2], PA14, PAV2, true),
+  parede('S-I-05', [6.854, 3.2], [6.854, 6.56], PA09, PAV2, true),
   // Parede entre o banheiro e o closet da SUÍTE 3 (oeste) e o quarto da SUÍTE 3 (leste).
   parede('S-I-06', [8.9, 0], [8.9, 6.56], PA14, PAV2, true),
-  parede('S-I-07', [6.7, 6.56], [11.75, 6.56], PA09, PAV2, true),
+  parede('S-I-07', [6.854, 6.56], [11.75, 6.56], PA09, PAV2, true),
   parede('S-I-08', [0, 7.76], [11.75, 7.76], PA09, PAV2, true),
   parede('S-I-09', [5.5, 7.76], [5.5, 14], PA09, PAV2, true),
   // Entre closet 3 e banheiro 3 (oeste) e a SUÍTE MASTER (leste).
@@ -139,7 +142,7 @@ const ABERTURAS_TERREO: Abertura[] = [
 /** Portas e janelas do pavimento 2 (B, seção 3.2). S8 com offset 3,99: o B dá 4,24, mas o vão 11,40–12,10 é 3,99. */
 const ABERTURAS_PAV2: Abertura[] = [
   ['S1', 'S-I-01', 'ot_p80', 2.0, 'P-07', true],
-  ['S2', 'S-I-07', 'ot_p90', 3.5, 'P-08', true], // corredor → quarto da SUÍTE 3 (sul)
+  ['S2', 'S-I-07', 'ot_p90', 3.346, 'P-08', true], // corredor → quarto da SUÍTE 3 (sul). Centro em x 10,20, como no B (offset 3,50 a partir de x 6,70, DEC-4)
   ['S3', 'S-I-06', 'ot_p80', 1.6, 'P-09'],
   ['S4', 'S-I-06', 'ot_p80', 4.8, 'P-10'],
   ['S5', 'S-I-08', 'ot_p80', 1.5, 'P-11'],
@@ -256,14 +259,15 @@ const TELHADO: Command = {
 
 /**
  * Escada reta, 17 espelhos (3,00 / 17 = 0,176 m) e 16 pisos de 0,285 m, largura 1,20 m. Eixo do 1º espelho em
- * (6,10; 2,00), subindo para o norte; é o mesmo croqui que `generateStraightRun` produz com esses valores (testado).
+ * (6,192; 2,00), subindo para o norte; é o mesmo croqui que `generateStraightRun` produz com esses valores (testado).
+ * DEC-4 (C-montagem §5): o lance está entre as faces de T-I-01 (5,592) e T-I-05 (6,792), 0,092 m à direita do que era.
  */
 function escada(): Command {
   const largura = 1.2;
   const piso = 0.285;
   const espelhos = 17;
-  const xEsq = 5.5;
-  const xDir = 6.7;
+  const xEsq = 5.592;
+  const xDir = 6.792;
   const y0 = 2.0;
   const yAt = (i: number): number => y0 + i * piso;
   const run: StairRun = {
@@ -323,8 +327,8 @@ function elevacoes(): SectionView[] {
 }
 
 const CORTES: SectionView[] = [
-  // AA pela escada: olha para o oeste (normal à esquerda de a→b, que sobe para o norte).
-  { id: 'V-AA', name: 'Corte AA', kind: 'section', a: { x: 6.1, y: -1 }, b: { x: 6.1, y: 15 }, depth: 17 },
+  // AA pela escada, no eixo do lance (x 6,192, DEC-4): olha para o oeste (normal à esquerda de a→b, que sobe para o norte).
+  { id: 'V-AA', name: 'Corte AA', kind: 'section', a: { x: 6.192, y: -1 }, b: { x: 6.192, y: 15 }, depth: 17 },
   // BB: olha para o norte.
   { id: 'V-BB', name: 'Corte BB', kind: 'section', a: { x: -1, y: 8.5 }, b: { x: 13, y: 8.5 }, depth: 17 },
 ];

@@ -1,6 +1,6 @@
 # C. Montagem da casa de alto padrão no app
 
-Montagem do projeto B (v2) como modelo inicial `house-premium`, com as alterações do coordenador. A geometria foi conferida pelos testes de `packages/engine/src/casaAltoPadrao.test.ts` (22 testes, todos passando). **A casa não foi aberta no navegador**: a conferência visual dos cortes e das elevações ainda precisa ser feita.
+Montagem do projeto B (v2) como modelo inicial `house-premium`, com as alterações do coordenador. A geometria foi conferida pelos testes de `packages/engine/src/casaAltoPadrao.test.ts` (23 testes, todos passando). **A casa não foi aberta no navegador**: a conferência visual dos cortes e das elevações ainda precisa ser feita.
 
 ## 1. Como abrir
 
@@ -52,6 +52,7 @@ O modelo não tem entidade de cômodo: os nomes existem nos comentários do temp
 | `S8` (§3.2) | offset 3,99 (B: 4,24) | A tabela do próprio B dá o vão de y 11,40 a 12,10, que é centrado em 11,75, ou seja offset 3,99. Com 4,24 o vão iria de 11,65 a 12,35. |
 | Laje `L-P2-01` (§4.1) | contorno pela face externa, de (−0,121; −0,121) a (11,871; 14,121) | Defeito do app (seção 6.1): com o contorno no eixo, o topo de parede externa sobre a borda da laje não ancora. Ajuste de 0,121 m por lado. |
 | `T-I-05` (§2.1) | em x = 6,854 (DEC-3, §5); topo fixo em 2,83 m | Afastada 0,154 m para leste (DEC-3, §5). Mantém a altura explícita de 2,83 m; o ponto médio agora (6,854; 3,95) cai na laje. |
+| `T-I-06` (§2.1) e pavimento 2 (§5) | `T-I-06` em y = 6,63; `S-I-03`, `S-I-04`, `S-I-05` e `S-I-07` em x = 6,854; `S2` com offset 3,346 (DEC-4) | O lance foi para x 5,592 a 6,792 (DEC-4). As paredes que o encostam acompanham a face de T-I-05 e o centro de S2 fica em x 10,20, como no B. Ver §5. |
 | Folga do furo da escada (§4.3, `openingMargin` 0,05) | 0 | Com 0,05 o vazio desce até y ≈ 3,095 e invade 4 cm do banheiro da SUÍTE 3, cujo piso livre começa em y 3,138 (face sul da `S-I-03`). Com 0 o furo começa em y ≈ 3,14, na face da parede. Área do furo: ≈ 4,10 m². |
 | Elevações (§4.4) | nomes "Norte", "Sul", "Leste", "Oeste", com as mesmas linhas de "Gerar elevações" | Assim "Gerar elevações" atualiza as quatro no lugar. O B pedia "Elevação Sul (frente)". |
 | Cortes (§4.4) | "Corte AA" e "Corte BB" | Nome automático do app. O B pedia "Corte AA (pela escada)". Posição, observador e profundidade (17 m) são os do B. |
@@ -59,12 +60,13 @@ O modelo não tem entidade de cômodo: os nomes existem nos comentários do temp
 
 ### 3.3 Escada
 
-Lance reto `generateStraightRun(start (6,10; 2,00), dir (0; 1), largura 1,20, 17 espelhos, piso 0,285)`. O lance do modelo é o mesmo croqui (teste). `openingMode: 'headroom'`, folga 0 (ver 3.2), `stt_monolitica`, sem patamar.
+Lance reto `generateStraightRun(start (6,192; 2,00), dir (0; 1), largura 1,20, 17 espelhos, piso 0,285)`, entre x 5,592 e 6,792 (DEC-4, §5). O lance do modelo é o mesmo croqui (teste). `openingMode: 'headroom'`, folga 0 (ver 3.2), `stt_monolitica`, sem patamar.
 
 ## 4. Avisos que sobraram
 
 - `validateProject`: nenhum aviso e nenhum erro.
 - Escada (`resolveStairs`): nenhum aviso de norma (`stair-risers-count`, `stair-uneven`, `stair-blondel`, pé-direito e largura, todos limpos). 17 espelhos, h = 0,1765 m, 2e + p = 0,637 m.
+- Escada, `stair-wall-overlap`: nenhum (DEC-4). `stairValidationIssues(casa)` devolve lista vazia.
 - Telhado (`roofSurfaceIssues`, `roofWallIssues`): nenhum aviso.
 - Faixa de vista do pavimento 2: 1 aviso, telhado R-01 fora do intervalo de vista. É esperado, porque a planta corta em 1,20 m.
 - Itens da seção 8 do B continuam em aberto e o app não os acusa: guarda-corpo da varanda aberta ao norte, sala de jantar sem janela externa, closet da SUÍTE MASTER com 5,60 m² (abaixo de 6 m²), prumadas do banheiro 3 e da cozinha e índices normativos não confirmados.
@@ -89,7 +91,28 @@ Resultado:
 - Largura livre entre faces: 1,046 → **1,200 m**.
 - Largura livre do hall: 2,20 → **2,046 m**; cômodo do hall 10,032 → **9,32976 m²**; escada (projeção) 5,472 → **6,17424 m²**.
 - Invasão da escada em `T-I-05`: **0,24 → 0 m²** (a face oeste passa a 6,792, fora do lance).
-- **`T-I-01` (0,42 m²) e `T-I-06` (0,07 m²) NÃO vão a zero.** Nenhuma das duas depende de `T-I-05`: a aresta oeste do lance está no eixo de `T-I-01` (x = 5,5; face 5,592) e o último espelho está no eixo de `T-I-06` (y = 6,56). Zerar `T-I-01` exigiria deslocar o lance +0,092 m (para x 5,592 a 6,792, entre faces), o que cascateia no furo do pavimento 2; `T-I-06` pediria mover a parede ou encurtar o lance. **Em aberto — decisão do coordenador.**
+- **`T-I-01` (0,42 m²) e `T-I-06` (0,07 m²) NÃO vão a zero.** Nenhuma das duas depende de `T-I-05`: a aresta oeste do lance está no eixo de `T-I-01` (x = 5,5; face 5,592) e o último espelho está no eixo de `T-I-06` (y = 6,56). Zerar `T-I-01` exige deslocar o lance +0,092 m (para x 5,592 a 6,792, entre faces), o que cascateia no furo do pavimento 2; `T-I-06` pede mover a parede ou encurtar o lance. **Resolvido pela DEC-4 (abaixo).**
+
+### DEC-4: lance movido e T-I-06 afastada (decisão do dono)
+
+Decisão do dono: mover o lance +0,092 m em x e resolver `T-I-06`. Feito em `templateCasaAltoPadrao.ts` (e no teste):
+
+- **Lance:** x 5,500 a 6,700 virou **5,592 a 6,792**, entre a face leste de `T-I-01` (5,592) e a face oeste de `T-I-05` (6,792, com `T-I-05` em x 6,854). Largura livre entre faces igual à do lance, 1,20 m. Eixo do 1º espelho em (6,192; 2,00). Mantidos 17 espelhos e piso de 0,285 m, e portanto 2e + p = 0,637 m.
+- **`T-I-06`:** y 6,56 virou **6,63**. A face sul (6,568) fica 8 mm acima do último espelho (y 6,56). Escolheu-se mover a parede, e não encurtar o lance: encurtar pedia piso de 0,28 m e mudava o croqui do B.
+- **Cascata no pavimento 2.** O furo é a projeção dos degraus acima da cota de corte (`stairHoleRegion`), então acompanha o lance. `S-I-03`, `S-I-04`, `S-I-05` e `S-I-07` foram para x 6,854 (eram 6,70), a face de `T-I-05`, e `S-I-05` fica com a face oeste na borda do furo. `S2` ficou com offset 3,346, centro em x 10,20, como no B. O furo continua com 1,20 m de largura e a mesma faixa de y (3,14 a 6,56), área ≈ 4,10 m². O furo continua na faixa do teste (3,5 a 5,5 m²).
+- **Corte AA:** x 6,192 (eixo do lance). BB, elevações e demais vistas não mudam.
+- **Áreas dos cômodos (eixo a eixo, recalculadas no teste):**
+
+| Cômodo | Antes (B, DEC-3) | Agora (DEC-4) |
+|---|---|---|
+| hall | 9,32976 m² | **9,47298 m²** |
+| escada (projeção) | 6,17424 m² | **6,26902 m²** |
+| sala de jantar | 13,056 m² | **12,818 m²** |
+| closet da SUÍTE 3 | 7,392 m² | **6,87456 m²** |
+| vazio da escada (projeção, grade do pavimento 2) | 4,032 m² | **4,54944 m²** |
+
+  O closet da SUÍTE 3 perde 0,52 m² em relação ao B. Isso é um desvio do B, que a seção 3.2 não listava antes. Os demais cômodos do B ficam iguais.
+- **Resultado:** `validateProject` sem aviso; `resolveStairs` e `stairValidationIssues` sem aviso, inclusive `stair-wall-overlap`. No teste, a guarda que esperava 0,42 m² e 0,07 m² foi invertida para lista vazia, e os números dourados foram recalculados e comentados.
 
 ## 6. Defeito do app
 
@@ -117,14 +140,14 @@ Impacto: se a laje estiver no eixo das paredes externas, as paredes da borda sup
 
 ## 7. Verificação
 
-Testes (`npx vitest run packages/model packages/engine`, sem perf): 79 arquivos e 1337 testes passando, incluindo os 22 de `casaAltoPadrao.test.ts`.
+Testes (`npx vitest run packages/model packages/engine`, sem perf): 82 arquivos e 1368 testes passando, incluindo os 23 de `casaAltoPadrao.test.ts`.
 
 Checagens do teste:
 
 - `validateProject` sem erros; lista de avisos vazia.
 - `resolveLevel` nos dois níveis, sem exceção; junções limpas (fresta < 2e-5 m², sobreposição < 1e-5 m²).
 - Contorno externo: 1 anel por nível. Térreo 148,67 m² (caixa menos a varanda aberta ao norte, tolerância relativa 5e-4). Pavimento 2 170,79 m² (11,992 × 14,242).
-- Cômodos pela grade de eixos das paredes: todos com a área do B, tolerância 1e-6 (térreo: garagem 30,25; cozinha 22,00; despensa 11,00; serviço 13,75; vestíbulo 6,80; hall 9,32976; escada 6,17424; lavabo 3,80; sala em L 25,84; jantar 13,06. Pavimento 2: SUÍTE MASTER 23,40; SUÍTE 3 18,70; suíte 2 20,57; home office 36,08; corredor 14,10; banheiros e closets nas áreas do B). Nº de cômodos fechados igual ao nº de furos do contorno: 8 no térreo e 11 no pavimento 2.
+- Cômodos pela grade de eixos das paredes: todos com a área do B, tolerância 1e-6 (térreo: garagem 30,25; cozinha 22,00; despensa 11,00; serviço 13,75; vestíbulo 6,80; hall 9,47298; escada 6,26902; lavabo 3,80; sala em L 25,84; jantar 12,818 (DEC-4). Pavimento 2: SUÍTE MASTER 23,40; SUÍTE 3 18,70; suíte 2 20,57; home office 36,08; corredor 14,10; closet da SUÍTE 3 6,87456 (DEC-4); banheiros e demais closets nas áreas do B). Nº de cômodos fechados igual ao nº de furos do contorno: 8 no térreo e 11 no pavimento 2.
 - Escada: `resolveStairs` sem avisos; 17 espelhos; h = 3/17; 2e + p entre 0,63 e 0,64; croqui igual ao de `generateStraightRun`.
 - Laje do pavimento 2: furo com área > 0 (≈ 4,10 m²); cômodos da SUÍTE 3 (banheiro), closet da SUÍTE 3 e home office, com folga de 0,092 m (meia espessura de PA-14), continuam na laje.
 - Pavimento 2 sob 2,83 m; paredes do térreo com topo em 2,83 m; paredes do pavimento 2 com topo em 5,80 m.

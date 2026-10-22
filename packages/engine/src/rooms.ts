@@ -16,6 +16,7 @@ import {
 import { dist } from '@hestia/geom';
 import { roomCeilingHeight, roomsOnLevel, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { wallFaces } from './faces.ts';
+import { noteCircuitRecalc, wallsSignature } from './enclosed.ts';
 import { levelFrames } from './resolve.ts';
 
 /** Por que o ponto do ambiente não está num circuito fechado. */
@@ -106,7 +107,25 @@ function classifyPoint(at: Vec2, set: RegionSet): { problem: RoomProblem | null;
  */
 export function roomRegionAt(p: Project, levelId: Id, at: Vec2): { problem: RoomProblem | null; polygon: Polygon | null } {
   if (frameCount(p, levelId) === 0) return { problem: 'fora', polygon: null };
-  return classifyPoint(at, regionSet(p, levelId));
+  return classifyPoint(at, regionSetCached(p, levelId));
+}
+
+/** Espaço livre do nível em cache por conteúdo das paredes (decisão 0023 §11): só o nível editado refaz a união. */
+const regionCache = new Map<Id, { sig: string; set: RegionSet }>();
+
+/** Zera o cache do espaço livre (isolamento entre suítes de teste; o cache de circuitos é `resetCircuitCache`). */
+export function resetRegionCache(): void {
+  regionCache.clear();
+}
+
+function regionSetCached(p: Project, levelId: Id): RegionSet {
+  const sig = wallsSignature(p, levelId);
+  const hit = regionCache.get(levelId);
+  if (hit && hit.sig === sig) return hit.set;
+  noteCircuitRecalc();
+  const set = regionSet(p, levelId);
+  regionCache.set(levelId, { sig, set });
+  return set;
 }
 
 /**
@@ -133,7 +152,7 @@ export function resolveRooms(p: Project, levelId: Id): ResolvedRoom[] {
   if (frames.length === 0) {
     return rooms.map((r) => ({ ...base(r), problem: 'fora' as const, polygon: null, area: 0, perimeter: 0, volume: 0 }));
   }
-  const set = regionSet(p, levelId);
+  const set = regionSetCached(p, levelId);
   const seen = new Map<Polygon, Id>();
   return rooms.map((r) => {
     const { problem, polygon } = classifyPoint(r.point, set);

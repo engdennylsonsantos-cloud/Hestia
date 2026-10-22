@@ -1,6 +1,6 @@
 import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
-import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
+import { ceilingOutline, frameOfWall } from '@hestia/engine';
+import { isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
@@ -11,7 +11,7 @@ import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
 import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
-import { commitOutlineBoundary } from './outlineEdit.ts';
+import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
@@ -179,16 +179,19 @@ export class SelectTool extends ToolBase {
   deleteKey(): boolean {
     const pr = this.env.project();
     const f = this.focus ? pr.elements[this.focus.id] : undefined;
-    if (!this.focus || !(isFloor(f) || isSlab(f) || isRoof(f)) || !this.env.selection().includes(f.id) || this.focus.index >= f.boundary.length) {
+    const ring0 = f && (isFloor(f) || isSlab(f) || isRoof(f) || isCeiling(f)) ? (isCeiling(f) ? ceilingOutline(pr, f).boundary : f.boundary) : null;
+    if (!this.focus || !f || ring0 === null || !this.env.selection().includes(f.id) || this.focus.index >= ring0.length) {
       this.focus = null;
       return false;
     }
-    const ring = ringRemoveVertex(f.boundary, this.focus.index);
+    const ring = ringRemoveVertex(ring0, this.focus.index);
     if (!ring) {
-      this.env.say(`${isSlab(f) ? 'Uma laje' : isRoof(f) ? 'Um telhado' : 'Um piso'} precisa de ao menos 3 vértices.`);
+      this.env.say(`${isSlab(f) ? 'Uma laje' : isRoof(f) ? 'Um telhado' : isCeiling(f) ? 'Um forro' : 'Um piso'} precisa de ao menos 3 vértices.`);
       return true;
     }
-    if (isRoof(f)) commitRoofPatch(this.env, [f.id], roofRingPatch(f, ring, { kind: 'remove', vertex: this.focus.index })); else commitOutlineBoundary(this.env, f.id, ring);
+    if (isRoof(f)) commitRoofPatch(this.env, [f.id], roofRingPatch(f, ring, { kind: 'remove', vertex: this.focus.index }));
+    else if (isCeiling(f)) commitCeilingBoundary(this.env, f.id, ring);
+    else commitOutlineBoundary(this.env, f.id, ring);
     this.focus = { id: f.id, index: Math.min(this.focus.index, ring.length - 1) };
     this.env.say('Vértice removido. Ctrl+Z desfaz.');
     return true;

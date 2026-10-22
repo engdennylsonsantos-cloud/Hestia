@@ -189,6 +189,10 @@ export function labelOf(c: Command): string {
       return 'Soltar contorno das paredes';
     case 'relinkOutline':
       return 'Revincular contorno às paredes';
+    case 'detachCeilingRoom':
+      return 'Soltar forro do ambiente';
+    case 'relinkCeilingRoom':
+      return 'Revincular forro ao ambiente';
     case 'setWallEnds':
       return 'Ajustar parede';
     case 'setJoin':

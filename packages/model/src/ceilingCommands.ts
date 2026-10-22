@@ -2,7 +2,10 @@ import type { Command } from './commands.ts';
 import { isCeiling, type Ceiling, type Project } from './types.ts';
 
 /** Comando de forro, sem o `switch` de `commands.ts` (aquele arquivo passa do limite de linhas). */
-export type CeilingCommand = Extract<Command, { type: 'addCeiling' | 'addCeilings' | 'updateCeiling' | 'removeCeiling' | 'upsertCeilingType' | 'deleteCeilingType' | 'duplicateCeilingType' }>;
+export type CeilingCommand = Extract<
+  Command,
+  { type: 'addCeiling' | 'addCeilings' | 'updateCeiling' | 'removeCeiling' | 'upsertCeilingType' | 'deleteCeilingType' | 'duplicateCeilingType' | 'detachCeilingRoom' | 'relinkCeilingRoom' }
+>;
 
 /** Validação de um forro novo: contorno com ao menos 3 pontos, tipo existente e nível existente. */
 function validateCeilingInput(p: Project, c: Omit<Ceiling, 'order'>): void {
@@ -30,6 +33,21 @@ export function applyCeilingCommand(p: Project, c: Command): boolean {
       const e = p.elements[c.id];
       if (!isCeiling(e)) throw new Error('Forro inexistente');
       p.elements[c.id] = { ...e, ...c.patch };
+      return true;
+    }
+    case 'detachCeilingRoom': {
+      // Solta o forro do ambiente (decisão 0023 §13, P-5): o contorno atual vira estático. Sem ambiente, não faz nada.
+      const e = p.elements[c.id];
+      if (!isCeiling(e)) throw new Error('Forro inexistente');
+      if (e.roomId) p.elements[c.id] = { ...e, roomLinked: false };
+      return true;
+    }
+    case 'relinkCeilingRoom': {
+      // Religa ao ambiente indicado (o de origem ou o que contém o forro; a escolha é de quem chama). O contorno sai no motor.
+      const e = p.elements[c.id];
+      if (!isCeiling(e)) throw new Error('Forro inexistente');
+      if (!p.elements[c.roomId] || p.elements[c.roomId]!.kind !== 'room') throw new Error('Ambiente inexistente');
+      p.elements[c.id] = { ...e, roomId: c.roomId, roomLinked: true };
       return true;
     }
     case 'removeCeiling':

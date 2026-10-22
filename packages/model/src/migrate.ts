@@ -202,6 +202,9 @@ const migrations: Record<number, Migration> = {
       materials,
     };
   },
+  // v18 → v19: contorno associativo de piso e laje (decisão 0023 §8.2). Pisos e lajes existentes não têm `outlineSource`,
+  // o que significa estáticos (o contorno gravado continua valendo). A migração só avança a versão.
+  18: (raw) => ({ ...raw }),
 };
 
 export class SchemaError extends Error {}

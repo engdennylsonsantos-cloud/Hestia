@@ -24,6 +24,8 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] C1 Parede anexada ao topo ou base da laje do nível, com a inclinação considerada **(bloqueante)**
 - [x] C2 Laje e piso sobrepostos no mesmo nível detectados, com aviso
 - [x] C3 Lajes sobrepostas detectadas, com aviso
+- [x] C4 Contorno associativo (motor): laje pelo perímetro externo guarda a origem e o contorno é derivado no motor — acompanha as paredes (decisão 0023 §8.2)
+- [ ] C5 Vínculo do contorno na interface: aviso "Contorno solto das paredes", botão "Revincular" e aviso de circuito aberto (fase P2)
 
 ## D · Vistas
 - [x] D1 Planta: laje vista de cima com hachura do material estrutural, atrás das paredes; laje do nível abaixo como subpavimento **(bloqueante)**

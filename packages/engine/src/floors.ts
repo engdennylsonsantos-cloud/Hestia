@@ -1,5 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { floorPolygon, floorsOnLevel, levelElevation, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, levelElevation, type Id, type Project } from '@hestia/model';
+import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
 /** Camada resolvida do piso: o mesmo polígono em planta, entre as cotas absolutas z0 e z1. */
@@ -22,6 +23,8 @@ export interface ResolvedFloor {
   bottomZ: number;
   /** Do topo para baixo (índice 0 = camada de cima). */
   layers: ResolvedFloorLayer[];
+  /** Motivo do circuito vinculado não fechar (decisão 0023 §8.2c); null quando fechou ou o piso é estático. */
+  problem: OutlineProblem | null;
 }
 
 /** Pisos de todos os níveis do projeto (quem cruza níveis, como a parede anexada, usa esta lista). */
@@ -30,14 +33,28 @@ export const resolveAllFloors = (p: Project): ResolvedFloor[] => p.levels.flatMa
 /**
  * Geometria dos pisos de um nível. O piso não é recortado pelas paredes (como no Revit, a parede fica sobre o piso
  * e a planta desenha o piso atrás dela). O furo de escada é calculado pela cota da face inferior de cada piso (decisão
- * 0011, §6). Tipos ausentes ou contornos com menos de 3 pontos são ignorados: a validação do modelo é quem avisa.
+ * 0011, §6). Piso vinculado às paredes (`outlineSource.linked`) tem o contorno derivado do circuito (`resolveBoundary`):
+ * quando o circuito abre, mantém o último contorno válido e devolve `problem`. Tipos ausentes ou contornos com menos de
+ * 3 pontos são ignorados: a validação do modelo é quem avisa.
  */
 export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
   const openings = stairOpeningsOnLevel(p, levelId);
   const out: ResolvedFloor[] = [];
   for (const f of floorsOnLevel(p, levelId)) {
     const type = p.floorTypes[f.typeId];
-    if (!type || f.boundary.length < 3) continue;
+    if (!type) continue;
+    let boundary = f.boundary;
+    let holes = f.holes;
+    let problem: OutlineProblem | null = null;
+    if (f.outlineSource?.linked) {
+      const outline = resolveBoundary(p, f.levelId, f);
+      if (outline.polygon) {
+        boundary = outline.polygon[0]!;
+        holes = [...f.holes, ...outline.polygon.slice(1)];
+      }
+      problem = outline.problem;
+    }
+    if (boundary.length < 3) continue;
     const topZ = levelElevation(p, f.levelId) + f.heightOffset;
     let z = topZ;
     const layers: ResolvedFloorLayer[] = [];
@@ -49,9 +66,9 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
       z -= l.thickness;
     });
     const bottomZ = z;
-    const polygon = cutStairOpenings([floorPolygon(f)], stairHolesFor(openings, bottomZ));
+    const polygon = cutStairOpenings([[boundary, ...holes]], stairHolesFor(openings, bottomZ));
     if (polygon.length === 0) continue;
-    out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ, layers });
+    out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ, layers, problem });
   }
   return out;
 }

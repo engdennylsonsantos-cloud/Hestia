@@ -26,6 +26,8 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] C2 Piso respeita a face interna das paredes ao ser criado por paredes
 - [x] C3 Pisos sobrepostos no mesmo nível detectados, com aviso
 - [-] C4 Junção de geometria entre pisos adjacentes (une camadas iguais): reavaliar com lajes
+- [x] C5 Contorno associativo (motor): piso criado por paredes/perímetro guarda a origem e o contorno é derivado no motor — acompanha mover/espessura/tipo de parede (porta/janela não alteram); circuito aberto mantém o último contorno (decisão 0023 §8.2)
+- [ ] C6 Vínculo do contorno na interface: aviso "Contorno solto das paredes", botão "Revincular" e aviso de circuito aberto (fase P2)
 
 ## D · Vistas
 - [x] D1 Planta: preenchimento e hachura do material da camada de topo, atrás das paredes **(bloqueante)**

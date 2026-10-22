@@ -283,7 +283,7 @@ Parede W1 com camada de acabamento de prioridade 4, fora do núcleo; piso F1 com
 | P9. Parede anexada por trecho | `wallZ.ts` (61-130), `layerGeom.ts` (`withProfile`, 230), `types.ts:166-168` (`bottomProfile`), `Properties.tsx` (controles e aviso) | P3 | G |
 | P10. Inverter corte e Não cortar (futura) | Comandos por par e desfazer da junção. Só se P-4 for decidida (com um caso real) | P7, decisão P-4 | M |
 
-**Status da P1: em andamento.**
+**Status (2026-10-22): P1 concluída** — contorno associativo no modelo (`outlineSource?` em `Floor`/`Slab`), migração v18→v19 (só avança a versão, pisos/lajes antigos viram estáticos), comandos `detachOutline`/`relinkOutline`, motor (`resolveBoundary`; circuitos movidos de `tools/enclosed.ts` para `engine/enclosed.ts`, com cache por nível) e ferramentas (Piso/Laje gravam a origem; alças de vértice soltam o vínculo). P2 e P3 seguem pendentes.
 
 Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P4. P7 depois de P5. P8 depois de P7. P9 depois de P3. P10 só depois de P-4. O contorno associativo vem antes do término por camada, como pede o dono.
 

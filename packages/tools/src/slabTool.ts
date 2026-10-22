@@ -1,5 +1,5 @@
 import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Ring, type Vec2 } from '@hestia/geom';
-import { isSlab, makeSlab, newId, type Slab } from '@hestia/model';
+import { isSlab, makeSlab, newId, type OutlineSource, type Slab } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ringAreaAbs, ringPerimeter } from './floorPick.ts';
 import { outerPerimeter } from './enclosed.ts';
@@ -139,7 +139,7 @@ export class SlabTool extends ToolBase {
       this.env.say('Clique perto de uma parede do nível.');
       return;
     }
-    this.commit(ring);
+    this.commit(ring, { mode: 'perimeter', seed: p.raw, linked: true });
   }
 
   private clickRect(p: PointerInfo): void {
@@ -216,7 +216,7 @@ export class SlabTool extends ToolBase {
   }
 
   /** Cria a laje no nível ativo com o tipo e o deslocamento das opções, e a deixa selecionada. */
-  private commit(boundary: Vec2[]): void {
+  private commit(boundary: Vec2[], outline?: OutlineSource): void {
     const o = this.env.options();
     const p = this.env.project();
     const typeId = p.slabTypes[o.slabTypeId] ? o.slabTypeId : Object.keys(p.slabTypes)[0];
@@ -225,7 +225,7 @@ export class SlabTool extends ToolBase {
       return;
     }
     const id = newId('l');
-    this.env.exec({ type: 'addSlab', slab: makeSlab({ id, typeId, levelId: this.env.levelId(), boundary, holes: [], heightOffset: o.slabOffset }) });
+    this.env.exec({ type: 'addSlab', slab: makeSlab({ id, typeId, levelId: this.env.levelId(), boundary, holes: [], heightOffset: o.slabOffset, ...(outline ? { outlineSource: outline } : {}) }) });
     this.env.setSelection([id]);
     const area = multiArea([[boundary]]);
     this.env.say(`Laje criada: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);

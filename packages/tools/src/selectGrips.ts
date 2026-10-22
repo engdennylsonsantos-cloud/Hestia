@@ -8,6 +8,7 @@ import { slabGripAt } from './slabPick.ts';
 import { roofGripAt } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
+import { commitOutlineBoundary } from './outlineEdit.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { stairGripAt, stairHold } from './stairGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
@@ -44,7 +45,7 @@ interface RingOwner {
   commit(env: ToolEnv, id: Id, ring: Vec2[], insertEdge: number | null): void;
 }
 
-const commitBoundary = (env: ToolEnv, id: Id, ring: Vec2[]): void => env.exec({ type: 'updateElements', ids: [id], patch: { boundary: ring } });
+const commitBoundary = (env: ToolEnv, id: Id, ring: Vec2[]): void => commitOutlineBoundary(env, id, ring);
 
 const FLOOR_OWNER: RingOwner = {
   boundary: (p, id) => {

@@ -5,7 +5,7 @@ import type { Sheet } from './sheet.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 
@@ -277,6 +277,18 @@ export interface FloorType {
 }
 
 /**
+ * Origem de um contorno criado a partir das paredes (decisão 0023 §8.2). Quando `linked` é verdadeiro, o contorno é
+ * DERIVADO no motor a cada mudança de parede e `boundary` guarda apenas o último contorno válido; quando falso (ou
+ * ausente), o contorno é manual/estático e `boundary` é a fonte. O `seed` é o ponto interior em planta que localiza o
+ * circuito (no perímetro externo, o ponto usado para achar a edificação). Ausente em piso/laje de arquivo antigo.
+ */
+export interface OutlineSource {
+  mode: 'walls-finish' | 'walls-core' | 'perimeter';
+  seed?: Vec2;
+  linked: boolean;
+}
+
+/**
  * Piso (Revit: Floor). Contorno fechado em planta (sentido qualquer) com furos. O topo do piso fica na cota do
  * nível mais `heightOffset`; as camadas descem a partir dele (a primeira camada é a de cima).
  */
@@ -287,6 +299,8 @@ export interface Floor {
   levelId: Id;
   boundary: Vec2[];
   holes: Vec2[][];
+  /** Origem do contorno quando criado por paredes/perímetro; ausente = estático (arquivo antigo). */
+  outlineSource?: OutlineSource;
   heightOffset: number;
   mark: string;
   comments: string;
@@ -321,6 +335,8 @@ export interface Slab {
   levelId: Id;
   boundary: Vec2[];
   holes: Vec2[][];
+  /** Origem do contorno quando criado por paredes/perímetro; ausente = estático (arquivo antigo). */
+  outlineSource?: OutlineSource;
   heightOffset: number;
   slope: SlabSlope | null;
   mark: string;

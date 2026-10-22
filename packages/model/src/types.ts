@@ -106,6 +106,37 @@ export interface Level {
   viewRange: ViewRange;
   /** Gráficos da planta deste nível (decisão 0015); ausente = padrão. */
   graphics?: ViewGraphics;
+  /** Cotas permanentes da planta (decisão 0019); ausente = nenhuma. */
+  dimensions?: Dimension[];
+  /** Textos de anotação da planta (decisão 0019); ausente = nenhum. */
+  texts?: TextNote[];
+}
+
+/** Referência de uma extremidade da cota a uma extremidade de parede: a cota acompanha a parede. */
+export interface DimensionRef {
+  wallId: Id;
+  end: 'a' | 'b';
+}
+
+/**
+ * Cota alinhada entre `a` e `b` (decisão 0019). O valor é a distância entre os pontos resolvidos (com `refs`, os da parede).
+ * `offset` é a distância da linha de cota ao segmento a–b, em metros, no lado da normal esquerda de a→b.
+ */
+export interface Dimension {
+  id: Id;
+  a: Vec2;
+  b: Vec2;
+  offset: number;
+  refs?: { a?: DimensionRef; b?: DimensionRef };
+}
+
+/** Texto de anotação: `at` é o ponto de inserção (centro), `height` em mm de papel, `rotation` em graus. */
+export interface TextNote {
+  id: Id;
+  at: Vec2;
+  text: string;
+  height: number;
+  rotation: number;
 }
 
 /** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */

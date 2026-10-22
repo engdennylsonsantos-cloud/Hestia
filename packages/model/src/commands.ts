@@ -45,6 +45,8 @@ import {
   resetView3D,
 } from './graphicsCommands.ts';
 
+import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
+
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
   | { type: 'addWall'; wall: Omit<Wall, 'order'> }
@@ -72,6 +74,7 @@ export type Command =
   | { type: 'upsertMaterial'; material: Material }
   | { type: 'upsertOpeningType'; openingType: OpeningType }
   | { type: 'upsertLevel'; level: Level }
+  | AnnotationCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
@@ -371,6 +374,14 @@ export function applyCommand(p: Project, c: Command): void {
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }
+    case 'addDimension':
+    case 'updateDimension':
+    case 'removeDimension':
+    case 'addText':
+    case 'updateText':
+    case 'removeText':
+      applyAnnotationCommand(p, c);
+      break;
     case 'setLevelViewRange': {
       const l = p.levels.find((x) => x.id === c.levelId);
       if (!l) throw new Error('Nível inexistente');

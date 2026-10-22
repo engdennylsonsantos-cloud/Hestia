@@ -223,5 +223,17 @@ export function labelOf(c: Command): string {
       return 'Trocar parede anfitriã';
     case 'setElementLevel':
       return 'Mudar de nível';
+    case 'addDimension':
+      return 'Criar cota';
+    case 'updateDimension':
+      return 'Editar cota';
+    case 'removeDimension':
+      return 'Excluir cota';
+    case 'addText':
+      return 'Criar texto';
+    case 'updateText':
+      return 'Editar texto';
+    case 'removeText':
+      return 'Excluir texto';
   }
 }

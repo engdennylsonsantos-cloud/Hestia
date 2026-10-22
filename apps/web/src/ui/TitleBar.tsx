@@ -25,7 +25,7 @@ export function TitleBar(): ReactElement {
       // Vista de corte/elevação aberta: exporta o corte (com as larguras da vista); senão, a planta do nível.
       const status = ui.view === 'section' && ui.sectionId
         ? await saveSectionDxf(editor.project, ui.sectionId)
-        : await savePlanDxf(editor.project, ui.levelId);
+        : await savePlanDxf(editor.project, ui.levelId, ui.showRoofProjection);
       useUi.setState({ status });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });

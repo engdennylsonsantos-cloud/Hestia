@@ -150,11 +150,12 @@ export function lineWeightsOf(p: Project, levelId: Id, geo: DxfLevelGeometry): R
  * Geometria do nível para o DXF, na mesma vista da planta na tela (decisão 0013 §4, `planViewOf`): paredes e aberturas
  * pela geometria com o plano de corte da vista, paredes fora do corte como contorno de projeção, pisos, lajes, telhados e
  * escadas com a cota de corte e o topo do intervalo. O que está fora do intervalo não sai, exceto a projeção do telhado
- * (a tela a mostra tracejada por padrão). Categoria oculta na vista (`overrides[cat].visible === false`, decisão 0015 §2
- * item 4) não sai. Cada camada leva a largura de linha da categoria na escala da vista (`lineWeightsOf`). O io não importa
- * o engine, então a montagem fica aqui, no web.
+ * (a tela a mostra tracejada por padrão, só com a preferência "Mostrar projeção da cobertura" ligada; `showRoofProjection`
+ * reflete essa preferência). Categoria oculta na vista (`overrides[cat].visible === false`, decisão 0015 §2 item 4) não
+ * sai. Cada camada leva a largura de linha da categoria na escala da vista (`lineWeightsOf`). O io não importa o engine,
+ * então a montagem fica aqui, no web.
  */
-export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
+export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true): DxfLevelGeometry {
   const view: PlanView = planViewOf(p, levelId);
   const { hidden } = view;
   const vg = levelGraphicsOf(p, levelId);
@@ -175,7 +176,7 @@ export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
     clusters: shown('wall') ? view.geo.clusters : [],
     openings,
     wallOutlines: shown('wall') ? view.outlines.map((o) => ({ state: o.cls, polygons: o.shape })) : [],
-    roofProjections: shown('roof') ? roofs.filter((r) => hidden.has(r.roofId)).flatMap((r) => roofFootprint(r)) : [],
+    roofProjections: shown('roof') && showRoofProjection ? roofs.filter((r) => hidden.has(r.roofId)).flatMap((r) => roofFootprint(r)) : [],
     floors: shown('floor')
       ? resolveFloors(p, levelId)
           .filter((f) => !hidden.has(f.floorId))
@@ -208,15 +209,15 @@ export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
 }
 
 /** Texto DXF da planta do nível, na vista do intervalo. */
-export function planDxf(p: Project, levelId: Id): string {
-  return exportDxf(p, levelId, dxfGeometryOf(p, levelId));
+export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
+  return exportDxf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
 }
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */
-export function savePlanDxf(p: Project, levelId: Id): Promise<string> {
+export function savePlanDxf(p: Project, levelId: Id, showRoofProjection = true): Promise<string> {
   const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
   const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).replace(/[^\w\- ]+/g, '').trim() || 'nivel';
-  return saveText(`${base}-${level}.dxf`, planDxf(p, levelId));
+  return saveText(`${base}-${level}.dxf`, planDxf(p, levelId, showRoofProjection));
 }
 
 /** Categoria gráfica de uma origem do corte (parede, piso, laje, telhado ou escada). */

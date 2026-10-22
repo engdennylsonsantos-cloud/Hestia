@@ -4,6 +4,7 @@ import { planeHas, WATER_MIN_AREA } from './roofGeom.ts';
 import { joinRoofs, type JoinItem } from './roofJoin.ts';
 import { roofLines } from './roofLines.ts';
 import { boundaryKindsOf, waterPlanesOf } from './roofShapes.ts';
+import { holeGableLines } from './roofSkeleton.ts';
 
 /** Água resolvida: região em planta e plano da face superior (cota absoluta z0 em `origin`, subida `up`, `percent`). */
 export interface ResolvedRoofPlane {
@@ -74,7 +75,7 @@ export function roofTopAt(r: ResolvedRoof, p: Vec2): number | null {
 export const roofThickness = (r: ResolvedRoof): number => r.layers.reduce((s, l) => s + l.thickness, 0);
 
 /** Telhado antes da junção: águas da forma menos os furos. Sem tipo ou contorno de três pontos, null. */
-type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string; steps?: SkeletonStep[] };
+type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string; steps?: SkeletonStep[]; holeLines: RoofLine[] };
 
 function baseOf(p: Project, r: Roof): Base | null {
   const type = p.roofTypes[r.typeId];
@@ -91,6 +92,7 @@ function baseOf(p: Project, r: Roof): Base | null {
   const planes = water.planes
     .map((pl) => ({ ...pl, polygon: holes.length ? difference(pl.polygon, ...holes) : pl.polygon }))
     .filter((pl) => multiArea(pl.polygon) > WATER_MIN_AREA);
+  const holeLines = holeGableLines(r.holes, water.planes);
   return {
     roof: r,
     type,
@@ -98,6 +100,7 @@ function baseOf(p: Project, r: Roof): Base | null {
     planes,
     joinOthers: r.joinOthers === true,
     joinedArea: 0,
+    holeLines,
     ...(water.problem ? { problem: water.problem } : {}),
     ...(water.steps ? { steps: water.steps } : {}),
   };
@@ -118,7 +121,7 @@ function finish(b: Base, joinLines: ResolvedRoof['lines']): ResolvedRoof {
     typeId: r.typeId,
     levelId: r.levelId,
     planes: b.planes,
-    lines: [...roofLines(r, b.planes, boundaryKindsOf(r)), ...joinLines],
+    lines: [...roofLines(r, b.planes, boundaryKindsOf(r)), ...b.holeLines, ...joinLines],
     layers,
     eaveZ: b.eaveZ,
     joinedArea: b.joinedArea,

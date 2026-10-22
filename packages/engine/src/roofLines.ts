@@ -64,7 +64,8 @@ export function interiorLines(planes: ResolvedRoofPlane[]): RoofLine[] {
 
 /**
  * Linhas notáveis do telhado em planta: contorno ('eave' ou 'gable' por aresta, conforme `kinds`) e divisas entre águas
- * ('ridge', 'hip' ou 'valley'). Furos não geram linha. Extrusão tem as suas (agente de extrusão).
+ * ('ridge', 'hip' ou 'valley'). Os furos geram as empenas (testeiras) à parte, em `holeGableLines` (roofSkeleton.ts).
+ * Extrusão tem as suas (agente de extrusão).
  */
 export function roofLines(r: Roof, planes: ResolvedRoofPlane[], kinds: RoofLine['kind'][]): RoofLine[] {
   if (r.shape === 'extrusion') return extrusionLines(r);

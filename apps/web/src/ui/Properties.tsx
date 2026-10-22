@@ -278,7 +278,7 @@ function ViewRangeGroup({ levelId }: { levelId: Id }): ReactElement {
       <Row label="Direção da vista" htmlFor="vr-dir">
         <select id="vr-dir" className="select" value={range.direction} onChange={(e) => edit({ direction: e.target.value as ViewRange['direction'] })}>
           <option value="down">Para baixo</option>
-          <option value="up" disabled>Para cima (em breve)</option>
+          <option value="up">Para cima (planta de forro)</option>
         </select>
       </Row>
       {error && <div className="vr-error" role="alert">{error}</div>}

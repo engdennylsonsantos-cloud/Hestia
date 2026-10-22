@@ -17,6 +17,7 @@ export * from './enclosed.ts';
 export * from './outlineBound.ts';
 export * from './junctionLevel.ts';
 export * from './outlineIssues.ts';
+export * from './outlineSuggest.ts';
 export * from './wallZ.ts';
 export * from './wallFloorIssues.ts';
 export * from './faces.ts';

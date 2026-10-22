@@ -61,12 +61,12 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
           <NumField id="p-foff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
         </Row>
       </Group>
-      <Group title="Construção">
+      <Group title="Construção" open={false}>
         {type ? (
           <>
             <Row label="Espessura total"><span className="val">{fmt(floorTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i} style={{ minHeight: 22 }}>
+              <div className="prow" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>

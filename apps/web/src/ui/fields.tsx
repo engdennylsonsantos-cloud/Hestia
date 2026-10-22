@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { parseNumber } from '@hestia/tools';
+import { safeGet, safeSet } from '../editor/storage.ts';
 
 const fmt = (v: number, decimals: number): string => v.toFixed(decimals).replace('.', ',');
 
@@ -131,9 +132,27 @@ export function Row({ label, htmlFor, children }: { label: string; htmlFor?: str
   );
 }
 
+/**
+ * Grupo de propriedades da paleta (Restrições, Dimensões, Identidade...). O aberto/fechado fica guardado no navegador
+ * pelo título: o grupo fechado continua fechado ao trocar de seleção, que é o que mantém a paleta compacta (padrão do
+ * Revit). O título é a chave, então grupos de mesmo nome em painéis diferentes compartilham o estado.
+ */
 export function Group({ title, children, open = true }: { title: string; children: ReactNode; open?: boolean }): ReactElement {
+  const key = `pgroup:${title}`;
+  const [isOpen, setOpen] = useState<boolean>(() => {
+    const saved = safeGet(key);
+    return saved === null ? open : saved === '1';
+  });
   return (
-    <details className="pgroup" open={open}>
+    <details
+      className="pgroup"
+      open={isOpen}
+      onToggle={(e) => {
+        const next = e.currentTarget.open;
+        setOpen(next);
+        safeSet(key, next ? '1' : '0');
+      }}
+    >
       <summary>{title}</summary>
       {children}
     </details>

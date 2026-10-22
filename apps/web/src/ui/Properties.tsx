@@ -150,7 +150,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         ) : (
           <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
         )}
-        <Row label="Topo ajustado ao telhado"><Check id="p-attachroof" checked={attachRoof.value} mixed={attachRoof.mixed} onChange={(v) => patch(ids, { attachTopToRoof: v })} /></Row>
+        <Row label="Topo no telhado"><Check id="p-attachroof" checked={attachRoof.value} mixed={attachRoof.mixed} onChange={(v) => patch(ids, { attachTopToRoof: v })} /></Row>
         <ProfileRow key={ids.join(',')} walls={walls} />
         <Row label="Linha de localização" htmlFor="p-loc">
           <select id="p-loc" className="select" value={loc.mixed ? '' : loc.value} onChange={(e) => e.target.value && patch(ids, { locationLine: e.target.value as LocationLine })}>
@@ -168,12 +168,12 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
           <JoinRows wall={single} />
         </Group>
       )}
-      <Group title="Construção">
+      <Group title="Construção" open={false}>
         {t ? (
           <>
             <Row label="Espessura total"><span className="val">{fmt(totalThickness(t) * 100, 1)} cm</span></Row>
             {t.layers.map((l, i) => (
-              <div className="prow" key={i} style={{ minHeight: 22 }}>
+              <div className="prow" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>
@@ -313,7 +313,7 @@ function ViewProps(): ReactElement {
         <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
-        <Row label="Mostrar projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => setRoofProjection(v)} /></Row>
+        <Row label="Projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => setRoofProjection(v)} /></Row>
         <Row label="Etiquetas de parede"><Check id="v-tags" checked={p.settings.showTags} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showTags: v } })} /></Row>
         <Row label="Depurar junções"><Check id="v-debugjoins" checked={p.settings.debugJoins} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { debugJoins: v } })} /></Row>
         <Row label="Nível de detalhe" htmlFor="v-detail">

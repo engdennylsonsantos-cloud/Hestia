@@ -99,12 +99,12 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
           <div className="hint">{hasSlope ? 'Selecione uma laje para ver a variação do topo.' : 'Sem inclinação. Use Inclinação na faixa Arquitetura e clique na planta.'}</div>
         )}
       </Group>
-      <Group title="Construção">
+      <Group title="Construção" open={false}>
         {type ? (
           <>
             <Row label="Espessura total"><span className="val">{fmt(slabTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i} style={{ minHeight: 22 }}>
+              <div className="prow" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>

@@ -15,7 +15,7 @@ export function LevelGraphicsGroup({ levelId }: { levelId: Id }): ReactElement {
   const hidden = GRAPHICS_CATEGORIES.filter((c) => !g.overrides[c].visible);
   const isPreset = PLAN_SCALES.includes(g.scale);
   return (
-    <Group title="Gráficos da vista">
+    <Group title="Gráficos da vista" open={false}>
       <Row label="Escala" htmlFor="lg-scale">
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <select id="lg-scale" className="select" value={isPreset ? String(g.scale) : ''} onChange={(e) => e.target.value && edit({ scale: Number(e.target.value) })} aria-label="Escala da planta">
@@ -36,7 +36,7 @@ export function LevelGraphicsGroup({ levelId }: { levelId: Id }): ReactElement {
           {PLAN_VISUAL_STYLES.map((k) => <option key={k} value={k}>{VISUAL_STYLE_LABEL[k]}</option>)}
         </select>
       </Row>
-      <Row label="Exibição parcial de estrutura" htmlFor="lg-partial">
+      <Row label="Parcial de estrutura" htmlFor="lg-partial">
         <select id="lg-partial" className="select" value={g.partialStructure} onChange={(e) => edit({ partialStructure: e.target.value as ViewGraphics['partialStructure'] })}>
           {(Object.keys(PARTIAL_LABEL) as Array<keyof typeof PARTIAL_LABEL>).map((k) => <option key={k} value={k}>{PARTIAL_LABEL[k]}</option>)}
         </select>

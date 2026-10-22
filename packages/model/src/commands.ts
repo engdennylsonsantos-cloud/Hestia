@@ -55,6 +55,7 @@ import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts
 import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
 import { applyRoomCommand } from './roomCommands.ts';
+import { applyOutlineCommand } from './outlineCommands.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -83,6 +84,8 @@ export type Command =
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
   | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Room> }
+  | { type: 'detachOutline'; id: Id }
+  | { type: 'relinkOutline'; id: Id }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -176,8 +179,8 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   const idMap = c.copy?.idMap;
   transformEach(p, c, isRoof, transformRoof);
   transformEach(p, c, isStair, transformStair);
-  transformEach(p, c, isSlab, transformSlab);
-  transformEach(p, c, isFloor, transformFloor);
+  transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
+  transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
   transformEach(p, c, isCeiling, transformCeiling);
   transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
@@ -207,7 +210,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
 }
 
 export function applyCommand(p: Project, c: Command): void {
-  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c)) return;
+  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c) || applyOutlineCommand(p, c)) return;
   switch (c.type) {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };

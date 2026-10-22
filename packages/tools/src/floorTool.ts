@@ -1,5 +1,5 @@
 import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { isFloor, makeFloor, type Floor, type Id, type Project } from '@hestia/model';
+import { isFloor, makeFloor, type Floor, type Id, type OutlineSource, type Project } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { enclosedRooms, outerPerimeter, roomAt } from './enclosed.ts';
 import { ringAreaAbs, ringPerimeter, selectedFloors } from './floorPick.ts';
@@ -178,7 +178,8 @@ export class FloorTool extends ToolBase {
       this.env.say(this.outside ? 'Não há edificação neste ponto' : 'Não há área fechada por paredes neste ponto');
       return;
     }
-    this.commit(region[0]!, region.slice(1));
+    const mode: OutlineSource['mode'] = this.outside ? 'perimeter' : this.env.options().floorCore ? 'walls-core' : 'walls-finish';
+    this.commit(region[0]!, region.slice(1), { mode, seed: p.raw, linked: true });
   }
 
   private clickPerimeter(p: PointerInfo): void {
@@ -187,7 +188,7 @@ export class FloorTool extends ToolBase {
       this.env.say('Não há parede perto deste ponto.');
       return;
     }
-    this.commit(ring);
+    this.commit(ring, [], { mode: 'perimeter', seed: p.raw, linked: true });
   }
 
   private clickRect(p: PointerInfo): void {
@@ -264,7 +265,7 @@ export class FloorTool extends ToolBase {
   }
 
   /** Cria o piso no nível ativo com o tipo e o deslocamento das opções, e o deixa selecionado. */
-  private commit(boundary: Ring, holes: Ring[] = []): void {
+  private commit(boundary: Ring, holes: Ring[] = [], outline?: OutlineSource): void {
     const o = this.env.options();
     const p = this.env.project();
     const typeId = p.floorTypes[o.floorTypeId] ? o.floorTypeId : Object.keys(p.floorTypes)[0];
@@ -273,7 +274,7 @@ export class FloorTool extends ToolBase {
       return;
     }
     const id = makeId('f');
-    this.env.exec({ type: 'addFloor', floor: makeFloor({ id, typeId, levelId: this.env.levelId(), boundary, holes, heightOffset: o.floorOffset }) });
+    this.env.exec({ type: 'addFloor', floor: makeFloor({ id, typeId, levelId: this.env.levelId(), boundary, holes, heightOffset: o.floorOffset, ...(outline ? { outlineSource: outline } : {}) }) });
     this.env.setSelection([id]);
     const area = multiArea([[boundary, ...holes]]);
     this.env.say(`Piso criado: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);

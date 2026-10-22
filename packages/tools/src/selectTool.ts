@@ -11,6 +11,7 @@ import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
 import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
+import { commitOutlineBoundary } from './outlineEdit.ts';
 import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
@@ -187,7 +188,7 @@ export class SelectTool extends ToolBase {
       this.env.say(`${isSlab(f) ? 'Uma laje' : isRoof(f) ? 'Um telhado' : 'Um piso'} precisa de ao menos 3 vértices.`);
       return true;
     }
-    if (isRoof(f)) commitRoofPatch(this.env, [f.id], roofRingPatch(f, ring, { kind: 'remove', vertex: this.focus.index })); else this.env.exec({ type: 'updateElements', ids: [f.id], patch: { boundary: ring } });
+    if (isRoof(f)) commitRoofPatch(this.env, [f.id], roofRingPatch(f, ring, { kind: 'remove', vertex: this.focus.index })); else commitOutlineBoundary(this.env, f.id, ring);
     this.focus = { id: f.id, index: Math.min(this.focus.index, ring.length - 1) };
     this.env.say('Vértice removido. Ctrl+Z desfaz.');
     return true;

@@ -1,17 +1,21 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import { type Ceiling, type Floor, type Slab } from './types.ts';
 
+/** Solta o vínculo do contorno quando o elemento é movido/girado/espelhado (a cópia herda a origem; decisão 0023 §8.2b). */
+const detach = <T extends { outlineSource?: { linked: boolean } }>(e: T, copy: boolean): T =>
+  !copy && e.outlineSource?.linked ? { ...e, outlineSource: { ...e.outlineSource, linked: false } } : e;
+
 /** Move/gira/espelha um piso; espelhar inverte o sentido do contorno (a orientação não importa ao motor, mas fica estável). */
-export function transformFloor(f: Floor, t: Transform): Floor {
+export function transformFloor(f: Floor, t: Transform, copy = false): Floor {
   const pts = (ring: Vec2[]): Vec2[] => {
     const out = ring.map((q) => applyTransform(t, q));
     return t.kind === 'mirror' ? out.reverse() : out;
   };
-  return { ...f, boundary: pts(f.boundary), holes: f.holes.map(pts) };
+  return detach({ ...f, boundary: pts(f.boundary), holes: f.holes.map(pts) }, copy);
 }
 
 /** Move/gira/espelha uma laje: contorno, furos e a linha de inclinação (origem e direção). */
-export function transformSlab(s: Slab, t: Transform): Slab {
+export function transformSlab(s: Slab, t: Transform, copy = false): Slab {
   const pts = (ring: Vec2[]): Vec2[] => {
     const out = ring.map((q) => applyTransform(t, q));
     return t.kind === 'mirror' ? out.reverse() : out;
@@ -25,7 +29,7 @@ export function transformSlab(s: Slab, t: Transform): Slab {
     const l = Math.hypot(dx, dy) || 1;
     slope = { origin: o, dir: { x: dx / l, y: dy / l }, percent: slope.percent };
   }
-  return { ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope };
+  return detach({ ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope }, copy);
 }
 
 /** Move/gira/espelha um forro: contorno e furos (o nível e a cota não mudam). */

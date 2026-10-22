@@ -185,6 +185,10 @@ export function labelOf(c: Command): string {
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':
       return 'Alterar propriedades';
+    case 'detachOutline':
+      return 'Soltar contorno das paredes';
+    case 'relinkOutline':
+      return 'Revincular contorno às paredes';
     case 'setWallEnds':
       return 'Ajustar parede';
     case 'setJoin':

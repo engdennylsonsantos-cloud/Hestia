@@ -12,6 +12,8 @@ export * from './bandFuse.ts';
 export * from './floors.ts';
 export * from './floorQuantities.ts';
 export * from './floorSchedule.ts';
+export * from './enclosed.ts';
+export * from './outlineBound.ts';
 export * from './wallZ.ts';
 export * from './faces.ts';
 export * from './slabs.ts';

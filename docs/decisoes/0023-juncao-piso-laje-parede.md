@@ -248,6 +248,8 @@ Tags: `[DOC]` para núcleo, hierarquia e linha quando a função casa com materi
 | P8. Contorno por camada | `floors.ts`, `slabs.ts` (`layerExtent`), `floorQuantities.ts:52-55`, `slabQuantities.ts:69-72`, `plan/floors.ts`, `plan/slabs.ts`, `section.ts:193-257`, `model3d/solids.ts:393-446` | P1, P3, P7 | G |
 | P9. Parede anexada por trecho | `wallZ.ts` (61-130), `layerGeom.ts` (`withProfile`, 230), `types.ts:166-168` (`bottomProfile`), `Properties.tsx` (controles e aviso) | P3 | G |
 
+**Status (2026-10-22): P1 concluída** — contorno associativo no modelo (`outlineSource?` em `Floor`/`Slab`), migração v18→v19 (só avança a versão, pisos/lajes antigos viram estáticos), comandos `detachOutline`/`relinkOutline`, motor (`resolveBoundary`; circuitos movidos de `tools/enclosed.ts` para `engine/enclosed.ts`, com cache por nível) e ferramentas (Piso/Laje gravam a origem; alças de vértice soltam o vínculo). P2 e P3 seguem pendentes.
+
 Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P4. P7 depois de P5. P8 depois de P7. P9 depois de P3. O contorno associativo vem antes do corte por camada, como pede o dono.
 
 ## 11. Riscos e compatibilidade

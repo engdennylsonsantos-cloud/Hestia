@@ -6,6 +6,7 @@ export * from './ids.ts';
 export * from './defaults.ts';
 export * from './commands.ts';
 export * from './history.ts';
+export * from './outlineCommands.ts';
 export * from './migrate.ts';
 export * from './templates.ts';
 export * from './wall.ts';

@@ -65,7 +65,7 @@ sobram são não bloqueantes (ver "Pendências").
 - Contorno derivado do circuito fechado pelas paredes do nível; ferramenta **Ambiente** (**Z**) e "Ambientes em todos os
   circuitos fechados"; área líquida, perímetro e volume; tabela com filtros e CSV; DXF nas camadas `AMBIENTES` e `AMBIENTES_TEXTO`.
 
-**Forros e planta de forro** — 32 feitos, 1 fora de escopo, 0 pendentes (`docs/paridade/forros.md`; decisão 0021).
+**Forros e planta de forro** — 33 feitos, 0 fora de escopo, 0 pendentes (`docs/paridade/forros.md`; decisão 0021).
 - Forro por contorno, retângulo ou "No ambiente"; botão **"Forro em todos os ambientes"** (um Ctrl+Z); cota do topo
   (padrão 2,60 m); tipos em camadas (gesso 12,5 mm, PVC, laje aparente).
 - **Planta de forro** em "Direção da vista → Para cima"; 3D, corte, quantitativos por camada, tabela e CSV; DXF na camada `FORRO`.
@@ -104,8 +104,8 @@ sobram são não bloqueantes (ver "Pendências").
 - **Símbolo de giro**: em "V" (convenção própria: a NBR 6492:2021 é paga e não foi acessada; 0024 §2).
 - **Junções**: "Inverter corte/Não cortar" por par (P-4, adiada; 0023 §13 e P10).
 - **Ambientes**: sem geometria 3D própria (D2); sem linha separadora (A5); sem piso de acabamento gerado (C3).
-- **Forros**: o forro grava o contorno do ambiente na criação (0021 §4). A decisão do dono de 2026-10-22 (0023 §13, P-5)
-  manda o forro criado a partir de ambiente acompanhar o contorno dele; essa mudança não está implementada.
+- **Forros**: o forro criado a partir de ambiente acompanha o contorno dele (0021 §4; decisão P-5 de 2026-10-22, 0023 §13),
+  implementada: soltar (alça, propriedade ou mover) e revincular ao ambiente no painel "Contorno".
 - **Pranchas**: carimbo com logotipo e campos personalizados, modelos (E1); quantitativos na prancha (E2); imagem do 3D (B5);
   pan (D7).
 - **Paredes**: parede inclinada (A6), espessura variável (A9), contorno vertical livre (A10), regiões gráficas na elevação
@@ -172,7 +172,7 @@ Os fluxos de navegador estão em `tests/e2e/*.mjs` (22 fluxos; `helpers.mjs` é 
 ## Qualidade e verificação
 
 - Checklists (feitos + fora de escopo + pendentes): paredes 67+15+1, pisos 40+7+1, lajes 38+3+1, telhados 43+1+0,
-  escadas 36+4+0, aberturas 35+7+0, ambientes 24+4+0, forros 32+1+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
+  escadas 36+4+0, aberturas 35+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
 - `npm run test:rapido` em 2026-10-22: 264 arquivos e 3276 testes, todos passando (72,8 s; `test:rapido`, sem property e perf).
 - `npm run test:completo` em 2026-10-22: 265 arquivos e 3578 testes, todos passando, com as 60 sementes (590 s, código de saída 0).

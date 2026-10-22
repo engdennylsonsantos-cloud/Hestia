@@ -9,7 +9,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 - [x] A2 Cota do topo (`heightOffset`, padrão 2,60 m); face inferior derivada das camadas **(bloqueante)**
 - [x] A3 Tipos de forro com camadas (gesso 12,5 mm, PVC, laje aparente) em `ceilingTypes`, com migração v17 → v18
 - [x] A4 Vínculo com o ambiente de origem (`roomId`), contorno gravado na criação
-- [-] A5 Contorno que acompanha o ambiente depois de criado: o forro grava o contorno (decisão 0021, §4)
+- [x] A5 Contorno que acompanha o ambiente depois de criado: forro com `roomId` segue o contorno do ambiente; soltar e revincular no painel "Contorno" (decisão 0023 §13, P-5; decisão 0021, §4). Evidência: `ceilingRoom.test.ts`, `ceilingRoomLink.test.ts`, `ceilingRoomEdit.test.ts`, `CeilingOutlineGroup.test.ts` e `tests/e2e/forro-ambiente.mjs`
 
 ## B · Motor
 - [x] B1 `resolveCeilings`: contorno, cota do topo, face inferior e camadas **(bloqueante)**

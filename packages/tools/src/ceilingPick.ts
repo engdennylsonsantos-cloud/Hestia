@@ -1,5 +1,5 @@
 import { dist, pointInMulti, type Vec2 } from '@hestia/geom';
-import { ceilingOutline, resolveCeilings } from '@hestia/engine';
+import { ceilingOutline, resolveCeilings, roomsById, type RoomsById } from '@hestia/engine';
 import { isCeiling, viewRangeOf, type Id, type Project } from '@hestia/model';
 
 /**
@@ -11,11 +11,12 @@ export function pickCeilingAt(p: Project, levelId: Id, at: Vec2, mpp: number): I
   if (viewRangeOf(p, levelId).direction !== 'up') return null;
   const tol = 4 * mpp;
   const list = resolveCeilings(p, levelId);
+  const rooms = roomsById(p, levelId);
   for (let i = list.length - 1; i >= 0; i--) {
     const c = list[i]!;
     if (pointInMulti(at, c.polygon)) return c.ceilingId;
     const e = p.elements[c.ceilingId];
-    if (isCeiling(e) && ceilingOutline(p, e).boundary.some((a, k, r) => distToSeg(at, a, r[(k + 1) % r.length]!) <= tol)) return c.ceilingId;
+    if (isCeiling(e) && ceilingOutline(p, e, rooms).boundary.some((a, k, r) => distToSeg(at, a, r[(k + 1) % r.length]!) <= tol)) return c.ceilingId;
   }
   return null;
 }
@@ -34,7 +35,11 @@ export interface CeilingGrip {
  */
 export function ceilingGripAt(p: Project, ids: Id[], at: Vec2, mpp: number): CeilingGrip | null {
   const tol = 9 * mpp;
-  const rings = ids.map((id) => p.elements[id]).filter(isCeiling).map((c) => ({ id: c.id, r: ceilingOutline(p, c).boundary }));
+  const rooms = new Map<Id, RoomsById>();
+  const rings = ids.map((id) => p.elements[id]).filter(isCeiling).map((c) => {
+    if (!rooms.has(c.levelId)) rooms.set(c.levelId, roomsById(p, c.levelId));
+    return { id: c.id, r: ceilingOutline(p, c, rooms.get(c.levelId)).boundary };
+  });
   for (const { id, r } of rings) {
     const i = r.findIndex((q) => dist(q, at) <= tol);
     if (i >= 0) return { ceilingId: id, kind: 'vertex', index: i, at: r[i]! };

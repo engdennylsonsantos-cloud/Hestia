@@ -4,7 +4,7 @@ import { ProjectStore, createEmptyProject, makeCeiling, makeRoom, makeWall, type
 import type { Vec2 } from '@hestia/geom';
 import { ceilingGripAt } from './ceilingPick.ts';
 import { CEILING_DETACHED_MSG, commitCeilingBoundary } from './outlineEdit.ts';
-import { makeEnv } from './testEnv.ts';
+import { clickAt, makeEnv, tool } from './testEnv.ts';
 import type { ToolEnv } from './types.ts';
 
 const wall = (id: string, a: Vec2, b: Vec2) => makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a, b });
@@ -23,7 +23,7 @@ function salaComForro() {
   const msgs: string[] = [];
   const env: ToolEnv = { ...ctx.env, say: (m) => msgs.push(m) };
   env.setSelection(['c1']);
-  return { store, env, msgs };
+  return { store, env, msgs, options: ctx.options };
 }
 
 const ceilingOf = (store: ProjectStore): Ceiling => store.project.elements.c1 as Ceiling;
@@ -58,6 +58,22 @@ describe('forro que acompanha o ambiente: edição pelas alças (decisão 0023 �
     store.exec({ type: 'updateElements', ids: ['wr'], patch: { a: { x: 5, y: 0 }, b: { x: 5, y: 3 } } });
     expect(resolveCeilings(store.project, 'lv_0').find((r) => r.ceilingId === 'c1')!.problem).toBeNull();
     expect(ceilingOutline(store.project, ceilingOf(store)).boundary).toEqual(ring);
+  });
+
+  it('furo num forro que acompanha o ambiente solta o forro e grava o furo, num só desfazer', () => {
+    const { store, env, options } = salaComForro();
+    options.ceilingMode = 'hole';
+    const h = tool('ceiling', env);
+    clickAt(h, 1, 1);
+    clickAt(h, 2, 1);
+    clickAt(h, 2, 2);
+    clickAt(h, 1, 2);
+    clickAt(h, 1, 1);
+    expect(ceilingOf(store).roomLinked).toBe(false);
+    expect(ceilingOf(store).holes).toHaveLength(1);
+    store.undo();
+    expect(ceilingOf(store).roomLinked).toBeUndefined();
+    expect(ceilingOf(store).holes).toHaveLength(0);
   });
 
   it('forro desenhado à mão, sem ambiente, edita sem soltar nem avisar', () => {

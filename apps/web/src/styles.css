@@ -236,7 +236,7 @@ svg { display: block; }
 /* Faces e células não recebem o ponteiro: o palco resolve o clique pela geometria. As células continuam focáveis. */
 .vc-face { position: absolute; inset: 0; display: grid; grid-template-columns: 22% 56% 22%; grid-template-rows: 22% 56% 22%; backface-visibility: hidden; -webkit-backface-visibility: hidden; pointer-events: none; }
 /* Arestas finas e claras; o rótulo da face é pequeno e sem negrito, para não pesar sobre a vista. */
-.vc-cell { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0.5px solid var(--line-strong); background: var(--panel); color: var(--fg-soft); font-size: 6.5px; font-weight: 500; line-height: 1; letter-spacing: 0; box-sizing: border-box; pointer-events: none; white-space: nowrap; }
+.vc-cell { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0.5px solid var(--line-strong); background: var(--panel); color: var(--fg-soft); font-size: 7px; font-weight: 500; line-height: 1; letter-spacing: 0; box-sizing: border-box; pointer-events: none; white-space: nowrap; }
 .vc-cell--face { background: var(--sheet); color: var(--fg-soft); }
 /* Destaque sutil: tinta da cor de seleção do tema, sem bloco chapado. */
 .vc-cell.is-hover { background: color-mix(in srgb, var(--select) 22%, transparent); border-color: var(--select); color: var(--fg); }

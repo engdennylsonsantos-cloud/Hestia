@@ -9,6 +9,7 @@ import {
   dxfSectionLineRoleOf,
   exportDxf,
   exportSectionDxf,
+  notesDxfOf,
   type DxfLevelGeometry,
   type DxfOpening,
   type DxfPoint,
@@ -205,7 +206,9 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
           }))
       : [],
   };
-  return { ...geo, lineWeights: lineWeightsOf(p, levelId, geo) };
+  // Cotas e textos (decisão 0019) seguem a visibilidade da categoria 'anotação' e a escala da vista.
+  const withNotes: DxfLevelGeometry = { ...geo, ...(shown('annotation') ? { notes: notesDxfOf(p, levelId, vg.scale) } : {}) };
+  return { ...withNotes, lineWeights: lineWeightsOf(p, levelId, withNotes) };
 }
 
 /** Texto DXF da planta do nível, na vista do intervalo. */

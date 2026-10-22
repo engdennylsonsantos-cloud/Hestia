@@ -5,6 +5,8 @@ export interface ResolvedLayer {
   layerIndex: number;
   materialId: Id;
   priority: number;
+  /** Camada dentro do núcleo da parede (decisão 0023 §1.2): entra na junção por camada (P7). */
+  core: boolean;
   /** Fragmento da camada depois da prioridade de junção, SEM os vãos (base do 3D). */
   fragment: MultiPolygon;
   /** Fragmento com os vãos recortados (planta). */

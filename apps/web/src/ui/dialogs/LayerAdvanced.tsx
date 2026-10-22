@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement } from 'react';
 import { FUNCTION_PRIORITY, type Layer } from '@hestia/model';
 
-const AJUDA = 'Na junção, a camada de menor número atravessa as de maior número. Camadas de mesmo número e mesmo material se fundem.';
+const AJUDA = 'Número menor = prioridade maior: a camada de menor número atravessa as de maior número. Camadas de mesmo número não se cortam e deixam linha de fronteira.';
 
 interface LayerAdvancedProps {
   /** Prefixo de id estável da linha, ex.: `wt-layer-2`. */
@@ -49,7 +49,7 @@ export function LayerAdvanced({ id, layer, onChange }: LayerAdvancedProps): Reac
   return (
     <div className="adv-panel">
       <div className="adv-row">
-        <label htmlFor={`${id}-prio`}>Prioridade de junção</label>
+        <label htmlFor={`${id}-prio`}>Prioridade de junção (sobrescreve a função)</label>
         <span className="adv-ctl">
           <input
             id={`${id}-prio`}

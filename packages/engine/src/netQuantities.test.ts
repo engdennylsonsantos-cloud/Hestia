@@ -27,16 +27,29 @@ const floorOf = (p: Project) => quantifyFloors(p, 'lv_0').floors[0]!;
 const slabOf = (p: Project) => quantifySlabs(p, 'lv_0').slabs[0]!;
 
 describe('quantitativos líquidos (decisão 0023 §4)', () => {
-  it('parede embutida em piso perde 0,0368 m³ (0,23 × 0,16) e o piso não muda', () => {
+  it('parede embutida em piso: a interseção (0,0368 m³) sai uma vez, dividida pela prioridade de camada (0023 §1, P7)', () => {
     // Parede 0,23 m × 1,00 m × 2,80 m; o piso de 0,16 m de topo cobre a base dela até essa cota.
+    // Estrutura do piso (1) e núcleo da parede (1): empate, o piso corta a parede (0,23 × 0,09 = 0,0207 m³ saem da parede).
+    // Substrato (2) e acabamento (4) do piso são cortados pelo núcleo da parede (1): 0,23 × 0,07 = 0,0161 m³ saem do piso.
     const p = build(0.23, { walls: [{}], floors: [{ heightOffset: 0.16 }] });
     const w = wallsOf(p)[0]!;
     expect(w.grossVolume).toBeCloseTo(0.644, 9);
-    expect(w.volume).toBeCloseTo(0.644 - 0.0368, 9);
-    expect(floorOf(p).volume).toBeCloseTo(6 * 0.19, 9);
+    expect(w.volume).toBeCloseTo(0.644 - 0.23 * 0.09, 9);
+    expect(floorOf(p).volume).toBeCloseTo(6 * 0.19 - 0.23 * 0.07, 9);
     expect(floorOf(p).grossVolume).toBeCloseTo(6 * 0.19, 9);
     // O total é a soma sem dobro: o volume de interseção sai uma vez só.
     expect(w.volume + floorOf(p).volume).toBeCloseTo(0.644 + 6 * 0.19 - 0.0368, 9);
+  });
+
+  it('trocar o nome e o material das camadas não muda o líquido (a regra usa atributo de camada, P-6)', () => {
+    const p = build(0.23, { walls: [{}], floors: [{ heightOffset: 0.16 }], slabs: [{ heightOffset: 0.5 }] });
+    const q = structuredClone(p);
+    for (const t of [...Object.values(q.wallTypes), ...Object.values(q.floorTypes), ...Object.values(q.slabTypes)]) {
+      for (const l of t.layers) l.materialId = `zz_${l.materialId}`;
+    }
+    expect(wallsOf(q)[0]!.volume).toBeCloseTo(wallsOf(p)[0]!.volume, 12);
+    expect(floorOf(q).volume).toBeCloseTo(floorOf(p).volume, 12);
+    expect(slabOf(q).volume).toBeCloseTo(slabOf(p).volume, 12);
   });
 
   it('laje atravessando parede: os 12 cm de laje na parede saem da parede, uma vez; a laje fica inteira', () => {
@@ -48,18 +61,17 @@ describe('quantitativos líquidos (decisão 0023 §4)', () => {
     expect(w.volume + slabOf(p).volume).toBeCloseTo(0.644 + 6 * 0.12 - 0.0276, 9);
   });
 
-  it('piso por perímetro externo: a faixa de 1,3215 m² sob a parede sai da parede pela sobreposição de cota', () => {
-    // Parede de 8,81 m × 0,15 m, de 2,80 m; o piso (topo em 0,12) tem a faixa sob ela e segue inteiro.
+  it('piso por perímetro externo: a faixa de 1,3215 m² sob a parede é dividida pela prioridade (estrutura do piso sai da parede; o resto, do piso)', () => {
+    // Parede de 8,81 m × 0,15 m, de 2,80 m; o piso (topo em 0,12) tem a faixa sob ela. Só a estrutura (cota de 0 a 0,05)
+    // é do piso por empate; substrato e acabamento (prioridades 2 e 4) cedem ao núcleo da parede (1).
     const p = build(0.15, {
       walls: [{ b: { x: 8.81, y: 0 } }],
       floors: [{ boundary: rect(-1, -1, 10, 1), heightOffset: 0.12 }],
     });
     const w = wallsOf(p)[0]!;
-    const cut = (w.grossVolume - w.volume) / 0.12;
-    expect(cut).toBeCloseTo(8.81 * 0.15, 6);
+    expect((w.grossVolume - w.volume) / 0.05).toBeCloseTo(8.81 * 0.15, 6);
     expect(floorOf(p).area).toBeCloseTo(22, 9);
-    expect(floorOf(p).netArea).toBeCloseTo(22, 9);
-    expect(floorOf(p).volume).toBeCloseTo(22 * 0.19, 9);
+    expect(floorOf(p).volume).toBeCloseTo(22 * 0.19 - 8.81 * 0.15 * 0.07, 6);
   });
 
   it('laje cortando piso: o piso perde a parte dentro da laje e a laje não perde nada', () => {
@@ -168,7 +180,7 @@ describe('tabelas: bruto e líquido só aparecem quando diferem', () => {
     const sch = buildWallSchedule(p);
     const lines = linesOf(scheduleToCsv(sch.rows, sch.totals));
     expect(lines[0]).toMatch(/Camadas \(cm\);Volume bruto \(m³\)$/);
-    expect(lines[1]).toContain(';0,607;');
+    expect(lines[1]).toContain(';0,623;');
     expect(lines[1]).toMatch(/;0,644$/);
     expect(sch.totals.grossVolume).toBeCloseTo(0.644, 9);
   });

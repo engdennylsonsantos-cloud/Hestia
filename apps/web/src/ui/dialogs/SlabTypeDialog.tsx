@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactElement } from 'react';
-import { FUNCTION_LABEL, slabTypeThickness, type Layer, type LayerFunction, type SlabType } from '@hestia/model';
+import { FUNCTION_LABEL, type Layer, type LayerFunction, type SlabType, slabTypeThickness, temPrioridadeEmpatada } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { duplicateSlabType, slabTypeDeleteBlock, slabTypeError, slabTypeUsage, tryDeleteSlabType } from '../../editor/slabTypeActions.ts';
@@ -143,6 +143,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
               </tbody>
             </table>
             <div className="total"><span>Espessura total</span><strong>{fmtCm(slabTypeThickness(draft))} cm</strong></div>
+            {temPrioridadeEmpatada(draft.layers) && <p className="hint">Há camadas de funções diferentes com a mesma prioridade: elas não se cortam e deixam linha de fronteira.</p>}
             <button className="btn small" onClick={insert}>+ Inserir camada</button>
             {error && <p className="hint" role="alert" style={{ color: 'var(--danger, #b42318)', marginTop: 8 }}>{error}</p>}
           </div>

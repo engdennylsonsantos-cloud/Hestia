@@ -30,6 +30,7 @@ import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallF
 import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
 import { endPoint, layerQuad, membranesOf, sideAt, withProfile } from './layerGeom.ts';
 import { flatEnd } from './joinSides.ts';
+import { layerCoreFlags } from './junctionPlanar.ts';
 import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
@@ -47,6 +48,8 @@ interface Item {
   layerIndex: number;
   materialId: Id;
   priority: number;
+  /** Camada dentro do núcleo da parede (0023 §1.2). */
+  core: boolean;
   order: number;
   /** Espessura do núcleo da parede: desempata camadas de mesma prioridade entre paredes sem junção (a mais robusta domina). */
   coreT: number;
@@ -105,6 +108,7 @@ function buildItems(
 ): Item[] {
   const items: Item[] = [];
   const coreT = Math.round((coreSpan(f.type).to - coreSpan(f.type).from) * 1e6) / 1e6;
+  const coreFlags = layerCoreFlags(f.type.layers);
   const endWraps = new Map<number, MultiPolygon>();
   if (f.type.wrapEnds !== 'none') {
     for (const which of freeEnds) {
@@ -117,6 +121,7 @@ function buildItems(
       layerIndex,
       materialId,
       priority,
+      core: layerIndex >= 0 && (coreFlags[layerIndex] ?? false),
       order: f.wall.order,
       coreT,
       through,
@@ -352,7 +357,7 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
     const bands = bandsOf.get(it) ?? [];
     if (!fragment.length && bands.length === 0) continue;
     const arr = layers.get(it.wallId) ?? [];
-    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, fragment, cut, bands, raw: it.shape });
+    arr.push({ layerIndex: it.layerIndex, materialId: it.materialId, priority: it.priority, core: it.core, fragment, cut, bands, raw: it.shape });
     layers.set(it.wallId, arr);
     if (cut.length) byMaterial.set(it.materialId, [...(byMaterial.get(it.materialId) ?? []), cut]);
   }

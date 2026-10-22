@@ -9,7 +9,7 @@ import { FUNCTION_PRIORITY } from './priority.ts';
 export const isMembraneLayer = (l: Layer): boolean => l.function === 'membrane' || l.thickness < 1e-6;
 
 /**
- * Prioridade de junção da membrana (decisão 0023 §1.1, aprovada em P-1). Ainda sem efeito: a junção com parede entra
- * na fase P7.
+ * Prioridade de junção da membrana (decisão 0023 §1.1, aprovada em P-1). Usada pelo resolvedor de junção piso/laje ×
+ * parede (P7); sem ela a face de espessura zero não corta nem é cortada por volume.
  */
 export const MEMBRANE_PRIORITY: number = FUNCTION_PRIORITY.membrane;

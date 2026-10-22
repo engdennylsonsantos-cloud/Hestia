@@ -27,6 +27,8 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] C4 Contorno associativo (motor): laje pelo perímetro externo guarda a origem e o contorno é derivado no motor — acompanha as paredes (decisão 0023 §8.2)
 - [x] C5 Vínculo do contorno na interface (P2 e P3): grupo "Contorno" com estado, "Desvincular" e "Revincular às paredes" (um passo de desfazer); aviso `contorno-aberto` com "Ir para"; barra de status ao soltar por edição de vértice. Evidência: `packages/engine/src/outlineIssues.test.ts`, `apps/web/src/ui/OutlineGroup.test.ts`, `packages/tools/src/outlineEdit.test.ts`, e2e `tests/e2e/contorno.mjs` (piso; laje segue o mesmo grupo e o mesmo aviso)
 - [x] C6 Piso sobre a laje com camada estrutural avisa `piso-estrutura-sobre-laje` (decisão 0023 P5); o acabamento usa `ft_acab`
+- [x] C7 Laje × parede e laje × piso por prioridade de camada nos quantitativos (0023 §1, P7); testes em `netQuantities.test.ts`
+- [ ] C8 Laje × parede e laje × piso por prioridade na planta, no corte e no 3D (0023 P7)
 
 ## D · Vistas
 - [x] D1 Planta: laje vista de cima com hachura do material estrutural, atrás das paredes; laje do nível abaixo como subpavimento **(bloqueante)**

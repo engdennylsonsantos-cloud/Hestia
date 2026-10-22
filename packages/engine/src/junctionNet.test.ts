@@ -56,3 +56,30 @@ describe('volume de interseção entre pedaços', () => {
     expect(multiArea(sq(0, 0, 2, 2))).toBe(4);
   });
 });
+
+describe('corte por prioridade de camada (0023 §1, P7)', () => {
+  const withMeta = (poly: MultiPolygon, z0: number, z1: number, meta: SolidPiece['meta']): SolidPiece => ({ ...flatPiece(poly, z0, z1), meta });
+
+  it('com atributos, a camada de prioridade menor corta a de número maior; a de número maior não corta a outra', () => {
+    const core = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'wall', priority: 1, core: true, owner: 'w1' });
+    const acab = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'floor', priority: 4, core: false, owner: 'f1' });
+    const cutters: CutterSolid[] = [{ kind: 'wall', pieces: [core] }];
+    expect(cutVolume(acab, 'floor', cutters)).toBeCloseTo(4, 9);
+    expect(cutVolume(core, 'wall', [{ kind: 'floor', pieces: [acab] }])).toBe(0);
+  });
+
+  it('a camada não corta as outras camadas do próprio elemento', () => {
+    const own1 = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'floor', priority: 1, core: true, owner: 'f1' });
+    const own2 = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'floor', priority: 4, core: false, owner: 'f1' });
+    expect(cutVolume(own2, 'floor', [{ kind: 'floor', pieces: [own1] }])).toBe(0);
+  });
+
+  it('empate de prioridade: a laje corta o piso, e a camada de mesmo tipo e prioridade não corta', () => {
+    const floor = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'floor', priority: 3, core: false, owner: 'f1' });
+    const slab = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'slab', priority: 3, core: false, owner: 's1' });
+    const other = withMeta(sq(0, 0, 2, 2), 0, 1, { kind: 'floor', priority: 3, core: false, owner: 'f2' });
+    expect(cutVolume(floor, 'floor', [{ kind: 'slab', pieces: [slab] }])).toBeCloseTo(4, 9);
+    expect(cutVolume(floor, 'floor', [{ kind: 'floor', pieces: [other] }])).toBe(0);
+  });
+});
+

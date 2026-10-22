@@ -1,6 +1,7 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveSlabs, type ResolvedSlab } from './slabs.ts';
+import { coveredFaceArea, cutVolume, floorCutters, slabCutters, slabLayerPiece, wallCutters, type CutterSolid } from './junctionNet.ts';
 
 /**
  * Uma camada de uma laje. A espessura é vertical e igual em todo o plano (a camada acompanha a inclinação), então o
@@ -64,20 +65,25 @@ const ringLength = (r: Vec2[]): number => r.reduce((s, p, i) => s + dist(p, r[(i
 /** Área real sobre área em planta de um plano com esse percentual: 1 / cos(atan(|percentual| / 100)). */
 const slopeFactor = (percent: number): number => 1 / Math.cos(Math.atan(Math.abs(percent) / 100));
 
-function quantifySlab(rs: ResolvedSlab): { slab: SlabQuantity; layers: SlabLayerQuantity[] } {
+function quantifySlab(rs: ResolvedSlab, cutters: readonly CutterSolid[]): { slab: SlabQuantity; layers: SlabLayerQuantity[] } {
   const planArea = multiArea(rs.polygon);
   const slopePercent = rs.slope?.percent ?? 0;
   const faceArea = planArea * slopeFactor(slopePercent);
   const layers = rs.layers.map<SlabLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
+    // Piso e laje mais prioritários (0023 §1, P7) tiram o volume que ocupam; a membrana tira a área de face.
+    const piece = slabLayerPiece(rs, l);
+    const gross = planArea * thickness;
+    const volume = l.membrane ? 0 : Math.max(0, gross - cutVolume(piece, 'slab', cutters));
+    const layerFace = l.membrane ? Math.max(0, faceArea - coveredFaceArea(piece, 'slab', cutters)) : gross > 0 ? faceArea * (volume / gross) : faceArea;
     return {
       slabId: rs.slabId,
       layerIndex: l.layerIndex,
       materialId: l.materialId,
       thickness,
       planArea,
-      faceArea,
-      volume: l.membrane ? 0 : planArea * thickness,
+      faceArea: layerFace,
+      volume,
       membrane: l.membrane,
     };
   });
@@ -108,8 +114,9 @@ export function quantifySlabs(p: Project, levelId: Id): SlabQuantities {
   const layers: SlabLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
+  const cutters = [...floorCutters(p, levelId), ...slabCutters(p, levelId), ...wallCutters(p, levelId)];
   for (const rs of resolveSlabs(p, levelId)) {
-    const q = quantifySlab(rs);
+    const q = quantifySlab(rs, cutters);
     slabs.push(q.slab);
     for (const l of q.layers) {
       layers.push(l);

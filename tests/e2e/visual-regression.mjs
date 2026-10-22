@@ -74,12 +74,16 @@ const ROOF_CASES = {
   'telhado-empena': [...wallsOf(RECT_WALLS), E('t1', RECT_EAVE, [30, null, 30, null])],
 };
 
+// D6 (ambientes, G6): ambiente com circuito fechado nas paredes de 8 × 6 m, com nome, número e área na etiqueta.
+const RM = (id, extra = {}) => ({ id, kind: 'room', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 4, y: 3 }, heightOffset: 0, floorFinish: '', wallFinish: '', ceilingFinish: '', ...extra });
+const ROOM_CASES = { 'ambiente-sala': [...wallsOf(RECT_WALLS), RM('r1')] };
+
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES })) {
   await page.evaluate((ws) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
     editor.zoomExtents();
   }, items);
   await page.waitForTimeout(250);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
-import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
+import { resolveFloors, resolveRooms, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
@@ -184,6 +184,7 @@ export function ViewportCanvas(): ReactElement {
                 belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
                 belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
                 belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
+                belowRooms: below ? resolveRooms(p, p.levels[idx - 1]!.id) : undefined,
                 viewport: v,
                 theme,
                 dark,

@@ -52,15 +52,15 @@ interface Seg {
 
 /** Separadores sem parede: a planta de B fecha cômodos que a tabela de paredes deixa abertos (passagens e pé da escada). */
 const SEPARADORES_TERREO: Seg[] = [
-  // Passagem entre vestíbulo e hall, ancorada em T-I-05 (agora x = 6,854 — DEC-3): a linha do pé da escada e a da passagem.
+  // Passagem entre vestíbulo e hall, ancorada em T-I-05 (x = 6,854 — DEC-3): a linha do pé da escada e a da passagem.
   { a: P(6.854, 2.0), b: P(8.9, 2.0) },
   { a: P(5.5, 2.0), b: P(6.854, 2.0) },
-  // Lado do lance no trecho de passagem livre (y 5,9 a 6,56).
-  { a: P(6.854, 5.9), b: P(6.854, 6.56) },
+  // Lado do lance no trecho de passagem livre (y 5,9 a 6,63, até T-I-06 afastada pela DEC-4).
+  { a: P(6.854, 5.9), b: P(6.854, 6.63) },
 ];
 const SEPARADORES_PAV2: Seg[] = [
-  // Borda do vazio da escada no topo do lance (ligação com o corredor).
-  { a: P(5.5, 6.56), b: P(6.7, 6.56) },
+  // Borda do vazio da escada no topo do lance (ligação com o corredor), até a face de S-I-05 (x 6,854, DEC-4).
+  { a: P(5.5, 6.56), b: P(6.854, 6.56) },
 ];
 
 /**
@@ -138,17 +138,20 @@ const COMODOS_TERREO: Array<[string, Vec2, number]> = [
   ['despensa', P(2.75, 10.5), 11.0],
   ['área de serviço', P(2.75, 12.75), 13.75],
   ['vestíbulo', P(7.8, 1.0), 6.8],
-  ['hall', P(7.8, 4.0), 9.32976],
-  ['escada (projeção)', P(6.1, 4.0), 6.17424],
+  // DEC-4: T-I-06 em y 6,63 (era 6,56). hall = 2,046 × 4,63 (era 9,32976); escada = 1,354 × 4,63 (era 6,17424).
+  ['hall', P(7.8, 4.0), 9.47298],
+  ['escada (projeção)', P(6.192, 4.0), 6.26902],
   ['lavabo', P(9.85, 1.0), 3.8],
   ['sala de estar (em L)', P(10.0, 6.0), 25.84],
-  ['sala de jantar', P(7.2, 8.5), 13.056],
+  // DEC-4: sala de jantar = 3,40 × (10,40 − 6,63) = 12,818 (era 13,056, com T-I-06 em 6,56).
+  ['sala de jantar', P(7.2, 8.5), 12.818],
 ];
 const COMODOS_PAV2: Array<[string, Vec2, number]> = [
   ['SUÍTE MASTER (NE, quarto)', P(9.9, 10.9), 23.4],
   ['SUÍTE 3 (SE, quarto)', P(10.3, 3.3), 18.696],
   ['banheiro da SUÍTE 3', P(7.2, 1.6), 10.88],
-  ['closet da SUÍTE 3', P(7.8, 4.9), 7.392],
+  // DEC-4: closet da SUÍTE 3 = 2,046 × 3,36 (era 2,20 × 3,36 = 7,392), com S-I-05 em x 6,854.
+  ['closet da SUÍTE 3', P(7.8, 4.9), 6.87456],
   ['SUÍTE 2 (quarto)', P(2.75, 9.6), 20.57],
   ['banheiro da SUÍTE 2', P(1.4, 12.75), 7.0],
   ['closet da SUÍTE 2', P(4.1, 12.75), 6.75],
@@ -156,7 +159,8 @@ const COMODOS_PAV2: Array<[string, Vec2, number]> = [
   ['banheiro da SUÍTE MASTER', P(6.75, 12.0), 10.0],
   ['home office', P(2.75, 3.25), 36.08],
   ['corredor íntimo', P(3.0, 7.16), 14.1],
-  ['vazio da escada (projeção)', P(6.1, 4.9), 4.032],
+  // DEC-4: vazio da escada = 1,354 × 3,36 (era 1,20 × 3,36 = 4,032), entre S-I-02 (x 5,5) e S-I-05 (x 6,854).
+  ['vazio da escada (projeção)', P(6.192, 4.9), 4.54944],
 ];
 
 /** Contorno externo: união das faces de todas as paredes do grupo principal, sem os vãos (fragment). */
@@ -322,22 +326,13 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
     const e = st!.riserHeight;
     expect(2 * e + 0.285).toBeGreaterThan(0.63);
     expect(2 * e + 0.285).toBeLessThan(0.64);
-    // A invasão nas paredes é o problema de partido da seção 5, conferido no teste seguinte.
-    expect(stairValidationIssues(p).filter((i) => i.code !== 'stair-wall-overlap')).toEqual([]);
+    // Sem nenhum aviso de escada, inclusive `stair-wall-overlap` (DEC-4; ver o teste seguinte).
+    expect(stairValidationIssues(p)).toEqual([]);
   });
 
-  it('stair-wall-overlap: a escada invade T-I-01 (0,42 m²) e T-I-06 (0,07 m²) hoje (guarda da parte 2)', () => {
+  it('stair-wall-overlap: o lance não invade parede nenhuma (DEC-4: lance em x 5,592 a 6,792; T-I-06 em y 6,63)', () => {
     const p = project();
-    const list = stairValidationIssues(p).filter((i) => i.code === 'stair-wall-overlap');
-    expect(list.map((i) => i.ids?.[1]).sort()).toEqual(['T-I-01', 'T-I-06']);
-    for (const i of list) expect(i.elementId).toBe('ES-01');
-    const areaOf = (wallId: string): number => {
-      const hit = list.find((i) => i.ids?.[1] === wallId)!;
-      const m = /em (\d+,\d+) m²/.exec(hit.message);
-      return m ? Number(m[1]!.replace(',', '.')) : NaN;
-    };
-    expect(areaOf('T-I-01')).toBeCloseTo(0.42, 2);
-    expect(areaOf('T-I-06')).toBeCloseTo(0.07, 2);
+    expect(stairValidationIssues(p).filter((i) => i.code === 'stair-wall-overlap')).toEqual([]);
   });
 
   it('o lance do modelo é o mesmo croqui de generateStraightRun (eixo 6,10; 2,00, subindo para o norte)', () => {
@@ -346,7 +341,7 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
     if (!st || st.kind !== 'stair') throw new Error('escada não encontrada');
     const run = st.components[0];
     if (!run || !('boundaryLeft' in run)) throw new Error('lance não encontrado');
-    const ref = generateStraightRun({ start: P(6.1, 2.0), dir: P(0, 1), width: 1.2, risers: 17, tread: 0.285 });
+    const ref = generateStraightRun({ start: P(6.192, 2.0), dir: P(0, 1), width: 1.2, risers: 17, tread: 0.285 });
     const ordena = (cs: Array<{ a: Vec2; b: Vec2 }>): number[] => cs.flatMap((c) => [c.a.x, c.a.y, c.b.x, c.b.y]).sort((x, y) => x - y);
     for (const [k, v] of [
       ['boundaryLeft', run.boundaryLeft],
@@ -377,14 +372,14 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
     };
     const salas = {
       'banheiro da SUÍTE 3': dentro(5.5, 0, 8.9, 3.2),
-      'closet da SUÍTE 3': dentro(6.7, 3.2, 8.9, 6.56),
+      'closet da SUÍTE 3': dentro(6.854, 3.2, 8.9, 6.56),
       'home office': dentro(0, 0, 5.5, 6.56),
     };
     for (const [nome, pts] of Object.entries(salas)) {
       expect(pts.every((q) => pointInMulti(q, laje!.polygon)), `${nome} invadido pelo furo`).toBe(true);
     }
-    // O vazio está na projeção da escada: o centro do lance (6,10; 4,9) não pode estar na laje.
-    expect(pointInMulti(P(6.1, 4.9), laje!.polygon)).toBe(false);
+    // O vazio está na projeção da escada: o centro do lance (6,192; 4,9) não pode estar na laje.
+    expect(pointInMulti(P(6.192, 4.9), laje!.polygon)).toBe(false);
   });
 
   it('laje sob o pavimento 2 a 2,83 m; paredes do térreo com topo nessa cota', () => {

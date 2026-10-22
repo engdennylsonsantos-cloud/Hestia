@@ -28,6 +28,8 @@ describe('tipos de laje: uso, exclusão e substituição (B4)', () => {
     expect(slabTypeDeleteBlock(store.project, 'ls_mac15')).toBeNull();
     store.exec({ type: 'deleteSlabType', id: 'ls_mac15' });
     store.exec({ type: 'deleteSlabType', id: 'ls_cobertura' });
+    // O catálogo ganhou `ls_unica` (decisão 0025): também sai para que `ls_mac12` seja o último tipo.
+    store.exec({ type: 'deleteSlabType', id: 'ls_unica' });
     expect(slabTypeDeleteBlock(store.project, 'ls_mac12')).toContain('único');
   });
 

@@ -87,6 +87,10 @@ Hoje há um contorno por elemento, igual para todas as camadas (`floors.ts:47-54
 | `núcleo` | Até o núcleo da parede |
 | `face de acabamento` | Até a face de acabamento da parede |
 | deslocamento em cm | Positivo avança sobre a parede; negativo recua. Referência proposta: face de acabamento (ponto aberto, §9.4) |
+| `passa` | Passa por baixo da parede: sem recorte (**0025**) |
+| `até a prioridade ≤ N` | Para na primeira camada da parede de prioridade efetiva ≤ N, de fora para dentro (1 a 9). Sem camada assim, a parede é `passa` (**0025**) |
+
+Status (0025, P10): as regras `face`, `nucleo`, `passa` e `até a prioridade ≤ N` valem para piso e laje estáticos e vinculados, recortam o piso pelas paredes do nível (e pelas de níveis vizinhos, na laje), e o término segue a junção por prioridade contra paredes só nas camadas sem regra. O piso único (`ft_unico`) e a laje única (`ls_unica`) usam essas regras. Vãos de porta que chegam ao piso não entram na zona bloqueada. O recorte da parede pela camada nos desenhos continua pendente (0025 §9).
 
 Com o núcleo do piso na camada estrutural, `auto` reproduz a tabela anterior: estrutura até o núcleo; substrato, acabamento e membrana até a face. `[INFERIDO]`
 
@@ -352,6 +356,9 @@ Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P
 - **Testes.** `wallFloorProfile.test.ts` (metade coberta com valores à mão; parede toda coberta e sem cobertura iguais ao ajuste anterior; laje inclinada; topo por trecho; dez sementes), `wallFloorIssues.test.ts`, `wallFloorSection.test.ts`, `packages/render/src/model3d/wallFloorSolids.test.ts`, `wallFloorActions.test.ts` e `issuesView.test.ts` (grupo de informação). Nenhum teste existente foi alterado.
 - **Regressão visual** (`tests/e2e/visual-regression.mjs`, sem `--update`). Os 26 casos atuais em 0,000%. Caso novo `parede-base-piso-metade` (baseline criada e conferida). A planta não mostra o degrau; ele aparece no corte, no 3D e nos quantitativos.
 - **Fora da P9.** (1) O lado da parede: a parede não é recortada pela camada de piso ou laje que vence (E3 de paredes, C6 de pisos, C8 de lajes), como antes. (2) O IFC exporta a parede como caixa, da base mínima ao topo máximo, como já fazia com perfil superior. (3) Abertura: o peitoril vale a partir da base mínima e a área de abertura usa a altura média. (4) Dentro de um trecho coberto por laje inclinada a base usa a cota do ponto médio do trecho (aproximação; o degrau é menor que a inclinação vezes meio trecho). (5) Parede curva não tem base por trecho.
+
+
+**Status da P10 (0025, 2026-10-22, feita).** Término por camada no piso e na laje única: `termino` ganha `passa` e `{ ate: { prioridade } }`, e a região de cada camada com regra é o contorno menos a zona bloqueada das paredes (0025 §1 e §2). Piso único `ft_unico` e laje única `ls_unica` no catálogo padrão. Planta (preenchimento da camada de topo), corte, 3D e quantitativos usam o multipolígono da camada. Fora da P10: recorte da parede pela camada nos desenhos (C6 de pisos, C8 de lajes), DXF e IFC por camada e cor por camada na planta (0025 §9). As decisões 1 a 10 não mudam.
 
 ## 11. Riscos e compatibilidade
 

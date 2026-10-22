@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea, type MultiPolygon } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeFloor, makeWall, type Layer, type LayerTermino, type Project } from '@hestia/model';
+import { junctionLevel } from './junctionLevel.ts';
 import { resolveFloors } from './floors.ts';
 import { quantifyFloors } from './floorQuantities.ts';
 
@@ -143,6 +144,21 @@ describe('piso único: término por camada (decisão 0025)', () => {
     expect(m).toHaveLength(2);
     expect(m.some((poligono) => poligono.length === 2)).toBe(true);
     expect(multiArea(m)).toBeCloseTo(BRUTA - 8 * 0.184, 6);
+  });
+});
+
+describe('piso único: a junção automática não recorta as camadas com regra de parede (decisão 0025)', () => {
+  it('parede embutida (base 10 cm abaixo do topo): sem corte na junção, porque as camadas com regra já decidem a região', () => {
+    const base = createEmptyProject();
+    base.floorTypes.ft_teste = { ...base.floorTypes.ft_unico!, id: 'ft_teste', layers: UNICO_LAYERS };
+    const s = new ProjectStore(base);
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'pu', typeId: 'ft_teste', levelId: 'lv_0', boundary: RECT.map((q) => ({ ...q })) }) });
+    s.exec({
+      type: 'addWall',
+      wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: ENTRE, b: ATE, baseOffset: -0.1, height: 2.8, joinStart: LIVRE, joinEnd: LIVRE }),
+    });
+    expect(junctionLevel(s.project, 'lv_0').elements.get('pu')?.cut ?? false).toBe(false);
+    expect(area(s.project, 0)).toBeCloseTo(BRUTA - PEGADA, 6);
   });
 });
 

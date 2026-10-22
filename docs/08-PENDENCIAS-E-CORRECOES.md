@@ -7,6 +7,44 @@ Estado em que foi escrito originalmente: branch `claude/zealous-hamilton-iayjlf`
 branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento foi atualizado sem alterar código; os
 números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
+Atualização (2026-10-22, fechamento G5): **entraram ambientes (H2), forros (H3),
+pranchas e PDF (G4) e cotas/textos na planta (I1)**, com paridade em `docs/paridade/ambientes.md`, `forros.md` e
+`pranchas.md` (todos concluídos; `npm run parity`). Medido nesta rodada, no contêiner, com Chromium do Playwright:
+
+- **I-3 fechado** com `npm run test:perf` (ambos os arquivos passam): K4 com 500 paredes, base 54 ms, a frio 1260 ms
+  (razão 23,3, limite 60), depois de mover uma parede 737 ms (razão 13,8, limite 40); captura de faces com 500 chamadas a
+  `infer`, base 55 ms, 601 ms (razão 10,9, limite 30). Nenhum limite foi aumentado.
+- **I-4 fechado**: `npm run build` (`dist/index.html` 2.495,62 kB) e `npm run build:artifact` (`artifact.html` 2.435 kB)
+  sem erro e sem `TMPDIR`.
+- `npm run check` verde (lint, tipos, 229 arquivos e 3043 testes sem os de tempo); `npm run e2e` (12 verificações) e
+  `node tests/e2e/pranchas.mjs` (17 verificações, PDF incluído) sem erro de console ou de página.
+- **Regressão visual** (`tests/e2e/visual-regression.mjs`, 21 casos): `ambiente-sala` criada e conferida na imagem (sala
+  8 × 6 m com "Sala (101) · 45,46 m²"; área = (8 − 0,184)(6 − 0,184), com a espessura do alv14 mais reboco). Vinte
+  baselines diferem, e **nenhuma foi regravada**. Diferenças medidas (fração de pixels fora da tolerância):
+  - Paredes (7 casos): L-encosto 17,54%, L-esquadria 2,04%, T 2,01%, X 1,53%, L-14-com-9-esquadria 2,05%, no-3-paredes
+    1,62%, sala-com-arco 2,52%. Causa provável: contorno mais grosso, pelos pesos de linha por escala (decisão 0015,
+    `1be4648`, posterior à baseline `d4b179f`). No caso L-encosto soma-se o enquadramento inicial (abaixo).
+  - Pisos e lajes (6 casos): piso-retangulo 0,45%, piso-com-furo 0,59%, piso-L 0,39%, laje-retangulo 0,33%,
+    laje-com-furo 0,43%, laje-inclinada 0,35%. Causa provável: a mesma linha de contorno; não inspecionado pixel a pixel.
+  - Telhados (7 casos): duas-aguas 47,06%, quatro-aguas 46,95%, uma-agua 46,16%, telhado-L 36,49%, telhado-T 30,57%,
+    3-aguas 23,55%, empena 47,06%. Causa: **mudança intencional** da decisão 0013 (`b2fede1`): telhado acima do corte
+    aparece só como contorno tracejado na planta de nível (a opção "Mostrar projeção da cobertura" fica ligada por
+    padrão); as águas, cumeeira e setas continuam na planta de cobertura. A baseline é de `962e8bd`, anterior a isso.
+- Desvio de comportamento observado, **não corrigido**: no primeiro render, o canvas mede 491 px de altura, porque a barra
+  de título (38 px) ainda não montou; o enquadramento inicial (`zoomExtents`/`ensureViewport`) usa essa medida e fica
+  cerca de 8% menor que o do render seguinte (524 px). Só afeta o primeiro enquadramento, mas explica o 17,54% do
+  L-encosto. Correção sugerida: refazer o enquadramento na primeira medida estável do canvas.
+
+**Em aberto depois desta rodada:**
+- Regravar as 20 baselines acima é decisão do dono (são mudanças de desenho já aceitas pelas decisões 0013 e 0015);
+  até lá, `visual-regression.mjs` falha por desenho, não por defeito.
+- **CV-2** e **CV-3** (§6.5 e §10), como antes.
+- Checklists que ficaram para trás: `aberturas.md` C3 e C4 (peitoril saliente e verga, que já existem como campos
+  opcionais do tipo) e `escadas.md` C7, `paredes.md` J1 e `pisos.md` E5 (IFC, que já é exportado). Não foram editados
+  nesta rodada, por escopo.
+- Não rodado nesta rodada: `npm run test:visual` (escadas, vista-planta e escadas-closeup) e `npm run visual:juntas`.
+  O caso "close-lshape-d/-f" citado no briefing não existe nesta árvore.
+
 Atualização (2026-10-22, esta rodada): **branches unidas e verificação final** — a `claude/wizardly-goldberg-qtjveg`
 reúne as frentes de gráficos de vista, seleção no 3D e nos cortes, ViewCube/câmera ortogonal, famílias de aberturas e
 escadas (incl. caracol). O **F1 (BVH por lote no picking 3D)** entrou em `5203453` e no merge `3d26015`. Verificado nesta

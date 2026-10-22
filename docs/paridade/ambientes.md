@@ -42,7 +42,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) §6 (Revit: Room; ArchiCAD:
 - [x] G3 Casos dourados de área/perímetro/volume (retângulo 4×5 → 20 m², com pilar interno, em L, circuito aberto → problema, nível sem paredes) **(bloqueante)**
 - [x] G4 Testes de propriedade: ponto em 30 retângulos aleatórios (sem exceção, área e perímetro batem com o retângulo)
 - [x] G5 Migração de arquivo v16 → v17 e ida e volta de JSON preservando os ambientes
-- [ ] G6 Regressão visual por captura de tela (pendente; D1 já está pronto)
+- [x] G6 Regressão visual por captura de tela: baseline `tests/e2e/baseline/ambiente-sala.png` gravada (sala 8 × 6 m com etiqueta "Sala (101) · 45,46 m²", conferida na imagem; área = (8 − 0,184)(6 − 0,184), espessura do alv14 com reboco)
 - [x] G7 Avisos de ambiente no painel de avisos (`roomValidationIssues` e `roomIssues`) com "Ir para" centrado no ponto interior
 
 ## H · Saída

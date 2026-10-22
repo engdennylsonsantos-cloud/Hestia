@@ -332,8 +332,8 @@ function ViewProps(): ReactElement {
         </Row>
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'levels' })}>Editar níveis…</button></div>
       </Group>
-      {s.view === 'plan' && <ViewRangeGroup key={s.levelId} levelId={s.levelId} />}
-      {s.view === 'plan' && <LevelGraphicsGroup key={s.levelId} levelId={s.levelId} />}
+      {s.view === 'plan' && <ViewRangeGroup key={`vr-${s.levelId}`} levelId={s.levelId} />}
+      {s.view === 'plan' && <LevelGraphicsGroup key={`lg-${s.levelId}`} levelId={s.levelId} />}
       {s.view === '3d' && <View3DGroup />}
       {s.view === 'section' && <SectionGraphicsGroup />}
       <Group title="Padrões do projeto" open={false}>

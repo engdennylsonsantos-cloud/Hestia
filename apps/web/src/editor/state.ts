@@ -5,9 +5,9 @@ import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOpt
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
 
-export type ViewKind = 'plan' | '3d' | 'section';
+export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -15,6 +15,8 @@ export interface UiState {
   levelId: Id;
   /** Vista de corte ou elevação aberta quando `view` é 'section'. */
   sectionId: Id | null;
+  /** Prancha aberta quando `view` é 'sheet' (decisão 0022). */
+  sheetId: Id | null;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -153,6 +155,7 @@ export const useUi = create<UiState>(() => ({
   view: 'plan',
   levelId: 'lv_0',
   sectionId: null,
+  sheetId: null,
   selection: [],
   hover: null,
   options: DEFAULT_OPTIONS,

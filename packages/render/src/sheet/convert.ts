@@ -1,0 +1,82 @@
+import type { Vec2 } from '@hestia/geom';
+import { mix } from '../plan/color.ts';
+import type { PlanDrawList, PlanTheme } from '../plan/types.ts';
+import type { SheetPoint, ViewportParts } from './types.ts';
+import type { SheetViewport } from '@hestia/model';
+
+type VpBox = Pick<SheetViewport, 'at' | 'size' | 'scale'>;
+
+/**
+ * Conversão do mundo (m) e das listas de desenho da tela para a folha (mm de papel). A vista é montada com zoom
+ * `1e6 / escala`, de modo que 1 mm de papel vale 1000 px: a largura de linha vira `px / 1000` sem o mínimo de 1 px do
+ * `paperMmToPx`, e a escala da vista (1:S) sai certa sem outra conta.
+ */
+export const SHEET_PX_PER_MM = 1000;
+/** Altura padrão do texto de rótulos sem tamanho próprio (mm de papel). */
+export const LABEL_MM = 2.5;
+/** Deslocamento de rótulo em px de tela (96 dpi) convertido para mm de papel. */
+const SCREEN_PX_MM = 25.4 / 96;
+const WHITE = '#ffffff';
+
+/** Centro da caixa do conteúdo, no mundo: a vista é centrada nele (a prancha não tem deslocamento de vista). */
+export interface ViewMapping {
+  /** Zoom da lista de desenho: px por metro. */
+  zoom: number;
+  /** Caixa da vista na tela (px), igual à caixa de papel × SHEET_PX_PER_MM. */
+  width: number;
+  height: number;
+  cx: number;
+  cy: number;
+  /** mm de papel por metro. */
+  k: number;
+}
+
+export function viewMappingOf(v: Pick<VpBox, 'size' | 'scale'>, centre: Vec2): ViewMapping {
+  return {
+    zoom: (SHEET_PX_PER_MM * 1000) / v.scale,
+    width: v.size.w * SHEET_PX_PER_MM,
+    height: v.size.h * SHEET_PX_PER_MM,
+    cx: centre.x,
+    cy: centre.y,
+    k: 1000 / v.scale,
+  };
+}
+
+/** Mundo → folha: a caixa da vista (`at`, `size`) fica centrada no centro de `m`. */
+export const toPaper = (vp: Pick<VpBox, 'at' | 'size'>, m: ViewMapping) =>
+  (q: Vec2): SheetPoint => ({ x: vp.at.x + vp.size.w / 2 + (q.x - m.cx) * m.k, y: vp.at.y + vp.size.h / 2 + (q.y - m.cy) * m.k });
+
+/** Ponto de rótulo com deslocamento de tela: a tela tem y para baixo, o papel para cima. */
+const shifted = (p: SheetPoint, dx: number, dy: number): SheetPoint => ({ x: p.x + dx * SCREEN_PX_MM, y: p.y - dy * SCREEN_PX_MM });
+
+/** Cor da tinta de uma lista (texto, traços) com a transparência já misturada ao branco do papel. */
+const inkOf = (color: string, alpha: number): string => (alpha >= 1 ? color : mix(WHITE, color, Math.max(0, alpha)));
+
+/** Converte a lista de desenho (mundo + px) para as partes da folha (mm de papel). `theme` dá a cor do texto. */
+export function partsOf(list: PlanDrawList, to: (q: Vec2) => SheetPoint, theme: PlanTheme): ViewportParts {
+  const fills = list.fills.map((f) => ({
+    polygons: f.polygons.map((poly) => poly.map((ring) => ring.map(to))),
+    color: inkOf(f.color, f.alpha),
+  }));
+  const paths = list.strokes.map((s) => ({
+    pts: s.pts.map(to),
+    closed: s.closed,
+    widthMm: s.widthPx / SHEET_PX_PER_MM,
+    color: inkOf(s.color, s.alpha),
+    ...(s.dash ? { dashMm: [s.dash[0] / SHEET_PX_PER_MM, s.dash[1] / SHEET_PX_PER_MM] as [number, number] } : {}),
+  }));
+  const texts = list.labels.map((l) => {
+    const base = to(l.at);
+    const at = l.dx !== undefined || l.dy !== undefined ? shifted(base, l.dx ?? 0, l.dy ?? 0) : base;
+    return {
+      at,
+      text: l.text,
+      sizeMm: l.fontPx !== undefined ? l.fontPx / SHEET_PX_PER_MM : LABEL_MM,
+      rotation: -(l.rotation ?? 0),
+      center: l.center === true,
+      color: l.tone === 'soft' ? mix(theme.ink, theme.bg, 0.45) : theme.ink,
+    };
+  });
+  return { fills, paths, texts };
+}
+

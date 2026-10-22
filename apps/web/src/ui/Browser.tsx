@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, type OpeningType } from '@hestia/model';
+import { duplicateSheetCommand, addSheetAction } from '../editor/sheetActions.ts';
+import { isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, projectSheets, type OpeningType } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -20,6 +21,19 @@ function openingGroups(kind: 'door' | 'window', types: OpeningType[]): Array<{ i
   return groups;
 }
 
+/** Abre a prancha na aba de folha (decisão 0022). */
+const openSheet = (id: string): void => useUi.setState({ view: 'sheet', sheetId: id });
+
+/** Ações de uma prancha da lista: duplicar e excluir (cada uma é um passo de desfazer). */
+function sheetRowAction(run: () => void, ok: string): void {
+  try {
+    run();
+    useUi.setState({ status: ok });
+  } catch (e) {
+    useUi.setState({ status: e instanceof Error ? e.message : 'Operação recusada.' });
+  }
+}
+
 /** Navegador de projeto: vistas, famílias (tipos) e materiais, como a árvore do Revit. */
 export function Browser(): ReactElement {
   const p = useProject();
@@ -33,6 +47,7 @@ export function Browser(): ReactElement {
   const stairTypes = Object.values(p.stairTypes);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
+  const sheets = projectSheets(p);
   return (
     <aside className="side right" aria-label="Navegador de projeto">
       <div className="panel-head">
@@ -70,6 +85,26 @@ export function Browser(): ReactElement {
                 <Icon name="plus" size={14} /> Gerar elevações
               </button>
             </details>
+          </div>
+        </details>
+        <details open>
+          <summary>Pranchas</summary>
+          <div className="sub">
+            {sheets.length === 0 ? <p className="tree-empty">Nenhuma prancha. Crie uma para montar a impressão.</p> : null}
+            {sheets.map((sh) => (
+              <div key={sh.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button className={`leaf${s.view === 'sheet' && s.sheetId === sh.id ? ' on' : ''}`} style={{ flex: 1 }} onClick={() => openSheet(sh.id)}>
+                  <Icon name="plan" size={14} /> {sh.number} {sh.name}
+                  <span className="meta">{sh.size}</span>
+                </button>
+                <button className="chiplink" title="Propriedades da prancha" onClick={() => useUi.setState({ dialog: 'sheet', dialogArg: sh.id })}>Editar</button>
+                <button className="chiplink" title="Duplicar prancha" onClick={() => sheetRowAction(() => { const c = duplicateSheetCommand(p, sh.id); if (c) editor.store.exec(c, 'Duplicar prancha'); }, 'Prancha duplicada.')}>Duplicar</button>
+                <button className="chiplink" title="Excluir prancha" onClick={() => sheetRowAction(() => editor.store.exec({ type: 'removeSheet', id: sh.id }, 'Excluir prancha'), 'Prancha excluída.')}>Excluir</button>
+              </div>
+            ))}
+            <button className="leaf" onClick={() => sheetRowAction(() => openSheet(addSheetAction(editor.store)), 'Prancha criada.')}>
+              <Icon name="plus" size={14} /> Nova prancha
+            </button>
           </div>
         </details>
         <details open>

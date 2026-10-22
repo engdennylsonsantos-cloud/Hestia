@@ -1,0 +1,88 @@
+import { newId } from './ids.ts';
+import { projectSheets, sheetIssue, sheetOf, viewportIssue, type Sheet, type SheetViewport, type SheetViewSource } from './sheet.ts';
+import type { Id, Project } from './types.ts';
+
+/**
+ * Comandos de pranchas (decisão 0022). Recusam com mensagem pt-BR e não alteram o projeto. Mudar tamanho, orientação ou
+ * margem revalida todas as vistas: a mudança é recusada se alguma vista ficaria fora da folha.
+ */
+export type SheetCommand =
+  | { type: 'addSheet'; sheet: Sheet }
+  | { type: 'updateSheet'; id: Id; patch: Partial<Omit<Sheet, 'id' | 'viewports'>> }
+  | { type: 'removeSheet'; id: Id }
+  | { type: 'addViewport'; sheetId: Id; viewport: SheetViewport }
+  | { type: 'updateViewport'; sheetId: Id; id: Id; patch: Partial<Omit<SheetViewport, 'id'>> }
+  | { type: 'removeViewport'; sheetId: Id; id: Id };
+
+/** Motivo de recusa de uma fonte de vista (nível ou seção que precisa existir), ou null. */
+export function viewSourceIssue(p: Pick<Project, 'levels' | 'views'>, view: SheetViewSource): string | null {
+  if (view.kind === 'plan' && !p.levels.some((l) => l.id === view.levelId)) return 'Nível inexistente';
+  if (view.kind === 'section' && !p.views.some((v) => v.id === view.sectionId)) return 'Vista de corte inexistente';
+  return null;
+}
+
+const refuse = (issue: string | null): void => {
+  if (issue) throw new Error(issue);
+};
+
+function sheetRef(p: Project, id: Id): Sheet {
+  const s = sheetOf(p, id);
+  if (!s) throw new Error('Prancha inexistente');
+  return s;
+}
+
+function setSheets(p: Project, next: Sheet[]): void {
+  p.sheets = next;
+}
+
+/** Aplica um comando de prancha sobre o rascunho do projeto. Lança Error em texto pt-BR se recusar. */
+export function applySheetCommand(p: Project, c: SheetCommand): void {
+  switch (c.type) {
+    case 'addSheet': {
+      refuse(sheetIssue(c.sheet));
+      if (projectSheets(p).some((s) => s.id === c.sheet.id)) throw new Error('Prancha já existe');
+      c.sheet.viewports.forEach((v) => refuse(viewportIssue(c.sheet, v) ?? viewSourceIssue(p, v.view)));
+      setSheets(p, [...projectSheets(p), c.sheet]);
+      break;
+    }
+    case 'updateSheet': {
+      const old = sheetRef(p, c.id);
+      const next: Sheet = { ...old, ...c.patch, id: old.id, viewports: old.viewports };
+      refuse(sheetIssue(next));
+      next.viewports.forEach((v) => refuse(viewportIssue(next, v)));
+      setSheets(p, projectSheets(p).map((s) => (s.id === c.id ? next : s)));
+      break;
+    }
+    case 'removeSheet': {
+      sheetRef(p, c.id);
+      setSheets(p, projectSheets(p).filter((s) => s.id !== c.id));
+      break;
+    }
+    case 'addViewport': {
+      const old = sheetRef(p, c.sheetId);
+      if (old.viewports.some((v) => v.id === c.viewport.id)) throw new Error('Vista já existe na prancha');
+      refuse(viewportIssue(old, c.viewport) ?? viewSourceIssue(p, c.viewport.view));
+      setSheets(p, projectSheets(p).map((s) => (s.id === c.sheetId ? { ...s, viewports: [...s.viewports, c.viewport] } : s)));
+      break;
+    }
+    case 'updateViewport': {
+      const old = sheetRef(p, c.sheetId);
+      const cur = old.viewports.find((v) => v.id === c.id);
+      if (!cur) throw new Error('Vista inexistente');
+      const next: SheetViewport = { ...cur, ...c.patch, id: cur.id };
+      refuse(viewportIssue(old, next) ?? viewSourceIssue(p, next.view));
+      setSheets(p, projectSheets(p).map((s) => (s.id === c.sheetId ? { ...s, viewports: s.viewports.map((v) => (v.id === c.id ? next : v)) } : s)));
+      break;
+    }
+    case 'removeViewport': {
+      const old = sheetRef(p, c.sheetId);
+      if (!old.viewports.some((v) => v.id === c.id)) throw new Error('Vista inexistente');
+      setSheets(p, projectSheets(p).map((s) => (s.id === c.sheetId ? { ...s, viewports: s.viewports.filter((v) => v.id !== c.id) } : s)));
+      break;
+    }
+  }
+}
+
+/** Id novo de prancha ou vista (prefixos `sht` e `vpt`), para quem monta os comandos. */
+export const newSheetId = (): Id => newId('sht');
+export const newViewportId = (): Id => newId('vpt');

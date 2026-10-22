@@ -125,3 +125,44 @@ export function clipBandsToProfile(bands: LayerBand[], a: Vec2, u: Vec2, length:
   }
   return out;
 }
+
+/**
+ * Corta as faixas de uma parede reta pela base (perfil inferior derivado de `wallZRange`, decisão 0023 §6): o que fica
+ * abaixo da cota do perfil sai, e a faixa passa a começar nela. O perfil é em degraus (cada trecho com uma cota, e a
+ * mudança na borda do contorno), então cada trecho vira uma faixa de base plana. Intervalos fora dos pontos usam a cota
+ * do ponto mais próximo, como em `profileHeightAt`.
+ */
+export function clipBandsToBottom(bands: LayerBand[], a: Vec2, u: Vec2, length: number, pts: ProfilePoint[]): LayerBand[] {
+  const lo = Math.min(-1, ...pts.map((q) => q.t));
+  const hi = Math.max(length + 1, ...pts.map((q) => q.t));
+  const cuts = [...new Set([lo, hi, ...pts.map((q) => Math.min(hi, Math.max(lo, q.t)))])].sort((x, y) => x - y);
+  const strip = (ta: number, tb: number): MultiPolygon => [[orientedRect(a.x + u.x * ((ta + tb) / 2), a.y + u.y * ((ta + tb) / 2), u.x, u.y, (tb - ta) / 2, STRIP_HALF)]];
+  const out: LayerBand[] = [];
+  for (const band of bands) {
+    let group: { ta: number; tb: number; z0: number } | null = null;
+    const flush = (): void => {
+      if (!group) return;
+      const poly = intersection(band.poly, strip(group.ta, group.tb));
+      if (poly.length) out.push({ z0: group.z0, z1: band.z1, poly, ...(band.slope ? { slope: band.slope } : {}) });
+      group = null;
+    };
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const ta = cuts[i]!;
+      const tb = cuts[i + 1]!;
+      if (tb - ta < EPS) continue;
+      const h = profileHeightAt(pts, (ta + tb) / 2);
+      if (h >= band.z1 - EPS) {
+        flush();
+        continue;
+      }
+      const z0 = Math.max(band.z0, h);
+      if (group && Math.abs(group.z0 - z0) < EPS && Math.abs(group.tb - ta) < EPS) group.tb = tb;
+      else {
+        flush();
+        group = { ta, tb, z0 };
+      }
+    }
+    flush();
+  }
+  return out;
+}

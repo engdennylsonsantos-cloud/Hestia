@@ -18,11 +18,11 @@ export interface IssueTarget {
   box?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
-const TITLE: Record<ValidationSeverity, string> = { error: 'Erros', warning: 'Avisos' };
+const TITLE: Record<ValidationSeverity, string> = { error: 'Erros', warning: 'Avisos', info: 'Informações' };
 
 /** Agrupa por severidade, erros primeiro. Grupos vazios não aparecem; a ordem original é mantida dentro de cada grupo. */
 export function groupIssues(issues: readonly ValidationIssue[]): IssueGroup[] {
-  const order: ValidationSeverity[] = ['error', 'warning'];
+  const order: ValidationSeverity[] = ['error', 'warning', 'info'];
   return order
     .map((severity) => ({ severity, title: TITLE[severity], items: issues.filter((i) => i.severity === severity) }))
     .filter((g) => g.items.length > 0);
@@ -32,16 +32,19 @@ export function groupIssues(issues: readonly ValidationIssue[]): IssueGroup[] {
 export function summarize(issues: readonly ValidationIssue[]): string {
   const errors = issues.filter((i) => i.severity === 'error').length;
   const warnings = issues.filter((i) => i.severity === 'warning').length;
+  const infos = issues.filter((i) => i.severity === 'info').length;
   const parts: string[] = [];
   if (errors > 0) parts.push(errors === 1 ? '1 erro' : `${errors} erros`);
   if (warnings > 0) parts.push(warnings === 1 ? '1 aviso' : `${warnings} avisos`);
+  if (infos > 0) parts.push(infos === 1 ? '1 informação' : `${infos} informações`);
   return parts.join(' · ');
 }
 
 /** Severidade mais grave presente, ou null quando não há problemas. */
 export function worstSeverity(issues: readonly ValidationIssue[]): ValidationSeverity | null {
   if (issues.some((i) => i.severity === 'error')) return 'error';
-  return issues.length > 0 ? 'warning' : null;
+  if (issues.some((i) => i.severity === 'warning')) return 'warning';
+  return issues.length > 0 ? 'info' : null;
 }
 
 /**

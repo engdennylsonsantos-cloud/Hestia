@@ -53,8 +53,11 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
     const w = p.elements[rw.wallId];
     if (!w || w.kind !== 'wall') continue;
     const profiled = w.topProfile && w.sag === 0 ? w.topProfile : null;
-    // Altura resolvida (com a base e o topo anexados a piso); sem anexos é a altura do modelo.
-    const H = profiled ? profileMean(profiled, wallLength(w)) : rw.height;
+    // Altura resolvida (com a base e o topo anexados a piso); sem anexos é a altura do modelo. Com base por trecho
+    // (decisão 0023 §6, P9), a altura média é o topo médio menos a base média.
+    const comprimento = wallLength(w);
+    const H0 = profiled ? profileMean(profiled, comprimento) : rw.height;
+    const H = rw.profileBottom ? (rw.profileTop ? profileMean(rw.profileTop, comprimento) : H0) - profileMean(rw.profileBottom, comprimento) : H0;
     let total = 0;
     let grossTotal = 0;
     for (const l of rw.layers) {

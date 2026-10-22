@@ -28,7 +28,7 @@ import {
 } from '@hestia/model';
 import { buildFrame, normalAt, pointAt, sAtDepth, tangentAt, toLocal, type WallFrame } from './frame.ts';
 import { computeEnds, joinStatus, type EndSpec, type WallEnds } from './joins.ts';
-import { endPoint, layerQuad, membranesOf, sideAt, withProfile } from './layerGeom.ts';
+import { endPoint, layerQuad, membranesOf, sideAt, withBottomProfile, withProfile } from './layerGeom.ts';
 import { flatEnd } from './joinSides.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { makeReturnClipper } from './clipReturn.ts';
@@ -36,7 +36,7 @@ import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { resolveAllFloors } from './floors.ts';
 import { resolveAllSlabs } from './slabs.ts';
 import { resolveAllRoofs } from './roofs.ts';
-import { wallZRange } from './wallZ.ts';
+import { wallZRange, type WallZ } from './wallZ.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
 const MIN_AREA = 1e-9;
@@ -287,6 +287,12 @@ function breakpoints(items: Item[], zr: Map<Id, ZRange>, opens: OpeningGeometry[
   return [...set].sort((a, b) => a - b);
 }
 
+/** Perfis derivados da parede (topo e base por trecho), relativos à base, só quando existem (decisão 0023 §6, P9). */
+const perfisDoResolvido = (z: WallZ): Pick<ResolvedWall, 'profileTop' | 'profileBottom'> => ({
+  ...(z.profile ? { profileTop: z.profile } : {}),
+  ...(z.bottomProfile ? { profileBottom: z.bottomProfile } : {}),
+});
+
 type Returns = Map<string, Array<{ openingId: Id; poly: MultiPolygon }>>;
 
 function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRange>, returns: Returns, planOpen: (id: Id) => boolean): ClusterCore {
@@ -462,8 +468,9 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         sLo: f.sLo,
         baseZ: wz.get(f.wall.id)!.z0,
         height: heights.get(f.wall.id)!,
-        layers: withProfile(core.layers.get(f.wall.id) ?? [], f, wz.get(f.wall.id)!.profile),
+        layers: withProfile(withBottomProfile(core.layers.get(f.wall.id) ?? [], f, wz.get(f.wall.id)!.bottomProfile), f, wz.get(f.wall.id)!.profile),
         membranes: membranesOf(f, ends.get(f.wall.id)!),
+        ...perfisDoResolvido(wz.get(f.wall.id)!),
       };
       out.walls[f.wall.id] = rw;
     }

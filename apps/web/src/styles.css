@@ -19,6 +19,8 @@
   --shadow: 0 10px 34px rgba(18, 28, 36, 0.22);
   --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Largura da coluna de rótulo da paleta de propriedades: cabe o rótulo mais longo (22 caracteres a 11 px). */
+  --prop-label: 122px;
   --r: 5px;
 }
 @media (prefers-color-scheme: dark) {
@@ -80,7 +82,7 @@ body {
 }
 #root { height: 100%; padding-block: 12px; }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; white-space: nowrap; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 svg { display: block; }
 
@@ -113,7 +115,7 @@ svg { display: block; }
 .ibtn:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
 .ibtn:disabled { opacity: 0.4; cursor: default; }
 .ibtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: var(--r); }
+.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: var(--r); white-space: nowrap; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 500; }
@@ -155,24 +157,40 @@ svg { display: block; }
 /* ---- painéis laterais ---- */
 .workspace { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; }
 .side { width: 258px; background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+/* A paleta de propriedades mantém a largura do `.side`: o desenho (canvas) não muda com a densidade. */
 .side.left { border-right: 1px solid var(--line-strong); }
 .side.right { border-left: 1px solid var(--line-strong); width: 236px; }
-.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
 .panel-scroll { overflow: auto; flex: 1; min-height: 0; }
-.typesel { padding: 8px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.typesel { padding: 5px 8px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
 .typesel .row { display: flex; gap: 6px; }
 .typesel .select { flex: 1; }
+.typesel .btn { flex: 0 0 auto; }
 .pgroup { border-bottom: 1px solid var(--line); }
-.pgroup > summary { list-style: none; cursor: pointer; padding: 5px 10px; background: var(--chrome); font-weight: 600; font-size: 11.5px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; }
+.pgroup > summary { list-style: none; cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; }
 .pgroup > summary::-webkit-details-marker { display: none; }
-.pgroup > summary::before { content: ''; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2.5px; transform: rotate(-45deg); transition: transform 0.12s; }
+.pgroup > summary::before { content: ''; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2px; transform: rotate(-45deg); transition: transform 0.12s; }
 .pgroup[open] > summary::before { transform: rotate(45deg); }
-.prow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); align-items: center; gap: 8px; padding: 3px 10px; min-height: 28px; }
-.prow > label, .prow > .lbl { color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/*
+ * Linha de parâmetro da paleta: coluna de rótulo FIXA (`--prop-label`, dimensionada para o rótulo mais longo) e
+ * coluna de valor flexível. Linha de 20 px, sem folga entre elas — é a densidade da paleta do Revit. O editor fica
+ * "sem chrome" (borda e fundo transparentes) até o ponteiro passar ou o foco entrar.
+ */
+.prow { display: grid; grid-template-columns: var(--prop-label) minmax(0, 1fr); align-items: center; gap: 6px; padding: 1px 8px; min-height: 20px; }
+.prow > label, .prow > .lbl { font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Linha de botão (o primeiro filho é um `<span />` vazio): o botão ocupa a largura toda, sem espremer o texto. */
+.prow:has(> span:empty) { grid-template-columns: minmax(0, 1fr); }
+.prow > span:empty { display: none; }
 .prow .select, .prow .input.wide { width: 100%; }
-.prow .val { font-family: var(--font-mono); color: var(--fg); text-align: right; }
+.prow .input, .prow .select { height: 20px; padding: 0 3px; border-color: transparent; background-color: transparent; }
+.prow:hover .input, .prow:hover .select { border-color: var(--line-strong); background-color: var(--sheet); }
+.prow .input:focus, .prow .select:focus { border-color: var(--accent); background-color: var(--sheet); }
+.prow .input.num { width: 62px; }
+.prow .val { font-family: var(--font-mono); font-size: 11px; color: var(--fg); text-align: right; white-space: nowrap; }
 .prow .val.soft { color: var(--fg-soft); }
+.prow .check { font-size: 11px; }
 .hint { padding: 10px; color: var(--fg-soft); }
+.side .hint { padding: 4px 8px; font-size: 11px; }
 .vr-error { padding: 2px 10px 4px; color: var(--danger); font-size: 11.5px; }
 .vr-msg { color: var(--warn); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chiplink { color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; }

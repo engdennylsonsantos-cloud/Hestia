@@ -189,12 +189,12 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
           <Check id="p-rsoffit" checked={soffit.value} mixed={soffit.mixed} onChange={(v) => setEave({ soffit: v })}>Forro de beiral</Check>
         </Row>
       </Group>
-      <Group title="Construção">
+      <Group title="Construção" open={false}>
         {type ? (
           <>
             <Row label="Espessura total"><span className="val">{fmt(roofTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i} style={{ minHeight: 22 }}>
+              <div className="prow" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>
@@ -204,7 +204,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
           <div className="hint">Selecione telhados do mesmo tipo para ver as camadas.</div>
         )}
       </Group>
-      <Group title="Quantitativos">
+      <Group title="Quantitativos" open={false}>
         <Row label="Área em planta"><span className="val">{fmt(planArea)} m²</span></Row>
         <Row label="Área real"><span className="val">{resolved ? `${fmt(realArea)} m²` : '—'}</span></Row>
         <Row label="Águas"><span className="val">{planes || '—'}</span></Row>

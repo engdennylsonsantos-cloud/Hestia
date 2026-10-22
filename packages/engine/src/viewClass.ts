@@ -1,4 +1,7 @@
 import {
+  ceilingTypeThickness,
+  ceilingsOnLevel,
+  isCeiling,
   floorTypeThickness,
   floorsOnLevel,
   isFloor,
@@ -35,7 +38,7 @@ import { wallZRange } from './wallZ.ts';
 export type ViewClass = 'cut' | 'projection-above' | 'projection-below' | 'beyond' | 'hidden';
 
 /** Categoria do elemento para avisos e tabelas (decisão 0013 §3). */
-export type ViewCategory = 'wall' | 'opening' | 'floor' | 'slab' | 'roof' | 'stair';
+export type ViewCategory = 'wall' | 'opening' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair';
 
 /** Faixa de cotas absolutas [z0, z1] de um elemento (z0 ≤ z1). */
 export interface ElementZRange {
@@ -66,13 +69,20 @@ const EPS = 1e-9;
 /**
  * Classifica uma faixa de cotas [z0, z1] na vista (decisão 0013 §2). `elevation` é a cota do nível; as cotas do
  * intervalo são relativas a ela. `extendBelow` (piso, laje, escada) faz a base e a profundidade valerem −∞: o
- * elemento abaixo da base aparece como `projection-below` e nunca fica oculto. A direção da vista não entra aqui.
+ * elemento abaixo da base aparece como `projection-below` e nunca fica oculto.
+ * Vista de cima (`direction: 'up'`, planta de forro, decisão 0021): o topo não limita (tudo acima do corte aparece, como
+ * forro a 2,60 m com topo padrão de 2,30 m), o que está abaixo do corte não aparece, e não há base nem profundidade.
  */
 export function viewClassOf(range: ViewRange, elevation: number, z0: number, z1: number, opts: { extendBelow?: boolean } = {}): ViewClass {
   const lo = Math.min(z0, z1);
   const hi = Math.max(z0, z1);
   const top = elevation + range.top;
   const cut = elevation + range.cut;
+  if (range.direction === 'up') {
+    if (hi < cut - EPS) return 'hidden';
+    if (lo <= cut + EPS && hi >= cut - EPS) return 'cut';
+    return 'projection-above';
+  }
   const extend = opts.extendBelow === true;
   const bottom = extend ? -Infinity : elevation + range.bottom;
   const depth = extend ? -Infinity : elevation + range.depth;
@@ -97,6 +107,7 @@ function categoryOf(e: Element): ViewCategory {
   if (isFloor(e)) return 'floor';
   if (isSlab(e)) return 'slab';
   if (isRoof(e)) return 'roof';
+  if (isCeiling(e)) return 'ceiling';
   return 'stair';
 }
 
@@ -123,6 +134,11 @@ export function elementZRange(p: Project, e: Element, ctx: Partial<ViewContext> 
     const t = p.floorTypes[e.typeId];
     const top = levelElevation(p, e.levelId) + e.heightOffset;
     return { z0: top - (t ? floorTypeThickness(t) : 0), z1: top };
+  }
+  if (isCeiling(e)) {
+    const t = p.ceilingTypes[e.typeId];
+    const top = levelElevation(p, e.levelId) + e.heightOffset;
+    return { z0: top - (t ? ceilingTypeThickness(t) : 0), z1: top };
   }
   if (isSlab(e)) {
     const t = p.slabTypes[e.typeId];
@@ -174,6 +190,7 @@ export function classifyLevelEntries(p: Project, levelId: Id, range: ViewRange, 
     ...openings,
     ...floorsOnLevel(p, levelId),
     ...slabsOnLevel(p, levelId),
+    ...ceilingsOnLevel(p, levelId),
     ...roofsOnLevel(p, levelId),
     ...stairsOnLevel(p, levelId),
   ];
@@ -182,8 +199,9 @@ export function classifyLevelEntries(p: Project, levelId: Id, range: ViewRange, 
     const r = elementZRange(p, e, ctx);
     if (!r) continue;
     const category = categoryOf(e);
-    // Piso, laje e escada estendem para baixo: nunca ficam ocultos nem "além" por estarem abaixo da base.
-    const extendBelow = category === 'floor' || category === 'slab' || category === 'stair';
+    // Piso, laje e escada estendem para baixo: nunca ficam ocultos nem "além" por estarem abaixo da base. Na planta de
+    // forro (vista de cima) não estendem: o que está abaixo do corte não sai.
+    const extendBelow = range.direction === 'down' && (category === 'floor' || category === 'slab' || category === 'stair');
     out.push({ id: e.id, category, cls: viewClassOf(range, elevation, r.z0, r.z1, { extendBelow }) });
   }
   return out.sort(byId);

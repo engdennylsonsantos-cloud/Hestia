@@ -90,3 +90,13 @@ describe('comandos de prancha', () => {
     expect(sheetOf(s.project, 'sh1')!.size).toBe('A3');
   });
 });
+
+describe('persistência', () => {
+  it('a prancha vai no .hestia.json e volta igual (arquivo sem pranchas segue sem elas)', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSheet', sheet: sheet('sh1', { viewports: [vp('v1', { scale: 50 })] }) });
+    const back = JSON.parse(JSON.stringify(s.project));
+    expect(sheetOf(back, 'sh1')).toEqual(sheetOf(s.project, 'sh1'));
+    expect(sheetOf(JSON.parse(JSON.stringify(createEmptyProject())), 'sh1')).toBeUndefined();
+  });
+});

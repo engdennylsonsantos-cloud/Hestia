@@ -113,9 +113,10 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (!noFill) fills.push({ polygons: [[ring]], color: halftone(color, pt), alpha: pt.alpha });
       strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
     };
-    // Traço simbólico da elevação (abertura, giro, seta): fino e tracejado (dash [4,3], distinto do tracejado dos níveis [10,5]).
-    const symbol = (pts: Vec2[]): void => {
-      strokes.push({ pts, closed: false, widthPx: symbolWidth(kind), color: halftone(theme.inkSoft, pt), alpha: 1, dash: [4, 3] });
+    // Traço simbólico da elevação (abertura, giro, seta): fino. Por padrão tracejado (dash [4,3], distinto do tracejado dos
+    // níveis [10,5]); `dashed = false` sai contínuo (decisão 0024 §2: tracejado = abre para o observador, contínuo = não).
+    const symbol = (pts: Vec2[], dashed = true): void => {
+      strokes.push({ pts, closed: false, widthPx: symbolWidth(kind), color: halftone(theme.inkSoft, pt), alpha: 1, ...(dashed ? { dash: [4, 3] as [number, number] } : {}) });
     };
     const esq = o.esquadria;
     if (!esq) {
@@ -222,10 +223,23 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
           const zc = (z0 + z1) / 2;
           symbol([{ x: t0, y: zc }, { x: t1, y: zc }]);
           symbol([{ x: t1 - 0.12, y: zc + 0.05 }, { x: t1, y: zc }, { x: t1 - 0.12, y: zc - 0.05 }]);
+        } else if (esq.family === 'door_double') {
+          // Porta dupla: duas folhas com dobradiças nas ombreiras; duas diagonais do topo de cada ombreira ao centro
+          // da base (vértice na dobradiça de cada folha).
+          const tc = (t0 + t1) / 2;
+          symbol([{ x: t0, y: z1 }, { x: tc, y: z0 }], esq.swingTowardViewer);
+          symbol([{ x: t1, y: z1 }, { x: tc, y: z0 }], esq.swingTowardViewer);
+        } else if (esq.family === 'door_pivot') {
+          // Porta pivotante: eixo vertical a W/4 da ombreira da dobradiça (mesma convenção da planta, decisão 0017 §8)
+          // e a diagonal da folha girando até a ombreira oposta.
+          const tAxis = tc + (esq.flipHand ? 1 : -1) * (esq.width / 4);
+          const opp = esq.flipHand ? t0 : t1;
+          symbol([{ x: tAxis, y: z1 }, { x: tAxis, y: z0 }]);
+          symbol([{ x: tAxis, y: z1 }, { x: opp, y: z0 }], esq.swingTowardViewer);
         } else {
           const hinge = esq.flipHand ? t1 : t0;
           const opp = esq.flipHand ? t0 : t1;
-          symbol([{ x: hinge, y: z1 }, { x: opp, y: z0 }]);
+          symbol([{ x: hinge, y: z1 }, { x: opp, y: z0 }], esq.swingTowardViewer);
         }
       }
     }

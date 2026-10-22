@@ -93,6 +93,8 @@ export interface SectionEsquadria {
   leafThickness: number;
   flipHand: boolean;
   flipFacing: boolean;
+  /** Folha abre para o observador da elevação (decisão 0024 §2): giro tracejado; contrário, contínuo. */
+  swingTowardViewer: boolean;
   frameMaterialId: Id;
   glassMaterialId: Id;
   /** Alizar, peitoril saliente, verga e contraverga do tipo; ausentes = não desenhar. */
@@ -324,14 +326,12 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         const foot = orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2);
         const crossing = lineIntervals([foot], line.a, d, n).some(([t0, t1]) => t1 > 0 && t0 < length);
         if (!crossing && intersection([[foot]], slab).length === 0) continue;
-        const ts = foot.map(along);
-        const t0 = Math.max(0, Math.min(...ts));
-        const t1 = Math.min(length, Math.max(...ts));
+        const t0 = Math.max(0, Math.min(...foot.map(along)));
+        const t1 = Math.min(length, Math.max(...foot.map(along)));
         if (t1 - t0 < EPS_T) continue;
         const z0 = rw.baseZ + g.sill;
         const ot = openingType(p, o);
-        const core = coreSpan(f.type);
-        const fr = openingFrame(ot, core.to - core.from);
+        const fr = openingFrame(ot, coreSpan(f.type).to - coreSpan(f.type).from);
         openings.push({
           openingId: o.id,
           kind: g.kind,
@@ -354,6 +354,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             leafThickness: fr.leafThickness,
             flipHand: o.flipHand,
             flipFacing: o.flipFacing,
+            // Folha gira para +n se `flipFacing` é falso (`openingSymbol.ts`); o observador está em −n.
+            swingTowardViewer: (g.n.x * n.x + g.n.y * n.y) * (o.flipFacing ? -1 : 1) < 0,
             frameMaterialId: ot.frameMaterialId,
             glassMaterialId: ot.glassMaterialId,
             casing: openingCasing(ot),

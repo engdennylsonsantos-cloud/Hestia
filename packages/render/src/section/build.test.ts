@@ -17,7 +17,7 @@ import {
   type StairRun,
   type ViewGraphics,
 } from '@hestia/model';
-import { LIGHT } from '../plan/types.ts';
+import { LIGHT, type StrokeOp } from '../plan/types.ts';
 import { buildSectionDrawList, type SectionInput } from './build.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
@@ -233,11 +233,31 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(tracos[0]!.pts.every((q) => q.y >= o.z0 - 1e-9 && q.y <= o.z1 + 1e-9)).toBe(true);
   });
 
-  it('E1: a porta de giro mostra o símbolo tracejado do lado da dobradiça', () => {
+  it('E1: a porta de giro mostra o símbolo de giro com o vértice no lado da dobradiça', () => {
     const d = buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente', 3, { flipHand: true })]));
-    const tracos = d.strokes.filter((s) => s.dash?.[0] === 4);
-    expect(tracos).toHaveLength(1);
-    expect(tracos[0]!.pts[0]!.x).toBeCloseTo(3.4, 6); // dobradiça à direita (t1)
+    // A dobradiça à direita (t1 = 3,4): a diagonal nasce no topo da dobradiça e termina na base do trinco (t0).
+    const swing = d.strokes.find((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.y > s.pts[1]!.y)!;
+    expect(swing.pts[0]!.x).toBeCloseTo(3.4, 6);
+    expect(swing.pts[1]!.x).toBeCloseTo(2.6, 6);
+  });
+
+  it('E1 (traço): o giro sai tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto', () => {
+    // A fachada olha do sul (y = −2) para a parede em y = 0; com flipFacing falso a folha abre para +y (para dentro,
+    // para longe do observador) → contínuo; com flipFacing verdadeiro abre para −y (para o observador) → tracejado.
+    const swing = (d: ReturnType<typeof buildSectionDrawList>): StrokeOp | undefined => d.strokes.find((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.y > s.pts[1]!.y);
+    expect(swing(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente', 3, { flipFacing: false })])))!.dash).toBeUndefined();
+    expect(swing(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente', 3, { flipFacing: true })])))!.dash).toEqual([4, 3]);
+  });
+
+  it('E1: a porta dupla mostra duas diagonais das ombreiras ao centro; a pivotante, o eixo e a folha', () => {
+    const dupla = buildSectionDrawList(facade([op('p', 'door', 'ot_p160', 'frente')]));
+    const swings = dupla.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.y > s.pts[1]!.y);
+    expect(swings).toHaveLength(2);
+    expect(swings[0]!.pts[0]!.x).toBeCloseTo(2.2, 6); // ombreira esquerda (t0)
+    expect(swings[1]!.pts[0]!.x).toBeCloseTo(3.8, 6); // ombreira direita (t1)
+    // A pivotante (ot_pp80) tem o eixo vertical a W/4 da ombreira da dobradiça + a diagonal da folha.
+    const pivot = buildSectionDrawList(facade([op('p', 'door', 'ot_pp80', 'frente')]));
+    expect(pivot.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.x === s.pts[1]!.x)).toHaveLength(1);
   });
 
   it('E2: a janela e a porta de correr mostram a seta de correr; a fixa não', () => {

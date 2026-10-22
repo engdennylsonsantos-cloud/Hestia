@@ -1,4 +1,5 @@
-import { ceilingTypeThickness, isCeiling, isWall, levelElevation, wallsOnLevel, type Ceiling, type Project, type ValidationIssue } from '@hestia/model';
+import { ceilingTypeThickness, followsRoom, isCeiling, isWall, levelElevation, wallsOnLevel, type Ceiling, type Id, type Project, type ValidationIssue } from '@hestia/model';
+import { ceilingOutline, roomsById, type CeilingRoomProblem, type RoomsById } from './ceilings.ts';
 import { elementZRange } from './viewClass.ts';
 
 /** Tolerância (m) para a comparação de cotas: 1 mm. */
@@ -6,12 +7,21 @@ const EPS = 1e-3;
 
 const label = (c: Ceiling): string => (c.mark ? `"${c.mark}" (${c.id})` : `"${c.id}"`);
 
+const ROOM_PROBLEM_TEXT: Record<CeilingRoomProblem, string> = {
+  aberto: 'o circuito de paredes do ambiente tem um vão',
+  fora: 'o ambiente não está num circuito fechado de paredes',
+  apagado: 'o ambiente foi apagado',
+};
+
 /**
  * Avisos dos forros (decisão 0021): forro sem contorno, tipo ausente, e forro cuja face inferior fica acima da parede
  * mais baixa do nível (o forro deveria ficar abaixo do topo das paredes que o cercam). Não bloqueia nada.
+ * `forro-ambiente-aberto` (decisão 0023 §13, P-5): forro que acompanha o ambiente e não o segue (vão, ponto fora ou
+ * ambiente apagado); o forro mantém o último contorno gravado.
  */
 export function ceilingIssues(p: Project): ValidationIssue[] {
   const out: ValidationIssue[] = [];
+  const roomsCache = new Map<Id, RoomsById>();
   for (const c of Object.values(p.elements).filter(isCeiling)) {
     const name = label(c);
     if (c.boundary.length < 3) {
@@ -22,6 +32,18 @@ export function ceilingIssues(p: Project): ValidationIssue[] {
     if (!t) {
       out.push({ severity: 'error', code: 'ceiling-type-missing', message: `Forro ${name} usa um tipo que não existe no projeto.`, elementId: c.id });
       continue;
+    }
+    if (followsRoom(c)) {
+      if (!roomsCache.has(c.levelId)) roomsCache.set(c.levelId, roomsById(p, c.levelId));
+      const { problem } = ceilingOutline(p, c, roomsCache.get(c.levelId));
+      if (problem) {
+        out.push({
+          severity: 'warning',
+          code: 'forro-ambiente-aberto',
+          message: `Forro ${name} acompanha o ambiente, mas ${ROOM_PROBLEM_TEXT[problem]}: mantém o último contorno gravado. Solte o forro para editá-lo à mão.`,
+          elementId: c.id,
+        });
+      }
     }
     const walls = wallsOnLevel(p, c.levelId).filter(isWall);
     if (walls.length === 0) continue;

@@ -40,7 +40,7 @@ export type RoomExtend = 'finish' | 'core';
  * por CONTEÚDO (decisão 0023 §11): editar uma parede muda a assinatura só do nível dela, e os demais níveis reaproveitam
  * o circuito já calculado (o projeto é imutável no Immer, então a identidade não serve de chave).
  */
-function wallsSignature(p: Project, levelId: Id): string {
+export function wallsSignature(p: Project, levelId: Id): string {
   const r = (n: number): number => Math.round(n * 1e6) / 1e6;
   return levelFrames(p, levelId)
     .map((f) => {
@@ -58,6 +58,11 @@ export function resetCircuitCache(): void {
   roomsCache.clear();
   perimeterCache.clear();
   recalcCount = 0;
+}
+
+/** Conta um recálculo feito por outro cache do motor (espaço livre dos ambientes, `rooms.ts`), para o mesmo contador. */
+export function noteCircuitRecalc(): void {
+  recalcCount += 1;
 }
 
 /** Zera só o contador de recálculos, mantendo o cache quente (chave do teste de "nível não editado = zero recálculos"). */

@@ -87,6 +87,8 @@ export type Command =
   | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Room> }
   | { type: 'detachOutline'; id: Id }
   | { type: 'relinkOutline'; id: Id }
+  | { type: 'detachCeilingRoom'; id: Id }
+  | { type: 'relinkCeilingRoom'; id: Id; roomId: Id }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -182,7 +184,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   transformEach(p, c, isStair, transformStair);
   transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
   transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
-  transformEach(p, c, isCeiling, transformCeiling);
+  transformEach(p, c, isCeiling, (f, t) => transformCeiling(f, t, !!c.copy?.idMap));
   transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {

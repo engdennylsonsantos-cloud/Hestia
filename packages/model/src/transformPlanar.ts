@@ -1,4 +1,5 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
+import { followsRoom } from './ceiling.ts';
 import { type Ceiling, type Floor, type Slab } from './types.ts';
 
 /** Solta o vínculo do contorno quando o elemento é movido/girado/espelhado (a cópia herda a origem; decisão 0023 §8.2b). */
@@ -32,11 +33,15 @@ export function transformSlab(s: Slab, t: Transform, copy = false): Slab {
   return detach({ ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope }, copy);
 }
 
-/** Move/gira/espelha um forro: contorno e furos (o nível e a cota não mudam). */
-export function transformCeiling(c: Ceiling, t: Transform): Ceiling {
+/**
+ * Move/gira/espelha um forro: contorno e furos (o nível e a cota não mudam). Forro que acompanha o ambiente se solta ao
+ * mover (como o piso); a cópia herda o vínculo.
+ */
+export function transformCeiling(c: Ceiling, t: Transform, copy = false): Ceiling {
   const pts = (ring: Vec2[]): Vec2[] => {
     const out = ring.map((q) => applyTransform(t, q));
     return t.kind === 'mirror' ? out.reverse() : out;
   };
-  return { ...c, boundary: pts(c.boundary), holes: c.holes.map(pts) };
+  const moved = { ...c, boundary: pts(c.boundary), holes: c.holes.map(pts) };
+  return !copy && followsRoom(c) ? { ...moved, roomLinked: false } : moved;
 }

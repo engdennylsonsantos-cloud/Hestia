@@ -17,6 +17,9 @@ export const ceilingsOnLevel = (p: Project, levelId: Id): Ceiling[] =>
     .filter((c) => c.levelId === levelId)
     .sort((a, b) => a.order - b.order);
 
+/** Forro que acompanha o ambiente de origem: tem `roomId` e não foi solto (`roomLinked` ausente ou verdadeiro). */
+export const followsRoom = (c: Pick<Ceiling, 'roomId' | 'roomLinked'>): boolean => !!c.roomId && c.roomLinked !== false;
+
 export const ceilingTypeThickness = (t: CeilingType): number => t.layers.reduce((s, l) => s + l.thickness, 0);
 
 /** Polígono do forro (contorno + furos) para as operações de geometria. */

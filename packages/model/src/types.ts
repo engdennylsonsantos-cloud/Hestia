@@ -369,7 +369,8 @@ export interface CeilingType {
 /**
  * Forro (Revit: Ceiling). Contorno fechado em planta com furos. O topo do forro fica na cota do nível mais
  * `heightOffset` (padrão 2,60 m, o pé-direito) e as camadas descem a partir dele: a face inferior, visível, fica na
- * cota `heightOffset` menos a espessura total. `roomId` é só o vínculo com o ambiente de origem (o contorno é gravado).
+ * cota `heightOffset` menos a espessura total. Forro criado de ambiente (`roomId`) acompanha o contorno do ambiente
+ * enquanto `roomLinked` não é falso (decisão 0023 §13, P-5); editar o contorno à mão ou mover o forro solta o vínculo.
  */
 export interface Ceiling {
   id: Id;
@@ -380,6 +381,8 @@ export interface Ceiling {
   holes: Vec2[][];
   /** Ambiente de origem ("Forro no ambiente"); ausente ou null quando o forro foi desenhado livremente. */
   roomId?: Id | null;
+  /** Falso quando o forro foi solto do ambiente (desvinculado, editado à mão ou movido). Ausente = acompanha (forros antigos). */
+  roomLinked?: boolean;
   heightOffset: number;
   mark: string;
   comments: string;

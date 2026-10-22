@@ -98,7 +98,7 @@ Com o núcleo do piso na camada estrutural, `auto` reproduz a tabela anterior: e
 
 **Implementação.** `enclosedRooms` já gera os contornos `'finish' | 'core'` (`packages/tools/src/enclosed.ts:34-41`); o término escolhe um deles por camada. O deslocamento em cm exige um contorno a mais por valor, calculado pelo mesmo circuito.
 
-Perímetro externo: o mesmo princípio, com a face externa. Na v1, a regra por camada vale para paredes internas; no perímetro, todas as camadas usam o mesmo contorno até a fase P8.
+Perímetro externo: o mesmo princípio, com a face externa. Na v1, a regra por camada vale para paredes internas; no perímetro, todas as camadas usam o mesmo contorno (P8 não cobre o perímetro ainda).
 
 ## 3. Corte e planta por cota
 
@@ -328,6 +328,19 @@ Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P
 - **Regressão visual.** Três casos novos (`junc-piso-L-nucleo`, `junc-laje-perimetro-parede`, `junc-parede-embutida-piso`), com baselines criadas e lidas. Nenhum mostra recorte visível na planta: sem o lado da parede, a planta fica igual à de antes. Os 21 casos atuais seguem em 0,000%.
 - **Testes.** `junctionLevel.test.ts` (cache, sem sobreposição, laje × piso, parede embutida, dono e parede × parede, propriedade em 10 sementes), `junctionSection.test.ts`, `plan/junctionPlan.test.ts`, `model3d/junctionSolids.test.ts`. Nenhum teste existente foi alterado.
 - **Paridade.** `pisos.md` C6, `lajes.md` C8 e `paredes.md` E3 seguem `[ ]`: só marcam [x] quando a parede também for recortada.
+
+**Status da P8 (2026-10-22, parcial).** Contorno por camada e término na junção para piso e laje vinculados às paredes (circuito, não perímetro).
+
+- **Modelo.** `Layer.termino?` (`packages/model/src/types.ts`, tipo `LayerTermino`): `'auto' | 'nucleo' | 'face' | { cm }`, opcional e aditivo, sem migração e sem mudar `SCHEMA_VERSION`. Padrão por leitura `auto` (`termino.ts`). `upsertFloorType`/`upsertSlabType` recusam deslocamento fora de −30 a +30 cm.
+- **Motor** (`packages/engine/src/layerOutline.ts`). `finish` e `core` vêm do mesmo circuito de paredes (`enclosedRooms`, extremos `finish` e `core`). `face` = face de acabamento; `nucleo` = núcleo da parede; `auto` = núcleo para a camada dentro do núcleo do elemento (posição, `layerCoreFlags`), face para as demais; `{cm}` = a face deslocada (`offsetMulti`, positivo avança). `ResolvedFloorLayer` e `ResolvedSlabLayer` ganham `polygon`. `resolveFloors().polygon` continua sendo o contorno base (modo do elemento), então quem não consome camadas não muda.
+- **Consumidores.** Quantitativos (`floorQuantities.ts`, `slabQuantities.ts`): área e volume de cada camada com o contorno dela; `junctionNet.ts` usa o mesmo contorno, então a parede perde o que a camada do núcleo ocupa. Corte (`section.ts`, `sectionMembrane.ts`): cada camada usa o seu polígono e a membrana sai na face da própria camada. 3D (`model3d/solids.ts`) e planta (`plan/floors.ts`, `plan/slabs.ts`): o sólido e a linha de membrana usam o polígono da camada. A planta continua pintando o preenchimento do elemento (cor e hachura por camada ficam para depois).
+- **Elementos fora do escopo** mantêm o que era: estático, de perímetro externo (todas as camadas no mesmo contorno, como antes) e circuito aberto (último contorno válido em todas as camadas). A exportação IFC e DXF segue com o contorno do elemento.
+- **Interface.** Campo "Término na junção" na seção avançada da camada, em `FloorTypeDialog` e `SlabTypeDialog` (`LayerTermino.tsx`, `terminoForm.ts`). Dica: "Vale para pisos e lajes vinculados às paredes".
+- **Testes.** `layerOutline.test.ts` (retângulo e L à mão; `auto`; `face`; `nucleo`; `{cm}` positivo e negativo; associativo com espessura de acabamento trocada; independência de nome e material; soma por camada; estático, perímetro e circuito aberto; dez sementes), `layerOutlineSection.test.ts`, `layerOutlineSolids.test.ts`, `termino.test.ts`, `terminoForm.test.ts`. Ajuste justificado em `outlineBound.test.ts`: o contador de recálculos passa de 1 para 2 por nível, porque um piso vinculado com término `auto` agora também calcula o circuito do núcleo (0023 §11: nível não editado continua com zero recálculos).
+- **Regressão visual** (`tests/e2e/visual-regression.mjs`, sem `--update`): os 24 casos anteriores seguem em 0,000%, inclusive `junc-piso-L-nucleo`. Dois casos novos, com baseline criada e lida: `junc-piso-retangulo-auto` e `junc-piso-retangulo-cm-menos-1` (cerâmica em `{cm: -1}`). As duas imagens saem iguais, porque a planta pinta o preenchimento do elemento e as paredes cobrem o núcleo estendido. A diferença aparece nos quantitativos e no 3D, não na planta.
+- **Pendente (não entregue).** (1) O lado da parede: paredes não são recortadas pela camada do piso em planta, corte e 3D (C6 de pisos e C8 de lajes seguem `[ ]`). (2) Término em perímetro externo. (3) Laje com caimento fora da junção (já era assim). (4) Cor e hachura por camada na planta. (5) IFC e DXF por camada. (6) Validação no Revit de G-B e G-K2 (sentido da prioridade).
+- **Achado anterior à P8, não corrigido.** No canto reentrante do L, o circuito de paredes deixa um quadrado d × d sem parede (d = meia espessura), que entra no cômodo, com ou sem esquadria. A conta de área do L em `layerOutline.test.ts` inclui esse quadrado de propósito.
+
 
 ## 11. Riscos e compatibilidade
 

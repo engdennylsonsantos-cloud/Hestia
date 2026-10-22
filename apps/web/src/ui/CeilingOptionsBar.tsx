@@ -2,12 +2,14 @@ import type { ReactElement } from 'react';
 import type { CeilingMode } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { addCeilingsAllRooms } from '../editor/ceilingRoomActions.ts';
 import { NumField } from './fields.tsx';
 
 const MODES: Array<[CeilingMode, string]> = [
   ['poly', 'Contorno por pontos'],
   ['rect', 'Retângulo (2 cantos)'],
   ['room', 'No ambiente (clique no ambiente)'],
+  ['hole', 'Furo (forro selecionado)'],
 ];
 
 /** Opções da ferramenta Forro: tipo, modo e cota do topo. Fica fora do OptionsBar, como a da laje. */
@@ -46,6 +48,9 @@ export function CeilingOptionsBar(): ReactElement {
         Cota do topo
         <NumField id="opt-ceilingoffset" value={o.ceilingOffset ?? 2.6} onCommit={(v) => set({ ceilingOffset: v })} unit="m" />
       </label>
+      <button id="opt-ceilingall" className="btn small" onClick={() => addCeilingsAllRooms()} title="Cria um forro em cada ambiente de circuito fechado do nível que ainda não tem forro; um só Ctrl+Z desfaz tudo">
+        Forro em todos os ambientes
+      </button>
     </>
   );
 }

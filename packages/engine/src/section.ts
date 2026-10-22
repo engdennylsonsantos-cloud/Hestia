@@ -1,5 +1,5 @@
 import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { coreSpan, openingCasing, openingFamilyOf, openingFrame, openingLintel, openingSillBeam, openingSillBoard, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningCasing, type OpeningFamilyId, type OpeningLeaves, type OpeningLintel, type OpeningSillBoard, type PlanSymbol, type Project } from '@hestia/model';
+import { coreSpan, type HatchKind, openingCasing, openingFamilyOf, openingFrame, openingLintel, openingSillBeam, openingSillBoard, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningCasing, type OpeningFamilyId, type OpeningLeaves, type OpeningLintel, type OpeningSillBoard, type PlanSymbol, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
@@ -48,6 +48,8 @@ export interface SectionOrigin {
  */
 export interface SectionRegion {
   materialId: Id;
+  /** Hachura própria do corte (forro, D3); sem valor, vale a do material. */
+  hatch?: HatchKind;
   /** Polígonos em (t, z), já sem o que está na frente. */
   polygons: MultiPolygon;
   sources: SectionOrigin[];
@@ -62,6 +64,8 @@ export interface SectionRegion {
  */
 export interface SectionBeyond extends SectionOrigin {
   materialId: Id;
+  /** Hachura própria da elevação (forro, D3); sem valor, sem hachura. */
+  hatch?: HatchKind;
   layerIndex: number;
   /** Distância do plano de corte ao ponto mais próximo. */
   depth: number;
@@ -164,11 +168,12 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   if (length < 1e-6) return empty;
 
   // Cortes por material (união depois, antes da oclusão); cada polígono guarda a origem para `sources`.
-  const cutBy = new Map<Id, Array<{ polygon: Polygon; origin: SectionOrigin }>>();
-  const addCut = (materialId: Id, polygon: Polygon, origin: SectionOrigin): void => {
-    const list = cutBy.get(materialId) ?? [];
-    list.push({ polygon, origin });
-    cutBy.set(materialId, list);
+  const cutBy = new Map<string, { materialId: Id; hatch?: HatchKind; items: Array<{ polygon: Polygon; origin: SectionOrigin }> }>();
+  const addCut = (materialId: Id, polygon: Polygon, origin: SectionOrigin, hatch?: HatchKind): void => {
+    const key = `${materialId}|${hatch ?? ''}`;
+    const entry = cutBy.get(key) ?? { materialId, hatch, items: [] };
+    entry.items.push({ polygon, origin });
+    cutBy.set(key, entry);
   };
   // Além e vãos ainda sem oclusão (projeção completa): a oclusão e a parte visível vêm no fim.
   const beyond: SectionBeyond[] = [];
@@ -253,7 +258,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     }
     // Forros (decisão 0021): mesmo tratamento dos pisos planos (`sectionCeilings.ts`).
     const ck = sectionOfCeilings(p, levelId, line);
-    for (const c of ck.cut) addCut(c.materialId, c.polygon, c.origin);
+    for (const c of ck.cut) addCut(c.materialId, c.polygon, c.origin, c.hatch);
     beyond.push(...ck.beyond);
     grow(ck.zMin, ck.zMax);
     // Telhados (D3): como as lajes, por água e por camada (cada faixa segue a cota da água menos `below`).
@@ -356,10 +361,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   type Ref = { cut: SectionRegion } | { beyond: SectionBeyond } | { opening: SectionOpening };
   const refs: Ref[] = [];
   const items: OcclusionItem[] = [];
-  for (const [materialId, list] of cutBy) {
+  for (const { materialId, hatch, items: list } of cutBy.values()) {
     const sources = uniqueOrigins(list.map((c) => c.origin));
     const region: SectionRegion = {
       materialId,
+      hatch,
       polygons: union(...list.map((c): MultiPolygon => [c.polygon])),
       sources,
       parts: partsByOrigin(list, sources),

@@ -33,4 +33,19 @@ describe('corte e elevação com forros (decisão 0021)', () => {
     const ids = new Set(r.cut.flatMap((c) => c.sources.map((o) => o.floorId ?? o.ceilingId)));
     expect(ids).toEqual(new Set(['f', 'c']));
   });
+
+  it('a hachura do tipo de forro (gesso) vai para o corte, separada da do material (D3)', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addCeiling', ceiling: makeCeiling({ id: 'c', typeId: 'ct_gesso', levelId: 'lv_0', boundary: RECT, heightOffset: 2.6 }) });
+    const r = computeSection(s.project, { a: { x: -1, y: 2 }, b: { x: 7, y: 2 }, depth: 2 });
+    expect(r.cut.find((c) => c.sources.some((o) => o.ceilingId === 'c'))?.hatch).toBe('gesso');
+    expect(s.project.ceilingTypes.ct_laje?.hatch).toBeUndefined();
+  });
+
+  it('elevação: o forro atrás do corte leva a hachura do tipo', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addCeiling', ceiling: makeCeiling({ id: 'c', typeId: 'ct_gesso', levelId: 'lv_0', boundary: RECT, heightOffset: 2.6 }) });
+    const r = computeSection(s.project, { a: { x: -1, y: -2 }, b: { x: 7, y: -2 }, depth: 8 });
+    expect(r.beyond.find((b) => b.ceilingId === 'c')?.hatch).toBe('gesso');
+  });
 });

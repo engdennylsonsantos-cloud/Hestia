@@ -17,7 +17,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 - [x] B3 Tabela `ceilingSchedule` com filtros e CSV (`;`, decimal com vírgula, BOM)
 - [x] B4 Avisos: sem contorno, tipo ausente, forro acima da parede mais baixa
 - [x] B5 Forro por ambiente: um rascunho por ambiente com circuito fechado
-- [ ] B6 Recorte do forro por escada e por abertura de piso — fora desta rodada
+- [x] B6 Recorte do forro por escada e por abertura de piso/laje do nível de cima (`ceilings.ts`, decisão 0021 §18)
 
 ## C · Planta de forro (direção para cima)
 - [x] C1 `direction: 'up'` desenha a planta de forro; o topo não limita **(bloqueante)**
@@ -30,7 +30,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 ## D · Outras vistas
 - [x] D1 3D: sólido por camada, na categoria de pisos
 - [x] D2 Corte e elevação: faixa t×z por camada, com origem do forro
-- [ ] D3 Hachura própria de forro no corte (usa a hachura do material) — revisão visual pendente
+- [x] D3 Hachura própria de forro (`gesso`, no tipo `hatch`) no corte e na elevação, com teste
 
 ## E · Edição
 - [x] E1 Comandos `addCeiling`, `addCeilings` (lote), `updateCeiling`, `removeCeiling`, com desfazer/refazer **(bloqueante)**
@@ -38,8 +38,8 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 - [x] E3 Ferramenta Forro: contorno, retângulo e "No ambiente", com barra de opções e botão no Ribbon
 - [x] E4 Diálogo do tipo com seção ao vivo (reuso do editor de camadas e da seção de laje)
 - [x] E5 Propriedades do forro (tipo, cota, construção, dimensões, marca)
-- [ ] E6 Forro por ambiente do nível inteiro em um clique — o lote existe, falta o botão
-- [ ] E7 Furos pela ferramenta — o modelo e o motor aceitam
+- [x] E6 Forro por ambiente do nível inteiro em um clique (botão na barra de opções e no Ribbon, aba Arquitetura; um Ctrl+Z)
+- [x] E7 Furos pela ferramenta: modo "Furo (forro selecionado)", contorno interno como no piso (decisão 0021, 21)
 
 ## F · Saídas
 - [x] F1 Tabela de forros na Vista e na Árvore de projeto, com CSV

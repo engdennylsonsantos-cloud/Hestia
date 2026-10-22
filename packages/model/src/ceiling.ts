@@ -33,10 +33,10 @@ const ct = (id: string, name: string, code: string, description: string, layers:
 
 /** Tipos de forro iniciais (camadas do topo para baixo: estrutura acima, acabamento visível embaixo). */
 export const DEFAULT_CEILING_TYPES: CeilingType[] = [
-  ct('ct_gesso', 'Forro de gesso 12,5 mm', 'FR-01', 'Placa de gesso 12,5 mm sobre perfis de aço', [
+  { ...ct('ct_gesso', 'Forro de gesso 12,5 mm', 'FR-01', 'Placa de gesso 12,5 mm sobre perfis de aço', [
     L('structure', 'mat_perfil', 0.03),
     L('finish1', 'mat_gesso', 0.0125),
-  ], 70),
+  ], 70), hatch: 'gesso' },
   ct('ct_pvc', 'Forro de PVC', 'FR-02', 'Forro de PVC em réguas sobre travessas de madeira', [
     L('structure', 'mat_madeira', 0.02),
     L('finish1', 'mat_pvc', 0.01),

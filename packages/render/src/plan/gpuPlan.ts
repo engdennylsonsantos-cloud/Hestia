@@ -45,6 +45,10 @@ function hatchTexture(kind: string): THREE.Texture | null {
   if (kind === 'dots') {
     for (let x = 8; x < 64; x += 16) for (let y = 8; y < 64; y += 16) g.fillRect(x, y, 4, 4);
   }
+  // `gesso` (forro, D3): tracejado leve, um traço horizontal a cada 16 px.
+  if (kind === 'gesso') {
+    for (let y = 8; y < 64; y += 16) for (let x = 0; x < 64; x += 16) g.fillRect(x, y, 10, 2);
+  }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.RepeatWrapping;

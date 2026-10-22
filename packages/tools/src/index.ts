@@ -14,6 +14,7 @@ export * from './roomPick.ts';
 export * from './floorPick.ts';
 export { FloorTool } from './floorTool.ts';
 export * from './roomCreate.ts';
+export * from './ceilingRoom.ts';
 export { RoomTool, ROOM_PROBLEM_TEXT } from './roomTool.ts';
 export * from './slabPick.ts';
 export * from './slabSlope.ts';

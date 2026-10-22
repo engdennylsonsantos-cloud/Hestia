@@ -1,5 +1,5 @@
 import { intersection, type Polygon, type Vec2 } from '@hestia/geom';
-import type { Id, Project } from '@hestia/model';
+import type { HatchKind, Id, Project } from '@hestia/model';
 import { resolveCeilings } from './ceilings.ts';
 import { EPS_T, lineIntervals, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
 import type { SectionBeyond, SectionOrigin } from './section.ts';
@@ -9,6 +9,8 @@ export interface CeilingCut {
   materialId: Id;
   polygon: Polygon;
   origin: SectionOrigin;
+  /** Hachura do tipo de forro (D3); sem valor, vale a do material. */
+  hatch?: HatchKind;
 }
 
 export interface CeilingSection {
@@ -29,13 +31,14 @@ export function sectionOfCeilings(p: Project, levelId: Id, line: SectionLine): C
   const out: CeilingSection = { cut: [], beyond: [], zMin: Infinity, zMax: -Infinity };
   for (const c of resolveCeilings(p, levelId)) {
     const inCut = intersection(c.polygon, slab);
+    const hatch = p.ceilingTypes[c.typeId]?.hatch;
     for (const layer of c.layers) {
       for (const poly of c.polygon) {
         for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
           const lo = Math.max(0, t0);
           const hi = Math.min(length, t1);
           if (hi - lo < EPS_T) continue;
-          out.cut.push({ materialId: layer.materialId, polygon: [rect(lo, hi, layer.z0, layer.z1)], origin: { ceilingId: c.ceilingId } });
+          out.cut.push({ materialId: layer.materialId, polygon: [rect(lo, hi, layer.z0, layer.z1)], origin: { ceilingId: c.ceilingId }, hatch });
           out.zMin = Math.min(out.zMin, layer.z0);
           out.zMax = Math.max(out.zMax, layer.z1);
         }
@@ -53,6 +56,7 @@ export function sectionOfCeilings(p: Project, levelId: Id, line: SectionLine): C
           layerIndex: layer.layerIndex,
           depth: Math.max(0, Math.min(...outer.map(dist))),
           polygons: [[rect(tMin, tMax, layer.z0, layer.z1)]],
+          hatch,
         });
         out.zMin = Math.min(out.zMin, layer.z0);
         out.zMax = Math.max(out.zMax, layer.z1);

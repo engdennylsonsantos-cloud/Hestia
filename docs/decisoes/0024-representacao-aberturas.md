@@ -13,12 +13,22 @@ e as fontes que consegui ler são de concurso e de tutorial.
 
 ## 2. Giro na elevação e no corte
 
-- **Convenção própria** (marcada como tal na pesquisa): o símbolo de giro é a diagonal do topo da dobradiça à base do trinco.
-  Sai **tracejado quando a folha abre para o observador** da elevação e **contínuo quando abre para o lado oposto**.
+- **Símbolo em V** (decisão do dono, 2026-10-22: "troque sim"). Substitui a diagonal única do topo da dobradiça à base do
+  trinco, que a versão anterior desta decisão adotava. O V é a forma convencional do símbolo de giro em projeto brasileiro
+  (prática corrente, não confirmada na NBR 6492): duas linhas partindo de um **vértice no lado da dobradiça**, no meio da
+  altura, até as **duas pontas do lado do trinco** (topo e base). Desenhado num traço só de três pontos.
+- **Convenção própria** (marcada como tal na pesquisa): sai **tracejado quando a folha abre para o observador** da elevação
+  e **contínuo quando abre para o lado oposto**. A regra não mudou; só o desenho.
 - O sentido vem de `swingTowardViewer` (engine, `section.ts`): o produto interno entre a normal da parede no sentido de giro
   (`flipFacing`) e a normal da linha de vista. Sem lado resolvível, sai tracejado.
-- Porta dupla: duas diagonais, uma de cada ombreira ao centro da base. Porta pivotante: eixo vertical a W/4 da ombreira da
-  dobradiça, mais a diagonal da folha (mesma convenção de eixo da planta, decisão 0017 §8, ainda provisória).
+- **Porta de giro** (1 folha): V com o vértice no meio da altura da dobradiça (`flipHand`).
+- **Porta dupla**: um V por folha. Cada vértice fica na sua ombreira; as pontas, no centro, no topo e na base.
+- **Porta pivotante**: o eixo vertical a W/4 da ombreira da dobradiça (mesma convenção da planta, decisão 0017 §8, ainda
+  provisória) fica como traço; o vértice do V fica sobre ele, na altura média, e as pontas vão ao lado oposto.
+- **Janelas de abrir** (E1): o maxim-ar tem o vértice no meio da aresta **superior** do caixilho (dobradiça no topo) e as
+  pontas nos dois cantos inferiores; o basculante, o vértice na aresta **inferior** e as pontas nos cantos superiores. O
+  arco tracejado de antes saiu. Na janela, o tracejado segue a mesma regra de `swingTowardViewer` (antes, sempre tracejado).
+- **Janela de correr e fixa**: sem V (seta de correr e nada, como antes).
 - Fato de apoio [DOC]: no Revit, o giro de porta em elevação é uma linha simbólica da família, visível só na vista em que
   foi desenhada (Autodesk, *About Creating 2D Geometry*, 2016).
 
@@ -45,19 +55,24 @@ e as fontes que consegui ler são de concurso e de tutorial.
 
 ## 5. O que não mudou
 
-- Níveis de detalhe (decisão 0015): no grosseiro, sem símbolo de vão e sem X de furo. Médio e fino têm o mesmo símbolo de
-  vão: nenhuma diferença foi implementada entre os dois. Fonte: Graphisoft AC26, *Door/Window Settings and Opening*, 2D
+- Níveis de detalhe (decisão 0015): no grosseiro, sem símbolo de vão e sem X de furo, na planta e também na elevação
+  (V, seta de correr e X de vão; antes o corte e a elevação desenhavam esses traços no grosso). Médio e fino têm o mesmo
+  símbolo de vão: nenhuma diferença foi implementada entre os dois. Fonte: Graphisoft AC26, *Door/Window Settings and Opening*, 2D
   Detail Level (`By MVO`, `Scale Sensitive`, escala fixa, `Off`).
 - Projeção acima do corte: tracejada, como já era (decisão 0013).
 - `SCHEMA_VERSION` não foi incrementado; não há campo novo no modelo.
 
 ## 6. Verificação
 
-- Testes: geometria do X e do giro (`openingSymbol.test.ts`, `build.test.ts`), X de furo (`holeMarks.test.ts`, `floors.test.ts`,
+- Testes: geometria do X e do giro (`openingSymbol.test.ts`, `build.test.ts`: V por família, `hand`/`flipFacing`, grosso e linhas finas), X de furo (`holeMarks.test.ts`, `floors.test.ts`,
   `slabs.test.ts`), DXF (`dxf.test.ts`, `dxfExport.test.ts`).
 - Regressão visual: os casos `piso-com-furo` e `laje-com-furo` mudaram 0,136 % cada, só pelo X do furo; as imagens foram lidas
-  e as duas baselines regravadas. Os demais 25 casos seguem em 0,000 %. Três casos novos, com baseline criada e conferida:
+  e as duas baselines regravadas. Na troca do giro para o V, só `elevacao-porta-janela` mudou (ver a revisão SV1 em §6). Três casos novos, com baseline criada e conferida:
   `planta-porta-janela`, `laje-abertura-x` e `elevacao-porta-janela`.
+
+- Revisão SV1 (giro em V): só `elevacao-porta-janela` mudou, 0,090 % antes da regravação. A imagem nova mostra a porta de
+  giro com o V (vértice na dobradiça a meia altura, pontas no trinco, contínuo porque a folha abre para longe), e o diff fica
+  só dentro da folha. Os outros 29 casos seguem em 0,000 %. Baseline regravada sem `--update` geral.
 
 ## 7. Fora desta entrega
 

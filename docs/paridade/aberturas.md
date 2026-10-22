@@ -31,10 +31,11 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 - [x] C7 X do vão livre no corte e na elevação: duas diagonais contínuas de vértice a vértice do contorno (0024 §3) — `packages/render/src/section/build.test.ts`
 
 ## Elevação
-- [x] E1 Símbolo de abertura na elevação: arco tracejado do maxim-ar/basculante dentro do vão, do lado de `flipFacing`, e traço tracejado do lado da dobradiça na porta de giro — `packages/render/src/section/build.test.ts`
+- [x] E1 Símbolo de abertura na elevação: V de giro na porta de giro (vértice na dobradiça), e na janela de abrir (maxim-ar com o vértice no topo; basculante, na base); o arco tracejado saiu na SV1 (0024 §2) — `packages/render/src/section/build.test.ts`
 - [x] E2 Folha de correr na elevação com a seta de correr (janela e porta) — `packages/render/src/section/build.test.ts`
 - [x] E3 Giro na elevação: tracejado quando a folha abre para o observador, contínuo quando abre para o lado oposto; vértice na dobradiça. Convenção própria: a NBR 6492 e a Autodesk não deram a regra (0024 §2) — `packages/render/src/section/build.test.ts`, `packages/engine/src/section.ts`
-- [x] E4 Porta dupla (duas diagonais das ombreiras ao centro) e pivotante (eixo a W/4 e folha) na elevação — `packages/render/src/section/build.test.ts`
+- [x] E4 Porta dupla (um V por folha, vértices nas ombreiras e pontas no centro) e pivotante (eixo a W/4 e V sobre ele) na elevação — `packages/render/src/section/build.test.ts`
+- [x] E5 Símbolos de elevação (V, seta de correr e X de vão) somem no grosso (decisão 0015; 0024 §5); janela de correr e fixa sem V — `packages/render/src/section/build.test.ts`
 
 ## 3D
 - [x] D1 Batente (ombreiras e verga) com a largura do tipo (`frameWidth`), não 0,05 fixo **(bloqueante)** — `packages/render/src/model3d/scene3d.test.ts`

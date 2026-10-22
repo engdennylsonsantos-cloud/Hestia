@@ -138,11 +138,26 @@ describe('ferramenta Dividir', () => {
     expect(t.preview()).toContainEqual({ kind: 'highlight', ids: ['w'] });
   });
 
-  it('parede curva não é dividida e a mensagem explica o motivo', () => {
-    const { store, env, messages } = oneWall({ sag: 0.5 });
+  it('divide parede em arco pelo ponto clicado sobre o arco', () => {
+    const { store, env } = oneWall({ sag: 0.5 });
     const t = tool('split', env);
     clickAt(t, 3, 0.5); // o meio do arco fica a uma flecha da corda
-    expect(walls(store)).toHaveLength(1);
-    expect(messages.at(-1)).toBe('Dividir parede curva ainda não é suportado.');
+    const [first, second] = walls(store) as [Wall, Wall];
+    expect(walls(store)).toHaveLength(2);
+    expect(first.sag).not.toBe(0);
+    expect(second.sag).not.toBe(0);
+    expect(first.b.x).toBeCloseTo(second.a.x);
+    expect(first.b.y).toBeCloseTo(second.a.y);
+    expect(first.b.y).toBeCloseTo(0.5, 1);
+  });
+
+  it('no arco, digitar a distância usa o comprimento do arco', () => {
+    const { store, env } = oneWall({ sag: 1 });
+    const t = tool('split', env);
+    t.move(P(3, 1));
+    expect(t.type('3')).toBe(true);
+    const [first] = walls(store) as [Wall, Wall];
+    expect(first.sag).not.toBe(0);
+    expect(first.b.x).toBeLessThan(3);
   });
 });

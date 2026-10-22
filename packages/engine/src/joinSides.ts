@@ -141,9 +141,8 @@ export function stairSpec(r: EndRef, self: MiterSide, other: MiterSide, edge: 'l
     const tLow = tAtS(sLow);
     const tHigh = tAtS(sHigh);
     if (!ok(tEdge) || !ok(tLow) || !ok(tHigh)) return null;
-    // Faixa que corta a face de arco da outra parede: a corda entre os dois pontos fica registrada em `on`.
-    if (Math.abs(tHigh - tLow) < 1e-9 && !other.arc) runs.push({ s: sLow, t: tEdge, on: sOther, host: other.wallId });
-    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh, on: sOther, host: other.wallId });
+    if (Math.abs(tHigh - tLow) < 1e-9) runs.push({ s: sLow, t: tEdge });
+    else runs.push({ s: sLow, s1: sHigh, t: tLow, t1: tHigh });
   }
   runs.sort((x, y) => x.s - y.s);
   return runs.length ? { kind: 'steps', runs } : null;

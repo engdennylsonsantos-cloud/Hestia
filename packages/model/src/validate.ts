@@ -1,5 +1,5 @@
 import { cross, dist, dot, norm, sub, type Vec2 } from '@hestia/geom';
-import { unjoinedEndIssues } from './validateJoins.ts';
+import { curveJoinDomainIssues, unjoinedEndIssues } from './validateJoins.ts';
 import { floorIssues } from './validateFloors.ts';
 import { slabIssues } from './validateSlabs.ts';
 import { roofIssues } from './validateRoofs.ts';
@@ -243,6 +243,7 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...openingOverlaps(p, openings),
     ...wallOverlaps(walls),
     ...unjoinedEndIssues(p, walls),
+    ...curveJoinDomainIssues(p, walls),
     ...floorIssues(p),
     ...slabIssues(p),
     ...roofIssues(p),

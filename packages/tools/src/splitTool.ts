@@ -1,13 +1,12 @@
-import { dist, dot, lerp, sub, type Vec2 } from '@hestia/geom';
+import { type Vec2 } from '@hestia/geom';
 import { isOpening, isWall, type Id, type Wall } from '@hestia/model';
+import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
 import { ToolBase, makeId } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { pickAt } from './pick.ts';
 import type { PointerInfo } from './types.ts';
 
 const SNAP_PX = 10;
-const CURVED = 'Dividir parede curva ainda não é suportado.';
-
 /** Ponto de corte: distância `t` ao longo da parede, medida a partir de `a`. */
 interface Cut {
   wallId: Id;
@@ -63,11 +62,12 @@ export class SplitTool extends ToolBase {
     return isWall(host) ? host : null;
   }
 
-  /** Projeta o cursor no eixo da parede e arredonda à grade quando está perto. Null fora do miolo da parede. */
+  /** Projeta o cursor no eixo da parede (reta ou arco) e arredonda à grade quando está perto. Null fora do miolo. */
   private cutOn(w: Wall, raw: Vec2): Cut | null {
-    const L = dist(w.a, w.b);
-    if (L < 1e-9) return null;
-    let t = dot(sub(raw, w.a), { x: (w.b.x - w.a.x) / L, y: (w.b.y - w.a.y) / L });
+    const f = frameOfWall(this.env.project(), w.id);
+    if (!f || f.length < 1e-9) return null;
+    const L = f.length;
+    let t = toLocal(f, raw).t;
     if (t <= 0 || t >= L) return null;
     const g = this.env.gridStep();
     const near = g > 0 ? Math.round(t / g) * g : t;
@@ -76,7 +76,7 @@ export class SplitTool extends ToolBase {
       t = near;
       snapped = true;
     }
-    return { wallId: w.id, t, at: lerp(w.a, w.b, t / L), snapped };
+    return { wallId: w.id, t, at: pointAt(f, t, 0), snapped };
   }
 
   override move(p: PointerInfo): void {
@@ -87,7 +87,6 @@ export class SplitTool extends ToolBase {
     if (!w) return;
     this.items.push({ kind: 'highlight', ids: [w.id] });
     if (this.gapStart && this.gapStart.wallId !== w.id) this.items.push({ kind: 'highlight', ids: [this.gapStart.wallId] });
-    if (w.sag !== 0) return;
     const cut = this.cutOn(w, p.raw);
     if (!cut) return;
     this.inf = { point: cut.at, kind: cut.snapped ? 'grid' : 'nearest', guides: [] };
@@ -105,10 +104,6 @@ export class SplitTool extends ToolBase {
     const w = this.wallAt(p);
     if (!w) {
       this.env.say('Clique sobre uma parede.');
-      return;
-    }
-    if (w.sag !== 0) {
-      this.env.say(CURVED);
       return;
     }
     const cut = this.cutOn(w, p.raw);

@@ -11,6 +11,7 @@ export function makeEnv(store = new ProjectStore(createEmptyProject())) {
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
     rotateCopy: false, mirrorCopy: false, offsetCopy: true,
     floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly', slabTypeId: 'ls_mac12', slabOffset: 0, slabMode: 'poly', slabSlopePercent: 2,
+    ceilingTypeId: 'ct_gesso', ceilingOffset: 2.6, ceilingMode: 'poly',
   };
   const env: ToolEnv = {
     project: () => store.project,

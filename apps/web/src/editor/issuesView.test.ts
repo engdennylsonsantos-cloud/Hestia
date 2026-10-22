@@ -117,3 +117,14 @@ describe('Ir para dos avisos de contorno associativo (decisão 0023 §8.2c)', ()
     });
   });
 });
+
+describe('P9 · avisos informativos (wall-floor-partial)', () => {
+  it('informação tem grupo próprio, depois dos avisos, e não deixa o botão vermelho', () => {
+    const info = { severity: 'info' as const, code: 'wall-floor-partial', message: 'só parte' };
+    const warn = { severity: 'warning' as const, code: 'x', message: 'aviso' };
+    expect(groupIssues([info, warn]).map((g) => g.severity)).toEqual(['warning', 'info']);
+    expect(groupIssues([info])[0]!.title).toBe('Informações');
+    expect(worstSeverity([info])).toBe('info');
+    expect(summarize([info, info])).toBe('2 informações');
+  });
+});

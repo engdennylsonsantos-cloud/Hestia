@@ -70,29 +70,46 @@ export function floorFills(
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('floor', v.zoom),
 ): FloorOps {
+  return concatOps(
+    resolveFloors(p, levelId)
+      .filter((f) => !hidden?.has(f.floorId))
+      .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint)),
+  );
+}
+
+/** Operações de um piso (preenchimento, contorno, etiqueta). `floorFills` as junta; a planta as ordena pela cota. */
+export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
-  for (const f of resolveFloors(p, levelId)) {
-    if (hidden?.has(f.floorId)) continue;
-    const top = f.layers[0];
-    const m = top ? p.materials[top.materialId] : undefined;
-    const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-    out.fills.push({ polygons: f.polygon, color, alpha: 1, hatch });
-    if (detail !== 'coarse') {
-      // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
-      // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima). A espessura é a
-      // do corte do piso (decisão 0015 §2.1).
-      const band = difference(f.polygon, offsetMulti(f.polygon, -paint.cutPx / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
-    }
-    if (p.settings.showTags) {
-      const code = p.floorTypes[f.typeId]?.code;
-      const at = labelPoint(f.polygon);
-      const text = [code, fmtArea(multiArea(f.polygon), 1)].filter(Boolean).join(' · ');
-      if (at) out.labels.push({ at, text });
-    }
+  const top = f.layers[0];
+  const m = top ? p.materials[top.materialId] : undefined;
+  const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  out.fills.push({ polygons: f.polygon, color, alpha: 1, hatch });
+  if (detail !== 'coarse') {
+    // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
+    // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima). A espessura é a
+    // do corte do piso (decisão 0015 §2.1).
+    const band = difference(f.polygon, offsetMulti(f.polygon, -paint.cutPx / v.zoom));
+    if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+  }
+  if (p.settings.showTags) {
+    const code = p.floorTypes[f.typeId]?.code;
+    const at = labelPoint(f.polygon);
+    const text = [code, fmtArea(multiArea(f.polygon), 1)].filter(Boolean).join(' · ');
+    if (at) out.labels.push({ at, text });
+  }
+  return out;
+}
+
+/** Junta operações de várias peças, na ordem dada (a ordem dos preenchimentos é a de pintura). */
+export function concatOps(list: FloorOps[]): FloorOps {
+  const out = empty();
+  for (const o of list) {
+    out.fills.push(...o.fills);
+    out.strokes.push(...o.strokes);
+    out.labels.push(...o.labels);
   }
   return out;
 }

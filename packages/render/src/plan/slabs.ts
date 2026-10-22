@@ -3,7 +3,7 @@ import { resolveSlabs, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { concatOps, fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
@@ -54,30 +54,36 @@ export function slabFills(
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('slab', v.zoom),
 ): FloorOps {
+  return concatOps(
+    resolveSlabs(p, levelId)
+      .filter((s) => !hidden?.has(s.slabId))
+      .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint)),
+  );
+}
+
+/** Operações de uma laje (preenchimento, contorno, seta de caimento e etiquetas). `slabFills` as junta; a planta as ordena pela cota. */
+export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
-  for (const s of resolveSlabs(p, levelId)) {
-    if (hidden?.has(s.slabId)) continue;
-    const layer = structuralLayer(p, s);
-    const m = layer ? p.materials[layer.materialId] : undefined;
-    const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-    out.fills.push({ polygons: s.polygon, color, alpha: 1, hatch });
-    const at = labelPoint(s.polygon);
-    if (detail !== 'coarse') {
-      const band = difference(s.polygon, offsetMulti(s.polygon, -paint.cutPx / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
-      if (s.slope && at) {
-        out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
-        out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });
-      }
+  const layer = structuralLayer(p, s);
+  const m = layer ? p.materials[layer.materialId] : undefined;
+  const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  out.fills.push({ polygons: s.polygon, color, alpha: 1, hatch });
+  const at = labelPoint(s.polygon);
+  if (detail !== 'coarse') {
+    const band = difference(s.polygon, offsetMulti(s.polygon, -paint.cutPx / v.zoom));
+    if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+    if (s.slope && at) {
+      out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
+      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });
     }
-    if (p.settings.showTags && at) {
-      const code = p.slabTypes[s.typeId]?.code;
-      const text = [code, fmtArea(multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
-      out.labels.push({ at, text, ...(s.slope ? { dy: -10 } : {}) });
-    }
+  }
+  if (p.settings.showTags && at) {
+    const code = p.slabTypes[s.typeId]?.code;
+    const text = [code, fmtArea(multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
+    out.labels.push({ at, text, ...(s.slope ? { dy: -10 } : {}) });
   }
   return out;
 }

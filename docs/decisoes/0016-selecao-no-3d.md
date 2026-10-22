@@ -24,7 +24,7 @@ Decidido em 2026-10-21 com o dono: selecionar elementos pela vista 3D (paredes, 
 - O cursor vira `pointer` sobre um elemento. O hover faz um raio por quadro de animação (o último ponto ganha) e limpa ao sair do canvas ou ao trocar de vista.
 
 ## 5 · Teclas (vista 3D, `controller.ts`)
-- Esc limpa a seleção. Delete e Backspace excluem a seleção (Ctrl+Z desfaz). Teclas de ferramenta não atuam na vista 3D.
+- Esc segue o da planta: cancela a operação em curso da ferramenta, se houver; senão volta para a ferramenta Selecionar; a seleção só é limpa quando já está na Selecionar sem operação. Delete e Backspace excluem a seleção (Ctrl+Z desfaz). Teclas de ferramenta não atuam na vista 3D.
 
 ## 6 · Limitações
 - As arestas do realce têm 1 px: o WebGL não tem espessura de linha, e a versão grossa exigiria linhas com geometria própria.

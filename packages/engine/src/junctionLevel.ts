@@ -1,7 +1,8 @@
 import { multiArea, union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors } from './floors.ts';
-import { adjacentLevelIds, floorLayerPiece, slabLayerPiece, wallLayerPieces, type SolidPiece } from './junctionNet.ts';
+import { adjacentLevelIds, floorLayerPiece, slabLayerPiece, wallLayerPieces, wallPiecesOf, wallZRange, type SolidPiece } from './junctionNet.ts';
+import { resolveLevel } from './resolve.ts';
 import { resolveJunction, zOverlaps, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
 import { resolveSlabs } from './slabs.ts';
 
@@ -40,6 +41,9 @@ interface Tagged {
 }
 
 const r6 = (n: number): number => Math.round(n * 1e6) / 1e6;
+
+/** Tolerância (m) para duas faixas de cota se cruzarem de verdade (como em `junctionPlanar`). */
+const Z_EPS = 1e-6;
 
 /** Peça plana de uma peça de sólido: a faixa de cota é a envolvente dos vértices. Membrana (espessura zero) fica de fora. */
 function planarOf(sp: SolidPiece): PlanarPiece | null {
@@ -106,9 +110,17 @@ function adjacentPieces(p: Project, levelId: Id, own: readonly PlanarPiece[]): P
         if (piece && ownWalls.some((w) => zOverlaps(w, piece))) out.push({ ...piece, external: true });
       }
     }
-    for (const { piece: sp } of wallLayerPieces(p, id)) {
-      const piece = planarOf(sp);
-      if (piece && ownHorizontal.some((h) => zOverlaps(h, piece))) out.push({ ...piece, external: true });
+    // Parede vizinha: só as que têm faixa de cota comum com algum piso ou laje do nível (sem montar as outras).
+    if (ownHorizontal.length === 0) continue;
+    const hz0 = Math.min(...ownHorizontal.map((h) => h.z0));
+    const hz1 = Math.max(...ownHorizontal.map((h) => h.z1));
+    for (const rw of Object.values(resolveLevel(p, id).walls)) {
+      const [z0, z1] = wallZRange(rw);
+      if (Math.min(z1, hz1) - Math.max(z0, hz0) <= Z_EPS) continue;
+      for (const { piece: sp } of wallPiecesOf(rw)) {
+        const piece = planarOf(sp);
+        if (piece && ownHorizontal.some((h) => zOverlaps(h, piece))) out.push({ ...piece, external: true });
+      }
     }
   }
   return out;

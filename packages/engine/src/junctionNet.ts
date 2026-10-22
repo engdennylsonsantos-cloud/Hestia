@@ -181,12 +181,25 @@ export interface WallLayerPiece {
   piece: SolidPiece;
 }
 
+/** Faixa de cota (base e topo absolutos) de uma parede pelas faixas de todas as camadas; sem montar peças. */
+export function wallZRange(rw: ResolvedWall): readonly [number, number] {
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const l of rw.layers) for (const b of l.bands) {
+    z0 = Math.min(z0, rw.baseZ + b.z0);
+    z1 = Math.max(z1, rw.baseZ + b.z1);
+  }
+  return [z0, z1];
+}
+
+/** Pedaços das faixas de uma parede resolvida, com o índice da camada de cada um (P7c). */
+export function wallPiecesOf(rw: ResolvedWall): WallLayerPiece[] {
+  return rw.layers.flatMap((l) => l.bands.map((b) => ({ layerIndex: l.layerIndex, piece: bandPiece(rw, b, { priority: l.priority, core: l.core }) })));
+}
+
 /** Pedaços das faixas de parede do nível, com o índice da camada de cada um (base da junção por camada, P7c). */
 export function wallLayerPieces(p: Project, levelId: Id): WallLayerPiece[] {
-  const r = resolveLevel(p, levelId);
-  return Object.values(r.walls).flatMap((rw) =>
-    rw.layers.flatMap((l) => l.bands.map((b) => ({ layerIndex: l.layerIndex, piece: bandPiece(rw, b, { priority: l.priority, core: l.core }) }))),
-  );
+  return Object.values(resolveLevel(p, levelId).walls).flatMap(wallPiecesOf);
 }
 
 /** Pedaços das faixas de parede do nível, camada a camada: piso e laje também podem ser cortados por parede (0023 §1, P7). */

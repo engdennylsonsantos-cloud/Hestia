@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Command, type Id, type ProjectStore } from '@hestia/model';
+import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Command, type Id, type Project, type ProjectStore } from '@hestia/model';
 
 /** Resultado de uma edição de gráficos: `error` traz a mensagem pt-BR de quem recusou (nada é gravado). */
 export interface GraphicsEdit {
@@ -116,4 +116,19 @@ export function restoreProjectGraphicsDefault(store: ProjectStore): GraphicsEdit
     },
     'Restaurar pesos de linha',
   );
+}
+
+/** Alvo das linhas finas (decisão 0015): a planta de um nível, ou o corte/elevação aberto (um conjunto para todos os cortes). */
+export type ThinLinesTarget = { levelId: Id } | 'section';
+
+/** Linhas finas da vista ativa ligadas? Sem o campo salvo, desligadas. */
+export function thinLinesOn(p: Project, target: ThinLinesTarget): boolean {
+  return (target === 'section' ? sectionGraphicsOf(p) : levelGraphicsOf(p, target.levelId)).thinLines === true;
+}
+
+/** Liga ou desliga as linhas finas (só na tela, a plotagem não muda) da vista. Grava no projeto, em um passo de desfazer. */
+export function editThinLines(store: ProjectStore, target: ThinLinesTarget, on: boolean): GraphicsEdit {
+  return target === 'section'
+    ? editSectionGraphics(store, { thinLines: on }, 'Alternar linhas finas do corte')
+    : editLevelGraphics(store, target.levelId, { thinLines: on }, 'Alternar linhas finas da planta');
 }

@@ -461,7 +461,7 @@ function layerTable(text: string): Map<string, number | undefined> {
 }
 
 /** Gráficos salvos de uma vista, parciais como no projeto (o leitor completa com o padrão). */
-type SavedLevelGraphics = { scale?: number; overrides?: Partial<Record<GraphicsCategory, Partial<CategoryOverride>>> };
+type SavedLevelGraphics = { scale?: number; thinLines?: boolean; overrides?: Partial<Record<GraphicsCategory, Partial<CategoryOverride>>> };
 
 /** Cópia do projeto com os gráficos salvos na vista. O comando de edição não faz parte deste teste. */
 function withLevelGraphics(p: Project, levelId: string, g: SavedLevelGraphics): Project {
@@ -592,5 +592,15 @@ describe('corte e elevação no DXF (decisão 0015 §2.7)', () => {
     expect(w['0']).toBeUndefined();
     expect(w['CORTE_PAREDE_PROJECAO']).toBeGreaterThan(0);
     expect(w['CORTE_CONTORNO']).toBeGreaterThan(0);
+  });
+});
+
+describe('linhas finas não mudam o DXF (decisão 0015, só na tela)', () => {
+  it('um nível com linhas finas sai igual ao sem o modo, com o 370 real de cada camada de parede', () => {
+    const p = lPlan().project;
+    const fina = withLevelGraphics(p, 'lv_0', { thinLines: true } as SavedLevelGraphics);
+    expect(planDxf(fina, 'lv_0')).toBe(planDxf(p, 'lv_0'));
+    const table = layerTable(planDxf(fina, 'lv_0'));
+    for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(50);
   });
 });

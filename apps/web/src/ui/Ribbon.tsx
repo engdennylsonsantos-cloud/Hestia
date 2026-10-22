@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
 import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { editView3D } from '../editor/graphicsActions.ts';
+import { editThinLines, editView3D, thinLinesOn } from '../editor/graphicsActions.ts';
 import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
@@ -33,9 +33,9 @@ function ToolButton({ id }: { id: ToolId }): ReactElement {
   );
 }
 
-function Toggle({ icon, label, on, onClick, title }: { icon: string; label: string; on: boolean; onClick: () => void; title?: string }): ReactElement {
+function Toggle({ icon, label, on, onClick, title, disabled }: { icon: string; label: string; on: boolean; onClick: () => void; title?: string; disabled?: boolean }): ReactElement {
   return (
-    <button className={`tbtn${on ? ' on' : ''}`} onClick={onClick} title={title ?? label} aria-pressed={on}>
+    <button className={`tbtn${on ? ' on' : ''}`} onClick={onClick} title={title ?? label} aria-pressed={on} disabled={disabled}>
       <Icon name={icon} size={22} />
       <span>{label}</span>
     </button>
@@ -82,6 +82,14 @@ export function Ribbon(): ReactElement {
     const patch = key === 'shadows' ? { shadows: !v3.shadows } : key === 'edges' ? { edges: !v3.edges } : { openOpenings: !(v3.openOpenings === true) };
     const r = editView3D(editor.store, patch, label);
     if (!r.ok) useUi.setState({ status: r.error ?? 'Não foi possível alterar a vista 3D.' });
+  };
+  /** Linhas finas da vista ativa (planta do nível ou corte aberto); no 3D e na prancha o botão fica desabilitado. */
+  const thinAvailable = s.view === 'plan' || s.view === 'section';
+  const thinTarget = s.view === 'section' ? 'section' : { levelId: s.levelId };
+  const thin = thinAvailable && thinLinesOn(p, thinTarget);
+  const toggleThin = (): void => {
+    const r = editThinLines(editor.store, thinTarget, !thin);
+    if (!r.ok) useUi.setState({ status: r.error ?? 'Não foi possível alterar as linhas finas.' });
   };
   const tabs: Array<[typeof tab, string]> = [
     ['arquitetura', 'Arquitetura'],
@@ -156,6 +164,7 @@ export function Ribbon(): ReactElement {
                 <Toggle icon="grid" label="Grade" on={s.showGrid} onClick={() => set({ showGrid: !s.showGrid })} />
                 <Toggle icon="layers" label="Subpavimento" on={s.showUnderlay} onClick={() => set({ showUnderlay: !s.showUnderlay })} title="Mostrar o pavimento abaixo, apagado" />
                 <Toggle icon="roof" label="Mostrar projeção da cobertura" on={s.showRoofProjection} onClick={toggleRoofProjection} title="Mostrar a projeção tracejada da cobertura acima do corte (decisão 0013)" />
+                <Toggle icon="plan" label="Linhas finas" on={thin} disabled={!thinAvailable} onClick={toggleThin} title={thinAvailable ? 'Desenha os traços da vista ativa com 1 px, só na tela (gravado no projeto, desfazível); a plotagem mantém os pesos reais' : 'Disponível na planta e no corte'} />
               </div>
               <div className="rgroup-title">Planta</div>
             </div>

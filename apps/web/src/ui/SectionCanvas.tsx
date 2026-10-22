@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { buildSectionDrawList, DARK, LIGHT, type PlanDrawList, type Viewport } from '@hestia/render';
 import { editor, useProject } from '../editor/controller.ts';
+import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 
@@ -13,7 +14,7 @@ export function buildSectionFrame(v: Viewport, dark: boolean): PlanDrawList | nu
   const st = useUi.getState();
   const section = editor.sectionOf(st.sectionId);
   if (!section) return null;
-  return buildSectionDrawList({ project: editor.project, section, viewport: v, theme: dark ? DARK : LIGHT, dark, showGrid: st.showGrid, highlight: { selection: st.selection, hover: st.hover } });
+  return buildSectionDrawList({ project: editor.project, section, viewport: v, theme: dark ? DARK : LIGHT, dark, showGrid: st.showGrid, highlight: { selection: st.selection, hover: st.hover }, thinLines: thinLinesOn(editor.project, 'section') });
 }
 
 /** Nome da vista aberta, no canto, com saída para a planta. */

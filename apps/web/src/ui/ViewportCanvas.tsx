@@ -5,6 +5,7 @@ import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
+import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
@@ -193,6 +194,8 @@ export function ViewportCanvas(): ReactElement {
                 preview: tool.preview(),
                 inference: tool.inference(),
                 showGrid: st.showGrid,
+                // Linhas finas da planta do nível (decisão 0015): só na tela; a plotagem não passa a opção.
+                thinLines: thinLinesOn(p, { levelId: st.levelId }),
                 // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
                 ...{ showRoofProjection: st.showRoofProjection },
             }),

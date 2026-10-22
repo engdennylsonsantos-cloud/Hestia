@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_VIEW_3D, DEFAULT_VIEW_GRAPHICS, ProjectStore, createEmptyProject, graphicsOf, levelGraphicsOf, view3dOf } from '@hestia/model';
-import { alreadyApplied, editLevelGraphics, editProjectGraphics, editView3D, restoreLevelGraphicsDefault, restoreProjectGraphicsDefault, restoreView3DDefault } from './graphicsActions.ts';
+import { alreadyApplied, editLevelGraphics, editProjectGraphics, editThinLines, editView3D, restoreLevelGraphicsDefault, restoreProjectGraphicsDefault, restoreView3DDefault, thinLinesOn } from './graphicsActions.ts';
 
 const store = (): ProjectStore => new ProjectStore(createEmptyProject());
 
@@ -197,5 +197,26 @@ describe('restauração (planta, 3D)', () => {
     const label = s.undoLabel;
     expect(restoreView3DDefault(s)).toEqual({ ok: true, error: null });
     expect(s.undoLabel).toBe(label);
+  });
+});
+
+describe('editThinLines (linhas finas da vista ativa, só na tela)', () => {
+  it('liga na planta, grava no projeto, desfaz e volta a desligada', () => {
+    const s = store();
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+    expect(editThinLines(s, { levelId: 'lv_0' }, true)).toEqual({ ok: true, error: null });
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(true);
+    expect(s.project.levels[0]!.graphics?.thinLines).toBe(true);
+    expect(s.undoLabel).toBe('Alternar linhas finas da planta');
+    s.undo();
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+  });
+
+  it('no corte, grava no conjunto do projeto (não no nível) e tem o próprio rótulo de desfazer', () => {
+    const s = store();
+    expect(editThinLines(s, 'section', true).ok).toBe(true);
+    expect(thinLinesOn(s.project, 'section')).toBe(true);
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+    expect(s.undoLabel).toBe('Alternar linhas finas do corte');
   });
 });

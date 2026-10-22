@@ -262,3 +262,11 @@ describe('vistas de referência', () => {
     expect(v.azimuth).toBeCloseTo(-Math.PI / 4, 12);
   });
 });
+
+describe('tamanho do cubo', () => {
+  it('o lado do cubo fica entre 64 e 80 px (cubo pequeno e discreto, sem ocupar o viewport)', () => {
+    const side = CUBE_HALF_PX * 2;
+    expect(side).toBeGreaterThanOrEqual(64);
+    expect(side).toBeLessThanOrEqual(80);
+  });
+});

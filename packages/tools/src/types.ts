@@ -140,6 +140,11 @@ export interface PointerInfo {
   shift: boolean;
   ctrl: boolean;
   alt: boolean;
+  /**
+   * Vista 3D: elemento sob o cursor, o mesmo que a 3D destaca (`pickElement`); null no vazio. Ausente na planta, onde a
+   * ferramenta acha o elemento pelo ponto (`raw`).
+   */
+  hit3d?: Id | null;
 }
 
 /** Contrato único de ferramenta (docs/01 §7). A ferramenta nunca altera o modelo: ela emite comandos. */

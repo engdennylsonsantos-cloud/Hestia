@@ -1,5 +1,4 @@
-import type { Vec2 } from '@hestia/geom';
-import { isOpening, isWall, type Id, type Project, type Wall } from '@hestia/model';
+import { isOpening, isRoof, isWall, type Id, type Project, type Roof, type Wall } from '@hestia/model';
 import { resolveAllRoofs, roofAxisReport } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { pickAt } from './pick.ts';
@@ -11,13 +10,31 @@ const UNCOVERED_TOL = 1e-3;
 
 const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 
-/** Parede sob o cursor: a própria, ou a que hospeda a abertura (porta/janela). */
-function wallUnder(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
-  const hit = pickAt(p, levelId, at, mpp);
+/**
+ * Parede sob o cursor. Na 3D, é o elemento que a própria vista destaca (`hit3d`): escolher pelo ponto projetado na planta
+ * erra quando a superfície vista é o beiral ou o topo de uma parede anexada, que cai fora da pegada da parede. Na planta,
+ * a parede sob o ponto. A abertura vale pela parede que a hospeda; só paredes do nível atual.
+ */
+function wallUnder(p: Project, levelId: Id, info: PointerInfo, mpp: number): Id | null {
+  if (info.hit3d !== undefined) {
+    const e = info.hit3d ? p.elements[info.hit3d] : undefined;
+    const w = e && isOpening(e) ? p.elements[e.hostId] : e;
+    return w && isWall(w) && w.levelId === levelId ? w.id : null;
+  }
+  const hit = pickAt(p, levelId, info.raw, mpp);
   if (!hit) return null;
   const e = p.elements[hit.id];
   if (isWall(e)) return e.id;
   return isOpening(e) ? e.hostId : null;
+}
+
+/** Telhado sob o cursor: na 3D, o que a vista destaca (`hit3d`); na planta, o que cobre o ponto. */
+function roofUnder(p: Project, levelId: Id, info: PointerInfo, mpp: number): Id | null {
+  if (info.hit3d !== undefined) {
+    const r: Roof | undefined = info.hit3d ? (p.elements[info.hit3d] as Roof | undefined) : undefined;
+    return r && isRoof(r) && r.levelId === levelId ? r.id : null;
+  }
+  return pickRoofAt(p, levelId, info.raw, mpp);
 }
 
 /**
@@ -92,7 +109,7 @@ export class AttachRoofTool extends ToolBase {
     this.items = [];
     if (this.walls.length) this.items.push({ kind: 'highlight', ids: this.walls });
     if (this.stage === 'roof') {
-      const roof = pickRoofAt(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
+      const roof = roofUnder(this.env.project(), this.env.levelId(), p, this.env.metersPerPixel());
       if (roof) this.items.push({ kind: 'highlight', ids: [roof] });
     }
   }
@@ -103,16 +120,17 @@ export class AttachRoofTool extends ToolBase {
     const levelId = this.env.levelId();
     const mpp = this.env.metersPerPixel();
     if (this.stage === 'walls') {
-      const w = wallUnder(pr, levelId, p.raw, mpp);
+      const w = wallUnder(pr, levelId, p, mpp);
       if (!w) {
-        this.env.say('Clique numa parede (ou selecione-a antes) e depois Enter.');
+        const onRoof = !!p.hit3d && isRoof(pr.elements[p.hit3d]);
+        this.env.say(onRoof ? 'Isso é um telhado: clique nas paredes e depois Enter escolhe o telhado.' : 'Clique numa parede (ou selecione-a antes) e depois Enter.');
         return;
       }
       this.walls = this.walls.includes(w) ? this.walls.filter((id) => id !== w) : [...this.walls, w];
       this.env.say(this.walls.length ? `${this.walls.length} parede(s) escolhida(s). Enter escolhe o telhado.` : WALLS_HINT);
       return;
     }
-    const roof = pickRoofAt(pr, levelId, p.raw, mpp);
+    const roof = roofUnder(pr, levelId, p, mpp);
     if (!roof) {
       this.env.say('Clique sobre um telhado do nível atual. Enter volta às paredes.');
       return;
@@ -191,7 +209,7 @@ export class DetachRoofTool extends ToolBase {
 
   override click(p: PointerInfo): void {
     this.raw = p.raw;
-    const w = wallUnder(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
+    const w = wallUnder(this.env.project(), this.env.levelId(), p, this.env.metersPerPixel());
     if (!w) {
       this.env.say('Clique numa parede anexada ao telhado.');
       return;

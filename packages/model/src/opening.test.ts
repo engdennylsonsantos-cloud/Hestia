@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_OPENING_TYPES, ProjectStore, createEmptyProject, openingFamilies, openingFamilyName, openingFamilyOf, openingLeaves, openingTypeIssue, type OpeningType } from './index.ts';
+import { DEFAULT_OPENING_TYPES, ProjectStore, createEmptyProject, nextOpeningFavorite, openingCasing, openingFamilies, openingFamilyName, openingFamilyOf, openingFavorites, openingLeaves, openingLintel, openingRough, openingSillBeam, openingSillBoard, openingTypeIssue, type OpeningType } from './index.ts';
 
 const tipo = (id: string): OpeningType => {
   const t = DEFAULT_OPENING_TYPES.find((x) => x.id === id);
@@ -77,5 +77,61 @@ describe('regra do tipo no comando', () => {
     expect(s.project.openingTypes.ot_novo).toMatchObject({ name: 'Porta da sala', code: 'P-10', leaves: 1, plan: 'swing' });
     expect(() => s.exec({ type: 'upsertOpeningType', openingType: { ...base, id: 'ot_ruim', leaves: 3 } })).toThrow(/Combinação inválida/);
     expect(s.project.openingTypes.ot_ruim).toBeUndefined();
+  });
+});
+
+
+describe('vão bruto, alizar, peitoril e vergas do tipo', () => {
+  it('sem os campos, o vão bruto é o do tipo e os acabamentos não existem', () => {
+    const t = tipo('ot_j120');
+    expect(openingRough(t)).toEqual({ width: 1.2, height: 1.2 });
+    expect(openingCasing(t)).toBeNull();
+    expect(openingSillBoard(t)).toBeNull();
+    expect(openingLintel(t)).toBeNull();
+    expect(openingSillBeam(t)).toBeNull();
+  });
+
+  it('a folga soma na largura e na altura do furo; valores inválidos valem zero', () => {
+    const r = openingRough({ width: 0.8, height: 2.1, roughOversize: { w: 0.04, h: 0.06 } });
+    expect(r.width).toBeCloseTo(0.84, 9);
+    expect(r.height).toBeCloseTo(2.16, 9);
+    expect(openingRough({ width: 0.8, height: 2.1, roughOversize: { w: -1, h: Number.NaN } })).toEqual({ width: 0.8, height: 2.1 });
+  });
+
+  it('alizar e peitoril só valem com as duas medidas positivas; peitoril só em janela', () => {
+    expect(openingCasing({ casing: { width: 0.05, thickness: 0.015 } })).toEqual({ width: 0.05, thickness: 0.015 });
+    expect(openingCasing({ casing: { width: 0, thickness: 0.015 } })).toBeNull();
+    expect(openingSillBoard({ kind: 'window', sillBoard: { projection: 0.03, thickness: 0.02 } })).toEqual({ projection: 0.03, thickness: 0.02 });
+    expect(openingSillBoard({ kind: 'door', sillBoard: { projection: 0.03, thickness: 0.02 } })).toBeNull();
+  });
+
+  it('verga e contraverga usam transpasse padrão de 0,30 m quando o campo está presente sem valores', () => {
+    expect(openingLintel({ lintel: {} })).toEqual({ over: 0.3, height: 0.2 });
+    expect(openingLintel({ lintel: { over: 0.4, height: 0.15 } })).toEqual({ over: 0.4, height: 0.15 });
+    expect(openingSillBeam({ sillBeam: { over: 0 } })).toEqual({ over: 0, height: 0.2 });
+    expect(openingLintel({})).toBeNull();
+  });
+});
+
+describe('favoritos de tipo de abertura', () => {
+  it('o comando liga e desliga o favorito e o desfazer volta a lista', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(openingFavorites(s.project)).toEqual([]);
+    s.exec({ type: 'toggleOpeningFavorite', id: 'ot_p80' }, 'Favoritar tipo de abertura');
+    expect(openingFavorites(s.project)).toEqual(['ot_p80']);
+    s.exec({ type: 'toggleOpeningFavorite', id: 'ot_j120' }, 'Favoritar tipo de abertura');
+    expect(openingFavorites(s.project)).toEqual(['ot_p80', 'ot_j120']);
+    s.exec({ type: 'toggleOpeningFavorite', id: 'ot_p80' }, 'Remover tipo dos favoritos');
+    expect(openingFavorites(s.project)).toEqual(['ot_j120']);
+    s.undo();
+    expect(openingFavorites(s.project)).toEqual(['ot_p80', 'ot_j120']);
+    expect(() => s.exec({ type: 'toggleOpeningFavorite', id: 'nao_existe' })).toThrow(/Tipo de abertura inexistente/);
+  });
+
+  it('nextOpeningFavorite é pura: não altera a lista recebida', () => {
+    const list = ['a'];
+    expect(nextOpeningFavorite(list, 'b')).toEqual(['a', 'b']);
+    expect(nextOpeningFavorite(list, 'a')).toEqual([]);
+    expect(list).toEqual(['a']);
   });
 });

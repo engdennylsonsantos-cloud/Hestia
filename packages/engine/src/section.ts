@@ -1,5 +1,5 @@
 import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { coreSpan, openingFamilyOf, openingFrame, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningFamilyId, type OpeningLeaves, type PlanSymbol, type Project } from '@hestia/model';
+import { coreSpan, openingCasing, openingFamilyOf, openingFrame, openingLintel, openingSillBeam, openingSillBoard, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningCasing, type OpeningFamilyId, type OpeningLeaves, type OpeningLintel, type OpeningSillBoard, type PlanSymbol, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
@@ -82,6 +82,11 @@ export interface SectionEsquadria {
   flipFacing: boolean;
   frameMaterialId: Id;
   glassMaterialId: Id;
+  /** Alizar, peitoril saliente, verga e contraverga do tipo; ausentes = não desenhar. */
+  casing: OpeningCasing | null;
+  sillBoard: OpeningSillBoard | null;
+  lintel: OpeningLintel | null;
+  sillBeam: OpeningLintel | null;
 }
 
 /** Vão de porta ou janela. `t0..z1` é a caixa do vão; `polygons` é a parte visível (sem o que está na frente). */
@@ -339,6 +344,10 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
             flipFacing: o.flipFacing,
             frameMaterialId: ot.frameMaterialId,
             glassMaterialId: ot.glassMaterialId,
+            casing: openingCasing(ot),
+            sillBoard: openingSillBoard(ot),
+            lintel: openingLintel(ot),
+            sillBeam: openingSillBeam(ot),
           },
         });
       }

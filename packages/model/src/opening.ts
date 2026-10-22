@@ -1,4 +1,4 @@
-import type { OpeningLeaves, OpeningType, PlanSymbol } from './types.ts';
+import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
 
 /**
  * Família de abertura (Revit: família da porta/janela; ArchiCAD: Library Part). A família define o COMPORTAMENTO e o
@@ -93,4 +93,14 @@ export function openingTypeIssue(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves'
   const kind = t.kind === 'door' ? 'porta' : 'janela';
   const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
   return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
+}
+
+/** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */
+export function openingFavorites(p: Pick<Project, 'settings'>): Id[] {
+  return p.settings?.favoriteOpeningTypes ?? [];
+}
+
+/** Lista de favoritos depois de ligar/desligar um tipo (função pura; o comando grava o resultado). */
+export function nextOpeningFavorite(list: readonly Id[], id: Id): Id[] {
+  return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
 }

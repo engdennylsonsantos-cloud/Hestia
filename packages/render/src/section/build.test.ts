@@ -230,3 +230,35 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(buildSectionDrawList(facade([op('jf', 'window', 'ot_jfixa60', 'frente')])).strokes.filter((s) => s.dash?.[0] === 4)).toHaveLength(0);
   });
 });
+
+describe('acabamento e vergas da esquadria no corte e na elevação', () => {
+  const fixa = createEmptyProject().openingTypes.ot_jfixa60!;
+  const com = (id: string, patch: Partial<OpeningType>): OpeningType => comTipo(fixa, { id, ...patch });
+  const pecas = (d: ReturnType<typeof buildSectionDrawList>, l: number, a: number): number =>
+    d.fills.filter((f) => Math.abs(largura(f.polygons) - l) < 1e-6 && Math.abs(altura(f.polygons) - a) < 1e-6).length;
+
+  it('verga: peça de concreto na elevação com transpasse de 0,30 m para cada lado (vão de 0,60 m)', () => {
+    const d = buildSectionDrawList(facade([op('j', 'window', 'ot_vg', 'frente')], com('ot_vg', { lintel: {} })));
+    expect(pecas(d, 1.2, 0.2)).toBe(1);
+    expect(pecas(buildSectionDrawList(facade([op('j', 'window', 'ot_vg0', 'frente')], com('ot_vg0', {}))), 1.2, 0.2)).toBe(0);
+  });
+
+  it('contraverga: peça de concreto sob o vão com a altura do tipo; sem o campo, nenhuma', () => {
+    const d = buildSectionDrawList(facade([op('j', 'window', 'ot_cv', 'frente')], com('ot_cv', { sillBeam: { over: 0, height: 0.25 } })));
+    expect(pecas(d, 0.6, 0.25)).toBe(1);
+  });
+
+  it('peitoril saliente: na elevação, faixa com a largura do vão sob ele; no corte, projeta além das duas faces', () => {
+    const tipo = com('ot_pt', { sillBoard: { projection: 0.03, thickness: 0.02 } });
+    expect(pecas(buildSectionDrawList(facade([op('j', 'window', 'ot_pt', 'frente')], tipo)), 0.6, 0.02)).toBe(1);
+    // A parede wt_alv14 tem 0,184 m de espessura; o peitoril sobra 0,03 m de cada lado.
+    expect(pecas(buildSectionDrawList(cross([op('j', 'window', 'ot_pt', 'w')], tipo)), 0.184 + 0.06, 0.02)).toBe(1);
+  });
+
+  it('alizar: contorno a mais em volta do vão (quatro linhas fechadas numa janela) na elevação', () => {
+    const fechados = (d: ReturnType<typeof buildSectionDrawList>): number => d.strokes.filter((s) => s.closed).length;
+    const base = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al0', 'frente')], com('ot_al0', {}))));
+    const alizado = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al', 'frente')], com('ot_al', { casing: { width: 0.05, thickness: 0.015 } }))));
+    expect(alizado - base).toBe(4);
+  });
+});

@@ -88,15 +88,45 @@ describe('CSV da tabela de portas e janelas', () => {
   it('BOM UTF-8, separador ";", cabeçalho, uma linha por tipo e total', () => {
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(lines).toHaveLength(schedule.rows.length + 2);
-    expect(lines[0]).toBe('Código;Tipo;Família;Categoria;Largura (m);Altura (m);Peitoril (m);Folhas;Quantidade;Área unitária (m²);Área total (m²)');
+    expect(lines[0]).toBe('Código;Tipo;Família;Categoria;Largura (m);Altura (m);Largura bruta (m);Altura bruta (m);Peitoril (m);Folhas;Verga (m);Contraverga (m);Quantidade;Área unitária (m²);Área total (m²)');
   });
 
   it('decimal com vírgula e categoria Porta/Janela', () => {
-    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,00;1;1;1,68;1,68');
-    expect(lines[5]).toBe('J-06;Janela de correr 240 x 120 (3 folhas);Janela de correr;Janela;2,40;1,20;1,10;3;1;2,88;2,88');
+    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,80;2,10;0,00;1;0,00;0,00;1;1,68;1,68');
+    expect(lines[5]).toBe('J-06;Janela de correr 240 x 120 (3 folhas);Janela de correr;Janela;2,40;1,20;2,40;1,20;1,10;3;0,00;0,00;1;2,88;2,88');
   });
 
   it('a linha de total traz a quantidade de instâncias e a área total', () => {
-    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '5', '', '13,17'].join(';'));
+    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '', '', '', '', '5', '', '13,17'].join(';'));
+  });
+});
+
+
+describe('vão bruto e vergas no quadro', () => {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+  const base = createEmptyProject().openingTypes.ot_j120!;
+  s.exec({
+    type: 'upsertOpeningType',
+    openingType: { ...base, id: 'ot_bruto', roughOversize: { w: 0.04, h: 0.06 }, lintel: { over: 0.3, height: 0.2 }, sillBeam: {} },
+  });
+  s.exec({ type: 'addOpening', opening: opening({ id: 'j', kind: 'window', typeId: 'ot_bruto', hostId: 'w', offset: 2 }) });
+  const tab = buildOpeningSchedule(s.project);
+  const row = tab.rows[0]!;
+
+  it('largura e altura brutas somam a folga do tipo; a área da esquadria não muda', () => {
+    expect(row.width).toBeCloseTo(1.2, 9);
+    expect(row.height).toBeCloseTo(1.2, 9);
+    expect(row.roughWidth).toBeCloseTo(1.24, 9);
+    expect(row.roughHeight).toBeCloseTo(1.26, 9);
+    expect(row.unitArea).toBeCloseTo(1.44, 9);
+  });
+
+  it('verga e contraverga trazem transpasse, altura padrão e comprimento total', () => {
+    expect(row.lintel).toEqual({ over: 0.3, height: 0.2 });
+    expect(row.sillBeam).toEqual({ over: 0.3, height: 0.2 }); // presente sem valores usa o padrão
+    expect(row.lintelLength).toBeCloseTo(1.8, 9);
+    expect(row.sillBeamLength).toBeCloseTo(1.8, 9);
+    expect(openingScheduleToCsv([row], sumOpeningRows([row]))).toContain('1,80;1,80;1;1,44;1,44');
   });
 });

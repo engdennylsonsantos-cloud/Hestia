@@ -133,6 +133,30 @@ describe('resolveJunction (região resolvida por camada)', () => {
   });
 });
 
+describe('término por prioridade (G-K, decisão 0023 §9.5): sentido de aumentar o número', () => {
+  // Acabamento da parede (4), fora do núcleo, encontra o substrato do piso. Região comum: 1 m² em planta e 0,05 m de cota.
+  const wallFinish = { kind: 'wall' as const, priority: 4, core: false };
+  const region = rect(0, 0, 1, 1);
+  const floorSub = (priority: number): PlanarPiece => ({ meta: { kind: 'floor', priority, core: false }, poly: region, z0: 0, z1: 0.05 });
+  const wallPiece: PlanarPiece = { meta: wallFinish, poly: region, z0: 0, z1: 0.05 };
+
+  it('G-K1/G-K2: substrato de número 2 (maior prioridade) faz a parede parar; de número 5 a parede atravessa', () => {
+    // Número 2 vence o acabamento 4: a parede perde a região comum (o substrato a leva).
+    const [w2] = resolveJunction([floorSub(2), wallPiece]).slice(1);
+    expect(volume(w2!)).toBeCloseTo(0, 9);
+    // Número 5 perde para o acabamento 4: o piso perde a região comum e a parede a mantém.
+    const [s5, w5] = resolveJunction([floorSub(5), wallPiece]);
+    expect(volume(s5!)).toBeCloseTo(0, 9);
+    expect(volume(w5!)).toBeCloseTo(0.05, 9);
+  });
+
+  it('no sentido inverso, diminuir o número do acabamento da parede (4 para 1) faz a parede atravessar o substrato', () => {
+    const [s, w] = resolveJunction([floorSub(2), { ...wallPiece, meta: { ...wallFinish, priority: 1 } }]);
+    expect(volume(s!)).toBeCloseTo(0, 9);
+    expect(volume(w!)).toBeCloseTo(0.05, 9);
+  });
+});
+
 describe('propriedades (10 sementes)', () => {
   const rng = (seed: number): (() => number) => {
     let s = seed >>> 0;

@@ -3,6 +3,7 @@ import { resolveBoundary } from '@hestia/engine';
 import { isFloor, isSlab, type Id, type OutlineSource, type ProjectStore } from '@hestia/model';
 import { editor } from '../editor/controller.ts';
 import { Group } from './fields.tsx';
+import { LinkOutlineButton } from './OutlineLinkControls.tsx';
 
 /** Só o que o grupo lê de um piso ou laje (decisão 0023 §8.2). */
 export interface OutlineHolder {
@@ -22,6 +23,8 @@ export interface OutlineView {
   text: string;
   detachIds: Id[];
   relinkIds: Id[];
+  /** Sem origem (croqui ou modelo pronto): podem ser vinculados às paredes pela sugestão de modo e semente. */
+  linkIds: Id[];
 }
 
 /**
@@ -44,6 +47,7 @@ export function outlineView(els: readonly OutlineHolder[]): OutlineView {
     text: parts.join(' · ') || 'Sem elementos',
     detachIds: linked.map((e) => e.id),
     relinkIds: estatico.map((e) => e.id),
+    linkIds: semOrigem.map((e) => e.id),
   };
 }
 
@@ -88,6 +92,7 @@ export function OutlineGroup({ elements }: { elements: readonly OutlineHolder[] 
           Revincular às paredes
         </button>
       </div>
+      <LinkOutlineButton ids={view.linkIds} />
     </Group>
   );
 }

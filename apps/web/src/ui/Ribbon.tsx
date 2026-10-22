@@ -6,6 +6,7 @@ import { editThinLines, editView3D, thinLinesOn } from '../editor/graphicsAction
 import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
+import { LinkLevelButton } from './OutlineLinkControls.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
   arquitetura: [
@@ -138,6 +139,7 @@ export function Ribbon(): ReactElement {
           <div className="rgroup">
             <div className="rgroup-tools">
               <MoveLevelButton />
+              <LinkLevelButton />
             </div>
             <div className="rgroup-title">Nível</div>
           </div>

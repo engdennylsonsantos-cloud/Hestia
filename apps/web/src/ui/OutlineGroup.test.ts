@@ -89,3 +89,15 @@ describe('grupo Contorno do piso e da laje (decisão 0023 §8.2)', () => {
     expect(area()).toBeCloseTo((6 - t) * (3 - t), 6);
   });
 });
+
+describe('botão Vincular às paredes do grupo Contorno (decisão 0023 §8.2)', () => {
+  it('piso de croqui ou de modelo pronto (sem origem) pode ser vinculado; estático com origem não', () => {
+    const v = outlineView([croqui('a'), stat('b'), linked('c')]);
+    expect(v.linkIds).toEqual(['a']);
+    expect(v.relinkIds).toEqual(['b']);
+  });
+
+  it('seleção só de vinculados não oferece Vincular às paredes', () => {
+    expect(outlineView([linked('a')]).linkIds).toEqual([]);
+  });
+});

@@ -2,7 +2,6 @@ import type { ReactElement } from 'react';
 import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
 import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { addCeilingsAllRooms } from '../editor/ceilingRoomActions.ts';
 import { editView3D } from '../editor/graphicsActions.ts';
 import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -31,21 +30,6 @@ function ToolButton({ id }: { id: ToolId }): ReactElement {
       <span>{TOOL_LABEL[id]}</span>
       {sc ? <kbd>{sc}</kbd> : null}
     </button>
-  );
-}
-
-/** Grupo "Forro" da aba Arquitetura: um forro por ambiente do nível (E6), com o tipo e a cota das opções. */
-function CeilingRoomsGroup(): ReactElement {
-  return (
-    <div className="rgroup">
-      <div className="rgroup-tools">
-        <button className="tbtn" onClick={() => addCeilingsAllRooms()} title="Cria um forro em cada ambiente de circuito fechado do nível que ainda não tem forro; um só Ctrl+Z desfaz tudo">
-          <Icon name="ceiling" size={22} />
-          <span>Forro nos ambientes</span>
-        </button>
-      </div>
-      <div className="rgroup-title">Forro</div>
-    </div>
   );
 }
 
@@ -115,7 +99,6 @@ export function Ribbon(): ReactElement {
         ))}
       </nav>
       <div className="ribbon" role="toolbar" aria-label="Ferramentas">
-        {tab === 'arquitetura' && <CeilingRoomsGroup />}
         {tab !== 'vista' &&
           GROUP_BY_TAB[tab]!.map((g) => (
             <div className="rgroup" key={g.title}>

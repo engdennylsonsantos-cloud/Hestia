@@ -35,6 +35,7 @@ gráficos por categoria; nível de detalhe por vista; exibição parcial de estr
    para depois).
 7. **DXF:** cada camada recebe a largura de linha do peso da categoria na escala da vista (código de grupo 370, centésimos de mm), em vez de ignorá-la.
 8. **Hachura `solid`** passa a ter ramo de desenho (hoje não aparece), tanto na planta por CPU quanto por GPU.
+9. **Ordem de desenho da planta na GPU:** todo material da planta é transparente, para que a ordem seja só a da lista de desenho (`renderOrder`), como no CPU. Antes, a hachura (com textura) virava transparente e o three.js a desenhava depois das paredes opacas: a hachura da laje saía por cima da parede. A regressão com GPU (`tests/e2e/visual-regression-gpu.mjs`, seis casos, baselines em `tests/e2e/baseline-gpu/`) cobre o caso; a regressão CPU segue como referência de pixel.
 
 ## 3 · Interface
 - Propriedades da vista (planta): Escala, Detalhe, Estilo visual, Exibição parcial de estrutura, botão "Visibilidade e gráficos…" (diálogo com a tabela

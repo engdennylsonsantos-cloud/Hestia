@@ -19,3 +19,5 @@ export { defaultPaint, planStyleOf, type PlanPaint, type PlanStyle, type PlanVis
 export { climbWalk, spiralByComponent, spiralPostRing, stairCut, type StairCut } from './plan/stairs.ts';
 export { risersInClimbOrder } from './stairRisers.ts';
 export { roofFootprint } from './plan/roofs.ts';
+// Ambientes (decisão 0018): rótulo e centro de cada ambiente, o mesmo texto da planta e do DXF.
+export { roomLabelAt, roomLabelText } from './plan/rooms.ts';

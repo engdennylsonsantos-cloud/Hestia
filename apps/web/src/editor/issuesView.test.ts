@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeStair, makeWall, type Opening, type Project, type StairRun, type ValidationIssue, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeRoom, makeStair, makeWall, type Opening, type Project, type StairRun, type ValidationIssue, type Wall } from '@hestia/model';
 import { groupIssues, issueTarget, summarize, worstSeverity } from './issuesView.ts';
 
 const err = (code: string, elementId?: string): ValidationIssue => ({ severity: 'error', code, message: `erro ${code}`, ...(elementId ? { elementId } : {}) });
@@ -94,5 +94,13 @@ describe('Ir para: escada', () => {
     expect(t!.levelId).toBe('lv_0');
     expect(t!.box).toEqual({ minX: 2, minY: 0, maxX: 3, maxY: 3 });
     expect(t!.center).toEqual({ x: 2.5, y: 1.5 });
+  });
+});
+
+describe('ir para ambiente', () => {
+  it('ambiente sem circuito: alvo no nível dele, centrado no ponto interior', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoom', room: makeRoom({ id: 'rm1', levelId: 'lv_0', name: 'Sala', number: '1', point: { x: 2, y: 3 } }) });
+    expect(issueTarget(s.project, err('room-point-outside', 'rm1'))).toEqual({ elementId: 'rm1', levelId: 'lv_0', center: { x: 2, y: 3 } });
   });
 });

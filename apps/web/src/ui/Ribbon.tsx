@@ -117,6 +117,10 @@ export function Ribbon(): ReactElement {
                 <Icon name="sametype" size={22} />
                 <span>Mesmo tipo</span>
               </button>
+              <button className="tbtn" onClick={() => editor.selectAllOfSelectedName()} title="Selecionar todos os ambientes com o mesmo nome dos selecionados (mesmo nível)">
+                <Icon name="sametype" size={22} />
+                <span>Mesmo nome</span>
+              </button>
             </div>
             <div className="rgroup-title">Tipo</div>
           </div>

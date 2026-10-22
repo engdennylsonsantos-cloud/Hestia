@@ -1,9 +1,9 @@
 import type { Id, Project, ProjectStore } from '@hestia/model';
-import { clipboardFrom, idsOfType, pasteAlignedCommand, selectedTypeId, type ClipBuffer } from '@hestia/tools';
+import { clipboardFrom, idsOfType, pasteAlignedCommand, sameNameRoomIds, selectedTypeId, type ClipBuffer } from '@hestia/tools';
 import { useUi } from './state.ts';
 
 /** Contagens do buffer copiado (ausente em buffers antigos = nenhuma escada). */
-const counts = (c: ClipBuffer): Counts => ({ walls: c.walls.length, floors: c.floors.length, slabs: c.slabs.length, roofs: c.roofs.length, stairs: c.stairs?.length ?? 0 });
+const counts = (c: ClipBuffer): Counts => ({ walls: c.walls.length, floors: c.floors.length, slabs: c.slabs.length, roofs: c.roofs.length, stairs: c.stairs?.length ?? 0, rooms: c.rooms?.length ?? 0 });
 
 /** Contagem por categoria do que foi copiado ou colado. */
 interface Counts {
@@ -12,6 +12,7 @@ interface Counts {
   slabs: number;
   roofs: number;
   stairs: number;
+  rooms: number;
 }
 
 /** "2 parede(s), 1 piso, 1 laje e 1 escada": frase do status para o que foi copiado ou colado. */
@@ -22,6 +23,7 @@ function describe(c: Counts): string {
   if (c.slabs) parts.push(`${c.slabs} laje(s)`);
   if (c.roofs) parts.push(`${c.roofs} telhado(s)`);
   if (c.stairs) parts.push(`${c.stairs} escada(s)`);
+  if (c.rooms) parts.push(`${c.rooms} ambiente(s)`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}` : (parts[0] ?? '');
 }
 
@@ -56,8 +58,8 @@ export class Transfer {
       return false;
     }
     store.exec(r.command, 'Colar alinhado');
-    const pasted: Counts = { walls: r.wallIds.length, floors: r.floorIds.length, slabs: r.slabIds.length, roofs: r.roofIds.length, stairs: r.stairIds.length };
-    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds, ...r.slabIds, ...r.roofIds, ...r.stairIds], status: `${describe(pasted)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
+    const pasted: Counts = { walls: r.wallIds.length, floors: r.floorIds.length, slabs: r.slabIds.length, roofs: r.roofIds.length, stairs: r.stairIds.length, rooms: r.roomIds.length };
+    useUi.setState({ selection: [...r.wallIds, ...r.openingIds, ...r.floorIds, ...r.slabIds, ...r.roofIds, ...r.stairIds, ...r.roomIds], status: `${describe(pasted)} colado(s) no mesmo lugar. Ctrl+Z desfaz.` });
     return true;
   }
 
@@ -65,6 +67,13 @@ export class Transfer {
   ofType(p: Project, levelId: Id, typeId: Id): number {
     const ids = idsOfType(p, levelId, typeId);
     useUi.setState({ selection: ids, status: ids.length ? `${ids.length} elemento(s) do mesmo tipo selecionado(s).` : 'Nenhum elemento deste tipo neste nível.' });
+    return ids.length;
+  }
+
+  /** "Mesmo nome" (ambientes): seleciona todos os ambientes do nível com o nome dos ambientes selecionados. Devolve quantos. */
+  sameName(p: Project, levelId: Id): number {
+    const ids = sameNameRoomIds(p, levelId, useUi.getState().selection);
+    useUi.setState({ selection: ids, status: ids.length ? `${ids.length} ambiente(s) com o mesmo nome selecionado(s).` : 'Selecione um ambiente primeiro.' });
     return ids.length;
   }
 

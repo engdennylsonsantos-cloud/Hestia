@@ -85,8 +85,9 @@ desenha a partir dela:
 
 - **Vista face** (elevação e corte longitudinal, quando a projeção do vão é a largura) — batente como anel de
   `frameWidth` (ombreiras, verga e soleira), vidro na região interna, **linha central só em janela de correr** (2 ou 3
-  folhas), e os símbolos: arco tracejado do maxim-ar/basculante (dentro do vão, do lado de `flipFacing`), traço do lado
-  da dobradiça na porta de giro e seta de correr na janela e na porta de correr.
+  folhas), e os símbolos: **V de giro** (decisão 0024 §2) na porta de giro, na dupla e na pivotante, e na janela de abrir
+  (maxim-ar com o vértice na aresta superior; basculante, na inferior), e seta de correr na janela e na porta de correr.
+  O arco tracejado do maxim-ar/basculante saiu. No grosso, nenhum símbolo.
 - **Corte transversal** (a projeção é a espessura) — verga e soleira com `frameDepth` **centradas na parede** e vidro
   com `glassThickness`.
 - **Vão livre** (0 folhas) — sem batente nem vidro; a janela sem folha fica só com a soleira (como no 3D), a porta sem
@@ -194,9 +195,11 @@ Decisões do dono e o que passou a valer em `packages/render/src/model3d/opening
 
 Decisão completa em [0024](0024-representacao-aberturas.md). O que muda nesta seção:
 
-- **Giro na elevação (§6, E1).** O símbolo de giro sai tracejado quando a folha abre para o observador e contínuo quando
-  abre para o lado oposto; o vértice fica no lado da dobradiça. Convenção própria: a NBR 6492 e a Autodesk não deram a regra.
-- **Porta dupla e pivotante na elevação (§6).** Dupla: duas diagonais das ombreiras ao centro. Pivotante: eixo a W/4 e folha.
+- **Giro na elevação (§6, E1).** O símbolo de giro é um V: vértice no lado da dobradiça, pontas no lado do trinco. Sai
+  tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto. Convenção própria: a NBR 6492
+  e a Autodesk não deram a regra.
+- **Porta dupla e pivotante na elevação (§6).** Dupla: um V por folha, vértices nas ombreiras e pontas no centro. Pivotante:
+  eixo a W/4 com o vértice do V sobre ele.
 - **Vão livre e furos com X (0024 §3).** O vão livre leva duas diagonais no corte, na elevação e na planta; furo
   quadrangular de piso e laje leva o X na planta. O X segue a categoria da abertura e não aparece no grosseiro.
 - **Pivotante (§8).** A posição do eixo continua provisória (W/4), sem fonte oficial.

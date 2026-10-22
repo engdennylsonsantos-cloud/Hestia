@@ -61,7 +61,7 @@ projeção acima do corte; `plan/view.ts` já separa corte × projeção.
 | Símbolo de giro em elevação | No Revit, é **linha simbólica desenhada pelo usuário na família** para representar o giro em elevação | [DOC] Autodesk "About Creating 2D Geometry" (https://help.autodesk.com/cloudhelp/2016/ENU/Revit-Model/files/GUID-4949A893-E556-4426-AE1D-0BC3C90BF672.htm, lido 2026-10-22): "Symbolic lines are not part of the actual geometry of the family." e "Example: You might sketch symbolic lines in an elevation view to represent a door swing." |
 | Visibilidade da linha simbólica | Só aparece paralela à vista em que foi desenhada | [DOC] mesma página: "Symbolic lines are visible parallel to the view in which you sketch them." |
 | Tracejado × contínuo (sentido de abertura) | Tracejado = abre para um lado; contínuo = para o outro | **[NÃO ENCONTRADO]** em fonte oficial. Forum e tutorial [SEC] dizem apenas que o giro em planta fica na subcategoria "Plan Swing (projection)" e que o tracejado de elevação do template métrico do Revit é problemático |
-| Vértice do giro | Lado da dobradiça (diagonal do trinco à dobradiça) | [INFERIDO; prática corrente; o Hestia já faz 1 diagonal] |
+| Vértice do giro | Lado da dobradiça: V com o vértice no meio da altura da dobradiça e as duas pontas no trinco (topo e base) | [INFERIDO; V é a forma usual no Brasil, não confirmada na NBR 6492; o Hestia fazia 1 diagonal até a SV1 (0024 §2)] |
 | Seta de correr | Seta horizontal no centro do vão | [INFERIDO; o Hestia já faz] |
 
 ## 3. O "X" (diagonais ligando vértices)
@@ -89,7 +89,7 @@ oficial: [NÃO ENCONTRADO].**
 2. **Traço do X.** [NÃO ENCONTRADO]. Convenção própria: contorno do furo + 2 diagonais; peso da categoria de projeção;
    tracejado só quando o vão está acima do corte.
 3. **Janela de giro (side-hung).** Não é família do Hestia (`OPENING_FAMILIES`). O "giro" cai no maxim-ar (`casement`)
-   e no basculante (`tilt`), que já têm arco/V.
+   e no basculante (`tilt`), que já têm símbolo de abertura (arco ou V na planta; V na elevação).
 4. **Porta pivotante em elevação.** [NÃO ENCONTRADO]; mantém a convenção do eixo (W/4) da planta, como na decisão 0017 §8.
 5. **X opcional.** Como no Revit, o X é uma opção de família/abertura, não automático, para não mudar a planta de quem não pede.
 
@@ -97,13 +97,13 @@ oficial: [NÃO ENCONTRADO].**
 
 | Convenção | Planta | Corte/Elevação | Fonte |
 |---|---|---|---|
-| Porta de giro (folha + arco 90°) | símbolo `swing` | diagonal da dobradiça ao trinco | [INFERIDO] |
-| Porta dupla | 2 folhas + 2 arcos ao centro | 2 diagonais das ombreiras ao centro | [SEC/INFERIDO] |
+| Porta de giro (folha + arco 90°) | símbolo `swing` | V: vértice na dobradiça, pontas no trinco | [INFERIDO] |
+| Porta dupla | 2 folhas + 2 arcos ao centro | 1 V por folha: vértices nas ombreiras, pontas no centro | [SEC/INFERIDO] |
 | Porta de correr | 2 folhas + seta | seta | [SEC/INFERIDO] |
-| Porta pivotante | eixo + 2 arcos | eixo + folha | [NÃO ENCONTRADO] (eixo provisório) |
+| Porta pivotante | eixo + 2 arcos | eixo + V com o vértice sobre o eixo | [NÃO ENCONTRADO] (eixo provisório) |
 | Giro em elevação (Revit) | — | linha simbólica da família, visível só na vista desenhada | [DOC] Autodesk 2016 |
 | Janela fixa | 3 linhas | caixilho + vidro, sem símbolo | [INFERIDO] |
-| Janela maxim-ar/basculante | arco tracejado / V | arco tracejado | [INFERIDO] |
+| Janela maxim-ar/basculante | arco tracejado / V | V (maxim-ar: vértice no topo; basculante: na base) | [INFERIDO] |
 | Janela de correr | n folhas + seta | seta | [SEC/INFERIDO] |
 | Vão livre em parede (sem esquadria) | **X** (contorno + 2 diagonais) | **X** | [NÃO ENCONTRADO] no Revit (Wall Opening); [INFERIDO] |
 | Furo em piso/laje/telhado (shaft) | **X** opcional | **X** opcional, em todos os níveis | [DOC] Autodesk 2024 (opcional); forma [SEC] |

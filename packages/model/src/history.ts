@@ -151,6 +151,20 @@ export function labelOf(c: Command): string {
       return 'Excluir tipo de laje';
     case 'addRoof':
       return 'Criar telhado';
+    case 'addCeiling':
+      return 'Criar forro';
+    case 'addCeilings':
+      return c.ceilings.length === 1 ? 'Criar forro' : 'Criar forros por ambiente';
+    case 'updateCeiling':
+      return 'Alterar forro';
+    case 'removeCeiling':
+      return 'Excluir forro';
+    case 'upsertCeilingType':
+      return 'Editar tipo de forro';
+    case 'deleteCeilingType':
+      return 'Excluir tipo de forro';
+    case 'duplicateCeilingType':
+      return 'Duplicar tipo de forro';
     case 'addRoom':
       return 'Criar ambiente';
     case 'updateRoom':

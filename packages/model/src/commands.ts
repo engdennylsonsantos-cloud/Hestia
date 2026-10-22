@@ -2,12 +2,15 @@ import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import { wallLength } from './queries.ts';
 import {
   isOpening,
+  isCeiling,
   isFloor,
   isSlab,
   isRoof,
   isStair,
   isWall,
   isRoom,
+  type Ceiling,
+  type CeilingType,
   type Element,
   type Floor,
   type FloorType,
@@ -33,7 +36,7 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
-import { transformFloor, transformSlab } from './transformPlanar.ts';
+import { transformCeiling, transformFloor, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
@@ -49,6 +52,7 @@ import {
 } from './graphicsCommands.ts';
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
+import { applyCeilingCommand } from './ceilingCommands.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -57,6 +61,13 @@ export type Command =
   | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
   | { type: 'addSlab'; slab: Omit<Slab, 'order'> }
   | { type: 'addRoof'; roof: Omit<Roof, 'order'> }
+  | { type: 'addCeiling'; ceiling: Omit<Ceiling, 'order'> }
+  | { type: 'addCeilings'; ceilings: Omit<Ceiling, 'order'>[] }
+  | { type: 'updateCeiling'; id: Id; patch: Partial<Omit<Ceiling, 'id' | 'kind' | 'order'>> }
+  | { type: 'removeCeiling'; id: Id }
+  | { type: 'upsertCeilingType'; ceilingType: CeilingType }
+  | { type: 'deleteCeilingType'; id: Id }
+  | { type: 'duplicateCeilingType'; id: Id; newId: Id; name: string }
   | { type: 'addRoom'; room: Omit<Room, 'order'> }
   | { type: 'updateRoom'; id: Id; patch: Partial<Omit<Room, 'id' | 'kind' | 'order'>> }
   | { type: 'removeRoom'; id: Id }
@@ -69,7 +80,7 @@ export type Command =
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> | Partial<Stair> | Partial<Room> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Room> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -164,6 +175,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   transformEach(p, c, isStair, transformStair);
   transformEach(p, c, isSlab, transformSlab);
   transformEach(p, c, isFloor, transformFloor);
+  transformEach(p, c, isCeiling, transformCeiling);
   transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {
@@ -192,6 +204,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
 }
 
 export function applyCommand(p: Project, c: Command): void {
+  if (applyCeilingCommand(p, c)) return;
   switch (c.type) {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };

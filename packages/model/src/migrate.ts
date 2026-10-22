@@ -1,5 +1,6 @@
 import { DEFAULT_MATERIALS, createEmptyProject } from './defaults.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
+import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
@@ -190,6 +191,17 @@ const migrations: Record<number, Migration> = {
   // v16 → v17: ambientes (Room). Guardados em `elements` (como pisos e lajes), então um arquivo v16 simplesmente não
   // os tem e nada precisa ser acrescentado: a migração só avança a versão e preserva o restante do arquivo.
   16: (raw) => ({ ...raw }),
+  // v17 → v18: forros (Ceiling, decisão 0021). Tipos padrão acrescentados sem sobrescrever os do arquivo; o material PVC
+  // entra no catálogo se faltar. Forros são elementos de `elements`, então arquivo antigo não tem nenhum a converter.
+  17: (raw) => {
+    const own = (raw.ceilingTypes as Record<string, unknown>) ?? {};
+    const materials = { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => m.id === 'mat_pvc').map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) };
+    return {
+      ...raw,
+      ceilingTypes: { ...Object.fromEntries(DEFAULT_CEILING_TYPES.map((t) => [t.id, t])), ...own },
+      materials,
+    };
+  },
 };
 
 export class SchemaError extends Error {}

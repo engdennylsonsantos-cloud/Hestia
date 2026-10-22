@@ -1,5 +1,5 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
-import { type Floor, type Slab } from './types.ts';
+import { type Ceiling, type Floor, type Slab } from './types.ts';
 
 /** Move/gira/espelha um piso; espelhar inverte o sentido do contorno (a orientação não importa ao motor, mas fica estável). */
 export function transformFloor(f: Floor, t: Transform): Floor {
@@ -26,4 +26,13 @@ export function transformSlab(s: Slab, t: Transform): Slab {
     slope = { origin: o, dir: { x: dx / l, y: dy / l }, percent: slope.percent };
   }
   return { ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope };
+}
+
+/** Move/gira/espelha um forro: contorno e furos (o nível e a cota não mudam). */
+export function transformCeiling(c: Ceiling, t: Transform): Ceiling {
+  const pts = (ring: Vec2[]): Vec2[] => {
+    const out = ring.map((q) => applyTransform(t, q));
+    return t.kind === 'mirror' ? out.reverse() : out;
+  };
+  return { ...c, boundary: pts(c.boundary), holes: c.holes.map(pts) };
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { clipPlanes, zoomedDistance } from './cameraClip.ts';
 
 /**
  * Vista padrão do app (botão Início e abertura da vista 3D): azimute −45° (câmera a sudeste, x leste, y norte) e
@@ -57,7 +58,7 @@ export function cameraBasis(azimuth: number, elevation: number): { toCamera: THR
 
 /** Câmera orbital com Z para cima: arrastar gira, Shift/botão do meio desloca, roda aproxima. */
 export class OrbitCamera {
-  /** Câmera em perspectiva (padrão). */
+  /** Câmera em perspectiva (padrão). Os planos de recorte são recalculados a cada mudança (`clipPlanes`). */
   readonly perspective = new THREE.PerspectiveCamera(38, 1, 0.05, 2000);
   /**
    * Câmera ortogonal alternativa. O enquadramento é o mesmo da perspectiva: a meia altura visível é
@@ -65,6 +66,13 @@ export class OrbitCamera {
    */
   readonly orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 2000);
   target = new THREE.Vector3(0, 0, 1);
+  /** Raio (m) do modelo, para o plano distante cobrir a cena (0 se vazio). Definido pela cena 3D. */
+  sceneRadius = 0;
+  /**
+   * Distância (m) da origem à primeira superfície do modelo na direção dada, ou null. Usada pelo zoom para a câmera não
+   * atravessar uma parede (a cena 3D a fornece). Sem ela, o zoom só respeita a distância mínima.
+   */
+  obstacle: ((origin: THREE.Vector3, dir: THREE.Vector3) => number | null) | null = null;
   azimuth = HOME_VIEW.azimuth;
   elevation = HOME_VIEW.elevation;
   distance = 14;
@@ -148,13 +156,18 @@ export class OrbitCamera {
     this.updateFrustum();
   }
 
-  apply(): void {
+  /** Posição da câmera (do alvo, a `distance`, na elevação e azimute atuais). */
+  private eye(): THREE.Vector3 {
     const ce = Math.cos(this.elevation);
-    const pos = new THREE.Vector3(
+    return new THREE.Vector3(
       this.target.x + this.distance * ce * Math.cos(this.azimuth),
       this.target.y + this.distance * ce * Math.sin(this.azimuth),
       this.target.z + this.distance * Math.sin(this.elevation),
     );
+  }
+
+  apply(): void {
+    const pos = this.eye();
     for (const c of [this.perspective, this.orthographic]) {
       c.position.copy(pos);
       c.lookAt(this.target);
@@ -163,14 +176,27 @@ export class OrbitCamera {
     this.updateFrustum();
   }
 
-  /** Frustro ortogonal: meia altura = distância·tan(fov/2), a mesma da perspectiva no plano do alvo. */
+  /**
+   * Planos de recorte pela distância ao alvo (`clipPlanes`), nas duas câmeras. A ortogonal usa o mesmo plano próximo
+   * positivo: um plano negativo mostraria paredes atrás da câmera por cima do alvo quando ela está dentro da casa.
+   * Frustro ortogonal: meia altura = distância·tan(fov/2), a mesma da perspectiva no plano do alvo.
+   */
   private updateFrustum(): void {
+    const { near, far } = clipPlanes(this.distance, this.sceneRadius);
+    const p = this.perspective;
+    if (p.near !== near || p.far !== far) {
+      p.near = near;
+      p.far = far;
+      p.updateProjectionMatrix();
+    }
     const half = this.distance * Math.tan((this.perspective.fov * Math.PI) / 360);
     const c = this.orthographic;
     c.top = half;
     c.bottom = -half;
     c.right = half * this.aspect;
     c.left = -half * this.aspect;
+    c.near = near;
+    c.far = far;
     c.updateProjectionMatrix();
   }
 
@@ -199,9 +225,19 @@ export class OrbitCamera {
     this.apply();
   }
 
+  /**
+   * Roda: aproxima (delta < 0) ou afasta. Ao aproximar, para antes da primeira superfície do modelo sobre o eixo de visão
+   * (`obstacle`), para a câmera não atravessar a parede; afastar não tem esse limite.
+   */
   zoom(delta: number): void {
     this.cancelAnimation();
-    this.distance = Math.max(DISTANCE.min, Math.min(DISTANCE.max, this.distance * Math.pow(1.0016, delta)));
+    const requested = this.distance * Math.pow(1.0016, delta);
+    let next = requested;
+    if (delta < 0 && this.obstacle) {
+      const dir = this.target.clone().sub(this.eye()).normalize();
+      next = zoomedDistance(this.distance, requested, this.obstacle(this.eye(), dir));
+    }
+    this.distance = Math.max(DISTANCE.min, Math.min(DISTANCE.max, next));
     this.apply();
   }
 

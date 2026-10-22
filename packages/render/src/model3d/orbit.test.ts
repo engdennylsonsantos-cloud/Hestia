@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { HOME_VIEW, OrbitCamera, POLE_ELEVATION, cameraBasis, easeInOut, wrapAngle } from './orbit.ts';
+import { clipPlanes } from './cameraClip.ts';
 
 const DEG = Math.PI / 180;
 
@@ -285,6 +286,81 @@ describe('OrbitCamera: arrasto perto do polo e enquadramento', () => {
         expect(up.dot(toCamera)).toBeGreaterThanOrEqual(-1e-9);
         expect(up.z).toBeGreaterThan(0);
       }
+    }
+  });
+});
+
+describe('OrbitCamera: planos de recorte acompanham a distância', () => {
+  it('ao aproximar, o plano próximo diminui; ao afastar, cresce (perspectiva e ortogonal)', () => {
+    const o = setup(0.3, 0.4, 14);
+    const near14 = o.perspective.near;
+    o.zoom(-2000);
+    expect(o.distance).toBeLessThan(1);
+    expect(o.perspective.near).toBeLessThan(near14);
+    expect(o.orthographic.near).toBe(o.perspective.near);
+    o.zoom(1500);
+    expect(o.perspective.near).toBeCloseTo(clipPlanes(o.distance).near, 12);
+    expect(o.perspective.near).toBeGreaterThan(0.01);
+    expect(o.orthographic.far).toBe(o.perspective.far);
+  });
+
+  it('o plano distante cobre o raio do modelo quando ele é grande', () => {
+    const o = setup(0, 0.4, 14);
+    o.sceneRadius = 1500;
+    o.apply();
+    expect(o.perspective.far).toBeGreaterThanOrEqual(1500);
+    expect(o.perspective.far / o.perspective.near).toBeLessThanOrEqual(2e5);
+  });
+});
+
+describe('OrbitCamera.zoom: não atravessa a parede no eixo de visão', () => {
+  // Parede plana em x = 3, de frente para a câmera quando ela está do lado x > 3.
+  const wall = new THREE.Plane(new THREE.Vector3(1, 0, 0), -3);
+  const probe = (origin: THREE.Vector3, dir: THREE.Vector3): number | null => new THREE.Ray(origin, dir).distanceToPlane(wall);
+  /** Alvo do lado de dentro (x < 3), câmera a `d` m, de frente para a parede (azimute 0, elevação 0). */
+  const facing = (d: number): OrbitCamera => {
+    const o = setup(0, 0, d);
+    o.target.set(0, 0, 1);
+    o.apply();
+    return o;
+  };
+
+  it('aproximar para na folga antes da parede, sem entrar nela', () => {
+    const o = facing(10);
+    o.obstacle = probe;
+    o.zoom(-5000);
+    const eyeX = o.perspective.position.x;
+    expect(eyeX).toBeGreaterThanOrEqual(3 + 0.2 - 1e-9);
+    expect(eyeX).toBeLessThan(3.5);
+  });
+
+  it('afastar da parede segue livre, e aproximar de novo para na mesma folga', () => {
+    const o = facing(10);
+    o.obstacle = probe;
+    o.zoom(-5000);
+    o.zoom(3000);
+    expect(o.distance).toBeGreaterThan(5);
+    o.zoom(-5000);
+    expect(o.perspective.position.x).toBeGreaterThanOrEqual(3 + 0.2 - 1e-9);
+  });
+
+  it('sem parede no eixo, o zoom só respeita a distância mínima (0,5 m)', () => {
+    const o = facing(10);
+    o.obstacle = () => null;
+    o.zoom(-10000);
+    expect(o.distance).toBeCloseTo(0.5, 9);
+  });
+
+  it('uma sequência de rodas nunca deixa a câmera mais perto da parede que a folga', () => {
+    const o = facing(10);
+    o.elevation = 0.1;
+    o.apply();
+    o.obstacle = probe;
+    const steps = [-120, -300, -40, -800, 200, -90, -600, 50, -1000];
+    for (let i = 0; i < 40; i++) {
+      o.zoom(steps[i % steps.length]!);
+      // A folga é ao longo do eixo de visão (elevação 0,1 rad): na direção x ela vale 0,2·cos(elevação).
+      expect(o.perspective.position.x - 3).toBeGreaterThanOrEqual(0.2 * Math.cos(o.elevation) - 1e-6);
     }
   });
 });

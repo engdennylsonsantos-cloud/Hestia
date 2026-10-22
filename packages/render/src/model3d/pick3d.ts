@@ -22,6 +22,21 @@ export function pickModelPoint(root: THREE.Object3D, camera: THREE.Camera, ndc: 
   return null;
 }
 
+/**
+ * Distância (m) de `origin` à primeira superfície do modelo na direção `dir` (unitária), ou null. Mesmas regras de
+ * `pickModelPoint`: ignora linhas e o chão. Usada pelo zoom para não atravessar paredes.
+ */
+export function firstSurfaceDistance(root: THREE.Object3D, origin: THREE.Vector3, dir: THREE.Vector3): number | null {
+  root.updateMatrixWorld(true);
+  const rc = new THREE.Raycaster(origin, dir);
+  for (const h of rc.intersectObject(root, true)) {
+    const m = h.object as THREE.Mesh;
+    if (!m.isMesh || m.geometry.type === 'PlaneGeometry') continue;
+    return h.distance;
+  }
+  return null;
+}
+
 /** Elemento sob o cursor: o id, o ponto (m) da face atingida e a categoria gráfica (parede, porta, janela, piso, ...). */
 export interface ElementHit {
   id: Id;

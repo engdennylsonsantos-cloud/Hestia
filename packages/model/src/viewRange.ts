@@ -11,7 +11,7 @@ export interface ViewRange {
   bottom: number;
   /** Profundidade de vista: cota (≤ base) até onde elementos abaixo da base aparecem no estilo "além" (padrão = base). */
   depth: number;
-  /** Direção da vista: 'down' = planta baixa. 'up' (planta de forro) está reservada, ainda sem desenho. */
+  /** Direção da vista: 'down' = planta baixa; 'up' = planta de forro (decisão 0021: sem limite superior, abaixo do corte não sai). */
   direction: 'down' | 'up';
 }
 

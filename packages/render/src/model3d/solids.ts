@@ -1,5 +1,5 @@
 import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
+import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
 
@@ -343,6 +343,23 @@ export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
       const b = batchOf(byMat, l.materialId, 'floor');
       ofElement(b, f.floorId, () => {
         for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
+      });
+    }
+  }
+  return [...byMat.values()];
+}
+
+/**
+ * Sólidos dos forros (decisão 0021): uma extrusão por camada entre as cotas absolutas, com a mesma categoria dos pisos
+ * (visibilidade e transparência da vista 3D). Forro é elemento de `elements`, então a seleção no 3D o encontra pelo id.
+ */
+export function buildCeilingSolids(ceilings: ResolvedCeiling[]): SolidBatch[] {
+  const byMat = new Map<Id, SolidBatch>();
+  for (const c of ceilings) {
+    for (const l of c.layers) {
+      const b = batchOf(byMat, l.materialId, 'floor');
+      ofElement(b, c.ceilingId, () => {
+        for (const poly of c.polygon) extrudePolygon(b, poly, l.z0, l.z1);
       });
     }
   }

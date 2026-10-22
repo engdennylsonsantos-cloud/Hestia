@@ -15,7 +15,7 @@ export interface ViewRangeWarning {
   message: string;
 }
 
-const CATEGORY_ORDER: ViewCategory[] = ['wall', 'opening', 'floor', 'slab', 'roof', 'stair'];
+const CATEGORY_ORDER: ViewCategory[] = ['wall', 'opening', 'floor', 'slab', 'ceiling', 'roof', 'stair'];
 const KIND_ORDER: ViewWarningKind[] = ['hidden', 'beyond'];
 
 /** Substantivo no singular e no plural, por categoria. */
@@ -24,6 +24,7 @@ const NOUNS: Record<ViewCategory, readonly [string, string]> = {
   opening: ['abertura', 'aberturas'],
   floor: ['piso', 'pisos'],
   slab: ['laje', 'lajes'],
+  ceiling: ['forro', 'forros'],
   roof: ['telhado', 'telhados'],
   stair: ['escada', 'escadas'],
 };
@@ -46,6 +47,8 @@ export function viewRangeWarnings(p: Project, levelId: Id, range: ViewRange): Vi
   const entries = classifyLevelEntries(p, levelId, range);
   const out: ViewRangeWarning[] = [];
   for (const category of CATEGORY_ORDER) {
+    // Forro só é desenhado na planta de forro: na planta baixa ele não é aviso de intervalo.
+    if (category === 'ceiling' && range.direction === 'down') continue;
     for (const kind of KIND_ORDER) {
       const ids = entries.filter((e) => e.category === category && e.cls === kind).map((e) => e.id);
       if (ids.length === 0) continue;

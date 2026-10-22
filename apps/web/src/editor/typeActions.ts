@@ -3,7 +3,7 @@ import { ProjectStore, isFloor, isOpening, isRoof, isSlab, isStair, isWall, newI
 import { stairPoints } from './stairActions.ts';
 
 /** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje e telhado. */
-export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
+export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair';
 
 export interface TypeChoice {
   id: Id;
@@ -15,7 +15,7 @@ const otherLevels = (n: number): string => (n === 1 ? '1 em outro nível' : `${n
 
 /** Nível de um elemento: a parede tem o seu; a abertura herda o da parede anfitriã. */
 export function levelOfElement(p: Project, e: Element): Id | undefined {
-  if (isWall(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
+  if (isWall(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'ceiling' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
   const host = p.elements[e.hostId];
   return isWall(host) ? host.levelId : undefined;
 }
@@ -24,6 +24,7 @@ function usesType(e: Element, kind: TypeKind, typeId: Id): boolean {
   if (kind === 'wall') return isWall(e) && e.typeId === typeId;
   if (kind === 'floor') return isFloor(e) && e.typeId === typeId;
   if (kind === 'slab') return isSlab(e) && e.typeId === typeId;
+  if (kind === 'ceiling') return e.kind === 'ceiling' && e.typeId === typeId;
   if (kind === 'roof') return isRoof(e) && e.typeId === typeId;
   if (kind === 'stair') return isStair(e) && e.typeId === typeId;
   return isOpening(e) && e.kind === kind && e.typeId === typeId;

@@ -23,6 +23,8 @@ import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
 import { RoomScheduleDialog } from './ui/dialogs/RoomScheduleDialog.tsx';
 import { SlabTypeDialog } from './ui/dialogs/SlabTypeDialog.tsx';
 import { SlabScheduleDialog } from './ui/dialogs/SlabScheduleDialog.tsx';
+import { CeilingScheduleDialog } from './ui/dialogs/CeilingScheduleDialog.tsx';
+import { CeilingTypeDialog } from './ui/dialogs/CeilingTypeDialog.tsx';
 import { RoofTypeDialog } from './ui/dialogs/RoofTypeDialog.tsx';
 import { RoofScheduleDialog } from './ui/dialogs/RoofScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
@@ -87,6 +89,10 @@ function Dialogs(): ReactElement | null {
       return arg ? <SlabTypeDialog typeId={arg} /> : null;
     case 'slabSchedule':
       return <SlabScheduleDialog />;
+    case 'ceilingType':
+      return arg ? <CeilingTypeDialog typeId={arg} /> : null;
+    case 'ceilingSchedule':
+      return <CeilingScheduleDialog />;
     case 'roofType':
       return arg ? <RoofTypeDialog typeId={arg} /> : null;
     case 'roofSchedule':

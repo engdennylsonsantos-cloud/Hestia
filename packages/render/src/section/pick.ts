@@ -34,6 +34,7 @@ const OWNER_FIELDS: Array<[Exclude<keyof SectionOrigin, 'openingId'>, GraphicsCa
   ['wallId', 'wall'],
   ['floorId', 'floor'],
   ['slabId', 'slab'],
+  ['ceilingId', 'floor'],
   ['roofId', 'roof'],
   ['stairId', 'stair'],
 ];

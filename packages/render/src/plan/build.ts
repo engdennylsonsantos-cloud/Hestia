@@ -10,6 +10,7 @@ import { sectionMarksOf } from './sectionMarks.ts';
 import { belowFloorOps, floorFills, floorSelectionOps, type FloorOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
 import { roomOps, roomSelectionOps } from './rooms.ts';
+import { ceilingFills, ceilingSelectionOps } from './ceilings.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
 import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
@@ -130,37 +131,40 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   // Intervalo de vista do nível (decisão 0013): o que está fora dele não sai, e o corte da geometria é o da vista.
   // A planta de cobertura segue a geometria padrão, como antes.
   const view: PlanView | null = rp ? null : planViewOf(p, input.levelId);
+  // Planta de forro (decisão 0021): vista para cima. Sem o que está embaixo do nível (referências apagadas) e com forros.
+  const up = view?.range.direction === 'up';
+  const below = up ? null : input.below;
   const geo: ResolvedLevel = view ? view.geo : input.resolved;
   const hidden = view?.hidden;
   // Telhados ocultos pela categoria (decisão 0015 §2.4): na planta de cobertura só eles são filtrados.
   const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(resolveRoofs(p, input.levelId).map((r) => r.roofId));
 
   // Pavimento abaixo como subpiso apagado (referência): sem preenchimento no arame, linhas como antes.
-  if (input.below) {
-    for (const c of input.below.clusters) {
+  if (below) {
+    for (const c of below.clusters) {
       if (!wire) fills.push({ polygons: c.silhouette, color: theme.underlay, alpha: 0.22 });
       if (!rp) for (const r of ringsOf(c.silhouette)) strokes.push({ pts: r, closed: true, widthPx: 1, color: theme.underlay, alpha: 0.7 });
     }
   }
 
-  if (input.below && input.belowFloors) {
+  if (below && input.belowFloors) {
     const bf = belowFloorOps(input.belowFloors, theme);
     fills.push(...surfaces(bf.fills));
     if (!rp) strokes.push(...bf.strokes);
   }
-  if (input.below && input.belowSlabs) {
+  if (below && input.belowSlabs) {
     const bs = belowFloorOps(input.belowSlabs, theme);
     fills.push(...surfaces(bs.fills));
     if (!rp) strokes.push(...bs.strokes);
   }
   // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
   const stairs = resolveStairsOnLevel(p, input.levelId).filter((s) => !hidden?.has(s.id));
-  if (input.below) {
-    const bst = belowStairOps(resolveStairsOnLevel(p, input.below.levelId), theme);
+  if (below) {
+    const bst = belowStairOps(resolveStairsOnLevel(p, below.levelId), theme);
     fills.push(...surfaces(bst.fills));
     if (!rp) strokes.push(...bst.strokes);
   }
-  if (input.below && input.belowRoofs) {
+  if (below && input.belowRoofs) {
     if (rp) {
       // Telhados de baixo opacos: só o preenchimento; as linhas e cotas do nível de baixo não aparecem por cima.
       fills.push(...surfaces(roofOps(input.belowRoofs, p, theme, input.dark, detail, v, { planMode: true }).fills));
@@ -181,6 +185,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   addOps(roomOps(p, input.levelId, theme, input.dark, detail, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
   addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair), paint.stair, !rp);
+  // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
+  if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor), paint.floor, true);
 
   // Paredes: conjuntos (silhueta e regiões por material) e contornos fora do corte, com o estilo da categoria parede.
   // Parede oculta pela categoria: a geometria do nível já sai vazia (ver `planViewOf`), e os conjuntos não entram.
@@ -286,6 +292,12 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...lsel.fills);
   strokes.push(...lsel.strokes);
   labels.push(...lsel.labels);
+  if (up) {
+    const csel = ceilingSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
+    fills.push(...csel.fills);
+    strokes.push(...csel.strokes);
+    labels.push(...csel.labels);
+  }
   const rsel = roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, roofHidden, paint.roof);
   fills.push(...rsel.fills);
   strokes.push(...rsel.strokes);

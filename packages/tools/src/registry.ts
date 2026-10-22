@@ -10,6 +10,7 @@ import { SectionTool } from './sectionTool.ts';
 import { RehostTool } from './rehostTool.ts';
 import { FloorTool } from './floorTool.ts';
 import { SlabTool } from './slabTool.ts';
+import { CeilingTool } from './ceilingTool.ts';
 import { SlopeTool } from './slabSlopeTool.ts';
 import { ParallelTool } from './parallelTool.ts';
 import { RoofTool } from './roofTool.ts';
@@ -22,10 +23,10 @@ import { DimensionTool } from './dimensionTool.ts';
 import { TextTool } from './textTool.ts';
 import { RoomTool } from './roomTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'stairrun', 'room'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'room'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Anotar', tools: ['dimension', 'text'] },
   { title: 'Medir', tools: ['measure'] },
@@ -41,6 +42,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new FloorTool(env);
     case 'slab':
       return new SlabTool(env);
+    case 'ceiling':
+      return new CeilingTool(env);
     case 'slope':
       return new SlopeTool(env);
     case 'roof':
@@ -103,6 +106,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   wall: 'Parede',
   floor: 'Piso',
   slab: 'Laje',
+  ceiling: 'Forro',
   roof: 'Telhado',
   slope: 'Inclinação',
   roofarrow: 'Seta de inclinação',

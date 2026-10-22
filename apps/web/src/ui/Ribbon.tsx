@@ -9,7 +9,7 @@ import { MoveLevelButton } from './MoveLevel.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
   arquitetura: [
-    { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] },
+    { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] },
     { title: 'Anotar', tools: ['dimension', 'text'] },
     { title: 'Ambientes', tools: ['room'] },
   ],
@@ -180,6 +180,10 @@ export function Ribbon(): ReactElement {
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })} title="Tabela de lajes com área, volume por camada e exportação CSV">
                   <Icon name="file" size={22} />
                   <span>Tabela de lajes</span>
+                </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'ceilingSchedule', dialogArg: null })} title="Tabela de forros com área, volume por camada e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de forros</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })} title="Tabela de telhados com áreas, cumeeira, beiral, volume e exportação CSV">
                   <Icon name="file" size={22} />

@@ -1,4 +1,5 @@
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
+import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_TYPES } from './stair.ts';
@@ -27,6 +28,7 @@ export const DEFAULT_MATERIALS: Material[] = [
   mat('mat_argamassa', 'Argamassa', '#cdbfa9', 'dots', { cost: 30 }),
   mat('mat_ceramica', 'Revestimento cerâmico', '#e9e4da', 'none', { gloss: 0.6, cost: 85 }),
   mat('mat_gesso', 'Placa de gesso', '#ece9e2', 'none', { cost: 44 }),
+  mat('mat_pvc', 'PVC', '#e8e6df', 'none', { gloss: 0.4, cost: 60 }),
   mat('mat_la', 'Lã mineral', '#e5d27a', 'dots', { cost: 28 }),
   mat('mat_perfil', 'Perfil de aço', '#9aa0a6', 'cross', { cost: 20 }),
   mat('mat_aco', 'Aço', '#7b8189', 'solid', { gloss: 0.6, unit: 'm3' }),
@@ -166,6 +168,7 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     wallTypes: toRecord(DEFAULT_WALL_TYPES),
     floorTypes: toRecord(DEFAULT_FLOOR_TYPES),
     slabTypes: toRecord(DEFAULT_SLAB_TYPES),
+    ceilingTypes: toRecord(DEFAULT_CEILING_TYPES),
     roofTypes: toRecord(DEFAULT_ROOF_TYPES),
     stairTypes: toRecord(DEFAULT_STAIR_TYPES),
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),

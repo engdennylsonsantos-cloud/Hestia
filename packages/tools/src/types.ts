@@ -63,6 +63,9 @@ export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
 /** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
 export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
+/** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
+export type CeilingMode = 'poly' | 'rect' | 'room';
+
 /** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, pelo perímetro externo das paredes (com balanço), ou abertura (furo) no telhado selecionado. 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
 export type RoofMode = 'poly' | 'rect' | 'paredes' | 'hole' | 'extrusao';
 
@@ -113,6 +116,10 @@ export interface ToolOptions {
   slabOffset: number;
   slabMode: SlabMode;
   slabSlopePercent: number;
+  /** Forro: tipo, cota do topo (m, relativa ao nível) e modo. Ausentes = padrão (primeiro tipo, 2,60 m, contorno). */
+  ceilingTypeId?: Id;
+  ceilingOffset?: number;
+  ceilingMode?: CeilingMode;
   /** Telhado: tipo, modo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
   roofTypeId?: Id;
   roofMode?: RoofMode;

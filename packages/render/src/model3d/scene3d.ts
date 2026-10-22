@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyPartialStructure, frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
+import { applyPartialStructure, frameOfWall, openingGeometry, resolveCeilings, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
@@ -8,7 +8,7 @@ import { openingPieces } from './openingParts.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { disposeHighlight, highlightOf, type HighlightStyle } from './highlight3d.ts';
-import { buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
+import { buildCeilingSolids, buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
 
 /**
  * Opções herdadas. A vista 3D lê arestas e sombras de `view3dOf(p)` (decisão 0015 §2.2): `edges` e `shadows` são
@@ -269,6 +269,7 @@ export class ModelScene {
       const batches: SolidBatch[] = [
         ...(shown('wall') ? buildLevelSolids(lv).batches : []),
         ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId)) : []),
+        ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
         ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId)) : []),
         ...buildRoofSolids(roofs),
         ...eave.batches,

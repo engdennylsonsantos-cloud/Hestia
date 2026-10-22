@@ -4,6 +4,7 @@ import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
+import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
 import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
@@ -35,6 +36,7 @@ export interface SectionOrigin {
   wallId?: Id;
   floorId?: Id;
   slabId?: Id;
+  ceilingId?: Id;
   roofId?: Id;
   stairId?: Id;
   openingId?: Id;
@@ -139,8 +141,8 @@ function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
   const byKey = new Map<string, SectionBeyond[]>();
   list.forEach((b, i) => {
     // Escadas e telhados ficam peça a peça (cada degrau, espelho e água é um item); paredes, pisos e lajes agrupam.
-    const merge = b.wallId !== undefined || b.floorId !== undefined || b.slabId !== undefined;
-    const key = merge ? [b.wallId, b.floorId, b.slabId, b.materialId, b.layerIndex, b.depth.toFixed(6)].join('|') : `#${i}`;
+    const merge = b.wallId !== undefined || b.floorId !== undefined || b.slabId !== undefined || b.ceilingId !== undefined;
+    const key = merge ? [b.wallId, b.floorId, b.slabId, b.ceilingId, b.materialId, b.layerIndex, b.depth.toFixed(6)].join('|') : `#${i}`;
     const group = byKey.get(key);
     if (group) group.push(b);
     else byKey.set(key, [b]);
@@ -249,6 +251,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         }
       }
     }
+    // Forros (decisão 0021): mesmo tratamento dos pisos planos (`sectionCeilings.ts`).
+    const ck = sectionOfCeilings(p, levelId, line);
+    for (const c of ck.cut) addCut(c.materialId, c.polygon, c.origin);
+    beyond.push(...ck.beyond);
+    grow(ck.zMin, ck.zMax);
     // Telhados (D3): como as lajes, por água e por camada (cada faixa segue a cota da água menos `below`).
     const rf = sectionOfRoofs(resolveRoofs(p, levelId), line);
     for (const c of rf.cut) addCut(c.materialId, c.polygon, { roofId: c.roofId });

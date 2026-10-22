@@ -5,7 +5,7 @@ import type { Sheet } from './sheet.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 
@@ -327,6 +327,37 @@ export interface Slab {
   order: number;
 }
 
+/** Tipo de forro: camadas do topo para baixo (estrutura, placa, acabamento visível). Mesmo papel do tipo de piso. */
+export interface CeilingType {
+  id: Id;
+  name: string;
+  code: string;
+  description: string;
+  layers: Layer[];
+  /** Custo por m² (R$), informativo. */
+  cost: number;
+}
+
+/**
+ * Forro (Revit: Ceiling). Contorno fechado em planta com furos. O topo do forro fica na cota do nível mais
+ * `heightOffset` (padrão 2,60 m, o pé-direito) e as camadas descem a partir dele: a face inferior, visível, fica na
+ * cota `heightOffset` menos a espessura total. `roomId` é só o vínculo com o ambiente de origem (o contorno é gravado).
+ */
+export interface Ceiling {
+  id: Id;
+  kind: 'ceiling';
+  typeId: Id;
+  levelId: Id;
+  boundary: Vec2[];
+  holes: Vec2[][];
+  /** Ambiente de origem ("Forro no ambiente"); ausente ou null quando o forro foi desenhado livremente. */
+  roomId?: Id | null;
+  heightOffset: number;
+  mark: string;
+  comments: string;
+  order: number;
+}
+
 /** Tipo de telhado: camadas do topo para baixo (telha, ripamento, estrutura), espessura medida na vertical. */
 export interface RoofType {
   id: Id;
@@ -437,7 +468,7 @@ export interface Room {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab | Roof | Stair | Room;
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -479,6 +510,8 @@ export interface Project {
   wallTypes: Record<Id, WallType>;
   floorTypes: Record<Id, FloorType>;
   slabTypes: Record<Id, SlabType>;
+  /** Tipos de forro (decisão 0021). Ausente em arquivo antigo: a migração 17 → 18 preenche os padrões. */
+  ceilingTypes: Record<Id, CeilingType>;
   roofTypes: Record<Id, RoofType>;
   /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
   stairTypes: Record<Id, StairType>;
@@ -501,6 +534,7 @@ export interface Project {
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';
 export const isSlab = (e: Element | undefined): e is Slab => e?.kind === 'slab';
+export const isCeiling = (e: Element | undefined): e is Ceiling => e?.kind === 'ceiling';
 export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floor';
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';

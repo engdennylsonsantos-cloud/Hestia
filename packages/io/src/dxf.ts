@@ -63,6 +63,8 @@ export interface DxfLevelGeometry {
   floors?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
   /** Lajes do nível: contorno e furos em planta; `typeCode` vira a camada `LAJE_<código>`. A inclinação não aparece na planta. */
   slabs?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][]; typeCode: string }>;
+  /** Forros da planta de forro (decisão 0021): contorno e furos, na camada `FORRO`. Vazio na planta baixa. */
+  ceilings?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][] }>;
   /**
    * Telhados do nível: contorno do beiral (POLYLINE fechada na camada `TELHADO_<código>`), segmentos de cumeeira,
    * espigão e rincão em planta (LINE na camada `TELHADO_CUMEEIRA`, todos juntos) e de empena (LINE na camada
@@ -101,6 +103,8 @@ export interface DxfLevelGeometry {
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
+/** Camada dos forros da planta de forro (decisão 0021). */
+export const DXF_LAYER_CEILING = 'FORRO';
 /** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS`. */
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
 /** Vãos acima do corte (peitoril acima do plano): símbolo tracejado, a parede fica inteira. */
@@ -262,6 +266,7 @@ const projection = (category: GraphicsCategory): DxfLineRole => ({ category, vie
 /** Papel das camadas com nome fixo. As de material, piso, laje e telhado do tipo são pelo prefixo (`dxfLineRoleOf`). */
 const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_CONTOUR, cut('wall')],
+  [DXF_LAYER_CEILING, cut('floor')],
   // Portas e janelas saem juntas: a camada leva o peso da janela (o DXF não separa os dois).
   [DXF_LAYER_OPENINGS, cut('window')],
   [DXF_LAYER_OPENING_ABOVE, projection('window')],
@@ -335,6 +340,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
   for (const r of geo.rooms ?? []) push(DXF_LAYER_ROOM, [[r.outline, ...r.holes]]);
+  for (const c of geo.ceilings ?? []) push(DXF_LAYER_CEILING, [[c.outline, ...c.holes]]);
   for (const r of geo.roofs ?? []) push(dxfLayerOfRoof(r.typeCode), [[r.outline]]);
   if (geo.roofProjections) push(DXF_LAYER_ROOF_PROJECTION, geo.roofProjections);
   for (const s of geo.stairs ?? []) {

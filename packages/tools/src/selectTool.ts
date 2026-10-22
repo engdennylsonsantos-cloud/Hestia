@@ -6,6 +6,7 @@ import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpening
 import { idsInBox, pickAt } from './pick.ts';
 import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
 import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
+import { pickCeilingAt } from './ceilingPick.ts';
 import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
 import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
@@ -25,7 +26,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'room' | 'annotation';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'room' | 'annotation';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -94,6 +95,8 @@ export class SelectTool extends ToolBase {
     if (f) return { id: f, kind: 'floor' };
     const sl = pickSlabAt(pr, lv, at, mpp);
     if (sl) return { id: sl, kind: 'slab' };
+    const cl = pickCeilingAt(pr, lv, at, mpp);
+    if (cl) return { id: cl, kind: 'ceiling' };
     const rf = pickRoofAt(pr, lv, at, mpp);
     if (rf) return { id: rf, kind: 'roof' };
     // Ambiente: por último entre os elementos de planta (o piso e a parede sob o cursor ganham o clique).

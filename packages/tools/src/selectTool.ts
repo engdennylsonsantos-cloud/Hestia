@@ -13,16 +13,18 @@ import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
+import { annotationAt, dimGripAt, signedOffset } from './annotationPick.ts';
+import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions } from '@hestia/model';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
-type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge';
+type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge' | 'dimgrip';
 
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'annotation';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -42,6 +44,22 @@ export class SelectTool extends ToolBase {
   private delta: Vec2 = { x: 0, y: 0 };
   private hover: Id | null = null;
   private openingId: Id | null = null;
+  /** Alça de deslocamento da cota selecionada (decisão 0019) e o deslocamento que ela assume ao soltar. */
+  private dimGrip: Id | null = null;
+  private dimOffset: number | null = null;
+
+  /** Arrasto da alça da cota: o deslocamento é a distância do cursor à linha a–b, no lado do cursor. */
+  private dragDimGrip(p: PointerInfo): void {
+    const pr = this.env.project();
+    const d = levelDimensions(pr, this.env.levelId()).find((x) => x.id === this.dimGrip);
+    if (!d) return;
+    const pts = dimensionPoints(pr, d);
+    const off = signedOffset(pts.a, pts.b, p.raw);
+    if (Math.abs(off) < DIM_MIN_LENGTH) return;
+    this.dimOffset = off;
+    const g = dimensionGeometry(pts.a, pts.b, off, this.env.metersPerPixel() * 4);
+    this.items = [{ kind: 'line', a: g.line[0], b: g.line[1] }];
+  }
 
   protected reset(): void {
     this.mode = 'idle';
@@ -76,7 +94,10 @@ export class SelectTool extends ToolBase {
     const sl = pickSlabAt(pr, lv, at, mpp);
     if (sl) return { id: sl, kind: 'slab' };
     const rf = pickRoofAt(pr, lv, at, mpp);
-    return rf ? { id: rf, kind: 'roof' } : null;
+    if (rf) return { id: rf, kind: 'roof' };
+    // Cotas e textos de anotação (decisão 0019): por último, para não roubar o clique de um elemento.
+    const an = annotationAt(pr, lv, at, mpp);
+    return an ? { id: an.id, kind: 'annotation' } : null;
   }
 
   override move(p: PointerInfo): void {
@@ -91,6 +112,9 @@ export class SelectTool extends ToolBase {
     if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()));
     // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
     this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
+    // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
+    const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
+    if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
     // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
     const w = this.singleWall();
     if (w && this.mode === 'idle') {
@@ -175,6 +199,8 @@ export class SelectTool extends ToolBase {
     }
     const re = roofEdgeAt(pr, sel, p.raw, mpp);
     if (re) { this.roofEdgeDown = re; this.mode = 'roofedge'; return; }
+    const dg = dimGripAt(pr, this.env.levelId(), sel, p.raw, mpp);
+    if (dg) { this.dimGrip = dg; this.dimOffset = null; this.mode = 'dimgrip'; return; }
     const hit = this.hitAt(p.raw);
     if (hit && sel.includes(hit.id)) {
       if (hit.kind === 'door' || hit.kind === 'window') {
@@ -194,6 +220,7 @@ export class SelectTool extends ToolBase {
     if (this.mode === 'roofedge' && moved) this.mode = 'dragwait';
     if (this.mode === 'dragwait' && moved) this.mode = 'moving';
     this.items = [];
+    if (this.mode === 'dimgrip') this.dragDimGrip(p);
     switch (this.mode) {
       case 'window': {
         const a = this.downPt;
@@ -238,6 +265,10 @@ export class SelectTool extends ToolBase {
         hold?.release(p, (f) => {
           this.focus = f;
         });
+        break;
+      }
+      case 'dimgrip': {
+        if (this.dimGrip && this.dimOffset !== null) this.env.exec({ type: 'updateDimension', levelId: this.env.levelId(), id: this.dimGrip, patch: { offset: this.dimOffset } });
         break;
       }
       case 'roofedge': {

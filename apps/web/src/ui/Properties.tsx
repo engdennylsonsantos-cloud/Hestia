@@ -27,6 +27,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
 import { setRoofProjection, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
@@ -343,6 +344,7 @@ function ViewProps(): ReactElement {
 export function Properties(): ReactElement {
   const p = useProject();
   const sel = useUi((s) => s.selection);
+  const note = selectedNote(p, useUi((s) => s.levelId), sel);
   const els = sel.map((id) => p.elements[id]).filter((e) => !!e);
   const walls = els.filter(isWall);
   const ops = els.filter(isOpening);
@@ -366,6 +368,7 @@ export function Properties(): ReactElement {
           : kinds === 1 && slabs.length > 0 ? <SlabProperties slabs={slabs} />
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
+          : note ? <AnnotationProps dim={note.dim} text={note.text} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado ou escada) para editar propriedades.</div>
         ) : <ViewProps />}

@@ -41,6 +41,7 @@ const CATEGORY_LAYER: Record<GraphicsCategory, string> = {
   slab: 'CORTE_LAJE',
   roof: 'CORTE_TELHADO',
   stair: 'CORTE_ESCADA',
+  annotation: 'CORTE_ANOTACAO',
 };
 
 /** Contorno externo do corte/elevação (união das regiões visíveis). */

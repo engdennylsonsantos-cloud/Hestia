@@ -341,9 +341,9 @@ describe('cache de materiais e limpeza', () => {
 });
 
 /** Substituições padrão (todas as categorias visíveis, sem transparência nem meio-tom). */
-function defaultsOverrides(): Record<'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair', { visible: boolean; transparency: number; halftone: boolean; color?: string }> {
+function defaultsOverrides(): Record<'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'annotation', { visible: boolean; transparency: number; halftone: boolean; color?: string }> {
   const ok = { visible: true, transparency: 0, halftone: false };
-  return { wall: ok, door: ok, window: ok, floor: ok, slab: ok, roof: ok, stair: ok };
+  return { wall: ok, door: ok, window: ok, floor: ok, slab: ok, roof: ok, stair: ok, annotation: ok };
 }
 
 describe('esquadrias no 3D: folhas e espessuras do tipo', () => {

@@ -1,5 +1,6 @@
 import { levelFrames, pointAt } from '@hestia/engine';
 import { openingsOfWall, wallType, type Id, type Project } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
 import type { LabelOp } from './types.ts';
 
 /** Largura aproximada de um caractere da etiqueta (px de tela) e folga até o vão (px). */
@@ -46,3 +47,6 @@ export function wallTagLabels(p: Project, levelId: Id, zoom: number, hidden?: Re
   }
   return out;
 }
+
+/** Rótulo de anotação (cota ou texto, decisão 0019): centrado em `at`, na fonte e na rotação do papel. */
+export const noteLabel = (at: Vec2, text: string, fontPx: number, rotation: number): LabelOp => ({ at, text, fontPx, rotation, center: true });

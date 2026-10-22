@@ -1,6 +1,6 @@
 import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
-import { isOpening, isWall, type Id } from '@hestia/model';
+import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { pickAt } from './pick.ts';
@@ -20,7 +20,7 @@ abstract class SelectionTool extends ToolBase {
     return selectedOpenings(this.env.project(), this.env.selection());
   }
   protected hasSelection(): boolean {
-    return this.movables().length + this.openings().length > 0;
+    return this.movables().length + this.openings().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length > 0;
   }
   override start(): void {
     this.reset();
@@ -76,14 +76,19 @@ export class MoveTool extends SelectionTool {
   private apply(d: Vec2): void {
     if (len(d) < 1e-6) return;
     const els = this.movables();
+    // Cotas e textos de anotação (decisão 0019) seguem a seleção: movem-se ou copiam-se pelos próprios comandos.
+    const notes = annotationMoveCommands(this.env.project(), this.env.levelId(), this.env.selection(), d, this.copy);
     if (this.copy) {
       this.env.transaction('Copiar', () => {
         if (els.length) copyWalls(this.env, els, { kind: 'translate', d });
+        for (const c of notes) this.env.exec(c);
       });
     } else if (els.length) {
       moveWalls(this.env, els, d);
+      for (const c of notes) this.env.exec(c);
     } else {
       slideOpenings(this.env, this.openings(), d);
+      for (const c of notes) this.env.exec(c);
     }
   }
 

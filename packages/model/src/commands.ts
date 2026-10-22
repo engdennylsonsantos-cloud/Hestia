@@ -31,6 +31,7 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
+import { transformFloor, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
@@ -44,6 +45,8 @@ import {
   resetSectionGraphics,
   resetView3D,
 } from './graphicsCommands.ts';
+
+import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -72,6 +75,7 @@ export type Command =
   | { type: 'upsertMaterial'; material: Material }
   | { type: 'upsertOpeningType'; openingType: OpeningType }
   | { type: 'upsertLevel'; level: Level }
+  | AnnotationCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
@@ -112,33 +116,6 @@ function removeIds(p: Project, ids: Id[]): void {
   const doomed = new Set(ids);
   for (const e of Object.values(p.elements)) if (isOpening(e) && doomed.has(e.hostId)) doomed.add(e.id);
   for (const id of doomed) delete p.elements[id];
-}
-
-/** Move/gira/espelha um piso; espelhar inverte o sentido do contorno (a orientação não importa ao motor, mas fica estável). */
-function transformFloor(f: Floor, t: Transform): Floor {
-  const pts = (ring: Vec2[]): Vec2[] => {
-    const out = ring.map((q) => applyTransform(t, q));
-    return t.kind === 'mirror' ? out.reverse() : out;
-  };
-  return { ...f, boundary: pts(f.boundary), holes: f.holes.map(pts) };
-}
-
-/** Move/gira/espelha uma laje: contorno, furos e a linha de inclinação (origem e direção). */
-function transformSlab(s: Slab, t: Transform): Slab {
-  const pts = (ring: Vec2[]): Vec2[] => {
-    const out = ring.map((q) => applyTransform(t, q));
-    return t.kind === 'mirror' ? out.reverse() : out;
-  };
-  let slope = s.slope;
-  if (slope) {
-    const o = applyTransform(t, slope.origin);
-    const e = applyTransform(t, { x: slope.origin.x + slope.dir.x, y: slope.origin.y + slope.dir.y });
-    const dx = e.x - o.x;
-    const dy = e.y - o.y;
-    const l = Math.hypot(dx, dy) || 1;
-    slope = { origin: o, dir: { x: dx / l, y: dy / l }, percent: slope.percent };
-  }
-  return { ...s, boundary: pts(s.boundary), holes: s.holes.map(pts), slope };
 }
 
 /** Move/gira/espelha um telhado: contorno, furos, direção e águas livres (origem e direção de subida). */
@@ -371,6 +348,14 @@ export function applyCommand(p: Project, c: Command): void {
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }
+    case 'addDimension':
+    case 'updateDimension':
+    case 'removeDimension':
+    case 'addText':
+    case 'updateText':
+    case 'removeText':
+      applyAnnotationCommand(p, c);
+      break;
     case 'setLevelViewRange': {
       const l = p.levels.find((x) => x.id === c.levelId);
       if (!l) throw new Error('Nível inexistente');

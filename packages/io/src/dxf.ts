@@ -1,4 +1,5 @@
 import type { GraphicsCategory, Id, Project } from '@hestia/model';
+import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextRecords, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
 export interface DxfPoint {
@@ -91,6 +92,8 @@ export interface DxfLevelGeometry {
    * Quem monta a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
    */
   lineWeights?: Partial<Record<string, number>>;
+  /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
+  notes?: DxfNotes;
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -269,6 +272,8 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_STAIR_POST, cut('stair')],
   [DXF_LAYER_STAIR_ARROW, 'annotation'],
   [DXF_LAYER_STAIR_CUT, 'annotation'],
+  [DXF_LAYER_COTAS, 'annotation'],
+  [DXF_LAYER_TEXTOS, 'annotation'],
 ]);
 
 /** Papel de uma camada pelo nome. `undefined` = sem categoria (sai com -3). `PAREDE_<material>` é corte de parede. */
@@ -284,6 +289,7 @@ export function dxfLineRoleOf(layer: string): DxfLineRole | undefined {
 
 /** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE), e as de espelho e seta das escadas. */
 function linesOf(geo: DxfLevelGeometry): Line[] {
+  const notes = (geo.notes?.lines ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_COTAS, a, b }));
   const roof = (geo.roofs ?? []).flatMap((r) => [
     ...r.ridges.map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
     ...(r.gables ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
@@ -292,7 +298,7 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
     ...s.risers.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_RISER, a, b })),
     ...s.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_ARROW, a, b })),
   ]);
-  return [...roof, ...stair];
+  return [...roof, ...stair, ...notes];
 }
 
 /**
@@ -341,13 +347,13 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
 }
 
 /** Camadas da tabela LAYER: `0` e as das polilinhas e das linhas, sem repetição e em ordem. */
-function layerNamesOf(shapes: Shape[], lines: Line[]): string[] {
-  return [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer)])].sort();
+function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): string[] {
+  return [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer), ...texts.map((t) => t.layer)])].sort();
 }
 
 /** Nomes das camadas que `exportDxf` põe na tabela LAYER para esta geometria (a base de `lineWeights`). */
 export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
-  return layerNamesOf(shapesOf(project, geo), linesOf(geo));
+  return layerNamesOf(shapesOf(project, geo), linesOf(geo), geo.notes?.texts ?? []);
 }
 
 /**
@@ -363,10 +369,11 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
-  const layers = layerNamesOf(shapes, lines);
+  const texts = geo.notes?.texts ?? [];
+  const layers = layerNamesOf(shapes, lines, texts);
   // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
   const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);
-  const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b])];
+  const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b]), ...texts.map((t) => t.at)];
   const lo = all.reduce((m, p) => ({ x: Math.min(m.x, p.x), y: Math.min(m.y, p.y) }), { x: 0, y: 0 });
   const hi = all.reduce((m, p) => ({ x: Math.max(m.x, p.x), y: Math.max(m.y, p.y) }), { x: 0, y: 0 });
 
@@ -465,6 +472,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
     rec(21, fmt(l.b.y));
     rec(31, '0.000000');
   }
+  for (const t of texts) for (const [c, v] of dxfTextRecords(t)) rec(c, v);
   rec(0, 'ENDSEC');
   rec(0, 'EOF');
   return `${out.join('\r\n')}\r\n`;

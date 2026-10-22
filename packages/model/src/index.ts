@@ -24,3 +24,5 @@ export * from './level.ts';
 export * from './elementLevel.ts';
 export * from './opening.ts';
 export * from './openingExtras.ts';
+export * from './dimension.ts';
+export * from './annotations.ts';

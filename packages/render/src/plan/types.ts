@@ -30,6 +30,10 @@ export interface LabelOp {
   dy?: number;
   /** 'soft': rótulo mais claro (degrau acima do corte, decisão 0014 §1 item 9). */
   tone?: 'info' | 'accent' | 'soft';
+  /** Texto de anotação (decisão 0019): tamanho da fonte em px de tela, rotação em graus, centrado em `at`. */
+  fontPx?: number;
+  rotation?: number;
+  center?: boolean;
 }
 
 /** Lista de desenho neutra: tanto o renderizador de GPU quanto o de CPU a consomem. */

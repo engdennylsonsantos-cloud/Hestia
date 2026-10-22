@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, worldToScreen, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
 import { resolveFloors, resolveRoofs, resolveSlabs } from '@hestia/engine';
 import { view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProjectVersion } from '../editor/controller.ts';
@@ -8,6 +8,7 @@ import { clickSelect3d, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
+import { PlanLabels } from './PlanLabels';
 
 /** Escuro se o usuário escolheu escuro, ou se o tema do host/sistema for escuro. */
 export function useDark(): boolean {
@@ -427,18 +428,7 @@ export function ViewportCanvas(): ReactElement {
       onPointerLeave={onLeave}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="labels" aria-hidden="true">
-        {ui.view !== '3d' && v
-          ? labels.map((l, i) => {
-              const sp = worldToScreen(v, l.at);
-              return (
-                <span key={i} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
-                  {l.text}
-                </span>
-              );
-            })
-          : null}
-      </div>
+      <PlanLabels labels={ui.view !== '3d' && v ? labels : []} v={v} />
       {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
       {ui.gpu === 'cpu' && ui.view === '3d' && (
         <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>

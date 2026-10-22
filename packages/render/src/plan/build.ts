@@ -13,6 +13,7 @@ import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts'
 import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
+import { noteOps } from './notes.ts';
 import { openingViewOps, planViewOf, wallOutlineOps, type PlanView } from './view.ts';
 import { paintOps, planStyleOf, surfaceColor, type PlanPaint } from './style.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
@@ -260,6 +261,11 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...marks.fills);
   strokes.push(...marks.strokes);
   labels.push(...marks.labels);
+
+  // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'.
+  const notes = noteOps(p, input.levelId, paint.annotation, theme.ink, v.zoom, style.scale);
+  strokes.push(...notes.strokes);
+  labels.push(...notes.labels);
 
   // Etiquetas de tipo (G4) e depuração de junção (G6), por configuração do projeto.
   if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, hidden));

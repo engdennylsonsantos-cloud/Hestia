@@ -91,7 +91,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
    * Desenho do vão no corte e na elevação, a partir do tipo e da FAMÍLIA (`o.esquadria`): batente com a espessura do
    * perfil (`frameWidth`) — no corte transversal, com a profundidade do batente (`frameDepth`) centrada na parede —,
    * vidro com a espessura do tipo, folha de porta, e os símbolos de elevação (arco do maxim-ar/basculante, giro da
-   * porta e seta de correr). Sem `esquadria` (lista sintética), cai no retângulo de antes.
+   * porta, em V, e seta de correr). Sem `esquadria` (lista sintética), cai no retângulo de antes.
    */
   const drawOpening = (o: SectionOpening): void => {
     const { polygons, kind, cut, t0, t1, z0, z1 } = o;
@@ -113,9 +113,11 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (!noFill) fills.push({ polygons: [[ring]], color: halftone(color, pt), alpha: pt.alpha });
       strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
     };
-    // Traço simbólico da elevação (abertura, giro, seta): fino. Por padrão tracejado (dash [4,3], distinto do tracejado dos
+    // Traço simbólico da elevação (abertura, giro, seta, X): fino. Por padrão tracejado (dash [4,3], distinto do tracejado dos
     // níveis [10,5]); `dashed = false` sai contínuo (decisão 0024 §2: tracejado = abre para o observador, contínuo = não).
+    // No grosso não sai símbolo nenhum (decisão 0015; 0024 §3 e §5).
     const symbol = (pts: Vec2[], dashed = true): void => {
+      if (detail === 'coarse') return;
       strokes.push({ pts, closed: false, widthPx: symbolWidth(kind), color: halftone(theme.inkSoft, pt), alpha: 1, ...(dashed ? { dash: [4, 3] as [number, number] } : {}) });
     };
     const esq = o.esquadria;
@@ -126,6 +128,9 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       return;
     }
     const fw = esq.frameWidth;
+    // Giro em V (decisão 0024 §2): duas linhas saindo do vértice, no lado da dobradiça, até as duas pontas do lado do trinco,
+    // num traço só de três pontos. Tracejado quando a folha abre para o observador (`swingTowardViewer`).
+    const swingV = (vertex: Vec2, tipA: Vec2, tipB: Vec2): void => symbol([tipA, vertex, tipB], esq.swingTowardViewer);
     // Vista face (t = largura do vão) x corte transversal (t = espessura da parede): a projeção da pegada
     // (largura × espessura) sobre a linha diz qual é. A vista face é a da elevação e a do corte longitudinal.
     const faceOn = Math.abs(t1 - t0 - esq.width) <= Math.abs(t1 - t0 - esq.thickness);
@@ -140,6 +145,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
     };
     const tc = (t0 + t1) / 2;
+    const zc = (z0 + z1) / 2;
     // Verga e contraverga: transpasse além do vão na vista face e a espessura da parede no corte transversal.
     if (esq.lintel) {
       if (faceOn) concretePiece(t0 - esq.lintel.over, t1 + esq.lintel.over, z1, z1 + esq.lintel.height);
@@ -192,23 +198,19 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
             strokes.push({ pts: [{ x: t, y: z0 + fw }, { x: t, y: z1 - fw }], closed: false, widthPx: symbolWidth(kind), color: theme.ink, alpha: 0.7 });
           }
         }
-        // Símbolos da elevação: seta de correr (E2) ou arco tracejado do maxim-ar/basculante (E1).
+        // Símbolos da elevação: seta de correr (E2) ou V de giro do maxim-ar/basculante (E1).
         if (esq.plan === 'sliding') {
-          const zc = (z0 + z1) / 2;
           symbol([{ x: t0 + fw, y: zc }, { x: t1 - fw, y: zc }]);
           symbol([{ x: t1 - fw - 0.1, y: zc + 0.04 }, { x: t1 - fw, y: zc }, { x: t1 - fw - 0.1, y: zc - 0.04 }]);
         } else if (esq.family === 'window_casement' || esq.family === 'window_tilt') {
-          // Símbolo de abertura (E1): arco tracejado dentro do vão, saindo da verga (ou da soleira, com o sentido
-          // invertido) para o lado da abertura.
-          const dip = Math.min(0.25 * (z1 - z0), 0.4);
-          const base = esq.flipFacing ? z0 + fw : z1 - fw;
-          const dir = esq.flipFacing ? 1 : -1;
-          const pts: Vec2[] = [];
-          for (let i = 0; i <= 18; i++) {
-            const t = t0 + fw + ((t1 - t0 - 2 * fw) * i) / 18;
-            pts.push({ x: t, y: base + dir * dip * Math.sin((Math.PI * i) / 18) });
-          }
-          symbol(pts);
+          // Janela de abrir (E1), com o V no lado da dobradiça e as pontas nos cantos do lado oposto do caixilho: o
+          // maxim-ar tem a dobradiça no topo (vértice no meio da aresta superior); o basculante, na base.
+          const left = t0 + fw;
+          const right = t1 - fw;
+          const top = z1 - fw;
+          const bottom = z0 + fw;
+          if (esq.family === 'window_casement') swingV({ x: tc, y: top }, { x: left, y: bottom }, { x: right, y: bottom });
+          else swingV({ x: tc, y: bottom }, { x: left, y: top }, { x: right, y: top });
         }
       } else {
         // Corte transversal: verga e soleira com a profundidade do batente, centradas na parede; vidro com a espessura.
@@ -225,28 +227,25 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (!noFill) fills.push({ polygons, color: halftone(pt.color ?? DOOR_FILL, pt), alpha: pt.alpha });
       outline();
       if (faceOn) {
-        // Símbolos da elevação: seta de correr da porta (E2) ou giro do lado da dobradiça (E1).
+        // Símbolos da elevação: seta de correr da porta (E2) ou V de giro do lado da dobradiça (E1).
         if (esq.family === 'door_sliding') {
-          const zc = (z0 + z1) / 2;
           symbol([{ x: t0, y: zc }, { x: t1, y: zc }]);
           symbol([{ x: t1 - 0.12, y: zc + 0.05 }, { x: t1, y: zc }, { x: t1 - 0.12, y: zc - 0.05 }]);
         } else if (esq.family === 'door_double') {
-          // Porta dupla: duas folhas com dobradiças nas ombreiras; duas diagonais do topo de cada ombreira ao centro
-          // da base (vértice na dobradiça de cada folha).
-          const tc = (t0 + t1) / 2;
-          symbol([{ x: t0, y: z1 }, { x: tc, y: z0 }], esq.swingTowardViewer);
-          symbol([{ x: t1, y: z1 }, { x: tc, y: z0 }], esq.swingTowardViewer);
+          // Porta dupla: um V por folha, com o vértice na ombreira (dobradiça) e as pontas no centro, no topo e na base.
+          swingV({ x: t0, y: zc }, { x: tc, y: z1 }, { x: tc, y: z0 });
+          swingV({ x: t1, y: zc }, { x: tc, y: z1 }, { x: tc, y: z0 });
         } else if (esq.family === 'door_pivot') {
-          // Porta pivotante: eixo vertical a W/4 da ombreira da dobradiça (mesma convenção da planta, decisão 0017 §8)
-          // e a diagonal da folha girando até a ombreira oposta.
+          // Porta pivotante: o eixo vertical a W/4 da ombreira da dobradiça (mesma convenção da planta, decisão 0017 §8),
+          // com o vértice do V sobre ele, na altura média, e as pontas no lado oposto.
           const tAxis = tc + (esq.flipHand ? 1 : -1) * (esq.width / 4);
           const opp = esq.flipHand ? t0 : t1;
           symbol([{ x: tAxis, y: z1 }, { x: tAxis, y: z0 }]);
-          symbol([{ x: tAxis, y: z1 }, { x: opp, y: z0 }], esq.swingTowardViewer);
+          swingV({ x: tAxis, y: zc }, { x: opp, y: z1 }, { x: opp, y: z0 });
         } else {
           const hinge = esq.flipHand ? t1 : t0;
           const opp = esq.flipHand ? t0 : t1;
-          symbol([{ x: hinge, y: z1 }, { x: opp, y: z0 }], esq.swingTowardViewer);
+          swingV({ x: hinge, y: zc }, { x: opp, y: z1 }, { x: opp, y: z0 });
         }
       }
     }

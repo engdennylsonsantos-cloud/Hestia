@@ -1,5 +1,5 @@
 import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
+import { fillRegionOf, junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -91,7 +91,8 @@ export function floorFills(
  */
 export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
-  const region = el?.cut ? el.region : f.polygon;
+  // Preenchimento: a camada de topo quando ela tem regra explícita (decisão 0025); senão o elemento, como antes.
+  const region = fillRegionOf(f.layers[0] ?? { explicit: false, polygon: f.polygon }, f.polygon, el);
   if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';

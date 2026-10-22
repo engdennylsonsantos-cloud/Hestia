@@ -114,6 +114,19 @@ const P9_CASES = {
   'parede-base-piso-metade': [W('bp1', [0, 0], [4, 0], { attachBottomToFloor: true }), F('pb1', [[-1, -1], [2, -1], [2, 1], [-1, 1]], { heightOffset: 0.05 })],
 };
 
+// P10 (decisão 0025): piso único (obra inteira, 8 × 6 m) com uma parede interna que atravessa o contorno. Acabamento
+// e assentamento param na face (`ft_unico`) ou no núcleo (variante); a estrutura passa por baixo. Baselines novas.
+const FT_UNICO = (acabamento) => ({ id: 'ft_unico', name: 'Piso único (obra inteira)', code: 'PS-05', description: '', cost: 250, layers: [
+  { function: 'finish1', materialId: 'mat_ceramica', thickness: 0.01, wraps: false, termino: acabamento },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.02, wraps: false, termino: 'face' },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.04, wraps: false, termino: 'face' },
+  { function: 'structure', materialId: 'mat_concreto', thickness: 0.12, wraps: false, termino: 'passa' },
+] });
+const PISO_UNICO_CASES = {
+  'piso-unico-parede-face': [{ kind: 'floorType', floorType: FT_UNICO('face') }, W('div', [4, -1], [4, 7]), F('pu1', [[0, 0], [8, 0], [8, 6], [0, 6]], { typeId: 'ft_unico' })],
+  'piso-unico-parede-nucleo': [{ kind: 'floorType', floorType: FT_UNICO('nucleo') }, W('div', [4, -1], [4, 7]), F('pu2', [[0, 0], [8, 0], [8, 6], [0, 6]], { typeId: 'ft_unico' })],
+};
+
 // Decisão 0024 (representação de aberturas): casos novos de porta, janela, vão livre e X de furo. A planta leva porta de
 // giro e janela de correr na parede sul/norte e um vão livre na leste (X); a laje tem dois furos quadrangulares (X em cada
 // um). A elevação abre a vista da fachada sul (`addView` + `openSection`) com a porta, o vão livre e a janela.
@@ -153,7 +166,7 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES, ...PISO_UNICO_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
   await page.evaluate(([ws, v, sec]) => {
     const { editor } = window.__hestia;

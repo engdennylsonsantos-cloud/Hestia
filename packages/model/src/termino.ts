@@ -16,8 +16,14 @@ export const TERMINO_PRIORIDADE_MAX = 9;
 /** Término efetivo da camada (padrão `auto` quando ausente). */
 export const terminoOf = (l: Pick<Layer, 'termino'>): LayerTermino => l.termino ?? 'auto';
 
-/** Há regra explícita (diferente de `auto`): a camada usa o término e não a junção automática por prioridade contra paredes. */
-export const terminoEhExplicito = (l: Pick<Layer, 'termino'>): boolean => terminoOf(l) !== 'auto';
+/**
+ * Regra de parede (decisão 0025): `face`, `nucleo`, `passa` ou `{ ate }`. A região da camada vem dessa regra, e a junção
+ * automática por prioridade contra as paredes não a recorta. O deslocamento em cm não entra: segue a junção como antes.
+ */
+export const terminoEhRegraParede = (l: Pick<Layer, 'termino'>): boolean => {
+  const t = terminoOf(l);
+  return t === 'face' || t === 'nucleo' || t === 'passa' || (typeof t === 'object' && 'ate' in t);
+};
 
 /** Erro de validação do término, ou null quando é válido. */
 export function terminoIssue(l: Pick<Layer, 'termino'>): string | null {

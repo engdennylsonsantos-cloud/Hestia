@@ -116,6 +116,19 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 }
 
 /**
+ * Região em planta do preenchimento de um piso ou laje (decisão 0025). Quando a camada de topo tem regra explícita, o
+ * preenchimento é essa camada (o piso para na face da parede e o resto segue sob ela); senão, o elemento, como antes:
+ * a região do corte (`el.region`) ou o contorno do elemento.
+ */
+export function fillRegionOf(top: { explicit: boolean; polygon: MultiPolygon }, element: MultiPolygon, el?: ElementJunction): MultiPolygon {
+  if (top.explicit) {
+    const parts = el?.cut ? el.layers.find((l) => l.layerIndex === 0)?.parts : undefined;
+    return parts ? union(...parts.map((x) => x.poly)) : top.polygon;
+  }
+  return el?.cut ? el.region : element;
+}
+
+/**
  * Partes de uma camada para o desenho: as resolvidas quando o elemento foi cortado e a camada está nele; senão `fallback`
  * (a camada inteira, como antes). Membrana e camada sem junção caem no `fallback`.
  */

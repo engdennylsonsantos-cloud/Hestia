@@ -16,6 +16,16 @@ export const TERMINO_OPCOES: ReadonlyArray<{ value: TerminoKind; label: string }
   { value: 'cm', label: 'Deslocamento (cm)' },
 ];
 
+/** Dica curta de cada opção do seletor (decisão 0025). */
+export const TERMINO_AJUDA: Record<TerminoKind, string> = {
+  auto: 'Padrão: o núcleo do piso vai até o núcleo da parede; as demais camadas param na face de acabamento.',
+  face: 'Para na face de acabamento da parede: o piso não entra na parede.',
+  nucleo: 'Avança sob o acabamento da parede e para no núcleo (estrutura).',
+  passa: 'Passa por baixo da parede: a parede não recorta esta camada.',
+  ate: 'Para na primeira camada da parede com prioridade igual ou maior. Número de 1 a 9; menor número, prioridade maior.',
+  cm: 'Positivo avança sobre a parede; negativo recua, a partir da face de acabamento.',
+};
+
 /** Tipo e texto do campo de um término guardado (o texto é a prioridade ou o deslocamento). */
 export function formDoTermino(t: LayerTermino): { kind: TerminoKind; cmText: string } {
   if (typeof t === 'object' && 'cm' in t) return { kind: 'cm', cmText: String(t.cm) };

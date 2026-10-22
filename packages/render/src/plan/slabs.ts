@@ -1,5 +1,5 @@
 import { difference, multiArea, offsetMulti, type Vec2 } from '@hestia/geom';
-import { junctionLevel, resolveSlabs, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
+import { fillRegionOf, junctionLevel, resolveSlabs, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -67,7 +67,8 @@ export function slabFills(
 export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
   // Região depois da junção (P7b): a laje sem corte fica com o contorno dela; cortada, com a região que sobra.
-  const region = el?.cut ? el.region : s.polygon;
+  // Preenchimento: a camada de topo quando ela tem regra explícita (decisão 0025); senão o elemento, como antes.
+  const region = fillRegionOf(s.layers[0] ?? { explicit: false, polygon: s.polygon }, s.polygon, el);
   if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';

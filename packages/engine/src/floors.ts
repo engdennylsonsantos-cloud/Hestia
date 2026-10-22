@@ -1,5 +1,5 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, terminoEhExplicito, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, terminoEhRegraParede, type Id, type Project } from '@hestia/model';
 import { layerOutlines, memoCut } from './layerOutline.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
@@ -98,7 +98,7 @@ export function resolveFloors(p: Project, levelId: Id, opts: FloorResolveOptions
       membrane: isMembraneLayer(l),
       priority: layerPriority(l),
       core: core[i]!,
-      explicit: terminoEhExplicito(l),
+      explicit: terminoEhRegraParede(l),
       polygon: cut(outlines[i]!),
     }));
     out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ, layers, problem });

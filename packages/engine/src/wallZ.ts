@@ -1,4 +1,4 @@
-import { arcPointAt, pointInMulti, type Vec2 } from '@hestia/geom';
+import { arcPointAt, pointInMulti, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { profileMax, slabRiseAt, wallArc, wallBaseElevation, wallMaxHeight, type Id, type Project, type ProfilePoint, type Wall } from '@hestia/model';
 import { resolveAllFloors, type ResolvedFloor } from './floors.ts';
 import { resolveAllRoofs, type ResolvedRoof } from './roofs.ts';
@@ -18,6 +18,39 @@ export interface WallZ {
 /** Folga mínima para uma parede anexada continuar com altura (1 cm). */
 const MIN_HEIGHT = 0.01;
 
+/** Tolerância para considerar o ponto médio exatamente sobre a borda de um contorno (m). */
+const ON_EDGE_EPS = 1e-7;
+
+/** Distância do ponto ao segmento [a, b]. */
+function distToSegment(pt: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(pt.x - a.x, pt.y - a.y);
+  const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2));
+  return Math.hypot(pt.x - (a.x + t * dx), pt.y - (a.y + t * dy));
+}
+
+/** O ponto cai sobre a borda do anel (a menos de `ON_EDGE_EPS`). */
+function onRing(pt: Vec2, r: Ring): boolean {
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    if (distToSegment(pt, r[j]!, r[i]!) <= ON_EDGE_EPS) return true;
+  }
+  return false;
+}
+
+/**
+ * O ponto é coberto pelo contorno (piso ou laje)? Além do teste de interior (`pointInMulti`), trata o ponto sobre a
+ * borda como coberto: o ray-casting de `pointInRing` é ambíguo exatamente sobre a borda (o resultado depende do lado em
+ * que o ponto cai — defeito 6.1 de docs/projetos/casa-alto-padrao/C-montagem.md). Aqui a decisão fica consistente nos
+ * quatro lados, sem alterar o `pointInRing`/`pointInMulti` do geom, que seguem com o comportamento padrão.
+ */
+function covered(at: Vec2, m: MultiPolygon): boolean {
+  if (pointInMulti(at, m)) return true;
+  for (const poly of m) for (const ring of poly) if (onRing(at, ring)) return true;
+  return false;
+}
+
 /** Ponto médio do eixo: no arco, o ponto do meio do comprimento do arco. */
 function axisMid(w: Wall): Vec2 {
   const arc = wallArc(w);
@@ -30,12 +63,12 @@ function facesAt(levelId: Id, at: Vec2, floors: ResolvedFloor[], slabs: Resolved
   const tops: number[] = [];
   const bottoms: number[] = [];
   for (const f of floors) {
-    if (f.levelId !== levelId || !pointInMulti(at, f.polygon)) continue;
+    if (f.levelId !== levelId || !covered(at, f.polygon)) continue;
     tops.push(f.topZ);
     bottoms.push(f.bottomZ);
   }
   for (const s of slabs) {
-    if (s.levelId !== levelId || !pointInMulti(at, s.polygon)) continue;
+    if (s.levelId !== levelId || !covered(at, s.polygon)) continue;
     // Lajes inclinadas: as faces sobem juntas, então a cota vale no ponto (topo ou base da origem + subida).
     const rise = slabRiseAt(s.slope, at);
     tops.push(s.topZ + rise);

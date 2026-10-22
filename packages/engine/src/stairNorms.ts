@@ -23,6 +23,9 @@ export interface StairNorms {
   spiralTreadMin: number;
   /** Caracol: piso na borda estreita (interna), mínimo informativo (m). */
   spiralNarrowMin: number;
+  /** Leque (decisão 0011 §1 item 10): piso medido a `winderTreadAt` m da borda interna, mínimo `winderTreadMin` (m). */
+  winderTreadAt: number;
+  winderTreadMin: number;
 }
 
 export const DEFAULT_STAIR_NORMS: StairNorms = {
@@ -37,4 +40,6 @@ export const DEFAULT_STAIR_NORMS: StairNorms = {
   spiralTreadAt: 0.55,
   spiralTreadMin: 0.28,
   spiralNarrowMin: 0.07,
+  winderTreadAt: 0.55,
+  winderTreadMin: 0.28,
 };

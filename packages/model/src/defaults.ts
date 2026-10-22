@@ -114,13 +114,14 @@ export interface OpeningFrame {
 const positiveOr = (v: number | undefined, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback);
 
 /**
- * Espessuras da esquadria de um tipo. `wallThickness` é a espessura da parede que o vão corta: a profundidade do batente
- * é o padrão (ou o valor do tipo) limitado a ela, para o batente não sair do outro lado da parede.
+ * Espessuras da esquadria de um tipo. `maxDepth` é o limite da profundidade do batente — o NÚCLEO da parede
+ * (`coreSpan`), não a espessura total com acabamentos (DEC-1): o batente não deve ficar sob o reboco. A profundidade é
+ * o padrão (ou o valor do tipo) limitado a esse teto.
  */
-export function openingFrame(t: OpeningType, wallThickness: number): OpeningFrame {
+export function openingFrame(t: OpeningType, maxDepth: number): OpeningFrame {
   return {
     frameWidth: positiveOr(t.frameWidth, OPENING_FRAME_DEFAULTS.frameWidth),
-    frameDepth: Math.min(positiveOr(t.frameDepth, OPENING_FRAME_DEFAULTS.frameDepth), wallThickness),
+    frameDepth: Math.min(positiveOr(t.frameDepth, OPENING_FRAME_DEFAULTS.frameDepth), maxDepth),
     leafThickness: positiveOr(t.leafThickness, t.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf),
     glassThickness: positiveOr(t.glassThickness, OPENING_FRAME_DEFAULTS.glass),
   };
@@ -134,15 +135,20 @@ const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId' | 'closur
 });
 
 export const DEFAULT_OPENING_TYPES: OpeningType[] = [
-  ot({ id: 'ot_p80', kind: 'door', name: 'Porta 80 x 210', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
-  ot({ id: 'ot_p90', kind: 'door', name: 'Porta 90 x 210', width: 0.9, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
-  ot({ id: 'ot_p70', kind: 'door', name: 'Porta 70 x 210', width: 0.7, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
-  ot({ id: 'ot_p160', kind: 'door', name: 'Porta dupla 160 x 210', width: 1.6, height: 2.1, sill: 0, leaves: 2, plan: 'double' }),
-  ot({ id: 'ot_vao90', kind: 'door', name: 'Vão livre 90 x 210', width: 0.9, height: 2.1, sill: 0, leaves: 0, plan: 'swing' }),
-  ot({ id: 'ot_j120', kind: 'window', name: 'Janela 120 x 120', width: 1.2, height: 1.2, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
-  ot({ id: 'ot_j150', kind: 'window', name: 'Janela 150 x 100', width: 1.5, height: 1.0, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
-  ot({ id: 'ot_j60', kind: 'window', name: 'Janela 60 x 60', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'casement' }, 'mat_aluminio'),
-  ot({ id: 'ot_j200', kind: 'window', name: 'Janela 200 x 120', width: 2.0, height: 1.2, sill: 1.0, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_p70', kind: 'door', name: 'Porta 70 x 210', code: 'P-01', width: 0.7, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p80', kind: 'door', name: 'Porta 80 x 210', code: 'P-02', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p90', kind: 'door', name: 'Porta 90 x 210', code: 'P-03', width: 0.9, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
+  ot({ id: 'ot_p160', kind: 'door', name: 'Porta dupla 160 x 210', code: 'P-04', width: 1.6, height: 2.1, sill: 0, leaves: 2, plan: 'double' }),
+  ot({ id: 'ot_pc160', kind: 'door', name: 'Porta de correr 160 x 210', code: 'P-05', width: 1.6, height: 2.1, sill: 0, leaves: 2, plan: 'sliding' }),
+  ot({ id: 'ot_pp80', kind: 'door', name: 'Porta pivotante 80 x 210', code: 'P-06', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'pivot' }),
+  ot({ id: 'ot_vao90', kind: 'door', name: 'Vão livre 90 x 210', code: 'V-01', width: 0.9, height: 2.1, sill: 0, leaves: 0, plan: 'swing' }),
+  ot({ id: 'ot_j120', kind: 'window', name: 'Janela 120 x 120', code: 'J-01', width: 1.2, height: 1.2, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_j150', kind: 'window', name: 'Janela 150 x 100', code: 'J-02', width: 1.5, height: 1.0, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_j60', kind: 'window', name: 'Janela 60 x 60', code: 'J-03', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'casement' }, 'mat_aluminio'),
+  ot({ id: 'ot_j200', kind: 'window', name: 'Janela 200 x 120', code: 'J-04', width: 2.0, height: 1.2, sill: 1.0, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_jfixa60', kind: 'window', name: 'Janela fixa 60 x 60', code: 'J-05', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'fixed' }, 'mat_aluminio'),
+  ot({ id: 'ot_j240', kind: 'window', name: 'Janela de correr 240 x 120 (3 folhas)', code: 'J-06', width: 2.4, height: 1.2, sill: 1.1, leaves: 3, plan: 'sliding' }, 'mat_aluminio'),
+  ot({ id: 'ot_jv120', kind: 'window', name: 'Vão livre de janela 120 x 120', code: 'V-02', width: 1.2, height: 1.2, sill: 1.0, leaves: 0, plan: 'fixed' }, 'mat_aluminio'),
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>

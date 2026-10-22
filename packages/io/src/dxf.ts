@@ -329,7 +329,9 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   }
   for (const o of geo.openings) {
     const state = o.state ?? 'cut';
-    if (state === 'cut' || !o.symbol) {
+    // Decisão X1 (docs/aberturas/A-pesquisa.md §5): o símbolo de planta vale em todas as camadas de vãos, corte
+    // (ABERTURAS) e projeção (ABERTURA_*). Sem símbolo, o vão sai como retângulo fechado, como antes.
+    if (!o.symbol) {
       out.push({ layer: OPENING_LAYER[state], pts: openingRect(o) });
       continue;
     }

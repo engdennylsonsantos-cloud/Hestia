@@ -25,7 +25,12 @@
     {
       "id": "escadas",
       "arquivo": "escadas.md",
-      "status": "em-andamento"
+      "status": "concluido"
+    },
+    {
+      "id": "aberturas",
+      "arquivo": "aberturas.md",
+      "status": "concluido"
     },
     {
       "id": "ambientes",

@@ -32,6 +32,7 @@ import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
 import { stairTypeIssue } from './stair.ts';
+import { openingTypeIssue } from './opening.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import {
@@ -345,9 +346,12 @@ export function applyCommand(p: Project, c: Command): void {
     case 'upsertMaterial':
       p.materials[c.material.id] = c.material;
       break;
-    case 'upsertOpeningType':
+    case 'upsertOpeningType': {
+      const issue = openingTypeIssue(c.openingType);
+      if (issue) throw new Error(issue);
       p.openingTypes[c.openingType.id] = c.openingType;
       break;
+    }
     case 'upsertLevel': {
       const i = p.levels.findIndex((l) => l.id === c.level.id);
       if (i >= 0) p.levels[i] = c.level;

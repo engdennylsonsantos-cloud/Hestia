@@ -1,10 +1,24 @@
 import type { ReactElement } from 'react';
-import { isFloor, isRoof, isSlab, isStair, isWall } from '@hestia/model';
+import { isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, type OpeningType } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { TypeRow } from './TypeRow.tsx';
 import { ViewRow } from './ViewRow.tsx';
+
+/** Agrupa os tipos de abertura por família (um nó por família, como no Revit); dentro do grupo, ordena pelo código. */
+function openingGroups(kind: 'door' | 'window', types: OpeningType[]): Array<{ id: string; name: string; types: OpeningType[] }> {
+  const byCode = (t: OpeningType): string => t.code ?? t.name;
+  const groups: Array<{ id: string; name: string; types: OpeningType[] }> = [];
+  for (const f of openingFamilies(kind)) {
+    const items = types.filter((t) => openingFamilyOf(t)?.id === f.id);
+    if (items.length) groups.push({ id: f.id, name: f.name, types: items });
+  }
+  const orphans = types.filter((t) => !openingFamilyOf(t));
+  if (orphans.length) groups.push({ id: 'outros', name: 'Outros', types: orphans });
+  for (const g of groups) g.types.sort((a, b) => byCode(a).localeCompare(byCode(b), 'pt-BR'));
+  return groups;
+}
 
 /** Navegador de projeto: vistas, famílias (tipos) e materiais, como a árvore do Revit. */
 export function Browser(): ReactElement {
@@ -78,32 +92,48 @@ export function Browser(): ReactElement {
             </details>
             <details>
               <summary>Portas</summary>
-              {doors.map((t) => (
-                <TypeRow
-                  key={t.id}
-                  kind="door"
-                  typeId={t.id}
-                  name={t.name}
-                  icon="door"
-                  active={s.options.doorTypeId === t.id}
-                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, doorTypeId: t.id } }))}
-                  onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
-                />
+              {openingGroups('door', doors).map((g) => (
+                <details key={g.id}>
+                  <summary>
+                    {g.name}
+                    <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-faint)' }}>{g.types.length}</span>
+                  </summary>
+                  {g.types.map((t) => (
+                    <TypeRow
+                      key={t.id}
+                      kind="door"
+                      typeId={t.id}
+                      name={t.name}
+                      icon="door"
+                      active={s.options.doorTypeId === t.id}
+                      onUse={() => useUi.setState((st) => ({ options: { ...st.options, doorTypeId: t.id } }))}
+                      onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
+                    />
+                  ))}
+                </details>
               ))}
             </details>
             <details>
               <summary>Janelas</summary>
-              {windows.map((t) => (
-                <TypeRow
-                  key={t.id}
-                  kind="window"
-                  typeId={t.id}
-                  name={t.name}
-                  icon="window"
-                  active={s.options.windowTypeId === t.id}
-                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, windowTypeId: t.id } }))}
-                  onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
-                />
+              {openingGroups('window', windows).map((g) => (
+                <details key={g.id}>
+                  <summary>
+                    {g.name}
+                    <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-faint)' }}>{g.types.length}</span>
+                  </summary>
+                  {g.types.map((t) => (
+                    <TypeRow
+                      key={t.id}
+                      kind="window"
+                      typeId={t.id}
+                      name={t.name}
+                      icon="window"
+                      active={s.options.windowTypeId === t.id}
+                      onUse={() => useUi.setState((st) => ({ options: { ...st.options, windowTypeId: t.id } }))}
+                      onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: t.id })}
+                    />
+                  ))}
+                </details>
               ))}
             </details>
             <details>

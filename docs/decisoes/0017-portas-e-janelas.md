@@ -1,0 +1,140 @@
+# Decisão 0017 · Portas e janelas (família, tipo e instância)
+
+Decidido em 2026-10-21 com o dono: fechar a frente de portas e janelas em três níveis — a **família** (comportamento,
+símbolo de planta e folhas aceitas), o **tipo** (dimensões, código e espessuras de esquadria) e a **instância**
+(posição, dobradiça, sentido, peitoril e marca). A família é o que o tipo ESCOLHE; é o contrato que dá sentido ao
+símbolo de planta, ao 3D, ao corte e ao quadro. Fontes: Revit 2024 (Door/Window Type Properties, `Operation` do IFC) e
+ArchiCAD 26 (Door/Window Custom Settings: `Opening Type`, `Shape`, `Floor Plan Display`). Pesquisa e estado anterior
+desta frente: [docs/aberturas](../aberturas/) (`A-pesquisa.md` e `B-estado-atual.md`).
+
+## 1 · Família: comportamento + símbolo + folhas aceitas
+
+`packages/model/src/opening.ts` define `OPENING_FAMILIES` (10 famílias) e os helpers `openingFamilies(kind)`,
+`openingFamilyOf(t)`, `openingFamilyName(t)`, `openingLeaves(t)`. A família dá o **símbolo de planta** (`plan`), o
+**comportamento** (planta e 3D) e as **contagens de folhas** (`leaves`) que ela aceita. O tipo escolhe a família; a
+instância não muda a família.
+
+| Família (`id`) | Nome | Símbolo (`plan`) | Folhas | Comportamento (planta / 3D) | Par no Revit/ArchiCAD |
+|---|---|---|---|---|---|
+| `door_swing` | Porta de giro | `swing` | 1 | Folha de comprimento W na dobradiça e arco de 90° de raio W até a ombreira; no 3D, uma folha | Revit: porta de 1 folha. IFC `Operation`: `SINGLE_SWING_*` |
+| `door_double` | Porta dupla | `double` | 2 | Duas folhas de W/2 e dois arcos até o centro; no 3D, dois painéis | Revit: porta dupla. IFC: `DOUBLE_DOOR_*` |
+| `door_sliding` | Porta de correr | `sliding` | 2 | Dois retângulos fechados em faces opostas, com sobreposição e seta; no 3D, dois painéis em trilhos defasados na profundidade | Revit: porta de correr. IFC: `SLIDING_*` |
+| `door_pivot` | Porta pivotante | `pivot` | 1 | Eixo a W/4 de uma ombreira, folha de comprimento W e dois arcos até as duas ombreiras; no 3D, uma folha no plano médio | Sem família de sistema no Revit; ArchiCAD: `Opening Type` `Double-Acting` (o mais próximo). **Mantida por decisão do dono** (§8) |
+| `door_void` | Vão livre | `swing` | 0 | Só a soleira tracejada; no 3D, só o recorte da parede (sem folha nem caixilho) | Revit: `Opening`; ArchiCAD: vão |
+| `window_fixed` | Janela fixa | `fixed` | 1 | Duas linhas de face, linha do plano médio e duas ombreiras; no 3D, caixilho e vidro | Revit: janela fixa. IFC: sem operação |
+| `window_tilt` | Janela basculante | `tilt` | 1 | Como a fixa, mais um V no plano médio | Revit: basculante. IFC `Operation`: `BOTTOM_HUNG` |
+| `window_casement` | Janela maxim-ar | `casement` | 1 | Como a fixa, mais um arco tracejado do lado de `flipFacing` | Revit: maxim-ar. IFC `Operation`: `TOP_HUNG` |
+| `window_sliding` | Janela de correr | `sliding` | 2 ou 3 | n folhas em linhas defasadas, sem linha no plano médio, com seta; no 3D, n vidros em trilhos defasados | Revit: janela de correr. IFC: `SLIDING_HORIZONTAL` |
+| `window_void` | Vão livre de janela | `fixed` | 0 | Só a soleira tracejada; no 3D, só a soleira | Revit: `Opening`; ArchiCAD: vão |
+
+Os valores IFC são o mapeamento mais próximo do enum (`IfcDoorTypeOperationEnum` / `IfcWindowPanelOperationEnum`); quem
+fixa o valor final é o exportador. O `Operation` é enum do IFC, **não** parâmetro de sistema do Revit (ver
+`A-pesquisa.md` §3.1).
+
+`openingFamilyOf` aceita duas grafias para a porta dupla: o arquivo antigo grava `plan: 'double'` e o editor pode gravar
+`plan: 'swing'` com 2 folhas; as duas caem na família `door_double` (o símbolo normaliza `double` para `swing` com 2
+folhas, ver `normalize` em `packages/geom/src/openingSymbol.ts`). O valor `double` continua em `PlanSymbol` só para ler
+arquivos antigos.
+
+## 2 · Tipo: dimensões, código e esquadria
+
+`OpeningType` (`packages/model/src/types.ts`) ganhou `code?` (Revit: **Type Mark**, como `P-01`/`J-02`) e `description?`;
+`leaves` passou de `0|1|2` para `OpeningLeaves = 0|1|2|3` (a janela de correr aceita 3 folhas). As espessuras de
+esquadria são campos opcionais do tipo, com o padrão em `OPENING_FRAME_DEFAULTS` (`packages/model/src/defaults.ts`):
+`frameWidth` 0,05 m, `frameDepth` 0,09 m, folha de porta 0,04 m, folha de janela 0,03 m, vidro 0,012 m.
+`openingFrame(t, maxDepth)` resolve o valor do tipo com o padrão onde o campo falta e limita a profundidade do batente
+(§4). Não houve passo novo de migração: alargar `leaves` e acrescentar campos opcionais é compatível com arquivos
+antigos (o `SCHEMA_VERSION` continua 16).
+
+`DEFAULT_OPENING_TYPES` passa a 14 tipos, com `code`: `ot_p70`/`ot_p80`/`ot_p90` (P-01..P-03), `ot_p160` (P-04),
+`ot_pc160` (P-05, porta de correr), `ot_pp80` (P-06, pivotante), `ot_vao90` (V-01), `ot_j120`/`ot_j150`/`ot_j200`
+(J-01/J-02/J-04), `ot_j60` (J-03), `ot_jfixa60` (J-05, fixa), `ot_j240` (J-06, correr 3 folhas), `ot_jv120` (V-02).
+
+A **regra do tipo** é conferida ao salvar (`upsertOpeningType` em `packages/model/src/commands.ts` chama
+`openingTypeIssue`): a combinação (categoria × símbolo × folhas) tem de existir em `OPENING_FAMILIES`, senão o comando
+recusa com "Combinação inválida: …". O tipo é um **schema fechado**: o que não está em `OPENING_FAMILIES` não é
+desenhável e por isso é recusado.
+
+## 3 · Instância (como já era)
+
+`Opening` não mudou: `id`, `kind`, `typeId`, `hostId`, `offset`, `flipHand` (lado da dobradiça), `flipFacing` (sentido de
+abertura), `sillOverride` (peitoril por instância) e `mark`. A família é do tipo; a instância só escolhe a posição e o
+lado. No Revit são os *flip controls* Hand/Facing; o Hestia já usava os dois booleanos.
+
+## 4 · DEC-1 · batente limitado ao NÚCLEO da parede
+
+A profundidade do batente é limitada ao **núcleo** da parede (camada de estrutura, `coreSpan(f.type)`), não à espessura
+total com acabamentos. Na `wt_alv14` o núcleo tem **0,14 m** (bloco 14) e a espessura total, com reboco e tinta, é
+**0,184 m**: o batente não deve ficar sob o reboco. Sem camada de estrutura, `coreSpan` devolve a espessura total.
+Testes: `packages/render/src/model3d/scene3d.test.ts` (pedido de 0,20 m vira 0,14 m; nenhuma peça usa 0,184 m) e
+`packages/render/src/section/build.test.ts` (C1 no corte transversal).
+
+## 5 · X1 · símbolo no DXF
+
+O vão de corte no DXF passou a sair com o **símbolo de planta** (a mesma função pura `openingSymbolPaths`, de
+`packages/geom/src/openingSymbol.ts`, que a tela usa), na camada `ABERTURAS`; sem símbolo, continua retângulo fechado
+(compatibilidade). A montagem do `DxfOpening` fica em `apps/web/src/editor/dxfExport.ts` (`dxfGeometryOf`) e a emissão em
+`packages/io/src/dxf.ts`. A projeção (acima/abaixo/além) já saía com o símbolo. Testes: `packages/io/src/dxf.test.ts` e
+`apps/web/src/editor/dxfExport.test.ts`.
+
+## 6 · Corte e elevação por família (C1, C2, C5, C6, E1, E2)
+
+`packages/engine/src/section.ts` passa a carregar, por vão, a **esquadria** (`SectionEsquadria`: família, folhas, símbolo,
+largura, espessura da parede e as espessuras do tipo já limitadas ao núcleo). `packages/render/src/section/build.ts`
+desenha a partir dela:
+
+- **Vista face** (elevação e corte longitudinal, quando a projeção do vão é a largura) — batente como anel de
+  `frameWidth` (ombreiras, verga e soleira), vidro na região interna, **linha central só em janela de correr** (2 ou 3
+  folhas), e os símbolos: arco tracejado do maxim-ar/basculante (dentro do vão, do lado de `flipFacing`), traço do lado
+  da dobradiça na porta de giro e seta de correr na janela e na porta de correr.
+- **Corte transversal** (a projeção é a espessura) — verga e soleira com `frameDepth` **centradas na parede** e vidro
+  com `glassThickness`.
+- **Vão livre** (0 folhas) — sem batente nem vidro; a janela sem folha fica só com a soleira (como no 3D), a porta sem
+  folha fica só com o recorte.
+
+Testes: `packages/render/src/section/build.test.ts`, describe "esquadria no corte e na elevação (tipo e família)".
+Baselines de corte e elevação mudam de desenho (regravadas em `tests/e2e/baseline/`).
+
+## 7 · Quadro (tabela de portas e janelas)
+
+`packages/engine/src/openingSchedule.ts` monta a tabela: uma linha por **tipo** usado, com código (Type Mark), família,
+categoria, largura, altura, peitoril, folhas, quantidade, área unitária (largura × altura) e área total; ordena portas
+antes de janelas e, dentro da categoria, por código; traz totais por categoria e área; CSV com `;`, decimal com vírgula
+e BOM UTF-8. O diálogo é `apps/web/src/ui/dialogs/OpeningScheduleDialog.tsx` (botão em `Ribbon.tsx`, `DialogKind`
+`openingSchedule` em `apps/web/src/editor/state.ts`, rota em `App.tsx`). Testes:
+`packages/engine/src/openingSchedule.test.ts`.
+
+## 8 · O que fica para depois
+
+- **Vão bruto e tolerâncias:** o furo do vão é a largura × altura do tipo, sem folga de assentamento (Revit: *Rough
+  Width/Height*; ArchiCAD: *Opening Oversizes* e as definições Wallhole/Unit/Egress/Leaf).
+- **Reveal, soleira saliente, alizar (casing) e verga/contraverga:** não há peça nem campo no tipo. A verga e a
+  contraverga dependem do projeto estrutural (altura e transpasse divergentes nas fontes, `A-pesquisa.md` §2.3 e §6).
+- **Favoritos:** não há biblioteca de tipos favoritos (ArchiCAD: *Favorites* + *Transfer Sets*).
+- **Exibição simbólica × projetada:** o ArchiCAD 26 tem `Floor Plan Display` `Symbolic` × `Projected`/`Overhead All`/
+  `Projected with Overhead`; o Hestia sempre desenha o símbolo simbólico.
+- **Folha de porta aberta no 3D:** a folha é sempre desenhada fechada (sem modo aberto).
+- **Porta pivotante:** mantida como família; a convenção exata do eixo (posição e comprimento da folha) segue
+  provisória, sem fonte oficial (`A-pesquisa.md` §6).
+
+## 9 · O que NÃO se copia do Revit
+
+O Revit permite **famílias com parâmetros autorais** (o autor cria `Frame Width`, `Frame Depth`, `Glass Thickness`,
+`Number of Panels` dentro da família — ver `A-pesquisa.md` §3.1). O Hestia **não** copia isso: o tipo é um schema
+fechado (`openingTypeIssue`), o conjunto de famílias é fixo (`OPENING_FAMILIES`) e as espessuras são campos conhecidos do
+tipo. A interoperabilidade é que segue o Revit/IFC (o `code` é o Type Mark; a família mapeia para `Operation`), não o
+modelo de autoria.
+
+## 10 · Critérios de aceitação
+
+- Famílias: 5 de porta e 5 de janela na ordem da interface; cada tipo do catálogo cai na família do seu comportamento;
+  combinação fora das famílias é recusada — `packages/model/src/opening.test.ts`.
+- Tipo: `upsertOpeningType` grava o tipo válido e recusa o inválido sem alterar o projeto; o diálogo oferece só as folhas
+  da família; "+ Novo tipo" cria na família escolhida — `opening.test.ts`,
+  `apps/web/src/ui/dialogs/openingTypeForm.test.ts`.
+- Símbolo: P1..P10 — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`.
+- 3D: D1..D8, com o batente limitado ao núcleo — `packages/render/src/model3d/scene3d.test.ts`.
+- Corte e elevação: C1, C2, C5, C6, E1, E2 — `packages/render/src/section/build.test.ts`.
+- DXF: X1 e X2 — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`.
+- Quadro: uma linha por tipo, portas antes de janelas, código e áreas, CSV com BOM —
+  `packages/engine/src/openingSchedule.test.ts`.

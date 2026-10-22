@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -7,7 +7,7 @@ import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { RoofOptionsBar } from './RoofOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
-import type { LocationLine } from '@hestia/model';
+import { openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
   wallCenter: 'Eixo da parede',
@@ -17,6 +17,46 @@ export const LOCATION_LABEL: Record<LocationLine, string> = {
   coreExterior: 'Face externa do núcleo',
   coreInterior: 'Face interna do núcleo',
 };
+
+/** Tipo Selector do Revit: agrupa os tipos por família e filtra por nome ou código. */
+function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window'; value: string; onChange: (id: string) => void }): ReactElement {
+  const p = useProject();
+  const [q, setQ] = useState('');
+  const types = Object.values(p.openingTypes).filter((t) => t.kind === kind);
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? types.filter((t) => t.name.toLowerCase().includes(needle) || (t.code ?? '').toLowerCase().includes(needle)) : types;
+  // Um grupo por família (ordem da interface); tipos sem família (dado fora do contrato) caem em "Outros".
+  const groups = openingFamilies(kind)
+    .map((f) => ({ family: f, items: shown.filter((t) => openingFamilyOf(t)?.id === f.id) }))
+    .filter((g) => g.items.length);
+  const orphans = shown.filter((t) => !openingFamilyOf(t));
+  const visible = new Set(shown.map((t) => t.id));
+  const current = p.openingTypes[value];
+  return (
+    <>
+      <label>
+        Buscar
+        <input id="opt-opensearch" className="input" style={{ width: 120 }} value={q} placeholder="nome ou código" aria-label="Buscar tipo de abertura" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+      </label>
+      <label>
+        Tipo
+        <select id="opt-opentype" className="select" value={value} onChange={(e) => onChange(e.target.value)}>
+          {current && !visible.has(value) ? <option value={value}>{current.name}</option> : null}
+          {groups.map((g) => (
+            <optgroup key={g.family.id} label={g.family.name}>
+              {g.items.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </optgroup>
+          ))}
+          {orphans.length ? (
+            <optgroup label="Outros">
+              {orphans.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </optgroup>
+          ) : null}
+        </select>
+      </label>
+    </>
+  );
+}
 
 export function OptionsBar(): ReactElement {
   const p = useProject();
@@ -104,14 +144,11 @@ export function OptionsBar(): ReactElement {
       {tool === 'stair' && <StairOptionsBar />}
       {tool === 'stairrun' && <StairRunOptionsBar />}
       {(tool === 'door' || tool === 'window') && (
-        <label>
-          Tipo
-          <select id="opt-opentype" className="select" value={tool === 'door' ? o.doorTypeId : o.windowTypeId} onChange={(e) => set(tool === 'door' ? { doorTypeId: e.target.value } : { windowTypeId: e.target.value })}>
-            {Object.values(p.openingTypes).filter((t) => t.kind === tool).map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </label>
+        <OpeningTypePicker
+          kind={tool}
+          value={tool === 'door' ? o.doorTypeId : o.windowTypeId}
+          onChange={(id) => set(tool === 'door' ? { doorTypeId: id } : { windowTypeId: id })}
+        />
       )}
       {tool === 'rotate' && <Check id="opt-rcopy" checked={o.rotateCopy} onChange={(v) => set({ rotateCopy: v })}>Copiar</Check>}
       {tool === 'mirror' && <Check id="opt-mcopy" checked={o.mirrorCopy} onChange={(v) => set({ mirrorCopy: v })}>Copiar</Check>}

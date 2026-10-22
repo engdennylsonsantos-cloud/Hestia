@@ -111,6 +111,13 @@ A coluna "Convenção recomendada" é proposta. Quando a célula não tem fonte,
 | Fóruns ArchiCAD | Comportamento de arco | "Projected display" não desenha arco simbólico; arco de giro em planta depende de script no 3D [FÓRUM, community.graphisoft.com] | [FÓRUM] |
 | Material de ensino (IFSC, planos de disciplina IFPB, UNIPAMPA) | Prática brasileira | Porta com arco simples é porta de abrir; arcos duplos, folhas duplas; porta desenhada com folha e linhas auxiliares para movimento e espaço [ESTUDO, IFSC, planner5d, busca] | [ESTUDO] |
 
+### 3.1 Correções desta rodada
+
+Duas correções de pesquisa, com a fonte oficial (as linhas da tabela acima ficam como registro do que a busca, por trecho, tinha achado em 2026-10-21):
+
+- **(a) O ArchiCAD 26 já tem `Floor Plan Display` `Symbolic` × `Projected`/`Overhead All`/`Projected with Overhead`.** Não é exclusividade do AC27/AC29. Fonte: Graphisoft, AC26 Help — "Floor Plan Display" (`https://help.graphisoft.com/AC/26/INT/_AC26_Help/150_UserInterfaceToolSettings/150_UserInterfaceToolSettings-18.htm`). Consequência no Hestia: ele sempre desenha o símbolo simbólico (`openingSymbolPaths`); a exibição projetada fica para depois (decisão [0017](../decisoes/0017-portas-e-janelas.md) §8).
+- **(b) `Show Elevation Swing`, `Opening Cut`, `Number of Panels`, `Frame Width`/`Frame Depth` e `Glass Thickness` NÃO são parâmetros de sistema do Revit 2024.** Nas listas oficiais de propriedades de tipo e de instância eles não aparecem; são parâmetros criados pelo autor da família. O oficial e análogo é `Enable Cutting in Views` / `Cut with Voids When Loaded`, em Family Category and Parameters. Fontes: Autodesk Revit 2024 — "Door Type Properties" (`https://help.autodesk.com/view/RVT/2024/ENU/?guid=GUID-29905EE0-3D7D-422E-A627-5A7A8AC34D7B`), "Window Type Properties" (`https://help.autodesk.com/view/RVT/2024/ENU/?guid=GUID-1C03B7DF-89EE-48B1-B501-571745B1D513`) e "Family Category and Parameters" (`https://help.autodesk.com/view/RVT/2024/ENU/?guid=GUID-68EFCA67-4913-4E00-AB9E-F2E6A7BEF8C6`). Consequência no Hestia: as espessuras de esquadria são campos do TIPO (`frameWidth`, `frameDepth`, `leafThickness`, `glassThickness`), não parâmetros autorais de família — o tipo é um schema fechado (decisão [0017](../decisoes/0017-portas-e-janelas.md) §2 e §9).
+
 ## 4. Adaptação à estrutura de dados (`OpeningType`)
 
 Estado atual (`packages/model/src/types.ts:174-190`): `id`, `kind`, `name`, `width`, `height`, `sill`, `leaves` (0, 1, 2), `plan`, `frameMaterialId`, `glassMaterialId`, `closure`. Instância (`types.ts:192-206`): `id`, `kind`, `typeId`, `hostId`, `offset`, `flipHand`, `flipFacing`, `sillOverride`, `mark`.
@@ -190,7 +197,7 @@ Cada critério diz o que medir, em qual função, e qual valor é esperado. "Pas
 
 **DXF (`packages/io/src/dxf.ts:330-337`; `apps/web/src/editor/dxfExport.ts:148-161`)**
 
-- **X1. Vão de corte.** O vão de corte no DXF deve seguir a mesma regra da planta: símbolo ou retângulo. Hoje a planta usa símbolo e o DXF usa retângulo. **Discordância hoje**; escolher uma regra e testar.
+- **X1. Vão de corte.** O vão de corte no DXF deve seguir a mesma regra da planta: símbolo ou retângulo. Hoje a planta usa símbolo e o DXF usa retângulo. **Discordância hoje**; escolher uma regra e testar. **Decisão do dono (21/10/2026):** símbolo, desenhado pela mesma função pura `openingSymbolPaths` (`packages/geom/src/openingSymbol.ts`) que a tela usa. **Feito:** o vão de corte passou a sair com o símbolo na camada `ABERTURAS` (`packages/io/src/dxf.ts`, `apps/web/src/editor/dxfExport.ts`); sem símbolo, continua retângulo fechado (compatibilidade); a projeção segue com símbolo (`ABERTURA_ACIMA`, `ABERTURA_ABAIXO`, `ABERTURA_ALEM`). Testes em `packages/io/src/dxf.test.ts` e `apps/web/src/editor/dxfExport.test.ts`.
 - **X2. Projeção.** Símbolo na camada da projeção (`ABERTURA_ACIMA`, `ABERTURA_ABAIXO`, `ABERTURA_ALEM`). **Passa hoje** (`dxf.test.ts`, teste "porta acima do corte").
 
 **Quantitativo**

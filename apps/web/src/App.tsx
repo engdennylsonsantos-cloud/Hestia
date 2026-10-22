@@ -23,6 +23,7 @@ import { RoofScheduleDialog } from './ui/dialogs/RoofScheduleDialog.tsx';
 import { WallTypeDialog } from './ui/dialogs/WallTypeDialog.tsx';
 import { StairTypeDialog } from './ui/dialogs/StairTypeDialog.tsx';
 import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
+import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
 
@@ -81,6 +82,8 @@ function Dialogs(): ReactElement | null {
       return arg ? <StairTypeDialog typeId={arg} /> : null;
     case 'stairSchedule':
       return <StairScheduleDialog />;
+    case 'openingSchedule':
+      return <OpeningScheduleDialog />;
     case 'openingType':
       return arg ? <OpeningTypeDialog typeId={arg} /> : null;
     case 'materials':

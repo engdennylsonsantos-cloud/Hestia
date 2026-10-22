@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_OPENING_TYPES, DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, makeStair, migrateProject, SCHEMA_VERSION, type Project } from './index.ts';
+import { DEFAULT_OPENING_TYPES, DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, makeStair, migrateProject, openingFamilyOf, SCHEMA_VERSION, type Project } from './index.ts';
 
 /** Projeto no formato da versão 5: sem os campos acrescentados em 6. */
 function legacyV5(): Record<string, unknown> {
@@ -28,11 +28,10 @@ describe('vão livre e símbolos de planta', () => {
     const t = DEFAULT_OPENING_TYPES.find((x) => x.id === 'ot_vao90');
     expect(t).toMatchObject({ kind: 'door', leaves: 0, closure: 'inherit', width: 0.9, height: 2.1 });
   });
-  it('cada porta e janela padrão tem família de planta compatível com as folhas', () => {
-    for (const t of DEFAULT_OPENING_TYPES) {
-      if (t.kind === 'door') expect(t.plan).toBe(t.leaves === 2 ? 'double' : 'swing');
-      if (t.kind === 'window') expect(['sliding', 'casement']).toContain(t.plan);
-    }
+  it('cada porta e janela padrão tem uma família de abertura válida', () => {
+    // O catálogo cresceu com as famílias de correr, pivotante, fixa e vão livre: a regra passou a ser a do modelo —
+    // todo tipo padrão precisa ter família em `OPENING_FAMILIES` (antes o teste fixava o par plano × folhas antigo).
+    for (const t of DEFAULT_OPENING_TYPES) expect(openingFamilyOf(t)).not.toBeNull();
   });
 });
 

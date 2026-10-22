@@ -342,11 +342,21 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     expect(polys[0]!.closed && polys[0]!.pts.length === 4).toBe(true);
   });
 
-  it('o vão de corte ignora o símbolo: continua retângulo em ABERTURAS', () => {
+  // Decisão X1 (docs/aberturas/A-pesquisa.md §5): o vão de corte passou a usar o símbolo de planta, o mesmo da tela.
+  // Este teste fixava o retângulo antigo; agora confere folha e arco na camada ABERTURAS.
+  it('o vão de corte usa o símbolo da planta: folha e arco em ABERTURAS', () => {
     const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [leaf, arc])] });
     const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS, DXF_LAYER_OPENINGS]);
+    expect(polys.map((p) => p.pts.length)).toEqual([2, 19]);
+    expect(polys.every((p) => !p.closed)).toBe(true);
+  });
+
+  it('vão de corte sem símbolo continua retângulo fechado em ABERTURAS (compatibilidade)', () => {
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut')] });
+    const polys = polylines(text);
     expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS]);
-    expect(polys[0]!.pts).toHaveLength(4);
+    expect(polys[0]!.closed && polys[0]!.pts.length === 4).toBe(true);
   });
 
   it('traço tracejado dentro de camada contínua (arco do maxim-ar, soleira) leva o tipo DASHED na entidade', () => {

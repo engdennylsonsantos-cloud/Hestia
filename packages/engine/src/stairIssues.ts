@@ -172,9 +172,44 @@ function evenTreadCheck(rs: ResolvedStair, ci: number, risers: ResolvedStairRise
   }
 }
 
-/** Lance a lance: largura, piso médio, Blondel, desnível sem patamar e degraus iguais. */
-function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {
-  const h = rs.riserHeight;
+/**
+ * Piso do leque (decisão 0011 §1 item 10, aviso `stair-winder-tread`): entre dois espelhos que NÃO são paralelos, o piso
+ * medido a `winderTreadAt` m da borda interna — a corda entre os dois espelhos nesse afastamento — não pode ser menor
+ * que `winderTreadMin`. O lado interno é o lado em que as pontas dos espelhos ficam mais próximas entre si. O caracol
+ * tem a sua própria regra (`stair-spiral-tread`), com os mesmos números: aqui ele é pulado.
+ */
+function winderTreadCheck(rs: ResolvedStair, ci: number, risers: ResolvedStairRiser[], norms: StairNorms, out: StairIssueItem[]): void {
+  if (risers.length < 2 || rs.spiral?.componentIndex === ci) return;
+  const pointAt = (inner: Vec2, outer: Vec2): Vec2 => {
+    const l = dist(inner, outer);
+    return lerp(inner, outer, l > EPS ? Math.min(1, norms.winderTreadAt / l) : 0);
+  };
+  let worst = Infinity;
+  for (let i = 1; i < risers.length; i++) {
+    const p = risers[i - 1]!;
+    const q = risers[i]!;
+    if (Math.abs(cross(norm(sub(p.b, p.a)), norm(sub(q.b, q.a)))) < PARALLEL_SIN) continue;
+    // O lado interno é o par de pontas mais próximo; o outro par é a borda externa.
+    const straightPair = dist(p.a, q.a) + dist(p.b, q.b);
+    const crossedPair = dist(p.a, q.b) + dist(p.b, q.a);
+    const [i0, o0, i1, o1] = straightPair <= crossedPair ? [p.a, p.b, q.a, q.b] : [p.b, p.a, q.b, q.a];
+    worst = Math.min(worst, dist(pointAt(i0, o0), pointAt(i1, o1)));
+  }
+  if (worst < norms.winderTreadMin - EPS) {
+    out.push(
+      makeStairIssue(
+        rs.id,
+        'stair-winder-tread',
+        'warning',
+        `O piso do degrau do leque a ${num(norms.winderTreadAt, 2)} m da borda interna (${num(worst, 2)} m) é menor que o mínimo de ${num(norms.winderTreadMin, 2)} m.`,
+        ci,
+      ),
+    );
+  }
+}
+
+/** Lance a lance: largura, piso médio, Blondel, desnível sem patamar, degraus iguais e piso do leque. */
+function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {  const h = rs.riserHeight;
   for (const [ci, risers] of risersByRun(rs.risers)) {
     const width = Math.min(...risers.map((r) => polyLength(r.points)));
     if (width < rs.type.minRunWidth - EPS) {
@@ -189,6 +224,7 @@ function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]):
       );
     }
     evenTreadCheck(rs, ci, risers, out);
+    winderTreadCheck(rs, ci, risers, norms, out);
     if (risers.length >= 2) {
       const mids = risers.map((r) => arcMid(r.points));
       let sum = 0;

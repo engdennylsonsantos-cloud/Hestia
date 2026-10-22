@@ -99,9 +99,9 @@ const luz = (ms: ModelScene): THREE.DirectionalLight => ms.scene.children.find((
 const lotesParede = (p: Project): number => buildLevelSolids(niveis(p)[0]!).batches.length;
 
 describe('ModelScene: padrão da vista 3D (mesmo resultado de antes)', () => {
-  it('a fixture padrão tem 16 malhas, 6 linhas e 10 materiais (9 padrão de superfície e 1 de linha)', () => {
+  it('a fixture padrão tem 17 malhas, 6 linhas e 10 materiais (9 padrão de superfície e 1 de linha)', () => {
     const ms = cena(casa());
-    expect(malhas(ms)).toHaveLength(16);
+    expect(malhas(ms)).toHaveLength(17);
     expect(linhas(ms)).toHaveLength(6);
     const materiais = new Set<THREE.Material>();
     modelo(ms).traverse((o) => {
@@ -135,7 +135,7 @@ describe('estilos visuais', () => {
   it('sombreado: MeshLambertMaterial nas faces e sem sombras', () => {
     const ms = cena(comVista(casa(), { style: 'shaded' }));
     const faces = malhas(ms);
-    expect(faces.length).toBe(16);
+    expect(faces.length).toBe(17);
     expect(faces.every((m) => m.material instanceof THREE.MeshLambertMaterial)).toBe(true);
     expect(faces.every((m) => !m.castShadow && !m.receiveShadow)).toBe(true);
     expect(luz(ms).castShadow).toBe(false);
@@ -153,15 +153,15 @@ describe('estilos visuais', () => {
   it('linhas ocultas: faces do papel (branco), com polygonOffset, e arestas sempre, mesmo com edges desligado', () => {
     const ms = cena(comVista(casa(), { style: 'hiddenLine', edges: false }));
     const faces = malhas(ms);
-    expect(faces).toHaveLength(16);
+    expect(faces).toHaveLength(17);
     for (const m of faces) {
       const mat = m.material as THREE.MeshBasicMaterial;
       expect(mat).toBeInstanceOf(THREE.MeshBasicMaterial);
       expect(mat.color.getHexString()).toBe('ffffff');
       expect(mat.polygonOffset).toBe(true);
     }
-    // 6 lotes de sólidos + 10 peças das esquadrias (4 da porta, 6 da janela).
-    expect(linhas(ms)).toHaveLength(16);
+    // 6 lotes de sólidos + 11 peças das esquadrias (4 da porta, 7 da janela de correr de 2 folhas).
+    expect(linhas(ms)).toHaveLength(17);
   });
 
   it('linhas ocultas no tema escuro: faces cinza escuro e arestas claras', () => {
@@ -174,7 +174,7 @@ describe('estilos visuais', () => {
   it('só arestas: nenhuma malha no modelo, arestas de todas as peças (inclusive as de trás) e chão oculto', () => {
     const ms = cena(comVista(casa(), { style: 'wireframe' }));
     expect(malhas(ms)).toHaveLength(0);
-    expect(linhas(ms)).toHaveLength(16);
+    expect(linhas(ms)).toHaveLength(17);
     expect(ms.scene.children.find((o) => o instanceof THREE.Mesh && o.geometry instanceof THREE.PlaneGeometry)?.visible).toBe(false);
   });
 
@@ -202,13 +202,13 @@ describe('arestas', () => {
 });
 
 describe('exibição por categoria (substituições)', () => {
-  it('ocultar porta tira as 4 peças da porta; janela tira 6; a linha não muda', () => {
+  it('ocultar porta tira as 4 peças da porta; janela tira 7; a linha não muda', () => {
     const p = casa();
     const base = malhas(cena(p)).length;
     const semPorta = cena(comVista(p, { overrides: { ...defaultsOverrides(), door: { visible: false, transparency: 0, halftone: false } } }));
     const semJanela = cena(comVista(p, { overrides: { ...defaultsOverrides(), window: { visible: false, transparency: 0, halftone: false } } }));
     expect(malhas(semPorta)).toHaveLength(base - 4);
-    expect(malhas(semJanela)).toHaveLength(base - 6);
+    expect(malhas(semJanela)).toHaveLength(base - 7);
     expect(linhas(semPorta)).toHaveLength(6);
   });
 
@@ -384,10 +384,11 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     for (const m of dupla) expect(medida(m).x).toBeCloseTo((1.6 - 0.1) / 2, 6);
   });
 
-  it('janela de 2 folhas: caixilho, vidro e um montante central com a espessura da folha da janela', () => {
+  it('janela de correr de 2 folhas: caixilho, duas folhas de vidro em trilhos e um montante central', () => {
     const ms = cena(casa());
     const janelas = pecas(ms, 'window');
-    expect(janelas).toHaveLength(6);
+    // 4 do caixilho (ombreiras, verga e soleira) + 2 folhas de vidro (defasadas na profundidade) + 1 montante central.
+    expect(janelas).toHaveLength(7);
     const montante = janelas.find((m) => Math.abs(centroDa(m).x) < 1e-6 && medida(m).z > 0.5 && medida(m).x < 0.1)!;
     expect(montante).toBeDefined();
     // Padrão de janela: 3 cm (`OPENING_FRAME_DEFAULTS.windowLeaf`).
@@ -410,7 +411,8 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     const portas = pecas(ms, 'door');
     expect(portas.filter((m) => Math.abs(medida(m).x - 0.08) < 1e-6)).toHaveLength(2);
     expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.02, 6);
-    // Profundidade pedida 0,20 m, mas a parede tem 0,14 m: o batente fica com 0,14 m.
+    // Profundidade pedida 0,20 m, mas o NÚCLEO da parede tem 0,14 m (a espessura total, com reboco e tinta, é 0,184 m):
+    // o batente fica com 0,14 m, limitado ao núcleo (DEC-1).
     expect(medida(portas[0]!).y).toBeCloseTo(0.14, 6);
     const vidro = comTipo(p, { ...p.openingTypes.ot_j120!, id: 'ot_vid', glassThickness: 0.02 }, 'j1');
     expect(pecas(cena(vidro), 'window').some((m) => Math.abs(medida(m).y - 0.02) < 1e-6)).toBe(true);
@@ -420,7 +422,61 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     const ms = cena(casa());
     expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.04, 6);
     expect(pecas(ms, 'window').some((m) => Math.abs(medida(m).y - 0.012) < 1e-6)).toBe(true);
-    // Ombreiras e verga da porta têm a profundidade de 9 cm (parede de 14 cm, o padrão de 9 cm vale).
+    // Ombreiras e verga da porta têm a profundidade de 9 cm (núcleo de 14 cm, o padrão de 9 cm vale).
     expect(pecas(ms, 'door').filter((m) => Math.abs(medida(m).y - 0.09) < 1e-6)).toHaveLength(3);
+  });
+
+  it('porta de correr: dois painéis de (W − 2·batente)/2, um em cada face da parede (defasados na profundidade)', () => {
+    const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_pc160')!);
+    const ms = cena(p);
+    // 3 peças do caixilho (2 ombreiras + verga) e os 2 painéis que se encontram no meio (o trilho).
+    expect(pecas(ms, 'door')).toHaveLength(5);
+    const paineis = folhas(ms);
+    expect(paineis).toHaveLength(2);
+    for (const m of paineis) expect(medida(m).x).toBeCloseTo((1.6 - 0.1) / 2, 6);
+    const xs = paineis.map((m) => centroDa(m).x).sort((a, b) => a - b);
+    expect(xs[0]!).toBeCloseTo(-(1.6 - 0.1) / 4, 6);
+    expect(xs[1]!).toBeCloseTo((1.6 - 0.1) / 4, 6);
+    // Faces opostas da parede: os centros ficam defasados na profundidade (y local), com sinais opostos.
+    const ys = paineis.map((m) => centroDa(m).y).sort((a, b) => a - b);
+    expect(ys[0]!).toBeLessThan(0);
+    expect(ys[1]!).toBeGreaterThan(0);
+    expect(ys[1]! - ys[0]!).toBeGreaterThan(0.01);
+  });
+
+  it('janela de correr com 3 folhas: três folhas de vidro em trilhos defasados na profundidade', () => {
+    const p = casa();
+    const tres = comTipo(p, DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_j240')!, 'j1');
+    const janelas = pecas(cena(tres), 'window');
+    // 4 do caixilho + 3 folhas de vidro + 2 montantes (entre as três folhas).
+    expect(janelas).toHaveLength(9);
+    const vidros = janelas.filter((m) => Math.abs(medida(m).y - 0.012) < 1e-6);
+    expect(vidros).toHaveLength(3);
+    const ys = vidros.map((m) => centroDa(m).y).sort((a, b) => a - b);
+    expect(ys[0]!).toBeLessThan(0);
+    expect(ys[2]!).toBeGreaterThan(0);
+    // Três trilhos distintos: nenhuma folha compartilha a profundidade com outra.
+    expect(new Set(ys.map((y) => y.toFixed(4))).size).toBe(3);
+  });
+
+  it('profundidade do batente limitada ao NÚCLEO estrutural (0,14 m na wt_alv14), não à espessura total (0,184 m)', () => {
+    const p = casa();
+    const tipo = { ...p.openingTypes.ot_p80!, id: 'ot_core', frameDepth: 0.5 };
+    const ms = cena(comTipo(p, tipo));
+    const ombreiras = pecas(ms, 'door').filter((m) => Math.abs(medida(m).x - 0.05) < 1e-6);
+    expect(ombreiras).toHaveLength(2);
+    for (const m of ombreiras) expect(medida(m).y).toBeCloseTo(0.14, 6);
+    // Nenhuma peça da porta usa a espessura total da parede (0,184 m).
+    expect(pecas(ms, 'door').every((m) => Math.abs(medida(m).y - 0.184) > 1e-6)).toBe(true);
+  });
+
+  it('porta pivotante: uma folha com a largura do vão livre, no plano médio (mantida)', () => {
+    const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_pp80')!);
+    const ms = cena(p);
+    expect(pecas(ms, 'door')).toHaveLength(4);
+    const [f] = folhas(ms);
+    expect(f).toBeDefined();
+    expect(medida(f!).x).toBeCloseTo(0.8 - 0.1, 6);
+    expect(centroDa(f!).y).toBeCloseTo(0, 6);
   });
 });

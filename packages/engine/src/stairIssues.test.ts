@@ -14,6 +14,7 @@ import { DEFAULT_STAIR_NORMS } from './stairNorms.ts';
 import { minWidth, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs } from './stairs.ts';
 import { stairIssueList, stairValidationIssues } from './stairChecks.ts';
+import { generateSpiralRun, type SpiralRunOptions, type SpiralRunSketch } from './stairSpiral.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: v(ax, ay), b: v(bx, by), sag: 0 });
@@ -36,6 +37,17 @@ function straight(n: number, spacing: number, width = 1.2, x0 = 0, ext0 = 0.5, e
 function rect(x0: number, x1: number, w: number): StairLanding {
   const h = w / 2;
   return { id: 'landing', kind: 'landing', boundary: [ln(x0, -h, x1, -h), ln(x1, -h, x1, h), ln(x1, h, x0, h), ln(x0, h, x0, -h)] };
+}
+
+/**
+ * Lance em leque: o croqui do caracol de 90° sem o metadado (`generatedBy` e `spiral`), ou seja, um leque comum. Os
+ * limites são arcos concêntricos e os espelhos são radiais, que é o que a norma do piso do leque mede.
+ */
+function fan(o: SpiralRunOptions): StairRun {
+  const run: Partial<SpiralRunSketch> = generateSpiralRun(o);
+  delete run.generatedBy;
+  delete run.spiral;
+  return { id: 'run', kind: 'run', boundaryLeft: run.boundaryLeft!, boundaryRight: run.boundaryRight!, risers: run.risers!, path: run.path! };
 }
 
 /** Projeto com a escada `st1`; padrão térreo + pavimento 2 acima, H = 2,80 m. */
@@ -74,6 +86,25 @@ describe('avisos de norma por código', () => {
     });
     expect(find(list, 'stair-risers-count').severity).toBe('warning');
     expect(find(list, 'stair-riser-range').severity).toBe('warning');
+  });
+
+  it('stair-winder-tread (aviso): leque apertado, piso a 0,55 m da borda interna abaixo de 0,28 m', () => {
+    // 90° com 16 espelhos e raio interno de 0,10 m: a corda a 0,55 m da borda interna é ≈ 0,07 m.
+    const list = stairIssueList(projectWith([fan({ center: v(0, 0), rInner: 0.1, rOuter: 1, startAngle: 0, sweep: Math.PI / 2, risers: 16 })]));
+    const issue = find(list, 'stair-winder-tread');
+    expect(issue).toMatchObject({ severity: 'warning', stairId: 'st1', componentIndex: 0 });
+    expect(issue.message).toMatch(/^O piso do degrau do leque a 0,55 m da borda interna \(0,0\d m\) é menor que o mínimo de 0,28 m\.$/);
+  });
+
+  it('leque folgado: piso a 0,55 m da borda interna ≥ 0,28 m, sem aviso de piso do leque', () => {
+    // 90° com 6 espelhos e raio interno de 1,00 m: a corda a 0,55 m da borda interna é ≈ 0,49 m.
+    const list = stairIssueList(projectWith([fan({ center: v(0, 0), rInner: 1, rOuter: 2, startAngle: 0, sweep: Math.PI / 2, risers: 6 })]));
+    expect(codes(list)).not.toContain('stair-winder-tread');
+  });
+
+  it('lance reto não tem aviso de leque: os espelhos são paralelos', () => {
+    const list = stairIssueList(projectWith([straight(16, 0.28)]));
+    expect(codes(list)).not.toContain('stair-winder-tread');
   });
 
   it('stair-riser-range (aviso): h = 0,156 m, abaixo de 0,16 m', () => {

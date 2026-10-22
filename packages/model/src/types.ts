@@ -171,16 +171,23 @@ export interface Wall {
  */
 export type PlanSymbol = 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement';
 
+/** Contagem de folhas de uma abertura. 0 = vão livre (sem folha nem caixilho). As famílias aceitas estão em `opening.ts`. */
+export type OpeningLeaves = 0 | 1 | 2 | 3;
+
 export interface OpeningType {
   id: Id;
   kind: 'door' | 'window';
   name: string;
+  /** Código do tipo (Revit: Type Mark), como "P-01" ou "J-02"; vazio quando não informado. */
+  code?: string;
+  /** Descrição livre do tipo; vazio quando não informada. */
+  description?: string;
   width: number;
   height: number;
   /** Peitoril padrão (0 para porta). */
   sill: number;
   /** Folhas. 0 = vão livre: só o recorte e a soleira, sem folha nem caixilho. */
-  leaves: 0 | 1 | 2;
+  leaves: OpeningLeaves;
   /** Símbolo de planta da família. */
   plan: PlanSymbol;
   frameMaterialId: Id;

@@ -52,11 +52,11 @@ interface Seg {
 
 /** Separadores sem parede: a planta de B fecha cômodos que a tabela de paredes deixa abertos (passagens e pé da escada). */
 const SEPARADORES_TERREO: Seg[] = [
-  // Passagem de 2,20 m entre vestíbulo e hall: a linha do pé da escada e a da passagem.
-  { a: P(6.7, 2.0), b: P(8.9, 2.0) },
-  { a: P(5.5, 2.0), b: P(6.7, 2.0) },
+  // Passagem entre vestíbulo e hall, ancorada em T-I-05 (agora x = 6,854 — DEC-3): a linha do pé da escada e a da passagem.
+  { a: P(6.854, 2.0), b: P(8.9, 2.0) },
+  { a: P(5.5, 2.0), b: P(6.854, 2.0) },
   // Lado do lance no trecho de passagem livre (y 5,9 a 6,56).
-  { a: P(6.7, 5.9), b: P(6.7, 6.56) },
+  { a: P(6.854, 5.9), b: P(6.854, 6.56) },
 ];
 const SEPARADORES_PAV2: Seg[] = [
   // Borda do vazio da escada no topo do lance (ligação com o corredor).
@@ -138,8 +138,8 @@ const COMODOS_TERREO: Array<[string, Vec2, number]> = [
   ['despensa', P(2.75, 10.5), 11.0],
   ['área de serviço', P(2.75, 12.75), 13.75],
   ['vestíbulo', P(7.8, 1.0), 6.8],
-  ['hall', P(7.8, 4.0), 10.032],
-  ['escada (projeção)', P(6.1, 4.0), 5.472],
+  ['hall', P(7.8, 4.0), 9.32976],
+  ['escada (projeção)', P(6.1, 4.0), 6.17424],
   ['lavabo', P(9.85, 1.0), 3.8],
   ['sala de estar (em L)', P(10.0, 6.0), 25.84],
   ['sala de jantar', P(7.2, 8.5), 13.056],
@@ -496,7 +496,9 @@ describe('casa de alto padrão: aberturas', () => {
 });
 
 describe('casa de alto padrão: cortes e elevações', () => {
-  it('cortes AA e BB e as quatro elevações calculam sem exceção', () => {
+  // Corte AA, Corte BB e as quatro elevações resolvem o modelo inteiro: nesta máquina passa de 5 s (o padrão do vitest),
+  // por isso o limite explícito (o mesmo recurso do teste de alça do caracol).
+  it('cortes AA e BB e as quatro elevações calculam sem exceção', { timeout: 30000 }, () => {
     const p = project();
     for (const v of p.views) {
       const r = computeSection(p, { a: v.a, b: v.b, depth: v.depth });

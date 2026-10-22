@@ -76,9 +76,10 @@ const PAREDES: Command[] = [
   parede('T-I-02', [0, 5.5], [5.5, 5.5], PA14, TERREO),
   parede('T-I-03', [0, 9.5], [5.5, 9.5], PA09, TERREO),
   parede('T-I-04', [0, 11.5], [5.5, 11.5], PA14, TERREO),
-  // Fecha a passagem sob o lance da escada (pé-direito abaixo de 2,10 m) pelo lado do hall. Topo fixo em 2,83 m, sem
-  // anexar à laje: o ponto médio (6,7; 3,95) cai na borda do vazio da escada, onde não há laje para anexar.
-  parede('T-I-05', [6.7, 2.0], [6.7, 5.9], PA09, TERREO, true, 2.83),
+  // Fecha a passagem sob o lance da escada (pé-direito abaixo de 2,10 m) pelo lado do hall. Topo fixo em 2,83 m.
+  // DEC-3 (C-montagem §5): afastada 0,154 m para leste, de x = 6,7 para x = 6,854, para a largura livre entre faces
+  // ficar em 1,20 m, igual à largura do lance (face de T-I-01 em 5,5 + 0,092 = 5,592; face desta em 6,854 − 0,062 = 6,792).
+  parede('T-I-05', [6.854, 2.0], [6.854, 5.9], PA09, TERREO, true, 2.83),
   parede('T-I-06', [5.5, 6.56], [8.9, 6.56], PA09, TERREO),
   parede('T-I-07', [8.9, 0], [8.9, 10.4], PA09, TERREO),
   parede('T-I-08', [8.9, 2.0], [10.8, 2.0], PA09, TERREO),

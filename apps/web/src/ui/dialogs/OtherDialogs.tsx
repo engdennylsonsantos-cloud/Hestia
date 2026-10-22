@@ -1,15 +1,16 @@
-import { useMemo, useState, type ReactElement } from 'react';
-import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, type OpeningType, type PlanSymbol, type TemplateId } from '@hestia/model';
+import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, type OpeningType, type TemplateId } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
+import { applyFamily, familyOptionsFor, leavesChoicesFor, leavesLabel, newOpeningTypeFromFamily } from './openingTypeForm.ts';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
-// "Dupla" é o giro com 2 folhas (ver `normalize` em geom/openingSymbol.ts): escolhê-la põe 2 folhas.
-const DOOR_PLANS: Array<[PlanSymbol, string]> = [['swing', 'Arco (folha)'], ['double', 'Dupla (2 folhas)'], ['sliding', 'De correr'], ['pivot', 'Pivotante']];
-const WINDOW_PLANS: Array<[PlanSymbol, string]> = [['fixed', 'Fixa'], ['tilt', 'Basculante'], ['casement', 'Maxim-ar (arco tracejado)'], ['sliding', 'De correr']];
+// Seções nomeadas do formulário do tipo (padrão Revit/ArchiCAD), no mesmo estilo do antigo bloco "Esquadria".
+const SECTION: CSSProperties = { border: 0, padding: 0, margin: '12px 0 0' };
+const LEGEND: CSSProperties = { color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' };
 
 export function LevelsDialog(): ReactElement {
   const p = useProject();
@@ -51,6 +52,10 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   if (!d) return null;
   const set = (patch: Partial<OpeningType>): void => setD({ ...d, ...patch });
   const used = Object.values(p.elements).filter((e) => (e.kind === 'door' || e.kind === 'window') && e.typeId === d.id).length;
+  const families = familyOptionsFor(d.kind);
+  const family = openingFamilyOf(d);
+  // Folhas aceitas pela família escolhida; sem família válida (dado fora do contrato) mostra só a contagem atual.
+  const leaves = family ? leavesChoicesFor(family) : [{ value: d.leaves, label: leavesLabel(d.leaves) }];
   const ok = (): void => {
     editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura');
     close();
@@ -61,6 +66,15 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
     useUi.setState({ dialogArg: copy.id });
     setD(copy);
   };
+  /** Tipo novo da família escolhida; passa a editar o tipo criado (no Revit: Duplicate → novo tipo). */
+  const create = (): void => {
+    const fam = family ?? families[0];
+    if (!fam) return;
+    const created = newOpeningTypeFromFamily(fam);
+    editor.store.exec({ type: 'upsertOpeningType', openingType: created }, 'Novo tipo de abertura');
+    useUi.setState({ dialogArg: created.id });
+    setD(created);
+  };
   return (
     <Dialog
       title="Propriedades do tipo"
@@ -69,6 +83,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
       onClose={close}
       footer={
         <>
+          <button className="btn" onClick={create}>+ Novo tipo</button>
           <button className="btn" onClick={dup}>Duplicar</button>
           <span style={{ flex: 1 }} />
           <button className="btn" onClick={close}>Cancelar</button>
@@ -76,43 +91,55 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
         </>
       }
     >
-      <div className="field-row"><label htmlFor="ot-name">Nome</label><TextField id="ot-name" value={d.name} onCommit={(v) => set({ name: v })} /></div>
-      <div className="field-row"><label htmlFor="ot-w">Largura</label><NumField id="ot-w" value={d.width} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ width: v })} /></div>
-      <div className="field-row"><label htmlFor="ot-h">Altura</label><NumField id="ot-h" value={d.height} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ height: v })} /></div>
-      <div className="field-row"><label htmlFor="ot-s">Peitoril</label><NumField id="ot-s" value={d.sill} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ sill: v })} /></div>
-      <div className="field-row">
-        <label htmlFor="ot-l">Folhas</label>
-        <select id="ot-l" className="select" value={d.leaves} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
-          <option value="0">Vão livre (sem folha)</option>
-          <option value="1">1 folha</option>
-          <option value="2">2 folhas</option>
-        </select>
-      </div>
-      <div className="field-row">
-        <label htmlFor="ot-plan" title="Desenho do símbolo na planta">Símbolo na planta</label>
-        <select id="ot-plan" className="select" value={d.plan} onChange={(e) => { const plan = e.target.value as PlanSymbol; set(plan === 'double' ? { plan, leaves: 2 } : { plan }); }}>
-          {(d.kind === 'door' ? DOOR_PLANS : WINDOW_PLANS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-        </select>
-      </div>
-      <div className="field-row">
-        <label htmlFor="ot-clos" title="Substitui o retorno de acabamento definido no tipo de parede">Fechamento do vão</label>
-        <select id="ot-clos" className="select" value={d.closure} onChange={(e) => set({ closure: e.target.value as OpeningType['closure'] })}>
-          <option value="inherit">Seguir o tipo de parede</option>
-          <option value="none">Sem retorno</option>
-          <option value="both">Retorno dos dois lados</option>
-          <option value="exterior">Só lado externo</option>
-          <option value="interior">Só lado interno</option>
-        </select>
-      </div>
-      <div className="field-row">
-        <label htmlFor="ot-fm">Material do caixilho</label>
-        <select id="ot-fm" className="select" value={d.frameMaterialId} onChange={(e) => set({ frameMaterialId: e.target.value })}>
-          {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
+      <fieldset style={SECTION}>
+        <legend style={LEGEND}>Dimensões</legend>
+        <div className="field-row"><label htmlFor="ot-w">Largura</label><NumField id="ot-w" value={d.width} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ width: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-h">Altura</label><NumField id="ot-h" value={d.height} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ height: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-s">Peitoril</label><NumField id="ot-s" value={d.sill} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ sill: v })} /></div>
+      </fieldset>
+      <fieldset style={SECTION}>
+        <legend style={LEGEND}>Família e folhas</legend>
+        <div className="field-row">
+          <label htmlFor="ot-fam" title="Comportamento e símbolo de planta do tipo (família da porta ou janela)">Família</label>
+          <select id="ot-fam" className="select" value={family?.id ?? ''} onChange={(e) => { const fam = families.find((f) => f.id === e.target.value); if (fam) setD(applyFamily(d, fam)); }}>
+            {families.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </div>
+        <div className="field-row">
+          <label htmlFor="ot-l">Folhas</label>
+          <select id="ot-l" className="select" value={d.leaves} disabled={leaves.length <= 1} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
+            {leaves.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </fieldset>
+      <fieldset style={SECTION}>
+        <legend style={LEGEND}>Fechamento do vão</legend>
+        <div className="field-row">
+          <label htmlFor="ot-clos" title="Substitui o retorno de acabamento definido no tipo de parede">Retorno do vão</label>
+          <select id="ot-clos" className="select" value={d.closure} onChange={(e) => set({ closure: e.target.value as OpeningType['closure'] })}>
+            <option value="inherit">Seguir o tipo de parede</option>
+            <option value="none">Sem retorno</option>
+            <option value="both">Retorno dos dois lados</option>
+            <option value="exterior">Só lado externo</option>
+            <option value="interior">Só lado interno</option>
+          </select>
+        </div>
+      </fieldset>
+      <fieldset style={SECTION}>
+        <legend style={LEGEND}>Identidade</legend>
+        <div className="field-row"><label htmlFor="ot-name">Nome</label><TextField id="ot-name" value={d.name} onCommit={(v) => set({ name: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-code">Código</label><TextField id="ot-code" value={d.code ?? ''} onCommit={(v) => set({ code: v })} /></div>
+        <div className="field-row"><label htmlFor="ot-desc">Descrição</label><TextField id="ot-desc" value={d.description ?? ''} onCommit={(v) => set({ description: v })} /></div>
+      </fieldset>
       {/* Espessuras da esquadria (cm). Campos vazios no tipo valem o padrão mostrado; a profundidade do batente é limitada à parede. */}
-      <fieldset style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
-        <legend style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Esquadria</legend>
+      <fieldset style={SECTION}>
+        <legend style={LEGEND}>Esquadria</legend>
+        <div className="field-row">
+          <label htmlFor="ot-fm">Material do caixilho</label>
+          <select id="ot-fm" className="select" value={d.frameMaterialId} onChange={(e) => set({ frameMaterialId: e.target.value })}>
+            {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
         <div className="field-row"><label htmlFor="ot-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="ot-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameWidth: v })} /></div>
         <div className="field-row"><label htmlFor="ot-fd" title="Profundidade do batente na espessura da parede (limitada a ela)">Profundidade do batente</label><NumField id="ot-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
         <div className="field-row"><label htmlFor="ot-lt">Espessura da folha</label><NumField id="ot-lt" value={d.leafThickness ?? (d.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ leafThickness: v })} /></div>

@@ -96,8 +96,8 @@ export interface OpeningGeometry {
   /** Faixa s da parede em que o vão está. */
   sHi: number;
   sLo: number;
-  /** 0 = vão livre: sem folha nem caixilho (só o recorte e a soleira). */
-  leaves: 0 | 1 | 2;
+  /** 0 = vão livre: sem folha nem caixilho (só o recorte e a soleira). Janela de correr aceita até 3. */
+  leaves: 0 | 1 | 2 | 3;
   /** Família do símbolo de planta. */
   plan: PlanSymbol;
   flipHand: boolean;

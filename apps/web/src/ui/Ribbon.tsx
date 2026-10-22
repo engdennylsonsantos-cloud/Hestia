@@ -194,6 +194,10 @@ export function Ribbon(): ReactElement {
                   <Icon name="file" size={22} />
                   <span>Tabela de escadas</span>
                 </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'openingSchedule', dialogArg: null })} title="Tabela de portas e janelas com código do tipo, dimensões, folhas, quantidade e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de portas e janelas</span>
+                </button>
               </div>
               <div className="rgroup-title">Documentar</div>
             </div>

@@ -148,8 +148,10 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     const wf = levelFrames(p, 'lv_0').find((f) => f.wall.id === wp.hostId)!;
     expect(above).toHaveLength(openingSymbolPaths(openingGeometry(p, wp, wf)).length);
     expect(above.length).toBeGreaterThan(1);
-    // o vão de 1,50 não aparece nas camadas de corte
-    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURAS')).toHaveLength(1);
+    // o vão de 1,50 não aparece nas camadas de corte: em ABERTURAS sai só o símbolo da janela de 0,90 (decisão X1)
+    const jc = p.elements['jCorta'] as Opening;
+    const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
+    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURAS')).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
     // a parede com a janela alta é igual à mesma parede sem janela (furo nenhum)
     expect(notOpening(text).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1))).toEqual(
       notOpening(planDxf(without(p, 'jAlta'), 'lv_0')).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1)),
@@ -161,7 +163,11 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     const p = vistaPlan().project;
     const text = planDxf(p, 'lv_0');
     const cut = polylinesOf(text).filter((x) => x.layer === 'ABERTURAS' && x.pts.some((v) => v.y > 4 && v.y < 6));
-    expect(cut).toHaveLength(1);
+    // Decisão X1: o vão de corte sai com o símbolo de planta, o mesmo da tela (antes era um retângulo só).
+    const jc = p.elements['jCorta'] as Opening;
+    const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
+    expect(cut).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
+    expect(cut.length).toBeGreaterThan(1);
     // a parede da janela de 0,90 tem outro desenho com o vão do que sem ele
     const band = (ps: Poly[]): Poly[] => ps.filter((x) => x.pts.some((v) => v.y > 4 && v.y < 6));
     expect(band(notOpening(text))).not.toEqual(band(notOpening(planDxf(without(p, 'jCorta'), 'lv_0'))));

@@ -150,8 +150,9 @@ export function dxfGeometryOf(p: Project, levelId: Id): DxfLevelGeometry {
       const state = shown(o.kind) ? dxfStateOf(view.cls.get(o.id)) : null;
       if (state === null) return [];
       const g = openingGeometry(p, o, f);
-      // Projeção: o símbolo de planta da família (o mesmo da tela); o corte fica como retângulo, na camada ABERTURAS.
-      const symbol = state === 'cut' ? undefined : openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
+      // Símbolo de planta da família, o mesmo da tela (decisão X1): vale no corte (camada ABERTURAS) e na projeção
+      // (ABERTURA_ACIMA/ABAIXO/ALEM). O DXF põe a camada; o desenho vem da mesma função pura da planta.
+      const symbol = openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
       return [{ center: g.center, u: g.u, width: g.width, thickness: g.thickness, state, symbol }];
     }),
   );

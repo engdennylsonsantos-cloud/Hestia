@@ -31,7 +31,7 @@ Fonte: [docs/escadas](../escadas/) (Revit 2026: Stair by Component e croqui; Arc
 - [-] C5 Apoios (stringer, carriage): fora da v1 (decisão 0011 #13)
 - [-] C6 Escada de vários andares: fora desta etapa (decisão do dono)
 - [-] C7 Exportação IFC (IfcStair, IfcStairFlight, patamar LANDING): Fase 8 do roteiro
-- [ ] C8 Norma do piso do leque: degraus do leque com piso ≥ 0,28 m a 0,55 m da borda interna (decisão 0011 §1 item 10). Hoje o leque não tem aviso de piso
+- [x] C8 Norma do piso do leque: degraus do leque com piso ≥ 0,28 m a 0,55 m da borda interna (decisão 0011 §1 item 10). Aviso `stair-winder-tread` (mede a corda entre espelhos radiais a 0,55 m da borda interna; `stairIssues.test.ts`)
 
 ## D · Vistas
 - [x] D1 Planta: degraus, seta de subida com texto, linha de corte, degraus acima do corte tracejados, numeração contínua dos degraus (o patamar não tem rótulo; decisão 0011 §7) **(bloqueante)**

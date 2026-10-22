@@ -1,5 +1,5 @@
 import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { coreSpan, openingFamilyOf, openingFrame, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningFamilyId, type OpeningLeaves, type PlanSymbol, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
@@ -62,6 +62,28 @@ export interface SectionBeyond extends SectionOrigin {
   polygons: MultiPolygon;
 }
 
+/**
+ * Esquadria do vão no corte e na elevação: família, folhas e espessuras do tipo (`openingFrame`), com a profundidade
+ * do batente já limitada ao núcleo da parede. Permite ao desenho montar batente, vidro, folha e símbolos por família.
+ */
+export interface SectionEsquadria {
+  /** Família (`opening.ts`); null quando a combinação (símbolo × folhas) do tipo não existe. */
+  family: OpeningFamilyId | null;
+  leaves: OpeningLeaves;
+  plan: PlanSymbol;
+  /** Largura do vão e espessura total da parede anfitriã: distinguem a vista face do corte transversal. */
+  width: number;
+  thickness: number;
+  frameWidth: number;
+  frameDepth: number;
+  glassThickness: number;
+  leafThickness: number;
+  flipHand: boolean;
+  flipFacing: boolean;
+  frameMaterialId: Id;
+  glassMaterialId: Id;
+}
+
 /** Vão de porta ou janela. `t0..z1` é a caixa do vão; `polygons` é a parte visível (sem o que está na frente). */
 export interface SectionOpening {
   openingId: Id;
@@ -74,6 +96,8 @@ export interface SectionOpening {
   /** O plano de corte atravessa o vão. */
   cut: boolean;
   polygons: MultiPolygon;
+  /** Esquadria do tipo e da família (para o desenho do corte e da elevação). Ausente = desenho antigo. */
+  esquadria?: SectionEsquadria;
 }
 
 export interface SectionLevelMark {
@@ -288,7 +312,35 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         const t1 = Math.min(length, Math.max(...ts));
         if (t1 - t0 < EPS_T) continue;
         const z0 = rw.baseZ + g.sill;
-        openings.push({ openingId: o.id, kind: g.kind, t0, t1, z0, z1: z0 + g.height, depth: Math.max(0, Math.min(...foot.map(dist))), cut: crossing, polygons: [[rect(t0, t1, z0, z0 + g.height)]] });
+        const ot = openingType(p, o);
+        const core = coreSpan(f.type);
+        const fr = openingFrame(ot, core.to - core.from);
+        openings.push({
+          openingId: o.id,
+          kind: g.kind,
+          t0,
+          t1,
+          z0,
+          z1: z0 + g.height,
+          depth: Math.max(0, Math.min(...foot.map(dist))),
+          cut: crossing,
+          polygons: [[rect(t0, t1, z0, z0 + g.height)]],
+          esquadria: {
+            family: openingFamilyOf(ot)?.id ?? null,
+            leaves: ot.leaves,
+            plan: ot.plan,
+            width: ot.width,
+            thickness: g.thickness,
+            frameWidth: fr.frameWidth,
+            frameDepth: fr.frameDepth,
+            glassThickness: fr.glassThickness,
+            leafThickness: fr.leafThickness,
+            flipHand: o.flipHand,
+            flipFacing: o.flipFacing,
+            frameMaterialId: ot.frameMaterialId,
+            glassMaterialId: ot.glassMaterialId,
+          },
+        });
       }
     }
   }

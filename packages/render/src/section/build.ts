@@ -1,5 +1,5 @@
-import type { MultiPolygon, Ring } from '@hestia/geom';
-import { lineIntervals, type SectionResult } from '@hestia/engine';
+import type { MultiPolygon, Ring, Vec2 } from '@hestia/geom';
+import type { SectionOpening, SectionResult } from '@hestia/engine';
 import type { Id, Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
@@ -56,15 +56,111 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: mix(theme.ink, paper, 0.35 + 0.4 * (depth / maxDepth)), alpha: 1 });
   };
 
-  const drawOpening = (polygons: MultiPolygon, kind: 'door' | 'window', cut: boolean, t0: number, t1: number): void => {
-    fills.push({ polygons, color: kind === 'window' ? GLASS_FILL : DOOR_FILL, alpha: 1 });
-    for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: cut ? 1.6 : 1.2, color: theme.ink, alpha: 1 });
-    if (kind !== 'window') return;
-    // Montante no meio do vão: só o trecho visível (o que não está na frente de outro elemento).
-    const mid = (t0 + t1) / 2;
-    for (const poly of polygons) {
-      for (const [z0, z1] of lineIntervals(poly, { x: mid, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 0 })) {
-        strokes.push({ pts: [{ x: mid, y: z0 }, { x: mid, y: z1 }], closed: false, widthPx: 1, color: theme.ink, alpha: 0.7 });
+  /**
+   * Desenho do vão no corte e na elevação, a partir do tipo e da FAMÍLIA (`o.esquadria`): batente com a espessura do
+   * perfil (`frameWidth`) — no corte transversal, com a profundidade do batente (`frameDepth`) centrada na parede —,
+   * vidro com a espessura do tipo, folha de porta, e os símbolos de elevação (arco do maxim-ar/basculante, giro da
+   * porta e seta de correr). Sem `esquadria` (lista sintética), cai no retângulo de antes.
+   */
+  const drawOpening = (o: SectionOpening): void => {
+    const { polygons, kind, cut, t0, t1, z0, z1 } = o;
+    const edge = cut ? 1.6 : 1.2;
+    const outline = (): void => {
+      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
+    };
+    const quad = (a: number, b: number, c: number, d: number): Ring => [
+      { x: a, y: c },
+      { x: b, y: c },
+      { x: b, y: d },
+      { x: a, y: d },
+    ];
+    // Peça do batente/caixilho: preenchida e contornada, no plano da vista.
+    const piece = (a: number, b: number, c: number, d: number, color: string): void => {
+      const ring = quad(a, b, c, d);
+      fills.push({ polygons: [[ring]], color, alpha: 1 });
+      strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
+    };
+    // Traço simbólico da elevação (abertura, giro, seta): fino e tracejado (dash [4,3], distinto do tracejado dos níveis [10,5]).
+    const symbol = (pts: Vec2[]): void => {
+      strokes.push({ pts, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 1, dash: [4, 3] });
+    };
+    const esq = o.esquadria;
+    if (!esq) {
+      // Lista sintética sem esquadria: retângulo com o fundo e o contorno de antes.
+      fills.push({ polygons, color: kind === 'window' ? GLASS_FILL : DOOR_FILL, alpha: 1 });
+      outline();
+      return;
+    }
+    const fw = esq.frameWidth;
+    // Vista face (t = largura do vão) x corte transversal (t = espessura da parede): a projeção da pegada
+    // (largura × espessura) sobre a linha diz qual é. A vista face é a da elevação e a do corte longitudinal.
+    const faceOn = Math.abs(t1 - t0 - esq.width) <= Math.abs(t1 - t0 - esq.thickness);
+    const frameColor = mix(p.materials[esq.frameMaterialId]?.color ?? '#9aa0a6', paper, 0.5);
+    // Vão livre (sem folha): nenhum batente nem vidro. A porta é só o vão aberto (o vazio mostra o papel); a janela
+    // sem folha fica com a soleira, como no 3D.
+    if (esq.leaves === 0) {
+      if (kind === 'window') piece(t0, t1, z0, z0 + fw, frameColor);
+      outline();
+      return;
+    }
+    if (kind === 'window') {
+      outline();
+      if (faceOn) {
+        // Batente: ombreiras, verga e soleira com a espessura do perfil, dentro do vão.
+        piece(t0, t0 + fw, z0, z1, frameColor);
+        piece(t1 - fw, t1, z0, z1, frameColor);
+        piece(t0, t1, z1 - fw, z1, frameColor);
+        piece(t0, t1, z0, z0 + fw, frameColor);
+        // Vidro: região interna do caixilho (opaco, cor fixa do desenho).
+        fills.push({ polygons: [[quad(t0 + fw, t1 - fw, z0 + fw, z1 - fw)]], color: GLASS_FILL, alpha: 1 });
+        // Linha central (C6): só na janela de correr (2 ou 3 folhas); a fixa, a basculante e a maxim-ar não a têm.
+        if (esq.leaves >= 2) {
+          const inner = t1 - t0 - 2 * fw;
+          for (let i = 1; i < esq.leaves; i++) {
+            const t = t0 + fw + (i * inner) / esq.leaves;
+            strokes.push({ pts: [{ x: t, y: z0 + fw }, { x: t, y: z1 - fw }], closed: false, widthPx: 1, color: theme.ink, alpha: 0.7 });
+          }
+        }
+        // Símbolos da elevação: seta de correr (E2) ou arco tracejado do maxim-ar/basculante (E1).
+        if (esq.plan === 'sliding') {
+          const zc = (z0 + z1) / 2;
+          symbol([{ x: t0 + fw, y: zc }, { x: t1 - fw, y: zc }]);
+          symbol([{ x: t1 - fw - 0.1, y: zc + 0.04 }, { x: t1 - fw, y: zc }, { x: t1 - fw - 0.1, y: zc - 0.04 }]);
+        } else if (esq.family === 'window_casement' || esq.family === 'window_tilt') {
+          // Símbolo de abertura (E1): arco tracejado dentro do vão, saindo da verga (ou da soleira, com o sentido
+          // invertido) para o lado da abertura.
+          const dip = Math.min(0.25 * (z1 - z0), 0.4);
+          const base = esq.flipFacing ? z0 + fw : z1 - fw;
+          const dir = esq.flipFacing ? 1 : -1;
+          const pts: Vec2[] = [];
+          for (let i = 0; i <= 18; i++) {
+            const t = t0 + fw + ((t1 - t0 - 2 * fw) * i) / 18;
+            pts.push({ x: t, y: base + dir * dip * Math.sin((Math.PI * i) / 18) });
+          }
+          symbol(pts);
+        }
+      } else {
+        // Corte transversal: verga e soleira com a profundidade do batente, centradas na parede; vidro com a espessura.
+        const tc = (t0 + t1) / 2;
+        piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z1 - fw, z1, frameColor);
+        piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z0, z0 + fw, frameColor);
+        fills.push({ polygons: [[quad(tc - esq.glassThickness / 2, tc + esq.glassThickness / 2, z0 + fw, z1 - fw)]], color: GLASS_FILL, alpha: 1 });
+      }
+    } else {
+      // Porta com folha: a folha fechada preenche o vão (C5). O vão livre (0 folhas) saiu acima, sem preenchimento.
+      fills.push({ polygons, color: DOOR_FILL, alpha: 1 });
+      outline();
+      if (faceOn) {
+        // Símbolos da elevação: seta de correr da porta (E2) ou giro do lado da dobradiça (E1).
+        if (esq.family === 'door_sliding') {
+          const zc = (z0 + z1) / 2;
+          symbol([{ x: t0, y: zc }, { x: t1, y: zc }]);
+          symbol([{ x: t1 - 0.12, y: zc + 0.05 }, { x: t1, y: zc }, { x: t1 - 0.12, y: zc - 0.05 }]);
+        } else {
+          const hinge = esq.flipHand ? t1 : t0;
+          const opp = esq.flipHand ? t0 : t1;
+          symbol([{ x: hinge, y: z1 }, { x: opp, y: z0 }]);
+        }
       }
     }
   };
@@ -73,7 +169,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   type Paint = { depth: number; cut: boolean; draw: () => void };
   const paint: Paint[] = [
     ...s.beyond.map((b): Paint => ({ depth: b.depth, cut: false, draw: () => drawBeyond(b.polygons, p.materials[b.materialId]?.color, b.depth) })),
-    ...s.openings.map((o): Paint => ({ depth: o.depth, cut: false, draw: () => drawOpening(o.polygons, o.kind, o.cut, o.t0, o.t1) })),
+    ...s.openings.map((o): Paint => ({ depth: o.depth, cut: false, draw: () => drawOpening(o) })),
     ...s.cut.map((r): Paint => ({
       depth: 0,
       cut: true,

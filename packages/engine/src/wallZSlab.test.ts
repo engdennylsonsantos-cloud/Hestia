@@ -118,3 +118,32 @@ describe('C1 · parede anexada ao topo na laje do nível de topo', () => {
     expect(zOf(p)).toEqual({ z0: 0, height: 2.8 });
   });
 });
+
+describe('6.1 · o topo anexado não depende do lado da borda da laje', () => {
+  // Laje ls_mac15 (0,02 + 0,15 = 0,17 m) no lv_1 (3,00 m), contorno sobre o eixo (0,0)–(4,0)–(4,4)–(0,4): a face
+  // inferior fica em 3,00 − 0,17 = 2,83 m. O ponto médio de cada uma das quatro paredes cai EXATAMENTE sobre uma borda
+  // da laje, e todas precisam ancorar em 2,83 m. Antes da correção (defeito 6.1 de C-montagem.md), a borda superior e a
+  // direita davam 3,000 m, porque o ray-casting de `pointInRing` é ambíguo sobre a borda.
+  const lajeNoEixo = makeSlab({ id: 'laje', typeId: 'ls_mac15', levelId: 'lv_1', boundary: rect(0, 0, 4, 4), heightOffset: 0 });
+  const naBorda = (a: { x: number; y: number }, b: { x: number; y: number }): W => wall3({ a, b, height: 3, topLevelId: 'lv_1', attachTopToFloor: true });
+  const casos: Array<[string, { x: number; y: number }, { x: number; y: number }]> = [
+    ['borda superior', { x: 0, y: 4 }, { x: 4, y: 4 }],
+    ['borda inferior', { x: 4, y: 0 }, { x: 0, y: 0 }],
+    ['borda direita', { x: 4, y: 0 }, { x: 4, y: 4 }],
+    ['borda esquerda', { x: 0, y: 4 }, { x: 0, y: 0 }],
+  ];
+
+  for (const [nome, a, b] of casos) {
+    it(`${nome}: ponto médio sobre a borda ancora na face inferior da laje (2,83 m)`, () => {
+      const p = build([naBorda(a, b)], [], [lajeNoEixo]);
+      const z = zOf(p);
+      expect(z.z0).toBe(0);
+      expect(z.height).toBeCloseTo(3 - 0.17, 9);
+    });
+  }
+
+  it('ponto médio fora da laje não ancora: só a borda passou a contar como coberta', () => {
+    const p = build([naBorda({ x: 0, y: 5 }, { x: 4, y: 5 })], [], [lajeNoEixo]);
+    expect(zOf(p)).toEqual({ z0: 0, height: 3 });
+  });
+});

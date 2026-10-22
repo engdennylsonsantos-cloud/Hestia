@@ -150,17 +150,27 @@ describe('contorno por camada: término explícito (decisão 0023 §2, P8)', () 
 });
 
 describe('contorno por camada: estático e casos sem vínculo (decisão 0023 §2, compatibilidade)', () => {
-  it('piso estático: todas as camadas usam o contorno do elemento, como antes', () => {
+  it('piso estático: o deslocamento segue ignorado; a regra de parede (até a face, até o núcleo) recorta pelas paredes (decisão 0025)', () => {
     const p = build({ linked: false, termos: ['nucleo', 'face', { cm: 2 }] });
     const f = floorOf(p);
-    for (const l of f.layers) expect(l.polygon).toBe(f.polygon);
-    expect(multiArea(f.polygon)).toBeCloseTo(4 * 3, 9);
+    // Camada com `cm` em elemento sem vínculo: contorno do elemento, como antes (identidade preservada).
+    expect(f.layers[2]!.polygon).toBe(f.polygon);
+    // Paredes de 14 cm (acabamento de 2 cm, núcleo de 10 cm) sobre o contorno de 4 × 3 m: só a metade interna sai do piso.
+    // Núcleo: 5 cm por dentro × perímetro de 14 m, menos o canto (0,05² × 4). Pegada: 7 cm por dentro, mesma conta.
+    const area = (i: number): number => multiArea(f.layers[i]!.polygon);
+    expect(multiArea(f.polygon) - area(0)).toBeCloseTo(0.05 * 14 - 0.05 * 0.05 * 4, 2);
+    expect(multiArea(f.polygon) - area(1)).toBeCloseTo(0.07 * 14 - 0.07 * 0.07 * 4, 2);
+    expect(area(1)).toBeLessThan(area(0));
   });
 
-  it('modo perímetro externo: todas as camadas usam o mesmo contorno (P8 não cobre o perímetro)', () => {
+  it('modo perímetro externo: a regra explícita recorta pelas paredes e o automático segue o contorno do elemento (decisão 0025)', () => {
     const p = build({ mode: 'perimeter', termos: ['nucleo', 'face', 'auto'] });
     const f = floorOf(p);
-    for (const l of f.layers) expect(multiArea(l.polygon)).toBeCloseTo(multiArea(f.polygon), 9);
+    const area = (i: number): number => multiArea(f.layers[i]!.polygon);
+    expect(area(2)).toBeCloseTo(multiArea(f.polygon), 9);
+    // Contorno externo (paredes inteiras dentro dele): núcleo de 10 cm e pegada de 14 cm saem por inteiro.
+    expect(multiArea(f.polygon) - area(0)).toBeCloseTo(0.1 * 14, 2);
+    expect(multiArea(f.polygon) - area(1)).toBeCloseTo(0.14 * 14, 2);
   });
 
   it('circuito aberto: mantém o último contorno e todas as camadas usam ele', () => {

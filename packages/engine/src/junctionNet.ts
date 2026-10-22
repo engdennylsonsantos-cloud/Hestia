@@ -156,7 +156,7 @@ export function slabLayerPiece(rs: ResolvedSlab, l: ResolvedSlab['layers'][numbe
     poly: l.polygon,
     span: (q: Vec2) => [l.z0 + slabRiseAt(rs.slope, q), l.z1 + slabRiseAt(rs.slope, q)] as const,
     flat: rs.slope === null,
-    meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId },
+    meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId, explicit: l.explicit },
   };
 }
 
@@ -167,7 +167,7 @@ export function slabCutters(p: Project, levelId: Id): CutterSolid[] {
 
 /** Pedaço de uma camada de piso: a forma em planta da camada (P8, pode ir ao núcleo da parede) e a faixa de cota dela. */
 export function floorLayerPiece(rf: ResolvedFloor, l: ResolvedFloorLayer): SolidPiece {
-  return { ...flatPiece(l.polygon, l.z0, l.z1), meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId } };
+  return { ...flatPiece(l.polygon, l.z0, l.z1), meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId, explicit: l.explicit } };
 }
 
 /** Pedaços dos pisos do nível, camada a camada. */

@@ -1,8 +1,10 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { isMembraneLayer, layerPriority, levelElevation, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
+import { isMembraneLayer, layerPriority, levelElevation, slabsOnLevel, terminoEhRegraParede, type Id, type Project, type SlabSlope } from '@hestia/model';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { layerOutlines, memoCut } from './layerOutline.ts';
+import { adjacentLevelIds } from './terminoBlock.ts';
+import type { FloorResolveOptions } from './floors.ts';
 import { coverUnderside, cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
 /** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
@@ -19,6 +21,8 @@ export interface ResolvedSlabLayer {
   core: boolean;
   /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
   membrane: boolean;
+  /** Término com regra explícita (decisão 0025): a junção automática por prioridade contra paredes não recorta a camada. */
+  explicit: boolean;
   /** Contorno da camada, em planta, menos furos (decisão 0023 §2, P8): o da laje, salvo término que vai ao núcleo ou desloca. */
   polygon: MultiPolygon;
 }
@@ -43,7 +47,7 @@ export interface ResolvedSlab {
  * contorno; uma laje inteiramente coberta por eles não entra. Laje vinculada (`outlineSource.linked`) tem o contorno
  * derivado (`resolveBoundary`): circuito aberto mantém o último contorno e devolve `problem`.
  */
-export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
+export function resolveSlabs(p: Project, levelId: Id, opts: FloorResolveOptions = {}): ResolvedSlab[] {
   const openings = stairOpeningsOnLevel(p, levelId);
   const out: ResolvedSlab[] = [];
   for (const s of slabsOnLevel(p, levelId)) {
@@ -75,7 +79,10 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
     const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, underside)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
-    const outlines = layerOutlines(p, s.levelId, s, type.layers, core, base);
+    // Faixa de cota da laje inteira: a parede que parte do topo dela (ou que termina nela) corta todas as camadas.
+    const zones = bounds.map(() => ({ z0: bottomZ, z1: topZ }));
+    const levelIds = [s.levelId, ...adjacentLevelIds(p, s.levelId)];
+    const outlines = opts.layers === false ? type.layers.map(() => base) : layerOutlines(p, s.levelId, s, type.layers, core, base, { levelIds, zones });
     const layers: ResolvedSlabLayer[] = type.layers.map((l, i) => ({
       layerIndex: i,
       materialId: l.materialId,
@@ -84,6 +91,7 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
       membrane: isMembraneLayer(l),
       priority: layerPriority(l),
       core: core[i]!,
+      explicit: terminoEhRegraParede(l),
       polygon: cut(outlines[i]!),
     }));
     out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon, topZ, bottomZ, slope: s.slope, layers, problem });
@@ -92,4 +100,4 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
 }
 
 /** Lajes de todos os níveis do projeto (a parede anexada cruza níveis, como com os pisos). */
-export const resolveAllSlabs = (p: Project): ResolvedSlab[] => p.levels.flatMap((l) => resolveSlabs(p, l.id));
+export const resolveAllSlabs = (p: Project, opts: FloorResolveOptions = {}): ResolvedSlab[] => p.levels.flatMap((l) => resolveSlabs(p, l.id, opts));

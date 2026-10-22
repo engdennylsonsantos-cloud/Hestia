@@ -87,6 +87,10 @@ Hoje há um contorno por elemento, igual para todas as camadas (`floors.ts:47-54
 | `núcleo` | Até o núcleo da parede |
 | `face de acabamento` | Até a face de acabamento da parede |
 | deslocamento em cm | Positivo avança sobre a parede; negativo recua. Referência proposta: face de acabamento (ponto aberto, §9.4) |
+| `passa` | Passa por baixo da parede: sem recorte (**0025**) |
+| `até a prioridade ≤ N` | Para na primeira camada da parede de prioridade efetiva ≤ N, de fora para dentro (1 a 9). Sem camada assim, a parede é `passa` (**0025**) |
+
+Status (0025, P10): as regras `face`, `nucleo`, `passa` e `até a prioridade ≤ N` valem para piso e laje estáticos e vinculados, recortam o piso pelas paredes do nível (e pelas de níveis vizinhos, na laje), e o término segue a junção por prioridade contra paredes só nas camadas sem regra. O piso único (`ft_unico`) e a laje única (`ls_unica`) usam essas regras. Vãos de porta que chegam ao piso não entram na zona bloqueada. O recorte da parede pela camada nos desenhos continua pendente (0025 §9).
 
 Com o núcleo do piso na camada estrutural, `auto` reproduz a tabela anterior: estrutura até o núcleo; substrato, acabamento e membrana até a face. `[INFERIDO]`
 
@@ -362,6 +366,8 @@ Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P
 - **Testes.** `junctionLevelAdjacent.test.ts` (adjacência só acima e abaixo; laje do pavimento 2 atravessa a parede 0,10 m, uma vez; sem interseção; parede do pavimento 2 sobre a laje do térreo; piso × laje entre níveis não cortam; cache; dez sementes: líquido = bruto menos a interseção e sem interseção = bruto). `junctionLevel.test.ts` (encosto sem área = `cut` falso).
 - **Desempenho.** `npm run test:perf` mede só `resolveLevel` e a captura, sem a junção; ficou dentro da faixa de ruído. Na casa, a junção (com cache) sobe cerca de 10 ms por nível, por resolver o nível vizinho; os quantitativos caem de cerca de 155 ms para cerca de 97 ms (faixas de cota sem sobreposição não entram na interseção).
 - **Pendente.** (1) O pintor de paredes (`resolve.ts`) ainda não recebe as partes resolvidas: planta, corte e 3D da parede seguem sem o recorte (E3 de paredes, C6 de pisos e C8 de lajes seguem `[ ]`). (2) Validação no Revit (itens (a) a (d) da P7b).
+
+**Status da P10 (0025, 2026-10-22, feita).** Término por camada no piso e na laje única: `termino` ganha `passa` e `{ ate: { prioridade } }`, e a região de cada camada com regra é o contorno menos a zona bloqueada das paredes (0025 §1 e §2). Piso único `ft_unico` e laje única `ls_unica` no catálogo padrão. Planta (preenchimento da camada de topo), corte, 3D e quantitativos usam o multipolígono da camada. Fora da P10: recorte da parede pela camada nos desenhos (C6 de pisos, C8 de lajes), DXF e IFC por camada e cor por camada na planta (0025 §9). As decisões 1 a 10 não mudam.
 
 ## 11. Riscos e compatibilidade
 

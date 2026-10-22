@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { terminoOf, type Layer } from '@hestia/model';
-import { TERMINO_OPCOES, formDoTermino, terminoDoForm, type TerminoKind } from './terminoForm.ts';
+import { TERMINO_AJUDA, TERMINO_OPCOES, formDoTermino, terminoDoForm, type TerminoKind } from './terminoForm.ts';
 
 interface LayerTerminoProps {
   /** Prefixo de id estável da linha, ex.: `ft-layer-0`. */
@@ -9,9 +9,7 @@ interface LayerTerminoProps {
   onChange: (next: Layer) => void;
 }
 
-const AJUDA = 'Vale para pisos e lajes vinculados às paredes. Deslocamento: positivo avança sobre a parede, negativo recua, a partir da face de acabamento.';
-
-/** Linha "Término na junção" da seção avançada da camada de piso ou de laje (decisão 0023 §2, P8). */
+/** Linha "Término nas paredes" da seção avançada da camada de piso ou de laje (decisão 0023 §2, P8; decisão 0025). */
 export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactElement {
   const shown = formDoTermino(terminoOf(layer));
   const [kind, setKind] = useState<TerminoKind>(shown.kind);
@@ -43,7 +41,7 @@ export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactE
   return (
     <div className="adv-panel">
       <div className="adv-row">
-        <label htmlFor={`${id}-termino`}>Término na junção</label>
+        <label htmlFor={`${id}-termino`}>Término nas paredes</label>
         <span className="adv-ctl">
           <select
             id={`${id}-termino`}
@@ -51,25 +49,28 @@ export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactE
             value={kind}
             onChange={(e) => {
               const k = e.target.value as TerminoKind;
+              // Ao escolher prioridade, o campo começa em 3 (ou mantém um número de 1 a 9 já digitado).
+              const text = k === 'ate' && !/^[1-9]$/.test(cmText.trim()) ? '3' : cmText;
               setKind(k);
-              apply(k, cmText);
+              setCmText(text);
+              apply(k, text);
             }}
           >
             {TERMINO_OPCOES.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          {kind === 'cm' && (
+          {(kind === 'cm' || kind === 'ate') && (
             <input
               id={`${id}-termino-cm`}
               className="input num"
-              inputMode="decimal"
-              aria-label="Deslocamento em centímetros"
+              inputMode={kind === 'cm' ? 'decimal' : 'numeric'}
+              aria-label={kind === 'cm' ? 'Deslocamento em centímetros' : 'Prioridade da parede, de 1 a 9'}
               aria-invalid={erro !== null}
               aria-describedby={`${id}-termino-help`}
               value={cmText}
               onChange={(e) => setCmText(e.target.value)}
-              onBlur={() => apply('cm', cmText)}
+              onBlur={() => apply(kind, cmText)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur();
                 e.stopPropagation();
@@ -78,7 +79,7 @@ export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactE
           )}
         </span>
       </div>
-      <p id={`${id}-termino-help`} className="adv-help">{erro ?? AJUDA}</p>
+      <p id={`${id}-termino-help`} className="adv-help">{erro ?? TERMINO_AJUDA[kind]}</p>
     </div>
   );
 }

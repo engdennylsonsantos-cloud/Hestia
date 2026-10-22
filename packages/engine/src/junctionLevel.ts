@@ -61,7 +61,7 @@ function planarOf(sp: SolidPiece): PlanarPiece | null {
     }
   }
   if (!(z1 - z0 > 1e-9)) return null;
-  return { meta: { kind: meta.kind, priority: meta.priority, core: meta.core }, poly: sp.poly, z0, z1, owner: meta.owner };
+  return { meta: { kind: meta.kind, priority: meta.priority, core: meta.core, ...(meta.explicit ? { explicit: true } : {}) }, poly: sp.poly, z0, z1, owner: meta.owner };
 }
 
 /** Assinatura do conteúdo das peças (camada, faixa, prioridade e contorno): muda quando o nível muda. */
@@ -69,7 +69,7 @@ function signature(tagged: readonly Tagged[]): string {
   return tagged
     .map(({ piece: t, layerIndex }) => {
       const poly = t.poly.map((p) => p.map((ring) => ring.map((v) => `${r6(v.x)},${r6(v.y)}`).join(' ')).join('/')).join('#');
-      return `${t.external ? 'x' : ''}${t.owner}|${layerIndex}|${t.meta.kind}|${t.meta.priority}|${t.meta.core ? 1 : 0}|${r6(t.z0)}|${r6(t.z1)}|${poly}`;
+      return `${t.external ? 'x' : ''}${t.owner}|${layerIndex}|${t.meta.kind}|${t.meta.priority}|${t.meta.core ? 1 : 0}|${t.meta.explicit ? 1 : 0}|${r6(t.z0)}|${r6(t.z1)}|${poly}`;
     })
     .join('\n');
 }
@@ -172,6 +172,19 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   const value: JunctionLevel = { levelId, elements };
   levelCache.set(levelId, { sig, value });
   return value;
+}
+
+/**
+ * Região em planta do preenchimento de um piso ou laje (decisão 0025). Quando a camada de topo tem regra explícita, o
+ * preenchimento é essa camada (o piso para na face da parede e o resto segue sob ela); senão, o elemento, como antes:
+ * a região do corte (`el.region`) ou o contorno do elemento.
+ */
+export function fillRegionOf(top: { explicit: boolean; polygon: MultiPolygon }, element: MultiPolygon, el?: ElementJunction): MultiPolygon {
+  if (top.explicit) {
+    const parts = el?.cut ? el.layers.find((l) => l.layerIndex === 0)?.parts : undefined;
+    return parts ? union(...parts.map((x) => x.poly)) : top.polygon;
+  }
+  return el?.cut ? el.region : element;
 }
 
 /**

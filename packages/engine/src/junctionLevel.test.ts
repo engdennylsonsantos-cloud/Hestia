@@ -44,6 +44,16 @@ describe('junção resolvida por nível (decisão 0023 §3, P7b)', () => {
     expect(layerPartsOf(el, 0, fb)).toBe(fb);
   });
 
+  it('encostar sem sobrepor área não é corte: piso e laje que só dividem a aresta ficam com cut falso (P7c)', () => {
+    // O piso vai de x 0 a 6 e a laje de x 6 a 9: a aresta comum tem faixa de cota sobreposta, mas nenhuma área.
+    const p = build({ floors: [{}], slabs: [{ boundary: rect(6, 0, 9, 4) }] });
+    const j = junctionLevel(p, 'lv_0');
+    const el = j.elements.get('f')!;
+    expect(el.cut).toBe(false);
+    expect(area(el.layers[0]!.parts[0]!.poly)).toBeCloseTo(24, 9);
+    expect(j.elements.get('s')?.cut ?? false).toBe(false);
+  });
+
   it('laje estrutural corta piso (empate: laje vence): o piso fica com 12 de 24 m², a laje inteira', () => {
     const p = build({ floors: [{}], slabs: [{}] });
     const j = junctionLevel(p, 'lv_0');

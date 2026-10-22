@@ -1,6 +1,6 @@
 import { multiArea } from '@hestia/geom';
 import { bandVolume } from './profile.ts';
-import { bandPiece, cutVolume, floorCutters, slabCutters } from './junctionNet.ts';
+import { adjacentCutters, bandPiece, cutVolume, floorCutters, slabCutters } from './junctionNet.ts';
 import { profileHeightAt, profileMean, openingSill, openingType, openingsOfWall, wallLength, type Id, type Project } from '@hestia/model';
 import type { ResolvedLevel } from './types.ts';
 
@@ -48,7 +48,7 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
   const walls: WallQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
-  const cutters = [...floorCutters(p, r.levelId), ...slabCutters(p, r.levelId)];
+  const cutters = [...floorCutters(p, r.levelId), ...slabCutters(p, r.levelId), ...adjacentCutters(p, r.levelId, 'wall')];
   for (const rw of Object.values(r.walls)) {
     const w = p.elements[rw.wallId];
     if (!w || w.kind !== 'wall') continue;

@@ -66,8 +66,10 @@ describe('corte: a cota decide o que fica por cima (P6)', () => {
     const floorArea = r.cut.reduce((acc, c) => acc + (c.parts ?? []).filter((q) => q.origin.floorId === 'f1').reduce((x, q) => x + areaOf(q.polygons), 0), 0);
     const slabArea = r.cut.reduce((acc, c) => acc + (c.parts ?? []).filter((q) => q.origin.slabId === 'l1').reduce((x, q) => x + areaOf(q.polygons), 0), 0);
     const floorAlone = computeSection(project(false), LINE);
-    // o piso (topo 0,12) cobre a laje (topo 0) na faixa comum: o piso fica inteiro e a laje perde essa faixa
-    expect(floorArea).toBeCloseTo(cutTotal(floorAlone), 6);
+    // o piso (topo 0,12) cobre a laje (topo 0) na faixa comum de -0,07 a 0 m. A laje vence o empate de prioridade pelo
+    // tipo (laje corta piso, como nos quantitativos): a camada estrutural do piso perde 0,07 m × 4 m de corte (P7c, o
+    // `cut` agora é por volume); acabamento e substrato, acima de 0, ficam inteiros. A laje fica inteira.
+    expect(floorArea).toBeCloseTo(cutTotal(floorAlone) - 0.07 * 4, 6);
     expect(slabArea).toBeGreaterThan(0);
     expect(floorArea + slabArea).toBeCloseTo(cutTotal(r), 6);
   });

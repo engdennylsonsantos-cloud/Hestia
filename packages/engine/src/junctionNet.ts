@@ -1,5 +1,5 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import type { Id, Project } from '@hestia/model';
+import { levelAbove, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
 import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
@@ -87,8 +87,28 @@ function integrate(m: MultiPolygon, f: (p: Vec2) => number): number {
   return total;
 }
 
+/** Faixa de cota (menor base e maior topo) de um pedaço, pelos vértices. Cacheada: o pedaço não muda depois de montado. */
+const envelopes = new WeakMap<SolidPiece, readonly [number, number]>();
+function zEnvelope(sp: SolidPiece): readonly [number, number] {
+  const hit = envelopes.get(sp);
+  if (hit) return hit;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const poly of sp.poly) for (const ring of poly) for (const v of ring) {
+    const [a, b] = sp.span(v);
+    z0 = Math.min(z0, a);
+    z1 = Math.max(z1, b);
+  }
+  const env = [z0, z1] as const;
+  envelopes.set(sp, env);
+  return env;
+}
+
 /** Volume (m³) de `a` que está dentro de `b`: área da interseção em planta vezes a sobreposição de cota. */
 export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
+  const [a0, a1] = zEnvelope(a);
+  const [b0, b1] = zEnvelope(b);
+  if (Math.min(a1, b1) - Math.max(a0, b0) <= 0) return 0;
   if (!boxesOverlap(boxOf(multiPoints(a.poly)), boxOf(multiPoints(b.poly)))) return 0;
   const common = intersection(a.poly, b.poly);
   if (common.length === 0) return 0;
@@ -155,13 +175,59 @@ export function floorCutters(p: Project, levelId: Id): CutterSolid[] {
   return resolveFloors(p, levelId).map((rf: ResolvedFloor) => ({ kind: 'floor', pieces: rf.layers.map((l) => floorLayerPiece(rf, l)) }));
 }
 
+/** Faixa de parede de uma camada (índice da camada na parede), para a junção que devolve partes por camada (P7c). */
+export interface WallLayerPiece {
+  layerIndex: number;
+  piece: SolidPiece;
+}
+
+/** Faixa de cota (base e topo absolutos) de uma parede pelas faixas de todas as camadas; sem montar peças. */
+export function wallZRange(rw: ResolvedWall): readonly [number, number] {
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const l of rw.layers) for (const b of l.bands) {
+    z0 = Math.min(z0, rw.baseZ + b.z0);
+    z1 = Math.max(z1, rw.baseZ + b.z1);
+  }
+  return [z0, z1];
+}
+
+/** Pedaços das faixas de uma parede resolvida, com o índice da camada de cada um (P7c). */
+export function wallPiecesOf(rw: ResolvedWall): WallLayerPiece[] {
+  return rw.layers.flatMap((l) => l.bands.map((b) => ({ layerIndex: l.layerIndex, piece: bandPiece(rw, b, { priority: l.priority, core: l.core }) })));
+}
+
+/** Pedaços das faixas de parede do nível, com o índice da camada de cada um (base da junção por camada, P7c). */
+export function wallLayerPieces(p: Project, levelId: Id): WallLayerPiece[] {
+  return Object.values(resolveLevel(p, levelId).walls).flatMap(wallPiecesOf);
+}
+
 /** Pedaços das faixas de parede do nível, camada a camada: piso e laje também podem ser cortados por parede (0023 §1, P7). */
 export function wallCutters(p: Project, levelId: Id): CutterSolid[] {
-  const r = resolveLevel(p, levelId);
-  const pieces = Object.values(r.walls).flatMap((rw) =>
-    rw.layers.flatMap((l) => l.bands.map((b) => bandPiece(rw, b, { priority: l.priority, core: l.core }))),
-  );
-  return [{ kind: 'wall', pieces }];
+  return [{ kind: 'wall', pieces: wallLayerPieces(p, levelId).map((x) => x.piece) }];
+}
+
+/**
+ * Níveis adjacentes (0023 §10, P7c): o de elevação imediatamente acima e o imediatamente abaixo. Sem nível vizinho,
+ * a lista sai menor. Nível inexistente sai vazio.
+ */
+export function adjacentLevelIds(p: Project, levelId: Id): Id[] {
+  const base = p.levels.find((l) => l.id === levelId);
+  if (!base) return [];
+  let below: { id: Id; elevation: number } | null = null;
+  for (const l of p.levels) if (l.elevation < base.elevation && (!below || l.elevation > below.elevation)) below = l;
+  const above = levelAbove(p, levelId);
+  return [above?.id, below?.id].filter((id): id is Id => id !== undefined);
+}
+
+/**
+ * Cortadores de um nível vizinho que cortam os elementos do nível (P7c, junção entre níveis). Para parede do nível, são
+ * os pisos e as lajes dos níveis adjacentes (a laje do nível de cima apoiada na parede do térreo, ou a laje que a
+ * atravessa). Para piso e laje do nível, são as faixas de parede dos níveis adjacentes (a parede do térreo que sobe
+ * até a laje). Quem perde é só o de menor prioridade, então o volume sai uma vez (0023 §4).
+ */
+export function adjacentCutters(p: Project, levelId: Id, target: 'wall' | 'horizontal'): CutterSolid[] {
+  return adjacentLevelIds(p, levelId).flatMap((id) => (target === 'wall' ? [...floorCutters(p, id), ...slabCutters(p, id)] : wallCutters(p, id)));
 }
 
 /** Pedaço de uma faixa de altura de parede: a base absoluta da parede mais a faixa (o topo pode ser inclinado). */

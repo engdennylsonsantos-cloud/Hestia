@@ -4,6 +4,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, NumField } from './fields.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
+import { CeilingOptionsBar } from './CeilingOptionsBar.tsx';
 import { RoofOptionsBar } from './RoofOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
@@ -159,6 +160,7 @@ export function OptionsBar(): ReactElement {
         </>
       )}
       {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
+      {tool === 'ceiling' && <CeilingOptionsBar />}
       {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar tool={tool} />}
       {tool === 'stair' && <StairOptionsBar />}
       {tool === 'stairrun' && <StairRunOptionsBar />}

@@ -3,7 +3,7 @@ import { ProjectStore, isFloor, isOpening, isRoof, isSlab, isStair, isWall, newI
 import { stairPoints } from './stairActions.ts';
 
 /** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje e telhado. */
-export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
+export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair';
 
 export interface TypeChoice {
   id: Id;
@@ -24,6 +24,7 @@ function usesType(e: Element, kind: TypeKind, typeId: Id): boolean {
   if (kind === 'wall') return isWall(e) && e.typeId === typeId;
   if (kind === 'floor') return isFloor(e) && e.typeId === typeId;
   if (kind === 'slab') return isSlab(e) && e.typeId === typeId;
+  if (kind === 'ceiling') return e.kind === 'ceiling' && e.typeId === typeId;
   if (kind === 'roof') return isRoof(e) && e.typeId === typeId;
   if (kind === 'stair') return isStair(e) && e.typeId === typeId;
   return isOpening(e) && e.kind === kind && e.typeId === typeId;

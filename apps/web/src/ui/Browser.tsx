@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, type OpeningType } from '@hestia/model';
+import { isCeiling, isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, type OpeningType } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
@@ -29,6 +29,7 @@ export function Browser(): ReactElement {
   const windows = Object.values(p.openingTypes).filter((t) => t.kind === 'window');
   const floorTypes = Object.values(p.floorTypes);
   const slabTypes = Object.values(p.slabTypes);
+  const ceilingTypes = Object.values(p.ceilingTypes);
   const roofTypes = Object.values(p.roofTypes);
   const stairTypes = Object.values(p.stairTypes);
   const sections = p.views.filter((v) => v.kind === 'section');
@@ -167,6 +168,21 @@ export function Browser(): ReactElement {
               ))}
             </details>
             <details open>
+              <summary>Forros</summary>
+              {ceilingTypes.map((t) => (
+                <TypeRow
+                  key={t.id}
+                  kind="ceiling"
+                  typeId={t.id}
+                  name={t.name}
+                  icon="ceiling"
+                  active={s.options.ceilingTypeId === t.id}
+                  onUse={() => useUi.setState((st) => ({ options: { ...st.options, ceilingTypeId: t.id } }))}
+                  onEdit={() => useUi.setState({ dialog: 'ceilingType', dialogArg: t.id })}
+                />
+              ))}
+            </details>
+            <details open>
               <summary>Telhados</summary>
               {roofTypes.map((t) => (
                 <TypeRow
@@ -223,6 +239,10 @@ export function Browser(): ReactElement {
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de lajes
               <span className="meta">{Object.values(p.elements).filter(isSlab).length}</span>
+            </button>
+            <button className="leaf" onClick={() => useUi.setState({ dialog: 'ceilingSchedule', dialogArg: null })}>
+              <Icon name="file" size={14} /> Tabela de forros
+              <span className="meta">{Object.values(p.elements).filter(isCeiling).length}</span>
             </button>
             <button className="leaf" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })}>
               <Icon name="file" size={14} /> Tabela de telhados

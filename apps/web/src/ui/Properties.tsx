@@ -6,6 +6,7 @@ import {
   isOpening,
   isRoof,
   isSlab,
+  isCeiling,
   isStair,
   isWall,
   newId,
@@ -35,6 +36,7 @@ import { ProfileRow } from './ProfileRow.tsx';
 import { FloorProperties } from './FloorProperties.tsx';
 import { RoofProperties } from './RoofProperties.tsx';
 import { SlabProperties } from './SlabProperties.tsx';
+import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
@@ -350,11 +352,12 @@ export function Properties(): ReactElement {
   const ops = els.filter(isOpening);
   const floors = els.filter(isFloor);
   const slabs = els.filter(isSlab);
+  const ceilings = els.filter(isCeiling);
   const roofs = els.filter(isRoof);
   const stairs = els.filter(isStair);
-  const count = walls.length + ops.length + floors.length + slabs.length + roofs.length + stairs.length;
-  const kinds = [walls, ops, floors, slabs, roofs, stairs].filter((g) => g.length > 0).length;
-  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : 'Vista';
+  const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length;
+  const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs].filter((g) => g.length > 0).length;
+  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : 'Vista';
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
@@ -366,6 +369,7 @@ export function Properties(): ReactElement {
           : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />
           : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
           : kinds === 1 && slabs.length > 0 ? <SlabProperties slabs={slabs} />
+          : kinds === 1 && ceilings.length > 0 ? <CeilingProperties ceilings={ceilings} />
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} />

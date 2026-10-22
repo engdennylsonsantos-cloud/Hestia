@@ -38,6 +38,7 @@ const P: Record<string, string> = {
   help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01',
   floor: 'M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9M7 14.5h3M14 14.5h3M8 18h2M14 18h2',
   slab: 'M3 8h18v4H3zM3 12h18v5H3zM7 17v2M12 17v2M17 17v2M7 8V5M12 8V5M17 8V5',
+  ceiling: 'M3 4h18v3H3zM3 10h18M3 14h18M3 18h18M7 4v-1M17 4v-1',
   slope: 'M3 17L21 9M21 9v4M21 9h-4M3 20h18M3 17v3',
   roof: 'M3 14l9-9 9 9M6 12v8h12v-8',
   roofarrow: 'M3 14l9-9 9 9M6 12v8h12v-8M12 17v-4M10.5 14.5L12 13l1.5 1.5',

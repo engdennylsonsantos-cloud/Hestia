@@ -7,7 +7,7 @@ import { selectionAfterClick } from './selectionClick.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -138,6 +138,9 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   slabOffset: 0,
   slabMode: 'poly',
   slabSlopePercent: 2,
+  ceilingTypeId: 'ct_gesso',
+  ceilingOffset: 2.6,
+  ceilingMode: 'poly',
   roofTypeId: 'rt_ceramica',
   roofMode: 'poly',
   roofShape: 'gable',

@@ -1,5 +1,5 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { computeSection, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { computeSection, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { climbWalk, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfLayersOf,
@@ -182,6 +182,12 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
       ? resolveFloors(p, levelId)
           .filter((f) => !hidden.has(f.floorId))
           .flatMap((f) => f.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' })))
+      : [],
+    // Forros: só na planta de forro (decisão 0021); na planta baixa ficam acima do topo e não saem.
+    ceilings: shown('floor') && view.range.direction === 'up'
+      ? resolveCeilings(p, levelId)
+          .filter((c) => !hidden.has(c.ceilingId))
+          .flatMap((c) => c.polygon.map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1) })))
       : [],
     slabs: shown('slab')
       ? resolveSlabs(p, levelId)

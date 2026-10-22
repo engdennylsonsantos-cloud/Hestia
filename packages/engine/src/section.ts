@@ -4,6 +4,7 @@ import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
 import { junctionLevel, layerPartsOf } from './junctionLevel.ts';
+import { cutLevelByJunction } from './wallJunction.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
@@ -190,10 +191,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   };
 
   for (const levelId of levelIds) {
-    const resolved = resolveLevel(p, levelId);
-    // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto. Com a
-    // junção resolvida (P7b), cada camada corta só a parte que sobra dela (`layerPartsOf`); sem corte, a camada inteira.
+    // Junção resolvida do nível (P7b, P7c, P7d): cada camada de piso, de laje e de parede corta só a parte que sobra dela
+    // (`layerPartsOf` e `cutLevelByJunction`); sem corte, a camada inteira. Pisos entram como as paredes: a linha corta
+    // cada camada (retângulo t×z) e a laje de visão mostra o resto.
     const jl = junctionLevel(p, levelId);
+    const resolved = cutLevelByJunction(resolveLevel(p, levelId), jl);
     for (const f of resolveFloors(p, levelId)) {
       membranes.push(...membraneCutsOf(f.layers, { floorId: f.floorId }, null, frame));
       for (const layer of f.layers) {

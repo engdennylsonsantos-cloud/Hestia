@@ -1,4 +1,5 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
+import { acabamentoIssue, type OpeningAcabamento } from './openingExtras.ts';
 
 /**
  * Família de abertura (Revit: família da porta/janela; ArchiCAD: Library Part). A família define o COMPORTAMENTO e o
@@ -84,15 +85,17 @@ export function openingFamilyName(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves
 }
 
 /**
- * Regra do tipo que o modelo confere ao salvar (`upsertOpeningType`): a família e a contagem de folhas têm de existir.
+ * Regra do tipo que o modelo confere ao salvar (`upsertOpeningType`): a família e a contagem de folhas têm de existir, e o acabamento tem de estar nos limites.
  * Devolve a 1ª mensagem, ou null. O tipo é um schema fechado (nada de parâmetros autorais como no Revit): o que não
  * está em `OPENING_FAMILIES` não é desenhável e por isso é recusado.
  */
-export function openingTypeIssue(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves'>): string | null {
-  if (openingFamilyOf(t)) return null;
-  const kind = t.kind === 'door' ? 'porta' : 'janela';
-  const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
-  return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
+export function openingTypeIssue(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves'> & OpeningAcabamento): string | null {
+  if (!openingFamilyOf(t)) {
+    const kind = t.kind === 'door' ? 'porta' : 'janela';
+    const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
+    return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
+  }
+  return acabamentoIssue(t);
 }
 
 /** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */

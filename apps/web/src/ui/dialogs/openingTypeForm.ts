@@ -1,4 +1,4 @@
-import { newId, openingFamilies, type OpeningFamily, type OpeningLeaves, type OpeningType } from '@hestia/model';
+import { OPENING_LINTEL_DEFAULTS, newId, openingFamilies, type OpeningFamily, type OpeningLeaves, type OpeningType } from '@hestia/model';
 
 /** Famílias oferecidas ao tipo (portas ou janelas), na ordem da interface. */
 export function familyOptionsFor(kind: OpeningType['kind']): OpeningFamily[] {
@@ -39,4 +39,22 @@ export function newOpeningTypeFromFamily(family: OpeningFamily): OpeningType {
     glassMaterialId: 'mat_vidro',
     closure: 'inherit',
   };
+}
+
+/** Acabamentos que o diálogo liga e desliga (alizar, soleira saliente, verga e contraverga). */
+export type CampoAcabamento = 'casing' | 'sillBoard' | 'lintel' | 'sillBeam';
+
+/** Valores que um acabamento recebe ao ser ligado (depois o usuário ajusta). Verga e contraverga usam o padrão do modelo. */
+export const ACABAMENTO_PADRAO = {
+  casing: { width: 0.05, thickness: 0.015 },
+  sillBoard: { projection: 0.03, thickness: 0.03 },
+  lintel: { ...OPENING_LINTEL_DEFAULTS },
+  sillBeam: { ...OPENING_LINTEL_DEFAULTS },
+} as const;
+
+/** Liga (valor padrão) ou desliga (tira o campo, que volta ao padrão por leitura) um acabamento do tipo. Função pura. */
+export function alternarAcabamento(t: OpeningType, campo: CampoAcabamento, ligado: boolean): OpeningType {
+  const next: OpeningType = { ...t };
+  delete next[campo];
+  return ligado ? Object.assign(next, { [campo]: { ...ACABAMENTO_PADRAO[campo] } }) : next;
 }

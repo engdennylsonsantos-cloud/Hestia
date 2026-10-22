@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveLevel, resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
-import { roomLabelText, roomOps, roomSelectionOps } from './rooms.ts';
+import { belowRoomOps, roomLabelText, roomOps, roomSelectionOps } from './rooms.ts';
 import { DARK, LIGHT } from './types.ts';
 import { defaultPaint } from './style.ts';
 import type { Viewport } from '../viewport.ts';
@@ -89,5 +89,45 @@ describe('ambiente na planta (D1, E3)', () => {
     const dl = buildPlanDrawList(input(p));
     expect(dl.labels.some((l) => /^Sala \(101\) · /.test(l.text))).toBe(true);
     expect(resolveRooms(p, 'lv_0')).toHaveLength(1);
+  });
+});
+
+describe('ambientes do subpavimento (D3)', () => {
+  /** Planta do pavimento 2 (lv_1) com o térreo (lv_0) logo abaixo, como o app monta. */
+  const acima = (p: Project, belowRooms?: ResolvedRoom[]) =>
+    input(p, {
+      levelId: 'lv_1',
+      resolved: resolveLevel(p, 'lv_1', new Map()),
+      below: { ...resolveLevel(p, 'lv_0', new Map()), levelId: 'lv_0' },
+      belowRooms,
+    });
+
+  it('belowRoomOps: um preenchimento e um contorno por anel, sem etiqueta; sem circuito não entra', () => {
+    const p = sala();
+    const rooms = resolveRooms(p, 'lv_0');
+    const ops = belowRoomOps(rooms, DARK);
+    expect(ops.fills).toHaveLength(1);
+    expect(ops.fills[0]!.color).toBe(DARK.underlay);
+    expect(ops.strokes.length).toBeGreaterThan(0);
+    expect(ops.strokes.every((s) => s.color === DARK.underlay)).toBe(true);
+    expect(ops.labels).toHaveLength(0);
+    expect(belowRoomOps([{ ...rooms[0]!, polygon: null }], DARK).fills).toHaveLength(0);
+  });
+
+  it('sem belowRooms, o ambiente do nível abaixo não aparece na planta', () => {
+    const p = sala();
+    const contorno = JSON.stringify([resolveRooms(p, 'lv_0')[0]!.polygon]);
+    const dl = buildPlanDrawList(acima(p));
+    expect(dl.fills.some((f) => JSON.stringify(f.polygons) === contorno)).toBe(false);
+    expect(dl.labels.some((l) => /^Sala \(101\)/.test(l.text))).toBe(false);
+  });
+
+  it('com belowRooms, o ambiente de baixo aparece apagado e sem etiqueta', () => {
+    const p = sala();
+    const rooms = resolveRooms(p, 'lv_0');
+    const dl = buildPlanDrawList(acima(p, rooms));
+    const i = dl.fills.findIndex((f) => f.color === LIGHT.underlay && f.alpha === 0.22 && JSON.stringify(f.polygons) === JSON.stringify([rooms[0]!.polygon]));
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(dl.labels.some((l) => /^Sala \(101\)/.test(l.text))).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import { resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
-import { fmtArea, labelPoint, type FloorOps } from './floors.ts';
+import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
 import { surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
 
@@ -48,6 +48,17 @@ export function roomOps(
     if (at) out.labels.push({ at, text: roomLabelText(r, detail), tone: 'info' });
   }
   return out;
+}
+
+/**
+ * Ambientes do nível abaixo, como referência apagada (D3): mesma linguagem dos pisos de referência (D4), só o contorno
+ * e o preenchimento leve do tema, sem etiqueta. Ambiente sem circuito não entra.
+ */
+export function belowRoomOps(rooms: ResolvedRoom[], theme: PlanTheme): FloorOps {
+  return belowFloorOps(
+    rooms.flatMap((r) => (r.polygon ? [{ polygon: [r.polygon] }] : [])),
+    theme,
+  );
 }
 
 /** Destaque de seleção e de hover dos ambientes: azul translúcido e contorno de 2 px; sem circuito, não há destaque. */

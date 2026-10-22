@@ -24,7 +24,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) §6 (Revit: Room; ArchiCAD:
 ## D · Vistas
 - [x] D1 Planta: preenchimento do ambiente (cor própria ou padrão do tema) e etiqueta com nome, número e área; no grosso, só o nome
 - [-] D2 3D: o ambiente não tem geometria própria (é contorno em planta); fica fora do 3D
-- [ ] D3 Subpavimento: ambiente do nível abaixo (pendente, não entrou na H2)
+- [x] D3 Subpavimento: ambiente do nível abaixo aparece apagado (contorno e preenchimento do tema, sem etiqueta), como os pisos de referência (`belowRoomOps`)
 
 ## E · Quantitativos
 - [x] E1 Área líquida, perímetro e volume (área × pé-direito) derivados do circuito **(bloqueante)**

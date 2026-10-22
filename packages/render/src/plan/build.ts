@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, resolveRoofs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
+import { frameOfWall, openingGeometry, resolveRoofs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -9,7 +9,7 @@ import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { belowFloorOps, floorFills, floorSelectionOps, type FloorOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
-import { roomOps, roomSelectionOps } from './rooms.ts';
+import { belowRoomOps, roomOps, roomSelectionOps } from './rooms.ts';
 import { ceilingFills, ceilingSelectionOps } from './ceilings.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
 import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
@@ -35,6 +35,8 @@ export interface PlanInput {
   belowSlabs?: ResolvedSlab[];
   /** Telhados do nível abaixo, apagados como as lajes (D4); sem eles, nada aparece. */
   belowRoofs?: ResolvedRoof[];
+  /** Ambientes do nível abaixo, apagados como os pisos (D3); sem eles, nada aparece. */
+  belowRooms?: ResolvedRoom[];
   /**
    * Planta de cobertura (D6): telhados do nível opacos (alpha 1) e os de `belowRoofs` também, só o preenchimento;
    * paredes só como contorno fino por cima; sem pisos, lajes ou aberturas; cota da cumeeira sempre visível. O app
@@ -156,6 +158,11 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     const bs = belowFloorOps(input.belowSlabs, theme);
     fills.push(...surfaces(bs.fills));
     if (!rp) strokes.push(...bs.strokes);
+  }
+  if (below && input.belowRooms) {
+    const brm = belowRoomOps(input.belowRooms, theme);
+    fills.push(...surfaces(brm.fills));
+    if (!rp) strokes.push(...brm.strokes);
   }
   // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
   const stairs = resolveStairsOnLevel(p, input.levelId).filter((s) => !hidden?.has(s.id));

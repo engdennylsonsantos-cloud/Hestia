@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeFloor, type Floor } from '@hestia/model';
+import { multiArea } from '@hestia/geom';
+import { resolveFloors } from '@hestia/engine';
+import { ProjectStore, createEmptyProject, makeFloor, makeWall, totalThickness, type Floor } from '@hestia/model';
 import { outlineView, runOutlineAction, type OutlineHolder } from './OutlineGroup.tsx';
 
 const linked = (id: string, mode: 'walls-finish' | 'walls-core' | 'perimeter' = 'walls-finish'): OutlineHolder => ({ id, outlineSource: { mode, seed: { x: 1, y: 1 }, linked: true } });
@@ -59,5 +61,31 @@ describe('grupo Contorno do piso e da laje (decisão 0023 §8.2)', () => {
     expect((store.project.elements.f1 as Floor).outlineSource!.linked).toBe(true);
     store.undo();
     expect((store.project.elements.f1 as Floor).outlineSource!.linked).toBe(false);
+  });
+
+  it('Desvincular congela o circuito visto: mover parede depois não muda a área; revincular volta a acompanhar', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const seg = (id: string, a: { x: number; y: number }, b: { x: number; y: number }) => store.exec({ type: 'addWall', wall: makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a, b }) });
+    seg('wb', { x: 0, y: 0 }, { x: 4, y: 0 });
+    seg('wr', { x: 4, y: 0 }, { x: 4, y: 3 });
+    seg('wt', { x: 4, y: 3 }, { x: 0, y: 3 });
+    seg('wl', { x: 0, y: 3 }, { x: 0, y: 0 });
+    store.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }], outlineSource: { mode: 'walls-finish', seed: { x: 2, y: 1.5 }, linked: true } }) });
+    const t = totalThickness(store.project.wallTypes.wt_alv14!);
+    const area = (): number => multiArea(resolveFloors(store.project, 'lv_0').find((r) => r.floorId === 'f1')!.polygon);
+    const moveRight = (x: number) => {
+      store.exec({ type: 'updateElements', ids: ['wr'], patch: { a: { x, y: 0 }, b: { x, y: 3 } } });
+      store.exec({ type: 'updateElements', ids: ['wb'], patch: { b: { x, y: 0 } } });
+      store.exec({ type: 'updateElements', ids: ['wt'], patch: { a: { x, y: 3 } } });
+    };
+    moveRight(5);
+    expect(area()).toBeCloseTo((5 - t) * (3 - t), 6);
+    runOutlineAction(store, 'detach', ['f1']);
+    const solto = area();
+    expect(solto).toBeCloseTo((5 - t) * (3 - t), 6);
+    moveRight(6);
+    expect(area()).toBeCloseTo(solto, 6);
+    runOutlineAction(store, 'relink', ['f1']);
+    expect(area()).toBeCloseTo((6 - t) * (3 - t), 6);
   });
 });

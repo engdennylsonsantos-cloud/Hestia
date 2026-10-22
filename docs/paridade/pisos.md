@@ -27,7 +27,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] C3 Pisos sobrepostos no mesmo nível detectados, com aviso
 - [-] C4 Junção de geometria entre pisos adjacentes (une camadas iguais): reavaliar com lajes
 - [x] C5 Contorno associativo (motor): piso criado por paredes/perímetro guarda a origem e o contorno é derivado no motor — acompanha mover/espessura/tipo de parede (porta/janela não alteram); circuito aberto mantém o último contorno (decisão 0023 §8.2)
-- [ ] C6 Vínculo do contorno na interface: aviso "Contorno solto das paredes", botão "Revincular" e aviso de circuito aberto (fase P2)
+- [x] C6 Vínculo do contorno na interface (P2 e P3): grupo "Contorno" com estado, "Desvincular" e "Revincular às paredes" (um passo de desfazer; sem origem fica "Sem vínculo (desenhado por croqui)"); avisos `contorno-aberto` e `piso-circuito-duplicado` com "Ir para"; barra de status ao soltar por edição de vértice. Evidência: `packages/engine/src/outlineIssues.test.ts`, `packages/engine/src/outlineBound.test.ts` (mover, espessura, porta, apagar parede, dois pisos, cache de 200 paredes), `apps/web/src/ui/OutlineGroup.test.ts`, `apps/web/src/editor/issuesView.test.ts`, `packages/tools/src/outlineEdit.test.ts`, e2e `tests/e2e/contorno.mjs`
 
 ## D · Vistas
 - [x] D1 Planta: preenchimento e hachura do material da camada de topo, atrás das paredes **(bloqueante)**

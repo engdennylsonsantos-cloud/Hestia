@@ -130,6 +130,28 @@ describe('contorno associativo de laje (perímetro externo)', () => {
 });
 
 describe('cache de circuitos por nível (decisão 0023 §11)', () => {
+  it('casa de referência com 200 paredes: editar o nível 1 não recalcula o nível 0; editar o nível 0 recalcula uma vez', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const lv0 = rectRoom(store, 'lv_0', 4, 3);
+    // 196 paredes soltas longe do cômodo: só enchem o nível para o custo do circuito ser real.
+    for (let k = 0; k < 196; k++) store.exec({ type: 'addWall', wall: makeWall({ id: `ex${k}`, typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 10 + k * 0.5 }, b: { x: 1, y: 10 + k * 0.5 } }) });
+    addLinkedFloor(store, 'f0', 'lv_0', { x: 2, y: 1.5 });
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'up', typeId: 'wt_alv14', levelId: 'lv_1', a: { x: 0, y: 0 }, b: { x: 6, y: 0 } }) });
+
+    resolveFloors(store.project, 'lv_0');
+    resetCircuitRecalcCount();
+    store.exec({ type: 'updateElements', ids: ['up'], patch: { b: { x: 7, y: 0 } } });
+    resolveFloors(store.project, 'lv_0');
+    expect(circuitRecalcCount()).toBe(0);
+
+    store.exec({ type: 'updateElements', ids: [lv0.right!], patch: { a: { x: 5, y: 0 }, b: { x: 5, y: 3 } } });
+    store.exec({ type: 'updateElements', ids: [lv0.bottom!], patch: { b: { x: 5, y: 0 } } });
+    store.exec({ type: 'updateElements', ids: [lv0.top!], patch: { a: { x: 5, y: 3 } } });
+    const t = totalThickness(store.project.wallTypes.wt_alv14!);
+    expect(multiArea(resolveFloors(store.project, 'lv_0').find((r) => r.floorId === 'f0')!.polygon)).toBeCloseTo((5 - t) * (3 - t), 6);
+    expect(circuitRecalcCount()).toBe(1);
+  });
+
   it('editar uma parede do nível 0 não recalcula o circuito do nível 1', () => {
     const store = new ProjectStore(createEmptyProject());
     const lv0 = rectRoom(store, 'lv_0', 4, 3);

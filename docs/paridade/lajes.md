@@ -25,7 +25,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] C2 Laje e piso sobrepostos no mesmo nível detectados, com aviso
 - [x] C3 Lajes sobrepostas detectadas, com aviso
 - [x] C4 Contorno associativo (motor): laje pelo perímetro externo guarda a origem e o contorno é derivado no motor — acompanha as paredes (decisão 0023 §8.2)
-- [ ] C5 Vínculo do contorno na interface: aviso "Contorno solto das paredes", botão "Revincular" e aviso de circuito aberto (fase P2)
+- [x] C5 Vínculo do contorno na interface (P2 e P3): grupo "Contorno" com estado, "Desvincular" e "Revincular às paredes" (um passo de desfazer); aviso `contorno-aberto` com "Ir para"; barra de status ao soltar por edição de vértice. Evidência: `packages/engine/src/outlineIssues.test.ts`, `apps/web/src/ui/OutlineGroup.test.ts`, `packages/tools/src/outlineEdit.test.ts`, e2e `tests/e2e/contorno.mjs` (piso; laje segue o mesmo grupo e o mesmo aviso)
 
 ## D · Vistas
 - [x] D1 Planta: laje vista de cima com hachura do material estrutural, atrás das paredes; laje do nível abaixo como subpavimento **(bloqueante)**

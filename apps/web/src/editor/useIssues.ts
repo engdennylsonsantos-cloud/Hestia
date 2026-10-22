@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ceilingIssues, roofSurfaceIssues, roofWallIssues, roomValidationIssues, stairValidationIssues } from '@hestia/engine';
+import { ceilingIssues, outlineIssues, roofSurfaceIssues, roofWallIssues, roomValidationIssues, stairValidationIssues } from '@hestia/engine';
 import { validateProject, type Project, type ValidationIssue } from '@hestia/model';
 import { useProject } from './controller.ts';
 
-/** Avisos do projeto: os de validação, os de parede que ultrapassa ou fica fora do telhado (C2), os degraus da superfície e os do croqui e de norma das escadas e os de ambiente. */
-const allIssues = (p: Project): ValidationIssue[] => [...validateProject(p), ...roofWallIssues(p), ...roofSurfaceIssues(p), ...stairValidationIssues(p), ...roomValidationIssues(p), ...ceilingIssues(p)];
+/** Avisos do projeto: os de validação, os de parede que ultrapassa ou fica fora do telhado (C2), os degraus da superfície, os do croqui e de norma das escadas, os de ambiente e os do contorno associativo de piso e laje. */
+const allIssues = (p: Project): ValidationIssue[] => [...validateProject(p), ...roofWallIssues(p), ...roofSurfaceIssues(p), ...stairValidationIssues(p), ...roomValidationIssues(p), ...ceilingIssues(p), ...outlineIssues(p)];
 
 /** Acima deste número de elementos a validação espera o modelo parar de mudar. */
 const LARGE_MODEL = 2000;

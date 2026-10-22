@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea, type Vec2 } from '@hestia/geom';
 import { floorsOnLevel, type Floor } from '@hestia/model';
-import { commitOutlineBoundary } from './outlineEdit.ts';
+import { OUTLINE_DETACHED_MSG, commitOutlineBoundary } from './outlineEdit.ts';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 
 /** Paredes de um retângulo w × h (eixo nas bordas), desenhadas pela ferramenta Parede (forma retângulo). */
@@ -78,6 +78,16 @@ describe('alças de vértice soltam o vínculo (decisão 0023 §8.2b)', () => {
     const back = ctx.store.project.elements[id] as Floor;
     expect(back.outlineSource!.linked).toBe(true);
     expect(back.boundary[0]).toEqual({ x: 0.1, y: 0.1 });
+  });
+
+  it('a barra de status avisa que o contorno deixou de acompanhar as paredes', () => {
+    const ctx = rectHouse(4, 3);
+    ctx.store.exec({ type: 'addFloor', floor: { id: 'f1', kind: 'floor', typeId: 'ft_ceram', levelId: 'lv_0', boundary: [{ x: 0.1, y: 0.1 }, { x: 3.9, y: 0.1 }, { x: 3.9, y: 2.9 }, { x: 0.1, y: 2.9 }], holes: [], heightOffset: 0, mark: '', comments: '', outlineSource: { mode: 'walls-finish', seed: { x: 2, y: 1.5 }, linked: true } } });
+    const said: string[] = [];
+    ctx.env.say = (m: string) => said.push(m);
+    commitOutlineBoundary(ctx.env, 'f1', [{ x: 0.2, y: 0.2 }, { x: 3.8, y: 0.2 }, { x: 3.8, y: 2.8 }]);
+    expect(said).toEqual([OUTLINE_DETACHED_MSG]);
+    expect(OUTLINE_DETACHED_MSG).toContain('Revincular nas propriedades');
   });
 
   it('contorno sem vínculo só troca o boundary (sem detachOutline)', () => {

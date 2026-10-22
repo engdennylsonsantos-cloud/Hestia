@@ -6,6 +6,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { OutlineGroup } from './OutlineGroup.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -99,6 +100,7 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
           <div className="hint">{hasSlope ? 'Selecione uma laje para ver a variação do topo.' : 'Sem inclinação. Use Inclinação na faixa Arquitetura e clique na planta.'}</div>
         )}
       </Group>
+      <OutlineGroup elements={slabs} />
       <Group title="Construção" open={false}>
         {type ? (
           <>

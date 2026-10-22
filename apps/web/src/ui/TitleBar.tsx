@@ -2,6 +2,7 @@ import { useRef, type ReactElement } from 'react';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { savePlanDxf, saveSectionDxf } from '../editor/dxfExport.ts';
+import { saveProjectIfc } from '../editor/ifcExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
 
@@ -29,6 +30,13 @@ export function TitleBar(): ReactElement {
       useUi.setState({ status });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
+    }
+  };
+  const exportIfc = async (): Promise<void> => {
+    try {
+      useUi.setState({ status: await saveProjectIfc(editor.project) });
+    } catch (e) {
+      useUi.setState({ status: `Não foi possível exportar o IFC: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
     }
   };
   return (
@@ -59,6 +67,9 @@ export function TitleBar(): ReactElement {
       </button>
       <button className="ibtn" onClick={() => void exportDxf()} title="Exportar a planta do nível atual em DXF (metros)">
         <Icon name="plan" size={17} /> <span className="lbl-text">Exportar DXF</span>
+      </button>
+      <button className="ibtn" onClick={() => void exportIfc()} title="Exportar o projeto inteiro em IFC4 (.ifc, metros)">
+        <Icon name="save" size={17} /> <span className="lbl-text">Exportar IFC</span>
       </button>
       <span className="sep" />
       <button className="ibtn" disabled={!store.canUndo} onClick={() => editor.undo()} title={store.undoLabel ? `Desfazer: ${store.undoLabel} (Ctrl+Z)` : 'Desfazer'}>

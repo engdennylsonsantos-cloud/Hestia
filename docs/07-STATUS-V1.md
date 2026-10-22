@@ -26,7 +26,8 @@ sobram são não bloqueantes (ver "Pendências").
 - Contorno por cliques, retângulo, medida, seleção de paredes ou área fechada; furos; edição por alças.
 - Contorno associativo às paredes (0023 P1–P3): "Desvincular" e "Revincular às paredes"; avisos de contorno aberto e duplicado.
 - Tipo em camadas com seção ao vivo; tipo `ft_acab` sobre laje (P5); quantitativos líquidos por camada; membrana de
-  espessura zero (P4); "Término na junção" por camada (P8, parcial).
+  espessura zero (P4); "Término na junção" por camada (P8) e piso único com término de cada camada contra as paredes
+  (face, núcleo, passa, até prioridade N, cm; 0025 P10; tipos `ft_unico` e `ls_unica`).
 - Planta com hachura, 3D por camada, corte, subpavimento, etiqueta, DXF, quantitativos e tabela com CSV.
 
 **Lajes** — 38 feitos, 3 fora de escopo, 1 pendente (C8) (`docs/paridade/lajes.md`).
@@ -120,8 +121,8 @@ sobram são não bloqueantes (ver "Pendências").
 
 - **Parede × piso/laje** (E3, C6 e C8): planta, corte e 3D ainda não recortam a parede pela região do piso ou da laje.
   Os quantitativos já seguem a prioridade de camada (0023 §1, P7). A parede ainda não é recortada nos desenhos pela camada de piso ou laje que vence (parte adiada da P7, chamada P7c nas conversas de projeto).
-- **Término na junção** (0023 P8, parcial): falta o término em perímetro externo, cor e hachura por camada na planta, e
-  IFC e DXF por camada.
+- **Término na junção** (0023 P8 e 0025 P10): falta cor e hachura por camada na planta, e IFC e DXF por camada.
+  Junção entre níveis (P7c parcial): parede × piso/laje do nível vizinho já entra nos quantitativos.
 - **Canto reentrante de um L** (achado do P8, não corrigido): o circuito de paredes deixa um quadrado d × d sem parede
   (d = meia espessura) que entra no cômodo. A área do L em `layerOutline.test.ts` inclui esse quadrado de propósito.
 - **Close-ups 3D do L** (`tests/e2e/escadas-closeup.mjs`): tolerância própria de 1,5% (d) e 25% (f), porque o WebGL por

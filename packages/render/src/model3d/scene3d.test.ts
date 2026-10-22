@@ -480,3 +480,28 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     expect(centroDa(f!).y).toBeCloseTo(0, 6);
   });
 });
+
+describe('abrir vãos no 3D', () => {
+  const comTipo = (p: Project, tipo: OpeningType, id = 'd1'): Project => ({ ...p, openingTypes: { ...p.openingTypes, [tipo.id]: tipo }, elements: { ...p.elements, [id]: { ...(p.elements[id] as Opening), typeId: tipo.id } } });
+  /** Grupos da abertura `id` (o do vão e os pivôs das folhas). */
+  const grupos = (ms: ModelScene, id: string): THREE.Group[] => {
+    const out: THREE.Group[] = [];
+    modelo(ms).traverse((o) => {
+      if (o instanceof THREE.Group && o.userData.elementId === id) out.push(o);
+    });
+    return out;
+  };
+
+  it('porta pivotante: com "Abrir vãos" gira 90° no eixo a W/4; fechada continua sem giro', () => {
+    const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_pp80')!);
+    const abrir = (aberto: boolean): ModelScene => cena(comVista(p, { openOpenings: aberto }));
+    const giros = (ms: ModelScene): THREE.Group[] => grupos(ms, 'd1').filter((g) => g.rotation.z !== 0 || g.rotation.x !== 0);
+    expect(giros(abrir(false))).toHaveLength(0);
+    const pivo = giros(abrir(true));
+    expect(pivo).toHaveLength(1);
+    expect(Math.abs(pivo[0]!.rotation.z)).toBeCloseTo(Math.PI / 2, 9);
+    expect(Math.abs(pivo[0]!.position.x)).toBeCloseTo(0.8 / 4, 9);
+    // As peças (batente e folha) não mudam de quantidade nem de dimensão ao abrir.
+    expect(malhas(abrir(true))).toHaveLength(malhas(abrir(false)).length);
+  });
+});

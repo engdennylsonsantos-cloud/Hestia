@@ -4,6 +4,7 @@ import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project 
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
+import { thinStrokes } from './thin.ts';
 import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
@@ -56,6 +57,11 @@ export interface PlanInput {
   preview: PreviewItem[];
   inference: Inference | null;
   showGrid: boolean;
+  /**
+   * Linhas finas só na tela (decisão 0015): todo traço sai com 1 px. Padrão desligado; a composição de pranchas, o PDF e
+   * o DXF não passam a opção, então usam os pesos reais. Não lê o modelo: quem chama decide.
+   */
+  thinLines?: boolean;
 }
 
 const ringsOf = (m: MultiPolygon): Ring[] => m.flatMap((p) => p);
@@ -286,6 +292,10 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   // Etiquetas de tipo (G4) e depuração de junção (G6), por configuração do projeto.
   if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
+
+  // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,
+  // pré-visualização e guias) mantém a largura própria.
+  if (input.thinLines) thinStrokes(strokes);
 
   // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
   const fsel = floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);

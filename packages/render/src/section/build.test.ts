@@ -335,3 +335,23 @@ describe('acabamento e vergas da esquadria no corte e na elevação', () => {
     expect(alizado - base).toBe(4);
   });
 });
+
+describe('linhas finas só na tela (decisão 0015)', () => {
+  it('com a opção, todo traço do modelo sai com 1 px; a parede cortada não mantém o peso 5', () => {
+    const fina = buildSectionDrawList({ ...styledBox({ scale: 100 }, cutInput), thinLines: true });
+    expect(fina.strokes.every((s) => s.widthPx <= 1)).toBe(true);
+    expect(closedWidths(fina)).not.toContain(weightPx(5, 100));
+  });
+
+  it('sem a opção (ou com ela falsa), o desenho é o de antes: a parede cortada mantém o peso real', () => {
+    const base = styledBox({ scale: 100 }, cutInput);
+    const padrao = buildSectionDrawList(base);
+    expect(buildSectionDrawList({ ...base, thinLines: false })).toEqual(padrao);
+    expect(closedWidths(padrao)).toContain(weightPx(5, 100));
+  });
+
+  it('o realce de seleção mantém a largura própria (2 px) mesmo com linhas finas', () => {
+    const draw = buildSectionDrawList({ ...styledBox({ scale: 100 }, cutInput), thinLines: true, highlight: { selection: ['frente'], hover: null } });
+    expect(draw.strokes.some((s) => s.color === LIGHT.select && s.widthPx === 2)).toBe(true);
+  });
+});

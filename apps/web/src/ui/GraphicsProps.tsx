@@ -41,6 +41,8 @@ export function LevelGraphicsGroup({ levelId }: { levelId: Id }): ReactElement {
           {(Object.keys(PARTIAL_LABEL) as Array<keyof typeof PARTIAL_LABEL>).map((k) => <option key={k} value={k}>{PARTIAL_LABEL[k]}</option>)}
         </select>
       </Row>
+      <Row label="Linhas finas (só na tela)"><Check id="lg-thin" checked={g.thinLines === true} onChange={(x) => edit({ thinLines: x })} /></Row>
+      <div className="hint">A plotagem (prancha, PDF e DXF) mantém os pesos de linha reais.</div>
       {error && <div className="vr-error" role="alert">{error}</div>}
       <div className="prow"><span /><button className="btn small" onClick={() => useUi.setState({ dialog: 'graphicsVisibility', dialogArg: levelId })}>Visibilidade e gráficos…</button></div>
       <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreLevelGraphicsDefault(editor.store, levelId).error)}>Restaurar padrão</button></div>
@@ -86,6 +88,8 @@ export function SectionGraphicsGroup(): ReactElement {
           {(Object.keys(PARTIAL_LABEL) as Array<keyof typeof PARTIAL_LABEL>).map((k) => <option key={k} value={k}>{PARTIAL_LABEL[k]}</option>)}
         </select>
       </Row>
+      <Row label="Linhas finas (só na tela)"><Check id="sg-thin" checked={g.thinLines === true} onChange={(x) => edit({ thinLines: x })} /></Row>
+      <div className="hint">A plotagem (prancha, PDF e DXF) mantém os pesos de linha reais.</div>
       {error && <div className="vr-error" role="alert">{error}</div>}
       <div className="prow"><span /><button className="btn small" onClick={() => useUi.setState({ dialog: 'graphicsVisibility', dialogArg: 'section' })}>Visibilidade e gráficos…</button></div>
       <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreSectionGraphicsDefault(editor.store).error)}>Restaurar padrão</button></div>

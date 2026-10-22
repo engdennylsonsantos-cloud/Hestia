@@ -76,6 +76,11 @@ export interface ViewGraphics {
   style: VisualStyle;
   partialStructure: PartialStructure;
   overrides: Record<GraphicsCategory, CategoryOverride>;
+  /**
+   * Linhas finas só na tela (padrão false): a vista desenha todos os traços com 1 px, sem os pesos por categoria e escala.
+   * A plotagem (prancha, PDF e DXF) nunca usa este modo. Ausente = desligado (sem migração).
+   */
+  thinLines?: boolean;
 }
 
 /** Gráficos do modelo 3D (o app tem uma vista 3D). */
@@ -158,6 +163,7 @@ export const DEFAULT_VIEW_GRAPHICS: ViewGraphics = {
   style: 'hiddenLine',
   partialStructure: 'entire',
   overrides: defaultOverrides(),
+  thinLines: false,
 };
 
 /**
@@ -283,6 +289,7 @@ function viewIssues(g: ViewGraphics): string[] {
   if (!DETAIL_OPTIONS.includes(g.detail)) out.push('O detalhe deve ser "byScale", "coarse", "medium" ou "fine".');
   if (!PLAN_VISUAL_STYLES.includes(g.style)) out.push('O estilo visual da planta deve ser wireframe, hiddenLine ou shaded.');
   if (!PARTIAL_STRUCTURES.includes(g.partialStructure)) out.push(PARTIAL_MSG);
+  if (g.thinLines !== undefined && typeof g.thinLines !== 'boolean') out.push('Linhas finas deve ser sim ou não.');
   return [...out, ...overrideIssues(g.overrides)];
 }
 

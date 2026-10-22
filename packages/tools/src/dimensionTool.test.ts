@@ -145,3 +145,25 @@ describe('seleção de anotações', () => {
     expect(annotationAt(ctx.store.project, 'lv_0', { x: 1.001, y: 2 }, 0.01)).toEqual({ id: levelTexts(ctx.store.project, 'lv_0')[0]!.id, kind: 'text' });
   });
 });
+
+describe('alça de deslocamento da cota', () => {
+  it('arrastar a alça do ponto médio muda o deslocamento para o lado do cursor', () => {
+    const ctx = makeEnv();
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    clickAt(t, 2, 1);
+    const id = dims(ctx.store)[0]!.id;
+    const sel = tool('select', ctx.env);
+    sel.move(P(2, 1));
+    sel.down!(P(2, 1));
+    sel.up!(P(2, 1));
+    expect(ctx.sel()).toEqual([id]);
+    // A alça fica no ponto médio da linha de cota (2, 1): arrastar até (2, −1,5) põe a linha do outro lado.
+    sel.move(P(2, 1));
+    sel.down!(P(2, 1));
+    sel.drag!(P(2, -1.5));
+    sel.up!(P(2, -1.5));
+    expect(dims(ctx.store)[0]!.offset).toBeCloseTo(-1.5, 9);
+  });
+});

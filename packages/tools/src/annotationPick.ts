@@ -48,3 +48,16 @@ export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number): { 
   }
   return null;
 }
+
+/** Alça da cota selecionada: o ponto médio da linha de cota. Arrastá-la muda o deslocamento. */
+export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number): Id | null {
+  if (sel.length !== 1) return null;
+  const d = levelDimensions(p, levelId).find((x) => x.id === sel[0]);
+  if (!d) return null;
+  const pts = dimensionPoints(p, d);
+  const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);
+  return dist(at, mid(g.line[0], g.line[1])) <= 6 * mpp ? d.id : null;
+}
+
+/** Ponto médio de um segmento. */
+export const mid = (a: Vec2, b: Vec2): Vec2 => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });

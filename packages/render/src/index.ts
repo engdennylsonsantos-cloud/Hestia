@@ -19,3 +19,6 @@ export { defaultPaint, planStyleOf, type PlanPaint, type PlanStyle, type PlanVis
 export { climbWalk, spiralByComponent, spiralPostRing, stairCut, type StairCut } from './plan/stairs.ts';
 export { risersInClimbOrder } from './stairRisers.ts';
 export { roofFootprint } from './plan/roofs.ts';
+// Pranchas (decisão 0022): lista de desenho da folha em mm de papel, para a tela e o PDF.
+export * from './sheet/types.ts';
+export * from './sheet/build.ts';

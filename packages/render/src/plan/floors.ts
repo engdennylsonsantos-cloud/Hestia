@@ -3,6 +3,7 @@ import { junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
+import { holeMarkOps } from './holeMarks.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 
@@ -100,6 +101,7 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
+  out.strokes.push(...holeMarkOps(f.polygon, theme, paint, detail));
   if (detail !== 'coarse') {
     // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
     // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima). A espessura é a

@@ -82,7 +82,7 @@ describe('piso na planta (D1)', () => {
   it('contorno como faixa preenchida (fica atrás das paredes), com o furo também contornado', () => {
     const p = floorProject('ft_ceram', { holes: [HOLE] });
     const ops = floorFill(p, 'medium');
-    expect(ops.strokes).toHaveLength(0); // traços são desenhados depois dos preenchimentos: não servem ao contorno
+    expect(ops.strokes).toHaveLength(2); // só o X do furo (decisão 0024 §3); o contorno não é traço (ver faixa abaixo)
     expect(ops.fills).toHaveLength(2); // preenchimento + faixa do contorno
     const band = ops.fills[1]!.polygons;
     expect(band.length).toBeGreaterThan(0);

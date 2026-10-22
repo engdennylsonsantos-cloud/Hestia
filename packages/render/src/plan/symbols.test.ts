@@ -29,9 +29,10 @@ const geom = (over: Partial<OpeningGeometry>): OpeningGeometry => ({
 const count = (over: Partial<OpeningGeometry>): number => openingSymbol(geom(over), LIGHT).length;
 
 describe('vão livre (leaves 0)', () => {
-  it('gera só a soleira tracejada no plano médio, sem folha nem caixilho', () => {
+  it('vão livre: a soleira tracejada no plano médio e o X (duas diagonais contínuas), sem folha nem caixilho', () => {
     const s = openingSymbol(geom({ leaves: 0 }), LIGHT);
-    expect(s).toHaveLength(1);
+    expect(s).toHaveLength(3);
+    expect(s.slice(1).every((x) => x.dash === undefined && x.pts.length === 2)).toBe(true);
     expect(s[0]!.dash).toBeDefined();
     expect(s[0]!.pts[0]!.y).toBeCloseTo(0);
     expect(s[0]!.pts[1]!.y).toBeCloseTo(0);

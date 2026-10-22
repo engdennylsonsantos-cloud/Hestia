@@ -87,7 +87,7 @@ describe('planDxf com o engine real', () => {
     const wallLayers = p.wallTypes[p.defaults.wallTypeId]!.layers.map((l) => dxfLayerOfMaterial(p.materials[l.materialId]!.name));
     for (const layer of new Set(wallLayers)) expect(text).toContain(`\r\n${layer}\r\n`);
     expect(text).toContain('\r\nPAREDE_CONTORNO\r\n');
-    expect(text).toContain('\r\nABERTURAS\r\n');
+    expect(text).toContain('\r\nABERTURA_SIMBOLO\r\n');
 
     // cada polilinha abre com 0/POLYLINE e fecha com SEQEND: contagem por registro
     const polylines = text.match(/\r\n0\r\nPOLYLINE\r\n/g) ?? [];
@@ -151,10 +151,10 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     const wf = levelFrames(p, 'lv_0').find((f) => f.wall.id === wp.hostId)!;
     expect(above).toHaveLength(openingSymbolPaths(openingGeometry(p, wp, wf)).length);
     expect(above.length).toBeGreaterThan(1);
-    // o vão de 1,50 não aparece nas camadas de corte: em ABERTURAS sai só o símbolo da janela de 0,90 (decisão X1)
+    // o vão de 1,50 não aparece nas camadas de corte: em ABERTURA_SIMBOLO sai só o símbolo da janela de 0,90 (decisão X1)
     const jc = p.elements['jCorta'] as Opening;
     const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
-    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURAS')).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
+    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO')).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
     // a parede com a janela alta é igual à mesma parede sem janela (furo nenhum)
     expect(notOpening(text).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1))).toEqual(
       notOpening(planDxf(without(p, 'jAlta'), 'lv_0')).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1)),
@@ -162,10 +162,10 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     expect(text).toContain('\r\nDASHED\r\n');
   });
 
-  it('janela de peitoril 0,90 cruza o corte: fura a parede e sai em ABERTURAS', () => {
+  it('janela de peitoril 0,90 cruza o corte: fura a parede e sai em ABERTURA_SIMBOLO', () => {
     const p = vistaPlan().project;
     const text = planDxf(p, 'lv_0');
-    const cut = polylinesOf(text).filter((x) => x.layer === 'ABERTURAS' && x.pts.some((v) => v.y > 4 && v.y < 6));
+    const cut = polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO' && x.pts.some((v) => v.y > 4 && v.y < 6));
     // Decisão X1: o vão de corte sai com o símbolo de planta, o mesmo da tela (antes era um retângulo só).
     const jc = p.elements['jCorta'] as Opening;
     const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
@@ -489,9 +489,9 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     }
   });
 
-  it('ABERTURAS (portas e janelas juntas) leva o peso de corte da janela, 3: 0,35 / 0,25 / 0,18 mm', () => {
+  it('ABERTURA_SIMBOLO (portas e janelas juntas) leva o peso de corte da janela, 3: 0,35 / 0,25 / 0,18 mm', () => {
     const p = lPlan().project;
-    const weights = [50, 100, 200].map((scale) => layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0')).get('ABERTURAS'));
+    const weights = [50, 100, 200].map((scale) => layerTable(planDxf(withLevelGraphics(p, 'lv_0', { scale }), 'lv_0')).get('ABERTURA_SIMBOLO'));
     expect(weights).toEqual([35, 25, 18]);
   });
 
@@ -514,7 +514,7 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(200);
     expect(table.get('ABERTURA_ACIMA')).toBe(140);
     // O corte da janela não foi substituído: segue 3 (0,25 mm a 1:100).
-    expect(table.get('ABERTURAS')).toBe(25);
+    expect(table.get('ABERTURA_SIMBOLO')).toBe(25);
   });
 
   it('categoria oculta na vista não sai: parede, porta e piso somem; as janelas (outra categoria) ficam', () => {
@@ -523,7 +523,7 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     expect(walls.has('ABERTURA_ACIMA')).toBe(true);
 
     const doors = layerTable(planDxf(withLevelGraphics(lPlan().project, 'lv_0', { overrides: { door: { visible: false } } }), 'lv_0'));
-    expect(doors.has('ABERTURAS')).toBe(false);
+    expect(doors.has('ABERTURA_SIMBOLO')).toBe(false);
     expect(wallMaterialLayers(lPlan().project).every((l) => doors.has(l))).toBe(true);
 
     const vista = vistaPlan().project;

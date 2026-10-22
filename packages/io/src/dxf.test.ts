@@ -4,6 +4,7 @@ import {
   type DxfSymbolPath,
   DXF_LAYER_CONTOUR,
   DXF_LAYER_OPENINGS,
+  DXF_LAYER_OPENING_SYMBOL,
   DXF_LAYER_OPENING_ABOVE,
   DXF_LAYER_OPENING_BELOW,
   DXF_LAYER_OPENING_BEYOND,
@@ -342,14 +343,24 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     expect(polys[0]!.closed && polys[0]!.pts.length === 4).toBe(true);
   });
 
-  // Decisão X1 (docs/aberturas/A-pesquisa.md §5): o vão de corte passou a usar o símbolo de planta, o mesmo da tela.
-  // Este teste fixava o retângulo antigo; agora confere folha e arco na camada ABERTURAS.
-  it('o vão de corte usa o símbolo da planta: folha e arco em ABERTURAS', () => {
+  // Decisão X1 (docs/aberturas/A-pesquisa.md §5): o vão de corte usa o símbolo de planta, o mesmo da tela, agora na
+  // camada própria ABERTURA_SIMBOLO (decisão 0024 §4). O retângulo do corte não sai quando há símbolo.
+  it('o vão de corte usa o símbolo da planta: folha e arco em ABERTURA_SIMBOLO, sem retângulo em ABERTURAS', () => {
     const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [leaf, arc])] });
     const polys = polylines(text);
-    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENINGS, DXF_LAYER_OPENINGS]);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL, DXF_LAYER_OPENING_SYMBOL]);
     expect(polys.map((p) => p.pts.length)).toEqual([2, 19]);
     expect(polys.every((p) => !p.closed)).toBe(true);
+    expect(text).not.toContain('\r\nABERTURAS\r\n');
+  });
+
+  it('o X do vão livre no corte vai à ABERTURA_SIMBOLO como duas linhas, sem tracejado', () => {
+    const x1: DxfSymbolPath = { pts: [{ x: 0.6, y: 0 }, { x: 1.4, y: 2 }], closed: false };
+    const x2: DxfSymbolPath = { pts: [{ x: 1.4, y: 0 }, { x: 0.6, y: 2 }], closed: false };
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [x1, x2])] });
+    const polys = polylines(text);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL, DXF_LAYER_OPENING_SYMBOL]);
+    expect(linetypeOf(text, DXF_LAYER_OPENING_SYMBOL)).toBe('CONTINUOUS');
   });
 
   it('vão de corte sem símbolo continua retângulo fechado em ABERTURAS (compatibilidade)', () => {

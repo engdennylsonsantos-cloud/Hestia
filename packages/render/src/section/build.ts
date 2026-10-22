@@ -1,10 +1,12 @@
-import type { MultiPolygon, Ring, Vec2 } from '@hestia/geom';
-import type { SectionOpening, SectionResult } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import type { SectionBeyond, SectionOpening, SectionOrigin, SectionResult } from '@hestia/engine';
+import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
+import type { PlanPaint } from '../plan/style.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
 import type { Viewport } from '../viewport.ts';
-import { sectionItems } from './pick.ts';
+import { ownerOf, sectionItems } from './pick.ts';
+import { sectionStyleOf } from './style.ts';
 
 export interface SectionInput {
   project: Project;
@@ -25,6 +27,9 @@ const ringsOf = (m: MultiPolygon): Ring[] => m.flatMap((p) => p);
 
 const fmt = (z: number): string => `${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(2).replace('.', ',')}`;
 
+/** Categoria gráfica de uma origem do motor (parede, piso, laje, telhado ou escada). */
+const categoryOf = (o: SectionOrigin): GraphicsCategory => ownerOf(o)?.kind ?? 'wall';
+
 /**
  * Lista de desenho do corte/elevação: x = distância ao longo da linha, y = cota. Os polígonos já são a parte visível
  * (linha oculta, no motor): aqui só se pinta. Segue a hierarquia de peso do Revit: o que é cortado leva hachura e
@@ -38,6 +43,18 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   const labels: LabelOp[] = [];
   const paper = input.dark ? theme.bg : '#ffffff';
   const maxDepth = Math.max(1e-6, ...s.beyond.map((b) => b.depth), ...s.openings.map((o) => o.depth));
+  const style = sectionStyleOf(p, v.zoom);
+  const { detail, paint, visual, saved } = style;
+  // Arame e grosso não têm superfícies: no arame só contornos; no grosso, só os contornos do modelo.
+  const wire = visual === 'wireframe';
+  const noFill = wire || detail === 'coarse';
+  const cutWidth = (c: GraphicsCategory): number => (saved ? paint[c].cutPx : 1);
+  const projWidth = (c: GraphicsCategory): number => (saved ? paint[c].projPx : 1);
+  const openingEdge = (c: GraphicsCategory, cut: boolean): number => (saved ? (cut ? paint[c].cutPx : paint[c].projPx) : cut ? 1.6 : 1.2);
+  const symbolWidth = (c: GraphicsCategory): number => (saved ? paint[c].projPx : 1);
+  const halftone = (color: string, pt: PlanPaint): string => (pt.halftone ? mix(color, paper, 0.5) : color);
+  // Para o contorno externo de uma vista com categoria oculta: a silhueta do motor une tudo, então ela é refeita dos itens visíveis.
+  const silhouetteParts: MultiPolygon[] = [];
 
   // Solo e níveis: linhas finas tracejadas ao longo de todo o comprimento.
   for (const l of s.levels) {
@@ -49,11 +66,19 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     labels.push({ at: edge[1]!, text: `${l.name} ${fmt(l.z)}`, dx: 6, dy: -8, tone: 'info' });
   }
 
-  const drawBeyond = (polygons: MultiPolygon, materialColor: string | undefined, depth: number): void => {
-    const fade = 0.55 + 0.35 * (depth / maxDepth);
-    const color = mix(mix(materialColor ?? '#999999', paper, 0.55), paper, fade * 0.35);
-    fills.push({ polygons, color, alpha: 1 });
-    for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: mix(theme.ink, paper, 0.35 + 0.4 * (depth / maxDepth)), alpha: 1 });
+  const drawBeyond = (b: SectionBeyond): void => {
+    const cat = categoryOf(b);
+    const pt = paint[cat];
+    if (!pt.visible) return;
+    silhouetteParts.push(b.polygons);
+    const base = pt.color ?? p.materials[b.materialId]?.color ?? '#999999';
+    if (!noFill) {
+      const fade = 0.55 + 0.35 * (b.depth / maxDepth);
+      const color = pt.visual === 'shaded' ? base : mix(mix(base, paper, 0.55), paper, fade * 0.35);
+      fills.push({ polygons: b.polygons, color: halftone(color, pt), alpha: pt.alpha });
+    }
+    const line = mix(theme.ink, paper, 0.35 + 0.4 * (b.depth / maxDepth));
+    for (const ring of ringsOf(b.polygons)) strokes.push({ pts: ring, closed: true, widthPx: projWidth(cat), color: halftone(line, pt), alpha: 1 });
   };
 
   /**
@@ -64,9 +89,11 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
    */
   const drawOpening = (o: SectionOpening): void => {
     const { polygons, kind, cut, t0, t1, z0, z1 } = o;
-    const edge = cut ? 1.6 : 1.2;
+    const pt = paint[kind];
+    if (!pt.visible) return;
+    const edge = openingEdge(kind, cut);
     const outline = (): void => {
-      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
+      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
     };
     const quad = (a: number, b: number, c: number, d: number): Ring => [
       { x: a, y: c },
@@ -77,17 +104,17 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     // Peça do batente/caixilho: preenchida e contornada, no plano da vista.
     const piece = (a: number, b: number, c: number, d: number, color: string): void => {
       const ring = quad(a, b, c, d);
-      fills.push({ polygons: [[ring]], color, alpha: 1 });
-      strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
+      if (!noFill) fills.push({ polygons: [[ring]], color: halftone(color, pt), alpha: pt.alpha });
+      strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
     };
     // Traço simbólico da elevação (abertura, giro, seta): fino e tracejado (dash [4,3], distinto do tracejado dos níveis [10,5]).
     const symbol = (pts: Vec2[]): void => {
-      strokes.push({ pts, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 1, dash: [4, 3] });
+      strokes.push({ pts, closed: false, widthPx: symbolWidth(kind), color: halftone(theme.inkSoft, pt), alpha: 1, dash: [4, 3] });
     };
     const esq = o.esquadria;
     if (!esq) {
       // Lista sintética sem esquadria: retângulo com o fundo e o contorno de antes.
-      fills.push({ polygons, color: kind === 'window' ? GLASS_FILL : DOOR_FILL, alpha: 1 });
+      if (!noFill) fills.push({ polygons, color: halftone(pt.color ?? (kind === 'window' ? GLASS_FILL : DOOR_FILL), pt), alpha: pt.alpha });
       outline();
       return;
     }
@@ -95,7 +122,8 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     // Vista face (t = largura do vão) x corte transversal (t = espessura da parede): a projeção da pegada
     // (largura × espessura) sobre a linha diz qual é. A vista face é a da elevação e a do corte longitudinal.
     const faceOn = Math.abs(t1 - t0 - esq.width) <= Math.abs(t1 - t0 - esq.thickness);
-    const frameColor = mix(p.materials[esq.frameMaterialId]?.color ?? '#9aa0a6', paper, 0.5);
+    const frameBase = pt.color ?? p.materials[esq.frameMaterialId]?.color ?? '#9aa0a6';
+    const frameColor = pt.visual === 'shaded' ? frameBase : mix(frameBase, paper, 0.5);
     // Vão livre (sem folha): nenhum batente nem vidro. A porta é só o vão aberto (o vazio mostra o papel); a janela
     // sem folha fica com a soleira, como no 3D.
     if (esq.leaves === 0) {
@@ -112,13 +140,13 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
         piece(t0, t1, z1 - fw, z1, frameColor);
         piece(t0, t1, z0, z0 + fw, frameColor);
         // Vidro: região interna do caixilho (opaco, cor fixa do desenho).
-        fills.push({ polygons: [[quad(t0 + fw, t1 - fw, z0 + fw, z1 - fw)]], color: GLASS_FILL, alpha: 1 });
+        if (!noFill) fills.push({ polygons: [[quad(t0 + fw, t1 - fw, z0 + fw, z1 - fw)]], color: halftone(pt.color ?? GLASS_FILL, pt), alpha: pt.alpha });
         // Linha central (C6): só na janela de correr (2 ou 3 folhas); a fixa, a basculante e a maxim-ar não a têm.
         if (esq.leaves >= 2) {
           const inner = t1 - t0 - 2 * fw;
           for (let i = 1; i < esq.leaves; i++) {
             const t = t0 + fw + (i * inner) / esq.leaves;
-            strokes.push({ pts: [{ x: t, y: z0 + fw }, { x: t, y: z1 - fw }], closed: false, widthPx: 1, color: theme.ink, alpha: 0.7 });
+            strokes.push({ pts: [{ x: t, y: z0 + fw }, { x: t, y: z1 - fw }], closed: false, widthPx: symbolWidth(kind), color: theme.ink, alpha: 0.7 });
           }
         }
         // Símbolos da elevação: seta de correr (E2) ou arco tracejado do maxim-ar/basculante (E1).
@@ -144,11 +172,11 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
         const tc = (t0 + t1) / 2;
         piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z1 - fw, z1, frameColor);
         piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z0, z0 + fw, frameColor);
-        fills.push({ polygons: [[quad(tc - esq.glassThickness / 2, tc + esq.glassThickness / 2, z0 + fw, z1 - fw)]], color: GLASS_FILL, alpha: 1 });
+        if (!noFill) fills.push({ polygons: [[quad(tc - esq.glassThickness / 2, tc + esq.glassThickness / 2, z0 + fw, z1 - fw)]], color: halftone(pt.color ?? GLASS_FILL, pt), alpha: pt.alpha });
       }
     } else {
       // Porta com folha: a folha fechada preenche o vão (C5). O vão livre (0 folhas) saiu acima, sem preenchimento.
-      fills.push({ polygons, color: DOOR_FILL, alpha: 1 });
+      if (!noFill) fills.push({ polygons, color: halftone(pt.color ?? DOOR_FILL, pt), alpha: pt.alpha });
       outline();
       if (faceOn) {
         // Símbolos da elevação: seta de correr da porta (E2) ou giro do lado da dobradiça (E1).
@@ -167,26 +195,43 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
 
   // Pintura do mais longe ao mais perto: além e vãos pela profundidade; o corte (profundidade 0) por último.
   type Paint = { depth: number; cut: boolean; draw: () => void };
-  const paint: Paint[] = [
-    ...s.beyond.map((b): Paint => ({ depth: b.depth, cut: false, draw: () => drawBeyond(b.polygons, p.materials[b.materialId]?.color, b.depth) })),
-    ...s.openings.map((o): Paint => ({ depth: o.depth, cut: false, draw: () => drawOpening(o) })),
-    ...s.cut.map((r): Paint => ({
+  const cutPaint = s.cut.flatMap((r): Paint[] => {
+    const cats = [...new Set(r.sources.map(categoryOf))];
+    if (!cats.some((c) => paint[c].visible)) return [];
+    const cat = cats.find((c) => paint[c].visible) ?? 'wall';
+    const pt = paint[cat];
+    return [{
       depth: 0,
       cut: true,
       draw: () => {
+        silhouetteParts.push(r.polygons);
         const m = p.materials[r.materialId];
-        const color = mix(m?.color ?? '#999999', paper, input.dark ? 0.5 : 0.58);
-        const hatch = m && m.hatch !== 'none' && v.zoom >= 40 ? { kind: m.hatch, color: mix(m.color, input.dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-        fills.push({ polygons: r.polygons, color, alpha: 1, hatch });
-        for (const ring of ringsOf(r.polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: mix(theme.ink, paper, 0.35), alpha: 1 });
+        if (!noFill) {
+          const base = pt.color ?? m?.color ?? '#999999';
+          const color = pt.visual === 'shaded' ? base : mix(base, paper, input.dark ? 0.5 : 0.58);
+          const hatch = !wire && m && m.hatch !== 'none' && (detail === 'fine' || v.zoom >= 40)
+            ? { kind: m.hatch, color: halftone(mix(pt.color ?? m.color, input.dark ? '#ffffff' : '#000000', 0.45), pt) }
+            : undefined;
+          fills.push({ polygons: r.polygons, color: halftone(color, pt), alpha: pt.alpha, hatch });
+        }
+        const line = halftone(mix(theme.ink, paper, 0.35), pt);
+        for (const ring of ringsOf(r.polygons)) strokes.push({ pts: ring, closed: true, widthPx: cutWidth(cat), color: line, alpha: 1 });
       },
-    })),
+    }];
+  });
+  const paintList: Paint[] = [
+    ...s.beyond.map((b): Paint => ({ depth: b.depth, cut: false, draw: () => drawBeyond(b) })),
+    ...s.openings.map((o): Paint => ({ depth: o.depth, cut: false, draw: () => drawOpening(o) })),
+    ...cutPaint,
   ];
-  paint.sort((x, y) => y.depth - x.depth || Number(x.cut) - Number(y.cut));
-  for (const item of paint) item.draw();
+  paintList.sort((x, y) => y.depth - x.depth || Number(x.cut) - Number(y.cut));
+  for (const item of paintList) item.draw();
 
-  // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra).
-  for (const ring of ringsOf(s.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
+  // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra). Com categoria oculta,
+  // a silhueta do motor (que une tudo) é refeita só com os itens que ficaram.
+  const hiddenAny = GRAPHICS_CATEGORIES.some((c) => !paint[c].visible);
+  const silhouette = hiddenAny ? (silhouetteParts.length > 0 ? union(...silhouetteParts) : []) : s.silhouette;
+  for (const ring of ringsOf(silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
 
   if (input.highlight) highlightOps(s, input.highlight, theme, fills, strokes);
 

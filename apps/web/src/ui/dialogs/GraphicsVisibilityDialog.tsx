@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, view3dOf, type CategoryOverride, type GraphicsCategory } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type CategoryOverride, type GraphicsCategory } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
-import { editLevelGraphics, editView3D, type GraphicsEdit } from '../../editor/graphicsActions.ts';
+import { editLevelGraphics, editSectionGraphics, editView3D, type GraphicsEdit } from '../../editor/graphicsActions.ts';
 import { useUi } from '../../editor/state.ts';
 import { CATEGORY_LABEL, WEIGHTS } from '../graphicsLabels.ts';
 import { Check, NumField } from '../fields.tsx';
@@ -31,28 +31,30 @@ function ColorCell({ id, label, value, onCommit }: { id: string; label: string; 
 }
 
 /**
- * Visibilidade e gráficos por categoria da vista ativa (decisão 0015 §3): `target` é o id do nível (planta) ou '3d'.
+ * Visibilidade e gráficos por categoria da vista ativa (decisão 0015 §3): `target` é o id do nível (planta), '3d' ou
+ * 'section' (corte/elevação).
  * Cada linha grava o próprio comando (um passo de desfazer por alteração); recusa aparece na linha, nada é gravado.
  * Vazio em peso e cor = o valor do projeto (sem substituição na vista).
  */
 export function GraphicsVisibilityDialog({ target }: { target: string }): ReactElement | null {
   const p = useProject();
   const is3d = target === '3d';
-  const lvl = is3d ? undefined : p.levels.find((l) => l.id === target);
+  const isSection = target === 'section';
+  const lvl = is3d || isSection ? undefined : p.levels.find((l) => l.id === target);
   const [errors, setErrors] = useState<Partial<Record<GraphicsCategory, string>>>({});
-  if (!is3d && !lvl) return null;
-  const g = is3d ? view3dOf(p) : levelGraphicsOf(p, target);
+  if (!is3d && !isSection && !lvl) return null;
+  const g = is3d ? view3dOf(p) : isSection ? sectionGraphicsOf(p) : levelGraphicsOf(p, target);
   const pg = graphicsOf(p);
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const run = (c: GraphicsCategory, o: Override): void => {
-    const r: GraphicsEdit = is3d ? editView3D(editor.store, one(c, o)) : editLevelGraphics(editor.store, target, one(c, o));
+    const r: GraphicsEdit = is3d ? editView3D(editor.store, one(c, o)) : isSection ? editSectionGraphics(editor.store, one(c, o)) : editLevelGraphics(editor.store, target, one(c, o));
     setErrors((prev) => ({ ...prev, [c]: r.error ?? undefined }));
   };
   const failed = GRAPHICS_CATEGORIES.filter((c) => errors[c]);
   return (
     <Dialog
       title="Visibilidade e gráficos"
-      sub={is3d ? 'Modelo 3D' : `Planta · ${lvl!.name}`}
+      sub={is3d ? 'Modelo 3D' : isSection ? 'Corte/elevação' : `Planta · ${lvl!.name}`}
       onClose={close}
       size="mid"
       footer={<button className="btn primary" onClick={close}>Fechar</button>}

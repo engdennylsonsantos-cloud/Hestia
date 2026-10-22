@@ -210,6 +210,12 @@ export function levelGraphicsOf(p: Pick<Project, 'levels'>, levelId: Id): ViewGr
   return { ...DEFAULT_VIEW_GRAPHICS, ...(g ?? {}), overrides: mergeOverrides(g?.overrides) };
 }
 
+/** Gráficos do corte/elevação com os padrões aplicados (não há nível natural: a vista cruza níveis). */
+export function sectionGraphicsOf(p: Pick<Project, 'sectionGraphics'>): ViewGraphics {
+  const g = p.sectionGraphics;
+  return { ...DEFAULT_VIEW_GRAPHICS, ...(g ?? {}), overrides: mergeOverrides(g?.overrides) };
+}
+
 /** Gráficos do 3D com os padrões aplicados. */
 export function view3dOf(p: Pick<Project, 'view3d'>): View3DSettings {
   const g = p.view3d;

@@ -35,6 +35,16 @@
     {
       "id": "ambientes",
       "arquivo": "ambientes.md",
+      "status": "concluido"
+    },
+    {
+      "id": "forros",
+      "arquivo": "forros.md",
+      "status": "em-andamento"
+    },
+    {
+      "id": "pranchas",
+      "arquivo": "pranchas.md",
       "status": "nao-iniciado"
     }
   ]

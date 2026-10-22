@@ -20,7 +20,8 @@ describe('atalhos de ferramenta', () => {
   });
 
   it('tecla sem ferramenta devolve undefined', () => {
-    expect(toolForKey('z')).toBeUndefined();
+    expect(toolForKey('z')).toBe('room');
+    expect(toolForKey('1')).toBeUndefined();
     expect(toolForKey('Enter')).toBeUndefined();
   });
 });

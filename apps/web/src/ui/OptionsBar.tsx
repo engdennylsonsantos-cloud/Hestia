@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
+import { addRoomsAllCircuits } from '../editor/roomActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, NumField } from './fields.tsx';
@@ -119,6 +120,11 @@ export function OptionsBar(): ReactElement {
           <Check id="opt-chain" checked={o.chain} onChange={(v) => set({ chain: v })}>Encadear</Check>
           <Check id="opt-ortho" checked={o.orthoLock} onChange={(v) => set({ orthoLock: v })}>Travar em 0°/90°</Check>
         </>
+      )}
+      {tool === 'room' && (
+        <button id="opt-roomall" className="btn small" onClick={() => addRoomsAllCircuits()} title="Cria um ambiente em cada circuito fechado que ainda não tem um; um só Ctrl+Z desfaz tudo">
+          Ambientes em todos os circuitos fechados
+        </button>
       )}
       {tool === 'floor' && (
         <>

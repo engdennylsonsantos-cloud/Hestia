@@ -5,6 +5,7 @@ import {
   isOpening,
   isRoof,
   isSlab,
+  isStair,
   isWall,
   levelElevation,
   openingSill,
@@ -149,6 +150,7 @@ export function elementZRange(p: Project, e: Element, ctx: Partial<ViewContext> 
     if (!rr || !Number.isFinite(lo)) return { z0: eave, z1: eave };
     return { z0: lo - roofThickness(rr), z1: hi };
   }
+  if (!isStair(e)) return null;
   const z0 = stairBaseZ(p, e);
   const z1 = stairTopZ(p, e);
   return { z0: Math.min(z0, z1), z1: Math.max(z0, z1) };

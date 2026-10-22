@@ -7,6 +7,7 @@ import {
   isRoof,
   isStair,
   isWall,
+  isRoom,
   type Element,
   type Floor,
   type FloorType,
@@ -15,6 +16,7 @@ import {
   type RoofType,
   type SlabType,
   type Id,
+  type Room,
   type Stair,
   type StairType,
   type JoinConfig,
@@ -50,6 +52,9 @@ export type Command =
   | { type: 'addFloor'; floor: Omit<Floor, 'order'> }
   | { type: 'addSlab'; slab: Omit<Slab, 'order'> }
   | { type: 'addRoof'; roof: Omit<Roof, 'order'> }
+  | { type: 'addRoom'; room: Omit<Room, 'order'> }
+  | { type: 'updateRoom'; id: Id; patch: Partial<Omit<Room, 'id' | 'kind' | 'order'>> }
+  | { type: 'removeRoom'; id: Id }
   | { type: 'upsertRoofType'; roofType: RoofType }
   | { type: 'deleteRoofType'; id: Id }
   | { type: 'addStair'; stair: Omit<Stair, 'order'> }
@@ -59,7 +64,7 @@ export type Command =
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> | Partial<Stair> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Roof> | Partial<Stair> | Partial<Room> }
   | { type: 'setWallEnds'; id: Id; a?: Vec2; b?: Vec2 }
   | { type: 'setJoin'; ends: Array<{ wallId: Id; end: 'a' | 'b' }>; config: JoinConfig }
   | { type: 'transform'; ids: Id[]; transform: Transform; copy?: { idMap: Record<Id, Id> } }
@@ -157,44 +162,27 @@ function transformRoof(r: Roof, t: Transform): Roof {
   };
 }
 
+/** Move/gira/espelha cada elemento do tipo pedido (mesmo padrão para piso, laje, telhado, escada e ambiente). */
+function transformEach<E extends Element>(p: Project, c: Extract<Command, { type: 'transform' }>, pred: (e: Element | undefined) => e is E, map: (e: E, t: Transform) => E): void {
+  const idMap = c.copy?.idMap;
+  for (const e of c.ids.map((id) => p.elements[id]).filter(pred)) {
+    const next = map(e, c.transform);
+    if (idMap) {
+      const nid = idMap[e.id];
+      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ } as E;
+    } else {
+      p.elements[e.id] = next;
+    }
+  }
+}
+
 function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }>): void {
   const idMap = c.copy?.idMap;
-  for (const r of c.ids.map((id) => p.elements[id]).filter(isRoof)) {
-    const next = transformRoof(r, c.transform);
-    if (idMap) {
-      const nid = idMap[r.id];
-      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
-    } else {
-      p.elements[r.id] = next;
-    }
-  }
-  for (const st of c.ids.map((id) => p.elements[id]).filter(isStair)) {
-    const next = transformStair(st, c.transform);
-    if (idMap) {
-      const nid = idMap[st.id];
-      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
-    } else {
-      p.elements[st.id] = next;
-    }
-  }
-  for (const s of c.ids.map((id) => p.elements[id]).filter(isSlab)) {
-    const next = transformSlab(s, c.transform);
-    if (idMap) {
-      const nid = idMap[s.id];
-      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
-    } else {
-      p.elements[s.id] = next;
-    }
-  }
-  for (const f of c.ids.map((id) => p.elements[id]).filter(isFloor)) {
-    const next = transformFloor(f, c.transform);
-    if (idMap) {
-      const nid = idMap[f.id];
-      if (nid) p.elements[nid] = { ...next, id: nid, order: p.nextOrder++ };
-    } else {
-      p.elements[f.id] = next;
-    }
-  }
+  transformEach(p, c, isRoof, transformRoof);
+  transformEach(p, c, isStair, transformStair);
+  transformEach(p, c, isSlab, transformSlab);
+  transformEach(p, c, isFloor, transformFloor);
+  transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {
     const next = transformWall(w, c.transform);
@@ -262,6 +250,20 @@ export function applyCommand(p: Project, c: Command): void {
       p.elements[c.roof.id] = { ...c.roof, order: p.nextOrder++ };
       break;
     }
+    case 'addRoom': {
+      if (!p.levels.some((l) => l.id === c.room.levelId)) throw new Error('Nível inexistente');
+      p.elements[c.room.id] = { ...c.room, order: p.nextOrder++ };
+      break;
+    }
+    case 'updateRoom': {
+      const r = p.elements[c.id];
+      if (!isRoom(r)) throw new Error('Ambiente inexistente');
+      p.elements[c.id] = { ...r, ...c.patch };
+      break;
+    }
+    case 'removeRoom':
+      delete p.elements[c.id];
+      break;
     case 'upsertRoofType':
       p.roofTypes[c.roofType.id] = c.roofType;
       break;

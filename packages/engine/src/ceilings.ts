@@ -1,6 +1,7 @@
-import type { MultiPolygon, Vec2 } from '@hestia/geom';
-import { ceilingPolygon, ceilingsOnLevel, levelElevation, type Ceiling, type Id, type Project } from '@hestia/model';
+import { union, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { ceilingPolygon, ceilingsOnLevel, floorsOnLevel, levelAbove, levelElevation, slabsOnLevel, type Ceiling, type Id, type Project } from '@hestia/model';
 import { resolveRooms } from './rooms.ts';
+import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel, type StairOpening } from './stairOpenings.ts';
 
 /** Camada resolvida do forro: a mesma área em planta, entre as cotas absolutas z0 e z1. */
 export interface ResolvedCeilingLayer {
@@ -24,12 +25,39 @@ export interface ResolvedCeiling {
   layers: ResolvedCeilingLayer[];
 }
 
+/** Vãos do nível de cima que atravessam o forro: escadas que furam o nível de cima e furos próprios de pisos e lajes dele. */
+interface UpperOpenings {
+  stairs: StairOpening[];
+  /** Furos das lajes e dos pisos do nível de cima, em planta (independem da cota). */
+  shafts: MultiPolygon[];
+}
+
+/** Vãos do nível acima do forro (decisão 0021, B6). Sem nível acima, nada a recortar. */
+function upperOpenings(p: Project, levelId: Id): UpperOpenings {
+  const above = levelAbove(p, levelId);
+  if (!above) return { stairs: [], shafts: [] };
+  const holes = [...floorsOnLevel(p, above.id), ...slabsOnLevel(p, above.id)].flatMap((e) => e.holes);
+  return { stairs: stairOpeningsOnLevel(p, above.id), shafts: holes.map((h): MultiPolygon => [[h]]) };
+}
+
 /**
- * Geometria dos forros de um nível (decisão 0021). Forro não é recortado por escada nem por parede: fica onde o usuário
- * desenhou. Tipo ausente ou contorno com menos de 3 pontos são ignorados (a validação avisa).
+ * Região que o forro perde no vão de cima (decisão 0021, B6): a projeção das escadas na cota da face inferior do forro,
+ * pela mesma regra do furo da laje (decisão 0011, item 11), e os furos do piso e da laje do nível de cima. O forro fica
+ * pendurado sob essa laje, então a escada e o furo aparecem nele.
+ */
+function ceilingVoid(upper: UpperOpenings, bottomZ: number): MultiPolygon {
+  const parts = [stairHolesFor(upper.stairs, bottomZ), ...upper.shafts].filter((region) => region.length > 0);
+  return parts.length ? union(...parts) : [];
+}
+
+/**
+ * Geometria dos forros de um nível (decisão 0021). Forro não é recortado por parede: fica onde o usuário desenhou, mas
+ * perde o vão de escada e de furo do nível de cima (B6, `ceilingVoid`). Tipo ausente, contorno com menos de 3 pontos ou
+ * forro inteiro coberto pelo vão são ignorados (a validação avisa).
  */
 export function resolveCeilings(p: Project, levelId: Id): ResolvedCeiling[] {
   const out: ResolvedCeiling[] = [];
+  const upper = upperOpenings(p, levelId);
   for (const c of ceilingsOnLevel(p, levelId)) {
     const type = p.ceilingTypes[c.typeId];
     if (!type || c.boundary.length < 3) continue;
@@ -41,7 +69,8 @@ export function resolveCeilings(p: Project, levelId: Id): ResolvedCeiling[] {
       layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
       z -= l.thickness;
     });
-    const polygon: MultiPolygon = [ceilingPolygon(c)];
+    const polygon = cutStairOpenings([ceilingPolygon(c)], ceilingVoid(upper, z));
+    if (polygon.length === 0) continue;
     out.push({ ceilingId: c.id, typeId: c.typeId, levelId: c.levelId, polygon, topZ, bottomZ: z, layers });
   }
   return out;

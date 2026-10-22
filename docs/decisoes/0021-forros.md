@@ -18,15 +18,15 @@ o motor, a planta de forro, 3D, corte, a ferramenta, a tabela e o DXF.
 | 10 | Vista para cima: `direction: 'up'` vira a planta de forro. **O topo não limita essa vista** (o forro a 2,60 m aparece com topo padrão de 2,30 m). O que está abaixo do plano de corte não é desenhado (piso, laje e escada saem). Paredes são cortadas no plano de corte, como na planta baixa | Revit (Ceiling Plan) mostra o forro acima do corte. Limitar pelo topo esconderia o forro padrão |
 | 11 | Na planta de forro: forro preenchido com a cor do material da primeira camada (índice 0), com a hachura do material em médio/fino com zoom suficiente e a faixa de contorno das lajes. Marca e área com etiquetas ligadas. Sem o desenho de nível abaixo | Mesma regra de superfície das lajes. O nível abaixo é referência de planta baixa e não entra no forro |
 | 12 | Na planta baixa forro **não é desenhado** e não gera aviso de intervalo (`viewRangeWarnings` ignora forros em `down`) | Forro está acima do topo da planta baixa; avisar por ele seria ruído |
-| 13 | Forro não é recortado por escada nem por parede: fica onde foi desenhado. Aberturas de escada no piso não o afetam | Simplificação desta rodada; o recorte por escada fica para a etapa de detalhe |
+| 13 | Forro não é recortado por parede: fica onde foi desenhado. Por escada e furo do nível de cima, o forro é recortado (ver 18) | Parede não limita o forro; vão de escada e de furo sim, pois o forro fica sob a laje que os tem |
 | 14 | 3D: sólido por camada, na categoria `floor` (visibilidade e transparência dos pisos). Corte e elevação: faixa t×z por camada, com a origem do forro para a seleção (`ceilingId`) | Forro é uma superfície de piso no 3D; o corte usa o mesmo mecanismo dos pisos planos |
 | 15 | Ferramenta Forro: contorno por cliques (com comprimento digitado), retângulo e "No ambiente" (clique num ambiente). Na planta de forro, a seleção pega o forro pelo interior ou pela borda | A captura da planta baixa não vê forro, então só a planta de forro é clicável |
 | 16 | DXF: forros da planta de forro na camada `FORRO` (polilinhas fechadas, com furos). Planta baixa não leva forro | Camada fixa, como `PISO_` e `LAJE_`; o nome é o pedido no roteiro |
 | 17 | Interface: tipos na Árvore de projeto (lista "Forros"), diálogo do tipo com seção ao vivo (reuso do editor de camadas e da seção de laje), propriedades do forro, tabela de forros (Vista e Árvore) | Mesmo fluxo de piso e laje |
+| 18 | Recorte do vão (`resolveCeilings`, B6): o forro perde (a) a projeção das escadas que sobem ao nível de cima, pela regra do furo da laje (`stairHolesFor` na cota da face inferior do forro, decisão 0011 §6; escadas com `openingMode` 'none' não entram, como na laje) e (b) os furos próprios dos pisos e lajes do nível de cima. Derivado, nada é gravado; forro coberto por inteiro não é resolvido | Mesma regra da laje: o forro sob a escada fica com o vão que a laje de cima teria |
 
 ## Fora desta rodada
 - **Forro por ambiente do nível inteiro** em um comando de interface: o lote (`addCeilings`) e o rascunho (`ceilingDraftsFromRooms`) existem; a ferramenta cria um forro por clique no ambiente.
-- **Recorte por escada e por abertura de piso** no forro.
 - **Furos pela ferramenta**: o modelo e o motor aceitam `holes`, mas a ferramenta ainda não os desenha.
 - **Vínculo vivo com o ambiente**: o contorno é gravado; quando o ambiente muda, o forro não acompanha.
 - **Seção ao vivo** do tipo de forro reusa o componente da laje (mesma forma de dados), sem renderização própria.

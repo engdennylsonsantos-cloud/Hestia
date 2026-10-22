@@ -17,7 +17,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 - [x] B3 Tabela `ceilingSchedule` com filtros e CSV (`;`, decimal com vírgula, BOM)
 - [x] B4 Avisos: sem contorno, tipo ausente, forro acima da parede mais baixa
 - [x] B5 Forro por ambiente: um rascunho por ambiente com circuito fechado
-- [ ] B6 Recorte do forro por escada e por abertura de piso — fora desta rodada
+- [x] B6 Recorte do forro por escada e por abertura de piso/laje do nível de cima (`ceilings.ts`, decisão 0021 §18)
 
 ## C · Planta de forro (direção para cima)
 - [x] C1 `direction: 'up'` desenha a planta de forro; o topo não limita **(bloqueante)**

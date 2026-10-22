@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import type { Vec2 } from '@hestia/geom';
-import { DEFAULT_CEILING_TYPES, ProjectStore, createEmptyProject, makeCeiling, makeRoom, makeWall, type Project } from '@hestia/model';
+import { multiArea, pointInMulti, type Vec2 } from '@hestia/geom';
+import {
+  DEFAULT_CEILING_TYPES,
+  ProjectStore,
+  createEmptyProject,
+  defaultStairTypeId,
+  makeCeiling,
+  makeFloor,
+  makeRoom,
+  makeStair,
+  makeWall,
+  type Project,
+  type StairCurve,
+  type StairRun,
+} from '@hestia/model';
 import { buildCeilingSchedule, ceilingDraftsFromRooms, ceilingIssues, ceilingScheduleToCsv, quantifyCeilings, resolveCeilings } from './index.ts';
 
 const sq = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
@@ -138,5 +151,69 @@ describe('ceilingIssues', () => {
   it('erro para contorno curto e para tipo ausente (o comando já impede, mas um arquivo pode trazer)', () => {
     expect(ceilingIssues(rawCeiling({ boundary: [{ x: 0, y: 0 }] })).map((i) => i.code)).toEqual(['ceiling-no-boundary']);
     expect(ceilingIssues(rawCeiling({ typeId: 'nao_existe' })).map((i) => i.code)).toEqual(['ceiling-type-missing']);
+  });
+});
+
+const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag: 0 });
+
+/** Lance reto em +x: `n` espelhos a cada `spacing` a partir de x = 0, largura 1,20 m, centrado em y = 0. */
+function straightRun(n: number, spacing: number): StairRun {
+  const b = (n - 1) * spacing + 0.5;
+  return {
+    id: 'run',
+    kind: 'run',
+    boundaryLeft: [ln(-0.5, 0.6, b, 0.6)],
+    boundaryRight: [ln(-0.5, -0.6, b, -0.6)],
+    risers: Array.from({ length: n }, (_, k) => ln(k * spacing, -1, k * spacing, 1)),
+    path: [],
+  };
+}
+
+/** Forro de 5 m x 2 m no térreo (pavimento 1 a 3 m), com as peças do nível de cima opcionais. */
+function ceilingBelow(upper: (s: ProjectStore) => void): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'addCeiling', ceiling: makeCeiling({ id: 'c1', typeId: 'ct_gesso', levelId: 'lv_0', boundary: sq(-1, -1, 6, 1) }) });
+  upper(s);
+  return s.project;
+}
+
+describe('forro recortado pelo vão do nível de cima (decisão 0021, B6)', () => {
+  const area = (p: Project): number => multiArea(resolveCeilings(p, 'lv_0')[0]?.polygon ?? []);
+  const full = 7 * 2;
+
+  it('sem nada acima, o forro fica inteiro', () => {
+    expect(area(ceilingBelow(() => {}))).toBeCloseTo(full, 9);
+  });
+
+  it('furo próprio da laje do nível de cima sai do forro (mesmo contorno, mesma planta)', () => {
+    const p = ceilingBelow((s) =>
+      s.exec({
+        type: 'addFloor',
+        floor: makeFloor({ id: 'f1', typeId: 'ft_laje12', levelId: 'lv_1', boundary: sq(-1, -1, 6, 1), holes: [sq(0, -0.5, 1, 0.5)] }),
+      }),
+    );
+    expect(area(p)).toBeCloseTo(full - 1, 9);
+    expect(pointInMulti({ x: 0.5, y: 0 }, resolveCeilings(p, 'lv_0')[0]!.polygon)).toBe(false);
+  });
+
+  it('a escada que sobe ao nível de cima atravessa o forro: os degraus altos saem, o primeiro degrau fica', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addCeiling', ceiling: makeCeiling({ id: 'c1', typeId: 'ct_gesso', levelId: 'lv_0', boundary: sq(-1, -1, 6, 1) }) });
+    s.exec({
+      type: 'addStair',
+      stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [straightRun(16, 0.28)], openingMargin: 0 }),
+    });
+    const [r] = resolveCeilings(s.project, 'lv_0');
+    expect(r).toBeDefined();
+    expect(pointInMulti({ x: 0.1, y: 0 }, r!.polygon)).toBe(true);
+    expect(pointInMulti({ x: 2.0, y: 0 }, r!.polygon)).toBe(false);
+    expect(multiArea(r!.polygon)).toBeLessThan(full - 1);
+  });
+
+  it('forro inteiramente coberto pelo vão não é resolvido', () => {
+    const p = ceilingBelow((s) =>
+      s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_laje12', levelId: 'lv_1', boundary: sq(-2, -2, 7, 2), holes: [sq(-1, -1, 6, 1)] }) }),
+    );
+    expect(resolveCeilings(p, 'lv_0')).toHaveLength(0);
   });
 });

@@ -22,6 +22,7 @@ import { key3d, useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
+import { safeFilename } from './nomeArquivo.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -405,7 +406,7 @@ export class Editor {
    */
   async save(): Promise<void> {
     const text = this.serialize();
-    const name = `${this.project.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto'}.hestia.json`;
+    const name = safeFilename(`${this.project.name.trim() || 'projeto'}.hestia.json`);
     safeSet(STORAGE_KEY, text);
     type Dl = { save(r: { filename: string; data: string }): Promise<unknown> };
     const host = (window as unknown as { claude?: { use?: (n: string) => Promise<Dl | null> } }).claude;
@@ -437,9 +438,7 @@ export class Editor {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       downloaded = true;
-    } catch {
-      downloaded = false;
-    }
+    } catch { /* sem download: segue para a área de transferência */ }
     this.store.markSaved();
     try {
       await navigator.clipboard.writeText(text);

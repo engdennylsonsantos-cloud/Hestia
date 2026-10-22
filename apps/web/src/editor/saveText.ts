@@ -1,3 +1,5 @@
+import { safeFilename } from './nomeArquivo.ts';
+
 type Downloads = { save(r: { filename: string; data: string }): Promise<unknown> };
 type ClaudeHost = { use?: (name: string) => Promise<Downloads | null> };
 
@@ -24,7 +26,8 @@ const isDeclined = (e: unknown): boolean => typeof e === 'object' && e !== null 
  * Entrega um arquivo de texto ao usuário e devolve uma frase de status em português.
  * Ordem: capacidade `downloads` do artefato (com confirmação), download direto, área de transferência.
  */
-export async function saveText(filename: string, text: string): Promise<string> {
+export async function saveText(nomeOriginal: string, text: string): Promise<string> {
+  const filename = safeFilename(nomeOriginal);
   const host = (window as unknown as { claude?: ClaudeHost }).claude;
   if (host?.use) {
     try {

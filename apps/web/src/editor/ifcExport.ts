@@ -134,6 +134,6 @@ export function projectIfc(p: Project, now: Date = new Date()): string {
 
 /** Entrega o `.ifc` pelo mesmo caminho do DXF (`saveText`) e devolve a frase de status. */
 export function saveProjectIfc(p: Project): Promise<string> {
-  const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
+  const base = p.name.trim() || 'projeto';
   return saveText(`${base}.ifc`, projectIfc(p));
 }

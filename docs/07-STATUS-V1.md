@@ -134,6 +134,7 @@ elementos estão `concluido` (`npm run parity`).
 - **Gráficos de vista** (decisão 0015): escala, detalhe, estilo visual, exibição parcial de estrutura e substituições
   por categoria na planta; pesos de linha por categoria e escala (em mm de papel nas pranchas); estilos, sombras,
   arestas, sol, fundo e visibilidade no 3D; hachura sólida; largura de linha no DXF (código 370).
+- **Linhas finas por vista** (decisão 0015 §6): botão "Linhas finas" na aba Vista e caixa nas propriedades; traços com 1 px só na tela, a prancha, o PDF e o DXF mantêm os pesos reais.
 - **Documentação e quantitativos**: DXF da planta do nível atual (camadas de paredes, pisos, lajes, telhados, escadas,
   ambientes, forros, cotas e textos); tabelas de paredes, pisos, lajes, telhados, escadas, portas/janelas, ambientes e
   forros com filtros, totais e CSV; validação do modelo com painel de avisos e "Ir para".

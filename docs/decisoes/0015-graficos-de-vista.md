@@ -42,6 +42,11 @@ gráficos por categoria; nível de detalhe por vista; exibição parcial de estr
 - Propriedades da vista 3D (nada selecionado no 3D): Estilo visual, parcial, visibilidade e gráficos, sombras, arestas, sol, fundo.
 - Diálogo de projeto "Pesos de linha" (Gerenciar): tabela 16 × 3 editável, pesos por categoria e limites de detalhe.
 
+## 6 · Linhas finas por vista (só na tela)
+- `ViewGraphics.thinLines?: boolean` (planta do nível e `Project.sectionGraphics`; padrão false; sem migração). Comandos `setLevelGraphics` e `setSectionGraphics`, com desfazer; botão "Linhas finas" na aba Vista (planta e corte; desabilitado no 3D e na prancha) e caixa "Linhas finas (só na tela)" nas propriedades da vista.
+- Com o modo ligado, a tela desenha os traços da vista com 1 px (`thinStrokes`, opção `thinLines` de `buildPlanDrawList` e `buildSectionDrawList`). Seleção, cursor, cotas temporárias e guias mantêm a largura própria. Hachuras e preenchimentos não mudam.
+- A plotagem nunca usa o modo: a prancha, o PDF e o DXF não passam a opção e seguem com os pesos da tabela (código 370 por camada no DXF). A opção é de entrada: as funções não leem o modelo.
+
 ## 4 · Fora desta etapa
 Modelos de vista (view templates), filtros por regra, texturas e padrões de superfície, silhueta com peso próprio, motor Vectorial × hardware, névoa de
 profundidade, planta de forro, regras de substituição por parâmetro (ArchiCAD GOR).

@@ -24,7 +24,7 @@ sobram são não bloqueantes (ver "Pendências").
 
 **Pisos** — 40 feitos, 7 fora de escopo, 1 pendente (C6) (`docs/paridade/pisos.md`).
 - Contorno por cliques, retângulo, medida, seleção de paredes ou área fechada; furos; edição por alças.
-- Contorno associativo às paredes (0023 P1–P3): "Desvincular" e "Revincular às paredes"; avisos de contorno aberto e duplicado.
+- Contorno associativo às paredes (0023 P1–P3): "Desvincular" e "Revincular às paredes"; avisos de contorno aberto e duplicado. Piso ou laje sem origem (croqui ou modelo pronto): "Vincular às paredes" com prévia e confirmação, e "Vincular pisos e lajes" no nível (0023 §10); no `house-premium`, 1 de 3 elementos casa (a laje do pavimento 2).
 - Tipo em camadas com seção ao vivo; tipo `ft_acab` sobre laje (P5); quantitativos líquidos por camada; membrana de
   espessura zero (P4); "Término na junção" por camada (P8, parcial).
 - Planta com hachura, 3D por camada, corte, subpavimento, etiqueta, DXF, quantitativos e tabela com CSV.

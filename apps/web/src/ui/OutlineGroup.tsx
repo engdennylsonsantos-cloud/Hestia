@@ -92,7 +92,7 @@ export function OutlineGroup({ elements }: { elements: readonly OutlineHolder[] 
           Revincular às paredes
         </button>
       </div>
-      <LinkOutlineButton ids={view.linkIds} />
+      <LinkOutlineButton key={view.linkIds.join(',')} ids={view.linkIds} />
     </Group>
   );
 }

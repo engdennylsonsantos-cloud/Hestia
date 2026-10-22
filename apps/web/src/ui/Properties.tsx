@@ -28,6 +28,7 @@ import {
 import { editor, useProject } from '../editor/controller.ts';
 import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
 import { setRoofProjection, useUi } from '../editor/state.ts';
+import { avisoSemNivelAcima, proximoNivelAcima, setBaseNoPiso, setTopoNoPiso } from '../editor/wallFloorActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
@@ -98,6 +99,11 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
   const height = common(walls, (w) => w.height);
   const topOff = common(walls, (w) => w.topOffset);
   const attachRoof = common(walls, (w) => w.attachTopToRoof ?? false);
+  const attachBottom = common(walls, (w) => w.attachBottomToFloor ?? false);
+  const attachTopFloor = common(walls, (w) => w.attachTopToFloor ?? false);
+  const baseLigada = attachBottom.value && !attachBottom.mixed;
+  const topoLigado = attachTopFloor.value && !attachTopFloor.mixed;
+  const semNivelAcima = walls.some((w) => !w.topLevelId && !proximoNivelAcima(p, w.levelId));
   const loc = common(walls, (w) => w.locationLine);
   const flipped = common(walls, (w) => w.flipped);
   const noS = common(walls, (w) => w.noJoinStart);
@@ -156,6 +162,16 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
           <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
         )}
         <Row label="Topo no telhado"><Check id="p-attachroof" checked={attachRoof.value} mixed={attachRoof.mixed} onChange={(v) => patch(ids, { attachTopToRoof: v })} /></Row>
+        <Row label="Base no piso"><button id="p-base-piso" className="btn small" onClick={() => setBaseNoPiso(editor.store, ids, !baseLigada)}>{baseLigada ? 'Desanexar' : 'Anexar'}</button></Row>
+        <Row label="Topo no piso"><button id="p-topo-piso" className="btn small" disabled={!topoLigado && semNivelAcima} onClick={() => { const sem = setTopoNoPiso(editor.store, ids, !topoLigado); if (sem.length) avisoSemNivelAcima(sem); }}>{topoLigado ? 'Desanexar' : 'Anexar'}</button></Row>
+        {topoLigado && (
+          <Row label="Nível do topo" htmlFor="p-topo-nivel">
+            <select id="p-topo-nivel" className="select" value={top.mixed ? '' : top.value} onChange={(e) => e.target.value && patch(ids, { topLevelId: e.target.value })}>
+              {top.mixed && <option value="">variados</option>}
+              {p.levels.map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}
+            </select>
+          </Row>
+        )}
         <ProfileRow key={ids.join(',')} walls={walls} />
         <Row label="Linha de localização" htmlFor="p-loc">
           <select id="p-loc" className="select" value={loc.mixed ? '' : loc.value} onChange={(e) => e.target.value && patch(ids, { locationLine: e.target.value as LocationLine })}>

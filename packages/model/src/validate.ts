@@ -11,7 +11,8 @@ import { viewRangeIssues } from './viewRange.ts';
 import { graphicsIssues, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf } from './graphics.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 
-export type ValidationSeverity = 'error' | 'warning';
+/** `info`: aviso informativo (não é problema; ex.: parede anexada só em parte ao piso). */
+export type ValidationSeverity = 'error' | 'warning' | 'info';
 
 export interface ValidationIssue {
   severity: ValidationSeverity;

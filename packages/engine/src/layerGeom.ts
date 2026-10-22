@@ -3,7 +3,7 @@ import { layerSpans, type ProfilePoint } from '@hestia/model';
 import { planeHit, pointAt, sAtDepth, toLocal, type WallFrame } from './frame.ts';
 import { miterBreaks, miterPoint } from './joinSides.ts';
 import type { EndSpec, SideSpec, StepRun, WallEnds } from './joinTypes.ts';
-import { clipBandsToProfile } from './profile.ts';
+import { clipBandsToBottom, clipBandsToProfile } from './profile.ts';
 import type { Membrane, ResolvedLayer } from './types.ts';
 
 const MIN_AREA = 1e-9;
@@ -224,6 +224,15 @@ export function membranesOf(f: WallFrame, ends: WallEnds): Membrane[] {
       const s = sAtDepth(f, sp.from);
       return { layerIndex: sp.index, materialId: sp.layer.materialId, pts: [endPoint(f, 'a', ends.a, s), endPoint(f, 'b', ends.b, s)] };
     });
+}
+
+/**
+ * Base por trecho (só parede reta, decisão 0023 §6): recorta as faixas pela cota da base do perfil derivado de `wallZRange`.
+ * Sem perfil, as camadas ficam como estavam.
+ */
+export function withBottomProfile(layers: ResolvedLayer[], f: WallFrame, pts: ProfilePoint[] | null | undefined): ResolvedLayer[] {
+  if (!pts || f.wall.sag !== 0 || pts.length < 2) return layers;
+  return layers.map((l) => ({ ...l, bands: clipBandsToBottom(l.bands, f.a, f.u, f.length, pts) }));
 }
 
 /** Perfil superior (só parede reta): recorta as faixas de cada camada pelo topo poligonal (do modelo ou do telhado). */

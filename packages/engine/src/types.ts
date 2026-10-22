@@ -1,5 +1,5 @@
 import type { MultiPolygon, Vec2 } from '@hestia/geom';
-import type { Id, PlanSymbol } from '@hestia/model';
+import type { Id, PlanSymbol, ProfilePoint } from '@hestia/model';
 
 export interface ResolvedLayer {
   layerIndex: number;
@@ -54,6 +54,10 @@ export interface ResolvedWall {
   layers: ResolvedLayer[];
   /** Camadas de espessura zero (membranas, barreiras): linhas no limite entre camadas, em planta e nos quantitativos. */
   membranes: Membrane[];
+  /** Topo do perfil (relativo a baseZ) quando o topo vem de telhado ou de piso/laje; ausente nas demais. */
+  profileTop?: ProfilePoint[];
+  /** Base por trecho (relativa a baseZ), só quando a base não é uniforme (decisão 0023 §6, P9). */
+  profileBottom?: ProfilePoint[];
 }
 
 export interface Membrane {

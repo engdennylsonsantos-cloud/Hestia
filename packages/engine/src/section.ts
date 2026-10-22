@@ -13,6 +13,7 @@ import { sectionOfStairs } from './sectionStairs.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
 import { uniqueOrigins, type SectionPart } from './sectionParts.ts';
 import { cutPieces, cutRegions, type CutPiece } from './sectionCut.ts';
+import { membraneCutsOf, type SectionMembrane } from './sectionMembrane.ts';
 
 export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
 export { type SectionPart } from './sectionParts.ts';
@@ -134,6 +135,8 @@ export interface SectionResult {
   beyond: SectionBeyond[];
   /** Vãos visíveis, do mais longe ao mais perto. */
   openings: SectionOpening[];
+  /** Membranas de piso e laje cortadas pelo plano: linha na cota da face (decisão 0023 §5). */
+  membranes: SectionMembrane[];
   levels: SectionLevelMark[];
 }
 
@@ -165,7 +168,7 @@ const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1
 
 export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p.levels.map((l) => l.id)): SectionResult {
   const { length, d, n, slab } = sectionFrame(line);
-  const empty: SectionResult = { length, zMin: 0, zMax: 3, cut: [], silhouette: [], beyond: [], openings: [], levels: [] };
+  const empty: SectionResult = { length, zMin: 0, zMax: 3, cut: [], silhouette: [], beyond: [], openings: [], membranes: [], levels: [] };
   if (length < 1e-6) return empty;
 
   // Cortes por material (união depois, antes da oclusão); cada polígono guarda a origem para `sources`.
@@ -178,6 +181,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   };
   // Além e vãos ainda sem oclusão (projeção completa): a oclusão e a parte visível vêm no fim.
   const beyond: SectionBeyond[] = [];
+  const membranes: SectionMembrane[] = []; const frame = { line, length, d, n };
   const openings: SectionOpening[] = [];
   let zMin = Infinity;
   let zMax = -Infinity;
@@ -193,6 +197,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto.
     for (const f of resolveFloors(p, levelId)) {
       const inSlab = intersection(f.polygon, slab);
+      membranes.push(...membraneCutsOf(f.polygon, f.layers, { floorId: f.floorId }, null, frame));
       for (const layer of f.layers) {
         for (const poly of f.polygon) {
           for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
@@ -224,6 +229,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     // Lajes (D3): como os pisos, mas com inclinação; cada cota (base e topo) soma a subida no ponto da linha de corte.
     for (const sl of resolveSlabs(p, levelId)) {
       const inView = intersection(sl.polygon, slab);
+      membranes.push(...membraneCutsOf(sl.polygon, sl.layers, { slabId: sl.slabId }, sl.slope, frame));
       for (const layer of sl.layers) {
         for (const poly of sl.polygon) {
           for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
@@ -396,7 +402,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   const silhouette = unionClipper(...cut.map((c) => c.polygons), ...beyondVisible.map((b) => b.polygons));
   const levels = p.levels.map((l) => ({ levelId: l.id, name: l.name, z: l.elevation }));
   if (!isFinite(zMin)) return { ...empty, levels };
-  return { length, zMin, zMax, cut, silhouette, beyond: beyondVisible, openings: openingsVisible, levels };
+  return { length, zMin, zMax, cut, silhouette, beyond: beyondVisible, openings: openingsVisible, membranes, levels };
 }
 
 /** Telhado no corte (D3): quadriláteros da linha de corte por material e, além do plano, as faixas por camada. */

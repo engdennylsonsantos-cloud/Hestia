@@ -167,6 +167,7 @@ describe('ordem do picking', () => {
     silhouette: [],
     beyond,
     openings,
+    membranes: [],
     levels: [],
   });
   const quad = (x0: number, z0: number, x1: number, z1: number) => [[[v(x0, z0), v(x1, z0), v(x1, z1), v(x0, z1)]]];

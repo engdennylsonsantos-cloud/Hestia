@@ -164,3 +164,19 @@ describe('subpavimento com lajes (D1/D4)', () => {
     expect(dl.fills[i]!.polygons).toEqual(below[0]!.polygon);
   });
 });
+
+describe('membrana de laje na planta (decisão 0023 §5)', () => {
+  it('ls_cobertura: a membrana vira um contorno tracejado; sem membrana, nenhum traço tracejado', () => {
+    const dashed = (ops: { strokes: Array<{ dash?: [number, number] }> }) => ops.strokes.filter((s) => s.dash);
+    const withMembrane = dashed(slabOps(slabProject({}, {}, 'ls_cobertura')));
+    expect(withMembrane).toHaveLength(1);
+    expect(withMembrane[0]!.dash).toEqual([6, 3]);
+    expect(dashed(slabOps(slabProject()))).toHaveLength(0);
+  });
+
+  it('a cor da laje vem da camada estrutural, nunca da membrana', () => {
+    const p = slabProject({}, {}, 'ls_cobertura');
+    const [s] = resolveSlabs(p, 'lv_0');
+    expect(structuralLayer(p, s!)!.membrane).toBe(false);
+  });
+});

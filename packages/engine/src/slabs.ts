@@ -1,5 +1,5 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { levelElevation, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
+import { isMembraneLayer, levelElevation, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { coverUnderside, cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
@@ -12,6 +12,8 @@ export interface ResolvedSlabLayer {
   /** Cotas absolutas na origem da inclinação (sem inclinação: valem em toda a laje). */
   z0: number;
   z1: number;
+  /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
+  membrane: boolean;
 }
 
 export interface ResolvedSlab {
@@ -56,8 +58,7 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
     let z = topZ;
     const layers: ResolvedSlabLayer[] = [];
     type.layers.forEach((l, i) => {
-      if (l.thickness < 1e-6) return;
-      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
+      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l) });
       z -= l.thickness;
     });
     const bottomZ = z;

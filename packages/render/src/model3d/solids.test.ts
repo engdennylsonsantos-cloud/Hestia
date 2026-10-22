@@ -168,3 +168,13 @@ describe('sólidos de laje (D2)', () => {
     }
   });
 });
+
+describe('membrana sem sólido (decisão 0023 §5)', () => {
+  it('ls_cobertura: a membrana não gera malha; o volume é só o das camadas com espessura (24 m² × 0,13 m)', () => {
+    const boundary = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }];
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSlab', slab: makeSlab({ id: 's', typeId: 'ls_cobertura', levelId: 'lv_0', boundary }) });
+    const batches = buildSlabSolids(resolveSlabs(s.project, 'lv_0'));
+    expect(batches.reduce((sum, b) => sum + volume(b), 0)).toBeCloseTo(24 * 0.13, 6);
+  });
+});

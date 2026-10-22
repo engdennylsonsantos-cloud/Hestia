@@ -8,10 +8,12 @@ export interface FloorLayerQuantity {
   layerIndex: number;
   materialId: Id;
   thickness: number;
-  /** Área da face superior da camada (m²) = área líquida do piso. */
+  /** Área da face superior da camada (m²) = área líquida do piso. Membrana também tem área de face. */
   area: number;
-  /** Volume da camada (m³) = área × espessura. */
+  /** Volume da camada (m³) = área × espessura; zero na membrana (decisão 0023 §5). */
   volume: number;
+  /** Membrana: aparece com área de face e volume zero. */
+  membrane: boolean;
 }
 
 export interface FloorQuantity {
@@ -51,7 +53,15 @@ function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: Floor
   const area = multiArea(rf.polygon);
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
-    return { floorId: rf.floorId, layerIndex: l.layerIndex, materialId: l.materialId, thickness, area, volume: area * thickness };
+    return {
+      floorId: rf.floorId,
+      layerIndex: l.layerIndex,
+      materialId: l.materialId,
+      thickness,
+      area,
+      volume: l.membrane ? 0 : area * thickness,
+      membrane: l.membrane,
+    };
   });
   const volume = layers.reduce((s, l) => s + l.volume, 0);
   const floor: FloorQuantity = {

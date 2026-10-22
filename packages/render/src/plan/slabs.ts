@@ -3,7 +3,7 @@ import { resolveSlabs, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { concatOps, fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, type FloorOps } from './floors.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
@@ -12,7 +12,7 @@ const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 /** Camada que dá a cor e a hachura da laje: a estrutural (função 'structure'); sem ela, a de topo. */
 export function structuralLayer(p: Project, s: ResolvedSlab): ResolvedSlabLayer | undefined {
   const layers = p.slabTypes[s.typeId]?.layers ?? [];
-  return s.layers.find((l) => layers[l.layerIndex]?.function === 'structure') ?? s.layers[0];
+  return s.layers.find((l) => layers[l.layerIndex]?.function === 'structure') ?? s.layers.find((l) => !l.membrane);
 }
 
 /**
@@ -75,6 +75,7 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   if (detail !== 'coarse') {
     const band = difference(s.polygon, offsetMulti(s.polygon, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+    if (s.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(s.polygon, theme));
     if (s.slope && at) {
       out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
       out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });

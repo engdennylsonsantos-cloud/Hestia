@@ -16,8 +16,10 @@ export interface SlabLayerQuantity {
   planArea: number;
   /** Área real da face da camada sobre a inclinação (m²); igual à área em planta sem inclinação. */
   faceArea: number;
-  /** Volume da camada (m³) = área em planta × espessura vertical. */
+  /** Volume da camada (m³) = área em planta × espessura vertical; zero na membrana (decisão 0023 §5). */
   volume: number;
+  /** Membrana: aparece com área de face e volume zero. */
+  membrane: boolean;
 }
 
 export interface SlabQuantity {
@@ -68,7 +70,16 @@ function quantifySlab(rs: ResolvedSlab): { slab: SlabQuantity; layers: SlabLayer
   const faceArea = planArea * slopeFactor(slopePercent);
   const layers = rs.layers.map<SlabLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
-    return { slabId: rs.slabId, layerIndex: l.layerIndex, materialId: l.materialId, thickness, planArea, faceArea, volume: planArea * thickness };
+    return {
+      slabId: rs.slabId,
+      layerIndex: l.layerIndex,
+      materialId: l.materialId,
+      thickness,
+      planArea,
+      faceArea,
+      volume: l.membrane ? 0 : planArea * thickness,
+      membrane: l.membrane,
+    };
   });
   const volume = layers.reduce((s, l) => s + l.volume, 0);
   const slab: SlabQuantity = {

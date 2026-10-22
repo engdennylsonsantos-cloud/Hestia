@@ -81,7 +81,7 @@ describe('quantitativo de pisos', () => {
     expect(f.thickness).toBeCloseTo(T, 9);
   });
 
-  it('camadas de espessura zero não entram nos volumes nem nas listas', () => {
+  it('membrana de espessura zero: aparece com área de face e volume zero (decisão 0023 §5)', () => {
     const q = quantifyFloors(
       build([{ id: 'f1', boundary: rect(0, 0, 4, 3), typeId: 'ft_zero' }], (p) => {
         p.floorTypes.ft_zero = {
@@ -98,9 +98,14 @@ describe('quantitativo de pisos', () => {
       }),
       'lv_0',
     );
-    expect(q.layers).toHaveLength(1);
+    expect(q.layers).toHaveLength(2);
+    const [membrane, concrete] = q.layers;
+    expect(membrane).toMatchObject({ layerIndex: 0, membrane: true, thickness: 0, volume: 0 });
+    expect(membrane!.area).toBeCloseTo(12, 9);
+    expect(concrete).toMatchObject({ layerIndex: 1, membrane: false });
     expect(q.floors[0]!.volume).toBeCloseTo(1.2, 9);
-    expect(q.volumeByMaterial.mat_tinta).toBeUndefined();
+    expect(q.volumeByMaterial.mat_tinta).toBe(0);
+    expect(q.faceAreaByMaterial.mat_tinta).toBeCloseTo(12, 9);
   });
 
   it('nível com dois pisos: totais são a soma dos pisos', () => {

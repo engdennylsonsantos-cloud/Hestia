@@ -14,6 +14,11 @@ export interface FloorOps {
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
+/** Linha da membrana de piso ou laje: o contorno (furos incluídos), fino e tracejado, como a membrana da parede (decisão 0023 §5). */
+export function membraneLineOps(polygon: MultiPolygon, theme: PlanTheme): StrokeOp[] {
+  return polygon.flat().map((ring) => ({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] }));
+}
+
 /** Área em m² com vírgula decimal, como nas demais etiquetas da planta. */
 export const fmtArea = (a: number, digits: number): string => `${a.toFixed(digits).replace('.', ',')} m²`;
 
@@ -82,7 +87,8 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
-  const top = f.layers[0];
+  // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
+  const top = f.layers.find((l) => !l.membrane);
   const m = top ? p.materials[top.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
@@ -93,6 +99,7 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
     // do corte do piso (decisão 0015 §2.1).
     const band = difference(f.polygon, offsetMulti(f.polygon, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+    if (f.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(f.polygon, theme));
   }
   if (p.settings.showTags) {
     const code = p.floorTypes[f.typeId]?.code;

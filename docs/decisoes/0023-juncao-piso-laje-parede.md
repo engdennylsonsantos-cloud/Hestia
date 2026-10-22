@@ -268,13 +268,17 @@ Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P
 - O derivado não é gravado, exceto o último contorno válido de `boundary`. Teste de ida e volta de arquivo.
 - Quando a fase fecha, marcar os itens em `docs/paridade/pisos.md` (C1 a C4) e `docs/paridade/lajes.md` (C1 a C3). Esta decisão não altera esses arquivos.
 
-## 13. Pendências do dono
+## 13. Decisões do dono (2026-10-22), todas fechadas
 
-- **P-1.** Membrana com prioridade 3 (proposta), ou sem número? Validar no Revit antes de P7 (`[INFERIDO]`).
-- **P-2.** Aprovar o tipo novo `ft_acab` como padrão de piso sobre laje, sem reescrever tipos já salvos (§4).
-- **P-3.** Parede parcialmente anexada: perfil de base (proposta, reusa `topProfile`) ou dividir a parede no limite do piso (§6).
-- **P-4.** "Inverter corte": por par (proposta) ou por tipo?
-- **P-5.** O forro (`0021`) passa a seguir o modelo B, ou fica como está?
+- **P-1. Membrana com prioridade 3: APROVADO.** Entre Térmica/Ar (3) e Acabamento 1 (4), no mesmo patamar da térmica. O Revit não numera a membrana na ajuda
+  oficial (`[INFERIDO]`); validar num teste dourado antes de P7.
+- **P-2. Tipo novo `ft_acab` (piso de acabamento sobre laje): APROVADO**, sem reescrever tipos já salvos (§4).
+- **P-3. Parede parcialmente anexada: perfil de base** (reusa `topProfile`). É o que o Revit faz: "só a parte da parede sobre o piso se anexa" e a
+  altura se ajusta ao contorno, com a parede continuando uma só (`[DOC]` Attach Walls to Other Elements). Dividir a parede não é o comportamento do Revit.
+- **P-4. "Inverter corte": por PAR de elementos, com padrão por tipo.** O Revit define a hierarquia padrão por tipo (piso/teto/telhado cortam parede;
+  estrutural corta host) e permite inverter por par (Switch Join Order) e desfazer a junção (Unjoin). Não existe tabela global por tipo editável no Revit.
+- **P-5. Forro segue o modelo B** quando criado a partir de ambiente (`roomId`): acompanha o contorno do ambiente, que já é derivado das paredes.
+  Forro desenhado à mão (sem `roomId`) continua estático. É o que o Revit faz: forro automático acompanha as paredes, forro por croqui não.
 
 ## Nota: correções a `docs/05` (não aplicadas nesta tarefa)
 

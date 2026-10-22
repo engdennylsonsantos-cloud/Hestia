@@ -41,6 +41,17 @@ describe('quantitativos líquidos (decisão 0023 §4)', () => {
     expect(w.volume + floorOf(p).volume).toBeCloseTo(0.644 + 6 * 0.19 - 0.0368, 9);
   });
 
+  it('trocar o nome e o material das camadas não muda o líquido (a regra usa atributo de camada, P-6)', () => {
+    const p = build(0.23, { walls: [{}], floors: [{ heightOffset: 0.16 }], slabs: [{ heightOffset: 0.5 }] });
+    const q = structuredClone(p);
+    for (const t of [...Object.values(q.wallTypes), ...Object.values(q.floorTypes), ...Object.values(q.slabTypes)]) {
+      for (const l of t.layers) l.materialId = `zz_${l.materialId}`;
+    }
+    expect(wallsOf(q)[0]!.volume).toBeCloseTo(wallsOf(p)[0]!.volume, 12);
+    expect(floorOf(q).volume).toBeCloseTo(floorOf(p).volume, 12);
+    expect(slabOf(q).volume).toBeCloseTo(slabOf(p).volume, 12);
+  });
+
   it('laje atravessando parede: os 12 cm de laje na parede saem da parede, uma vez; a laje fica inteira', () => {
     // Laje de 12 cm com topo em 1,00 m: corta a parede entre 0,88 e 1,00 m, na área de 0,23 m² (1,00 × 0,23).
     const p = build(0.23, { walls: [{}], slabs: [{ heightOffset: 1 }] });

@@ -91,9 +91,9 @@ try {
     await shot('06-padrao.png');
   });
 
-  await rep.step('7 · Direção "Para cima" está desabilitada (reservada)', async () => {
+  await rep.step('7 · Direção "Para cima" está habilitada (planta de forro, decisão 0021)', async () => {
     const dis = await page.locator('#vr-dir option[value="up"]').evaluate((o) => o.disabled);
-    rep.check('opção "up" desabilitada', dis === true);
+    rep.check('opção "up" habilitada', dis === false);
   });
 
   await rep.step('8 · Sem erros de console ou de página', async () => {

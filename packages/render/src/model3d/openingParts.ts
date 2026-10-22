@@ -45,20 +45,24 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
     add(g.width, depth, jamb, 0, 0, jamb / 2, t.frameMaterialId);
     const inner = g.width - jamb * 2;
     const glassH = h - jamb * 2;
+    // O vidro ocupa exatamente o vão interno do caixilho: de `jamb` (face superior da soleira) a `h - jamb` (face
+    // inferior da verga). O centro fica em `jamb + glassH/2`.
+    const glassZ = jamb + glassH / 2;
     if (g.plan === 'sliding') {
       // Janela de correr: cada folha é um painel de vidro em trilho próprio, defasado na profundidade. Aberta, cada
       // folha desliza um pouco no seu trilho (entreaberta).
       const n = Math.max(1, g.leaves);
       for (let k = 0; k < n; k++) {
         const shift = open ? (k % 2 === 0 ? 1 : -1) * (inner / n) * 0.18 : 0;
-        add(inner / n, glassT, glassH, -inner / 2 + (k + 0.5) * (inner / n) + shift, depth * ((k + 1) / (n + 1) - 0.5), glassH / 2, t.glassMaterialId);
+        add(inner / n, glassT, glassH, -inner / 2 + (k + 0.5) * (inner / n) + shift, depth * ((k + 1) / (n + 1) - 0.5), glassZ, t.glassMaterialId);
       }
     } else {
-      // Fixa, basculante e maxim-ar: uma folha de vidro no plano médio. Aberta, a maxim-ar/basculante gira pelo topo.
-      const hinge = open && (g.plan === 'casement' || g.plan === 'tilt') ? { axis: 'x' as const, at: glassH, angle: (g.flipFacing ? -1 : 1) * 0.35 } : undefined;
-      add(inner, glassT, glassH, 0, 0, glassH / 2, t.glassMaterialId, hinge);
+      // Fixa, basculante e maxim-ar: uma folha de vidro no plano médio. Aberta, a maxim-ar/basculante gira pelo topo,
+      // com o eixo na face inferior da verga (`jamb + glassH`).
+      const hinge = open && (g.plan === 'casement' || g.plan === 'tilt') ? { axis: 'x' as const, at: jamb + glassH, angle: (g.flipFacing ? -1 : 1) * 0.35 } : undefined;
+      add(inner, glassT, glassH, 0, 0, glassZ, t.glassMaterialId, hinge);
     }
-    for (let i = 1; i < g.leaves; i++) add(leaf, depth, glassH, -inner / 2 + (i * inner) / g.leaves, 0, glassH / 2, t.frameMaterialId);
+    for (let i = 1; i < g.leaves; i++) add(leaf, depth, glassH, -inner / 2 + (i * inner) / g.leaves, 0, glassZ, t.frameMaterialId);
   } else {
     add(jamb, depth, h, -g.width / 2 + jamb / 2, 0, h / 2, t.frameMaterialId);
     add(jamb, depth, h, g.width / 2 - jamb / 2, 0, h / 2, t.frameMaterialId);
@@ -85,11 +89,13 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
         for (const x of [-leafW / 4, leafW / 4]) add(leafW / 2, leaf, doorH, x, 0, doorH / 2, t.frameMaterialId);
       }
     } else {
-      // Porta de giro: aberta, gira 90° na dobradiça. A pivotante fica fechada (o eixo não é uma ombreira).
+      // Porta de giro: aberta, gira 90° na dobradiça. O sinal do giro leva em conta o lado da dobradiça: com a
+      // folha à direita do eixo, o mesmo ângulo a levaria para o lado oposto ao do arco da planta.
       const swing = g.plan === 'swing' || g.plan === 'double';
       if (open && swing) {
         const hinge = g.flipHand ? g.width / 2 - jamb : -g.width / 2 + jamb;
-        add(leafW, leaf, doorH, hinge + (g.flipHand ? -leafW / 2 : leafW / 2), 0, doorH / 2, t.frameMaterialId, { axis: 'z', at: hinge, angle: (dir * Math.PI) / 2 });
+        const hand = g.flipHand ? -1 : 1;
+        add(leafW, leaf, doorH, hinge + (g.flipHand ? -leafW / 2 : leafW / 2), 0, doorH / 2, t.frameMaterialId, { axis: 'z', at: hinge, angle: (dir * hand * Math.PI) / 2 });
       } else add(leafW, leaf, doorH, 0, 0, doorH / 2, t.frameMaterialId);
     }
   }

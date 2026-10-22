@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { frameOfWall, openingGeometry, type OpeningGeometry } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeWall, type Opening, type OpeningType, type Project } from '@hestia/model';
+import { openingSymbolPaths } from '@hestia/geom';
+import { DEFAULT_OPENING_TYPES, ProjectStore, coreSpan, createEmptyProject, makeWall, openingFrame, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { openingPieces, type OpeningPiece } from './openingParts.ts';
 
+/** Dobradiça/sentido da instância; o padrão é o mesmo das demais cenas. */
+interface Flips {
+  flipHand?: boolean;
+  flipFacing?: boolean;
+}
+
 /** Parede de 4 m com um vão no meio. `extra` completa o tipo base (acabamento, vão bruto, verga) antes de inseri-lo. */
-function cena(base: 'ot_p80' | 'ot_j120', extra: Partial<OpeningType> = {}): { p: Project; o: Opening; g: OpeningGeometry } {
+function cena(base: string, extra: Partial<OpeningType> = {}, flips: Flips = {}): { p: Project; o: Opening; g: OpeningGeometry } {
   const s = new ProjectStore(createEmptyProject());
-  const t = s.project.openingTypes[base]!;
+  const t = s.project.openingTypes[base];
+  if (!t) throw new Error(`tipo padrão ausente: ${base}`);
   s.exec({ type: 'upsertOpeningType', openingType: { ...t, id: 'ot_x', ...extra } });
   s.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
-  s.exec({ type: 'addOpening', opening: { id: 'v', kind: t.kind, typeId: 'ot_x', hostId: 'w', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+  s.exec({
+    type: 'addOpening',
+    opening: { id: 'v', kind: t.kind, typeId: 'ot_x', hostId: 'w', offset: 2, flipHand: flips.flipHand ?? false, flipFacing: flips.flipFacing ?? false, sillOverride: null, mark: '' },
+  });
   const p = s.project;
   const o = p.elements.v as Opening;
   const f = frameOfWall(p, 'w')!;
@@ -85,5 +96,82 @@ describe('folha aberta no 3D', () => {
     const aberta = pecas(c, true);
     expect(aberta.some((x) => x.hinge)).toBe(false);
     expect(aberta.map((x) => x.x)).not.toEqual(fechada.map((x) => x.x));
+  });
+});
+
+describe('regressão do 3D aberto', () => {
+  const r6 = (n: number): number => Math.round(n * 1e6) / 1e6;
+  const dimensoes = (pc: OpeningPiece[]): string[] => pc.map((x) => `${r6(x.w)}x${r6(x.d)}x${r6(x.h)}`).sort();
+  const jambDe = (c: { p: Project; o: Opening }): number => {
+    const f = frameOfWall(c.p, 'w')!;
+    const core = coreSpan(f.type);
+    return openingFrame(c.p.openingTypes[c.o.typeId]!, core.to - core.from).frameWidth;
+  };
+  const alturaDe = (c: { g: OpeningGeometry }): number => Math.min(c.g.height, 2.8 - c.g.sill);
+
+  /** Lado do arco/folha da planta em relação a +n, pelo traço da folha (peso 1,3). */
+  function ladoDaPlanta(g: OpeningGeometry): number {
+    const folha = openingSymbolPaths(g).find((s) => s.weight === 1.3);
+    if (!folha) throw new Error('símbolo sem traço de folha');
+    const s = (pt: { x: number; y: number }): number => (pt.x - g.center.x) * g.n.x + (pt.y - g.center.y) * g.n.y;
+    const extremo = folha.pts.reduce((a, b) => (Math.abs(s(b)) > Math.abs(s(a)) ? b : a));
+    return Math.sign(s(extremo));
+  }
+
+  /** Lado para onde a folha aberta vai no 3D: sinal de y depois do giro em torno do eixo z. */
+  function ladoDoGiro(pc: OpeningPiece[]): number {
+    const folha = pc.find((x) => x.hinge);
+    if (!folha?.hinge) throw new Error('folha aberta sem dobradiça');
+    return Math.sign((folha.x - folha.hinge.at) * Math.sin(folha.hinge.angle));
+  }
+
+  it('dimensões das peças iguais fechado × aberto nos 14 tipos padrão', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(14);
+    for (const t of DEFAULT_OPENING_TYPES) {
+      const c = cena(t.id);
+      expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));
+    }
+  });
+
+  it('vidro e montantes ocupam exatamente jamb…h−jamb em todas as janelas com vidro', () => {
+    for (const t of DEFAULT_OPENING_TYPES.filter((x) => x.kind === 'window' && x.leaves > 0)) {
+      const c = cena(t.id);
+      const jamb = jambDe(c);
+      const h = alturaDe(c);
+      const pc = pecas(c);
+      const vidros = pc.filter((x) => x.materialId === t.glassMaterialId);
+      expect(vidros.length, t.id).toBeGreaterThan(0);
+      for (const v of vidros) {
+        expect(v.z - v.h / 2, t.id).toBeCloseTo(jamb, 9);
+        expect(v.z + v.h / 2, t.id).toBeCloseTo(h - jamb, 9);
+      }
+      const montantes = pc.filter((x) => x.materialId === t.frameMaterialId && Math.abs(x.h - (h - 2 * jamb)) < 1e-9);
+      for (const m of montantes) {
+        expect(m.z - m.h / 2, t.id).toBeCloseTo(jamb, 9);
+        expect(m.z + m.h / 2, t.id).toBeCloseTo(h - jamb, 9);
+      }
+    }
+  });
+
+  it('maxim-ar: eixo de giro na face inferior da verga (jamb + glassH)', () => {
+    const c = cena('ot_j60');
+    const jamb = jambDe(c);
+    const h = alturaDe(c);
+    const folha = pecas(c, true).find((x) => x.hinge)!;
+    expect(folha.hinge!.axis).toBe('x');
+    expect(folha.hinge!.at).toBeCloseTo(jamb + (h - 2 * jamb), 9);
+    expect(folha.hinge!.at).toBeCloseTo(h - jamb, 9);
+  });
+
+  it('porta de giro: o lado aberto no 3D confere com o arco da planta nas 4 combinações', () => {
+    for (const flipHand of [false, true]) {
+      for (const flipFacing of [false, true]) {
+        const c = cena('ot_p80', {}, { flipHand, flipFacing });
+        const aberta = pecas(c, true);
+        const caso = `hand=${flipHand} facing=${flipFacing}`;
+        expect(ladoDoGiro(aberta), caso).toBe(ladoDaPlanta(c.g));
+        expect(Math.abs(aberta.find((x) => x.hinge)!.hinge!.angle), caso).toBeCloseTo(Math.PI / 2, 9);
+      }
+    }
   });
 });

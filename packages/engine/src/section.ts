@@ -3,6 +3,7 @@ import { coreSpan, type HatchKind, openingCasing, openingFamilyOf, openingFrame,
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
+import { junctionLevel, layerPartsOf } from './junctionLevel.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
@@ -194,72 +195,81 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
 
   for (const levelId of levelIds) {
     const resolved = resolveLevel(p, levelId);
-    // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto.
+    // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto. Com a
+    // junção resolvida (P7b), cada camada corta só a parte que sobra dela (`layerPartsOf`); sem corte, a camada inteira.
+    const jl = junctionLevel(p, levelId);
     for (const f of resolveFloors(p, levelId)) {
-      const inSlab = intersection(f.polygon, slab);
       membranes.push(...membraneCutsOf(f.polygon, f.layers, { floorId: f.floorId }, null, frame));
+      const el = jl.elements.get(f.floorId);
       for (const layer of f.layers) {
-        for (const poly of f.polygon) {
-          for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
-            const lo = Math.max(0, t0);
-            const hi = Math.min(length, t1);
-            if (hi - lo < EPS_T) continue;
-            addCut(layer.materialId, [rect(lo, hi, layer.z0, layer.z1)], { floorId: f.floorId });
-            grow(layer.z0, layer.z1);
+        const parts = layerPartsOf(el, layer.layerIndex, [{ poly: f.polygon, z0: layer.z0, z1: layer.z1 }]);
+        for (const part of parts) {
+          for (const poly of part.poly) {
+            for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
+              const lo = Math.max(0, t0);
+              const hi = Math.min(length, t1);
+              if (hi - lo < EPS_T) continue;
+              addCut(layer.materialId, [rect(lo, hi, part.z0, part.z1)], { floorId: f.floorId });
+              grow(part.z0, part.z1);
+            }
           }
-        }
-        for (const sp of inSlab) {
-          const outer = sp[0];
-          if (!outer || outer.length < 3) continue;
-          const ts = outer.map(along);
-          const tMin = Math.max(0, Math.min(...ts));
-          const tMax = Math.min(length, Math.max(...ts));
-          if (tMax - tMin < EPS_T) continue;
-          beyond.push({
-            floorId: f.floorId,
-            materialId: layer.materialId,
-            layerIndex: layer.layerIndex,
-            depth: Math.max(0, Math.min(...outer.map(dist))),
-            polygons: [[rect(tMin, tMax, layer.z0, layer.z1)]],
-          });
-          grow(layer.z0, layer.z1);
+          for (const sp of intersection(part.poly, slab)) {
+            const outer = sp[0];
+            if (!outer || outer.length < 3) continue;
+            const ts = outer.map(along);
+            const tMin = Math.max(0, Math.min(...ts));
+            const tMax = Math.min(length, Math.max(...ts));
+            if (tMax - tMin < EPS_T) continue;
+            beyond.push({
+              floorId: f.floorId,
+              materialId: layer.materialId,
+              layerIndex: layer.layerIndex,
+              depth: Math.max(0, Math.min(...outer.map(dist))),
+              polygons: [[rect(tMin, tMax, part.z0, part.z1)]],
+            });
+            grow(part.z0, part.z1);
+          }
         }
       }
     }
     // Lajes (D3): como os pisos, mas com inclinação; cada cota (base e topo) soma a subida no ponto da linha de corte.
+    // Lajes com caimento não entram na junção (`junctionLevel`) e seguem como antes.
     for (const sl of resolveSlabs(p, levelId)) {
-      const inView = intersection(sl.polygon, slab);
       membranes.push(...membraneCutsOf(sl.polygon, sl.layers, { slabId: sl.slabId }, sl.slope, frame));
+      const el = jl.elements.get(sl.slabId);
       for (const layer of sl.layers) {
-        for (const poly of sl.polygon) {
-          for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
-            const lo = Math.max(0, t0);
-            const hi = Math.min(length, t1);
-            if (hi - lo < EPS_T) continue;
-            const rl = slabRiseAt(sl.slope, { x: line.a.x + d.x * lo, y: line.a.y + d.y * lo });
-            const rh = slabRiseAt(sl.slope, { x: line.a.x + d.x * hi, y: line.a.y + d.y * hi });
-            addCut(layer.materialId, [slabQuad(lo, hi, layer.z0 + rl, layer.z0 + rh, layer.z1 + rl, layer.z1 + rh)], { slabId: sl.slabId });
-            grow(layer.z0 + Math.min(rl, rh), layer.z1 + Math.max(rl, rh));
+        const parts = layerPartsOf(el, layer.layerIndex, [{ poly: sl.polygon, z0: layer.z0, z1: layer.z1 }]);
+        for (const part of parts) {
+          for (const poly of part.poly) {
+            for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
+              const lo = Math.max(0, t0);
+              const hi = Math.min(length, t1);
+              if (hi - lo < EPS_T) continue;
+              const rl = slabRiseAt(sl.slope, { x: line.a.x + d.x * lo, y: line.a.y + d.y * lo });
+              const rh = slabRiseAt(sl.slope, { x: line.a.x + d.x * hi, y: line.a.y + d.y * hi });
+              addCut(layer.materialId, [slabQuad(lo, hi, part.z0 + rl, part.z0 + rh, part.z1 + rl, part.z1 + rh)], { slabId: sl.slabId });
+              grow(part.z0 + Math.min(rl, rh), part.z1 + Math.max(rl, rh));
+            }
           }
-        }
-        for (const sp of inView) {
-          const outer = sp[0];
-          if (!outer || outer.length < 3) continue;
-          const ts = outer.map(along);
-          const tMin = Math.max(0, Math.min(...ts));
-          const tMax = Math.min(length, Math.max(...ts));
-          if (tMax - tMin < EPS_T) continue;
-          // Laje plana: retângulo. Inclinada: projeção exata do prisma (a cota sobe linear sobre o contorno).
-          const rise = (v: Vec2): number => slabRiseAt(sl.slope, v);
-          const zs = outer.map(rise);
-          beyond.push({
-            slabId: sl.slabId,
-            materialId: layer.materialId,
-            layerIndex: layer.layerIndex,
-            depth: Math.max(0, Math.min(...outer.map(dist))),
-            polygons: sl.slope ? prismProjection(outer, along, (v) => layer.z0 + rise(v), (v) => layer.z1 + rise(v)) : [[rect(tMin, tMax, layer.z0, layer.z1)]],
-          });
-          grow(layer.z0 + Math.min(...zs), layer.z1 + Math.max(...zs));
+          for (const sp of intersection(part.poly, slab)) {
+            const outer = sp[0];
+            if (!outer || outer.length < 3) continue;
+            const ts = outer.map(along);
+            const tMin = Math.max(0, Math.min(...ts));
+            const tMax = Math.min(length, Math.max(...ts));
+            if (tMax - tMin < EPS_T) continue;
+            // Laje plana: retângulo. Inclinada: projeção exata do prisma (a cota sobe linear sobre o contorno).
+            const rise = (v: Vec2): number => slabRiseAt(sl.slope, v);
+            const zs = outer.map(rise);
+            beyond.push({
+              slabId: sl.slabId,
+              materialId: layer.materialId,
+              layerIndex: layer.layerIndex,
+              depth: Math.max(0, Math.min(...outer.map(dist))),
+              polygons: sl.slope ? prismProjection(outer, along, (v) => part.z0 + rise(v), (v) => part.z1 + rise(v)) : [[rect(tMin, tMax, part.z0, part.z1)]],
+            });
+            grow(part.z0 + Math.min(...zs), part.z1 + Math.max(...zs));
+          }
         }
       }
     }

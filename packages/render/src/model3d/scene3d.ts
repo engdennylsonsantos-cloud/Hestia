@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { applyPartialStructure, frameOfWall, openingGeometry, resolveCeilings, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
+import { applyPartialStructure, frameOfWall, openingGeometry, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
@@ -271,9 +271,9 @@ export class ModelScene {
       // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
       const batches: SolidBatch[] = [
         ...(shown('wall') ? buildLevelSolids(lv).batches : []),
-        ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId)) : []),
+        ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
         ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
-        ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId)) : []),
+        ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
         ...buildRoofSolids(roofs),
         ...eave.batches,
         ...(shown('stair') ? buildStairSolids(stairs.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),

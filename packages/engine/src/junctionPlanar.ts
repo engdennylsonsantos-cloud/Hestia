@@ -1,4 +1,4 @@
-import { difference, type MultiPolygon } from '@hestia/geom';
+import { boxOf, boxesOverlap, difference, multiPoints, type MultiPolygon } from '@hestia/geom';
 import { layerPriority, type Layer } from '@hestia/model';
 
 /**
@@ -22,12 +22,16 @@ export interface JunctionMeta {
   core: boolean;
 }
 
-/** Camada no plano: a região em planta e a faixa de cota (absoluta, m; face inferior `z0`, superior `z1`). */
+/**
+ * Camada no plano: a região em planta e a faixa de cota (absoluta, m; face inferior `z0`, superior `z1`). `owner` é o
+ * elemento dono: as camadas de um mesmo elemento não se cortam.
+ */
 export interface PlanarPiece {
   meta: JunctionMeta;
   poly: MultiPolygon;
   z0: number;
   z1: number;
+  owner?: string;
 }
 
 /** Tolerância (m) para duas faixas de cota se cruzarem de verdade (faces que apenas se encostam não contam). */
@@ -83,9 +87,22 @@ export interface ResolvedPrism {
  * por planta, corte, 3D e quantitativos. Sem vencedor, a camada inteira fica (inclusive em mesmo tipo e mesma
  * prioridade: a sobreposição vira aviso, sem resolver).
  */
+/**
+ * Par que entra na junção (0023 §1.3, P7b): camadas do mesmo elemento não se cortam, e parede não corta parede (a
+ * junção entre paredes é a da própria parede). Piso × piso e laje × laje entram, como nos quantitativos.
+ */
+const pairCuts = (c: PlanarPiece, t: PlanarPiece): boolean =>
+  !(c.owner !== undefined && c.owner === t.owner) && !(c.meta.kind === 'wall' && t.meta.kind === 'wall');
+
 export function resolveJunction(pieces: readonly PlanarPiece[]): ResolvedPrism[][] {
+  // Caixa de cada camada: pré-filtro barato para o par não entrar no `difference` quando não há sobreposição em planta.
+  const boxes = pieces.map((t) => (t.poly.length ? boxOf(multiPoints(t.poly)) : null));
   return pieces.map((t, i) => {
-    const winners = pieces.filter((c, j) => j !== i && zOverlaps(t, c) && winsOver(c.meta, t.meta) === true);
+    const bi = boxes[i];
+    const winners = pieces.filter((c, j) => {
+      const bj = boxes[j];
+      return j !== i && bi && bj && boxesOverlap(bi, bj) && pairCuts(c, t) && zOverlaps(t, c) && winsOver(c.meta, t.meta) === true;
+    });
     if (winners.length === 0) return [{ poly: t.poly, z0: t.z0, z1: t.z1 }];
     const cuts = [t.z0, t.z1];
     for (const w of winners) cuts.push(w.z0, w.z1);

@@ -1,5 +1,5 @@
 import { difference, multiArea, offsetMulti, type Vec2 } from '@hestia/geom';
-import { resolveSlabs, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
+import { junctionLevel, resolveSlabs, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -54,26 +54,30 @@ export function slabFills(
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('slab', v.zoom),
 ): FloorOps {
+  const jl = junctionLevel(p, levelId);
   return concatOps(
     resolveSlabs(p, levelId)
       .filter((s) => !hidden?.has(s.slabId))
-      .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint)),
+      .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint, jl.elements.get(s.slabId))),
   );
 }
 
 /** Operações de uma laje (preenchimento, contorno, seta de caimento e etiquetas). `slabFills` as junta; a planta as ordena pela cota. */
-export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint): FloorOps {
+export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
+  // Região depois da junção (P7b): a laje sem corte fica com o contorno dela; cortada, com a região que sobra.
+  const region = el?.cut ? el.region : s.polygon;
+  if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
   const layer = structuralLayer(p, s);
   const m = layer ? p.materials[layer.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-  out.fills.push({ polygons: s.polygon, color, alpha: 1, hatch });
+  out.fills.push({ polygons: region, color, alpha: 1, hatch });
   const at = labelPoint(s.polygon);
   if (detail !== 'coarse') {
-    const band = difference(s.polygon, offsetMulti(s.polygon, -paint.cutPx / v.zoom));
+    const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
     if (s.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(s.polygon, theme));
     if (s.slope && at) {

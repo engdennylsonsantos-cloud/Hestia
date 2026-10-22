@@ -1,5 +1,5 @@
 import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { lineIntervals, resolveFloors, type ResolvedFloor } from '@hestia/engine';
+import { junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -75,16 +75,23 @@ export function floorFills(
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('floor', v.zoom),
 ): FloorOps {
+  const jl = junctionLevel(p, levelId);
   return concatOps(
     resolveFloors(p, levelId)
       .filter((f) => !hidden?.has(f.floorId))
-      .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint)),
+      .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint, jl.elements.get(f.floorId))),
   );
 }
 
-/** Operações de um piso (preenchimento, contorno, etiqueta). `floorFills` as junta; a planta as ordena pela cota. */
-export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint): FloorOps {
+/**
+ * Operações de um piso (preenchimento, contorno, etiqueta). `floorFills` as junta; a planta as ordena pela cota. Com a
+ * junção resolvida (`el.cut`, decisão 0023 §3, P7b), o preenchimento e o contorno são a região que o piso ocupa depois
+ * do recorte; sem corte, o contorno do piso, como antes.
+ */
+export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
+  const region = el?.cut ? el.region : f.polygon;
+  if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
   // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
@@ -92,12 +99,12 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   const m = top ? p.materials[top.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-  out.fills.push({ polygons: f.polygon, color, alpha: 1, hatch });
+  out.fills.push({ polygons: region, color, alpha: 1, hatch });
   if (detail !== 'coarse') {
     // Contorno como faixa preenchida (e não traço): os traços são todos desenhados depois dos preenchimentos e
     // apareceriam por cima das paredes; a faixa respeita a ordem (piso primeiro, paredes por cima). A espessura é a
     // do corte do piso (decisão 0015 §2.1).
-    const band = difference(f.polygon, offsetMulti(f.polygon, -paint.cutPx / v.zoom));
+    const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
     if (f.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(f.polygon, theme));
   }

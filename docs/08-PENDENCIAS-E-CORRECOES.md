@@ -21,8 +21,7 @@ Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido con
   acabamento do tipo de abertura já aparece na tela (seção Acabamento); nomes reais de botão e de menu.
 - **Medido nesta revisão** (2026-10-22): `npm run test:rapido` 264 arquivos e 3276 testes, todos passando (72,8 s; `test:rapido`, sem property e perf); `npm run test:completo` 265 arquivos e 3578 testes, todos passando, com as 60 sementes (590 s, código de saída 0); build `dist/index.html` 2.532,22 kB e `artifact.html` 2.531,98 kB (kB decimais, medidos em bytes); `build:artifact` sem erro e sem TMPDIR.
   Desempenho e regressão visual não foram repetidos aqui (ver as atualizações abaixo).
-- **Branches**: a branch de trabalho é `claude/wizardly-goldberg-qtjveg` (888eff8). `main` **não** foi atualizada: está em
-  `10aa3aa` (2026-10-20) e 266 commits atrás da branch de trabalho, sem commits próprios. Menções a
+- **Branches**: a branch de trabalho é `claude/wizardly-goldberg-qtjveg` (888eff8). `main` **foi atualizada** em 2026-10-22 e é igual à branch de trabalho (avanço simples, sem sobrescrever nada). Menções a
   `claude/zealous-hamilton-iayjlf` nas linhas 6 e 666 são históricas e ficam como estão.
 
 Atualização (2026-10-22, fechamento G5): **entraram ambientes (H2), forros (H3),
@@ -115,7 +114,7 @@ justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts
 ```powershell
 git clone https://github.com/engdennylsonsantos-cloud/Hestia.git
 cd Hestia
-git switch claude/wizardly-goldberg-qtjveg   # a branch de trabalho; `main` está atrasada
+git switch main   # igual à branch de trabalho claude/wizardly-goldberg-qtjveg (2026-10-22)
 npm ci
 ```
 

@@ -55,8 +55,8 @@ sobram são não bloqueantes (ver "Pendências").
   (`casing`), soleira saliente só de janela (`sillBoard`), verga e contraverga com transpasse (`lintel`, `sillBeam`).
   Sem o campo, nada é desenhado. Aparecem no 3D e no corte; na planta, verga e peitoril ainda não (P13).
 - Favoritos no seletor (`favoriteOpeningTypes`, desfazível).
-- Giro e X de vão em planta, corte e elevação (0024): o giro é a diagonal da dobradiça à base do trinco, tracejada
-  quando abre para o observador; o X de vão em parede é convenção própria; o X de furo de piso/laje segue o Shaft Opening
+- Giro e X de vão em planta, corte e elevação (0024): o giro é o símbolo em "V" (vértice no lado da dobradiça, a meia altura; pontas no lado do
+  trinco; decisão 0024 §2), tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto; o X de vão em parede é convenção própria; o X de furo de piso/laje segue o Shaft Opening
   do Revit.
 - 3D por família; folha aberta com "Abrir vãos" (vidro, giro, correr e pivotante corrigidos, 0017 §11).
 - Instância com lado da dobradiça, sentido de abertura e marca; "Tabela de portas e janelas" com CSV.
@@ -101,7 +101,7 @@ sobram são não bloqueantes (ver "Pendências").
   eles (P13); janela de giro como família (P14); tipo basculante no catálogo; X no DXF de corte (X4) e X dos furos de
   piso/laje no DXF de planta (X5); porta pivotante com eixo provisório a W/4 (0024 §7). P13, X4 e X5 estão `[-]` por
   limite de escopo e não estão feitos.
-- **Símbolo de giro**: hoje diagonal única (0024 §2, convenção própria); não há símbolo em "V" duplo no código.
+- **Símbolo de giro**: em "V" (convenção própria: a NBR 6492:2021 é paga e não foi acessada; 0024 §2).
 - **Junções**: "Inverter corte/Não cortar" por par (P-4, adiada; 0023 §13 e P10).
 - **Ambientes**: sem geometria 3D própria (D2); sem linha separadora (A5); sem piso de acabamento gerado (C3).
 - **Forros**: o forro grava o contorno do ambiente na criação (0021 §4). A decisão do dono de 2026-10-22 (0023 §13, P-5)
@@ -119,7 +119,7 @@ sobram são não bloqueantes (ver "Pendências").
 ## Pendências não bloqueantes
 
 - **Parede × piso/laje** (E3, C6 e C8): planta, corte e 3D ainda não recortam a parede pela região do piso ou da laje.
-  Os quantitativos já seguem a prioridade de camada (0023 §1, P7). O rótulo "P7c" não existe nos documentos.
+  Os quantitativos já seguem a prioridade de camada (0023 §1, P7). A parede ainda não é recortada nos desenhos pela camada de piso ou laje que vence (parte adiada da P7, chamada P7c nas conversas de projeto).
 - **Término na junção** (0023 P8, parcial): falta o término em perímetro externo, cor e hachura por camada na planta, e
   IFC e DXF por camada.
 - **Canto reentrante de um L** (achado do P8, não corrigido): o circuito de paredes deixa um quadrado d × d sem parede

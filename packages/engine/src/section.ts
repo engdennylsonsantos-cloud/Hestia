@@ -17,7 +17,6 @@ import { membraneCutsOf, type SectionMembrane } from './sectionMembrane.ts';
 
 export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
 export { type SectionPart } from './sectionParts.ts';
-export { type SectionMembrane } from './sectionMembrane.ts';
 
 /**
  * Corte e elevação a partir da geometria já resolvida em faixas (bands).
@@ -182,8 +181,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   };
   // Além e vãos ainda sem oclusão (projeção completa): a oclusão e a parte visível vêm no fim.
   const beyond: SectionBeyond[] = [];
-  const membranes: SectionMembrane[] = [];
-  const frame = { line, length, d, n };
+  const membranes: SectionMembrane[] = []; const frame = { line, length, d, n };
   const openings: SectionOpening[] = [];
   let zMin = Infinity;
   let zMax = -Infinity;

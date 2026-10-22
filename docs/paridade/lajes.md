@@ -52,3 +52,4 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] G4 Testes de propriedade (sem exceção, volume = área × espessura média)
 - [x] G5 Migração de arquivo v7 e ida e volta
 - [x] G6 Regressão visual por captura
+- [x] G7 Membrana de espessura zero: linha na planta e no corte, área de face e volume zero, sem sólido no 3D (decisão 0023 P4)

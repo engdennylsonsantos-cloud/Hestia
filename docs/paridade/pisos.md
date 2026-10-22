@@ -57,3 +57,4 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] G4 Testes de propriedade com contornos aleatórios (sem exceção, área = contorno − furos)
 - [x] G5 Migração de arquivo antigo (v6 sem pisos) e ida e volta de arquivo
 - [x] G6 Regressão visual por captura de tela
+- [x] G7 Membrana de espessura zero: linha na planta e no corte, área de face e volume zero, sem sólido no 3D (decisão 0023 P4)

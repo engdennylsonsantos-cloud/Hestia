@@ -8,7 +8,7 @@ import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
-import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, type SectionLine } from './sectionGeom.ts';
+import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, slabQuad, type SectionLine } from './sectionGeom.ts';
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
@@ -160,12 +160,6 @@ function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
 }
 
 /** Camada de laje entre as cotas de base (b0 em t0, b1 em t1) e de topo (u0 em t0, u1 em t1): trapézio se inclinada. */
-const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
-  { x: t0, y: b0 },
-  { x: t1, y: b1 },
-  { x: t1, y: u1 },
-  { x: t0, y: u0 },
-];
 
 export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p.levels.map((l) => l.id)): SectionResult {
   const { length, d, n, slab } = sectionFrame(line);
@@ -200,9 +194,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     const jl = junctionLevel(p, levelId);
     for (const f of resolveFloors(p, levelId)) {
       membranes.push(...membraneCutsOf(f.polygon, f.layers, { floorId: f.floorId }, null, frame));
-      const el = jl.elements.get(f.floorId);
       for (const layer of f.layers) {
-        const parts = layerPartsOf(el, layer.layerIndex, [{ poly: f.polygon, z0: layer.z0, z1: layer.z1 }]);
+        const parts = layerPartsOf(jl.elements.get(f.floorId), layer.layerIndex, [{ poly: f.polygon, z0: layer.z0, z1: layer.z1 }]);
         for (const part of parts) {
           for (const poly of part.poly) {
             for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
@@ -236,9 +229,8 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     // Lajes com caimento não entram na junção (`junctionLevel`) e seguem como antes.
     for (const sl of resolveSlabs(p, levelId)) {
       membranes.push(...membraneCutsOf(sl.polygon, sl.layers, { slabId: sl.slabId }, sl.slope, frame));
-      const el = jl.elements.get(sl.slabId);
       for (const layer of sl.layers) {
-        const parts = layerPartsOf(el, layer.layerIndex, [{ poly: sl.polygon, z0: layer.z0, z1: layer.z1 }]);
+        const parts = layerPartsOf(jl.elements.get(sl.slabId), layer.layerIndex, [{ poly: sl.polygon, z0: layer.z0, z1: layer.z1 }]);
         for (const part of parts) {
           for (const poly of part.poly) {
             for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {

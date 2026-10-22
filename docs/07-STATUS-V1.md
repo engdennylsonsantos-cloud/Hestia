@@ -164,6 +164,7 @@ npm run build:artifact # gera apps/web/dist/artifact.html
 npm run e2e            # fluxo no navegador (requer Chromium do Playwright)
 node tests/e2e/pranchas.mjs            # pranchas: aba, vistas, carimbo e PDF (requer build e Chromium)
 node tests/e2e/visual-regression.mjs   # regressão visual da planta (--update regrava as referências)
+node tests/e2e/visual-regression-gpu.mjs   # regressão visual da planta no caminho GPU, 6 casos (--update regrava as referências em baseline-gpu/)
 npm run parity         # percentual de paridade por elemento
 ```
 

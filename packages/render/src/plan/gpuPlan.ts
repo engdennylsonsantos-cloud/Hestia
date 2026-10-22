@@ -80,12 +80,17 @@ export class PlanScene {
     this.camera.position.set(0, 0, 10);
   }
 
+  /**
+   * Todo material é transparente (mesmo opaco): o three.js desenha os opacos antes dos transparentes, e isso poria a hachura
+   * (com textura) por cima das paredes, que vêm depois na lista. Com tudo no mesmo grupo, a ordem é a da lista (`renderOrder`),
+   * como no CPU (decisão 0015 §2.4). Um pixel de alfa 1 sobrescreve; um de alfa 0 da textura não altera o que está embaixo.
+   */
   private material(key: string, color: string, alpha: number, map?: THREE.Texture | null): THREE.MeshBasicMaterial {
     let m = this.mats.get(key);
     if (!m) {
       m = new THREE.MeshBasicMaterial({
         color: new THREE.Color(color),
-        transparent: alpha < 1 || !!map,
+        transparent: true,
         opacity: alpha,
         depthTest: false,
         depthWrite: false,

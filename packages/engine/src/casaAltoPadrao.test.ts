@@ -322,7 +322,22 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
     const e = st!.riserHeight;
     expect(2 * e + 0.285).toBeGreaterThan(0.63);
     expect(2 * e + 0.285).toBeLessThan(0.64);
-    expect(stairValidationIssues(p)).toEqual([]);
+    // A invasão nas paredes é o problema de partido da seção 5, conferido no teste seguinte.
+    expect(stairValidationIssues(p).filter((i) => i.code !== 'stair-wall-overlap')).toEqual([]);
+  });
+
+  it('stair-wall-overlap: a escada invade T-I-01 (0,42 m²) e T-I-06 (0,07 m²) hoje (guarda da parte 2)', () => {
+    const p = project();
+    const list = stairValidationIssues(p).filter((i) => i.code === 'stair-wall-overlap');
+    expect(list.map((i) => i.ids?.[1]).sort()).toEqual(['T-I-01', 'T-I-06']);
+    for (const i of list) expect(i.elementId).toBe('ES-01');
+    const areaOf = (wallId: string): number => {
+      const hit = list.find((i) => i.ids?.[1] === wallId)!;
+      const m = /em (\d+,\d+) m²/.exec(hit.message);
+      return m ? Number(m[1]!.replace(',', '.')) : NaN;
+    };
+    expect(areaOf('T-I-01')).toBeCloseTo(0.42, 2);
+    expect(areaOf('T-I-06')).toBeCloseTo(0.07, 2);
   });
 
   it('o lance do modelo é o mesmo croqui de generateStraightRun (eixo 6,10; 2,00, subindo para o norte)', () => {

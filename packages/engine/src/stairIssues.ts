@@ -9,6 +9,8 @@ export interface StairIssueItem {
   message: string;
   stairId: string;
   componentIndex?: number;
+  /** Elementos envolvidos, para o "Ir para" (ex.: escada e parede invadida). */
+  ids?: string[];
 }
 
 /** Tolerância (m) nas comparações com faixas e com o nº de espelhos (evita 0,28 × 0,9999… virar aviso). */

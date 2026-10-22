@@ -18,6 +18,9 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(pathToFileURL(path.resolve('apps/web/dist/index.html')).href + '?cpu=1&debug=1');
 await page.waitForFunction(() => window.__hestia);
+// As fontes da interface terminam de carregar depois do boot e mudam a altura do canvas (491 → 524 px); esperá-las evita
+// que a primeira captura enquadre com a área antiga.
+await page.evaluate(() => document.fonts.ready);
 
 const W = (id, a, b, extra = {}) => ({ id, kind: 'wall', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, baseOffset: 0, topLevelId: null, height: 2.8, topOffset: 0, locationLine: 'wallCenter', flipped: false, noJoinStart: false, noJoinEnd: false, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, sag: 0, topProfile: null, mark: '', comments: '', ...extra });
 const F = (id, boundary, extra = {}) => ({ id, kind: 'floor', typeId: 'ft_ceram', levelId: 'lv_0', boundary: boundary.map(([x, y]) => ({ x, y })), holes: [], heightOffset: 0, mark: '', comments: '', ...extra });
@@ -63,6 +66,10 @@ const TRI_EAVE = [[-0.3, -0.3], [8.3, -0.3], [4, 6.4]];
 const RECT_WALLS = [[0, 0], [8, 0], [8, 6], [0, 6]];
 const RECT_EAVE = [[-0.3, -0.3], [8.3, -0.3], [8.3, 6.3], [-0.3, 6.3]];
 
+// Decisão 0013: com o padrão (corte 1,20 m) o telhado a 2,80 m fica acima do corte e só aparece tracejado. Os casos de telhado
+// usam topo 6,0 m e corte 2,75 m: a face inferior do beiral (2,80 − 0,095) fica ≤ corte ≤ cumeeira, então o telhado é cortado,
+// e o corte (2,75 m) ainda atravessa as paredes de 2,80 m, que mantêm a hachura da baseline.
+const VISTA_COBERTURA = { top: 6, cut: 2.75 };
 const ROOF_CASES = {
   'telhado-duas-aguas': [...HOUSE, R('t1', 'gable', { x: 1, y: 0 })],
   'telhado-quatro-aguas': [...HOUSE, R('t1', 'hip', { x: 1, y: 0 })],
@@ -78,15 +85,44 @@ const ROOF_CASES = {
 const RM = (id, extra = {}) => ({ id, kind: 'room', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 4, y: 3 }, heightOffset: 0, floorFinish: '', wallFinish: '', ceilingFinish: '', ...extra });
 const ROOM_CASES = { 'ambiente-sala': [...wallsOf(RECT_WALLS), RM('r1')] };
 
+// Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas
+// no desenho seguinte ao layout. A espera pede duas medidas iguais seguidas do canvas, que a vista do editor tenha o mesmo
+// tamanho, e dois quadros de animação. Assim o enquadramento sai sempre com a área final.
+async function assentar(page) {
+  await page.evaluate(() => new Promise((resolve) => {
+    const canvas = () => document.querySelector('.canvas-wrap canvas');
+    const medir = () => { const r = canvas()?.getBoundingClientRect(); return r ? `${Math.round(r.width)}x${Math.round(r.height)}` : ''; };
+    const vistaIgual = () => {
+      const v = window.__hestia.editor.viewport();
+      const r = canvas()?.getBoundingClientRect();
+      return !!v && !!r && v.width === Math.round(r.width) && v.height === Math.round(r.height);
+    };
+    let anterior = '';
+    let iguais = 0;
+    let tentativas = 0;
+    const passo = () => {
+      const atual = medir();
+      iguais = atual !== '' && atual === anterior ? iguais + 1 : 0;
+      anterior = atual;
+      if ((iguais >= 1 && vistaIgual()) || ++tentativas > 100) return requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      setTimeout(passo, 50);
+    };
+    passo();
+  }));
+}
+
 let failed = 0;
 for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES })) {
-  await page.evaluate((ws) => {
+  const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
+  await page.evaluate(([ws, v]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
     for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
-    editor.zoomExtents();
-  }, items);
-  await page.waitForTimeout(250);
+    if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });
+  }, [items, vista]);
+  await assentar(page);
+  await page.evaluate(() => window.__hestia.editor.zoomExtents());
+  await assentar(page);
   const canvas = page.locator('.canvas-wrap canvas').first();
   const shot = await canvas.screenshot();
   const file = `${BASE}/${name}.png`;

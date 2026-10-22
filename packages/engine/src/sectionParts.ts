@@ -1,4 +1,4 @@
-import { intersection, union, type MultiPolygon, type Polygon } from '@hestia/geom';
+import { union, type MultiPolygon, type Polygon } from '@hestia/geom';
 import type { SectionOrigin } from './section.ts';
 
 /**
@@ -11,7 +11,7 @@ export interface SectionPart {
 }
 
 /** Chave estável de uma origem (por valor), para agrupar e distinguir origens. */
-const originKey = (o: SectionOrigin): string => JSON.stringify(o);
+export const originKey = (o: SectionOrigin): string => JSON.stringify(o);
 
 /** Origens distintas (por valor), na ordem da primeira aparição. */
 export function uniqueOrigins(list: SectionOrigin[]): SectionOrigin[] {
@@ -35,12 +35,4 @@ export function partsByOrigin(list: Array<{ polygon: Polygon; origin: SectionOri
     origin,
     polygons: union(...list.filter((c) => originKey(c.origin) === originKey(origin)).map((c): MultiPolygon => [c.polygon])),
   }));
-}
-
-/** Recorta cada peça pela região visível (oclusão já aplicada) e descarta as que não sobraram. */
-export function clipParts(parts: SectionPart[] | undefined, visible: MultiPolygon): SectionPart[] | undefined {
-  if (!parts) return undefined;
-  return parts
-    .map((part): SectionPart => ({ origin: part.origin, polygons: intersection(part.polygons, visible) }))
-    .filter((part) => part.polygons.length > 0);
 }

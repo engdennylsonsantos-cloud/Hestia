@@ -11,7 +11,8 @@ import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, type Section
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
-import { clipParts, partsByOrigin, uniqueOrigins, type SectionPart } from './sectionParts.ts';
+import { uniqueOrigins, type SectionPart } from './sectionParts.ts';
+import { cutPieces, cutRegions, type CutPiece } from './sectionCut.ts';
 
 export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
 export { type SectionPart } from './sectionParts.ts';
@@ -358,20 +359,16 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   }
 
   // Linha oculta: corte (depth 0), vãos e o além numa só ordem do mais perto ao mais longe; cada um vê o que sobra.
-  type Ref = { cut: SectionRegion } | { beyond: SectionBeyond } | { opening: SectionOpening };
+  // O corte é ocluído peça a peça (uma por origem em cada material), pela cota (`cotaKeys`), não pela ordem de inserção.
+  const cutEntries = [...cutBy.values()];
+  const cutSources = cutEntries.map((entry) => uniqueOrigins(entry.items.map((c) => c.origin)));
+  const pieces = cutPieces(cutEntries, cutSources);
+  type Ref = { cut: CutPiece } | { beyond: SectionBeyond } | { opening: SectionOpening };
   const refs: Ref[] = [];
   const items: OcclusionItem[] = [];
-  for (const { materialId, hatch, items: list } of cutBy.values()) {
-    const sources = uniqueOrigins(list.map((c) => c.origin));
-    const region: SectionRegion = {
-      materialId,
-      hatch,
-      polygons: union(...list.map((c): MultiPolygon => [c.polygon])),
-      sources,
-      parts: partsByOrigin(list, sources),
-    };
-    refs.push({ cut: region });
-    items.push({ depth: 0, rank: OCCLUSION_RANK.cut, polygons: region.polygons });
+  for (const piece of pieces) {
+    refs.push({ cut: piece });
+    items.push(piece.item);
   }
   for (const b of groupBeyond(beyond)) {
     refs.push({ beyond: b });
@@ -382,18 +379,17 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     items.push({ depth: o.depth, rank: OCCLUSION_RANK.opening, polygons: o.polygons });
   }
   const visible = visibleParts(items);
-  const cut: SectionRegion[] = [];
   const beyondVisible: SectionBeyond[] = [];
   const openingsVisible: SectionOpening[] = [];
+  const cutVisible: SectionPart[][] = cutEntries.map((): SectionPart[] => []);
   refs.forEach((ref, i) => {
     const polygons = visible[i]!;
     if (polygons.length === 0) return;
-    if ('cut' in ref) {
-      const parts = clipParts(ref.cut.parts, polygons);
-      cut.push({ ...ref.cut, polygons, parts });
-    } else if ('beyond' in ref) beyondVisible.push({ ...ref.beyond, polygons });
+    if ('cut' in ref) cutVisible[ref.cut.entry]!.push({ origin: ref.cut.part.origin, polygons });
+    else if ('beyond' in ref) beyondVisible.push({ ...ref.beyond, polygons });
     else openingsVisible.push({ ...ref.opening, polygons });
   });
+  const cut = cutRegions(cutEntries, cutSources, cutVisible);
   // Telhado: as camadas projetam na mesma área (a face é inclinada), então a de cima (índice menor) desenha por último.
   beyondVisible.sort((x, y) => y.depth - x.depth || (x.roofId || y.roofId ? y.layerIndex - x.layerIndex : x.layerIndex - y.layerIndex));
   openingsVisible.sort((x, y) => y.depth - x.depth);

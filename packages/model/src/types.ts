@@ -12,7 +12,8 @@ export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRu
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
 
-export type HatchKind = 'solid' | 'diagonal' | 'cross' | 'dots' | 'none';
+/** Hachura de superfície. `gesso` é a do forro (tracejado leve), definida no tipo de forro (decisão 0021, D3). */
+export type HatchKind = 'solid' | 'diagonal' | 'cross' | 'dots' | 'gesso' | 'none';
 
 export interface Material {
   id: Id;
@@ -336,6 +337,8 @@ export interface CeilingType {
   layers: Layer[];
   /** Custo por m² (R$), informativo. */
   cost: number;
+  /** Hachura do corte e da elevação (D3). Sem valor, usa a hachura do material da camada. */
+  hatch?: HatchKind;
 }
 
 /**

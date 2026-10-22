@@ -32,6 +32,8 @@ function hatchPattern(ctx: CanvasRenderingContext2D, kind: string, color: string
   }
   g.stroke();
   if (kind === 'dots') g.fillRect(3, 3, 1.5, 1.5);
+  // `gesso` (forro, D3): tracejado leve, um traço horizontal por célula.
+  if (kind === 'gesso') g.fillRect(0, 3, 5, 1);
   const pat = ctx.createPattern(c, 'repeat');
   patternCache.set(key, pat);
   return pat;

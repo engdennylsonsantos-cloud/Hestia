@@ -30,7 +30,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Ceiling e Ceiling P
 ## D · Outras vistas
 - [x] D1 3D: sólido por camada, na categoria de pisos
 - [x] D2 Corte e elevação: faixa t×z por camada, com origem do forro
-- [ ] D3 Hachura própria de forro no corte (usa a hachura do material) — revisão visual pendente
+- [x] D3 Hachura própria de forro (`gesso`, no tipo `hatch`) no corte e na elevação, com teste
 
 ## E · Edição
 - [x] E1 Comandos `addCeiling`, `addCeilings` (lote), `updateCeiling`, `removeCeiling`, com desfazer/refazer **(bloqueante)**

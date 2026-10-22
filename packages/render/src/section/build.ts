@@ -75,7 +75,10 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     if (!noFill) {
       const fade = 0.55 + 0.35 * (b.depth / maxDepth);
       const color = pt.visual === 'shaded' ? base : mix(mix(base, paper, 0.55), paper, fade * 0.35);
-      fills.push({ polygons: b.polygons, color: halftone(color, pt), alpha: pt.alpha });
+      const hatch = b.hatch && !wire && (detail === 'fine' || v.zoom >= 40)
+        ? { kind: b.hatch, color: halftone(mix(base, input.dark ? '#ffffff' : '#000000', 0.45), pt) }
+        : undefined;
+      fills.push({ polygons: b.polygons, color: halftone(color, pt), alpha: pt.alpha, hatch });
     }
     const line = mix(theme.ink, paper, 0.35 + 0.4 * (b.depth / maxDepth));
     for (const ring of ringsOf(b.polygons)) strokes.push({ pts: ring, closed: true, widthPx: projWidth(cat), color: halftone(line, pt), alpha: 1 });
@@ -241,8 +244,9 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
         if (!noFill) {
           const base = pt.color ?? m?.color ?? '#999999';
           const color = pt.visual === 'shaded' ? base : mix(base, paper, input.dark ? 0.5 : 0.58);
-          const hatch = !wire && m && m.hatch !== 'none' && (detail === 'fine' || v.zoom >= 40)
-            ? { kind: m.hatch, color: halftone(mix(pt.color ?? m.color, input.dark ? '#ffffff' : '#000000', 0.45), pt) }
+          const hatchKind = r.hatch ?? m?.hatch;
+          const hatch = !wire && hatchKind && hatchKind !== 'none' && (detail === 'fine' || v.zoom >= 40)
+            ? { kind: hatchKind, color: halftone(mix(pt.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45), pt) }
             : undefined;
           fills.push({ polygons: r.polygons, color: halftone(color, pt), alpha: pt.alpha, hatch });
         }

@@ -189,3 +189,14 @@ Decisões do dono e o que passou a valer em `packages/render/src/model3d/opening
   eixo da basculante fica para uma decisão futura.
 - **Basculante e maxim-ar.** O 3D não distingue a basculante da maxim-ar enquanto não houver decisão sobre o eixo
   inferior; a dimensão das peças é a mesma fechada e aberta nos 14 tipos padrão.
+
+## 12 · Atualização da representação técnica (OP1, 2026-10-22)
+
+Decisão completa em [0024](0024-representacao-aberturas.md). O que muda nesta seção:
+
+- **Giro na elevação (§6, E1).** O símbolo de giro sai tracejado quando a folha abre para o observador e contínuo quando
+  abre para o lado oposto; o vértice fica no lado da dobradiça. Convenção própria: a NBR 6492 e a Autodesk não deram a regra.
+- **Porta dupla e pivotante na elevação (§6).** Dupla: duas diagonais das ombreiras ao centro. Pivotante: eixo a W/4 e folha.
+- **Vão livre e furos com X (0024 §3).** O vão livre leva duas diagonais no corte, na elevação e na planta; furo
+  quadrangular de piso e laje leva o X na planta. O X segue a categoria da abertura e não aparece no grosseiro.
+- **Pivotante (§8).** A posição do eixo continua provisória (W/4), sem fonte oficial.

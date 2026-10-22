@@ -59,7 +59,7 @@ export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
     let grossTotal = 0;
     for (const l of rw.layers) {
       const grossVol = l.bands.reduce((s, b) => s + bandVolume(b), 0);
-      const vol = l.bands.reduce((s, b) => s + Math.max(0, bandVolume(b) - cutVolume(bandPiece(rw, b), 'wall', cutters)), 0);
+      const vol = l.bands.reduce((s, b) => s + Math.max(0, bandVolume(b) - cutVolume(bandPiece(rw, b, { priority: l.priority, core: l.core }), 'wall', cutters)), 0);
       total += vol;
       grossTotal += grossVol;
       layers.push({ wallId: rw.wallId, layerIndex: l.layerIndex, materialId: l.materialId, planArea: multiArea(l.cut), volume: vol, grossVolume: grossVol });

@@ -1,5 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { floorsOnLevel, isMembraneLayer, levelElevation, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, type Id, type Project } from '@hestia/model';
+import { layerCoreFlags } from './junctionPlanar.ts';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
@@ -9,6 +10,9 @@ export interface ResolvedFloorLayer {
   materialId: Id;
   z0: number;
   z1: number;
+  /** Prioridade efetiva e núcleo, para a junção por camada (decisão 0023 §1, P7). */
+  priority: number;
+  core: boolean;
   /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
   membrane: boolean;
 }
@@ -60,8 +64,9 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
     const topZ = levelElevation(p, f.levelId) + f.heightOffset;
     let z = topZ;
     const layers: ResolvedFloorLayer[] = [];
+    const core = layerCoreFlags(type.layers);
     type.layers.forEach((l, i) => {
-      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l) });
+      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l), priority: layerPriority(l), core: core[i]! });
       z -= l.thickness;
     });
     const bottomZ = z;

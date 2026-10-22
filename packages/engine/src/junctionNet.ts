@@ -1,9 +1,13 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
-import { resolveFloors, type ResolvedFloor } from './floors.ts';
-import { resolveSlabs, slabRiseAt } from './slabs.ts';
+import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
+import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
+import { winsOver, type JunctionKind, type JunctionMeta } from './junctionPlanar.ts';
+import { resolveLevel } from './resolve.ts';
 import type { LayerBand, ResolvedWall } from './types.ts';
+
+export type { JunctionKind } from './junctionPlanar.ts';
 
 /**
  * Quantitativos líquidos (decisão 0023 §4, P5). Um elemento cortado perde o volume que está dentro do elemento que o
@@ -11,15 +15,17 @@ import type { LayerBand, ResolvedWall } from './types.ts';
  * laje corta piso e parede; piso corta parede; parede não corta ninguém; laje não é cortada por nenhum elemento.
  */
 
-/** Tipo de elemento para a junção. */
-export type JunctionKind = 'wall' | 'floor' | 'slab';
-
-/** Quem corta um elemento deste tipo (padrão por tipo, §1.3). */
+/** Quem corta um elemento deste tipo sem atributo de camada (padrão por tipo, §1.3). Só para peças sem `meta`. */
 const CUTTERS: Record<JunctionKind, readonly JunctionKind[]> = {
   wall: ['floor', 'slab'],
   floor: ['slab'],
   slab: [],
 };
+
+/** Atributos de junção da camada e o elemento dono (a camada não corta as outras do próprio elemento). */
+export interface PieceMeta extends JunctionMeta {
+  owner: string;
+}
 
 /**
  * Pedaço sólido: a forma em planta e a faixa de cota (base e topo absolutos, em m) em cada ponto. `flat` indica cota
@@ -29,6 +35,8 @@ export interface SolidPiece {
   poly: MultiPolygon;
   span: (p: Vec2) => readonly [number, number];
   flat: boolean;
+  /** Prioridade, núcleo e dono da camada (P7). Sem ele, vale o padrão por tipo (`CUTTERS`). */
+  meta?: PieceMeta;
 }
 
 /** Elemento que corta outros, como os pedaços de cada camada dele. */
@@ -39,6 +47,18 @@ export interface CutterSolid {
 
 /** Tolerância (m) para a face de espessura zero (membrana) estar dentro da faixa de um cortador. */
 const Z_EPS = 1e-6;
+
+/**
+ * `c` (com a peça `cp`) corta a peça `piece`? Com atributos de camada, vale a prioridade (0023 §1, P7) e o outro elemento
+ * do próprio dono não corta. Sem atributos, vale o padrão por tipo.
+ */
+function cuts(c: CutterSolid, cp: SolidPiece, piece: SolidPiece, kind: JunctionKind): boolean {
+  if (cp.meta && piece.meta) {
+    if (cp.meta.owner === piece.meta.owner) return false;
+    return winsOver(cp.meta, piece.meta) === true;
+  }
+  return CUTTERS[kind].includes(c.kind);
+}
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
@@ -85,8 +105,7 @@ export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
 export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {
   let cut = 0;
   for (const c of cutters) {
-    if (!CUTTERS[kind].includes(c.kind)) continue;
-    for (const cp of c.pieces) cut += overlapVolume(piece, cp);
+    for (const cp of c.pieces) if (cuts(c, cp, piece, kind)) cut += overlapVolume(piece, cp);
   }
   return cut;
 }
@@ -98,8 +117,8 @@ export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readon
 export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {
   let area = 0;
   for (const c of cutters) {
-    if (!CUTTERS[kind].includes(c.kind)) continue;
     for (const cp of c.pieces) {
+      if (!cuts(c, cp, piece, kind)) continue;
       const common = intersection(piece.poly, cp.poly);
       const first = common[0]?.[0]?.[0];
       if (!first) continue;
@@ -111,31 +130,46 @@ export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: 
   return area;
 }
 
-/** Pedaços das lajes do nível, camada a camada (a inclinação entra na faixa de cada ponto). */
-export function slabCutters(p: Project, levelId: Id): CutterSolid[] {
-  return resolveSlabs(p, levelId).map((rs) => ({
-    kind: 'slab',
-    pieces: rs.layers.map((l) => ({
-      poly: rs.polygon,
-      span: (q: Vec2) => [l.z0 + slabRiseAt(rs.slope, q), l.z1 + slabRiseAt(rs.slope, q)] as const,
-      flat: rs.slope === null,
-    })),
-  }));
+/** Pedaço de uma camada de laje: a forma em planta da laje e a faixa de cota da camada (inclinação incluída). */
+export function slabLayerPiece(rs: ResolvedSlab, l: ResolvedSlab['layers'][number]): SolidPiece {
+  return {
+    poly: rs.polygon,
+    span: (q: Vec2) => [l.z0 + slabRiseAt(rs.slope, q), l.z1 + slabRiseAt(rs.slope, q)] as const,
+    flat: rs.slope === null,
+    meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId },
+  };
 }
 
-/** Pedaços dos pisos do nível, camada a camada (pisos são faixas constantes). */
+/** Pedaços das lajes do nível, camada a camada (a inclinação entra na faixa de cada ponto). */
+export function slabCutters(p: Project, levelId: Id): CutterSolid[] {
+  return resolveSlabs(p, levelId).map((rs) => ({ kind: 'slab', pieces: rs.layers.map((l) => slabLayerPiece(rs, l)) }));
+}
+
+/** Pedaço de uma camada de piso: a forma em planta do piso e a faixa de cota da camada (pisos são faixas constantes). */
+export function floorLayerPiece(rf: ResolvedFloor, l: ResolvedFloorLayer): SolidPiece {
+  return { ...flatPiece(rf.polygon, l.z0, l.z1), meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId } };
+}
+
+/** Pedaços dos pisos do nível, camada a camada. */
 export function floorCutters(p: Project, levelId: Id): CutterSolid[] {
-  return resolveFloors(p, levelId).map((rf: ResolvedFloor) => ({
-    kind: 'floor',
-    pieces: rf.layers.map((l) => flatPiece(rf.polygon, l.z0, l.z1)),
-  }));
+  return resolveFloors(p, levelId).map((rf: ResolvedFloor) => ({ kind: 'floor', pieces: rf.layers.map((l) => floorLayerPiece(rf, l)) }));
+}
+
+/** Pedaços das faixas de parede do nível, camada a camada: piso e laje também podem ser cortados por parede (0023 §1, P7). */
+export function wallCutters(p: Project, levelId: Id): CutterSolid[] {
+  const r = resolveLevel(p, levelId);
+  const pieces = Object.values(r.walls).flatMap((rw) =>
+    rw.layers.flatMap((l) => l.bands.map((b) => bandPiece(rw, b, { priority: l.priority, core: l.core }))),
+  );
+  return [{ kind: 'wall', pieces }];
 }
 
 /** Pedaço de uma faixa de altura de parede: a base absoluta da parede mais a faixa (o topo pode ser inclinado). */
-export function bandPiece(rw: ResolvedWall, b: LayerBand): SolidPiece {
+export function bandPiece(rw: ResolvedWall, b: LayerBand, meta?: Pick<PieceMeta, 'priority' | 'core'>): SolidPiece {
   return {
     poly: b.poly,
     span: (q: Vec2) => [rw.baseZ + b.z0, rw.baseZ + bandTopAt(b, q)] as const,
     flat: !b.slope,
+    ...(meta ? { meta: { kind: 'wall' as const, owner: rw.wallId, ...meta } } : {}),
   };
 }

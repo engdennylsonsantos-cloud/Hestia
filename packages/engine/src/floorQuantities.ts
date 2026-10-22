@@ -1,7 +1,7 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors, type ResolvedFloor } from './floors.ts';
-import { coveredFaceArea, cutVolume, flatPiece, slabCutters, type CutterSolid } from './junctionNet.ts';
+import { coveredFaceArea, cutVolume, floorCutters, floorLayerPiece, slabCutters, wallCutters, type CutterSolid } from './junctionNet.ts';
 
 /** Uma camada de um piso. A área é a da face superior da camada, líquida: sem o que a laje ocupa (decisão 0023 §4). */
 export interface FloorLayerQuantity {
@@ -60,7 +60,7 @@ function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: Floo
   const area = multiArea(rf.polygon);
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
-    const piece = flatPiece(rf.polygon, l.z0, l.z1);
+    const piece = floorLayerPiece(rf, l);
     // Só o volume que a laje ocupa sai do piso (padrão por tipo, §1.3). A membrana não tem volume a descontar.
     const grossVolume = l.membrane ? 0 : area * thickness;
     const volume = l.membrane ? 0 : Math.max(0, grossVolume - cutVolume(piece, 'floor', cutters));
@@ -105,7 +105,7 @@ export function quantifyFloors(p: Project, levelId: Id): FloorQuantities {
   const layers: FloorLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
-  const cutters = slabCutters(p, levelId);
+  const cutters = [...slabCutters(p, levelId), ...floorCutters(p, levelId), ...wallCutters(p, levelId)];
   for (const rf of resolveFloors(p, levelId)) {
     const q = quantifyFloor(rf, cutters);
     floors.push(q.floor);

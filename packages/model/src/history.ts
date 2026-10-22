@@ -241,5 +241,17 @@ export function labelOf(c: Command): string {
       return 'Editar texto';
     case 'removeText':
       return 'Excluir texto';
+    case 'addSheet':
+      return 'Criar prancha';
+    case 'updateSheet':
+      return 'Editar prancha';
+    case 'removeSheet':
+      return 'Excluir prancha';
+    case 'addViewport':
+      return 'Adicionar vista à prancha';
+    case 'updateViewport':
+      return 'Mover vista da prancha';
+    case 'removeViewport':
+      return 'Excluir vista da prancha';
   }
 }

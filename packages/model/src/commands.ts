@@ -49,6 +49,7 @@ import {
 } from './graphicsCommands.ts';
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
+import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -81,6 +82,7 @@ export type Command =
   | { type: 'upsertOpeningType'; openingType: OpeningType }
   | { type: 'upsertLevel'; level: Level }
   | AnnotationCommand
+  | SheetCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
@@ -357,6 +359,14 @@ export function applyCommand(p: Project, c: Command): void {
     case 'updateText':
     case 'removeText':
       applyAnnotationCommand(p, c);
+      break;
+    case 'addSheet':
+    case 'updateSheet':
+    case 'removeSheet':
+    case 'addViewport':
+    case 'updateViewport':
+    case 'removeViewport':
+      applySheetCommand(p, c);
       break;
     case 'setLevelViewRange': {
       const l = p.levels.find((x) => x.id === c.levelId);

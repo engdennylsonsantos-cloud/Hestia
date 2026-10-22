@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 import type { ViewRange } from './viewRange.ts';
+import type { Sheet } from './sheet.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 
 export type Id = string;
@@ -494,6 +495,8 @@ export interface Project {
   view3d?: View3DSettings;
   /** Gráficos do corte e da elevação (decisão 0015); ausente = padrão. */
   sectionGraphics?: ViewGraphics;
+  /** Pranchas (decisão 0022); ausente = nenhuma. */
+  sheets?: Sheet[];
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

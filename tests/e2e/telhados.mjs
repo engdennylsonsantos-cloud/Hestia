@@ -38,7 +38,9 @@ await page.mouse.click(onWall.x, onWall.y);
 await page.waitForTimeout(500);
 const r = await roofs();
 check(r.length === 1, 'telhado criado pelas paredes');
-check(r[0]?.shape === 'gable', 'forma duas águas');
+// Telhado novo é por arestas (decisão 0008): duas águas = exatamente 2 arestas com inclinação (as outras são empenas).
+const caem = (r[0]?.edgeSlopes ?? []).filter((s) => s !== null && s > 0).length;
+check(r[0]?.shape === 'edges' && caem === 2, `forma duas águas (por arestas, ${caem} arestas com inclinação)`);
 const w = b.maxX - b.minX, h = b.maxY - b.minY;
 const xs = r[0] ? r[0].boundary.map((p) => p.x) : [0], ys = r[0] ? r[0].boundary.map((p) => p.y) : [0];
 const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);

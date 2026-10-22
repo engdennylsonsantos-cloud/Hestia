@@ -15,6 +15,7 @@ export * from './profile.ts';
 export * from './floor.ts';
 export * from './slab.ts';
 export * from './roof.ts';
+export * from './room.ts';
 export * from './stair.ts';
 export * from './stairTypes.ts';
 export * from './viewRange.ts';

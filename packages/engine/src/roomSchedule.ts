@@ -1,0 +1,149 @@
+import type { Id, Project } from '@hestia/model';
+import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { resolveRooms } from './rooms.ts';
+
+/** Um ambiente na tabela. Unidades: m, m² e m³. */
+export interface RoomScheduleRow {
+  roomId: Id;
+  number: string;
+  name: string;
+  levelId: Id;
+  levelName: string;
+  /** Área líquida do circuito (m²); 0 quando o ponto não está num circuito fechado. */
+  area: number;
+  /** Perímetro do contorno externo (m). */
+  perimeter: number;
+  /** Pé-direito (m). */
+  ceilingHeight: number;
+  /** Volume (m³) = área × pé-direito. */
+  volume: number;
+  floorFinish: string;
+  wallFinish: string;
+  ceilingFinish: string;
+}
+
+export interface RoomScheduleTotals {
+  count: number;
+  area: number;
+  perimeter: number;
+  volume: number;
+}
+
+/** Total de um nível (linhas agrupadas por `levelId`). */
+export interface RoomLevelTotals extends RoomScheduleTotals {
+  levelId: Id;
+  levelName: string;
+}
+
+export interface RoomSchedule {
+  rows: RoomScheduleRow[];
+  /** Total geral do projeto. */
+  totals: RoomScheduleTotals;
+  /** Totais por nível, na ordem dos níveis. */
+  byLevel: RoomLevelTotals[];
+}
+
+export interface RoomScheduleFilter {
+  levelId?: Id;
+}
+
+/**
+ * Tabela de ambientes do projeto inteiro, nível a nível (ordem de criação dentro de cada nível). A geometria vem de
+ * `resolveRooms`, então área, perímetro e volume são os mesmos da planta. Ambientes com problema (ponto fora de
+ * circuito) aparecem com área zero — a validação é quem aponta o problema.
+ */
+export function buildRoomSchedule(p: Project): RoomSchedule {
+  const rows: RoomScheduleRow[] = [];
+  for (const level of p.levels) {
+    for (const r of resolveRooms(p, level.id)) {
+      rows.push({
+        roomId: r.roomId,
+        number: r.number,
+        name: r.name,
+        levelId: level.id,
+        levelName: level.name,
+        area: r.area,
+        perimeter: r.perimeter,
+        ceilingHeight: r.ceilingHeight,
+        volume: r.volume,
+        floorFinish: r.floorFinish,
+        wallFinish: r.wallFinish,
+        ceilingFinish: r.ceilingFinish,
+      });
+    }
+  }
+  return { rows, totals: sumRoomRows(rows), byLevel: roomLevelTotals(rows) };
+}
+
+/** Linhas que passam pelo filtro de nível (sem filtro, todas). */
+export const filterRoomRows = (rows: RoomScheduleRow[], f: RoomScheduleFilter): RoomScheduleRow[] =>
+  rows.filter((r) => f.levelId === undefined || r.levelId === f.levelId);
+
+/** Somatórios de um conjunto de linhas (o da tabela inteira ou só o filtrado). */
+export function sumRoomRows(rows: RoomScheduleRow[]): RoomScheduleTotals {
+  return rows.reduce<RoomScheduleTotals>(
+    (t, r) => ({ count: t.count + 1, area: t.area + r.area, perimeter: t.perimeter + r.perimeter, volume: t.volume + r.volume }),
+    { count: 0, area: 0, perimeter: 0, volume: 0 },
+  );
+}
+
+/** Totais por nível de um conjunto de linhas, na ordem em que os níveis aparecem (linhas contíguas por nível). */
+export function roomLevelTotals(rows: RoomScheduleRow[]): RoomLevelTotals[] {
+  const out: RoomLevelTotals[] = [];
+  for (const r of rows) {
+    const last = out[out.length - 1];
+    if (last && last.levelId === r.levelId) {
+      last.count += 1;
+      last.area += r.area;
+      last.perimeter += r.perimeter;
+      last.volume += r.volume;
+    } else {
+      out.push({ levelId: r.levelId, levelName: r.levelName, count: 1, area: r.area, perimeter: r.perimeter, volume: r.volume });
+    }
+  }
+  return out;
+}
+
+const CSV_HEADER = ['Número', 'Nome', 'Nível', 'Área (m²)', 'Perímetro (m)', 'Pé-direito (m)', 'Volume (m³)', 'Piso', 'Parede', 'Forro'];
+
+/**
+ * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das tabelas de pisos
+ * e lajes). Uma linha por ambiente, uma linha de subtotal por nível e uma linha de total geral.
+ */
+export function roomScheduleToCsv(rows: RoomScheduleRow[], totals: RoomScheduleTotals): string {
+  const n = formatDecimal;
+  const lines: string[][] = [CSV_HEADER];
+  let levelId: Id | null = null;
+  let levelName = '';
+  let acc = { area: 0, perimeter: 0, volume: 0 };
+  const flush = (): void => {
+    if (levelId === null) return;
+    lines.push(['', '', `Subtotal ${levelName}`, n(acc.area, 2), n(acc.perimeter, 2), '', n(acc.volume, 3), '', '', '']);
+  };
+  for (const r of rows) {
+    if (levelId !== null && r.levelId !== levelId) {
+      flush();
+      acc = { area: 0, perimeter: 0, volume: 0 };
+    }
+    levelId = r.levelId;
+    levelName = r.levelName;
+    acc.area += r.area;
+    acc.perimeter += r.perimeter;
+    acc.volume += r.volume;
+    lines.push([
+      csvText(r.number),
+      csvText(r.name),
+      csvText(r.levelName),
+      n(r.area, 2),
+      n(r.perimeter, 2),
+      n(r.ceilingHeight, 2),
+      n(r.volume, 3),
+      csvText(r.floorFinish),
+      csvText(r.wallFinish),
+      csvText(r.ceilingFinish),
+    ]);
+  }
+  flush();
+  lines.push(['Total', '', '', n(totals.area, 2), n(totals.perimeter, 2), '', n(totals.volume, 3), '', '', '']);
+  return csvDocument(lines);
+}

@@ -4,7 +4,7 @@ import type { ViewRange } from './viewRange.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 
@@ -408,7 +408,35 @@ export interface Roof {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab | Roof | Stair;
+/**
+ * Ambiente (Revit: Room; ArchiCAD: Zone). Guardado por nível (como os pisos): `levelId` + um `point` interior em
+ * planta. O contorno, a área e o volume são DERIVADOS pelo motor a partir do circuito de paredes que contém o ponto
+ * (nunca gravados). Os acabamentos são textos livres por instância; `ceilingHeight` é o pé-direito (padrão de leitura:
+ * `defaults.wallHeight`).
+ */
+export interface Room {
+  id: Id;
+  kind: 'room';
+  levelId: Id;
+  name: string;
+  /** Número do ambiente (Revit: Number), como "101" ou "Sala 1"; texto livre. */
+  number: string;
+  /** Ponto interior em planta (m) usado para achar o circuito de paredes que define o ambiente. */
+  point: Vec2;
+  /** Deslocamento da base em relação ao nível (m). Ausente = 0. */
+  heightOffset?: number;
+  /** Pé-direito (m). Ausente = `defaults.wallHeight` (leitura). */
+  ceilingHeight?: number;
+  floorFinish?: string;
+  wallFinish?: string;
+  ceilingFinish?: string;
+  /** Cor do preenchimento na planta (#rrggbb). Ausente = padrão. */
+  color?: string;
+  /** Ordem de criação (desempate e ordenação nas tabelas). */
+  order: number;
+}
+
+export type Element = Wall | Opening | Floor | Slab | Roof | Stair | Room;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -474,3 +502,4 @@ export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floo
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
 export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';
+export const isRoom = (e: Element | undefined): e is Room => e?.kind === 'room';

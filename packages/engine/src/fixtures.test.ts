@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import raw from './fixtures/casa-2-quartos.hestia.json';
 import { multiArea, intersection, union } from '@hestia/geom';
-import { migrateProject, validateProject, type Project } from '@hestia/model';
+import { migrateProject, validateProject, type Project, type Wall } from '@hestia/model';
 import { resolveLevel } from './index.ts';
 
 /** Arquivo real do usuário (casa de 2 quartos com ramal de concreto chegando num canto, em diagonal). */
@@ -13,7 +13,7 @@ const THROUGH = 'w_bae74db32'; // alvenaria 14 em diagonal, chega ao canto da ca
 const structure = (p: Project, id: string) => {
   const r = resolveLevel(p, 'lv_0', new Map());
   const w = r.walls[id]!;
-  const type = p.wallTypes[p.elements[id]!.typeId as string]!;
+  const type = p.wallTypes[(p.elements[id] as Wall).typeId]!;
   const idx = type.layers.findIndex((l) => l.function === 'structure');
   return w.layers.find((l) => l.layerIndex === idx)!.cut;
 };

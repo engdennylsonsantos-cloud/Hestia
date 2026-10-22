@@ -4,6 +4,7 @@ import { floorIssues } from './validateFloors.ts';
 import { slabIssues } from './validateSlabs.ts';
 import { roofIssues } from './validateRoofs.ts';
 import { stairIssues } from './validateStairs.ts';
+import { roomIssues } from './validateRooms.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { viewRangeIssues } from './viewRange.ts';
@@ -34,7 +35,7 @@ const COLLINEAR_ANGLE = (1 * Math.PI) / 180;
 /** Distância lateral máxima entre eixos para serem "praticamente colineares" (1 cm). */
 const COLLINEAR_OFFSET = 0.01;
 
-const label = (e: Element): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
+const label = (e: Element): string => ('mark' in e && e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
 const fmt = (n: number): string => (Number.isFinite(n) ? n.toFixed(3) : String(n));
 
 function wallIssues(p: Project, w: Wall): ValidationIssue[] {
@@ -248,5 +249,6 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...slabIssues(p),
     ...roofIssues(p),
     ...stairIssues(p),
+    ...roomIssues(p),
   ];
 }

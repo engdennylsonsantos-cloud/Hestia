@@ -187,6 +187,9 @@ const migrations: Record<number, Migration> = {
     const materials = { ...Object.fromEntries(DEFAULT_MATERIALS.filter((m) => m.id === 'mat_aco').map((m) => [m.id, m])), ...((raw.materials as object) ?? {}) };
     return { ...raw, stairTypes, materials };
   },
+  // v16 → v17: ambientes (Room). Guardados em `elements` (como pisos e lajes), então um arquivo v16 simplesmente não
+  // os tem e nada precisa ser acrescentado: a migração só avança a versão e preserva o restante do arquivo.
+  16: (raw) => ({ ...raw }),
 };
 
 export class SchemaError extends Error {}

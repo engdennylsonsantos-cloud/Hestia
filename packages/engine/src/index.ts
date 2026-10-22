@@ -40,6 +40,8 @@ export * from './stairArrival.ts';
 export * from './stairQuantities.ts';
 export * from './stairSchedule.ts';
 export * from './openingSchedule.ts';
+export * from './rooms.ts';
+export * from './roomSchedule.ts';
 export * from './viewClass.ts';
 export * from './viewWarnings.ts';
 export * from './planWallCuts.ts';

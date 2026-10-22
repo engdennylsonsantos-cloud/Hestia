@@ -1,5 +1,5 @@
 import { levelElevation } from './queries.ts';
-import { isFloor, isRoof, isSlab, isStair, isWall, type Element, type Floor, type Id, type Project, type Roof, type Slab, type Stair, type Wall } from './types.ts';
+import { isFloor, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Floor, type Id, type Project, type Roof, type Room, type Slab, type Stair, type Wall } from './types.ts';
 
 /**
  * Como manter o elemento ao trocar de nível: `elevation` preserva a cota absoluta (compensa o deslocamento);
@@ -14,7 +14,7 @@ export interface SetElementLevel {
 }
 
 /** Elementos com nível próprio. Aberturas não têm: acompanham a parede anfitriã. */
-export const hasLevel = (e: Element | undefined): e is Wall | Floor | Slab | Roof | Stair => isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e);
+export const hasLevel = (e: Element | undefined): e is Wall | Floor | Slab | Roof | Stair | Room => isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRoom(e);
 
 /** Nível de um elemento com nível próprio; null para abertura ou id inexistente. */
 export function elementLevelId(e: Element | undefined): Id | null {
@@ -43,6 +43,7 @@ export function applyElementLevel(p: Project, c: SetElementLevel): void {
     const delta = c.keep === 'elevation' ? levelElevation(p, e.levelId) - target.elevation : 0;
     e.levelId = target.id;
     if (isWall(e) || isStair(e)) e.baseOffset += delta;
+    else if (isRoom(e)) e.heightOffset = (e.heightOffset ?? 0) + delta;
     else e.heightOffset += delta;
   }
 }

@@ -151,6 +151,12 @@ export function labelOf(c: Command): string {
       return 'Excluir tipo de laje';
     case 'addRoof':
       return 'Criar telhado';
+    case 'addRoom':
+      return 'Criar ambiente';
+    case 'updateRoom':
+      return 'Alterar ambiente';
+    case 'removeRoom':
+      return 'Excluir ambiente';
     case 'upsertRoofType':
       return 'Editar tipo de telhado';
     case 'deleteRoofType':

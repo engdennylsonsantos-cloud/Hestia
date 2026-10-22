@@ -144,16 +144,16 @@ describe('seleção em corte (pickSection)', () => {
     expect(pickSection(r, interior(cut.polygons))).toEqual({ id: 'st1', kind: 'stair' });
   });
 
-  it('material cortado de várias origens (paredes do mesmo tipo): o motor não separa, então vale a primeira origem', () => {
+  it('material cortado de várias origens (paredes do mesmo tipo): o clique devolve a parede de cada trecho', () => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addWall', wall: makeWall({ id: 'a', typeId: 'wt_alv14', levelId: 'lv_0', a: v(1, 0), b: v(1, 4), height: 3 }) });
     store.exec({ type: 'addWall', wall: makeWall({ id: 'b', typeId: 'wt_alv14', levelId: 'lv_0', a: v(4, 0), b: v(4, 4), height: 3 }) });
     const r = computeSection(store.project, { a: v(-1, 2), b: v(7, 2), depth: 2 });
     const region = r.cut.find((c) => c.sources.length > 1)!;
     expect(region.sources.map((o) => o.wallId)).toEqual(['a', 'b']);
-    // a linha começa em x = −1: a parede b (x = 4) está em t = 5, no interior do corte unido; o motor não diz qual
-    // origem cobre esse trecho, então o id é o primeiro de `sources` (a parede a)
-    expect(pickSection(r, v(5, 1.5))).toEqual({ id: 'a', kind: 'wall' });
+    // a linha começa em x = −1: a parede a (x = 1) está em t = 2, a parede b (x = 4) em t = 5; cada clique acha o dono
+    expect(pickSection(r, v(2, 1.5))).toEqual({ id: 'a', kind: 'wall' });
+    expect(pickSection(r, v(5, 1.5))).toEqual({ id: 'b', kind: 'wall' });
   });
 });
 

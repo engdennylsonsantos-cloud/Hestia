@@ -1,5 +1,5 @@
 import { boxOf, closestOnSegment, pointInMulti, type Box, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import type { SectionOrigin, SectionResult } from '@hestia/engine';
+import type { SectionOrigin, SectionPart, SectionResult } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 
 /**
@@ -23,6 +23,8 @@ export interface SectionItem {
   /** Donos do item: um para parede, piso, laje, telhado, escada e vão; no corte unido, as origens de `sources`. */
   owners: SectionPick[];
   box: Box;
+  /** Peças por origem do corte unido (decisão 0016 §7); ausente quando o motor não separa as origens. */
+  parts?: SectionPart[];
 }
 
 /** Ordem de empate da oclusão no motor (`OCCLUSION_RANK` em sectionOcclusion.ts): corte, vão, além. */
@@ -52,13 +54,13 @@ export function ownerOf(o: SectionOrigin): SectionPick | null {
  */
 export function sectionItems(s: SectionResult): SectionItem[] {
   const items: Array<SectionItem & { order: number }> = [];
-  const push = (depth: number, rank: number, polygons: MultiPolygon, owners: SectionPick[]): void => {
+  const push = (depth: number, rank: number, polygons: MultiPolygon, owners: SectionPick[], parts?: SectionPart[]): void => {
     if (polygons.length === 0 || owners.length === 0) return;
-    items.push({ depth, rank, polygons, owners, box: boxOf(polygons.flatMap((p) => p.flatMap((r) => r))), order: items.length });
+    items.push({ depth, rank, polygons, owners, box: boxOf(polygons.flatMap((p) => p.flatMap((r) => r))), order: items.length, parts });
   };
   for (const r of s.cut) {
     const owners = uniquePicks(r.sources.map(ownerOf).filter((o): o is SectionPick => o !== null));
-    push(0, RANK.cut, r.polygons, owners);
+    push(0, RANK.cut, r.polygons, owners, r.parts);
   }
   for (const o of s.openings) push(o.depth, RANK.opening, o.polygons, [{ id: o.openingId, kind: o.kind === 'door' ? 'door' : 'window' }]);
   for (const b of s.beyond) {
@@ -101,24 +103,54 @@ function containsPoint(it: SectionItem, p: Vec2): boolean {
   return pointInMulti(p, it.polygons);
 }
 
+/** Dono do item no interior: sem `parts`, o primeiro dono; com `parts`, o da peça que contém o ponto. */
+function ownerInside(it: SectionItem, p: Vec2): SectionPick {
+  if (it.parts) {
+    for (const part of it.parts) {
+      if (pointInMulti(p, part.polygons)) {
+        const o = ownerOf(part.origin);
+        if (o) return o;
+      }
+    }
+  }
+  return it.owners[0]!;
+}
+
+/** Dono do item na borda: sem `parts`, o primeiro dono; com `parts`, o da peça mais próxima dentro da tolerância. */
+function ownerNear(it: SectionItem, p: Vec2, tolerance: number): SectionPick {
+  if (!it.parts) return it.owners[0]!;
+  let best: SectionPick | null = null;
+  let bestD = Infinity;
+  for (const part of it.parts) {
+    const d = distanceToBoundary(p, part.polygons);
+    if (d <= tolerance && d < bestD) {
+      const o = ownerOf(part.origin);
+      if (o) {
+        best = o;
+        bestD = d;
+      }
+    }
+  }
+  return best ?? it.owners[0]!;
+}
+
 /**
  * Elemento sob o ponto (t, z) do corte ou da elevação. Duas passagens sobre os itens visíveis, cada uma do mais perto
  * ao mais longe: primeiro o interior (o que está visível sob o ponto ganha); se nenhum contém o ponto, a borda a
  * `tolerance` (unidades do desenho: o chamador converte os 4 px com `4 / zoom`). Itens totalmente ocultos não entram:
  * não são selecionáveis, intencional.
  *
- * Corte unido: o motor une por material e não dá o polígono de cada origem, então, com várias origens, o id é a
- * primeira de `sources` (limitação documentada na decisão 0016).
+ * Corte unido (decisão 0016 §7): com `parts`, o dono é o da peça cujo polígono contém o ponto (interior) ou, na
+ * segunda passagem, o da peça mais próxima da borda dentro da tolerância. Sem `parts`, vale o primeiro de `sources`.
  */
 export function pickSection(s: SectionResult, point: Vec2, tolerance = 0): SectionPick | null {
   const items = sectionItems(s);
-  const inside = items.find((it) => containsPoint(it, point));
-  if (inside) return inside.owners[0]!;
+  for (const it of items) if (containsPoint(it, point)) return ownerInside(it, point);
   if (tolerance <= 0) return null;
-  const near = items.find((it) => {
+  for (const it of items) {
     const b = it.box;
-    if (point.x < b.minX - tolerance || point.x > b.maxX + tolerance || point.y < b.minY - tolerance || point.y > b.maxY + tolerance) return false;
-    return distanceToBoundary(point, it.polygons) <= tolerance;
-  });
-  return near ? near.owners[0]! : null;
+    if (point.x < b.minX - tolerance || point.x > b.maxX + tolerance || point.y < b.minY - tolerance || point.y > b.maxY + tolerance) continue;
+    if (distanceToBoundary(point, it.polygons) <= tolerance) return ownerNear(it, point, tolerance);
+  }
+  return null;
 }

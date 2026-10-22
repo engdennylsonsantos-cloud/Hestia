@@ -10,8 +10,10 @@ import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, type Section
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
+import { clipParts, partsByOrigin, uniqueOrigins, type SectionPart } from './sectionParts.ts';
 
 export { lineIntervals, sectionFrame, type SectionLine } from './sectionGeom.ts';
+export { type SectionPart } from './sectionParts.ts';
 
 /**
  * Corte e elevação a partir da geometria já resolvida em faixas (bands).
@@ -47,6 +49,8 @@ export interface SectionRegion {
   /** Polígonos em (t, z), já sem o que está na frente. */
   polygons: MultiPolygon;
   sources: SectionOrigin[];
+  /** Peças por origem (decisão 0016 §7): a parte visível de cada elemento do corte unido, para a seleção achar o dono. */
+  parts?: SectionPart[];
 }
 
 /**
@@ -138,19 +142,6 @@ function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
   });
   return [...byKey.values()].map((g) => (g.length === 1 ? g[0]! : { ...g[0]!, polygons: unionClipper(...g.map((b) => b.polygons)) }));
 }
-
-/** Origens distintas (por valor), na ordem da primeira aparição. */
-const uniqueOrigins = (list: SectionOrigin[]): SectionOrigin[] => {
-  const seen = new Set<string>();
-  const out: SectionOrigin[] = [];
-  for (const o of list) {
-    const key = JSON.stringify(o);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(o);
-  }
-  return out;
-};
 
 /** Camada de laje entre as cotas de base (b0 em t0, b1 em t1) e de topo (u0 em t0, u1 em t1): trapézio se inclinada. */
 const slabQuad = (t0: number, t1: number, b0: number, b1: number, u0: number, u1: number): Ring => [
@@ -350,10 +341,12 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   const refs: Ref[] = [];
   const items: OcclusionItem[] = [];
   for (const [materialId, list] of cutBy) {
+    const sources = uniqueOrigins(list.map((c) => c.origin));
     const region: SectionRegion = {
       materialId,
       polygons: union(...list.map((c): MultiPolygon => [c.polygon])),
-      sources: uniqueOrigins(list.map((c) => c.origin)),
+      sources,
+      parts: partsByOrigin(list, sources),
     };
     refs.push({ cut: region });
     items.push({ depth: 0, rank: OCCLUSION_RANK.cut, polygons: region.polygons });
@@ -373,8 +366,10 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   refs.forEach((ref, i) => {
     const polygons = visible[i]!;
     if (polygons.length === 0) return;
-    if ('cut' in ref) cut.push({ ...ref.cut, polygons });
-    else if ('beyond' in ref) beyondVisible.push({ ...ref.beyond, polygons });
+    if ('cut' in ref) {
+      const parts = clipParts(ref.cut.parts, polygons);
+      cut.push({ ...ref.cut, polygons, parts });
+    } else if ('beyond' in ref) beyondVisible.push({ ...ref.beyond, polygons });
     else openingsVisible.push({ ...ref.opening, polygons });
   });
   // Telhado: as camadas projetam na mesma área (a face é inclinada), então a de cima (índice menor) desenha por último.

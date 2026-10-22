@@ -500,11 +500,11 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     expect(layerTable(planDxf(p, 'lv_0')).get('PAREDE_PROJECAO_ACIMA')).toBe(9);
   });
 
-  it('piso e laje (peso de corte 4 nos dois) a 1:100: 0,35 mm', () => {
+  it('piso (peso de corte 3: 0,25 mm) e laje (peso de corte 4: 0,35 mm) a 1:100', () => {
     const p = vistaPlan().project;
     const floor = dxfLayerOfFloor(p.floorTypes['ft_ceram']!.code);
     const slab = dxfLayerOfSlab(p.slabTypes['ls_mac12']!.code);
-    expect(layerTable(planDxf(p, 'lv_0')).get(floor)).toBe(35);
+    expect(layerTable(planDxf(p, 'lv_0')).get(floor)).toBe(25);
     expect(layerTable(planDxf(p, 'lv_1')).get(slab)).toBe(35);
   });
 

@@ -130,7 +130,7 @@ export const DEFAULT_CATEGORY_STYLES: Record<GraphicsCategory, CategoryLineStyle
   wall: { cutWeight: 5, projectionWeight: 2 },
   door: { cutWeight: 3, projectionWeight: 2 },
   window: { cutWeight: 3, projectionWeight: 2 },
-  floor: { cutWeight: 4, projectionWeight: 1 },
+  floor: { cutWeight: 3, projectionWeight: 1 },
   slab: { cutWeight: 4, projectionWeight: 1 },
   roof: { cutWeight: 4, projectionWeight: 2 },
   stair: { cutWeight: 4, projectionWeight: 2 },

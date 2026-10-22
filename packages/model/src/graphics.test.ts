@@ -360,3 +360,32 @@ describe('serialização dos gráficos (abrir e salvar)', () => {
     expect(graphicsOf(volta)).toEqual(DEFAULT_PROJECT_GRAPHICS);
   });
 });
+
+describe('linhas finas (decisão 0015, só na tela)', () => {
+  it('padrão desligado: sem o campo salvo, a planta e o corte leem false', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(false);
+    expect(sectionGraphicsOf(s.project).thinLines).toBe(false);
+    expect(s.project.levels[0]!.graphics).toBeUndefined();
+  });
+
+  it('liga na planta e no corte, grava no projeto e desfaz', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec(lg({ thinLines: true }));
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(true);
+    s.exec({ type: 'setSectionGraphics', patch: { thinLines: true } });
+    expect(s.project.sectionGraphics?.thinLines).toBe(true);
+    expect(sectionGraphicsOf(s.project).thinLines).toBe(true);
+    s.undo();
+    expect(sectionGraphicsOf(s.project).thinLines).toBe(false);
+    s.undo();
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(false);
+  });
+
+  it('recusa valor que não é sim ou não, com mensagem pt-BR, e não grava', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(() => s.exec(lg({ thinLines: 'sim' as unknown as boolean }))).toThrow('Linhas finas deve ser sim ou não.');
+    expect(s.project.levels[0]!.graphics).toBeUndefined();
+    expect(graphicsIssues({ ...DEFAULT_VIEW_GRAPHICS, thinLines: 1 as unknown as boolean })).toContain('Linhas finas deve ser sim ou não.');
+  });
+});

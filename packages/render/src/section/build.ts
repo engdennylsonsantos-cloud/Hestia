@@ -2,6 +2,7 @@ import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { SectionBeyond, SectionOpening, SectionOrigin, SectionResult } from '@hestia/engine';
 import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
+import { thinStrokes } from '../plan/thin.ts';
 import type { PlanPaint } from '../plan/style.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -17,6 +18,8 @@ export interface SectionInput {
   showGrid: boolean;
   /** Seleção e cursor (decisão 0016): realçados por cima do desenho. Sem ele, o desenho é o de sempre. */
   highlight?: { selection: Id[]; hover: Id | null };
+  /** Linhas finas só na tela (decisão 0015): todo traço do modelo sai com 1 px. Padrão desligado; a prancha não passa. */
+  thinLines?: boolean;
 }
 
 /** Caixilho de vidro (opaco na linha oculta, como o dono decidiu) e folha de porta: cores fixas do desenho. */
@@ -269,6 +272,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   const silhouette = hiddenAny ? (silhouetteParts.length > 0 ? union(...silhouetteParts) : []) : s.silhouette;
   for (const ring of ringsOf(silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 2.2, color: theme.ink, alpha: 1 });
 
+  if (input.thinLines) thinStrokes(strokes);
   if (input.highlight) highlightOps(s, input.highlight, theme, fills, strokes);
 
   return { background: theme.bg, fills, strokes, labels };

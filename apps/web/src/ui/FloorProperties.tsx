@@ -6,6 +6,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { OutlineGroup } from './OutlineGroup.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -61,6 +62,7 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
           <NumField id="p-foff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
         </Row>
       </Group>
+      <OutlineGroup elements={floors} />
       <Group title="Construção" open={false}>
         {type ? (
           <>

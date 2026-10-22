@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeRoom, makeStair, makeWall, type Opening, type Project, type StairRun, type ValidationIssue, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeFloor, makeRoom, makeStair, makeWall, type Opening, type Project, type StairRun, type ValidationIssue, type Wall } from '@hestia/model';
 import { groupIssues, issueTarget, summarize, worstSeverity } from './issuesView.ts';
 
 const err = (code: string, elementId?: string): ValidationIssue => ({ severity: 'error', code, message: `erro ${code}`, ...(elementId ? { elementId } : {}) });
@@ -102,5 +102,18 @@ describe('ir para ambiente', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addRoom', room: makeRoom({ id: 'rm1', levelId: 'lv_0', name: 'Sala', number: '1', point: { x: 2, y: 3 } }) });
     expect(issueTarget(s.project, err('room-point-outside', 'rm1'))).toEqual({ elementId: 'rm1', levelId: 'lv_0', center: { x: 2, y: 3 } });
+  });
+});
+
+describe('Ir para dos avisos de contorno associativo (decisão 0023 §8.2c)', () => {
+  it('contorno-aberto no piso aponta o piso e enquadra a caixa do contorno', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }] }) });
+    expect(issueTarget(s.project, warn('contorno-aberto', 'f1'))).toEqual({
+      elementId: 'f1',
+      levelId: 'lv_0',
+      center: { x: 2, y: 1.5 },
+      box: { minX: 0, minY: 0, maxX: 4, maxY: 3 },
+    });
   });
 });

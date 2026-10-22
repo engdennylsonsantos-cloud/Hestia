@@ -7,6 +7,7 @@ import {
   resolveFloors,
   resolveLevel,
   resolveRoofs,
+  resolveRooms,
   resolveSlabs,
   resolveStairsOnLevel,
   type OpeningGeometry,
@@ -79,7 +80,7 @@ const memo = new WeakMap<Project, Map<string, PlanView>>();
 
 const OUTLINE_CLASSES: OutlineClass[] = ['projection-above', 'projection-below', 'beyond'];
 
-/** Ids dos elementos do nível cuja categoria está oculta na vista (paredes, aberturas, pisos, lajes, telhados e escadas). */
+/** Ids dos elementos do nível cuja categoria está oculta na vista (paredes, aberturas, pisos, lajes, telhados, escadas e ambientes). */
 function categoryHiddenIds(p: Project, levelId: Id, hiddenCats: HiddenCats): Set<Id> {
   const out = new Set<Id>();
   if (hiddenCats.size === 0) return out;
@@ -94,6 +95,7 @@ function categoryHiddenIds(p: Project, levelId: Id, hiddenCats: HiddenCats): Set
   for (const s of resolveSlabs(p, levelId)) add('slab', s.slabId);
   for (const r of resolveRoofs(p, levelId)) add('roof', r.roofId);
   for (const s of resolveStairsOnLevel(p, levelId)) add('stair', s.id);
+  for (const r of resolveRooms(p, levelId)) add('room', r.roomId);
   return out;
 }
 

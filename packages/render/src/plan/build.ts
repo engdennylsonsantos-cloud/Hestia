@@ -9,6 +9,7 @@ import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { belowFloorOps, floorFills, floorSelectionOps, type FloorOps } from './floors.ts';
 import { slabFills, slabSelectionOps } from './slabs.ts';
+import { roomOps, roomSelectionOps } from './rooms.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
 import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
@@ -176,6 +177,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   // Lajes antes dos pisos (a laje fica por baixo do piso); pisos antes das paredes (decisão 0006).
   addOps(slabFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.slab), paint.slab, !rp);
   addOps(floorFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor), paint.floor, !rp);
+  // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
+  addOps(roomOps(p, input.levelId, theme, input.dark, detail, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
   addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair), paint.stair, !rp);
 
@@ -276,6 +279,9 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   fills.push(...fsel.fills);
   strokes.push(...fsel.strokes);
   labels.push(...fsel.labels);
+  const rmsel = roomSelectionOps(p, input.levelId, input.selection, input.hover, theme, hidden);
+  fills.push(...rmsel.fills);
+  strokes.push(...rmsel.strokes);
   const lsel = slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
   fills.push(...lsel.fills);
   strokes.push(...lsel.strokes);

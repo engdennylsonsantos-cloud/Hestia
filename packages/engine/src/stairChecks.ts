@@ -4,6 +4,7 @@ import { resolveFloors } from './floors.ts';
 import { makeStairIssue, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
+import { stairWallOverlapIssues } from './stairWallOverlap.ts';
 
 /**
  * Avisos que dependem da geometria das lajes e pisos do nível de topo (`stair-headroom`). Ficam fora de `stairs.ts`:
@@ -62,25 +63,37 @@ export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[]): Stair
   );
 }
 
-/** Todos os avisos e erros das escadas: os de `resolveStairs` mais `stair-headroom` (com a geometria do nível de topo). */
+/** Todos os avisos e erros das escadas: os de `resolveStairs`, `stair-headroom` e `stair-wall-overlap`. */
 export function stairIssueList(p: Project): StairIssueItem[] {
   const covers = new Map<Id, TopCover[]>();
-  return resolveStairs(p).flatMap((r) => {
-    const out = [...r.issues];
+  const resolved = resolveStairs(p);
+  const out = resolved.flatMap((r) => {
+    const list = [...r.issues];
     if (r.topLevelId) {
-      let list = covers.get(r.topLevelId);
-      if (!list) {
-        list = topCovers(p, r.topLevelId);
-        covers.set(r.topLevelId, list);
+      let coversOnLevel = covers.get(r.topLevelId);
+      if (!coversOnLevel) {
+        coversOnLevel = topCovers(p, r.topLevelId);
+        covers.set(r.topLevelId, coversOnLevel);
       }
-      const h = stairHeadroomIssue(r, list);
-      if (h) out.push(h);
+      const h = stairHeadroomIssue(r, coversOnLevel);
+      if (h) list.push(h);
     }
-    return out;
+    return list;
   });
+  out.push(...stairWallOverlapIssues(p, resolved));
+  return out;
 }
 
-/** Os mesmos avisos no formato do painel (`ValidationIssue`, com `elementId` = id da escada). */
-export function stairValidationIssues(p: Project): ValidationIssue[] {
-  return stairIssueList(p).map((i) => ({ severity: i.severity, code: i.code, message: i.message, elementId: i.stairId }));
+/** Aviso no formato do painel, com os ids da relação (quando houver) além do `elementId`. */
+export type StairValidationIssue = ValidationIssue & { ids?: string[] };
+
+/** Os mesmos avisos no formato do painel (`ValidationIssue`, com `elementId` = id da escada e `ids` da relação). */
+export function stairValidationIssues(p: Project): StairValidationIssue[] {
+  return stairIssueList(p).map((i) => ({
+    severity: i.severity,
+    code: i.code,
+    message: i.message,
+    elementId: i.stairId,
+    ...(i.ids ? { ids: i.ids } : {}),
+  }));
 }

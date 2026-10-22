@@ -33,6 +33,7 @@ export * from './stairIssues.ts';
 export * from './stairs.ts';
 export * from './stairOpenings.ts';
 export * from './stairChecks.ts';
+export * from './stairWallOverlap.ts';
 export * from './stairBody.ts';
 export * from './partialStructure.ts';
 export * from './stairArrival.ts';

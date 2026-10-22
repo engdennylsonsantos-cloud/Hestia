@@ -19,6 +19,8 @@ export interface ValidationIssue {
   /** Mensagem em português do Brasil, pronta para a interface. */
   message: string;
   elementId?: string;
+  /** Elementos envolvidos quando o aviso é de uma relação (ex.: escada e parede); o "Ir para" usa `elementId`. */
+  ids?: string[];
 }
 
 /** Abaixo disso a parede não tem direção definida. */

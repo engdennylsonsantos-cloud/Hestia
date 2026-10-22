@@ -7,6 +7,24 @@ Estado em que foi escrito originalmente: branch `claude/zealous-hamilton-iayjlf`
 branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento foi atualizado sem alterar código; os
 números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
+Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido contra código, testes e decisões; nenhum código alterado.**
+- **Entrou na frente de piso e laje** (já no código): contorno associativo às paredes (0023 P1–P3), membrana de espessura
+  zero (P4), tipo `ft_acab` e quantitativos líquidos (P5), corte e planta por cota (P6), parede anexada por trecho (P9),
+  "Término na junção" por camada (P8, parcial) e junção piso/laje × parede (P7, parcial: quantitativos e desenho de piso
+  e laje; a parede não é recortada). Aberturas (OP1): giro na elevação, X de vão e de furo, DXF. Decisões do dono de
+  2026-10-22: basculante fora do catálogo (0017 §11), P-4 adiada (0023 §13).
+- **Ficou aberto**: E3 de paredes, C6 de pisos e C8 de lajes (parede recortada pelo piso/laje na planta, corte e 3D);
+  o restante do P8 (perímetro externo, cor e hachura por camada, IFC e DXF por camada); P-5 (forro criado a partir de
+  ambiente acompanhar o contorno dele), decidido em 0023 §13 e sem código; P13, X4 e X5 de aberturas (`[-]`, fora desta
+  entrega); inversão por par (P-4). O achado do quadrado no canto reentrante do L continua sem correção.
+- **Correções feitas no 07**: esquema 19 (não 18); checklists com pendências não bloqueantes (não "0 pendentes");
+  acabamento do tipo de abertura já aparece na tela (seção Acabamento); nomes reais de botão e de menu.
+- **Medido nesta revisão** (2026-10-22): `npm run test:rapido` 264 arquivos e 3276 testes, todos passando (72,8 s; `test:rapido`, sem property e perf); `npm run test:completo` 265 arquivos e 3578 testes, todos passando, com as 60 sementes (590 s, código de saída 0); build `dist/index.html` 2.532,22 kB e `artifact.html` 2.531,98 kB (kB decimais, medidos em bytes); `build:artifact` sem erro e sem TMPDIR.
+  Desempenho e regressão visual não foram repetidos aqui (ver as atualizações abaixo).
+- **Branches**: a branch de trabalho é `claude/wizardly-goldberg-qtjveg` (888eff8). `main` **não** foi atualizada: está em
+  `10aa3aa` (2026-10-20) e 266 commits atrás da branch de trabalho, sem commits próprios. Menções a
+  `claude/zealous-hamilton-iayjlf` nas linhas 6 e 666 são históricas e ficam como estão.
+
 Atualização (2026-10-22, fechamento G5): **entraram ambientes (H2), forros (H3),
 pranchas e PDF (G4) e cotas/textos na planta (I1)**, com paridade em `docs/paridade/ambientes.md`, `forros.md` e
 `pranchas.md` (todos concluídos; `npm run parity`). Medido nesta rodada, no contêiner, com Chromium do Playwright:

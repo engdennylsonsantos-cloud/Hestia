@@ -3,8 +3,17 @@
 Documento de trabalho: o que está quebrado, o que já foi medido, como corrigir e como provar que a correção
 funcionou. Escrito para ser retomado em outra máquina sem depender da conversa que o gerou.
 
-Estado em que foi escrito: branch `claude/zealous-hamilton-iayjlf`, em `659eea8`, árvore limpa. Este documento foi
-atualizado sem alterar código; os números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
+Estado em que foi escrito originalmente: branch `claude/zealous-hamilton-iayjlf`, em `659eea8`, árvore limpa; hoje a
+branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento foi atualizado sem alterar código; os
+números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
+
+Atualização (2026-10-22, esta rodada): **branches unidas e verificação final** — a `claude/wizardly-goldberg-qtjveg`
+reúne as frentes de gráficos de vista, seleção no 3D e nos cortes, ViewCube/câmera ortogonal, famílias de aberturas e
+escadas (incl. caracol). O **F1 (BVH por lote no picking 3D)** entrou em `5203453` e no merge `3d26015`. Verificado nesta
+rodada: `npm run build:artifact` terminou sem erro e gerou `apps/web/dist/artifact.html` (2.311 kB, a partir de
+`dist/index.html` com 2.368,30 kB), sem precisar de `TMPDIR`; `npm run test:perf` passou nos dois arquivos — K4 a frio
+1575 ms (razão 42,2 < 60) e depois de mover uma parede 1206 ms (razão 27,6 < 40), captura de faces 521 ms (razão 9,0 < 30).
+**I-3 e I-4 fechados** (§10). Seguem abertos **CV-2** e **CV-3**.
 
 Atualização (2026-10-21, esta rodada): **frente de portas e janelas fechada** — família, tipo e instância (decisão `docs/decisoes/0017-portas-e-janelas.md`), com a paridade em `docs/paridade/aberturas.md` (elemento novo em `ORDEM.json`, concluído). Entregue: `packages/model/src/opening.ts` (`OPENING_FAMILIES` com 10 famílias, `openingFamilyOf`/`openingLeaves`/`openingFamilyName`/`openingTypeIssue`, cobrada em `upsertOpeningType`); `OpeningType` com `code?`/`description?` e `leaves` `0|1|2|3`; 14 tipos padrão com código e as espessuras de esquadria com padrão (`defaults.ts`, `OPENING_FRAME_DEFAULTS`, `openingFrame`); diálogo do tipo em seções (`OtherDialogs.tsx`, `openingTypeForm.ts`), seletor agrupado por família com busca (`OptionsBar.tsx`) e árvore de Portas/Janelas (`Browser.tsx`); quadro de portas e janelas (`packages/engine/src/openingSchedule.ts`, `OpeningScheduleDialog.tsx`, botão em `Ribbon.tsx`); 3D por família (`scene3d.ts`); corte e elevação por família (`section.ts`, `section/build.ts`: batente, vidro, linha central só na correr, símbolos de elevação); DXF com o símbolo no vão de corte (X1). **Defeito 6.1** (borda da laje) corrigido em `packages/engine/src/wallZ.ts` (ponto sobre a borda conta como coberto). **Item C8 da paridade de escadas fechado**: aviso `stair-winder-tread` (`stairIssues.ts`, `winderTreadAt`/`winderTreadMin` em `stairNorms.ts`). **Casa de alto padrão**: `T-I-05` afastada para x = 6,854 (DEC-3), largura livre do lance em 1,20 m; a invasão residual em `T-I-01` (0,42 m²) e `T-I-06` (0,07 m²) fica em aberto para o coordenador (`docs/projetos/casa-alto-padrao/C-montagem.md` §5). Suíte completa com `npx vitest run`; `npm run lint` e `npm run typecheck` limpos. Seguem abertos: **CV-2** (parede curva fora do domínio), **CV-3** (código de arco sem uso) e **I-4** (`build:artifact` não verificado).
 
@@ -37,8 +46,8 @@ justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts
 | **I-1** | `npm run test:completo` não rodava no Windows (sintaxe POSIX) | média | **corrigido** (`scripts/completo.mjs`) | `package.json` |
 | **I-1b** | Suíte completa saía com código 1 por ruído do vitest (`Timeout calling "onTaskUpdate"`) mesmo com tudo passando | **alta para CI** | **corrigido** (`tests/vitestSetup.ts` cede o event loop após cada teste; 0 timeouts em três execuções, §9.5). Risco residual: um teste síncrono acima de 60 s | infra do vitest |
 | **I-2** | Filtro `--seed` do script rápido casava por prefixo (`--seed 4` rodava 40–49) | média | **corrigido** (lookahead) | `scripts/test-esquadria.mjs` |
-| **I-3** | `K4` (500 paredes) reprovava até isolado (1768 ms a quente contra limite de 1500 ms) e `snapFaces` reprovava dentro da suíte (2117 ms contra 1500 ms) | **alta** (portão de qualidade vermelho) | **tratado**: os testes de tempo saíram do `npm test` e rodam em `npm run test:perf` com limite relativo. K4 não tem regressão (`10aa3aa` 645–774 ms; HEAD 589–789 ms); o 1768 ms veio de carga concorrente; `snapFaces` é contenção. Falta rodar `test:perf` no HEAD final (§10) | `perf.test.ts`, `snapFaces.test.ts`, `vitest.perf.config.ts` |
-| **I-4** | `build:artifact` não verificado | baixa | não verificado | `scripts/make-artifact.mjs` |
+| **I-3** | `K4` (500 paredes) reprovava até isolado (1768 ms a quente contra limite de 1500 ms) e `snapFaces` reprovava dentro da suíte (2117 ms contra 1500 ms) | **alta** (portão de qualidade vermelho) | **verificado**: os testes de tempo saíram do `npm test` e rodam em `npm run test:perf` com limite relativo. Em 2026-10-22, 2 arquivos/2 testes verdes: K4 a frio 1575 ms (razão 42,2 < 60) e quente 1206 ms (razão 27,6 < 40); captura 521 ms (razão 9,0 < 30). K4 não tem regressão (`10aa3aa` 645–774 ms; HEAD 589–789 ms); o 1768 ms veio de carga concorrente | `perf.test.ts`, `snapFaces.test.ts`, `vitest.perf.config.ts` |
+| **I-4** | `build:artifact` não verificado | baixa | **verificado em 2026-10-22**: `npm run build:artifact` sem erro, sem `TMPDIR`; gerou `apps/web/dist/artifact.html` (2.311 kB) a partir de `dist/index.html` (2.368,30 kB) | `scripts/make-artifact.mjs` |
 
 ---
 
@@ -47,7 +56,7 @@ justificados: `golden.test.ts` ("L em encosto") e `render/model3d/solids.test.ts
 ```powershell
 git clone https://github.com/engdennylsonsantos-cloud/Hestia.git
 cd Hestia
-git switch claude/zealous-hamilton-iayjlf   # a branch de trabalho; `main` está atrasada
+git switch claude/wizardly-goldberg-qtjveg   # a branch de trabalho; `main` está atrasada
 npm ci
 ```
 
@@ -613,7 +622,7 @@ sobrepõem em 0,012740 m² (o pintor dá o canto ao bloco da grossa).
    canto externo. Onde não há canto externo (NO, Y), a configuração não muda a área. **Pergunta aberta:** a
    interface deve esconder ou avisar a configuração nesses casos, já que ela não produz efeito ali?
 3. **Limite do sweep line em produção (4.4-d).** Só decidir com a telemetria de 4.5.1 na mão.
-4. **`main` está atrás.** O trabalho vive em `claude/zealous-hamilton-iayjlf`. P-1, J-1, J-2 e CV-1 (no domínio suportado) estão fechados; **pergunta
+4. **`main` está atrás.** O trabalho vive em `claude/wizardly-goldberg-qtjveg` (a `claude/zealous-hamilton-iayjlf` foi unida a ela). P-1, J-1, J-2 e CV-1 (no domínio suportado) estão fechados; **pergunta
    aberta:** a mescla em `main` sai com o CV-2 (curvas fora do domínio) como limitação conhecida, ou espera mais trabalho?
 5. **CI.** `.github/workflows/ci.yml` roda `npm run check` como portão. `npm run test:perf` e `npm run test:completo`
    rodam em jobs com `continue-on-error`. Falta: tirar o `continue-on-error` do job `completo` quando a suíte completa
@@ -682,16 +691,16 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 
 ---
 
-## 10. Itens não verificados nesta rodada
+## 10. Verificações finais e itens em aberto
 
-| Item | O que falta |
+| Item | Estado |
 |---|---|
-| **K4** (`packages/engine/src/perf.test.ts`) | Medido sem regressão (§9.5): `10aa3aa` 645–774 ms, HEAD 589–789 ms. O 1768 ms veio de carga concorrente. Falta rodar `npm run test:perf` no HEAD final para confirmar o limite relativo |
-| **captura de faces** (`snapFaces.test.ts`) | 1241 ms isolado e 2117 ms dentro da suíte antes de sair do `npm test`: é **contenção**, não regressão. Falta rodar `npm run test:perf` no HEAD final |
-| **`build:artifact`** | `npm run build:artifact` (`scripts/make-artifact.mjs`) nunca foi executado. Verificar que o artefato publica |
-| **`npm test` / `npm run check`** | Nesta rodada, medidos separadamente: `npx vitest run` (111 arquivos, 1520 testes, ~26 s), lint e typecheck limpos. `npm test` e `npm run check` como comandos únicos não constam nesta rodada |
-| **Nó após `nodeOfWalls`** | Reconferido pela suíte inteira nesta rodada (`npx vitest run`, 1520 testes, que inclui `golden.test.ts` e `nos.test.ts`) |
-| **Visual das junções** | `npm run visual:juntas` nesta rodada: 14 cenários × 2 tipos (esquadria e encosto) sem falha numérica (um anel, zero furos, soma × união < 1e-5). Não há conferência da imagem registrada. Olhar os cenários de nó e de curva antes de dar o J-2 e o CV-1 por visualmente fechados |
+| **K4** (`packages/engine/src/perf.test.ts`) | **Verificado em 2026-10-22** com `npm run test:perf`: a frio 1575 ms (razão 42,2 < 60) e depois de mover uma parede 1206 ms (razão 27,6 < 40). Sem regressão (§9.5) |
+| **captura de faces** (`snapFaces.test.ts`) | **Verificado em 2026-10-22** com `npm run test:perf`: 500 chamadas a `infer` em 521 ms (razão 9,0 < 30). O caso antigo era contenção dentro da suíte, não regressão |
+| **`build:artifact`** | **Verificado em 2026-10-22**: `npm run build:artifact` (`scripts/make-artifact.mjs`) sem erro e sem `TMPDIR`; publica `apps/web/dist/artifact.html` (2.311 kB) |
+| **`npm test` / `npm run check`** | Medidos separadamente em 2026-10-22: `npx tsc -p tsconfig.json --noEmit`, `npm run lint` (eslint, fronteiras, paridade e paleta) e `npx vitest run` (180 arquivos, 2713 testes, ~122 s) limpos. `npm run check` como comando único não foi rodado |
+| **Nó após `nodeOfWalls`** | Reconferido pela suíte inteira (`npx vitest run`, que inclui `golden.test.ts` e `nos.test.ts`) |
+| **Visual das junções** | `npm run visual:juntas`: 14 cenários × 2 tipos (esquadria e encosto) sem falha numérica (um anel, zero furos, soma × união < 1e-5). Não há conferência da imagem registrada. Olhar os cenários de nó e de curva antes de dar o J-2 e o CV-1 por visualmente fechados |
 
 ---
 
@@ -708,12 +717,12 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
 |  | ↳ passo 2 (nó de 3+) | resolvido por `nodeOfWalls` (§6.3); pareamento por lado descartado (§6.4) | feito |
 | 5 | **O-1**: contorno da edificação pelo contorno real (5.8) | feito (`659eea8`) | feito |
 | 6 | **I-1b**: ruído do vitest / CI (9.3) | feito (cessão do event loop, §9.5) | feito |
-| 7 | **I-3**: testes de tempo fora do `npm test` (§9.5) | tratado; falta rodar `test:perf` no HEAD final (§10) | 1 h |
+| 7 | **I-3**: testes de tempo fora do `npm test` (§9.5) | feito: `npm run test:perf` verde em 2026-10-22 (§10) | — |
 | 8 | **CV-1**: paredes curvas (§6.5) | feito no domínio suportado (raio ≥ 3 m, quina de 60° a 120°) | feito |
 |  | ↳ CV-2: fora do domínio (R < 3 m, quina de 30° ou 150°) | aberto (limitação conhecida) | a estimar |
 |  | ↳ CV-3: remover o código de arco sem uso | limpeza futura | a estimar |
 | 9 | Decisões da seção 8 | fecham o escopo (pergunta aberta: interface do nó; mescla com `main`) | — |
-| 10 | Itens da seção 10 | verificação final | 1 h |
+| 10 | Itens da seção 10 | verificação final: I-3 e I-4 fechados; visual das junções segue manual | — |
 
 ---
 
@@ -736,4 +745,4 @@ Foi feito o caminho de cessão do event loop (§9.5), que ataca a causa sem divi
   (forma antes do pintor), guardas sobre `raw` e teste negativo em encosto (7.4; o esquadro saiu, 0010 #1).
 - **I-1/I-2**: os scripts de verificação rápida funcionam no Windows e o filtro de semente casa exato.
 - **I-1b**: o código 1 sem falha de teste (ruído do birpc) foi corrigido por cessão do event loop (`tests/vitestSetup.ts`).
-- **I-3**: os testes de tempo saíram do `npm test` e rodam em `npm run test:perf`; K4 não tem regressão medida.
+- **I-3**: os testes de tempo saíram do `npm test` e rodam em `npm run test:perf`; K4 e a captura de faces passaram em 2026-10-22, sem regressão.

@@ -224,7 +224,7 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente')])).fills.filter((f) => f.color === DOOR_T)).toHaveLength(1);
   });
 
-  it('C6: o vão livre leva o X, duas diagonais contínuas ligando os vértices opostos do contorno', () => {
+  it('X do vão livre no corte: duas diagonais contínuas ligando os vértices opostos do contorno', () => {
     const d = buildSectionDrawList(facade([op('v', 'door', 'ot_vao90', 'frente')]));
     const xs = d.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.dash === undefined && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y);
     expect(xs).toHaveLength(2);

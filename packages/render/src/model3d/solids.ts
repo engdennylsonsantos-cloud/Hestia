@@ -1,5 +1,5 @@
 import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab } from '@hestia/engine';
+import { bandTopAt, fuseBands, planeZ, slabRiseAt, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
 
@@ -323,16 +323,70 @@ function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): Soli
   return b;
 }
 
-/** Sólidos de todas as camadas das paredes do nível, por material. */
+/** Limite de camadas de parede guardadas (a mais antiga sai primeiro): um projeto típico usa algumas dezenas. */
+const WALL_CACHE_MAX = 512;
+
+/** Sólido de uma camada de parede, com índices locais (começam em 0), por chave de conteúdo (`wallLayerKey`). */
+const wallLayerCache = new Map<string, SolidBatch>();
+let wallLayerStats = { hits: 0, misses: 0 };
+
+/**
+ * Chave de conteúdo de uma camada: o que a extrusão lê (id da parede, material, cota da base e faixas). Parede que não
+ * mudou (sem anexo de telhado, sem edição) dá a mesma chave e reaproveita o sólido, em vez de refazer as uniões.
+ */
+function wallLayerKey(rw: ResolvedWall, l: ResolvedWall['layers'][number]): string {
+  return `${rw.wallId}|${l.materialId}|${rw.baseZ}|${JSON.stringify(l.bands)}`;
+}
+
+/** Sólido da camada (do cache, ou extrudado agora e guardado). Quem chama copia os dados; o cache não é alterado. */
+function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number]): SolidBatch {
+  const key = wallLayerKey(rw, l);
+  const hit = wallLayerCache.get(key);
+  if (hit) {
+    wallLayerStats.hits++;
+    wallLayerCache.delete(key);
+    wallLayerCache.set(key, hit);
+    return hit;
+  }
+  wallLayerStats.misses++;
+  const local: SolidBatch = { materialId: l.materialId, category: 'wall', positions: [], normals: [], indices: [], ids: [] };
+  ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(l.bands), rw.baseZ));
+  if (wallLayerCache.size >= WALL_CACHE_MAX) wallLayerCache.delete(wallLayerCache.keys().next().value!);
+  wallLayerCache.set(key, local);
+  return local;
+}
+
+/** Acrescenta o sólido local `f` ao lote `b`, deslocando vértices, índices e faixas (cópia: `f` fica intacto). */
+function appendSolid(b: SolidBatch, f: SolidBatch): void {
+  const v0 = b.positions.length / 3;
+  const i0 = b.indices.length;
+  for (const x of f.positions) b.positions.push(x);
+  for (const n of f.normals) b.normals.push(n);
+  for (const i of f.indices) b.indices.push(i + v0);
+  for (const r of f.ids) b.ids.push({ id: r.id, start: r.start + i0, count: r.count });
+}
+
+/**
+ * Sólidos de todas as camadas das paredes do nível, por material. Cada camada sai de `wallLayerSolid` (cache por
+ * conteúdo): ao anexar uma parede ao telhado, só as camadas dela são extrudadas de novo (decisão 0016, desempenho).
+ */
 export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
   const byMat = new Map<Id, SolidBatch>();
   for (const rw of Object.values(r.walls)) {
-    for (const l of rw.layers) {
-      const b = batchOf(byMat, l.materialId, 'wall');
-      ofElement(b, rw.wallId, () => extrudeLayer(b, fuseBands(l.bands), rw.baseZ));
-    }
+    for (const l of rw.layers) appendSolid(batchOf(byMat, l.materialId, 'wall'), wallLayerSolid(rw, l));
   }
   return { batches: [...byMat.values()] };
+}
+
+/** Contadores do cache de camadas de parede (acertos e erros desde o início ou o último `clearWallLayerCache`). */
+export function wallLayerCacheStats(): { hits: number; misses: number; size: number } {
+  return { ...wallLayerStats, size: wallLayerCache.size };
+}
+
+/** Esvazia o cache de camadas de parede e zera os contadores (testes e troca de projeto). */
+export function clearWallLayerCache(): void {
+  wallLayerCache.clear();
+  wallLayerStats = { hits: 0, misses: 0 };
 }
 
 /** Sólidos dos pisos: uma extrusão por camada entre as cotas absolutas (furos incluídos), agrupada por material. */

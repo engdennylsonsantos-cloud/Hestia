@@ -222,3 +222,70 @@ describe('telhado alvo e acompanhamento do telhado', () => {
     expect(roofWallIssues(p).some((i) => i.code === 'wall-roof-uncovered' && i.elementId === 'w1')).toBe(true);
   });
 });
+
+describe('Anexar topo na 3D: escolhe o elemento que a vista destaca', () => {
+  it('parede escolhida pelo elemento 3D vale mesmo com o ponto fora da pegada na planta', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    const w = walls(ctx.store.project)[0]!;
+    ctx.env.setSelection([]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 30, 30, { hit3d: w.id });
+    expect(ctx.last()).toBe('1 parede(s) escolhida(s). Enter escolhe o telhado.');
+  });
+
+  it('vazio na 3D não escolhe parede, mesmo com o ponto sobre ela', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    ctx.env.setSelection([]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 3, 1, { hit3d: null });
+    expect(ctx.last()).toMatch(/^Clique numa parede/);
+  });
+
+  it('abertura escolhida na 3D vale pela parede que a hospeda', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    const w = walls(ctx.store.project)[0]!;
+    ctx.env.exec({ type: 'addOpening', opening: { id: 'jan1', kind: 'window', typeId: 'ot_j120', hostId: w.id, offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    ctx.env.setSelection([]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 3, 1, { hit3d: 'jan1' });
+    expect(ctx.last()).toBe('1 parede(s) escolhida(s). Enter escolhe o telhado.');
+  });
+
+  it('telhado escolhido na 3D que está na etapa de paredes avisa que o telhado vem depois', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    ctx.env.setSelection([]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 3, 2, { hit3d: ctx.roofId });
+    expect(ctx.last()).toMatch(/^Isso é um telhado/);
+  });
+
+  it('na etapa do telhado, o telhado escolhido na 3D anexa mesmo com o ponto fora do beiral na planta', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    const w = walls(ctx.store.project)[0]!;
+    ctx.env.setSelection([w.id]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 40, 40, { hit3d: ctx.roofId });
+    expect(wallById(ctx.store.project, w.id).attachTopToRoof).toBe(true);
+  });
+
+  it('duas paredes seguidas na 3D: a segunda entra na lista e anexa com Enter (sem trocar de vista)', () => {
+    const ctx = withRoof();
+    drawWall(ctx.env, [1, 1], [5, 1]);
+    drawWall(ctx.env, [1, 3], [5, 3]);
+    const [w1, w2] = walls(ctx.store.project);
+    ctx.env.setSelection([w1!.id]);
+    const t = tool('attachroof', ctx.env);
+    clickAt(t, 40, 40, { hit3d: ctx.roofId });
+    expect(wallById(ctx.store.project, w1!.id).attachTopToRoof).toBe(true);
+    clickAt(t, 3, 3, { hit3d: w2!.id });
+    t.confirm();
+    clickAt(t, 40, 40, { hit3d: ctx.roofId });
+    expect(wallById(ctx.store.project, w2!.id).attachTopRoofId).toBe(ctx.roofId);
+    expect(wallById(ctx.store.project, w2!.id).attachTopToRoof).toBe(true);
+  });
+});

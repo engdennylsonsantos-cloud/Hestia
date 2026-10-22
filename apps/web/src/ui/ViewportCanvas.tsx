@@ -384,7 +384,7 @@ export function ViewportCanvas(): ReactElement {
       if (editor.activeTool.pick3d) {
         if (d.mode === 'orbit') {
           const hit = pick3dAt(s);
-          if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
+          if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, hit3d: elementAt3d(s)?.id ?? null });
           else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
         }
       } else {

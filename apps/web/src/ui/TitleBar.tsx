@@ -22,7 +22,7 @@ export function TitleBar(): ReactElement {
   const exportDxf = async (): Promise<void> => {
     const levelId = useUi.getState().levelId;
     try {
-      const status = await savePlanDxf(editor.project, levelId);
+      const status = await savePlanDxf(editor.project, levelId, useUi.getState().showRoofProjection);
       useUi.setState({ status });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });

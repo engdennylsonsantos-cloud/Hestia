@@ -49,9 +49,9 @@ padrão ligada), independente do topo, porque é prática de projeto brasileira;
   No DXF, o que está fora do corte vai para camadas de projeção (`PAREDE_PROJECAO_ACIMA`/`ABAIXO`, `PAREDE_ALEM`, `ABERTURA_ACIMA`/`ABAIXO`/`ALEM`,
   `TELHADO_PROJECAO`, `ESCADA_ACIMA`; as acima do corte são tracejadas); o oculto não sai; a escada usa a cota de corte e o topo da vista;
   pisos e lajes fora do intervalo não saem.
-- **Divergência (pendente):** na tela, o contorno tracejado dos telhados fora do intervalo (`roofs.ts`, `showProjection`) aparece só com a
-  preferência "Mostrar projeção da cobertura" ligada. O DXF põe esse contorno sempre, na camada `TELHADO_PROJECAO` (`roofProjections` em
-  `dxfGeometryOf`), sem ler a preferência.
+- **Divergência (resolvida):** na tela, o contorno tracejado dos telhados fora do intervalo (`roofs.ts`, `showProjection`) aparece só com a
+  preferência "Mostrar projeção da cobertura" ligada. O DXF respeita a mesma preferência: `dxfGeometryOf` recebe
+  `showRoofProjection` e só põe o contorno em `TELHADO_PROJECAO` quando ela está ligada (`savePlanDxf` lê o estado da tela).
 
 ## 5 · Interface
 Propriedades da vista (nível ativo): Topo, Plano de corte, Base, Profundidade (m, relativos ao nível), Direção (Baixo | Cima [em breve]), botão "Restaurar padrão",

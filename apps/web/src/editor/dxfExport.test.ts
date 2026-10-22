@@ -6,6 +6,7 @@ import {
   ProjectStore,
   buildTemplate,
   makeFloor,
+  makeRoof,
   makeSlab,
   makeStair,
   makeWall,
@@ -311,6 +312,34 @@ function curvedRunStair(): Project {
   store.exec({ type: 'addStair', stair: makeStair({ id: 'st_curva', typeId: 'stt_monolitica', levelId: 'lv_0', components: [run] }) });
   return store.project;
 }
+
+describe('projeção da cobertura no DXF respeita a preferência (decisão 0013 §4)', () => {
+  /** Telhado com o beiral em 3 m, acima do topo do intervalo (2,30 m): fica fora do intervalo e vira projeção. */
+  function roofAboveTop(): Project {
+    const store = new ProjectStore(buildTemplate('blank'));
+    store.exec({
+      type: 'addRoof',
+      roof: makeRoof({
+        id: 'rCima',
+        typeId: 'rt_ceramica',
+        levelId: 'lv_0',
+        boundary: [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 6 }, { x: 0, y: 6 }],
+        shape: 'hip',
+        slopePercent: 30,
+        heightOffset: 3,
+      }),
+    });
+    return store.project;
+  }
+
+  it('com a preferência ligada (padrão), o contorno sai em TELHADO_PROJECAO', () => {
+    expect(planDxf(roofAboveTop(), 'lv_0')).toContain('\r\nTELHADO_PROJECAO\r\n');
+  });
+
+  it('com a preferência desligada, o contorno da cobertura não sai', () => {
+    expect(planDxf(roofAboveTop(), 'lv_0', false)).not.toContain('TELHADO_PROJECAO');
+  });
+});
 
 describe('símbolo dos vãos de projeção: o mesmo da planta', () => {
   it('porta acima do corte: folha e arco em ABERTURA_ACIMA (tracejada), iguais aos da tela, sem retângulo', () => {

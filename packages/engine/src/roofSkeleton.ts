@@ -1,6 +1,6 @@
 import { ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
-import { perpOf, unitOf } from './roofGeom.ts';
-import type { ResolvedRoofPlane } from './roofs.ts';
+import { crossingParams, perpOf, planeHas, unitOf } from './roofGeom.ts';
+import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
 
 /** Solver do esqueleto reto com pesos (`weightedSkeleton`, em @hestia/geom); trocável pelos testes. */
 export type WeightedSkeleton = (input: SkeletonInput) => SkeletonResult;
@@ -24,10 +24,11 @@ export interface WaterSolution {
 export const weightOf = (s: number | null | undefined): number => (s !== null && s !== undefined && Number.isFinite(s) && s > 0 ? s / 100 : 0);
 
 /**
- * Furos entram no esqueleto como anéis de peso 0 (empena em volta da abertura, decisão 0008 item 8)? Hoje não: o
- * esqueleto de @hestia/geom falha com furo de aresta paralela ao contorno ("arestas paralelas"), com furo triangular ou
- * fora do centro ("limite de eventos") e não termina com furo girado. Enquanto isso, o furo é recortado da superfície
- * calculada sem ele (`roofs.ts`): área e cota longe do furo ficam certas. Trocar para `true` quando o SK resolver.
+ * Furos entram no esqueleto como anéis de peso 0 (empena em volta da abertura, decisão 0008 item 8)? Não: o esqueleto de
+ * @hestia/geom falha com furo de aresta paralela ao contorno ("arestas paralelas"), com furo triangular ou fora do centro
+ * ("limite de eventos") e não termina com furo girado. Em vez disso, o contorno é resolvido sem o furo e a empena do furo
+ * é construída à parte como prisma vertical até o plano das águas (`holeGableLines`), com a empena por furo; o furo segue
+ * recortado da superfície (`roofs.ts`), então a área e a cota longe do furo ficam certas e não há exceção.
  */
 export const HOLES_IN_SKELETON = false;
 
@@ -83,4 +84,34 @@ export function skeletonPlanes(boundary: Vec2[], holes: Vec2[][], edgeSlopes: Ar
   }
   const steps = res.steps && res.steps.length > 0 ? { steps: res.steps } : {};
   return planes.length ? { planes, ...steps } : { planes, problem: 'o contorno não gerou águas' };
+}
+
+/**
+ * Empena (testeira) em volta de cada furo (claraboia/shaft): o furo não entra no esqueleto; cada aresta do furo vira
+ * uma linha 'gable' — o prisma vertical da cota do beiral até o plano da água que a cobre. O trecho é partido onde a
+ * aresta cruza uma divisa entre águas, para a área da testeira sair por água; o trecho fora de toda água não gera linha
+ * (furo fora das águas, como em águas livres que não cobrem a região).
+ */
+export function holeGableLines(holes: Vec2[][], planes: ResolvedRoofPlane[]): RoofLine[] {
+  const water = planes.flatMap((pl) => pl.polygon);
+  const out: RoofLine[] = [];
+  for (const h of holes) {
+    if (h.length < 3) continue;
+    for (let i = 0; i < h.length; i++) {
+      const a = h[i]!;
+      const b = h[(i + 1) % h.length]!;
+      const ab = sub(b, a);
+      const ts = crossingParams(a, b, water);
+      for (let k = 0; k + 1 < ts.length; k++) {
+        const t0 = ts[k]!;
+        const t1 = ts[k + 1]!;
+        if (t1 - t0 < 1e-12) continue;
+        const p = { x: a.x + ab.x * t0, y: a.y + ab.y * t0 };
+        const q = { x: a.x + ab.x * t1, y: a.y + ab.y * t1 };
+        const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+        if (planes.some((pl) => planeHas(pl.polygon, m))) out.push({ kind: 'gable', a: p, b: q });
+      }
+    }
+  }
+  return out;
 }

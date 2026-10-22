@@ -1,7 +1,7 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors, type ResolvedFloor } from './floors.ts';
-import { coveredFaceArea, cutVolume, floorCutters, floorLayerPiece, slabCutters, wallCutters, type CutterSolid } from './junctionNet.ts';
+import { adjacentCutters, coveredFaceArea, cutVolume, floorCutters, floorLayerPiece, slabCutters, wallCutters, type CutterSolid } from './junctionNet.ts';
 
 /** Uma camada de um piso. A área é a da face superior da camada, líquida: sem o que a laje ocupa (decisão 0023 §4). */
 export interface FloorLayerQuantity {
@@ -107,7 +107,7 @@ export function quantifyFloors(p: Project, levelId: Id): FloorQuantities {
   const layers: FloorLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
-  const cutters = [...slabCutters(p, levelId), ...floorCutters(p, levelId), ...wallCutters(p, levelId)];
+  const cutters = [...slabCutters(p, levelId), ...floorCutters(p, levelId), ...wallCutters(p, levelId), ...adjacentCutters(p, levelId, 'horizontal')];
   for (const rf of resolveFloors(p, levelId)) {
     const q = quantifyFloor(rf, cutters);
     floors.push(q.floor);

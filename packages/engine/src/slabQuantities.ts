@@ -1,7 +1,7 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveSlabs, type ResolvedSlab } from './slabs.ts';
-import { coveredFaceArea, cutVolume, floorCutters, slabCutters, slabLayerPiece, wallCutters, type CutterSolid } from './junctionNet.ts';
+import { adjacentCutters, coveredFaceArea, cutVolume, floorCutters, slabCutters, slabLayerPiece, wallCutters, type CutterSolid } from './junctionNet.ts';
 
 /**
  * Uma camada de uma laje. A espessura é vertical e igual em todo o plano (a camada acompanha a inclinação), então o
@@ -116,7 +116,7 @@ export function quantifySlabs(p: Project, levelId: Id): SlabQuantities {
   const layers: SlabLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
-  const cutters = [...floorCutters(p, levelId), ...slabCutters(p, levelId), ...wallCutters(p, levelId)];
+  const cutters = [...floorCutters(p, levelId), ...slabCutters(p, levelId), ...wallCutters(p, levelId), ...adjacentCutters(p, levelId, 'horizontal')];
   for (const rs of resolveSlabs(p, levelId)) {
     const q = quantifySlab(rs, cutters);
     slabs.push(q.slab);

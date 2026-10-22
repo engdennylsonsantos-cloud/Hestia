@@ -32,6 +32,11 @@ export interface PlanarPiece {
   z0: number;
   z1: number;
   owner?: string;
+  /**
+   * Peça de um nível adjacente (0023 §10, P7c): só corta as peças do nível (parede × piso e laje de nível vizinho) e não
+   * é resolvida aqui. Par de dois elementos externos não conta; piso × piso e laje × laje de outro nível não entram.
+   */
+  external?: boolean;
 }
 
 /** Tolerância (m) para duas faixas de cota se cruzarem de verdade (faces que apenas se encostam não contam). */
@@ -81,7 +86,7 @@ export interface ResolvedPrism {
 }
 
 /**
- * Região resolvida de cada camada (saída na ordem de `pieces`). A camada perde, em cada faixa de cota, a região comum
+ * Região resolvida de cada camada (saída na ordem de `pieces`; peça externa sai vazia, só corta). A camada perde, em cada faixa de cota, a região comum
  * com as camadas que a vencem e se cruzam ali. Como a cota pode mudar dentro da camada (piso sob parede alta), a faixa
  * é dividida nas cotas de corte: cada parte tem uma região em planta constante. Não muda o modelo: é derivada, usada
  * por planta, corte, 3D e quantitativos. Sem vencedor, a camada inteira fica (inclusive em mesmo tipo e mesma
@@ -91,13 +96,19 @@ export interface ResolvedPrism {
  * Par que entra na junção (0023 §1.3, P7b): camadas do mesmo elemento não se cortam, e parede não corta parede (a
  * junção entre paredes é a da própria parede). Piso × piso e laje × laje entram, como nos quantitativos.
  */
-const pairCuts = (c: PlanarPiece, t: PlanarPiece): boolean =>
-  !(c.owner !== undefined && c.owner === t.owner) && !(c.meta.kind === 'wall' && t.meta.kind === 'wall');
+const pairCuts = (c: PlanarPiece, t: PlanarPiece): boolean => {
+  if (c.external || t.external) {
+    // Entre níveis só parede × piso ou laje (P7c): exatamente um externo e exatamente uma parede no par.
+    return c.external !== t.external && (c.meta.kind === 'wall') !== (t.meta.kind === 'wall');
+  }
+  return !(c.owner !== undefined && c.owner === t.owner) && !(c.meta.kind === 'wall' && t.meta.kind === 'wall');
+};
 
 export function resolveJunction(pieces: readonly PlanarPiece[]): ResolvedPrism[][] {
   // Caixa de cada camada: pré-filtro barato para o par não entrar no `difference` quando não há sobreposição em planta.
   const boxes = pieces.map((t) => (t.poly.length ? boxOf(multiPoints(t.poly)) : null));
   return pieces.map((t, i) => {
+    if (t.external) return [];
     const bi = boxes[i];
     const winners = pieces.filter((c, j) => {
       const bj = boxes[j];

@@ -30,6 +30,25 @@ corte e elevação ainda sem folha), **L-6** parcial (alizar, peitoril e verga e
 não), **L-8** parcial (o tipo ganhou os campos de acabamento; perfil de caixilho e folha continuam fora). A decisão
 `docs/decisoes/0017-portas-e-janelas.md` §8 traz o detalhe.
 
+### Rodada AB1 (2026-10-22): correções de aberturas no 3D
+
+Correções em `packages/render/src/model3d/openingParts.ts` (testes em `openingParts.test.ts` e `scene3d.test.ts`),
+com o detalhe em `docs/decisoes/0017-portas-e-janelas.md` §11:
+
+- **Vidro e montantes:** ocupam exatamente `jamb…h − jamb` (centro em `jamb + glassH/2`), sem a fresta de 5 cm no topo
+  nem a invasão da soleira; o eixo da maxim-ar fica na face inferior da verga (`jamb + glassH`).
+- **Porta de giro:** o sinal do ângulo considera `flipHand`; o lado aberto no 3D confere com o arco da planta nas
+  quatro combinações de `flipHand` × `flipFacing`.
+- **Correr (janela 2/3 folhas e porta):** fechadas, as folhas continuam lado a lado cobrindo o vão; abertas, correm
+  dentro do vão, empilham sobre a primeira e não passam de `±(W/2 − jamb)` (janela) nem do vão livre (porta). O
+  montante central da janela de correr sai do percurso das folhas quando aberta.
+- **Porta pivotante:** abre com "Abrir vãos", com giro de 90° no eixo vertical a `W/4` da ombreira de `flipHand` e para
+  o lado de `flipFacing`, como no símbolo da planta; fechada, continua como antes.
+- **Basculante:** não entra no catálogo por decisão do dono em 2026-10-22 (e não há janela de giro vertical nova). Se
+  existir um tipo `tilt`, abre pelo topo como a maxim-ar por ora.
+
+Os 14 tipos padrão mantêm as dimensões das peças iguais fechado × aberto.
+
 ## 1. Resumo
 
 - **Há uma única fonte do símbolo de planta.** `openingSymbolPaths` (`packages/geom/src/openingSymbol.ts:68`) gera os traços e é usada pela tela (`packages/render/src/plan/symbols.ts:9`) e pelo DXF (`apps/web/src/editor/dxfExport.ts:154`). Isso é bom: uma definição, dois destinos.
@@ -124,7 +143,7 @@ Para a elevação, o mesmo cálculo é feito com a linha fora da construção e 
 
 ## 5. 3D
 
-Função: `openingObject` em `packages/render/src/model3d/scene3d.ts:248-280` (HEAD). Chamada em `scene3d.ts:213`, com a base e a altura resolvidas da parede.
+Função: `openingObject` em `packages/render/src/model3d/scene3d.ts:248-280` (HEAD). Chamada em `scene3d.ts:213`, com a base e a altura resolvidas da parede. O estado descrito nesta seção é o anterior às correções da Rodada AB1 (§0); para o comportamento atual de vidro, giro, correr e pivotante, ver essa rodada e a decisão 0017 §11.
 
 | Trecho | Linha | Comportamento |
 |---|---|---|

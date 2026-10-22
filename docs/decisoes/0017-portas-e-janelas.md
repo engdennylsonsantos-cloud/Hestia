@@ -19,10 +19,10 @@ instância não muda a família.
 | `door_swing` | Porta de giro | `swing` | 1 | Folha de comprimento W na dobradiça e arco de 90° de raio W até a ombreira; no 3D, uma folha | Revit: porta de 1 folha. IFC `Operation`: `SINGLE_SWING_*` |
 | `door_double` | Porta dupla | `double` | 2 | Duas folhas de W/2 e dois arcos até o centro; no 3D, dois painéis | Revit: porta dupla. IFC: `DOUBLE_DOOR_*` |
 | `door_sliding` | Porta de correr | `sliding` | 2 | Dois retângulos fechados em faces opostas, com sobreposição e seta; no 3D, dois painéis em trilhos defasados na profundidade | Revit: porta de correr. IFC: `SLIDING_*` |
-| `door_pivot` | Porta pivotante | `pivot` | 1 | Eixo a W/4 de uma ombreira, folha de comprimento W e dois arcos até as duas ombreiras; no 3D, uma folha no plano médio | Sem família de sistema no Revit; ArchiCAD: `Opening Type` `Double-Acting` (o mais próximo). **Mantida por decisão do dono** (§8) |
+| `door_pivot` | Porta pivotante | `pivot` | 1 | Eixo a W/4 de uma ombreira, folha de comprimento W e dois arcos até as duas ombreiras; no 3D, uma folha que abre 90° no eixo a W/4 | Sem família de sistema no Revit; ArchiCAD: `Opening Type` `Double-Acting` (o mais próximo). **Mantida por decisão do dono** (§8) |
 | `door_void` | Vão livre | `swing` | 0 | Só a soleira tracejada; no 3D, só o recorte da parede (sem folha nem caixilho) | Revit: `Opening`; ArchiCAD: vão |
 | `window_fixed` | Janela fixa | `fixed` | 1 | Duas linhas de face, linha do plano médio e duas ombreiras; no 3D, caixilho e vidro | Revit: janela fixa. IFC: sem operação |
-| `window_tilt` | Janela basculante | `tilt` | 1 | Como a fixa, mais um V no plano médio | Revit: basculante. IFC `Operation`: `BOTTOM_HUNG` |
+| `window_tilt` | Janela basculante | `tilt` | 1 | Como a fixa, mais um V no plano médio; no 3D, abre pelo topo como a maxim-ar por ora | Revit: basculante. IFC `Operation`: `BOTTOM_HUNG`. **Fora do catálogo por decisão do dono em 2026-10-22** (§11) |
 | `window_casement` | Janela maxim-ar | `casement` | 1 | Como a fixa, mais um arco tracejado do lado de `flipFacing` | Revit: maxim-ar. IFC `Operation`: `TOP_HUNG` |
 | `window_sliding` | Janela de correr | `sliding` | 2 ou 3 | n folhas em linhas defasadas, sem linha no plano médio, com seta; no 3D, n vidros em trilhos defasados | Revit: janela de correr. IFC: `SLIDING_HORIZONTAL` |
 | `window_void` | Vão livre de janela | `fixed` | 0 | Só a soleira tracejada; no 3D, só a soleira | Revit: `Opening`; ArchiCAD: vão |
@@ -119,7 +119,8 @@ sem migração e sem mudar `SCHEMA_VERSION`. Padrão ausente = nada desenhado (e
 - **Verga e contraverga:** `lintel` e `sillBeam` com `{over, height}`; transpasse padrão 0,30 m e altura padrão 0,20 m.
   Peças de concreto com hachura no corte e no 3D. O quadro traz o comprimento total das peças (transpasse incluído).
 - **Folha aberta no 3D:** `View3DSettings.openOpenings` (padrão fechada), com o botão "Abrir vãos" na faixa Vista. Porta
-  de giro e porta dupla a 90°; janela de correr entreaberta; maxim-ar e basculante abertas pelo topo.
+  de giro, porta dupla e porta pivotante a 90°; folhas de correr deslizando dentro do vão; maxim-ar e basculante
+  abertas pelo topo (a basculante, se existir, por ora abre como a maxim-ar — ver §11).
 - **Favoritos:** `ProjectSettings.favoriteOpeningTypes`, estrela no seletor de tipo (favoritos no topo da lista) e
   comando `toggleOpeningFavorite` desfazível. Lista do projeto, sem biblioteca de transferência.
 
@@ -132,9 +133,8 @@ sem migração e sem mudar `SCHEMA_VERSION`. Padrão ausente = nada desenhado (e
 - **Biblioteca de tipos (*Transfer Sets*):** fora do escopo; os favoritos são do projeto.
 - **Exibição simbólica × projetada:** o ArchiCAD 26 tem `Floor Plan Display` `Symbolic` × `Projected`/`Overhead All`/
   `Projected with Overhead`; o Hestia sempre desenha o símbolo simbólico.
-- **Folha de porta aberta no 3D:** a folha é sempre desenhada fechada (sem modo aberto).
-- **Porta pivotante:** mantida como família; a convenção exata do eixo (posição e comprimento da folha) segue
-  provisória, sem fonte oficial (`A-pesquisa.md` §6).
+- **Porta pivotante:** mantida como família; a convenção do eixo (W/4 a partir da ombreira) continua a de
+  `A-pesquisa.md` §6, agora reproduzida no 3D (§11).
 
 ## 9 · O que NÃO se copia do Revit
 
@@ -157,3 +157,29 @@ modelo de autoria.
 - DXF: X1 e X2 — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`.
 - Quadro: uma linha por tipo, portas antes de janelas, código e áreas, CSV com BOM —
   `packages/engine/src/openingSchedule.test.ts`.
+
+## 11 · Correções de aberturas no 3D (2026-10-22)
+
+Decisões do dono e o que passou a valer em `packages/render/src/model3d/openingParts.ts` (testes em
+`openingParts.test.ts` e `scene3d.test.ts`):
+
+- **Vidro e montantes no vão interno.** O vidro e os montantes de janela ocupam exatamente `jamb…h − jamb` (centro em
+  `jamb + glassH/2`), sem fresta no topo nem invasão da soleira. O eixo da maxim-ar fica na face inferior da verga
+  (`jamb + glassH`).
+- **Porta de giro.** O sinal do giro considera `flipHand`; o lado em que a folha abre no 3D coincide com o arco da
+  planta nas quatro combinações de `flipHand` × `flipFacing`. A porta dupla não mudou.
+- **Folhas de correr.** Janela de correr (2 e 3 folhas) e porta de correr: fechadas, as folhas continuam lado a lado
+  cobrindo o vão; abertas, cada folha corre no seu trilho e empilha sobre a primeira, sem passar de `±(W/2 − jamb)`
+  (janela) ou do vão livre (porta) nem entrar no núcleo da parede. O montante central das janelas de correr sai do
+  percurso das folhas quando abertas (fica logo depois da pilha); fechado, permanece no limite entre as folhas.
+- **Porta pivotante.** Abre com "Abrir vãos": giro de 90° em torno de eixo vertical a `W/4` da ombreira do lado de
+  `flipHand`, para o lado de `flipFacing`, reproduzindo a convenção do símbolo (`pivotDoor` em
+  `packages/geom/src/openingSymbol.ts`): a banda curta (eixo–ombreira) abre para o lado de `flipFacing` e a longa para
+  o oposto. A peça 3D mantém a largura livre das demais folhas (`W − 2·jamb`) e o estado fechado é o de antes.
+- **Janela basculante fora do catálogo.** Por decisão do dono em 2026-10-22 não entra tipo `tilt` nos 14 padrões e não
+  há janela de giro vertical nova. A família `window_tilt` continua em `OPENING_FAMILIES`; se existir um tipo `tilt`,
+  ele abre pelo topo como a maxim-ar por ora. Isso resolve a contradição anterior entre a tabela da §1 (basculante
+  `BOTTOM_HUNG`) e a linha antiga "maxim-ar e basculante abertas pelo topo": o 3D usa o topo nas duas, e a convenção de
+  eixo da basculante fica para uma decisão futura.
+- **Basculante e maxim-ar.** O 3D não distingue a basculante da maxim-ar enquanto não houver decisão sobre o eixo
+  inferior; a dimensão das peças é a mesma fechada e aberta nos 14 tipos padrão.

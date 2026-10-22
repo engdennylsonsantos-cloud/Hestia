@@ -261,3 +261,43 @@ describe('folhas de correr abertas dentro do vão', () => {
     }
   });
 });
+
+describe('porta pivotante aberta', () => {
+  const jambDe = (c: { p: Project; o: Opening }): number => {
+    const f = frameOfWall(c.p, 'w')!;
+    const core = coreSpan(f.type);
+    return openingFrame(c.p.openingTypes[c.o.typeId]!, core.to - core.from).frameWidth;
+  };
+  const sOf = (g: OpeningGeometry, pt: { x: number; y: number }): number => (pt.x - g.center.x) * g.n.x + (pt.y - g.center.y) * g.n.y;
+
+  it('eixo a W/4 da ombreira de flipHand e lado da banda curta igual ao da planta nas 4 combinações', () => {
+    for (const flipHand of [false, true]) {
+      for (const flipFacing of [false, true]) {
+        const c = cena('ot_pp80', {}, { flipHand, flipFacing });
+        const leafW = c.g.width - 2 * jambDe(c);
+        const folha = pecas(c, true).find((x) => x.hinge)!;
+        const caso = `hand=${flipHand} facing=${flipFacing}`;
+        expect(folha.hinge!.axis, caso).toBe('z');
+        expect(folha.hinge!.at, caso).toBeCloseTo((flipHand ? 1 : -1) * (c.g.width / 4), 9);
+        expect(Math.abs(folha.hinge!.angle), caso).toBeCloseTo(Math.PI / 2, 9);
+        // Planta: o primeiro arco suave é o da banda curta, que termina na ombreira da dobradiça.
+        const curta = openingSymbolPaths(c.g).filter((s) => s.tone === 'soft')[0]!;
+        const ladoPlanta = Math.sign(sOf(c.g, curta.pts[0]!));
+        expect(ladoPlanta, caso).toBe(flipFacing ? -1 : 1);
+        // 3D: lado da ponta da folha do lado da dobradiça, depois do giro em torno do eixo z.
+        const pontaDobradica = (flipHand ? 1 : -1) * (leafW / 2);
+        const lado3D = Math.sign((pontaDobradica - folha.hinge!.at) * Math.sin(folha.hinge!.angle));
+        expect(lado3D, caso).toBe(ladoPlanta);
+      }
+    }
+  });
+
+  it('fechada continua igual a hoje: folha no centro, sem dobradiça e com a largura do vão livre', () => {
+    const c = cena('ot_pp80');
+    const fechada = pecas(c, false);
+    expect(fechada.some((x) => x.hinge)).toBe(false);
+    const folha = fechada.find((x) => Math.abs(x.w - (c.g.width - 2 * jambDe(c))) < 1e-9)!;
+    expect(folha.x).toBeCloseTo(0, 9);
+    expect(folha.y).toBeCloseTo(0, 9);
+  });
+});

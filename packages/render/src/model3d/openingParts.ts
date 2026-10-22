@@ -106,6 +106,13 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
         const hinge = g.flipHand ? g.width / 2 - jamb : -g.width / 2 + jamb;
         const hand = g.flipHand ? -1 : 1;
         add(leafW, leaf, doorH, hinge + (g.flipHand ? -leafW / 2 : leafW / 2), 0, doorH / 2, t.frameMaterialId, { axis: 'z', at: hinge, angle: (dir * hand * Math.PI) / 2 });
+      } else if (open && g.plan === 'pivot') {
+        // Pivotante: eixo vertical a W/4 da ombreira de `flipHand`, folha inteira girando 90°. O sinal reproduz a
+        // convenção da planta (`openingSymbol.ts`, `pivotDoor`): a banda curta (do eixo à ombreira) abre para o lado
+        // de `flipFacing` e a banda longa para o lado oposto.
+        const axis = (g.flipHand ? 1 : -1) * (g.width / 4);
+        const angle = (dir * (g.flipHand ? 1 : -1) * Math.PI) / 2;
+        add(leafW, leaf, doorH, 0, 0, doorH / 2, t.frameMaterialId, { axis: 'z', at: axis, angle });
       } else add(leafW, leaf, doorH, 0, 0, doorH / 2, t.frameMaterialId);
     }
   }

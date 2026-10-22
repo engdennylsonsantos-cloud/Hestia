@@ -29,8 +29,8 @@ function geometryFromModel(p: Project): IfcGeometry {
   for (const e of Object.values(p.elements)) {
     if (!isWall(e)) continue;
     const th = wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) || 0.1;
-    const footprint: IfcPolygon = [wallRect(e, th)];
-    walls.push({ wallId: e.id, footprint, baseZ: wallBaseElevation(p, e), height: wallHeight(p, e) });
+    const footprints: IfcPolygon[] = [[wallRect(e, th)]];
+    walls.push({ wallId: e.id, footprints, baseZ: wallBaseElevation(p, e), height: wallHeight(p, e) });
   }
   for (const e of Object.values(p.elements)) {
     if (!isOpening(e)) continue;
@@ -147,7 +147,7 @@ describe('exportIfc', () => {
     const tread = (x: number) => ({ polygon: [[{ x, y: 0 }, { x: x + 0.3, y: 0 }, { x: x + 0.3, y: 1 }, { x, y: 1 }]], top: { a: 0, b: 0, c: elev + 0.2 }, bottom: { a: 0, b: 0, c: elev - 0.1 } });
     const g: IfcGeometry = {
       ...geo,
-      floors: [{ floorId: 'fl1', prism: { polygon: [rect], top: { a: 0, b: 0, c: elev }, bottom: { a: 0, b: 0, c: elev - 0.2 } } }],
+      floors: [{ floorId: 'fl1', prisms: [{ polygon: [rect], top: { a: 0, b: 0, c: elev }, bottom: { a: 0, b: 0, c: elev - 0.2 } }] }],
       roofs: [{ roofId: 'rf1', planes: [{ polygon: [rect], top: { a: 0, b: 0.2, c: elev + 3 }, bottom: { a: 0, b: 0.2, c: elev + 2.8 } }] }],
       stairs: [{ stairId: 'st1', levelId: lv.id, spiral: false, riserHeight: 0.18, flights: [{ componentIndex: 1, pieces: [tread(0), tread(0.3)], treads: 2, risers: 3 }], landings: [{ polygon: [rect], top: { a: 0, b: 0, c: elev + 0.2 }, bottom: { a: 0, b: 0, c: elev - 0.1 } }] }],
     };

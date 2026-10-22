@@ -35,14 +35,14 @@ export function addPlates(c: IfcCtx, geo: IfcGeometry): void {
     const st = isFloor(el) ? storeyOf(c, el.levelId) : undefined;
     if (!isFloor(el) || !st) continue;
     const name = c.p.floorTypes[el.typeId]?.name ?? 'Piso';
-    st.contained.push(slabEntity(c, st, `floor:${f.floorId}`, name, [f.prism], 'FLOOR'));
+    st.contained.push(slabEntity(c, st, `floor:${f.floorId}`, name, f.prisms, 'FLOOR'));
   }
   for (const s of geo.slabs) {
     const el = c.p.elements[s.slabId];
     const st = isSlab(el) ? storeyOf(c, el.levelId) : undefined;
     if (!isSlab(el) || !st) continue;
     const name = c.p.slabTypes[el.typeId]?.name ?? 'Laje';
-    st.contained.push(slabEntity(c, st, `slab:${s.slabId}`, name, [s.prism], slabKindOf(name)));
+    st.contained.push(slabEntity(c, st, `slab:${s.slabId}`, name, s.prisms, slabKindOf(name)));
   }
 }
 

@@ -32,8 +32,9 @@ function addWalls(c: IfcCtx, walls: IfcWallGeo[]): void {
     if (!st) continue;
     const type = c.p.wallTypes[wall.typeId];
     const name = stepString(type?.name ?? 'Parede');
-    const solid = extrudeSolid(c.w, g.footprint, g.baseZ - st.elev, g.height);
-    const shape = bodyShape(c.w, c.ctx, 'SweptSolid', [solid]);
+    if (g.footprints.length === 0) continue;
+    const solids = g.footprints.map((f) => extrudeSolid(c.w, f, g.baseZ - st.elev, g.height));
+    const shape = bodyShape(c.w, c.ctx, 'SweptSolid', solids);
     const place = localPlacement(c.w, st.place, [0, 0, 0]);
     const id = c.w.add('IFCWALL', [gid(`wall:${g.wallId}`), OMIT, name, OMIT, name, ref(place), ref(shape), optStr(wall.mark), en('STANDARD')]);
     c.walls.set(g.wallId, id);

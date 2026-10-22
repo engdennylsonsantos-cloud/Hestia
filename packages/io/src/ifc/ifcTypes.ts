@@ -26,10 +26,10 @@ export interface IfcPrism {
   bottom: IfcPlane;
 }
 
-/** Parede resolvida: contorno em planta (união das camadas, sem vãos) e cotas absolutas da base e da altura. */
+/** Parede resolvida: contornos em planta (união das camadas, sem vãos; um por pedaço) e cotas absolutas da base e da altura. */
 export interface IfcWallGeo {
   wallId: Id;
-  footprint: IfcPolygon;
+  footprints: IfcPolygon[];
   baseZ: number;
   height: number;
 }
@@ -76,8 +76,8 @@ export interface IfcStairGeo {
 export interface IfcGeometry {
   walls: IfcWallGeo[];
   openings: IfcOpeningGeo[];
-  floors: Array<{ floorId: Id; prism: IfcPrism }>;
-  slabs: Array<{ slabId: Id; prism: IfcPrism }>;
+  floors: Array<{ floorId: Id; prisms: IfcPrism[] }>;
+  slabs: Array<{ slabId: Id; prisms: IfcPrism[] }>;
   roofs: Array<{ roofId: Id; planes: IfcPrism[] }>;
   stairs: IfcStairGeo[];
 }

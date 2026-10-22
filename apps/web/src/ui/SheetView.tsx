@@ -133,7 +133,7 @@ export function SheetView({ sheetId }: { sheetId: string }): ReactElement {
     <div className="sheet-wrap" aria-label={`Prancha ${sheet.number}`} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, minHeight: 0, overflow: 'auto' }}>
       <div className="sheet-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         <button className="btn small" onClick={() => useUi.setState({ dialog: 'sheet', dialogArg: sheetId })}>Propriedades da prancha</button>
-        <button className="btn small" onClick={() => useUi.setState({ dialog: 'addView', dialogArg: sheetId })}>
+        <button className="btn small" style={{ whiteSpace: 'nowrap' }} onClick={() => useUi.setState({ dialog: 'addView', dialogArg: sheetId })}>
           <Icon name="plus" size={13} /> Adicionar vista
         </button>
         {selected ? (

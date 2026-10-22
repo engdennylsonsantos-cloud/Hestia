@@ -114,6 +114,18 @@ const P9_CASES = {
   'parede-base-piso-metade': [W('bp1', [0, 0], [4, 0], { attachBottomToFloor: true }), F('pb1', [[-1, -1], [2, -1], [2, 1], [-1, 1]], { heightOffset: 0.05 })],
 };
 
+// Decisão 0024 (representação de aberturas): casos novos de porta, janela, vão livre e X de furo. A planta leva porta de
+// giro e janela de correr na parede sul/norte e um vão livre na leste (X); a laje tem dois furos quadrangulares (X em cada
+// um). A elevação abre a vista da fachada sul (`addView` + `openSection`) com a porta, o vão livre e a janela.
+const OPEN = (id, kind, typeId, hostId, offset) => ({ kind: 'opening', opening: { id, kind, typeId, hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+const RECT_HOLES = [[{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 2 }, { x: 1, y: 2 }], [{ x: 5, y: 3 }, { x: 5.8, y: 3 }, { x: 5.8, y: 3.8 }, { x: 5, y: 3.8 }]];
+const OPENING_CASES = {
+  'planta-porta-janela': [...wallsOf(RECT_WALLS), OPEN('po1', 'door', 'ot_p80', 'w0', 2), OPEN('jn1', 'window', 'ot_j120', 'w2', 3), OPEN('vl1', 'door', 'ot_vao90', 'w1', 2.5)],
+  'laje-abertura-x': [SL('ls3', RECT_WALLS, { holes: RECT_HOLES })],
+};
+const SECTION_CASES = {
+  'elevacao-porta-janela': [...wallsOf(RECT_WALLS), OPEN('po2', 'door', 'ot_p80', 'w0', 2), OPEN('vl2', 'door', 'ot_vao90', 'w0', 4.5), OPEN('jn2', 'window', 'ot_j120', 'w0', 6), { kind: 'view', view: { id: 'v_frente', name: 'Fachada sul', kind: 'elevation', a: { x: -0.5, y: -2 }, b: { x: 8.5, y: -2 }, depth: 8 } }],
+};
 // Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas
 // no desenho seguinte ao layout. A espera pede duas medidas iguais seguidas do canvas, que a vista do editor tenha o mesmo
 // tamanho, e dois quadros de animação. Assim o enquadramento sai sempre com a área final.
@@ -141,16 +153,18 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
-  await page.evaluate(([ws, v]) => {
+  await page.evaluate(([ws, v, sec]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : w.kind === 'floorType' ? { type: 'upsertFloorType', floorType: w.floorType } : { type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : w.kind === 'floorType' ? { type: 'upsertFloorType', floorType: w.floorType } : w.kind === 'opening' ? { type: 'addOpening', opening: w.opening } : w.kind === 'view' ? { type: 'addView', view: w.view } : { type: 'addWall', wall: w });
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });
-  }, [items, vista]);
+    if (sec) editor.openSection(sec);
+  }, [items, vista, name in SECTION_CASES ? 'v_frente' : null]);
   await assentar(page);
-  await page.evaluate(() => window.__hestia.editor.zoomExtents());
+  // A vista de corte já se enquadra ao abrir (`openSection`); o enquadramento de planta só vale para os casos de planta.
+  if (!(name in SECTION_CASES)) await page.evaluate(() => window.__hestia.editor.zoomExtents());
   await assentar(page);
   const canvas = page.locator('.canvas-wrap canvas').first();
   const shot = await canvas.screenshot();

@@ -64,7 +64,7 @@ export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
 export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
 /** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
-export type CeilingMode = 'poly' | 'rect' | 'room';
+export type CeilingMode = 'poly' | 'rect' | 'room' | 'hole';
 
 /** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, pelo perímetro externo das paredes (com balanço), ou abertura (furo) no telhado selecionado. 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
 export type RoofMode = 'poly' | 'rect' | 'paredes' | 'hole' | 'extrusao';

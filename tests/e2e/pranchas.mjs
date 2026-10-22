@@ -108,7 +108,7 @@ const pdfPath = path.join(OUT, 'pranchas.pdf');
 await dl.saveAs(pdfPath);
 const status = await page.evaluate(() => window.__hestia.useUi.getState().status);
 // "térrea" no nome do projeto: o nome sai sem acento (com acento o navegador salvava como "download").
-check('C4 download com o nome do projeto, sem acento', dl.suggestedFilename() === 'Casa terrea, 2 quartos-pranchas.pdf' && /-pranchas\.pdf/.test(status), `(${dl.suggestedFilename()})`);
+check('C4 download com o nome do projeto, sem acento', dl.suggestedFilename() === 'Casa-terrea-2-quartos-pranchas.pdf' && /-pranchas\.pdf/.test(status), `(${dl.suggestedFilename()})`);
 
 // 9. validação do arquivo PDF
 const bytes = readFileSync(pdfPath);

@@ -134,6 +134,52 @@ function slabFloorOverlaps(p: Project, slabs: Slab[], floors: Floor[]): Validati
   return out;
 }
 
+/** Tolerância (1 cm) entre a face inferior do piso e a laje para o aviso de concreto em dobro (decisão 0023 §4). */
+const STRUCTURE_TOLERANCE = 0.01;
+
+/**
+ * Piso com camada de função Estrutura cuja face inferior toca ou entra na laje do mesmo nível, com a mesma área em
+ * planta (warning). O concreto da laje e o da camada estrutural do piso ficam contados duas vezes. O aviso não
+ * bloqueia; a saída é um tipo de piso de acabamento (`ft_acab`), que não tem camada estrutural.
+ */
+function floorStructureOverSlab(p: Project, slabs: Slab[], floors: Floor[]): ValidationIssue[] {
+  const slabShapes = slabs
+    .filter((s) => s.boundary.length >= 3 && !selfIntersects(s.boundary) && p.slabTypes[s.typeId])
+    .map((s) => ({ s, poly: [slabPolygon(s)], box: boxOf(slabPolygon(s).flat()) }));
+  const out: ValidationIssue[] = [];
+  for (const f of floors) {
+    const type = p.floorTypes[f.typeId];
+    if (!type || !type.layers.some((l) => l.function === 'structure')) continue;
+    if (f.boundary.length < 3 || selfIntersects(f.boundary)) continue;
+    const floorPoly = [floorPolygon(f)];
+    const floorBox = boxOf(floorPolygon(f).flat());
+    const floorBottom = levelElevation(p, f.levelId) + f.heightOffset - floorTypeThickness(type);
+    for (const a of slabShapes) {
+      if (a.s.levelId !== f.levelId || !boxesOverlap(a.box, floorBox)) continue;
+      const slabTop = levelElevation(p, a.s.levelId) + a.s.heightOffset;
+      const slabBottom = slabTop - slabTypeThickness(p.slabTypes[a.s.typeId]!);
+      const common = intersection(a.poly, floorPoly);
+      // Com laje inclinada a faixa da laje muda em planta: a faixa testada vai de B + r mínimo a T + r máximo.
+      const rises = common.flat(2).map((q) => slabRiseAt(a.s.slope, q));
+      if (rises.length === 0) continue;
+      const lo = slabBottom + Math.min(...rises);
+      const hi = slabTop + Math.max(...rises) + STRUCTURE_TOLERANCE;
+      if (floorBottom < lo - Z_TOLERANCE || floorBottom > hi + Z_TOLERANCE) continue;
+      const area = multiArea(common);
+      if (area <= OVERLAP_MIN) continue;
+      out.push({
+        severity: 'warning',
+        code: 'piso-estrutura-sobre-laje',
+        message:
+          `Piso ${label(f)} tem camada estrutural e a face inferior dele está sobre a laje ${label(a.s)} (${fmtArea(area)} em comum): ` +
+          'o concreto está contado duas vezes (piso e laje); use um tipo de piso de acabamento.',
+        elementId: f.id,
+      });
+    }
+  }
+  return out;
+}
+
 /** Problemas das lajes do projeto: geometria, inclinação, tipo, nível, sobreposição entre lajes e entre laje e piso. */
 export function slabIssues(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
@@ -143,5 +189,6 @@ export function slabIssues(p: Project): ValidationIssue[] {
     ...slabs.flatMap((s) => slabIssuesOf(p, s)),
     ...slabOverlaps(slabs),
     ...slabFloorOverlaps(p, slabs, floors),
+    ...floorStructureOverSlab(p, slabs, floors),
   ];
 }

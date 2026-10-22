@@ -26,6 +26,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] C3 Lajes sobrepostas detectadas, com aviso
 - [x] C4 Contorno associativo (motor): laje pelo perímetro externo guarda a origem e o contorno é derivado no motor — acompanha as paredes (decisão 0023 §8.2)
 - [x] C5 Vínculo do contorno na interface (P2 e P3): grupo "Contorno" com estado, "Desvincular" e "Revincular às paredes" (um passo de desfazer); aviso `contorno-aberto` com "Ir para"; barra de status ao soltar por edição de vértice. Evidência: `packages/engine/src/outlineIssues.test.ts`, `apps/web/src/ui/OutlineGroup.test.ts`, `packages/tools/src/outlineEdit.test.ts`, e2e `tests/e2e/contorno.mjs` (piso; laje segue o mesmo grupo e o mesmo aviso)
+- [x] C6 Piso sobre a laje com camada estrutural avisa `piso-estrutura-sobre-laje` (decisão 0023 P5); o acabamento usa `ft_acab`
 
 ## D · Vistas
 - [x] D1 Planta: laje vista de cima com hachura do material estrutural, atrás das paredes; laje do nível abaixo como subpavimento **(bloqueante)**
@@ -38,6 +39,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] E2 Tabela de lajes com colunas, filtros, totais e CSV
 - [x] E3 Etiqueta de laje na planta
 - [x] E4 Exportação DXF
+- [x] E5 Quantitativo líquido: a laje não perde volume para piso ou parede; pisos que ela corta perdem a interseção (decisão 0023 §4, P5)
 
 ## F · Edição
 - [x] F1 Selecionar, mover, copiar, girar, espelhar, matriz **(bloqueante)**

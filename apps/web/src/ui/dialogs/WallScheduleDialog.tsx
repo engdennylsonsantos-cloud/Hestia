@@ -148,6 +148,7 @@ export function WallScheduleDialog(): ReactElement {
             <span>Comprimento {fmt(totals.length, 2)} m</span>
             <span>Área líquida {fmt(totals.netFaceArea, 2)} m²</span>
             <span>Volume {fmt(totals.volume, 3)} m³</span>
+            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>Volume bruto {fmt(totals.grossVolume, 3)} m³</span>}
           </div>
         </>
       )}

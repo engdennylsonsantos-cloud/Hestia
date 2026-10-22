@@ -1,17 +1,20 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors, type ResolvedFloor } from './floors.ts';
+import { coveredFaceArea, cutVolume, flatPiece, slabCutters, type CutterSolid } from './junctionNet.ts';
 
-/** Uma camada de um piso. A área é a da face superior da camada (a mesma área em planta do piso). */
+/** Uma camada de um piso. A área é a da face superior da camada, líquida: sem o que a laje ocupa (decisão 0023 §4). */
 export interface FloorLayerQuantity {
   floorId: Id;
   layerIndex: number;
   materialId: Id;
   thickness: number;
-  /** Área da face superior da camada (m²) = área líquida do piso. Membrana também tem área de face. */
+  /** Área líquida da face superior da camada (m²). Sem corte, igual à área em planta do piso. Membrana também tem área. */
   area: number;
-  /** Volume da camada (m³) = área × espessura; zero na membrana (decisão 0023 §5). */
+  /** Volume líquido da camada (m³) = área bruta × espessura menos o que a laje ocupa; zero na membrana (decisão 0023 §5). */
   volume: number;
+  /** Volume bruto da camada (m³), antes do desconto da laje. */
+  grossVolume: number;
   /** Membrana: aparece com área de face e volume zero. */
   membrane: boolean;
 }
@@ -28,8 +31,12 @@ export interface FloorQuantity {
   holesPerimeter: number;
   /** Espessura total do piso (m). */
   thickness: number;
-  /** Volume total (m³) = soma das camadas. */
+  /** Volume líquido total (m³) = soma das camadas. */
   volume: number;
+  /** Volume bruto (m³), sem o desconto da laje. Igual a `volume` quando não há corte. */
+  grossVolume: number;
+  /** Área líquida da face superior (m²): a área da primeira camada, sem o que a laje ocupa. */
+  netArea: number;
   layers: FloorLayerQuantity[];
 }
 
@@ -38,7 +45,7 @@ export interface FloorQuantities {
   layers: FloorLayerQuantity[];
   /** Área líquida somada de todos os pisos do nível (m²). */
   totalArea: number;
-  /** Volume total do nível (m³). */
+  /** Volume líquido total do nível (m³). */
   totalVolume: number;
   /** Volume (m³) por material. */
   volumeByMaterial: Record<Id, number>;
@@ -49,17 +56,23 @@ export interface FloorQuantities {
 /** Comprimento de um anel fechado (o último ponto liga-se ao primeiro). */
 const ringLength = (r: Vec2[]): number => r.reduce((s, p, i) => s + dist(p, r[(i + 1) % r.length]!), 0);
 
-function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: FloorLayerQuantity[] } {
+function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: FloorQuantity; layers: FloorLayerQuantity[] } {
   const area = multiArea(rf.polygon);
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
+    const piece = flatPiece(rf.polygon, l.z0, l.z1);
+    // Só o volume que a laje ocupa sai do piso (padrão por tipo, §1.3). A membrana não tem volume a descontar.
+    const grossVolume = l.membrane ? 0 : area * thickness;
+    const volume = l.membrane ? 0 : Math.max(0, grossVolume - cutVolume(piece, 'floor', cutters));
+    const faceArea = l.membrane ? Math.max(0, area - coveredFaceArea(piece, 'floor', cutters)) : thickness > 0 ? volume / thickness : area;
     return {
       floorId: rf.floorId,
       layerIndex: l.layerIndex,
       materialId: l.materialId,
       thickness,
-      area,
-      volume: l.membrane ? 0 : area * thickness,
+      area: faceArea,
+      volume,
+      grossVolume,
       membrane: l.membrane,
     };
   });
@@ -74,6 +87,8 @@ function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: Floor
     holesPerimeter: rf.polygon.reduce((s, poly) => s + poly.slice(1).reduce((t, h) => t + ringLength(h), 0), 0),
     thickness: rf.topZ - rf.bottomZ,
     volume,
+    grossVolume: layers.reduce((s, l) => s + l.grossVolume, 0),
+    netArea: layers[0]?.area ?? area,
     layers,
   };
   return { floor, layers };
@@ -81,15 +96,18 @@ function quantifyFloor(rf: ResolvedFloor): { floor: FloorQuantity; layers: Floor
 
 /**
  * Quantitativos dos pisos de um nível. A geometria vem de `resolveFloors`, então área e volume são os mesmos do
- * 3D e da planta. Pisos sem tipo válido ou com contorno de menos de 3 pontos não entram (a validação aponta).
+ * 3D e da planta. O volume e a área de face são líquidos: descontam a interseção com as lajes do nível (decisão 0023
+ * §4). A área em planta (`area`) continua sendo a do contorno. Pisos sem tipo válido ou com contorno de menos de 3
+ * pontos não entram (a validação aponta).
  */
 export function quantifyFloors(p: Project, levelId: Id): FloorQuantities {
   const floors: FloorQuantity[] = [];
   const layers: FloorLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
+  const cutters = slabCutters(p, levelId);
   for (const rf of resolveFloors(p, levelId)) {
-    const q = quantifyFloor(rf);
+    const q = quantifyFloor(rf, cutters);
     floors.push(q.floor);
     for (const l of q.layers) {
       layers.push(l);

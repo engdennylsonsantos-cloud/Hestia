@@ -36,6 +36,11 @@ export const DEFAULT_FLOOR_TYPES: FloorType[] = [
     L('substrate', 'mat_argamassa', 0.04),
     L('structure', 'mat_concreto', 0.12),
   ], 160),
+  ft('ft_acab', 'Acabamento sobre laje', 'PS-04', 'Revestimento cerâmico, assentamento e contrapiso sobre laje, sem camada estrutural (a laje já tem o concreto)', [
+    L('finish1', 'mat_ceramica', 0.01),
+    L('substrate', 'mat_argamassa', 0.01),
+    L('substrate', 'mat_argamassa', 0.02),
+  ], 90),
   ft('ft_laje12', 'Laje de concreto 12', 'PS-02', 'Laje maciça de concreto armado com regularização', [
     L('substrate', 'mat_argamassa', 0.03),
     L('structure', 'mat_concreto', 0.12),

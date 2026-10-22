@@ -18,7 +18,10 @@ export interface WallScheduleRow {
   grossFaceArea: number;
   openingsArea: number;
   netFaceArea: number;
+  /** Volume líquido (m³): sem o que piso e laje do nível ocupam. */
   volume: number;
+  /** Volume bruto (m³), antes do desconto de piso e laje. */
+  grossVolume: number;
   /** Camadas da face externa para a interna, em cm: "Reboco 2,0 | Bloco 14,0 | ...". */
   layersSummary: string;
 }
@@ -30,6 +33,7 @@ export interface WallScheduleTotals {
   openingsArea: number;
   netFaceArea: number;
   volume: number;
+  grossVolume: number;
 }
 
 export interface MaterialVolume {
@@ -64,19 +68,21 @@ function rowOf(p: Project, wall: Wall, levelName: string, q: WallQuantity): Wall
     openingsArea: q.openingsArea,
     netFaceArea: q.netFaceArea,
     volume: q.volume,
+    grossVolume: q.grossVolume,
     layersSummary: layersSummary(p, t),
   };
 }
 
 /** Somatórios de um conjunto de linhas (o da tabela inteira ou só o filtrado). */
 export function sumWallRows(rows: WallScheduleRow[]): WallScheduleTotals {
-  const t: WallScheduleTotals = { count: rows.length, length: 0, grossFaceArea: 0, openingsArea: 0, netFaceArea: 0, volume: 0 };
+  const t: WallScheduleTotals = { count: rows.length, length: 0, grossFaceArea: 0, openingsArea: 0, netFaceArea: 0, volume: 0, grossVolume: 0 };
   for (const r of rows) {
     t.length += r.length;
     t.grossFaceArea += r.grossFaceArea;
     t.openingsArea += r.openingsArea;
     t.netFaceArea += r.netFaceArea;
     t.volume += r.volume;
+    t.grossVolume += r.grossVolume;
   }
   return t;
 }
@@ -116,12 +122,16 @@ const CSV_HEADER = [
   'Camadas (cm)',
 ];
 
+/** Coluna extra do fim, só quando alguma parede perde volume para piso ou laje (bruto diferente do líquido). */
+const GROSS_VOLUME_HEADER = 'Volume bruto (m³)';
+
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8.
  * Uma linha por parede, seguida de uma linha de total.
  */
 export function scheduleToCsv(rows: WallScheduleRow[], totals: WallScheduleTotals): string {
   const n = (v: number, d: number): string => formatDecimal(v, d);
+  const grossCut = rows.some((r) => Math.abs(r.grossVolume - r.volume) > 1e-9);
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
@@ -134,7 +144,9 @@ export function scheduleToCsv(rows: WallScheduleRow[], totals: WallScheduleTotal
     n(r.netFaceArea, 2),
     n(r.volume, 3),
     csvText(r.layersSummary),
+    ...(grossCut ? [n(r.grossVolume, 3)] : []),
   ]);
   const total = ['Total', '', '', '', n(totals.length, 2), '', n(totals.grossFaceArea, 2), n(totals.openingsArea, 2), n(totals.netFaceArea, 2), n(totals.volume, 3), ''];
-  return csvDocument([CSV_HEADER, ...body, total]);
+  if (grossCut) total.push(n(totals.grossVolume, 3));
+  return csvDocument([grossCut ? [...CSV_HEADER, GROSS_VOLUME_HEADER] : CSV_HEADER, ...body, total]);
 }

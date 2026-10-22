@@ -45,11 +45,13 @@ export interface Layer {
 }
 
 /**
- * Término de uma camada de piso ou de laje vinculados às paredes (decisão 0023 §2): `auto` (núcleo do piso até o núcleo
- * da parede, o resto até a face de acabamento), `nucleo`, `face` ou deslocamento em cm a partir da face de acabamento
- * (positivo avança sobre a parede, negativo recua).
+ * Término de uma camada de piso ou de laje nas paredes (decisão 0023 §2; regras por camada, decisão 0025): `auto`
+ * (núcleo do piso até o núcleo da parede, o resto até a face de acabamento), `face` (até a face de acabamento da parede),
+ * `nucleo` (até o núcleo da parede), `passa` (passa por baixo da parede, sem recorte), `{ ate: { prioridade } }` (até a
+ * primeira camada da parede de prioridade efetiva ≤ N, 1 a 9) ou `{ cm }` (deslocamento a partir da face de acabamento,
+ * positivo avança sobre a parede, negativo recua).
  */
-export type LayerTermino = 'auto' | 'nucleo' | 'face' | { cm: number };
+export type LayerTermino = 'auto' | 'nucleo' | 'face' | 'passa' | { cm: number } | { ate: { prioridade: number } };
 
 /** Em que lados os acabamentos "envolvem" (retornam) nos vãos e nas extremidades da parede. */
 export type WrapMode = 'none' | 'interior' | 'exterior' | 'both';

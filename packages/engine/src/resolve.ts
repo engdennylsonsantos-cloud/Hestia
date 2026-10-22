@@ -401,8 +401,9 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
-  const floors = resolveAllFloors(p);
-  const slabs = resolveAllSlabs(p);
+  // Pisos e lajes só pelo contorno do elemento: as camadas com término por parede dependem das paredes (sem ciclo).
+  const floors = resolveAllFloors(p, { layers: false });
+  const slabs = resolveAllSlabs(p, { layers: false });
   const roofs = resolveAllRoofs(p);
   for (const group of clusterWalls(frames, ends)) {
     const tol = p.settings?.joinTolerance;

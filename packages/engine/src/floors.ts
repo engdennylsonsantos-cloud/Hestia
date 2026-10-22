@@ -1,5 +1,5 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, terminoEhExplicito, type Id, type Project } from '@hestia/model';
 import { layerOutlines, memoCut } from './layerOutline.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
@@ -16,6 +16,8 @@ export interface ResolvedFloorLayer {
   core: boolean;
   /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
   membrane: boolean;
+  /** Término com regra explícita (decisão 0025): a junção automática por prioridade contra paredes não recorta a camada. */
+  explicit: boolean;
   /** Contorno da camada, em planta, menos furos (decisão 0023 §2, P8): o do piso, salvo término que vai ao núcleo ou desloca. */
   polygon: MultiPolygon;
 }
@@ -36,8 +38,16 @@ export interface ResolvedFloor {
   problem: OutlineProblem | null;
 }
 
+/**
+ * Opções da resolução. `layers: false` deixa as camadas com o contorno do elemento (sem término por parede): é o que a
+ * resolução de paredes usa para se anexar ao piso, e quebra o ciclo piso → camada → parede → piso (decisão 0025).
+ */
+export interface FloorResolveOptions {
+  layers?: boolean;
+}
+
 /** Pisos de todos os níveis do projeto (quem cruza níveis, como a parede anexada, usa esta lista). */
-export const resolveAllFloors = (p: Project): ResolvedFloor[] => p.levels.flatMap((l) => resolveFloors(p, l.id));
+export const resolveAllFloors = (p: Project, opts: FloorResolveOptions = {}): ResolvedFloor[] => p.levels.flatMap((l) => resolveFloors(p, l.id, opts));
 
 /**
  * Geometria dos pisos de um nível. O piso não é recortado pelas paredes (como no Revit, a parede fica sobre o piso
@@ -46,7 +56,7 @@ export const resolveAllFloors = (p: Project): ResolvedFloor[] => p.levels.flatMa
  * quando o circuito abre, mantém o último contorno válido e devolve `problem`. Tipos ausentes ou contornos com menos de
  * 3 pontos são ignorados: a validação do modelo é quem avisa.
  */
-export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
+export function resolveFloors(p: Project, levelId: Id, opts: FloorResolveOptions = {}): ResolvedFloor[] {
   const openings = stairOpeningsOnLevel(p, levelId);
   const out: ResolvedFloor[] = [];
   for (const f of floorsOnLevel(p, levelId)) {
@@ -77,7 +87,9 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
     const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, bottomZ)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
-    const outlines = layerOutlines(p, f.levelId, f, type.layers, core, base);
+    // Faixa de cota do piso inteiro: a parede que parte do topo dele corta todas as camadas (decisão 0025).
+    const zones = bounds.map(() => ({ z0: bottomZ, z1: topZ }));
+    const outlines = opts.layers === false ? type.layers.map(() => base) : layerOutlines(p, f.levelId, f, type.layers, core, base, { levelIds: [f.levelId], zones });
     const layers: ResolvedFloorLayer[] = type.layers.map((l, i) => ({
       layerIndex: i,
       materialId: l.materialId,
@@ -86,6 +98,7 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
       membrane: isMembraneLayer(l),
       priority: layerPriority(l),
       core: core[i]!,
+      explicit: terminoEhExplicito(l),
       polygon: cut(outlines[i]!),
     }));
     out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ, layers, problem });

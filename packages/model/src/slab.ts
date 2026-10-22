@@ -29,6 +29,9 @@ export const slabArea = (s: Slab): number => multiArea([slabPolygon(s)]);
 
 const L = (fn: Layer['function'], materialId: string, thickness: number): Layer => ({ function: fn, materialId, thickness, wraps: false });
 
+/** Camada com término explícito nas paredes (decisão 0025): o padrão da laje única. */
+const LT = (fn: Layer['function'], materialId: string, thickness: number, termino: Layer['termino']): Layer => ({ ...L(fn, materialId, thickness), termino });
+
 const st = (id: string, name: string, code: string, description: string, layers: Layer[], cost = 0): SlabType => ({ id, name, code, description, layers, cost });
 
 /** Tipos de laje iniciais (camadas do topo para baixo). */
@@ -43,4 +46,8 @@ export const DEFAULT_SLAB_TYPES: SlabType[] = [
     L('membrane', 'mat_argamassa', 0),
     L('structure', 'mat_concreto', 0.1),
   ], 210),
+  st('ls_unica', 'Laje única (obra inteira)', 'LJ-UN', 'Regularização até a face das paredes; a estrutura de concreto passa por baixo delas. Para uma laje que cobre a obra inteira', [
+    LT('substrate', 'mat_argamassa', 0.03, 'face'),
+    LT('structure', 'mat_concreto', 0.12, 'passa'),
+  ], 230),
 ];

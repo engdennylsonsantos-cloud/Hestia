@@ -1,6 +1,8 @@
 import { offsetMulti, type MultiPolygon, type Ring } from '@hestia/geom';
-import { terminoMeters, terminoOf, type Id, type Layer, type OutlineSource, type Project } from '@hestia/model';
+import { terminoMeters, terminoOf, type Id, type Layer, type LayerTermino, type OutlineSource, type Project } from '@hestia/model';
 import { enclosedRooms, roomAt, type RoomExtend } from './enclosed.ts';
+import type { ResolvedWall } from './types.ts';
+import { regionMinusWalls, regionPlusWalls, wallsOfLevel } from './terminoBlock.ts';
 
 /**
  * Contorno por camada de piso e de laje vinculados às paredes (decisão 0023 §2, P8). Cada camada escolhe, pelo seu
@@ -19,33 +21,60 @@ function withHoles(room: Ring[], holes: Ring[]): MultiPolygon {
   return [[room[0]!, ...holes, ...room.slice(1)]];
 }
 
+/** Faixa de cota de uma camada (absoluta, m), para escolher as paredes que a tocam. */
+export interface LayerZone {
+  z0: number;
+  z1: number;
+}
+
+/**
+ * Paredes que contam para as camadas do elemento (decisão 0025): os níveis dados (piso: o próprio nível; laje: também o
+ * de baixo e o de cima, para o teto entre pavimentos) e a faixa de cota de cada camada.
+ */
+export interface WallScope {
+  levelIds: Id[];
+  zones: readonly LayerZone[];
+}
+
+/** Término que pede a prioridade de parede (`{ ate }`). */
+const isAte = (t: LayerTermino): t is { ate: { prioridade: number } } => typeof t === 'object' && 'ate' in t;
+
 /**
  * Contorno de cada camada, antes do corte de escada. Elemento estático, de perímetro externo ou com circuito aberto:
- * todas as camadas recebem `base` (o contorno do elemento, como antes). Vinculado a circuito fechado: `finish` e `core`
- * vêm do mesmo circuito (o do modo do elemento é o `base`; o outro é recalculado). Quando o circuito do núcleo não fecha,
- * as camadas que iriam ao núcleo ficam na face de acabamento.
+ * as camadas com `auto` recebem `base`, como antes. Vinculado a circuito fechado: `finish` e `core` vêm do mesmo
+ * circuito (o do modo do elemento é o `base`; o outro é recalculado). Quando o circuito do núcleo não fecha, as camadas
+ * que iriam ao núcleo ficam na face de acabamento.
  *
- * Término: `face` = face de acabamento; `nucleo` = núcleo da parede; `auto` = núcleo para a camada dentro do núcleo do
- * elemento, face para as demais; `{cm}` = a face de acabamento deslocada em cm (positivo avança sobre a parede).
+ * Término (decisão 0023 §2 e 0025): `face` = até a face de acabamento; `nucleo` = até o núcleo; `passa` = sem recorte;
+ * `{ate}` = até a primeira camada da parede de prioridade ≤ N; `{cm}` = a face de acabamento deslocada (positivo avança), só
+ * em elemento vinculado: em estático e em perímetro o deslocamento segue ignorado, como antes.
+ * Nos três casos com parede, a região é o contorno menos a zona bloqueada das paredes do `scope` (`regionMinusWalls`).
+ * Em elemento vinculado, `face` e `nucleo` saem dos circuitos (P8, sem mudança). Sem `scope`, não há paredes.
  */
-export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: readonly Layer[], core: readonly boolean[], base: MultiPolygon): MultiPolygon[] {
+export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: readonly Layer[], core: readonly boolean[], base: MultiPolygon, scope?: WallScope): MultiPolygon[] {
   const src = el.outlineSource;
+  const linked = !!src?.linked && src.mode !== 'perimeter' && !!src.seed;
   const fallback = layers.map(() => base);
-  if (!src?.linked || src.mode === 'perimeter' || !src.seed) return fallback;
   const term = layers.map(terminoOf);
-  const needCore = term.some((t, i) => t === 'nucleo' || (t === 'auto' && core[i]));
+  const needCore = linked && term.some((t, i) => t === 'nucleo' || t === 'passa' || isAte(t) || (t === 'auto' && core[i]));
   const circuit = (extend: RoomExtend): MultiPolygon | null => {
-    const room = roomAt(enclosedRooms(p, levelId, extend), src.seed!);
+    const room = roomAt(enclosedRooms(p, levelId, extend), src!.seed!);
     return room ? withHoles(room, el.holes) : null;
   };
-  const finish = src.mode === 'walls-finish' ? base : circuit('finish');
+  const finish = !linked ? base : src!.mode === 'walls-finish' ? base : circuit('finish');
   if (!finish) return fallback;
-  const corePoly = src.mode === 'walls-core' ? base : needCore ? circuit('core') : null;
+  const corePoly = !linked ? base : src!.mode === 'walls-core' ? base : needCore ? circuit('core') : null;
+  const ref = corePoly ?? finish;
+  let walls: ResolvedWall[] | null = null;
+  const wallsNow = (): ResolvedWall[] => (walls ??= scope ? scope.levelIds.flatMap((id) => wallsOfLevel(p, id)) : []);
+  const zoneOf = (i: number): LayerZone => scope?.zones[i] ?? { z0: 0, z1: 0 };
   return layers.map((_, i) => {
     const t = term[i]!;
-    if (typeof t === 'object') return t.cm === 0 ? finish : offsetMulti(finish, terminoMeters(t));
-    if (t === 'face') return finish;
-    if (t === 'nucleo') return corePoly ?? finish;
+    if (typeof t === 'object' && 'cm' in t) return linked && t.cm !== 0 ? offsetMulti(finish, terminoMeters(t)) : base;
+    if (t === 'face') return linked ? finish : regionMinusWalls(p, base, wallsNow(), { kind: 'face' }, zoneOf(i).z0, zoneOf(i).z1);
+    if (t === 'nucleo') return linked ? ref : regionMinusWalls(p, base, wallsNow(), { kind: 'nucleo' }, zoneOf(i).z0, zoneOf(i).z1);
+    if (t === 'passa') return linked ? regionPlusWalls(ref, wallsNow(), zoneOf(i).z0, zoneOf(i).z1) : base;
+    if (isAte(t)) return regionMinusWalls(p, ref, wallsNow(), { kind: 'ate', prioridade: t.ate.prioridade }, zoneOf(i).z0, zoneOf(i).z1);
     return core[i] && corePoly ? corePoly : finish;
   });
 }

@@ -20,6 +20,8 @@ export interface JunctionMeta {
   priority: number;
   /** Camada dentro do núcleo do elemento (§1.2). */
   core: boolean;
+  /** Término com regra explícita (decisão 0025): paredes não a recortam (a regra da camada já decide a região). */
+  explicit?: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ export function layerMetas(kind: JunctionKind, layers: readonly Layer[]): Juncti
  * maior (número menor) que estejam fora do núcleo; (2) prioridade: número menor vence; (3) empate: hierarquia por tipo.
  */
 export function winsOver(a: JunctionMeta, b: JunctionMeta): boolean | null {
+  if (b.explicit && a.kind === 'wall') return null;
   if (a.core && !b.core && b.priority < a.priority) return true;
   if (b.core && !a.core && a.priority < b.priority) return false;
   if (a.priority !== b.priority) return a.priority < b.priority;

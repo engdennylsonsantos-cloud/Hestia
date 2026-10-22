@@ -22,6 +22,7 @@ import { key3d, useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
+import { entregarArquivo } from './entregarArquivo.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -407,39 +408,17 @@ export class Editor {
     const text = this.serialize();
     const name = `${this.project.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto'}.hestia.json`;
     safeSet(STORAGE_KEY, text);
-    type Dl = { save(r: { filename: string; data: string }): Promise<unknown> };
-    const host = (window as unknown as { claude?: { use?: (n: string) => Promise<Dl | null> } }).claude;
-    if (host?.use) {
-      try {
-        const dl = await host.use('downloads');
-        if (dl) {
-          await dl.save({ filename: name, data: text });
-          this.store.markSaved();
-          useUi.setState({ status: `Salvo como ${name}.` });
-          return;
-        }
-      } catch (e) {
-        const code = (e as { code?: string }).code;
-        if (code === 'declined') {
-          useUi.setState({ status: 'Salvamento cancelado. O projeto continua guardado neste navegador.' });
-          return;
-        }
-      }
+    const entrega = await entregarArquivo({ nome: name, conteudo: text });
+    if (entrega === 'salvo') {
+      this.store.markSaved();
+      useUi.setState({ status: `Salvo como ${name}.` });
+      return;
     }
-    let downloaded = false;
-    try {
-      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      downloaded = true;
-    } catch {
-      downloaded = false;
+    if (entrega === 'cancelado') {
+      useUi.setState({ status: 'Salvamento cancelado. O projeto continua guardado neste navegador.' });
+      return;
     }
+    const downloaded = entrega === 'baixado';
     this.store.markSaved();
     try {
       await navigator.clipboard.writeText(text);

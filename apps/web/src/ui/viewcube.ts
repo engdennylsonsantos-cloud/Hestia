@@ -139,8 +139,8 @@ export function cellSign(face: Face, row: number, col: number): Sign3 {
   return vec3((i) => f.n[i]! + su * f.r[i]! + sv * f.u[i]!) as Sign3;
 }
 
-/** Meio lado do cubo em px (o cubo tem 104 px de lado; é a mesma constante de `--vc-half` no CSS). */
-export const CUBE_HALF_PX = 52;
+/** Meio lado do cubo em px (o cubo tem 64 px de lado; é a mesma constante de `--vc-half` no CSS). */
+export const CUBE_HALF_PX = 32;
 
 /** Centro de uma célula no espaço do cubo (cubo de lado 2, centrado na origem), para os testes e a projeção. */
 export function cellCenter(face: Face, row: number, col: number): [number, number, number] {

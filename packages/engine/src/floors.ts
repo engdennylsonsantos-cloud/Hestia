@@ -1,5 +1,6 @@
 import type { MultiPolygon } from '@hestia/geom';
 import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, type Id, type Project } from '@hestia/model';
+import { layerOutlines, memoCut } from './layerOutline.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
@@ -15,6 +16,8 @@ export interface ResolvedFloorLayer {
   core: boolean;
   /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
   membrane: boolean;
+  /** Contorno da camada, em planta, menos furos (decisão 0023 §2, P8): o do piso, salvo término que vai ao núcleo ou desloca. */
+  polygon: MultiPolygon;
 }
 
 export interface ResolvedFloor {
@@ -63,15 +66,28 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
     if (boundary.length < 3) continue;
     const topZ = levelElevation(p, f.levelId) + f.heightOffset;
     let z = topZ;
-    const layers: ResolvedFloorLayer[] = [];
-    const core = layerCoreFlags(type.layers);
-    type.layers.forEach((l, i) => {
-      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l), priority: layerPriority(l), core: core[i]! });
-      z -= l.thickness;
+    const bounds = type.layers.map((l) => {
+      const r = { z0: z - l.thickness, z1: z };
+      z = r.z0;
+      return r;
     });
     const bottomZ = z;
-    const polygon = cutStairOpenings([[boundary, ...holes]], stairHolesFor(openings, bottomZ));
+    const core = layerCoreFlags(type.layers);
+    const base: MultiPolygon = [[boundary, ...holes]];
+    const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, bottomZ)));
+    const polygon = cut(base);
     if (polygon.length === 0) continue;
+    const outlines = layerOutlines(p, f.levelId, f, type.layers, core, base);
+    const layers: ResolvedFloorLayer[] = type.layers.map((l, i) => ({
+      layerIndex: i,
+      materialId: l.materialId,
+      z0: bounds[i]!.z0,
+      z1: bounds[i]!.z1,
+      membrane: isMembraneLayer(l),
+      priority: layerPriority(l),
+      core: core[i]!,
+      polygon: cut(outlines[i]!),
+    }));
     out.push({ floorId: f.id, typeId: f.typeId, levelId: f.levelId, polygon, topZ, bottomZ, layers, problem });
   }
   return out;

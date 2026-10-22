@@ -193,9 +193,9 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     // junção resolvida (P7b), cada camada corta só a parte que sobra dela (`layerPartsOf`); sem corte, a camada inteira.
     const jl = junctionLevel(p, levelId);
     for (const f of resolveFloors(p, levelId)) {
-      membranes.push(...membraneCutsOf(f.polygon, f.layers, { floorId: f.floorId }, null, frame));
+      membranes.push(...membraneCutsOf(f.layers, { floorId: f.floorId }, null, frame));
       for (const layer of f.layers) {
-        const parts = layerPartsOf(jl.elements.get(f.floorId), layer.layerIndex, [{ poly: f.polygon, z0: layer.z0, z1: layer.z1 }]);
+        const parts = layerPartsOf(jl.elements.get(f.floorId), layer.layerIndex, [{ poly: layer.polygon, z0: layer.z0, z1: layer.z1 }]);
         for (const part of parts) {
           for (const poly of part.poly) {
             for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {
@@ -228,9 +228,9 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     // Lajes (D3): como os pisos, mas com inclinação; cada cota (base e topo) soma a subida no ponto da linha de corte.
     // Lajes com caimento não entram na junção (`junctionLevel`) e seguem como antes.
     for (const sl of resolveSlabs(p, levelId)) {
-      membranes.push(...membraneCutsOf(sl.polygon, sl.layers, { slabId: sl.slabId }, sl.slope, frame));
+      membranes.push(...membraneCutsOf(sl.layers, { slabId: sl.slabId }, sl.slope, frame));
       for (const layer of sl.layers) {
-        const parts = layerPartsOf(jl.elements.get(sl.slabId), layer.layerIndex, [{ poly: sl.polygon, z0: layer.z0, z1: layer.z1 }]);
+        const parts = layerPartsOf(jl.elements.get(sl.slabId), layer.layerIndex, [{ poly: layer.polygon, z0: layer.z0, z1: layer.z1 }]);
         for (const part of parts) {
           for (const poly of part.poly) {
             for (const [t0, t1] of lineIntervals(poly, line.a, d, n)) {

@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactElement } from 'react';
 import { FUNCTION_PRIORITY, type Layer } from '@hestia/model';
+import { LayerTermino } from './LayerTermino.tsx';
 
 const AJUDA = 'Número menor = prioridade maior: a camada de menor número atravessa as de maior número. Camadas de mesmo número não se cortam e deixam linha de fronteira.';
 
@@ -9,10 +10,12 @@ interface LayerAdvancedProps {
   layer: Layer;
   /** Recebe a camada inteira. A chave `priority` sai do objeto quando a prioridade volta ao padrão. */
   onChange: (next: Layer) => void;
+  /** Mostra também "Término na junção" (só pisos e lajes, decisão 0023 §2, P8). */
+  termino?: boolean;
 }
 
 /** Conteúdo expandido ("mais") de uma linha de camada (docs/06 §5). Não guarda nada além do texto do campo. */
-export function LayerAdvanced({ id, layer, onChange }: LayerAdvancedProps): ReactElement {
+export function LayerAdvanced({ id, layer, onChange, termino = false }: LayerAdvancedProps): ReactElement {
   const padrao = FUNCTION_PRIORITY[layer.function];
   const shown = layer.priority === undefined ? '' : String(layer.priority);
   const [text, setText] = useState(shown);
@@ -47,34 +50,37 @@ export function LayerAdvanced({ id, layer, onChange }: LayerAdvancedProps): Reac
   };
 
   return (
-    <div className="adv-panel">
-      <div className="adv-row">
-        <label htmlFor={`${id}-prio`}>Prioridade de junção (sobrescreve a função)</label>
-        <span className="adv-ctl">
-          <input
-            id={`${id}-prio`}
-            className="input num"
-            inputMode="numeric"
-            placeholder={String(padrao)}
-            aria-describedby={`${id}-prio-help`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') {
-                cancel.current = true;
-                e.currentTarget.blur();
-              }
-              e.stopPropagation();
-            }}
-          />
-          <button id={`${id}-prio-reset`} className="btn small" disabled={layer.priority === undefined} onClick={() => apply(null)}>
-            Padrão
-          </button>
-        </span>
+    <>
+      <div className="adv-panel">
+        <div className="adv-row">
+          <label htmlFor={`${id}-prio`}>Prioridade de junção (sobrescreve a função)</label>
+          <span className="adv-ctl">
+            <input
+              id={`${id}-prio`}
+              className="input num"
+              inputMode="numeric"
+              placeholder={String(padrao)}
+              aria-describedby={`${id}-prio-help`}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') {
+                  cancel.current = true;
+                  e.currentTarget.blur();
+                }
+                e.stopPropagation();
+              }}
+            />
+            <button id={`${id}-prio-reset`} className="btn small" disabled={layer.priority === undefined} onClick={() => apply(null)}>
+              Padrão
+            </button>
+          </span>
+        </div>
+        <p id={`${id}-prio-help`} className="adv-help">{AJUDA}</p>
       </div>
-      <p id={`${id}-prio-help`} className="adv-help">{AJUDA}</p>
-    </div>
+      {termino && <LayerTermino id={id} layer={layer} onChange={onChange} />}
+    </>
   );
 }

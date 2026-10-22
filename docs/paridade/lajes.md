@@ -28,6 +28,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] C5 Vínculo do contorno na interface (P2 e P3): grupo "Contorno" com estado, "Desvincular" e "Revincular às paredes" (um passo de desfazer); aviso `contorno-aberto` com "Ir para"; barra de status ao soltar por edição de vértice. Evidência: `packages/engine/src/outlineIssues.test.ts`, `apps/web/src/ui/OutlineGroup.test.ts`, `packages/tools/src/outlineEdit.test.ts`, e2e `tests/e2e/contorno.mjs` (piso; laje segue o mesmo grupo e o mesmo aviso)
 - [x] C6 Piso sobre a laje com camada estrutural avisa `piso-estrutura-sobre-laje` (decisão 0023 P5); o acabamento usa `ft_acab`
 - [x] C7 Laje × parede e laje × piso por prioridade de camada nos quantitativos (0023 §1, P7); testes em `netQuantities.test.ts`
+- [x] C9 Contorno por camada com término na junção (0023 §2, P8): mesmo critério do piso (C7 de pisos), para lajes vinculadas às paredes sem caimento. Evidência: `packages/engine/src/layerOutline.test.ts`, `layerOutlineSection.test.ts`, `packages/model/src/termino.test.ts`, `apps/web/src/ui/dialogs/terminoForm.test.ts`. Fora: perímetro externo, laje com caimento e o lado da parede (C8)
 - [ ] C8 Laje × parede e laje × piso por prioridade na planta, no corte e no 3D (0023 P7, P7b): parcial. A laje e o piso recortados pela região resolvida na planta, no corte e no 3D (lajes com caimento ficam de fora). Falta a parede recortada pela laje, como em pisos C6
 
 ## D · Vistas

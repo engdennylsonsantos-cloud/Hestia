@@ -79,7 +79,8 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   if (detail !== 'coarse') {
     const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
-    if (s.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(s.polygon, theme));
+    // Linha de membrana na face da própria camada (P8): ela pode ir ao núcleo da parede.
+    for (const l of s.layers) if (l.membrane) out.strokes.push(...membraneLineOps(l.polygon, theme));
     if (s.slope && at) {
       out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
       out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });

@@ -39,6 +39,7 @@ import { transformStair } from './stairTransform.ts';
 import { transformCeiling, transformFloor, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
+import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import {
@@ -221,9 +222,7 @@ export function applyCommand(p: Project, c: Command): void {
       p.elements[c.floor.id] = { ...c.floor, order: p.nextOrder++ };
       break;
     }
-    case 'upsertFloorType':
-      p.floorTypes[c.floorType.id] = c.floorType;
-      break;
+    case 'upsertFloorType': p.floorTypes[c.floorType.id] = comTerminoValido(c.floorType); break;
     case 'deleteFloorType': {
       if (Object.values(p.elements).some((e) => isFloor(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
       if (Object.keys(p.floorTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de piso');
@@ -236,9 +235,7 @@ export function applyCommand(p: Project, c: Command): void {
       p.elements[c.slab.id] = { ...c.slab, order: p.nextOrder++ };
       break;
     }
-    case 'upsertSlabType':
-      p.slabTypes[c.slabType.id] = c.slabType;
-      break;
+    case 'upsertSlabType': p.slabTypes[c.slabType.id] = comTerminoValido(c.slabType); break;
     case 'deleteSlabType': {
       if (Object.values(p.elements).some((e) => isSlab(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
       if (Object.keys(p.slabTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de laje');

@@ -122,7 +122,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                         <td><NumField value={l.thickness} scale={100} decimals={1} min={l.function === 'membrane' ? 0 : 0.001} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
                         <td>
                           <span className="iconrow">
-                            <button id={`lt-layer-${i}-more`} className={`ibtn more${adv === i ? ' open' : ''}${l.priority !== undefined ? ' changed' : ''}`} aria-expanded={adv === i} aria-controls={adv === i ? `lt-layer-${i}-adv` : undefined} aria-label={`Opções avançadas da camada ${i + 1}`} title="Mais" onClick={() => setAdv(adv === i ? null : i)}><Icon name="chevron" size={14} /></button>
+                            <button id={`lt-layer-${i}-more`} className={`ibtn more${adv === i ? ' open' : ''}${l.priority !== undefined || l.termino !== undefined ? ' changed' : ''}`} aria-expanded={adv === i} aria-controls={adv === i ? `lt-layer-${i}-adv` : undefined} aria-label={`Opções avançadas da camada ${i + 1}`} title="Mais" onClick={() => setAdv(adv === i ? null : i)}><Icon name="chevron" size={14} /></button>
                             <button className="ibtn" onClick={() => move(i, -1)} aria-label="Subir camada" disabled={i === 0}><Icon name="up" size={14} /></button>
                             <button className="ibtn" onClick={() => move(i, 1)} aria-label="Descer camada" disabled={i === draft.layers.length - 1}><Icon name="down" size={14} /></button>
                             <button className="ibtn" onClick={() => remove(i)} aria-label="Remover camada" disabled={draft.layers.length <= 1}><Icon name="close" size={14} /></button>
@@ -132,7 +132,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                       {adv === i && (
                         <tr id={`lt-layer-${i}-adv`} className="adv">
                           <td colSpan={5}>
-                            <LayerAdvanced id={`lt-layer-${i}`} layer={l} onChange={(next) => replaceLayer(i, next)} />
+                            <LayerAdvanced id={`lt-layer-${i}`} layer={l} onChange={(next) => replaceLayer(i, next)} termino />
                           </td>
                         </tr>
                       )}

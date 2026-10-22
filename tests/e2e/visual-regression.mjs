@@ -87,6 +87,14 @@ const ROOM_CASES = { 'ambiente-sala': [...wallsOf(RECT_WALLS), RM('r1')] };
 
 // P7b (decisão 0023 §3, §10): junção piso/laje × parede. A parede com base abaixo do topo do piso ou da laje entra na
 // faixa deles; a camada que perde prioridade sai onde a outra a vence. Sem sobreposição, nada muda (os 21 casos acima).
+// P8 (decisão 0023 §2): os dois casos de término por camada são novos e têm baseline própria (criada e conferida).
+// P8 (decisão 0023 §2): tipo de piso ft_ceram com a cerâmica em { cm: -1 } (o padrão é a mesma sem término).
+const FT_CERAMICA_RECUADA = { id: 'ft_ceram', name: 'Cerâmico sobre contrapiso', code: 'PS-01', description: '', cost: 160, layers: [
+  { function: 'finish1', materialId: 'mat_ceramica', thickness: 0.01, wraps: false, termino: { cm: -1 } },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.02, wraps: false },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.04, wraps: false },
+  { function: 'structure', materialId: 'mat_concreto', thickness: 0.12, wraps: false },
+] };
 const JUNCTION_CASES = {
   // (a) piso pelo núcleo ("Estender até o núcleo", `walls-core`) em L; as paredes descem 0,10 m abaixo do nível.
   'junc-piso-L-nucleo': [...wallsOf(L_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pj1', L_WALLS, { outlineSource: { mode: 'walls-core', seed: { x: 2, y: 1.5 }, linked: true } })],
@@ -94,6 +102,10 @@ const JUNCTION_CASES = {
   'junc-laje-perimetro-parede': [...wallsOf(RECT_WALLS), W('div', [4, 0], [4, 6], { baseOffset: -0.1 }), SL('ls1', RECT_WALLS, { outlineSource: { mode: 'perimeter', seed: { x: 2, y: 2 }, linked: true } })],
   // (c) parede embutida no piso: a parede atravessa o piso 6 × 4 m e tem base 0,10 m abaixo do topo dele.
   'junc-parede-embutida-piso': [W('e1', [-1, 2], [7, 2], { baseOffset: -0.1 }), F('pe1', [[0, 0], [6, 0], [6, 4], [0, 4]])],
+  // (d) piso vinculado em retângulo (8 × 6 m, paredes 0,10 m abaixo do topo) com término automático em todas as camadas.
+  'junc-piso-retangulo-auto': [...wallsOf(RECT_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pr1', RECT_WALLS, { outlineSource: { mode: 'walls-finish', seed: { x: 4, y: 3 }, linked: true } })],
+  // (e) o mesmo piso com a cerâmica (topo) recuada 1 cm da face de acabamento (`{ cm: -1 }`); a estrutura segue `auto`.
+  'junc-piso-retangulo-cm-menos-1': [{ kind: 'floorType', floorType: FT_CERAMICA_RECUADA }, ...wallsOf(RECT_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pr2', RECT_WALLS, { outlineSource: { mode: 'walls-finish', seed: { x: 4, y: 3 }, linked: true } })],
 };
 
 // Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas
@@ -128,7 +140,7 @@ for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_C
   await page.evaluate(([ws, v]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : { type: 'addWall', wall: w });
+    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : w.kind === 'floorType' ? { type: 'upsertFloorType', floorType: w.floorType } : { type: 'addWall', wall: w });
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });
   }, [items, vista]);
   await assentar(page);

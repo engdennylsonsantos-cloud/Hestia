@@ -40,7 +40,16 @@ export interface Layer {
   wraps: boolean;
   /** Substitui a prioridade padrão da função (avançado). */
   priority?: number;
+  /** Término na junção (decisão 0023 §2, P8): até onde a camada vai sobre a parede. Ausente = `auto`. Só pisos e lajes. */
+  termino?: LayerTermino;
 }
+
+/**
+ * Término de uma camada de piso ou de laje vinculados às paredes (decisão 0023 §2): `auto` (núcleo do piso até o núcleo
+ * da parede, o resto até a face de acabamento), `nucleo`, `face` ou deslocamento em cm a partir da face de acabamento
+ * (positivo avança sobre a parede, negativo recua).
+ */
+export type LayerTermino = 'auto' | 'nucleo' | 'face' | { cm: number };
 
 /** Em que lados os acabamentos "envolvem" (retornam) nos vãos e nas extremidades da parede. */
 export type WrapMode = 'none' | 'interior' | 'exterior' | 'both';

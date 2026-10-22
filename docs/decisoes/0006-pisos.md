@@ -8,3 +8,5 @@
 | 4 | O tipo de piso reutiliza `Layer` do tipo de parede | Mesmo editor de camadas e mesmos quantitativos |
 | 5 | Piso inclinado, vão estrutural e IFC ficam fora desta etapa | Dependem de cota por ponto (lajes e telhados) e da fase de interoperabilidade |
 | 6 | Parede com a base anexada ao piso começa na face superior do piso do próprio nível; com o topo anexado, termina na face inferior do piso do nível `topLevelId` (campos `attachBottomToFloor`/`attachTopToFloor`, padrão desligados) | Evita parede atravessando o piso; E2/E3 do checklist de paredes são resolvidos aqui. Sem piso sobre o ponto médio da parede, nada muda; pisos sobrepostos: vale o mais alto para a base e o mais baixo para o topo |
+
+Nota (0023 P8): o término por camada da junção (`Término na junção`, campo `termino` em `Layer`) está em `docs/decisoes/0023-juncao-piso-laje-parede.md` §2 e §10. Vale para piso e laje vinculados às paredes; o padrão `auto` mantém o corte da tabela de §2.

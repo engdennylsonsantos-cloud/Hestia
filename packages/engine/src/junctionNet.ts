@@ -130,10 +130,10 @@ export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: 
   return area;
 }
 
-/** Pedaço de uma camada de laje: a forma em planta da laje e a faixa de cota da camada (inclinação incluída). */
+/** Pedaço de uma camada de laje: a forma em planta da camada (P8) e a faixa de cota dela (inclinação incluída). */
 export function slabLayerPiece(rs: ResolvedSlab, l: ResolvedSlab['layers'][number]): SolidPiece {
   return {
-    poly: rs.polygon,
+    poly: l.polygon,
     span: (q: Vec2) => [l.z0 + slabRiseAt(rs.slope, q), l.z1 + slabRiseAt(rs.slope, q)] as const,
     flat: rs.slope === null,
     meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId },
@@ -145,9 +145,9 @@ export function slabCutters(p: Project, levelId: Id): CutterSolid[] {
   return resolveSlabs(p, levelId).map((rs) => ({ kind: 'slab', pieces: rs.layers.map((l) => slabLayerPiece(rs, l)) }));
 }
 
-/** Pedaço de uma camada de piso: a forma em planta do piso e a faixa de cota da camada (pisos são faixas constantes). */
+/** Pedaço de uma camada de piso: a forma em planta da camada (P8, pode ir ao núcleo da parede) e a faixa de cota dela. */
 export function floorLayerPiece(rf: ResolvedFloor, l: ResolvedFloorLayer): SolidPiece {
-  return { ...flatPiece(rf.polygon, l.z0, l.z1), meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId } };
+  return { ...flatPiece(l.polygon, l.z0, l.z1), meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId } };
 }
 
 /** Pedaços dos pisos do nível, camada a camada. */

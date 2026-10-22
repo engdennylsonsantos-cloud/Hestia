@@ -40,12 +40,12 @@
     {
       "id": "forros",
       "arquivo": "forros.md",
-      "status": "em-andamento"
+      "status": "concluido"
     },
     {
       "id": "pranchas",
       "arquivo": "pranchas.md",
-      "status": "nao-iniciado"
+      "status": "concluido"
     }
   ]
 }

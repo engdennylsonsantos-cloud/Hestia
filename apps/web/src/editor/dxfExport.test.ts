@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
 import { openingSymbolPaths } from '@hestia/geom';
-import { dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, type DxfLevelGeometry } from '@hestia/io';
+import { dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry } from '@hestia/io';
 import {
   ProjectStore,
   buildTemplate,
+  graphicsOf,
+  lineWeightMm,
   makeFloor,
   makeSlab,
   makeStair,
@@ -18,7 +20,7 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { climbWalk, planViewOf, risersInClimbOrder } from '@hestia/render';
-import { arrowOfPath, lineWeightsOf, planDxf, stairArrow } from './dxfExport.ts';
+import { arrowOfPath, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
 function lPlan(): ProjectStore {
@@ -514,5 +516,52 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     expect(w.ESCADA_SETA).toBe(0);
     expect(w.ESCADA_CORTE).toBe(0);
     expect(w.ESCADA).toBe(35);
+  });
+});
+
+/** Corte A sobre a planta em L: a linha (y = −2) fica diante das paredes, que entram como projeção. */
+function sectionPlan(): ProjectStore {
+  const store = lPlan();
+  store.exec({ type: 'addView', view: { id: 'corte_a', name: 'Corte A', kind: 'section', a: { x: -1, y: -2 }, b: { x: 7, y: -2 }, depth: 8 } });
+  return store;
+}
+
+describe('corte e elevação no DXF (decisão 0015 §2.7)', () => {
+  it('a escala muda o 370 da projeção da parede no corte: 1:50 e 1:100 saem com larguras diferentes', () => {
+    const store = sectionPlan();
+    const at = (scale: number): Map<string, number | undefined> => {
+      store.exec({ type: 'setSectionGraphics', patch: { scale } });
+      return layerTable(sectionDxf(store.project, 'corte_a'));
+    };
+    const w50 = at(50).get('CORTE_PAREDE_PROJECAO');
+    const w100 = at(100).get('CORTE_PAREDE_PROJECAO');
+    expect(w50).toBeGreaterThan(0);
+    expect(w100).toBeGreaterThan(0);
+    expect(w50).not.toBe(w100);
+  });
+
+  it('sem gráficos salvos, o 370 segue a tabela do projeto na escala padrão (1:100, peso de projeção da parede)', () => {
+    const p = sectionPlan().project;
+    const g = graphicsOf(p);
+    const want = dxfLineWeight(lineWeightMm(g.lineWeights, g.categories.wall.projectionWeight, 100) * 100);
+    expect(layerTable(sectionDxf(p, 'corte_a')).get('CORTE_PAREDE_PROJECAO')).toBe(want);
+  });
+
+  it('categoria oculta na vista não sai no DXF: sem paredes, a camada de projeção da parede não existe', () => {
+    const store = sectionPlan();
+    store.exec({ type: 'setSectionGraphics', patch: { overrides: { wall: { visible: false } } } });
+    const geo = sectionDxfGeometryOf(store.project, 'corte_a');
+    expect(geo.beyond.some((b) => b.category === 'wall')).toBe(false);
+    expect(geo.silhouette).toBeUndefined();
+    expect(polylinesOf(sectionDxf(store.project, 'corte_a')).some((p) => p.layer === 'CORTE_PAREDE_PROJECAO')).toBe(false);
+  });
+
+  it('sectionLineWeightsOf dá peso de corte ao cortado e de projeção ao visto além, e 0 à anotação', () => {
+    const store = sectionPlan();
+    const geo = sectionDxfGeometryOf(store.project, 'corte_a');
+    const w = sectionLineWeightsOf(store.project, geo);
+    expect(w['0']).toBeUndefined();
+    expect(w['CORTE_PAREDE_PROJECAO']).toBeGreaterThan(0);
+    expect(w['CORTE_CONTORNO']).toBeGreaterThan(0);
   });
 });

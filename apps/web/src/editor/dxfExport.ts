@@ -1,8 +1,22 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type ViewClass } from '@hestia/engine';
-import { climbWalk, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
-import { dxfLayersOf, dxfLineRoleOf, dxfLineWeight, exportDxf, type DxfLevelGeometry, type DxfOpening, type DxfPoint, type DxfViewState } from '@hestia/io';
-import { graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { computeSection, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { climbWalk, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import {
+  dxfLayersOf,
+  dxfLineRoleOf,
+  dxfLineWeight,
+  dxfSectionLayersOf,
+  dxfSectionLineRoleOf,
+  exportDxf,
+  exportSectionDxf,
+  type DxfLevelGeometry,
+  type DxfOpening,
+  type DxfPoint,
+  type DxfSectionGeometry,
+  type DxfSectionItem,
+  type DxfViewState,
+} from '@hestia/io';
+import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, sectionGraphicsOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 type StairDxf = NonNullable<DxfLevelGeometry['stairs']>[number];
@@ -203,4 +217,70 @@ export function savePlanDxf(p: Project, levelId: Id): Promise<string> {
   const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
   const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).replace(/[^\w\- ]+/g, '').trim() || 'nivel';
   return saveText(`${base}-${level}.dxf`, planDxf(p, levelId));
+}
+
+/** Categoria gráfica de uma origem do corte (parede, piso, laje, telhado ou escada). */
+function sectionCategoryOf(o: SectionOrigin): GraphicsCategory {
+  return ownerOf(o)?.kind ?? 'wall';
+}
+
+/**
+ * Largura de linha (centésimos de mm) de cada camada do corte/elevação: o peso da categoria na escala da vista
+ * (decisão 0015 §2.7), com a substituição da vista valendo sobre o peso do projeto. Níveis são anotação (0).
+ */
+export function sectionLineWeightsOf(p: Project, geo: DxfSectionGeometry): Record<string, number> {
+  const pg = graphicsOf(p);
+  const vg = sectionGraphicsOf(p);
+  const out: Record<string, number> = {};
+  for (const layer of dxfSectionLayersOf(geo)) {
+    const role = dxfSectionLineRoleOf(layer);
+    if (role === undefined) continue;
+    if (role === 'annotation') {
+      out[layer] = 0;
+      continue;
+    }
+    const over = vg.overrides[role.category];
+    const base = pg.categories[role.category];
+    const weight = role.view === 'cut' ? (over.cutWeight ?? base.cutWeight) : (over.projectionWeight ?? base.projectionWeight);
+    out[layer] = dxfLineWeight(lineWeightMm(pg.lineWeights, weight, vg.scale) * 100);
+  }
+  return out;
+}
+
+/**
+ * Geometria do corte/elevação para o DXF, a partir do mesmo `computeSection` da tela. Categoria oculta na vista
+ * (`sectionGraphics.overrides[cat].visible === false`) não sai. As camadas levam a largura da categoria na escala.
+ */
+export function sectionDxfGeometryOf(p: Project, sectionId: Id): DxfSectionGeometry {
+  const view = p.views.find((v) => v.id === sectionId);
+  if (!view) throw new Error(`Vista ausente: ${sectionId}`);
+  const section = computeSection(p, { a: view.a, b: view.b, depth: view.depth });
+  const vg = sectionGraphicsOf(p);
+  const shown = (c: GraphicsCategory): boolean => vg.overrides[c].visible !== false;
+  const cut: DxfSectionItem[] = [];
+  for (const r of section.cut) {
+    const cats = [...new Set(r.sources.map(sectionCategoryOf))];
+    const cat = cats.find(shown);
+    if (cat) cut.push({ category: cat, polygons: r.polygons });
+  }
+  const beyond: DxfSectionItem[] = section.beyond.flatMap((b) => {
+    const cat = sectionCategoryOf(b);
+    return shown(cat) ? [{ category: cat, polygons: b.polygons }] : [];
+  });
+  const openings = section.openings.flatMap((o) => (shown(o.kind) ? [{ category: o.kind, polygons: o.polygons, cut: o.cut }] : []));
+  const allShown = GRAPHICS_CATEGORIES.every(shown);
+  const geo: DxfSectionGeometry = { cut, beyond, openings, ...(allShown ? { silhouette: section.silhouette } : {}) };
+  return { ...geo, lineWeights: sectionLineWeightsOf(p, geo) };
+}
+
+/** Texto DXF do corte/elevação, com as camadas e as larguras de linha da vista. */
+export function sectionDxf(p: Project, sectionId: Id): string {
+  return exportSectionDxf(p, sectionId, sectionDxfGeometryOf(p, sectionId));
+}
+
+/** Entrega o DXF do corte pelo mesmo caminho da planta e devolve a frase de status. */
+export function saveSectionDxf(p: Project, sectionId: Id): Promise<string> {
+  const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
+  const view = (p.views.find((v) => v.id === sectionId)?.name ?? sectionId).replace(/[^\w\- ]+/g, '').trim() || 'vista';
+  return saveText(`${base}-${view}.dxf`, sectionDxf(p, sectionId));
 }

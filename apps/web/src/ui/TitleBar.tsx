@@ -1,7 +1,7 @@
 import { useRef, type ReactElement } from 'react';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
-import { savePlanDxf } from '../editor/dxfExport.ts';
+import { savePlanDxf, saveSectionDxf } from '../editor/dxfExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
 
@@ -20,9 +20,12 @@ export function TitleBar(): ReactElement {
     useUi.setState({ status: r.ok ? `Aberto: ${f.name}` : `Não foi possível abrir: ${r.error}` });
   };
   const exportDxf = async (): Promise<void> => {
-    const levelId = useUi.getState().levelId;
+    const ui = useUi.getState();
     try {
-      const status = await savePlanDxf(editor.project, levelId);
+      // Vista de corte/elevação aberta: exporta o corte (com as larguras da vista); senão, a planta do nível.
+      const status = ui.view === 'section' && ui.sectionId
+        ? await saveSectionDxf(editor.project, ui.sectionId)
+        : await savePlanDxf(editor.project, ui.levelId);
       useUi.setState({ status });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });

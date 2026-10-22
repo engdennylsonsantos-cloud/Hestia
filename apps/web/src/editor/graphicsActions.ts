@@ -1,4 +1,4 @@
-import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, view3dOf, type Command, type Id, type ProjectStore } from '@hestia/model';
+import { DEFAULT_CATEGORY_STYLES, DEFAULT_LINE_WEIGHTS, DEFAULT_PROJECT_GRAPHICS, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Command, type Id, type ProjectStore } from '@hestia/model';
 
 /** Resultado de uma edição de gráficos: `error` traz a mensagem pt-BR de quem recusou (nada é gravado). */
 export interface GraphicsEdit {
@@ -9,6 +9,7 @@ export interface GraphicsEdit {
 /** Patches parciais e profundos (o comando faz o merge): só as chaves dadas mudam. */
 export type LevelGraphicsPatch = Extract<Command, { type: 'setLevelGraphics' }>['patch'];
 export type View3DPatch = Extract<Command, { type: 'setView3D' }>['patch'];
+export type SectionGraphicsPatch = Extract<Command, { type: 'setSectionGraphics' }>['patch'];
 export type ProjectGraphicsPatch = Extract<Command, { type: 'setProjectGraphics' }>['patch'];
 
 const OK: GraphicsEdit = { ok: true, error: null };
@@ -76,6 +77,28 @@ export function restoreView3DDefault(store: ProjectStore): GraphicsEdit {
   try {
     if (!store.project.view3d) return OK;
     store.exec({ type: 'resetView3D' }, 'Restaurar gráficos do 3D');
+    return OK;
+  } catch (e) {
+    return failed(e);
+  }
+}
+
+/** Aplica os gráficos do corte/elevação (um único conjunto para todas as vistas de corte). */
+export function editSectionGraphics(store: ProjectStore, patch: SectionGraphicsPatch, label = 'Alterar gráficos do corte'): GraphicsEdit {
+  try {
+    if (alreadyApplied(patch, sectionGraphicsOf(store.project))) return OK;
+    store.exec({ type: 'setSectionGraphics', patch }, label);
+    return OK;
+  } catch (e) {
+    return failed(e);
+  }
+}
+
+/** Volta os gráficos do corte/elevação ao padrão (apaga o que o projeto guardou). */
+export function restoreSectionGraphicsDefault(store: ProjectStore): GraphicsEdit {
+  try {
+    if (!store.project.sectionGraphics) return OK;
+    store.exec({ type: 'resetSectionGraphics' }, 'Restaurar gráficos do corte');
     return OK;
   } catch (e) {
     return failed(e);

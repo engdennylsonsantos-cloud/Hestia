@@ -27,7 +27,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
 import { setRoofProjection, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
-import { LevelGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
+import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
@@ -301,9 +301,11 @@ function ViewProps(): ReactElement {
   const p = useProject();
   const s = useUi();
   const lvl = p.levels.find((l) => l.id === s.levelId);
+  const section = s.view === 'section' ? p.views.find((v) => v.id === s.sectionId) : undefined;
+  const title = s.view === 'plan' ? `Planta · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
   return (
     <>
-      <div className="typesel"><strong>{s.view === 'plan' ? `Planta · ${lvl?.name ?? ''}` : 'Modelo 3D'}</strong></div>
+      <div className="typesel"><strong>{title}</strong></div>
       <Group title="Vista">
         <Row label="Nível" htmlFor="v-level">
           <select id="v-level" className="select" value={s.levelId} onChange={(e) => editor.selectLevel(e.target.value)}>
@@ -328,6 +330,7 @@ function ViewProps(): ReactElement {
       {s.view === 'plan' && <ViewRangeGroup key={s.levelId} levelId={s.levelId} />}
       {s.view === 'plan' && <LevelGraphicsGroup key={s.levelId} levelId={s.levelId} />}
       {s.view === '3d' && <View3DGroup />}
+      {s.view === 'section' && <SectionGraphicsGroup />}
       <Group title="Padrões do projeto" open={false}>
         <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
         <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>

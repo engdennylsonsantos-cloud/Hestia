@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react';
-import { GRAPHICS_CATEGORIES, PLAN_VISUAL_STYLES, levelGraphicsOf, view3dOf, type Id, type View3DSettings, type ViewGraphics } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, PLAN_VISUAL_STYLES, levelGraphicsOf, sectionGraphicsOf, view3dOf, type Id, type View3DSettings, type ViewGraphics } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { editLevelGraphics, editView3D, restoreLevelGraphicsDefault, restoreView3DDefault, type LevelGraphicsPatch, type View3DPatch } from '../editor/graphicsActions.ts';
+import { editLevelGraphics, editSectionGraphics, editView3D, restoreLevelGraphicsDefault, restoreSectionGraphicsDefault, restoreView3DDefault, type LevelGraphicsPatch, type SectionGraphicsPatch, type View3DPatch } from '../editor/graphicsActions.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row } from './fields.tsx';
 import { CATEGORY_LABEL, DETAIL_LABEL, PARTIAL_LABEL, PLAN_SCALES, VISUAL_STYLE_LABEL } from './graphicsLabels.ts';
@@ -44,6 +44,51 @@ export function LevelGraphicsGroup({ levelId }: { levelId: Id }): ReactElement {
       {error && <div className="vr-error" role="alert">{error}</div>}
       <div className="prow"><span /><button className="btn small" onClick={() => useUi.setState({ dialog: 'graphicsVisibility', dialogArg: levelId })}>Visibilidade e gráficos…</button></div>
       <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreLevelGraphicsDefault(editor.store, levelId).error)}>Restaurar padrão</button></div>
+      {hidden.length > 0 ? (
+        <div className="hint">Oculto nesta vista: {hidden.map((c) => CATEGORY_LABEL[c].toLowerCase()).join(', ')}.</div>
+      ) : null}
+    </Group>
+  );
+}
+
+/** Gráficos do corte/elevação (decisão 0015 §3): os mesmos controles da planta, guardados no projeto. */
+export function SectionGraphicsGroup(): ReactElement {
+  const p = useProject();
+  const g = sectionGraphicsOf(p);
+  const [error, setError] = useState<string | null>(null);
+  const edit = (patch: SectionGraphicsPatch): void => setError(editSectionGraphics(editor.store, patch).error);
+  const hidden = GRAPHICS_CATEGORIES.filter((c) => !g.overrides[c].visible);
+  const isPreset = PLAN_SCALES.includes(g.scale);
+  return (
+    <Group title="Gráficos da vista" open={false}>
+      <Row label="Escala" htmlFor="sg-scale">
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <select id="sg-scale" className="select" value={isPreset ? String(g.scale) : ''} onChange={(e) => e.target.value && edit({ scale: Number(e.target.value) })} aria-label="Escala do corte">
+            {!isPreset && <option value="">Outra</option>}
+            {PLAN_SCALES.map((n) => <option key={n} value={n}>{`1:${n}`}</option>)}
+          </select>
+          <span className="val soft">1:</span>
+          <NumField id="sg-scale-free" value={g.scale} decimals={0} min={1} width={64} onCommit={(v) => edit({ scale: v })} />
+        </span>
+      </Row>
+      <Row label="Detalhe" htmlFor="sg-detail">
+        <select id="sg-detail" className="select" value={g.detail} onChange={(e) => edit({ detail: e.target.value as ViewGraphics['detail'] })}>
+          {(Object.keys(DETAIL_LABEL) as Array<keyof typeof DETAIL_LABEL>).map((k) => <option key={k} value={k}>{DETAIL_LABEL[k]}</option>)}
+        </select>
+      </Row>
+      <Row label="Estilo visual" htmlFor="sg-style">
+        <select id="sg-style" className="select" value={g.style} onChange={(e) => edit({ style: e.target.value as ViewGraphics['style'] })}>
+          {PLAN_VISUAL_STYLES.map((k) => <option key={k} value={k}>{VISUAL_STYLE_LABEL[k]}</option>)}
+        </select>
+      </Row>
+      <Row label="Parcial de estrutura" htmlFor="sg-partial">
+        <select id="sg-partial" className="select" value={g.partialStructure} onChange={(e) => edit({ partialStructure: e.target.value as ViewGraphics['partialStructure'] })}>
+          {(Object.keys(PARTIAL_LABEL) as Array<keyof typeof PARTIAL_LABEL>).map((k) => <option key={k} value={k}>{PARTIAL_LABEL[k]}</option>)}
+        </select>
+      </Row>
+      {error && <div className="vr-error" role="alert">{error}</div>}
+      <div className="prow"><span /><button className="btn small" onClick={() => useUi.setState({ dialog: 'graphicsVisibility', dialogArg: 'section' })}>Visibilidade e gráficos…</button></div>
+      <div className="prow"><span /><button className="btn small" onClick={() => setError(restoreSectionGraphicsDefault(editor.store).error)}>Restaurar padrão</button></div>
       {hidden.length > 0 ? (
         <div className="hint">Oculto nesta vista: {hidden.map((c) => CATEGORY_LABEL[c].toLowerCase()).join(', ')}.</div>
       ) : null}

@@ -11,6 +11,7 @@ import {
   isDefaultLevelGraphics,
   levelGraphicsOf,
   migrateProject,
+  sectionGraphicsOf,
   validateProject,
   view3dOf,
   type Command,
@@ -40,6 +41,7 @@ describe('padrões e arquivos sem os campos de gráficos', () => {
     expect(graphicsOf(p)).toEqual(DEFAULT_PROJECT_GRAPHICS);
     expect(levelGraphicsOf(p, LV0)).toEqual(DEFAULT_VIEW_GRAPHICS);
     expect(view3dOf(p)).toEqual(DEFAULT_VIEW_3D);
+    expect(sectionGraphicsOf(p)).toEqual(DEFAULT_VIEW_GRAPHICS);
     expect(issuesOf(p)).toEqual([]);
   });
 
@@ -143,6 +145,45 @@ describe('setLevelGraphics', () => {
     s.redo();
     s.redo();
     expect(levelGraphicsOf(s.project, LV0)).toEqual({ ...DEFAULT_VIEW_GRAPHICS, scale: 50, style: 'shaded' });
+  });
+});
+
+describe('setSectionGraphics', () => {
+  const sg = (patch: DeepPartial<ViewGraphics>): Command => ({ type: 'setSectionGraphics', patch });
+
+  it('aplica o patch parcial e grava a vista do corte completa, com o detalhe pela escala', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec(sg({ scale: 50 }));
+    expect(s.project.sectionGraphics).toEqual({ ...DEFAULT_VIEW_GRAPHICS, scale: 50 });
+    expect(sectionGraphicsOf(s.project)).toEqual({ ...DEFAULT_VIEW_GRAPHICS, scale: 50 });
+  });
+
+  it('overrides mesclam por categoria e o histórico usa o rótulo do corte', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec(sg({ overrides: { wall: { visible: false } } }));
+    s.exec(sg({ overrides: { wall: { halftone: true } } }));
+    expect(sectionGraphicsOf(s.project).overrides.wall).toEqual({ visible: false, transparency: 0, halftone: true });
+    expect(s.undoLabel).toBe('Alterar gráficos do corte');
+    s.undo();
+    expect(sectionGraphicsOf(s.project).overrides.wall).toEqual({ visible: false, transparency: 0, halftone: false });
+  });
+
+  it('resetSectionGraphics remove o campo salvo; desfazer o traz de volta', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec(sg({ scale: 200 }));
+    s.exec({ type: 'resetSectionGraphics' });
+    expect(s.project.sectionGraphics).toBeUndefined();
+    expect(sectionGraphicsOf(s.project)).toEqual(DEFAULT_VIEW_GRAPHICS);
+    expect(s.undoLabel).toBe('Restaurar gráficos do corte');
+    s.undo();
+    expect(sectionGraphicsOf(s.project).scale).toBe(200);
+  });
+
+  it('recusa escala inválida sem alterar o projeto', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(() => s.exec(sg({ scale: 0 }))).toThrow('A escala deve ser um denominador inteiro de 1 a 5000 (100 = 1:100).');
+    expect(s.project.sectionGraphics).toBeUndefined();
+    expect(s.canUndo).toBe(false);
   });
 });
 

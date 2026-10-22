@@ -199,6 +199,10 @@ export function labelOf(c: Command): string {
       return 'Alterar a vista 3D';
     case 'resetView3D':
       return 'Restaurar a vista 3D';
+    case 'setSectionGraphics':
+      return 'Alterar gráficos do corte';
+    case 'resetSectionGraphics':
+      return 'Restaurar gráficos do corte';
     case 'setProjectName':
       return 'Renomear projeto';
     case 'setDefaults':

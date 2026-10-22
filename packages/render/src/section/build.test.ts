@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { MultiPolygon, Vec2 } from '@hestia/geom';
 import { computeSection } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, makeWall, type Opening, type OpeningType, type StairCurve, type StairRun } from '@hestia/model';
+import {
+  DEFAULT_LINE_WEIGHTS,
+  ProjectStore,
+  createEmptyProject,
+  defaultStairTypeId,
+  lineWeightMm,
+  makeStair,
+  makeWall,
+  paperMmToPx,
+  type DeepPartial,
+  type Opening,
+  type OpeningType,
+  type StairCurve,
+  type StairRun,
+  type ViewGraphics,
+} from '@hestia/model';
 import { LIGHT } from '../plan/types.ts';
 import { buildSectionDrawList, type SectionInput } from './build.ts';
 
@@ -71,15 +86,16 @@ function boxProject() {
   return store.project;
 }
 
+/** Vista de fora da caixa de 6 × 4 m (linha em y = −2), usada pelos testes de gráficos. */
+function boxInput(): SectionInput {
+  const project = boxProject();
+  return { project, section: computeSection(project, { a: v(0, -2), b: v(6, -2), depth: 8 }), viewport: { cx: 3, cy: 1.5, zoom: 60, width: 800, height: 600 }, theme: LIGHT, dark: false, showGrid: false };
+}
+
 describe('desenho do corte com linha oculta', () => {
   const GLASS = '#bfe3f5';
-  const box = (): SectionInput => {
-    const project = boxProject();
-    return { project, section: computeSection(project, { a: v(0, -2), b: v(6, -2), depth: 8 }), viewport: { cx: 3, cy: 1.5, zoom: 60, width: 800, height: 600 }, theme: LIGHT, dark: false, showGrid: false };
-  };
-
   it('a janela de trás e a da parede interna não são pintadas: só o vidro da face voltada ao observador', () => {
-    const draw = buildSectionDrawList(box());
+    const draw = buildSectionDrawList(boxInput());
     expect(draw.fills.filter((f) => f.color === GLASS)).toHaveLength(1);
   });
 
@@ -228,5 +244,62 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(buildSectionDrawList(facade([op('j', 'window', 'ot_j120', 'frente')])).strokes.filter((s) => s.dash?.[0] === 4).length).toBeGreaterThanOrEqual(2);
     expect(buildSectionDrawList(facade([op('p', 'door', 'ot_pc160', 'frente')])).strokes.filter((s) => s.dash?.[0] === 4).length).toBeGreaterThanOrEqual(2);
     expect(buildSectionDrawList(facade([op('jf', 'window', 'ot_jfixa60', 'frente')])).strokes.filter((s) => s.dash?.[0] === 4)).toHaveLength(0);
+  });
+});
+
+
+/** Corte transversal da caixa (linha em x = 3): as paredes perpendiculares à linha entram cortadas, com o peso de corte. */
+function cutInput(): SectionInput {
+  const project = boxProject();
+  return { ...boxInput(), section: computeSection(project, { a: v(3, -1), b: v(3, 5), depth: 8 }) };
+}
+
+/** A vista de fora de uma caixa com uma janela em cada face, com os gráficos do corte salvos pelo comando real. */
+function styledBox(patch: DeepPartial<ViewGraphics>, base: () => SectionInput = boxInput): SectionInput {
+  const i = base();
+  const store = new ProjectStore(i.project);
+  store.exec({ type: 'setSectionGraphics', patch });
+  return { ...i, project: store.project };
+}
+
+/** Larguras fechadas do desenho (sem repetição), para achar o peso de cada categoria. */
+const closedWidths = (d: ReturnType<typeof buildSectionDrawList>): number[] =>
+  [...new Set(d.strokes.filter((s) => s.closed).map((s) => s.widthPx))];
+
+const weightPx = (weight: number, scale: number): number => paperMmToPx(lineWeightMm(DEFAULT_LINE_WEIGHTS, weight, scale), 60, scale);
+
+describe('gráficos do corte/elevação (decisão 0015)', () => {
+  it('a escala muda a largura da parede cortada (peso 5): 3 px em 1:100 e 2,1 px em 1:50 (espessura em papel)', () => {
+    const at100 = closedWidths(buildSectionDrawList(styledBox({ scale: 100 }, cutInput)));
+    const at50 = closedWidths(buildSectionDrawList(styledBox({ scale: 50 }, cutInput)));
+    expect(at100.some((w) => Math.abs(w - weightPx(5, 100)) < 1e-9)).toBe(true);
+    expect(at50.some((w) => Math.abs(w - weightPx(5, 50)) < 1e-9)).toBe(true);
+    expect(weightPx(5, 100)).toBeGreaterThan(weightPx(5, 50));
+  });
+
+  it('o que está além leva o peso de projeção da categoria (parede 2), não o de corte', () => {
+    const widths = closedWidths(buildSectionDrawList(styledBox({ scale: 100 })));
+    expect(widths.some((w) => Math.abs(w - weightPx(2, 100)) < 1e-9)).toBe(true);
+  });
+
+  it('categoria oculta some: janela oculta não pinta vidro; parede oculta não deixa o corte nem a hachura', () => {
+    const semJanela = buildSectionDrawList(styledBox({ overrides: { window: { visible: false } } }));
+    expect(semJanela.fills.filter((f) => f.color === '#bfe3f5')).toHaveLength(0);
+    const semParede = buildSectionDrawList(styledBox({ overrides: { wall: { visible: false } } }, cutInput));
+    expect(semParede.fills.filter((f) => f.hatch)).toHaveLength(0);
+    expect(closedWidths(semParede)).not.toContain(weightPx(5, 100));
+  });
+
+  it('arame não preenche (nem hachura); grosso fica só com os contornos', () => {
+    const arame = buildSectionDrawList(styledBox({ style: 'wireframe' }));
+    expect(arame.fills).toHaveLength(0);
+    const grosso = buildSectionDrawList(styledBox({ detail: 'coarse' }));
+    expect(grosso.fills).toHaveLength(0);
+  });
+
+  it('sem gráficos salvos o hiddenLine continua com os traços fixos de antes (silhueta 2,2 e além 1)', () => {
+    const d = buildSectionDrawList(boxInput());
+    expect(d.strokes.filter((s) => s.closed).some((s) => s.widthPx === 2.2)).toBe(true);
+    expect(d.strokes.filter((s) => s.closed && s.widthPx === 1).length).toBeGreaterThan(0);
   });
 });

@@ -3,6 +3,7 @@ import {
   graphicsIssues,
   graphicsOf,
   levelGraphicsOf,
+  sectionGraphicsOf,
   view3dOf,
   type CategoryLineStyle,
   type CategoryOverride,
@@ -87,4 +88,14 @@ export function applyView3D(p: Project, patch: DeepPartial<View3DSettings>): voi
 
 export function resetView3D(p: Project): void {
   delete p.view3d;
+}
+
+export function applySectionGraphics(p: Project, patch: DeepPartial<ViewGraphics>): void {
+  const next = mergeLevel(copy(sectionGraphicsOf(p)), copy(patch));
+  refuse(graphicsIssues(next));
+  p.sectionGraphics = next;
+}
+
+export function resetSectionGraphics(p: Project): void {
+  delete p.sectionGraphics;
 }

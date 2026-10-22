@@ -7,7 +7,7 @@ import { stairIssues } from './validateStairs.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { viewRangeIssues } from './viewRange.ts';
-import { graphicsIssues, graphicsOf, levelGraphicsOf, view3dOf } from './graphics.ts';
+import { graphicsIssues, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf } from './graphics.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 
 export type ValidationSeverity = 'error' | 'warning';
@@ -224,6 +224,7 @@ function graphicsProblems(p: Project): ValidationIssue[] {
   add('Gráficos do projeto: ', graphicsIssues(graphicsOf(p)));
   for (const l of p.levels) add(`Nível "${l.name}" (${l.id}): `, graphicsIssues(levelGraphicsOf(p, l.id)));
   add('Vista 3D: ', graphicsIssues(view3dOf(p)));
+  add('Corte/elevação: ', graphicsIssues(sectionGraphicsOf(p)));
   return out;
 }
 

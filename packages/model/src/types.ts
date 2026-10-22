@@ -419,6 +419,8 @@ export interface Project {
   graphics?: ProjectGraphics;
   /** Gráficos do modelo 3D (decisão 0015); ausente = padrão. */
   view3d?: View3DSettings;
+  /** Gráficos do corte e da elevação (decisão 0015); ausente = padrão. */
+  sectionGraphics?: ViewGraphics;
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

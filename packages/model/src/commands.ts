@@ -38,8 +38,10 @@ import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from 
 import {
   applyLevelGraphics,
   applyProjectGraphics,
+  applySectionGraphics,
   applyView3D,
   resetLevelGraphics,
+  resetSectionGraphics,
   resetView3D,
 } from './graphicsCommands.ts';
 
@@ -77,6 +79,8 @@ export type Command =
   | { type: 'resetLevelGraphics'; levelId: Id }
   | { type: 'setView3D'; patch: DeepPartial<View3DSettings> }
   | { type: 'resetView3D' }
+  | { type: 'setSectionGraphics'; patch: DeepPartial<ViewGraphics> }
+  | { type: 'resetSectionGraphics' }
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
@@ -390,6 +394,12 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'resetView3D':
       resetView3D(p);
+      break;
+    case 'setSectionGraphics':
+      applySectionGraphics(p, c.patch);
+      break;
+    case 'resetSectionGraphics':
+      resetSectionGraphics(p);
       break;
     case 'setProjectName':
       p.name = c.name;

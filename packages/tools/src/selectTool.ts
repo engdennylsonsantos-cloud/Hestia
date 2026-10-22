@@ -5,6 +5,7 @@ import { ToolBase } from './base.ts';
 import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
 import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
+import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
 import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
 import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
@@ -24,7 +25,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'annotation';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'room' | 'annotation';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -95,6 +96,9 @@ export class SelectTool extends ToolBase {
     if (sl) return { id: sl, kind: 'slab' };
     const rf = pickRoofAt(pr, lv, at, mpp);
     if (rf) return { id: rf, kind: 'roof' };
+    // Ambiente: por último entre os elementos de planta (o piso e a parede sob o cursor ganham o clique).
+    const rm = pickRoomAt(pr, lv, at);
+    if (rm) return { id: rm, kind: 'room' };
     // Cotas e textos de anotação (decisão 0019): por último, para não roubar o clique de um elemento.
     const an = annotationAt(pr, lv, at, mpp);
     return an ? { id: an.id, kind: 'annotation' } : null;
@@ -292,6 +296,7 @@ export class SelectTool extends ToolBase {
           ...slabIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
         const cur = this.env.selection();
         this.env.setSelection(p.shift ? [...new Set([...cur, ...ids])] : ids);

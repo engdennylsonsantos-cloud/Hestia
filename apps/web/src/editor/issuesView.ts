@@ -1,4 +1,4 @@
-import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
 import { stairBox, stairPoints } from './stairActions.ts';
 
 export interface IssueGroup {
@@ -64,6 +64,10 @@ export function issueTarget(p: Project, issue: ValidationIssue): IssueTarget | n
       center: { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 },
       box,
     };
+  }
+  // Ambiente: o ponto interior é o centro do aviso (o contorno vem do circuito e pode não existir).
+  if (isRoom(el)) {
+    return { elementId: id, levelId: p.levels.some((l) => l.id === el.levelId) ? el.levelId : null, center: el.point };
   }
   if (isStair(el)) {
     const box = stairBox(el);

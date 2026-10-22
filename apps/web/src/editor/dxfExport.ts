@@ -1,9 +1,10 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { computeSection, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { climbWalk, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { computeSection, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { climbWalk, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfLayersOf,
   dxfLineRoleOf,
+  DXF_LAYER_ROOM_TEXT,
   dxfLineWeight,
   dxfSectionLayersOf,
   dxfSectionLineRoleOf,
@@ -173,7 +174,14 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
     }),
   );
   const roofs = resolveRoofs(p, levelId);
+  // Ambientes (decisão 0018): contorno em AMBIENTES e nome, número e área em AMBIENTES_TEXTO; sem circuito, nada sai.
+  const rooms = shown('room') ? resolveRooms(p, levelId).filter((r) => r.polygon && !hidden.has(r.roomId)) : [];
   const geo: DxfLevelGeometry = {
+    rooms: rooms.map((r) => ({ outline: r.polygon![0] ?? [], holes: r.polygon!.slice(1) })),
+    roomTexts: rooms.flatMap((r) => {
+      const at = roomLabelAt(r);
+      return at ? [{ at, text: roomLabelText(r, 'fine'), height: ROOM_TEXT_HEIGHT_M, rotation: 0, layer: DXF_LAYER_ROOM_TEXT }] : [];
+    }),
     clusters: shown('wall') ? view.geo.clusters : [],
     openings,
     wallOutlines: shown('wall') ? view.outlines.map((o) => ({ state: o.cls, polygons: o.shape })) : [],
@@ -210,6 +218,9 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
   const withNotes: DxfLevelGeometry = { ...geo, ...(shown('annotation') ? { notes: notesDxfOf(p, levelId, vg.scale) } : {}) };
   return { ...withNotes, lineWeights: lineWeightsOf(p, levelId, withNotes) };
 }
+
+/** Altura (m de desenho) do texto do ambiente no DXF. */
+const ROOM_TEXT_HEIGHT_M = 0.2;
 
 /** Texto DXF da planta do nível, na vista do intervalo. */
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {

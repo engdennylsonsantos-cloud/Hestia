@@ -1,19 +1,20 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, newId, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, type Id, type Project } from '@hestia/model';
 import { followingEnds } from './pick.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
 import { selectedFloors } from './floorPick.ts';
 import { selectedSlabs } from './slabPick.ts';
 import { selectedRoofs } from './roofPick.ts';
+import { selectedRooms } from './roomPick.ts';
 import type { PreviewItem, ToolEnv } from './types.ts';
 
 /** Paredes dentro da seleção (aberturas selecionadas acompanham o anfitrião). */
 export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isWall(p.elements[id]));
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
 /** Paredes, pisos, lajes e telhados: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
-export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids)];
+export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRooms(p, ids)];
 
 /** Mapa de novos IDs para copiar paredes, pisos e as aberturas hospedadas nas paredes copiadas. */
 export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
@@ -25,6 +26,7 @@ export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
     else if (isSlab(e)) map[id] = newId('l');
     else if (isRoof(e)) map[id] = newId('t');
     else if (isStair(e)) map[id] = newId('st');
+    else if (isRoom(e)) map[id] = newId('rm');
   }
   for (const e of Object.values(p.elements)) {
     if (isOpening(e) && ids.includes(e.hostId)) map[e.id] = newId(e.kind === 'door' ? 'd' : 'j');
@@ -42,6 +44,11 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
       continue;
     }
     const fl = p.elements[id];
+    // Ambiente: o contorno é derivado do circuito, então o fantasma é o ponto interior movido.
+    if (isRoom(fl)) {
+      out.push({ kind: 'point', at: applyTransform(t, fl.point) });
+      continue;
+    }
     if (isFloor(fl) || isSlab(fl) || isRoof(fl)) {
       out.push({ kind: 'polygon', ring: fl.boundary.map((q) => applyTransform(t, q)), dashed: true });
       continue;

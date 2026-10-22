@@ -94,6 +94,10 @@ export interface DxfLevelGeometry {
   lineWeights?: Partial<Record<string, number>>;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
   notes?: DxfNotes;
+  /** Ambientes do nível: contorno e furos em planta (POLYLINE fechada na camada `AMBIENTES`). Ausente = nenhum. */
+  rooms?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][] }>;
+  /** Textos dos ambientes (nome, número e área) na camada `AMBIENTES_TEXTO`. Ausente = nenhum. */
+  roomTexts?: DxfNoteText[];
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -126,6 +130,9 @@ export const DXF_LAYER_STAIR_ARROW = 'ESCADA_SETA';
 /** Símbolo de corte da escada: polilinha aberta em zigue-zague, só quando o plano de corte cruza a escada. */
 export const DXF_LAYER_STAIR_CUT = 'ESCADA_CORTE';
 /** Poste central do caracol: círculo fechado (POLYLINE) de 24 a 48 lados, abaixo ou na cota de corte. */
+export const DXF_LAYER_ROOM = 'AMBIENTES';
+/** Textos de ambiente (nome, número e área), no centro de cada ambiente. */
+export const DXF_LAYER_ROOM_TEXT = 'AMBIENTES_TEXTO';
 export const DXF_LAYER_STAIR_POST = 'ESCADA_POSTE';
 
 /** Camada de cada estado de vão e de parede fora do corte. */
@@ -270,6 +277,8 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_STAIR_ABOVE, projection('stair')],
   [DXF_LAYER_STAIR_RISER, cut('stair')],
   [DXF_LAYER_STAIR_POST, cut('stair')],
+  [DXF_LAYER_ROOM, cut('room')],
+  [DXF_LAYER_ROOM_TEXT, 'annotation'],
   [DXF_LAYER_STAIR_ARROW, 'annotation'],
   [DXF_LAYER_STAIR_CUT, 'annotation'],
   [DXF_LAYER_COTAS, 'annotation'],
@@ -325,6 +334,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   for (const w of geo.wallOutlines ?? []) push(WALL_LAYER[w.state], w.polygons);
   for (const f of geo.floors ?? []) push(dxfLayerOfFloor(f.typeCode), [[f.outline, ...f.holes]]);
   for (const s of geo.slabs ?? []) push(dxfLayerOfSlab(s.typeCode), [[s.outline, ...s.holes]]);
+  for (const r of geo.rooms ?? []) push(DXF_LAYER_ROOM, [[r.outline, ...r.holes]]);
   for (const r of geo.roofs ?? []) push(dxfLayerOfRoof(r.typeCode), [[r.outline]]);
   if (geo.roofProjections) push(DXF_LAYER_ROOF_PROJECTION, geo.roofProjections);
   for (const s of geo.stairs ?? []) {
@@ -346,6 +356,9 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
   return out;
 }
 
+/** Textos da planta: os de anotação (cotas e textos do usuário) e os dos ambientes. */
+const textsOf = (geo: DxfLevelGeometry): DxfNoteText[] => [...(geo.notes?.texts ?? []), ...(geo.roomTexts ?? [])];
+
 /** Camadas da tabela LAYER: `0` e as das polilinhas e das linhas, sem repetição e em ordem. */
 function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): string[] {
   return [...new Set(['0', ...shapes.map((s) => s.layer), ...lines.map((l) => l.layer), ...texts.map((t) => t.layer)])].sort();
@@ -353,7 +366,7 @@ function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): str
 
 /** Nomes das camadas que `exportDxf` põe na tabela LAYER para esta geometria (a base de `lineWeights`). */
 export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
-  return layerNamesOf(shapesOf(project, geo), linesOf(geo), geo.notes?.texts ?? []);
+  return layerNamesOf(shapesOf(project, geo), linesOf(geo), textsOf(geo));
 }
 
 /**
@@ -369,7 +382,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
-  const texts = geo.notes?.texts ?? [];
+  const texts = textsOf(geo);
   const layers = layerNamesOf(shapes, lines, texts);
   // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
   const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);

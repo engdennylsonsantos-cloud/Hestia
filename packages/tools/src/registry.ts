@@ -20,11 +20,12 @@ import { StairTool } from './stairTool.ts';
 import { StairRunTool } from './stairRunTool.ts';
 import { DimensionTool } from './dimensionTool.ts';
 import { TextTool } from './textTool.ts';
+import { RoomTool } from './roomTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'stairrun'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'stairrun', 'room'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Anotar', tools: ['dimension', 'text'] },
   { title: 'Medir', tools: ['measure'] },
@@ -60,6 +61,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new DimensionTool(env);
     case 'text':
       return new TextTool(env);
+    case 'room':
+      return new RoomTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -126,6 +129,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   stairrun: 'Escada (reta/L/U/caracol)',
   dimension: 'Cota',
   text: 'Texto',
+  room: 'Ambiente',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
@@ -154,4 +158,5 @@ export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
   stairrun: 'Q',
   dimension: 'Y',
   text: 'X',
+  room: 'Z',
 };

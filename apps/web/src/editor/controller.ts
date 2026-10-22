@@ -343,6 +343,8 @@ export class Editor {
   selectAllOfType(typeId: Id): number { return transfer.ofType(this.project, useUi.getState().levelId, typeId); }
   /** "Mesmo tipo" (botão na aba Modificar). */
   selectAllOfSelectedType(): boolean { this.setTool('select'); return transfer.sameType(this.project, useUi.getState().levelId) > 0; }
+  /** "Mesmo nome" dos ambientes selecionados (botão na aba Modificar). */
+  selectAllOfSelectedName(): boolean { this.setTool('select'); return transfer.sameName(this.project, useUi.getState().levelId) > 0; }
 
   /** Ctrl+Z / Ctrl+Y no croqui da escada: desfaz ou refaz a última linha pegada. Sem pegada, vale o histórico do modelo. */
   private stairPickHistory(redo: boolean): boolean {

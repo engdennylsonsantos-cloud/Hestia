@@ -22,3 +22,5 @@ export { roofFootprint } from './plan/roofs.ts';
 // Pranchas (decisão 0022): lista de desenho da folha em mm de papel, para a tela e o PDF.
 export * from './sheet/types.ts';
 export * from './sheet/build.ts';
+// Ambientes (decisão 0018): rótulo e centro de cada ambiente, o mesmo texto da planta e do DXF.
+export { roomLabelAt, roomLabelText } from './plan/rooms.ts';

@@ -10,6 +10,7 @@ export const CATEGORY_LABEL: Record<GraphicsCategory, string> = {
   slab: 'Laje',
   roof: 'Telhado',
   stair: 'Escada',
+  room: 'Ambiente',
   annotation: 'Anotação',
 };
 

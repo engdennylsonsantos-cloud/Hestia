@@ -68,6 +68,8 @@ interface RegionSet {
   wallBox: Box;
 }
 
+const frameCount = (p: Project, levelId: Id): number => levelFrames(p, levelId).length;
+
 const insideBox = (q: Vec2, b: Box): boolean => q.x >= b.minX - EPS && q.x <= b.maxX + EPS && q.y >= b.minY - EPS && q.y <= b.maxY + EPS;
 
 /** Espaço livre entre as faces internas das paredes do nível (a caixa envolvente menos a união das silhuetas). */
@@ -87,6 +89,25 @@ function regionSet(p: Project, levelId: Id): RegionSet {
 
 /** Comprimento de um anel fechado (o último ponto liga-se ao primeiro). */
 const ringLength = (r: Ring): number => r.reduce((s, p, i) => s + dist(p, r[(i + 1) % r.length]!), 0);
+
+/** Circuito que contém o ponto (o mesmo critério de `resolveRooms`): anel de borda + furos, ou o motivo de não haver. */
+function classifyPoint(at: Vec2, set: RegionSet): { problem: RoomProblem | null; polygon: Polygon | null } {
+  const b = boxOf(set.frame);
+  const onFrame = (v: Vec2): boolean => Math.abs(v.x - b.minX) < EPS || Math.abs(v.x - b.maxX) < EPS || Math.abs(v.y - b.minY) < EPS || Math.abs(v.y - b.maxY) < EPS;
+  const holder = set.free.find((poly) => pointInPolygon(at, poly)) ?? null;
+  if (!holder) return { problem: 'fora', polygon: null };
+  if (holder[0]!.some(onFrame)) return { problem: insideBox(at, set.wallBox) ? 'aberto' : 'fora', polygon: null };
+  return { problem: null, polygon: holder };
+}
+
+/**
+ * Circuito de paredes sob um ponto em planta (a pré-visualização da ferramenta Ambiente usa o mesmo critério de
+ * `resolveRooms`). `problem` diz por que o ponto não fecha um circuito; `polygon` é o anel externo + furos quando fecha.
+ */
+export function roomRegionAt(p: Project, levelId: Id, at: Vec2): { problem: RoomProblem | null; polygon: Polygon | null } {
+  if (frameCount(p, levelId) === 0) return { problem: 'fora', polygon: null };
+  return classifyPoint(at, regionSet(p, levelId));
+}
 
 /**
  * Ambientes resolvidos de um nível. O contorno vem do circuito fechado pelas faces internas das paredes que contém o
@@ -113,22 +134,9 @@ export function resolveRooms(p: Project, levelId: Id): ResolvedRoom[] {
     return rooms.map((r) => ({ ...base(r), problem: 'fora' as const, polygon: null, area: 0, perimeter: 0, volume: 0 }));
   }
   const set = regionSet(p, levelId);
-  const onFrame = (v: Vec2): boolean => {
-    const b = boxOf(set.frame);
-    return Math.abs(v.x - b.minX) < EPS || Math.abs(v.x - b.maxX) < EPS || Math.abs(v.y - b.minY) < EPS || Math.abs(v.y - b.maxY) < EPS;
-  };
   const seen = new Map<Polygon, Id>();
   return rooms.map((r) => {
-    const holder = set.free.find((poly) => pointInPolygon(r.point, poly)) ?? null;
-    let problem: RoomProblem | null = null;
-    let polygon: Polygon | null = holder;
-    if (!holder) {
-      problem = 'fora';
-      polygon = null;
-    } else if (holder[0]!.some(onFrame)) {
-      problem = insideBox(r.point, set.wallBox) ? 'aberto' : 'fora';
-      polygon = null;
-    }
+    const { problem, polygon } = classifyPoint(r.point, set);
     const area = polygon ? polygonArea(polygon) : 0;
     const perimeter = polygon ? ringLength(polygon[0]!) : 0;
     let duplicateOf: Id | undefined;

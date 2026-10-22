@@ -7,7 +7,7 @@ import { selectionAfterClick } from './selectionClick.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | null;
 
 export interface UiState {
   tool: ToolId;

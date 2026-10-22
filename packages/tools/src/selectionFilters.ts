@@ -1,12 +1,12 @@
-import { isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project } from '@hestia/model';
 
-/** Categorias de filtro: paredes, portas, janelas, pisos, lajes e telhados. */
-export type ElementCategory = 'walls' | 'doors' | 'windows' | 'floors' | 'slabs' | 'roofs' | 'stairs';
+/** Categorias de filtro: paredes, portas, janelas, pisos, lajes, telhados, escadas e ambientes ('rooms', categoria 'room'). */
+export type ElementCategory = 'walls' | 'doors' | 'windows' | 'floors' | 'slabs' | 'roofs' | 'stairs' | 'rooms';
 
 /** Parede ou abertura pertence ao nível? Abertura pertence ao nível da parede que a hospeda. */
 function onLevel(p: Project, id: Id, levelId: Id): boolean {
   const e = p.elements[id];
-  if (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e)) return e.levelId === levelId;
+  if (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRoom(e)) return e.levelId === levelId;
   if (isOpening(e)) {
     const host = p.elements[e.hostId];
     return isWall(host) && host.levelId === levelId;
@@ -30,6 +30,7 @@ export function idsOfCategory(p: Project, levelId: Id, category: ElementCategory
       if (category === 'slabs') return isSlab(e) && onLevel(p, e.id, levelId);
       if (category === 'roofs') return isRoof(e) && onLevel(p, e.id, levelId);
       if (category === 'stairs') return isStair(e) && onLevel(p, e.id, levelId);
+      if (category === 'rooms') return isRoom(e) && onLevel(p, e.id, levelId);
       if (category === 'doors') return isOpening(e) && e.kind === 'door' && onLevel(p, e.id, levelId);
       return isOpening(e) && e.kind === 'window' && onLevel(p, e.id, levelId);
     })

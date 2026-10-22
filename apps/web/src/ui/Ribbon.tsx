@@ -11,6 +11,7 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
   arquitetura: [
     { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] },
     { title: 'Anotar', tools: ['dimension', 'text'] },
+    { title: 'Ambientes', tools: ['room'] },
   ],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
@@ -19,8 +20,6 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
     { title: 'Medir', tools: ['measure'] },
   ],
 };
-
-const SOON: Array<{ icon: string; label: string }> = [{ icon: 'room', label: 'Ambiente' }];
 
 function ToolButton({ id }: { id: ToolId }): ReactElement {
   const active = useUi((s) => s.tool === id);
@@ -118,6 +117,10 @@ export function Ribbon(): ReactElement {
                 <Icon name="sametype" size={22} />
                 <span>Mesmo tipo</span>
               </button>
+              <button className="tbtn" onClick={() => editor.selectAllOfSelectedName()} title="Selecionar todos os ambientes com o mesmo nome dos selecionados (mesmo nível)">
+                <Icon name="sametype" size={22} />
+                <span>Mesmo nome</span>
+              </button>
             </div>
             <div className="rgroup-title">Tipo</div>
           </div>
@@ -129,19 +132,6 @@ export function Ribbon(): ReactElement {
               <MoveLevelButton />
             </div>
             <div className="rgroup-title">Nível</div>
-          </div>
-        )}
-        {tab === 'arquitetura' && (
-          <div className="rgroup">
-            <div className="rgroup-tools">
-              {SOON.map((x) => (
-                <button key={x.label} className="tbtn" disabled title={`${x.label}: planejado para as próximas fases`}>
-                  <Icon name={x.icon} size={22} />
-                  <span>{x.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="rgroup-title">Em breve</div>
           </div>
         )}
         {tab === 'vista' && (
@@ -198,6 +188,10 @@ export function Ribbon(): ReactElement {
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })} title="Tabela de escadas com espelhos, piso, área, volume e exportação CSV">
                   <Icon name="file" size={22} />
                   <span>Tabela de escadas</span>
+                </button>
+                <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roomSchedule', dialogArg: null })} title="Tabela de ambientes com número, área, perímetro, pé-direito, volume, acabamentos e exportação CSV">
+                  <Icon name="file" size={22} />
+                  <span>Tabela de ambientes</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'openingSchedule', dialogArg: null })} title="Tabela de portas e janelas com código do tipo, dimensões, folhas, quantidade e exportação CSV">
                   <Icon name="file" size={22} />

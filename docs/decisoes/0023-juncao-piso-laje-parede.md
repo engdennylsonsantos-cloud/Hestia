@@ -250,6 +250,15 @@ Tags: `[DOC]` para núcleo, hierarquia e linha quando a função casa com materi
 
 Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P4. P7 depois de P5. P8 depois de P7. P9 depois de P3. O contorno associativo vem antes do corte por camada, como pede o dono.
 
+**Status da P6 (implementada).** Corte e planta ordenados por cota. Substitui, para a linha oculta, o que §3 diz sobre a parede embutida: ela não some mais.
+
+- **Corte.** A linha oculta é feita por peça (uma por origem em cada material), não por material. Quem fica por cima é a cota de topo do elemento inteiro (`sectionOcclusion.ts`, `cotaKeys`; peças em `sectionCut.ts`). Regra adotada: (a) o elemento de maior cota de topo prevalece no ponto; (b) parede com base e topo dentro da faixa de cotas de piso, laje, forro, telhado ou escada que a toca em planta não é ocultada por ele (`[INFERIDO]`; é o pedido de `INV-D` §7, lacuna 6); (c) empate de topo: a parede fica por cima; o resto pela ordem da lista.
+- **Desvio do §3, passo 1.** A hierarquia do §1.3 (piso corta parede) não entra na linha oculta, porque faria a parede embutida sumir do corte, que é o problema medido (0,200 m³ sozinha, 0,000 m³ com o piso). Ela continua valendo para os quantitativos (P5 e P7). Quando o piso é o único a conter a parede em cota, o total do conjunto não perde área: a parede fica inteira e o piso perde só a faixa comum.
+- **Planta.** Pisos e lajes são pintados em ordem crescente da cota da face superior no centro da caixa do contorno (`plan/surfaces.ts`). Empate: lajes antes dos pisos, como antes; as paredes continuam por cima.
+- **Testes.** `packages/engine/src/sectionCota.test.ts` (caso medido e laje sob piso), `sectionOcclusion.test.ts` (regras, empate e propriedade com 10 sementes fixas: soma das áreas visíveis igual à união, não menor que a do elemento mais alto) e `packages/render/src/plan/surfaces.test.ts` (ordem dos preenchimentos em `buildPlanDrawList`, empate e ocultos).
+- **Regressão visual** (`npm run build` e `node tests/e2e/visual-regression.mjs`, sem `--update`): 0,000% em todos os casos.
+- **Fora da P6:** quantitativos líquidos (P5), hierarquia de junção e os comandos "Inverter corte" e "Não cortar" (P7), contorno por camada (P8). `docs/paridade/pisos.md` e `lajes.md` não têm item de ordem de corte e planta, então não foram alterados.
+
 ## 11. Riscos e compatibilidade
 
 - **Arquivos salvos.** v18 abre sem mudança: pisos e lajes viram estáticos. Arquivo v19 não abre em versão antiga, porque versão futura é recusada (decisão 0005 #10). Avisar na release.

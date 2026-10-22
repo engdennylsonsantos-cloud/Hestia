@@ -1,4 +1,4 @@
-import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { union, voidCrossPaths, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { SectionBeyond, SectionOpening, SectionOrigin, SectionResult } from '@hestia/engine';
 import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
@@ -165,6 +165,13 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     if (esq.leaves === 0) {
       if (kind === 'window') piece(t0, t1, z0, z0 + fw, frameColor);
       outline();
+      // X do vão sem esquadria, ligando os vértices opostos do contorno (decisão 0024 §3): contínuo.
+      for (const seg of voidCrossPaths([
+        { x: t0, y: z0 },
+        { x: t1, y: z0 },
+        { x: t1, y: z1 },
+        { x: t0, y: z1 },
+      ])) symbol(seg, false);
       return;
     }
     if (kind === 'window') {

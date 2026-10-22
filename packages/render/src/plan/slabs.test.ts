@@ -75,9 +75,9 @@ describe('laje na planta (D1)', () => {
     expect(ops.labels).toHaveLength(0);
   });
 
-  it('contorno como faixa preenchida, com o furo também contornado; sem traços (ficam por cima dos preenchimentos)', () => {
+  it('contorno como faixa preenchida, com o furo também contornado; o único traço é o X do furo', () => {
     const ops = slabOps(slabProject({ holes: [HOLE] }));
-    expect(ops.strokes).toHaveLength(0);
+    expect(ops.strokes).toHaveLength(2);
     expect(ops.fills).toHaveLength(2);
     const band = ops.fills[1]!.polygons;
     expect(band.length).toBeGreaterThan(0);

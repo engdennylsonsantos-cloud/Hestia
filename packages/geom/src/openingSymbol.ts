@@ -57,6 +57,19 @@ function arc(center: Vec2, from: Vec2, to: Vec2, steps = 18): Vec2[] {
   return pts;
 }
 
+/**
+ * X de vão sem esquadria (decisão 0024 §3): as duas diagonais que ligam os vértices opostos do contorno. `corners` são
+ * os quatro vértices do retângulo em ordem (a, b, c, d); saem os segmentos a→c e b→d. Usado na planta (vão livre e
+ * furo de piso), no corte e na elevação.
+ */
+export function voidCrossPaths(corners: readonly [Vec2, Vec2, Vec2, Vec2]): [Vec2[], Vec2[]] {
+  const [a, b, c, d] = corners;
+  return [
+    [a, c],
+    [b, d],
+  ];
+}
+
 type Line = (pts: Vec2[], closed?: boolean, weight?: number, dash?: [number, number]) => void;
 type Rel = (t: number, s: number) => Vec2;
 
@@ -74,9 +87,10 @@ export function openingSymbolPaths(input: OpeningSymbolInput): OpeningSymbolStro
   const hw = g.width / 2;
   const sMid = (g.sHi + g.sLo) / 2;
   const rel: Rel = (t, s) => at(g.center, g.u, g.n, t, s - sMid);
-  // Vão livre: só o recorte e a soleira tracejada no plano médio da parede.
+  // Vão livre: a soleira tracejada no plano médio da parede e o X ligando os vértices do vão (decisão 0024 §3).
   if (g.leaves === 0) {
     line([rel(-hw, sMid), rel(hw, sMid)], false, 1, [6, 3]);
+    for (const seg of voidCrossPaths([rel(-hw, g.sLo), rel(hw, g.sLo), rel(hw, g.sHi), rel(-hw, g.sHi)])) line(seg, false, 0.6);
     return out;
   }
   if (g.kind === 'window') {

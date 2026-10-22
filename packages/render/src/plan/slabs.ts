@@ -4,6 +4,7 @@ import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { holeMarkOps } from './holeMarks.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
@@ -75,6 +76,7 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
+  out.strokes.push(...holeMarkOps(s.polygon, theme, paint, detail));
   const at = labelPoint(s.polygon);
   if (detail !== 'coarse') {
     const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));

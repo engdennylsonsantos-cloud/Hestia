@@ -224,6 +224,22 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente')])).fills.filter((f) => f.color === DOOR_T)).toHaveLength(1);
   });
 
+  it('C6: o vão livre leva o X, duas diagonais contínuas ligando os vértices opostos do contorno', () => {
+    const d = buildSectionDrawList(facade([op('v', 'door', 'ot_vao90', 'frente')]));
+    const xs = d.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.dash === undefined && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y);
+    expect(xs).toHaveLength(2);
+    const all = xs.flatMap((s) => s.pts);
+    const [x0, x1] = [Math.min(...all.map((p) => p.x)), Math.max(...all.map((p) => p.x))];
+    const [y0, y1] = [Math.min(...all.map((p) => p.y)), Math.max(...all.map((p) => p.y))];
+    const key = (x: number, y: number): string => `${x.toFixed(6)},${y.toFixed(6)}`;
+    const cantos = (s: { pts: Vec2[] }): Set<string> => new Set(s.pts.map((p) => key(p.x, p.y)));
+    const same = (a: Set<string>, b: Set<string>): boolean => a.size === b.size && [...a].every((k) => b.has(k));
+    const sA = new Set([key(x0, y0), key(x1, y1)]);
+    const sB = new Set([key(x0, y1), key(x1, y0)]);
+    expect(xs.some((s) => same(cantos(s), sA))).toBe(true);
+    expect(xs.some((s) => same(cantos(s), sB))).toBe(true);
+  });
+
   it('E1: a janela maxim-ar mostra o símbolo tracejado de abertura no topo da elevação', () => {
     const input = facade([op('j', 'window', 'ot_j60', 'frente')]);
     const d = buildSectionDrawList(input);

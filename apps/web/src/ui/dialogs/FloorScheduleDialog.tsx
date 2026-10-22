@@ -71,7 +71,7 @@ export function FloorScheduleDialog(): ReactElement {
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
   const exportCsv = async (): Promise<void> => {
-    const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
+    const base = p.name.trim() || 'projeto';
     const status = await saveText(`${base}-pisos.csv`, floorScheduleToCsv(visible, totals));
     setMsg(status);
     useUi.setState({ status });

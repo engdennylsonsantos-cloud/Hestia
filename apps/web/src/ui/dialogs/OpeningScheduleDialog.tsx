@@ -74,7 +74,7 @@ export function OpeningScheduleDialog(): ReactElement {
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
   const exportCsv = async (): Promise<void> => {
-    const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
+    const base = p.name.trim() || 'projeto';
     const status = await saveText(`${base}-portas-e-janelas.csv`, openingScheduleToCsv(visible, totals));
     setMsg(status);
     useUi.setState({ status });

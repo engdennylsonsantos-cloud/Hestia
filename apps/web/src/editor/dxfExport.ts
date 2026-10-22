@@ -235,8 +235,8 @@ export function planDxf(p: Project, levelId: Id, showRoofProjection = true): str
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */
 export function savePlanDxf(p: Project, levelId: Id, showRoofProjection = true): Promise<string> {
-  const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
-  const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).replace(/[^\w\- ]+/g, '').trim() || 'nivel';
+  const base = p.name.trim() || 'projeto';
+  const level = (p.levels.find((l) => l.id === levelId)?.name ?? levelId).trim() || 'nivel';
   return saveText(`${base}-${level}.dxf`, planDxf(p, levelId, showRoofProjection));
 }
 
@@ -301,7 +301,7 @@ export function sectionDxf(p: Project, sectionId: Id): string {
 
 /** Entrega o DXF do corte pelo mesmo caminho da planta e devolve a frase de status. */
 export function saveSectionDxf(p: Project, sectionId: Id): Promise<string> {
-  const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
-  const view = (p.views.find((v) => v.id === sectionId)?.name ?? sectionId).replace(/[^\w\- ]+/g, '').trim() || 'vista';
+  const base = p.name.trim() || 'projeto';
+  const view = (p.views.find((v) => v.id === sectionId)?.name ?? sectionId).trim() || 'vista';
   return saveText(`${base}-${view}.dxf`, sectionDxf(p, sectionId));
 }

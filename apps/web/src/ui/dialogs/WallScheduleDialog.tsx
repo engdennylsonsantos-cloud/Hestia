@@ -74,7 +74,7 @@ export function WallScheduleDialog(): ReactElement {
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
   const exportCsv = async (): Promise<void> => {
-    const base = p.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto';
+    const base = p.name.trim() || 'projeto';
     const status = await saveText(`${base}-paredes.csv`, scheduleToCsv(visible, totals));
     setMsg(status);
     useUi.setState({ status });

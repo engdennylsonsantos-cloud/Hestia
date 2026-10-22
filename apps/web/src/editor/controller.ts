@@ -23,6 +23,7 @@ import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
+import { safeFilename } from './nomeArquivo.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -228,8 +229,8 @@ export class Editor {
       // Delete e Backspace excluem a seleção, como na 3D (decisão 0016 §5).
       return key3d(k, ui.selection, () => this.deleteSelection());
     }
-    // Ferramenta de escolha na 3D (Anexar topo): Enter e Tab seguem para o tratamento da planta, senão a etapa não avança.
-    if (ui.view === '3d' && !(this.tool.pick3d && (k === 'Enter' || k === 'Tab'))) return key3d(k, ui.selection, () => this.deleteSelection());
+    // Na 3D, Esc segue o da planta (cancela a operação, senão volta à Selecionar; decisão 0016 §5). Ferramenta de escolha (Anexar topo): Enter e Tab seguem para a planta, senão a etapa não avança.
+    if (ui.view === '3d' && k !== 'Escape' && !(this.tool.pick3d && (k === 'Enter' || k === 'Tab'))) return key3d(k, ui.selection, () => this.deleteSelection());
     if (k === 'Escape') {
       if (ui.typed) useUi.setState({ typed: '' });
       else this.tool.cancel();
@@ -406,7 +407,7 @@ export class Editor {
    */
   async save(): Promise<void> {
     const text = this.serialize();
-    const name = `${this.project.name.replace(/[^\w\- ]+/g, '').trim() || 'projeto'}.hestia.json`;
+    const name = safeFilename(`${this.project.name.trim() || 'projeto'}.hestia.json`);
     safeSet(STORAGE_KEY, text);
     const entrega = await entregarArquivo({ nome: name, conteudo: text });
     if (entrega === 'salvo') {

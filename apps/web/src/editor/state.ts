@@ -108,13 +108,12 @@ export function clickSelect3d(hit: Id | null, additive: boolean): void {
 }
 
 /**
- * Teclas de seleção nas vistas 3D e de corte (sem ferramentas de desenho, decisão 0016 §5): Esc limpa a seleção; Delete e Backspace a excluem
- * por `remove`. Devolve se a tecla foi consumida (sem seleção, nada é consumido).
+ * Teclas de exclusão nas vistas 3D e de corte (decisão 0016 §5): Delete e Backspace excluem a seleção por `remove`.
+ * Esc não passa por aqui: segue o da planta no controlador. Devolve se a tecla foi consumida (sem seleção, nada é consumido).
  */
 export function key3d(k: string, selection: readonly Id[], remove: () => void): boolean {
-  if (!selection.length || !['Escape', 'Delete', 'Backspace'].includes(k)) return false;
-  if (k === 'Escape') clickSelect3d(null, false);
-  else remove();
+  if (!selection.length || !['Delete', 'Backspace'].includes(k)) return false;
+  remove();
   return true;
 }
 

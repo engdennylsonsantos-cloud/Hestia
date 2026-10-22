@@ -52,7 +52,7 @@ describe('controlador na vista 3D: seleção e teclas', () => {
     expect(useUi.getState().selection).toEqual([]);
   });
 
-  it('Esc na vista 3D limpa a seleção e é consumida', () => {
+  it('Esc na vista 3D com a Selecionar limpa a seleção e é consumida', () => {
     useUi.setState({ selection: ['w1'] });
     expect(editor.key(tecla('Escape'))).toBe(true);
     expect(useUi.getState().selection).toEqual([]);
@@ -76,5 +76,49 @@ describe('controlador na vista 3D: seleção e teclas', () => {
   it('teclas de ferramenta não trocam a ferramenta na vista 3D (sem desenho no 3D)', () => {
     expect(editor.key(tecla('w'))).toBe(false);
     expect(editor.activeTool.id).toBe('select');
+  });
+});
+
+describe('Esc na vista 3D segue o da planta (decisão 0016 §5)', () => {
+  const ponto = { raw: { x: 1, y: 1 }, shift: false, ctrl: false, alt: false };
+
+  beforeEach(() => {
+    const store = new ProjectStore(createEmptyProject());
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    editor.load(store.project, 'teste.hestia.json');
+    useUi.setState({ view: 'plan', selection: [], typed: '' });
+    editor.setTool('select');
+    useUi.setState({ view: '3d' });
+  });
+
+  it('com a ferramenta de parede em operação, o primeiro Esc cancela a operação e fica na parede', () => {
+    useUi.setState({ view: 'plan' });
+    editor.setTool('wall');
+    editor.pointer('click', ponto);
+    useUi.setState({ view: '3d' });
+    expect(editor.key(tecla('Escape'))).toBe(true);
+    expect(useUi.getState().tool).toBe('wall');
+  });
+
+  it('sem operação, o Esc com a ferramenta de parede volta à Selecionar e mantém a seleção', () => {
+    editor.setTool('wall');
+    useUi.setState({ selection: ['w1'] });
+    expect(editor.key(tecla('Escape'))).toBe(true);
+    expect(useUi.getState().tool).toBe('select');
+    expect(useUi.getState().selection).toEqual(['w1']);
+  });
+
+  it('na Selecionar sem operação, o Esc limpa a seleção; sem seleção, também é consumido', () => {
+    useUi.setState({ selection: ['w1'] });
+    expect(editor.key(tecla('Escape'))).toBe(true);
+    expect(useUi.getState().selection).toEqual([]);
+    expect(editor.key(tecla('Escape'))).toBe(true);
+    expect(useUi.getState().tool).toBe('select');
+  });
+
+  it('Delete continua excluindo a seleção na 3D', () => {
+    clickSelect3d('w1', false);
+    expect(editor.key(tecla('Delete'))).toBe(true);
+    expect(editor.project.elements.w1).toBeUndefined();
   });
 });

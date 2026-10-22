@@ -108,6 +108,12 @@ const JUNCTION_CASES = {
   'junc-piso-retangulo-cm-menos-1': [{ kind: 'floorType', floorType: FT_CERAMICA_RECUADA }, ...wallsOf(RECT_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pr2', RECT_WALLS, { outlineSource: { mode: 'walls-finish', seed: { x: 4, y: 3 }, linked: true } })],
 };
 
+// P9 (decisão 0023 §6): parede anexada à base no piso que cobre só metade dela (2 m de 4 m, face superior em +0,05). A planta
+// não mostra o degrau da base (ele aparece no corte, no 3D e nos quantitativos), então é um caso novo de baseline própria.
+const P9_CASES = {
+  'parede-base-piso-metade': [W('bp1', [0, 0], [4, 0], { attachBottomToFloor: true }), F('pb1', [[-1, -1], [2, -1], [2, 1], [-1, 1]], { heightOffset: 0.05 })],
+};
+
 // Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas
 // no desenho seguinte ao layout. A espera pede duas medidas iguais seguidas do canvas, que a vista do editor tenha o mesmo
 // tamanho, e dois quadros de animação. Assim o enquadramento sai sempre com a área final.
@@ -135,7 +141,7 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
   await page.evaluate(([ws, v]) => {
     const { editor } = window.__hestia;

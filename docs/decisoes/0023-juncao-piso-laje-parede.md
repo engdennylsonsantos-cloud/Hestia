@@ -148,6 +148,8 @@ Proposta, igual à parede (decisão 0005 #8):
 - Aviso `parede-parcialmente-anexada` quando parte do eixo não tem cobertura, com o trecho destacado.
 - Topo com perfil superior continua sem anexo (`wallZ.ts:102,105`).
 
+**Status (P9, 2026-10-22): concluída, §10.** A cota passou a valer por trecho do eixo (`wallAttach.ts`). Nomes dos avisos: `wall-floor-partial` (informativo) e `wall-attach-none` (aviso). O controle está nas Propriedades ("Base no piso", "Topo no piso").
+
 ## 7. Campo "Prioridade de junção"
 
 Hoje o campo aparece e é editável em `FloorTypeDialog.tsx:135`, `SlabTypeDialog.tsx:135` e `LayerAdvanced.tsx:52-77`, mas `floors.ts`, `slabs.ts` e os quantitativos não leem `priority`. Só o resolvedor de paredes usa (`resolve.ts:16-17,114-166`).
@@ -341,6 +343,15 @@ Ordem sugerida: P1, P2 e P3 primeiro (gate). P4 e P6 em paralelo. P5 depois de P
 - **Pendente (não entregue).** (1) O lado da parede: paredes não são recortadas pela camada do piso em planta, corte e 3D (C6 de pisos e C8 de lajes seguem `[ ]`). (2) Término em perímetro externo. (3) Laje com caimento fora da junção (já era assim). (4) Cor e hachura por camada na planta. (5) IFC e DXF por camada. (6) Validação no Revit de G-B e G-K2 (sentido da prioridade).
 - **Achado anterior à P8, não corrigido.** No canto reentrante do L, o circuito de paredes deixa um quadrado d × d sem parede (d = meia espessura), que entra no cômodo, com ou sem esquadria. A conta de área do L em `layerOutline.test.ts` inclui esse quadrado de propósito.
 
+
+**Status da P9 (2026-10-22, feita; lado da junção pendente).** Parede anexada por trecho (P-3, perfil de base).
+- **Motor** (`wallAttach.ts`, `wallZ.ts`). O eixo reto é cortado nos pontos em que cruza uma borda de piso ou laje do nível (e nos vértices sobre ele). Cada trecho recebe a face superior mais alta que o cobre (base) ou a face inferior mais baixa do nível de topo (topo), avaliada no ponto médio do trecho; laje inclinada usa a cota da face nesse ponto. Parede curva segue com um trecho só, como antes. O resultado é derivado, sem guardar nada no modelo: `WallZ.bottomProfile` e `WallZ.profile` (degraus, relativos a `z0`), e `ResolvedWall.profileBottom` e `profileTop`. Sem migração e sem mudança de `SCHEMA_VERSION`.
+- **Geometria.** `clipBandsToBottom` (`profile.ts`) e `withBottomProfile` (`layerGeom.ts`) recortam as faixas pela base, antes do perfil superior (`resolve.ts`). Planta, corte, 3D e quantitativos leem as mesmas faixas. A área de face usa a altura média (topo médio menos base média).
+- **Avisos** (`wallFloorIssues.ts`). `wall-floor-partial` (informativo, severidade nova `info`, grupo "Informações"): só parte do eixo é coberta, e só o trecho coberto foi ajustado. `wall-attach-none` (aviso): anexada, mas nenhum piso ou laje do nível cobre o eixo. O aviso de telhado (`wall-roof-uncovered`) e o perfil superior não entram.
+- **Interface** (`Properties.tsx`, `wallFloorActions.ts`). Linhas "Base no piso" e "Topo no piso" (Anexar e Desanexar), e "Nível do topo" quando o topo está ligado. Ligar o topo sem nível de topo usa o nível logo acima; no nível mais alto o botão fica desabilitado e a barra de status explica. Cada passo é um desfazer. Ferramenta: nenhuma.
+- **Testes.** `wallFloorProfile.test.ts` (metade coberta com valores à mão; parede toda coberta e sem cobertura iguais ao ajuste anterior; laje inclinada; topo por trecho; dez sementes), `wallFloorIssues.test.ts`, `wallFloorSection.test.ts`, `packages/render/src/model3d/wallFloorSolids.test.ts`, `wallFloorActions.test.ts` e `issuesView.test.ts` (grupo de informação). Nenhum teste existente foi alterado.
+- **Regressão visual** (`tests/e2e/visual-regression.mjs`, sem `--update`). Os 26 casos atuais em 0,000%. Caso novo `parede-base-piso-metade` (baseline criada e conferida). A planta não mostra o degrau; ele aparece no corte, no 3D e nos quantitativos.
+- **Fora da P9.** (1) O lado da parede: a parede não é recortada pela camada de piso ou laje que vence (E3 de paredes, C6 de pisos, C8 de lajes), como antes. (2) O IFC exporta a parede como caixa, da base mínima ao topo máximo, como já fazia com perfil superior. (3) Abertura: o peitoril vale a partir da base mínima e a área de abertura usa a altura média. (4) Dentro de um trecho coberto por laje inclinada a base usa a cota do ponto médio do trecho (aproximação; o degrau é menor que a inclinação vezes meio trecho). (5) Parede curva não tem base por trecho.
 
 ## 11. Riscos e compatibilidade
 

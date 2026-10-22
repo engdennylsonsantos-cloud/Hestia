@@ -1,4 +1,4 @@
-import { EPS, add, len, mul, norm, perp, sub, type Vec2 } from './vec.ts';
+import { EPS, add, dot, len, mul, norm, perp, sub, type Vec2 } from './vec.ts';
 
 /**
  * Arco definido pelas extremidades e pela flecha (sagitta): distância do meio do arco à corda,
@@ -104,4 +104,33 @@ export function sagFromThreePoints(a: Vec2, m: Vec2, b: Vec2): number {
   const apex = hc + Math.sign(dm) * r; // ponto do arco mais afastado da corda, do lado de m
   const sag = Math.abs(dm) > 0 ? (Math.sign(dm) * Math.min(Math.abs(apex), chord / 2)) : 0;
   return sag;
+}
+
+
+/** Interseções da circunferência (centro `c`, raio `r`) com a reta infinita p + k·d. */
+export function intersectCircleLine(c: Vec2, r: number, p: Vec2, d: Vec2): Vec2[] {
+  const dd = dot(d, d);
+  if (dd < EPS || r <= 0) return [];
+  const w = sub(p, c);
+  const b = dot(d, w) / dd;
+  const cc = (dot(w, w) - r * r) / dd;
+  const disc = b * b - cc;
+  if (disc < -1e-10) return [];
+  const sq = Math.sqrt(Math.max(0, disc));
+  return [-b - sq, -b + sq].map((k) => add(p, mul(d, k)));
+}
+
+/** Interseções de duas circunferências (0, 1 tangente ou 2 pontos). */
+export function intersectCircles(c1: Vec2, r1: number, c2: Vec2, r2: number): Vec2[] {
+  const dv = sub(c2, c1);
+  const d = len(dv);
+  if (d < 1e-12 || r1 <= 0 || r2 <= 0 || d > r1 + r2 + 1e-10 || d < Math.abs(r1 - r2) - 1e-10) return [];
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h2 = r1 * r1 - a * a;
+  if (h2 < -1e-10) return [];
+  const h = Math.sqrt(Math.max(0, h2));
+  const u = { x: dv.x / d, y: dv.y / d };
+  const q = add(c1, mul(u, a));
+  const n = { x: -u.y, y: u.x };
+  return [add(q, mul(n, h)), sub(q, mul(n, h))];
 }

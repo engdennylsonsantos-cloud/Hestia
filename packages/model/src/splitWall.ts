@@ -1,4 +1,4 @@
-import { dist, lerp } from '@hestia/geom';
+import { arcFromSagitta, arcPointAt, dist, lerp, sagFromThreePoints, type Arc, type Vec2 } from '@hestia/geom';
 import type { Command } from './commands.ts';
 import { DEFAULT_JOIN } from './wall.ts';
 import { splitProfile } from './profile.ts';
@@ -9,9 +9,10 @@ const EPS = 1e-9;
 const DEFAULT_WIDTH = 0.8;
 
 /**
- * Divide uma parede reta em duas (Revit: Split Wall / Split with Gap).
- * `t` é a distância ao longo de a→b a partir de `a`. Com `gap`, o trecho [t−gap/2, t+gap/2] é removido.
- * A original vai de `a` até t−gap/2; a nova (`newId`) vai de t+gap/2 até `b`.
+ * Divide uma parede reta ou em arco em duas (Revit: Split Wall / Split with Gap).
+ * `t` é a distância ao longo do eixo (comprimento do arco, se curva) a partir de `a`. Com `gap`, o trecho
+ * [t−gap/2, t+gap/2] é removido. A original vai de `a` até t−gap/2; a nova (`newId`) vai de t+gap/2 até `b`.
+ * Nas paredes em arco, as duas metades são recalculadas sobre a mesma circunferência (novo `sag`).
  * Aberturas com centro antes do corte ficam na original; as depois, na nova (offset recalculado);
  * as que não cabem no novo comprimento, ou caem no intervalo removido, são apagadas.
  * Tudo ocorre dentro de um único `produce`: se a validação falhar, o projeto não muda.
@@ -19,11 +20,11 @@ const DEFAULT_WIDTH = 0.8;
 export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>): void {
   const w = p.elements[c.id];
   if (!isWall(w)) throw new Error('Parede não encontrada');
-  if (w.sag !== 0) throw new Error('Dividir parede curva ainda não é suportado');
   if (p.elements[c.newId]) throw new Error('Identificador da nova parede já existe');
 
   const gap = c.gap ?? 0;
-  const L = dist(w.a, w.b);
+  const arc = arcFromSagitta(w.a, w.b, w.sag);
+  const L = arc ? arc.length : dist(w.a, w.b);
   const lo = c.t - gap / 2;
   const hi = c.t + gap / 2;
   // Negações escritas como comparações positivas: NaN também é rejeitado.
@@ -31,8 +32,9 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
 
   const a = { x: w.a.x, y: w.a.y };
   const b = { x: w.b.x, y: w.b.y };
-  const cutStart = lerp(a, b, lo / L);
-  const cutEnd = lerp(a, b, hi / L);
+  const pointAt = (t: number): Vec2 => (arc ? arcPointAt(arc, t) : lerp(a, b, t / L));
+  const cutStart = pointAt(lo);
+  const cutEnd = pointAt(hi);
   const newLen = L - hi;
 
   for (const o of Object.values(p.elements).filter(isOpening).filter((x) => x.hostId === w.id)) {
@@ -59,6 +61,7 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
     id: c.newId,
     a: cutEnd,
     b,
+    sag: arc ? subArcSag(arc, hi, L) : w.sag,
     joinStart: { ...DEFAULT_JOIN },
     noJoinStart: false,
     joinEnd,
@@ -68,9 +71,18 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
   p.elements[c.newId] = right;
 
   w.b = cutStart;
+  w.sag = arc ? subArcSag(arc, 0, lo) : w.sag;
   w.topProfile = profL;
   w.joinEnd = { ...DEFAULT_JOIN };
   w.noJoinEnd = false;
+}
+
+/** Flecha do trecho t0→t1 do mesmo arco, para a metade continuar sobre a mesma circunferência. */
+function subArcSag(arc: Arc, t0: number, t1: number): number {
+  const p0 = arcPointAt(arc, t0);
+  const pm = arcPointAt(arc, (t0 + t1) / 2);
+  const p1 = arcPointAt(arc, t1);
+  return sagFromThreePoints(p0, pm, p1);
 }
 
 function moveOpening(p: Project, o: Opening, hostId: string, offset: number, newOpeningId: string): void {

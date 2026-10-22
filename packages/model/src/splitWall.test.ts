@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { arcFromSagitta, arcPointAt } from '@hestia/geom';
 import { DEFAULT_JOIN, ProjectStore, createEmptyProject, makeWall, openingsOfWall, wallsOnLevel, type Opening, type Project, type Wall } from './index.ts';
 
 const wall = (id: string, ax: number, ay: number, bx: number, by: number, extra: Partial<Wall> = {}): Omit<Wall, 'order'> =>
@@ -99,11 +100,44 @@ describe('dividir parede', () => {
     expect((s.project.elements.j1 as Opening).offset).toBeCloseTo(0.7);
   });
 
-  it('recusa parede curva com a mensagem da regra', () => {
+  it('divide parede em arco em duas que continuam na mesma circunferência', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: wall('w', 0, 0, 6, 0, { sag: 0.5 }) });
-    expect(() => s.exec({ type: 'splitWall', id: 'w', newId: 'w2', t: 2 })).toThrow('Dividir parede curva ainda não é suportado');
-    expect(wallsOnLevel(s.project, 'lv_0')).toHaveLength(1);
+    const original = arcFromSagitta({ x: 0, y: 0 }, { x: 6, y: 0 }, 0.5)!;
+    const t = original.length / 2;
+    s.exec({ type: 'splitWall', id: 'w', newId: 'w2', t });
+    expect(wallsOnLevel(s.project, 'lv_0')).toHaveLength(2);
+    const left = el(s, 'w');
+    const right = el(s, 'w2');
+    const apex = arcPointAt(original, t);
+    expect(left.b.x).toBeCloseTo(apex.x);
+    expect(left.b.y).toBeCloseTo(apex.y);
+    expect(right.a.x).toBeCloseTo(apex.x);
+    expect(right.a.y).toBeCloseTo(apex.y);
+    for (const half of [left, right]) {
+      expect(half.sag).not.toBe(0);
+      const arc = arcFromSagitta(half.a, half.b, half.sag)!;
+      expect(arc.radius).toBeCloseTo(original.radius);
+      expect(arc.center.x).toBeCloseTo(original.center.x);
+      expect(arc.center.y).toBeCloseTo(original.center.y);
+    }
+    expect(left.b.x).toBeLessThan(right.b.x);
+  });
+
+  it('divide parede em arco com intervalo e recalcula as flechas', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: wall('w', 0, 0, 6, 0, { sag: 1 }) });
+    const original = arcFromSagitta({ x: 0, y: 0 }, { x: 6, y: 0 }, 1)!;
+    s.exec({ type: 'splitWall', id: 'w', newId: 'w2', t: original.length / 2, gap: 0.4 });
+    const left = el(s, 'w');
+    const right = el(s, 'w2');
+    for (const half of [left, right]) {
+      const arc = arcFromSagitta(half.a, half.b, half.sag)!;
+      expect(arc.radius).toBeCloseTo(original.radius);
+      expect(arc.center.x).toBeCloseTo(original.center.x);
+      expect(arc.center.y).toBeCloseTo(original.center.y);
+    }
+    expect(left.b.x).toBeLessThan(right.a.x);
   });
 
   it('recusa ponto de corte fora da parede ou trecho que não sobra', () => {

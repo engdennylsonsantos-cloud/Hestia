@@ -20,8 +20,12 @@ const COLS: Col[] = [
   { key: 'kind', label: 'Categoria' },
   { key: 'width', label: 'Largura (m)', decimals: 2 },
   { key: 'height', label: 'Altura (m)', decimals: 2 },
+  { key: 'roughWidth', label: 'Largura bruta (m)', decimals: 2 },
+  { key: 'roughHeight', label: 'Altura bruta (m)', decimals: 2 },
   { key: 'sill', label: 'Peitoril (m)', decimals: 2 },
   { key: 'leaves', label: 'Folhas', decimals: 0 },
+  { key: 'lintelLength', label: 'Verga (m)', decimals: 2 },
+  { key: 'sillBeamLength', label: 'Contraverga (m)', decimals: 2 },
   { key: 'count', label: 'Quantidade', decimals: 0 },
   { key: 'unitArea', label: 'Área unitária (m²)', decimals: 2 },
   { key: 'totalArea', label: 'Área total (m²)', decimals: 2 },
@@ -45,6 +49,7 @@ const cellValue = (r: OpeningScheduleRow, c: Col): ReactNode => {
   if (c.key === 'kind') return r.kind === 'door' ? 'Porta' : 'Janela';
   const v = r[c.key];
   if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'object') return '—';
   return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
 };
 

@@ -20,6 +20,16 @@ Este documento descreve o estado ANTES da frente de portas e janelas. O históri
 
 O que continua valendo: o mapa de arquivos (§2) e as lacunas de construção do tipo (reveal, soleira saliente, alizar, verga/contraverga, vão bruto e tolerâncias), a folha de porta sempre fechada no 3D e a exibição sempre simbólica — tudo registrado como "depois" em `docs/decisoes/0017-portas-e-janelas.md` §8. A divergência planta/3D da janela sem folha (§7) deixou de existir. Na §8, L-1, L-2, L-3, L-4, L-7, L-9 e L-13 estão resolvidos nesta rodada; L-5 (só a folha em corte/elevação e o modo aberto do 3D), L-6, L-8, L-10, L-11, L-12, L-14 e L-15 seguem abertos.
 
+### Rodada E (2026-10-22): acabamento de portas e janelas
+
+Campos novos e opcionais no tipo (`roughOversize`, `casing`, `sillBoard`, `lintel`, `sillBeam`), padrão por leitura em
+`packages/model/src/openingExtras.ts`. Feito: vão bruto (motor, 3D, quadro), alizar (3D e contorno na elevação),
+peitoril saliente (3D, corte e elevação), verga e contraverga (corte, 3D e quadro), folha aberta no 3D (botão "Abrir
+vãos") e favoritos de tipo (seletor e comando). Efeito nas lacunas da §8 abaixo: **L-5** parcial (3D abre a folha;
+corte e elevação ainda sem folha), **L-6** parcial (alizar, peitoril e verga em corte, elevação e 3D; a planta ainda
+não), **L-8** parcial (o tipo ganhou os campos de acabamento; perfil de caixilho e folha continuam fora). A decisão
+`docs/decisoes/0017-portas-e-janelas.md` §8 traz o detalhe.
+
 ## 1. Resumo
 
 - **Há uma única fonte do símbolo de planta.** `openingSymbolPaths` (`packages/geom/src/openingSymbol.ts:68`) gera os traços e é usada pela tela (`packages/render/src/plan/symbols.ts:9`) e pelo DXF (`apps/web/src/editor/dxfExport.ts:154`). Isso é bom: uma definição, dois destinos.

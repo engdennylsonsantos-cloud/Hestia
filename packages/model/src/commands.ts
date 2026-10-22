@@ -32,7 +32,7 @@ import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
 import { stairTypeIssue } from './stair.ts';
-import { openingTypeIssue } from './opening.ts';
+import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import {
@@ -84,6 +84,7 @@ export type Command =
   | { type: 'setProjectName'; name: string }
   | { type: 'setDefaults'; patch: Partial<Project['defaults']> }
   | { type: 'setSettings'; patch: Partial<Project['settings']> }
+  | { type: 'toggleOpeningFavorite'; id: Id }
   | { type: 'addView'; view: SectionView }
   | { type: 'updateView'; id: Id; patch: Partial<Omit<SectionView, 'id'>> }
   | { type: 'deleteView'; id: Id }
@@ -410,6 +411,7 @@ export function applyCommand(p: Project, c: Command): void {
     case 'setSettings':
       p.settings = { ...p.settings, ...c.patch };
       break;
+    case 'toggleOpeningFavorite': toggleFavoriteIn(p, c.id); break;
     case 'addView':
       if (p.views.some((v) => v.id === c.view.id)) throw new Error('Vista já existe');
       p.views.push(c.view);

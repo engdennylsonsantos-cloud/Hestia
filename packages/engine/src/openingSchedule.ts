@@ -1,4 +1,4 @@
-import { isOpening, openingFamilyName, type Id, type OpeningLeaves, type Project } from '@hestia/model';
+import { isOpening, openingFamilyName, openingLintel, openingRough, openingSillBeam, type Id, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
 import { csvDocument, csvText, formatDecimal } from './csv.ts';
 
 /**
@@ -15,8 +15,17 @@ export interface OpeningScheduleRow {
   familyName: string;
   width: number;
   height: number;
+  /** Vão bruto (furo na parede): largura e altura do tipo mais a folga `roughOversize`. */
+  roughWidth: number;
+  roughHeight: number;
   sill: number;
   leaves: OpeningLeaves;
+  /** Verga e contraverga do tipo (transpasse e altura); null quando o tipo não as tem. */
+  lintel: OpeningLintel | null;
+  sillBeam: OpeningLintel | null;
+  /** Comprimento total das peças no projeto (m) = (largura + 2 × transpasse) × quantidade. */
+  lintelLength: number;
+  sillBeamLength: number;
   /** Quantidade de instâncias deste tipo no projeto. */
   count: number;
   /** Área do vão unitária (m²) = largura × altura. */
@@ -75,6 +84,9 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
     const t = p.openingTypes[typeId];
     if (!t) continue;
     const unitArea = t.width * t.height;
+    const rough = openingRough(t);
+    const lintel = openingLintel(t);
+    const sillBeam = openingSillBeam(t);
     rows.push({
       typeId,
       kind: t.kind,
@@ -83,8 +95,14 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
       familyName: openingFamilyName(t) ?? '',
       width: t.width,
       height: t.height,
+      roughWidth: rough.width,
+      roughHeight: rough.height,
       sill: t.sill,
       leaves: t.leaves,
+      lintel,
+      sillBeam,
+      lintelLength: lintel ? (t.width + 2 * lintel.over) * count : 0,
+      sillBeamLength: sillBeam ? (t.width + 2 * sillBeam.over) * count : 0,
       count,
       unitArea,
       totalArea: unitArea * count,
@@ -118,8 +136,12 @@ const CSV_HEADER = [
   'Categoria',
   'Largura (m)',
   'Altura (m)',
+  'Largura bruta (m)',
+  'Altura bruta (m)',
   'Peitoril (m)',
   'Folhas',
+  'Verga (m)',
+  'Contraverga (m)',
   'Quantidade',
   'Área unitária (m²)',
   'Área total (m²)',
@@ -138,12 +160,16 @@ export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: Opening
     csvText(r.kind === 'door' ? 'Porta' : 'Janela'),
     n(r.width, 2),
     n(r.height, 2),
+    n(r.roughWidth, 2),
+    n(r.roughHeight, 2),
     n(r.sill, 2),
     String(r.leaves),
+    n(r.lintelLength, 2),
+    n(r.sillBeamLength, 2),
     String(r.count),
     n(r.unitArea, 2),
     n(r.totalArea, 2),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2)];
+  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2)];
   return csvDocument([CSV_HEADER, ...body, total]);
 }

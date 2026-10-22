@@ -209,6 +209,8 @@ export function labelOf(c: Command): string {
       return 'Padrões do projeto';
     case 'setSettings':
       return 'Configurações do projeto';
+    case 'toggleOpeningFavorite':
+      return 'Favoritar tipo de abertura';
     case 'addView':
       return 'Criar vista';
     case 'updateView':

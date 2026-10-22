@@ -203,6 +203,18 @@ export interface OpeningType {
   frameDepth?: number;
   leafThickness?: number;
   glassThickness?: number;
+  /*
+   * Acabamento e vão bruto (m), todos opcionais: ausente vale o padrão por leitura (`openingExtras.ts`), sem migração.
+   * `roughOversize`: folga total do vão bruto em relação à largura e à altura do tipo (o furo cresce, a esquadria não).
+   * `casing`: alizar em volta do vão nas duas faces da parede (largura vista e espessura saliente).
+   * `sillBoard`: peitoril saliente de janela (projeção além de cada face e espessura).
+   * `lintel`/`sillBeam`: verga e contraverga (transpasse para cada lado e altura; padrão do transpasse 0,30 m).
+   */
+  roughOversize?: { w: number; h: number };
+  casing?: { width: number; thickness: number };
+  sillBoard?: { projection: number; thickness: number };
+  lintel?: { over?: number; height?: number };
+  sillBeam?: { over?: number; height?: number };
 }
 
 export interface Opening {
@@ -385,6 +397,8 @@ export interface ProjectSettings {
   /** Sobreposição de depuração: tipo e ordem de cada junção na planta. */
   debugJoins: boolean;
   detail: DetailLevel;
+  /** Tipos de abertura favoritos (ArchiCAD: Favorites), na ordem em que aparecem no seletor. Ausente = nenhum. */
+  favoriteOpeningTypes?: Id[];
 }
 
 /** Vista de corte ou elevação: linha em planta + profundidade visível; o observador olha para a esquerda de a→b. */

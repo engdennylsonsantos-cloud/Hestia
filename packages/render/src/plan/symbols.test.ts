@@ -12,6 +12,8 @@ const geom = (over: Partial<OpeningGeometry>): OpeningGeometry => ({
   n: { x: 0, y: 1 },
   width: 0.9,
   height: 2.1,
+  roughWidth: 0.9,
+  roughHeight: 2.1,
   sill: 0,
   thickness: 0.14,
   sHi: 0.07,

@@ -145,7 +145,7 @@ export function ViewportCanvas(): ReactElement {
       const m = model.current;
       // Sombras e arestas são da vista 3D no projeto (decisão 0015 §1): a chave inclui a versão do projeto.
       const v3 = view3dOf(p);
-      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}`;
+      const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
         const levels = p.levels.map((l) => editor.resolved(l.id));

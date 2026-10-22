@@ -23,3 +23,4 @@ export * from './graphicsCommands.ts';
 export * from './level.ts';
 export * from './elementLevel.ts';
 export * from './opening.ts';
+export * from './openingExtras.ts';

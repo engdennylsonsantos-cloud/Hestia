@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, openingGeometry, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
-import { coreSpan, openingFrame, openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
+import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { mix } from '../plan/color.ts';
 import { OrbitCamera } from './orbit.ts';
+import { openingPieces } from './openingParts.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { disposeHighlight, highlightOf, type HighlightStyle } from './highlight3d.ts';
@@ -326,75 +327,42 @@ export class ModelScene {
     const cat: GraphicsCategory = o.kind;
     if (!this.frame.view.overrides[cat].visible) return null;
     const g = openingGeometry(p, o, f);
-    const t = p.openingTypes[o.typeId];
-    if (!t) return null;
     // Vão livre de porta: só o recorte da parede; sem folha nem caixilho.
     if (g.kind === 'door' && g.leaves === 0) return null;
     const grp = new THREE.Group();
-    const h = Math.min(g.height, H - g.sill);
     // Aberturas só têm arestas nos estilos de linhas (nos estilos com cor, como antes, não).
     const edges = isLineStyle(this.frame.view.style);
-    const frameMat = p.materials[t.frameMaterialId];
-    const glassMat = p.materials[t.glassMaterialId];
     // Cada peça da esquadria é um elemento inteiro: a faixa cobre a geometria toda (decisão 0016).
-    const add = (w: number, d: number, hh: number, x: number, z: number, m: Material | undefined, y = 0): void => {
-      const box = new THREE.BoxGeometry(w, d, hh).translate(x, y, z);
-      this.draw(grp, box, m, cat, edges, [{ id: o.id, start: 0, count: box.index?.count ?? 0 }]);
-    };
-    // Espessuras do tipo (campos opcionais; ausentes valem o padrão, que é o que o 3D usava fixo). A profundidade do
-    // batente é limitada ao NÚCLEO da parede (camada de estrutura; `coreSpan(f.type)`), não à espessura total com
-    // acabamentos: o batente não deve ficar sob o reboco (DEC-1). Sem estrutura, `coreSpan` devolve a espessura total.
-    const core = coreSpan(f.type);
-    const { frameWidth: jamb, frameDepth: depth, leafThickness: leaf, glassThickness: glassT } = openingFrame(t, core.to - core.from);
-    if (g.kind === 'window' && g.leaves === 0) {
-      // Janela sem folha: só a soleira, sem caixilho nem vidro (a planta também desenha só a soleira).
-      add(g.width, depth, jamb, 0, jamb / 2, frameMat);
-    } else if (g.kind === 'window') {
-      add(jamb, depth, h, -g.width / 2 + jamb / 2, h / 2, frameMat);
-      add(jamb, depth, h, g.width / 2 - jamb / 2, h / 2, frameMat);
-      add(g.width, depth, jamb, 0, h - jamb / 2, frameMat);
-      add(g.width, depth, jamb, 0, jamb / 2, frameMat);
-      const inner = g.width - jamb * 2;
-      const glassH = h - jamb * 2;
-      if (g.plan === 'sliding') {
-        // Janela de correr (família `window.sliding`): cada folha vira um painel de vidro em trilho próprio, defasado
-        // na profundidade — a leitura do símbolo de planta (`windowSlidingLeaves`): 2 ou 3 folhas, não todas no plano
-        // médio.
-        const n = Math.max(1, g.leaves);
-        for (let k = 0; k < n; k++) {
-          add(inner / n, glassT, glassH, -inner / 2 + (k + 0.5) * (inner / n), glassH / 2, glassMat, depth * ((k + 1) / (n + 1) - 0.5));
+    const range = (count: number): ElementRange[] => [{ id: o.id, start: 0, count }];
+    const pieces = openingPieces(p, o, g, f, H, this.frame.view.openOpenings === true);
+    for (const piece of pieces) {
+      const mat = p.materials[piece.materialId];
+      // Folha aberta: a caixa é desenhada num grupo na dobradiça, que gira a peça inteira.
+      if (piece.hinge) {
+        const pivot = new THREE.Group();
+        let dx = 0;
+        if (piece.hinge.axis === 'z') {
+          pivot.position.x = piece.hinge.at;
+          pivot.rotation.z = piece.hinge.angle;
+          dx = piece.hinge.at;
+        } else {
+          pivot.position.z = piece.hinge.at;
+          pivot.rotation.x = piece.hinge.angle;
         }
+        const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x - dx, piece.y, piece.z - (piece.hinge.axis === 'x' ? piece.hinge.at : 0));
+        this.draw(pivot, box, mat, cat, edges, range(box.index?.count ?? 0));
+        grp.add(pivot);
       } else {
-        // Fixa, basculante e maxim-ar: uma folha de vidro no plano médio (como antes).
-        add(inner, glassT, glassH, 0, glassH / 2, glassMat);
-      }
-      // Montantes entre as folhas: n folhas, n − 1 montantes igualmente espaçados, no plano médio.
-      for (let i = 1; i < g.leaves; i++) add(leaf, depth, glassH, -inner / 2 + (i * inner) / g.leaves, glassH / 2, frameMat);
-    } else {
-      add(jamb, depth, h, -g.width / 2 + jamb / 2, h / 2, frameMat);
-      add(jamb, depth, h, g.width / 2 - jamb / 2, h / 2, frameMat);
-      add(g.width, depth, jamb, 0, h - jamb / 2, frameMat);
-      const leafW = g.width - jamb * 2;
-      const doorH = h - jamb;
-      if (g.plan === 'sliding') {
-        // Porta de correr (família `door.sliding`): dois painéis de (W − 2·batente)/2, um em cada face da parede (cada
-        // um no seu trilho, defasados na profundidade), que se encontram no meio — a leitura do símbolo de planta
-        // (`slidingPanels`).
-        const panelW = leafW / 2;
-        const track = depth / 4;
-        for (const s of [-1, 1] as const) add(panelW, leaf, doorH, (s * leafW) / 4, doorH / 2, frameMat, s * track);
-      } else if (g.leaves === 2) {
-        // Porta dupla: duas folhas, cada uma com metade do vão livre, encostadas no centro (plano médio).
-        for (const x of [-leafW / 4, leafW / 4]) add(leafW / 2, leaf, doorH, x, doorH / 2, frameMat);
-      } else {
-        // Porta de giro ou pivotante (1 folha): uma folha com a largura do vão livre, no plano médio (como antes).
-        add(leafW, leaf, doorH, 0, doorH / 2, frameMat);
+        const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x, piece.y, piece.z);
+        this.draw(grp, box, mat, cat, edges, range(box.index?.count ?? 0));
       }
     }
     grp.rotation.z = Math.atan2(g.u.y, g.u.x);
     grp.position.set(g.center.x, g.center.y, baseZ + g.sill);
     grp.userData.elementId = o.id;
-    for (const c of grp.children) c.userData.elementId = o.id;
+    grp.traverse((c) => {
+      c.userData.elementId = o.id;
+    });
     return grp;
   }
 

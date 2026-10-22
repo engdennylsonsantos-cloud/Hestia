@@ -16,6 +16,7 @@ import {
   FUNCTION_PRIORITY,
   layerPriority,
   layerSpans,
+  openingRough,
   openingSill,
   openingType,
   openingsOfWall,
@@ -211,6 +212,7 @@ function clusterWalls(frames: WallFrame[], ends: Map<string, WallEnds>): WallFra
 
 export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGeometry {
   const t = openingType(p, o);
+  const rough = openingRough(t);
   return {
     openingId: o.id,
     hostId: o.hostId,
@@ -220,6 +222,8 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
     n: normalAt(f, o.offset),
     width: t.width,
     height: t.height,
+    roughWidth: rough.width,
+    roughHeight: rough.height,
     sill: openingSill(t, o),
     thickness: f.thickness,
     sHi: f.sHi,
@@ -233,14 +237,14 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
 }
 
 const openingRect = (g: OpeningGeometry): MultiPolygon => [
-  [orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2 + 0.02)],
+  [orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.roughWidth / 2, g.thickness / 2 + 0.02)],
 ];
 
 const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
   const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}:${i.outline ? 1 : 0}|${ringsOfShape(i.shape)}`);
-  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
+  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.roughWidth)}|${round(g.roughHeight)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
 
@@ -273,7 +277,7 @@ function breakpoints(items: Item[], zr: Map<Id, ZRange>, opens: OpeningGeometry[
   for (const g of opens) {
     const w = zr.get(g.hostId);
     if (!w) continue;
-    for (const z of [w.z0 + g.sill, w.z0 + g.sill + g.height]) if (z > w.z0 + EPS_Z && z < w.z1 - EPS_Z) add(z);
+    for (const z of [w.z0 + g.sill, w.z0 + g.sill + g.roughHeight]) if (z > w.z0 + EPS_Z && z < w.z1 - EPS_Z) add(z);
   }
   return [...set].sort((a, b) => a - b);
 }
@@ -315,13 +319,13 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
       if (!frag || frag.length === 0) continue;
       const w = zr.get(it.wallId)!;
       const holes = opens
-        .filter((g) => g.hostId === it.wallId && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height)
+        .filter((g) => g.hostId === it.wallId && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.roughHeight)
         .map(openingRect);
       let poly = holes.length ? difference(frag, ...holes) : frag;
       // Retorno do acabamento no vão: só nas faixas de altura que o vão atravessa.
       for (const r of returns.get(`${it.wallId}|${it.layerIndex}`) ?? []) {
         const g = opens.find((x) => x.openingId === r.openingId);
-        if (g && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.height) poly = [...poly, ...clipReturn(r, it.wallId, painted)];
+        if (g && mid > w.z0 + g.sill && mid < w.z0 + g.sill + g.roughHeight) poly = [...poly, ...clipReturn(r, it.wallId, painted)];
       }
       if (poly.length === 0) continue;
       const list = bandsOf.get(it) ?? [];

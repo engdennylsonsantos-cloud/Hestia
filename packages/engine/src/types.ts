@@ -91,6 +91,9 @@ export interface OpeningGeometry {
   n: Vec2;
   width: number;
   height: number;
+  /** Vão bruto (furo na parede): `width/height` + `roughOversize` do tipo. A esquadria continua com width/height. */
+  roughWidth: number;
+  roughHeight: number;
   sill: number;
   thickness: number;
   /** Faixa s da parede em que o vão está. */

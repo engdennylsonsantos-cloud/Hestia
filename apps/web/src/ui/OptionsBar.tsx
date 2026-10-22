@@ -25,11 +25,16 @@ function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window';
   const types = Object.values(p.openingTypes).filter((t) => t.kind === kind);
   const needle = q.trim().toLowerCase();
   const shown = needle ? types.filter((t) => t.name.toLowerCase().includes(needle) || (t.code ?? '').toLowerCase().includes(needle)) : types;
+  // Favoritos no topo (ArchiCAD: Favorites); os demais ficam agrupados por família.
+  const favorites = p.settings.favoriteOpeningTypes ?? [];
+  const favSet = new Set(favorites);
+  const favoriteItems = shown.filter((t) => favSet.has(t.id));
+  const rest = shown.filter((t) => !favSet.has(t.id));
   // Um grupo por família (ordem da interface); tipos sem família (dado fora do contrato) caem em "Outros".
   const groups = openingFamilies(kind)
-    .map((f) => ({ family: f, items: shown.filter((t) => openingFamilyOf(t)?.id === f.id) }))
+    .map((f) => ({ family: f, items: rest.filter((t) => openingFamilyOf(t)?.id === f.id) }))
     .filter((g) => g.items.length);
-  const orphans = shown.filter((t) => !openingFamilyOf(t));
+  const orphans = rest.filter((t) => !openingFamilyOf(t));
   const visible = new Set(shown.map((t) => t.id));
   const current = p.openingTypes[value];
   return (
@@ -42,6 +47,11 @@ function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window';
         Tipo
         <select id="opt-opentype" className="select" value={value} onChange={(e) => onChange(e.target.value)}>
           {current && !visible.has(value) ? <option value={value}>{current.name}</option> : null}
+          {favoriteItems.length ? (
+            <optgroup label="★ Favoritos">
+              {favoriteItems.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </optgroup>
+          ) : null}
           {groups.map((g) => (
             <optgroup key={g.family.id} label={g.family.name}>
               {g.items.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -54,6 +64,15 @@ function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window';
           ) : null}
         </select>
       </label>
+      <button
+        type="button"
+        className="btn small"
+        aria-label={favSet.has(value) ? 'Remover tipo dos favoritos' : 'Adicionar tipo aos favoritos'}
+        title={favSet.has(value) ? 'Remover dos favoritos (desfazível)' : 'Adicionar aos favoritos (desfazível)'}
+        onClick={() => editor.store.exec({ type: 'toggleOpeningFavorite', id: value }, favSet.has(value) ? 'Remover tipo dos favoritos' : 'Favoritar tipo de abertura')}
+      >
+        {favSet.has(value) ? '★' : '☆'}
+      </button>
     </>
   );
 }

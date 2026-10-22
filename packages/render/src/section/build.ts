@@ -124,6 +124,35 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
     const faceOn = Math.abs(t1 - t0 - esq.width) <= Math.abs(t1 - t0 - esq.thickness);
     const frameBase = pt.color ?? p.materials[esq.frameMaterialId]?.color ?? '#9aa0a6';
     const frameColor = pt.visual === 'shaded' ? frameBase : mix(frameBase, paper, 0.5);
+    // Peça de concreto (verga/contraverga): preenchida com a cor do material e hachura de corte, no mesmo critério do corte.
+    const concrete = p.materials['mat_concreto'];
+    const concretePiece = (a: number, b: number, c: number, d: number): void => {
+      const ring = quad(a, b, c, d);
+      const hatch = concrete && concrete.hatch !== 'none' && v.zoom >= 40 ? { kind: concrete.hatch, color: mix(concrete.color, input.dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+      fills.push({ polygons: [[ring]], color: mix(concrete?.color ?? '#8f9296', paper, 0.35), alpha: 1, hatch });
+      strokes.push({ pts: ring, closed: true, widthPx: edge, color: theme.ink, alpha: 1 });
+    };
+    const tc = (t0 + t1) / 2;
+    // Verga e contraverga: transpasse além do vão na vista face e a espessura da parede no corte transversal.
+    if (esq.lintel) {
+      if (faceOn) concretePiece(t0 - esq.lintel.over, t1 + esq.lintel.over, z1, z1 + esq.lintel.height);
+      else concretePiece(t0, t1, z1, z1 + esq.lintel.height);
+    }
+    if (esq.sillBeam) {
+      if (faceOn) concretePiece(t0 - esq.sillBeam.over, t1 + esq.sillBeam.over, z0 - esq.sillBeam.height, z0);
+      else concretePiece(t0, t1, z0 - esq.sillBeam.height, z0);
+    }
+    // Alizar: contorno em volta do vão, nas duas faces da parede (na elevação, o contorno da peça).
+    const outlineRect = (a: number, b: number, c: number, d: number): void => {
+      strokes.push({ pts: quad(a, b, c, d), closed: true, widthPx: Math.min(edge, 1.2), color: theme.ink, alpha: 1 });
+    };
+    if (esq.casing) {
+      const cw = esq.casing.width;
+      outlineRect(t0 - cw, t0, z0, z1 + cw);
+      outlineRect(t1, t1 + cw, z0, z1 + cw);
+      outlineRect(t0 - cw, t1 + cw, z1, z1 + cw);
+      if (kind === 'window') outlineRect(t0 - cw, t1 + cw, z0 - cw, z0);
+    }
     // Vão livre (sem folha): nenhum batente nem vidro. A porta é só o vão aberto (o vazio mostra o papel); a janela
     // sem folha fica com a soleira, como no 3D.
     if (esq.leaves === 0) {
@@ -169,11 +198,14 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
         }
       } else {
         // Corte transversal: verga e soleira com a profundidade do batente, centradas na parede; vidro com a espessura.
-        const tc = (t0 + t1) / 2;
         piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z1 - fw, z1, frameColor);
         piece(tc - esq.frameDepth / 2, tc + esq.frameDepth / 2, z0, z0 + fw, frameColor);
         if (!noFill) fills.push({ polygons: [[quad(tc - esq.glassThickness / 2, tc + esq.glassThickness / 2, z0 + fw, z1 - fw)]], color: halftone(pt.color ?? GLASS_FILL, pt), alpha: pt.alpha });
+        // Peitoril saliente: no corte transversal, projeta além das duas faces (t = espessura da parede).
+        if (esq.sillBoard) piece(t0 - esq.sillBoard.projection, t1 + esq.sillBoard.projection, z0 - esq.sillBoard.thickness, z0, frameColor);
       }
+      // Peitoril saliente na elevação: faixa sob o vão, com a espessura da peça.
+      if (faceOn && esq.sillBoard) piece(t0, t1, z0 - esq.sillBoard.thickness, z0, frameColor);
     } else {
       // Porta com folha: a folha fechada preenche o vão (C5). O vão livre (0 folhas) saiu acima, sem preenchimento.
       if (!noFill) fills.push({ polygons, color: halftone(pt.color ?? DOOR_FILL, pt), alpha: pt.alpha });

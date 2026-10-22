@@ -89,6 +89,8 @@ export interface View3DSettings {
   sunElevation: number;
   /** Cor de fundo (#rrggbb); null = pelo tema. */
   background: string | null;
+  /** Abre as folhas no 3D (porta de giro a 90°, janela de correr/giro entreaberta). Ausente = fechada. */
+  openOpenings?: boolean;
 }
 
 /** Tabela do template padrão do Revit (mm de papel, 1:50 | 1:100 | 1:200). Fonte: docs/visualizacao/C-relatorio-pesquisa.md (c) [SECUNDÁRIO]. */
@@ -166,6 +168,7 @@ export const DEFAULT_VIEW_3D: View3DSettings = {
   sunAzimuth: 324.46,
   sunElevation: 51.97,
   background: null,
+  openOpenings: false,
 };
 
 /** Largura da linha em mm de papel: peso (1–16, fora disso é limitado) na escala 1:`scale`. */
@@ -287,6 +290,7 @@ function view3dIssues(g: View3DSettings): string[] {
   if (!Number.isFinite(g.sunAzimuth)) out.push('O azimute do sol deve ser um número finito, em graus.');
   if (!(Number.isFinite(g.sunElevation) && g.sunElevation >= 0 && g.sunElevation <= 90)) out.push('A elevação do sol deve estar entre 0 e 90 graus.');
   if (g.background !== null && !isHex(g.background)) out.push('A cor de fundo deve estar no formato #rrggbb, ou ser null para o padrão do tema.');
+  if (g.openOpenings !== undefined && typeof g.openOpenings !== 'boolean') out.push('Abrir vãos no 3D deve ser sim ou não.');
   return out;
 }
 

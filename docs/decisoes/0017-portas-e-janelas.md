@@ -104,13 +104,32 @@ e BOM UTF-8. O diálogo é `apps/web/src/ui/dialogs/OpeningScheduleDialog.tsx` (
 `openingSchedule` em `apps/web/src/editor/state.ts`, rota em `App.tsx`). Testes:
 `packages/engine/src/openingSchedule.test.ts`.
 
-## 8 · O que fica para depois
+## 8 · Feito (acabamento de portas e janelas) e o que fica para depois
 
-- **Vão bruto e tolerâncias:** o furo do vão é a largura × altura do tipo, sem folga de assentamento (Revit: *Rough
-  Width/Height*; ArchiCAD: *Opening Oversizes* e as definições Wallhole/Unit/Egress/Leaf).
-- **Reveal, soleira saliente, alizar (casing) e verga/contraverga:** não há peça nem campo no tipo. A verga e a
-  contraverga dependem do projeto estrutural (altura e transpasse divergentes nas fontes, `A-pesquisa.md` §2.3 e §6).
-- **Favoritos:** não há biblioteca de tipos favoritos (ArchiCAD: *Favorites* + *Transfer Sets*).
+**Feito.** Todos os campos são opcionais no `OpeningType`, com padrão por leitura (`packages/model/src/openingExtras.ts`);
+sem migração e sem mudar `SCHEMA_VERSION`. Padrão ausente = nada desenhado (exceto o furo, que é o vão do tipo).
+
+- **Vão bruto (Revit: *Rough Width/Height*; ArchiCAD: *Opening Oversizes*):** `roughOversize: {w, h}` em m. O furo na
+  parede cresce; a esquadria não. Vale no recorte da parede (planta, corte e 3D), no 3D e no quadro (colunas de largura
+  e altura bruta).
+- **Alizar (*casing*):** `casing: {width, thickness}`. Peça 3D em volta do vão nas duas faces da parede e contorno na
+  elevação.
+- **Peitoril saliente (*sill board*):** `sillBoard: {projection, thickness}`, só para janela. Peça no 3D, faixa sob o vão
+  na elevação e projeção além das duas faces no corte transversal.
+- **Verga e contraverga:** `lintel` e `sillBeam` com `{over, height}`; transpasse padrão 0,30 m e altura padrão 0,20 m.
+  Peças de concreto com hachura no corte e no 3D. O quadro traz o comprimento total das peças (transpasse incluído).
+- **Folha aberta no 3D:** `View3DSettings.openOpenings` (padrão fechada), com o botão "Abrir vãos" na faixa Vista. Porta
+  de giro e porta dupla a 90°; janela de correr entreaberta; maxim-ar e basculante abertas pelo topo.
+- **Favoritos:** `ProjectSettings.favoriteOpeningTypes`, estrela no seletor de tipo (favoritos no topo da lista) e
+  comando `toggleOpeningFavorite` desfazível. Lista do projeto, sem biblioteca de transferência.
+
+**Ainda para depois.**
+
+- **Alizar, peitoril saliente e verga na planta:** a planta não desenha essas peças (o corte da parede já usa o vão bruto).
+- **Folha aberta em corte e elevação:** só o 3D abre a folha; corte e elevação seguem fechados.
+- **Reveal com medida própria:** segue o retorno do acabamento pelo tipo de parede e de abertura, sem campo novo.
+- **Pingadeira e soleira com cota:** não há peça nem campo.
+- **Biblioteca de tipos (*Transfer Sets*):** fora do escopo; os favoritos são do projeto.
 - **Exibição simbólica × projetada:** o ArchiCAD 26 tem `Floor Plan Display` `Symbolic` × `Projected`/`Overhead All`/
   `Projected with Overhead`; o Hestia sempre desenha o símbolo simbólico.
 - **Folha de porta aberta no 3D:** a folha é sempre desenhada fechada (sem modo aberto).

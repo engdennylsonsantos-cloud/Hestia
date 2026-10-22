@@ -92,7 +92,7 @@ Com o núcleo do piso na camada estrutural, `auto` reproduz a tabela anterior: e
 
 `Término na junção` não é o `modo` do contorno do piso (§8.2): o modo define o circuito; o término decide, camada a camada, até qual face desse circuito ela vai.
 
-**Exemplo por atributos.** Parede com camada de acabamento de prioridade 4, fora do núcleo, encontra um piso com substrato (prioridade 2) e acabamento (prioridade 4). A camada da parede para no topo da camada de maior prioridade do piso que ela encontra: o substrato (2). Para a camada da parede descer mais, o usuário aumenta o número de prioridade desse substrato (por exemplo, de 2 para 5, ou seja, menor prioridade): a parede passa a atravessá-lo. Nenhum nome ou material entra na regra. Testes: §9.5.
+**Exemplo por atributos.** Parede com camada de acabamento de prioridade 4, fora do núcleo, encontra um piso com substrato (prioridade 2) e acabamento (prioridade 4). A camada da parede para no topo da camada de maior prioridade do piso que ela encontra: o substrato (2). Para a camada da parede descer mais, o usuário aumenta o número de prioridade desse substrato (por exemplo, de 2 para 5, ou seja, menor prioridade): a parede passa a atravessá-lo. O mesmo efeito se obtém na camada da parede, diminuindo o número dela (por exemplo, de 4 para 2: prioridade maior, igual à do substrato). Lembrete: número menor = prioridade maior. Nenhum nome ou material entra na regra. Testes: §9.5.
 
 **Limitação.** `[NÃO ENCONTRADO]`: o Revit não documenta término por camada em piso. Isto é melhoria própria, não cópia. Revestimento só até certa altura (barra de revestimento, rodapé, por exemplo) é das faixas verticais da parede (decisão 0005), independente do piso.
 

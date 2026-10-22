@@ -113,6 +113,23 @@ describe('vão bruto, alizar, peitoril e vergas do tipo', () => {
   });
 });
 
+describe('acabamento na regra do tipo e no comando', () => {
+  it('openingTypeIssue recusa medida de acabamento fora da faixa e aceita o tipo válido', () => {
+    const base = { kind: 'window' as const, plan: 'fixed' as const, leaves: 1 as const };
+    expect(openingTypeIssue(base)).toBeNull();
+    expect(openingTypeIssue({ ...base, casing: { width: 0.05, thickness: -0.01 } })).toBe('Alizar, espessura: use um valor de 0 a 5 cm.');
+  });
+
+  it('o comando não grava o tipo com acabamento inválido e grava o válido', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const t = s.project.openingTypes['ot_p80'] ?? DEFAULT_OPENING_TYPES[0]!;
+    expect(() => s.exec({ type: 'upsertOpeningType', openingType: { ...t, id: 'ot_x', lintel: { over: 2 } } })).toThrow('Verga, transpasse: use um valor de 0 a 100 cm.');
+    expect(s.project.openingTypes['ot_x']).toBeUndefined();
+    s.exec({ type: 'upsertOpeningType', openingType: { ...t, id: 'ot_x', lintel: { over: 0.3, height: 0.2 } } });
+    expect(s.project.openingTypes['ot_x']?.lintel).toEqual({ over: 0.3, height: 0.2 });
+  });
+});
+
 describe('favoritos de tipo de abertura', () => {
   it('o comando liga e desliga o favorito e o desfazer volta a lista', () => {
     const s = new ProjectStore(createEmptyProject());

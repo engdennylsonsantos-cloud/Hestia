@@ -9,6 +9,7 @@ export * from './model3d/solids.ts';
 export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
+export * from './model3d/openingParts.ts';
 export * from './section/build.ts';
 export * from './section/pick.ts';
 export { sectionStyleOf, type SectionStyle } from './section/style.ts';

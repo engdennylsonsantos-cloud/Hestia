@@ -121,6 +121,12 @@ sem migração e sem mudar `SCHEMA_VERSION`. Padrão ausente = nada desenhado (e
 - **Folha aberta no 3D:** `View3DSettings.openOpenings` (padrão fechada), com o botão "Abrir vãos" na faixa Vista. Porta
   de giro, porta dupla e porta pivotante a 90°; folhas de correr deslizando dentro do vão; maxim-ar e basculante
   abertas pelo topo (a basculante, se existir, por ora abre como a maxim-ar — ver §11).
+- **Tela do acabamento (diálogo do tipo):** seção recolhível **Acabamento** em `OtherDialogs.tsx` (`OpeningTypeDialog`): folga do
+  vão (largura e altura), alizar, soleira saliente (só janela), verga e contraverga. Cada peça liga e desliga: ligar grava o
+  padrão (`ACABAMENTO_PADRAO`, em `openingTypeForm.ts`) e desligar tira o campo, que volta ao padrão por leitura. Medida fora
+  da faixa (`ACABAMENTO_LIMITES` e `acabamentoIssue`, em `openingExtras.ts`) é recusada pelo comando `upsertOpeningType`; a
+  mensagem aparece no diálogo, que continua aberto. Testes: `openingTypeForm.test.ts` (cada campo muda a peça do 3D e a linha do
+  quadro) e o fluxo `tests/e2e/aberturas-acabamento.mjs` (ligar o alizar aumenta as peças do 3D).
 - **Favoritos:** `ProjectSettings.favoriteOpeningTypes`, estrela no seletor de tipo (favoritos no topo da lista) e
   comando `toggleOpeningFavorite` desfazível. Lista do projeto, sem biblioteca de transferência.
 

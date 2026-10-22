@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import { mix } from '../plan/color.ts';
 import type { PlanDrawList, PlanTheme } from '../plan/types.ts';
+import { hatchPartsOf } from './hatch.ts';
 import type { SheetPoint, ViewportParts } from './types.ts';
 import type { SheetViewport } from '@hestia/model';
 
@@ -54,17 +55,22 @@ const inkOf = (color: string, alpha: number): string => (alpha >= 1 ? color : mi
 
 /** Converte a lista de desenho (mundo + px) para as partes da folha (mm de papel). `theme` dá a cor do texto. */
 export function partsOf(list: PlanDrawList, to: (q: Vec2) => SheetPoint, theme: PlanTheme): ViewportParts {
-  const fills = list.fills.map((f) => ({
-    polygons: f.polygons.map((poly) => poly.map((ring) => ring.map(to))),
-    color: inkOf(f.color, f.alpha),
-  }));
-  const paths = list.strokes.map((s) => ({
+  // Cada preenchimento com hachura vira o próprio preenchimento mais as partes da hachura (B6), na mesma ordem.
+  const filled = list.fills.map((f) => {
+    const polygons = f.polygons.map((poly) => poly.map((ring) => ring.map(to)));
+    const base = { polygons, color: inkOf(f.color, f.alpha) };
+    if (!f.hatch) return { fills: [base], paths: [] };
+    const hatch = hatchPartsOf(polygons, f.hatch.kind, inkOf(f.hatch.color, f.hatch.alpha ?? 1));
+    return { fills: [base, ...hatch.fills], paths: hatch.paths };
+  });
+  const fills = filled.flatMap((f) => f.fills);
+  const paths = [...filled.flatMap((f) => f.paths), ...list.strokes.map((s) => ({
     pts: s.pts.map(to),
     closed: s.closed,
     widthMm: s.widthPx / SHEET_PX_PER_MM,
     color: inkOf(s.color, s.alpha),
     ...(s.dash ? { dashMm: [s.dash[0] / SHEET_PX_PER_MM, s.dash[1] / SHEET_PX_PER_MM] as [number, number] } : {}),
-  }));
+  }))];
   const texts = list.labels.map((l) => {
     const base = to(l.at);
     const at = l.dx !== undefined || l.dy !== undefined ? shifted(base, l.dx ?? 0, l.dy ?? 0) : base;

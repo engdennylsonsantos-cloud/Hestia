@@ -81,6 +81,12 @@ describe('pranchas: funções de posição', () => {
     expect(freeSpot(sh, { w: 100, h: 50 })).toEqual({ x: 10, y: 10 });
   });
 
+  it('a vista nova não cai sobre o carimbo (canto inferior direito)', () => {
+    // Vista existente à esquerda, de 10 a 280 mm; o carimbo ocupa x 290–410, y 10–54: a vista nova vai acima dos dois.
+    const taken = { id: 'v1', view: { kind: '3d' as const }, at: { x: 10, y: 10 }, size: { w: 270, h: 50 }, scale: 100 };
+    expect(freeSpot({ ...sh, viewports: [taken] }, { w: 100, h: 50 })).toEqual({ x: 10, y: 60 });
+  });
+
   it('a vista padrão encolhe para caber numa folha pequena', () => {
     expect(defaultViewSize({ size: 'A4', orientation: 'portrait', margin: 10 }, { kind: 'plan', levelId: LV0 })).toEqual({ w: 180, h: 130 });
     expect(defaultViewSize({ size: 'A4', orientation: 'portrait', margin: 60 }, { kind: 'plan', levelId: LV0 })).toEqual({ w: 90, h: 130 });

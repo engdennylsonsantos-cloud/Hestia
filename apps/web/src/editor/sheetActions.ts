@@ -1,5 +1,5 @@
 import { newSheetId, newViewportId, projectSheets, sheetInnerBox, sheetIssue, sheetOf, viewportIssue, type Command, type Id, type Project, type ProjectStore, type Sheet, type SheetViewport, type SheetViewSource } from '@hestia/model';
-import { buildSheetDrawList, type SheetDrawList } from '@hestia/render';
+import { buildSheetDrawList, STAMP_H, STAMP_W, type SheetDrawList } from '@hestia/render';
 import { exportSheetsPdf } from '@hestia/io';
 
 /**
@@ -51,18 +51,21 @@ export function defaultViewSize(s: Pick<Sheet, 'size' | 'orientation' | 'margin'
   return { w: Math.min(want.w, box.x1 - box.x0), h: Math.min(want.h, box.y1 - box.y0) };
 }
 
-const overlaps = (a: { x: number; y: number; w: number; h: number }, b: SheetViewport): boolean =>
-  a.x < b.at.x + b.size.w && b.at.x < a.x + a.w && a.y < b.at.y + b.size.h && b.at.y < a.y + a.h;
+type Rect = { x: number; y: number; w: number; h: number };
+const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /**
  * Lugar para uma vista nova: a primeira posição da grade (passo de 10 mm, de baixo para cima) em que a caixa cabe na
- * área de desenho sem tocar as vistas existentes. Sem lugar livre, o canto inferior esquerdo.
+ * área de desenho sem tocar as vistas existentes nem o carimbo (canto inferior direito, por cima da folha). Sem lugar
+ * livre, o canto inferior esquerdo.
  */
 export function freeSpot(s: Pick<Sheet, 'size' | 'orientation' | 'margin' | 'viewports'>, size: { w: number; h: number }): { x: number; y: number } {
   const box = sheetInnerBox(s);
+  const stamp: Rect = { x: box.x1 - STAMP_W, y: box.y0, w: STAMP_W, h: STAMP_H };
+  const taken = (r: Rect): boolean => overlaps(r, stamp) || s.viewports.some((v) => overlaps(r, { x: v.at.x, y: v.at.y, w: v.size.w, h: v.size.h }));
   for (let y = box.y0; y + size.h <= box.y1 + 1e-6; y += SPOT_STEP) {
     for (let x = box.x0; x + size.w <= box.x1 + 1e-6; x += SPOT_STEP) {
-      if (!s.viewports.some((v) => overlaps({ x, y, w: size.w, h: size.h }, v))) return { x, y };
+      if (!taken({ x, y, w: size.w, h: size.h })) return { x, y };
     }
   }
   return { x: box.x0, y: box.y0 };

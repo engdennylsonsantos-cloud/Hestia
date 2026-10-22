@@ -35,10 +35,10 @@ export function TitleBar(): ReactElement {
     }
   };
   /** PDF vetorial com uma página por prancha (decisão 0022). */
-  const exportPdf = (): void => {
+  const exportPdf = async (): Promise<void> => {
     try {
       const bytes = sheetsPdfOf(editor.project);
-      useUi.setState({ status: bytes ? savePdf(`${editor.project.name || 'projeto'}-pranchas.pdf`, bytes) : 'Nenhuma prancha para exportar. Crie uma na seção Pranchas do navegador.' });
+      useUi.setState({ status: bytes ? await savePdf(`${editor.project.name || 'projeto'}-pranchas.pdf`, bytes) : 'Nenhuma prancha para exportar. Crie uma na seção Pranchas do navegador.' });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o PDF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
     }

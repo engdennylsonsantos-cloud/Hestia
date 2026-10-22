@@ -26,7 +26,8 @@ function raw(x: Omit<Slab, 'order'>): Project {
 }
 
 const codes = (issues: ValidationIssue[]): string[] => issues.map((i) => i.code);
-const issuesOf = (p: Project): ValidationIssue[] => validateProject(p).filter((i) => i.code.startsWith('slab-'));
+const issuesOf = (p: Project): ValidationIssue[] =>
+  validateProject(p).filter((i) => i.code.startsWith('slab-') || i.code.startsWith('piso-estrutura-'));
 
 describe('validação de lajes', () => {
   it('laje retangular válida não gera problemas', () => {
@@ -148,15 +149,42 @@ describe('validação de lajes', () => {
     expect(issues[0]!.message).toContain('deslocamento');
   });
 
-  it('piso de acabamento encostado na face superior da laje não avisa', () => {
-    // Laje de 12 cm no térreo: topo em 0. ft_ceram tem 19 cm; com deslocamento 0,19 a face inferior do piso fica em 0.
-    const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.19 });
+  it('piso de acabamento (ft_acab) encostado na face superior da laje não avisa', () => {
+    // Laje de 12 cm no térreo: topo em 0. ft_acab tem 4 cm; com deslocamento 0,04 a face inferior do piso fica em 0.
+    const floor = makeFloor({ id: 'f1', typeId: 'ft_acab', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.04 });
     expect(issuesOf(build([slab('s1')], [floor]))).toEqual([]);
   });
 
+  it('piso com camada estrutural (ft_ceram) encostado na laje avisa: o concreto está contado duas vezes', () => {
+    // ft_ceram tem 19 cm e a camada estrutural (concreto); com deslocamento 0,19 a face inferior dele fica no topo da laje.
+    const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.19 });
+    const issues = issuesOf(build([slab('s1')], [floor]));
+    expect(codes(issues)).toEqual(['piso-estrutura-sobre-laje']);
+    expect(issues[0]).toMatchObject({ severity: 'warning', elementId: 'f1' });
+    expect(issues[0]!.message).toContain('concreto está contado duas vezes');
+    expect(issues[0]!.message).toContain('acabamento');
+  });
+
   it('piso que entra 1 cm na laje avisa, mesmo com a mesma área em planta', () => {
+    // A face inferior do piso fica 1 cm dentro da laje: sobreposição em cota e concreto em dobro.
     const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.18 });
-    expect(codes(issuesOf(build([slab('s1')], [floor])))).toEqual(['slab-floor-overlap']);
+    expect(codes(issuesOf(build([slab('s1')], [floor]))).sort()).toEqual(['piso-estrutura-sobre-laje', 'slab-floor-overlap']);
+  });
+
+  it('piso com estrutura que entra 2 cm na laje avisa os dois problemas', () => {
+    // Face inferior 2 cm dentro da laje: há volume em comum e o concreto está em dobro.
+    const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.17 });
+    expect(codes(issuesOf(build([slab('s1')], [floor]))).sort()).toEqual(['piso-estrutura-sobre-laje', 'slab-floor-overlap']);
+  });
+
+  it('piso com estrutura acima da laje, com a face inferior 2 cm acima, não avisa', () => {
+    const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 4, 3), heightOffset: 0.21 });
+    expect(issuesOf(build([slab('s1')], [floor]))).toEqual([]);
+  });
+
+  it('piso com estrutura encostado na laje, sem área em comum em planta, não avisa', () => {
+    const floor = makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(10, 10, 12, 12), heightOffset: 0.19 });
+    expect(issuesOf(build([slab('s1')], [floor]))).toEqual([]);
   });
 
   it('piso abaixo da laje, sem volume em comum, não avisa', () => {

@@ -141,6 +141,7 @@ export function FloorScheduleDialog(): ReactElement {
             <span>Área {fmt(totals.area, 2)} m²</span>
             <span>Perímetro {fmt(totals.perimeter, 2)} m</span>
             <span>Volume {fmt(totals.volume, 3)} m³</span>
+            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>Volume bruto {fmt(totals.grossVolume, 3)} m³</span>}
           </div>
         </>
       )}

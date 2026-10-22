@@ -11,10 +11,16 @@ export interface FloorScheduleRow {
   typeCode: string;
   levelId: Id;
   levelName: string;
+  /** Área em planta do contorno, bruta (m²). */
   area: number;
+  /** Área líquida da face superior, sem o que a laje ocupa (m²). */
+  netArea: number;
   perimeter: number;
   thickness: number;
+  /** Volume líquido (m³): sem o que a laje ocupa. */
   volume: number;
+  /** Volume bruto (m³), antes do desconto da laje. Igual a `volume` sem corte. */
+  grossVolume: number;
   /** Deslocamento do topo em relação ao nível (m). */
   heightOffset: number;
 }
@@ -22,8 +28,10 @@ export interface FloorScheduleRow {
 export interface FloorScheduleTotals {
   count: number;
   area: number;
+  netArea: number;
   perimeter: number;
   volume: number;
+  grossVolume: number;
 }
 
 export interface FloorSchedule {
@@ -53,9 +61,11 @@ export function buildFloorSchedule(p: Project): FloorSchedule {
         levelId: q.levelId,
         levelName: level.name,
         area: q.area,
+        netArea: q.netArea,
         perimeter: q.perimeter,
         thickness: q.thickness,
         volume: q.volume,
+        grossVolume: q.grossVolume,
         heightOffset: e.heightOffset,
       });
     }
@@ -70,19 +80,33 @@ export const filterFloorRows = (rows: FloorScheduleRow[], f: FloorScheduleFilter
 /** Somatórios de um conjunto de linhas (o da tabela inteira ou só o filtrado). */
 export function sumFloorRows(rows: FloorScheduleRow[]): FloorScheduleTotals {
   return rows.reduce<FloorScheduleTotals>(
-    (t, r) => ({ count: t.count + 1, area: t.area + r.area, perimeter: t.perimeter + r.perimeter, volume: t.volume + r.volume }),
-    { count: 0, area: 0, perimeter: 0, volume: 0 },
+    (t, r) => ({
+      count: t.count + 1,
+      area: t.area + r.area,
+      netArea: t.netArea + r.netArea,
+      perimeter: t.perimeter + r.perimeter,
+      volume: t.volume + r.volume,
+      grossVolume: t.grossVolume + r.grossVolume,
+    }),
+    { count: 0, area: 0, netArea: 0, perimeter: 0, volume: 0, grossVolume: 0 },
   );
 }
 
 const CSV_HEADER = ['Marca', 'Tipo', 'Código', 'Nível', 'Área (m²)', 'Perímetro (m)', 'Espessura (m)', 'Volume (m³)', 'Deslocamento (m)'];
 
+/** Colunas extras do fim da tabela, só quando algum piso tem corte (líquido diferente do bruto). */
+const EPS = 1e-9;
+
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato da tabela de
- * paredes). Uma linha por piso, seguida de uma linha de total.
+ * paredes). Uma linha por piso, seguida de uma linha de total. Com corte, acrescenta no fim as colunas de área líquida
+ * e de volume bruto; sem corte o CSV fica igual ao de antes.
  */
 export function floorScheduleToCsv(rows: FloorScheduleRow[], totals: FloorScheduleTotals): string {
   const n = formatDecimal;
+  const netAreaCut = rows.some((r) => Math.abs(r.netArea - r.area) > EPS);
+  const grossCut = rows.some((r) => Math.abs(r.grossVolume - r.volume) > EPS);
+  const header = [...CSV_HEADER, ...(netAreaCut ? ['Área líquida (m²)'] : []), ...(grossCut ? ['Volume bruto (m³)'] : [])];
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
@@ -93,7 +117,21 @@ export function floorScheduleToCsv(rows: FloorScheduleRow[], totals: FloorSchedu
     n(r.thickness, 3),
     n(r.volume, 3),
     n(r.heightOffset, 3),
+    ...(netAreaCut ? [n(r.netArea, 2)] : []),
+    ...(grossCut ? [n(r.grossVolume, 3)] : []),
   ]);
-  const total = ['Total', '', '', '', n(totals.area, 2), n(totals.perimeter, 2), '', n(totals.volume, 3), ''];
-  return csvDocument([CSV_HEADER, ...body, total]);
+  const total = [
+    'Total',
+    '',
+    '',
+    '',
+    n(totals.area, 2),
+    n(totals.perimeter, 2),
+    '',
+    n(totals.volume, 3),
+    '',
+    ...(netAreaCut ? [n(totals.netArea, 2)] : []),
+    ...(grossCut ? [n(totals.grossVolume, 3)] : []),
+  ];
+  return csvDocument([header, ...body, total]);
 }

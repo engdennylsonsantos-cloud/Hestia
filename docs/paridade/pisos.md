@@ -20,6 +20,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] B3 Deslocamento de altura do topo em relação ao nível, na instância
 - [x] B4 Duplicar, renomear, substituir e excluir tipo (bloqueado se em uso)
 - [-] B5 Camada de espessura variável (caimento): fora, depende de A7
+- [x] B6 Tipo de acabamento sobre laje `ft_acab` (sem camada estrutural), padrão para pisos sobre laje; `ft_ceram` mantido (decisão 0023 P5)
 
 ## C · Relação com paredes
 - [x] C1 Parede cortada ou terminada pelo piso do nível (base/topo anexados ao piso) **(bloqueante)**
@@ -42,6 +43,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] E3 Etiqueta de piso na planta (código do tipo e área)
 - [x] E4 Exportação DXF do contorno do piso
 - [-] E5 IFC: fase de interoperabilidade
+- [x] E6 Quantitativos líquidos: piso perde o volume que a laje do nível ocupa; parede perde o que piso ocupa; tabela mostra bruto e líquido quando diferem (decisão 0023 §4, P5)
 
 ## F · Edição
 - [x] F1 Selecionar (clique, janela), mover, copiar, girar, espelhar, matriz **(bloqueante)**
@@ -58,3 +60,4 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] G5 Migração de arquivo antigo (v6 sem pisos) e ida e volta de arquivo
 - [x] G6 Regressão visual por captura de tela
 - [x] G7 Membrana de espessura zero: linha na planta e no corte, área de face e volume zero, sem sólido no 3D (decisão 0023 P4)
+- [x] G8 Aviso `piso-estrutura-sobre-laje`: piso com camada estrutural sobre a laje do nível (concreto contado duas vezes) (decisão 0023 P5)

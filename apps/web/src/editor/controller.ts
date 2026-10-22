@@ -200,6 +200,8 @@ export class Editor {
     const ui = useUi.getState();
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;
+    // Na aba de prancha, as teclas de ferramenta e de seleção não valem (o desfazer, com Ctrl, vale).
+    if (ui.view === 'sheet' && !mod) return false;
     if (mod && (k === 'z' || k === 'Z')) {
       if (this.stairPickHistory(e.shiftKey)) return true;
       if (e.shiftKey) this.redo();

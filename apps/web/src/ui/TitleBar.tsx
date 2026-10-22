@@ -2,6 +2,8 @@ import { useRef, type ReactElement } from 'react';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { savePlanDxf, saveSectionDxf } from '../editor/dxfExport.ts';
+import { savePdf } from '../editor/savePdf.ts';
+import { sheetsPdfOf } from '../editor/sheetActions.ts';
 import { saveProjectIfc } from '../editor/ifcExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
@@ -30,6 +32,15 @@ export function TitleBar(): ReactElement {
       useUi.setState({ status });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o DXF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
+    }
+  };
+  /** PDF vetorial com uma página por prancha (decisão 0022). */
+  const exportPdf = (): void => {
+    try {
+      const bytes = sheetsPdfOf(editor.project);
+      useUi.setState({ status: bytes ? savePdf(`${editor.project.name || 'projeto'}-pranchas.pdf`, bytes) : 'Nenhuma prancha para exportar. Crie uma na seção Pranchas do navegador.' });
+    } catch (e) {
+      useUi.setState({ status: `Não foi possível exportar o PDF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
     }
   };
   const exportIfc = async (): Promise<void> => {
@@ -67,6 +78,9 @@ export function TitleBar(): ReactElement {
       </button>
       <button className="ibtn" onClick={() => void exportDxf()} title="Exportar a planta do nível atual em DXF (metros)">
         <Icon name="plan" size={17} /> <span className="lbl-text">Exportar DXF</span>
+      </button>
+      <button className="ibtn" onClick={exportPdf} title="Exportar as pranchas em PDF vetorial (uma página por prancha)">
+        <Icon name="plan" size={17} /> <span className="lbl-text">Exportar PDF</span>
       </button>
       <button className="ibtn" onClick={() => void exportIfc()} title="Exportar o projeto inteiro em IFC4 (.ifc, metros)">
         <Icon name="save" size={17} /> <span className="lbl-text">Exportar IFC</span>

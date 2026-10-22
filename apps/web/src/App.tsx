@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement } from 'react';
+import { sheetOf } from '@hestia/model';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
@@ -11,6 +12,9 @@ import { StatusBar } from './ui/StatusBar.tsx';
 import { TitleBar } from './ui/TitleBar.tsx';
 import { Tutorial } from './ui/Tutorial.tsx';
 import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
+import { SheetView } from './ui/SheetView.tsx';
+import { SheetDialog } from './ui/dialogs/SheetDialog.tsx';
+import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
@@ -33,6 +37,7 @@ function ViewTabs(): ReactElement {
   const p = useProject();
   const s = useUi();
   const sectionTab = p.views.find((v) => v.id === s.sectionId);
+  const sheetTab = s.sheetId ? sheetOf(p, s.sheetId) : undefined;
   return (
     <div className="viewtabs" role="tablist" aria-label="Vistas abertas">
       <button className="ibtn" style={{ display: 'none' }} aria-hidden="true" />
@@ -47,6 +52,11 @@ function ViewTabs(): ReactElement {
       {s.view === 'section' && sectionTab ? (
         <button role="tab" aria-selected className="vtab on">
           <Icon name={sectionTab.kind === 'section' ? 'section' : 'elevation'} size={14} /> {sectionTab.name}
+        </button>
+      ) : null}
+      {s.view === 'sheet' && sheetTab ? (
+        <button role="tab" aria-selected className="vtab on">
+          <Icon name="plan" size={14} /> {sheetTab.number} {sheetTab.name}
         </button>
       ) : null}
       <span style={{ flex: 1 }} />
@@ -96,6 +106,10 @@ function Dialogs(): ReactElement | null {
       return <ShortcutsDialog />;
     case 'schedule':
       return <WallScheduleDialog />;
+    case 'sheet':
+      return arg ? <SheetDialog sheetId={arg} /> : null;
+    case 'addView':
+      return arg ? <AddViewDialog sheetId={arg} /> : null;
     case 'graphicsVisibility':
       return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
     case 'lineWeights':
@@ -109,6 +123,8 @@ export function App(): ReactElement {
   const left = useUi((s) => s.leftOpen);
   const right = useUi((s) => s.rightOpen);
   const theme = useUi((s) => s.theme);
+  const view = useUi((s) => s.view);
+  const sheetId = useUi((s) => s.sheetId);
   const dialog = useUi((s) => s.dialog);
 
   // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
@@ -155,7 +171,7 @@ export function App(): ReactElement {
         <main className="stage">
           <ViewTabs />
           <div style={{ position: 'relative', minHeight: 0, display: 'grid' }}>
-            <ViewportCanvas />
+            {view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
             <Tutorial />
           </div>
         </main>

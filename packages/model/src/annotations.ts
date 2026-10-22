@@ -1,5 +1,6 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
 import { DIM_MIN_LENGTH } from './dimension.ts';
+import { newId } from './ids.ts';
 import { type Dimension, type Id, type Project, type TextNote } from './types.ts';
 
 /**
@@ -93,5 +94,33 @@ export function annotationRemovals(p: Pick<Project, 'levels'>, levelId: Id, ids:
   const out: RemoveAnnotation[] = [];
   for (const d of levelDimensions(p, levelId)) if (want.has(d.id)) out.push({ type: 'removeDimension', levelId, id: d.id });
   for (const t of levelTexts(p, levelId)) if (want.has(t.id)) out.push({ type: 'removeText', levelId, id: t.id });
+  return out;
+}
+
+/** Ids das cotas e textos do nível que estão em `ids`. */
+export function annotationIdsIn(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[]): Id[] {
+  const have = new Set([...levelDimensions(p, levelId), ...levelTexts(p, levelId)].map((a) => a.id));
+  return ids.filter((id) => have.has(id));
+}
+
+/**
+ * Comandos que movem por `d` as cotas e os textos de `ids` (ou, com `copy`, criam cópias com ids novos). Uma cota movida
+ * perde as referências às paredes: a posição passa a ser livre.
+ */
+export function annotationMoveCommands(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[], d: Vec2, copy: boolean): AnnotationCommand[] {
+  const want = new Set(ids);
+  const shift = (v: Vec2): Vec2 => ({ x: v.x + d.x, y: v.y + d.y });
+  const out: AnnotationCommand[] = [];
+  for (const dim of levelDimensions(p, levelId)) {
+    if (!want.has(dim.id)) continue;
+    const moved = { a: shift(dim.a), b: shift(dim.b), offset: dim.offset };
+    if (copy) out.push({ type: 'addDimension', levelId, dimension: { id: newId('dim'), ...moved } });
+    else out.push({ type: 'updateDimension', levelId, id: dim.id, patch: { ...moved, refs: undefined } });
+  }
+  for (const t of levelTexts(p, levelId)) {
+    if (!want.has(t.id)) continue;
+    if (copy) out.push({ type: 'addText', levelId, text: { ...t, id: newId('txt'), at: shift(t.at) } });
+    else out.push({ type: 'updateText', levelId, id: t.id, patch: { at: shift(t.at) } });
+  }
   return out;
 }

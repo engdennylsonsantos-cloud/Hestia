@@ -167,3 +167,33 @@ describe('alça de deslocamento da cota', () => {
     expect(dims(ctx.store)[0]!.offset).toBeCloseTo(-1.5, 9);
   });
 });
+
+describe('mover e copiar anotações pelas ferramentas de edição', () => {
+  it('Mover desloca a cota e o texto selecionados; Copiar cria cópias com ids novos', () => {
+    const ctx = makeEnv();
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    clickAt(t, 2, 1);
+    const tx = tool('text', ctx.env);
+    clickAt(tx, 1, 2);
+    tx.type('Sala');
+    const dimId = dims(ctx.store)[0]!.id;
+    const txtId = levelTexts(ctx.store.project, 'lv_0')[0]!.id;
+    ctx.env.setSelection([dimId, txtId]);
+    const mv = tool('move', ctx.env);
+    clickAt(mv, 0, 0);
+    clickAt(mv, 1, 0);
+    const moved = dims(ctx.store)[0]!;
+    expect(moved.a).toEqual({ x: 1, y: 0 });
+    expect(moved.b).toEqual({ x: 5, y: 0 });
+    expect(levelTexts(ctx.store.project, 'lv_0')[0]!.at).toEqual({ x: 2, y: 2 });
+    ctx.env.setSelection([dimId, txtId]);
+    const cp = tool('copy', ctx.env);
+    clickAt(cp, 0, 0);
+    clickAt(cp, 0, 3);
+    cp.cancel();
+    expect(dims(ctx.store)).toHaveLength(2);
+    expect(levelTexts(ctx.store.project, 'lv_0')).toHaveLength(2);
+  });
+});

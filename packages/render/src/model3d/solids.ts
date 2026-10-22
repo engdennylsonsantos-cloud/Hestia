@@ -393,7 +393,9 @@ export function clearWallLayerCache(): void {
 export function buildFloorSolids(floors: ResolvedFloor[]): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const f of floors) {
+    // Membrana não tem volume nem sólido (decisão 0023 §5): fica só na planta e no corte.
     for (const l of f.layers) {
+      if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'floor');
       ofElement(b, f.floorId, () => {
         for (const poly of f.polygon) extrudePolygon(b, poly, l.z0, l.z1);
@@ -429,6 +431,7 @@ export function buildSlabSolids(slabs: ResolvedSlab[]): SolidBatch[] {
   for (const s of slabs) {
     const sl = s.slope;
     for (const l of s.layers) {
+      if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'slab');
       const topAt = sl ? (x: number, y: number): number => l.z1 + slabRiseAt(sl, { x, y }) : undefined;
       const bottomAt = sl ? (x: number, y: number): number => l.z0 + slabRiseAt(sl, { x, y }) : undefined;

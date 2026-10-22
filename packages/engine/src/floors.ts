@@ -1,5 +1,5 @@
 import type { MultiPolygon } from '@hestia/geom';
-import { floorsOnLevel, levelElevation, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isMembraneLayer, levelElevation, type Id, type Project } from '@hestia/model';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
@@ -9,6 +9,8 @@ export interface ResolvedFloorLayer {
   materialId: Id;
   z0: number;
   z1: number;
+  /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
+  membrane: boolean;
 }
 
 export interface ResolvedFloor {
@@ -21,7 +23,7 @@ export interface ResolvedFloor {
   topZ: number;
   /** Cota absoluta da face inferior (topo menos a espessura total). */
   bottomZ: number;
-  /** Do topo para baixo (índice 0 = camada de cima). */
+  /** Do topo para baixo (índice 0 = camada de cima). Inclui as membranas (`membrane: true`). */
   layers: ResolvedFloorLayer[];
   /** Motivo do circuito vinculado não fechar (decisão 0023 §8.2c); null quando fechou ou o piso é estático. */
   problem: OutlineProblem | null;
@@ -59,10 +61,7 @@ export function resolveFloors(p: Project, levelId: Id): ResolvedFloor[] {
     let z = topZ;
     const layers: ResolvedFloorLayer[] = [];
     type.layers.forEach((l, i) => {
-      if (l.thickness < 1e-6) {
-        return;
-      }
-      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z });
+      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l) });
       z -= l.thickness;
     });
     const bottomZ = z;

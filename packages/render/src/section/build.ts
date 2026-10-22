@@ -265,6 +265,12 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
   ];
   paintList.sort((x, y) => y.depth - x.depth || Number(x.cut) - Number(y.cut));
   for (const item of paintList) item.draw();
+  // Membranas de piso e laje: linha tracejada na cota da face (decisão 0023 §5), na espessura do corte do dono.
+  for (const m of s.membranes) {
+    const cat = categoryOf(m);
+    if (!paint[cat].visible) continue;
+    strokes.push({ pts: [...m.pts], closed: false, widthPx: cutWidth(cat), color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+  }
 
   // Contorno externo: a união das regiões visíveis (o que está atrás de um sólido não entra). Com categoria oculta,
   // a silhueta do motor (que une tudo) é refeita só com os itens que ficaram.

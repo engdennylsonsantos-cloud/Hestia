@@ -174,12 +174,15 @@ describe('G5 · arquivo', () => {
 });
 
 describe('G3 · membrana de espessura zero', () => {
-  it('ls_cobertura: a membrana não gera camada nem volume; ficam acabamento e concreto', () => {
+  it('ls_cobertura: a membrana fica como camada de volume zero e área de face; acabamento e concreto têm volume', () => {
     const p = build([{ id: 's1', boundary: rect(0, 0, 4, 3), typeId: 'ls_cobertura' }]);
     const [r] = resolveSlabs(p, 'lv_0');
-    expect(r!.layers.map((l) => l.layerIndex)).toEqual([0, 2]);
+    expect(r!.layers.map((l) => l.layerIndex)).toEqual([0, 1, 2]);
+    expect(r!.layers.map((l) => l.membrane)).toEqual([false, true, false]);
     const q = quantifySlabs(p, 'lv_0');
-    expect(q.layers.map((l) => l.thickness)).toEqual([0.03, 0.1].map((v) => expect.closeTo(v, 9)));
+    expect(q.layers.map((l) => l.thickness)).toEqual([0.03, 0, 0.1].map((v) => expect.closeTo(v, 9)));
+    expect(q.layers[1]).toMatchObject({ membrane: true, volume: 0 });
+    expect(q.layers[1]!.faceArea).toBeCloseTo(12, 9);
     expect(q.totalVolume).toBeCloseTo(12 * 0.13, 9);
     expect(q.slabs[0]!.thickness).toBeCloseTo(0.13, 9);
     expect(q.volumeByMaterial.mat_argamassa).toBeCloseTo(0.36, 9);

@@ -1,5 +1,6 @@
 export * from './types.ts';
 export * from './priority.ts';
+export * from './membrane.ts';
 export * from './wallType.ts';
 export * from './queries.ts';
 export * from './ids.ts';

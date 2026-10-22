@@ -8,8 +8,9 @@ import { thinStrokes } from './thin.ts';
 import { gridStrokes } from './grid.ts';
 import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
-import { belowFloorOps, floorFills, floorSelectionOps, type FloorOps } from './floors.ts';
-import { slabFills, slabSelectionOps } from './slabs.ts';
+import { belowFloorOps, floorSelectionOps, type FloorOps } from './floors.ts';
+import { slabSelectionOps } from './slabs.ts';
+import { floorAndSlabOps } from './surfaces.ts';
 import { belowRoomOps, roomOps, roomSelectionOps } from './rooms.ts';
 import { ceilingFills, ceilingSelectionOps } from './ceilings.ts';
 import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
@@ -191,9 +192,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   }
 
-  // Lajes antes dos pisos (a laje fica por baixo do piso); pisos antes das paredes (decisão 0006).
-  addOps(slabFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.slab), paint.slab, !rp);
-  addOps(floorFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor), paint.floor, !rp);
+  // Lajes e pisos pela cota da face superior (decisão 0023 §3): o mais alto desenha por último; pisos antes das paredes.
+  for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint)) addOps(sf.ops, sf.paint, !rp);
   // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
   addOps(roomOps(p, input.levelId, theme, input.dark, detail, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).

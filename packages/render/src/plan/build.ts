@@ -1,5 +1,5 @@
 import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, resolveRoofs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
+import { cutLevelByJunction, frameOfWall, junctionLevel, openingGeometry, resolveRoofs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
 import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -142,7 +142,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   const view: PlanView | null = rp ? null : planViewOf(p, input.levelId);
   // Planta de forro (decisão 0021): vista para cima. Sem o que está embaixo do nível (referências apagadas) e com forros.
   const up = view?.range.direction === 'up';
-  const below = up ? null : input.below;
+  // Pavimento de baixo (referência) com as paredes cortadas pela junção dele, como a planta do nível.
+  const below = up || !input.below ? null : cutLevelByJunction(input.below, junctionLevel(p, input.below.levelId));
   const geo: ResolvedLevel = view ? view.geo : input.resolved;
   const hidden = view?.hidden;
   // Telhados ocultos pela categoria (decisão 0015 §2.4): na planta de cobertura só eles são filtrados.

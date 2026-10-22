@@ -38,8 +38,10 @@ describe('corte: a cota decide o que fica por cima (P6)', () => {
 
     const wallAlone = wallCut(alone, 'w1');
     expect(wallAlone).toBeGreaterThan(0);
-    // a parede aparece inteira, como sozinha
-    expect(wallCut(both, 'w1')).toBeCloseTo(wallAlone, 6);
+    // Junção da parede (P7d, 0025 §9.1): o piso vence a parede onde se cruzam. A estrutura do piso (-0,10 a -0,07) vence
+    // toda a parede; o substrato (prioridade 2) vence o acabamento e deixa o núcleo de 0,14 m em -0,07 a -0,05 (0,14 × 0,02).
+    expect(wallCut(both, 'w1')).toBeCloseTo(0.14 * 0.02, 6);
+    expect(wallCut(both, 'w1')).toBeLessThan(wallAlone);
     // o piso perde só a faixa da parede: o total é a união das duas, que é o próprio piso (a parede está dentro dele)
     expect(cutTotal(both)).toBeCloseTo(cutTotal(floorAlone), 6);
   });

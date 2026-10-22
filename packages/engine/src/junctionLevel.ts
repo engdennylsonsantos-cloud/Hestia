@@ -155,7 +155,8 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   const res = resolveJunction(tagged.map((t) => t.piece));
   const elements = new Map<Id, ElementJunction>();
   tagged.forEach(({ piece, layerIndex }, i) => {
-    if (layerIndex < 0 || piece.external) return;
+    // Tiras verticais de parede (índice negativo) entram: os quantitativos já as descontam, e o desenho segue o líquido.
+    if (piece.external) return;
     const owner = piece.owner!;
     const el = elements.get(owner) ?? { cut: false, layers: [], region: [] };
     const parts = res[i]!;

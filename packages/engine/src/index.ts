@@ -55,3 +55,4 @@ export * from './roomSchedule.ts';
 export * from './viewClass.ts';
 export * from './viewWarnings.ts';
 export * from './planWallCuts.ts';
+export * from './wallJunction.ts';

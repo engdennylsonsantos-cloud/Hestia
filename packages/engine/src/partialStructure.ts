@@ -66,7 +66,7 @@ function partialWall(p: Project, rw: ResolvedWall, mode: PartialMode): ResolvedW
 }
 
 /** Região por material e silhueta do conjunto, com a mesma regra de `solveCluster` em resolve.ts. */
-function clusterOf(c: ResolvedCluster, walls: Record<Id, ResolvedWall>): ResolvedCluster {
+export function clusterOf(c: ResolvedCluster, walls: Record<Id, ResolvedWall>): ResolvedCluster {
   const byMaterial = new Map<Id, MultiPolygon[]>();
   for (const wid of c.wallIds) {
     for (const l of walls[wid]?.layers ?? []) {

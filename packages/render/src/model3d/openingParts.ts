@@ -49,12 +49,21 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
     // inferior da verga). O centro fica em `jamb + glassH/2`.
     const glassZ = jamb + glassH / 2;
     if (g.plan === 'sliding') {
-      // Janela de correr: cada folha é um painel de vidro em trilho próprio, defasado na profundidade. Aberta, cada
-      // folha desliza um pouco no seu trilho (entreaberta).
+      // Janela de correr: cada folha é um painel de vidro em trilho próprio, defasado na profundidade. Aberta, as
+      // folhas deslizam para dentro do caixilho: a primeira fica parada e cada seguinte corre sobre ela, empilhada
+      // em outro trilho. Nenhuma passa do vão interno (`±(W/2 − jamb)`).
       const n = Math.max(1, g.leaves);
+      const panel = inner / n;
       for (let k = 0; k < n; k++) {
-        const shift = open ? (k % 2 === 0 ? 1 : -1) * (inner / n) * 0.18 : 0;
-        add(inner / n, glassT, glassH, -inner / 2 + (k + 0.5) * (inner / n) + shift, depth * ((k + 1) / (n + 1) - 0.5), glassZ, t.glassMaterialId);
+        const shift = open ? -k * panel : 0;
+        add(panel, glassT, glassH, -inner / 2 + (k + 0.5) * panel + shift, depth * ((k + 1) / (n + 1) - 0.5), glassZ, t.glassMaterialId);
+      }
+      // Montante entre as folhas: fechado, no limite de sempre; aberto, sai do percurso das folhas (fica logo à
+      // direita da pilha), sem mudar de dimensão.
+      for (let i = 1; i < n; i++) {
+        const closedX = -inner / 2 + i * panel;
+        const x = open ? Math.max(closedX, -inner / 2 + panel + leaf / 2 + 1e-6) : closedX;
+        add(leaf, depth, glassH, x, 0, glassZ, t.frameMaterialId);
       }
     } else {
       // Fixa, basculante e maxim-ar: uma folha de vidro no plano médio. Aberta, a maxim-ar/basculante gira pelo topo,
@@ -62,7 +71,7 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
       const hinge = open && (g.plan === 'casement' || g.plan === 'tilt') ? { axis: 'x' as const, at: jamb + glassH, angle: (g.flipFacing ? -1 : 1) * 0.35 } : undefined;
       add(inner, glassT, glassH, 0, 0, glassZ, t.glassMaterialId, hinge);
     }
-    for (let i = 1; i < g.leaves; i++) add(leaf, depth, glassH, -inner / 2 + (i * inner) / g.leaves, 0, glassZ, t.frameMaterialId);
+    if (g.plan !== 'sliding') for (let i = 1; i < g.leaves; i++) add(leaf, depth, glassH, -inner / 2 + (i * inner) / g.leaves, 0, glassZ, t.frameMaterialId);
   } else {
     add(jamb, depth, h, -g.width / 2 + jamb / 2, 0, h / 2, t.frameMaterialId);
     add(jamb, depth, h, g.width / 2 - jamb / 2, 0, h / 2, t.frameMaterialId);
@@ -71,11 +80,12 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
     const doorH = h - jamb;
     const dir = g.flipFacing ? -1 : 1;
     if (g.plan === 'sliding') {
-      // Porta de correr: dois painéis em faces opostas; aberta, afastam-se do centro.
+      // Porta de correr: dois painéis em faces opostas. Aberta, o painel da direita corre sobre o da esquerda, no
+      // mesmo vão livre: cada painel continua dentro de `±(W/2 − jamb)` e fora do núcleo da parede.
       const panelW = leafW / 2;
       const track = depth / 4;
       for (const s of [-1, 1] as const) {
-        const shift = open ? s * panelW * 0.25 : 0;
+        const shift = open && s === 1 ? -panelW : 0;
         add(panelW, leaf, doorH, (s * leafW) / 4 + shift, s * track, doorH / 2, t.frameMaterialId);
       }
     } else if (g.leaves === 2) {

@@ -175,3 +175,89 @@ describe('regressão do 3D aberto', () => {
     }
   });
 });
+
+describe('folhas de correr abertas dentro do vão', () => {
+  const jambDe = (c: { p: Project; o: Opening }): number => {
+    const f = frameOfWall(c.p, 'w')!;
+    const core = coreSpan(f.type);
+    return openingFrame(c.p.openingTypes[c.o.typeId]!, core.to - core.from).frameWidth;
+  };
+  const alturaDe = (c: { g: OpeningGeometry }): number => Math.min(c.g.height, 2.8 - c.g.sill);
+  const sobrepoe = (a: OpeningPiece, b: OpeningPiece): boolean => {
+    const ax = [a.x - a.w / 2, a.x + a.w / 2] as const;
+    const bx = [b.x - b.w / 2, b.x + b.w / 2] as const;
+    const ay = [a.y - a.d / 2, a.y + a.d / 2] as const;
+    const by = [b.y - b.d / 2, b.y + b.d / 2] as const;
+    const az = [a.z - a.h / 2, a.z + a.h / 2] as const;
+    const bz = [b.z - b.h / 2, b.z + b.h / 2] as const;
+    return ax[0] < bx[1] - 1e-9 && bx[0] < ax[1] - 1e-9 && ay[0] < by[1] - 1e-9 && by[0] < ay[1] - 1e-9 && az[0] < bz[1] - 1e-9 && bz[0] < az[1] - 1e-9;
+  };
+
+  it('janela de correr 2 e 3 folhas: fechada lado a lado; aberta, as folhas empilham dentro do caixilho', () => {
+    for (const id of ['ot_j120', 'ot_j150', 'ot_j200', 'ot_j240']) {
+      const c = cena(id);
+      const t = c.p.openingTypes[c.o.typeId]!;
+      const jamb = jambDe(c);
+      const inner = c.g.width - 2 * jamb;
+      const n = t.leaves;
+      const panel = inner / n;
+      const fechada = pecas(c, false).filter((x) => x.materialId === t.glassMaterialId);
+      const aberta = pecas(c, true).filter((x) => x.materialId === t.glassMaterialId);
+      expect(fechada, id).toHaveLength(n);
+      expect(aberta, id).toHaveLength(n);
+      // Fechado: folhas lado a lado cobrindo o vão interno, como antes.
+      for (let k = 0; k < n; k++) {
+        expect(fechada[k]!.x, id).toBeCloseTo(-inner / 2 + (k + 0.5) * panel, 9);
+        expect(fechada[k]!.w, id).toBeCloseTo(panel, 9);
+      }
+      // Aberto: todas as folhas dentro de `±(W/2 − jamb)`; as que se movem empilham sobre a primeira.
+      for (const v of aberta) {
+        expect(v.x - v.w / 2, id).toBeGreaterThanOrEqual(-inner / 2 - 1e-9);
+        expect(v.x + v.w / 2, id).toBeLessThanOrEqual(inner / 2 + 1e-9);
+      }
+      expect(aberta[0]!.x, id).toBeCloseTo(-inner / 2 + panel / 2, 9);
+      for (let k = 1; k < n; k++) expect(aberta[k]!.x, id).toBeCloseTo(aberta[0]!.x, 9);
+      // Os montantes não ficam no percurso das folhas abertas.
+      const montantes = pecas(c, true).filter((x) => x.materialId === t.frameMaterialId && Math.abs(x.h - (alturaDe(c) - 2 * jamb)) < 1e-9);
+      expect(montantes, id).toHaveLength(n - 1);
+      for (const m of montantes) for (const v of aberta) expect(sobrepoe(v, m), id).toBe(false);
+    }
+  });
+
+  it('janela de correr: no estado fechado o montante central continua no limite entre as folhas', () => {
+    const c = cena('ot_j120');
+    const t = c.p.openingTypes[c.o.typeId]!;
+    const jamb = jambDe(c);
+    const montantes = pecas(c, false).filter((x) => x.materialId === t.frameMaterialId && Math.abs(x.h - (alturaDe(c) - 2 * jamb)) < 1e-9);
+    expect(montantes).toHaveLength(1);
+    expect(montantes[0]!.x).toBeCloseTo(0, 9);
+  });
+
+  it('porta de correr: aberta, um painel corre sobre o outro dentro do vão livre', () => {
+    const c = cena('ot_pc160');
+    const jamb = jambDe(c);
+    const leafW = c.g.width - 2 * jamb;
+    const painel = (open: boolean): OpeningPiece[] => pecas(c, open).filter((x) => Math.abs(x.w - leafW / 2) < 1e-9);
+    const fechada = painel(false);
+    const aberta = painel(true);
+    expect(fechada).toHaveLength(2);
+    expect(aberta).toHaveLength(2);
+    expect(fechada.map((x) => x.x).sort((a, b) => a - b)[0]!).toBeCloseTo(-leafW / 4, 9);
+    expect(fechada.map((x) => x.x).sort((a, b) => a - b)[1]!).toBeCloseTo(leafW / 4, 9);
+    for (const p of aberta) {
+      expect(p.x - p.w / 2).toBeGreaterThanOrEqual(-leafW / 2 - 1e-9);
+      expect(p.x + p.w / 2).toBeLessThanOrEqual(leafW / 2 + 1e-9);
+      expect(p.x).toBeCloseTo(-leafW / 4, 9);
+    }
+    // Trilhos distintos: os dois painéis continuam defasados na profundidade.
+    expect(Math.abs(aberta[0]!.y - aberta[1]!.y)).toBeGreaterThan(0.01);
+    // Nenhum painel entra no núcleo da parede (profundidade limitada ao núcleo).
+    const f = frameOfWall(c.p, 'w')!;
+    const core = coreSpan(f.type);
+    const half = f.thickness / 2;
+    for (const p of aberta) {
+      expect(p.y - p.d / 2).toBeGreaterThanOrEqual(core.from - half - 1e-9);
+      expect(p.y + p.d / 2).toBeLessThanOrEqual(core.to - half + 1e-9);
+    }
+  });
+});

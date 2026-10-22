@@ -20,7 +20,10 @@ pranchas e PDF (G4) e cotas/textos na planta (I1)**, com paridade em `docs/parid
   `node tests/e2e/pranchas.mjs` (17 verificações, PDF incluído) sem erro de console ou de página.
 - **Regressão visual** (`tests/e2e/visual-regression.mjs`, 21 casos): `ambiente-sala` criada e conferida na imagem (sala
   8 × 6 m com "Sala (101) · 45,46 m²"; área = (8 − 0,184)(6 − 0,184), com a espessura do alv14 mais reboco). Vinte
-  baselines diferem, e **nenhuma foi regravada**. Diferenças medidas (fração de pixels fora da tolerância):
+  baselines diferiam. **Depois de conferidas imagem a imagem, as 20 foram regravadas** (G6: o script passou a esperar as fontes e o
+  tamanho do canvas, o que tirou o L-encosto de 17,54% para 2,04%, e os casos de telhado passaram a usar a vista de cobertura,
+  topo 6,0 m e corte 2,75 m, para continuar mostrando águas, cumeeira e setas). Duas execuções seguidas dão 0,000% nos 21
+  casos. Diferenças medidas ANTES da regravação (fração de pixels fora da tolerância):
   - Paredes (7 casos): L-encosto 17,54%, L-esquadria 2,04%, T 2,01%, X 1,53%, L-14-com-9-esquadria 2,05%, no-3-paredes
     1,62%, sala-com-arco 2,52%. Causa provável: contorno mais grosso, pelos pesos de linha por escala (decisão 0015,
     `1be4648`, posterior à baseline `d4b179f`). No caso L-encosto soma-se o enquadramento inicial (abaixo).
@@ -36,8 +39,8 @@ pranchas e PDF (G4) e cotas/textos na planta (I1)**, com paridade em `docs/parid
   L-encosto. Correção sugerida: refazer o enquadramento na primeira medida estável do canvas.
 
 **Em aberto depois desta rodada:**
-- Regravar as 20 baselines acima é decisão do dono (são mudanças de desenho já aceitas pelas decisões 0013 e 0015);
-  até lá, `visual-regression.mjs` falha por desenho, não por defeito.
+- Baselines regravadas e conferidas (G6). Ponto a rever: o contorno dos pisos na planta sai um pouco mais escuro (peso de
+  projeção da decisão 0015).
 - **CV-2** e **CV-3** (§6.5 e §10), como antes.
 - Checklists que ficaram para trás: `aberturas.md` C3 e C4 (peitoril saliente e verga, que já existem como campos
   opcionais do tipo) e `escadas.md` C7, `paredes.md` J1 e `pisos.md` E5 (IFC, que já é exportado). Não foram editados

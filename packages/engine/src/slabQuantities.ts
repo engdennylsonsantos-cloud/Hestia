@@ -13,7 +13,7 @@ export interface SlabLayerQuantity {
   materialId: Id;
   /** Espessura vertical da camada (m). */
   thickness: number;
-  /** Área em planta, igual para todas as camadas da laje (m²). */
+  /** Área em planta da camada (m²): com o contorno da camada (P8), que pode ir ao núcleo da parede. */
   planArea: number;
   /** Área real da face da camada sobre a inclinação (m²); igual à área em planta sem inclinação. */
   faceArea: number;
@@ -73,15 +73,17 @@ function quantifySlab(rs: ResolvedSlab, cutters: readonly CutterSolid[]): { slab
     const thickness = l.z1 - l.z0;
     // Piso e laje mais prioritários (0023 §1, P7) tiram o volume que ocupam; a membrana tira a área de face.
     const piece = slabLayerPiece(rs, l);
-    const gross = planArea * thickness;
+    const layerPlan = multiArea(l.polygon);
+    const layerFaceGross = layerPlan * slopeFactor(slopePercent);
+    const gross = layerPlan * thickness;
     const volume = l.membrane ? 0 : Math.max(0, gross - cutVolume(piece, 'slab', cutters));
-    const layerFace = l.membrane ? Math.max(0, faceArea - coveredFaceArea(piece, 'slab', cutters)) : gross > 0 ? faceArea * (volume / gross) : faceArea;
+    const layerFace = l.membrane ? Math.max(0, layerFaceGross - coveredFaceArea(piece, 'slab', cutters)) : gross > 0 ? layerFaceGross * (volume / gross) : layerFaceGross;
     return {
       slabId: rs.slabId,
       layerIndex: l.layerIndex,
       materialId: l.materialId,
       thickness,
-      planArea,
+      planArea: layerPlan,
       faceArea: layerFace,
       volume,
       membrane: l.membrane,

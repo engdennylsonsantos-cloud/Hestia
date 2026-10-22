@@ -149,7 +149,8 @@ describe('cache de circuitos por nível (decisão 0023 §11)', () => {
     store.exec({ type: 'updateElements', ids: [lv0.top!], patch: { a: { x: 5, y: 3 } } });
     const t = totalThickness(store.project.wallTypes.wt_alv14!);
     expect(multiArea(resolveFloors(store.project, 'lv_0').find((r) => r.floorId === 'f0')!.polygon)).toBeCloseTo((5 - t) * (3 - t), 6);
-    expect(circuitRecalcCount()).toBe(1);
+    // Dois circuitos por nível (face e núcleo, 0023 §2 P8): o piso vinculado usa os dois; nenhum outro nível recalcula.
+    expect(circuitRecalcCount()).toBe(2);
   });
 
   it('editar uma parede do nível 0 não recalcula o circuito do nível 1', () => {
@@ -174,9 +175,10 @@ describe('cache de circuitos por nível (decisão 0023 §11)', () => {
     store.exec({ type: 'updateElements', ids: [lv0.bottom!], patch: { b: { x: 5, y: 0 } } });
     store.exec({ type: 'updateElements', ids: [lv0.top!], patch: { a: { x: 5, y: 3 } } });
 
+    // Face e núcleo do nível 0 (dois circuitos, 0023 §2 P8); o nível 1 não recalcula nada.
     resolveFloors(store.project, 'lv_0');
-    expect(circuitRecalcCount()).toBe(1);
+    expect(circuitRecalcCount()).toBe(2);
     resolveFloors(store.project, 'lv_1');
-    expect(circuitRecalcCount()).toBe(1);
+    expect(circuitRecalcCount()).toBe(2);
   });
 });

@@ -9,7 +9,7 @@ export interface FloorLayerQuantity {
   layerIndex: number;
   materialId: Id;
   thickness: number;
-  /** Área líquida da face superior da camada (m²). Sem corte, igual à área em planta do piso. Membrana também tem área. */
+  /** Área líquida da face superior da camada (m²), com o contorno da camada (P8). Sem corte, igual à da camada. Membrana também tem área. */
   area: number;
   /** Volume líquido da camada (m³) = área bruta × espessura menos o que a laje ocupa; zero na membrana (decisão 0023 §5). */
   volume: number;
@@ -61,10 +61,12 @@ function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: Floo
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
     const piece = floorLayerPiece(rf, l);
-    // Só o volume que a laje ocupa sai do piso (padrão por tipo, §1.3). A membrana não tem volume a descontar.
-    const grossVolume = l.membrane ? 0 : area * thickness;
+    // Área da própria camada (P8): pode ir ao núcleo da parede ou recuar à face. Só o volume que a laje ocupa sai do piso
+    // (padrão por tipo, §1.3). A membrana não tem volume a descontar.
+    const layerArea = multiArea(l.polygon);
+    const grossVolume = l.membrane ? 0 : layerArea * thickness;
     const volume = l.membrane ? 0 : Math.max(0, grossVolume - cutVolume(piece, 'floor', cutters));
-    const faceArea = l.membrane ? Math.max(0, area - coveredFaceArea(piece, 'floor', cutters)) : thickness > 0 ? volume / thickness : area;
+    const faceArea = l.membrane ? Math.max(0, layerArea - coveredFaceArea(piece, 'floor', cutters)) : thickness > 0 ? volume / thickness : layerArea;
     return {
       floorId: rf.floorId,
       layerIndex: l.layerIndex,

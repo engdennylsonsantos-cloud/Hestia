@@ -401,7 +401,7 @@ export function buildFloorSolids(floors: ResolvedFloor[], jl?: JunctionLevel): S
     for (const l of f.layers) {
       if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'floor');
-      const parts = layerPartsOf(jl?.elements.get(f.floorId), l.layerIndex, [{ poly: f.polygon, z0: l.z0, z1: l.z1 }]);
+      const parts = layerPartsOf(jl?.elements.get(f.floorId), l.layerIndex, [{ poly: l.polygon, z0: l.z0, z1: l.z1 }]);
       ofElement(b, f.floorId, () => {
         for (const part of parts) for (const poly of part.poly) extrudePolygon(b, poly, part.z0, part.z1);
       });
@@ -439,7 +439,7 @@ export function buildSlabSolids(slabs: ResolvedSlab[], jl?: JunctionLevel): Soli
       if (l.membrane) continue;
       const b = batchOf(byMat, l.materialId, 'slab');
       // Laje com caimento não entra na junção: a parte é a camada inteira, como antes.
-      const parts = layerPartsOf(jl?.elements.get(s.slabId), l.layerIndex, [{ poly: s.polygon, z0: l.z0, z1: l.z1 }]);
+      const parts = layerPartsOf(jl?.elements.get(s.slabId), l.layerIndex, [{ poly: l.polygon, z0: l.z0, z1: l.z1 }]);
       ofElement(b, s.slabId, () => {
         for (const part of parts) {
           const topAt = sl ? (x: number, y: number): number => part.z1 + slabRiseAt(sl, { x, y }) : undefined;

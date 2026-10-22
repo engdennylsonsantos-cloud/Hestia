@@ -106,7 +106,8 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
     // do corte do piso (decisão 0015 §2.1).
     const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));
     if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
-    if (f.layers.some((l) => l.membrane)) out.strokes.push(...membraneLineOps(f.polygon, theme));
+    // Linha de membrana na face da própria camada (P8): ela pode ir ao núcleo da parede.
+    for (const l of f.layers) if (l.membrane) out.strokes.push(...membraneLineOps(l.polygon, theme));
   }
   if (p.settings.showTags) {
     const code = p.floorTypes[f.typeId]?.code;

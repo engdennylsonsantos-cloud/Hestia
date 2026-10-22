@@ -2,6 +2,7 @@ import type { MultiPolygon } from '@hestia/geom';
 import { isMembraneLayer, layerPriority, levelElevation, slabsOnLevel, type Id, type Project, type SlabSlope } from '@hestia/model';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
+import { layerOutlines, memoCut } from './layerOutline.ts';
 import { coverUnderside, cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
 
 /** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
@@ -18,6 +19,8 @@ export interface ResolvedSlabLayer {
   core: boolean;
   /** Membrana (decisão 0023 §5): sem volume e sem sólido; a linha fica na face `z1`. Espessura zero tem z0 = z1. */
   membrane: boolean;
+  /** Contorno da camada, em planta, menos furos (decisão 0023 §2, P8): o da laje, salvo término que vai ao núcleo ou desloca. */
+  polygon: MultiPolygon;
 }
 
 export interface ResolvedSlab {
@@ -60,16 +63,29 @@ export function resolveSlabs(p: Project, levelId: Id): ResolvedSlab[] {
     if (boundary.length < 3) continue;
     const topZ = levelElevation(p, s.levelId) + s.heightOffset;
     let z = topZ;
-    const layers: ResolvedSlabLayer[] = [];
-    const core = layerCoreFlags(type.layers);
-    type.layers.forEach((l, i) => {
-      layers.push({ layerIndex: i, materialId: l.materialId, z0: z - l.thickness, z1: z, membrane: isMembraneLayer(l), priority: layerPriority(l), core: core[i]! });
-      z -= l.thickness;
+    const bounds = type.layers.map((l) => {
+      const r = { z0: z - l.thickness, z1: z };
+      z = r.z0;
+      return r;
     });
     const bottomZ = z;
+    const core = layerCoreFlags(type.layers);
+    const base: MultiPolygon = [[boundary, ...holes]];
     const underside = coverUnderside(bottomZ, s.slope, [boundary, ...holes]);
-    const polygon = cutStairOpenings([[boundary, ...holes]], stairHolesFor(openings, underside));
+    const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, underside)));
+    const polygon = cut(base);
     if (polygon.length === 0) continue;
+    const outlines = layerOutlines(p, s.levelId, s, type.layers, core, base);
+    const layers: ResolvedSlabLayer[] = type.layers.map((l, i) => ({
+      layerIndex: i,
+      materialId: l.materialId,
+      z0: bounds[i]!.z0,
+      z1: bounds[i]!.z1,
+      membrane: isMembraneLayer(l),
+      priority: layerPriority(l),
+      core: core[i]!,
+      polygon: cut(outlines[i]!),
+    }));
     out.push({ slabId: s.id, typeId: s.typeId, levelId: s.levelId, polygon, topZ, bottomZ, slope: s.slope, layers, problem });
   }
   return out;

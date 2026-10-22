@@ -232,10 +232,6 @@ npm run parity         # percentual de paridade por elemento
   contra limite de 60), depois de mover uma parede 737 ms (razão 13,8 contra 40); captura de faces com 500 chamadas a
   `infer`, base 55 ms, 601 ms (razão 10,9 contra 30).
 - `npm run e2e` e `node tests/e2e/pranchas.mjs` saem sem erro de página (12 e 17 conferências de fluxo e de PDF).
-- Regressão visual (`tests/e2e/visual-regression.mjs`, 2026-10-22): a baseline `ambiente-sala` foi criada e conferida
-  (sala com etiqueta "Sala (101) · 45,46 m²"). Vinte baselines anteriores diferem do desenho atual por mudanças
-  intencionais feitas depois da última regravação (pesos de linha por escala, decisão 0015, e intervalo de vista com
-  telhado acima do corte em projeção tracejada, decisão 0013); elas não foram regravadas. Detalhes em
-  [docs/08](08-PENDENCIAS-E-CORRECOES.md), seção de atualização de 2026-10-22.
+- Regressão visual (`tests/e2e/visual-regression.mjs`, 2026-10-22): as 21 baselines passam sem diferença (0,000 %) em duas execuções seguidas; as 20 antigas foram regravadas depois de conferidas (paredes e pesos de traço por escala, decisão 0015; telhados cortados com topo 6,0 m e corte 2,75 m, decisão 0013). O script espera as fontes e o enquadramento assentarem antes de cada captura.
 - A conferência visual final em navegador real continua manual: os testes cobrem geometria, unidade e desenho, não a
   aparência em todas as combinações de zoom, tema e GPU.

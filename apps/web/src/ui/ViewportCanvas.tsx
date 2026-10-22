@@ -58,6 +58,8 @@ export function ViewportCanvas(): ReactElement {
   const model = useRef(new ModelScene());
   // Gancho de depuração (?debug=1): câmera orbital do 3D para os testes no navegador.
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3d?: unknown }).__hestia3d = model.current.orbit;
+  // Mesmo gancho para o e2e contar as peças da cena 3D (`scene`, o grupo com as malhas do modelo).
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3dModel?: unknown }).__hestia3dModel = model.current;
   const modelKey = useRef('');
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [labels, setLabels] = useState<LabelOp[]>([]);

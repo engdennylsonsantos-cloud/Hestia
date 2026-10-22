@@ -49,6 +49,15 @@ com o detalhe em `docs/decisoes/0017-portas-e-janelas.md` §11:
 
 Os 14 tipos padrão mantêm as dimensões das peças iguais fechado × aberto.
 
+### Rodada U2 (2026-10-22): tela de acabamento do tipo
+
+O diálogo do tipo (`apps/web/src/ui/dialogs/OtherDialogs.tsx`) ganhou a seção recolhível **Acabamento**: folga do vão, alizar,
+soleira saliente (só janela), verga e contraverga. Ligar grava o padrão e desligar tira o campo, por `upsertOpeningType` com
+desfazer. A validação do modelo (`acabamentoIssue`) recusa medida fora da faixa e a mensagem aparece no diálogo. Efeito na §8:
+**L-8** parcial (os campos de acabamento agora se editam na tela; perfil de caixilho e folha continuam fora); **L-6** segue
+parcial (a planta não desenha alizar, soleira nem verga). Testes: `apps/web/src/ui/dialogs/openingTypeForm.test.ts` (cada campo
+muda a peça do 3D e a linha do quadro) e o fluxo `tests/e2e/aberturas-acabamento.mjs`.
+
 ## 1. Resumo
 
 - **Há uma única fonte do símbolo de planta.** `openingSymbolPaths` (`packages/geom/src/openingSymbol.ts:68`) gera os traços e é usada pela tela (`packages/render/src/plan/symbols.ts:9`) e pelo DXF (`apps/web/src/editor/dxfExport.ts:154`). Isso é bom: uma definição, dois destinos.

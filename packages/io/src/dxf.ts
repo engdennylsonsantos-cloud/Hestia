@@ -39,8 +39,8 @@ export interface DxfOpening {
   /** Estado na vista. Ausente vale `cut` (vão de corte, na camada `ABERTURAS`). */
   state?: DxfViewState;
   /**
-   * Símbolo de planta do vão (folhas, arcos, caixilho; o mesmo da tela, `openingSymbolPaths` do geom). Só sai nas camadas
-   * de projeção: o vão de corte continua como retângulo em `ABERTURAS`. Sem ele, a projeção sai como retângulo.
+   * Símbolo de planta do vão (folhas, arcos, caixilho e X; o mesmo da tela, `openingSymbolPaths` do geom). Sai em todos
+   * os estados. Sem ele, o vão sai como retângulo fechado (`ABERTURAS` no corte, a camada do estado na projeção).
    */
   symbol?: DxfSymbolPath[];
 }
@@ -105,8 +105,10 @@ export interface DxfLevelGeometry {
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 /** Camada dos forros da planta de forro (decisão 0021). */
 export const DXF_LAYER_CEILING = 'FORRO';
-/** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS`. */
+/** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS` quando não há símbolo. */
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
+/** Símbolo de planta do vão de corte (folhas, arcos, X do vão livre), em camada própria com o peso de corte da categoria. */
+export const DXF_LAYER_OPENING_SYMBOL = 'ABERTURA_SIMBOLO';
 /** Vãos acima do corte (peitoril acima do plano): símbolo tracejado, a parede fica inteira. */
 export const DXF_LAYER_OPENING_ABOVE = 'ABERTURA_ACIMA';
 /** Vãos abaixo do corte e acima da base: símbolo leve, a parede fica inteira. */
@@ -269,6 +271,7 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_CEILING, cut('floor')],
   // Portas e janelas saem juntas: a camada leva o peso da janela (o DXF não separa os dois).
   [DXF_LAYER_OPENINGS, cut('window')],
+  [DXF_LAYER_OPENING_SYMBOL, cut('window')],
   [DXF_LAYER_OPENING_ABOVE, projection('window')],
   [DXF_LAYER_OPENING_BELOW, projection('window')],
   [DXF_LAYER_OPENING_BEYOND, projection('window')],
@@ -357,7 +360,9 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
       out.push({ layer: OPENING_LAYER[state], pts: openingRect(o) });
       continue;
     }
-    for (const s of o.symbol) out.push({ layer: OPENING_LAYER[state], pts: s.pts, closed: s.closed, dashed: s.dashed === true });
+    // O símbolo do corte vai à `ABERTURA_SIMBOLO`; o da projeção, à camada do estado (tracejado, cinza, ...).
+    const layer = state === 'cut' ? DXF_LAYER_OPENING_SYMBOL : OPENING_LAYER[state];
+    for (const s of o.symbol) out.push({ layer, pts: s.pts, closed: s.closed, dashed: s.dashed === true });
   }
   return out;
 }

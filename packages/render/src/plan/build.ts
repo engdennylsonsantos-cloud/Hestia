@@ -263,7 +263,7 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   labels.push(...marks.labels);
 
   // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'.
-  const notes = noteOps(p, input.levelId, paint.annotation, theme.ink, v.zoom, style.scale);
+  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, selection: input.selection }, v.zoom, style.scale);
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
 

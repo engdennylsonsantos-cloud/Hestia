@@ -13,6 +13,7 @@ import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
+import { annotationAt } from './annotationPick.ts';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
@@ -22,7 +23,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'annotation';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -76,7 +77,10 @@ export class SelectTool extends ToolBase {
     const sl = pickSlabAt(pr, lv, at, mpp);
     if (sl) return { id: sl, kind: 'slab' };
     const rf = pickRoofAt(pr, lv, at, mpp);
-    return rf ? { id: rf, kind: 'roof' } : null;
+    if (rf) return { id: rf, kind: 'roof' };
+    // Cotas e textos de anotação (decisão 0019): por último, para não roubar o clique de um elemento.
+    const an = annotationAt(pr, lv, at, mpp);
+    return an ? { id: an.id, kind: 'annotation' } : null;
   }
 
   override move(p: PointerInfo): void {

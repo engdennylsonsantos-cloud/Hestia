@@ -8,7 +8,10 @@ import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
 
 const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
-  arquitetura: [{ title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] }],
+  arquitetura: [
+    { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] },
+    { title: 'Anotar', tools: ['dimension', 'text'] },
+  ],
   modificar: [
     { title: 'Seleção', tools: ['select'] },
     { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'] },

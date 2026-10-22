@@ -21,6 +21,7 @@ import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type View
 import { key3d, useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
+import { deleteSelectionIn } from './deleteIds.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -257,7 +258,8 @@ export class Editor {
       this.bump();
       return true;
     }
-    if (this.tool.inputPrompt() && /^[0-9.,+\-*/()]$/.test(k)) {
+    // Campo numérico: dígitos e operadores; ferramenta de texto (freeText): qualquer tecla digitável.
+    if (this.tool.inputPrompt() && (this.tool.freeText ? k.length === 1 : /^[0-9.,+\-*/()]$/.test(k))) {
       useUi.setState({ typed: ui.typed + k });
       return true;
     }
@@ -328,10 +330,7 @@ export class Editor {
   }
 
   deleteSelection(): void {
-    const ids = useUi.getState().selection;
-    if (!ids.length) return;
-    this.store.exec({ type: 'deleteElements', ids });
-    useUi.setState({ selection: [], status: 'Elementos excluídos.' });
+    deleteSelectionIn(this.store);
   }
 
   /** Copiar (Ctrl+C): paredes selecionadas e suas aberturas, em memória. */

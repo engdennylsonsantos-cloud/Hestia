@@ -84,3 +84,14 @@ export function applyAnnotationCommand(p: Project, c: AnnotationCommand): void {
       break;
   }
 }
+
+export type RemoveAnnotation = Extract<AnnotationCommand, { type: 'removeDimension' | 'removeText' }>;
+
+/** Comandos de exclusão para as cotas e os textos do nível cujos ids estão em `ids` (o resto são elementos). */
+export function annotationRemovals(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[]): RemoveAnnotation[] {
+  const want = new Set(ids);
+  const out: RemoveAnnotation[] = [];
+  for (const d of levelDimensions(p, levelId)) if (want.has(d.id)) out.push({ type: 'removeDimension', levelId, id: d.id });
+  for (const t of levelTexts(p, levelId)) if (want.has(t.id)) out.push({ type: 'removeText', levelId, id: t.id });
+  return out;
+}

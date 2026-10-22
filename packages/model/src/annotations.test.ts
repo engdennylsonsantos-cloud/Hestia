@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeLevel, levelDimensions, levelTexts, type Dimension, type TextNote } from './index.ts';
+import { ProjectStore, annotationRemovals, createEmptyProject, makeLevel, levelDimensions, levelTexts, type Dimension, type TextNote } from './index.ts';
 
 const LV0 = 'lv_0';
 const dim = (id: string, over: Partial<Dimension> = {}): Dimension => ({ id, a: { x: 0, y: 0 }, b: { x: 3, y: 0 }, offset: 0.8, ...over });
@@ -68,5 +68,18 @@ describe('textos no modelo', () => {
     s.exec({ type: 'addText', levelId: LV0, text: txt('t1') });
     s.exec({ type: 'updateText', levelId: LV0, id: 't1', patch: { id: 'outro', text: 'X' } } as never);
     expect(levelTexts(s.project, LV0)[0]!.id).toBe('t1');
+  });
+});
+
+describe('exclusão de anotações pelos ids da seleção', () => {
+  it('gera remoções só para as cotas e textos cujos ids foram pedidos', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: dim('d1') });
+    s.exec({ type: 'addText', levelId: LV0, text: txt('t1') });
+    expect(annotationRemovals(s.project, LV0, ['d1', 'e_parede', 't1'])).toEqual([
+      { type: 'removeDimension', levelId: LV0, id: 'd1' },
+      { type: 'removeText', levelId: LV0, id: 't1' },
+    ]);
+    expect(annotationRemovals(s.project, LV0, ['zz'])).toEqual([]);
   });
 });

@@ -50,9 +50,13 @@ const EXT = 'wt_ext19';
 const PA14 = 'wt_alv14';
 const PA09 = 'wt_alv9';
 
-/** Parede reta de a até b. Com `noTopo` false (térreo), o topo fica anexado à face inferior da laje do lv_1. */
+/**
+ * Parede reta de a até b. Com `noTopo` false (térreo), o topo vai ao **topo da laje** do lv_1 (3,00 + 0,10) e não é
+ * anexado: a parede não depende do piso para ter cota (decisão do dono, 2026-10-23). Com a laje terminando na face do
+ * núcleo, o acabamento externo da parede sobe na frente do corte dela.
+ */
 function parede(id: Id, a: [number, number], b: [number, number], typeId: Id, levelId: Id, noTopo = false, altura?: number): Command {
-  const topo = noTopo ? {} : { topLevelId: 'lv_1', attachTopToFloor: true };
+  const topo = noTopo ? {} : { topLevelId: 'lv_1', topOffset: -0.17 };
   const h = altura === undefined ? {} : { height: altura };
   return {
     type: 'addWall',

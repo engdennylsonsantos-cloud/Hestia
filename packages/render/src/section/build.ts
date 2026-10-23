@@ -6,7 +6,7 @@ import { thinStrokes } from '../plan/thin.ts';
 import type { PlanPaint } from '../plan/style.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
 import type { Viewport } from '../viewport.ts';
-import { ownerOf, sectionItems } from './pick.ts';
+import { ownerOf, sectionItems, type SectionItem } from './pick.ts';
 import { sectionStyleOf } from './style.ts';
 
 export interface SectionInput {
@@ -308,17 +308,27 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
  * Realce por seleção e por cursor (decisão 0016, seção "Seleção em cortes e elevações"). Um item selecionado (ou cujo
  * dono está selecionado) ganha contorno na cor de seleção e preenchimento translúcido (0,25) sobre as partes visíveis.
  * O item sob o cursor, se não estiver selecionado, ganha só um contorno fraco. Vai por último, por cima do desenho.
- * Corte unido: se uma das origens está selecionada, a região inteira é realçada (o motor não separa as origens).
+ * Corte unido: as peças guardam a origem (`parts`), então só a parte do dono selecionado é realçada. Sem `parts` (o
+ * motor não separa as origens), vale o item inteiro.
  */
 function highlightOps(s: SectionResult, hl: { selection: Id[]; hover: Id | null }, theme: PlanTheme, fills: FillOp[], strokes: StrokeOp[]): void {
   if (hl.selection.length === 0 && hl.hover === null) return;
-  const selected = new Set(hl.selection);
+  const polysOf = (item: SectionItem, id: Id): MultiPolygon => {
+    if (!item.owners.some((o) => o.id === id)) return [];
+    if (!item.parts) return item.polygons;
+    const parts = item.parts.filter((part) => ownerOf(part.origin)?.id === id);
+    if (parts.length === 0) return [];
+    return parts.length === 1 ? parts[0]!.polygons : union(...parts.map((part) => part.polygons));
+  };
   for (const item of sectionItems(s)) {
-    if (item.owners.some((o) => selected.has(o.id))) {
-      fills.push({ polygons: item.polygons, color: theme.select, alpha: 0.25 });
-      for (const ring of ringsOf(item.polygons)) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-    } else if (hl.hover !== null && item.owners.some((o) => o.id === hl.hover)) {
-      for (const ring of ringsOf(item.polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1.5, color: theme.select, alpha: 0.55 });
+    const sel = hl.selection.map((id) => polysOf(item, id)).filter((m) => m.length > 0);
+    if (sel.length > 0) {
+      const polygons = sel.length === 1 ? sel[0]! : union(...sel);
+      fills.push({ polygons, color: theme.select, alpha: 0.25 });
+      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+    } else if (hl.hover !== null) {
+      const polygons = polysOf(item, hl.hover);
+      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: 1.5, color: theme.select, alpha: 0.55 });
     }
   }
 }

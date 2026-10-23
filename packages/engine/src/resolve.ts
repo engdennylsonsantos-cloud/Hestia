@@ -20,6 +20,8 @@ import {
   openingSill,
   openingType,
   openingsOfWall,
+  wallBaseElevation,
+  wallMaxHeight,
   wallsOnLevel,
   wallType,
   type Id,
@@ -33,8 +35,7 @@ import { flatEnd } from './joinSides.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
-import { resolveAllFloors } from './floors.ts';
-import { resolveAllSlabs } from './slabs.ts';
+import { attachTargets } from './attachTargets.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { wallZRange, type WallZ } from './wallZ.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
@@ -89,6 +90,8 @@ export interface PlanResolveOptions {
    * `fragment`, pintada só entre si, com `cut` vazio: não entram em regiões nem na silhueta.
    */
   outlineWalls?: ReadonlySet<Id>;
+  /** Interno: anexa as paredes ao contorno de piso e laje, sem as camadas com término (usado pelo próprio término). */
+  flatAttach?: boolean;
 }
 
 function flatT(f: WallFrame, which: 'a' | 'b', spec: EndSpec, sFace: number): number {
@@ -401,8 +404,9 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
-  const floors = resolveAllFloors(p);
-  const slabs = resolveAllSlabs(p);
+  // Parede anexada enxerga o piso e a laje por camada (término esvazia o contorno); o próprio término usa o contorno
+  // do elemento (`flatAttach`), porque as camadas dependem das paredes (sem ciclo, decisão 0025).
+  const { floors, slabs } = attachTargets(p, walls, opts.flatAttach === true);
   const roofs = resolveAllRoofs(p);
   for (const group of clusterWalls(frames, ends)) {
     const tol = p.settings?.joinTolerance;
@@ -468,6 +472,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
         sLo: f.sLo,
         baseZ: wz.get(f.wall.id)!.z0,
         height: heights.get(f.wall.id)!,
+        nominalZ0: wallBaseElevation(p, f.wall),
+        nominalZ1: wallBaseElevation(p, f.wall) + wallMaxHeight(p, f.wall),
         layers: withProfile(withBottomProfile(core.layers.get(f.wall.id) ?? [], f, wz.get(f.wall.id)!.bottomProfile), f, wz.get(f.wall.id)!.profile),
         membranes: membranesOf(f, ends.get(f.wall.id)!),
         ...perfisDoResolvido(wz.get(f.wall.id)!),

@@ -8,12 +8,56 @@ branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento fo
 números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
 Atualização (2026-10-23, fechamento da junção piso/laje × parede, 0023): **E3, C6 e C8 fechados.** Corte e 3D seguem a regra B
-(hierarquia, como Revit e ArchiCAD), parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b), e a planta não
-recorta na altura de corte padrão (F2). Ficaram abertos: plano de corte dentro da zona de sobreposição na planta (baixa
-prioridade), lajes com caimento fora da junção, término no perímetro externo (F6), cor, hachura e exportação por camada (F7) e o
-desempenho com muitos níveis. Registro completo em `docs/decisoes/0023-plano-de-conclusao.md`, §6.2.
+(hierarquia, como Revit e ArchiCAD); parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b); a junção entre
+níveis vale só entre parede e piso/laje (a peça do nível vizinho só corta, e só contra a outra natureza — piso × piso e
+laje × laje entre níveis não se cortam); e a planta não recorta na altura de corte padrão (F2). Também fechados: término por
+camada no perímetro externo (F6), DXF e IFC de piso e laje pela região resolvida (F7.1) e a correção da peça "intacta" recortada
+só em altura. Ficaram abertos: plano de corte dentro da zona de sobreposição na planta (baixa prioridade), lajes com caimento
+fora da junção, cor e hachura por camada na planta (decisão de escopo da F7.2), IFC por camada (fase futura) e o desempenho com
+muitos níveis. Registro completo em `docs/decisoes/0023-plano-de-conclusao.md`, §6.2.
 - **P-5 (forro acompanha o contorno do ambiente): implementado.** Esta seção dizia "sem código" na revisão de 2026-10-22. Está
   nos commits `125628d`, `5f93b71`, `d373dca` e no merge `95da8b4`, e é o que `07-STATUS-V1.md` descreve.
+
+Atualização (2026-10-22, P7c parte 2 — parede recortada nos desenhos): **E3 de paredes, C6 de pisos e C8 de lajes fechados.**
+- A parede passa a ser recortada pela junção pelas mesmas partes por camada que os quantitativos usam: o corte e o 3D por faixa
+  de cota (`wallLayerBandsAfterJunction`) e a parede como elemento por `cutWallByJunction`/`cutLevelByJunction`, que leem as
+  faixas resolvidas de `junctionLevel`; o desenhado é o quantificado. Paredes sem sobreposição saem idênticas (regressão visual
+  0,000%). A fachada contínua é confirmada quando o acabamento externo vence na borda da laje.
+- Evidência: `packages/engine/src/wallJunction.test.ts`, `sectionCota.test.ts`, `packages/render/src/plan/junctionPlan.test.ts`,
+  `packages/render/src/model3d/junctionSolids.test.ts`, e2e `tests/e2e/parede-recorte.mjs` e baselines
+  `junc-parede-recortada-laje` e `junc-fachada-continua-laje`. Decisão: `docs/decisoes/0023` (seção "Status da P7c, parte
+  2").
+- `npm run parity` em 100% nos nove elementos. Continuam abertos: cor e hachura por camada na planta, IFC por camada, P13 e
+  X4/X5 de aberturas, P-4 (inversão por par) e o canto reentrante do L.
+- Medido nesta rodada (2026-10-22, Windows): `test:rapido` 277 arquivos/3373 testes (70,8 s), `test:completo`
+  278/3675 (700 s, código 0), tsc/eslint/check-* limpos, paridade 100%; e2e `parede-recorte`, `piso-unico`, `pisos`,
+  `lajes`, `contorno`, `sections` e `flow` verdes; regressão visual GPU 6/6 (0,000–0,074%) e CPU com os 2 casos novos em
+  0,000% (os antigos divergem 0,37–0,75% só em texto/hachura pelo ambiente; A/B antes/depois no mesmo ambiente deu
+  0,000%); `test:perf` verde (K4 3,07 s). Build: `npm run build` falha na minificação do esbuild (acesso negado ao
+  remover o temporário); o build dos e2e é `npm run build -w @hestia/web -- --target esnext --minify false`.
+
+Atualização (2026-10-22, correções da P7c/P10 — aplicadas e verificadas):
+- **Faixa de cota por camada** (`floors.ts`/`slabs.ts`): a faixa usada para escolher as paredes do término explícito
+  passou a ser a faixa real de CADA camada (antes, a do elemento inteiro). Parede que só encosta no topo/base do
+  piso/laje recorta apenas a camada tocada; as demais continuam inteiras (0025 §2).
+- **Fim do corte mútuo** (`junctionPlanar.ts`, `winsOver`): camada com término explícito (`face`, `nucleo`, `passa`,
+  `ate`) não recorta parede nem é recortada por ela — a parede não é mais interrompida pela camada que se recorta para
+  recebê-la. Vale para piso × parede e laje × parede; piso × laje e piso × piso não mudam (0025 §5).
+- **Realce por origem** (`packages/render/src/section/build.ts`, `highlightOps`): na seleção de cortes/elevações, o
+  realce usa as peças por origem (`SectionPart`/`parts`) e destaca só o dono selecionado; quando o motor não separa
+  origens, cai no item inteiro. Antes, o corte unido realçava todas as origens do item.
+- Testes alvo que passaram: `terminoPiso.test.ts`, `terminoLaje.test.ts`, `junctionPlanar.test.ts`,
+  `junctionLevel.test.ts`, `wallJunction.test.ts`, `pick.test.ts`, `terminoPisoSection.test.ts` e
+  `terminoVinculado.test.ts`. Verificação final: `typecheck` e `lint` verdes, `test:rapido` 277/3375 e
+  `test:completo` 278/3677; e2e `parede-recorte`, `piso-unico`, `pisos`, `lajes`, `contorno`, `sections` e `flow`
+  verdes. Na regressão visual CPU os dois casos novos ficam em 0,000% e os antigos em 0,373–0,747% (banner "Sem GPU"
+  + texto/hachura do ambiente); a GPU não roda no Windows por causa do caminho fixo `/opt/pw-browsers`.
+- **Decisão pendente do dono (nova)**: piso + laje no mesmo nível e sobrepostos (ex. `ft_acab` + `ls_mac12`) ainda
+  fazem o piso perder todas as camadas e sumir; a regra piso × laje não foi alterada. O aviso `slab-floor-overlap`
+  sinaliza. P-4 (inversão por par) continua adiada.
+- **Consequência conhecida (0025 §9.6)**: com `passa` atravessado por parede (base abaixo do topo da camada), a
+  parede e a camada ficam inteiras e a faixa comum pode ser contada duas vezes. O desenho não deixa vazio; o desconto
+  (ou a decisão de o `passa` ceder) fica para o dono.
 
 Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido contra código, testes e decisões; nenhum código alterado.**
 - **Entrou na frente de piso e laje** (já no código): contorno associativo às paredes (0023 P1–P3), membrana de espessura

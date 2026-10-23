@@ -70,28 +70,37 @@ export function axisMid(w: Wall): Vec2 {
   return { x: (w.a.x + w.b.x) / 2, y: (w.a.y + w.b.y) / 2 };
 }
 
-/** Faces superior e inferior (cotas absolutas) de pisos e lajes do nível que cobrem o ponto. */
+/**
+ * Faces superior e inferior (cotas absolutas) de pisos e lajes do nível que cobrem o ponto. Vale a região de cada
+ * camada com volume (decisão 0025): onde o término esvazia as camadas contra a parede, o ponto do eixo não é coberto por
+ * elas, e a parede continua pelo vazio até a primeira camada que cobre. Sem término, todas as camadas têm o mesmo
+ * contorno e o resultado é o do elemento inteiro.
+ */
 export function facesAt(levelId: Id, at: Vec2, floors: ResolvedFloor[], slabs: ResolvedSlab[]): { tops: number[]; bottoms: number[] } {
   const tops: number[] = [];
   const bottoms: number[] = [];
+  const add = (layers: readonly { z0: number; z1: number; membrane: boolean; polygon: MultiPolygon }[], rise: number): void => {
+    const hit = layers.filter((l) => !l.membrane && l.z1 > l.z0 && covered(at, l.polygon));
+    if (hit.length === 0) return;
+    tops.push(Math.max(...hit.map((l) => l.z1)) + rise);
+    bottoms.push(Math.min(...hit.map((l) => l.z0)) + rise);
+  };
   for (const f of floors) {
     if (f.levelId !== levelId || !covered(at, f.polygon)) continue;
-    tops.push(f.topZ);
-    bottoms.push(f.bottomZ);
+    add(f.layers, 0);
   }
   for (const s of slabs) {
     if (s.levelId !== levelId || !covered(at, s.polygon)) continue;
     // Lajes inclinadas: as faces sobem juntas, então a cota vale no ponto (topo ou base da origem + subida).
-    const rise = slabRiseAt(s.slope, at);
-    tops.push(s.topZ + rise);
-    bottoms.push(s.bottomZ + rise);
+    add(s.layers, slabRiseAt(s.slope, at));
   }
   return { tops, bottoms };
 }
 
-/** Polígonos (pisos e lajes) do nível, em planta. */
+/** Polígonos (pisos e lajes, contorno e camadas) do nível, em planta: onde o eixo muda de cobertura. */
 export function polygonsOfLevel(levelId: Id, floors: ResolvedFloor[], slabs: ResolvedSlab[]): MultiPolygon[] {
-  return [...floors.filter((f) => f.levelId === levelId).map((f) => f.polygon), ...slabs.filter((s) => s.levelId === levelId).map((s) => s.polygon)];
+  const own = [...floors.filter((f) => f.levelId === levelId), ...slabs.filter((s) => s.levelId === levelId)];
+  return own.flatMap((e) => [e.polygon, ...e.layers.map((l) => l.polygon).filter((m) => m !== e.polygon)]);
 }
 
 /**

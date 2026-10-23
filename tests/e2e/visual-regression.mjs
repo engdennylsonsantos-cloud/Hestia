@@ -95,6 +95,13 @@ const FT_CERAMICA_RECUADA = { id: 'ft_ceram', name: 'Cerâmico sobre contrapiso'
   { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.04, wraps: false },
   { function: 'structure', materialId: 'mat_concreto', thickness: 0.12, wraps: false },
 ] };
+// P7c (parte 2): parede da fachada com o acabamento externo (camada 0, a face +y) em prioridade 1, para ele vencer a laje
+// e passar contínuo sobre a borda dela (decisão do dono); o núcleo e o acabamento interno seguem a regra de prioridade.
+const FT_FACHADA_LAYERS = [
+  { function: 'finish1', materialId: 'mat_ceramica', thickness: 0.02, wraps: false, priority: 1 },
+  { function: 'structure', materialId: 'mat_bloco14', thickness: 0.16, wraps: false },
+  { function: 'finish1', materialId: 'mat_argamassa', thickness: 0.02, wraps: false },
+];
 const JUNCTION_CASES = {
   // (a) piso pelo núcleo ("Estender até o núcleo", `walls-core`) em L; as paredes descem 0,10 m abaixo do nível.
   'junc-piso-L-nucleo': [...wallsOf(L_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pj1', L_WALLS, { outlineSource: { mode: 'walls-core', seed: { x: 2, y: 1.5 }, linked: true } })],
@@ -106,12 +113,31 @@ const JUNCTION_CASES = {
   'junc-piso-retangulo-auto': [...wallsOf(RECT_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pr1', RECT_WALLS, { outlineSource: { mode: 'walls-finish', seed: { x: 4, y: 3 }, linked: true } })],
   // (e) o mesmo piso com a cerâmica (topo) recuada 1 cm da face de acabamento (`{ cm: -1 }`); a estrutura segue `auto`.
   'junc-piso-retangulo-cm-menos-1': [{ kind: 'floorType', floorType: FT_CERAMICA_RECUADA }, ...wallsOf(RECT_WALLS).map((w) => ({ ...w, baseOffset: -0.1 })), F('pr2', RECT_WALLS, { outlineSource: { mode: 'walls-finish', seed: { x: 4, y: 3 }, linked: true } })],
+  // P7c (parte 2): a parede desenhada é a mesma que se quantifica. (f) a laje a 1,30 m atravessa a parede de 8 m; na
+  // planta padrão (corte 1,20 m) a parede aparece recortada no trecho coberto. (g) a laje termina na face interna do
+  // acabamento externo (`wt_fachada`, camada 0 com prioridade 1): o acabamento externo passa contínuo e o núcleo e o
+  // acabamento interno perdem a faixa da laje.
+  'junc-parede-recortada-laje': [W('pr1', [0, 0], [8, 0]), SL('lj1', [[-1, -1], [5, -1], [5, 3], [-1, 3]], { heightOffset: 1.3 })],
+  'junc-fachada-continua-laje': [{ kind: 'wallType', wallType: { id: 'wt_alv14', layers: FT_FACHADA_LAYERS } }, W('fc1', [0, 0], [8, 0]), SL('lj2', [[-1, -1], [5, -1], [5, 0.08], [-1, 0.08]], { heightOffset: 1.3 })],
 };
 
 // P9 (decisão 0023 §6): parede anexada à base no piso que cobre só metade dela (2 m de 4 m, face superior em +0,05). A planta
 // não mostra o degrau da base (ele aparece no corte, no 3D e nos quantitativos), então é um caso novo de baseline própria.
 const P9_CASES = {
   'parede-base-piso-metade': [W('bp1', [0, 0], [4, 0], { attachBottomToFloor: true }), F('pb1', [[-1, -1], [2, -1], [2, 1], [-1, 1]], { heightOffset: 0.05 })],
+};
+
+// P10 (decisão 0025): piso único (obra inteira, 8 × 6 m) com uma parede interna que atravessa o contorno. Acabamento
+// e assentamento param na face (`ft_unico`) ou no núcleo (variante); a estrutura passa por baixo. Baselines novas.
+const FT_UNICO = (acabamento) => ({ id: 'ft_unico', name: 'Piso único (obra inteira)', code: 'PS-05', description: '', cost: 250, layers: [
+  { function: 'finish1', materialId: 'mat_ceramica', thickness: 0.01, wraps: false, termino: acabamento },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.02, wraps: false, termino: 'face' },
+  { function: 'substrate', materialId: 'mat_argamassa', thickness: 0.04, wraps: false, termino: 'face' },
+  { function: 'structure', materialId: 'mat_concreto', thickness: 0.12, wraps: false, termino: 'passa' },
+] });
+const PISO_UNICO_CASES = {
+  'piso-unico-parede-face': [{ kind: 'floorType', floorType: FT_UNICO('face') }, W('div', [4, -1], [4, 7]), F('pu1', [[0, 0], [8, 0], [8, 6], [0, 6]], { typeId: 'ft_unico' })],
+  'piso-unico-parede-nucleo': [{ kind: 'floorType', floorType: FT_UNICO('nucleo') }, W('div', [4, -1], [4, 7]), F('pu2', [[0, 0], [8, 0], [8, 6], [0, 6]], { typeId: 'ft_unico' })],
 };
 
 // Decisão 0024 (representação de aberturas): casos novos de porta, janela, vão livre e X de furo. A planta leva porta de
@@ -156,12 +182,22 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES, ...PISO_UNICO_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
   await page.evaluate(([ws, v, sec]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
-    for (const w of ws) editor.store.exec(w.kind === 'room' ? { type: 'addRoom', room: w } : w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : w.kind === 'floorType' ? { type: 'upsertFloorType', floorType: w.floorType } : w.kind === 'opening' ? { type: 'addOpening', opening: w.opening } : w.kind === 'view' ? { type: 'addView', view: w.view } : { type: 'addWall', wall: w });
+    for (const w of ws) {
+      if (w.kind === 'room') editor.store.exec({ type: 'addRoom', room: w });
+      else if (w.kind === 'roof') editor.store.exec({ type: 'addRoof', roof: w });
+      else if (w.kind === 'slab') editor.store.exec({ type: 'addSlab', slab: w });
+      else if (w.kind === 'floor') editor.store.exec({ type: 'addFloor', floor: w });
+      else if (w.kind === 'floorType') editor.store.exec({ type: 'upsertFloorType', floorType: w.floorType });
+      else if (w.kind === 'wallType') editor.store.exec({ type: 'upsertWallType', wallType: { ...editor.project.wallTypes[w.wallType.id], ...w.wallType } });
+      else if (w.kind === 'opening') editor.store.exec({ type: 'addOpening', opening: w.opening });
+      else if (w.kind === 'view') editor.store.exec({ type: 'addView', view: w.view });
+      else editor.store.exec({ type: 'addWall', wall: w });
+    }
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });
     if (sec) editor.openSection(sec);
   }, [items, vista, name in SECTION_CASES ? 'v_frente' : null]);

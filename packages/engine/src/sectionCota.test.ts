@@ -38,7 +38,8 @@ describe('corte: a cota decide o que fica por cima (P6)', () => {
 
     const wallAlone = wallCut(alone, 'w1');
     expect(wallAlone).toBeGreaterThan(0);
-    // a parede perde a zona em que a estrutura do piso vence: o corte dela fica menor que sozinha
+    // a parede perde a zona em que a estrutura do piso vence: o corte dela fica menor que sozinha (o `cut` é por volume,
+    // `lostVolume` em `junctionLevel`, não por identidade de polígono)
     expect(wallCut(both, 'w1')).toBeLessThan(wallAlone - 1e-9);
     // a zona comum aparece uma vez só: parede + piso somam a união, e a união é o próprio piso (a parede está dentro dele)
     expect(cutTotal(both)).toBeCloseTo(cutTotal(floorAlone), 6);

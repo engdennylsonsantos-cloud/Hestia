@@ -4,6 +4,7 @@ import { junctionLevel, resolveFloors, resolveSlabs } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeFloor, makeSlab, makeWall, type Layer, type Project } from '@hestia/model';
 import { floorOpsOf } from './floors.ts';
 import { slabOpsOf } from './slabs.ts';
+import { planViewOf } from './view.ts';
 import { defaultPaint } from './style.ts';
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -27,6 +28,41 @@ function project(slabBox = rect(3, 0, 9, 4)): Project {
   s.exec({ type: 'addSlab', slab: makeSlab({ id: 's', typeId: 'ls_t', levelId: 'lv_0', boundary: slabBox }) });
   return s.project;
 }
+
+describe('planta: parede recortada pela junção (decisão 0023 §10, P7c parte 2)', () => {
+  const camada = (fn: Layer['function'], thick: number): Layer => ({ function: fn, materialId: 'mat_concreto', thickness: thick, wraps: false });
+
+  /** Parede de 3 camadas (0,20 m) cruzada por uma laje de 0,10 m com topo em 0,05, ou só a parede. */
+  function wallProject(overlap: boolean): Project {
+    const base = createEmptyProject();
+    base.slabTypes.ls_t = { ...base.slabTypes.ls_mac12!, id: 'ls_t', name: 'Laje teste', code: 'LT', layers: [camada('structure', 0.1)] };
+    base.wallTypes.wt_t = { ...base.wallTypes.wt_alv14!, id: 'wt_t', name: 'Parede teste', code: 'T', layers: [camada('finish1', 0.02), camada('structure', 0.16), camada('finish1', 0.02)] };
+    const s = new ProjectStore(base);
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_t', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, height: 3 }) });
+    if (overlap) s.exec({ type: 'addSlab', slab: makeSlab({ id: 's1', typeId: 'ls_t', levelId: 'lv_0', boundary: rect(-1, -1, 2, 0), heightOffset: 0.05 }) });
+    // Plano de corte em 0,01 m: dentro da faixa em que a laje cruza a parede.
+    s.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { cut: 0.01 } });
+    return s.project;
+  }
+
+  it('na cota do plano de corte, cada camada desenha só a região que sobra', () => {
+    const view = planViewOf(wallProject(true), 'lv_0');
+    expect(view.cutZ).toBeCloseTo(0.01, 9);
+    const cut = view.geo.walls.w1!.layers.map((l) => multiArea(l.cut));
+    [0.08, 0.48, 0.04].forEach((v, i) => expect(cut[i]!).toBeCloseTo(v, 9));
+    // A silhueta do conjunto é a união das camadas recortadas (nada a mais).
+    expect(multiArea(view.geo.clusters[0]!.silhouette)).toBeCloseTo(0.08 + 0.48 + 0.04, 9);
+  });
+
+  it('parede sem sobreposição: a planta sai com as mesmas áreas de antes', () => {
+    const p = wallProject(false);
+    const view = planViewOf(p, 'lv_0');
+    const cut = view.geo.walls.w1!.layers.map((l) => multiArea(l.cut));
+    [0.08, 0.64, 0.08].forEach((v, i) => expect(cut[i]!).toBeCloseTo(v, 9));
+    expect(multiArea(view.geo.clusters[0]!.silhouette)).toBeCloseTo(0.8, 9);
+    expect(junctionLevel(p, 'lv_0').elements.get('w1')?.cut ?? false).toBe(false);
+  });
+});
 
 describe('planta: piso e laje pela região resolvida (decisão 0023 §3, P7b)', () => {
   it('o piso cortado pela laje pinta só a região que sobra (12 de 24 m²)', () => {

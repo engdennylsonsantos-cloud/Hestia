@@ -150,17 +150,35 @@ describe('contorno por camada: término explícito (decisão 0023 §2, P8)', () 
 });
 
 describe('contorno por camada: estático e casos sem vínculo (decisão 0023 §2, compatibilidade)', () => {
-  it('piso estático: todas as camadas usam o contorno do elemento, como antes', () => {
+  it('piso estático: o deslocamento segue ignorado; só a camada em contato com a parede é recortada (decisão 0025, revista)', () => {
     const p = build({ linked: false, termos: ['nucleo', 'face', { cm: 2 }] });
     const f = floorOf(p);
-    for (const l of f.layers) expect(l.polygon).toBe(f.polygon);
-    expect(multiArea(f.polygon)).toBeCloseTo(4 * 3, 9);
+    // Camada com `cm` em elemento sem vínculo: contorno do elemento, como antes (identidade preservada).
+    expect(f.layers[2]!.polygon).toBe(f.polygon);
+    // Parede de 14 cm com a base no topo do piso: toca só a camada de acabamento (índice 0). O substrato `face`
+    // (índice 1) e a estrutura ou o `cm` abaixo dele não são recortados (0025 §2, revisão de 2026-10-22).
+    // Núcleo: 5 cm por dentro × perímetro de 14 m, menos o canto (0,05² × 4).
+    const area = (i: number): number => multiArea(f.layers[i]!.polygon);
+    expect(multiArea(f.polygon) - area(0)).toBeCloseTo(0.05 * 14 - 0.05 * 0.05 * 4, 2);
+    expect(multiArea(f.polygon) - area(1)).toBeCloseTo(0, 9);
+    expect(area(1)).toBeGreaterThan(area(0));
   });
 
   it('modo perímetro externo: `auto` fica na face de acabamento (compatibilidade com projetos antigos)', () => {
     const p = build({ mode: 'perimeter', termos: ['auto', 'auto', 'auto'] });
     const f = floorOf(p);
     for (const l of f.layers) expect(multiArea(l.polygon)).toBeCloseTo(multiArea(f.polygon), 9);
+  });
+
+  it('modo perímetro externo: a regra explícita recorta só a camada tocada e o automático fica no contorno externo', () => {
+    const p = build({ mode: 'perimeter', termos: ['nucleo', 'face', 'auto'] });
+    const f = floorOf(p);
+    const area = (i: number): number => multiArea(f.layers[i]!.polygon);
+    expect(area(2)).toBeCloseTo(multiArea(f.polygon), 9);
+    // A camada `face` (índice 1) e o `auto` (índice 2) continuam com o contorno externo; só a `nucleo` (índice 0) recua,
+    // até a face externa do núcleo (F6). A faixa que recua é a do acabamento externo da parede, não o elemento inteiro.
+    expect(multiArea(f.polygon) - area(1)).toBeCloseTo(0, 9);
+    expect(area(0)).toBeLessThan(multiArea(f.polygon) - 1e-9);
   });
 
   it('modo perímetro externo: término `nucleo` por escrito vai ao núcleo externo (F6)', () => {

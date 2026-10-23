@@ -1,10 +1,11 @@
 import { Fragment, useState, type ReactElement } from 'react';
-import { type FloorType, floorTypeThickness, FUNCTION_LABEL, type Layer, type LayerFunction, temPrioridadeEmpatada } from '@hestia/model';
+import { coreRange, type FloorType, floorTypeThickness, FUNCTION_LABEL, type Layer, type LayerFunction, layerPriority, temPrioridadeEmpatada } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { duplicateFloorType, floorTypeDeleteBlock, floorTypeError, floorTypeUsage, tryDeleteFloorType } from '../../editor/typeActions.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
+import { coreHint } from './coreHint.ts';
 import { Dialog } from './Dialog.tsx';
 import { FloorSectionPreview } from './FloorSectionPreview.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
@@ -30,6 +31,8 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   if (!draft) return null;
   const usage = floorTypeUsage(p, draft.id);
   const error = floorTypeError(draft);
+  const core = coreRange(draft);
+  const nucleo = coreHint(draft);
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const setLayer = (i: number, patch: Partial<Layer>): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
   const replaceLayer = (i: number, next: Layer): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? next : l)) });
@@ -104,14 +107,18 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
                 <tr><td colSpan={5} style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Topo do piso</td></tr>
                 {draft.layers.map((l, i) => {
                   const m = p.materials[l.materialId];
+                  const inCore = i >= core.first && i <= core.last;
                   return (
                     <Fragment key={i}>
-                      <tr>
+                      <tr className={inCore ? 'core' : ''}>
                         <td className="mono">{i + 1}</td>
                         <td>
-                          <select className="select" aria-label={`Função da camada ${i + 1}`} value={l.function} onChange={(e) => setLayer(i, { function: e.target.value as LayerFunction })}>
-                            {FUNCTIONS.map((f) => <option key={f} value={f}>{FUNCTION_LABEL[f]}</option>)}
-                          </select>
+                          <span className="fn-cell">
+                            <select className="select" aria-label={`Função da camada ${i + 1}`} value={l.function} onChange={(e) => setLayer(i, { function: e.target.value as LayerFunction })}>
+                              {FUNCTIONS.map((f) => <option key={f} value={f}>{FUNCTION_LABEL[f]}</option>)}
+                            </select>
+                            <span className="pbadge" title="Prioridade de junção efetiva">P{layerPriority(l)}</span>
+                          </span>
                         </td>
                         <td>
                           <button className="btn small" style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setPick(i)} title="Escolher material">
@@ -143,6 +150,7 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
               </tbody>
             </table>
             <div className="total"><span>Espessura total</span><strong>{fmtCm(floorTypeThickness(draft))} cm</strong></div>
+            <p className="hint">{nucleo.text}</p>
             {temPrioridadeEmpatada(draft.layers) && <p className="hint">Há camadas de funções diferentes com a mesma prioridade: elas não se cortam e deixam linha de fronteira.</p>}
             <button className="btn small" onClick={insert}>+ Inserir camada</button>
             {error && <p className="hint" role="alert" style={{ color: 'var(--danger, #b42318)', marginTop: 8 }}>{error}</p>}

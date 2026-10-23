@@ -26,6 +26,9 @@ export function floorArea(f: Floor): number {
 
 const L = (fn: Layer['function'], materialId: string, thickness: number): Layer => ({ function: fn, materialId, thickness, wraps: false });
 
+/** Camada com término explícito nas paredes (decisão 0025): o padrão do piso único. */
+const LT = (fn: Layer['function'], materialId: string, thickness: number, termino: Layer['termino']): Layer => ({ ...L(fn, materialId, thickness), termino });
+
 const ft = (id: string, name: string, code: string, description: string, layers: Layer[], cost = 0): FloorType => ({ id, name, code, description, layers, cost });
 
 /** Tipos de piso iniciais (camadas do topo para baixo). */
@@ -50,4 +53,10 @@ export const DEFAULT_FLOOR_TYPES: FloorType[] = [
     L('substrate', 'mat_argamassa', 0.04),
     L('structure', 'mat_concreto', 0.12),
   ], 260),
+  ft('ft_unico', 'Piso único (obra inteira)', 'PS-05', 'Acabamento, assentamento e contrapiso param na face das paredes; a estrutura de concreto passa por baixo delas. Para um piso que cobre a obra inteira', [
+    LT('finish1', 'mat_ceramica', 0.01, 'face'),
+    LT('substrate', 'mat_argamassa', 0.02, 'face'),
+    LT('substrate', 'mat_argamassa', 0.04, 'face'),
+    LT('structure', 'mat_concreto', 0.12, 'passa'),
+  ], 250),
 ];

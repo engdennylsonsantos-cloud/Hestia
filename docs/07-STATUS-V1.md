@@ -2,8 +2,8 @@
 
 Estado em 2026-10-22, conferido no código, nos testes e nos documentos de decisão desta árvore (esquema 19). Os
 checklists de [docs/paridade](paridade/) são a fonte por elemento; `docs/paridade/ORDEM.json` registra o portão, e os
-nove elementos estão `concluido` (`npm run parity`: paredes 99%, pisos 98%, lajes 98%, os demais 100%). Os itens que
-sobram são não bloqueantes (ver "Pendências").
+nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sobram são não bloqueantes (ver
+"Pendências").
 
 ## O que está pronto
 
@@ -22,20 +22,27 @@ sobram são não bloqueantes (ver "Pendências").
   medir, anexar topo ao telhado etc.); planta, corte, 3D, DXF, tabela com CSV e painel de avisos.
 - Parede anexada a piso ou laje por trecho, com perfil de base (0023 P9).
 
-**Pisos** — 41 feitos, 7 fora de escopo, 0 pendentes (`docs/paridade/pisos.md`). C6 (junção com parede) fechado em 2026-10-23.
+**Pisos** — 42 feitos, 7 fora de escopo, 0 pendentes (`docs/paridade/pisos.md`). C6 (junção com parede) fechado em 2026-10-23.
 - Contorno por cliques, retângulo, medida, seleção de paredes ou área fechada; furos; edição por alças.
 - Contorno associativo às paredes (0023 P1–P3): "Desvincular" e "Revincular às paredes"; avisos de contorno aberto e duplicado.
 - Tipo em camadas com seção ao vivo; tipo `ft_acab` sobre laje (P5); quantitativos líquidos por camada; membrana de
-  espessura zero (P4); "Término na junção" por camada (P8, parcial).
+  espessura zero (P4); "Término na junção" por camada (P8) e piso único com término de cada camada contra as paredes
+  (face, núcleo, passa, até prioridade N, cm; 0025 P10; tipos `ft_unico` e `ls_unica`).
 - Planta com hachura, 3D por camada, corte, subpavimento, etiqueta, DXF, quantitativos e tabela com CSV.
 
-**Lajes** — 39 feitos, 3 fora de escopo, 0 pendentes (`docs/paridade/lajes.md`). C8 (junção com parede) fechado em 2026-10-23.
+**Lajes** — 40 feitos, 3 fora de escopo, 0 pendentes (`docs/paridade/lajes.md`). C8 (junção com parede) fechado em 2026-10-23.
 - Contorno por cliques, retângulo, medida, automático pelo perímetro ou por área fechada; furos; mesmo vínculo, membrana
   e término dos pisos. Inclinação por linha e percentual; parede anexada à laje.
 - Planta, 3D com inclinação e furos, corte com hachura por camada, DXF, quantitativos e tabela com CSV.
 - Junção piso/laje × parede (0023, fechada em 2026-10-23): prioridade efetiva e regra B no corte, no 3D e nos quantitativos.
-  Parede que atravessa o nível é cortada pela laje do pavimento de cima. A planta não recorta a parede na altura de corte
-  padrão (decisão de escopo, F2). Lajes com caimento ficam de fora da junção (ver pendências).
+  Parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b) e a junção entre níveis vale só entre parede
+  e piso/laje. A planta não recorta a parede na altura de corte padrão (decisão de escopo, F2). Lajes com caimento ficam
+  de fora da junção (ver pendências).
+- **Revisão 2026-10-22 (correções aplicadas e verificadas)**: no término por camada, a faixa de cota
+  para escolher as paredes passou a ser a de cada camada (`floors.ts`/`slabs.ts`; 0025 §2), e camada com término
+  explícito não recorta parede nem é recortada por ela — sem corte mútuo (0025 §5). O `passa` vinculado ancora a
+  união das paredes no elemento, não na camada. Na seleção de cortes/elevações, o realce é por origem
+  (`highlightOps`, `packages/render/src/section/build.ts`).
 
 **Telhados** — 43 feitos, 1 fora de escopo, 0 pendentes (`docs/paridade/telhados.md`).
 - Formas uma, duas e quatro águas, contorno qualquer e extrusão de perfil; cumeeira, espigões e rincões; furos; beiral.
@@ -119,11 +126,22 @@ sobram são não bloqueantes (ver "Pendências").
 
 ## Pendências não bloqueantes
 
-- **Junção com piso e laje (fechada em 2026-10-23, 0023):** resta o caso raro de plano de corte dentro da zona de sobreposição na
-  planta (baixa prioridade, F2), lajes com caimento fora da junção (decisão pendente) e o desempenho com muitos níveis (item 1b).
-  Término por camada no perímetro externo (F6) e cor, hachura e exportação por camada (F7) seguem pendentes.
-- **Término na junção** (0023 P8, parcial): falta o término em perímetro externo, cor e hachura por camada na planta, e
-  IFC e DXF por camada.
+- **Junção com piso e laje (fechada em 2026-10-23, 0023):** corte e 3D seguem a regra B (hierarquia, como Revit e
+  ArchiCAD), parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b), a junção entre níveis vale só
+  entre parede e piso/laje, e a planta não recorta a parede na altura de corte padrão (F2, decisão de escopo). Restam, sem
+  bloquear: o caso raro de plano de corte dentro da zona de sobreposição na planta (F2), lajes com caimento fora da junção
+  (decisão pendente), o desempenho com muitos níveis (item 1b) e a decisão do item 14 (`auto` no perímetro: face ou núcleo).
+- **Recorte da parede** (E3, C6 e C8, feito na P7c parte 2 e em F1–F4): o corte, a elevação e o 3D usam as mesmas partes da
+  junção que os quantitativos, e o desenhado coincide com o quantificado (`desenhoQuantitativo.test.ts`). Ficam de fora, sem
+  bloquear: camada com topo ou base inclinados (perfil P9; a faixa inclinada não se recorta por aproximação plana) e parede
+  curva (entra só pelo polígono).
+- **Término na junção** (0023 P8 e F6, 0025 P10): o término por camada vale no interior e no perímetro externo; falta cor e
+  hachura por camada na planta (decisão de escopo da F7.2) e o IFC por camada (`IfcMaterialLayerSet`/`IfcCovering`, item 15
+  de 0023 §6.2). O DXF de piso e laje já sai com a região resolvida (F7.1).
+- **Piso + laje no mesmo nível, sobrepostos** (decisão pendente do dono, Revisão 2026-10-22): com, por exemplo,
+  `ft_acab` + `ls_mac12` no mesmo nível, o piso perde todas as camadas e some. A regra piso × laje não foi alterada
+  pelas correções de 2026-10-22; o aviso `slab-floor-overlap` sinaliza o caso. Relacionado: "Inverter corte/Não
+  cortar" por par (P-4) seguem adiados (0023 §13).
 - **Canto reentrante de um L** (achado do P8, não corrigido): o circuito de paredes deixa um quadrado d × d sem parede
   (d = meia espessura) que entra no cômodo. A área do L em `layerOutline.test.ts` inclui esse quadrado de propósito.
 - **Close-ups 3D do L** (`tests/e2e/escadas-closeup.mjs`): tolerância própria de 1,5% (d) e 25% (f), porque o WebGL por
@@ -166,19 +184,23 @@ npm run build:artifact # gera apps/web/dist/artifact.html
 npm run e2e            # fluxo no navegador (requer Chromium do Playwright)
 node tests/e2e/pranchas.mjs            # pranchas: aba, vistas, carimbo e PDF (requer build e Chromium)
 node tests/e2e/visual-regression.mjs   # regressão visual da planta (--update regrava as referências)
+node tests/e2e/visual-regression-gpu.mjs   # regressão visual da planta no caminho GPU, 6 casos (--update regrava as referências em baseline-gpu/)
 npm run parity         # percentual de paridade por elemento
 ```
 
-Os fluxos de navegador estão em `tests/e2e/*.mjs` (22 fluxos; `helpers.mjs` é auxiliar).
+Os fluxos de navegador estão em `tests/e2e/*.mjs` (23 fluxos; `helpers.mjs` é auxiliar).
 
 ## Qualidade e verificação
 
-- Checklists (feitos + fora de escopo + pendentes): paredes 67+15+1, pisos 40+7+1, lajes 38+3+1, telhados 43+1+0,
-  escadas 36+4+0, aberturas 35+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
+- Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 42+7+0, lajes 40+3+0, telhados 43+1+0,
+  escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
-- `npm run test:rapido` em 2026-10-22: 264 arquivos e 3276 testes, todos passando (72,8 s; `test:rapido`, sem property e perf).
-- `npm run test:completo` em 2026-10-22: 265 arquivos e 3578 testes, todos passando, com as 60 sementes (590 s, código de saída 0).
-- Build em 2026-10-22: `dist/index.html` 2.532,22 kB e `artifact.html` 2.531,98 kB (kB decimais, medidos em bytes); `build:artifact` sem erro e sem TMPDIR.
+- `npm run test:rapido` em 2026-10-22: 277 arquivos e 3373 testes, todos passando (70,8 s; `test:rapido`, sem property e perf).
+- `npm run test:completo` em 2026-10-22: 278 arquivos e 3675 testes, todos passando, com as 60 sementes (700 s, código de saída 0).
+- Build em 2026-10-22 (Windows, esbuild 0.28.2 do lockfile): `npm run build` falha na minificação com
+  `[vite:esbuild-transpile] remove ... Acesso negado` (limitação local do esbuild ao apagar o diretório temporário;
+  não é erro de código). O build usado nos e2e é `npm run build -w @hestia/web -- --target esnext --minify false`:
+  `dist/index.html` com 6.418,48 kB (kB decimais, medidos em bytes). `build:artifact` não foi refeito nesta rodada.
 - Desempenho e regressão visual: os números estão na atualização de [08](08-PENDENCIAS-E-CORRECOES.md) e não foram
   repetidos nesta revisão, salvo onde indicado acima.
 - A conferência visual final em navegador real continua manual: os testes cobrem geometria, unidade e desenho, não a

@@ -127,26 +127,35 @@ export function enclosedRegionAt(p: Project, levelId: Id, at: Vec2): Polygon | n
 
 /**
  * Contorno de cada parede para a edificação: o `outline` de `wallFaces` (esquadria, encosto, T, degraus das pontas e
- * arcos). Só cai na faixa reta se `wallFaces` não tiver a parede.
+ * arcos). Com `extend === 'core'`, o `coreOutline` (só a faixa do núcleo). Só cai na faixa reta se `wallFaces` não tiver
+ * a parede.
  */
-function outlinePieces(p: Project, levelId: Id, frames: WallFrame[]): Ring[] {
-  const outlines = new Map(wallFaces(p, levelId).map((w) => [w.wallId, w.outline] as const));
+function outlinePieces(p: Project, levelId: Id, frames: WallFrame[], extend: RoomExtend): Ring[] {
+  const faces = wallFaces(p, levelId);
+  if (extend === 'core') {
+    const outlines = new Map(faces.map((w) => [w.wallId, w.coreOutline] as const));
+    return frames.map((f) => outlines.get(f.wall.id) ?? coreSilhouette(f));
+  }
+  const outlines = new Map(faces.map((w) => [w.wallId, w.outline] as const));
   return frames.map((f) => outlines.get(f.wall.id) ?? bandRing(f, f.sHi, f.sLo));
 }
 
 /**
  * Contorno externo de cada conjunto de paredes ligado do nível (união sem furos internos). Vãos não recortam.
  * `extend` escolhe a face: `finish` pela face de acabamento (`wallFaces`); `core` pela face do núcleo (F6, 0023 §2).
+ * A chave do cache é nível + extensão: o contorno de acabamento e o do núcleo não se reaproveitam.
  */
-function buildingOutlines(p: Project, levelId: Id, extend: RoomExtend): Ring[] {
+function buildingOutlines(p: Project, levelId: Id, extend: RoomExtend = 'finish'): Ring[] {
   const key = `${levelId}|${extend}`;
   const sig = wallsSignature(p, levelId);
   const hit = perimeterCache.get(key);
   if (hit && hit.sig === sig) return hit.value;
   recalcCount += 1;
   const frames = levelFrames(p, levelId);
-  const pieces = extend === 'core' ? frames.map(coreSilhouette) : outlinePieces(p, levelId, frames);
-  const value: Ring[] = frames.length === 0 ? [] : closeGapsSafe(union(...pieces.map((r) => asMulti(r)))).map((poly) => poly[0]!);
+  const value: Ring[] =
+    frames.length === 0
+      ? []
+      : closeGapsSafe(union(...outlinePieces(p, levelId, frames, extend).map((r) => asMulti(r)))).map((poly) => poly[0]!);
   perimeterCache.set(key, { sig, value });
   return value;
 }
@@ -159,8 +168,9 @@ function distToRing(q: Vec2, r: Ring): number {
 }
 
 /**
- * Contorno pela FACE EXTERNA da edificação (anel externo da união das paredes do nível, sem furos).
+ * Contorno pela face externa da edificação (anel externo da união das paredes do nível, sem furos).
  * Com `near`: a edificação que contém o ponto; senão a mais próxima dele (até PERIMETER_REACH). Sem `near`: a maior.
+ * `'finish'` = face externa do acabamento; `'core'` = face externa do núcleo.
  * Devolve só o anel externo, ou null se não há paredes ali.
  */
 export function outerPerimeter(p: Project, levelId: Id, near?: Vec2, extend: RoomExtend = 'finish'): Ring | null {

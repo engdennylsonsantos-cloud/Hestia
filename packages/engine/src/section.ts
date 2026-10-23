@@ -191,8 +191,10 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
 
   for (const levelId of levelIds) {
     const resolved = resolveLevel(p, levelId);
-    // Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o resto. Com a
-    // junção resolvida (P7b), cada camada corta só a parte que sobra dela (`layerPartsOf`); sem corte, a camada inteira.
+    // Junção resolvida do nível (P7b e P7c): cada camada de piso, de laje e de parede corta só a parte que sobra dela
+    // (`layerPartsOf` para piso e laje; `wallLayerBandsAfterJunction` para as paredes, 0023 §3 regra B). Sem corte, a
+    // camada inteira. Pisos entram como as paredes: a linha corta cada camada (retângulo t×z) e a laje de visão mostra o
+    // resto.
     const jl = junctionLevel(p, levelId);
     for (const f of resolveFloors(p, levelId)) {
       membranes.push(...membraneCutsOf(f.layers, { floorId: f.floorId }, null, frame));
@@ -443,8 +445,7 @@ function convexHull(pts: Vec2[]): Ring {
  * corte de 7,07 cm.
  */
 export function squareCutRun(percent: number, thickness: number): number {
-  const g = percent / 100;
-  return (g * thickness) / (1 + g * g);
+  return ((percent / 100) * thickness) / (1 + (percent / 100) ** 2);
 }
 
 /**

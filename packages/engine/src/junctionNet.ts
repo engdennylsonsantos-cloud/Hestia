@@ -1,5 +1,5 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import type { Id, Project } from '@hestia/model';
+import { levelAbove, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
 import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
@@ -40,6 +40,11 @@ export interface SolidPiece {
   flat: boolean;
   /** Prioridade, núcleo e dono da camada (P7). Sem ele, vale o padrão por tipo (`CUTTERS`). */
   meta?: PieceMeta;
+  /**
+   * Peça de outro nível (0023 §10, P7c): só corta, nunca é cortada, e a junção entre níveis vale só entre parede e
+   * piso/laje — piso × piso e laje × laje entre níveis não se cortam.
+   */
+  external?: boolean;
 }
 
 /** Elemento que corta outros, como os pedaços de cada camada dele. */
@@ -56,6 +61,10 @@ const Z_EPS = 1e-6;
  * do próprio dono não corta. Sem atributos, vale o padrão por tipo.
  */
 function cuts(c: CutterSolid, cp: SolidPiece, piece: SolidPiece, kind: JunctionKind): boolean {
+  // Junção entre níveis (0023 §10, P7c): a peça do nível vizinho só corta, e só contra a outra natureza (parede ×
+  // piso/laje). Piso × piso e laje × laje entre níveis não se cortam.
+  if (piece.external) return false;
+  if (cp.external && (cp.meta?.kind === 'wall') === (piece.meta?.kind === 'wall')) return false;
   if (cp.meta && piece.meta) {
     if (cp.meta.owner === piece.meta.owner) return false;
     return winsOver(cp.meta, piece.meta) === true;
@@ -90,8 +99,28 @@ function integrate(m: MultiPolygon, f: (p: Vec2) => number): number {
   return total;
 }
 
+/** Faixa de cota (menor base e maior topo) de um pedaço, pelos vértices. Cacheada: o pedaço não muda depois de montado. */
+const envelopes = new WeakMap<SolidPiece, readonly [number, number]>();
+function zEnvelope(sp: SolidPiece): readonly [number, number] {
+  const hit = envelopes.get(sp);
+  if (hit) return hit;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const poly of sp.poly) for (const ring of poly) for (const v of ring) {
+    const [a, b] = sp.span(v);
+    z0 = Math.min(z0, a);
+    z1 = Math.max(z1, b);
+  }
+  const env = [z0, z1] as const;
+  envelopes.set(sp, env);
+  return env;
+}
+
 /** Volume (m³) de `a` que está dentro de `b`: área da interseção em planta vezes a sobreposição de cota. */
 export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
+  const [a0, a1] = zEnvelope(a);
+  const [b0, b1] = zEnvelope(b);
+  if (Math.min(a1, b1) - Math.max(a0, b0) <= 0) return 0;
   if (!boxesOverlap(boxOf(multiPoints(a.poly)), boxOf(multiPoints(b.poly)))) return 0;
   const common = intersection(a.poly, b.poly);
   if (common.length === 0) return 0;
@@ -139,7 +168,7 @@ export function slabLayerPiece(rs: ResolvedSlab, l: ResolvedSlab['layers'][numbe
     poly: l.polygon,
     span: (q: Vec2) => [l.z0 + slabRiseAt(rs.slope, q), l.z1 + slabRiseAt(rs.slope, q)] as const,
     flat: rs.slope === null,
-    meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId, layerIndex: l.layerIndex },
+    meta: { kind: 'slab', priority: l.priority, core: l.core, owner: rs.slabId, layerIndex: l.layerIndex, explicit: l.explicit },
   };
 }
 
@@ -147,8 +176,21 @@ export function slabLayerPiece(rs: ResolvedSlab, l: ResolvedSlab['layers'][numbe
 export function floorLayerPiece(rf: ResolvedFloor, l: ResolvedFloorLayer): SolidPiece {
   return {
     ...flatPiece(l.polygon, l.z0, l.z1),
-    meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId, layerIndex: l.layerIndex },
+    meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId, layerIndex: l.layerIndex, explicit: l.explicit },
   };
+}
+
+/**
+ * Níveis adjacentes (0023 §10, P7c): o de elevação imediatamente acima e o imediatamente abaixo. Sem nível vizinho,
+ * a lista sai menor. Nível inexistente sai vazio.
+ */
+export function adjacentLevelIds(p: Project, levelId: Id): Id[] {
+  const base = p.levels.find((l) => l.id === levelId);
+  if (!base) return [];
+  let below: { id: Id; elevation: number } | null = null;
+  for (const l of p.levels) if (l.elevation < base.elevation && (!below || l.elevation > below.elevation)) below = l;
+  const above = levelAbove(p, levelId);
+  return [above?.id, below?.id].filter((id): id is Id => id !== undefined);
 }
 
 /** Pedaço de uma faixa de altura de parede: a base absoluta da parede mais a faixa (o topo pode ser inclinado). */
@@ -217,7 +259,9 @@ export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
     if (other.id === levelId) continue;
     const c = levelCutters(p, other.id);
     const keep = (solids: CutterSolid[]): CutterSolid[] =>
-      solids.map((s) => ({ kind: s.kind, pieces: s.pieces.filter(reaches) })).filter((s) => s.pieces.length > 0);
+      solids
+        .map((s) => ({ kind: s.kind, pieces: s.pieces.filter(reaches).map((sp) => ({ ...sp, external: true })) }))
+        .filter((s) => s.pieces.length > 0);
     out.floors.push(...keep(c.floors));
     out.slabs.push(...keep(c.slabs));
     out.walls.push(...keep(c.walls));

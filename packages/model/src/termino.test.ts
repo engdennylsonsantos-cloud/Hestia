@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, type Layer } from './index.ts';
-import { TERMINO_MAX_CM, terminoIssue, terminoMeters, terminoOf } from './termino.ts';
+import { TERMINO_MAX_CM, terminoAtePrioridade, terminoEhRegraParede, terminoIssue, terminoMeters, terminoOf } from './termino.ts';
 
 const camada = (termino?: Layer['termino']): Layer => ({ function: 'structure', materialId: 'mat_concreto', thickness: 0.1, wraps: false, ...(termino === undefined ? {} : { termino }) });
 
@@ -33,5 +33,32 @@ describe('término na junção (decisão 0023 §2, P8)', () => {
     const u = s.project.slabTypes.ls_mac12!;
     expect(() => s.exec({ type: 'upsertSlabType', slabType: { ...u, layers: [{ ...u.layers[0]!, termino: { cm: -31 } }] } })).toThrow(/30 cm/);
     expect(() => s.exec({ type: 'upsertSlabType', slabType: { ...u, layers: [{ ...u.layers[0]!, termino: 'nucleo' }] } })).not.toThrow();
+  });
+});
+
+describe('término nas paredes: regra de parede e prioridade (decisão 0025)', () => {
+  it('reconhece a regra de parede (face, núcleo, passa, prioridade) e não o deslocamento em cm', () => {
+    expect(terminoEhRegraParede(camada('face'))).toBe(true);
+    expect(terminoEhRegraParede(camada('nucleo'))).toBe(true);
+    expect(terminoEhRegraParede(camada('passa'))).toBe(true);
+    expect(terminoEhRegraParede(camada({ ate: { prioridade: 3 } }))).toBe(true);
+    expect(terminoEhRegraParede(camada({ cm: -1 }))).toBe(false);
+    expect(terminoEhRegraParede(camada('auto'))).toBe(false);
+    expect(terminoEhRegraParede(camada())).toBe(false);
+  });
+
+  it('a prioridade de `ate` vai de 1 a 9, inteira; fora disso, erro de validação', () => {
+    expect(terminoIssue(camada({ ate: { prioridade: 1 } }))).toBeNull();
+    expect(terminoIssue(camada({ ate: { prioridade: 9 } }))).toBeNull();
+    expect(terminoIssue(camada({ ate: { prioridade: 0 } }))).toMatch(/1 e 9/);
+    expect(terminoIssue(camada({ ate: { prioridade: 10 } }))).toMatch(/1 e 9/);
+    expect(terminoIssue(camada({ ate: { prioridade: 2.5 } }))).toMatch(/1 e 9/);
+    expect(terminoAtePrioridade({ ate: { prioridade: 4 } })).toBe(4);
+    expect(terminoAtePrioridade('face')).toBeNull();
+  });
+
+  it('passa é válido e não tem deslocamento', () => {
+    expect(terminoIssue(camada('passa'))).toBeNull();
+    expect(terminoMeters('passa')).toBe(0);
   });
 });

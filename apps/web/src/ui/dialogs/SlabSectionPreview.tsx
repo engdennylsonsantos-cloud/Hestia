@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { slabTypeThickness, type Material, type SlabType } from '@hestia/model';
+import { coreRange, slabTypeThickness, type Material, type SlabType } from '@hestia/model';
 
 function mixHex(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16);
@@ -27,6 +27,9 @@ export function SlabSectionPreview({ type, materials }: { type: SlabType; materi
     return band;
   });
   const bottom = y;
+  const core = coreRange(type);
+  const primeira = bands[core.first];
+  const ultima = bands[core.last];
   return (
     <svg className="section-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Seção da laje">
       <defs>
@@ -45,12 +48,14 @@ export function SlabSectionPreview({ type, materials }: { type: SlabType; materi
         const fill = mixHex(m?.color ?? '#999999', '#ffffff', 0.55);
         const w = 260;
         const x = 22;
+        const inCore = b.i >= core.first && b.i <= core.last;
         return (
           <g key={b.i}>
             <rect x={x} y={b.y} width={w} height={b.h} fill={fill} stroke="var(--fg)" strokeWidth="0.6" />
             {m && (m.hatch === 'diagonal' || m.hatch === 'cross' || m.hatch === 'dots') && (
               <rect x={x} y={b.y} width={w} height={b.h} fill={`url(#lh-${m.hatch})`} style={{ color: 'var(--fg-soft)' }} />
             )}
+            {inCore && <rect x={x} y={b.y} width={w} height={b.h} fill="none" stroke="var(--accent)" strokeWidth={1.4} />}
             {b.h > 11 && (
               <text x={x + 6} y={b.y + b.h / 2 + 3} fontSize="9" fill="var(--fg)" fontFamily="var(--font-ui)">
                 {(b.layer.thickness * 100).toFixed(1).replace('.', ',')} cm
@@ -59,6 +64,12 @@ export function SlabSectionPreview({ type, materials }: { type: SlabType; materi
           </g>
         );
       })}
+      {primeira && ultima && (
+        <g stroke="var(--accent)" strokeWidth="1.2" fill="none">
+          <path d={`M14 ${primeira.y}H8V${ultima.y + ultima.h}H14`} />
+          <text x={7} y={(primeira.y + ultima.y + ultima.h) / 2} fontSize="9" textAnchor="middle" fill="var(--accent)" stroke="none" fontFamily="var(--font-ui)" transform={`rotate(-90 7 ${(primeira.y + ultima.y + ultima.h) / 2})`}>núcleo</text>
+        </g>
+      )}
       <g stroke="var(--fg-soft)" strokeWidth="0.8" fill="none">
         <path d={`M${W - 30} ${top}V${bottom}M${W - 34} ${top}H${W - 26}M${W - 34} ${bottom}H${W - 26}`} />
       </g>

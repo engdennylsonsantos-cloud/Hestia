@@ -1,5 +1,5 @@
 import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
+import { fillRegionOf, junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -93,8 +93,9 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   const out = empty();
   // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
   const top = f.layers.find((l) => !l.membrane);
-  // Sem corte, a planta mostra a camada de cima: o término dela vale mesmo sem junção (sem isso, o piso ia até a face de acabamento).
-  const region = el?.cut ? el.region : (top?.polygon ?? f.polygon);
+  // Preenchimento: a camada de cima (o término dela vale mesmo sem junção) ou, com corte, a região resolvida — ou as
+  // partes da camada de cima quando o término dela é explícito (0023 F7 e 0025).
+  const region = fillRegionOf(top ?? { explicit: false, polygon: f.polygon }, el);
   if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';

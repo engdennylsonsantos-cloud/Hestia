@@ -1,13 +1,15 @@
-import { union, type MultiPolygon } from '@hestia/geom';
+import { multiArea, union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import type { LayerBand, ResolvedLayer, ResolvedWall } from './types.ts';
 import { levelCutterSet, type SolidPiece } from './junctionNet.ts';
 import { resolveJunction, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
 
 /**
- * Junção resolvida de um nível (decisão 0023 §3 e §10, P7b). Uma função única para planta, corte e 3D: cada camada de
- * piso e de laje sai com as partes em que ela existe, já recortadas pela camada que a vence (`resolveJunction`). Sem
- * sobreposição de elementos, nada é recortado e o desenho segue o original (`cut` falso).
+ * Junção resolvida de um nível (decisão 0023 §3 e §10, P7b e P7c). Uma função única para planta, corte, 3D e
+ * quantitativos: cada camada de piso, de laje e de parede sai com as partes em que ela existe, já recortadas pela
+ * camada que a vence (`resolveJunction`). Os níveis adjacentes entram como cortadores (P7c): a laje do nível de cima
+ * que atravessa a parede do térreo, e a parede do térreo que sobe até a laje. Sem sobreposição, nada é recortado e o
+ * desenho segue o original (`cut` falso).
  */
 
 /** Partes de uma camada depois da junção: planta e faixa de cota (absoluta) em que ela existe. Vazio: camada vencida. */
@@ -16,7 +18,7 @@ export interface LayerParts {
   parts: ResolvedPrism[];
 }
 
-/** Piso ou laje com a junção resolvida. `cut` falso: nenhuma camada foi recortada, então vale o desenho original. */
+/** Piso, laje ou parede com a junção resolvida. `cut` falso: nenhuma camada foi recortada, então vale o desenho original. */
 export interface ElementJunction {
   cut: boolean;
   layers: LayerParts[];
@@ -71,7 +73,7 @@ function planarOf(sp: SolidPiece): PlanarPiece | null {
     }
   }
   if (!(z1 - z0 > 1e-9)) return null;
-  return { meta: { kind: meta.kind, priority: meta.priority, core: meta.core }, poly: sp.poly, z0, z1, owner: meta.owner };
+  return { meta: { kind: meta.kind, priority: meta.priority, core: meta.core, ...(meta.explicit ? { explicit: true } : {}) }, poly: sp.poly, z0, z1, owner: meta.owner, ...(sp.external ? { external: true } : {}) };
 }
 
 /** Assinatura do conteúdo das peças (camada, faixa, prioridade e contorno): muda quando o nível muda. */
@@ -79,7 +81,7 @@ function signature(tagged: readonly Tagged[]): string {
   return tagged
     .map(({ piece: t, layerIndex }) => {
       const poly = t.poly.map((p) => p.map((ring) => ring.map((v) => `${r6(v.x)},${r6(v.y)}`).join(' ')).join('/')).join('#');
-      return `${t.owner}|${layerIndex}|${t.meta.kind}|${t.meta.priority}|${t.meta.core ? 1 : 0}|${r6(t.z0)}|${r6(t.z1)}|${poly}`;
+      return `${t.external ? 'x' : ''}${t.owner}|${layerIndex}|${t.meta.kind}|${t.meta.priority}|${t.meta.core ? 1 : 0}|${t.meta.explicit ? 1 : 0}|${r6(t.z0)}|${r6(t.z1)}|${poly}`;
     })
     .join('\n');
 }
@@ -87,10 +89,20 @@ function signature(tagged: readonly Tagged[]): string {
 /** Cache por nível e por conteúdo (como o circuito de ambientes, decisão 0023 §11): nível não editado = mesmo resultado. */
 const levelCache = new Map<Id, { sig: string; value: JunctionLevel }>();
 
+/** Volume (m³) das partes de uma camada: área em planta vezes a altura de cada parte. */
+const volumeOfParts = (parts: readonly ResolvedPrism[]): number => parts.reduce((s, x) => s + multiArea(x.poly) * (x.z1 - x.z0), 0);
+
 /**
- * Junção resolvida do nível. Pisos e lajes com camadas recortadas pela de maior prioridade (`resolveJunction`); lajes
- * com caimento ficam de fora, porque a faixa inclinada não se recorta por aproximação plana (quantitativos já integram).
- * Paredes cortam pisos e lajes pela faixa de cada faixa de parede (o topo inclinado usa o ponto mais alto).
+ * A camada perdeu volume? Compara o volume antes e depois (tolerância 1e-9 m³), não a identidade do polígono: o
+ * `difference` que não tira nada devolve geometria nova com a mesma área, e isso não é corte (P7c, `cut` falso).
+ */
+const lostVolume = (t: PlanarPiece, parts: readonly ResolvedPrism[]): boolean =>
+  Math.abs(multiArea(t.poly) * (t.z1 - t.z0) - volumeOfParts(parts)) > 1e-9;
+
+/**
+ * Junção resolvida do nível. Pisos, lajes e paredes com camadas recortadas pela de maior prioridade (`resolveJunction`),
+ * com os elementos dos níveis adjacentes como cortadores (P7c, só o que cruza a cota). Lajes com caimento ficam de fora,
+ * porque a faixa inclinada não se recorta por aproximação plana (quantitativos já integram).
  */
 export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   // Cortadores do nível e dos níveis que o alcançam (F1b). Laje com caimento fica de fora da junção.
@@ -118,8 +130,11 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   const walls = new Map<Id, { cut: boolean; bands: Map<string, ResolvedPrism[]> }>();
   tagged.forEach(({ piece, layerIndex, wall }, i) => {
     const parts = res[i]!;
-    // Intacta só se a peça inteira sobrou: uma fatia com a mesma forma mas em cota menor já foi recortada (a faixa sumiu).
-    const untouched = parts.length === 1 && parts[0]!.poly === piece.poly && parts[0]!.z0 === piece.z0 && parts[0]!.z1 === piece.z1;
+    // Peça de outro nível só corta (0023 §10, P7c): não faz parte do desenho deste nível.
+    if (piece.external) return;
+    // Intacta só se o volume sobrou: uma fatia com a mesma forma, mas em cota menor, já foi recortada. Comparar volume
+    // pega este caso e o da peça recortada só em altura (P7c, F7), sem depender da identidade do polígono.
+    const untouched = !lostVolume(piece, parts);
     if (wall) {
       const wj = walls.get(wall.id) ?? { cut: false, bands: new Map<string, ResolvedPrism[]>() };
       if (wall.flat) {
@@ -144,12 +159,25 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 }
 
 /**
+ * Região em planta do preenchimento de um piso ou laje (decisões 0023 F7 e 0025). Com corte, é a região resolvida do
+ * elemento; quando a camada de topo tem regra explícita de término, é a própria camada (o piso para na face da parede e
+ * o resto segue sob ela). Sem corte, é a camada de cima: o término dela vale mesmo sem junção (sem isso, o piso ia até a
+ * face de acabamento).
+ */
+export function fillRegionOf(top: { explicit: boolean; polygon: MultiPolygon }, el?: ElementJunction): MultiPolygon {
+  const parts = top.explicit && el?.cut ? el.layers.find((l) => l.layerIndex === 0)?.parts : undefined;
+  if (parts) return union(...parts.map((x) => x.poly));
+  return el?.cut ? el.region : top.polygon;
+}
+
+/**
  * Partes de uma camada para o desenho: as resolvidas quando o elemento foi cortado e a camada está nele; senão `fallback`
  * (a camada inteira, como antes). Membrana e camada sem junção caem no `fallback`.
  */
 export function layerPartsOf(el: ElementJunction | undefined, layerIndex: number, fallback: ResolvedPrism[]): ResolvedPrism[] {
   if (!el || !el.cut) return fallback;
-  return el.layers.find((l) => l.layerIndex === layerIndex)?.parts ?? fallback;
+  const hit = el.layers.filter((l) => l.layerIndex === layerIndex);
+  return hit.length ? hit.flatMap((l) => l.parts) : fallback;
 }
 
 /**

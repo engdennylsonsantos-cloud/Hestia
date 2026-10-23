@@ -70,18 +70,35 @@ export function axisMid(w: Wall): Vec2 {
   return { x: (w.a.x + w.b.x) / 2, y: (w.a.y + w.b.y) / 2 };
 }
 
+/** Camada de piso ou laje como o anexo a vê: a faixa de cota e a região com volume. */
+interface FaceLayer {
+  z0: number;
+  z1: number;
+  membrane: boolean;
+  polygon: MultiPolygon;
+  /** Término com regra de parede (0025): a camada é recortada pela própria parede que se anexa. */
+  explicit: boolean;
+}
+
 /**
  * Faces superior e inferior (cotas absolutas) de pisos e lajes do nível que cobrem o ponto. Vale a região de cada
  * camada com volume (decisão 0025): onde o término esvazia as camadas contra a parede, o ponto do eixo não é coberto por
  * elas, e a parede continua pelo vazio até a primeira camada que cobre. Sem término, todas as camadas têm o mesmo
  * contorno e o resultado é o do elemento inteiro.
+ *
+ * **Cota decidida pelas camadas sem regra de término.** Camada com término (`explicit`) é recortada pela própria parede:
+ * usá-la para decidir a cota da parede faz a cota depender do recorte, e o recorte depender da cota — o que produziu
+ * topo de parede em dois níveis ao longo do mesmo eixo (2,91 e 2,93 m num caso real). Então a cota sai das camadas sem
+ * regra (a estrutura); sem nenhuma delas no ponto, valem todas as que cobrem. A parede fica uniforme ao longo do eixo.
  */
 export function facesAt(levelId: Id, at: Vec2, floors: ResolvedFloor[], slabs: ResolvedSlab[]): { tops: number[]; bottoms: number[] } {
   const tops: number[] = [];
   const bottoms: number[] = [];
-  const add = (layers: readonly { z0: number; z1: number; membrane: boolean; polygon: MultiPolygon }[], rise: number): void => {
-    const hit = layers.filter((l) => !l.membrane && l.z1 > l.z0 && covered(at, l.polygon));
-    if (hit.length === 0) return;
+  const add = (layers: readonly FaceLayer[], rise: number): void => {
+    const cobertas = layers.filter((l) => !l.membrane && l.z1 > l.z0 && covered(at, l.polygon));
+    if (cobertas.length === 0) return;
+    const semRegra = cobertas.filter((l) => !l.explicit);
+    const hit = semRegra.length ? semRegra : cobertas;
     tops.push(Math.max(...hit.map((l) => l.z1)) + rise);
     bottoms.push(Math.min(...hit.map((l) => l.z0)) + rise);
   };

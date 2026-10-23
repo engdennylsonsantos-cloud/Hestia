@@ -206,6 +206,9 @@ svg { display: block; }
 .tree .leaf:hover { background: var(--chrome); }
 .tree .leaf.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
 .tree .leaf .meta { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); }
+.tree .levels { max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tree .levels::-webkit-scrollbar { width: 8px; }
+.tree .levels::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
 .tree .sub { padding-left: 12px; }
 
 /* ---- área de trabalho ---- */

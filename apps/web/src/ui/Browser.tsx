@@ -60,12 +60,14 @@ export function Browser(): ReactElement {
           <div className="sub">
             <details open>
               <summary>Plantas</summary>
-              {p.levels.map((l) => (
-                <button key={l.id} className={`leaf${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => editor.selectLevel(l.id)}>
-                  <Icon name="plan" size={14} /> {l.name}
-                  <span className="meta">{l.elevation.toFixed(2).replace('.', ',')} m</span>
-                </button>
-              ))}
+              <div className="levels">
+                {p.levels.map((l) => (
+                  <button key={l.id} className={`leaf${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => editor.selectLevel(l.id)}>
+                    <Icon name="plan" size={14} /> {l.name}
+                    <span className="meta">{l.elevation.toFixed(2).replace('.', ',')} m</span>
+                  </button>
+                ))}
+              </div>
             </details>
             <details open>
               <summary>3D</summary>

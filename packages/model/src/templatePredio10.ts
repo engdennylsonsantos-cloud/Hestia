@@ -105,6 +105,21 @@ const UNIDADES: Array<{ nome: string; box: { x0: number; y0: number; x1: number;
   { nome: 'l', box: { x0: CORE.x1, y0: CORE.y0, x1: W, y1: CORE.y1 } },
 ];
 
+/** Porta interna de 0,80 × 2,10. */
+const porta80 = (hostId: Id, offset: number, id: Id): Command => ({
+  type: 'addOpening',
+  opening: { id, kind: 'door', typeId: 'ot_p80', hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' },
+});
+
+/** Divisória interna da unidade (parede de 9 cm) com uma porta de 0,80 no meio. */
+function divisoria(cmds: Command[], levelId: Id, id: Id, a: Vec2, b: Vec2, topo: Partial<{ topLevelId: Id | null; topOffset: number }>): void {
+  cmds.push({
+    type: 'addWall',
+    wall: makeWall({ id, typeId: 'wt_alv9', levelId, a, b, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, ...topo }),
+  });
+  cmds.push(porta80(id, Math.hypot(b.x - a.x, b.y - a.y) / 2, `${id}-p`));
+}
+
 const CORTES: SectionView[] = [
   // AA pelo núcleo, no eixo x = 10 (olha para o oeste, atravessa os 10 pavimentos).
   { id: 'PD-AA', name: 'Corte AA (prédio)', kind: 'section', a: { x: 10, y: -2 }, b: { x: 10, y: D + 2 }, depth: D + 4 },
@@ -130,6 +145,17 @@ export function predio10(cmds: Command[]): void {
     for (const u of UNIDADES) {
       cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-${u.nome.toUpperCase()}`, typeId: 'pd_piso', levelId: nivel, boundary: rect(u.box.x0, u.box.y0, u.box.x1, u.box.y1) }) });
     }
+
+    // Apartamentos: as unidades norte e sul têm dois dormitórios, banheiro e sala/cozinha; oeste e leste,
+    // sala e dormitório. Cada divisória leva uma porta de 0,80.
+    for (const [sufixo, y0, y1] of [['N', CORE.y1, D], ['S', 0, CORE.y0]] as const) {
+      const divisorias: Array<[number, number]> = [[5, 1], [8.5, 2], [14, 3]];
+      for (const [x, n] of divisorias) {
+        divisoria(cmds, nivel, `PD${i}-${sufixo}-D${n}`, { x, y: y0 }, { x, y: y1 }, topo);
+      }
+    }
+    divisoria(cmds, nivel, `PD${i}-O-D1`, { x: 0, y: (CORE.y0 + CORE.y1) / 2 }, { x: CORE.x0, y: (CORE.y0 + CORE.y1) / 2 }, topo);
+    divisoria(cmds, nivel, `PD${i}-L-D1`, { x: CORE.x1, y: (CORE.y0 + CORE.y1) / 2 }, { x: W, y: (CORE.y0 + CORE.y1) / 2 }, topo);
 
     cmds.push(porta(`PD${i}-NUC-n`, (CORE.x1 - CORE.x0) / 2, `PD${i}-pN`));
     cmds.push(porta(`PD${i}-NUC-s`, (CORE.x1 - CORE.x0) / 2, `PD${i}-pS`));

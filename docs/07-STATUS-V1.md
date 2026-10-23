@@ -130,7 +130,8 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   ArchiCAD), parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b), a junção entre níveis vale só
   entre parede e piso/laje, e a planta não recorta a parede na altura de corte padrão (F2, decisão de escopo). Restam, sem
   bloquear: o caso raro de plano de corte dentro da zona de sobreposição na planta (F2), lajes com caimento fora da junção
-  (decisão pendente), o desempenho com muitos níveis (item 1b) e a decisão do item 14 (`auto` no perímetro: face ou núcleo).
+  (decisão pendente), o desempenho com muitos níveis (item 1b) e a decisão do item 14 (`auto` no perímetro), já fechada
+  pelo dono: fica na face de acabamento, e a estrutura vai ao núcleo só quando a camada pede `nucleo`.
 - **Recorte da parede** (E3, C6 e C8, feito na P7c parte 2 e em F1–F4): o corte, a elevação e o 3D usam as mesmas partes da
   junção que os quantitativos, e o desenhado coincide com o quantificado (`desenhoQuantitativo.test.ts`). Ficam de fora, sem
   bloquear: camada com topo ou base inclinados (perfil P9; a faixa inclinada não se recorta por aproximação plana) e parede

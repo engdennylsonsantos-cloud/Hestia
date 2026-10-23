@@ -173,9 +173,10 @@ Desenho (decidido antes de codar, para retomada por outro agente):
 Checklist:
 - [x] `outerPerimeter` com `extend` e cache por `levelId|extend` (`enclosed.ts`).
 - [x] `layerOutlines` com o ramo `perimeter` por camada (`layerOutline.ts`, função `pickLayer` compartilhada com as paredes internas).
-- [x] **Decisão tomada na implementação:** no perímetro, o `auto` fica na face de acabamento (como antes), para projetos antigos
-      não mudarem de área. O término `nucleo` por escrito, `face` e `{cm}` valem. Ficou em §6.2 (item 14) para o dono decidir se o
-      `auto` deve levar a estrutura ao núcleo também no perímetro, como nas paredes internas.
+- [x] **Decisão do dono (2026-10-23):** no perímetro, o `auto` fica na **face de acabamento**, para projetos antigos não
+      mudarem de área. O término `nucleo` por escrito, `face` e `{cm}` valem. A medição do outro comportamento
+      (−0,29 m², −2,2% na área da camada `auto`; 40,4% dos pixels no caso `junc-laje-perimetro-parede`) está em
+      `docs/handoff/merge-0023-0025.md` §5, e o item 14 do §6.2 fica fechado.
 - [x] Testes em `layerOutline.test.ts`: `auto` = face (compatibilidade); `nucleo` escrito vai ao núcleo externo; `{cm: 5}` aumenta
       a área da camada. O teste antigo que fixava "todas iguais no perímetro" foi reescrito, porque codificava a limitação.
 - [x] Regressão visual: 31 casos, todos dentro da tolerância (nenhuma baseline mudou).
@@ -240,7 +241,7 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 | F2 (decisão de escopo) | `b83d763` | 2026-10-23 | planta não recorta parede na altura padrão; sem mudança de código |
 | Regressão visual corte | `c7070b3` | 2026-10-23 | caso `junc-corte-parede-embutida-piso`, baseline conferida na imagem |
 | F5 (fechamento) | `c0d0883` | 2026-10-23 | desenho = quantitativo, matriz §9.1, cache por nível, paridade E3/C6/C8, docs 07 e 08 |
-| F6 (término no perímetro) | `abd31d8` | 2026-10-23 | nucleo/face/{cm} no perímetro; auto fica na face (compatibilidade); decisão 14 pendente |
+| F6 (término no perímetro) | `abd31d8` | 2026-10-23 | nucleo/face/{cm} no perímetro; `auto` fica na face (decisão do dono, item 14 fechado) |
 | F7 (DXF/IFC = planta; correção de peça 'intacta') | `244317f` | 2026-10-23 | exportação usa a região resolvida; defeito de recorte só em altura corrigido; cor por camada fechada como decisão |
 | Correção: planta e DXF sem corte seguem a camada de cima | (este commit) | 2026-10-23 | Com término `nucleo` no perímetro, a planta desenhava o contorno de acabamento (até a face externa) quando a junção não cortava o elemento. Agora sem corte a planta e o DXF usam o polígono da camada de cima, como o 3D. Baseline `junc-piso-retangulo-cm-menos-1` aceita (recuo de 1 cm da cerâmica agora aparece). IFC segue com o contorno do elemento: o por camada é o item 15. |
 | F1b | `64a7b8e` | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
@@ -260,9 +261,9 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | feito | F5 | `junctionCache.test.ts`, por identidade do objeto em cache |
 | 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | feito | F5 | 100% em todos os elementos |
 | 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | feito | F5 | 08 corrigida (P-5 implementado) |
-| 9 | Término por camada no perímetro externo (P8b) | feito, exceto item 14 | F6 | `nucleo`, `face` e `{cm}` valem no perímetro; `auto` fica na face (compatibilidade) |
+| 9 | Término por camada no perímetro externo (P8b) | feito | F6 | `nucleo`, `face` e `{cm}` valem no perímetro; `auto` fica na face (decisão do dono) |
 | 15 | IFC por camada (`IfcMaterialLayerSet`, `IfcCovering`), fase própria de exportação | fase futura | F7.3 | hoje o IFC usa a região resolvida com a altura do elemento |
-| 14 | `auto` no perímetro: levar a estrutura ao núcleo (como nas paredes internas) muda a área de pisos e lajes de borda já existentes | decisão pendente do dono | F6 | hoje fica na face para não mudar projetos antigos |
+| 14 | `auto` no perímetro: levar a estrutura ao núcleo (como nas paredes internas) muda a área de pisos e lajes de borda já existentes | **decidido pelo dono em 2026-10-23: fica na face** | F6 | medição do outro lado: −0,29 m² (−2,2%) na camada `auto` e 40,4% dos pixels em `junc-laje-perimetro-parede`; `docs/handoff/merge-0023-0025.md` §5 |
 | 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
 | 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |
 | 12 | Inversão de corte por par (P-4, P10) | decisão pendente do dono | — | não bloqueia a conclusão |

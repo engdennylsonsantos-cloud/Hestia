@@ -16,13 +16,17 @@ export const roundMm = (m: number): number => Math.round(m * 1000) / 1000;
 
 /**
  * Pontos medidos da cota. Uma extremidade com referência a parede existente segue essa extremidade da parede
- * (decisão 0019); sem a parede, vale o ponto guardado (a cota vira livre).
+ * (decisão 0019); sem a parede, vale o ponto guardado (a cota vira livre). Com `ref.axis`, só a coordenada do
+ * eixo acompanha a parede e a outra fica na linha guardada — é o que mantém reta uma cadeia de um lado da planta.
  */
 export function dimensionPoints(p: Pick<Project, 'elements'>, d: Dimension): { a: Vec2; b: Vec2 } {
   const at = (ref: DimensionRef | undefined, fallback: Vec2): Vec2 => {
     const w = ref ? p.elements[ref.wallId] : undefined;
     if (!ref || !isWall(w)) return fallback;
-    return ref.end === 'a' ? { ...w.a } : { ...w.b };
+    const pt = ref.end === 'a' ? w.a : w.b;
+    if (ref.axis === 'x') return { x: pt.x, y: fallback.y };
+    if (ref.axis === 'y') return { x: fallback.x, y: pt.y };
+    return { ...pt };
   };
   return { a: at(d.refs?.a, d.a), b: at(d.refs?.b, d.b) };
 }

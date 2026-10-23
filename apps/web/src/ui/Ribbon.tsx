@@ -14,8 +14,8 @@ const ACTIONS: Record<ActionId, { label: string; icon: string; title: string; ru
   cotasAuto: {
     label: 'Cotas auto',
     icon: 'measure',
-    title: 'Cotas automáticas do nível ativo: aberturas, paredes e total nos quatro lados',
-    run: () => editor.cotasAutomaticasDaPlanta(),
+    title: 'Cotas automáticas do nível ativo: escolha o que cotar, por onde medir e em quais lados',
+    run: () => useUi.setState({ dialog: 'cotasAuto', dialogArg: null }),
   },
 };
 

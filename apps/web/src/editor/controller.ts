@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { computeSection, cotasAutomaticas, resolveLevel, type ResolvedLevel, type SectionResult } from '@hestia/engine';
+import { computeSection, cotasAutomaticas, resolveLevel, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
   buildTemplate,
@@ -366,13 +366,18 @@ export class Editor {
   }
 
   /**
-   * Cotas automáticas da planta (camadas por lado: aberturas → paredes → total). As cotas entram como qualquer cota
-   * manual, com `refs` nas pontas de parede (associativas).
+   * Cotas automáticas da planta (camadas por lado: aberturas → paredes → contorno → total). As cotas entram como
+   * qualquer cota manual, com `refs` nas pontas de parede (associativas e projetadas no eixo do lado).
    */
-  cotasAutomaticasDaPlanta(): void {
+  cotasAutomaticasDaPlanta(opts: AutoCotaOptions = {}): void {
     const levelId = useUi.getState().levelId;
-    const cotas = cotasAutomaticas(this.store.project, levelId, { lados: 'todos' });
+    const cotas = cotasAutomaticas(this.store.project, levelId, opts);
     for (const dimension of cotas) this.store.exec({ type: 'addDimension', levelId, dimension });
+    useUi.setState({
+      status: cotas.length > 0
+        ? `${cotas.length} cotas automáticas criadas no nível. Ctrl+Z desfaz.`
+        : 'Nenhuma cota gerada: confira as camadas escolhidas e os lados com parede paralela.',
+    });
   }
 
   selectLevel(id: Id): void {

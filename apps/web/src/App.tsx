@@ -15,6 +15,7 @@ import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { SheetView } from './ui/SheetView.tsx';
 import { SheetDialog } from './ui/dialogs/SheetDialog.tsx';
 import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
+import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
@@ -123,6 +124,8 @@ function Dialogs(): ReactElement | null {
       return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
     case 'lineWeights':
       return <LineWeightsDialog />;
+    case 'cotasAuto':
+      return <AutoCotaDialog />;
     default:
       return null;
   }

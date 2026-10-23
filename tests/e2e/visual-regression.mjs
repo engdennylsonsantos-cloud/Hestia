@@ -150,10 +150,12 @@ const OPENING_CASES = {
   'laje-abertura-x': [SL('ls3', RECT_WALLS, { holes: RECT_HOLES })],
 };
 
-// Decisão 0028: cotas automáticas do nível ativo (botão "Cotas auto"). A casa 8 × 6 m tem uma porta na parede sul e uma
-// janela na norte; o gerador põe quatro lados em camadas aberturas → paredes → total. Baseline nova (conferida a olho).
+// Decisão 0028: cotas automáticas do nível ativo (botão "Cotas auto"). A casa 8 × 6 m é desenhada no sentido horário
+// (face externa para fora) e tem uma porta na parede sul e uma janela na norte. O caso fixa os critérios do diálogo:
+// as quatro camadas, aberturas pelas arestas, referência nas faces externas e só o contorno externo.
+const COTAS_WALLS = [[0, 0], [0, 6], [8, 6], [8, 0]];
 const COTAS_CASES = {
-  'cotas-automaticas': [...wallsOf(RECT_WALLS), OPEN('cd1', 'door', 'ot_p80', 'w0', 2), OPEN('cj1', 'window', 'ot_j120', 'w2', 3), { kind: 'autoCotas' }],
+  'cotas-automaticas': [...wallsOf(COTAS_WALLS), OPEN('cd1', 'door', 'ot_p80', 'w3', 6), OPEN('cj1', 'window', 'ot_j120', 'w1', 3), { kind: 'autoCotas' }],
 };
 const SECTION_CASES = {
   // Regra B (0023 §3): corte pela hierarquia. Parede embutida no piso (mesmo caso da planta) atravessada pelo corte em x = 3:
@@ -202,7 +204,7 @@ for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_C
       else if (w.kind === 'wallType') editor.store.exec({ type: 'upsertWallType', wallType: { ...editor.project.wallTypes[w.wallType.id], ...w.wallType } });
       else if (w.kind === 'opening') editor.store.exec({ type: 'addOpening', opening: w.opening });
       else if (w.kind === 'view') editor.store.exec({ type: 'addView', view: w.view });
-      else if (w.kind === 'autoCotas') editor.cotasAutomaticasDaPlanta();
+      else if (w.kind === 'autoCotas') editor.cotasAutomaticasDaPlanta({ lados: 'todos', geral: true, geometria: true, paredes: true, aberturas: true, modoAberturas: 'arestas', referencia: 'externa', somenteExternas: true, offset: 0.6, espacamento: 0.45 });
       else editor.store.exec({ type: 'addWall', wall: w });
     }
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });

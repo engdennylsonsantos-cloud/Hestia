@@ -41,6 +41,15 @@ describe('valor da cota', () => {
     expect(dimensionPoints(s.project, d).b).toEqual({ x: 4, y: 0 });
     expect(dimensionValue(s.project, d)).toBe(4);
   });
+
+  it('com eixo, a referência projeta só a coordenada do eixo (cadeia reta)', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: LV0, a: { x: 0, y: 0 }, b: { x: 4, y: 2 } }) });
+    // A ponta b está em (4, 2); a cota corre em y = 5 e só acompanha o x da parede.
+    const d = dim({ a: { x: 0, y: 5 }, b: { x: 0, y: 5 }, refs: { b: { wallId: 'w1', end: 'b', axis: 'x' } } });
+    expect(dimensionPoints(s.project, d).b).toEqual({ x: 4, y: 5 });
+    expect(dimensionValue(s.project, d)).toBe(4);
+  });
 });
 
 describe('geometria da cota', () => {

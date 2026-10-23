@@ -89,7 +89,8 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 - **Exportar PDF**: PDF 1.4 vetorial sem dependências, uma página por prancha.
 
 **Anotações** — cota (**Y**, com referência à parede) e texto (**X**), na planta e no DXF (camadas `COTAS` e `TEXTOS`).
-Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): camadas aberturas → paredes → total nos quatro lados.
+Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): diálogo de critérios (o que cotar, referência da parede
+e lados); camadas aberturas → paredes → contorno → total, só nos lados que têm parede paralela.
 
 **Avisos do projeto** (0029): o painel soma aos avisos do modelo três leituras da geometria resolvida —
 `abertura-fora-da-parede` (offset + largura passa do eixo), `parede-topo-desnivelado` (paredes colineares do mesmo
@@ -207,7 +208,7 @@ Os fluxos de navegador estão em `tests/e2e/*.mjs` (23 fluxos; `helpers.mjs` é 
 - Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 44+7+0, lajes 42+3+0, telhados 43+1+0,
   escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
-- `npx vitest run --maxWorkers=4` em 2026-10-23: 293 arquivos e 3568 testes, todos passando (115 s). O `npm run check`
+- `npx vitest run --maxWorkers=4` em 2026-10-23: 293 arquivos e 3577 testes, todos passando (120 s). O `npm run check`
   padrão estourou dois timeouts por carga nesta máquina (`predio10` e `ifcExport`); os mesmos testes passam em
   paralelismo menor.
 - `npm run test:rapido` em 2026-10-22: 277 arquivos e 3373 testes, todos passando (70,8 s; `test:rapido`, sem property e perf).

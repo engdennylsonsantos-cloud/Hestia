@@ -138,10 +138,15 @@ export interface Level {
   texts?: TextNote[];
 }
 
-/** Referência de uma extremidade da cota a uma extremidade de parede: a cota acompanha a parede. */
+/**
+ * Referência de uma extremidade da cota a uma extremidade de parede: a cota acompanha a parede.
+ * `axis` projeta a ponta no eixo da cota (cadeias de um lado da planta): a medida usa só a coordenada
+ * ao longo do lado e a ponta continua associativa. Sem `axis`, vale o ponto exato da parede (cota alinhada).
+ */
 export interface DimensionRef {
   wallId: Id;
   end: 'a' | 'b';
+  axis?: 'x' | 'y';
 }
 
 /**

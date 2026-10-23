@@ -270,7 +270,7 @@ export class ModelScene {
       // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
       // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
       const batches: SolidBatch[] = [
-        ...(shown('wall') ? buildLevelSolids(lv).batches : []),
+        ...(shown('wall') ? buildLevelSolids(lv, junctionLevel(p, lv.levelId)).batches : []),
         ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
         ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
         ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),

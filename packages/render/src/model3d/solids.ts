@@ -1,5 +1,5 @@
 import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
+import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, wallBandCut, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
 
@@ -334,13 +334,25 @@ let wallLayerStats = { hits: 0, misses: 0 };
  * Chave de conteúdo de uma camada: o que a extrusão lê (id da parede, material, cota da base e faixas). Parede que não
  * mudou (sem anexo de telhado, sem edição) dá a mesma chave e reaproveita o sólido, em vez de refazer as uniões.
  */
-function wallLayerKey(rw: ResolvedWall, l: ResolvedWall['layers'][number]): string {
-  return `${rw.wallId}|${l.materialId}|${rw.baseZ}|${JSON.stringify(l.bands)}`;
+function wallLayerKey(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): string {
+  return `${rw.wallId}|${l.materialId}|${rw.baseZ}|${JSON.stringify(wallBandsOf(rw, l, jl))}`;
+}
+
+/**
+ * Faixas da camada depois da junção com piso e laje (decisão 0023 §3, F4): a faixa recortada vira as partes que sobram,
+ * com cota relativa à base da parede. Sem junção, são as faixas da própria camada.
+ */
+function wallBandsOf(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): LayerBand[] {
+  return l.bands.flatMap((b, bandIndex) => {
+    const parts = wallBandCut(jl, rw.wallId, l.layerIndex, bandIndex);
+    if (!parts) return [b];
+    return parts.map((x) => ({ z0: x.z0 - rw.baseZ, z1: x.z1 - rw.baseZ, poly: x.poly }));
+  });
 }
 
 /** Sólido da camada (do cache, ou extrudado agora e guardado). Quem chama copia os dados; o cache não é alterado. */
-function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number]): SolidBatch {
-  const key = wallLayerKey(rw, l);
+function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): SolidBatch {
+  const key = wallLayerKey(rw, l, jl);
   const hit = wallLayerCache.get(key);
   if (hit) {
     wallLayerStats.hits++;
@@ -350,7 +362,7 @@ function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number]): So
   }
   wallLayerStats.misses++;
   const local: SolidBatch = { materialId: l.materialId, category: 'wall', positions: [], normals: [], indices: [], ids: [] };
-  ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(l.bands), rw.baseZ));
+  ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(wallBandsOf(rw, l, jl)), rw.baseZ));
   if (wallLayerCache.size >= WALL_CACHE_MAX) wallLayerCache.delete(wallLayerCache.keys().next().value!);
   wallLayerCache.set(key, local);
   return local;
@@ -370,10 +382,10 @@ function appendSolid(b: SolidBatch, f: SolidBatch): void {
  * Sólidos de todas as camadas das paredes do nível, por material. Cada camada sai de `wallLayerSolid` (cache por
  * conteúdo): ao anexar uma parede ao telhado, só as camadas dela são extrudadas de novo (decisão 0016, desempenho).
  */
-export function buildLevelSolids(r: ResolvedLevel): LevelSolids {
+export function buildLevelSolids(r: ResolvedLevel, jl?: JunctionLevel): LevelSolids {
   const byMat = new Map<Id, SolidBatch>();
   for (const rw of Object.values(r.walls)) {
-    for (const l of rw.layers) appendSolid(batchOf(byMat, l.materialId, 'wall'), wallLayerSolid(rw, l));
+    for (const l of rw.layers) appendSolid(batchOf(byMat, l.materialId, 'wall'), wallLayerSolid(rw, l, jl));
   }
   return { batches: [...byMat.values()] };
 }

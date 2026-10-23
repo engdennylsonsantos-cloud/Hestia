@@ -140,17 +140,16 @@ Testes desta fase (qualquer opção): `npx vitest run packages/engine/src/sectio
 
 ### F4 · 3D
 
-Arquivos: `packages/render/src/model3d/solids.ts` (`wallLayerSolid`, linhas 337-376), `packages/render/src/model3d/junctionSolids.test.ts`.
+Feito em 2026-10-23 (segue a opção A da F3: 3D segue a hierarquia, como os quantitativos).
 
-- [ ] Gerar o sólido da camada de parede a partir das partes resolvidas (uma por faixa, com `z0`/`z1` da parte).
-- [ ] Manter o mesmo material e a mesma chave de lote (`wallLayerKey`) para não quebrar seleção por BVH (`triBvh.ts`).
-- [ ] Ajustar `solids.ts` ao limite de 420 linhas por arquivo se preciso (ESLint `max-lines`): extrair `wallJunctionSolids.ts`.
-
-Testes:
-- [ ] Volume do sólido 3D da camada de parede = volume do quantitativo (tolerância 1e-6 relativa).
-- [ ] Seleção por clique numa parede cortada continua acertando a parede (teste em `triBvh` ou e2e).
-
-Aceite F4: os três volumes (quantitativo, sólido 3D e área do corte) batem para o mesmo nível de teste.
+- [x] `buildLevelSolids(r, jl)` recebe a junção (opcional, como `buildFloorSolids`); `scene3d.ts` passa `junctionLevel(p, lv.levelId)`.
+- [x] Faixa recortada é extrudada só nas partes que sobram (`wallBandsOf` em `solids.ts`); a chave do cache inclui essas faixas, então a
+      mudança invalida o sólido certo e nada mais.
+- [x] Mesmo material e mesma chave de lote (`wallLayerKey`), então a seleção por BVH não muda de forma.
+- [x] Teste: `packages/render/src/model3d/wallJunctionSolids.test.ts` (3 casos). Volume por divergência; parede acima do piso
+      fica igual com e sem junção.
+- [ ] Pendente: conferir o volume do 3D contra o quantitativo da mesma parede no mesmo nível (hoje o teste compara com a soma
+      das partes, não com `quantities.ts`). Fica para o teste de F5 (desenho = quantitativo).
 
 ### F5 · Fechamento da junção
 

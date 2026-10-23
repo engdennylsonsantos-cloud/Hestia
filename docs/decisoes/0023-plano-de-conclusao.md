@@ -75,22 +75,26 @@ Testes (`packages/engine/src/junctionWall.test.ts`, 7 casos):
 Aceite F1: `npx vitest run packages/engine` verde (2003 testes, 140 arquivos), `tsc` e `eslint` limpos nos arquivos novos.
 Medição: sem mudança de valor em testes antigos.
 
-### F1b · Parede que atravessa o nível (novo, achado da F1)
+### F1b · Parede que atravessa o nível (feito em 2026-10-23)
 
-Problema: `wallBandPieces(p, levelId)` só olha paredes **do próprio nível**. Uma parede de dois pavimentos (base no térreo,
-topo no pavimento superior) atravessa a laje do pavimento de cima, e essa laje não a corta. Isso vale para o quantitativo
-(`quantities.ts:65` usa `wallCutters(p, levelId)`), para a junção do nível e para o desenho. Os números de piso e laje
-também ignoram a parede de outro nível (`floorQuantities.ts:110`, `slabQuantities.ts:119`).
+Problema: a junção e os quantitativos só olhavam peças do próprio nível. Uma parede do térreo que sobe até o pavimento de cima
+não era cortada pela laje dele, nem no quantitativo nem no desenho.
 
-- [ ] Ao montar a junção de um nível, incluir as paredes de **outros níveis** cuja faixa de cota cruza a cota de algum piso
-      ou laje do nível em análise (faixa absoluta: `baseZ + band.z0..z1`).
-- [ ] Mesma regra nos quantitativos de piso, laje e parede (um só ponto de entrada, para não divergir).
-- [ ] Teste: parede de 6 m (térreo, base 0) com laje do pavimento 1 em 2,88–3,00 m corta a parede só nessa faixa; o volume
-      da parede no térreo cai pelo volume da laje sobre ela; o quantitativo da laje não muda.
-- [ ] Decidir com o dono se a parede de dois pavimentos é cortada pela laje ou pelo piso do pavimento de cima (é a mesma
-      regra de `winsOver`; a dúvida é só a semântica de produto).
+Solução: `levelCutterSet(p, levelId)` (em `junctionNet.ts`) reúne os cortadores do próprio nível e os de outros níveis que tocam
+a faixa de cota do nível. Peças de outro nível sem cota comum não entram. Junção (`junctionLevel`), quantitativos de piso, laje
+e parede (`floorCutters`, `slabCutters`, `wallCutters`) usam esta mesma função, para não divergirem.
 
-Aceite F1b: o quantitativo total do conjunto (parede + laje) não conta a sobreposição duas vezes, nem em um sentido nem no outro.
+- [x] `PieceMeta` guarda `layerIndex` e `bandIndex`, para devolver a parte resolvida à camada e à faixa certas.
+- [x] `junctionLevel` passa a usar `levelCutterSet`. Laje com caimento continua de fora.
+- [x] Quantitativos: `quantities.ts`, `floorQuantities.ts` e `slabQuantities.ts` herdam o alcance entre níveis sem mudar a chamada.
+- [x] Comentário de `quantities.ts` atualizado (a regra é par a par, inclusive com piso ou laje de outro nível).
+- [x] Testes: `packages/engine/src/junctionCrossLevel.test.ts` (5 casos). Parede de 6 m perde o volume que a laje do pavimento de
+      cima ocupa, e a perda bate com a soma par a par (`winsOver`). A laje não perde para a parede que ela vence. Parede de 2,80 m
+      não muda. A junção do térreo marca a parede como recortada.
+- [ ] Pendente: teste de desempenho com projeto de vários níveis (cada chamada percorre todos os níveis; hoje sem filtro
+      por elevação). Entra em §6.2.
+
+Medição: `npm run check` com 272 arquivos e 3.405 testes, todos passando. Nenhum teste antigo mudou de valor.
 
 ### F2 · Planta (verificação e não-regressão)
 
@@ -203,7 +207,7 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 | F3 (decisão) | `e127190` | 2026-10-23 | tentativa de corte pela hierarquia revertida; conflito com a P6 registrado |
 | F4 | `1a50f90` | 2026-10-23 | sólido 3D da parede recortado; 3 testes novos |
 | F3 regra B | `a9181fa` | 2026-10-23 | corte pela hierarquia (regra B, como Revit e ArchiCAD); `sectionCota.test.ts` reescrito; sem mudança no 3D |
-| F1b | — | — | em andamento |
+| F1b | (ver linha abaixo) | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
 
 ### 6.2 Pendências consolidadas da junção piso/laje × parede
 
@@ -211,7 +215,8 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 
 | # | Item | Estado | Fase | Notas |
 |---|---|---|---|---|
-| 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | em andamento | F1b | junção, quantitativos e 3D dependem disso |
+| 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | feito | F1b | commit da F1b; ver §6.1 |
+| 1b | Desempenho da junção com muitos níveis (sem filtro por elevação; cada chamada percorre todos os níveis) | pendente | F1b/perf | medir com projeto de 5+ níveis antes de otimizar |
 | 2 | Planta: teste de não-regressão e caso com plano de corte dentro da zona comum | pendente | F2 | a planta não muda na altura padrão |
 | 3 | Regressão visual do corte (mudou de propósito com a regra B) | pendente | F3/F5 | regravar a baseline só depois de olhar a imagem nova |
 | 4 | Teste "desenho = quantitativo": volume 3D e corte batem com o quantitativo da mesma parede | pendente | F5 | hoje o teste de F4 compara com a soma das partes, não com `quantities.ts` |

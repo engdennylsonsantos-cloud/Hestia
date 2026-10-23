@@ -1,10 +1,8 @@
 import { union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import type { LayerBand, ResolvedLayer, ResolvedWall } from './types.ts';
-import { resolveFloors } from './floors.ts';
-import { floorLayerPiece, slabLayerPiece, wallBandPieces, type SolidPiece } from './junctionNet.ts';
+import { levelCutterSet, type SolidPiece } from './junctionNet.ts';
 import { resolveJunction, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
-import { resolveSlabs } from './slabs.ts';
 
 /**
  * Junção resolvida de um nível (decisão 0023 §3 e §10, P7b). Uma função única para planta, corte e 3D: cada camada de
@@ -95,22 +93,20 @@ const levelCache = new Map<Id, { sig: string; value: JunctionLevel }>();
  * Paredes cortam pisos e lajes pela faixa de cada faixa de parede (o topo inclinado usa o ponto mais alto).
  */
 export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
+  // Cortadores do nível e dos níveis que o alcançam (F1b). Laje com caimento fica de fora da junção.
   const tagged: Tagged[] = [];
-  const add = (sp: SolidPiece, layerIndex: number): void => {
+  const cutters = levelCutterSet(p, levelId);
+  for (const sp of [...cutters.floors, ...cutters.slabs, ...cutters.walls].flatMap((c) => c.pieces)) {
+    const meta = sp.meta;
+    if (!meta || (meta.kind === 'slab' && !sp.flat)) continue;
     const piece = planarOf(sp);
-    if (piece) tagged.push({ piece, layerIndex });
-  };
-  for (const rf of resolveFloors(p, levelId)) {
-    for (const l of rf.layers) add(floorLayerPiece(rf, l), l.layerIndex);
-  }
-  for (const rs of resolveSlabs(p, levelId)) {
-    if (rs.slope) continue;
-    for (const l of rs.layers) add(slabLayerPiece(rs, l), l.layerIndex);
-  }
-  for (const w of wallBandPieces(p, levelId)) {
-    const piece = planarOf(w.piece);
     if (!piece) continue;
-    tagged.push({ piece, layerIndex: w.layerIndex, wall: { id: w.wallId, key: bandKey(w.layerIndex, w.bandIndex), flat: w.piece.flat } });
+    const layerIndex = meta.layerIndex ?? -1;
+    tagged.push(
+      meta.kind === 'wall'
+        ? { piece, layerIndex, wall: { id: meta.owner, key: bandKey(layerIndex, meta.bandIndex ?? 0), flat: sp.flat } }
+        : { piece, layerIndex },
+    );
   }
 
   const sig = signature(tagged);

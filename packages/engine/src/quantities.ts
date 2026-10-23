@@ -40,8 +40,8 @@ export interface Quantities {
 
 /**
  * Quantitativos por camada: o acabamento vem da própria parede (docs/02 §1). O volume é líquido: a parede perde a parte
- * que está dentro de piso ou laje do mesmo nível (padrão por tipo, decisão 0023 §1.3 e §4). Piso e laje não perdem nada
- * para a parede.
+ * que está dentro de piso ou laje (do mesmo nível ou do pavimento de cima que alcança a parede; padrão por tipo, decisão 0023 §1.3 e §4). A regra é par a par
+ * (decisão 0023 §1, B): quem tem prioridade maior fica com a zona comum, inclusive laje ou piso de outro nível que alcance a parede.
  */
 export function quantifyLevel(p: Project, r: ResolvedLevel): Quantities {
   const layers: LayerQuantity[] = [];

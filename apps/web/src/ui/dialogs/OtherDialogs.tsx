@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
-import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId } from '@hestia/model';
+import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId, type Wall } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -204,18 +204,53 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   );
 }
 
-function Thumb({ id }: { id: TemplateId }): ReactElement {
-  const walls = useMemo(() => Object.values(buildTemplate(id).elements).filter(isWall), [id]);
-  if (!walls.length) return <svg viewBox="0 0 10 7" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="6" fill="none" stroke="var(--line-strong)" strokeDasharray="0.4 0.3" strokeWidth="0.08" /></svg>;
+/** Enquadramento da miniatura: caixa das paredes com margem proporcional, para o desenho nunca sair do SVG. */
+function thumbViewBox(walls: Wall[]): string {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const w of walls) {
+    for (const v of [w.a, w.b]) {
+      x0 = Math.min(x0, v.x);
+      x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y);
+      y1 = Math.max(y1, v.y);
+    }
+  }
+  if (!Number.isFinite(x0)) return '0 0 10 7';
+  const pad = Math.max(0.4, Math.max(x1 - x0, y1 - y0) * 0.06);
+  return `${x0 - pad} ${y0 - pad} ${x1 - x0 + pad * 2} ${y1 - y0 + pad * 2}`;
+}
+
+/** Miniatura da planta do exemplo: as paredes do nível térreo, enquadradas na própria caixa. */
+function Thumb({ walls }: { walls: Wall[] }): ReactElement {
+  if (walls.length === 0) {
+    return (
+      <svg viewBox="0 0 10 7" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <rect x="0.5" y="0.5" width="9" height="6" fill="none" stroke="var(--line-strong)" strokeDasharray="0.4 0.3" strokeWidth="0.08" />
+      </svg>
+    );
+  }
   return (
-    <svg viewBox="-0.6 -0.6 11.2 8.2" aria-hidden="true" style={{ transform: 'scaleY(-1)' }}>
-      {walls.map((w) => <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="var(--fg)" strokeWidth="0.22" strokeLinecap="square" />)}
+    <svg viewBox={thumbViewBox(walls)} preserveAspectRatio="xMidYMid meet" aria-hidden="true" style={{ transform: 'scaleY(-1)' }}>
+      {walls.map((w) => <line key={w.id} x1={w.a.x} y1={w.a.y} x2={w.b.x} y2={w.b.y} stroke="var(--fg)" strokeWidth="0.2" strokeLinecap="square" />)}
     </svg>
   );
 }
 
 export function StartDialog(): ReactElement {
   const [has] = useState(() => editor.hasAutosave());
+  // Cada exemplo é montado uma vez: a miniatura usa as mesmas paredes que a contagem mostra.
+  const cards = useMemo(
+    () =>
+      TEMPLATES.map((t) => {
+        const p = buildTemplate(t.id);
+        const els = Object.values(p.elements);
+        return { ...t, walls: els.filter(isWall), levels: p.levels.length, horizontal: els.filter((e) => e.kind === 'floor' || e.kind === 'slab').length };
+      }),
+    [],
+  );
   const pick = (id: TemplateId): void => {
     editor.newProject(id);
     close();
@@ -230,12 +265,17 @@ export function StartDialog(): ReactElement {
       </>
     }>
       <div className="tplgrid">
-        {TEMPLATES.map((t) => (
+        {cards.map((t) => (
           <button key={t.id} className="tpl" onClick={() => pick(t.id)}>
-            <Thumb id={t.id} />
-            <strong>{t.name}</strong>
-            <span style={{ color: 'var(--fg-soft)' }}>{t.description}</span>
-            <span className="area">{t.area}</span>
+            <span className="tpl-thumb"><Thumb walls={t.walls} /></span>
+            <span className="tpl-body">
+              <span className="tpl-name">{t.name}</span>
+              <span className="tpl-desc">{t.description}</span>
+              <span className="tpl-meta">
+                {t.levels} {t.levels === 1 ? 'nível' : 'níveis'} · {t.walls.length} paredes{t.horizontal > 0 ? ` · ${t.horizontal} pisos` : ''}
+                <span className="area">{t.area}</span>
+              </span>
+            </span>
           </button>
         ))}
       </div>

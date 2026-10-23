@@ -288,12 +288,17 @@ svg { display: block; }
 .field-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
 .field-row > label { color: var(--fg-soft); }
 .section-svg { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r); width: 100%; }
-.tplgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--sheet); padding: 10px; display: grid; gap: 4px; }
-.tpl:hover { border-color: var(--accent); }
-.tpl strong { font-weight: 600; }
-.tpl .area { font-family: var(--font-mono); color: var(--accent); font-size: 11px; }
-.tpl svg { width: 100%; height: 76px; }
+.tplgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(226px, 1fr)); gap: 12px; }
+.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--sheet); padding: 0; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.tpl:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0, 0, 0, .1); }
+.tpl:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tpl-thumb { display: block; background: var(--chrome); border-bottom: 1px solid var(--line); aspect-ratio: 4 / 3; padding: 8px; }
+.tpl-body { display: grid; gap: 3px; padding: 10px 12px 12px; }
+.tpl-name { font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+.tpl-desc { color: var(--fg-soft); font-size: 11.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tpl-meta { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); }
+.tpl .area { font-family: var(--font-mono); color: var(--accent); font-size: 11px; margin-left: auto; }
+.tpl svg { width: 100%; height: 100%; display: block; }
 .kbtable { width: 100%; border-collapse: collapse; }
 .kbtable td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
 .kbtable kbd { font-family: var(--font-mono); background: var(--chrome); border: 1px solid var(--line-strong); border-radius: 3px; padding: 0 5px; }

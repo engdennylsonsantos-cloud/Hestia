@@ -224,6 +224,7 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 | F2 (decisão de escopo) | `b83d763` | 2026-10-23 | planta não recorta parede na altura padrão; sem mudança de código |
 | Regressão visual corte | `c7070b3` | 2026-10-23 | caso `junc-corte-parede-embutida-piso`, baseline conferida na imagem |
 | F5 (fechamento) | `c0d0883` | 2026-10-23 | desenho = quantitativo, matriz §9.1, cache por nível, paridade E3/C6/C8, docs 07 e 08 |
+| F6 (término no perímetro) | `abd31d8` | 2026-10-23 | nucleo/face/{cm} no perímetro; auto fica na face (compatibilidade); decisão 14 pendente |
 | F1b | `64a7b8e` | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
 
 ### 6.2 Pendências consolidadas da junção piso/laje × parede

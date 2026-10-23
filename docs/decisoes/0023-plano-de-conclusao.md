@@ -96,26 +96,18 @@ e parede (`floorCutters`, `slabCutters`, `wallCutters`) usam esta mesma função
 
 Medição: `npm run check` com 272 arquivos e 3.405 testes, todos passando. Nenhum teste antigo mudou de valor.
 
-### F2 · Planta (verificação e não-regressão)
+### F2 · Planta (fechada em 2026-10-23 por decisão de escopo)
 
-Arquivos: `packages/render/src/plan/build.ts` (linha 90), `packages/render/src/plan/junctionPlan.test.ts`.
+Medida do código: a forma da parede na planta é `wallUnion` (`plan/build.ts`), que usa a camada inteira (`cut` ou
+`fragment`) e não olha a cota do piso. O plano de corte da planta fica acima do piso, então a parede aparece inteira, e
+isso é o comportamento correto para a regra B.
 
-Na altura de corte padrão, a planta não muda: a parede aparece inteira porque o plano de corte está acima do piso. Esta fase
-existe para garantir que a planta usa a mesma fonte (`wallBandPartsOf`) e que o caso em que o plano de corte passa pela
-zona de sobreposição fica certo.
-
-- [ ] Usar `wallBandPartsOf` na região da camada da planta, onde hoje entra `rw.layers[].cut`/`fragment`. Quando o plano de corte
-      não toca a zona de sobreposição, o resultado tem que ser idêntico ao atual (teste de não-regressão).
-- [ ] Linhas de contorno de parede (`fragment`) seguem a região recortada, sem linha fantasma sobre o piso.
-- [ ] Linha de fronteira só onde o empate de prioridade deixa as duas camadas (`winsOver` = `null`).
-
-Testes:
-- [ ] Planta na altura de corte acima do piso: parede inalterada (regressão).
-- [ ] Plano de corte dentro da zona de sobreposição: área da parede na planta cai pela área comum.
-- [ ] Teste de regressão visual `tests/e2e/visual-regression.mjs`: caso novo `junção-piso-parede` (canto de sala).
-      **Baseline regravada só depois de olhar a imagem** (ver §4).
-
-Aceite F2: planta sem mudança na altura padrão e área cortada certa quando o plano atravessa a zona de sobreposição.
+- [x] Decisão: a planta não recorta a parede pela cota de piso ou laje na altura de corte padrão. Só o piso e a laje
+      (recortados pela junção, F1 e P7b) aparecem na planta com a região resolvida.
+- [x] Não há mudança de código nesta fase. `junctionPlan.test.ts` e `junctionCrossLevel.test.ts` cobrem o que a planta lê.
+- [ ] Caso não coberto: plano de corte dentro da zona de sobreposição (piso ou laje alcançando a altura de corte, por
+      exemplo a planta de um nível com piso elevado). Fica em §6.2 como pendência de baixa prioridade. Se for preciso,
+      exige `wallUnion` com a cota de corte da planta.
 
 ### F3 · Corte (regra B, decidida em 2026-10-23)
 
@@ -217,7 +209,7 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 |---|---|---|---|---|
 | 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | feito | F1b | `64a7b8e` |
 | 1b | Desempenho da junção com muitos níveis (sem filtro por elevação; cada chamada percorre todos os níveis) | pendente | F1b/perf | medir com projeto de 5+ níveis antes de otimizar |
-| 2 | Planta: teste de não-regressão e caso com plano de corte dentro da zona comum | pendente | F2 | a planta não muda na altura padrão |
+| 2 | Planta: caso com plano de corte dentro da zona comum (baixa prioridade) | decidido, pendente só o caso raro | F2 | a planta não muda na altura padrão; ver §3 F2 |
 | 3 | Regressão visual do corte (mudou de propósito com a regra B) | pendente | F3/F5 | regravar a baseline só depois de olhar a imagem nova |
 | 4 | Teste "desenho = quantitativo": volume 3D e corte batem com o quantitativo da mesma parede | pendente | F5 | hoje o teste de F4 compara com a soma das partes, não com `quantities.ts` |
 | 5 | Tabela §9.1 da 0023 (G-B, piso F1/F2/F3 × parede W1/W2/W3, L e T) como teste | pendente | F5 | a validação no Revit é conferência manual do dono |

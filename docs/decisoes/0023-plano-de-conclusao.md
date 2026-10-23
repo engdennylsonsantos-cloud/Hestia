@@ -180,13 +180,25 @@ Checklist:
       a área da camada. O teste antigo que fixava "todas iguais no perímetro" foi reescrito, porque codificava a limitação.
 - [x] Regressão visual: 31 casos, todos dentro da tolerância (nenhuma baseline mudou).
 
-### F7 · Cor, hachura e exportação por camada (P8 restante)
+### F7 · Cor, hachura e exportação por camada — em andamento desde 2026-10-23
 
-- [ ] Planta: cor e hachura por camada no piso e na laje (já há hachura por material; cor por camada é a parte nova).
-- [ ] DXF: uma camada de DXF por função de camada de piso e de laje (`ESTRUTURA_PISO`, `ACABAMENTO_PISO` etc., nomes a
-      definir no próprio código de `packages/render/src/dxf`).
-- [ ] IFC: `IfcSlab` e `IfcCovering` por camada, se a exportação já tiver a estrutura (ver `docs/07-STATUS-V1.md`: IFC não
-      exporta `IfcCovering` hoje). Se não houver, registrar como item de fase futura, não como pendência desta junção.
+Achado (2026-10-23): o DXF de pisos e lajes usa `f.polygon` (`apps/web/src/editor/dxfExport.ts`, linhas 192 e 203), que é o
+contorno antes da junção. A planta na tela usa a região resolvida (`el.region`, quando houve corte). Então o DXF não bate com a
+planta: mostra o piso inteiro onde a parede ou a laje já o recortou.
+
+Escopo decidido:
+- **F7.1 DXF = planta (implementar agora):** pisos e lajes exportam a região resolvida pela junção (`el.region` quando `el.cut`),
+  com o mesmo critério da planta. Checklist:
+  - [ ] `dxfExport.ts` usa `junctionLevel(p, levelId)` e `el.region` quando `cut`, senão `f.polygon`.
+  - [ ] Teste: piso com parede que o recorta exporta a região recortada (área menor que o contorno); piso sem corte, igual a antes.
+  - [ ] Furos continuam os da região (não duplicam os de escada).
+- **F7.2 Planta: cor e hachura por camada (decisão, sem código):** a planta mostra a superfície de cima (camada não membrana),
+  que é a que se vê de cima. As camadas de baixo ficam escondidas, e a diferença de término aparece só onde a parede cobre.
+  Pintar por camada não mudaria o que se enxerga. Fica fechado como decisão de escopo.
+- **F7.3 IFC por camada (fase futura, sem código nesta fase):** exige `IfcMaterialLayerSet` e `IfcCovering` (hoje o IFC exporta
+  o piso como `IfcSlab` FLOOR, com os prismas). É um trabalho próprio de exportação, não de junção. Registrado em §6.2.
+- Histórico: DXF e IFC usam os prismas e o contorno de hoje; a verificação do IFC contra a região resolvida fica em F7.1
+  (checar se `ifc/ifcTypes` recebe a região recortada ou o contorno).
 
 ## 4. Como verificar (comandos)
 

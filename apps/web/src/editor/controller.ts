@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { computeSection, resolveLevel, type ResolvedLevel, type SectionResult } from '@hestia/engine';
+import { computeSection, cotasAutomaticas, resolveLevel, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
   buildTemplate,
@@ -363,6 +363,16 @@ export class Editor {
   }
   redo(): void {
     this.store.redo();
+  }
+
+  /**
+   * Cotas automáticas da planta (camadas por lado: aberturas → paredes → total). As cotas entram como qualquer cota
+   * manual, com `refs` nas pontas de parede (associativas).
+   */
+  cotasAutomaticasDaPlanta(): void {
+    const levelId = useUi.getState().levelId;
+    const cotas = cotasAutomaticas(this.store.project, levelId, { lados: 'todos' });
+    for (const dimension of cotas) this.store.exec({ type: 'addDimension', levelId, dimension });
   }
 
   selectLevel(id: Id): void {

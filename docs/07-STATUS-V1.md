@@ -43,6 +43,12 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   explícito não recorta parede nem é recortada por ela — sem corte mútuo (0025 §5). O `passa` vinculado ancora a
   união das paredes no elemento, não na camada. Na seleção de cortes/elevações, o realce é por origem
   (`highlightOps`, `packages/render/src/section/build.ts`).
+- **Revisão 2026-10-23 (duas correções na borda da laje):** (1) o topo da parede anexada ao piso ou à laje passou a ser
+  decidido pelas camadas **sem** regra de término — antes a cota saía das camadas que a própria parede recorta, e o topo
+  ficava em dois níveis no mesmo eixo (2,91/2,93 m na casa de alto padrão, com fresta de 2 cm acima de aberturas);
+  (2) campo novo por camada, **limite no perímetro externo** (decisão 0027), para a laje ir só até a face externa da
+  parede ou até a face externa do núcleo, deixando o acabamento externo contínuo por fora dela. Evidência:
+  `packages/engine/src/wallAttachTermino.test.ts`, `limiteExterno.test.ts`, `apps/web/src/ui/dialogs/terminoForm.test.ts`.
 
 **Telhados** — 43 feitos, 1 fora de escopo, 0 pendentes (`docs/paridade/telhados.md`).
 - Formas uma, duas e quatro águas, contorno qualquer e extrusão de perfil; cumeeira, espigões e rincões; furos; beiral.

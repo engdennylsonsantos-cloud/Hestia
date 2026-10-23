@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, type Layer } from './index.ts';
-import { TERMINO_MAX_CM, terminoAtePrioridade, terminoEhRegraParede, terminoIssue, terminoMeters, terminoOf } from './termino.ts';
+import { TERMINO_MAX_CM, comTerminoValido, limiteExternoIssue, terminoAtePrioridade, terminoEhRegraParede, terminoIssue, terminoMeters, terminoOf } from './termino.ts';
 
 const camada = (termino?: Layer['termino']): Layer => ({ function: 'structure', materialId: 'mat_concreto', thickness: 0.1, wraps: false, ...(termino === undefined ? {} : { termino }) });
 
@@ -60,5 +60,30 @@ describe('término nas paredes: regra de parede e prioridade (decisão 0025)', (
   it('passa é válido e não tem deslocamento', () => {
     expect(terminoIssue(camada('passa'))).toBeNull();
     expect(terminoMeters('passa')).toBe(0);
+  });
+});
+
+describe('limite no perímetro externo (decisão 0027)', () => {
+  const comLimite = (limiteExterno?: Layer['limiteExterno']): Layer => ({ ...camada(), ...(limiteExterno === undefined ? {} : { limiteExterno }) });
+
+  it('campo ausente é válido e significa "contorno do elemento"', () => {
+    expect(limiteExternoIssue(comLimite())).toBeNull();
+  });
+
+  it('as duas faces externas são válidas; qualquer outro valor é erro', () => {
+    expect(limiteExternoIssue(comLimite('parede'))).toBeNull();
+    expect(limiteExternoIssue(comLimite('nucleo'))).toBeNull();
+    expect(limiteExternoIssue({ limiteExterno: 'externo' as never })).toMatch(/Limite no perímetro externo/);
+  });
+
+  it('o limite é independente do término: não muda a regra de parede', () => {
+    expect(terminoEhRegraParede(comLimite('nucleo'))).toBe(false);
+    expect(terminoOf(comLimite('parede'))).toBe('auto');
+  });
+
+  it('comTerminoValido barra o limite inválido ao gravar o tipo', () => {
+    const tipo = { layers: [{ ...camada(), limiteExterno: 'x' as never }] };
+    expect(() => comTerminoValido(tipo)).toThrow(/Limite no perímetro externo/);
+    expect(comTerminoValido({ layers: [comLimite('nucleo')] }).layers).toHaveLength(1);
   });
 });

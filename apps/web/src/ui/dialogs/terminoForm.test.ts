@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TERMINO_AJUDA, TERMINO_OPCOES, formDoTermino, terminoDoForm } from './terminoForm.ts';
+import { LIMITE_EXTERNO_AJUDA, LIMITE_EXTERNO_OPCOES, TERMINO_AJUDA, TERMINO_OPCOES, formDoLimiteExterno, formDoTermino, limiteExternoDoForm, terminoDoForm } from './terminoForm.ts';
 
 describe('campo "Término nas paredes" (decisão 0023 §2, P8; decisão 0025)', () => {
   it('oferece as seis opções, nesta ordem, com rótulos de até 22 caracteres', () => {
@@ -31,6 +31,19 @@ describe('campo "Término nas paredes" (decisão 0023 §2, P8; decisão 0025)', 
     expect(terminoDoForm('cm', '30,1')).toEqual({ erro: 'Entre −30 e 30 cm' });
     expect(terminoDoForm('cm', '')).toEqual({ erro: 'Entre −30 e 30 cm' });
     expect(terminoDoForm('cm', 'abc')).toEqual({ erro: 'Entre −30 e 30 cm' });
+  });
+
+  it('limite no perímetro externo: três opções, rótulos curtos e ida e volta com a camada', () => {
+    expect(LIMITE_EXTERNO_OPCOES.map((o) => o.value)).toEqual(['auto', 'parede', 'nucleo']);
+    for (const o of LIMITE_EXTERNO_OPCOES) {
+      expect([...o.label].length).toBeLessThanOrEqual(22);
+      expect(LIMITE_EXTERNO_AJUDA[o.value].length).toBeGreaterThan(10);
+    }
+    expect(limiteExternoDoForm('auto')).toBeUndefined();
+    expect(limiteExternoDoForm('parede')).toBe('parede');
+    expect(limiteExternoDoForm('nucleo')).toBe('nucleo');
+    expect(formDoLimiteExterno(undefined)).toBe('auto');
+    expect(formDoLimiteExterno('nucleo')).toBe('nucleo');
   });
 
   it('prioridade é inteira de 1 a 9; fora disso, erro sem gravar', () => {

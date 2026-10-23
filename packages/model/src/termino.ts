@@ -1,4 +1,4 @@
-import type { Layer, LayerTermino } from './types.ts';
+import type { Layer, LayerLimiteExterno, LayerTermino } from './types.ts';
 
 /**
  * Término na junção por camada (decisão 0023 §2, P8; regras por camada, decisão 0025). Campo opcional e aditivo: sem o
@@ -50,7 +50,20 @@ export const terminoAtePrioridade = (t: LayerTermino): number | null => (typeof 
 
 /** Tipo de piso ou de laje com as camadas validadas: lança erro na primeira camada com término inválido. */
 export function comTerminoValido<T extends { layers: readonly Layer[] }>(tipo: T): T {
-  const erro = tipo.layers.map((l) => terminoIssue(l)).find((e) => e !== null);
+  const erro = tipo.layers.flatMap((l) => [terminoIssue(l), limiteExternoIssue(l)]).find((e) => e !== null);
   if (erro) throw new Error(erro);
   return tipo;
+}
+
+/**
+ * Limite da camada no perímetro externo (decisão 0027). Ausente = o contorno do elemento manda, como antes; `parede` e
+ * `nucleo` são as duas faces externas da parede. Campo aditivo: arquivo antigo abre igual.
+ */
+export const limiteExternoOf = (l: Pick<Layer, 'limiteExterno'>): LayerLimiteExterno | undefined => l.limiteExterno;
+
+/** Erro de validação do limite externo, ou null quando é válido. */
+export function limiteExternoIssue(l: Pick<Layer, 'limiteExterno'>): string | null {
+  const v = l.limiteExterno;
+  if (v === undefined || v === 'parede' || v === 'nucleo') return null;
+  return 'Limite no perímetro externo: valor inválido';
 }

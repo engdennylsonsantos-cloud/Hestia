@@ -42,7 +42,20 @@ export interface Layer {
   priority?: number;
   /** Término na junção (decisão 0023 §2, P8): até onde a camada vai sobre a parede. Ausente = `auto`. Só pisos e lajes. */
   termino?: LayerTermino;
+  /**
+   * Limite no perímetro externo (decisão 0027): até onde a camada vai na **borda da edificação**, independente do
+   * `termino` (que governa as paredes internas). `parede` = até a face externa da parede, atravessando o acabamento
+   * externo; `nucleo` = passa sob o acabamento externo e para na face externa do núcleo. Ausente = contorno do elemento,
+   * como antes. Só pisos e lajes.
+   */
+  limiteExterno?: LayerLimiteExterno;
 }
+
+/**
+ * Limite da camada no perímetro externo (decisão 0027): `parede` (até a face externa da parede, incluindo o acabamento
+ * externo) ou `nucleo` (até a face externa do núcleo, sob o acabamento externo). Ausente: o contorno do elemento manda.
+ */
+export type LayerLimiteExterno = 'parede' | 'nucleo';
 
 /**
  * Término de uma camada de piso ou de laje nas paredes (decisão 0023 §2; regras por camada, decisão 0025): `auto`

@@ -1,4 +1,4 @@
-import { offsetMulti, type MultiPolygon, type Ring } from '@hestia/geom';
+import { intersection, offsetMulti, type MultiPolygon, type Ring } from '@hestia/geom';
 import { terminoMeters, terminoOf, type Id, type Layer, type LayerTermino, type OutlineSource, type Project } from '@hestia/model';
 import { enclosedRooms, outerPerimeter, roomAt, type RoomExtend } from './enclosed.ts';
 import type { ResolvedWall } from './types.ts';
@@ -68,6 +68,17 @@ export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: r
   // estrutura pode estar abaixo do contato da parede e ainda assim correr por baixo dela (revisão de 2026-10-22).
   const allZ0 = scope?.zones.length ? Math.min(...scope.zones.map((z) => z.z0)) : 0;
   const allZ1 = scope?.zones.length ? Math.max(...scope.zones.map((z) => z.z1)) : 0;
+  /**
+   * Limite no perímetro externo (decisão 0027). Independente do `termino` (que governa as paredes internas): corta a
+   * região da camada no contorno externo da edificação, na face pedida — `parede` na face externa do acabamento, `nucleo`
+   * na face externa do núcleo, que deixa o acabamento externo contínuo por fora da laje. Sem limite, fica o contorno.
+   */
+  const limite = (i: number, m: MultiPolygon): MultiPolygon => {
+    const lim = layers[i]?.limiteExterno;
+    if (!lim) return m;
+    const ring = outerPerimeter(p, levelId, src?.seed, lim === 'nucleo' ? 'core' : 'finish');
+    return ring ? intersection(m, [[ring]]) : m;
+  };
   if (src?.mode === 'perimeter') {
     // F6 (0023 §2): a borda externa tem a face de acabamento e a do núcleo, como as paredes internas.
     const edge = (extend: RoomExtend): MultiPolygon | null => {
@@ -92,7 +103,7 @@ export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: r
       // núcleo fica no contorno inteiro, que já está na face do núcleo, e as demais param na face interna da parede.
       if (!perimetroCore) return finish;
       return core[i] ? base : regionMinusWalls(p, base, wallsNow(), { kind: 'face' }, zoneOf(i).z0, zoneOf(i).z1);
-    });
+    }).map((m, i) => limite(i, m));
   }
   const circuit = (extend: RoomExtend): MultiPolygon | null => {
     const room = roomAt(enclosedRooms(p, levelId, extend), src!.seed!);
@@ -111,7 +122,7 @@ export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: r
     if (t === 'passa') return linked ? regionPlusWalls(ref, wallsNow(), allZ0, allZ1) : base;
     if (isAte(t)) return regionMinusWalls(p, ref, wallsNow(), { kind: 'ate', prioridade: t.ate.prioridade }, zoneOf(i).z0, zoneOf(i).z1);
     return core[i] && corePoly ? corePoly : finish;
-  });
+  }).map((m, i) => limite(i, m));
 }
 
 /**

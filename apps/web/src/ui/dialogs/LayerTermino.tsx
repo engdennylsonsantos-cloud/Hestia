@@ -1,6 +1,17 @@
 import { useState, type ReactElement } from 'react';
 import { terminoOf, type Layer } from '@hestia/model';
-import { TERMINO_AJUDA, TERMINO_OPCOES, formDoTermino, terminoDoForm, type TerminoKind } from './terminoForm.ts';
+import {
+  LIMITE_EXTERNO_AJUDA,
+  LIMITE_EXTERNO_OPCOES,
+  TERMINO_AJUDA,
+  TERMINO_OPCOES,
+  formDoLimiteExterno,
+  formDoTermino,
+  limiteExternoDoForm,
+  terminoDoForm,
+  type LimiteExternoKind,
+  type TerminoKind,
+} from './terminoForm.ts';
 
 interface LayerTerminoProps {
   /** Prefixo de id estável da linha, ex.: `ft-layer-0`. */
@@ -12,17 +23,30 @@ interface LayerTerminoProps {
 /** Linha "Término nas paredes" da seção avançada da camada de piso ou de laje (decisão 0023 §2, P8; decisão 0025). */
 export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactElement {
   const shown = formDoTermino(terminoOf(layer));
+  const shownLimite = formDoLimiteExterno(layer.limiteExterno);
   const [kind, setKind] = useState<TerminoKind>(shown.kind);
   const [cmText, setCmText] = useState(shown.cmText);
+  const [limite, setLimite] = useState<LimiteExternoKind>(shownLimite);
   const [erro, setErro] = useState<string | null>(null);
-  const [seen, setSeen] = useState(JSON.stringify(shown));
+  const [seen, setSeen] = useState(JSON.stringify({ shown, shownLimite }));
   // Sincroniza quando a camada muda por fora (desfazer, troca de tipo).
-  if (seen !== JSON.stringify(shown)) {
-    setSeen(JSON.stringify(shown));
+  if (seen !== JSON.stringify({ shown, shownLimite })) {
+    setSeen(JSON.stringify({ shown, shownLimite }));
     setKind(shown.kind);
     setCmText(shown.cmText);
+    setLimite(shownLimite);
     setErro(null);
   }
+
+  const applyLimite = (k: LimiteExternoKind): void => {
+    setLimite(k);
+    const next: Layer = { ...layer };
+    const v = limiteExternoDoForm(k);
+    if (v === undefined) delete next.limiteExterno;
+    else next.limiteExterno = v;
+    if (JSON.stringify(next.limiteExterno) === JSON.stringify(layer.limiteExterno)) return;
+    onChange(next);
+  };
 
   const apply = (k: TerminoKind, text: string): void => {
     const r = terminoDoForm(k, text);
@@ -80,6 +104,22 @@ export function LayerTermino({ id, layer, onChange }: LayerTerminoProps): ReactE
         </span>
       </div>
       <p id={`${id}-termino-help`} className="adv-help">{erro ?? TERMINO_AJUDA[kind]}</p>
+      <div className="adv-row">
+        <label htmlFor={`${id}-limite`}>Limite no perímetro</label>
+        <span className="adv-ctl">
+          <select
+            id={`${id}-limite`}
+            className="input"
+            value={limite}
+            onChange={(e) => applyLimite(e.target.value as LimiteExternoKind)}
+          >
+            {LIMITE_EXTERNO_OPCOES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </span>
+      </div>
+      <p id={`${id}-limite-help`} className="adv-help">{LIMITE_EXTERNO_AJUDA[limite]}</p>
     </div>
   );
 }

@@ -41,9 +41,11 @@ const isAte = (t: LayerTermino): t is { ate: { prioridade: number } } => typeof 
 
 /**
  * Contorno de cada camada, antes do corte de escada. Elemento estático, de perímetro externo ou com circuito aberto:
- * as camadas com `auto` recebem `base`, como antes. Vinculado a circuito fechado: `finish` e `core` vêm do mesmo
- * circuito (o do modo do elemento é o `base`; o outro é recalculado). Quando o circuito do núcleo não fecha, as camadas
- * que iriam ao núcleo ficam na face de acabamento.
+ * as camadas com `auto` recebem `base`, como antes — exceto no perímetro pelo núcleo (decisão 0026, D3): a camada fora
+ * do núcleo para na face interna da parede (`regionMinusWalls` com `{ kind: 'face' }` e a faixa de cota da própria
+ * camada) e a camada do núcleo (ou o tipo sem camada estrutural) fica no contorno do elemento, que já é o do núcleo.
+ * Vinculado a circuito fechado: `finish` e `core` vêm do mesmo circuito (o do modo do elemento é o `base`; o outro é
+ * recalculado). Quando o circuito do núcleo não fecha, as camadas que iriam ao núcleo ficam na face de acabamento.
  *
  * Término (decisão 0023 §2 e 0025): `face` = até a face de acabamento; `nucleo` = até o núcleo; `passa` = sem recorte;
  * `{ate}` = até a primeira camada da parede de prioridade ≤ N; `{cm}` = a face de acabamento deslocada (positivo avança), só
@@ -54,6 +56,9 @@ const isAte = (t: LayerTermino): t is { ate: { prioridade: number } } => typeof 
 export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: readonly Layer[], core: readonly boolean[], base: MultiPolygon, scope?: WallScope): MultiPolygon[] {
   const src = el.outlineSource;
   const linked = !!src?.linked && src.mode !== 'perimeter' && !!src.seed;
+  // Elemento de perímetro com contorno no núcleo (decisão 0026, D3): a camada do núcleo fica no contorno inteiro (que já
+  // está na face do núcleo) e as demais param na face interna da parede. Fora do modo core, `auto` continua como antes.
+  const perimetroCore = !linked && src?.mode === 'perimeter' && src.extend === 'core';
   const fallback = layers.map(() => base);
   const term = layers.map(terminoOf);
   const needCore = linked && term.some((t, i) => t === 'nucleo' || t === 'passa' || isAte(t) || (t === 'auto' && core[i]));
@@ -79,6 +84,7 @@ export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: r
     if (t === 'nucleo') return linked ? ref : regionMinusWalls(p, base, wallsNow(), { kind: 'nucleo' }, zoneOf(i).z0, zoneOf(i).z1);
     if (t === 'passa') return linked ? regionPlusWalls(ref, wallsNow(), allZ0, allZ1) : base;
     if (isAte(t)) return regionMinusWalls(p, ref, wallsNow(), { kind: 'ate', prioridade: t.ate.prioridade }, zoneOf(i).z0, zoneOf(i).z1);
+    if (perimetroCore && !core[i]) return regionMinusWalls(p, base, wallsNow(), { kind: 'face' }, zoneOf(i).z0, zoneOf(i).z1);
     return core[i] && corePoly ? corePoly : finish;
   });
 }

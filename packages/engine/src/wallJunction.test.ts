@@ -204,4 +204,58 @@ describe('parede recortada pela junção de piso e laje (0023 §10, P7c parte 2)
       }
     }
   });
+
+  it('perímetro do núcleo: a laje no núcleo deixa o acabamento externo contínuo (e o de acabamento recorta)', () => {
+    // Retângulo de 4 × 3 em sentido HORÁRIO, com `coreExterior`: a face externa do núcleo cai no eixo e a parede
+    // cresce para dentro (acabamento externo 2 cm para fora, núcleo 16 cm e acabamento interno 2 cm para dentro).
+    const MITER_T = { kind: 'miter' as const, flip: false };
+    const cerca = (extend: 'finish' | 'core', comLaje = true): Project => {
+      const base = createEmptyProject();
+      base.slabTypes.ls_t = { ...base.slabTypes.ls_mac12!, id: 'ls_t', name: 'Laje teste', code: 'LT', layers: [camada('structure', 0.1)] };
+      base.wallTypes.wt_t = { ...base.wallTypes.wt_alv14!, id: 'wt_t', name: 'Parede teste', code: 'T', layers: PAREDE };
+      const s = new ProjectStore(base);
+      const lados: Array<[string, Pt, Pt]> = [
+        ['w1', { x: 0, y: 3 }, { x: 4, y: 3 }],
+        ['w2', { x: 4, y: 3 }, { x: 4, y: 0 }],
+        ['w3', { x: 4, y: 0 }, { x: 0, y: 0 }],
+        ['w4', { x: 0, y: 0 }, { x: 0, y: 3 }],
+      ];
+      for (const [id, a, b] of lados) {
+        s.exec({ type: 'addWall', wall: makeWall({ id, typeId: 'wt_t', levelId: 'lv_0', a, b, height: 2.9, locationLine: 'coreExterior', joinStart: MITER_T, joinEnd: MITER_T }) });
+      }
+      if (comLaje) {
+        s.exec({
+          type: 'addSlab',
+          slab: makeSlab({
+            id: 's1',
+            typeId: 'ls_t',
+            levelId: 'lv_0',
+            boundary: rect(0, 0, 4, 3),
+            heightOffset: 0.15,
+            outlineSource: { mode: 'perimeter', seed: { x: 2, y: 1.5 }, linked: true, extend },
+          }),
+        });
+      }
+      return s.project;
+    };
+
+    // Decisão 0026, D3: a laje do perímetro no núcleo cobre o núcleo da parede e para na face interna; por fora do
+    // núcleo ela não entra, então o acabamento externo fica inteiro.
+    const p = cerca('core');
+    const desenhado = corte(p, 0.1);
+    // Sem a laje, o acabamento externo na cota 0,10 é a referência (a esquadria mexe nos cantos, então comparamos).
+    const semLaje = corte(cerca('core', false), 0.1);
+    expect(desenhado.layers[0]).toBe(nivel(p).walls.w1!.layers[0]);
+    expect(multiArea(desenhado.layers[0]!.cut)).toBeCloseTo(multiArea(semLaje.layers[0]!.cut), 9);
+    // A laje (topo 0,15, base 0,05) cruza a cota 0,10 e ocupa toda a faixa do núcleo dentro do contorno: sobra zero.
+    expect(multiArea(desenhado.layers[1]!.cut)).toBeCloseTo(0, 6);
+    // A laje vence o núcleo da parede e não perde nada.
+    expect(junc(p).elements.get('s1')!.cut).toBe(false);
+
+    // Controle: no perímetro de acabamento a laje avança 2 cm para fora do eixo e recorta o acabamento externo.
+    const controle = cerca('finish');
+    const desenhadoControle = corte(controle, 0.1);
+    expect(desenhadoControle.layers[0]).not.toBe(nivel(controle).walls.w1!.layers[0]);
+    expect(multiArea(desenhadoControle.layers[0]!.cut)).toBeLessThan(multiArea(desenhado.layers[0]!.cut));
+  });
 });

@@ -1,6 +1,7 @@
 import { union, type MultiPolygon } from '@hestia/geom';
 import {
   frameOfWall,
+  junctionLevel,
   openingGeometry,
   resolveFloors,
   resolveLevel,
@@ -103,6 +104,25 @@ function stairOf(p: Project, s: ResolvedStair): IfcStairGeo {
   };
 }
 
+
+/** Pisos do nível com o contorno da região resolvida pela junção (F7.1): a região quando houve corte, senão o contorno. */
+function resolveFloorsWithJunction(p: Project, levelId: Id) {
+  const jl = junctionLevel(p, levelId);
+  return resolveFloors(p, levelId).map((f) => {
+    const el = jl.elements.get(f.floorId);
+    return el?.cut ? { ...f, polygon: el.region } : f;
+  });
+}
+
+/** Lajes do nível com o contorno da região resolvida pela junção (F7.1). */
+function resolveSlabsWithJunction(p: Project, levelId: Id) {
+  const jl = junctionLevel(p, levelId);
+  return resolveSlabs(p, levelId).map((s) => {
+    const el = jl.elements.get(s.slabId);
+    return el?.cut ? { ...s, polygon: el.region } : s;
+  });
+}
+
 /**
  * Geometria RESOLVIDA do projeto para o IFC (decisão 0020): paredes, vãos, pisos, lajes, telhados e escadas pelo mesmo
  * motor da planta e do DXF. O io não importa o engine, então a montagem fica aqui, no web.
@@ -110,11 +130,18 @@ function stairOf(p: Project, s: ResolvedStair): IfcStairGeo {
 export function ifcGeometryOf(p: Project): IfcGeometry {
   const levels = p.levels.map((l) => l.id);
   const walls = levels.flatMap((id) => wallsOfLevel(p, id));
-  const floors = levels.flatMap((id) => resolveFloors(p, id)).map((f) => ({ floorId: f.floorId, prisms: prismsOf(f.polygon, flatPlane(f.topZ), flatPlane(f.bottomZ)) }));
-  const slabs = levels.flatMap((id) => resolveSlabs(p, id)).map((s) => {
-    const [top, bottom] = slabPlanes(s.topZ, s.bottomZ, s.slope);
-    return { slabId: s.slabId, prisms: prismsOf(s.polygon, top, bottom) };
-  });
+  // Pisos e lajes com a região resolvida pela junção, como a planta e o DXF (F7.1, 0023 §6). Sem corte, o contorno do elemento.
+  const floors = levels
+    .flatMap((id) => resolveFloorsWithJunction(p, id))
+    .map((f) => ({ floorId: f.floorId, prisms: prismsOf(f.polygon, flatPlane(f.topZ), flatPlane(f.bottomZ)) }))
+    .filter((f) => f.prisms.length > 0);
+  const slabs = levels
+    .flatMap((id) => resolveSlabsWithJunction(p, id))
+    .map((s) => {
+      const [top, bottom] = slabPlanes(s.topZ, s.bottomZ, s.slope);
+      return { slabId: s.slabId, prisms: prismsOf(s.polygon, top, bottom) };
+    })
+    .filter((s) => s.prisms.length > 0);
   const roofs = levels.flatMap((id) => resolveRoofs(p, id)).map((r) => {
     const t = roofThickness(r);
     const planes = r.planes.flatMap((pl) => {

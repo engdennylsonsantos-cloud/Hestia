@@ -83,17 +83,20 @@ describe('corte: a cota decide o que fica por cima (P6)', () => {
     expect(wallCut(r2, 'w1')).toBeGreaterThan(0);
   });
 
-  it('piso mais alto sobre laje mais baixa (sobreposição de cota): o piso fica por cima e a laje perde a faixa comum', () => {
+  it('piso mais alto sobre laje mais baixa (sobreposição de cota): regra B, a laje estrutural corta o piso na faixa comum', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addSlab', slab: makeSlab({ id: 'l1', typeId: 'ls_mac12', levelId: 'lv_0', boundary: RECT }) });
     s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: RECT, heightOffset: 0.12 }) });
     const r = computeSection(s.project, LINE);
     const floorArea = r.cut.reduce((acc, c) => acc + (c.parts ?? []).filter((q) => q.origin.floorId === 'f1').reduce((x, q) => x + areaOf(q.polygons), 0), 0);
     const slabArea = r.cut.reduce((acc, c) => acc + (c.parts ?? []).filter((q) => q.origin.slabId === 'l1').reduce((x, q) => x + areaOf(q.polygons), 0), 0);
+    const slabOnly = new ProjectStore(createEmptyProject());
+    slabOnly.exec({ type: 'addSlab', slab: makeSlab({ id: 'l1', typeId: 'ls_mac12', levelId: 'lv_0', boundary: RECT }) });
+    const slabAlone = computeSection(slabOnly.project, LINE);
     const floorAlone = computeSection(project(false), LINE);
-    // o piso (topo 0,12) cobre a laje (topo 0) na faixa comum: o piso fica inteiro e a laje perde essa faixa
-    expect(floorArea).toBeCloseTo(cutTotal(floorAlone), 6);
-    expect(slabArea).toBeGreaterThan(0);
+    // laje (topo 0) vence o piso (topo 0,12) na faixa comum (regra B, 0023 §1.3): a laje sai inteira e o piso perde essa faixa
+    expect(slabArea).toBeCloseTo(cutTotal(slabAlone), 6);
+    expect(floorArea).toBeLessThan(cutTotal(floorAlone) - 1e-9);
     expect(floorArea + slabArea).toBeCloseTo(cutTotal(r), 6);
   });
 });

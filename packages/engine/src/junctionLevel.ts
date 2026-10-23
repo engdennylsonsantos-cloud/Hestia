@@ -118,7 +118,8 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   const walls = new Map<Id, { cut: boolean; bands: Map<string, ResolvedPrism[]> }>();
   tagged.forEach(({ piece, layerIndex, wall }, i) => {
     const parts = res[i]!;
-    const untouched = parts.length === 1 && parts[0]!.poly === piece.poly;
+    // Intacta só se a peça inteira sobrou: uma fatia com a mesma forma mas em cota menor já foi recortada (a faixa sumiu).
+    const untouched = parts.length === 1 && parts[0]!.poly === piece.poly && parts[0]!.z0 === piece.z0 && parts[0]!.z1 === piece.z1;
     if (wall) {
       const wj = walls.get(wall.id) ?? { cut: false, bands: new Map<string, ResolvedPrism[]>() };
       if (wall.flat) {

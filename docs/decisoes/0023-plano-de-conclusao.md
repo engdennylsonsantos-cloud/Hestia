@@ -180,25 +180,29 @@ Checklist:
       a área da camada. O teste antigo que fixava "todas iguais no perímetro" foi reescrito, porque codificava a limitação.
 - [x] Regressão visual: 31 casos, todos dentro da tolerância (nenhuma baseline mudou).
 
-### F7 · Cor, hachura e exportação por camada — em andamento desde 2026-10-23
+### F7 · Cor, hachura e exportação por camada (feito em 2026-10-23, com decisões)
 
-Achado (2026-10-23): o DXF de pisos e lajes usa `f.polygon` (`apps/web/src/editor/dxfExport.ts`, linhas 192 e 203), que é o
-contorno antes da junção. A planta na tela usa a região resolvida (`el.region`, quando houve corte). Então o DXF não bate com a
-planta: mostra o piso inteiro onde a parede ou a laje já o recortou.
+Achado: o DXF e o IFC de pisos e lajes usavam `f.polygon`, o contorno antes da junção. A planta usa a região resolvida. Então
+a exportação não batia com a planta.
 
-Escopo decidido:
-- **F7.1 DXF = planta (implementar agora):** pisos e lajes exportam a região resolvida pela junção (`el.region` quando `el.cut`),
-  com o mesmo critério da planta. Checklist:
-  - [ ] `dxfExport.ts` usa `junctionLevel(p, levelId)` e `el.region` quando `cut`, senão `f.polygon`.
-  - [ ] Teste: piso com parede que o recorta exporta a região recortada (área menor que o contorno); piso sem corte, igual a antes.
-  - [ ] Furos continuam os da região (não duplicam os de escada).
-- **F7.2 Planta: cor e hachura por camada (decisão, sem código):** a planta mostra a superfície de cima (camada não membrana),
-  que é a que se vê de cima. As camadas de baixo ficam escondidas, e a diferença de término aparece só onde a parede cobre.
-  Pintar por camada não mudaria o que se enxerga. Fica fechado como decisão de escopo.
-- **F7.3 IFC por camada (fase futura, sem código nesta fase):** exige `IfcMaterialLayerSet` e `IfcCovering` (hoje o IFC exporta
-  o piso como `IfcSlab` FLOOR, com os prismas). É um trabalho próprio de exportação, não de junção. Registrado em §6.2.
-- Histórico: DXF e IFC usam os prismas e o contorno de hoje; a verificação do IFC contra a região resolvida fica em F7.1
-  (checar se `ifc/ifcTypes` recebe a região recortada ou o contorno).
+Achado extra (defeito corrigido nesta fase): `junctionLevel` marcava uma peça como "intacta" comparando só a forma do polígono.
+Quando a peça era recortada só em altura (a faixa de cota sumia, mas a fatia que sobrava tinha a mesma forma), ela ficava
+marcada como intacta, e o piso, a laje ou a parede não eram recortados na planta, no corte, no 3D nem na exportação. A checagem
+agora compara também a faixa de cota (`junctionLevel.ts`).
+
+- [x] **F7.1 DXF = planta:** pisos e lajes saem com a região resolvida (`resolvedRegion`, `dxfExport.ts`). Teste em
+      `apps/web/src/editor/dxfJunction.test.ts`: a laje estrutural vence a zona comum e sai inteira; piso inteiro dentro da laje
+      não sai no DXF, como na planta.
+- [x] **F7.1 IFC = planta:** `ifcExport.ts` usa a região resolvida e descarta elemento sem geometria. Teste no mesmo arquivo.
+- [x] **Correção do defeito de "intacta"** (`junctionLevel.ts`), com as expectativas de `sectionCota.test.ts` reescritas para a
+      regra B: a laje estrutural vence o piso na zona comum (antes o teste fixava a regra P6 de cota). A regressão visual (31
+      casos) e os cortes da casa (`01-corte`, `02-corte`, `05-topo`) continuam iguais.
+- [x] **F7.2 Planta: cor e hachura por camada = decisão de escopo, sem código:** a planta mostra a superfície de cima (camada
+      não membrana), que é a que se vê de cima. As camadas de baixo ficam escondidas; pintar por camada não mudaria o que se
+      enxerga. Fechado.
+- [ ] **F7.3 IFC por camada (fase futura):** exige `IfcMaterialLayerSet` e `IfcCovering`; o IFC hoje exporta o piso como
+      `IfcSlab` FLOOR. Trabalho próprio de exportação. Registrado em §6.2 (item 15). Limitação atual: o IFC usa a região
+      resolvida, mas a altura (topo e base) continua a do elemento inteiro.
 
 ## 4. Como verificar (comandos)
 
@@ -255,6 +259,7 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | feito | F5 | 100% em todos os elementos |
 | 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | feito | F5 | 08 corrigida (P-5 implementado) |
 | 9 | Término por camada no perímetro externo (P8b) | feito, exceto item 14 | F6 | `nucleo`, `face` e `{cm}` valem no perímetro; `auto` fica na face (compatibilidade) |
+| 15 | IFC por camada (`IfcMaterialLayerSet`, `IfcCovering`), fase própria de exportação | fase futura | F7.3 | hoje o IFC usa a região resolvida com a altura do elemento |
 | 14 | `auto` no perímetro: levar a estrutura ao núcleo (como nas paredes internas) muda a área de pisos e lajes de borda já existentes | decisão pendente do dono | F6 | hoje fica na face para não mudar projetos antigos |
 | 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
 | 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |

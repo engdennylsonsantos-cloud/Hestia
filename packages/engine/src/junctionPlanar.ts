@@ -69,7 +69,10 @@ export function layerMetas(kind: JunctionKind, layers: readonly Layer[]): Juncti
  * maior (número menor) que estejam fora do núcleo; (2) prioridade: número menor vence; (3) empate: hierarquia por tipo.
  */
 export function winsOver(a: JunctionMeta, b: JunctionMeta): boolean | null {
+  // Camada com regra explícita (0025) decide a própria região com as paredes: ela não é recortada por parede e também
+  // não recorta a parede (senão os dois lados perdem a mesma faixa e sobra um vazio).
   if (b.explicit && a.kind === 'wall') return null;
+  if (a.explicit && b.kind === 'wall') return null;
   if (a.core && !b.core && b.priority < a.priority) return true;
   if (b.core && !a.core && a.priority < b.priority) return false;
   if (a.priority !== b.priority) return a.priority < b.priority;

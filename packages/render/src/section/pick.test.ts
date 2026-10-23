@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { multiArea, pointInMulti, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { computeSection, type SectionResult } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeSlab, makeStair, makeWall, type Project, type StairCurve, type StairRun } from '@hestia/model';
 import { LIGHT } from '../plan/types.ts';
 import { buildSectionDrawList, type SectionInput } from './build.ts';
-import { pickSection, sectionItems } from './pick.ts';
+import { ownerOf, pickSection, sectionItems } from './pick.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const RECT: Vec2[] = [v(0, 0), v(6, 0), v(6, 4), v(0, 4)];
@@ -224,8 +224,34 @@ describe('realce na lista de desenho', () => {
   it('o realce cobre só as partes visíveis do selecionado (sem contornos de outros itens)', () => {
     const s = computeSection(fachada(), FRENTE);
     const d = buildSectionDrawList(input({ selection: ['frente'], hover: null }));
-    const frente = sectionItems(s).filter((it) => it.owners.some((o) => o.id === 'frente'));
-    expect(selectedFills(d).map((f) => f.polygons)).toEqual(frente.map((it) => it.polygons));
+    const want = sectionItems(s)
+      .filter((it) => it.owners.some((o) => o.id === 'frente'))
+      .reduce((total, it) => {
+        const parts = it.parts?.filter((p) => ownerOf(p.origin)?.id === 'frente') ?? [];
+        return total + multiArea(parts.length > 0 ? union(...parts.map((p) => p.polygons)) : it.polygons);
+      }, 0);
+    const fills = selectedFills(d);
+    expect(fills.length).toBeGreaterThan(0);
+    expect(fills.reduce((total, f) => total + multiArea(f.polygons), 0)).toBeCloseTo(want, 9);
+  });
+
+  it('corte unido: selecionar uma parede realça só a parte dela, não a das outras origens', () => {
+    const store = new ProjectStore(createEmptyProject());
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'a', typeId: 'wt_alv14', levelId: 'lv_0', a: v(1, 0), b: v(1, 4), height: 3 }) });
+    store.exec({ type: 'addWall', wall: makeWall({ id: 'b', typeId: 'wt_alv14', levelId: 'lv_0', a: v(4, 0), b: v(4, 4), height: 3 }) });
+    const section = computeSection(store.project, { a: v(-1, 2), b: v(7, 2), depth: 2 });
+    const items = sectionItems(section).filter((it) => it.owners.some((o) => o.id === 'a'));
+    expect(items.some((it) => it.owners.some((o) => o.id === 'b'))).toBe(true);
+    const areaOf = (it: (typeof items)[number], id: string): number => {
+      const parts = it.parts?.filter((p) => ownerOf(p.origin)?.id === id) ?? [];
+      return parts.length > 0 ? multiArea(union(...parts.map((p) => p.polygons))) : 0;
+    };
+    const areaA = items.reduce((total, it) => total + areaOf(it, 'a'), 0);
+    const areaAll = items.reduce((total, it) => total + multiArea(it.polygons), 0);
+    expect(areaA).toBeLessThan(areaAll - 1e-6);
+    const d = buildSectionDrawList({ ...input({ selection: ['a'], hover: null }), project: store.project, section });
+    const fills = selectedFills(d);
+    expect(fills.reduce((total, f) => total + multiArea(f.polygons), 0)).toBeCloseTo(areaA, 9);
   });
 
   it('seleção múltipla: cada selecionado aparece; o que não está na vista não aparece', () => {

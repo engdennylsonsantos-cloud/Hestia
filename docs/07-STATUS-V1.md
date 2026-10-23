@@ -37,6 +37,16 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 - Junção piso/laje × parede (0023 P7, P7b e P7c parte 2): prioridade efetiva alimenta os quantitativos; planta, corte,
   elevação e 3D desenham piso, laje e parede pelas mesmas partes por camada, então o desenhado é o quantificado. Fora:
   laje com caimento fora da junção, parede curva (entra só pelo polígono) e DXF/IFC por camada.
+- **Revisão 2026-10-22 (correções aplicadas e verificadas)**: no término por camada, a faixa de cota
+  para escolher as paredes passou a ser a de cada camada (`floors.ts`/`slabs.ts`; 0025 §2), e camada com término
+  explícito não recorta parede nem é recortada por ela — sem corte mútuo (0025 §5). O `passa` vinculado ancora a
+  união das paredes no elemento, não na camada. Na seleção de cortes/elevações, o realce é por origem
+  (`highlightOps`, `packages/render/src/section/build.ts`). Verificação: `typecheck` e `lint` verdes,
+  `test:rapido` 277 arquivos / 3375 testes, `test:completo` 278 / 3677, e2e
+  `parede-recorte`/`piso-unico`/`pisos`/`lajes`/`contorno`/`sections`/`flow` verdes; na regressão visual CPU os dois
+  casos novos ficam em 0,000% e os antigos divergem 0,373–0,747% só no banner "Sem GPU" e em texto/hachura do
+  ambiente (não atualizar as baselines antigas). A regressão GPU não roda nesta máquina Windows (o caminho
+  `/opt/pw-browsers` é fixo no script).
 
 **Telhados** — 43 feitos, 1 fora de escopo, 0 pendentes (`docs/paridade/telhados.md`).
 - Formas uma, duas e quatro águas, contorno qualquer e extrusão de perfil; cumeeira, espigões e rincões; furos; beiral.
@@ -126,6 +136,10 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   laje com caimento fora da junção.
 - **Término na junção** (0023 P8 e 0025 P10): falta cor e hachura por camada na planta, e IFC e DXF por camada.
   Junção entre níveis (P7c): parede × piso/laje do nível vizinho entra na junção, nos quantitativos e nos desenhos.
+- **Piso + laje no mesmo nível, sobrepostos** (decisão pendente do dono, Revisão 2026-10-22): com, por exemplo,
+  `ft_acab` + `ls_mac12` no mesmo nível, o piso perde todas as camadas e some. A regra piso × laje não foi alterada
+  pelas correções de 2026-10-22; o aviso `slab-floor-overlap` sinaliza o caso. Relacionado: "Inverter corte/Não
+  cortar" por par (P-4) seguem adiados (0023 §13).
 - **Canto reentrante de um L** (achado do P8, não corrigido): o circuito de paredes deixa um quadrado d × d sem parede
   (d = meia espessura) que entra no cômodo. A área do L em `layerOutline.test.ts` inclui esse quadrado de propósito.
 - **Close-ups 3D do L** (`tests/e2e/escadas-closeup.mjs`): tolerância própria de 1,5% (d) e 25% (f), porque o WebGL por

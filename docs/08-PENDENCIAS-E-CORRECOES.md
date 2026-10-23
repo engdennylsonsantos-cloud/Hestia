@@ -26,6 +26,29 @@ Atualização (2026-10-22, P7c parte 2 — parede recortada nos desenhos): **E3 
   0,000%); `test:perf` verde (K4 3,07 s). Build: `npm run build` falha na minificação do esbuild (acesso negado ao
   remover o temporário); o build dos e2e é `npm run build -w @hestia/web -- --target esnext --minify false`.
 
+Atualização (2026-10-22, correções da P7c/P10 — aplicadas e verificadas):
+- **Faixa de cota por camada** (`floors.ts`/`slabs.ts`): a faixa usada para escolher as paredes do término explícito
+  passou a ser a faixa real de CADA camada (antes, a do elemento inteiro). Parede que só encosta no topo/base do
+  piso/laje recorta apenas a camada tocada; as demais continuam inteiras (0025 §2).
+- **Fim do corte mútuo** (`junctionPlanar.ts`, `winsOver`): camada com término explícito (`face`, `nucleo`, `passa`,
+  `ate`) não recorta parede nem é recortada por ela — a parede não é mais interrompida pela camada que se recorta para
+  recebê-la. Vale para piso × parede e laje × parede; piso × laje e piso × piso não mudam (0025 §5).
+- **Realce por origem** (`packages/render/src/section/build.ts`, `highlightOps`): na seleção de cortes/elevações, o
+  realce usa as peças por origem (`SectionPart`/`parts`) e destaca só o dono selecionado; quando o motor não separa
+  origens, cai no item inteiro. Antes, o corte unido realçava todas as origens do item.
+- Testes alvo que passaram: `terminoPiso.test.ts`, `terminoLaje.test.ts`, `junctionPlanar.test.ts`,
+  `junctionLevel.test.ts`, `wallJunction.test.ts`, `pick.test.ts`, `terminoPisoSection.test.ts` e
+  `terminoVinculado.test.ts`. Verificação final: `typecheck` e `lint` verdes, `test:rapido` 277/3375 e
+  `test:completo` 278/3677; e2e `parede-recorte`, `piso-unico`, `pisos`, `lajes`, `contorno`, `sections` e `flow`
+  verdes. Na regressão visual CPU os dois casos novos ficam em 0,000% e os antigos em 0,373–0,747% (banner "Sem GPU"
+  + texto/hachura do ambiente); a GPU não roda no Windows por causa do caminho fixo `/opt/pw-browsers`.
+- **Decisão pendente do dono (nova)**: piso + laje no mesmo nível e sobrepostos (ex. `ft_acab` + `ls_mac12`) ainda
+  fazem o piso perder todas as camadas e sumir; a regra piso × laje não foi alterada. O aviso `slab-floor-overlap`
+  sinaliza. P-4 (inversão por par) continua adiada.
+- **Consequência conhecida (0025 §9.6)**: com `passa` atravessado por parede (base abaixo do topo da camada), a
+  parede e a camada ficam inteiras e a faixa comum pode ser contada duas vezes. O desenho não deixa vazio; o desconto
+  (ou a decisão de o `passa` ceder) fica para o dono.
+
 Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido contra código, testes e decisões; nenhum código alterado.**
 - **Entrou na frente de piso e laje** (já no código): contorno associativo às paredes (0023 P1–P3), membrana de espessura
   zero (P4), tipo `ft_acab` e quantitativos líquidos (P5), corte e planta por cota (P6), parede anexada por trecho (P9),

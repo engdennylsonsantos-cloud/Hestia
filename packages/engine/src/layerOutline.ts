@@ -68,12 +68,16 @@ export function layerOutlines(p: Project, levelId: Id, el: LinkedHost, layers: r
   let walls: ResolvedWall[] | null = null;
   const wallsNow = (): ResolvedWall[] => (walls ??= scope ? scope.levelIds.flatMap((id) => wallsOfLevel(p, id)) : []);
   const zoneOf = (i: number): LayerZone => scope?.zones[i] ?? { z0: 0, z1: 0 };
+  // O `passa` de elemento vinculado soma a pegada das paredes que tocam o ELEMENTO (0025 §4), não só a camada: a
+  // estrutura pode estar abaixo do contato da parede e ainda assim correr por baixo dela (revisão de 2026-10-22).
+  const allZ0 = scope?.zones.length ? Math.min(...scope.zones.map((z) => z.z0)) : 0;
+  const allZ1 = scope?.zones.length ? Math.max(...scope.zones.map((z) => z.z1)) : 0;
   return layers.map((_, i) => {
     const t = term[i]!;
     if (typeof t === 'object' && 'cm' in t) return linked && t.cm !== 0 ? offsetMulti(finish, terminoMeters(t)) : base;
     if (t === 'face') return linked ? finish : regionMinusWalls(p, base, wallsNow(), { kind: 'face' }, zoneOf(i).z0, zoneOf(i).z1);
     if (t === 'nucleo') return linked ? ref : regionMinusWalls(p, base, wallsNow(), { kind: 'nucleo' }, zoneOf(i).z0, zoneOf(i).z1);
-    if (t === 'passa') return linked ? regionPlusWalls(ref, wallsNow(), zoneOf(i).z0, zoneOf(i).z1) : base;
+    if (t === 'passa') return linked ? regionPlusWalls(ref, wallsNow(), allZ0, allZ1) : base;
     if (isAte(t)) return regionMinusWalls(p, ref, wallsNow(), { kind: 'ate', prioridade: t.ate.prioridade }, zoneOf(i).z0, zoneOf(i).z1);
     return core[i] && corePoly ? corePoly : finish;
   });

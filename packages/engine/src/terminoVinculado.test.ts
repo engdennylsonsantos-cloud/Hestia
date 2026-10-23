@@ -53,5 +53,8 @@ describe('piso vinculado com regra de parede (decisão 0025)', () => {
     const f = vinculado(['passa', 'face', 'passa']);
     expect(multiArea(f.layers[0]!.polygon)).toBeCloseTo(4.184 * 3.184, 2);
     expect(multiArea(f.layers[0]!.polygon)).toBeGreaterThan(multiArea(vinculado([{ ate: { prioridade: 1 } }, 'face', 'passa']).layers[0]!.polygon));
+    // A estrutura `passa` está abaixo do contato da parede (base no topo do piso): ancora no ELEMENTO, senão perde a
+    // união da pegada das paredes (revisão de 2026-10-22).
+    expect(multiArea(f.layers[2]!.polygon)).toBeCloseTo(4.184 * 3.184, 2);
   });
 });

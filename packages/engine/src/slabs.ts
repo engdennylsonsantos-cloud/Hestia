@@ -79,8 +79,8 @@ export function resolveSlabs(p: Project, levelId: Id, opts: FloorResolveOptions 
     const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, underside)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
-    // Faixa de cota da laje inteira: a parede que parte do topo dela (ou que termina nela) corta todas as camadas.
-    const zones = bounds.map(() => ({ z0: bottomZ, z1: topZ }));
+    // Faixa de cota de cada camada (decisão 0025, revista): a parede só recorta as camadas com que se cruza de fato.
+    const zones = bounds;
     const levelIds = [s.levelId, ...adjacentLevelIds(p, s.levelId)];
     const outlines = opts.layers === false ? type.layers.map(() => base) : layerOutlines(p, s.levelId, s, type.layers, core, base, { levelIds, zones });
     const layers: ResolvedSlabLayer[] = type.layers.map((l, i) => ({

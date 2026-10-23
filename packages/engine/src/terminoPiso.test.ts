@@ -71,11 +71,13 @@ const BRUTA = 10 * 8;
 const PEGADA = 0.184 * 8;
 
 describe('piso único: término por camada (decisão 0025)', () => {
-  it('(a) acabamento até a face vira duas partes e perde a pegada; a estrutura que passa mantém a área bruta', () => {
+  it('(a) só a camada que a parede toca perde a pegada; abaixo dela o piso continua inteiro', () => {
     const p = cenario();
     expect(poligono(p, 0)).toHaveLength(2);
     expect(area(p, 0)).toBeCloseTo(BRUTA - PEGADA, 6);
-    expect(area(p, 1)).toBeCloseTo(BRUTA - PEGADA, 6);
+    // A parede nasce no topo do piso e só encosta na primeira camada: as demais ficam inteiras (0025 revista).
+    expect(poligono(p, 1)).toHaveLength(1);
+    expect(area(p, 1)).toBeCloseTo(BRUTA, 6);
     expect(area(p, 3)).toBeCloseTo(BRUTA, 6);
   });
 
@@ -159,6 +161,24 @@ describe('piso único: a junção automática não recorta as camadas com regra 
     });
     expect(junctionLevel(s.project, 'lv_0').elements.get('pu')?.cut ?? false).toBe(false);
     expect(area(s.project, 0)).toBeCloseTo(BRUTA - PEGADA, 6);
+  });
+
+  it('parede atravessando camada com regra: a camada não recorta a parede (sem corte mútuo)', () => {
+    const base = createEmptyProject();
+    base.floorTypes.ft_teste = { ...base.floorTypes.ft_unico!, id: 'ft_teste', layers: UNICO_LAYERS };
+    const s = new ProjectStore(base);
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'pu', typeId: 'ft_teste', levelId: 'lv_0', boundary: RECT.map((q) => ({ ...q })) }) });
+    s.exec({
+      type: 'addWall',
+      wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: ENTRE, b: ATE, baseOffset: -0.1, height: 2.8, joinStart: LIVRE, joinEnd: LIVRE }),
+    });
+    const w = junctionLevel(s.project, 'lv_0').elements.get('w1')!;
+    expect(w.cut).toBe(false);
+    for (const layer of w.layers) {
+      expect(layer.parts).toHaveLength(1);
+      expect(layer.parts[0]!.z0).toBeCloseTo(-0.1, 9);
+      expect(layer.parts[0]!.z1).toBeCloseTo(2.7, 9);
+    }
   });
 });
 

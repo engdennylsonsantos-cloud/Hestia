@@ -87,8 +87,8 @@ export function resolveFloors(p: Project, levelId: Id, opts: FloorResolveOptions
     const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, bottomZ)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
-    // Faixa de cota do piso inteiro: a parede que parte do topo dele corta todas as camadas (decisão 0025).
-    const zones = bounds.map(() => ({ z0: bottomZ, z1: topZ }));
+    // Faixa de cota de cada camada (decisão 0025, revista): a parede só recorta as camadas com que se cruza de fato.
+    const zones = bounds;
     const outlines = opts.layers === false ? type.layers.map(() => base) : layerOutlines(p, f.levelId, f, type.layers, core, base, { levelIds: [f.levelId], zones });
     const layers: ResolvedFloorLayer[] = type.layers.map((l, i) => ({
       layerIndex: i,

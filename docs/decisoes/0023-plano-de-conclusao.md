@@ -171,13 +171,14 @@ Desenho (decidido antes de codar, para retomada por outro agente):
   a área de pisos e lajes de borda que já existem. Conferir os testes e as baselines visuais antes de aceitar.
 
 Checklist:
-- [ ] `outerPerimeter` com `extend` e cache por `levelId|extend`.
-- [ ] `layerOutlines` com o ramo `perimeter` por camada.
-- [ ] Teste: piso de borda com acabamento que avança 5 cm sobre o perímetro externo; área do acabamento muda, a da
-      estrutura não (ou a estrutura vai ao núcleo em `auto`, conforme a decisão acima).
-- [ ] Testes existentes de perímetro (`junc-laje-perimetro-parede` e os de `outlineBound`) conferidos; mudança de valor
-      explicada no commit.
-- [ ] Regressão visual, com baseline só depois de olhar a imagem.
+- [x] `outerPerimeter` com `extend` e cache por `levelId|extend` (`enclosed.ts`).
+- [x] `layerOutlines` com o ramo `perimeter` por camada (`layerOutline.ts`, função `pickLayer` compartilhada com as paredes internas).
+- [x] **Decisão tomada na implementação:** no perímetro, o `auto` fica na face de acabamento (como antes), para projetos antigos
+      não mudarem de área. O término `nucleo` por escrito, `face` e `{cm}` valem. Ficou em §6.2 (item 14) para o dono decidir se o
+      `auto` deve levar a estrutura ao núcleo também no perímetro, como nas paredes internas.
+- [x] Testes em `layerOutline.test.ts`: `auto` = face (compatibilidade); `nucleo` escrito vai ao núcleo externo; `{cm: 5}` aumenta
+      a área da camada. O teste antigo que fixava "todas iguais no perímetro" foi reescrito, porque codificava a limitação.
+- [x] Regressão visual: 31 casos, todos dentro da tolerância (nenhuma baseline mudou).
 
 ### F7 · Cor, hachura e exportação por camada (P8 restante)
 
@@ -240,7 +241,8 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | feito | F5 | `junctionCache.test.ts`, por identidade do objeto em cache |
 | 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | feito | F5 | 100% em todos os elementos |
 | 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | feito | F5 | 08 corrigida (P-5 implementado) |
-| 9 | Término por camada no perímetro externo (P8b) | em andamento | F6 | ver §3 F6 |
+| 9 | Término por camada no perímetro externo (P8b) | feito, exceto item 14 | F6 | `nucleo`, `face` e `{cm}` valem no perímetro; `auto` fica na face (compatibilidade) |
+| 14 | `auto` no perímetro: levar a estrutura ao núcleo (como nas paredes internas) muda a área de pisos e lajes de borda já existentes | decisão pendente do dono | F6 | hoje fica na face para não mudar projetos antigos |
 | 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
 | 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |
 | 12 | Inversão de corte por par (P-4, P10) | decisão pendente do dono | — | não bloqueia a conclusão |

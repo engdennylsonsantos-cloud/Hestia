@@ -157,10 +157,25 @@ describe('contorno por camada: estático e casos sem vínculo (decisão 0023 §2
     expect(multiArea(f.polygon)).toBeCloseTo(4 * 3, 9);
   });
 
-  it('modo perímetro externo: todas as camadas usam o mesmo contorno (P8 não cobre o perímetro)', () => {
-    const p = build({ mode: 'perimeter', termos: ['nucleo', 'face', 'auto'] });
+  it('modo perímetro externo: `auto` fica na face de acabamento (compatibilidade com projetos antigos)', () => {
+    const p = build({ mode: 'perimeter', termos: ['auto', 'auto', 'auto'] });
     const f = floorOf(p);
     for (const l of f.layers) expect(multiArea(l.polygon)).toBeCloseTo(multiArea(f.polygon), 9);
+  });
+
+  it('modo perímetro externo: término `nucleo` por escrito vai ao núcleo externo (F6)', () => {
+    const p = build({ mode: 'perimeter', termos: ['nucleo', 'auto', 'auto'] });
+    const f = floorOf(p);
+    const face = multiArea(f.polygon);
+    const core = multiArea(f.layers[0]!.polygon);
+    // o núcleo externo fica dentro da face externa da parede: a camada que vai ao núcleo é menor que a da face
+    expect(core).toBeLessThan(face - 1e-9);
+  });
+
+  it('modo perímetro externo: término `{cm}` desloca a face externa da camada (F6)', () => {
+    const p = build({ mode: 'perimeter', termos: [{ cm: 5 }, 'auto', 'auto'] });
+    const f = floorOf(p);
+    expect(multiArea(f.layers[0]!.polygon)).toBeGreaterThan(multiArea(f.polygon) + 1e-9);
   });
 
   it('circuito aberto: mantém o último contorno e todas as camadas usam ele', () => {

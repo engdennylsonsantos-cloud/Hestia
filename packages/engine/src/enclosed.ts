@@ -134,15 +134,19 @@ function outlinePieces(p: Project, levelId: Id, frames: WallFrame[]): Ring[] {
   return frames.map((f) => outlines.get(f.wall.id) ?? bandRing(f, f.sHi, f.sLo));
 }
 
-/** Contorno externo de cada conjunto de paredes ligado do nível (união sem furos internos). Vãos não recortam. */
-function buildingOutlines(p: Project, levelId: Id): Ring[] {
-  const key = levelId;
+/**
+ * Contorno externo de cada conjunto de paredes ligado do nível (união sem furos internos). Vãos não recortam.
+ * `extend` escolhe a face: `finish` pela face de acabamento (`wallFaces`); `core` pela face do núcleo (F6, 0023 §2).
+ */
+function buildingOutlines(p: Project, levelId: Id, extend: RoomExtend): Ring[] {
+  const key = `${levelId}|${extend}`;
   const sig = wallsSignature(p, levelId);
   const hit = perimeterCache.get(key);
   if (hit && hit.sig === sig) return hit.value;
   recalcCount += 1;
   const frames = levelFrames(p, levelId);
-  const value: Ring[] = frames.length === 0 ? [] : closeGapsSafe(union(...outlinePieces(p, levelId, frames).map((r) => asMulti(r)))).map((poly) => poly[0]!);
+  const pieces = extend === 'core' ? frames.map(coreSilhouette) : outlinePieces(p, levelId, frames);
+  const value: Ring[] = frames.length === 0 ? [] : closeGapsSafe(union(...pieces.map((r) => asMulti(r)))).map((poly) => poly[0]!);
   perimeterCache.set(key, { sig, value });
   return value;
 }
@@ -159,8 +163,8 @@ function distToRing(q: Vec2, r: Ring): number {
  * Com `near`: a edificação que contém o ponto; senão a mais próxima dele (até PERIMETER_REACH). Sem `near`: a maior.
  * Devolve só o anel externo, ou null se não há paredes ali.
  */
-export function outerPerimeter(p: Project, levelId: Id, near?: Vec2): Ring | null {
-  const rings = buildingOutlines(p, levelId);
+export function outerPerimeter(p: Project, levelId: Id, near?: Vec2, extend: RoomExtend = 'finish'): Ring | null {
+  const rings = buildingOutlines(p, levelId, extend);
   if (rings.length === 0) return null;
   if (!near) return rings.reduce((best, r) => (Math.abs(ringArea(r)) > Math.abs(ringArea(best)) ? r : best));
   const holding = rings.find((r) => pointInRing(near, r));

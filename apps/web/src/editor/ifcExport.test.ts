@@ -27,6 +27,7 @@ describe('exportação IFC do projeto (web)', () => {
     expect(count(text, 'IFCBUILDINGSTOREY')).toBe(p.levels.length);
   });
 
+  // 60 s: o prédio de 10 pavimentos (template `predio10`) é o maior modelo de partida.
   it('todos os modelos de partida exportam sem exceção e com referências íntegras', () => {
     for (const t of TEMPLATES) {
       const p: Project = buildTemplate(t.id);
@@ -34,7 +35,7 @@ describe('exportação IFC do projeto (web)', () => {
       expect(danglingRefs(text), t.id).toEqual([]);
       expect(count(text, 'IFCPROJECT'), t.id).toBe(1);
     }
-  });
+  }, 60000);
 
   it('é determinístico com a mesma data e a geometria traz paredes e vãos', () => {
     const p = buildTemplate('house2');

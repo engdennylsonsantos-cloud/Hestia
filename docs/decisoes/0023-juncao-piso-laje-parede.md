@@ -272,6 +272,12 @@ Parede W1 com camada de acabamento de prioridade 4, fora do núcleo; piso F1 com
 
 ## 10. Plano em fases
 
+**Status (2026-10-23): junção fechada, com ressalvas.** F1 (partes resolvidas das paredes), F1b (parede que atravessa o nível),
+F3 (corte pela regra B, hierarquia, como Revit e ArchiCAD), F4 (3D) e F5 (testes de fechamento) estão feitos. A planta não
+recorta a parede na altura de corte padrão (F2, decisão de escopo). Pendências: lajes com caimento fora da junção, plano de
+corte dentro da zona de sobreposição na planta, término no perímetro externo (F6), cor, hachura e exportação por camada (F7) e
+desempenho com muitos níveis. Registro completo e commits em `0023-plano-de-conclusao.md`, §6.
+
 | Fase | O que muda (arquivos) | Depende de | Tamanho |
 |---|---|---|---|
 | P1. Vínculo do contorno | `packages/model/src/types.ts` (origem em `Floor` e `Slab`), `floor.ts`, `slab.ts`, `migrate.ts` (v18 para v19, só avança a versão); `packages/engine/src/floors.ts`, `slabs.ts`, novo `contornoVinculado`, circuitos movidos de `packages/tools/src/enclosed.ts`; `floorTool.ts`, `slabTool.ts` (gravam origem); comandos `vincularContorno` e `desvincularContorno` | Nada | G |

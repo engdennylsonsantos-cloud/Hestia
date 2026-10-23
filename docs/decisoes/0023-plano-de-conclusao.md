@@ -137,17 +137,24 @@ Feito em 2026-10-23 (segue a opção A da F3: 3D segue a hierarquia, como os qua
 - [ ] Pendente: conferir o volume do 3D contra o quantitativo da mesma parede no mesmo nível (hoje o teste compara com a soma
       das partes, não com `quantities.ts`). Fica para o teste de F5 (desenho = quantitativo).
 
-### F5 · Fechamento da junção
+### F5 · Fechamento da junção (feito em 2026-10-23, com ressalvas)
 
-- [ ] **Teste de desenho = quantitativo** para todos os casos de §9.1 da 0023 (F1, F2, F3 × W1, W2, W3; L e T). Este é o
-      teste de aceite da junção (§2, item 3). Arquivo sugerido: `packages/engine/src/junctionGolden.test.ts`.
-- [ ] **Teste do contador de recálculos** (0023 §9.2): editar parede do nível 2 não recalcula o nível 1.
-- [ ] **Lajes com caimento:** hoje ficam de fora da junção (`junctionLevel.ts`: `if (rs.slope) continue`). Decidir com o dono
-      (ver §5, item 2). Até a decisão, a laje com caimento aparece com aviso `laje-caimento-sem-junção` (novo, informativo).
-- [ ] Atualizar checklists: `docs/paridade/paredes.md` (E3), `docs/paridade/pisos.md` (C6), `docs/paridade/lajes.md` (C8).
-- [ ] Atualizar `docs/07-STATUS-V1.md` (remover de "O que ainda não existe" e de "Pendências"), `docs/08-PENDENCIAS-E-CORRECOES.md`
-      (corrigir a linha "P-5 sem código", que já está implementada) e o status de `docs/decisoes/0023-juncao-piso-laje-parede.md` (§10).
-- [ ] `npm run parity` sem bloqueante aberto para junção.
+- [x] **Desenho = quantitativo** (critério 1): `packages/render/src/model3d/desenhoQuantitativo.test.ts`, 3 casos. O volume
+      do sólido 3D da parede bate com o quantitativo (1e-6), sem junção, com a parede descendo até o piso e com a parede de
+      6 m atravessando a laje do pavimento de cima (F1b).
+- [x] **Matriz da tabela §9.1** (critério 3, parcial): `packages/engine/src/junctionMatriz.test.ts`, 18 combinações (3 pisos ×
+      3 paredes × L e T) mais um controle. Garante que, depois da junção, nenhuma camada de piso e nenhuma faixa de parede
+      ocupam o mesmo volume. Não compara célula a célula com a tabela §9.1 (que é descritiva e marcada como não validada no
+      Revit); essa conferência continua manual, com o dono.
+- [x] **Contador de recálculos** (0023 §9.2): `packages/engine/src/junctionCache.test.ts`. Editar parede do pavimento de cima
+      que não alcança o térreo devolve a mesma junção (acerto de cache); editar parede do térreo recalcula.
+- [x] **Paridade**: E3 (paredes), C6 (pisos) e C8 (lajes) marcados como concluídos com a evidência. `npm run parity` em 100%.
+- [x] **Documentos 07 e 08** atualizados. A 08 ganhou a correção de P-5 (estava marcado como sem código).
+- [x] **Regressão visual do corte** (ver §6.2 item 3): caso `junc-corte-parede-embutida-piso`, baseline conferida na imagem.
+- [ ] **Lajes com caimento** continuam fora da junção (decisão pendente, §6.2 item 11).
+- [x] **Atualizar o status da 0023 §10** (ver nota no próprio documento).
+
+Medição: `npm run check` verde (ver §6.1, linha da F5).
 
 ### F6 · Término no perímetro externo (P8b)
 
@@ -211,11 +218,11 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 1b | Desempenho da junção com muitos níveis (sem filtro por elevação; cada chamada percorre todos os níveis) | pendente | F1b/perf | medir com projeto de 5+ níveis antes de otimizar |
 | 2 | Planta: caso com plano de corte dentro da zona comum (baixa prioridade) | decidido, pendente só o caso raro | F2 | a planta não muda na altura padrão; ver §3 F2 |
 | 3 | Regressão visual do corte (regra B) | feito | F3/F5 | caso novo `junc-corte-parede-embutida-piso`, baseline criada e conferida na imagem; cortes da casa (`01-corte`, `02-corte`) não mudaram com a regra B (0,467% antes e depois, mesmo nº de pixels) |
-| 4 | Teste "desenho = quantitativo": volume 3D e corte batem com o quantitativo da mesma parede | pendente | F5 | hoje o teste de F4 compara com a soma das partes, não com `quantities.ts` |
-| 5 | Tabela §9.1 da 0023 (G-B, piso F1/F2/F3 × parede W1/W2/W3, L e T) como teste | pendente | F5 | a validação no Revit é conferência manual do dono |
-| 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | pendente | F5 | 0023 §9.2 |
-| 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | pendente | F5 | |
-| 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | pendente | F5 | a 08 ainda diz que P-5 está sem código, o que está desatualizado |
+| 4 | Teste "desenho = quantitativo": volume 3D bate com o quantitativo da mesma parede | feito | F5 | `desenhoQuantitativo.test.ts` (3 casos); o corte não tem volume, então a conferência é 3D × quantitativo |
+| 5 | Tabela §9.1 da 0023 (G-B, piso F1/F2/F3 × parede W1/W2/W3, L e T) como teste | feito (invariante) | F5 | `junctionMatriz.test.ts`: sem sobreposição de volume em 18 combinações; comparação célula a célula com a tabela continua manual (dono, no Revit) |
+| 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | feito | F5 | `junctionCache.test.ts`, por identidade do objeto em cache |
+| 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | feito | F5 | 100% em todos os elementos |
+| 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | feito | F5 | 08 corrigida (P-5 implementado) |
 | 9 | Término por camada no perímetro externo (P8b) | pendente | F6 | hoje só vale para parede interna |
 | 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
 | 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |

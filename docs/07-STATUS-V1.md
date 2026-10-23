@@ -13,7 +13,7 @@ sobram são não bloqueantes (ver "Pendências").
 - Modelo versionado (`SCHEMA_VERSION` 19) com desfazer/refazer e migrações v15→v16 (caracol), v16→v17 (ambientes),
   v17→v18 (forros) e v18→v19 (contorno associativo). Ida e volta de arquivo em `esquema.test.ts`. Autosave e `.hestia.json`.
 
-**Paredes** — 67 feitos, 15 fora de escopo, 1 pendente (E3) (`docs/paridade/paredes.md`).
+**Paredes** — 68 feitos, 15 fora de escopo, 0 pendentes (`docs/paridade/paredes.md`). E3 (junção com piso e laje) fechado em 2026-10-23.
 - Reta, em arco e por retângulo; alturas, deslocamentos de base e topo; linha de localização (6 opções).
 - Camadas com função, material, espessura, prioridade e "envolve"; membranas de espessura zero; faixas verticais; perfil superior.
 - Junções L/T/X por prioridade, com encosto, esquadria, cortes oblíquos de 30° a 150° e paredes empilhadas. Arco no
@@ -22,19 +22,20 @@ sobram são não bloqueantes (ver "Pendências").
   medir, anexar topo ao telhado etc.); planta, corte, 3D, DXF, tabela com CSV e painel de avisos.
 - Parede anexada a piso ou laje por trecho, com perfil de base (0023 P9).
 
-**Pisos** — 40 feitos, 7 fora de escopo, 1 pendente (C6) (`docs/paridade/pisos.md`).
+**Pisos** — 41 feitos, 7 fora de escopo, 0 pendentes (`docs/paridade/pisos.md`). C6 (junção com parede) fechado em 2026-10-23.
 - Contorno por cliques, retângulo, medida, seleção de paredes ou área fechada; furos; edição por alças.
 - Contorno associativo às paredes (0023 P1–P3): "Desvincular" e "Revincular às paredes"; avisos de contorno aberto e duplicado.
 - Tipo em camadas com seção ao vivo; tipo `ft_acab` sobre laje (P5); quantitativos líquidos por camada; membrana de
   espessura zero (P4); "Término na junção" por camada (P8, parcial).
 - Planta com hachura, 3D por camada, corte, subpavimento, etiqueta, DXF, quantitativos e tabela com CSV.
 
-**Lajes** — 38 feitos, 3 fora de escopo, 1 pendente (C8) (`docs/paridade/lajes.md`).
+**Lajes** — 39 feitos, 3 fora de escopo, 0 pendentes (`docs/paridade/lajes.md`). C8 (junção com parede) fechado em 2026-10-23.
 - Contorno por cliques, retângulo, medida, automático pelo perímetro ou por área fechada; furos; mesmo vínculo, membrana
   e término dos pisos. Inclinação por linha e percentual; parede anexada à laje.
 - Planta, 3D com inclinação e furos, corte com hachura por camada, DXF, quantitativos e tabela com CSV.
-- Junção piso/laje × parede (0023 P7, parcial): prioridade efetiva alimenta os quantitativos; planta, corte e 3D de piso
-  e laje usam a região resolvida. A parede ainda não é recortada (ver pendências).
+- Junção piso/laje × parede (0023, fechada em 2026-10-23): prioridade efetiva e regra B no corte, no 3D e nos quantitativos.
+  Parede que atravessa o nível é cortada pela laje do pavimento de cima. A planta não recorta a parede na altura de corte
+  padrão (decisão de escopo, F2). Lajes com caimento ficam de fora da junção (ver pendências).
 
 **Telhados** — 43 feitos, 1 fora de escopo, 0 pendentes (`docs/paridade/telhados.md`).
 - Formas uma, duas e quatro águas, contorno qualquer e extrusão de perfil; cumeeira, espigões e rincões; furos; beiral.
@@ -118,8 +119,9 @@ sobram são não bloqueantes (ver "Pendências").
 
 ## Pendências não bloqueantes
 
-- **Parede × piso/laje** (E3, C6 e C8): planta, corte e 3D ainda não recortam a parede pela região do piso ou da laje.
-  Os quantitativos já seguem a prioridade de camada (0023 §1, P7). A parede ainda não é recortada nos desenhos pela camada de piso ou laje que vence (parte adiada da P7, chamada P7c nas conversas de projeto).
+- **Junção com piso e laje (fechada em 2026-10-23, 0023):** resta o caso raro de plano de corte dentro da zona de sobreposição na
+  planta (baixa prioridade, F2), lajes com caimento fora da junção (decisão pendente) e o desempenho com muitos níveis (item 1b).
+  Término por camada no perímetro externo (F6) e cor, hachura e exportação por camada (F7) seguem pendentes.
 - **Término na junção** (0023 P8, parcial): falta o término em perímetro externo, cor e hachura por camada na planta, e
   IFC e DXF por camada.
 - **Canto reentrante de um L** (achado do P8, não corrigido): o circuito de paredes deixa um quadrado d × d sem parede

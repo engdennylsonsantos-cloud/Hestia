@@ -62,7 +62,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md). Item sem 
 ## E · Conexões verticais
 - [x] E1 Topo até nível mais deslocamento
 - [x] E2 Anexar topo e base a laje, piso e telhado: base e topo anexados a piso e laje por trecho do eixo, só sobre o trecho coberto, com degrau na borda (0023 P9); controles "Base no piso" e "Topo no piso" nas Propriedades, um passo de desfazer; topo ao telhado (telhados C2). Evidência: `packages/engine/src/wallFloorProfile.test.ts`, `wallFloorIssues.test.ts`, `wallFloorSection.test.ts`, `packages/render/src/model3d/wallFloorSolids.test.ts`, `apps/web/src/editor/wallFloorActions.test.ts`; regressão visual `parede-base-piso-metade`.
-- [ ] E3 Parede cortada por piso e laje conforme as regras de junção: quantitativos já seguem a prioridade de camada (0023 P7); planta, corte e 3D ainda não recortam a parede (P7b cortou só piso e laje; ver pisos C6 e lajes C8) Com P9 o degrau da base já aparece no corte e no 3D, mas a parede ainda não é recortada pela camada que vence.
+- [x] E3 Parede cortada por piso e laje conforme as regras de junção (0023 F1, F1b, F3 regra B, F4). O corte e o 3D recortam a parede pela camada que vence; o volume bate com o quantitativo (`desenhoQuantitativo.test.ts`). Parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b). A planta não recorta na altura de corte padrão, por decisão de escopo (F2, 0023 §3). Testes: `junctionWall`, `junctionCrossLevel`, `sectionCota`, `wallJunctionSolids`, `junctionMatriz`; regressão `junc-corte-parede-embutida-piso`.
 
 ## F · Edição
 - [x] F1 Selecionar (clique, janela, alças), mover, copiar, girar, espelhar, matriz, deslocar, aparar ao canto, alinhar, medir

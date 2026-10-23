@@ -7,6 +7,14 @@ Estado em que foi escrito originalmente: branch `claude/zealous-hamilton-iayjlf`
 branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento foi atualizado sem alterar código; os
 números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
+Atualização (2026-10-23, fechamento da junção piso/laje × parede, 0023): **E3, C6 e C8 fechados.** Corte e 3D seguem a regra B
+(hierarquia, como Revit e ArchiCAD), parede que atravessa o nível é cortada pela laje do pavimento de cima (F1b), e a planta não
+recorta na altura de corte padrão (F2). Ficaram abertos: plano de corte dentro da zona de sobreposição na planta (baixa
+prioridade), lajes com caimento fora da junção, término no perímetro externo (F6), cor, hachura e exportação por camada (F7) e o
+desempenho com muitos níveis. Registro completo em `docs/decisoes/0023-plano-de-conclusao.md`, §6.2.
+- **P-5 (forro acompanha o contorno do ambiente): implementado.** Esta seção dizia "sem código" na revisão de 2026-10-22. Está
+  nos commits `125628d`, `5f93b71`, `d373dca` e no merge `95da8b4`, e é o que `07-STATUS-V1.md` descreve.
+
 Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido contra código, testes e decisões; nenhum código alterado.**
 - **Entrou na frente de piso e laje** (já no código): contorno associativo às paredes (0023 P1–P3), membrana de espessura
   zero (P4), tipo `ft_acab` e quantitativos líquidos (P5), corte e planta por cota (P6), parede anexada por trecho (P9),

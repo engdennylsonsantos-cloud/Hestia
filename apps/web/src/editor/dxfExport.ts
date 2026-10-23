@@ -22,8 +22,8 @@ import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, opening
 import { saveText } from './saveText.ts';
 
 /**
- * Região de um piso ou laje para o DXF (F7.1, 0023 §6): a região resolvida pela junção quando houve corte, igual à planta;
- * sem corte, o contorno do elemento, como antes.
+ * Região de um piso ou laje para o DXF (F7.1, 0023 §6): a região resolvida pela junção quando houve corte; sem corte, a camada
+ * de cima (como a planta, para o término por camada valer também no DXF).
  */
 function resolvedRegion(jl: JunctionLevel, id: Id, polygon: MultiPolygon): MultiPolygon {
   const el = jl.elements.get(id);
@@ -199,7 +199,7 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
     floors: shown('floor')
       ? resolveFloors(p, levelId)
           .filter((f) => !hidden.has(f.floorId))
-          .flatMap((f) => resolvedRegion(jl, f.floorId, f.polygon).map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' })))
+          .flatMap((f) => resolvedRegion(jl, f.floorId, f.layers.find((l) => !l.membrane)?.polygon ?? f.polygon).map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.floorTypes[f.typeId]?.code ?? '' })))
       : [],
     // Forros: só na planta de forro (decisão 0021); na planta baixa ficam acima do topo e não saem.
     ceilings: shown('floor') && view.range.direction === 'up'
@@ -210,7 +210,7 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
     slabs: shown('slab')
       ? resolveSlabs(p, levelId)
           .filter((s) => !hidden.has(s.slabId))
-          .flatMap((s) => resolvedRegion(jl, s.slabId, s.polygon).map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' })))
+          .flatMap((s) => resolvedRegion(jl, s.slabId, s.layers.find((l) => !l.membrane)?.polygon ?? s.polygon).map((poly) => ({ outline: poly[0] ?? [], holes: poly.slice(1), typeCode: p.slabTypes[s.typeId]?.code ?? '' })))
       : [],
     // Escadas: degraus e patamares (contorno), espelhos, seta de subida e símbolo de corte, com a cota de corte da vista.
     stairs: shown('stair')

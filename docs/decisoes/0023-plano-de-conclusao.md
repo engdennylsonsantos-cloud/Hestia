@@ -242,6 +242,7 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 | F5 (fechamento) | `c0d0883` | 2026-10-23 | desenho = quantitativo, matriz §9.1, cache por nível, paridade E3/C6/C8, docs 07 e 08 |
 | F6 (término no perímetro) | `abd31d8` | 2026-10-23 | nucleo/face/{cm} no perímetro; auto fica na face (compatibilidade); decisão 14 pendente |
 | F7 (DXF/IFC = planta; correção de peça 'intacta') | `244317f` | 2026-10-23 | exportação usa a região resolvida; defeito de recorte só em altura corrigido; cor por camada fechada como decisão |
+| Correção: planta e DXF sem corte seguem a camada de cima | (este commit) | 2026-10-23 | Com término `nucleo` no perímetro, a planta desenhava o contorno de acabamento (até a face externa) quando a junção não cortava o elemento. Agora sem corte a planta e o DXF usam o polígono da camada de cima, como o 3D. Baseline `junc-piso-retangulo-cm-menos-1` aceita (recuo de 1 cm da cerâmica agora aparece). IFC segue com o contorno do elemento: o por camada é o item 15. |
 | F1b | `64a7b8e` | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
 
 ### 6.2 Pendências consolidadas da junção piso/laje × parede

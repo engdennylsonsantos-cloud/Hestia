@@ -67,7 +67,9 @@ export function slabFills(
 export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
   // Região depois da junção (P7b): a laje sem corte fica com o contorno dela; cortada, com a região que sobra.
-  const region = el?.cut ? el.region : s.polygon;
+  // Sem corte, a planta mostra a camada de cima (o término dela vale mesmo sem junção; ver `floorOpsOf`).
+  const top = s.layers.find((l) => !l.membrane);
+  const region = el?.cut ? el.region : (top?.polygon ?? s.polygon);
   if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';

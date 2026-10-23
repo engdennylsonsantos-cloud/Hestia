@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea } from '@hestia/geom';
 import { junctionLevel, resolveFloors, resolveSlabs } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeFloor, makeSlab, type Layer, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeFloor, makeSlab, makeWall, type Layer, type Project } from '@hestia/model';
 import { floorOpsOf } from './floors.ts';
 import { slabOpsOf } from './slabs.ts';
 import { defaultPaint } from './style.ts';
@@ -57,5 +57,27 @@ describe('planta: piso e laje pela região resolvida (decisão 0023 §3, P7b)', 
     const rf = resolveFloors(p, 'lv_0')[0]!;
     const ops = floorOpsOf(p, rf, LIGHT, false, 'medium', VIEW, defaultPaint('floor', VIEW.zoom), junctionLevel(p, 'lv_0').elements.get('f'));
     expect(multiArea(ops.fills[0]!.polygons)).toBeCloseTo(24, 9);
+  });
+});
+
+describe('planta · região sem corte segue a camada de cima (término por camada, perímetro)', () => {
+  it('piso de borda com término núcleo: a planta desenha o núcleo, não o contorno de acabamento', () => {
+    const base = createEmptyProject();
+    const ft = base.floorTypes['ft_ceram']!;
+    base.floorTypes['ft_ceram'] = { ...ft, layers: ft.layers.map((l, i) => (i === 0 ? { ...l, termino: 'nucleo' } : l)) } as Project['floorTypes'][string];
+    const s = new ProjectStore(base);
+    const W = (id: string, a: { x: number; y: number }, b: { x: number; y: number }) => makeWall({ id, typeId: 'wt_alv14', levelId: 'lv_0', a, b, height: 3 });
+    s.exec({ type: 'addWall', wall: W('n', { x: 0, y: 6 }, { x: 8, y: 6 }) });
+    s.exec({ type: 'addWall', wall: W('e', { x: 8, y: 6 }, { x: 8, y: 0 }) });
+    s.exec({ type: 'addWall', wall: W('s', { x: 8, y: 0 }, { x: 0, y: 0 }) });
+    s.exec({ type: 'addWall', wall: W('o', { x: 0, y: 0 }, { x: 0, y: 6 }) });
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f', typeId: 'ft_ceram', levelId: 'lv_0', boundary: rect(0, 0, 8, 6), outlineSource: { mode: 'perimeter', seed: { x: 4, y: 3 }, linked: true } }) });
+    const p = s.project;
+    const rf = resolveFloors(p, 'lv_0')[0]!;
+    const ops = floorOpsOf(p, rf, LIGHT, false, 'medium', VIEW, defaultPaint('floor', VIEW.zoom), junctionLevel(p, 'lv_0').elements.get('f'));
+    const drawn = multiArea(ops.fills[0]!.polygons);
+    // A camada de cima vai ao núcleo (menor que a face de acabamento, 50,61 m²)
+    expect(drawn).toBeCloseTo(multiArea(rf.layers[0]!.polygon), 6);
+    expect(drawn).toBeLessThan(multiArea(rf.polygon) - 1e-6);
   });
 });

@@ -91,12 +91,13 @@ export function floorFills(
  */
 export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
   const out = empty();
-  const region = el?.cut ? el.region : f.polygon;
+  // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
+  const top = f.layers.find((l) => !l.membrane);
+  // Sem corte, a planta mostra a camada de cima: o término dela vale mesmo sem junção (sem isso, o piso ia até a face de acabamento).
+  const region = el?.cut ? el.region : (top?.polygon ?? f.polygon);
   if (region.length === 0) return out;
   const fillBase = dark ? theme.bg : '#ffffff';
   const fine = detail === 'fine';
-  // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
-  const top = f.layers.find((l) => !l.membrane);
   const m = top ? p.materials[top.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
   const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;

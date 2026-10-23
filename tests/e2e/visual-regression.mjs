@@ -124,6 +124,9 @@ const OPENING_CASES = {
   'laje-abertura-x': [SL('ls3', RECT_WALLS, { holes: RECT_HOLES })],
 };
 const SECTION_CASES = {
+  // Regra B (0023 §3): corte pela hierarquia. Parede embutida no piso (mesmo caso da planta) atravessada pelo corte em x = 3:
+  // a zona comum fica com o piso e a parede some dela. Baseline nova: conferir a imagem antes de aceitar.
+  'junc-corte-parede-embutida-piso': [W('e1', [-1, 2], [7, 2], { baseOffset: -0.1 }), F('pe1', [[0, 0], [6, 0], [6, 4], [0, 4]]), { kind: 'view', view: { id: 'v_frente', name: 'Corte AA', kind: 'section', a: { x: 3, y: -1 }, b: { x: 3, y: 5 }, depth: 2 } }],
   'elevacao-porta-janela': [...wallsOf(RECT_WALLS), OPEN('po2', 'door', 'ot_p80', 'w0', 2), OPEN('vl2', 'door', 'ot_vao90', 'w0', 4.5), OPEN('jn2', 'window', 'ot_j120', 'w0', 6), { kind: 'view', view: { id: 'v_frente', name: 'Fachada sul', kind: 'elevation', a: { x: -0.5, y: -2 }, b: { x: 8.5, y: -2 }, depth: 8 } }],
 };
 // Determinismo: o enquadramento (zoomExtents) usa a largura e a altura guardadas na vista do editor, que só são atualizadas

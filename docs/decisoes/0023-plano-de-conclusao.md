@@ -210,7 +210,7 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | feito | F1b | `64a7b8e` |
 | 1b | Desempenho da junção com muitos níveis (sem filtro por elevação; cada chamada percorre todos os níveis) | pendente | F1b/perf | medir com projeto de 5+ níveis antes de otimizar |
 | 2 | Planta: caso com plano de corte dentro da zona comum (baixa prioridade) | decidido, pendente só o caso raro | F2 | a planta não muda na altura padrão; ver §3 F2 |
-| 3 | Regressão visual do corte (mudou de propósito com a regra B) | pendente | F3/F5 | regravar a baseline só depois de olhar a imagem nova |
+| 3 | Regressão visual do corte (regra B) | feito | F3/F5 | caso novo `junc-corte-parede-embutida-piso`, baseline criada e conferida na imagem; cortes da casa (`01-corte`, `02-corte`) não mudaram com a regra B (0,467% antes e depois, mesmo nº de pixels) |
 | 4 | Teste "desenho = quantitativo": volume 3D e corte batem com o quantitativo da mesma parede | pendente | F5 | hoje o teste de F4 compara com a soma das partes, não com `quantities.ts` |
 | 5 | Tabela §9.1 da 0023 (G-B, piso F1/F2/F3 × parede W1/W2/W3, L e T) como teste | pendente | F5 | a validação no Revit é conferência manual do dono |
 | 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | pendente | F5 | 0023 §9.2 |

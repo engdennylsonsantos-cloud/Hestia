@@ -270,7 +270,7 @@ export class ModelScene {
       // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
       // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
       const batches: SolidBatch[] = [
-        // Paredes com a junção (P7d): cada camada é extrudada só onde sobra dela, como a planta e o corte.
+        // Paredes com a junção (P7c parte 2): cada camada é extrudada só onde sobra dela, como a planta e o corte.
         ...(shown('wall') ? buildLevelSolids(cutLevelByJunction(lv, junctionLevel(p, lv.levelId))).batches : []),
         ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
         ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),

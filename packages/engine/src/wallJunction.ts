@@ -7,7 +7,7 @@ import { bandVolume } from './profile.ts';
 import type { LayerBand, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
 /**
- * Parede com a junção resolvida (decisão 0023 §10, P7d; decisão 0025 §9.1). Piso e laje já saem recortados pela camada
+ * Parede com a junção resolvida (decisão 0023 §10, P7c parte 2; decisão 0025 §9.1). Piso e laje já saem recortados pela camada
  * que vence (`junctionLevel`); aqui a parede faz o mesmo: cada camada perde a região que a camada vencedora ocupa, na
  * faixa de cota em que ela ocupa. O resultado é usado pelo desenho (planta, corte e 3D), então o desenhado bate com o
  * líquido dos quantitativos.
@@ -115,7 +115,7 @@ function computeCut(level: ResolvedLevel, jl: JunctionLevel, opts: WallCutOption
 }
 
 /**
- * Nível com as paredes cortadas pela junção (P7d). Usado pela planta (com a cota do plano da vista), pelo corte e pelo
+ * Nível com as paredes cortadas pela junção (P7c parte 2). Usado pela planta (com a cota do plano da vista), pelo corte e pelo
  * 3D. Mesma entrada, mesmo resultado (cache por nível e por opções). Não altera o modelo nem os quantitativos.
  */
 export function cutLevelByJunction(level: ResolvedLevel, jl: JunctionLevel, opts: WallCutOptions = {}): ResolvedLevel {

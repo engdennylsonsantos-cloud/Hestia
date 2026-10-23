@@ -7,6 +7,25 @@ Estado em que foi escrito originalmente: branch `claude/zealous-hamilton-iayjlf`
 branch de trabalho é `claude/wizardly-goldberg-qtjveg` (§2). Este documento foi atualizado sem alterar código; os
 números vêm das medições registradas nas seções indicadas e nas atualizações abaixo.
 
+Atualização (2026-10-22, P7c parte 2 — parede recortada nos desenhos): **E3 de paredes, C6 de pisos e C8 de lajes fechados.**
+- A parede passa a ser recortada na planta (cota do plano de corte da vista), no corte/elevação (faixas de cota) e no 3D
+  pelas mesmas partes por camada de `junctionLevel` que os quantitativos usam (`cutLevelByJunction`); o desenhado é o
+  quantificado. Paredes sem sobreposição saem idênticas (regressão visual 0,000%). A fachada contínua é confirmada quando
+  o acabamento externo vence na borda da laje.
+- Evidência: `packages/engine/src/wallJunction.test.ts`, `sectionCota.test.ts`, `packages/render/src/plan/junctionPlan.test.ts`,
+  `packages/render/src/model3d/junctionSolids.test.ts`, e2e `tests/e2e/parede-recorte.mjs` e baselines
+  `junc-parede-recortada-laje` e `junc-fachada-continua-laje`. Decisão: `docs/decisoes/0023` (seção "Status da P7c, parte
+  2").
+- `npm run parity` em 100% nos nove elementos. Continuam abertos: o restante do P8 (perímetro externo, cor e hachura por
+  camada, IFC e DXF por camada), P-5 (forro de ambiente), P13/X4/X5 de aberturas, P-4 (inversão por par) e o canto
+  reentrante do L. Este bloco substitui o "Ficou aberto" do bloco ST1 abaixo quanto a E3, C6 e C8.
+- Medido nesta rodada (2026-10-22, Windows): `test:rapido` 277 arquivos/3373 testes (70,8 s), `test:completo`
+  278/3675 (700 s, código 0), tsc/eslint/check-* limpos, paridade 100%; e2e `parede-recorte`, `piso-unico`, `pisos`,
+  `lajes`, `contorno`, `sections` e `flow` verdes; regressão visual GPU 6/6 (0,000–0,074%) e CPU com os 2 casos novos em
+  0,000% (os antigos divergem 0,37–0,75% só em texto/hachura pelo ambiente; A/B antes/depois no mesmo ambiente deu
+  0,000%); `test:perf` verde (K4 3,07 s). Build: `npm run build` falha na minificação do esbuild (acesso negado ao
+  remover o temporário); o build dos e2e é `npm run build -w @hestia/web -- --target esnext --minify false`.
+
 Atualização (2026-10-22, revisão de estado ST1): **documento 07 conferido contra código, testes e decisões; nenhum código alterado.**
 - **Entrou na frente de piso e laje** (já no código): contorno associativo às paredes (0023 P1–P3), membrana de espessura
   zero (P4), tipo `ft_acab` e quantitativos líquidos (P5), corte e planta por cota (P6), parede anexada por trecho (P9),

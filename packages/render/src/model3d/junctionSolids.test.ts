@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { junctionLevel, quantifyFloors, quantifySlabs, resolveFloors, resolveSlabs } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeFloor, makeSlab, type Layer, type Project } from '@hestia/model';
-import { buildFloorSolids, buildSlabSolids, type SolidBatch } from './solids.ts';
+import { cutLevelByJunction, junctionLevel, quantifyFloors, quantifyLevel, quantifySlabs, resolveFloors, resolveLevel, resolveSlabs } from '@hestia/engine';
+import { ProjectStore, createEmptyProject, makeFloor, makeSlab, makeWall, type Layer, type Project } from '@hestia/model';
+import { buildFloorSolids, buildLevelSolids, buildSlabSolids, type SolidBatch } from './solids.ts';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [
   { x: x0, y: y0 },
@@ -49,5 +49,41 @@ describe('3D: sólidos de piso e laje pela junção resolvida (decisão 0023 §3
   it('sem junção, o sólido do piso é o contorno inteiro (24 × 0,10 m³), como antes', () => {
     const p = project();
     expect(total(buildFloorSolids(resolveFloors(p, 'lv_0')))).toBeCloseTo(2.4, 6);
+  });
+});
+
+describe('3D: parede recortada pela junção (decisão 0023 §10, P7c parte 2)', () => {
+  const camada = (fn: Layer['function'], thick: number): Layer => ({ function: fn, materialId: 'mat_concreto', thickness: thick, wraps: false });
+
+  /** Parede de 4 m × 3 m (0,20 m em 3 camadas) e, opcionalmente, uma laje que cruza 2 m dela na faixa de 0 a 0,05 m. */
+  function wallProject(overlap: boolean): Project {
+    const base = createEmptyProject();
+    base.slabTypes.ls_t = { ...base.slabTypes.ls_mac12!, id: 'ls_t', name: 'Laje teste', code: 'LT', layers: [camada('structure', 0.1)] };
+    base.wallTypes.wt_t = { ...base.wallTypes.wt_alv14!, id: 'wt_t', name: 'Parede teste', code: 'T', layers: [camada('finish1', 0.02), camada('structure', 0.16), camada('finish1', 0.02)] };
+    const s = new ProjectStore(base);
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_t', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, height: 3 }) });
+    if (overlap) s.exec({ type: 'addSlab', slab: makeSlab({ id: 's1', typeId: 'ls_t', levelId: 'lv_0', boundary: rect(-1, -1, 2, 0), heightOffset: 0.05 }) });
+    return s.project;
+  }
+
+  it('a malha da parede tem o volume líquido dos quantitativos, camada a camada', () => {
+    const p = wallProject(true);
+    const lv = resolveLevel(p, 'lv_0');
+    const desenhado = cutLevelByJunction(lv, junctionLevel(p, 'lv_0'));
+    const q = quantifyLevel(p, lv);
+    const solids = buildLevelSolids(desenhado).batches;
+    expect(total(solids)).toBeCloseTo(q.walls[0]!.volume, 6);
+    expect(total(solids)).toBeCloseTo(2.39, 6);
+    // O lote é por material: aqui as três camadas usam o mesmo, então o total é a soma delas.
+    const porCamada = q.layers.filter((l) => l.wallId === 'w1').map((l) => l.volume);
+    expect(porCamada[1]).toBeCloseTo(0.64 * 3 - 0.08 * 0.05 * 2, 9);
+  });
+
+  it('parede sem sobreposição: o sólido continua com o volume bruto (2,4 m³)', () => {
+    const p = wallProject(false);
+    const lv = resolveLevel(p, 'lv_0');
+    const desenhado = cutLevelByJunction(lv, junctionLevel(p, 'lv_0'));
+    expect(desenhado).toBe(lv);
+    expect(total(buildLevelSolids(desenhado).batches)).toBeCloseTo(2.4, 6);
   });
 });

@@ -191,7 +191,7 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
   };
 
   for (const levelId of levelIds) {
-    // Junção resolvida do nível (P7b, P7c, P7d): cada camada de piso, de laje e de parede corta só a parte que sobra dela
+    // Junção resolvida do nível (P7b e P7c parte 2): cada camada de piso, de laje e de parede corta só a parte que sobra dela
     // (`layerPartsOf` e `cutLevelByJunction`); sem corte, a camada inteira. Pisos entram como as paredes: a linha corta
     // cada camada (retângulo t×z) e a laje de visão mostra o resto.
     const jl = junctionLevel(p, levelId);
@@ -444,8 +444,7 @@ function convexHull(pts: Vec2[]): Ring {
  * corte de 7,07 cm.
  */
 export function squareCutRun(percent: number, thickness: number): number {
-  const g = percent / 100;
-  return (g * thickness) / (1 + g * g);
+  return ((percent / 100) * thickness) / (1 + (percent / 100) ** 2);
 }
 
 /**

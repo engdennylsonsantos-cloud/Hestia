@@ -127,7 +127,7 @@ function computePlanView(p: Project, levelId: Id, partial: PartialStructure, hid
   // Parede oculta pela categoria: a geometria do nível sai sem nenhuma parede (nada delas aparece, nem juntas nem silhueta).
   const walls0 = hiddenCats.has('wall')
     ? ({ levelId, walls: {}, clusters: [] } as ResolvedLevel)
-    // Paredes cortadas pela junção (P7d): cada camada sai só onde sobra da camada que a vence, na cota do plano da vista.
+    // Paredes cortadas pela junção (P7c parte 2): cada camada sai só onde sobra da camada que a vence, na cota do plano da vista.
     : cutLevelByJunction(resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls }), junctionLevel(p, levelId), { planZ: cutZ, outline: outlineWalls });
   const geo = applyPartialStructure(p, walls0, partial);
   // Silhueta cortada: o contorno das paredes fora do corte não deve riscá-la.

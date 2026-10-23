@@ -10,6 +10,10 @@ de uma laje. O motor calcula em `packages/engine/src/projectIssues.ts`; a interf
 `wallFloorIssues`. Fica **fora** de `validateProject`: a validação do modelo continua com os mesmos códigos, e
 `casaAltoPadrao.test.ts` (que exige zero problemas em `validateProject`) não muda.
 
+Pisos, lajes e telhados só são resolvidos quando o projeto tem um par candidato de topos (paredes colineares no mesmo
+nível) ou uma laje existente com camada `passa`; um modelo grande sem esses casos não paga a resolução (o `predio10`
+fica em poucos milissegundos).
+
 ## 2. `abertura-fora-da-parede`
 
 Para cada abertura com parede e tipo existentes, compara `offset + largura do tipo` com o comprimento do eixo da parede.
@@ -61,6 +65,6 @@ têm `passa`, então nenhum deles avisa. A mensagem informa a camada (1-based) e
 
 `npm run lint` (fronteiras, paridade e porta de qualidade) verde; `npx tsc -p tsconfig.json --noEmit` limpo;
 `npx vitest run --maxWorkers=4` com 293 arquivos e 3568 testes passando; build
-`npm run build -w @hestia/web -- --target esnext --minify false` verde (`dist/index.html` com 6.451,51 kB). O
+`npm run build -w @hestia/web -- --target esnext --minify false` verde (`dist/index.html` com 6.452,60 kB). O
 `npm run check` padrão continua sujeito a dois timeouts por carga nesta máquina (`predio10` e `ifcExport`); os mesmos
 testes passam em paralelismo menor.

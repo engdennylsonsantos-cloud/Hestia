@@ -5,6 +5,9 @@ import {
   isWall,
   slabRiseAt,
   terminoOf,
+  wallBaseElevation,
+  wallMaxHeight,
+  type Id,
   type Project,
   type Slab,
   type ValidationIssue,
@@ -26,18 +29,23 @@ const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 const label = (e: { id: string; mark: string }): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
 
 /**
- * Avisos do projeto que dependem da geometria resolvida (decisão 0028):
+ * Avisos do projeto que dependem da geometria resolvida (decisão 0029):
  * - `abertura-fora-da-parede`: o offset somado à largura do tipo passa do eixo da parede.
  * - `parede-topo-desnivelado`: duas paredes retas, colineares e do mesmo nível têm topos diferentes.
  * - `parede-dentro-da-laje`: a faixa de cota da parede cruza uma camada de laje com término `passa`, que continua
  *   sob a parede e pode contar o mesmo trecho duas vezes.
- * O motor calcula; a interface junta. A validação do modelo (`validateProject`) não é alterada.
+ * O motor calcula; a interface junta. A validação do modelo (`validateProject`) não é alterada. Pisos, lajes e telhados
+ * só são resolvidos quando há um par candidato de topos ou uma camada `passa`; modelos sem esses casos não pagam a conta.
  */
 export function projectIssues(p: Project): ValidationIssue[] {
-  const floors = resolveAllFloors(p);
-  const slabs = resolveAllSlabs(p);
-  const roofs = resolveAllRoofs(p);
-  return [...openingOutside(p), ...wallTopIssues(p, floors, slabs, roofs), ...wallInsideSlab(p, floors, slabs)];
+  const out = openingOutside(p);
+  out.push(...wallTopIssues(p));
+  if (hasPassaLayer(p)) {
+    const floors = resolveAllFloors(p);
+    const slabs = resolveAllSlabs(p);
+    out.push(...wallInsideSlab(p, floors, slabs));
+  }
+  return out;
 }
 
 /** Abertura cujo `offset + largura` passa do comprimento do eixo da parede (1 mm de folga). */
@@ -62,29 +70,22 @@ function openingOutside(p: Project): ValidationIssue[] {
   return out;
 }
 
-/** Parede reta com topo uniforme, já resolvido (piso, laje ou telhado anexados). */
-interface WallTop {
+/** Eixo de uma parede reta com topo uniforme (perfil editado e topo no telhado ficam fora). */
+interface WallAxis {
   wall: Wall;
   u: Vec2;
   length: number;
-  top: number;
 }
 
-/**
- * Topo resolvido da parede, ou null quando o topo não é uma cota única: parede curva, perfil superior editado, topo
- * anexado ao telhado (o perfil segue a água) ou topo anexado a piso/laje que cobre só parte do eixo (perfil em degraus).
- */
-function straightTop(p: Project, w: Wall, floors: ReturnType<typeof resolveAllFloors>, slabs: ResolvedSlab[], roofs: ReturnType<typeof resolveAllRoofs>): WallTop | null {
+function wallAxis(w: Wall): WallAxis | null {
   if (w.sag !== 0 || w.topProfile !== null || w.attachTopToRoof === true) return null;
-  const z = wallZRange(p, w, floors, slabs, roofs);
-  if (z.profile) return null;
   const length = dist(w.a, w.b);
   if (length < EPS) return null;
-  return { wall: w, u: { x: (w.b.x - w.a.x) / length, y: (w.b.y - w.a.y) / length }, length, top: z.z0 + z.height };
+  return { wall: w, u: { x: (w.b.x - w.a.x) / length, y: (w.b.y - w.a.y) / length }, length };
 }
 
 /** As duas paredes estão no mesmo nível, são colineares (1° e 1 cm) e se sobrepõem ou se tocam ao longo do eixo. */
-function collinearPair(a: WallTop, b: WallTop): boolean {
+function collinearAxis(a: WallAxis, b: WallAxis): boolean {
   if (a.wall.levelId !== b.wall.levelId) return false;
   if (Math.abs(cross(a.u, b.u)) > Math.sin(COLLINEAR_ANGLE)) return false;
   for (const q of [b.wall.a, b.wall.b]) {
@@ -96,37 +97,70 @@ function collinearPair(a: WallTop, b: WallTop): boolean {
   return Math.min(a.length, hi) - Math.max(0, lo) >= -EPS;
 }
 
+/** O topo só depende do piso/laje quando está anexado ao nível de topo; os demais saem da cota do modelo. */
+const needsResolvedTop = (w: Wall): boolean => w.attachTopToFloor === true && w.topLevelId !== null;
+
+/** Topo uniforme da parede, ou null quando o anexo a piso/laje deixa o topo em degraus. */
+function wallTop(p: Project, w: Wall, floors?: ReturnType<typeof resolveAllFloors>, slabs?: ResolvedSlab[], roofs?: ReturnType<typeof resolveAllRoofs>): number | null {
+  if (!needsResolvedTop(w)) return wallBaseElevation(p, w) + wallMaxHeight(p, w);
+  if (!floors || !slabs) return null;
+  const z = wallZRange(p, w, floors, slabs, roofs);
+  return z.profile ? null : z.z0 + z.height;
+}
+
 /** Paredes colineares e do mesmo nível com topos diferentes (mais de 1 mm). */
-function wallTopIssues(p: Project, floors: ReturnType<typeof resolveAllFloors>, slabs: ResolvedSlab[], roofs: ReturnType<typeof resolveAllRoofs>): ValidationIssue[] {
-  const tops = Object.values(p.elements)
+function wallTopIssues(p: Project): ValidationIssue[] {
+  const axes = Object.values(p.elements)
     .filter(isWall)
-    .map((w) => straightTop(p, w, floors, slabs, roofs))
-    .filter((t): t is WallTop => t !== null);
-  const out: ValidationIssue[] = [];
-  for (let i = 0; i < tops.length; i++) {
-    for (let j = i + 1; j < tops.length; j++) {
-      const a = tops[i]!;
-      const b = tops[j]!;
-      if (!collinearPair(a, b) || Math.abs(a.top - b.top) <= EPS) continue;
-      const levelName = p.levels.find((l) => l.id === a.wall.levelId)?.name ?? a.wall.levelId;
-      out.push({
-        severity: 'warning',
-        code: 'parede-topo-desnivelado',
-        message: `Paredes ${label(a.wall)} e ${label(b.wall)} estão alinhadas no nível "${levelName}", mas os topos estão desnivelados: ${fmt(a.top)} m e ${fmt(b.top)} m.`,
-        elementId: a.wall.id,
-        ids: [a.wall.id, b.wall.id],
-      });
+    .map(wallAxis)
+    .filter((a): a is WallAxis => a !== null);
+  const pairs: Array<[WallAxis, WallAxis]> = [];
+  for (let i = 0; i < axes.length; i++) {
+    for (let j = i + 1; j < axes.length; j++) {
+      if (collinearAxis(axes[i]!, axes[j]!)) pairs.push([axes[i]!, axes[j]!]);
     }
+  }
+  if (pairs.length === 0) return [];
+
+  const involved = new Set<Id>();
+  for (const [a, b] of pairs) {
+    involved.add(a.wall.id);
+    involved.add(b.wall.id);
+  }
+  const walls = [...involved].map((id) => p.elements[id]).filter(isWall);
+  const resolve = walls.some(needsResolvedTop);
+  const floors = resolve ? resolveAllFloors(p) : undefined;
+  const slabs = resolve ? resolveAllSlabs(p) : undefined;
+  const roofs = resolve ? resolveAllRoofs(p) : undefined;
+  const tops = new Map<Id, number | null>();
+  for (const w of walls) tops.set(w.id, wallTop(p, w, floors, slabs, roofs));
+
+  const out: ValidationIssue[] = [];
+  for (const [a, b] of pairs) {
+    const topA = tops.get(a.wall.id);
+    const topB = tops.get(b.wall.id);
+    if (topA == null || topB == null || Math.abs(topA - topB) <= EPS) continue;
+    const levelName = p.levels.find((l) => l.id === a.wall.levelId)?.name ?? a.wall.levelId;
+    out.push({
+      severity: 'warning',
+      code: 'parede-topo-desnivelado',
+      message: `Paredes ${label(a.wall)} e ${label(b.wall)} estão alinhadas no nível "${levelName}", mas os topos estão desnivelados: ${fmt(topA)} m e ${fmt(topB)} m.`,
+      elementId: a.wall.id,
+      ids: [a.wall.id, b.wall.id],
+    });
   }
   return out;
 }
+
+/** Há alguma laje existente cujo tipo tenha camada de término `passa`? Sem isso, a laje não entra na conta. */
+const hasPassaLayer = (p: Project): boolean =>
+  Object.values(p.elements).some((e) => isSlab(e) && (p.slabTypes[e.typeId]?.layers.some((l) => terminoOf(l) === 'passa') ?? false));
 
 /** Camada de laje com término `passa` (a camada continua sob a parede, sem recorte). */
 interface PassaLayer {
   slab: Slab;
   resolved: ResolvedSlab;
   layerIndex: number;
-  polygon: ResolvedSlab['layers'][number]['polygon'];
 }
 
 /** Paredes cuja faixa de cota cruza uma camada `passa` que cobre o eixo: o trecho comum pode ser contado duas vezes. */
@@ -137,9 +171,8 @@ function wallInsideSlab(p: Project, floors: ReturnType<typeof resolveAllFloors>,
     if (!isSlab(slab)) continue;
     const type = p.slabTypes[slab.typeId];
     if (!type) continue;
-    r.layers.forEach((layer, i) => {
-      if (terminoOf(type.layers[i]!) !== 'passa') return;
-      layers.push({ slab, resolved: r, layerIndex: i, polygon: layer.polygon });
+    r.layers.forEach((_, i) => {
+      if (terminoOf(type.layers[i]!) === 'passa') layers.push({ slab, resolved: r, layerIndex: i });
     });
   }
   if (layers.length === 0) return [];
@@ -152,11 +185,12 @@ function wallInsideSlab(p: Project, floors: ReturnType<typeof resolveAllFloors>,
     if (top - z.z0 < EPS || L < EPS) continue;
     // Cinco amostras do eixo bastam: a camada `passa` cobre a parede inteira ou não cobre.
     const samples: Vec2[] = [0, 0.25, 0.5, 0.75, 1].map((t) => ({ x: w.a.x + (w.b.x - w.a.x) * t, y: w.a.y + (w.b.y - w.a.y) * t }));
-    const best = new Map<string, { layer: PassaLayer; overlap: number }>();
+    const best = new Map<Id, { layer: PassaLayer; overlap: number }>();
     for (const layer of layers) {
       let overlap = 0;
       for (const q of samples) {
-        if (!pointInMulti(q, layer.polygon)) continue;
+        const polygon = layer.resolved.layers[layer.layerIndex]!.polygon;
+        if (!pointInMulti(q, polygon)) continue;
         const rise = slabRiseAt(layer.resolved.slope, q);
         const z0 = layer.resolved.layers[layer.layerIndex]!.z0 + rise;
         const z1 = layer.resolved.layers[layer.layerIndex]!.z1 + rise;

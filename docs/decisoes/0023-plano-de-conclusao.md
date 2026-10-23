@@ -156,14 +156,28 @@ Feito em 2026-10-23 (segue a opção A da F3: 3D segue a hierarquia, como os qua
 
 Medição: `npm run check` verde (ver §6.1, linha da F5).
 
-### F6 · Término no perímetro externo (P8b)
+### F6 · Término no perímetro externo (P8b) — em andamento desde 2026-10-23
 
-Hoje o término por camada vale só para paredes internas (0023 §2). No perímetro, todas as camadas usam o mesmo contorno.
+Hoje: `layerOutlines` (`layerOutline.ts`) devolve o mesmo contorno para todas as camadas quando `mode === 'perimeter'`.
+A borda externa não tem término por camada.
 
-- [ ] Contorno externo por camada, usando a face externa como referência (`enclosedRooms` já gera `'finish' | 'core'`;
-      o perímetro usa `outerPerimeter` em `packages/engine/src/enclosed.ts`).
-- [ ] Mesmo critério de `termino.ts` (`auto`, `nucleo`, `face`, deslocamento em cm), com os testes espelhados.
-- [ ] Teste: piso com acabamento que avança 5 cm sobre o perímetro externo; área do acabamento muda, a da estrutura não.
+Desenho (decidido antes de codar, para retomada por outro agente):
+- `outerPerimeter(p, levelId, near, extend)` (`enclosed.ts`) ganha `extend: 'finish' | 'core'`. O núcleo usa a união das
+  silhuetas do núcleo das paredes (`coreSilhouette`), com o mesmo cache por nível e por conteúdo (chave `levelId|extend`).
+- `layerOutlines` (`layerOutline.ts`): para `perimeter`, a face externa vem de `extend: 'finish'` e o núcleo externo de
+  `extend: 'core'`, com os furos manuais do elemento. A escolha por camada é a mesma das paredes internas (`face`, `nucleo`,
+  `auto`, `{cm}`).
+- Atenção: o `auto` passa a valer também no perímetro, então a estrutura do piso vai ao núcleo da parede externa. Isso muda
+  a área de pisos e lajes de borda que já existem. Conferir os testes e as baselines visuais antes de aceitar.
+
+Checklist:
+- [ ] `outerPerimeter` com `extend` e cache por `levelId|extend`.
+- [ ] `layerOutlines` com o ramo `perimeter` por camada.
+- [ ] Teste: piso de borda com acabamento que avança 5 cm sobre o perímetro externo; área do acabamento muda, a da
+      estrutura não (ou a estrutura vai ao núcleo em `auto`, conforme a decisão acima).
+- [ ] Testes existentes de perímetro (`junc-laje-perimetro-parede` e os de `outlineBound`) conferidos; mudança de valor
+      explicada no commit.
+- [ ] Regressão visual, com baseline só depois de olhar a imagem.
 
 ### F7 · Cor, hachura e exportação por camada (P8 restante)
 
@@ -226,7 +240,7 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 | 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | feito | F5 | `junctionCache.test.ts`, por identidade do objeto em cache |
 | 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | feito | F5 | 100% em todos os elementos |
 | 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | feito | F5 | 08 corrigida (P-5 implementado) |
-| 9 | Término por camada no perímetro externo (P8b) | pendente | F6 | hoje só vale para parede interna |
+| 9 | Término por camada no perímetro externo (P8b) | em andamento | F6 | ver §3 F6 |
 | 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
 | 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |
 | 12 | Inversão de corte por par (P-4, P10) | decisão pendente do dono | — | não bloqueia a conclusão |

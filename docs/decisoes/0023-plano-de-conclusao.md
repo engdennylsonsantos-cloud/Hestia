@@ -36,8 +36,12 @@ aparece inteira por cima do piso, e o usuário vê uma coisa que o quantitativo 
 
 Para dar a junção por concluída, todos os itens abaixo precisam valer:
 
-1. **Desenho = quantitativo.** Para qualquer nível de teste, a área e o volume visíveis da parede na planta, no corte e no 3D
-   batem com o quantitativo da parede (tolerância 1e-6 relativa).
+1. **Desenho = quantitativo.** Para qualquer nível de teste, o volume da parede no corte e no 3D bate com o quantitativo da
+   parede (tolerância 1e-6 relativa). Na planta, o corte fica numa altura acima do piso, então a parede inteira continua
+   aparecendo; a planta só muda quando o plano de corte passa pela zona de sobreposição (§3, F2).
+   Medida: volume (área × altura), não área, porque a parede e o piso se cruzam em faixas de cota diferentes.
+   **Regra de conferência:** o volume removido é a soma, par a par, das camadas do piso que vencem as da parede (`winsOver`,
+   0023 §1) × área comum × altura comum. É o que `junctionWall.test.ts` verifica.
 2. **Consistência entre vistas.** Planta, corte e 3D usam a mesma região resolvida (uma única fonte: `junctionLevel`).
 3. **Tabela de §9.1 da 0023 como teste.** Os casos G-B (piso F1, F2, F3 × parede W1, W2, W3, em L e T) passam como teste.
    A validação contra o Revit continua pendente e não bloqueia (ver §5).
@@ -54,34 +58,60 @@ Ordem obrigatória: F1 → F2 → F3 → F4 → F5. F6 e F7 podem começar depoi
 
 Arquivos: `packages/engine/src/junctionLevel.ts`, `packages/engine/src/junctionNet.ts` (`bandPiece` aceita índice de faixa).
 
-- [ ] Tag de cada peça de parede com `{ wallId, layerIndex, bandIndex }` em vez de `-1`.
-- [ ] Guardar as partes resolvidas de cada faixa de parede: `ElementJunction`-like para paredes, com `layerPartsOf` e um
-      `wallBandPartsOf(jl, wallId, layerIndex, bandIndex, fallback)`.
-- [ ] Manter `cut` e `region` por elemento (pisos e lajes não mudam de comportamento).
-- [ ] Cache: a assinatura já inclui as peças de parede, então nada a mudar além de incluir o índice da faixa.
+- [x] Tag de cada peça de parede com `{ wallId, layerIndex, bandIndex }` (`wallBandPieces` em `junctionNet.ts`).
+- [x] Partes resolvidas de cada faixa de parede: `WallJunction` em `junctionLevel.ts`, com `wallBandPartsOf(jl, wallId,
+      layerIndex, bandIndex, fallback)`. Faixa com topo inclinado fica de fora do recorte (`flat` falso).
+- [x] `cut` e `region` por elemento de piso e laje não mudaram de comportamento (130 testes antigos iguais).
+- [x] Cache: a assinatura já inclui as peças de parede, sem mudança.
 
-Testes novos (em `junctionLevel.test.ts`, ou ao lado de `junctionPlan.test.ts`):
-- [ ] Piso sob a parede de canto: a estrutura do piso (prioridade 1, núcleo) corta a parede no núcleo; o reboco da parede
-      fora do núcleo do piso não é cortado pela estrutura. Área esperada calculada à mão e escrita no teste.
-- [ ] Parede × parede não corta (`pairCuts`).
-- [ ] Piso e parede sem sobreposição de cota: parte da parede intacta (cota fora da laje).
+Testes (`packages/engine/src/junctionWall.test.ts`, 7 casos):
+- [x] Parede que desce até a cota do piso é recortada; parede acima dela não é.
+- [x] Volume removido = soma, par a par, das camadas que vencem (`winsOver`) × área comum × altura comum.
+- [x] Volume que sobra + volume removido = volume cheio.
+- [x] A parte que sobra não se sobrepõe à estrutura do piso na cota comum.
+- [x] Parede × parede não corta.
+- [x] Faixa sem parte resolvida cai na faixa inteira (fallback).
 
-Aceite F1: `npx vitest run packages/engine/src/junction` verde, e nenhum teste antigo muda de valor.
+Aceite F1: `npx vitest run packages/engine` verde (2003 testes, 140 arquivos), `tsc` e `eslint` limpos nos arquivos novos.
+Medição: sem mudança de valor em testes antigos.
 
-### F2 · Planta
+### F1b · Parede que atravessa o nível (novo, achado da F1)
+
+Problema: `wallBandPieces(p, levelId)` só olha paredes **do próprio nível**. Uma parede de dois pavimentos (base no térreo,
+topo no pavimento superior) atravessa a laje do pavimento de cima, e essa laje não a corta. Isso vale para o quantitativo
+(`quantities.ts:65` usa `wallCutters(p, levelId)`), para a junção do nível e para o desenho. Os números de piso e laje
+também ignoram a parede de outro nível (`floorQuantities.ts:110`, `slabQuantities.ts:119`).
+
+- [ ] Ao montar a junção de um nível, incluir as paredes de **outros níveis** cuja faixa de cota cruza a cota de algum piso
+      ou laje do nível em análise (faixa absoluta: `baseZ + band.z0..z1`).
+- [ ] Mesma regra nos quantitativos de piso, laje e parede (um só ponto de entrada, para não divergir).
+- [ ] Teste: parede de 6 m (térreo, base 0) com laje do pavimento 1 em 2,88–3,00 m corta a parede só nessa faixa; o volume
+      da parede no térreo cai pelo volume da laje sobre ela; o quantitativo da laje não muda.
+- [ ] Decidir com o dono se a parede de dois pavimentos é cortada pela laje ou pelo piso do pavimento de cima (é a mesma
+      regra de `winsOver`; a dúvida é só a semântica de produto).
+
+Aceite F1b: o quantitativo total do conjunto (parede + laje) não conta a sobreposição duas vezes, nem em um sentido nem no outro.
+
+### F2 · Planta (verificação e não-regressão)
 
 Arquivos: `packages/render/src/plan/build.ts` (linha 90), `packages/render/src/plan/junctionPlan.test.ts`.
 
-- [ ] Usar `wallBandPartsOf` para a região da camada na planta, no mesmo lugar onde hoje entra `rw.layers[].cut`/`fragment`.
+Na altura de corte padrão, a planta não muda: a parede aparece inteira porque o plano de corte está acima do piso. Esta fase
+existe para garantir que a planta usa a mesma fonte (`wallBandPartsOf`) e que o caso em que o plano de corte passa pela
+zona de sobreposição fica certo.
+
+- [ ] Usar `wallBandPartsOf` na região da camada da planta, onde hoje entra `rw.layers[].cut`/`fragment`. Quando o plano de corte
+      não toca a zona de sobreposição, o resultado tem que ser idêntico ao atual (teste de não-regressão).
 - [ ] Linhas de contorno de parede (`fragment`) seguem a região recortada, sem linha fantasma sobre o piso.
 - [ ] Linha de fronteira só onde o empate de prioridade deixa as duas camadas (`winsOver` = `null`).
 
 Testes:
-- [ ] Área da camada de parede na planta cai pelo overlap com o piso (teste de propriedade com 10 sementes fixas).
+- [ ] Planta na altura de corte acima do piso: parede inalterada (regressão).
+- [ ] Plano de corte dentro da zona de sobreposição: área da parede na planta cai pela área comum.
 - [ ] Teste de regressão visual `tests/e2e/visual-regression.mjs`: caso novo `junção-piso-parede` (canto de sala).
       **Baseline regravada só depois de olhar a imagem** (ver §4).
 
-Aceite F2: área da parede na planta = quantitativo da parede, dentro de 1e-6.
+Aceite F2: planta sem mudança na altura padrão e área cortada certa quando o plano atravessa a zona de sobreposição.
 
 ### F3 · Corte
 

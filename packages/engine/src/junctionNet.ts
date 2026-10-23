@@ -155,13 +155,35 @@ export function floorCutters(p: Project, levelId: Id): CutterSolid[] {
   return resolveFloors(p, levelId).map((rf: ResolvedFloor) => ({ kind: 'floor', pieces: rf.layers.map((l) => floorLayerPiece(rf, l)) }));
 }
 
+/**
+ * Pedaço de uma faixa de parede com a origem dela (parede, camada e faixa), para devolver a parte resolvida à faixa certa
+ * (decisão 0023 §3, F1 do plano de conclusão). Faixa com topo inclinado vem com `slope` e não entra na junção.
+ */
+export interface WallBandPiece {
+  wallId: Id;
+  layerIndex: number;
+  bandIndex: number;
+  piece: SolidPiece;
+}
+
+/** Pedaços de todas as faixas de parede do nível, com a origem de cada um. */
+export function wallBandPieces(p: Project, levelId: Id): WallBandPiece[] {
+  const r = resolveLevel(p, levelId);
+  return Object.values(r.walls).flatMap((rw) =>
+    rw.layers.flatMap((l) =>
+      l.bands.map((b, bandIndex) => ({
+        wallId: rw.wallId,
+        layerIndex: l.layerIndex,
+        bandIndex,
+        piece: bandPiece(rw, b, { priority: l.priority, core: l.core }),
+      })),
+    ),
+  );
+}
+
 /** Pedaços das faixas de parede do nível, camada a camada: piso e laje também podem ser cortados por parede (0023 §1, P7). */
 export function wallCutters(p: Project, levelId: Id): CutterSolid[] {
-  const r = resolveLevel(p, levelId);
-  const pieces = Object.values(r.walls).flatMap((rw) =>
-    rw.layers.flatMap((l) => l.bands.map((b) => bandPiece(rw, b, { priority: l.priority, core: l.core }))),
-  );
-  return [{ kind: 'wall', pieces }];
+  return [{ kind: 'wall', pieces: wallBandPieces(p, levelId).map((w) => w.piece) }];
 }
 
 /** Pedaço de uma faixa de altura de parede: a base absoluta da parede mais a faixa (o topo pode ser inclinado). */

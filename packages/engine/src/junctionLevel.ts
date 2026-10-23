@@ -1,7 +1,7 @@
 import { union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors } from './floors.ts';
-import { floorLayerPiece, slabLayerPiece, wallCutters, type SolidPiece } from './junctionNet.ts';
+import { floorLayerPiece, slabLayerPiece, wallBandPieces, type SolidPiece } from './junctionNet.ts';
 import { resolveJunction, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
 import { resolveSlabs } from './slabs.ts';
 
@@ -25,16 +25,33 @@ export interface ElementJunction {
   region: MultiPolygon;
 }
 
-/** Junção do nível: piso e laje pelo id do elemento. Paredes entram só como cortadoras (ver `junctionLevel`). */
+/**
+ * Junção de uma parede: partes resolvidas de cada faixa de cada camada (chave `bandKey`). Faixa ausente, ou parede sem
+ * `cut`, vale a faixa inteira (como antes). Faixas com topo inclinado não entram: a cota delas não se recorta plano.
+ */
+export interface WallJunction {
+  cut: boolean;
+  bands: ReadonlyMap<string, ResolvedPrism[]>;
+}
+
+/** Junção do nível: piso e laje pelo id do elemento, paredes pelo id da parede (decisão 0023 §3, F1). */
 export interface JunctionLevel {
   levelId: Id;
   elements: ReadonlyMap<Id, ElementJunction>;
+  walls: ReadonlyMap<Id, WallJunction>;
 }
 
-/** Entrada da junção: a peça no plano e a camada de origem (-1 para parede, que não tem camada resolvida aqui). */
+/** Chave de uma faixa dentro de uma parede: camada e faixa de altura, como vêm de `ResolvedWall`. */
+export const bandKey = (layerIndex: number, bandIndex: number): string => `${layerIndex}/${bandIndex}`;
+
+/**
+ * Entrada da junção: a peça no plano e a camada de origem. Para piso e laje, `layerIndex` é a camada do elemento; para
+ * parede, `wall` leva a parede e a chave da faixa, e `flat` diz se a faixa tem cota constante (recortável).
+ */
 interface Tagged {
   piece: PlanarPiece;
   layerIndex: number;
+  wall?: { id: Id; key: string; flat: boolean };
 }
 
 const r6 = (n: number): number => Math.round(n * 1e6) / 1e6;
@@ -89,7 +106,11 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
     if (rs.slope) continue;
     for (const l of rs.layers) add(slabLayerPiece(rs, l), l.layerIndex);
   }
-  for (const cut of wallCutters(p, levelId)) for (const sp of cut.pieces) add(sp, -1);
+  for (const w of wallBandPieces(p, levelId)) {
+    const piece = planarOf(w.piece);
+    if (!piece) continue;
+    tagged.push({ piece, layerIndex: w.layerIndex, wall: { id: w.wallId, key: bandKey(w.layerIndex, w.bandIndex), flat: w.piece.flat } });
+  }
 
   const sig = signature(tagged);
   const hit = levelCache.get(levelId);
@@ -97,12 +118,21 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 
   const res = resolveJunction(tagged.map((t) => t.piece));
   const elements = new Map<Id, ElementJunction>();
-  tagged.forEach(({ piece, layerIndex }, i) => {
-    if (layerIndex < 0) return;
-    const owner = piece.owner!;
-    const el = elements.get(owner) ?? { cut: false, layers: [], region: [] };
+  const walls = new Map<Id, { cut: boolean; bands: Map<string, ResolvedPrism[]> }>();
+  tagged.forEach(({ piece, layerIndex, wall }, i) => {
     const parts = res[i]!;
     const untouched = parts.length === 1 && parts[0]!.poly === piece.poly;
+    if (wall) {
+      const wj = walls.get(wall.id) ?? { cut: false, bands: new Map<string, ResolvedPrism[]>() };
+      if (wall.flat) {
+        if (!untouched) wj.cut = true;
+        wj.bands.set(wall.key, parts);
+      }
+      walls.set(wall.id, wj);
+      return;
+    }
+    const owner = piece.owner!;
+    const el = elements.get(owner) ?? { cut: false, layers: [], region: [] };
     if (!untouched) el.cut = true;
     el.layers.push({ layerIndex, parts });
     elements.set(owner, el);
@@ -110,7 +140,7 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   for (const el of elements.values()) {
     if (el.cut) el.region = union(...el.layers.flatMap((l) => l.parts.map((x) => x.poly)));
   }
-  const value: JunctionLevel = { levelId, elements };
+  const value: JunctionLevel = { levelId, elements, walls };
   levelCache.set(levelId, { sig, value });
   return value;
 }
@@ -122,4 +152,20 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 export function layerPartsOf(el: ElementJunction | undefined, layerIndex: number, fallback: ResolvedPrism[]): ResolvedPrism[] {
   if (!el || !el.cut) return fallback;
   return el.layers.find((l) => l.layerIndex === layerIndex)?.parts ?? fallback;
+}
+
+/**
+ * Partes de uma faixa de parede para o desenho (planta, corte e 3D): as resolvidas quando a parede foi recortada por piso
+ * ou laje; senão `fallback` (a faixa inteira). Faixa com topo inclinado sempre cai no `fallback`.
+ */
+export function wallBandPartsOf(
+  jl: JunctionLevel | undefined,
+  wallId: Id,
+  layerIndex: number,
+  bandIndex: number,
+  fallback: ResolvedPrism[],
+): ResolvedPrism[] {
+  const wj = jl?.walls.get(wallId);
+  if (!wj || !wj.cut) return fallback;
+  return wj.bands.get(bandKey(layerIndex, bandIndex)) ?? fallback;
 }

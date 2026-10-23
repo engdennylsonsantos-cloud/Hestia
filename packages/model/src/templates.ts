@@ -67,7 +67,7 @@ function house2(cmds: Command[]): void {
     opening('h_i3', 'ot_p70', 4.5, 'door'),
     opening('h_n', 'ot_j120', 2.0, 'window'),
     opening('h_n', 'ot_j200', 6.0, 'window'),
-    opening('h_n', 'ot_j150', 8.7, 'window'),
+    opening('h_n', 'ot_j150', 8.5, 'window'), // 8,5 + 1,5 = 10,0: no limite do eixo (aviso abertura-fora-da-parede)
     opening('h_w', 'ot_j120', 1.7, 'window'),
     opening('h_w', 'ot_j120', 5.3, 'window'),
     opening('h_e', 'ot_j150', 2.6, 'window'),
@@ -103,7 +103,7 @@ function studio(cmds: Command[]): void {
     opening('s_i2', 'ot_p70', 1.0, 'door'),
     opening('s_n', 'ot_j200', 3.0, 'window'),
     opening('s_w', 'ot_j120', 2.5, 'window'),
-    opening('s_e', 'ot_j60', 4.8, 'window'),
+    opening('s_e', 'ot_j60', 4.4, 'window'), // 4,4 + 0,6 = 5,0: no limite do eixo (aviso abertura-fora-da-parede)
   ];
   for (const o of os) cmds.push({ type: 'addOpening', opening: o });
 }

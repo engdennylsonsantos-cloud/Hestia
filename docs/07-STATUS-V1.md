@@ -91,6 +91,10 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 **Anotações** — cota (**Y**, com referência à parede) e texto (**X**), na planta e no DXF (camadas `COTAS` e `TEXTOS`).
 Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): camadas aberturas → paredes → total nos quatro lados.
 
+**Avisos do projeto** (0029): o painel soma aos avisos do modelo três leituras da geometria resolvida —
+`abertura-fora-da-parede` (offset + largura passa do eixo), `parede-topo-desnivelado` (paredes colineares do mesmo
+nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada de laje com término `passa`).
+
 **Vistas, gráficos e seleção**
 - **Planta** por nível com intervalo de vista, direção para cima ou para baixo, subpavimento e projeção da cobertura (0013).
 - **Cortes e elevações**: corte por dois cliques; as quatro elevações em um passo; linha oculta; seleção e realce (0016).
@@ -200,9 +204,12 @@ Os fluxos de navegador estão em `tests/e2e/*.mjs` (23 fluxos; `helpers.mjs` é 
 
 ## Qualidade e verificação
 
-- Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 43+7+0, lajes 41+3+0, telhados 43+1+0,
+- Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 44+7+0, lajes 42+3+0, telhados 43+1+0,
   escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
+- `npx vitest run --maxWorkers=4` em 2026-10-23: 293 arquivos e 3568 testes, todos passando (115 s). O `npm run check`
+  padrão estourou dois timeouts por carga nesta máquina (`predio10` e `ifcExport`); os mesmos testes passam em
+  paralelismo menor.
 - `npm run test:rapido` em 2026-10-22: 277 arquivos e 3373 testes, todos passando (70,8 s; `test:rapido`, sem property e perf).
 - `npm run test:completo` em 2026-10-22: 278 arquivos e 3675 testes, todos passando, com as 60 sementes (700 s, código de saída 0).
 - Build em 2026-10-22 (Windows, esbuild 0.28.2 do lockfile): `npm run build` falha na minificação com

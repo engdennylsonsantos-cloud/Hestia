@@ -113,19 +113,30 @@ Testes:
 
 Aceite F2: planta sem mudança na altura padrão e área cortada certa quando o plano atravessa a zona de sobreposição.
 
-### F3 · Corte
+### F3 · Corte: CONFLITO DE REGRA, decisão do dono antes de codar
 
-Arquivos: `packages/engine/src/section.ts` (linhas 288-300), `packages/engine/src/junctionSection.test.ts`.
+Tentativa feita em 2026-10-23 e **revertida**. Ela aplicava a junção (piso tira a parede) ao corte, e isso quebrou
+`sectionCota.test.ts` (P6). O motivo está registrado no próprio código e na 0023 §3: a parede embutida no piso (z de −0,10 a
+−0,05, dentro da faixa do piso) **sumia** do corte, de 0,200 m³ para 0,000 m³. A P6 corrigiu isso: no corte, a cota decide o
+que fica por cima, a parede embutida fica inteira e o piso perde só a faixa comum. Ou seja, a regra de corte **não** é a
+mesma da quantidade.
 
-- [ ] Para cada faixa de parede, usar as partes resolvidas (`fuseBands` continua, mas aplicado às partes, não à faixa inteira).
-- [ ] `addCut` recebe a região recortada; `grow` continua pela faixa total para não encolher a cota do desenho.
-- [ ] Parede embutida em piso (caso medido em 0023 §3, 0,200 m³ sozinha) continua aparecendo inteira na parte que sobra.
+Consequência: a F3 como estava escrita contradiz a P6. Não foi implementada.
 
-Testes:
-- [ ] Área do corte da parede = volume/comprimento esperado do quantitativo, no mesmo corte.
-- [ ] Corte da parede com piso de caimento e de laje: caso fora do escopo fica documentado com aviso (ver F5).
+Duas opções para o dono decidir:
 
-Aceite F3: área do corte da parede bate com a da planta do mesmo nível.
+- **A (recomendada):** corte segue a P6 (cota). Quantitativo e 3D seguem a hierarquia. A diferença de cor na zona comum
+  (quem aparece como material) é aceita e documentada. Não há código a mudar no corte; falta só o teste de não-regressão.
+- **B:** corte também segue a hierarquia. Exige rever a P6: a parede embutida passa a sumir na zona comum, e o piso mostra
+  a estrutura. Precisa de uma regra que mantenha a parede visível fora da zona comum (a parte que sobra).
+
+Enquanto não houver decisão, a F3 fica bloqueada e a F4 (3D) só pode seguir se for coerente com a escolha acima.
+
+- [ ] Decisão A ou B registrada em `docs/decisoes/0023-juncao-piso-laje-parede.md` (§13).
+- [ ] Se A: teste de não-regressão do corte com a junção ativa (já existe em `sectionCota.test.ts`; manter) e nota em §3.
+- [ ] Se B: reescrever a P6 em §3 e atualizar `sectionCota.test.ts` com a nova regra, antes de mudar `section.ts`.
+
+Testes desta fase (qualquer opção): `npx vitest run packages/engine/src/sectionCota.test.ts packages/engine/src/junctionSection.test.ts`.
 
 ### F4 · 3D
 

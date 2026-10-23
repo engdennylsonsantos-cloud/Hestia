@@ -165,7 +165,12 @@ export function wallBandPartsOf(
   bandIndex: number,
   fallback: ResolvedPrism[],
 ): ResolvedPrism[] {
+  return wallBandCut(jl, wallId, layerIndex, bandIndex) ?? fallback;
+}
+
+/** Partes recortadas de uma faixa de parede, ou `undefined` quando a faixa não foi recortada (vale a inteira). */
+export function wallBandCut(jl: JunctionLevel | undefined, wallId: Id, layerIndex: number, bandIndex: number): ResolvedPrism[] | undefined {
   const wj = jl?.walls.get(wallId);
-  if (!wj || !wj.cut) return fallback;
-  return wj.bands.get(bandKey(layerIndex, bandIndex)) ?? fallback;
+  if (!wj || !wj.cut) return undefined;
+  return wj.bands.get(bandKey(layerIndex, bandIndex));
 }

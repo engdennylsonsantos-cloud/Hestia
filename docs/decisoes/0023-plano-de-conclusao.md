@@ -207,7 +207,7 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 | F3 (decisão) | `e127190` | 2026-10-23 | tentativa de corte pela hierarquia revertida; conflito com a P6 registrado |
 | F4 | `1a50f90` | 2026-10-23 | sólido 3D da parede recortado; 3 testes novos |
 | F3 regra B | `a9181fa` | 2026-10-23 | corte pela hierarquia (regra B, como Revit e ArchiCAD); `sectionCota.test.ts` reescrito; sem mudança no 3D |
-| F1b | (ver linha abaixo) | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
+| F1b | `64a7b8e` | 2026-10-23 | cortadores entre níveis (`levelCutterSet`); 5 testes novos |
 
 ### 6.2 Pendências consolidadas da junção piso/laje × parede
 
@@ -215,7 +215,7 @@ Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o 
 
 | # | Item | Estado | Fase | Notas |
 |---|---|---|---|---|
-| 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | feito | F1b | commit da F1b; ver §6.1 |
+| 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | feito | F1b | `64a7b8e` |
 | 1b | Desempenho da junção com muitos níveis (sem filtro por elevação; cada chamada percorre todos os níveis) | pendente | F1b/perf | medir com projeto de 5+ níveis antes de otimizar |
 | 2 | Planta: teste de não-regressão e caso com plano de corte dentro da zona comum | pendente | F2 | a planta não muda na altura padrão |
 | 3 | Regressão visual do corte (mudou de propósito com a regra B) | pendente | F3/F5 | regravar a baseline só depois de olhar a imagem nova |

@@ -51,6 +51,9 @@ export interface ResolvedWall {
   sLo: number;
   baseZ: number;
   height: number;
+  /** Faixa de cota da parede sem anexar a piso/laje (base do modelo até a altura máxima): é a que o término por camada usa. */
+  nominalZ0?: number;
+  nominalZ1?: number;
   layers: ResolvedLayer[];
   /** Camadas de espessura zero (membranas, barreiras): linhas no limite entre camadas, em planta e nos quantitativos. */
   membranes: Membrane[];

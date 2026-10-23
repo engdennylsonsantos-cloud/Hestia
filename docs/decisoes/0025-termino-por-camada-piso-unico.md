@@ -96,3 +96,11 @@ Não faz (pendências):
 - `packages/model/src/termino.test.ts` e `apps/web/src/ui/dialogs/terminoForm.test.ts` (validação e formulário).
 - `tests/e2e/piso-unico.mjs` (app real: piso único pelo perímetro, estrutura > acabamento, troca para núcleo).
 - Regressão visual: os 30 casos atuais seguem em 0,000% (CPU) e a regressão GPU passa. Dois casos novos, `piso-unico-parede-face` e `piso-unico-parede-nucleo`, com baselines criadas. Conferidas a olho: as duas imagens são praticamente iguais, porque a parede pinta por cima da diferença (ela fica dentro da pegada). A diferença está nas operações de preenchimento (testadas) e no corte, no 3D e nos quantitativos.
+
+## 10. Parede anexada respeita o término por camada (correção de 2026-10-23)
+
+Defeito: a parede com "Topo no piso/laje" (ou "Base no piso/laje") se anexava ao contorno do elemento inteiro, então a parede de baixo parava sempre na face inferior da laje, mesmo onde o término esvaziava as camadas contra ela (a parede de cima já encaixava no vazio da camada de topo).
+
+Regra nova: a cota de anexo vem das camadas com volume que cobrem o ponto médio do trecho do eixo (`facesAt`): base = maior `z1` entre elas, topo = menor `z0`. Onde todas as camadas estão esvaziadas pelo término, nada cobre o eixo e a parede segue pelo vazio até a cota normal (topo da laje). Os trechos do eixo também são cortados nas bordas dos polígonos das camadas (`polygonsOfLevel`).
+
+Sem ciclo: o término continua lendo as paredes com anexo ao contorno (`resolveLevel(..., { flatAttach: true })`) e pela faixa de cota nominal da parede (`nominalZ0/nominalZ1`), sem o anexo; só a resolução final da parede enxerga as camadas (`attachTargets.ts`, memoizado por projeto, e só quando existe parede anexada e algum tipo com regra de término). Projetos sem regra de término ficam idênticos. Teste: `wallAttachTermino.test.ts`.

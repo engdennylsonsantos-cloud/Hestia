@@ -22,8 +22,12 @@ export type BlockRule = { kind: 'face' } | { kind: 'nucleo' } | { kind: 'ate'; p
 export const Z_TOL = 1e-3;
 
 /** Parede do nível cuja faixa de cota (base até base mais altura) toca a faixa da camada (± 1 mm). */
-export const wallTouchesZone = (rw: ResolvedWall, z0: number, z1: number): boolean =>
-  rw.baseZ <= z1 + Z_TOL && rw.baseZ + rw.height >= z0 - Z_TOL;
+export const wallTouchesZone = (rw: ResolvedWall, z0: number, z1: number): boolean => {
+  // Faixa nominal: a parede anexada a uma laje (topo na face inferior) ainda atravessa as camadas que o término esvazia.
+  const b0 = rw.nominalZ0 ?? rw.baseZ;
+  const b1 = rw.nominalZ1 ?? rw.baseZ + rw.height;
+  return b0 <= z1 + Z_TOL && b1 >= z0 - Z_TOL;
+};
 
 /** Índices das camadas da parede que a regra bloqueia (faixa contígua entre o menor e o maior índice, no caso `ate`). */
 export function blockedLayerIndexes(rw: ResolvedWall, rule: BlockRule): number[] {
@@ -77,7 +81,8 @@ export function wallZoneAt(p: Project, rw: ResolvedWall, rule: BlockRule, z1: nu
 
 /** Paredes resolvidas de um nível (o resolvedor do nível, com o cache dele). */
 export function wallsOfLevel(p: Project, levelId: Id): ResolvedWall[] {
-  return Object.values(resolveLevel(p, levelId).walls);
+  // Anexo plano: as paredes que esvaziam as camadas não dependem das camadas (sem ciclo, decisão 0025).
+  return Object.values(resolveLevel(p, levelId, undefined, { flatAttach: true }).walls);
 }
 
 /** Caixa de um polígono (para o filtro barato antes das booleanas). */

@@ -27,9 +27,16 @@ db1372f wip: fase 1a perímetro pela face externa do núcleo (extend, coreOutlin
 064887e wip: fase 1 auto no perímetro pelo núcleo (camadas e fachada contínua)
 ```
 
-Verificação no último commit: `npx tsc -p tsconfig.json --noEmit` limpo, `npx eslint packages/engine packages/model apps/web`
-limpo, `npx vitest run packages/engine` 98 arquivos / 1344 testes verdes, `npx vitest run apps/web` 36 / 329,
-`npx vitest run packages/model` 28 / 411. **Nada de e2e, baselines, `test:completo`, `test:perf` nem build ainda.**
+Depois desses commits a branch foi integrada com o `origin` (`git merge origin/claude/wizardly-goldberg-qtjveg`), que tinha
+o commit `f0462eb fix(engine): parede anexada a piso/laje respeita o término por camada (parede de baixo preenche o vazio
+da laje)`. O único conflito foi de documentação (`docs/decisoes/0025-...`, resolvido mantendo as duas seções e renumerando
+a nova para §11). **Esse commit remoto mexe em `wallAttach.ts`, `resolve.ts`, `terminoBlock.ts`, `types.ts` e cria
+`attachTargets.ts`** — leia antes da Fase 2 (§6).
+
+Verificação no estado integrado: `npx tsc -p tsconfig.json --noEmit` limpo e
+`npx vitest run packages/engine packages/model` = 127 arquivos / 1758 testes verdes. Antes do merge: `npx eslint
+packages/engine packages/model apps/web` limpo, `npx vitest run apps/web` 36 / 329.
+**Nada de e2e, baselines, `test:completo`, `test:perf` nem build ainda.**
 
 ## 2. O que está implementado (e como conferir)
 
@@ -129,6 +136,10 @@ Se estiver tudo verde, o estado é o do §1. Depois siga a ordem do §7 do brief
 ## 6. Fase 2 e documentos
 
 Fase 2 (topo da parede na face superior), como no brief §6:
+0. **Antes de tudo**, ler o commit remoto `f0462eb` (já integrado): `attachSpans` não usa mais `bottoms`/`mins` do
+   elemento inteiro — a base é o maior `z1` e o topo o menor `z0` entre as **camadas com volume que cobrem o ponto médio**
+   do trecho (`facesAt` + `attachTargets.ts`, memoizado). O modo `'topside'` tem de entrar nessa mesma conta, escolhendo
+   a face de cima da camada mais alta (topo) em vez da face de baixo da mais baixa.
 1. `packages/model/src/types.ts`: `Wall.attachTopFace?: 'underside' | 'topside'` (ausente = `'underside'`).
 2. `packages/engine/src/wallAttach.ts`: `attachSpans` ganha o modo; `topside` usa `facesAt(...).tops` com `Math.max`
    (simétrico da base, que já usa `tops`/`max`) e `underside` continua `bottoms`/`min`. `facesAt` já resolve a inclinação.

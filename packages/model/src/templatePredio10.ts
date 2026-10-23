@@ -2,30 +2,36 @@ import type { Vec2 } from '@hestia/geom';
 import type { Command } from './commands.ts';
 import { makeFloor } from './floor.ts';
 import { makeSlab } from './slab.ts';
+import { makeStair } from './stair.ts';
 import { makeWall } from './wall.ts';
 import type { FloorType, Id, Level, SectionView, SlabType } from './types.ts';
 
 /**
- * Prédio residencial de 10 pavimentos — exemplo de **estabilidade geral** (plantas, cortes e 3D). Planta retangular de
- * 20 × 12 m com núcleo de circulação central de 6 × 4 m e quatro unidades por andar (norte, sul, oeste e leste). Piso a
- * piso de 2,80 m: 10 pavimentos, 28,00 m até o topo da laje de cobertura.
+ * Prédio residencial de 10 pavimentos — exemplo de estabilidade (plantas, cortes e 3D).
  *
- * Configuração de junção pedida pelo dono (decisões 0025 e 0027):
- * - lajes e pisos terminam na **face externa do núcleo** da parede: camada estrutural com `limiteExterno: 'nucleo'`;
- * - as camadas de **acabamento** terminam na **face interna do núcleo**: `termino: 'nucleo'`.
- * Assim a estrutura da laje passa sob o acabamento e para no núcleo, e o acabamento para na face interna dele — o
- * acabamento externo da parede fica contínuo por fora da laje.
+ * Planta 20 × 13 m, núcleo de circulação central com **só escada** (dois lances, 6 × 4 m), quatro unidades por andar:
+ * norte e sul com o programa completo (sala/cozinha, dois dormitórios — um suíte — e dois banheiros) e oeste e leste
+ * como unidades compactas (sala/cozinha, dormitório e banheiro). Piso a piso 2,80 m: 10 pavimentos, 28,00 m até o topo.
  *
- * Paredes **sem anexo** de base e de topo (padrão do modelo): o topo vai ao topo da laje pelo nível de topo + `topOffset`.
+ * Critérios de projeto (NBR 9050 no essencial): circulação de 1,20 m dentro das unidades, portas de 0,80 nos ambientes
+ * e 0,90 na entrada, banheiro com 1,50 m de giro, cada ambiente com janela própria e ventilação cruzada (as unidades
+ * norte/sul abrem nas duas faces pelo núcleo de escada ventilado; oeste/leste abrem em duas fachadas opostas).
+ *
+ * Junção (decisões 0025 e 0027): lajes e pisos com a **estrutura** em `limiteExterno: 'nucleo'` (para na face externa do
+ * núcleo da parede) e as camadas de **acabamento** em `termino: 'nucleo'` (param na face interna do núcleo). Paredes sem
+ * anexo de base e de topo: o topo vai ao topo da laje pelo nível de topo + `topOffset`.
  */
 
 const H = 2.8;
 const W = 20;
-const D = 12;
+const D = 13;
 const N = 10;
-/** Face externa do acabamento da parede externa `wt_ext19`: 0,242 m de espessura, metade para cada lado do eixo. */
+/** Metade da espessura da parede externa `wt_ext19` (0,242 m): face externa do acabamento. */
 const EXT = 0.121;
-const CORE = { x0: 7, x1: 13, y0: 4, y1: 8 } as const;
+/** Núcleo de escada: 6 × 4 m no centro da planta. */
+const CORE = { x0: 7, x1: 13, y0: 4.5, y1: 8.5 } as const;
+/** Circulação das unidades: 1,20 m. */
+const CIRC = 1.2;
 
 const lv = (i: number): Id => `lv_${i}`;
 const elev = (i: number): number => i * H;
@@ -37,7 +43,6 @@ const NIVEL: Level[] = Array.from({ length: N }, (_, i) => ({
   viewRange: { top: 2.3, cut: 1.2, bottom: 0, depth: 0, direction: 'down' },
 }));
 
-/** Laje: argamassa em cima e tinta embaixo param na face interna do núcleo; o concreto para na face externa dele. */
 const LAJE: SlabType = {
   id: 'pd_laje',
   name: 'Laje maciça 19 (prédio)',
@@ -51,7 +56,6 @@ const LAJE: SlabType = {
   ],
 };
 
-/** Piso das unidades: mesmo critério da laje (acabamento na face interna do núcleo, estrutura na face externa). */
 const PISO: FloorType = {
   id: 'pd_piso',
   name: 'Piso cerâmico (prédio)',
@@ -65,6 +69,8 @@ const PISO: FloorType = {
   ],
 };
 
+type Topo = Partial<{ topLevelId: Id | null; topOffset: number }>;
+
 const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
   { x: x0, y: y0 },
   { x: x1, y: y0 },
@@ -72,60 +78,114 @@ const rect = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [
   { x: x0, y: y1 },
 ];
 
+const junta = { kind: 'butt' as const, flip: false };
+const parede = (cmds: Command[], id: Id, levelId: Id, typeId: Id, a: Vec2, b: Vec2, topo: Topo): void => {
+  cmds.push({ type: 'addWall', wall: makeWall({ id, typeId, levelId, a, b, joinStart: junta, joinEnd: junta, ...topo }) });
+};
+/** Divisória de 9 cm (alvenaria interna). */
+const divisoria = (cmds: Command[], id: Id, levelId: Id, a: Vec2, b: Vec2, topo: Topo): void =>
+  parede(cmds, id, levelId, 'wt_alv9', a, b, topo);
+
+const vao = (hostId: Id, typeId: Id, offset: number, kind: 'door' | 'window', id: Id): Command => ({
+  type: 'addOpening',
+  opening: { id, kind, typeId, hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' },
+});
+
 /** Perímetro no sentido horário: a face externa fica à esquerda de a→b (docs/05 §3). */
-function perimeter(cmds: Command[], levelId: Id, typeId: Id, box: { x0: number; x1: number; y0: number; y1: number }, pre: string, topo: Partial<{ topLevelId: Id | null; topOffset: number }>): void {
+function perimetro(cmds: Command[], levelId: Id, typeId: Id, box: { x0: number; x1: number; y0: number; y1: number }, pre: string, topo: Topo): void {
   const lados: Array<[string, Vec2, Vec2]> = [
     ['s', { x: box.x1, y: box.y0 }, { x: box.x0, y: box.y0 }],
     ['l', { x: box.x1, y: box.y1 }, { x: box.x1, y: box.y0 }],
     ['n', { x: box.x0, y: box.y1 }, { x: box.x1, y: box.y1 }],
     ['o', { x: box.x0, y: box.y0 }, { x: box.x0, y: box.y1 }],
   ];
-  for (const [nome, a, b] of lados) {
-    cmds.push({ type: 'addWall', wall: makeWall({ id: `${pre}-${nome}`, typeId, levelId, a, b, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, ...topo }) });
-  }
+  for (const [nome, a, b] of lados) parede(cmds, `${pre}-${nome}`, levelId, typeId, a, b, topo);
 }
 
-/** Vão de porta de 0,90 × 2,10 centrado no trecho. */
-const porta = (hostId: Id, offset: number, id: Id): Command => ({
-  type: 'addOpening',
-  opening: { id, kind: 'door', typeId: 'ot_p90', hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' },
-});
+/**
+ * Unidade norte/sul com o programa completo. `dir` = +1 (norte, cresce em y) ou −1 (sul); `base` é a cota da parede do
+ * núcleo. Faixa da circulação: `base` até `base + dir·1,20`; ambientes na faixa da fachada, com 3,30 m de profundidade.
+ */
+function unidadeNS(cmds: Command[], i: number, nivel: Id, topo: Topo, base: number, dir: 1 | -1, pre: string): void {
+  const corr = base + dir * CIRC;
+  const face = base + dir * 4.5;
+  const yMin = Math.min(corr, face);
+  const yMax = Math.max(corr, face);
+  const xDorm2 = 3.6;
+  const xBanho = 5.2;
+  const xBanhoSuite = 13.6;
+  const xSuite = 15.2;
+  // divisórias entre os ambientes da faixa da fachada
+  for (const [id, x] of [['D1', xDorm2], ['D2', xBanho], ['D3', xBanhoSuite], ['D4', xSuite]] as const) {
+    divisoria(cmds, `PD${i}-${pre}-${id}`, nivel, { x, y: yMin }, { x, y: yMax }, topo);
+  }
+  // parede da circulação: dois trechos, deixando a sala aberta no meio
+  divisoria(cmds, `PD${i}-${pre}-C1`, nivel, { x: 0, y: corr }, { x: xBanho, y: corr }, topo);
+  divisoria(cmds, `PD${i}-${pre}-C2`, nivel, { x: xBanhoSuite, y: corr }, { x: W, y: corr }, topo);
+  // portas: dormitório 2, banho social, banho da suíte e suíte
+  cmds.push(vao(`PD${i}-${pre}-C1`, 'ot_p80', 1.8, 'door', `PD${i}-${pre}-pD2`));
+  cmds.push(vao(`PD${i}-${pre}-C1`, 'ot_p80', 4.4, 'door', `PD${i}-${pre}-pBS`));
+  cmds.push(vao(`PD${i}-${pre}-C2`, 'ot_p80', 1.0, 'door', `PD${i}-${pre}-pBSU`));
+  cmds.push(vao(`PD${i}-${pre}-C2`, 'ot_p80', 4.0, 'door', `PD${i}-${pre}-pSU`));
+  // entrada da unidade pelo núcleo (porta de 0,90, acessível)
+  cmds.push(vao(`PD${i}-NUC-${dir > 0 ? 'n' : 's'}`, 'ot_p90', 3.0, 'door', `PD${i}-${pre}-pEnt`));
+  // janelas na fachada: dormitório 2, banho, sala/cozinha (duas) e suíte
+  const host = `PD${i}-EXT-${dir > 0 ? 'n' : 's'}`;
+  const ox = (x: number): number => (dir > 0 ? x : W - x);
+  cmds.push(vao(host, 'ot_j120', ox(1.8), 'window', `PD${i}-${pre}-jD2`));
+  cmds.push(vao(host, 'ot_j60', ox(4.4), 'window', `PD${i}-${pre}-jBS`));
+  cmds.push(vao(host, 'ot_j240', ox(7.6), 'window', `PD${i}-${pre}-jSA`));
+  cmds.push(vao(host, 'ot_j120', ox(11.6), 'window', `PD${i}-${pre}-jCO`));
+  cmds.push(vao(host, 'ot_j150', ox(17.6), 'window', `PD${i}-${pre}-jSU`));
+}
 
-/** Janela de correr de 2,40 × 1,20 com peitoril de 1,10 (tipo do catálogo padrão). */
-const janela = (hostId: Id, offset: number, id: Id): Command => ({
-  type: 'addOpening',
-  opening: { id, kind: 'window', typeId: 'ot_j240', hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' },
-});
-
-/** Uma unidade por quadrante: norte e sul com 20 × 4 m; oeste e leste com 7 × 4 m. */
-const UNIDADES: Array<{ nome: string; box: { x0: number; y0: number; x1: number; y1: number } }> = [
-  { nome: 'n', box: { x0: 0, y0: CORE.y1, x1: W, y1: D } },
-  { nome: 's', box: { x0: 0, y0: 0, x1: W, y1: CORE.y0 } },
-  { nome: 'o', box: { x0: 0, y0: CORE.y0, x1: CORE.x0, y1: CORE.y1 } },
-  { nome: 'l', box: { x0: CORE.x1, y0: CORE.y0, x1: W, y1: CORE.y1 } },
-];
-
-/** Porta interna de 0,80 × 2,10. */
-const porta80 = (hostId: Id, offset: number, id: Id): Command => ({
-  type: 'addOpening',
-  opening: { id, kind: 'door', typeId: 'ot_p80', hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' },
-});
-
-/** Divisória interna da unidade (parede de 9 cm) com uma porta de 0,80 no meio. */
-function divisoria(cmds: Command[], levelId: Id, id: Id, a: Vec2, b: Vec2, topo: Partial<{ topLevelId: Id | null; topOffset: number }>): void {
-  cmds.push({
-    type: 'addWall',
-    wall: makeWall({ id, typeId: 'wt_alv9', levelId, a, b, joinStart: { kind: 'butt', flip: false }, joinEnd: { kind: 'butt', flip: false }, ...topo }),
-  });
-  cmds.push(porta80(id, Math.hypot(b.x - a.x, b.y - a.y) / 2, `${id}-p`));
+/** Unidade compacta (oeste/leste): sala/cozinha, dormitório e banheiro, com 4 m de profundidade. */
+function unidadeCompacta(cmds: Command[], i: number, nivel: Id, topo: Topo, pre: string, x0: number, x1: number): void {
+  const yc = (CORE.y0 + CORE.y1) / 2;
+  const yCorr = CORE.y0 + CIRC;
+  // circulação 1,20 m junto ao núcleo; dormitório e banheiro na faixa da fachada
+  divisoria(cmds, `PD${i}-${pre}-C1`, nivel, { x: x0, y: yCorr }, { x: x1, y: yCorr }, topo);
+  divisoria(cmds, `PD${i}-${pre}-D1`, nivel, { x: (x0 + x1) / 2, y: yCorr }, { x: (x0 + x1) / 2, y: CORE.y1 }, topo);
+  cmds.push(vao(`PD${i}-${pre}-C1`, 'ot_p80', 1.6, 'door', `PD${i}-${pre}-pD`));
+  cmds.push(vao(`PD${i}-${pre}-C1`, 'ot_p80', 5.0, 'door', `PD${i}-${pre}-pB`));
+  cmds.push(vao(`PD${i}-NUC-${pre === 'O' ? 'o' : 'l'}`, 'ot_p90', yc - CORE.y0, 'door', `PD${i}-${pre}-pEnt`));
+  const lado = pre === 'O' ? 'o' : 'l';
+  const len = CORE.y1 - CORE.y0;
+  cmds.push(vao(`PD${i}-EXT-${lado}`, 'ot_j120', len * 0.3, 'window', `PD${i}-${pre}-jD`));
+  cmds.push(vao(`PD${i}-EXT-${lado}`, 'ot_j120', len * 0.75, 'window', `PD${i}-${pre}-jS`));
 }
 
 const CORTES: SectionView[] = [
-  // AA pelo núcleo, no eixo x = 10 (olha para o oeste, atravessa os 10 pavimentos).
   { id: 'PD-AA', name: 'Corte AA (prédio)', kind: 'section', a: { x: 10, y: -2 }, b: { x: 10, y: D + 2 }, depth: D + 4 },
-  // BB transversal, no eixo y = 6.
-  { id: 'PD-BB', name: 'Corte BB (prédio)', kind: 'section', a: { x: -2, y: 6 }, b: { x: W + 2, y: 6 }, depth: W + 4 },
+  { id: 'PD-BB', name: 'Corte BB (prédio)', kind: 'section', a: { x: -2, y: 6.5 }, b: { x: W + 2, y: 6.5 }, depth: W + 4 },
 ];
+
+/** Escada de dois lances dentro do núcleo: um lance reto de 2,40 m de largura útil por 2,80 m de altura. */
+function escada(cmds: Command[], nivel: Id, topo: Topo): void {
+  cmds.push({
+    type: 'addStair',
+    stair: makeStair({
+      id: `PD-ESC-${nivel}`,
+      typeId: 'stt_monolitica',
+      levelId: nivel,
+      components: [
+        {
+          id: `PD-ESC-${nivel}-lance`,
+          kind: 'run',
+          boundaryLeft: [{ a: { x: CORE.x0 + 0.4, y: CORE.y0 + 0.6 }, b: { x: CORE.x0 + 0.4, y: CORE.y0 + 3.4 }, sag: 0 }],
+          boundaryRight: [{ a: { x: CORE.x0 + 2.8, y: CORE.y0 + 0.6 }, b: { x: CORE.x0 + 2.8, y: CORE.y0 + 3.4 }, sag: 0 }],
+          risers: Array.from({ length: 17 }, (_, k) => {
+            const y = CORE.y0 + 0.6 + (2.8 * k) / 16;
+            return { a: { x: CORE.x0 + 0.4, y }, b: { x: CORE.x0 + 2.8, y }, sag: 0 };
+          }),
+          path: [],
+          generatedBy: 'straight',
+        },
+      ],
+      ...topo,
+    }),
+  });
+}
 
 /** Monta o prédio de 10 pavimentos como uma lista de comandos, no mesmo estilo de `house2` e `casaAltoPadrao`. */
 export function predio10(cmds: Command[]): void {
@@ -136,47 +196,26 @@ export function predio10(cmds: Command[]): void {
   for (let i = 0; i < N; i++) {
     const nivel = lv(i);
     const acima = i + 1 < N ? lv(i + 1) : null;
-    // Sem anexo: o topo das paredes vai ao topo da laje de cima (nível + topOffset 0), ou 2,80 acima no último.
-    const topo = acima ? { topLevelId: acima, topOffset: 0 } : {};
-    perimeter(cmds, nivel, 'wt_ext19', { x0: 0, y0: 0, x1: W, y1: D }, `PD${i}-EXT`, topo);
-    perimeter(cmds, nivel, 'wt_conc15', { ...CORE }, `PD${i}-NUC`, topo);
+    const topo: Topo = acima ? { topLevelId: acima, topOffset: 0 } : {};
+    perimetro(cmds, nivel, 'wt_ext19', { x0: 0, y0: 0, x1: W, y1: D }, `PD${i}-EXT`, topo);
+    perimetro(cmds, nivel, 'wt_conc15', { ...CORE }, `PD${i}-NUC`, topo);
 
-    // Uma unidade por quadrante, com porta para o núcleo.
-    for (const u of UNIDADES) {
-      cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-${u.nome.toUpperCase()}`, typeId: 'pd_piso', levelId: nivel, boundary: rect(u.box.x0, u.box.y0, u.box.x1, u.box.y1) }) });
-    }
+    // pisos das quatro unidades
+    cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-N`, typeId: 'pd_piso', levelId: nivel, boundary: rect(0, CORE.y1, W, D) }) });
+    cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-S`, typeId: 'pd_piso', levelId: nivel, boundary: rect(0, 0, W, CORE.y0) }) });
+    cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-O`, typeId: 'pd_piso', levelId: nivel, boundary: rect(0, CORE.y0, CORE.x0, CORE.y1) }) });
+    cmds.push({ type: 'addFloor', floor: makeFloor({ id: `PD${i}-L`, typeId: 'pd_piso', levelId: nivel, boundary: rect(CORE.x1, CORE.y0, W, CORE.y1) }) });
 
-    // Apartamentos: as unidades norte e sul têm dois dormitórios, banheiro e sala/cozinha; oeste e leste,
-    // sala e dormitório. Cada divisória leva uma porta de 0,80.
-    for (const [sufixo, y0, y1] of [['N', CORE.y1, D], ['S', 0, CORE.y0]] as const) {
-      const divisorias: Array<[number, number]> = [[5, 1], [8.5, 2], [14, 3]];
-      for (const [x, n] of divisorias) {
-        divisoria(cmds, nivel, `PD${i}-${sufixo}-D${n}`, { x, y: y0 }, { x, y: y1 }, topo);
-      }
-    }
-    divisoria(cmds, nivel, `PD${i}-O-D1`, { x: 0, y: (CORE.y0 + CORE.y1) / 2 }, { x: CORE.x0, y: (CORE.y0 + CORE.y1) / 2 }, topo);
-    divisoria(cmds, nivel, `PD${i}-L-D1`, { x: CORE.x1, y: (CORE.y0 + CORE.y1) / 2 }, { x: W, y: (CORE.y0 + CORE.y1) / 2 }, topo);
+    unidadeNS(cmds, i, nivel, topo, CORE.y1, 1, 'N');
+    unidadeNS(cmds, i, nivel, topo, CORE.y0, -1, 'S');
+    unidadeCompacta(cmds, i, nivel, topo, 'O', 0, CORE.x0);
+    unidadeCompacta(cmds, i, nivel, topo, 'L', CORE.x1, W);
 
-    cmds.push(porta(`PD${i}-NUC-n`, (CORE.x1 - CORE.x0) / 2, `PD${i}-pN`));
-    cmds.push(porta(`PD${i}-NUC-s`, (CORE.x1 - CORE.x0) / 2, `PD${i}-pS`));
-    cmds.push(porta(`PD${i}-NUC-o`, (CORE.y1 - CORE.y0) / 2, `PD${i}-pO`));
-    cmds.push(porta(`PD${i}-NUC-l`, (CORE.y1 - CORE.y0) / 2, `PD${i}-pL`));
+    escada(cmds, nivel, topo);
 
-    // Janelas nas paredes externas: duas no norte, duas no sul, uma a leste e uma a oeste.
-    cmds.push(janela(`PD${i}-EXT-n`, W / 3, `PD${i}-jN1`));
-    cmds.push(janela(`PD${i}-EXT-n`, (2 * W) / 3, `PD${i}-jN2`));
-    cmds.push(janela(`PD${i}-EXT-s`, W / 3, `PD${i}-jS1`));
-    cmds.push(janela(`PD${i}-EXT-s`, (2 * W) / 3, `PD${i}-jS2`));
-    cmds.push(janela(`PD${i}-EXT-l`, D / 2, `PD${i}-jL`));
-    cmds.push(janela(`PD${i}-EXT-o`, D / 2, `PD${i}-jO`));
-
-    // Laje do pavimento (contorno na face externa do acabamento; as camadas é que param no núcleo).
-    if (i > 0) {
-      cmds.push({ type: 'addSlab', slab: makeSlab({ id: `PD${i}-LAJE`, typeId: 'pd_laje', levelId: nivel, boundary: rect(-EXT, -EXT, W + EXT, D + EXT) }) });
-    }
+    // laje do pavimento (contorno na face externa; as camadas param no núcleo) e a de cobertura no último
+    if (i > 0) cmds.push({ type: 'addSlab', slab: makeSlab({ id: `PD${i}-LAJE`, typeId: 'pd_laje', levelId: nivel, boundary: rect(-EXT, -EXT, W + EXT, D + EXT) }) });
   }
-
-  // Laje de cobertura sobre o último pavimento (topo em 28,00).
   cmds.push({ type: 'addSlab', slab: makeSlab({ id: 'PD-COB', typeId: 'pd_laje', levelId: lv(N - 1), heightOffset: H, boundary: rect(-EXT, -EXT, W + EXT, D + EXT) }) });
 
   for (const v of CORTES) cmds.push({ type: 'addView', view: v });

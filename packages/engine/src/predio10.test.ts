@@ -23,11 +23,11 @@ describe('prédio de 10 pavimentos: estrutura do projeto', () => {
     expect(p.levels[9]!.elevation).toBeCloseTo(25.2, 9);
   });
 
-  it('todo pavimento tem as mesmas paredes (4 externas + 4 do núcleo + 8 divisórias) e 4 unidades', () => {
+  it('todo pavimento tem as mesmas paredes (4 externas + 4 do núcleo + 16 divisórias) e 4 unidades', () => {
     for (const nivel of niveis) {
       const walls = Object.values(p.elements).filter((e) => isWall(e) && e.levelId === nivel);
       const floors = Object.values(p.elements).filter((e) => e.kind === 'floor' && e.levelId === nivel);
-      expect(walls, `${nivel}: paredes`).toHaveLength(16);
+      expect(walls, `${nivel}: paredes`).toHaveLength(24);
       expect(floors, `${nivel}: unidades`).toHaveLength(4);
     }
   });

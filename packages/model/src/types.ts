@@ -297,6 +297,13 @@ export interface OutlineSource {
   mode: 'walls-finish' | 'walls-core' | 'perimeter';
   seed?: Vec2;
   linked: boolean;
+  /**
+   * Para onde vai o contorno quando `mode === 'perimeter'`: `'finish'` (padrão, ausente) na face externa de
+   * acabamento da edificação; `'core'` na face externa do NÚCLEO das paredes (o Extend "into wall (to core)" do
+   * Revit), deixando o acabamento externo fora do contorno. Ignorado nos modos `walls-finish`/`walls-core`, que já
+   * dizem o lado. Decisão 0026 (T7).
+   */
+  extend?: 'finish' | 'core';
 }
 
 /**

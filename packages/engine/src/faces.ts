@@ -16,6 +16,8 @@ export interface WallFaces {
   core: Seg[];
   /** Contorno real da parede inteira (todas as camadas), com as cadeias e degraus das pontas e os arcos. */
   outline: Vec2[];
+  /** Contorno real só da faixa do NÚCLEO (primeira à última camada de estrutura), mesma construção do `outline`. */
+  coreOutline: Vec2[];
 }
 
 /**
@@ -34,6 +36,7 @@ export function wallFaces(p: Project, levelId: Id): WallFaces[] {
     const sides = f.arc ? [] : [line(f.sHi), line(f.sLo)];
     const core = f.arc ? [] : sCore.map(line);
     const outline = layerQuad(f, e, f.sLo, f.sHi);
-    return { wallId: f.wall.id, faces: [...sides, cap('a'), cap('b')], core, outline };
+    const coreOutline = layerQuad(f, e, sCore[0]!, sCore[1]!);
+    return { wallId: f.wall.id, faces: [...sides, cap('a'), cap('b')], core, outline, coreOutline };
   });
 }

@@ -29,7 +29,7 @@ export function resolveBoundary(p: Project, levelId: Id, el: Floor | Slab): Reso
   const src = el.outlineSource;
   if (!src || !src.linked) return { polygon: null, problem: null };
   if (src.mode === 'perimeter') {
-    const ring = outerPerimeter(p, levelId, src.seed);
+    const ring = outerPerimeter(p, levelId, src.seed, src.extend === 'core' ? 'core' : 'finish');
     return ring ? { polygon: [ring], problem: null } : { polygon: null, problem: openOrOutside(p, levelId) };
   }
   if (!src.seed) return { polygon: null, problem: openOrOutside(p, levelId) };

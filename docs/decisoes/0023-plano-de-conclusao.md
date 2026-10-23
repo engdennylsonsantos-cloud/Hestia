@@ -192,17 +192,54 @@ esperada (o recorte da parede), anotando no commit quais casos mudaram e por qu�
 3. **Validação no Revit da tabela §9.1.** Não é possível daqui. A tabela vira teste de especificação; a comparação com o
    Revit fica como item de conferência manual do dono.
 
-## 6. Commits e registro
+## 6. Registro de andamento e pendências (atualizar a cada commit)
+
+### 6.1 Commits
 
 | Fase | Commit | Data | Observação |
 |---|---|---|---|
-| Plano | — | — | este documento |
-| F1 | — | — | |
-| F2 | — | — | |
-| F3 | — | — | |
-| F4 | — | — | |
-| F5 | — | — | |
-| F6 | — | — | |
-| F7 | — | — | |
+| Plano | `9e5cc12` | 2026-10-23 | plano de conclusão |
+| F1 | `e55034d` | 2026-10-23 | partes resolvidas das paredes (`WallJunction`, `wallBandCut`); 7 testes novos; sem mudança em testes antigos |
+| F3 (decisão) | `e127190` | 2026-10-23 | tentativa de corte pela hierarquia revertida; conflito com a P6 registrado |
+| F4 | `1a50f90` | 2026-10-23 | sólido 3D da parede recortado; 3 testes novos |
+| F3 regra B | `a9181fa` | 2026-10-23 | corte pela hierarquia (regra B, como Revit e ArchiCAD); `sectionCota.test.ts` reescrito; sem mudança no 3D |
+| F1b | — | — | em andamento |
 
-Quando uma fase for concluída, preencher a linha com o hash, a data e o que mudou de valor em testes antigos.
+### 6.2 Pendências consolidadas da junção piso/laje × parede
+
+Estado em 2026-10-23, depois de `a9181fa`. Cada item aponta a fase do §3 que o resolve.
+
+| # | Item | Estado | Fase | Notas |
+|---|---|---|---|---|
+| 1 | Parede que atravessa o nível (laje do andar de cima corta parede do térreo, e o inverso) | em andamento | F1b | junção, quantitativos e 3D dependem disso |
+| 2 | Planta: teste de não-regressão e caso com plano de corte dentro da zona comum | pendente | F2 | a planta não muda na altura padrão |
+| 3 | Regressão visual do corte (mudou de propósito com a regra B) | pendente | F3/F5 | regravar a baseline só depois de olhar a imagem nova |
+| 4 | Teste "desenho = quantitativo": volume 3D e corte batem com o quantitativo da mesma parede | pendente | F5 | hoje o teste de F4 compara com a soma das partes, não com `quantities.ts` |
+| 5 | Tabela §9.1 da 0023 (G-B, piso F1/F2/F3 × parede W1/W2/W3, L e T) como teste | pendente | F5 | a validação no Revit é conferência manual do dono |
+| 6 | Teste do contador de recálculos (nível não editado = zero recálculos) | pendente | F5 | 0023 §9.2 |
+| 7 | Atualizar paridade: E3 de paredes, C6 de pisos, C8 de lajes; `npm run parity` | pendente | F5 | |
+| 8 | Atualizar `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md` | pendente | F5 | a 08 ainda diz que P-5 está sem código, o que está desatualizado |
+| 9 | Término por camada no perímetro externo (P8b) | pendente | F6 | hoje só vale para parede interna |
+| 10 | Cor, hachura, DXF e IFC por camada (P8 restante) | pendente | F7 | IFC pode não ter `IfcCovering`; se não tiver, vira item de fase futura |
+| 11 | Lajes com caimento fora da junção | decisão pendente | F5 | sugestão: aviso `laje-caimento-sem-junção` |
+| 12 | Inversão de corte por par (P-4, P10) | decisão pendente do dono | — | não bloqueia a conclusão |
+| 13 | Revisão de P-4 e da tabela §9.1 no Revit | manual, dono | — | não há acesso ao Revit daqui |
+
+### 6.3 Pendências fora da junção (de `07-STATUS-V1.md` e `08-PENDENCIAS-E-CORRECOES.md`)
+
+Não fazem parte deste plano, mas ficam registradas para não se perderem.
+
+- Paredes: CV-2 (curva fora do domínio: R < 3 m ou quina de 30° ou 150°), CV-3 (remover código de arco sem uso), canto reentrante do L (quadrado d × d sem parede).
+- Aberturas: P13 (verga e peitoril na planta), X4 e X5 (X no DXF), P14 (janela de giro como família), basculante fora do catálogo por decisão do dono.
+- Interface do nó com 3 ou mais paredes (decisão do dono, `08` §8.1).
+- Mesclar `claude/wizardly-goldberg-qtjveg` em `main` (decisão do dono; `08` §8.4 e o cabeçalho divergem sobre o estado de `main`).
+- CI: tirar `continue-on-error` do job `completo` quando a suíte completa estiver estável.
+- Limite do sweep line em produção (`08` §4.4-d), depende de telemetria.
+- Verificação visual manual das junções (`08` §10).
+
+## 7. Regras deste plano
+
+- Antes de cada commit: `npm run check` verde.
+- Cada fase concluída: commit, push para `claude/inspiring-brahmagupta-4eh7f2`, e linha nova em §6.1.
+- Pendência nova descoberta durante a implementação entra em §6.2 no mesmo commit em que é descoberta.
+- Nenhum PR sem pedido explícito.

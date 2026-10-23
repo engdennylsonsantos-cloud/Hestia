@@ -149,6 +149,12 @@ const OPENING_CASES = {
   'planta-porta-janela': [...wallsOf(RECT_WALLS), OPEN('po1', 'door', 'ot_p80', 'w0', 2), OPEN('jn1', 'window', 'ot_j120', 'w2', 3), OPEN('vl1', 'door', 'ot_vao90', 'w1', 2.5)],
   'laje-abertura-x': [SL('ls3', RECT_WALLS, { holes: RECT_HOLES })],
 };
+
+// Decisão 0028: cotas automáticas do nível ativo (botão "Cotas auto"). A casa 8 × 6 m tem uma porta na parede sul e uma
+// janela na norte; o gerador põe quatro lados em camadas aberturas → paredes → total. Baseline nova (conferida a olho).
+const COTAS_CASES = {
+  'cotas-automaticas': [...wallsOf(RECT_WALLS), OPEN('cd1', 'door', 'ot_p80', 'w0', 2), OPEN('cj1', 'window', 'ot_j120', 'w2', 3), { kind: 'autoCotas' }],
+};
 const SECTION_CASES = {
   // Regra B (0023 §3): corte pela hierarquia. Parede embutida no piso (mesmo caso da planta) atravessada pelo corte em x = 3:
   // a zona comum fica com o piso e a parede some dela. Baseline nova: conferir a imagem antes de aceitar.
@@ -182,7 +188,7 @@ async function assentar(page) {
 }
 
 let failed = 0;
-for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...SECTION_CASES, ...PISO_UNICO_CASES })) {
+for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_CASES, ...ROOF_CASES, ...ROOM_CASES, ...JUNCTION_CASES, ...P9_CASES, ...OPENING_CASES, ...COTAS_CASES, ...SECTION_CASES, ...PISO_UNICO_CASES })) {
   const vista = name in ROOF_CASES ? VISTA_COBERTURA : null;
   await page.evaluate(([ws, v, sec]) => {
     const { editor } = window.__hestia;
@@ -196,6 +202,7 @@ for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_C
       else if (w.kind === 'wallType') editor.store.exec({ type: 'upsertWallType', wallType: { ...editor.project.wallTypes[w.wallType.id], ...w.wallType } });
       else if (w.kind === 'opening') editor.store.exec({ type: 'addOpening', opening: w.opening });
       else if (w.kind === 'view') editor.store.exec({ type: 'addView', view: w.view });
+      else if (w.kind === 'autoCotas') editor.cotasAutomaticasDaPlanta();
       else editor.store.exec({ type: 'addWall', wall: w });
     }
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });

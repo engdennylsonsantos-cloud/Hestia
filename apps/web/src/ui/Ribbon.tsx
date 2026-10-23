@@ -7,10 +7,22 @@ import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
 import { MoveLevelButton } from './MoveLevel.tsx';
 
-const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = {
+/** Ações pontuais da faixa (não são ferramenta: rodam uma vez e mantêm a ferramenta atual). */
+type ActionId = 'cotasAuto';
+
+const ACTIONS: Record<ActionId, { label: string; icon: string; title: string; run: () => void }> = {
+  cotasAuto: {
+    label: 'Cotas auto',
+    icon: 'measure',
+    title: 'Cotas automáticas do nível ativo: aberturas, paredes e total nos quatro lados',
+    run: () => editor.cotasAutomaticasDaPlanta(),
+  },
+};
+
+const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[]; actions?: ActionId[] }>> = {
   arquitetura: [
     { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'] },
-    { title: 'Anotar', tools: ['dimension', 'text'] },
+    { title: 'Anotar', tools: ['dimension', 'text'], actions: ['cotasAuto'] },
     { title: 'Ambientes', tools: ['room'] },
   ],
   modificar: [
@@ -29,6 +41,17 @@ function ToolButton({ id }: { id: ToolId }): ReactElement {
       <Icon name={id} size={22} />
       <span>{TOOL_LABEL[id]}</span>
       {sc ? <kbd>{sc}</kbd> : null}
+    </button>
+  );
+}
+
+/** Mesmo visual do `ToolButton`, sem ferramenta nem atalho: executa a ação e mantém a ferramenta atual. */
+function ActionButton({ id }: { id: ActionId }): ReactElement {
+  const action = ACTIONS[id];
+  return (
+    <button className="tbtn" onClick={action.run} title={action.title}>
+      <Icon name={action.icon} size={22} />
+      <span>{action.label}</span>
     </button>
   );
 }
@@ -113,6 +136,9 @@ export function Ribbon(): ReactElement {
               <div className="rgroup-tools">
                 {g.tools.map((t) => (
                   <ToolButton key={t} id={t} />
+                ))}
+                {g.actions?.map((a) => (
+                  <ActionButton key={a} id={a} />
                 ))}
               </div>
               <div className="rgroup-title">{g.title}</div>

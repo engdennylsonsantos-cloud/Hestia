@@ -89,6 +89,7 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 - **Exportar PDF**: PDF 1.4 vetorial sem dependências, uma página por prancha.
 
 **Anotações** — cota (**Y**, com referência à parede) e texto (**X**), na planta e no DXF (camadas `COTAS` e `TEXTOS`).
+Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): camadas aberturas → paredes → total nos quatro lados.
 
 **Vistas, gráficos e seleção**
 - **Planta** por nível com intervalo de vista, direção para cima ou para baixo, subpavimento e projeção da cobertura (0013).
@@ -199,7 +200,7 @@ Os fluxos de navegador estão em `tests/e2e/*.mjs` (23 fluxos; `helpers.mjs` é 
 
 ## Qualidade e verificação
 
-- Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 42+7+0, lajes 40+3+0, telhados 43+1+0,
+- Checklists (feitos + fora de escopo + pendentes): paredes 68+15+0, pisos 43+7+0, lajes 41+3+0, telhados 43+1+0,
   escadas 36+4+0, aberturas 36+7+0, ambientes 24+4+0, forros 33+0+0, pranchas 19+4+0. O portão de 95% e os bloqueantes
   são verificados por `scripts/check-parity.mjs` no lint e no CI.
 - `npm run test:rapido` em 2026-10-22: 277 arquivos e 3373 testes, todos passando (70,8 s; `test:rapido`, sem property e perf).

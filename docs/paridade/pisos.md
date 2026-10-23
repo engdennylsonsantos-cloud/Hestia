@@ -42,6 +42,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] D3 Corte e elevação: piso cortado com hachura por camada **(bloqueante)**
 - [x] D4 Subpavimento: piso do nível abaixo como referência apagada
 - [x] D5 Nível de detalhe grosseiro, médio e fino também no piso
+- [x] D6 Cotas automáticas da planta (0028): botão **Cotas auto** no grupo **Anotar** grava no nível ativo as camadas aberturas → paredes → total nos quatro lados, com referência associativa nas pontas de parede; as cotas convivem com o piso na mesma planta. Evidência: `packages/engine/src/autoCotas.test.ts`, regressão `cotas-automaticas`
 
 ## E · Quantitativos e documentação
 - [x] E1 Área e volume por camada e por material **(bloqueante)**

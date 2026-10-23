@@ -39,6 +39,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Floor estrutural; A
 - [x] D2 3D com inclinação e furos **(bloqueante)**
 - [x] D3 Corte e elevação com inclinação e hachura por camada **(bloqueante)**
 - [x] D4 Nível de detalhe em planta
+- [x] D5 Cotas automáticas da planta (0028): botão **Cotas auto** no grupo **Anotar** grava no nível ativo as camadas aberturas → paredes → total nos quatro lados, com referência associativa nas pontas de parede; as cotas convivem com a laje na mesma planta. Evidência: `packages/engine/src/autoCotas.test.ts`, regressão `cotas-automaticas`
 
 ## E · Quantitativos
 - [x] E1 Área, volume por camada e por material, considerando a inclinação **(bloqueante)**

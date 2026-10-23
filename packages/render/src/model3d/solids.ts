@@ -1,5 +1,5 @@
 import { difference, ringArea, triangulate, union, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, wallBandCut, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
+import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, wallLayerBandsAfterJunction, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
 
@@ -335,19 +335,7 @@ let wallLayerStats = { hits: 0, misses: 0 };
  * mudou (sem anexo de telhado, sem edição) dá a mesma chave e reaproveita o sólido, em vez de refazer as uniões.
  */
 function wallLayerKey(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): string {
-  return `${rw.wallId}|${l.materialId}|${rw.baseZ}|${JSON.stringify(wallBandsOf(rw, l, jl))}`;
-}
-
-/**
- * Faixas da camada depois da junção com piso e laje (decisão 0023 §3, F4): a faixa recortada vira as partes que sobram,
- * com cota relativa à base da parede. Sem junção, são as faixas da própria camada.
- */
-function wallBandsOf(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): LayerBand[] {
-  return l.bands.flatMap((b, bandIndex) => {
-    const parts = wallBandCut(jl, rw.wallId, l.layerIndex, bandIndex);
-    if (!parts) return [b];
-    return parts.map((x) => ({ z0: x.z0 - rw.baseZ, z1: x.z1 - rw.baseZ, poly: x.poly }));
-  });
+  return `${rw.wallId}|${l.materialId}|${rw.baseZ}|${JSON.stringify(wallLayerBandsAfterJunction(jl, rw, l))}`;
 }
 
 /** Sólido da camada (do cache, ou extrudado agora e guardado). Quem chama copia os dados; o cache não é alterado. */
@@ -362,7 +350,7 @@ function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?
   }
   wallLayerStats.misses++;
   const local: SolidBatch = { materialId: l.materialId, category: 'wall', positions: [], normals: [], indices: [], ids: [] };
-  ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(wallBandsOf(rw, l, jl)), rw.baseZ));
+  ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(wallLayerBandsAfterJunction(jl, rw, l)), rw.baseZ));
   if (wallLayerCache.size >= WALL_CACHE_MAX) wallLayerCache.delete(wallLayerCache.keys().next().value!);
   wallLayerCache.set(key, local);
   return local;

@@ -1,5 +1,6 @@
 import { union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
+import type { LayerBand, ResolvedLayer, ResolvedWall } from './types.ts';
 import { resolveFloors } from './floors.ts';
 import { floorLayerPiece, slabLayerPiece, wallBandPieces, type SolidPiece } from './junctionNet.ts';
 import { resolveJunction, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
@@ -152,6 +153,19 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 export function layerPartsOf(el: ElementJunction | undefined, layerIndex: number, fallback: ResolvedPrism[]): ResolvedPrism[] {
   if (!el || !el.cut) return fallback;
   return el.layers.find((l) => l.layerIndex === layerIndex)?.parts ?? fallback;
+}
+
+/**
+ * Faixas de uma camada de parede depois da junção com piso e laje, no formato de `LayerBand` (cota relativa à base da
+ * parede). Faixa recortada vira as partes que sobram; sem corte, a própria faixa. Corte, 3D e planta usam esta função,
+ * e quem desenha funde as faixas depois (`fuseBands`).
+ */
+export function wallLayerBandsAfterJunction(jl: JunctionLevel | undefined, rw: ResolvedWall, layer: ResolvedLayer): LayerBand[] {
+  return layer.bands.flatMap((b, bandIndex) => {
+    const parts = wallBandCut(jl, rw.wallId, layer.layerIndex, bandIndex);
+    if (!parts) return [b];
+    return parts.map((x) => ({ z0: x.z0 - rw.baseZ, z1: x.z1 - rw.baseZ, poly: x.poly }));
+  });
 }
 
 /**

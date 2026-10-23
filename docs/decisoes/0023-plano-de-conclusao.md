@@ -113,30 +113,20 @@ Testes:
 
 Aceite F2: planta sem mudança na altura padrão e área cortada certa quando o plano atravessa a zona de sobreposição.
 
-### F3 · Corte: CONFLITO DE REGRA, decisão do dono antes de codar
+### F3 · Corte (regra B, decidida em 2026-10-23)
 
-Tentativa feita em 2026-10-23 e **revertida**. Ela aplicava a junção (piso tira a parede) ao corte, e isso quebrou
-`sectionCota.test.ts` (P6). O motivo está registrado no próprio código e na 0023 §3: a parede embutida no piso (z de −0,10 a
-−0,05, dentro da faixa do piso) **sumia** do corte, de 0,200 m³ para 0,000 m³. A P6 corrigiu isso: no corte, a cota decide o
-que fica por cima, a parede embutida fica inteira e o piso perde só a faixa comum. Ou seja, a regra de corte **não** é a
-mesma da quantidade.
+Decisão do dono: **B**. A zona comum de piso ou laje com parede é decidida pela junção, como no Revit (Join Geometry) e no
+ArchiCAD (prioridade de material). Antes desta decisão a regra era a P6 (cota), e a parede embutida ficava inteira no corte.
 
-Consequência: a F3 como estava escrita contradiz a P6. Não foi implementada.
+- [x] `wallLayerBandsAfterJunction` em `junctionLevel.ts`, usado por `section.ts`, pelo 3D (`solids.ts`) e pela mesma fonte.
+- [x] `sectionCota.test.ts` reescrito para a regra B: a parede embutida cede à zona comum; o total do corte é a união; a
+      parede que sai do piso fica inteira fora dele (linha em x = −1) e cede dentro (linha em x = 3).
+- [x] Decisão 0023 §3 atualizada (corte e 3D seguem a hierarquia).
+- [ ] Teste de não-regressão com `junctionSection.test.ts` e a regressão visual (ver F5). A regressão visual do corte muda por
+      decisão: a baseline só é regravada depois de olhar a imagem.
 
-Duas opções para o dono decidir:
-
-- **A (recomendada):** corte segue a P6 (cota). Quantitativo e 3D seguem a hierarquia. A diferença de cor na zona comum
-  (quem aparece como material) é aceita e documentada. Não há código a mudar no corte; falta só o teste de não-regressão.
-- **B:** corte também segue a hierarquia. Exige rever a P6: a parede embutida passa a sumir na zona comum, e o piso mostra
-  a estrutura. Precisa de uma regra que mantenha a parede visível fora da zona comum (a parte que sobra).
-
-Enquanto não houver decisão, a F3 fica bloqueada e a F4 (3D) só pode seguir se for coerente com a escolha acima.
-
-- [ ] Decisão A ou B registrada em `docs/decisoes/0023-juncao-piso-laje-parede.md` (§13).
-- [ ] Se A: teste de não-regressão do corte com a junção ativa (já existe em `sectionCota.test.ts`; manter) e nota em §3.
-- [ ] Se B: reescrever a P6 em §3 e atualizar `sectionCota.test.ts` com a nova regra, antes de mudar `section.ts`.
-
-Testes desta fase (qualquer opção): `npx vitest run packages/engine/src/sectionCota.test.ts packages/engine/src/junctionSection.test.ts`.
+Aviso de consistência: após esta fase, corte, 3D e quantitativo dizem a mesma coisa para a zona comum. Antes, o 3D já seguia
+a hierarquia (F4) e o corte seguia a P6, então havia divergência que esta fase fecha.
 
 ### F4 · 3D
 

@@ -63,7 +63,7 @@ Camada dentro do núcleo do elemento unido se estende pelo núcleo do outro e at
 
 Mapeamento: `slab` é a laje estrutural e `floor` é o piso, que faz o papel de hospedeiro.
 
-Esta hierarquia vale para os quantitativos (§4) e para a junção (P7). Não vale para a linha oculta do corte (§3).
+Esta hierarquia vale para os quantitativos (§4), para a junção (P7), para o 3D e para o **corte** (regra B, decidida em 2026-10-23, §3). Igual ao Revit (Join Geometry) e ao ArchiCAD (prioridade de material): quem tem prioridade maior mantém a zona comum e o outro perde só essa parte.
 
 Inversão por par ("Inverter corte" e "Não cortar"): **ADIADA** (P-4, §13). Hoje vale só o padrão acima. Quando for decidida, o equivalente do Join Geometry é: o primeiro escolhido define o material aplicado aos dois `[DOC]`. No Hestia o material fica por camada, então a escolha não define material; define só quem corta `[INFERIDO]`.
 
@@ -102,12 +102,12 @@ Perímetro externo: o mesmo princípio, com a face externa. Na v1, a regra por c
 
 ## 3. Corte e planta por cota
 
-**Corte, como está (P6, feito).** A linha oculta é feita por peça (uma por origem em cada material) e ordenada pela cota de topo do elemento inteiro (`sectionOcclusion.ts`, `cotaKeys`; peças em `sectionCut.ts`). Regra:
+**Corte (regra B, decidida em 2026-10-23).** A zona comum de piso ou laje com parede é decidida pela junção: a camada de prioridade maior mantém a região e a outra perde só essa parte (`wallLayerBandsAfterJunction`, `section.ts`). Quem cai numa zona comum some dela; o restante (parede acima, abaixo ou fora do piso) continua visível. A zona comum aparece uma vez só, e o total do corte é a união das peças.
 1. O elemento de maior cota de topo prevalece no ponto.
 2. Parede com base e topo dentro da faixa de cotas de piso, laje, forro, telhado ou escada que a toca em planta não é ocultada por esse elemento. `[INFERIDO]`; atende o pedido de INV-D §7, lacuna 6.
 3. Empate de topo: a parede fica por cima; o resto, pela ordem da lista.
 
-A hierarquia do §1.3 ("piso corta parede") não entra na linha oculta, porque faria a parede embutida sumir do corte. Ela vale para quantitativos (§4, P5) e junção (P7). `[INFERIDO]`
+Na regra B, a hierarquia do §1.3 vale também para a linha oculta do corte. A regra anterior (P6, cota decide e a parede embutida fica inteira) foi revisada: ela fazia o corte divergir do quantitativo e do 3D. A parede embutida inteiramente na zona do piso deixa de aparecer no corte nessa zona, como no Revit e no ArchiCAD. Ver a nota de 2026-10-23 abaixo.
 
 Antes da P6 a ordem de inserção decidia (pisos, lajes, forros, telhados, escadas e paredes, `sectionOcclusion.ts`), e a parede embutida no piso sumia: 0,200 m³ de corte sozinha e 0,000 m³ com o piso (INV-D §4). Hoje ela aparece inteira; o piso perde só a faixa comum, e a área do conjunto não cai.
 

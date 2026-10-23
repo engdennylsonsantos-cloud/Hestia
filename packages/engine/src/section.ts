@@ -3,7 +3,7 @@ import { coreSpan, type HatchKind, openingCasing, openingFamilyOf, openingFrame,
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
-import { junctionLevel, layerPartsOf } from './junctionLevel.ts';
+import { junctionLevel, layerPartsOf, wallLayerBandsAfterJunction } from './junctionLevel.ts';
 import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
@@ -286,8 +286,9 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
       const rw = resolved.walls[w.id];
       if (!rw) continue;
       for (const layer of rw.layers) {
+        // Parede recortada pela junção (0023 §3, regra B): a faixa cortada entra só com as partes que sobram.
         // Faixas fundidas em prismas (bandFuse): sem contorno horizontal falso entre faixas da mesma região.
-        for (const band of fuseBands(layer.bands)) {
+        for (const band of fuseBands(wallLayerBandsAfterJunction(jl, rw, layer))) {
           const z0 = rw.baseZ + band.z0;
           const z1 = rw.baseZ + band.z1;
           for (const poly of band.poly) {

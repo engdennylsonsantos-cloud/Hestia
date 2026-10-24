@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { makeFloor, type Project } from '@hestia/model';
+import { wallFaces } from '@hestia/engine';
 import { infer, type InferContext } from './infer.ts';
 import { DEFAULT_SNAP } from './types.ts';
-import { drawWall, makeEnv, tool, walls } from './testEnv.ts';
+import { clickAt, drawWall, makeEnv, tool, walls } from './testEnv.ts';
 
 /** Escala de teste: 1 px = 0,005 m, então a tolerância de captura (10 px) é 0,05 m. */
 const MPP = 0.005;
@@ -170,6 +171,74 @@ describe('capturas inteligentes e rastreamento dinâmico (Smart Snaps)', () => {
     expect(near(r.point, 2, 3)).toBe(true);
     expect(r.guides.length).toBeGreaterThan(0);
     expect(r.guides.some((g) => g.kind === 'alignment' && near(g.from, 2, 0))).toBe(true);
+  });
+
+  it('estende a guia colinear da face lateral de uma parede oblíqua', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 4]);
+    const wf = wallFaces(ctx.store.project, 'lv_0')[0]!;
+    const side = wf.faces.slice(0, 2).sort((a, b) => Math.hypot(b[1].x - b[0].x, b[1].y - b[0].y) - Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y))[0]!;
+    const dx = side[1].x - side[0].x;
+    const dy = side[1].y - side[0].y;
+    const sideLen = Math.hypot(dx, dy);
+    const cursor = { x: side[1].x + dx * 0.5 - (dy / sideLen) * 0.01, y: side[1].y + dy * 0.5 + (dx / sideLen) * 0.01 };
+    const r = infer(cursor, { project: ctx.store.project, levelId: 'lv_0', mpp: MPP, gridStep: 0.1, snap: { ...DEFAULT_SNAP, grid: false } });
+    expect(r.kind).toBe('alignment');
+    expect(r.guides.some((g) => g.kind === 'alignment' && near(g.from, side[1].x, side[1].y, 1e-5))).toBe(true);
+  });
+
+  it('Tab cicla do eixo para a face lateral como referência de alinhamento', () => {
+    const { store } = oneWall();
+    const base = { project: store.project, levelId: 'lv_0' as const, mpp: MPP, gridStep: 0.1, snap: { ...DEFAULT_SNAP, grid: false } };
+    const axis = infer({ x: 5, y: 0.045 }, base);
+    const face = infer({ x: 5, y: 0.045 }, { ...base, alignmentCycle: 1 });
+    expect(axis.kind).toBe('alignment');
+    expect(face.kind).toBe('alignment');
+    expect(axis.point.y).toBeCloseTo(0, 6);
+    expect(face.point.y).toBeCloseTo(0.092, 3);
+    expect(face.guides[0]?.from.y).toBeCloseTo(0.092, 3);
+
+    const ctx = oneWall();
+    ctx.env.metersPerPixel = () => MPP;
+    ctx.options.snap = { ...DEFAULT_SNAP, grid: false };
+    const w = tool('wall', ctx.env);
+    w.move({ raw: { x: 5, y: 0.045 }, shift: false, ctrl: false, alt: false });
+    expect(w.inference()?.point.y).toBeCloseTo(0, 6);
+    w.tab();
+    expect(w.inference()?.kind).toBe('alignment');
+    expect(w.inference()?.point.y).toBeCloseTo(0.092, 3);
+  });
+});
+
+describe('Parede: Linha de Localização e Espaço', () => {
+  it('finishExterior mantém a face da parede nova coplanar à referência de outra espessura', () => {
+    const ctx = oneWall();
+    ctx.env.metersPerPixel = () => MPP;
+    ctx.options.snap = { ...DEFAULT_SNAP, grid: false };
+    ctx.options.locationLine = 'finishExterior';
+    ctx.options.wallTypeId = 'wt_alv9';
+    const ref = wallFaces(ctx.store.project, 'lv_0')[0]!;
+    const refSide = ref.faces.slice(0, 2).find((s) => Math.abs(s[0].y - s[1].y) < 1e-8 && Math.abs(s[0].y) > 0.05)!;
+    const y = refSide[0].y;
+    const w = tool('wall', ctx.env);
+    clickAt(w, 0.5, y);
+    clickAt(w, 3.5, y);
+    const created = walls(ctx.store).find((wall) => wall.id !== ref.wallId)!;
+    expect(created.locationLine).toBe('finishExterior');
+    const newFaces = wallFaces(ctx.store.project, 'lv_0').find((wf) => wf.wallId === created.id)!.faces.slice(0, 2);
+    const newSide = newFaces.find((s) => Math.abs(s[0].y - s[1].y) < 1e-8 && Math.abs(s[0].y - y) < 1e-8);
+    expect(newSide).toBeDefined();
+    expect(newSide![0].y).toBeCloseTo(refSide[0].y, 8);
+    expect(newSide![1].y).toBeCloseTo(refSide[1].y, 8);
+  });
+
+  it('Espaço inverte o lado da parede durante o traçado', () => {
+    const ctx = makeEnv();
+    const w = tool('wall', ctx.env);
+    clickAt(w, 0, 0);
+    w.space?.();
+    clickAt(w, 3, 0);
+    expect(walls(ctx.store)[0]?.flipped).toBe(true);
   });
 });
 

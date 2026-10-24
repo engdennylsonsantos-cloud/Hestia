@@ -46,7 +46,8 @@ export function weldBands(bands: LayerBand[]): LayerBand[] {
 export function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: number): void {
   const pos = b.positions;
   const nVert = pos.length / 3;
-  // Grade de vértices da camada: célula de ~1/40 da maior dimensão (mínimo 2 cm).
+  // Grade de vértices da camada: célula de ~1/12 da maior dimensão (mínimo 2 cm).
+  // A busca verifica a distância exata depois; a célula mais grossa reduz consultas sem perder candidatos.
   const mn = [Infinity, Infinity, Infinity];
   const mx = [-Infinity, -Infinity, -Infinity];
   for (let i = firstVert; i < nVert; i++) {
@@ -55,10 +56,12 @@ export function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: numb
       mx[k] = Math.max(mx[k]!, pos[i * 3 + k]!);
     }
   }
-  const h = Math.max(0.02, Math.max(mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!) / 40);
+  const h = Math.max(0.02, Math.max(mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!) / 12);
   const cell = (v: number, k: number): number => Math.floor((v - mn[k]!) / h);
-  const grid = new Map<string, number[]>();
-  const keyOf = (ix: number, iy: number, iz: number): string => `${ix},${iy},${iz}`;
+  // Cada eixo ocupa no máximo 13 células (12 divisões + extremidade); base 64 evita
+  // colisões e dispensa montar strings na consulta, que acontece para cada aresta do triângulo.
+  const grid = new Map<number, number[]>();
+  const keyOf = (ix: number, iy: number, iz: number): number => (ix * 64 + iy) * 64 + iz;
   for (let i = firstVert; i < nVert; i++) {
     const k = keyOf(cell(pos[i * 3]!, 0), cell(pos[i * 3 + 1]!, 1), cell(pos[i * 3 + 2]!, 2));
     const list = grid.get(k);
@@ -98,13 +101,15 @@ export function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: numb
     const lmax = Math.max(Math.hypot(...u), Math.hypot(...w), Math.hypot(C[0] - B[0], C[1] - B[1], C[2] - B[2]));
     return cr < 1e-6 * lmax;
   };
+  // Índices de consulta fora de [0, 63] não têm vértice da grade (ela cobre só [mn, mx]); o recorte mantém a chave injetiva.
+  const cellIn = (v: number, k: number): number => Math.min(63, Math.max(0, cell(v, k)));
   const candidates = (x: number, y: number): number[] => {
     const out: number[] = [];
     const lo = [Math.min(pos[x * 3]!, pos[y * 3]!) - TOL, Math.min(pos[x * 3 + 1]!, pos[y * 3 + 1]!) - TOL, Math.min(pos[x * 3 + 2]!, pos[y * 3 + 2]!) - TOL];
     const hi = [Math.max(pos[x * 3]!, pos[y * 3]!) + TOL, Math.max(pos[x * 3 + 1]!, pos[y * 3 + 1]!) + TOL, Math.max(pos[x * 3 + 2]!, pos[y * 3 + 2]!) + TOL];
-    for (let ix = cell(lo[0]!, 0); ix <= cell(hi[0]!, 0); ix++)
-      for (let iy = cell(lo[1]!, 1); iy <= cell(hi[1]!, 1); iy++)
-        for (let iz = cell(lo[2]!, 2); iz <= cell(hi[2]!, 2); iz++) out.push(...(grid.get(keyOf(ix, iy, iz)) ?? []));
+    for (let ix = cellIn(lo[0]!, 0); ix <= cellIn(hi[0]!, 0); ix++)
+      for (let iy = cellIn(lo[1]!, 1); iy <= cellIn(hi[1]!, 1); iy++)
+        for (let iz = cellIn(lo[2]!, 2); iz <= cellIn(hi[2]!, 2); iz++) out.push(...(grid.get(keyOf(ix, iy, iz)) ?? []));
     return out;
   };
   const stack: number[][] = [];

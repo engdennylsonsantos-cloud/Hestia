@@ -59,8 +59,10 @@ export function buildTriBvh(positions: ArrayLike<number>, indices: ArrayLike<num
     centroids[t * 3 + 2] = z / 3;
   }
 
+  // Chave de divisão de cada triângulo no eixo do nó atual (só vale no intervalo do nó; reescrita a cada nível).
+  const keys = new Float64Array(triangles);
   let next = 0;
-  const build = (start: number, end: number, depth: number): number => {
+  const build =(start: number, end: number, depth: number): number => {
     const node = next++;
     let minX = Infinity;
     let minY = Infinity;
@@ -120,9 +122,11 @@ export function buildTriBvh(positions: ArrayLike<number>, indices: ArrayLike<num
     const ez = cMaxZ - cMinZ;
     const axis = ex >= ey && ex >= ez ? 0 : ey >= ez ? 1 : 2;
     const mid = (start + end) >> 1;
-    const part = Array.from(bvh.order.subarray(start, end));
-    part.sort((a, c) => centroids[a * 3 + axis]! - centroids[c * 3 + axis]!);
-    bvh.order.set(part, start);
+    for (let i = start; i < end; i++) {
+      const t = bvh.order[i]!;
+      keys[t] = centroids[t * 3 + axis]!;
+    }
+    selectKth(bvh.order, keys, start, end - 1, mid);
 
     bvh.left[node] = build(start, mid, depth + 1);
     bvh.right[node] = build(mid, end, depth + 1);
@@ -183,6 +187,34 @@ export function raycastTriBvh(
 
   if (bestFace < 0) return null;
   return { faceIndex: bestFace, distance: bestT, point: ray.at(bestT, new THREE.Vector3()) };
+}
+
+/**
+ * Põe em `order[k]` o triângulo que ficaria ali numa ordenação por `key` no intervalo [lo, hi] (inclusive), com os de
+ * chave menor antes e os de chave maior depois (seleção de Wirth). Sem alocar e sem ordenar tudo: a divisão por mediana
+ * só precisa disso.
+ */
+function selectKth(order: Uint32Array, key: Float64Array, lo: number, hi: number, k: number): void {
+  let l = lo;
+  let r = hi;
+  while (l < r) {
+    const x = key[order[k]!]!;
+    let i = l;
+    let j = r;
+    do {
+      while (key[order[i]!]! < x) i++;
+      while (x < key[order[j]!]!) j--;
+      if (i <= j) {
+        const t = order[i]!;
+        order[i] = order[j]!;
+        order[j] = t;
+        i++;
+        j--;
+      }
+    } while (i <= j);
+    if (j < k) l = i;
+    if (k < i) r = j;
+  }
 }
 
 function hitBox(

@@ -64,3 +64,84 @@ describe('firstSurfaceDistance: distância à primeira parede no eixo (zoom)', (
     expect(firstSurfaceDistance(new THREE.Group(), new THREE.Vector3(0, 0, 2), new THREE.Vector3(0, 0, 1))).toBeNull();
   });
 });
+
+/** Referência: o que o picking fazia antes do BVH (`Raycaster` sobre a cena inteira, sem as linhas e o chão). */
+function refSurface(root: THREE.Object3D, ray: THREE.Raycaster): { point: THREE.Vector3; distance: number } | null {
+  root.updateMatrixWorld(true);
+  for (const h of ray.intersectObject(root, true)) {
+    const m = h.object as THREE.Mesh;
+    if (!m.isMesh || m.geometry.type === 'PlaneGeometry') continue;
+    return { point: h.point, distance: h.distance };
+  }
+  return null;
+}
+
+const SIDES = [THREE.FrontSide, THREE.BackSide, THREE.DoubleSide, THREE.FrontSide];
+
+/** Malhas de triângulos aleatórios (com e sem índice, com cada lado de material) e os raios de teste. */
+function cenaAleatoria(seed: number): { root: THREE.Group; camera: THREE.PerspectiveCamera; ndc: Array<{ x: number; y: number }>; rays: Array<{ o: THREE.Vector3; d: THREE.Vector3 }> } {
+  let a = seed >>> 0;
+  const random = (): number => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const root = new THREE.Group();
+  SIDES.forEach((side, k) => {
+    const n = 300;
+    const pos: number[] = [];
+    for (let i = 0; i < n * 9; i++) pos.push((random() * 2 - 1) * 3, (random() * 2 - 1) * 3, (random() * 2 - 1) * 3 + k * 0.5);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    // Malhas pares indexadas; as ímpares não têm índice (caem no Raycaster, como antes).
+    if (k % 2 === 0) geo.setIndex(Array.from({ length: n * 3 }, (_, i) => i));
+    root.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side })));
+  });
+  const camera = topCamera();
+  const ndc = Array.from({ length: 40 }, () => ({ x: random() * 2 - 1, y: random() * 2 - 1 }));
+  const rays = Array.from({ length: 40 }, () => {
+    const d = new THREE.Vector3(random() * 2 - 1, random() * 2 - 1, random() * 2 - 1).normalize();
+    return { o: new THREE.Vector3((random() * 2 - 1) * 4, (random() * 2 - 1) * 4, (random() * 2 - 1) * 4), d };
+  });
+  return { root, camera, ndc, rays };
+}
+
+describe('pick por BVH é igual ao Raycaster (lados de material e malhas sem índice)', () => {
+  it('pickModelPoint acha a mesma superfície que o Raycaster', () => {
+    const { root, camera, ndc } = cenaAleatoria(7);
+    let acertos = 0;
+    for (const p of ndc) {
+      const rc = new THREE.Raycaster();
+      rc.setFromCamera(new THREE.Vector2(p.x, p.y), camera);
+      const want = refSurface(root, rc);
+      const got = pickModelPoint(root, camera, p);
+      if (!want) {
+        expect(got).toBeNull();
+        continue;
+      }
+      acertos++;
+      expect(got!.x).toBeCloseTo(want.point.x, 9);
+      expect(got!.y).toBeCloseTo(want.point.y, 9);
+    }
+    expect(acertos).toBeGreaterThan(5);
+  });
+
+  it('firstSurfaceDistance acha a mesma distância que o Raycaster', () => {
+    const { root, rays } = cenaAleatoria(11);
+    let acertos = 0;
+    for (const r of rays) {
+      const rc = new THREE.Raycaster(r.o, r.d);
+      const want = refSurface(root, rc);
+      const got = firstSurfaceDistance(root, r.o, r.d);
+      if (!want) {
+        expect(got).toBeNull();
+        continue;
+      }
+      acertos++;
+      expect(got).toBeCloseTo(want.distance, 9);
+    }
+    expect(acertos).toBeGreaterThan(5);
+  });
+});

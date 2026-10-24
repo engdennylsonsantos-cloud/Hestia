@@ -347,17 +347,7 @@ export function ViewportCanvas(): ReactElement {
       if (d.mode === 'orbit') model.current.orbit.orbit(s.x - d.last.x, s.y - d.last.y);
       else if (d.mode === 'pan') model.current.orbit.pan(s.x - d.last.x, s.y - d.last.y);
       if (d.mode !== 'none') {
-        if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) {
-          d.moved = true;
-          // Ao iniciar o arrasto de órbita com seleção, re-centra o pivot nos elementos selecionados
-          if (d.mode === 'orbit' && useUi.getState().selection.length > 0) {
-            const selBox = model.current.selectionBounds(useUi.getState().selection);
-            if (selBox) {
-              const center = selBox.getCenter(model.current.orbit.target.clone());
-              model.current.orbit.target.copy(center);
-            }
-          }
-        }
+        if (!d.moved && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) d.moved = true;
         d.last = s;
         useUi.setState((st) => ({ previewTick: st.previewTick + 1 }));
       } else pickHover3d(s);

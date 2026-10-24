@@ -48,9 +48,10 @@ describe('ambiente na planta (D1, E3)', () => {
 
   it('desenha o preenchimento e a etiqueta do ambiente, com a área do circuito (4 × 6 menos as paredes)', () => {
     const p = sala();
-    const ops = roomOps(p, 'lv_0', LIGHT, false, 'fine', undefined, defaultPaint('room', 100));
+    const ops = roomOps(p, 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, defaultPaint('room', 100));
     expect(ops.fills).toHaveLength(1);
     expect(ops.labels).toHaveLength(1);
+    expect(ops.labels[0]!.fontPx).toBeGreaterThan(0);
     const text = ops.labels[0]!.text;
     expect(text).toMatch(/^Sala \(101\) · \d+,\d\d m²$/);
     const area = Number(text.match(/· (\d+),(\d\d) m²/)!.slice(1).join('.'));
@@ -61,17 +62,17 @@ describe('ambiente na planta (D1, E3)', () => {
   it('ambiente oculto ou sem circuito não é desenhado', () => {
     const p = sala();
     const paint = defaultPaint('room', 100);
-    expect(roomOps(p, 'lv_0', LIGHT, false, 'fine', new Set(['r1']), paint).fills).toHaveLength(0);
+    expect(roomOps(p, 'lv_0', LIGHT, false, 'fine', 50, 100, new Set(['r1']), paint).fills).toHaveLength(0);
     const aberto = sala('Sala', '101', { point: P(20, 20) });
-    expect(roomOps(aberto, 'lv_0', LIGHT, false, 'fine', undefined, paint).fills).toHaveLength(0);
+    expect(roomOps(aberto, 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills).toHaveLength(0);
   });
 
   it('cor própria do ambiente substitui o padrão; no tema escuro o preenchimento muda', () => {
     const paint = defaultPaint('room', 100);
-    const claro = roomOps(sala('Sala', '101', { color: '#ff0000' }), 'lv_0', LIGHT, false, 'fine', undefined, paint).fills[0]!.color;
-    const escuro = roomOps(sala(), 'lv_0', DARK, true, 'fine', undefined, paint).fills[0]!.color;
+    const claro = roomOps(sala('Sala', '101', { color: '#ff0000' }), 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills[0]!.color;
+    const escuro = roomOps(sala(), 'lv_0', DARK, true, 'fine', 50, 100, undefined, paint).fills[0]!.color;
     expect(claro).toMatch(/^#/);
-    expect(claro).not.toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', undefined, paint).fills[0]!.color);
+    expect(claro).not.toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills[0]!.color);
     expect(escuro).not.toBe(claro);
   });
 

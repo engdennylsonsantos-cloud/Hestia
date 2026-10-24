@@ -114,6 +114,7 @@ describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => 
     const sobe = stairFills(p, [st!], LIGHT, false, 'medium', VIEW).labels.find((l) => l.text === 'SOBE')!;
     expect(sobe.at.x).toBeCloseTo(P, 9);
     expect(sobe.at.y).toBeCloseTo(0, 9);
+    expect(sobe.fontPx).toBeGreaterThan(0);
   });
 });
 

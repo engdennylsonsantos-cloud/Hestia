@@ -1,13 +1,15 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingsOfWall, wallType, type Id, type Project } from '@hestia/model';
+import { openingsOfWall, paperMmToPx, wallType, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import type { LabelOp } from './types.ts';
+import type { PlanPaint } from './style.ts';
 
-/** Largura aproximada de um caractere da etiqueta (px de tela) e folga até o vão (px). */
-const CHAR_PX = 7;
-const PAD_PX = 6;
-/** Deslocamento vertical da etiqueta em relação ao eixo da parede (px; negativo sobe na tela). */
-const TAG_DY = -8;
+/** Medidas em mm de papel (anotação, decisão 0019). */
+const TAG_TEXT_MM = 1.6;
+const CHAR_W_MM = 1;
+const PAD_MM = 0.9;
+/** Deslocamento vertical da etiqueta em mm de papel (positivo sobe). */
+const TAG_DY_MM = 1.2;
 
 /** Maior trecho livre de [lo, hi] depois de tirar os intervalos bloqueados. */
 function longestFree(lo: number, hi: number, blocked: Array<[number, number]>): [number, number] | null {
@@ -27,15 +29,21 @@ function longestFree(lo: number, hi: number, blocked: Array<[number, number]>): 
 
 /**
  * Etiqueta com o código do tipo em cada parede do nível (G4). A etiqueta vai ao ponto médio do maior trecho livre
- * do eixo, deslocado ao longo da parede para não cair sobre um vão (com folga do tamanho do texto).
+ * do eixo, deslocado ao longo da parede para não cair sobre um vão (com folga do tamanho do texto). A fonte segue
+ * a categoria 'anotação' (visibilidade e tamanho em mm de papel).
  */
-export function wallTagLabels(p: Project, levelId: Id, zoom: number, hidden?: ReadonlySet<Id>): LabelOp[] {
+export function wallTagLabels(p: Project, levelId: Id, zoom: number, paint: PlanPaint, scale: number, hidden?: ReadonlySet<Id>): LabelOp[] {
   const out: LabelOp[] = [];
+  if (!paint.visible) return out;
+  const mPerMm = scale / 1000;
+  const fontPx = paperMmToPx(TAG_TEXT_MM, zoom, scale);
+  const halfPad = PAD_MM * mPerMm;
+  const chW = CHAR_W_MM * mPerMm;
   for (const f of levelFrames(p, levelId)) {
     if (hidden?.has(f.wall.id)) continue;
     const code = wallType(p, f.wall).code;
     if (!code) continue;
-    const halfText = (code.length * CHAR_PX) / 2 / zoom + PAD_PX / zoom;
+    const halfText = (code.length * chW) / 2 + halfPad;
     const blocked = openingsOfWall(p, f.wall.id).map((o): [number, number] => {
       const half = (p.openingTypes[o.typeId]?.width ?? 0) / 2;
       return [o.offset - half - halfText, o.offset + half + halfText];
@@ -43,7 +51,7 @@ export function wallTagLabels(p: Project, levelId: Id, zoom: number, hidden?: Re
     const span = longestFree(0, f.length, blocked);
     if (!span) continue;
     const t = (span[0] + span[1]) / 2;
-    out.push({ at: pointAt(f, t, f.sMid), text: code, dy: TAG_DY });
+    out.push({ at: pointAt(f, t, f.sMid), text: code, dy: -paperMmToPx(TAG_DY_MM, zoom, scale), fontPx });
   }
   return out;
 }

@@ -196,9 +196,9 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   // Lajes e pisos pela cota da face superior (decisão 0023 §3): o mais alto desenha por último; pisos antes das paredes.
   for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint)) addOps(sf.ops, sf.paint, !rp);
   // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
-  addOps(roomOps(p, input.levelId, theme, input.dark, detail, hidden, paint.room), paint.room, !rp);
+  addOps(roomOps(p, input.levelId, theme, input.dark, detail, v.zoom, style.scale, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
-  addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair), paint.stair, !rp);
+  addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
   // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
   if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor), paint.floor, true);
 
@@ -291,8 +291,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
 
-  // Etiquetas de tipo (G4) e depuração de junção (G6), por configuração do projeto.
-  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, hidden));
+  // Etiquetas de tipo (G4) seguem a categoria 'anotação' (visibilidade e mm de papel).
+  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, paint.annotation, style.scale, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,

@@ -1,6 +1,6 @@
 import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { sampleChain, spiralParamsOf, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
-import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
+import { isStair, paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
@@ -22,6 +22,11 @@ export interface StairView {
 
 /** Traço (px) do tracejado dos degraus acima da cota de corte. */
 export const STAIR_DASH: [number, number] = [6, 3];
+
+/** Rótulos da escada em mm de papel, no mesmo padrão das anotações (decisão 0019). */
+const STAIR_TEXT_MM = 1.6;
+const STAIR_TAG_MM = 1.6;
+const STAIR_SOBE_OFFSET_MM = 2.35;
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
@@ -136,8 +141,8 @@ function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number, wid
   return { pts: polygon, closed: true, widthPx, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
 }
 
-/** Desloca a etiqueta 16 px para um lado da seta (perpendicular ao primeiro trecho), para não cruzar a linha. */
-const beside = (u: Vec2): { dx: number; dy: number } => ({ dx: -16 * u.y, dy: -16 * u.x });
+/** Desloca a etiqueta para um lado da seta (perpendicular ao primeiro trecho), para não cruzar a linha. */
+const beside = (u: Vec2, px: number): { dx: number; dy: number } => ({ dx: -px * u.y, dy: -px * u.x });
 
 /** Lados do círculo do poste de caracol (decisão 0014 §1 item 9): entre 24 e 48. Planta e DXF usam o mesmo. */
 export const SPIRAL_POST_SIDES = 48;
@@ -248,8 +253,12 @@ export function stairFills(
   v: Viewport,
   view?: StairView,
   paint: PlanPaint = defaultPaint('stair', v.zoom),
+  scale = 100,
 ): FloorOps {
   const out = empty();
+  const fontPx = paperMmToPx(STAIR_TEXT_MM, v.zoom, scale);
+  const tagFontPx = paperMmToPx(STAIR_TAG_MM, v.zoom, scale);
+  const besidePx = paperMmToPx(STAIR_SOBE_OFFSET_MM, v.zoom, scale);
   const fillBase = dark ? theme.bg : '#ffffff';
   const lineColor = mix(theme.ink, fillBase, 0.35);
   for (const s of stairs) {
@@ -283,7 +292,7 @@ export function stairFills(
     out.strokes.push(...climbArrow(walk, v.zoom, theme.ink, paint.cutPx));
     if (walk.length >= 2) {
       const u = norm(sub(walk[1]!, walk[0]!));
-      out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u) });
+      out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u, besidePx), fontPx });
     }
     const cut = stairCut(s, risers, v.zoom, cutZ);
     if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink, paint.cutPx));
@@ -292,12 +301,12 @@ export function stairFills(
       for (const st of steps) {
         if (st.kind !== 'tread') continue;
         const at = treadLabelAt(st, steps, spirals);
-        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
+        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), fontPx, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
       }
     }
     if (p.settings.showTags) {
       const at = labelPoint(s.footprint);
-      if (at) out.labels.push({ at, text: s.type.code });
+      if (at) out.labels.push({ at, text: s.type.code, fontPx: tagFontPx });
     }
   }
   return out;

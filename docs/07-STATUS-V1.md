@@ -93,7 +93,8 @@ Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): diálogo d
 e lados); camadas aberturas → paredes → contorno → total, só nos lados que têm parede paralela. Marcas de corte e
 elevação são anotações de primeira classe (0030): número, título, rótulo, aparência, referências de parede e papel
 estável das elevações; seleção, propriedades, mover/copiar/girar/espelhar, prancha e DXF (`CORTES`/`ELEVACOES`) usam a
-mesma geometria em mm de papel.
+mesma geometria em mm de papel. Etiquetas de parede, rótulos de ambiente e rótulos de escada também usam fonte em
+mm de papel (e as etiquetas de parede seguem a visibilidade da categoria `anotação`).
 
 **Avisos do projeto** (0029): o painel soma aos avisos do modelo três leituras da geometria resolvida —
 `abertura-fora-da-parede` (offset + largura passa do eixo), `parede-topo-desnivelado` (paredes colineares do mesmo

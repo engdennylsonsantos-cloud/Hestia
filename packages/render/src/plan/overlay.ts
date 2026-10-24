@@ -51,13 +51,39 @@ export function snapMarker(inf: Inference, v: Viewport, theme: PlanTheme): Strok
   }
 }
 
+const SNAP_TOOLTIPS: Record<string, string> = {
+  endpoint: 'Extremidade',
+  face: 'Canto da face',
+  core: 'Face do núcleo',
+  midpoint: 'Ponto médio',
+  intersection: 'Interseção',
+  perpendicular: 'Perpendicular',
+  nearest: 'Na parede',
+  alignment: 'Alinhamento',
+  ortho: 'Ortogonal',
+};
+
+/** Rótulo flutuante junto ao cursor com a captura ativa (AutoCAD / Revit Snap Tooltip). */
+export function snapTooltipLabel(inf: Inference): LabelOp | null {
+  if (inf.kind === 'none' || inf.kind === 'grid') return null;
+  const text = SNAP_TOOLTIPS[inf.kind];
+  if (!text) return null;
+  return {
+    at: inf.point,
+    text,
+    dx: 12,
+    dy: -12,
+    tone: 'accent',
+  };
+}
+
 export function guideStrokes(guides: Guide[], theme: PlanTheme): StrokeOp[] {
   return guides.map((g) => ({
     pts: [g.from, g.to],
     closed: false,
-    widthPx: 1,
+    widthPx: 1.2,
     color: g.kind === 'perpendicular' ? theme.accent : theme.guide,
-    alpha: 0.9,
+    alpha: 0.95,
     dash: [6, 4] as [number, number],
   }));
 }

@@ -138,3 +138,38 @@ describe('ferramenta Parede com captura de faces', () => {
     w.cancel();
   });
 });
+
+describe('capturas inteligentes e rastreamento dinâmico (Smart Snaps)', () => {
+  it('com snap.enabled = false (F3), ignora todas as capturas e devolve o ponto cru', () => {
+    const { store } = oneWall();
+    const r = at(store.project, 0, 0, { snap: { ...DEFAULT_SNAP, enabled: false } });
+    expect(r.kind).toBe('none');
+    expect(near(r.point, 0, 0)).toBe(true);
+  });
+
+  it('com snap.midpoint = false, desativa captura de pontos médios', () => {
+    const { store } = oneWall();
+    // Ponto médio da parede é (2, 0). Com midpoint desligado, cai em 'nearest' ou grade
+    const r = at(store.project, 2, 0.005, { snap: { ...DEFAULT_SNAP, midpoint: false, grid: false } });
+    expect(r.kind).not.toBe('midpoint');
+  });
+
+  it('com snap.endpoint = false, desativa captura de extremidades', () => {
+    const { store } = oneWall();
+    const r = at(store.project, 0, 0.005, { snap: { ...DEFAULT_SNAP, endpoint: false, grid: false } });
+    expect(r.kind).not.toBe('endpoint');
+    expect(r.kind).not.toBe('face');
+  });
+
+  it('rastreamento dinâmico de alinhamento com o ponto médio de uma parede existente', () => {
+    const { store } = oneWall();
+    // Parede de (0,0) a (4,0), ponto médio em (2,0).
+    // Cursor em (2.01, 3) deve alinhar em X com o ponto médio (x=2)
+    const r = at(store.project, 2.01, 3, { snap: { ...DEFAULT_SNAP, grid: false } });
+    expect(r.kind).toBe('alignment');
+    expect(near(r.point, 2, 3)).toBe(true);
+    expect(r.guides.length).toBeGreaterThan(0);
+    expect(r.guides.some((g) => g.kind === 'alignment' && near(g.from, 2, 0))).toBe(true);
+  });
+});
+

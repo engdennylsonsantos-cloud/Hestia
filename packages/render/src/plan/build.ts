@@ -6,7 +6,7 @@ import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { thinStrokes } from './thin.ts';
 import { gridStrokes } from './grid.ts';
-import { guideStrokes, previewOverlay, snapMarker } from './overlay.ts';
+import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { belowFloorOps, floorSelectionOps, type FloorOps } from './floors.ts';
 import { slabSelectionOps } from './slabs.ts';
@@ -361,6 +361,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   if (input.inference) {
     strokes.push(...guideStrokes(input.inference.guides, theme));
     strokes.push(...snapMarker(input.inference, v, theme));
+    const tip = snapTooltipLabel(input.inference);
+    if (tip) labels.push(tip);
   }
   return { background: theme.bg, fills, strokes, labels };
 }

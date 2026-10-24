@@ -80,8 +80,12 @@ function facesOf(p: Project, levelId: Id): WallFaces[] {
  * Todas as ferramentas o consomem; o cursor "adivinha" o que o usuário quer.
  */
 export function infer(cursor: Vec2, ctx: InferContext): Inference {
-  const tol = TOL_PX * ctx.mpp;
   const sn = { ...DEFAULT_SNAP, ...ctx.snap };
+  if (sn.enabled === false) {
+    return { point: cursor, kind: 'none', guides: [] };
+  }
+
+  const tol = TOL_PX * ctx.mpp;
   const walls = wallsOnLevel(ctx.project, ctx.levelId).filter((w) => !ctx.ignore?.has(w.id));
   const cands: Cand[] = [];
   const add = (c: Cand): void => {
@@ -95,13 +99,17 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     ends.push(w.a, w.b);
     if (dist(cursor, closestOnSegment(cursor, w.a, w.b)) <= tol) nearWalls.push(w);
     if (sn.axis) {
-      for (const p of [w.a, w.b]) {
-        const d = dist(cursor, p);
-        if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
+      if (sn.endpoint !== false) {
+        for (const p of [w.a, w.b]) {
+          const d = dist(cursor, p);
+          if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
+        }
       }
-      const m = wallMid(w);
-      const dm = dist(cursor, m);
-      if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
+      if (sn.midpoint !== false) {
+        const m = wallMid(w);
+        const dm = dist(cursor, m);
+        if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
+      }
     }
     const near = closestOnWall(w, cursor);
     // Sobre o eixo: também é o ponto de hospedagem de portas e janelas, por isso fica ligado com a captura de eixo.
@@ -120,21 +128,27 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     }
   }
   // Pontos extras (vértices de pisos, contorno em construção) não entram na captura exclusiva de paredes (aberturas).
-  for (const q of ctx.onWallsOnly ? [] : (ctx.extraPoints ?? [])) {
-    const d = dist(cursor, q);
-    if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
+  if (sn.endpoint !== false) {
+    for (const q of ctx.onWallsOnly ? [] : (ctx.extraPoints ?? [])) {
+      const d = dist(cursor, q);
+      if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
+    }
   }
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
   const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core'): void => {
     for (const [a, b] of segs) {
       if (dist(a, b) < 1e-9) continue;
-      for (const q of [a, b]) {
-        const d = dist(cursor, q);
-        if (d <= tol) add({ point: q, kind, score: d });
+      if (sn.endpoint !== false) {
+        for (const q of [a, b]) {
+          const d = dist(cursor, q);
+          if (d <= tol) add({ point: q, kind, score: d });
+        }
       }
-      const mid = v2((a.x + b.x) / 2, (a.y + b.y) / 2);
-      const dm = dist(cursor, mid);
-      if (dm <= tol) add({ point: mid, kind: 'midpoint', score: dm + tol * 0.1 });
+      if (sn.midpoint !== false) {
+        const mid = v2((a.x + b.x) / 2, (a.y + b.y) / 2);
+        const dm = dist(cursor, mid);
+        if (dm <= tol) add({ point: mid, kind: 'midpoint', score: dm + tol * 0.1 });
+      }
       const foot = closestOnSegment(cursor, a, b);
       const df = dist(cursor, foot);
       if (df <= tol) add({ point: foot, kind: 'nearest', score: df + tol * 0.5 });
@@ -163,8 +177,17 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   }
   if (ctx.onWallsOnly) return pickBest(cands, cursor, [], undefined);
 
-  // Alinhamento horizontal/vertical com extremidades e com o ponto anterior.
-  const refs = ctx.from ? [...ends, ctx.from] : ends;
+  // Alinhamento dinâmico horizontal/vertical e rastreamento com extremidades, pontos médios e ponto anterior.
+  const refs: Vec2[] = [];
+  if (ctx.from) refs.push(ctx.from);
+  refs.push(...ends);
+  if (sn.midpoint !== false) {
+    for (const w of walls) refs.push(wallMid(w));
+  }
+  if (!ctx.onWallsOnly && ctx.extraPoints) {
+    refs.push(...ctx.extraPoints);
+  }
+
   let ax: Vec2 | null = null;
   let ay: Vec2 | null = null;
   for (const r of refs) {

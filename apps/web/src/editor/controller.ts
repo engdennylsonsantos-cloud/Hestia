@@ -15,13 +15,13 @@ import {
   type SectionView,
   type TemplateId,
 } from '@hestia/model';
-import { createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
-import { key3d, useUi } from './state.ts';
+import { key3d, setSnap, useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
@@ -226,6 +226,18 @@ export class Editor {
     }
     if (mod && ui.view === 'plan' && /^[cv]$/i.test(k)) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
     if (mod) return false;
+    if (k === 'F3') {
+      const cur = (useUi.getState().options.snap ?? DEFAULT_SNAP).enabled !== false;
+      setSnap({ enabled: !cur });
+      useUi.setState({ status: !cur ? 'Capturas ativadas (F3)' : 'Capturas desativadas (F3)' });
+      return true;
+    }
+    if (k === 'F11') {
+      const cur = (useUi.getState().options.snap ?? DEFAULT_SNAP).alignment;
+      setSnap({ alignment: !cur });
+      useUi.setState({ status: !cur ? 'Rastreamento de alinhamento ativado (F11)' : 'Rastreamento de alinhamento desativado (F11)' });
+      return true;
+    }
     if (ui.view === 'section') {
       if (k === 'Escape') {
         this.closeSection();

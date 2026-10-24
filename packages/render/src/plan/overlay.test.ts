@@ -3,7 +3,7 @@ import { resolveLevel } from '@hestia/engine';
 import { createEmptyProject } from '@hestia/model';
 import type { PreviewItem } from '@hestia/tools';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
-import { previewOverlay } from './overlay.ts';
+import { previewOverlay, snapTooltipLabel } from './overlay.ts';
 import { DARK, LIGHT, type PlanTheme } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -84,5 +84,20 @@ describe('prévia da escada por tom (decisão 0011 · interface)', () => {
       expect(colors.has(c)).toBe(true);
     }
     expect(dl.strokes.filter((s) => s.color === LIGHT.accent && s.widthPx === 1.5 && s.pts.length === 2)).toHaveLength(1);
+  });
+
+  it('snapTooltipLabel gera rótulo flutuante para capturas geométricas', () => {
+    const pt = { x: 10, y: 20 };
+    expect(snapTooltipLabel({ point: pt, kind: 'endpoint', guides: [] })).toEqual({
+      at: pt,
+      text: 'Extremidade',
+      dx: 12,
+      dy: -12,
+      tone: 'accent',
+    });
+    expect(snapTooltipLabel({ point: pt, kind: 'midpoint', guides: [] })?.text).toBe('Ponto médio');
+    expect(snapTooltipLabel({ point: pt, kind: 'alignment', guides: [] })?.text).toBe('Alinhamento');
+    expect(snapTooltipLabel({ point: pt, kind: 'none', guides: [] })).toBeNull();
+    expect(snapTooltipLabel({ point: pt, kind: 'grid', guides: [] })).toBeNull();
   });
 });

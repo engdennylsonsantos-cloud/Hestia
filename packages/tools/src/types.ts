@@ -69,10 +69,12 @@ export type CeilingMode = 'poly' | 'rect' | 'room' | 'hole';
 /** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, pelo perímetro externo das paredes (com balanço), ou abertura (furo) no telhado selecionado. 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
 export type RoofMode = 'poly' | 'rect' | 'paredes' | 'hole' | 'extrusao';
 
-/** Quais capturas estão ligadas (Revit: Snaps). */
+/** Quais capturas estão ligadas (AutoCAD / Revit Snaps). */
 export interface SnapOptions {
+  /** Chave mestre: se falso, desativa todas as capturas temporariamente (AutoCAD F3 / Revit SO). */
+  enabled?: boolean;
   grid: boolean;
-  /** Pontas e pontos médios do eixo das paredes. */
+  /** Eixo das paredes e arestas estruturais. */
   axis: boolean;
   /** Cantos, arestas e pontos médios das faces de acabamento (por dentro e por fora dos cômodos). */
   faces: boolean;
@@ -80,11 +82,26 @@ export interface SnapOptions {
   core: boolean;
   intersections: boolean;
   perpendicular: boolean;
-  /** Alinhamento com outros pontos e ortogonal. */
+  /** Alinhamento dinâmico e ortogonal com outros pontos e eixos (AutoCAD F11 / Revit). */
   alignment: boolean;
+  /** Captura de extremidades/vértices (AutoCAD Endpoint - quadrado). */
+  endpoint?: boolean;
+  /** Captura de pontos médios (AutoCAD Midpoint - triângulo). */
+  midpoint?: boolean;
 }
 
-export const DEFAULT_SNAP: SnapOptions = { grid: true, axis: true, faces: true, core: false, intersections: true, perpendicular: true, alignment: true };
+export const DEFAULT_SNAP: SnapOptions = {
+  enabled: true,
+  grid: true,
+  axis: true,
+  faces: true,
+  core: false,
+  intersections: true,
+  perpendicular: true,
+  alignment: true,
+  endpoint: true,
+  midpoint: true,
+};
 
 export interface ToolOptions {
   /** Capturas ligadas; ausente = padrão. */

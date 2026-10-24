@@ -4,9 +4,9 @@ import { IssuesButton } from './IssuesButton.tsx';
 import { SnapButton } from './SnapButton.tsx';
 
 const SNAP: Record<string, string> = {
-  endpoint: 'Extremidade do eixo',
+  endpoint: 'Extremidade',
   face: 'Canto da face',
-  core: 'Canto do núcleo',
+  core: 'Face do núcleo',
   midpoint: 'Ponto médio',
   intersection: 'Interseção',
   perpendicular: 'Perpendicular',

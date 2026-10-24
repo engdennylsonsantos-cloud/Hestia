@@ -1,68 +1,80 @@
-/* Mesa de desenho: chrome grafite-claro em volta de uma folha branca; um único acento azul-petróleo. */
+/* Paleta Canônica Autodesk Revit 2024 */
 :root {
-  --bg: #e4e8eb;
-  --chrome: #f1f4f6;
-  --panel: #fafbfc;
+  --bg: #dcdfe3;
+  --chrome: #e6eaed;
+  --ribbon: #f0f3f5;
+  --panel: #f7f9fa;
   --sheet: #ffffff;
-  --line: #d3d9de;
-  --line-strong: #b8c1c8;
-  --fg: #182026;
-  --fg-soft: #56626d;
-  --fg-faint: #85909a;
-  --accent: #0a6c75;
+  --line: #ced5db;
+  --line-strong: #b2bcc4;
+  --fg: #1a202c;
+  --fg-soft: #4a5568;
+  --fg-faint: #718096;
+  --accent: #0078d4;
   --accent-fg: #ffffff;
-  --accent-soft: #d6ecee;
-  --select: #1d6fe0;
-  --warn: #a8480a;
-  --danger: #b42318;
-  --ok: #14773a;
-  --shadow: 0 10px 34px rgba(18, 28, 36, 0.22);
-  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --accent-soft: #deecf9;
+  --revit-green: #107c41;
+  --revit-green-soft: #dff6dd;
+  --revit-green-border: #22c55e;
+  --select: #0078d4;
+  --warn: #c25e00;
+  --danger: #d13438;
+  --ok: #107c41;
+  --shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+  --font-ui: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
   /* Largura da coluna de rótulo da paleta de propriedades: cabe o rótulo mais longo (22 caracteres a 11 px). */
   --prop-label: 122px;
-  --r: 5px;
+  --r: 3px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0e1114;
-    --chrome: #161a1e;
-    --panel: #1a1f24;
-    --sheet: #16191d;
-    --line: #2a3138;
-    --line-strong: #3b444d;
-    --fg: #e5e9ed;
-    --fg-soft: #9ba6b1;
-    --fg-faint: #6f7a85;
-    --accent: #4cc2cb;
-    --accent-fg: #06262a;
-    --accent-soft: #123a3e;
-    --select: #5aa2ff;
-    --warn: #f0a15b;
-    --danger: #f2877d;
-    --ok: #5fcf8a;
-    --shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+    --bg: #141414;
+    --chrome: #1f1f1f;
+    --ribbon: #333333;
+    --panel: #252525;
+    --sheet: #1e1e1e;
+    --line: #383838;
+    --line-strong: #484848;
+    --fg: #f3f4f6;
+    --fg-soft: #a1a1aa;
+    --fg-faint: #71717a;
+    --accent: #60a5fa;
+    --accent-fg: #0f172a;
+    --accent-soft: #1e3a5f;
+    --revit-green: #4ade80;
+    --revit-green-soft: #173827;
+    --revit-green-border: #22c55e;
+    --select: #3b82f6;
+    --warn: #fb923c;
+    --danger: #f87171;
+    --ok: #4ade80;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --bg: #0e1114;
-  --chrome: #161a1e;
-  --panel: #1a1f24;
-  --sheet: #16191d;
-  --line: #2a3138;
-  --line-strong: #3b444d;
-  --fg: #e5e9ed;
-  --fg-soft: #9ba6b1;
-  --fg-faint: #6f7a85;
-  --accent: #4cc2cb;
-  --accent-fg: #06262a;
-  --accent-soft: #123a3e;
-  --select: #5aa2ff;
-  --warn: #f0a15b;
-  --danger: #f2877d;
-  --ok: #5fcf8a;
-  --shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+  --bg: #141414;
+  --chrome: #1f1f1f;
+  --ribbon: #333333;
+  --panel: #252525;
+  --sheet: #1e1e1e;
+  --line: #383838;
+  --line-strong: #484848;
+  --fg: #f3f4f6;
+  --fg-soft: #a1a1aa;
+  --fg-faint: #71717a;
+  --accent: #60a5fa;
+  --accent-fg: #0f172a;
+  --accent-soft: #1e3a5f;
+  --revit-green: #4ade80;
+  --revit-green-soft: #173827;
+  --revit-green-border: #22c55e;
+  --select: #3b82f6;
+  --warn: #fb923c;
+  --danger: #f87171;
+  --ok: #4ade80;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 
@@ -461,4 +473,135 @@ svg { display: block; }
 @media (max-width: 600px) {
   .snap-count { display: none; }
   .snap-pop { position: fixed; left: 16px; right: 16px; bottom: 36px; width: auto; }
+}
+
+
+/* ---- Estilo Autodesk Revit para Ribbon e Abas ---- */
+.ribbon-tabs {
+  background: var(--chrome);
+  padding: 0 4px;
+  gap: 1px;
+}
+.rtab {
+  border-radius: 3px 3px 0 0;
+  padding: 5px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  color: var(--fg-soft);
+  transition: background 0.1s;
+}
+.rtab:hover {
+  background: color-mix(in srgb, var(--chrome) 85%, var(--fg) 15%);
+  color: var(--fg);
+}
+.rtab.on {
+  background: var(--panel);
+  border-color: var(--line-strong);
+  border-top: 2px solid var(--accent);
+  color: var(--fg);
+  font-weight: 600;
+}
+/* Aba Contextual Verde do Revit */
+.rtab.contextual {
+  background: var(--revit-green-soft);
+  border-color: var(--revit-green-border);
+  border-top: 2px solid var(--revit-green-border);
+  color: var(--revit-green);
+  font-weight: 600;
+}
+.rtab.contextual:hover {
+  background: color-mix(in srgb, var(--revit-green-soft) 85%, var(--fg) 15%);
+}
+
+/* Grupo e Painéis do Ribbon Revit */
+.rgroup {
+  padding: 2px 6px;
+  background: transparent;
+}
+.rgroup-title {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+  font-weight: 600;
+}
+.tbtn.primary-tool {
+  min-width: 52px;
+  padding: 4px 6px 2px;
+}
+.tbtn.primary-tool svg {
+  width: 26px;
+  height: 26px;
+}
+
+
+/* ---- Barra de Controle de Vista (View Control Bar do Revit) ---- */
+.view-control-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 3px 8px;
+  box-shadow: var(--shadow);
+  font-size: 11px;
+}
+.vc-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.vc-label {
+  font-size: 10.5px;
+  color: var(--fg-soft);
+  font-weight: 500;
+}
+.vc-select {
+  height: 22px;
+  padding: 0 4px;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 11px;
+  color: var(--fg);
+}
+.vc-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+  margin: 0 2px;
+}
+.vc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--fg-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+.vc-btn:hover:not(:disabled) {
+  background: var(--chrome);
+  border-color: var(--line);
+  color: var(--fg);
+}
+.vc-btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.vc-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

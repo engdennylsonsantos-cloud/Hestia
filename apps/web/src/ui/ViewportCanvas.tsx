@@ -10,6 +10,7 @@ import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels } from './PlanLabels';
+import { ViewControlBar } from './ViewControlBar.tsx';
 
 /** Escuro se o usuário escolheu escuro, ou se o tema do host/sistema for escuro. */
 export function useDark(): boolean {
@@ -448,6 +449,7 @@ export function ViewportCanvas(): ReactElement {
       </div>
       {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
       {ui.view === 'section' ? <SectionBadge /> : null}
+      <ViewControlBar />
       {ui.view === 'plan' && ui.prompt ? (
         <div className="typebox" role="status">
           <span className="cap">{ui.prompt}</span>

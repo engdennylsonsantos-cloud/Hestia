@@ -4,6 +4,7 @@ import type { Backend } from '@hestia/render';
 import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
+import { activeViewOf, addView, type OpenView } from './openViews.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -42,6 +43,11 @@ export interface UiState {
   ribbon: 'arquitetura' | 'modificar' | 'vista';
   /** Aresta de telhado escolhida na planta (seção "Aresta N" em Propriedades). */
   roofEdge: RoofEdgeSel | null;
+  /**
+   * Vistas abertas na barra, na ordem das abas (sessão, não vai para o projeto). A vista ativa é sempre uma delas:
+   * `view`/`levelId`/`sectionId`/`sheetId` continuam sendo a fonte da vista ativa, e esta lista é sincronizada com eles.
+   */
+  openViews: OpenView[];
 }
 
 const SNAP_KEY = 'hestia.snap';
@@ -152,6 +158,12 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   stairRun: DEFAULT_STAIR_RUN_OPTIONS,
 };
 
+/**
+ * Padrão ao abrir o projeto (decisão a confirmar): só o nível ativo fica aberto. Ver o relatório da frente D.
+ * Para mudar para "todos os níveis", troque esta constante por uma lista com todas as plantas (ou calcule-a ao carregar).
+ */
+export const DEFAULT_OPEN_VIEWS: OpenView[] = [{ kind: 'plan', levelId: 'lv_0' }];
+
 export const useUi = create<UiState>(() => ({
   tool: 'select',
   view: 'plan',
@@ -180,4 +192,18 @@ export const useUi = create<UiState>(() => ({
   seen3d: false,
   ribbon: 'arquitetura',
   roofEdge: null,
+  openViews: DEFAULT_OPEN_VIEWS.map((v) => ({ ...v })),
 }));
+
+/**
+ * Toda vista ativa entra na lista de vistas abertas (abrir um nível já aberto só ativa, pois `addView` não duplica).
+ * Assim, qualquer caminho que muda a vista (árvore, ribbon, corte, prancha, ferramenta de planta) abre a aba sem
+ * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em App.tsx).
+ */
+useUi.subscribe((s, prev) => {
+  if (s.view === prev.view && s.levelId === prev.levelId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
+  const active = activeViewOf(s);
+  if (!active) return;
+  const next = addView(s.openViews, active);
+  if (next !== s.openViews) useUi.setState({ openViews: next });
+});

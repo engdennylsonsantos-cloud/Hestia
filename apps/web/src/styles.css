@@ -225,9 +225,13 @@ svg { display: block; }
 
 /* ---- área de trabalho ---- */
 .stage { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; background: var(--bg); }
-.viewtabs { display: flex; gap: 2px; padding: 4px 6px 0; background: var(--chrome); border-bottom: 1px solid var(--line-strong); }
-.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 12px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 6px; align-items: center; margin-bottom: -1px; }
+/* overflow-x: auto: com muitos pavimentos as abas rolam horizontalmente, sem empurrar o canvas (decisão 0025). */
+.viewtabs { display: flex; gap: 2px; padding: 4px 6px 0; background: var(--chrome); border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; min-width: 0; flex-shrink: 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 10px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12.5px; }
 .vtab.on { background: var(--sheet); border-color: var(--line-strong); color: var(--fg); font-weight: 500; }
+/* Botões de painel ficam colados à direita mesmo com scroll de abas */
+.vtab-controls { display: flex; align-items: center; gap: 2px; position: sticky; right: 0; background: var(--chrome); padding-left: 4px; flex-shrink: 0; }
+
 .canvas-wrap { position: relative; background: var(--sheet); min-height: 0; overflow: hidden; touch-action: none; }
 .canvas-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }

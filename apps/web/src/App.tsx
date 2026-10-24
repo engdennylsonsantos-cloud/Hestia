@@ -42,8 +42,18 @@ function ViewTabs(): ReactElement {
   const s = useUi();
   const sectionTab = p.views.find((v) => v.id === s.sectionId);
   const sheetTab = s.sheetId ? sheetOf(p, s.sheetId) : undefined;
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  // Ao trocar de vista/nível, rola a barra para mostrar a aba ativa
+  useEffect(() => {
+    const bar = tabsRef.current;
+    if (!bar) return;
+    const active = bar.querySelector<HTMLElement>('.vtab.on');
+    if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [s.view, s.levelId, s.sectionId, s.sheetId]);
+
   return (
-    <div className="viewtabs" role="tablist" aria-label="Vistas abertas">
+    <div className="viewtabs" role="tablist" aria-label="Vistas abertas" ref={tabsRef}>
       <button className="ibtn" style={{ display: 'none' }} aria-hidden="true" />
       {p.levels.map((l) => (
         <button key={l.id} role="tab" aria-selected={s.view === 'plan' && s.levelId === l.id} className={`vtab${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => editor.selectLevel(l.id)}>
@@ -63,13 +73,16 @@ function ViewTabs(): ReactElement {
           <Icon name="plan" size={14} /> {sheetTab.number} {sheetTab.name}
         </button>
       ) : null}
-      <span style={{ flex: 1 }} />
-      <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
-        <Icon name="edit" size={16} />
-      </button>
-      <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen, ...(narrow() && !s.rightOpen ? { leftOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
-        <Icon name="levels" size={16} />
-      </button>
+      <span style={{ flex: 1, minWidth: 4 }} />
+      {/* Botões de painel: position sticky para aparecer mesmo com muitas abas */}
+      <div className="vtab-controls">
+        <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
+          <Icon name="edit" size={16} />
+        </button>
+        <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen, ...(narrow() && !s.rightOpen ? { leftOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
+          <Icon name="levels" size={16} />
+        </button>
+      </div>
     </div>
   );
 }

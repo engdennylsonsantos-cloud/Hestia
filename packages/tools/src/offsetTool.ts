@@ -1,0 +1,118 @@
+import { cross, mul, offsetArc, sub, type Vec2 } from '@hestia/geom';
+import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
+import { isWall, type Id } from '@hestia/model';
+import { ToolBase } from './base.ts';
+import { copyWalls, ghostBands, moveWalls } from './edit.ts';
+import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { ringOps } from './ringOps.ts';
+import type { EdgePick } from './ringEdge.ts';
+import type { PointerInfo } from './types.ts';
+
+const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+
+/** Deslocar: copia ou move uma parede paralelamente, para o lado do cursor (concêntrico nas curvas). */
+export class OffsetTool extends ToolBase {
+  readonly id = 'offset';
+  readonly label = 'Deslocar';
+  readonly hint = 'Deslocar: passe sobre uma parede ou aresta de piso, laje, telhado ou forro e clique para o lado desejado. A distância está na barra de opções.';
+
+  protected reset(): void {
+    this.items = [];
+  }
+  protected busy(): boolean {
+    return false;
+  }
+
+  /** Aresta de anel sob o cursor; null se o alvo é parede ou não há nada. */
+  private edgeAt(at: Vec2): EdgePick | null {
+    const t = pickLineTarget(this.env.project(), this.env.levelId(), at, this.env.metersPerPixel());
+    return t?.kind === 'edge' ? t.pick : null;
+  }
+
+  /**
+   * Aresta deslocada para o lado do cursor: sinal pelo produto vetorial (cursor à esquerda de a→b = +dist, como
+   * ringOps.offsetEdge). `next` é o anel inteiro já editado; `a`/`b` são os vértices novos da aresta.
+   */
+  private edgeOffset(pick: EdgePick, at: Vec2): { signed: number; next: Vec2[]; a: Vec2; b: Vec2 } | null {
+    const ring = ringOfRef(this.env.project(), pick.ref);
+    if (!ring) return null;
+    const dist0 = this.env.options().offsetDistance;
+    const signed = cross(sub(pick.b, pick.a), sub(at, pick.a)) > 0 ? dist0 : -dist0;
+    const next = ringOps.offsetEdge(ring, pick.ref.index, signed);
+    const j = (pick.ref.index + 1) % ring.length;
+    return { signed, next, a: next[pick.ref.index]!, b: next[j]! };
+  }
+
+  private target(p: Vec2): { id: Id; d: Vec2; arc: { a: Vec2; b: Vec2; sag: number } | null } | null {
+    const pr = this.env.project();
+    let best: { id: Id; dist: number; n: Vec2; side: number } | null = null;
+    for (const e of Object.values(pr.elements)) {
+      if (!isWall(e) || e.levelId !== this.env.levelId()) continue;
+      const f = frameOfWall(pr, e.id);
+      if (!f) continue;
+      const l = toLocal(f, p);
+      if (l.t < 0 || l.t > f.length) continue;
+      const dd = Math.abs(l.s - f.sMid);
+      const n = f.arc ? normalAt(f, l.t) : f.n;
+      if (!best || dd < best.dist) best = { id: e.id, dist: dd, n, side: l.s - f.sMid };
+    }
+    if (!best || best.dist > 5) return null;
+    const dist0 = this.env.options().offsetDistance;
+    const sign = best.side >= 0 ? 1 : -1;
+    const w = pr.elements[best.id];
+    const arc = isWall(w) && Math.abs(w.sag) > 1e-6 ? offsetArc(w.a, w.b, w.sag, sign * dist0) : null;
+    return { id: best.id, d: mul(best.n, sign * dist0), arc };
+  }
+
+  override move(p: PointerInfo): void {
+    this.items = [];
+    this.raw = p.raw;
+    const edge = this.edgeAt(p.raw);
+    if (edge) {
+      const off = this.edgeOffset(edge, p.raw);
+      if (!off) return;
+      this.items.push({ kind: 'highlight', ids: [edge.ref.elementId] });
+      this.items.push({ kind: 'line', a: edge.a, b: edge.b });
+      this.items.push({ kind: 'line', a: off.a, b: off.b, dashed: true });
+      this.items.push({ kind: 'label', at: { x: (off.a.x + off.b.x) / 2, y: (off.a.y + off.b.y) / 2 }, text: fmtM(Math.abs(off.signed)) });
+      return;
+    }
+    const t = this.target(p.raw);
+    if (!t) return;
+    this.items.push({ kind: 'highlight', ids: [t.id] });
+    const f = frameOfWall(this.env.project(), t.id);
+    if (t.arc && f) this.items.push({ kind: 'wallBand', a: t.arc.a, b: t.arc.b, thickness: f.thickness, sMid: f.sMid, sag: t.arc.sag });
+    else this.items.push(...ghostBands(this.env.project(), [t.id], { kind: 'translate', d: t.d }));
+  }
+
+  override click(p: PointerInfo): void {
+    const edge = this.edgeAt(p.raw);
+    if (edge) {
+      if (this.env.options().offsetCopy) {
+        this.env.say('Deslocar aresta: cópia ainda não suportada');
+        return;
+      }
+      const off = this.edgeOffset(edge, p.raw);
+      if (!off) return;
+      this.env.transaction('Deslocar aresta', () => {
+        commitRingEdit(this.env, edge.ref, off.next);
+      });
+      return;
+    }
+    const t = this.target(p.raw);
+    if (!t) return;
+    const copy = this.env.options().offsetCopy;
+    if (!t.arc) {
+      if (copy) this.env.transaction('Deslocar e copiar', () => copyWalls(this.env, [t.id], { kind: 'translate', d: t.d }));
+      else moveWalls(this.env, [t.id], t.d);
+      return;
+    }
+    const patch = { a: t.arc.a, b: t.arc.b, sag: t.arc.sag };
+    if (copy) {
+      this.env.transaction('Deslocar e copiar', () => {
+        const [nid] = copyWalls(this.env, [t.id], { kind: 'translate', d: { x: 0, y: 0 } });
+        if (nid) this.env.exec({ type: 'updateElements', ids: [nid], patch });
+      });
+    } else this.env.exec({ type: 'updateElements', ids: [t.id], patch });
+  }
+}

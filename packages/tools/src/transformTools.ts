@@ -1,10 +1,13 @@
-import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@hestia/geom';
-import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
+import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
+import { frameOfWall } from '@hestia/engine';
 import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
+import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { ringOps } from './ringOps.ts';
+import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
 
 const deg = (r: number): number => (r * 180) / Math.PI;
@@ -42,17 +45,31 @@ export class MoveTool extends SelectionTool {
   readonly id: 'move' | 'copy';
   readonly label: string;
   readonly hint: string;
+  /** Dica quando não há seleção: a ferramenta espera um clique numa aresta de anel. */
+  readonly edgeHint: string;
   private base: Vec2 | null = null;
+  /** Aresta escolhida no primeiro clique (só sem seleção). */
+  private edgePick: EdgePick | null = null;
 
   constructor(env: ToolEnv, private copy: boolean) {
     super(env);
     this.id = copy ? 'copy' : 'move';
     this.label = copy ? 'Copiar' : 'Mover';
     this.hint = `${this.label}: clique no ponto base e depois no destino, ou digite a distância.`;
+    this.edgeHint = copy
+      ? 'Copiar: selecione elementos (Selecionar) para copiar. Uma aresta sozinha ainda não pode ser copiada.'
+      : 'Mover: selecione elementos (Selecionar) ou clique numa aresta de piso, laje, telhado ou forro.';
+  }
+
+  /** Sem seleção a ferramenta continua ativa, à espera de um clique em aresta. */
+  override start(): void {
+    this.reset();
+    this.env.say(this.hasSelection() ? this.hint : this.edgeHint);
   }
 
   protected reset(): void {
     this.base = null;
+    this.edgePick = null;
     this.items = [];
     this.inf = null;
   }
@@ -63,8 +80,71 @@ export class MoveTool extends SelectionTool {
     return this.base ? 'Distância' : null;
   }
 
+  /** Aresta de anel sob o cursor (parede não conta aqui: null se o alvo é parede ou não há nada). */
+  private edgeAt(at: Vec2): EdgePick | null {
+    const t = pickLineTarget(this.env.project(), this.env.levelId(), at, this.env.metersPerPixel());
+    return t?.kind === 'edge' ? t.pick : null;
+  }
+
+  /** Sem seleção: mostra a aresta sob o cursor ou, depois do clique base, a aresta na posição de destino. */
+  private edgeMove(p: PointerInfo): void {
+    if (!this.edgePick || !this.base) {
+      const pick = this.edgeAt(p.raw);
+      if (!pick) return;
+      this.items.push({ kind: 'highlight', ids: [pick.ref.elementId] }, { kind: 'line', a: pick.a, b: pick.b }, { kind: 'point', at: pick.at });
+      return;
+    }
+    const inf = this.snap(p, { from: this.base });
+    const d = sub(inf.point, this.base);
+    const ring = ringOfRef(this.env.project(), this.edgePick.ref);
+    if (!ring) return;
+    const moved = ringOps.moveEdge(ring, this.edgePick.ref.index, d);
+    const i = this.edgePick.ref.index;
+    this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
+    this.items.push({ kind: 'line', a: moved[i]!, b: moved[(i + 1) % ring.length]!, dashed: true });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
+  }
+
+  /** Move só a aresta pelo vetor d (Mover aresta). Copiar aresta não existe nesta versão. */
+  private applyEdge(pick: EdgePick, d: Vec2): void {
+    if (len(d) < 1e-6) return;
+    const ring = ringOfRef(this.env.project(), pick.ref);
+    if (!ring) return;
+    this.env.transaction('Mover aresta', () => {
+      commitRingEdit(this.env, pick.ref, ringOps.moveEdge(ring, pick.ref.index, d));
+    });
+  }
+
+  /** Sem seleção: o primeiro clique numa aresta define a base; o segundo, o destino. Outro clique sai com a mensagem de seleção. */
+  private edgeClick(p: PointerInfo): void {
+    const pick = this.edgePick;
+    if (!pick || !this.base) {
+      const found = this.edgeAt(p.raw);
+      if (!found) {
+        this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
+        this.env.done();
+        return;
+      }
+      if (this.copy) {
+        this.env.say('Copiar aresta: ainda não suportado');
+        return;
+      }
+      this.edgePick = found;
+      this.base = found.at;
+      return;
+    }
+    const inf = this.snap(p, { from: this.base });
+    this.applyEdge(pick, sub(inf.point, this.base));
+    this.reset();
+    this.env.done();
+  }
+
   override move(p: PointerInfo): void {
     this.items = [];
+    if (!this.hasSelection()) {
+      this.edgeMove(p);
+      return;
+    }
     const els = this.movables();
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(els) });
     if (!this.base) {
@@ -99,6 +179,10 @@ export class MoveTool extends SelectionTool {
   }
 
   override click(p: PointerInfo): void {
+    if (!this.hasSelection()) {
+      this.edgeClick(p);
+      return;
+    }
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (!this.base) {
       this.base = inf.point;
@@ -115,6 +199,13 @@ export class MoveTool extends SelectionTool {
     const v = parseNumber(text);
     if (v === null) return false;
     const dir = norm(sub(this.inf?.point ?? this.raw, this.base));
+    if (!this.hasSelection()) {
+      if (!this.edgePick) return false;
+      this.applyEdge(this.edgePick, mul(len(dir) < 1e-9 ? v2(1, 0) : dir, v));
+      this.reset();
+      this.env.done();
+      return true;
+    }
     this.apply(mul(len(dir) < 1e-9 ? v2(1, 0) : dir, v));
     if (!this.copy) {
       this.reset();
@@ -377,69 +468,5 @@ export class ArrayTool extends SelectionTool {
     const dir = norm(sub(this.inf?.point ?? this.raw, this.base));
     this.commit(mul(len(dir) < 1e-9 ? v2(1, 0) : dir, v));
     return true;
-  }
-}
-
-/** Deslocar: copia ou move uma parede paralelamente, para o lado do cursor (concêntrico nas curvas). */
-export class OffsetTool extends ToolBase {
-  readonly id = 'offset';
-  readonly label = 'Deslocar';
-  readonly hint = 'Deslocar: passe sobre uma parede e clique para o lado desejado. A distância está na barra de opções.';
-
-  protected reset(): void {
-    this.items = [];
-  }
-  protected busy(): boolean {
-    return false;
-  }
-
-  private target(p: Vec2): { id: Id; d: Vec2; arc: { a: Vec2; b: Vec2; sag: number } | null } | null {
-    const pr = this.env.project();
-    let best: { id: Id; dist: number; n: Vec2; side: number } | null = null;
-    for (const e of Object.values(pr.elements)) {
-      if (!isWall(e) || e.levelId !== this.env.levelId()) continue;
-      const f = frameOfWall(pr, e.id);
-      if (!f) continue;
-      const l = toLocal(f, p);
-      if (l.t < 0 || l.t > f.length) continue;
-      const dd = Math.abs(l.s - f.sMid);
-      const n = f.arc ? normalAt(f, l.t) : f.n;
-      if (!best || dd < best.dist) best = { id: e.id, dist: dd, n, side: l.s - f.sMid };
-    }
-    if (!best || best.dist > 5) return null;
-    const dist0 = this.env.options().offsetDistance;
-    const sign = best.side >= 0 ? 1 : -1;
-    const w = pr.elements[best.id];
-    const arc = isWall(w) && Math.abs(w.sag) > 1e-6 ? offsetArc(w.a, w.b, w.sag, sign * dist0) : null;
-    return { id: best.id, d: mul(best.n, sign * dist0), arc };
-  }
-
-  override move(p: PointerInfo): void {
-    this.items = [];
-    this.raw = p.raw;
-    const t = this.target(p.raw);
-    if (!t) return;
-    this.items.push({ kind: 'highlight', ids: [t.id] });
-    const f = frameOfWall(this.env.project(), t.id);
-    if (t.arc && f) this.items.push({ kind: 'wallBand', a: t.arc.a, b: t.arc.b, thickness: f.thickness, sMid: f.sMid, sag: t.arc.sag });
-    else this.items.push(...ghostBands(this.env.project(), [t.id], { kind: 'translate', d: t.d }));
-  }
-
-  override click(p: PointerInfo): void {
-    const t = this.target(p.raw);
-    if (!t) return;
-    const copy = this.env.options().offsetCopy;
-    if (!t.arc) {
-      if (copy) this.env.transaction('Deslocar e copiar', () => copyWalls(this.env, [t.id], { kind: 'translate', d: t.d }));
-      else moveWalls(this.env, [t.id], t.d);
-      return;
-    }
-    const patch = { a: t.arc.a, b: t.arc.b, sag: t.arc.sag };
-    if (copy) {
-      this.env.transaction('Deslocar e copiar', () => {
-        const [nid] = copyWalls(this.env, [t.id], { kind: 'translate', d: { x: 0, y: 0 } });
-        if (nid) this.env.exec({ type: 'updateElements', ids: [nid], patch });
-      });
-    } else this.env.exec({ type: 'updateElements', ids: [t.id], patch });
   }
 }

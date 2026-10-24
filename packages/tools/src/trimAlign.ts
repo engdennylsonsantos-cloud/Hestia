@@ -3,7 +3,9 @@ import { frameOfWall, normalAt, pointAt, toLocal, type WallFrame } from '@hestia
 import type { Id, Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
-import { pickAt } from './pick.ts';
+import type { EdgePick, EdgeRef } from './ringEdge.ts';
+import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { ringOps } from './ringOps.ts';
 import type { PointerInfo } from './types.ts';
 
 type Axis = { kind: 'line'; p: Vec2; d: Vec2 } | { kind: 'circle'; c: Vec2; r: number };
@@ -84,31 +86,49 @@ interface TrimPick {
   at: Vec2;
 }
 
+/** Duas referências do mesmo anel: mesma aresta de anel (elemento, furo e índice). */
+function sameEdge(a: EdgeRef, b: EdgeRef): boolean {
+  return a.elementId === b.elementId && a.hole === b.hole && a.index === b.index;
+}
+
+/** Anel igual ao outro em todos os vértices (tolerância 1e-9 m). */
+function sameRing(a: Vec2[], b: Vec2[]): boolean {
+  return a.length === b.length && a.every((v, i) => Math.abs(v.x - b[i]!.x) <= 1e-9 && Math.abs(v.y - b[i]!.y) <= 1e-9);
+}
+
 /**
  * Aparar/estender até o canto (Revit: Trim/Extend to Corner). Clique na parte que deve ficar.
  * Modo várias (Revit: Trim/Extend Multiple): Shift+clique acumula paredes a aparar; o clique final,
  * numa parede de referência (sem Shift), aplica a todas num único passo de desfazer. A referência não muda.
+ * Arestas de anel (piso, laje, telhado, forro): duas arestas, sem modo várias; o canto é a interseção das retas.
  */
 export class TrimTool extends ToolBase {
   readonly id = 'trim';
   readonly label = 'Aparar/Estender';
   readonly hint = 'Aparar/Estender ao canto: clique na parte que deseja manter da primeira e da segunda parede. Shift+clique acumula várias paredes; o clique final, na referência, aplica a todas.';
   private first: TrimPick | null = null;
+  /** Primeira aresta de anel escolhida, com o ponto do clique sobre ela. */
+  private firstEdge: { ref: EdgeRef; at: Vec2 } | null = null;
   private group: TrimPick[] = [];
 
   protected reset(): void {
     this.first = null;
+    this.firstEdge = null;
     this.group = [];
     this.items = [];
   }
   protected busy(): boolean {
-    return this.first !== null || this.group.length > 0;
+    return this.first !== null || this.firstEdge !== null || this.group.length > 0;
   }
 
   override move(p: PointerInfo): void {
-    const hit = pickAt(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
-    this.items = hit?.kind === 'wall' ? [{ kind: 'highlight', ids: [hit.id] }] : [];
-    const held = [...(this.first ? [this.first.id] : []), ...this.group.map((g) => g.id)];
+    const target = pickLineTarget(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
+    this.items = target ? [{ kind: 'highlight', ids: [target.kind === 'wall' ? target.id : target.pick.ref.elementId] }] : [];
+    const held = [
+      ...(this.first ? [this.first.id] : []),
+      ...(this.firstEdge ? [this.firstEdge.ref.elementId] : []),
+      ...this.group.map((g) => g.id),
+    ];
     if (held.length) this.items.push({ kind: 'highlight', ids: held });
   }
 
@@ -158,36 +178,101 @@ export class TrimTool extends ToolBase {
     this.env.say(`${patches.length} parede(s) aparada(s).${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''}`);
   }
 
-  override click(p: PointerInfo): void {
-    const pr = this.env.project();
-    const hit = pickAt(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
-    if (!hit || hit.kind !== 'wall') {
-      this.env.say('Clique sobre uma parede.');
+  /** Mistura de parede e aresta (ou várias com uma só): desfaz a escolha e pede de novo. */
+  private mixed(): void {
+    this.env.say('Aparar: escolha duas paredes ou duas arestas.');
+    this.reset();
+  }
+
+  /**
+   * Segunda aresta (ou primeira): a extremidade da primeira aresta mais próxima do clique vai para a interseção das
+   * duas retas. A segunda aresta não muda. Retas paralelas não têm canto.
+   */
+  private clickEdge(pick: EdgePick, p: PointerInfo, pr: Project): void {
+    if (p.shift) {
+      this.env.say('Shift+clique (várias) vale só para paredes.');
       return;
     }
+    if (this.first || this.group.length) {
+      this.mixed();
+      return;
+    }
+    if (!this.firstEdge) {
+      this.firstEdge = { ref: pick.ref, at: p.raw };
+      this.env.say('Agora clique na segunda aresta.');
+      return;
+    }
+    const first = this.firstEdge;
+    if (sameEdge(first.ref, pick.ref)) {
+      this.env.say('Escolha outra aresta.');
+      return;
+    }
+    const ring = ringOfRef(pr, first.ref);
+    if (!ring) {
+      this.reset();
+      return;
+    }
+    const i = first.ref.index;
+    const corner = ringOps.intersectEdgeLine(ring, i, pick.a, pick.b);
+    if (!corner) {
+      this.env.say('Arestas paralelas: não há canto.');
+      this.reset();
+      return;
+    }
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    // Como na parede, a parte clicada fica: sai a extremidade mais distante do clique.
+    const end = dist(first.at, a) >= dist(first.at, b) ? 'a' : 'b';
+    const next = ringOps.moveEdgeEnd(ring, i, end, corner);
+    const ref = first.ref;
+    let ok = false;
+    this.env.transaction('Aparar ao canto', () => {
+      ok = commitRingEdit(this.env, ref, next);
+    });
+    this.reset();
+    // Recusado (travado): commitRingEdit já disse o motivo na barra de status; não sobrescrever.
+    if (ok) this.env.say(this.hint);
+  }
+
+  override click(p: PointerInfo): void {
+    const pr = this.env.project();
+    const target = pickLineTarget(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
+    if (!target) {
+      this.env.say('Clique sobre uma parede ou aresta.');
+      return;
+    }
+    if (target.kind === 'edge') {
+      this.clickEdge(target.pick, p, pr);
+      return;
+    }
+    if (this.firstEdge) {
+      this.mixed();
+      return;
+    }
+    const hitId = target.id;
     if (p.shift) {
-      this.toggleGroup(hit.id, p.raw);
+      this.toggleGroup(hitId, p.raw);
       return;
     }
     if (this.group.length) {
-      if (this.group.some((g) => g.id === hit.id)) {
+      if (this.group.some((g) => g.id === hitId)) {
         this.env.say('A referência não pode estar na lista. Escolha outra parede.');
         return;
       }
-      this.applyGroup(hit.id, p.raw, pr);
+      this.applyGroup(hitId, p.raw, pr);
       return;
     }
     if (!this.first) {
-      this.first = { id: hit.id, at: p.raw };
+      this.first = { id: hitId, at: p.raw };
       this.env.say('Agora clique na parte que deseja manter da segunda parede.');
       return;
     }
-    if (this.first.id === hit.id) {
+    if (this.first.id === hitId) {
       this.env.say('Escolha outra parede.');
       return;
     }
     const fa = frameOfWall(pr, this.first.id);
-    const fb = frameOfWall(pr, hit.id);
+    const fb = frameOfWall(pr, hitId);
     if (!fa || !fb) return;
     const first = this.first;
     const plan = cornerPlan(fa, fb, first.at, p.raw);
@@ -221,13 +306,16 @@ export class AlignTool extends ToolBase {
   readonly label = 'Alinhar';
   readonly hint = 'Alinhar: clique na face de referência e depois na face da parede a mover.';
   private ref: RefFace | null = null;
+  /** Referência de aresta de anel: a reta `p → q` da aresta (ver ringEdge). */
+  private refEdge: { p: Vec2; q: Vec2 } | null = null;
 
   protected reset(): void {
     this.ref = null;
+    this.refEdge = null;
     this.items = [];
   }
   protected busy(): boolean {
-    return this.ref !== null;
+    return this.ref !== null || this.refEdge !== null;
   }
 
   /** Face mais próxima do clique, com o ponto e a normal no sistema local (vale para reta e arco). */
@@ -238,26 +326,63 @@ export class AlignTool extends ToolBase {
   }
 
   override move(p: PointerInfo): void {
-    const hit = pickAt(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
-    this.items = hit?.kind === 'wall' ? [{ kind: 'highlight', ids: [hit.id] }] : [];
+    const target = pickLineTarget(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
+    this.items = target ? [{ kind: 'highlight', ids: [target.kind === 'wall' ? target.id : target.pick.ref.elementId] }] : [];
+  }
+
+  /** Mesma natureza: parede com parede, aresta com aresta. */
+  private static readonly NATUREZA_MSG = 'Alinhar: mesma natureza (parede com parede, aresta com aresta).';
+
+  /** Clique numa aresta: a referência é a reta da aresta, ou a aresta é alinhada à reta de referência. */
+  private clickEdge(pick: EdgePick, pr: Project): void {
+    if (this.ref) {
+      this.env.say(AlignTool.NATUREZA_MSG);
+      return;
+    }
+    if (!this.refEdge) {
+      this.refEdge = { p: pick.a, q: pick.b };
+      this.env.say('Referência definida. Clique na parede ou aresta a alinhar (Esc para trocar a referência).');
+      return;
+    }
+    const ring = ringOfRef(pr, pick.ref);
+    if (!ring) return;
+    const next = ringOps.alignEdgeToLine(ring, pick.ref.index, this.refEdge.p, this.refEdge.q);
+    if (sameRing(ring, next)) {
+      this.env.say('Já estão alinhadas.');
+      return;
+    }
+    const ref = pick.ref;
+    // Travada: commitRingEdit já diz o motivo na barra de status.
+    this.env.transaction('Alinhar aresta', () => {
+      commitRingEdit(this.env, ref, next);
+    });
   }
 
   override click(p: PointerInfo): void {
     const pr = this.env.project();
-    const hit = pickAt(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
-    if (!hit || hit.kind !== 'wall') {
-      this.env.say('Clique sobre uma parede.');
+    const target = pickLineTarget(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
+    if (!target) {
+      this.env.say('Clique sobre uma parede ou aresta.');
       return;
     }
-    const f = frameOfWall(pr, hit.id);
+    if (target.kind === 'edge') {
+      this.clickEdge(target.pick, pr);
+      return;
+    }
+    if (this.refEdge) {
+      this.env.say(AlignTool.NATUREZA_MSG);
+      return;
+    }
+    const hitId = target.id;
+    const f = frameOfWall(pr, hitId);
     if (!f) return;
     if (!this.ref) {
       const face = this.nearestFace(f, p.raw);
-      this.ref = { id: hit.id, n: face.n, at: face.point, arc: !!f.arc };
+      this.ref = { id: hitId, n: face.n, at: face.point, arc: !!f.arc };
       this.env.say('Referência definida. Clique na parede a alinhar (Esc para trocar a referência).');
       return;
     }
-    if (hit.id === this.ref.id) return;
+    if (hitId === this.ref.id) return;
     const face = this.nearestFace(f, p.raw);
     if (Math.abs(cross(face.n, this.ref.n)) > 1e-3) {
       this.env.say('As paredes precisam ser paralelas para alinhar.');
@@ -271,7 +396,7 @@ export class AlignTool extends ToolBase {
       this.env.say('Já estão alinhadas.');
       return;
     }
-    moveWalls(this.env, [hit.id], k);
+    moveWalls(this.env, [hitId], k);
   }
 }
 

@@ -1,9 +1,18 @@
 import { type Vec2 } from '@hestia/geom';
-import { isOpening, isWall, type Id, type Wall } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isSlab, isWall, makeFloor, makeSlab, type Floor, type Id, type Slab, type Wall } from '@hestia/model';
 import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
 import { ToolBase, makeId } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { pickAt } from './pick.ts';
+import { pickFloorAt } from './floorPick.ts';
+import { pickSlabAt } from './slabPick.ts';
+import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { ringOps } from './ringOps.ts';
+import { roofRingPatch } from './roofEdges.ts';
+import { commitRoofPatch } from './roofCheck.ts';
+import { OUTLINE_LOCKED_MSG } from './outlineEdit.ts';
+import { splitRingByLine } from './splitRing.ts';
+import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo } from './types.ts';
 
 const SNAP_PX = 10;
@@ -15,35 +24,45 @@ interface Cut {
   snapped: boolean;
 }
 
+/** Primeiro clique de Dividir piso/laje: o elemento e o ponto A sobre ele. */
+interface SlabStart {
+  id: Id;
+  at: Vec2;
+}
+
 const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
 /**
- * Dividir (Revit: Split Element / Split with Gap). Clique no ponto de corte; Tab alterna o modo
- * "com intervalo" (dois cliques delimitam o trecho removido); digitar uma distância e Enter corta
- * a essa medida do início da parede em destaque.
+ * Dividir (Revit: Split Element / Split with Gap). Parede: clique no ponto de corte; Tab alterna o modo "com intervalo"
+ * (dois cliques delimitam o trecho removido); digitar uma distância e Enter corta a essa medida do início da parede em
+ * destaque. Aresta de piso, laje, telhado ou forro: clique insere um vértice naquele ponto. Piso ou laje: dois cliques
+ * (A e B) dividem o elemento em dois pela linha A→B.
  */
 export class SplitTool extends ToolBase {
   readonly id = 'split';
   readonly label = 'Dividir';
-  readonly hint = 'Dividir: passe sobre a parede e clique no ponto de corte. Digite a distância e Enter para medida exata. Tab: com intervalo.';
+  readonly hint = 'Dividir: clique na parede (ponto de corte) ou numa aresta (insere vértice). Piso ou laje: dois cliques dividem. Digite a distância e Enter para medida exata. Tab: com intervalo.';
   private hoverId: Id | null = null;
   private gapStart: Cut | null = null;
+  private slabStart: SlabStart | null = null;
   private withGap = false;
 
   protected reset(): void {
     this.hoverId = null;
     this.gapStart = null;
+    this.slabStart = null;
     this.items = [];
     this.inf = null;
   }
 
   protected busy(): boolean {
-    return this.gapStart !== null;
+    return this.gapStart !== null || this.slabStart !== null;
   }
 
   override tab(): void {
     this.withGap = !this.withGap;
     this.gapStart = null;
+    this.slabStart = null;
     this.items = [];
     this.env.say(this.withGap ? 'Com intervalo: clique no início e no fim do trecho a remover.' : this.hint);
   }
@@ -60,6 +79,21 @@ export class SplitTool extends ToolBase {
     const el = pr.elements[hit.id];
     const host = isOpening(el) ? pr.elements[el.hostId] : el;
     return isWall(host) ? host : null;
+  }
+
+  /** Piso ou laje sob o cursor (dentro ou sobre a borda), pelos mesmos critérios de pickFloorAt e pickSlabAt. */
+  private slabLikeAt(p: PointerInfo): Id | null {
+    const pr = this.env.project();
+    const levelId = this.env.levelId();
+    const mpp = this.env.metersPerPixel();
+    return pickFloorAt(pr, levelId, p.raw, mpp) ?? pickSlabAt(pr, levelId, p.raw, mpp);
+  }
+
+  /** Motivo para não dividir o piso ou a laje, ou null se pode dividir. */
+  private blockReason(el: Floor | Slab): string | null {
+    if (el.outlineSource?.linked) return OUTLINE_LOCKED_MSG;
+    if (isSlab(el) && el.slope) return 'Dividir laje com caimento ainda não suportado';
+    return null;
   }
 
   /** Projeta o cursor no eixo da parede (reta ou arco) e arredonda à grade quando está perto. Null fora do miolo. */
@@ -82,9 +116,19 @@ export class SplitTool extends ToolBase {
   override move(p: PointerInfo): void {
     this.items = [];
     this.inf = null;
+    if (this.slabStart) {
+      this.hoverId = null;
+      this.items.push({ kind: 'highlight', ids: [this.slabStart.id] });
+      this.items.push({ kind: 'point', at: this.slabStart.at });
+      this.items.push({ kind: 'line', a: this.slabStart.at, b: p.raw, dashed: true });
+      return;
+    }
     const w = this.wallAt(p);
     this.hoverId = w?.id ?? null;
-    if (!w) return;
+    if (!w) {
+      this.moveNonWall(p);
+      return;
+    }
     this.items.push({ kind: 'highlight', ids: [w.id] });
     if (this.gapStart && this.gapStart.wallId !== w.id) this.items.push({ kind: 'highlight', ids: [this.gapStart.wallId] });
     const cut = this.cutOn(w, p.raw);
@@ -100,10 +144,28 @@ export class SplitTool extends ToolBase {
     this.items.push({ kind: 'label', at: cut.at, text: `${fmt(cut.t)} do início` });
   }
 
+  /** Sem parede sob o cursor: aresta de anel (Dividir aresta) ou piso/laje (para a divisão em dois cliques). */
+  private moveNonWall(p: PointerInfo): void {
+    if (this.withGap) return;
+    const target = pickLineTarget(this.env.project(), this.env.levelId(), p.raw, this.env.metersPerPixel());
+    if (target?.kind === 'edge') {
+      this.items.push({ kind: 'highlight', ids: [target.pick.ref.elementId] });
+      this.items.push({ kind: 'point', at: target.pick.at });
+      this.inf = { point: target.pick.at, kind: 'nearest', guides: [] };
+      return;
+    }
+    const id = this.slabLikeAt(p);
+    if (id) this.items.push({ kind: 'highlight', ids: [id] });
+  }
+
   override click(p: PointerInfo): void {
+    if (this.slabStart) {
+      this.finishSlabSplit(p.raw);
+      return;
+    }
     const w = this.wallAt(p);
     if (!w) {
-      this.env.say('Clique sobre uma parede.');
+      this.clickNonWall(p);
       return;
     }
     const cut = this.cutOn(w, p.raw);
@@ -128,6 +190,86 @@ export class SplitTool extends ToolBase {
     const start = this.gapStart;
     this.split(w.id, (start.t + cut.t) / 2, Math.abs(cut.t - start.t));
     this.reset();
+  }
+
+  /** Clique sem parede: aresta de anel insere vértice; piso ou laje começa a divisão em dois cliques. */
+  private clickNonWall(p: PointerInfo): void {
+    if (this.withGap) {
+      this.env.say('Clique sobre uma parede.');
+      return;
+    }
+    const pr = this.env.project();
+    const target = pickLineTarget(pr, this.env.levelId(), p.raw, this.env.metersPerPixel());
+    if (target?.kind === 'edge') {
+      this.splitEdge(target.pick);
+      return;
+    }
+    const id = this.slabLikeAt(p);
+    if (!id) {
+      this.env.say('Clique sobre uma parede, aresta ou piso.');
+      return;
+    }
+    const el = pr.elements[id];
+    if (!(isFloor(el) || isSlab(el))) return;
+    const blocked = this.blockReason(el);
+    if (blocked) {
+      this.env.say(blocked);
+      return;
+    }
+    this.slabStart = { id, at: p.raw };
+    this.env.say('Agora clique no segundo ponto da linha de divisão.');
+  }
+
+  /** Insere um vértice no ponto da aresta sob o cursor. Telhado acompanha o vetor por aresta (inclinação e balanço). */
+  private splitEdge(pick: EdgePick): void {
+    const pr = this.env.project();
+    const ring = ringOfRef(pr, pick.ref);
+    const e = pr.elements[pick.ref.elementId];
+    if (!ring || !e) return;
+    const next = ringOps.insertVertex(ring, pick.ref.index, pick.at);
+    if (isRoof(e) && pick.ref.hole === null) {
+      if (commitRoofPatch(this.env, [e.id], roofRingPatch(e, next, { kind: 'insert', edge: pick.ref.index }))) this.env.say('Vértice inserido na aresta do telhado.');
+      this.reset();
+      return;
+    }
+    if (commitRingEdit(this.env, pick.ref, next)) this.env.say('Vértice inserido na aresta.');
+    this.reset();
+  }
+
+  /** Segundo clique de Dividir piso/laje: corta o contorno pela linha A→B e cria o segundo elemento no mesmo passo de desfazer. */
+  private finishSlabSplit(b: Vec2): void {
+    const start = this.slabStart;
+    this.reset();
+    if (!start) return;
+    const pr = this.env.project();
+    const el = pr.elements[start.id];
+    if (!(isFloor(el) || isSlab(el))) return;
+    const blocked = this.blockReason(el);
+    if (blocked) {
+      this.env.say(blocked);
+      return;
+    }
+    const parts = splitRingByLine(el.boundary, start.at, b);
+    if (!parts) {
+      this.env.say('A linha precisa cruzar o contorno em dois pontos.');
+      return;
+    }
+    const [first, second] = parts;
+    const floor = isFloor(el);
+    const hadHoles = el.holes.length > 0;
+    try {
+      this.env.transaction(floor ? 'Dividir piso' : 'Dividir laje', () => {
+        const common = { typeId: el.typeId, levelId: el.levelId, boundary: second, holes: [], heightOffset: el.heightOffset, mark: el.mark, comments: el.comments };
+        if (isFloor(el)) this.env.exec({ type: 'addFloor', floor: makeFloor({ ...common, id: makeId('f') }) });
+        else this.env.exec({ type: 'addSlab', slab: makeSlab({ ...common, id: makeId('l') }) });
+        this.env.exec({ type: 'updateElements', ids: [el.id], patch: { boundary: first, holes: [] } });
+      });
+    } catch (e) {
+      this.env.say(e instanceof Error ? e.message : 'Não foi possível dividir o elemento.');
+      return;
+    }
+    const msg = floor ? 'Piso dividido em dois' : 'Laje dividida em duas';
+    this.env.say(hadHoles ? `${msg}. Furos não foram divididos.` : `${msg}.`);
   }
 
   override type(text: string): boolean {

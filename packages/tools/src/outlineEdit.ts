@@ -3,29 +3,26 @@ import { ceilingOutline } from '@hestia/engine';
 import { followsRoom, isCeiling, isFloor, isSlab, type Id } from '@hestia/model';
 import type { ToolEnv } from './types.ts';
 
-/** Mensagem da barra de status quando a edição manual solta o contorno (decisão 0023 §8.2b). */
-export const OUTLINE_DETACHED_MSG = 'O contorno deixou de acompanhar as paredes (estático). Use Revincular nas propriedades.';
+/** Mensagem da barra de status quando a edição de um contorno travado nas paredes é recusada (decisão 0031, Revit: linha travada). */
+export const OUTLINE_LOCKED_MSG = 'Contorno travado nas paredes. Use Desvincular nas propriedades para editar.';
 
 /** Mensagem da barra de status quando a edição de um forro que acompanha o ambiente o solta (decisão 0023 §13, P-5). */
 export const CEILING_DETACHED_MSG = 'O forro deixou de acompanhar o ambiente (solto). Use Revincular ao ambiente nas propriedades.';
 
 /**
- * Grava um contorno editado de piso ou laje. Se o elemento está vinculado às paredes, SOLTA o vínculo (decisão 0023
- * §8.2b) no mesmo passo de desfazer da mudança do contorno — a edição manual vira estática, e a barra de status avisa.
- * Elemento sem vínculo (ou telhado) apenas troca o contorno.
+ * Grava um contorno editado de piso ou laje. Contorno vinculado às paredes fica TRAVADO (decisão 0031, Revit: a aresta
+ * presa à parede não se move sozinha): a edição é recusada e a barra de status pede "Desvincular". Só depois de
+ * desvincular (`detachOutline`) a edição grava. Elemento sem vínculo apenas troca o contorno. Devolve se gravou.
  */
-export function commitOutlineBoundary(env: ToolEnv, id: Id, ring: Vec2[]): void {
+export function commitOutlineBoundary(env: ToolEnv, id: Id, ring: Vec2[]): boolean {
   const e = env.project().elements[id];
   const linked = (isFloor(e) || isSlab(e)) && e.outlineSource?.linked;
-  if (!linked) {
-    env.exec({ type: 'updateElements', ids: [id], patch: { boundary: ring } });
-    return;
+  if (linked) {
+    env.say(OUTLINE_LOCKED_MSG);
+    return false;
   }
-  env.transaction('Editar contorno', () => {
-    env.exec({ type: 'detachOutline', id });
-    env.exec({ type: 'updateElements', ids: [id], patch: { boundary: ring } });
-  });
-  env.say(OUTLINE_DETACHED_MSG);
+  env.exec({ type: 'updateElements', ids: [id], patch: { boundary: ring } });
+  return true;
 }
 
 /**

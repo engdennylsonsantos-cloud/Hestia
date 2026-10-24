@@ -47,7 +47,9 @@ interface RingOwner {
   commit(env: ToolEnv, id: Id, ring: Vec2[], insertEdge: number | null): void;
 }
 
-const commitBoundary = (env: ToolEnv, id: Id, ring: Vec2[]): void => commitOutlineBoundary(env, id, ring);
+const commitBoundary = (env: ToolEnv, id: Id, ring: Vec2[]): void => {
+  commitOutlineBoundary(env, id, ring);
+};
 
 const FLOOR_OWNER: RingOwner = {
   boundary: (p, id) => {

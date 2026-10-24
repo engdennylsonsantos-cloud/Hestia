@@ -1,0 +1,513 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" font-family="'Segoe UI', system-ui, sans-serif">
+  <!-- Fundo do Frame da Janela Revit (Dark Slate) -->
+  <rect width="1600" height="900" fill="#2b2b2b"/>
+  
+  <!-- BARRA DE TÍTULO / QAT (Quick Access Toolbar) -->
+  <rect y="0" width="1600" height="36" fill="#1f1f1f"/>
+  <rect x="8" y="6" width="24" height="24" rx="3" fill="#0078d4"/>
+  <text x="20" y="23" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">R</text>
+  
+  <!-- QAT Icons -->
+  <g fill="#9e9e9e" stroke="#9e9e9e" stroke-width="1.2">
+    <!-- Save -->
+    <rect x="42" y="10" width="16" height="16" rx="2" fill="none"/>
+    <path d="M45 10v5h10v-5"/>
+    <!-- Undo / Redo -->
+    <path d="M72 16h6a4 4 0 0 1 4 4M72 16l3-3M72 16l3 3" fill="none"/>
+    <path d="M96 16h-6a4 4 0 0 0-4 4M96 16l-3-3M96 16l-3 3" fill="none"/>
+    <!-- Measure -->
+    <line x1="110" y1="24" x2="124" y2="10"/>
+    <!-- Home 3D -->
+    <path d="M136 22v-6l5-4 5 4v6h-3v-4h-4v4z" fill="none"/>
+  </g>
+  <text x="800" y="22" font-size="12" fill="#aaaaaa" text-anchor="middle">Autodesk Revit 2024 - Projeto_Residencial_Padrao.rvt - Floor Plan: Nível 1</text>
+  
+  <!-- ABAS DO RIBBON -->
+  <g transform="translate(0, 36)">
+    <rect width="1600" height="28" fill="#262626"/>
+    <!-- Architecture (Active) -->
+    <path d="M8 28V6a2 2 0 0 1 2-2h88a2 2 0 0 1 2 2v22z" fill="#333333"/>
+    <rect x="8" y="4" width="92" height="2.5" fill="#0078d4"/>
+    <text x="54" y="19" font-size="12" fill="#ffffff" font-weight="600" text-anchor="middle">Architecture</text>
+    
+    <text x="135" y="19" font-size="12" fill="#a0a0a0">Structure</text>
+    <text x="200" y="19" font-size="12" fill="#a0a0a0">Steel</text>
+    <text x="245" y="19" font-size="12" fill="#a0a0a0">Precast</text>
+    <text x="300" y="19" font-size="12" fill="#a0a0a0">Systems</text>
+    <text x="360" y="19" font-size="12" fill="#a0a0a0">Insert</text>
+    <text x="410" y="19" font-size="12" fill="#a0a0a0">Annotate</text>
+    <text x="475" y="19" font-size="12" fill="#a0a0a0">Analyze</text>
+    <text x="540" y="19" font-size="12" fill="#a0a0a0">Massing &amp; Site</text>
+    <text x="635" y="19" font-size="12" fill="#a0a0a0">Collaborate</text>
+    <text x="715" y="19" font-size="12" fill="#a0a0a0">View</text>
+    <text x="760" y="19" font-size="12" fill="#a0a0a0">Manage</text>
+    
+    <!-- Contextual Green Tab (Modify | Place Wall) -->
+    <path d="M820 28V6a2 2 0 0 1 2-2h130a2 2 0 0 1 2 2v22z" fill="#1b3d2f"/>
+    <rect x="820" y="4" width="134" height="2.5" fill="#22c55e"/>
+    <text x="887" y="19" font-size="12" fill="#4ade80" font-weight="600" text-anchor="middle">Modify | Place Wall</text>
+  </g>
+  
+  <!-- CORPO DO RIBBON (Painéis e Ferramentas) -->
+  <g transform="translate(0, 64)">
+    <rect width="1600" height="92" fill="#333333"/>
+    
+    <!-- Painel 1: Select -->
+    <g transform="translate(10, 4)">
+      <rect width="56" height="66" rx="3" fill="#3a3a3a"/>
+      <path d="M26 18l14 8-6 2-2 7z" fill="#60a5fa"/>
+      <text x="28" y="58" font-size="10" fill="#ffffff" text-anchor="middle">Modify</text>
+      <text x="28" y="78" font-size="9" fill="#888888" text-anchor="middle">Select</text>
+      <line x1="66" y1="4" x2="66" y2="80" stroke="#444444"/>
+    </g>
+    
+    <!-- Painel 2: Build -->
+    <g transform="translate(86, 4)">
+      <!-- Wall (Split tool) -->
+      <g transform="translate(0, 0)">
+        <rect width="54" height="66" rx="3" fill="#2e2e2e" stroke="#4a4a4a"/>
+        <rect x="14" y="12" width="26" height="18" fill="none" stroke="#e2e8f0" stroke-width="1.8"/>
+        <line x1="22" y1="12" x2="22" y2="30" stroke="#e2e8f0" stroke-width="1.2"/>
+        <line x1="31" y1="12" x2="31" y2="30" stroke="#e2e8f0" stroke-width="1.2"/>
+        <text x="27" y="46" font-size="10" fill="#ffffff" text-anchor="middle">Wall</text>
+        <path d="M24 54l3 3 3-3" fill="#aaaaaa"/>
+      </g>
+      
+      <!-- Door -->
+      <g transform="translate(60, 0)">
+        <rect x="15" y="12" width="24" height="24" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
+        <path d="M27 12a12 12 0 0 1 12 12" fill="none" stroke="#60a5fa" stroke-width="1.4"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Door</text>
+      </g>
+      
+      <!-- Window -->
+      <g transform="translate(118, 0)">
+        <rect x="15" y="14" width="24" height="20" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
+        <line x1="27" y1="14" x2="27" y2="34" stroke="#e2e8f0"/>
+        <line x1="15" y1="24" x2="39" y2="24" stroke="#e2e8f0"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Window</text>
+      </g>
+      
+      <!-- Component -->
+      <g transform="translate(176, 0)">
+        <rect x="17" y="16" width="20" height="18" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Component</text>
+      </g>
+      
+      <!-- Column -->
+      <g transform="translate(244, 0)">
+        <rect x="21" y="13" width="12" height="22" fill="#64748b" stroke="#e2e8f0"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Column</text>
+      </g>
+      
+      <!-- Roof -->
+      <g transform="translate(298, 0)">
+        <path d="M15 28l12-14 12 14z" fill="none" stroke="#e2e8f0" stroke-width="1.8"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Roof</text>
+      </g>
+      
+      <!-- Ceiling -->
+      <g transform="translate(348, 0)">
+        <rect x="16" y="16" width="22" height="18" fill="none" stroke="#94a3b8" stroke-dasharray="3,2"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Ceiling</text>
+      </g>
+      
+      <!-- Floor -->
+      <g transform="translate(398, 0)">
+        <polygon points="16,28 38,28 34,16 12,16" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Floor</text>
+      </g>
+      
+      <text x="230" y="78" font-size="9" fill="#888888" text-anchor="middle">Build</text>
+      <line x1="460" y1="4" x2="460" y2="80" stroke="#444444"/>
+    </g>
+    
+    <!-- Painel 3: Circulation -->
+    <g transform="translate(556, 4)">
+      <!-- Stair -->
+      <g transform="translate(0, 0)">
+        <path d="M16 32h6v-6h6v-6h6v-6" fill="none" stroke="#e2e8f0" stroke-width="1.8"/>
+        <text x="25" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Stair</text>
+      </g>
+      <!-- Ramp -->
+      <g transform="translate(50, 0)">
+        <polygon points="16,30 38,30 38,18" fill="none" stroke="#e2e8f0" stroke-width="1.6"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Ramp</text>
+      </g>
+      <!-- Railing -->
+      <g transform="translate(100, 0)">
+        <path d="M16 18h22M18 18v12M27 18v12M36 18v12" stroke="#e2e8f0" stroke-width="1.4"/>
+        <text x="27" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Railing</text>
+      </g>
+      
+      <text x="75" y="78" font-size="9" fill="#888888" text-anchor="middle">Circulation</text>
+      <line x1="156" y1="4" x2="156" y2="80" stroke="#444444"/>
+    </g>
+    
+    <!-- Painel 4: Model / Room -->
+    <g transform="translate(722, 4)">
+      <g transform="translate(0, 0)">
+        <rect x="14" y="14" width="24" height="20" fill="none" stroke="#60a5fa" stroke-width="1.6"/>
+        <text x="26" y="28" font-size="8" fill="#60a5fa" text-anchor="middle">TAG</text>
+        <text x="26" y="50" font-size="10" fill="#cccccc" text-anchor="middle">Room</text>
+      </g>
+      <g transform="translate(56, 4)">
+        <text x="0" y="14" font-size="10" fill="#cccccc">⬚ Room Separator</text>
+        <text x="0" y="30" font-size="10" fill="#cccccc">🏷 Tag Room</text>
+      </g>
+      <text x="65" y="78" font-size="9" fill="#888888" text-anchor="middle">Room &amp; Area</text>
+      <line x1="145" y1="4" x2="145" y2="80" stroke="#444444"/>
+    </g>
+  </g>
+  
+  <!-- BARRA DE OPÇÕES (Options Bar do Revit) -->
+  <g transform="translate(0, 156)">
+    <rect width="1600" height="30" fill="#282828" stroke="#383838" stroke-width="1"/>
+    <text x="14" y="19" font-size="11" fill="#4ade80" font-weight="600">Modify | Place Wall</text>
+    <line x1="130" y1="6" x2="130" y2="24" stroke="#444"/>
+    
+    <text x="145" y="19" font-size="11" fill="#9e9e9e">Height:</text>
+    <rect x="190" y="5" width="110" height="20" rx="2" fill="#1e1e1e" stroke="#444"/>
+    <text x="198" y="19" font-size="11" fill="#ffffff">Unconnected</text>
+    <path d="M288 12l3 3 3-3" fill="#888"/>
+    
+    <rect x="310" y="5" width="65" height="20" rx="2" fill="#1e1e1e" stroke="#444"/>
+    <text x="365" y="19" font-size="11" fill="#ffffff" text-anchor="end">3.00 m</text>
+    
+    <text x="390" y="19" font-size="11" fill="#9e9e9e">Location Line:</text>
+    <rect x="470" y="5" width="120" height="20" rx="2" fill="#1e1e1e" stroke="#444"/>
+    <text x="478" y="19" font-size="11" fill="#ffffff">Wall Centerline</text>
+    
+    <text x="610" y="19" font-size="11" fill="#9e9e9e">Chain:</text>
+    <rect x="650" y="9" width="12" height="12" rx="2" fill="#0078d4"/>
+    <path d="M652 15l3 3 5-5" stroke="#fff" stroke-width="1.5" fill="none"/>
+    
+    <text x="680" y="19" font-size="11" fill="#9e9e9e">Offset:</text>
+    <rect x="725" y="5" width="60" height="20" rx="2" fill="#1e1e1e" stroke="#444"/>
+    <text x="775" y="19" font-size="11" fill="#ffffff" text-anchor="end">0.00</text>
+    
+    <text x="800" y="19" font-size="11" fill="#9e9e9e">Radius:</text>
+    <rect x="845" y="9" width="12" height="12" rx="2" fill="#1e1e1e" stroke="#444"/>
+  </g>
+  
+  <!-- ÁREA DE TRABALHO: PAINÉIS LATERAIS + CANVAS CENTRAL -->
+  <g transform="translate(0, 186)">
+    <!-- COLUNA DA ESQUERDA: PALETA DE PROPRIEDADES + PROJECT BROWSER (EMPILHADOS COMO NO REVIT) -->
+    <g transform="translate(0, 0)">
+      <rect width="280" height="684" fill="#252525" stroke="#383838" stroke-width="1"/>
+      
+      <!-- PARTE SUPERIOR: PROPERTIES PALETTE -->
+      <rect width="280" height="26" fill="#2d2d2d"/>
+      <text x="10" y="18" font-size="11" font-weight="600" fill="#ffffff">Properties</text>
+      <text x="264" y="18" font-size="12" fill="#888888">✕</text>
+      
+      <!-- Type Selector Dropdown -->
+      <g transform="translate(8, 34)">
+        <rect width="264" height="42" rx="2" fill="#1e1e1e" stroke="#444444"/>
+        <rect x="6" y="6" width="30" height="30" fill="#333333" stroke="#555"/>
+        <line x1="16" y1="6" x2="16" y2="36" stroke="#999" stroke-width="3"/>
+        <line x1="26" y1="6" x2="26" y2="36" stroke="#e2e8f0" stroke-width="3"/>
+        <text x="44" y="20" font-size="11" font-weight="600" fill="#ffffff">Basic Wall</text>
+        <text x="44" y="32" font-size="10" fill="#aaaaaa">Generic - 200mm</text>
+        <path d="M250 20l3 4 3-4" fill="#aaaaaa"/>
+      </g>
+      
+      <!-- Edit Type Button -->
+      <g transform="translate(8, 82)">
+        <rect width="264" height="24" rx="2" fill="#383838" stroke="#4a4a4a"/>
+        <text x="140" y="16" font-size="11" fill="#ffffff" font-weight="500" text-anchor="middle">Edit Type</text>
+      </g>
+      
+      <!-- Tabela de Propriedades (Constraints, Structural, Dimensions) -->
+      <g transform="translate(8, 114)">
+        <!-- Header Constraints -->
+        <rect width="264" height="20" fill="#2e2e2e"/>
+        <text x="8" y="14" font-size="10" font-weight="bold" fill="#888888">Constraints</text>
+        
+        <g font-size="10" fill="#cccccc">
+          <text x="8" y="36">Location Line</text>
+          <text x="256" y="36" text-anchor="end" fill="#ffffff">Wall Centerline</text>
+          <line x1="0" y1="42" x2="264" y2="42" stroke="#333333"/>
+          
+          <text x="8" y="56">Base Constraint</text>
+          <text x="256" y="56" text-anchor="end" fill="#ffffff">Nível 1</text>
+          <line x1="0" y1="62" x2="264" y2="62" stroke="#333333"/>
+          
+          <text x="8" y="76">Base Offset</text>
+          <text x="256" y="76" text-anchor="end" fill="#60a5fa">0.00 m</text>
+          <line x1="0" y1="82" x2="264" y2="82" stroke="#333333"/>
+          
+          <text x="8" y="96">Top Constraint</text>
+          <text x="256" y="96" text-anchor="end" fill="#ffffff">Up to level: Nível 2</text>
+          <line x1="0" y1="102" x2="264" y2="102" stroke="#333333"/>
+          
+          <text x="8" y="116">Unconnected Height</text>
+          <text x="256" y="116" text-anchor="end" fill="#888888">3.00 m</text>
+          <line x1="0" y1="122" x2="264" y2="122" stroke="#333333"/>
+        </g>
+        
+        <!-- Header Dimensions -->
+        <rect y="128" width="264" height="20" fill="#2e2e2e"/>
+        <text x="8" y="142" font-size="10" font-weight="bold" fill="#888888">Dimensions</text>
+        
+        <g font-size="10" fill="#cccccc">
+          <text x="8" y="164">Length</text>
+          <text x="256" y="164" text-anchor="end" fill="#888888">12.50 m</text>
+          <line x1="0" y1="170" x2="264" y2="170" stroke="#333333"/>
+          
+          <text x="8" y="184">Area</text>
+          <text x="256" y="184" text-anchor="end" fill="#888888">37.50 m²</text>
+          <line x1="0" y1="190" x2="264" y2="190" stroke="#333333"/>
+          
+          <text x="8" y="204">Volume</text>
+          <text x="256" y="204" text-anchor="end" fill="#888888">7.50 m³</text>
+          <line x1="0" y1="210" x2="264" y2="210" stroke="#333333"/>
+        </g>
+      </g>
+      
+      <!-- PARTE INFERIOR: PROJECT BROWSER (ÁRVORE DE VISTAS) -->
+      <g transform="translate(0, 360)">
+        <rect width="280" height="324" fill="#222222" stroke="#383838" stroke-width="1"/>
+        
+        <!-- Header Browser com Search Bar (Revit 2024 feature) -->
+        <rect width="280" height="26" fill="#2d2d2d"/>
+        <text x="10" y="18" font-size="11" font-weight="600" fill="#ffffff">Project Browser - Projeto_Residencial</text>
+        <text x="264" y="18" font-size="12" fill="#888888">✕</text>
+        
+        <rect x="8" y="32" width="264" height="22" rx="2" fill="#1a1a1a" stroke="#444"/>
+        <text x="16" y="47" font-size="10" fill="#777">🔍 Search project...</text>
+        
+        <!-- Tree Nodes -->
+        <g transform="translate(12, 66)" font-size="11" fill="#cccccc">
+          <text x="0" y="14">▼ Views (all)</text>
+          
+          <g transform="translate(14, 20)">
+            <text x="0" y="14">▼ Floor Plans (Planta Baixa)</text>
+            
+            <!-- Active View -->
+            <rect x="10" y="22" width="230" height="20" rx="2" fill="#1e3a5f"/>
+            <text x="16" y="36" fill="#60a5fa" font-weight="600">↳ Nível 1</text>
+            
+            <text x="16" y="56" fill="#a0a0a0">↳ Nível 2</text>
+            <text x="16" y="74" fill="#a0a0a0">↳ Cobertura</text>
+          </g>
+          
+          <g transform="translate(14, 102)">
+            <text x="0" y="14">► Ceiling Plans (Forro)</text>
+            <text x="0" y="32">► 3D Views (Vistas 3D)</text>
+            <text x="0" y="50">► Elevations (Elevações)</text>
+            <text x="0" y="68">► Sections (Cortes)</text>
+          </g>
+          
+          <text x="0" y="196">► Legends</text>
+          <text x="0" y="214">► Schedules/Quantities (Tabelas)</text>
+          <text x="0" y="232">► Sheets (all) (Pranchas)</text>
+          <text x="0" y="250">► Families (Famílias de portas, janelas...)</text>
+        </g>
+      </g>
+    </g>
+    
+    <!-- ÁREA CENTRAL DO DESENHO (CANVAS COM PLANTA BAIXA REVIT) -->
+    <g transform="translate(280, 0)">
+      <!-- Canvas Paper White Background -->
+      <rect width="1320" height="684" fill="#ffffff"/>
+      
+      <!-- Grid de Fundo Sutil -->
+      <g stroke="#f1f5f9" stroke-width="1">
+        <line x1="0" y1="100" x2="1320" y2="100"/>
+        <line x1="0" y1="200" x2="1320" y2="200"/>
+        <line x1="0" y1="300" x2="1320" y2="300"/>
+        <line x1="0" y1="400" x2="1320" y2="400"/>
+        <line x1="0" y1="500" x2="1320" y2="500"/>
+        <line x1="0" y1="600" x2="1320" y2="600"/>
+        <line x1="200" y1="0" x2="200" y2="684"/>
+        <line x1="400" y1="0" x2="400" y2="684"/>
+        <line x1="600" y1="0" x2="600" y2="684"/>
+        <line x1="800" y1="0" x2="800" y2="684"/>
+        <line x1="1000" y1="0" x2="1000" y2="684"/>
+      </g>
+      
+      <!-- Símbolos de Elevação (N, S, L, O do Revit em volta do modelo) -->
+      <!-- Norte -->
+      <g transform="translate(640, 60)" fill="#111827">
+        <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+        <polygon points="0,-14 6,-24 -6,-24"/>
+        <text x="0" y="4" font-size="9" font-weight="bold" text-anchor="middle">1</text>
+      </g>
+      <!-- Sul -->
+      <g transform="translate(640, 580)" fill="#111827">
+        <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+        <polygon points="0,14 6,24 -6,24"/>
+        <text x="0" y="4" font-size="9" font-weight="bold" text-anchor="middle">2</text>
+      </g>
+      <!-- Oeste -->
+      <g transform="translate(180, 320)" fill="#111827">
+        <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+        <polygon points="-14,0 -24,-6 -24,6"/>
+        <text x="0" y="4" font-size="9" font-weight="bold" text-anchor="middle">3</text>
+      </g>
+      <!-- Leste -->
+      <g transform="translate(1100, 320)" fill="#111827">
+        <circle cx="0" cy="0" r="14" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+        <polygon points="14,0 24,-6 24,6"/>
+        <text x="0" y="4" font-size="9" font-weight="bold" text-anchor="middle">4</text>
+      </g>
+      
+      <!-- DESENHO DA PLANTA ARQUITETÔNICA (Paredes, Portas, Janelas, Cotas, Rótulos) -->
+      <g transform="translate(360, 160)">
+        <!-- Paredes externas com hatch preto sólido cortado -->
+        <rect x="0" y="0" width="560" height="340" fill="none" stroke="#111111" stroke-width="20"/>
+        
+        <!-- Parede divisória interna -->
+        <line x1="280" y1="0" x2="280" y2="340" stroke="#111111" stroke-width="14"/>
+        
+        <!-- Janelas (Aberturas com vidros duplos) -->
+        <!-- Janela superior quarto -->
+        <g transform="translate(100, -10)">
+          <rect width="80" height="20" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+          <line x1="0" y1="10" x2="80" y2="10" stroke="#0284c7" stroke-width="2"/>
+        </g>
+        <!-- Janela superior sala -->
+        <g transform="translate(380, -10)">
+          <rect width="100" height="20" fill="#ffffff" stroke="#111111" stroke-width="1.5"/>
+          <line x1="0" y1="10" x2="100" y2="10" stroke="#0284c7" stroke-width="2"/>
+        </g>
+        
+        <!-- Portas (Abertura + batente + arco de giro 90°) -->
+        <!-- Porta de entrada -->
+        <g transform="translate(340, 340)">
+          <rect x="0" y="-10" width="70" height="20" fill="#ffffff"/>
+          <line x1="0" y1="-10" x2="0" y2="10" stroke="#111" stroke-width="2"/>
+          <line x1="70" y1="-10" x2="70" y2="10" stroke="#111" stroke-width="2"/>
+          <line x1="0" y1="0" x2="0" y2="-70" stroke="#854d0e" stroke-width="2.5"/>
+          <path d="M0 -70 A70 70 0 0 1 70 0" fill="none" stroke="#0284c7" stroke-dasharray="3,3" stroke-width="1.4"/>
+        </g>
+        
+        <!-- Porta quarto -->
+        <g transform="translate(280, 180)">
+          <rect x="-7" y="0" width="14" height="70" fill="#ffffff"/>
+          <line x1="0" y1="0" x2="-70" y2="0" stroke="#854d0e" stroke-width="2.5"/>
+          <path d="M-70 0 A70 70 0 0 1 0 70" fill="none" stroke="#0284c7" stroke-dasharray="3,3" stroke-width="1.4"/>
+        </g>
+        
+        <!-- Rótulos de Ambientes no Padrão Revit (Tag com Caixa/Sublinhado) -->
+        <g transform="translate(140, 160)" text-anchor="middle">
+          <text y="0" font-size="13" font-weight="bold" fill="#111827">DORMITÓRIO</text>
+          <text y="16" font-size="10" fill="#4b5563">101</text>
+          <text y="30" font-size="11" fill="#1e40af">18.20 m²</text>
+          <rect x="-55" y="-14" width="110" height="52" fill="none" stroke="#cbd5e1" stroke-dasharray="2,2"/>
+        </g>
+        
+        <g transform="translate(420, 160)" text-anchor="middle">
+          <text y="0" font-size="13" font-weight="bold" fill="#111827">SALA / ESTAR</text>
+          <text y="16" font-size="10" fill="#4b5563">102</text>
+          <text y="30" font-size="11" fill="#1e40af">24.50 m²</text>
+          <rect x="-55" y="-14" width="110" height="52" fill="none" stroke="#cbd5e1" stroke-dasharray="2,2"/>
+        </g>
+        
+        <!-- Linhas de Cota Alinhadas (Aligned Dimensions) no Padrão Revit -->
+        <!-- Cota superior total -->
+        <g transform="translate(0, -50)" stroke="#1e293b" stroke-width="1.2">
+          <line x1="0" y1="0" x2="560" y2="0"/>
+          <!-- Ticks oblíquos 45 graus clássicos do Revit -->
+          <line x1="-5" y1="5" x2="5" y2="-5" stroke-width="2"/>
+          <line x1="275" y1="5" x2="285" y2="-5" stroke-width="2"/>
+          <line x1="555" y1="5" x2="565" y2="-5" stroke-width="2"/>
+          <!-- Linhas de extensão -->
+          <line x1="0" y1="0" x2="0" y2="40" stroke="#94a3b8" stroke-dasharray="2,2"/>
+          <line x1="280" y1="0" x2="280" y2="40" stroke="#94a3b8" stroke-dasharray="2,2"/>
+          <line x1="560" y1="0" x2="560" y2="40" stroke="#94a3b8" stroke-dasharray="2,2"/>
+          <!-- Textos da cota -->
+          <text x="140" y="-8" font-size="12" font-family="'Segoe UI', monospace" fill="#0f172a" text-anchor="middle">4.00 m</text>
+          <text x="420" y="-8" font-size="12" font-family="'Segoe UI', monospace" fill="#0f172a" text-anchor="middle">4.00 m</text>
+        </g>
+      </g>
+      
+      <!-- VIEWCUBE NO CANTO SUPERIOR DIREITO -->
+      <g transform="translate(1220, 20)">
+        <polygon points="40,10 70,25 40,40 10,25" fill="#f8fafc" stroke="#94a3b8"/>
+        <polygon points="10,25 40,40 40,75 10,60" fill="#e2e8f0" stroke="#94a3b8"/>
+        <polygon points="40,40 70,25 70,60 40,75" fill="#cbd5e1" stroke="#94a3b8"/>
+        <text x="25" y="55" font-size="8" fill="#475569" font-weight="bold">TOP</text>
+        <circle cx="40" cy="40" r="36" fill="none" stroke="#64748b" stroke-width="1.2" stroke-dasharray="3,3"/>
+        <!-- Bússola W, E, N, S -->
+        <text x="40" y="2" font-size="9" font-weight="bold" fill="#0284c7" text-anchor="middle">N</text>
+        <text x="40" y="88" font-size="8" fill="#64748b" text-anchor="middle">S</text>
+        <text x="-4" y="44" font-size="8" fill="#64748b" text-anchor="middle">W</text>
+        <text x="84" y="44" font-size="8" fill="#64748b" text-anchor="middle">E</text>
+      </g>
+      
+      <!-- BARRA DE CONTROLE DA VISTA (VIEW CONTROL BAR NO CANTO INFERIOR ESQUERDO) -->
+      <g transform="translate(0, 654)">
+        <rect width="1320" height="30" fill="rgba(245, 245, 245, 0.96)" stroke="#cbd5e1" stroke-width="1"/>
+        <g transform="translate(10, 6)" font-size="11" fill="#334155">
+          <!-- Scale -->
+          <rect width="52" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+          <text x="26" y="13" text-anchor="middle" font-weight="600">1 : 100</text>
+          
+          <!-- Detail Level -->
+          <g transform="translate(60, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <rect x="4" y="4" width="4" height="10" fill="#334155"/>
+            <rect x="10" y="4" width="8" height="10" fill="#94a3b8"/>
+          </g>
+          
+          <!-- Visual Style (Hidden Line) -->
+          <g transform="translate(90, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <polygon points="5,14 11,4 17,14" fill="none" stroke="#334155" stroke-width="1.2"/>
+          </g>
+          
+          <!-- Sun Path -->
+          <g transform="translate(120, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <circle cx="11" cy="9" r="4" fill="none" stroke="#f59e0b" stroke-width="1.2"/>
+          </g>
+          
+          <!-- Shadows Off/On -->
+          <g transform="translate(150, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <circle cx="9" cy="9" r="4" fill="#334155"/>
+            <path d="M12 12l5 3" stroke="#334155" stroke-width="1.2"/>
+          </g>
+          
+          <!-- Crop View -->
+          <g transform="translate(180, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <rect x="5" y="4" width="12" height="10" fill="none" stroke="#334155" stroke-dasharray="2,1"/>
+          </g>
+          
+          <!-- Temporary Hide / Isolate (Glasses) -->
+          <g transform="translate(210, 0)">
+            <rect width="26" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <circle cx="8" cy="9" r="3" fill="none" stroke="#0284c7" stroke-width="1.2"/>
+            <circle cx="18" cy="9" r="3" fill="none" stroke="#0284c7" stroke-width="1.2"/>
+            <line x1="11" y1="9" x2="15" y2="9" stroke="#0284c7"/>
+          </g>
+          
+          <!-- Reveal Hidden (Lightbulb) -->
+          <g transform="translate(244, 0)">
+            <rect width="22" height="18" rx="2" fill="#ffffff" stroke="#94a3b8"/>
+            <path d="M11 4a4 4 0 0 1 3 6v2h-6v-2a4 4 0 0 1 3-6z" fill="#dc2626"/>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  
+  <!-- BARRA DE ESTADO (STATUS BAR NO RODAPÉ) -->
+  <g transform="translate(0, 870)">
+    <rect width="1600" height="30" fill="#1f1f1f" stroke="#333333" stroke-width="1"/>
+    <text x="14" y="19" font-size="11" fill="#9ca3af">Clique para indicar o ponto inicial da parede. Pressione TAB para alternar seleção de arestas. ESPAÇO inverte a orientação.</text>
+    <g transform="translate(1360, 6)" font-size="10" fill="#6b7280">
+      <rect width="80" height="18" rx="2" fill="#262626" stroke="#3f3f3f"/>
+      <text x="40" y="13" text-anchor="middle" fill="#9ca3af">Main Model</text>
+      
+      <rect x="88" y="0" width="60" height="18" rx="2" fill="#262626" stroke="#3f3f3f"/>
+      <text x="118" y="13" text-anchor="middle" fill="#9ca3af">Filtro: 0</text>
+      
+      <rect x="156" y="0" width="70" height="18" rx="2" fill="#262626" stroke="#3f3f3f"/>
+      <text x="191" y="13" text-anchor="middle" fill="#9ca3af">Worksharing</text>
+    </g>
+  </g>
+</svg>

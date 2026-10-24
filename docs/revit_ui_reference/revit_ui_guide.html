@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<title>Mapa de Referência Visual - Interface Autodesk Revit</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #1e1e1e; color: #ececec; padding: 24px; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; color: #ffffff; }
+  p.subtitle { color: #a0a0a0; font-size: 13px; margin-bottom: 24px; }
+  
+  .card { background: #252526; border: 1px solid #3c3c3c; border-radius: 6px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+  .card h2 { font-size: 15px; margin-bottom: 12px; color: #61afef; display: flex; align-items: center; gap: 8px; }
+  
+  /* Mockup Revit Frame */
+  .revit-window {
+    background: #2b2b2b;
+    border: 1px solid #3f3f3f;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    font-size: 11px;
+  }
+  
+  /* Titlebar & QAT */
+  .qat-bar {
+    background: #1f1f1f;
+    border-bottom: 1px solid #383838;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #cccccc;
+  }
+  .qat-icons { display: flex; gap: 4px; }
+  .qat-icon { width: 18px; height: 18px; background: #333; border: 1px solid #444; border-radius: 3px; display: grid; place-items: center; font-size: 9px; }
+  .qat-title { margin-left: auto; margin-right: auto; color: #999; font-size: 11px; }
+  
+  /* Ribbon */
+  .ribbon-tabs {
+    background: #2b2b2b;
+    display: flex;
+    gap: 2px;
+    padding: 0 6px;
+    border-bottom: 1px solid #383838;
+  }
+  .rtab {
+    padding: 6px 12px;
+    color: #b0b0b0;
+    cursor: pointer;
+  }
+  .rtab.active {
+    background: #333333;
+    color: #ffffff;
+    border-top: 2px solid #0078d4;
+  }
+  .rtab.contextual {
+    background: #1b3d2f;
+    color: #4ade80;
+    border-top: 2px solid #22c55e;
+  }
+  
+  .ribbon-body {
+    background: #333333;
+    display: flex;
+    padding: 6px 8px;
+    gap: 8px;
+    border-bottom: 1px solid #222;
+    min-height: 84px;
+    align-items: stretch;
+  }
+  .rpanel {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #444;
+    padding-right: 8px;
+    justify-content: space-between;
+  }
+  .rpanel-tools {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .big-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #fff;
+    cursor: pointer;
+    min-width: 48px;
+  }
+  .big-btn:hover { background: #3f3f3f; border-color: #555; }
+  .big-icon { width: 32px; height: 32px; background: #474747; border-radius: 4px; display: grid; place-items: center; font-size: 16px; }
+  .small-tools { display: flex; flex-direction: column; gap: 2px; }
+  .small-btn { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 10px; color: #ddd; border-radius: 2px; }
+  .small-btn:hover { background: #3f3f3f; }
+  .rpanel-title {
+    text-align: center;
+    font-size: 9.5px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-top: 2px;
+  }
+  
+  /* Options Bar */
+  .options-bar {
+    background: #282828;
+    border-bottom: 1px solid #383838;
+    padding: 3px 10px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #aaa;
+    font-size: 11px;
+  }
+  .options-bar span.active { color: #fff; font-weight: 500; }
+  .opt-field { background: #1e1e1e; border: 1px solid #444; padding: 1px 4px; color: #fff; border-radius: 2px; }
+  
+  /* Main Middle Body */
+  .workspace-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    height: 380px;
+    background: #181818;
+  }
+  
+  /* Left Palettes Docked (Properties + Browser stacked) */
+  .left-dock {
+    background: #252525;
+    border-right: 1px solid #383838;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .palette-header {
+    background: #2d2d2d;
+    padding: 4px 8px;
+    font-weight: 600;
+    font-size: 11px;
+    color: #ddd;
+    border-bottom: 1px solid #383838;
+    display: flex;
+    justify-content: space-between;
+  }
+  .type-selector {
+    padding: 6px 8px;
+    background: #212121;
+    border-bottom: 1px solid #383838;
+    display: flex;
+    gap: 4px;
+  }
+  .type-drop { flex: 1; background: #2d2d2d; border: 1px solid #444; color: #eee; padding: 3px 6px; border-radius: 2px; }
+  .edit-type-btn { background: #383838; border: 1px solid #555; color: #eee; padding: 2px 6px; border-radius: 2px; }
+  .prop-table {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 10.5px;
+  }
+  .prop-group { background: #2a2a2a; padding: 2px 6px; color: #888; font-weight: bold; border-bottom: 1px solid #333; }
+  .prop-row { display: grid; grid-template-columns: 100px 1fr; padding: 2px 6px; border-bottom: 1px solid #2e2e2e; }
+  .prop-row span:first-child { color: #999; }
+  .prop-row span:last-child { color: #eee; font-family: monospace; }
+  
+  /* Project Browser Sub-pane */
+  .browser-sub {
+    border-top: 2px solid #383838;
+    height: 150px;
+    background: #232323;
+    display: flex;
+    flex-direction: column;
+  }
+  .tree-node { padding: 2px 8px 2px 18px; color: #ccc; cursor: pointer; }
+  .tree-node.active { color: #60a5fa; font-weight: 600; background: #1e293b; }
+  
+  /* Drawing Canvas */
+  .canvas-area {
+    background: #ffffff;
+    color: #111;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .canvas-grid {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .model-preview {
+    position: relative;
+    border: 3px solid #111;
+    width: 220px;
+    height: 140px;
+    background: #fafafa;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+  }
+  .viewcube-mock {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 56px;
+    height: 56px;
+    background: #eaeaea;
+    border: 1px solid #bbb;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    display: grid;
+    place-items: center;
+    font-size: 8px;
+    color: #444;
+  }
+  
+  /* View Control Bar */
+  .view-control-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(245, 245, 245, 0.95);
+    border-top: 1px solid #ddd;
+    padding: 2px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: #333;
+  }
+  .vc-pill { border: 1px solid #ccc; background: #fff; padding: 1px 4px; border-radius: 2px; }
+  
+  /* Status Bar */
+  .status-bar {
+    background: #1f1f1f;
+    border-top: 1px solid #333;
+    padding: 3px 8px;
+    display: flex;
+    align-items: center;
+    font-size: 10px;
+    color: #888;
+    justify-content: space-between;
+  }
+  
+  /* Paleta de Cores Revit Hex Table */
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+  th, td { border: 1px solid #3c3c3c; padding: 6px 10px; text-align: left; }
+  th { background: #2d2d2d; color: #fff; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: middle; margin-right: 6px; border: 1px solid #555; }
+</style>
+</head>
+<body>
+
+<h1>Referência Visual da Interface do Autodesk Revit</h1>
+<p class="subtitle">Mapeamento arquitetural de posições, hierarquia visual, dimensões e paleta cromática (Modos Dark & Light do Revit 2024)</p>
+
+<div class="card">
+  <h2>1. Mockup Arquitetural do Layout Canônico do Revit</h2>
+  
+  <div class="revit-window">
+    <!-- QAT / Titlebar -->
+    <div class="qat-bar">
+      <span style="font-weight:700; color:#fff; background:#0078d4; padding:1px 5px; border-radius:2px;">R</span>
+      <div class="qat-icons">
+        <div class="qat-icon">💾</div>
+        <div class="qat-icon">↩</div>
+        <div class="qat-icon">↪</div>
+        <div class="qat-icon">📐</div>
+        <div class="qat-icon">🏠</div>
+        <div class="qat-icon">🔍</div>
+      </div>
+      <div class="qat-title">Autodesk Revit 2024 - Projeto Residencial.rvt - Floor Plan: Nível 1</div>
+    </div>
+    
+    <!-- Ribbon Tabs -->
+    <div class="ribbon-tabs">
+      <div class="rtab active">Architecture</div>
+      <div class="rtab">Structure</div>
+      <div class="rtab">Steel</div>
+      <div class="rtab">Precast</div>
+      <div class="rtab">Systems</div>
+      <div class="rtab">Insert</div>
+      <div class="rtab">Annotate</div>
+      <div class="rtab">Analyze</div>
+      <div class="rtab">Massing & Site</div>
+      <div class="rtab">Collaborate</div>
+      <div class="rtab">View</div>
+      <div class="rtab">Manage</div>
+      <div class="rtab contextual">Modify | Place Wall</div>
+    </div>
+    
+    <!-- Ribbon Body -->
+    <div class="ribbon-body">
+      <!-- Select Panel -->
+      <div class="rpanel">
+        <div class="rpanel-tools">
+          <div class="big-btn">
+            <div class="big-icon">↖</div>
+            <span>Modify</span>
+          </div>
+        </div>
+        <div class="rpanel-title">Select</div>
+      </div>
+      
+      <!-- Build Panel -->
+      <div class="rpanel">
+        <div class="rpanel-tools">
+          <div class="big-btn">
+            <div class="big-icon">🧱</div>
+            <span>Wall</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">🚪</div>
+            <span>Door</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">🪟</div>
+            <span>Window</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">📦</div>
+            <span>Component</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">🏛</div>
+            <span>Column</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">🏠</div>
+            <span>Roof</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">⏹</div>
+            <span>Ceiling</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">⬚</div>
+            <span>Floor</span>
+          </div>
+        </div>
+        <div class="rpanel-title">Build</div>
+      </div>
+      
+      <!-- Circulation Panel -->
+      <div class="rpanel">
+        <div class="rpanel-tools">
+          <div class="big-btn">
+            <div class="big-icon">🪜</div>
+            <span>Stair</span>
+          </div>
+          <div class="big-btn">
+            <div class="big-icon">📐</div>
+            <span>Railing</span>
+          </div>
+        </div>
+        <div class="rpanel-title">Circulation</div>
+      </div>
+      
+      <!-- Room & Area Panel -->
+      <div class="rpanel">
+        <div class="rpanel-tools">
+          <div class="big-btn">
+            <div class="big-icon">🏷</div>
+            <span>Room</span>
+          </div>
+          <div class="small-tools">
+            <div class="small-btn">⌂ Separator</div>
+            <div class="small-btn">🏷 Room Tag</div>
+          </div>
+        </div>
+        <div class="rpanel-title">Room & Area</div>
+      </div>
+    </div>
+    
+    <!-- Options Bar -->
+    <div class="options-bar">
+      <span>Modify | Place Wall:</span>
+      <span>Height: <strong class="opt-field">Unconnected</strong></span>
+      <span>20.00 m</span>
+      <span>Location Line: <strong class="opt-field">Wall Centerline</strong></span>
+      <span>Chain: ☑</span>
+      <span>Offset: <strong class="opt-field">0.00</strong></span>
+    </div>
+    
+    <!-- Workspace: Properties + Browser docked on Left, Canvas Center -->
+    <div class="workspace-layout">
+      <!-- Left Dock -->
+      <div class="left-dock">
+        <!-- Properties Palette -->
+        <div style="flex: 1; display:flex; flex-direction:column; overflow:hidden;">
+          <div class="palette-header">
+            <span>Properties</span>
+            <span>✕</span>
+          </div>
+          <div class="type-selector">
+            <div class="type-drop">Basic Wall: Generic - 200mm</div>
+            <button class="edit-type-btn">Edit Type</button>
+          </div>
+          <div class="prop-table">
+            <div class="prop-group">Constraints</div>
+            <div class="prop-row"><span>Location Line</span><span>Wall Centerline</span></div>
+            <div class="prop-row"><span>Base Constraint</span><span>Nível 1</span></div>
+            <div class="prop-row"><span>Base Offset</span><span>0.00 m</span></div>
+            <div class="prop-row"><span>Top Constraint</span><span>Nível 2</span></div>
+            <div class="prop-row"><span>Unconnected H.</span><span>3.00 m</span></div>
+            <div class="prop-group">Dimensions</div>
+            <div class="prop-row"><span>Length</span><span>12.50 m</span></div>
+            <div class="prop-row"><span>Area</span><span>37.50 m²</span></div>
+            <div class="prop-row"><span>Volume</span><span>7.50 m³</span></div>
+            <div class="prop-group">Identity Data</div>
+            <div class="prop-row"><span>Comments</span><span>-</span></div>
+          </div>
+        </div>
+        
+        <!-- Project Browser Stacked Below -->
+        <div class="browser-sub">
+          <div class="palette-header">
+            <span>Project Browser - Projeto</span>
+            <span>✕</span>
+          </div>
+          <div style="flex:1; overflow-y:auto; padding: 4px 0;">
+            <div class="tree-node">▼ Views (all)</div>
+            <div class="tree-node" style="padding-left:26px;">▼ Floor Plans</div>
+            <div class="tree-node active" style="padding-left:36px;">↳ Nível 1</div>
+            <div class="tree-node" style="padding-left:36px;">↳ Nível 2</div>
+            <div class="tree-node" style="padding-left:26px;">► 3D Views</div>
+            <div class="tree-node" style="padding-left:26px;">► Elevations (Building Elevation)</div>
+            <div class="tree-node">► Legends</div>
+            <div class="tree-node">► Schedules/Quantities</div>
+            <div class="tree-node">► Sheets (all)</div>
+            <div class="tree-node">► Families</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Drawing Canvas -->
+      <div class="canvas-area">
+        <div class="canvas-grid"></div>
+        <div class="model-preview">
+          PLANTA BAIXA - NÍVEL 1
+        </div>
+        <div class="viewcube-mock">VIEW CUBE</div>
+        
+        <!-- View Control Bar -->
+        <div class="view-control-bar">
+          <div class="vc-pill">1 : 100</div>
+          <div class="vc-pill">Detail: Medium</div>
+          <div class="vc-pill">Style: Hidden Line</div>
+          <div class="vc-pill">Sun: Off</div>
+          <div class="vc-pill">Shadows: On</div>
+          <div class="vc-pill">Crop View</div>
+          <div class="vc-pill">👓 Temporary Hide/Isolate</div>
+          <div class="vc-pill">Reveal Hidden</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span>Click to enter wall start point. TAB cycles, SPACE flips orientation.</span>
+      <span>Main Model | Filter: 0 | Workset1</span>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>2. Especificação Cromática do Revit (Dark vs Light)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Elemento</th>
+        <th>Revit 2024 Dark Theme (Hex)</th>
+        <th>Revit Light Theme (Hex)</th>
+        <th>Hestia Atual (Hex)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Frame / Barra de Título</strong></td>
+        <td><span class="swatch" style="background:#1f1f1f"></span>#1F1F1F / #2B2B2B</td>
+        <td><span class="swatch" style="background:#E1E1E1"></span>#E1E1E1</td>
+        <td><span class="swatch" style="background:#f1f4f6"></span>#F1F4F6 (light) / #161a1e</td>
+      </tr>
+      <tr>
+        <td><strong>Ribbon (Faixa de Ferramentas)</strong></td>
+        <td><span class="swatch" style="background:#333333"></span>#333333</td>
+        <td><span class="swatch" style="background:#F0F0F0"></span>#F0F0F0</td>
+        <td><span class="swatch" style="background:#fafbfc"></span>#FAFBFC / #1a1f24</td>
+      </tr>
+      <tr>
+        <td><strong>Aba Ativa da Faixa</strong></td>
+        <td><span class="swatch" style="background:#333333; border-top: 2px solid #0078d4"></span>#333333 + Acento #0078D4</td>
+        <td><span class="swatch" style="background:#FFFFFF; border-top: 2px solid #0078d4"></span>#FFFFFF + Acento #0078D4</td>
+        <td>Texto #0a6c75 (azul petróleo)</td>
+      </tr>
+      <tr>
+        <td><strong>Aba Contextual (Modificar / Criar)</strong></td>
+        <td><span class="swatch" style="background:#1b3d2f; border-top: 2px solid #22c55e"></span>#1B3D2F (Verde escuro)</td>
+        <td><span class="swatch" style="background:#E7F6E7; border-top: 2px solid #22c55e"></span>#E7F6E7 (Verde claro Revit)</td>
+        <td>Sem aba contextual verde</td>
+      </tr>
+      <tr>
+        <td><strong>Painel de Propriedades</strong></td>
+        <td><span class="swatch" style="background:#252525"></span>#252525</td>
+        <td><span class="swatch" style="background:#F8F8F8"></span>#F8F8F8</td>
+        <td><span class="swatch" style="background:#fafbfc"></span>#FAFBFC</td>
+      </tr>
+      <tr>
+        <td><strong>Seletor de Tipo (Type Selector)</strong></td>
+        <td><span class="swatch" style="background:#212121"></span>Dropdown em destaque + botão 'Edit Type'</td>
+        <td>Dropdown com preview em corte + 'Edit Type'</td>
+        <td>Dropdown simples sem pré-visualização gráfica</td>
+      </tr>
+      <tr>
+        <td><strong>Bordas e Divisores</strong></td>
+        <td><span class="swatch" style="background:#3f3f3f"></span>#3F3F3F / #444444</td>
+        <td><span class="swatch" style="background:#D0D0D0"></span>#D0D0D0</td>
+        <td><span class="swatch" style="background:#d3d9de"></span>#D3D9DE / #2a3138</td>
+      </tr>
+      <tr>
+        <td><strong>Canvas (Desenho)</strong></td>
+        <td><span class="swatch" style="background:#000000"></span>#000000 ou #FFFFFF (independente)</td>
+        <td><span class="swatch" style="background:#FFFFFF"></span>#FFFFFF puro</td>
+        <td><span class="swatch" style="background:#ffffff"></span>#FFFFFF / #16191d</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>3. Principais Padrões Ergonômicos do Revit</h2>
+  <ul style="line-height: 1.8; padding-left: 20px; font-size: 13px;">
+    <li><strong>Ribbon com Ícones Grandes e Pequenos:</strong> No Revit, as ações principais (Wall, Door, Window, Stair, Roof) usam ícones de 32x32 com texto abaixo; ferramentas secundárias se agrupam em colunas verticais com ícones de 16x16. O Hestia usa todos os botões no mesmo tamanho médio (48px com ícone de 22px).</li>
+    <li><strong>Aba Contextual Verde (Modify | [Element]):</strong> Ao selecionar um elemento ou disparar uma ferramenta de croqui, o Revit abre uma aba de destaque verde vibrante com as opções de finalização (✔ Concluir / ✖ Cancelar modo croqui) e modificadores directos (Move, Copy, Rotate, Mirror).</li>
+    <li><strong>Barra de Opções (Options Bar):</strong> Fica imediatamente abaixo do Ribbon e exibe parâmetros de criação imediata (ex: altura desconectada, linha de localização da parede, chain/cadeia, offset de cota). O Hestia já possui uma `OptionsBar`, o que é uma excelente conformidade com o Revit.</li>
+    <li><strong>View Control Bar (Barra de Controle de Vista):</strong> No Revit, a escala (1:50, 1:100), o nível de detalhe (Baixo, Médio, Alto), o estilo visual (Linha Oculta, Sombreado, Cores Consistentes, Textura) e o controle de sombras ficam encostados na borda inferior do canvas, nunca em menus escondidos.</li>
+    <li><strong>Disposição dos Painéis:</strong> No Revit clássico, tanto as <em>Propriedades</em> quanto o <em>Project Browser</em> ficam empilhados na <strong>esquerda</strong> (ou o navegador como aba acoplada). No Hestia atual, Propriedades fica na esquerda e o Navegador fica na direita.</li>
+  </ul>
+</div>
+
+</body>
+</html>

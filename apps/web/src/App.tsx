@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { sheetOf } from '@hestia/model';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
@@ -42,40 +42,210 @@ function ViewTabs(): ReactElement {
   const s = useUi();
   const sectionTab = p.views.find((v) => v.id === s.sectionId);
   const sheetTab = s.sheetId ? sheetOf(p, s.sheetId) : undefined;
-  const tabsRef = useRef<HTMLDivElement>(null);
 
-  // Ao trocar de vista/nível, rola a barra para mostrar a aba ativa
+  const containerRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
+
+  const [fitCount, setFitCount] = useState<number>(999);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const allTabs = [
+    ...p.levels.map((l) => ({
+      key: `level-${l.id}`,
+      label: l.name,
+      icon: 'plan',
+      active: s.view === 'plan' && s.levelId === l.id,
+      onClick: () => editor.selectLevel(l.id),
+    })),
+    {
+      key: 'view-3d',
+      label: 'Modelo 3D',
+      icon: 'cube',
+      active: s.view === '3d',
+      onClick: () => editor.setView('3d'),
+    },
+    ...(s.view === 'section' && sectionTab
+      ? [{
+          key: `section-${sectionTab.id}`,
+          label: sectionTab.name,
+          icon: sectionTab.kind === 'section' ? 'section' : 'elevation',
+          active: true,
+          onClick: () => {},
+        }]
+      : []),
+    ...(s.view === 'sheet' && sheetTab
+      ? [{
+          key: `sheet-${sheetTab.id}`,
+          label: `${sheetTab.number} ${sheetTab.name}`,
+          icon: 'plan',
+          active: true,
+          onClick: () => {},
+        }]
+      : []),
+  ];
+
+  // Fecha o menu suspenso ao clicar fora
   useEffect(() => {
-    const bar = tabsRef.current;
-    if (!bar) return;
-    const active = bar.querySelector<HTMLElement>('.vtab.on');
-    if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [s.view, s.levelId, s.sectionId, s.sheetId]);
+    if (!dropdownOpen) return;
+    const handler = (e: PointerEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [dropdownOpen]);
+
+  // Medição precisa do espaço disponível para abas (evita qualquer barra de rolagem)
+  useEffect(() => {
+    const updateFit = () => {
+      const container = containerRef.current;
+      const controls = controlsRef.current;
+      const measure = measureRef.current;
+      if (!container || !measure) return;
+
+      const totalWidth = container.clientWidth;
+      const controlsWidth = controls ? controls.offsetWidth : 60;
+      const availableWithoutOverflow = totalWidth - controlsWidth - 20;
+      const availableWithOverflow = availableWithoutOverflow - 75;
+
+      const tabElements = Array.from(measure.children) as HTMLElement[];
+      let used = 0;
+      let allFit = true;
+      const widths: number[] = [];
+
+      for (let i = 0; i < tabElements.length; i++) {
+        const el = tabElements[i];
+        if (!el) continue;
+        const w = el.offsetWidth + 2;
+        widths.push(w);
+        used += w;
+        if (used > availableWithoutOverflow) {
+          allFit = false;
+        }
+      }
+
+      if (allFit) {
+        setFitCount(allTabs.length);
+        return;
+      }
+
+      let count = 0;
+      let acc = 0;
+      for (let i = 0; i < widths.length; i++) {
+        const w = widths[i] ?? 0;
+        if (acc + w <= availableWithOverflow) {
+          acc += w;
+          count++;
+        } else {
+          break;
+        }
+      }
+      setFitCount(Math.max(1, count));
+    };
+
+    updateFit();
+
+    const ro = new ResizeObserver(() => {
+      updateFit();
+    });
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [allTabs.length, p.levels]);
+
+  const activeIndex = allTabs.findIndex((t) => t.active);
+  let visibleTabs = allTabs;
+  let overflowTabs: typeof allTabs = [];
+
+  if (fitCount < allTabs.length) {
+    const activeTab = activeIndex >= 0 ? allTabs[activeIndex] : undefined;
+    if (activeIndex >= fitCount && activeTab) {
+      // Garante que a aba ativa sempre permaneça visível no topo
+      const head = allTabs.slice(0, Math.max(1, fitCount - 1));
+      visibleTabs = [...head, activeTab];
+      const visibleKeys = new Set(visibleTabs.map((t) => t.key));
+      overflowTabs = allTabs.filter((t) => !visibleKeys.has(t.key));
+    } else {
+      visibleTabs = allTabs.slice(0, fitCount);
+      overflowTabs = allTabs.slice(fitCount);
+    }
+  }
 
   return (
-    <div className="viewtabs" role="tablist" aria-label="Vistas abertas" ref={tabsRef}>
-      <button className="ibtn" style={{ display: 'none' }} aria-hidden="true" />
-      {p.levels.map((l) => (
-        <button key={l.id} role="tab" aria-selected={s.view === 'plan' && s.levelId === l.id} className={`vtab${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => editor.selectLevel(l.id)}>
-          <Icon name="plan" size={14} /> {l.name}
+    <div className="viewtabs" role="tablist" aria-label="Vistas abertas" ref={containerRef}>
+      {/* Elemento oculto para medição de tamanho exato de cada aba */}
+      <div
+        ref={measureRef}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: -9999,
+          top: -9999,
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          display: 'flex',
+          gap: 2,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {allTabs.map((t) => (
+          <button key={t.key} className="vtab">
+            <Icon name={t.icon} size={14} /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {visibleTabs.map((t) => (
+        <button
+          key={t.key}
+          role="tab"
+          aria-selected={t.active}
+          className={`vtab${t.active ? ' on' : ''}`}
+          onClick={t.onClick}
+        >
+          <Icon name={t.icon} size={14} /> {t.label}
         </button>
       ))}
-      <button role="tab" aria-selected={s.view === '3d'} className={`vtab${s.view === '3d' ? ' on' : ''}`} onClick={() => editor.setView('3d')}>
-        <Icon name="cube" size={14} /> Modelo 3D
-      </button>
-      {s.view === 'section' && sectionTab ? (
-        <button role="tab" aria-selected className="vtab on">
-          <Icon name={sectionTab.kind === 'section' ? 'section' : 'elevation'} size={14} /> {sectionTab.name}
-        </button>
-      ) : null}
-      {s.view === 'sheet' && sheetTab ? (
-        <button role="tab" aria-selected className="vtab on">
-          <Icon name="plan" size={14} /> {sheetTab.number} {sheetTab.name}
-        </button>
-      ) : null}
+
+      {overflowTabs.length > 0 && (
+        <div className="vtab-overflow" ref={overflowRef}>
+          <button
+            className={`vtab-overflow-btn${overflowTabs.some((t) => t.active) ? ' has-active' : ''}`}
+            onClick={() => setDropdownOpen((v) => !v)}
+            title="Mais vistas"
+            aria-haspopup="menu"
+            aria-expanded={dropdownOpen}
+          >
+            <span>+{overflowTabs.length}</span>
+            <Icon name="down" size={12} />
+          </button>
+
+          {dropdownOpen && (
+            <div className="vtab-overflow-menu" role="menu">
+              {overflowTabs.map((t) => (
+                <button
+                  key={t.key}
+                  role="menuitem"
+                  className={`vtab-overflow-item${t.active ? ' on' : ''}`}
+                  onClick={() => {
+                    t.onClick();
+                    setDropdownOpen(false);
+                  }}
+                >
+                  <Icon name={t.icon} size={14} />
+                  <span>{t.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <span style={{ flex: 1, minWidth: 4 }} />
-      {/* Botões de painel: position sticky para aparecer mesmo com muitas abas */}
-      <div className="vtab-controls">
+
+      <div className="vtab-controls" ref={controlsRef}>
         <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
           <Icon name="edit" size={16} />
         </button>

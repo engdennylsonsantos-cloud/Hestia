@@ -59,6 +59,18 @@ function drawFill(ctx: CanvasRenderingContext2D, f: FillOp, v: Viewport): void {
 }
 
 /** Renderizador de planta em CPU (Canvas2D): usado só quando não há GPU disponível. */
+/** Desenha a planta num canvas 2D, ajustando o tamanho do canvas à vista e ao pixel de tela (DPR). */
+export function drawPlanOnCanvas(c: HTMLCanvasElement, dl: PlanDrawList, v: Viewport, dpr: number): void {
+  const pw = Math.round(v.width * dpr);
+  const ph = Math.round(v.height * dpr);
+  if (c.width !== pw || c.height !== ph) {
+    c.width = pw;
+    c.height = ph;
+  }
+  const ctx = c.getContext('2d');
+  if (ctx) drawPlanCpu(ctx, dl, v, dpr);
+}
+
 export function drawPlanCpu(ctx: CanvasRenderingContext2D, dl: PlanDrawList, v: Viewport, dpr: number): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;

@@ -1,26 +1,30 @@
-import { boxOf, orientedRect, ringArea, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { cutLevelByJunction, frameOfWall, junctionLevel, openingGeometry, resolveRoofs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { isOpening, isWall, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { boxOf, ringArea, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { cutLevelByJunction, frameOfWall, junctionLevel, openingGeometry, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
+import { levelDimensions, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { thinStrokes } from './thin.ts';
 import { gridStrokes } from './grid.ts';
-import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
-import { belowFloorOps, floorSelectionOps, type FloorOps } from './floors.ts';
-import { slabSelectionOps } from './slabs.ts';
+import { belowFloorOps, type FloorOps } from './floors.ts';
 import { floorAndSlabOps } from './surfaces.ts';
-import { belowRoomOps, roomOps, roomSelectionOps } from './rooms.ts';
-import { ceilingFills, ceilingSelectionOps } from './ceilings.ts';
-import { roofFills, roofFootprint, roofOps, roofSelectionOps } from './roofs.ts';
-import { belowStairOps, stairFills, stairSelectionOps } from './stairs.ts';
+import { belowRoomOps, roomOps } from './rooms.ts';
+import { ceilingFills } from './ceilings.ts';
+import { roofFills, roofFootprint, roofOps } from './roofs.ts';
+import { belowStairOps, stairFills } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import { noteOps } from './notes.ts';
-import { openingViewOps, planViewOf, wallOutlineOps, type PlanView } from './view.ts';
-import { paintOps, planStyleOf, surfaceColor, type PlanPaint } from './style.ts';
-import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from './types.ts';
+import { openingViewOps, wallOutlineOps } from './view.ts';
+import { paintOps, surfaceColor, type PlanPaint } from './style.ts';
+import { planContext } from './planContext.ts';
+import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
+
+import { buildPlanOverlay } from './planOverlay.ts';
+
+export { buildPlanOverlay, buildPlanScreenOverlay } from './planOverlay.ts';
+export { planBelowOf } from './planContext.ts';
 
 export interface PlanInput {
   project: Project;
@@ -81,32 +85,21 @@ function thicknessPx(poly: Ring[], zoom: number): number {
 }
 
 /**
- * Forma da parede na planta: as camadas cortadas (`cut`) ou, para parede só de contorno, os fragmentos inteiros
- * (`fragment`, sem as aberturas).
+ * Parte da seleção que a geometria do nível usa: as cotas do nível (decisão 0019) e as marcas de corte e elevação
+ * selecionadas mudam de cor com a seleção. A geometria depende só desse subconjunto; o resto é da sobreposição.
  */
-function wallUnion(geo: ResolvedLevel, id: Id, outline = false): MultiPolygon {
-  const rw = geo.walls[id];
-  if (!rw) return [];
-  return outline ? union(...rw.layers.map((l) => l.fragment)) : union(...rw.layers.map((l) => l.cut));
+export function planGeometrySelection(p: Project, levelId: Id, selection: readonly Id[]): Id[] {
+  if (selection.length === 0) return [];
+  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...p.views.map((v) => v.id)]);
+  return selection.filter((id) => used.has(id));
 }
 
-function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: string, alpha: number, view: PlanView | null): FillOp[] {
-  const out: FillOp[] = [];
-  for (const id of ids) {
-    if (view?.hidden.has(id)) continue;
-    const e = p.elements[id];
-    if (isWall(e)) out.push({ polygons: wallUnion(geo, id, view?.outlineWalls.has(id) === true), color, alpha });
-    else if (isOpening(e)) {
-      const f = frameOfWall(p, e.hostId);
-      if (!f) continue;
-      const g = openingGeometry(p, e, f);
-      out.push({ polygons: [[orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.width / 2, g.thickness / 2 + 0.02)]], color, alpha });
-    }
-  }
-  return out;
-}
-
-export function buildPlanDrawList(input: PlanInput): PlanDrawList {
+/**
+ * Geometria do nível (decisão 0013, D1–D6): pisos, lajes, ambientes, escadas, paredes, aberturas, telhados, forros,
+ * cotas e etiquetas. Não depende de pan, de seleção (exceto as cotas), de cursor, de ferramenta nem da grade; o zoom
+ * entra porque o desenho usa tamanhos em pixels de tela. A sobreposição fica em `buildPlanOverlay`.
+ */
+export function buildPlanGeometry(input: PlanInput): PlanOps {
   const { project: p, viewport: v, theme } = input;
   const fills: FillOp[] = [];
   const strokes: StrokeOp[] = [];
@@ -114,8 +107,8 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   const fillBase = input.dark ? theme.bg : '#ffffff';
   const fillT = input.dark ? 0.5 : 0.58;
 
-  // Gráficos da vista do nível (decisão 0015): escala, detalhe, estilo visual e substituições por categoria, já em px.
-  const style = planStyleOf(p, input.levelId, v.zoom);
+  // Contexto do nível e da vista (o mesmo que a sobreposição usa): estilo, vista, geometria e ocultos.
+  const { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs } = planContext(input);
   const { detail, paint } = style;
   // Arame: só contornos. Os preenchimentos de modelo somem (as faixas de contorno ficam); referências também.
   const wire = style.visual === 'wireframe';
@@ -130,24 +123,12 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     }
   };
 
-  if (input.showGrid) strokes.push(...gridStrokes(v, theme));
-
   // Nível de detalhe (H3, decisão 0015 §2.2): grosseiro = um contorno preenchido por cluster, sem camadas, hachura nem
   // símbolos; médio = como antes; fino = linhas de camada sempre e hachura mesmo em zoom baixo.
   const fine = detail === 'fine';
-  // Planta de cobertura (D6): sem traços por baixo nem paredes preenchidas; os telhados cobrem o que está embaixo.
-  const rp = input.roofPlanMode === true;
-  // Intervalo de vista do nível (decisão 0013): o que está fora dele não sai, e o corte da geometria é o da vista.
-  // A planta de cobertura segue a geometria padrão, como antes.
-  const view: PlanView | null = rp ? null : planViewOf(p, input.levelId);
   // Planta de forro (decisão 0021): vista para cima. Sem o que está embaixo do nível (referências apagadas) e com forros.
-  const up = view?.range.direction === 'up';
   // Pavimento de baixo (referência) com as paredes cortadas pela junção dele, como a planta do nível.
   const below = up || !input.below ? null : cutLevelByJunction(input.below, junctionLevel(p, input.below.levelId));
-  const geo: ResolvedLevel = view ? view.geo : input.resolved;
-  const hidden = view?.hidden;
-  // Telhados ocultos pela categoria (decisão 0015 §2.4): na planta de cobertura só eles são filtrados.
-  const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(resolveRoofs(p, input.levelId).map((r) => r.roofId));
 
   // Pavimento abaixo como subpiso apagado (referência): sem preenchimento no arame, linhas como antes.
   if (below) {
@@ -173,7 +154,6 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     if (!rp) strokes.push(...brm.strokes);
   }
   // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
-  const stairs = resolveStairsOnLevel(p, input.levelId).filter((s) => !hidden?.has(s.id));
   if (below) {
     const bst = belowStairOps(resolveStairsOnLevel(p, below.levelId), theme);
     fills.push(...surfaces(bst.fills));
@@ -265,7 +245,6 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
-  const roofHidden = view ? hidden : roofOff;
   const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, {
     planMode: rp,
     hidden: roofHidden,
@@ -298,73 +277,23 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,
   // pré-visualização e guias) mantém a largura própria.
   if (input.thinLines) thinStrokes(strokes);
+  return { fills, strokes, labels };
+}
 
-  // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  const fsel = floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
-  fills.push(...fsel.fills);
-  strokes.push(...fsel.strokes);
-  labels.push(...fsel.labels);
-  const rmsel = roomSelectionOps(p, input.levelId, input.selection, input.hover, theme, hidden);
-  fills.push(...rmsel.fills);
-  strokes.push(...rmsel.strokes);
-  const lsel = slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
-  fills.push(...lsel.fills);
-  strokes.push(...lsel.strokes);
-  labels.push(...lsel.labels);
-  if (up) {
-    const csel = ceilingSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden);
-    fills.push(...csel.fills);
-    strokes.push(...csel.strokes);
-    labels.push(...csel.labels);
-  }
-  const rsel = roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, roofHidden, paint.roof);
-  fills.push(...rsel.fills);
-  strokes.push(...rsel.strokes);
-  labels.push(...rsel.labels);
-  const ssel = stairSelectionOps(p, stairs, input.selection, input.hover, theme, v);
-  fills.push(...ssel.fills);
-  strokes.push(...ssel.strokes);
-  labels.push(...ssel.labels);
-  if (input.hover && !input.selection.includes(input.hover)) {
-    fills.push(...elementHighlight(p, geo, [input.hover], theme.select, 0.16, view));
-  }
-  if (input.selection.length) {
-    fills.push(...elementHighlight(p, geo, input.selection, theme.select, 0.26, view));
-    for (const id of input.selection) {
-      const e = p.elements[id];
-      if (!isWall(e) || hidden?.has(id)) continue;
-      for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      if (input.selection.length === 1) {
-        // Cota temporária: comprimento do eixo, como no Revit ao selecionar.
-        const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
-        labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: `${len.toFixed(3).replace('.', ',')} m`, dy: -12, tone: 'info' });
-      }
-      const half = 4.5 / v.zoom;
-      for (const pt of [e.a, e.b]) {
-        const sq: Vec2[] = [
-          { x: pt.x - half, y: pt.y - half },
-          { x: pt.x + half, y: pt.y - half },
-          { x: pt.x + half, y: pt.y + half },
-          { x: pt.x - half, y: pt.y + half },
-        ];
-        fills.push({ polygons: [[sq]], color: '#ffffff', alpha: 1 });
-        strokes.push({ pts: sq, closed: true, widthPx: 1.6, color: theme.select, alpha: 1 });
-      }
-    }
-  }
-
-  // Pré-visualização, guias e marcador de captura.
-  const ov = previewOverlay(input.preview, v, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view));
-  fills.push(...ov.fills);
-  strokes.push(...ov.strokes);
-  labels.push(...ov.labels);
-  if (input.inference) {
-    strokes.push(...guideStrokes(input.inference.guides, theme));
-    strokes.push(...snapMarker(input.inference, v, theme));
-    const tip = snapTooltipLabel(input.inference);
-    if (tip) labels.push(tip);
-  }
-  return { background: theme.bg, fills, strokes, labels };
+/**
+ * Lista de desenho completa (geometria, sobreposição e grade), na ordem de desenho de sempre. A planta de tela não a
+ * usa: separa as camadas (ver `PlanFrame`). Continua para a plotagem, o modo CPU e os testes.
+ */
+export function buildPlanDrawList(input: PlanInput): PlanDrawList {
+  const g = buildPlanGeometry(input);
+  const o = buildPlanOverlay(input);
+  const grid = input.showGrid ? gridStrokes(input.viewport, input.theme) : [];
+  return {
+    background: input.theme.bg,
+    fills: [...g.fills, ...o.fills],
+    strokes: [...grid, ...g.strokes, ...o.strokes],
+    labels: [...g.labels, ...o.labels],
+  };
 }
 
 /** Caixa de todas as paredes do nível, para "enquadrar tudo". */

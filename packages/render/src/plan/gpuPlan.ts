@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { triangulate, type Mesh2D, type Polygon, type Vec2 } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { DOT_PX, HATCH_PX, hatchSegments } from './hatch.ts';
-import type { PlanDrawList, StrokeOp } from './types.ts';
+import type { FillOp, PlanDrawList, StrokeOp } from './types.ts';
+
+export { PlanFrame, planFrameUpdateOf, sameView } from './planFrame.ts';
 
 const triCache = new WeakMap<Polygon, Mesh2D>();
 function tri(p: Polygon): Mesh2D {
@@ -22,21 +24,34 @@ interface Batch {
   idx: number[];
 }
 
-/** Cena ortográfica 2D: consome a lista de desenho neutra e a transforma em malhas na GPU. */
+/**
+ * Camadas da cena da planta, na ordem de desenho: preenchimentos da geometria, preenchimentos da sobreposição, grade,
+ * traços da geometria e traços da sobreposição. Cada uma tem o seu grupo: refazer a sobreposição não toca as outras.
+ */
+export type PlanSlot = 'fillsBase' | 'fillsOver' | 'grid' | 'strokesBase' | 'strokesOver';
+const SLOTS: readonly PlanSlot[] = ['fillsBase', 'fillsOver', 'grid', 'strokesBase', 'strokesOver'];
+/** Faixa de `renderOrder` por camada: a ordem dentro de uma camada não alcança a seguinte. */
+const SLOT_STRIDE = 1_000_000;
+
+/** Cena ortográfica 2D: consome as camadas de desenho neutras e as transforma em malhas na GPU. */
 export class PlanScene {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
-  private group = new THREE.Group();
+  private slots = new Map<PlanSlot, THREE.Group>();
   private mats = new Map<string, THREE.MeshBasicMaterial>();
 
   constructor() {
-    this.scene.add(this.group);
+    for (const s of SLOTS) {
+      const g = new THREE.Group();
+      this.slots.set(s, g);
+      this.scene.add(g);
+    }
     this.camera.position.set(0, 0, 10);
   }
 
   /**
    * Todo material é transparente (mesmo opaco): o three.js desenha os opacos antes dos transparentes, e isso poria a hachura
-   * por cima das paredes, que vêm depois na lista. Com tudo no mesmo grupo, a ordem é a da lista (`renderOrder`),
+   * por cima das paredes, que vêm depois na lista. Com tudo transparente, a ordem é a da lista (`renderOrder`),
    * como no CPU (decisão 0015 §2.4). A hachura é vetorial (linhas e pontos), então não há textura para amostrar com o zoom.
    */
   private material(key: string, color: string, alpha: number): THREE.MeshBasicMaterial {
@@ -66,18 +81,27 @@ export class PlanScene {
     this.camera.updateProjectionMatrix();
   }
 
-  private clear(): void {
-    for (const ch of [...this.group.children]) {
+  setBackground(color: string): void {
+    this.scene.background = new THREE.Color(color);
+  }
+
+  private clearSlot(slot: PlanSlot): void {
+    const group = this.slots.get(slot)!;
+    for (const ch of [...group.children]) {
       const m = ch as THREE.Mesh;
       m.geometry.dispose();
-      this.group.remove(m);
+      group.remove(m);
     }
   }
 
-  setDrawList(dl: PlanDrawList, v: Viewport): void {
-    this.clear();
-    this.scene.background = new THREE.Color(dl.background);
-    let order = 0;
+  /**
+   * Refaz uma camada: preenchimentos (com a hachura vetorial) e traços (a largura em pixels de tela sai pelo zoom de `v`).
+   * Listas vazias limpam a camada. Só a camada indicada é tocada.
+   */
+  setSlot(slot: PlanSlot, fills: FillOp[], strokes: StrokeOp[], v: Viewport): void {
+    this.clearSlot(slot);
+    const group = this.slots.get(slot)!;
+    let order = SLOTS.indexOf(slot) * SLOT_STRIDE;
     const flush = (b: Batch | null): void => {
       if (!b || b.idx.length === 0) return;
       const g = new THREE.BufferGeometry();
@@ -86,7 +110,7 @@ export class PlanScene {
       const mesh = new THREE.Mesh(g, this.material(b.key, b.color, b.alpha));
       mesh.renderOrder = order++;
       mesh.frustumCulled = false;
-      this.group.add(mesh);
+      group.add(mesh);
     };
 
     // Uma lista corrente: troca de lote só quando muda cor, alfa ou tipo, na ordem em que os itens aparecem.
@@ -105,7 +129,7 @@ export class PlanScene {
       for (let i = 0; i < m.positions.length; i += 2) b.pos.push(m.positions[i]!, m.positions[i + 1]!, 0);
       for (const k of m.indices) b.idx.push(base + k);
     };
-    for (const f of dl.fills) {
+    for (const f of fills) {
       for (const poly of f.polygons) fillPolygon(poly, f.color, f.alpha);
       if (!f.hatch) continue;
       const { kind, color } = f.hatch;
@@ -126,7 +150,7 @@ export class PlanScene {
     cur = null;
 
     const strokeBatch = (s: StrokeOp): Batch => batchFor(`s|${s.color}|${s.alpha}`, s.color, s.alpha);
-    for (const s of dl.strokes) {
+    for (const s of strokes) {
       const b = strokeBatch(s);
       const w = s.widthPx / v.zoom;
       const segs = s.dash ? dashSegments(s.pts, s.closed, s.dash[0] / v.zoom, s.dash[1] / v.zoom) : edges(s.pts, s.closed);
@@ -135,8 +159,16 @@ export class PlanScene {
     flush(cur);
   }
 
+  /** Lista de desenho inteira (fundo, preenchimentos e traços) numa só troca: as camadas de sobreposição e grade ficam vazias. */
+  setDrawList(dl: PlanDrawList, v: Viewport): void {
+    this.setBackground(dl.background);
+    for (const s of SLOTS) this.clearSlot(s);
+    this.setSlot('fillsBase', dl.fills, [], v);
+    this.setSlot('strokesBase', [], dl.strokes, v);
+  }
+
   dispose(): void {
-    this.clear();
+    for (const s of SLOTS) this.clearSlot(s);
     for (const m of this.mats.values()) m.dispose();
   }
 }

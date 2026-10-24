@@ -194,13 +194,13 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   }
 
   // Lajes e pisos pela cota da face superior (decisão 0023 §3): o mais alto desenha por último; pisos antes das paredes.
-  for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint)) addOps(sf.ops, sf.paint, !rp);
+  for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint, style.scale)) addOps(sf.ops, sf.paint, !rp);
   // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
   addOps(roomOps(p, input.levelId, theme, input.dark, detail, v.zoom, style.scale, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
   addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
   // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
-  if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor), paint.floor, true);
+  if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor, style.scale), paint.floor, true);
 
   // Paredes: conjuntos (silhueta e regiões por material) e contornos fora do corte, com o estilo da categoria parede.
   // Parede oculta pela categoria: a geometria do nível já sai vazia (ver `planViewOf`), e os conjuntos não entram.
@@ -272,7 +272,7 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     categoryHidden: roofOff,
     showProjection: input.showRoofProjection !== false,
     paint: paint.roof,
-  });
+  }, style.scale);
   addOps(rf, paint.roof, true);
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
   if (rp && paint.wall.visible) {

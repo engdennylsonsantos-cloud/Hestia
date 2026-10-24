@@ -1,6 +1,6 @@
 import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { fillRegionOf, junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { holeMarkOps } from './holeMarks.ts';
@@ -75,12 +75,13 @@ export function floorFills(
   v: Viewport,
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('floor', v.zoom),
+  scale = 100,
 ): FloorOps {
   const jl = junctionLevel(p, levelId);
   return concatOps(
     resolveFloors(p, levelId)
       .filter((f) => !hidden?.has(f.floorId))
-      .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint, jl.elements.get(f.floorId))),
+      .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint, jl.elements.get(f.floorId), scale)),
   );
 }
 
@@ -89,7 +90,10 @@ export function floorFills(
  * junção resolvida (`el.cut`, decisão 0023 §3, P7b), o preenchimento e o contorno são a região que o piso ocupa depois
  * do recorte; sem corte, o contorno do piso, como antes.
  */
-export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
+/** Tamanho da fonte das etiquetas de piso e laje em mm de papel (mesmo padrão dos ambientes). */
+export const SURFACE_TEXT_MM = 1.6;
+
+export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction, scale = 100): FloorOps {
   const out = empty();
   // A cor do piso é a da camada de cima que não é membrana (a membrana não tem volume nem cor própria na planta).
   const top = f.layers.find((l) => !l.membrane);
@@ -117,7 +121,8 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
     const code = p.floorTypes[f.typeId]?.code;
     const at = labelPoint(f.polygon);
     const text = [code, fmtArea(multiArea(f.polygon), 1)].filter(Boolean).join(' · ');
-    if (at) out.labels.push({ at, text });
+    const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
+    if (at) out.labels.push({ at, text, fontPx });
   }
   return out;
 }

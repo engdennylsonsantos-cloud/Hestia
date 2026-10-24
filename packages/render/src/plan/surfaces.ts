@@ -33,17 +33,18 @@ export function floorAndSlabOps(
   v: Viewport,
   hidden: ReadonlySet<Id> | undefined,
   paint: { floor: PlanPaint; slab: PlanPaint },
+  scale = 100,
 ): SurfaceOps[] {
   const list: Array<SurfaceOps & { top: number }> = [];
   const jl = junctionLevel(p, levelId);
   for (const s of resolveSlabs(p, levelId)) {
     if (hidden?.has(s.slabId)) continue;
     const top = s.topZ + slabRiseAt(s.slope, contourMid(s.polygon));
-    list.push({ top, ops: slabOpsOf(p, s, theme, dark, detail, v, paint.slab, jl.elements.get(s.slabId)), paint: paint.slab });
+    list.push({ top, ops: slabOpsOf(p, s, theme, dark, detail, v, paint.slab, jl.elements.get(s.slabId), scale), paint: paint.slab });
   }
   for (const f of resolveFloors(p, levelId)) {
     if (hidden?.has(f.floorId)) continue;
-    list.push({ top: f.topZ, ops: floorOpsOf(p, f, theme, dark, detail, v, paint.floor, jl.elements.get(f.floorId)), paint: paint.floor });
+    list.push({ top: f.topZ, ops: floorOpsOf(p, f, theme, dark, detail, v, paint.floor, jl.elements.get(f.floorId), scale), paint: paint.floor });
   }
   return list.sort((a, b) => a.top - b.top).map(({ ops, paint: pt }) => ({ ops, paint: pt }));
 }

@@ -1,9 +1,9 @@
 import { difference, multiArea, offsetMulti } from '@hestia/geom';
 import { resolveCeilings, type ResolvedCeiling } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
 
@@ -28,6 +28,7 @@ export function ceilingFills(
   v: Viewport,
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('floor', v.zoom),
+  scale = 100,
 ): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
@@ -48,7 +49,8 @@ export function ceilingFills(
       const e = p.elements[c.ceilingId];
       const mark = e && e.kind === 'ceiling' ? e.mark : '';
       const text = [mark, fmtArea(multiArea(c.polygon), 1)].filter(Boolean).join(' · ');
-      out.labels.push({ at, text });
+      const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
+      out.labels.push({ at, text, fontPx });
     }
   }
   return out;

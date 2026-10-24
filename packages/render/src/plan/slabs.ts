@@ -1,9 +1,9 @@
 import { difference, multiArea, offsetMulti, type Vec2 } from '@hestia/geom';
 import { fillRegionOf, junctionLevel, resolveSlabs, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { holeMarkOps } from './holeMarks.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
@@ -54,17 +54,18 @@ export function slabFills(
   v: Viewport,
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('slab', v.zoom),
+  scale = 100,
 ): FloorOps {
   const jl = junctionLevel(p, levelId);
   return concatOps(
     resolveSlabs(p, levelId)
       .filter((s) => !hidden?.has(s.slabId))
-      .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint, jl.elements.get(s.slabId))),
+      .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint, jl.elements.get(s.slabId), scale)),
   );
 }
 
 /** Operações de uma laje (preenchimento, contorno, seta de caimento e etiquetas). `slabFills` as junta; a planta as ordena pela cota. */
-export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction): FloorOps {
+export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, paint: PlanPaint, el?: ElementJunction, scale = 100): FloorOps {
   const out = empty();
   // Região depois da junção (P7b): a laje sem corte fica com o contorno dela; cortada, com a região que sobra.
   // Preenchimento: a camada de cima (o término dela vale mesmo sem junção; ver `floorOpsOf`) ou, com corte, a região
@@ -87,14 +88,19 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
     // Linha de membrana na face da própria camada (P8): ela pode ir ao núcleo da parede.
     for (const l of s.layers) if (l.membrane) out.strokes.push(...membraneLineOps(l.polygon, theme));
     if (s.slope && at) {
+      // Deslocamento vertical da etiqueta de percentual: equivalente a 12 px de tela no zoom/escala padrão.
+      const slopeDyPx = paperMmToPx(1.2, v.zoom, scale);
       out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
-      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: 12 });
+      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: slopeDyPx, fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
     }
   }
   if (p.settings.showTags && at) {
     const code = p.slabTypes[s.typeId]?.code;
     const text = [code, fmtArea(multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
-    out.labels.push({ at, text, ...(s.slope ? { dy: -10 } : {}) });
+    const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
+    // Quando há inclinação, a seta de caimento ocupa espaço abaixo do ponto: desloca a etiqueta para cima.
+    const dy = s.slope ? -paperMmToPx(1.0, v.zoom, scale) : undefined;
+    out.labels.push({ at, text, fontPx, ...(dy !== undefined ? { dy } : {}) });
   }
   return out;
 }

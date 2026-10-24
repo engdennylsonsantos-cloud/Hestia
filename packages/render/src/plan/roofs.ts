@@ -1,9 +1,9 @@
 import { add, closestOnSegment, difference, dist, mid, multiArea, norm, offsetMulti, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
-import { isRoof, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { isRoof, paperMmToPx, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { fmtArea, labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
+import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { slopeArrow } from './slabs.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
@@ -41,8 +41,11 @@ function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
   return r.layers.reduce<ResolvedRoofLayer | undefined>((best, l) => (!best || l.below < best.below ? l : best), undefined);
 }
 
-/** Desloca a etiqueta 20 px para o lado da seta (perpendicular a ela), para não cruzar a haste. */
-const beside = (u: Vec2): { dx: number; dy: number } => ({ dx: -20 * u.y, dy: -20 * u.x });
+/**
+ * Desloca a etiqueta `offsetPx` pixels para o lado da seta (perpendicular a ela, y da tela cresce para baixo),
+ * para não cruzar a haste. O chamador passa o valor já convertido para px de tela.
+ */
+const beside = (u: Vec2, offsetPx: number): { dx: number; dy: number } => ({ dx: -offsetPx * u.y, dy: -offsetPx * u.x });
 
 /** Deslocamento em pixels de tela de um vetor do mundo (y da tela cresce para baixo). */
 const screenOffset = (w: Vec2, px: number): { dx: number; dy: number } => ({ dx: w.x * px, dy: -w.y * px });
@@ -174,7 +177,7 @@ export interface RoofOpsOptions {
  * água, seta de caimento (da subida para a descida) com o percentual. A cumeeira mais alta leva a cota absoluta
  * ("▲ +5,70") com etiquetas ligadas ou na planta de cobertura. Com etiquetas ligadas, código e área real no centroide.
  */
-export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}): FloorOps {
+export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   const coarse = detail === 'coarse';
@@ -207,18 +210,24 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
         if (!at) continue;
         const down = { x: -pl.up.x, y: -pl.up.y };
         out.strokes.push(...slopeArrow(down, at, v, theme, paint.cutPx));
-        out.labels.push({ at, text: fmtPercent(pl.percent), ...beside(down) });
+        // Deslocamento lateral em mm de papel: 2 mm garantem que a etiqueta não cruze a haste da seta.
+        const sidePx = paperMmToPx(2.0, v.zoom, scale);
+        out.labels.push({ at, text: fmtPercent(pl.percent), ...beside(down, sidePx), fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
       }
     }
     if (planMode || p.settings.showTags) {
       const rd = highestRidge(r);
-      if (rd) out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, dy: -12 });
+      // Deslocamento vertical da cota da cumeeira: equivalente a 12 px de tela no zoom/escala padrão.
+      if (rd) out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, dy: -paperMmToPx(1.2, v.zoom, scale), fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
     }
     if (p.settings.showTags) {
       const at = labelPoint(foot);
       const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
-      // Acima da seta de caimento (que tem 40 px para cada lado), para não se sobrepor a ela.
-      if (at) out.labels.push({ at, text, dy: coarse ? -10 : -52 });
+      const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
+      // Grosseiro: deslocamento leve acima (-10 px ≈ -1,0 mm). Fino: a seta de caimento tem 80 px de semilado;
+      // deslocamento de -52 px ≈ -5,2 mm garante que a etiqueta fique acima dela.
+      const dy = coarse ? -paperMmToPx(1.0, v.zoom, scale) : -paperMmToPx(5.2, v.zoom, scale);
+      if (at) out.labels.push({ at, text, dy, fontPx });
     }
   }
   return out;
@@ -228,11 +237,11 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
  * Telhados do nível na planta (D1), antes das etiquetas e depois das paredes e aberturas. Os `hidden` (fora do intervalo
  * de vista) saem; com `showProjection`, cada um deixa o contorno do beiral tracejado (projeção da cobertura).
  */
-export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}): FloorOps {
+export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const all = resolveRoofs(p, levelId);
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
-  const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts);
+  const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
   if (opts.showProjection === true) {
     const projPx = (opts.paint ?? defaultPaint('roof', v.zoom)).projPx;
     for (const r of all) {

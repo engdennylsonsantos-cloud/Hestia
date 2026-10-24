@@ -14,8 +14,16 @@ export function PlanLabels({ labels, v }: { labels: LabelOp[]; v: Viewport | nul
                   {l.text}
                 </span>
               );
+            // Rótulo com fonte em mm de papel, mas não centrado (etiqueta de parede, ambiente, escada): usa plan-note
+            // sem centralizar em X, só em Y (para o ponto de ancoragem ficar no centro vertical do texto).
+            if (l.fontPx !== undefined)
+              return (
+                <span key={i} className="plan-note" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), fontSize: l.fontPx, transform: 'translate(0, -50%)' }}>
+                  {l.text}
+                </span>
+              );
             return (
-              <span key={i} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), ...(l.fontPx !== undefined ? { fontSize: l.fontPx } : {}) }}>
+              <span key={i} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
                 {l.text}
               </span>
             );

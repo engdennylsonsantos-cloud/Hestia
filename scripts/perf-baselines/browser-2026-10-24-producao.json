@@ -1,0 +1,90 @@
+{
+  "geradoEm": "2026-10-24T22:04:01.742Z",
+  "navegador": {
+    "executavel": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "versao": "155.0.8059.86",
+    "cabecalhoGPU": "padrão do navegador (sem --use-angle=swiftshader)",
+    "headless": true
+  },
+  "app": {
+    "endereco": "file:///<raiz-do-repositorio>/.claude/worktrees/agent-a2eccaf285324061e/apps/web/dist/index.html",
+    "modo": "producao"
+  },
+  "maquina": {
+    "so": "win32 10.0.19045",
+    "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+    "ramTotalGB": 15.8
+  },
+  "projeto": {
+    "pavimentos": 10,
+    "paredes": 320
+  },
+  "metodo": {
+    "repeticoes": 5,
+    "panPassos": 60,
+    "zoomPassos": 30,
+    "medida": "do evento ao quadro seguinte pintado (rAF duplo)"
+  },
+  "medidas": {
+    "abertura10Pavimentos": {
+      "abrirProjeto": {
+        "n": 5,
+        "medianaMs": 844.8,
+        "p95Ms": 891.2,
+        "mediaMs": 812.38,
+        "minMs": 680.7,
+        "maxMs": 891.2
+      },
+      "carregarPaginaAteAppPronto": {
+        "n": 5,
+        "medianaMs": 960,
+        "p95Ms": 1312,
+        "mediaMs": 1041.6,
+        "minMs": 936,
+        "maxMs": 1312
+      },
+      "primeiraPinturaFCP": {
+        "n": 5,
+        "medianaMs": 612,
+        "p95Ms": 744,
+        "mediaMs": 642.4,
+        "minMs": 576,
+        "maxMs": 744
+      }
+    },
+    "planta10Pavimentos": {
+      "pan": {
+        "n": 300,
+        "medianaMs": 25.4,
+        "p95Ms": 45,
+        "mediaMs": 28.53,
+        "minMs": 16,
+        "maxMs": 53.6
+      },
+      "zoom": {
+        "n": 150,
+        "medianaMs": 25.8,
+        "p95Ms": 38.6,
+        "mediaMs": 27.57,
+        "minMs": 20.3,
+        "maxMs": 46.9
+      }
+    },
+    "pick3D": {
+      "ponto": {
+        "x": 456,
+        "y": 290.93
+      },
+      "cliques": 20,
+      "pickClique": {
+        "n": 20,
+        "medianaMs": 29.5,
+        "p95Ms": 39.3,
+        "mediaMs": 30.2,
+        "minMs": 20.2,
+        "maxMs": 41.2
+      }
+    }
+  },
+  "pendencias": []
+}

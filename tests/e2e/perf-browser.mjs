@@ -160,7 +160,14 @@ const zoom = [];
 // 3. Clique de pick na 3D: pointerup até a seleção mudar.
 {
   const page = ultima;
-  await page.getByRole('tab', { name: /Modelo 3D/ }).click();
+  // Abre a vista 3D pelo botão "Modelo 3D" do navegador de projeto (caminho real da interface). Sem o botão visível,
+  // usa o gancho de depuração do editor (?debug=1). Não depende de aba fixa: a aba só existe para as vistas abertas.
+  const botao = page.getByRole('button', { name: /Modelo 3D/ }).first();
+  if (await botao.count()) await botao.click().catch(() => {});
+  if (!(await page.evaluate(() => window.__hestia.useUi.getState().view === '3d'))) {
+    pendencias.push('3D: botão "Modelo 3D" não respondeu; vista aberta pelo gancho window.__hestia.editor.setView');
+    await page.evaluate(() => window.__hestia.editor.setView('3d'));
+  }
   await page.waitForTimeout(2000);
   await page.evaluate(() => window.__hestia3dModel.fit());
   await page.waitForTimeout(400);

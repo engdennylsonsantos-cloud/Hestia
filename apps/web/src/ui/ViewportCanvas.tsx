@@ -415,6 +415,22 @@ export function ViewportCanvas(): ReactElement {
     e.preventDefault();
     const st = useUi.getState();
     if (st.view === '3d') {
+      // Zoom para o ponto sob o cursor: ao aproximar, o target deriva em direção ao ponto 3D sob o cursor.
+      // Isso faz a órbita subsequente girar ao redor do que o usuário estava inspecionando (comportamento Revit/Blender).
+      if (e.deltaY < 0) {
+        const s = local(e);
+        const r = host.current!.getBoundingClientRect();
+        const ndc = { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 };
+        const hit = pickModelPoint(model.current.scene, model.current.orbit.camera, ndc);
+        if (hit) {
+          // Quanto mais rola o scroll, mais o target se move em direção ao ponto sob o cursor.
+          // Factor pequeno: movimento suave e sem saltos; acumula com vários scrolls.
+          const factor = Math.min(0.12, Math.abs(e.deltaY) * 0.001);
+          const orb = model.current.orbit;
+          orb.target.x += (hit.x - orb.target.x) * factor;
+          orb.target.y += (hit.y - orb.target.y) * factor;
+        }
+      }
       model.current.orbit.zoom(e.deltaY);
       useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
     } else editor.zoomWheel(local(e), e.deltaY);

@@ -1,5 +1,5 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { levelAbove, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isFloor, isRoof, isSlab, isStair, levelAbove, openingsOfWall, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
 import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
@@ -204,7 +204,11 @@ export function bandPiece(rw: ResolvedWall, b: LayerBand, meta?: Pick<PieceMeta,
 }
 
 /** Cota absoluta em que um pedaço existe: envolvente dos vértices (topo inclinado incluído). Sem vértices: null. */
+const spanRangeCache = new WeakMap<SolidPiece, readonly [number, number] | null>();
+
 export function spanRange(sp: SolidPiece): readonly [number, number] | null {
+  const cached = spanRangeCache.get(sp);
+  if (cached !== undefined) return cached;
   let z0 = Infinity;
   let z1 = -Infinity;
   for (const poly of sp.poly) {
@@ -216,18 +220,72 @@ export function spanRange(sp: SolidPiece): readonly [number, number] | null {
       }
     }
   }
-  return z0 <= z1 ? [z0, z1] : null;
+  const result = z0 <= z1 ? [z0, z1] as const : null;
+  spanRangeCache.set(sp, result);
+  return result;
 }
 
 /**
  * Pedaços de cada categoria de um nível, sem filtro: pisos e lajes por camada; paredes por faixa (`wallBandPieces`).
  */
+const levelCuttersCache = new WeakMap<Project, Map<Id, LevelCutters>>();
+const levelCutterSourcesByProject = new WeakMap<Project, Map<Id, readonly unknown[]>>();
+const levelCutterContentCache = new Map<Id, { sources: readonly unknown[]; value: LevelCutters }>();
+
+function cutterSources(p: Project, levelId: Id): readonly unknown[] {
+  let byLevel = levelCutterSourcesByProject.get(p);
+  if (!byLevel) {
+    byLevel = new Map();
+    levelCutterSourcesByProject.set(p, byLevel);
+  }
+  const cached = byLevel.get(levelId);
+  if (cached) return cached;
+  const walls = wallsOnLevel(p, levelId);
+  const sources: unknown[] = [
+    p.levels, p.settings, p.defaults, p.wallTypes, p.openingTypes, p.floorTypes, p.slabTypes, p.roofTypes, p.stairTypes,
+    ...walls,
+    ...walls.flatMap((wall) => openingsOfWall(p, wall.id)),
+    ...floorsOnLevel(p, levelId),
+    ...slabsOnLevel(p, levelId),
+    ...stairsOnLevel(p, levelId),
+    ...roofsOnLevel(p, levelId),
+    // Alturas anexadas e contornos com dependências verticais também leem estes elementos de outros níveis.
+    ...Object.values(p.elements).filter((e) => isFloor(e) || isSlab(e) || isStair(e) || isRoof(e)),
+  ];
+  byLevel.set(levelId, sources);
+  return sources;
+}
+
+const sameSources = (a: readonly unknown[], b: readonly unknown[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Cortadores de um nível são puros para um snapshot imutável do projeto. `levelCutterSet` consulta todos os níveis
+ * para cada nível pedido; guardar a resolução local evita refazer pisos, lajes e `resolveLevel` em padrão N².
+ */
 function levelCutters(p: Project, levelId: Id): LevelCutters {
-  return {
+  let byLevel = levelCuttersCache.get(p);
+  if (!byLevel) {
+    byLevel = new Map();
+    levelCuttersCache.set(p, byLevel);
+  }
+  const cached = byLevel.get(levelId);
+  if (cached) return cached;
+  const sources = cutterSources(p, levelId);
+  const content = levelCutterContentCache.get(levelId);
+  if (content && sameSources(content.sources, sources)) {
+    byLevel.set(levelId, content.value);
+    return content.value;
+  }
+  const result: LevelCutters = {
     floors: resolveFloors(p, levelId).map((rf) => ({ kind: 'floor', pieces: rf.layers.map((l) => floorLayerPiece(rf, l)) })),
     slabs: resolveSlabs(p, levelId).map((rs) => ({ kind: 'slab', pieces: rs.layers.map((l) => slabLayerPiece(rs, l)) })),
     walls: [{ kind: 'wall', pieces: wallBandPieces(p, levelId).map((w) => w.piece) }],
   };
+  byLevel.set(levelId, result);
+  levelCutterContentCache.delete(levelId);
+  levelCutterContentCache.set(levelId, { sources, value: result });
+  if (levelCutterContentCache.size > 1024) levelCutterContentCache.delete(levelCutterContentCache.keys().next().value!);
+  return result;
 }
 
 /** Cortadores separados por categoria, como os usam quantitativos e junção. */
@@ -237,17 +295,31 @@ export interface LevelCutters {
   walls: CutterSolid[];
 }
 
+const levelCutterSetCache = new Map<Id, { sources: readonly unknown[]; value: LevelCutters }>();
+const levelCutterSetByProject = new WeakMap<Project, Map<Id, LevelCutters>>();
+
 /**
  * Cortadores de um nível (0023 §1, F1b): pisos, lajes e paredes do próprio nível, mais os de OUTROS níveis que tocam a
  * faixa de cota do nível. Assim a laje do pavimento de cima corta a parede do térreo que a atravessa, e a parede que sobe
  * corta a laje de cima. Peças de outro nível sem cota comum com o nível não entram. Peças próprias entram sempre.
  */
 export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
+  const exact = levelCutterSetByProject.get(p)?.get(levelId);
+  if (exact) return exact;
+  const remember = (value: LevelCutters): LevelCutters => {
+    let byLevel = levelCutterSetByProject.get(p);
+    if (!byLevel) {
+      byLevel = new Map();
+      levelCutterSetByProject.set(p, byLevel);
+    }
+    byLevel.set(levelId, value);
+    return value;
+  };
   const own = levelCutters(p, levelId);
   const ownRanges = [...own.floors, ...own.slabs, ...own.walls]
     .flatMap((c) => c.pieces.map(spanRange))
     .filter((r): r is readonly [number, number] => r !== null);
-  if (ownRanges.length === 0) return own;
+  if (ownRanges.length === 0) return remember(own);
   const lo = Math.min(...ownRanges.map((r) => r[0]));
   const hi = Math.max(...ownRanges.map((r) => r[1]));
   const reaches = (sp: SolidPiece): boolean => {
@@ -255,6 +327,7 @@ export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
     return r !== null && r[1] > lo + Z_EPS && r[0] < hi - Z_EPS;
   };
   const out: LevelCutters = { floors: [...own.floors], slabs: [...own.slabs], walls: [...own.walls] };
+  const sources: unknown[] = [p.levels, own];
   for (const other of p.levels) {
     if (other.id === levelId) continue;
     const c = levelCutters(p, other.id);
@@ -262,11 +335,20 @@ export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
       solids
         .map((s) => ({ kind: s.kind, pieces: s.pieces.filter(reaches).map((sp) => ({ ...sp, external: true })) }))
         .filter((s) => s.pieces.length > 0);
-    out.floors.push(...keep(c.floors));
-    out.slabs.push(...keep(c.slabs));
-    out.walls.push(...keep(c.walls));
+    const floors = keep(c.floors);
+    const slabs = keep(c.slabs);
+    const walls = keep(c.walls);
+    if (floors.length || slabs.length || walls.length) sources.push(c);
+    out.floors.push(...floors);
+    out.slabs.push(...slabs);
+    out.walls.push(...walls);
   }
-  return out;
+  const cached = levelCutterSetCache.get(levelId);
+  if (cached && sameSources(cached.sources, sources)) return remember(cached.value);
+  levelCutterSetCache.delete(levelId);
+  levelCutterSetCache.set(levelId, { sources, value: out });
+  if (levelCutterSetCache.size > 1024) levelCutterSetCache.delete(levelCutterSetCache.keys().next().value!);
+  return remember(out);
 }
 
 /** Pedaços dos pisos do nível e dos níveis que o alcançam (F1b), camada a camada. */

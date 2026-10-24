@@ -323,12 +323,23 @@ function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): Soli
   return b;
 }
 
-/** Limite de camadas de parede guardadas (a mais antiga sai primeiro): um projeto típico usa algumas dezenas. */
-const WALL_CACHE_MAX = 512;
+/** Teto de memória estimada para os sólidos reaproveitáveis de paredes. */
+const WALL_CACHE_BYTES_MAX = 64 * 1024 * 1024;
 
 /** Sólido de uma camada de parede, com índices locais (começam em 0), por chave de conteúdo (`wallLayerKey`). */
 const wallLayerCache = new Map<string, SolidBatch>();
 let wallLayerStats = { hits: 0, misses: 0 };
+let wallLayerCacheBytes = 0;
+
+/** Arrays numéricos do cache são arrays JS (8 bytes por número); ids e objetos recebem margem conservadora. */
+function estimatedBatchBytes(batch: SolidBatch): number {
+  return 256 + 8 * (batch.positions.length + batch.normals.length + batch.indices.length) + 48 * batch.ids.length;
+}
+
+function estimatedCacheEntryBytes(key: string, batch: SolidBatch): number {
+  // Chaves contêm o JSON das faixas e ficam retidas pelo Map junto com a malha.
+  return estimatedBatchBytes(batch) + 128 + key.length * 2;
+}
 
 /**
  * Chave de conteúdo de uma camada: o que a extrusão lê (id da parede, material, cota da base e faixas). Parede que não
@@ -351,8 +362,16 @@ function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?
   wallLayerStats.misses++;
   const local: SolidBatch = { materialId: l.materialId, category: 'wall', positions: [], normals: [], indices: [], ids: [] };
   ofElement(local, rw.wallId, () => extrudeLayer(local, fuseBands(wallLayerBandsAfterJunction(jl, rw, l)), rw.baseZ));
-  if (wallLayerCache.size >= WALL_CACHE_MAX) wallLayerCache.delete(wallLayerCache.keys().next().value!);
+  const bytes = estimatedCacheEntryBytes(key, local);
+  if (bytes > WALL_CACHE_BYTES_MAX) return local;
+  while (wallLayerCache.size && wallLayerCacheBytes + bytes > WALL_CACHE_BYTES_MAX) {
+    const oldest = wallLayerCache.entries().next().value;
+    if (!oldest) break;
+    wallLayerCacheBytes -= estimatedCacheEntryBytes(oldest[0], oldest[1]);
+    wallLayerCache.delete(oldest[0]);
+  }
   wallLayerCache.set(key, local);
+  wallLayerCacheBytes += bytes;
   return local;
 }
 
@@ -379,13 +398,14 @@ export function buildLevelSolids(r: ResolvedLevel, jl?: JunctionLevel): LevelSol
 }
 
 /** Contadores do cache de camadas de parede (acertos e erros desde o início ou o último `clearWallLayerCache`). */
-export function wallLayerCacheStats(): { hits: number; misses: number; size: number } {
-  return { ...wallLayerStats, size: wallLayerCache.size };
+export function wallLayerCacheStats(): { hits: number; misses: number; size: number; estimatedBytes: number; maxBytes: number } {
+  return { ...wallLayerStats, size: wallLayerCache.size, estimatedBytes: wallLayerCacheBytes, maxBytes: WALL_CACHE_BYTES_MAX };
 }
 
 /** Esvazia o cache de camadas de parede e zera os contadores (testes e troca de projeto). */
 export function clearWallLayerCache(): void {
   wallLayerCache.clear();
+  wallLayerCacheBytes = 0;
   wallLayerStats = { hits: 0, misses: 0 };
 }
 

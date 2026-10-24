@@ -33,6 +33,8 @@ export interface InferContext {
   extraPoints?: Vec2[];
   /** Capturas ligadas (padrão: DEFAULT_SNAP). */
   snap?: SnapOptions;
+  /** Índice usado para ciclar referências de alinhamento equivalentes/próximas (Tab na ferramenta Parede). */
+  alignmentCycle?: number;
 }
 
 const TOL_PX = 10;
@@ -177,31 +179,76 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   }
   if (ctx.onWallsOnly) return pickBest(cands, cursor, [], undefined);
 
-  // Alinhamento dinâmico horizontal/vertical e rastreamento com extremidades, pontos médios e ponto anterior.
+  // Alinhamento dinâmico horizontal/vertical parte de eixos, faces e pontos extra.
   const refs: Vec2[] = [];
   if (ctx.from) refs.push(ctx.from);
   refs.push(...ends);
   if (sn.midpoint !== false) {
     for (const w of walls) refs.push(wallMid(w));
   }
+  const faceTracks: Array<{ a: Vec2; b: Vec2 }> = [];
+  if (sn.alignment && sn.faces) {
+    for (const wf of facesOf(ctx.project, ctx.levelId)) {
+      if (ctx.ignore?.has(wf.wallId)) continue;
+      // wallFaces ordena primeiro as duas laterais longitudinais e depois as tampas.
+      // Curvas não fornecem faces laterais lineares nessa API.
+      for (const seg of wf.faces.slice(0, 2)) {
+        if (dist(seg[0], seg[1]) < 1e-9) continue;
+        faceTracks.push({ a: seg[0], b: seg[1] });
+        refs.push(seg[0], seg[1]);
+      }
+    }
+  }
   if (!ctx.onWallsOnly && ctx.extraPoints) {
     refs.push(...ctx.extraPoints);
   }
 
-  let ax: Vec2 | null = null;
-  let ay: Vec2 | null = null;
-  for (const r of refs) {
-    if (Math.abs(cursor.x - r.x) <= tol && (!ax || Math.abs(cursor.x - r.x) < Math.abs(cursor.x - ax.x))) ax = r;
-    if (Math.abs(cursor.y - r.y) <= tol && (!ay || Math.abs(cursor.y - r.y) < Math.abs(cursor.y - ay.y))) ay = r;
-  }
-  if (sn.alignment && (ax || ay)) {
+  const alignments: Array<{ point: Vec2; score: number; guides: Guide[] }> = [];
+  // Uma linha por coordenada evita que dois pontos da mesma face criem candidatos duplicados.
+  const addAxisRef = (axis: 'x' | 'y', ref: Vec2): void => {
+    const delta = Math.abs(cursor[axis] - ref[axis]);
+    if (delta > tol || alignments.some((c) => c.guides[0]?.from[axis] === ref[axis] && c.guides[0]?.kind === 'alignment')) return;
     const g = ctx.noGrid ? 0 : ctx.gridStep;
     const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
-    const p = v2(ax ? ax.x : free(cursor.x), ay ? ay.y : free(cursor.y));
-    const guides: Guide[] = [];
-    if (ax) guides.push({ from: ax, to: p, kind: 'alignment' });
-    if (ay) guides.push({ from: ay, to: p, kind: 'alignment' });
-    add({ point: p, kind: 'alignment', score: dist(cursor, p) + tol * 0.25, guides });
+    const point = axis === 'x' ? v2(ref.x, free(cursor.y)) : v2(free(cursor.x), ref.y);
+    alignments.push({ point, score: delta + tol * 0.25, guides: [{ from: ref, to: point, kind: 'alignment' }] });
+  };
+  if (sn.alignment) {
+    const cursorOnFace = faceTracks.some(({ a, b }) => {
+      const d = sub(b, a);
+      const ll = dot(d, d);
+      if (ll < 1e-12) return false;
+      const t = dot(sub(cursor, a), d) / ll;
+      if (t < 0 || t > 1) return false;
+      return dist(cursor, v2(a.x + d.x * t, a.y + d.y * t)) <= tol;
+    });
+    if (!cursorOnFace) {
+      for (const r of refs) {
+        addAxisRef('x', r);
+        addAxisRef('y', r);
+      }
+    }
+    // Rastreia a extensão das faces laterais, inclusive em paredes oblíquas. A âncora da guia
+    // fica no trecho real da face mais próximo da projeção, e o ponto pode cair fora do segmento.
+    for (const { a, b } of faceTracks) {
+      const d = sub(b, a);
+      const ll = dot(d, d);
+      if (ll < 1e-12) continue;
+      const t = dot(sub(cursor, a), d) / ll;
+      const projected = v2(a.x + d.x * t, a.y + d.y * t);
+      const off = dist(cursor, projected);
+      if (off <= tol && (t < 0 || t > 1)) {
+        const anchor = closestOnSegment(projected, a, b);
+        alignments.push({ point: projected, score: off + tol * 0.25, guides: [{ from: anchor, to: projected, kind: 'alignment' }] });
+      }
+    }
+  }
+  const hasGeometrySnap = cands.some((c) => PRIORITY[c.kind] < PRIORITY.alignment);
+  if (alignments.length && !hasGeometrySnap) {
+    alignments.sort((a, b) => a.score - b.score);
+    const index = ((ctx.alignmentCycle ?? 0) % alignments.length + alignments.length) % alignments.length;
+    const selected = alignments[index]!;
+    add({ point: selected.point, kind: 'alignment', score: selected.score, guides: selected.guides });
   }
 
   // Ortogonal a partir do ponto anterior: sempre ativo quando próximo, travado com Shift/opção.

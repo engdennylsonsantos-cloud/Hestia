@@ -66,3 +66,5 @@ Não suportado nesta versão (avisa na barra de status, sem gravar):
 - Junção de paredes com arestas continua só entre paredes (`joinTool.ts`).
 
 Pendente: escadas e ambientes (§5). Verificação de interface na tela ainda não feita.
+
+**Atualização (mesmo dia):** resolvidos nesta rodada: furos na divisão de piso e laje (ficam na parte que contém o seu centro; furo cortado pela linha é descartado), laje com caimento (as duas partes mantêm o plano de caimento) e junção de arestas (feita pelo Aparar entre duas arestas, que é como o Revit une linhas de croqui). Ainda em aberto: copiar aresta e deslocar com cópia (depende de decidir se a cópia vai para outro elemento ou gera um contorno novo, porque no mesmo contorno fechado a cópia ficaria sobreposta); escadas e ambientes (fase 2).

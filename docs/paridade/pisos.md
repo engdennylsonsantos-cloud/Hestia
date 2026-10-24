@@ -56,7 +56,7 @@ Fonte do comportamento: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) (Revit: Fl
 - [x] F1 Selecionar (clique, janela), mover, copiar, girar, espelhar, matriz **(bloqueante)**
 - [x] F2 Colar alinhado entre níveis inclui pisos
 - [x] F3 Selecionar todos do mesmo tipo
-- [-] F4 Dividir piso por uma linha: compartilha a operação de recorte com as lajes; entra no checklist de lajes
+- [x] F4 Dividir piso por uma linha: gera dois pisos do mesmo tipo (decisão 0031 §2); furos seguem a parte que contém o seu centro, furo cortado pela linha é descartado; contorno vinculado às paredes fica travado até Desvincular. Evidência: `packages/tools/src/splitEdge.test.ts`, `splitRing.test.ts`
 - [x] F5 Ferramenta Piso no Ribbon, atalho e barra de opções (tipo, deslocamento, modo)
 
 ## G · Qualidade

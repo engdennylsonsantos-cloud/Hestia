@@ -433,3 +433,5 @@ Testes alvo que passaram: `terminoPiso.test.ts`, `terminoLaje.test.ts`, `junctio
 - Autodesk, Attach Walls to Other Elements (2026): help.autodesk.com/cloudhelp/2026/ENU/Revit-ArchDesign/files/GUID-ED60CE62-B955-45E9-9D7D-00F1552D858C.htm
 - Autodesk, Create a Floor (2015): help.autodesk.com/cloudhelp/2015/ENU/Revit-Model/files/GUID-A688CED0-E08C-4ED3-A8E8-14CBE78902BB.htm
 - Graphisoft, Basic Intersection Principles (AC25): help.graphisoft.com/START/25/INT/_AC25_Help/040_ElementsVB/040_ElementsVB-269.htm
+
+**Nota (2026-10-24):** a regra de §8.2b (editar o contorno de piso ou laje vinculado solta o vínculo sozinho) foi substituída pela [0031](0031-modificar-sobre-linhas-de-croqui.md) §1: o contorno vinculado fica travado e pede Desvincular antes da edição.

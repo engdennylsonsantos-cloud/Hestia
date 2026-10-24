@@ -118,3 +118,31 @@ describe('ferramenta Dividir: aresta e piso', () => {
     expect(fs[0]!.boundary).toEqual(RECT);
   });
 });
+
+describe('ferramenta Dividir: furos e caimento', () => {
+  it('furo fica na parte que contém o seu centro; o da outra parte não se duplica', () => {
+    const hole = [{ x: 2.8, y: 1 }, { x: 3.2, y: 1 }, { x: 3.2, y: 2 }, { x: 2.8, y: 2 }];
+    const { store, env, messages } = rectFloor({ holes: [hole] });
+    const t = tool('split', env);
+    clickAt(t, 2, 1);
+    clickAt(t, 2, 2);
+    const fs = floors(store);
+    expect(fs).toHaveLength(2);
+    const comFuro = fs.filter((f) => f.holes.length === 1);
+    expect(comFuro).toHaveLength(1);
+    expect(comFuro[0]!.id).toBe(fs.find((f) => f.id !== 'f1')!.id);
+    expect(messages.at(-1)).toMatch(/Piso dividido em dois/);
+  });
+
+  it('laje com caimento: as duas partes mantêm a mesma inclinação', () => {
+    const { store, env } = makeEnv();
+    const slope = { origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 2 };
+    store.exec({ type: 'addSlab', slab: { kind: 'slab', id: 'l1', typeId: 'ls_mac12', levelId: 'lv_0', boundary: RECT, holes: [], heightOffset: 0, slope, mark: '', comments: '' } });
+    const t = tool('split', env);
+    clickAt(t, 2, 1);
+    clickAt(t, 2, 2);
+    const ls = Object.values(store.project.elements).filter((e) => e.kind === 'slab') as Array<{ slope: unknown }>;
+    expect(ls).toHaveLength(2);
+    for (const l of ls) expect(l.slope).toEqual(slope);
+  });
+});

@@ -1,4 +1,4 @@
-import { type Vec2 } from '@hestia/geom';
+import { pointInRing, type Vec2 } from '@hestia/geom';
 import { isFloor, isOpening, isRoof, isSlab, isWall, makeFloor, makeSlab, type Floor, type Id, type Slab, type Wall } from '@hestia/model';
 import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
 import { ToolBase, makeId } from './base.ts';
@@ -92,7 +92,6 @@ export class SplitTool extends ToolBase {
   /** Motivo para não dividir o piso ou a laje, ou null se pode dividir. */
   private blockReason(el: Floor | Slab): string | null {
     if (el.outlineSource?.linked) return OUTLINE_LOCKED_MSG;
-    if (isSlab(el) && el.slope) return 'Dividir laje com caimento ainda não suportado';
     return null;
   }
 
@@ -256,20 +255,25 @@ export class SplitTool extends ToolBase {
     }
     const [first, second] = parts;
     const floor = isFloor(el);
-    const hadHoles = el.holes.length > 0;
+    // Furo fica na parte que contém o seu centro; furo que a linha corta é descartado (não há como dividi-lo).
+    const holesOf = (ring: Vec2[]): Vec2[][] => el.holes.filter((h) => pointInRing(centroidOf(h), ring));
+    const firstHoles = holesOf(first);
+    const secondHoles = holesOf(second);
+    const cut = el.holes.length - firstHoles.length - secondHoles.length;
     try {
       this.env.transaction(floor ? 'Dividir piso' : 'Dividir laje', () => {
-        const common = { typeId: el.typeId, levelId: el.levelId, boundary: second, holes: [], heightOffset: el.heightOffset, mark: el.mark, comments: el.comments };
+        // Caimento é um plano: as duas partes mantêm a mesma inclinação.
+        const common = { typeId: el.typeId, levelId: el.levelId, boundary: second, holes: secondHoles, heightOffset: el.heightOffset, mark: el.mark, comments: el.comments };
         if (isFloor(el)) this.env.exec({ type: 'addFloor', floor: makeFloor({ ...common, id: makeId('f') }) });
-        else this.env.exec({ type: 'addSlab', slab: makeSlab({ ...common, id: makeId('l') }) });
-        this.env.exec({ type: 'updateElements', ids: [el.id], patch: { boundary: first, holes: [] } });
+        else this.env.exec({ type: 'addSlab', slab: makeSlab({ ...common, slope: el.slope, id: makeId('l') }) });
+        this.env.exec({ type: 'updateElements', ids: [el.id], patch: { boundary: first, holes: firstHoles } });
       });
     } catch (e) {
       this.env.say(e instanceof Error ? e.message : 'Não foi possível dividir o elemento.');
       return;
     }
     const msg = floor ? 'Piso dividido em dois' : 'Laje dividida em duas';
-    this.env.say(hadHoles ? `${msg}. Furos não foram divididos.` : `${msg}.`);
+    this.env.say(cut > 0 ? `${msg}. ${cut} furo(s) cortado(s) pela linha foram removidos.` : `${msg}.`);
   }
 
   override type(text: string): boolean {
@@ -295,4 +299,10 @@ export class SplitTool extends ToolBase {
     this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(gap)}.` : `Parede dividida em ${fmt(t)} do início.`);
     return true;
   }
+}
+
+/** Média dos vértices: centro de referência de um furo para saber em qual parte do piso ele cai. */
+function centroidOf(ring: Vec2[]): Vec2 {
+  const n = ring.length;
+  return { x: ring.reduce((s, q) => s + q.x, 0) / n, y: ring.reduce((s, q) => s + q.y, 0) / n };
 }

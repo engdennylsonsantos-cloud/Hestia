@@ -297,21 +297,32 @@ export function ViewportCanvas(): ReactElement {
       drag.current.mode = 'none';
       return;
     }
-    const panBtn = e.button === 1 || (e.button === 0 && (spaceDown.current || (view === '3d' && e.shiftKey)));
+    const isMiddleBtn = e.button === 1;
+    const isOrbitReq = (isMiddleBtn && e.shiftKey) || (e.button === 0 && e.altKey);
+    const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || (view !== '3d' && e.shiftKey)));
     if (e.button === 2) {
       if (view === 'plan') editor.activeTool.cancel();
       editor.bump();
       return;
     }
     if (view === '3d') {
-      drag.current = { mode: panBtn ? 'pan' : 'orbit', start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current };
+      const mode = isOrbitReq ? 'orbit' : isPanReq ? 'pan' : (e.button === 0 ? 'orbit' : 'none');
+      if (mode === 'orbit' && useUi.getState().selection.length > 0) {
+        const selBox = model.current.selectionBounds(useUi.getState().selection);
+        if (selBox) {
+          const center = selBox.getCenter(model.current.orbit.target.clone());
+          model.current.orbit.target.copy(center);
+          model.current.orbit.apply();
+        }
+      }
+      drag.current = { mode, start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current && !e.altKey };
       // Ao pressionar, o realce some: enquanto arrasta, o cursor orbita e não destaca.
       if (useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
     // Na vista de corte não há ferramentas: o botão esquerdo arrasta a vista e, sem arrasto, seleciona (decisão 0016).
-    if (panBtn || view === 'section') {
-      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && !panBtn && e.button === 0 };
+    if (isPanReq || isMiddleBtn || view === 'section') {
+      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && !isPanReq && e.button === 0 };
       if (view === 'section' && useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
@@ -386,15 +397,21 @@ export function ViewportCanvas(): ReactElement {
     }
     // Clique sem arrasto na vista 3D. Com ferramenta que aceita pick3d: vai o ponto da superfície sob o cursor (no plano).
     // Sem essa ferramenta (seleção): seleciona o elemento sob o cursor; Shift/Ctrl acrescenta ou alterna (decisão 0016 §3).
+    // Clique no vazio deseleciona.
     if (!d.moved && d.pick && useUi.getState().view === '3d') {
+      const hit = pick3dAt(s);
+      const el = elementAt3d(s);
       if (editor.activeTool.pick3d) {
-        if (d.mode === 'orbit') {
-          const hit = pick3dAt(s);
-          if (hit) editor.pointer('click', { raw: hit, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, hit3d: elementAt3d(s)?.id ?? null });
-          else useUi.setState({ status: 'Nada sob o cursor: clique numa parede ou no telhado do modelo.' });
+        if (hit || el) {
+          editor.pointer('click', { raw: hit ?? { x: 0, y: 0 }, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey, hit3d: el?.id ?? null });
+        } else {
+          // Clique no vazio cancela/sai para a ferramenta de seleção
+          editor.activeTool.cancel();
+          clickSelect3d(null, false);
+          useUi.setState({ status: 'Modo de seleção ativado.' });
         }
       } else {
-        clickSelect3d(elementAt3d(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+        clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
     // Clique sem arrasto no corte ou na elevação: o mesmo caminho da 3D (clickSelect3d, que usa selectionAfterClick).
@@ -421,8 +438,16 @@ export function ViewportCanvas(): ReactElement {
   const onLeave = (): void => { if (['3d', 'section'].includes(useUi.getState().view) && useUi.getState().hover) useUi.setState({ hover: null }); };
 
   const v = editor.viewport();
-  // Sobre um elemento do 3D, o cursor vira mão (pointer); no vazio, a mão de arrastar a vista.
-  const cursorCss = ui.view === '3d' ? (ui.hover ? 'pointer' : 'grab') : ui.view === 'section' ? (ui.hover ? 'pointer' : 'grab') : ui.tool === 'select' ? 'default' : 'crosshair';
+  // Cursores refinados estilo Revit:
+  // - No 3D: sobre objeto = pointer; arrastando órbita/pan = grabbing; repouso = default
+  const isDragging = drag.current.mode !== 'none' && drag.current.moved;
+  const cursorCss = ui.view === '3d'
+    ? (isDragging ? 'grabbing' : (ui.hover ? 'pointer' : 'default'))
+    : ui.view === 'section'
+    ? (ui.hover ? 'pointer' : 'grab')
+    : ui.tool === 'select'
+    ? 'default'
+    : 'crosshair';
   return (
     <div
       ref={host}

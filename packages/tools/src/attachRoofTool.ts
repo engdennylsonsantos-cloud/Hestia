@@ -19,7 +19,7 @@ function wallUnder(p: Project, levelId: Id, info: PointerInfo, mpp: number): Id 
   if (info.hit3d !== undefined) {
     const e = info.hit3d ? p.elements[info.hit3d] : undefined;
     const w = e && isOpening(e) ? p.elements[e.hostId] : e;
-    return w && isWall(w) && w.levelId === levelId ? w.id : null;
+    return w && isWall(w) ? w.id : null;
   }
   const hit = pickAt(p, levelId, info.raw, mpp);
   if (!hit) return null;
@@ -32,7 +32,7 @@ function wallUnder(p: Project, levelId: Id, info: PointerInfo, mpp: number): Id 
 function roofUnder(p: Project, levelId: Id, info: PointerInfo, mpp: number): Id | null {
   if (info.hit3d !== undefined) {
     const r: Roof | undefined = info.hit3d ? (p.elements[info.hit3d] as Roof | undefined) : undefined;
-    return r && isRoof(r) && r.levelId === levelId ? r.id : null;
+    return r && isRoof(r) ? r.id : null;
   }
   return pickRoofAt(p, levelId, info.raw, mpp);
 }
@@ -132,6 +132,14 @@ export class AttachRoofTool extends ToolBase {
     }
     const roof = roofUnder(pr, levelId, p, mpp);
     if (!roof) {
+      // Se clicou numa parede na etapa do telhado, troca a seleção para essa parede
+      const w = wallUnder(pr, levelId, p, mpp);
+      if (w) {
+        this.walls = [w];
+        this.env.setSelection([w]);
+        this.env.say('Parede alterada. Selecione o telhado para anexar topo.');
+        return;
+      }
       this.env.say('Clique sobre um telhado do nível atual. Enter volta às paredes.');
       return;
     }
@@ -147,7 +155,7 @@ export class AttachRoofTool extends ToolBase {
     this.confirm();
   }
 
-  /** Grava o telhado nas paredes escolhidas, em um único comando (um passo de desfazer). A ferramenta continua ativa. */
+  /** Grava o telhado nas paredes escolhidas, em um único comando (um passo de desfazer). Conclui a ferramenta. */
   private apply(roofId: Id): void {
     const pr = this.env.project();
     const ids = this.walls.filter((id) => isWall(pr.elements[id]));
@@ -166,6 +174,7 @@ export class AttachRoofTool extends ToolBase {
     const done = `Topo anexado a ${ids.length} parede(s).`;
     const more = notes.length > 1 ? ` (e mais ${notes.length - 1})` : '';
     this.env.say(notes.length ? `${done} Aviso: ${notes[0]}${more}. Ctrl+Z desfaz.` : `${done} Ctrl+Z desfaz.`);
+    this.env.done();
   }
 }
 

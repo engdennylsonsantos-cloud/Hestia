@@ -377,6 +377,36 @@ export class ModelScene {
     return this.boxCache;
   }
 
+  /** Caixa delimitadora (mundo) dos elementos dados (seleção), ou null se vazia/não encontrada. */
+  selectionBounds(ids: readonly Id[]): THREE.Box3 | null {
+    if (!ids.length) return null;
+    const want = new Set(ids);
+    const box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    this.model.updateMatrixWorld(true);
+    this.model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const ranges = mesh.userData.ranges as ElementRange[] | undefined;
+      const index = (mesh.geometry as THREE.BufferGeometry | undefined)?.index;
+      if (!mesh.isMesh || !ranges || !index) {
+        // Elementos que podem ter userData.elementId direto (ex: aberturas)
+        if (mesh.userData.elementId && want.has(mesh.userData.elementId as Id)) {
+          box.expandByObject(mesh);
+        }
+        return;
+      }
+      const attr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+      for (const r of ranges) {
+        if (!want.has(r.id)) continue;
+        for (let k = r.start; k < r.start + r.count; k++) {
+          v.fromBufferAttribute(attr, index.getX(k)).applyMatrix4(mesh.matrixWorld);
+          box.expandByPoint(v);
+        }
+      }
+    });
+    return box.isEmpty() ? null : box;
+  }
+
   fit(): void {
     if (this.boxCache.isEmpty()) {
       this.orbit.target.set(0, 0, 1);

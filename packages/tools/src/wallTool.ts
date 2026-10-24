@@ -2,6 +2,7 @@ import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThree
 import { exteriorOffset } from '@hestia/engine';
 import { makeWall, totalThickness, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import type { InferContext } from './infer.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
@@ -14,13 +15,15 @@ const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 export class WallTool extends ToolBase {
   readonly id = 'wall';
   readonly label = 'Parede';
-  readonly hint = 'Parede: clique no ponto inicial. Tab inverte o lado externo.';
+  readonly hint = 'Parede: clique no ponto inicial. Tab alterna referências de alinhamento; Espaço inverte o lado.';
   private startPt: Vec2 | null = null;
   /** Arco: ponto final da corda, já definido; falta o ponto sobre o arco. */
   private chordEnd: Vec2 | null = null;
   private first: Vec2 | null = null;
   private count = 0;
   private flip = false;
+  private alignmentCycle = 0;
+  private lastPointer: PointerInfo | null = null;
 
   protected reset(): void {
     this.startPt = null;
@@ -29,6 +32,8 @@ export class WallTool extends ToolBase {
     this.count = 0;
     this.items = [];
     this.inf = null;
+    this.alignmentCycle = 0;
+    this.lastPointer = null;
   }
 
   protected busy(): boolean {
@@ -45,7 +50,7 @@ export class WallTool extends ToolBase {
 
   /**
    * Lado externo à direita de a→b (`flipped`). Paredes de retângulo saem anti-horárias, então o externo
-   * padrão é o da direita (para fora); Tab inverte nos dois casos.
+   * padrão é o da direita (para fora); Espaço inverte nos dois casos.
    */
   private sideFlip(): boolean {
     return this.isRect() ? !this.flip : this.flip;
@@ -57,8 +62,18 @@ export class WallTool extends ToolBase {
   }
 
   override tab(): void {
+    this.alignmentCycle += 1;
+    if (this.lastPointer) this.move(this.lastPointer);
+  }
+
+  override space(): void {
     this.flip = !this.flip;
+    if (this.lastPointer) this.move(this.lastPointer);
     this.env.say(this.sideFlip() ? 'Lado externo à direita do sentido de desenho.' : 'Lado externo à esquerda do sentido de desenho.');
+  }
+
+  private snapWall(p: PointerInfo, extra: Partial<InferContext> = {}) {
+    return this.snap(p, { ...extra, alignmentCycle: this.alignmentCycle });
   }
 
   private band() {
@@ -83,7 +98,7 @@ export class WallTool extends ToolBase {
   }
 
   private moveRect(p: PointerInfo): void {
-    const inf = this.snap(p);
+    const inf = this.snapWall(p);
     this.items = [];
     const a = this.startPt;
     if (!a) {
@@ -100,7 +115,7 @@ export class WallTool extends ToolBase {
   }
 
   private clickRect(p: PointerInfo): void {
-    const inf = this.snap(p);
+    const inf = this.snapWall(p);
     if (!this.startPt) {
       this.startPt = inf.point;
       this.first = inf.point;
@@ -122,11 +137,12 @@ export class WallTool extends ToolBase {
   }
 
   override move(p: PointerInfo): void {
+    this.lastPointer = p;
     if (this.isRect()) {
       this.moveRect(p);
       return;
     }
-    const inf = this.snap(p, { from: this.chordEnd ?? this.startPt ?? undefined });
+    const inf = this.snapWall(p, { from: this.chordEnd ?? this.startPt ?? undefined });
     this.items = [];
     if (!this.startPt) {
       this.items.push({ kind: 'point', at: inf.point });
@@ -190,7 +206,7 @@ export class WallTool extends ToolBase {
       this.clickRect(p);
       return;
     }
-    const inf = this.snap(p, { from: this.chordEnd ?? this.startPt ?? undefined });
+    const inf = this.snapWall(p, { from: this.chordEnd ?? this.startPt ?? undefined });
     if (!this.startPt) {
       this.startPt = inf.point;
       this.first = inf.point;

@@ -30,6 +30,7 @@ export abstract class ToolBase implements Tool {
     return false;
   }
   tab(): void {}
+  space(): void {}
   confirm(): void {
     if (this.busy()) {
       this.reset();

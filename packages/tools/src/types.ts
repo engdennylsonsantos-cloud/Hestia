@@ -182,6 +182,8 @@ export interface Tool {
   type(text: string): boolean;
   /** Tab alterna uma opção da ferramenta. */
   tab(): void;
+  /** Espaço alterna uma opção secundária quando a ferramenta declara suporte. */
+  space?(): void;
   /** Esc: cancela o passo; segundo Esc sai da ferramenta. */
   cancel(): void;
   confirm(): void;

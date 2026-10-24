@@ -280,6 +280,11 @@ export class Editor {
       this.bump();
       return true;
     }
+    if (k === ' ' && this.tool.id === 'wall') {
+      this.tool.space?.();
+      this.bump();
+      return true;
+    }
     // Campo numérico: dígitos e operadores; ferramenta de texto (freeText): qualquer tecla digitável.
     if (this.tool.inputPrompt() && (this.tool.freeText ? k.length === 1 : /^[0-9.,+\-*/()]$/.test(k))) {
       useUi.setState({ typed: ui.typed + k });

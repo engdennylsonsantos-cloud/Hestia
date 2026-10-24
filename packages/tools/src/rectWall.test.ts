@@ -82,10 +82,10 @@ describe('parede por retângulo (A5)', () => {
     expect(walls(store)).toHaveLength(0);
   });
 
-  it('Tab inverte o lado externo (volta para dentro)', () => {
+  it('Espaço inverte o lado externo (volta para dentro)', () => {
     const { store, env } = rectOpts();
     const t = tool('wall', env);
-    t.tab();
+    t.space?.();
     clickAt(t, 0, 0);
     clickAt(t, 4, 3);
     expect(walls(store).every((w) => !w.flipped)).toBe(true);

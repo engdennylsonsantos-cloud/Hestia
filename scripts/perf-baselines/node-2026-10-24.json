@@ -1,0 +1,2494 @@
+{
+  "geradoEm": "2026-10-24T21:26:16.270Z",
+  "metodo": {
+    "corridas": 30,
+    "aquecimento": 5,
+    "percentil": "p95 = amostra de ordem ceil(0,95·n); mediana pela mesma ordem",
+    "semente": "layout fixo (sem sorteio): gerador de bench-20-pavimentos.mts",
+    "frioQuente": "frio = projeto de geometria nova (chave de cache inédita); quente = mesmo projeto, redesenho",
+    "ambiente": "Node (sem navegador): sem GPU, sem quadros, sem pintura do canvas"
+  },
+  "maquina": {
+    "so": "win32 10.0.19045 (x64)",
+    "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+    "cpusLogicas": 12,
+    "ramTotalGB": 15.8,
+    "ramLivreGBNoInicio": 6.9,
+    "node": "v24.14.1"
+  },
+  "git": {
+    "commit": "f7e1cefa76ce6e6e9c94791757db05f96e5cd1ad",
+    "branch": "worktree-agent-a2eccaf285324061e",
+    "arvoreSuja": true
+  },
+  "projetos": [
+    {
+      "pavimentos": 10,
+      "paredes": 320,
+      "aberturas": 10,
+      "pisos": 10,
+      "lajes": 10,
+      "cobertura": 1
+    },
+    {
+      "pavimentos": 20,
+      "paredes": 640,
+      "aberturas": 20,
+      "pisos": 20,
+      "lajes": 20,
+      "cobertura": 1
+    }
+  ],
+  "resultados": {
+    "10pavimentos": {
+      "levels": [
+        {
+          "id": "lv_0",
+          "name": "Pavimento 1",
+          "elevation": 0,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 70.102,
+              "p95Ms": 80.042,
+              "meanMs": 72.354,
+              "minMs": 65.589,
+              "maxMs": 107.828
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 21.451,
+              "p95Ms": 33.052,
+              "meanMs": 23.491,
+              "minMs": 20.139,
+              "maxMs": 35.238
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.068,
+              "p95Ms": 0.1,
+              "meanMs": 0.066,
+              "minMs": 0.036,
+              "maxMs": 0.121
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.171,
+              "p95Ms": 0.188,
+              "meanMs": 0.174,
+              "minMs": 0.167,
+              "maxMs": 0.207
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.037,
+              "p95Ms": 0.074,
+              "meanMs": 0.044,
+              "minMs": 0.033,
+              "maxMs": 0.103
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.174,
+              "p95Ms": 0.191,
+              "meanMs": 0.177,
+              "minMs": 0.163,
+              "maxMs": 0.193
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.018,
+              "p95Ms": 0.043,
+              "meanMs": 0.021,
+              "minMs": 0.016,
+              "maxMs": 0.052
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.173,
+              "p95Ms": 0.184,
+              "meanMs": 0.169,
+              "minMs": 0.083,
+              "maxMs": 0.193
+            }
+          }
+        },
+        {
+          "id": "lv_1",
+          "name": "Pavimento 2",
+          "elevation": 3,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 68.428,
+              "p95Ms": 108.174,
+              "meanMs": 74.092,
+              "minMs": 62.518,
+              "maxMs": 114.43
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 23.538,
+              "p95Ms": 53.702,
+              "meanMs": 28.721,
+              "minMs": 20.069,
+              "maxMs": 55.172
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.037,
+              "p95Ms": 0.079,
+              "meanMs": 0.044,
+              "minMs": 0.035,
+              "maxMs": 0.086
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.173,
+              "p95Ms": 0.195,
+              "meanMs": 0.176,
+              "minMs": 0.172,
+              "maxMs": 0.195
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.035,
+              "p95Ms": 0.057,
+              "meanMs": 0.039,
+              "minMs": 0.035,
+              "maxMs": 0.087
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.177,
+              "p95Ms": 0.329,
+              "meanMs": 0.194,
+              "minMs": 0.17,
+              "maxMs": 0.356
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.017,
+              "meanMs": 0.017,
+              "minMs": 0.017,
+              "maxMs": 0.017
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.085,
+              "p95Ms": 0.165,
+              "meanMs": 0.098,
+              "minMs": 0.084,
+              "maxMs": 0.167
+            }
+          }
+        },
+        {
+          "id": "perf_lv_2",
+          "name": "Pavimento 3",
+          "elevation": 6,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 65.634,
+              "p95Ms": 88.678,
+              "meanMs": 68.29,
+              "minMs": 57.95,
+              "maxMs": 102.594
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 21.346,
+              "p95Ms": 34.834,
+              "meanMs": 22.646,
+              "minMs": 18.786,
+              "maxMs": 35.528
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.037,
+              "p95Ms": 0.061,
+              "meanMs": 0.041,
+              "minMs": 0.036,
+              "maxMs": 0.063
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.182,
+              "p95Ms": 0.363,
+              "meanMs": 0.205,
+              "minMs": 0.178,
+              "maxMs": 0.388
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.036,
+              "p95Ms": 0.064,
+              "meanMs": 0.041,
+              "minMs": 0.035,
+              "maxMs": 0.093
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.173,
+              "p95Ms": 0.25,
+              "meanMs": 0.181,
+              "minMs": 0.17,
+              "maxMs": 0.256
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.018,
+              "p95Ms": 0.029,
+              "meanMs": 0.019,
+              "minMs": 0.017,
+              "maxMs": 0.035
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.084,
+              "p95Ms": 0.09,
+              "meanMs": 0.086,
+              "minMs": 0.084,
+              "maxMs": 0.108
+            }
+          }
+        },
+        {
+          "id": "perf_lv_3",
+          "name": "Pavimento 4",
+          "elevation": 9,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 69.266,
+              "p95Ms": 91.364,
+              "meanMs": 72.689,
+              "minMs": 61.424,
+              "maxMs": 102.09
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 20.546,
+              "p95Ms": 22.474,
+              "meanMs": 20.568,
+              "minMs": 17.84,
+              "maxMs": 23.245
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.035,
+              "p95Ms": 0.055,
+              "meanMs": 0.037,
+              "minMs": 0.034,
+              "maxMs": 0.064
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.184,
+              "p95Ms": 0.353,
+              "meanMs": 0.208,
+              "minMs": 0.17,
+              "maxMs": 0.455
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.035,
+              "p95Ms": 0.036,
+              "meanMs": 0.035,
+              "minMs": 0.035,
+              "maxMs": 0.037
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.167,
+              "p95Ms": 0.168,
+              "meanMs": 0.167,
+              "minMs": 0.166,
+              "maxMs": 0.169
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.018,
+              "p95Ms": 0.033,
+              "meanMs": 0.02,
+              "minMs": 0.017,
+              "maxMs": 0.035
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.085,
+              "p95Ms": 0.097,
+              "meanMs": 0.086,
+              "minMs": 0.084,
+              "maxMs": 0.097
+            }
+          }
+        },
+        {
+          "id": "perf_lv_4",
+          "name": "Pavimento 5",
+          "elevation": 12,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 64.274,
+              "p95Ms": 84.814,
+              "meanMs": 70.257,
+              "minMs": 57.24,
+              "maxMs": 151.294
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 20.659,
+              "p95Ms": 25.958,
+              "meanMs": 21.572,
+              "minMs": 17.982,
+              "maxMs": 33.718
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.036,
+              "p95Ms": 0.048,
+              "meanMs": 0.038,
+              "minMs": 0.034,
+              "maxMs": 0.062
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.178,
+              "p95Ms": 0.275,
+              "meanMs": 0.19,
+              "minMs": 0.17,
+              "maxMs": 0.339
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.034,
+              "p95Ms": 0.04,
+              "meanMs": 0.036,
+              "minMs": 0.033,
+              "maxMs": 0.046
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.177,
+              "p95Ms": 0.215,
+              "meanMs": 0.18,
+              "minMs": 0.169,
+              "maxMs": 0.224
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.027,
+              "meanMs": 0.019,
+              "minMs": 0.016,
+              "maxMs": 0.028
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.081,
+              "p95Ms": 0.095,
+              "meanMs": 0.084,
+              "minMs": 0.081,
+              "maxMs": 0.121
+            }
+          }
+        },
+        {
+          "id": "perf_lv_5",
+          "name": "Pavimento 6",
+          "elevation": 15,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 64.102,
+              "p95Ms": 79.672,
+              "meanMs": 67.753,
+              "minMs": 58.563,
+              "maxMs": 125.95
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 19.618,
+              "p95Ms": 21.541,
+              "meanMs": 19.693,
+              "minMs": 17.723,
+              "maxMs": 22.651
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.033,
+              "p95Ms": 0.037,
+              "meanMs": 0.034,
+              "minMs": 0.032,
+              "maxMs": 0.039
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.192,
+              "p95Ms": 0.247,
+              "meanMs": 0.195,
+              "minMs": 0.165,
+              "maxMs": 0.266
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.038,
+              "p95Ms": 0.086,
+              "meanMs": 0.047,
+              "minMs": 0.034,
+              "maxMs": 0.128
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.165,
+              "p95Ms": 0.174,
+              "meanMs": 0.166,
+              "minMs": 0.163,
+              "maxMs": 0.176
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.024,
+              "meanMs": 0.018,
+              "minMs": 0.016,
+              "maxMs": 0.028
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.084,
+              "p95Ms": 0.106,
+              "meanMs": 0.088,
+              "minMs": 0.083,
+              "maxMs": 0.129
+            }
+          }
+        },
+        {
+          "id": "perf_lv_6",
+          "name": "Pavimento 7",
+          "elevation": 18,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 69.174,
+              "p95Ms": 94.579,
+              "meanMs": 74.199,
+              "minMs": 55.715,
+              "maxMs": 156.504
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 25.047,
+              "p95Ms": 47.294,
+              "meanMs": 29.11,
+              "minMs": 21.327,
+              "maxMs": 52.698
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.053,
+              "p95Ms": 0.106,
+              "meanMs": 0.058,
+              "minMs": 0.035,
+              "maxMs": 0.119
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.181,
+              "p95Ms": 0.274,
+              "meanMs": 0.194,
+              "minMs": 0.178,
+              "maxMs": 0.39
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.038,
+              "p95Ms": 0.085,
+              "meanMs": 0.052,
+              "minMs": 0.035,
+              "maxMs": 0.092
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.182,
+              "p95Ms": 0.358,
+              "meanMs": 0.208,
+              "minMs": 0.177,
+              "maxMs": 0.423
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.044,
+              "meanMs": 0.023,
+              "minMs": 0.017,
+              "maxMs": 0.052
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.087,
+              "p95Ms": 0.089,
+              "meanMs": 0.087,
+              "minMs": 0.086,
+              "maxMs": 0.09
+            }
+          }
+        },
+        {
+          "id": "perf_lv_7",
+          "name": "Pavimento 8",
+          "elevation": 21,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 77.987,
+              "p95Ms": 106.807,
+              "meanMs": 82.14,
+              "minMs": 64.885,
+              "maxMs": 136.018
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 23.126,
+              "p95Ms": 46.619,
+              "meanMs": 27.416,
+              "minMs": 20.25,
+              "maxMs": 57.89
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.036,
+              "p95Ms": 0.037,
+              "meanMs": 0.036,
+              "minMs": 0.035,
+              "maxMs": 0.045
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.178,
+              "p95Ms": 0.206,
+              "meanMs": 0.244,
+              "minMs": 0.175,
+              "maxMs": 2.107
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.035,
+              "p95Ms": 0.039,
+              "meanMs": 0.036,
+              "minMs": 0.034,
+              "maxMs": 0.045
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.177,
+              "p95Ms": 0.183,
+              "meanMs": 0.178,
+              "minMs": 0.176,
+              "maxMs": 0.185
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.031,
+              "meanMs": 0.019,
+              "minMs": 0.017,
+              "maxMs": 0.038
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.087,
+              "p95Ms": 0.099,
+              "meanMs": 0.089,
+              "minMs": 0.081,
+              "maxMs": 0.128
+            }
+          }
+        },
+        {
+          "id": "perf_lv_8",
+          "name": "Pavimento 9",
+          "elevation": 24,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 72.943,
+              "p95Ms": 122.694,
+              "meanMs": 78.508,
+              "minMs": 61.246,
+              "maxMs": 146.952
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 22.283,
+              "p95Ms": 50.399,
+              "meanMs": 26.394,
+              "minMs": 20.034,
+              "maxMs": 51.164
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.036,
+              "p95Ms": 0.08,
+              "meanMs": 0.042,
+              "minMs": 0.035,
+              "maxMs": 0.082
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.178,
+              "p95Ms": 0.218,
+              "meanMs": 0.184,
+              "minMs": 0.176,
+              "maxMs": 0.25
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.034,
+              "p95Ms": 0.037,
+              "meanMs": 0.035,
+              "minMs": 0.033,
+              "maxMs": 0.038
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.181,
+              "p95Ms": 0.328,
+              "meanMs": 0.206,
+              "minMs": 0.175,
+              "maxMs": 0.351
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.017,
+              "p95Ms": 0.023,
+              "meanMs": 0.018,
+              "minMs": 0.017,
+              "maxMs": 0.03
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.088,
+              "p95Ms": 0.097,
+              "meanMs": 0.089,
+              "minMs": 0.087,
+              "maxMs": 0.101
+            }
+          }
+        },
+        {
+          "id": "perf_lv_9",
+          "name": "Pavimento 10",
+          "elevation": 27,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 66.214,
+              "p95Ms": 75.074,
+              "meanMs": 67.977,
+              "minMs": 60.159,
+              "maxMs": 98.135
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 21.368,
+              "p95Ms": 24.918,
+              "meanMs": 21.391,
+              "minMs": 18.821,
+              "maxMs": 25.727
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.043,
+              "p95Ms": 0.082,
+              "meanMs": 0.055,
+              "minMs": 0.035,
+              "maxMs": 0.099
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.178,
+              "p95Ms": 0.185,
+              "meanMs": 0.179,
+              "minMs": 0.176,
+              "maxMs": 0.192
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.035,
+              "p95Ms": 0.039,
+              "meanMs": 0.035,
+              "minMs": 0.034,
+              "maxMs": 0.041
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.181,
+              "p95Ms": 0.361,
+              "meanMs": 0.208,
+              "minMs": 0.169,
+              "maxMs": 0.366
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.14,
+              "p95Ms": 0.259,
+              "meanMs": 0.16,
+              "minMs": 0.116,
+              "maxMs": 0.299
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.193,
+              "p95Ms": 0.215,
+              "meanMs": 0.197,
+              "minMs": 0.174,
+              "maxMs": 0.239
+            }
+          }
+        }
+      ],
+      "modelSceneUpdate": {
+        "frio": {
+          "n": 10,
+          "medianMs": 4481.668,
+          "p95Ms": 5027.32,
+          "meanMs": 4528.873,
+          "minMs": 4035.47,
+          "maxMs": 5027.32
+        },
+        "quente": {
+          "n": 10,
+          "medianMs": 4089.805,
+          "p95Ms": 9513.037,
+          "meanMs": 4893.044,
+          "minMs": 3723.342,
+          "maxMs": 9513.037
+        }
+      },
+      "pick": {
+        "exemplo": {
+          "elemento": {
+            "id": "perf_w_6_2",
+            "kind": "wall"
+          },
+          "ponto": {
+            "x": 12.12100028991685,
+            "y": -0.12099999934434535
+          }
+        },
+        "pickElement": {
+          "centro": {
+            "n": 30,
+            "medianMs": 0.387,
+            "p95Ms": 1.353,
+            "meanMs": 0.706,
+            "minMs": 0.334,
+            "maxMs": 1.374
+          },
+          "grade3x3": {
+            "n": 270,
+            "medianMs": 0.151,
+            "p95Ms": 0.317,
+            "meanMs": 0.195,
+            "minMs": 0.128,
+            "maxMs": 1.197
+          }
+        },
+        "pickModelPoint": {
+          "centro": {
+            "n": 30,
+            "medianMs": 4.001,
+            "p95Ms": 7.059,
+            "meanMs": 4.645,
+            "minMs": 2.926,
+            "maxMs": 7.479
+          },
+          "grade3x3": {
+            "n": 270,
+            "medianMs": 0.155,
+            "p95Ms": 3.338,
+            "meanMs": 0.986,
+            "minMs": 0.119,
+            "maxMs": 6.768
+          }
+        }
+      }
+    },
+    "20pavimentos": {
+      "levels": [
+        {
+          "id": "lv_0",
+          "name": "Pavimento 1",
+          "elevation": 0,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 78.476,
+              "p95Ms": 96.126,
+              "meanMs": 80.132,
+              "minMs": 70.895,
+              "maxMs": 96.777
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.906,
+              "p95Ms": 64.619,
+              "meanMs": 54.211,
+              "minMs": 48.045,
+              "maxMs": 69.741
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.13,
+              "meanMs": 0.075,
+              "minMs": 0.063,
+              "maxMs": 0.132
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.418,
+              "p95Ms": 0.589,
+              "meanMs": 0.436,
+              "minMs": 0.398,
+              "maxMs": 0.666
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.063,
+              "p95Ms": 0.089,
+              "meanMs": 0.069,
+              "minMs": 0.06,
+              "maxMs": 0.18
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.423,
+              "p95Ms": 0.478,
+              "meanMs": 0.429,
+              "minMs": 0.414,
+              "maxMs": 0.506
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.03,
+              "p95Ms": 0.031,
+              "meanMs": 0.03,
+              "minMs": 0.029,
+              "maxMs": 0.031
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.206,
+              "p95Ms": 0.301,
+              "meanMs": 0.214,
+              "minMs": 0.19,
+              "maxMs": 0.302
+            }
+          }
+        },
+        {
+          "id": "lv_1",
+          "name": "Pavimento 2",
+          "elevation": 3,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 76.566,
+              "p95Ms": 88.322,
+              "meanMs": 76.973,
+              "minMs": 67.652,
+              "maxMs": 91.122
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.022,
+              "p95Ms": 72.591,
+              "meanMs": 56.079,
+              "minMs": 47.046,
+              "maxMs": 113.634
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.067,
+              "p95Ms": 0.101,
+              "meanMs": 0.073,
+              "minMs": 0.064,
+              "maxMs": 0.103
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.428,
+              "p95Ms": 0.454,
+              "meanMs": 0.428,
+              "minMs": 0.4,
+              "maxMs": 0.481
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.076,
+              "meanMs": 0.066,
+              "minMs": 0.061,
+              "maxMs": 0.091
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.432,
+              "p95Ms": 0.796,
+              "meanMs": 0.478,
+              "minMs": 0.4,
+              "maxMs": 0.863
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.054,
+              "meanMs": 0.034,
+              "minMs": 0.031,
+              "maxMs": 0.054
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.211,
+              "p95Ms": 0.362,
+              "meanMs": 0.23,
+              "minMs": 0.201,
+              "maxMs": 0.366
+            }
+          }
+        },
+        {
+          "id": "perf_lv_2",
+          "name": "Pavimento 3",
+          "elevation": 6,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 75.374,
+              "p95Ms": 88.48,
+              "meanMs": 76.429,
+              "minMs": 67.826,
+              "maxMs": 89.646
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.767,
+              "p95Ms": 64.915,
+              "meanMs": 54.177,
+              "minMs": 48.582,
+              "maxMs": 66.01
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.059,
+              "p95Ms": 0.071,
+              "meanMs": 0.061,
+              "minMs": 0.058,
+              "maxMs": 0.078
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.393,
+              "p95Ms": 0.424,
+              "meanMs": 0.395,
+              "minMs": 0.371,
+              "maxMs": 0.444
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.059,
+              "p95Ms": 0.109,
+              "meanMs": 0.065,
+              "minMs": 0.057,
+              "maxMs": 0.113
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.676,
+              "p95Ms": 0.783,
+              "meanMs": 0.608,
+              "minMs": 0.342,
+              "maxMs": 0.814
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.027,
+              "p95Ms": 0.039,
+              "meanMs": 0.029,
+              "minMs": 0.026,
+              "maxMs": 0.051
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.207,
+              "p95Ms": 0.24,
+              "meanMs": 0.204,
+              "minMs": 0.167,
+              "maxMs": 0.249
+            }
+          }
+        },
+        {
+          "id": "perf_lv_3",
+          "name": "Pavimento 4",
+          "elevation": 9,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 75.589,
+              "p95Ms": 85.863,
+              "meanMs": 76.478,
+              "minMs": 66.537,
+              "maxMs": 88.688
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.7,
+              "p95Ms": 84.684,
+              "meanMs": 58.72,
+              "minMs": 46.909,
+              "maxMs": 88.6
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.084,
+              "meanMs": 0.067,
+              "minMs": 0.064,
+              "maxMs": 0.086
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.423,
+              "p95Ms": 0.551,
+              "meanMs": 0.44,
+              "minMs": 0.415,
+              "maxMs": 0.598
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.076,
+              "meanMs": 0.066,
+              "minMs": 0.063,
+              "maxMs": 0.083
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.422,
+              "p95Ms": 0.479,
+              "meanMs": 0.434,
+              "minMs": 0.412,
+              "maxMs": 0.493
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.042,
+              "meanMs": 0.034,
+              "minMs": 0.031,
+              "maxMs": 0.053
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.21,
+              "p95Ms": 0.316,
+              "meanMs": 0.23,
+              "minMs": 0.202,
+              "maxMs": 0.418
+            }
+          }
+        },
+        {
+          "id": "perf_lv_4",
+          "name": "Pavimento 5",
+          "elevation": 12,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 77.479,
+              "p95Ms": 89.549,
+              "meanMs": 77.574,
+              "minMs": 67.376,
+              "maxMs": 90.542
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 51.768,
+              "p95Ms": 60.643,
+              "meanMs": 53.226,
+              "minMs": 47.188,
+              "maxMs": 62.14
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.111,
+              "meanMs": 0.069,
+              "minMs": 0.06,
+              "maxMs": 0.112
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.399,
+              "p95Ms": 0.445,
+              "meanMs": 0.404,
+              "minMs": 0.373,
+              "maxMs": 0.525
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.068,
+              "p95Ms": 0.142,
+              "meanMs": 0.083,
+              "minMs": 0.061,
+              "maxMs": 0.158
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.419,
+              "p95Ms": 0.759,
+              "meanMs": 0.469,
+              "minMs": 0.398,
+              "maxMs": 0.826
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.061,
+              "p95Ms": 0.082,
+              "meanMs": 0.054,
+              "minMs": 0.032,
+              "maxMs": 0.086
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.205,
+              "p95Ms": 0.241,
+              "meanMs": 0.21,
+              "minMs": 0.202,
+              "maxMs": 0.263
+            }
+          }
+        },
+        {
+          "id": "perf_lv_5",
+          "name": "Pavimento 6",
+          "elevation": 15,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.205,
+              "p95Ms": 34.867,
+              "meanMs": 25.181,
+              "minMs": 21.516,
+              "maxMs": 36.714
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.079,
+              "p95Ms": 65.947,
+              "meanMs": 53.546,
+              "minMs": 46.271,
+              "maxMs": 91.8
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.069,
+              "p95Ms": 0.139,
+              "meanMs": 0.093,
+              "minMs": 0.062,
+              "maxMs": 0.142
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.805,
+              "p95Ms": 0.865,
+              "meanMs": 0.806,
+              "minMs": 0.713,
+              "maxMs": 0.899
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.128,
+              "meanMs": 0.075,
+              "minMs": 0.061,
+              "maxMs": 0.139
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.441,
+              "p95Ms": 0.493,
+              "meanMs": 0.45,
+              "minMs": 0.413,
+              "maxMs": 0.721
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.033,
+              "p95Ms": 0.048,
+              "meanMs": 0.035,
+              "minMs": 0.032,
+              "maxMs": 0.066
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.198,
+              "p95Ms": 0.221,
+              "meanMs": 0.201,
+              "minMs": 0.194,
+              "maxMs": 0.228
+            }
+          }
+        },
+        {
+          "id": "perf_lv_6",
+          "name": "Pavimento 7",
+          "elevation": 18,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.628,
+              "p95Ms": 33.804,
+              "meanMs": 26.947,
+              "minMs": 22.034,
+              "maxMs": 68.914
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 53.161,
+              "p95Ms": 66.743,
+              "meanMs": 54.726,
+              "minMs": 45.882,
+              "maxMs": 68.763
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.061,
+              "p95Ms": 0.072,
+              "meanMs": 0.064,
+              "minMs": 0.059,
+              "maxMs": 0.087
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.397,
+              "p95Ms": 0.463,
+              "meanMs": 0.404,
+              "minMs": 0.373,
+              "maxMs": 0.489
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.058,
+              "p95Ms": 0.065,
+              "meanMs": 0.059,
+              "minMs": 0.057,
+              "maxMs": 0.076
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.427,
+              "p95Ms": 0.8,
+              "meanMs": 0.503,
+              "minMs": 0.396,
+              "maxMs": 0.822
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.03,
+              "p95Ms": 0.038,
+              "meanMs": 0.031,
+              "minMs": 0.029,
+              "maxMs": 0.043
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.204,
+              "p95Ms": 0.218,
+              "meanMs": 0.205,
+              "minMs": 0.196,
+              "maxMs": 0.236
+            }
+          }
+        },
+        {
+          "id": "perf_lv_7",
+          "name": "Pavimento 8",
+          "elevation": 21,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.363,
+              "p95Ms": 34.283,
+              "meanMs": 26.256,
+              "minMs": 22.284,
+              "maxMs": 42.599
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.418,
+              "p95Ms": 66.086,
+              "meanMs": 53.988,
+              "minMs": 48.572,
+              "maxMs": 71.285
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.076,
+              "meanMs": 0.065,
+              "minMs": 0.061,
+              "maxMs": 0.083
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.422,
+              "p95Ms": 0.465,
+              "meanMs": 0.426,
+              "minMs": 0.399,
+              "maxMs": 0.502
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.072,
+              "p95Ms": 0.128,
+              "meanMs": 0.081,
+              "minMs": 0.064,
+              "maxMs": 0.137
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.421,
+              "p95Ms": 0.811,
+              "meanMs": 0.52,
+              "minMs": 0.41,
+              "maxMs": 0.845
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.033,
+              "p95Ms": 0.067,
+              "meanMs": 0.044,
+              "minMs": 0.031,
+              "maxMs": 0.113
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.21,
+              "p95Ms": 0.388,
+              "meanMs": 0.232,
+              "minMs": 0.203,
+              "maxMs": 0.399
+            }
+          }
+        },
+        {
+          "id": "perf_lv_8",
+          "name": "Pavimento 9",
+          "elevation": 24,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.444,
+              "p95Ms": 31.151,
+              "meanMs": 25.417,
+              "minMs": 20.657,
+              "maxMs": 43.062
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.948,
+              "p95Ms": 61.219,
+              "meanMs": 54.082,
+              "minMs": 48.645,
+              "maxMs": 74.424
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.06,
+              "p95Ms": 0.136,
+              "meanMs": 0.073,
+              "minMs": 0.054,
+              "maxMs": 0.14
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.446,
+              "p95Ms": 0.816,
+              "meanMs": 0.526,
+              "minMs": 0.343,
+              "maxMs": 0.819
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.086,
+              "meanMs": 0.068,
+              "minMs": 0.06,
+              "maxMs": 0.117
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.451,
+              "p95Ms": 0.839,
+              "meanMs": 0.529,
+              "minMs": 0.417,
+              "maxMs": 0.867
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.05,
+              "meanMs": 0.036,
+              "minMs": 0.029,
+              "maxMs": 0.074
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.211,
+              "p95Ms": 0.256,
+              "meanMs": 0.215,
+              "minMs": 0.182,
+              "maxMs": 0.329
+            }
+          }
+        },
+        {
+          "id": "perf_lv_9",
+          "name": "Pavimento 10",
+          "elevation": 27,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 23.973,
+              "p95Ms": 29.5,
+              "meanMs": 24.977,
+              "minMs": 21.196,
+              "maxMs": 35.879
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 51.354,
+              "p95Ms": 70.964,
+              "meanMs": 52.91,
+              "minMs": 44.937,
+              "maxMs": 72.459
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.061,
+              "p95Ms": 0.074,
+              "meanMs": 0.061,
+              "minMs": 0.053,
+              "maxMs": 0.075
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.401,
+              "p95Ms": 0.455,
+              "meanMs": 0.409,
+              "minMs": 0.375,
+              "maxMs": 0.468
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.06,
+              "p95Ms": 0.124,
+              "meanMs": 0.067,
+              "minMs": 0.059,
+              "maxMs": 0.13
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.403,
+              "p95Ms": 0.442,
+              "meanMs": 0.407,
+              "minMs": 0.382,
+              "maxMs": 0.461
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.03,
+              "p95Ms": 0.042,
+              "meanMs": 0.031,
+              "minMs": 0.029,
+              "maxMs": 0.045
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.191,
+              "p95Ms": 0.195,
+              "meanMs": 0.191,
+              "minMs": 0.189,
+              "maxMs": 0.196
+            }
+          }
+        },
+        {
+          "id": "perf_lv_10",
+          "name": "Pavimento 11",
+          "elevation": 30,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 26.917,
+              "p95Ms": 37.406,
+              "meanMs": 27.942,
+              "minMs": 19.996,
+              "maxMs": 39.246
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 53.424,
+              "p95Ms": 76.751,
+              "meanMs": 55.499,
+              "minMs": 45.856,
+              "maxMs": 78.214
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.066,
+              "p95Ms": 0.141,
+              "meanMs": 0.082,
+              "minMs": 0.064,
+              "maxMs": 0.145
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.423,
+              "p95Ms": 0.628,
+              "meanMs": 0.446,
+              "minMs": 0.4,
+              "maxMs": 0.708
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.066,
+              "p95Ms": 0.143,
+              "meanMs": 0.079,
+              "minMs": 0.06,
+              "maxMs": 0.167
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.415,
+              "p95Ms": 0.461,
+              "meanMs": 0.421,
+              "minMs": 0.386,
+              "maxMs": 0.502
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.048,
+              "meanMs": 0.034,
+              "minMs": 0.029,
+              "maxMs": 0.059
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.208,
+              "p95Ms": 0.23,
+              "meanMs": 0.208,
+              "minMs": 0.188,
+              "maxMs": 0.246
+            }
+          }
+        },
+        {
+          "id": "perf_lv_11",
+          "name": "Pavimento 12",
+          "elevation": 33,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.311,
+              "p95Ms": 27.021,
+              "meanMs": 24.687,
+              "minMs": 21.841,
+              "maxMs": 32.121
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 53.165,
+              "p95Ms": 61.317,
+              "meanMs": 54.308,
+              "minMs": 48.644,
+              "maxMs": 69.825
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.063,
+              "p95Ms": 0.074,
+              "meanMs": 0.065,
+              "minMs": 0.062,
+              "maxMs": 0.076
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.402,
+              "p95Ms": 0.435,
+              "meanMs": 0.406,
+              "minMs": 0.384,
+              "maxMs": 0.435
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.073,
+              "meanMs": 0.064,
+              "minMs": 0.059,
+              "maxMs": 0.089
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.418,
+              "p95Ms": 0.687,
+              "meanMs": 0.443,
+              "minMs": 0.384,
+              "maxMs": 0.729
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.03,
+              "p95Ms": 0.043,
+              "meanMs": 0.033,
+              "minMs": 0.029,
+              "maxMs": 0.069
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.2,
+              "p95Ms": 0.216,
+              "meanMs": 0.205,
+              "minMs": 0.195,
+              "maxMs": 0.282
+            }
+          }
+        },
+        {
+          "id": "perf_lv_12",
+          "name": "Pavimento 13",
+          "elevation": 36,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.513,
+              "p95Ms": 34.002,
+              "meanMs": 25.993,
+              "minMs": 21.468,
+              "maxMs": 38.884
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 55.017,
+              "p95Ms": 82.3,
+              "meanMs": 57.519,
+              "minMs": 47.795,
+              "maxMs": 87.367
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.066,
+              "p95Ms": 0.076,
+              "meanMs": 0.069,
+              "minMs": 0.064,
+              "maxMs": 0.133
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.426,
+              "p95Ms": 0.77,
+              "meanMs": 0.499,
+              "minMs": 0.415,
+              "maxMs": 1.569
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.111,
+              "meanMs": 0.073,
+              "minMs": 0.062,
+              "maxMs": 0.131
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.417,
+              "p95Ms": 0.502,
+              "meanMs": 0.43,
+              "minMs": 0.385,
+              "maxMs": 0.684
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.043,
+              "meanMs": 0.033,
+              "minMs": 0.031,
+              "maxMs": 0.043
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.205,
+              "p95Ms": 0.243,
+              "meanMs": 0.212,
+              "minMs": 0.202,
+              "maxMs": 0.255
+            }
+          }
+        },
+        {
+          "id": "perf_lv_13",
+          "name": "Pavimento 14",
+          "elevation": 39,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 23.865,
+              "p95Ms": 29.555,
+              "meanMs": 24.65,
+              "minMs": 22.349,
+              "maxMs": 36.245
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 53.472,
+              "p95Ms": 64.311,
+              "meanMs": 54.869,
+              "minMs": 49.248,
+              "maxMs": 77.552
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.06,
+              "p95Ms": 0.082,
+              "meanMs": 0.063,
+              "minMs": 0.058,
+              "maxMs": 0.083
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.4,
+              "p95Ms": 0.469,
+              "meanMs": 0.412,
+              "minMs": 0.343,
+              "maxMs": 0.748
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.06,
+              "p95Ms": 0.076,
+              "meanMs": 0.063,
+              "minMs": 0.053,
+              "maxMs": 0.143
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.34,
+              "p95Ms": 0.41,
+              "meanMs": 0.349,
+              "minMs": 0.336,
+              "maxMs": 0.414
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.029,
+              "p95Ms": 0.032,
+              "meanMs": 0.03,
+              "minMs": 0.026,
+              "maxMs": 0.054
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.211,
+              "p95Ms": 0.389,
+              "meanMs": 0.257,
+              "minMs": 0.184,
+              "maxMs": 0.389
+            }
+          }
+        },
+        {
+          "id": "perf_lv_14",
+          "name": "Pavimento 15",
+          "elevation": 42,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 25.264,
+              "p95Ms": 40.123,
+              "meanMs": 27.372,
+              "minMs": 22.745,
+              "maxMs": 44.312
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.21,
+              "p95Ms": 67.466,
+              "meanMs": 55.933,
+              "minMs": 47.269,
+              "maxMs": 77.524
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.078,
+              "p95Ms": 0.133,
+              "meanMs": 0.092,
+              "minMs": 0.062,
+              "maxMs": 0.134
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.431,
+              "p95Ms": 0.85,
+              "meanMs": 0.531,
+              "minMs": 0.377,
+              "maxMs": 0.901
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.13,
+              "meanMs": 0.075,
+              "minMs": 0.062,
+              "maxMs": 0.134
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.406,
+              "p95Ms": 0.439,
+              "meanMs": 0.416,
+              "minMs": 0.386,
+              "maxMs": 0.544
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.031,
+              "p95Ms": 0.035,
+              "meanMs": 0.031,
+              "minMs": 0.03,
+              "maxMs": 0.037
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.197,
+              "p95Ms": 0.204,
+              "meanMs": 0.203,
+              "minMs": 0.195,
+              "maxMs": 0.337
+            }
+          }
+        },
+        {
+          "id": "perf_lv_15",
+          "name": "Pavimento 16",
+          "elevation": 45,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 25.029,
+              "p95Ms": 33.225,
+              "meanMs": 26.45,
+              "minMs": 22.584,
+              "maxMs": 34.04
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.156,
+              "p95Ms": 69.001,
+              "meanMs": 56.491,
+              "minMs": 47.94,
+              "maxMs": 72.332
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.06,
+              "p95Ms": 0.089,
+              "meanMs": 0.064,
+              "minMs": 0.059,
+              "maxMs": 0.099
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.368,
+              "p95Ms": 0.452,
+              "meanMs": 0.38,
+              "minMs": 0.34,
+              "maxMs": 0.475
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.061,
+              "p95Ms": 0.115,
+              "meanMs": 0.068,
+              "minMs": 0.053,
+              "maxMs": 0.12
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.372,
+              "p95Ms": 0.636,
+              "meanMs": 0.397,
+              "minMs": 0.338,
+              "maxMs": 0.66
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.029,
+              "p95Ms": 0.055,
+              "meanMs": 0.031,
+              "minMs": 0.026,
+              "maxMs": 0.056
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.208,
+              "p95Ms": 0.227,
+              "meanMs": 0.213,
+              "minMs": 0.203,
+              "maxMs": 0.283
+            }
+          }
+        },
+        {
+          "id": "perf_lv_16",
+          "name": "Pavimento 17",
+          "elevation": 48,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.69,
+              "p95Ms": 32.327,
+              "meanMs": 25.623,
+              "minMs": 21.577,
+              "maxMs": 32.737
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.254,
+              "p95Ms": 64.881,
+              "meanMs": 55.211,
+              "minMs": 48.507,
+              "maxMs": 66.199
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.07,
+              "p95Ms": 0.194,
+              "meanMs": 0.103,
+              "minMs": 0.065,
+              "maxMs": 0.239
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.428,
+              "p95Ms": 0.474,
+              "meanMs": 0.433,
+              "minMs": 0.402,
+              "maxMs": 0.49
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.066,
+              "p95Ms": 0.083,
+              "meanMs": 0.068,
+              "minMs": 0.064,
+              "maxMs": 0.108
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.417,
+              "p95Ms": 0.46,
+              "meanMs": 0.424,
+              "minMs": 0.413,
+              "maxMs": 0.465
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.037,
+              "meanMs": 0.033,
+              "minMs": 0.031,
+              "maxMs": 0.038
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.206,
+              "p95Ms": 0.225,
+              "meanMs": 0.209,
+              "minMs": 0.203,
+              "maxMs": 0.234
+            }
+          }
+        },
+        {
+          "id": "perf_lv_17",
+          "name": "Pavimento 18",
+          "elevation": 51,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.582,
+              "p95Ms": 34.11,
+              "meanMs": 25.781,
+              "minMs": 22.48,
+              "maxMs": 35.154
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.349,
+              "p95Ms": 68.541,
+              "meanMs": 56.601,
+              "minMs": 46.736,
+              "maxMs": 73.949
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.064,
+              "p95Ms": 0.089,
+              "meanMs": 0.069,
+              "minMs": 0.062,
+              "maxMs": 0.135
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.412,
+              "p95Ms": 0.447,
+              "meanMs": 0.415,
+              "minMs": 0.398,
+              "maxMs": 0.457
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.063,
+              "p95Ms": 0.085,
+              "meanMs": 0.068,
+              "minMs": 0.06,
+              "maxMs": 0.121
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.404,
+              "p95Ms": 0.45,
+              "meanMs": 0.412,
+              "minMs": 0.397,
+              "maxMs": 0.461
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.031,
+              "p95Ms": 0.037,
+              "meanMs": 0.032,
+              "minMs": 0.03,
+              "maxMs": 0.042
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.21,
+              "p95Ms": 0.314,
+              "meanMs": 0.219,
+              "minMs": 0.197,
+              "maxMs": 0.38
+            }
+          }
+        },
+        {
+          "id": "perf_lv_18",
+          "name": "Pavimento 19",
+          "elevation": 54,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 24.727,
+              "p95Ms": 39.451,
+              "meanMs": 26.675,
+              "minMs": 21.85,
+              "maxMs": 46.22
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 52.128,
+              "p95Ms": 69.015,
+              "meanMs": 54.684,
+              "minMs": 44.592,
+              "maxMs": 71.209
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.066,
+              "p95Ms": 0.131,
+              "meanMs": 0.072,
+              "minMs": 0.064,
+              "maxMs": 0.135
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.426,
+              "p95Ms": 0.514,
+              "meanMs": 0.436,
+              "minMs": 0.412,
+              "maxMs": 0.543
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.065,
+              "p95Ms": 0.136,
+              "meanMs": 0.074,
+              "minMs": 0.063,
+              "maxMs": 0.144
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.418,
+              "p95Ms": 0.46,
+              "meanMs": 0.426,
+              "minMs": 0.411,
+              "maxMs": 0.489
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.032,
+              "p95Ms": 0.077,
+              "meanMs": 0.039,
+              "minMs": 0.031,
+              "maxMs": 0.091
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.206,
+              "p95Ms": 0.219,
+              "meanMs": 0.208,
+              "minMs": 0.203,
+              "maxMs": 0.231
+            }
+          }
+        },
+        {
+          "id": "perf_lv_19",
+          "name": "Pavimento 20",
+          "elevation": 57,
+          "buildPlanDrawList": {
+            "frio": {
+              "n": 30,
+              "medianMs": 25.466,
+              "p95Ms": 36.346,
+              "meanMs": 27.317,
+              "minMs": 22.323,
+              "maxMs": 37.711
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 54.333,
+              "p95Ms": 68.382,
+              "meanMs": 56.716,
+              "minMs": 47.978,
+              "maxMs": 77.221
+            }
+          },
+          "resolveFloors": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.067,
+              "p95Ms": 0.116,
+              "meanMs": 0.081,
+              "minMs": 0.063,
+              "maxMs": 0.345
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.44,
+              "p95Ms": 0.575,
+              "meanMs": 0.466,
+              "minMs": 0.417,
+              "maxMs": 0.579
+            }
+          },
+          "resolveSlabs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.067,
+              "p95Ms": 0.144,
+              "meanMs": 0.09,
+              "minMs": 0.062,
+              "maxMs": 0.161
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.423,
+              "p95Ms": 0.795,
+              "meanMs": 0.489,
+              "minMs": 0.414,
+              "maxMs": 0.811
+            }
+          },
+          "resolveRoofs": {
+            "frio": {
+              "n": 30,
+              "medianMs": 0.116,
+              "p95Ms": 0.152,
+              "meanMs": 0.12,
+              "minMs": 0.113,
+              "maxMs": 0.161
+            },
+            "quente": {
+              "n": 30,
+              "medianMs": 0.299,
+              "p95Ms": 0.549,
+              "meanMs": 0.343,
+              "minMs": 0.29,
+              "maxMs": 0.549
+            }
+          }
+        }
+      ],
+      "modelSceneUpdate": {
+        "frio": {
+          "n": 10,
+          "medianMs": 9145.3,
+          "p95Ms": 9792.198,
+          "meanMs": 9320.996,
+          "minMs": 9013.838,
+          "maxMs": 9792.198
+        },
+        "quente": {
+          "n": 10,
+          "medianMs": 8173.111,
+          "p95Ms": 9071.915,
+          "meanMs": 8293.531,
+          "minMs": 7776.472,
+          "maxMs": 9071.915
+        }
+      },
+      "pick": {
+        "exemplo": {
+          "elemento": {
+            "id": "perf_w_11_2",
+            "kind": "wall"
+          },
+          "ponto": {
+            "x": 12.121000289916665,
+            "y": -0.12099999934434891
+          }
+        },
+        "pickElement": {
+          "centro": {
+            "n": 30,
+            "medianMs": 0.452,
+            "p95Ms": 0.908,
+            "meanMs": 0.67,
+            "minMs": 0.382,
+            "maxMs": 2.475
+          },
+          "grade3x3": {
+            "n": 270,
+            "medianMs": 0.305,
+            "p95Ms": 0.533,
+            "meanMs": 0.363,
+            "minMs": 0.282,
+            "maxMs": 1.223
+          }
+        },
+        "pickModelPoint": {
+          "centro": {
+            "n": 30,
+            "medianMs": 3.172,
+            "p95Ms": 3.799,
+            "meanMs": 3.323,
+            "minMs": 2.957,
+            "maxMs": 3.966
+          },
+          "grade3x3": {
+            "n": 270,
+            "medianMs": 0.272,
+            "p95Ms": 3.926,
+            "meanMs": 1.353,
+            "minMs": 0.216,
+            "maxMs": 7.558
+          }
+        }
+      }
+    }
+  }
+}

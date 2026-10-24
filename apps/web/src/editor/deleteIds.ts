@@ -1,4 +1,4 @@
-import { annotationRemovals, type ProjectStore } from '@hestia/model';
+import { annotationRemovals, viewRemovals, type ProjectStore } from '@hestia/model';
 import { useUi } from './state.ts';
 
 /**
@@ -9,11 +9,14 @@ export function deleteSelectionIn(store: ProjectStore): void {
   const { selection: ids, levelId } = useUi.getState();
   if (!ids.length) return;
   const notes = annotationRemovals(store.project, levelId, ids);
+  const views = viewRemovals(store.project, ids);
   const noteIds = new Set(notes.map((c) => c.id));
-  const elems = ids.filter((id) => !noteIds.has(id));
+  const viewIds = new Set(views.map((c) => c.id));
+  const elems = ids.filter((id) => !noteIds.has(id) && !viewIds.has(id));
   store.transaction('Excluir', () => {
     if (elems.length) store.exec({ type: 'deleteElements', ids: elems });
     for (const c of notes) store.exec(c);
+    for (const c of views) store.exec(c);
   });
-  useUi.setState({ selection: [], status: 'Elementos excluídos.' });
+  useUi.setState({ selection: [], status: 'Seleção excluída.' });
 }

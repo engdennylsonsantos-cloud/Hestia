@@ -23,6 +23,19 @@ export interface DxfCluster {
  */
 export type DxfViewState = 'cut' | 'projection-above' | 'projection-below' | 'beyond';
 
+/** Linha de uma marca de corte/elevação, já com a camada (`CORTES` ou `ELEVACOES`). */
+export interface DxfSectionMarkLine {
+  a: DxfPoint;
+  b: DxfPoint;
+  layer: string;
+}
+
+/** Marcas de corte/elevação em planta para o DXF: hastes, setas e rótulos. */
+export interface DxfSectionMarks {
+  lines: DxfSectionMarkLine[];
+  texts: DxfNoteText[];
+}
+
 /** Traço do símbolo de planta de um vão: polilinha aberta ou fechada; `dashed` põe o tracejado no próprio traço. */
 export interface DxfSymbolPath {
   pts: DxfPoint[];
@@ -96,6 +109,8 @@ export interface DxfLevelGeometry {
   lineWeights?: Partial<Record<string, number>>;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
   notes?: DxfNotes;
+  /** Marcas de corte/elevação em planta (linhas, setas e rótulos), ver `sectionMarksDxfOf`. Ausente = nenhuma. */
+  sectionMarks?: DxfSectionMarks;
   /** Ambientes do nível: contorno e furos em planta (POLYLINE fechada na camada `AMBIENTES`). Ausente = nenhum. */
   rooms?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][] }>;
   /** Textos dos ambientes (nome, número e área) na camada `AMBIENTES_TEXTO`. Ausente = nenhum. */
@@ -140,6 +155,9 @@ export const DXF_LAYER_ROOM = 'AMBIENTES';
 /** Textos de ambiente (nome, número e área), no centro de cada ambiente. */
 export const DXF_LAYER_ROOM_TEXT = 'AMBIENTES_TEXTO';
 export const DXF_LAYER_STAIR_POST = 'ESCADA_POSTE';
+/** Marcas de corte e elevação em planta (linha, setas e rótulo), separadas por tipo. */
+export const DXF_LAYER_CORTES = 'CORTES';
+export const DXF_LAYER_ELEVACOES = 'ELEVACOES';
 
 /** Camada de cada estado de vão e de parede fora do corte. */
 const OPENING_LAYER: Record<DxfViewState, string> = {
@@ -291,6 +309,9 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_STAIR_CUT, 'annotation'],
   [DXF_LAYER_COTAS, 'annotation'],
   [DXF_LAYER_TEXTOS, 'annotation'],
+  // A marca é desenho, não texto: usa o peso de corte da categoria 'anotação' (as camadas de texto ficam em 0).
+  [DXF_LAYER_CORTES, cut('annotation')],
+  [DXF_LAYER_ELEVACOES, cut('annotation')],
 ]);
 
 /** Papel de uma camada pelo nome. `undefined` = sem categoria (sai com -3). `PAREDE_<material>` é corte de parede. */
@@ -315,7 +336,8 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
     ...s.risers.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_RISER, a, b })),
     ...s.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_ARROW, a, b })),
   ]);
-  return [...roof, ...stair, ...notes];
+  const marks = (geo.sectionMarks?.lines ?? []).map((l): Line => ({ layer: l.layer, a: l.a, b: l.b }));
+  return [...roof, ...stair, ...marks, ...notes];
 }
 
 /**
@@ -368,7 +390,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
 }
 
 /** Textos da planta: os de anotação (cotas e textos do usuário) e os dos ambientes. */
-const textsOf = (geo: DxfLevelGeometry): DxfNoteText[] => [...(geo.notes?.texts ?? []), ...(geo.roomTexts ?? [])];
+const textsOf = (geo: DxfLevelGeometry): DxfNoteText[] => [...(geo.notes?.texts ?? []), ...(geo.sectionMarks?.texts ?? []), ...(geo.roomTexts ?? [])];
 
 /** Camadas da tabela LAYER: `0` e as das polilinhas e das linhas, sem repetição e em ordem. */
 function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): string[] {

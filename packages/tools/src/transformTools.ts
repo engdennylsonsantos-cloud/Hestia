@@ -2,7 +2,7 @@ import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@h
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
 import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
-import { copyWalls, ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
+import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
@@ -19,8 +19,12 @@ abstract class SelectionTool extends ToolBase {
   protected openings(): Id[] {
     return selectedOpenings(this.env.project(), this.env.selection());
   }
+  /** Vistas de corte/elevação selecionadas: marcas de anotação também movem, copiam, giram e espelham. */
+  protected views(): Id[] {
+    return selectedViews(this.env.project(), this.env.selection());
+  }
   protected hasSelection(): boolean {
-    return this.movables().length + this.openings().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length > 0;
+    return this.movables().length + this.openings().length + this.views().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length > 0;
   }
   override start(): void {
     this.reset();
@@ -69,27 +73,29 @@ export class MoveTool extends SelectionTool {
     }
     const d = sub(inf.point, this.base);
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
-    this.items.push(...ghostBands(this.env.project(), els, { kind: 'translate', d }));
+    const t = { kind: 'translate' as const, d };
+    this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t));
     this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
   }
 
   private apply(d: Vec2): void {
     if (len(d) < 1e-6) return;
     const els = this.movables();
-    // Cotas e textos de anotação (decisão 0019) seguem a seleção: movem-se ou copiam-se pelos próprios comandos.
+    const views = this.views();
+    const t = { kind: 'translate', d } as const;
+    // Cotas, textos (decisão 0019) e marcas de corte/elevação seguem a seleção e entram no mesmo passo de desfazer.
     const notes = annotationMoveCommands(this.env.project(), this.env.levelId(), this.env.selection(), d, this.copy);
-    if (this.copy) {
-      this.env.transaction('Copiar', () => {
-        if (els.length) copyWalls(this.env, els, { kind: 'translate', d });
-        for (const c of notes) this.env.exec(c);
-      });
-    } else if (els.length) {
-      moveWalls(this.env, els, d);
+    this.env.transaction(this.copy ? 'Copiar' : 'Mover', () => {
+      if (this.copy) {
+        if (els.length) copyWalls(this.env, els, t);
+        if (views.length) transformViews(this.env, views, t, true);
+      } else {
+        if (els.length) moveWalls(this.env, els, d);
+        else if (this.openings().length) slideOpenings(this.env, this.openings(), d);
+        if (views.length) transformViews(this.env, views, t);
+      }
       for (const c of notes) this.env.exec(c);
-    } else {
-      slideOpenings(this.env, this.openings(), d);
-      for (const c of notes) this.env.exec(c);
-    }
+    });
   }
 
   override click(p: PointerInfo): void {
@@ -159,7 +165,8 @@ export class RotateTool extends SelectionTool {
     this.items.push({ kind: 'line', a: this.center, b: inf.point, dashed: true });
     if (this.ref) {
       const ang = this.angleTo(p.raw);
-      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'rotate', about: this.center, angle: ang }));
+      const t = { kind: 'rotate', about: this.center, angle: ang } as const;
+      this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
       this.items.push({ kind: 'label', at: p.raw, text: `${deg(ang).toFixed(1).replace('.', ',')}°` });
     }
   }
@@ -167,9 +174,16 @@ export class RotateTool extends SelectionTool {
   private commit(angle: number): void {
     if (!this.center || Math.abs(angle) < 1e-6) return;
     const els = this.movables();
+    const views = this.views();
     const t = { kind: 'rotate', about: this.center, angle } as const;
-    if (this.env.options().rotateCopy) this.env.transaction('Girar e copiar', () => copyWalls(this.env, els, t));
-    else this.env.exec({ type: 'transform', ids: els, transform: t });
+    const copy = this.env.options().rotateCopy;
+    this.env.transaction(copy ? 'Girar e copiar' : 'Girar', () => {
+      if (els.length) {
+        if (copy) copyWalls(this.env, els, t);
+        else this.env.exec({ type: 'transform', ids: els, transform: t });
+      }
+      if (views.length) transformViews(this.env, views, t, copy);
+    });
     this.reset();
     this.env.done();
   }
@@ -237,7 +251,8 @@ export class MirrorTool extends SelectionTool {
       if (!id || !f) return;
       this.items.push({ kind: 'highlight', ids: [id] });
       this.items.push({ kind: 'line', a: f.a, b: f.b, dashed: true });
-      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'mirror', a: f.a, b: f.b }));
+      const t = { kind: 'mirror', a: f.a, b: f.b } as const;
+      this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
       return;
     }
     const inf = this.snap(p, { from: this.p1 ?? undefined, ignore: new Set(this.movables()) });
@@ -247,16 +262,24 @@ export class MirrorTool extends SelectionTool {
     }
     this.items.push({ kind: 'line', a: this.p1, b: inf.point, dashed: true });
     if (dist(this.p1, inf.point) > 1e-6) {
-      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'mirror', a: this.p1, b: inf.point }));
+      const t = { kind: 'mirror', a: this.p1, b: inf.point } as const;
+      this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
     }
   }
 
   /** Aplica o espelho pelo eixo a→b às paredes, com cópia se a opção estiver marcada. */
   private apply(a: Vec2, b: Vec2): void {
     const els = this.movables();
+    const views = this.views();
     const t = { kind: 'mirror', a, b } as const;
-    if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, els, t));
-    else this.env.exec({ type: 'transform', ids: els, transform: t });
+    const copy = this.env.options().mirrorCopy;
+    this.env.transaction(copy ? 'Espelhar e copiar' : 'Espelhar', () => {
+      if (els.length) {
+        if (copy) copyWalls(this.env, els, t);
+        else this.env.exec({ type: 'transform', ids: els, transform: t });
+      }
+      if (views.length) transformViews(this.env, views, t, copy);
+    });
     this.reset();
     this.env.done();
   }
@@ -304,7 +327,8 @@ export class ArrayTool extends SelectionTool {
   private ghosts(d: Vec2): void {
     const n = Math.max(2, this.env.options().arrayCount);
     for (let i = 1; i < n; i++) {
-      this.items.push(...ghostBands(this.env.project(), this.movables(), { kind: 'translate', d: mul(d, i) }));
+      const t = { kind: 'translate', d: mul(d, i) } as const;
+      this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
     }
   }
 
@@ -325,8 +349,13 @@ export class ArrayTool extends SelectionTool {
     if (len(d) < 1e-6) return;
     const n = Math.max(2, this.env.options().arrayCount);
     const els = this.movables();
+    const views = this.views();
     this.env.transaction('Matriz', () => {
-      for (let i = 1; i < n; i++) copyWalls(this.env, els, { kind: 'translate', d: mul(d, i) });
+      for (let i = 1; i < n; i++) {
+        const t = { kind: 'translate', d: mul(d, i) } as const;
+        if (els.length) copyWalls(this.env, els, t);
+        if (views.length) transformViews(this.env, views, t, true);
+      }
     });
     this.reset();
     this.env.done();

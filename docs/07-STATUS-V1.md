@@ -90,7 +90,10 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 
 **Anotações** — cota (**Y**, com referência à parede) e texto (**X**), na planta e no DXF (camadas `COTAS` e `TEXTOS`).
 Cotas automáticas do nível ativo pelo botão **Cotas auto** (0028): diálogo de critérios (o que cotar, referência da parede
-e lados); camadas aberturas → paredes → contorno → total, só nos lados que têm parede paralela.
+e lados); camadas aberturas → paredes → contorno → total, só nos lados que têm parede paralela. Marcas de corte e
+elevação são anotações de primeira classe (0030): número, título, rótulo, aparência, referências de parede e papel
+estável das elevações; seleção, propriedades, mover/copiar/girar/espelhar, prancha e DXF (`CORTES`/`ELEVACOES`) usam a
+mesma geometria em mm de papel.
 
 **Avisos do projeto** (0029): o painel soma aos avisos do modelo três leituras da geometria resolvida —
 `abertura-fora-da-parede` (offset + largura passa do eixo), `parede-topo-desnivelado` (paredes colineares do mesmo
@@ -99,6 +102,8 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 **Vistas, gráficos e seleção**
 - **Planta** por nível com intervalo de vista, direção para cima ou para baixo, subpavimento e projeção da cobertura (0013).
 - **Cortes e elevações**: corte por dois cliques; as quatro elevações em um passo; linha oculta; seleção e realce (0016).
+  A marca tem número, título, rótulo, estilo e referências de parede (0030), com geometria em mm de papel na tela, na
+  prancha e no DXF.
 - **3D** orbital com plano próximo dinâmico, sombras, sol e estilos (0015); seleção por clique com BVH (`triBvh.ts`);
   ViewCube com 26 zonas e alternância entre perspectiva e ortográfica.
 - **Gráficos de vista** (0015): escala, detalhe, estilo e substituições por categoria; pesos de linha reais nas pranchas,

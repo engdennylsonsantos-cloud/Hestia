@@ -550,6 +550,39 @@ export interface ProjectSettings {
   favoriteOpeningTypes?: Id[];
 }
 
+/** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */
+export type SectionRole = 'north' | 'south' | 'east' | 'west';
+
+/** Onde a marca de corte/elevação aparece ao longo da linha. */
+export type SectionMarkPlacement = 'both' | 'start' | 'end' | 'middle';
+
+/** Traço da linha de corte/elevação. Ausente = traço-ponto no corte e contínuo na elevação. */
+export type SectionMarkLineStyle = 'dash-dot' | 'continuous' | 'dashed';
+
+/**
+ * Aparência da marca de corte/elevação em planta. Tudo opcional: sem o campo valem os padrões do Hestia, e
+ * arquivos antigos continuam válidos sem migração. As medidas são em mm de papel.
+ */
+export interface SectionMarkStyle {
+  visible?: boolean;
+  placement?: SectionMarkPlacement;
+  showArrow?: boolean;
+  showLabel?: boolean;
+  lineStyle?: SectionMarkLineStyle;
+  /** Comprimento da seta, em mm de papel. */
+  arrowMm?: number;
+  /** Altura do rótulo, em mm de papel. */
+  textMm?: number;
+  /** Deslocamento do rótulo em relação à ponta: x ao longo da linha, y para o lado de visão. */
+  labelOffsetMm?: Vec2;
+}
+
+/** Extremidade de corte/elevação presa à extremidade de uma parede (some a parede, vale o ponto guardado). */
+export interface SectionRef {
+  wallId: Id;
+  end: 'a' | 'b';
+}
+
 /** Vista de corte ou elevação: linha em planta + profundidade visível; o observador olha para a esquerda de a→b. */
 export interface SectionView {
   id: Id;
@@ -558,6 +591,18 @@ export interface SectionView {
   a: Vec2;
   b: Vec2;
   depth: number;
+  /** Identificação curta da marca (ex.: "A"). Ausente = usa `name`. */
+  number?: string;
+  /** Título completo para a prancha (ex.: "Corte AA — Escada"). Ausente = usa `name`. */
+  title?: string;
+  /** Texto da marca em planta. Ausente = usa `number` ou `name`. */
+  label?: string;
+  /** Aparência da marca; ausente = padrão. */
+  mark?: SectionMarkStyle;
+  /** Extremidades associadas a paredes; ausente = pontos livres. */
+  refs?: { a?: SectionRef; b?: SectionRef };
+  /** Papel de uma elevação gerada automaticamente; ausente em vistas antigas e em cortes. */
+  role?: SectionRole;
 }
 
 export interface Project {

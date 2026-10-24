@@ -2,7 +2,7 @@ import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
 import { isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
-import { ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
+import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
 import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
 import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
@@ -17,7 +17,8 @@ import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
 import { annotationAt, dimGripAt, signedOffset } from './annotationPick.ts';
-import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions } from '@hestia/model';
+import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
+import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
@@ -27,7 +28,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'room' | 'annotation';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'room' | 'annotation' | 'view';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -103,9 +104,12 @@ export class SelectTool extends ToolBase {
     // Ambiente: por último entre os elementos de planta (o piso e a parede sob o cursor ganham o clique).
     const rm = pickRoomAt(pr, lv, at);
     if (rm) return { id: rm, kind: 'room' };
-    // Cotas e textos de anotação (decisão 0019): por último, para não roubar o clique de um elemento.
+    // Cotas e textos de anotação (decisão 0019) e marcas de corte/elevação: por último, para não roubar o clique de um
+    // elemento. A marca é uma anotação de primeira classe e também pode ser selecionada e transformada.
     const an = annotationAt(pr, lv, at, mpp);
-    return an ? { id: an.id, kind: 'annotation' } : null;
+    if (an) return { id: an.id, kind: 'annotation' };
+    const vm = sectionMarkAt(pr, lv, at, mpp);
+    return vm ? { id: vm, kind: 'view' } : null;
   }
 
   override move(p: PointerInfo): void {
@@ -247,7 +251,8 @@ export class SelectTool extends ToolBase {
         const els = selectedMovables(pr, this.env.selection());
         const inf = this.snap(p, { from: this.downPt, ignore: new Set(els) });
         this.delta = sub(inf.point, this.downPt);
-        this.items.push(...ghostBands(pr, els, { kind: 'translate', d: this.delta }));
+        const t = { kind: 'translate' as const, d: this.delta };
+        this.items.push(...ghostBands(pr, els, t), ...ghostViews(pr, this.env.selection(), t));
         break;
       }
       case 'opening': {
@@ -288,8 +293,13 @@ export class SelectTool extends ToolBase {
         break;
       }
       case 'moving': {
-        const els = selectedMovables(pr, this.env.selection());
-        if (els.length && (this.delta.x || this.delta.y)) moveWalls(this.env, els, this.delta, true, p.alt);
+        const sel = this.env.selection();
+        const els = selectedMovables(pr, sel);
+        const views = selectedViews(pr, sel);
+        if ((els.length || views.length) && (this.delta.x || this.delta.y)) {
+          if (els.length) moveWalls(this.env, els, this.delta, true, p.alt);
+          if (views.length) transformViews(this.env, views, { kind: 'translate', d: this.delta });
+        }
         break;
       }
       case 'opening': {
@@ -304,6 +314,7 @@ export class SelectTool extends ToolBase {
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
         const cur = this.env.selection();
         this.env.setSelection(p.shift ? [...new Set([...cur, ...ids])] : ids);
@@ -335,6 +346,13 @@ export class SelectTool extends ToolBase {
       if (isWall(e)) pts.push(e.a, e.b);
       else if (isStair(e)) pts.push(...stairEndpoints(e));
       else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
+      else {
+        const v = pr.views.find((x) => x.id === id);
+        if (v) {
+          const p = sectionPoints(pr, v);
+          pts.push(p.a, p.b);
+        }
+      }
     }
     return pts.length ? boxOf(pts) : null;
   }

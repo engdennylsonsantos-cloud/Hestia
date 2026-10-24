@@ -12,6 +12,7 @@ const PAINEL = [
   'apps/web/src/ui/SlabProperties.tsx',
   'apps/web/src/ui/RoofProperties.tsx',
   'apps/web/src/ui/StairProperties.tsx',
+  'apps/web/src/ui/SectionViewProps.tsx',
 ];
 /** Orçamento de caracteres do rótulo visível: cabe na coluna `--prop-label` (122 px) a 11 px. */
 const LABEL_MAX = 22;

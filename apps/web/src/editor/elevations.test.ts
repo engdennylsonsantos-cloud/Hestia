@@ -16,8 +16,9 @@ function leftNormal(a: { x: number; y: number }, b: { x: number; y: number }) {
 describe('elevationSpecs', () => {
   const specs = elevationSpecs(BOX);
 
-  it('gera Norte, Sul, Leste e Oeste nessa ordem', () => {
+  it('gera Norte, Sul, Leste e Oeste nessa ordem, com papel estável', () => {
     expect(specs.map((s) => s.name)).toEqual(['Norte', 'Sul', 'Leste', 'Oeste']);
+    expect(specs.map((s) => s.role)).toEqual(['north', 'south', 'east', 'west']);
   });
 
   it.each(elevationSpecs(BOX).map((s) => [s.name, s] as const))('%s: a normal à esquerda aponta para o centro da caixa', (_name, s) => {
@@ -91,6 +92,15 @@ describe('elevationCommand', () => {
     expect(norte?.id).toBe('old_norte');
     expect(norte?.depth).toBeCloseTo(14);
     expect(store.project.views.find((v) => v.id === 'corte_a')).toBeDefined();
+  });
+
+  it('reconhece a elevação renomeada pelo papel, sem criar outra', () => {
+    const renamed: SectionView = { id: 'renamed', name: 'Fachada Norte', kind: 'elevation', role: 'north', a: { x: 0, y: 0 }, b: { x: 1, y: 0 }, depth: 2 };
+    const store = addAll([renamed]);
+    const norte = store.project.views.find((v) => v.role === 'north');
+    expect(norte?.id).toBe('renamed');
+    expect(norte?.name).toBe('Fachada Norte');
+    expect(store.project.views.filter((v) => v.role === 'north')).toHaveLength(1);
   });
 
   it('remove duplicatas de elevação com o mesmo nome', () => {

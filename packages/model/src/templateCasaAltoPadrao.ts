@@ -4,7 +4,7 @@ import { makeFloor } from './floor.ts';
 import { makeRoof } from './roof.ts';
 import { makeSlab } from './slab.ts';
 import { makeStair } from './stair.ts';
-import type { Id, Opening, OpeningType, PlanSymbol, SectionView, StairRun } from './types.ts';
+import type { Id, Opening, OpeningType, PlanSymbol, SectionRole, SectionView, StairRun } from './types.ts';
 import { makeWall } from './wall.ts';
 
 /**
@@ -306,13 +306,13 @@ function elevacoes(): SectionView[] {
   const w = CAIXA.maxX - CAIXA.minX;
   const h = CAIXA.maxY - CAIXA.minY;
   // Observador olha para `look`; a linha a→b tem a normal à esquerda apontando para `look`.
-  const LOOKS: Array<{ nome: string; id: Id; look: Vec2 }> = [
-    { nome: 'Norte', id: 'V-norte', look: { x: 0, y: -1 } },
-    { nome: 'Sul', id: 'V-sul', look: { x: 0, y: 1 } },
-    { nome: 'Leste', id: 'V-leste', look: { x: -1, y: 0 } },
-    { nome: 'Oeste', id: 'V-oeste', look: { x: 1, y: 0 } },
+  const LOOKS: Array<{ nome: string; id: Id; role: SectionRole; look: Vec2 }> = [
+    { nome: 'Norte', id: 'V-norte', role: 'north', look: { x: 0, y: -1 } },
+    { nome: 'Sul', id: 'V-sul', role: 'south', look: { x: 0, y: 1 } },
+    { nome: 'Leste', id: 'V-leste', role: 'east', look: { x: -1, y: 0 } },
+    { nome: 'Oeste', id: 'V-oeste', role: 'west', look: { x: 1, y: 0 } },
   ];
-  return LOOKS.map(({ nome, id, look: u }): SectionView => {
+  return LOOKS.map(({ nome, id, role, look: u }): SectionView => {
     const d: Vec2 = { x: u.y, y: -u.x };
     const back = Math.min(...corners.map((c) => c.x * u.x + c.y * u.y));
     const shift = back - AFASTAMENTO - (cx * u.x + cy * u.y);
@@ -323,6 +323,7 @@ function elevacoes(): SectionView[] {
       id,
       name: nome,
       kind: 'elevation',
+      role,
       a: { x: p.x - (d.x * along) / 2, y: p.y - (d.y * along) / 2 },
       b: { x: p.x + (d.x * along) / 2, y: p.y + (d.y * along) / 2 },
       depth,

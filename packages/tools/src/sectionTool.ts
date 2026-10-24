@@ -1,5 +1,6 @@
 import { dist, mid, type Vec2 } from '@hestia/geom';
 import type { SectionView } from '@hestia/model';
+import { endRefAt } from './annotationPick.ts';
 import { ToolBase, makeId } from './base.ts';
 import type { PointerInfo } from './types.ts';
 
@@ -68,6 +69,8 @@ export class SectionTool extends ToolBase {
     const a = this.first;
     const b = inf.point;
     if (dist(a, b) < 0.05) return;
+    const refA = endRefAt(this.env.project(), this.env.levelId(), a);
+    const refB = endRefAt(this.env.project(), this.env.levelId(), b);
     const view: SectionView = {
       id: makeId('v'),
       name: nextSectionName(this.env.project().views),
@@ -75,6 +78,9 @@ export class SectionTool extends ToolBase {
       a,
       b,
       depth: DEFAULT_SECTION_DEPTH,
+      ...(refA || refB
+        ? { refs: { ...(refA ? { a: { wallId: refA.wallId, end: refA.end } } : {}), ...(refB ? { b: { wallId: refB.wallId, end: refB.end } } : {}) } }
+        : {}),
     };
     this.env.exec({ type: 'addView', view });
     this.env.done();

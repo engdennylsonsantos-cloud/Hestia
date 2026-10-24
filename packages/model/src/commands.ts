@@ -54,6 +54,7 @@ import {
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
 import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
+import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
 import { applyRoomCommand } from './roomCommands.ts';
 import { applyOutlineCommand } from './outlineCommands.ts';
@@ -412,17 +413,9 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'toggleOpeningFavorite': toggleFavoriteIn(p, c.id); break;
     case 'addView':
-      if (p.views.some((v) => v.id === c.view.id)) throw new Error('Vista já existe');
-      p.views.push(c.view);
-      break;
-    case 'updateView': {
-      const v = p.views.find((x) => x.id === c.id);
-      if (!v) throw new Error('Vista inexistente');
-      Object.assign(v, c.patch);
-      break;
-    }
+    case 'updateView':
     case 'deleteView':
-      p.views = p.views.filter((v) => v.id !== c.id);
+      applyViewCommand(p, c);
       break;
     case 'batch':
       for (const sub of c.commands) applyCommand(p, sub);

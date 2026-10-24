@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { sheetOf, type SheetViewSource } from '@hestia/model';
+import { sectionTitleOf, sheetOf, type SheetViewSource } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { addViewAction, SCALE_OPTIONS } from '../../editor/sheetActions.ts';
 import { useUi } from '../../editor/state.ts';
@@ -16,7 +16,7 @@ interface Source {
 function sourcesOf(p: ReturnType<typeof useProject>): Source[] {
   return [
     ...p.levels.map((l) => ({ key: `plan:${l.id}`, label: `Planta · ${l.name}`, view: { kind: 'plan' as const, levelId: l.id } })),
-    ...p.views.map((v) => ({ key: `section:${v.id}`, label: `${v.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${v.name}`, view: { kind: 'section' as const, sectionId: v.id } })),
+    ...p.views.map((v) => ({ key: `section:${v.id}`, label: `${v.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${sectionTitleOf(v)}`, view: { kind: 'section' as const, sectionId: v.id } })),
     { key: '3d', label: 'Modelo 3D (quadro no PDF)', view: { kind: '3d' as const } },
   ];
 }

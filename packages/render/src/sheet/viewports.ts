@@ -1,5 +1,5 @@
 import { computeSection, resolveLevel } from '@hestia/engine';
-import { levelGraphicsOf, sectionGraphicsOf, type Id, type Project, type SheetViewport, type SheetViewSource } from '@hestia/model';
+import { levelGraphicsOf, sectionGraphicsOf, sectionPoints, type Id, type Project, type SheetViewport, type SheetViewSource } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { buildPlanDrawList, levelBox } from '../plan/build.ts';
 import { LIGHT } from '../plan/types.ts';
@@ -51,7 +51,8 @@ export function sectionPartsOf(p: Project, sectionId: Id, vp: SheetViewport): Vi
   const view = p.views.find((v) => v.id === sectionId);
   if (!view) return emptyParts();
   const pp = withSheetScale(p, { kind: 'section', sectionId }, vp.scale);
-  const section = computeSection(pp, { a: view.a, b: view.b, depth: view.depth });
+  const pts = sectionPoints(p, view);
+  const section = computeSection(pp, { a: pts.a, b: pts.b, depth: view.depth });
   const m = viewMappingOf(vp, centreOf(sectionBox(section)));
   const list = buildSectionDrawList({
     project: pp,

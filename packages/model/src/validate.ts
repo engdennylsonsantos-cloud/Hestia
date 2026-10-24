@@ -9,6 +9,9 @@ import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
 import { viewRangeIssues } from './viewRange.ts';
 import { graphicsIssues, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dOf } from './graphics.ts';
+import { sectionRefIssues, sectionViewIssue } from './sectionView.ts';
+import { projectSheets } from './sheet.ts';
+import { viewSourceIssue } from './sheetCommands.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 
 /** `info`: aviso informativo (não é problema; ex.: parede anexada só em parte ao piso). */
@@ -232,6 +235,40 @@ function graphicsProblems(p: Project): ValidationIssue[] {
   return out;
 }
 
+/** Vistas de corte/elevação: geometria, nomes repetidos e referências de parede que sumiram. */
+function viewProblems(p: Project): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  const byId = new Set<string>();
+  const byName = new Map<string, string>();
+  for (const v of p.views) {
+    const name = v.name.trim() || v.id;
+    if (byId.has(v.id)) {
+      out.push({ severity: 'error', code: 'view-id-duplicate', message: `A vista "${name}" repete o id "${v.id}".`, elementId: v.id });
+    }
+    byId.add(v.id);
+    const issue = sectionViewIssue(v);
+    if (issue) out.push({ severity: 'error', code: 'view-invalid', message: `Vista "${name}": ${issue}`, elementId: v.id });
+    const other = byName.get(v.name);
+    if (other) {
+      out.push({ severity: 'error', code: 'view-name-duplicate', message: `As vistas com ids "${other}" e "${v.id}" usam o mesmo nome "${v.name}".`, elementId: v.id, ids: [other, v.id] });
+    } else byName.set(v.name, v.id);
+    for (const msg of sectionRefIssues(p, v)) out.push({ severity: 'warning', code: 'view-ref-missing', message: msg, elementId: v.id });
+  }
+  return out;
+}
+
+/** Pranchas: viewport apontando para nível ou corte que não existe mais. */
+function sheetProblems(p: Project): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  for (const s of projectSheets(p)) {
+    for (const vp of s.viewports) {
+      const issue = viewSourceIssue(p, vp.view);
+      if (issue) out.push({ severity: 'error', code: 'sheet-view-missing', message: `Prancha "${s.number}": ${issue.toLowerCase()}.`, ids: [s.id, vp.id] });
+    }
+  }
+  return out;
+}
+
 /** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
 export function validateProject(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
@@ -239,6 +276,8 @@ export function validateProject(p: Project): ValidationIssue[] {
   const openings = elements.filter(isOpening);
   return [
     ...graphicsProblems(p),
+    ...viewProblems(p),
+    ...sheetProblems(p),
     ...p.levels.flatMap((l) => levelIssues(l)),
     ...walls.flatMap((w) => wallIssues(p, w)),
     ...openings.flatMap((o) => openingIssues(p, o)),

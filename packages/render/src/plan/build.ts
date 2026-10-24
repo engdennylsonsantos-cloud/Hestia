@@ -279,8 +279,9 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
     for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: paint.wall.projPx, color: theme.inkSoft, alpha: 0.8 });
   }
 
-  // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis.
-  const marks = sectionMarksOf(p.views, v, theme);
+  // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria
+  // 'anotação' (visibilidade, cor e peso) e a escala da vista, com geometria em mm de papel.
+  const marks = sectionMarksOf(p, v, theme, paint.annotation, style.scale, input.selection);
   fills.push(...marks.fills);
   strokes.push(...marks.strokes);
   labels.push(...marks.labels);

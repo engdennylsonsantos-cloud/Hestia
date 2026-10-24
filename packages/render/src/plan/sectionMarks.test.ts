@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { SectionView } from '@hestia/model';
 import { LIGHT } from './types.ts';
-import { sectionMarkOps } from './sectionMarks.ts';
+import { sectionMarkOps, sectionMarksOf } from './sectionMarks.ts';
+import type { PlanPaint } from './style.ts';
 
 const V = { cx: 0, cy: 0, zoom: 50, width: 800, height: 600 };
 
@@ -35,5 +37,20 @@ describe('marcas de corte na planta', () => {
     const m = sectionMarkOps({ a: { x: 1, y: 1 }, b: { x: 1, y: 1 } }, V, LIGHT);
     expect(m.strokes).toHaveLength(0);
     expect(m.fills).toHaveLength(0);
+  });
+
+  it('a planta respeita visibilidade, cor, espessura e seleção da categoria anotação', () => {
+    const paint = { visible: true, color: '#123456', cutPx: 2, projPx: 1 } as PlanPaint;
+    const view: SectionView = { id: 'v1', name: 'Corte A', kind: 'section', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, depth: 5 };
+    const p = { views: [view], elements: {} };
+    const normal = sectionMarksOf(p, V, LIGHT, paint, 100);
+    expect(normal.strokes[0]!.color).toBe('#123456');
+    expect(normal.strokes[0]!.widthPx).toBe(2);
+    expect(normal.labels[0]!.fontPx).toBeGreaterThan(0);
+    const selected = sectionMarksOf(p, V, LIGHT, paint, 100, ['v1']);
+    expect(selected.strokes[0]!.color).toBe(LIGHT.select);
+    const hidden = sectionMarksOf(p, V, LIGHT, { ...paint, visible: false }, 100);
+    expect(hidden.strokes).toHaveLength(0);
+    expect(sectionMarksOf({ views: [{ ...view, mark: { visible: false } }], elements: {} }, V, LIGHT, paint, 100).strokes).toHaveLength(0);
   });
 });

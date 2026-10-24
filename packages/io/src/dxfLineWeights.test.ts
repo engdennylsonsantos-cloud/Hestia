@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildTemplate } from '@hestia/model';
 import {
   DXF_LAYER_CONTOUR,
+  DXF_LAYER_CORTES,
+  DXF_LAYER_ELEVACOES,
   DXF_LAYER_OPENINGS,
   DXF_LAYER_OPENING_ABOVE,
   DXF_LAYER_ROOF_PROJECTION,
@@ -98,6 +100,11 @@ describe('dxfLineRoleOf (categoria de cada camada da planta)', () => {
     expect(dxfLineRoleOf(DXF_LAYER_STAIR_ARROW)).toBe('annotation');
     expect(dxfLineRoleOf(DXF_LAYER_STAIR_CUT)).toBe('annotation');
     expect(dxfLineRoleOf('0')).toBeUndefined();
+  });
+
+  it('marcas de corte/elevação são desenho de anotação, com o peso de corte da categoria', () => {
+    expect(dxfLineRoleOf(DXF_LAYER_CORTES)).toEqual({ category: 'annotation', view: 'cut' });
+    expect(dxfLineRoleOf(DXF_LAYER_ELEVACOES)).toEqual({ category: 'annotation', view: 'cut' });
   });
 });
 

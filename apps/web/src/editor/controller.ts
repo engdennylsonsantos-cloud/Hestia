@@ -2,14 +2,17 @@ import { useSyncExternalStore } from 'react';
 import { computeSection, cotasAutomaticas, resolveLevel, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
+  annotationIdsIn,
   buildTemplate,
   createEmptyProject,
   isOpening,
   isWall,
   migrateProject,
   newId,
+  sectionPoints,
   type Id,
   type Project,
+  type SectionView,
   type TemplateId,
 } from '@hestia/model';
 import { createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
@@ -22,6 +25,7 @@ import { key3d, useUi } from './state.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
+import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
 
@@ -124,7 +128,8 @@ export class Editor {
     if (!view) return null;
     const hit = this.sectionCache.get(id);
     if (hit && hit.project === this.project) return hit.value;
-    const value = computeSection(this.project, { a: view.a, b: view.b, depth: view.depth });
+    const pts = sectionPoints(this.project, view);
+    const value = computeSection(this.project, { a: pts.a, b: pts.b, depth: view.depth });
     this.sectionCache.set(id, { project: this.project, value });
     return value;
   }
@@ -284,7 +289,10 @@ export class Editor {
   private pruneSelection(): void {
     const sel = useUi.getState().selection;
     const p = this.store.project;
-    const keep = sel.filter((id) => p.elements[id]);
+    // A seleção guarda ids de elementos, cotas/textos e vistas: só sai o que realmente sumiu do projeto.
+    const notes = new Set(annotationIdsIn(p, useUi.getState().levelId, sel));
+    const views = new Set(p.views.map((v) => v.id));
+    const keep = sel.filter((id) => p.elements[id] || notes.has(id) || views.has(id));
     if (keep.length !== sel.length) useUi.setState({ selection: keep });
     const lv = useUi.getState().levelId;
     if (!p.levels.some((l) => l.id === lv)) useUi.setState({ levelId: p.levels[0]?.id ?? 'lv_0' });
@@ -309,18 +317,16 @@ export class Editor {
     this.activate('select');
   }
 
+  updateView(id: Id, patch: Partial<Omit<SectionView, 'id'>>): string | null {
+    return updateViewAction(this.store, id, patch);
+  }
+
   renameView(id: Id, name: string): boolean {
-    const clean = name.trim();
-    if (!clean) return false;
-    this.store.exec({ type: 'updateView', id, patch: { name: clean } });
-    return true;
+    return renameViewAction(this.store, id, name);
   }
 
   deleteView(id: Id): void {
-    const v = this.project.views.find((x) => x.id === id);
-    if (!v) return;
-    this.store.exec({ type: 'deleteView', id });
-    useUi.setState({ status: `${v.name} excluído. Ctrl+Z desfaz.` });
+    deleteViewAction(this.store, id);
   }
 
   /** Gera (ou atualiza) as quatro elevações do nível ativo, em um único passo de desfazer. */

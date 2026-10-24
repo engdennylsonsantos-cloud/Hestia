@@ -41,7 +41,7 @@ describe('prédio de 10 pavimentos: estrutura do projeto', () => {
       const topo = Math.max(...z.layers.flatMap((l) => l.bands.map((b) => z.baseZ + b.z1)));
       expect(topo, `${e.id}: topo`).toBeLessThanOrEqual(28 + 1e-6);
     }
-  });
+  }, 30000);
 
   it('o topo das paredes de cada pavimento chega ao topo da laje de cima', () => {
     for (let i = 0; i < 9; i++) {

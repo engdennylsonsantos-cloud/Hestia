@@ -1,5 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
-import type { Command, SectionView } from '@hestia/model';
+import type { Command, SectionRole, SectionView } from '@hestia/model';
 
 /** Caixa em planta (metros), no formato de `levelBox`. */
 export interface PlanBox {
@@ -14,6 +14,7 @@ export const ELEVATION_OFFSET = 3;
 
 export interface ElevationSpec {
   name: string;
+  role: SectionRole;
   a: Vec2;
   b: Vec2;
   depth: number;
@@ -23,11 +24,11 @@ export interface ElevationSpec {
  * Direção para onde o observador olha. O nome segue a fachada mostrada (convenção de projeto brasileira e do
  * Revit/ArchiCAD): a elevação "Norte" mostra a fachada norte, vista de norte olhando para -y.
  */
-const LOOKS: Array<{ name: string; look: Vec2 }> = [
-  { name: 'Norte', look: { x: 0, y: -1 } },
-  { name: 'Sul', look: { x: 0, y: 1 } },
-  { name: 'Leste', look: { x: -1, y: 0 } },
-  { name: 'Oeste', look: { x: 1, y: 0 } },
+const LOOKS: Array<{ name: string; role: SectionRole; look: Vec2 }> = [
+  { name: 'Norte', role: 'north', look: { x: 0, y: -1 } },
+  { name: 'Sul', role: 'south', look: { x: 0, y: 1 } },
+  { name: 'Leste', role: 'east', look: { x: -1, y: 0 } },
+  { name: 'Oeste', role: 'west', look: { x: 1, y: 0 } },
 ];
 
 /**
@@ -46,7 +47,7 @@ export function elevationSpecs(box: PlanBox, offset = ELEVATION_OFFSET): Elevati
   const cy = (box.minY + box.maxY) / 2;
   const w = box.maxX - box.minX;
   const h = box.maxY - box.minY;
-  return LOOKS.map(({ name, look: u }) => {
+  return LOOKS.map(({ name, role, look: u }) => {
     // Para que a normal à esquerda de a→b seja u, a direção é d = (u.y, -u.x), pois perp(d) = (-d.y, d.x) = u.
     const d: Vec2 = { x: u.y, y: -u.x };
     // Face de trás da caixa ao longo de u, menos o afastamento.
@@ -57,6 +58,7 @@ export function elevationSpecs(box: PlanBox, offset = ELEVATION_OFFSET): Elevati
     const depth = Math.abs(u.x) * w + Math.abs(u.y) * h + 2 * offset;
     return {
       name,
+      role,
       a: { x: p.x - (d.x * along) / 2, y: p.y - (d.y * along) / 2 },
       b: { x: p.x + (d.x * along) / 2, y: p.y + (d.y * along) / 2 },
       depth,
@@ -65,19 +67,23 @@ export function elevationSpecs(box: PlanBox, offset = ELEVATION_OFFSET): Elevati
 }
 
 /**
- * Comando único que gera as quatro elevações. Uma elevação com o mesmo nome é atualizada no lugar (mantém o id);
- * duplicatas extras são removidas. Tudo entra em um batch, então um único desfazer reverte a operação.
+ * Comando único que gera as quatro elevações. Uma elevação com o mesmo papel (ou, nas antigas sem papel, o mesmo
+ * nome) é atualizada no lugar (mantém o id); duplicatas extras são removidas. Tudo entra em um batch, então um único
+ * desfazer reverte a operação.
  */
 export function elevationCommand(views: SectionView[], box: PlanBox, makeId: (prefix: string) => string): Command {
   const commands: Command[] = [];
   for (const spec of elevationSpecs(box)) {
-    const same = views.filter((v) => v.kind === 'elevation' && v.name === spec.name);
+    // O papel (norte/sul/leste/oeste) é a identidade estável: renomear a elevação não cria uma duplicata. Vistas
+    // antigas, sem papel, ainda são encontradas pelo nome e ganham o papel na primeira geração.
+    const byRole = views.filter((v) => v.kind === 'elevation' && v.role === spec.role);
+    const same = byRole.length ? byRole : views.filter((v) => v.kind === 'elevation' && !v.role && v.name === spec.name);
     const [keep, ...extra] = same;
     if (keep) {
-      commands.push({ type: 'updateView', id: keep.id, patch: { a: spec.a, b: spec.b, depth: spec.depth } });
+      commands.push({ type: 'updateView', id: keep.id, patch: { a: spec.a, b: spec.b, depth: spec.depth, role: spec.role } });
       for (const v of extra) commands.push({ type: 'deleteView', id: v.id });
     } else {
-      commands.push({ type: 'addView', view: { id: makeId('v'), name: spec.name, kind: 'elevation', a: spec.a, b: spec.b, depth: spec.depth } });
+      commands.push({ type: 'addView', view: { id: makeId('v'), name: spec.name, kind: 'elevation', a: spec.a, b: spec.b, depth: spec.depth, role: spec.role } });
     }
   }
   return { type: 'batch', commands };

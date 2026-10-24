@@ -5,6 +5,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { SCALE_OPTIONS, moveViewportAction } from '../editor/sheetActions.ts';
 import { useUi } from '../editor/state.ts';
 import { Icon } from './Icon.tsx';
+import { TextField } from './fields.tsx';
 
 /** Número para o SVG, sem ruído de ponto flutuante. */
 const n = (v: number): string => (Math.round(v * 1000) / 1000).toString();
@@ -145,6 +146,10 @@ export function SheetView({ sheetId }: { sheetId: string }): ReactElement {
               ))}
               {SCALE_OPTIONS.includes(selected.scale as (typeof SCALE_OPTIONS)[number]) ? null : <option value={selected.scale}>1:{selected.scale}</option>}
             </select>
+            <label className="val soft" htmlFor="sheet-title">Título</label>
+            <span style={{ minWidth: 170 }}>
+              <TextField id="sheet-title" value={selected.title ?? ''} placeholder="Título na prancha" onCommit={(v) => run(() => editor.store.exec({ type: 'updateViewport', sheetId, id: selected.id, patch: { title: v.trim() || undefined } }, 'Alterar título da vista'), 'Título alterado.')} />
+            </span>
             <button className="btn small danger" onClick={() => { run(() => editor.store.exec({ type: 'removeViewport', sheetId, id: selected.id }, 'Excluir vista da prancha'), 'Vista removida.'); setSel(null); }}>Remover vista</button>
           </>
         ) : (

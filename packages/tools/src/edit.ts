@@ -1,6 +1,6 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
 import { followingEnds } from './pick.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
@@ -15,6 +15,32 @@ export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) =>
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
 /** Paredes, pisos, lajes e telhados: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
 export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRooms(p, ids)];
+
+/** Vistas de corte/elevação dentro da seleção. Elas transformam junto com os elementos. */
+export const selectedViews = (p: Project, ids: Id[]): Id[] => viewIdsIn(p, ids);
+
+/** Fantasmas das marcas de corte/elevação sob mover/girar/espelhar. */
+export function ghostViews(p: Project, ids: Id[], t: Transform): PreviewItem[] {
+  const out: PreviewItem[] = [];
+  for (const id of viewIdsIn(p, ids)) {
+    const v = p.views.find((x) => x.id === id);
+    if (!v) continue;
+    const pts = sectionPoints(p, v);
+    out.push({ kind: 'sectionLine', a: applyTransform(t, pts.a), b: applyTransform(t, pts.b), dashed: true, label: sectionLabelOf(v), elevation: v.kind === 'elevation' });
+  }
+  return out;
+}
+
+/** Move, gira, espelha ou copia vistas num único passo de desfazer; devolve os ids das cópias. */
+export function transformViews(env: ToolEnv, ids: Id[], t: Transform, copy = false): Id[] {
+  const cmds = viewTransformCommands(env.project(), ids, t, copy);
+  if (!cmds.length) return [];
+  const created = cmds.flatMap((c) => (c.type === 'addView' ? [c.view.id] : []));
+  env.transaction(copy ? 'Copiar vista' : 'Mover vista', () => {
+    for (const c of cmds) env.exec(c);
+  });
+  return created;
+}
 
 /** Mapa de novos IDs para copiar paredes, pisos e as aberturas hospedadas nas paredes copiadas. */
 export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {

@@ -11,6 +11,7 @@ import {
   exportDxf,
   exportSectionDxf,
   notesDxfOf,
+  sectionMarksDxfOf,
   type DxfLevelGeometry,
   type DxfOpening,
   type DxfPoint,
@@ -18,7 +19,7 @@ import {
   type DxfSectionItem,
   type DxfViewState,
 } from '@hestia/io';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, sectionGraphicsOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -230,8 +231,13 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
           }))
       : [],
   };
-  // Cotas e textos (decisão 0019) seguem a visibilidade da categoria 'anotação' e a escala da vista.
-  const withNotes: DxfLevelGeometry = { ...geo, ...(shown('annotation') ? { notes: notesDxfOf(p, levelId, vg.scale) } : {}) };
+  // Cotas, textos (decisão 0019) e marcas de corte/elevação seguem a visibilidade da categoria 'anotação' e a escala.
+  const withNotes: DxfLevelGeometry = {
+    ...geo,
+    ...(shown('annotation')
+      ? { notes: notesDxfOf(p, levelId, vg.scale), sectionMarks: sectionMarksDxfOf(p, vg.scale) }
+      : {}),
+  };
   return { ...withNotes, lineWeights: lineWeightsOf(p, levelId, withNotes) };
 }
 
@@ -285,7 +291,8 @@ export function sectionLineWeightsOf(p: Project, geo: DxfSectionGeometry): Recor
 export function sectionDxfGeometryOf(p: Project, sectionId: Id): DxfSectionGeometry {
   const view = p.views.find((v) => v.id === sectionId);
   if (!view) throw new Error(`Vista ausente: ${sectionId}`);
-  const section = computeSection(p, { a: view.a, b: view.b, depth: view.depth });
+  const pts = sectionPoints(p, view);
+  const section = computeSection(p, { a: pts.a, b: pts.b, depth: view.depth });
   const vg = sectionGraphicsOf(p);
   const shown = (c: GraphicsCategory): boolean => vg.overrides[c].visible !== false;
   const cut: DxfSectionItem[] = [];
@@ -312,6 +319,7 @@ export function sectionDxf(p: Project, sectionId: Id): string {
 /** Entrega o DXF do corte pelo mesmo caminho da planta e devolve a frase de status. */
 export function saveSectionDxf(p: Project, sectionId: Id): Promise<string> {
   const base = p.name.trim() || 'projeto';
-  const view = (p.views.find((v) => v.id === sectionId)?.name ?? sectionId).trim() || 'vista';
+  const found = p.views.find((v) => v.id === sectionId);
+  const view = (found ? sectionTitleOf(found) : sectionId).trim() || 'vista';
   return saveText(`${base}-${view}.dxf`, sectionDxf(p, sectionId));
 }

@@ -1,5 +1,5 @@
 import type { Project, Sheet, SheetViewport, SheetViewSource } from '@hestia/model';
-import { sheetInnerBox } from '@hestia/model';
+import { sectionTitleOf, sheetInnerBox } from '@hestia/model';
 import { emptyParts, type ViewportParts } from './types.ts';
 
 /** Altura das linhas do carimbo e largura da caixa (mm de papel). */
@@ -28,7 +28,10 @@ export function captionOf(p: Project, view: SheetViewSource, vp: SheetViewport):
 
 function sourceName(p: Project, view: SheetViewSource): string {
   if (view.kind === 'plan') return p.levels.find((l) => l.id === view.levelId)?.name ?? 'Vista inexistente';
-  if (view.kind === 'section') return p.views.find((v) => v.id === view.sectionId)?.name ?? 'Vista inexistente';
+  if (view.kind === 'section') {
+    const found = p.views.find((v) => v.id === view.sectionId);
+    return found ? sectionTitleOf(found) : 'Vista inexistente';
+  }
   return '3D';
 }
 

@@ -31,6 +31,7 @@ import { setRoofProjection, useUi } from '../editor/state.ts';
 import { avisoSemNivelAcima, proximoNivelAcima, setBaseNoPiso, setTopoNoPiso } from '../editor/wallFloorActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
+import { SectionViewProps, selectedView } from './SectionViewProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
@@ -352,6 +353,7 @@ function ViewProps(): ReactElement {
       {s.view === 'plan' && <LevelGraphicsGroup key={`lg-${s.levelId}`} levelId={s.levelId} />}
       {s.view === '3d' && <View3DGroup />}
       {s.view === 'section' && <SectionGraphicsGroup />}
+      {s.view === 'section' && section ? <SectionViewProps view={section} /> : null}
       <Group title="Padrões do projeto" open={false}>
         <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
         <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>
@@ -365,6 +367,7 @@ export function Properties(): ReactElement {
   const p = useProject();
   const sel = useUi((s) => s.selection);
   const note = selectedNote(p, useUi((s) => s.levelId), sel);
+  const view = selectedView(p, sel);
   const els = sel.map((id) => p.elements[id]).filter((e) => !!e);
   const walls = els.filter(isWall);
   const ops = els.filter(isOpening);
@@ -376,7 +379,7 @@ export function Properties(): ReactElement {
   const rooms = els.filter(isRoom);
   const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length;
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
-  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : 'Vista';
+  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
@@ -393,6 +396,7 @@ export function Properties(): ReactElement {
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} />
+          : view ? <SectionViewProps view={view} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada ou ambiente) para editar propriedades.</div>
         ) : <ViewProps />}

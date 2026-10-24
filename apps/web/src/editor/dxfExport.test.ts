@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
 import { openingSymbolPaths } from '@hestia/geom';
-import { dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry } from '@hestia/io';
+import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry } from '@hestia/io';
 import {
   ProjectStore,
   buildTemplate,
@@ -545,6 +545,25 @@ describe('larguras de linha no DXF (decisão 0015 §2 item 7)', () => {
     expect(w.ESCADA_SETA).toBe(0);
     expect(w.ESCADA_CORTE).toBe(0);
     expect(w.ESCADA).toBe(35);
+  });
+
+  it('marcas de corte/elevação usam o peso de corte da anotação (1 = 0,10 mm em 1:100)', () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 1, y: 0 };
+    const geo: DxfLevelGeometry = {
+      clusters: [],
+      openings: [],
+      sectionMarks: {
+        lines: [
+          { a, b, layer: DXF_LAYER_CORTES },
+          { a, b, layer: DXF_LAYER_ELEVACOES },
+        ],
+        texts: [],
+      },
+    };
+    const w = lineWeightsOf(lPlan().project, 'lv_0', geo);
+    expect(w[DXF_LAYER_CORTES]).toBe(9);
+    expect(w[DXF_LAYER_ELEVACOES]).toBe(9);
   });
 });
 

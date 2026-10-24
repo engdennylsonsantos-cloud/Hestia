@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { triangulate, type Mesh2D, type Polygon, type Vec2 } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
+import { DOT_PX, HATCH_PX, hatchSegments } from './hatch.ts';
 import type { PlanDrawList, StrokeOp } from './types.ts';
-
-const HATCH_TILE = 0.2; // metros por repetição do padrão
 
 const triCache = new WeakMap<Polygon, Mesh2D>();
 function tri(p: Polygon): Mesh2D {
@@ -15,55 +14,11 @@ function tri(p: Polygon): Mesh2D {
   return m;
 }
 
-function hatchTexture(kind: string): THREE.Texture | null {
-  if (typeof document === 'undefined') return null;
-  const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 64;
-  const g = c.getContext('2d');
-  if (!g) return null;
-  g.clearRect(0, 0, 64, 64);
-  g.strokeStyle = '#ffffff';
-  g.fillStyle = '#ffffff';
-  g.lineWidth = 3;
-  g.beginPath();
-  // `solid`: textura cheia; a cor da hachura entra pelo material (cor × textura), como nos demais padrões (decisão 0015 §2.8).
-  if (kind === 'solid') g.fillRect(0, 0, 64, 64);
-  if (kind === 'diagonal' || kind === 'cross') {
-    for (let k = -64; k <= 64; k += 16) {
-      g.moveTo(k, 64);
-      g.lineTo(k + 64, 0);
-    }
-  }
-  if (kind === 'cross') {
-    for (let k = -64; k <= 64; k += 16) {
-      g.moveTo(k, 0);
-      g.lineTo(k + 64, 64);
-    }
-  }
-  g.stroke();
-  if (kind === 'dots') {
-    for (let x = 8; x < 64; x += 16) for (let y = 8; y < 64; y += 16) g.fillRect(x, y, 4, 4);
-  }
-  // `gesso` (forro, D3): tracejado leve, um traço horizontal a cada 16 px.
-  if (kind === 'gesso') {
-    for (let y = 8; y < 64; y += 16) for (let x = 0; x < 64; x += 16) g.fillRect(x, y, 10, 2);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
-
 interface Batch {
   key: string;
   color: string;
   alpha: number;
-  hatch?: string;
   pos: number[];
-  uv: number[];
   idx: number[];
 }
 
@@ -73,7 +28,6 @@ export class PlanScene {
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private group = new THREE.Group();
   private mats = new Map<string, THREE.MeshBasicMaterial>();
-  private hatchTex = new Map<string, THREE.Texture | null>();
 
   constructor() {
     this.scene.add(this.group);
@@ -82,10 +36,10 @@ export class PlanScene {
 
   /**
    * Todo material é transparente (mesmo opaco): o three.js desenha os opacos antes dos transparentes, e isso poria a hachura
-   * (com textura) por cima das paredes, que vêm depois na lista. Com tudo no mesmo grupo, a ordem é a da lista (`renderOrder`),
-   * como no CPU (decisão 0015 §2.4). Um pixel de alfa 1 sobrescreve; um de alfa 0 da textura não altera o que está embaixo.
+   * por cima das paredes, que vêm depois na lista. Com tudo no mesmo grupo, a ordem é a da lista (`renderOrder`),
+   * como no CPU (decisão 0015 §2.4). A hachura é vetorial (linhas e pontos), então não há textura para amostrar com o zoom.
    */
-  private material(key: string, color: string, alpha: number, map?: THREE.Texture | null): THREE.MeshBasicMaterial {
+  private material(key: string, color: string, alpha: number): THREE.MeshBasicMaterial {
     let m = this.mats.get(key);
     if (!m) {
       m = new THREE.MeshBasicMaterial({
@@ -95,7 +49,6 @@ export class PlanScene {
         depthTest: false,
         depthWrite: false,
         side: THREE.DoubleSide,
-        map: map ?? null,
       });
       this.mats.set(key, m);
     }
@@ -129,61 +82,55 @@ export class PlanScene {
       if (!b || b.idx.length === 0) return;
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
-      if (b.hatch) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
       g.setIndex(b.idx);
-      let map: THREE.Texture | null | undefined;
-      if (b.hatch) {
-        if (!this.hatchTex.has(b.hatch)) this.hatchTex.set(b.hatch, hatchTexture(b.hatch));
-        map = this.hatchTex.get(b.hatch);
-      }
-      const mesh = new THREE.Mesh(g, this.material(`${b.key}`, b.color, b.alpha, map));
+      const mesh = new THREE.Mesh(g, this.material(b.key, b.color, b.alpha));
       mesh.renderOrder = order++;
       mesh.frustumCulled = false;
       this.group.add(mesh);
     };
 
+    // Uma lista corrente: troca de lote só quando muda cor, alfa ou tipo, na ordem em que os itens aparecem.
     let cur: Batch | null = null;
-    const fillBatch = (hatch: string | undefined, color: string, alpha: number): Batch => {
-      const key = `${color}|${alpha}|${hatch ?? ''}`;
+    const batchFor = (key: string, color: string, alpha: number): Batch => {
       if (cur && cur.key === key) return cur;
       flush(cur);
-      cur = { key, color, alpha, hatch, pos: [], uv: [], idx: [] };
+      cur = { key, color, alpha, pos: [], idx: [] };
       return cur;
     };
+    const fillPolygon = (poly: Polygon, color: string, alpha: number): void => {
+      const m = tri(poly);
+      if (m.indices.length === 0) return;
+      const b = batchFor(`f|${color}|${alpha}`, color, alpha);
+      const base = b.pos.length / 3;
+      for (let i = 0; i < m.positions.length; i += 2) b.pos.push(m.positions[i]!, m.positions[i + 1]!, 0);
+      for (const k of m.indices) b.idx.push(base + k);
+    };
     for (const f of dl.fills) {
-      const pass: Array<{ hatch?: string; color: string; alpha: number }> = [{ color: f.color, alpha: f.alpha }];
-      if (f.hatch) pass.push({ hatch: f.hatch.kind, color: f.hatch.color, alpha: f.hatch.alpha ?? 1 });
-      for (const ps of pass) {
-        for (const poly of f.polygons) {
-          const m = tri(poly);
-          if (m.indices.length === 0) continue;
-          const b = fillBatch(ps.hatch, ps.color, ps.alpha);
-          const base = b.pos.length / 3;
-          for (let i = 0; i < m.positions.length; i += 2) {
-            const x = m.positions[i]!;
-            const y = m.positions[i + 1]!;
-            b.pos.push(x, y, 0);
-            if (ps.hatch) b.uv.push(x / HATCH_TILE, y / HATCH_TILE);
-          }
-          for (const k of m.indices) b.idx.push(base + k);
+      for (const poly of f.polygons) fillPolygon(poly, f.color, f.alpha);
+      if (!f.hatch) continue;
+      const { kind, color } = f.hatch;
+      const alpha = f.hatch.alpha ?? 1;
+      if (kind === 'solid') {
+        for (const poly of f.polygons) fillPolygon(poly, color, alpha);
+        continue;
+      }
+      // Hachura vetorial: linhas de HATCH_PX (pontos de DOT_PX) recortadas ao contorno, com a mesma espessura em qualquer zoom.
+      for (const poly of f.polygons) {
+        for (const s of hatchSegments(poly, kind)) {
+          const b = batchFor(`h|${color}|${alpha}`, color, alpha);
+          quad(b, s.a, s.b, (s.dot ? DOT_PX : HATCH_PX) / v.zoom);
         }
       }
     }
     flush(cur);
     cur = null;
 
-    const strokeBatch = (s: StrokeOp): Batch => {
-      const key = `s|${s.color}|${s.alpha}`;
-      if (cur && cur.key === key) return cur;
-      flush(cur);
-      cur = { key, color: s.color, alpha: s.alpha, pos: [], uv: [], idx: [] };
-      return cur;
-    };
+    const strokeBatch = (s: StrokeOp): Batch => batchFor(`s|${s.color}|${s.alpha}`, s.color, s.alpha);
     for (const s of dl.strokes) {
       const b = strokeBatch(s);
       const w = s.widthPx / v.zoom;
       const segs = s.dash ? dashSegments(s.pts, s.closed, s.dash[0] / v.zoom, s.dash[1] / v.zoom) : edges(s.pts, s.closed);
-      for (const [p, q] of segs) quad(b, p, q, w, !s.dash);
+      for (const [p, q] of segs) quad(b, p, q, w);
     }
     flush(cur);
   }
@@ -191,7 +138,6 @@ export class PlanScene {
   dispose(): void {
     this.clear();
     for (const m of this.mats.values()) m.dispose();
-    for (const t of this.hatchTex.values()) t?.dispose();
   }
 }
 
@@ -226,7 +172,11 @@ function dashSegments(pts: Vec2[], closed: boolean, dash: number, gap: number): 
   return out;
 }
 
-function quad(b: Batch, p: Vec2, q: Vec2, w: number, capped: boolean): void {
+/**
+ * Traço de espessura `w` (metros) de `p` a `q`, com ponta de meia espessura em cada extremo. Vale para linhas inteiras,
+ * tracejados e hachura: a ponta evita a falha de cobertura nos cantos de contornos tracejados.
+ */
+function quad(b: Batch, p: Vec2, q: Vec2, w: number): void {
   const dx = q.x - p.x;
   const dy = q.y - p.y;
   const L = Math.hypot(dx, dy);
@@ -234,13 +184,12 @@ function quad(b: Batch, p: Vec2, q: Vec2, w: number, capped: boolean): void {
   const ux = dx / L;
   const uy = dy / L;
   const h = w / 2;
-  const e = capped ? h : 0;
   const nx = -uy * h;
   const ny = ux * h;
-  const ax = p.x - ux * e;
-  const ay = p.y - uy * e;
-  const bx = q.x + ux * e;
-  const by = q.y + uy * e;
+  const ax = p.x - ux * h;
+  const ay = p.y - uy * h;
+  const bx = q.x + ux * h;
+  const by = q.y + uy * h;
   const base = b.pos.length / 3;
   b.pos.push(ax + nx, ay + ny, 0, ax - nx, ay - ny, 0, bx - nx, by - ny, 0, bx + nx, by + ny, 0);
   b.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);

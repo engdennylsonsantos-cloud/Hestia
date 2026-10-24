@@ -322,62 +322,50 @@ describe('hachura sólida (decisão 0015 §2.8)', () => {
     expect(f!.hatch!.color).toBe(mix(p0().materials[wallMaterialOf(p0())]!.color, '#000000', 0.45));
   });
 
-  it('CPU: o padrão sólido pinta a célula inteira com a cor da hachura', () => {
-    const rec: Array<[string, unknown[]]> = [];
-    const fakeG = {
-      fillRect: (...a: unknown[]) => rec.push(['fillRect', a]),
-      fillStyle: '' as unknown,
-      strokeStyle: '' as unknown,
-      lineWidth: 0,
-      beginPath: () => {},
-      moveTo: () => {},
-      lineTo: () => {},
-      stroke: () => {},
-      clearRect: () => {},
-    };
-    const fakeCtx = new Proxy({ globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1 } as Record<string, unknown>, {
-      get: (t, k: string) => (k in t ? t[k] : () => ({})),
+  it('CPU: o padrão sólido é um preenchimento na cor da hachura, sem padrão rasterizado', () => {
+    const calls: string[] = [];
+    const fillStyles: unknown[] = [];
+    const fakeCtx = new Proxy({} as Record<string, unknown>, {
+      get: (t, k: string) => {
+        if (k in t) return t[k];
+        return () => {
+          calls.push(k);
+          return {};
+        };
+      },
       set: (t, k: string, v) => {
+        if (k === 'fillStyle') fillStyles.push(v);
         t[k] = v;
         return true;
       },
     });
-    vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => fakeG }) });
+    const createCanvas = vi.fn(() => ({ width: 0, height: 0, getContext: () => ({}) }));
+    vi.stubGlobal('document', { createElement: createCanvas });
     try {
       const dl = draw(solidProject());
       const hatchColor = dl.fills.find((x) => x.hatch?.kind === 'solid')!.hatch!.color;
-      expect(hatchColor).toBeDefined();
       drawPlanCpu(fakeCtx as unknown as CanvasRenderingContext2D, dl, VIEW, 1);
-      expect(rec.some(([n, a]) => n === 'fillRect' && a[0] === 0 && a[2] === 8 && a[3] === 8)).toBe(true);
-      expect(fakeG.fillStyle).toBe(hatchColor);
+      expect(fillStyles).toContain(hatchColor);
+      expect(calls).toContain('fill');
+      expect(calls).not.toContain('createPattern');
+      expect(createCanvas).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('GPU: a textura do padrão sólido é cheia (64×64), e a cor da hachura entra pelo material', () => {
-    const made: Array<{ fillRects: unknown[][] }> = [];
-    const makeCanvas = () => {
-      const rec = { fillRects: [] as unknown[][] };
-      made.push(rec);
-      const g = {
-        fillRect: (...a: unknown[]) => rec.fillRects.push(a),
-        clearRect: () => {},
-        beginPath: () => {},
-        moveTo: () => {},
-        lineTo: () => {},
-        stroke: () => {},
-        strokeStyle: '',
-        fillStyle: '',
-        lineWidth: 0,
-      };
-      return { width: 0, height: 0, getContext: () => g };
-    };
-    vi.stubGlobal('document', { createElement: makeCanvas });
+  it('GPU: o padrão sólido é malha na cor da hachura, sem textura (vetorial)', () => {
+    const createCanvas = vi.fn(() => ({ width: 0, height: 0, getContext: () => ({}) }));
+    vi.stubGlobal('document', { createElement: createCanvas });
     try {
+      const dl = draw(solidProject());
+      const hatchColor = dl.fills.find((x) => x.hatch?.kind === 'solid')!.hatch!.color;
       const scenePlan = new PlanScene();
-      scenePlan.setDrawList(draw(solidProject()), VIEW);
-      expect(made.some((r) => r.fillRects.some((a) => a[0] === 0 && a[1] === 0 && a[2] === 64 && a[3] === 64))).toBe(true);
+      scenePlan.setDrawList(dl, VIEW);
+      const meshes = scenePlan.scene.children.flatMap((c) => c.children) as unknown as Array<{ material: { color: { getHexString: () => string }; map: unknown } }>;
+      expect(meshes.some((m) => m.material.color.getHexString() === hatchColor!.slice(1))).toBe(true);
+      expect(meshes.every((m) => m.material.map === null || m.material.map === undefined)).toBe(true);
+      expect(createCanvas).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

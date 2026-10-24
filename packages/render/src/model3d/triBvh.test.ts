@@ -94,3 +94,39 @@ describe('BVH de triângulos', () => {
     expect(bvh.stats.tested).toBeLessThan(bvh.stats.triangles / 4);
   });
 });
+
+describe('BVH de triângulos com chaves iguais', () => {
+  it('uma grade de faces coplanares (muitos centroides no mesmo valor) equivale à força bruta', () => {
+    // 400 quadrados no plano z = 0, cada um em duas faces: centroides com x e y repetidos, a divisão cai em empates.
+    const positions: number[] = [];
+    const indices: number[] = [];
+    let v = 0;
+    for (let i = 0; i < 20; i++) {
+      for (let j = 0; j < 20; j++) {
+        const x = i * 0.5;
+        const y = j * 0.5;
+        positions.push(x, y, 0, x + 0.5, y, 0, x + 0.5, y + 0.5, 0, x, y + 0.5, 0);
+        indices.push(v, v + 1, v + 2, v, v + 2, v + 3);
+        v += 4;
+      }
+    }
+    const pos = new Float32Array(positions);
+    const idx = new Uint32Array(indices);
+    const grade = buildTriBvh(pos, idx);
+    const sorteio = rng(99);
+    for (let i = 0; i < 100; i++) {
+      const origin = new THREE.Vector3(sorteio() * 10 - 1, sorteio() * 10 - 1, 1 + sorteio() * 3);
+      const target = new THREE.Vector3(sorteio() * 10 - 1, sorteio() * 10 - 1, 0);
+      const ray = new THREE.Ray(origin, target.clone().sub(origin).normalize());
+      const got = raycastTriBvh(grade, ray, Infinity, THREE.DoubleSide);
+      const want = forcaBruta(pos, idx, ray);
+      if (!want) {
+        expect(got).toBeNull();
+        continue;
+      }
+      expect(got).not.toBeNull();
+      expect(got!.faceIndex).toBe(want.faceIndex);
+      expect(got!.distance).toBeCloseTo(want.distance, 9);
+    }
+  });
+});

@@ -44,6 +44,13 @@ export interface PlanDrawList {
   labels: LabelOp[];
 }
 
+/** Uma camada da planta (geometria do nível ou sobreposição), sem o fundo. */
+export interface PlanOps {
+  fills: FillOp[];
+  strokes: StrokeOp[];
+  labels: LabelOp[];
+}
+
 export interface PlanTheme {
   bg: string;
   gridMinor: string;

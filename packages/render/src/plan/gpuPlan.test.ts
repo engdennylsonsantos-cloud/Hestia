@@ -6,10 +6,9 @@ import type { PlanDrawList } from './types.ts';
 const VIEW = { cx: 0, cy: 0, zoom: 10, width: 400, height: 300 };
 const quad = (x0: number, y0: number, x1: number, y1: number) => [[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]];
 
-/** Malhas do grupo da cena, na ordem em que foram criadas (ordem da lista de desenho). */
+/** Malhas de todas as camadas da cena, na ordem das camadas (ordem da lista de desenho). */
 function meshesOf(scene: PlanScene): THREE.Mesh[] {
-  const group = scene.scene.children[0] as THREE.Group;
-  return group.children as THREE.Mesh[];
+  return (scene.scene.children as THREE.Group[]).flatMap((g) => g.children as THREE.Mesh[]);
 }
 
 describe('PlanScene: ordem de desenho segue a lista (como o CPU)', () => {

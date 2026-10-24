@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanScene, buildPlanDrawList, createGpu, drawPlanCpu, hiddenSelectionOps, pickElement, pickModelPoint, planViewOf, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type PlanTheme, type Viewport } from '@hestia/render';
-import { resolveFloors, resolveRooms, resolveRoofs, resolveSlabs } from '@hestia/engine';
-import { view3dOf, type Id, type Project } from '@hestia/model';
-import { editor, useProjectVersion } from '../editor/controller.ts';
+import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
+import { view3dOf } from '@hestia/model';
+import { useShallow } from 'zustand/react/shallow';
+import { editor } from '../editor/controller.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
@@ -44,11 +44,8 @@ interface Pt {
   y: number;
 }
 
-/** Planta com o contorno fantasma dos selecionados fora do intervalo de vista (decisão 0013 §4): a planta não os desenha. */
-function withHiddenSelection(dl: PlanDrawList, p: Project, levelId: Id, selection: Id[], theme: PlanTheme): PlanDrawList {
-  const ghosts = hiddenSelectionOps(p, levelId, planViewOf(p, levelId), selection, theme);
-  return ghosts.length ? { ...dl, strokes: [...dl.strokes, ...ghosts] } : dl;
-}
+/** Rótulos vazios com referência fixa: a planta compara por identidade para não atualizar o estado à toa. */
+const NO_LABELS: LabelOp[] = [];
 
 /** Desenha o plano (GPU ou CPU) e o 3D, e traduz o ponteiro em chamadas ao editor. */
 export function ViewportCanvas(): ReactElement {
@@ -63,13 +60,18 @@ export function ViewportCanvas(): ReactElement {
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3dModel?: unknown }).__hestia3dModel = model.current;
   const modelKey = useRef('');
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [labels, setLabels] = useState<LabelOp[]>([]);
+  // Rótulos da planta e a vista deles: o estado só troca quando o conteúdo ou a vista muda (`publish`).
+  const [labels, setLabels] = useState<LabelOp[]>(NO_LABELS);
+  const [labelView, setLabelView] = useState<Viewport | null>(null);
   const [ready, setReady] = useState(false);
   const dark = useDark();
-  const pv = useProjectVersion();
-  const ui = useUi();
+  // Só o que a própria tela lê: a mudança de outros campos não re-renderiza a planta (o redesenho sai do agendamento abaixo).
+  const ui = useUi(useShallow((s) => ({ view: s.view, gpu: s.gpu, prompt: s.prompt, typed: s.typed, hover: s.hover, tool: s.tool })));
   const frame = useRef(0);
   const dprRef = useRef(1);
+  const planFrame = useRef<PlanFrame | null>(null);
+  const shownLabels = useRef<LabelOp[]>(NO_LABELS);
+  const shownView = useRef<Viewport | null>(null);
 
   // ---- inicialização: GPU primeiro, CPU só sem suporte ----
   const bootRef = useRef<(prefer: 'auto' | 'webgl2' | 'cpu') => Promise<void>>(async () => {});
@@ -107,6 +109,8 @@ export function ViewportCanvas(): ReactElement {
         useUi.setState({ gpu: 'cpu' });
       }
       modelKey.current = '';
+      // Troca de dispositivo (GPU ou CPU): a cena da planta começa do zero.
+      planFrame.current?.reset();
       setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
       setReady(true);
       useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
@@ -133,6 +137,12 @@ export function ViewportCanvas(): ReactElement {
     } catch {
       if (g.gpu.backend === 'webgpu') void bootRef.current('webgl2');
     }
+  };
+
+  /** Publica os rótulos e a vista só quando mudam: a planta não re-renderiza a cada quadro (`null`: sem planta). */
+  const publish = (next: LabelOp[], vw: Viewport | null): void => {
+    if (next !== shownLabels.current) setLabels((shownLabels.current = next));
+    if (!sameView(shownView.current, vw)) setLabelView((shownView.current = vw && { ...vw }));
   };
 
   // ---- desenho ----
@@ -168,67 +178,38 @@ export function ViewportCanvas(): ReactElement {
       if (m.orbit.step(performance.now())) useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
       m.orbit.setAspect(w, h);
       safeRender(g, m.scene, m.orbit.camera);
-      setLabels([]);
+      publish(NO_LABELS, null);
       return;
     }
     const v = editor.ensureViewport(w, h);
-    const resolved = editor.resolved(st.levelId);
-    const idx = p.levels.findIndex((l) => l.id === st.levelId);
-    const below = st.showUnderlay && idx > 0 ? editor.resolved(p.levels[idx - 1]!.id) : null;
+    const pf = (planFrame.current ??= new PlanFrame(plan.current));
+    // Vista de corte: a cena é refeita por inteiro (ver `PlanFrame`).
+    if (st.view === 'section') {
+      pf.reset();
+      const dl: PlanDrawList = buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] };
+      if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); plan.current.setDrawList(dl, v); safeRender(g, plan.current.scene, plan.current.camera); }
+      else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, dl, v, dpr);
+      publish(dl.labels, v);
+      return;
+    }
+    // Planta: pan e zoom mudam a câmera; geometria, sobreposição e grade só são refeitas quando a chave muda (PlanFrame).
     const tool = editor.activeTool;
-    const dl =
-      st.view === 'section'
-        ? (buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] })
-        : withHiddenSelection(
-            buildPlanDrawList({
-                project: p,
-                levelId: st.levelId,
-                resolved,
-                below,
-                belowFloors: below ? resolveFloors(p, p.levels[idx - 1]!.id) : undefined,
-                belowSlabs: below ? resolveSlabs(p, p.levels[idx - 1]!.id) : undefined,
-                belowRoofs: below ? resolveRoofs(p, p.levels[idx - 1]!.id) : undefined,
-                belowRooms: below ? resolveRooms(p, p.levels[idx - 1]!.id) : undefined,
-                viewport: v,
-                theme,
-                dark,
-                selection: st.selection,
-                hover: st.hover,
-                preview: tool.preview(),
-                inference: tool.inference(),
-                showGrid: st.showGrid,
-                // Linhas finas da planta do nível (decisão 0015): só na tela; a plotagem não passa a opção.
-                thinLines: thinLinesOn(p, { levelId: st.levelId }),
-                // Opção de vista (padrão ligada). Espalhada para compilar antes de PlanInput ganhar o campo (agente B3).
-                ...{ showRoofProjection: st.showRoofProjection },
-            }),
-            p,
-            st.levelId,
-            st.selection,
-            theme,
-          );
+    pf.update(planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: st.showGrid, showUnderlay: st.showUnderlay, showRoofProjection: st.showRoofProjection, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: tool.preview(), inference: tool.inference(), resolve: (id) => editor.resolved(id) }));
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
-      plan.current.setDrawList(dl, v);
       safeRender(g, plan.current.scene, plan.current.camera);
-    } else if (cpuRef.current) {
-      const c = cpuRef.current;
-      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
-        c.width = Math.round(w * dpr);
-        c.height = Math.round(h * dpr);
-      }
-      const ctx = c.getContext('2d');
-      if (ctx) drawPlanCpu(ctx, dl, v, dpr);
-    }
-    setLabels(dl.labels);
+    } else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, pf.drawList(theme), v, dpr);
+    publish(pf.labels, v);
   }, [size, ready, dark]);
 
+  // Qualquer mudança do estado agenda um quadro; o quadro decide o que refazer (ver PlanFrame).
   useEffect(() => {
-    cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(frame.current);
-  }, [render, pv, ui.previewTick, ui.view, ui.levelId, ui.sectionId, ui.selection, ui.hover, ui.showGrid, ui.showUnderlay, ui.showRoofProjection, ui.tool]);
+    const sched = (): void => { cancelAnimationFrame(frame.current); frame.current = requestAnimationFrame(render); };
+    sched();
+    const off = useUi.subscribe(sched);
+    return () => { off(); cancelAnimationFrame(frame.current); };
+  }, [render]);
 
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
@@ -445,7 +426,6 @@ export function ViewportCanvas(): ReactElement {
   /** Saiu do canvas: o realce do 3D e o do corte somem (o da planta não é tocado). */
   const onLeave = (): void => { if (['3d', 'section'].includes(useUi.getState().view) && useUi.getState().hover) useUi.setState({ hover: null }); };
 
-  const v = editor.viewport();
   // Cursores refinados estilo Revit:
   // - No 3D: sobre objeto = pointer; arrastando órbita/pan = grabbing; repouso = default
   const isDragging = drag.current.mode !== 'none' && drag.current.moved;
@@ -468,7 +448,7 @@ export function ViewportCanvas(): ReactElement {
       onPointerLeave={onLeave}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <PlanLabels labels={ui.view !== '3d' && v ? labels : []} v={v} />
+      <PlanLabels labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
       {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
       {ui.gpu === 'cpu' && ui.view === '3d' && (
         <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>

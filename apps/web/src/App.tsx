@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { sheetOf } from '@hestia/model';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
+import { activeViewOf, canClose, LAST_VIEW_MESSAGE, sameView, viewKey } from './editor/openViews.ts';
+import { activateView, closeTab, dropMissingViews, tabOf } from './editor/viewTabActions.ts';
 import { Browser } from './ui/Browser.tsx';
 import { Icon } from './ui/Icon.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
@@ -40,8 +41,8 @@ const narrow = (): boolean => window.innerWidth <= 900;
 function ViewTabs(): ReactElement {
   const p = useProject();
   const s = useUi();
-  const sectionTab = p.views.find((v) => v.id === s.sectionId);
-  const sheetTab = s.sheetId ? sheetOf(p, s.sheetId) : undefined;
+  const active = activeViewOf(s);
+  const canCloseAny = canClose(s.openViews);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -51,40 +52,22 @@ function ViewTabs(): ReactElement {
   const [fitCount, setFitCount] = useState<number>(999);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const allTabs = [
-    ...p.levels.map((l) => ({
-      key: `level-${l.id}`,
-      label: l.name,
-      icon: 'plan',
-      active: s.view === 'plan' && s.levelId === l.id,
-      onClick: () => editor.selectLevel(l.id),
-    })),
-    {
-      key: 'view-3d',
-      label: 'Modelo 3D',
-      icon: 'cube',
-      active: s.view === '3d',
-      onClick: () => editor.setView('3d'),
-    },
-    ...(s.view === 'section' && sectionTab
-      ? [{
-          key: `section-${sectionTab.id}`,
-          label: sectionTab.name,
-          icon: sectionTab.kind === 'section' ? 'section' : 'elevation',
-          active: true,
-          onClick: () => {},
-        }]
-      : []),
-    ...(s.view === 'sheet' && sheetTab
-      ? [{
-          key: `sheet-${sheetTab.id}`,
-          label: `${sheetTab.number} ${sheetTab.name}`,
-          icon: 'plan',
-          active: true,
-          onClick: () => {},
-        }]
-      : []),
-  ];
+  // Abas = vistas abertas (openViews), não os níveis do projeto. Fechar uma aba é o "×" de cada uma.
+  const allTabs = s.openViews.flatMap((v) => {
+    const t = tabOf(p, v);
+    if (!t) return [];
+    return [{
+      key: viewKey(v),
+      label: t.label,
+      icon: t.icon,
+      active: active !== null && sameView(active, v),
+      onClick: () => activateView(v),
+      onClose: () => closeTab(v),
+    }];
+  });
+
+  // Abas que sumiram do projeto (ex.: nível excluído) saem da lista de vistas abertas.
+  useEffect(() => dropMissingViews(p), [p]);
 
   // Fecha o menu suspenso ao clicar fora
   useEffect(() => {
@@ -153,7 +136,7 @@ function ViewTabs(): ReactElement {
     });
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [allTabs.length, p.levels]);
+  }, [allTabs.length, p.levels, s.openViews]);
 
   const activeIndex = allTabs.findIndex((t) => t.active);
   let visibleTabs = allTabs;
@@ -191,22 +174,37 @@ function ViewTabs(): ReactElement {
         }}
       >
         {allTabs.map((t) => (
-          <button key={t.key} className="vtab">
-            <Icon name={t.icon} size={14} /> {t.label}
-          </button>
+          <div key={t.key} style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
+            <button className="vtab">
+              <Icon name={t.icon} size={14} /> {t.label}
+            </button>
+            <span style={{ width: 20 }} />
+          </div>
         ))}
       </div>
 
       {visibleTabs.map((t) => (
-        <button
-          key={t.key}
-          role="tab"
-          aria-selected={t.active}
-          className={`vtab${t.active ? ' on' : ''}`}
-          onClick={t.onClick}
-        >
-          <Icon name={t.icon} size={14} /> {t.label}
-        </button>
+        <div key={t.key} style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
+          <button
+            role="tab"
+            aria-selected={t.active}
+            className={`vtab${t.active ? ' on' : ''}`}
+            onClick={t.onClick}
+          >
+            <Icon name={t.icon} size={14} /> {t.label}
+          </button>
+          <button
+            type="button"
+            className="ibtn"
+            aria-label={`Fechar ${t.label}`}
+            title={canCloseAny ? `Fechar ${t.label}` : LAST_VIEW_MESSAGE}
+            disabled={!canCloseAny}
+            onClick={t.onClose}
+            style={{ width: 20, height: 20, fontSize: 14, lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
       ))}
 
       {overflowTabs.length > 0 && (
@@ -225,18 +223,31 @@ function ViewTabs(): ReactElement {
           {dropdownOpen && (
             <div className="vtab-overflow-menu" role="menu">
               {overflowTabs.map((t) => (
-                <button
-                  key={t.key}
-                  role="menuitem"
-                  className={`vtab-overflow-item${t.active ? ' on' : ''}`}
-                  onClick={() => {
-                    t.onClick();
-                    setDropdownOpen(false);
-                  }}
-                >
-                  <Icon name={t.icon} size={14} />
-                  <span>{t.label}</span>
-                </button>
+                <div key={t.key} style={{ display: 'flex', alignItems: 'center' }}>
+                  <button
+                    role="menuitem"
+                    className={`vtab-overflow-item${t.active ? ' on' : ''}`}
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      t.onClick();
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <Icon name={t.icon} size={14} />
+                    <span>{t.label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="ibtn"
+                    aria-label={`Fechar ${t.label}`}
+                    title={canCloseAny ? `Fechar ${t.label}` : LAST_VIEW_MESSAGE}
+                    disabled={!canCloseAny}
+                    onClick={t.onClose}
+                    style={{ width: 20, height: 20, fontSize: 14, lineHeight: 1 }}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           )}

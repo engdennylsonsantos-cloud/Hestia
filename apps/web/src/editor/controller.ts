@@ -22,6 +22,7 @@ import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
+import { defaultOpenViews } from './openViews.ts';
 import { toolForKey } from './toolKeys.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
@@ -422,7 +423,8 @@ export class Editor {
     this.fileName = name;
     this.resolveCache.clear();
     this.viewports.clear();
-    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });
+    // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
+    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });
     this.setTool('select');
   }
 

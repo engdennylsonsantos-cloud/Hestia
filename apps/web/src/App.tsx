@@ -13,6 +13,7 @@ import { Ribbon } from './ui/Ribbon.tsx';
 import { StatusBar } from './ui/StatusBar.tsx';
 import { TitleBar } from './ui/TitleBar.tsx';
 import { Tutorial } from './ui/Tutorial.tsx';
+import { ViewControlBar } from './ui/ViewControlBar.tsx';
 import { ViewTabs } from './ui/ViewTabs.tsx';
 import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { SheetView } from './ui/SheetView.tsx';
@@ -168,6 +169,7 @@ export function App(): ReactElement {
               {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
             </div>
           </div>
+          {!semVistas && <ViewControlBar />}
         </main>
         <Dock side="right" />
       </div>

@@ -131,3 +131,25 @@
 .dock-split.v.right { left: -3px; }
 .dock-split.v:hover, .dock-split.v:focus-visible { background: color-mix(in srgb, var(--accent) 45%, transparent); outline: none; }
 .ph-right { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+
+/* ---- barra de controle da vista (faixa fixa na base) e barra de navegação (lateral da vista) ---- */
+.vcb { display: flex; align-items: center; gap: 2px; height: 26px; padding: 0 8px; background: var(--ribbon); border-top: 1px solid var(--line-strong); font-size: 11px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.vcb-field { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 2px 0 5px; border: 1px solid transparent; border-radius: 2px; }
+.vcb-field:hover { background: var(--accent-soft); border-color: var(--line-strong); }
+.vcb-select { height: 18px; padding: 0 2px; font-size: 11px; color: var(--fg); background: transparent; border: 0; outline: none; cursor: pointer; }
+.vcb-select option { color: #1a202c; background: #fff; }
+.vcb-btn { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 20px; min-width: 22px; padding: 0 5px; justify-content: center; font-size: 11px; color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 2px; }
+.vcb-btn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--line-strong); }
+.vcb-btn.on { background: var(--accent-soft); border-color: var(--accent); }
+.vcb-btn:disabled { opacity: 0.4; cursor: default; }
+.vcb-btn:disabled svg { filter: grayscale(1); }
+.vcb-sep { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--line-strong); }
+.navbar { position: absolute; z-index: 2; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 1px; padding: 2px; background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line-strong); }
+.navbar.below-cube { top: 160px; }
+.navbar button { width: 26px; height: 24px; display: grid; place-items: center; padding: 0; color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 2px; }
+.navbar button:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--line-strong); }
+.navbar button:disabled { opacity: 0.4; cursor: default; }
+.navbar .navminus { font-size: 18px; line-height: 1; }
+
+/* ---- barra de status: filtro de seleção ---- */
+.sb-filter { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; background: var(--sheet); border: 1px solid var(--line-strong); }

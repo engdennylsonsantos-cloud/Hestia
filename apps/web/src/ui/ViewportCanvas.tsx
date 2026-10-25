@@ -6,11 +6,10 @@ import { editor } from '../editor/controller.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
-import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels } from './PlanLabels';
-import { ViewControlBar } from './ViewControlBar.tsx';
+import { NavBar } from './NavBar.tsx';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 
@@ -448,14 +447,9 @@ export function ViewportCanvas(): ReactElement {
           Este navegador não oferece WebGL nem WebGPU. Use a planta.
         </div>
       )}
-      <div className="cornerbtns">
-        <button className="ibtn" title="Enquadrar tudo" onClick={() => (ui.view !== '3d' ? editor.zoomExtents() : (model.current.fit(), useUi.setState((x) => ({ previewTick: x.previewTick + 1 }))))}>
-          <Icon name="fit" size={18} />
-        </button>
-      </div>
+      <NavBar model={model.current} center={() => { const r = host.current?.getBoundingClientRect(); return { x: (r?.width ?? 0) / 2, y: (r?.height ?? 0) / 2 }; }} />
       {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
       {ui.view === 'section' ? <SectionBadge /> : null}
-      <ViewControlBar />
       {ui.view === 'plan' && ui.prompt ? (
         <div className="typebox" role="status">
           <span className="cap">{ui.prompt}</span>

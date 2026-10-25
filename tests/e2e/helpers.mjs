@@ -86,3 +86,21 @@ export async function clickWorld(page, x, y) {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(40);
 }
+
+/** Sequências de teclas do perfil de atalhos padrão (Revit, duas letras) para as ferramentas que os roteiros acionam. */
+export const TOOL_SEQ = { w: 'wa', d: 'dr', j: 'wn', m: 'mv', r: 'ro', k: 'ct', b: 'lj', q: 'le', i: 'es' };
+
+/**
+ * Aciona uma ferramenta pela letra que os roteiros antigos usavam. Com o atalho em sequência, digita as duas teclas; `v` (Selecionar) não tem
+ * tecla: Esc cancela o passo e Esc de novo volta à seleção.
+ */
+export async function pressTool(page, letter) {
+  if (letter === 'v') {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    return;
+  }
+  const seq = TOOL_SEQ[letter];
+  if (!seq) throw new Error(`sem sequência de atalho para '${letter}'`);
+  for (const k of seq) await page.keyboard.press(k);
+}

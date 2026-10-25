@@ -5,7 +5,8 @@ import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
+import path from 'node:path';
+import { pressTool } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/pranchas';
 mkdirSync(OUT, { recursive: true });
@@ -37,7 +38,7 @@ await page.waitForTimeout(300);
 // 2. corte: ferramenta K na planta, duas cliques (o corte nasce como "Corte A")
 const box = await page.locator('.canvas-wrap').boundingBox();
 const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-await page.keyboard.press('k');
+await pressTool(page, 'k');
 await page.mouse.click(cx - 220, cy);
 await page.mouse.click(cx + 220, cy);
 await page.keyboard.press('Escape');

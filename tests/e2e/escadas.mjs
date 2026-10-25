@@ -4,7 +4,7 @@
 //   npm run build && SHOTS=<pasta> node tests/e2e/escadas.mjs
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { clickWorld, launch, makeReporter, openApp } from './helpers.mjs';
+import { clickWorld, launch, makeReporter, openApp, pressTool } from './helpers.mjs';
 import { checkShot } from './visual.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/escadas';
@@ -119,7 +119,7 @@ try {
 
   await rep.step('2 · Laje retangular no Pavimento 2 cobrindo a casa (para ver o furo)', async () => {
     await goLevel(/Pavimento 2/);
-    await page.keyboard.press('b');
+    await pressTool(page, 'b');
     await page.locator('select', { has: page.locator('option[value="rect"]') }).selectOption('rect');
     await page.waitForTimeout(100);
     await clickWorld(page, 0, 0);
@@ -133,7 +133,7 @@ try {
 
   await rep.step('3 · Escada reta (Q, forma Reta): clique no 1º espelho e na direção', async () => {
     await goLevel(/Térreo/);
-    await page.keyboard.press('q');
+    await pressTool(page, 'q');
     await page.waitForTimeout(100);
     rep.check('ferramenta Escada reta/L/U ativa (Q)', (await state()).tool === 'stairrun');
     await page.locator('#opt-stairshape').selectOption('straight');
@@ -210,7 +210,7 @@ try {
   });
 
   await rep.step('7 · Croqui (I): limites, espelhos, contador e erro de espelho', async () => {
-    await page.keyboard.press('i');
+    await pressTool(page, 'i');
     await page.waitForTimeout(150);
     rep.check('ferramenta Escada (croqui, I) ativa', (await state()).tool === 'stair');
     // Topo 2 m abaixo do Pavimento 2: H = 1,00 m; 1,00 / 0,18 → 6 espelhos desejados.
@@ -269,7 +269,7 @@ try {
   });
 
   await rep.step('9 · Seleção da escada reta: painel de propriedades', async () => {
-    await page.keyboard.press('v');
+    await pressTool(page, 'v');
     await clickWorld(page, 7.2, 4.5);
     await page.waitForTimeout(200);
     const s = await state();
@@ -327,7 +327,7 @@ try {
 
   await rep.step('12 · Corte: linha pela escada e vista de corte', async () => {
     await goLevel(/Térreo/);
-    await page.keyboard.press('k');
+    await pressTool(page, 'k');
     await clickWorld(page, 7.0, 1.0);
     await clickWorld(page, 7.0, 6.0);
     await page.waitForTimeout(200);

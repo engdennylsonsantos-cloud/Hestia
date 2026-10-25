@@ -2,7 +2,8 @@
 import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import path from 'node:path';
+import { pressTool } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -32,7 +33,7 @@ const P = (x, y) => [cx + (x - 5) * 60, cy - (y - 3.5) * 60];
 const click = async (x, y) => { const [px, py] = P(x, y); await page.mouse.move(px, py); await page.mouse.click(px, py); };
 
 // 1. desenhar um retângulo 6 x 4 m
-await page.keyboard.press('w');
+await pressTool(page, 'w');
 for (const [x, y] of [[2, 1.5], [2, 5.5], [8, 5.5], [8, 1.5], [2, 1.5]]) await click(x, y);
 let s = await st();
 check('4 paredes desenhadas', s.walls.length === 4, `(${s.walls.length})`);
@@ -41,7 +42,7 @@ check('comprimentos exatos 4,6,4,6', lens.join() === '4.000,6.000,4.000,6.000', 
 
 // 2. digitar comprimento
 await page.keyboard.press('Escape');
-await page.keyboard.press('w');
+await pressTool(page, 'w');
 await click(0, 0);
 const [mx, my] = P(2, 0); await page.mouse.move(mx, my);
 await page.keyboard.type('2,5');
@@ -52,8 +53,8 @@ check('parede por medida digitada = 2,50', Math.abs(Math.hypot(typed.b.x - typed
 await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 
 // 3. porta e janela
-await page.keyboard.press('d'); await click(5, 1.5);
-await page.keyboard.press('j'); await click(2, 3.5); await click(8, 3.5);
+await pressTool(page, 'd'); await click(5, 1.5);
+await pressTool(page, 'j'); await click(2, 3.5); await click(8, 3.5);
 await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 s = await st();
 check('3 aberturas', s.openings.length === 3, `(${s.openings.length})`);
@@ -62,7 +63,7 @@ check('3 aberturas', s.openings.length === 3, `(${s.openings.length})`);
 await click(5, 5.5);
 const sel = await page.evaluate(() => window.__hestia.useUi.getState().selection.length);
 check('seleção por clique', sel === 1);
-await page.keyboard.press('m');
+await pressTool(page, 'm');
 await click(4, 5.5); await click(4, 6.5);
 s = await st();
 const top = s.walls.find((w) => Math.abs(w.a.y - 6.5) < 1e-6 && Math.abs(w.b.y - 6.5) < 1e-6);
@@ -74,8 +75,8 @@ s = await st();
 check('desfazer volta a posição', s.walls.some((w) => Math.abs(w.a.y - 5.5) < 1e-6 && Math.abs(w.b.y - 5.5) < 1e-6));
 
 // 5. girar digitando 90°
-await page.keyboard.press('v'); await click(5, 5.5);
-await page.keyboard.press('r'); await click(5, 5.5);
+await pressTool(page, 'v'); await click(5, 5.5);
+await pressTool(page, 'r'); await click(5, 5.5);
 await page.keyboard.type('90'); await page.keyboard.press('Enter');
 s = await st();
 check('girar 90° por valor digitado', s.walls.some((w) => Math.abs(w.a.x - 5) < 1e-6 && Math.abs(w.b.x - 5) < 1e-6 && Math.abs(Math.abs(w.a.y - w.b.y) - 6) < 1e-6));
@@ -114,7 +115,7 @@ await page.screenshot({ path: `${OUT}/24-dark-3d.png` });
 
 // 10. desempenho: 20 movimentos de mouse na planta
 await page.getByRole('tab', { name: /Térreo/ }).click();
-await page.keyboard.press('w');
+await pressTool(page, 'w');
 await click(0, 0);
 const t0 = Date.now();
 for (let i = 0; i < 40; i++) { const [a, b] = P(1 + i * 0.1, 1 + i * 0.05); await page.mouse.move(a, b); }

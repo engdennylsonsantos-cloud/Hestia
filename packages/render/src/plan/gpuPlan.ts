@@ -16,24 +16,28 @@ const SLOTS: readonly PlanSlot[] = ['fillsBase', 'fillsOver', 'grid', 'strokesBa
 const SLOT_STRIDE = 1_000_000;
 
 /**
- * Traço no vertex shader: cada vértice é deslocado em tela (metros = pixels / zoom). `aExt` é (ao longo, lado, largura em
- * px), `aDir` é (ux, uy, distância ao início do traço em metros) e `aPadrao` é (traço, período) em px.
+ * Traço no vertex shader: cada vértice é deslocado em tela (metros = pixels / zoom). `aExt` é (ao longo, lado, largura),
+ * `aDir` é (ux, uy, distância ao início do traço em metros) e `aPadrao` é (traço, período) em px. Com `uPapel` ligado,
+ * a largura é `kPapel` (mm × escala ÷ 1000) e vira pixels pelo zoom, com piso de 1 px (como `paperMmToPx`); senão, é
+ * a largura em pixels de `aExt.z`.
  */
 const VERTEX_TRACO = /* glsl */ `
 attribute vec3 aExt;
 attribute vec3 aDir;
 attribute vec2 aPadrao;
 uniform float uZoom;
+uniform float uPapel;
 varying float vDist;
 varying float vMeia;
 varying vec2 vPadrao;
 void main() {
-  float meia = 0.5 * aExt.z / uZoom;
+  float larg = uPapel > 0.5 ? max(1.0, aExt.z * uZoom) : aExt.z;
+  float meia = 0.5 * larg / uZoom;
   vec2 u = aDir.xy;
   vec2 n = vec2(-u.y, u.x);
   vec2 p = position.xy + u * (aExt.x * meia) + n * (aExt.y * meia);
-  vDist = aDir.z * uZoom + aExt.x * 0.5 * aExt.z;
-  vMeia = 0.5 * aExt.z;
+  vDist = aDir.z * uZoom + aExt.x * 0.5 * larg;
+  vMeia = 0.5 * larg;
   vPadrao = aPadrao;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, position.z, 1.0);
 }
@@ -103,7 +107,7 @@ export class PlanScene {
   /** Material de traço: a espessura e o tracejado saem do shader, com o zoom compartilhado (`uZoom`). */
   private materialTraco(lote: LoteGpu): THREE.ShaderMaterial {
     return new THREE.ShaderMaterial({
-      uniforms: { uZoom: this.uZoom, uCor: { value: new THREE.Color(lote.color) }, uAlfa: { value: lote.alpha } },
+      uniforms: { uZoom: this.uZoom, uPapel: { value: lote.papel ? 1 : 0 }, uCor: { value: new THREE.Color(lote.color) }, uAlfa: { value: lote.alpha } },
       vertexShader: VERTEX_TRACO,
       fragmentShader: FRAGMENT_TRACO,
       transparent: true,

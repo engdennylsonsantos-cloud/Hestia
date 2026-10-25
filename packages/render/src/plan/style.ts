@@ -6,7 +6,6 @@ import {
   graphicsOf,
   levelGraphicsOf,
   lineWeightMm,
-  paperMmToPx,
   PLAN_VISUAL_STYLES,
   type CategoryOverride,
   type DetailLevel,
@@ -18,7 +17,8 @@ import {
   type VisualStyle,
 } from '@hestia/model';
 import { mix } from './color.ts';
-import type { FillOp, LabelOp, StrokeOp } from './types.ts';
+import { espessuraDePapel } from './espessura.ts';
+import type { Espessura, FillOp, LabelOp, StrokeOp } from './types.ts';
 
 /** Estilo visual que a planta desenha (decisão 0015 §2.3): arame, linha oculta (o padrão) ou sombreado. */
 export type PlanVisual = Extract<VisualStyle, 'wireframe' | 'hiddenLine' | 'shaded'>;
@@ -35,10 +35,14 @@ export interface PlanPaint {
   halftone: boolean;
   /** Fator das alphas dos preenchimentos: 1 − transparência. */
   alpha: number;
-  /** Largura do que é cortado (contornos principais). */
+  /** Largura do que é cortado (contornos principais), em px no zoom da vista. */
   cutPx: number;
-  /** Largura do que está acima/abaixo do corte, além, e das linhas finas do elemento. */
+  /** Largura do que está acima/abaixo do corte, além, e das linhas finas do elemento, em px no zoom da vista. */
   projPx: number;
+  /** Espessura de corte em mm de papel (a GPU aplica o zoom): para os traços da categoria. */
+  cut: Espessura;
+  /** Espessura de projeção em mm de papel (a GPU aplica o zoom): para os traços da categoria. */
+  proj: Espessura;
 }
 
 /** Gráficos da planta de um nível já resolvidos para o desenho (com o zoom corrente). */
@@ -54,15 +58,19 @@ const isPlanVisual = (v: VisualStyle): v is PlanVisual => (PLAN_VISUAL_STYLES as
 
 function paintOf(gp: ProjectGraphics, c: GraphicsCategory, ov: CategoryOverride, zoom: number, scale: number, visual: PlanVisual): PlanPaint {
   const base = gp.categories[c];
-  const px = (weight: number): number => paperMmToPx(lineWeightMm(gp.lineWeights, weight, scale), zoom, scale);
+  const espessura = (weight: number): Espessura => espessuraDePapel(lineWeightMm(gp.lineWeights, weight, scale), zoom, scale);
+  const cut = espessura(ov.cutWeight ?? base.cutWeight);
+  const proj = espessura(ov.projectionWeight ?? base.projectionWeight);
   return {
     visible: ov.visible,
     visual,
     color: ov.color ?? null,
     halftone: ov.halftone,
     alpha: 1 - ov.transparency,
-    cutPx: px(ov.cutWeight ?? base.cutWeight),
-    projPx: px(ov.projectionWeight ?? base.projectionWeight),
+    cutPx: cut.widthPx,
+    projPx: proj.widthPx,
+    cut,
+    proj,
   };
 }
 

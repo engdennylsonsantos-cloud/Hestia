@@ -20,13 +20,15 @@ export interface VerticeEmulado {
  * Vértice `k` da geometria com o deslocamento do shader para o zoom dado. Geometria sem `aExt` (preenchimento) devolve só a
  * posição, sem deslocamento nem tracejado.
  */
-export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: number): VerticeEmulado {
+export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: number, papel = false): VerticeEmulado {
   const pos = geo.getAttribute('position');
   const ext = geo.getAttribute('aExt');
   if (!ext) return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0] };
   const dir = geo.getAttribute('aDir');
   const pad = geo.getAttribute('aPadrao');
-  const meia = (0.5 * ext.getZ(k)) / zoom;
+  // Com `papel`, `aExt.z` é kPapel e a largura em pixels sai do zoom, com piso de 1 px (como o vertex shader).
+  const larg = papel ? Math.max(1, ext.getZ(k) * zoom) : ext.getZ(k);
+  const meia = (0.5 * larg) / zoom;
   const along = ext.getX(k);
   const side = ext.getY(k);
   const ux = dir.getX(k);
@@ -34,8 +36,8 @@ export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: numbe
   return {
     x: pos.getX(k) + ux * along * meia - uy * side * meia,
     y: pos.getY(k) + uy * along * meia + ux * side * meia,
-    dist: dir.getZ(k) * zoom + along * 0.5 * ext.getZ(k),
-    meia: 0.5 * ext.getZ(k),
+    dist: dir.getZ(k) * zoom + along * 0.5 * larg,
+    meia: 0.5 * larg,
     padrao: [pad.getX(k), pad.getY(k)],
   };
 }
@@ -64,11 +66,12 @@ export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.Ortho
     const mat = m.material as THREE.MeshBasicMaterial & { uniforms?: Record<string, { value: unknown }> };
     const cor = traco ? (mat.uniforms!.uCor!.value as THREE.Color) : mat.color;
     const a = traco ? (mat.uniforms!.uAlfa!.value as number) : mat.opacity;
+    const papel = traco && mat.uniforms!.uPapel!.value === 1;
     const { r, g, b } = cor;
     const vs = [0, 1, 2].map(() => ({ x: 0, y: 0, dist: 0, meia: 0, padrao: [0, 0] as [number, number] }));
     for (let t = 0; t < idx.count; t += 3) {
       for (let c = 0; c < 3; c++) {
-        const e = verticeEmulado(geo, idx.getX(t + c), zoom);
+        const e = verticeEmulado(geo, idx.getX(t + c), zoom, papel);
         vs[c] = {
           x: ((e.x - esq) / (dir - esq)) * W,
           y: ((topo - e.y) / (topo - base)) * H,

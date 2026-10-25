@@ -4,7 +4,6 @@ import {
   detailOf,
   graphicsOf,
   lineWeightMm,
-  paperMmToPx,
   sectionGraphicsOf,
   type CategoryOverride,
   type GraphicsCategory,
@@ -12,7 +11,9 @@ import {
   type ProjectGraphics,
   type VisualStyle,
 } from '@hestia/model';
+import { espessuraDePapel } from '../plan/espessura.ts';
 import type { PlanPaint, PlanStyle, PlanVisual } from '../plan/style.ts';
+import type { Espessura } from '../plan/types.ts';
 
 /** Gráficos do corte/elevação resolvidos para o desenho (as larguras já em px de tela no zoom corrente). */
 export interface SectionStyle extends PlanStyle {
@@ -24,15 +25,19 @@ const isPlanVisual = (v: VisualStyle): v is PlanVisual => (PLAN_VISUAL_STYLES as
 
 function paintOf(gp: ProjectGraphics, c: GraphicsCategory, ov: CategoryOverride, zoom: number, scale: number, visual: PlanVisual): PlanPaint {
   const base = gp.categories[c];
-  const px = (weight: number): number => paperMmToPx(lineWeightMm(gp.lineWeights, weight, scale), zoom, scale);
+  const espessura = (weight: number): Espessura => espessuraDePapel(lineWeightMm(gp.lineWeights, weight, scale), zoom, scale);
+  const cut = espessura(ov.cutWeight ?? base.cutWeight);
+  const proj = espessura(ov.projectionWeight ?? base.projectionWeight);
   return {
     visible: ov.visible,
     visual,
     color: ov.color ?? null,
     halftone: ov.halftone,
     alpha: 1 - ov.transparency,
-    cutPx: px(ov.cutWeight ?? base.cutWeight),
-    projPx: px(ov.projectionWeight ?? base.projectionWeight),
+    cutPx: cut.widthPx,
+    projPx: proj.widthPx,
+    cut,
+    proj,
   };
 }
 

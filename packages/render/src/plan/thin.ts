@@ -7,6 +7,11 @@ import type { StrokeOp } from './types.ts';
  */
 export function thinStrokes(strokes: StrokeOp[]): void {
   strokes.forEach((s, i) => {
-    if (s.widthPx > 1) strokes[i] = { ...s, widthPx: 1 };
+    if (s.papel) {
+      // Traço de papel (sempre com 1 px ou mais): sai em 1 px, sem o peso de papel, que o shader aplicaria de novo.
+      const fina: StrokeOp = { ...s, widthPx: 1 };
+      delete fina.papel;
+      strokes[i] = fina;
+    } else if (s.widthPx > 1) strokes[i] = { ...s, widthPx: 1 };
   });
 }

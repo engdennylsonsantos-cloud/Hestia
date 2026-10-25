@@ -1,5 +1,6 @@
 import type { Ring } from '@hestia/geom';
 import { worldToScreen, type Viewport } from '../viewport.ts';
+import { larguraEmPx } from './espessura.ts';
 import { DOT_PX, HATCH_PX, hatchSegments } from './hatch.ts';
 import type { FillOp, PlanDrawList } from './types.ts';
 
@@ -90,7 +91,7 @@ export function drawPlanCpu(ctx: CanvasRenderingContext2D, dl: PlanDrawList, v: 
     if (s.closed) ctx.closePath();
     ctx.globalAlpha = s.alpha;
     ctx.strokeStyle = s.color;
-    ctx.lineWidth = s.widthPx;
+    ctx.lineWidth = larguraEmPx(s, v.zoom);
     ctx.setLineDash(s.dash ?? []);
     ctx.stroke();
   }

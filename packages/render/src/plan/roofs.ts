@@ -1,10 +1,11 @@
 import { add, closestOnSegment, difference, dist, mid, multiArea, norm, offsetMulti, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { planeZ, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
+import { planeZ, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
 import { isRoof, paperMmToPx, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { slopeArrow } from './slabs.ts';
+import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
@@ -238,7 +239,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
  * de vista) saem; com `showProjection`, cada um deixa o contorno do beiral tracejado (projeção da cobertura).
  */
 export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
-  const all = resolveRoofs(p, levelId);
+  const all = telhadosDoNivel(p, levelId);
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
@@ -266,7 +267,7 @@ export function roofSelectionOps(
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('roof', v.zoom),
 ): FloorOps {
-  const roofs = resolveRoofs(p, levelId).filter((r) => !hidden?.has(r.roofId));
+  const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
   const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r) }));
   const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).

@@ -1,7 +1,8 @@
 import type { Vec2 } from '@hestia/geom';
-import { resolveRooms, type ResolvedRoom } from '@hestia/engine';
+import type { ResolvedRoom } from '@hestia/engine';
 import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
+import { ambientesDoNivel } from './resolucao.ts';
 import { surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
 
@@ -46,7 +47,7 @@ export function roomOps(
   const out = empty();
   const fontPx = paperMmToPx(ROOM_TEXT_MM, zoom, scale);
   const fillBase = dark ? theme.bg : '#ffffff';
-  for (const r of resolveRooms(p, levelId)) {
+  for (const r of ambientesDoNivel(p, levelId)) {
     if (!r.polygon || hidden?.has(r.roomId)) continue;
     const color = surfaceColor(r.color ?? ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
     out.fills.push({ polygons: [r.polygon], color, alpha: 0.7 });
@@ -71,7 +72,7 @@ export function belowRoomOps(rooms: ResolvedRoom[], theme: PlanTheme): FloorOps 
 export function roomSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, hidden?: ReadonlySet<Id>): FloorOps {
   const out = empty();
   const sel = new Set(selection);
-  for (const r of resolveRooms(p, levelId)) {
+  for (const r of ambientesDoNivel(p, levelId)) {
     if (!r.polygon || hidden?.has(r.roomId)) continue;
     const isSel = sel.has(r.roomId);
     const isHover = !isSel && hover === r.roomId;

@@ -1,9 +1,10 @@
 import { difference, multiArea, offsetMulti, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { fillRegionOf, junctionLevel, lineIntervals, resolveFloors, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
+import { fillRegionOf, lineIntervals, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
 import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { holeMarkOps } from './holeMarks.ts';
+import { juncaoDoNivel, pisosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 
@@ -77,9 +78,9 @@ export function floorFills(
   paint: PlanPaint = defaultPaint('floor', v.zoom),
   scale = 100,
 ): FloorOps {
-  const jl = junctionLevel(p, levelId);
+  const jl = juncaoDoNivel(p, levelId);
   return concatOps(
-    resolveFloors(p, levelId)
+    pisosDoNivel(p, levelId)
       .filter((f) => !hidden?.has(f.floorId))
       .map((f) => floorOpsOf(p, f, theme, dark, detail, v, paint, jl.elements.get(f.floorId), scale)),
   );
@@ -183,7 +184,7 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
 
 /** Destaque dos pisos do nível (D1). */
 export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
-  const parts = resolveFloors(p, levelId)
+  const parts = pisosDoNivel(p, levelId)
     .filter((f) => !hidden?.has(f.floorId))
     .map((f) => ({ id: f.floorId, polygon: f.polygon }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);

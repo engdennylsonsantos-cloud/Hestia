@@ -3,6 +3,7 @@ import { duplicateSheetCommand, addSheetAction } from '../editor/sheetActions.ts
 import { isCeiling, isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, projectSheets, type OpeningType } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { activateView } from '../editor/viewTabActions.ts';
 import { Icon } from './Icon.tsx';
 import { TypeRow } from './TypeRow.tsx';
 import { ViewRow } from './ViewRow.tsx';
@@ -22,7 +23,7 @@ function openingGroups(kind: 'door' | 'window', types: OpeningType[]): Array<{ i
 }
 
 /** Abre a prancha na aba de folha (decisão 0022). */
-const openSheet = (id: string): void => useUi.setState({ view: 'sheet', sheetId: id });
+const openSheet = (id: string): void => activateView({ kind: 'sheet', sheetId: id });
 
 /** Ações de uma prancha da lista: duplicar e excluir (cada uma é um passo de desfazer). */
 function sheetRowAction(run: () => void, ok: string): void {
@@ -62,7 +63,7 @@ export function Browser(): ReactElement {
               <summary>Plantas</summary>
               <div className="levels">
                 {p.levels.map((l) => (
-                  <button key={l.id} className={`leaf${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => editor.selectLevel(l.id)}>
+                  <button key={l.id} className={`leaf${s.view === 'plan' && s.levelId === l.id ? ' on' : ''}`} onClick={() => activateView({ kind: 'plan', levelId: l.id })}>
                     <Icon name="plan" size={14} /> {l.name}
                     <span className="meta">{l.elevation.toFixed(2).replace('.', ',')} m</span>
                   </button>
@@ -71,7 +72,7 @@ export function Browser(): ReactElement {
             </details>
             <details open>
               <summary>3D</summary>
-              <button className={`leaf${s.view === '3d' ? ' on' : ''}`} onClick={() => editor.setView('3d')}>
+              <button className={`leaf${s.view === '3d' ? ' on' : ''}`} onClick={() => activateView({ kind: '3d' })}>
                 <Icon name="cube" size={14} /> Modelo 3D
               </button>
             </details>

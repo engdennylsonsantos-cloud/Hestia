@@ -2,6 +2,7 @@ import { useRef, useState, type ReactElement } from 'react';
 import type { SectionView } from '@hestia/model';
 import { editor } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { activateView } from '../editor/viewTabActions.ts';
 import { Icon } from './Icon.tsx';
 
 /** Corte ou elevação no navegador: duplo clique abre; abrir, renomear e excluir ficam ao lado. */
@@ -46,11 +47,11 @@ export function ViewRow({ view }: { view: SectionView }): ReactElement {
   }
   return (
     <div className="type-row">
-      <button className={`leaf${active ? ' on' : ''}`} title="Duplo clique abre a vista" onDoubleClick={() => editor.openSection(view.id)}>
+      <button className={`leaf${active ? ' on' : ''}`} title="Duplo clique abre a vista" onDoubleClick={() => activateView({ kind: 'section', viewId: view.id })}>
         <Icon name={icon} size={14} /> {view.name}
       </button>
       <div className="type-actions" role="group" aria-label={`Ações de ${view.name}`}>
-        <button type="button" className="ibtn type-act" title="Abrir" aria-label={`Abrir ${view.name}`} onClick={() => editor.openSection(view.id)}>
+        <button type="button" className="ibtn type-act" title="Abrir" aria-label={`Abrir ${view.name}`} onClick={() => activateView({ kind: 'section', viewId: view.id })}>
           <Icon name="chevron" size={13} />
         </button>
         <button type="button" className="ibtn type-act" title="Renomear" aria-label={`Renomear ${view.name}`} onClick={start}>

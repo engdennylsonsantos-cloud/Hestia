@@ -198,7 +198,7 @@ export const useUi = create<UiState>(() => ({
 /**
  * Toda vista ativa entra na lista de vistas abertas (abrir um nível já aberto só ativa, pois `addView` não duplica).
  * Assim, qualquer caminho que muda a vista (árvore, ribbon, corte, prancha, ferramenta de planta) abre a aba sem
- * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em App.tsx).
+ * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em ui/ViewTabs.tsx).
  */
 useUi.subscribe((s, prev) => {
   if (s.view === prev.view && s.levelId === prev.levelId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;

@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
-import { activeViewOf, canClose, LAST_VIEW_MESSAGE, sameView, viewKey } from './editor/openViews.ts';
-import { activateView, closeTab, dropMissingViews, tabOf } from './editor/viewTabActions.ts';
+import { tabOf } from './editor/viewTabActions.ts';
 import { Browser } from './ui/Browser.tsx';
-import { Icon } from './ui/Icon.tsx';
+import { EmptyViews } from './ui/EmptyViews.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
 import { Properties } from './ui/Properties.tsx';
 import { Ribbon } from './ui/Ribbon.tsx';
 import { StatusBar } from './ui/StatusBar.tsx';
 import { TitleBar } from './ui/TitleBar.tsx';
 import { Tutorial } from './ui/Tutorial.tsx';
+import { ViewTabs } from './ui/ViewTabs.tsx';
 import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { SheetView } from './ui/SheetView.tsx';
 import { SheetDialog } from './ui/dialogs/SheetDialog.tsx';
@@ -35,238 +35,6 @@ import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
 import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
-
-const narrow = (): boolean => window.innerWidth <= 900;
-
-function ViewTabs(): ReactElement {
-  const p = useProject();
-  const s = useUi();
-  const active = activeViewOf(s);
-  const canCloseAny = canClose(s.openViews);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLDivElement>(null);
-  const overflowRef = useRef<HTMLDivElement>(null);
-
-  const [fitCount, setFitCount] = useState<number>(999);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  // Abas = vistas abertas (openViews), não os níveis do projeto. Fechar uma aba é o "×" de cada uma.
-  const allTabs = s.openViews.flatMap((v) => {
-    const t = tabOf(p, v);
-    if (!t) return [];
-    return [{
-      key: viewKey(v),
-      label: t.label,
-      icon: t.icon,
-      active: active !== null && sameView(active, v),
-      onClick: () => activateView(v),
-      onClose: () => closeTab(v),
-    }];
-  });
-
-  // Abas que sumiram do projeto (ex.: nível excluído) saem da lista de vistas abertas.
-  useEffect(() => dropMissingViews(p), [p]);
-
-  // Fecha o menu suspenso ao clicar fora
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handler = (e: PointerEvent) => {
-      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    window.addEventListener('pointerdown', handler);
-    return () => window.removeEventListener('pointerdown', handler);
-  }, [dropdownOpen]);
-
-  // Medição precisa do espaço disponível para abas (evita qualquer barra de rolagem)
-  useEffect(() => {
-    const updateFit = () => {
-      const container = containerRef.current;
-      const controls = controlsRef.current;
-      const measure = measureRef.current;
-      if (!container || !measure) return;
-
-      const totalWidth = container.clientWidth;
-      const controlsWidth = controls ? controls.offsetWidth : 60;
-      const availableWithoutOverflow = totalWidth - controlsWidth - 20;
-      const availableWithOverflow = availableWithoutOverflow - 75;
-
-      const tabElements = Array.from(measure.children) as HTMLElement[];
-      let used = 0;
-      let allFit = true;
-      const widths: number[] = [];
-
-      for (let i = 0; i < tabElements.length; i++) {
-        const el = tabElements[i];
-        if (!el) continue;
-        const w = el.offsetWidth + 2;
-        widths.push(w);
-        used += w;
-        if (used > availableWithoutOverflow) {
-          allFit = false;
-        }
-      }
-
-      if (allFit) {
-        setFitCount(allTabs.length);
-        return;
-      }
-
-      let count = 0;
-      let acc = 0;
-      for (let i = 0; i < widths.length; i++) {
-        const w = widths[i] ?? 0;
-        if (acc + w <= availableWithOverflow) {
-          acc += w;
-          count++;
-        } else {
-          break;
-        }
-      }
-      setFitCount(Math.max(1, count));
-    };
-
-    updateFit();
-
-    const ro = new ResizeObserver(() => {
-      updateFit();
-    });
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, [allTabs.length, p.levels, s.openViews]);
-
-  const activeIndex = allTabs.findIndex((t) => t.active);
-  let visibleTabs = allTabs;
-  let overflowTabs: typeof allTabs = [];
-
-  if (fitCount < allTabs.length) {
-    const activeTab = activeIndex >= 0 ? allTabs[activeIndex] : undefined;
-    if (activeIndex >= fitCount && activeTab) {
-      // Garante que a aba ativa sempre permaneça visível no topo
-      const head = allTabs.slice(0, Math.max(1, fitCount - 1));
-      visibleTabs = [...head, activeTab];
-      const visibleKeys = new Set(visibleTabs.map((t) => t.key));
-      overflowTabs = allTabs.filter((t) => !visibleKeys.has(t.key));
-    } else {
-      visibleTabs = allTabs.slice(0, fitCount);
-      overflowTabs = allTabs.slice(fitCount);
-    }
-  }
-
-  return (
-    <div className="viewtabs" role="tablist" aria-label="Vistas abertas" ref={containerRef}>
-      {/* Elemento oculto para medição de tamanho exato de cada aba */}
-      <div
-        ref={measureRef}
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: -9999,
-          top: -9999,
-          visibility: 'hidden',
-          pointerEvents: 'none',
-          display: 'flex',
-          gap: 2,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {allTabs.map((t) => (
-          <div key={t.key} style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
-            <button className="vtab">
-              <Icon name={t.icon} size={14} /> {t.label}
-            </button>
-            <span style={{ width: 20 }} />
-          </div>
-        ))}
-      </div>
-
-      {visibleTabs.map((t) => (
-        <div key={t.key} style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
-          <button
-            role="tab"
-            aria-selected={t.active}
-            className={`vtab${t.active ? ' on' : ''}`}
-            onClick={t.onClick}
-          >
-            <Icon name={t.icon} size={14} /> {t.label}
-          </button>
-          <button
-            type="button"
-            className="ibtn"
-            aria-label={`Fechar ${t.label}`}
-            title={canCloseAny ? `Fechar ${t.label}` : LAST_VIEW_MESSAGE}
-            disabled={!canCloseAny}
-            onClick={t.onClose}
-            style={{ width: 20, height: 20, fontSize: 14, lineHeight: 1 }}
-          >
-            ×
-          </button>
-        </div>
-      ))}
-
-      {overflowTabs.length > 0 && (
-        <div className="vtab-overflow" ref={overflowRef}>
-          <button
-            className={`vtab-overflow-btn${overflowTabs.some((t) => t.active) ? ' has-active' : ''}`}
-            onClick={() => setDropdownOpen((v) => !v)}
-            title="Mais vistas"
-            aria-haspopup="menu"
-            aria-expanded={dropdownOpen}
-          >
-            <span>+{overflowTabs.length}</span>
-            <Icon name="down" size={12} />
-          </button>
-
-          {dropdownOpen && (
-            <div className="vtab-overflow-menu" role="menu">
-              {overflowTabs.map((t) => (
-                <div key={t.key} style={{ display: 'flex', alignItems: 'center' }}>
-                  <button
-                    role="menuitem"
-                    className={`vtab-overflow-item${t.active ? ' on' : ''}`}
-                    style={{ flex: 1 }}
-                    onClick={() => {
-                      t.onClick();
-                      setDropdownOpen(false);
-                    }}
-                  >
-                    <Icon name={t.icon} size={14} />
-                    <span>{t.label}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="ibtn"
-                    aria-label={`Fechar ${t.label}`}
-                    title={canCloseAny ? `Fechar ${t.label}` : LAST_VIEW_MESSAGE}
-                    disabled={!canCloseAny}
-                    onClick={t.onClose}
-                    style={{ width: 20, height: 20, fontSize: 14, lineHeight: 1 }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <span style={{ flex: 1, minWidth: 4 }} />
-
-      <div className="vtab-controls" ref={controlsRef}>
-        <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
-          <Icon name="edit" size={16} />
-        </button>
-        <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen, ...(narrow() && !s.rightOpen ? { leftOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
-          <Icon name="levels" size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function Dialogs(): ReactElement | null {
   const d = useUi((s) => s.dialog);
@@ -332,6 +100,10 @@ export function App(): ReactElement {
   const view = useUi((s) => s.view);
   const sheetId = useUi((s) => s.sheetId);
   const dialog = useUi((s) => s.dialog);
+  const project = useProject();
+  const openViews = useUi((s) => s.openViews);
+  // Sem nenhuma aba válida, a área de desenho mostra o estado vazio (o navegador continua acessível).
+  const semVistas = !openViews.some((v) => tabOf(project, v) !== null);
 
   // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
   const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
@@ -377,7 +149,7 @@ export function App(): ReactElement {
         <main className="stage">
           <ViewTabs />
           <div style={{ position: 'relative', minHeight: 0, display: 'grid' }}>
-            {view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+            {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
             <Tutorial />
           </div>
         </main>

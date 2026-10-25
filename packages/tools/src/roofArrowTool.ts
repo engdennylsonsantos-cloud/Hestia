@@ -32,13 +32,23 @@ export class RoofArrowTool extends ToolBase {
   private stateHint(): string {
     const r = this.roof();
     if (!r) return 'Selecione um telhado de águas livres (Propriedades → Forma → Águas livres).';
-    if (r.shape !== 'free') return 'Este telhado não é de águas livres: escolha Águas livres em Propriedades → Forma.';
+    if (r.shape !== 'free') return 'A seta só vale em telhado de águas livres. Clique em Converter para águas livres na barra, ou troque a Forma em Propriedades.';
     return HINT;
   }
 
   override start(): void {
     this.reset();
     this.env.say(this.stateHint());
+  }
+
+  /** O primeiro Esc cancela só o passo em andamento; sem passo, o Esc sai da ferramenta (ToolBase.cancel). */
+  override cancel(): void {
+    if (this.busy()) {
+      this.reset();
+      this.env.say('Passo cancelado. Esc de novo sai da ferramenta.');
+      return;
+    }
+    super.cancel();
   }
 
   protected reset(): void {

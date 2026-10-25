@@ -81,6 +81,8 @@ export const I18N = {
     tool_attachroof: 'Anexar topo',
     tool_detachroof: 'Desanexar topo',
     tool_measure: 'Medir',
+    tool_section: 'Corte',
+    tool_roofextrusion: 'Telhado por extrusão',
 
     // Painéis
     properties_title: 'Propriedades',
@@ -176,6 +178,8 @@ export const I18N = {
     tool_attachroof: 'Attach Top/Base',
     tool_detachroof: 'Detach Top/Base',
     tool_measure: 'Measure',
+    tool_section: 'Section',
+    tool_roofextrusion: 'Roof by Extrusion',
 
     // Palettes
     properties_title: 'Properties',

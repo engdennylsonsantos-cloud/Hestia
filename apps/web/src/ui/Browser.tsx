@@ -3,6 +3,7 @@ import { duplicateSheetCommand, addSheetAction } from '../editor/sheetActions.ts
 import { isCeiling, isFloor, isRoof, isSlab, isStair, isWall, openingFamilies, openingFamilyOf, projectSheets, type OpeningType } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { sufixoAtalho } from '../editor/shortcutConfig.ts';
 import { activateView } from '../editor/viewTabActions.ts';
 import { Icon } from './Icon.tsx';
 import { TypeRow } from './TypeRow.tsx';
@@ -78,7 +79,7 @@ export function Browser(): ReactElement {
             </details>
             <details open>
               <summary>Cortes</summary>
-              {sections.length === 0 ? <p className="tree-empty">Nenhum corte. Use a ferramenta Corte (K) na planta.</p> : sections.map((v) => <ViewRow key={v.id} view={v} />)}
+              {sections.length === 0 ? <p className="tree-empty">Nenhum corte. Use a ferramenta Corte{sufixoAtalho('section')} na planta.</p> : sections.map((v) => <ViewRow key={v.id} view={v} />)}
             </details>
             <details open>
               <summary>Elevações</summary>

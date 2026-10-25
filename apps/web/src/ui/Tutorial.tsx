@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { isOpening, isWall } from '@hestia/model';
 import { editor, useProject, useProjectVersion } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { sufixoAtalho } from '../editor/shortcutConfig.ts';
 
 export function Tutorial(): ReactElement | null {
   const on = useUi((s) => s.tutorial);
@@ -13,8 +14,8 @@ export function Tutorial(): ReactElement | null {
   const els = Object.values(p.elements);
   const walls = els.filter(isWall);
   const steps: Array<[string, boolean]> = [
-    ['Desenhe um circuito de paredes (W) — clique nos pontos e feche no primeiro', walls.length >= 4],
-    ['Insira uma porta (D) e uma janela (J) sobre as paredes', els.filter(isOpening).length >= 2],
+    [`Desenhe um circuito de paredes${sufixoAtalho('wall')} — clique nos pontos e feche no primeiro`, walls.length >= 4],
+    [`Insira uma porta${sufixoAtalho('door')} e uma janela${sufixoAtalho('window')} sobre as paredes`, els.filter(isOpening).length >= 2],
     ['Selecione uma parede e troque o tipo nas Propriedades', walls.some((w) => w.typeId !== p.defaults.wallTypeId)],
     ['Abra o Modelo 3D no navegador de projeto', seen3d || view === '3d'],
     ['Salve o projeto (Ctrl+S)', !editor.store.dirty && els.length > 0],

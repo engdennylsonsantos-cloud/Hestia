@@ -172,6 +172,17 @@ export function importaAtalhos(texto: string): ResultadoAtalho {
   return { ok: true, mensagem: 'Atalhos importados.' };
 }
 
+/** Sequência atual de um comando (a da configuração, qualquer perfil). Null se o comando não tem tecla. */
+export function atalhoAtual(cmd: ShortcutCommand): string | null {
+  return useAtalhos.getState().mapa[cmd] ?? null;
+}
+
+/** " (X)" com o atalho atual do comando, ou vazio se não tem tecla: para textos da interface sem letra fixa. */
+export function sufixoAtalho(cmd: ShortcutCommand): string {
+  const seq = atalhoAtual(cmd);
+  return seq ? ` (${seq})` : '';
+}
+
 /** Casador da tela: lê o mapa atual e mostra o buffer na barra de status. */
 export const casador = new CasadorSequencia(
   () => useAtalhos.getState().mapa,

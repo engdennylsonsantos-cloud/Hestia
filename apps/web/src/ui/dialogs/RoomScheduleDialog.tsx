@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildRoomSchedule, filterRoomRows, roomScheduleToCsv, sumRoomRows, type RoomScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { sufixoAtalho } from '../../editor/shortcutConfig.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
@@ -96,7 +97,7 @@ export function RoomScheduleDialog(): ReactElement {
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há ambientes neste projeto. Use a ferramenta Ambiente (Z) para criá-los.' : 'Nenhum ambiente com este filtro.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? `Não há ambientes neste projeto. Use a ferramenta Ambiente${sufixoAtalho('room')} para criá-los.` : 'Nenhum ambiente com este filtro.'}</p>
       ) : (
         <>
           <div className="wsched-scroll">

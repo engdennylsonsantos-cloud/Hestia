@@ -273,9 +273,11 @@ export class StairRunTool extends ToolBase {
       this.env.say(`Não é possível criar a escada: ${r?.error ?? 'falha ao gravar.'}`);
       return false;
     }
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning');
-    const extra = aviso ? ` Aviso: ${aviso.message}` : '';
-    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra} Ctrl+Z desfaz.`);
+    // Com comprimento que dá outro nº (`note`), a explicação substitui o aviso "difere do nº desejado", que contradiria o criado.
+    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
+    const extra = b.note ? ` ${b.note}` : '';
+    const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
+    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
     this.reset();
     return true;
   }

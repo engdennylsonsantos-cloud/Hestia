@@ -46,6 +46,15 @@ describe('escada reta: o 2º clique define o comprimento e o nº de espelhos (fr
     expect(ctx.last()).toMatch(/^Escada criada: 17 espelhos de 16,5 cm/);
   });
 
+  it('D3: 5,10 m dá 17 espelhos (piso mais perto do ideal) e a mensagem explica o ideal pela altura (16) sem "difere"', () => {
+    const ctx = setup();
+    drawTo(tool('stairrun', ctx.env), [0, 5.1]);
+    expect(runOf(stairsOf(ctx.store)[0]!).risers).toHaveLength(17);
+    expect(ctx.last()).toMatch(/^Escada criada: 17 espelhos de 16,5 cm, piso 31,9 cm\. \(o comprimento de 5,10 m permite 17; o ideal pela altura é 16: ajuste o comprimento para 4,20 m ou edite o nº de espelhos\)\. /);
+    expect(ctx.last()).toMatch(/ Ctrl\+Z desfaz\.$/);
+    expect(ctx.last()).not.toMatch(/difere do nº desejado/);
+  });
+
   it('comprimento curto demais para o nº mínimo de espelhos: erro claro e nada criado', () => {
     const ctx = setup();
     drawTo(tool('stairrun', ctx.env), [0, 0.5]);

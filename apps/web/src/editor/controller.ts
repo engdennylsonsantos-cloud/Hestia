@@ -21,7 +21,7 @@ import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
-import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
+import { fitBox, levelFrameBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews } from './openViews.ts';
 import { casador } from './shortcutConfig.ts';
@@ -103,7 +103,7 @@ export class Editor {
       const r = this.sectionOf(st.sectionId);
       return r ? sectionBox(r) : null;
     }
-    return levelBox(this.project, st.levelId);
+    return levelFrameBox(this.project, st.levelId);
   }
 
   ensureViewport(width: number, height: number): Viewport {
@@ -359,7 +359,7 @@ export class Editor {
 
   /** Gera (ou atualiza) as quatro elevações do nível ativo, em um único passo de desfazer. */
   generateElevations(): void {
-    const box = levelBox(this.project, useUi.getState().levelId);
+    const box = levelFrameBox(this.project, useUi.getState().levelId);
     if (!box) {
       useUi.setState({ status: 'Não há paredes neste nível para gerar elevações.' });
       return;

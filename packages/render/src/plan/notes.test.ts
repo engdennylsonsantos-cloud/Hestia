@@ -35,6 +35,19 @@ describe('anotações na planta', () => {
     for (const st of ops.strokes) expect(st.widthPx).toBe(pt.cutPx);
   });
 
+  it('cota curta (valor maior que o trecho): rótulo afastado com linha de chamada, alternando alturas entre vizinhos', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'c1', a: { x: 0, y: 0 }, b: { x: 0.12, y: 0 }, offset: 1 } });
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'c2', a: { x: 0.12, y: 0 }, b: { x: 0.3, y: 0 }, offset: 1 } });
+    const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);
+    const [r1, r2] = [ops.labels[0]!, ops.labels[1]!];
+    // Trecho de 0,12 m a 40 px/m (~4,8 px) não cabe o texto "0,12 m": o rótulo sai fora da linha (acima do centro, em y negativo do desenho)
+    expect(r1.text).toBe('0,12 m');
+    expect(r1.at.y).toBeGreaterThan(1.5);
+    expect(r2.at.y).toBeGreaterThan(r1.at.y);
+    expect(ops.strokes.filter((st) => st.pts.length === 2 && st.widthPx === defaultPaint('annotation', ZOOM).cutPx)).toHaveLength(2 * 5 + 2);
+  });
+
   it('texto livre: valor, altura em mm de papel e rotação do próprio texto', () => {
     const p = comCota().project;
     const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);

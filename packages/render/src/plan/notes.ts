@@ -1,5 +1,6 @@
 import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
 import { noteLabel } from './tags.ts';
+import { dimensionLabelOps } from './dimLabels.ts';
 import type { PlanPaint } from './style.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
 
@@ -29,12 +30,17 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
   const picked = (id: Id): boolean => look.selection.includes(id);
   const mPerMm = scale / 1000;
   const fontPx = paperMmToPx(DIM_TEXT_MM, zoom, scale);
+  // Trechos curtos (valor maior que o trecho) saem com rótulo afastado; `lane` alterna as alturas entre vizinhos.
+  let lane = 0;
   for (const d of levelDimensions(p, levelId)) {
     const { a, b } = dimensionPoints(p, d);
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     const c = picked(d.id) ? look.select : color;
     for (const seg of [g.line, ...g.extensions, ...g.ticks]) out.strokes.push({ pts: [...seg], closed: false, widthPx: pt.cutPx, color: c, alpha: 1 });
-    out.labels.push(noteLabel(g.textAt, dimensionText(p, d), fontPx, g.textRotation));
+    const lab = dimensionLabelOps(g, d.offset, dimensionText(p, d), fontPx, zoom, mPerMm, lane, c, pt.cutPx);
+    if (lab.short) lane++;
+    out.labels.push(...lab.labels);
+    out.strokes.push(...lab.strokes);
   }
   for (const t of levelTexts(p, levelId)) out.labels.push(noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation));
   out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color, new Set(look.selection), look.select));

@@ -1,6 +1,6 @@
-import { boxOf, ringArea, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { add, boxOf, mul, norm, perp, ringArea, sub, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { dimensionPoints, levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -301,6 +301,25 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
 export function levelBox(p: Project, levelId: Id): { minX: number; minY: number; maxX: number; maxY: number } | null {
   const pts = wallsOnLevel(p, levelId).flatMap((w) => [w.a, w.b]);
   if (!pts.length) return null;
+  const b = boxOf(pts);
+  const pad = 0.5;
+  return { minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad };
+}
+
+/**
+ * Caixa para enquadrar a planta na vista: a de `levelBox` mais as cotas. A linha de cota fica deslocada das paredes
+ * (`offset`), então sem ela o "Enquadrar" cortava as cotas da borda e deixava a barra de escala por cima delas.
+ */
+export function levelFrameBox(p: Project, levelId: Id): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  const base = levelBox(p, levelId);
+  const pts: Vec2[] = [];
+  for (const d of levelDimensions(p, levelId)) {
+    const { a, b } = dimensionPoints(p, d);
+    const n = perp(norm(sub(b, a)));
+    pts.push(a, b, add(a, mul(n, d.offset)), add(b, mul(n, d.offset)));
+  }
+  if (!pts.length) return base;
+  if (base) pts.push({ x: base.minX, y: base.minY }, { x: base.maxX, y: base.maxY });
   const b = boxOf(pts);
   const pad = 0.5;
   return { minX: b.minX - pad, minY: b.minY - pad, maxX: b.maxX + pad, maxY: b.maxY + pad };

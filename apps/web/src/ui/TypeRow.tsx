@@ -21,14 +21,14 @@ import { duplicateSlabType, renameSlabType, slabTypeDeleteBlock, tryDeleteSlabTy
 import { duplicateCeilingType, renameCeilingType, ceilingTypeDeleteBlock, tryDeleteCeilingType } from '../editor/ceilingTypeActions.ts';
 import { duplicateRoofType, renameRoofType, roofTypeDeleteBlock, tryDeleteRoofType } from '../editor/roofTypeActions.ts';
 import { duplicateStairType, renameStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../editor/stairTypeActions.ts';
-import { Icon } from './Icon.tsx';
+import { Node, type MenuItem } from './browser/Tree.tsx';
 
 interface TypeRowProps {
   kind: TypeKind;
   typeId: Id;
   name: string;
   icon: string;
-  /** Tipo escolhido para desenhar. */
+  /** Tipo escolhido para desenhar (em negrito). */
   active: boolean;
   onUse: () => void;
   onEdit: () => void;
@@ -36,7 +36,7 @@ interface TypeRowProps {
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : 'falha desconhecida');
 
-/** Motivo pelo qual o tipo não pode ser excluído (parede, piso, laje ou telhado); null quando pode ou não é excluível (porta, janela). */
+/** Motivo pelo qual o tipo não pode ser excluído (parede, piso, laje…); null quando pode ou não é excluível (porta, janela). */
 function deleteBlockOf(p: Project, kind: TypeKind, typeId: Id): string | null {
   if (kind === 'wall') return wallTypeDeleteBlock(p, typeId);
   if (kind === 'floor') return floorTypeDeleteBlock(p, typeId);
@@ -48,8 +48,8 @@ function deleteBlockOf(p: Project, kind: TypeKind, typeId: Id): string | null {
 }
 
 /**
- * Linha de tipo no navegador. Clique usa o tipo ao desenhar e duplo clique edita o tipo.
- * As ações por tipo ficam ao lado e aparecem ao passar o mouse ou focar a linha.
+ * Tipo na árvore do navegador (Famílias ▸ Categoria ▸ Família ▸ Tipo). Clique usa o tipo ao desenhar (negrito), duplo
+ * clique edita o tipo e o botão direito abre o menu: onde é usado, selecionar instâncias, substituir, duplicar, renomear, excluir.
  */
 export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: TypeRowProps): ReactElement {
   const p = useProject();
@@ -63,8 +63,8 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
   const uses = instancesOfType(p, kind, typeId).length;
   const choices = compatibleTypes(p, kind, typeId);
   const chosen = choices.some((c) => c.id === target) ? target : (choices[0]?.id ?? '');
-  /** Tipos de parede, piso e laje podem ser excluídos aqui; portas e janelas não. */
   const deletable = kind === 'wall' || kind === 'floor' || kind === 'slab' || kind === 'ceiling' || kind === 'roof' || kind === 'stair';
+  const renamable = kind === 'floor' || kind === 'slab' || kind === 'ceiling' || kind === 'roof' || kind === 'stair';
   const deleteBlock = deleteBlockOf(p, kind, typeId);
   const replaceBlock = choices.length === 0 ? 'Não há outro tipo compatível.' : uses === 0 ? 'Este tipo não tem instâncias.' : null;
 
@@ -72,12 +72,9 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
     const plan = selectAllPlan(editor.project, kind, typeId, useUi.getState().levelId, name);
     useUi.setState({ selection: plan.ids, status: plan.status });
   };
-
   const showWhereUsed = (): void => {
-    const status = whereUsed(editor, kind, typeId, name, (ids) => useUi.setState({ selection: ids }));
-    useUi.setState({ status });
+    useUi.setState({ status: whereUsed(editor, kind, typeId, name, (ids) => useUi.setState({ selection: ids })) });
   };
-
   const apply = (): void => {
     const to = choices.find((c) => c.id === chosen);
     if (!to) return;
@@ -91,7 +88,6 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
       useUi.setState({ status: `Não foi possível substituir: ${errText(e)}` });
     }
   };
-
   const remove = (): void => {
     const r = kind === 'floor' ? tryDeleteFloorType(editor.store, typeId) : kind === 'slab' ? tryDeleteSlabType(editor.store, typeId) : kind === 'ceiling' ? tryDeleteCeilingType(editor.store, typeId) : kind === 'roof' ? tryDeleteRoofType(editor.store, typeId) : kind === 'stair' ? tryDeleteStairType(editor.store, typeId) : tryDeleteWallType(editor.store, typeId);
     if (!r.ok) {
@@ -116,12 +112,10 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
     setAskDelete(false);
     useUi.setState({ status: `Tipo «${name}» excluído.` });
   };
-
   const duplicate = (): void => {
     const id = kind === 'slab' ? duplicateSlabType(editor.store, typeId) : kind === 'ceiling' ? duplicateCeilingType(editor.store, typeId) : kind === 'roof' ? duplicateRoofType(editor.store, typeId) : kind === 'stair' ? duplicateStairType(editor.store, typeId) : duplicateFloorType(editor.store, typeId);
     useUi.setState({ status: id ? `Tipo «${name}» duplicado. Duplo clique na cópia para editar.` : 'Não foi possível duplicar este tipo.' });
   };
-
   const applyRename = (): void => {
     const r = kind === 'slab' ? renameSlabType(editor.store, typeId, newName) : kind === 'ceiling' ? renameCeilingType(editor.store, typeId, newName) : kind === 'roof' ? renameRoofType(editor.store, typeId, newName) : kind === 'stair' ? renameStairType(editor.store, typeId, newName) : renameFloorType(editor.store, typeId, newName);
     if (!r.ok) {
@@ -131,134 +125,39 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
     setRenaming(false);
     useUi.setState({ status: `Tipo renomeado para «${newName.trim()}».` });
   };
-
   const onRenameKey = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      applyRename();
-    } else if (e.key === 'Escape') {
-      e.stopPropagation();
-      setRenaming(false);
-    }
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); applyRename(); }
+    else if (e.key === 'Escape') setRenaming(false);
   };
 
-  const onPanelKey = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      setReplacing(false);
-    }
-  };
+  const menu: MenuItem[] = [
+    { label: 'Propriedades de tipo…', run: onEdit },
+    { label: 'Usar ao desenhar', run: onUse },
+    { label: 'Selecionar todas as instâncias (nível atual)', run: selectAll, sep: true },
+    { label: 'Onde é usado', run: showWhereUsed, disabled: uses === 0, hint: uses === 0 ? 'Este tipo não tem instâncias.' : 'Vai ao nível com mais instâncias, enquadra e seleciona.' },
+    { label: 'Substituir por outro tipo…', run: () => setReplacing(true), disabled: replaceBlock !== null, hint: replaceBlock ?? undefined },
+    ...(renamable ? [{ label: 'Duplicar', run: duplicate, sep: true }, { label: 'Renomear', run: () => { setNewName(name); setRenaming(true); } }] : []),
+    ...(deletable ? [{ label: 'Excluir', run: remove, disabled: deleteBlock !== null, danger: true, sep: !renamable, hint: deleteBlock ? `Não é possível excluir: ${deleteBlock}` : undefined }] : []),
+  ];
 
-  return (
+  const label = renaming ? (
+    <input className="input view-rename" aria-label="Novo nome do tipo" value={newName} autoFocus onChange={(e) => setNewName(e.target.value)} onKeyDown={onRenameKey} onBlur={() => setRenaming(false)} onClick={(e) => e.stopPropagation()} />
+  ) : name;
+
+  const panels = (
     <>
-      <div className={`type-row${replacing ? ' open' : ''}`}>
-        <button className={`leaf${active ? ' on' : ''}`} title="Clique para usar este tipo ao desenhar. Duplo clique edita o tipo." onClick={onUse} onDoubleClick={onEdit}>
-          <Icon name={icon} size={14} /> {name}
-          <span className="meta" title={`${uses} ${uses === 1 ? 'uso' : 'usos'} no projeto`}>
-            {uses}
-          </span>
-        </button>
-        <div className="type-actions" role="group" aria-label={`Ações do tipo ${name}`}>
-          <button
-            type="button"
-            className="ibtn type-act"
-            title={uses === 0 ? 'Este tipo não tem instâncias.' : 'Onde é usado: vai ao nível com mais instâncias, enquadra e seleciona'}
-            aria-label={`Onde é usado: ${name}`}
-            disabled={uses === 0}
-            onClick={showWhereUsed}
-          >
-            <Icon name="fit" size={13} />
-          </button>
-          <button
-            type="button"
-            className="ibtn type-act"
-            title="Selecionar as instâncias deste nível"
-            aria-label={`Selecionar todas as instâncias de ${name}`}
-            onClick={selectAll}
-          >
-            <Icon name="select" size={13} />
-          </button>
-          <button
-            type="button"
-            className={`ibtn type-act${replacing ? ' on' : ''}`}
-            title={replaceBlock ?? 'Substituir por outro tipo em todas as instâncias'}
-            aria-label={`Substituir o tipo ${name} por outro`}
-            aria-expanded={replacing}
-            aria-controls={replacing ? panelId : undefined}
-            disabled={replaceBlock !== null}
-            onClick={() => setReplacing((v) => !v)}
-          >
-            <Icon name="rotate" size={13} />
-          </button>
-          {kind === 'floor' || kind === 'slab' || kind === 'ceiling' || kind === 'roof' || kind === 'stair' ? (
-            <>
-              <button type="button" className="ibtn type-act" title="Duplicar tipo" aria-label={`Duplicar tipo ${name}`} onClick={duplicate}>
-                <Icon name="plus" size={13} />
-              </button>
-              <button
-                type="button"
-                className={`ibtn type-act${renaming ? ' on' : ''}`}
-                title="Renomear tipo"
-                aria-label={`Renomear tipo ${name}`}
-                aria-expanded={renaming}
-                onClick={() => {
-                  setNewName(name);
-                  setRenaming((v) => !v);
-                }}
-              >
-                <Icon name="edit" size={13} />
-              </button>
-            </>
-          ) : null}
-          {deletable ? (
-            <button
-              type="button"
-              className="ibtn type-act danger"
-              title={deleteBlock ? `Não é possível excluir: ${deleteBlock}` : 'Excluir tipo'}
-              aria-label={`Excluir tipo ${name}`}
-              disabled={deleteBlock !== null}
-              onClick={remove}
-            >
-              <Icon name="trash" size={13} />
-            </button>
-          ) : null}
-        </div>
-      </div>
-      {renaming ? (
-        <div className="type-replace" role="group" aria-label={`Renomear o tipo ${name}`}>
-          <label>
-            <span>Novo nome</span>
-            <input className="input" aria-label="Novo nome do tipo" value={newName} autoFocus onChange={(e) => setNewName(e.target.value)} onKeyDown={onRenameKey} />
-          </label>
-          <div className="type-replace-btns">
-            <button type="button" className="btn small primary" onClick={applyRename}>
-              Renomear
-            </button>
-            <button type="button" className="btn small" onClick={() => setRenaming(false)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      ) : null}
       {replacing ? (
-        <div id={panelId} className="type-replace" onKeyDown={onPanelKey}>
+        <div id={panelId} className="type-replace" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setReplacing(false); } }}>
           <label>
             <span>Substituir por…</span>
             <select className="select" aria-label="Novo tipo" value={chosen} onChange={(e) => setTarget(e.target.value)}>
-              {choices.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+              {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
           <div className="type-replace-btns">
-            <button type="button" className="btn small primary" disabled={!chosen} onClick={apply}>
-              Aplicar
-            </button>
-            <button type="button" className="btn small" onClick={() => setReplacing(false)}>
-              Cancelar
-            </button>
+            <button type="button" className="btn small primary" disabled={!chosen} onClick={apply}>Aplicar</button>
+            <button type="button" className="btn small" onClick={() => setReplacing(false)}>Cancelar</button>
           </div>
         </div>
       ) : null}
@@ -266,15 +165,25 @@ export function TypeRow({ kind, typeId, name, icon, active, onUse, onEdit }: Typ
         <div className="type-replace" role="group" aria-label={`Excluir o tipo ${name}`}>
           <span>Excluir o tipo «{name}», que ficou sem uso?</span>
           <div className="type-replace-btns">
-            <button type="button" className="btn small danger" onClick={remove}>
-              Excluir tipo
-            </button>
-            <button type="button" className="btn small" onClick={() => setAskDelete(false)}>
-              Manter
-            </button>
+            <button type="button" className="btn small danger" onClick={remove}>Excluir tipo</button>
+            <button type="button" className="btn small" onClick={() => setAskDelete(false)}>Manter</button>
           </div>
         </div>
       ) : null}
     </>
+  );
+
+  return (
+    <Node
+      id={`type:${kind}:${typeId}`}
+      label={label}
+      icon={icon}
+      bold={active}
+      title={`${name} — ${uses} ${uses === 1 ? 'uso' : 'usos'} no projeto. Clique usa ao desenhar; duplo clique edita; botão direito abre o menu.`}
+      onSelect={onUse}
+      onOpen={onEdit}
+      menu={menu}
+      after={panels}
+    />
   );
 }

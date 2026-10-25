@@ -1,0 +1,149 @@
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Icon } from '../Icon.tsx';
+
+/**
+ * Árvore do Navegador de projeto no padrão Revit: nós com caixa ⊞/⊟, ícone pequeno, nome (negrito = vista ativa ou tipo em uso)
+ * e menu de botão direito. Duplo clique ou Enter abre/edita; um clique só seleciona.
+ */
+
+export interface MenuItem {
+  label: string;
+  run?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  /** Linha divisória antes do item. */
+  sep?: boolean;
+  hint?: string;
+}
+
+interface Sel {
+  id: string | null;
+  set: (id: string) => void;
+  menu: (e: MouseEvent, items: MenuItem[]) => void;
+}
+const TreeCtx = createContext<Sel>({ id: null, set: () => undefined, menu: () => undefined });
+
+/** Menu de contexto solto na tela, na posição do clique; fecha com Esc, clique fora ou ao escolher. */
+function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuItem[]; onClose: () => void }): ReactElement {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+  useLayoutEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setPos({ left: Math.max(4, Math.min(x, window.innerWidth - r.width - 4)), top: Math.max(4, Math.min(y, window.innerHeight - r.height - 4)) });
+  }, [x, y]);
+  useEffect(() => {
+    const down = (e: PointerEvent): void => { if (!ref.current?.contains(e.target as Node)) onClose(); };
+    const key = (e: globalThis.KeyboardEvent): void => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    document.addEventListener('pointerdown', down, true);
+    document.addEventListener('keydown', key, true);
+    window.addEventListener('blur', onClose);
+    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('keydown', key, true); window.removeEventListener('blur', onClose); };
+  }, [onClose]);
+  return createPortal(
+    <div ref={ref} className="rb-menu" role="menu" style={pos}>
+      {items.map((it, i) => (
+        <div key={i}>
+          {it.sep && <hr className="rb-sep" />}
+          <button role="menuitem" className={`rb-menuitem${it.danger ? ' danger' : ''}`} disabled={it.disabled} title={it.hint} onClick={() => { onClose(); it.run?.(); }}>
+            <span>{it.label}</span>
+          </button>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+/** Raiz da árvore: guarda o nó selecionado e o menu de contexto aberto. */
+export function Tree({ children, label }: { children: ReactNode; label: string }): ReactElement {
+  const [id, setId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const ctx: Sel = {
+    id,
+    set: setId,
+    menu: (e, items) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (items.length) setMenu({ x: e.clientX, y: e.clientY, items });
+    },
+  };
+  return (
+    <TreeCtx.Provider value={ctx}>
+      <div className="btree" role="tree" aria-label={label}>{children}</div>
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+    </TreeCtx.Provider>
+  );
+}
+
+export interface NodeProps {
+  /** Chave única do nó (seleção). */
+  id: string;
+  label: ReactNode;
+  icon?: string;
+  /** Tem filhos (mostra a caixa ⊞/⊟), mesmo vazios. */
+  group?: boolean;
+  open?: boolean;
+  bold?: boolean;
+  title?: string;
+  /** Texto de ajuda mostrado sob o nó aberto, quando não há filhos. */
+  empty?: string;
+  /** Duplo clique ou Enter. */
+  onOpen?: () => void;
+  /** Clique simples (além de selecionar o nó). */
+  onSelect?: () => void;
+  menu?: MenuItem[];
+  children?: ReactNode;
+  /** Conteúdo extra logo depois da linha (painéis inline do tipo). */
+  after?: ReactNode;
+}
+
+/** Um nó da árvore. Grupos abrem e fecham pela caixa, pela seta do teclado ou por duplo clique. */
+export function Node({ id, label, icon, group = false, open: initial = false, bold = false, title, empty, onOpen, onSelect, menu, children, after }: NodeProps): ReactElement {
+  const t = useContext(TreeCtx);
+  const [open, setOpen] = useState(initial);
+  const selected = t.id === id;
+  const has = group || !!children;
+  const toggle = (): void => setOpen((v) => !v);
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter') { e.preventDefault(); if (onOpen) onOpen(); else if (has) toggle(); }
+    else if (e.key === 'ArrowRight' && has && !open) { e.preventDefault(); setOpen(true); }
+    else if (e.key === 'ArrowLeft' && has && open) { e.preventDefault(); setOpen(false); }
+    else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      t.menu({ preventDefault: () => undefined, stopPropagation: () => undefined, clientX: r.left + 24, clientY: r.bottom } as unknown as MouseEvent, menu ?? []);
+    }
+  };
+  return (
+    <div role="none">
+      <div
+        role="treeitem"
+        tabIndex={0}
+        aria-selected={selected}
+        aria-expanded={has ? open : undefined}
+        className={`bnode${selected ? ' sel' : ''}${bold ? ' bold' : ''}`}
+        title={title}
+        onClick={() => { t.set(id); onSelect?.(); }}
+        onDoubleClick={() => { if (onOpen) onOpen(); else if (has) toggle(); }}
+        onContextMenu={(e) => { t.set(id); t.menu(e, menu ?? []); }}
+        onKeyDown={onKey}
+      >
+        <span className={`bbox${has ? '' : ' none'}`} aria-hidden="true" onClick={(e) => { e.stopPropagation(); if (has) toggle(); }}>{has ? (open ? '−' : '+') : ''}</span>
+        {icon ? <Icon name={icon} size={14} /> : null}
+        <span className="blabel">{label}</span>
+      </div>
+      {after}
+      {has && open && (
+        <div className="bkids" role="group">
+          {children}
+          {!children && empty ? <p className="btree-empty">{empty}</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Contexto para nós que precisam do menu a partir de um componente próprio (ex.: tipo com renomear inline). */
+export function useTree(): Sel {
+  return useContext(TreeCtx);
+}

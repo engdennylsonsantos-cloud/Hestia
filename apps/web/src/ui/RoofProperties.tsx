@@ -153,6 +153,8 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         ) : (
           <div className="hint">
             {freeRoof ? 'Águas livres: cada água tem inclinação e subida próprias (lista abaixo).'
+              : single?.shape === 'edges' && roofPresetOf(single) === 'gable' ? 'Duas águas: a inclinação vale para as arestas paralelas à cumeeira. Escolha uma aresta na planta para editá-la.'
+              : single?.shape === 'edges' && roofPresetOf(single) === 'hip' ? 'Quatro águas: a inclinação vale para todas as arestas do contorno. Escolha uma aresta na planta para editá-la.'
               : single?.shape === 'edges' ? 'Por arestas: inclinação só nas arestas que a definem. Escolha uma aresta na planta para editá-la.'
               : single?.shape === 'extrusion' ? 'Telhado por extrusão: o perfil (altura por transversal) se edita pelo botão abaixo.'
               : single ? 'Forma de uma água, duas águas ou quatro águas: troque por Por arestas para editar cada aresta.'

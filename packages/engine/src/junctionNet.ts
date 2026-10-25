@@ -1,6 +1,8 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { floorsOnLevel, isFloor, isRoof, isSlab, isStair, levelAbove, openingsOfWall, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, levelAbove, openingsOfWall, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
+import { horizontaisDoProjeto } from './junctionIndex.ts';
+import { cacheDeCortadores } from './cutterCache.ts';
 import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
 import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
 import { winsOver, type JunctionKind, type JunctionMeta } from './junctionPlanar.ts';
@@ -230,7 +232,6 @@ export function spanRange(sp: SolidPiece): readonly [number, number] | null {
  */
 const levelCuttersCache = new WeakMap<Project, Map<Id, LevelCutters>>();
 const levelCutterSourcesByProject = new WeakMap<Project, Map<Id, readonly unknown[]>>();
-const levelCutterContentCache = new Map<Id, { sources: readonly unknown[]; value: LevelCutters }>();
 
 function cutterSources(p: Project, levelId: Id): readonly unknown[] {
   let byLevel = levelCutterSourcesByProject.get(p);
@@ -250,7 +251,7 @@ function cutterSources(p: Project, levelId: Id): readonly unknown[] {
     ...stairsOnLevel(p, levelId),
     ...roofsOnLevel(p, levelId),
     // Alturas anexadas e contornos com dependências verticais também leem estes elementos de outros níveis.
-    ...Object.values(p.elements).filter((e) => isFloor(e) || isSlab(e) || isStair(e) || isRoof(e)),
+    ...horizontaisDoProjeto(p),
   ];
   byLevel.set(levelId, sources);
   return sources;
@@ -271,7 +272,7 @@ function levelCutters(p: Project, levelId: Id): LevelCutters {
   const cached = byLevel.get(levelId);
   if (cached) return cached;
   const sources = cutterSources(p, levelId);
-  const content = levelCutterContentCache.get(levelId);
+  const content = cacheDeCortadores.get(`conteudo:${levelId}`);
   if (content && sameSources(content.sources, sources)) {
     byLevel.set(levelId, content.value);
     return content.value;
@@ -282,9 +283,7 @@ function levelCutters(p: Project, levelId: Id): LevelCutters {
     walls: [{ kind: 'wall', pieces: wallBandPieces(p, levelId).map((w) => w.piece) }],
   };
   byLevel.set(levelId, result);
-  levelCutterContentCache.delete(levelId);
-  levelCutterContentCache.set(levelId, { sources, value: result });
-  if (levelCutterContentCache.size > 1024) levelCutterContentCache.delete(levelCutterContentCache.keys().next().value!);
+  cacheDeCortadores.set(`conteudo:${levelId}`, { sources, value: result });
   return result;
 }
 
@@ -295,7 +294,6 @@ export interface LevelCutters {
   walls: CutterSolid[];
 }
 
-const levelCutterSetCache = new Map<Id, { sources: readonly unknown[]; value: LevelCutters }>();
 const levelCutterSetByProject = new WeakMap<Project, Map<Id, LevelCutters>>();
 
 /**
@@ -343,11 +341,9 @@ export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
     out.slabs.push(...slabs);
     out.walls.push(...walls);
   }
-  const cached = levelCutterSetCache.get(levelId);
+  const cached = cacheDeCortadores.get(`conjunto:${levelId}`);
   if (cached && sameSources(cached.sources, sources)) return remember(cached.value);
-  levelCutterSetCache.delete(levelId);
-  levelCutterSetCache.set(levelId, { sources, value: out });
-  if (levelCutterSetCache.size > 1024) levelCutterSetCache.delete(levelCutterSetCache.keys().next().value!);
+  cacheDeCortadores.set(`conjunto:${levelId}`, { sources, value: out });
   return remember(out);
 }
 

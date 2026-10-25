@@ -44,6 +44,7 @@ import { RoomProperties } from './RoomProperties.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
+import { changeOpeningType } from '../editor/openingTypeActions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -235,7 +236,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
         selectedId={typeId.mixed ? null : typeId.value}
         disabled={!kind}
         editDisabled={typeId.mixed}
-        onSelect={(id) => patch(ids, { typeId: id })}
+        onSelect={(id) => changeOpeningType(editor.store, ids, id, (m) => useUi.setState({ status: m }))}
         onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: typeId.value })}
       />
       <Group title="Restrições">
@@ -243,15 +244,15 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
           <>
             <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} unit="m" /></Row>
             <Row label="Peitoril" htmlFor="p-sill">
-              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} />
+              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros, como 0,90.' })} />
             </Row>
             {single.sillOverride !== null && (
               <div className="prow"><span /><button className="chiplink" onClick={() => patch(ids, { sillOverride: null })}>Usar peitoril do tipo</button></div>
             )}
           </>
         )}
-        <Row label="Inverter dobradiça"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
-        <Row label="Inverter sentido"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
+        <Row label="Inverter dobradiça" htmlFor="p-hand"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
+        <Row label="Inverter sentido" htmlFor="p-facing"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
       </Group>
       <Group title="Dimensões" open={!!single}>
         {type && (

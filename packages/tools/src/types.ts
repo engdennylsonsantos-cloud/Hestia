@@ -50,6 +50,8 @@ export interface ToolEnv {
   openView?(id: Id): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
+  /** Idioma da interface: as mensagens traduzíveis das ferramentas (ex.: Matriz) saem nele. Ausente = português. */
+  lang?(): 'pt' | 'en';
   /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */
   roofEdge?(): RoofEdgeSel | null;
   setRoofEdge?(sel: RoofEdgeSel | null): void;

@@ -25,7 +25,7 @@ export function StatusBar(): ReactElement {
   const view = useUi((s) => s.view);
   return (
     <footer className="statusbar" role="status">
-      <span className="msg">{status}</span>
+      <span className="msg" title={status}>{status}</span>
       {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
       {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}
       <SnapButton />

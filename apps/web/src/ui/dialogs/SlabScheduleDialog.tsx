@@ -2,29 +2,31 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildSlabSchedule, filterSlabRows, slabScheduleToCsv, sumSlabRows, type SlabScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 
 interface Col {
   key: keyof SlabScheduleRow;
-  label: string;
+  /** Chave do rótulo em I18N (PT/EN). */
+  labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
 }
 
 const COLS: Col[] = [
-  { key: 'mark', label: 'Marca' },
-  { key: 'typeName', label: 'Tipo' },
-  { key: 'typeCode', label: 'Código' },
-  { key: 'levelName', label: 'Nível' },
-  { key: 'planArea', label: 'Área em planta (m²)', decimals: 2 },
-  { key: 'faceArea', label: 'Área real (m²)', decimals: 2 },
-  { key: 'slopePercent', label: 'Inclinação (%)', decimals: 1 },
-  { key: 'perimeter', label: 'Perímetro (m)', decimals: 2 },
-  { key: 'thickness', label: 'Espessura (m)', decimals: 3 },
-  { key: 'volume', label: 'Volume (m³)', decimals: 3 },
-  { key: 'heightOffset', label: 'Deslocamento (m)', decimals: 3 },
+  { key: 'mark', labelKey: 'col_mark' },
+  { key: 'typeName', labelKey: 'col_type' },
+  { key: 'typeCode', labelKey: 'col_code' },
+  { key: 'levelName', labelKey: 'col_level' },
+  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2 },
+  { key: 'faceArea', labelKey: 'col_real_area', decimals: 2 },
+  { key: 'slopePercent', labelKey: 'col_slope', decimals: 1 },
+  { key: 'perimeter', labelKey: 'col_perimeter', decimals: 2 },
+  { key: 'thickness', labelKey: 'col_thickness', decimals: 3 },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'heightOffset', labelKey: 'col_offset', decimals: 3 },
 ];
 
 interface Sort {
@@ -32,7 +34,9 @@ interface Sort {
   dir: 1 | -1;
 }
 
-const fmt = (v: number, decimals: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
+const fmt = (v: number, decimals: number): string =>
+  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: SlabScheduleRow, b: SlabScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -49,6 +53,7 @@ const cellValue = (r: SlabScheduleRow, c: Col): ReactNode => {
 /** Tabela de lajes com ordenação, filtros por nível e tipo, totais e exportação CSV (padrão da tabela de pisos). */
 export function SlabScheduleDialog(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const schedule = useMemo(() => buildSlabSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -81,34 +86,34 @@ export function SlabScheduleDialog(): ReactElement {
 
   return (
     <Dialog
-      title="Tabela de lajes"
-      sub={`${visible.length} de ${schedule.rows.length} lajes`}
+      title={t.sched_title_slab}
+      sub={`${visible.length} ${t.sched_of} ${schedule.rows.length} ${t.sched_noun_slab}`}
       onClose={close}
       footer={
         <>
           <span className="wsched-msg" role="status">{msg}</span>
-          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title="Exporta as linhas filtradas, na ordem da tabela">
-            Exportar CSV
+          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title={t.sched_export_tip}>
+            {t.sched_export_csv}
           </button>
-          <button className="btn" onClick={close}>Fechar</button>
+          <button className="btn" onClick={close}>{t.sched_close}</button>
         </>
       }
     >
       <div className="wsched-bar">
-        <label htmlFor="ssc-level">Nível</label>
+        <label htmlFor="ssc-level">{t.col_level}</label>
         <select id="ssc-level" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
-          <option value="">Todos os níveis</option>
+          <option value="">{t.sched_all_levels}</option>
           {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
-        <label htmlFor="ssc-type">Tipo</label>
+        <label htmlFor="ssc-type">{t.col_type}</label>
         <select id="ssc-type" className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          <option value="">{t.sched_all_types}</option>
+          {types.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
         </select>
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há lajes neste projeto.' : 'Nenhuma laje com estes filtros.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? t.sched_empty_slab : t.sched_none_slab}</p>
       ) : (
         <>
           <div className="wsched-scroll">
@@ -117,8 +122,8 @@ export function SlabScheduleDialog(): ReactElement {
                 <tr>
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title="Ordenar por esta coluna">
-                        {c.label}
+                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
+                        {t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -139,11 +144,11 @@ export function SlabScheduleDialog(): ReactElement {
             </table>
           </div>
           <div className="total">
-            <span>{totals.count} {totals.count === 1 ? 'laje' : 'lajes'}</span>
-            <span>Área em planta {fmt(totals.planArea, 2)} m²</span>
-            <span>Área real {fmt(totals.faceArea, 2)} m²</span>
-            <span>Perímetro {fmt(totals.perimeter, 2)} m</span>
-            <span>Volume {fmt(totals.volume, 3)} m³</span>
+            <span>{totals.count} {totals.count === 1 ? t.sched_noun_slab_one : t.sched_noun_slab}</span>
+            <span>{t.sched_total_plan_area} {fmt(totals.planArea, 2)} m²</span>
+            <span>{t.sched_total_face_area} {fmt(totals.faceArea, 2)} m²</span>
+            <span>{t.sched_total_perimeter} {fmt(totals.perimeter, 2)} m</span>
+            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
           </div>
         </>
       )}

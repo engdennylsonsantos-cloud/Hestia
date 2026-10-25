@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { computeSection, cotasAutomaticas, resolveLevel, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';
+import { computeSection, cotasAutomaticas, LevelResolveCache, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
   annotationIdsIn,
@@ -41,7 +41,8 @@ export class Editor {
   readonly store = new ProjectStore(createEmptyProject());
   private tool: Tool;
   private viewports = new Map<Id, Viewport>();
-  private resolveCache = new Map<Id, { project: Project; value: ResolvedLevel }>();
+  /** Resolução por nível: uma edição recalcula só o nível editado e os que dependem dele (ver `LevelResolveCache`). */
+  private readonly levels = new LevelResolveCache();
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
@@ -146,11 +147,13 @@ export class Editor {
   }
 
   resolved(levelId: Id): ResolvedLevel {
-    const hit = this.resolveCache.get(levelId);
-    if (hit && hit.project === this.project) return hit.value;
-    const value = resolveLevel(this.project, levelId);
-    this.resolveCache.set(levelId, { project: this.project, value });
-    return value;
+    return this.levels.get(this.project, levelId);
+  }
+
+  /** Libera os caches de um nível (viewport da planta e resolução). Chamado ao fechar uma aba de planta. */
+  releaseLevel(levelId: Id): void {
+    this.viewports.delete(levelId);
+    this.levels.release(levelId);
   }
 
   // ---------- ferramentas ----------
@@ -421,7 +424,7 @@ export class Editor {
   load(p: Project, name: string): void {
     this.store.load(p);
     this.fileName = name;
-    this.resolveCache.clear();
+    this.levels.clear();
     this.viewports.clear();
     // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
     useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });

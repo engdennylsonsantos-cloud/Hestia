@@ -407,7 +407,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   // Parede anexada enxerga o piso e a laje por camada (término esvazia o contorno); o próprio término usa o contorno
   // do elemento (`flatAttach`), porque as camadas dependem das paredes (sem ciclo, decisão 0025).
   const { floors, slabs } = attachTargets(p, walls, opts.flatAttach === true);
-  const roofs = resolveAllRoofs(p);
+  // Telhados de todos os níveis só entram se alguma parede deste nível se anexa ao topo do telhado (senão não são lidos).
+  const roofs = walls.some((w) => w.attachTopToRoof === true) ? resolveAllRoofs(p) : [];
   for (const group of clusterWalls(frames, ends)) {
     const tol = p.settings?.joinTolerance;
     const freeOf = (f: WallFrame): Array<'a' | 'b'> =>

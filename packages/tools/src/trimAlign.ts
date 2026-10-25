@@ -428,7 +428,7 @@ export class AlignTool extends ToolBase {
 /** Cota de uma medida: linha entre os dois pontos, marcas nas extremidades e o valor no meio. */
 function cotaItems(a: Vec2, b: Vec2): PreviewItem[] {
   return [
-    { kind: 'line', a, b },
+    { kind: 'line', a, b, halo: true },
     { kind: 'point', at: a },
     { kind: 'point', at: b },
     { kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: `${dist(a, b).toFixed(3).replace('.', ',')} m` },
@@ -460,7 +460,7 @@ export class MeasureTool extends ToolBase {
       this.items.push({ kind: 'point', at: inf.point });
       return;
     }
-    this.items.push({ kind: 'line', a: this.a, b: inf.point });
+    this.items.push({ kind: 'line', a: this.a, b: inf.point, halo: true });
     this.items.push({ kind: 'label', at: inf.point, text: `${dist(this.a, inf.point).toFixed(3).replace('.', ',')} m` });
   }
 

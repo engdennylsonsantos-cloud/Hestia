@@ -21,7 +21,8 @@ export interface Inference {
 
 /** O que a ferramenta mostra antes do clique (docs/03 §5: pré-visualização sempre). */
 export type PreviewItem =
-  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone }
+  /** `halo`: linha de cota do Medir, mais grossa e com contorno claro por baixo (legível sobre hachura de parede). */
+  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone; halo?: boolean }
   | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: StairTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }

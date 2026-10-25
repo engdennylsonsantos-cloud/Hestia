@@ -62,6 +62,13 @@ describe('prévia da escada por tom (decisão 0011 · interface)', () => {
     expect(ov.strokes[1]).toEqual({ pts: RING, closed: true, widthPx: 1.5, color: LIGHT.accent, alpha: 0.95, dash: undefined });
   });
 
+  it('cota do Medir (halo): contorno claro por baixo e traço mais grosso na cor de destaque', () => {
+    const ov = previewOverlay([{ kind: 'line', a: A, b: B, halo: true }], VIEW, DARK, noHighlight);
+    expect(ov.strokes).toHaveLength(2);
+    expect(ov.strokes[0]).toMatchObject({ widthPx: 4.5, color: '#ffffff' });
+    expect(ov.strokes[1]).toMatchObject({ widthPx: 2.25, color: DARK.accent });
+  });
+
   it('o PlanDrawList da prévia leva as cores por tom e mantém a cor de destaque nos itens sem tom', () => {
     const p = createEmptyProject();
     const input: PlanInput = {

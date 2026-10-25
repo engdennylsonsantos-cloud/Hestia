@@ -24,13 +24,28 @@ const ACTIONS: Record<ActionId, { labelKey: 'tool_cotasAuto'; icon: string; titl
 /** Ferramentas primárias de modelagem que recebem botão grande com destaque visual no padrão Revit */
 const PRIMARY_TOOLS: Set<ToolId> = new Set(['wall', 'door', 'window', 'floor', 'ceiling', 'roof', 'stair', 'room', 'select']);
 
-function ToolButton({ id, primary = false }: { id: ToolId; primary?: boolean }): ReactElement {
+/** Botão pequeno, só ícone; o nome aparece no tooltip (title). */
+function ToolButton({ id, primary = false, mini = false }: { id: ToolId; primary?: boolean; mini?: boolean }): ReactElement {
   const active = useUi((s) => s.tool === id);
   const lang = useI18n((s) => s.lang);
   const label = toolLabel(id, lang);
   const sc = TOOL_SHORTCUT[id];
   const isBig = primary || PRIMARY_TOOLS.has(id);
-  
+
+  if (mini) {
+    return (
+      <button
+        className={`tbtn${active ? ' on' : ''}`}
+        style={{ width: 22, height: 22, minWidth: 0, padding: 0, justifyContent: 'center' }}
+        onClick={() => editor.setTool(id)}
+        title={`${label}${sc ? ` (${sc})` : ''}`}
+        aria-label={label}
+      >
+        <Icon name={id} size={20} />
+      </button>
+    );
+  }
+
   return (
     <button
       className={`tbtn${isBig ? ' primary-tool' : ''}${active ? ' on' : ''}`}
@@ -43,6 +58,10 @@ function ToolButton({ id, primary = false }: { id: ToolId; primary?: boolean }):
     </button>
   );
 }
+
+/** Três espaços à direita do botão Ambiente: o primeiro é o Separador de ambientes; os outros ficam reservados. */
+const ROOM_SLOTS_STYLE = { display: 'flex', flexDirection: 'column', gap: 2 } as const;
+const EMPTY_SLOT_STYLE = { width: 22, height: 22, boxSizing: 'border-box', border: '1px dashed currentColor', borderRadius: 'var(--r)', opacity: 0.35 } as const;
 
 /** Mesmo visual do `ToolButton`, sem ferramenta nem atalho: executa a ação e mantém a ferramenta atual. */
 function ActionButton({ id }: { id: ActionId }): ReactElement {
@@ -184,6 +203,11 @@ export function Ribbon(): ReactElement {
             <div className="rgroup">
               <div className="rgroup-tools">
                 <ToolButton id="room" primary />
+                <div style={ROOM_SLOTS_STYLE}>
+                  <ToolButton id="roomsep" mini />
+                  <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />
+                  <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />
+                </div>
               </div>
               <div className="rgroup-title">{t.grp_rooms}</div>
             </div>

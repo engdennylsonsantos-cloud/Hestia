@@ -15,7 +15,8 @@ export type AnnotationCommand =
   | { type: 'updateText'; levelId: Id; id: Id; patch: Partial<Omit<TextNote, 'id'>> }
   | { type: 'removeText'; levelId: Id; id: Id }
   | { type: 'addRoomSeparator'; levelId: Id; separator: RoomSeparator }
-  | { type: 'removeRoomSeparator'; levelId: Id; id: Id };
+  | { type: 'removeRoomSeparator'; levelId: Id; id: Id }
+  | { type: 'updateRoomSeparator'; levelId: Id; id: Id; patch: Partial<Omit<RoomSeparator, 'id'>> };
 
 const finite = (v: Vec2): boolean => Number.isFinite(v.x) && Number.isFinite(v.y);
 
@@ -108,6 +109,15 @@ export function applyAnnotationCommand(p: Project, c: AnnotationCommand): void {
       if (!level.roomSeparators?.some((r) => r.id === c.id)) throw new Error('Linha de separação inexistente');
       level.roomSeparators = level.roomSeparators.filter((r) => r.id !== c.id);
       break;
+    case 'updateRoomSeparator': {
+      const old = level.roomSeparators?.find((r) => r.id === c.id);
+      if (!old) throw new Error('Linha de separação inexistente');
+      const next: RoomSeparator = { ...old, ...c.patch, id: old.id };
+      const issue = roomSeparatorIssue(next);
+      if (issue) throw new Error(issue);
+      level.roomSeparators = level.roomSeparators!.map((r) => (r.id === c.id ? next : r));
+      break;
+    }
   }
 }
 

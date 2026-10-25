@@ -61,6 +61,7 @@ export const I18N = {
     tool_stairrun: 'Lance de escada',
     tool_room: 'Ambiente',
     tool_dimension: 'Cota alinhada',
+    tool_roomsep: 'Linha de separação',
     tool_text: 'Texto',
     tool_cotasAuto: 'Cotas automáticas',
 
@@ -155,6 +156,7 @@ export const I18N = {
     tool_stairrun: 'Stair by Run',
     tool_room: 'Room',
     tool_dimension: 'Aligned Dimension',
+    tool_roomsep: 'Room Separation Line',
     tool_text: 'Text',
     tool_cotasAuto: 'Auto Dimensions',
 

@@ -6,6 +6,7 @@ import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, 
 import { idsInBox, pickAt } from './pick.ts';
 import { floorIdsInBox, pickFloorAt, ringRemoveVertex } from './floorPick.ts';
 import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
+import { pickRoomSeparatorAt } from './roomSeparatorPick.ts';
 import { pickCeilingAt } from './ceilingPick.ts';
 import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
 import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
@@ -28,7 +29,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'room' | 'annotation' | 'view';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -101,6 +102,10 @@ export class SelectTool extends ToolBase {
     if (cl) return { id: cl, kind: 'ceiling' };
     const rf = pickRoofAt(pr, lv, at, mpp);
     if (rf) return { id: rf, kind: 'roof' };
+    // Linha de separação de ambiente (guardada no nível, fora de project.elements): depois dos elementos, antes do ambiente
+    // que ela divide. Parede, abertura, piso ou telhado sob o cursor continuam ganhando o clique.
+    const rs = pickRoomSeparatorAt(pr, lv, at, mpp);
+    if (rs) return { id: rs.id, kind: 'roomSeparator' };
     // Ambiente: por último entre os elementos de planta (o piso e a parede sob o cursor ganham o clique).
     const rm = pickRoomAt(pr, lv, at);
     if (rm) return { id: rm, kind: 'room' };
@@ -217,7 +222,8 @@ export class SelectTool extends ToolBase {
     const dg = dimGripAt(pr, this.env.levelId(), sel, p.raw, mpp);
     if (dg) { this.dimGrip = dg; this.dimOffset = null; this.mode = 'dimgrip'; return; }
     const hit = this.hitAt(p.raw);
-    if (hit && sel.includes(hit.id)) {
+    // Linha de separação selecionada não se arrasta (não é movível pelo arrasto): o clique só (des)seleciona no soltar.
+    if (hit && sel.includes(hit.id) && hit.kind !== 'roomSeparator') {
       if (hit.kind === 'door' || hit.kind === 'window') {
         this.mode = 'opening';
         this.openingId = hit.id;

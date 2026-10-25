@@ -261,6 +261,8 @@ export function labelOf(c: Command): string {
       return 'Criar linha de separação';
     case 'removeRoomSeparator':
       return 'Excluir linha de separação';
+    case 'updateRoomSeparator':
+      return 'Editar linha de separação';
     case 'addText':
       return 'Criar texto';
     case 'updateText':

@@ -59,3 +59,9 @@ export function commitRingEdit(env: ToolEnv, ref: RingRef, ring: Vec2[]): boolea
   if (isRoof(e)) return commitRoofPatch(env, [ref.elementId], roofRingPatch(e, ring, null));
   return false;
 }
+
+/** Aresta de anel sob o cursor (parede não conta: null se o alvo é parede ou não há nada). */
+export function edgeAtCursor(env: Pick<ToolEnv, 'project' | 'levelId' | 'metersPerPixel'>, at: Vec2): EdgePick | null {
+  const t = pickLineTarget(env.project(), env.levelId(), at, env.metersPerPixel());
+  return t?.kind === 'edge' ? t.pick : null;
+}

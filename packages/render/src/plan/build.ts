@@ -1,6 +1,6 @@
 import { boxOf, ringArea, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { levelDimensions, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -91,7 +91,7 @@ function thicknessPx(poly: Ring[], zoom: number): number {
  */
 export function planGeometrySelection(p: Project, levelId: Id, selection: readonly Id[]): Id[] {
   if (selection.length === 0) return [];
-  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...p.views.map((v) => v.id)]);
+  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...levelRoomSeparators(p, levelId).map((r) => r.id), ...p.views.map((v) => v.id)]);
   return selection.filter((id) => used.has(id));
 }
 

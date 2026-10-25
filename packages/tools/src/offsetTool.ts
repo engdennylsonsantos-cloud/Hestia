@@ -3,7 +3,7 @@ import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
 import { isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, moveWalls } from './edit.ts';
-import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
 import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo } from './types.ts';
@@ -21,12 +21,6 @@ export class OffsetTool extends ToolBase {
   }
   protected busy(): boolean {
     return false;
-  }
-
-  /** Aresta de anel sob o cursor; null se o alvo é parede ou não há nada. */
-  private edgeAt(at: Vec2): EdgePick | null {
-    const t = pickLineTarget(this.env.project(), this.env.levelId(), at, this.env.metersPerPixel());
-    return t?.kind === 'edge' ? t.pick : null;
   }
 
   /**
@@ -67,7 +61,7 @@ export class OffsetTool extends ToolBase {
   override move(p: PointerInfo): void {
     this.items = [];
     this.raw = p.raw;
-    const edge = this.edgeAt(p.raw);
+    const edge = edgeAtCursor(this.env, p.raw);
     if (edge) {
       const off = this.edgeOffset(edge, p.raw);
       if (!off) return;
@@ -86,7 +80,7 @@ export class OffsetTool extends ToolBase {
   }
 
   override click(p: PointerInfo): void {
-    const edge = this.edgeAt(p.raw);
+    const edge = edgeAtCursor(this.env, p.raw);
     if (edge) {
       if (this.env.options().offsetCopy) {
         this.env.say('Deslocar aresta com cópia: não permitido. A cópia sobreporia a linha ou deixaria o croqui aberto (como no Revit).');

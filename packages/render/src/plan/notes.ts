@@ -10,6 +10,9 @@ export interface NoteLook {
   selection: Id[];
 }
 
+/** Espessura relativa das linhas de separação selecionadas (um pouco maior que a normal, traço mantido). */
+const SEPARATOR_SELECTED_WIDTH = 1.5;
+
 export interface NoteOps {
   strokes: StrokeOp[];
   labels: LabelOp[];
@@ -34,7 +37,7 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     out.labels.push(noteLabel(g.textAt, formatDimensionValue(dimensionValue(p, d)), fontPx, g.textRotation));
   }
   for (const t of levelTexts(p, levelId)) out.labels.push(noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation));
-  out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color));
+  out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color, new Set(look.selection), look.select));
   return out;
 }
 
@@ -42,7 +45,10 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
  * Linhas de separação de ambiente do nível (tracejadas e finas, como o Revit). Usam a cor e a espessura de projeção da
  * categoria 'anotação' e o traço das membranas. Só o nível pedido: a planta de outro nível não as recebe.
  */
-export function roomSeparatorStrokes(p: Project, levelId: Id, pt: PlanPaint, color: string): StrokeOp[] {
+export function roomSeparatorStrokes(p: Project, levelId: Id, pt: PlanPaint, color: string, selected: ReadonlySet<Id> = new Set(), select: string = color): StrokeOp[] {
   if (!pt.visible) return [];
-  return levelRoomSeparators(p, levelId).map((r) => ({ pts: [r.a, r.b], closed: false, widthPx: pt.projPx, color, alpha: 1, dash: [6, 3] as [number, number] }));
+  return levelRoomSeparators(p, levelId).map((r) => {
+    const picked = selected.has(r.id);
+    return { pts: [r.a, r.b], closed: false, widthPx: picked ? pt.projPx * SEPARATOR_SELECTED_WIDTH : pt.projPx, color: picked ? select : color, alpha: 1, dash: [6, 3] as [number, number] };
+  });
 }

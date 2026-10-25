@@ -1,7 +1,7 @@
 import { dist, sagFromThreePoints, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { ceilingOutline } from '@hestia/engine';
-import { isCeiling, isFloor, isRoof, isSlab, isWall, type Id, type Project } from '@hestia/model';
+import { isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
@@ -12,6 +12,7 @@ import { commitRoofPatch } from './roofCheck.ts';
 import { ceilingGripAt } from './ceilingPick.ts';
 import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
+import { moveRoomSeparatorEnd, roomSeparatorGripAt, type RoomSeparatorGrip } from './roomSeparatorPick.ts';
 import { stairGripAt, stairHold } from './stairGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
@@ -143,6 +144,40 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
   };
 }
 
+/** Linha de separação selecionada na planta, pelo id, no nível ativo. */
+const separatorOf = (env: ToolEnv, id: Id) => levelRoomSeparators(env.project(), env.levelId()).find((r) => r.id === id);
+
+/** Alça de extremidade de linha de separação: arrasta só essa ponta; ao soltar, grava uma vez (a recusa do modelo vira aviso). */
+function roomSeparatorHold(env: ToolEnv, g: RoomSeparatorGrip): GripHold {
+  let point: Vec2 = g.at;
+  return {
+    at: g.at,
+    keepsFocus: false,
+    drag(_p, snap) {
+      const r = separatorOf(env, g.id);
+      if (!r) return [];
+      const other = g.end === 'a' ? r.b : r.a;
+      point = snap({ from: other });
+      // Linha atual tracejada; a nova, com a ponta levada ao destino.
+      return [
+        { kind: 'line', a: r.a, b: r.b, dashed: true },
+        { kind: 'line', a: g.end === 'a' ? point : r.a, b: g.end === 'b' ? point : r.b },
+      ];
+    },
+    release() {
+      if (dist(point, g.at) <= 1e-6) return;
+      const r = separatorOf(env, g.id);
+      if (!r) return;
+      const issue = roomSeparatorIssue({ ...r, [g.end]: point });
+      if (issue) {
+        env.say(issue);
+        return;
+      }
+      moveRoomSeparatorEnd(env, g.id, g.end, point);
+    },
+  };
+}
+
 /** Alça de vértice ou de meio de aresta de um contorno (piso, laje ou telhado). */
 function ringHold(env: ToolEnv, owner: RingOwner, id: Id, g: { kind: 'vertex' | 'edge'; index: number; at: Vec2 }): GripHold {
   const vertex = g.kind === 'vertex';
@@ -170,6 +205,12 @@ function ringHold(env: ToolEnv, owner: RingOwner, id: Id, g: { kind: 'vertex' | 
     },
   };
 }
+
+/** Extremidade de linha de separação selecionada (`roomSeparatorPick.ts`). Vem antes da parede: a linha é a seleção. */
+const roomSeparatorGrip: GripProvider = (env, at) => {
+  const g = roomSeparatorGripAt(env.project(), env.levelId(), env.selection(), at, env.metersPerPixel());
+  return g ? roomSeparatorHold(env, g) : null;
+};
 
 const wallGrip: GripProvider = (env, at) => {
   const g = gripAt(env.project(), env.selection(), at, env.metersPerPixel());
@@ -209,7 +250,7 @@ const stairGrip: GripProvider = (env, at) => {
 };
 
 /** Registro de provedores de alça, em ordem de prioridade (o primeiro que acerta vence). */
-export const gripProviders: GripProvider[] = [wallGrip, spiralGrip, stairGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
+export const gripProviders: GripProvider[] = [roomSeparatorGrip, wallGrip, spiralGrip, stairGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
 
 /** Alça sob o cursor entre os elementos selecionados, por ordem de `gripProviders`. */
 export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {
@@ -222,9 +263,15 @@ export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {
 
 /** Alças desenhadas no piso, laje ou telhado selecionado (vértices e meio das arestas), com o foco e a seta de caimento. */
 export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null): PreviewItem[] {
-  const f = sel.length === 1 ? p.elements[sel[0]!] : undefined;
-  if (!(isFloor(f) || isSlab(f) || isRoof(f))) return [];
+  // Extremidades das linhas de separação selecionadas (uma alça em cada ponta).
   const items: PreviewItem[] = [];
+  for (const level of p.levels) {
+    for (const r of level.roomSeparators ?? []) {
+      if (sel.includes(r.id)) items.push({ kind: 'point', at: r.a }, { kind: 'point', at: r.b });
+    }
+  }
+  const f = sel.length === 1 ? p.elements[sel[0]!] : undefined;
+  if (!(isFloor(f) || isSlab(f) || isRoof(f))) return items;
   const n = f.boundary.length;
   for (let i = 0; i < n; i++) {
     const a = f.boundary[i]!;

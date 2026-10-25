@@ -5,8 +5,9 @@ import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
-import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
+import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
+import { moveRoomSeparators, movableSeparatorIds, separatorGhostItems } from './roomSeparatorPick.ts';
 import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
 
@@ -61,6 +62,10 @@ export class MoveTool extends SelectionTool {
       : 'Mover: selecione elementos (Selecionar) ou clique numa aresta de piso, laje, telhado ou forro.';
   }
 
+  protected override hasSelection(): boolean {
+    return super.hasSelection() || movableSeparatorIds(this.env, this.copy).length > 0;
+  }
+
   /** Sem seleção a ferramenta continua ativa, à espera de um clique em aresta. */
   override start(): void {
     this.reset();
@@ -80,16 +85,10 @@ export class MoveTool extends SelectionTool {
     return this.base ? 'Distância' : null;
   }
 
-  /** Aresta de anel sob o cursor (parede não conta aqui: null se o alvo é parede ou não há nada). */
-  private edgeAt(at: Vec2): EdgePick | null {
-    const t = pickLineTarget(this.env.project(), this.env.levelId(), at, this.env.metersPerPixel());
-    return t?.kind === 'edge' ? t.pick : null;
-  }
-
   /** Sem seleção: mostra a aresta sob o cursor ou, depois do clique base, a aresta na posição de destino. */
   private edgeMove(p: PointerInfo): void {
     if (!this.edgePick || !this.base) {
-      const pick = this.edgeAt(p.raw);
+      const pick = edgeAtCursor(this.env, p.raw);
       if (!pick) return;
       this.items.push({ kind: 'highlight', ids: [pick.ref.elementId] }, { kind: 'line', a: pick.a, b: pick.b }, { kind: 'point', at: pick.at });
       return;
@@ -119,7 +118,7 @@ export class MoveTool extends SelectionTool {
   private edgeClick(p: PointerInfo): void {
     const pick = this.edgePick;
     if (!pick || !this.base) {
-      const found = this.edgeAt(p.raw);
+      const found = edgeAtCursor(this.env, p.raw);
       if (!found) {
         this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
         this.env.done();
@@ -155,6 +154,7 @@ export class MoveTool extends SelectionTool {
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     const t = { kind: 'translate' as const, d };
     this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t));
+    if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
     this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
   }
 
@@ -163,6 +163,7 @@ export class MoveTool extends SelectionTool {
     const els = this.movables();
     const views = this.views();
     const t = { kind: 'translate', d } as const;
+    const seps = movableSeparatorIds(this.env, this.copy);
     // Cotas, textos (decisão 0019) e marcas de corte/elevação seguem a seleção e entram no mesmo passo de desfazer.
     const notes = annotationMoveCommands(this.env.project(), this.env.levelId(), this.env.selection(), d, this.copy);
     this.env.transaction(this.copy ? 'Copiar' : 'Mover', () => {
@@ -173,6 +174,7 @@ export class MoveTool extends SelectionTool {
         if (els.length) moveWalls(this.env, els, d);
         else if (this.openings().length) slideOpenings(this.env, this.openings(), d);
         if (views.length) transformViews(this.env, views, t);
+        if (seps.length) moveRoomSeparators(this.env, seps, d);
       }
       for (const c of notes) this.env.exec(c);
     });

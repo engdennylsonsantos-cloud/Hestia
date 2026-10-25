@@ -8,6 +8,9 @@ import type { PointerInfo } from './types.ts';
 const HINT_LINEAR = 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.';
 const HINT_RADIAL = 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.';
 
+/** Dica do primeiro passo de cada tipo (a barra de status usa a mesma ao trocar o tipo). */
+export const arrayHint = (radial: boolean): string => (radial ? HINT_RADIAL : HINT_LINEAR);
+
 /**
  * Matriz: linear (N elementos pelo espaçamento) ou radial (N elementos girados em torno de um centro).
  * "Mover para": Segundo leva o espaçamento/ângulo do 1º ao 2º item; Último, do 1º ao último (dividido entre os itens).
@@ -18,6 +21,8 @@ export class ArrayTool extends SelectionTool {
   readonly hint = HINT_LINEAR;
   /** Linear: ponto base. Radial: centro da matriz. */
   private base: Vec2 | null = null;
+  /** Tipo e "Mover para" em uso quando o passo começou: se a barra mudar, o passo recomeça (D1/D2). */
+  private stepMode = '';
 
   private radial(): boolean {
     return this.env.options().arrayKind === 'radial';
@@ -32,7 +37,18 @@ export class ArrayTool extends SelectionTool {
     return this.env.options().arrayAngle ?? 360;
   }
   private hintNow(): string {
-    return this.radial() ? HINT_RADIAL : this.hint;
+    return arrayHint(this.radial());
+  }
+  private modeNow(): string {
+    return `${this.radial()}|${this.anchor()}`;
+  }
+  /** Trocar o tipo ou "Mover para" no meio do passo descarta a base/centro e a prévia: o próximo clique é um primeiro passo. */
+  private checkStep(): void {
+    if (this.base && this.stepMode !== this.modeNow()) this.reset();
+  }
+  private startStep(p: Vec2): void {
+    this.base = p;
+    this.stepMode = this.modeNow();
   }
 
   protected reset(): void {
@@ -43,6 +59,7 @@ export class ArrayTool extends SelectionTool {
     return this.base !== null;
   }
   override inputPrompt(): string | null {
+    this.checkStep();
     if (!this.base) return null;
     if (this.radial()) return 'Ângulo (graus)';
     return this.anchor() === 'last' ? 'Distância total' : 'Espaçamento';
@@ -72,6 +89,7 @@ export class ArrayTool extends SelectionTool {
   }
 
   override move(p: PointerInfo): void {
+    this.checkStep();
     this.items = [];
     if (this.radial()) return this.moveRadial(p);
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
@@ -130,10 +148,11 @@ export class ArrayTool extends SelectionTool {
   }
 
   override click(p: PointerInfo): void {
+    this.checkStep();
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (this.radial()) {
       if (!this.base) {
-        this.base = inf.point;
+        this.startStep(inf.point);
         this.env.say(`Matriz radial: centro em (${fmtXY(inf.point)}). Clique para criar os itens, ou digite o ângulo.`);
         return;
       }
@@ -141,13 +160,14 @@ export class ArrayTool extends SelectionTool {
       return;
     }
     if (!this.base) {
-      this.base = inf.point;
+      this.startStep(inf.point);
       return;
     }
     this.commit(sub(inf.point, this.base));
   }
 
   override type(text: string): boolean {
+    this.checkStep();
     if (!this.base) return false;
     const v = parseNumber(text);
     if (v === null) return false;

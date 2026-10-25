@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import type { ArrayAnchor, ArrayKind } from '@hestia/tools';
+import { arrayHint, type ArrayAnchor, type ArrayKind } from '@hestia/tools';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
 
@@ -7,6 +7,11 @@ import { NumField } from './fields.tsx';
 export function ArrayOptionsBar(): ReactElement {
   const o = useUi((s) => s.options);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...useUi.getState().options, ...patch } });
+  /** Trocar o tipo ou "Mover para" reinicia o passo em andamento (a ferramenta descarta base/centro); a barra de status volta à dica do primeiro passo. */
+  const setPasso = (patch: Partial<typeof o>): void => {
+    set(patch);
+    useUi.setState({ status: arrayHint(useUi.getState().options.arrayKind === 'radial') });
+  };
   const radial = o.arrayKind === 'radial';
   return (
     <>
@@ -17,7 +22,7 @@ export function ArrayOptionsBar(): ReactElement {
           className="select"
           value={o.arrayKind ?? 'linear'}
           // Radial começa com "Último": 360° divide-se entre os itens (com "Segundo", 360° empilharia todos no mesmo lugar).
-          onChange={(e) => set({ arrayKind: e.target.value as ArrayKind, ...(e.target.value === 'radial' ? { arrayAnchor: 'last' as ArrayAnchor } : {}) })}
+          onChange={(e) => setPasso({ arrayKind: e.target.value as ArrayKind, ...(e.target.value === 'radial' ? { arrayAnchor: 'last' as ArrayAnchor } : {}) })}
         >
           <option value="linear">Linear</option>
           <option value="radial">Radial</option>
@@ -25,7 +30,7 @@ export function ArrayOptionsBar(): ReactElement {
       </label>
       <label>
         Mover para
-        <select id="opt-arrayanchor" className="select" value={o.arrayAnchor ?? 'second'} onChange={(e) => set({ arrayAnchor: e.target.value as ArrayAnchor })}>
+        <select id="opt-arrayanchor" className="select" value={o.arrayAnchor ?? 'second'} onChange={(e) => setPasso({ arrayAnchor: e.target.value as ArrayAnchor })}>
           <option value="second">Segundo</option>
           <option value="last">Último</option>
         </select>

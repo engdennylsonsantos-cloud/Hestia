@@ -158,6 +158,55 @@ describe('matriz radial no motor', () => {
     expect(done()).toBe(1);
   });
 
+  it('D1: base linear marcada; trocar para Radial no meio do passo recomeça (o clique seguinte é o centro, sem cópia)', () => {
+    const { store, env, options } = makeEnv();
+    drawWall(env, [2, 0], [3, 0]);
+    env.setSelection([walls(store)[0]!.id]);
+    options.arrayKind = 'linear';
+    options.arrayCount = 3;
+    options.arrayAnchor = 'second';
+    const a = tool('array', env);
+    a.click(P(2, 0)); // base linear
+    options.arrayKind = 'radial';
+    options.arrayAnchor = 'last';
+    a.click(P(0, 0)); // deve ser o centro, não a confirmação
+    expect(walls(store)).toHaveLength(1);
+    a.click(P(0, 0)); // agora sim: cria os itens em torno do centro
+    expect(walls(store)).toHaveLength(3);
+  });
+
+  it('D2: centro radial marcado; trocar para Linear no meio do passo não cria cópias com o vetor centro→clique', () => {
+    const { store, env, options } = makeEnv();
+    drawWall(env, [2, 0], [3, 0]);
+    env.setSelection([walls(store)[0]!.id]);
+    options.arrayKind = 'radial';
+    options.arrayCount = 3;
+    options.arrayAngle = 360;
+    options.arrayAnchor = 'last';
+    const a = tool('array', env);
+    a.click(P(0, 0)); // centro radial
+    options.arrayKind = 'linear';
+    options.arrayAnchor = 'second';
+    a.click(P(5, 0)); // primeiro clique do linear: ponto base
+    expect(walls(store)).toHaveLength(1);
+    a.click(P(6, 0)); // segundo clique: espaçamento de 1 m
+    expect(walls(store)).toHaveLength(3);
+  });
+
+  it('D1: trocar Mover para (Segundo/Último) no meio do passo também recomeça o passo', () => {
+    const { store, env, options } = makeEnv();
+    drawWall(env, [2, 0], [3, 0]);
+    env.setSelection([walls(store)[0]!.id]);
+    options.arrayKind = 'linear';
+    options.arrayCount = 3;
+    options.arrayAnchor = 'second';
+    const a = tool('array', env);
+    a.click(P(2, 0));
+    options.arrayAnchor = 'last';
+    a.click(P(5, 0));
+    expect(walls(store)).toHaveLength(1);
+  });
+
   it('o centro da matriz radial não entra na cópia quando nada está selecionado', () => {
     const { store, env, options } = makeEnv();
     drawWall(env, [2, 0], [3, 0]);

@@ -1,0 +1,122 @@
+import type { BufferGeometry, Group, Object3D } from 'three';
+import type { GraphicsCategory, Id } from '@hestia/model';
+import type { ElementRange } from './solids.ts';
+
+/**
+ * Teto padrão do cache de malhas por nível, em bytes estimados (vértices, normais, índices e arestas). 128 MB: cabe no
+ * navegador junto com o resto da página; um projeto de 20 pavimentos ocupa uma fração disso (ver o relatório da frente).
+ */
+export const TETO_MALHAS_BYTES = 128 * 2 ** 20;
+
+/** Peça só de picking do wireframe: a geometria, o objeto dono (para a transformação) e o que o picking lê. */
+export interface PickSource {
+  geo: BufferGeometry;
+  owner: Object3D;
+  kind: GraphicsCategory;
+  ranges: ElementRange[];
+}
+
+/**
+ * Malhas de um nível montadas: o grupo com as peças (paredes, pisos, lajes, telhados, escadas, aberturas, arestas), as peças
+ * de picking do wireframe, os materiais que o nível usou e a chave do conteúdo com que foi montado.
+ */
+export interface EntradaNivel {
+  readonly levelId: Id;
+  /** Chave do conteúdo (ver `chaveNivel3d.ts`): igual = malha reaproveitável. */
+  readonly chave: string;
+  readonly grupo: Group;
+  readonly picks: PickSource[];
+  /** Chaves de material que o nível usou (marcadas de novo quando o nível é reaproveitado). */
+  readonly mats: string[];
+  /** Bytes estimados das geometrias do nível (o que o cache conta contra o teto). */
+  readonly bytes: number;
+}
+
+/** Bytes de uma geometria: os arrays dos atributos e o de índices. */
+function bytesDeGeometria(g: BufferGeometry): number {
+  let n = g.index?.array.byteLength ?? 0;
+  for (const a of Object.values(g.attributes)) n += a.array.byteLength;
+  return n;
+}
+
+/** Bytes estimados das geometrias de um nível (grupo e peças de picking, sem contar duas vezes a mesma). */
+export function bytesDeNivel(grupo: Group, picks: PickSource[]): number {
+  const geos = new Set<BufferGeometry>();
+  grupo.traverse((o) => {
+    const g = (o as { geometry?: BufferGeometry }).geometry;
+    if (g) geos.add(g);
+  });
+  for (const s of picks) geos.add(s.geo);
+  let total = 0;
+  for (const g of geos) total += bytesDeGeometria(g);
+  return total;
+}
+
+/** Libera as geometrias de um nível (grupo e picking). Os materiais são do pool de materiais, não do nível. */
+export function disposeNivel(e: EntradaNivel): void {
+  e.grupo.traverse((o) => (o as { geometry?: BufferGeometry }).geometry?.dispose());
+  for (const s of e.picks) s.geo.dispose();
+}
+
+/**
+ * Cache LRU de malhas por nível, com teto em bytes. Guarda entradas só para reuso: uma entrada expulsa pode continuar na
+ * cena (quem a tem na cena a descarta quando ela sai). A ordem do mapa é a de uso: a primeira é a menos recente.
+ */
+export class CacheMalhas {
+  private entradas = new Map<Id, EntradaNivel>();
+
+  constructor(readonly teto: number = TETO_MALHAS_BYTES) {}
+
+  /** Bytes estimados guardados agora. */
+  get total(): number {
+    let t = 0;
+    for (const e of this.entradas.values()) t += e.bytes;
+    return t;
+  }
+
+  get tamanho(): number {
+    return this.entradas.size;
+  }
+
+  /** Entrada do nível, se a chave for a mesma; torna-a a mais recente. Senão, undefined. */
+  buscar(levelId: Id, chave: string): EntradaNivel | undefined {
+    const e = this.entradas.get(levelId);
+    if (!e || e.chave !== chave) return undefined;
+    this.entradas.delete(levelId);
+    this.entradas.set(levelId, e);
+    return e;
+  }
+
+  /** Guarda a entrada como a mais recente. Devolve a que ela substitui (mesmo nível, outra chave), se houver. */
+  guardar(e: EntradaNivel): EntradaNivel | undefined {
+    const velha = this.entradas.get(e.levelId);
+    this.entradas.delete(e.levelId);
+    this.entradas.set(e.levelId, e);
+    return velha;
+  }
+
+  /** Se a entrada ainda é a guardada para o nível. */
+  contem(e: EntradaNivel): boolean {
+    return this.entradas.get(e.levelId) === e;
+  }
+
+  /** Expulsa as menos recentes até o total caber no teto. Devolve as expulsas (quem as tem na cena decide). */
+  enforcar(): EntradaNivel[] {
+    const expulsas: EntradaNivel[] = [];
+    let total = this.total;
+    for (const [id, e] of this.entradas) {
+      if (total <= this.teto) break;
+      this.entradas.delete(id);
+      expulsas.push(e);
+      total -= e.bytes;
+    }
+    return expulsas;
+  }
+
+  /** Tira todas as entradas e devolve-as (para liberar). */
+  limpar(): EntradaNivel[] {
+    const todas = [...this.entradas.values()];
+    this.entradas.clear();
+    return todas;
+  }
+}

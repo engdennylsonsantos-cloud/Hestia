@@ -22,10 +22,14 @@ interface NumProps {
   placeholder?: string;
   /** Campo vazio confirmado: o valor volta a "nenhum" (null). Sem ele, campo vazio não grava nada. */
   onClear?: () => void;
+  /** Texto que não é número, ou valor fora de min/max com `strictRange`: avisa, em vez de corrigir em silêncio. */
+  onInvalid?: (texto: string) => void;
+  /** Com `strictRange`, valor fora de min/max é recusado (volta o último valor válido) em vez de ser limitado. */
+  strictRange?: boolean;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, strictRange }: NumProps): ReactElement {
   const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -40,6 +44,12 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
     }
     const n = parseNumber(text);
     if (n === null) {
+      onInvalid?.(text);
+      setText(show(value));
+      return;
+    }
+    if (strictRange && ((min !== undefined && n / scale < min) || (max !== undefined && n / scale > max))) {
+      onInvalid?.(text);
       setText(show(value));
       return;
     }

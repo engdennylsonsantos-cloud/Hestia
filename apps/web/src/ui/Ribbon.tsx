@@ -271,7 +271,7 @@ export function Ribbon(): ReactElement {
 
             <div className="rgroup">
               <div className="rgroup-tools">
-                <button className="tbtn" onClick={() => editor.selectAllOfSelectedType()} title={lang === 'pt' ? 'Selecionar todas as instâncias do tipo' : 'Select all instances of type'}>
+                <button className="tbtn" disabled={selection.length === 0} onClick={() => editor.selectAllOfSelectedType()} title={selection.length === 0 ? (lang === 'pt' ? 'Selecione um elemento para usar o mesmo tipo' : 'Select an element first') : lang === 'pt' ? 'Selecionar todas as instâncias do tipo' : 'Select all instances of type'}>
                   <Icon name="sametype" size={22} />
                   <span>{lang === 'pt' ? 'Mesmo tipo' : 'Same Type'}</span>
                 </button>

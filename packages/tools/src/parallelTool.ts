@@ -19,7 +19,7 @@ const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
 export class ParallelTool extends ToolBase {
   readonly id = 'parallel';
   readonly label = 'Parede paralela';
-  readonly hint = 'Parede paralela: clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado.';
+  readonly hint = 'Parede paralela: clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado. A distância é medida face a face (padrão) ou entre eixos, conforme a barra de opções.';
   private base: Id | null = null;
   private frame: WallFrame | null = null;
   private side: 1 | -1 = 1;
@@ -46,6 +46,17 @@ export class ParallelTool extends ToolBase {
 
   private byFace(): boolean {
     return (this.env.options().offsetFrom ?? 'face') === 'face';
+  }
+
+  /** Nome do modo de medida mostrado nas mensagens: o usuário vê antes do clique qual convenção vale. */
+  private modo(): string {
+    return this.byFace() ? 'face a face' : 'entre eixos';
+  }
+
+  /** Ao ativar a ferramenta, a barra de status já diz o modo (padrão: face a face). */
+  override start(): void {
+    this.reset();
+    this.env.say(`Parede paralela (${this.modo()}): clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado.`);
   }
 
   /** Parede sob o cursor (dentro da faixa da parede, ou a até um pixel da faixa). Mais próxima do eixo vence. */
@@ -125,7 +136,7 @@ export class ParallelTool extends ToolBase {
       this.items.push(...ghostBands(pr, [this.base!], { kind: 'translate', d: plan.d }));
     }
     this.items.push({ kind: 'label', at, text: fmtM(d) });
-    this.env.say('Clique para criar a parede paralela nesta distância, ou digite a distância e Enter.');
+    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}), ou digite a distância e Enter.`);
   }
 
   override click(p: PointerInfo): void {
@@ -135,7 +146,7 @@ export class ParallelTool extends ToolBase {
       this.base = hit.id;
       this.frame = hit.f;
       this.side = this.sideAt(toLocal(hit.f, p.raw).s);
-      this.env.say('Lado escolhido. Clique a distância desejada, ou digite-a e Enter.');
+      this.env.say(`Base escolhida. Medida ${this.modo()}: clique a distância desejada, ou digite-a e Enter.`);
       this.move(p);
       return;
     }

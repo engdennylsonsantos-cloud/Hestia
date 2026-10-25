@@ -1,6 +1,7 @@
 import { cross, dist, lerp, norm, sub, type Vec2 } from '@hestia/geom';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import { DEFAULT_STAIR_NORMS, type StairNorms } from './stairNorms.ts';
+import { stairQuantities } from './stairQuantities.ts';
 
 /** Aviso ou erro de uma escada. `componentIndex` (posição em `components`) quando o caso é de um lance ou patamar. */
 export interface StairIssueItem {
@@ -212,6 +213,7 @@ function winderTreadCheck(rs: ResolvedStair, ci: number, risers: ResolvedStairRi
 
 /** Lance a lance: largura, piso médio, Blondel, desnível sem patamar, degraus iguais e piso do leque. */
 function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {  const h = rs.riserHeight;
+  const quant = stairQuantities(rs);
   for (const [ci, risers] of risersByRun(rs.risers)) {
     const width = Math.min(...risers.map((r) => polyLength(r.points)));
     if (width < rs.type.minRunWidth - EPS) {
@@ -227,11 +229,11 @@ function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]):
     }
     evenTreadCheck(rs, ci, risers, out);
     winderTreadCheck(rs, ci, risers, norms, out);
-    if (risers.length >= 2) {
-      const mids = risers.map((r) => arcMid(r.points));
-      let sum = 0;
-      for (let i = 1; i < mids.length; i++) sum += dist(mids[i - 1]!, mids[i]!);
-      const tread = sum / (mids.length - 1);
+    const run = quant.runs.find((q) => q.componentIndex === ci);
+    if (risers.length >= 2 && run && run.treadCount > 0) {
+      // Piso médio do quantitativo (área dos degraus ÷ largura × nº de degraus): o aviso e a tabela usam a mesma conta.
+      // A soma das cordas entre pontos médios subestimava o caracol (0,393 contra 0,395).
+      const tread = run.treadMean;
       if (tread < norms.treadMin - EPS || tread > norms.treadMax + EPS) {
         out.push(
           makeStairIssue(

@@ -4,6 +4,7 @@ import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
 import { vizinhaCurta } from './alignNeighbors.ts';
+import { algumMudou, NADA_A_APARAR } from './trimChange.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
 import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
@@ -192,6 +193,11 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    if (!algumMudou(pr, patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
+      return;
+    }
     const frase = confirmaCanto(pr, patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of patches) this.applyPatch(id, patch);
@@ -302,6 +308,11 @@ export class TrimTool extends ToolBase {
       const cruzam = axisIntersections(axisOf(fa), axisOf(fb)).length > 0;
       this.env.say(cruzam ? 'O arco não pode ser estendido até o canto (mais de 180°).' : 'As paredes não se cruzam: não há canto.');
       this.reset();
+      return;
+    }
+    if (!algumMudou(pr, plan.patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
       return;
     }
     const frase = confirmaCanto(pr, plan.patches);

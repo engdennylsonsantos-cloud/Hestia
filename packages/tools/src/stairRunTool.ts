@@ -147,7 +147,8 @@ export class StairRunTool extends ToolBase {
       this.env.say('Afaste o cursor do ponto inicial para dar a direção.');
       return;
     }
-    this.create(dir);
+    // Reta: o 2º clique define também o comprimento do lance (o nº de espelhos sai dele).
+    this.create(dir, len(dir));
   }
 
   /** Enter: no caracol, confirma a varredura atual (com o cursor onde está); nas outras formas, o padrão. */
@@ -200,7 +201,7 @@ export class StairRunTool extends ToolBase {
     if (this.origin === null) return [{ kind: 'point', at: cursor }];
     const dir = sub(cursor, this.origin);
     if (len(dir) < MIN_DIRECTION) return [{ kind: 'point', at: this.origin }];
-    const b = this.build(dir);
+    const b = this.build(dir, len(dir));
     if ('error' in b) {
       this.env.say(b.error);
       return [{ kind: 'point', at: this.origin }];
@@ -244,16 +245,20 @@ export class StairRunTool extends ToolBase {
     return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };
   }
 
-  /** Plano da escada reta/L/U/leque para a direção dada; erro com a mensagem de status em pt-BR. */
-  private build(dir: Vec2): StairRunPlan | { error: string } {
+  /**
+   * Plano da escada reta/L/U/leque para a direção dada; erro com a mensagem de status em pt-BR. `length` (reta, pelo 2º
+   * clique) fixa o comprimento do lance; sem ele (ângulo digitado), vale o nº de espelhos pela altura.
+   */
+  private build(dir: Vec2, length?: number): StairRunPlan | { error: string } {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options: this.opts });
+    const options = length !== undefined ? { ...this.opts, length } : this.opts;
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options });
   }
 
-  /** Cria a escada com a direção dada, em um passo de desfazer. Mantém a ferramenta pronta para a próxima. */
-  private create(dir: Vec2): boolean {
-    const b = this.build(dir);
+  /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */
+  private create(dir: Vec2, length?: number): boolean {
+    const b = this.build(dir, length);
     if ('error' in b) {
       this.env.say(b.error);
       return false;

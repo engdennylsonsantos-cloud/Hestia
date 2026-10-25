@@ -259,8 +259,9 @@ describe('ferramenta Escada: forma caracol (3 cliques)', () => {
     const t = tool('stairrun', ctx.env);
     t.move(at(0, 0));
     t.click(at(0, 0));
-    t.move(at(1, 90));
-    t.click(at(1, 90));
+    // 4,20 m: comprimento que dá 16 espelhos com piso válido (o 2º clique define o comprimento da reta).
+    t.move(at(4.2, 90));
+    t.click(at(4.2, 90));
     expect(stairsOf(ctx)[0]!.typeId).toBe('stt_monolitica');
   });
 

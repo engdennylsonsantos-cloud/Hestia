@@ -32,6 +32,8 @@ export interface StairRunToolOptions {
   /** Tipo de escada; ausente ou inexistente = o padrão do projeto. */
   typeId?: Id;
   shape: StairRunShape;
+  /** Reta: comprimento do lance, do 1º ao último espelho (m), dado pelo 2º clique. Ausente = nº de espelhos pela altura. */
+  length?: number;
   /** Largura de cada lance (m). */
   width: number;
   /** Lado do giro, visto de quem sobe o 1º lance (L, U e leque). */
@@ -59,6 +61,25 @@ export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 
 /** Winder: espelhos do 1º lance reto; espelhos radiais do leque (padrão do gerador); o resto vai ao último lance. */
 export const WINDER_FIRST_RISERS = 2;
 export const WINDER_FAN_RISERS = 3;
+
+/**
+ * Espelhos e piso de um lance reto de comprimento `length` (m, do 1º ao último espelho). Entre os N que a altura permite
+ * (N ≥ ceil(H ÷ espelho máximo)), fica o de piso mais perto do piso ideal do tipo (`treadFor`, 0,63 − 2·h); o piso não
+ * pode ficar abaixo do mínimo. Erro se nem o menor N dá piso mínimo: o lance é curto demais.
+ */
+export function risersForLength(H: number, maxRiser: number, minTread: number, length: number): { risers: number; tread: number } | { error: string } {
+  const N0 = riserCountFor(H, maxRiser);
+  let best: { risers: number; tread: number; score: number } | null = null;
+  for (let N = Math.max(2, N0); N <= N0 + 400; N++) {
+    const tread = length / (N - 1);
+    // Mais espelhos, piso menor: a partir daqui todo N seguinte também fica abaixo do mínimo.
+    if (tread < minTread - 1e-9) break;
+    const score = Math.abs(tread - treadFor(H / N, minTread));
+    if (!best || score < best.score) best = { risers: N, tread, score };
+  }
+  if (!best) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${Math.max(2, N0)} espelhos: o piso ficaria abaixo do mínimo (${(minTread * 100).toFixed(0)} cm).` };
+  return { risers: best.risers, tread: best.tread };
+}
 
 export interface StairRunPlanInput {
   /** Centro do 1º espelho (1º clique). */
@@ -104,8 +125,14 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   }
   if (N < 2) return { error: 'A altura é menor que um espelho: nada a gerar.' };
   if (N < MIN_RISERS[shape]) return { error: `Esta forma precisa de ao menos ${MIN_RISERS[shape]} espelhos; a altura dá ${N}.` };
+  // Reta com comprimento (2º clique): o comprimento escolhe N e o piso (a altura do espelho é H ÷ N).
+  if (shape === 'straight' && i.options.length !== undefined) {
+    const sized = risersForLength(i.H, i.maxRiser, i.minTread, i.options.length);
+    if ('error' in sized) return sized;
+    N = sized.risers;
+  }
   const riserHeight = i.H / N;
-  const tread = treadFor(riserHeight, i.minTread);
+  const tread = shape === 'straight' && i.options.length !== undefined ? (i.options.length / (N - 1)) : treadFor(riserHeight, i.minTread);
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];
   try {

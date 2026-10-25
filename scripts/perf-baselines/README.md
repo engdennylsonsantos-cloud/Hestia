@@ -13,7 +13,7 @@ página. Um ganho no Node não garante ganho no navegador, e um número do naveg
 ## Como reproduzir
 
     npm run bench:interacao -- --save     # grava scripts/perf-baselines/node-<data>.json
-    npm run perf:browser -- --save        # exige apps/web/dist (npm run build) ou APP_URL; ver PENDENTE abaixo
+    npm run perf:browser -- --save        # exige apps/web/dist (npm run build) ou APP_URL; ver a seção Navegador abaixo
 
 Variáveis: `BENCH_RUNS` (medidas por cenário, padrão 30); `CHROME_PATH` (Chrome ou Edge, se não estiver nos caminhos
 padrão); `PERF_RUNS` (repetições do navegador, padrão 5); `PERF_HEADED=1` (janela visível); `APP_URL` (servidor de dev:
@@ -64,30 +64,39 @@ O JSON tem a tabela completa, nível por nível, com `frio`, `quente`, mínimo e
 
 Observações que o baseline não explica (não as corrigi, só registro):
 
-- A planta "quente" é mais lenta que a "fria" em vários níveis de 20 pavimentos (soma de 1065 contra 755 ms). Não sei a
-  causa; pode ser ruído de máquina compartilhada ou um custo por quadro que a medida fria não paga. Investigar antes de
-  usar esse número como alvo.
+- (Resolvido em investigação posterior, ver "Planta quente e fria" abaixo.)
 - `ModelScene.update` quase não melhora com o cache de parede aquecido (frio e quente têm a mesma ordem de grandeza).
   Ou o cache não cobre a montagem inteira, ou o custo está fora dele.
 - O p95 de `pickModelPoint` na grade (cerca de 3,3 a 3,9 ms) é parecido nos dois projetos e muito acima da mediana (cerca de
   0,2 ms). Hipótese, não verificada: o `updateMatrixWorld` do modelo inteiro que o pick faz a cada clique.
 
-## Navegador: PENDENTE
+## Planta quente e fria (investigação)
 
-Não há número de navegador. Motivo:
+A anomalia de planta quente mais lenta que a fria (node-2026-10-24, commit f7e1cef) não se repete no código atual
+(dc0c10b). Medido no mesmo ambiente, 20 pavimentos: frio ~45 ms, quente ~12 ms por nível (`bench-interacao`); experimento
+por nível com frio antes do quente: quente ~12 ms, frio ~100 ms (máquina com outros agentes). Não há bug de cache no
+caminho quente: a vista do projeto (`planViewOf`) e o cache de hachuras são por objeto, e o quente reaproveita o mesmo
+projeto. O número de f7e1cef veio de código anterior (`2d16475`, `3fe3ef5`, planta com contexto da vista e cache de
+contornos) e de máquina carregada; a causa exata daquela medida não foi reproduzida. Nenhuma mudança no método do bench.
 
-- Chrome 155 existe em `C:\Program Files\Google\Chrome\Application\chrome.exe` e o Edge em `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`: o navegador não é o problema.
-- `apps/web/dist` não existe: `npx vite build` falha neste worktree com
-  `[vite:esbuild-transpile] remove ...esbuild-<hash>: Acesso negado`, ao apagar um arquivo temporário do esbuild. Repeti
-  com TEMP padrão, com TEMP em outra pasta e após parar o servidor de dev, sem sucesso. É um problema do ambiente
-  (permissão de exclusão no Windows), não do código. Com build de produção, `npm run perf:browser -- --save` gera o
-  JSON; sem ele o script sai com código 2 e a mensagem PENDENTE.
-- Validação do roteiro: rodei o script contra o servidor de dev (`APP_URL`). Abriu o projeto de 10 pavimentos, mediu
-  abertura, pan, zoom e pick (sem `--save`, nada gravado). Esses números são de modo dev (React sem otimização) e não entram como baseline.
+## Navegador (f67e2f0, produção)
 
-Nova tentativa (2026-10-24, branch `worktree-agent-a2f7bc46ff7082796`, em f67e2f0): `npm run build` falhou de novo com o
-mesmo `Acesso negado` do esbuild, em três tentativas (inclusive com TEMP em outra pasta). Não há `apps/web/dist` neste
-worktree, então o baseline de navegador de 10 e 20 pavimentos continua PENDENTE.
+Arquivo: `browser-20-pav-2026-10-25-antes.json` (rótulo `antes`, `PERF_RUNS=5`). Gerado no worktree detached de f67e2f0
+com `npm run build` e `tests/e2e/perf-browser.mjs` (cópia do script de dc0c10b; o roteiro não mudou). Chrome 155, headless,
+Xeon E5-2620 v3, Windows 10, 15,8 GB RAM. Medianas e p95 em ms:
 
-Para fechar o baseline de navegador: resolver o build no Windows (antivírus ou permissão na pasta temporária do
-esbuild), rodar `npm run build`, e depois `npm run perf:browser -- --save`.
+| Medida | 10 pavimentos | 20 pavimentos |
+|---|---|---|
+| Abrir projeto (até o 2º quadro) | 1358,8 / 1424,5 | 1680,6 / 1846,9 |
+| Carregar página até app pronto | 1894 / 1981 | 1060 / 1197 |
+| Primeira pintura (FCP) | 1012 / 1032 | 644 / 736 |
+| Planta do nível do meio | 72,0 / 241,4 | 74,7 / 235,6 |
+| Seleção por clique na planta | 44,2 / 71,8 | 32,9 / 70,7 |
+| Edição de parede (setWallEnds) | 181,1 / 400,7 | 235,7 / 426,4 |
+| Pan (300 quadros) | 30,8 / 37,9 | 22,0 / 32,3 |
+| Zoom (150 quadros) | 35,8 / 43,6 | 23,0 / 37,5 |
+| Pick 3D (20 cliques) | 27,5 / 32,7 | 50,8 / 57,0 |
+
+Sem pendências. Os caminhos do roteiro existiam no f67e2f0 (aba "Modelo 3D" no navegador de projeto, ganchos `__hestia` e
+`__hestia3dModel`), então o script rodou sem ajuste. Números de 5 repetições: a planta do nível do meio e a edição têm
+variação alta (p95 cerca de 3 vezes a mediana).

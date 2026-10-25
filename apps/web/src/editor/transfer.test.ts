@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, defaultStairTypeId, makeLevel, makeStair, makeWall, stairsOnLevel, wallsOnLevel, type StairLanding, type StairRun, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, defaultStairTypeId, makeLevel, makeRoom, makeStair, makeWall, stairsOnLevel, wallsOnLevel, type StairLanding, type StairRun, type Wall } from '@hestia/model';
 import { Transfer } from './transfer.ts';
 import { useUi } from './state.ts';
 
@@ -45,6 +45,19 @@ describe('transferência do editor (copiar, colar alinhado, mesmo tipo)', () => 
     useUi.setState({ selection: ['A'], levelId: 'lv_0' });
     expect(new Transfer().sameType(s.project, 'lv_0')).toBe(1);
     expect(useUi.getState().selection).toEqual(['A']);
+  });
+
+  it('mesmo nome seleciona os ambientes de mesmo nome (e só eles); sem ambiente na seleção, não seleciona e explica', () => {
+    const s = setup();
+    s.exec({ type: 'addRoom', room: makeRoom({ id: 'r1', levelId: 'lv_0', name: 'Sala', number: '1', point: { x: 1, y: 1 } }) });
+    s.exec({ type: 'addRoom', room: makeRoom({ id: 'r2', levelId: 'lv_0', name: 'Sala', number: '2', point: { x: 3, y: 1 } }) });
+    s.exec({ type: 'addRoom', room: makeRoom({ id: 'r3', levelId: 'lv_0', name: 'Cozinha', number: '3', point: { x: 5, y: 1 } }) });
+    useUi.setState({ selection: ['A'], levelId: 'lv_0' });
+    expect(new Transfer().sameName(s.project, 'lv_0')).toBe(0);
+    expect(useUi.getState().status).toMatch(/Selecione um ambiente primeiro/);
+    useUi.setState({ selection: ['r1'], levelId: 'lv_0' });
+    expect(new Transfer().sameName(s.project, 'lv_0')).toBe(2);
+    expect([...useUi.getState().selection].sort()).toEqual(['r1', 'r2']);
   });
 
   it('mesmo tipo com seleção vazia informa e não seleciona', () => {

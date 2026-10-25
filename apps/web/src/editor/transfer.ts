@@ -73,7 +73,7 @@ export class Transfer {
   /** "Mesmo nome" (ambientes): seleciona todos os ambientes do nível com o nome dos ambientes selecionados. Devolve quantos. */
   sameName(p: Project, levelId: Id): number {
     const ids = sameNameRoomIds(p, levelId, useUi.getState().selection);
-    useUi.setState({ selection: ids, status: ids.length ? `${ids.length} ambiente(s) com o mesmo nome selecionado(s).` : 'Selecione um ambiente primeiro.' });
+    useUi.setState({ selection: ids, status: ids.length ? `${ids.length} ambiente(s) com o mesmo nome selecionado(s).` : 'Selecione um ambiente primeiro: Mesmo nome seleciona os ambientes do nível com o mesmo nome (só ambientes).' });
     return ids.length;
   }
 

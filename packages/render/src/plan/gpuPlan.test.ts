@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type * as THREE from 'three';
+import { resolveLevel } from '@hestia/engine';
+import { buildTemplate } from '@hestia/model';
 import { PlanScene } from './gpuPlan.ts';
-import type { PlanDrawList } from './types.ts';
+import { PlanFrame, planFrameUpdateOf, type PlanViewState } from './planFrame.ts';
+import { LIGHT, type PlanDrawList } from './types.ts';
 
 const VIEW = { cx: 0, cy: 0, zoom: 10, width: 400, height: 300 };
 const quad = (x0: number, y0: number, x1: number, y1: number) => [[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]];
@@ -10,6 +13,38 @@ const quad = (x0: number, y0: number, x1: number, y1: number) => [[{ x: x0, y: y
 function meshesOf(scene: PlanScene): THREE.Mesh[] {
   return (scene.scene.children as THREE.Group[]).flatMap((g) => g.children as THREE.Mesh[]);
 }
+
+describe('PlanScene: poucas malhas por quadro (draw calls)', () => {
+  it('um pavimento do prédio de 10 (zoom 60): a grade é 5 malhas e o quadro inteiro fica abaixo de 80', () => {
+    const p = buildTemplate('predio10');
+    const scene = new PlanScene();
+    const frame = new PlanFrame(scene);
+    const estado: PlanViewState = {
+      project: p,
+      version: 1,
+      levelId: 'lv_5',
+      v: { cx: 10, cy: 6.5, zoom: 60, width: 1200, height: 800 },
+      theme: LIGHT,
+      dark: false,
+      gpu: true,
+      showGrid: true,
+      showUnderlay: true,
+      showRoofProjection: true,
+      thinLines: false,
+      selection: [],
+      hover: null,
+      preview: [],
+      inference: null,
+      resolve: (id) => resolveLevel(p, id, new Map()),
+    };
+    frame.update(planFrameUpdateOf(estado));
+    const camadas = scene.scene.children as THREE.Group[];
+    expect(camadas[2]!.children.length).toBeLessThanOrEqual(5);
+    const total = camadas.reduce((n, g) => n + g.children.length, 0);
+    expect(total).toBeLessThan(80);
+    scene.dispose();
+  }, 60_000);
+});
 
 describe('PlanScene: ordem de desenho segue a lista (como o CPU)', () => {
   it('a parede (preenchimento sólido posterior) fica depois da hachura da laje, e todo material é transparente', () => {

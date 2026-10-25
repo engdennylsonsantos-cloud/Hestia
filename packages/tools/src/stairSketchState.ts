@@ -213,6 +213,12 @@ function widthWarning(r: RunDraft, limits: StairLimits): StairSketchIssue[] {
   return [issue('stair-width-min', 'warning', `A largura do lance (${fmtM(width)} m) é menor que a mínima do tipo (${fmtM(limits.minRunWidth)} m).`)];
 }
 
+/** Espelhos que faltam para o nº desejado, com a conta: "Faltam 3 espelhos para concluir (de 17)"; null se não faltam. */
+export function missingText(rep: Pick<DraftReport, 'created' | 'remaining' | 'desired'>): string | null {
+  if (rep.created === 0 || rep.remaining <= 0) return null;
+  return `Faltam ${rep.remaining} espelho${rep.remaining > 1 ? 's' : ''} para concluir (de ${rep.desired}).`;
+}
+
 /** Texto do contador: "N restantes" ou "N a mais". */
 export function counterText(rep: Pick<DraftReport, 'created' | 'remaining'>): string {
   const rest = rep.remaining >= 0 ? `${rep.remaining} restantes` : `${-rep.remaining} a mais`;

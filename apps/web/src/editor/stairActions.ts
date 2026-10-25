@@ -1,4 +1,4 @@
-import type { StairStatus } from '@hestia/tools';
+import { missingText, type StairStatus } from '@hestia/tools';
 import type { Id, Project, ProjectStore, Stair, StairRun } from '@hestia/model';
 
 interface Pt {
@@ -40,8 +40,11 @@ export function patchStairs(store: ProjectStore, ids: Id[], patch: Partial<Stair
 }
 
 /** Nota da barra do croqui: o 1º erro (cor de erro); sem erro, o 1º aviso; sem nada, null. */
-export function stairNote(st: Pick<StairStatus, 'firstError' | 'issues'>): { tone: 'error' | 'warning'; text: string } | null {
+export function stairNote(st: Pick<StairStatus, 'firstError' | 'issues'> & Partial<Pick<StairStatus, 'created' | 'remaining' | 'desired'>>): { tone: 'error' | 'warning'; text: string } | null {
   if (st.firstError) return { tone: 'error', text: st.firstError };
+  // Espelhos faltando: a conta vai à barra antes do aviso de norma (Concluir não grava enquanto faltarem).
+  const missing = st.created !== undefined && st.remaining !== undefined && st.desired !== undefined ? missingText(st) : null;
+  if (missing) return { tone: 'warning', text: missing };
   const w = st.issues.find((i) => i.severity === 'warning');
   return w ? { tone: 'warning', text: w.message } : null;
 }

@@ -1,5 +1,5 @@
-import { dist, type Vec2 } from '@hestia/geom';
-import { stairLandingPolygon } from '@hestia/engine';
+import { closestOnSegment, dist, type Vec2 } from '@hestia/geom';
+import { sampleChain, stairLandingPolygon } from '@hestia/engine';
 import type { StairCurve } from '@hestia/model';
 import { copyCurve, lastRun, partsFromComponents, componentsFromParts, type RunDraft, type StairPart, type StairSubmode } from './stairSketchState.ts';
 import { CONNECT_TOL, chainEnd, emptyStroke, strokeClick, strokeUndo, type Stroke, type StrokeEvent } from './stairStroke.ts';
@@ -114,6 +114,31 @@ function step(st: DrawState, q: Vec2, chained: boolean): StrokeEvent {
   return r.event;
 }
 
+/**
+ * Raio (m) do "imã" do limite no espelho: um clique a até este valor de um limite cai sobre ele. O clique à mão
+ * erra por décimos de metro; sem o imã, o espelho não liga os dois limites e o croqui não fecha.
+ */
+export const RISER_SNAP_M = 0.4;
+
+/** Ponto do limite mais próximo de `q` (até `RISER_SNAP_M`), ou `q` se nenhum limite está ao alcance. */
+export function snapToBoundary(run: RunDraft | null, q: Vec2): Vec2 {
+  if (!run) return q;
+  let best: Vec2 | null = null;
+  let bestD = RISER_SNAP_M;
+  for (const cs of [run.boundaryLeft, run.boundaryRight]) {
+    const pts = sampleChain(cs);
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const c = closestOnSegment(q, pts[i]!, pts[i + 1]!);
+      const d = dist(q, c);
+      if (d <= bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+  }
+  return best ?? q;
+}
+
 /** Espelho: dois cliques (ou três, com arco) por espelho; cada um sai direto, sem cadeia. */
 function riserPoint(st: DrawState, q: Vec2): string | undefined {
   const run = lastRun(st.parts);
@@ -121,7 +146,7 @@ function riserPoint(st: DrawState, q: Vec2): string | undefined {
     st.stroke = emptyStroke(st.stroke.prim);
     return 'Desenhe os limites antes dos espelhos.';
   }
-  const ev = step(st, q, false);
+  const ev = step(st, snapToBoundary(run, q), false);
   if (ev.kind === 'reject') return ev.message;
   if (ev.kind === 'segment') run.risers.push(copyCurve(ev.curve));
   return undefined;

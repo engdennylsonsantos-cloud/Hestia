@@ -21,7 +21,7 @@ import {
 } from './stairSketchState.ts';
 import { chainEnd, emptyStroke, strokeBusy, typedPoint } from './stairStroke.ts';
 import { createStairFromComponents, draftStair, stairLimits, stairTypeId, updateStairComponents, type StairCreateOptions } from './stairCommands.ts';
-import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto, undoStroke, type DrawState, type PickOp } from './stairDraw.ts';
+import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto, snapToBoundary, undoStroke, type DrawState, type PickOp } from './stairDraw.ts';
 import { chainAt, leftSide, nearestPickLine, offsetChain, PICK_PX, pickLinesOf } from './stairPickLines.ts';
 import { discardSpiralOnEdit } from './stairSpiralRun.ts';
 import { activeTone, buildItems, hintText, warningText } from './stairView.ts';
@@ -196,7 +196,8 @@ export class StairTool extends ToolBase {
       this.pickItems = this.pickPreview();
     } else {
       const inf = this.snap(p, this.snapExtra());
-      this.cursor = inf.point;
+      // Espelho: a prévia já mostra o ponto no limite (o mesmo que o clique vai gravar).
+      this.cursor = this.st.submode === 'espelhos' ? snapToBoundary(lastRun(this.st.parts), inf.point) : inf.point;
       this.pickItems = [];
     }
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);

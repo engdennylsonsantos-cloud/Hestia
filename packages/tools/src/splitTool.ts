@@ -68,7 +68,7 @@ export class SplitTool extends ToolBase {
   }
 
   override inputPrompt(): string | null {
-    return this.hoverId && !this.withGap ? 'Distância do início da parede' : null;
+    return this.hoverId && !this.withGap ? 'Distância do início do trecho' : null;
   }
 
   /** Parede sob o cursor; uma abertura conta como a parede que a hospeda. */

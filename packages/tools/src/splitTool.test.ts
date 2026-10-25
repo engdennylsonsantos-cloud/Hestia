@@ -67,7 +67,7 @@ describe('ferramenta Dividir', () => {
     const { store, env } = oneWall();
     const t = tool('split', env);
     t.move(P(1, 0.02));
-    expect(t.inputPrompt()).toBe('Distância do início da parede');
+    expect(t.inputPrompt()).toBe('Distância do início do trecho');
     expect(t.type('3,5')).toBe(true);
     const [first, second] = walls(store) as [Wall, Wall];
     expect(first.b.x).toBeCloseTo(3.5);

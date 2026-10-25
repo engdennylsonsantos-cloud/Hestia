@@ -101,7 +101,7 @@ describe('Dividir: texto exato da posição', () => {
     const { store, env, msgs } = cena();
     const sp = tool('split', env);
     sp.move(P(2, 0));
-    expect(sp.inputPrompt()).toBe('Distância do início da parede');
+    expect(sp.inputPrompt()).toBe('Distância do início do trecho');
     expect(sp.type('1,5')).toBe(true);
     expect(msgs.at(-1)).toBe('Parede dividida a 1,50 m do início do trecho.');
     expect(walls(store).length).toBe(2);

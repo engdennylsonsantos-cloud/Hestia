@@ -1,10 +1,12 @@
 import * as THREE from 'three';
-import { applyPartialStructure, frameOfWall, openingGeometry, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
+import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { OrbitCamera } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
-import { openingPieces } from './openingParts.ts';
+import { montarAbertura } from './aberturas3d.ts';
+import { arestasDosLotes, geometriaDoLote, juntarLotes } from './lotesMalha3d.ts';
+import { SombraSobDemanda } from './sombras3d.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { disposeHighlight, highlightOf, type HighlightStyle } from './highlight3d.ts';
@@ -84,6 +86,8 @@ export class ModelScene {
   private ground: THREE.Mesh;
   private grid: THREE.GridHelper;
   private boxCache = new THREE.Box3();
+  /** Sombra sob demanda: o mapa é refeito só quando `update` muda o modelo ou o sol (ver `sombras3d.ts`). */
+  readonly sombra = new SombraSobDemanda();
 
   /** `tetoMalhasBytes`: teto do cache de malhas por nível (padrão `TETO_MALHAS_BYTES`). */
   constructor(opcoes: { tetoMalhasBytes?: number } = {}) {
@@ -203,6 +207,7 @@ export class ModelScene {
     };
     this.mats.marco = { view, dark: opt.dark };
     this.mats.used = new Set();
+    this.sombra.marcar();
     // O realce guarda cópias dos triângulos: com o modelo refeito, refaz-se (a seleção e o cursor são lidos de novo).
     this.dropHighlight('sel');
     this.dropHighlight('hov');
@@ -294,21 +299,25 @@ export class ModelScene {
       ...eave.batches,
       ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
     ];
-    for (const b of batches) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(b.positions, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(b.normals, 3));
-      g.setIndex(b.indices);
-      this.draw(grupo, g, p.materials[b.materialId] ?? eave.materials[b.materialId], b.category, this.frame.edges, b.ids);
-    }
+    const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];
+    // Lotes do nível juntados por categoria e material: uma malha por grupo (ver `lotesMalha3d.ts`).
+    this.desenharLotes(grupo, batches, this.frame.edges, materialOf);
+    // Esquadrias: cada uma tem o seu grupo (no vão); as peças fixas são juntadas por material dentro dele, e a folha aberta
+    // fica no pivô da dobradiça.
     for (const w of wallsOnLevel(p, lv.levelId)) {
       const f = frameOfWall(p, w.id);
       if (!f) continue;
       for (const o of openingsOfWall(p, w.id)) {
         // Base e altura resolvidas (paredes anexadas a pisos mudam de cota); sem resolução, as do modelo.
         const rw = lv.walls[w.id];
-        const grp = this.openingObject(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w));
-        if (grp) grupo.add(grp);
+        const linhas = isLineStyle(view.style);
+        const m = montarAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view, linhas, (parent, geo, mat, cat, edges, ranges) => this.draw(parent, geo, mat, cat, edges, ranges));
+        if (!m) continue;
+        this.desenharLotes(m.grupo, m.lotes, linhas, materialOf);
+        m.grupo.traverse((c) => {
+          c.userData.elementId = o.id;
+        });
+        grupo.add(m.grupo);
       }
     }
     this.picks = picksAnt;
@@ -316,46 +325,15 @@ export class ModelScene {
     return { levelId: lv0.levelId, chave, grupo, picks, mats: [...mats], bytes: bytesDeNivel(grupo, picks) };
   }
 
-  private openingObject(p: Project, o: ReturnType<typeof openingsOfWall>[number], f: NonNullable<ReturnType<typeof frameOfWall>>, baseZ: number, H: number): THREE.Group | null {
-    const cat: GraphicsCategory = o.kind;
-    if (!this.frame.view.overrides[cat].visible) return null;
-    const g = openingGeometry(p, o, f);
-    // Vão livre de porta: só o recorte da parede; sem folha nem caixilho.
-    if (g.kind === 'door' && g.leaves === 0) return null;
-    const grp = new THREE.Group();
-    // Aberturas só têm arestas nos estilos de linhas (nos estilos com cor, como antes, não).
-    const edges = isLineStyle(this.frame.view.style);
-    // Cada peça da esquadria é um elemento inteiro: a faixa cobre a geometria toda (decisão 0016).
-    const range = (count: number): ElementRange[] => [{ id: o.id, start: 0, count }];
-    const pieces = openingPieces(p, o, g, f, H, this.frame.view.openOpenings === true);
-    for (const piece of pieces) {
-      // Folha aberta: a caixa é desenhada num grupo na dobradiça, que gira a peça inteira.
-      if (piece.hinge) {
-        const pivot = new THREE.Group();
-        let dx = 0;
-        if (piece.hinge.axis === 'z') {
-          pivot.position.x = piece.hinge.at;
-          pivot.rotation.z = piece.hinge.angle;
-          dx = piece.hinge.at;
-        } else {
-          pivot.position.z = piece.hinge.at;
-          pivot.rotation.x = piece.hinge.angle;
-        }
-        const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x - dx, piece.y, piece.z - (piece.hinge.axis === 'x' ? piece.hinge.at : 0));
-        this.draw(pivot, box, p.materials[piece.materialId], cat, edges, range(box.index?.count ?? 0));
-        grp.add(pivot);
-      } else {
-        const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x, piece.y, piece.z);
-        this.draw(grp, box, p.materials[piece.materialId], cat, edges, range(box.index?.count ?? 0));
-      }
-    }
-    grp.rotation.z = Math.atan2(g.u.y, g.u.x);
-    grp.position.set(g.center.x, g.center.y, baseZ + g.sill);
-    grp.userData.elementId = o.id;
-    grp.traverse((c) => {
-      c.userData.elementId = o.id;
-    });
-    return grp;
+  /**
+   * Desenha lotes do nível juntados por categoria e material (ver `lotesMalha3d.ts`): uma malha por grupo, com as faixas de
+   * elemento deslocadas (picking e realce continuam por triângulo). As arestas de todos os lotes saem numa linha só, com o
+   * mesmo ângulo de antes, e só quando `edges`.
+   */
+  private desenharLotes(parent: THREE.Object3D, lotes: SolidBatch[], edges: boolean, materialOf: (id: Id) => Material | undefined): void {
+    for (const b of juntarLotes(lotes)) this.draw(parent, geometriaDoLote(b), materialOf(b.materialId), b.category, false, b.ids);
+    const arestas = edges ? arestasDosLotes(lotes, EDGE_ANGLE) : null;
+    if (arestas) parent.add(new THREE.LineSegments(arestas, this.mats.edge()));
   }
 
   bounds(): THREE.Box3 {

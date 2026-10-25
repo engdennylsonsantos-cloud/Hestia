@@ -4,7 +4,7 @@ import { resolveFloors, resolveLevel, type ResolvedLevel } from '@hestia/engine'
 import { DEFAULT_OPENING_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeStair, makeWall, type Opening, type OpeningType, type Project, type StairRun, type View3DSettings } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import { ModelScene, sunDirection } from './scene3d.ts';
-import { buildFloorSolids, buildLevelSolids } from './solids.ts';
+import { buildFloorSolids, buildLevelSolids, type ElementRange } from './solids.ts';
 
 const curve = (ax: number, ay: number, bx: number, by: number, sag = 0) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by }, sag });
 /** Lance reto de 17 espelhos de 0,28 m (cota de 3 m = 0,176 m por espelho, dentro da norma): gera degraus. */
@@ -95,14 +95,52 @@ function linhas(ms: ModelScene): THREE.LineSegments[] {
 
 const luz = (ms: ModelScene): THREE.DirectionalLight => ms.scene.children.find((o): o is THREE.DirectionalLight => o instanceof THREE.DirectionalLight)!;
 
+/**
+ * Peças de uma categoria: cada faixa de elemento (`userData.ranges`) de uma malha é uma peça. As peças fixas de uma
+ * esquadria, e as de um nível com o mesmo material, dividem uma malha só (ver `lotesMalha3d.ts`), então a conta de peças
+ * é pelas faixas, não pelas malhas.
+ */
+function pecasDe(ms: ModelScene, kind: string): THREE.Mesh[] {
+  return malhas(ms).filter((m) => m.userData.kind === kind).flatMap(pecasDaMalha);
+}
+
+/** Uma malha por faixa: só os triângulos da faixa, em coordenadas locais da malha (as da esquadria, no vão). */
+function pecasDaMalha(m: THREE.Mesh): THREE.Mesh[] {
+  const ranges = m.userData.ranges as ElementRange[];
+  const index = m.geometry.index!;
+  const pos = m.geometry.getAttribute('position');
+  return ranges.map((r) => {
+    const novo = new Map<number, number>();
+    const idx: number[] = [];
+    const verts: number[] = [];
+    for (let k = r.start; k < r.start + r.count; k++) {
+      const v = index.getX(k);
+      let nv = novo.get(v);
+      if (nv === undefined) {
+        nv = novo.size;
+        novo.set(v, nv);
+        verts.push(pos.getX(v), pos.getY(v), pos.getZ(v));
+      }
+      idx.push(nv);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    g.setIndex(idx);
+    const piece = new THREE.Mesh(g, m.material as THREE.Material);
+    piece.userData = { kind: m.userData.kind, id: r.id };
+    return piece;
+  });
+}
+
 /** Nº de lotes de parede do nível (um por material): cada um vira uma malha. */
 const lotesParede = (p: Project): number => buildLevelSolids(niveis(p)[0]!).batches.length;
 
 describe('ModelScene: padrão da vista 3D (mesmo resultado de antes)', () => {
-  it('a fixture padrão tem 17 malhas, 6 linhas e 10 materiais (9 padrão de superfície e 1 de linha)', () => {
+  it('a fixture padrão tem 9 malhas, 1 linha e 10 materiais (9 padrão de superfície e 1 de linha)', () => {
+    // Uma malha por material e categoria do nível (e por material das esquadrias); uma linha só para as arestas do nível.
     const ms = cena(casa());
-    expect(malhas(ms)).toHaveLength(17);
-    expect(linhas(ms)).toHaveLength(6);
+    expect(malhas(ms)).toHaveLength(9);
+    expect(linhas(ms)).toHaveLength(1);
     const materiais = new Set<THREE.Material>();
     modelo(ms).traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
@@ -129,13 +167,13 @@ describe('estilos visuais', () => {
   it('realista: MeshStandardMaterial nas faces, com arestas', () => {
     const ms = cena(casa());
     expect(malhas(ms).every((m) => m.material instanceof THREE.MeshStandardMaterial)).toBe(true);
-    expect(linhas(ms)).toHaveLength(6);
+    expect(linhas(ms)).toHaveLength(1);
   });
 
   it('sombreado: MeshLambertMaterial nas faces e sem sombras', () => {
     const ms = cena(comVista(casa(), { style: 'shaded' }));
     const faces = malhas(ms);
-    expect(faces.length).toBe(17);
+    expect(faces.length).toBe(9);
     expect(faces.every((m) => m.material instanceof THREE.MeshLambertMaterial)).toBe(true);
     expect(faces.every((m) => !m.castShadow && !m.receiveShadow)).toBe(true);
     expect(luz(ms).castShadow).toBe(false);
@@ -153,15 +191,15 @@ describe('estilos visuais', () => {
   it('linhas ocultas: faces do papel (branco), com polygonOffset, e arestas sempre, mesmo com edges desligado', () => {
     const ms = cena(comVista(casa(), { style: 'hiddenLine', edges: false }));
     const faces = malhas(ms);
-    expect(faces).toHaveLength(17);
+    expect(faces).toHaveLength(9);
     for (const m of faces) {
       const mat = m.material as THREE.MeshBasicMaterial;
       expect(mat).toBeInstanceOf(THREE.MeshBasicMaterial);
       expect(mat.color.getHexString()).toBe('ffffff');
       expect(mat.polygonOffset).toBe(true);
     }
-    // 6 lotes de sólidos + 11 peças das esquadrias (4 da porta, 7 da janela de correr de 2 folhas).
-    expect(linhas(ms)).toHaveLength(17);
+    // Arestas sempre: 1 linha para os sólidos do nível e 1 para cada esquadria (porta e janela).
+    expect(linhas(ms)).toHaveLength(3);
   });
 
   it('linhas ocultas no tema escuro: faces cinza escuro e arestas claras', () => {
@@ -174,7 +212,7 @@ describe('estilos visuais', () => {
   it('só arestas: nenhuma malha no modelo, arestas de todas as peças (inclusive as de trás) e chão oculto', () => {
     const ms = cena(comVista(casa(), { style: 'wireframe' }));
     expect(malhas(ms)).toHaveLength(0);
-    expect(linhas(ms)).toHaveLength(17);
+    expect(linhas(ms)).toHaveLength(3);
     expect(ms.scene.children.find((o) => o instanceof THREE.Mesh && o.geometry instanceof THREE.PlaneGeometry)?.visible).toBe(false);
   });
 
@@ -192,24 +230,28 @@ describe('arestas', () => {
   it('em estilos com cor, as arestas seguem `edges`', () => {
     expect(linhas(cena(comVista(casa(), { style: 'realistic', edges: false })))).toHaveLength(0);
     expect(linhas(cena(comVista(casa(), { style: 'shaded', edges: false })))).toHaveLength(0);
-    expect(linhas(cena(comVista(casa(), { style: 'consistentColors', edges: true })))).toHaveLength(6);
+    expect(linhas(cena(comVista(casa(), { style: 'consistentColors', edges: true })))).toHaveLength(1);
   });
 
   it('aberturas não têm arestas nos estilos com cor (como antes)', () => {
     const ms = cena(comVista(casa(), { style: 'realistic', edges: true }));
-    expect(linhas(ms)).toHaveLength(6);
+    expect(linhas(ms)).toHaveLength(1);
   });
 });
 
 describe('exibição por categoria (substituições)', () => {
   it('ocultar porta tira as 4 peças da porta; janela tira 7; a linha não muda', () => {
     const p = casa();
-    const base = malhas(cena(p)).length;
+    const base = cena(p);
     const semPorta = cena(comVista(p, { overrides: { ...defaultsOverrides(), door: { visible: false, transparency: 0, halftone: false } } }));
     const semJanela = cena(comVista(p, { overrides: { ...defaultsOverrides(), window: { visible: false, transparency: 0, halftone: false } } }));
-    expect(malhas(semPorta)).toHaveLength(base - 4);
-    expect(malhas(semJanela)).toHaveLength(base - 7);
-    expect(linhas(semPorta)).toHaveLength(6);
+    expect(pecasDe(base, 'door')).toHaveLength(4);
+    expect(pecasDe(base, 'window')).toHaveLength(7);
+    expect(pecasDe(semPorta, 'door')).toHaveLength(0);
+    expect(pecasDe(semPorta, 'window')).toHaveLength(7);
+    expect(pecasDe(semJanela, 'window')).toHaveLength(0);
+    expect(pecasDe(semJanela, 'door')).toHaveLength(4);
+    expect(linhas(semPorta)).toHaveLength(linhas(base).length);
   });
 
   it('ocultar paredes, piso e escada: não gera as malhas da categoria', () => {
@@ -347,7 +389,7 @@ function defaultsOverrides(): Record<'wall' | 'door' | 'window' | 'floor' | 'sla
 }
 
 describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
-  const pecas = (ms: ModelScene, kind: 'door' | 'window'): THREE.Mesh[] => malhas(ms).filter((m) => m.userData.kind === kind);
+  const pecas = (ms: ModelScene, kind: 'door' | 'window'): THREE.Mesh[] => pecasDe(ms, kind);
   const medida = (m: THREE.Mesh): THREE.Vector3 => {
     m.geometry.computeBoundingBox();
     return m.geometry.boundingBox!.getSize(new THREE.Vector3());
@@ -501,7 +543,7 @@ describe('abrir vãos no 3D', () => {
     expect(pivo).toHaveLength(1);
     expect(Math.abs(pivo[0]!.rotation.z)).toBeCloseTo(Math.PI / 2, 9);
     expect(Math.abs(pivo[0]!.position.x)).toBeCloseTo(0.8 / 4, 9);
-    // As peças (batente e folha) não mudam de quantidade nem de dimensão ao abrir.
-    expect(malhas(abrir(true))).toHaveLength(malhas(abrir(false)).length);
+    // As peças (batente e folha) não mudam de quantidade nem de dimensão ao abrir (contadas pelas faixas).
+    expect(pecasDe(abrir(true), 'door')).toHaveLength(pecasDe(abrir(false), 'door').length);
   });
 });

@@ -29,7 +29,7 @@ import { deleteSelectionIn } from './deleteIds.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
-import { ResolucaoProgressiva } from './resolucaoAssincrona.ts';
+import { FluxoEdicao } from './fluxoEdicao.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -44,7 +44,7 @@ export class Editor {
   private viewports = new Map<Id, Viewport>();
   /** Resolução por nível: uma edição recalcula só o nível editado e os que dependem dele (ver `LevelResolveCache`). */
   private readonly levels = new LevelResolveCache();
-  private readonly resolucao = new ResolucaoProgressiva({ aoMudar: () => this.bump() });
+  readonly fluxo = new FluxoEdicao({ aoMudar: () => this.bump() }); // provisório na hora, exato em segundo plano (fluxoEdicao.ts)
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
@@ -53,7 +53,7 @@ export class Editor {
     this.tool = createTool('select', this.env);
     this.store.subscribe(() => {
       this.pruneSelection();
-      this.scheduleAutosave(); this.resolucao.atualizar(this.project);
+      this.scheduleAutosave(); this.fluxo.atualizar(this.project, this.store.version);
       useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
     });
   }
@@ -148,12 +148,12 @@ export class Editor {
     if (v) this.setViewport(panBy(v, dx, dy));
   }
 
-  resolved(levelId: Id): ResolvedLevel { return this.resolucao.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId); }
+  resolved(levelId: Id): ResolvedLevel { return this.fluxo.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId); }
 
   /** Libera os caches de um nível (viewport da planta e resolução). Chamado ao fechar uma aba de planta. */
   releaseLevel(levelId: Id): void {
     this.viewports.delete(levelId);
-    this.levels.release(levelId); this.resolucao.liberar(levelId);
+    this.levels.release(levelId); this.fluxo.liberar(levelId);
   }
 
   // ---------- ferramentas ----------
@@ -424,7 +424,7 @@ export class Editor {
   load(p: Project, name: string): void {
     this.store.load(p);
     this.fileName = name;
-    this.levels.clear(); this.resolucao.abrir(p).forEach((id) => this.resolved(id));
+    this.levels.clear(); this.fluxo.abrir(p, this.store.version).forEach((id) => this.resolved(id));
     this.viewports.clear();
     // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
     useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });

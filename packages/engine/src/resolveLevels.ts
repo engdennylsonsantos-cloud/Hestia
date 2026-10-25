@@ -26,7 +26,7 @@ const FORA_DA_RESOLUCAO = new Set<string>(['elements', 'nextOrder', 'views', 'sh
 export type NiveisAfetados = ReadonlySet<Id> | 'todos';
 
 /** Nível de um elemento: o próprio `levelId`, ou o da parede hospedeira (abertura). `null` se não há como saber. */
-function nivelDe(p: Project, e: Element): Id | null {
+export function nivelDe(p: Project, e: Element): Id | null {
   if ('levelId' in e) return e.levelId;
   if ('hostId' in e) {
     const host = p.elements[e.hostId];

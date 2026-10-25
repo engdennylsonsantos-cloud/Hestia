@@ -121,6 +121,20 @@ export const I18N = {
     thin_lines: 'Linhas finas',
     hide_isolate: 'Ocultar/Isolar',
     reset_hide: 'Restaurar',
+
+    // Barra da Matriz
+    arr_kind: 'Tipo',
+    arr_kind_linear: 'Linear',
+    arr_kind_radial: 'Radial',
+    arr_anchor: 'Mover para',
+    arr_anchor_second: 'Segundo',
+    arr_anchor_last: 'Último',
+    arr_count: 'Número de itens',
+    arr_angle: 'Ângulo total',
+    arr_hint_linear: 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.',
+    arr_hint_radial: 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.',
+    arr_count_min: 'Número de itens deve ser 2 ou mais; usando 2.',
+    arr_angle_zero: 'O ângulo total deve ser diferente de 0°',
   },
   en: {
     // Ribbon Tabs
@@ -216,6 +230,20 @@ export const I18N = {
     thin_lines: 'Thin Lines',
     hide_isolate: 'Temporary Hide/Isolate',
     reset_hide: 'Reset',
+
+    // Array bar
+    arr_kind: 'Type',
+    arr_kind_linear: 'Linear',
+    arr_kind_radial: 'Radial',
+    arr_anchor: 'Move to',
+    arr_anchor_second: 'Second',
+    arr_anchor_last: 'Last',
+    arr_count: 'Number of items',
+    arr_angle: 'Total angle',
+    arr_hint_linear: 'Linear array: click the base point and the second point (spacing) — or type the spacing.',
+    arr_hint_radial: 'Radial array: click the array center. Then click to create the items, or type the angle in degrees.',
+    arr_count_min: 'Number of items must be 2 or more; using 2.',
+    arr_angle_zero: 'The total angle must be different from 0°',
   },
 } as const;
 

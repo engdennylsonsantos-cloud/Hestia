@@ -138,7 +138,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   dimension: 'Cota',
   text: 'Texto',
   room: 'Ambiente',
-  roomsep: 'Linha de separação',
+  roomsep: 'Separador de ambiente',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {

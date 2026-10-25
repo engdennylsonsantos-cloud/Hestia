@@ -20,6 +20,7 @@ import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
 import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
+import { ShortcutsConfigDialog } from './ui/dialogs/ShortcutsConfigDialog.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
@@ -77,6 +78,8 @@ function Dialogs(): ReactElement | null {
       return <StartDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
+    case 'shortcutsConfig':
+      return <ShortcutsConfigDialog />;
     case 'schedule':
       return <WallScheduleDialog />;
     case 'sheet':

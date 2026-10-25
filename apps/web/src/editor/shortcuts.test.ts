@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PERFIL_REVIT, PERFIL_SIMPLES, type ShortcutMap } from '@hestia/tools';
-import { CasadorSequencia, TEMPO_SEQUENCIA_MS, conflitoDe, conflitoNoMapa, normalizaSequencia } from './shortcuts.ts';
+import { CasadorSequencia, TEMPO_SEQUENCIA_MS, conflitoDe, conflitosDe, conflitoNoMapa, normalizaSequencia } from './shortcuts.ts';
 
 describe('normalizaSequencia', () => {
   it('põe em maiúsculas e aceita letras e dígitos até 4 caracteres', () => {
@@ -27,6 +27,11 @@ describe('conflitos', () => {
   it('sequência que começa igual a outra (ou é começo dela) é conflito por prefixo', () => {
     expect(conflitoDe(mapa, 'room', 'W')?.motivo).toBe('prefixo');
     expect(conflitoDe({ wall: 'W' }, 'room', 'WA')).toEqual({ comando: 'wall', sequencia: 'W', motivo: 'prefixo' });
+  });
+
+  it('lista todos os conflitos da sequência, não só o primeiro (W conflita com WA e WN)', () => {
+    expect(conflitosDe(mapa, 'room', 'W').map((c) => c.comando)).toEqual(['wall', 'window']);
+    expect(conflitosDe(mapa, 'room', 'PA')).toEqual([]);
   });
 
   it('o próprio comando não conflita consigo, e sequência livre passa', () => {

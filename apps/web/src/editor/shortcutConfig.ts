@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { COMANDOS_COM_ATALHO, PERFIL_PADRAO, SHORTCUT_PROFILES, nomeComando, type ShortcutCommand, type ShortcutMap, type ShortcutProfile } from '@hestia/tools';
-import { CasadorSequencia, conflitoDe, conflitoNoMapa, normalizaSequencia } from './shortcuts.ts';
+import { CasadorSequencia, conflitoNoMapa, conflitosDe, normalizaSequencia, type ConflitoAtalho } from './shortcuts.ts';
 
 const CHAVE = 'hestia.atalhos.v1';
 const FORMATO = 'hestia-atalhos';
@@ -106,9 +106,14 @@ export function atribuirAtalho(cmd: ShortcutCommand, raw: string): ResultadoAtal
   if (!seq) return { ok: false, erro: 'Use de 1 a 4 letras ou números, sem espaços.' };
   const { perfil, mapa } = useAtalhos.getState();
   const novo: ShortcutMap = { ...mapa, [cmd]: seq };
-  const conflito = conflitoDe(mapa, cmd, seq);
-  if (conflito) {
-    return { ok: false, erro: `"${seq}" já é usada por ${nomeComando(conflito.comando)}${conflito.motivo === 'prefixo' ? ` (começa igual a "${conflito.sequencia}")` : ''}. Escolha outra.` };
+  const conflitos = conflitosDe(mapa, cmd, seq);
+  if (conflitos.length) {
+    // Lista até três conflitos; o resto vira "…e mais N".
+    const cita = (c: ConflitoAtalho): string => `${nomeComando(c.comando)}${c.motivo === 'prefixo' ? ` (começa igual a "${c.sequencia}")` : ''}`;
+    const tres = conflitos.slice(0, 3).map(cita);
+    const resto = conflitos.length - tres.length;
+    const lista = tres.length === 1 ? tres[0] : `${tres.slice(0, -1).join(', ')} e ${tres[tres.length - 1]}`;
+    return { ok: false, erro: `"${seq}" já é usada por ${lista}${resto > 0 ? ` …e mais ${resto}` : ''}. Escolha outra.` };
   }
   aplica(perfil, alteracoesDe(perfil, novo));
   return { ok: true, mensagem: `${nomeComando(cmd)}: atalho ${seq}.` };

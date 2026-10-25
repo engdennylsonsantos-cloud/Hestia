@@ -20,14 +20,20 @@ export interface ConflitoAtalho {
   motivo: 'igual' | 'prefixo';
 }
 
-/** Conflito que `seq` causaria se fosse atribuída a `cmd` no mapa (ignora o próprio `cmd`). Undefined se livre. */
-export function conflitoDe(mapa: ShortcutMap, cmd: ShortcutCommand, seq: string): ConflitoAtalho | undefined {
+/** Todos os conflitos que `seq` causaria se fosse atribuída a `cmd` no mapa (ignora o próprio `cmd`). Lista vazia se livre. */
+export function conflitosDe(mapa: ShortcutMap, cmd: ShortcutCommand, seq: string): ConflitoAtalho[] {
+  const out: ConflitoAtalho[] = [];
   for (const [outro, s] of Object.entries(mapa) as Array<[ShortcutCommand, string | undefined]>) {
     if (!s || outro === cmd) continue;
-    if (s === seq) return { comando: outro, sequencia: s, motivo: 'igual' };
-    if (s.startsWith(seq) || seq.startsWith(s)) return { comando: outro, sequencia: s, motivo: 'prefixo' };
+    if (s === seq) out.push({ comando: outro, sequencia: s, motivo: 'igual' });
+    else if (s.startsWith(seq) || seq.startsWith(s)) out.push({ comando: outro, sequencia: s, motivo: 'prefixo' });
   }
-  return undefined;
+  return out;
+}
+
+/** Primeiro conflito que `seq` causaria em `cmd`. Undefined se livre. */
+export function conflitoDe(mapa: ShortcutMap, cmd: ShortcutCommand, seq: string): ConflitoAtalho | undefined {
+  return conflitosDe(mapa, cmd, seq)[0];
 }
 
 /** Valida um mapa inteiro: devolve o primeiro par de comandos em conflito, ou undefined se o mapa é livre de prefixo. */

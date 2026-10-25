@@ -1,0 +1,51 @@
+/*
+ * Faixa de ferramentas no padrão Revit (decisão 0032): linha de abas de 28 px, corpo de 96 px (painel 78 px + título 18 px),
+ * botão grande com ícone de 32 px e rótulo de até 2 linhas, botão pequeno com ícone de 16 px e rótulo à direita, pilha de
+ * até 3 pequenos na altura de um grande, botão dividido com ▾, título do painel em caixa normal.
+ */
+.ribbon-tabs { display: flex; align-items: flex-end; padding: 0 4px; height: 28px; background: var(--chrome); border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.ribbon-tabs::-webkit-scrollbar { display: none; }
+.rtab { flex: none; height: 24px; padding: 0 11px; font-size: 12px; color: var(--fg); background: transparent; border: 1px solid transparent; border-bottom: 0; border-radius: 3px 3px 0 0; white-space: nowrap; }
+.rtab:hover { background: var(--accent-soft); }
+.rtab.on { height: 28px; margin-bottom: -1px; padding-bottom: 1px; background: var(--ribbon); border-color: var(--line-strong); font-weight: 600; position: relative; }
+.rtab.file { margin-right: 3px; background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.rtab.file:hover { filter: brightness(1.12); }
+.rtab.contextual { color: var(--revit-green); font-weight: 600; }
+.rtab.contextual.on { background: var(--revit-green-soft); border-top: 2px solid var(--revit-green-border); }
+
+.ribbon { display: flex; height: 96px; background: var(--ribbon); border-bottom: 1px solid var(--line-strong); overflow-x: auto; overflow-y: hidden; }
+.ribbon.ctx { background: var(--revit-green-soft); }
+.rb-panel { display: flex; flex-direction: column; flex: none; border-right: 1px solid var(--line); }
+.rb-cols { display: flex; flex: 1; min-height: 0; align-items: stretch; gap: 1px; padding: 3px 3px 0; }
+.rb-title { height: 18px; padding: 0 10px; font-size: 11px; line-height: 18px; text-align: center; white-space: nowrap; color: var(--fg-soft); }
+
+.rb-btn { font: inherit; font-size: 11.5px; color: var(--fg); background: transparent; border: 1px solid transparent; border-radius: 2px; }
+.rb-btn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--line-strong); }
+.rb-btn.on { background: var(--accent-soft); border-color: var(--accent); }
+.rb-btn:disabled { cursor: default; opacity: 0.45; }
+.rb-btn.soon { opacity: 0.5; }
+.rb-btn:disabled svg, .rb-btn.soon svg, .rb-menuitem.soon svg { filter: grayscale(1); }
+.rb-large { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 46px; max-width: 80px; padding: 3px 4px 1px; line-height: 1.12; text-align: center; white-space: normal; }
+.rb-large .rb-lbl { display: block; min-height: 26px; }
+.rb-small { display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 6px 0 4px; text-align: left; white-space: nowrap; }
+.rb-stack { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 0 2px; }
+
+/* Botão dividido: o ícone roda a variante padrão, o rótulo com ▾ abre o menu. */
+.rb-split { position: relative; }
+.rb-split.large { display: flex; flex-direction: column; align-items: stretch; min-width: 46px; max-width: 80px; border: 1px solid transparent; border-radius: 2px; }
+.rb-split.large:hover { border-color: var(--line-strong); }
+.rb-split.large.on { border-color: var(--accent); background: var(--accent-soft); }
+.rb-split.large .rb-btn { border: 0; background: transparent; }
+.rb-split.large .rb-top { align-items: center; padding: 3px 4px 0; }
+.rb-split.large .rb-bottom { display: block; padding: 2px 4px 1px; text-align: center; line-height: 1.12; white-space: normal; }
+.rb-split.large .rb-bottom .rb-lbl { display: block; min-height: 26px; }
+.rb-split.large .rb-btn:hover:not(:disabled) { background: var(--accent-soft); }
+.rb-split.small { display: flex; align-items: stretch; }
+.rb-split.small .rb-arrow { width: 14px; padding: 0; font-size: 9px; }
+
+.rb-menu { position: fixed; z-index: 200; min-width: 220px; padding: 2px 0; font-size: 12px; background: var(--sheet); border: 1px solid var(--line-strong); box-shadow: var(--shadow); }
+.rb-menuitem { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 12px 3px 8px; font: inherit; text-align: left; color: var(--fg); background: none; border: 0; }
+.rb-menuitem:hover:not(:disabled) { background: var(--accent-soft); }
+.rb-menuitem.on { font-weight: 600; }
+.rb-menuitem.soon { opacity: 0.5; cursor: default; }
+.rb-menuitem em { margin-left: auto; padding-left: 18px; font-size: 10px; font-style: normal; color: var(--fg-faint); }

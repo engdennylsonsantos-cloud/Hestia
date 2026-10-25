@@ -38,6 +38,7 @@ import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
 import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
+import { MoveLevelDialog } from './ui/MoveLevel.tsx';
 
 function Dialogs(): ReactElement | null {
   const d = useUi((s) => s.dialog);
@@ -91,6 +92,8 @@ function Dialogs(): ReactElement | null {
       return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
     case 'lineWeights':
       return <LineWeightsDialog />;
+    case 'moveLevel':
+      return <MoveLevelDialog onClose={() => useUi.setState({ dialog: null })} />;
     case 'cotasAuto':
       return <AutoCotaDialog />;
     default:

@@ -140,21 +140,6 @@ svg { display: block; }
 .btn.small { padding: 2px 7px; font-size: 11.5px; }
 
 /* ---- faixa de ferramentas ---- */
-.ribbon-tabs { display: flex; gap: 2px; padding: 0 8px; background: var(--chrome); border-bottom: 1px solid var(--line); }
-.rtab { border: 0; background: transparent; padding: 6px 12px; border-bottom: 2px solid transparent; color: var(--fg-soft); font-weight: 500; margin-bottom: -1px; }
-.rtab:hover { color: var(--fg); }
-.rtab.on { color: var(--accent); border-bottom-color: var(--accent); }
-.ribbon { display: flex; align-items: stretch; gap: 0; padding: 4px 8px; background: var(--panel); border-bottom: 1px solid var(--line-strong); overflow-x: auto; min-height: 66px; }
-.rgroup { display: flex; flex-direction: column; padding: 0 8px; border-right: 1px solid var(--line); min-width: 0; }
-.rgroup:last-child { border-right: 0; }
-.rgroup-tools { display: flex; gap: 2px; flex: 1; align-items: center; }
-.rgroup-title { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); padding-top: 2px; white-space: nowrap; }
-.tbtn { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid transparent; background: transparent; padding: 4px 6px; border-radius: var(--r); min-width: 48px; color: var(--fg); }
-.tbtn span { font-size: 10.5px; white-space: nowrap; }
-.tbtn kbd { font-family: var(--font-mono); font-size: 9px; color: var(--fg-faint); }
-.tbtn:hover:not(:disabled) { background: var(--chrome); border-color: var(--line); }
-.tbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.tbtn:disabled { opacity: 0.38; cursor: default; }
 
 /* ---- barra de opções ---- */
 .optbar { display: flex; align-items: center; gap: 12px; padding: 4px 10px; background: var(--chrome); border-bottom: 1px solid var(--line); min-height: 32px; flex-wrap: wrap; }
@@ -424,7 +409,6 @@ svg { display: block; }
 @media (max-width: 700px) {
   .lbl-text { display: none; }
   .proj-name { min-width: 60px; max-width: 120px; }
-  .ribbon { min-height: 62px; }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }
@@ -432,7 +416,6 @@ svg { display: block; }
   .side.left { left: 0; }
   .side.right { right: 0; }
   .split { grid-template-columns: minmax(0, 1fr); }
-  .ribbon { min-height: 62px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -577,65 +560,6 @@ svg { display: block; }
   .snap-pop { position: fixed; left: 16px; right: 16px; bottom: 36px; width: auto; }
 }
 
-
-/* ---- Estilo Autodesk Revit para Ribbon e Abas ---- */
-.ribbon-tabs {
-  background: var(--chrome);
-  padding: 0 4px;
-  gap: 1px;
-}
-.rtab {
-  border-radius: 3px 3px 0 0;
-  padding: 5px 14px;
-  font-size: 11.5px;
-  font-weight: 500;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  color: var(--fg-soft);
-  transition: background 0.1s;
-}
-.rtab:hover {
-  background: color-mix(in srgb, var(--chrome) 85%, var(--fg) 15%);
-  color: var(--fg);
-}
-.rtab.on {
-  background: var(--panel);
-  border-color: var(--line-strong);
-  border-top: 2px solid var(--accent);
-  color: var(--fg);
-  font-weight: 600;
-}
-/* Aba Contextual Verde do Revit */
-.rtab.contextual {
-  background: var(--revit-green-soft);
-  border-color: var(--revit-green-border);
-  border-top: 2px solid var(--revit-green-border);
-  color: var(--revit-green);
-  font-weight: 600;
-}
-.rtab.contextual:hover {
-  background: color-mix(in srgb, var(--revit-green-soft) 85%, var(--fg) 15%);
-}
-
-/* Grupo e Painéis do Ribbon Revit */
-.rgroup {
-  padding: 2px 6px;
-  background: transparent;
-}
-.rgroup-title {
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
-  color: var(--fg-faint);
-  font-weight: 600;
-}
-.tbtn.primary-tool {
-  min-width: 52px;
-  padding: 4px 6px 2px;
-}
-.tbtn.primary-tool svg {
-  width: 28px;
-  height: 28px;
-}
 
 /* ---- Ícones de ferramenta no estilo Revit (geometria em Icon.tsx; degradês em IconDefs) ----
    Traço de espessura fixa em pixels de tela, para ficar nítido de 14 a 28 px. */

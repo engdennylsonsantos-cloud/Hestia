@@ -127,7 +127,9 @@ export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanThe
   for (const it of items) {
     switch (it.kind) {
       case 'line':
-        o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 1.5, color: toneColor(it.tone, theme), alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
+        // Cota do Medir (halo): contorno claro por baixo e traço mais grosso, para aparecer sobre a hachura.
+        if (it.halo) o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 4.5, color: '#ffffff', alpha: 0.85 });
+        o.strokes.push({ pts: [it.a, it.b], closed: false, widthPx: it.halo ? 2.25 : 1.5, color: toneColor(it.tone, theme), alpha: 0.95, dash: it.dashed ? [7, 5] : undefined });
         break;
       case 'polygon':
         if (it.tone === 'tread') {

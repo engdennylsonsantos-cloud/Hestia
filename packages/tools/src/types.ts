@@ -21,7 +21,8 @@ export interface Inference {
 
 /** O que a ferramenta mostra antes do clique (docs/03 §5: pré-visualização sempre). */
 export type PreviewItem =
-  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone }
+  /** `halo`: linha de cota do Medir, mais grossa e com contorno claro por baixo (legível sobre hachura de parede). */
+  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone; halo?: boolean }
   | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: StairTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
@@ -49,6 +50,8 @@ export interface ToolEnv {
   openView?(id: Id): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
+  /** Idioma da interface: as mensagens traduzíveis das ferramentas (ex.: Matriz) saem nele. Ausente = português. */
+  lang?(): 'pt' | 'en';
   /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */
   roofEdge?(): RoofEdgeSel | null;
   setRoofEdge?(sel: RoofEdgeSel | null): void;

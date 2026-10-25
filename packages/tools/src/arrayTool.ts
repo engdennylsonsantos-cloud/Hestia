@@ -5,17 +5,47 @@ import { parseNumber } from './numeric.ts';
 import { arraySet, commitRadial, fmtXY, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
 import type { PointerInfo } from './types.ts';
 
-const HINT_LINEAR = 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.';
-const HINT_RADIAL = 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.';
+/**
+ * Textos da Matriz por idioma. As ferramentas não leem o I18N do app: o idioma vem de `env.lang` (ausente = português).
+ * Mensagens com valores são funções, para que a ordem das partes siga cada língua.
+ */
+const TEXTOS = {
+  pt: {
+    hintLinear: 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.',
+    hintRadial: 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.',
+    /** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
+    hospedeira: 'Selecione também a parede hospedeira: portas e janelas acompanham a parede.',
+    /** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
+    anguloZero: 'O ângulo total deve ser diferente de 0°',
+    centroRadial: 'Clique no centro da matriz',
+    anguloGraus: 'Ângulo (graus)',
+    distanciaTotal: 'Distância total',
+    espacamento: 'Espaçamento',
+    centroDefinido: (xy: string) => `Matriz radial: centro em (${xy}). Clique para criar os itens, ou digite o ângulo.`,
+    resumoRadial: (n: number, graus: string, xy: string) => `Matriz radial: ${n} itens em ${graus}° em torno de (${xy})`,
+  },
+  en: {
+    hintLinear: 'Linear array: click the base point and the second point (spacing), or type the spacing.',
+    hintRadial: 'Radial array: click the array center. Then click to create the items, or type the angle in degrees.',
+    hospedeira: 'Also select the host wall: doors and windows follow the wall.',
+    anguloZero: 'The total angle must be different from 0°',
+    centroRadial: 'Click the array center',
+    anguloGraus: 'Angle (degrees)',
+    distanciaTotal: 'Total distance',
+    espacamento: 'Spacing',
+    centroDefinido: (xy: string) => `Radial array: center at (${xy}). Click to create the items, or type the angle.`,
+    resumoRadial: (n: number, graus: string, xy: string) => `Radial array: ${n} items at ${graus}° around (${xy})`,
+  },
+} as const;
 
 /** Dica do primeiro passo de cada tipo (a barra de status usa a mesma ao trocar o tipo). */
-export const arrayHint = (radial: boolean): string => (radial ? HINT_RADIAL : HINT_LINEAR);
+export const arrayHint = (radial: boolean, lang: 'pt' | 'en' = 'pt'): string => (radial ? TEXTOS[lang].hintRadial : TEXTOS[lang].hintLinear);
 
 /** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
-export const AVISO_HOSPEDEIRA = 'Selecione também a parede hospedeira: portas e janelas acompanham a parede.';
+export const AVISO_HOSPEDEIRA = TEXTOS.pt.hospedeira;
 
 /** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
-export const AVISO_ANGULO_ZERO = 'O ângulo total deve ser diferente de 0°';
+export const AVISO_ANGULO_ZERO = TEXTOS.pt.anguloZero;
 
 /**
  * Matriz: linear (N elementos pelo espaçamento) ou radial (N elementos girados em torno de um centro).
@@ -24,12 +54,18 @@ export const AVISO_ANGULO_ZERO = 'O ângulo total deve ser diferente de 0°';
 export class ArrayTool extends SelectionTool {
   readonly id = 'array';
   readonly label = 'Matriz';
-  readonly hint = HINT_LINEAR;
+  /** Dica do início (base chama `say(hint)` no start): segue o idioma da interface. */
+  override get hint(): string {
+    return arrayHint(false, this.lang());
+  }
   /** Linear: ponto base. Radial: centro da matriz. */
   private base: Vec2 | null = null;
   /** Tipo e "Mover para" em uso quando o passo começou: se a barra mudar, o passo recomeça (D1/D2). */
   private stepMode = '';
 
+  private lang(): 'pt' | 'en' {
+    return this.env.lang?.() ?? 'pt';
+  }
   private radial(): boolean {
     return this.env.options().arrayKind === 'radial';
   }
@@ -43,7 +79,7 @@ export class ArrayTool extends SelectionTool {
     return this.env.options().arrayAngle ?? 360;
   }
   private hintNow(): string {
-    return arrayHint(this.radial());
+    return arrayHint(this.radial(), this.lang());
   }
   private modeNow(): string {
     return `${this.radial()}|${this.anchor()}`;
@@ -67,13 +103,14 @@ export class ArrayTool extends SelectionTool {
   override inputPrompt(): string | null {
     this.checkStep();
     if (!this.base) return null;
-    if (this.radial()) return 'Ângulo (graus)';
-    return this.anchor() === 'last' ? 'Distância total' : 'Espaçamento';
+    const t = TEXTOS[this.lang()];
+    if (this.radial()) return t.anguloGraus;
+    return this.anchor() === 'last' ? t.distanciaTotal : t.espacamento;
   }
 
   override start(): void {
     super.start();
-    if (this.soAberturas()) this.env.say(AVISO_HOSPEDEIRA);
+    if (this.soAberturas()) this.env.say(TEXTOS[this.lang()].hospedeira);
     else if (this.hasSelection()) this.env.say(this.hintNow());
   }
 
@@ -121,7 +158,7 @@ export class ArrayTool extends SelectionTool {
   private moveRadial(p: PointerInfo): void {
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
     if (!this.base) {
-      this.items.push({ kind: 'point', at: inf.point }, { kind: 'label', at: inf.point, text: 'Clique no centro da matriz' });
+      this.items.push({ kind: 'point', at: inf.point }, { kind: 'label', at: inf.point, text: TEXTOS[this.lang()].centroRadial });
       return;
     }
     this.items.push({ kind: 'point', at: this.base }, { kind: 'line', a: this.base, b: inf.point, dashed: true });
@@ -131,7 +168,7 @@ export class ArrayTool extends SelectionTool {
   }
 
   private commit(d: Vec2): void {
-    if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
+    if (this.soAberturas()) return this.env.say(TEXTOS[this.lang()].hospedeira);
     const n = this.count();
     const step = linearStep(d, n, this.anchor());
     if (len(step) < 1e-6) return;
@@ -152,12 +189,13 @@ export class ArrayTool extends SelectionTool {
   private applyRadial(angleDeg: number): void {
     const center = this.base;
     if (!center) return;
-    if (Math.abs(angleDeg) < 1e-6) return this.env.say(AVISO_ANGULO_ZERO);
-    if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
+    const t = TEXTOS[this.lang()];
+    if (Math.abs(angleDeg) < 1e-6) return this.env.say(t.anguloZero);
+    if (this.soAberturas()) return this.env.say(t.hospedeira);
     const n = this.count();
     const angles = radialAngles(n, angleDeg, this.anchor());
     commitRadial(this.env, arraySet(this.env.project(), this.env.selection()), center, angles);
-    const msg = `Matriz radial: ${n} itens em ${angleDeg.toFixed(1).replace('.', ',')}° em torno de (${fmtXY(center)})`;
+    const msg = t.resumoRadial(n, angleDeg.toFixed(1).replace('.', ','), fmtXY(center));
     this.reset();
     this.env.done();
     this.env.say(msg);
@@ -169,7 +207,7 @@ export class ArrayTool extends SelectionTool {
     if (this.radial()) {
       if (!this.base) {
         this.startStep(inf.point);
-        this.env.say(`Matriz radial: centro em (${fmtXY(inf.point)}). Clique para criar os itens, ou digite o ângulo.`);
+        this.env.say(TEXTOS[this.lang()].centroDefinido(fmtXY(inf.point)));
         return;
       }
       this.applyRadial(this.angleDeg());

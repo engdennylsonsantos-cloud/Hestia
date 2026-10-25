@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
-import { COMANDOS_COM_ATALHO, TOOL_GROUPS, nomeComando, type ShortcutCommand } from '@hestia/tools';
+import { COMANDOS_COM_ATALHO, TOOL_GROUPS, type ShortcutCommand } from '@hestia/tools';
+import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
 import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId, type Wall } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
@@ -338,6 +339,7 @@ const DESCRICAO_COMANDO: Partial<Record<ShortcutCommand, string>> = {
 /** Tabela de atalhos gerada da configuração atual: comandos na ordem da faixa, depois as teclas fixas. */
 export function ShortcutsDialog(): ReactElement {
   const mapa = useAtalhos((s) => s.mapa);
+  const lang = useI18n((s) => s.lang);
   const ordem = [...new Set<ShortcutCommand>([...TOOL_GROUPS.flatMap((g) => g.tools), ...COMANDOS_COM_ATALHO])];
   return (
     <Dialog
@@ -352,7 +354,7 @@ export function ShortcutsDialog(): ReactElement {
           {ordem.map((cmd) => (
             <tr key={cmd}>
               <td>{mapa[cmd] ? <kbd>{mapa[cmd]}</kbd> : <span style={{ color: 'var(--fg-faint)' }}>sem atalho</span>}</td>
-              <td>{DESCRICAO_COMANDO[cmd] ?? nomeComando(cmd)}</td>
+              <td title={DESCRICAO_COMANDO[cmd]}>{nomeComandoLang(cmd, lang)}</td>
             </tr>
           ))}
           {KEYS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}

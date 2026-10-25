@@ -105,7 +105,7 @@ export function TitleBar(): ReactElement {
       <button
         className="ibtn lang-toggle"
         onClick={toggleLang}
-        title={lang === 'pt' ? 'Mudar idioma para English (Revit EN)' : 'Mudar idioma para Português (Revit PT-BR)'}
+        title={lang === 'pt' ? 'Mudar idioma para English (Revit EN)' : 'Switch language to Portuguese (Revit PT-BR)'}
         style={{ fontWeight: 600, fontSize: '11px', letterSpacing: '0.05em' }}
       >
         <span style={{ color: lang === 'pt' ? 'var(--accent)' : 'var(--fg-faint)' }}>PT</span>

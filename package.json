@@ -24,7 +24,8 @@
     "visual:juntas": "vite-node scripts/visual-juntas.mts && node scripts/visual-juntas.shot.mjs",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "bench:interacao": "vite-node scripts/bench-interacao.mts",
-    "perf:browser": "node tests/e2e/perf-browser.mjs"
+    "perf:browser": "node tests/e2e/perf-browser.mjs",
+    "medir:gpu": "node scripts/medir-gpu-memoria.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

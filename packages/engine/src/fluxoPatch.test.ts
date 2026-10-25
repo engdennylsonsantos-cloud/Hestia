@@ -17,7 +17,7 @@ import { elementoProvisorio, patchesProvisorios } from './fluxoProvisorio.ts';
 import { resolveLevel } from './resolve.ts';
 import { caminhoNaoSerializavel, colherBuffers } from './worker/protocolo.ts';
 import { projetoComPavimentos } from './worker/fixturePavimentos.ts';
-import { syntheticProject } from '../../../scripts/perf-baselines/projeto-sintetico.mts';
+import { syntheticProject } from './fixtureSintetica.ts';
 
 /** Aplica um comando e devolve os dois projetos. */
 function editar(p: Project, comando: Parameters<ProjectStore['exec']>[0]): { antes: Project; depois: Project } {

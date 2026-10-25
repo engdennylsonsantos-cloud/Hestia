@@ -46,7 +46,8 @@ const compare = (a: RoofScheduleRow, b: RoofScheduleRow, s: Sort): number => {
   return r * s.dir;
 };
 
-const cellValue = (r: RoofScheduleRow, c: Col): ReactNode => {
+const cellValue = (r: RoofScheduleRow, c: Col, shapeName: (s: RoofShape) => string): ReactNode => {
+  if (c.key === 'shapeLabel') return shapeName(r.shape);
   const v = r[c.key];
   if (v === null) return '—';
   return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
@@ -58,6 +59,8 @@ const SHAPES = Object.keys(ROOF_SHAPE_LABEL) as RoofShape[];
 export function RoofScheduleDialog(): ReactElement {
   const p = useProject();
   const t = I18N[useI18n((s) => s.lang)];
+  /** Nome da forma no idioma ativo (o rótulo do engine é só PT). */
+  const shapeName = (s: RoofShape): string => t[`roof_shape_${s}` as keyof typeof I18N.pt];
   const schedule = useMemo(() => buildRoofSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -118,7 +121,7 @@ export function RoofScheduleDialog(): ReactElement {
         <label htmlFor="rsc-shape">{t.col_shape}</label>
         <select id="rsc-shape" className="select" value={shape} onChange={(e) => setShape(e.target.value as RoofShape | '')}>
           <option value="">{t.sched_all_shapes}</option>
-          {SHAPES.map((s) => <option key={s} value={s}>{ROOF_SHAPE_LABEL[s]}</option>)}
+          {SHAPES.map((s) => <option key={s} value={s}>{shapeName(s)}</option>)}
         </select>
       </div>
 
@@ -145,7 +148,7 @@ export function RoofScheduleDialog(): ReactElement {
                   <tr key={r.roofId}>
                     {COLS.map((c) => (
                       <td key={c.key} className={c.decimals !== undefined ? 'num' : undefined}>
-                        {cellValue(r, c)}
+                        {cellValue(r, c, shapeName)}
                       </td>
                     ))}
                   </tr>

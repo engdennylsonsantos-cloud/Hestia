@@ -118,6 +118,12 @@ export const PT_TABELAS = {
     col_floor_finish: 'Piso',
     col_wall_finish: 'Parede',
     col_ceiling_finish: 'Forro',
+    roof_shape_shed: 'Uma água',
+    roof_shape_gable: 'Duas águas',
+    roof_shape_hip: 'Quatro águas',
+    roof_shape_free: 'Águas livres',
+    roof_shape_edges: 'Por arestas',
+    roof_shape_extrusion: 'Por extrusão',
 } as const;
 
 export const EN_TABELAS = {
@@ -238,4 +244,10 @@ export const EN_TABELAS = {
     col_floor_finish: 'Floor finish',
     col_wall_finish: 'Wall finish',
     col_ceiling_finish: 'Ceiling finish',
+    roof_shape_shed: 'Shed',
+    roof_shape_gable: 'Gable',
+    roof_shape_hip: 'Hip',
+    roof_shape_free: 'Free',
+    roof_shape_edges: 'By edges',
+    roof_shape_extrusion: 'By extrusion',
 } as const;

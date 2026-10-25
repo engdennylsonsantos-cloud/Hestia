@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { rotate, type Vec2 } from '@hestia/geom';
 import { isCeiling, makeCeiling, makeFloor, openingsOfWall, wallsOnLevel, type Wall } from '@hestia/model';
 import { radialAngles, linearStep } from './arrayRadial.ts';
-import { AVISO_HOSPEDEIRA } from './arrayTool.ts';
+import { AVISO_ANGULO_ZERO, AVISO_HOSPEDEIRA } from './arrayTool.ts';
 import { clickAt, drawWall, makeEnv, P, tool, walls } from './testEnv.ts';
 
 const deg = (d: number): number => (d * Math.PI) / 180;
@@ -238,6 +238,28 @@ describe('matriz radial no motor', () => {
     expect(said.at(-1)).toBe(AVISO_HOSPEDEIRA);
     expect(walls(store)).toHaveLength(1);
     expect(openingsOfWall(store.project, w.id)).toHaveLength(1);
+  });
+
+  it('D4: ângulo total 0 na radial não copia e avisa com a mensagem (sem fingir sucesso)', () => {
+    const { store, env, options } = makeEnv();
+    drawWall(env, [2, 0], [3, 0]);
+    env.setSelection([walls(store)[0]!.id]);
+    const said: string[] = [];
+    env.say = (m) => {
+      said.push(m);
+    };
+    options.arrayKind = 'radial';
+    options.arrayCount = 3;
+    options.arrayAngle = 0;
+    options.arrayAnchor = 'second';
+    const a = tool('array', env);
+    clickAt(a, 0, 0);
+    a.click(P(0, 0));
+    expect(walls(store)).toHaveLength(1);
+    expect(said.at(-1)).toBe(AVISO_ANGULO_ZERO);
+    expect(a.type('0')).toBe(true);
+    expect(walls(store)).toHaveLength(1);
+    expect(said.at(-1)).toBe(AVISO_ANGULO_ZERO);
   });
 
   it('o centro da matriz radial não entra na cópia quando nada está selecionado', () => {

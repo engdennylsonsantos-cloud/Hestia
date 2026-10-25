@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { arrayHint, type ArrayAnchor, type ArrayKind } from '@hestia/tools';
+import { arrayHint, AVISO_ANGULO_ZERO, type ArrayAnchor, type ArrayKind } from '@hestia/tools';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
 
@@ -42,7 +42,17 @@ export function ArrayOptionsBar(): ReactElement {
       {radial && (
         <label>
           Ângulo total
-          <NumField id="opt-arrayangle" value={o.arrayAngle ?? 360} decimals={1} unit="°" onCommit={(v) => set({ arrayAngle: v })} />
+          <NumField
+            id="opt-arrayangle"
+            value={o.arrayAngle ?? 360}
+            decimals={1}
+            unit="°"
+            onCommit={(v) => {
+              // Ângulo 0 não gira nada: rejeita e mantém o último valor válido (D4).
+              if (Math.abs(v) < 1e-6) useUi.setState({ status: AVISO_ANGULO_ZERO });
+              else set({ arrayAngle: v });
+            }}
+          />
         </label>
       )}
     </>

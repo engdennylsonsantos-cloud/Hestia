@@ -14,6 +14,9 @@ export const arrayHint = (radial: boolean): string => (radial ? HINT_RADIAL : HI
 /** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
 export const AVISO_HOSPEDEIRA = 'Selecione também a parede hospedeira: portas e janelas acompanham a parede.';
 
+/** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
+export const AVISO_ANGULO_ZERO = 'O ângulo total deve ser diferente de 0°';
+
 /**
  * Matriz: linear (N elementos pelo espaçamento) ou radial (N elementos girados em torno de um centro).
  * "Mover para": Segundo leva o espaçamento/ângulo do 1º ao 2º item; Último, do 1º ao último (dividido entre os itens).
@@ -148,7 +151,8 @@ export class ArrayTool extends SelectionTool {
   /** Radial: copia a seleção em cada ângulo e sai, com a mensagem de resumo. */
   private applyRadial(angleDeg: number): void {
     const center = this.base;
-    if (!center || Math.abs(angleDeg) < 1e-6) return;
+    if (!center) return;
+    if (Math.abs(angleDeg) < 1e-6) return this.env.say(AVISO_ANGULO_ZERO);
     if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
     const n = this.count();
     const angles = radialAngles(n, angleDeg, this.anchor());

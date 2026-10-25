@@ -4,7 +4,7 @@ export * from './numeric.ts';
 export * from './pick.ts';
 export * from './edit.ts';
 export * from './registry.ts';
-export { arrayHint } from './arrayTool.ts';
+export { arrayHint, AVISO_ANGULO_ZERO } from './arrayTool.ts';
 export { ToolBase } from './base.ts';
 export * from './wallGeom.ts';
 export * from './clipboard.ts';

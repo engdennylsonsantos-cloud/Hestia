@@ -11,7 +11,7 @@ import type { Id, Project } from '@hestia/model';
  */
 
 /** Tipos de resolução que podem rodar no worker (cada um tem uma chamada em `executor.ts`). */
-export const TIPOS_RESOLUCAO = ['nivel', 'pisos', 'lajes', 'telhados', 'ambientes'] as const;
+export const TIPOS_RESOLUCAO = ['nivel', 'pisos', 'lajes', 'telhados', 'ambientes', 'juncoes'] as const;
 export type TipoResolucao = (typeof TIPOS_RESOLUCAO)[number];
 
 /**

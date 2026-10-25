@@ -98,6 +98,29 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
   });
 
+  it('Enter com dois pontos não cria telhado, avisa do mínimo e mantém os pontos para continuar', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 3, 0);
+    t.confirm();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toMatch(/Contorno precisa de ao menos 3 pontos/);
+    clickAt(t, 0, 3);
+    t.confirm();
+    expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
+  });
+
+  it('Esc no meio do contorno descarta os pontos, avisa e deixa claro que outro Esc sai da ferramenta', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 3, 0);
+    t.cancel();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toMatch(/Contorno cancelado.*Esc de novo sai da ferramenta/);
+  });
+
   it('inclinação inválida nas opções não cria telhado', () => {
     const ctx = roofCtx('rect');
     ctx.options.roofSlope = 0;

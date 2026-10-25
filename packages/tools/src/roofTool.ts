@@ -218,7 +218,22 @@ export class RoofTool extends ToolBase {
       this.finishContour();
       return;
     }
+    // Com um ou dois pontos o contorno não fecha: avisa e mantém os pontos para o usuário continuar.
+    if (this.polyLike() && this.pts.length > 0) {
+      this.env.say('Contorno precisa de ao menos 3 pontos. Continue clicando, ou Esc cancela.');
+      return;
+    }
     super.confirm();
+  }
+
+  /** O primeiro Esc descarta o desenho em andamento e avisa; sem desenho, o Esc sai da ferramenta (ToolBase.cancel). */
+  override cancel(): void {
+    if (this.busy()) {
+      this.reset();
+      this.env.say(`${this.polyLike() ? 'Contorno' : 'Desenho'} cancelado. Esc de novo sai da ferramenta.`);
+      return;
+    }
+    super.cancel();
   }
 
   override type(text: string): boolean {

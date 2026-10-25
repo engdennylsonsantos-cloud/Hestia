@@ -147,10 +147,14 @@ export interface CenaVista3d extends CenaMontagem {
  * enquadra tudo (uma vez por sessão, como antes: `seen3d`). O enquadramento espera a última fatia, para não pular enquanto
  * os níveis chegam.
  */
-export function criarMontagemVista3d(cena: CenaVista3d, resolver: (id: Id) => ResolvedLevel): Montagem3dProgressiva {
+export function criarMontagemVista3d(
+  cena: CenaVista3d,
+  resolver: (id: Id) => ResolvedLevel,
+  pronto?: (id: Id) => ResolvedLevel | null,
+): Montagem3dProgressiva {
   return new Montagem3dProgressiva({
     cena,
-    fonte: { resolver },
+    fonte: { resolver, pronto },
     aoAtualizar: () => useUi.setState((x) => ({ previewTick: x.previewTick + 1 })),
     aoConcluir: () => {
       if (useUi.getState().seen3d) return;

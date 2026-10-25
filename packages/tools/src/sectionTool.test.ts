@@ -6,6 +6,7 @@ import type { PointerInfo, PreviewItem, Tool, ToolEnv, ToolOptions } from './typ
 function makeEnv(store = new ProjectStore(createEmptyProject())) {
   let selection: Id[] = [];
   let finished = 0;
+  const opened: Id[] = [];
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
@@ -22,9 +23,10 @@ function makeEnv(store = new ProjectStore(createEmptyProject())) {
     gridStep: () => 0.1,
     say: () => {},
     done: () => { finished += 1; },
+    openView: (id) => { opened.push(id); },
     options: () => options,
   };
-  return { store, env, done: () => finished };
+  return { store, env, done: () => finished, opened: () => opened };
 }
 
 const P = (x: number, y: number, extra: Partial<PointerInfo> = {}): PointerInfo => ({ raw: { x, y }, shift: false, ctrl: false, alt: false, ...extra });
@@ -61,6 +63,15 @@ describe('ferramenta Corte', () => {
     expect(v.a.x).toBeCloseTo(0);
     expect(v.b.x).toBeCloseTo(4);
     expect(done()).toBe(1);
+  });
+
+  it('o corte criado abre sozinho na área de desenho (sem duplo clique no navegador)', () => {
+    const { store, env, opened } = makeEnv();
+    const t = new SectionTool(env);
+    t.start();
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    expect(opened()).toEqual([store.project.views[0]!.id]);
   });
 
   it('o segundo corte recebe a próxima letra', () => {

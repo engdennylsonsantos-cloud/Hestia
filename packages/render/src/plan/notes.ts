@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionValue, DIM_TEXT_MM, formatDimensionValue, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
 import { noteLabel } from './tags.ts';
 import type { PlanPaint } from './style.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
@@ -34,7 +34,7 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     const c = picked(d.id) ? look.select : color;
     for (const seg of [g.line, ...g.extensions, ...g.ticks]) out.strokes.push({ pts: [...seg], closed: false, widthPx: pt.cutPx, color: c, alpha: 1 });
-    out.labels.push(noteLabel(g.textAt, formatDimensionValue(dimensionValue(p, d)), fontPx, g.textRotation));
+    out.labels.push(noteLabel(g.textAt, dimensionText(p, d), fontPx, g.textRotation));
   }
   for (const t of levelTexts(p, levelId)) out.labels.push(noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation));
   out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color, new Set(look.selection), look.select));

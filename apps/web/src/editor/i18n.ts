@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { safeGet, safeSet } from './storage.ts';
 import type { ToolId } from '@hestia/tools';
+import { PT_TABELAS, EN_TABELAS } from './i18nTabelas.ts';
 
 export type Lang = 'pt' | 'en';
 
@@ -57,6 +58,7 @@ export const I18N = {
     tool_roof: 'Telhado',
     tool_slope: 'Inclinação',
     tool_roofarrow: 'Seta de inclinação',
+    tool_roofextrusion: 'Extrusão de telhado',
     tool_stair: 'Escada por croqui',
     tool_stairrun: 'Lance de escada',
     tool_room: 'Ambiente',
@@ -81,6 +83,7 @@ export const I18N = {
     tool_attachroof: 'Anexar topo',
     tool_detachroof: 'Desanexar topo',
     tool_measure: 'Medir',
+    tool_section: 'Corte',
 
     // Painéis
     properties_title: 'Propriedades',
@@ -121,6 +124,18 @@ export const I18N = {
     thin_lines: 'Linhas finas',
     hide_isolate: 'Ocultar/Isolar',
     reset_hide: 'Restaurar',
+
+    ...PT_TABELAS,
+
+    // Dicas da barra de título (tema, ajuda, GPU, alterações)
+    tip_dirty: 'Alterações ainda não exportadas',
+    tip_engine: 'Motor de desenho em uso',
+    tip_starting: 'iniciando…',
+    tip_theme: 'Tema',
+    tip_theme_system: 'sistema',
+    tip_theme_light: 'claro',
+    tip_theme_dark: 'escuro',
+    tip_help: 'Atalhos de teclado',
   },
   en: {
     // Ribbon Tabs
@@ -152,6 +167,7 @@ export const I18N = {
     tool_roof: 'Roof',
     tool_slope: 'Slope',
     tool_roofarrow: 'Slope Arrow',
+    tool_roofextrusion: 'Roof by Extrusion',
     tool_stair: 'Stair by Sketch',
     tool_stairrun: 'Stair by Run',
     tool_room: 'Room',
@@ -176,6 +192,7 @@ export const I18N = {
     tool_attachroof: 'Attach Top/Base',
     tool_detachroof: 'Detach Top/Base',
     tool_measure: 'Measure',
+    tool_section: 'Section',
 
     // Palettes
     properties_title: 'Properties',
@@ -216,6 +233,19 @@ export const I18N = {
     thin_lines: 'Thin Lines',
     hide_isolate: 'Temporary Hide/Isolate',
     reset_hide: 'Reset',
+
+    // Quantity schedules (*ScheduleDialog)
+    ...EN_TABELAS,
+
+    // Title bar tips (theme, help, GPU, unsaved changes)
+    tip_dirty: 'Changes not exported yet',
+    tip_engine: 'Rendering engine in use',
+    tip_starting: 'starting…',
+    tip_theme: 'Theme',
+    tip_theme_system: 'system',
+    tip_theme_light: 'light',
+    tip_theme_dark: 'dark',
+    tip_help: 'Keyboard shortcuts',
   },
 } as const;
 

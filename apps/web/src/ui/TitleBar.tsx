@@ -4,7 +4,7 @@ import { useUi } from '../editor/state.ts';
 import { useI18n, I18N } from '../editor/i18n.ts';
 import { savePlanDxf, saveSectionDxf } from '../editor/dxfExport.ts';
 import { savePdf } from '../editor/savePdf.ts';
-import { sheetsPdfOf } from '../editor/sheetActions.ts';
+import { pranchaDaPlantaAtual, sheetsPdfOf } from '../editor/sheetActions.ts';
 import { saveProjectIfc } from '../editor/ifcExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
@@ -39,7 +39,12 @@ export function TitleBar(): ReactElement {
   };
   const exportPdf = async (): Promise<void> => {
     try {
-      const bytes = sheetsPdfOf(editor.project);
+      // Sem prancha: cria uma com a planta do nível atual (ação com desfazer) e exporta essa.
+      let bytes = sheetsPdfOf(editor.project);
+      if (!bytes) {
+        pranchaDaPlantaAtual(editor.store, useUi.getState().levelId);
+        bytes = sheetsPdfOf(editor.project);
+      }
       useUi.setState({ status: bytes ? await savePdf(`${editor.project.name || 'projeto'}-pranchas.pdf`, bytes) : 'Nenhuma prancha para exportar.' });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o PDF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });
@@ -66,7 +71,7 @@ export function TitleBar(): ReactElement {
         onChange={(e) => editor.store.exec({ type: 'setProjectName', name: e.target.value }, 'Renomear projeto')}
         onKeyDown={(e) => e.stopPropagation()}
       />
-      {store.dirty ? <span className="dirty" title="Alterações ainda não exportadas">●</span> : null}
+      {store.dirty ? <span className="dirty" title={t.tip_dirty}>●</span> : null}
       <span className="sep" />
       <button className="ibtn" onClick={() => useUi.setState({ dialog: 'start' })} title={t.btn_new}>
         <Icon name="file" size={17} /> <span className="lbl-text">{t.btn_new}</span>
@@ -108,13 +113,13 @@ export function TitleBar(): ReactElement {
         <span style={{ color: lang === 'en' ? 'var(--accent)' : 'var(--fg-faint)' }}>EN</span>
       </button>
 
-      <span className={`badge ${gpu === 'cpu' ? 'cpu' : 'gpu'}`} title="Motor de desenho em uso">
-        {gpu === 'pending' ? 'iniciando…' : gpu === 'cpu' ? 'CPU' : gpu === 'webgpu' ? 'GPU · WebGPU' : 'GPU · WebGL2'}
+      <span className={`badge ${gpu === 'cpu' ? 'cpu' : 'gpu'}`} title={t.tip_engine}>
+        {gpu === 'pending' ? t.tip_starting : gpu === 'cpu' ? 'CPU' : gpu === 'webgpu' ? 'GPU · WebGPU' : 'GPU · WebGL2'}
       </span>
-      <button className="ibtn" onClick={cycleTheme} title={`Tema: ${theme === 'system' ? 'sistema' : theme === 'light' ? 'claro' : 'escuro'}`}>
+      <button className="ibtn" onClick={cycleTheme} title={`${t.tip_theme}: ${theme === 'system' ? t.tip_theme_system : theme === 'light' ? t.tip_theme_light : t.tip_theme_dark}`}>
         <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={17} />
       </button>
-      <button className="ibtn" onClick={() => useUi.setState({ dialog: 'shortcuts' })} title="Atalhos de teclado">
+      <button className="ibtn" onClick={() => useUi.setState({ dialog: 'shortcuts' })} title={t.tip_help}>
         <Icon name="help" size={17} />
       </button>
     </header>

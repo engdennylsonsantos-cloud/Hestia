@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionValue, DIM_TEXT_MM, levelDimensions, levelTexts, type Id, type Project } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelTexts, type Id, type Project } from '@hestia/model';
 import type { DxfPoint } from './dxf.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
@@ -33,13 +33,11 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
     const { a, b } = dimensionPoints(p, d);
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     lines.push(g.line, ...g.extensions, ...g.ticks);
-    texts.push({ at: g.textAt, text: formatValue(dimensionValue(p, d)), height: DIM_TEXT_MM * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
+    texts.push({ at: g.textAt, text: dimensionText(p, d), height: DIM_TEXT_MM * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
   }
   for (const t of levelTexts(p, levelId)) texts.push({ at: t.at, text: t.text, height: t.height * mPerMm, rotation: t.rotation, layer: DXF_LAYER_TEXTOS });
   return { lines, texts };
 }
-
-const formatValue = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
 /** Registros do TEXT (centrado no ponto de alinhamento, código 72=1 e 73=2) como pares [código, valor]. */
 export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]> {

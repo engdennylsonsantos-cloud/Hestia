@@ -67,11 +67,13 @@ export class DimensionTool extends ToolBase {
   override type(text: string): boolean {
     if (!this.a || !this.b) return false;
     const v = parseNumber(text);
-    if (v === null || v <= 0) {
-      this.env.say('Digite o deslocamento em metros, maior que zero.');
+    if (v === null || v === 0) {
+      this.env.say('Digite o deslocamento em metros, diferente de zero. Com sinal negativo, a cota vai para o lado direito de a→b.');
       return false;
     }
-    this.commit(this.side(this.raw) * v);
+    // O sinal digitado escolhe o lado (negativo = direito de a→b); sem sinal, vale o lado do cursor.
+    const side = v < 0 ? -1 : this.side(this.raw);
+    this.commit(side * roundMm(Math.abs(v)));
     return true;
   }
 

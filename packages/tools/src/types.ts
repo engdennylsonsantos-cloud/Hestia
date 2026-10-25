@@ -64,6 +64,12 @@ export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
 /** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
 export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
 
+/** Tipo da ferramenta Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). */
+export type ArrayKind = 'linear' | 'radial';
+
+/** "Mover para" da Matriz: Segundo (o valor vai do 1º ao 2º item) ou Último (vai do 1º ao último, dividido entre os itens). */
+export type ArrayAnchor = 'second' | 'last';
+
 /** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
 export type CeilingMode = 'poly' | 'rect' | 'room' | 'hole';
 
@@ -117,6 +123,12 @@ export interface ToolOptions {
   windowTypeId: Id;
   orthoLock: boolean;
   arrayCount: number;
+  /** Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). Ausente = linear. */
+  arrayKind?: ArrayKind;
+  /** Matriz radial: ângulo total em graus (positivo = anti-horário). Ausente = 360. */
+  arrayAngle?: number;
+  /** Matriz: "Mover para". Segundo = o espaçamento/ângulo é o do 1º ao 2º item; Último = o do 1º ao último. Ausente = Segundo. */
+  arrayAnchor?: ArrayAnchor;
   offsetDistance: number;
   rotateCopy: boolean;
   mirrorCopy: boolean;

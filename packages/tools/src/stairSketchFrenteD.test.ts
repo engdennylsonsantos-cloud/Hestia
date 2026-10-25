@@ -31,7 +31,37 @@ function risers(t: StairTool, xs: number[], y0: number, y1: number): void {
   }
 }
 
+/** Gerador determinístico (LCG): o ruído dos cliques à mão é sempre o mesmo entre execuções. */
+function lcg(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
 describe('ferramenta Escada: espelhos faltando e tolerância dos limites (frente D)', () => {
+  it('D1: 17 espelhos a 0,28 m com cliques à mão (ruído de 0,05 a 0,15 m) e snap LIGADO concluem', () => {
+    // Antes da correção: a grade (0,1 m) e a ponta do espelho anterior puxavam os cliques e dois espelhos coincidiam.
+    for (const mpp of [0.005, 0.01, 0.02, 0.03]) {
+      const ctx = setup();
+      ctx.env.metersPerPixel = () => mpp;
+      const t = tool('stair', ctx.env) as StairTool;
+      boundaries(t);
+      const rnd = lcg(7);
+      const dev = () => (rnd() < 0.5 ? -1 : 1) * (0.05 + rnd() * 0.1);
+      for (let i = 0; i < 17; i++) {
+        const x = i * 0.28;
+        clickAt(t, x + dev(), 0.5 + dev());
+        clickAt(t, x + dev(), -0.5 + dev());
+      }
+      expect(t.status().firstError, `mpp ${mpp}`).toBeNull();
+      expect(t.status().created, `mpp ${mpp}`).toBe(17);
+      t.setSubmode('concluir');
+      expect(ctx.last()).toMatch(/^Escada criada: 17 espelhos\./);
+    }
+  });
+
   it('2 de 17 espelhos: a conta "Faltam 15" vai ao croqui, e Concluir grava com aviso que diz quantos faltam', () => {
     const ctx = setup();
     const t = tool('stair', ctx.env) as StairTool;

@@ -254,7 +254,8 @@ export class Editor {
     if (ui.view === '3d' && k !== 'Escape' && !(this.tool.pick3d && (k === 'Enter' || k === 'Tab'))) return key3d(k, ui.selection, () => this.deleteSelection());
     if (k === 'Escape') {
       if (ui.typed) useUi.setState({ typed: '' });
-      else this.tool.cancel();
+      // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
+      if (!ui.typed || this.tool.freeText) this.tool.cancel();
       this.bump();
       return true;
     }

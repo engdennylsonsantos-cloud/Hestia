@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hestia — ícones estilo Revit e ArchiCAD</title>
+<style>
+:root{--ink:#172b3a;--muted:#657985;--line:#d7e0e6;--blue:#155b88}
+*{box-sizing:border-box}
+body{margin:0;background:#e9eef2;color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+.page{max-width:1400px;margin:auto;padding:26px}
+.hero{padding:24px 30px;background:linear-gradient(115deg,#112c40,#1b4965);color:#fff;border-radius:13px}
+.hero small{color:#91cde0;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+.hero h1{font-size:26px;margin:8px 0}
+.hero p{color:#d2e2ea;margin:0;max-width:900px}
+.stamp{float:right;border:1px solid #7391a2;border-radius:6px;padding:6px 9px;color:#d2e2ea;font:11px ui-monospace,monospace}
+h2{font-size:20px;margin:28px 0 4px}
+.intro{margin:0 0 14px;color:var(--muted)}
+.mock{background:#fff;border:1px solid #cfd9e0;border-radius:10px;overflow:hidden;margin-top:12px}
+.mock .cap{padding:8px 14px;background:#eaf0f3;border-bottom:1px solid var(--line);font-size:12px;color:#516673}
+.rib{display:flex;gap:0;padding:8px 10px;overflow:auto;background:#f1f2f3}
+.grp{display:flex;flex-direction:column;border-right:1px solid #d3d6d9;padding:0 8px}
+.grp .row{display:flex;gap:2px;flex:1}
+.grp .gt{font-size:11px;color:#59616a;text-align:center;padding-top:3px}
+.btn{width:58px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 2px;font-size:11px;color:#2d3338;text-align:center;line-height:1.15;border:1px solid transparent;border-radius:3px}
+.btn.sel{background:#cfe4f7;border-color:#7fb1de}
+.btn svg{width:34px;height:34px}
+.tbx{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;padding:12px;background:#ececec}
+.tbx .t{display:grid;place-items:center;height:42px;background:#f5f5f5;border:1px solid #d4d4d4;border-radius:3px}
+.tbx .t svg{width:30px;height:30px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.card{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.trio{display:flex;gap:6px}
+.col{display:flex;flex-direction:column;align-items:center;gap:3px}
+.col .lbl{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#7b8b94}
+.box{width:58px;height:58px;border-radius:8px;display:grid;place-items:center}
+.box svg{width:44px;height:44px}
+.box.old{background:#eff3f5;color:#7e8c94}
+.box.old svg{width:30px;height:30px}
+.box.rv{background:#f1f2f3;border:1px solid #d8dadc}
+.box.ac{background:#f5f5f5;border:1px solid #dcdcdc}
+.small{display:flex;gap:4px;align-items:center;margin-top:2px}
+.small svg{width:18px;height:18px}
+.card h3{font-size:14px;margin:0}
+.card .g{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#7b8b94}
+.card p{margin:3px 0 0;font-size:12px;color:#516673}
+.card p.fix{color:#137d9c}
+.note{padding:14px 16px;margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:8px;color:#536a78;font-size:12.5px}
+.note b{color:var(--ink)}
+.note ul{margin:6px 0 0;padding-left:18px}
+.note a{color:var(--blue)}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}.two{grid-template-columns:1fr}.page{padding:14px}.stamp{display:none}}
+
+/* ---- Estilo Revit: cinza sombreado em 3D, azul para superfícies, laranja para esboço/ação ---- */
+.rv .s1{fill:url(#g1)} .rv .s2{fill:url(#g2)} .rv .s3{fill:url(#g3)}
+.rv .bl{fill:url(#gb)} .rv .gl{fill:url(#gg)}
+.rv .s1,.rv .s2,.rv .s3,.rv .bl,.rv .gl{stroke:#5b6369;stroke-width:.8;stroke-linejoin:round}
+.rv .ln{fill:none;stroke:#5b6369;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+.rv .ln2{fill:none;stroke:#5b6369;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rv .ac1{fill:none;stroke:#e8892b;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rv .fa{fill:#e8892b;stroke:none}
+.rv .tx{fill:#5b6369;stroke:none;font:700 8px "Segoe UI",sans-serif}
+
+/* ---- Estilo ArchiCAD: contorno escuro uniforme, preenchimento quase branco ---- */
+.ac .s1,.ac .s2,.ac .bl,.ac .gl{fill:#fbfbfb}
+.ac .s3{fill:#ededee}
+.ac .s1,.ac .s2,.ac .s3,.ac .bl,.ac .gl{stroke:#1f2a30;stroke-width:1.3;stroke-linejoin:round}
+.ac .ln,.ac .ac1{fill:none;stroke:#1f2a30;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.ac .ln2{fill:none;stroke:#1f2a30;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ac .fa{fill:#1f2a30;stroke:none}
+.ac .tx{fill:#1f2a30;stroke:none;font:700 8px "Segoe UI",sans-serif}
+.ds{stroke-dasharray:2.5 2}
+.oldsvg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e3e6e9"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9ecee"/><stop offset="1" stop-color="#bfc5ca"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9bfc5"/><stop offset="1" stop-color="#8a9198"/></linearGradient>
+    <linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6ebfc"/><stop offset="1" stop-color="#4f9fe0"/></linearGradient>
+    <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3ebf2"/><stop offset="1" stop-color="#a6b9ca"/></linearGradient>
+  </defs>
+</svg>
+
+<main class="page">
+<header class="hero">
+  <span class="stamp">PROPOSTA 03 · NÃO IMPLEMENTADA</span>
+  <small>Estudo visual · Interface BIM</small>
+  <h1>Ícones no estilo do Revit e do ArchiCAD</h1>
+  <p>Cada ferramenta aparece em três versões: o ícone atual, uma versão no estilo da faixa de opções do Revit (sólidos cinza sombreados em 3D, azul para superfícies, laranja para ação) e uma no estilo do toolbox do ArchiCAD (contorno escuro uniforme, preenchimento claro, leve perspectiva). Escada agora é só o perfil de degraus visto de lado; janela sem a diagonal.</p>
+</header>
+
+<h2>Como ficaria na interface</h2>
+<p class="intro">À esquerda, a faixa de opções com o estilo Revit; à direita, um toolbox compacto com o estilo ArchiCAD.</p>
+<div class="two">
+  <section class="mock"><div class="cap">Estilo Revit · aba Arquitetura</div><div class="rib" id="ribRv"></div></section>
+  <section class="mock"><div class="cap">Estilo ArchiCAD · caixa de ferramentas</div><div class="tbx ac" id="tbxAc"></div></section>
+</div>
+
+<h2>Ferramenta por ferramenta</h2>
+<p class="intro">Em cada cartão: atual · Revit · ArchiCAD, e abaixo de cada um o mesmo desenho em 18 px (tamanho aproximado do botão pequeno).</p>
+<div class="grid" id="grid"></div>
+
+<aside class="note">
+  <b>O que foi consultado.</b> Capturas reais da faixa Arquitetura do Revit (versões 2010 e 2021+, tutoriais da Autodesk) e o painel de ferramentas do ArchiCAD publicado no site de desenvolvedores da Graphisoft
+  (<a href="https://archicadapi.graphisoft.com/wp-content/uploads/2017/01/DG_Test_Element_Icons_Dialog-1.png">imagem do toolbox</a>).
+  Dali saíram as regras de estilo: no Revit, volume cinza com luz vinda de cima-esquerda, azul em piso/forro/ambiente, lápis ou seta laranja quando o ícone é “esboçar”; no ArchiCAD, traço escuro fino, quase sem cor, objetos em perspectiva leve (porta com folha entreaberta e maçaneta, janela de quatro vidros, laje e escada em perspectiva).
+  <ul>
+    <li>São <b>redesenhos próprios</b> nesse estilo, não cópias dos ícones da Autodesk ou da Graphisoft (que são protegidos). Mantêm a mesma lógica visual para o usuário reconhecer de relance.</li>
+    <li>As capturas que consegui eram de baixa resolução; os detalhes finos dos ícones originais foram interpretados, não medidos.</li>
+    <li>Este arquivo é só uma proposta; nenhum botão ou comportamento do Hestia foi alterado.</li>
+  </ul>
+</aside>
+</main>
+
+<script>
+/* ===== Geometria única (32×32); o estilo vem das classes CSS da .rv / .ac ===== */
+const P=(c,d,x)=>`<path class="${c}" d="${d}"${x?' '+x:''}/>`;
+const ICONS={
+  select:[P('s1','M8 3V24L13 19L16.5 27L19.8 25.6L16.5 18.2L23 18Z')],
+  wall:[P('s1','M4 12L12 7H28L20 12Z'),P('s2','M4 12H20V25H4Z'),P('s3','M20 12L28 7V20L20 25Z')],
+  door:[P('s3','M8 4H24V28H8Z'),P('s2','M8 4L19 6.5V30L8 28Z'),'<circle class="fa" cx="16" cy="18" r="1.3"/>'],
+  window:[P('s2','M5 3H27V26H5Z'),P('gl','M8 6H15V13H8Z'),P('gl','M17 6H24V13H17Z'),P('gl','M8 15H15V22H8Z'),P('gl','M17 15H24V22H17Z'),P('s3','M3 26H29V29H3Z')],
+  floor:[P('bl','M3 14L16 7L29 14L16 21Z'),P('s2','M3 14L16 21V25L3 18Z'),P('s3','M16 21L29 14V18L16 25Z')],
+  slab:[P('s1','M3 11L16 4L29 11L16 18Z'),P('s2','M3 11L16 18V28L3 21Z'),P('s3','M16 18L29 11V21L16 28Z')],
+  ceiling:[P('ln','M5 4H27M9 4V13.8M16 4V10M23 4V13.8'),P('bl','M3 17L16 10L29 17L16 24Z'),P('ln','M9.5 13.5L22.5 20.5M22.5 13.5L9.5 20.5')],
+  roof:[P('s1','M13 10L21 5L31 21L23 26Z'),P('s2','M3 26L13 10L23 26Z')],
+  slope:[P('s3','M21 26V12L27 8V22Z'),P('s1','M3 26L21 12L27 8L9 22Z'),P('s2','M3 26H21V12Z')],
+  roofarrow:[P('s1','M3 24L9 10H29L23 24Z'),P('ac1','M12 21L19 13M19 13H14.8M19 13V17.2')],
+  roofextrusion:[P('s3','M21 16L28 12V22L21 26Z'),P('s1','M3 16Q12 4 21 16L28 12Q19 0 10 12Z'),P('s2','M3 26V16Q12 4 21 16V26Z'),P('ac1','M3 16Q12 4 21 16')],
+  stair:[P('s2','M3 27V20H11V14H19V8H29V27Z')],
+  stairrun:[P('s1','M6 3H26V29H6Z'),P('ln','M6 9H26M6 14H26M6 19H26M6 24H26'),P('ac1','M16 27V9'),P('fa','M12 11L16 5L20 11Z')],
+  room:[P('s1','M3 3H29V29H3Z'),P('bl','M7 11H25V25H7Z'),P('ln','M7 11L25 25M25 11L7 25')],
+  dimension:[P('ln','M5 6V24M27 6V24M5 18H27'),P('ac1','M3 20L7 16M25 20L29 16'),'<text class="tx" x="16" y="15" text-anchor="middle">12</text>'],
+  text:[P('ln2','M6 27L16 5L26 27M10 20H22')],
+  cotasAuto:[P('ln','M4 4V18M14 4V18M28 4V18M4 14H28'),P('ac1','M2 16L6 12M12 16L16 12M26 16L30 12'),P('s2','M4 21H28V29H4Z'),P('fa','M21 3L22 6L25 7L22 8L21 11L20 8L17 7L20 6Z')],
+  move:[P('s1','M11 11H21V21H11Z'),P('ln','M16 7V11M16 21V25M7 16H11M21 16H25'),P('fa','M16 2L12 7H20ZM16 30L12 25H20ZM2 16L7 12V20ZM30 16L25 12V20Z')],
+  copy:[P('s3','M3 3H19V19H3Z'),P('s1','M12 12H28V28H12Z'),P('ac1','M20 15V25M15 20H25')],
+  rotate:[P('s1','M12 12H20V20H12Z','transform="rotate(20 16 16)"'),P('ac1','M27 16A11 11 0 1 1 21.5 6.5'),P('ac1','M17 7L21.5 6.5L19.5 2.5')],
+  mirror:[P('ln ds','M16 2V30'),P('s1','M13 8L4 24H13Z'),P('s3','M19 8L28 24H19Z')],
+  array:[P('s1','M3 5H10V12H3Z'),P('s1','M12.5 5H19.5V12H12.5Z'),P('s1','M22 5H29V12H22Z'),P('s1','M3 14H10V21H3Z'),P('s1','M12.5 14H19.5V21H12.5Z'),P('s1','M22 14H29V21H22Z'),P('ac1','M3 26H29M3 24V28M29 24V28')],
+  parallel:[P('s2','M3 4H29V10H3Z'),P('s2','M3 22H29V28H3Z'),P('fa','M16 11L13 15H19ZM16 21L13 17H19Z')],
+  offset:[P('ln','M4 28V5H28'),P('ac1','M10 28V11H28'),P('ac1','M5 20H9')],
+  trim:[P('ln2','M3 20H20V4'),P('ac1 ds','M20 20H29M20 20V29')],
+  align:[P('ac1','M6 3V29'),P('s2','M9 5H27V11H9Z'),P('s2','M9 13H21V19H9Z'),P('s2','M9 21H25V27H9Z')],
+  joins:[P('s2','M3 12H11V4H21V12H29V20H21V28H11V20H3Z'),P('ac1','M11 12H21V20H11Z')],
+  split:[P('s2','M3 11H13V21H3Z'),P('s2','M19 11H29V21H19Z'),P('ac1 ds','M16 4V28')],
+  measure:['<g transform="rotate(-35 16 16)">'+P('s1','M1 11H31V21H1Z')+P('ln','M6 11V16M11 11V14M16 11V16M21 11V14M26 11V16')+'</g>'],
+  rehost:[P('s3','M3 5H9V27H3Z'),P('s3','M23 5H29V27H23Z'),P('ac1','M12 11H20M20 21H12'),P('fa','M21 11L17 8V14ZM11 21L15 18V24Z')],
+  attachroof:[P('s1','M3 15L16 5L29 15Z'),P('s2','M6 15H26V28H6Z'),P('ac1','M16 25V19'),P('fa','M16 16L12.5 20.5H19.5Z')],
+  detachroof:[P('s1','M3 10L16 2L29 10Z'),P('s2','M6 19H26V29H6Z'),P('ac1','M16 12V16'),P('fa','M16 18L12.5 13.5H19.5Z')],
+  section:[P('s3','M2 17L8 11V23Z'),P('s3','M30 17L24 11V23Z'),P('ln ds','M8 17H24'),P('ac1','M16 17V9'),P('fa','M16 3L12 9H20Z')]
+};
+const svg=k=>`<svg viewBox="0 0 32 32" aria-hidden="true">${ICONS[k].join('')}</svg>`;
+
+/* Ícones atuais (extraídos de apps/web/src/ui/Icon.tsx) */
+const OLD={
+  select:'M5 3l13 8-5 2-2 6-3-1 2-5zM13 13l5 7',wall:'M3 7h18v10H3zM3 10h18M8 7v3m6 0v3m6-3v7',
+  door:'M2 9h6m12 0h2M8 9V3M8 3a6 6 0 0 1 6 6',window:'M4 4h16v16H4zM4 12h16M12 4v16M6 6l12 12',
+  move:'M12 3v18M3 12h18M12 3l-3 3m3-3 3 3M12 21l-3-3m3 3 3-3M3 12l3-3m-3 3 3 3m15-3-3-3m3 3-3 3',
+  copy:'M8 8h12v12H8zM4 16V4h12M11 14h6M14 11v6',rotate:'M20 11a8 8 0 1 1-2.3-5.7M20 4v6h-6',
+  mirror:'M12 3v18M9 7l-5 5 5 5zM15 7l5 5-5 5z',array:'M3 4h5v5H3zM10 4h5v5h-5zM17 4h4v5h-4zM3 12h5v5H3zM10 12h5v5h-5zM17 12h4v5h-4zM5 21h14',
+  parallel:'M3 7h18v3H3zM3 14h18v3H3zM19 10v4m-2-2 2 2 2-2',offset:'M4 19 12 5l8 14zM7 16h10M9 12h6',
+  trim:'M4 4v16h16M4 12h9M13 7v10M13 7l6-3',align:'M5 3v18M9 6h11M9 12h8M9 18h11M7 6h2m-2 6h2m-2 6h2',
+  joins:'M4 20V8h12M4 8l5-5M16 8v12M16 8l5 5M13 8h6',split:'M3 12h7m4 0h7M12 4v4m0 8v4M10 10l4 4m0-4-4 4',
+  measure:'M4 18 18 4l3 3L7 21zM8 14l2 2m1-5 2 2m1-5 2 2',rehost:'M2 7h7v10H2zM15 7h7v10h-7zM9 12h6m-3-3 3 3-3 3M4 10h3m10 0h3',
+  attachroof:'M3 9l9-6 9 6M5 9v11h14V9M8 14h8M12 11v6m-3-3h6',detachroof:'M3 8l9-5 6 4M6 10v10h12v-8M16 6l5-4m-5 0 5 4',
+  floor:'M3 8l9-5 9 5-9 5zM3 8v8l9 5v-8m9-5v8l-9 5M7 10l9-5M12 13l8-3',slab:'M3 8h18v4H3zM3 12h18v5H3zM6 17v3m6-3v3m6-3v3M7 8V5m10 3V5',
+  ceiling:'M3 5h18v3H3zM6 8v5m6-5v5m6-5v5M4 14h16M4 18h16M7 14v4m10-4v4',slope:'M3 18 20 7M16 7h4v4M4 21h16M4 18v3',
+  roof:'M2 14 12 5l10 9M4 14h16M6 13v3m12-3v3M3 18h18',roofarrow:'M3 12l9-8 9 8M5 12v8h14v-8M12 17V8m-3 3 3-3 3 3',
+  roofextrusion:'M3 12l7-7 7 7v7H3zM10 5l4-2 7 6v8l-4 2M3 12h14M17 12l4-3',
+  stair:'M3 20h4v-4h4v-4h4V8h6M3 20V6M7 16v-4m4 0V8m4 0V4M5 4l2-2 2 2',stairrun:'M4 20h16V4H4zM6 17h4v-3h4v-3h4V8M7 6h10M7 6l3-3m-3 3 3 3',
+  room:'M4 4h16v16H4zM4 12h5m6 0h5M12 4v4m0 8v4M9 9h6v6H9z',dimension:'M4 18h16M6 16v4m12-4v4M8 15l4-6 4 6M12 9V5m-2 2 2-2 2 2',
+  text:'M5 5h14M12 5v14M8 19h8M16 12l5 5',cotasAuto:'M4 5h16v11H4zM7 8v5m5-5v3m5-3v5M3 20h18M5 18v4m14-4v4M7 14h10',
+  section:'M3 12h18M6 9l-3 3 3 3m12-6 3 3-3 3M12 3v4m-3-2 3-2 3 2M12 17v4m-3-2 3 2 3-2'
+};
+const oldSvg=k=>`<svg viewBox="0 0 24 24" class="oldsvg" aria-hidden="true"><path d="${OLD[k]}"/></svg>`;
+
+/* ===== Cartões ===== */
+const CARDS=[
+ ['select','Modificar','Seleção','Cursor com a mesma silhueta nos dois estilos.'],
+ ['wall','Parede','Arquitetura','Bloco de parede em perspectiva: topo, face e lateral.'],
+ ['door','Porta','Arquitetura','Vão escuro com folha entreaberta e maçaneta (como no ArchiCAD).'],
+ ['window','Janela','Arquitetura','Caixilho de quatro vidros e peitoril. Sem a diagonal.'],
+ ['floor','Piso','Arquitetura','Placa fina; no Revit o topo é azul, como nas superfícies.'],
+ ['slab','Laje','Arquitetura','Mesma placa, mais espessa, para diferenciar do piso.'],
+ ['ceiling','Forro','Arquitetura','Plano azul com paginação e pendurais.'],
+ ['roof','Telhado','Arquitetura','Cobertura de duas águas em perspectiva, com cumeeira e empena.'],
+ ['slope','Inclinação','Arquitetura','Cunha em perspectiva, como a rampa do Revit.'],
+ ['roofarrow','Seta de inclinação','Arquitetura','Plano inclinado com seta no sentido do caimento.'],
+ ['roofextrusion','Extrusão de telhado','Arquitetura','Perfil curvo na frente, extrudado em profundidade.'],
+ ['stair','Escada','Arquitetura','Só o perfil de três degraus visto de lado, como pedido.'],
+ ['stairrun','Lance de escada','Arquitetura','Lance em planta, com linhas de degrau e seta de subida.'],
+ ['room','Ambiente','Ambientes','Contorno com caixa e X de ambiente (azul no Revit).'],
+ ['dimension','Cota alinhada','Anotação','Linhas de extensão, linha de cota com marcas e valor.'],
+ ['text','Texto','Anotação','Letra A em traço grosso.'],
+ ['cotasAuto','Cotas automáticas','Anotação','Cadeia de cotas sobre a planta, com brilho de “automático”.'],
+ ['move','Mover','Modificar','Objeto no centro e quatro setas.'],
+ ['copy','Copiar','Modificar','Original atrás, cópia à frente com sinal de mais.'],
+ ['rotate','Girar','Modificar','Objeto inclinado dentro de arco com seta.'],
+ ['mirror','Espelhar','Modificar','Eixo tracejado e dois triângulos refletidos.'],
+ ['array','Matriz','Modificar','Repetição em grade com cota de espaçamento.'],
+ ['offset','Deslocar','Modificar','Contorno original e contorno paralelo.'],
+ ['parallel','Parede paralela','Modificar','Duas paredes afastadas e setas de distância.'],
+ ['trim','Aparar/Estender','Modificar','Encontro em canto: trecho mantido e prolongamento pontilhado.'],
+ ['align','Alinhar','Modificar','Linha de referência e três barras alinhadas.'],
+ ['joins','Unir geometria','Modificar','Dois blocos fundidos em uma só forma.'],
+ ['split','Dividir elemento','Modificar','Barra cortada em duas com linha de corte.'],
+ ['rehost','Trocar hospedeiro','Modificar','Duas paredes e setas de troca.'],
+ ['attachroof','Anexar topo','Modificar','Seta subindo da parede até o telhado.'],
+ ['detachroof','Desanexar topo','Modificar','Telhado afastado da parede, seta para baixo.'],
+ ['measure','Medir','Modificar','Régua diagonal com marcas de escala.'],
+ ['section','Corte','Vista','Linha de corte com cabeças e seta de direção da vista.']
+];
+const grid=document.getElementById('grid');
+grid.innerHTML=CARDS.map(([k,n,g,t])=>`
+<article class="card">
+  <div class="trio">
+    <div class="col"><div class="box old">${oldSvg(k)}</div><span class="lbl">Atual</span></div>
+    <div class="col"><div class="box rv rv">${svg(k)}</div><span class="lbl">Revit</span><div class="small rv">${svg(k)}</div></div>
+    <div class="col"><div class="box ac ac">${svg(k)}</div><span class="lbl">ArchiCAD</span><div class="small ac">${svg(k)}</div></div>
+  </div>
+  <div><div class="g">${g}</div><h3>${n}</h3><p>${t}</p></div>
+</article>`).join('');
+/* as classes rv/ac precisam estar no elemento ancestral do svg */
+grid.querySelectorAll('.box.rv,.small.rv').forEach(e=>e.classList.add('rv'));
+
+/* ===== Mock da faixa Revit ===== */
+const grp=(title,btns)=>`<div class="grp"><div class="row">${btns.map(([k,n,sel])=>`<div class="btn${sel?' sel':''}">${svg(k)}<span>${n}</span></div>`).join('')}</div><div class="gt">${title}</div></div>`;
+document.getElementById('ribRv').classList.add('rv');
+document.getElementById('ribRv').innerHTML=
+  grp('Selecionar',[['select','Modificar']])+
+  grp('Construir',[['wall','Parede',1],['door','Porta'],['window','Janela'],['roof','Telhado'],['ceiling','Forro'],['floor','Piso'],['slab','Laje']])+
+  grp('Circulação',[['stair','Escada'],['stairrun','Lance'],['slope','Rampa']])+
+  grp('Ambiente',[['room','Ambiente']])+
+  grp('Anotação',[['dimension','Cota'],['text','Texto']]);
+
+/* ===== Mock do toolbox ArchiCAD ===== */
+document.getElementById('tbxAc').innerHTML=['select','wall','door','window','slab','roof','stair','room','dimension','text','floor','ceiling','move','copy','rotate','mirror'].map(k=>`<div class="t">${svg(k)}</div>`).join('');
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { polygonArea, ringArea, type Vec2 } from '@hestia/geom';
-import { roofAutoOffset, degToPercent, defaultRoofDir, eaveOutline, percentToDeg, roofDirFor, roofSlopeError, ROOF_DEFAULT_OFFSET } from './roofGeom.ts';
+import { roofAutoOffset, degToPercent, defaultRoofDir, eaveOutline, percentToDeg, roofDirFor, roofSlopeError, roofSlopeFromDegField, ROOF_DEFAULT_OFFSET } from './roofGeom.ts';
 import { makeEnv } from './testEnv.ts';
 
 const rect = (w: number, h: number): Vec2[] => [
@@ -25,6 +25,17 @@ describe('telhado: inclinação em % e graus (B3, A3)', () => {
     expect(roofSlopeError(-5)).not.toBeNull();
     expect(roofSlopeError(250)).not.toBeNull();
     expect(roofSlopeError(30)).toBeNull();
+  });
+
+  it('campo em graus sem edição não regrava a inclinação (45 % continua 45 %)', () => {
+    const shown = Number(percentToDeg(45).toFixed(1));
+    // Ao sair do campo sem digitar, o valor lido é o mostrado (24,2°): a inclinação em % fica como estava.
+    expect(roofSlopeFromDegField(shown, percentToDeg(45), 45)).toBe(45);
+  });
+
+  it('campo em graus editado grava a inclinação digitada', () => {
+    expect(roofSlopeFromDegField(24.23, percentToDeg(45), 45)).toBeCloseTo(degToPercent(24.23), 9);
+    expect(roofSlopeFromDegField(20, percentToDeg(45), 45)).toBeCloseTo(degToPercent(20), 9);
   });
 });
 

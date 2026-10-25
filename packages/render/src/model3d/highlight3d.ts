@@ -40,10 +40,11 @@ export function highlightOf(model: THREE.Object3D, ids: readonly Id[], style: Hi
   if (!pos.length) return out;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  // polygonOffset puxa o preenchimento para a câmera: não briga em z com a face do modelo que ele cobre.
+  // Sem polygonOffset: a cópia tem a mesma geometria da face que cobre, então passa no teste de profundidade sem
+  // empurrar a sobreposição para a frente. Com o offset, camadas de baixo (cm abaixo do topo) vazavam pelo topo.
   const fill = new THREE.Mesh(
     geo,
-    new THREE.MeshBasicMaterial({ color: style.color, transparent: true, opacity: style.fill, depthTest: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }),
+    new THREE.MeshBasicMaterial({ color: style.color, transparent: true, opacity: style.fill, depthTest: true, depthWrite: false }),
   );
   fill.renderOrder = 5;
   const edges = new THREE.LineSegments(

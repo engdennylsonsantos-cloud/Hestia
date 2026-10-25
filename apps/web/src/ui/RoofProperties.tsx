@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { quantifyRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { FUNCTION_LABEL, roofTypeThickness, type Id, type Roof, type RoofShape } from '@hestia/model';
 import { defaultExtrusionProfile } from '@hestia/engine';
-import { roofShapePatch, roofSlopeError, degToPercent, percentToDeg } from '@hestia/tools';
+import { roofPresetOf, roofShapePatch, roofSlopeError, roofSlopeFromDegField, percentToDeg } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
@@ -127,7 +127,8 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       </Group>
       <Group title="Forma">
         <Row label="Forma" htmlFor="p-rshape">
-          <select id="p-rshape" className="select" value={shape.mixed ? '' : shape.value} onChange={(e) => e.target.value && setShape(e.target.value as RoofShape)} aria-label="Forma do telhado">
+          {/* Telhado por arestas que reproduz uma predefinição (duas águas, etc.) mostra essa forma, como a barra. */}
+          <select id="p-rshape" className="select" value={shape.mixed ? '' : single?.shape === 'edges' ? (roofPresetOf(single) ?? 'edges') : shape.value} onChange={(e) => e.target.value && setShape(e.target.value as RoofShape)} aria-label="Forma do telhado">
             {shape.mixed && <option value="">variadas</option>}
             {SHAPE_OPTIONS.map((s) => (
               <option key={s} value={s}>{ROOF_SHAPE_LABEL[s]}</option>
@@ -138,7 +139,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
           <NumField id="p-rslope" value={slope.value} mixed={slope.mixed} onCommit={setSlope} unit="%" min={0.1} max={200} />
         </Row>
         <Row label="Inclinação (°)" htmlFor="p-rdeg">
-          <NumField id="p-rdeg" value={percentToDeg(slope.value)} mixed={slope.mixed} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => setSlope(degToPercent(v))} />
+          <NumField id="p-rdeg" value={percentToDeg(slope.value)} mixed={slope.mixed} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => setSlope(roofSlopeFromDegField(v, percentToDeg(slope.value), slope.value))} />
         </Row>
         {hasRidge && single ? (
           <>

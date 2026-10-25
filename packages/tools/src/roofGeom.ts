@@ -10,6 +10,15 @@ export const percentToDeg = (percent: number): number => (Math.atan(percent / 10
 /** Graus para percentual de inclinação: % = tan(graus) × 100. */
 export const degToPercent = (deg: number): number => Math.tan((deg * Math.PI) / 180) * 100;
 
+/**
+ * Inclinação (%) gravada pelo campo em graus ao sair dele. Sem edição, o campo lê o valor mostrado (1 casa decimal):
+ * nesse caso a inclinação atual em % fica como estava, senão o arredondamento trocaria 45 % por 44,94 %.
+ */
+export function roofSlopeFromDegField(typedDeg: number, currentDeg: number, currentPercent: number): number {
+  const shownDeg = Number(currentDeg.toFixed(1));
+  return Math.abs(typedDeg - shownDeg) < 1e-9 ? currentPercent : degToPercent(typedDeg);
+}
+
 /** Erro da inclinação de telhado (não finita, não positiva ou acima do limite), ou null quando é aceita. */
 export function roofSlopeError(percent: number): string | null {
   if (!Number.isFinite(percent)) return 'Inclinação inválida: digite um número.';

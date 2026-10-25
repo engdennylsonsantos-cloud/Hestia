@@ -58,7 +58,7 @@ export const I18N = {
     tool_roof: 'Telhado',
     tool_slope: 'Inclinação',
     tool_roofarrow: 'Seta de inclinação',
-    tool_roofextrusion: 'Extrusão de telhado',
+    tool_roofextrusion: 'Telhado por extrusão',
     tool_stair: 'Escada por croqui',
     tool_stairrun: 'Lance de escada',
     tool_room: 'Ambiente',

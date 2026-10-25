@@ -33,6 +33,7 @@ import {
 } from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
 import { openingSymbol } from './symbols.ts';
+import { contextoDaVista } from './viewContext.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 /** Estados de parede que a planta desenha só como contorno (fora do corte, dentro do intervalo). */
@@ -113,7 +114,7 @@ function computePlanView(p: Project, levelId: Id, partial: PartialStructure, hid
   const outlineWalls = new Set<Id>();
   const categoryHidden = categoryHiddenIds(p, levelId, hiddenCats);
   // Mesma classificação de `openingsCrossingCut` (aberturas `cut`), numa só passada pelo nível. Categoria oculta vira `hidden`.
-  for (const e of classifyLevelEntries(p, levelId, range)) {
+  for (const e of classifyLevelEntries(p, levelId, range, contextoDaVista(p, levelId))) {
     const cl: ViewClass = categoryHidden.has(e.id) ? 'hidden' : e.cls;
     cls.set(e.id, cl);
     if (cl === 'hidden') hidden.add(e.id);

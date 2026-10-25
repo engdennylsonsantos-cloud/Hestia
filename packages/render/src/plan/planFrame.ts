@@ -28,6 +28,11 @@ export interface PlanViewState {
   resolve: (id: Id) => ResolvedLevel;
 }
 
+/** Resolução vazia do nível atual: a planta normal não a lê (ver `planFrameUpdateOf`). */
+export function resolucaoVazia(levelId: Id): ResolvedLevel {
+  return { levelId, walls: {}, clusters: [] };
+}
+
 /**
  * Atualização do quadro a partir do estado da planta: as chaves (a geometria só depende do que ela lê; a sobreposição, do
  * que aparece sobre ela) e as funções que refazem cada camada, chamadas só quando a chave muda.
@@ -35,7 +40,10 @@ export interface PlanViewState {
 export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   const { project: p, levelId, v, theme, dark } = s;
   const geoSel = planGeometrySelection(p, levelId, s.selection);
-  const base = { project: p, levelId, resolved: s.resolve(levelId), viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection };
+  // A planta normal não usa a resolução do nível atual: `planViewOf` refaz a geometria com o corte (ver `planContext`).
+  // Só a planta de cobertura (`roofPlanMode`) lê `resolved`, e este quadro não a liga. Por isso não se resolve o nível
+  // atual aqui: resolvê-lo seria o dobro de trabalho na abertura. O nível de baixo continua resolvido (ver `planBelowOf`).
+  const base = { project: p, levelId, resolved: resolucaoVazia(levelId), viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection };
   return {
     v,
     theme,

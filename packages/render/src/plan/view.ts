@@ -33,7 +33,7 @@ import {
 } from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
 import { openingSymbol } from './symbols.ts';
-import { contextoDaVista } from './viewContext.ts';
+import { contextoDaVista, projetoDaJuncao } from './viewContext.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 /** Estados de parede que a planta desenha só como contorno (fora do corte, dentro do intervalo). */
@@ -129,7 +129,7 @@ function computePlanView(p: Project, levelId: Id, partial: PartialStructure, hid
   const walls0 = hiddenCats.has('wall')
     ? ({ levelId, walls: {}, clusters: [] } as ResolvedLevel)
     // Paredes cortadas pela junção (P7c parte 2): cada camada sai só onde sobra da camada que a vence, na cota do plano da vista.
-    : cutLevelByJunction(resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls }), junctionLevel(p, levelId), { planZ: cutZ, outline: outlineWalls });
+    : cutLevelByJunction(resolveLevel(p, levelId, undefined, { cutZ, planOpenings: cutOpenings, outlineWalls }), junctionLevel(projetoDaJuncao(p, levelId), levelId), { planZ: cutZ, outline: outlineWalls });
   const geo = applyPartialStructure(p, walls0, partial);
   // Silhueta cortada: o contorno das paredes fora do corte não deve riscá-la.
   const cutSilhouette = union(...geo.clusters.map((c) => c.silhouette));
@@ -238,7 +238,7 @@ function ghostOps(p: Project, levelId: Id, view: PlanView, ids: Id[], theme: Pla
   const wallIds = ids.filter((id) => isWall(p.elements[id]));
   if (wallIds.length > 0) {
     // Mesmo corte da vista; as ocultas entram como contorno (`outlineWalls`), então o `fragment` é a parede inteira.
-    const walls = cutLevelByJunction(resolveLevel(p, levelId, undefined, { cutZ: view.cutZ, planOpenings: new Set<Id>(), outlineWalls: new Set<Id>(wallIds) }), junctionLevel(p, levelId), { outline: new Set<Id>(wallIds) });
+    const walls = cutLevelByJunction(resolveLevel(p, levelId, undefined, { cutZ: view.cutZ, planOpenings: new Set<Id>(), outlineWalls: new Set<Id>(wallIds) }), junctionLevel(projetoDaJuncao(p, levelId), levelId), { outline: new Set<Id>(wallIds) });
     const geo = applyPartialStructure(p, walls, view.partial);
     for (const id of wallIds) addRings(union(...(geo.walls[id]?.layers ?? []).map((l) => l.fragment)));
   }

@@ -4,7 +4,7 @@ import { useUi } from '../editor/state.ts';
 import { useI18n, I18N } from '../editor/i18n.ts';
 import { savePlanDxf, saveSectionDxf } from '../editor/dxfExport.ts';
 import { savePdf } from '../editor/savePdf.ts';
-import { sheetsPdfOf } from '../editor/sheetActions.ts';
+import { pranchaDaPlantaAtual, sheetsPdfOf } from '../editor/sheetActions.ts';
 import { saveProjectIfc } from '../editor/ifcExport.ts';
 import { Icon } from './Icon.tsx';
 import { useProjectVersion } from '../editor/controller.ts';
@@ -39,7 +39,12 @@ export function TitleBar(): ReactElement {
   };
   const exportPdf = async (): Promise<void> => {
     try {
-      const bytes = sheetsPdfOf(editor.project);
+      // Sem prancha: cria uma com a planta do nível atual (ação com desfazer) e exporta essa.
+      let bytes = sheetsPdfOf(editor.project);
+      if (!bytes) {
+        pranchaDaPlantaAtual(editor.store, useUi.getState().levelId);
+        bytes = sheetsPdfOf(editor.project);
+      }
       useUi.setState({ status: bytes ? await savePdf(`${editor.project.name || 'projeto'}-pranchas.pdf`, bytes) : 'Nenhuma prancha para exportar.' });
     } catch (e) {
       useUi.setState({ status: `Não foi possível exportar o PDF: ${e instanceof Error ? e.message : 'falha desconhecida'}` });

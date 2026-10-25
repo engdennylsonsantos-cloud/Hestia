@@ -126,7 +126,7 @@ export class MoveTool extends SelectionTool {
         return;
       }
       if (this.copy) {
-        this.env.say('Copiar aresta: ainda não suportado');
+        this.env.say('Copiar aresta: não permitido. A cópia sobreporia a linha ou deixaria o croqui aberto (como no Revit).');
         return;
       }
       this.edgePick = found;

@@ -57,7 +57,7 @@ describe('deslocar aresta de piso (Deslocar)', () => {
     ctx.options.offsetCopy = true;
     const off = tool('offset', ctx.env);
     clickAt(off, 2, -0.02);
-    expect(ctx.msgs).toContain('Deslocar aresta: cópia ainda não suportada');
+    expect(ctx.msgs).toContain('Deslocar aresta com cópia: não permitido. A cópia sobreporia a linha ou deixaria o croqui aberto (como no Revit).');
     expect(floorOf(ctx).boundary[0]!.y).toBeCloseTo(0);
   });
 
@@ -100,7 +100,7 @@ describe('mover aresta de piso (Mover sem seleção)', () => {
     const c = tool('copy', ctx.env);
     clickAt(c, 2, 3);
     clickAt(c, 2, 4);
-    expect(ctx.msgs).toContain('Copiar aresta: ainda não suportado');
+    expect(ctx.msgs).toContain('Copiar aresta: não permitido. A cópia sobreporia a linha ou deixaria o croqui aberto (como no Revit).');
     expect(floorOf(ctx).boundary).toEqual(OUTER);
   });
 });

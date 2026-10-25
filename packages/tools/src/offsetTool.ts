@@ -89,7 +89,7 @@ export class OffsetTool extends ToolBase {
     const edge = this.edgeAt(p.raw);
     if (edge) {
       if (this.env.options().offsetCopy) {
-        this.env.say('Deslocar aresta: cópia ainda não suportada');
+        this.env.say('Deslocar aresta com cópia: não permitido. A cópia sobreporia a linha ou deixaria o croqui aberto (como no Revit).');
         return;
       }
       const off = this.edgeOffset(edge, p.raw);

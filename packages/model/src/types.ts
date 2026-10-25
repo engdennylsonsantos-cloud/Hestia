@@ -136,6 +136,15 @@ export interface Level {
   dimensions?: Dimension[];
   /** Textos de anotação da planta (decisão 0019); ausente = nenhum. */
   texts?: TextNote[];
+  /** Linhas de separação de ambiente (decisão 0031 §3; Revit: Room Separation Line); ausente = nenhuma. */
+  roomSeparators?: RoomSeparator[];
+}
+
+/** Linha de separação de ambiente: divide a área livre entre paredes em dois ambientes (Revit: Room Separation Line). */
+export interface RoomSeparator {
+  id: Id;
+  a: Vec2;
+  b: Vec2;
 }
 
 /**

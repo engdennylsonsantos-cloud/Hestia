@@ -23,8 +23,9 @@ import { StairRunTool } from './stairRunTool.ts';
 import { DimensionTool } from './dimensionTool.ts';
 import { TextTool } from './textTool.ts';
 import { RoomTool } from './roomTool.ts';
+import { RoomSeparatorTool } from './roomSeparatorTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'room'] },
@@ -67,6 +68,8 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new TextTool(env);
     case 'room':
       return new RoomTool(env);
+    case 'roomsep':
+      return new RoomSeparatorTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -135,6 +138,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   dimension: 'Cota',
   text: 'Texto',
   room: 'Ambiente',
+  roomsep: 'Linha de separação',
 };
 
 export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {

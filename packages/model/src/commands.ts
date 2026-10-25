@@ -361,6 +361,8 @@ export function applyCommand(p: Project, c: Command): void {
     case 'addText':
     case 'updateText':
     case 'removeText':
+    case 'addRoomSeparator':
+    case 'removeRoomSeparator':
       applyAnnotationCommand(p, c);
       break;
     case 'addSheet':

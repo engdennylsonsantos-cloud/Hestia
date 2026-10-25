@@ -1,7 +1,7 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
 import { DIM_MIN_LENGTH } from './dimension.ts';
 import { newId } from './ids.ts';
-import { type Dimension, type Id, type Project, type TextNote } from './types.ts';
+import { type Dimension, type Id, type Project, type RoomSeparator, type TextNote } from './types.ts';
 
 /**
  * Anotações da planta (decisão 0019): cotas e textos ficam em cada nível. Os comandos recusam com mensagem pt-BR
@@ -13,7 +13,9 @@ export type AnnotationCommand =
   | { type: 'removeDimension'; levelId: Id; id: Id }
   | { type: 'addText'; levelId: Id; text: TextNote }
   | { type: 'updateText'; levelId: Id; id: Id; patch: Partial<Omit<TextNote, 'id'>> }
-  | { type: 'removeText'; levelId: Id; id: Id };
+  | { type: 'removeText'; levelId: Id; id: Id }
+  | { type: 'addRoomSeparator'; levelId: Id; separator: RoomSeparator }
+  | { type: 'removeRoomSeparator'; levelId: Id; id: Id };
 
 const finite = (v: Vec2): boolean => Number.isFinite(v.x) && Number.isFinite(v.y);
 
@@ -36,6 +38,19 @@ export function textIssue(t: TextNote): string | null {
 
 export const levelDimensions = (p: Pick<Project, 'levels'>, levelId: Id): Dimension[] =>
   p.levels.find((l) => l.id === levelId)?.dimensions ?? [];
+
+/** Comprimento mínimo (m) de uma linha de separação de ambiente. */
+export const ROOM_SEPARATOR_MIN_LENGTH = 0.05;
+
+/** Motivo de recusa de uma linha de separação, ou null. Pontos distintos e não muito próximos. */
+export function roomSeparatorIssue(r: RoomSeparator): string | null {
+  if (!finite(r.a) || !finite(r.b)) return 'As coordenadas da linha de separação devem ser números finitos.';
+  if (len(sub(r.b, r.a)) < ROOM_SEPARATOR_MIN_LENGTH) return 'A linha de separação precisa de dois pontos distintos.';
+  return null;
+}
+
+export const levelRoomSeparators = (p: Pick<Project, 'levels'>, levelId: Id): RoomSeparator[] =>
+  p.levels.find((l) => l.id === levelId)?.roomSeparators ?? [];
 
 export const levelTexts = (p: Pick<Project, 'levels'>, levelId: Id): TextNote[] =>
   p.levels.find((l) => l.id === levelId)?.texts ?? [];
@@ -83,10 +98,20 @@ export function applyAnnotationCommand(p: Project, c: AnnotationCommand): void {
       if (!level.texts?.some((t) => t.id === c.id)) throw new Error('Texto inexistente');
       level.texts = level.texts.filter((t) => t.id !== c.id);
       break;
+    case 'addRoomSeparator': {
+      const issue = roomSeparatorIssue(c.separator);
+      if (issue) throw new Error(issue);
+      level.roomSeparators = [...(level.roomSeparators ?? []), c.separator];
+      break;
+    }
+    case 'removeRoomSeparator':
+      if (!level.roomSeparators?.some((r) => r.id === c.id)) throw new Error('Linha de separação inexistente');
+      level.roomSeparators = level.roomSeparators.filter((r) => r.id !== c.id);
+      break;
   }
 }
 
-export type RemoveAnnotation = Extract<AnnotationCommand, { type: 'removeDimension' | 'removeText' }>;
+export type RemoveAnnotation = Extract<AnnotationCommand, { type: 'removeDimension' | 'removeText' | 'removeRoomSeparator' }>;
 
 /** Comandos de exclusão para as cotas e os textos do nível cujos ids estão em `ids` (o resto são elementos). */
 export function annotationRemovals(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[]): RemoveAnnotation[] {

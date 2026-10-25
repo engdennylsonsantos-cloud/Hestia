@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionValue, DIM_TEXT_MM, formatDimensionValue, levelDimensions, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, dimensionValue, DIM_TEXT_MM, formatDimensionValue, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
 import { noteLabel } from './tags.ts';
 import type { PlanPaint } from './style.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
@@ -34,5 +34,15 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     out.labels.push(noteLabel(g.textAt, formatDimensionValue(dimensionValue(p, d)), fontPx, g.textRotation));
   }
   for (const t of levelTexts(p, levelId)) out.labels.push(noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation));
+  out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color));
   return out;
+}
+
+/**
+ * Linhas de separação de ambiente do nível (tracejadas e finas, como o Revit). Usam a cor e a espessura de projeção da
+ * categoria 'anotação' e o traço das membranas. Só o nível pedido: a planta de outro nível não as recebe.
+ */
+export function roomSeparatorStrokes(p: Project, levelId: Id, pt: PlanPaint, color: string): StrokeOp[] {
+  if (!pt.visible) return [];
+  return levelRoomSeparators(p, levelId).map((r) => ({ pts: [r.a, r.b], closed: false, widthPx: pt.projPx, color, alpha: 1, dash: [6, 3] as [number, number] }));
 }

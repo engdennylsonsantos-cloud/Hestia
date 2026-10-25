@@ -13,8 +13,8 @@ import {
   type Ring,
   type Vec2,
 } from '@hestia/geom';
-import { dist } from '@hestia/geom';
-import { roomCeilingHeight, roomsOnLevel, type Id, type Project, type ValidationIssue } from '@hestia/model';
+import { add, dist, len, sub } from '@hestia/geom';
+import { levelRoomSeparators, roomCeilingHeight, roomsOnLevel, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { wallFaces } from './faces.ts';
 import { noteCircuitRecalc, wallsSignature } from './enclosed.ts';
 import { levelFrames } from './resolve.ts';
@@ -84,8 +84,43 @@ function regionSet(p: Project, levelId: Id): RegionSet {
     { x: b.maxX, y: b.maxY },
     { x: b.minX, y: b.maxY },
   ];
-  const free = difference(asMulti(frame), walls);
+  // Linhas de separação (Revit: Room Separation Line) entram como faixas finas que cortam a área livre (decisão 0031 §3).
+  const bands = roomSeparatorBands(p, levelId);
+  const open = difference(asMulti(frame), walls);
+  const free = bands.length ? dropBandHoles(difference(open, bands), bands) : open;
   return { walls, frame, free, wallBox };
+}
+
+/**
+ * Linha que não divide a sala (não chega às paredes) vira um furo fino dentro da área livre: esse furo é descartado,
+ * como no Revit, onde uma linha solta não muda a área. Só sai o furo cuja caixa cabe numa faixa; o contorno externo
+ * das paredes, que a faixa só corta por fora, fica.
+ */
+function dropBandHoles(m: MultiPolygon, bands: MultiPolygon): MultiPolygon {
+  const boxes = bands.map((b) => boxOf(b.flat()));
+  const inBand = (h: Ring): boolean => {
+    const hb = boxOf(h);
+    return boxes.some((bb) => hb.minX >= bb.minX - EPS && hb.maxX <= bb.maxX + EPS && hb.minY >= bb.minY - EPS && hb.maxY <= bb.maxY + EPS);
+  };
+  return m.map(([outer, ...holes]) => [outer!, ...holes.filter((h) => !inBand(h))]);
+}
+
+/** Espessura (m) da faixa que representa uma linha de separação: 1 mm, o bastante para o corte sem mudar a área. */
+const SEPARATOR_WIDTH = 0.001;
+/** Prolongamento (m) de cada ponta da linha, para fechar a fresta até a face da parede. */
+const SEPARATOR_EXT = 0.01;
+
+/** Faixas (um retângulo por linha de separação) que cortam a área livre do nível. */
+function roomSeparatorBands(p: Project, levelId: Id): MultiPolygon {
+  return levelRoomSeparators(p, levelId).map((r) => {
+    const d = sub(r.b, r.a);
+    const L = len(d);
+    const u = { x: d.x / L, y: d.y / L };
+    const n = { x: (-u.y * SEPARATOR_WIDTH) / 2, y: (u.x * SEPARATOR_WIDTH) / 2 };
+    const a = sub(r.a, { x: u.x * SEPARATOR_EXT, y: u.y * SEPARATOR_EXT });
+    const b = add(r.b, { x: u.x * SEPARATOR_EXT, y: u.y * SEPARATOR_EXT });
+    return [[add(a, n), add(b, n), sub(b, n), sub(a, n)]];
+  });
 }
 
 /** Comprimento de um anel fechado (o último ponto liga-se ao primeiro). */
@@ -119,7 +154,8 @@ export function resetRegionCache(): void {
 }
 
 function regionSetCached(p: Project, levelId: Id): RegionSet {
-  const sig = wallsSignature(p, levelId);
+  // A chave inclui as linhas de separação: mudar uma delas refaz o espaço livre do nível.
+  const sig = `${wallsSignature(p, levelId)}|${JSON.stringify(levelRoomSeparators(p, levelId))}`;
   const hit = regionCache.get(levelId);
   if (hit && hit.sig === sig) return hit.set;
   noteCircuitRecalc();

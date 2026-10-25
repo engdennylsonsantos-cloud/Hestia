@@ -30,6 +30,8 @@ import { deleteViewAction, renameViewAction, updateViewAction } from './sectionV
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
 import { FluxoEdicao } from './fluxoEdicao.ts';
+import { CacheGeometria } from './geometryCache.ts';
+import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
 
 const STORAGE_KEY = 'hestia.autosave.v1';
 const TUTORIAL_KEY = 'hestia.tutorial.v1';
@@ -46,6 +48,14 @@ export class Editor {
   private readonly levels = new LevelResolveCache();
   readonly fluxo = new FluxoEdicao({ aoMudar: () => this.bump(), exatoAssincrono: true }); // provisório na hora, exato em segundo plano (fluxoEdicao.ts)
   readonly provisorios = this.fluxo.provisorios; // a planta os desenha (ui/quadroPlanta.ts); ler aqui liga o cálculo a cada edição
+  /** Cache de geometria por projeto: na abertura restaura os níveis (ver `geometriaAbertura.ts`); só a abertura grava. */
+  private readonly portasAbertura: PortasAbertura = {
+    cache: new CacheGeometria({ tetoBytes: TETO_GEOMETRIA_BYTES }),
+    atual: () => this.store.project,
+    lerNivel: (id) => this.fluxo.nivelPronto(id) ?? this.levels.get(this.store.project, id),
+    pendente: (id) => this.fluxo.pendente(id),
+    semear: (id, valor) => this.fluxo.resolucao.semear(id, valor),
+  };
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
@@ -150,6 +160,9 @@ export class Editor {
   }
 
   resolved(levelId: Id, exigirExato = true): ResolvedLevel { return this.fluxo.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId, exigirExato); }
+
+  /** Resolução do nível já pronta em segundo plano (ou do cache de geometria), sem calcular. Para a montagem da 3D. */
+  resolucaoPronta(levelId: Id): ResolvedLevel | null { return this.fluxo.nivelPronto(levelId); }
 
   /** Libera os caches de um nível (viewport da planta e resolução). Chamado ao fechar uma aba de planta. */
   releaseLevel(levelId: Id): void {
@@ -426,6 +439,7 @@ export class Editor {
     this.store.load(p);
     this.fileName = name;
     this.levels.clear(); this.fluxo.abrir(p, this.store.version).forEach((id) => this.resolved(id));
+    void abrirComCache(this.portasAbertura, p);
     this.viewports.clear();
     // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
     useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });

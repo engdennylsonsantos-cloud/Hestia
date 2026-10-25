@@ -123,3 +123,28 @@ describe('ResolucaoProgressiva: invalidação por edição', () => {
     expect(r.nivelPronto('pav_2')).not.toEqual(executarResolucao('nivel', p, 'pav_2'));
   }, 60_000);
 });
+
+describe('ResolucaoProgressiva.semear', () => {
+  it('põe o resultado conhecido como pronto: vale para a planta e o segundo plano não o recalcula', async () => {
+    const p = projetoComPavimentos(2);
+    const r = new ResolucaoProgressiva({ cliente: clienteSimulado() });
+    r.abrir(p);
+    const valor = new LevelResolveCache().get(p, 'pav_1');
+    expect(r.semear('pav_1', valor)).toBe(true);
+    expect(r.nivelPronto('pav_1')).toBe(valor);
+    expect(r.resolvido('pav_1', () => {
+      throw new Error('não devia calcular: o nível já está pronto');
+    })).toBe(valor);
+    await esperarAte(() => r.nivelPronto('pav_0') !== null);
+    expect(r.nivelPronto('pav_1')).toBe(valor);
+  });
+
+  it('não semeia um nível já calculado na hora (o resultado síncrono prevalece)', () => {
+    const p = projetoComPavimentos(1);
+    const r = new ResolucaoProgressiva();
+    r.abrir(p);
+    const sincrono = new LevelResolveCache();
+    r.resolvido('pav_0', () => sincrono.get(p, 'pav_0'));
+    expect(r.semear('pav_0', sincrono.get(p, 'pav_0'))).toBe(false);
+  });
+});

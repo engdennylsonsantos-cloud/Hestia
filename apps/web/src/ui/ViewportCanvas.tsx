@@ -141,7 +141,7 @@ export function ViewportCanvas(): ReactElement {
       if (key !== modelKey.current) {
         modelKey.current = key;
         // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
-        montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id));
+        montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id), (id) => editor.resolucaoPronta(id));
         montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
       }
       // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).

@@ -62,7 +62,7 @@ interface PickHit {
  */
 export class StairTool extends ToolBase {
   readonly id = 'stair';
-  readonly label = 'Escada';
+  readonly label = 'Escada por croqui';
   readonly hint = HINT;
   private st: DrawState = { submode: 'limites', phase: 'left', parts: [], stroke: emptyStroke('line'), pick: false };
   /** Croqui ao entrar na edição (Esc descarta o que foi feito desde então). */

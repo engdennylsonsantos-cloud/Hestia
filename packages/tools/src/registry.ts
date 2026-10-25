@@ -133,7 +133,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   rehost: 'Trocar anfitriã',
   attachroof: 'Anexar topo',
   detachroof: 'Desanexar topo',
-  stair: 'Escada',
+  stair: 'Escada por croqui',
   stairrun: 'Escada (reta/L/U/caracol)',
   dimension: 'Cota',
   text: 'Texto',

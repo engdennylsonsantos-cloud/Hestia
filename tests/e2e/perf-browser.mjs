@@ -10,7 +10,9 @@
 //   3. seleção por clique na planta: do pointerup até a seleção mudar, e um quadro pintado depois;
 //   4. edição: move uma parede (setWallEnds pelo store, o mesmo caminho das ferramentas) e mede até o quadro pintado;
 //   5. pan (botão do meio) e zoom (roda) na planta: do evento ao quadro seguinte pintado (média e p95);
-//   6. clique de pick na 3D: do pointerup até a seleção mudar (média e p95).
+//   6. clique de pick na 3D: do pointerup até a seleção mudar (média e p95);
+//   7. inserção (tests/e2e/perf-acoes.mjs): porta e janela numa parede do nível do meio, e parede nova, por cliques reais
+//      nas ferramentas; do pointerup ao quadro seguinte pintado (mediana, p95, média, mínimo e máximo).
 // Sem navegador ou sem build, sai com código 2 e a mensagem do que falta: o baseline de navegador fica PENDENTE.
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,6 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright-core';
+import { medirInsercoes } from './perf-acoes.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RUNS = Math.max(1, Number(process.env.PERF_RUNS ?? 5));
@@ -219,6 +222,10 @@ async function medirProjeto(n) {
   }
   medidas.edicaoParede = { edicoes: edicao.length, confirmadasNoStore: editou, tempo: resumo(edicao) };
   if (editou < RUNS) pendencias.push(`[${rotulo}] edição: o store não refletiu a mudança em ${RUNS - editou} repetição(ões)`);
+
+  // 4b. Inserção: porta e janela na parede alvo, parede nova no nível do meio (cliques reais nas ferramentas).
+  const insercoes = await medirInsercoes({ page, RUNS, nivel: idNivel(meio), idParede, resumo, esperarQuadros, pendencias, rotulo });
+  Object.assign(medidas, insercoes);
 
   // Volta ao térreo para o pan, o zoom e o pick, que usam o nível 0.
   await page.evaluate(() => window.__hestia.editor.selectLevel('lv_0'));

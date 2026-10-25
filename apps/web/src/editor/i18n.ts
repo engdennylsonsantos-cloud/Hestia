@@ -57,6 +57,7 @@ export const I18N = {
     tool_roof: 'Telhado',
     tool_slope: 'Inclinação',
     tool_roofarrow: 'Seta de inclinação',
+    tool_roofextrusion: 'Extrusão de telhado',
     tool_stair: 'Escada por croqui',
     tool_stairrun: 'Lance de escada',
     tool_room: 'Ambiente',
@@ -81,6 +82,7 @@ export const I18N = {
     tool_attachroof: 'Anexar topo',
     tool_detachroof: 'Desanexar topo',
     tool_measure: 'Medir',
+    tool_section: 'Corte',
 
     // Painéis
     properties_title: 'Propriedades',
@@ -152,6 +154,7 @@ export const I18N = {
     tool_roof: 'Roof',
     tool_slope: 'Slope',
     tool_roofarrow: 'Slope Arrow',
+    tool_roofextrusion: 'Roof by Extrusion',
     tool_stair: 'Stair by Sketch',
     tool_stairrun: 'Stair by Run',
     tool_room: 'Room',
@@ -176,6 +179,7 @@ export const I18N = {
     tool_attachroof: 'Attach Top/Base',
     tool_detachroof: 'Detach Top/Base',
     tool_measure: 'Measure',
+    tool_section: 'Section',
 
     // Palettes
     properties_title: 'Properties',

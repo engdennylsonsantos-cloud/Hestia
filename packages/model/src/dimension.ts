@@ -40,6 +40,12 @@ export function dimensionValue(p: Pick<Project, 'elements'>, d: Dimension): numb
 /** Texto do valor: duas casas decimais em metros, com vírgula ("3,50 m"). */
 export const formatDimensionValue = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
+/** Texto mostrado na cota: o texto fixo, se houver algum (sem espaços nas pontas); senão, o valor medido. */
+export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension): string {
+  const fixed = d.text?.trim();
+  return fixed ? fixed : formatDimensionValue(dimensionValue(p, d));
+}
+
 export interface DimensionGeometry {
   /** Linha de cota, de uma extremidade à outra. */
   line: [Vec2, Vec2];

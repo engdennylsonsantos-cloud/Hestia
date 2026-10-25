@@ -30,10 +30,13 @@ export function AnnotationProps({ dim, text }: { dim?: Dimension; text?: TextNot
     return (
       <Group title="Cota">
         <Row label="Valor"><span className="val">{formatDimensionValue(dimensionValue(p, dim))}</span></Row>
+        <Row label="Texto" htmlFor="p-dtext">
+          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimensionValue(dimensionValue(p, dim))} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
+        </Row>
         <Row label="Deslocamento" htmlFor="p-doff">
           <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} unit="m" />
         </Row>
-        <div className="prow"><span className="soft">Acompanha a parede quando a extremidade está presa a uma parede.</span></div>
+        <div className="prow"><span className="soft">Acompanha a parede quando a extremidade está presa a uma parede. Texto vazio mostra o valor medido.</span></div>
       </Group>
     );
   }

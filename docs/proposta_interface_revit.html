@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta · Interface no padrão Revit</title>
+<style>
+:root {
+  --bg:#dcdfe3; --chrome:#e6eaed; --tabbg:#e3e6ea; --ribbon:#f5f6f7; --ribbon2:#eaecee; --panel:#f7f9fa; --sheet:#fff;
+  --line:#ced5db; --line-strong:#b2bcc4; --fg:#1a202c; --fg-soft:#4a5568; --fg-faint:#718096;
+  --accent:#0078d4; --accent-fg:#fff; --accent-soft:#deecf9; --ro:#eceff2; --warn:#c25e00; --danger:#d13438; --ok:#107c41;
+  --green:#107c41; --green-soft:#dff6dd; --hover:#e1ecf6; --ic-ink:#5b6369;
+  --font-ui:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; --font-mono:'Cascadia Code',Consolas,Menlo,monospace;
+  --r:3px; --shadow:0 6px 22px rgba(0,0,0,.22);
+}
+:root[data-theme='dark'] {
+  --bg:#141414; --chrome:#1f1f1f; --tabbg:#262626; --ribbon:#333; --ribbon2:#2a2a2a; --panel:#252525; --sheet:#1e1e1e;
+  --line:#383838; --line-strong:#4a4a4a; --fg:#f3f4f6; --fg-soft:#a1a1aa; --fg-faint:#71717a;
+  --accent:#60a5fa; --accent-fg:#0f172a; --accent-soft:#1e3a5f; --ro:#2e2e2e; --warn:#fb923c; --danger:#f87171; --ok:#4ade80;
+  --green:#4ade80; --green-soft:#173827; --hover:#3d4a5a; --ic-ink:#c3c9cf; --shadow:0 8px 30px rgba(0,0,0,.6);
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 var(--font-ui); }
+button,input,select { font:inherit; color:inherit; }
+button { cursor:pointer; }
+a { color:var(--accent); }
+code,.mono { font-family:var(--font-mono); font-size:11.5px; }
+code { background:var(--chrome); padding:0 4px; border-radius:2px; }
+
+/* ---------- página ---------- */
+.top { position:sticky; top:0; z-index:50; display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; padding:8px 16px; background:var(--chrome); border-bottom:1px solid var(--line-strong); }
+.top h1 { margin:0; font-size:14px; font-weight:600; }
+.top nav { display:flex; flex-wrap:wrap; gap:2px; flex:1; }
+.top nav a { text-decoration:none; color:var(--fg-soft); padding:3px 9px; border-radius:var(--r); font-size:12px; }
+.top nav a:hover { background:var(--accent-soft); color:var(--accent); }
+.pill { border:1px solid var(--line-strong); background:var(--panel); border-radius:var(--r); padding:3px 10px; font-size:12px; }
+main { max-width:1320px; margin:0 auto; padding:18px 16px 60px; }
+section { margin-bottom:44px; scroll-margin-top:56px; }
+section > h2 { font-size:17px; margin:0 0 4px; }
+section > .lead { color:var(--fg-soft); margin:0 0 14px; max-width:920px; }
+h3 { font-size:13.5px; margin:18px 0 6px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px 16px; }
+.grid { display:grid; gap:12px; }
+.g2 { grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); }
+.g3 { grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+.g4 { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+.score { display:flex; align-items:baseline; gap:6px; }
+.score b { font-size:24px; color:var(--accent); }
+.bar { height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin:4px 0 6px; }
+.bar i { display:block; height:100%; background:var(--accent); }
+.tag { font-size:10px; font-weight:600; padding:1px 7px; border-radius:9px; background:var(--accent-soft); color:var(--accent); }
+.tag.ok { background:var(--green-soft); color:var(--green); }
+.tag.w { background:#fdecc8; color:var(--warn); }
+:root[data-theme='dark'] .tag.w { background:#4a3515; }
+ul.t { margin:4px 0; padding-left:18px; color:var(--fg-soft); }
+ul.t li { margin:2px 0; }
+table.m { width:100%; border-collapse:collapse; font-size:12px; background:var(--panel); border:1px solid var(--line); }
+table.m th { text-align:left; padding:5px 8px; background:var(--chrome); border-bottom:1px solid var(--line-strong); font-weight:600; position:sticky; top:41px; }
+table.m td { padding:4px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+table.m tr:hover td { background:var(--accent-soft); }
+.legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; color:var(--fg-soft); margin:6px 0 10px; }
+.legend span { display:inline-flex; align-items:center; gap:5px; }
+.sw { width:12px; height:12px; border-radius:50%; display:inline-block; border:1px solid var(--line-strong); }
+.sw.a { background:var(--fg); } .sw.b { background:var(--accent); } .sw.c { background:transparent; border-style:dashed; }
+.ctl { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin:0 0 10px; }
+.ctl label { display:inline-flex; align-items:center; gap:5px; }
+.seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--r); overflow:hidden; }
+.seg button { border:0; background:var(--panel); padding:4px 11px; border-right:1px solid var(--line); }
+.seg button:last-child { border-right:0; }
+.seg button.on { background:var(--accent); color:var(--accent-fg); }
+.note { border-left:3px solid var(--accent); background:var(--accent-soft); padding:7px 12px; border-radius:0 4px 4px 0; margin:10px 0; color:var(--fg); }
+.note.w { border-color:var(--warn); background:#fdf1dd; }
+:root[data-theme='dark'] .note.w { background:#3a2c14; }
+.cols2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:14px; align-items:start; }
+.lab { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--fg-faint); font-weight:600; margin:0 0 6px; }
+.lab b { color:var(--accent); }
+.scroll-x { overflow-x:auto; }
+
+/* ---------- ícones ---------- */
+.ic path,.ic circle { vector-effect:non-scaling-stroke; stroke-linejoin:round; stroke-linecap:round; }
+.ic .ic-s1,.ic .ic-s2,.ic .ic-s3,.ic .ic-bl,.ic .ic-gl { stroke:#5b6369; stroke-width:1px; }
+.ic .ic-s1 { fill:url(#ic-g1); } .ic .ic-s2 { fill:url(#ic-g2); } .ic .ic-s3 { fill:url(#ic-g3); } .ic .ic-bl { fill:url(#ic-gb); } .ic .ic-gl { fill:url(#ic-gg); }
+.ic .ic-ln { fill:none; stroke:var(--ic-ink); stroke-width:1.1px; } .ic .ic-ln2 { fill:none; stroke:var(--ic-ink); stroke-width:1.8px; }
+.ic .ic-ac { fill:none; stroke:#e8892b; stroke-width:1.6px; } .ic .ic-fa { fill:#e8892b; stroke:none; }
+.ic .ic-ds { stroke-dasharray:3 2; } .ic .ic-tx { fill:var(--ic-ink); stroke:none; font:700 8px var(--font-ui); }
+
+/* ---------- faixa (réplica da estrutura do Revit) ---------- */
+.rb-tabs { display:flex; background:var(--tabbg); border-bottom:1px solid var(--line-strong); padding:0 4px; height:27px; align-items:flex-end; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+.rb-tab { flex:none; padding:0 11px; height:24px; font-size:12px; border:1px solid transparent; border-bottom:0; background:transparent; color:var(--fg); border-radius:3px 3px 0 0; white-space:nowrap; }
+.rb-tab:hover { background:var(--hover); }
+.rb-tab.file { color:var(--accent-fg); background:var(--accent); font-weight:600; margin-right:3px; }
+.rb-tab.file:hover { filter:brightness(1.1); }
+.rb-tab.on { background:var(--ribbon); border-color:var(--line-strong); height:27px; font-weight:600; }
+.rb-tab.ctx { color:var(--green); }
+.rb-tab.ctx.on { background:var(--green-soft); border-top:2px solid var(--green); }
+.rb-tab.empty::after { content:'·'; color:var(--fg-faint); margin-left:3px; }
+.rb-body { display:flex; background:var(--ribbon); border-bottom:1px solid var(--line-strong); height:96px; overflow-x:auto; overflow-y:hidden; }
+.rb-body.ctxbody { background:var(--green-soft); }
+.rpanel { display:flex; flex-direction:column; border-right:1px solid var(--line); flex:none; }
+.rcols { display:flex; flex:1; padding:3px 4px 0; gap:1px; align-items:stretch; }
+.rtitle { height:18px; font-size:11px; color:var(--fg-soft); text-align:center; position:relative; line-height:18px; padding:0 14px; white-space:nowrap; }
+.rtitle .sl,.rtitle .ln { position:absolute; right:3px; top:0; font-size:8px; color:var(--fg-faint); }
+.lbtn { min-width:46px; max-width:76px; padding:2px 4px 1px; display:flex; flex-direction:column; align-items:center; gap:1px; border:1px solid transparent; background:transparent; border-radius:2px; font-size:11.5px; line-height:1.12; text-align:center; color:var(--fg); position:relative; }
+.lbtn svg { width:32px; height:32px; margin-top:3px; }
+.lbtn .tx { display:block; min-height:26px; }
+.lbtn:hover:not(.dis) { background:var(--hover); border-color:var(--line-strong); }
+.lbtn.on,.sbtn.on { background:var(--accent-soft); border-color:var(--accent); }
+.stack { display:flex; flex-direction:column; justify-content:center; gap:1px; padding:0 2px; }
+.sbtn { display:flex; align-items:center; gap:5px; height:24px; padding:0 6px 0 4px; font-size:11.5px; border:1px solid transparent; background:transparent; text-align:left; white-space:nowrap; min-width:0; border-radius:2px; color:var(--fg); position:relative; }
+.sbtn svg { width:16px; height:16px; flex:none; }
+.sbtn:hover:not(.dis) { background:var(--hover); border-color:var(--line-strong); }
+.ph0 { opacity:.45; } .ph0 svg { filter:grayscale(1); } .ph0 { cursor:default; }
+.dot2::after { content:''; position:absolute; top:2px; right:3px; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+.rb-body.nodots .dot2::after { display:none; }
+.rb-body.hideph .ph0 { display:none; }
+.gal { display:grid; grid-template-columns:repeat(4,24px); grid-auto-rows:24px; gap:1px; align-content:center; padding:0 3px; }
+.gal button { border:1px solid transparent; background:transparent; display:grid; place-items:center; border-radius:2px; }
+.gal button:hover { background:var(--hover); border-color:var(--line-strong); }
+.gal button.on { background:var(--accent-soft); border-color:var(--accent); }
+.gal svg { width:18px; height:18px; }
+.rmenu { position:fixed; z-index:200; background:var(--sheet); border:1px solid var(--line-strong); box-shadow:var(--shadow); min-width:210px; padding:2px 0; font-size:12px; }
+.rmenu div { display:flex; align-items:center; gap:8px; padding:4px 12px 4px 10px; white-space:nowrap; }
+.rmenu div:hover { background:var(--accent-soft); }
+.rmenu .d { margin-left:auto; padding-left:20px; font-size:10px; color:var(--fg-faint); }
+.rmenu div.off { color:var(--fg-faint); }
+.rmenu svg { width:20px; height:20px; }
+
+/* ---------- janela do app (mock) ---------- */
+.app { border:1px solid var(--line-strong); box-shadow:var(--shadow); background:var(--chrome); min-width:1560px; position:relative; display:flex; flex-direction:column; height:760px; overflow:hidden; }
+.tb { display:flex; align-items:center; gap:3px; height:30px; padding:0 6px; background:var(--chrome); border-bottom:1px solid var(--line); font-size:12px; flex:none; }
+.tb .app-r { width:22px; height:22px; border-radius:4px; background:var(--accent); color:#fff; display:grid; place-items:center; font:600 12px var(--font-mono); margin-right:4px; }
+.tb .q { width:24px; height:24px; display:grid; place-items:center; border:1px solid transparent; background:transparent; border-radius:2px; }
+.tb .q:hover { background:var(--hover); border-color:var(--line-strong); }
+.tb .q svg { width:17px; height:17px; }
+.tb .q.dis { opacity:.4; }
+.tb .vsep { width:1px; height:18px; background:var(--line-strong); margin:0 4px; }
+.tb .title { flex:1; text-align:center; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 10px; }
+.tb .info { display:flex; align-items:center; gap:6px; }
+.tb .search { border:1px solid var(--line-strong); background:var(--sheet); height:21px; width:170px; padding:0 8px; font-size:11.5px; border-radius:2px; color:var(--fg-faint); display:flex; align-items:center; }
+.optbar { height:30px; flex:none; display:flex; align-items:center; gap:14px; padding:0 10px; background:var(--chrome); border-bottom:1px solid var(--line); font-size:12px; }
+.optbar .sel { border:1px solid var(--line-strong); background:var(--sheet); height:22px; padding:0 8px; display:inline-flex; align-items:center; gap:14px; }
+.optbar b { font-weight:600; }
+.work { flex:1; min-height:0; display:grid; }
+.dock { display:flex; flex-direction:column; min-height:0; background:var(--panel); border-right:1px solid var(--line-strong); }
+.dock.r { border-right:0; border-left:1px solid var(--line-strong); }
+.pane { display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.pane + .pane { border-top:3px solid var(--line-strong); }
+.phead { height:22px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 6px 0 8px; background:var(--chrome); border-bottom:1px solid var(--line); font-weight:600; font-size:11.5px; white-space:nowrap; overflow:hidden; }
+.phead .x { color:var(--fg-faint); font-weight:400; margin-left:8px; }
+.pscroll { overflow:auto; flex:1; min-height:0; background:var(--sheet); }
+.stage { display:flex; flex-direction:column; min-width:0; min-height:0; background:#fff; }
+.vtabs { height:26px; flex:none; display:flex; align-items:flex-end; gap:1px; padding:0 4px; background:var(--chrome); border-bottom:1px solid var(--line-strong); }
+.vtab { height:24px; padding:0 8px; display:flex; align-items:center; gap:7px; font-size:11.5px; background:var(--tabbg); border:1px solid var(--line); border-bottom:0; color:var(--fg-soft); white-space:nowrap; }
+.vtab.on { background:#fff; color:#000; border-color:var(--line-strong); height:26px; font-weight:600; }
+.vtab .x { color:var(--fg-faint); font-weight:400; }
+.canvas { flex:1; position:relative; min-height:0; background:#fff; }
+.canvas > svg.plan { position:absolute; inset:0; width:100%; height:100%; }
+.vcb { flex:none; height:24px; display:flex; align-items:center; gap:2px; padding:0 8px; background:var(--ribbon); border-top:1px solid var(--line-strong); font-size:11px; color:var(--fg); }
+.vcb button { height:20px; min-width:22px; padding:0 5px; border:1px solid transparent; background:transparent; border-radius:2px; display:inline-flex; align-items:center; gap:3px; font-size:11px; }
+.vcb button:hover { background:var(--hover); border-color:var(--line-strong); }
+.vcb button.on { background:var(--accent-soft); border-color:var(--accent); }
+.vcb .s { width:1px; height:14px; background:var(--line-strong); margin:0 3px; }
+.vcb svg { width:14px; height:14px; }
+.navbar { position:absolute; right:8px; top:78px; width:30px; background:rgba(245,246,247,.95); border:1px solid var(--line-strong); display:flex; flex-direction:column; align-items:center; padding:2px; gap:2px; }
+.navbar button { width:24px; height:24px; border:1px solid transparent; background:transparent; display:grid; place-items:center; color:#444; }
+.navbar button:hover { background:var(--hover); border-color:var(--line-strong); }
+.navbar svg { width:16px; height:16px; }
+.vcube { position:absolute; right:10px; top:8px; width:60px; height:60px; display:grid; place-items:center; color:#333; font-size:10px; }
+.vcube i { display:grid; place-items:center; width:42px; height:42px; background:#fff; border:1px solid #9aa4ad; font-style:normal; box-shadow:2px 2px 0 #cdd4da; }
+.status { height:24px; flex:none; display:flex; align-items:center; gap:14px; padding:0 8px; background:var(--chrome); border-top:1px solid var(--line-strong); font-size:11.5px; color:var(--fg-soft); }
+.status .msg { flex:1; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.status .it { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.status .box { border:1px solid var(--line-strong); background:var(--sheet); height:18px; padding:0 7px; display:inline-flex; align-items:center; gap:5px; }
+.backstage { position:absolute; left:0; top:30px; bottom:0; width:520px; background:var(--panel); border-right:1px solid var(--line-strong); box-shadow:var(--shadow); z-index:30; display:none; font-size:12.5px; }
+.backstage.open { display:grid; grid-template-columns:200px 1fr; }
+.backstage .l { background:var(--chrome); border-right:1px solid var(--line); padding:6px 0; }
+.backstage .l div { padding:6px 16px; display:flex; justify-content:space-between; }
+.backstage .l div:hover { background:var(--accent-soft); }
+.backstage .l hr { border:0; border-top:1px solid var(--line); margin:5px 8px; }
+.backstage .rr { padding:10px 16px; }
+.backstage h4 { margin:0 0 6px; font-size:12px; }
+
+/* ---------- tabela de propriedades / árvore ---------- */
+.pgroup > summary { list-style:none; cursor:pointer; padding:2px 8px; background:var(--chrome); font-weight:600; font-size:11px; color:var(--fg-soft); border-bottom:1px solid var(--line); border-top:1px solid var(--line); display:flex; justify-content:space-between; }
+.pgroup > summary::-webkit-details-marker { display:none; }
+.pgroup > summary::after { content:'▲'; font-size:7px; color:var(--fg-faint); align-self:center; }
+.pgroup:not([open]) > summary::after { content:'▼'; }
+.prow { display:grid; grid-template-columns:48% 1fr; min-height:21px; border-bottom:1px solid var(--line); }
+.prow > .l { padding:2px 8px; border-right:1px solid var(--line); font-size:11px; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; }
+.prow > .v { padding:2px 6px; font-size:11px; display:flex; align-items:center; justify-content:space-between; gap:4px; min-width:0; overflow:hidden; white-space:nowrap; }
+.prow.ro > .l,.prow.ro > .v { background:var(--ro); color:var(--fg-soft); }
+.prow .cb { width:11px; height:11px; border:1px solid var(--line-strong); background:var(--sheet); display:inline-grid; place-items:center; font-size:9px; line-height:1; }
+.prow .btn { border:1px solid var(--line-strong); background:var(--panel); font-size:10.5px; padding:0 8px; height:17px; }
+.tsel { margin:6px 8px 0; border:1px solid var(--line-strong); background:var(--sheet); min-height:36px; display:flex; align-items:center; gap:8px; padding:3px 8px; font-size:11.5px; }
+.tsel svg { width:28px; height:28px; flex:none; }
+.tsel .t { flex:1; min-width:0; line-height:1.25; }
+.tsel .t b { display:block; font-size:12px; }
+.filt { margin:6px 8px; display:flex; gap:6px; }
+.filt .f { flex:1; border:1px solid var(--line-strong); background:var(--sheet); height:23px; padding:0 8px; font-weight:600; display:flex; align-items:center; justify-content:space-between; font-size:11.5px; }
+.filt .b { border:1px solid var(--line-strong); background:var(--panel); height:23px; padding:0 10px; font-size:11.5px; display:flex; align-items:center; white-space:nowrap; }
+.pfoot { flex:none; display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-top:1px solid var(--line-strong); background:var(--panel); font-size:11.5px; }
+.pfoot .btn { border:1px solid var(--line-strong); background:var(--panel); padding:2px 14px; font-size:11.5px; }
+.pfoot .btn:disabled { opacity:.5; }
+.prev { margin:8px 8px 0; height:92px; border:1px solid var(--line-strong); background:linear-gradient(#f7fafc,#e3e9ee); display:grid; place-items:center; color:#8896a3; font-size:11px; }
+.tree { font-size:12px; padding:4px 0; color:var(--fg); }
+.tree ul { list-style:none; margin:0; padding:0 0 0 15px; }
+.tree > ul { padding-left:3px; }
+.tree li > .n { display:flex; align-items:center; gap:4px; padding:1px 4px 1px 0; cursor:default; white-space:nowrap; }
+.tree li > .n:hover { background:var(--accent-soft); }
+.tree .b { width:11px; height:11px; border:1px solid var(--line-strong); background:var(--sheet); font:9px/9px var(--font-mono); display:inline-grid; place-items:center; flex:none; color:var(--fg-soft); cursor:pointer; }
+.tree .b.none { visibility:hidden; }
+.tree li.c > ul { display:none; }
+.tree .bold > .n { font-weight:700; }
+.tree .sel > .n { background:var(--accent-soft); outline:1px dotted var(--accent); }
+.tree .ic16 { width:14px; height:14px; flex:none; }
+.tree .meta { margin-left:auto; padding-left:12px; font:10.5px var(--font-mono); color:var(--fg-faint); }
+.tree .chip { margin-left:6px; font-size:10px; border:1px solid var(--line-strong); border-radius:2px; padding:0 4px; color:var(--accent); background:var(--panel); }
+.tree .hint { margin:2px 8px 4px 34px; color:var(--fg-faint); font-size:11px; }
+.cur-frame { width:300px; height:560px; border:1px solid var(--line-strong); background:var(--panel); display:flex; flex-direction:column; box-shadow:var(--shadow); }
+.cur-frame.sm { height:520px; }
+.callout { position:relative; }
+.callout::after { content:attr(data-n); position:absolute; top:-7px; left:-7px; background:var(--danger); color:#fff; font:700 10px/16px var(--font-ui); width:16px; height:16px; border-radius:50%; text-align:center; z-index:2; }
+.old .tbtn { display:flex; flex-direction:column; align-items:center; gap:2px; border:1px solid transparent; background:transparent; padding:4px 6px; border-radius:3px; min-width:48px; font-size:10.5px; }
+.old .tbtn svg { width:28px; height:28px; }
+.old .tbtn kbd { font:9px var(--font-mono); color:var(--fg-faint); }
+.old .mini { width:22px; height:22px; border:1px solid transparent; background:transparent; display:grid; place-items:center; padding:0; }
+.old .mini svg { width:20px; height:20px; }
+.old .slot { width:22px; height:22px; border:1px dashed currentColor; opacity:.35; border-radius:3px; }
+.old .gt { text-align:center; font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--fg-faint); }
+.old .grp { display:inline-flex; flex-direction:column; padding:4px 8px; border-right:1px solid var(--line); background:var(--panel); vertical-align:top; }
+.old .grp .row { display:flex; gap:2px; align-items:center; flex:1; }
+.old .ribbonwrap { border:1px solid var(--line-strong); background:var(--panel); padding:2px 0; display:inline-block; }
+.new .ribbonwrap { border:1px solid var(--line-strong); background:var(--ribbon); display:inline-block; }
+.rule { display:grid; grid-template-columns:150px 1fr; gap:8px; padding:7px 0; border-bottom:1px solid var(--line); align-items:center; }
+.rule:last-child { border:0; }
+.rule b { font-size:12px; }
+.step { display:grid; grid-template-columns:44px 1fr auto; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); align-items:start; }
+.step .n { width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; font-weight:700; }
+.q { padding:7px 0; border-bottom:1px solid var(--line); }
+.mini-title { display:flex; align-items:center; border:1px solid var(--line-strong); background:var(--chrome); height:30px; padding:0 8px; gap:8px; font-size:11.5px; overflow:hidden; white-space:nowrap; }
+details.tabdet { border:1px solid var(--line); margin:6px 0; background:var(--panel); }
+details.tabdet > summary { cursor:pointer; padding:6px 10px; font-weight:600; display:flex; gap:10px; align-items:center; background:var(--chrome); }
+details.tabdet > summary small { font-weight:400; color:var(--fg-faint); }
+details.tabdet .strip { overflow-x:auto; }
+details.tabdet .rb-body { height:96px; width:max-content; min-width:100%; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<linearGradient id="ic-g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e3e6e9"/></linearGradient>
+<linearGradient id="ic-g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9ecee"/><stop offset="1" stop-color="#bfc5ca"/></linearGradient>
+<linearGradient id="ic-g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9bfc5"/><stop offset="1" stop-color="#8a9198"/></linearGradient>
+<linearGradient id="ic-gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6ebfc"/><stop offset="1" stop-color="#4f9fe0"/></linearGradient>
+<linearGradient id="ic-gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3ebf2"/><stop offset="1" stop-color="#a6b9ca"/></linearGradient>
+</defs></svg>
+
+<header class="top">
+  <h1>Hestia · Interface no padrão Revit</h1>
+  <nav>
+    <a href="#resumo">Diagnóstico</a><a href="#tela">Tela proposta</a><a href="#abas">Abas e sequência</a><a href="#agrupar">Padrão de agrupamento</a>
+    <a href="#props">Propriedades</a><a href="#nav">Navegador</a><a href="#barras">Barras</a><a href="#mapa">Mapa das ferramentas</a><a href="#plano">Plano e decisões</a>
+  </nav>
+  <button class="pill" id="themeBtn">Tema: claro</button>
+</header>
+
+<main>
+
+<section id="resumo">
+  <h2>1 · Diagnóstico: onde a interface atual já está e onde se afasta do Revit</h2>
+  <p class="lead">Li o código de <code>Ribbon.tsx</code>, <code>Properties.tsx</code>, <code>Browser.tsx</code>, <code>TitleBar.tsx</code>, <code>ViewControlBar.tsx</code>, <code>StatusBar.tsx</code>, <code>App.tsx</code> e o CSS, e abri o app rodando. As notas abaixo são estimativa minha de “quão parecido com o Revit 2024 está”, não uma medida objetiva.</p>
+  <div class="grid g4" id="scores"></div>
+
+  <div class="cols2" style="margin-top:14px">
+    <div class="card">
+      <h3 style="margin-top:0">O que já está bom (manter)</h3>
+      <ul class="t">
+        <li>Paleta de propriedades: tabela rótulo|valor, grupos recolhíveis com ▲/▼, célula cinza para somente leitura, seletor de tipo, filtro “Paredes (n)” + <b>Editar tipo</b>, rodapé <b>Aplicar</b>.</li>
+        <li>Ícones sombreados em 3D com laranja para a ação (<code>Icon.tsx</code>): é a “cara” dos ícones do Revit.</li>
+        <li>Aba contextual verde “Modificar | …”, abas de vista com ×, barra de opções, ViewCube, PT-BR/EN.</li>
+        <li>Largura de coluna, tipografia Segoe UI e tokens de tema já centralizados em <code>styles.css</code>.</li>
+        <li>Seus grupos de Escada e Ambiente (botão grande + coluna de botões pequenos) <b>já são o padrão do Revit</b>; só faltam o desenho certo e a regra de quando usar.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">As maiores distâncias do Revit</h3>
+      <ul class="t">
+        <li><b>Só 4 abas</b> (Arquitetura, Modificar, Anotar, Vista). O Revit tem 14 + “Arquivo”, em ordem fixa, e <b>Modificar é a última</b>, não a segunda.</li>
+        <li><b>Faixa baixa e densa</b> (≈66 px, rótulo 10,5 px, atalho dentro do botão, títulos em MAIÚSCULAS). No Revit: ≈96 px, rótulo 12 px, títulos em caixa normal, atalho só no tooltip.</li>
+        <li><b>Sem botão dividido</b> (split button ▾). Hoje Telhado, Piso/Laje, Escada, Cota ocupam um botão grande cada; no Revit são variantes dentro de um menu.</li>
+        <li><b>Aba contextual não é contextual</b>: “Modificar | Inserir Parede” mostra o mesmo conteúdo da aba Modificar. No Revit ela traz painéis próprios (Desenhar, Modificar Parede…).</li>
+        <li><b>Barra de título</b> com 6 botões de texto (Novo/Abrir/Salvar/DXF/PDF/IFC) em vez de Arquivo + Barra de Acesso Rápido + InfoCenter.</li>
+        <li><b>Navegador</b> mistura Famílias, “Projeto” (Materiais, Níveis, Tabelas) e botões Editar/Duplicar/Excluir inline; o Revit usa raiz “Vistas (todas)”, tabelas em “Tabelas/Quantidades”, e menu de botão direito.</li>
+        <li><b>Barra de controle de vista</b> é uma caixa flutuante com 3 itens; no Revit é uma faixa de ~12 controles (escala, nível de detalhe, estilo visual, sombras…).</li>
+        <li>Propriedades e Navegador estão em lados opostos; no Revit o padrão é <b>os dois empilhados à esquerda</b>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="tela">
+  <h2>2 · Tela completa proposta (interativa)</h2>
+  <p class="lead">Escolha um estado e clique nas abas, nos botões com ▾ e nos nós da árvore. Pontos em azul = existe hoje mas fora da faixa; botões esmaecidos = ainda não existem (você cria quando precisar). Role a página para o lado se a janela for estreita.</p>
+  <div class="ctl">
+    <span class="seg" id="stateSeg">
+      <button data-s="none" class="on">Nada selecionado</button>
+      <button data-s="sel">Parede selecionada</button>
+      <button data-s="tool">Ferramenta Parede ativa</button>
+    </span>
+    <label><input type="checkbox" id="swLeft" checked> Propriedades + Navegador à esquerda (padrão do Revit)</label>
+    <label><input type="checkbox" id="swPh" checked> Mostrar botões ainda inexistentes</label>
+    <label><input type="checkbox" id="swDots" checked> Pontos azuis (já existe em outro lugar)</label>
+  </div>
+  <div class="legend"><span><i class="sw a"></i> existe e funciona</span><span><i class="sw b"></i> existe, mas hoje fora da faixa (só realocar)</span><span><i class="sw c"></i> ainda não existe (placeholder)</span></div>
+  <div class="scroll-x"><div class="app" id="app"></div></div>
+  <p class="note"><b>Atenção:</b> a disposição exata dos botões dentro de cada painel (quem é grande, quem é pequeno) eu reproduzi de memória do Revit 2024. Os <b>nomes e a ordem das abas</b> e os painéis principais estão corretos; nas abas ainda vazias (Estrutura, Aço, Sistemas…) os nomes de painel são aproximados. Se quiser fidelidade de pixel, me mande prints da sua faixa aberta em cada aba e eu ajusto.</p>
+</section>
+
+<section id="abas">
+  <h2>3 · Abas e sequência (todas, mesmo vazias)</h2>
+  <p class="lead">Sequência do Revit 2024, da esquerda para a direita. A aba contextual (verde) nasce depois de <b>Modificar</b>, só quando há ferramenta ativa ou seleção, e é selecionada sozinha. Abaixo, cada aba aberta como ficaria, usando exatamente os mesmos componentes da tela acima.</p>
+  <div class="card" style="margin-bottom:10px"><b>Sequência:</b> <span id="seq" class="mono"></span></div>
+  <div id="tabsDetail"></div>
+</section>
+
+<section id="agrupar">
+  <h2>4 · Padrão de agrupamento (a regra para criar ferramentas novas)</h2>
+  <p class="lead">O Revit não improvisa por ferramenta: toda a faixa é feita de <b>4 peças</b> dentro de um <b>painel com título embaixo</b>. Se você adotar as peças e a regra de escolha, qualquer ferramenta nova já nasce no lugar certo.</p>
+
+  <div class="cols2">
+    <div>
+      <p class="lab"><b>As 4 peças</b> (réplica ao vivo; clique nos ▾)</p>
+      <div class="new"><div class="ribbonwrap"><div class="rb-body" id="anat" style="height:96px"></div></div></div>
+      <ol class="t" style="margin-top:10px">
+        <li><b>Botão grande</b> — ícone 32 px, rótulo de até 2 linhas embaixo. Comando principal do painel (Parede, Porta, Ambiente).</li>
+        <li><b>Botão grande dividido</b> (split) — o mesmo botão grande, mas o rótulo termina em ▾. O clique no ícone roda a variante padrão; o ▾ abre as variantes. É o que o Revit faz com Telhado, Piso, Escada, Cota.</li>
+        <li><b>Pilha de até 3 botões pequenos</b> — ícone 16 px + rótulo à direita, alinhados à esquerda, ocupam a altura de 1 botão grande. Comandos relacionados, secundários.</li>
+        <li><b>Título do painel</b> — centro, caixa normal (não MAIÚSCULAS), 11 px. Opcional: ▾ à direita = painel que desliza com mais ferramentas; ↘ = abre o diálogo de configurações do painel.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <p class="lab" style="margin-top:0"><b>Regra de escolha</b></p>
+      <div class="rule"><b>Mesmo comando, formas diferentes</b><span>→ <b>botão grande dividido</b>. Ex.: Escada (por componente | por croqui), Telhado (perímetro | extrusão), Piso (arquitetônico | estrutural/laje), Cota (alinhada | linear | angular…).</span></div>
+      <div class="rule"><b>Comando próprio, mas satélite do principal</b><span>→ <b>pilha de pequenos ao lado do grande</b>. Ex.: Ambiente + (Separador de ambiente, Etiquetar ambiente); Texto + (Ortografia, Localizar).</span></div>
+      <div class="rule"><b>Comandos independentes e importantes</b><span>→ <b>cada um grande</b>, lado a lado (Parede, Porta, Janela).</span></div>
+      <div class="rule"><b>Muitos comandos parecidos e secundários</b><span>→ <b>pilhas de 3</b>, uma coluna após a outra (painel Modificar: Alinhar/Deslocar/Espelhar…).</span></div>
+      <div class="rule"><b>Liga/desliga de vista</b><span>→ <b>não vai na faixa de criação</b>: vai para a barra de controle da vista ou para a aba Vista, com estado “pressionado”.</span></div>
+      <div class="rule"><b>Espaço reservado vazio</b><span>→ <b>não existe</b> no Revit (nada de caixinha tracejada). O que não existe fica fora, ou esmaecido se você quiser mostrar o roteiro.</span></div>
+    </div>
+  </div>
+
+  <h3>Seus grupos Escada e Ambiente: antes e depois</h3>
+  <div class="cols2">
+    <div class="old">
+      <p class="lab"><b>Antes</b> (atual: 28 px + mini 22 px + 2 slots tracejados)</p>
+      <div class="ribbonwrap" id="oldgrp"></div>
+      <ul class="t"><li>Ícone pequeno sem rótulo (só tooltip); as 2 caixas tracejadas ocupam espaço sem função.</li><li>“Escada (reta/L/U/caracol)” e “Escada por croqui” são <b>duas formas da mesma coisa</b>, mas uma está grande e a outra miniatura sem nome.</li><li>Não há título de painel no padrão (está em MAIÚSCULAS e 9,5 px).</li></ul>
+    </div>
+    <div class="new">
+      <p class="lab"><b>Depois</b> (padrão Revit)</p>
+      <div class="ribbonwrap"><div class="rb-body" id="newgrp" style="height:96px"></div></div>
+      <ul class="t"><li><b>Escada</b> vira botão dividido: variante padrão “por componente” (a atual <code>stairrun</code>) e “por croqui” (a atual <code>stair</code>) no menu. O mesmo vale para Telhado e Piso.</li><li><b>Ambiente</b> fica grande, com a pilha de satélites ao lado já com rótulo: Separador de ambiente e Etiquetar ambiente. Se aparecer um 3º, entra na mesma pilha.</li><li>Sem slots tracejados. Título em caixa normal, com ▾ quando houver painel deslizante.</li></ul>
+    </div>
+  </div>
+
+  <h3>Medidas de referência (Revit em 100%)</h3>
+  <table class="m"><thead><tr><th>Elemento</th><th>Revit</th><th>Hestia hoje</th><th>Proposta</th></tr></thead><tbody>
+    <tr><td>Linha de abas</td><td>≈24–26 px</td><td>≈28 px, 4 abas</td><td>26 px, 15 abas, rolagem horizontal</td></tr>
+    <tr><td>Altura do corpo da faixa</td><td>≈92–96 px (inclui título de painel 18 px)</td><td>min 66 px</td><td>96 px</td></tr>
+    <tr><td>Ícone grande / pequeno</td><td>32 px / 16 px</td><td>28 px / 22 px</td><td>32 px / 16 px (os mesmos SVG 32×32 escalam)</td></tr>
+    <tr><td>Rótulo</td><td>≈12 px, Segoe UI</td><td>10,5 px</td><td>11,5–12 px</td></tr>
+    <tr><td>Título do painel</td><td>caixa normal, ≈11 px, ▾ e ↘ à direita</td><td>MAIÚSCULAS 9,5 px</td><td>caixa normal 11 px</td></tr>
+    <tr><td>Atalho</td><td>só no tooltip (“Parede (WA)”)</td><td><code>&lt;kbd&gt;</code> dentro do botão</td><td>só no tooltip, com descrição em 2 linhas</td></tr>
+  </tbody></table>
+</section>
+
+<section id="props">
+  <h2>5 · Paleta de Propriedades</h2>
+  <p class="lead">É a parte mais próxima do Revit; os ajustes são finos. Esquerda: como está hoje (reconstruído do <code>styles.css</code>). Direita: proposta.</p>
+  <div class="cols2">
+    <div><p class="lab"><b>Hoje</b></p><div class="cur-frame" id="propsOld"></div></div>
+    <div><p class="lab"><b>Proposta</b></p><div class="cur-frame" id="propsNew"></div></div>
+  </div>
+  <table class="m" style="margin-top:12px"><thead><tr><th style="width:26%">Ajuste</th><th>Motivo / como</th></tr></thead><tbody>
+    <tr><td>Tirar a prévia de 120 px do topo</td><td>A paleta do Revit não tem miniatura; o topo é só seletor de tipo. Mover a prévia para o diálogo <b>Editar tipo</b>, onde já existe espaço (<code>tdlg-pv</code>). Ganha ~130 px de altura útil, essencial com o Navegador empilhado embaixo.</td></tr>
+    <tr><td>Cabeçalho com ✕ e nome fiel</td><td>“Propriedades” + ✕ (fecha/reabre pela aba Vista ▸ Interface do usuário e Modificar ▸ Propriedades). Hoje não fecha pelo painel.</td></tr>
+    <tr><td>Seletor de tipo: ícone da categoria + “Família” em negrito + “Tipo”</td><td>Revit mostra <b>Parede básica</b> / Genérico - 200 mm, não só o nome do tipo. A estrutura (<code>TypeSelector</code>) já tem duas linhas; trocar a miniatura por ícone da categoria.</td></tr>
+    <tr><td>Ordem dos grupos por categoria</td><td>Paredes: Restrições, Construção, Gráficos, Dados de identidade, Fases. Pisos/Forros/Telhados/Escadas idem. Vista: Gráficos, Dados de identidade, Extensões, Fases. Hoje “Dimensões” e “Junções” vêm antes de “Dados de identidade”; passá-los para dentro de Restrições / Construção / Análise conforme o Revit.</td></tr>
+    <tr><td>Divisória de coluna arrastável</td><td>O Revit permite arrastar a divisória rótulo|valor. Hoje fixa em 46 %.</td></tr>
+    <tr><td>Seleção múltipla com “Paredes (3)” ▾ e “*variados*”</td><td>Já existe “variados”; adicionar o menu do filtro com contagem por categoria.</td></tr>
+    <tr><td>Dock e largura</td><td>Painel redimensionável por divisória, largura inicial ≈ 290 px; empilhado com o Navegador (divisória horizontal arrastável) ou em abas.</td></tr>
+  </tbody></table>
+</section>
+
+<section id="nav">
+  <h2>6 · Navegador de projeto</h2>
+  <div class="cols2">
+    <div><p class="lab"><b>Hoje</b></p><div class="cur-frame sm" id="navOld"></div></div>
+    <div><p class="lab"><b>Proposta</b> (clique em ⊞ / ⊟)</p><div class="cur-frame sm" id="navNew"></div></div>
+  </div>
+  <table class="m" style="margin-top:12px"><thead><tr><th style="width:28%">Hoje</th><th>No Revit / proposta</th></tr></thead><tbody>
+    <tr><td>Título “Navegador de projeto”</td><td>“Navegador de projeto - Casa térrea, 2 quartos” + ✕.</td></tr>
+    <tr><td>Chevrons ▸/▾ e itens com contagem à direita (“0,00 m”, “7”)</td><td>Caixas <b>⊞ / ⊟</b>; sem metadados à direita (a cota do nível vai para as Propriedades). Vista aberta/ativa em <b>negrito</b>.</td></tr>
+    <tr><td>Raiz “Vistas” → Plantas, 3D, Cortes, Elevações</td><td>Raiz <b>[≡] Vistas (todas)</b> → Plantas de piso, Plantas de forro, Vistas 3D, Elevações (Elevação de edifício), Cortes (Corte de edifício), Vistas de desenho, Legendas (os vazios aparecem mesmo assim).</td></tr>
+    <tr><td>“Pranchas” com botões Editar/Duplicar/Excluir/Nova prancha na linha</td><td>Raiz <b>Pranchas (todas)</b>, só os itens “A-101 Planta baixa”. Duplicar, excluir, renomear, propriedades → <b>botão direito</b>; “Nova prancha” → botão direito em Pranchas e aba Vista.</td></tr>
+    <tr><td>“Gerar elevações” dentro do nó Elevações</td><td>Sai da árvore; vai para Vista ▸ Criar ▸ Elevação ▾ (“Gerar 4 elevações”) e botão direito em Elevações.</td></tr>
+    <tr><td>“Projeto”: Materiais, Níveis, Pesos de linha, 6 Tabelas</td><td>Sai. Tabelas ficam em <b>Tabelas/Quantidades (todas)</b>; Materiais e Pesos de linha em Gerenciar ▸ Configurações; Níveis em Arquitetura ▸ Referência ▸ Nível (e como elevações nas vistas).</td></tr>
+    <tr><td>“Famílias” → Paredes → tipos (lista plana), TypeRow com botões Usar/Editar</td><td><b>Famílias → Categoria → Família → Tipo</b> (ex.: Paredes ▸ Parede básica ▸ Genérico - 200 mm). Tipo ativo em negrito. Duplo clique = Propriedades de tipo; arrastar para a vista = colocar; botão direito = Duplicar, Renomear, Excluir, Selecionar todas as instâncias.</td></tr>
+    <tr><td>Sem Grupos / Links</td><td>Nós <b>Grupos</b> e <b>Links do Revit</b> ao final (vazios por enquanto).</td></tr>
+    <tr><td>—</td><td>Pesquisa (Ctrl+F ou botão direito ▸ Pesquisar), filtro de vistas e recolher tudo no menu de contexto da raiz.</td></tr>
+  </tbody></table>
+</section>
+
+<section id="barras">
+  <h2>7 · Barras: título, opções, controle de vista, navegação e status</h2>
+
+  <h3>Barra de título → Arquivo + Acesso Rápido + InfoCenter</h3>
+  <div class="cols2">
+    <div><p class="lab"><b>Hoje</b></p>
+      <div class="mini-title"><span class="app-r" style="display:inline-grid;width:20px;height:20px;border-radius:4px;background:var(--accent);color:#fff;place-items:center;font:600 10px var(--font-mono)">R</span><b>Hestia</b><span>Casa térrea, 2 quartos</span><span>●</span><span>| Novo | Abrir | Salvar | DXF | PDF | IFC |</span><span>↶ ↷</span><span style="flex:1"></span><span>PT|EN</span><span>GPU · WebGL2</span><span>☀ ?</span></div></div>
+    <div><p class="lab"><b>Proposta</b></p><div id="tbNew" style="border:1px solid var(--line-strong)"></div></div>
+  </div>
+  <ul class="t">
+    <li><b>Aba “Arquivo”</b> (azul, 1ª da linha de abas) abre o menu: Novo, Abrir, Salvar, Salvar como, <b>Exportar ▸ DXF/PDF/IFC</b>, Imprimir, Opções (idioma PT/EN, tema, motor GPU/CPU), Fechar. Tira 6 botões de texto da barra de título.</li>
+    <li><b>Barra de Acesso Rápido</b> (só ícones): Abrir, Salvar, Desfazer ▾, Refazer ▾, Medir, Cota alinhada, Etiquetar por categoria, Texto, Vista 3D padrão, Corte, Linhas finas, Fechar ocultas. Personalizável (▾ no fim).</li>
+    <li><b>Título</b> centralizado no formato do Revit: “Hestia - [Casa térrea, 2 quartos] - Planta de piso: Térreo”. O nome do projeto editável vai para Gerenciar ▸ Informações do projeto.</li>
+    <li><b>InfoCenter</b> à direita: busca de ajuda, ícone de ajuda ▾ (Atalhos, Tutorial, Sobre). O selo “GPU” passa para o rodapé/Opções.</li>
+  </ul>
+
+  <h3>Barra de opções</h3>
+  <p>Já existe e está certa em conceito. Ajustes: posição fixa logo abaixo da faixa, altura 30 px, campos no estilo “caixa branca com borda”; vazia (só “Modificar”) quando não há ferramenta, em vez de mostrar o nome da ferramenta em negrito.</p>
+
+  <h3>Barra de controle da vista e Barra de navegação</h3>
+  <div class="cols2">
+    <div><p class="lab"><b>Hoje</b> (flutuante, 3 itens)</p>
+      <div style="display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line-strong);background:var(--panel);padding:3px 8px;border-radius:4px;box-shadow:var(--shadow)">Escala: <span style="border:1px solid var(--line);background:var(--sheet);padding:0 6px">1 : 100 ▾</span> | <b>TL</b> | ⛶</div></div>
+    <div><p class="lab"><b>Proposta</b> (faixa fixa na base da vista, como no Revit)</p><div class="vcb" id="vcbNew" style="border:1px solid var(--line-strong)"></div></div>
+  </div>
+  <ul class="t">
+    <li>Ordem do Revit: <b>Escala · Nível de detalhe · Estilo visual · Caminho do sol · Sombras · (Cortar vista · Mostrar região de corte) · Ocultar/isolar temporário · Revelar ocultos · Propriedades temporárias da vista</b>. Hoje “Sombras”, “Arestas” e “Abrir vãos” estão na aba Vista; Sombras vai para cá, Arestas vira estilo visual (Linhas ocultas / Sombreado / Cores consistentes) e Abrir vãos fica como propriedade da vista 3D.</li>
+    <li><b>Linhas finas</b>: vai para Vista ▸ Gráficos e para o Acesso Rápido (no Revit não está na barra de controle).</li>
+    <li><b>Barra de navegação</b> vertical à direita da vista (abaixo do ViewCube): Roda de navegação, Zoom ▾ (Enquadrar tudo, Zoom região, Zoom +/−, Voltar). O botão “Enquadrar” sai da faixa.</li>
+    <li><b>ViewCube</b> só em vistas 3D (já é assim).</li>
+  </ul>
+
+  <h3>Barra de status</h3>
+  <ul class="t">
+    <li>À esquerda a mensagem de instrução (“Clique para selecionar, TAB para alternar, CTRL adiciona, SHIFT desmarca.”) — já existe; manter.</li>
+    <li>À direita, no padrão Revit: <b>filtro de seleção</b> (funil + contagem), modo de seleção (clique/arraste), <b>Revisar avisos</b> (hoje o <code>IssuesButton</code> está aqui; o Revit tem isso em Gerenciar ▸ Consulta). Coordenadas x/y e “Snap” são extras úteis: manter, mas à direita e discretas.</li>
+  </ul>
+</section>
+
+<section id="mapa">
+  <h2>8 · Mapa: onde cada ferramenta atual vai parar</h2>
+  <table class="m"><thead><tr><th>Ferramenta / controle atual</th><th>Onde está hoje</th><th>Onde fica (Revit)</th></tr></thead><tbody id="mapRows"></tbody></table>
+</section>
+
+<section id="plano">
+  <h2>9 · Plano em etapas e decisões que preciso de você</h2>
+  <div class="card" style="margin-bottom:14px">
+    <b>Antes de implementar:</b> o working tree tem muita coisa em andamento (<code>Ribbon.tsx</code>, <code>Properties.tsx</code>, <code>styles.css</code> e outros modificados, e a branch <code>integracao/frentes-qa</code> aguardando sua autorização para mesclar na <code>feat/revit-ui-theme</code>). Sugiro fechar esse merge primeiro e fazer esta rodada em uma branch nova, para não misturar com a correção das ferramentas. <code>Ribbon.tsx</code> está com 408 linhas e o limite do lint é 420: a refatoração para <b>faixa guiada por dados</b> não é só estética, é necessária.
+  </div>
+  <div id="steps"></div>
+
+  <h3>Perguntas (suas respostas mudam o desenho)</h3>
+  <div class="card">
+    <div class="q"><b>1. Quais versão e idioma do Revit são sua referência?</b> Assumi Revit 2024 em PT-BR. Se for outra (2022, 2025), a ordem de alguns painéis muda.</div>
+    <div class="q"><b>2. Abas sem ferramentas:</b> mostrar com placeholders esmaecidos (como na tela acima, mostra o roteiro) ou só o painel vazio com o título? Recomendo esmaecidos, com tooltip “Ainda não disponível”.</div>
+    <div class="q"><b>3. Navegador à esquerda?</b> O Revit padrão empilha Propriedades + Navegador à esquerda. Você prefere manter o Navegador à direita (como hoje) ou seguir o Revit? Dá para oferecer as duas via arrastar painéis (etapa 6).</div>
+    <div class="q"><b>4. Itens que não existem no Revit mas existem no seu app</b> (Laje separada de Piso, Parede paralela, Seta de inclinação, Cotas automáticas, Códigos de parede, Subpavimento): sugiro mantê-los <b>onde o Revit teria o mais parecido</b> (tabela da seção 8) e marcá-los discretamente como “extra”. Concorda?</div>
+    <div class="q"><b>5. Atalhos:</b> manter o perfil Revit de duas letras (WA, DR…) só no tooltip, como o Revit, e remover o <code>&lt;kbd&gt;</code> de dentro dos botões?</div>
+    <div class="q"><b>6. Ícones:</b> os 47 atuais já têm o estilo certo. Para os ~60 novos (pilar, viga, rampa…) prefere que eu desenhe no mesmo estilo ou use placeholder cinza até cada ferramenta existir?</div>
+  </div>
+</section>
+
+</main>
+
+<script>
+const ICONS={"roomsep":"<path class=\"ic-s1\" d=\"M3 3H29V29H3Z\"/><path class=\"ic-bl\" d=\"M7 11H25V25H7Z\"/><path class=\"ic-ln\" d=\"M1 18H31\"/>","select":"<path class=\"ic-s1\" d=\"M8 3V24L13 19L16.5 27L19.8 25.6L16.5 18.2L23 18Z\"/>","move":"<path class=\"ic-s1\" d=\"M11 11H21V21H11Z\"/><path class=\"ic-ln\" d=\"M16 7V11M16 21V25M7 16H11M21 16H25\"/><path class=\"ic-fa\" d=\"M16 2L12 7H20ZM16 30L12 25H20ZM2 16L7 12V20ZM30 16L25 12V20Z\"/>","copy":"<path class=\"ic-s3\" d=\"M3 3H19V19H3Z\"/><path class=\"ic-s1\" d=\"M12 12H28V28H12Z\"/><path class=\"ic-ac\" d=\"M20 15V25M15 20H25\"/>","rotate":"<path class=\"ic-s1\" d=\"M12 12H20V20H12Z\" transform=\"rotate(20 16 16)\"/><path class=\"ic-ac\" d=\"M27 16A11 11 0 1 1 21.5 6.5\"/><path class=\"ic-ac\" d=\"M17 7L21.5 6.5L19.5 2.5\"/>","mirror":"<path class=\"ic-ln ic-ds\" d=\"M16 2V30\"/><path class=\"ic-s1\" d=\"M13 8L4 24H13Z\"/><path class=\"ic-s3\" d=\"M19 8L28 24H19Z\"/>","array":"<path class=\"ic-s1\" d=\"M3 5H10V12H3Z\"/><path class=\"ic-s1\" d=\"M12.5 5H19.5V12H12.5Z\"/><path class=\"ic-s1\" d=\"M22 5H29V12H22Z\"/><path class=\"ic-s1\" d=\"M3 14H10V21H3Z\"/><path class=\"ic-s1\" d=\"M12.5 14H19.5V21H12.5Z\"/><path class=\"ic-s1\" d=\"M22 14H29V21H22Z\"/><path class=\"ic-ac\" d=\"M3 26H29M3 24V28M29 24V28\"/>","parallel":"<path class=\"ic-s2\" d=\"M3 4H29V10H3Z\"/><path class=\"ic-s2\" d=\"M3 22H29V28H3Z\"/><path class=\"ic-fa\" d=\"M16 11L13 15H19ZM16 21L13 17H19Z\"/>","offset":"<path class=\"ic-ln\" d=\"M4 28V5H28\"/><path class=\"ic-ac\" d=\"M10 28V11H28M5 20H9\"/>","trim":"<path class=\"ic-ln2\" d=\"M3 20H20V4\"/><path class=\"ic-ac ic-ds\" d=\"M20 20H29M20 20V29\"/>","align":"<path class=\"ic-ac\" d=\"M6 3V29\"/><path class=\"ic-s2\" d=\"M9 5H27V11H9Z\"/><path class=\"ic-s2\" d=\"M9 13H21V19H9Z\"/><path class=\"ic-s2\" d=\"M9 21H25V27H9Z\"/>","joins":"<path class=\"ic-s2\" d=\"M3 12H11V4H21V12H29V20H21V28H11V20H3Z\"/><path class=\"ic-ac\" d=\"M11 12H21V20H11Z\"/>","split":"<path class=\"ic-s2\" d=\"M3 11H13V21H3Z\"/><path class=\"ic-s2\" d=\"M19 11H29V21H19Z\"/><path class=\"ic-ac ic-ds\" d=\"M16 4V28\"/>","measure":"<g transform=\"rotate(-35 16 16)\"><path class=\"ic-s1\" d=\"M1 11H31V21H1Z\"/><path class=\"ic-ln\" d=\"M6 11V16M11 11V14M16 11V16M21 11V14M26 11V16\"/></g>","rehost":"<path class=\"ic-s3\" d=\"M3 5H9V27H3Z\"/><path class=\"ic-s3\" d=\"M23 5H29V27H23Z\"/><path class=\"ic-ac\" d=\"M12 11H20M20 21H12\"/><path class=\"ic-fa\" d=\"M21 11L17 8V14ZM11 21L15 18V24Z\"/>","attachroof":"<path class=\"ic-s1\" d=\"M3 15L16 5L29 15Z\"/><path class=\"ic-s2\" d=\"M6 15H26V28H6Z\"/><path class=\"ic-ac\" d=\"M16 25V19\"/><path class=\"ic-fa\" d=\"M16 16L12.5 20.5H19.5Z\"/>","detachroof":"<path class=\"ic-s1\" d=\"M3 10L16 2L29 10Z\"/><path class=\"ic-s2\" d=\"M6 19H26V29H6Z\"/><path class=\"ic-ac\" d=\"M16 12V16\"/><path class=\"ic-fa\" d=\"M16 18L12.5 13.5H19.5Z\"/>","sametype":"<path class=\"ic-bl\" d=\"M4 4H14V14H4Z\"/><path class=\"ic-bl\" d=\"M18 4H28V14H18Z\"/><path class=\"ic-bl\" d=\"M4 18H14V28H4Z\"/><path class=\"ic-bl\" d=\"M18 18H28V28H18Z\"/>","samename":"<path class=\"ic-s1\" d=\"M3 7H29V25H3Z\"/><text class=\"ic-tx\" x=\"16\" y=\"20\" text-anchor=\"middle\">Aa</text>","wall":"<path class=\"ic-s1\" d=\"M4 12L12 7H28L20 12Z\"/><path class=\"ic-s2\" d=\"M4 12H20V25H4Z\"/><path class=\"ic-s3\" d=\"M20 12L28 7V20L20 25Z\"/>","door":"<path class=\"ic-s3\" d=\"M8 4H24V28H8Z\"/><path class=\"ic-s2\" d=\"M8 4L19 6.5V30L8 28Z\"/><circle class=\"ic-fa\" cx=\"16\" cy=\"18\" r=\"1.3\"/>","window":"<path class=\"ic-s2\" d=\"M5 3H27V26H5Z\"/><path class=\"ic-gl\" d=\"M8 6H15V13H8Z\"/><path class=\"ic-gl\" d=\"M17 6H24V13H17Z\"/><path class=\"ic-gl\" d=\"M8 15H15V22H8Z\"/><path class=\"ic-gl\" d=\"M17 15H24V22H17Z\"/><path class=\"ic-s3\" d=\"M3 26H29V29H3Z\"/>","floor":"<path class=\"ic-bl\" d=\"M3 14L16 7L29 14L16 21Z\"/><path class=\"ic-s2\" d=\"M3 14L16 21V25L3 18Z\"/><path class=\"ic-s3\" d=\"M16 21L29 14V18L16 25Z\"/>","slab":"<path class=\"ic-s1\" d=\"M3 11L16 4L29 11L16 18Z\"/><path class=\"ic-s2\" d=\"M3 11L16 18V28L3 21Z\"/><path class=\"ic-s3\" d=\"M16 18L29 11V21L16 28Z\"/>","ceiling":"<path class=\"ic-ln\" d=\"M5 4H27M9 4V13.8M16 4V10M23 4V13.8\"/><path class=\"ic-bl\" d=\"M3 17L16 10L29 17L16 24Z\"/><path class=\"ic-ln\" d=\"M9.5 13.5L22.5 20.5M22.5 13.5L9.5 20.5\"/>","roof":"<path class=\"ic-s1\" d=\"M13 10L21 5L31 21L23 26Z\"/><path class=\"ic-s2\" d=\"M3 26L13 10L23 26Z\"/>","slope":"<path class=\"ic-s3\" d=\"M21 26V12L27 8V22Z\"/><path class=\"ic-s1\" d=\"M3 26L21 12L27 8L9 22Z\"/><path class=\"ic-s2\" d=\"M3 26H21V12Z\"/>","roofarrow":"<path class=\"ic-s1\" d=\"M3 24L9 10H29L23 24Z\"/><path class=\"ic-ac\" d=\"M12 21L19 13M19 13H14.8M19 13V17.2\"/>","roofextrusion":"<path class=\"ic-s3\" d=\"M21 16L28 12V22L21 26Z\"/><path class=\"ic-s1\" d=\"M3 16Q12 4 21 16L28 12Q19 0 10 12Z\"/><path class=\"ic-s2\" d=\"M3 26V16Q12 4 21 16V26Z\"/><path class=\"ic-ac\" d=\"M3 16Q12 4 21 16\"/>","stair":"<path class=\"ic-s2\" d=\"M3 27V20H11V14H19V8H29V27Z\"/>","stairrun":"<path class=\"ic-s1\" d=\"M6 3H26V29H6Z\"/><path class=\"ic-ln\" d=\"M6 9H26M6 14H26M6 19H26M6 24H26\"/><path class=\"ic-ac\" d=\"M16 27V9\"/><path class=\"ic-fa\" d=\"M12 11L16 5L20 11Z\"/>","room":"<path class=\"ic-s1\" d=\"M3 3H29V29H3Z\"/><path class=\"ic-bl\" d=\"M7 11H25V25H7Z\"/><path class=\"ic-ln\" d=\"M7 11L25 25M25 11L7 25\"/>","dimension":"<path class=\"ic-ln\" d=\"M5 6V24M27 6V24M5 18H27\"/><path class=\"ic-ac\" d=\"M3 20L7 16M25 20L29 16\"/><text class=\"ic-tx\" x=\"16\" y=\"15\" text-anchor=\"middle\">12</text>","text":"<path class=\"ic-ln2\" d=\"M6 27L16 5L26 27M10 20H22\"/>","detailLine":"<path class=\"ic-ln2\" d=\"M4 24L11 9L18 21L27 7\"/><path class=\"ic-ac\" d=\"M3 27H29\"/>","filledRegion":"<path class=\"ic-bl\" d=\"M5 5H27V27H5Z\"/><path class=\"ic-ln\" d=\"M5 5L27 27M27 5L5 27\"/>","tag":"<path class=\"ic-s2\" d=\"M3 6H17L28 17L17 28L3 17Z\"/><circle class=\"ic-ac\" cx=\"10\" cy=\"13\" r=\"1.5\"/>","cotasAuto":"<path class=\"ic-ln\" d=\"M4 4V18M14 4V18M28 4V18M4 14H28\"/><path class=\"ic-ac\" d=\"M2 16L6 12M12 16L16 12M26 16L30 12\"/><path class=\"ic-s2\" d=\"M4 21H28V29H4Z\"/><path class=\"ic-fa\" d=\"M21 3L22 6L25 7L22 8L21 11L20 8L17 7L20 6Z\"/>","section":"<path class=\"ic-s3\" d=\"M2 17L8 11V23Z\"/><path class=\"ic-s3\" d=\"M30 17L24 11V23Z\"/><path class=\"ic-ln ic-ds\" d=\"M8 17H24\"/><path class=\"ic-ac\" d=\"M16 17V9\"/><path class=\"ic-fa\" d=\"M16 3L12 9H20Z\"/>","plan":"<path class=\"ic-s1\" d=\"M4 4H28V28H4Z\"/><path class=\"ic-ln2\" d=\"M16 4V16H28M4 21H12\"/><path class=\"ic-ac\" d=\"M12 21A6 6 0 0 1 18 27\"/>","fit":"<path class=\"ic-ln2\" d=\"M4 11V4H11M21 4H28V11M28 21V28H21M11 28H4V21\"/><path class=\"ic-s1\" d=\"M11 11H21V21H11Z\"/>","grid":"<path class=\"ic-ln\" d=\"M10 9V29M22 9V29M9 15H29M9 23H29\"/><circle class=\"ic-s1\" cx=\"10\" cy=\"6\" r=\"3\"/><circle class=\"ic-s1\" cx=\"22\" cy=\"6\" r=\"3\"/><circle class=\"ic-s1\" cx=\"6\" cy=\"15\" r=\"3\"/><circle class=\"ic-s1\" cx=\"6\" cy=\"23\" r=\"3\"/>","cube":"<path class=\"ic-s1\" d=\"M16 3L28 10L16 17L4 10Z\"/><path class=\"ic-s2\" d=\"M4 10L16 17V30L4 23Z\"/><path class=\"ic-s3\" d=\"M16 17L28 10V23L16 30Z\"/>","sun":"<circle class=\"ic-fa\" cx=\"16\" cy=\"16\" r=\"6\"/><path class=\"ic-ac\" d=\"M16 3V7M16 25V29M3 16H7M25 16H29M7 7L9.5 9.5M22.5 22.5L25 25M7 25L9.5 22.5M22.5 9.5L25 7\"/>","layers":"<path class=\"ic-s3\" d=\"M3 21L16 15L29 21L16 27Z\"/><path class=\"ic-s2\" d=\"M3 15L16 9L29 15L16 21Z\"/><path class=\"ic-bl\" d=\"M3 9L16 3L29 9L16 15Z\"/>","schedule":"<path class=\"ic-s1\" d=\"M4 5H28V27H4Z\"/><path class=\"ic-s3\" d=\"M4 5H28V11H4Z\"/><path class=\"ic-ln\" d=\"M4 17H28M4 22H28M13 11V27\"/>","type":"<path class=\"ic-s1\" d=\"M4 5H28V12H4Z\"/><path class=\"ic-s3\" d=\"M4 14H28V19H4Z\"/><path class=\"ic-s2\" d=\"M4 21H28V28H4Z\"/>"};
+</script>
+<script>
+/* ============ ícones ============ */
+const p = (c, d, x='') => `<path class="ic-${c}" d="${d}"${x ? ' ' + x : ''}/>`;
+Object.assign(ICONS, {
+  column: p('s2','M11 3H21V29H11Z') + p('s3','M8 26H24V29H8Z') + p('s3','M8 3H24V6H8Z'),
+  beam: p('s2','M3 11H29V19H3Z') + p('s3','M3 19H29V23H3Z'),
+  ramp: p('s1','M3 26L29 12V26Z') + p('ac','M8 22L22 16'),
+  railing: p('ln2','M4 9H28') + p('s2','M6 9V26M12 9V26M18 9V26M24 9V26') + p('ln','M4 26H28'),
+  level: p('ln ic-ds','M2 21H30') + p('s3','M3 9L9 15H-1Z') + p('ac','M6 21V6'),
+  component: p('s2','M6 10H24V28H6Z') + p('s3','M6 10L11 5H29L24 10Z') + p('s3','M24 10L29 5V23L24 28Z'),
+  curtain: p('gl','M4 4H28V28H4Z') + p('ln','M12 4V28M20 4V28M4 12H28M4 20H28'),
+  opening: p('s2','M4 4H28V28H4Z') + p('bl','M11 11H21V21H11Z'),
+  sheet: p('s1','M6 3H26V29H6Z') + p('bl','M9 7H23V19H9Z') + p('ln','M9 23H23M9 26H18'),
+  link: p('s1','M3 10H17V22H3Z') + p('s3','M15 10H29V22H15Z'),
+  ph: p('s1','M5 5H27V27H5Z') + p('ln ic-ds','M10 10H22V22H10Z'),
+  close: p('ac','M7 7L25 25M25 7L7 25'),
+  open: p('s2','M3 8H13L16 11H29V26H3Z'),
+  save: p('s2','M5 4H24L28 8V28H5Z') + p('bl','M9 4H21V12H9Z') + p('s1','M9 17H24V28H9Z'),
+  undo: p('ac','M12 10L5 16L12 22M5 16H20A6 6 0 0 1 20 28H14'),
+  redo: p('ac','M20 10L27 16L20 22M27 16H12A6 6 0 0 0 12 28H18'),
+  help: p('bl','M16 3A13 13 0 1 0 16 29A13 13 0 1 0 16 3Z') + '<text class="ic-tx" x="16" y="21" text-anchor="middle" style="font-size:16px;fill:#fff">?</text>',
+  search: p('ln2','M13 5A8 8 0 1 0 13 21A8 8 0 1 0 13 5ZM19 19L28 28'),
+  user: p('s3','M16 4A5 5 0 1 0 16 14A5 5 0 1 0 16 4Z') + p('s2','M5 28C5 19 27 19 27 28Z'),
+  eye: p('s1','M2 16C8 6 24 6 30 16C24 26 8 26 2 16Z') + p('bl','M16 11A5 5 0 1 0 16 21A5 5 0 1 0 16 11Z'),
+  cut: p('s2','M4 12H28V22H4Z') + p('ac ic-ds','M2 17H30'),
+  paste: p('s2','M7 6H25V28H7Z') + p('s3','M12 3H20V8H12Z') + p('ln','M11 14H21M11 18H21M11 22H17'),
+  nav: p('ln2','M16 4A12 12 0 1 0 16 28A12 12 0 1 0 16 4ZM16 8V24M8 16H24'),
+  zoom: p('ln2','M13 5A8 8 0 1 0 13 21A8 8 0 1 0 13 5ZM19 19L28 28M9 13H17M13 9V17'),
+  tl: '<text class="ic-tx" x="16" y="21" text-anchor="middle" style="font-size:15px">TL</text>',
+  scale: '<text class="ic-tx" x="16" y="21" text-anchor="middle" style="font-size:12px">1:n</text>',
+  detail: p('ln2','M5 6H27M5 12H27M5 18H21M5 24H15'),
+  style: p('s1','M16 3L28 10L16 17L4 10Z') + p('s2','M4 10L16 17V30L4 23Z') + p('s3','M16 17L28 10V23L16 30Z'),
+  crop: p('ln2','M9 3V23H29M3 9H23V29') ,
+  hide: p('s1','M2 16C8 6 24 6 30 16C24 26 8 26 2 16Z') + p('ac','M5 27L27 5'),
+  isolate: p('s1','M3 10H17V22H3Z') + p('ac','M22 8L28 14L22 20'),
+  funnel: p('s3','M3 5H29L19 17V28L13 24V17Z'),
+});
+function ic(name, size) {
+  const body = ICONS[name] || ICONS.ph;
+  return `<svg class="ic" ${size ? `width="${size}" height="${size}"` : ''} viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
+}
+
+/* ============ modelo da faixa (mesma fonte para tela, abas e agrupamento) ============ */
+/* have: 1 existe e funciona · 2 existe, mas fora da faixa hoje · 0 ainda não existe */
+const L = (label, icon, have = 1, menu) => ({ k:'L', label, icon, have, menu });
+const S = (label, icon, have = 1, menu) => ({ k:'S', label, icon, have, menu });
+const G = (...icons) => ({ k:'G', icons });
+const P = (title, cols, o = {}) => ({ title, cols, ...o });
+const Ph = (label, icon = 'ph') => L(label, icon, 0);
+const Sp = (label, icon = 'ph') => S(label, icon, 0);
+
+const MOD_SELECT = P('Selecionar', [L('Modificar', 'select')], { slide: 1 });
+const MOD_PROPS = P('Propriedades', [L('Propriedades de tipo', 'type', 2), L('Propriedades', 'type', 2)]);
+const MOD_CLIP = P('Área de transferência', [L('Colar', 'paste', 0), [S('Recortar', 'cut', 0), S('Copiar p/ área', 'copy', 0), S('Corresp. tipo', 'sametype', 0)]]);
+const MOD_GEO = P('Geometria', [L('Cortar', 'cut', 0), [S('Cortar geometria', 'cut', 0), S('Unir geometria', 'joins', 1), S('Entalhar', 'ph', 0)]]);
+const MOD_MOD = P('Modificar', [
+  [S('Alinhar', 'align'), S('Deslocar', 'offset'), S('Espelhar - eixo', 'mirror')],
+  [S('Mover', 'move'), S('Copiar', 'copy'), S('Girar', 'rotate')],
+  [S('Aparar/estender', 'trim'), S('Dividir elemento', 'split'), S('Matriz', 'array')],
+  [S('Escala', 'ph', 0), S('Fixar', 'ph', 0), S('Excluir', 'close', 2)],
+]);
+const MOD_VIEW = P('Vista', [L('Ocultar em vista', 'hide', 0, [['Ocultar elementos', 0], ['Ocultar categoria', 0]]), L('Substituir gráficos', 'layers', 0)]);
+const MOD_MEASURE = P('Medir', [L('Medir', 'measure', 1, [['Entre dois pontos', 1], ['Ao longo de um elemento', 0]]), L('Cota alinhada', 'dimension', 1)]);
+const MOD_CREATE = P('Criar', [L('Criar similar', 'copy', 0), L('Criar grupo', 'layers', 0)]);
+const MOD_WALL = P('Modificar parede', [L('Editar perfil', 'wall', 2), [S('Anexar topo/base', 'attachroof'), S('Desanexar topo/base', 'detachroof'), S('Parede paralela', 'parallel')]]);
+const MOD_DRAW = P('Desenhar', [G('wall', 'filledRegion', 'ph', 'ph', 'ph', 'ph', 'ph', 'ph'), [S('Escolher linhas', 'ph', 0), S('Escolher faces', 'ph', 0)]]);
+
+const TABS = [
+  { id:'arq', label:'Arquitetura', panels:[
+    MOD_SELECT,
+    P('Construir', [
+      L('Parede', 'wall', 1, [['Parede: Arquitetônica', 1], ['Parede: Estrutural', 0], ['Parede por face', 0], ['Parede: Varrida', 0], ['Parede: Frisos', 0]]),
+      L('Porta', 'door'), L('Janela', 'window'),
+      L('Componente', 'component', 0, [['Colocar componente', 0], ['Modelar no local', 0]]),
+      L('Pilar', 'column', 0, [['Pilar: Arquitetônico', 0], ['Pilar: Estrutural', 0]]),
+      L('Telhado', 'roof', 1, [['Telhado por perímetro', 1], ['Telhado por extrusão', 1], ['Telhado por face', 0], ['Forro de beiral', 0], ['Fáscia', 0], ['Calha', 0]]),
+      L('Forro', 'ceiling', 1, [['Forro automático', 1], ['Forro por croqui', 0]]),
+      L('Piso', 'floor', 1, [['Piso: Arquitetônico', 1], ['Piso: Estrutural (Laje)', 1], ['Piso por face', 0], ['Piso: Borda de laje', 0]]),
+      [S('Sistema de fachada cortina', 'curtain', 0), S('Grade de fachada cortina', 'curtain', 0), S('Montante', 'curtain', 0)],
+    ]),
+    P('Circulação', [L('Guarda-corpo', 'railing', 0, [['Caminho de croqui', 0], ['Colocar no hospedeiro', 0]]), L('Rampa', 'ramp', 0), L('Escada', 'stairrun', 1, [['Escada (por componente)', 1, 'stairrun'], ['Escada por croqui', 1, 'stair']])]),
+    P('Modelo', [[S('Texto do modelo', 'text', 0), S('Linha de modelo', 'detailLine', 0), S('Grupo de modelo', 'layers', 0)]]),
+    P('Ambiente e área', [L('Ambiente', 'room'), [S('Separador de ambiente', 'roomsep'), S('Etiquetar ambiente', 'tag')], L('Área', 'room', 0, [['Área bruta', 0], ['Área útil', 0]]), [S('Limite de área', 'roomsep', 0), S('Etiqueta de área', 'tag', 0)]], { slide: 1 }),
+    P('Abertura', [L('Por face', 'opening', 0), L('Poço', 'opening', 0), L('Parede', 'opening', 0), L('Vertical', 'opening', 0), L('Água-furtada', 'opening', 0)]),
+    P('Referência', [L('Nível', 'level', 2), L('Grade', 'grid', 0)]),
+    P('Plano de trabalho', [L('Definir', 'ph', 0), [S('Exibir', 'eye', 0), S('Plano de referência', 'ph', 0), S('Visualizador', 'ph', 0)]]),
+  ]},
+  { id:'est', label:'Estrutura', panels:[
+    P('Conexão', [Ph('Conexão')]),
+    P('Estrutura', [Ph('Pilar', 'column'), Ph('Viga', 'beam'), Ph('Contraventamento'), [Sp('Sistema de vigas', 'beam'), Sp('Treliça'), Sp('Emenda')]]),
+    P('Fundação', [Ph('Parede'), Ph('Isolada'), Ph('Laje', 'slab')]),
+    P('Reforço', [Ph('Armadura'), [Sp('Cobrimento'), Sp('Área'), Sp('Malha')]]),
+    P('Modelo analítico', [Ph('Cargas'), Ph('Condições de contorno')]),
+    P('Referência', [Ph('Nível', 'level'), Ph('Grade', 'grid')]),
+  ]},
+  { id:'aco', label:'Aço', panels:[P('Conexões', [Ph('Conexão'), Ph('Chapa'), Ph('Ancoragem')]), P('Elementos de aço', [Ph('Parafuso'), Ph('Solda'), Ph('Pino')]), P('Modificar', [[Sp('Entalhe'), Sp('Corte'), Sp('Chanfro')]])]},
+  { id:'pre', label:'Pré-moldado', panels:[P('Peças', [Ph('Painel'), Ph('Pilar', 'column'), Ph('Viga', 'beam')]), P('Divisão', [Ph('Dividir peça'), Ph('Juntas')])]},
+  { id:'sis', label:'Sistemas', panels:[P('HVAC', [Ph('Duto'), Ph('Tubo flexível'), Ph('Difusor')]), P('Mecânico', [Ph('Equipamento'), Ph('Componente', 'component')]), P('Hidráulica e tubulação', [Ph('Tubo'), Ph('Conexão'), Ph('Aparelho sanitário')]), P('Elétrico', [Ph('Eletroduto'), Ph('Bandeja'), Ph('Luminária')])]},
+  { id:'ins', label:'Inserir', panels:[
+    P('Vincular', [Ph('Vincular Revit', 'link'), Ph('Vincular IFC', 'link'), Ph('Vincular CAD', 'link'), Ph('Topografia'), Ph('Nuvem de pontos')]),
+    P('Importar', [Ph('Importar CAD (DXF)', 'open'), Ph('Importar PDF', 'sheet'), Ph('Imagem', 'sheet')]),
+    P('Carregar da biblioteca', [Ph('Carregar família', 'open'), Ph('Carregar como grupo', 'layers')]),
+  ]},
+  { id:'ano', label:'Anotar', panels:[
+    P('Cota', [L('Alinhada', 'dimension', 1, [['Alinhada', 1], ['Linear', 0], ['Angular', 0], ['Radial', 0], ['Diâmetro', 0], ['Comprimento do arco', 0]]), L('Cotas automáticas', 'cotasAuto', 1), [S('Cota de elevação', 'dimension', 0), S('Coordenada de ponto', 'ph', 0), S('Inclinação de ponto', 'ph', 0)]], { launcher: 1 }),
+    P('Detalhe', [L('Linha de detalhe', 'detailLine'), L('Região', 'filledRegion', 1, [['Região preenchida', 1], ['Região de máscara', 0]]), L('Componente de detalhe', 'component', 0), L('Nuvem de revisão', 'ph', 0), L('Grupo de detalhe', 'layers', 0)], { slide: 1 }),
+    P('Texto', [L('Texto', 'text'), [S('Verificar ortografia', 'ph', 0), S('Localizar/substituir', 'search', 0)]]),
+    P('Etiqueta', [L('Etiquetar por categoria', 'tag'), L('Etiquetar todos', 'tag'), [S('Ambiente', 'tag'), S('Material', 'tag', 0), S('Multicategoria', 'tag', 0)]]),
+    P('Símbolo', [Ph('Símbolo'), [Sp('Seta norte'), Sp('Caminho da escada')]]),
+  ]},
+  { id:'ana', label:'Analisar', panels:[P('Espaços e zonas', [Ph('Espaço'), Ph('Zona')]), P('Relatórios e tabelas', [Ph('Relatório de carga'), Ph('Tabela de carga')]), P('Energia', [Ph('Otimização de energia')]), P('Verificação', [Ph('Verificar sistemas')])]},
+  { id:'mas', label:'Massa e terreno', panels:[P('Modelo de massa', [Ph('Mostrar massa'), Ph('Massa no local'), Ph('Colocar massa')]), P('Modelo por massa', [Ph('Telhado por face', 'roof'), Ph('Parede por face', 'wall'), Ph('Forro por face', 'ceiling'), Ph('Piso por face', 'floor')]), P('Terreno', [Ph('Topografia'), Ph('Subdivisão'), Ph('Plataforma'), Ph('Componente de terreno'), Ph('Linhas de propriedade')])]},
+  { id:'col', label:'Colaborar', panels:[P('Comunicar', [Ph('Colaborar')]), P('Sincronizar', [Ph('Sincronizar')]), P('Gerenciar colaboração', [Ph('Conjuntos de trabalho'), Ph('Opções de design')]), P('Coordenar', [Ph('Copiar/monitorar'), Ph('Verificar interferências')])]},
+  { id:'vis', label:'Vista', panels:[
+    P('Gráficos', [Ph('Modelos de vista', 'layers'), L('Visibilidade/Gráficos', 'layers', 2), Ph('Filtros'), [S('Linhas finas', 'tl', 2), S('Mostrar linhas ocultas', 'eye', 0), S('Remover linhas ocultas', 'hide', 0)]]),
+    P('Apresentação', [Ph('Renderizar'), Ph('Galeria de renderização')]),
+    P('Criar', [
+      L('Vistas 3D', 'cube', 1, [['Vista 3D padrão', 1], ['Câmera', 0], ['Percurso', 0]]),
+      L('Corte', 'section'), L('Chamada', 'ph', 0),
+      L('Elevação', 'ph', 1, [['Elevação', 0], ['Gerar 4 elevações', 1], ['Quadro', 0]]),
+      L('Vistas de planta', 'plan', 0, [['Planta de piso', 0], ['Planta de forro', 0], ['Planta de área', 0]]),
+      L('Vista de desenho', 'ph', 0), L('Duplicar vista', 'layers', 0, [['Duplicar', 0], ['Duplicar com detalhamento', 0]]), L('Legendas', 'ph', 0),
+      L('Tabelas', 'schedule', 2, [['Tabela/quantidades', 0], ['Tabela de paredes', 2], ['Tabela de pisos', 2], ['Tabela de lajes', 2], ['Tabela de forros', 2], ['Tabela de telhados', 2], ['Tabela de escadas', 2], ['Tabela de ambientes', 2], ['Tabela de portas e janelas', 2]]),
+    ], { slide: 1 }),
+    P('Composição de pranchas', [L('Prancha', 'sheet', 2), L('Vista', 'plan', 0), L('Linhas de correspondência', 'ph', 0), L('Revisões', 'ph', 0)]),
+    P('Janelas', [L('Alternar janelas', 'ph', 0), L('Fechar ocultas', 'close', 0), L('Cascata', 'ph', 0), L('Lado a lado', 'ph', 0), L('Interface do usuário', 'ph', 2, [['Navegador de projeto', 2], ['Propriedades', 2], ['Barra de status', 0]])]),
+  ]},
+  { id:'ger', label:'Gerenciar', panels:[
+    P('Configurações', [L('Materiais', 'layers', 2), L('Estilos de objeto', 'ph', 0), [S('Informações do projeto', 'ph', 0), S('Parâmetros do projeto', 'ph', 0), S('Parâmetros compartilhados', 'ph', 0)], [S('Transferir padrões', 'ph', 0), S('Limpar não usados', 'ph', 0), S('Unidades do projeto', 'ph', 0)], L('Snaps', 'ph', 2), L('Config. adicionais', 'plan', 2, [['Espessuras de linha', 2], ['Estilos de linha', 0], ['Padrões de preenchimento', 0], ['Estilos de seta', 0]])], { launcher: 1 }),
+    P('Gerenciar projeto', [Ph('Gerenciar links', 'link'), Ph('Gerenciar imagens', 'sheet'), Ph('Vista inicial', 'eye')]),
+    P('Fases', [Ph('Fases')]),
+    P('Consulta', [Ph('Selecionar por ID'), L('Revisar avisos', 'help', 2)]),
+    P('Macros', [Ph('Gerenciador de macros')]),
+  ]},
+  { id:'sup', label:'Suplementos', panels:[P('Ferramentas externas', [Ph('Ferramentas externas')])]},
+  { id:'mod', label:'Modificar', panels:[MOD_SELECT, MOD_PROPS, MOD_CLIP, MOD_GEO, MOD_MOD, MOD_VIEW, MOD_MEASURE, MOD_CREATE]},
+];
+const CTX = {
+  tool: { label: 'Modificar | Colocar Parede', panels: [MOD_SELECT, MOD_PROPS, MOD_MOD, MOD_MEASURE, MOD_CREATE, MOD_DRAW] },
+  sel:  { label: 'Modificar | Paredes', panels: [MOD_SELECT, MOD_PROPS, MOD_CLIP, MOD_GEO, MOD_MOD, MOD_VIEW, MOD_MEASURE, MOD_CREATE, MOD_WALL] },
+};
+
+/* ============ renderização da faixa ============ */
+const MENUS = [];
+const HAVE_TXT = ['ainda não existe', 'existe e funciona', 'existe, mas hoje fora da faixa'];
+function itemHTML(it) {
+  if (it.k === 'G') return `<div class="gal">${it.icons.map((n, i) => `<button class="${i === 0 ? 'on' : ''}">${ic(n)}</button>`).join('')}</div>`;
+  const cls = [it.k === 'L' ? 'lbtn' : 'sbtn', it.have === 0 ? 'ph0 dis' : '', it.have === 2 ? 'dot2' : ''].join(' ');
+  const mid = it.menu ? MENUS.push(it.menu) - 1 : -1;
+  const lab = it.label + (it.menu ? ' ▾' : '');
+  const tip = `${it.label} — ${HAVE_TXT[it.have]}`;
+  return it.k === 'L'
+    ? `<button class="${cls}" ${mid >= 0 ? `data-mid="${mid}"` : ''} title="${tip}">${ic(it.icon)}<span class="tx">${lab}</span></button>`
+    : `<button class="${cls}" ${mid >= 0 ? `data-mid="${mid}"` : ''} title="${tip}">${ic(it.icon)}<span>${lab}</span></button>`;
+}
+function panelHTML(pn) {
+  const cols = pn.cols.map((c) => Array.isArray(c) ? `<div class="stack">${c.map(itemHTML).join('')}</div>` : itemHTML(c)).join('');
+  return `<div class="rpanel"><div class="rcols">${cols}</div><div class="rtitle">${pn.title}${pn.slide ? '<span class="sl">▼</span>' : ''}${pn.launcher ? '<span class="ln">↘</span>' : ''}</div></div>`;
+}
+const stripHTML = (panels) => panels.map(panelHTML).join('');
+function countHave(panels) {
+  let a = 0, b = 0, c = 0;
+  const walk = (it) => { if (it.k === 'G') return; if (it.have === 1) a++; else if (it.have === 2) b++; else c++; if (it.menu) it.menu.forEach((m) => { if (m[1] === 1) a++; else if (m[1] === 2) b++; else c++; }); };
+  panels.forEach((pn) => pn.cols.forEach((col) => (Array.isArray(col) ? col : [col]).forEach(walk)));
+  return { a, b, c };
+}
+
+/* ---- menus dos botões divididos ---- */
+const menuEl = document.createElement('div'); menuEl.className = 'rmenu'; menuEl.style.display = 'none'; document.body.appendChild(menuEl);
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-mid]');
+  if (!btn) { menuEl.style.display = 'none'; return; }
+  const items = MENUS[Number(btn.dataset.mid)];
+  menuEl.innerHTML = items.map(([n, h, icn]) => `<div class="${h === 0 ? 'off' : ''}">${ic(icn || 'ph')}<span>${n}</span><span class="d">${h === 0 ? 'a criar' : h === 2 ? 'realocar' : ''}</span></div>`).join('');
+  const r = btn.getBoundingClientRect();
+  menuEl.style.left = Math.min(r.left, innerWidth - 260) + 'px'; menuEl.style.top = (r.bottom + 2) + 'px'; menuEl.style.display = 'block';
+  e.stopPropagation();
+}, true);
+
+/* ============ peças da paleta e da árvore ============ */
+const row = (l, v, o = {}) => `<div class="prow${o.ro ? ' ro' : ''}"><div class="l" title="${l}">${l}</div><div class="v">${v}</div></div>`;
+const cb = (on) => `<span class="cb">${on ? '✓' : ''}</span>`;
+const grp = (t, rows, open = true) => `<details class="pgroup" ${open ? 'open' : ''}><summary>${t}</summary>${rows}</details>`;
+function propsHTML(mode, st) {
+  const isView = st === 'none';
+  const head = `<div class="phead"><span>Propriedades</span><span class="x">${mode === 'new' ? '✕' : ''}</span></div>`;
+  let body = '';
+  if (mode === 'old') body += `<div class="prev">${isView ? 'prévia da vista' : 'prévia do tipo'}</div>`;
+  if (isView) {
+    body += `<div class="tsel">${ic('plan')}<div class="t"><b>Planta de piso</b>Planta de piso</div><span>▾</span></div><div class="filt"><div class="f">Planta de piso: Térreo<span>▾</span></div><div class="b">Editar tipo</div></div>`;
+    body += grp('Gráficos', row('Escala da vista', '1 : 100') + row('Valor da escala', '100', {ro:1}) + row('Exibir modelo', 'Normal') + row('Nível de detalhe', 'Médio') + row('Visibilidade de partes', 'Mostrar original') + row('Sobreposições de vis./gráficos', '<span class="btn">Editar…</span>') + row('Estilo visual', 'Linhas ocultas') + row('Linhas finas', cb(0)));
+    body += grp('Extensões', row('Cortar vista', cb(0)) + row('Região de corte visível', cb(0)) + row('Intervalo de vista', '<span class="btn">Editar…</span>') + row('Nível associado', 'Térreo', {ro:1}));
+    body += grp('Dados de identidade', row('Modelo de vista', '&lt;Nenhum&gt;') + row('Nome da vista', 'Térreo') + row('Dependência', 'Independente', {ro:1}) + row('Título na prancha', ''));
+    body += grp('Fases', row('Filtro de fase', 'Mostrar tudo') + row('Fase', 'Nova construção'), mode === 'new');
+  } else {
+    body += `<div class="tsel">${ic('wall')}<div class="t"><b>${mode === 'new' ? 'Parede básica' : 'Alvenaria 15 cm'}</b>${mode === 'new' ? 'Alvenaria 15 cm (reboco 2 faces)' : 'Parede · 0,15 m'}</div><span>▾</span></div>`;
+    body += `<div class="filt"><div class="f">${mode === 'new' ? 'Paredes (1)' : 'Paredes (1)'}<span>▾</span></div><div class="b">Editar tipo</div></div>`;
+    body += grp('Restrições', row('Nível base', 'Térreo') + row('Desloc. da base', '0,00 m') + row('Nível superior', 'Até Pavimento 2') + row('Desloc. do topo', '0,00 m') + row('Topo no telhado', cb(0)) + row('Linha de localização', 'Eixo da parede') + (mode === 'old' ? row('Flecha do arco', '0,00 m') : '') + row('Não unir no início', cb(0)) + row('Não unir no fim', cb(0)));
+    if (mode === 'old') body += grp('Junções', row('Início: junção', 'Esquadria') + row('Fim: junção', 'Livre'));
+    body += grp('Construção', row('Espessura total', '15,0 cm', {ro:1}) + row('Função', 'Exterior', {ro:1}) + (mode === 'new' ? row('Estrutura', '<span class="btn">Editar…</span>') : ''), mode === 'new');
+    if (mode === 'old') body += grp('Dimensões', row('Comprimento', '4,200 m') + row('Área', '11,80 m²') + row('Volume', '1,77 m³'), false);
+    if (mode === 'new') body += grp('Gráficos', row('Detalhe da junção', 'Esquadria') , false) + grp('Dimensões', row('Comprimento', '4,200 m', {ro:1}) + row('Área', '11,80 m²', {ro:1}) + row('Volume', '1,77 m³', {ro:1}), true);
+    body += grp('Dados de identidade', row('Comentários', '') + row('Marca', 'P-01'), false);
+    if (mode === 'new') body += grp('Fases', row('Fase de criação', 'Nova construção') + row('Fase de demolição', 'Nenhuma'), false);
+  }
+  const foot = `<div class="pfoot"><a href="#">Ajuda de propriedades</a><button class="btn">Aplicar</button></div>`;
+  return `${head}<div class="pscroll">${body}</div>${foot}`;
+}
+const TI = (open, name, icon, o = {}) => ({ name, icon, open, ...o });
+function node(n, kids) {
+  const k = kids && kids.length;
+  return `<li class="${k ? (n.open ? '' : 'c') : ''}${n.bold ? ' bold' : ''}${n.sel ? ' sel' : ''}"><div class="n"><span class="b ${k ? '' : 'none'}">${n.open ? '−' : '+'}</span>${n.icon ? `<span class="ic16">${ic(n.icon)}</span>` : ''}<span>${n.name}</span>${n.meta ? `<span class="meta">${n.meta}</span>` : ''}</div>${k ? `<ul>${kids.join('')}</ul>` : ''}</li>`;
+}
+const leaf = (name, icon, o = {}) => node({ name, icon, ...o });
+function navNew() {
+  const T = (name, kids, o = {}) => node({ name, open: o.open !== false, ...o }, kids);
+  return `<div class="tree"><ul>${
+    T('[≡] Vistas (todas)', [
+      T('Plantas de piso (Planta de piso)', [leaf('Térreo', 'plan', { bold: 1, sel: 1 }), leaf('Pavimento 2', 'plan')]),
+      T('Plantas de forro (Planta de forro)', [leaf('Térreo', 'ceiling'), leaf('Pavimento 2', 'ceiling')], { open: false }),
+      T('Vistas 3D (3D View)', [leaf('{3D}', 'cube', { bold: 1 })]),
+      T('Elevações (Elevação de edifício)', [leaf('Norte', 'plan'), leaf('Sul', 'plan'), leaf('Leste', 'plan'), leaf('Oeste', 'plan')], { open: false }),
+      T('Cortes (Corte de edifício)', [leaf('Corte 1', 'section')], { open: false }),
+      T('Vistas de desenho (Detalhe)', [], { open: false }),
+      T('Legendas', [], { open: false }),
+    ]) +
+    T('Tabelas/Quantidades (todas)', [leaf('Tabela de ambientes', 'schedule'), leaf('Tabela de escadas', 'schedule'), leaf('Tabela de forros', 'schedule'), leaf('Tabela de lajes', 'schedule'), leaf('Tabela de pisos', 'schedule'), leaf('Tabela de portas e janelas', 'schedule'), leaf('Tabela de paredes', 'schedule'), leaf('Tabela de telhados', 'schedule')], { open: false }) +
+    T('Pranchas (todas)', [leaf('A-101 - Planta baixa', 'sheet')]) +
+    T('Famílias', [
+      T('Escadas', [T('Escada monolítica', [leaf('Monolítica 12 cm', 'stairrun')], {open:false})], { open: false }),
+      T('Forros', [T('Forro composto', [leaf('Forro gesso 12 mm', 'ceiling')], {open:false})], { open: false }),
+      T('Janelas', [T('Janela de correr', [leaf('J-120x120', 'window'), leaf('J-150x100', 'window')], {open:false})], { open: false }),
+      T('Paredes', [T('Parede básica', [leaf('Alvenaria 15 cm', 'wall', { bold: 1 }), leaf('Alvenaria 20 cm', 'wall'), leaf('Divisória drywall', 'wall')])]),
+      T('Pisos', [T('Piso composto', [leaf('Porcelanato 60x60', 'floor')], {open:false})], { open: false }),
+      T('Portas', [T('Porta de giro', [leaf('P-90x210', 'door'), leaf('P-80x210', 'door')], {open:false})], { open: false }),
+      T('Telhados', [T('Telhado básico', [leaf('Telha cerâmica', 'roof')], {open:false})], { open: false }),
+    ], { open: false }) +
+    T('Grupos', [], { open: false }) + T('Links do Revit', [], { open: false })
+  }</ul></div>`;
+}
+function navOld() {
+  const d = (t, inner, open = true) => `<details ${open ? 'open' : ''}><summary style="list-style:none;cursor:pointer;padding:3px 10px;font-weight:600;color:var(--fg-soft)">▸ ${t}</summary>${inner}</details>`;
+  const lf = (t, ic2, meta, on, extra = '') => `<div style="display:flex;align-items:center;gap:6px;padding:3px 10px 3px 28px;${on ? 'background:var(--accent-soft);color:var(--accent);font-weight:500;' : ''}"><span style="width:14px;height:14px">${ic(ic2)}</span> ${t}${extra}${meta ? `<span style="margin-left:auto;font:10.5px var(--font-mono);color:var(--fg-faint)">${meta}</span>` : ''}</div>`;
+  const chips = '<span class="chip" style="margin-left:auto;font-size:10px;color:var(--accent)">Editar</span><span class="chip" style="font-size:10px;color:var(--accent)">Duplicar</span><span class="chip" style="font-size:10px;color:var(--accent)">Excluir</span>';
+  return `<div class="tree" style="font-size:12.5px"><div style="padding-left:12px">${
+    d('Vistas', d('Plantas', lf('Térreo', 'plan', '0,00 m', 1) + lf('Pavimento 2', 'plan', '2,80 m')) + d('3D', lf('Modelo 3D', 'cube')) + d('Cortes', '<p class="hint" style="margin:2px 10px 6px 28px;font-size:11px;color:var(--fg-faint)">Nenhum corte. Use a ferramenta Corte (K) na planta.</p>') + d('Elevações', lf('Norte', 'plan') + lf('+ Gerar elevações', 'plan')))
+  }${d('Pranchas', lf('A-101 Planta baixa', 'plan', 'A3', 0, chips) + lf('+ Nova prancha', 'plan'))
+  }${d('Famílias', d('Paredes', lf('Alvenaria 15 cm', 'wall', '', 1, '<span class="chip" style="margin-left:auto;font-size:10px;color:var(--accent)">Editar</span>') + lf('Alvenaria 20 cm', 'wall')) + d('Portas', '', false) + d('Janelas', '', false) + d('Pisos', '', false))
+  }${d('Projeto', lf('Materiais', 'layers', '24') + lf('Níveis', 'level', '2') + lf('Pesos de linha', 'plan') + lf('Tabela de paredes', 'schedule', '18') + lf('Tabela de pisos', 'schedule', '3'))}</div></div>`;
+}
+
+/* ============ planta do mock ============ */
+const PLAN_SVG = `<svg class="plan" viewBox="0 0 800 520" preserveAspectRatio="xMidYMid slice"><defs><pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e6eaee" stroke-width=".7"/></pattern></defs><rect width="800" height="520" fill="url(#g)"/>
+<g fill="#cfd5da" stroke="#222" stroke-width="1.4"><path d="M170 90H620V380H170Z" fill="none" stroke-width="9" stroke="#444"/><path d="M170 90H620V380H170Z" fill="none" stroke-width="6" stroke="#cfd5da"/><path d="M360 90V250H170" fill="none" stroke="#444" stroke-width="7"/><path d="M360 250V380" fill="none" stroke="#444" stroke-width="7"/><path d="M480 250H620" fill="none" stroke="#444" stroke-width="7"/></g>
+<g fill="none" stroke="#222" stroke-width="1"><path d="M250 380A40 40 0 0 1 290 340"/><path d="M360 305A32 32 0 0 0 392 337" transform="translate(-0 -30)"/><path d="M520 90V120" stroke="#2b7bd6" stroke-width="3"/></g>
+<g font-size="12" fill="#444" text-anchor="middle"><text x="265" y="170">Quarto 1</text><text x="490" y="170">Sala</text><text x="265" y="330">Quarto 2</text><text x="550" y="330">Cozinha</text></g>
+<g id="sel" style="display:none"><path d="M170 90H360" stroke="#2b7bd6" stroke-width="4" fill="none"/><g fill="#fff" stroke="#2b7bd6"><rect x="166" y="86" width="8" height="8"/><rect x="356" y="86" width="8" height="8"/></g><text x="265" y="76" fill="#2b7bd6" font-size="12" text-anchor="middle">4 200</text></g></svg>`;
+
+/* ============ montagem da tela ============ */
+const TAB_ORDER = ['Arquivo', ...TABS.map((t) => t.label)];
+let state = 'none', tabId = 'arq', left = true, showPh = true, showDots = true;
+const appEl = document.getElementById('app');
+function titleBarHTML(mock = true) {
+  const q = (n, o = '') => `<button class="q ${o}" title="${n}">${ic(n === 'Abrir' ? 'open' : n === 'Salvar' ? 'save' : n === 'Desfazer' ? 'undo' : n === 'Refazer' ? 'redo' : n === 'Medir' ? 'measure' : n === 'Cota alinhada' ? 'dimension' : n === 'Etiquetar' ? 'tag' : n === 'Texto' ? 'text' : n === '3D' ? 'cube' : n === 'Corte' ? 'section' : n === 'TL' ? 'tl' : 'close')}</button>`;
+  return `<div class="tb"><span class="app-r">R</span>${q('Abrir')}${q('Salvar')}<span class="vsep"></span>${q('Desfazer')}${q('Refazer', 'dis')}<span class="vsep"></span>${q('Medir')}${q('Cota alinhada')}${q('Etiquetar')}${q('Texto')}${q('3D')}${q('Corte')}${q('TL')}${q('Fechar')}<span style="color:var(--fg-faint);font-size:9px">▾</span><span class="title">Hestia - [Casa térrea, 2 quartos] - Planta de piso: Térreo</span><span class="info"><span class="search">Pesquisar na ajuda</span><span style="width:20px;height:20px">${ic('user')}</span><span style="width:20px;height:20px">${ic('help')}</span></span></div>`;
+}
+function render() {
+  const ctx = state === 'none' ? null : CTX[state];
+  const tabs = [...TABS];
+  const cur = ctx && tabId === 'ctx' ? { panels: ctx.panels, ctx: true } : tabId === 'arquivo' ? null : TABS.find((t) => t.id === tabId);
+  const tabBtns = `<button class="rb-tab file" data-t="arquivo">Arquivo</button>` + tabs.map((t) => `<button class="rb-tab${t.id === tabId ? ' on' : ''}${t.panels.length && !t.panels.some((pn) => countHave([pn]).a + countHave([pn]).b) ? ' empty' : ''}" data-t="${t.id}">${t.label}</button>`).join('') + (ctx ? `<button class="rb-tab ctx${tabId === 'ctx' ? ' on' : ''}" data-t="ctx">${ctx.label}</button>` : '');
+  const panels = cur ? cur.panels : (TABS.find((t) => t.id === 'arq').panels);
+  const bodyCls = ['rb-body', cur && cur.ctx ? 'ctxbody' : '', showPh ? '' : 'hideph', showDots ? '' : 'nodots'].join(' ');
+  const opt = state === 'tool'
+    ? `<b>Modificar | Colocar Parede</b><span>Altura:</span><span class="sel">Pavimento 2 ▾</span><span>Linha de localização:</span><span class="sel">Eixo da parede ▾</span><label><input type="checkbox" checked> Cadeia</label><span>Deslocamento:</span><span class="sel">0,00</span>`
+    : state === 'sel' ? `<b>Modificar | Paredes</b><span style="color:var(--fg-faint)">Selecionado: 1 elemento</span>` : `<span style="color:var(--fg-faint)">&nbsp;</span>`;
+  const msg = state === 'tool' ? 'Clique para iniciar a parede. TAB alterna o lado; digite o comprimento; Esc cancela.' : state === 'sel' ? 'Parede básica: Alvenaria 15 cm. TAB alterna, CTRL adiciona, SHIFT remove.' : 'Clique para selecionar, TAB para alternar, CTRL adiciona, SHIFT desmarca.';
+  const dock = `<div class="dock ${left ? '' : 'r'}" style="${left ? '' : 'display:none'}"></div>`;
+  const propsPane = `<div class="pane" style="${left ? 'flex:1.05' : 'flex:1'}">${propsHTML('new', state)}</div>`;
+  const navPane = `<div class="pane" style="flex:.95"><div class="phead"><span>Navegador de projeto - Casa térrea, 2 quartos</span><span class="x">✕</span></div><div class="pscroll">${navNew()}</div></div>`;
+  const leftDock = `<div class="dock" style="width:${left ? 292 : 262}px">${propsPane}${left ? navPane : ''}</div>`;
+  const rightDock = left ? '' : `<div class="dock r" style="width:262px">${navPane}</div>`;
+  const vc = state === 'none' ? '' : '';
+  appEl.innerHTML = `${titleBarHTML()}
+    <div class="rb-tabs">${tabBtns}</div>
+    <div class="${bodyCls}">${stripHTML(panels)}</div>
+    <div class="optbar">${opt}</div>
+    <div class="work" style="grid-template-columns:${left ? '292px' : '262px'} minmax(0,1fr) ${left ? '' : '262px'}">
+      ${leftDock}
+      <div class="stage"><div class="vtabs"><div class="vtab on">Planta de piso: Térreo <span class="x">✕</span></div><div class="vtab">{3D} <span class="x">✕</span></div></div>
+        <div class="canvas">${PLAN_SVG}<div class="vcube"><i>Topo</i></div>
+          <div class="navbar"><button title="Roda de navegação">${ic('nav')}</button><button title="Zoom ▾">${ic('zoom')}</button></div></div>
+        <div class="vcb" id="vcb"></div>
+      </div>
+      ${rightDock}
+    </div>
+    <div class="status"><span class="msg">${msg}</span><span class="it">x 3,20  y 4,10 m</span><span class="it">Snap ▾</span><span class="box">${ic('funnel', 12)} :0</span><span class="it">⚠ Avisos: 0</span></div>
+    <div class="backstage" id="bs"><div class="l"><div>Novo</div><div>Abrir</div><div>Salvar</div><div>Salvar como</div><hr><div>Exportar <span>▸</span></div><div>Imprimir</div><hr><div>Opções</div><div>Fechar</div></div><div class="rr"><h4>Exportar</h4><div style="padding:4px 0">DXF (planta/corte)</div><div style="padding:4px 0">PDF (pranchas)</div><div style="padding:4px 0">IFC</div><h4 style="margin-top:14px">Opções</h4><div style="padding:4px 0">Idioma: PT | EN</div><div style="padding:4px 0">Tema: Claro / Escuro / Sistema</div><div style="padding:4px 0">Motor gráfico: GPU · WebGL2</div></div></div>`;
+  vcbHTML(document.getElementById('vcb'));
+  document.getElementById('sel').style.display = '';
+  const selEl = appEl.querySelector('#sel'); if (selEl) selEl.style.display = state === 'sel' ? '' : 'none';
+}
+const vcbItems = [['scale', '1 : 100 ▾', 'Escala'], ['detail', 'Médio ▾', 'Nível de detalhe'], ['style', 'Linhas ocultas ▾', 'Estilo visual'], ['sun', '', 'Caminho do sol (desligado)'], ['sun', 'Sombras', 'Sombras'], '|', ['crop', '', 'Cortar vista'], ['crop', '', 'Mostrar região de corte'], '|', ['isolate', '▾', 'Ocultar/isolar temporário'], ['eye', '', 'Revelar elementos ocultos'], ['ph', '', 'Propriedades temporárias da vista']];
+function vcbHTML(el) {
+  el.innerHTML = vcbItems.map((i) => i === '|' ? '<span class="s"></span>' : `<button title="${i[2]}">${ic(i[0])}${i[1] ? `<span>${i[1]}</span>` : ''}</button>`).join('');
+}
+appEl.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-t]'); if (!t) return;
+  const id = t.dataset.t;
+  if (id === 'arquivo') { document.getElementById('bs').classList.toggle('open'); return; }
+  tabId = id; render();
+});
+document.getElementById('stateSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state = b.dataset.s; tabId = state === 'none' ? (tabId === 'ctx' ? 'arq' : tabId) : 'ctx';
+  document.querySelectorAll('#stateSeg button').forEach((x) => x.classList.toggle('on', x === b));
+  render();
+});
+document.getElementById('swLeft').onchange = (e) => { left = e.target.checked; render(); };
+document.getElementById('swPh').onchange = (e) => { showPh = e.target.checked; render(); };
+document.getElementById('swDots').onchange = (e) => { showDots = e.target.checked; render(); };
+document.addEventListener('click', (e) => { const b = e.target.closest('.tree .b'); if (b && !b.classList.contains('none')) { const li = b.closest('li'); li.classList.toggle('c'); b.textContent = li.classList.contains('c') ? '+' : '−'; } });
+render();
+
+/* ============ painéis estáticos ============ */
+document.getElementById('propsOld').innerHTML = propsHTML('old', 'sel');
+document.getElementById('propsNew').innerHTML = propsHTML('new', 'sel');
+document.getElementById('navOld').innerHTML = `<div class="phead"><span>Navegador de projeto</span></div><div class="pscroll">${navOld()}</div>`;
+document.getElementById('navNew').innerHTML = `<div class="phead"><span>Navegador de projeto - Casa térrea, 2 quartos</span><span class="x">✕</span></div><div class="pscroll">${navNew()}</div>`;
+document.getElementById('tbNew').innerHTML = titleBarHTML() + `<div class="rb-tabs" style="height:27px"><button class="rb-tab file">Arquivo</button><button class="rb-tab on">Arquitetura</button><button class="rb-tab">Estrutura</button><button class="rb-tab">…</button></div>`;
+vcbHTML(document.getElementById('vcbNew'));
+
+/* ============ abas detalhadas ============ */
+document.getElementById('seq').innerHTML = TAB_ORDER.map((t) => `<b>${t}</b>`).join(' › ') + ' › <b style="color:var(--green)">[Modificar | …]</b>';
+document.getElementById('tabsDetail').innerHTML = TABS.map((t, i) => {
+  const c = countHave(t.panels);
+  return `<details class="tabdet" ${i === 0 || t.id === 'ano' ? 'open' : ''}><summary>${i + 2}. ${t.label} <small>${t.panels.length} painéis · ${c.a} existem · ${c.b} a realocar · ${c.c} a criar</small></summary><div class="strip new"><div class="rb-body">${stripHTML(t.panels)}</div></div></details>`;
+}).join('') + `<details class="tabdet"><summary>Contextual: ${CTX.tool.label} <small>aparece ao ativar a ferramenta Parede</small></summary><div class="strip new"><div class="rb-body ctxbody">${stripHTML(CTX.tool.panels)}</div></div></details><details class="tabdet"><summary>Contextual: ${CTX.sel.label} <small>aparece ao selecionar paredes</small></summary><div class="strip new"><div class="rb-body ctxbody">${stripHTML(CTX.sel.panels)}</div></div></details>`;
+
+/* ============ agrupamento ============ */
+document.getElementById('anat').innerHTML = panelHTML(P('Construir', [L('Porta', 'door'), L('Telhado', 'roof', 1, [['Telhado por perímetro', 1], ['Telhado por extrusão', 1]]), [S('Sistema de fachada cortina', 'curtain', 1), S('Grade de fachada cortina', 'curtain', 1), S('Montante', 'curtain', 1)]], { slide: 1 })).replace('class="rpanel"', 'class="rpanel"');
+document.getElementById('oldgrp').innerHTML = `<div class="grp"><div class="row"><div class="tbtn">${ic('stairrun')}<span>Escada (reta/L/U/caracol)</span><kbd>Q</kbd></div><div style="display:flex;flex-direction:column;gap:2px"><button class="mini">${ic('stair')}</button><span class="slot"></span><span class="slot"></span></div></div><div class="gt">Escada</div></div><div class="grp"><div class="row"><div class="tbtn">${ic('room')}<span>Ambiente</span><kbd>Z</kbd></div><div style="display:flex;flex-direction:column;gap:2px"><button class="mini">${ic('roomsep')}</button><span class="slot"></span><span class="slot"></span></div></div><div class="gt">Ambientes</div></div>`;
+document.getElementById('newgrp').innerHTML = panelHTML(P('Circulação', [L('Escada', 'stairrun', 1, [['Escada (por componente)', 1, 'stairrun'], ['Escada por croqui', 1, 'stair']])])) + panelHTML(P('Ambiente e área', [L('Ambiente', 'room'), [S('Separador de ambiente', 'roomsep'), S('Etiquetar ambiente', 'tag')]], { slide: 1 }));
+
+/* ============ painéis estáticos: mapa ============ */
+const MAP = [
+  ['Selecionar (V)', 'Arquitetura e Modificar (repetido)', 'Painel “Selecionar” (botão Modificar) como 1º painel de Arquitetura, Modificar e de toda aba contextual'],
+  ['Parede (W)', 'Arquitetura ▸ Construir', 'Arquitetura ▸ Construir ▸ Parede ▾ (Arquitetônica, Estrutural, por face…)'],
+  ['Porta (D), Janela (J)', 'Arquitetura ▸ Construir', 'Igual (botões grandes)'],
+  ['Piso (F) e Laje (B)', 'dois botões separados', 'Piso ▾: “Piso: Arquitetônico” e “Piso: Estrutural (Laje)”. Se quiser manter Laje solta, vai como extra'],
+  ['Forro', 'Construir', 'Forro ▾ (automático / por croqui)'],
+  ['Telhado (U), Telhado por extrusão', 'Construir + contextual', 'Telhado ▾ (por perímetro, por extrusão, por face…)'],
+  ['Seta de inclinação, Inclinação (slope)', 'Construir', 'Contextual de croqui de telhado (Desenhar ▸ Seta de inclinação) e de piso (Editar forma)'],
+  ['Escada por componente (Q) / por croqui (I)', 'grupo Escada (grande + mini)', 'Arquitetura ▸ Circulação ▸ Escada ▾'],
+  ['Ambiente (Z), Separador de ambiente', 'grupo Ambientes (grande + mini)', 'Arquitetura ▸ Ambiente e área: Ambiente + pilha (Separador, Etiquetar)'],
+  ['Níveis (diálogo)', 'Navegador ▸ Projeto', 'Arquitetura ▸ Referência ▸ Nível'],
+  ['Cota (Y), Cotas automáticas', 'Anotar ▸ Cotas', 'Anotar ▸ Cota ▾ (Alinhada…) + Cotas automáticas (extra)'],
+  ['Texto (X)', 'Anotar', 'Anotar ▸ Texto'],
+  ['Linha de detalhe, Região preenchida', 'Anotar ▸ “Detalhamento”', 'Anotar ▸ Detalhe: Linha de detalhe, Região ▾'],
+  ['Etiqueta, Etiquetar todos', 'Anotar ▸ Etiquetas', 'Anotar ▸ Etiqueta: Etiquetar por categoria, Etiquetar todos'],
+  ['“Códigos de parede” (liga/desliga)', 'Anotar ▸ Etiquetas', 'Vista ▸ Gráficos ▸ Visibilidade/Gráficos (aba Categorias de anotação)'],
+  ['Mover, Copiar, Girar, Espelhar, Matriz, Deslocar, Aparar, Alinhar, Dividir', 'Modificar ▸ Modificar', 'Modificar ▸ Modificar em pilhas de 3 (mesma ordem do Revit)'],
+  ['Parede paralela (G)', 'Modificar ▸ Modificar', 'Contextual “Modificar | Paredes” ▸ Modificar parede (extra)'],
+  ['Junção (N)', 'Modificar ▸ Modificar', 'Modificar ▸ Geometria ▸ Unir geometria'],
+  ['Trocar anfitriã (H)', 'Modificar ▸ Modificar', 'Contextual de porta/janela ▸ Hospedeiro ▸ Escolher novo hospedeiro'],
+  ['Anexar topo / Desanexar topo', 'Modificar ▸ Anexar', 'Contextual “Modificar | Paredes” ▸ Modificar parede'],
+  ['Medir (E)', 'Modificar ▸ Medir', 'Modificar ▸ Medir (e Acesso Rápido)'],
+  ['Mesmo tipo / Mesmo nome', 'Modificar ▸ Tipo', 'Botão direito ▸ “Selecionar todas as instâncias” (Na vista / No projeto) e barra de status'],
+  ['Mover para nível', 'Modificar ▸ Nível', 'Propriedade “Nível base” (já existe) e contextual ▸ Modificar'],
+  ['Enquadrar', 'Vista ▸ Navegar', 'Barra de navegação ▸ Zoom ▾ ▸ Enquadrar tudo'],
+  ['Corte (K)', 'Vista ▸ Cortes', 'Vista ▸ Criar ▸ Corte (e Acesso Rápido)'],
+  ['Grade (liga/desliga)', 'Vista ▸ Planta', 'Gerenciar ▸ Configurações ▸ Snaps (grade de desenho); “Grade” (eixos) é da aba Arquitetura ▸ Referência'],
+  ['Subpavimento, Projeção da cobertura', 'Vista ▸ Planta', 'Propriedades da vista ▸ “Base inferior / Intervalo de vista” e Visibilidade/Gráficos'],
+  ['Linhas finas (TL)', 'Vista ▸ Planta e barra de controle', 'Vista ▸ Gráficos ▸ Linhas finas + Acesso Rápido'],
+  ['Sombras, Arestas, Abrir vãos (3D)', 'Vista ▸ 3D', 'Sombras → barra de controle da vista; Arestas → Estilo visual; Abrir vãos → propriedade da vista 3D'],
+  ['Tabelas (8 botões)', 'Vista ▸ Tabelas e Navegador', 'Vista ▸ Criar ▸ Tabelas ▾ e Navegador ▸ Tabelas/Quantidades'],
+  ['Pesos de linha, Materiais', 'Navegador ▸ Projeto', 'Gerenciar ▸ Configurações'],
+  ['Novo / Abrir / Salvar / DXF / PDF / IFC', 'Barra de título', 'Arquivo (menu) + Acesso Rápido (Abrir, Salvar, Desfazer, Refazer)'],
+  ['PT|EN, GPU, Tema, Atalhos', 'Barra de título', 'Arquivo ▸ Opções; Atalhos em Ajuda ▾ (InfoCenter)'],
+  ['Avisos de projeto (IssuesButton)', 'Barra de status', 'Gerenciar ▸ Consulta ▸ Revisar avisos (e manter indicador na status)'],
+];
+document.getElementById('mapRows').innerHTML = MAP.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+
+/* ============ placar e plano ============ */
+const SCORES = [
+  ['Faixa de ferramentas', 3, 'Poucas abas, sem split, painéis baixos, contextual vazio de significado.'],
+  ['Abas e sequência', 2, '4 de 15 abas; “Modificar” na posição errada.'],
+  ['Agrupamento de ferramentas', 4, 'Seu padrão grande+mini é certo; falta split, rótulos e regra.'],
+  ['Paleta de propriedades', 8, 'Muito próxima; ajustar prévia, ordem dos grupos e cabeçalho.'],
+  ['Navegador de projeto', 4, 'Estrutura própria; precisa da árvore e menu de contexto do Revit.'],
+  ['Barra de título / Acesso Rápido', 3, 'Faltam Arquivo, QAT e InfoCenter.'],
+  ['Barra de controle da vista', 3, 'Flutuante e com 3 itens.'],
+  ['Barra de status / navegação', 5, 'Mensagem ok; faltam filtro de seleção e barra de navegação.'],
+];
+document.getElementById('scores').innerHTML = SCORES.map((s) => `<div class="card"><div class="score"><b>${s[1]}</b><span>/10</span></div><div class="bar"><i style="width:${s[1] * 10}%"></i></div><b style="font-size:12.5px">${s[0]}</b><div style="color:var(--fg-soft);font-size:12px;margin-top:2px">${s[2]}</div></div>`).join('');
+const STEPS = [
+  ['Faixa guiada por dados', 'Criar <code>ribbonModel.ts</code> (abas → painéis → itens: <code>large | split | stack | gallery | toggle</code>) e componentes <code>RibbonTabs</code>, <code>RibbonPanel</code>, <code>LargeButton</code>, <code>SplitButton</code>, <code>SmallStack</code>. Migrar o conteúdo das 4 abas atuais sem mudar comportamento. Corrige o limite de 420 linhas do <code>Ribbon.tsx</code>.', 'M'],
+  ['Todas as abas, na ordem do Revit', 'Arquivo + 14 abas; Modificar por último; abas vazias com painéis esmaecidos. Aba contextual com painéis próprios por ferramenta/seleção, auto-selecionada e removida no Esc.', 'M'],
+  ['Visual da faixa', 'Altura 96 px, ícones 32/16, rótulos 11,5–12 px, títulos em caixa normal com ▾/↘, tooltip em 2 linhas com atalho (“Parede (WA)”); tirar <code>&lt;kbd&gt;</code> dos botões; remover slots tracejados.', 'S'],
+  ['Barra de título → Arquivo + Acesso Rápido + InfoCenter', 'Aba Arquivo (menu com Exportar e Opções), QAT com ícones, título no formato Revit, ajuda/atalhos. Mover nome do projeto, PT/EN, tema e GPU.', 'M'],
+  ['Navegador no padrão Revit', 'Árvore ⊞/⊟ com “Vistas (todas)”, “Tabelas/Quantidades”, “Pranchas”, “Famílias > Categoria > Família > Tipo”, “Grupos”, “Links”. Menu de botão direito; duplo clique abre/edita; tirar chips e a seção “Projeto”.', 'L'],
+  ['Docks: Propriedades + Navegador empilhados', 'Divisores arrastáveis, ✕ para fechar, reabrir por Vista ▸ Interface do usuário; layout salvo por usuário. Opcional: arrastar para a direita.', 'L'],
+  ['Barras inferiores', 'Barra de controle da vista completa e fixa, barra de navegação lateral, filtro de seleção na status; levar Sombras/Estilo visual/Nível de detalhe para dentro do modelo de vista.', 'M'],
+  ['Ajustes da paleta', 'Remover prévia do topo (vai para Editar tipo), reordenar grupos por categoria, seletor “Família / Tipo”, divisória arrastável.', 'S'],
+];
+document.getElementById('steps').innerHTML = STEPS.map((s, i) => `<div class="step"><div class="n">${i + 1}</div><div><b>${s[0]}</b><div style="color:var(--fg-soft)">${s[1]}</div></div><span class="tag ${s[2] === 'L' ? 'w' : 'ok'}">esforço ${s[2] === 'S' ? 'pequeno' : s[2] === 'M' ? 'médio' : 'grande'}</span></div>`).join('');
+
+/* tema */
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick = () => { const d = document.documentElement.dataset.theme === 'dark'; document.documentElement.dataset.theme = d ? 'light' : 'dark'; themeBtn.textContent = 'Tema: ' + (d ? 'claro' : 'escuro'); };
+</script>
+</body>
+</html>

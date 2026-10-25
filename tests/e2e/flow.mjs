@@ -2,7 +2,8 @@
 import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import path from 'node:path';
+
 import { pressTool } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
@@ -94,6 +95,7 @@ await page.keyboard.press('Control+z');
 check('desfazer edição de tipo', (await page.evaluate(() => window.__hestia.editor.project.wallTypes.wt_alv14.layers.length)) === 5);
 
 // 7. materiais
+await page.locator('.rtab', { hasText: 'Gerenciar' }).click();
 await page.getByRole('button', { name: /Materiais/ }).click();
 await page.screenshot({ path: `${OUT}/21-materials.png` });
 await page.keyboard.press('Escape');
@@ -105,8 +107,11 @@ await page.screenshot({ path: `${OUT}/22-level2.png` });
 await page.getByRole('tab', { name: /Térreo/ }).click();
 
 // 9. tema escuro + 3D
+await page.locator('.rtab.file').click();
+await page.getByRole('button', { name: 'Opções' }).click();
 await page.locator('button[title^="Tema"]').click();
 await page.locator('button[title^="Tema"]').click();
+await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/23-dark-plan.png` });
 await page.getByRole('tab', { name: /Modelo 3D/ }).click();

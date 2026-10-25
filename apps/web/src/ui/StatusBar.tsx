@@ -27,7 +27,7 @@ export function StatusBar(): ReactElement {
   const pendente = useAtalhos((s) => s.pendente);
   return (
     <footer className="statusbar" role="status">
-      <span className="msg">{status}</span>
+      <span className="msg" title={status}>{status}</span>
       {pendente ? <span className="mono" aria-label="Sequência de atalho em andamento">{pendente}…</span> : null}
       {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
       {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}

@@ -256,7 +256,8 @@ export class Editor {
     if (k === 'Escape') {
       casador.limpar();
       if (ui.typed) useUi.setState({ typed: '' });
-      else this.tool.cancel();
+      // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
+      if (!ui.typed || this.tool.freeText) this.tool.cancel();
       this.bump();
       return true;
     }

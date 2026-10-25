@@ -50,7 +50,7 @@ export function ViewControlBar(): ReactElement {
           id="vc-scale-select"
           className="vc-select"
           value={currentScale}
-          onChange={(e) => setScale(Number(e.target.value))}
+          onChange={(e) => { setScale(Number(e.target.value)); e.target.blur(); /* o foco volta ao desenho: Delete e os atalhos seguem valendo */ }}
           title={lang === 'pt' ? 'Escala da vista ativa' : 'Active view scale'}
         >
           {scales.map((sc) => (

@@ -34,10 +34,13 @@ interface AnyHit {
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
+/** Shift ou Ctrl (Cmd no Mac): o clique e a janela somam à seleção (Ctrl alterna quem já está selecionado). */
+const soma = (p: PointerInfo): boolean => p.shift || p.ctrl;
+
 export class SelectTool extends ToolBase {
   readonly id = 'select';
   readonly label = 'Selecionar';
-  readonly hint = 'Clique para selecionar. Arraste para janela (esq→dir contém, dir→esq cruza). Shift soma à seleção.';
+  readonly hint = 'Clique para selecionar. Arraste para janela (esq→dir contém, dir→esq cruza). Shift ou Ctrl soma à seleção.';
   private mode: Mode = 'idle';
   private downPt: Vec2 = { x: 0, y: 0 };
   /** Alça pressionada (parede, piso, laje ou telhado); as alças em si estão em selectGrips.ts. */
@@ -323,7 +326,7 @@ export class SelectTool extends ToolBase {
           ...sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
         const cur = this.env.selection();
-        this.env.setSelection(p.shift ? [...new Set([...cur, ...ids])] : ids);
+        this.env.setSelection(soma(p) ? [...new Set([...cur, ...ids])] : ids);
         break;
       }
       default:
@@ -333,8 +336,8 @@ export class SelectTool extends ToolBase {
       const hit = this.hitAt(p.raw);
       const cur = this.env.selection();
       if (!hit) {
-        if (!p.shift) this.env.setSelection([]);
-      } else if (p.shift) {
+        if (!soma(p)) this.env.setSelection([]);
+      } else if (soma(p)) {
         this.env.setSelection(cur.includes(hit.id) ? cur.filter((x) => x !== hit.id) : [...cur, hit.id]);
       } else {
         this.env.setSelection([hit.id]);

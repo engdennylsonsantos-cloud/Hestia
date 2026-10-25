@@ -5,7 +5,8 @@ import { useUi } from '../editor/state.ts';
 import { sufixoAtalho } from '../editor/shortcutConfig.ts';
 
 export function Tutorial(): ReactElement | null {
-  const on = useUi((s) => s.tutorial);
+  // Fechado uma vez (Dispensar ou Concluir), não volta nos próximos projetos em branco (localStorage, ver markTutorialSeen).
+  const on = useUi((s) => s.tutorial) && !editor.tutorialSeen();
   const seen3d = useUi((s) => s.seen3d);
   const view = useUi((s) => s.view);
   const p = useProject();

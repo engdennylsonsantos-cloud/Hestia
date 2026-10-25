@@ -42,6 +42,20 @@ export function presetEdgeSlopes(boundary: Vec2[], shape: EdgePresetShape, dir: 
 }
 
 /**
+ * Predefinição de forma (duas águas, uma água ou quatro águas) que reproduz exatamente as inclinações por aresta do
+ * telhado, com a mesma direção e inclinação; null quando não corresponde a nenhuma (inclinações editadas por aresta).
+ * A Propriedades usa para mostrar a forma escolhida na barra, em vez de "Por arestas".
+ */
+export function roofPresetOf(r: Roof): EdgePresetShape | null {
+  for (const s of ['gable', 'shed', 'hip'] as const) {
+    const want = presetEdgeSlopes(r.boundary, s, r.dir, r.slopePercent);
+    const same = want.length === r.edgeSlopes.length && want.every((v, i) => (v === null ? r.edgeSlopes[i] === null : r.edgeSlopes[i] !== null && Math.abs(r.edgeSlopes[i]! - v) < 1e-9));
+    if (same) return s;
+  }
+  return null;
+}
+
+/**
  * Desloca só a aresta `i` do contorno em `delta` metros: positivo para fora, negativo para dentro. Os vértices vizinhos
  * andam ao longo das arestas adjacentes (cantos em esquadria). Null quando a aresta é nula ou as vizinhas são paralelas a ela.
  */

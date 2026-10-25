@@ -11,6 +11,9 @@ const HINT_RADIAL = 'Matriz radial: clique no centro da matriz. Depois clique pa
 /** Dica do primeiro passo de cada tipo (a barra de status usa a mesma ao trocar o tipo). */
 export const arrayHint = (radial: boolean): string => (radial ? HINT_RADIAL : HINT_LINEAR);
 
+/** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
+export const AVISO_HOSPEDEIRA = 'Selecione também a parede hospedeira: portas e janelas acompanham a parede.';
+
 /**
  * Matriz: linear (N elementos pelo espaçamento) ou radial (N elementos girados em torno de um centro).
  * "Mover para": Segundo leva o espaçamento/ângulo do 1º ao 2º item; Último, do 1º ao último (dividido entre os itens).
@@ -67,7 +70,14 @@ export class ArrayTool extends SelectionTool {
 
   override start(): void {
     super.start();
-    if (this.hasSelection()) this.env.say(this.hintNow());
+    if (this.soAberturas()) this.env.say(AVISO_HOSPEDEIRA);
+    else if (this.hasSelection()) this.env.say(this.hintNow());
+  }
+
+  /** Só portas ou janelas selecionadas: a Matriz copia paredes, pisos, lajes, vistas e forros, não a abertura solta. */
+  private soAberturas(): boolean {
+    const set = arraySet(this.env.project(), this.env.selection());
+    return this.openings().length > 0 && set.els.length === 0 && set.views.length === 0 && set.ceil.length === 0;
   }
 
   /** Esc: cancela o centro ou o ponto base; o segundo Esc sai da ferramenta. */
@@ -118,6 +128,7 @@ export class ArrayTool extends SelectionTool {
   }
 
   private commit(d: Vec2): void {
+    if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
     const n = this.count();
     const step = linearStep(d, n, this.anchor());
     if (len(step) < 1e-6) return;
@@ -138,6 +149,7 @@ export class ArrayTool extends SelectionTool {
   private applyRadial(angleDeg: number): void {
     const center = this.base;
     if (!center || Math.abs(angleDeg) < 1e-6) return;
+    if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
     const n = this.count();
     const angles = radialAngles(n, angleDeg, this.anchor());
     commitRadial(this.env, arraySet(this.env.project(), this.env.selection()), center, angles);

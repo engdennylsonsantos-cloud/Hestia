@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { rotate, type Vec2 } from '@hestia/geom';
 import { isCeiling, makeCeiling, makeFloor, openingsOfWall, wallsOnLevel, type Wall } from '@hestia/model';
 import { radialAngles, linearStep } from './arrayRadial.ts';
+import { AVISO_HOSPEDEIRA } from './arrayTool.ts';
 import { clickAt, drawWall, makeEnv, P, tool, walls } from './testEnv.ts';
 
 const deg = (d: number): number => (d * Math.PI) / 180;
@@ -205,6 +206,38 @@ describe('matriz radial no motor', () => {
     options.arrayAnchor = 'last';
     a.click(P(5, 0));
     expect(walls(store)).toHaveLength(1);
+  });
+
+  it('D3: só a porta selecionada, linear e radial, avisa para selecionar a parede e não copia nada', () => {
+    const { store, env, options } = makeEnv();
+    drawWall(env, [2, 0], [3, 0]);
+    const w = walls(store)[0]!;
+    const door = tool('door', env);
+    clickAt(door, 2.5, 0);
+    door.cancel();
+    const porta = openingsOfWall(store.project, w.id)[0]!;
+    const said: string[] = [];
+    env.say = (m) => {
+      said.push(m);
+    };
+    env.setSelection([porta.id]);
+    options.arrayKind = 'radial';
+    options.arrayCount = 3;
+    options.arrayAngle = 360;
+    options.arrayAnchor = 'last';
+    const r = tool('array', env);
+    clickAt(r, 0, 0);
+    r.click(P(0, 0));
+    expect(said.at(-1)).toBe(AVISO_HOSPEDEIRA);
+    expect(walls(store)).toHaveLength(1);
+    options.arrayKind = 'linear';
+    options.arrayAnchor = 'second';
+    const l = tool('array', env);
+    clickAt(l, 2, 0);
+    l.click(P(3, 0));
+    expect(said.at(-1)).toBe(AVISO_HOSPEDEIRA);
+    expect(walls(store)).toHaveLength(1);
+    expect(openingsOfWall(store.project, w.id)).toHaveLength(1);
   });
 
   it('o centro da matriz radial não entra na cópia quando nada está selecionado', () => {

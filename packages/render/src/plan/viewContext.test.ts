@@ -79,9 +79,10 @@ describe('junção da vista (projetoDaJuncao)', () => {
     expect(projetoDaJuncao(p, 'lv_2').levels.length).toBe(p.levels.length);
   });
 
-  it('com parede anexada no projeto, vale o projeto inteiro', () => {
+  it('com parede anexada ao telhado num nível, a redução não traz o projeto inteiro (só o nível e os vizinhos)', () => {
     const p = predio(6, 2.8, true);
-    expect(projetoDaJuncao(p, 'lv_3')).toBe(p);
+    const ids = projetoDaJuncao(p, 'lv_3').levels.map((l) => l.id).sort();
+    expect(ids).toEqual(['lv_2', 'lv_3', 'lv_4']);
   });
 
   it('a junção do nível sai igual com o projeto reduzido e com o inteiro (parede cortada pela laje de cima)', () => {
@@ -118,5 +119,57 @@ describe('junção da vista (projetoDaJuncao)', () => {
     const inteiro = junctionLevel(p, 'lv_3');
     expect([...reduzido.walls.keys()]).toEqual([...inteiro.walls.keys()]);
     for (const id of inteiro.walls.keys()) expect(reduzido.walls.get(id)?.cut).toBe(inteiro.walls.get(id)?.cut);
+  });
+});
+
+/**
+ * Prédio de `n` pavimentos (a cada 3 m), com paredes, piso e uma parede por nível; telhados nos níveis de `telhados`.
+ * `anexos` liga o topo de paredes ao telhado (`nivel`), com o nível de topo opcional (`topo`).
+ */
+function predioComTelhado(n: number, telhados: number[], anexos: Array<{ nivel: number; topo?: number }>): Project {
+  const s = new ProjectStore(createEmptyProject('Telhado'));
+  const anexo = new Map(anexos.map((a) => [a.nivel, a] as const));
+  for (let i = 0; i < n; i++) {
+    s.exec({ type: 'upsertLevel', level: makeLevel({ id: `lv_${i}`, name: `Pav ${i}`, elevation: i * 3 }) });
+    const a = anexo.get(i);
+    const topo = a?.topo !== undefined ? { topLevelId: `lv_${a.topo}` } : {};
+    s.exec({ type: 'addWall', wall: makeWall({ id: `w${i}`, typeId: 'wt_ext19', levelId: `lv_${i}`, a: { x: 0, y: 0 }, b: { x: 6, y: 0 }, height: 2.8, attachTopToRoof: a !== undefined, ...topo }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: `v${i}`, typeId: 'wt_ext19', levelId: `lv_${i}`, a: { x: 6, y: 0 }, b: { x: 6, y: 6 }, height: 2.8 }) });
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: `f${i}`, typeId: 'ft_ceram', levelId: `lv_${i}`, boundary: BOX }) });
+  }
+  for (const i of telhados) s.exec({ type: 'addRoof', roof: makeRoof({ id: `r${i}`, typeId: 'rt_ceramica', levelId: `lv_${i}`, boundary: BOX, shape: 'gable', slopePercent: 30 }) });
+  return s.project;
+}
+
+describe('junção com parede anexada ao telhado (projetoDaJuncao, exato)', () => {
+  const casos: Array<[string, number, number[], Array<{ nivel: number; topo?: number }>]> = [
+    ['10 pavimentos, telhados em 2 e 6, parede do 2 no próprio telhado e a do 5 no telhado do 6', 10, [2, 6], [{ nivel: 2 }, { nivel: 5, topo: 6 }]],
+    ['10 pavimentos, parede do 3 atada ao telhado do 7 (nível de topo)', 10, [7, 9], [{ nivel: 3, topo: 7 }]],
+    ['20 pavimentos, telhados em 2, 6, 11 e 16, anexos no 2, no 5 (topo 6) e no 11', 20, [2, 6, 11, 16], [{ nivel: 2 }, { nivel: 5, topo: 6 }, { nivel: 11 }]],
+    ['20 pavimentos, parede do 3 atada ao telhado do 9', 20, [2, 6, 9, 16], [{ nivel: 3, topo: 9 }]],
+  ];
+
+  for (const [nome, n, telhados, anexos] of casos) {
+    it(`${nome}: a junção de cada nível com a redução sai igual à do projeto inteiro`, () => {
+      const p = predioComTelhado(n, telhados, anexos);
+      for (const l of p.levels) {
+        const reduzido = projetoDaJuncao(p, l.id);
+        expect(reduzido.levels.length).toBeLessThanOrEqual(p.levels.length);
+        expect(junctionLevel(reduzido, l.id)).toEqual(junctionLevel(p, l.id));
+      }
+    });
+  }
+
+  it('20 pavimentos: a junção de um nível baixo lê poucos níveis, não os 20', () => {
+    const p = predioComTelhado(20, [2, 6, 11, 16], [{ nivel: 2 }, { nivel: 5, topo: 6 }, { nivel: 11 }]);
+    const ids = projetoDaJuncao(p, 'lv_9').levels.map((l) => l.id).sort();
+    expect(ids.length).toBeLessThan(p.levels.length);
+    expect(ids).toEqual(['lv_8', 'lv_9', 'lv_10'].sort());
+  });
+
+  it('a parede anexada ao telhado de outro nível, que não toca a faixa, fica fora da redução', () => {
+    const p = predioComTelhado(20, [2, 6, 11, 16], [{ nivel: 15, topo: 16 }]);
+    const ids = projetoDaJuncao(p, 'lv_1').levels.map((l) => l.id);
+    expect(ids).not.toContain('lv_15');
   });
 });

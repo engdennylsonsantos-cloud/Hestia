@@ -1,5 +1,5 @@
-import { resolveRoofs, viewContextOf, type ViewContext } from '@hestia/engine';
-import { isWall, levelAbove, levelElevation, wallMaxHeight, wallsOnLevel, wallTopElevation, type Id, type Project } from '@hestia/model';
+import { resolveFloors, resolveRoofs, resolveSlabs, viewContextOf, wallZRange, type ResolvedFloor, type ResolvedRoof, type ResolvedSlab, type ViewContext } from '@hestia/engine';
+import { isWall, levelAbove, levelElevation, wallMaxHeight, wallsOnLevel, wallTopElevation, type Id, type Project, type Wall } from '@hestia/model';
 
 /**
  * Cotas que a classificação da vista de um nível usa. Sem parede anexada, a faixa das paredes não lê piso, laje nem
@@ -28,6 +28,35 @@ function espessuraMaxima(p: Project): number {
 /** Faixa de cota absoluta de cada nível: a união das faixas de parede, piso e laje que estão nele. Sem elemento, fora do mapa. */
 const faixasMemo = new WeakMap<Project, Map<Id, readonly [number, number]>>();
 
+/** Elementos que a faixa de cota de uma parede anexada ao telhado lê, por nível: telhados, pisos e lajes. */
+interface LeituraDeNivel {
+  roofs: ResolvedRoof[];
+  floors: ResolvedFloor[];
+  slabs: ResolvedSlab[];
+}
+
+/**
+ * Faixa de cota exata de uma parede anexada ao telhado (`wallZRange`, com o topo na face do telhado). A parede lê só os
+ * telhados, pisos e lajes do próprio nível e do nível de topo (`topLevelId`, ou o próprio): `axisRoofs` filtra por esses
+ * dois níveis. Por isso a faixa sai com a mesma leitura do motor, sem resolver os demais níveis.
+ */
+function faixaDaParedeNoTelhado(p: Project, w: Wall, porNivel: Map<Id, LeituraDeNivel>): readonly [number, number] {
+  const niveis = [...new Set<Id>([w.levelId, w.topLevelId ?? w.levelId])];
+  const leitura: LeituraDeNivel = { roofs: [], floors: [], slabs: [] };
+  for (const id of niveis) {
+    let doNivel = porNivel.get(id);
+    if (!doNivel) {
+      doNivel = { roofs: resolveRoofs(p, id), floors: resolveFloors(p, id), slabs: resolveSlabs(p, id) };
+      porNivel.set(id, doNivel);
+    }
+    leitura.roofs.push(...doNivel.roofs);
+    leitura.floors.push(...doNivel.floors);
+    leitura.slabs.push(...doNivel.slabs);
+  }
+  const z = wallZRange(p, w, leitura.floors, leitura.slabs, leitura.roofs);
+  return [z.z0, z.z0 + z.height];
+}
+
 function faixasDosNiveis(p: Project): Map<Id, readonly [number, number]> {
   const hit = faixasMemo.get(p);
   if (hit) return hit;
@@ -37,11 +66,17 @@ function faixasDosNiveis(p: Project): Map<Id, readonly [number, number]> {
     const h = out.get(id);
     out.set(id, h ? [Math.min(h[0], lo), Math.max(h[1], hi)] : [lo, hi]);
   };
+  const porNivel = new Map<Id, LeituraDeNivel>();
   for (const e of Object.values(p.elements)) {
     if (isWall(e)) {
       const base = levelElevation(p, e.levelId) + e.baseOffset;
       const topo = wallTopElevation(p, e);
       soma(e.levelId, Math.min(base, topo), Math.max(base, topo, base + wallMaxHeight(p, e)));
+      // Com o topo no telhado, a cota real sai do telhado (pode subir acima da altura normal): a união cobre as duas.
+      if (e.attachTopToRoof === true) {
+        const [lo, hi] = faixaDaParedeNoTelhado(p, e, porNivel);
+        soma(e.levelId, lo, hi);
+      }
     } else if (e.kind === 'floor' || e.kind === 'slab') {
       const z = levelElevation(p, e.levelId) + e.heightOffset;
       const inclinacao = e.kind === 'slab' && e.slope ? (Math.abs(e.slope.percent) / 100) * diagonal(e.boundary) : 0;
@@ -87,11 +122,21 @@ function adicionaDependencias(p: Project, nivel: Id, mantidos: Set<Id>): void {
     if (e.attachTopToFloor === true && e.topLevelId) {
       for (const d of [e.topLevelId, ...adjacentesDoNivel(p, e.topLevelId)]) mantidos.add(d);
     }
+    // Parede anexada ao telhado lê só os telhados do próprio nível e do nível de topo (`axisRoofs`).
+    if (e.attachTopToRoof === true) {
+      for (const d of [nivel, e.topLevelId ?? nivel]) mantidos.add(d);
+    }
   }
 }
 
-/** Parede anexada ao telhado: a faixa dela lê os telhados de todos os níveis, então não há recorte por cota (projeto inteiro). */
-const temParedeNoTelhado = (p: Project): boolean => Object.values(p.elements).some((e) => isWall(e) && e.attachTopToRoof === true);
+/** Fecha as dependências: cada nível mantido puxa os níveis que as paredes dele leem, até o conjunto parar de crescer. */
+function fechaDependencias(p: Project, mantidos: Set<Id>): void {
+  let tamanho = -1;
+  while (tamanho !== mantidos.size) {
+    tamanho = mantidos.size;
+    for (const id of [...mantidos]) adicionaDependencias(p, id, mantidos);
+  }
+}
 
 /** Projetos reduzidos por projeto e nível (memorizados, para que os caches de cortadores reencontrem o mesmo objeto). */
 const juncaoMemo = new WeakMap<Project, Map<Id, Project>>();
@@ -100,10 +145,11 @@ const juncaoMemo = new WeakMap<Project, Map<Id, Project>>();
  * Projeto para a junção da vista de um nível. A junção só recebe cortadores de outro nível que tocam a faixa de cota do
  * nível (`levelCutterSet`), então os outros níveis são calculados à toa. Ficam:
  *  - o próprio nível e os vizinhos (a resolução de lajes lê os vizinhos);
- *  - os níveis cuja faixa de elementos (paredes, pisos e lajes, com a espessura dos tipos) toca a faixa do nível;
- *  - os níveis que as paredes anexadas desses níveis leem (piso de base ou de topo, e os vizinhos deles).
- * Sem parede anexada ao telhado, isso reproduz a junção do projeto inteiro: nível fora desse conjunto não tem peça que
- * alcance a faixa do nível. Com parede anexada ao telhado, vale o projeto inteiro (resultado exato, como antes).
+ *  - os níveis cuja faixa de elementos (paredes, pisos e lajes, com a espessura dos tipos) toca a faixa do nível. Para
+ *    parede anexada ao telhado, a faixa é a cota exata que o motor calcula (`wallZRange`);
+ *  - os níveis que as paredes anexadas desses níveis leem: piso de base ou de topo (com os vizinhos) e, para telhado, o
+ *    próprio nível e o de topo. O conjunto fecha sobre si mesmo, porque cada nível novo traz as próprias dependências.
+ * Assim a junção do nível sai igual à do projeto inteiro: nível fora do conjunto não tem peça que alcance a faixa do nível.
  */
 export function projetoDaJuncao(p: Project, levelId: Id): Project {
   let byLevel = juncaoMemo.get(p);
@@ -114,26 +160,22 @@ export function projetoDaJuncao(p: Project, levelId: Id): Project {
   const hit = byLevel.get(levelId);
   if (hit) return hit;
   let out: Project = p;
-  if (!temParedeNoTelhado(p)) {
-    const faixas = faixasDosNiveis(p);
-    const mantidos = new Set<Id>([levelId, ...adjacentesDoNivel(p, levelId)]);
-    const propria = faixas.get(levelId);
-    if (propria) {
-      // Níveis cuja faixa toca a do nível; para cada um, os vizinhos (resolução de lajes) e as paredes anexadas.
-      const tocam = new Set<Id>([levelId]);
-      for (const l of p.levels) {
-        const f = faixas.get(l.id);
-        if (f && f[1] >= propria[0] - EPS && f[0] <= propria[1] + EPS) tocam.add(l.id);
-      }
-      for (const id of tocam) {
-        mantidos.add(id);
-        for (const v of adjacentesDoNivel(p, id)) mantidos.add(v);
-        adicionaDependencias(p, id, mantidos);
+  const faixas = faixasDosNiveis(p);
+  const mantidos = new Set<Id>([levelId, ...adjacentesDoNivel(p, levelId)]);
+  const propria = faixas.get(levelId);
+  if (propria) {
+    // Níveis cuja faixa toca a do nível; para cada um, os vizinhos (resolução de lajes).
+    for (const l of p.levels) {
+      const f = faixas.get(l.id);
+      if (f && f[1] >= propria[0] - EPS && f[0] <= propria[1] + EPS) {
+        mantidos.add(l.id);
+        for (const v of adjacentesDoNivel(p, l.id)) mantidos.add(v);
       }
     }
-    const levels = p.levels.filter((l) => mantidos.has(l.id));
-    if (levels.length < p.levels.length) out = { ...p, levels };
   }
+  fechaDependencias(p, mantidos);
+  const levels = p.levels.filter((l) => mantidos.has(l.id));
+  if (levels.length < p.levels.length) out = { ...p, levels };
   byLevel.set(levelId, out);
   return out;
 }

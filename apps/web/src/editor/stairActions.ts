@@ -43,7 +43,7 @@ export function patchStairs(store: ProjectStore, ids: Id[], patch: Partial<Stair
 export function stairNote(st: Pick<StairStatus, 'firstError' | 'issues'> & Partial<Pick<StairStatus, 'created' | 'remaining' | 'desired'>>): { tone: 'error' | 'warning'; text: string } | null {
   if (st.firstError) return { tone: 'error', text: st.firstError };
   // Espelhos faltando: a conta vai à barra antes do aviso de norma (Concluir não grava enquanto faltarem).
-  const missing = st.created !== undefined && st.remaining !== undefined && st.desired !== undefined ? missingText(st) : null;
+  const missing = st.created !== undefined && st.remaining !== undefined && st.desired !== undefined ? missingText({ created: st.created, remaining: st.remaining, desired: st.desired }) : null;
   if (missing) return { tone: 'warning', text: missing };
   const w = st.issues.find((i) => i.severity === 'warning');
   return w ? { tone: 'warning', text: w.message } : null;

@@ -11,6 +11,7 @@ import {
   componentsFromParts,
   copyCurve,
   lastRun,
+  missingText,
   partsFromComponents,
   runSketch,
   type DraftReport,
@@ -28,6 +29,12 @@ import { activeTone, buildItems, hintText, warningText } from './stairView.ts';
 import { DEFAULT_SNAP, type PointerInfo, type PreviewItem, type Tool } from './types.ts';
 
 const HINT = 'Escada: desenhe o limite esquerdo; Enter passa ao direito e outro Enter vai a Espelhos. Esc cancela a cadeia; outro Esc descarta o croqui.';
+
+/** A conta dos espelhos que faltam, com espaço no fim (vazia se não faltam). Concluir grava mesmo assim: é aviso. */
+const missingPrefix = (rep: DraftReport): string => {
+  const m = missingText(rep);
+  return m ? `${m} ` : '';
+};
 
 /** Estado do croqui para a interface: a análise, o contador, o sub-modo e "Pegar linhas". */
 export interface StairStatus extends DraftReport {
@@ -470,13 +477,13 @@ export class StairTool extends ToolBase {
       const r = updateStairComponents(this.env, this.stairId, kept);
       if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
       this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
-      this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);
+      this.env.say(`Croqui atualizado. ${missingPrefix(r.report)}${warningText(r.report)}Ctrl+Z desfaz.`);
       return;
     }
     const r = createStairFromComponents(this.env, components, this.creationOptions());
     if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
     this.env.done();
-    this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);
+    this.env.say(`Escada criada: ${r.report.created} espelhos. ${missingPrefix(r.report)}${warningText(r.report)}Ctrl+Z desfaz.`);
   }
 }
 

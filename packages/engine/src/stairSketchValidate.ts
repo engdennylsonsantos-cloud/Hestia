@@ -9,6 +9,7 @@ import {
   TOUCH_TOL,
   walkOf,
   type Prepared,
+  type RiserGeom,
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';

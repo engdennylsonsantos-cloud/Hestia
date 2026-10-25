@@ -1,6 +1,6 @@
 import { cross, dist, dot, intersectCircleLine, intersectCircles, intersectLines, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall, normalAt, pointAt, toLocal, type WallFrame } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
@@ -78,6 +78,26 @@ function cornerPlan(fa: WallFrame, fb: WallFrame, clickA: Vec2, clickB: Vec2): C
   const pb = cornerPatch(fb, corner, clickB);
   if (!pa || !pb) return null;
   return { patches: [{ id: fa.wall.id, patch: pa }, { id: fb.wall.id, patch: pb }] };
+}
+
+/**
+ * Frase de confirmação do canto (antes de aplicar, com o projeto ainda antigo): "estendida" quando a parede ficou
+ * mais longa, "aparada" quando ficou mais curta, e as duas quando o canto mexe nas duas paredes.
+ */
+function confirmaCanto(pr: Project, patches: Array<{ id: Id; patch: EndPatch }>): string {
+  let estendidas = 0;
+  let aparadas = 0;
+  for (const { id, patch } of patches) {
+    const w = pr.elements[id];
+    if (!isWall(w)) continue;
+    const antes = dist(w.a, w.b);
+    const depois = dist(patch.a ?? w.a, patch.b ?? w.b);
+    if (depois > antes + 1e-6) estendidas += 1;
+    else if (depois < antes - 1e-6) aparadas += 1;
+  }
+  if (estendidas && aparadas) return 'Cantos ajustados.';
+  if (estendidas) return estendidas === 1 ? 'Parede estendida.' : 'Paredes estendidas.';
+  return aparadas === 1 ? 'Parede aparada.' : 'Paredes aparadas.';
 }
 
 /** Parede escolhida para aparar, com o ponto clicado (define a parte que fica). */
@@ -171,11 +191,12 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    const frase = confirmaCanto(pr, patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of patches) this.applyPatch(id, patch);
     });
     this.reset();
-    this.env.say(`${patches.length} parede(s) aparada(s).${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''}`);
+    this.env.say(`${frase}${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''} ${this.hint}`);
   }
 
   /** Mistura de parede e aresta (ou várias com uma só): desfaz a escolha e pede de novo. */
@@ -231,7 +252,7 @@ export class TrimTool extends ToolBase {
     });
     this.reset();
     // Recusado (travado): commitRingEdit já disse o motivo na barra de status; não sobrescrever.
-    if (ok) this.env.say(this.hint);
+    if (ok) this.env.say(`Canto aplicado. ${this.hint}`);
   }
 
   override click(p: PointerInfo): void {
@@ -282,11 +303,12 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    const frase = confirmaCanto(pr, plan.patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of plan.patches) this.applyPatch(id, patch);
     });
     this.reset();
-    this.env.say(this.hint);
+    this.env.say(`${frase} ${this.hint}`);
   }
 }
 
@@ -353,9 +375,11 @@ export class AlignTool extends ToolBase {
     }
     const ref = pick.ref;
     // Travada: commitRingEdit já diz o motivo na barra de status.
+    let ok = false;
     this.env.transaction('Alinhar aresta', () => {
-      commitRingEdit(this.env, ref, next);
+      ok = commitRingEdit(this.env, ref, next);
     });
+    if (ok) this.env.say('Alinhado. Clique na próxima parede ou aresta a alinhar (Esc para trocar a referência).');
   }
 
   override click(p: PointerInfo): void {
@@ -397,6 +421,7 @@ export class AlignTool extends ToolBase {
       return;
     }
     moveWalls(this.env, [hitId], k);
+    this.env.say('Alinhado. Clique na próxima parede a alinhar (Esc para trocar a referência).');
   }
 }
 

@@ -83,8 +83,9 @@ export class SectionTool extends ToolBase {
         : {}),
     };
     this.env.exec({ type: 'addView', view });
-    this.env.openView?.(view.id);
+    // Primeiro volta à seleção (que, na vista de corte, levaria à planta) e só então abre a vista criada.
     this.env.done();
+    this.env.openView?.(view.id);
     this.env.say(`${view.name} criado e aberto. Para voltar à planta, use a aba da planta.`);
   }
 }

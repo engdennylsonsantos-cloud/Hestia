@@ -354,9 +354,9 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     expect(text).not.toContain('\r\nABERTURAS\r\n');
   });
 
-  it('a soleira do vão livre no corte vai à ABERTURA_SIMBOLO como uma linha contínua, sem tracejado', () => {
-    const soleira: DxfSymbolPath = { pts: [{ x: 0.6, y: 0 }, { x: 1.4, y: 0 }], closed: false };
-    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [soleira])] });
+  it('um traço reto sem tracejado no vão de corte vai à ABERTURA_SIMBOLO em linha contínua', () => {
+    const reto: DxfSymbolPath = { pts: [{ x: 0.6, y: 0 }, { x: 1.4, y: 0 }], closed: false };
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [reto])] });
     const polys = polylines(text);
     expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL]);
     expect(linetypeOf(text, DXF_LAYER_OPENING_SYMBOL)).toBe('CONTINUOUS');

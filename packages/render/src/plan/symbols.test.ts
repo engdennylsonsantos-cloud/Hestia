@@ -29,12 +29,13 @@ const geom = (over: Partial<OpeningGeometry>): OpeningGeometry => ({
 const count = (over: Partial<OpeningGeometry>): number => openingSymbol(geom(over), LIGHT).length;
 
 describe('vão livre (leaves 0)', () => {
-  it('vão livre: só a soleira contínua no plano médio, sem X, sem folha nem caixilho', () => {
+  it('vão livre: duas linhas tracejadas nas faces da parede, sem X, sem folha nem caixilho', () => {
     const s = openingSymbol(geom({ leaves: 0 }), LIGHT);
-    expect(s).toHaveLength(1);
-    expect(s[0]!.dash).toBeUndefined();
-    expect(s[0]!.pts[0]!.y).toBeCloseTo(0);
-    expect(s[0]!.pts[1]!.y).toBeCloseTo(0);
+    expect(s).toHaveLength(2);
+    expect(s.every((x) => x.dash !== undefined)).toBe(true);
+    expect(s[0]!.pts[0]!.y).toBeCloseTo(0.07);
+    expect(s[0]!.pts[1]!.y).toBeCloseTo(0.07);
+    expect(s[1]!.pts[0]!.y).toBeCloseTo(-0.07);
     expect(s[0]!.pts[0]!.x).toBeCloseTo(-0.45);
     expect(s[0]!.pts[1]!.x).toBeCloseTo(0.45);
   });

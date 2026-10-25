@@ -13,10 +13,10 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 - [x] P5 Janela de correr: n folhas em linhas defasadas (2 ou 3), sem linha no plano médio, com seta **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`
 - [x] P6 Janela fixa: duas linhas de face, linha do plano médio e duas ombreiras **(bloqueante)** — `packages/render/src/plan/symbols.test.ts`
 - [x] P7 Maxim-ar (arco tracejado do lado de `flipFacing`) e basculante (V no plano médio) **(bloqueante)** — `packages/render/src/plan/symbols.test.ts`
-- [x] P8 Vão livre (0 folhas): só a soleira, linha fina contínua no plano médio de −W/2 a +W/2; sem X (0024 §3, revisada em 2026-10-24) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`
+- [x] P8 Vão livre (0 folhas): duas linhas tracejadas nas faces da parede, de −W/2 a +W/2 (a verga, como o vão vazio do ArchiCAD); sem X nem linha central (0024 §3, revisada em 2026-10-24) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`
 - [x] P9 Famílias com efeito: cada família desenha diferente; `double` passou a ter sentido próprio (2 folhas) e é normalizado para `swing` com 2 folhas; combinação fora das famílias é recusada **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`, `packages/model/src/opening.test.ts`
-- [x] P10 Janela com 0 folhas: planta e 3D concordam no que é peça — sem caixilho nem vidro; a planta acrescenta só a soleira (sem X, 0024 §3) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/model3d/scene3d.test.ts`
-- [-] P11 X do vão livre na planta: **removido** em 2026-10-24; Revit e ArchiCAD não o desenham em vão de parede (0024 §3). O teste confere que o vão livre sai só com a soleira — `packages/geom/src/openingSymbol.test.ts`
+- [x] P10 Janela com 0 folhas: planta e 3D concordam no que é peça — sem caixilho nem vidro; a planta acrescenta só as duas linhas tracejadas nas faces (sem X, 0024 §3) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/model3d/scene3d.test.ts`
+- [-] P11 X do vão livre na planta: **removido** em 2026-10-24; Revit e ArchiCAD não o desenham em vão de parede (0024 §3). O teste confere que o vão livre sai só com as duas linhas tracejadas nas faces — `packages/geom/src/openingSymbol.test.ts`
 - [x] P12 X do furo quadrangular de piso e laje na planta: duas diagonais; furo com mais de quatro vértices sem X; no grosseiro não sai (0024 §3) — `packages/render/src/plan/holeMarks.test.ts`, `packages/render/src/plan/floors.test.ts`, `packages/render/src/plan/slabs.test.ts`
 - [-] P13 Verga e peitoril na planta quando o corte passa por eles: fora desta entrega, próxima rodada (0024 §7)
 - [-] P14 Janela de giro (side-hung) como família: fora do escopo; o giro cai no maxim-ar (topo) e no basculante (base), que já têm arco e V (0024 §7)
@@ -50,7 +50,7 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 ## DXF
 - [x] X1 Vão de corte no DXF com o símbolo de planta (mesma função `openingSymbolPaths` da tela), na camada `ABERTURA_SIMBOLO` (0024 §4); sem símbolo, continua retângulo fechado em `ABERTURAS` (compatibilidade) **(bloqueante)** — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`
 - [x] X2 Projeção (acima/abaixo/além) com o símbolo nas camadas `ABERTURA_ACIMA`/`ABERTURA_ABAIXO`/`ABERTURA_ALEM` — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`
-- [-] X3 X do vão livre no corte no DXF: **removido** com o X do vão (0024 §3); o DXF segue mandando à `ABERTURA_SIMBOLO` os traços retos contínuos (a soleira) — `packages/io/src/dxf.test.ts`
+- [-] X3 X do vão livre no corte no DXF: **removido** com o X do vão (0024 §3); o DXF segue mandando à `ABERTURA_SIMBOLO` os traços do símbolo, com o tracejado na própria entidade — `packages/io/src/dxf.test.ts`
 - [-] X4 DXF de corte com o giro e o X da elevação: fora desta entrega, `dxfSection.ts` recebe só polígonos do vão (0024 §4, §7)
 - [-] X5 X dos furos de piso e laje no DXF de planta: fora desta entrega, próxima rodada (0024 §4, §7)
 

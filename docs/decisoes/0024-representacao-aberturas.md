@@ -42,15 +42,20 @@ o vão vazio ("Empty Opening", tipo de porta ou janela como o nosso), interrompe
 contorno e de borda superior tracejada (fórum Graphisoft; as páginas oficiais de Wall Opening e Empty Opening não foram
 lidas). Na planta o X ainda virava uma ampulheta ilegível nos 14 cm da parede, e na elevação concorria com o V de giro.
 
-- **Vão livre de parede (0 folhas), planta**: parede interrompida nos batentes (como já era) e **só a soleira**: uma linha
-  fina contínua no plano médio, de −W/2 a +W/2. Era tracejada; passou a contínua porque o tracejado da planta significa
-  "acima do corte" (decisão 0013) e a soleira fica abaixo dele.
+- **Vão livre de parede (0 folhas), planta**: segue o vão vazio do ArchiCAD. A parede é interrompida nos batentes (como já
+  era) e o vão leva **duas linhas tracejadas, uma em cada face da parede**, de −W/2 a +W/2: as bordas superiores do vão
+  (a verga, acima do plano de corte), com o tracejado que a decisão 0013 já usa para "acima do corte". Sem X e sem linha
+  central. A primeira versão desta revisão pôs uma soleira contínua no meio; foi trocada por estas linhas. Evidência: só
+  trechos de fórum da Graphisoft (as "overhead lines" do vão vazio são as bordas superiores; a opção de ligá-las é do próprio
+  objeto); as páginas oficiais de Empty Opening não foram lidas. O Revit, por padrão, só interrompe a parede: o tracejado
+  de borda no Wall Opening exige Linework ou overhead manual, e só janela, mobiliário e genérico aparecem acima do corte.
 - **Vão livre, corte e elevação**: só o contorno do vão; a janela sem folha mantém a soleira (como no 3D). Sem diagonais.
-- **Furo quadrangular de piso, laje e telhado, planta**: mantém o X, contorno mais **duas diagonais ligando os vértices
-  opostos** (`voidCrossPaths`, em `packages/geom`; só `plan/holeMarks.ts` o usa). Furo com mais de quatro vértices não leva
-  X, porque a diagonal entre opostos só é definida em quadrilátero.
+- **Furo quadrangular de piso e laje, planta**: mantém o X, contorno mais **duas diagonais ligando os vértices opostos**
+  (`voidCrossPaths`, em `packages/geom`; só `plan/holeMarks.ts` o usa, chamado por `plan/floors.ts` e `plan/slabs.ts`).
+  Furo com mais de quatro vértices não leva X, porque a diagonal entre opostos só é definida em quadrilátero. **Telhado e
+  forro não têm X hoje** (o texto anterior dizia "telhado"; ver §7).
 - **Nível de detalhe do X de furo**: não sai no grosseiro (decisão 0015); sai no médio e no fino.
-- **Peso e visibilidade do X de furo**: seguem o traço de projeção do piso, da laje ou do telhado (categoria do elemento).
+- **Peso e visibilidade do X de furo**: seguem o traço de projeção do piso ou da laje (categoria do elemento).
   **Não criei categoria gráfica nova**: o X de furo segue a categoria existente do elemento, como a decisão 0015 permite.
 - **Traço do X de furo**: sem fonte oficial de peso nem de tracejado ([NÃO ENCONTRADO]). Convenção própria: contínuo e fino.
 - **Revit, Wall Opening**: sem X, confirmado pela ausência de fonte em C §3 e pelo comportamento conhecido do programa.
@@ -83,9 +88,9 @@ lidas). Na planta o X ainda virava uma ampulheta ilegível nos 14 cm da parede, 
   giro com o V (vértice na dobradiça a meia altura, pontas no trinco, contínuo porque a folha abre para longe), e o diff fica
   só dentro da folha. Os outros 29 casos seguem em 0,000 %. Baseline regravada sem `--update` geral.
 
-- Revisão do X (2026-10-24, vão livre sem X): testes ajustados em `openingSymbol.test.ts` (só a soleira, contínua, também com
-  a rotação do vão), `symbols.test.ts`, `build.test.ts` (sem diagonais no corte, na elevação e no grosso) e `dxf.test.ts`
-  (traço reto contínuo em `ABERTURA_SIMBOLO`). `holeMarks`, `floors` e `slabs` não mudaram: o X de furo segue como estava.
+- Revisão do X (2026-10-24, vão livre sem X): testes ajustados em `openingSymbol.test.ts` (duas linhas tracejadas nas faces,
+  também com a rotação do vão), `symbols.test.ts`, `build.test.ts` (sem diagonais no corte, na elevação e no grosso) e
+  `dxf.test.ts` (traço reto contínuo em `ABERTURA_SIMBOLO`). `holeMarks`, `floors` e `slabs` não mudaram: o X de furo segue como estava.
   Baselines visuais: `planta-porta-janela` e `elevacao-porta-janela` mudaram só no vão livre, e as imagens foram lidas.
   Como a máquina desta revisão (Windows) não reproduz as baselines de Linux (o canvas sai 4 px mais baixo e a interface da
   branch `feat/revit-ui-theme` tem a barra de escala; os 36 casos divergem por isso, 100 % ou cerca de 2 %, com ou sem a
@@ -99,7 +104,8 @@ lidas). Na planta o X ainda virava uma ampulheta ilegível nos 14 cm da parede, 
 - DXF de corte com giro e X (ver §4).
 - Verga e peitoril na planta quando o corte passa por eles.
 - Janela de giro (side-hung) como família: o giro fica no maxim-ar e no basculante, como antes.
-- X de telhado (claraboia): o telhado não foi testado com furo quadrangular.
+- X de telhado (claraboia) e de forro: não ligados; só piso e laje o desenham. O Revit trata Vertical Opening e Shaft como
+  corte em piso, telhado e forro, então é a próxima lacuna.
 - Porta pivotante: a posição do eixo segue provisória (W/4), sem fonte oficial.
 - Chave por categoria para ligar e desligar só o X: exigiria categoria nova no modelo.
 

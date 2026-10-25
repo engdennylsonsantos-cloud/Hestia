@@ -106,7 +106,7 @@ oficial: [NÃO ENCONTRADO].**
 | Janela fixa | 3 linhas | caixilho + vidro, sem símbolo | [INFERIDO] |
 | Janela maxim-ar/basculante | arco tracejado / V | V (maxim-ar: vértice no topo; basculante: na base) | [INFERIDO] |
 | Janela de correr | n folhas + seta | seta | [SEC/INFERIDO] |
-| Vão livre em parede (sem esquadria) | parede interrompida + soleira, **sem X** | contorno do vão, **sem X** | decisão 0024 §3 (revista); o X não foi achado em Wall Opening nem em Empty Opening |
+| Vão livre em parede (sem esquadria) | parede interrompida + duas linhas tracejadas nas faces (borda superior, como o vão vazio do ArchiCAD), **sem X** | contorno do vão, **sem X** | decisão 0024 §3 (revista); o X não foi achado em Wall Opening nem em Empty Opening |
 | Furo em piso/laje/telhado (shaft) | **X** opcional | **X** opcional, em todos os níveis | [DOC] Autodesk 2024 (opcional); forma [SEC] |
 | Projeção acima do corte | tracejado | — | [DOC] Autodesk View Range |
 | Nível de detalhe | grosso sem símbolo; médio/fino com | `By MVO` / `Scale Sensitive` / `Off` | [DOC] Graphisoft AC26 |

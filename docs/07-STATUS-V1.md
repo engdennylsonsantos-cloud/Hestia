@@ -71,7 +71,7 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 - Favoritos no seletor (`favoriteOpeningTypes`, desfazível).
 - Giro em elevação e X de furo (0024): o giro é o símbolo em "V" (vértice no lado da dobradiça, a meia altura; pontas no lado do
   trinco; decisão 0024 §2), tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto; o vão livre de parede
-  não leva X (só parede interrompida e soleira na planta, contorno no corte e na elevação; 0024 §3); o X de furo de piso/laje segue o Shaft Opening
+  não leva X (planta: parede interrompida e duas linhas tracejadas nas faces; corte e elevação: contorno; 0024 §3); o X de furo de piso/laje segue o Shaft Opening
   do Revit.
 - 3D por família; folha aberta com "Abrir vãos" (vidro, giro, correr e pivotante corrigidos, 0017 §11).
 - Instância com lado da dobradiça, sentido de abertura e marca; "Tabela de portas e janelas" com CSV.

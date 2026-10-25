@@ -87,10 +87,11 @@ export function openingSymbolPaths(input: OpeningSymbolInput): OpeningSymbolStro
   const hw = g.width / 2;
   const sMid = (g.sHi + g.sLo) / 2;
   const rel: Rel = (t, s) => at(g.center, g.u, g.n, t, s - sMid);
-  // Vão livre: só a soleira, uma linha fina contínua no plano médio da parede (abaixo do corte, então sem tracejado).
-  // Sem X: Revit e ArchiCAD não o desenham em vão de parede (decisão 0024 §3).
+  // Vão livre: as duas bordas superiores do vão (a verga, acima do plano de corte), tracejadas, sobre as duas faces da
+  // parede, como no vão vazio do ArchiCAD. Sem X nem linha central (decisão 0024 §3).
   if (g.leaves === 0) {
-    line([rel(-hw, sMid), rel(hw, sMid)], false, 0.6);
+    line([rel(-hw, g.sHi), rel(hw, g.sHi)], false, 0.7, [6, 3]);
+    line([rel(-hw, g.sLo), rel(hw, g.sLo)], false, 0.7, [6, 3]);
     return out;
   }
   if (g.kind === 'window') {

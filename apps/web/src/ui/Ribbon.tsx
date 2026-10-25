@@ -159,7 +159,7 @@ export function Ribbon(): ReactElement {
   ];
   void TOOL_GROUPS;
 
-  const buildTools: ToolId[] = ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope'];
+  const buildTools: ToolId[] = ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope', 'roofextrusion'];
   const annotateTools: ToolId[] = ['dimension', 'text'];
   const modifyTools: ToolId[] = ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'];
 

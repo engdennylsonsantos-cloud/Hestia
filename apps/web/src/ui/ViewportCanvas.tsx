@@ -151,6 +151,7 @@ export function ViewportCanvas(): ReactElement {
       // Animação da câmera (ViewCube, Início): avança a cada quadro e pede o próximo enquanto anima.
       if (m.orbit.step(performance.now())) useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
       m.orbit.setAspect(w, h);
+      m.sombra.aplicar(g.gpu.renderer);
       safeRender(g, m.scene, m.orbit.camera);
       publish(NO_LABELS, null);
       return;

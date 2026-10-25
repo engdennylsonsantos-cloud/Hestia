@@ -239,7 +239,7 @@ export class StairRunTool extends ToolBase {
       return {
         error: stairTopLevel(p, ref)
           ? 'O nível de topo não fica acima da base: nada a gerar.'
-          : 'Altura inválida: informe uma altura positiva na barra de escada.',
+          : 'Sem nível de topo: escolha o nível de cima na barra de escada (ou informe uma altura positiva).',
       };
     }
     return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };

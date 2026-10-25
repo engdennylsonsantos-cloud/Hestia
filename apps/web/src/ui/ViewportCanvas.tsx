@@ -189,7 +189,8 @@ export function ViewportCanvas(): ReactElement {
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
   /** `pick`: o ponteiro foi o botão esquerdo sem Espaço, então um clique sem arrasto na vista 3D escolhe um elemento (Shift pode ser pan). */
-  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
+  /** `shiftPending`: Shift com ferramenta de desenho na planta; sem arrasto é clique com shift (trava ortogonal), com arrasto vira pan. */
+  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean; shiftPending?: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
   const gesture = useRef<{ dist: number; mid: Pt } | null>(null);
   const spaceDown = useRef(false);
 
@@ -255,8 +256,10 @@ export function ViewportCanvas(): ReactElement {
     }
     const isMiddleBtn = e.button === 1;
     const isOrbitReq = (isMiddleBtn && e.shiftKey) || (e.button === 0 && e.altKey);
-    // Na planta, Shift com a Selecionar é da seleção (soma e janela); com as outras ferramentas, Shift continua a arrastar a vista.
-    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select';
+    // Na planta, Shift com a Selecionar é da seleção (soma e janela). Com ferramenta de desenho, Shift sem arrasto trava
+    // ortogonal (vai à ferramenta com shift); só vira pan se o ponteiro se mover (onMove). Na vista de corte, Shift arrasta a vista.
+    const shiftDraw = view === 'plan' && e.button === 0 && e.shiftKey && !spaceDown.current && editor.activeTool.id !== 'select';
+    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select' && !shiftDraw;
     const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || shiftPan));
     if (e.button === 2) {
       if (view === 'plan') editor.activeTool.cancel();
@@ -278,8 +281,9 @@ export function ViewportCanvas(): ReactElement {
       return;
     }
     if (!editor.viewport()) return;
-    drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false };
-    editor.pointer('down', info(e, s));
+    drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false, shiftPending: shiftDraw };
+    // Com Shift pendente, o 'down' só vai ao soltar (ver onUp), para não começar um gesto da ferramenta antes de saber se é pan.
+    if (!shiftDraw) editor.pointer('down', info(e, s));
   };
 
   const onMove = (e: RPointerEvent): void => {
@@ -320,6 +324,13 @@ export function ViewportCanvas(): ReactElement {
     }
     // Sem botão pressionado, o corte realça o elemento sob o cursor (decisão 0016).
     if (view === 'section') { if (d.mode === 'none') hoverSectionAt(s); return; }
+    // Shift pendente que passou de ~3 px é arrasto da vista (pan), como antes; a ferramenta não recebe o gesto.
+    if (d.shiftPending && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) {
+      d.shiftPending = false; d.mode = 'pan'; d.moved = true;
+      editor.pan(s.x - d.start.x, s.y - d.start.y);
+      d.last = s;
+      return;
+    }
     const v = editor.viewport();
     if (!v) return;
     const inf = info(e, s);
@@ -342,7 +353,9 @@ export function ViewportCanvas(): ReactElement {
     }
     const d = drag.current;
     if (d.mode === 'tool') {
-      const inf = info(e, s);
+      // Shift pendente sem arrasto: é um toque com shift (trava ortogonal) e a ferramenta recebe down, up e click.
+      const inf = d.shiftPending ? { ...info(e, s), shift: true } : info(e, s);
+      if (d.shiftPending) editor.pointer('down', inf);
       editor.pointer('up', inf);
       if (!d.moved) editor.pointer('click', inf);
     }

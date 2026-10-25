@@ -145,7 +145,7 @@ export class ParallelTool extends ToolBase {
       this.items.push(...ghostBands(pr, [this.base!], { kind: 'translate', d: plan.d }));
     }
     this.items.push({ kind: 'label', at, text: fmtM(d) });
-    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}), ou digite a distância e Enter.`);
+    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}${this.flip ? ', do lado oposto ao cursor' : ''}), ou digite a distância e Enter.`);
   }
 
   override click(p: PointerInfo): void {

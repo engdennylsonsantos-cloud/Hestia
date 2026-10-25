@@ -22,6 +22,12 @@ só para testar o roteiro, o resultado não é baseline).
 Projeto sintético: `projeto-sintetico.mts`, o mesmo gerador para os dois. Layout fixo, sem sorteio (32 paredes por
 pavimento, uma porta, um piso e uma laje por nível, cobertura no topo). Dez pavimentos têm 320 paredes; vinte, 640.
 
+Navegador, roteiro (`tests/e2e/perf-browser.mjs`, agora com 10 e 20 pavimentos): abrir o projeto (até o segundo quadro);
+planta do nível do meio (troca de nível até o quadro); seleção por clique na planta (pointerup até a seleção mudar e um
+quadro); edição (`setWallEnds` pelo store, a parede de índice 25 do nível do meio, ida e volta); pan; zoom; pick 3D. Cada
+um sai com mediana, p95, média, mínimo e máximo. O arquivo gravado é `browser-20-pav-<data>-<PERF_ROTULO>.json`
+(padrão `antes`). Com `--save` e servidor de desenvolvimento, não grava (sai com código 3).
+
 ## Método (Node)
 
 - Aquecimento de 5 execuções fora das medidas; depois 30 medidas (`BENCH_RUNS`). Cenário de cena 3D: 10 medidas.
@@ -78,6 +84,10 @@ Não há número de navegador. Motivo:
   JSON; sem ele o script sai com código 2 e a mensagem PENDENTE.
 - Validação do roteiro: rodei o script contra o servidor de dev (`APP_URL`). Abriu o projeto de 10 pavimentos, mediu
   abertura, pan, zoom e pick (sem `--save`, nada gravado). Esses números são de modo dev (React sem otimização) e não entram como baseline.
+
+Nova tentativa (2026-10-24, branch `worktree-agent-a2f7bc46ff7082796`, em f67e2f0): `npm run build` falhou de novo com o
+mesmo `Acesso negado` do esbuild, em três tentativas (inclusive com TEMP em outra pasta). Não há `apps/web/dist` neste
+worktree, então o baseline de navegador de 10 e 20 pavimentos continua PENDENTE.
 
 Para fechar o baseline de navegador: resolver o build no Windows (antivírus ou permissão na pasta temporária do
 esbuild), rodar `npm run build`, e depois `npm run perf:browser -- --save`.

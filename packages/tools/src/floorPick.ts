@@ -1,6 +1,6 @@
 import { boxOf, dist, intersectSegments, pointInMulti, ringArea, type Vec2 } from '@hestia/geom';
-import { resolveFloors } from '@hestia/engine';
 import { floorsOnLevel, isFloor, type Floor, type Id, type Project } from '@hestia/model';
+import { formasDoNivel } from './pickShapes.ts';
 
 /** Pisos entre os selecionados. */
 export const selectedFloors = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isFloor(p.elements[id]));
@@ -20,7 +20,7 @@ export interface FloorGrip {
 export function pickFloorAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
   const tol = 4 * mpp;
   const floors = floorsOnLevel(p, levelId);
-  const shape = new Map(resolveFloors(p, levelId).map((r) => [r.floorId, r.polygon] as const));
+  const shape = formasDoNivel(p, levelId, 'piso');
   for (let i = floors.length - 1; i >= 0; i--) {
     const f = floors[i]!;
     if (onBoundary(f, at, tol)) return f.id;

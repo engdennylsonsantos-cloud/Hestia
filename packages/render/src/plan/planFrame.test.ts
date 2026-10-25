@@ -214,6 +214,19 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     expect(planFrameUpdateOf(state({ version: 2 })).geometryKey).not.toBe(base.geometryKey);
   });
 
+  it('abrir a planta não resolve o nível atual (a geometria vem da vista); só o nível de baixo é resolvido', () => {
+    const chamadas: string[] = [];
+    const resolve = (id: string) => {
+      chamadas.push(id);
+      return resolveLevel(p, id, new Map());
+    };
+    planFrameUpdateOf(state({ levelId: 'lv_1', showUnderlay: true, resolve })).geometry();
+    expect(chamadas).toEqual(['lv_0']);
+    chamadas.length = 0;
+    planFrameUpdateOf(state({ levelId: 'lv_0', showUnderlay: true, resolve })).geometry();
+    expect(chamadas).toEqual([]);
+  });
+
   it('a sobreposição muda com a seleção e o cursor, mas não com o pan', () => {
     const base = planFrameUpdateOf(state());
     expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).not.toBe(base.overlayKey);

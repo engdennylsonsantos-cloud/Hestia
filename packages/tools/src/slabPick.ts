@@ -1,6 +1,6 @@
 import { boxOf, closestOnSegment, dist, intersectSegments, pointInMulti, type Vec2 } from '@hestia/geom';
-import { resolveSlabs } from '@hestia/engine';
 import { isSlab, slabsOnLevel, type Id, type Project, type Slab } from '@hestia/model';
+import { formasDoNivel } from './pickShapes.ts';
 
 /** Lajes entre os selecionados. */
 export const selectedSlabs = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isSlab(p.elements[id]));
@@ -27,7 +27,7 @@ function onBoundary(s: Slab, at: Vec2, tol: number): boolean {
 export function pickSlabAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
   const tol = 4 * mpp;
   const slabs = slabsOnLevel(p, levelId);
-  const shape = new Map(resolveSlabs(p, levelId).map((r) => [r.slabId, r.polygon] as const));
+  const shape = formasDoNivel(p, levelId, 'laje');
   for (let i = slabs.length - 1; i >= 0; i--) {
     const s = slabs[i]!;
     if (onBoundary(s, at, tol)) return s.id;

@@ -1,24 +1,28 @@
 import { dist, boxesOverlap, boxOf, intersectSegments, type Vec2 } from '@hestia/geom';
 import { wallMid } from './wallGeom.ts';
-import { openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
-import { frameOfWall, openingGeometry, toLocal } from '@hestia/engine';
+import { wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { toLocal } from '@hestia/engine';
+import { candidatesAt, wallIndexOf } from './pickIndex.ts';
 
 export interface Hit {
   id: Id;
   kind: 'wall' | 'door' | 'window';
 }
 
-/** Elemento sob o ponto (aberturas têm prioridade sobre a parede que as hospeda). */
+/**
+ * Elemento sob o ponto (aberturas têm prioridade sobre a parede que as hospeda). Só as paredes que podem acertar o ponto
+ * entram na conta (índice de `pickIndex.ts`); o resultado é o da varredura de todas as paredes, na mesma ordem.
+ */
 export function pickAt(p: Project, levelId: Id, at: Vec2, mpp: number): Hit | null {
   const tol = 4 * mpp;
+  const ix = wallIndexOf(p, levelId);
   let bestWall: { id: Id; d: number } | null = null;
-  for (const w of wallsOnLevel(p, levelId)) {
-    const f = frameOfWall(p, w.id);
-    if (!f) continue;
-    for (const o of openingsOfWall(p, w.id)) {
-      const g = openingGeometry(p, o, f);
+  for (const i of candidatesAt(ix, at, 2 * tol)) {
+    const w = ix.walls[i]!;
+    const f = w.frame;
+    for (const o of w.opens) {
       const l = toLocal(f, at);
-      if (Math.abs(l.t - g.offset) <= g.width / 2 + tol && l.s <= f.sHi + tol && l.s >= f.sLo - tol) return { id: o.id, kind: o.kind };
+      if (Math.abs(l.t - o.g.offset) <= o.g.width / 2 + tol && l.s <= f.sHi + tol && l.s >= f.sLo - tol) return { id: o.id, kind: o.kind };
     }
     const l = toLocal(f, at);
     if (l.t < -tol || l.t > f.length + tol) continue;

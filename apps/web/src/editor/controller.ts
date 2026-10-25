@@ -44,7 +44,8 @@ export class Editor {
   private viewports = new Map<Id, Viewport>();
   /** Resolução por nível: uma edição recalcula só o nível editado e os que dependem dele (ver `LevelResolveCache`). */
   private readonly levels = new LevelResolveCache();
-  readonly fluxo = new FluxoEdicao({ aoMudar: () => this.bump() }); // provisório na hora, exato em segundo plano (fluxoEdicao.ts)
+  readonly fluxo = new FluxoEdicao({ aoMudar: () => this.bump(), exatoAssincrono: true }); // provisório na hora, exato em segundo plano (fluxoEdicao.ts)
+  readonly provisorios = this.fluxo.provisorios; // a planta os desenha (ui/quadroPlanta.ts); ler aqui liga o cálculo a cada edição
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   fileName = 'projeto.hestia.json';
@@ -148,7 +149,7 @@ export class Editor {
     if (v) this.setViewport(panBy(v, dx, dy));
   }
 
-  resolved(levelId: Id): ResolvedLevel { return this.fluxo.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId); }
+  resolved(levelId: Id, exigirExato = true): ResolvedLevel { return this.fluxo.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId, exigirExato); }
 
   /** Libera os caches de um nível (viewport da planta e resolução). Chamado ao fechar uma aba de planta. */
   releaseLevel(levelId: Id): void {

@@ -83,7 +83,8 @@ export class SectionTool extends ToolBase {
         : {}),
     };
     this.env.exec({ type: 'addView', view });
+    this.env.openView?.(view.id);
     this.env.done();
-    this.env.say(`${view.name} criado. Duplo clique no navegador abre o corte.`);
+    this.env.say(`${view.name} criado e aberto. Para voltar à planta, use a aba da planta.`);
   }
 }

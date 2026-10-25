@@ -70,6 +70,7 @@ export class Editor {
     gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
     say: (m) => useUi.setState({ status: m }),
     done: () => this.setTool('select'),
+    openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
     roofEdge: () => useUi.getState().roofEdge, setRoofEdge: (sel) => useUi.setState({ roofEdge: sel }),
   };

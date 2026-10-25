@@ -2,27 +2,29 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildFloorSchedule, filterFloorRows, floorScheduleToCsv, sumFloorRows, type FloorScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 
 interface Col {
   key: keyof FloorScheduleRow;
-  label: string;
+  /** Chave do rótulo em I18N (PT/EN). */
+  labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
 }
 
 const COLS: Col[] = [
-  { key: 'mark', label: 'Marca' },
-  { key: 'typeName', label: 'Tipo' },
-  { key: 'typeCode', label: 'Código' },
-  { key: 'levelName', label: 'Nível' },
-  { key: 'area', label: 'Área (m²)', decimals: 2 },
-  { key: 'perimeter', label: 'Perímetro (m)', decimals: 2 },
-  { key: 'thickness', label: 'Espessura (m)', decimals: 3 },
-  { key: 'volume', label: 'Volume (m³)', decimals: 3 },
-  { key: 'heightOffset', label: 'Deslocamento (m)', decimals: 3 },
+  { key: 'mark', labelKey: 'col_mark' },
+  { key: 'typeName', labelKey: 'col_type' },
+  { key: 'typeCode', labelKey: 'col_code' },
+  { key: 'levelName', labelKey: 'col_level' },
+  { key: 'area', labelKey: 'col_area', decimals: 2 },
+  { key: 'perimeter', labelKey: 'col_perimeter', decimals: 2 },
+  { key: 'thickness', labelKey: 'col_thickness', decimals: 3 },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'heightOffset', labelKey: 'col_offset', decimals: 3 },
 ];
 
 interface Sort {
@@ -30,7 +32,9 @@ interface Sort {
   dir: 1 | -1;
 }
 
-const fmt = (v: number, decimals: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
+const fmt = (v: number, decimals: number): string =>
+  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: FloorScheduleRow, b: FloorScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -47,6 +51,7 @@ const cellValue = (r: FloorScheduleRow, c: Col): ReactNode => {
 /** Tabela de pisos com ordenação, filtros por nível e tipo, totais e exportação CSV (padrão da tabela de paredes). */
 export function FloorScheduleDialog(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const schedule = useMemo(() => buildFloorSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -79,34 +84,34 @@ export function FloorScheduleDialog(): ReactElement {
 
   return (
     <Dialog
-      title="Tabela de pisos"
-      sub={`${visible.length} de ${schedule.rows.length} pisos`}
+      title={t.sched_title_floor}
+      sub={`${visible.length} ${t.sched_of} ${schedule.rows.length} ${t.sched_noun_floor}`}
       onClose={close}
       footer={
         <>
           <span className="wsched-msg" role="status">{msg}</span>
-          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title="Exporta as linhas filtradas, na ordem da tabela">
-            Exportar CSV
+          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title={t.sched_export_tip}>
+            {t.sched_export_csv}
           </button>
-          <button className="btn" onClick={close}>Fechar</button>
+          <button className="btn" onClick={close}>{t.sched_close}</button>
         </>
       }
     >
       <div className="wsched-bar">
-        <label htmlFor="fsc-level">Nível</label>
+        <label htmlFor="fsc-level">{t.col_level}</label>
         <select id="fsc-level" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
-          <option value="">Todos os níveis</option>
+          <option value="">{t.sched_all_levels}</option>
           {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
-        <label htmlFor="fsc-type">Tipo</label>
+        <label htmlFor="fsc-type">{t.col_type}</label>
         <select id="fsc-type" className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          <option value="">{t.sched_all_types}</option>
+          {types.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
         </select>
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há pisos neste projeto.' : 'Nenhum piso com estes filtros.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? t.sched_empty_floor : t.sched_none_floor}</p>
       ) : (
         <>
           <div className="wsched-scroll">
@@ -115,8 +120,8 @@ export function FloorScheduleDialog(): ReactElement {
                 <tr>
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title="Ordenar por esta coluna">
-                        {c.label}
+                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
+                        {t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -137,11 +142,11 @@ export function FloorScheduleDialog(): ReactElement {
             </table>
           </div>
           <div className="total">
-            <span>{totals.count} {totals.count === 1 ? 'piso' : 'pisos'}</span>
-            <span>Área {fmt(totals.area, 2)} m²</span>
-            <span>Perímetro {fmt(totals.perimeter, 2)} m</span>
-            <span>Volume {fmt(totals.volume, 3)} m³</span>
-            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>Volume bruto {fmt(totals.grossVolume, 3)} m³</span>}
+            <span>{totals.count} {totals.count === 1 ? t.sched_noun_floor_one : t.sched_noun_floor}</span>
+            <span>{t.sched_total_area} {fmt(totals.area, 2)} m²</span>
+            <span>{t.sched_total_perimeter} {fmt(totals.perimeter, 2)} m</span>
+            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
+            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>{t.sched_total_gross_volume} {fmt(totals.grossVolume, 3)} m³</span>}
           </div>
         </>
       )}

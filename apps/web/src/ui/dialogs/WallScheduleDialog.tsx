@@ -2,30 +2,32 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildWallSchedule, scheduleToCsv, sumWallRows, type WallScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 
 interface Col {
   key: keyof WallScheduleRow;
-  label: string;
+  /** Chave do rótulo em I18N (PT/EN). */
+  labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
   sortable?: boolean;
 }
 
 const COLS: Col[] = [
-  { key: 'mark', label: 'Marca' },
-  { key: 'typeName', label: 'Tipo' },
-  { key: 'levelName', label: 'Nível' },
-  { key: 'thickness', label: 'Espessura (m)', decimals: 3 },
-  { key: 'length', label: 'Comprimento (m)', decimals: 2 },
-  { key: 'height', label: 'Altura (m)', decimals: 2 },
-  { key: 'grossFaceArea', label: 'Área bruta (m²)', decimals: 2 },
-  { key: 'openingsArea', label: 'Vãos (m²)', decimals: 2 },
-  { key: 'netFaceArea', label: 'Área líquida (m²)', decimals: 2 },
-  { key: 'volume', label: 'Volume (m³)', decimals: 3 },
-  { key: 'layersSummary', label: 'Camadas (cm)', sortable: false },
+  { key: 'mark', labelKey: 'col_mark' },
+  { key: 'typeName', labelKey: 'col_type' },
+  { key: 'levelName', labelKey: 'col_level' },
+  { key: 'thickness', labelKey: 'col_thickness', decimals: 3 },
+  { key: 'length', labelKey: 'col_length', decimals: 2 },
+  { key: 'height', labelKey: 'col_height', decimals: 2 },
+  { key: 'grossFaceArea', labelKey: 'col_gross_area', decimals: 2 },
+  { key: 'openingsArea', labelKey: 'col_openings_area', decimals: 2 },
+  { key: 'netFaceArea', labelKey: 'col_net_area', decimals: 2 },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'layersSummary', labelKey: 'col_layers', sortable: false },
 ];
 
 interface Sort {
@@ -33,7 +35,9 @@ interface Sort {
   dir: 1 | -1;
 }
 
-const fmt = (v: number, decimals: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
+const fmt = (v: number, decimals: number): string =>
+  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: WallScheduleRow, b: WallScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -50,6 +54,7 @@ const cellValue = (r: WallScheduleRow, c: Col): ReactNode => {
 /** Tabela de paredes com ordenação, filtros por nível e tipo, totais e exportação CSV. */
 export function WallScheduleDialog(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const schedule = useMemo(() => buildWallSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -82,34 +87,34 @@ export function WallScheduleDialog(): ReactElement {
 
   return (
     <Dialog
-      title="Tabela de paredes"
-      sub={`${visible.length} de ${schedule.rows.length} paredes`}
+      title={t.sched_title_wall}
+      sub={`${visible.length} ${t.sched_of} ${schedule.rows.length} ${t.sched_noun_wall}`}
       onClose={close}
       footer={
         <>
           <span className="wsched-msg" role="status">{msg}</span>
-          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title="Exporta as linhas filtradas, na ordem da tabela">
-            Exportar CSV
+          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title={t.sched_export_tip}>
+            {t.sched_export_csv}
           </button>
-          <button className="btn" onClick={close}>Fechar</button>
+          <button className="btn" onClick={close}>{t.sched_close}</button>
         </>
       }
     >
       <div className="wsched-bar">
-        <label htmlFor="wsc-level">Nível</label>
+        <label htmlFor="wsc-level">{t.col_level}</label>
         <select id="wsc-level" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
-          <option value="">Todos os níveis</option>
+          <option value="">{t.sched_all_levels}</option>
           {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
-        <label htmlFor="wsc-type">Tipo</label>
+        <label htmlFor="wsc-type">{t.col_type}</label>
         <select id="wsc-type" className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          <option value="">{t.sched_all_types}</option>
+          {types.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
         </select>
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há paredes neste projeto.' : 'Nenhuma parede com estes filtros.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? t.sched_empty_wall : t.sched_none_wall}</p>
       ) : (
         <>
           <div className="wsched-scroll">
@@ -119,10 +124,10 @@ export function WallScheduleDialog(): ReactElement {
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                       {c.sortable === false ? (
-                        c.label
+                        t[c.labelKey]
                       ) : (
-                        <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title="Ordenar por esta coluna">
-                          {c.label}
+                        <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
+                          {t[c.labelKey]}
                           {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                         </button>
                       )}
@@ -144,21 +149,21 @@ export function WallScheduleDialog(): ReactElement {
             </table>
           </div>
           <div className="total">
-            <span>{totals.count} {totals.count === 1 ? 'parede' : 'paredes'}</span>
-            <span>Comprimento {fmt(totals.length, 2)} m</span>
-            <span>Área líquida {fmt(totals.netFaceArea, 2)} m²</span>
-            <span>Volume {fmt(totals.volume, 3)} m³</span>
-            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>Volume bruto {fmt(totals.grossVolume, 3)} m³</span>}
+            <span>{totals.count} {totals.count === 1 ? t.sched_noun_wall_one : t.sched_noun_wall}</span>
+            <span>{t.sched_total_length} {fmt(totals.length, 2)} m</span>
+            <span>{t.sched_total_net_area} {fmt(totals.netFaceArea, 2)} m²</span>
+            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
+            {Math.abs(totals.grossVolume - totals.volume) > 1e-9 && <span>{t.sched_total_gross_volume} {fmt(totals.grossVolume, 3)} m³</span>}
           </div>
         </>
       )}
 
-      <h3 className="wsched-h">Volume por material (projeto inteiro, sem filtros)</h3>
+      <h3 className="wsched-h">{t.sched_material_volume}</h3>
       <table className="layers">
         <thead>
           <tr>
-            <th>Material</th>
-            <th className="num">Volume (m³)</th>
+            <th>{t.sched_material}</th>
+            <th className="num">{t.col_volume}</th>
           </tr>
         </thead>
         <tbody>

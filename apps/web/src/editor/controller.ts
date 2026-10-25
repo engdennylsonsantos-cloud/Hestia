@@ -17,6 +17,7 @@ import {
 } from '@hestia/model';
 import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
+import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts';
 import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
@@ -385,12 +386,8 @@ export class Editor {
     return done;
   }
 
-  undo(): void {
-    this.store.undo();
-  }
-  redo(): void {
-    this.store.redo();
-  }
+  undo(): void { desfazerOuRefazer(this.store, 'undo'); }
+  redo(): void { desfazerOuRefazer(this.store, 'redo'); }
 
   /**
    * Cotas automáticas da planta (camadas por lado: aberturas → paredes → contorno → total). As cotas entram como

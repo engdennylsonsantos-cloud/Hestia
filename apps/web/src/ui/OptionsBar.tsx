@@ -197,6 +197,7 @@ export function OptionsBar(): ReactElement {
               min={0.01}
               strictRange
               onInvalid={(texto) => useUi.setState({ status: `Distância inválida (${texto.trim() || 'vazia'}): digite um valor em metros, maior que zero. Mantida: ${o.offsetDistance.toFixed(2).replace('.', ',')} m.` })}
+              onValid={() => { if (useUi.getState().status.startsWith('Distância inválida')) useUi.setState({ status: 'Pronto.' }); }}
             />
           </label>
           <Check id="opt-ocopy" checked={o.offsetCopy} onChange={(v) => set({ offsetCopy: v })}>Copiar</Check>

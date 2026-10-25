@@ -24,12 +24,14 @@ interface NumProps {
   onClear?: () => void;
   /** Texto que não é número, ou valor fora de min/max com `strictRange`: avisa, em vez de corrigir em silêncio. */
   onInvalid?: (texto: string) => void;
+  /** Texto novo aceito (mesmo que o valor não mude): serve para limpar um aviso antigo. */
+  onValid?: () => void;
   /** Com `strictRange`, valor fora de min/max é recusado (volta o último valor válido) em vez de ser limitado. */
   strictRange?: boolean;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, strictRange }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange }: NumProps): ReactElement {
   const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -57,6 +59,8 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
     if (min !== undefined) v = Math.max(min, v);
     if (max !== undefined) v = Math.min(max, v);
     if (value === null || Math.abs(v - value) > 1e-9 || mixed) onCommit(v);
+    // Texto diferente do exibido: é um valor digitado de novo (o texto restaurado após um aviso não conta).
+    if (text !== show(value)) onValid?.();
     setText(fmt(v * scale, decimals));
   };
   return (

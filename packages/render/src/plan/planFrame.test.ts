@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type * as THREE from 'three';
 import { resolveLevel } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeWall, type Project } from '@hestia/model';
 import { buildPlanGeometry, buildPlanOverlay, planGeometrySelection, type PlanInput } from './build.ts';
@@ -32,6 +33,9 @@ function ops(count: { g: number; o: number }) {
 const slotMeshes = (scene: PlanScene): unknown[][] => scene.scene.children.map((g) => [...g.children]);
 /** Mesmas malhas, na mesma ordem (identidade, não igualdade estrutural). */
 const sameMeshes = (a: unknown[], b: unknown[]): boolean => a.length === b.length && a.every((m, i) => m === b[i]);
+/** Versão do buffer de posições de cada malha, por camada: só sobe quando a camada é reescrita (as malhas são reaproveitadas). */
+const versoesDasPosicoes = (scene: PlanScene): number[][] =>
+  scene.scene.children.map((g) => g.children.map((m) => ((m as THREE.Mesh).geometry.getAttribute('position') as THREE.BufferAttribute).version));
 
 describe('quadro da planta (PlanFrame)', () => {
   it('pan dentro da área coberta não refaz a geometria nem a sobreposição (as malhas ficam as mesmas)', () => {
@@ -58,12 +62,18 @@ describe('quadro da planta (PlanFrame)', () => {
     const { geometry, overlay } = ops(count);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g1', overlayKey: 'o1', geometry, overlay });
     const before = slotMeshes(scene);
+    const versoesAntes = versoesDasPosicoes(scene);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g1', overlayKey: 'o2', geometry, overlay });
     expect(count).toEqual({ g: 1, o: 2 });
     const after = slotMeshes(scene);
     expect(sameMeshes(after[0]!, before[0]!)).toBe(true);
     expect(sameMeshes(after[3]!, before[3]!)).toBe(true);
-    expect(sameMeshes(after[4]!, before[4]!)).toBe(false);
+    // A sobreposição é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
+    expect(sameMeshes(after[4]!, before[4]!)).toBe(true);
+    const versoesDepois = versoesDasPosicoes(scene);
+    expect(versoesDepois[0]).toEqual(versoesAntes[0]);
+    expect(versoesDepois[3]).toEqual(versoesAntes[3]);
+    expect(versoesDepois[4]![0]).not.toBe(versoesAntes[4]![0]);
     scene.dispose();
   });
 

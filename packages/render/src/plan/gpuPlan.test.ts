@@ -46,6 +46,72 @@ describe('PlanScene: poucas malhas por quadro (draw calls)', () => {
   }, 60_000);
 });
 
+/**
+ * Triângulos desenhados de cada malha, por camada, na ordem da cena: as posições pelos índices, até a faixa de desenho, com
+ * a cor, o alfa e a ordem. Duas cenas com a mesma imagem têm a mesma lista (buffers reaproveitados não aparecem aqui).
+ */
+function triangulosDaCena(scene: PlanScene): unknown[][] {
+  return (scene.scene.children as THREE.Group[]).map((g) =>
+    (g.children as THREE.Mesh[]).map((m) => {
+      const geo = m.geometry;
+      const pos = geo.getAttribute('position').array;
+      const idx = geo.index!.array;
+      const n = geo.drawRange.count;
+      const mat = m.material as THREE.MeshBasicMaterial;
+      return {
+        ordem: m.renderOrder,
+        cor: mat.color.getHexString(),
+        alfa: mat.opacity,
+        vertices: Array.from(idx.slice(0, n), (k) => [pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]].join(',')),
+      };
+    }),
+  );
+}
+
+describe('PlanScene: atualização incremental igual à recriação completa', () => {
+  it('uma sequência de mudanças (geometria, seleção, zoom, nível, grade) dá a mesma imagem que uma cena nova em cada passo', () => {
+    const p = buildTemplate('predio10');
+    const paredeLv5 = Object.values(p.elements).find((e) => e.kind === 'wall' && 'levelId' in e && e.levelId === 'lv_5')!.id;
+    const base: PlanViewState = {
+      project: p,
+      version: 1,
+      levelId: 'lv_5',
+      v: { cx: 10, cy: 6.5, zoom: 60, width: 1200, height: 800 },
+      theme: LIGHT,
+      dark: false,
+      gpu: true,
+      showGrid: true,
+      showUnderlay: true,
+      showRoofProjection: true,
+      thinLines: false,
+      selection: [],
+      hover: null,
+      preview: [],
+      inference: null,
+      resolve: (id) => resolveLevel(p, id, new Map()),
+    };
+    const passos: PlanViewState[] = [
+      base,
+      { ...base, hover: paredeLv5 },
+      { ...base, hover: paredeLv5, selection: [paredeLv5] },
+      { ...base, selection: [paredeLv5], v: { ...base.v, zoom: 80 } },
+      { ...base, selection: [paredeLv5], v: { ...base.v, zoom: 80 }, levelId: 'lv_4', resolve: (id) => resolveLevel(p, id, new Map()) },
+      { ...base, selection: [paredeLv5], v: { ...base.v, zoom: 80 }, levelId: 'lv_4', showGrid: false },
+      { ...base, levelId: 'lv_5', version: 2, v: { ...base.v, zoom: 40 } },
+    ];
+    const incremental = new PlanScene();
+    const quadro = new PlanFrame(incremental);
+    for (const [i, estado] of passos.entries()) {
+      quadro.update(planFrameUpdateOf(estado));
+      const completa = new PlanScene();
+      new PlanFrame(completa).update(planFrameUpdateOf(estado));
+      expect(triangulosDaCena(incremental), `passo ${i}`).toEqual(triangulosDaCena(completa));
+      completa.dispose();
+    }
+    incremental.dispose();
+  }, 60_000);
+});
+
 describe('PlanScene: ordem de desenho segue a lista (como o CPU)', () => {
   it('a parede (preenchimento sólido posterior) fica depois da hachura da laje, e todo material é transparente', () => {
     // Laje com hachura no retângulo grande, parede (sólida, posterior na lista) cobrindo parte dele.

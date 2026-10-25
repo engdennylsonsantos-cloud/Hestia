@@ -14,8 +14,28 @@ export const wallsOnLevel = (p: Project, levelId: Id): Wall[] =>
     .filter((w) => w.levelId === levelId)
     .sort((a, b) => a.order - b.order);
 
-export const openingsOfWall = (p: Project, wallId: Id): Opening[] =>
-  Object.values(p.elements).filter(isOpening).filter((o) => o.hostId === wallId);
+/**
+ * Aberturas de cada parede por snapshot do projeto (o motor é imutável: elemento novo vem com projeto novo). Monta-se
+ * numa só passagem; antes, cada chamada varria `p.elements` inteiro (paredes × elementos em cada nível).
+ */
+const aberturasPorParede = new WeakMap<Project, Map<Id, Opening[]>>();
+
+function aberturasDoProjeto(p: Project): Map<Id, Opening[]> {
+  const hit = aberturasPorParede.get(p);
+  if (hit) return hit;
+  const porParede = new Map<Id, Opening[]>();
+  for (const e of Object.values(p.elements)) {
+    if (!isOpening(e)) continue;
+    const lista = porParede.get(e.hostId);
+    if (lista) lista.push(e);
+    else porParede.set(e.hostId, [e]);
+  }
+  aberturasPorParede.set(p, porParede);
+  return porParede;
+}
+
+/** Aberturas da parede, na ordem do projeto. A lista devolvida é cópia: quem a altera não mexe no índice. */
+export const openingsOfWall = (p: Project, wallId: Id): Opening[] => [...(aberturasDoProjeto(p).get(wallId) ?? [])];
 
 export const wallType = (p: Project, w: Wall): WallType => {
   const t = p.wallTypes[w.typeId] ?? p.wallTypes[p.defaults.wallTypeId];

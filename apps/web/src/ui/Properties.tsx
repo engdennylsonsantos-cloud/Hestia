@@ -44,6 +44,7 @@ import { RoomProperties } from './RoomProperties.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
+import { changeOpeningType } from '../editor/openingTypeActions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -235,7 +236,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
         selectedId={typeId.mixed ? null : typeId.value}
         disabled={!kind}
         editDisabled={typeId.mixed}
-        onSelect={(id) => patch(ids, { typeId: id })}
+        onSelect={(id) => changeOpeningType(editor.store, ids, id, (m) => useUi.setState({ status: m }))}
         onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: typeId.value })}
       />
       <Group title="Restrições">

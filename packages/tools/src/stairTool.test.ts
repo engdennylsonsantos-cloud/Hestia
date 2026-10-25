@@ -53,7 +53,7 @@ describe('ferramenta Escada: croqui reto por cliques', () => {
     expect(runOf(s!).boundaryLeft).toHaveLength(1);
     expect(ctx.done()).toBe(1);
     // Nível de topo: lv_1 (3 m) → H = 3 m; 3 espelhos ficam abaixo do máximo? Não: 1 m > 0,18 m, então é aviso.
-    expect(ctx.last()).toMatch(/Escada criada: 3 espelhos/);
+    expect(ctx.last()).toMatch(/Escada criada com 3 de 17 espelhos: faltam 14 para chegar ao nível de cima/);
     expect(ctx.last()).toMatch(/Aviso/);
   });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { stairsOnLevel } from '@hestia/model';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 import { StairTool } from './stairTool.ts';
 import { missingText } from './stairSketchState.ts';
@@ -12,6 +13,8 @@ function setup() {
   ctx.options.stair = {};
   return { ...ctx, last: () => msgs[msgs.length - 1] ?? '' };
 }
+
+const stairsOf = (store: { project: Parameters<typeof stairsOnLevel>[0] }) => stairsOnLevel(store.project, 'lv_0');
 
 /** Limites de teste: esquerdo em y = 0,5 e direito em y = −0,5, de x = −0,5 a 5 (padrão de `stairTool.test.ts`). */
 function boundaries(t: StairTool): void {
@@ -70,7 +73,18 @@ describe('ferramenta Escada: espelhos faltando e tolerância dos limites (frente
     expect(t.status().remaining).toBe(15);
     expect(missingText(t.status())).toBe('Faltam 15 espelhos para concluir (de 17).');
     t.setSubmode('concluir');
-    expect(ctx.last()).toMatch(/^Escada criada: 2 espelhos\. Faltam 15 espelhos para concluir \(de 17\)\./);
+    expect(ctx.last()).toMatch(/^Escada criada com 2 de 17 espelhos: faltam 15 para chegar ao nível de cima\. Edite o croqui para completar\./);
+  });
+
+  it('D2: Enter com espelhos faltando conclui como Concluir, com a mesma mensagem coerente', () => {
+    const ctx = setup();
+    const t = tool('stair', ctx.env) as StairTool;
+    boundaries(t);
+    risers(t, Array.from({ length: 11 }, (_, i) => i * 0.2), -0.7, 0.7);
+    t.confirm();
+    expect(ctx.done()).toBe(1);
+    expect(stairsOf(ctx.store)).toHaveLength(1);
+    expect(ctx.last()).toMatch(/^Escada criada com 11 de 17 espelhos: faltam 6 para chegar ao nível de cima\. Edite o croqui para completar\. /);
   });
 
   it('17 espelhos clicados a 0,2 m dos limites ligam os dois (captura de 0,4 m) e concluem', () => {

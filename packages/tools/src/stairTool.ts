@@ -30,10 +30,13 @@ import { DEFAULT_SNAP, type PointerInfo, type PreviewItem, type Tool } from './t
 
 const HINT = 'Escada: desenhe o limite esquerdo; Enter passa ao direito e outro Enter vai a Espelhos. Esc cancela a cadeia; outro Esc descarta o croqui.';
 
-/** A conta dos espelhos que faltam, com espaço no fim (vazia se não faltam). Concluir grava mesmo assim: é aviso. */
-const missingPrefix = (rep: DraftReport): string => {
-  const m = missingText(rep);
-  return m ? `${m} ` : '';
+/**
+ * Mensagem de Concluir (Enter nos espelhos faz o mesmo): com espelhos faltando, diz a conta e como completar. Concluir
+ * não bloqueia (há croquis parciais de propósito), então o aviso tem de bater com o que foi criado.
+ */
+const concluirText = (rep: DraftReport, base: 'Escada criada' | 'Croqui atualizado'): string => {
+  if (!missingText(rep)) return `${base}${base === 'Escada criada' ? `: ${rep.created} espelhos` : ''}. `;
+  return `${base} com ${rep.created} de ${rep.desired} espelhos: faltam ${rep.remaining} para chegar ao nível de cima. Edite o croqui para completar. `;
 };
 
 /** Estado do croqui para a interface: a análise, o contador, o sub-modo e "Pegar linhas". */
@@ -249,9 +252,9 @@ export class StairTool extends ToolBase {
     return this.st.submode !== 'concluir' && this.st.stroke.prim === 'line' && this.st.stroke.last !== null ? 'Comprimento' : null;
   }
 
-  /** Enter: fecha o limite, a caminhada ou o patamar; em Concluir, grava. */
+  /** Enter: fecha o limite, a caminhada ou o patamar; em Concluir, grava. Nos espelhos (sem traçado), Enter é Concluir. */
   override confirm(): void {
-    if (this.st.submode === 'concluir') {
+    if (this.st.submode === 'concluir' || (this.st.submode === 'espelhos' && !strokeBusy(this.st.stroke))) {
       this.finish();
       return;
     }
@@ -484,13 +487,13 @@ export class StairTool extends ToolBase {
       const r = updateStairComponents(this.env, this.stairId, kept);
       if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
       this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
-      this.env.say(`Croqui atualizado. ${missingPrefix(r.report)}${warningText(r.report)}Ctrl+Z desfaz.`);
+      this.env.say(`${concluirText(r.report, 'Croqui atualizado')}${warningText(r.report)}Ctrl+Z desfaz.`);
       return;
     }
     const r = createStairFromComponents(this.env, components, this.creationOptions());
     if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
     this.env.done();
-    this.env.say(`Escada criada: ${r.report.created} espelhos. ${missingPrefix(r.report)}${warningText(r.report)}Ctrl+Z desfaz.`);
+    this.env.say(`${concluirText(r.report, 'Escada criada')}${warningText(r.report)}Ctrl+Z desfaz.`);
   }
 }
 

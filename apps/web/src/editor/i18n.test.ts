@@ -19,8 +19,8 @@ describe('rótulos de ferramenta', () => {
     expect(toolLabel('section', 'en')).toBe('Section');
   });
 
-  it('Extrusão de telhado e Separador de ambiente têm rótulo nos dois idiomas', () => {
-    expect(toolLabel('roofextrusion', 'pt')).toBe('Extrusão de telhado');
+  it('Telhado por extrusão e Separador de ambiente têm rótulo nos dois idiomas', () => {
+    expect(toolLabel('roofextrusion', 'pt')).toBe('Telhado por extrusão');
     expect(toolLabel('roofextrusion', 'en')).toBe('Roof by Extrusion');
     expect(toolLabel('roomsep', 'en')).toBe('Room Separator');
   });

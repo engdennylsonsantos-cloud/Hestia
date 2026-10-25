@@ -57,11 +57,13 @@ function triangulosDaCena(scene: PlanScene): unknown[][] {
       const pos = geo.getAttribute('position').array;
       const idx = geo.index!.array;
       const n = geo.drawRange.count;
-      const mat = m.material as THREE.MeshBasicMaterial;
+      const mat = m.material as THREE.MeshBasicMaterial | THREE.ShaderMaterial;
+      // Traço usa o shader (cor e alfa nos uniforms); preenchimento usa o material básico.
+      const uni = 'uniforms' in mat ? mat.uniforms : null;
       return {
         ordem: m.renderOrder,
-        cor: mat.color.getHexString(),
-        alfa: mat.opacity,
+        cor: uni ? (uni.uCor!.value as THREE.Color).getHexString() : (mat as THREE.MeshBasicMaterial).color.getHexString(),
+        alfa: uni ? (uni.uAlfa!.value as number) : mat.opacity,
         vertices: Array.from(idx.slice(0, n), (k) => [pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]].join(',')),
       };
     }),

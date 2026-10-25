@@ -3,6 +3,7 @@ import type * as THREE from 'three';
 import { visibleBounds, type Viewport } from '../viewport.ts';
 import { PlanScene } from './gpuPlan.ts';
 import { gridStrokes } from './grid.ts';
+import { rasterizarCena } from './rasterSoftware.ts';
 import { DARK, LIGHT, type PlanTheme, type StrokeOp } from './types.ts';
 
 const W = 320;
@@ -33,65 +34,11 @@ function malhasDaGrade(scene: PlanScene): THREE.Mesh[] {
   return grupo.children as THREE.Mesh[];
 }
 
-/**
- * Rasteriza as malhas da cena em `W × H` pixels, na ordem de `renderOrder`, com a mistura alfa de cada material: a imagem
- * depende da ordem dos triângulos que se sobrepõem, como na GPU. Só lê a câmera e os materiais (sem three.js renderer).
- */
-function rasterizar(scene: PlanScene, v: Viewport): Float64Array {
-  scene.setViewport(v);
-  const cam = scene.camera;
-  const esq = cam.position.x + cam.left;
-  const dir = cam.position.x + cam.right;
-  const topo = cam.position.y + cam.top;
-  const base = cam.position.y + cam.bottom;
-  const buf = new Float64Array(W * H * 3).fill(1);
-  const malhas = (scene.scene.children as THREE.Group[]).flatMap((g) => g.children as THREE.Mesh[]).sort((a, b) => a.renderOrder - b.renderOrder);
-  for (const m of malhas) {
-    const pos = m.geometry.getAttribute('position');
-    const idx = m.geometry.getIndex()!;
-    const mat = m.material as THREE.MeshBasicMaterial;
-    const { r, g, b } = mat.color;
-    const a = mat.opacity;
-    const px = (i: number): number => ((pos.getX(i) - esq) / (dir - esq)) * W;
-    const py = (i: number): number => ((topo - pos.getY(i)) / (topo - base)) * H;
-    for (let t = 0; t < idx.count; t += 3) {
-      const [i0, i1, i2] = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)];
-      const [x0, y0, x1, y1, x2, y2] = [px(i0), py(i0), px(i1), py(i1), px(i2), py(i2)];
-      const area = edge(x0, y0, x1, y1, x2, y2);
-      if (area === 0) continue;
-      const x0m = Math.max(0, Math.floor(Math.min(x0, x1, x2)));
-      const x1m = Math.min(W - 1, Math.ceil(Math.max(x0, x1, x2)));
-      const y0m = Math.max(0, Math.floor(Math.min(y0, y1, y2)));
-      const y1m = Math.min(H - 1, Math.ceil(Math.max(y0, y1, y2)));
-      for (let y = y0m; y <= y1m; y++) {
-        for (let x = x0m; x <= x1m; x++) {
-          const cx = x + 0.5;
-          const cy = y + 0.5;
-          const w0 = edge(x1, y1, x2, y2, cx, cy) / area;
-          const w1 = edge(x2, y2, x0, y0, cx, cy) / area;
-          const w2 = edge(x0, y0, x1, y1, cx, cy) / area;
-          if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-          const k = (y * W + x) * 3;
-          buf[k] = r * a + buf[k]! * (1 - a);
-          buf[k + 1] = g * a + buf[k + 1]! * (1 - a);
-          buf[k + 2] = b * a + buf[k + 2]! * (1 - a);
-        }
-      }
-    }
-  }
-  return buf;
-}
-
-/** Função de aresta: positiva de um lado da reta de (ax, ay) a (bx, by), negativa do outro. */
-function edge(ax: number, ay: number, bx: number, by: number, px: number, py: number): number {
-  return (bx - ax) * (py - ay) - (by - ay) * (px - ax);
-}
-
 /** Grade de uma vista (com a cena da grade montada) e a imagem rasterizada dela. */
 function cena(strokes: StrokeOp[], v: Viewport): { scene: PlanScene; imagem: Float64Array } {
   const scene = new PlanScene();
   scene.setSlot('grid', [], strokes, v);
-  return { scene, imagem: rasterizar(scene, v) };
+  return { scene, imagem: rasterizarCena(scene, v, W, H) };
 }
 
 const vistas = (zoom: number, cx = 4, cy = 3): Viewport => ({ cx, cy, zoom, width: W, height: H });

@@ -25,22 +25,28 @@ function geometriaVazia(): THREE.BufferGeometry {
 }
 
 /**
- * Escreve as posições de um lote no buffer da geometria. Com capacidade suficiente, reaproveita o buffer e envia só o trecho
- * usado (bufferSubData, por faixa de atualização); senão, aloca um buffer com a folga. Devolve se alocou.
+ * Escreve um atributo por vértice (`itens` valores por vértice) no buffer da geometria. Com capacidade suficiente,
+ * reaproveita o buffer e envia só o trecho usado (bufferSubData, por faixa de atualização); senão, aloca com a folga.
+ * Devolve se alocou.
  */
-export function escreverPosicoes(g: THREE.BufferGeometry, pos: readonly number[]): boolean {
-  let attr = g.getAttribute('position') as THREE.BufferAttribute | undefined;
+export function escreverAtributo(g: THREE.BufferGeometry, nome: string, valores: readonly number[], itens: number): boolean {
+  let attr = g.getAttribute(nome) as THREE.BufferAttribute | undefined;
   let alocou = false;
-  if (!attr || attr.array.length < pos.length) {
-    attr = new THREE.Float32BufferAttribute(new Float32Array(capacidadeDe(pos.length)), 3);
-    g.setAttribute('position', attr);
+  if (!attr || attr.array.length < valores.length) {
+    attr = new THREE.Float32BufferAttribute(new Float32Array(capacidadeDe(valores.length)), itens);
+    g.setAttribute(nome, attr);
     alocou = true;
   }
-  (attr.array as Float32Array).set(pos);
+  (attr.array as Float32Array).set(valores);
   attr.clearUpdateRanges();
-  attr.addUpdateRange(0, pos.length);
+  attr.addUpdateRange(0, valores.length);
   attr.needsUpdate = true;
   return alocou;
+}
+
+/** Escreve as posições de um lote (três valores por vértice). Ver `escreverAtributo`. */
+export function escreverPosicoes(g: THREE.BufferGeometry, pos: readonly number[]): boolean {
+  return escreverAtributo(g, 'position', pos, 3);
 }
 
 /**
@@ -98,6 +104,11 @@ export class CamadaGpu {
       }
       escreverPosicoes(m.geometry, lote.pos);
       escreverIndices(m.geometry, lote.idx);
+      if (lote.traco) {
+        escreverAtributo(m.geometry, 'aExt', lote.traco.ext, 3);
+        escreverAtributo(m.geometry, 'aDir', lote.traco.dir, 3);
+        escreverAtributo(m.geometry, 'aPadrao', lote.traco.padrao, 2);
+      }
       m.material = this.material(lote);
       m.renderOrder = this.ordemBase + i;
     });

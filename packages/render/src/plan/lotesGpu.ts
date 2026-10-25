@@ -1,11 +1,22 @@
 import { triangulate, type Mesh2D, type Polygon, type Vec2 } from '@hestia/geom';
-import type { Viewport } from '../viewport.ts';
 import { DOT_PX, HATCH_PX, hatchSegments } from './hatch.ts';
 import type { FillOp, StrokeOp } from './types.ts';
 
 /**
+ * Atributos por vértice de um lote de traço (linhas e hachura). A espessura e o tracejado saem do shader, então a
+ * geometria não depende do zoom. Por vértice: `ext` (ao longo, lado, largura em px), `dir` (direção ux, uy e distância
+ * ao início do traço, em metros) e `padrao` (traço e período, em px; período 0 é linha inteira).
+ */
+export interface TracoGpu {
+  ext: number[];
+  dir: number[];
+  padrao: number[];
+}
+
+/**
  * Lote de uma camada da planta na GPU: os vértices (x, y, 0), os índices e a cor e o alfa do material. Lotes com a mesma
  * chave saem juntos numa malha só; a chave é `f|` (preenchimento), `h|` (hachura) ou `s|` (traço), com cor e alfa.
+ * Lote de traço tem `traco`; o de preenchimento não.
  */
 export interface LoteGpu {
   key: string;
@@ -13,6 +24,7 @@ export interface LoteGpu {
   alpha: number;
   pos: number[];
   idx: number[];
+  traco?: TracoGpu;
 }
 
 const triCache = new WeakMap<Polygon, Mesh2D>();
@@ -28,25 +40,26 @@ function tri(p: Polygon): Mesh2D {
 
 /**
  * Lotes de uma camada, na ordem em que os itens aparecem: troca de lote só quando muda cor, alfa ou tipo. Sem triângulos
- * não há lote. A ordem devolvida é a de desenho (o `renderOrder` da malha é a posição no vetor).
+ * não há lote. A ordem devolvida é a de desenho (o `renderOrder` da malha é a posição no vetor). Não depende do zoom:
+ * a espessura dos traços (em pixels de tela) é aplicada no shader.
  */
-export function montarLotesCamada(fills: readonly FillOp[], strokes: readonly StrokeOp[], v: Viewport): LoteGpu[] {
+export function montarLotesCamada(fills: readonly FillOp[], strokes: readonly StrokeOp[]): LoteGpu[] {
   const lotes: LoteGpu[] = [];
   let cur: LoteGpu | null = null;
   const flush = (): void => {
     if (cur && cur.idx.length > 0) lotes.push(cur);
     cur = null;
   };
-  const batchFor = (key: string, color: string, alpha: number): LoteGpu => {
+  const batchFor = (key: string, color: string, alpha: number, tracado: boolean): LoteGpu => {
     if (cur && cur.key === key) return cur;
     flush();
-    cur = { key, color, alpha, pos: [], idx: [] };
+    cur = tracado ? { key, color, alpha, pos: [], idx: [], traco: { ext: [], dir: [], padrao: [] } } : { key, color, alpha, pos: [], idx: [] };
     return cur;
   };
   const fillPolygon = (poly: Polygon, color: string, alpha: number): void => {
     const m = tri(poly);
     if (m.indices.length === 0) return;
-    const b = batchFor(`f|${color}|${alpha}`, color, alpha);
+    const b = batchFor(`f|${color}|${alpha}`, color, alpha, false);
     const base = b.pos.length / 3;
     for (let i = 0; i < m.positions.length; i += 2) b.pos.push(m.positions[i]!, m.positions[i + 1]!, 0);
     for (const k of m.indices) b.idx.push(base + k);
@@ -60,21 +73,19 @@ export function montarLotesCamada(fills: readonly FillOp[], strokes: readonly St
       for (const poly of f.polygons) fillPolygon(poly, color, alpha);
       continue;
     }
-    // Hachura vetorial: linhas de HATCH_PX (pontos de DOT_PX) recortadas ao contorno, com a mesma espessura em qualquer zoom.
+    // Hachura vetorial: linhas de HATCH_PX (pontos de DOT_PX) recortadas ao contorno, em pixels de tela (sem zoom).
     for (const poly of f.polygons) {
       for (const s of hatchSegments(poly, kind)) {
-        const b = batchFor(`h|${color}|${alpha}`, color, alpha);
-        quad(b, s.a, s.b, (s.dot ? DOT_PX : HATCH_PX) / v.zoom);
+        const b = batchFor(`h|${color}|${alpha}`, color, alpha, true);
+        quad(b, s.a, s.b, s.dot ? DOT_PX : HATCH_PX);
       }
     }
   }
   flush();
 
   for (const s of strokes) {
-    const b = batchFor(`s|${s.color}|${s.alpha}`, s.color, s.alpha);
-    const w = s.widthPx / v.zoom;
-    const segs = s.dash ? dashSegments(s.pts, s.closed, s.dash[0] / v.zoom, s.dash[1] / v.zoom) : edges(s.pts, s.closed);
-    for (const [p, q] of segs) quad(b, p, q, w);
+    const b = batchFor(`s|${s.color}|${s.alpha}`, s.color, s.alpha, true);
+    tracar(b, s);
   }
   flush();
   return lotes;
@@ -88,7 +99,56 @@ export function edges(pts: Vec2[], closed: boolean): Array<[Vec2, Vec2]> {
   return out;
 }
 
-/** Trechos ligados (traço de `dash`, espaço de `gap`) ao longo das arestas da polilinha. */
+/** Período do tracejado em pixels (traço e período), ou [0, 0] se a linha é inteira. */
+export function padraoDoTracejado(dash: [number, number] | undefined): [number, number] {
+  if (!dash || dash[0] <= 0 || dash[1] <= 0) return [0, 0];
+  return [dash[0], dash[0] + dash[1]];
+}
+
+/** Traço de uma polilinha (inteira ou tracejada): cada aresta vira um quad, com a distância acumulada ao início. */
+function tracar(b: LoteGpu, s: StrokeOp): void {
+  const padrao = padraoDoTracejado(s.dash);
+  let dist = 0;
+  for (const [p, q] of edges(s.pts, s.closed)) dist = quad(b, p, q, s.widthPx, dist, padrao);
+}
+
+/**
+ * Trecho de `p` a `q` como quad de quatro vértices (dois triângulos). Os vértices guardam o ponto de extremo, o lado e a
+ * largura em pixels; o shader desloca cada um em tela (meia espessura para os lados e a ponta de meia espessura nos
+ * extremos). `dist` é a distância ao início do traço até `p`, e `padrao` o tracejado (ver `padraoDoTracejado`).
+ * Devolve a distância até `q`. Trecho de comprimento zero não gera vértice.
+ */
+export function quad(b: LoteGpu, p: Vec2, q: Vec2, widthPx: number, dist = 0, padrao: [number, number] = [0, 0]): number {
+  const t = b.traco;
+  if (!t) throw new Error('quad: o lote precisa ser de traço');
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const L = Math.hypot(dx, dy);
+  if (L < 1e-12) return dist;
+  const ux = dx / L;
+  const uy = dy / L;
+  const base = b.pos.length / 3;
+  // Ordem dos vértices: (extremo, ao longo, lado), a mesma da geometria antiga em metros.
+  const corners: Array<[Vec2, number, number, number]> = [
+    [p, -1, 1, dist],
+    [p, -1, -1, dist],
+    [q, 1, -1, dist + L],
+    [q, 1, 1, dist + L],
+  ];
+  for (const [pt, along, side, d] of corners) {
+    b.pos.push(pt.x, pt.y, 0);
+    t.ext.push(along, side, widthPx);
+    t.dir.push(ux, uy, d);
+    t.padrao.push(padrao[0], padrao[1]);
+  }
+  b.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  return dist + L;
+}
+
+/**
+ * Trechos ligados (traço de `dash`, espaço de `gap`) ao longo das arestas da polilinha, em metros. Referência do tracejado
+ * antigo (quads recortados por zoom): o shader faz o mesmo recorte pelo padrão em pixels, sem refazer a geometria.
+ */
 export function dashSegments(pts: Vec2[], closed: boolean, dash: number, gap: number): Array<[Vec2, Vec2]> {
   const out: Array<[Vec2, Vec2]> = [];
   let on = true;
@@ -111,27 +171,4 @@ export function dashSegments(pts: Vec2[], closed: boolean, dash: number, gap: nu
     }
   }
   return out;
-}
-
-/**
- * Traço de espessura `w` (metros) de `p` a `q`, com ponta de meia espessura em cada extremo. Vale para linhas inteiras,
- * tracejados e hachura: a ponta evita a falha de cobertura nos cantos de contornos tracejados.
- */
-export function quad(b: LoteGpu, p: Vec2, q: Vec2, w: number): void {
-  const dx = q.x - p.x;
-  const dy = q.y - p.y;
-  const L = Math.hypot(dx, dy);
-  if (L < 1e-12) return;
-  const ux = dx / L;
-  const uy = dy / L;
-  const h = w / 2;
-  const nx = -uy * h;
-  const ny = ux * h;
-  const ax = p.x - ux * h;
-  const ay = p.y - uy * h;
-  const bx = q.x + ux * h;
-  const by = q.y + uy * h;
-  const base = b.pos.length / 3;
-  b.pos.push(ax + nx, ay + ny, 0, ax - nx, ay - ny, 0, bx - nx, by - ny, 0, bx + nx, by + ny, 0);
-  b.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }

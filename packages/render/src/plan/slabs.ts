@@ -1,8 +1,9 @@
 import { difference, multiArea, offsetMulti, type Vec2 } from '@hestia/geom';
-import { fillRegionOf, junctionLevel, resolveSlabs, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
+import { fillRegionOf, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
 import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
+import { juncaoDoNivel, lajesDoNivel } from './resolucao.ts';
 import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { holeMarkOps } from './holeMarks.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
@@ -56,9 +57,9 @@ export function slabFills(
   paint: PlanPaint = defaultPaint('slab', v.zoom),
   scale = 100,
 ): FloorOps {
-  const jl = junctionLevel(p, levelId);
+  const jl = juncaoDoNivel(p, levelId);
   return concatOps(
-    resolveSlabs(p, levelId)
+    lajesDoNivel(p, levelId)
       .filter((s) => !hidden?.has(s.slabId))
       .map((s) => slabOpsOf(p, s, theme, dark, detail, v, paint, jl.elements.get(s.slabId), scale)),
   );
@@ -107,7 +108,7 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
 
 /** Destaque de seleção e de hover das lajes (D1), no mesmo padrão dos pisos. */
 export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
-  const parts = resolveSlabs(p, levelId)
+  const parts = lajesDoNivel(p, levelId)
     .filter((s) => !hidden?.has(s.slabId))
     .map((s) => ({ id: s.slabId, polygon: s.polygon }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);

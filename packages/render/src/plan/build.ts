@@ -1,6 +1,7 @@
 import { boxOf, ringArea, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { cutLevelByJunction, frameOfWall, junctionLevel, openingGeometry, resolveStairsOnLevel, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { levelDimensions, openingsOfWall, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
+import { levelDimensions, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -128,7 +129,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   const fine = detail === 'fine';
   // Planta de forro (decisão 0021): vista para cima. Sem o que está embaixo do nível (referências apagadas) e com forros.
   // Pavimento de baixo (referência) com as paredes cortadas pela junção dele, como a planta do nível.
-  const below = up || !input.below ? null : cutLevelByJunction(input.below, junctionLevel(p, input.below.levelId));
+  const below = up || !input.below ? null : cutLevelByJunction(input.below, juncaoDoNivel(p, input.below.levelId));
 
   // Pavimento abaixo como subpiso apagado (referência): sem preenchimento no arame, linhas como antes.
   if (below) {
@@ -155,7 +156,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   }
   // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
   if (below) {
-    const bst = belowStairOps(resolveStairsOnLevel(p, below.levelId), theme);
+    const bst = belowStairOps(escadasDoNivel(p, below.levelId), theme);
     fills.push(...surfaces(bst.fills));
     if (!rp) strokes.push(...bst.strokes);
   }
@@ -218,7 +219,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   addOps(wallOps, paint.wall, true);
 
   // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
-  for (const w of rp ? [] : wallsOnLevel(p, input.levelId)) {
+  for (const w of rp ? [] : paredesDoNivel(p, input.levelId)) {
     if (hidden?.has(w.id)) continue;
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
       if (!off) continue;
@@ -232,10 +233,10 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Símbolos das aberturas (fora do grosseiro): cortadas, tracejadas acima do corte, leves abaixo; as ocultas saem.
   // Cada um com o estilo da sua categoria (porta ou janela) e a espessura de corte ou de projeção.
   if (detail !== 'coarse' && !rp) {
-    for (const w of wallsOnLevel(p, input.levelId)) {
+    for (const w of paredesDoNivel(p, input.levelId)) {
       const f = frameOfWall(p, w.id);
       if (!f) continue;
-      for (const o of openingsOfWall(p, w.id)) {
+      for (const o of aberturasDaParede(p, w.id)) {
         const g = openingGeometry(p, o, f);
         const pt = paint[g.kind];
         const sym = openingViewOps(g, view?.cls.get(o.id), theme, { cutPx: pt.cutPx, projPx: pt.projPx });

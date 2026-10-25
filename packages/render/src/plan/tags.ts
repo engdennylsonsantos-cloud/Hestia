@@ -1,6 +1,7 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingsOfWall, paperMmToPx, wallType, type Id, type Project } from '@hestia/model';
+import { paperMmToPx, wallType, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
+import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp } from './types.ts';
 import type { PlanPaint } from './style.ts';
 
@@ -44,7 +45,7 @@ export function wallTagLabels(p: Project, levelId: Id, zoom: number, paint: Plan
     const code = wallType(p, f.wall).code;
     if (!code) continue;
     const halfText = (code.length * chW) / 2 + halfPad;
-    const blocked = openingsOfWall(p, f.wall.id).map((o): [number, number] => {
+    const blocked = aberturasDaParede(p, f.wall.id).map((o): [number, number] => {
       const half = (p.openingTypes[o.typeId]?.width ?? 0) / 2;
       return [o.offset - half - halfText, o.offset + half + halfText];
     });

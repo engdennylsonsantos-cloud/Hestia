@@ -1,5 +1,6 @@
-import { resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedLevel, type ResolvedStair } from '@hestia/engine';
+import type { ResolvedLevel, ResolvedStair } from '@hestia/engine';
 import type { Id, Project } from '@hestia/model';
+import { ambientesDoNivel, escadasDoNivel, lajesDoNivel, pisosDoNivel, telhadosDoNivel } from './resolucao.ts';
 import { planStyleOf, type PlanStyle } from './style.ts';
 import { planViewOf, type PlanView } from './view.ts';
 import type { PlanInput } from './build.ts';
@@ -12,7 +13,7 @@ export function planBelowOf(p: Project, levelId: Id, resolve: (id: Id) => Resolv
   const idx = p.levels.findIndex((l) => l.id === levelId);
   if (!on || idx <= 0) return { below: null };
   const id = p.levels[idx - 1]!.id;
-  return { below: resolve(id), belowFloors: resolveFloors(p, id), belowSlabs: resolveSlabs(p, id), belowRoofs: resolveRoofs(p, id), belowRooms: resolveRooms(p, id) };
+  return { below: resolve(id), belowFloors: pisosDoNivel(p, id), belowSlabs: lajesDoNivel(p, id), belowRoofs: telhadosDoNivel(p, id), belowRooms: ambientesDoNivel(p, id) };
 }
 
 /**
@@ -47,8 +48,8 @@ export function planContext(input: PlanInput): PlanContext {
   const up = view?.range.direction === 'up';
   const geo: ResolvedLevel = view ? view.geo : input.resolved;
   const hidden = view?.hidden;
-  const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(resolveRoofs(p, input.levelId).map((r) => r.roofId));
+  const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(telhadosDoNivel(p, input.levelId).map((r) => r.roofId));
   const roofHidden = view ? hidden : roofOff;
-  const stairs = resolveStairsOnLevel(p, input.levelId).filter((s) => !hidden?.has(s.id));
+  const stairs = escadasDoNivel(p, input.levelId).filter((s) => !hidden?.has(s.id));
   return { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs };
 }

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
+import { projetoDaJuncao } from '../plan/viewContext.ts';
 import { OrbitCamera } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
 import { montarAbertura } from './aberturas3d.ts';
@@ -89,9 +90,16 @@ export class ModelScene {
   /** Sombra sob demanda: o mapa é refeito só quando `update` muda o modelo ou o sol (ver `sombras3d.ts`). */
   readonly sombra = new SombraSobDemanda();
 
-  /** `tetoMalhasBytes`: teto do cache de malhas por nível (padrão `TETO_MALHAS_BYTES`). */
-  constructor(opcoes: { tetoMalhasBytes?: number } = {}) {
+  /** Junção sobre os níveis que tocam a faixa de cada nível (`projetoDaJuncao`), como a planta. Falso: projeto inteiro (referência). */
+  private readonly reduzirJuncao: boolean;
+
+  /**
+   * `tetoMalhasBytes`: teto do cache de malhas por nível (padrão `TETO_MALHAS_BYTES`). `reduzirJuncao` (padrão verdadeiro):
+   * a junção de cada nível usa o conjunto reduzido da planta; falso usa o projeto inteiro (referência para testes).
+   */
+  constructor(opcoes: { tetoMalhasBytes?: number; reduzirJuncao?: boolean } = {}) {
     this.cache = new CacheMalhas(opcoes.tetoMalhasBytes);
+    this.reduzirJuncao = opcoes.reduzirJuncao ?? true;
     // O zoom da órbita não atravessa as paredes do modelo (a cena fornece a primeira superfície sobre o eixo de visão).
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
@@ -287,14 +295,16 @@ export class ModelScene {
     // Categoria oculta: não gera as malhas dela (decisão 0015 §2.4).
     const roofs = shown('roof') ? resolveRoofs(p, lv.levelId) : [];
     const eave = buildEaveSolids(p, roofs);
+    // Junção do nível sobre o projeto reduzido (a mesma redução da planta, `projetoDaJuncao`): o resultado é o do projeto inteiro.
+    const juncao = junctionLevel(this.reduzirJuncao ? projetoDaJuncao(p, lv.levelId) : p, lv.levelId);
     // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
     // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
     const batches: SolidBatch[] = [
       // Paredes com a junção (0023 F4): cada faixa é extrudada só nas partes que sobram dela, como o corte e a planta.
-      ...(shown('wall') ? buildLevelSolids(lv, junctionLevel(p, lv.levelId)).batches : []),
-      ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
+      ...(shown('wall') ? buildLevelSolids(lv, juncao).batches : []),
+      ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), juncao) : []),
       ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
-      ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), junctionLevel(p, lv.levelId)) : []),
+      ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
       ...buildRoofSolids(roofs),
       ...eave.batches,
       ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),

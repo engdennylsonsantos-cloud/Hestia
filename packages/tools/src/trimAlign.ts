@@ -3,6 +3,8 @@ import { frameOfWall, normalAt, pointAt, toLocal, type WallFrame } from '@hestia
 import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
+import { vizinhaCurta } from './alignNeighbors.ts';
+import { algumMudou, NADA_A_APARAR } from './trimChange.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
 import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
@@ -191,6 +193,11 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    if (!algumMudou(pr, patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
+      return;
+    }
     const frase = confirmaCanto(pr, patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of patches) this.applyPatch(id, patch);
@@ -301,6 +308,11 @@ export class TrimTool extends ToolBase {
       const cruzam = axisIntersections(axisOf(fa), axisOf(fb)).length > 0;
       this.env.say(cruzam ? 'O arco não pode ser estendido até o canto (mais de 180°).' : 'As paredes não se cruzam: não há canto.');
       this.reset();
+      return;
+    }
+    if (!algumMudou(pr, plan.patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
       return;
     }
     const frase = confirmaCanto(pr, plan.patches);
@@ -418,6 +430,12 @@ export class AlignTool extends ToolBase {
     const k = f.arc || this.ref.arc ? delta : { x: this.ref.n.x * dot(delta, this.ref.n), y: this.ref.n.y * dot(delta, this.ref.n) };
     if (Math.hypot(k.x, k.y) < 1e-6) {
       this.env.say('Já estão alinhadas.');
+      return;
+    }
+    // Uma vizinha que zeraria (ou quase) não pode: recusa e não grava nada, em vez de deixar a parede sumir.
+    const curta = vizinhaCurta(pr, this.env.levelId(), hitId, k);
+    if (curta) {
+      this.env.say(`Alinhar deixaria a parede ${curta.mark || curta.id} com comprimento zero: nada foi alterado.`);
       return;
     }
     moveWalls(this.env, [hitId], k);

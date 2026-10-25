@@ -2,7 +2,7 @@ import { len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { copyWalls, ghostBands, ghostViews, transformViews } from './edit.ts';
 import { fmtM, SelectionTool } from './transformTools.ts';
 import { parseNumber } from './numeric.ts';
-import { arraySet, commitRadial, fmtXY, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
+import { arraySet, commitRadial, fmtXY, itensSobrepostos, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
 import type { PointerInfo } from './types.ts';
 
 /**
@@ -43,6 +43,10 @@ export const arrayHint = (radial: boolean, lang: 'pt' | 'en' = 'pt'): string => 
 
 /** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
 export const AVISO_HOSPEDEIRA = TEXTOS.pt.hospedeira;
+
+/** Aviso dos itens da radial que caíram sobre elementos existentes (a cópia é feita mesmo assim). */
+const avisoSobrepostos = (itens: number[]): string =>
+  itens.length === 1 ? `O item ${itens[0]} ficou sobre um elemento existente.` : `Os itens ${itens.join(', ')} ficaram sobre elementos existentes.`;
 
 /** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
 export const AVISO_ANGULO_ZERO = TEXTOS.pt.anguloZero;
@@ -194,8 +198,13 @@ export class ArrayTool extends SelectionTool {
     if (this.soAberturas()) return this.env.say(t.hospedeira);
     const n = this.count();
     const angles = radialAngles(n, angleDeg, this.anchor());
-    commitRadial(this.env, arraySet(this.env.project(), this.env.selection()), center, angles);
-    const msg = t.resumoRadial(n, angleDeg.toFixed(1).replace('.', ','), fmtXY(center));
+    const p = this.env.project();
+    const set = arraySet(p, this.env.selection());
+    // Itens que caem sobre parede existente: o aviso sai na barra, mas a cópia é feita (só avisa, como no croqui).
+    const sobre = itensSobrepostos(p, this.env.levelId(), set, center, angles);
+    commitRadial(this.env, set, center, angles);
+    const aviso = sobre.length ? ` ${avisoSobrepostos(sobre)}` : '';
+    const msg = t.resumoRadial(n, angleDeg.toFixed(1).replace('.', ','), fmtXY(center)) + aviso;
     this.reset();
     this.env.done();
     this.env.say(msg);

@@ -1,5 +1,5 @@
-import { applyTransform, mul, type Transform, type Vec2 } from '@hestia/geom';
-import { isCeiling, newId, type Id, type Project } from '@hestia/model';
+import { applyTransform, dist, mul, type Transform, type Vec2 } from '@hestia/geom';
+import { isCeiling, isWall, newId, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { copyWalls, ghostBands, ghostViews, selectedMovables, selectedViews, transformViews } from './edit.ts';
 import type { ArrayAnchor, PreviewItem, ToolEnv } from './types.ts';
 
@@ -50,6 +50,31 @@ export function radialGhosts(env: ToolEnv, set: ArraySet, center: Vec2, angles: 
       if (isCeiling(c)) out.push({ kind: 'polygon', ring: c.boundary.map((q) => applyTransform(t, q)), dashed: true });
     }
   }
+  return out;
+}
+
+/** Tolerância, em metros, para duas paredes ocuparem o mesmo lugar (mesmas extremidades, em qualquer ordem). */
+const TOL_MESMO_LUGAR = 0.01;
+
+/**
+ * Itens da matriz radial (o original é o item 1) cuja cópia de parede cai sobre uma parede que já existe no nível, com as
+ * mesmas extremidades. Só avisa: a matriz copia assim mesmo.
+ */
+export function itensSobrepostos(p: Project, levelId: Id, set: ArraySet, center: Vec2, angles: number[]): number[] {
+  const originais = set.els.map((id) => p.elements[id]).filter(isWall);
+  const existentes = wallsOnLevel(p, levelId);
+  const mesmo = (u: Vec2, v: Vec2): boolean => dist(u, v) <= TOL_MESMO_LUGAR;
+  const out: number[] = [];
+  angles.forEach((angle, i) => {
+    if (i === 0) return;
+    const t: Transform = { kind: 'rotate', about: center, angle };
+    const cai = originais.some((w) => {
+      const a = applyTransform(t, w.a);
+      const b = applyTransform(t, w.b);
+      return existentes.some((e) => (mesmo(e.a, a) && mesmo(e.b, b)) || (mesmo(e.a, b) && mesmo(e.b, a)));
+    });
+    if (cai) out.push(i + 1);
+  });
   return out;
 }
 

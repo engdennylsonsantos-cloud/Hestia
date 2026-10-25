@@ -20,7 +20,7 @@ describe('PDF sem prancha', () => {
     const lv = s.project.levels[0]!.id;
     pranchaDaPlantaAtual(s, lv);
     expect(s.project.sheets?.length ?? 0).toBe(1);
-    s.undo();
+    // Um só Ctrl+Z desfaz a prancha e a vista juntas (não sobra prancha vazia).
     s.undo();
     expect(s.project.sheets?.length ?? 0).toBe(0);
   });

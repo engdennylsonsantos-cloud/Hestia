@@ -94,6 +94,43 @@ describe('matriz radial no motor', () => {
     expect(walls(store)).toHaveLength(4);
   });
 
+  it('item da radial que cai sobre parede existente: avisa na barra (o item N), mas copia assim mesmo', () => {
+    const { store, env, options } = makeEnv();
+    const msgs: string[] = [];
+    env.say = (m: string) => msgs.push(m);
+    drawWall(env, [0, 0], [4, 0]);
+    drawWall(env, [4, 0], [4, 3]);
+    drawWall(env, [4, 3], [0, 3]);
+    drawWall(env, [0, 3], [0, 0]);
+    const antes = walls(store).length;
+    env.setSelection(walls(store).filter((w) => w.a.y === 0 && w.b.y === 0).map((w) => w.id));
+    options.arrayKind = 'radial';
+    options.arrayCount = 2;
+    options.arrayAngle = 180;
+    options.arrayAnchor = 'second';
+    const a = tool('array', env);
+    clickAt(a, 2, 1.5); // centro no meio do retângulo: a cópia a 180° cai sobre a parede de cima
+    a.click(P(0, 0));
+    expect(walls(store)).toHaveLength(antes + 1);
+    expect(msgs.at(-1)).toContain('O item 2 ficou sobre um elemento existente.');
+  });
+
+  it('item da radial livre (sem parede no lugar) não gera aviso', () => {
+    const { store, env, options } = makeEnv();
+    const msgs: string[] = [];
+    env.say = (m: string) => msgs.push(m);
+    drawWall(env, [2, 0], [3, 0]);
+    env.setSelection([walls(store)[0]!.id]);
+    options.arrayKind = 'radial';
+    options.arrayCount = 3;
+    options.arrayAngle = 90;
+    options.arrayAnchor = 'second';
+    const a = tool('array', env);
+    clickAt(a, 0, 0);
+    a.click(P(0, 0));
+    expect(msgs.some((m) => m.includes('ficou sobre'))).toBe(false);
+  });
+
   it('a cópia leva o piso e a abertura hospedada, e tudo volta num único desfazer', () => {
     const { store, env, options } = makeEnv();
     drawWall(env, [2, 0], [3, 0]);

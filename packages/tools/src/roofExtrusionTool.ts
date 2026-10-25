@@ -80,6 +80,7 @@ export class RoofExtrusionTool extends ToolBase {
     const inf = this.snap(p);
     if (!this.startPt) {
       this.startPt = inf.point;
+      this.env.say('Canto inicial marcado: clique no canto oposto. Esc cancela.');
       return;
     }
     const a = this.startPt;

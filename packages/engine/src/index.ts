@@ -58,3 +58,4 @@ export * from './planWallCuts.ts';
 export * from './wallJunction.ts';
 export * from './autoCotas.ts';
 export * from './projectIssues.ts';
+export * from './resolveLevels.ts';

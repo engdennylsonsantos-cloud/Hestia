@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 /** Armazenamento em memória com a mesma forma do localStorage. */
 function memoria(falha = false): Storage & { dados: Map<string, string> } {
@@ -29,6 +29,11 @@ afterEach(() => {
 });
 
 describe('configuração de atalhos', () => {
+  // A primeira importação transforma o módulo inteiro (lenta sob carga): aquece antes, para os testes não estourarem o tempo.
+  beforeAll(async () => {
+    await import('./shortcutConfig.ts');
+  }, 60000);
+
   it('começa no perfil Revit, sem alterações', async () => {
     const m = await carrega(memoria());
     expect(m.useAtalhos.getState().perfil).toBe('revit');

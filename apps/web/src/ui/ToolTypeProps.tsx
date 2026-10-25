@@ -1,13 +1,13 @@
 import { useUi, type DialogKind } from '../editor/state.ts';
 import { useProject } from '../editor/controller.ts';
-import { stairTypeId } from '@hestia/tools';
+import { DEFAULT_STAIR_RUN_OPTIONS, stairTypeForShape, stairTypeId, stairTypesForShape } from '@hestia/tools';
 import type { ReactElement } from 'react';
 import { TypeSelector } from './TypeSelector.tsx';
 import { floorOptions, ceilingOptions, openingOptions, roofOptions, slabOptions, stairOptions, wallOptions } from './typeOptions.ts';
 import { setStairOpt } from './StairOptionsBar.tsx';
 
 /** Ferramentas de colocação com tipo: a paleta mostra o tipo escolhido antes de desenhar (o mesmo valor da barra de opções). */
-export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair';
+export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'stairrun';
 const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   wall: 'Colocar Parede',
   door: 'Colocar Porta',
@@ -16,7 +16,8 @@ const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   slab: 'Colocar Laje',
   ceiling: 'Colocar Forro',
   roof: 'Colocar Telhado',
-  stair: 'Colocar Escada',
+  stair: 'Colocar Escada (croqui)',
+  stairrun: 'Colocar Escada',
 };
 
 export function isToolTypeKind(tool: string): tool is ToolTypeKind {
@@ -73,6 +74,16 @@ export function ToolTypeProps({ tool }: { tool: ToolTypeKind }): ReactElement {
       return (
         <TypeSelector categoryLabel={categoryLabel} triggerId="prop-stairtype" label="Tipo de escada" options={stairOptions(p)} selectedId={sid || null}
           onSelect={(id) => setStairOpt({ typeId: id })} onEdit={() => edit('stairType', sid)} />
+      );
+    }
+    case 'stairrun': {
+      // A escada por lance (reta, L, U, leque ou caracol) só lista os tipos que servem à forma escolhida na barra de opções.
+      const run = o.stairRun ?? DEFAULT_STAIR_RUN_OPTIONS;
+      const allowed = new Set(stairTypesForShape(p, run.shape).map((t) => t.id));
+      const sid = stairTypeForShape(p, run.shape, run.typeId) ?? '';
+      return (
+        <TypeSelector categoryLabel={categoryLabel} triggerId="prop-stairruntype" label="Tipo de escada" options={stairOptions(p).filter((t) => allowed.has(t.id))} selectedId={sid || null}
+          onSelect={(id) => setOpt({ stairRun: { ...(useUi.getState().options.stairRun ?? DEFAULT_STAIR_RUN_OPTIONS), typeId: id } })} onEdit={() => edit('stairType', sid)} />
       );
     }
   }

@@ -59,8 +59,8 @@ function ToolButton({ id, primary = false, mini = false }: { id: ToolId; primary
   );
 }
 
-/** Três espaços à direita do botão Ambiente: o primeiro é o Separador de ambientes; os outros ficam reservados. */
-const ROOM_SLOTS_STYLE = { display: 'flex', flexDirection: 'column', gap: 2 } as const;
+/** Três espaços à direita do botão principal do grupo (Ambiente, Escada): o primeiro tem a ferramenta secundária; os outros ficam reservados. */
+const MINI_SLOTS_STYLE = { display: 'flex', flexDirection: 'column', gap: 2 } as const;
 const EMPTY_SLOT_STYLE = { width: 22, height: 22, boxSizing: 'border-box', border: '1px dashed currentColor', borderRadius: 'var(--r)', opacity: 0.35 } as const;
 
 /** Mesmo visual do `ToolButton`, sem ferramenta nem atalho: executa a ação e mantém a ferramenta atual. */
@@ -159,7 +159,7 @@ export function Ribbon(): ReactElement {
   ];
   void TOOL_GROUPS;
 
-  const buildTools: ToolId[] = ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope', 'stair', 'stairrun'];
+  const buildTools: ToolId[] = ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'roofarrow', 'slope'];
   const annotateTools: ToolId[] = ['dimension', 'text'];
   const modifyTools: ToolId[] = ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost'];
 
@@ -202,8 +202,20 @@ export function Ribbon(): ReactElement {
 
             <div className="rgroup">
               <div className="rgroup-tools">
+                <ToolButton id="stairrun" primary />
+                <div style={MINI_SLOTS_STYLE}>
+                  <ToolButton id="stair" mini />
+                  <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />
+                  <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />
+                </div>
+              </div>
+              <div className="rgroup-title">{t.grp_stair}</div>
+            </div>
+
+            <div className="rgroup">
+              <div className="rgroup-tools">
                 <ToolButton id="room" primary />
-                <div style={ROOM_SLOTS_STYLE}>
+                <div style={MINI_SLOTS_STYLE}>
                   <ToolButton id="roomsep" mini />
                   <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />
                   <span style={EMPTY_SLOT_STYLE} aria-hidden="true" />

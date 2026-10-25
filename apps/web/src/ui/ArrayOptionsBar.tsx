@@ -13,7 +13,8 @@ export function ArrayOptionsBar(): ReactElement {
   /** Trocar o tipo ou "Mover para" reinicia o passo em andamento (a ferramenta descarta base/centro); a barra de status volta à dica do primeiro passo. */
   const setPasso = (patch: Partial<typeof o>): void => {
     set(patch);
-    useUi.setState({ status: useUi.getState().options.arrayKind === 'radial' ? t.arr_hint_radial : t.arr_hint_linear });
+    // O passo recomeça, então o rótulo de entrada (prompt) some até o próximo clique.
+    useUi.setState({ status: useUi.getState().options.arrayKind === 'radial' ? t.arr_hint_radial : t.arr_hint_linear, prompt: null });
   };
   const radial = o.arrayKind === 'radial';
   return (

@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactElement } from 'react';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
+import { atalhoAtual } from './editor/shortcutConfig.ts';
 import { tabOf } from './editor/viewTabActions.ts';
 import { Browser } from './ui/Browser.tsx';
 import { IconDefs } from './ui/Icon.tsx';
@@ -20,6 +21,7 @@ import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
 import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
+import { ShortcutsConfigDialog } from './ui/dialogs/ShortcutsConfigDialog.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
@@ -77,6 +79,8 @@ function Dialogs(): ReactElement | null {
       return <StartDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
+    case 'shortcutsConfig':
+      return <ShortcutsConfigDialog />;
     case 'schedule':
       return <WallScheduleDialog />;
     case 'sheet':
@@ -118,7 +122,9 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (!editor.restoreAutosave()) editor.newProject('house2');
-    useUi.setState({ status: 'Pronto. Pressione W para desenhar paredes, ou selecione para editar.' });
+    // A dica usa a sequência atual da parede (depende do perfil e da personalização); sem tecla, não cita letra.
+    const parede = atalhoAtual('wall');
+    useUi.setState({ status: parede ? `Pronto. Pressione ${parede} para desenhar paredes, ou selecione para editar.` : 'Pronto. Escolha uma ferramenta, ou selecione para editar.' });
   }, []);
 
   useEffect(() => {

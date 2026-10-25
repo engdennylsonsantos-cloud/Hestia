@@ -36,7 +36,7 @@ export function RoofEdgeSection({ roof, index }: { roof: Roof; index: number }):
       <Row label="Balanço" htmlFor="p-eover">
         <NumField id="p-eover" value={roof.edgeOverhangs[index] ?? 0} onCommit={(v) => setEdgeOverhang(editor.store, roof, index, v)} unit="m" />
       </Row>
-      <div className="hint">Desligar "define inclinação" torna a aresta empena (vertical). Balanço positivo afasta a aresta do centro e move o beiral. A tecla I alterna "define inclinação".</div>
+      <div className="hint">Desligar "define inclinação" torna a aresta empena (vertical). Balanço positivo afasta a aresta do centro e move o beiral.</div>
     </Group>
   );
 }

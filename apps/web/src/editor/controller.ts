@@ -23,7 +23,7 @@ import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews } from './openViews.ts';
-import { toolForKey } from './toolKeys.ts';
+import { casador } from './shortcutConfig.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
@@ -253,11 +253,14 @@ export class Editor {
     // Na 3D, Esc segue o da planta (cancela a operação, senão volta à Selecionar; decisão 0016 §5). Ferramenta de escolha (Anexar topo): Enter e Tab seguem para a planta, senão a etapa não avança.
     if (ui.view === '3d' && k !== 'Escape' && !(this.tool.pick3d && (k === 'Enter' || k === 'Tab'))) return key3d(k, ui.selection, () => this.deleteSelection());
     if (k === 'Escape') {
+      casador.limpar();
       if (ui.typed) useUi.setState({ typed: '' });
       else this.tool.cancel();
       this.bump();
       return true;
     }
+    // Qualquer outra tecla de controle (Enter, Tab, Delete, Espaço…) interrompe uma sequência em andamento; modificadores não.
+    if (k.length > 1 && !['Shift', 'Control', 'Alt', 'Meta'].includes(k)) casador.limpar();
     if (k === 'Enter') {
       if (ui.typed) {
         const ok = this.tool.type(ui.typed);
@@ -298,12 +301,13 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const id = toolForKey(k);
-    if (id && !e.altKey) {
-      this.setTool(id);
-      return true;
-    }
-    return false;
+    // Atalho por sequência (ex.: WA). Alt não dispara; digitação ativa ou ferramenta de texto (freeText, sem ponto) não deixa letras virarem atalho.
+    if (e.altKey || ui.typed || this.tool.freeText) return false;
+    const r = casador.tecla(k);
+    if (!r.tratada) return false;
+    if (r.comando === 'atalhos') useUi.setState({ dialog: 'shortcutsConfig', dialogArg: null });
+    else if (r.comando) this.setTool(r.comando);
+    return true;
   }
 
   // ---------- seleção e edição ----------

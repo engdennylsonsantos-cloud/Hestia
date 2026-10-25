@@ -35,7 +35,7 @@ export function hintText(st: Pick<DrawState, 'submode' | 'phase' | 'pick'>, rep:
     case 'limites':
       return st.phase === 'left' ? 'Limite esquerdo: clique os pontos; Enter fecha e passa ao direito.' : 'Limite direito: clique os pontos; Enter fecha e passa a Espelhos.';
     case 'espelhos':
-      return `Espelhos: clique o início e o fim de cada espelho. ${counterText(rep)}.`;
+      return `Espelhos: clique o início e o fim de cada espelho; Enter conclui. ${counterText(rep)}.`;
     case 'caminhada':
       return 'Caminhada: clique do primeiro ao último espelho; Enter fecha.';
     case 'patamar':

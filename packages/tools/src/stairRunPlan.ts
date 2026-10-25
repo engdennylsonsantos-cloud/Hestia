@@ -32,6 +32,8 @@ export interface StairRunToolOptions {
   /** Tipo de escada; ausente ou inexistente = o padrão do projeto. */
   typeId?: Id;
   shape: StairRunShape;
+  /** Reta: comprimento do lance, do 1º ao último espelho (m), dado pelo 2º clique. Ausente = nº de espelhos pela altura. */
+  length?: number;
   /** Largura de cada lance (m). */
   width: number;
   /** Lado do giro, visto de quem sobe o 1º lance (L, U e leque). */
@@ -60,6 +62,25 @@ export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 
 export const WINDER_FIRST_RISERS = 2;
 export const WINDER_FAN_RISERS = 3;
 
+/**
+ * Espelhos e piso de um lance reto de comprimento `length` (m, do 1º ao último espelho). Entre os N que a altura permite
+ * (N ≥ ceil(H ÷ espelho máximo)), fica o de piso mais perto do piso ideal do tipo (`treadFor`, 0,63 − 2·h); o piso não
+ * pode ficar abaixo do mínimo. Erro se nem o menor N dá piso mínimo: o lance é curto demais.
+ */
+export function risersForLength(H: number, maxRiser: number, minTread: number, length: number): { risers: number; tread: number } | { error: string } {
+  const N0 = riserCountFor(H, maxRiser);
+  let best: { risers: number; tread: number; score: number } | null = null;
+  for (let N = Math.max(2, N0); N <= N0 + 400; N++) {
+    const tread = length / (N - 1);
+    // Mais espelhos, piso menor: a partir daqui todo N seguinte também fica abaixo do mínimo.
+    if (tread < minTread - 1e-9) break;
+    const score = Math.abs(tread - treadFor(H / N, minTread));
+    if (!best || score < best.score) best = { risers: N, tread, score };
+  }
+  if (!best) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${Math.max(2, N0)} espelhos: o piso ficaria abaixo do mínimo (${(minTread * 100).toFixed(0)} cm).` };
+  return { risers: best.risers, tread: best.tread };
+}
+
 export interface StairRunPlanInput {
   /** Centro do 1º espelho (1º clique). */
   start: Vec2;
@@ -80,6 +101,19 @@ export interface StairRunPlan {
   risers: number;
   riserHeight: number;
   tread: number;
+  /** Reta com comprimento que dá N diferente do nº desejado pela altura: a explicação em pt-BR (ausente se bate). */
+  note?: string;
+}
+
+/**
+ * Explicação de uma reta cujo comprimento dá N ≠ N0 (nº desejado pela altura). Regra anunciada: o comprimento escolhe N
+ * entre os que a altura permite (N ≥ N0), no piso mais perto do ideal (`treadFor`); para N0, o comprimento que dá o piso
+ * ideal é (N0 − 1) × treadFor(H ÷ N0).
+ */
+function lengthNote(H: number, minTread: number, length: number, N: number, N0: number): string {
+  const L0 = (N0 - 1) * treadFor(H / N0, minTread);
+  const m = (v: number): string => v.toFixed(2).replace('.', ',');
+  return `(o comprimento de ${m(length)} m permite ${N}; o ideal pela altura é ${N0}: ajuste o comprimento para ${m(L0)} m ou edite o nº de espelhos).`;
 }
 
 export type StairRunPlanResult = StairRunPlan | { error: string };
@@ -104,8 +138,17 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   }
   if (N < 2) return { error: 'A altura é menor que um espelho: nada a gerar.' };
   if (N < MIN_RISERS[shape]) return { error: `Esta forma precisa de ao menos ${MIN_RISERS[shape]} espelhos; a altura dá ${N}.` };
+  // Reta com comprimento (2º clique): o comprimento escolhe N e o piso (a altura do espelho é H ÷ N).
+  const N0 = N;
+  const byLength = shape === 'straight' && i.options.length !== undefined;
+  if (byLength) {
+    const sized = risersForLength(i.H, i.maxRiser, i.minTread, i.options.length!);
+    if ('error' in sized) return sized;
+    N = sized.risers;
+  }
   const riserHeight = i.H / N;
-  const tread = treadFor(riserHeight, i.minTread);
+  const tread = byLength ? (i.options.length! / (N - 1)) : treadFor(riserHeight, i.minTread);
+  const note = byLength && N !== N0 ? lengthNote(i.H, i.minTread, i.options.length!, N, N0) : undefined;
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];
   try {
@@ -120,7 +163,7 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   } catch (e) {
     return { error: e instanceof RangeError ? e.message : 'Não foi possível gerar a escada.' };
   }
-  return { parts, risers: N, riserHeight, tread };
+  return { parts, risers: N, riserHeight, tread, note };
 }
 
 /** Componentes do gerador para o croqui (cada lance recebe a origem `generatedBy`). */

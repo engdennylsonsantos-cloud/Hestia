@@ -66,8 +66,9 @@ export const STAIR_SKETCH_MESSAGES: Record<string, string> = {
   'stair-landing-open': 'O contorno do patamar deve ser um laço fechado.',
 };
 
-export function sketchIssue(code: string, riserIndex?: number): StairSketchIssue {
-  const issue: StairSketchIssue = { code, severity: 'error', message: STAIR_SKETCH_MESSAGES[code] ?? code };
+/** Erro de croqui. `message` substitui o texto padrão quando a mensagem traz o espelho, o limite ou a distância. */
+export function sketchIssue(code: string, riserIndex?: number, message?: string): StairSketchIssue {
+  const issue: StairSketchIssue = { code, severity: 'error', message: message ?? STAIR_SKETCH_MESSAGES[code] ?? code };
   if (riserIndex !== undefined) issue.riserIndex = riserIndex;
   return issue;
 }

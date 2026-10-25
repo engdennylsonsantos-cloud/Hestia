@@ -147,7 +147,8 @@ export class StairRunTool extends ToolBase {
       this.env.say('Afaste o cursor do ponto inicial para dar a direção.');
       return;
     }
-    this.create(dir);
+    // Reta: o 2º clique define também o comprimento do lance (o nº de espelhos sai dele).
+    this.create(dir, len(dir));
   }
 
   /** Enter: no caracol, confirma a varredura atual (com o cursor onde está); nas outras formas, o padrão. */
@@ -200,7 +201,7 @@ export class StairRunTool extends ToolBase {
     if (this.origin === null) return [{ kind: 'point', at: cursor }];
     const dir = sub(cursor, this.origin);
     if (len(dir) < MIN_DIRECTION) return [{ kind: 'point', at: this.origin }];
-    const b = this.build(dir);
+    const b = this.build(dir, len(dir));
     if ('error' in b) {
       this.env.say(b.error);
       return [{ kind: 'point', at: this.origin }];
@@ -238,22 +239,26 @@ export class StairRunTool extends ToolBase {
       return {
         error: stairTopLevel(p, ref)
           ? 'O nível de topo não fica acima da base: nada a gerar.'
-          : 'Altura inválida: informe uma altura positiva na barra de escada.',
+          : 'Sem nível de topo: escolha o nível de cima na barra de escada (ou informe uma altura positiva).',
       };
     }
     return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };
   }
 
-  /** Plano da escada reta/L/U/leque para a direção dada; erro com a mensagem de status em pt-BR. */
-  private build(dir: Vec2): StairRunPlan | { error: string } {
+  /**
+   * Plano da escada reta/L/U/leque para a direção dada; erro com a mensagem de status em pt-BR. `length` (reta, pelo 2º
+   * clique) fixa o comprimento do lance; sem ele (ângulo digitado), vale o nº de espelhos pela altura.
+   */
+  private build(dir: Vec2, length?: number): StairRunPlan | { error: string } {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options: this.opts });
+    const options = length !== undefined ? { ...this.opts, length } : this.opts;
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options });
   }
 
-  /** Cria a escada com a direção dada, em um passo de desfazer. Mantém a ferramenta pronta para a próxima. */
-  private create(dir: Vec2): boolean {
-    const b = this.build(dir);
+  /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */
+  private create(dir: Vec2, length?: number): boolean {
+    const b = this.build(dir, length);
     if ('error' in b) {
       this.env.say(b.error);
       return false;
@@ -268,9 +273,11 @@ export class StairRunTool extends ToolBase {
       this.env.say(`Não é possível criar a escada: ${r?.error ?? 'falha ao gravar.'}`);
       return false;
     }
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning');
-    const extra = aviso ? ` Aviso: ${aviso.message}` : '';
-    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra} Ctrl+Z desfaz.`);
+    // Com comprimento que dá outro nº (`note`), a explicação substitui o aviso "difere do nº desejado", que contradiria o criado.
+    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
+    const extra = b.note ? ` ${b.note}` : '';
+    const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
+    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
     this.reset();
     return true;
   }

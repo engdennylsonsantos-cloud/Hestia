@@ -4,6 +4,7 @@ import { resolveFloors } from '../floors.ts';
 import { resolveSlabs } from '../slabs.ts';
 import { resolveRoofs } from '../roofs.ts';
 import { resolveRooms } from '../rooms.ts';
+import { junctionLevel } from '../junctionLevel.ts';
 import type { TipoResolucao } from './protocolo.ts';
 
 /**
@@ -22,5 +23,7 @@ export function executarResolucao(tipo: TipoResolucao, p: Project, nivel: Id, ca
       return resolveRoofs(p, nivel);
     case 'ambientes':
       return resolveRooms(p, nivel);
+    case 'juncoes':
+      return junctionLevel(p, nivel);
   }
 }

@@ -4,6 +4,7 @@ import { executarResolucao } from './executor.ts';
 import {
   chaveDoPedido,
   ResolucaoCancelada,
+  TIPOS_RESOLUCAO,
   type MensagemResolucao,
   type MotivoCancelamento,
   type PedidoResolucao,
@@ -88,9 +89,22 @@ export class ClienteResolucao {
     this.encerrarPedido(id, 'cancelado');
   }
 
+  /** Cancela os pedidos pendentes de um nível (todos os tipos). Ex.: nível liberado da planta, ou editado. */
+  cancelarNivel(nivel: Id): void {
+    for (const tipo of TIPOS_RESOLUCAO) {
+      const id = this.atuais.get(chaveDoPedido(tipo, nivel));
+      if (id !== undefined) this.encerrarPedido(id, 'cancelado');
+    }
+  }
+
+  /** Cancela todos os pedidos pendentes, sem desligar o worker. */
+  cancelarTodos(): void {
+    for (const pid of [...this.pendentes.keys()]) this.encerrarPedido(pid, 'cancelado');
+  }
+
   /** Cancela todos os pedidos e desliga o worker. Depois disso, `resolver` ainda funciona, na thread principal. */
   encerrar(): void {
-    for (const pid of [...this.pendentes.keys()]) this.encerrarPedido(pid, 'cancelado');
+    this.cancelarTodos();
     const w = this.worker;
     this.worker = null;
     try {

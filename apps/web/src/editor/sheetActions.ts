@@ -139,8 +139,12 @@ export function sheetsPdfOf(p: Project): Uint8Array | null {
  * São dois comandos com desfazer (criar prancha, colocar a vista). Devolve o id da prancha criada.
  */
 export function pranchaDaPlantaAtual(store: ProjectStore, levelId: Id): Id {
-  const id = addSheetAction(store);
-  addViewAction(store, id, { kind: 'plan', levelId }, 100);
+  // Um único passo de desfazer: prancha e vista somem juntas (com Ctrl+Z não sobra prancha vazia).
+  let id = '';
+  store.transaction('Criar prancha com a planta', () => {
+    id = addSheetAction(store);
+    addViewAction(store, id, { kind: 'plan', levelId }, 100);
+  });
   return id;
 }
 

@@ -11,24 +11,34 @@ import type { Id, Project } from '@hestia/model';
  */
 
 /** Tipos de resolução que podem rodar no worker (cada um tem uma chamada em `executor.ts`). */
-export const TIPOS_RESOLUCAO = ['nivel', 'pisos', 'lajes', 'telhados', 'ambientes', 'juncoes'] as const;
+export const TIPOS_RESOLUCAO = ['nivel', 'patchNivel', 'pisos', 'lajes', 'telhados', 'ambientes', 'juncoes'] as const;
 export type TipoResolucao = (typeof TIPOS_RESOLUCAO)[number];
 
 /**
  * Projeto como viaja para o worker. `versao` é o contador que quem chama incrementa a cada edição (o worker não o
  * interpreta; serve para diagnóstico e para o cliente saber de qual edição veio cada resposta). `estrutura` é o dado puro.
+ * Ausente: é o mesmo projeto (mesma `versao`) do último pedido que a trouxe, e o worker o reaproveita. Assim cada versão
+ * do projeto atravessa o `postMessage` uma vez só, por mais pedidos (nível, junções) que ela gere.
  */
 export interface ProjetoEnviado {
   versao: number;
-  estrutura: Project;
+  estrutura?: Project;
 }
 
-/** Pedido de resolução de um tipo, de um nível, de um projeto. */
+/** Erro devolvido quando o pedido omite a `estrutura` e o worker não tem o projeto dessa `versao` (o cliente reenvia completo). */
+export const ERRO_PROJETO_AUSENTE = 'projeto-ausente';
+
+/**
+ * Pedido de resolução de um tipo, de um nível, de um projeto. `base` só vale para `patchNivel`: a versão do resultado de
+ * nível que quem pede já tem aplicado (`null`/ausente: não tem nenhum). Com ela o worker responde só a diferença
+ * (ver `gerarPatchNivel` em `fluxoPatch.ts`); sem ela, o patch completo.
+ */
 export interface PedidoResolucao {
   id: number;
   tipo: TipoResolucao;
   nivel: Id;
   projeto: ProjetoEnviado;
+  base?: number | null;
 }
 
 /** Cancelamento de um pedido pelo id (vale se o pedido ainda não começou no worker). */

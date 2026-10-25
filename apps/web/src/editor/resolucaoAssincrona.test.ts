@@ -68,7 +68,7 @@ describe('ResolucaoProgressiva: agendamento', () => {
     r.resolvido('pav_0', () => new LevelResolveCache().get(p, 'pav_0'));
     r.resolvido('pav_1', () => new LevelResolveCache().get(p, 'pav_1'));
     await esperarAte(() => r.juncoes('pav_3') !== null);
-    expect(cliente.log).toEqual(['juncoes:pav_0', 'juncoes:pav_1', 'nivel:pav_2', 'juncoes:pav_2', 'nivel:pav_3', 'juncoes:pav_3']);
+    expect(cliente.log).toEqual(['juncoes:pav_0', 'juncoes:pav_1', 'patchNivel:pav_2', 'juncoes:pav_2', 'patchNivel:pav_3', 'juncoes:pav_3']);
   });
 
   it('liberar: cancela o pedido do nível e ele não volta à fila até ser o visível', async () => {

@@ -1,8 +1,10 @@
 import type { Id, Project } from '@hestia/model';
 import type { ResolveCache } from '../resolve.ts';
+import { MemoriaPatch } from '../fluxoPatch.ts';
 import { executarResolucao } from './executor.ts';
 import {
   chaveDoPedido,
+  ERRO_PROJETO_AUSENTE,
   ResolucaoCancelada,
   TIPOS_RESOLUCAO,
   type MensagemResolucao,
@@ -37,6 +39,7 @@ interface Pendente {
   nivel: Id;
   projeto: Project;
   versao: number;
+  base: number | null;
   resolver: (valor: unknown) => void;
   rejeitar: (erro: unknown) => void;
 }
@@ -55,6 +58,10 @@ export class ClienteResolucao {
   private readonly pendentes = new Map<number, Pendente>();
   /** Id do pedido mais recente de cada chave (tipo + nível). */
   private readonly atuais = new Map<string, number>();
+  /** Últimos resultados de nível entregues como patch na thread principal (o worker tem a memória dele). */
+  private readonly memoriaLocal = new MemoriaPatch();
+  /** Último projeto enviado inteiro ao worker: pedidos do mesmo projeto e versão seguem sem a estrutura (ver `ProjetoEnviado`). */
+  private enviado: { projeto: Project; versao: number } | null = null;
 
   constructor(private readonly opcoes: OpcoesClienteResolucao = {}) {
     if (opcoes.usarWorker && opcoes.criarWorker) this.worker = this.tentarCriar(opcoes.criarWorker);
@@ -70,14 +77,17 @@ export class ClienteResolucao {
     return this.pendentes.size;
   }
 
-  /** Pede a resolução de um tipo de um nível. `versao` é o contador de edição do projeto (ver `ProjetoEnviado`). */
-  resolver(tipo: TipoResolucao, nivel: Id, projeto: Project, versao: number): Promise<unknown> {
+  /**
+   * Pede a resolução de um tipo de um nível. `versao` é o contador de edição do projeto (ver `ProjetoEnviado`). `base`
+   * só vale para `patchNivel`: a versão do resultado do nível que quem pede já aplicou (ver `PedidoResolucao`).
+   */
+  resolver(tipo: TipoResolucao, nivel: Id, projeto: Project, versao: number, base: number | null = null): Promise<unknown> {
     const chave = chaveDoPedido(tipo, nivel);
     const anterior = this.atuais.get(chave);
     if (anterior !== undefined) this.encerrarPedido(anterior, 'substituido');
     const id = this.proximoId++;
     return new Promise((resolver, rejeitar) => {
-      const pendente: Pendente = { id, chave, tipo, nivel, projeto, versao, resolver, rejeitar };
+      const pendente: Pendente = { id, chave, tipo, nivel, projeto, versao, base, resolver, rejeitar };
       this.pendentes.set(id, pendente);
       this.atuais.set(chave, id);
       this.enviar(pendente);
@@ -136,9 +146,11 @@ export class ClienteResolucao {
 
   private enviar(p: Pendente): void {
     if (this.worker) {
-      const mensagem: PedidoResolucao = { id: p.id, tipo: p.tipo, nivel: p.nivel, projeto: { versao: p.versao, estrutura: p.projeto } };
+      const repetido = this.enviado?.projeto === p.projeto && this.enviado.versao === p.versao;
+      const mensagem: PedidoResolucao = { id: p.id, tipo: p.tipo, nivel: p.nivel, projeto: repetido ? { versao: p.versao } : { versao: p.versao, estrutura: p.projeto }, base: p.base };
       try {
         this.worker.postMessage(mensagem);
+        if (!repetido) this.enviado = { projeto: p.projeto, versao: p.versao };
         return;
       } catch (e) {
         // Projeto que não atravessa o clone: só esta vez, na thread principal. Outras falhas derrubam o worker.
@@ -158,7 +170,7 @@ export class ClienteResolucao {
       this.pendentes.delete(p.id);
       if (this.atuais.get(p.chave) === p.id) this.atuais.delete(p.chave);
       try {
-        p.resolver(executarResolucao(p.tipo, p.projeto, p.nivel, this.opcoes.cache));
+        p.resolver(executarResolucao(p.tipo, p.projeto, p.nivel, this.opcoes.cache, { versao: p.versao, base: p.base, memoria: this.memoriaLocal }));
       } catch (e) {
         p.rejeitar(e);
       }
@@ -170,7 +182,13 @@ export class ClienteResolucao {
     if (!p) return; // cancelada, substituída ou já respondida: descarta
     this.pendentes.delete(p.id);
     if (this.atuais.get(p.chave) === p.id) this.atuais.delete(p.chave);
-    if (resposta.erro !== null) p.rejeitar(new Error(resposta.erro));
+    if (resposta.erro === ERRO_PROJETO_AUSENTE) {
+      // O worker não tem o projeto desta versão: manda de novo, completo.
+      this.enviado = null;
+      this.pendentes.set(p.id, p);
+      this.atuais.set(p.chave, p.id);
+      this.enviar(p);
+    } else if (resposta.erro !== null) p.rejeitar(new Error(resposta.erro));
     else p.resolver(resposta.resultado);
   }
 
@@ -178,6 +196,7 @@ export class ClienteResolucao {
   private falhaDoWorker(): void {
     const w = this.worker;
     this.worker = null;
+    this.enviado = null;
     try {
       w?.terminate();
     } catch {

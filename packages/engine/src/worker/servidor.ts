@@ -1,6 +1,7 @@
 import type { Id, Project } from '@hestia/model';
+import { MemoriaPatch } from '../fluxoPatch.ts';
 import { executarResolucao } from './executor.ts';
-import { colherBuffers, chaveDoPedido, ehCancelamento, type MensagemResolucao, type PedidoResolucao, type RespostaResolucao, type TipoResolucao } from './protocolo.ts';
+import { colherBuffers, chaveDoPedido, ehCancelamento, ERRO_PROJETO_AUSENTE, type MensagemResolucao, type PedidoResolucao, type RespostaResolucao, type TipoResolucao } from './protocolo.ts';
 
 /** Parte do escopo do worker que o servidor usa (`self` em um Worker dedicado). */
 export interface EscopoServidor {
@@ -8,10 +9,23 @@ export interface EscopoServidor {
   onmessage: ((evento: { data: unknown }) => void) | null;
 }
 
-/** Função que resolve um pedido; no worker é `executarResolucao`, em testes pode ser outra. */
-export type Executor = (tipo: TipoResolucao, projeto: Project, nivel: Id) => unknown;
+/** Versão do projeto e base do patch de um pedido (ver `PedidoResolucao`). */
+export interface ContextoPedido {
+  versao: number;
+  base: number | null;
+}
 
-const executorPadrao: Executor = (tipo, projeto, nivel) => executarResolucao(tipo, projeto, nivel);
+/** Função que resolve um pedido; no worker é `executarResolucao`, em testes pode ser outra. */
+export type Executor = (tipo: TipoResolucao, projeto: Project, nivel: Id, contexto: ContextoPedido) => unknown;
+
+/** Executor padrão, com a memória dos últimos resultados de nível deste servidor (base dos patches de diferença). */
+function criarExecutorPadrao(): Executor {
+  const memoria = new MemoriaPatch();
+  return (tipo, projeto, nivel, contexto) => executarResolucao(tipo, projeto, nivel, undefined, { ...contexto, memoria });
+}
+
+/** Pedido na fila: o projeto já está resolvido (o da mensagem ou o último recebido por inteiro). */
+type PedidoNaFila = PedidoResolucao & { projeto: { versao: number; estrutura: Project } };
 
 /** Mensagem de erro legível para o cliente. */
 const textoDoErro = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -22,14 +36,16 @@ const textoDoErro = (e: unknown): string => (e instanceof Error ? e.message : St
  * os da mesma chave (tipo + nível) que ainda estão na fila saem: só o mais recente interessa.
  * Devolve a função que desinstala o servidor.
  */
-export function instalarServidor(escopo: EscopoServidor, executor: Executor = executorPadrao): () => void {
-  const fila: PedidoResolucao[] = [];
+export function instalarServidor(escopo: EscopoServidor, executor: Executor = criarExecutorPadrao()): () => void {
+  const fila: PedidoNaFila[] = [];
   let agendado = false;
+  /** Último projeto recebido por inteiro: os pedidos que omitem a `estrutura` (mesma versão) usam este. */
+  let ultimo: { versao: number; estrutura: Project } | null = null;
 
-  const executar = (pedido: PedidoResolucao): void => {
+  const executar = (pedido: PedidoNaFila): void => {
     const { id } = pedido;
     try {
-      const resultado = executor(pedido.tipo, pedido.projeto.estrutura, pedido.nivel);
+      const resultado = executor(pedido.tipo, pedido.projeto.estrutura, pedido.nivel, { versao: pedido.projeto.versao, base: pedido.base ?? null });
       const resposta: RespostaResolucao = { id, resultado, erro: null };
       escopo.postMessage(resposta, colherBuffers(resultado));
     } catch (e) {
@@ -58,12 +74,19 @@ export function instalarServidor(escopo: EscopoServidor, executor: Executor = ex
       if (i >= 0) fila.splice(i, 1);
       return;
     }
+    // O projeto é fixado ao chegar o pedido (não ao executá-lo): um pedido da fila de uma versão antiga não vê a seguinte.
+    const { versao, estrutura } = mensagem.projeto;
+    if (estrutura) ultimo = { versao, estrutura };
+    else if (!ultimo || ultimo.versao !== versao) {
+      escopo.postMessage({ id: mensagem.id, resultado: null, erro: ERRO_PROJETO_AUSENTE } satisfies RespostaResolucao);
+      return;
+    }
     const chave = chaveDoPedido(mensagem.tipo, mensagem.nivel);
     for (let i = fila.length - 1; i >= 0; i--) {
       const antigo = fila[i]!;
       if (chaveDoPedido(antigo.tipo, antigo.nivel) === chave) fila.splice(i, 1);
     }
-    fila.push(mensagem);
+    fila.push({ ...mensagem, projeto: { versao, estrutura: estrutura ?? ultimo!.estrutura } });
     agendar();
   };
 

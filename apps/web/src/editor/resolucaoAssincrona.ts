@@ -1,7 +1,9 @@
-import { niveisAfetados, type JunctionLevel, type ResolvedLevel } from '@hestia/engine';
+import { niveisAfetados, type JunctionLevel, type NiveisAfetados, type ResolvedLevel } from '@hestia/engine';
+import { aplicarPatchNivel, type PatchNivel } from '@hestia/engine/src/fluxoPatch.ts';
 import type { ClienteResolucao } from '@hestia/engine/src/worker/cliente.ts';
 import type { TipoResolucao } from '@hestia/engine/src/worker/protocolo.ts';
 import type { Id, Project } from '@hestia/model';
+import type { EventoFluxo } from './fluxoEdicao.ts';
 import { criarClienteResolucao } from './resolveWorker.ts';
 
 /** Atraso (ms) do aviso à interface: resoluções que chegam juntas geram um único redesenho. */
@@ -18,6 +20,8 @@ interface Voo {
   nivel: Id;
   tipo: TipoResolucao;
   token: number;
+  /** Versão do projeto em que o pedido saiu. */
+  versao: number;
 }
 
 export interface OpcoesResolucaoProgressiva {
@@ -25,6 +29,8 @@ export interface OpcoesResolucaoProgressiva {
   cliente?: ClienteResolucao;
   /** Chamado (com agrupamento) quando um nível fica pronto ou se invalida: a interface redesenha. */
   aoMudar?: () => void;
+  /** Eventos do fluxo de edição vindos daqui: `exato`, `juncoes`, `descartado` e `concluido` (ver `fluxoEdicao.ts`). */
+  aoEvento?: (evento: EventoFluxo) => void;
 }
 
 /** Ordem dos níveis em relação ao visível: o mais perto primeiro, desempate pelo índice. */
@@ -44,8 +50,18 @@ const distanciaAoVisivel = (ids: Id[], visivel: Id | null, i: number): number =>
 export class ResolucaoProgressiva {
   private readonly cliente: ClienteResolucao;
   private readonly aoMudar: () => void;
+  private readonly aoEvento: (evento: EventoFluxo) => void;
   private projeto: Project | null = null;
   private versaoProjeto = 0;
+  /** Último resultado exato aplicado de cada nível, com a versão do projeto de que saiu: base dos patches de diferença. */
+  private readonly anteriores = new Map<Id, { versao: number; valor: ResolvedLevel }>();
+  /** Versão a partir da qual um resultado vale, por nível, e a de piso para todos (mudança global). Mais antigo: descarta. */
+  private readonly versaoMinima = new Map<Id, number>();
+  private versaoMinimaGlobal = 0;
+  /** Verdadeiro: `resolvido` devolve o último exato (possivelmente antigo) em vez de calcular na hora (ver `exatoAssincrono`). */
+  exatoAssincrono = false;
+  /** Já avisou `concluido` desde a última mudança do projeto. */
+  private ocioso = true;
   private visivel: Id | null = null;
   private readonly prontos = new Map<Id, Pronto>();
   /** Níveis já resolvidos na thread da interface: o segundo plano não os refaz. */
@@ -62,6 +78,7 @@ export class ResolucaoProgressiva {
   constructor(opcoes: OpcoesResolucaoProgressiva = {}) {
     this.cliente = opcoes.cliente ?? criarClienteResolucao({ usarWorker: true });
     this.aoMudar = opcoes.aoMudar ?? (() => undefined);
+    this.aoEvento = opcoes.aoEvento ?? (() => undefined);
   }
 
   /** Contador de versão da resolução: a planta observa para saber que algo ficou pronto ou mudou. */
@@ -73,34 +90,44 @@ export class ResolucaoProgressiva {
    * Abre um projeto: cancela o que restava do anterior e agenda o segundo plano. Devolve os níveis que devem ser
    * resolvidos já (o visível e o vizinho imediato), para o controller chamar `resolvido` neles.
    */
-  abrir(p: Project): Id[] {
+  abrir(p: Project, versao?: number): Id[] {
     this.parado = false;
     this.cliente.cancelarTodos();
     this.voo = null;
     this.prontos.clear();
     this.sincronos.clear();
     this.liberados.clear();
+    this.anteriores.clear();
+    this.versaoMinima.clear();
     this.projeto = p;
-    this.versaoProjeto++;
+    this.versaoProjeto = versao ?? this.versaoProjeto + 1;
+    this.versaoMinimaGlobal = this.versaoProjeto;
+    this.ocioso = false;
     this.visivel = p.levels[0]?.id ?? null;
     this.versaoResolucao++;
     setTimeout(() => this.avancar(), 0);
     return p.levels.slice(0, 2).map((l) => l.id);
   }
 
-  /** Chamado a cada mudança do projeto: invalida só o que a edição alcança e reinicia a fila dos afetados. */
-  atualizar(p: Project): void {
+  /**
+   * Chamado a cada mudança do projeto: invalida só o que a edição alcança e reinicia a fila dos afetados. `versao` é a
+   * versão do projeto (`store.version`); `niveis` os níveis afetados, quando quem chama já os calculou.
+   */
+  atualizar(p: Project, versao?: number, niveis?: NiveisAfetados): void {
     const antes = this.projeto;
     if (!antes) {
       this.projeto = p;
       return;
     }
     if (p === antes) return;
-    const afetados = niveisAfetados(antes, p);
+    const afetados = niveis ?? niveisAfetados(antes, p);
     this.projeto = p;
-    this.versaoProjeto++;
+    this.versaoProjeto = versao ?? this.versaoProjeto + 1;
+    this.ocioso = false;
     if (afetados === 'todos') {
+      this.versaoMinimaGlobal = this.versaoProjeto;
       this.cliente.cancelarTodos();
+      if (this.voo) this.aoEvento({ tipo: 'descartado', nivel: this.voo.nivel, versao: this.voo.versao, motivo: 'versao-antiga' });
       this.voo = null;
       this.prontos.clear();
       this.sincronos.clear();
@@ -117,13 +144,23 @@ export class ResolucaoProgressiva {
    * Quando calcula, marca o nível como síncrono e cancela um pedido em curso dele. `prioritario` põe o nível
    * como visível para a fila (o nível que a planta mostra).
    */
-  resolvido(id: Id, sincrono: () => ResolvedLevel, prioritario = false): ResolvedLevel {
+  resolvido(id: Id, sincrono: () => ResolvedLevel, prioritario = false, exigirExato = false): ResolvedLevel {
     if (prioritario) this.priorizar(id);
     const pronto = this.nivelPronto(id);
     if (pronto) return pronto;
+    const anterior = this.anteriores.get(id);
+    // Nível liberado não está na fila: o recálculo não viria, então devolver o antigo seria devolver para sempre.
+    if (this.exatoAssincrono && !exigirExato && anterior && !this.liberados.has(id)) return anterior.valor;
     this.sincronos.add(id);
     if (this.voo?.nivel === id) this.cancelarVoo();
-    return sincrono();
+    const valor = sincrono();
+    this.anteriores.set(id, { versao: this.versaoProjeto, valor });
+    return valor;
+  }
+
+  /** O resultado do nível ainda não é o da versão atual do projeto (há um recálculo a caminho). */
+  pendente(id: Id): boolean {
+    return !this.prontos.get(id)?.nivel && !this.sincronos.has(id);
   }
 
   /** Resolução de nível já pronta em segundo plano (senão `null`). Não calcula nada. */
@@ -162,8 +199,17 @@ export class ResolucaoProgressiva {
   private invalidar(id: Id): void {
     this.prontos.delete(id);
     this.sincronos.delete(id);
+    this.versaoMinima.set(id, this.versaoProjeto);
     this.cliente.cancelarNivel(id);
-    if (this.voo?.nivel === id) this.voo = null;
+    if (this.voo?.nivel === id) {
+      this.aoEvento({ tipo: 'descartado', nivel: id, versao: this.voo.versao, motivo: 'versao-antiga' });
+      this.voo = null;
+    }
+  }
+
+  /** O resultado de `versao` ainda vale para o nível? Não vale se uma edição posterior o alcançou (descarte por versão). */
+  private vale(nivel: Id, versao: number): boolean {
+    return versao >= Math.max(this.versaoMinimaGlobal, this.versaoMinima.get(nivel) ?? 0);
   }
 
   /** Cancela o pedido em curso e segue a fila (o cancelamento chega como rejeição, tratada em `avancar`). */
@@ -201,12 +247,21 @@ export class ResolucaoProgressiva {
   private avancar(): void {
     if (this.parado || this.voo || !this.projeto) return;
     const alvo = this.proximo();
-    if (!alvo) return;
+    if (!alvo) {
+      if (!this.ocioso) {
+        this.ocioso = true;
+        this.aoEvento({ tipo: 'concluido', versao: this.versaoProjeto });
+      }
+      return;
+    }
     const token = ++this.tokens;
-    this.voo = { nivel: alvo.nivel, tipo: alvo.tipo, token };
+    const versao = this.versaoProjeto;
+    this.voo = { nivel: alvo.nivel, tipo: alvo.tipo, token, versao };
+    // O nível sai como patch: só a diferença para o último resultado que já foi aplicado (ver `fluxoPatch.ts`).
+    const pedido = alvo.tipo === 'nivel' ? 'patchNivel' : alvo.tipo;
     this.cliente
-      .resolver(alvo.tipo, alvo.nivel, this.projeto, this.versaoProjeto)
-      .then((valor) => this.receber(token, alvo.tipo, alvo.nivel, valor))
+      .resolver(pedido, alvo.nivel, this.projeto, versao, alvo.tipo === 'nivel' ? (this.anteriores.get(alvo.nivel)?.versao ?? null) : null)
+      .then((valor) => this.receber(token, alvo.tipo, alvo.nivel, versao, valor))
       .catch(() => undefined) // cancelado (ResolucaoCancelada) ou falha: a fila segue
       .finally(() => {
         if (this.voo?.token === token) {
@@ -216,13 +271,24 @@ export class ResolucaoProgressiva {
       });
   }
 
-  private receber(token: number, tipo: TipoResolucao, nivel: Id, valor: unknown): void {
+  private receber(token: number, tipo: TipoResolucao, nivel: Id, versao: number, valor: unknown): void {
     if (this.voo?.token !== token) return;
+    if (!this.vale(nivel, versao)) {
+      this.aoEvento({ tipo: 'descartado', nivel, versao, motivo: 'versao-antiga' });
+      return;
+    }
     const e: Pronto = this.prontos.get(nivel) ?? {};
-    if (tipo === 'nivel') e.nivel = valor as ResolvedLevel;
-    else e.juncoes = valor as JunctionLevel;
+    if (tipo === 'nivel') {
+      const patch = valor as PatchNivel;
+      const novo = aplicarPatchNivel(this.anteriores.get(nivel)?.valor ?? null, patch);
+      // Patch que não cabe no estado daqui (a base não é a que temos): esquece o anterior e a fila pede o completo.
+      if (!novo) return void this.anteriores.delete(nivel);
+      this.anteriores.set(nivel, { versao: patch.versao, valor: novo });
+      e.nivel = novo;
+    } else e.juncoes = valor as JunctionLevel;
     this.prontos.set(nivel, e);
     this.versaoResolucao++;
+    this.aoEvento(tipo === 'nivel' ? { tipo: 'exato', versao, patch: valor as PatchNivel } : { tipo: 'juncoes', nivel, versao });
     this.avisar();
   }
 

@@ -123,6 +123,6 @@ export class CasadorSequencia {
 }
 
 /** Alguma sequência do mapa começa por `seq` (inclusive quando é igual a ela). */
-function ehPrefixo(mapa: ShortcutMap, seq: string): boolean {
+export function ehPrefixo(mapa: ShortcutMap, seq: string): boolean {
   return Object.values(mapa).some((s) => typeof s === 'string' && s.startsWith(seq));
 }

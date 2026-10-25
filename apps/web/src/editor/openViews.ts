@@ -23,9 +23,6 @@ export function defaultOpenViews(levelIds: readonly Id[]): OpenView[] {
   return [{ kind: 'plan', levelId: levelIds[0] ?? 'lv_0' }];
 }
 
-/** Mensagem exibida quando o usuário tenta fechar a última vista aberta. */
-export const LAST_VIEW_MESSAGE = 'Não é possível fechar a última vista aberta.';
-
 /** Chave estável de uma vista (serve de `key` na barra e para comparar vistas). */
 export function viewKey(v: OpenView): string {
   switch (v.kind) {
@@ -73,26 +70,28 @@ export function neighborOf(list: readonly OpenView[], v: OpenView): OpenView | n
   return list[i + 1] ?? list[i - 1] ?? null;
 }
 
-/** Pode fechar uma vista? Nunca se a lista ficaria vazia. */
-export function canClose(list: readonly OpenView[]): boolean {
-  return list.length > 1;
+/** Resultado de fechar uma vista: a nova lista (pode ficar vazia) e a vista a ativar (só se a fechada era a ativa e há vizinha). */
+export interface CloseResult {
+  list: OpenView[];
+  activate: OpenView | null;
 }
 
-/** Resultado de fechar uma vista: recusado (com a mensagem), ou a nova lista e a vista a ativar (se a fechada era a ativa). */
-export type CloseResult = { ok: false; message: string } | { ok: true; list: OpenView[]; activate: OpenView | null };
-
 /**
- * Regras de fechar uma aba (sem efeitos colaterais). `active` é a vista ativa agora.
- * - Última vista aberta: recusada.
+ * Regras de fechar uma aba (sem efeitos colaterais). `active` é a vista ativa agora. Qualquer vista pode fechar,
+ * inclusive a última: a área de desenho então mostra o estado vazio.
  * - Vista que não está aberta: nada muda.
- * - Fechar a ativa: a nova lista e a vizinha (`activate`) para o chamador ativar.
+ * - Fechar a ativa: a nova lista e a vizinha (`activate`, null se não sobrou nenhuma) para o chamador ativar.
  * - Fechar outra vista: só sai da lista; a ativa não muda.
  */
 export function closeView(list: readonly OpenView[], target: OpenView, active: OpenView | null): CloseResult {
-  if (!canClose(list)) return { ok: false, message: LAST_VIEW_MESSAGE };
-  if (!hasView(list, target)) return { ok: true, list: [...list], activate: null };
+  if (!hasView(list, target)) return { list: [...list], activate: null };
   const wasActive = active !== null && sameView(active, target);
-  return { ok: true, list: removeView(list, target), activate: wasActive ? neighborOf(list, target) : null };
+  return { list: removeView(list, target), activate: wasActive ? neighborOf(list, target) : null };
+}
+
+/** Nível cuja planta é liberada ao fechar a aba (só plantas têm nível); null para as demais vistas. */
+export function levelToRelease(v: OpenView): Id | null {
+  return v.kind === 'plan' ? v.levelId : null;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { activeViewOf, addView, canClose, closeView, defaultOpenViews, hasView, LAST_VIEW_MESSAGE, neighborOf, pruneViews, removeView, sameView, viewKey, type OpenView } from './openViews.ts';
+import { activeViewOf, addView, closeView, defaultOpenViews, hasView, levelToRelease, neighborOf, pruneViews, removeView, sameView, viewKey, type OpenView } from './openViews.ts';
 import { DEFAULT_OPEN_VIEWS, useUi } from './state.ts';
 
 const T0: OpenView = { kind: 'plan', levelId: 'lv_0' };
@@ -33,6 +33,10 @@ describe('abrir (addView)', () => {
     expect(addView(list, T0)).toBe(list);
   });
 
+  it('com a lista vazia (sem vista aberta), abrir uma vista a põe na lista', () => {
+    expect(addView([], V3D)).toEqual([V3D]);
+  });
+
   it('não muta a lista recebida', () => {
     const list = [T0];
     addView(list, T1);
@@ -41,29 +45,38 @@ describe('abrir (addView)', () => {
 });
 
 describe('fechar sem efeitos (closeView)', () => {
-  it('a última vista aberta não fecha: devolve a mensagem', () => {
+  it('a última vista aberta pode fechar: a lista fica vazia e nenhuma vista é ativada', () => {
     const r = closeView([T0], T0, T0);
-    expect(r).toEqual({ ok: false, message: LAST_VIEW_MESSAGE });
+    expect(r).toEqual({ list: [], activate: null });
+  });
+
+  it('fechar o 3D quando é a única aba deixa a lista vazia (sem vizinha)', () => {
+    expect(closeView([V3D], V3D, V3D)).toEqual({ list: [], activate: null });
   });
 
   it('fechar a ativa devolve a vizinha da direita para ativar', () => {
     const r = closeView([T0, T1, T2], T1, T1);
-    expect(r).toEqual({ ok: true, list: [T0, T2], activate: T2 });
+    expect(r).toEqual({ list: [T0, T2], activate: T2 });
   });
 
   it('fechar a ativa na última posição ativa a vizinha da esquerda', () => {
     const r = closeView([T0, T1, T2], T2, T2);
-    expect(r).toEqual({ ok: true, list: [T0, T1], activate: T1 });
+    expect(r).toEqual({ list: [T0, T1], activate: T1 });
   });
 
   it('fechar outra vista (não ativa) só tira da lista e não muda a ativa', () => {
     const r = closeView([T0, T1, T2], T0, T2);
-    expect(r).toEqual({ ok: true, list: [T1, T2], activate: null });
+    expect(r).toEqual({ list: [T1, T2], activate: null });
   });
 
   it('vista que não está aberta não altera a lista', () => {
     const r = closeView([T0, T1], T2, T0);
-    expect(r).toEqual({ ok: true, list: [T0, T1], activate: null });
+    expect(r).toEqual({ list: [T0, T1], activate: null });
+  });
+
+  it('fechar a ativa com duas abas ativa a outra', () => {
+    const r = closeView([T0, SEC], SEC, SEC);
+    expect(r).toEqual({ list: [T0], activate: T0 });
   });
 
   it('não muta a lista recebida', () => {
@@ -89,10 +102,11 @@ describe('vizinha, remoção e possibilidade de fechar', () => {
     expect(removeView([T0], T1)).toEqual([T0]);
   });
 
-  it('canClose só é verdadeiro com mais de uma vista', () => {
-    expect(canClose([T0])).toBe(false);
-    expect(canClose([T0, T1])).toBe(true);
-    expect(canClose([])).toBe(false);
+  it('levelToRelease: só a planta devolve o nível a liberar', () => {
+    expect(levelToRelease(T1)).toBe('lv_1');
+    expect(levelToRelease(V3D)).toBeNull();
+    expect(levelToRelease(SEC)).toBeNull();
+    expect(levelToRelease(SHEET)).toBeNull();
   });
 
   it('hasView identifica vista presente', () => {

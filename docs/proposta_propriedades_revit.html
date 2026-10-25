@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta · Paleta de Propriedades estilo Revit</title>
+<style>
+:root {
+  --bg: #dcdfe3; --chrome: #e6eaed; --panel: #f7f9fa; --sheet: #ffffff;
+  --line: #ced5db; --line-strong: #b2bcc4; --fg: #1a202c; --fg-soft: #4a5568; --fg-faint: #718096;
+  --accent: #0078d4; --accent-fg: #fff; --accent-soft: #deecf9; --ro: #eceff2; --warn: #c25e00;
+  --font-ui: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, Menlo, monospace;
+  --r: 3px; --shadow: 0 6px 22px rgba(0,0,0,.2);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141414; --chrome: #1d1d1d; --panel: #252525; --sheet: #1a1a1a;
+    --line: #383838; --line-strong: #484848; --fg: #f3f4f6; --fg-soft: #a1a1aa; --fg-faint: #71717a;
+    --accent: #60a5fa; --accent-fg: #0f172a; --accent-soft: #1e3a5f; --ro: #2e2e2e; --warn: #f0a050;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #141414; --chrome: #1d1d1d; --panel: #252525; --sheet: #1a1a1a;
+  --line: #383838; --line-strong: #484848; --fg: #f3f4f6; --fg-soft: #a1a1aa; --fg-faint: #71717a;
+  --accent: #60a5fa; --accent-fg: #0f172a; --accent-soft: #1e3a5f; --ro: #2e2e2e; --warn: #f0a050;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 12px/1.35 var(--font-ui); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* ---- cabeçalho da página ---- */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; background: var(--chrome); border-bottom: 1px solid var(--line-strong); position: sticky; top: 0; z-index: 5; }
+.top h1 { font-size: 14px; margin: 0; font-weight: 600; }
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.tab { border: 1px solid transparent; background: transparent; padding: 5px 11px; border-radius: var(--r); color: var(--fg-soft); font-weight: 500; }
+.tab:hover { background: var(--panel); border-color: var(--line); }
+.tab.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.top .spacer { flex: 1; }
+.pill { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 4px 10px; }
+.pill:hover { border-color: var(--accent); }
+
+.stage { display: flex; flex-wrap: wrap; gap: 20px; padding: 18px 16px 40px; align-items: flex-start; }
+.col h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-faint); font-weight: 600; }
+.col h2 b { color: var(--accent); }
+.frame { width: 300px; height: 780px; background: var(--panel); border: 1px solid var(--line-strong); box-shadow: var(--shadow); display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.notes { flex: 1; min-width: 300px; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 18px; }
+.notes h3 { margin: 14px 0 4px; font-size: 12.5px; }
+.notes h3:first-child { margin-top: 0; }
+.notes p, .notes li { color: var(--fg-soft); margin: 3px 0; font-size: 12px; }
+.notes ul { padding-left: 18px; margin: 4px 0; }
+.notes a { color: var(--accent); }
+.notes code { font-family: var(--font-mono); font-size: 11px; background: var(--chrome); padding: 0 4px; border-radius: 2px; }
+.tag { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); margin-left: 4px; }
+
+/* ================= PAINEL ATUAL (cópia do styles.css) ================= */
+.cur .panel-head { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
+.cur .panel-head span + span { color: var(--fg-faint); font-weight: 400; }
+.cur .scroll { overflow: auto; flex: 1; }
+.cur .typesel { padding: 5px 8px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
+.cur .typesel .row { display: flex; gap: 6px; }
+.cur .select, .cur .input { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 3px; padding: 3px 6px; height: 24px; min-width: 0; }
+.cur .typesel .select { flex: 1; }
+.cur .btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 2px 10px; border-radius: var(--r); white-space: nowrap; }
+.cur .btn:hover { border-color: var(--accent); }
+.cur .pgroup { border-bottom: 1px solid var(--line); }
+.cur .pgroup > .sum { cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; }
+.cur .pgroup > .sum::before { content: ''; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2px; transform: rotate(-45deg); }
+.cur .pgroup.open > .sum::before { transform: rotate(45deg); }
+.cur .pgroup:not(.open) > .body { display: none; }
+.cur .prow { display: grid; grid-template-columns: 122px minmax(0,1fr); align-items: center; gap: 6px; padding: 1px 8px; min-height: 20px; }
+.cur .prow > .lbl { font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cur .prow .input, .cur .prow .select { height: 20px; padding: 0 3px; border-color: transparent; background: transparent; width: 100%; }
+.cur .prow:hover .input, .cur .prow:hover .select { border-color: var(--line-strong); background: var(--sheet); }
+.cur .prow .val { font-family: var(--font-mono); font-size: 11px; text-align: right; white-space: nowrap; }
+.cur .prow .val.soft { color: var(--fg-soft); }
+.cur .prow .layer { display: contents; }
+
+/* ================= PAINEL PROPOSTO (estilo Revit) ================= */
+.rv-title { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 4px 10px; background: var(--chrome); border-bottom: 1px solid var(--line-strong); font-weight: 600; }
+.rv-title .x { border: 0; background: none; color: var(--fg-faint); font-size: 14px; line-height: 1; padding: 0 3px; }
+.rv-preview { position: relative; margin: 8px 8px 0; border: 1px solid var(--line-strong); background: linear-gradient(#f7fafc, #e3e9ee); height: 120px; display: grid; place-items: center; }
+.rv-preview svg { width: 100%; height: 100%; display: block; }
+.rv-preview .chip { position: absolute; left: 5px; bottom: 4px; font: 10px var(--font-mono); color: #4a5568; background: rgba(255,255,255,.8); padding: 0 5px; border-radius: 2px; }
+.rv-preview .dims { position: absolute; right: 5px; bottom: 4px; font: 10px var(--font-mono); color: #4a5568; background: rgba(255,255,255,.8); padding: 0 5px; border-radius: 2px; }
+.rv-tsel-wrap { position: relative; margin: 6px 8px 0; }
+.rv-tsel { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid var(--line-strong); background: var(--sheet); border-radius: var(--r); padding: 3px 8px; min-height: 38px; }
+.rv-tsel:hover, .rv-tsel[aria-expanded='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.rv-tsel .two { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rv-tsel .two b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-tsel .two span { font-size: 11px; color: var(--fg-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-tsel .chev { color: var(--fg-faint); font-size: 10px; }
+.rv-thumb { width: 38px; height: 26px; flex: 0 0 auto; background: linear-gradient(#f7fafc, #e3e9ee); border: 1px solid var(--line); display: block; }
+.rv-thumb svg { width: 100%; height: 100%; display: block; }
+.rv-menu { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 20; background: var(--sheet); border: 1px solid var(--accent); box-shadow: var(--shadow); max-height: 430px; display: flex; flex-direction: column; }
+.rv-menu .search { margin: 6px; border: 1px solid var(--line-strong); border-radius: var(--r); padding: 3px 7px; background: var(--sheet); height: 24px; }
+.rv-menu .search:focus { outline: none; border-color: var(--accent); }
+.rv-menu .list { overflow: auto; padding-bottom: 4px; }
+.rv-menu .fam { font-weight: 600; padding: 4px 8px 2px; font-size: 11px; color: var(--fg-soft); background: var(--chrome); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+.rv-menu .opt { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left; padding: 3px 8px 3px 14px; }
+.rv-menu .opt:hover { background: var(--accent-soft); }
+.rv-menu .opt.on { background: var(--accent); color: var(--accent-fg); }
+.rv-menu .opt .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-menu .opt .c { font: 10px var(--font-mono); opacity: .7; }
+.rv-menu .empty { padding: 10px; color: var(--fg-faint); }
+.rv-filter { display: flex; gap: 6px; margin: 6px 8px 8px; }
+.rv-filter .filt { flex: 1; text-align: left; border: 1px solid var(--line-strong); background: var(--sheet); border-radius: var(--r); padding: 2px 8px; height: 24px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+.rv-filter .filt i { font-style: normal; font-size: 10px; color: var(--fg-faint); }
+.rv-filter .edit { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 10px; height: 24px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.rv-filter .edit:hover { border-color: var(--accent); color: var(--accent); }
+.rv-scroll { overflow: auto; flex: 1; border-top: 1px solid var(--line-strong); background: var(--sheet); }
+.rv-g { border-bottom: 1px solid var(--line-strong); }
+.rv-gh { display: flex; align-items: center; justify-content: space-between; padding: 2px 8px; background: var(--chrome); font-weight: 600; cursor: pointer; user-select: none; border-bottom: 1px solid var(--line); }
+.rv-gh:hover { background: var(--accent-soft); }
+.rv-gh .ch { font-size: 9px; color: var(--fg-faint); transition: transform .12s; }
+.rv-g:not(.open) .ch { transform: rotate(180deg); }
+.rv-g:not(.open) .rv-gb { display: none; }
+.rv-r { display: grid; grid-template-columns: 46% 54%; min-height: 22px; border-bottom: 1px solid var(--line); align-items: stretch; }
+.rv-r:last-child { border-bottom: 0; }
+.rv-r > .l { padding: 2px 8px; color: var(--fg-soft); border-right: 1px solid var(--line); display: flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-r > .v { display: flex; align-items: center; min-width: 0; }
+.rv-r > .v input[type=text], .rv-r > .v select { border: 0; background: transparent; width: 100%; height: 100%; min-height: 21px; padding: 0 6px; border-radius: 0; }
+.rv-r > .v input[type=text]:focus, .rv-r > .v select:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--sheet); }
+.rv-r > .v .u { padding-right: 6px; color: var(--fg-faint); font-size: 11px; }
+.rv-r > .v.check { padding-left: 6px; }
+.rv-r.ro > .v, .rv-r.ro > .l { background: var(--ro); }
+.rv-r.ro > .v { padding: 0 6px; color: var(--fg-soft); }
+.rv-r > .v .btn { margin: 0 4px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 0 8px; height: 18px; font-size: 11px; }
+.rv-r .tmark { font-size: 9px; color: var(--accent); margin-left: 5px; border: 1px solid var(--accent); border-radius: 8px; padding: 0 4px; }
+.rv-r.layerrow > .v { gap: 6px; padding: 0 6px; }
+.sw { width: 10px; height: 10px; border: 1px solid rgba(0,0,0,.35); flex: 0 0 auto; }
+.rv-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-top: 1px solid var(--line-strong); background: var(--chrome); }
+.rv-foot a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.rv-foot .apply { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 14px; }
+.rv-foot .apply:hover { border-color: var(--accent); }
+.rv-hint { padding: 8px 10px; color: var(--fg-faint); font-size: 11px; }
+
+/* ================= DIÁLOGO PROPRIEDADES DO TIPO ================= */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; place-items: center; z-index: 50; }
+.scrim.on { display: grid; }
+.dlg { width: min(720px, 94vw); max-height: 90vh; background: var(--panel); border: 1px solid var(--line-strong); box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.dlg header { padding: 6px 10px; background: var(--chrome); border-bottom: 1px solid var(--line-strong); font-weight: 600; display: flex; justify-content: space-between; }
+.dlg .bar { display: grid; grid-template-columns: 70px 1fr auto; gap: 6px 8px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); }
+.dlg .bar .in { border: 1px solid var(--line-strong); background: var(--ro); border-radius: var(--r); padding: 3px 6px; }
+.dlg .bar .btns { display: flex; gap: 6px; }
+.dlg button.b { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 3px 12px; }
+.dlg button.b:hover { border-color: var(--accent); }
+.dlg button.b.p { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.dlg .mid { display: flex; min-height: 0; flex: 1; overflow: hidden; }
+.dlg .params { flex: 1; overflow: auto; background: var(--sheet); border-right: 1px solid var(--line-strong); }
+.dlg .pv { width: 240px; padding: 10px; background: var(--panel); }
+.dlg .pv .rv-preview { margin: 0; height: 160px; }
+.dlg footer { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line-strong); background: var(--chrome); }
+
+@media (max-width: 760px) { .frame { width: 100%; } }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Paleta de Propriedades · proposta estilo Revit</h1>
+  <div class="tabs" id="tabs"></div>
+  <span class="spacer"></span>
+  <button class="pill" id="theme">Tema: auto</button>
+</div>
+
+<div class="stage">
+  <div class="col"><h2>Atual (como está hoje)</h2><div class="frame cur" id="cur"></div></div>
+  <div class="col"><h2><b>Proposta</b> (estilo Revit)</h2><div class="frame" id="rev"></div></div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<div class="scrim" id="scrim"><div class="dlg" id="dlg"></div></div>
+
+<script>
+/* ===================== DADOS (espelham packages/model/src/defaults.ts) ===================== */
+const MAT = { tinta:'#f3efe4', reboco:'#d9d1bf', bloco:'#c47a55', gesso:'#f4f4f1', perfil:'#8f98a1', concreto:'#a2a7ac', ceramica:'#9db4c4', argamassa:'#cdc3ae', contrapiso:'#bdb6a8', laje:'#a2a7ac', porcelanato:'#c9d3da' };
+const FN = { finish1:'Acabamento 1', finish2:'Acabamento 2', substrate:'Substrato', structure:'Estrutura' };
+const L = (fn, mat, t) => ({ fn, mat, t });
+const WALL_TYPES = [
+  { id:'wt_alv14', fam:'Parede básica', name:'Alvenaria 14 + reboco', code:'PA-14', layers:[L('finish2','tinta',.002),L('substrate','reboco',.02),L('structure','bloco',.14),L('substrate','reboco',.02),L('finish2','tinta',.002)] },
+  { id:'wt_alv9',  fam:'Parede básica', name:'Alvenaria 9 (divisória)', code:'PA-09', layers:[L('finish2','tinta',.002),L('substrate','reboco',.015),L('structure','bloco',.09),L('substrate','reboco',.015),L('finish2','tinta',.002)] },
+  { id:'wt_ext19', fam:'Parede básica', name:'Externa 19 + cerâmica', code:'PE-19', layers:[L('finish1','ceramica',.01),L('substrate','argamassa',.02),L('structure','bloco',.19),L('substrate','reboco',.02),L('finish2','tinta',.002)] },
+  { id:'wt_dry',   fam:'Parede básica', name:'Drywall 7', code:'DW-07', layers:[L('finish1','gesso',.0125),L('structure','perfil',.048),L('finish1','gesso',.0125)] },
+  { id:'wt_conc15',fam:'Parede de concreto', name:'Concreto 15', code:'PC-15', layers:[L('finish2','tinta',.002),L('substrate','reboco',.015),L('structure','concreto',.15),L('substrate','reboco',.015),L('finish2','tinta',.002)] },
+];
+const D = (id, fam, name, code, w, h, sill, leaves, plan) => ({ id, kind:'door', fam, name, code, w, h, sill, leaves, plan });
+const J = (id, fam, name, code, w, h, sill, leaves, plan) => ({ id, kind:'window', fam, name, code, w, h, sill, leaves, plan });
+const DOOR_TYPES = [
+  D('ot_p70','Porta de giro 1 folha','Porta 70 x 210','P-01',.7,2.1,0,1,'swing'),
+  D('ot_p80','Porta de giro 1 folha','Porta 80 x 210','P-02',.8,2.1,0,1,'swing'),
+  D('ot_p90','Porta de giro 1 folha','Porta 90 x 210','P-03',.9,2.1,0,1,'swing'),
+  D('ot_p160','Porta de giro 2 folhas','Porta dupla 160 x 210','P-04',1.6,2.1,0,2,'double'),
+  D('ot_pc160','Porta de correr','Porta de correr 160 x 210','P-05',1.6,2.1,0,2,'sliding'),
+  D('ot_pp80','Porta pivotante','Porta pivotante 80 x 210','P-06',.8,2.1,0,1,'pivot'),
+  D('ot_vao90','Vão livre','Vão livre 90 x 210','V-01',.9,2.1,0,0,'swing'),
+];
+const WIN_TYPES = [
+  J('ot_j120','Janela de correr','Janela 120 x 120','J-01',1.2,1.2,1.1,2,'sliding'),
+  J('ot_j150','Janela de correr','Janela 150 x 100','J-02',1.5,1.0,1.1,2,'sliding'),
+  J('ot_j200','Janela de correr','Janela 200 x 120','J-04',2.0,1.2,1.0,2,'sliding'),
+  J('ot_j240','Janela de correr','Janela de correr 240 x 120 (3 folhas)','J-06',2.4,1.2,1.1,3,'sliding'),
+  J('ot_j60','Janela de abrir','Janela 60 x 60','J-03',.6,.6,1.5,1,'casement'),
+  J('ot_jfixa60','Janela fixa','Janela fixa 60 x 60','J-05',.6,.6,1.5,1,'fixed'),
+  J('ot_jv120','Vão de janela','Vão livre de janela 120 x 120','V-02',1.2,1.2,1.0,0,'fixed'),
+];
+const FLOOR_TYPES = [
+  { id:'ft_porc', fam:'Piso', name:'Porcelanato 60 sobre contrapiso', code:'PI-01', layers:[L('finish1','porcelanato',.01),L('substrate','argamassa',.02),L('substrate','contrapiso',.04),L('structure','laje',.12)] },
+  { id:'ft_conc', fam:'Piso', name:'Concreto polido 10', code:'PI-02', layers:[L('finish1','concreto',.01),L('structure','laje',.10)] },
+];
+const LEVELS = ['Térreo','Pavimento 2'];
+
+/* ===================== PREVIEWS (SVG gerados dos dados do tipo) ===================== */
+const wallBg = `<defs><pattern id="hh" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="rgba(0,0,0,.35)" stroke-width="1"/></pattern></defs>`;
+function svgLayers(t, vertical) {
+  const total = t.layers.reduce((s, l) => s + l.t, 0);
+  let out = wallBg;
+  if (!vertical) {                                  // seção horizontal da parede (planta cortada)
+    const s = Math.min(150 / total, 700), x0 = 100 - total * s / 2; let x = x0;
+    out += `<text x="${x0 - 6}" y="64" text-anchor="end" font-size="8" fill="#718096">Ext.</text><text x="${x0 + total * s + 6}" y="64" font-size="8" fill="#718096">Int.</text>`;
+    t.layers.forEach(l => {
+      const w = l.t * s;
+      out += `<rect x="${x}" y="16" width="${w}" height="84" fill="${MAT[l.mat]}" stroke="#2d3748" stroke-width=".6"/>`;
+      if (l.fn === 'structure') out += `<rect x="${x}" y="16" width="${w}" height="84" fill="url(#hh)"/>`;
+      x += w;
+    });
+    out += `<line x1="${x0}" y1="108" x2="${x0 + total * s}" y2="108" stroke="#4a5568" stroke-width=".8"/><line x1="${x0}" y1="105" x2="${x0}" y2="111" stroke="#4a5568"/><line x1="${x0 + total * s}" y1="105" x2="${x0 + total * s}" y2="111" stroke="#4a5568"/>`;
+  } else {                                          // seção vertical do piso
+    const s = Math.min(70 / total, 500), w = 150, x0 = 25; let y = 20;
+    t.layers.forEach(l => {
+      const h = l.t * s;
+      out += `<rect x="${x0}" y="${y}" width="${w}" height="${h}" fill="${MAT[l.mat]}" stroke="#2d3748" stroke-width=".6"/>`;
+      if (l.fn === 'structure') out += `<rect x="${x0}" y="${y}" width="${w}" height="${h}" fill="url(#hh)"/>`;
+      y += h;
+    });
+    out += `<text x="${x0}" y="${y + 14}" font-size="8" fill="#718096">espessura total ${fmt(total * 100, 1)} cm</text>`;
+  }
+  return `<svg viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${out}</svg>`;
+}
+function svgDoor(t) {
+  const s = Math.min(92 / t.h, 150 / t.w), W = t.w * s, H = t.h * s, x0 = 100 - W / 2, y0 = 108 - H, fw = Math.max(2.2, .05 * s);
+  let o = wallBg + `<rect x="8" y="12" width="184" height="96" fill="url(#hh)" opacity=".18"/><line x1="8" y1="108" x2="192" y2="108" stroke="#4a5568" stroke-width="1.4"/>`;
+  o += `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="#fafcfd"/>`;
+  const n = Math.max(t.leaves, 1), iw = W - 2 * fw, lw = iw / n;
+  if (t.leaves === 0) {
+    o += `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="none" stroke="#2d3748" stroke-dasharray="4 3"/><text x="100" y="${y0 + H / 2}" text-anchor="middle" font-size="9" fill="#718096">vão livre</text>`;
+  } else {
+    for (let i = 0; i < n; i++) {
+      const lx = x0 + fw + i * lw + (t.plan === 'sliding' && i === 1 ? -lw * .15 : 0);
+      o += `<rect x="${lx}" y="${y0 + fw}" width="${lw}" height="${H - fw}" fill="#b98a5b" stroke="#5c4128" stroke-width=".8"/>`;
+      o += `<rect x="${lx + lw * .15}" y="${y0 + fw + 5}" width="${lw * .7}" height="${(H - fw) * .38}" fill="none" stroke="#7a5a37" stroke-width=".6"/>`;
+      o += `<rect x="${lx + lw * .15}" y="${y0 + fw + (H - fw) * .5}" width="${lw * .7}" height="${(H - fw) * .42}" fill="none" stroke="#7a5a37" stroke-width=".6"/>`;
+      const kx = t.plan === 'double' ? (i === 0 ? lx + lw - 4 : lx + 4) : lx + lw - 5;
+      if (t.plan !== 'pivot') o += `<circle cx="${kx}" cy="${y0 + H * .52}" r="1.7" fill="#ecc66a" stroke="#6b5420" stroke-width=".4"/>`;
+    }
+    if (t.plan === 'pivot') o += `<line x1="${x0 + W * .42}" y1="${y0 - 4}" x2="${x0 + W * .42}" y2="${y0 + H + 4}" stroke="#d13438" stroke-dasharray="3 2"/>`;
+    if (t.plan === 'sliding') o += `<path d="M${x0 + 8} ${y0 + H * .2} h${W - 16}" stroke="#0078d4" stroke-width="1.2" marker-start="url(#ar)" marker-end="url(#ar)"/><defs><marker id="ar" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#0078d4"/></marker></defs>`;
+  }
+  o += `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="none" stroke="#5c4128" stroke-width="${fw}"/>`;
+  return `<svg viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${o}</svg>`;
+}
+function svgWindow(t) {
+  const s = Math.min(70 / t.h, 150 / t.w), W = t.w * s, H = t.h * s, x0 = 100 - W / 2, y0 = 60 - H / 2, fw = Math.max(2, .05 * s);
+  let o = wallBg + `<rect x="8" y="8" width="184" height="104" fill="url(#hh)" opacity=".18"/>`;
+  o += `<defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6ecfa"/><stop offset="1" stop-color="#9ccbe6"/></linearGradient></defs>`;
+  o += `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="url(#gl)"/>`;
+  const n = Math.max(t.leaves, 1), iw = W - 2 * fw, lw = iw / n;
+  if (t.leaves === 0) o += `<text x="100" y="${y0 + H / 2}" text-anchor="middle" font-size="9" fill="#4a5568">vão sem esquadria</text>`;
+  for (let i = 0; t.leaves > 0 && i < n; i++) {
+    const lx = x0 + fw + i * lw;
+    o += `<rect x="${lx}" y="${y0 + fw}" width="${lw}" height="${H - 2 * fw}" fill="none" stroke="#6c7782" stroke-width="${Math.max(1.2, fw * .7)}"/>`;
+    if (t.plan === 'casement') o += `<path d="M${lx} ${y0 + fw} L${lx + lw} ${y0 + H / 2} L${lx} ${y0 + H - fw}" fill="none" stroke="#4a5568" stroke-width=".7" stroke-dasharray="3 2"/>`;
+    if (t.plan === 'sliding') o += `<path d="M${lx + 5} ${y0 + H / 2} h${lw - 10}" stroke="#0078d4" stroke-width="1" marker-end="url(#ar2)" ${i % 2 ? 'transform="translate(0 0)"' : ''}/>`;
+    if (t.plan === 'fixed' || t.plan === 'sliding') o += `<path d="M${lx + lw * .2} ${y0 + H * .85} L${lx + lw * .55} ${y0 + H * .2}" stroke="#fff" stroke-opacity=".7" stroke-width="2"/>`;
+  }
+  o += `<defs><marker id="ar2" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6z" fill="#0078d4"/></marker></defs>`;
+  o += `<rect x="${x0}" y="${y0}" width="${W}" height="${H}" fill="none" stroke="#6c7782" stroke-width="${fw}"/>`;
+  o += `<rect x="${x0 - 3}" y="${y0 + H + fw / 2}" width="${W + 6}" height="3" fill="#8d98a3" stroke="#4a5568" stroke-width=".5"/>`;
+  return `<svg viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${o}</svg>`;
+}
+function previewSvg(sc, t) {
+  if (sc.kind === 'wall') return svgLayers(t, false);
+  if (sc.kind === 'floor') return svgLayers(t, true);
+  return t.kind === 'door' ? svgDoor(t) : svgWindow(t);
+}
+
+/* ===================== CENÁRIOS ===================== */
+const fmt = (n, d = 2) => n.toFixed(d).replace('.', ',');
+const totalT = t => t.layers.reduce((s, l) => s + l.t, 0);
+const SC = {
+  wall:   { label:'Parede',  kind:'wall',  types:WALL_TYPES,  cur:'wt_alv14', cat:'Paredes (1)',  typeLabel:'Tipo de parede' },
+  door:   { label:'Porta',   kind:'door',  types:DOOR_TYPES,  cur:'ot_p80',   cat:'Portas (1)',   typeLabel:'Tipo de abertura' },
+  window: { label:'Janela',  kind:'window',types:WIN_TYPES,   cur:'ot_j120',  cat:'Janelas (1)',  typeLabel:'Tipo de abertura' },
+  floor:  { label:'Piso',    kind:'floor', types:FLOOR_TYPES, cur:'ft_porc',  cat:'Pisos (1)',    typeLabel:'Tipo de piso' },
+  tool:   { label:'Ferramenta Porta (colocar)', kind:'door', tool:true, types:DOOR_TYPES, cur:'ot_p90', cat:'Colocar Porta', typeLabel:'Tipo de abertura' },
+  view:   { label:'Nada selecionado (Vista)', kind:'view', cat:'Planta de piso', typeLabel:'' },
+};
+const state = { sc:'wall', menu:false, q:'', open:{}, dlg:false };
+const typeOf = sc => sc.types.find(t => t.id === sc.cur);
+
+/* grupos de parâmetros — cada linha: [rótulo, tipo, valor, extra] ; tipos: sel, num, txt, chk, ro, btn, layer */
+function groups(sc) {
+  const t = sc.types && typeOf(sc);
+  if (sc.kind === 'wall') {
+    return [
+      { n:'Restrições', open:true, r:[
+        ['Nível base','sel',LEVELS,0],['Desloc. da base','num','0,00','m'],['Nível superior','sel',['Não vinculado','Até Pavimento 2'],1],
+        ['Desloc. do topo','num','0,00','m'],['Topo no telhado','chk',false],['Base no piso','btn','Anexar'],
+        ['Linha de localização','sel',['Eixo da parede','Eixo do núcleo','Face externa','Face interna'],1],['Inverter lado externo','chk',false]] },
+      { n:'Junções', open:true, r:[['Início: junção','sel',['Encosto','Esquadria'],0],['Fim: junção','sel',['Encosto','Esquadria'],1]] },
+      { n:'Construção', open:false, r:[['Espessura total','ro',fmt(totalT(t) * 100, 1) + ' cm', 'type'], ...t.layers.map(l => ['Camada · ' + FN[l.fn],'layer',fmt(l.t * 100, 1) + ' cm', MAT[l.mat]])] },
+      { n:'Dimensões', open:true, r:[['Comprimento','ro','4,250 m'],['Área líquida','ro',fmt(11.07,2) + ' m²'],['Volume','ro',fmt(11.07 * totalT(t),3) + ' m³']] },
+      { n:'Identidade', open:false, r:[['Marca','txt',''],['Comentários','txt','']] },
+    ];
+  }
+  if (sc.kind === 'door' || sc.kind === 'window') {
+    const isD = sc.kind === 'door';
+    const r1 = sc.tool ? [] : [['Distância ao início','num','1,20','m']];
+    return [
+      { n:'Restrições', open:true, r:[['Nível','sel',LEVELS,0], ...r1, ['Peitoril','num',fmt(t.sill),'m'],['Inverter dobradiça','chk',false],['Inverter sentido','chk',false]] },
+      { n:'Dimensões', open:true, r:[['Largura','ro',fmt(t.w * 100,0) + ' cm','type'],['Altura','ro',fmt(t.h * 100,0) + ' cm','type'],...(sc.tool ? [] : [['Anfitriã','ro','Alvenaria 14 + reboco']])] },
+      { n:'Identidade', open:false, r:[['Marca','txt',sc.tool ? '' : t.code],['Código do tipo','ro',t.code,'type']] },
+    ];
+  }
+  if (sc.kind === 'floor') {
+    return [
+      { n:'Restrições', open:true, r:[['Nível','sel',LEVELS,0],['Desloc. do nível','num','0,00','m'],['Limite no núcleo','chk',true]] },
+      { n:'Construção', open:true, r:[['Espessura total','ro',fmt(totalT(t) * 100,1) + ' cm','type'], ...t.layers.map(l => ['Camada · ' + FN[l.fn],'layer',fmt(l.t * 100,1) + ' cm',MAT[l.mat]])] },
+      { n:'Dimensões', open:true, r:[['Área','ro','18,40 m²'],['Perímetro','ro','17,20 m'],['Volume','ro',fmt(18.4 * totalT(t),3) + ' m³']] },
+      { n:'Identidade', open:false, r:[['Marca','txt',''],['Comentários','txt','']] },
+    ];
+  }
+  return [
+    { n:'Vista', open:true, r:[['Nível','sel',LEVELS,0],['Elevação','ro','0,00 m'],['Grade','chk',true],['Subpavimento','chk',false],['Projeção da cobertura','chk',false],['Nível de detalhe','sel',['Grosseiro','Médio','Fino'],1]] },
+    { n:'Intervalo de vista', open:true, r:[['Topo','num','2,30','m'],['Plano de corte','num','1,20','m'],['Base','num','0,00','m'],['Profundidade','num','0,00','m'],['Direção da vista','sel',['Para baixo','Para cima (planta de forro)'],0]] },
+    { n:'Padrões do projeto', open:false, r:[['Tolerância de junção','num','5,0','cm'],['Altura de parede','num','3,00','m']] },
+  ];
+}
+
+/* ===================== RENDER: PAINEL ATUAL ===================== */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function curRow(r) {
+  const [l, k, v, x] = r;
+  let c = '';
+  if (k === 'sel') c = `<select class="select">${v.map((o,i)=>`<option ${i===x?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (k === 'num') c = `<span><input class="input" value="${esc(v)}" style="width:62px"> <span style="color:var(--fg-faint);font:11px var(--font-mono)">${x}</span></span>`;
+  else if (k === 'txt') c = `<input class="input" value="${esc(v)}">`;
+  else if (k === 'chk') c = `<input type="checkbox" ${v?'checked':''}>`;
+  else if (k === 'btn') c = `<button class="btn">${v}</button>`;
+  else c = `<span class="val soft">${esc(v)}</span>`;
+  return `<div class="prow"><span class="lbl">${esc(l)}</span>${c}</div>`;
+}
+function renderCur() {
+  const sc = SC[state.sc], t = sc.types && typeOf(sc);
+  const head = sc.kind === 'view' ? 'Vista' : sc.tool ? 'Porta (ferramenta)' : sc.label.toLowerCase();
+  let h = `<div class="panel-head"><span>Propriedades</span><span>${esc(head)}</span></div><div class="scroll">`;
+  if (sc.kind === 'view') h += `<div class="typesel"><strong>Planta · Térreo</strong></div>`;
+  else {
+    h += `<div class="typesel"><select class="select" disabled style="opacity:1">${sc.types.map(x=>`<option ${x.id===sc.cur?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+      <div class="row"><button class="btn">Editar tipo…</button>${sc.kind==='wall'?'<button class="btn">Duplicar tipo</button>':''}</div></div>`;
+  }
+  groups(sc).forEach((g, i) => {
+    const key = 'c' + state.sc + i, open = key in state.open ? state.open[key] : g.open;
+    h += `<div class="pgroup ${open?'open':''}" data-k="${key}"><div class="sum" data-tg="${key}">${esc(g.n)}</div><div class="body">${g.r.map(curRow).join('')}</div></div>`;
+  });
+  document.getElementById('cur').innerHTML = h + '</div>';
+  // o seletor "atual" é nativo: reativa a troca de tipo
+  const s = document.querySelector('#cur .typesel .select');
+  if (s) { s.disabled = false; s.onchange = () => { sc.cur = sc.types[s.selectedIndex].id; render(); }; }
+}
+
+/* ===================== RENDER: PAINEL PROPOSTO ===================== */
+function revRow(r) {
+  const [l, k, v, x] = r;
+  const typeMark = x === 'type' ? `<span class="tmark" title="Parâmetro do tipo — edite em Editar tipo">tipo</span>` : '';
+  if (k === 'ro') return `<div class="rv-r ro"><div class="l">${esc(l)}${typeMark}</div><div class="v">${esc(v)}</div></div>`;
+  if (k === 'layer') return `<div class="rv-r ro layerrow"><div class="l">${esc(l)}</div><div class="v"><i class="sw" style="background:${x}"></i>${esc(v)}</div></div>`;
+  let c = '';
+  if (k === 'sel') c = `<select>${v.map((o,i)=>`<option ${i===x?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (k === 'num') c = `<input type="text" value="${esc(v)}"><span class="u">${x}</span>`;
+  else if (k === 'txt') c = `<input type="text" value="${esc(v)}">`;
+  else if (k === 'chk') return `<div class="rv-r"><div class="l">${esc(l)}</div><div class="v check"><input type="checkbox" ${v?'checked':''}></div></div>`;
+  else if (k === 'btn') c = `<button class="btn">${v}</button>`;
+  return `<div class="rv-r"><div class="l">${esc(l)}</div><div class="v">${c}</div></div>`;
+}
+function thumb(sc, t) { return `<span class="rv-thumb">${previewSvg(sc, t)}</span>`; }
+function menuHtml(sc) {
+  const q = state.q.trim().toLowerCase();
+  const list = sc.types.filter(t => !q || (t.fam + ' ' + t.name + ' ' + t.code).toLowerCase().includes(q));
+  let h = `<div class="rv-menu"><input class="search" id="q" placeholder="Pesquisar tipos…" value="${esc(state.q)}"><div class="list">`;
+  let last = '';
+  list.forEach(t => {
+    if (t.fam !== last) { h += `<div class="fam">${esc(t.fam)}</div>`; last = t.fam; }
+    h += `<button class="opt ${t.id===sc.cur?'on':''}" data-t="${t.id}">${thumb(sc, t)}<span class="n">${esc(t.name)}</span><span class="c">${esc(t.code)}</span></button>`;
+  });
+  if (!list.length) h += `<div class="empty">Nenhum tipo encontrado.</div>`;
+  return h + '</div></div>';
+}
+function renderRev() {
+  const sc = SC[state.sc], t = sc.types && typeOf(sc);
+  let h = `<div class="rv-title"><span>Propriedades</span><button class="x" title="Fechar">✕</button></div>`;
+  if (sc.kind !== 'view') {
+    const dims = sc.kind === 'door' || sc.kind === 'window' ? `${fmt(t.w*100,0)} × ${fmt(t.h*100,0)} cm` : `${fmt(totalT(t)*100,1)} cm`;
+    h += `<div class="rv-preview">${previewSvg(sc, t)}<span class="chip">${esc(t.code)}</span><span class="dims">${dims}</span></div>
+      <div class="rv-tsel-wrap"><button class="rv-tsel" id="tsel" aria-expanded="${state.menu}">${thumb(sc, t)}<span class="two"><b>${esc(t.fam)}</b><span>${esc(t.name)}</span></span><span class="chev">▼</span></button>${state.menu ? menuHtml(sc) : ''}</div>`;
+  } else {
+    h += `<div class="rv-tsel-wrap"><button class="rv-tsel" style="margin-top:2px"><span class="two"><b>Planta de piso</b><span>Planta · Térreo</span></span><span class="chev">▼</span></button></div>`;
+  }
+  h += `<div class="rv-filter"><button class="filt">${esc(sc.cat)}<i>▼</i></button>${sc.tool ? '' : '<button class="edit" id="edit">✎ Editar tipo</button>'}${sc.tool ? '<button class="edit" id="edit">✎ Editar tipo</button>' : ''}</div><div class="rv-scroll">`;
+  groups(sc).forEach((g, i) => {
+    const key = 'r' + state.sc + i, open = key in state.open ? state.open[key] : g.open;
+    h += `<div class="rv-g ${open?'open':''}"><div class="rv-gh" data-tg="${key}"><span>${esc(g.n)}</span><span class="ch">▲</span></div><div class="rv-gb">${g.r.map(revRow).join('')}</div></div>`;
+  });
+  if (sc.kind === 'view') h += `<div class="rv-hint">Selecione um elemento para ver suas propriedades.</div>`;
+  h += `</div><div class="rv-foot"><a>Ajuda de propriedades</a><button class="apply">Aplicar</button></div>`;
+  document.getElementById('rev').innerHTML = h;
+  const q = document.getElementById('q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+}
+
+/* ===================== DIÁLOGO "EDITAR TIPO" ===================== */
+function openDlg() {
+  const sc = SC[state.sc]; if (!sc.types) return;
+  const t = typeOf(sc); let rows = '';
+  const R = (l, v) => `<div class="rv-r"><div class="l">${esc(l)}</div><div class="v"><input type="text" value="${esc(v)}"></div></div>`;
+  const G = (n, body) => `<div class="rv-g open"><div class="rv-gh"><span>${n}</span></div><div class="rv-gb">${body}</div></div>`;
+  if (sc.kind === 'wall' || sc.kind === 'floor') {
+    rows = G('Construção', `<div class="rv-r ro"><div class="l">Espessura total</div><div class="v">${fmt(totalT(t)*100,1)} cm</div></div>` +
+      t.layers.map((l,i)=>`<div class="rv-r"><div class="l">${i+1}. ${FN[l.fn]}</div><div class="v"><i class="sw" style="background:${MAT[l.mat]};margin-left:6px"></i><input type="text" value="${fmt(l.t*100,1)} cm"></div></div>`).join('')) + G('Identidade', R('Código do tipo', t.code) + R('Descrição', ''));
+  } else {
+    rows = G('Dimensões', R('Largura', fmt(t.w*100,0)+' cm') + R('Altura', fmt(t.h*100,0)+' cm') + R('Peitoril padrão', fmt(t.sill*100,0)+' cm') + R('Nº de folhas', String(t.leaves))) +
+      G('Materiais e acabamentos', R('Material da esquadria', sc.kind==='door'?'Madeira':'Alumínio') + R('Material do vidro', 'Vidro')) + G('Identidade', R('Código do tipo', t.code));
+  }
+  document.getElementById('dlg').innerHTML = `<header><span>Propriedades do tipo</span><span style="cursor:pointer" data-close>✕</span></header>
+    <div class="bar"><label>Família:</label><div class="in">${esc(t.fam)}</div><div class="btns"><button class="b">Carregar…</button></div>
+      <label>Tipo:</label><div class="in">${esc(t.name)}</div><div class="btns"><button class="b">Duplicar…</button><button class="b">Renomear…</button></div></div>
+    <div class="mid"><div class="params">${rows}</div><div class="pv"><div class="rv-preview">${previewSvg(sc, t)}</div><p style="color:var(--fg-faint);font-size:11px">Pré-visualização atualizada conforme os parâmetros do tipo mudam.</p></div></div>
+    <footer><button class="b p" data-close>OK</button><button class="b" data-close>Cancelar</button><button class="b" data-close>Aplicar</button></footer>`;
+  document.getElementById('scrim').classList.add('on');
+}
+
+/* ===================== NOTAS ===================== */
+function renderNotes() {
+  document.getElementById('notes').innerHTML = `
+  <h3>O que o Revit faz de fato</h3>
+  <p>Segundo a <a href="https://help.autodesk.com/cloudhelp/2023/ENU/Revit-GetStarted/files/GUID-A764EA7A-FE26-469B-857C-F3A70812FC34.htm" target="_blank" rel="noopener">ajuda oficial da Autodesk</a>, a paleta é, de cima para baixo:</p>
+  <ul>
+    <li><b>Seletor de tipo</b> — mostra a família/tipo atual e abre a lista para trocar; aparece com uma ferramenta de colocação ativa <i>ou</i> com elementos do mesmo tipo selecionados.</li>
+    <li><b>Filtro de propriedades</b> — categoria e quantidade ("Paredes (3)"); com várias categorias, deixa escolher qual ver.</li>
+    <li><b>Editar tipo</b> — abre o diálogo de propriedades do tipo, que tem a <b>pré-visualização</b> (<a href="https://help.autodesk.com/cloudhelp/2017/ENU/Revit-GetStarted/files/GUID-119039A6-7720-43ED-975F-2B00009CE010.htm" target="_blank" rel="noopener">Preview Family Types</a>).</li>
+    <li><b>Parâmetros de instância</b> em grupos recolhíveis; os <b>somente leitura ficam sombreados</b> (calculados, ou controlados por outro parâmetro).</li>
+    <li><b>Sem seleção</b>, a paleta mostra as propriedades da vista ativa.</li>
+  </ul>
+  <p>Fonte não confirma: o tamanho exato da miniatura. Nas versões recentes, a miniatura do tipo aparece junto ao seletor — usei isso como referência e deixei o tamanho ajustável.</p>
+
+  <h3>O que mudou na proposta</h3>
+  <ul>
+    <li><b>Prévia do tipo no topo</b> (gerada dos dados: camadas da parede, elevação de porta/janela com folhas e sentido de correr) <span class="tag">novo</span></li>
+    <li><b>Seletor em duas linhas</b> (Família em negrito, Tipo embaixo) com <b>miniatura</b>; a lista tem <b>busca</b>, <b>agrupa por família</b> e mostra miniatura + código (P-02, J-01…) <span class="tag">novo</span></li>
+    <li><b>Linha de filtro</b> "Portas (1)" + botão <b>Editar tipo</b> ao lado, no lugar dos dois botões soltos <span class="tag">novo</span></li>
+    <li><b>Linhas de tabela</b> com divisórias; leitura somente em cinza; selo <code>tipo</code> nos parâmetros que vêm do tipo (Largura, Altura, Espessura) — avisa "mudar aqui altera todas as instâncias" <span class="tag">novo</span></li>
+    <li><b>Rodapé</b>: ajuda + Aplicar (opcional — hoje o app já aplica ao sair do campo)</li>
+    <li><b>Ferramenta ativa</b>: abra a aba "Ferramenta Porta" para ver a escolha do tipo <i>antes</i> de colocar</li>
+    <li>"Duplicar tipo" migra para dentro do diálogo Editar tipo, como no Revit</li>
+  </ul>
+
+  <h3>Experimente</h3>
+  <ul>
+    <li>Clique no seletor de tipo (direita) e digite "correr" na busca.</li>
+    <li>Troque entre Parede / Porta / Janela / Piso e compare com o painel atual à esquerda.</li>
+    <li>Clique em <b>Editar tipo</b>. Os grupos recolhem ao clicar no título.</li>
+  </ul>
+  <h3>Se aprovar, no código</h3>
+  <p><code>Properties.tsx</code> ganha um <code>TypeSelector</code> compartilhado (prévia + lista) usado por Parede, Abertura, Piso, Laje, Forro, Telhado e Escada; a prévia reaproveita os símbolos de <code>packages/render</code>. Estilo em <code>styles.css</code> (<code>.typesel</code>, <code>.prow</code>).</p>`;
+}
+
+/* ===================== EVENTOS ===================== */
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = Object.entries(SC).map(([k, v]) => `<button class="tab ${k===state.sc?'on':''}" data-sc="${k}">${v.label}</button>`).join('');
+}
+function render() { renderTabs(); renderCur(); renderRev(); }
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-sc]');
+  if (a) { state.sc = a.dataset.sc; state.menu = false; state.q = ''; return render(); }
+  const g = e.target.closest('[data-tg]');
+  if (g) { const k = g.dataset.tg, el = g.parentElement; el.classList.toggle('open'); state.open[k] = el.classList.contains('open'); return; }
+  if (e.target.closest('#tsel')) { state.menu = !state.menu; state.q = ''; return renderRev(); }
+  const o = e.target.closest('.opt');
+  if (o) { SC[state.sc].cur = o.dataset.t; state.menu = false; state.q = ''; return render(); }
+  if (e.target.closest('#edit')) return openDlg();
+  if (e.target.closest('[data-close]') || e.target.id === 'scrim') return document.getElementById('scrim').classList.remove('on');
+  if (state.menu && !e.target.closest('.rv-menu')) { state.menu = false; renderRev(); }
+});
+document.addEventListener('input', e => { if (e.target.id === 'q') { state.q = e.target.value; renderRev(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { state.menu = false; document.getElementById('scrim').classList.remove('on'); renderRev(); } });
+let themeIdx = 0; const themes = ['auto','light','dark'];
+document.getElementById('theme').onclick = function () {
+  themeIdx = (themeIdx + 1) % 3; const t = themes[themeIdx];
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  this.textContent = 'Tema: ' + t;
+};
+renderNotes(); render();
+</script>
+</body>
+</html>

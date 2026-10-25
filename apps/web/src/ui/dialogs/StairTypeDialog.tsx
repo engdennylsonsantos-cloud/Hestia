@@ -6,6 +6,8 @@ import { keptStairType } from '../../editor/stairActions.ts';
 import { duplicateStairType, stairTypeDeleteBlock, stairTypeError, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
+import { TypeDialogHeader } from './TypeDialogHeader.tsx';
+import { FAMILY } from '../typeFamilies.ts';
 import { StairSectionPreview } from './StairSectionPreview.tsx';
 
 const STYLE_LABEL: Record<StairRunStyle, string> = { monolithic: 'Monolítico (concreto)', assembled: 'Piso e espelho (montado)', post: 'Poste central' };
@@ -40,6 +42,11 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
           ? { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.05, riserThickness: 0, treadOverlap: draft.treadOverlap || 0.025 }
           : { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.03, riserThickness: draft.riserThickness || 0.02 },
     );
+  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+  const apply = (): void => {
+    if (error) return;
+    editor.store.exec({ type: 'upsertStairType', stairType: draft }, 'Editar tipo de escada');
+  };
   const ok = (): void => {
     if (error) return;
     editor.store.exec({ type: 'upsertStairType', stairType: draft }, 'Editar tipo de escada');
@@ -70,14 +77,15 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
       size="mid"
       footer={
         <>
-          <button className="btn" onClick={duplicate}>Duplicar</button>
           <button className="btn danger" disabled={blocked !== null} title={blocked ?? 'Excluir tipo'} onClick={del}>Excluir</button>
           <span style={{ flex: 1 }} />
           <button className="btn" onClick={close}>Cancelar</button>
+          <button className="btn" onClick={apply} disabled={error !== null}>Aplicar</button>
           <button className="btn primary" onClick={ok} disabled={error !== null} title={error ?? undefined}>OK</button>
         </>
       }
     >
+      <TypeDialogHeader family={FAMILY.stair} types={Object.values(p.stairTypes)} currentId={draft.id} nameFieldId="stt-name" onDuplicate={duplicate} />
       <div className="field-row">
         <label htmlFor="stt-name">Nome do tipo</label>
         <TextField id="stt-name" value={draft.name} onCommit={(v) => set({ name: v })} />

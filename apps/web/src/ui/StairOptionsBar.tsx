@@ -15,7 +15,7 @@ function act(fn: (t: StairTool) => void): void {
 }
 
 /** Muda uma opção da escada e recalcula a análise (limites, topo e altura entram no cálculo do croqui). */
-function setStairOpt(patch: Partial<StairToolOptions>): void {
+export function setStairOpt(patch: Partial<StairToolOptions>): void {
   const o = useUi.getState().options;
   useUi.setState({ options: { ...o, stair: { ...o.stair, ...patch } } });
   // `refresh` mantém o traçado em curso e a fase do croqui; só a análise e a prévia mudam.

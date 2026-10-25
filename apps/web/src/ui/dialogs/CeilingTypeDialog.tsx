@@ -6,6 +6,8 @@ import { duplicateCeilingType, ceilingTypeDeleteBlock, ceilingTypeError, ceiling
 import { NumField, TextField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { TypeDialogHeader } from './TypeDialogHeader.tsx';
+import { FAMILY } from '../typeFamilies.ts';
 import { SlabSectionPreview } from './SlabSectionPreview.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
@@ -52,6 +54,11 @@ export function CeilingTypeDialog({ typeId }: { typeId: string }): ReactElement 
       setAdv(null);
     }
   };
+  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+  const apply = (): void => {
+    if (error) return;
+    editor.store.exec({ type: 'upsertCeilingType', ceilingType: draft }, 'Editar tipo de forro');
+  };
   const ok = (): void => {
     if (error) return;
     editor.store.exec({ type: 'upsertCeilingType', ceilingType: draft }, 'Editar tipo de forro');
@@ -82,14 +89,15 @@ export function CeilingTypeDialog({ typeId }: { typeId: string }): ReactElement 
         size="mid"
         footer={
           <>
-            <button className="btn" onClick={duplicate}>Duplicar</button>
             <button className="btn danger" disabled={blocked !== null} title={blocked ?? 'Excluir tipo'} onClick={del}>Excluir</button>
             <span style={{ flex: 1 }} />
             <button className="btn" onClick={close}>Cancelar</button>
+            <button className="btn" onClick={apply} disabled={error !== null}>Aplicar</button>
             <button className="btn primary" onClick={ok} disabled={error !== null} title={error ?? undefined}>OK</button>
           </>
         }
       >
+        <TypeDialogHeader family={FAMILY.ceiling} types={Object.values(p.ceilingTypes)} currentId={draft.id} nameFieldId="lt-name" onDuplicate={duplicate} />
         <div className="field-row">
           <label htmlFor="lt-name">Nome do tipo</label>
           <TextField id="lt-name" value={draft.name} onCommit={(v) => setDraft({ ...draft, name: v })} />

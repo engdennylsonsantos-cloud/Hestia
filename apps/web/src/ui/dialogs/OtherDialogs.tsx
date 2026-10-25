@@ -4,6 +4,9 @@ import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
+import { TypeDialogHeader } from './TypeDialogHeader.tsx';
+import { TypePreview } from '../TypePreview.tsx';
+import { openingFamilyName } from '../typeFamilies.ts';
 import { alternarAcabamento, applyFamily, familyOptionsFor, leavesChoicesFor, leavesLabel, newOpeningTypeFromFamily } from './openingTypeForm.ts';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
@@ -50,6 +53,13 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const src = p.openingTypes[typeId];
   const [d, setD] = useState<OpeningType | null>(src ? { ...src } : null);
   const [err, setErr] = useState('');
+  // Trocar o tipo pelo cabeçalho recomeça o rascunho com o tipo escolhido.
+  const [current, setCurrent] = useState(typeId);
+  if (current !== typeId) {
+    setCurrent(typeId);
+    setD(p.openingTypes[typeId] ? { ...p.openingTypes[typeId]! } : null);
+    setErr('');
+  }
   if (!d) return null;
   const set = (patch: Partial<OpeningType>): void => setD({ ...d, ...patch });
   const used = Object.values(p.elements).filter((e) => (e.kind === 'door' || e.kind === 'window') && e.typeId === d.id).length;
@@ -73,6 +83,10 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
       return false;
     }
   };
+  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+  const apply = (): void => {
+    run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura'));
+  };
   const ok = (): void => {
     if (run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura'))) close();
   };
@@ -95,18 +109,21 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
     <Dialog
       title="Propriedades do tipo"
       sub={`${d.kind === 'door' ? 'Porta' : 'Janela'} · usado em ${used}`}
-      size="narrow"
+      size="mid"
       onClose={close}
       footer={
         <>
           <button className="btn" onClick={create}>+ Novo tipo</button>
-          <button className="btn" onClick={dup}>Duplicar</button>
           <span style={{ flex: 1 }} />
           <button className="btn" onClick={close}>Cancelar</button>
+          <button className="btn" onClick={apply}>Aplicar</button>
           <button className="btn primary" onClick={ok}>OK</button>
         </>
       }
     >
+      <TypeDialogHeader family={openingFamilyName(d)} types={Object.values(p.openingTypes).filter((t) => t.kind === d.kind)} currentId={d.id} nameFieldId="ot-name" onDuplicate={dup} />
+      <div className="tdlg-mid">
+      <div className="tdlg-params">
       <fieldset style={SECTION}>
         <legend style={LEGEND}>Dimensões</legend>
         <div className="field-row"><label htmlFor="ot-w">Largura</label><NumField id="ot-w" value={d.width} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ width: v })} /></div>
@@ -200,6 +217,12 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
         ) : null}
       </details>
       {err ? <p className="error" role="alert">{err}</p> : null}
+      </div>
+      <aside className="tdlg-pv">
+        <TypePreview subject={{ kind: d.kind, type: d }} />
+        <p className="tdlg-caption">Pré-visualização atualizada conforme os parâmetros do tipo mudam.</p>
+      </aside>
+      </div>
     </Dialog>
   );
 }

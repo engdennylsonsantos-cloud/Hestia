@@ -48,7 +48,7 @@ await page.waitForTimeout(300);
 [px, py] = P(8, 3.5); await page.mouse.move(px, py); await page.mouse.click(px, py);
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/11-selected.png` });
-await page.getByRole('button', { name: 'Editar tipo…' }).click();
+await page.getByRole('button', { name: 'Editar tipo' }).click();
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/12-typedialog.png` });
 console.log('errors:', errors.length ? errors.join('\n') : 'none');

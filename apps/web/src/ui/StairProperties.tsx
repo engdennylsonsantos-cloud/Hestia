@@ -6,9 +6,10 @@ import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
 import { commonOf, patchStairs } from '../editor/stairActions.ts';
-import { duplicateStairTypeFor } from '../editor/stairTypeActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { TypeSelector } from './TypeSelector.tsx';
+import { stairOptions } from './typeOptions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 /** Um grau em radianos: os ângulos do caracol são guardados em rad e mostrados em graus. */
@@ -66,28 +67,18 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
 
   const patch = (targets: Id[], value: Partial<Stair>): void => patchStairs(editor.store, targets, value);
 
-  const duplicateType = (): void => {
-    if (typeId.mixed) return;
-    const id = duplicateStairTypeFor(editor.store, ids, typeId.value);
-    if (id) useUi.setState({ dialog: 'stairType', dialogArg: id });
-  };
-
   return (
     <>
-      <div className="typesel">
-        <div className="row">
-          <select id="prop-stairtype" className="select" value={typeId.mixed ? '' : typeId.value} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de escada">
-            {typeId.mixed && <option value="">variados</option>}
-            {Object.values(p.stairTypes).map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'stairType', dialogArg: typeId.value })}>Editar tipo…</button>
-          <button className="btn small" disabled={typeId.mixed} onClick={duplicateType}>Duplicar tipo</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-stairtype"
+        label="Tipo de escada"
+        categoryLabel={`Escadas (${stairs.length})`}
+        options={stairOptions(p)}
+        selectedId={typeId.mixed ? null : typeId.value}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'stairType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         <LevelField ids={ids} label="Nível base" />
         <Row label="Nível de topo" htmlFor="p-stop">

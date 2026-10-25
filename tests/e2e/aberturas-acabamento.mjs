@@ -28,7 +28,7 @@ const tris = () => page.evaluate(TRIS);
 /** Espera a cena 3D refletir a mudança: o número de triângulos sai de `antes`. */
 const esperaMudar = (antes) => page.waitForFunction(`${TRIS} !== ${antes}`, null, { timeout: 15000 });
 const abrirTipo = async () => {
-  await page.getByRole('button', { name: 'Editar tipo…' }).click();
+  await page.getByRole('button', { name: 'Editar tipo' }).click();
   await page.getByText('Propriedades do tipo').waitFor();
 };
 

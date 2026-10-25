@@ -10,7 +10,6 @@ import {
   isCeiling,
   isStair,
   isWall,
-  newId,
   type DetailLevel,
   type JoinKind,
   openingSill,
@@ -42,6 +41,9 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { TypeSelector } from './TypeSelector.tsx';
+import { openingOptions, wallOptions } from './typeOptions.ts';
+import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -120,33 +122,18 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
     return quantifyLevel(p, editor.resolved(lv)).walls.find((x) => x.wallId === single.id) ?? null;
   }, [p, single]);
 
-  const duplicateType = (): void => {
-    const src = p.wallTypes[typeId.value];
-    if (!src) return;
-    const copy = { ...src, id: newId('wt'), name: `${src.name} (cópia)` };
-    editor.store.transaction('Duplicar tipo', () => {
-      editor.store.exec({ type: 'upsertWallType', wallType: copy });
-      patch(ids, { typeId: copy.id });
-    });
-    useUi.setState({ dialog: 'wallType', dialogArg: copy.id });
-  };
-
   return (
     <>
-      <div className="typesel">
-        <div className="row">
-          <select id="prop-walltype" className="select" value={typeId.mixed ? '' : typeId.value} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de parede">
-            {typeId.mixed && <option value="">variados</option>}
-            {Object.values(p.wallTypes).map((tp) => (
-              <option key={tp.id} value={tp.id}>{tp.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'wallType', dialogArg: typeId.value })}>Editar tipo…</button>
-          <button className="btn small" disabled={typeId.mixed} onClick={duplicateType}>Duplicar tipo</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-walltype"
+        label="Tipo de parede"
+        categoryLabel={`Paredes (${walls.length})`}
+        options={wallOptions(p)}
+        selectedId={typeId.mixed ? null : typeId.value}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'wallType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         <LevelField ids={ids} label="Nível base" />
         <Row label="Desloc. da base" htmlFor="p-base"><NumField id="p-base" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} unit="m" /></Row>
@@ -193,9 +180,9 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
       <Group title="Construção" open={false}>
         {t ? (
           <>
-            <Row label="Espessura total"><span className="val">{fmt(totalThickness(t) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(totalThickness(t) * 100, 1)} cm</span></Row>
             {t.layers.map((l, i) => (
-              <div className="prow" key={i}>
+              <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>
@@ -239,15 +226,18 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
   const mark = common(items, (o) => o.mark);
   return (
     <>
-      <div className="typesel">
-        <select id="prop-opentype" className="select" value={typeId.mixed ? '' : typeId.value} disabled={!kind} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de abertura">
-          {typeId.mixed && <option value="">variados</option>}
-          {Object.values(p.openingTypes).filter((t) => !kind || t.kind === kind).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'openingType', dialogArg: typeId.value })}>Editar tipo…</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-opentype"
+        label="Tipo de abertura"
+        categoryLabel={`${kind === 'door' ? 'Portas' : kind === 'window' ? 'Janelas' : 'Aberturas'} (${items.length})`}
+        options={kind ? openingOptions(p, kind) : []}
+        favoriteIds={p.settings.favoriteOpeningTypes ?? []}
+        selectedId={typeId.mixed ? null : typeId.value}
+        disabled={!kind}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         {single && (
           <>
@@ -266,9 +256,9 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
       <Group title="Dimensões" open={!!single}>
         {type && (
           <>
-            <Row label="Largura"><span className="val">{fmt(type.width * 100, 0)} cm</span></Row>
-            <Row label="Altura"><span className="val">{fmt(type.height * 100, 0)} cm</span></Row>
-            <Row label="Anfitriã"><span className="val soft">{host && isWall(host) ? p.wallTypes[host.typeId]?.name ?? '' : ''}</span></Row>
+            <Row label="Largura" readOnly fromType><span className="val">{fmt(type.width * 100, 0)} cm</span></Row>
+            <Row label="Altura" readOnly fromType><span className="val">{fmt(type.height * 100, 0)} cm</span></Row>
+            <Row label="Anfitriã" readOnly><span className="val soft">{host && isWall(host) ? p.wallTypes[host.typeId]?.name ?? '' : ''}</span></Row>
           </>
         )}
       </Group>
@@ -325,9 +315,12 @@ function ViewProps(): ReactElement {
   const lvl = p.levels.find((l) => l.id === s.levelId);
   const section = s.view === 'section' ? p.views.find((v) => v.id === s.sectionId) : undefined;
   const title = s.view === 'plan' ? `Planta · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
+  const kindLabel = s.view === 'plan' ? 'Planta de piso' : s.view === 'section' ? (section?.kind === 'elevation' ? 'Elevação' : 'Corte') : 'Modelo 3D';
   return (
     <>
-      <div className="typesel"><strong>{title}</strong></div>
+      <div className="rv-stick">
+        <div className="rv-head"><b>{kindLabel}</b><span>{title}</span></div>
+      </div>
       <Group title="Vista">
         <Row label="Nível" htmlFor="v-level">
           <select id="v-level" className="select" value={s.levelId} onChange={(e) => editor.selectLevel(e.target.value)}>
@@ -380,6 +373,7 @@ export function Properties(): ReactElement {
   const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length;
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
   const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
+  const tool = useUi((s) => s.tool);
   return (
     <aside className="side left" aria-label="Propriedades">
       <div className="panel-head">
@@ -399,7 +393,17 @@ export function Properties(): ReactElement {
           : view ? <SectionViewProps view={view} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada ou ambiente) para editar propriedades.</div>
-        ) : <ViewProps />}
+        ) : (
+          <>
+            {isToolTypeKind(tool) && <ToolTypeProps tool={tool} />}
+            <ViewProps />
+          </>
+        )}
+      </div>
+      <div className="rv-foot">
+        <button type="button" className="link" onClick={() => useUi.setState({ dialog: 'shortcuts' })}>Ajuda de propriedades</button>
+        {/* Edições já valem ao sair do campo; o botão só tira o foco do campo que ainda está aberto. */}
+        <button type="button" className="apply" onClick={() => (document.activeElement as HTMLElement | null)?.blur()}>Aplicar</button>
       </div>
     </aside>
   );

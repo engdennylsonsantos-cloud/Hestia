@@ -7,6 +7,8 @@ import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
 import { OutlineGroup } from './OutlineGroup.tsx';
+import { TypeSelector } from './TypeSelector.tsx';
+import { slabOptions } from './typeOptions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -66,19 +68,16 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
 
   return (
     <>
-      <div className="typesel">
-        <div className="row">
-          <select id="prop-slabtype" className="select" value={typeId.mixed ? '' : typeId.value} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de laje">
-            {typeId.mixed && <option value="">variados</option>}
-            {Object.values(p.slabTypes).map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'slabType', dialogArg: typeId.value })}>Editar tipo…</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-slabtype"
+        label="Tipo de laje"
+        categoryLabel={`Lajes (${slabs.length})`}
+        options={slabOptions(p)}
+        selectedId={typeId.mixed ? null : typeId.value}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'slabType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Desloc. do topo" htmlFor="p-soff">
@@ -104,9 +103,9 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total"><span className="val">{fmt(slabTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(slabTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i}>
+              <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>

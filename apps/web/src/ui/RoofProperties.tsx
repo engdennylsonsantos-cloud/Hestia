@@ -11,6 +11,8 @@ import { LevelField } from './LevelField.tsx';
 import { RoofEdgeSection, RoofEdgeTable } from './RoofEdgeProps.tsx';
 import { RoofPlanesSection } from './RoofPlanesProps.tsx';
 import { RoofProfileRow } from './RoofProfileRow.tsx';
+import { TypeSelector } from './TypeSelector.tsx';
+import { roofOptions } from './typeOptions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -107,19 +109,16 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
 
   return (
     <>
-      <div className="typesel">
-        <div className="row">
-          <select id="prop-rooftype" className="select" value={typeId.mixed ? '' : typeId.value} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de telhado">
-            {typeId.mixed && <option value="">variados</option>}
-            {Object.values(p.roofTypes).map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'roofType', dialogArg: typeId.value })}>Editar tipo…</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-rooftype"
+        label="Tipo de telhado"
+        categoryLabel={`Telhados (${roofs.length})`}
+        options={roofOptions(p)}
+        selectedId={typeId.mixed ? null : typeId.value}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'roofType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Cota do beiral" htmlFor="p-roff">
@@ -192,9 +191,9 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total"><span className="val">{fmt(roofTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(roofTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i}>
+              <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>

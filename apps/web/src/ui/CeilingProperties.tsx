@@ -7,6 +7,8 @@ import { useUi } from '../editor/state.ts';
 import { CeilingOutlineGroup } from './CeilingOutlineGroup.tsx';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { TypeSelector } from './TypeSelector.tsx';
+import { ceilingOptions } from './typeOptions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -43,19 +45,16 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
 
   return (
     <>
-      <div className="typesel">
-        <div className="row">
-          <select id="prop-ceilingtype" className="select" value={typeId.mixed ? '' : typeId.value} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de forro">
-            {typeId.mixed && <option value="">variados</option>}
-            {Object.values(p.ceilingTypes).map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="row">
-          <button className="btn small" disabled={typeId.mixed} onClick={() => useUi.setState({ dialog: 'ceilingType', dialogArg: typeId.value })}>Editar tipo…</button>
-        </div>
-      </div>
+      <TypeSelector
+        triggerId="prop-ceilingtype"
+        label="Tipo de forro"
+        categoryLabel={`Forros (${ceilings.length})`}
+        options={ceilingOptions(p)}
+        selectedId={typeId.mixed ? null : typeId.value}
+        editDisabled={typeId.mixed}
+        onSelect={(id) => patch(ids, { typeId: id })}
+        onEdit={() => useUi.setState({ dialog: 'ceilingType', dialogArg: typeId.value })}
+      />
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Cota do topo" htmlFor="p-ctop">
@@ -67,9 +66,9 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total"><span className="val">{fmt(ceilingTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(ceilingTypeThickness(type) * 100, 1)} cm</span></Row>
             {type.layers.map((l, i) => (
-              <div className="prow" key={i}>
+              <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
                 <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
               </div>

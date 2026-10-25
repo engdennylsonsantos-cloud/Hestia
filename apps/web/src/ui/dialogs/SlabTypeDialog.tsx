@@ -7,6 +7,8 @@ import { NumField, TextField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { coreHint } from './coreHint.ts';
 import { Dialog } from './Dialog.tsx';
+import { TypeDialogHeader } from './TypeDialogHeader.tsx';
+import { FAMILY } from '../typeFamilies.ts';
 import { SlabSectionPreview } from './SlabSectionPreview.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
@@ -55,6 +57,11 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
       setAdv(null);
     }
   };
+  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+  const apply = (): void => {
+    if (error) return;
+    editor.store.exec({ type: 'upsertSlabType', slabType: draft }, 'Editar tipo de laje');
+  };
   const ok = (): void => {
     if (error) return;
     editor.store.exec({ type: 'upsertSlabType', slabType: draft }, 'Editar tipo de laje');
@@ -85,14 +92,15 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
         size="mid"
         footer={
           <>
-            <button className="btn" onClick={duplicate}>Duplicar</button>
             <button className="btn danger" disabled={blocked !== null} title={blocked ?? 'Excluir tipo'} onClick={del}>Excluir</button>
             <span style={{ flex: 1 }} />
             <button className="btn" onClick={close}>Cancelar</button>
+            <button className="btn" onClick={apply} disabled={error !== null}>Aplicar</button>
             <button className="btn primary" onClick={ok} disabled={error !== null} title={error ?? undefined}>OK</button>
           </>
         }
       >
+        <TypeDialogHeader family={FAMILY.slab} types={Object.values(p.slabTypes)} currentId={draft.id} nameFieldId="lt-name" onDuplicate={duplicate} />
         <div className="field-row">
           <label htmlFor="lt-name">Nome do tipo</label>
           <TextField id="lt-name" value={draft.name} onCommit={(v) => setDraft({ ...draft, name: v })} />

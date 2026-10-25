@@ -5,6 +5,8 @@ import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { TypeDialogHeader } from './TypeDialogHeader.tsx';
+import { FAMILY } from '../typeFamilies.ts';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
 import { SectionPreview } from './SectionPreview.tsx';
@@ -57,6 +59,11 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
       setAdv(null);
     }
   };
+  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+  const apply = (): void => {
+    if (stripsInvalid) return;
+    editor.store.exec({ type: 'upsertWallType', wallType: draft }, 'Editar tipo de parede');
+  };
   const ok = (): void => {
     if (stripsInvalid) return;
     editor.store.exec({ type: 'upsertWallType', wallType: draft }, 'Editar tipo de parede');
@@ -86,14 +93,15 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
         onClose={close}
         footer={
           <>
-            <button className="btn" onClick={duplicate}>Duplicar</button>
             <button className="btn danger" disabled={usage > 0 || draft.id === p.defaults.wallTypeId} title={usage > 0 ? 'Há paredes usando este tipo' : 'Excluir tipo'} onClick={del}>Excluir</button>
             <span style={{ flex: 1 }} />
             <button className="btn" onClick={close}>Cancelar</button>
+            <button className="btn" onClick={apply} disabled={stripsInvalid}>Aplicar</button>
             <button className="btn primary" onClick={ok} disabled={stripsInvalid} title={stripsInvalid ? 'Corrija as faixas inválidas' : undefined}>OK</button>
           </>
         }
       >
+        <TypeDialogHeader family={FAMILY.wall} types={Object.values(p.wallTypes)} currentId={draft.id} nameFieldId="wt-name" onDuplicate={duplicate} />
         <div className="field-row">
           <label htmlFor="wt-name">Nome do tipo</label>
           <TextField id="wt-name" value={draft.name} onCommit={(v) => setDraft({ ...draft, name: v })} />

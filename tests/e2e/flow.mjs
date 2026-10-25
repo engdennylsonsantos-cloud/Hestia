@@ -83,7 +83,7 @@ await page.keyboard.press('Control+z');
 
 // 6. diálogo de tipo: adicionar camada, OK e verificar histórico
 await click(8, 2.2);
-await page.getByRole('button', { name: 'Editar tipo…' }).click();
+await page.getByRole('button', { name: 'Editar tipo' }).click();
 await page.getByRole('button', { name: '+ Inserir camada' }).click();
 await page.screenshot({ path: `${OUT}/20-type-add-layer.png` });
 await page.getByRole('button', { name: 'OK' }).click();

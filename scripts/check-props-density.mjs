@@ -14,7 +14,7 @@ const PAINEL = [
   'apps/web/src/ui/StairProperties.tsx',
   'apps/web/src/ui/SectionViewProps.tsx',
 ];
-/** Orçamento de caracteres do rótulo visível: cabe na coluna `--prop-label` (122 px) a 11 px. */
+/** Orçamento de caracteres do rótulo visível: a coluna de rótulo é 46% da paleta (~117 px a 11 px). */
 const LABEL_MAX = 22;
 /** Altura máxima da linha de parâmetro (px). */
 const ROW_MAX = 22;
@@ -38,10 +38,7 @@ const px = (text, prop) => {
   return m ? Number(m[1]) : null;
 };
 
-// 1. A coluna do rótulo é uma variável, dimensionada para o rótulo mais longo.
-if (!/:root\s*\{[^}]*--prop-label:\s*[0-9]+px/.test(css)) fail(`${CSS}: falta --prop-label (coluna de rótulo da paleta)`);
-
-// 2. A paleta é larga o bastante para a coluna de rótulo e uma coluna de valor útil (a largura pode vir do `.side`).
+// 1. A paleta é larga o bastante para a coluna de rótulo e uma coluna de valor útil (a largura pode vir do `.side`).
 const leftW = px(block('.side.left'), 'width') ?? px(block('.side'), 'width');
 if (leftW === null || leftW < PANEL_MIN) fail(`${CSS}: paleta de propriedades com width ${leftW ?? 'ausente'} px; o mínimo é ${PANEL_MIN} px`);
 
@@ -51,7 +48,7 @@ if (!prow) fail(`${CSS}: falta a regra .prow`);
 else {
   const h = px(prow, 'min-height');
   if (h === null || h > ROW_MAX) fail(`${CSS}: .prow com min-height ${h ?? 'ausente'} px; o máximo é ${ROW_MAX} px`);
-  if (!/grid-template-columns:\s*var\(--prop-label\)/.test(prow)) fail(`${CSS}: .prow precisa usar grid-template-columns: var(--prop-label) ...`);
+  if (!/grid-template-columns:\s*46%/.test(prow)) fail(`${CSS}: .prow precisa dividir rótulo e valor em 46% (tabela de propriedades)`);
 }
 
 // 4. Botão nunca quebra linha (global e na classe .btn).
@@ -75,7 +72,7 @@ for (const file of PAINEL) {
     ...[...src.matchAll(/<Group title="([^"]+)"/g)].map((m) => m[1]),
   ];
   for (const label of labels) {
-    if (label.length > LABEL_MAX) fail(`${file}: rótulo "${label}" tem ${label.length} caracteres; o máximo é ${LABEL_MAX} (cabe em --prop-label)`);
+    if (label.length > LABEL_MAX) fail(`${file}: rótulo "${label}" tem ${label.length} caracteres; o máximo é ${LABEL_MAX} (cabe na coluna de 46%)`);
   }
 }
 

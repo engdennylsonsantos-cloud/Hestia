@@ -23,8 +23,8 @@
   --shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
   --font-ui: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   --font-mono: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
-  /* Largura da coluna de rótulo da paleta de propriedades: cabe o rótulo mais longo (22 caracteres a 11 px). */
-  --prop-label: 122px;
+  /* Célula somente leitura da tabela de propriedades (parâmetro que vem do tipo ou é calculado). */
+  --ro: #eceff2;
   --r: 3px;
   --ic-ink: #5b6369;
 }
@@ -52,6 +52,7 @@
     --ok: #4ade80;
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
     --ic-ink: #c3c9cf;
+    --ro: #2e2e2e;
     color-scheme: dark;
   }
 }
@@ -78,6 +79,7 @@
   --ok: #4ade80;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
   --ic-ink: #c3c9cf;
+  --ro: #2e2e2e;
   color-scheme: dark;
 }
 
@@ -176,34 +178,90 @@ svg { display: block; }
 .side.left { border-right: 1px solid var(--line-strong); }
 .side.right { border-left: 1px solid var(--line-strong); width: 236px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
-.panel-scroll { overflow: auto; flex: 1; min-height: 0; }
-.typesel { padding: 5px 8px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; }
-.typesel .row { display: flex; gap: 6px; }
-.typesel .select { flex: 1; }
-.typesel .btn { flex: 0 0 auto; }
-.pgroup { border-bottom: 1px solid var(--line); }
-.pgroup > summary { list-style: none; cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; }
+.panel-scroll { overflow: auto; flex: 1; min-height: 0; background: var(--sheet); }
+/* Grupo recolhível: cabeçalho em barra de cromo, com o chevron à direita (▲ aberto, ▼ fechado). */
+.pgroup { border-bottom: 1px solid var(--line-strong); }
+.pgroup > summary { list-style: none; cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; border-bottom: 1px solid var(--line); }
+.pgroup > summary:hover { background: var(--accent-soft); }
 .pgroup > summary::-webkit-details-marker { display: none; }
-.pgroup > summary::before { content: ''; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2px; transform: rotate(-45deg); transition: transform 0.12s; }
-.pgroup[open] > summary::before { transform: rotate(45deg); }
+.pgroup > summary::after { content: ''; margin-left: auto; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2.5px; transform: rotate(45deg); transition: transform 0.12s; }
+.pgroup[open] > summary::after { transform: rotate(-135deg); }
 /*
- * Linha de parâmetro da paleta: coluna de rótulo FIXA (`--prop-label`, dimensionada para o rótulo mais longo) e
- * coluna de valor flexível. Linha de 20 px, sem folga entre elas — é a densidade da paleta do Revit. O editor fica
- * "sem chrome" (borda e fundo transparentes) até o ponteiro passar ou o foco entrar.
+ * Linha da tabela de propriedades (estilo Revit): rótulo à esquerda (46%) e valor à direita (54%), com divisória
+ * entre as células. O campo fica sem caixa até o ponteiro passar ou o foco entrar. Sem `grid-template-columns` fixo
+ * em pixels: a paleta tem largura de `.side`, e a tabela acompanha.
  */
-.prow { display: grid; grid-template-columns: var(--prop-label) minmax(0, 1fr); align-items: center; gap: 6px; padding: 1px 8px; min-height: 20px; }
-.prow > label, .prow > .lbl { font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow { display: grid; grid-template-columns: 46% minmax(0, 1fr); align-items: stretch; min-height: 22px; border-bottom: 1px solid var(--line); }
+.prow:last-child { border-bottom: 0; }
+.prow > label, .prow > .lbl { display: flex; align-items: center; min-width: 0; padding: 2px 8px; border-right: 1px solid var(--line); font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow > div { display: flex; align-items: center; min-width: 0; }
+.prow > .val, .prow > div > .val { font-family: var(--font-mono); font-size: 11px; color: var(--fg); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow > .val { display: flex; align-items: center; justify-content: flex-end; padding: 0 6px; min-width: 0; }
+.prow > div > .val { width: 100%; padding: 0 6px; }
 /* Linha de botão (o primeiro filho é um `<span />` vazio): o botão ocupa a largura toda, sem espremer o texto. */
 .prow:has(> span:empty) { grid-template-columns: minmax(0, 1fr); }
 .prow > span:empty { display: none; }
-.prow .select, .prow .input.wide { width: 100%; }
-.prow .input, .prow .select { height: 20px; padding: 0 3px; border-color: transparent; background-color: transparent; }
-.prow:hover .input, .prow:hover .select { border-color: var(--line-strong); background-color: var(--sheet); }
-.prow .input:focus, .prow .select:focus { border-color: var(--accent); background-color: var(--sheet); }
-.prow .input.num { width: 62px; }
-.prow .val { font-family: var(--font-mono); font-size: 11px; color: var(--fg); text-align: right; white-space: nowrap; }
+.prow > div > .select, .prow > div > .input.wide, .prow > div > .numwrap { width: 100%; min-width: 0; }
+.prow > div > .numwrap { display: flex; align-items: center; }
+.prow .input, .prow .select { height: 100%; min-height: 21px; width: 100%; padding: 0 6px; border: 0; border-radius: 0; background: transparent; }
+.prow .input:focus, .prow .select:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--sheet); border: 0; box-shadow: none; }
+.prow .input.num { width: auto; flex: 1; min-width: 0; text-align: right; }
+.prow .numwrap .unit { padding-right: 6px; }
+.prow > div > .check { padding: 0 6px; font-size: 11px; }
 .prow .val.soft { color: var(--fg-soft); }
-.prow .check { font-size: 11px; }
+.prow > div > .btn { margin: 0 4px; height: 18px; padding: 0 8px; font-size: 11px; }
+/* Parâmetro somente leitura: célula sombreada. Quando vem do tipo, o selo "tipo" avisa onde se altera. */
+.prow.ro > label, .prow.ro > .lbl, .prow.ro > .val, .prow.ro > div { background: var(--ro); }
+.prow.ro > div { color: var(--fg-soft); }
+.tmark { flex: 0 0 auto; margin-left: 5px; font-size: 9px; color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 0 4px; }
+.prow .sw { margin: 0 6px; }
+
+/* ---- paleta de propriedades estilo Revit: prévia, seletor de tipo, filtro e rodapé ---- */
+/* Cores da prévia fixas no tema claro (o fundo é claro nos dois temas, então o desenho também). */
+.rv-preview, .rv-thumb { --fg: #1a202c; --fg-soft: #4a5568; --fg-faint: #718096; --accent: #0078d4; --sheet: #ffffff; --bg-soft: transparent; color-scheme: light; }
+.rv-preview { position: relative; margin: 8px 8px 0; border: 1px solid var(--line-strong); background: linear-gradient(#f7fafc, #e3e9ee); height: 120px; display: grid; place-items: center; overflow: hidden; }
+.rv-preview > svg, .rv-preview .section-svg { width: 100%; height: 100%; display: block; border: 0; background: transparent; }
+.rv-preview .chip, .rv-preview .dims { position: absolute; bottom: 4px; font: 10px var(--font-mono); color: #4a5568; background: rgba(255, 255, 255, 0.8); padding: 0 5px; border-radius: 2px; }
+.rv-preview .chip { left: 5px; }
+.rv-preview .dims { right: 5px; max-width: calc(100% - 64px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Miniatura: sem os rótulos de texto do desenho (ficariam ilegíveis e poluiriam o nome acessível do botão). */
+.rv-thumb svg text { display: none; }
+.rv-thumb { width: 38px; height: 26px; flex: 0 0 auto; background: linear-gradient(#f7fafc, #e3e9ee); border: 1px solid var(--line); display: block; overflow: hidden; }
+.rv-thumb > svg, .rv-thumb .section-svg { width: 100%; height: 100%; display: block; border: 0; background: transparent; }
+/* Sticky: o seletor e o filtro ficam no topo da paleta ao rolar; o menu de tipos abre por cima dos grupos. */
+.rv-stick { position: sticky; top: 0; z-index: 4; background: var(--panel); border-bottom: 1px solid var(--line-strong); padding-bottom: 6px; }
+.rv-tsel-wrap { position: relative; margin: 6px 8px 0; }
+.rv-tsel { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; border: 1px solid var(--line-strong); background: var(--sheet); border-radius: var(--r); padding: 3px 8px; min-height: 38px; }
+.rv-tsel:hover:not(:disabled), .rv-tsel[aria-expanded='true'] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.rv-tsel:disabled { opacity: 0.6; cursor: default; }
+.rv-tsel .two { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rv-tsel .two b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-tsel .two span { font-size: 11px; color: var(--fg-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-tsel .chev { color: var(--fg-faint); font-size: 10px; }
+.rv-menu { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 20; background: var(--sheet); border: 1px solid var(--accent); box-shadow: var(--shadow); max-height: 430px; display: flex; flex-direction: column; }
+.rv-menu .search { margin: 6px; border: 1px solid var(--line-strong); border-radius: var(--r); padding: 3px 7px; background: var(--sheet); height: 24px; }
+.rv-menu .search:focus { outline: none; border-color: var(--accent); }
+.rv-menu .list { overflow: auto; padding-bottom: 4px; }
+.rv-menu .fam { font-weight: 600; padding: 4px 8px 2px; font-size: 11px; color: var(--fg-soft); background: var(--chrome); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+.rv-menu .opt { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left; padding: 3px 8px 3px 14px; color: var(--fg); }
+.rv-menu .opt:hover { background: var(--accent-soft); }
+.rv-menu .opt.on { background: var(--accent); color: var(--accent-fg); }
+.rv-menu .opt .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-menu .opt .c { font: 10px var(--font-mono); opacity: 0.7; }
+.rv-menu .empty { padding: 10px; color: var(--fg-faint); }
+.rv-filter { display: flex; gap: 6px; margin: 6px 8px 0; }
+.rv-filter .filt { flex: 1; min-width: 0; border: 1px solid var(--line-strong); background: var(--sheet); border-radius: var(--r); padding: 2px 8px; height: 24px; font-weight: 600; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+.rv-filter .edit { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 10px; height: 24px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.rv-filter .edit:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.rv-filter .edit:disabled { opacity: 0.45; cursor: default; }
+.rv-head { padding: 6px 8px; border-bottom: 1px solid var(--line-strong); background: var(--panel); }
+.rv-head b { display: block; font-size: 12px; }
+.rv-head span { display: block; font-size: 11px; color: var(--fg-soft); }
+.rv-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-top: 1px solid var(--line-strong); background: var(--chrome); }
+.rv-foot .link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.rv-foot .apply { border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 14px; }
+.rv-foot .apply:hover { border-color: var(--accent); }
+.rv-hint { padding: 8px 10px; color: var(--fg-faint); font-size: 11px; }
 .hint { padding: 10px; color: var(--fg-soft); }
 .side .hint { padding: 4px 8px; font-size: 11px; }
 .vr-error { padding: 2px 10px 4px; color: var(--danger); font-size: 11.5px; }
@@ -306,6 +364,21 @@ svg { display: block; }
 .dtab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 5px 12px; color: var(--fg-soft); margin-bottom: -1px; }
 .dtab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
 .split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 14px; }
+/* "Propriedades do tipo" (Editar tipo): barra Família/Tipo no topo e, no diálogo do vão, prévia ao lado dos parâmetros. */
+.tdlg-bar { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; margin: -12px -14px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.tdlg-bar > label { color: var(--fg-soft); }
+.tdlg-bar .in { min-width: 0; border: 1px solid var(--line-strong); background: var(--ro); border-radius: var(--r); padding: 3px 6px; height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdlg-bar .in.pick { padding: 0 4px; }
+.tdlg-bar .btns { display: flex; gap: 6px; }
+.tdlg-mid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 0; margin: -12px -14px; min-height: 0; }
+.tdlg-params { min-width: 0; padding: 12px 14px; }
+.tdlg-pv { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--panel); border-left: 1px solid var(--line-strong); }
+.tdlg-pv .rv-preview { margin: 0; height: 160px; }
+.tdlg-caption { margin: 0; color: var(--fg-faint); font-size: 11px; line-height: 1.4; }
+@media (max-width: 700px) {
+  .tdlg-mid { grid-template-columns: minmax(0, 1fr); }
+  .tdlg-pv { border-left: 0; border-top: 1px solid var(--line-strong); }
+}
 .layers { width: 100%; border-collapse: collapse; }
 .layers th { text-align: left; font-weight: 500; font-size: 11px; color: var(--fg-faint); padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .layers td { padding: 3px 4px; border-bottom: 1px solid var(--line); vertical-align: middle; }

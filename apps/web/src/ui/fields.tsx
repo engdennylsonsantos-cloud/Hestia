@@ -121,11 +121,16 @@ export function Check({ id, checked, onChange, children, disabled, mixed }: { id
   );
 }
 
-export function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }): ReactElement {
+/**
+ * Linha da tabela de propriedades: rótulo e valor em duas células. `readOnly` sombreia a linha (valor calculado ou
+ * controlado por outro lugar); `fromType` põe o selo "tipo" (o valor vem do tipo: muda-se em Editar tipo).
+ */
+export function Row({ label, htmlFor, children, readOnly, fromType }: { label: string; htmlFor?: string; children: ReactNode; readOnly?: boolean; fromType?: boolean }): ReactElement {
   return (
-    <div className="prow">
+    <div className={`prow${readOnly ? ' ro' : ''}`}>
       <label htmlFor={htmlFor} title={label}>
         {label}
+        {fromType ? <span className="tmark" title="Parâmetro do tipo — edite em Editar tipo">tipo</span> : null}
       </label>
       <div>{children}</div>
     </div>

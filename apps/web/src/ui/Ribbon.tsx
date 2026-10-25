@@ -1,13 +1,11 @@
 import { useEffect, useMemo, type ReactElement } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { useProject } from '../editor/controller.ts';
 import { useI18n } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
 import { txt, type RibbonTab, type RibbonTabId } from './ribbon/model.ts';
 import { PanelView } from './ribbon/parts.tsx';
 import { contextTab } from './ribbon/context.ts';
 import { TABS } from './ribbon/tabs.ts';
-import type { RibbonCtx } from './ribbon/actions.ts';
+import { useRibbonCtx } from './ribbon/useCtx.ts';
 
 /**
  * Faixa de ferramentas no padrão Revit: aba Arquivo, 14 abas na ordem do Revit e, depois de Modificar, a aba contextual
@@ -15,12 +13,10 @@ import type { RibbonCtx } from './ribbon/actions.ts';
  */
 export function Ribbon(): ReactElement {
   const lang = useI18n((s) => s.lang);
-  const p = useProject();
-  const ui = useUi(useShallow((s) => ({
-    ribbon: s.ribbon, ribbonBack: s.ribbonBack, tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid,
-    showUnderlay: s.showUnderlay, showRoofProjection: s.showRoofProjection, leftOpen: s.leftOpen, rightOpen: s.rightOpen, options: s.options,
-  })));
-  const ctxTab = useMemo(() => contextTab(ui.tool, ui.selection, p), [ui.tool, ui.selection, p]);
+  const ctx = useRibbonCtx();
+  const ribbon = useUi((st) => st.ribbon);
+  const ribbonBack = useUi((st) => st.ribbonBack);
+  const ctxTab = useMemo(() => contextTab(ctx.tool, ctx.selection, ctx.p), [ctx.tool, ctx.selection, ctx.p]);
   const key = ctxTab?.key ?? null;
 
   // A aba contextual é selecionada sozinha quando nasce (ou quando o assunto muda) e, ao sumir, devolve a aba de antes.
@@ -30,9 +26,8 @@ export function Ribbon(): ReactElement {
     else if (!key && s.ribbon === 'ctx') useUi.setState({ ribbon: s.ribbonBack });
   }, [key]);
 
-  const activeId: RibbonTabId = ui.ribbon === 'ctx' && !ctxTab ? ui.ribbonBack : ui.ribbon;
+  const activeId: RibbonTabId = ribbon === 'ctx' && !ctxTab ? ribbonBack : ribbon;
   const active: RibbonTab | undefined = activeId === 'ctx' ? ctxTab?.tab : TABS.find((tb) => tb.id === activeId);
-  const ctx: RibbonCtx = { ...ui, p };
   const select = (id: RibbonTabId): void => useUi.setState({ ribbon: id });
 
   return (

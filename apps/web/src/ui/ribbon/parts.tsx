@@ -165,3 +165,13 @@ export function PanelView({ panel, ctx, lang }: { panel: RibbonPanel; ctx: Ribbo
     </div>
   );
 }
+
+/** Botão só de ícone (barra de acesso rápido), com o mesmo comportamento dos botões da faixa. */
+export function QuickButton({ item, ctx, lang }: { item: RibbonItem; ctx: RibbonCtx; lang: Lang }): ReactElement {
+  const f = useFace(item, ctx, lang);
+  return (
+    <button className={cls('qbtn', f.on && 'on')} title={f.title} aria-label={f.label} aria-pressed={f.on || undefined} disabled={f.disabled} onClick={f.onClick}>
+      <Icon name={f.icon} size={18} />
+    </button>
+  );
+}

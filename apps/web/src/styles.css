@@ -112,20 +112,13 @@ svg { display: block; }
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   overflow: hidden;
+  position: relative;
 }
 
 /* ---- barra de título ---- */
-.titlebar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--line); background: var(--chrome); flex-wrap: wrap; }
-.brand { display: flex; align-items: center; gap: 7px; font-weight: 600; letter-spacing: 0.01em; margin-right: 6px; }
-.brand-mark { width: 20px; height: 20px; border-radius: 4px; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
-.proj-name { border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: var(--r); min-width: 90px; max-width: 220px; font-weight: 500; }
-.proj-name:hover, .proj-name:focus { border-color: var(--line-strong); background: var(--panel); }
-.sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 4px; }
-.spacer { flex: 1; }
 .badge { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 6px; border-radius: 3px; border: 1px solid var(--line-strong); color: var(--fg-soft); }
 .badge.gpu { color: var(--accent); border-color: var(--accent); }
 .badge.cpu { color: var(--warn); border-color: var(--warn); }
-.dirty { color: var(--warn); font-size: 11px; }
 
 /* ---- botões ---- */
 .ibtn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; background: transparent; padding: 4px 7px; border-radius: var(--r); color: var(--fg); }
@@ -408,7 +401,6 @@ svg { display: block; }
 /* ---- telas estreitas: painéis viram gavetas ---- */
 @media (max-width: 700px) {
   .lbl-text { display: none; }
-  .proj-name { min-width: 60px; max-width: 120px; }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }

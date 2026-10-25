@@ -5,6 +5,7 @@ import { useUi } from './editor/state.ts';
 import { atalhoAtual } from './editor/shortcutConfig.ts';
 import { tabOf } from './editor/viewTabActions.ts';
 import { Browser } from './ui/Browser.tsx';
+import { FileMenu } from './ui/FileMenu.tsx';
 import { IconDefs } from './ui/Icon.tsx';
 import { EmptyViews } from './ui/EmptyViews.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
@@ -171,6 +172,7 @@ export function App(): ReactElement {
       </div>
       <StatusBar />
       <Dialogs />
+      <FileMenu />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { TOOL_GROUPS, type ToolId } from '@hestia/tools';
-import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
+import { isRoom, isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useAtalhos } from '../editor/shortcutConfig.ts';
 import { editThinLines, editView3D, thinLinesOn } from '../editor/graphicsActions.ts';
@@ -124,6 +124,8 @@ export function Ribbon(): ReactElement {
   const s = useUi();
   const p = useProject();
   const selStairs = stairsIn(p, s.selection);
+  // "Mesmo nome" só vale para ambientes: sem um ambiente na seleção, o botão fica desabilitado.
+  const temAmbiente = s.selection.some((id) => isRoom(p.elements[id]));
   const v3 = view3dOf(p);
   const set = (p: Partial<typeof s>): void => useUi.setState(p);
 
@@ -272,11 +274,11 @@ export function Ribbon(): ReactElement {
 
             <div className="rgroup">
               <div className="rgroup-tools">
-                <button className="tbtn" onClick={() => editor.selectAllOfSelectedType()} title={lang === 'pt' ? 'Selecionar todas as instâncias do tipo' : 'Select all instances of type'}>
+                <button className="tbtn" disabled={selection.length === 0} onClick={() => editor.selectAllOfSelectedType()} title={selection.length === 0 ? (lang === 'pt' ? 'Selecione um elemento para usar o mesmo tipo' : 'Select an element first') : lang === 'pt' ? 'Selecionar todas as instâncias do tipo' : 'Select all instances of type'}>
                   <Icon name="sametype" size={22} />
                   <span>{lang === 'pt' ? 'Mesmo tipo' : 'Same Type'}</span>
                 </button>
-                <button className="tbtn" onClick={() => editor.selectAllOfSelectedName()} title={lang === 'pt' ? 'Selecionar todos com o mesmo nome' : 'Select all with same name'}>
+                <button className="tbtn" disabled={!temAmbiente} onClick={() => editor.selectAllOfSelectedName()} title={temAmbiente ? (lang === 'pt' ? 'Seleciona todos os ambientes do nível com o mesmo nome (hoje só ambientes)' : 'Select all rooms with same name') : lang === 'pt' ? 'Selecione um ambiente primeiro; depois seleciona os ambientes com o mesmo nome' : 'Select a room first'}>
                   <Icon name="samename" size={22} />
                   <span>{lang === 'pt' ? 'Mesmo nome' : 'Same Name'}</span>
                 </button>

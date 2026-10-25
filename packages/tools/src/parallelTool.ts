@@ -19,7 +19,7 @@ const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
 export class ParallelTool extends ToolBase {
   readonly id = 'parallel';
   readonly label = 'Parede paralela';
-  readonly hint = 'Parede paralela: clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado.';
+  readonly hint = 'Parede paralela: clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado. A distância é medida face a face (padrão) ou entre eixos, conforme a barra de opções.';
   private base: Id | null = null;
   private frame: WallFrame | null = null;
   private side: 1 | -1 = 1;
@@ -48,6 +48,17 @@ export class ParallelTool extends ToolBase {
     return (this.env.options().offsetFrom ?? 'face') === 'face';
   }
 
+  /** Nome do modo de medida mostrado nas mensagens: o usuário vê antes do clique qual convenção vale. */
+  private modo(): string {
+    return this.byFace() ? 'face a face' : 'entre eixos';
+  }
+
+  /** Ao ativar a ferramenta, a barra de status já diz o modo (padrão: face a face). */
+  override start(): void {
+    this.reset();
+    this.env.say(`Parede paralela (${this.modo()}): clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado.`);
+  }
+
   /** Parede sob o cursor (dentro da faixa da parede, ou a até um pixel da faixa). Mais próxima do eixo vence. */
   private pick(at: Vec2): { id: Id; f: WallFrame } | null {
     const pr = this.env.project();
@@ -66,18 +77,27 @@ export class ParallelTool extends ToolBase {
     return best ? { id: best.id, f: best.f } : null;
   }
 
-  /** Lado da nova parede: o do cursor em relação ao eixo da base, invertido por Tab. */
+  /** Lado do cursor em relação ao eixo da base. */
+  private cursorSideAt(s: number): 1 | -1 {
+    return s - this.frame!.sMid >= 0 ? 1 : -1;
+  }
+
+  /** Lado onde a nova parede fica: o do cursor, invertido por Tab. */
   private sideAt(s: number): 1 | -1 {
-    const cursorSide = s - this.frame!.sMid >= 0 ? 1 : -1;
+    const cursorSide = this.cursorSideAt(s);
     return this.flip ? (-cursorSide as 1 | -1) : cursorSide;
   }
 
-  /** Distância medida pela convenção de `offsetFrom`, para o cursor em `at` (negativa: o cursor está dentro da base). */
+  /**
+   * Distância medida pela convenção de `offsetFrom`, para o cursor em `at` (negativa: o cursor está dentro da base).
+   * A medida segue o lado do CURSOR, não o lado invertido por Tab: Tab só troca onde a parede é criada.
+   */
   private measure(at: Vec2): number {
     const f = this.frame!;
     const l = toLocal(f, at);
-    const from = this.byFace() ? f.sMid + this.side * (f.thickness / 2) : f.sMid;
-    return this.side * (l.s - from);
+    const c = this.cursorSideAt(l.s);
+    const from = this.byFace() ? f.sMid + c * (f.thickness / 2) : f.sMid;
+    return c * (l.s - from);
   }
 
   /** Deslocamento do eixo da base para a nova parede, a partir da distância `d` medida pela convenção. */
@@ -125,7 +145,7 @@ export class ParallelTool extends ToolBase {
       this.items.push(...ghostBands(pr, [this.base!], { kind: 'translate', d: plan.d }));
     }
     this.items.push({ kind: 'label', at, text: fmtM(d) });
-    this.env.say('Clique para criar a parede paralela nesta distância, ou digite a distância e Enter.');
+    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}${this.flip ? ', do lado oposto ao cursor' : ''}), ou digite a distância e Enter.`);
   }
 
   override click(p: PointerInfo): void {
@@ -135,7 +155,7 @@ export class ParallelTool extends ToolBase {
       this.base = hit.id;
       this.frame = hit.f;
       this.side = this.sideAt(toLocal(hit.f, p.raw).s);
-      this.env.say('Lado escolhido. Clique a distância desejada, ou digite-a e Enter.');
+      this.env.say(`Base escolhida. Medida ${this.modo()}: clique a distância desejada, ou digite-a e Enter.`);
       this.move(p);
       return;
     }

@@ -443,6 +443,7 @@ export class MeasureTool extends ToolBase {
     const inf = this.snap(p, { from: this.a ?? undefined });
     if (!this.a) {
       this.kept = null;
+      this.items = [];
       this.a = inf.point;
       return;
     }

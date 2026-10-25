@@ -10,6 +10,7 @@ import { RoofOptionsBar } from './RoofOptionsBar.tsx';
 import { RoofArrowOptionsBar } from './RoofArrowOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
+import { ArrayOptionsBar } from './ArrayOptionsBar.tsx';
 import { openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
@@ -181,12 +182,7 @@ export function OptionsBar(): ReactElement {
       )}
       {tool === 'rotate' && <Check id="opt-rcopy" checked={o.rotateCopy} onChange={(v) => set({ rotateCopy: v })}>Copiar</Check>}
       {tool === 'mirror' && <Check id="opt-mcopy" checked={o.mirrorCopy} onChange={(v) => set({ mirrorCopy: v })}>Copiar</Check>}
-      {tool === 'array' && (
-        <label>
-          Número de itens
-          <NumField id="opt-count" value={o.arrayCount} decimals={0} onCommit={(v) => set({ arrayCount: Math.max(2, Math.round(v)) })} />
-        </label>
-      )}
+      {tool === 'array' && <ArrayOptionsBar />}
       {tool === 'offset' && (
         <>
           <label>

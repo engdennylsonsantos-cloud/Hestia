@@ -1,5 +1,5 @@
 import { dist, dot, len, sub, type Vec2 } from '@hestia/geom';
-import { dimensionGeometry, dimensionPoints, levelDimensions, levelTexts, wallsOnLevel, type DimensionRef, type Id, type Project } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, wallsOnLevel, type DimensionRef, type Id, type Project, type TextNote } from '@hestia/model';
 
 /** Tolerância (m) para dizer que um ponto é a extremidade de uma parede. */
 const END_TOL = 1e-4;
@@ -38,9 +38,29 @@ function distToSegment(q: Vec2, p: Vec2, r: Vec2): number {
   return dist(q, { x: p.x + d.x * t, y: p.y + d.y * t });
 }
 
-/** Cota ou texto de anotação sob o cursor (tolerância de 6 px; o texto vale pelo centro, ~10 px). */
+/** Largura média de um caractere, em múltiplos do corpo da fonte (estimativa para o retângulo do texto). */
+const TEXT_CHAR_EM = 0.6;
+
+/**
+ * Texto sob o cursor: o retângulo do texto, centrado na âncora e girado com ele, mais a tolerância de 6 px.
+ * Corpo (m de modelo) = altura em mm de papel × escala ÷ 1000; largura = caracteres × 0,6 do corpo.
+ */
+export function textHit(t: TextNote, scale: number, at: Vec2, tol: number): boolean {
+  const body = (t.height * scale) / 1000;
+  const hw = (Math.max(1, [...t.text].length) * TEXT_CHAR_EM * body) / 2 + tol;
+  const hh = body / 2 + tol;
+  // Coordenadas do cursor no referencial do texto (girado por `rotation` graus, anti-horário, como na planta).
+  const r = (t.rotation * Math.PI) / 180;
+  const dx = at.x - t.at.x, dy = at.y - t.at.y;
+  const u = dx * Math.cos(r) + dy * Math.sin(r);
+  const v = -dx * Math.sin(r) + dy * Math.cos(r);
+  return Math.abs(u) <= hw && Math.abs(v) <= hh;
+}
+
+/** Cota ou texto de anotação sob o cursor (tolerância de 6 px, como a cota; o texto vale pelo retângulo, não só pela âncora). */
 export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number): { id: Id; kind: 'dimension' | 'text' } | null {
-  for (const t of levelTexts(p, levelId)) if (dist(at, t.at) <= 10 * mpp) return { id: t.id, kind: 'text' };
+  const scale = levelGraphicsOf(p, levelId).scale;
+  for (const t of levelTexts(p, levelId)) if (textHit(t, scale, at, 6 * mpp)) return { id: t.id, kind: 'text' };
   for (const d of levelDimensions(p, levelId)) {
     const pts = dimensionPoints(p, d);
     const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);

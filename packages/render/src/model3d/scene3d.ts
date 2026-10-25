@@ -5,12 +5,16 @@ import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
 import { OrbitCamera } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
-import { montarAbertura } from './aberturas3d.ts';
+import { caixasDaAbertura, montarAbertura } from './aberturas3d.ts';
 import { arestasDosLotes, geometriaDoLote, juntarLotes } from './lotesMalha3d.ts';
 import { SombraSobDemanda } from './sombras3d.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
-import { disposeHighlight, highlightOf, type HighlightStyle } from './highlight3d.ts';
+import { RealcesDaCena } from './realceDaCena3d.ts';
+import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
+import { CaixasDoNivel } from './caixasDoNivel3d.ts';
+import { criarCaixaUnitaria } from './caixas3d.ts';
+import { arestasInstanciadas, liberarMalhasInstanciadas, malhasInstanciadas } from './malhasInstanciadas3d.ts';
 import { buildCeilingSolids, buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
 import { Materiais3D } from './materiais3d.ts';
 import { CacheMalhas, bytesDeNivel, disposeNivel, type EntradaNivel, type PickSource } from './cacheMalhas3d.ts';
@@ -44,14 +48,6 @@ export function sunDirection(azimuth: number, elevation: number): THREE.Vector3 
 /** Estilos de linhas: sempre mostram as arestas, com ou sem faces. */
 const isLineStyle = (s: VisualStyle): boolean => s === 'hiddenLine' || s === 'wireframe';
 
-/** Sobreposição de realce (seleção ou elemento sob o cursor) e a chave que a identifica, para não refazê-la à toa. */
-interface Highlight {
-  key: string;
-  obj: THREE.Object3D;
-}
-/** Ranhuras do realce: a seleção (`sel`) e o elemento sob o cursor (`hov`). */
-type HighlightSlot = 'sel' | 'hov';
-
 /** Estado de uma atualização: a vista 3D, o tema e as arestas e sombras efetivas desta vista. */
 interface Frame3D {
   view: View3DSettings;
@@ -70,12 +66,18 @@ export class ModelScene {
   readonly orbit = new OrbitCamera();
   private model = new THREE.Group();
   /** Sobreposições de realce, fora do modelo: não entram nas malhas do modelo nem no picking por faixas. */
-  private highlightLayer = new THREE.Object3D();
+  private realces = new RealcesDaCena(this.scene);
   /** Malhas só de picking no wireframe (fora do modelo; ver `buildPickLayer`). */
   private pickLayer = new THREE.Object3D();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
   private picks: PickSource[] = [];
-  private hl: Record<HighlightSlot, Highlight | null> = { sel: null, hov: null };
+  /** Malhas e arestas das caixas (paredes retas e esquadrias), fora do modelo: o picking lê as malhas de picking dos níveis. */
+  private instLayer = new THREE.Object3D();
+  private malhasInst: THREE.InstancedMesh[] = [];
+  private arestasInst: THREE.LineSegments | null = null;
+  private caixaUnitaria = criarCaixaUnitaria();
+  /** Paredes retas e esquadrias como caixas instanciadas (padrão); falso: tudo como geometria, o caminho de referência. */
+  private readonly instanciar: boolean;
   /** Materiais por chave (ver `Materiais3D`). */
   private mats = new Materiais3D();
   /** Níveis que a cena mostra agora, e o cache de malhas por nível (ver `update`). */
@@ -96,15 +98,18 @@ export class ModelScene {
   /**
    * `tetoMalhasBytes`: teto do cache de malhas por nível (padrão `TETO_MALHAS_BYTES`). `reduzirJuncao` (padrão verdadeiro):
    * a junção de cada nível usa o conjunto reduzido da planta; falso usa o projeto inteiro (referência para testes).
+   * `instanciar` (padrão verdadeiro): paredes retas e esquadrias viram caixas instanciadas; falso mantém a geometria de sempre.
    */
-  constructor(opcoes: { tetoMalhasBytes?: number; reduzirJuncao?: boolean } = {}) {
+  constructor(opcoes: { tetoMalhasBytes?: number; reduzirJuncao?: boolean; instanciar?: boolean } = {}) {
     this.cache = new CacheMalhas(opcoes.tetoMalhasBytes);
     this.reduzirJuncao = opcoes.reduzirJuncao ?? true;
+    this.instanciar = opcoes.instanciar ?? true;
     // O zoom da órbita não atravessa as paredes do modelo (a cena fornece a primeira superfície sobre o eixo de visão).
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
-    this.scene.add(this.highlightLayer);
+    this.scene.add(this.instLayer);
+    this.scene.add(this.realces.camada);
     const hemi = new THREE.HemisphereLight(0xf4f7fb, 0xb9b2a4, 1.25);
     hemi.position.set(0, 0, 1);
     this.scene.add(hemi);
@@ -176,27 +181,8 @@ export class ModelScene {
    */
   highlight(selection: readonly Id[], hover: Id | null): void {
     const color = this.frame.dark ? DARK.select : LIGHT.select;
-    this.setHighlight('sel', selection, { color, fill: 0.35, edges: 1 });
-    this.setHighlight('hov', hover && !selection.includes(hover) ? [hover] : [], { color, fill: 0.15, edges: 0.6 });
-  }
-
-  private setHighlight(slot: HighlightSlot, ids: readonly Id[], style: HighlightStyle): void {
-    const key = `${String(style.color)}|${ids.join(',')}`;
-    const cur = this.hl[slot];
-    if (cur?.key === key) return;
-    if (cur) this.dropHighlight(slot);
-    if (!ids.length) return;
-    const obj = highlightOf(this.scene, ids, style);
-    this.highlightLayer.add(obj);
-    this.hl[slot] = { key, obj };
-  }
-
-  private dropHighlight(slot: HighlightSlot): void {
-    const cur = this.hl[slot];
-    if (!cur) return;
-    this.highlightLayer.remove(cur.obj);
-    disposeHighlight(cur.obj);
-    this.hl[slot] = null;
+    this.realces.definir('sel', selection, { color, fill: 0.35, edges: 1 });
+    this.realces.definir('hov', hover && !selection.includes(hover) ? [hover] : [], { color, fill: 0.15, edges: 0.6 });
   }
 
   /**
@@ -217,8 +203,7 @@ export class ModelScene {
     this.mats.used = new Set();
     this.sombra.marcar();
     // O realce guarda cópias dos triângulos: com o modelo refeito, refaz-se (a seleção e o cursor são lidos de novo).
-    this.dropHighlight('sel');
-    this.dropHighlight('hov');
+    this.realces.soltarTodos();
     const chaves = chavesDeNivel(p, JSON.stringify([opt.dark, this.frame.edges, this.frame.shadows, view.style]));
     const antes = this.cenaNiveis;
     const atuais: EntradaNivel[] = [];
@@ -243,6 +228,7 @@ export class ModelScene {
     this.cenaNiveis = atuais;
     for (const e of atuais) this.model.add(e.grupo);
     this.buildPickLayer();
+    this.montarInstancias(p, atuais);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
@@ -299,9 +285,14 @@ export class ModelScene {
     const juncao = junctionLevel(this.reduzirJuncao ? projetoDaJuncao(p, lv.levelId) : p, lv.levelId);
     // Escadas do nível (decisão 0011 §1): uma malha por material do tipo; escada com erro não gera malha. A chegada
     // monolítica termina na face inferior da laje que cobre o último espelho (decisão 0012 §2, `stairArrivalTopZ`).
+    // Paredes com a junção (0023 F4): cada faixa é extrudada só nas partes que sobram dela, como o corte e a planta. As camadas
+    // de prismas retangulares viram caixas instanciadas (`paredesInstanciadas3d.ts`); o resto segue como geometria.
+    const caixas = this.instanciar ? new CaixasDoNivel() : null;
+    const paredes = !shown('wall') ? { batches: [], caixas: [], arestas: [] } : caixas ? buildLevelSolidsComCaixas(lv, juncao, this.frame.edges) : { batches: buildLevelSolids(lv, juncao).batches, caixas: [], arestas: [] };
+    for (const c of paredes.caixas) caixas?.adicionar('wall', c.materialId, c.wallId, c.matriz, false);
+    caixas?.adicionarArestas(paredes.arestas);
     const batches: SolidBatch[] = [
-      // Paredes com a junção (0023 F4): cada faixa é extrudada só nas partes que sobram dela, como o corte e a planta.
-      ...(shown('wall') ? buildLevelSolids(lv, juncao).batches : []),
+      ...paredes.batches,
       ...(shown('floor') ? buildFloorSolids(resolveFloors(p, lv.levelId), juncao) : []),
       ...(shown('floor') ? buildCeilingSolids(resolveCeilings(p, lv.levelId)) : []),
       ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
@@ -321,6 +312,11 @@ export class ModelScene {
         // Base e altura resolvidas (paredes anexadas a pisos mudam de cota); sem resolução, as do modelo.
         const rw = lv.walls[w.id];
         const linhas = isLineStyle(view.style);
+        if (caixas) {
+          // Esquadria em caixas instanciadas: todas as peças, fixas ou articuladas, são caixas do material delas.
+          for (const c of caixasDaAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view) ?? []) caixas.adicionar(o.kind, c.materialId, o.id, c.matriz, linhas);
+          continue;
+        }
         const m = montarAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view, linhas, (parent, geo, mat, cat, edges, ranges) => this.draw(parent, geo, mat, cat, edges, ranges));
         if (!m) continue;
         this.desenharLotes(m.grupo, m.lotes, linhas, materialOf);
@@ -330,9 +326,29 @@ export class ModelScene {
         grupo.add(m.grupo);
       }
     }
+    // Malhas de picking (invisíveis) e arestas das caixas: no grupo do nível, para o cache, o picking e o realce as acharem.
+    const montadas = caixas?.montar(grupo, this.mats.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
     this.picks = picksAnt;
     this.mats.noNivel = matsAnt;
-    return { levelId: lv0.levelId, chave, grupo, picks, mats: [...mats], bytes: bytesDeNivel(grupo, picks) };
+    return { levelId: lv0.levelId, chave, grupo, picks, mats: [...mats], bytes: bytesDeNivel(grupo, picks, montadas?.colecoes, montadas?.arestas), instancias: montadas?.colecoes, arestasCaixas: montadas?.arestas };
+  }
+
+  /** Refaz as malhas instanciadas e a linha de arestas da cena a partir das caixas dos níveis mostrados (no wireframe, só as arestas). */
+  private montarInstancias(p: Project, niveis: readonly EntradaNivel[]): void {
+    this.soltarInstancias();
+    if (this.frame.view.style !== 'wireframe') {
+      this.malhasInst = malhasInstanciadas(niveis.flatMap((e) => e.instancias ?? []), this.caixaUnitaria, (cat, id) => this.mats.face(p.materials[id], cat), this.frame.shadows);
+      if (this.malhasInst.length) this.instLayer.add(...this.malhasInst);
+    }
+    this.arestasInst = arestasInstanciadas(niveis.flatMap((e) => (e.arestasCaixas ? [e.arestasCaixas] : [])), this.mats.edge());
+    if (this.arestasInst) this.instLayer.add(this.arestasInst);
+  }
+
+  private soltarInstancias(): void {
+    this.instLayer.clear();
+    liberarMalhasInstanciadas(this.malhasInst, this.arestasInst);
+    this.malhasInst = [];
+    this.arestasInst = null;
   }
 
   /**
@@ -370,8 +386,9 @@ export class ModelScene {
 
   dispose(): void {
     this.detach();
-    this.dropHighlight('sel');
-    this.dropHighlight('hov');
+    this.soltarInstancias();
+    this.caixaUnitaria.dispose();
+    this.realces.soltarTodos();
     const todas = new Set([...this.cenaNiveis, ...this.cache.limpar()]);
     this.cenaNiveis = [];
     for (const e of todas) disposeNivel(e);

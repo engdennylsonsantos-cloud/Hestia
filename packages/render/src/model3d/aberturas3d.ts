@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { frameOfWall, openingGeometry } from '@hestia/engine';
-import type { GraphicsCategory, Material, Opening, Project, View3DSettings } from '@hestia/model';
+import type { GraphicsCategory, Id, Material, Opening, Project, View3DSettings } from '@hestia/model';
 import { openingPieces } from './openingParts.ts';
 import { loteDeGeometria } from './lotesMalha3d.ts';
 import type { ElementRange, SolidBatch } from './solids.ts';
@@ -67,4 +67,49 @@ export function montarAbertura(
   }
   grupo.userData.elementId = o.id;
   return { grupo, lotes };
+}
+
+/** Uma peça de esquadria como caixa: o material e a matriz que leva a caixa unitária ao mundo. */
+export interface CaixaDeAbertura {
+  materialId: Id;
+  matriz: number[];
+}
+
+/**
+ * Esquadria em caixas (desempenho 3D): cada peça, fixa ou articulada, é uma caixa unitária levada ao mundo por
+ * `vão · dobradiça · caixa`, a mesma cadeia de transformações de `montarAbertura` (grupo do vão, pivô da dobradiça, caixa
+ * deslocada), só que numa matriz. Mesmas saídas nulas: categoria oculta ou vão livre de porta.
+ */
+export function caixasDaAbertura(
+  p: Project,
+  o: Opening,
+  f: NonNullable<ReturnType<typeof frameOfWall>>,
+  baseZ: number,
+  H: number,
+  view: View3DSettings,
+): CaixaDeAbertura[] | null {
+  if (!view.overrides[o.kind].visible) return null;
+  const g = openingGeometry(p, o, f);
+  if (g.kind === 'door' && g.leaves === 0) return null;
+  const vao = new THREE.Matrix4().makeRotationZ(Math.atan2(g.u.y, g.u.x)).setPosition(g.center.x, g.center.y, baseZ + g.sill);
+  const out: CaixaDeAbertura[] = [];
+  for (const piece of openingPieces(p, o, g, f, H, view.openOpenings === true)) {
+    const m = vao.clone();
+    let dx = 0;
+    let dz = 0;
+    if (piece.hinge) {
+      const pivo = new THREE.Matrix4();
+      if (piece.hinge.axis === 'z') {
+        pivo.makeRotationZ(piece.hinge.angle).setPosition(piece.hinge.at, 0, 0);
+        dx = piece.hinge.at;
+      } else {
+        pivo.makeRotationX(piece.hinge.angle).setPosition(0, 0, piece.hinge.at);
+        dz = piece.hinge.at;
+      }
+      m.multiply(pivo);
+    }
+    m.multiply(new THREE.Matrix4().makeTranslation(piece.x - dx, piece.y, piece.z - dz)).multiply(new THREE.Matrix4().makeScale(piece.w, piece.d, piece.h));
+    out.push({ materialId: piece.materialId, matriz: m.toArray() });
+  }
+  return out;
 }

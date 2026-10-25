@@ -314,7 +314,7 @@ export interface LevelSolids {
 }
 
 /** Lote do material `m` (e da categoria `cat`) dentro do mapa, criado na primeira vez. */
-function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): SolidBatch {
+export function batchOf(byMat: Map<Id, SolidBatch>, m: Id, cat: GraphicsCategory): SolidBatch {
   let b = byMat.get(m);
   if (!b) {
     b = { materialId: m, category: cat, positions: [], normals: [], indices: [], ids: [] };
@@ -350,7 +350,7 @@ function wallLayerKey(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: 
 }
 
 /** Sólido da camada (do cache, ou extrudado agora e guardado). Quem chama copia os dados; o cache não é alterado. */
-function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): SolidBatch {
+export function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?: JunctionLevel): SolidBatch {
   const key = wallLayerKey(rw, l, jl);
   const hit = wallLayerCache.get(key);
   if (hit) {
@@ -376,7 +376,7 @@ function wallLayerSolid(rw: ResolvedWall, l: ResolvedWall['layers'][number], jl?
 }
 
 /** Acrescenta o sólido local `f` ao lote `b`, deslocando vértices, índices e faixas (cópia: `f` fica intacto). */
-function appendSolid(b: SolidBatch, f: SolidBatch): void {
+export function appendSolid(b: SolidBatch, f: SolidBatch): void {
   const v0 = b.positions.length / 3;
   const i0 = b.indices.length;
   for (const x of f.positions) b.positions.push(x);

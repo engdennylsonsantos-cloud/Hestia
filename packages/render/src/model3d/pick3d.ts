@@ -47,7 +47,8 @@ function firstSurface(root: THREE.Object3D, ray: THREE.Raycaster): SurfaceHit | 
   let best: SurfaceHit | null = null;
   root.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (!m.isMesh || m.geometry.type === 'PlaneGeometry' || !o.layers.test(ray.layers)) return;
+    // Malhas instanciadas (`userData.semPick`) não entram: a geometria delas é a caixa unitária, e o mundo está nas malhas de picking dos níveis.
+    if (!m.isMesh || m.geometry.type === 'PlaneGeometry' || m.userData.semPick === true || !o.layers.test(ray.layers)) return;
     const bvh = Array.isArray(m.material) || !m.material ? null : bvhOf(m);
     if (!bvh) {
       for (const h of ray.intersectObject(m, false)) {

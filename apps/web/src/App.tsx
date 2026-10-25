@@ -4,12 +4,11 @@ import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
 import { atalhoAtual } from './editor/shortcutConfig.ts';
 import { tabOf } from './editor/viewTabActions.ts';
-import { Browser } from './ui/Browser.tsx';
+import { Dock, dockWidths } from './ui/Dock.tsx';
 import { FileMenu } from './ui/FileMenu.tsx';
 import { IconDefs } from './ui/Icon.tsx';
 import { EmptyViews } from './ui/EmptyViews.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
-import { Properties } from './ui/Properties.tsx';
 import { Ribbon } from './ui/Ribbon.tsx';
 import { StatusBar } from './ui/StatusBar.tsx';
 import { TitleBar } from './ui/TitleBar.tsx';
@@ -103,8 +102,10 @@ function Dialogs(): ReactElement | null {
 }
 
 export function App(): ReactElement {
-  const left = useUi((s) => s.leftOpen);
-  const right = useUi((s) => s.rightOpen);
+  const propsOpen = useUi((s) => s.propsOpen);
+  const browserOpen = useUi((s) => s.browserOpen);
+  const dock = useUi((s) => s.dock);
+  const widths = dockWidths(propsOpen, browserOpen, dock);
   const theme = useUi((s) => s.theme);
   const view = useUi((s) => s.view);
   const sheetId = useUi((s) => s.sheetId);
@@ -156,8 +157,8 @@ export function App(): ReactElement {
       <TitleBar />
       <Ribbon />
       <OptionsBar />
-      <div className="workspace" style={{ gridTemplateColumns: `${left ? 'auto' : '0px'} minmax(0, 1fr) ${right ? 'auto' : '0px'}` }}>
-        {left ? <Properties /> : <span />}
+      <div className="workspace" style={{ gridTemplateColumns: `${widths.left}px minmax(0, 1fr) ${widths.right}px` }}>
+        <Dock side="left" />
         <main className="stage">
           <ViewTabs />
           {/* O tutorial fica numa faixa própria acima da área de desenho (não cobre a planta nem recebe o clique). */}
@@ -168,7 +169,7 @@ export function App(): ReactElement {
             </div>
           </div>
         </main>
-        {right ? <Browser /> : <span />}
+        <Dock side="right" />
       </div>
       <StatusBar />
       <Dialogs />

@@ -8,7 +8,7 @@ export function useRibbonCtx(): RibbonCtx {
   const p = useProject();
   const ui = useUi(useShallow((s) => ({
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
-    showRoofProjection: s.showRoofProjection, leftOpen: s.leftOpen, rightOpen: s.rightOpen, options: s.options,
+    showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, browserSide: s.dock.browserSide, options: s.options,
   })));
   return { ...ui, p };
 }

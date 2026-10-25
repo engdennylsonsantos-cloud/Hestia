@@ -13,10 +13,10 @@ import { SchedulesTree, SheetsTree, ViewsTree } from './browser/Views.tsx';
 export function Browser(): ReactElement {
   const p = useProject();
   return (
-    <aside className="side right" aria-label="Navegador de projeto">
+    <aside className="side" aria-label="Navegador de projeto">
       <div className="panel-head">
         <span className="ph-title" title={`Navegador de projeto - ${p.name}`}>Navegador de projeto - {p.name}</span>
-        <button className="ph-x" aria-label="Fechar o navegador de projeto" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ rightOpen: false })}>✕</button>
+        <button className="ph-x" aria-label="Fechar o navegador de projeto" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ browserOpen: false })}>✕</button>
       </div>
       <div className="panel-scroll">
         <Tree label="Navegador de projeto">

@@ -1,6 +1,7 @@
 import { isCeiling, isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project } from '@hestia/model';
 import type { ToolOptions } from '@hestia/tools';
 import { editor } from '../../editor/controller.ts';
+import { setDock } from '../../editor/dockActions.ts';
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
 import { toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
@@ -16,8 +17,9 @@ export interface RibbonCtx {
   showGrid: boolean;
   showUnderlay: boolean;
   showRoofProjection: boolean;
-  leftOpen: boolean;
-  rightOpen: boolean;
+  propsOpen: boolean;
+  browserOpen: boolean;
+  browserSide: 'left' | 'right';
   options: ToolOptions;
   p: Project;
 }
@@ -95,15 +97,22 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     label: t('Propriedades', 'Properties'),
     icon: 'props',
     hint: t('Mostra ou oculta a paleta de propriedades.', 'Show or hide the Properties palette.'),
-    run: () => useUi.setState((s) => ({ leftOpen: !s.leftOpen })),
-    pressed: (c) => c.leftOpen,
+    run: () => useUi.setState((s) => ({ propsOpen: !s.propsOpen })),
+    pressed: (c) => c.propsOpen,
   },
   browser: {
     label: t('Navegador de projeto', 'Project Browser'),
     icon: 'levels',
     hint: t('Mostra ou oculta o navegador de projeto.', 'Show or hide the Project Browser.'),
-    run: () => useUi.setState((s) => ({ rightOpen: !s.rightOpen })),
-    pressed: (c) => c.rightOpen,
+    run: () => useUi.setState((s) => ({ browserOpen: !s.browserOpen })),
+    pressed: (c) => c.browserOpen,
+  },
+  browserSide: {
+    label: t('Navegador à direita', 'Project Browser on the Right'),
+    icon: 'levels',
+    hint: t('Move o navegador de projeto para o lado direito (padrão do Revit: à esquerda, sob as propriedades).', 'Move the Project Browser to the right side.'),
+    run: () => setDock({ browserSide: useUi.getState().dock.browserSide === 'left' ? 'right' : 'left' }),
+    pressed: (c) => c.browserSide === 'right',
   },
   sameType: {
     label: t('Mesmo tipo', 'Same Type'),
@@ -221,6 +230,6 @@ export function ctxNow(): RibbonCtx {
   const s = useUi.getState();
   return {
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
-    showRoofProjection: s.showRoofProjection, leftOpen: s.leftOpen, rightOpen: s.rightOpen, options: s.options, p: editor.project,
+    showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, browserSide: s.dock.browserSide, options: s.options, p: editor.project,
   };
 }

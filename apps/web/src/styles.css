@@ -151,10 +151,7 @@ svg { display: block; }
 
 /* ---- painéis laterais ---- */
 .workspace { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; }
-.side { width: 258px; background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-/* A paleta de propriedades mantém a largura do `.side`: o desenho (canvas) não muda com a densidade. */
-.side.left { border-right: 1px solid var(--line-strong); }
-.side.right { border-left: 1px solid var(--line-strong); width: 236px; }
+.side { flex: 1; min-height: 0; background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
 .panel-scroll { overflow: auto; flex: 1; min-height: 0; background: var(--sheet); }
 /* Grupo recolhível: cabeçalho em barra de cromo, com o chevron à direita (▲ aberto, ▼ fechado). */
@@ -390,10 +387,10 @@ svg { display: block; }
   .lbl-text { display: none; }
 }
 @media (max-width: 900px) {
-  .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }
-  .side { position: absolute; z-index: 20; top: 0; bottom: 0; box-shadow: var(--shadow); }
-  .side.left { left: 0; }
-  .side.right { right: 0; }
+  .workspace { grid-template-columns: minmax(0, 1fr) !important; position: relative; }
+  .dock { position: absolute; z-index: 20; top: 0; bottom: 0; max-width: 92vw; box-shadow: var(--shadow); }
+  .dock.left { left: 0; }
+  .dock.right { right: 0; }
   .split { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

@@ -20,7 +20,7 @@ export type ActionId =
   | 'zoomFit' | 'thinLines' | 'grid' | 'underlay' | 'roofProjection' | 'graphicsVisibility' | 'view3d' | 'genElevations' | 'newSheet'
   | 'materials' | 'levels' | 'lineWeights' | 'shortcutsConfig' | 'shortcuts'
   | 'schedWalls' | 'schedFloors' | 'schedSlabs' | 'schedCeilings' | 'schedRoofs' | 'schedStairs' | 'schedRooms' | 'schedOpenings'
-  | 'stairSketch' | 'stairTypes';
+  | 'stairSketch' | 'stairTypes' | 'browserSide';
 
 export type RibbonItem =
   /** Ferramenta do editor: o clique chama `editor.setTool`; mostra o atalho no tooltip. */

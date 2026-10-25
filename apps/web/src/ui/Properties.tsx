@@ -376,10 +376,13 @@ export function Properties(): ReactElement {
   const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
   return (
-    <aside className="side left" aria-label="Propriedades">
+    <aside className="side" aria-label="Propriedades">
       <div className="panel-head">
         <span>Propriedades</span>
-        <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>
+        <span className="ph-right">
+          <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>
+          <button className="ph-x" aria-label="Fechar as propriedades" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ propsOpen: false })}>✕</button>
+        </span>
       </div>
       <div className="panel-scroll">
         {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />

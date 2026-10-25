@@ -38,9 +38,14 @@ const px = (text, prop) => {
   return m ? Number(m[1]) : null;
 };
 
-// 1. A paleta é larga o bastante para a coluna de rótulo e uma coluna de valor útil (a largura pode vir do `.side`).
-const leftW = px(block('.side.left'), 'width') ?? px(block('.side'), 'width');
-if (leftW === null || leftW < PANEL_MIN) fail(`${CSS}: paleta de propriedades com width ${leftW ?? 'ausente'} px; o mínimo é ${PANEL_MIN} px`);
+// 1. A paleta é larga o bastante para a coluna de rótulo e uma coluna de valor útil: o dock (ver editor/dockLayout.ts)
+//    define a largura inicial e o mínimo ao arrastar a divisória.
+const DOCK = 'apps/web/src/editor/dockLayout.ts';
+const dockSrc = readFileSync(DOCK, 'utf8');
+const dockMin = Number(dockSrc.match(/minW:\s*([0-9]+)/)?.[1] ?? NaN);
+const dockInit = Number(dockSrc.match(/leftW:\s*([0-9]+)/)?.[1] ?? NaN);
+if (!(dockMin >= PANEL_MIN)) fail(`${DOCK}: largura mínima do dock ${Number.isNaN(dockMin) ? 'ausente' : dockMin} px; o mínimo é ${PANEL_MIN} px`);
+if (!(dockInit >= PANEL_MIN)) fail(`${DOCK}: largura inicial do dock ${Number.isNaN(dockInit) ? 'ausente' : dockInit} px; o mínimo é ${PANEL_MIN} px`);
 
 // 3. Linha de parâmetro densa e com a coluna de rótulo fixa.
 const prow = block('.prow');

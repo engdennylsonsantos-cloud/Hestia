@@ -6,6 +6,7 @@ import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
 import { activeViewOf, addView, type OpenView } from './openViews.ts';
 import type { RibbonTabId } from '../ui/ribbon/model.ts';
+import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -33,8 +34,11 @@ export interface UiState {
   showUnderlay: boolean;
   /** Projeção tracejada do contorno da cobertura acima do corte (opção da planta, decisão 0013 §2). */
   showRoofProjection: boolean;
-  leftOpen: boolean;
-  rightOpen: boolean;
+  /** Paleta de propriedades e navegador de projeto abertos. */
+  propsOpen: boolean;
+  browserOpen: boolean;
+  /** Disposição dos painéis acoplados (lado do navegador, larguras, divisória). */
+  dock: DockLayout;
   tutorial: boolean;
   /** Incrementa quando a pré-visualização da ferramenta muda (força novo desenho). */
   previewTick: number;
@@ -192,8 +196,9 @@ export const useUi = create<UiState>(() => ({
   showGrid: true,
   showUnderlay: true,
   showRoofProjection: readRoofProjection(),
-  leftOpen: typeof window === 'undefined' || window.innerWidth > 900,
-  rightOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  propsOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  browserOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  dock: loadDock(),
   tutorial: false,
   previewTick: 0,
   cursor: null,

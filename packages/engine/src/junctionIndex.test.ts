@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, makeFloor, makeWall, type Project } from '@hestia/model';
-import { horizontaisDoProjeto } from './junctionIndex.ts';
+import { fontesDoCortador, horizontaisDoProjeto } from './junctionIndex.ts';
 
 /** Horizontais por projeto: pisos, lajes, escadas e telhados do projeto inteiro, na ordem do projeto; cache por snapshot. */
 
@@ -29,5 +29,28 @@ describe('horizontais do projeto (junctionIndex)', () => {
     const q: Project = { ...p, elements: { ...p.elements } };
     expect(horizontaisDoProjeto(p)).toBe(horizontaisDoProjeto(p));
     expect(horizontaisDoProjeto(q)).not.toBe(horizontaisDoProjeto(p));
+  });
+
+  it('fontes do cortador: projeto reduzido (outro array de níveis, mesmos elementos) tem as mesmas fontes', () => {
+    const p = projeto();
+    const q: Project = { ...p, levels: p.levels.filter((l) => l.id === 'lv_0') };
+    const a = fontesDoCortador(p, 'lv_0');
+    const b = fontesDoCortador(q, 'lv_0');
+    expect(b).toHaveLength(a.length);
+    expect(b.every((x, i) => x === a[i])).toBe(true);
+  });
+
+  it('fontes do cortador: parede fixada ao piso lê todos os níveis (o array de níveis entra)', () => {
+    const s = new ProjectStore(projeto());
+    s.exec({ type: 'updateElements', ids: ['w1'], patch: { attachBottomToFloor: true } });
+    const p = s.project;
+    expect(fontesDoCortador(p, 'lv_0')).toContain(p.levels);
+  });
+
+  it('fontes do cortador: nível de topo da parede entra como objeto de nível', () => {
+    const s = new ProjectStore(projeto());
+    s.exec({ type: 'updateElements', ids: ['w1'], patch: { topLevelId: 'lv_1' } });
+    const p = s.project;
+    expect(fontesDoCortador(p, 'lv_0')).toContain(p.levels.find((l) => l.id === 'lv_1'));
   });
 });

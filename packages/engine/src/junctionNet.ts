@@ -1,7 +1,7 @@
 import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { floorsOnLevel, levelAbove, openingsOfWall, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { levelAbove, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
-import { horizontaisDoProjeto } from './junctionIndex.ts';
+import { fontesDoCortador } from './junctionIndex.ts';
 import { cacheDeCortadores } from './cutterCache.ts';
 import { resolveFloors, type ResolvedFloor, type ResolvedFloorLayer } from './floors.ts';
 import { resolveSlabs, slabRiseAt, type ResolvedSlab } from './slabs.ts';
@@ -231,32 +231,6 @@ export function spanRange(sp: SolidPiece): readonly [number, number] | null {
  * Pedaços de cada categoria de um nível, sem filtro: pisos e lajes por camada; paredes por faixa (`wallBandPieces`).
  */
 const levelCuttersCache = new WeakMap<Project, Map<Id, LevelCutters>>();
-const levelCutterSourcesByProject = new WeakMap<Project, Map<Id, readonly unknown[]>>();
-
-function cutterSources(p: Project, levelId: Id): readonly unknown[] {
-  let byLevel = levelCutterSourcesByProject.get(p);
-  if (!byLevel) {
-    byLevel = new Map();
-    levelCutterSourcesByProject.set(p, byLevel);
-  }
-  const cached = byLevel.get(levelId);
-  if (cached) return cached;
-  const walls = wallsOnLevel(p, levelId);
-  const sources: unknown[] = [
-    p.levels, p.settings, p.defaults, p.wallTypes, p.openingTypes, p.floorTypes, p.slabTypes, p.roofTypes, p.stairTypes,
-    ...walls,
-    ...walls.flatMap((wall) => openingsOfWall(p, wall.id)),
-    ...floorsOnLevel(p, levelId),
-    ...slabsOnLevel(p, levelId),
-    ...stairsOnLevel(p, levelId),
-    ...roofsOnLevel(p, levelId),
-    // Alturas anexadas e contornos com dependências verticais também leem estes elementos de outros níveis.
-    ...horizontaisDoProjeto(p),
-  ];
-  byLevel.set(levelId, sources);
-  return sources;
-}
-
 const sameSources = (a: readonly unknown[], b: readonly unknown[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
 
 /**
@@ -271,7 +245,7 @@ function levelCutters(p: Project, levelId: Id): LevelCutters {
   }
   const cached = byLevel.get(levelId);
   if (cached) return cached;
-  const sources = cutterSources(p, levelId);
+  const sources = fontesDoCortador(p, levelId);
   const content = cacheDeCortadores.get(`conteudo:${levelId}`);
   if (content && sameSources(content.sources, sources)) {
     byLevel.set(levelId, content.value);
@@ -325,7 +299,9 @@ export function levelCutterSet(p: Project, levelId: Id): LevelCutters {
     return r !== null && r[1] > lo + Z_EPS && r[0] < hi - Z_EPS;
   };
   const out: LevelCutters = { floors: [...own.floors], slabs: [...own.slabs], walls: [...own.walls] };
-  const sources: unknown[] = [p.levels, own];
+  // Fontes do conjunto: o próprio cortador e o de cada outro nível que contribui (o resultado é função só deles, então o
+  // array de níveis do projeto, que muda na redução, não entra).
+  const sources: unknown[] = [own];
   for (const other of p.levels) {
     if (other.id === levelId) continue;
     const c = levelCutters(p, other.id);

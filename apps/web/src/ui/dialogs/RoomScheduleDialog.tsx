@@ -2,28 +2,30 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildRoomSchedule, filterRoomRows, roomScheduleToCsv, sumRoomRows, type RoomScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 
 interface Col {
   key: keyof RoomScheduleRow;
-  label: string;
+  /** Chave do rótulo em I18N (PT/EN). */
+  labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
 }
 
 const COLS: Col[] = [
-  { key: 'number', label: 'Número' },
-  { key: 'name', label: 'Nome' },
-  { key: 'levelName', label: 'Nível' },
-  { key: 'area', label: 'Área (m²)', decimals: 2 },
-  { key: 'perimeter', label: 'Perímetro (m)', decimals: 2 },
-  { key: 'ceilingHeight', label: 'Pé-direito (m)', decimals: 2 },
-  { key: 'volume', label: 'Volume (m³)', decimals: 3 },
-  { key: 'floorFinish', label: 'Piso' },
-  { key: 'wallFinish', label: 'Parede' },
-  { key: 'ceilingFinish', label: 'Forro' },
+  { key: 'number', labelKey: 'col_number' },
+  { key: 'name', labelKey: 'col_name' },
+  { key: 'levelName', labelKey: 'col_level' },
+  { key: 'area', labelKey: 'col_area', decimals: 2 },
+  { key: 'perimeter', labelKey: 'col_perimeter', decimals: 2 },
+  { key: 'ceilingHeight', labelKey: 'col_ceiling_height', decimals: 2 },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'floorFinish', labelKey: 'col_floor_finish' },
+  { key: 'wallFinish', labelKey: 'col_wall_finish' },
+  { key: 'ceilingFinish', labelKey: 'col_ceiling_finish' },
 ];
 
 interface Sort {
@@ -31,7 +33,9 @@ interface Sort {
   dir: 1 | -1;
 }
 
-const fmt = (v: number, decimals: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
+const fmt = (v: number, decimals: number): string =>
+  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: RoomScheduleRow, b: RoomScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -48,6 +52,7 @@ const cellValue = (r: RoomScheduleRow, c: Col): ReactNode => {
 /** Tabela de ambientes com ordenação, filtro por nível, totais e exportação CSV (padrão da tabela de pisos). */
 export function RoomScheduleDialog(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const schedule = useMemo(() => buildRoomSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [sort, setSort] = useState<Sort | null>(null);
@@ -74,29 +79,29 @@ export function RoomScheduleDialog(): ReactElement {
 
   return (
     <Dialog
-      title="Tabela de ambientes"
-      sub={`${visible.length} de ${schedule.rows.length} ambientes`}
+      title={t.sched_title_room}
+      sub={`${visible.length} ${t.sched_of} ${schedule.rows.length} ${t.sched_noun_room}`}
       onClose={close}
       footer={
         <>
           <span className="wsched-msg" role="status">{msg}</span>
-          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title="Exporta as linhas filtradas, na ordem da tabela">
-            Exportar CSV
+          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title={t.sched_export_tip}>
+            {t.sched_export_csv}
           </button>
-          <button className="btn" onClick={close}>Fechar</button>
+          <button className="btn" onClick={close}>{t.sched_close}</button>
         </>
       }
     >
       <div className="wsched-bar">
-        <label htmlFor="rsc-level">Nível</label>
+        <label htmlFor="rsc-level">{t.col_level}</label>
         <select id="rsc-level" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
-          <option value="">Todos os níveis</option>
+          <option value="">{t.sched_all_levels}</option>
           {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há ambientes neste projeto. Use a ferramenta Ambiente (Z) para criá-los.' : 'Nenhum ambiente com este filtro.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? t.sched_empty_room : t.sched_none_room}</p>
       ) : (
         <>
           <div className="wsched-scroll">
@@ -105,8 +110,8 @@ export function RoomScheduleDialog(): ReactElement {
                 <tr>
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title="Ordenar por esta coluna">
-                        {c.label}
+                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
+                        {t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -127,10 +132,10 @@ export function RoomScheduleDialog(): ReactElement {
             </table>
           </div>
           <div className="total">
-            <span>{totals.count} {totals.count === 1 ? 'ambiente' : 'ambientes'}</span>
-            <span>Área {fmt(totals.area, 2)} m²</span>
-            <span>Perímetro {fmt(totals.perimeter, 2)} m</span>
-            <span>Volume {fmt(totals.volume, 3)} m³</span>
+            <span>{totals.count} {totals.count === 1 ? t.sched_noun_room_one : t.sched_noun_room}</span>
+            <span>{t.sched_total_area} {fmt(totals.area, 2)} m²</span>
+            <span>{t.sched_total_perimeter} {fmt(totals.perimeter, 2)} m</span>
+            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
           </div>
         </>
       )}

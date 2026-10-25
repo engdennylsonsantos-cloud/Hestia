@@ -60,9 +60,13 @@ function niveis(p: Project): ResolvedLevel[] {
   return p.levels.map((l) => resolveLevel(p, l.id));
 }
 
-/** Cena montada com a vista de `p` (o `dark` vem do tema, como no app). */
+/**
+ * Cena montada com a vista de `p` (o `dark` vem do tema, como no app). Esta suíte lê a estrutura de geometria (uma malha por
+ * material, peças por faixa): roda no caminho de geometria (`instanciar: false`, o de referência e o de reserva). A cena com
+ * caixas instanciadas tem a suíte própria `instanciada3d.test.ts`.
+ */
 function cena(p: Project, dark = false): ModelScene {
-  const ms = new ModelScene();
+  const ms = new ModelScene({ instanciar: false });
   ms.update(p, niveis(p), { edges: false, shadows: false, dark });
   return ms;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { roomsOnLevel } from '@hestia/model';
 import { polygonArea } from '@hestia/geom';
 import { makeEnv, drawWall, clickAt, tool, P } from './testEnv.ts';
@@ -44,6 +44,33 @@ describe('ferramenta Ambiente (A4, F2)', () => {
     const rooms = roomsOnLevel(ctx.store.project, 'lv_0');
     expect(rooms.map((r) => r.number)).toEqual(['1', '2']);
     expect(ctx.msgs.at(-1)).toContain('duplicado');
+  });
+
+  it('duplo clique (dois cliques no mesmo ponto, em sequência) cria um só ambiente; Ctrl+Z desfaz tudo', () => {
+    const ctx = box();
+    let agora = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => agora);
+    const t = tool('room', ctx.env);
+    clickAt(t, 2, 1.5);
+    agora += 120;
+    clickAt(t, 2, 1.5);
+    expect(roomsOnLevel(ctx.store.project, 'lv_0')).toHaveLength(1);
+    ctx.store.undo();
+    expect(roomsOnLevel(ctx.store.project, 'lv_0')).toHaveLength(0);
+    vi.restoreAllMocks();
+  });
+
+  it('dois cliques no mesmo ponto, espaçados no tempo, criam dois ambientes (o aviso de duplicado segue)', () => {
+    const ctx = box();
+    let agora = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => agora);
+    const t = tool('room', ctx.env);
+    clickAt(t, 2, 1.5);
+    agora += 2000;
+    clickAt(t, 2, 1.5);
+    expect(roomsOnLevel(ctx.store.project, 'lv_0')).toHaveLength(2);
+    expect(ctx.msgs.at(-1)).toContain('duplicado');
+    vi.restoreAllMocks();
   });
 
   it('fora de circuito mostra o motivo e não cria nada', () => {

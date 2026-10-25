@@ -1,4 +1,4 @@
-import { pointInPolygon, polygonArea, type Vec2 } from '@hestia/geom';
+import { dist, pointInPolygon, polygonArea, type Vec2 } from '@hestia/geom';
 import { roomRegionAt, type RoomProblem } from '@hestia/engine';
 import { roomsOnLevel } from '@hestia/model';
 import { ToolBase } from './base.ts';
@@ -13,6 +13,9 @@ export const ROOM_PROBLEM_TEXT: Record<RoomProblem, string> = {
 
 const fmtArea = (a: number): string => `${a.toFixed(2).replace('.', ',')} m²`;
 
+/** Intervalo, em ms, em que um segundo clique no mesmo ponto é tratado como o duplo clique do mouse. */
+const DUPLO_CLIQUE_MS = 600;
+
 /**
  * Ambiente (Revit: Room). Passe o cursor num circuito fechado de paredes: a região é pré-visualizada com o nome e a
  * área; o clique cria o ambiente no nível ativo (um passo de desfazer). A ferramenta só emite `addRoom`.
@@ -21,6 +24,8 @@ export class RoomTool extends ToolBase {
   readonly id = 'room';
   readonly label = 'Ambiente';
   readonly hint = 'Ambiente: aponte para um circuito fechado de paredes e clique dentro dele.';
+  /** Último clique que criou ambiente (ponto e instante), para reconhecer o duplo clique. */
+  private ultimo: { at: Vec2; quando: number } | null = null;
 
   protected reset(): void {
     this.items = [];
@@ -46,6 +51,10 @@ export class RoomTool extends ToolBase {
       this.env.say(ROOM_PROBLEM_TEXT[region.problem ?? 'fora']);
       return;
     }
+    // Duplo clique: o navegador manda dois cliques no mesmo ponto, e o segundo não cria outro ambiente (um Ctrl+Z desfaz o único).
+    const agora = Date.now();
+    if (this.ultimo && agora - this.ultimo.quando < DUPLO_CLIQUE_MS && dist(this.ultimo.at, p.raw) <= 4 * this.env.metersPerPixel()) return;
+    this.ultimo = { at: p.raw, quando: agora };
     const polygon = region.polygon;
     const repeated = roomsOnLevel(project, levelId).some((r) => pointInPolygon(r.point, polygon));
     const room = roomDraft(project, levelId, p.raw);

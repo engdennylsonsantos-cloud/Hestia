@@ -270,7 +270,7 @@ describe('códigos de erro (um teste por código, mensagem exata)', () => {
   it('stair-riser-same-location', () => {
     const run = straightRun(1.2, [1, 2]);
     run.risers.push(ln(1, -1, 1, 1));
-    expectOnly(run, 'stair-riser-same-location', 'Dois espelhos ocupam a mesma posição.', 0);
+    expectOnly(run, 'stair-riser-same-location', 'Espelhos nº 2 e nº 4 ocupam a mesma posição (distância 0,0 cm).', 0);
   });
 
   it('stair-path-ends (caminhada começa antes do primeiro espelho)', () => {

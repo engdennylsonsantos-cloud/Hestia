@@ -301,8 +301,8 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    // Atalho de comando por sequência (ex.: WA). Alt não dispara; com digitação numérica ativa, letras não iniciam atalho.
-    if (e.altKey || ui.typed) return false;
+    // Atalho por sequência (ex.: WA). Alt não dispara; digitação ativa ou ferramenta de texto (freeText, sem ponto) não deixa letras virarem atalho.
+    if (e.altKey || ui.typed || this.tool.freeText) return false;
     const r = casador.tecla(k);
     if (!r.tratada) return false;
     if (r.comando === 'atalhos') useUi.setState({ dialog: 'shortcutsConfig', dialogArg: null });

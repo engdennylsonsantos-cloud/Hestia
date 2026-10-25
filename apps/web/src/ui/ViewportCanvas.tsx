@@ -255,7 +255,9 @@ export function ViewportCanvas(): ReactElement {
     }
     const isMiddleBtn = e.button === 1;
     const isOrbitReq = (isMiddleBtn && e.shiftKey) || (e.button === 0 && e.altKey);
-    const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || (view !== '3d' && e.shiftKey)));
+    // Na planta, Shift com a Selecionar é da seleção (soma e janela); com as outras ferramentas, Shift continua a arrastar a vista.
+    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select';
+    const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || shiftPan));
     if (e.button === 2) {
       if (view === 'plan') editor.activeTool.cancel();
       editor.bump();
@@ -270,7 +272,8 @@ export function ViewportCanvas(): ReactElement {
     }
     // Na vista de corte não há ferramentas: o botão esquerdo arrasta a vista e, sem arrasto, seleciona (decisão 0016).
     if (isPanReq || isMiddleBtn || view === 'section') {
-      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && !isPanReq && e.button === 0 };
+      // Corte: sem Espaço, o botão esquerdo também seleciona no soltar se não houve arrasto (Shift incluso).
+      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && e.button === 0 && !spaceDown.current };
       if (view === 'section' && useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }

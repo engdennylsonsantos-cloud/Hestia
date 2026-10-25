@@ -224,20 +224,14 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente')])).fills.filter((f) => f.color === DOOR_T)).toHaveLength(1);
   });
 
-  it('X do vão livre no corte: duas diagonais contínuas ligando os vértices opostos do contorno', () => {
+  // Diagonal solta: traço reto de dois pontos que não é horizontal nem vertical (o X do vão saiu, decisão 0024 §3).
+  const diagonais = (d: ReturnType<typeof buildSectionDrawList>): StrokeOp[] =>
+    d.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y);
+
+  it('vão livre no corte e na elevação: só o contorno, sem diagonais (sem X)', () => {
     const d = buildSectionDrawList(facade([op('v', 'door', 'ot_vao90', 'frente')]));
-    const xs = d.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.dash === undefined && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y);
-    expect(xs).toHaveLength(2);
-    const all = xs.flatMap((s) => s.pts);
-    const [x0, x1] = [Math.min(...all.map((p) => p.x)), Math.max(...all.map((p) => p.x))];
-    const [y0, y1] = [Math.min(...all.map((p) => p.y)), Math.max(...all.map((p) => p.y))];
-    const key = (x: number, y: number): string => `${x.toFixed(6)},${y.toFixed(6)}`;
-    const cantos = (s: { pts: Vec2[] }): Set<string> => new Set(s.pts.map((p) => key(p.x, p.y)));
-    const same = (a: Set<string>, b: Set<string>): boolean => a.size === b.size && [...a].every((k) => b.has(k));
-    const sA = new Set([key(x0, y0), key(x1, y1)]);
-    const sB = new Set([key(x0, y1), key(x1, y0)]);
-    expect(xs.some((s) => same(cantos(s), sA))).toBe(true);
-    expect(xs.some((s) => same(cantos(s), sB))).toBe(true);
+    expect(diagonais(d)).toHaveLength(0);
+    expect(d.strokes.some((s) => s.closed && s.widthPx > 0)).toBe(true); // o contorno do vão continua
   });
 
   // V de giro (decisão 0024 §2): traço de três pontos cujas duas pontas ficam longe uma da outra. A seta de correr também tem
@@ -336,19 +330,19 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(dashOf(true)).toEqual([4, 3]);
   });
 
-  it('E1: a janela de correr, a fixa e o vão livre não têm V; o vão livre mantém o X', () => {
+  it('E1: a janela de correr, a fixa e o vão livre não têm V; o vão livre também não tem X', () => {
     expect(vs(buildSectionDrawList(facade([op('j', 'window', 'ot_j120', 'frente')])))).toHaveLength(0);
     expect(vs(buildSectionDrawList(facade([op('jf', 'window', 'ot_jfixa60', 'frente')])))).toHaveLength(0);
     const vao = buildSectionDrawList(facade([op('v', 'door', 'ot_vao90', 'frente')]));
     expect(vs(vao)).toHaveLength(0);
-    expect(vao.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.dash === undefined && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y)).toHaveLength(2);
+    expect(diagonais(vao)).toHaveLength(0);
   });
 
-  it('E1 (níveis): no grosso não sai V, seta de correr nem X; no médio saem', () => {
+  it('E1 (níveis): no grosso não sai V nem seta de correr; no médio saem', () => {
     const grosso = styledBox({ detail: 'coarse' }, () => facade([op('p', 'door', 'ot_p80', 'frente'), op('v', 'door', 'ot_vao90', 'frente', 4.5), op('j', 'window', 'ot_j120', 'frente', 1.2)]));
     expect(vs(buildSectionDrawList(grosso))).toHaveLength(0);
     expect(buildSectionDrawList(grosso).strokes.filter((s) => s.dash?.[0] === 4)).toHaveLength(0);
-    expect(buildSectionDrawList(grosso).strokes.filter((s) => !s.closed && s.pts.length === 2 && s.dash === undefined && s.pts[0]!.x !== s.pts[1]!.x && s.pts[0]!.y !== s.pts[1]!.y)).toHaveLength(0);
+    expect(diagonais(buildSectionDrawList(grosso))).toHaveLength(0);
     const medio = buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente')]));
     expect(vs(medio)).toHaveLength(1);
   });

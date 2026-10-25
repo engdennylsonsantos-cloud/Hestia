@@ -13,10 +13,10 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 - [x] P5 Janela de correr: n folhas em linhas defasadas (2 ou 3), sem linha no plano médio, com seta **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`
 - [x] P6 Janela fixa: duas linhas de face, linha do plano médio e duas ombreiras **(bloqueante)** — `packages/render/src/plan/symbols.test.ts`
 - [x] P7 Maxim-ar (arco tracejado do lado de `flipFacing`) e basculante (V no plano médio) **(bloqueante)** — `packages/render/src/plan/symbols.test.ts`
-- [x] P8 Vão livre (0 folhas): a soleira tracejada no plano médio, de −W/2 a +W/2, e o X (0024 §3) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`
+- [x] P8 Vão livre (0 folhas): só a soleira, linha fina contínua no plano médio de −W/2 a +W/2; sem X (0024 §3, revisada em 2026-10-24) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`
 - [x] P9 Famílias com efeito: cada família desenha diferente; `double` passou a ter sentido próprio (2 folhas) e é normalizado para `swing` com 2 folhas; combinação fora das famílias é recusada **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/plan/symbols.test.ts`, `packages/model/src/opening.test.ts`
-- [x] P10 Janela com 0 folhas: planta e 3D concordam no que é peça — sem caixilho nem vidro; a planta acrescenta a soleira e o X (0024 §3) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/model3d/scene3d.test.ts`
-- [x] P11 X do vão livre na planta: duas diagonais de vértice a vértice do vão, entre as faces da parede (0024 §3) — `packages/geom/src/openingSymbol.test.ts`
+- [x] P10 Janela com 0 folhas: planta e 3D concordam no que é peça — sem caixilho nem vidro; a planta acrescenta só a soleira (sem X, 0024 §3) **(bloqueante)** — `packages/geom/src/openingSymbol.test.ts`, `packages/render/src/model3d/scene3d.test.ts`
+- [-] P11 X do vão livre na planta: **removido** em 2026-10-24; Revit e ArchiCAD não o desenham em vão de parede (0024 §3). O teste confere que o vão livre sai só com a soleira — `packages/geom/src/openingSymbol.test.ts`
 - [x] P12 X do furo quadrangular de piso e laje na planta: duas diagonais; furo com mais de quatro vértices sem X; no grosseiro não sai (0024 §3) — `packages/render/src/plan/holeMarks.test.ts`, `packages/render/src/plan/floors.test.ts`, `packages/render/src/plan/slabs.test.ts`
 - [-] P13 Verga e peitoril na planta quando o corte passa por eles: fora desta entrega, próxima rodada (0024 §7)
 - [-] P14 Janela de giro (side-hung) como família: fora do escopo; o giro cai no maxim-ar (topo) e no basculante (base), que já têm arco e V (0024 §7)
@@ -28,14 +28,14 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 - [-] C4 Verga e contraverga: fora desta entrega; a altura e o transpasse são divergentes nas fontes (`A-pesquisa.md` §2.3 e §6) e dependem do projeto estrutural
 - [x] C5 Porta em corte: o vão de porta sem folha não tem preenchimento e a porta com folha aparece preenchida (folha fechada, só a parte visível pela linha oculta) **(bloqueante)** — `packages/render/src/section/build.test.ts`
 - [x] C6 Linha central da janela: só na janela de correr (2 ou 3 folhas); a fixa, a basculante e a maxim-ar não a têm **(bloqueante)** — `packages/render/src/section/build.test.ts`
-- [x] C7 X do vão livre no corte e na elevação: duas diagonais contínuas de vértice a vértice do contorno (0024 §3) — `packages/render/src/section/build.test.ts`
+- [-] C7 X do vão livre no corte e na elevação: **removido** em 2026-10-24 (0024 §3); o vão livre sai só com o contorno (e a soleira, na janela) — `packages/render/src/section/build.test.ts`
 
 ## Elevação
 - [x] E1 Símbolo de abertura na elevação: V de giro na porta de giro (vértice na dobradiça), e na janela de abrir (maxim-ar com o vértice no topo; basculante, na base); o arco tracejado saiu na SV1 (0024 §2) — `packages/render/src/section/build.test.ts`
 - [x] E2 Folha de correr na elevação com a seta de correr (janela e porta) — `packages/render/src/section/build.test.ts`
 - [x] E3 Giro na elevação: tracejado quando a folha abre para o observador, contínuo quando abre para o lado oposto; vértice na dobradiça. Convenção própria: a NBR 6492 e a Autodesk não deram a regra (0024 §2) — `packages/render/src/section/build.test.ts`, `packages/engine/src/section.ts`
 - [x] E4 Porta dupla (um V por folha, vértices nas ombreiras e pontas no centro) e pivotante (eixo a W/4 e V sobre ele) na elevação — `packages/render/src/section/build.test.ts`
-- [x] E5 Símbolos de elevação (V, seta de correr e X de vão) somem no grosso (decisão 0015; 0024 §5); janela de correr e fixa sem V — `packages/render/src/section/build.test.ts`
+- [x] E5 Símbolos de elevação (V e seta de correr) somem no grosso (decisão 0015; 0024 §5); janela de correr e fixa sem V — `packages/render/src/section/build.test.ts`
 
 ## 3D
 - [x] D1 Batente (ombreiras e verga) com a largura do tipo (`frameWidth`), não 0,05 fixo **(bloqueante)** — `packages/render/src/model3d/scene3d.test.ts`
@@ -50,7 +50,7 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 ## DXF
 - [x] X1 Vão de corte no DXF com o símbolo de planta (mesma função `openingSymbolPaths` da tela), na camada `ABERTURA_SIMBOLO` (0024 §4); sem símbolo, continua retângulo fechado em `ABERTURAS` (compatibilidade) **(bloqueante)** — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`
 - [x] X2 Projeção (acima/abaixo/além) com o símbolo nas camadas `ABERTURA_ACIMA`/`ABERTURA_ABAIXO`/`ABERTURA_ALEM` — `packages/io/src/dxf.test.ts`, `apps/web/src/editor/dxfExport.test.ts`
-- [x] X3 X do vão livre no corte vai à `ABERTURA_SIMBOLO` como duas linhas contínuas (0024 §4) — `packages/io/src/dxf.test.ts`
+- [-] X3 X do vão livre no corte no DXF: **removido** com o X do vão (0024 §3); o DXF segue mandando à `ABERTURA_SIMBOLO` os traços retos contínuos (a soleira) — `packages/io/src/dxf.test.ts`
 - [-] X4 DXF de corte com o giro e o X da elevação: fora desta entrega, `dxfSection.ts` recebe só polígonos do vão (0024 §4, §7)
 - [-] X5 X dos furos de piso e laje no DXF de planta: fora desta entrega, próxima rodada (0024 §4, §7)
 
@@ -62,4 +62,4 @@ IFC `Operation`). Decisões em [docs/decisoes/0017](../decisoes/0017-portas-e-ja
 - [x] T2 Quadro (tabela de portas e janelas): uma linha por tipo usado, com código (Type Mark), família, dimensões, folhas, quantidade, área e CSV — `packages/engine/src/openingSchedule.test.ts`
 
 ## Regressão visual
-- [x] V1 Casos `planta-porta-janela` (porta de giro, janela de correr e vão livre com X), `laje-abertura-x` (dois furos com X) e `elevacao-porta-janela` (fachada com giro, X e janela de correr): baselines criadas e conferidas por leitura das imagens; `piso-com-furo` e `laje-com-furo` regravados pelo X dos furos (0,136 % antes) — `tests/e2e/visual-regression.mjs`
+- [x] V1 Casos `planta-porta-janela` (porta de giro, janela de correr e vão livre), `laje-abertura-x` (dois furos com X) e `elevacao-porta-janela` (fachada com giro, vão livre só com contorno e janela de correr): baselines criadas e conferidas por leitura das imagens (as duas de vão livre atualizadas em 2026-10-24, ver 0024 §6); `piso-com-furo` e `laje-com-furo` regravados pelo X dos furos (0,136 % antes) — `tests/e2e/visual-regression.mjs`

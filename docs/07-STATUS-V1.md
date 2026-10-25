@@ -69,8 +69,9 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
   (`casing`), soleira saliente só de janela (`sillBoard`), verga e contraverga com transpasse (`lintel`, `sillBeam`).
   Sem o campo, nada é desenhado. Aparecem no 3D e no corte; na planta, verga e peitoril ainda não (P13).
 - Favoritos no seletor (`favoriteOpeningTypes`, desfazível).
-- Giro e X de vão em planta, corte e elevação (0024): o giro é o símbolo em "V" (vértice no lado da dobradiça, a meia altura; pontas no lado do
-  trinco; decisão 0024 §2), tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto; o X de vão em parede é convenção própria; o X de furo de piso/laje segue o Shaft Opening
+- Giro em elevação e X de furo (0024): o giro é o símbolo em "V" (vértice no lado da dobradiça, a meia altura; pontas no lado do
+  trinco; decisão 0024 §2), tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto; o vão livre de parede
+  não leva X (só parede interrompida e soleira na planta, contorno no corte e na elevação; 0024 §3); o X de furo de piso/laje segue o Shaft Opening
   do Revit.
 - 3D por família; folha aberta com "Abrir vãos" (vidro, giro, correr e pivotante corrigidos, 0017 §11).
 - Instância com lado da dobradiça, sentido de abertura e marca; "Tabela de portas e janelas" com CSV.

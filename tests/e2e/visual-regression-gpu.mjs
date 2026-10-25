@@ -46,7 +46,7 @@ const CASOS = {
   'junc-parede-embutida-piso': { items: [W('e1', [-1, 2], [7, 2], { baseOffset: -0.1 }), F('pe1', [[0, 0], [6, 0], [6, 4], [0, 4]])] },
   // Parede anexada à base no piso que cobre só metade dela (degrau de base na face superior do piso, +0,05 m).
   'parede-base-piso-metade': { items: [W('bp1', [0, 0], [4, 0], { attachBottomToFloor: true }), F('pb1', [[-1, -1], [2, -1], [2, 1], [-1, 1]], { heightOffset: 0.05 })] },
-  // Planta com porta de giro, janela de correr e vão livre (X) na casa de 8 × 6 m.
+  // Planta com porta de giro, janela de correr e vão livre (sem X, decisão 0024 §3) na casa de 8 × 6 m.
   'planta-porta-janela': { items: [...wallsOf(RECT_WALLS), OPEN('po1', 'door', 'ot_p80', 'w0', 2), OPEN('jn1', 'window', 'ot_j120', 'w2', 3), OPEN('vl1', 'door', 'ot_vao90', 'w1', 2.5)] },
 };
 

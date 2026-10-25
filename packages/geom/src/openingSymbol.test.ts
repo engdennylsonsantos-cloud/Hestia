@@ -180,32 +180,25 @@ describe('janela de correr com n folhas', () => {
 });
 
 describe('janela sem folha (vão livre)', () => {
-  it('leaves 0: a soleira tracejada no plano médio, de -W/2 a +W/2, e o X ligando os vértices do vão', () => {
+  it('leaves 0: só a soleira, contínua e fina, no plano médio de -W/2 a +W/2; sem X (decisão 0024 §3)', () => {
     const s = sym({ kind: 'window', plan: 'sliding', leaves: 0 });
-    expect(s).toHaveLength(3);
-    expect(s[0]!.dash).toBeDefined();
+    expect(s).toHaveLength(1);
+    expect(s[0]!.dash).toBeUndefined();
+    expect(s[0]!.weight).toBe(0.6);
     close(first(s[0]!), { x: -0.45, y: 0 });
     close(last(s[0]!), { x: 0.45, y: 0 });
   });
 
-  it('X do vão livre: diagonais exatas de (-W/2, sLo) a (+W/2, sHi) e de (+W/2, sLo) a (-W/2, sHi)', () => {
-    const [, d1, d2] = sym({ leaves: 0 });
-    close(first(d1!), { x: -0.45, y: -0.07 });
-    close(last(d1!), { x: 0.45, y: 0.07 });
-    close(first(d2!), { x: 0.45, y: -0.07 });
-    close(last(d2!), { x: -0.45, y: 0.07 });
-    expect(d1!.dash).toBeUndefined();
-    expect(d2!.dash).toBeUndefined();
+  it('vão livre de porta: o mesmo, um único traço reto; nenhuma diagonal', () => {
+    const s = sym({ leaves: 0 });
+    expect(s).toHaveLength(1);
+    expect(s[0]!.pts.every((p) => p.y === 0)).toBe(true);
   });
 
-  it('X segue a rotação do vão: com u e n trocados, os vértices vão para os novos eixos', () => {
-    const [, d1] = sym({ leaves: 0, u: { x: 0, y: 1 }, n: { x: -1, y: 0 } });
-    close(first(d1!), { x: 0.07, y: -0.45 });
-    close(last(d1!), { x: -0.07, y: 0.45 });
-  });
-
-  it('o vão com folha não leva o X (só o vão livre)', () => {
-    expect(sym({ leaves: 1 }).some((s) => s.pts.length === 2 && !s.closed && s.weight === 0.6)).toBe(false);
+  it('a soleira segue a rotação do vão: com u e n trocados, ela corre no novo eixo', () => {
+    const [s] = sym({ leaves: 0, u: { x: 0, y: 1 }, n: { x: -1, y: 0 } });
+    close(first(s!), { x: 0, y: -0.45 });
+    close(last(s!), { x: 0, y: 0.45 });
   });
 });
 

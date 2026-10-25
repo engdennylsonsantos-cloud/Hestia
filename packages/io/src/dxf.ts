@@ -52,7 +52,7 @@ export interface DxfOpening {
   /** Estado na vista. Ausente vale `cut` (vão de corte, na camada `ABERTURAS`). */
   state?: DxfViewState;
   /**
-   * Símbolo de planta do vão (folhas, arcos, caixilho e X; o mesmo da tela, `openingSymbolPaths` do geom). Sai em todos
+   * Símbolo de planta do vão (folhas, arcos, caixilho e soleira; o mesmo da tela, `openingSymbolPaths` do geom). Sai em todos
    * os estados. Sem ele, o vão sai como retângulo fechado (`ABERTURAS` no corte, a camada do estado na projeção).
    */
   symbol?: DxfSymbolPath[];
@@ -122,7 +122,7 @@ export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
 export const DXF_LAYER_CEILING = 'FORRO';
 /** Vãos que cortam o plano de corte (furam a parede): retângulo na camada `ABERTURAS` quando não há símbolo. */
 export const DXF_LAYER_OPENINGS = 'ABERTURAS';
-/** Símbolo de planta do vão de corte (folhas, arcos, X do vão livre), em camada própria com o peso de corte da categoria. */
+/** Símbolo de planta do vão de corte (folhas, arcos, soleira do vão livre), em camada própria com o peso de corte da categoria. */
 export const DXF_LAYER_OPENING_SYMBOL = 'ABERTURA_SIMBOLO';
 /** Vãos acima do corte (peitoril acima do plano): símbolo tracejado, a parede fica inteira. */
 export const DXF_LAYER_OPENING_ABOVE = 'ABERTURA_ACIMA';

@@ -32,31 +32,40 @@ e as fontes que consegui ler são de concurso e de tutorial.
 - Fato de apoio [DOC]: no Revit, o giro de porta em elevação é uma linha simbólica da família, visível só na vista em que
   foi desenhada (Autodesk, *About Creating 2D Geometry*, 2016).
 
-## 3. X de vão sem esquadria
+## 3. X só em furo de piso, laje e telhado; vão livre de parede sem X
 
-- **Onde**: (a) vão livre de parede (0 folhas), na planta e no corte/elevação; (b) furo quadrangular de piso e laje, na planta.
-- **Como**: contorno mais **duas diagonais ligando os vértices opostos** (`voidCrossPaths`, em `packages/geom`). Furo com mais
-  de quatro vértices não leva X, porque a diagonal entre opostos só é definida em quadrilátero.
-- **Nível de detalhe**: não sai no grosseiro (decisão 0015); sai no médio e no fino.
-- **Peso e visibilidade**: seguem a categoria da abertura na vista de corte (porta ou janela; categoria oculta, sem X).
-  Na planta, o X sai com o traço leve da própria abertura; nos furos, com o traço de projeção do piso ou da laje.
-  **Não criei categoria gráfica nova**: o pacote `model` não está na área de edição desta entrega, e o X é ligado pela
-  categoria existente da abertura, como a decisão 0015 permite.
-- **Traço do X**: sem fonte oficial de peso nem de tracejado ([NÃO ENCONTRADO]). Convenção própria: contínuo e fino.
-- **Revit, Wall Opening**: não achei página que diga que ele desenha X ([NÃO ENCONTRADO]). O X de parede do Hestia é
-  convenção própria para o vão livre, não cópia do Revit.
+**Revisão de 2026-10-24.** A versão original desta seção pôs o X também no vão livre de parede, por uma lembrança do dono
+de que "o Revit cria um X unindo vértices". A própria pesquisa (C §3) já mostrava que o X do Revit é linha simbólica
+**opcional** do Shaft Opening (furo em piso ou laje) e que não havia fonte para Wall Opening. Nenhum dos dois programas
+desenha X em vão de parede: o Revit interrompe a parede e mostra o contorno do vão em corte e elevação; o ArchiCAD, com
+o vão vazio ("Empty Opening", tipo de porta ou janela como o nosso), interrompe a parede e só tem linhas opcionais de
+contorno e de borda superior tracejada (fórum Graphisoft; as páginas oficiais de Wall Opening e Empty Opening não foram
+lidas). Na planta o X ainda virava uma ampulheta ilegível nos 14 cm da parede, e na elevação concorria com o V de giro.
+
+- **Vão livre de parede (0 folhas), planta**: parede interrompida nos batentes (como já era) e **só a soleira**: uma linha
+  fina contínua no plano médio, de −W/2 a +W/2. Era tracejada; passou a contínua porque o tracejado da planta significa
+  "acima do corte" (decisão 0013) e a soleira fica abaixo dele.
+- **Vão livre, corte e elevação**: só o contorno do vão; a janela sem folha mantém a soleira (como no 3D). Sem diagonais.
+- **Furo quadrangular de piso, laje e telhado, planta**: mantém o X, contorno mais **duas diagonais ligando os vértices
+  opostos** (`voidCrossPaths`, em `packages/geom`; só `plan/holeMarks.ts` o usa). Furo com mais de quatro vértices não leva
+  X, porque a diagonal entre opostos só é definida em quadrilátero.
+- **Nível de detalhe do X de furo**: não sai no grosseiro (decisão 0015); sai no médio e no fino.
+- **Peso e visibilidade do X de furo**: seguem o traço de projeção do piso, da laje ou do telhado (categoria do elemento).
+  **Não criei categoria gráfica nova**: o X de furo segue a categoria existente do elemento, como a decisão 0015 permite.
+- **Traço do X de furo**: sem fonte oficial de peso nem de tracejado ([NÃO ENCONTRADO]). Convenção própria: contínuo e fino.
+- **Revit, Wall Opening**: sem X, confirmado pela ausência de fonte em C §3 e pelo comportamento conhecido do programa.
 
 ## 4. DXF
 
-- O símbolo do vão de corte (folha, arco, X) vai à camada **`ABERTURA_SIMBOLO`**, com o peso de corte da categoria `window`
+- O símbolo do vão de corte (folha, arco, soleira do vão livre) vai à camada **`ABERTURA_SIMBOLO`**, com o peso de corte da categoria `window`
   (porta e janela juntas, como em `ABERTURAS`). O retângulo do vão sem símbolo continua em `ABERTURAS`.
 - As camadas de projeção (`ABERTURA_ACIMA`, `_ABAIXO`, `_ALEM`) não mudam.
-- **Não feito**: símbolo de giro e X no DXF de corte (`dxfSection.ts` recebe só polígonos do vão) e X dos furos no DXF de planta.
+- **Não feito**: símbolo de giro no DXF de corte (`dxfSection.ts` recebe só polígonos do vão) e X dos furos no DXF de planta.
 
 ## 5. O que não mudou
 
 - Níveis de detalhe (decisão 0015): no grosseiro, sem símbolo de vão e sem X de furo, na planta e também na elevação
-  (V, seta de correr e X de vão; antes o corte e a elevação desenhavam esses traços no grosso). Médio e fino têm o mesmo
+  (V e seta de correr; antes o corte e a elevação desenhavam esses traços no grosso). Médio e fino têm o mesmo
   símbolo de vão: nenhuma diferença foi implementada entre os dois. Fonte: Graphisoft AC26, *Door/Window Settings and Opening*, 2D
   Detail Level (`By MVO`, `Scale Sensitive`, escala fixa, `Off`).
 - Projeção acima do corte: tracejada, como já era (decisão 0013).
@@ -73,6 +82,17 @@ e as fontes que consegui ler são de concurso e de tutorial.
 - Revisão SV1 (giro em V): só `elevacao-porta-janela` mudou, 0,090 % antes da regravação. A imagem nova mostra a porta de
   giro com o V (vértice na dobradiça a meia altura, pontas no trinco, contínuo porque a folha abre para longe), e o diff fica
   só dentro da folha. Os outros 29 casos seguem em 0,000 %. Baseline regravada sem `--update` geral.
+
+- Revisão do X (2026-10-24, vão livre sem X): testes ajustados em `openingSymbol.test.ts` (só a soleira, contínua, também com
+  a rotação do vão), `symbols.test.ts`, `build.test.ts` (sem diagonais no corte, na elevação e no grosso) e `dxf.test.ts`
+  (traço reto contínuo em `ABERTURA_SIMBOLO`). `holeMarks`, `floors` e `slabs` não mudaram: o X de furo segue como estava.
+  Baselines visuais: `planta-porta-janela` e `elevacao-porta-janela` mudaram só no vão livre, e as imagens foram lidas.
+  Como a máquina desta revisão (Windows) não reproduz as baselines de Linux (o canvas sai 4 px mais baixo e a interface da
+  branch `feat/revit-ui-theme` tem a barra de escala; os 36 casos divergem por isso, 100 % ou cerca de 2 %, com ou sem a
+  mudança), as duas baselines foram **remendadas**: a imagem antiga ficou intacta e só o retângulo do vão foi trocado pelo
+  da renderização nova. **Pendente em Linux**: rodar `node tests/e2e/visual-regression.mjs` (CPU) e regravar, se preciso,
+  e regravar `baseline-gpu/planta-porta-janela.png` (`visual-regression-gpu.mjs --update`, que exige o Chromium de
+  `/opt/pw-browsers`), que ainda mostra o X.
 
 ## 7. Fora desta entrega
 

@@ -20,12 +20,12 @@ instância não muda a família.
 | `door_double` | Porta dupla | `double` | 2 | Duas folhas de W/2 e dois arcos até o centro; no 3D, dois painéis | Revit: porta dupla. IFC: `DOUBLE_DOOR_*` |
 | `door_sliding` | Porta de correr | `sliding` | 2 | Dois retângulos fechados em faces opostas, com sobreposição e seta; no 3D, dois painéis em trilhos defasados na profundidade | Revit: porta de correr. IFC: `SLIDING_*` |
 | `door_pivot` | Porta pivotante | `pivot` | 1 | Eixo a W/4 de uma ombreira, folha de comprimento W e dois arcos até as duas ombreiras; no 3D, uma folha que abre 90° no eixo a W/4 | Sem família de sistema no Revit; ArchiCAD: `Opening Type` `Double-Acting` (o mais próximo). **Mantida por decisão do dono** (§8) |
-| `door_void` | Vão livre | `swing` | 0 | Só a soleira tracejada; no 3D, só o recorte da parede (sem folha nem caixilho) | Revit: `Opening`; ArchiCAD: vão |
+| `door_void` | Vão livre | `swing` | 0 | Só a soleira (linha fina contínua); no 3D, só o recorte da parede (sem folha nem caixilho) | Revit: `Opening`; ArchiCAD: vão |
 | `window_fixed` | Janela fixa | `fixed` | 1 | Duas linhas de face, linha do plano médio e duas ombreiras; no 3D, caixilho e vidro | Revit: janela fixa. IFC: sem operação |
 | `window_tilt` | Janela basculante | `tilt` | 1 | Como a fixa, mais um V no plano médio; no 3D, abre pelo topo como a maxim-ar por ora | Revit: basculante. IFC `Operation`: `BOTTOM_HUNG`. **Fora do catálogo por decisão do dono em 2026-10-22** (§11) |
 | `window_casement` | Janela maxim-ar | `casement` | 1 | Como a fixa, mais um arco tracejado do lado de `flipFacing` | Revit: maxim-ar. IFC `Operation`: `TOP_HUNG` |
 | `window_sliding` | Janela de correr | `sliding` | 2 ou 3 | n folhas em linhas defasadas, sem linha no plano médio, com seta; no 3D, n vidros em trilhos defasados | Revit: janela de correr. IFC: `SLIDING_HORIZONTAL` |
-| `window_void` | Vão livre de janela | `fixed` | 0 | Só a soleira tracejada; no 3D, só a soleira | Revit: `Opening`; ArchiCAD: vão |
+| `window_void` | Vão livre de janela | `fixed` | 0 | Só a soleira (linha fina contínua); no 3D, só a soleira | Revit: `Opening`; ArchiCAD: vão |
 
 Os valores IFC são o mapeamento mais próximo do enum (`IfcDoorTypeOperationEnum` / `IfcWindowPanelOperationEnum`); quem
 fixa o valor final é o exportador. O `Operation` é enum do IFC, **não** parâmetro de sistema do Revit (ver
@@ -200,6 +200,7 @@ Decisão completa em [0024](0024-representacao-aberturas.md). O que muda nesta s
   e a Autodesk não deram a regra.
 - **Porta dupla e pivotante na elevação (§6).** Dupla: um V por folha, vértices nas ombreiras e pontas no centro. Pivotante:
   eixo a W/4 com o vértice do V sobre ele.
-- **Vão livre e furos com X (0024 §3).** O vão livre leva duas diagonais no corte, na elevação e na planta; furo
-  quadrangular de piso e laje leva o X na planta. O X segue a categoria da abertura e não aparece no grosseiro.
+- **Vão livre sem X, furos com X (0024 §3, revisada em 2026-10-24).** O vão livre de parede não leva X em nenhuma vista:
+  na planta, só a soleira (linha fina contínua); no corte e na elevação, só o contorno. Furo quadrangular de piso e laje
+  leva o X na planta, que segue a categoria do elemento e não aparece no grosseiro.
 - **Pivotante (§8).** A posição do eixo continua provisória (W/4), sem fonte oficial.

@@ -141,8 +141,9 @@ const PISO_UNICO_CASES = {
 };
 
 // Decisão 0024 (representação de aberturas): casos novos de porta, janela, vão livre e X de furo. A planta leva porta de
-// giro e janela de correr na parede sul/norte e um vão livre na leste (X); a laje tem dois furos quadrangulares (X em cada
-// um). A elevação abre a vista da fachada sul (`addView` + `openSection`) com a porta, o vão livre e a janela.
+// giro e janela de correr na parede sul/norte e um vão livre na leste (parede interrompida e soleira, sem X); a laje tem
+// dois furos quadrangulares (X em cada um). A elevação abre a vista da fachada sul (`addView` + `openSection`) com a porta,
+// o vão livre (só o contorno) e a janela.
 const OPEN = (id, kind, typeId, hostId, offset) => ({ kind: 'opening', opening: { id, kind, typeId, hostId, offset, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
 const RECT_HOLES = [[{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 3, y: 2 }, { x: 1, y: 2 }], [{ x: 5, y: 3 }, { x: 5.8, y: 3 }, { x: 5.8, y: 3.8 }, { x: 5, y: 3.8 }]];
 const OPENING_CASES = {

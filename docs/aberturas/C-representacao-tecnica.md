@@ -77,8 +77,9 @@ projeção acima do corte; `plan/view.ts` já separa corte × projeção.
 | **(iii) ArchiCAD "Opening"** | Símbolos de abertura em planta; na versão 23 não aparecem em corte/elevação. Um "X" de penetração em concreto em elevação é **rótulo personalizado** de usuário, não símbolo nativo | [SEC] Graphisoft AC23 e Community "Opening-Shape" (trechos de busca); [INFERIDO] que AC26 segue igual |
 | (iv) Janela fixa / vão livre | Janela fixa tem as "3 linhas". O X é reservado ao vão **sem quadro** | [INFERIDO] |
 
-**Conclusão:** o X é um **símbolo de vão sem esquadria** (furo em piso/laje/telhado e vão livre em parede), desenhado
-como contorno + 2 diagonais ligando os vértices opostos. Ele é **opcional** no Revit (linha simbólica do usuário).
+**Conclusão (revista em 2026-10-24):** o X é um **símbolo de furo em piso, laje ou telhado** (vão vertical), desenhado
+como contorno + 2 diagonais ligando os vértices opostos. Ele é **opcional** no Revit (linha simbólica do usuário). **Não vale
+para vão livre de parede**: a versão anterior desta conclusão o estendia à parede sem fonte, e a decisão 0024 §3 o retirou.
 Não é o símbolo de porta/janela com folha (esses têm arco, seta ou V). **O traço exato (peso e tracejado) do X não tem fonte
 oficial: [NÃO ENCONTRADO].**
 
@@ -105,7 +106,7 @@ oficial: [NÃO ENCONTRADO].**
 | Janela fixa | 3 linhas | caixilho + vidro, sem símbolo | [INFERIDO] |
 | Janela maxim-ar/basculante | arco tracejado / V | V (maxim-ar: vértice no topo; basculante: na base) | [INFERIDO] |
 | Janela de correr | n folhas + seta | seta | [SEC/INFERIDO] |
-| Vão livre em parede (sem esquadria) | **X** (contorno + 2 diagonais) | **X** | [NÃO ENCONTRADO] no Revit (Wall Opening); [INFERIDO] |
+| Vão livre em parede (sem esquadria) | parede interrompida + soleira, **sem X** | contorno do vão, **sem X** | decisão 0024 §3 (revista); o X não foi achado em Wall Opening nem em Empty Opening |
 | Furo em piso/laje/telhado (shaft) | **X** opcional | **X** opcional, em todos os níveis | [DOC] Autodesk 2024 (opcional); forma [SEC] |
 | Projeção acima do corte | tracejado | — | [DOC] Autodesk View Range |
 | Nível de detalhe | grosso sem símbolo; médio/fino com | `By MVO` / `Scale Sensitive` / `Off` | [DOC] Graphisoft AC26 |

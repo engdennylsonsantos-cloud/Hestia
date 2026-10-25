@@ -1,4 +1,4 @@
-import { union, voidCrossPaths, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { SectionBeyond, SectionOpening, SectionOrigin, SectionResult } from '@hestia/engine';
 import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
@@ -113,9 +113,9 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (!noFill) fills.push({ polygons: [[ring]], color: halftone(color, pt), alpha: pt.alpha });
       strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
     };
-    // Traço simbólico da elevação (abertura, giro, seta, X): fino. Por padrão tracejado (dash [4,3], distinto do tracejado dos
+    // Traço simbólico da elevação (abertura, giro, seta): fino. Por padrão tracejado (dash [4,3], distinto do tracejado dos
     // níveis [10,5]); `dashed = false` sai contínuo (decisão 0024 §2: tracejado = abre para o observador, contínuo = não).
-    // No grosso não sai símbolo nenhum (decisão 0015; 0024 §3 e §5).
+    // No grosso não sai símbolo nenhum (decisão 0015; 0024 §5).
     const symbol = (pts: Vec2[], dashed = true): void => {
       if (detail === 'coarse') return;
       strokes.push({ pts, closed: false, widthPx: symbolWidth(kind), color: halftone(theme.inkSoft, pt), alpha: 1, ...(dashed ? { dash: [4, 3] as [number, number] } : {}) });
@@ -167,17 +167,10 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (kind === 'window') outlineRect(t0 - cw, t1 + cw, z0 - cw, z0);
     }
     // Vão livre (sem folha): nenhum batente nem vidro. A porta é só o vão aberto (o vazio mostra o papel); a janela
-    // sem folha fica com a soleira, como no 3D.
+    // sem folha fica com a soleira, como no 3D. Só o contorno, sem X (decisão 0024 §3).
     if (esq.leaves === 0) {
       if (kind === 'window') piece(t0, t1, z0, z0 + fw, frameColor);
       outline();
-      // X do vão sem esquadria, ligando os vértices opostos do contorno (decisão 0024 §3): contínuo.
-      for (const seg of voidCrossPaths([
-        { x: t0, y: z0 },
-        { x: t1, y: z0 },
-        { x: t1, y: z1 },
-        { x: t0, y: z1 },
-      ])) symbol(seg, false);
       return;
     }
     if (kind === 'window') {

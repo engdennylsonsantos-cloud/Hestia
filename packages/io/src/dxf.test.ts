@@ -354,13 +354,13 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     expect(text).not.toContain('\r\nABERTURAS\r\n');
   });
 
-  it('o X do vão livre no corte vai à ABERTURA_SIMBOLO como duas linhas, sem tracejado', () => {
-    const x1: DxfSymbolPath = { pts: [{ x: 0.6, y: 0 }, { x: 1.4, y: 2 }], closed: false };
-    const x2: DxfSymbolPath = { pts: [{ x: 1.4, y: 0 }, { x: 0.6, y: 2 }], closed: false };
-    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [x1, x2])] });
+  it('a soleira do vão livre no corte vai à ABERTURA_SIMBOLO como uma linha contínua, sem tracejado', () => {
+    const soleira: DxfSymbolPath = { pts: [{ x: 0.6, y: 0 }, { x: 1.4, y: 0 }], closed: false };
+    const text = exportDxf(project, 'lv_0', { ...base, openings: [at('cut', [soleira])] });
     const polys = polylines(text);
-    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL, DXF_LAYER_OPENING_SYMBOL]);
+    expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL]);
     expect(linetypeOf(text, DXF_LAYER_OPENING_SYMBOL)).toBe('CONTINUOUS');
+    expect(ltypeNames(text)).toEqual(['CONTINUOUS']);
   });
 
   it('vão de corte sem símbolo continua retângulo fechado em ABERTURAS (compatibilidade)', () => {

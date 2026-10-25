@@ -53,7 +53,7 @@ if (!prow) fail(`${CSS}: falta a regra .prow`);
 else {
   const h = px(prow, 'min-height');
   if (h === null || h > ROW_MAX) fail(`${CSS}: .prow com min-height ${h ?? 'ausente'} px; o máximo é ${ROW_MAX} px`);
-  if (!/grid-template-columns:\s*46%/.test(prow)) fail(`${CSS}: .prow precisa dividir rótulo e valor em 46% (tabela de propriedades)`);
+  if (!/grid-template-columns:\s*(?:var\(--lbl,\s*)?46%/.test(prow)) fail(`${CSS}: .prow precisa dividir rótulo e valor em 46% (tabela de propriedades)`);
 }
 
 // 4. Botão nunca quebra linha (global e na classe .btn).

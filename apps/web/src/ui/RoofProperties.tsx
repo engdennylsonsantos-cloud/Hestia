@@ -213,7 +213,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         <Row label="Espigão"><span className="val">{fmt(hipLength)} m</span></Row>
         <Row label="Rincão"><span className="val">{fmt(valleyLength)} m</span></Row>
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-rmark"><TextField id="p-rmark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-rcomm"><TextField id="p-rcomm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>

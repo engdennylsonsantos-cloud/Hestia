@@ -153,3 +153,8 @@
 
 /* ---- barra de status: filtro de seleção ---- */
 .sb-filter { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; background: var(--sheet); border: 1px solid var(--line-strong); }
+
+/* ---- paleta de propriedades: divisória rótulo|valor arrastável ---- */
+.lbl-split-wrap { position: sticky; top: 0; z-index: 5; height: 0; }
+.lbl-split { position: absolute; top: 0; left: calc(var(--lbl, 46%) - 3px); width: 6px; cursor: col-resize; touch-action: none; }
+.lbl-split:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); }

@@ -166,7 +166,7 @@ svg { display: block; }
  * entre as células. O campo fica sem caixa até o ponteiro passar ou o foco entrar. Sem `grid-template-columns` fixo
  * em pixels: a paleta tem largura de `.side`, e a tabela acompanha.
  */
-.prow { display: grid; grid-template-columns: 46% minmax(0, 1fr); align-items: stretch; min-height: 22px; border-bottom: 1px solid var(--line); }
+.prow { display: grid; grid-template-columns: var(--lbl, 46%) minmax(0, 1fr); align-items: stretch; min-height: 22px; border-bottom: 1px solid var(--line); }
 .prow:last-child { border-bottom: 0; }
 .prow > label, .prow > .lbl { display: flex; align-items: center; min-width: 0; padding: 2px 8px; border-right: 1px solid var(--line); font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow > div { display: flex; align-items: center; min-width: 0; }

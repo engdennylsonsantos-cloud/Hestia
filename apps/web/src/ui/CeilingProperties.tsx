@@ -93,7 +93,7 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
           </>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-cmark"><TextField id="p-cmark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-ccomm"><TextField id="p-ccomm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>

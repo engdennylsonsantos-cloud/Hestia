@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 import { filterTypeChoices, groupTypeChoices } from './typeSelectorModel.ts';
-import { TypePreview, TypeThumb, type PreviewSubject } from './TypePreview.tsx';
+import { TypeThumb, type PreviewSubject } from './TypePreview.tsx';
 
 /** Um tipo na lista do seletor: os campos de busca, a família do agrupamento e o que a prévia desenha. */
 export interface TypeOption {
@@ -32,7 +32,7 @@ interface TypeSelectorProps {
 }
 
 /**
- * Seletor de tipo da paleta de propriedades (o Type Selector do Revit): prévia do tipo, botão de dois níveis
+ * Seletor de tipo da paleta de propriedades (o Type Selector do Revit): botão de dois níveis
  * (família em negrito e tipo embaixo) com miniatura, lista com busca e agrupada por família, e a linha de filtro com
  * a categoria e o "Editar tipo". A lista fecha com Esc, com clique fora ou ao escolher um tipo.
  */
@@ -75,7 +75,6 @@ export function TypeSelector({ triggerId, label, categoryLabel, options, selecte
 
   return (
     <div className="rv-type">
-      {selected ? <TypePreview subject={selected.subject} /> : null}
       <div className="rv-stick">
         <div className="rv-tsel-wrap" ref={wrapRef}>
           <button

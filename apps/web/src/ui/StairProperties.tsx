@@ -192,7 +192,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
           ))
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-smk"><TextField id="p-smk" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-scm"><TextField id="p-scm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>

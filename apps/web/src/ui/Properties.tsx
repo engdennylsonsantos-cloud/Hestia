@@ -41,6 +41,7 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { LabelScroll } from './LabelScroll.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
@@ -173,11 +174,6 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         <Row label="Não unir no início"><Check id="p-nos" checked={noS.value} mixed={noS.mixed} onChange={(v) => patch(ids, { noJoinStart: v })} /></Row>
         <Row label="Não unir no fim"><Check id="p-noe" checked={noE.value} mixed={noE.mixed} onChange={(v) => patch(ids, { noJoinEnd: v })} /></Row>
       </Group>
-      {single && (
-        <Group title="Junções">
-          <JoinRows wall={single} />
-        </Group>
-      )}
       <Group title="Construção" open={false}>
         {t ? (
           <>
@@ -205,7 +201,12 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
           <Row label="Comprimento total"><span className="val">{fmt(walls.reduce((s, w) => s + wallLength(w), 0), 2)} m</span></Row>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      {single && (
+        <Group title="Junções">
+          <JoinRows wall={single} />
+        </Group>
+      )}
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-mark"><TextField id="p-mark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-comm"><TextField id="p-comm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>
@@ -263,7 +264,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
           </>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-omark"><TextField id="p-omark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
       </Group>
     </>
@@ -384,7 +385,7 @@ export function Properties(): ReactElement {
           <button className="ph-x" aria-label="Fechar as propriedades" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ propsOpen: false })}>✕</button>
         </span>
       </div>
-      <div className="panel-scroll">
+      <LabelScroll>
         {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
           : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />
           : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
@@ -403,7 +404,7 @@ export function Properties(): ReactElement {
             <ViewProps />
           </>
         )}
-      </div>
+      </LabelScroll>
       <div className="rv-foot">
         <button type="button" className="link" onClick={() => useUi.setState({ dialog: 'shortcuts' })}>Ajuda de propriedades</button>
         {/* Edições já valem ao sair do campo; o botão só tira o foco do campo que ainda está aberto. */}

@@ -77,18 +77,27 @@ export class ParallelTool extends ToolBase {
     return best ? { id: best.id, f: best.f } : null;
   }
 
-  /** Lado da nova parede: o do cursor em relação ao eixo da base, invertido por Tab. */
+  /** Lado do cursor em relação ao eixo da base. */
+  private cursorSideAt(s: number): 1 | -1 {
+    return s - this.frame!.sMid >= 0 ? 1 : -1;
+  }
+
+  /** Lado onde a nova parede fica: o do cursor, invertido por Tab. */
   private sideAt(s: number): 1 | -1 {
-    const cursorSide = s - this.frame!.sMid >= 0 ? 1 : -1;
+    const cursorSide = this.cursorSideAt(s);
     return this.flip ? (-cursorSide as 1 | -1) : cursorSide;
   }
 
-  /** Distância medida pela convenção de `offsetFrom`, para o cursor em `at` (negativa: o cursor está dentro da base). */
+  /**
+   * Distância medida pela convenção de `offsetFrom`, para o cursor em `at` (negativa: o cursor está dentro da base).
+   * A medida segue o lado do CURSOR, não o lado invertido por Tab: Tab só troca onde a parede é criada.
+   */
   private measure(at: Vec2): number {
     const f = this.frame!;
     const l = toLocal(f, at);
-    const from = this.byFace() ? f.sMid + this.side * (f.thickness / 2) : f.sMid;
-    return this.side * (l.s - from);
+    const c = this.cursorSideAt(l.s);
+    const from = this.byFace() ? f.sMid + c * (f.thickness / 2) : f.sMid;
+    return c * (l.s - from);
   }
 
   /** Deslocamento do eixo da base para a nova parede, a partir da distância `d` medida pela convenção. */

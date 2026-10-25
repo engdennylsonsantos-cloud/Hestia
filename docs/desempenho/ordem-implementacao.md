@@ -94,3 +94,34 @@ Critério de saída: resultado idêntico ao da CPU, e ganho medido no navegador.
 - Medição antes e depois com método declarado.
 - Não fazer push sem autorização explícita.
 - Nenhum arquivo acima de ~400 linhas.
+
+## Plano em 8 etapas (2026-10-25)
+
+Cada etapa só entra com medição antes e depois. Etapas 2 a 6 podem rodar em paralelo quando mexem em arquivos diferentes.
+
+- **Etapa 0: destravar a medição.** Build de produção funcionou em 2026-10-25 com a máquina sem carga. Medição de referência: `scripts/perf-baselines/browser-20-pav-2026-10-25-etapa0.json` (porta, janela e parede nova já incluídos em `perf-browser.mjs`). `tests/e2e/perf-acoes.mjs` não grava resultado e deve ser removido ou concluído.
+- **Etapa 1: chave do cache de cortadores (engine).** Corrigir a identidade do projeto reduzido em `junctionNet.ts`. Libera a 3D com junção reduzida (hoje 20% mais lenta) e a abertura com todos os níveis.
+- **Etapa 2: zoom sem reconstruir (planta).** Tirar o zoom das chaves do quadro (`planFrame.ts`, `grid.ts`) e tornar o nível de detalhe por faixa. Critério: zoom só muda a câmera.
+- **Etapa 3: edição rápida.** Ligar o provisório na planta (UI) e o exato assíncrono. Critério: resposta visual em até 50 ms.
+- **Etapa 4: 3D na GPU.** Paredes como quads parametrizados, portas, janelas e mobília como instâncias, culling por frustum e por nível.
+- **Etapa 5: cortes e elevações por recorte.** Plano de recorte na GPU em vez de geometria de corte recalculada a cada quadro.
+- **Etapa 6: abertura.** Cache de geometria ligado no controller e montagem progressiva da 3D com `resolucaoPronta`. Critério: primeiro quadro em até 300 ms com 20 pavimentos.
+- **Etapa 7: WebGPU compute (triangulação e extrusão), com fallback WebGL2.** Só se a medição depois das etapas 1 a 6 mostrar que ainda pesa.
+- **Etapa 8: Rust/WASM para o núcleo de junção.** Só se o perfil depois da etapa 7 mostrar a CPU como gargalo.
+
+### Medição de referência (etapa 0, 2026-10-25, mediana em ms)
+
+| Medida | 10 pav | 20 pav |
+|---|---|---|
+| Abrir projeto | 317 | 408 |
+| Planta do nível do meio | 39 | 75 |
+| Seleção | 14 | 21 |
+| Editar parede | 103 | 135 |
+| Porta na parede | 121 | 227 |
+| Janela na parede | 133 | 237 |
+| Parede nova | 175 | 242 |
+| Pan | 29,5 | 52,8 |
+| Zoom | 19 | 29 |
+| Clique 3D | 49 | 57 |
+
+Atenção: a medição foi feita com 19 processos node ativos na máquina (restos de subagentes). Pan e zoom subiram em relação à onda 5, o que provavelmente é carga. Repetir com a máquina limpa antes de comparar.

@@ -1,5 +1,6 @@
 import { triangulate, type Mesh2D, type Polygon, type Vec2 } from '@hestia/geom';
 import { DOT_PX, HATCH_PX, hatchSegments } from './hatch.ts';
+import { kPapel } from './espessura.ts';
 import type { FillOp, StrokeOp } from './types.ts';
 
 /**
@@ -25,6 +26,8 @@ export interface LoteGpu {
   pos: number[];
   idx: number[];
   traco?: TracoGpu;
+  /** Traço em mm de papel: o `ext.z` é `kPapel` (ver `espessura.ts`) e o shader aplica o zoom com o piso de 1 px. */
+  papel?: true;
 }
 
 const triCache = new WeakMap<Polygon, Mesh2D>();
@@ -50,10 +53,11 @@ export function montarLotesCamada(fills: readonly FillOp[], strokes: readonly St
     if (cur && cur.idx.length > 0) lotes.push(cur);
     cur = null;
   };
-  const batchFor = (key: string, color: string, alpha: number, tracado: boolean): LoteGpu => {
+  const batchFor = (key: string, color: string, alpha: number, tracado: boolean, papel = false): LoteGpu => {
     if (cur && cur.key === key) return cur;
     flush();
-    cur = tracado ? { key, color, alpha, pos: [], idx: [], traco: { ext: [], dir: [], padrao: [] } } : { key, color, alpha, pos: [], idx: [] };
+    if (!tracado) cur = { key, color, alpha, pos: [], idx: [] };
+    else cur = papel ? { key, color, alpha, pos: [], idx: [], traco: { ext: [], dir: [], padrao: [] }, papel: true } : { key, color, alpha, pos: [], idx: [], traco: { ext: [], dir: [], padrao: [] } };
     return cur;
   };
   const fillPolygon = (poly: Polygon, color: string, alpha: number): void => {
@@ -84,7 +88,8 @@ export function montarLotesCamada(fills: readonly FillOp[], strokes: readonly St
   flush();
 
   for (const s of strokes) {
-    const b = batchFor(`s|${s.color}|${s.alpha}`, s.color, s.alpha, true);
+    const papel = s.papel !== undefined;
+    const b = batchFor(papel ? `s|${s.color}|${s.alpha}|p` : `s|${s.color}|${s.alpha}`, s.color, s.alpha, true, papel);
     tracar(b, s);
   }
   flush();
@@ -108,8 +113,10 @@ export function padraoDoTracejado(dash: [number, number] | undefined): [number, 
 /** Traço de uma polilinha (inteira ou tracejada): cada aresta vira um quad, com a distância acumulada ao início. */
 function tracar(b: LoteGpu, s: StrokeOp): void {
   const padrao = padraoDoTracejado(s.dash);
+  // Com `papel`, o vértice leva a espessura em unidades de mundo por zoom (o shader põe o zoom e o piso de 1 px).
+  const ext = s.papel ? kPapel(s.papel) : s.widthPx;
   let dist = 0;
-  for (const [p, q] of edges(s.pts, s.closed)) dist = quad(b, p, q, s.widthPx, dist, padrao);
+  for (const [p, q] of edges(s.pts, s.closed)) dist = quad(b, p, q, ext, dist, padrao);
 }
 
 /**

@@ -11,11 +11,31 @@ export interface FillOp {
   contour?: boolean;
 }
 
+/**
+ * Espessura em mm de papel na escala 1:`escala`. A GPU converte com o zoom corrente (piso de 1 px), então o zoom não
+ * entra na geometria do traço.
+ */
+export interface PesoPapel {
+  mm: number;
+  escala: number;
+}
+
+/** Espessura de um traço: `widthPx` é a largura em pixels no zoom de construção; `papel`, quando existe, manda na GPU. */
+export interface Espessura {
+  widthPx: number;
+  papel?: PesoPapel;
+}
+
 export interface StrokeOp {
   pts: Vec2[];
   closed: boolean;
-  /** Espessura em pixels de tela. */
+  /**
+   * Espessura em pixels de tela, no zoom em que o traço foi montado. Com `papel`, a espessura real sai do zoom corrente
+   * (ver `larguraEmPx`); sem `papel`, vale esta.
+   */
   widthPx: number;
+  /** Peso de papel do traço (categorias de desenho): a GPU aplica o zoom no shader, sem refazer a geometria. */
+  papel?: PesoPapel;
   color: string;
   alpha: number;
   /** [traço, vão] em pixels. */

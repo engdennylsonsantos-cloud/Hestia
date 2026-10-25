@@ -201,10 +201,10 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre). Linhas finas: peso de projeção.
       for (const poly of polys) {
         if (!fine && thicknessPx(poly, v.zoom) < 1.6) continue;
-        for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, widthPx: paint.wall.projPx, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
+        for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
       }
     }
-    for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, widthPx: paint.wall.cutPx, color: theme.ink, alpha: 1 });
+    for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.cut, color: theme.ink, alpha: 1 });
   }
   // Paredes fora do corte (decisão 0013 §4): contorno; projeção acima tracejada, abaixo e "além" em linha clara.
   if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, paint.wall.projPx));
@@ -213,7 +213,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   if (fine && !rp) {
     for (const [id, rw] of Object.entries(geo.walls)) {
       if (view?.cls.get(id) !== 'cut') continue;
-      for (const m of rw.membranes) wallOps.strokes.push({ pts: m.pts, closed: false, widthPx: paint.wall.projPx, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+      for (const m of rw.membranes) wallOps.strokes.push({ pts: m.pts, closed: false, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }
   addOps(wallOps, paint.wall, true);
@@ -256,7 +256,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   addOps(rf, paint.roof, true);
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
   if (rp && paint.wall.visible) {
-    for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: paint.wall.projPx, color: theme.inkSoft, alpha: 0.8 });
+    for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
   }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria

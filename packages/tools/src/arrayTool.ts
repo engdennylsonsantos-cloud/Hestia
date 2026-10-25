@@ -2,7 +2,7 @@ import { len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { copyWalls, ghostBands, ghostViews, transformViews } from './edit.ts';
 import { fmtM, SelectionTool } from './transformTools.ts';
 import { parseNumber } from './numeric.ts';
-import { arraySet, commitRadial, fmtXY, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
+import { arraySet, commitRadial, fmtXY, itensSobrepostos, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
 import type { PointerInfo } from './types.ts';
 
 const HINT_LINEAR = 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.';
@@ -13,6 +13,10 @@ export const arrayHint = (radial: boolean): string => (radial ? HINT_RADIAL : HI
 
 /** Porta ou janela sozinha não se copia: ela depende da parede hospedeira (D3). */
 export const AVISO_HOSPEDEIRA = 'Selecione também a parede hospedeira: portas e janelas acompanham a parede.';
+
+/** Aviso dos itens da radial que caíram sobre elementos existentes (a cópia é feita mesmo assim). */
+const avisoSobrepostos = (itens: number[]): string =>
+  itens.length === 1 ? `O item ${itens[0]} ficou sobre um elemento existente.` : `Os itens ${itens.join(', ')} ficaram sobre elementos existentes.`;
 
 /** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
 export const AVISO_ANGULO_ZERO = 'O ângulo total deve ser diferente de 0°';
@@ -156,8 +160,13 @@ export class ArrayTool extends SelectionTool {
     if (this.soAberturas()) return this.env.say(AVISO_HOSPEDEIRA);
     const n = this.count();
     const angles = radialAngles(n, angleDeg, this.anchor());
-    commitRadial(this.env, arraySet(this.env.project(), this.env.selection()), center, angles);
-    const msg = `Matriz radial: ${n} itens em ${angleDeg.toFixed(1).replace('.', ',')}° em torno de (${fmtXY(center)})`;
+    const p = this.env.project();
+    const set = arraySet(p, this.env.selection());
+    // Itens que caem sobre parede existente: o aviso sai na barra, mas a cópia é feita (só avisa, como no croqui).
+    const sobre = itensSobrepostos(p, this.env.levelId(), set, center, angles);
+    commitRadial(this.env, set, center, angles);
+    const aviso = sobre.length ? ` ${avisoSobrepostos(sobre)}` : '';
+    const msg = `Matriz radial: ${n} itens em ${angleDeg.toFixed(1).replace('.', ',')}° em torno de (${fmtXY(center)}).${aviso}`;
     this.reset();
     this.env.done();
     this.env.say(msg);

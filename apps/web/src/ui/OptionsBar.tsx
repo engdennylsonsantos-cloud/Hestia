@@ -189,17 +189,25 @@ export function OptionsBar(): ReactElement {
         <>
           <label>
             Distância
-            <NumField id="opt-offset" value={o.offsetDistance} onCommit={(v) => set({ offsetDistance: v })} unit="m" min={0.01} />
+            <NumField
+              id="opt-offset"
+              value={o.offsetDistance}
+              onCommit={(v) => set({ offsetDistance: v })}
+              unit="m"
+              min={0.01}
+              strictRange
+              onInvalid={(texto) => useUi.setState({ status: `Distância inválida (${texto.trim() || 'vazia'}): digite um valor em metros, maior que zero. Mantida: ${o.offsetDistance.toFixed(2).replace('.', ',')} m.` })}
+            />
           </label>
           <Check id="opt-ocopy" checked={o.offsetCopy} onChange={(v) => set({ offsetCopy: v })}>Copiar</Check>
         </>
       )}
       {tool === 'parallel' && (
         <label>
-          Distância entre
+          Medir distância
           <select id="opt-offsetfrom" className="select" value={o.offsetFrom ?? 'face'} onChange={(e) => set({ offsetFrom: e.target.value as 'axis' | 'face' })}>
-            <option value="face">Faces (padrão)</option>
-            <option value="axis">Eixos</option>
+            <option value="face">Face a face (padrão)</option>
+            <option value="axis">Entre eixos</option>
           </select>
         </label>
       )}

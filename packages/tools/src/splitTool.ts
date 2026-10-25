@@ -140,7 +140,7 @@ export class SplitTool extends ToolBase {
       return;
     }
     this.items.push({ kind: 'point', at: cut.at });
-    this.items.push({ kind: 'label', at: cut.at, text: `${fmt(cut.t)} do início` });
+    this.items.push({ kind: 'label', at: cut.at, text: `a ${fmt(cut.t)} do início do trecho` });
   }
 
   /** Sem parede sob o cursor: aresta de anel (Dividir aresta) ou piso/laje (para a divisão em dois cliques). */
@@ -280,7 +280,7 @@ export class SplitTool extends ToolBase {
     if (this.withGap || !this.hoverId) return false;
     const v = parseNumber(text);
     if (v === null) {
-      this.env.say('Valor inválido. Digite a distância em metros desde o início da parede.');
+      this.env.say('Valor inválido. Digite a distância em metros, medida desde o início do trecho sob o cursor.');
       return false;
     }
     if (!this.split(this.hoverId, v, 0)) return false;
@@ -296,7 +296,7 @@ export class SplitTool extends ToolBase {
       this.env.say(e instanceof Error ? e.message : 'Não foi possível dividir a parede.');
       return false;
     }
-    this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(gap)}.` : `Parede dividida em ${fmt(t)} do início.`);
+    this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(gap)}.` : `Parede dividida a ${fmt(t)} do início do trecho.`);
     return true;
   }
 }

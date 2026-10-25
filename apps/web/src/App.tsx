@@ -150,9 +150,12 @@ export function App(): ReactElement {
         {left ? <Properties /> : <span />}
         <main className="stage">
           <ViewTabs />
-          <div style={{ position: 'relative', minHeight: 0, display: 'grid' }}>
-            {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+          {/* O tutorial fica numa faixa própria acima da área de desenho (não cobre a planta nem recebe o clique). */}
+          <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Tutorial />
+            <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'grid' }}>
+              {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+            </div>
           </div>
         </main>
         {right ? <Browser /> : <span />}

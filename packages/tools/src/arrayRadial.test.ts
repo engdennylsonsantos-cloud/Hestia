@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rotate, type Vec2 } from '@hestia/geom';
-import { makeFloor, openingsOfWall, wallsOnLevel, type Wall } from '@hestia/model';
+import { isCeiling, makeCeiling, makeFloor, openingsOfWall, wallsOnLevel, type Wall } from '@hestia/model';
 import { radialAngles, linearStep } from './arrayRadial.ts';
 import { clickAt, drawWall, makeEnv, P, tool, walls } from './testEnv.ts';
 
@@ -119,6 +119,29 @@ describe('matriz radial no motor', () => {
     store.undo();
     expect(wallsOnLevel(store.project, 'lv_0')).toHaveLength(1);
     expect(Object.values(store.project.elements).filter((e) => e.kind === 'floor')).toHaveLength(1);
+  });
+
+  it('forro selecionado entra na matriz radial: cópias giradas com ids novos', () => {
+    const { store, env, options } = makeEnv();
+    const forro = makeCeiling({ id: 'ce_qa', typeId: 'ct_gesso', levelId: 'lv_0', boundary: [{ x: 2, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 5 }, { x: 2, y: 5 }] });
+    store.exec({ type: 'addCeiling', ceiling: forro });
+    env.setSelection(['ce_qa']);
+    options.arrayKind = 'radial';
+    options.arrayCount = 4;
+    options.arrayAngle = 360;
+    options.arrayAnchor = 'last';
+    const a = tool('array', env);
+    clickAt(a, 0, 0);
+    a.click(P(0, 0));
+    const forros = Object.values(store.project.elements).filter(isCeiling);
+    expect(forros).toHaveLength(4);
+    const ids = new Set(forros.map((c) => c.id));
+    expect(ids.size).toBe(4);
+    // (2, 4) girado 90° em torno da origem vira (-4, 2)
+    const girado90 = forros.some((c) => c.boundary.some((q) => Math.abs(q.x + 4) < 1e-6 && Math.abs(q.y - 2) < 1e-6));
+    expect(girado90).toBe(true);
+    store.undo();
+    expect(Object.values(store.project.elements).filter(isCeiling)).toHaveLength(1);
   });
 
   it('Esc cancela o centro e o segundo Esc sai da ferramenta', () => {

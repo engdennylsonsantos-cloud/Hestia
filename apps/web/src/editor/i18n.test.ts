@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TOOL_LABEL } from '@hestia/tools';
-import { I18N, toolLabel } from './i18n.ts';
+import { I18N, nomeComandoLang, toolLabel } from './i18n.ts';
 
 describe('rótulos de ferramenta', () => {
   // TOOL_LABEL é Record<ToolId, string>: suas chaves são todos os ToolIds do registro.
@@ -31,5 +31,17 @@ describe('dicionário PT/EN', () => {
     const pt = Object.keys(I18N.pt).sort();
     const en = Object.keys(I18N.en).sort();
     expect(en).toEqual(pt);
+  });
+});
+
+describe('nome de comando de atalho (diálogos de atalhos)', () => {
+  it('usa o mesmo rótulo da ferramenta na faixa (dimension = "Cota alinhada", não "Cota")', () => {
+    expect(nomeComandoLang('dimension', 'pt')).toBe('Cota alinhada');
+    expect(nomeComandoLang('dimension', 'en')).toBe(toolLabel('dimension', 'en'));
+  });
+
+  it('a tela de atalhos tem nome nos dois idiomas', () => {
+    expect(nomeComandoLang('atalhos', 'pt')).toBe('Atalhos de teclado');
+    expect(nomeComandoLang('atalhos', 'en')).toBe('Keyboard shortcuts');
   });
 });

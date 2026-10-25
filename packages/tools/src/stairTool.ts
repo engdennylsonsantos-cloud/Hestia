@@ -269,7 +269,10 @@ export class StairTool extends ToolBase {
     this.setPrimitive(this.st.stroke.prim === 'line' ? 'arc' : 'line');
   }
 
-  /** Esc em dois passos: 1º cancela a cadeia ou o traçado em curso; 2º descarta o croqui e sai da ferramenta. */
+  /**
+   * Esc em dois passos: 1º cancela a cadeia ou o traçado em curso; 2º descarta o croqui e sai da ferramenta. O descarte
+   * avisa quantos espelhos perdeu (a mensagem vai depois do `done`, que volta ao seletor e sobrescreve a dica).
+   */
   override cancel(): void {
     this.clearPicks();
     if (strokeBusy(this.st.stroke)) {
@@ -278,8 +281,10 @@ export class StairTool extends ToolBase {
       this.note('Cadeia cancelada. Esc de novo descarta o croqui.');
       return;
     }
+    const perdidos = this.report.created;
     this.st.parts = cloneParts(this.original);
     this.env.done();
+    if (perdidos > 0) this.env.say(`Croqui descartado (${perdidos} espelhos). Ctrl+Z não recupera: use Concluir para guardar.`);
   }
 
   /**

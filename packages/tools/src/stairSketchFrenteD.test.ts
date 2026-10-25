@@ -65,6 +65,20 @@ describe('ferramenta Escada: espelhos faltando e tolerância dos limites (frente
     }
   });
 
+  it('D4: Esc com traço em curso só cancela o traço; o 2º Esc descarta o croqui e avisa quantos espelhos perdeu', () => {
+    const ctx = setup();
+    const t = tool('stair', ctx.env) as StairTool;
+    boundaries(t);
+    risers(t, [0, 1], -1, 1);
+    clickAt(t, 2, -1);
+    t.cancel();
+    expect(ctx.done()).toBe(0);
+    expect(ctx.last()).toBe('Cadeia cancelada. Esc de novo descarta o croqui.');
+    t.cancel();
+    expect(ctx.done()).toBe(1);
+    expect(ctx.last()).toBe('Croqui descartado (2 espelhos). Ctrl+Z não recupera: use Concluir para guardar.');
+  });
+
   it('2 de 17 espelhos: a conta "Faltam 15" vai ao croqui, e Concluir grava com aviso que diz quantos faltam', () => {
     const ctx = setup();
     const t = tool('stair', ctx.env) as StairTool;

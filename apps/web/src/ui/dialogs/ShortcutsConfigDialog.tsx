@@ -64,7 +64,6 @@ export function ShortcutsConfigDialog(): ReactElement {
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
     // grava() só usa setters e atribuirAtalho; a sequência atual vem de `rascunho`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ativo, rascunho]);
 
   const termo = filtro.trim().toLowerCase();

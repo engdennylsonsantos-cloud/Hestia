@@ -259,6 +259,8 @@ export class Editor {
       this.bump();
       return true;
     }
+    // Qualquer outra tecla de controle (Enter, Tab, Delete, Espaço…) interrompe uma sequência em andamento; modificadores não.
+    if (k.length > 1 && !['Shift', 'Control', 'Alt', 'Meta'].includes(k)) casador.limpar();
     if (k === 'Enter') {
       if (ui.typed) {
         const ok = this.tool.type(ui.typed);

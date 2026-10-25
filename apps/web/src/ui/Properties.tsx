@@ -244,15 +244,15 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
           <>
             <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} unit="m" /></Row>
             <Row label="Peitoril" htmlFor="p-sill">
-              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} />
+              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros, como 0,90.' })} />
             </Row>
             {single.sillOverride !== null && (
               <div className="prow"><span /><button className="chiplink" onClick={() => patch(ids, { sillOverride: null })}>Usar peitoril do tipo</button></div>
             )}
           </>
         )}
-        <Row label="Inverter dobradiça"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
-        <Row label="Inverter sentido"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
+        <Row label="Inverter dobradiça" htmlFor="p-hand"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
+        <Row label="Inverter sentido" htmlFor="p-facing"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
       </Group>
       <Group title="Dimensões" open={!!single}>
         {type && (

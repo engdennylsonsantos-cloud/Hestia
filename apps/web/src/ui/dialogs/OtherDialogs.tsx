@@ -1,7 +1,9 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { COMANDOS_COM_ATALHO, TOOL_GROUPS, nomeComando, type ShortcutCommand } from '@hestia/tools';
 import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId, type Wall } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useAtalhos } from '../../editor/shortcutConfig.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
 import { TypeDialogHeader } from './TypeDialogHeader.tsx';
@@ -306,11 +308,8 @@ export function StartDialog(): ReactElement {
   );
 }
 
+/** Teclas que não são comando: a tabela de comandos (com as sequências atuais) entra antes destas. */
 const KEYS: Array<[string, string]> = [
-  ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['U', 'Telhado'], ['D', 'Porta'], ['J', 'Janela'],
-  ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
-  ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'], ['K', 'Corte (duas marcas na planta)'],
-  ['I', 'Escada (croqui: limites, espelhos, caminhada, patamar)'], ['Q', 'Escada reta, em L, em U ou com leque'],
   ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],
@@ -326,11 +325,38 @@ const KEYS: Array<[string, string]> = [
   ['Botão direito', 'Cancela o passo'],
 ];
 
+/** Descrições longas de comandos cujo rótulo sozinho não diz tudo (escada, corte etc.). */
+const DESCRICAO_COMANDO: Partial<Record<ShortcutCommand, string>> = {
+  stair: 'Escada (croqui: limites, espelhos, caminhada, patamar)',
+  stairrun: 'Escada reta, em L, em U ou com leque',
+  trim: 'Aparar/Estender',
+  joins: 'Junção de canto',
+  split: 'Dividir parede',
+  section: 'Corte (duas marcas na planta)',
+};
+
+/** Tabela de atalhos gerada da configuração atual: comandos na ordem da faixa, depois as teclas fixas. */
 export function ShortcutsDialog(): ReactElement {
+  const mapa = useAtalhos((s) => s.mapa);
+  const ordem = [...new Set<ShortcutCommand>([...TOOL_GROUPS.flatMap((g) => g.tools), ...COMANDOS_COM_ATALHO])];
   return (
-    <Dialog title="Atalhos" size="mid" onClose={close} footer={<button className="btn primary" onClick={close}>Fechar</button>}>
+    <Dialog
+      title="Atalhos"
+      size="mid"
+      onClose={close}
+      footer={<><button className="btn" onClick={() => useUi.setState({ dialog: 'shortcutsConfig', dialogArg: null })}>Personalizar atalhos…</button><button className="btn primary" onClick={close}>Fechar</button></>}
+    >
       <table className="kbtable">
-        <tbody>{KEYS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}</tbody>
+        <tbody>
+          <tr><td><span style={{ color: 'var(--fg-faint)' }}>sem tecla</span></td><td>Selecionar (volta com Esc)</td></tr>
+          {ordem.map((cmd) => (
+            <tr key={cmd}>
+              <td>{mapa[cmd] ? <kbd>{mapa[cmd]}</kbd> : <span style={{ color: 'var(--fg-faint)' }}>sem atalho</span>}</td>
+              <td>{DESCRICAO_COMANDO[cmd] ?? nomeComando(cmd)}</td>
+            </tr>
+          ))}
+          {KEYS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}
+        </tbody>
       </table>
     </Dialog>
   );

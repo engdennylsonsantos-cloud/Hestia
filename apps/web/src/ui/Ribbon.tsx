@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
-import { TOOL_GROUPS, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
+import { TOOL_GROUPS, type ToolId } from '@hestia/tools';
 import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { useAtalhos } from '../editor/shortcutConfig.ts';
 import { editThinLines, editView3D, thinLinesOn } from '../editor/graphicsActions.ts';
 import { toggleRoofProjection, useUi } from '../editor/state.ts';
 import { useI18n, toolLabel, I18N } from '../editor/i18n.ts';
@@ -29,7 +30,7 @@ function ToolButton({ id, primary = false, mini = false }: { id: ToolId; primary
   const active = useUi((s) => s.tool === id);
   const lang = useI18n((s) => s.lang);
   const label = toolLabel(id, lang);
-  const sc = TOOL_SHORTCUT[id];
+  const sc = useAtalhos((s) => s.mapa[id]);
   const isBig = primary || PRIMARY_TOOLS.has(id);
 
   if (mini) {

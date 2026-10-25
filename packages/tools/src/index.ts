@@ -53,3 +53,4 @@ export {
   type StairComponent,
 } from './stairSpiralRun.ts';
 export { spiralGripAt, spiralHandles, spiralHandlePoints, spiralHold, type SpiralGrip, type SpiralHandle } from './stairSpiralGrips.ts';
+export * from './shortcutDefaults.ts';

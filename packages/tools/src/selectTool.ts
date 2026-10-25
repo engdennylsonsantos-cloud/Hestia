@@ -92,6 +92,10 @@ export class SelectTool extends ToolBase {
     const mpp = this.env.metersPerPixel();
     const hit = pickAt(pr, lv, at, mpp);
     if (hit) return hit;
+    // Linha de separação de ambiente (guardada no nível, fora de project.elements): tem prioridade sobre piso, laje, forro,
+    // telhado e escada que estejam embaixo dela, como no Revit. Parede e abertura continuam ganhando o clique.
+    const rs = pickRoomSeparatorAt(pr, lv, at, mpp);
+    if (rs) return { id: rs.id, kind: 'roomSeparator' };
     const st = pickStairAt(pr, lv, at, mpp);
     if (st) return { id: st, kind: 'stair' };
     const f = pickFloorAt(pr, lv, at, mpp);
@@ -102,10 +106,6 @@ export class SelectTool extends ToolBase {
     if (cl) return { id: cl, kind: 'ceiling' };
     const rf = pickRoofAt(pr, lv, at, mpp);
     if (rf) return { id: rf, kind: 'roof' };
-    // Linha de separação de ambiente (guardada no nível, fora de project.elements): depois dos elementos, antes do ambiente
-    // que ela divide. Parede, abertura, piso ou telhado sob o cursor continuam ganhando o clique.
-    const rs = pickRoomSeparatorAt(pr, lv, at, mpp);
-    if (rs) return { id: rs.id, kind: 'roomSeparator' };
     // Ambiente: por último entre os elementos de planta (o piso e a parede sob o cursor ganham o clique).
     const rm = pickRoomAt(pr, lv, at);
     if (rm) return { id: rm, kind: 'room' };

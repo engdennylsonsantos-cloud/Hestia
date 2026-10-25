@@ -8,7 +8,7 @@ import type { ReactElement } from 'react';
 const p = (c: string, d: string, x = ''): string => `<path class="ic-${c}" d="${d}"${x ? ` ${x}` : ''}/>`;
 
 const R: Record<string, string> = {
-  roomsep: p('s1', 'M3 3H29V29H3Z') + p('bl', 'M5 5H14V27H5Z M18 5H27V27H18Z') + p('ln', 'M16 3V29'),
+  roomsep: p('s1', 'M4 6H28V26H4Z') + p('bl', 'M6 8H13V24H6Z M19 8H26V24H19Z') + p('ln', 'M16 1V31 M13 1H19 M13 31H19'),
   // Seleção e edição
   select: p('s1', 'M8 3V24L13 19L16.5 27L19.8 25.6L16.5 18.2L23 18Z'),
   move: p('s1', 'M11 11H21V21H11Z') + p('ln', 'M16 7V11M16 21V25M7 16H11M21 16H25') + p('fa', 'M16 2L12 7H20ZM16 30L12 25H20ZM2 16L7 12V20ZM30 16L25 12V20Z'),

@@ -75,12 +75,12 @@ describe('ferramenta Selecionar: linhas de separação de ambiente', () => {
     expect(sel()).toEqual([]);
   });
 
-  it('parede ou piso sob o mesmo ponto continua tendo prioridade sobre a linha', () => {
+  it('a linha tem prioridade sobre piso embaixo dela (clique seleciona a linha)', () => {
     const { store, env, sel } = withSeparator();
     store.exec({ type: 'addFloor', floor: makeFloor({ id: 'f1', typeId: 'ft_ceram', levelId: 'lv_0', boundary: RECT }) });
     const t = tool('select', env);
     clickAt(t, 2, 1.5);
-    expect(sel()).toEqual(['f1']);
+    expect(sel()).toEqual(['rs1']);
   });
 
   it('mover o cursor sobre a linha e clicar com elementos selecionados não quebra', () => {

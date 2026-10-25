@@ -2,7 +2,7 @@ import { angleOf, dist, len, mul, norm, offsetArc, sub, v2, type Vec2 } from '@h
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
 import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
-import { copyWalls, ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings } from './edit.ts';
+import { copyWalls, ghostBands, moveWalls, selectedMovables, selectedOpenings, slideOpenings, transformWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
@@ -25,8 +25,9 @@ abstract class SelectionTool extends ToolBase {
   override start(): void {
     this.reset();
     if (!this.hasSelection()) {
-      this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
+      // Depois de done(): a ferramenta de Selecionar troca a mensagem da barra de status, então a nossa vai por último.
       this.env.done();
+      this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
       return;
     }
     this.env.say(this.hint);
@@ -39,12 +40,22 @@ export class MoveTool extends SelectionTool {
   readonly label: string;
   readonly hint: string;
   private base: Vec2 | null = null;
+  /** Chave da sessão: todas as cópias de um mesmo Copiar entram num só passo de desfazer. */
+  private session: object = {};
+  /** Quantas cópias a sessão já fez (Esc, com cópias feitas, encerra a sessão). */
+  private copies = 0;
 
   constructor(env: ToolEnv, private copy: boolean) {
     super(env);
     this.id = copy ? 'copy' : 'move';
     this.label = copy ? 'Copiar' : 'Mover';
     this.hint = `${this.label}: clique no ponto base e depois no destino, ou digite a distância.`;
+  }
+
+  override start(): void {
+    this.session = {};
+    this.copies = 0;
+    super.start();
   }
 
   protected reset(): void {
@@ -57,6 +68,19 @@ export class MoveTool extends SelectionTool {
   }
   override inputPrompt(): string | null {
     return this.base ? 'Distância' : null;
+  }
+
+  /**
+   * Esc: em Copiar com cópias feitas, encerra a sessão de uma vez (o passo de desfazer já está gravado).
+   * Sem cópias, Esc cancela o ponto-base; o próximo Esc sai para Modificar, como nas demais ferramentas.
+   */
+  override cancel(): void {
+    if (this.copy && this.copies > 0) {
+      this.reset();
+      this.env.done();
+      return;
+    }
+    super.cancel();
   }
 
   override move(p: PointerInfo): void {
@@ -82,14 +106,16 @@ export class MoveTool extends SelectionTool {
       this.env.transaction('Copiar', () => {
         if (els.length) copyWalls(this.env, els, { kind: 'translate', d });
         for (const c of notes) this.env.exec(c);
-      });
-    } else if (els.length) {
-      moveWalls(this.env, els, d);
-      for (const c of notes) this.env.exec(c);
-    } else {
-      slideOpenings(this.env, this.openings(), d);
-      for (const c of notes) this.env.exec(c);
+      }, this.session);
+      this.copies += 1;
+      return;
     }
+    // Mover: paredes, aberturas e anotações num só passo de desfazer.
+    this.env.transaction('Mover', () => {
+      if (els.length) moveWalls(this.env, els, d);
+      else slideOpenings(this.env, this.openings(), d);
+      for (const c of notes) this.env.exec(c);
+    });
   }
 
   override click(p: PointerInfo): void {
@@ -169,7 +195,7 @@ export class RotateTool extends SelectionTool {
     const els = this.movables();
     const t = { kind: 'rotate', about: this.center, angle } as const;
     if (this.env.options().rotateCopy) this.env.transaction('Girar e copiar', () => copyWalls(this.env, els, t));
-    else this.env.exec({ type: 'transform', ids: els, transform: t });
+    else transformWalls(this.env, els, t, 'Girar');
     this.reset();
     this.env.done();
   }
@@ -256,7 +282,7 @@ export class MirrorTool extends SelectionTool {
     const els = this.movables();
     const t = { kind: 'mirror', a, b } as const;
     if (this.env.options().mirrorCopy) this.env.transaction('Espelhar e copiar', () => copyWalls(this.env, els, t));
-    else this.env.exec({ type: 'transform', ids: els, transform: t });
+    else transformWalls(this.env, els, t, 'Espelhar');
     this.reset();
     this.env.done();
   }

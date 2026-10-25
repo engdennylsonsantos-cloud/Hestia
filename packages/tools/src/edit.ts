@@ -68,6 +68,14 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
  * (como no Revit: o vizinho se estica); em nó de 3 ou mais paredes ela fica (ver `followingEnds`). Um passo de desfazer.
  */
 export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, invert = false): void {
+  transformWalls(env, wallIds, { kind: 'translate', d }, 'Mover', follow, invert);
+}
+
+/**
+ * Mover, girar ou espelhar paredes (`t`), com o mesmo critério de junção do Mover: a parede não selecionada que
+ * termina numa extremidade movida é esticada até o novo ponto dela. Um passo de desfazer, com o rótulo `label`.
+ */
+export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();
   const exclude = new Set(wallIds);
   const followers = new Map<Id, { a?: Vec2; b?: Vec2 }>();
@@ -76,19 +84,20 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
       const w = p.elements[id];
       if (!isWall(w)) continue;
       for (const pt of [w.a, w.b]) {
+        // Novo ponto da extremidade movida: é onde a parede vizinha tem de terminar.
+        const to = applyTransform(t, pt);
         for (const c of followingEnds(p, env.levelId(), pt, exclude, invert)) {
           const other = p.elements[c.wallId];
           if (!isWall(other)) continue;
           const cur = followers.get(c.wallId) ?? {};
-          const old = c.end === 'a' ? other.a : other.b;
-          cur[c.end] = { x: old.x + d.x, y: old.y + d.y };
+          cur[c.end] = to;
           followers.set(c.wallId, cur);
         }
       }
     }
   }
-  env.transaction('Mover', () => {
-    env.exec({ type: 'transform', ids: wallIds, transform: { kind: 'translate', d } });
+  env.transaction(label, () => {
+    env.exec({ type: 'transform', ids: wallIds, transform: t });
     for (const [id, ends] of followers) env.exec({ type: 'setWallEnds', id, ...ends });
   });
 }

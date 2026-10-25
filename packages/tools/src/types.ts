@@ -36,7 +36,8 @@ export interface ToolEnv {
   selection(): Id[];
   setSelection(ids: Id[]): void;
   exec(cmd: Command): void;
-  transaction(label: string, fn: () => void): void;
+  /** `session`: chave da sessão da ferramenta; transações da mesma sessão viram um só passo de desfazer. */
+  transaction(label: string, fn: () => void, session?: object): void;
   /** Metros por pixel na vista atual; usado para tolerâncias de clique. */
   metersPerPixel(): number;
   gridStep(): number;

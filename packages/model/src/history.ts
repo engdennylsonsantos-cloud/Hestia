@@ -22,6 +22,8 @@ export class ProjectStore {
   private future: Entry[] = [];
   private listeners = new Set<Listener>();
   private tx: { label: string; patches: Patch[]; inverse: Patch[] } | null = null;
+  /** Última transação de uma sessão (ex.: Copiar): novas transações da mesma sessão entram nesse passo. */
+  private lastSession: { key: object; entry: Entry } | null = null;
   /** Incrementa a cada mudança; serve de chave de cache. */
   version = 0;
   /** Versão do último salvamento, para o aviso de alterações não salvas. */
@@ -96,8 +98,12 @@ export class ProjectStore {
     this.emit();
   }
 
-  /** Executa vários comandos como um único passo de desfazer. */
-  transaction(label: string, fn: () => void): void {
+  /**
+   * Executa vários comandos como um único passo de desfazer. Com `session` (chave da sessão da ferramenta),
+   * a transação se junta ao passo anterior da mesma sessão enquanto ele ainda for o último do histórico
+   * (ex.: várias cópias num mesmo Copiar viram um só Ctrl+Z).
+   */
+  transaction(label: string, fn: () => void, session?: object): void {
     if (this.tx) {
       fn();
       return;
@@ -109,7 +115,16 @@ export class ProjectStore {
       const done = this.tx;
       this.tx = null;
       if (done.patches.length > 0) {
-        this.past.push(done);
+        const last = this.past[this.past.length - 1];
+        const s = this.lastSession;
+        if (session && s && s.key === session && s.entry === last) {
+          // Undo do passo: o inverso das novas alterações vai antes do inverso já guardado.
+          s.entry.patches.push(...done.patches);
+          s.entry.inverse.unshift(...done.inverse);
+        } else {
+          this.past.push(done);
+          this.lastSession = session ? { key: session, entry: done } : null;
+        }
         this.future = [];
         this.emit();
       }

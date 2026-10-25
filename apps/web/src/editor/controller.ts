@@ -57,7 +57,7 @@ export class Editor {
     selection: () => useUi.getState().selection,
     setSelection: (ids) => useUi.setState({ selection: ids, roofEdge: ids.length === 1 && useUi.getState().roofEdge?.roofId === ids[0] ? useUi.getState().roofEdge : null }),
     exec: (c) => this.store.exec(c),
-    transaction: (l, fn) => this.store.transaction(l, fn),
+    transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
     gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
     say: (m) => useUi.setState({ status: m }),

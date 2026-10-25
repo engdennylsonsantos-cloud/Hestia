@@ -328,7 +328,7 @@ export class RoofTool extends ToolBase {
     const ridge = r.lines.filter((l) => l.kind === 'ridge').reduce((s, l) => s + dist(l.a, l.b), 0);
     // Duas águas precisa de duas arestas paralelas à cumeeira; com menos, o motor gera uma água sem cumeeira. Avisa.
     const defining = (this.env.project().elements[id] as Roof | undefined)?.edgeSlopes.filter((s) => s !== null).length ?? 0;
-    if (shape === 'gable' && defining !== 2) {
+    if (shape === 'gable' && defining < 2) {
       return `Duas águas: só ${defining} ${defining === 1 ? 'aresta paralela' : 'arestas paralelas'} à cumeeira; o telhado saiu com ${n} ${n === 1 ? 'água' : 'águas'}. Use Quatro águas ou ajuste o contorno. Ctrl+Z desfaz.`;
     }
     return `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}, cumeeira ${fmt(ridge)}. Ctrl+Z desfaz.`;

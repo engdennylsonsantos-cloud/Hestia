@@ -36,9 +36,14 @@ export function ShortcutsConfigDialog(): ReactElement {
     setMsg('');
   };
 
-  const grava = (cmd: ShortcutCommand, texto: string): void => {
+  /** Encerra a captura em curso (Remover, Restaurar e Restaurar tudo não podem deixar as teclas irem ao rascunho). */
+  const encerraCaptura = (): void => {
     setAtivo(null);
     setRascunho('');
+  };
+
+  const grava = (cmd: ShortcutCommand, texto: string): void => {
+    encerraCaptura();
     if (!texto) {
       setMsg('Nenhuma tecla foi digitada: atalho não alterado.');
       return;
@@ -99,7 +104,7 @@ export function ShortcutsConfigDialog(): ReactElement {
           Importar JSON
           <input type="file" accept=".json,application/json" hidden onChange={(e) => { void importa(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
-        <button className="btn small" onClick={() => { restaurarTodos(); setMsg('Todos os atalhos voltaram ao padrão do perfil.'); }}>Restaurar tudo</button>
+        <button className="btn small" onClick={() => { encerraCaptura(); restaurarTodos(); setMsg('Todos os atalhos voltaram ao padrão do perfil.'); }}>Restaurar tudo</button>
       </div>
       {ativo ? (
         <p role="status" style={{ margin: '4px 0 10px' }}>
@@ -121,8 +126,8 @@ export function ShortcutsConfigDialog(): ReactElement {
                     <td>{editando ? <kbd>{rascunho || '…'}</kbd> : seq ? <kbd>{seq}</kbd> : <span style={faint}>sem atalho</span>}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn small" onClick={(e) => { e.stopPropagation(); inicia(cmd); }}>Atribuir</button>{' '}
-                      <button className="btn small" disabled={!seq} onClick={(e) => { e.stopPropagation(); removerAtalho(cmd); setMsg(`${nomeComando(cmd)}: sem atalho.`); }}>Remover</button>{' '}
-                      <button className="btn small" onClick={(e) => { e.stopPropagation(); restaurarAtalho(cmd); setMsg(`${nomeComando(cmd)}: atalho do perfil restaurado.`); }}>Restaurar</button>
+                      <button className="btn small" disabled={!seq} onClick={(e) => { e.stopPropagation(); encerraCaptura(); removerAtalho(cmd); setMsg(`${nomeComando(cmd)}: sem atalho.`); }}>Remover</button>{' '}
+                      <button className="btn small" onClick={(e) => { e.stopPropagation(); encerraCaptura(); restaurarAtalho(cmd); setMsg(`${nomeComando(cmd)}: atalho do perfil restaurado.`); }}>Restaurar</button>
                     </td>
                   </tr>
                 );

@@ -37,7 +37,18 @@ export function ArrayOptionsBar(): ReactElement {
       </label>
       <label>
         Número de itens
-        <NumField id="opt-count" value={o.arrayCount} decimals={0} onCommit={(v) => set({ arrayCount: Math.max(2, Math.round(v)) })} />
+        <NumField
+          id="opt-count"
+          value={o.arrayCount}
+          decimals={0}
+          onCommit={(v) => {
+            // Menos de 2 itens não é matriz: usa 2 e avisa na barra de status (D5).
+            if (Math.round(v) < 2) {
+              useUi.setState({ status: 'Número de itens deve ser 2 ou mais; usando 2.' });
+              set({ arrayCount: 2 });
+            } else set({ arrayCount: Math.round(v) });
+          }}
+        />
       </label>
       {radial && (
         <label>

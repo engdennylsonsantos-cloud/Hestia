@@ -11,9 +11,14 @@ const CAPACIDADE_MINIMA = 64;
 /** Quantas malhas livres (fora do grupo) a camada guarda para reuso. Acima disso, a geometria é liberada. */
 export const MALHAS_LIVRES_MAX = 16;
 
-/** Capacidade de um buffer para `necessario` itens: o uso com a folga, nunca abaixo do mínimo. */
-export function capacidadeDe(necessario: number): number {
-  return Math.max(CAPACIDADE_MINIMA, Math.ceil(necessario * FOLGA_CAPACIDADE));
+/**
+ * Capacidade de um buffer para `necessario` valores: o uso com a folga, nunca abaixo do mínimo. `itens` é o número de valores por
+ * vértice (3 nas posições): a capacidade fecha em múltiplo dele, senão o three enxerga um vértice fracionário, lê além do array
+ * e `computeBoundingSphere` devolve raio NaN.
+ */
+export function capacidadeDe(necessario: number, itens = 1): number {
+  const bruta = Math.max(CAPACIDADE_MINIMA, Math.ceil(necessario * FOLGA_CAPACIDADE));
+  return Math.ceil(bruta / itens) * itens;
 }
 
 /** Geometria sem vértices nem índices: o ponto de partida de uma malha da camada. */
@@ -33,7 +38,7 @@ export function escreverAtributo(g: THREE.BufferGeometry, nome: string, valores:
   let attr = g.getAttribute(nome) as THREE.BufferAttribute | undefined;
   let alocou = false;
   if (!attr || attr.array.length < valores.length) {
-    attr = new THREE.Float32BufferAttribute(new Float32Array(capacidadeDe(valores.length)), itens);
+    attr = new THREE.Float32BufferAttribute(new Float32Array(capacidadeDe(valores.length, itens)), itens);
     g.setAttribute(nome, attr);
     alocou = true;
   }

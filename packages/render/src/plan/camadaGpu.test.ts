@@ -29,6 +29,21 @@ describe('capacidade de buffer (camadaGpu)', () => {
     expect(capacidadeDe(1)).toBe(64);
     expect(capacidadeDe(1000)).toBe(1500);
   });
+
+  it('fecha em múltiplo de itens por vértice: o three não pode enxergar vértice fracionário (raio NaN)', () => {
+    expect(capacidadeDe(1, 3) % 3).toBe(0);
+    expect(capacidadeDe(1, 3)).toBe(66);
+    expect(capacidadeDe(1000, 3)).toBe(1500);
+    for (const n of [1, 2, 3, 7, 21, 22, 64, 100]) expect(capacidadeDe(n, 3) % 3).toBe(0);
+  });
+
+  it('posições escritas dão esfera de contorno finita (sem NaN)', () => {
+    const g = new THREE.BufferGeometry();
+    escreverPosicoes(g, [0, 0, 0, 1, 0, 0, 0, 1, 0]);
+    expect(Number.isInteger(g.getAttribute('position')!.count)).toBe(true);
+    g.computeBoundingSphere();
+    expect(Number.isFinite(g.boundingSphere!.radius)).toBe(true);
+  });
 });
 
 describe('escrita de buffers: reaproveita quando cabe, aloca quando não cabe', () => {

@@ -12,6 +12,7 @@ import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels } from './PlanLabels';
 import { ViewControlBar } from './ViewControlBar.tsx';
 import { useDark } from './useDark.ts';
+import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 
 interface Pt {
   x: number;
@@ -33,6 +34,7 @@ export function ViewportCanvas(): ReactElement {
   // Mesmo gancho para o e2e contar as peças da cena 3D (`scene`, o grupo com as malhas do modelo).
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3dModel?: unknown }).__hestia3dModel = model.current;
   const modelKey = useRef('');
+  const montagem = useRef<Montagem3dProgressiva | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   // Rótulos da planta e a vista deles: o estado só troca quando o conteúdo ou a vista muda (`publish`).
   const [labels, setLabels] = useState<LabelOp[]>(NO_LABELS);
@@ -100,6 +102,7 @@ export function ViewportCanvas(): ReactElement {
     ro.observe(el);
     return () => {
       cancelled = true;
+      montagem.current?.cancelar();
       ro.disconnect();
       teardown();
     };
@@ -137,12 +140,9 @@ export function ViewportCanvas(): ReactElement {
       const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}`;
       if (key !== modelKey.current) {
         modelKey.current = key;
-        const levels = p.levels.map((l) => editor.resolved(l.id));
-        m.update(p, levels, { edges: v3.edges, shadows: v3.shadows, dark });
-        if (!st.seen3d) {
-          m.fit();
-          useUi.setState({ seen3d: true });
-        }
+        // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
+        montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id));
+        montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
       }
       // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).
       m.highlight(st.selection, st.hover);

@@ -164,3 +164,28 @@ describe('ferramenta Telhado: pelas paredes com balanço (A2)', () => {
     expect(ctx.msgs.at(-1)).toMatch(/parede do nível/);
   });
 });
+
+describe('ferramenta Telhado: duas águas sem arestas paralelas (defeito 3)', () => {
+  it('triângulo em duas águas avisa que só uma aresta define a cumeeira e diz como resolver', () => {
+    const ctx = roofCtx('poly');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 3, 4);
+    clickAt(t, 0, 0);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(r.edgeSlopes.filter((s) => s !== null)).toHaveLength(1);
+    expect(ctx.msgs.at(-1)).toMatch(/só 1 aresta paralela à cumeeira/);
+    expect(ctx.msgs.at(-1)).toMatch(/Quatro águas/);
+  });
+
+  it('retângulo em duas águas não avisa', () => {
+    const ctx = roofCtx('rect');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 4);
+    expect(ctx.msgs.at(-1)).toMatch(/Telhado criado: 2 águas/);
+  });
+});

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 import { StairTool } from './stairTool.ts';
 import { missingText } from './stairSketchState.ts';
+import { DEFAULT_SNAP } from './types.ts';
 
 /** Ambiente com mensagens capturadas (o `say` do ambiente), como em `stairTool.test.ts`. */
 function setup() {
@@ -56,7 +57,7 @@ describe('ferramenta Escada: espelhos faltando e tolerância dos limites (frente
   it('espelho que fica a mais de 0,4 m do limite: a mensagem diz qual espelho, o limite e quanto falta', () => {
     const ctx = setup();
     // Sem captura: a perpendicular do snap levaria a ponta ao limite e o espelho ligaria os dois.
-    ctx.options.snap = { enabled: false };
+    ctx.options.snap = { ...DEFAULT_SNAP, enabled: false };
     const t = tool('stair', ctx.env) as StairTool;
     boundaries(t);
     clickAt(t, 1, -0.5);

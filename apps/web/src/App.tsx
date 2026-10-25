@@ -4,6 +4,7 @@ import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
 import { tabOf } from './editor/viewTabActions.ts';
 import { Browser } from './ui/Browser.tsx';
+import { IconDefs } from './ui/Icon.tsx';
 import { EmptyViews } from './ui/EmptyViews.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
 import { Properties } from './ui/Properties.tsx';
@@ -141,6 +142,7 @@ export function App(): ReactElement {
 
   return (
     <div className="app">
+      <IconDefs />
       <TitleBar />
       <Ribbon />
       <OptionsBar />

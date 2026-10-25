@@ -14,7 +14,7 @@ type ActionId = 'cotasAuto';
 const ACTIONS: Record<ActionId, { labelKey: 'tool_cotasAuto'; icon: string; titlePt: string; titleEn: string; run: () => void }> = {
   cotasAuto: {
     labelKey: 'tool_cotasAuto',
-    icon: 'measure',
+    icon: 'cotasAuto',
     titlePt: 'Cotas automáticas do nível ativo: escolha o que cotar, por onde medir e em quais lados',
     titleEn: 'Automatic dimensions for active level',
     run: () => useUi.setState({ dialog: 'cotasAuto', dialogArg: null }),
@@ -37,7 +37,7 @@ function ToolButton({ id, primary = false }: { id: ToolId; primary?: boolean }):
       onClick={() => editor.setTool(id)}
       title={`${label}${sc ? ` (${sc})` : ''}`}
     >
-      <Icon name={id} size={isBig ? 26 : 18} />
+      <Icon name={id} size={isBig ? 28 : 22} />
       <span>{label}</span>
       {sc ? <kbd>{sc}</kbd> : null}
     </button>
@@ -51,7 +51,7 @@ function ActionButton({ id }: { id: ActionId }): ReactElement {
   const label = I18N[lang][action.labelKey];
   return (
     <button className="tbtn" onClick={action.run} title={lang === 'pt' ? action.titlePt : action.titleEn}>
-      <Icon name={action.icon} size={18} />
+      <Icon name={action.icon} size={22} />
       <span>{label}</span>
     </button>
   );
@@ -60,7 +60,7 @@ function ActionButton({ id }: { id: ActionId }): ReactElement {
 function Toggle({ icon, label, on, onClick, title, disabled }: { icon: string; label: string; on: boolean; onClick: () => void; title?: string; disabled?: boolean }): ReactElement {
   return (
     <button className={`tbtn${on ? ' on' : ''}`} onClick={onClick} title={title ?? label} aria-pressed={on} disabled={disabled}>
-      <Icon name={icon} size={18} />
+      <Icon name={icon} size={22} />
       <span>{label}</span>
     </button>
   );
@@ -74,15 +74,15 @@ function StairGroup({ stairs }: { stairs: Array<{ id: Id; typeId: Id }> }): Reac
     <div className="rgroup">
       <div className="rgroup-tools">
         <button className="tbtn primary-tool" disabled={!one} onClick={() => editor.setTool('stair')} title={lang === 'pt' ? 'Editar o croqui da escada selecionada' : 'Edit stair sketch'}>
-          <Icon name="stair" size={26} />
+          <Icon name="stair" size={28} />
           <span>{lang === 'pt' ? 'Editar croqui' : 'Edit Sketch'}</span>
         </button>
         <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairType', dialogArg: stairs[0]!.typeId })} title={lang === 'pt' ? 'Abre o tipo da escada selecionada' : 'Stair types'}>
-          <Icon name="file" size={18} />
+          <Icon name="type" size={22} />
           <span>{lang === 'pt' ? 'Tipos de escada' : 'Stair Types'}</span>
         </button>
         <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de escadas' : 'Stair schedule'}>
-          <Icon name="file" size={18} />
+          <Icon name="schedule" size={22} />
           <span>{lang === 'pt' ? 'Tabela de escadas' : 'Stair Schedule'}</span>
         </button>
       </div>
@@ -236,11 +236,11 @@ export function Ribbon(): ReactElement {
             <div className="rgroup">
               <div className="rgroup-tools">
                 <button className="tbtn" onClick={() => editor.selectAllOfSelectedType()} title={lang === 'pt' ? 'Selecionar todas as instâncias do tipo' : 'Select all instances of type'}>
-                  <Icon name="sametype" size={18} />
+                  <Icon name="sametype" size={22} />
                   <span>{lang === 'pt' ? 'Mesmo tipo' : 'Same Type'}</span>
                 </button>
                 <button className="tbtn" onClick={() => editor.selectAllOfSelectedName()} title={lang === 'pt' ? 'Selecionar todos com o mesmo nome' : 'Select all with same name'}>
-                  <Icon name="sametype" size={18} />
+                  <Icon name="samename" size={22} />
                   <span>{lang === 'pt' ? 'Mesmo nome' : 'Same Name'}</span>
                 </button>
               </div>
@@ -263,7 +263,7 @@ export function Ribbon(): ReactElement {
             <div className="rgroup">
               <div className="rgroup-tools">
                 <button className="tbtn primary-tool" onClick={() => (s.view === '3d' ? useUi.setState({ previewTick: s.previewTick + 1 }) : editor.zoomExtents())} title={lang === 'pt' ? 'Enquadrar tudo' : 'Zoom to fit'}>
-                  <Icon name="fit" size={26} />
+                  <Icon name="fit" size={28} />
                   <span>{lang === 'pt' ? 'Enquadrar' : 'Fit to View'}</span>
                 </button>
               </div>
@@ -299,35 +299,35 @@ export function Ribbon(): ReactElement {
             <div className="rgroup">
               <div className="rgroup-tools">
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'schedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de paredes' : 'Wall schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela paredes' : 'Wall Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'floorSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de pisos' : 'Floor schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela pisos' : 'Floor Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'slabSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de lajes' : 'Slab schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela lajes' : 'Slab Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'ceilingSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de forros' : 'Ceiling schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela forros' : 'Ceiling Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roofSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de telhados' : 'Roof schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela telhados' : 'Roof Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'stairSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de escadas' : 'Stair schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela escadas' : 'Stair Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'roomSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de ambientes' : 'Room schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela ambientes' : 'Room Sched.'}</span>
                 </button>
                 <button className="tbtn" onClick={() => useUi.setState({ dialog: 'openingSchedule', dialogArg: null })} title={lang === 'pt' ? 'Tabela de aberturas' : 'Openings schedule'}>
-                  <Icon name="file" size={18} />
+                  <Icon name="schedule" size={22} />
                   <span>{lang === 'pt' ? 'Tabela vãos' : 'Openings Sched.'}</span>
                 </button>
               </div>

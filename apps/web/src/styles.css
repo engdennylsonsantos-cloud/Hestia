@@ -26,6 +26,7 @@
   /* Largura da coluna de rótulo da paleta de propriedades: cabe o rótulo mais longo (22 caracteres a 11 px). */
   --prop-label: 122px;
   --r: 3px;
+  --ic-ink: #5b6369;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -50,6 +51,7 @@
     --danger: #f87171;
     --ok: #4ade80;
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+    --ic-ink: #c3c9cf;
     color-scheme: dark;
   }
 }
@@ -75,6 +77,7 @@
   --danger: #f87171;
   --ok: #4ade80;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  --ic-ink: #c3c9cf;
   color-scheme: dark;
 }
 
@@ -557,9 +560,25 @@ svg { display: block; }
   padding: 4px 6px 2px;
 }
 .tbtn.primary-tool svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
+
+/* ---- Ícones de ferramenta no estilo Revit (geometria em Icon.tsx; degradês em IconDefs) ----
+   Traço de espessura fixa em pixels de tela, para ficar nítido de 14 a 28 px. */
+.ic path, .ic circle { vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.ic .ic-s1, .ic .ic-s2, .ic .ic-s3, .ic .ic-bl, .ic .ic-gl { stroke: #5b6369; stroke-width: 1px; }
+.ic .ic-s1 { fill: url(#ic-g1); }
+.ic .ic-s2 { fill: url(#ic-g2); }
+.ic .ic-s3 { fill: url(#ic-g3); }
+.ic .ic-bl { fill: url(#ic-gb); }
+.ic .ic-gl { fill: url(#ic-gg); }
+.ic .ic-ln { fill: none; stroke: var(--ic-ink); stroke-width: 1.1px; }
+.ic .ic-ln2 { fill: none; stroke: var(--ic-ink); stroke-width: 1.8px; }
+.ic .ic-ac { fill: none; stroke: #e8892b; stroke-width: 1.6px; }
+.ic .ic-fa { fill: #e8892b; stroke: none; }
+.ic .ic-ds { stroke-dasharray: 3 2; }
+.ic .ic-tx { fill: var(--ic-ink); stroke: none; font: 700 8px var(--font-ui); }
 
 
 /* ---- Barra de Controle de Vista (View Control Bar do Revit) ---- */

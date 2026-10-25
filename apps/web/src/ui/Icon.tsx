@@ -1,63 +1,112 @@
 import type { ReactElement } from 'react';
 
-const P: Record<string, string> = {
-  select: 'M5 3l13 7-6 2-2 6z',
-  wall: 'M3 9h18v6H3zM8 9v6M13 9v6M18 9v6',
-  door: 'M5 21V3h9v18M14 3l5 2v14l-5 2M11 12h.01',
-  window: 'M4 4h16v16H4zM12 4v16M4 12h16',
-  move: 'M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3',
-  copy: 'M8 8h12v12H8zM4 16V4h12',
-  rotate: 'M20 12a8 8 0 1 1-3-6.2M20 4v5h-5',
-  mirror: 'M12 3v18M8 7L3 12l5 5zM16 7l5 5-5 5z',
-  array: 'M3 6h4v4H3zM10 6h4v4h-4zM17 6h4v4h-4zM3 14h4v4H3zM10 14h4v4h-4zM17 14h4v4h-4z',
-  parallel: 'M3 7h18M3 17h18M9 3v4M15 3v4M9 15l-2 4M15 15l2 4',
-  offset: 'M4 20L20 4M4 14L14 4M10 20L20 10',
-  trim: 'M4 4v16h16M4 12h8M12 12l6-6',
-  align: 'M4 3v18M8 7h12M8 12h8M8 17h10',
-  joins: 'M4 20V9h11M4 9l5-5M15 9v11M15 9l5 5',
-  split: 'M4 12h6M14 12h6M12 4v16',
-  measure: 'M3 17L17 3l4 4L7 21zM8 12l2 2M11 9l2 2M14 6l2 2',
-  undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
-  redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
-  save: 'M5 3h12l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7',
-  open: 'M3 7h6l2 2h10v10H3zM3 7V5h6l2 2',
-  plus: 'M12 5v14M5 12h14',
-  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
-  fit: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
-  grid: 'M4 4h16v16H4zM9.3 4v16M14.7 4v16M4 9.3h16M4 14.7h16',
-  cube: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
-  plan: 'M4 4h16v16H4zM4 12h8v8M12 4v8',
-  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
-  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
-  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5',
-  levels: 'M3 6h18M3 12h18M3 18h18',
-  up: 'M6 14l6-6 6 6',
-  down: 'M6 10l6 6 6-6',
-  close: 'M6 6l12 12M18 6L6 18',
-  file: 'M6 3h9l4 4v14H6zM14 3v5h5',
-  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01',
-  floor: 'M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9M7 14.5h3M14 14.5h3M8 18h2M14 18h2',
-  slab: 'M3 8h18v4H3zM3 12h18v5H3zM7 17v2M12 17v2M17 17v2M7 8V5M12 8V5M17 8V5',
-  ceiling: 'M3 4h18v3H3zM3 10h18M3 14h18M3 18h18M7 4v-1M17 4v-1',
-  slope: 'M3 17L21 9M21 9v4M21 9h-4M3 20h18M3 17v3',
-  roof: 'M3 14l9-9 9 9M6 12v8h12v-8',
-  roofarrow: 'M3 14l9-9 9 9M6 12v8h12v-8M12 17v-4M10.5 14.5L12 13l1.5 1.5',
-  stair: 'M3 20h5v-4h4v-4h4V8h5M3 20v-2M8 16v-2M12 12v-2',
-  stairrun: 'M4 4h6v6h6v10H4zM7 10v7h7M4 4l3 3',
-  room: 'M4 4h16v16H4zM9 9h6v6H9z',
-  edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
-  chevron: 'M9 6l6 6-6 6',
-  section: 'M3 12h3M9 12h1.5M13.5 12h1.5M18 12h3M12 3v4M9 5l3-2 3 2M12 17v4M9 19l3 2 3-2',
-  elevation: 'M3 20h18M5 20V6h14v14M9 20v-5h6v5M9 10h2M13 10h2',
-  sametype: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  rehost: 'M3 9h18v6H3zM8 9v6M16 9v6M5 19l4-3M19 19l-4-3',
-  attachroof: 'M3 8l9-5 9 5M5 8v12h14V8M9 14h6M12 11v6',
-  detachroof: 'M3 8l9-5 9 5M5 8v12h14V8M4 4l16 16',
+/**
+ * Ícones de ferramenta no estilo da faixa do Revit: sólidos cinza sombreados em 3D (luz de cima-esquerda),
+ * azul para superfícies (piso, forro, ambiente) e laranja para a ação (setas, esboço).
+ * Geometria em 32×32; as cores vêm das classes `ic-*` em styles.css e dos degradês de `IconDefs`.
+ */
+const p = (c: string, d: string, x = ''): string => `<path class="ic-${c}" d="${d}"${x ? ` ${x}` : ''}/>`;
+
+const R: Record<string, string> = {
+  // Seleção e edição
+  select: p('s1', 'M8 3V24L13 19L16.5 27L19.8 25.6L16.5 18.2L23 18Z'),
+  move: p('s1', 'M11 11H21V21H11Z') + p('ln', 'M16 7V11M16 21V25M7 16H11M21 16H25') + p('fa', 'M16 2L12 7H20ZM16 30L12 25H20ZM2 16L7 12V20ZM30 16L25 12V20Z'),
+  copy: p('s3', 'M3 3H19V19H3Z') + p('s1', 'M12 12H28V28H12Z') + p('ac', 'M20 15V25M15 20H25'),
+  rotate: p('s1', 'M12 12H20V20H12Z', 'transform="rotate(20 16 16)"') + p('ac', 'M27 16A11 11 0 1 1 21.5 6.5') + p('ac', 'M17 7L21.5 6.5L19.5 2.5'),
+  mirror: p('ln ic-ds', 'M16 2V30') + p('s1', 'M13 8L4 24H13Z') + p('s3', 'M19 8L28 24H19Z'),
+  array: ['3 5', '12.5 5', '22 5', '3 14', '12.5 14', '22 14'].map((o) => { const [x, y] = o.split(' ').map(Number) as [number, number]; return p('s1', `M${x} ${y}H${x + 7}V${y + 7}H${x}Z`); }).join('') + p('ac', 'M3 26H29M3 24V28M29 24V28'),
+  parallel: p('s2', 'M3 4H29V10H3Z') + p('s2', 'M3 22H29V28H3Z') + p('fa', 'M16 11L13 15H19ZM16 21L13 17H19Z'),
+  offset: p('ln', 'M4 28V5H28') + p('ac', 'M10 28V11H28M5 20H9'),
+  trim: p('ln2', 'M3 20H20V4') + p('ac ic-ds', 'M20 20H29M20 20V29'),
+  align: p('ac', 'M6 3V29') + p('s2', 'M9 5H27V11H9Z') + p('s2', 'M9 13H21V19H9Z') + p('s2', 'M9 21H25V27H9Z'),
+  joins: p('s2', 'M3 12H11V4H21V12H29V20H21V28H11V20H3Z') + p('ac', 'M11 12H21V20H11Z'),
+  split: p('s2', 'M3 11H13V21H3Z') + p('s2', 'M19 11H29V21H19Z') + p('ac ic-ds', 'M16 4V28'),
+  measure: `<g transform="rotate(-35 16 16)">${p('s1', 'M1 11H31V21H1Z')}${p('ln', 'M6 11V16M11 11V14M16 11V16M21 11V14M26 11V16')}</g>`,
+  rehost: p('s3', 'M3 5H9V27H3Z') + p('s3', 'M23 5H29V27H23Z') + p('ac', 'M12 11H20M20 21H12') + p('fa', 'M21 11L17 8V14ZM11 21L15 18V24Z'),
+  attachroof: p('s1', 'M3 15L16 5L29 15Z') + p('s2', 'M6 15H26V28H6Z') + p('ac', 'M16 25V19') + p('fa', 'M16 16L12.5 20.5H19.5Z'),
+  detachroof: p('s1', 'M3 10L16 2L29 10Z') + p('s2', 'M6 19H26V29H6Z') + p('ac', 'M16 12V16') + p('fa', 'M16 18L12.5 13.5H19.5Z'),
+  sametype: p('bl', 'M4 4H14V14H4Z') + p('bl', 'M18 4H28V14H18Z') + p('bl', 'M4 18H14V28H4Z') + p('bl', 'M18 18H28V28H18Z'),
+  samename: p('s1', 'M3 7H29V25H3Z') + '<text class="ic-tx" x="16" y="20" text-anchor="middle">Aa</text>',
+
+  // Elementos de arquitetura
+  wall: p('s1', 'M4 12L12 7H28L20 12Z') + p('s2', 'M4 12H20V25H4Z') + p('s3', 'M20 12L28 7V20L20 25Z'),
+  door: p('s3', 'M8 4H24V28H8Z') + p('s2', 'M8 4L19 6.5V30L8 28Z') + '<circle class="ic-fa" cx="16" cy="18" r="1.3"/>',
+  window: p('s2', 'M5 3H27V26H5Z') + p('gl', 'M8 6H15V13H8Z') + p('gl', 'M17 6H24V13H17Z') + p('gl', 'M8 15H15V22H8Z') + p('gl', 'M17 15H24V22H17Z') + p('s3', 'M3 26H29V29H3Z'),
+  floor: p('bl', 'M3 14L16 7L29 14L16 21Z') + p('s2', 'M3 14L16 21V25L3 18Z') + p('s3', 'M16 21L29 14V18L16 25Z'),
+  slab: p('s1', 'M3 11L16 4L29 11L16 18Z') + p('s2', 'M3 11L16 18V28L3 21Z') + p('s3', 'M16 18L29 11V21L16 28Z'),
+  ceiling: p('ln', 'M5 4H27M9 4V13.8M16 4V10M23 4V13.8') + p('bl', 'M3 17L16 10L29 17L16 24Z') + p('ln', 'M9.5 13.5L22.5 20.5M22.5 13.5L9.5 20.5'),
+  roof: p('s1', 'M13 10L21 5L31 21L23 26Z') + p('s2', 'M3 26L13 10L23 26Z'),
+  slope: p('s3', 'M21 26V12L27 8V22Z') + p('s1', 'M3 26L21 12L27 8L9 22Z') + p('s2', 'M3 26H21V12Z'),
+  roofarrow: p('s1', 'M3 24L9 10H29L23 24Z') + p('ac', 'M12 21L19 13M19 13H14.8M19 13V17.2'),
+  roofextrusion: p('s3', 'M21 16L28 12V22L21 26Z') + p('s1', 'M3 16Q12 4 21 16L28 12Q19 0 10 12Z') + p('s2', 'M3 26V16Q12 4 21 16V26Z') + p('ac', 'M3 16Q12 4 21 16'),
+  stair: p('s2', 'M3 27V20H11V14H19V8H29V27Z'),
+  stairrun: p('s1', 'M6 3H26V29H6Z') + p('ln', 'M6 9H26M6 14H26M6 19H26M6 24H26') + p('ac', 'M16 27V9') + p('fa', 'M12 11L16 5L20 11Z'),
+  room: p('s1', 'M3 3H29V29H3Z') + p('bl', 'M7 11H25V25H7Z') + p('ln', 'M7 11L25 25M25 11L7 25'),
+  dimension: p('ln', 'M5 6V24M27 6V24M5 18H27') + p('ac', 'M3 20L7 16M25 20L29 16') + '<text class="ic-tx" x="16" y="15" text-anchor="middle">12</text>',
+  text: p('ln2', 'M6 27L16 5L26 27M10 20H22'),
+
+  // Documentação e vista
+  cotasAuto: p('ln', 'M4 4V18M14 4V18M28 4V18M4 14H28') + p('ac', 'M2 16L6 12M12 16L16 12M26 16L30 12') + p('s2', 'M4 21H28V29H4Z') + p('fa', 'M21 3L22 6L25 7L22 8L21 11L20 8L17 7L20 6Z'),
+  section: p('s3', 'M2 17L8 11V23Z') + p('s3', 'M30 17L24 11V23Z') + p('ln ic-ds', 'M8 17H24') + p('ac', 'M16 17V9') + p('fa', 'M16 3L12 9H20Z'),
+  plan: p('s1', 'M4 4H28V28H4Z') + p('ln2', 'M16 4V16H28M4 21H12') + p('ac', 'M12 21A6 6 0 0 1 18 27'),
+  fit: p('ln2', 'M4 11V4H11M21 4H28V11M28 21V28H21M11 28H4V21') + p('s1', 'M11 11H21V21H11Z'),
+  grid: p('ln', 'M10 9V29M22 9V29M9 15H29M9 23H29') + '<circle class="ic-s1" cx="10" cy="6" r="3"/><circle class="ic-s1" cx="22" cy="6" r="3"/><circle class="ic-s1" cx="6" cy="15" r="3"/><circle class="ic-s1" cx="6" cy="23" r="3"/>',
+  cube: p('s1', 'M16 3L28 10L16 17L4 10Z') + p('s2', 'M4 10L16 17V30L4 23Z') + p('s3', 'M16 17L28 10V23L16 30Z'),
+  sun: '<circle class="ic-fa" cx="16" cy="16" r="6"/>' + p('ac', 'M16 3V7M16 25V29M3 16H7M25 16H29M7 7L9.5 9.5M22.5 22.5L25 25M7 25L9.5 22.5M22.5 9.5L25 7'),
+  layers: p('s3', 'M3 21L16 15L29 21L16 27Z') + p('s2', 'M3 15L16 9L29 15L16 21Z') + p('bl', 'M3 9L16 3L29 9L16 15Z'),
+  schedule: p('s1', 'M4 5H28V27H4Z') + p('s3', 'M4 5H28V11H4Z') + p('ln', 'M4 17H28M4 22H28M13 11V27'),
+  type: p('s1', 'M4 5H28V12H4Z') + p('s3', 'M4 14H28V19H4Z') + p('s2', 'M4 21H28V28H4Z'),
 };
 
-export function Icon({ name, size = 20 }: { name: string; size?: number }): ReactElement {
+/** Glifos simples de interface (arquivo, setas, editar…), no traço contínuo de antes. */
+const P: Record<string, string> = {
+  elevation: 'M3 20h18M5 20V6h14v14M8 20v-6h8v6M8 10h2m4 0h2',
+  levels: 'M3 6h18M3 12h18M3 18h18M6 4v4m12-4v4m-9 2v4m6-4v4m-9 4v4m12-4v4',
+  moon: 'M20 14a8 8 0 1 1-10-10 7 7 0 0 0 10 10z',
+  undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  redo: 'M15 14l5-5-5-5m5 5H10a6 6 0 0 0 0 12h3',
+  save: 'M4 3h13l3 3v15H4zM8 3v6h8V3M8 21v-7h8v7',
+  open: 'M3 7h6l2 2h10v10H3zM3 7V5h6l2 2',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5',
+  file: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7m-7 4h7',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4M4 20l1-4',
+  chevron: 'M9 6l6 6-6 6',
+  up: 'M6 14l6-6 6 6M12 8v12',
+  down: 'M6 10l6 6 6-6M12 16V4',
+  close: 'M6 6l12 12M18 6 6 18',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01',
+};
+
+/** Degradês compartilhados pelos ícones sombreados: renderizar uma vez na raiz da aplicação. */
+export function IconDefs(): ReactElement {
+  const g = (id: string, a: string, b: string): ReactElement => (
+    <linearGradient id={`ic-${id}`} x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stopColor={a} />
+      <stop offset="1" stopColor={b} />
+    </linearGradient>
+  );
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true" focusable="false">
+      <defs>
+        {g('g1', '#ffffff', '#e3e6e9')}
+        {g('g2', '#e9ecee', '#bfc5ca')}
+        {g('g3', '#b9bfc5', '#8a9198')}
+        {g('gb', '#d6ebfc', '#4f9fe0')}
+        {g('gg', '#e3ebf2', '#a6b9ca')}
+      </defs>
+    </svg>
+  );
+}
+
+export function Icon({ name, size = 20 }: { name: string; size?: number }): ReactElement {
+  const shaded = R[name];
+  if (shaded !== undefined) {
+    // Marcação estática deste arquivo (nunca vem de dados do usuário).
+    return <svg className="ic" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" dangerouslySetInnerHTML={{ __html: shaded }} />;
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={P[name] ?? ''} />
     </svg>
   );

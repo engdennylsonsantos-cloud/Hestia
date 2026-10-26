@@ -71,6 +71,25 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingAngle3d(com('ot_p90', { angle3d: 0 }))).toBe(0);
   });
 
+  it('ângulos padrão por família do catálogo: 2D 55 no dobrável e 60 na janela de abrir; 3D 45/70/75/30', () => {
+    const semAngulo = (id: string): OpeningType => {
+      const { angle2d: _a2, angle3d: _a3, ...resto } = tipo(id);
+      return resto;
+    };
+    expect(openingAngle2d(semAngulo('ot_pd120'))).toBe(55);
+    expect(openingAngle2d(semAngulo('ot_ja120'))).toBe(60);
+    expect(openingAngle2d(semAngulo('ot_p90'))).toBe(90);
+    expect(openingAngle3d(semAngulo('ot_jv80'))).toBe(45);
+    expect(openingAngle3d(semAngulo('ot_pd120'))).toBe(70);
+    expect(openingAngle3d(semAngulo('ot_ps90'))).toBe(75);
+    expect(openingAngle3d(semAngulo('ot_j60'))).toBe(30);
+    expect(openingAngle3d(semAngulo('ot_ja120'))).toBe(90);
+    expect(openingAngle3d(semAngulo('ot_jp80'))).toBe(90);
+    expect(openingAngle3d(semAngulo('ot_pe80'))).toBe(90);
+    expect(openingAngle3d(semAngulo('ot_pg300'))).toBe(90);
+    expect(openingAngle3d(semAngulo('ot_jg90'))).toBe(90);
+  });
+
   it('valores inválidos caem no padrão; ângulos limitam 0..120 e grid 1..8', () => {
     expect(openingAngle2d(com('ot_p90', { angle2d: Number.NaN }))).toBe(90);
     expect(openingAngle2d(com('ot_p90', { angle2d: -10 }))).toBe(0);

@@ -45,6 +45,29 @@ describe('verificações do tipo de abertura', () => {
     expect(openingVentilationArea(basculante)).toBeCloseTo(0.6 * 0.6 * 0.8, 9);
   });
 
+  it('ventilação das famílias novas: abrir 100%, guilhotina 50%, pivotante 90% e veneziana 70%', () => {
+    const casos = [
+      { id: 'ot_ja120', fracao: 1, area: 1.2 * 1.2 },
+      { id: 'ot_jg90', fracao: 0.5, area: 0.9 * 1.5 * 0.5 },
+      { id: 'ot_jp80', fracao: 0.9, area: 0.8 * 1.2 * 0.9 },
+      { id: 'ot_jv80', fracao: 0.7, area: 0.8 * 0.6 * 0.7 },
+    ] as const;
+    for (const c of casos) {
+      const t = tipo(c.id);
+      expect(openingVentilationArea(t), c.id).toBeCloseTo(c.area, 9);
+      const vent = porTexto(openingChecks(t, 0.14), 'ventilação');
+      expect(vent?.level, c.id).toBe('ok');
+      expect(vent?.text, c.id).toContain(`${Math.round(c.fracao * 100)}%`);
+    }
+  });
+
+  it('porta não tem ventilação útil', () => {
+    for (const id of ['ot_p90', 'ot_pvv90', 'ot_pe80', 'ot_pg300']) {
+      expect(openingVentilationArea(tipo(id)), id).toBe(0);
+      expect(openingChecks(tipo(id), 0.14).some((c) => c.text.includes('ventilação')), id).toBe(false);
+    }
+  });
+
   it('profundidade do batente contra o núcleo: 0,12 m cabe, 0,20 m avisa', () => {
     const t = tipo('ot_p90');
     expect(porTexto(openingChecks({ ...t, frameDepth: 0.12 }, 0.14), 'Profundidade do batente')?.level).toBe('ok');

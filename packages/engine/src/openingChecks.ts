@@ -30,6 +30,14 @@ function ventilationFactor(t: OpeningType): number | null {
       return 1;
     case 'window_tilt':
       return 0.8;
+    case 'window_hinged':
+      return 1;
+    case 'window_hung':
+      return 0.5;
+    case 'window_pivot':
+      return 0.9;
+    case 'window_louver':
+      return 0.7;
     case 'window_void':
       return 0;
     default:

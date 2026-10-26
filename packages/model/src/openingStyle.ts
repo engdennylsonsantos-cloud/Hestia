@@ -91,17 +91,47 @@ export function openingSidelights(t: Pick<OpeningType, 'width' | 'sidelights'>):
   return { left, right, width: Math.min(x.width, t.width / 2) };
 }
 
-/** Ângulo de abertura em planta (graus): padrão 90, limitado a 0..120. */
-export function openingAngle2d(t: Pick<OpeningType, 'angle2d'>): number {
-  return angleOr(t.angle2d, 90);
+/** Ângulo de abertura em planta (graus) por símbolo: 90 no giro comum, 55 no dobrável e 60 na janela de abrir. */
+function angle2dPadrao(plan: OpeningType['plan']): number {
+  switch (plan) {
+    case 'bifold':
+      return 55;
+    case 'hinged':
+      return 60;
+    default:
+      return 90;
+  }
+}
+
+/** Ângulo de abertura em planta (graus): padrão por família (90, 55 no dobrável, 60 na janela de abrir), limitado a 0..120. */
+export function openingAngle2d(t: Pick<OpeningType, 'plan' | 'angle2d'>): number {
+  return angleOr(t.angle2d, angle2dPadrao(t.plan));
 }
 
 /**
- * Ângulo de abertura no 3D (graus): porta 90; maxim-ar e basculante 30; janela de giro 90. Limitado a 0..120.
+ * Ângulo de abertura no 3D (graus) por símbolo: maxim-ar/basculante 30; veneziana 45; dobrável 70; sanfonada 75; os
+ * demais 90. As famílias sem giro (embutir, seccionada, guilhotina e correr) devolvem 90 sem efeito, como manda a spec.
+ * Limitado a 0..120.
  */
+function angle3dPadrao(plan: OpeningType['plan']): number {
+  switch (plan) {
+    case 'casement':
+    case 'tilt':
+      return 30;
+    case 'louver':
+      return 45;
+    case 'bifold':
+      return 70;
+    case 'accordion':
+      return 75;
+    default:
+      return 90;
+  }
+}
+
+/** Ângulo de abertura no 3D (graus): padrão por família, limitado a 0..120. */
 export function openingAngle3d(t: Pick<OpeningType, 'kind' | 'plan' | 'angle3d'>): number {
-  const fallback = t.kind === 'door' ? 90 : t.plan === 'casement' || t.plan === 'tilt' ? 30 : 90;
-  return angleOr(t.angle3d, fallback);
+  return angleOr(t.angle3d, angle3dPadrao(t.plan));
 }
 
 /** Exibição em planta: 'symbolic' (padrão) ou 'projected'. */

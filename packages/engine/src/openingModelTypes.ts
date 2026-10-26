@@ -1,0 +1,108 @@
+/**
+ * Modelo único da esquadria (docs/aberturas/E-spec-modelo-unico.md). Planta, corte, elevação, 3D e prévia do diálogo
+ * desenham as MESMAS peças; nenhuma vista recalcula posição de batente, folha, vidro ou maçaneta por conta própria.
+ *
+ * Coordenadas locais do vão (metros):
+ * - `t` ao longo da parede, 0 no centro do vão, positivo na direção `u` da parede;
+ * - `s` na profundidade, 0 no plano médio da parede (a metade da espessura total), positivo para o lado de `n`
+ *   (as faces da parede ficam em `±thickness/2`);
+ * - `z` na altura, 0 na soleira do vão (o `sill` do tipo/instância), positivo para cima. A soleira de porta é z = 0.
+ */
+
+/** Papel da peça: define o desenho (hachura de corte, espessura de traço) e quais vistas a mostram. */
+export type PartRole =
+  | 'jamb' // ombreira do batente (cada lado)
+  | 'stop' // batedor/rebaixo do batente
+  | 'head' // travessa superior do batente
+  | 'sillFrame' // travessa inferior do caixilho (janela)
+  | 'threshold' // soleira de porta
+  | 'leaf' // folha (porta ou janela)
+  | 'leafPanel' // almofada/aleta/grelha (detalhe da folha)
+  | 'glass'
+  | 'muntin' // montante/travessa de divisão do vidro
+  | 'handle'
+  | 'casing' // alizar
+  | 'sillBoard' // peitoril saliente
+  | 'lintel' // verga
+  | 'sillBeam' // contraverga
+  | 'track' // trilho (correr, seccionada)
+  | 'pocket'; // cavidade da porta de embutir (tracejada, dentro da parede)
+
+/** Material lógico; o desenhista resolve para o `materialId` do tipo (`frame`, `glass`) ou do projeto. */
+export type PartMaterial = 'frame' | 'leaf' | 'glass' | 'concrete' | 'casing' | 'metal';
+
+/** Caixa alinhada aos eixos locais (`t0 < t1`, `s0 < s1`, `z0 < z1`), no estado FECHADO. */
+export interface PartBox {
+  t0: number;
+  t1: number;
+  s0: number;
+  s1: number;
+  z0: number;
+  z1: number;
+}
+
+/**
+ * Movimento da peça do estado fechado para o aberto.
+ * - `rotate`: gira em torno do eixo vertical (`axis: 'z'`, passa por (t, s)) ou do eixo horizontal paralelo a `t`
+ *   (`axis: 't'`, passa por (s, z)). `sign` (±1) diz para que lado o ângulo positivo leva a peça; o ângulo (rad)
+ *   é dado por quem desenha (`OpenState.angle`).
+ * - `slide`: desliza `travel` metros na direção unitária (`dt`, `ds`, `dz`); a fração aberta vem de `OpenState.slide`.
+ */
+export type PartMotion =
+  | { kind: 'rotate'; axis: 'z'; t: number; s: number; sign: 1 | -1 }
+  | { kind: 'rotate'; axis: 't'; s: number; z: number; sign: 1 | -1 }
+  | { kind: 'slide'; dt: number; ds: number; dz: number; travel: number };
+
+export interface OpeningPart {
+  /** Estável entre chamadas (ex.: 'jamb-left', 'leaf-0', 'glass-0-1'). */
+  id: string;
+  role: PartRole;
+  material: PartMaterial;
+  box: PartBox;
+  /** Ausente = peça fixa. */
+  motion?: PartMotion;
+  /** Índice da folha a que pertence (folha, vidro, divisões e maçaneta dela se movem juntos). */
+  leaf?: number;
+  /** Desenhar tracejada (peça oculta/abaixo/acima): cavidade de embutir, trilho, projeção do portão. */
+  dashed?: boolean;
+}
+
+/** Como a folha se abre, para as linhas de abertura (V) e o arco de giro. */
+export interface LeafOpening {
+  leaf: number;
+  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'fixed';
+  /** Lado em que a folha abre: +1 para o lado de `n`, −1 para o oposto. 0 em correr/fixa. */
+  side: 1 | -1 | 0;
+  /** Posição t da dobradiça (giro lateral/pivô) ou 0. */
+  hingeT: number;
+  /** Posição t do lado oposto à dobradiça (trinco). */
+  latchT: number;
+  /** Eixo do giro em planta (t, s) e raio do arco (comprimento da folha). */
+  pivot: { t: number; s: number };
+  radius: number;
+  /** Faixa em z da folha, para o V em elevação. */
+  z0: number;
+  z1: number;
+}
+
+export interface OpeningModel {
+  kind: 'door' | 'window';
+  /** Vão nominal (largura × altura do tipo) e espessura total da parede. */
+  width: number;
+  height: number;
+  thickness: number;
+  /** Centro e extensão (s) do núcleo da parede onde o batente se assenta (DEC-1). */
+  core: { s0: number; s1: number };
+  parts: OpeningPart[];
+  openings: LeafOpening[];
+  /** Vão livre: sem folha nem caixilho; `parts` traz só o que o vão tem (soleira, verga). */
+  void: boolean;
+}
+
+/** Estado de abertura pedido ao transformar uma peça: ângulo em radianos (folhas que giram) e fração 0..1 (correr). */
+export interface OpenState {
+  angle: number;
+  slide: number;
+}
+
+export const CLOSED: OpenState = { angle: 0, slide: 0 };

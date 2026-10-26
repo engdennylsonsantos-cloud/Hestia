@@ -323,6 +323,56 @@ export interface OpeningType {
   sillBoard?: { projection: number; thickness: number };
   lintel?: { over?: number; height?: number };
   sillBeam?: { over?: number; height?: number };
+  /*
+   * Esquadria v2 (docs/aberturas/E-spec-modelo-unico.md). Todos opcionais: ausente vale o padrão por leitura
+   * (`openingStyle.ts`), sem migração e sem mudar a aparência de arquivos antigos.
+   */
+  /** Estilo da folha (miniatura no diálogo). Porta: padrão 'flush'. Janela: 'glass'. */
+  leafStyle?: OpeningLeafStyle;
+  /** Maçaneta da porta. Padrão 'lever' na porta de giro e 'none' nas demais. */
+  handle?: OpeningHandle;
+  /** Estilo do batente: com rebaixo (padrão), simples, aduela (pré-marco) ou bloco (sem perfil visível). */
+  frameStyle?: OpeningFrameStyle;
+  /** Divisões do caixilho/vidro (colunas × linhas de vidro). Padrão 1 × 1. */
+  grid?: { cols: number; rows: number };
+  /** Bandeira superior (vidro acima da folha) e bandeiras laterais. Ausente = sem. */
+  transom?: { height: number; fixed?: boolean };
+  sidelights?: { left?: boolean; right?: boolean; width: number };
+  /** Ângulo de abertura em planta e no 3D, em graus (porta de giro padrão 90; maxim-ar e basculante no 3D, 30). */
+  angle2d?: number;
+  angle3d?: number;
+  /** Exibição em planta: simbólica (padrão) ou projetada (folha fechada com espessura + o que está acima do corte). */
+  planDisplay?: 'symbolic' | 'projected';
+  /** Nível de detalhe da planta: 'scale' (padrão, depende da escala), 'low' | 'mid' | 'high' fixos ou 'off'. */
+  detail2d?: 'scale' | 'low' | 'mid' | 'high' | 'off';
+  /** Nível de detalhe do 3D: 'view' (padrão, segue a vista), 'schematic' | 'simple' | 'full' ou 'off' (só o vão). */
+  detail3d?: 'view' | 'schematic' | 'simple' | 'full' | 'off';
+  /** Arco de giro em planta: mostrar (padrão sim) e estilo. */
+  showSwing?: boolean;
+  swingStyle?: 'arc' | 'dash' | 'line';
+  /** Posição da folha na profundidade do batente: do lado em que ela abre (padrão) ou do lado oposto. */
+  leafSide?: 'swing' | 'opposite';
+  /** Dados BIM do tipo (quadro e IFC). */
+  fireRating?: string;
+  acousticRw?: number;
+  uValue?: number;
+  solarFactor?: number;
+  cost?: number;
+  manufacturer?: string;
+}
+
+export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille';
+export type OpeningHandle = 'none' | 'lever' | 'knob' | 'pull';
+export type OpeningFrameStyle = 'rebate' | 'simple' | 'aduela' | 'block';
+
+/**
+ * Convenção da linha de abertura nas elevações e cortes (decisão do dono, 2026-10-26): o vértice do V fica no lado
+ * OPOSTO ao da dobradiça ('latch', padrão) ou no lado da dobradiça ('hinge'). `dashed`: tracejado quando a folha abre
+ * 'toward' o observador (padrão) ou 'away' dele.
+ */
+export interface OpeningLineConvention {
+  apex: 'latch' | 'hinge';
+  dashed: 'toward' | 'away';
 }
 
 export interface Opening {
@@ -600,6 +650,8 @@ export interface ProjectSettings {
   detail: DetailLevel;
   /** Tipos de abertura favoritos (ArchiCAD: Favorites), na ordem em que aparecem no seletor. Ausente = nenhum. */
   favoriteOpeningTypes?: Id[];
+  /** Convenção da linha de abertura (ausente = vértice no lado do trinco, tracejada ao abrir para o observador). */
+  openingLine?: OpeningLineConvention;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */

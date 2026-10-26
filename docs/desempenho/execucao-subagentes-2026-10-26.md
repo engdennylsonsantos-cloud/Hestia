@@ -11,9 +11,9 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — S0, S1 e S2 integrados; R1 iniciado com G0 parcial.
-**Em execução:** A1 (inserção/abertura), A2 (verificação visual), R1 (fundação 3D GPU).
-**Próxima ação:** aguardar A1/A2 para rodar M0 sem ruído; R1 usa os cenários do S2 e a instrumentação do S1.
+**Última atualização:** 2026-10-26 — S0, S1, S2 e A2 integrados; A1 e R1 em execução.
+**Em execução:** A1 (inserção/abertura), R1 (fundação 3D GPU).
+**Próxima ação:** aguardar A1 para rodar M0 sem ruído; R5 herda o FAIL de realce de linha de detalhe do A2.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
@@ -31,7 +31,7 @@
 - [x] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes) — concluído em `f494263`; ver `docs/desempenho/s2-projeto-grande-2026-10-26.md`
 - [ ] **M0** baseline 10/30/60
 - [ ] **A1** inserção/abertura
-- [ ] **A2** verificação visual
+- [x] **A2** verificação visual — concluído em `763b890`; 44 PASS, 1 FAIL (realce de linha de detalhe)
 - [ ] **I1** integração da Fase 1
 - [ ] **R1** fundação 3D GPU — em execução (worktree `gpu-r1-foundation`)
 - [ ] **R2** culling/LOD/sombras/precisão
@@ -98,6 +98,20 @@
 - **Padrão preservado:** `npm run medir:gpu` sem variáveis continua 10/20/30 × 32, sem pendências.
 - **Exceção de tamanho:** `scripts/medir-gpu-memoria.mjs` ficou com ~443 linhas (levemente acima de ~400); refatorar em H1.
 
+### Achados A2 (2026-10-26)
+
+- **Harness reproduzível:** `node tests/e2e/verificacao-visual.mjs` (aceita `--item`, `--list`, `--strict`, `--url`, `--browser`).
+- **Resultado:** 44 PASS, 1 FAIL, 0 PENDENTE em 45 critérios; 22 PNGs + `resultados.md` + `resumo.json` em
+  `tests/e2e/out/verificacao-visual/`.
+- **Cobertura:** cotas 12/60/220, texto com caixa, etiquetas/líderes, linhas de detalhe, cortes/elevações, 3D com
+  caixas instanciadas.
+- **FAIL real:** clicar na linha de detalhe tracejada seleciona, mas o desenho não muda (0 px; PNG idêntico por SHA-256).
+  Causa: `planGeometrySelection` não inclui linhas de detalhe; o realce não entra na geometria nem na sobreposição.
+  **Dono:** R5 (plano GPU), que deve corrigir e cobrir com `--item linhas`.
+- **Capturas em SwiftShader:** critérios estruturais/pixel-métricos, sem baseline; não substituem GPU real.
+- **Fora desta rodada:** tema escuro, zoom >220, pranchas/DXF e seleção de regiões de detalhe.
+- **Exceção de tamanho:** `tests/e2e/verificacao-visual.mjs` ficou com ~725 linhas; refatorar em H1.
+
 ## 1. Regras do board
 
 1. Um agente = um worktree = um ramo = um dono de arquivo. Ninguém edita o worktree do outro.
@@ -139,7 +153,7 @@
 
 | ID | Missão | Depende | Dono dos arquivos | Entrega | Tempo |
 |---|---|---|---|---|---|
-| **R5** | Planta zero-rebuild: overlay de cursor/seleção separado, hachura procedural, traço/texto com LOD | S1, M0 | `packages/render/src/plan/*`, `apps/web/src/ui/quadroPlanta.ts`, `PlanLabels.tsx` | pan/zoom ≤8 ms; hover ≤8 ms; sem rebuild | 4 d |
+| **R5** | Planta zero-rebuild: overlay de cursor/seleção separado, hachura procedural, traço/texto com LOD; **corrigir o realce de linhas de detalhe (FAIL A2)** | S1, M0 | `packages/render/src/plan/*`, `apps/web/src/ui/quadroPlanta.ts`, `PlanLabels.tsx` | pan/zoom ≤8 ms; hover ≤8 ms; sem rebuild; `--item linhas` PASS | 4 d |
 
 ### Squad 4 — WebGPU (Fase 3)
 

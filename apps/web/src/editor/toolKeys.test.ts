@@ -28,8 +28,9 @@ describe('sequências de comando (perfis)', () => {
 describe('perfis de atalho', () => {
   const perfis = Object.keys(SHORTCUT_PROFILES) as ShortcutProfile[];
 
-  it('todo comando com ferramenta (exceto Selecionar) tem atalho nos dois perfis', () => {
-    const ferramentas = Object.keys(TOOL_LABEL).filter((id) => id !== 'select');
+  it('todo comando com ferramenta (exceto Selecionar e Perímetro) tem atalho nos dois perfis', () => {
+    // O perímetro não tem tecla: abre-se pelas ferramentas Telhado, Piso, Laje e Forro.
+    const ferramentas = Object.keys(TOOL_LABEL).filter((id) => id !== 'select' && id !== 'perimeter');
     for (const perfil of perfis) {
       for (const id of ferramentas) expect(SHORTCUT_PROFILES[perfil][id as keyof typeof TOOL_LABEL], `${perfil}:${id}`).toBeTruthy();
     }
@@ -38,6 +39,10 @@ describe('perfis de atalho', () => {
 
   it('Selecionar não tem tecla em nenhum perfil', () => {
     for (const perfil of perfis) expect(SHORTCUT_PROFILES[perfil].select).toBeUndefined();
+  });
+
+  it('o Perímetro não tem tecla em nenhum perfil (modo aberto pela ferramenta do elemento)', () => {
+    for (const perfil of perfis) expect(SHORTCUT_PROFILES[perfil].perimeter).toBeUndefined();
   });
 
   it('nenhum perfil tem conflito de sequência', () => {

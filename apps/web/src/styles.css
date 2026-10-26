@@ -84,7 +84,8 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+/* Janela de aplicativo: ocupa a janela toda, sem margens nem rolagem da página (quem rola são os painéis). */
+html, body, #root { height: 100%; overflow: hidden; }
 body {
   margin: 0;
   background: var(--bg);
@@ -92,14 +93,28 @@ body {
   font-family: var(--font-ui);
   font-size: 12.5px;
   line-height: 1.35;
-  padding-block: 0;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
   -webkit-font-smoothing: antialiased;
 }
-#root { height: 100%; padding-block: 12px; }
+/* Interface não é texto de página: nada seleciona por padrão. Campos e tabelas de dados liberam a seleção (bloco abaixo). */
+html, body, body * { -webkit-user-select: none; user-select: none; }
+input, textarea, select, [contenteditable], .selectable, .selectable *,
+.wsched, .wsched *, .layers, .layers *, .kbtable, .kbtable *, .matlist, .matlist *,
+.dialog .error, .dialog .hint {
+  -webkit-user-select: text;
+  user-select: text;
+}
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; white-space: nowrap; }
+/* Botões usam a seta do sistema, não a mão do navegador. O white-space: nowrap é conferido por scripts/check-props-density.mjs. */
+button { cursor: default; white-space: nowrap; }
+
+/* Barras de rolagem em estilo Windows: 12 px, quadradas. ::-webkit-scrollbar só (sem scrollbar-width, para não sobrepor). */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--chrome); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--line-strong) 70%, var(--fg)); }
+::-webkit-scrollbar-corner { background: var(--chrome); }
+/* Áreas que escondem a barra de propósito (faixa e barra de controle da vista, em ribbon.css) continuam sem barra. */
+.vcb::-webkit-scrollbar { display: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 svg { display: block; }
 
@@ -109,8 +124,9 @@ svg { display: block; }
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   background: var(--chrome);
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  /* Sem borda externa e cantos retos: a janela é a própria janela do sistema. */
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
 }
@@ -125,7 +141,7 @@ svg { display: block; }
 .ibtn:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
 .ibtn:disabled { opacity: 0.4; cursor: default; }
 .ibtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: var(--r); white-space: nowrap; }
+.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: 2px; white-space: nowrap; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 500; }
@@ -140,7 +156,7 @@ svg { display: block; }
 .optbar .tool-name { font-weight: 600; color: var(--fg); }
 
 /* ---- campos ---- */
-.input, .select { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 3px; padding: 3px 6px; min-width: 0; height: 24px; }
+.input, .select { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 2px; padding: 3px 6px; min-width: 0; height: 24px; }
 .input:focus, .select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
 .input.num { font-family: var(--font-mono); text-align: right; width: 72px; }
 .input.wide { width: 100%; }
@@ -156,7 +172,7 @@ svg { display: block; }
 .panel-scroll { overflow: auto; flex: 1; min-height: 0; background: var(--sheet); }
 /* Grupo recolhível: cabeçalho em barra de cromo, com o chevron à direita (▲ aberto, ▼ fechado). */
 .pgroup { border-bottom: 1px solid var(--line-strong); }
-.pgroup > summary { list-style: none; cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; border-bottom: 1px solid var(--line); }
+.pgroup > summary { list-style: none; cursor: default; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; border-bottom: 1px solid var(--line); }
 .pgroup > summary:hover { background: var(--accent-soft); }
 .pgroup > summary::-webkit-details-marker { display: none; }
 .pgroup > summary::after { content: ''; margin-left: auto; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2.5px; transform: rotate(45deg); transition: transform 0.12s; }
@@ -250,15 +266,15 @@ svg { display: block; }
 .stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; background: var(--bg); }
 /* Barra de abas superior com agrupador (overflow) quando há muitas abas/pavimentos */
 .viewtabs { display: flex; gap: 2px; padding: 4px 6px 0; background: var(--chrome); border-bottom: 1px solid var(--line-strong); overflow: visible; min-width: 0; flex-shrink: 0; position: relative; }
-.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 10px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12.5px; cursor: pointer; }
+.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 10px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12.5px; cursor: default; }
 .vtab.on { background: var(--sheet); border-color: var(--line-strong); color: var(--fg); font-weight: 500; }
 .vtab-overflow { position: relative; display: inline-flex; align-items: center; }
-.vtab-overflow-btn { border: 1px solid var(--line); border-bottom: 0; background: var(--panel); padding: 4px 8px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.vtab-overflow-btn { border: 1px solid var(--line); border-bottom: 0; background: var(--panel); padding: 4px 8px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 500; cursor: default; transition: background 0.15s, color 0.15s; }
 .vtab-overflow-btn:hover { background: var(--sheet); color: var(--fg); }
 .vtab-overflow-btn.has-active { border-color: var(--line-strong); color: var(--accent); }
 .vtab-overflow-badge { background: var(--line-strong); color: var(--fg); font-size: 10px; font-family: var(--font-mono); padding: 1px 5px; border-radius: 10px; line-height: 1.2; }
 .vtab-overflow-menu { position: absolute; top: 100%; left: 0; margin-top: 1px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); padding: 4px; min-width: 170px; max-width: 260px; max-height: 60vh; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; gap: 2px; }
-.vtab-overflow-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: none; background: transparent; border-radius: 4px; color: var(--fg); font-size: 12px; font-family: inherit; text-align: left; cursor: pointer; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vtab-overflow-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: none; background: transparent; border-radius: 4px; color: var(--fg); font-size: 12px; font-family: inherit; text-align: left; cursor: default; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vtab-overflow-item:hover { background: var(--hover); }
 .vtab-overflow-item.on { background: var(--accent-dim, rgba(24, 119, 242, 0.1)); color: var(--accent); font-weight: 600; }
 .vtab-controls { display: flex; align-items: center; gap: 2px; background: var(--chrome); padding-left: 4px; flex-shrink: 0; }
@@ -312,14 +328,14 @@ svg { display: block; }
 
 /* ---- diálogos ---- */
 .overlay { position: fixed; inset: 0; background: rgba(10, 16, 20, 0.5); display: grid; place-items: center; z-index: 50; padding: 16px; }
-.dialog { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); width: min(860px, 100%); max-height: min(660px, 100%); display: flex; flex-direction: column; min-height: 0; }
+.dialog { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 3px; box-shadow: var(--shadow); width: min(860px, 100%); max-height: min(660px, 100%); display: flex; flex-direction: column; min-height: 0; }
 .dialog.narrow { width: min(520px, 100%); }
 .dialog.mid { width: min(700px, 100%); }
-.dhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--chrome); border-radius: 8px 8px 0 0; }
+.dhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--chrome); border-radius: 0; }
 .dhead h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
 .dhead .sub { color: var(--fg-soft); font-size: 11.5px; }
 .dbody { padding: 12px 14px; overflow: auto; min-height: 0; flex: 1; }
-.dfoot { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--chrome); border-radius: 0 0 8px 8px; }
+.dfoot { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--chrome); border-radius: 0; }
 .dtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .dtab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 5px 12px; color: var(--fg-soft); margin-bottom: -1px; }
 .dtab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
@@ -356,7 +372,7 @@ svg { display: block; }
 .field-row > label { color: var(--fg-soft); }
 .section-svg { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r); width: 100%; }
 .tplgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(226px, 1fr)); gap: 12px; }
-.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--sheet); padding: 0; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--sheet); padding: 0; display: flex; flex-direction: column; overflow: hidden; cursor: default; transition: border-color .12s, box-shadow .12s; }
 .tpl:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0, 0, 0, .1); }
 .tpl:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tpl-thumb { display: block; background: var(--chrome); border-bottom: 1px solid var(--line); aspect-ratio: 4 / 3; padding: 8px; }
@@ -496,7 +512,7 @@ svg { display: block; }
 /* ---- Capturas (botão Snap da barra de status e seu popover) ---- */
 .snap-anchor { position: relative; display: inline-flex; flex-shrink: 0; margin-left: auto; }
 .snap-anchor + .issues-anchor { margin-left: 0; }
-.snap-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--fg); cursor: pointer; }
+.snap-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--fg); cursor: default; }
 .snap-btn:hover { background: var(--sheet); }
 .snap-btn[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent-soft); }
 .snap-btn--disabled { opacity: 0.65; border-color: var(--line); color: var(--fg-soft); }

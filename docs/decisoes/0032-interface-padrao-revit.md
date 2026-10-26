@@ -39,6 +39,23 @@ na lista do painel certo, em `tabsMain.ts` (abas com ferramentas) ou `tabsSoon.t
   Abrir vãos), com os controles ainda inexistentes esmaecidos. **Barra de navegação** no canto da vista (aproximar, afastar, enquadrar).
   Status ganha filtro de seleção e o motor gráfico.
 
+## Aplicativo de Windows, painéis móveis e menu de contexto (2ª rodada)
+
+- **Aparência de app** (`appshell.css`, `editor/appShell.ts`): janela cheia sem margens nem cantos; texto da interface não selecionável (campos,
+  tabelas de dados e `.selectable` continuam); cursor de seta nos botões; barras de rolagem de 12 px quadradas; sem menu do navegador (exceto
+  em campos de texto), sem arrastar imagem, sem zoom da página (Ctrl+roda/+/−) fora do desenho e sem Ctrl+A de página.
+- **Painéis móveis** (`dockLayout.ts`, `Dock.tsx`, `PanelHead.tsx`, `dockDrag.ts`, `dockDragSession.ts`): Propriedades e Navegador vão para
+  qualquer lado, juntos ou separados, arrastando o cabeçalho (ou Alt+←/→). A sessão de arrasto é imperativa: mede os retângulos uma vez,
+  move o fantasma (miniatura do painel) por `transform` em requestAnimationFrame e só troca a prévia quando a zona muda. **A prévia é o
+  retângulo exato** que o painel terá ao soltar (`previewRect`), e a zona de acerto é a borda de 25% do workspace (não desenhada). O gesto
+  captura o ponteiro já no clique: movimento rápido que sai do cabeçalho antes dos 5 px não perde o arrasto. Nós abertos do navegador
+  sobrevivem ao painel mudar de lado.
+- **Menu de botão direito** (`contextMenu.ts`, `PopupMenu.tsx`, `useCanvasContextMenu.ts`, `docs/paridade/menu-contexto.md`): planta, corte e 3D,
+  com e sem seleção e durante ferramenta de criação, como o Revit (Repetir, Comandos recentes, Selecionar anterior, zoom, Criar semelhante,
+  Selecionar todas as instâncias, Excluir, Navegador, Propriedades). O botão direito não cancela mais a ferramenta; "Cancelar" está no menu.
+  Itens inexistentes aparecem esmaecidos. **Barra de espaço repete o último comando** só em Selecionar e ao soltar sem arrasto (pan e o espaço
+  da parede ficam como antes).
+
 ## Pendências conhecidas
 
 Painéis das abas vazias têm nomes aproximados; botões `soon` aguardam as ferramentas; roda de navegação, caminho do sol, região de corte e

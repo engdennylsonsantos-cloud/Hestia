@@ -10,6 +10,8 @@ import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels } from './PlanLabels';
 import { NavBar } from './NavBar.tsx';
+import { CanvasContextMenu } from './CanvasContextMenu.tsx';
+import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 
@@ -192,6 +194,8 @@ export function ViewportCanvas(): ReactElement {
   const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean; shiftPending?: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
   const gesture = useRef<{ dist: number; mid: Pt } | null>(null);
   const spaceDown = useRef(false);
+  /** Botão direito pressionado: solto sem arrasto (mais de 4 px) abre o menu de contexto. */
+  const rightPress = useRef<{ start: Pt; moved: boolean } | null>(null);
 
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
@@ -260,11 +264,8 @@ export function ViewportCanvas(): ReactElement {
     const shiftDraw = view === 'plan' && e.button === 0 && e.shiftKey && !spaceDown.current && editor.activeTool.id !== 'select';
     const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select' && !shiftDraw;
     const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || shiftPan));
-    if (e.button === 2) {
-      if (view === 'plan') editor.activeTool.cancel();
-      editor.bump();
-      return;
-    }
+    // Botão direito: o menu abre ao soltar sem arrasto (onUp). Não cancela a ferramenta: "Cancelar" está no menu.
+    if (e.button === 2) { rightPress.current = { start: s, moved: false }; return; }
     if (view === '3d') {
       const mode = isOrbitReq ? 'orbit' : isPanReq ? 'pan' : (e.button === 0 ? 'orbit' : 'none');
       drag.current = { mode, start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current && !e.altKey };
@@ -288,6 +289,7 @@ export function ViewportCanvas(): ReactElement {
   const onMove = (e: RPointerEvent): void => {
     const s = local(e);
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, s);
+    if (rightPress.current) { if (Math.hypot(s.x - rightPress.current.start.x, s.y - rightPress.current.start.y) > 4) rightPress.current.moved = true; return; }
     const view = useUi.getState().view;
     if (gesture.current && pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
@@ -346,6 +348,13 @@ export function ViewportCanvas(): ReactElement {
   const onUp = (e: RPointerEvent): void => {
     const s = local(e);
     pointers.current.delete(e.pointerId);
+    if (rightPress.current && e.button === 2) {
+      const rp = rightPress.current;
+      rightPress.current = null;
+      // Alvo sob o cursor: 3D e corte pelo pick da vista; planta pelo realce da Selecionar (sem ferramenta, é null).
+      if (!rp.moved) abrirMenuDeContexto(e.clientX, e.clientY, useUi.getState().view === '3d' ? (elementAt3d(s)?.id ?? null) : useUi.getState().view === 'section' ? (sectionPickAt(s)?.id ?? null) : useUi.getState().hover, viewDoMenu(useUi.getState().view));
+      return;
+    }
     if (gesture.current) {
       if (pointers.current.size < 2) gesture.current = null;
       return;
@@ -448,6 +457,7 @@ export function ViewportCanvas(): ReactElement {
         </div>
       )}
       <NavBar model={model.current} center={() => { const r = host.current?.getBoundingClientRect(); return { x: (r?.width ?? 0) / 2, y: (r?.height ?? 0) / 2 }; }} />
+      <CanvasContextMenu model={model.current} host={host} />
       {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
       {ui.view === 'section' ? <SectionBadge /> : null}
       {ui.view === 'plan' && ui.prompt ? (

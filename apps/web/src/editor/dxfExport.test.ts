@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
-import { openingSymbolPaths } from '@hestia/geom';
-import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry } from '@hestia/io';
+import { buildOpeningModel, generateSpiralRun, generateStraightRun, levelFrames, openingGeometry, resolveStairsOnLevel } from '@hestia/engine';
+import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, dxfLayerOfFloor, dxfLayerOfMaterial, dxfLayerOfSlab, dxfLineWeight, type DxfLevelGeometry, type DxfSymbolPath } from '@hestia/io';
 import {
   ProjectStore,
   buildTemplate,
@@ -12,6 +11,10 @@ import {
   makeSlab,
   makeStair,
   makeWall,
+  openingAngle2d,
+  openingPlanDisplay,
+  openingShowSwing,
+  openingSwingStyle,
   type CategoryOverride,
   type GraphicsCategory,
   type Opening,
@@ -20,7 +23,7 @@ import {
   type ViewGraphics,
   type ViewRange,
 } from '@hestia/model';
-import { climbWalk, planViewOf, risersInClimbOrder } from '@hestia/render';
+import { climbWalk, openingPlanWorldPaths, planViewOf, risersInClimbOrder } from '@hestia/render';
 import { arrowOfPath, lineWeightsOf, planDxf, sectionDxf, sectionDxfGeometryOf, sectionLineWeightsOf, stairArrow } from './dxfExport.ts';
 
 /** Duas paredes em L no térreo, com uma porta na primeira. Passa pelo engine real, como no app. */
@@ -103,6 +106,18 @@ describe('planDxf com o engine real', () => {
     expect(text).not.toContain('\r\nPOLYLINE\r\n');
     expect(text.endsWith('\r\n0\r\nEOF\r\n')).toBe(true);
   });
+
+  it('a folha da porta sai com espessura: retângulo fechado, não uma linha', () => {
+    const p = lPlan().project;
+    const polylines = polylinesOf(planDxf(p, 'lv_0')).filter((x) => x.layer === 'ABERTURA_SIMBOLO' && x.closed);
+    const comEspessura = polylines.some((x) => {
+      const xs = x.pts.map((q) => q.x);
+      const ys = x.pts.map((q) => q.y);
+      const lados = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)].sort((a, b) => a - b);
+      return Math.abs(lados[0]! - 0.04) < 1e-6;
+    });
+    expect(comEspessura).toBe(true);
+  });
 });
 
 /** Projeto de vista (decisão 0013): térreo com paredes isoladas por caso, um piso e um nível de cima com laje. */
@@ -141,6 +156,23 @@ function without(p: Project, openingId: string): Project {
   return q;
 }
 
+/** Símbolo esperado no DXF: o mesmo desenho do modelo único, no nível médio. */
+function expectedSymbol(p: Project, o: Opening, f: ReturnType<typeof levelFrames>[number], state: 'cut' | 'projection-above' | 'projection-below' | 'beyond'): DxfSymbolPath[] {
+  const g = openingGeometry(p, o, f);
+  const type = p.openingTypes[o.typeId]!;
+  const model = buildOpeningModel(p, o, g, f);
+  const view = planViewOf(p, f.wall.levelId);
+  const cutZ = state === 'cut' ? view.cutZ - (f.z?.z0 ?? 0) - g.sill : model.height / 2;
+  return openingPlanWorldPaths(g, model, {
+    detail: 'mid',
+    angle: (openingAngle2d(type) * Math.PI) / 180,
+    planDisplay: openingPlanDisplay(type),
+    showSwing: openingShowSwing(type),
+    swingStyle: openingSwingStyle(type),
+    cutZ,
+  }).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
+}
+
 describe('vista da planta no DXF (decisão 0013 §4)', () => {
   it('janela de peitoril 1,50 acima do corte: a parede sai inteira e o vão vai para ABERTURA_ACIMA (tracejado)', () => {
     const p = vistaPlan().project;
@@ -149,12 +181,12 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     // o símbolo da janela (caixilho, ombreiras, folhas) sai inteiro, não um retângulo só
     const wp = p.elements['jAlta'] as Opening;
     const wf = levelFrames(p, 'lv_0').find((f) => f.wall.id === wp.hostId)!;
-    expect(above).toHaveLength(openingSymbolPaths(openingGeometry(p, wp, wf)).length);
+    expect(above).toHaveLength(expectedSymbol(p, wp, wf, 'projection-above').length);
     expect(above.length).toBeGreaterThan(1);
     // o vão de 1,50 não aparece nas camadas de corte: em ABERTURA_SIMBOLO sai só o símbolo da janela de 0,90 (decisão X1)
     const jc = p.elements['jCorta'] as Opening;
     const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
-    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO')).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
+    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO')).toHaveLength(expectedSymbol(p, jc, jcf, 'cut').length);
     // a parede com a janela alta é igual à mesma parede sem janela (furo nenhum)
     expect(notOpening(text).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1))).toEqual(
       notOpening(planDxf(without(p, 'jAlta'), 'lv_0')).filter((x) => x.pts.some((v) => v.y < 1 && v.y > -1)),
@@ -169,7 +201,7 @@ describe('vista da planta no DXF (decisão 0013 §4)', () => {
     // Decisão X1: o vão de corte sai com o símbolo de planta, o mesmo da tela (antes era um retângulo só).
     const jc = p.elements['jCorta'] as Opening;
     const jcf = levelFrames(p, 'lv_0').find((f) => f.wall.id === jc.hostId)!;
-    expect(cut).toHaveLength(openingSymbolPaths(openingGeometry(p, jc, jcf)).length);
+    expect(cut).toHaveLength(expectedSymbol(p, jc, jcf, 'cut').length);
     expect(cut.length).toBeGreaterThan(1);
     // a parede da janela de 0,90 tem outro desenho com o vão do que sem ele
     const band = (ps: Poly[]): Poly[] => ps.filter((x) => x.pts.some((v) => v.y > 4 && v.y < 6));
@@ -349,8 +381,7 @@ describe('símbolo dos vãos de projeção: o mesmo da planta', () => {
     const text = planDxf(p, 'lv_0');
     const above = polylinesOf(text).filter((x) => x.layer === 'ABERTURA_ACIMA');
     const frame = levelFrames(p, 'lv_0').find((f) => f.wall.id === 'wAlto')!;
-    const screen = openingSymbolPaths(openingGeometry(p, p.elements['dAlta'] as Opening, frame));
-    expect(screen.map((s) => s.pts.length)).toEqual([2, 19]);
+    const screen = expectedSymbol(p, p.elements['dAlta'] as Opening, frame, 'projection-above');
     expect(above).toHaveLength(screen.length);
     screen.forEach((s, i) => {
       expect(above[i]!.closed).toBe(s.closed);

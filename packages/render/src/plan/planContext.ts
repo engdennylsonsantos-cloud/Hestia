@@ -9,10 +9,20 @@ import type { PlanInput } from './build.ts';
  * Pavimento de baixo como referência apagada (D1–D4): o nível e o que ele tem de desenhar. `on` desliga a referência
  * (opção "mostrar o nível de baixo"); `resolve` é a resolução do nível (o app a guarda em cache).
  */
-export function planBelowOf(p: Project, levelId: Id, resolve: (id: Id) => ResolvedLevel, on: boolean): Pick<PlanInput, 'below' | 'belowFloors' | 'belowSlabs' | 'belowRoofs' | 'belowRooms'> {
+/**
+ * Pavimento de referência da planta: a escolha do usuário, se for um nível abaixo do atual; senão o de baixo, que é o
+ * automático. Desligado (`on` falso) ou sem nível abaixo, não há referência. A planta e a captura usam esta função.
+ */
+export function underlayIdOf(p: Project, levelId: Id, on: boolean, choice: Id | null = null): Id | null {
   const idx = p.levels.findIndex((l) => l.id === levelId);
-  if (!on || idx <= 0) return { below: null };
-  const id = p.levels[idx - 1]!.id;
+  if (!on || idx <= 0) return null;
+  const ci = choice ? p.levels.findIndex((l) => l.id === choice) : -1;
+  return ci >= 0 && ci < idx ? p.levels[ci]!.id : p.levels[idx - 1]!.id;
+}
+
+export function planBelowOf(p: Project, levelId: Id, resolve: (id: Id) => ResolvedLevel, on: boolean, choice: Id | null = null): Pick<PlanInput, 'below' | 'belowFloors' | 'belowSlabs' | 'belowRoofs' | 'belowRooms'> {
+  const id = underlayIdOf(p, levelId, on, choice);
+  if (!id) return { below: null };
   return { below: resolve(id), belowFloors: pisosDoNivel(p, id), belowSlabs: lajesDoNivel(p, id), belowRoofs: telhadosDoNivel(p, id), belowRooms: ambientesDoNivel(p, id) };
 }
 

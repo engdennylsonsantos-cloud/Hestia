@@ -33,6 +33,7 @@ import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
 import { SectionViewProps, selectedView } from './SectionViewProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
 import { LevelField } from './LevelField.tsx';
+import { UnderlayRow } from './ViewOptionRows.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { ProfileRow } from './ProfileRow.tsx';
 import { FloorProperties } from './FloorProperties.tsx';
@@ -335,6 +336,7 @@ function ViewProps(): ReactElement {
         <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
+        <UnderlayRow />
         <Row label="Projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => setRoofProjection(v)} /></Row>
         <Row label="Depurar junções"><Check id="v-debugjoins" checked={p.settings.debugJoins} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { debugJoins: v } })} /></Row>
         <Row label="Nível de detalhe" htmlFor="v-detail">

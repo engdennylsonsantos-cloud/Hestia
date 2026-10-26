@@ -21,7 +21,7 @@ const ITEMS: SnapItemDef[] = [
   { key: 'alignment', label: 'Rastreamento Dinâmico', symbol: '☩', shortcut: 'F11', hint: 'Linhas-guia pontilhadas de alinhamento com outros pontos' },
   { key: 'faces', label: 'Faces de Parede', symbol: '⚏', hint: 'Cantos e arestas das faces de acabamento' },
   { key: 'core', label: 'Faces do Núcleo', symbol: '◇', hint: 'Cantos e arestas da alvenaria estrutural' },
-  { key: 'grid', label: 'Grade Modular', symbol: '⊞', hint: 'Pontos ortogonais da grade de desenho' },
+  { key: 'grid', label: 'Pela grade', symbol: '⊞', hint: 'Captura nos pontos da grade visível (passo automático pelo zoom)' },
 ];
 
 const ALL_ON: SnapOptions = {
@@ -147,18 +147,6 @@ export function SnapButton(): ReactElement {
                 </div>
               );
             })}
-          </div>
-
-          <div className="snap-row snap-grid-step">
-            <label htmlFor={`${popId}-grid`}>Espaçamento da grade</label>
-            <select id={`${popId}-grid`} value={String(snap.gridStep ?? 0)} onChange={(e) => setSnap({ gridStep: Number(e.target.value) })}>
-              <option value="0">Automático (pelo zoom)</option>
-              <option value="0.05">0,05 m</option>
-              <option value="0.1">0,10 m</option>
-              <option value="0.25">0,25 m</option>
-              <option value="0.5">0,50 m</option>
-              <option value="1">1,00 m</option>
-            </select>
           </div>
 
           <div className="snap-actions">

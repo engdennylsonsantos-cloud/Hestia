@@ -32,6 +32,8 @@ export interface UiState {
   dialogArg: string | null;
   showGrid: boolean;
   showUnderlay: boolean;
+  /** Pavimento de referência escolhido nas propriedades da vista (null = o de baixo). */
+  underlayLevel: string | null;
   /** Projeção tracejada do contorno da cobertura acima do corte (opção da planta, decisão 0013 §2). */
   showRoofProjection: boolean;
   /** Paleta de propriedades e navegador de projeto abertos. */
@@ -61,7 +63,7 @@ export interface UiState {
 }
 
 const SNAP_KEY = 'hestia.snap';
-const SNAP_FLAGS = Object.keys(DEFAULT_SNAP).filter((k) => k !== 'gridStep') as Array<Exclude<keyof SnapOptions, 'gridStep'>>;
+const SNAP_FLAGS = Object.keys(DEFAULT_SNAP) as Array<keyof SnapOptions>;
 
 /** Capturas guardadas no navegador (preferência da tela, não do projeto). Sem armazenamento ou dado inválido: padrão. */
 function loadSnap(): SnapOptions {
@@ -74,7 +76,6 @@ function loadSnap(): SnapOptions {
       const v = saved[k];
       if (typeof v === 'boolean') out[k] = v;
     }
-    if (typeof saved.gridStep === 'number') out.gridStep = saved.gridStep;
     return out;
   } catch {
     return DEFAULT_SNAP;
@@ -196,6 +197,7 @@ export const useUi = create<UiState>(() => ({
   dialogArg: null,
   showGrid: true,
   showUnderlay: true,
+  underlayLevel: null,
   showRoofProjection: readRoofProjection(),
   propsOpen: typeof window === 'undefined' || window.innerWidth > 900,
   browserOpen: typeof window === 'undefined' || window.innerWidth > 900,

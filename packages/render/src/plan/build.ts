@@ -29,7 +29,7 @@ import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from
 import { buildPlanOverlay } from './planOverlay.ts';
 
 export { buildPlanOverlay, buildPlanScreenOverlay } from './planOverlay.ts';
-export { planBelowOf } from './planContext.ts';
+export { planBelowOf, underlayIdOf } from './planContext.ts';
 
 export interface PlanInput {
   project: Project;
@@ -67,8 +67,6 @@ export interface PlanInput {
   preview: PreviewItem[];
   inference: Inference | null;
   showGrid: boolean;
-  /** Espaçamento da grade em metros (0 ou ausente = automático pelo zoom). */
-  gridStep?: number;
   /**
    * Linhas finas só na tela (decisão 0015): todo traço sai com 1 px. Padrão desligado; a composição de pranchas, o PDF e
    * o DXF não passam a opção, então usam os pesos reais. Não lê o modelo: quem chama decide.
@@ -327,7 +325,7 @@ export function buildPlanDrawList(input: PlanInput): PlanDrawList {
   const zoom = input.viewport.zoom;
   const g = resolverZoom(buildPlanGeometry(input), zoom);
   const o = resolverZoom(buildPlanOverlay(input), zoom);
-  const grid = input.showGrid ? gridStrokes(input.viewport, input.theme, input.gridStep) : [];
+  const grid = input.showGrid ? gridStrokes(input.viewport, input.theme) : [];
   return {
     background: input.theme.bg,
     fills: [...g.fills, ...o.fills],

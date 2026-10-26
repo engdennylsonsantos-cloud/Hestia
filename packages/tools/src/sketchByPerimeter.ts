@@ -140,6 +140,6 @@ export function perimeterFromBox(ctx: SketchCtx, boxMin: Vec2, boxMax: Vec2): Pe
   if (!shape.some((poly) => poly.length > 1)) warnings.push('Contorno aberto: as paredes da caixa não fecham um circuito.');
 
   const segs = ringToSegs(best[0]!, exteriorCircles(ctx, walls));
-  if (segs.length < 3) warnings.push('O contorno precisa de ao menos 3 lados.');
+  if (segs.length === 0) warnings.push('O contorno não tem área: menos de 3 pontos.');
   return { segs, warnings };
 }

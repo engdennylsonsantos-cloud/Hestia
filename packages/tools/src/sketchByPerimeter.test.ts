@@ -91,4 +91,18 @@ describe('contorno externo pela caixa (perimeterFromBox)', () => {
     expect(apex.x).toBeLessThan(-1.0);
     expect(apex.x).toBeGreaterThan(-1.2);
   });
+  it('círculo fechado por dois semicírculos: o anel inteiro sai como dois arcos sobre a face externa', () => {
+    // Dois arcos de 180° (flecha = meia corda = 2 m) formam um círculo de eixo R = 2 m; a face externa tem R + 0,092.
+    const walls = [wall('n', { x: 0, y: -2 }, { x: 0, y: 2 }, 2), wall('s', { x: 0, y: 2 }, { x: 0, y: -2 }, 2)];
+    const { ctx } = sceneWith(walls);
+    const r = perimeterFromBox(ctx, BOX.min, BOX.max);
+    expect(r.warnings).toEqual([]);
+    expect(r.segs).toHaveLength(2);
+    expect(closed(r.segs)).toBe(true);
+    for (const g of r.segs) {
+      expect(g.sag).toBeDefined();
+      expect(Math.abs(g.sag!)).toBeCloseTo(2 + D, 2);
+      expect(Math.hypot(g.a.x, g.a.y)).toBeCloseTo(2 + D, 2);
+    }
+  });
 });

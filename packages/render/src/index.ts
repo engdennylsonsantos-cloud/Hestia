@@ -12,6 +12,12 @@ export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
 export * from './model3d/openingParts.ts';
+// Recursos de GPU da cena 3D (Fase 2.1/2.2): orçamento contábil, lotes por categoria/material e instâncias.
+export { OrcamentoVram, TETO_VRAM_PADRAO } from './gpu/orcamento.ts';
+export { GestorRecursosGpu, type OpcoesAtualizacao, type OpcoesGestor, type ResultadoGestor } from './gpu/gestorRecursos.ts';
+export { caixaDePosicoes, LoteGeometriaGpu, mesclarLotes, unirCaixas, type Caixa, type DadosLote } from './gpu/loteGeometria.ts';
+export { LoteLinhasGpu } from './gpu/loteLinhas.ts';
+export { caixaDeMatrizes, InstanciasGpu } from './gpu/instanciasGpu.ts';
 export * from './section/build.ts';
 export * from './section/pick.ts';
 export { sectionStyleOf, type SectionStyle } from './section/style.ts';

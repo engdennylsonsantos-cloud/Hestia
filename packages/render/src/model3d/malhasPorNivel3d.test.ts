@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { resolveLevel, type ResolvedLevel } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeLevel, makeWall, type Command, type Id, type Project, type View3DSettings } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeWall, view3dOf, type Command, type Id, type Project, type View3DSettings } from '@hestia/model';
 import { ModelScene, type Scene3DOptions } from './scene3d.ts';
 
 /** Projeto com `n` pavimentos (cota de 3 m) e quatro paredes por nível, como o gerador do baseline de 20 pavimentos. */
@@ -31,13 +31,20 @@ function comParede(p: Project, i: number, j: number, dx: number): Project {
   return { ...p, elements: { ...p.elements, [w.id]: { ...w, b: { x: w.b.x + dx, y: w.b.y } } } };
 }
 
+/** Projeto com a parede `j` do pavimento `i` transladada em x (mesmo comprimento: mesma contagem de caixas/arestas). */
+function deslocarParede(p: Project, i: number, j: number, dx: number): Project {
+  const w = p.elements[`mn_w_${i}_${j}`];
+  if (!w || w.kind !== 'wall') throw new Error('parede de teste não encontrada');
+  return { ...p, elements: { ...p.elements, [w.id]: { ...w, a: { x: w.a.x + dx, y: w.a.y }, b: { x: w.b.x + dx, y: w.b.y } } } };
+}
+
 const niveis = (p: Project): ResolvedLevel[] => p.levels.map((l) => resolveLevel(p, l.id));
 const OPT: Scene3DOptions = { edges: false, shadows: false, dark: false };
 
-/** Grupos de pavimento na cena (filhos diretos do modelo, na ordem dos níveis). */
+/** Grupos de pavimento na cena (filhos diretos do modelo, na ordem dos níveis). Os lotes globais de GPU não são grupos de nível. */
 function grupos(ms: ModelScene): THREE.Object3D[] {
   const modelo = ms.scene.children.find((c): c is THREE.Group => c instanceof THREE.Group)!;
-  return [...modelo.children];
+  return modelo.children.filter((c) => c.userData.levelId !== undefined);
 }
 
 /** Malhas de faces e de arestas de uma árvore de objetos. */
@@ -178,5 +185,36 @@ describe('malhas por nível na atualização da cena', () => {
     const nova = new ModelScene();
     nova.update(p2, niveis(p2), OPT);
     expect(contar(ms.scene)).toEqual(contar(nova.scene));
+  });
+
+  it('editar um nível reenvia só a faixa dos níveis refeitos (caixas e arestas), não o buffer inteiro', () => {
+    const base = predio(6);
+    const p: Project = { ...base, view3d: { ...view3dOf(base), edges: true } };
+    const ms = new ModelScene();
+    ms.update(p, niveis(p), OPT);
+    const instanciadas: THREE.InstancedMesh[] = [];
+    let linha: THREE.LineSegments | null = null;
+    ms.scene.traverse((o) => {
+      if (o instanceof THREE.InstancedMesh) instanciadas.push(o);
+      else if (o instanceof THREE.LineSegments && !(o instanceof THREE.GridHelper)) linha = o;
+    });
+    expect(instanciadas.length).toBeGreaterThan(0);
+    expect(linha).not.toBeNull();
+    for (const m of instanciadas) m.instanceMatrix.clearUpdateRanges();
+    const posLinha = (linha as unknown as THREE.LineSegments).geometry.getAttribute('position') as THREE.BufferAttribute;
+    posLinha.clearUpdateRanges();
+
+    const p2: Project = { ...deslocarParede(p, 2, 1, 0.2), view3d: p.view3d };
+    ms.update(p2, niveis(p2), OPT);
+
+    const totalInstancias = instanciadas.reduce((s, m) => s + m.instanceMatrix.array.length / 16, 0);
+    const enviadoInstancias = instanciadas.reduce((s, m) => s + m.instanceMatrix.updateRanges.reduce((a, r) => a + r.count / 16, 0), 0);
+    expect(enviadoInstancias).toBeGreaterThan(0);
+    expect(enviadoInstancias).toBeLessThan(totalInstancias);
+
+    const totalLinha = posLinha.array.length;
+    const enviadoLinha = posLinha.updateRanges.reduce((a, r) => a + r.count, 0);
+    expect(enviadoLinha).toBeGreaterThan(0);
+    expect(enviadoLinha).toBeLessThan(totalLinha);
   });
 });

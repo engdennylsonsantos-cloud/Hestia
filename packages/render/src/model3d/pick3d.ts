@@ -110,18 +110,28 @@ export function pickElement(root: THREE.Object3D, camera: THREE.Camera, ndc: { x
   return best ? { id: best.id, point: best.point, kind: best.kind } : null;
 }
 
-const bvhs = new WeakMap<THREE.BufferGeometry, TriBvh | null>();
+const bvhs = new WeakMap<THREE.BufferGeometry, { bvh: TriBvh | null; versao: number }>();
 
-/** BVH da geometria da malha, montado uma vez por instância de geometria (geometria nova = cache novo). */
+/**
+ * BVH da geometria da malha, montado uma vez por versão da geometria. Os lotes globais da cena 3D são atualizados no
+ * mesmo `BufferGeometry` (envio parcial); `geometry.userData.versao` diz quando o BVH ficou velho. O BVH cobre só o que
+ * o `drawRange` desenha, não a capacidade inteira do buffer.
+ */
 function bvhOf(m: THREE.Mesh): TriBvh | null {
   const g = m.geometry;
-  let bvh = bvhs.get(g);
-  if (bvh === undefined) {
-    const pos = g.getAttribute('position');
-    const idx = g.getIndex();
-    bvh = pos && idx && !(pos instanceof THREE.InterleavedBufferAttribute) ? buildTriBvh(pos.array, idx.array) : null;
-    bvhs.set(g, bvh);
+  const versao = Number(g.userData.versao ?? 0);
+  const emCache = bvhs.get(g);
+  if (emCache && emCache.versao === versao) return emCache.bvh;
+  const pos = g.getAttribute('position');
+  const idx = g.getIndex();
+  const limite = Number.isFinite(g.drawRange.count) ? Math.min(g.drawRange.count, idx?.count ?? 0) : idx?.count ?? 0;
+  let bvh: TriBvh | null = null;
+  if (pos && idx && !(pos instanceof THREE.InterleavedBufferAttribute) && limite > 0) {
+    const todos = idx.array as Uint16Array | Uint32Array;
+    const indices = limite === todos.length ? todos : todos.subarray(0, limite);
+    bvh = buildTriBvh(pos.array, indices);
   }
+  bvhs.set(g, { bvh, versao });
   return bvh;
 }
 

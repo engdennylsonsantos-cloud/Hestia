@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { coreSpan, createEmptyProject, makeWall, openingFrame, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
-import { buildOpeningModel } from './openingModel.ts';
-import type { OpeningPart, PartBox } from './openingModelTypes.ts';
+import { buildOpeningModel, partTransformed, projectParts, slicePartsAtZ } from './openingModel.ts';
+import { CLOSED, type OpeningPart, type PartBox } from './openingModelTypes.ts';
 
 interface Cena {
   p: Project;
@@ -400,6 +400,161 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
     expect(verga.box.z0).toBeCloseTo(2.1, 9);
     expect(contra.box.t1 - contra.box.t0).toBeCloseTo(0.9 + 0.4, 9);
     expect(contra.box.z1).toBeCloseTo(0, 9);
+  });
+});
+
+describe('buildOpeningModel: as dez famílias nas quatro combinações', () => {
+  const familias: Array<{ nome: string; base: string; extra?: Partial<OpeningType> }> = [
+    { nome: 'porta de giro', base: 'ot_p90' },
+    { nome: 'porta dupla', base: 'ot_p160' },
+    { nome: 'porta de correr', base: 'ot_pc160' },
+    { nome: 'porta pivotante', base: 'ot_pp80' },
+    { nome: 'vão de porta', base: 'ot_vao90' },
+    { nome: 'janela fixa', base: 'ot_jfixa60' },
+    { nome: 'janela basculante', base: 'ot_j60', extra: { plan: 'tilt' } },
+    { nome: 'janela maxim-ar', base: 'ot_j60' },
+    { nome: 'janela de correr 2', base: 'ot_j120' },
+    { nome: 'janela de correr 3', base: 'ot_j240' },
+    { nome: 'vão de janela', base: 'ot_jv120' },
+  ];
+
+  it('ids únicos e estáveis, caixas válidas e nada fora do vão exceto os acabamentos', () => {
+    const permitidosFora = new Set<OpeningPart['role']>(['casing', 'sillBoard', 'lintel', 'sillBeam']);
+    const deBatente = new Set<OpeningPart['role']>(['jamb', 'stop', 'head', 'sillFrame', 'track']);
+    for (const familia of familias) {
+      for (const flipHand of [false, true]) {
+        for (const flipFacing of [false, true]) {
+          const c = cena(familia.base, familia.extra ?? {}, { flipHand, flipFacing });
+          const m = modelo(c);
+          const caso = `${familia.nome} hand=${flipHand} facing=${flipFacing}`;
+          expect(new Set(m.parts.map((x) => x.id)).size, caso).toBe(m.parts.length);
+          expect(m.parts.map((x) => x.id)).toEqual(modelo(c).parts.map((x) => x.id));
+          for (const p of m.parts) {
+            expect(p.box.t1 - p.box.t0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);
+            expect(p.box.s1 - p.box.s0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);
+            expect(p.box.z1 - p.box.z0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);
+            if (!permitidosFora.has(p.role)) {
+              expect(Math.abs(p.box.t0), `${caso} ${p.id}`).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
+              expect(Math.abs(p.box.t1), `${caso} ${p.id}`).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
+              expect(p.box.z0, `${caso} ${p.id}`).toBeGreaterThanOrEqual(-1e-9);
+              expect(p.box.z1, `${caso} ${p.id}`).toBeLessThanOrEqual(c.g.height + 1e-9);
+            }
+            if (deBatente.has(p.role)) {
+              expect(p.box.s0, `${caso} ${p.id}`).toBeGreaterThanOrEqual(m.core.s0 - 1e-9);
+              expect(p.box.s1, `${caso} ${p.id}`).toBeLessThanOrEqual(m.core.s1 + 1e-9);
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('partTransformed, slicePartsAtZ e projectParts', () => {
+  const media = (a: { t: number; s: number; z: number }, b: { t: number; s: number; z: number }) => ({
+    t: (a.t + b.t) / 2,
+    s: (a.s + b.s) / 2,
+    z: (a.z + b.z) / 2,
+  });
+
+  it('folha de giro a π/2: centro vai para o lado side, a dobradiça fica e o comprimento se mantém', () => {
+    for (const flipHand of [false, true]) {
+      for (const flipFacing of [false, true]) {
+        const c = cena('ot_p90', {}, { flipHand, flipFacing });
+        const f = folha(modelo(c).parts);
+        const motion = f.motion;
+        if (!motion || motion.kind !== 'rotate' || motion.axis !== 'z') throw new Error('folha sem giro em z');
+        const ob = partTransformed(f, { angle: Math.PI / 2, slide: 0 });
+        const caso = `hand=${flipHand} facing=${flipFacing}`;
+        expect(ob.center.t, caso).toBeCloseTo(motion.t, 9);
+        expect(Math.sign(ob.center.s - motion.s), caso).toBe(flipFacing ? -1 : 1);
+        expect(Math.abs(ob.center.s - motion.s), caso).toBeCloseTo((f.box.t1 - f.box.t0) / 2, 9);
+        const hingeLeft = Math.abs(f.box.t0 - motion.t) < 1e-9;
+        const [hi0, hi1, li0, li1] = hingeLeft ? [0, 3, 1, 2] : [1, 2, 0, 3];
+        const hinge = media(ob.corners[hi0]!, ob.corners[hi1]!);
+        expect(hinge.t, caso).toBeCloseTo(motion.t, 9);
+        expect(hinge.s, caso).toBeCloseTo(motion.s, 9);
+        expect(hinge.z, caso).toBeCloseTo(f.box.z0, 9);
+        const latch = media(ob.corners[li0]!, ob.corners[li1]!);
+        expect(Math.hypot(latch.t - hinge.t, latch.s - hinge.s), caso).toBeCloseTo(f.box.t1 - f.box.t0, 9);
+      }
+    }
+  });
+
+  it('maxim-ar: o eixo é o topo da folha e a folha aberta vai para side', () => {
+    const c = cena('ot_j60');
+    const m = modelo(c);
+    const vidro = de(m.parts, 'glass')[0]!;
+    const motion = vidro.motion;
+    if (!motion || motion.kind !== 'rotate' || motion.axis !== 't') throw new Error('maxim-ar sem giro em t');
+    expect(motion.z).toBeCloseTo(c.g.height - 0.05, 9);
+    const ob = partTransformed(vidro, { angle: Math.PI / 2, slide: 0 });
+    expect(ob.center.z).toBeCloseTo(motion.z, 9);
+    expect(Math.sign(ob.center.s - motion.s)).toBe(c.g.flipFacing ? -1 : 1);
+  });
+
+  it('correr: a folha móvel desloca travel em t e continua dentro do vão', () => {
+    const c = cena('ot_pc160');
+    const m = modelo(c);
+    const movel = de(m.parts, 'leaf').find((f) => f.motion?.kind === 'slide' && f.motion.travel > 0);
+    if (!movel || movel.motion?.kind !== 'slide') throw new Error('sem folha móvel');
+    const antes = partTransformed(movel, CLOSED);
+    const depois = partTransformed(movel, { angle: 0, slide: 1 });
+    expect(depois.center.t - antes.center.t).toBeCloseTo(movel.motion.dt * movel.motion.travel, 9);
+    expect(depois.bounds.t0).toBeGreaterThanOrEqual(-c.g.width / 2 - 1e-9);
+    expect(depois.bounds.t1).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
+  });
+
+  it('corte a 1,5 m da porta de giro: duas ombreiras (corpo e batedor, 4 anéis) e a folha', () => {
+    const m = modelo(cena('ot_p90'));
+    const corte = slicePartsAtZ(m, 1.5, CLOSED);
+    expect(corte.filter((x) => x.part.role === 'jamb' || x.part.role === 'stop')).toHaveLength(4);
+    expect(corte.some((x) => x.part.role === 'head')).toBe(false);
+    const f = corte.find((x) => x.part.role === 'leaf')!;
+    const ts = f.ring.map((p) => p.t);
+    const ss = f.ring.map((p) => p.s);
+    expect(Math.max(...ts) - Math.min(...ts)).toBeCloseTo(2 * 0.411, 9);
+    expect(Math.max(...ss) - Math.min(...ss)).toBeCloseTo(0.04, 9);
+  });
+
+  it('corte a 2,3 m devolve só a verga quando o tipo tem', () => {
+    const m = modelo(cena('ot_p90', { lintel: { height: 0.2 } }));
+    const corte = slicePartsAtZ(m, 2.3, CLOSED);
+    expect(corte).toHaveLength(1);
+    expect(corte[0]!.part.role).toBe('lintel');
+  });
+
+  it('elevação (axis s): retângulos de batente, folha, vidro e maçaneta', () => {
+    const proj = projectParts(modelo(cena('ot_p90', { leafStyle: 'glass' })), 's', CLOSED);
+    const roles = new Set(proj.map((x) => x.part.role));
+    for (const r of ['jamb', 'stop', 'head', 'leaf', 'glass', 'handle'] as const) expect(roles.has(r), r).toBe(true);
+    for (const x of proj) expect(x.ring, x.part.id).toHaveLength(4);
+  });
+
+  it('elevação: leafStyle panel devolve as 4 almofadas', () => {
+    const proj = projectParts(modelo(cena('ot_p90', { leafStyle: 'panel' })), 's', CLOSED);
+    expect(proj.filter((x) => x.part.role === 'leafPanel')).toHaveLength(4);
+  });
+
+  it('elevação: grid 2×2 na janela fixa devolve 1 montante vertical e 1 horizontal', () => {
+    const proj = projectParts(modelo(cena('ot_jfixa60', { grid: { cols: 2, rows: 2 } })), 's', CLOSED);
+    const muntins = proj.filter((x) => x.part.role === 'muntin');
+    expect(muntins).toHaveLength(2);
+    const dimensoes = muntins.map((x) => {
+      const us = x.ring.map((p) => p.u);
+      const zs = x.ring.map((p) => p.z);
+      return { w: Math.max(...us) - Math.min(...us), h: Math.max(...zs) - Math.min(...zs) };
+    });
+    expect(dimensoes.filter((d) => d.w < d.h)).toHaveLength(1);
+    expect(dimensoes.filter((d) => d.h < d.w)).toHaveLength(1);
+  });
+
+  it('corte transversal (axis t) devolve anéis em (s, z) e profundidade ordenável', () => {
+    const proj = projectParts(modelo(cena('ot_p90')), 't', CLOSED);
+    const folhaProj = proj.find((x) => x.part.role === 'leaf')!;
+    const ss = folhaProj.ring.map((p) => p.u);
+    expect(Math.max(...ss) - Math.min(...ss)).toBeCloseTo(0.04, 9);
+    expect(Number.isFinite(folhaProj.depth)).toBe(true);
   });
 });
 

@@ -22,7 +22,16 @@ import {
 } from '@hestia/model';
 import type { WallFrame } from './frame.ts';
 import type { OpeningGeometry } from './types.ts';
-import type { LeafOpening, OpeningModel, OpeningPart, PartBox, PartMaterial, PartMotion, PartRole } from './openingModelTypes.ts';
+import type {
+  LeafOpening,
+  OpeningModel,
+  OpeningPart,
+  OpenState,
+  PartBox,
+  PartMaterial,
+  PartMotion,
+  PartRole,
+} from './openingModelTypes.ts';
 
 /** Folga padrão da esquadria (m). */
 const GAP = 0.004;
@@ -270,6 +279,7 @@ function addLeafDetails(
 function addHandle(
   c: Ctx,
   index: number,
+  tCenter: number,
   sSpan: { s0: number; s1: number },
   z0: number,
   z1: number,
@@ -279,8 +289,8 @@ function addHandle(
   if (c.handle === 'none') return;
   const z = Math.min(Math.max(1.0, z0 + 0.05), z1 - 0.05);
   const sMid = (sSpan.s0 + sSpan.s1) / 2;
-  const inward = Math.sign(latchT) || 1;
-  const tR = latchT - inward * 0.06;
+  const inward = Math.sign(tCenter - latchT) || 1;
+  const tR = latchT + inward * 0.06;
   const opts: AddOptions = { motion, leaf: index };
   if (c.handle === 'pull') {
     const sCenter = sMid + c.side * (c.L / 2 + 0.015);
@@ -311,7 +321,7 @@ function addHandle(
       box(tR - 0.025, tR + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025),
       opts,
     );
-    const tHaste = tR - inward * 0.065;
+    const tHaste = tR + inward * 0.065;
     addPart(
       c,
       `handle-${index}-lever-${face < 0 ? 'a' : 'b'}`,
@@ -354,7 +364,7 @@ function addDoorLeaf(
     addPart(c, `leaf-${index}`, 'leaf', 'leaf', box(ta, tb, sSpan.s0, sSpan.s1, z.z0, z.z1), opts);
     addLeafDetails(c, index, ta, tb, sSpan, z.z0, z.z1, motion);
   }
-  addHandle(c, index, sSpan, z.z0, z.z1, latchT, motion);
+  addHandle(c, index, (ta + tb) / 2, sSpan, z.z0, z.z1, latchT, motion);
 }
 
 /** Folha de giro (uma ou duas), com a maçaneta e os detalhes do estilo. */
@@ -774,4 +784,228 @@ export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f:
     openings: c.openings,
     void: g.leaves === 0,
   };
+}
+
+/** Ponto no sistema local do vão. */
+export interface ModelPoint {
+  t: number;
+  s: number;
+  z: number;
+}
+
+/**
+ * Caixa orientada depois do movimento: 8 vértices (base 0..3 e topo 4..7, no sentido t0s0, t1s0, t1s1, t0s1), o
+ * centro e a caixa alinhada que a contém.
+ */
+export interface OrientedBox {
+  corners: ModelPoint[];
+  center: ModelPoint;
+  bounds: PartBox;
+}
+
+/** Anel de corte a uma altura `z`, em (t, s). */
+export interface SliceRing {
+  part: OpeningPart;
+  ring: Array<{ t: number; s: number }>;
+}
+
+/** Retângulo projetado numa vista: `u` é a horizontal (t na elevação, s no corte) e `z` a altura. */
+export interface ProjectedRing {
+  part: OpeningPart;
+  ring: Array<{ u: number; z: number }>;
+  /** Profundidade média no eixo de visão, para a ordem de pintura. */
+  depth: number;
+}
+
+const BOX_EDGES: ReadonlyArray<readonly [number, number]> = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 0],
+  [4, 5],
+  [5, 6],
+  [6, 7],
+  [7, 4],
+  [0, 4],
+  [1, 5],
+  [2, 6],
+  [3, 7],
+];
+
+function boxCorners(b: PartBox): ModelPoint[] {
+  const { t0, t1, s0, s1, z0, z1 } = b;
+  return [
+    { t: t0, s: s0, z: z0 },
+    { t: t1, s: s0, z: z0 },
+    { t: t1, s: s1, z: z0 },
+    { t: t0, s: s1, z: z0 },
+    { t: t0, s: s0, z: z1 },
+    { t: t1, s: s0, z: z1 },
+    { t: t1, s: s1, z: z1 },
+    { t: t0, s: s1, z: z1 },
+  ];
+}
+
+function movePoint(p: ModelPoint, motion: PartMotion | undefined, state: OpenState): ModelPoint {
+  if (!motion) return { ...p };
+  if (motion.kind === 'slide') {
+    const k = Math.min(1, Math.max(0, Number.isFinite(state.slide) ? state.slide : 0));
+    return {
+      t: p.t + motion.dt * motion.travel * k,
+      s: p.s + motion.ds * motion.travel * k,
+      z: p.z + motion.dz * motion.travel * k,
+    };
+  }
+  const angle = Number.isFinite(state.angle) ? state.angle : 0;
+  const phi = motion.sign * angle;
+  const cos = Math.cos(phi);
+  const sin = Math.sin(phi);
+  if (motion.axis === 'z') {
+    const dt = p.t - motion.t;
+    const ds = p.s - motion.s;
+    return { t: motion.t + dt * cos - ds * sin, s: motion.s + dt * sin + ds * cos, z: p.z };
+  }
+  const ds = p.s - motion.s;
+  const dz = p.z - motion.z;
+  return { t: p.t, s: motion.s + ds * cos - dz * sin, z: motion.z + ds * sin + dz * cos };
+}
+
+/** Caixa orientada da peça depois de aplicar o estado de abertura (`angle` em radianos, `slide` 0..1). */
+export function partTransformed(part: OpeningPart, state: OpenState): OrientedBox {
+  const corners = boxCorners(part.box).map((p) => movePoint(p, part.motion, state));
+  let t0 = Infinity;
+  let t1 = -Infinity;
+  let s0 = Infinity;
+  let s1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  let ct = 0;
+  let cs = 0;
+  let cz = 0;
+  for (const p of corners) {
+    t0 = Math.min(t0, p.t);
+    t1 = Math.max(t1, p.t);
+    s0 = Math.min(s0, p.s);
+    s1 = Math.max(s1, p.s);
+    z0 = Math.min(z0, p.z);
+    z1 = Math.max(z1, p.z);
+    ct += p.t;
+    cs += p.s;
+    cz += p.z;
+  }
+  return {
+    corners,
+    center: { t: ct / corners.length, s: cs / corners.length, z: cz / corners.length },
+    bounds: { t0, t1, s0, s1, z0, z1 },
+  };
+}
+
+function addUnique(list: Array<{ t: number; s: number }>, p: { t: number; s: number }): void {
+  for (const q of list) if (Math.abs(q.t - p.t) < 1e-9 && Math.abs(q.s - p.s) < 1e-9) return;
+  list.push(p);
+}
+
+function polygonArea(ring: Array<{ t: number; s: number }>): number {
+  let a = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i]!;
+    const q = ring[(i + 1) % ring.length]!;
+    a += p.t * q.s - q.t * p.s;
+  }
+  return a / 2;
+}
+
+function crossSection(corners: ModelPoint[], z: number): Array<{ t: number; s: number }> {
+  const pts: Array<{ t: number; s: number }> = [];
+  const eps = 1e-9;
+  for (const [ia, ib] of BOX_EDGES) {
+    const a = corners[ia]!;
+    const b = corners[ib]!;
+    const za = a.z - z;
+    const zb = b.z - z;
+    if (Math.abs(za) <= eps && Math.abs(zb) <= eps) {
+      addUnique(pts, { t: a.t, s: a.s });
+      addUnique(pts, { t: b.t, s: b.s });
+    } else if (Math.abs(za) <= eps) {
+      addUnique(pts, { t: a.t, s: a.s });
+    } else if (Math.abs(zb) <= eps) {
+      addUnique(pts, { t: b.t, s: b.s });
+    } else if (za * zb < 0) {
+      const k = za / (za - zb);
+      addUnique(pts, { t: a.t + (b.t - a.t) * k, s: a.s + (b.s - a.s) * k });
+    }
+  }
+  if (pts.length < 3) return [];
+  let ct = 0;
+  let cs = 0;
+  for (const p of pts) {
+    ct += p.t;
+    cs += p.s;
+  }
+  ct /= pts.length;
+  cs /= pts.length;
+  pts.sort((p, q) => Math.atan2(p.s - cs, p.t - ct) - Math.atan2(q.s - cs, q.t - ct));
+  return Math.abs(polygonArea(pts)) > 1e-12 ? pts : [];
+}
+
+/** Corte horizontal do modelo na altura `z`, no estado pedido: as peças que o plano atravessa com o anel (t, s). */
+export function slicePartsAtZ(m: OpeningModel, z: number, state: OpenState): SliceRing[] {
+  const out: SliceRing[] = [];
+  for (const part of m.parts) {
+    const ob = partTransformed(part, state);
+    if (z < ob.bounds.z0 - 1e-9 || z > ob.bounds.z1 + 1e-9) continue;
+    const ring = crossSection(ob.corners, z);
+    if (ring.length) out.push({ part, ring });
+  }
+  return out;
+}
+
+function convexHull(points: Array<{ u: number; z: number }>): Array<{ u: number; z: number }> {
+  const pts = [...points].sort((a, b) => a.u - b.u || a.z - b.z);
+  const uniq: Array<{ u: number; z: number }> = [];
+  for (const p of pts) {
+    const last = uniq[uniq.length - 1];
+    if (!last || Math.abs(last.u - p.u) > 1e-9 || Math.abs(last.z - p.z) > 1e-9) uniq.push(p);
+  }
+  if (uniq.length <= 2) return uniq;
+  const cross = (o: { u: number; z: number }, a: { u: number; z: number }, b: { u: number; z: number }): number =>
+    (a.u - o.u) * (b.z - o.z) - (a.z - o.z) * (b.u - o.u);
+  const lower: Array<{ u: number; z: number }> = [];
+  for (const p of uniq) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Array<{ u: number; z: number }> = [];
+  for (let i = uniq.length - 1; i >= 0; i--) {
+    const p = uniq[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+/**
+ * Projeção ortográfica das peças: `axis = 's'` é a elevação (horizontal em `t`, observada ao longo de `s`); `axis =
+ * 't'` é o corte transversal (horizontal em `s`, observado ao longo de `t`).
+ */
+export function projectParts(m: OpeningModel, axis: 's' | 't', state: OpenState): ProjectedRing[] {
+  const out: ProjectedRing[] = [];
+  for (const part of m.parts) {
+    const ob = partTransformed(part, state);
+    let depth = 0;
+    const projected = ob.corners.map((p) => {
+      if (axis === 's') {
+        depth += p.s;
+        return { u: p.t, z: p.z };
+      }
+      depth += p.t;
+      return { u: p.s, z: p.z };
+    });
+    const ring = convexHull(projected);
+    if (ring.length < 3) continue;
+    out.push({ part, ring, depth: depth / ob.corners.length });
+  }
+  return out;
 }

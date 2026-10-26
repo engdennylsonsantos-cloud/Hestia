@@ -283,6 +283,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
     categoryHidden: roofOff,
     showProjection: input.showRoofProjection !== false,
     paint: paint.roof,
+    classes: view?.cls,
   }, style.scale);
   addOps(rf, paint.roof, true);
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.

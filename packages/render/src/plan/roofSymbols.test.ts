@@ -71,13 +71,13 @@ describe('pegada tracejada rosa com balanço', () => {
     projetoCom(makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: EAVE, footprint: FOOT, edgeOverhangs: [0.5, 0.5, 0.5, 0.5], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: P(1, 0), ...over }));
   const rosas = (strokes: StrokeOp[]) => strokes.filter((s) => s.color === LIGHT.roofFootprint);
 
-  it('telhado visível com footprint 4×2 e balanço 0,5: uma linha tracejada rosa na espessura de projeção no contorno da pegada', () => {
+  it('telhado visível com footprint 4×2 e balanço 0,5: uma linha tracejada rosa, mais fina que a projeção, no contorno da pegada', () => {
     const fills = roofFills(roofCom({}), 'lv_0', LIGHT, false, 'medium', VIEW);
     const pink = rosas(fills.strokes);
     expect(pink).toHaveLength(1);
     expect(pink[0]!.pts).toEqual(FOOT);
     expect(pink[0]!.closed).toBe(true);
-    expect(pink[0]!.widthPx).toBe(defaultPaint('roof', 100).projPx);
+    expect(pink[0]!.widthPx).toBeLessThan(defaultPaint('roof', 100).projPx);
     expect(pink[0]!.dash).toEqual([6, 3]);
   });
 

@@ -4,7 +4,7 @@ import { ProjectStore, createEmptyProject, makeRoof, type Project } from '@hesti
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { roofOps } from './roofs.ts';
-import { corDaAresta, TONE_45, tomDaAgua } from './roofsAgua.ts';
+import { corDaAresta, DEFAULT_SUN_AZIMUTH, direcaoDoSol, TONE_45, tomDaAgua } from './roofsAgua.ts';
 import { DARK, LIGHT, type PlanTheme } from './types.ts';
 
 const P = (x: number, y: number) => ({ x, y });
@@ -45,29 +45,35 @@ function semMaterialDeTelha(): Project {
   return { ...p, materials: materiais };
 }
 
-describe('tomDaAgua: luz fixa de noroeste e inclinação', () => {
+describe('tomDaAgua: sol do 3D e inclinação', () => {
   it('água plana fica com a cor base pura', () => {
     expect(tomDaAgua(BASE, P(0, 1), 0)).toBe(BASE);
     expect(tomDaAgua(BASE, P(1, 0), 0)).toBe(BASE);
     expect(tomDaAgua(BASE, P(0, -1), 0)).toBe(BASE);
   });
 
-  it('a 45° com a queda voltada para a luz clareia e na direção oposta escurece em cerca de 14 %', () => {
-    expect(tomDaAgua(BASE, P(Math.SQRT1_2, -Math.SQRT1_2), 100)).toBe(mix(BASE, '#ffffff', TONE_45));
-    expect(tomDaAgua(BASE, P(-Math.SQRT1_2, Math.SQRT1_2), 100)).toBe(mix(BASE, '#000000', TONE_45));
+  it('a 45° com a queda voltada para o sol clareia e na direção oposta escurece em cerca de 22 %', () => {
+    // Azimute 0 = leste: a luz vem de +x. A água de `up` para oeste desce para leste (para o sol).
+    expect(tomDaAgua(BASE, P(-1, 0), 100, 0)).toBe(mix(BASE, '#ffffff', TONE_45));
+    expect(tomDaAgua(BASE, P(1, 0), 100, 0)).toBe(mix(BASE, '#000000', TONE_45));
   });
 
-  it('as quatro orientações de 45°: queda para norte e oeste clareia; para sul e leste escurece', () => {
+  it('a luz padrão é a do sol do 3D (azimute 324,46°), não mais uma constante de noroeste', () => {
+    const luz = direcaoDoSol(DEFAULT_SUN_AZIMUTH);
+    // A água que desce na direção do sol é a mais clara; a oposta, a mais escura.
+    expect(tomDaAgua(BASE, P(-luz.x, -luz.y), 100)).toBe(mix(BASE, '#ffffff', TONE_45));
+    expect(tomDaAgua(BASE, P(luz.x, luz.y), 100)).toBe(mix(BASE, '#000000', TONE_45));
+    expect(DEFAULT_SUN_AZIMUTH).toBe(324.46);
+  });
+
+  it('as orientações cardeais a 45° com o sol a leste: leste clareia, oeste escurece, norte e sul ficam na base', () => {
     // `up` aponta para o lado alto; a queda é o sentido oposto.
-    const desceSul = tomDaAgua(BASE, P(0, 1), 100);
-    const desceNorte = tomDaAgua(BASE, P(0, -1), 100);
-    const desceLeste = tomDaAgua(BASE, P(-1, 0), 100);
-    const desceOeste = tomDaAgua(BASE, P(1, 0), 100);
-    const passo = TONE_45 * Math.SQRT1_2;
-    expect(desceNorte).toBe(mix(BASE, '#ffffff', passo));
-    expect(desceOeste).toBe(mix(BASE, '#ffffff', passo));
-    expect(desceSul).toBe(mix(BASE, '#000000', passo));
-    expect(desceLeste).toBe(mix(BASE, '#000000', passo));
+    const desceLeste = tomDaAgua(BASE, P(-1, 0), 100, 0);
+    const desceOeste = tomDaAgua(BASE, P(1, 0), 100, 0);
+    expect(desceLeste).toBe(mix(BASE, '#ffffff', TONE_45));
+    expect(desceOeste).toBe(mix(BASE, '#000000', TONE_45));
+    expect(tomDaAgua(BASE, P(0, 1), 100, 0)).toBe(BASE);
+    expect(tomDaAgua(BASE, P(0, -1), 100, 0)).toBe(BASE);
   });
 
   it('a variação cresce com a inclinação: 45° mais forte que 30 % e água plana sem variação', () => {
@@ -122,8 +128,8 @@ describe('telhado real: tom por água e rincão tracejado', () => {
     const [r] = resolveRoofs(p, 'lv_0');
     const base = mix(BASE, '#ffffff', 0.25);
     const ops = roofOps([r!], p, LIGHT, false, 'medium', VIEW);
-    expect(ops.fills.some((f) => f.color === tomDaAgua(base, r!.planes[0]!.up, 30) && f.alpha === 0.55)).toBe(true);
-    expect(ops.fills.some((f) => f.color === tomDaAgua(base, r!.planes[1]!.up, 30) && f.alpha === 0.55)).toBe(true);
+    expect(ops.fills.some((f) => f.color === tomDaAgua(base, r!.planes[0]!.up, 30) && f.alpha === 0.98)).toBe(true);
+    expect(ops.fills.some((f) => f.color === tomDaAgua(base, r!.planes[1]!.up, 30) && f.alpha === 0.98)).toBe(true);
     // O telhado de duas águas não tem rincão: acrescenta-se um para conferir o tracejado da aresta.
     const comRincao: ResolvedRoof = { ...r!, lines: [...r!.lines, { kind: 'valley', a: P(0, 0), b: P(1, 1) }] };
     const valley = roofOps([comRincao], p, LIGHT, false, 'medium', VIEW).strokes.find((st) => st.dash && st.pts[0]!.x === 0 && st.pts[0]!.y === 0);

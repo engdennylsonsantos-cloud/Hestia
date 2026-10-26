@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { resolverZoom } from './zoomOps.ts';
 import { multiArea, type Vec2 } from '@hestia/geom';
-import { resolveLevel, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeRoof, makeWall, type DetailLevel, type Project } from '@hestia/model';
+import { resolveLevel, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer, type ViewClass } from '@hestia/engine';
+import { DEFAULT_VIEW_3D, ProjectStore, createEmptyProject, makeRoof, makeWall, type DetailLevel, type Id, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { mix } from './color.ts';
-import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps } from './roofs.ts';
-import { corDaAresta, TONE_45, tomDaAgua } from './roofsAgua.ts';
+import { labelPoint } from './floors.ts';
+import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps, highestRidge } from './roofs.ts';
+import { corDaAresta, DEFAULT_SUN_AZIMUTH, direcaoDoSol, TONE_45, tomDaAgua } from './roofsAgua.ts';
+import { caixaDoRotulo, caixasSobrepostas } from './roofsRotulos.ts';
 import { defaultPaint } from './style.ts';
 import { DARK, LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -77,36 +79,47 @@ function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
 describe('telhado na planta (D1)', () => {
   it('cada água: cor da camada de topo misturada com o papel a 0,25 e tom por orientação e inclinação', () => {
     const r = gable();
-    const fills = ops([r]).fills.filter((f) => f.alpha === 0.55);
+    const fills = ops([r]).fills.filter((f) => f.alpha === 0.98);
     const base = mix(TILE, '#ffffff', 0.25);
     expect(fills).toHaveLength(2);
     expect(fills[0]!.color).toBe(tomDaAgua(base, P(0, 1), 30));
     expect(fills[1]!.color).toBe(tomDaAgua(base, P(0, -1), 30));
   });
 
-  it('a luz de noroeste deixa mais clara a água que desce para ela e a outra mais escura', () => {
-    // a água da frente (subida para +y) desce para o sul; a de trás desce para o norte, voltada para a luz de NW
+  it('o sol padrão do 3D deixa mais clara a água que desce na direção dele e a oposta mais escura', () => {
+    // O azimute padrão (324,46°) vem de sudeste: a água que sobe para noroeste desce para o sol.
+    const luz = direcaoDoSol(DEFAULT_SUN_AZIMUTH);
     const base = mix(TILE, '#ffffff', 0.25);
-    expect(tomDaAgua(base, P(0, 1), 100)).toBe(mix(base, '#000000', TONE_45 * Math.SQRT1_2));
-    expect(tomDaAgua(base, P(0, -1), 100)).toBe(mix(base, '#ffffff', TONE_45 * Math.SQRT1_2));
+    expect(tomDaAgua(base, P(-luz.x, -luz.y), 100)).toBe(mix(base, '#ffffff', TONE_45));
+    expect(tomDaAgua(base, P(luz.x, luz.y), 100)).toBe(mix(base, '#000000', TONE_45));
     expect(tomDaAgua(base, P(0, 1), 30)).not.toBe(tomDaAgua(base, P(0, -1), 30));
   });
 
+  it('o azimute do sol pode vir da vista 3D do projeto (contexto da planta)', () => {
+    const r = gable();
+    const p = { ...createEmptyProject(), view3d: { ...DEFAULT_VIEW_3D, sunAzimuth: 0 } };
+    const base = mix(TILE, '#ffffff', 0.25);
+    const fills = ops([r], 'medium', 100, false, p).fills.filter((f) => f.alpha === 0.98);
+    expect(fills[0]!.color).toBe(tomDaAgua(base, P(0, 1), 30, 0));
+    expect(fills[0]!.color).not.toBe(tomDaAgua(base, P(0, 1), 30));
+  });
+
   it('escuro: mistura com o fundo a 0,2', () => {
-    const fills = ops([gable()], 'medium', 100, true).fills.filter((f) => f.alpha === 0.55);
+    const fills = ops([gable()], 'medium', 100, true).fills.filter((f) => f.alpha === 0.98);
     expect(fills[0]!.color).toBe(tomDaAgua(mix(TILE, DARK.bg, 0.2), P(0, 1), 30));
   });
 
-  it('semitransparente: 0,55 no médio e no fino; 0,8 no grosseiro', () => {
-    expect(ops([gable()], 'medium').fills.every((f) => f.alpha === 0.55 || f.alpha === 1)).toBe(true);
+  it('quase opaco: 0,98 no médio e no fino, para a grade não aparecer através da água', () => {
+    expect(ops([gable()], 'medium').fills.every((f) => f.alpha === 0.98 || f.alpha === 1)).toBe(true);
     const coarse = ops([gable()], 'coarse');
-    expect(coarse.fills.map((f) => f.alpha)).toEqual([0.8, 0.8]);
+    expect(coarse.fills.map((f) => f.alpha)).toEqual([0.98, 0.98]);
   });
 
-  it('hachura do material só com zoom a partir de 40 px/m (médio); no grosseiro, nunca', () => {
+  it('hachura do material só com zoom a partir de 40 px/m (médio), bem discreta; no grosseiro, nunca', () => {
     // rt_ceramica: telha com hachura diagonal
     expect(ops([gable()], 'medium', 10).fills[0]!.hatch).toBeUndefined();
     expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.kind).toBe('diagonal');
+    expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeLessThanOrEqual(0.12);
     expect(ops([gable()], 'coarse', 100).fills[0]!.hatch).toBeUndefined();
   });
 
@@ -210,7 +223,7 @@ describe('integração com o motor (resolveRoofs real)', () => {
     s.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 3.5 } });
     const p = s.project;
     const dl = buildPlanDrawList(input(p, { belowRoofs: [gable()], below: resolveLevel(p, 'lv_0', new Map()) }));
-    const roofIdx = dl.fills.findIndex((f) => f.alpha === 0.55);
+    const roofIdx = dl.fills.findIndex((f) => f.alpha === 0.98);
     const underIdx = dl.fills.findIndex((f) => f.color === LIGHT.underlay && f.alpha === 0.22);
     expect(roofIdx).toBeGreaterThan(-1);
     expect(underIdx).toBeGreaterThan(-1);
@@ -245,15 +258,12 @@ const L_BOUNDARY = [P(-0.3, -0.3), P(8.3, -0.3), P(8.3, 3.3), P(4.3, 3.3), P(4.3
 const RECT_BOUNDARY = [P(-0.3, -0.3), P(8.3, -0.3), P(8.3, 6.3), P(-0.3, 6.3)];
 
 describe('aresta de empena e símbolo "define inclinação" (A10/A11)', () => {
-  it('empena (kind gable): tracejado longo e um traço perpendicular no meio', () => {
+  it('empena (kind gable): traço cheio e mais escuro que as arestas internas, sem tracejado', () => {
     const o = ops([gable({ lines: [{ kind: 'gable', a: P(0, 0), b: P(8, 0) }] })]);
-    const dashed = o.strokes.filter((s) => s.dash);
-    expect(dashed).toHaveLength(1);
-    expect(dashed[0]!.dash).toEqual([12, 5]);
-    expect(dashed[0]!.pts).toEqual([P(0, 0), P(8, 0)]);
-    const tick = o.strokes.find((s) => !s.dash && s.pts.length === 2 && s.pts[0]!.x === 4 && Math.abs(s.widthPx - defaultPaint('roof', 100).cutPx * 0.75) < 1e-9)!;
-    expect(tick.pts[0]!.y).toBeCloseTo(-0.06, 9);
-    expect(tick.pts[1]!.y).toBeCloseTo(0.06, 9);
+    const linha = o.strokes.find((s) => !s.closed && s.pts.length === 2 && s.color === LIGHT.ink)!;
+    expect(linha.pts).toEqual([P(0, 0), P(8, 0)]);
+    expect(linha.dash).toBeUndefined();
+    expect(o.strokes.filter((s) => s.dash && s.color === LIGHT.ink)).toHaveLength(0);
   });
 
   it('selecionado em L com as 6 arestas definindo inclinação: 6 triângulos cheios na cor de destaque, cada um com "30 %"', () => {
@@ -328,6 +338,98 @@ function arcBoundary(n: number): Vec2[] {
   });
   return [P(0, 0), P(8, 0), ...arc.slice(1, -1), P(8, 6), P(0, 6)];
 }
+
+describe('beiral e pegada pelo intervalo de vista', () => {
+  const FOOT = [P(0, 0), P(4, 0), P(4, 2), P(0, 2)];
+  const EAVE = [P(-0.5, -0.5), P(4.5, -0.5), P(4.5, 2.5), P(-0.5, 2.5)];
+  function comBalanco(): { p: Project; r: ResolvedRoof } {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: EAVE, footprint: FOOT, edgeOverhangs: [0.5, 0.5, 0.5, 0.5], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: P(1, 0) }) });
+    const p = s.project;
+    return { p, r: resolveRoofs(p, 'lv_0')[0]! };
+  }
+  const base = mix(TILE, '#ffffff', 0.25);
+  const aresta = corDaAresta(base);
+
+  it('totalmente acima do corte: beiral tracejado na cor da aresta e nenhuma pegada rosa', () => {
+    const { p, r } = comBalanco();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'projection-above']]) });
+    expect(o.strokes.filter((s) => s.color === LIGHT.roofFootprint)).toHaveLength(0);
+    const beiral = o.strokes.find((s) => s.closed && s.dash?.join(',') === '6,3')!;
+    expect(beiral.color).toBe(aresta);
+    expect(o.fills.some((f) => f.contour)).toBe(false);
+  });
+
+  it('cortado pelo plano: contorno cheio e pegada rosa mais fina', () => {
+    const { p, r } = comBalanco();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'cut']]) });
+    expect(o.fills.some((f) => f.contour)).toBe(true);
+    const pink = o.strokes.filter((s) => s.color === LIGHT.roofFootprint);
+    expect(pink).toHaveLength(1);
+    expect(pink[0]!.pts).toEqual(FOOT);
+    expect(pink[0]!.widthPx).toBeLessThan(defaultPaint('roof', 100).projPx);
+  });
+
+  it('sem balanço não há pegada rosa; a projeção tracejada do beiral continua', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: EAVE, edgeOverhangs: [0, 0, 0, 0], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: P(1, 0) }) });
+    const p = s.project;
+    const o = roofOps(resolveRoofs(p, 'lv_0'), p, LIGHT, false, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'projection-above']]) });
+    expect(o.strokes.filter((s) => s.color === LIGHT.roofFootprint)).toHaveLength(0);
+    expect(o.strokes.some((s) => s.closed && s.dash && s.color === aresta)).toBe(true);
+  });
+
+  it('a planta real usa o plano de corte: acima não pinta de rosa; cortando o telhado, pinta', () => {
+    const { p } = comBalanco();
+    const acima = new ProjectStore(p);
+    acima.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 20 } });
+    const semRosa = buildPlanDrawList(input(acima.project));
+    expect(semRosa.strokes.some((s) => s.color === LIGHT.roofFootprint)).toBe(false);
+    expect(semRosa.strokes.some((s) => s.closed && s.dash && s.color === aresta)).toBe(true);
+
+    const cortado = new ProjectStore(p);
+    cortado.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { cut: 3.0, top: 20 } });
+    const comRosa = buildPlanDrawList(input(cortado.project));
+    expect(comRosa.strokes.some((s) => s.color === LIGHT.roofFootprint && s.dash)).toBe(true);
+  });
+});
+
+describe('anotações numa só camada, sem sobreposição', () => {
+  function quatroAguas(): { p: Project; r: ResolvedRoof } {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: RECT_BOUNDARY, heightOffset: 2.8, shape: 'hip', slopePercent: 30 }) });
+    s.exec({ type: 'setSettings', patch: { showTags: true } });
+    const p = s.project;
+    return { p, r: resolveRoofs(p, 'lv_0')[0]! };
+  }
+
+  it('setas, cota e área sem caixas de texto sobrepostas', () => {
+    const { p, r } = quatroAguas();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100));
+    expect(o.labels.length).toBeGreaterThanOrEqual(6);
+    const caixas = o.labels.map(caixaDoRotulo).filter((c) => c !== null);
+    expect(caixas).toHaveLength(o.labels.length);
+    for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) expect(caixasSobrepostas(caixas[i]!, caixas[j]!)).toBe(false);
+  });
+
+  it('a cota da cumeeira sai deslocada na normal da linha', () => {
+    const { p, r } = quatroAguas();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100));
+    const cota = o.labels.find((l) => l.text.startsWith('▲'))!;
+    const rd = highestRidge(r)!;
+    expect(cota.at).toEqual(rd.at);
+    expect(cota.papel!.desvio!.mm).toBeGreaterThanOrEqual(3);
+    expect(Math.hypot(cota.papel!.desvio!.ux ?? 0, cota.papel!.desvio!.uy ?? 1)).toBeCloseTo(1, 9);
+  });
+
+  it('o rótulo da área fica no centroide da água maior', () => {
+    const { p, r } = quatroAguas();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100));
+    const maior = r.planes.reduce((a, pl) => (multiArea(pl.polygon) > multiArea(a.polygon) ? pl : a));
+    const area = o.labels.find((l) => l.text.includes('m²'))!;
+    expect(area.at).toEqual(labelPoint(maior.polygon));
+  });
+});
 
 describe('telhado com trecho em arco (pegada amostrada)', () => {
   it('as geratrizes entre facetas do mesmo arco não viram espigão; a cumeeira entre as águas do arco e a divisa com a outra água fica', () => {

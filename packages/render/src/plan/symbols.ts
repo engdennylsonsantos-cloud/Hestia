@@ -21,11 +21,11 @@ export interface OpeningPlanWorldPath {
   role: OpeningPlanRole;
 }
 
-/** Limiares de zoom em que o detalhe da esquadria muda (px/m): 1 px = 0,012 m e 1 px = 0,004 m. */
-export const OPENING_DETAIL_ZOOMS = [(1 / 0.012) * (1 + 1e-9), (1 / 0.004) * (1 + 1e-9)] as const;
+/** Limiares de zoom em que o detalhe da esquadria muda (px/m): 20 px/m (≈ 1:300) e 100 px/m (≈ 1:60). */
+export const OPENING_DETAIL_ZOOMS = [20 * (1 + 1e-9), 100 * (1 + 1e-9)] as const;
 
 /**
- * Nível efetivo pelo zoom da vista (px/m): baixo até 1 px = 0,012 m; médio até 1 px = 0,004 m; alto abaixo disso.
+ * Nível efetivo pelo zoom da vista (px/m): baixo até 20 px/m; médio até 100 px/m; alto acima disso.
  * Com o registro de limiares da geometria, anota os dois limiares consultados (ver `limiares.ts`).
  */
 export function openingDetailByZoom(zoom: number, limiares?: { registrar(z: number): void }): 'low' | 'mid' | 'high' {
@@ -64,6 +64,12 @@ export function openingPlanWorldPaths(g: OpeningGeometry, model: OpeningModel, o
 }
 
 /**
+ * Pesos de traço em 3 classes (fino, normal, forte): cada peso distinto vira uma malha na GPU, e o orçamento de draw
+ * calls da planta (gpuPlan.test.ts) não comporta um peso por traço.
+ */
+const pesoEmClasse = (w: number): number => (w <= 0.85 ? 0.7 : w < 1.2 ? 1 : 1.4);
+
+/**
  * Símbolo de planta da abertura, a partir do modelo único (spec E §4.1). `cut` vai na tinta com a espessura de corte;
  * `ink` e `soft` seguem o desenho de antes (tinta e tinta leve, com o fator de peso do traço).
  */
@@ -72,7 +78,7 @@ export function openingSymbol(g: OpeningGeometry, model: OpeningModel, theme: Pl
   return openingPlanWorldPaths(g, model, opts).map((s) => ({
     pts: s.pts,
     closed: s.closed,
-    ...espessuraVezes(base, s.weight),
+    ...espessuraVezes(base, pesoEmClasse(s.weight)),
     color: s.tone === 'soft' ? theme.inkSoft : theme.ink,
     alpha: 1,
     ...(s.dash ? { dash: s.dash } : {}),

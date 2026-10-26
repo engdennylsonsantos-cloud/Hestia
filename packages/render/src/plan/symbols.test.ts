@@ -63,11 +63,11 @@ describe('openingSymbol: modelo único na planta', () => {
   });
 
   it("detail 'scale' escolhe low/mid/high pelo zoom", () => {
-    expect(openingPlanDetail('scale', 50)).toBe('low');
-    expect(openingPlanDetail('scale', 150)).toBe('mid');
+    expect(openingPlanDetail('scale', 15)).toBe('low');
+    expect(openingPlanDetail('scale', 60)).toBe('mid');
     expect(openingPlanDetail('scale', 400)).toBe('high');
-    expect(openingDetailByZoom(1 / 0.012)).toBe('low');
-    expect(openingDetailByZoom(1 / 0.004)).toBe('mid');
+    expect(openingDetailByZoom(20)).toBe('low');
+    expect(openingDetailByZoom(100)).toBe('mid');
     expect(openingDetailByZoom(1000)).toBe('high');
     expect(openingPlanDetail('off', 400)).toBe('off');
   });

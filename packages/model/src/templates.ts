@@ -4,12 +4,19 @@ import { ProjectStore } from './history.ts';
 import type { Opening, Project, Wall } from './types.ts';
 import { DEFAULT_JOIN, makeWall } from './wall.ts';
 import { casaAltoPadrao } from './templateCasaAltoPadrao.ts';
+import { esquadrias } from './templateEsquadrias.ts';
 import { predio10 } from './templatePredio10.ts';
 
-export type TemplateId = 'blank' | 'house2' | 'studio' | 'house-premium' | 'predio10';
+export type TemplateId = 'blank' | 'house2' | 'studio' | 'house-premium' | 'predio10' | 'esquadrias';
 
 export const TEMPLATES: Array<{ id: TemplateId; name: string; description: string; area: string }> = [
   { id: 'blank', name: 'Em branco', description: 'Dois níveis e os tipos de parede padrão.', area: '—' },
+  {
+    id: 'esquadrias',
+    name: 'Mostruário de esquadrias',
+    description: 'Um nível com todos os tipos do catálogo: portas na parede de baixo e janelas na paralela acima.',
+    area: '—',
+  },
   { id: 'house2', name: 'Casa térrea, 2 quartos', description: 'Sala e cozinha integradas, banheiro e dois quartos.', area: '70 m²' },
   { id: 'house-premium', name: 'Casa de alto padrão, 2 pavimentos', description: 'Garagem, sala em L, cozinha, varanda gourmet, três suítes e home office.', area: '330 m²' },
   { id: 'predio10', name: 'Prédio, 10 pavimentos', description: 'Núcleo de circulação central e quatro unidades por andar; lajes e pisos param no núcleo.', area: '1.900 m²' },
@@ -115,6 +122,7 @@ export function buildTemplate(id: TemplateId): Project {
   if (id === 'studio') studio(cmds);
   if (id === 'house-premium') casaAltoPadrao(cmds);
   if (id === 'predio10') predio10(cmds);
+  if (id === 'esquadrias') esquadrias(cmds);
   for (const c of cmds) store.exec(c);
   const p = store.project;
   return p;

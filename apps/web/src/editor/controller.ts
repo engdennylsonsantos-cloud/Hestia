@@ -16,10 +16,10 @@ import {
 import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
-import { keptFloorType } from './typeActions.ts';
-import { keptSlabType } from './slabTypeActions.ts';
+import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
-import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
+import { useI18n } from './i18n.ts';
+import { fitBox, levelFrameBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
@@ -67,7 +67,7 @@ export class Editor {
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
     gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
-    say: (m) => useUi.setState({ status: m }),
+    say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang,
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
@@ -99,7 +99,7 @@ export class Editor {
       const r = this.sectionOf(st.sectionId);
       return r ? sectionBox(r) : null;
     }
-    return levelBox(this.project, st.levelId);
+    return levelFrameBox(this.project, st.levelId);
   }
 
   ensureViewport(width: number, height: number): Viewport {
@@ -354,7 +354,7 @@ export class Editor {
 
   /** Gera (ou atualiza) as quatro elevações do nível ativo, em um único passo de desfazer. */
   generateElevations(): void {
-    const box = levelBox(this.project, useUi.getState().levelId);
+    const box = levelFrameBox(this.project, useUi.getState().levelId);
     if (!box) {
       useUi.setState({ status: 'Não há paredes neste nível para gerar elevações.' });
       return;

@@ -69,6 +69,15 @@ describe('ferramenta Telhado por extrusão (A9): dois cliques', () => {
     expect(rr.planes.reduce((s, pl) => s + multiArea(pl.polygon), 0)).toBeCloseTo(80, 6);
   });
 
+  it('primeiro clique: a barra diz que falta o canto oposto (dois cliques criam o telhado; não há 3º ponto nem Enter)', () => {
+    const ctx = ctxWithMessages();
+    const t = tool('roofextrusion', ctx.env);
+    clickAt(t, 0, 0);
+    expect(ctx.msgs.at(-1)).toBe('Canto inicial marcado: clique no canto oposto. Esc cancela.');
+    clickAt(t, 10, 8);
+    expect(roofs(ctx.store.project)).toHaveLength(1);
+  });
+
   it('retângulo muito estreito: não cria e pede outro canto', () => {
     const ctx = ctxWithMessages();
     const t = tool('roofextrusion', ctx.env);

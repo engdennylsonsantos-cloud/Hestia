@@ -3,6 +3,8 @@ import { frameOfWall, normalAt, pointAt, toLocal, type WallFrame } from '@hestia
 import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
+import { vizinhaCurta } from './alignNeighbors.ts';
+import { algumMudou, NADA_A_APARAR } from './trimChange.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
 import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
@@ -191,6 +193,11 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    if (!algumMudou(pr, patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
+      return;
+    }
     const frase = confirmaCanto(pr, patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of patches) this.applyPatch(id, patch);
@@ -301,6 +308,11 @@ export class TrimTool extends ToolBase {
       const cruzam = axisIntersections(axisOf(fa), axisOf(fb)).length > 0;
       this.env.say(cruzam ? 'O arco não pode ser estendido até o canto (mais de 180°).' : 'As paredes não se cruzam: não há canto.');
       this.reset();
+      return;
+    }
+    if (!algumMudou(pr, plan.patches)) {
+      this.reset();
+      this.env.say(NADA_A_APARAR);
       return;
     }
     const frase = confirmaCanto(pr, plan.patches);
@@ -420,6 +432,12 @@ export class AlignTool extends ToolBase {
       this.env.say('Já estão alinhadas.');
       return;
     }
+    // Uma vizinha que zeraria (ou quase) não pode: recusa e não grava nada, em vez de deixar a parede sumir.
+    const curta = vizinhaCurta(pr, this.env.levelId(), hitId, k);
+    if (curta) {
+      this.env.say(`Alinhar deixaria a parede ${curta.mark || curta.id} com comprimento zero: nada foi alterado.`);
+      return;
+    }
     moveWalls(this.env, [hitId], k);
     this.env.say('Alinhado. Clique na próxima parede a alinhar (Esc para trocar a referência).');
   }
@@ -428,7 +446,7 @@ export class AlignTool extends ToolBase {
 /** Cota de uma medida: linha entre os dois pontos, marcas nas extremidades e o valor no meio. */
 function cotaItems(a: Vec2, b: Vec2): PreviewItem[] {
   return [
-    { kind: 'line', a, b },
+    { kind: 'line', a, b, halo: true },
     { kind: 'point', at: a },
     { kind: 'point', at: b },
     { kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: `${dist(a, b).toFixed(3).replace('.', ',')} m` },
@@ -460,7 +478,7 @@ export class MeasureTool extends ToolBase {
       this.items.push({ kind: 'point', at: inf.point });
       return;
     }
-    this.items.push({ kind: 'line', a: this.a, b: inf.point });
+    this.items.push({ kind: 'line', a: this.a, b: inf.point, halo: true });
     this.items.push({ kind: 'label', at: inf.point, text: `${dist(this.a, inf.point).toFixed(3).replace('.', ',')} m` });
   }
 

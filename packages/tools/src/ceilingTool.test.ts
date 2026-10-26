@@ -90,6 +90,18 @@ describe('ferramenta Forro: no ambiente', () => {
     expect(ceilings(c.store)).toHaveLength(0);
     expect(c.msgs.at(-1)).toContain('Clique dentro de um ambiente');
   });
+
+  it('segundo clique no mesmo ambiente não cria forro empilhado: avisa e mantém o forro existente', () => {
+    const c = ctx('room');
+    room(c);
+    c.env.exec({ type: 'addRoom', room: makeRoom({ id: 'r1', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 2, y: 1.5 }, ceilingHeight: 2.9 }) });
+    const t = tool('ceiling', c.env);
+    clickAt(t, 2, 1.5);
+    clickAt(t, 2, 1.5);
+    expect(ceilings(c.store)).toHaveLength(1);
+    // Código do tipo do forro existente (FR-01 = forro de gesso, o tipo das opções por padrão).
+    expect(c.msgs.at(-1)).toBe('Este ambiente já tem forro (FR-01). Selecione-o para editar.');
+  });
 });
 
 /** Forro 4 × 3 desenhado pelo contorno, com a seleção nele. */

@@ -294,3 +294,9 @@ export function toolLabel(toolId: ToolId, lang: Lang): string {
   const key = `tool_${toolId}` as keyof typeof I18N.pt;
   return I18N[lang][key] || toolId;
 }
+
+/** Nome de um comando de atalho no idioma ativo: o mesmo rótulo da ferramenta na faixa (toolLabel). 'atalhos' é a tela de atalhos. */
+export function nomeComandoLang(cmd: string, lang: Lang): string {
+  if (cmd === 'atalhos') return lang === 'pt' ? 'Atalhos de teclado' : 'Keyboard shortcuts';
+  return toolLabel(cmd as ToolId, lang);
+}

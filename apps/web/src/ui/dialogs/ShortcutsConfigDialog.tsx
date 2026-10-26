@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react';
-import { COMANDOS_COM_ATALHO, PERFIL_NOMES, TOOL_GROUPS, nomeComando, type ShortcutCommand, type ShortcutProfile } from '@hestia/tools';
+import { COMANDOS_COM_ATALHO, PERFIL_NOMES, TOOL_GROUPS, type ShortcutCommand, type ShortcutProfile } from '@hestia/tools';
+import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
 import { useUi } from '../../editor/state.ts';
 import { atribuirAtalho, exportaAtalhos, importaAtalhos, removerAtalho, restaurarAtalho, restaurarTodos, trocarPerfil, useAtalhos } from '../../editor/shortcutConfig.ts';
 import { saveText } from '../../editor/saveText.ts';
@@ -19,6 +20,7 @@ function grupos(): Array<{ titulo: string; comandos: ShortcutCommand[] }> {
 export function ShortcutsConfigDialog(): ReactElement {
   const perfil = useAtalhos((s) => s.perfil);
   const mapa = useAtalhos((s) => s.mapa);
+  const lang = useI18n((s) => s.lang);
   const [filtro, setFiltro] = useState('');
   const [ativo, setAtivo] = useState<ShortcutCommand | null>(null);
   const [rascunho, setRascunho] = useState('');
@@ -73,7 +75,7 @@ export function ShortcutsConfigDialog(): ReactElement {
 
   const termo = filtro.trim().toLowerCase();
   const visiveis = grupos()
-    .map((g) => ({ ...g, comandos: g.comandos.filter((c) => !termo || nomeComando(c).toLowerCase().includes(termo)) }))
+    .map((g) => ({ ...g, comandos: g.comandos.filter((c) => !termo || nomeComandoLang(c, lang).toLowerCase().includes(termo)) }))
     .filter((g) => g.comandos.length > 0);
 
   const exporta = async (): Promise<void> => {
@@ -108,7 +110,7 @@ export function ShortcutsConfigDialog(): ReactElement {
       </div>
       {ativo ? (
         <p role="status" style={{ margin: '4px 0 10px' }}>
-          Pressione as novas teclas para <b>{nomeComando(ativo)}</b>: {rascunho ? <kbd>{rascunho}</kbd> : <span style={faint}>…</span>} Enter grava, Backspace apaga, Esc cancela.
+          Pressione as novas teclas para <b>{nomeComandoLang(ativo, lang)}</b>: {rascunho ? <kbd>{rascunho}</kbd> : <span style={faint}>…</span>} Enter grava, Backspace apaga, Esc cancela.
         </p>
       ) : null}
       {msg && !ativo ? <p role="status" style={{ margin: '4px 0 10px', color: 'var(--fg-soft)' }}>{msg}</p> : null}
@@ -122,12 +124,12 @@ export function ShortcutsConfigDialog(): ReactElement {
                 const editando = ativo === cmd;
                 return (
                   <tr key={cmd} onClick={() => inicia(cmd)} style={{ cursor: 'pointer', background: editando ? 'var(--chrome)' : undefined }}>
-                    <td>{nomeComando(cmd)}</td>
+                    <td>{nomeComandoLang(cmd, lang)}</td>
                     <td>{editando ? <kbd>{rascunho || '…'}</kbd> : seq ? <kbd>{seq}</kbd> : <span style={faint}>sem atalho</span>}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn small" onClick={(e) => { e.stopPropagation(); inicia(cmd); }}>Atribuir</button>{' '}
-                      <button className="btn small" disabled={!seq} onClick={(e) => { e.stopPropagation(); encerraCaptura(); removerAtalho(cmd); setMsg(`${nomeComando(cmd)}: sem atalho.`); }}>Remover</button>{' '}
-                      <button className="btn small" onClick={(e) => { e.stopPropagation(); encerraCaptura(); restaurarAtalho(cmd); setMsg(`${nomeComando(cmd)}: atalho do perfil restaurado.`); }}>Restaurar</button>
+                      <button className="btn small" disabled={!seq} onClick={(e) => { e.stopPropagation(); encerraCaptura(); removerAtalho(cmd); setMsg(`${nomeComandoLang(cmd, lang)}: sem atalho.`); }}>Remover</button>{' '}
+                      <button className="btn small" onClick={(e) => { e.stopPropagation(); encerraCaptura(); restaurarAtalho(cmd); setMsg(`${nomeComandoLang(cmd, lang)}: atalho do perfil restaurado.`); }}>Restaurar</button>
                     </td>
                   </tr>
                 );

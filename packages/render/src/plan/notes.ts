@@ -1,5 +1,6 @@
 import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
 import { noteLabel } from './tags.ts';
+import { dimensionLabelOps } from './dimLabels.ts';
 import type { PlanPaint } from './style.ts';
 import type { FillOp, LabelOp, StrokeOp } from './types.ts';
 
@@ -45,6 +46,8 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
   const picked = (id: Id): boolean => look.selection.includes(id);
   const mPerMm = scale / 1000;
   const level = p.levels.find((x) => x.id === levelId);
+  // Trechos curtos (valor maior que o trecho) saem com rótulo afastado; `lane` alterna as alturas entre vizinhos.
+  let lane = 0;
   for (const d of levelDimensions(p, levelId)) {
     const { a, b } = dimensionPoints(p, d);
     const textMm = d.textHeight ?? DIM_TEXT_MM;
@@ -54,7 +57,10 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     for (const seg of [g.line, ...g.extensions]) out.strokes.push({ pts: [...seg], closed: false, widthPx: pt.cutPx, color: c, alpha: 1 });
     out.strokes.push(...dimensionMarkStrokes(g, d.tickStyle ?? 'slash', mPerMm, c, pt.cutPx));
     if (d.textAt && Math.hypot(d.textAt.x - base.textAt.x, d.textAt.y - base.textAt.y) > 0.002) out.strokes.push({ pts: [{ x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, d.textAt], closed: false, widthPx: pt.projPx, color: c, alpha: 1 });
-    out.labels.push(noteLabel(g.textAt, dimensionText(p, d), paperMmToPx(textMm, zoom, scale), g.textRotation));
+    const lab = dimensionLabelOps(g, d.offset, dimensionText(p, d), paperMmToPx(textMm, zoom, scale), zoom, mPerMm, lane, c, pt.cutPx);
+    if (lab.short) lane++;
+    out.labels.push(...lab.labels);
+    out.strokes.push(...lab.strokes);
   }
   for (const t of levelTexts(p, levelId)) {
     if (t.leader) for (let i = 0; i < t.leader.length - 1; i++) out.strokes.push({ pts: [t.leader[i]!, t.leader[i + 1]!], closed: false, widthPx: pt.projPx, color, alpha: 1 });

@@ -1,6 +1,6 @@
 import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Vec2 } from '@hestia/geom';
 import { ceilingOutline } from '@hestia/engine';
-import { DEFAULT_CEILING_HEIGHT, followsRoom, isCeiling, makeCeiling, newId, type Ceiling, type Id } from '@hestia/model';
+import { DEFAULT_CEILING_HEIGHT, ceilingsOnLevel, followsRoom, isCeiling, makeCeiling, newId, type Ceiling, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ringAreaAbs, ringPerimeter } from './floorPick.ts';
 import { roomCeilingAt } from './ceilingRoom.ts';
@@ -118,9 +118,17 @@ export class CeilingTool extends ToolBase {
   }
 
   private clickRoom(p: PointerInfo): void {
-    const d = roomCeilingAt(this.env.project(), this.env.levelId(), p.raw, this.typeId());
+    const proj = this.env.project();
+    const d = roomCeilingAt(proj, this.env.levelId(), p.raw, this.typeId());
     if (!d) {
       this.env.say('Clique dentro de um ambiente com circuito fechado de paredes.');
+      return;
+    }
+    // Ambiente que já tem forro no nível: não empilha outro (um segundo clique não cria duplicata).
+    const existente = ceilingsOnLevel(proj, this.env.levelId()).find((c) => c.roomId && c.roomId === d.roomId);
+    if (existente) {
+      const tipo = proj.ceilingTypes[existente.typeId]?.code || existente.mark || 'forro';
+      this.env.say(`Este ambiente já tem forro (${tipo}). Selecione-o para editar.`);
       return;
     }
     this.commit(d.boundary, { holes: d.holes, roomId: d.roomId, heightOffset: d.heightOffset, mark: d.mark });

@@ -5,7 +5,8 @@ import { resolveLevel, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer }
 import { ProjectStore, createEmptyProject, makeRoof, makeWall, type DetailLevel, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { mix } from './color.ts';
-import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps, waterTone } from './roofs.ts';
+import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps } from './roofs.ts';
+import { corDaAresta, TONE_45, tomDaAgua } from './roofsAgua.ts';
 import { defaultPaint } from './style.ts';
 import { DARK, LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -74,26 +75,26 @@ function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
 }
 
 describe('telhado na planta (D1)', () => {
-  it('cada água: cor da camada de topo misturada com o papel a 0,5 e tom por orientação', () => {
+  it('cada água: cor da camada de topo misturada com o papel a 0,25 e tom por orientação e inclinação', () => {
     const r = gable();
     const fills = ops([r]).fills.filter((f) => f.alpha === 0.55);
-    const base = mix(TILE, '#ffffff', 0.5);
+    const base = mix(TILE, '#ffffff', 0.25);
     expect(fills).toHaveLength(2);
-    expect(fills[0]!.color).toBe(waterTone(base, P(0, 1)));
-    expect(fills[1]!.color).toBe(waterTone(base, P(0, -1)));
+    expect(fills[0]!.color).toBe(tomDaAgua(base, P(0, 1), 30));
+    expect(fills[1]!.color).toBe(tomDaAgua(base, P(0, -1), 30));
   });
 
-  it('a luz de noroeste deixa mais clara a água que olha para ela e a outra mais escura', () => {
+  it('a luz de noroeste deixa mais clara a água que desce para ela e a outra mais escura', () => {
     // a água da frente (subida para +y) desce para o sul; a de trás desce para o norte, voltada para a luz de NW
-    const base = mix(TILE, '#ffffff', 0.5);
-    expect(waterTone(base, P(0, 1))).toBe(mix(base, '#000000', 0.06));
-    expect(waterTone(base, P(0, -1))).toBe(mix(base, '#ffffff', 0.06));
-    expect(waterTone(base, P(0, 1))).not.toBe(waterTone(base, P(0, -1)));
+    const base = mix(TILE, '#ffffff', 0.25);
+    expect(tomDaAgua(base, P(0, 1), 100)).toBe(mix(base, '#000000', TONE_45 * Math.SQRT1_2));
+    expect(tomDaAgua(base, P(0, -1), 100)).toBe(mix(base, '#ffffff', TONE_45 * Math.SQRT1_2));
+    expect(tomDaAgua(base, P(0, 1), 30)).not.toBe(tomDaAgua(base, P(0, -1), 30));
   });
 
-  it('escuro: mistura com o fundo a 0,3', () => {
+  it('escuro: mistura com o fundo a 0,2', () => {
     const fills = ops([gable()], 'medium', 100, true).fills.filter((f) => f.alpha === 0.55);
-    expect(fills[0]!.color).toBe(waterTone(mix(TILE, DARK.bg, 0.3), P(0, 1)));
+    expect(fills[0]!.color).toBe(tomDaAgua(mix(TILE, DARK.bg, 0.2), P(0, 1), 30));
   });
 
   it('semitransparente: 0,55 no médio e no fino; 0,8 no grosseiro', () => {
@@ -116,23 +117,24 @@ describe('telhado na planta (D1)', () => {
     expect(multiArea(band.polygons)).toBeLessThan(multiArea(roofFootprint(gable())) * 0.2);
   });
 
-  it('linhas notáveis: cumeeira > espigão > rincão, na proporção da proposta sobre o corte; rincão tracejado', () => {
+  it('linhas notáveis: cumeeira, espigão e rincão como arestas finas na cor um pouco mais escura que o preenchimento; rincão tracejado', () => {
     // Linhas do telhado têm alpha 1; as setas de caimento têm 0,9 (ver o teste das setas).
-    const CUT = defaultPaint('roof', 100).cutPx;
+    const PROJ = defaultPaint('roof', 100).projPx;
+    const base = mix(TILE, '#ffffff', 0.25);
     const strokes = ops([gable()]).strokes.filter((s) => s.alpha === 1 && !s.closed);
     expect(strokes).toHaveLength(3);
     const ridge = strokes.find((s) => s.pts.length === 2 && s.pts[0]!.y === 3 && s.pts[1]!.y === 3)!;
-    expect(ridge.widthPx).toBeCloseTo(CUT * 1.5, 9);
-    expect(ridge.color).toBe(LIGHT.ink);
+    expect(ridge.widthPx).toBeCloseTo(PROJ, 9);
+    expect(ridge.color).toBe(corDaAresta(base));
     expect(ridge.pts).toEqual([P(0, 3), P(8, 3)]);
     const hip = strokes.find((s) => !s.dash && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
     expect(hip.pts).toEqual([P(0, 0), P(2, 2)]);
-    expect(hip.widthPx).toBeCloseTo(CUT * 1.25, 9);
+    expect(hip.widthPx).toBeCloseTo(PROJ, 9);
     const valley = strokes.find((s) => s.dash)!;
-    expect(valley.widthPx).toBe(CUT);
+    expect(valley.widthPx).toBe(PROJ);
     expect(valley.dash).toEqual([6, 3]);
-    expect(ridge.widthPx).toBeGreaterThan(hip.widthPx);
-    expect(hip.widthPx).toBeGreaterThan(valley.widthPx);
+    expect(ridge.color).toBe(hip.color);
+    expect(hip.color).toBe(valley.color);
   });
 
   it('seta de caimento por água, da subida para a descida, com o percentual', () => {
@@ -335,7 +337,8 @@ describe('telhado com trecho em arco (pegada amostrada)', () => {
     const p = s.project;
     const [r] = resolveRoofs(p, 'lv_0');
     const raw = r!.lines.filter((l) => l.kind === 'hip' || l.kind === 'ridge' || l.kind === 'valley');
-    const drawn = ops([r!], 'medium', 100, false, p).strokes.filter((s) => s.alpha === 1 && !s.closed && s.color === LIGHT.ink);
+    const aresta = corDaAresta(mix(TILE, '#ffffff', 0.25));
+    const drawn = ops([r!], 'medium', 100, false, p).strokes.filter((s) => s.alpha === 1 && !s.closed && s.color === aresta);
     // O motor gera uma divisa por faceta do arco; o desenho guarda só as que não são amostragem do arco.
     expect(raw.length).toBeGreaterThan(24);
     expect(drawn.length).toBeLessThan(raw.length / 4);
@@ -350,7 +353,8 @@ describe('telhado com trecho em arco (pegada amostrada)', () => {
     const o = roofFills(s.project, 'lv_0', LIGHT, false, 'medium', VIEW(100));
     const beiral = o.fills.filter((f) => f.contour);
     expect(beiral).toHaveLength(1);
-    expect(o.strokes.filter((st) => st.alpha === 1 && !st.closed && st.color === LIGHT.ink).length).toBeLessThan(12);
+    const aresta = corDaAresta(mix(TILE, '#ffffff', 0.25));
+    expect(o.strokes.filter((st) => st.alpha === 1 && !st.closed && st.color === aresta).length).toBeLessThan(12);
   });
 
   it('selecionado: alças só nos cantos lógicos, não em cada vértice amostrado do arco', () => {

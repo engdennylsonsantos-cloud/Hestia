@@ -12,13 +12,11 @@ import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
+import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
 import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
-
-/** Luz de noroeste na planta (y para cima = norte): a água voltada para ela fica um tom mais clara. */
-const LIGHT_NW: Vec2 = { x: -Math.SQRT1_2, y: Math.SQRT1_2 };
 
 /** Afastamento (m) para testar de que lado de uma divisa está cada água. */
 const SIDE = 1e-5;
@@ -62,12 +60,6 @@ export const fmtPercent = (p: number): string => `${String(Math.round(p * 10) / 
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
 export const fmtElevation = (z: number): string => `+${z.toFixed(2).replace('.', ',')}`;
-
-/** Tom da água: voltada para a luz de noroeste fica 6 % mais clara; a outra, 6 % mais escura (dá volume ao plano). */
-export function waterTone(color: string, up: Vec2): string {
-  const facing = -up.x * LIGHT_NW.x - up.y * LIGHT_NW.y;
-  return facing >= 0 ? mix(color, '#ffffff', 0.06) : mix(color, '#000000', 0.06);
-}
 
 /** Camada de topo: a de menor `below`, a que se vê de cima. */
 function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
@@ -221,13 +213,14 @@ export interface RoofOpsOptions {
 }
 
 /**
- * Telhados sobre a lista de águas (D1). Cada água tem a cor da camada de topo misturada com o papel (0,5 claro, 0,3
- * escuro) e um tom por orientação; o telhado é semitransparente (0,55; 0,8 no grosseiro) para ver as paredes por
- * baixo, e opaco na planta de cobertura. Fora do grosseiro: hachura em médio/fino com zoom suficiente, contorno do
- * beiral como faixa, cumeeira e espigão em traço, rincão tracejado, empena (aresta sem inclinação) tracejada e, por
- * água, seta de caimento (da subida para a descida) com o percentual; com balanço, a pegada tracejada rosa (`pegadaOps`).
- * A cumeeira mais alta leva a cota absoluta ("▲ +5,70") com etiquetas ligadas ou na planta de cobertura. Com etiquetas
- * ligadas, código e área real no centroide.
+ * Telhados sobre a lista de águas (D1), na representação de projeção do BIM: cada água tem a cor e a hachura do
+ * material da camada de topo (o `roofTile` quando o material não tem cor), com um tom pela direção da queda e pela
+ * inclinação (`tomDaAgua`); o telhado é semitransparente (0,55; 0,8 no grosseiro) para ver as paredes por baixo, e
+ * opaco na planta de cobertura. Fora do grosseiro: contorno do beiral como faixa, cumeeira, espigão e rincão como
+ * arestas finas (rincão tracejado) numa cor um pouco mais escura que o preenchimento, empena (aresta sem inclinação)
+ * tracejada e, por água, seta de caimento (da subida para a descida) com o percentual; com balanço, a pegada tracejada
+ * rosa (`pegadaOps`). A cumeeira mais alta leva a cota absoluta ("▲ +5,70") com etiquetas ligadas ou na planta de
+ * cobertura. Com etiquetas ligadas, código e área real no centroide.
  */
 export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const out = empty();
@@ -236,15 +229,19 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   const fine = detail === 'fine';
   const planMode = opts.planMode === true;
   const alpha = planMode ? 1 : coarse ? 0.8 : 0.55;
-  // Espessuras do telhado (decisão 0015 §2.1): cumeeira, espigão, rincão, beiral, empena e setas são de corte.
+  // Espessuras do telhado (decisão 0015 §2.1): beiral e empena de corte; arestas internas e setas finas (projeção).
   const paint = opts.paint ?? defaultPaint('roof', v.zoom);
   const esp = espessurasDoTelhado(paint);
   for (const r of roofs) {
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
-    const base = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.3 : 0.5, paint);
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
-    for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: waterTone(base, pl.up), alpha, hatch });
+    // Sem cor no material do tipo, a água cai no token de telha (terracota), e não no cinza padrão.
+    const matColor = m?.color?.trim() || theme.roofTile;
+    // Pouca mistura com o papel: a água deve ler na cor do material (o telhado é o assunto da vista), e não num tom lavado.
+    const base = surfaceColor(matColor, fillBase, dark ? 0.2 : 0.25, paint);
+    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.4), alpha: 0.55 } : undefined;
+    const aresta = corDaAresta(base);
+    for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: tomDaAgua(base, pl.up, pl.percent), alpha, hatch });
     const model = p.elements[r.roofId];
     if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, esp.projecao));
     const foot = roofFootprint(r);
@@ -259,9 +256,9 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
           out.strokes.push(...gableLineOps(ln.a, ln.b, theme, esp.empena));
           continue;
         }
-        const espessura = ln.kind === 'ridge' ? esp.cumeeira : ln.kind === 'hip' ? esp.espigao : esp.rincao;
+        // Cumeeira, espigão e rincão são arestas finas entre superfícies (sem a hierarquia grossa e preta do CAD).
         const dash: [number, number] | undefined = ln.kind === 'valley' ? [6, 3] : undefined;
-        out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...espessura, color: theme.ink, alpha: 1, ...(dash ? { dash } : {}) });
+        out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...esp.projecao, color: aresta, alpha: 1, ...(dash ? { dash } : {}) });
       }
       for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);

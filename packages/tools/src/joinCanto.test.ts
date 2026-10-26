@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { wallsOnLevel, type Wall } from '@hestia/model';
 import { joinStatus, levelFrames } from '@hestia/engine';
 import { drawWall, makeEnv, P, tool } from './testEnv.ts';
+import { DEFAULT_SNAP } from './types.ts';
 
 /**
  * Canto desenhado pela face (J-01): a ponta cai sobre a tampa da outra parede, meia espessura para fora do eixo.
@@ -86,5 +87,37 @@ describe('ferramenta Junção em T (J-03)', () => {
     j.click!(P(2, 0.092));
     const on = (wallsOnLevel(ctx.store.project, 'lv_0') as Wall[]).find((w) => w.id === b.id)!;
     expect(on.noJoinStart).toBe(false);
+  });
+});
+
+describe('T em canto pela ferramenta Junção (J-03)', () => {
+  it('T perto da extremidade vira canto com Tab', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]); // A
+    // B: T quase na extremidade de A. Captura desligada no desenho, para o ponto inicial não virar canto de face.
+    ctx.env.options().snap = { ...DEFAULT_SNAP, enabled: false };
+    drawWall(ctx.env, [3.95, 0.06], [3.95, 3]);
+    ctx.env.options().snap = DEFAULT_SNAP;
+    const b = (wallsOnLevel(ctx.store.project, 'lv_0') as Wall[]).find((w) => w.a.x === 3.95)!;
+    expect(joinStatus(levelFrames(ctx.store.project, 'lv_0'), b.id, 'a').kind).toBe('tee');
+    const j = tool('joins', ctx.env);
+    j.move!(P(3.95, 0.06));
+    j.tab!();
+    const after = (wallsOnLevel(ctx.store.project, 'lv_0') as Wall[]).find((w) => w.id === b.id)!;
+    expect(after.a.x).toBeCloseTo(4, 6);
+    expect(after.a.y).toBeCloseTo(0, 6);
+    expect(joinStatus(levelFrames(ctx.store.project, 'lv_0'), b.id, 'a').kind).toBe('pair');
+  });
+
+  it('T no meio do vão não vira canto: a ponta fica onde estava', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]);
+    drawWall(ctx.env, [2, 0.09], [2, 3]);
+    const b = (wallsOnLevel(ctx.store.project, 'lv_0') as Wall[]).find((w) => w.a.x === 2)!;
+    const j = tool('joins', ctx.env);
+    j.move!(P(2, 0.09));
+    j.tab!();
+    const after = (wallsOnLevel(ctx.store.project, 'lv_0') as Wall[]).find((w) => w.id === b.id)!;
+    expect(after.a.x).toBeCloseTo(2, 6);
   });
 });

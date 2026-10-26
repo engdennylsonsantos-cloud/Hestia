@@ -1,6 +1,6 @@
 import { orientedRect, v2 } from '@hestia/geom';
 import { frameOfWall, pointAt } from '@hestia/engine';
-import { openingType, type Opening } from '@hestia/model';
+import { openingType, openingsOfWall, type Opening } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
 import { parseNumber } from './numeric.ts';
@@ -62,6 +62,40 @@ export class OpeningTool extends ToolBase {
     return o;
   }
 
+  /**
+   * Captura da posição na parede (S-11): a borda da abertura encosta na ponta da parede, em outra abertura (encosto,
+   * batente ou centro). Só com a captura ligada (F3 desliga). Digitar a distância não passa por aqui: é exata.
+   */
+  private snapOffset(offset: number, wallId: string, width: number): { offset: number; note: string | null } {
+    if (this.env.options().snap?.enabled === false) return { offset, note: null };
+    const pr = this.env.project();
+    const f = frameOfWall(pr, wallId);
+    if (!f) return { offset, note: null };
+    const tol = 10 * this.env.metersPerPixel();
+    const h = width / 2;
+    const targets: Array<{ c: number; note: string }> = [
+      { c: h + 0.01, note: 'início da parede' },
+      { c: f.length - h - 0.01, note: 'fim da parede' },
+    ];
+    for (const o of openingsOfWall(pr, wallId)) {
+      const ot = pr.openingTypes[o.typeId];
+      const ow = (ot?.width ?? 0.8) / 2;
+      targets.push(
+        { c: o.offset - ow - h, note: 'encosto na abertura' },
+        { c: o.offset + ow + h, note: 'encosto na abertura' },
+        { c: o.offset - ow + h, note: 'batente alinhado' },
+        { c: o.offset + ow - h, note: 'batente alinhado' },
+        { c: o.offset, note: 'centro alinhado' },
+      );
+    }
+    let best: { c: number; note: string; d: number } | null = null;
+    for (const t of targets) {
+      const d = Math.abs(t.c - offset);
+      if (d <= tol && (!best || d < best.d)) best = { ...t, d };
+    }
+    return best ? { offset: best.c, note: best.note } : { offset, note: null };
+  }
+
   override move(p: PointerInfo): void {
     this.items = [];
     this.raw = p.raw;
@@ -76,7 +110,8 @@ export class OpeningTool extends ToolBase {
     const f = frameOfWall(pr, host.wallId);
     const t = pr.openingTypes[this.typeId()];
     if (!f || !t) return;
-    const off = this.resolve(host.offset, host.wallId);
+    const aligned = this.snapOffset(host.offset, host.wallId, t.width);
+    const off = this.resolve(aligned.offset, host.wallId);
     this.items.push({ kind: 'highlight', ids: [host.wallId] });
     if (off === null) {
       this.env.say('Sem espaço livre neste ponto da parede.');
@@ -85,7 +120,7 @@ export class OpeningTool extends ToolBase {
     this.current = { wallId: host.wallId, offset: off };
     const c = pointAt(f, off, f.sMid);
     this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, t.width / 2, f.thickness / 2 + 0.02) });
-    this.items.push({ kind: 'label', at: v2(c.x, c.y), text: `${(off).toFixed(2).replace('.', ',')} m` });
+    this.items.push({ kind: 'label', at: v2(c.x, c.y), text: `${(off).toFixed(2).replace('.', ',')} m${aligned.note ? ` · ${aligned.note}` : ''}` });
     this.env.say(`${t.name}: clique para inserir. Digite a distância ao início da parede e Enter para posição exata.`);
   }
 

@@ -1,6 +1,6 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { joinStatus, levelFrames } from '@hestia/engine';
-import type { JoinKind } from '@hestia/model';
+import { totalThickness, type JoinKind } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { pickAt } from './pick.ts';
 import type { PointerInfo } from './types.ts';
@@ -14,7 +14,7 @@ const LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria' };
  */
 type Node =
   | { at: Vec2; status: 'pair'; ends: Array<{ wallId: string; end: 'a' | 'b' }>; kind: JoinKind; flip: boolean }
-  | { at: Vec2; status: 'tee' | 'node' | 'disallowed'; ends: Array<{ wallId: string; end: 'a' | 'b' }>; clicked: { wallId: string; end: 'a' | 'b' }; count: number };
+  | { at: Vec2; status: 'tee' | 'node' | 'disallowed'; ends: Array<{ wallId: string; end: 'a' | 'b' }>; clicked: { wallId: string; end: 'a' | 'b' }; count: number; hostId?: string };
 
 /** Ferramenta Junção (Revit: Wall Joins): clique num canto para alternar encosto e esquadria; em T ou nó, liga/desliga "não unir". */
 export class JoinTool extends ToolBase {
@@ -53,7 +53,7 @@ export class JoinTool extends ToolBase {
           const cfg = firstEnd === 'a' ? first.joinStart : first.joinEnd;
           n = { at, status: 'pair', ends, kind: cfg.kind, flip: cfg.flip };
         } else if (st.kind === 'tee') {
-          n = { at, status: 'tee', ends: [clicked], clicked, count: 2 };
+          n = { at, status: 'tee', ends: [clicked], clicked, count: 2, hostId: st.hostId };
         } else if (st.kind === 'node') {
           n = { at, status: 'node', ends: [clicked, ...st.partners], clicked, count: st.partners.length + 1 };
         } else if (st.kind === 'disallowed') {
@@ -80,7 +80,7 @@ export class JoinTool extends ToolBase {
       case 'pair':
         return `${LABEL[n.kind]}${n.flip ? ' (ordem invertida)' : ''}`;
       case 'tee':
-        return 'Em T (encosto fixo) · clique: não unir';
+        return 'Em T (encosto fixo) · clique: não unir · Tab: transformar em canto';
       case 'node':
         return `Nó de ${n.count} paredes · clique: não unir esta ponta`;
       case 'disallowed':
@@ -137,5 +137,30 @@ export class JoinTool extends ToolBase {
 
   override tab(): void {
     if (this.node?.status === 'pair') this.apply(this.node.kind, !this.node.flip);
+    else if (this.node?.status === 'tee') this.toCorner(this.node);
+  }
+
+  /**
+   * T em canto (J-03): leva a ponta até a extremidade da outra parede, se a geometria permitir. "Permitir" aqui é a
+   * ponta estar a até duas espessuras dessa extremidade; mais longe, o T está no meio do vão e não vira canto.
+   */
+  private toCorner(n: { clicked: { wallId: string; end: 'a' | 'b' }; hostId?: string }): void {
+    const pr = this.env.project();
+    const wall = pr.elements[n.clicked.wallId];
+    const host = n.hostId ? pr.elements[n.hostId] : undefined;
+    if (!wall || wall.kind !== 'wall' || !host || host.kind !== 'wall') return;
+    const hostFrame = levelFrames(pr, this.env.levelId()).find((f) => f.wall.id === host.id);
+    if (!hostFrame) return;
+    const at = n.clicked.end === 'a' ? wall.a : wall.b;
+    const ends = [hostFrame.a, hostFrame.b];
+    const near = ends.reduce((best, e) => (dist(e, at) < dist(best, at) ? e : best));
+    const reach = 2 * totalThickness(pr.wallTypes[host.typeId] ?? { layers: [] });
+    if (dist(near, at) > reach) {
+      this.env.say('Não vira canto: a ponta está longe da extremidade da outra parede (no meio do vão).');
+      return;
+    }
+    this.env.exec({ type: 'setWallEnds', id: wall.id, [n.clicked.end]: near });
+    this.env.say('T transformado em canto.');
+    this.move({ raw: near, shift: false, ctrl: false, alt: false });
   }
 }

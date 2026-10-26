@@ -42,6 +42,8 @@ export interface InferContext {
   extraPoints?: SnapPoint[];
   /** Capturas ligadas (padrão: DEFAULT_SNAP). */
   snap?: SnapOptions;
+  /** Arestas de captura (contornos de pisos e lajes): o pé da perpendicular sobre a aresta vira captura. */
+  extraSegments?: Array<{ a: Vec2; b: Vec2; hostId?: Id }>;
   /** Tab: índice do candidato escolhido entre todos os que estão ao alcance (ordenados por custo). */
   cycle?: number;
   /** Captura escolhida na posição anterior do cursor: mantém-na enquanto continuar valendo (histerese). */
@@ -70,6 +72,8 @@ const WEIGHT: Record<SnapKind, number> = {
   alignment: 0.9,
   ortho: 1,
   grid: 1.5,
+  center: 0.2,
+  tangent: 0.3,
   none: 9,
 };
 /** Cruzamento de duas restrições (x × y, x × face, face × face): o ponto que o usuário mira. */
@@ -81,6 +85,22 @@ interface Cand {
   weight: number;
   guides: Guide[];
   hostId?: Id;
+}
+
+/** Pontos cuja caixa envolvente está a até `tol` do cursor (descarte rápido antes das contas de aresta). */
+function boxNear(cursor: Vec2, pts: Vec2[], tol: number): boolean {
+  if (pts.length === 0) return false;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const q of pts) {
+    if (q.x < minX) minX = q.x;
+    if (q.x > maxX) maxX = q.x;
+    if (q.y < minY) minY = q.y;
+    if (q.y > maxY) maxY = q.y;
+  }
+  return cursor.x >= minX - tol && cursor.x <= maxX + tol && cursor.y >= minY - tol && cursor.y <= maxY + tol;
 }
 
 /** Arco do eixo da parede, ou null se for reta. */
@@ -195,16 +215,18 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     if (near.dist <= tol) nearWalls.push(w);
     // Cada captura tem a sua chave: extremidade e ponto médio não dependem do eixo, que controla a captura "nearest".
     if (sn.endpoint !== false) {
+      // Pontas, pontos médios e interseções guardam a parede de origem: o tooltip mostra o nome dela.
       for (const p of [w.a, w.b]) {
-        if (dist(cursor, p) <= tol) add(p, 'endpoint');
+        if (dist(cursor, p) <= tol) add(p, 'endpoint', [], w.id);
       }
     }
     if (sn.midpoint !== false) {
       const m = wallMid(w);
-      if (dist(cursor, m) <= tol) add(m, 'midpoint');
+      if (dist(cursor, m) <= tol) add(m, 'midpoint', [], w.id);
     }
     // Sobre o eixo: também é o ponto de hospedagem de portas e janelas, por isso fica ligado com a captura de eixo.
     if (sn.axis && near.dist <= tol) add(near.point, 'nearest', [], w.id);
+
     if (sn.perpendicular && ctx.from) {
       for (const foot of perpendicularFeet(w, ctx.from)) {
         if (dist(cursor, foot) <= tol && dist(foot, ctx.from) > 1e-6) add(foot, 'perpendicular', [{ from: ctx.from, to: foot, kind: 'perpendicular' }]);
@@ -218,24 +240,33 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       if (dist(cursor, q) <= tol) add(v2(q.x, q.y), 'endpoint');
     }
   }
+  // Arestas de pisos e lajes: o pé sobre a aresta é captura de aresta (P2), com o dono para o ignore.
+  if (sn.faces && !ctx.onWallsOnly) {
+    for (const e of ctx.extraSegments ?? []) {
+      if (e.hostId !== undefined && ctx.ignore?.has(e.hostId)) continue;
+      if (dist(e.a, e.b) < 1e-9) continue;
+      const foot = closestOnSegment(cursor, e.a, e.b);
+      if (dist(cursor, foot) <= tol) add(foot, 'nearest', [], e.hostId);
+    }
+  }
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
-  const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core'): void => {
+  const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core', hostId?: Id): void => {
     for (const [a, b] of segs) {
       if (dist(a, b) < 1e-9) continue;
       if (sn.endpoint !== false) {
         for (const q of [a, b]) {
-          if (dist(cursor, q) <= tol) add(q, kind);
+          if (dist(cursor, q) <= tol) add(q, kind, [], hostId);
         }
       }
       if (sn.midpoint !== false) {
         const mid = v2((a.x + b.x) / 2, (a.y + b.y) / 2);
-        if (dist(cursor, mid) <= tol) add(mid, 'midpoint');
+        if (dist(cursor, mid) <= tol) add(mid, 'midpoint', [], hostId);
       }
       const foot = closestOnSegment(cursor, a, b);
-      if (dist(cursor, foot) <= tol) add(foot, 'nearest');
+      if (dist(cursor, foot) <= tol) add(foot, 'nearest', [], hostId);
       if (sn.perpendicular && ctx.from) {
         const pf = closestOnSegment(ctx.from, a, b);
-        if (dist(cursor, pf) <= tol && dist(pf, ctx.from) > 1e-6) add(pf, 'perpendicular', [{ from: ctx.from, to: pf, kind: 'perpendicular' }]);
+        if (dist(cursor, pf) <= tol && dist(pf, ctx.from) > 1e-6) add(pf, 'perpendicular', [{ from: ctx.from, to: pf, kind: 'perpendicular' }], hostId);
       }
     }
   };
@@ -244,28 +275,40 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   if (sn.faces || sn.core) {
     for (const wf of facesOf(ctx.project, ctx.levelId)) {
       if (ctx.ignore?.has(wf.wallId)) continue;
-      if (sn.faces) addSegs(wf.outline.length >= 3 ? outlineSegs(wf.outline) : wf.faces, 'face');
-      if (sn.core) addSegs(wf.coreOutline.length >= 3 ? outlineSegs(wf.coreOutline) : wf.core, 'core');
+      // Índice barato: contorno longe do cursor (além da tolerância) não tem captura. Evita varrer todas as arestas.
+      if (!boxNear(cursor, wf.outline, tol)) continue;
+      if (sn.faces) addSegs(wf.outline.length >= 3 ? outlineSegs(wf.outline) : wf.faces, 'face', wf.wallId);
+      if (sn.core) addSegs(wf.coreOutline.length >= 3 ? outlineSegs(wf.coreOutline) : wf.core, 'core', wf.wallId);
     }
   }
   // Faces de parede curva: as laterais são arcos concêntricos (raio R ± meia espessura), não a corda. A captura é
   // analítica: pontas do arco, ponto médio e pé radial sobre o arco da face (S-09).
-  if (sn.faces) {
-    for (const w of walls) {
-      const arc = curveOf(w);
-      if (!arc) continue;
-      const fr = frameOfWall(ctx.project, w.id);
-      if (!fr) continue;
-      const local = arcLocal(arc, cursor);
-      const t = Math.max(0, Math.min(arc.length, local.t));
-      for (const side of [fr.sHi, fr.sLo]) {
-        for (const q of [arcPointAt(arc, 0, side), arcPointAt(arc, arc.length, side)]) {
-          if (dist(cursor, q) <= tol) add(q, 'face');
+  for (const w of walls) {
+    const arc = curveOf(w);
+    if (!arc) continue;
+    const fr = frameOfWall(ctx.project, w.id);
+    if (!fr) continue;
+    const local = arcLocal(arc, cursor);
+    const t = Math.max(0, Math.min(arc.length, local.t));
+    for (const side of sn.faces ? [fr.sHi, fr.sLo] : []) {
+      for (const q of [arcPointAt(arc, 0, side), arcPointAt(arc, arc.length, side)]) {
+        if (dist(cursor, q) <= tol) add(q, 'face');
+      }
+      const mid = arcPointAt(arc, arc.length / 2, side);
+      if (sn.midpoint !== false && dist(cursor, mid) <= tol) add(mid, 'midpoint');
+      const foot = arcPointAt(arc, t, side);
+      if (dist(cursor, foot) <= tol) add(foot, 'nearest');
+    }
+    // Centro do arco, e ponto de tangência a partir do ponto anterior: o círculo do arco corta o círculo de
+    // diâmetro (ponto anterior, centro), e a tangente é o corte que cai sobre o arco.
+    if (sn.midpoint !== false && dist(cursor, arc.center) <= tol) add(arc.center, 'center', [], w.id);
+    if (sn.perpendicular && ctx.from) {
+      const dc = dist(ctx.from, arc.center);
+      if (dc > arc.radius) {
+        const half = v2((ctx.from.x + arc.center.x) / 2, (ctx.from.y + arc.center.y) / 2);
+        for (const q of intersectCircles(arc.center, arc.radius, half, dc / 2)) {
+          if (onArc(arc, q) && dist(cursor, q) <= tol) add(q, 'tangent', [{ from: ctx.from, to: q, kind: 'perpendicular' }], w.id);
         }
-        const mid = arcPointAt(arc, arc.length / 2, side);
-        if (sn.midpoint !== false && dist(cursor, mid) <= tol) add(mid, 'midpoint');
-        const foot = arcPointAt(arc, t, side);
-        if (dist(cursor, foot) <= tol) add(foot, 'nearest');
       }
     }
   }

@@ -184,3 +184,25 @@ describe('visibilidade (S-07): elemento oculto não é alvo de captura', () => {
     expect(at(p, cursorAtEnd.x, cursorAtEnd.y, { isVisible: (w) => w.id !== id }).kind).not.toBe('endpoint');
   });
 });
+
+describe('centro e tangente de arco (S-09)', () => {
+  it('cursor sobre o centro do arco captura o centro', () => {
+    const p = curved(walls([[0, 0], [4, 0]]), 1);
+    const arc = arcFromSagitta(v2(0, 0), v2(4, 0), 1)!;
+    const r = at(p, arc.center.x + 0.01, arc.center.y + 0.01, { snap: { ...DEFAULT_SNAP, grid: false, faces: false, alignment: false, intersections: false } });
+    expect(r.kind).toBe('center');
+    expect(dist(r.point, arc.center)).toBeLessThan(1e-9);
+  });
+
+  it('ponto de tangência a partir do ponto anterior cai sobre o arco', () => {
+    const p = curved(walls([[0, 0], [4, 0]]), 1);
+    const arc = arcFromSagitta(v2(0, 0), v2(4, 0), 1)!;
+    // Ponto de tangência T no trecho superior (60° a partir do centro) e o ponto anterior P, sobre a tangente em T.
+    const phi = Math.PI / 3;
+    const T = v2(arc.center.x + arc.radius * Math.cos(phi), arc.center.y + arc.radius * Math.sin(phi));
+    const from = v2(T.x - 3 * Math.sin(phi), T.y + 3 * Math.cos(phi));
+    const r = at(p, T.x + 0.01, T.y + 0.01, { from, snap: { ...DEFAULT_SNAP, grid: false, faces: false, core: false, alignment: false, intersections: false, endpoint: false, midpoint: false } });
+    expect(r.kind).toBe('tangent');
+    expect(dist(r.point, T)).toBeLessThan(1e-6);
+  });
+});

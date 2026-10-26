@@ -97,7 +97,7 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   if (input.inference) {
     strokes.push(...guideStrokes(input.inference.guides, theme));
     strokes.push(...snapMarker(input.inference, theme));
-    const tip = snapTooltipLabel(input.inference);
+    const tip = snapTooltipLabel(input.inference, p);
     if (tip) labels.push(tip);
   }
   return { fills, strokes, labels };

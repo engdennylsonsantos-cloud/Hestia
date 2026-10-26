@@ -1,4 +1,5 @@
 import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
+import type { Project } from '@hestia/model';
 import type { Guide, Inference, PreviewItem, StairTone } from '@hestia/tools';
 import { sectionMarkOps } from './sectionMarks.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
@@ -42,6 +43,10 @@ export function snapMarker(inf: Inference, theme: PlanTheme): StrokeOp[] {
       return [mk([P(-h * 0.8, -h), P(h * 0.8, -h), P(-h * 0.8, h), P(h * 0.8, h)], true)];
     case 'alignment':
       return [mk([P(-h * 0.7, -h * 0.7), P(h * 0.7, h * 0.7)], false), mk([P(-h * 0.7, h * 0.7), P(h * 0.7, -h * 0.7)], false)];
+    case 'center':
+      return [mk(cantosDoQuadrado(h * 0.5), true), mk([P(-h, 0), P(h, 0)], false), mk([P(0, -h), P(0, h)], false)];
+    case 'tangent':
+      return [mk([P(-h, h), P(h, h)], false), mk([P(0, h), P(0, -h * 0.6)], false)];
     case 'grid':
       return [fino([P(-h * 0.6, 0), P(h * 0.6, 0)]), fino([P(0, -h * 0.6), P(0, h * 0.6)])];
     default:
@@ -59,13 +64,19 @@ const SNAP_TOOLTIPS: Record<string, string> = {
   nearest: 'Na parede',
   alignment: 'Alinhamento',
   ortho: 'Ortogonal',
+  center: 'Centro do arco',
+  tangent: 'Tangente ao arco',
 };
 
 /** Rótulo flutuante junto ao cursor com a captura ativa (AutoCAD / Revit Snap Tooltip). */
-export function snapTooltipLabel(inf: Inference): LabelOp | null {
+export function snapTooltipLabel(inf: Inference, p?: Project): LabelOp | null {
   if (inf.kind === 'none' || inf.kind === 'grid') return null;
-  const text = SNAP_TOOLTIPS[inf.kind];
-  if (!text) return null;
+  const base = SNAP_TOOLTIPS[inf.kind];
+  if (!base) return null;
+  // Nome da parede de origem, quando a captura é de uma parede (S-tooltip): ajuda a saber qual elemento foi capturado.
+  const host = inf.hostId && p ? p.elements[inf.hostId] : undefined;
+  const name = host && host.kind === 'wall' ? (host.mark ? `parede ${host.mark}` : 'parede') : null;
+  const text = name ? `${base} · ${name}` : base;
   return {
     at: inf.point,
     text,

@@ -1,5 +1,5 @@
 import { boxOf, dist, intersectSegments, pointInMulti, ringArea, type Vec2 } from '@hestia/geom';
-import { floorsOnLevel, isFloor, type Floor, type Id, type Project } from '@hestia/model';
+import { floorsOnLevel, isFloor, slabsOnLevel, type Floor, type Id, type Project } from '@hestia/model';
 import { formasDoNivel } from './pickShapes.ts';
 import type { SnapPoint } from './infer.ts';
 
@@ -104,6 +104,15 @@ export const ringAreaAbs = (ring: Vec2[]): number => Math.abs(ringArea(ring));
 /** Vértices de contorno e de furo dos pisos do nível: candidatos de captura para alinhar pisos entre si (sem lajes). */
 export function floorVertices(p: Project, levelId: Id): SnapPoint[] {
   return floorsOnLevel(p, levelId).flatMap((f) => [...f.boundary, ...f.holes.flat()].map((v) => ({ x: v.x, y: v.y, hostId: f.id })));
+}
+
+/** Arestas dos contornos de pisos e lajes do nível (e dos furos): captura de aresta, com o dono para o `ignore`. */
+export function floorEdges(p: Project, levelId: Id): Array<{ a: Vec2; b: Vec2; hostId: Id }> {
+  const rings: Array<{ id: Id; ring: Vec2[] }> = [
+    ...floorsOnLevel(p, levelId).flatMap((f) => [{ id: f.id, ring: f.boundary }, ...f.holes.map((h) => ({ id: f.id, ring: h }))]),
+    ...slabsOnLevel(p, levelId).flatMap((s) => [{ id: s.id, ring: s.boundary }, ...s.holes.map((h) => ({ id: s.id, ring: h }))]),
+  ];
+  return rings.flatMap(({ id, ring }) => ring.map((a, i) => ({ a, b: ring[(i + 1) % ring.length]!, hostId: id })));
 }
 
 /** Perímetro do contorno, em m. */

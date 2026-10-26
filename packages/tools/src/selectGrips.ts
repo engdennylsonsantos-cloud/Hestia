@@ -216,7 +216,8 @@ function ringHold(env: ToolEnv, owner: RingOwner, id: Id, g: { kind: 'vertex' | 
       const ring = owner.boundary(env.project(), id);
       if (!ring) return [];
       // Snap aos outros vértices do próprio contorno (o vértice arrastado não se captura a si mesmo).
-      const inf = snap({ extraPoints: vertex ? ring.filter((_, i) => i !== g.index) : ring });
+      // O próprio elemento sai da captura: senão as arestas e vértices vizinhos do vértice arrastado viram alvo.
+      const inf = snap({ extraPoints: vertex ? ring.filter((_, i) => i !== g.index) : ring, ignore: new Set([id]) });
       point = inf;
       return [{ kind: 'polygon', ring, dashed: true }, { kind: 'polygon', ring: ringAfter(ring, vertex, g.index, inf) }];
     },

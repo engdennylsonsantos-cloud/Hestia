@@ -1,7 +1,7 @@
 import { newId } from '@hestia/model';
 import type { Inference, PointerInfo, PreviewItem, Tool, ToolEnv } from './types.ts';
 import { infer, type InferContext } from './infer.ts';
-import { floorVertices } from './floorPick.ts';
+import { floorEdges, floorVertices } from './floorPick.ts';
 import type { Vec2 } from '@hestia/geom';
 
 /** Implementação comum: Esc em dois passos, inferência e rótulos. */
@@ -74,6 +74,7 @@ export abstract class ToolBase implements Tool {
       ...extra,
       // Vértices dos pisos do nível entram sempre; os pontos que a ferramenta passa (contorno em construção) somam-se a eles.
       extraPoints: [...floorVertices(project, levelId), ...(extra.extraPoints ?? [])],
+      extraSegments: [...floorEdges(project, levelId), ...(extra.extraSegments ?? [])],
     };
   }
 

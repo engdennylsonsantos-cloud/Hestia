@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactElement } from 'react';
-import { editor, useProject } from './editor/controller.ts';
+import { editor } from './editor/controller.ts';
+import { useProjetoDerivado } from './editor/projetoDerivado.ts';
 import { useUi } from './editor/state.ts';
 import { atalhoAtual } from './editor/shortcutConfig.ts';
 import { tabOf } from './editor/viewTabActions.ts';
@@ -102,19 +103,38 @@ function Dialogs(): ReactElement | null {
   }
 }
 
+/**
+ * Área de desenho: escolhe entre o estado vazio, a prancha e o canvas. Fica num componente próprio para o `App` não
+ * assinar o projeto inteiro só para saber se sobrou alguma aba válida (ver `useProjetoDerivado`).
+ */
+function Palco(): ReactElement {
+  const openViews = useUi((s) => s.openViews);
+  const view = useUi((s) => s.view);
+  const sheetId = useUi((s) => s.sheetId);
+  // Sem nenhuma aba válida, a área de desenho mostra o estado vazio (o navegador continua acessível).
+  const semVistas = useProjetoDerivado((p) => !openViews.some((v) => tabOf(p, v) !== null));
+  return (
+    <main className="stage">
+      <ViewTabs />
+      {/* O tutorial fica numa faixa própria acima da área de desenho (não cobre a planta nem recebe o clique). */}
+      <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Tutorial />
+        <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'grid' }}>
+          {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+        </div>
+      </div>
+      {!semVistas && <ViewControlBar />}
+    </main>
+  );
+}
+
 export function App(): ReactElement {
   const propsOpen = useUi((s) => s.propsOpen);
   const browserOpen = useUi((s) => s.browserOpen);
   const dock = useUi((s) => s.dock);
   const widths = dockWidths(propsOpen, browserOpen, dock);
   const theme = useUi((s) => s.theme);
-  const view = useUi((s) => s.view);
-  const sheetId = useUi((s) => s.sheetId);
   const dialog = useUi((s) => s.dialog);
-  const project = useProject();
-  const openViews = useUi((s) => s.openViews);
-  // Sem nenhuma aba válida, a área de desenho mostra o estado vazio (o navegador continua acessível).
-  const semVistas = !openViews.some((v) => tabOf(project, v) !== null);
 
   // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
   const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
@@ -160,17 +180,7 @@ export function App(): ReactElement {
       <OptionsBar />
       <div className="workspace" style={{ gridTemplateColumns: `${widths.left}px minmax(0, 1fr) ${widths.right}px` }}>
         <Dock side="left" />
-        <main className="stage">
-          <ViewTabs />
-          {/* O tutorial fica numa faixa própria acima da área de desenho (não cobre a planta nem recebe o clique). */}
-          <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <Tutorial />
-            <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'grid' }}>
-              {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
-            </div>
-          </div>
-          {!semVistas && <ViewControlBar />}
-        </main>
+        <Palco />
         <Dock side="right" />
       </div>
       <StatusBar />

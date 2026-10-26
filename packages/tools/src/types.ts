@@ -28,6 +28,8 @@ export type PreviewItem =
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
   | { kind: 'highlight'; ids: Id[] }
+  /** Aresta de telhado sob o cursor, antes do clique: a planta a desenha em traço grosso na cor de seleção. */
+  | { kind: 'roofEdgeHover'; a: Vec2; b: Vec2 }
   /** Linha de corte ou elevação com a seta do lado de visão (a pré-visualização usa `dashed`). */
   | { kind: 'sectionLine'; a: Vec2; b: Vec2; dashed?: boolean; label?: string; elevation?: boolean };
 
@@ -59,6 +61,8 @@ export interface ToolEnv {
   /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */
   roofEdge?(): RoofEdgeSel | null;
   setRoofEdge?(sel: RoofEdgeSel | null): void;
+  /** Alterna "define inclinação" da aresta `index` do telhado `roofId`, selecionado ou não. Devolve true se aplicou. Ausente = o clique numa aresta de telhado não selecionado não faz nada. */
+  toggleRoofEdge?(roofId: Id, index: number): boolean;
 }
 
 /** Aresta do contorno de um telhado selecionado: `index` é a aresta de boundary[index] a boundary[index+1]. */

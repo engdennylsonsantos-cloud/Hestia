@@ -25,6 +25,7 @@ import { defaultOpenViews } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
+import { toggleRoofEdgeDefines } from './roofEdgeActions.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
@@ -83,6 +84,7 @@ export class Editor {
     openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
     roofEdge: () => useUi.getState().roofEdge, setRoofEdge: (sel) => useUi.setState({ roofEdge: sel }),
+    toggleRoofEdge: (roofId, index) => toggleRoofEdgeDefines(this.store, { roofId, index }),
   };
 
   get project(): Project { return this.store.project; }

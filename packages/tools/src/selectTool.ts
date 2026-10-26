@@ -9,7 +9,7 @@ import { pickRoomAt, roomIdsInBox } from './roomPick.ts';
 import { pickRoomSeparatorAt } from './roomSeparatorPick.ts';
 import { pickCeilingAt } from './ceilingPick.ts';
 import { pickSlabAt, slabIdsInBox } from './slabPick.ts';
-import { pickRoofAt, roofEdgeAt, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
+import { pickRoofAt, roofEdgeAt, roofEdgeHoverPreview, roofEdgeOnLevel, roofEdgePreview, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
@@ -32,6 +32,9 @@ interface AnyHit {
   kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view';
 }
 
+/** Itens que ganham o clique sobre a aresta de um telhado não selecionado (o telhado, o piso e o forro não ganham). */
+const CEDE_A_ARESTA: ReadonlySet<AnyHit['kind']> = new Set(['wall', 'door', 'window', 'stair', 'roomSeparator', 'annotation', 'view']);
+
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
 /** Shift ou Ctrl (Cmd no Mac): o clique e a janela somam à seleção (Ctrl alterna quem já está selecionado). */
@@ -47,6 +50,8 @@ export class SelectTool extends ToolBase {
   private hold: GripHold | null = null;
   /** Aresta de telhado pressionada (ainda sem arrasto: vira seleção de aresta no soltar). */
   private roofEdgeDown: RoofEdgeSel | null = null;
+  /** Aresta de telhado sob o cursor em repouso: o pré-destaque, e o que o clique alterna se o telhado não está selecionado. */
+  private roofEdgeHover: RoofEdgeSel | null = null;
   /** Vértice de piso, laje ou telhado em foco (clicado com a alça): o Delete o remove. */
   private focus: GripFocus | null = null;
   private delta: Vec2 = { x: 0, y: 0 };
@@ -128,6 +133,38 @@ export class SelectTool extends ToolBase {
     return vm ? { id: vm, kind: 'view' } : null;
   }
 
+  /**
+   * Aresta de telhado que o clique pega: a do telhado selecionado (como antes), ou a de outro telhado do nível. Esta cede
+   * a parede, a abertura e a anotação sob o cursor, para não roubar o clique de um elemento linear.
+   */
+  private roofEdgeUnder(at: Vec2): RoofEdgeSel | null {
+    const pr = this.env.project();
+    const lv = this.env.levelId();
+    const mpp = this.env.metersPerPixel();
+    const sel = this.env.selection();
+    const own = roofEdgeAt(pr, sel, at, mpp);
+    if (own) return own;
+    const other = roofEdgeOnLevel(pr, lv, sel, at, mpp);
+    if (!other) return null;
+    const hit = this.hitAt(at);
+    return hit && CEDE_A_ARESTA.has(hit.kind) ? null : other;
+  }
+
+  /** A aresta pressionada pertence a um telhado selecionado: o clique a escolhe para o painel (em vez de alternar). */
+  private roofEdgeChosen(): boolean {
+    const re = this.roofEdgeDown;
+    return !!re && this.env.selection().includes(re.roofId);
+  }
+
+  /** Alterna "define inclinação" da aresta de um telhado não selecionado, com a mensagem do resultado. */
+  private alternaAresta(re: RoofEdgeSel): void {
+    const r = this.env.project().elements[re.roofId];
+    if (!isRoof(r)) return;
+    const define = r.edgeSlopes[re.index] === null || r.edgeSlopes[re.index] === undefined;
+    if (!this.env.toggleRoofEdge?.(re.roofId, re.index)) return;
+    this.env.say(define ? `Aresta ${re.index + 1} passa a definir a inclinação. Ctrl+Z desfaz.` : `Aresta ${re.index + 1} deixa de definir a inclinação (empena). Ctrl+Z desfaz.`);
+  }
+
   override move(p: PointerInfo): void {
     this.raw = p.raw;
     const pr = this.env.project();
@@ -140,6 +177,9 @@ export class SelectTool extends ToolBase {
     if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()));
     // Aresta de telhado escolhida na planta: destacada enquanto o telhado segue selecionado.
     this.items.push(...roofEdgePreview(pr, this.env.selection(), this.env.roofEdge?.() ?? null));
+    // Aresta de telhado sob o cursor, selecionado ou não: pré-destaque antes do clique (o clique a escolhe ou a alterna).
+    this.roofEdgeHover = this.mode === 'idle' ? this.roofEdgeUnder(p.raw) : null;
+    this.items.push(...roofEdgeHoverPreview(pr, this.roofEdgeHover));
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
@@ -230,7 +270,7 @@ export class SelectTool extends ToolBase {
       this.mode = 'grip';
       return;
     }
-    const re = roofEdgeAt(pr, sel, p.raw, mpp);
+    const re = this.roofEdgeUnder(p.raw);
     if (re) { this.roofEdgeDown = re; this.mode = 'roofedge'; return; }
     const dt = dimTextGripAt(pr, this.env.levelId(), sel, p.raw, mpp);
     if (dt) { this.dimTextGrip = dt; this.dimTextAt = null; this.mode = 'dimtext'; return; }
@@ -253,7 +293,8 @@ export class SelectTool extends ToolBase {
     const moved = dist(p.raw, this.downPt) > 4 * mpp;
     const pr = this.env.project();
     if (this.mode === 'pending' && moved) this.mode = 'window';
-    if (this.mode === 'roofedge' && moved) this.mode = 'dragwait';
+    // Arrastar a partir da aresta de telhado não selecionado é janela (não alterna nada); o de telhado selecionado move.
+    if (this.mode === 'roofedge' && moved) this.mode = this.roofEdgeChosen() ? 'dragwait' : 'window';
     if (this.mode === 'dragwait' && moved) this.mode = 'moving';
     this.items = [];
     if (this.mode === 'dimgrip') this.dragDimGrip(p);
@@ -323,7 +364,9 @@ export class SelectTool extends ToolBase {
       }
       case 'roofedge': {
         const re = this.roofEdgeDown;
-        if (re) { this.env.setSelection([re.roofId]); this.env.setRoofEdge?.(re); this.env.say(`Aresta ${re.index + 1} selecionada: Propriedades define a inclinação e o balanço; I alterna "define inclinação".`); }
+        if (!re) break;
+        if (this.roofEdgeChosen()) { this.env.setSelection([re.roofId]); this.env.setRoofEdge?.(re); this.env.say(`Aresta ${re.index + 1} selecionada: Propriedades define a inclinação e o balanço; I alterna "define inclinação".`); }
+        else this.alternaAresta(re);
         break;
       }
       case 'moving': {

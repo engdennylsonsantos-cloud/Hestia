@@ -1,7 +1,9 @@
 import type { Vec2 } from './vec.ts';
 
 /** Família do símbolo de planta de um vão (mesmos nomes do `PlanSymbol` do model). */
-export type OpeningPlanFamily = 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement';
+export type OpeningPlanFamily =
+  | 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement'
+  | 'dblact' | 'pocket' | 'bifold' | 'accordion' | 'garage' | 'hinged' | 'hung' | 'pivotwin' | 'louver';
 
 /** O que o símbolo de planta precisa de um vão. O `OpeningGeometry` do engine cumpre (é um superconjunto). */
 export interface OpeningSymbolInput {
@@ -17,7 +19,7 @@ export interface OpeningSymbolInput {
   sHi: number;
   sLo: number;
   /** 0 = vão livre: só o recorte e a soleira. Portas: 1 ou 2. Janelas de correr: 1 a 3 folhas. */
-  leaves: 0 | 1 | 2 | 3;
+  leaves: 0 | 1 | 2 | 3 | 4;
   plan: OpeningPlanFamily;
   flipHand: boolean;
   flipFacing: boolean;

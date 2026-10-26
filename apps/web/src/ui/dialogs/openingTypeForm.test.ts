@@ -20,17 +20,17 @@ const store = (): ProjectStore => new ProjectStore(buildTemplate('house2'));
 
 describe('famílias de abertura no formulário', () => {
   it('oferece só as famílias do tipo, na ordem da interface', () => {
-    expect(familyOptionsFor('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_void']);
-    expect(familyOptionsFor('window').map((f) => f.id)).toEqual(['window_fixed', 'window_tilt', 'window_casement', 'window_sliding', 'window_void']);
+    expect(familyOptionsFor('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_dblact', 'door_pocket', 'door_bifold', 'door_accordion', 'door_garage', 'door_void']);
+    expect(familyOptionsFor('window').map((f) => f.id)).toEqual(['window_fixed', 'window_hinged', 'window_tilt', 'window_casement', 'window_sliding', 'window_hung', 'window_pivot', 'window_louver', 'window_void']);
   });
 
-  it('rótulo de folhas e opções aceitas pela família (janela de correr: 2 ou 3)', () => {
+  it('rótulo de folhas e opções aceitas pela família (janela de correr: 2 a 4)', () => {
     expect(leavesLabel(0)).toBe('Vão livre (sem folha)');
     expect(leavesLabel(1)).toBe('1 folha');
     expect(leavesLabel(2)).toBe('2 folhas');
     expect(leavesLabel(3)).toBe('3 folhas');
     const correr = familyOptionsFor('window').find((f) => f.id === 'window_sliding')!;
-    expect(leavesChoicesFor(correr).map((o) => o.value)).toEqual([2, 3]);
+    expect(leavesChoicesFor(correr).map((o) => o.value)).toEqual([2, 3, 4]);
     const fixa = familyOptionsFor('window').find((f) => f.id === 'window_fixed')!;
     expect(leavesChoicesFor(fixa)).toHaveLength(1);
   });

@@ -277,10 +277,13 @@ export interface Wall {
  * Família do símbolo de planta. Portas: arco com folha (swing), dupla, correr, pivotante.
  * Janelas: fixa, basculante, maxim-ar (arco tracejado) e correr.
  */
-export type PlanSymbol = 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement';
+export type PlanSymbol =
+  | 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement'
+  // Esquadrias v2 (decisão 0034): famílias novas. `hinged` = janela de abrir com giro lateral (`casement` segue sendo a maxim-ar).
+  | 'dblact' | 'pocket' | 'bifold' | 'accordion' | 'garage' | 'hinged' | 'hung' | 'pivotwin' | 'louver';
 
 /** Contagem de folhas de uma abertura. 0 = vão livre (sem folha nem caixilho). As famílias aceitas estão em `opening.ts`. */
-export type OpeningLeaves = 0 | 1 | 2 | 3;
+export type OpeningLeaves = 0 | 1 | 2 | 3 | 4;
 
 export interface OpeningType {
   id: Id;

@@ -8,9 +8,9 @@ const tipo = (id: string): OpeningType => {
 };
 
 describe('famílias de abertura', () => {
-  it('porta e janela têm cinco famílias cada, na ordem da interface', () => {
-    expect(openingFamilies('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_void']);
-    expect(openingFamilies('window').map((f) => f.id)).toEqual(['window_fixed', 'window_tilt', 'window_casement', 'window_sliding', 'window_void']);
+  it('famílias de porta (10) e de janela (9), na ordem da interface', () => {
+    expect(openingFamilies('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_dblact', 'door_pocket', 'door_bifold', 'door_accordion', 'door_garage', 'door_void']);
+    expect(openingFamilies('window').map((f) => f.id)).toEqual(['window_fixed', 'window_hinged', 'window_tilt', 'window_casement', 'window_sliding', 'window_hung', 'window_pivot', 'window_louver', 'window_void']);
   });
 
   it('cada tipo do catálogo cai na família do seu comportamento', () => {
@@ -39,10 +39,10 @@ describe('famílias de abertura', () => {
   it('folhas aceitas por família: giro 1, dupla 2, correr 2, pivotante 1, vão livre 0; janela de correr 2 e 3', () => {
     expect(openingLeaves({ kind: 'door', plan: 'swing', leaves: 1 })).toEqual([1]);
     expect(openingLeaves({ kind: 'door', plan: 'double', leaves: 2 })).toEqual([2]);
-    expect(openingLeaves({ kind: 'door', plan: 'sliding', leaves: 2 })).toEqual([2]);
+    expect(openingLeaves({ kind: 'door', plan: 'sliding', leaves: 2 })).toEqual([2, 1]);
     expect(openingLeaves({ kind: 'door', plan: 'pivot', leaves: 1 })).toEqual([1]);
     expect(openingLeaves({ kind: 'door', plan: 'swing', leaves: 0 })).toEqual([0]);
-    expect(openingLeaves({ kind: 'window', plan: 'sliding', leaves: 3 })).toEqual([2, 3]);
+    expect(openingLeaves({ kind: 'window', plan: 'sliding', leaves: 3 })).toEqual([2, 3, 4]);
     expect(openingLeaves({ kind: 'window', plan: 'tilt', leaves: 1 })).toEqual([1]);
   });
 

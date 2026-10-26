@@ -90,6 +90,15 @@ export type OpeningFamilyId =
   | 'door_sliding'
   | 'door_pivot'
   | 'door_void'
+  | 'door_dblact'
+  | 'door_pocket'
+  | 'door_bifold'
+  | 'door_accordion'
+  | 'door_garage'
+  | 'window_hinged'
+  | 'window_hung'
+  | 'window_pivot'
+  | 'window_louver'
   | 'window_fixed'
   | 'window_tilt'
   | 'window_casement'
@@ -118,13 +127,22 @@ export interface OpeningFamily {
 export const OPENING_FAMILIES: readonly OpeningFamily[] = [
   { id: 'door_swing', kind: 'door', plan: 'swing', leaves: [1], name: 'Porta de giro' },
   { id: 'door_double', kind: 'door', plan: 'double', leaves: [2], name: 'Porta dupla' },
-  { id: 'door_sliding', kind: 'door', plan: 'sliding', leaves: [2], name: 'Porta de correr' },
+  { id: 'door_sliding', kind: 'door', plan: 'sliding', leaves: [2, 1], name: 'Porta de correr' },
   { id: 'door_pivot', kind: 'door', plan: 'pivot', leaves: [1], name: 'Porta pivotante' },
+  { id: 'door_dblact', kind: 'door', plan: 'dblact', leaves: [1, 2], name: 'Porta vai-e-vem' },
+  { id: 'door_pocket', kind: 'door', plan: 'pocket', leaves: [1], name: 'Porta de embutir' },
+  { id: 'door_bifold', kind: 'door', plan: 'bifold', leaves: [2, 4], name: 'Porta dobrável' },
+  { id: 'door_accordion', kind: 'door', plan: 'accordion', leaves: [1], name: 'Porta sanfonada' },
+  { id: 'door_garage', kind: 'door', plan: 'garage', leaves: [1], name: 'Portão seccionado' },
   { id: 'door_void', kind: 'door', plan: 'swing', leaves: [0], name: 'Vão livre' },
   { id: 'window_fixed', kind: 'window', plan: 'fixed', leaves: [1], name: 'Janela fixa' },
+  { id: 'window_hinged', kind: 'window', plan: 'hinged', leaves: [1, 2], name: 'Janela de abrir' },
   { id: 'window_tilt', kind: 'window', plan: 'tilt', leaves: [1], name: 'Janela basculante' },
   { id: 'window_casement', kind: 'window', plan: 'casement', leaves: [1], name: 'Janela maxim-ar' },
-  { id: 'window_sliding', kind: 'window', plan: 'sliding', leaves: [2, 3], name: 'Janela de correr' },
+  { id: 'window_sliding', kind: 'window', plan: 'sliding', leaves: [2, 3, 4], name: 'Janela de correr' },
+  { id: 'window_hung', kind: 'window', plan: 'hung', leaves: [2], name: 'Janela guilhotina' },
+  { id: 'window_pivot', kind: 'window', plan: 'pivotwin', leaves: [1], name: 'Janela pivotante' },
+  { id: 'window_louver', kind: 'window', plan: 'louver', leaves: [1], name: 'Janela veneziana' },
   { id: 'window_void', kind: 'window', plan: 'fixed', leaves: [0], name: 'Vão livre' },
 ];
 

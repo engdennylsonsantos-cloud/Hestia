@@ -148,6 +148,11 @@ describe('diálogo do tipo de abertura (render)', () => {
       'Porta dupla',
       'Porta de correr',
       'Porta pivotante',
+      'Porta vai-e-vem',
+      'Porta de embutir',
+      'Porta dobrável',
+      'Porta sanfonada',
+      'Portão seccionado',
       'Vão livre',
     ]);
   });

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { resolveLevel } from '@hestia/engine';
 import { createEmptyProject, makeWall, type Opening, type Project, type Wall } from '@hestia/model';
+import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { openingTagLabels } from './openingTags.ts';
 import { defaultPaint } from './style.ts';
+import { LIGHT } from './types.ts';
 
 const wall = (): Wall => ({ ...makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }), order: 1 });
 const door = (extra: Partial<Opening> = {}): Opening => ({ id: 'd', kind: 'door', typeId: 'ot_p80', hostId: 'w', offset: 1.2, flipHand: false, flipFacing: false, sillOverride: null, mark: '', ...extra });
@@ -56,5 +59,26 @@ describe('etiquetas de portas e janelas', () => {
     p.settings = { ...p.settings, showOpeningTags: true };
     const labels = openingTagLabels(p, 'lv_0', paint, 100, new Set(['d']));
     expect(labels.map((l) => l.text)).toEqual(['J-01']);
+  });
+
+  it('o desenho da planta inclui a etiqueta quando a configuração está ligada', () => {
+    const p = project([door()]);
+    p.settings = { ...p.settings, showOpeningTags: true };
+    p.nextOrder = 2;
+    const input: PlanInput = {
+      project: p,
+      levelId: 'lv_0',
+      resolved: resolveLevel(p, 'lv_0', new Map()),
+      below: null,
+      viewport: { cx: 2, cy: 0, zoom: 100, width: 800, height: 600 },
+      theme: LIGHT,
+      dark: false,
+      selection: [],
+      hover: null,
+      preview: [],
+      inference: null,
+      showGrid: false,
+    };
+    expect(buildPlanDrawList(input).labels.map((l) => l.text)).toContain('P-02');
   });
 });

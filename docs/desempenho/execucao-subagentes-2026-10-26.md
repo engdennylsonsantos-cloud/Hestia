@@ -11,14 +11,14 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — S0, S1, S2 e A2 integrados; A1 e R1 em execução.
-**Em execução:** A1 (inserção/abertura), R1 (fundação 3D GPU).
-**Próxima ação:** aguardar A1 para rodar M0 sem ruído; R5 herda o FAIL de realce de linha de detalhe do A2.
+**Última atualização:** 2026-10-26 — A1 integrado; inserção na meta, abertura pendente. R1 em execução.
+**Em execução:** R1 (fundação 3D GPU).
+**Próxima ação:** aguardar R1 para rodar M0 em janela exclusiva; depois abrir A1b (abertura ≤300 ms).
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
 | 0 — Verdade | G0 | 🟨 em andamento | S0, S1, S2, M0 | — | — |
-| 1 — Estabilização | G1 | ⬜ aguarda G0 | A1, A2, I1 | — | — |
+| 1 — Estabilização | G1 | 🟨 parcial: inserção ok; abertura pendente (A1b) | A1, A1b, A2, I1 | 2026-10-26 | inserção 19–25 ms; abertura 445–465 ms |
 | 2 — Fundação GPU | G2 | ⬜ aguarda G1 | R1–R5 | — | — |
 | 3 — WebGPU | G3 | ⬜ aguarda G2 | W1, W2 | — | — |
 | 4 — CPU/workers | G4 | ⬜ paralela à 2/3 | P1, P2 | — | — |
@@ -30,7 +30,8 @@
 - [x] **S1** instrumentação (`?perf=1`, timers, contadores) — concluído em `2a4ec8e`; ver `docs/desempenho/instrumentacao-s1-2026-10-26.md`
 - [x] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes) — concluído em `f494263`; ver `docs/desempenho/s2-projeto-grande-2026-10-26.md`
 - [ ] **M0** baseline 10/30/60
-- [ ] **A1** inserção/abertura
+- [x] **A1** inserção/abertura — concluído em `1a7883c`/`16f9658`; inserção na meta, abertura ainda 445–465 ms
+- [ ] **A1b** abertura ≤300 ms (cache por nível, avisos adiados, desenho inicial)
 - [x] **A2** verificação visual — concluído em `763b890`; 44 PASS, 1 FAIL (realce de linha de detalhe)
 - [ ] **I1** integração da Fase 1
 - [ ] **R1** fundação 3D GPU — em execução (worktree `gpu-r1-foundation`)
@@ -111,6 +112,20 @@
 - **Capturas em SwiftShader:** critérios estruturais/pixel-métricos, sem baseline; não substituem GPU real.
 - **Fora desta rodada:** tema escuro, zoom >220, pranchas/DXF e seleção de regiões de detalhe.
 - **Exceção de tamanho:** `tests/e2e/verificacao-visual.mjs` ficou com ~725 linhas; refatorar em H1.
+
+### Achados A1 (2026-10-26)
+
+- **Inserção na meta:** porta 18,8–22,6 ms; janela 19,1–20,7 ms; parede nova 22,1–25,3 ms (20 pav, HTTP, 10 rep).
+  A meta de 20 ms é quase o piso da métrica (`pointerup → 2 rAF` = 2 quadros).
+- **Abertura não:** 445–465 ms contra meta 300 ms. Perfil: ~184–200 ms de resolução exata de dois níveis,
+  ~118–138 ms do primeiro desenho exato e ~119 ms de estilo/layout do DOM novos — tudo fora dos arquivos do A1.
+- **H1 mantida:** `App` não assina mais `useProject()`; `Palco` + `useProjetoDerivado` reduzem a cauda do React.
+- **H2 revertida:** resolver só o nível visível só move os mesmos ~80 ms para o 1º desenho; total igual.
+- **H3 confirmada:** `file://` não cria module worker (origem `null`); `http://` cria. A medição oficial é por HTTP.
+- **H4 descartada:** `ATRASO_AVISO_MS`/`avancar()` não seguram a thread (<1 ms).
+- **Novos achados para A1b:** `avisosDoProjeto` gasta 115–140 ms 300 ms após cada edição; o cache de geometria só
+  grava quando **todos** os níveis ficam prontos (~2 s), então quase nunca é reaproveitado na abertura seguinte.
+- **Ambiente:** a máquina estava compartilhada com S2/A2; o mesmo build base deu 435–474 ms. M0 precisa ser exclusivo.
 
 ## 1. Regras do board
 

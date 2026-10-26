@@ -37,7 +37,7 @@ Hoje: `packages/render/src/plan/sketch.ts` desenha a seleção como uma faixa az
 
 Plano:
 1. Realce visível: linha selecionada em azul sólido, mais grossa que a rosa, com vértices cheios nas pontas e ponto no meio; hover em azul claro antes do clique; as linhas de origem dos comandos também realçadas.
-2. Comandos dinâmicos: ligar Deslocar, Mover, Copiar, Girar, Espelhar, Matriz e escolher a linha com o mouse. Deslocar com uma linha: prévia da cópia do lado do cursor, distância digitada (Enter) ou clique do lado. Tab alterna "só a linha" e "todo o laço conectado".
+2. Comandos dinâmicos: ligar Deslocar, Mover, Copiar, Rotacionar, Espelhar, Matriz e escolher a linha com o mouse. Deslocar com uma linha: prévia da cópia do lado do cursor, distância digitada (Enter) ou clique do lado. Tab alterna "só a linha" e "todo o laço conectado".
 3. Janela de seleção (arrastar caixa), Shift soma, Ctrl subtrai, Ctrl+A seleciona tudo.
 4. Barra de status sempre com o passo seguinte.
 5. Atualizar `tests/e2e/perimetro-modificar.mjs` (hoje seleciona todas as linhas por `loadDraft` antes do Deslocar).

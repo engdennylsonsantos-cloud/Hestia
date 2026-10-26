@@ -1,5 +1,5 @@
 /**
- * Edição de linhas do esboço de perímetro (Aparar, Estender, Dividir, Deslocar, Espelhar, Girar, Copiar, Matriz,
+ * Edição de linhas do esboço de perímetro (Aparar, Estender, Dividir, Deslocar, Espelhar, Rotacionar, Copiar, Matriz,
  * Alinhar, Excluir, Unir e Encaixar). Funções puras sobre `SketchDraft`: devolvem um rascunho novo, ou null quando a
  * operação é impossível (nada a fazer, linha inexistente, arco que não se sustenta). Ids e flags de telhado das linhas
  * tocadas são preservados.

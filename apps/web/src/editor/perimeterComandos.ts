@@ -33,7 +33,7 @@ export const DICA_COMANDO: Record<PerimeterModifyKind, string> = {
   offset: 'Deslocar: digite a distância ou clique do lado para onde deslocar.',
   move: 'Mover: escolha o ponto de origem e depois o de destino.',
   copy: 'Copiar: escolha o ponto de origem e depois o de destino.',
-  rotate: 'Girar: escolha o centro e depois o ângulo.',
+  rotate: 'Rotacionar: escolha o centro e depois o ângulo.',
   mirror: 'Espelhar: clique em dois pontos do eixo. Tab copia.',
   array: 'Matriz: escolha a linha a repetir e depois a distância.',
   align: 'Alinhar: clique na linha a alinhar e depois na linha de referência.',

@@ -213,7 +213,7 @@ export function labelOf(c: Command): string {
     case 'setJoin':
       return 'Alterar junção';
     case 'transform':
-      return c.copy ? 'Copiar' : c.transform.kind === 'translate' ? 'Mover' : c.transform.kind === 'rotate' ? 'Girar' : 'Espelhar';
+      return c.copy ? 'Copiar' : c.transform.kind === 'translate' ? 'Mover' : c.transform.kind === 'rotate' ? 'Rotacionar' : 'Espelhar';
     case 'splitWall':
       return 'Dividir parede';
     case 'deleteElements':

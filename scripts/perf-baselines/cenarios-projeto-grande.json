@@ -1,0 +1,79 @@
+{
+  "geradoEm": "2026-10-26",
+  "frente": "S2 — gerador de projeto grande (Fase 0)",
+  "gerador": "scripts/perf-baselines/projeto-sintetico.mts",
+  "comando": "PROJETO_SAIDA=<arquivo.hestia.json> PROJETO_PAVIMENTOS=<pavimentos> PROJETO_PAREDES=<paredesPorPavimento> npx vite-node scripts/perf-baselines/projeto-sintetico.mts",
+  "padrao": {
+    "pavimentos": 10,
+    "paredesPorPavimento": 32,
+    "observacao": "Com 32 paredes o gerador chama fixtureSintetica.syntheticProject e o arquivo é idêntico ao baseline anterior (10 pavimentos: 252542 bytes, sha256 565c8e164ab4a862ac2629ef396caa9984836ffe1c65e97767eb321e055a6a53)."
+  },
+  "layouts": {
+    "32": {
+      "grade": "3 × 3 células de 4 m (12 × 12 m)",
+      "paredesDaGrade": 24,
+      "divisorias": 8,
+      "ambientesPorPavimento": 0,
+      "aberturasPorPavimento": 1,
+      "fonte": "packages/engine/src/fixtureSintetica.ts"
+    },
+    "128": {
+      "grade": "7 × 8 células de 4 m (28 × 32 m)",
+      "paredesDaGrade": 127,
+      "divisorias": 1,
+      "ambientesPorPavimento": 28,
+      "aberturasPorPavimento": 16
+    },
+    "256": {
+      "grade": "9 × 13 células de 4 m (36 × 52 m)",
+      "paredesDaGrade": 256,
+      "divisorias": 0,
+      "ambientesPorPavimento": 59,
+      "aberturasPorPavimento": 32
+    }
+  },
+  "cenarios": [
+    {
+      "pavimentos": 30,
+      "paredesPorPavimento": 128,
+      "paredes": 3840,
+      "ambientes": 840,
+      "aberturas": 480,
+      "arquivo": { "bytes": 3037259, "mb": 2.9, "sha256": "404c6f82f3c349fad2a3ba0d933343675f68c8c102243745bcf1e6b13c242062" },
+      "geracaoNoGeradorS": 0.15,
+      "processoViteNodeS": 2.18
+    },
+    {
+      "pavimentos": 30,
+      "paredesPorPavimento": 256,
+      "paredes": 7680,
+      "ambientes": 1770,
+      "aberturas": 960,
+      "arquivo": { "bytes": 6061790, "mb": 5.78, "sha256": "4d5581749501164218e9dd7c2cddfc0ec23e03d561b286f85f11279db6639356" },
+      "geracaoNoGeradorS": 0.36,
+      "processoViteNodeS": 2.5
+    },
+    {
+      "pavimentos": 60,
+      "paredesPorPavimento": 128,
+      "paredes": 7680,
+      "ambientes": 1680,
+      "aberturas": 960,
+      "arquivo": { "bytes": 6059005, "mb": 5.78, "sha256": "e6f754d58563c9fdf03ea1afffb338f65ea7a820538cc9c434224c4270dc7543" },
+      "geracaoNoGeradorS": 0.57,
+      "processoViteNodeS": 4.07
+    },
+    {
+      "pavimentos": 60,
+      "paredesPorPavimento": 256,
+      "paredes": 15360,
+      "ambientes": 3540,
+      "aberturas": 1920,
+      "arquivo": { "bytes": 12124209, "mb": 11.56, "sha256": "417129dc1b799dfbe741bf4f2e1e14eeb68d67e0b14b3dffd66bb88a545425ae" },
+      "geracaoNoGeradorS": 1.04,
+      "processoViteNodeS": 3.45
+    }
+  ],
+  "medicao": "scripts/perf-baselines/gpu-memoria-s2-exploratorio-2026-10-26.json",
+  "reproduzibilidade": "Duas gerações de 30 × 128 produziram o mesmo sha256; o JSON é determinístico (sem sorteio e sem carimbo de data no arquivo)."
+}

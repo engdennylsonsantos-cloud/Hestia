@@ -1,12 +1,12 @@
 import { cross, dist, dot, intersectCircleLine, intersectCircles, intersectLines, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall, normalAt, pointAt, toLocal, type WallFrame } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
 import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
-import type { PointerInfo } from './types.ts';
+import type { PointerInfo, PreviewItem } from './types.ts';
 
 type Axis = { kind: 'line'; p: Vec2; d: Vec2 } | { kind: 'circle'; c: Vec2; r: number };
 
@@ -78,6 +78,26 @@ function cornerPlan(fa: WallFrame, fb: WallFrame, clickA: Vec2, clickB: Vec2): C
   const pb = cornerPatch(fb, corner, clickB);
   if (!pa || !pb) return null;
   return { patches: [{ id: fa.wall.id, patch: pa }, { id: fb.wall.id, patch: pb }] };
+}
+
+/**
+ * Frase de confirmação do canto (antes de aplicar, com o projeto ainda antigo): "estendida" quando a parede ficou
+ * mais longa, "aparada" quando ficou mais curta, e as duas quando o canto mexe nas duas paredes.
+ */
+function confirmaCanto(pr: Project, patches: Array<{ id: Id; patch: EndPatch }>): string {
+  let estendidas = 0;
+  let aparadas = 0;
+  for (const { id, patch } of patches) {
+    const w = pr.elements[id];
+    if (!isWall(w)) continue;
+    const antes = dist(w.a, w.b);
+    const depois = dist(patch.a ?? w.a, patch.b ?? w.b);
+    if (depois > antes + 1e-6) estendidas += 1;
+    else if (depois < antes - 1e-6) aparadas += 1;
+  }
+  if (estendidas && aparadas) return 'Cantos ajustados.';
+  if (estendidas) return estendidas === 1 ? 'Parede estendida.' : 'Paredes estendidas.';
+  return aparadas === 1 ? 'Parede aparada.' : 'Paredes aparadas.';
 }
 
 /** Parede escolhida para aparar, com o ponto clicado (define a parte que fica). */
@@ -171,11 +191,12 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    const frase = confirmaCanto(pr, patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of patches) this.applyPatch(id, patch);
     });
     this.reset();
-    this.env.say(`${patches.length} parede(s) aparada(s).${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''}`);
+    this.env.say(`${frase}${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''} ${this.hint}`);
   }
 
   /** Mistura de parede e aresta (ou várias com uma só): desfaz a escolha e pede de novo. */
@@ -231,7 +252,7 @@ export class TrimTool extends ToolBase {
     });
     this.reset();
     // Recusado (travado): commitRingEdit já disse o motivo na barra de status; não sobrescrever.
-    if (ok) this.env.say(this.hint);
+    if (ok) this.env.say(`Canto aplicado. ${this.hint}`);
   }
 
   override click(p: PointerInfo): void {
@@ -282,11 +303,12 @@ export class TrimTool extends ToolBase {
       this.reset();
       return;
     }
+    const frase = confirmaCanto(pr, plan.patches);
     this.env.transaction('Aparar ao canto', () => {
       for (const { id, patch } of plan.patches) this.applyPatch(id, patch);
     });
     this.reset();
-    this.env.say(this.hint);
+    this.env.say(`${frase} ${this.hint}`);
   }
 }
 
@@ -353,9 +375,11 @@ export class AlignTool extends ToolBase {
     }
     const ref = pick.ref;
     // Travada: commitRingEdit já diz o motivo na barra de status.
+    let ok = false;
     this.env.transaction('Alinhar aresta', () => {
-      commitRingEdit(this.env, ref, next);
+      ok = commitRingEdit(this.env, ref, next);
     });
+    if (ok) this.env.say('Alinhado. Clique na próxima parede ou aresta a alinhar (Esc para trocar a referência).');
   }
 
   override click(p: PointerInfo): void {
@@ -397,27 +421,42 @@ export class AlignTool extends ToolBase {
       return;
     }
     moveWalls(this.env, [hitId], k);
+    this.env.say('Alinhado. Clique na próxima parede a alinhar (Esc para trocar a referência).');
   }
+}
+
+/** Cota de uma medida: linha entre os dois pontos, marcas nas extremidades e o valor no meio. */
+function cotaItems(a: Vec2, b: Vec2): PreviewItem[] {
+  return [
+    { kind: 'line', a, b },
+    { kind: 'point', at: a },
+    { kind: 'point', at: b },
+    { kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: `${dist(a, b).toFixed(3).replace('.', ',')} m` },
+  ];
 }
 
 export class MeasureTool extends ToolBase {
   readonly id = 'measure';
   readonly label = 'Medir';
-  readonly hint = 'Medir: clique em dois pontos.';
+  readonly hint = 'Medir: clique em dois pontos. A cota fica no desenho até Esc ou um novo clique.';
   private a: Vec2 | null = null;
+  /** Última medida concluída: a cota fica no desenho até Esc ou um novo clique. Só é visual (não entra no modelo nem no desfazer). */
+  private kept: { a: Vec2; b: Vec2 } | null = null;
 
   protected reset(): void {
     this.a = null;
+    this.kept = null;
     this.items = [];
   }
   protected busy(): boolean {
-    return this.a !== null;
+    return this.a !== null || this.kept !== null;
   }
 
   override move(p: PointerInfo): void {
     const inf = this.snap(p, { from: this.a ?? undefined });
     this.items = [];
     if (!this.a) {
+      if (this.kept) this.items.push(...cotaItems(this.kept.a, this.kept.b));
       this.items.push({ kind: 'point', at: inf.point });
       return;
     }
@@ -428,13 +467,16 @@ export class MeasureTool extends ToolBase {
   override click(p: PointerInfo): void {
     const inf = this.snap(p, { from: this.a ?? undefined });
     if (!this.a) {
+      this.kept = null;
+      this.items = [];
       this.a = inf.point;
       return;
     }
     const d = dist(this.a, inf.point);
     const ang = (Math.atan2(inf.point.y - this.a.y, inf.point.x - this.a.x) * 180) / Math.PI;
     this.env.say(`Distância ${d.toFixed(3).replace('.', ',')} m · ΔX ${(inf.point.x - this.a.x).toFixed(3).replace('.', ',')} · ΔY ${(inf.point.y - this.a.y).toFixed(3).replace('.', ',')} · ${((ang + 360) % 360).toFixed(1).replace('.', ',')}°`);
+    this.kept = { a: this.a, b: inf.point };
     this.a = null;
-    this.items = [];
+    this.items = cotaItems(this.kept.a, this.kept.b);
   }
 }

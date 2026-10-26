@@ -1,6 +1,8 @@
 import { offsetEdge, roofPatchProblem, roofSlopeError, type RoofEdgeSel } from '@hestia/tools';
 import { isRoof, type Id, type Project, type ProjectStore, type Roof } from '@hestia/model';
 import { useUi } from './state.ts';
+import { ehPrefixo } from './shortcuts.ts';
+import { casador, useAtalhos } from './shortcutConfig.ts';
 
 const say = (msg: string): void => useUi.setState({ status: msg });
 
@@ -69,10 +71,15 @@ export function toggleRoofEdgeDefines(store: ProjectStore, sel: RoofEdgeSel | nu
   return setEdgeDefines(store, r, sel.index, on);
 }
 
-/** Tecla "I" com uma aresta escolhida na planta: alterna "define inclinação". Devolve true quando consumiu a tecla. */
+/**
+ * Tecla "I" com uma aresta escolhida na planta: alterna "define inclinação". Devolve true quando consumiu a tecla.
+ * Decisão: a tecla da aresta não vale se começa um atalho (no Revit, I começa IN) ou se há sequência em andamento,
+ * senão engoliria a ferramenta. O "define inclinação" segue no painel de propriedades da aresta.
+ */
 export function roofEdgeKey(key: string, store: ProjectStore): boolean {
   const sel = useUi.getState().roofEdge;
   if (!sel || !/^i$/i.test(key)) return false;
+  if (casador.pendente || ehPrefixo(useAtalhos.getState().mapa, key.toUpperCase())) return false;
   toggleRoofEdgeDefines(store, sel);
   return true;
 }

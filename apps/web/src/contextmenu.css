@@ -1,0 +1,52 @@
+/* Menu de botão direito (PopupMenu): reaproveita .rb-menu e .rb-menuitem de ribbon.css e acrescenta o que é do menu de contexto. */
+
+.ctx-menu {
+  min-width: 232px;
+  border-radius: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  user-select: none;
+}
+
+.ctx-item {
+  padding: 4px 14px 4px 0;
+  outline: none;
+}
+
+.ctx-item[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ctx-item[aria-disabled="true"]:hover {
+  background: none;
+}
+
+.ctx-item.soon {
+  opacity: 0.5;
+}
+
+.ctx-active:not([aria-disabled="true"]) {
+  background: var(--accent-soft);
+}
+
+.ctx-check {
+  width: 22px;
+  flex: 0 0 22px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.ctx-label {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.ctx-item em {
+  margin-left: 24px;
+}
+
+.ctx-sub {
+  margin-left: 16px;
+  font-size: 10px;
+  color: var(--fg-faint);
+}

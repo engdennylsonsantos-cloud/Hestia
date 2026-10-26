@@ -168,6 +168,8 @@ export interface Dimension {
   b: Vec2;
   offset: number;
   refs?: { a?: DimensionRef; b?: DimensionRef };
+  /** Texto fixo que substitui o valor medido no desenho; vazio ou ausente mostra o valor medido. */
+  text?: string;
 }
 
 /** Texto de anotação: `at` é o ponto de inserção (centro), `height` em mm de papel, `rotation` em graus. */

@@ -12,8 +12,9 @@ const MODES: Array<[SlabMode, string]> = [
 ];
 
 /**
- * Opções das ferramentas Laje (tipo, modo, deslocamento do topo e inclinação) e Inclinação (percentual).
- * Fica fora do OptionsBar para que o barra principal só repasse a escolha da ferramenta.
+ * Opções das ferramentas Laje (tipo, modo e deslocamento do topo) e Inclinação (percentual). A inclinação só aparece na
+ * ferramenta Inclinação: a laje não a usa (sai com `slope: null`). Fica fora do OptionsBar para que a barra principal só
+ * repasse a escolha da ferramenta.
  */
 export function SlabOptionsBar({ tool }: { tool: 'slab' | 'slope' }): ReactElement {
   const p = useProject();
@@ -64,7 +65,6 @@ export function SlabOptionsBar({ tool }: { tool: 'slab' | 'slope' }): ReactEleme
         Deslocamento do topo
         <NumField id="opt-slaboffset" value={o.slabOffset} onCommit={(v) => set({ slabOffset: v })} unit="m" />
       </label>
-      {slope}
     </>
   );
 }

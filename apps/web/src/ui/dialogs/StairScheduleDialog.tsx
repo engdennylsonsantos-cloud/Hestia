@@ -2,29 +2,31 @@ import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildStairSchedule, filterStairRows, stairScheduleToCsv, sumStairRows, type StairScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 
 interface Col {
   key: keyof StairScheduleRow;
-  label: string;
+  /** Chave do rótulo em I18N (PT/EN). */
+  labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
 }
 
 const COLS: Col[] = [
-  { key: 'mark', label: 'Marca' },
-  { key: 'typeName', label: 'Tipo' },
-  { key: 'typeCode', label: 'Código' },
-  { key: 'baseLevelName', label: 'Nível de base' },
-  { key: 'topLevelName', label: 'Nível de topo' },
-  { key: 'riserCount', label: 'Espelhos', decimals: 0 },
-  { key: 'riserHeight', label: 'Altura do espelho (m)', decimals: 3 },
-  { key: 'treadMean', label: 'Piso médio (m)', decimals: 3 },
-  { key: 'width', label: 'Largura (m)', decimals: 2 },
-  { key: 'planArea', label: 'Área em planta (m²)', decimals: 2 },
-  { key: 'volume', label: 'Volume (m³)', decimals: 3 },
+  { key: 'mark', labelKey: 'col_mark' },
+  { key: 'typeName', labelKey: 'col_type' },
+  { key: 'typeCode', labelKey: 'col_code' },
+  { key: 'baseLevelName', labelKey: 'col_base_level' },
+  { key: 'topLevelName', labelKey: 'col_top_level' },
+  { key: 'riserCount', labelKey: 'col_risers', decimals: 0 },
+  { key: 'riserHeight', labelKey: 'col_riser_height', decimals: 3 },
+  { key: 'treadMean', labelKey: 'col_tread', decimals: 3 },
+  { key: 'width', labelKey: 'col_width', decimals: 2 },
+  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2 },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
 ];
 
 interface Sort {
@@ -32,7 +34,9 @@ interface Sort {
   dir: 1 | -1;
 }
 
-const fmt = (v: number, decimals: number): string => v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
+const fmt = (v: number, decimals: number): string =>
+  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: StairScheduleRow, b: StairScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -50,6 +54,7 @@ const cellValue = (r: StairScheduleRow, c: Col): ReactNode => {
 /** Tabela de escadas com ordenação, filtros por tipo e nível de base, totais e exportação CSV (padrão da tabela de telhados). */
 export function StairScheduleDialog(): ReactElement {
   const p = useProject();
+  const t = I18N[useI18n((s) => s.lang)];
   const schedule = useMemo(() => buildStairSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -82,34 +87,34 @@ export function StairScheduleDialog(): ReactElement {
 
   return (
     <Dialog
-      title="Tabela de escadas"
-      sub={`${visible.length} de ${schedule.rows.length} escadas`}
+      title={t.sched_title_stair}
+      sub={`${visible.length} ${t.sched_of} ${schedule.rows.length} ${t.sched_noun_stair}`}
       onClose={close}
       footer={
         <>
           <span className="wsched-msg" role="status">{msg}</span>
-          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title="Exporta as linhas filtradas, na ordem da tabela">
-            Exportar CSV
+          <button className="btn primary" onClick={() => void exportCsv()} disabled={visible.length === 0} title={t.sched_export_tip}>
+            {t.sched_export_csv}
           </button>
-          <button className="btn" onClick={close}>Fechar</button>
+          <button className="btn" onClick={close}>{t.sched_close}</button>
         </>
       }
     >
       <div className="wsched-bar">
-        <label htmlFor="ssc-level">Nível</label>
+        <label htmlFor="ssc-level">{t.col_level}</label>
         <select id="ssc-level" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
-          <option value="">Todos os níveis</option>
+          <option value="">{t.sched_all_levels}</option>
           {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
-        <label htmlFor="ssc-type">Tipo</label>
+        <label htmlFor="ssc-type">{t.col_type}</label>
         <select id="ssc-type" className="select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-          <option value="">Todos os tipos</option>
-          {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          <option value="">{t.sched_all_types}</option>
+          {types.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
         </select>
       </div>
 
       {visible.length === 0 ? (
-        <p className="hint">{schedule.rows.length === 0 ? 'Não há escadas neste projeto.' : 'Nenhuma escada com estes filtros.'}</p>
+        <p className="hint">{schedule.rows.length === 0 ? t.sched_empty_stair : t.sched_none_stair}</p>
       ) : (
         <>
           <div className="wsched-scroll">
@@ -118,8 +123,8 @@ export function StairScheduleDialog(): ReactElement {
                 <tr>
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
-                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title="Ordenar por esta coluna">
-                        {c.label}
+                      <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
+                        {t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -140,9 +145,9 @@ export function StairScheduleDialog(): ReactElement {
             </table>
           </div>
           <div className="total">
-            <span>{totals.count} {totals.count === 1 ? 'escada' : 'escadas'}</span>
-            <span>Área em planta {fmt(totals.planArea, 2)} m²</span>
-            <span>Volume {fmt(totals.volume, 3)} m³</span>
+            <span>{totals.count} {totals.count === 1 ? t.sched_noun_stair_one : t.sched_noun_stair}</span>
+            <span>{t.sched_total_plan_area} {fmt(totals.planArea, 2)} m²</span>
+            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
           </div>
         </>
       )}

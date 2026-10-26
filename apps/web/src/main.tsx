@@ -1,6 +1,15 @@
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import './ribbon.css';
+import './appshell.css';
+import './dock.css';
+import './contextmenu.css';
+import { installAppShell } from './editor/appShell.ts';
+import { installRecentCommands } from './editor/recentCommands.ts';
 import { App } from './App.tsx';
+
+installAppShell();
+installRecentCommands();
 
 createRoot(document.getElementById('root')!).render(<App />);
 

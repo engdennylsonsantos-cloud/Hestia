@@ -2,16 +2,19 @@ import { useEffect, useRef, type ReactElement } from 'react';
 import { editor, useProject } from './editor/controller.ts';
 import { roofEdgeKey } from './editor/roofEdgeActions.ts';
 import { useUi } from './editor/state.ts';
+import { atalhoAtual } from './editor/shortcutConfig.ts';
 import { tabOf } from './editor/viewTabActions.ts';
-import { Browser } from './ui/Browser.tsx';
+import { dockWidths } from './editor/dockLayout.ts';
+import { Dock } from './ui/Dock.tsx';
+import { FileMenu } from './ui/FileMenu.tsx';
 import { IconDefs } from './ui/Icon.tsx';
 import { EmptyViews } from './ui/EmptyViews.tsx';
 import { OptionsBar } from './ui/OptionsBar.tsx';
-import { Properties } from './ui/Properties.tsx';
 import { Ribbon } from './ui/Ribbon.tsx';
 import { StatusBar } from './ui/StatusBar.tsx';
 import { TitleBar } from './ui/TitleBar.tsx';
 import { Tutorial } from './ui/Tutorial.tsx';
+import { ViewControlBar } from './ui/ViewControlBar.tsx';
 import { ViewTabs } from './ui/ViewTabs.tsx';
 import { ViewportCanvas } from './ui/ViewportCanvas.tsx';
 import { SheetView } from './ui/SheetView.tsx';
@@ -20,6 +23,7 @@ import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
 import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
+import { ShortcutsConfigDialog } from './ui/dialogs/ShortcutsConfigDialog.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
@@ -36,6 +40,7 @@ import { StairScheduleDialog } from './ui/dialogs/StairScheduleDialog.tsx';
 import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
+import { MoveLevelDialog } from './ui/MoveLevel.tsx';
 
 function Dialogs(): ReactElement | null {
   const d = useUi((s) => s.dialog);
@@ -77,6 +82,8 @@ function Dialogs(): ReactElement | null {
       return <StartDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
+    case 'shortcutsConfig':
+      return <ShortcutsConfigDialog />;
     case 'schedule':
       return <WallScheduleDialog />;
     case 'sheet':
@@ -87,6 +94,8 @@ function Dialogs(): ReactElement | null {
       return arg ? <GraphicsVisibilityDialog target={arg} /> : null;
     case 'lineWeights':
       return <LineWeightsDialog />;
+    case 'moveLevel':
+      return <MoveLevelDialog onClose={() => useUi.setState({ dialog: null })} />;
     case 'cotasAuto':
       return <AutoCotaDialog />;
     default:
@@ -95,8 +104,10 @@ function Dialogs(): ReactElement | null {
 }
 
 export function App(): ReactElement {
-  const left = useUi((s) => s.leftOpen);
-  const right = useUi((s) => s.rightOpen);
+  const propsOpen = useUi((s) => s.propsOpen);
+  const browserOpen = useUi((s) => s.browserOpen);
+  const dock = useUi((s) => s.dock);
+  const widths = dockWidths(propsOpen, browserOpen, dock);
   const theme = useUi((s) => s.theme);
   const view = useUi((s) => s.view);
   const sheetId = useUi((s) => s.sheetId);
@@ -118,7 +129,9 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (!editor.restoreAutosave()) editor.newProject('house2');
-    useUi.setState({ status: 'Pronto. Pressione W para desenhar paredes, ou selecione para editar.' });
+    // A dica usa a sequência atual da parede (depende do perfil e da personalização); sem tecla, não cita letra.
+    const parede = atalhoAtual('wall');
+    useUi.setState({ status: parede ? `Pronto. Pressione ${parede} para desenhar paredes, ou selecione para editar.` : 'Pronto. Escolha uma ferramenta, ou selecione para editar.' });
   }, []);
 
   useEffect(() => {
@@ -146,19 +159,24 @@ export function App(): ReactElement {
       <TitleBar />
       <Ribbon />
       <OptionsBar />
-      <div className="workspace" style={{ gridTemplateColumns: `${left ? 'auto' : '0px'} minmax(0, 1fr) ${right ? 'auto' : '0px'}` }}>
-        {left ? <Properties /> : <span />}
+      <div className="workspace" style={{ gridTemplateColumns: `${widths.left}px minmax(0, 1fr) ${widths.right}px` }}>
+        <Dock side="left" />
         <main className="stage">
           <ViewTabs />
-          <div style={{ position: 'relative', minHeight: 0, display: 'grid' }}>
-            {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+          {/* O tutorial fica numa faixa própria acima da área de desenho (não cobre a planta nem recebe o clique). */}
+          <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Tutorial />
+            <div style={{ position: 'relative', minHeight: 0, flex: 1, display: 'grid' }}>
+              {semVistas ? <EmptyViews /> : view === 'sheet' && sheetId ? <SheetView sheetId={sheetId} /> : <ViewportCanvas />}
+            </div>
           </div>
+          {!semVistas && <ViewControlBar />}
         </main>
-        {right ? <Browser /> : <span />}
+        <Dock side="right" />
       </div>
       <StatusBar />
       <Dialogs />
+      <FileMenu />
     </div>
   );
 }

@@ -1,0 +1,32 @@
+/* ---- docks: Propriedades e Navegador acoplados aos lados (padrão Revit), redimensionáveis e movíveis ---- */
+.dock { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+.dock.left { border-right: 1px solid var(--line-strong); }
+.dock.right { border-left: 1px solid var(--line-strong); }
+.dock.empty { width: 0; border: 0; }
+.dock-pane { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.dock-split.h { flex: none; height: 5px; background: var(--line-strong); cursor: row-resize; touch-action: none; }
+.dock-split.h:hover, .dock-split.h:focus-visible { background: var(--accent); outline: none; }
+.dock-split.v { position: absolute; top: 0; bottom: 0; z-index: 6; width: 6px; cursor: col-resize; touch-action: none; }
+.dock-split.v.left { right: -3px; }
+.dock-split.v.right { left: -3px; }
+.dock-split.v:hover, .dock-split.v:focus-visible { background: color-mix(in srgb, var(--accent) 45%, transparent); outline: none; }
+
+/* cabeçalho é a alça de arrasto: não seleciona texto ao arrastar; foco por teclado (Alt+Setas) mostra o contorno */
+.panel-head { user-select: none; }
+.panel-head:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+body.dock-dragging, body.dock-dragging * { cursor: grabbing !important; }
+
+/* ---- arrasto de painel (ver ui/dockDragSession.ts): fantasma no cursor, prévia exata da área e guias nas bordas ---- */
+.dd-root { position: fixed; inset: 0; z-index: 10000; pointer-events: none; }
+.dd-edge { position: fixed; width: 3px; background: color-mix(in srgb, var(--accent) 55%, transparent); }
+/* A prévia é o retângulo real onde o painel vai ficar. A troca entre zonas desliza em ~100 ms. */
+.dd-preview { position: fixed; box-sizing: border-box; opacity: 0; background: color-mix(in srgb, var(--accent) 20%, transparent); border: 2px solid var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 35%, transparent); transition: left 0.1s ease-out, top 0.1s ease-out, width 0.1s ease-out, height 0.1s ease-out, opacity 0.08s linear; }
+.dd-preview.on { opacity: 1; }
+.dd-preview-label { position: absolute; left: 0; top: 0; right: 0; padding: 3px 8px; font-size: 11.5px; font-weight: 600; color: #fff; background: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Miniatura do painel que acompanha o cursor, com a pegada do clique preservada. */
+.dd-ghost { position: fixed; left: 0; top: 0; display: flex; flex-direction: column; box-sizing: border-box; opacity: 0.88; will-change: transform; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.dd-ghost.no-drop { opacity: 0.55; border-color: var(--line-strong); }
+.dd-ghost-title { flex: none; padding: 4px 8px; font-size: 11.5px; font-weight: 600; background: var(--chrome); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dd-ghost-body { flex: 1; background: repeating-linear-gradient(var(--sheet) 0 20px, var(--panel) 20px 21px); }
+/* O painel de origem fica esmaecido enquanto é levado. */
+.dock-pane.dd-source { opacity: 0.4; }

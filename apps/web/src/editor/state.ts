@@ -5,10 +5,12 @@ import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOpt
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
 import { activeViewOf, addView, type OpenView } from './openViews.ts';
+import type { RibbonTabId } from '../ui/ribbon/model.ts';
+import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -32,15 +34,23 @@ export interface UiState {
   showUnderlay: boolean;
   /** Projeção tracejada do contorno da cobertura acima do corte (opção da planta, decisão 0013 §2). */
   showRoofProjection: boolean;
-  leftOpen: boolean;
-  rightOpen: boolean;
+  /** Paleta de propriedades e navegador de projeto abertos. */
+  propsOpen: boolean;
+  browserOpen: boolean;
+  /** Disposição dos painéis acoplados (lado do navegador, larguras, divisória). */
+  dock: DockLayout;
   tutorial: boolean;
   /** Incrementa quando a pré-visualização da ferramenta muda (força novo desenho). */
   previewTick: number;
   cursor: { x: number; y: number } | null;
   snapKind: string;
   seen3d: boolean;
-  ribbon: 'arquitetura' | 'modificar' | 'vista';
+  /** Aba da faixa escolhida; 'ctx' é a aba contextual verde. */
+  ribbon: RibbonTabId;
+  /** Aba de antes da contextual: volta para ela quando a contextual some. */
+  ribbonBack: RibbonTabId;
+  /** Menu Arquivo aberto (aba Arquivo da faixa). */
+  fileMenu: boolean;
   /** Aresta de telhado escolhida na planta (seção "Aresta N" em Propriedades). */
   roofEdge: RoofEdgeSel | null;
   /**
@@ -134,6 +144,9 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   windowTypeId: 'ot_j120',
   orthoLock: false,
   arrayCount: 3,
+  arrayKind: 'linear',
+  arrayAngle: 360,
+  arrayAnchor: 'second',
   offsetDistance: 1,
   rotateCopy: false,
   mirrorCopy: true,
@@ -183,14 +196,17 @@ export const useUi = create<UiState>(() => ({
   showGrid: true,
   showUnderlay: true,
   showRoofProjection: readRoofProjection(),
-  leftOpen: typeof window === 'undefined' || window.innerWidth > 900,
-  rightOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  propsOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  browserOpen: typeof window === 'undefined' || window.innerWidth > 900,
+  dock: loadDock(),
   tutorial: false,
   previewTick: 0,
   cursor: null,
   snapKind: '',
   seen3d: false,
   ribbon: 'arquitetura',
+  ribbonBack: 'arquitetura',
+  fileMenu: false,
   roofEdge: null,
   openViews: DEFAULT_OPEN_VIEWS.map((v) => ({ ...v })),
 }));

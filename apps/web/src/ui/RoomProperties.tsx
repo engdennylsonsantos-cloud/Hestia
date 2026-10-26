@@ -49,7 +49,7 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
   return (
     <>
       {warning && <div className="hint warn" role="alert">{warning}</div>}
-      <Group title="Identidade">
+      <Group title="Dados de identidade">
         <Row label="Nome" htmlFor="p-rname"><TextField id="p-rname" value={name.value} mixed={name.mixed} onCommit={(v) => patch(ids, { name: v })} /></Row>
         <Row label="Número" htmlFor="p-rnum"><TextField id="p-rnum" value={number.value} mixed={number.mixed} onCommit={(v) => patch(ids, { number: v })} /></Row>
         {single && (

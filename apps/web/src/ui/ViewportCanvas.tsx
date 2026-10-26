@@ -6,11 +6,12 @@ import { editor } from '../editor/controller.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
-import { Icon } from './Icon.tsx';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels } from './PlanLabels';
-import { ViewControlBar } from './ViewControlBar.tsx';
+import { NavBar } from './NavBar.tsx';
+import { CanvasContextMenu } from './CanvasContextMenu.tsx';
+import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 
@@ -189,9 +190,12 @@ export function ViewportCanvas(): ReactElement {
   // ---- ponteiro ----
   const pointers = useRef(new Map<number, Pt>());
   /** `pick`: o ponteiro foi o botão esquerdo sem Espaço, então um clique sem arrasto na vista 3D escolhe um elemento (Shift pode ser pan). */
-  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
+  /** `shiftPending`: Shift com ferramenta de desenho na planta; sem arrasto é clique com shift (trava ortogonal), com arrasto vira pan. */
+  const drag = useRef<{ mode: 'tool' | 'pan' | 'orbit' | 'none'; start: Pt; last: Pt; moved: boolean; pick: boolean; shiftPending?: boolean }>({ mode: 'none', start: { x: 0, y: 0 }, last: { x: 0, y: 0 }, moved: false, pick: false });
   const gesture = useRef<{ dist: number; mid: Pt } | null>(null);
   const spaceDown = useRef(false);
+  /** Botão direito pressionado: solto sem arrasto (mais de 4 px) abre o menu de contexto. */
+  const rightPress = useRef<{ start: Pt; moved: boolean } | null>(null);
 
   useEffect(() => {
     const down = (e: KeyboardEvent): void => {
@@ -255,12 +259,13 @@ export function ViewportCanvas(): ReactElement {
     }
     const isMiddleBtn = e.button === 1;
     const isOrbitReq = (isMiddleBtn && e.shiftKey) || (e.button === 0 && e.altKey);
-    const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || (view !== '3d' && e.shiftKey)));
-    if (e.button === 2) {
-      if (view === 'plan') editor.activeTool.cancel();
-      editor.bump();
-      return;
-    }
+    // Na planta, Shift com a Selecionar é da seleção (soma e janela). Com ferramenta de desenho, Shift sem arrasto trava
+    // ortogonal (vai à ferramenta com shift); só vira pan se o ponteiro se mover (onMove). Na vista de corte, Shift arrasta a vista.
+    const shiftDraw = view === 'plan' && e.button === 0 && e.shiftKey && !spaceDown.current && editor.activeTool.id !== 'select';
+    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select' && !shiftDraw;
+    const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || shiftPan));
+    // Botão direito: o menu abre ao soltar sem arrasto (onUp). Não cancela a ferramenta: "Cancelar" está no menu.
+    if (e.button === 2) { rightPress.current = { start: s, moved: false }; return; }
     if (view === '3d') {
       const mode = isOrbitReq ? 'orbit' : isPanReq ? 'pan' : (e.button === 0 ? 'orbit' : 'none');
       drag.current = { mode, start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current && !e.altKey };
@@ -270,18 +275,21 @@ export function ViewportCanvas(): ReactElement {
     }
     // Na vista de corte não há ferramentas: o botão esquerdo arrasta a vista e, sem arrasto, seleciona (decisão 0016).
     if (isPanReq || isMiddleBtn || view === 'section') {
-      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && !isPanReq && e.button === 0 };
+      // Corte: sem Espaço, o botão esquerdo também seleciona no soltar se não houve arrasto (Shift incluso).
+      drag.current = { mode: 'pan', start: s, last: s, moved: false, pick: view === 'section' && e.button === 0 && !spaceDown.current };
       if (view === 'section' && useUi.getState().hover) useUi.setState({ hover: null });
       return;
     }
     if (!editor.viewport()) return;
-    drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false };
-    editor.pointer('down', info(e, s));
+    drag.current = { mode: 'tool', start: s, last: s, moved: false, pick: false, shiftPending: shiftDraw };
+    // Com Shift pendente, o 'down' só vai ao soltar (ver onUp), para não começar um gesto da ferramenta antes de saber se é pan.
+    if (!shiftDraw) editor.pointer('down', info(e, s));
   };
 
   const onMove = (e: RPointerEvent): void => {
     const s = local(e);
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, s);
+    if (rightPress.current) { if (Math.hypot(s.x - rightPress.current.start.x, s.y - rightPress.current.start.y) > 4) rightPress.current.moved = true; return; }
     const view = useUi.getState().view;
     if (gesture.current && pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
@@ -317,6 +325,13 @@ export function ViewportCanvas(): ReactElement {
     }
     // Sem botão pressionado, o corte realça o elemento sob o cursor (decisão 0016).
     if (view === 'section') { if (d.mode === 'none') hoverSectionAt(s); return; }
+    // Shift pendente que passou de ~3 px é arrasto da vista (pan), como antes; a ferramenta não recebe o gesto.
+    if (d.shiftPending && Math.hypot(s.x - d.start.x, s.y - d.start.y) > 3) {
+      d.shiftPending = false; d.mode = 'pan'; d.moved = true;
+      editor.pan(s.x - d.start.x, s.y - d.start.y);
+      d.last = s;
+      return;
+    }
     const v = editor.viewport();
     if (!v) return;
     const inf = info(e, s);
@@ -333,13 +348,22 @@ export function ViewportCanvas(): ReactElement {
   const onUp = (e: RPointerEvent): void => {
     const s = local(e);
     pointers.current.delete(e.pointerId);
+    if (rightPress.current && e.button === 2) {
+      const rp = rightPress.current;
+      rightPress.current = null;
+      // Alvo sob o cursor: 3D e corte pelo pick da vista; planta pelo realce da Selecionar (sem ferramenta, é null).
+      if (!rp.moved) abrirMenuDeContexto(e.clientX, e.clientY, useUi.getState().view === '3d' ? (elementAt3d(s)?.id ?? null) : useUi.getState().view === 'section' ? (sectionPickAt(s)?.id ?? null) : useUi.getState().hover, viewDoMenu(useUi.getState().view));
+      return;
+    }
     if (gesture.current) {
       if (pointers.current.size < 2) gesture.current = null;
       return;
     }
     const d = drag.current;
     if (d.mode === 'tool') {
-      const inf = info(e, s);
+      // Shift pendente sem arrasto: é um toque com shift (trava ortogonal) e a ferramenta recebe down, up e click.
+      const inf = d.shiftPending ? { ...info(e, s), shift: true } : info(e, s);
+      if (d.shiftPending) editor.pointer('down', inf);
       editor.pointer('up', inf);
       if (!d.moved) editor.pointer('click', inf);
     }
@@ -364,6 +388,8 @@ export function ViewportCanvas(): ReactElement {
     }
     // Clique sem arrasto no corte ou na elevação: o mesmo caminho da 3D (clickSelect3d, que usa selectionAfterClick).
     if (!d.moved && d.pick && useUi.getState().view === 'section') clickSelect3d(sectionPickAt(s)?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+    // Arrasto que começou sobre o seletor de escala deixa o foco no <select>, e aí Delete e os atalhos são ignorados: solta o foco.
+    if (d.moved && document.activeElement?.tagName === 'SELECT') (document.activeElement as HTMLElement).blur();
     drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };
   };
 
@@ -430,14 +456,10 @@ export function ViewportCanvas(): ReactElement {
           Este navegador não oferece WebGL nem WebGPU. Use a planta.
         </div>
       )}
-      <div className="cornerbtns">
-        <button className="ibtn" title="Enquadrar tudo" onClick={() => (ui.view !== '3d' ? editor.zoomExtents() : (model.current.fit(), useUi.setState((x) => ({ previewTick: x.previewTick + 1 }))))}>
-          <Icon name="fit" size={18} />
-        </button>
-      </div>
+      <NavBar model={model.current} center={() => { const r = host.current?.getBoundingClientRect(); return { x: (r?.width ?? 0) / 2, y: (r?.height ?? 0) / 2 }; }} />
+      <CanvasContextMenu model={model.current} host={host} />
       {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
       {ui.view === 'section' ? <SectionBadge /> : null}
-      <ViewControlBar />
       {ui.view === 'plan' && ui.prompt ? (
         <div className="typebox" role="status">
           <span className="cap">{ui.prompt}</span>

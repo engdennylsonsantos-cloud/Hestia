@@ -2,6 +2,7 @@ import { dist, type Vec2 } from '@hestia/geom';
 import { joinStatus, levelFrames } from '@hestia/engine';
 import type { JoinKind } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { pickAt } from './pick.ts';
 import type { PointerInfo } from './types.ts';
 
 const ORDER: JoinKind[] = ['butt', 'miter'];
@@ -70,10 +71,28 @@ export class JoinTool extends ToolBase {
     this.env.say(`Junção: ${LABEL[kind]}${flip ? ', ordem invertida' : ''}.`);
   }
 
+  /** Motivo do clique ignorado: ponta sem parceira, meio do vão (cruzamento) ou fora de paredes. */
+  private miss(p: Vec2): string {
+    const pr = this.env.project();
+    const tol = 12 * this.env.metersPerPixel();
+    const frames = levelFrames(pr, this.env.levelId());
+    for (const f of frames) {
+      for (const end of ['a', 'b'] as const) {
+        if (dist(end === 'a' ? f.a : f.b, p) > tol) continue;
+        const st = joinStatus(frames, f.wall.id, end, pr.settings.joinTolerance);
+        if (st.kind === 'node') return 'Clique no canto/ponta onde duas paredes se encontram. Mais de duas paredes neste canto: a junção só atua em cantos de duas paredes.';
+        if (st.kind === 'disallowed') return 'Clique no canto/ponta onde duas paredes se encontram. Esta ponta está com a junção desligada.';
+        return 'Clique no canto/ponta onde duas paredes se encontram. Esta ponta não tem outra parede para unir.';
+      }
+    }
+    if (pickAt(pr, this.env.levelId(), p, this.env.metersPerPixel())) return 'Clique no canto/ponta onde duas paredes se encontram. No meio do vão não há junção.';
+    return 'Clique no canto/ponta onde duas paredes se encontram.';
+  }
+
   override click(p: PointerInfo): void {
     this.node = this.find(p.raw);
     if (!this.node) {
-      this.env.say('Clique perto de um canto onde duas paredes se encontram.');
+      this.env.say(this.miss(p.raw));
       return;
     }
     this.apply(ORDER[(ORDER.indexOf(this.node.kind) + 1) % ORDER.length]!, this.node.flip);

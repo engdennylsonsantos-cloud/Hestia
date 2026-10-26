@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { totalThickness } from '@hestia/model';
 import { DEFAULT_SNAP } from './types.ts';
-import { clickAt, drawWall, makeEnv, tool, walls } from './testEnv.ts';
+import { P, clickAt, drawWall, makeEnv, tool, walls } from './testEnv.ts';
 
 /** Base (0,0)-(4,0) do tipo padrão (wt_alv14, 0,184 m de espessura) e o ambiente com a ferramenta Parede paralela. */
 function base() {
@@ -87,5 +87,24 @@ describe('ferramenta Parede paralela (distância entre eixos)', () => {
     clickAt(pt, 2, 0.092);
     pt.type('3');
     expect(walls(store)[1]!.a.y).toBeCloseTo(3, 6);
+  });
+});
+
+describe('ferramenta Parede paralela: Tab depois da base continua medindo pelo cursor', () => {
+  it('Tab inverte o lado da nova parede sem contradizer a medida: a prévia mede pelo cursor e fica do lado oposto', () => {
+    const { store, env, t, options } = base();
+    options.snap = { ...DEFAULT_SNAP, grid: false, faces: false, axis: false, intersections: false, perpendicular: false, alignment: false };
+    const said: string[] = [];
+    env.say = (m) => said.push(m);
+    const pt = tool('parallel', env);
+    clickAt(pt, 2, 0.092);
+    pt.tab();
+    pt.move(P(2, 1.6));
+    const ultima = said[said.length - 1]!;
+    expect(ultima).toContain('1,508 m');
+    expect(ultima).not.toContain('Afaste');
+    clickAt(pt, 2, 1.6);
+    const nova = walls(store)[1]!;
+    expect(nova.a.y).toBeCloseTo(-(t + 1.508), 3);
   });
 });

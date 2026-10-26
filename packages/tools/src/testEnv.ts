@@ -19,7 +19,7 @@ export function makeEnv(store = new ProjectStore(createEmptyProject())) {
     selection: () => selection,
     setSelection: (ids) => { selection = ids; },
     exec: (c) => store.exec(c),
-    transaction: (l, fn) => store.transaction(l, fn),
+    transaction: (l, fn, session) => store.transaction(l, fn, session),
     metersPerPixel: () => 0.01,
     gridStep: () => 0.1,
     say: () => {},

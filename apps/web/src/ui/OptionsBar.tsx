@@ -7,8 +7,10 @@ import { Check, NumField } from './fields.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { CeilingOptionsBar } from './CeilingOptionsBar.tsx';
 import { RoofOptionsBar } from './RoofOptionsBar.tsx';
+import { RoofArrowOptionsBar } from './RoofArrowOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
+import { ArrayOptionsBar } from './ArrayOptionsBar.tsx';
 import { openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
@@ -168,6 +170,7 @@ export function OptionsBar(): ReactElement {
       {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
       {tool === 'ceiling' && <CeilingOptionsBar />}
       {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar tool={tool} />}
+      {tool === 'roofarrow' && <RoofArrowOptionsBar />}
       {tool === 'stair' && <StairOptionsBar />}
       {tool === 'stairrun' && <StairRunOptionsBar />}
       {(tool === 'door' || tool === 'window') && (
@@ -179,27 +182,31 @@ export function OptionsBar(): ReactElement {
       )}
       {tool === 'rotate' && <Check id="opt-rcopy" checked={o.rotateCopy} onChange={(v) => set({ rotateCopy: v })}>Copiar</Check>}
       {tool === 'mirror' && <Check id="opt-mcopy" checked={o.mirrorCopy} onChange={(v) => set({ mirrorCopy: v })}>Copiar</Check>}
-      {tool === 'array' && (
-        <label>
-          Número de itens
-          <NumField id="opt-count" value={o.arrayCount} decimals={0} onCommit={(v) => set({ arrayCount: Math.max(2, Math.round(v)) })} />
-        </label>
-      )}
+      {tool === 'array' && <ArrayOptionsBar />}
       {tool === 'offset' && (
         <>
           <label>
             Distância
-            <NumField id="opt-offset" value={o.offsetDistance} onCommit={(v) => set({ offsetDistance: v })} unit="m" min={0.01} />
+            <NumField
+              id="opt-offset"
+              value={o.offsetDistance}
+              onCommit={(v) => set({ offsetDistance: v })}
+              unit="m"
+              min={0.01}
+              strictRange
+              onInvalid={(texto) => useUi.setState({ status: `Distância inválida (${texto.trim() || 'vazia'}): digite um valor em metros, maior que zero. Mantida: ${o.offsetDistance.toFixed(2).replace('.', ',')} m.` })}
+              onValid={() => { if (useUi.getState().status.startsWith('Distância inválida')) useUi.setState({ status: 'Pronto.' }); }}
+            />
           </label>
           <Check id="opt-ocopy" checked={o.offsetCopy} onChange={(v) => set({ offsetCopy: v })}>Copiar</Check>
         </>
       )}
       {tool === 'parallel' && (
         <label>
-          Distância entre
+          Medir distância
           <select id="opt-offsetfrom" className="select" value={o.offsetFrom ?? 'face'} onChange={(e) => set({ offsetFrom: e.target.value as 'axis' | 'face' })}>
-            <option value="face">Faces (padrão)</option>
-            <option value="axis">Eixos</option>
+            <option value="face">Face a face (padrão)</option>
+            <option value="axis">Entre eixos</option>
           </select>
         </label>
       )}

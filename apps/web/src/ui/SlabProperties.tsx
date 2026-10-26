@@ -131,7 +131,7 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
           </>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-smark"><TextField id="p-smark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-scomm"><TextField id="p-scomm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>

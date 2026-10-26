@@ -31,6 +31,7 @@ export { TextTool, TEXT_DEFAULT_HEIGHT_MM } from './textTool.ts';
 export { RoofArrowTool } from './roofArrowTool.ts';
 export * from './attachRoofTool.ts';
 export * from './stairSketchState.ts';
+export * from './stairRunEdit.ts';
 export * from './stairStroke.ts';
 export * from './stairPick.ts';
 export * from './stairCommands.ts';
@@ -53,3 +54,4 @@ export {
   type StairComponent,
 } from './stairSpiralRun.ts';
 export { spiralGripAt, spiralHandles, spiralHandlePoints, spiralHold, type SpiralGrip, type SpiralHandle } from './stairSpiralGrips.ts';
+export * from './shortcutDefaults.ts';

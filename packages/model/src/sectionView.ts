@@ -161,6 +161,14 @@ function textRotation(u: Vec2): number {
 }
 
 /**
+ * Patch que inverte o sentido do corte (início↔fim). O observador passa para o outro lado da linha e as
+ * referências às paredes trocam de extremidade junto, para a associação continuar a mesma.
+ */
+export function sectionInvertPatch(v: Pick<SectionView, 'a' | 'b' | 'refs'>): Partial<Omit<SectionView, 'id'>> {
+  return { a: v.b, b: v.a, refs: v.refs ? { a: v.refs.b, b: v.refs.a } : undefined };
+}
+
+/**
  * Geometria da marca de corte/elevação em metros de desenho. `mPerMm` é quantos metros cabem em 1 mm de papel
  * (escala / 1000): as medidas da marca são de papel e, por isso, ficam legíveis na tela e na prancha.
  */
@@ -205,8 +213,12 @@ export function sectionMarkGeometry(
     const anchors = look.placement === 'middle'
       ? [{ at: mul(add(a, b), 0.5), side: 0 }]
       : ends.map((e) => ({ at: e, side: e === a ? -1 : 1 }));
+    // Com seta nas pontas, o rótulo (centrado) fica além da ponta: seta + meia altura do texto + uma folga de 0,5 mm.
+    const folgaMm = 0.5;
+    const clearMm = look.showArrow && look.placement !== 'middle' ? look.arrowMm + look.textMm / 2 + folgaMm : 0;
+    const dyMm = Math.max(look.labelOffsetMm.y, clearMm);
     for (const { at, side } of anchors) {
-      const base = add(at, mul(n, look.labelOffsetMm.y * mPerMm));
+      const base = add(at, mul(n, dyMm * mPerMm));
       const pos = add(base, mul(u, side * look.labelOffsetMm.x * mPerMm));
       out.labels.push({ at: pos, text, rotation: textRotation(u) });
     }

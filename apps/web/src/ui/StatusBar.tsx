@@ -1,5 +1,8 @@
 import type { ReactElement } from 'react';
 import { useUi } from '../editor/state.ts';
+import { useAtalhos } from '../editor/shortcutConfig.ts';
+import { useI18n } from '../editor/i18n.ts';
+import { Icon } from './Icon.tsx';
 import { IssuesButton } from './IssuesButton.tsx';
 import { SnapButton } from './SnapButton.tsx';
 
@@ -23,13 +26,24 @@ export function StatusBar(): ReactElement {
   const cursor = useUi((s) => s.cursor);
   const snap = useUi((s) => s.snapKind);
   const view = useUi((s) => s.view);
+  const pendente = useAtalhos((s) => s.pendente);
+  const nSel = useUi((s) => s.selection.length);
+  const gpu = useUi((s) => s.gpu);
+  const pt = useI18n((s) => s.lang) === 'pt';
+  const engine = gpu === 'pending' ? '…' : gpu === 'cpu' ? 'CPU' : gpu === 'webgpu' ? 'WebGPU' : 'WebGL2';
   return (
     <footer className="statusbar" role="status">
-      <span className="msg">{status}</span>
+      <span className="msg" title={status}>{status}</span>
+      {pendente ? <span className="mono" aria-label="Sequência de atalho em andamento">{pendente}…</span> : null}
       {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
       {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}
       <SnapButton />
+      <span className="sb-filter" title={pt ? `Filtro de seleção: ${nSel} elemento${nSel === 1 ? '' : 's'} selecionado${nSel === 1 ? '' : 's'}` : `Selection filter: ${nSel} selected`}>
+        <Icon name="funnel" size={12} />
+        <span className="mono">:{nSel}</span>
+      </span>
       <IssuesButton />
+      <span className={`badge ${gpu === 'cpu' ? 'cpu' : 'gpu'}`} title={pt ? 'Motor de desenho em uso' : 'Rendering engine in use'}>{engine}</span>
     </footer>
   );
 }

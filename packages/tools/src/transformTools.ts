@@ -2,7 +2,7 @@ import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom'
 import { frameOfWall } from '@hestia/engine';
 import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
-import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
+import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews, transformWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
 import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
@@ -12,10 +12,10 @@ import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo, ToolEnv } from './types.ts';
 
 const deg = (r: number): number => (r * 180) / Math.PI;
-const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+export const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
 
 /** Base das ferramentas que exigem seleção prévia. */
-abstract class SelectionTool extends ToolBase {
+export abstract class SelectionTool extends ToolBase {
   /** Paredes e pisos selecionados: entram em mover, copiar, girar, espelhar e matriz. */
   protected movables(): Id[] {
     return selectedMovables(this.env.project(), this.env.selection());
@@ -33,8 +33,9 @@ abstract class SelectionTool extends ToolBase {
   override start(): void {
     this.reset();
     if (!this.hasSelection()) {
-      this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
+      // Sair para Selecionar põe a dica dela na barra: o aviso vem depois, para não ser apagado.
       this.env.done();
+      this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
       return;
     }
     this.env.say(this.hint);
@@ -51,6 +52,10 @@ export class MoveTool extends SelectionTool {
   private base: Vec2 | null = null;
   /** Aresta escolhida no primeiro clique (só sem seleção). */
   private edgePick: EdgePick | null = null;
+  /** Chave da sessão: todas as cópias de um mesmo Copiar entram num só passo de desfazer. */
+  private session: object = {};
+  /** Quantas cópias a sessão já fez (Esc, com cópias feitas, encerra a sessão). */
+  private copies = 0;
 
   constructor(env: ToolEnv, private copy: boolean) {
     super(env);
@@ -69,7 +74,22 @@ export class MoveTool extends SelectionTool {
   /** Sem seleção a ferramenta continua ativa, à espera de um clique em aresta. */
   override start(): void {
     this.reset();
+    this.session = {};
+    this.copies = 0;
     this.env.say(this.hasSelection() ? this.hint : this.edgeHint);
+  }
+
+  /**
+   * Esc: em Copiar com cópias feitas, encerra a sessão de uma vez (o passo de desfazer já está gravado).
+   * Sem cópias, Esc cancela o ponto-base; o próximo Esc sai para Modificar, como nas demais ferramentas.
+   */
+  override cancel(): void {
+    if (this.copy && this.copies > 0) {
+      this.reset();
+      this.env.done();
+      return;
+    }
+    super.cancel();
   }
 
   protected reset(): void {
@@ -120,8 +140,8 @@ export class MoveTool extends SelectionTool {
     if (!pick || !this.base) {
       const found = edgeAtCursor(this.env, p.raw);
       if (!found) {
-        this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
         this.env.done();
+        this.env.say(`${this.label}: selecione elementos antes (Selecionar) e escolha a ferramenta de novo.`);
         return;
       }
       if (this.copy) {
@@ -166,6 +186,7 @@ export class MoveTool extends SelectionTool {
     const seps = movableSeparatorIds(this.env, this.copy);
     // Cotas, textos (decisão 0019) e marcas de corte/elevação seguem a seleção e entram no mesmo passo de desfazer.
     const notes = annotationMoveCommands(this.env.project(), this.env.levelId(), this.env.selection(), d, this.copy);
+    // Copiar: a sessão junta as cópias num só passo de desfazer; Mover segue num passo próprio.
     this.env.transaction(this.copy ? 'Copiar' : 'Mover', () => {
       if (this.copy) {
         if (els.length) copyWalls(this.env, els, t);
@@ -177,7 +198,8 @@ export class MoveTool extends SelectionTool {
         if (seps.length) moveRoomSeparators(this.env, seps, d);
       }
       for (const c of notes) this.env.exec(c);
-    });
+    }, this.copy ? this.session : undefined);
+    if (this.copy && (els.length || views.length)) this.copies += 1;
   }
 
   override click(p: PointerInfo): void {
@@ -273,7 +295,7 @@ export class RotateTool extends SelectionTool {
     this.env.transaction(copy ? 'Girar e copiar' : 'Girar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else this.env.exec({ type: 'transform', ids: els, transform: t });
+        else transformWalls(this.env, els, t, 'Girar');
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });
@@ -369,7 +391,7 @@ export class MirrorTool extends SelectionTool {
     this.env.transaction(copy ? 'Espelhar e copiar' : 'Espelhar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else this.env.exec({ type: 'transform', ids: els, transform: t });
+        else transformWalls(this.env, els, t, 'Espelhar');
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });
@@ -399,76 +421,3 @@ export class MirrorTool extends SelectionTool {
   }
 }
 
-/** Matriz linear: N elementos, espaçamento definido por dois pontos ou digitado. */
-export class ArrayTool extends SelectionTool {
-  readonly id = 'array';
-  readonly label = 'Matriz';
-  readonly hint = 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.';
-  private base: Vec2 | null = null;
-
-  protected reset(): void {
-    this.base = null;
-    this.items = [];
-  }
-  protected busy(): boolean {
-    return this.base !== null;
-  }
-  override inputPrompt(): string | null {
-    return this.base ? 'Espaçamento' : null;
-  }
-
-  private ghosts(d: Vec2): void {
-    const n = Math.max(2, this.env.options().arrayCount);
-    for (let i = 1; i < n; i++) {
-      const t = { kind: 'translate', d: mul(d, i) } as const;
-      this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
-    }
-  }
-
-  override move(p: PointerInfo): void {
-    this.items = [];
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
-    if (!this.base) {
-      this.items.push({ kind: 'point', at: inf.point });
-      return;
-    }
-    const d = sub(inf.point, this.base);
-    this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
-    this.ghosts(d);
-    this.items.push({ kind: 'label', at: inf.point, text: `${this.env.options().arrayCount} × ${fmtM(len(d))}` });
-  }
-
-  private commit(d: Vec2): void {
-    if (len(d) < 1e-6) return;
-    const n = Math.max(2, this.env.options().arrayCount);
-    const els = this.movables();
-    const views = this.views();
-    this.env.transaction('Matriz', () => {
-      for (let i = 1; i < n; i++) {
-        const t = { kind: 'translate', d: mul(d, i) } as const;
-        if (els.length) copyWalls(this.env, els, t);
-        if (views.length) transformViews(this.env, views, t, true);
-      }
-    });
-    this.reset();
-    this.env.done();
-  }
-
-  override click(p: PointerInfo): void {
-    const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(this.movables()) });
-    if (!this.base) {
-      this.base = inf.point;
-      return;
-    }
-    this.commit(sub(inf.point, this.base));
-  }
-
-  override type(text: string): boolean {
-    if (!this.base) return false;
-    const v = parseNumber(text);
-    if (v === null) return false;
-    const dir = norm(sub(this.inf?.point ?? this.raw, this.base));
-    this.commit(mul(len(dir) < 1e-9 ? v2(1, 0) : dir, v));
-    return true;
-  }
-}

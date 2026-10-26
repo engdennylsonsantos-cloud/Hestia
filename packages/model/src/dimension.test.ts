@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionValue, formatDimensionValue, makeWall, type Dimension } from './index.ts';
+import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimensionValue, makeWall, type Dimension } from './index.ts';
 
 const LV0 = 'lv_0';
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -14,6 +14,19 @@ function storeWithWall(): ProjectStore {
 }
 
 const dim = (over: Partial<Dimension> = {}): Dimension => ({ id: 'd1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1, ...over });
+
+describe('texto da cota', () => {
+  it('sem texto fixo, mostra o valor medido', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(dimensionText(s.project, dim())).toBe('4,00 m');
+  });
+
+  it('texto fixo substitui o valor medido; vazio ou só espaços voltam ao valor medido', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(dimensionText(s.project, dim({ text: 'Vão 3,60' }))).toBe('Vão 3,60');
+    expect(dimensionText(s.project, dim({ text: '   ' }))).toBe('4,00 m');
+  });
+});
 
 describe('valor da cota', () => {
   it('é a distância a–b arredondada a 1 mm', () => {

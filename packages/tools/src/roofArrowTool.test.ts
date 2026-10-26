@@ -46,6 +46,30 @@ describe('seta de inclinação (A5)', () => {
     expect(msgs.at(-1)).toMatch(/Selecione um telhado/);
   });
 
+  it('telhado que não é de águas livres: a mensagem diz como converter (botão da barra ou Propriedades)', () => {
+    const ctx = makeEnv();
+    ctx.options.roofMode = 'rect';
+    ctx.options.roofShape = 'gable';
+    const msgs: string[] = [];
+    ctx.env.say = (m: string) => msgs.push(m);
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 4);
+    const r = roofsOnLevel(ctx.store.project, 'lv_0')[0]!;
+    ctx.env.setSelection([r.id]);
+    tool('roofarrow', ctx.env);
+    expect(msgs.at(-1)).toMatch(/só vale em telhado de águas livres/);
+    expect(msgs.at(-1)).toMatch(/Converter para águas livres/);
+  });
+
+  it('Esc no meio do passo cancela só o passo e diz que outro Esc sai da ferramenta', () => {
+    const ctx = freeRoof();
+    const a = tool('roofarrow', ctx.env);
+    clickAt(a, 0, 2);
+    a.cancel();
+    expect(ctx.msgs.at(-1)).toMatch(/Esc de novo sai da ferramenta/);
+  });
+
   it('a direção nula não cria água', () => {
     const ctx = freeRoof();
     const a = tool('roofarrow', ctx.env);

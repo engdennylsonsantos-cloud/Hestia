@@ -3,7 +3,7 @@
 //   npm run build && SHOTS=<pasta> node tests/e2e/caracol.mjs
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { clickWorld, launch, makeReporter, openApp } from './helpers.mjs';
+import { clickWorld, launch, makeReporter, openApp, pressTool } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/caracol';
 mkdirSync(OUT, { recursive: true });
@@ -35,7 +35,7 @@ const setField = async (id, v) => {
   await page.waitForTimeout(150);
 };
 async function create(center, typeMatch, sweep) {
-  await page.keyboard.press('q');
+  await pressTool(page, 'q');
   await page.waitForTimeout(100);
   await page.locator('#opt-stairshape').selectOption('spiral');
   const typeId = await page.locator('#opt-stairruntype option').evaluateAll((os, m) => os.find((o) => o.textContent.toLowerCase().includes(m))?.value, typeMatch);
@@ -57,7 +57,7 @@ try {
     await page.getByRole('tab', { name: /Térreo/ }).click();
     await page.waitForTimeout(250);
     await fixPlanView();
-    await page.keyboard.press('q');
+    await pressTool(page, 'q');
     await page.waitForTimeout(100);
     const tool = await page.evaluate(() => window.__hestia.editor.activeTool?.id);
     rep.check('ferramenta stairrun ativa', tool === 'stairrun', String(tool));

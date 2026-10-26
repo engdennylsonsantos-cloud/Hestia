@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { safeGet, safeSet } from './storage.ts';
 import type { ToolId } from '@hestia/tools';
+import { PT_TABELAS, EN_TABELAS } from './i18nTabelas.ts';
 
 export type Lang = 'pt' | 'en';
 
@@ -57,6 +58,7 @@ export const I18N = {
     tool_roof: 'Telhado',
     tool_slope: 'Inclinação',
     tool_roofarrow: 'Seta de inclinação',
+    tool_roofextrusion: 'Telhado por extrusão',
     tool_stair: 'Escada por croqui',
     tool_stairrun: 'Lance de escada',
     tool_room: 'Ambiente',
@@ -81,6 +83,7 @@ export const I18N = {
     tool_attachroof: 'Anexar topo',
     tool_detachroof: 'Desanexar topo',
     tool_measure: 'Medir',
+    tool_section: 'Corte',
 
     // Painéis
     properties_title: 'Propriedades',
@@ -121,6 +124,31 @@ export const I18N = {
     thin_lines: 'Linhas finas',
     hide_isolate: 'Ocultar/Isolar',
     reset_hide: 'Restaurar',
+
+    ...PT_TABELAS,
+
+    // Dicas da barra de título (tema, ajuda, GPU, alterações)
+    tip_dirty: 'Alterações ainda não exportadas',
+    tip_engine: 'Motor de desenho em uso',
+    tip_starting: 'iniciando…',
+    tip_theme: 'Tema',
+    tip_theme_system: 'sistema',
+    tip_theme_light: 'claro',
+    tip_theme_dark: 'escuro',
+    tip_help: 'Atalhos de teclado',
+    // Barra da Matriz
+    arr_kind: 'Tipo',
+    arr_kind_linear: 'Linear',
+    arr_kind_radial: 'Radial',
+    arr_anchor: 'Mover para',
+    arr_anchor_second: 'Segundo',
+    arr_anchor_last: 'Último',
+    arr_count: 'Número de itens',
+    arr_angle: 'Ângulo total',
+    arr_hint_linear: 'Matriz linear: clique no ponto base e no segundo ponto (espaçamento) — ou digite o espaçamento.',
+    arr_hint_radial: 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.',
+    arr_count_min: 'Número de itens deve ser 2 ou mais; usando 2.',
+    arr_angle_zero: 'O ângulo total deve ser diferente de 0°',
   },
   en: {
     // Ribbon Tabs
@@ -152,6 +180,7 @@ export const I18N = {
     tool_roof: 'Roof',
     tool_slope: 'Slope',
     tool_roofarrow: 'Slope Arrow',
+    tool_roofextrusion: 'Roof by Extrusion',
     tool_stair: 'Stair by Sketch',
     tool_stairrun: 'Stair by Run',
     tool_room: 'Room',
@@ -176,6 +205,7 @@ export const I18N = {
     tool_attachroof: 'Attach Top/Base',
     tool_detachroof: 'Detach Top/Base',
     tool_measure: 'Measure',
+    tool_section: 'Section',
 
     // Palettes
     properties_title: 'Properties',
@@ -216,6 +246,32 @@ export const I18N = {
     thin_lines: 'Thin Lines',
     hide_isolate: 'Temporary Hide/Isolate',
     reset_hide: 'Reset',
+
+    // Quantity schedules (*ScheduleDialog)
+    ...EN_TABELAS,
+
+    // Title bar tips (theme, help, GPU, unsaved changes)
+    tip_dirty: 'Changes not exported yet',
+    tip_engine: 'Rendering engine in use',
+    tip_starting: 'starting…',
+    tip_theme: 'Theme',
+    tip_theme_system: 'system',
+    tip_theme_light: 'light',
+    tip_theme_dark: 'dark',
+    tip_help: 'Keyboard shortcuts',
+    // Array bar
+    arr_kind: 'Type',
+    arr_kind_linear: 'Linear',
+    arr_kind_radial: 'Radial',
+    arr_anchor: 'Move to',
+    arr_anchor_second: 'Second',
+    arr_anchor_last: 'Last',
+    arr_count: 'Number of items',
+    arr_angle: 'Total angle',
+    arr_hint_linear: 'Linear array: click the base point and the second point (spacing) — or type the spacing.',
+    arr_hint_radial: 'Radial array: click the array center. Then click to create the items, or type the angle in degrees.',
+    arr_count_min: 'Number of items must be 2 or more; using 2.',
+    arr_angle_zero: 'The total angle must be different from 0°',
   },
 } as const;
 

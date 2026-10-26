@@ -3,25 +3,10 @@ import { type LevelKeep } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { LEVEL_KEEP_LABEL, levelBearingIds, moveToLevel, readLevelKeep, writeLevelKeep } from '../editor/levelActions.ts';
-import { Icon } from './Icon.tsx';
 import { Dialog } from './dialogs/Dialog.tsx';
 
-/** Botão "Nível…" da faixa Modificar: abre o diálogo para mover a seleção para outro nível. Sem seleção, fica desabilitado. */
-export function MoveLevelButton(): ReactElement {
-  const count = useUi((s) => s.selection.length);
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button className="tbtn" disabled={count === 0} onClick={() => setOpen(true)} title={count ? 'Mover a seleção para outro nível' : 'Selecione elementos para mudar de nível'}>
-        <Icon name="layers" size={22} />
-        <span>Nível…</span>
-      </button>
-      {open && <MoveLevelDialog onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-function MoveLevelDialog({ onClose }: { onClose: () => void }): ReactElement {
+/** Diálogo "Mover para o nível" (aba Modificar ▸ Seleção e nível). */
+export function MoveLevelDialog({ onClose }: { onClose: () => void }): ReactElement {
   const p = useProject();
   const sel = useUi((s) => s.selection);
   const movable = levelBearingIds(p, sel);

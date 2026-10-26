@@ -1,7 +1,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
 import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
-import { regenSpiralComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
+import { regenSpiralComponents, regenStraightComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
@@ -56,6 +56,20 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
       return;
     }
     patchStairs(editor.store, [single.id], { components: r.components }, 'Editar caracol');
+  };
+
+  // Reta gerada pela ferramenta: o nº de espelhos é editável (o piso e a altura do espelho se ajustam).
+  const straightRisersEditable = single?.components.length === 1 && single.components[0]?.kind === 'run' && single.components[0].generatedBy === 'straight';
+
+  /** Regenera a reta com outro nº de espelhos, em UM passo de desfazer. Erro vai para a barra de status. */
+  const editRisers = (n: number): void => {
+    if (!single) return;
+    const r = regenStraightComponents(single, n, p.stairTypes[single.typeId]?.minTread ?? 0);
+    if ('error' in r) {
+      useUi.setState({ status: `Escada: ${r.error}` });
+      return;
+    }
+    patchStairs(editor.store, [single.id], { components: r.components }, 'Editar nº de espelhos');
   };
 
   const quantities = useMemo(() => {
@@ -149,7 +163,13 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
       <Group title="Dimensões">
         {single && quantities ? (
           <>
-            <Row label="Nº de espelhos"><span className="val">{quantities.riserCount}</span></Row>
+            {straightRisersEditable ? (
+              <Row label="Nº de espelhos" htmlFor="p-srisers">
+                <NumField id="p-srisers" value={quantities.riserCount} decimals={0} min={2} onCommit={(v) => editRisers(Math.round(v))} />
+              </Row>
+            ) : (
+              <Row label="Nº de espelhos"><span className="val">{quantities.riserCount}</span></Row>
+            )}
             <Row label="Altura do espelho"><span className="val">{fmt(quantities.riserHeight, 3)} m</span></Row>
             <Row label="Piso médio"><span className="val">{fmt(quantities.treadMean, 3)} m</span></Row>
             <Row label="Largura"><span className="val">{fmt(quantities.width)} m</span></Row>
@@ -172,7 +192,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
           ))
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-smk"><TextField id="p-smk" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-scm"><TextField id="p-scm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>

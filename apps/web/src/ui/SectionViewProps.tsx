@@ -4,6 +4,7 @@ import {
   SECTION_LABEL_OFFSET_MM,
   SECTION_ROLE_LABEL,
   SECTION_TEXT_MM,
+  sectionInvertPatch,
   type SectionMarkLineStyle,
   type SectionMarkPlacement,
   type SectionMarkStyle,
@@ -38,7 +39,7 @@ export function SectionViewProps({ view }: { view: SectionView }): ReactElement 
 
   return (
     <>
-      <Group title="Identidade">
+      <Group title="Dados de identidade">
         <Row label="Tipo"><span className="val">{kind}</span></Row>
         {view.kind === 'elevation' && view.role ? <Row label="Papel"><span className="val">{SECTION_ROLE_LABEL[view.role]}</span></Row> : null}
         <Row label="Nome" htmlFor="sv-name">
@@ -70,6 +71,9 @@ export function SectionViewProps({ view }: { view: SectionView }): ReactElement 
         </Row>
         <Row label="Fim Y" htmlFor="sv-by">
           <NumField id="sv-by" value={view.b.y} unit="m" onCommit={(v) => setB(view.b.x, v)} />
+        </Row>
+        <Row label="Sentido">
+          <button className="btn" type="button" onClick={() => update(sectionInvertPatch(view))}>Inverter direção</button>
         </Row>
       </Group>
 

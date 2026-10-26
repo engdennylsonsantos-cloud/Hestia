@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { ROOF_SHAPE_LABEL } from '@hestia/engine';
-import { degToPercent, percentToDeg, roofAutoOffset, type RoofMode } from '@hestia/tools';
+import { percentToDeg, roofAutoOffset, roofSlopeFromDegField, type RoofMode } from '@hestia/tools';
 import type { RoofShape } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -72,7 +72,7 @@ export function RoofOptionsBar({ tool }: { tool: 'roof' | 'roofextrusion' }): Re
       </label>
       <label>
         Graus
-        <NumField id="opt-roofdeg" value={percentToDeg(slope)} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => set({ roofSlope: degToPercent(v) })} />
+        <NumField id="opt-roofdeg" value={percentToDeg(slope)} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => set({ roofSlope: roofSlopeFromDegField(v, percentToDeg(slope), slope) })} />
       </label>
       <label>
         Balanço

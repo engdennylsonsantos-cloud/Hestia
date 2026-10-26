@@ -5,6 +5,7 @@ import {
   emptyTitleBlock,
   makeWall,
   sectionLabelOf,
+  sectionInvertPatch,
   sectionMarkGeometry,
   sectionPoints,
   sectionTitleOf,
@@ -23,6 +24,38 @@ const view = (patch: Partial<SectionView> = {}): SectionView => ({
   b: { x: 4, y: 0 },
   depth: 5,
   ...patch,
+});
+
+describe('inverter o sentido do corte', () => {
+  it('troca início e fim e as referências junto, sem perder a associação com a parede', () => {
+    const v = view({ refs: { a: { wallId: 'w1', end: 'a' }, b: { wallId: 'w2', end: 'b' } } });
+    expect(sectionInvertPatch(v)).toEqual({
+      a: { x: 4, y: 0 },
+      b: { x: 0, y: 0 },
+      refs: { a: { wallId: 'w2', end: 'b' }, b: { wallId: 'w1', end: 'a' } },
+    });
+  });
+
+  it('corte sem referências inverte só os pontos', () => {
+    expect(sectionInvertPatch(view())).toEqual({ a: { x: 4, y: 0 }, b: { x: 0, y: 0 }, refs: undefined });
+  });
+});
+
+describe('rótulo da marca fica fora da seta', () => {
+  it('o rótulo da ponta fica além da ponta da seta, sem sobrepor a seta (padrão)', () => {
+    const g = sectionMarkGeometry({ x: 0, y: 0 }, { x: 10, y: 0 }, 'section', 'Corte A', 0.1);
+    const ends = g.labels.filter((l) => Math.abs(l.at.x) < 3);
+    expect(ends.length).toBeGreaterThan(0);
+    const tipDist = Math.abs(g.arrows[0]![1]!.y);
+    // Meia altura do texto (2,5 mm de papel, escala 1:100): o centro do rótulo deve ficar além da ponta mais essa meia altura.
+    for (const l of g.labels) expect(Math.abs(l.at.y)).toBeGreaterThanOrEqual(tipDist + 0.125 - 1e-9);
+  });
+
+  it('um deslocamento vertical menor que a seta não aproxima o rótulo da seta', () => {
+    const g = sectionMarkGeometry({ x: 0, y: 0 }, { x: 10, y: 0 }, 'section', 'Corte A', 0.1, { labelOffsetMm: { x: 2, y: 0.2 } });
+    const tipDist = Math.abs(g.arrows[0]![1]!.y);
+    for (const l of g.labels) expect(Math.abs(l.at.y)).toBeGreaterThanOrEqual(tipDist + 0.125 - 1e-9);
+  });
 });
 
 describe('vistas de corte e elevação: identidade e geometria', () => {
@@ -67,7 +100,8 @@ describe('vistas de corte e elevação: identidade e geometria', () => {
     expect(g.arrows[0]![1]!.x).toBeCloseTo(0);
     expect(g.arrows[0]![1]!.y).toBeCloseTo(0.3);
     expect(g.labels.map((l) => l.text)).toEqual(['Corte A', 'Corte A']);
-    expect(g.labels[0]!.at.y).toBeCloseTo(0.15);
+    // Rótulo além da ponta da seta: 3 mm de seta + 1,25 mm de meia altura + 0,5 mm de folga = 4,75 mm de papel.
+    expect(g.labels[0]!.at.y).toBeCloseTo(0.475);
   });
 
   it('respeita visibilidade, setas, rótulo e posição no meio', () => {

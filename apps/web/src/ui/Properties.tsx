@@ -41,9 +41,12 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { LabelScroll } from './LabelScroll.tsx';
+import { PanelHead } from './PanelHead.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
+import { changeOpeningType } from '../editor/openingTypeActions.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -172,11 +175,6 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
         <Row label="Não unir no início"><Check id="p-nos" checked={noS.value} mixed={noS.mixed} onChange={(v) => patch(ids, { noJoinStart: v })} /></Row>
         <Row label="Não unir no fim"><Check id="p-noe" checked={noE.value} mixed={noE.mixed} onChange={(v) => patch(ids, { noJoinEnd: v })} /></Row>
       </Group>
-      {single && (
-        <Group title="Junções">
-          <JoinRows wall={single} />
-        </Group>
-      )}
       <Group title="Construção" open={false}>
         {t ? (
           <>
@@ -204,7 +202,12 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
           <Row label="Comprimento total"><span className="val">{fmt(walls.reduce((s, w) => s + wallLength(w), 0), 2)} m</span></Row>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      {single && (
+        <Group title="Junções">
+          <JoinRows wall={single} />
+        </Group>
+      )}
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-mark"><TextField id="p-mark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
         <Row label="Comentários" htmlFor="p-comm"><TextField id="p-comm" value={comments.value} mixed={comments.mixed} onCommit={(v) => patch(ids, { comments: v })} /></Row>
       </Group>
@@ -235,7 +238,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
         selectedId={typeId.mixed ? null : typeId.value}
         disabled={!kind}
         editDisabled={typeId.mixed}
-        onSelect={(id) => patch(ids, { typeId: id })}
+        onSelect={(id) => changeOpeningType(editor.store, ids, id, (m) => useUi.setState({ status: m }))}
         onEdit={() => useUi.setState({ dialog: 'openingType', dialogArg: typeId.value })}
       />
       <Group title="Restrições">
@@ -243,15 +246,15 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
           <>
             <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} unit="m" /></Row>
             <Row label="Peitoril" htmlFor="p-sill">
-              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} />
+              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros, como 0,90.' })} />
             </Row>
             {single.sillOverride !== null && (
               <div className="prow"><span /><button className="chiplink" onClick={() => patch(ids, { sillOverride: null })}>Usar peitoril do tipo</button></div>
             )}
           </>
         )}
-        <Row label="Inverter dobradiça"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
-        <Row label="Inverter sentido"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
+        <Row label="Inverter dobradiça" htmlFor="p-hand"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
+        <Row label="Inverter sentido" htmlFor="p-facing"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
       </Group>
       <Group title="Dimensões" open={!!single}>
         {type && (
@@ -262,7 +265,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
           </>
         )}
       </Group>
-      <Group title="Identidade" open={false}>
+      <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-omark"><TextField id="p-omark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
       </Group>
     </>
@@ -375,12 +378,11 @@ export function Properties(): ReactElement {
   const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
   return (
-    <aside className="side left" aria-label="Propriedades">
-      <div className="panel-head">
-        <span>Propriedades</span>
-        <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>
-      </div>
-      <div className="panel-scroll">
+    <aside className="side" aria-label="Propriedades">
+      <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>}>
+        Propriedades
+      </PanelHead>
+      <LabelScroll>
         {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
           : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />
           : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
@@ -399,7 +401,7 @@ export function Properties(): ReactElement {
             <ViewProps />
           </>
         )}
-      </div>
+      </LabelScroll>
       <div className="rv-foot">
         <button type="button" className="link" onClick={() => useUi.setState({ dialog: 'shortcuts' })}>Ajuda de propriedades</button>
         {/* Edições já valem ao sair do campo; o botão só tira o foco do campo que ainda está aberto. */}

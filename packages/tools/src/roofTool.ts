@@ -218,7 +218,22 @@ export class RoofTool extends ToolBase {
       this.finishContour();
       return;
     }
+    // Com um ou dois pontos o contorno não fecha: avisa e mantém os pontos para o usuário continuar.
+    if (this.polyLike() && this.pts.length > 0) {
+      this.env.say('Contorno precisa de ao menos 3 pontos. Continue clicando, ou Esc cancela.');
+      return;
+    }
     super.confirm();
+  }
+
+  /** O primeiro Esc descarta o desenho em andamento e avisa; sem desenho, o Esc sai da ferramenta (ToolBase.cancel). */
+  override cancel(): void {
+    if (this.busy()) {
+      this.reset();
+      this.env.say(`${this.polyLike() ? 'Contorno' : 'Desenho'} cancelado. Esc de novo sai da ferramenta.`);
+      return;
+    }
+    super.cancel();
   }
 
   override type(text: string): boolean {
@@ -326,6 +341,11 @@ export class RoofTool extends ToolBase {
     if (!r || r.planes.length === 0) return `Telhado criado: ${ROOF_SHAPE_LABEL[shape]}, inclinação ${fmtPercent(slope)}. Ctrl+Z desfaz.`;
     const n = r.planes.length;
     const ridge = r.lines.filter((l) => l.kind === 'ridge').reduce((s, l) => s + dist(l.a, l.b), 0);
+    // Duas águas precisa de duas arestas paralelas à cumeeira; com menos, o motor gera uma água sem cumeeira. Avisa.
+    const defining = (this.env.project().elements[id] as Roof | undefined)?.edgeSlopes.filter((s) => s !== null).length ?? 0;
+    if (shape === 'gable' && defining < 2) {
+      return `Duas águas: só ${defining} ${defining === 1 ? 'aresta paralela' : 'arestas paralelas'} à cumeeira; o telhado saiu com ${n} ${n === 1 ? 'água' : 'águas'}. Use Quatro águas ou ajuste o contorno. Ctrl+Z desfaz.`;
+    }
     return `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}, cumeeira ${fmt(ridge)}. Ctrl+Z desfaz.`;
   }
 }

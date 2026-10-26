@@ -221,10 +221,10 @@ export function ViewTabs(): ReactElement {
       <span style={{ flex: 1, minWidth: 4 }} />
 
       <div className="vtab-controls" ref={controlsRef}>
-        <button className="ibtn" onClick={() => useUi.setState({ leftOpen: !s.leftOpen, ...(narrow() && !s.leftOpen ? { rightOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.leftOpen}>
+        <button className="ibtn" onClick={() => useUi.setState({ propsOpen: !s.propsOpen, ...(narrow() && !s.propsOpen ? { browserOpen: false } : {}) })} title="Mostrar/ocultar propriedades" aria-pressed={s.propsOpen}>
           <Icon name="edit" size={16} />
         </button>
-        <button className="ibtn" onClick={() => useUi.setState({ rightOpen: !s.rightOpen, ...(narrow() && !s.rightOpen ? { leftOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.rightOpen}>
+        <button className="ibtn" onClick={() => useUi.setState({ browserOpen: !s.browserOpen, ...(narrow() && !s.browserOpen ? { propsOpen: false } : {}) })} title="Mostrar/ocultar navegador" aria-pressed={s.browserOpen}>
           <Icon name="levels" size={16} />
         </button>
       </div>

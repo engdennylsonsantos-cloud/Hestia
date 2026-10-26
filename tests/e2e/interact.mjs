@@ -2,7 +2,8 @@
 import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import path from 'node:path';
+import { pressTool } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -22,7 +23,7 @@ await page.waitForTimeout(500);
 const box = await page.locator('.canvas-wrap').boundingBox();
 const cx = box.x + box.width / 2;
 const cy = box.y + box.height / 2;
-await page.keyboard.press('w');
+await pressTool(page, 'w');
 // zoom padrão 60px/m, centro (5,3.5): desenha retângulo 6 x 4 m ao redor do centro
 const P = (x, y) => [cx + (x - 5) * 60, cy - (y - 3.5) * 60];
 const pts = [[2, 1.5], [2, 5.5], [8, 5.5], [8, 1.5], [2, 1.5]];
@@ -35,11 +36,11 @@ for (const [x, y] of pts) {
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/10-walls.png` });
 // porta e janela
-await page.keyboard.press('d');
+await pressTool(page, 'd');
 let [px, py] = P(5, 1.5); await page.mouse.move(px, py); await page.mouse.click(px, py);
-await page.keyboard.press('j');
+await pressTool(page, 'j');
 [px, py] = P(2, 3.5); await page.mouse.move(px, py); await page.mouse.click(px, py);
-await page.keyboard.press('j');
+await pressTool(page, 'j');
 [px, py] = P(6.5, 5.5); await page.mouse.move(px, py); await page.mouse.click(px, py);
 await page.keyboard.press('Escape');
 await page.keyboard.press('Escape');

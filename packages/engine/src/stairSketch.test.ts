@@ -251,7 +251,7 @@ describe('códigos de erro (um teste por código, mensagem exata)', () => {
       risers: [ln(1, -1, 1, 1), ln(0.5, -1, 1.5, 1)],
       path: [],
     };
-    expectOnly(run, 'stair-riser-crossing', 'Espelhos que se cruzam não são permitidos.', 0);
+    expectOnly(run, 'stair-riser-crossing', 'Espelhos nº 1 e nº 2 se cruzam ou se tocam: não são permitidos (distância 0,0 cm).', 0);
   });
 
   it('stair-riser-boundary-multi', () => {
@@ -264,13 +264,13 @@ describe('códigos de erro (um teste por código, mensagem exata)', () => {
   it('stair-riser-not-spanning', () => {
     const run = straightRun(1.2, [2, 3]);
     run.risers.unshift(ln(1, -0.3, 1, 0.3));
-    expectOnly(run, 'stair-riser-not-spanning', 'Cada espelho deve ligar o limite esquerdo ao direito.', 0);
+    expectOnly(run, 'stair-riser-not-spanning', 'Espelho nº 1: deve ligar o limite esquerdo ao direito, mas não chega ao limite esquerdo (falta 30,0 cm).', 0);
   });
 
   it('stair-riser-same-location', () => {
     const run = straightRun(1.2, [1, 2]);
     run.risers.push(ln(1, -1, 1, 1));
-    expectOnly(run, 'stair-riser-same-location', 'Dois espelhos ocupam a mesma posição.', 0);
+    expectOnly(run, 'stair-riser-same-location', 'Espelhos nº 1 e nº 3 ocupam a mesma posição (distância 0,0 cm).', 0);
   });
 
   it('stair-path-ends (caminhada começa antes do primeiro espelho)', () => {

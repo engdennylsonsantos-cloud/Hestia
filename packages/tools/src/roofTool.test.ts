@@ -98,6 +98,29 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
   });
 
+  it('Enter com dois pontos não cria telhado, avisa do mínimo e mantém os pontos para continuar', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 3, 0);
+    t.confirm();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toMatch(/Contorno precisa de ao menos 3 pontos/);
+    clickAt(t, 0, 3);
+    t.confirm();
+    expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
+  });
+
+  it('Esc no meio do contorno descarta os pontos, avisa e deixa claro que outro Esc sai da ferramenta', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 3, 0);
+    t.cancel();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toMatch(/Contorno cancelado.*Esc de novo sai da ferramenta/);
+  });
+
   it('inclinação inválida nas opções não cria telhado', () => {
     const ctx = roofCtx('rect');
     ctx.options.roofSlope = 0;
@@ -162,5 +185,30 @@ describe('ferramenta Telhado: pelas paredes com balanço (A2)', () => {
     clickAt(t, 20, 20);
     expect(roofs(ctx.store.project)).toHaveLength(0);
     expect(ctx.msgs.at(-1)).toMatch(/parede do nível/);
+  });
+});
+
+describe('ferramenta Telhado: duas águas sem arestas paralelas (defeito 3)', () => {
+  it('triângulo em duas águas avisa que só uma aresta define a cumeeira e diz como resolver', () => {
+    const ctx = roofCtx('poly');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 3, 4);
+    clickAt(t, 0, 0);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(r.edgeSlopes.filter((s) => s !== null)).toHaveLength(1);
+    expect(ctx.msgs.at(-1)).toMatch(/só 1 aresta paralela à cumeeira/);
+    expect(ctx.msgs.at(-1)).toMatch(/Quatro águas/);
+  });
+
+  it('retângulo em duas águas não avisa', () => {
+    const ctx = roofCtx('rect');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 4);
+    expect(ctx.msgs.at(-1)).toMatch(/Telhado criado: 2 águas/);
   });
 });

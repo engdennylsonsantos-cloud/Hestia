@@ -9,6 +9,7 @@ import {
   TOUCH_TOL,
   walkOf,
   type Prepared,
+  type RiserGeom,
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
@@ -69,8 +70,23 @@ function checkRisers(P: Prepared, out: StairSketchIssue[]): void {
     const nL = g.hitsL.length;
     const nR = g.hitsR.length;
     if (nL > 1 || nR > 1) out.push(sketchIssue('stair-riser-boundary-multi', g.index));
-    else if (nL === 0 || nR === 0) out.push(sketchIssue('stair-riser-not-spanning', g.index));
+    else if (nL === 0 || nR === 0) out.push(notSpanning(P, g, nL === 0 ? 'esquerdo' : 'direito'));
   }
+}
+
+/** Distância (cm, com vírgula) de um número de metros. */
+const cmText = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
+
+/**
+ * Espelho que não liga os limites: diz qual espelho (nº no croqui), qual limite falta e por quanto (a menor distância das
+ * pontas do espelho até o limite). Se os dois faltam, o do lado que falta mais.
+ */
+function notSpanning(P: Prepared, g: RiserGeom, side: 'esquerdo' | 'direito'): StairSketchIssue {
+  const boundary = side === 'esquerdo' ? P.L : P.R;
+  const ends = [g.full.pts[0]!, g.full.pts[g.full.pts.length - 1]!];
+  const gap = Math.min(...ends.map((e) => polyDist([e], boundary.pts)));
+  const text = `Espelho nº ${g.index + 1}: deve ligar o limite esquerdo ao direito, mas não chega ao limite ${side} (falta ${cmText(gap)} cm).`;
+  return sketchIssue('stair-riser-not-spanning', g.index, text);
 }
 
 /**
@@ -88,8 +104,14 @@ function checkRiserPairs(P: Prepared, out: StairSketchIssue[], turn?: Map<number
       const B = gb.trimmed!;
       const sameA = dist(A[0]!, B[0]!) <= TOUCH_TOL;
       const sameB = dist(A[A.length - 1]!, B[B.length - 1]!) <= TOUCH_TOL;
-      if (sameA && sameB) out.push(sketchIssue('stair-riser-same-location', ga.index));
-      else if (polyDist(A, B) <= TOUCH_TOL) out.push(sketchIssue('stair-riser-crossing', ga.index));
+      // Os dois espelhos pelo nº no croqui e a distância entre eles (em cm), para o usuário achar os dois.
+      const pair = `Espelhos nº ${ga.index + 1} e nº ${gb.index + 1}`;
+      const d = polyDist(A, B);
+      if (sameA && sameB) {
+        out.push(sketchIssue('stair-riser-same-location', ga.index, `${pair} ocupam a mesma posição (distância ${cmText(d)} cm).`));
+      } else if (d <= TOUCH_TOL) {
+        out.push(sketchIssue('stair-riser-crossing', ga.index, `${pair} se cruzam ou se tocam: não são permitidos (distância ${cmText(d)} cm).`));
+      }
     }
   }
 }

@@ -84,7 +84,8 @@
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+/* Janela de aplicativo: ocupa a janela toda, sem margens nem rolagem da página (quem rola são os painéis). */
+html, body, #root { height: 100%; overflow: hidden; }
 body {
   margin: 0;
   background: var(--bg);
@@ -92,14 +93,28 @@ body {
   font-family: var(--font-ui);
   font-size: 12.5px;
   line-height: 1.35;
-  padding-block: 0;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
   -webkit-font-smoothing: antialiased;
 }
-#root { height: 100%; padding-block: 12px; }
+/* Interface não é texto de página: nada seleciona por padrão. Campos e tabelas de dados liberam a seleção (bloco abaixo). */
+html, body, body * { -webkit-user-select: none; user-select: none; }
+input, textarea, select, [contenteditable], .selectable, .selectable *,
+.wsched, .wsched *, .layers, .layers *, .kbtable, .kbtable *, .matlist, .matlist *,
+.dialog .error, .dialog .hint {
+  -webkit-user-select: text;
+  user-select: text;
+}
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; white-space: nowrap; }
+/* Botões usam a seta do sistema, não a mão do navegador. O white-space: nowrap é conferido por scripts/check-props-density.mjs. */
+button { cursor: default; white-space: nowrap; }
+
+/* Barras de rolagem em estilo Windows: 12 px, quadradas. ::-webkit-scrollbar só (sem scrollbar-width, para não sobrepor). */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--chrome); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--line-strong) 70%, var(--fg)); }
+::-webkit-scrollbar-corner { background: var(--chrome); }
+/* Áreas que escondem a barra de propósito (faixa e barra de controle da vista, em ribbon.css) continuam sem barra. */
+.vcb::-webkit-scrollbar { display: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 svg { display: block; }
 
@@ -109,30 +124,24 @@ svg { display: block; }
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   background: var(--chrome);
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
+  /* Sem borda externa e cantos retos: a janela é a própria janela do sistema. */
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
+  position: relative;
 }
 
 /* ---- barra de título ---- */
-.titlebar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-bottom: 1px solid var(--line); background: var(--chrome); flex-wrap: wrap; }
-.brand { display: flex; align-items: center; gap: 7px; font-weight: 600; letter-spacing: 0.01em; margin-right: 6px; }
-.brand-mark { width: 20px; height: 20px; border-radius: 4px; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
-.proj-name { border: 1px solid transparent; background: transparent; padding: 3px 6px; border-radius: var(--r); min-width: 90px; max-width: 220px; font-weight: 500; }
-.proj-name:hover, .proj-name:focus { border-color: var(--line-strong); background: var(--panel); }
-.sep { width: 1px; align-self: stretch; background: var(--line); margin: 2px 4px; }
-.spacer { flex: 1; }
 .badge { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 6px; border-radius: 3px; border: 1px solid var(--line-strong); color: var(--fg-soft); }
 .badge.gpu { color: var(--accent); border-color: var(--accent); }
 .badge.cpu { color: var(--warn); border-color: var(--warn); }
-.dirty { color: var(--warn); font-size: 11px; }
 
 /* ---- botões ---- */
 .ibtn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; background: transparent; padding: 4px 7px; border-radius: var(--r); color: var(--fg); }
 .ibtn:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
 .ibtn:disabled { opacity: 0.4; cursor: default; }
 .ibtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: var(--r); white-space: nowrap; }
+.btn { border: 1px solid var(--line-strong); background: var(--panel); padding: 4px 10px; border-radius: 2px; white-space: nowrap; }
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 500; }
@@ -140,21 +149,6 @@ svg { display: block; }
 .btn.small { padding: 2px 7px; font-size: 11.5px; }
 
 /* ---- faixa de ferramentas ---- */
-.ribbon-tabs { display: flex; gap: 2px; padding: 0 8px; background: var(--chrome); border-bottom: 1px solid var(--line); }
-.rtab { border: 0; background: transparent; padding: 6px 12px; border-bottom: 2px solid transparent; color: var(--fg-soft); font-weight: 500; margin-bottom: -1px; }
-.rtab:hover { color: var(--fg); }
-.rtab.on { color: var(--accent); border-bottom-color: var(--accent); }
-.ribbon { display: flex; align-items: stretch; gap: 0; padding: 4px 8px; background: var(--panel); border-bottom: 1px solid var(--line-strong); overflow-x: auto; min-height: 66px; }
-.rgroup { display: flex; flex-direction: column; padding: 0 8px; border-right: 1px solid var(--line); min-width: 0; }
-.rgroup:last-child { border-right: 0; }
-.rgroup-tools { display: flex; gap: 2px; flex: 1; align-items: center; }
-.rgroup-title { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); padding-top: 2px; white-space: nowrap; }
-.tbtn { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid transparent; background: transparent; padding: 4px 6px; border-radius: var(--r); min-width: 48px; color: var(--fg); }
-.tbtn span { font-size: 10.5px; white-space: nowrap; }
-.tbtn kbd { font-family: var(--font-mono); font-size: 9px; color: var(--fg-faint); }
-.tbtn:hover:not(:disabled) { background: var(--chrome); border-color: var(--line); }
-.tbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.tbtn:disabled { opacity: 0.38; cursor: default; }
 
 /* ---- barra de opções ---- */
 .optbar { display: flex; align-items: center; gap: 12px; padding: 4px 10px; background: var(--chrome); border-bottom: 1px solid var(--line); min-height: 32px; flex-wrap: wrap; }
@@ -162,7 +156,7 @@ svg { display: block; }
 .optbar .tool-name { font-weight: 600; color: var(--fg); }
 
 /* ---- campos ---- */
-.input, .select { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 3px; padding: 3px 6px; min-width: 0; height: 24px; }
+.input, .select { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 2px; padding: 3px 6px; min-width: 0; height: 24px; }
 .input:focus, .select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
 .input.num { font-family: var(--font-mono); text-align: right; width: 72px; }
 .input.wide { width: 100%; }
@@ -173,15 +167,12 @@ svg { display: block; }
 
 /* ---- painéis laterais ---- */
 .workspace { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; }
-.side { width: 258px; background: var(--panel); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-/* A paleta de propriedades mantém a largura do `.side`: o desenho (canvas) não muda com a densidade. */
-.side.left { border-right: 1px solid var(--line-strong); }
-.side.right { border-left: 1px solid var(--line-strong); width: 236px; }
+.side { flex: 1; min-height: 0; background: var(--panel); display: flex; flex-direction: column; overflow: hidden; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--line); font-weight: 600; background: var(--chrome); }
 .panel-scroll { overflow: auto; flex: 1; min-height: 0; background: var(--sheet); }
 /* Grupo recolhível: cabeçalho em barra de cromo, com o chevron à direita (▲ aberto, ▼ fechado). */
 .pgroup { border-bottom: 1px solid var(--line-strong); }
-.pgroup > summary { list-style: none; cursor: pointer; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; border-bottom: 1px solid var(--line); }
+.pgroup > summary { list-style: none; cursor: default; padding: 2px 8px; background: var(--chrome); font-weight: 600; font-size: 11px; color: var(--fg-soft); display: flex; align-items: center; gap: 6px; user-select: none; border-bottom: 1px solid var(--line); }
 .pgroup > summary:hover { background: var(--accent-soft); }
 .pgroup > summary::-webkit-details-marker { display: none; }
 .pgroup > summary::after { content: ''; margin-left: auto; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2.5px; transform: rotate(45deg); transition: transform 0.12s; }
@@ -191,7 +182,7 @@ svg { display: block; }
  * entre as células. O campo fica sem caixa até o ponteiro passar ou o foco entrar. Sem `grid-template-columns` fixo
  * em pixels: a paleta tem largura de `.side`, e a tabela acompanha.
  */
-.prow { display: grid; grid-template-columns: 46% minmax(0, 1fr); align-items: stretch; min-height: 22px; border-bottom: 1px solid var(--line); }
+.prow { display: grid; grid-template-columns: var(--lbl, 46%) minmax(0, 1fr); align-items: stretch; min-height: 22px; border-bottom: 1px solid var(--line); }
 .prow:last-child { border-bottom: 0; }
 .prow > label, .prow > .lbl { display: flex; align-items: center; min-width: 0; padding: 2px 8px; border-right: 1px solid var(--line); font-size: 11px; color: var(--fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow > div { display: flex; align-items: center; min-width: 0; }
@@ -270,33 +261,20 @@ svg { display: block; }
 .mixed::placeholder { color: var(--fg-faint); }
 
 /* ---- navegador de projeto ---- */
-.tree { padding: 4px 0; }
-.tree details > summary { list-style: none; cursor: pointer; padding: 3px 10px; font-weight: 600; color: var(--fg-soft); display: flex; gap: 6px; align-items: center; user-select: none; }
-.tree details > summary::-webkit-details-marker { display: none; }
-.tree details > summary::before { content: ''; border: solid var(--fg-faint); border-width: 0 1.5px 1.5px 0; padding: 2.5px; transform: rotate(-45deg); }
-.tree details[open] > summary::before { transform: rotate(45deg); }
-.tree .leaf { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: transparent; text-align: left; padding: 3px 10px 3px 28px; color: var(--fg); }
-.tree .leaf:hover { background: var(--chrome); }
-.tree .leaf.on { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
-.tree .leaf .meta { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-faint); }
-.tree .levels { max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.tree .levels::-webkit-scrollbar { width: 8px; }
-.tree .levels::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
-.tree .sub { padding-left: 12px; }
 
 /* ---- área de trabalho ---- */
-.stage { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; background: var(--bg); }
+.stage { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; background: var(--bg); }
 /* Barra de abas superior com agrupador (overflow) quando há muitas abas/pavimentos */
 .viewtabs { display: flex; gap: 2px; padding: 4px 6px 0; background: var(--chrome); border-bottom: 1px solid var(--line-strong); overflow: visible; min-width: 0; flex-shrink: 0; position: relative; }
-.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 10px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12.5px; cursor: pointer; }
+.vtab { border: 1px solid transparent; border-bottom: 0; background: transparent; padding: 4px 10px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12.5px; cursor: default; }
 .vtab.on { background: var(--sheet); border-color: var(--line-strong); color: var(--fg); font-weight: 500; }
 .vtab-overflow { position: relative; display: inline-flex; align-items: center; }
-.vtab-overflow-btn { border: 1px solid var(--line); border-bottom: 0; background: var(--panel); padding: 4px 8px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.vtab-overflow-btn { border: 1px solid var(--line); border-bottom: 0; background: var(--panel); padding: 4px 8px; border-radius: 5px 5px 0 0; color: var(--fg-soft); display: inline-flex; gap: 5px; align-items: center; margin-bottom: -1px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 500; cursor: default; transition: background 0.15s, color 0.15s; }
 .vtab-overflow-btn:hover { background: var(--sheet); color: var(--fg); }
 .vtab-overflow-btn.has-active { border-color: var(--line-strong); color: var(--accent); }
 .vtab-overflow-badge { background: var(--line-strong); color: var(--fg); font-size: 10px; font-family: var(--font-mono); padding: 1px 5px; border-radius: 10px; line-height: 1.2; }
 .vtab-overflow-menu { position: absolute; top: 100%; left: 0; margin-top: 1px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); padding: 4px; min-width: 170px; max-width: 260px; max-height: 60vh; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; gap: 2px; }
-.vtab-overflow-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: none; background: transparent; border-radius: 4px; color: var(--fg); font-size: 12px; font-family: inherit; text-align: left; cursor: pointer; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vtab-overflow-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: none; background: transparent; border-radius: 4px; color: var(--fg); font-size: 12px; font-family: inherit; text-align: left; cursor: default; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vtab-overflow-item:hover { background: var(--hover); }
 .vtab-overflow-item.on { background: var(--accent-dim, rgba(24, 119, 242, 0.1)); color: var(--accent); font-weight: 600; }
 .vtab-controls { display: flex; align-items: center; gap: 2px; background: var(--chrome); padding-left: 4px; flex-shrink: 0; }
@@ -312,12 +290,10 @@ svg { display: block; }
 .dim-label--soft { color: var(--fg-soft); opacity: 0.8; }
 /* Cota e texto de anotação (decisão 0019): sem caixa, na cor da tinta da planta. */
 .plan-note { position: absolute; font-family: var(--font-ui); color: var(--fg); white-space: nowrap; line-height: 1; pointer-events: none; }
-.typebox { position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; padding: 5px 9px; box-shadow: var(--shadow); font-family: var(--font-mono); }
+.typebox { position: absolute; left: 14px; bottom: 44px; z-index: 11; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; padding: 5px 9px; box-shadow: var(--shadow); font-family: var(--font-mono); }
 .typebox .cap { font-family: var(--font-ui); color: var(--fg-soft); }
 .typebox .buf { min-width: 60px; font-size: 14px; }
 .typebox .buf:empty::after { content: '…'; color: var(--fg-faint); }
-.cornerbtns { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; }
-.cornerbtns .ibtn { background: var(--panel); border-color: var(--line-strong); }
 /* ViewCube (vista 3D): cubo CSS 3D pequeno, discreto, abaixo do botão de enquadrar. Repouso em 85% de opacidade. */
 .viewcube { position: absolute; right: 10px; top: 46px; z-index: 2; width: 104px; max-width: calc(100% - 16px); display: grid; justify-items: center; gap: 2px; user-select: none; -webkit-user-select: none; opacity: 0.85; transition: opacity 0.15s ease; }
 .viewcube:hover, .viewcube:focus-within { opacity: 1; }
@@ -352,14 +328,14 @@ svg { display: block; }
 
 /* ---- diálogos ---- */
 .overlay { position: fixed; inset: 0; background: rgba(10, 16, 20, 0.5); display: grid; place-items: center; z-index: 50; padding: 16px; }
-.dialog { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); width: min(860px, 100%); max-height: min(660px, 100%); display: flex; flex-direction: column; min-height: 0; }
+.dialog { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 3px; box-shadow: var(--shadow); width: min(860px, 100%); max-height: min(660px, 100%); display: flex; flex-direction: column; min-height: 0; }
 .dialog.narrow { width: min(520px, 100%); }
 .dialog.mid { width: min(700px, 100%); }
-.dhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--chrome); border-radius: 8px 8px 0 0; }
+.dhead { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--chrome); border-radius: 0; }
 .dhead h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
 .dhead .sub { color: var(--fg-soft); font-size: 11.5px; }
 .dbody { padding: 12px 14px; overflow: auto; min-height: 0; flex: 1; }
-.dfoot { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--chrome); border-radius: 0 0 8px 8px; }
+.dfoot { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 9px 14px; border-top: 1px solid var(--line); background: var(--chrome); border-radius: 0; }
 .dtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .dtab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 5px 12px; color: var(--fg-soft); margin-bottom: -1px; }
 .dtab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
@@ -396,7 +372,7 @@ svg { display: block; }
 .field-row > label { color: var(--fg-soft); }
 .section-svg { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r); width: 100%; }
 .tplgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(226px, 1fr)); gap: 12px; }
-.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--sheet); padding: 0; display: flex; flex-direction: column; overflow: hidden; cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.tpl { text-align: left; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--sheet); padding: 0; display: flex; flex-direction: column; overflow: hidden; cursor: default; transition: border-color .12s, box-shadow .12s; }
 .tpl:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(0, 0, 0, .1); }
 .tpl:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tpl-thumb { display: block; background: var(--chrome); border-bottom: 1px solid var(--line); aspect-ratio: 4 / 3; padding: 8px; }
@@ -412,7 +388,7 @@ svg { display: block; }
 .error { color: var(--danger); }
 
 /* ---- tutorial: faixa fina no topo da folha, para não cobrir o desenho ---- */
-.tutorial { position: absolute; left: 10px; right: 54px; top: 10px; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); padding: 5px 8px 5px 10px; z-index: 3; }
+.tutorial { flex: none; margin: 6px 10px 0; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); padding: 5px 8px 5px 10px; }
 .tutorial .step-count { font-family: var(--font-mono); font-size: 11px; color: var(--accent); white-space: nowrap; }
 .tutorial .step-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutorial .dots { display: inline-flex; gap: 4px; }
@@ -423,16 +399,13 @@ svg { display: block; }
 /* ---- telas estreitas: painéis viram gavetas ---- */
 @media (max-width: 700px) {
   .lbl-text { display: none; }
-  .proj-name { min-width: 60px; max-width: 120px; }
-  .ribbon { min-height: 62px; }
 }
 @media (max-width: 900px) {
-  .workspace { grid-template-columns: minmax(0, 1fr); position: relative; }
-  .side { position: absolute; z-index: 20; top: 0; bottom: 0; box-shadow: var(--shadow); }
-  .side.left { left: 0; }
-  .side.right { right: 0; }
+  .workspace { grid-template-columns: minmax(0, 1fr) !important; position: relative; }
+  .dock { position: absolute; z-index: 20; top: 0; bottom: 0; max-width: 92vw; box-shadow: var(--shadow); }
+  .dock.left { left: 0; }
+  .dock.right { right: 0; }
   .split { grid-template-columns: minmax(0, 1fr); }
-  .ribbon { min-height: 62px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -469,19 +442,6 @@ svg { display: block; }
 }
 
 /* ---- ações por tipo no navegador de projeto (TypeRow) ---- */
-.type-row { display: flex; align-items: center; }
-.type-row .leaf { flex: 1; min-width: 0; width: auto; }
-.type-actions { display: inline-flex; align-items: center; gap: 1px; padding-right: 6px; opacity: 0; transition: opacity 0.12s; }
-.type-row:hover .type-actions,
-.type-row.open .type-actions,
-.type-row:has(:focus-visible) .type-actions,
-.type-actions:focus-within { opacity: 1; }
-@media (hover: none) { .type-actions { opacity: 1; } }
-.type-act { padding: 2px 4px; color: var(--fg-soft); }
-.type-act:hover:not(:disabled) { color: var(--accent); }
-.type-act.danger:hover:not(:disabled) { color: var(--danger); }
-.type-act.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
-.type-act:disabled { opacity: 0.35; }
 .type-replace { display: grid; gap: 6px; margin: 2px 10px 6px 28px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r); background: var(--sheet); }
 .type-replace label { display: grid; gap: 3px; color: var(--fg-soft); font-size: 11.5px; }
 .type-replace .select { width: 100%; }
@@ -526,7 +486,6 @@ svg { display: block; }
 .section-badge .section-name { min-width: 0; font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .section-badge .section-kind { color: var(--fg-soft); font-size: 11px; white-space: nowrap; }
 .section-badge .ibtn { background: var(--sheet); }
-.tree-empty { margin: 2px 10px 6px 28px; color: var(--fg-faint); font-size: 11.5px; line-height: 1.4; }
 .view-rename { margin: 2px 10px 4px 28px; width: calc(100% - 38px); font-size: 12px; }
 
 /* ---- perfil superior da parede (diálogo e linha de propriedades) ---- */
@@ -553,7 +512,7 @@ svg { display: block; }
 /* ---- Capturas (botão Snap da barra de status e seu popover) ---- */
 .snap-anchor { position: relative; display: inline-flex; flex-shrink: 0; margin-left: auto; }
 .snap-anchor + .issues-anchor { margin-left: 0; }
-.snap-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--fg); cursor: pointer; }
+.snap-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); border-radius: var(--r); padding: 2px 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; white-space: nowrap; color: var(--fg); cursor: default; }
 .snap-btn:hover { background: var(--sheet); }
 .snap-btn[aria-expanded='true'] { box-shadow: 0 0 0 2px var(--accent-soft); }
 .snap-btn--disabled { opacity: 0.65; border-color: var(--line); color: var(--fg-soft); }
@@ -578,65 +537,6 @@ svg { display: block; }
 }
 
 
-/* ---- Estilo Autodesk Revit para Ribbon e Abas ---- */
-.ribbon-tabs {
-  background: var(--chrome);
-  padding: 0 4px;
-  gap: 1px;
-}
-.rtab {
-  border-radius: 3px 3px 0 0;
-  padding: 5px 14px;
-  font-size: 11.5px;
-  font-weight: 500;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  color: var(--fg-soft);
-  transition: background 0.1s;
-}
-.rtab:hover {
-  background: color-mix(in srgb, var(--chrome) 85%, var(--fg) 15%);
-  color: var(--fg);
-}
-.rtab.on {
-  background: var(--panel);
-  border-color: var(--line-strong);
-  border-top: 2px solid var(--accent);
-  color: var(--fg);
-  font-weight: 600;
-}
-/* Aba Contextual Verde do Revit */
-.rtab.contextual {
-  background: var(--revit-green-soft);
-  border-color: var(--revit-green-border);
-  border-top: 2px solid var(--revit-green-border);
-  color: var(--revit-green);
-  font-weight: 600;
-}
-.rtab.contextual:hover {
-  background: color-mix(in srgb, var(--revit-green-soft) 85%, var(--fg) 15%);
-}
-
-/* Grupo e Painéis do Ribbon Revit */
-.rgroup {
-  padding: 2px 6px;
-  background: transparent;
-}
-.rgroup-title {
-  font-size: 9.5px;
-  letter-spacing: 0.04em;
-  color: var(--fg-faint);
-  font-weight: 600;
-}
-.tbtn.primary-tool {
-  min-width: 52px;
-  padding: 4px 6px 2px;
-}
-.tbtn.primary-tool svg {
-  width: 28px;
-  height: 28px;
-}
-
 /* ---- Ícones de ferramenta no estilo Revit (geometria em Icon.tsx; degradês em IconDefs) ----
    Traço de espessura fixa em pixels de tela, para ficar nítido de 14 a 28 px. */
 .ic path, .ic circle { vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
@@ -652,74 +552,3 @@ svg { display: block; }
 .ic .ic-fa { fill: #e8892b; stroke: none; }
 .ic .ic-ds { stroke-dasharray: 3 2; }
 .ic .ic-tx { fill: var(--ic-ink); stroke: none; font: 700 8px var(--font-ui); }
-
-
-/* ---- Barra de Controle de Vista (View Control Bar do Revit) ---- */
-.view-control-bar {
-  position: absolute;
-  bottom: 8px;
-  left: 12px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(4px);
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  padding: 3px 8px;
-  box-shadow: var(--shadow);
-  font-size: 11px;
-}
-.vc-group {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.vc-label {
-  font-size: 10.5px;
-  color: var(--fg-soft);
-  font-weight: 500;
-}
-.vc-select {
-  height: 22px;
-  padding: 0 4px;
-  background: var(--sheet);
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  font-size: 11px;
-  color: var(--fg);
-}
-.vc-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--line);
-  margin: 0 2px;
-}
-.vc-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  height: 22px;
-  padding: 0 6px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  color: var(--fg-soft);
-  font-size: 11px;
-  font-weight: 600;
-}
-.vc-btn:hover:not(:disabled) {
-  background: var(--chrome);
-  border-color: var(--line);
-  color: var(--fg);
-}
-.vc-btn.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.vc-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}

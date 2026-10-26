@@ -41,6 +41,13 @@ describe('anotações no DXF da planta', () => {
     expect(notes.texts.find((t) => t.layer === DXF_LAYER_TEXTOS)).toMatchObject({ text: 'Sala', rotation: 90, at: { x: 2, y: 2 } });
   });
 
+  it('cota com texto fixo sai no DXF com esse texto no lugar do valor medido', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'd9', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1, text: 'Vão 3,60' } });
+    const notes = notesDxfOf(s.project, LV0, 100);
+    expect(notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS).map((t) => t.text)).toEqual(['Vão 3,60']);
+  });
+
   it('exportDxf escreve LINE em COTAS, TEXT em COTAS e TEXTOS e declara as duas camadas', () => {
     const dxf = exportDxf(comAnotacoes().project, LV0, { ...GEO, notes: notesDxfOf(comAnotacoes().project, LV0, 100) });
     const ents = entities(dxf);

@@ -4,6 +4,8 @@ Meta: parecer um programa BIM de verdade. Para isso a interface segue **convenç
 
 ## 1. Layout
 
+> Atualizado pela decisão 0032 (faixa guiada por dados, 15 abas na ordem do Revit, docks à esquerda, barras). O diagrama abaixo é o desenho original.
+
 ```
 ┌───────────────────────────────────────────────────────────────┐
 │ Barra de título · acesso rápido (salvar, desfazer, refazer)   │

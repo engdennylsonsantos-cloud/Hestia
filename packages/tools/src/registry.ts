@@ -2,7 +2,8 @@ import type { Tool, ToolEnv } from './types.ts';
 import { WallTool } from './wallTool.ts';
 import { OpeningTool } from './openingTool.ts';
 import { SelectTool } from './selectTool.ts';
-import { ArrayTool, MirrorTool, MoveTool, RotateTool } from './transformTools.ts';
+import { MirrorTool, MoveTool, RotateTool } from './transformTools.ts';
+import { ArrayTool } from './arrayTool.ts';
 import { OffsetTool } from './offsetTool.ts';
 import { AlignTool, MeasureTool, TrimTool } from './trimAlign.ts';
 import { JoinTool } from './joinTool.ts';
@@ -141,31 +142,3 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   roomsep: 'Separador de ambiente',
 };
 
-export const TOOL_SHORTCUT: Partial<Record<ToolId, string>> = {
-  select: 'V',
-  wall: 'W',
-  floor: 'F',
-  slab: 'B',
-  roof: 'U',
-  door: 'D',
-  window: 'J',
-  move: 'M',
-  copy: 'C',
-  rotate: 'R',
-  mirror: 'S',
-  array: 'A',
-  offset: 'O',
-  parallel: 'G',
-  trim: 'T',
-  align: 'L',
-  joins: 'N',
-  split: 'P',
-  measure: 'E',
-  section: 'K',
-  rehost: 'H',
-  stair: 'I',
-  stairrun: 'Q',
-  dimension: 'Y',
-  text: 'X',
-  room: 'Z',
-};

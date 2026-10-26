@@ -11,6 +11,7 @@ import {
   componentsFromParts,
   copyCurve,
   lastRun,
+  missingText,
   partsFromComponents,
   runSketch,
   type DraftReport,
@@ -21,13 +22,22 @@ import {
 } from './stairSketchState.ts';
 import { chainEnd, emptyStroke, strokeBusy, typedPoint } from './stairStroke.ts';
 import { createStairFromComponents, draftStair, stairLimits, stairTypeId, updateStairComponents, type StairCreateOptions } from './stairCommands.ts';
-import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto, undoStroke, type DrawState, type PickOp } from './stairDraw.ts';
+import { clearActive, closeCurrent, cloneParts, drawPoint, partPoints, pickInto, snapToBoundary, undoStroke, type DrawState, type PickOp } from './stairDraw.ts';
 import { chainAt, leftSide, nearestPickLine, offsetChain, PICK_PX, pickLinesOf } from './stairPickLines.ts';
 import { discardSpiralOnEdit } from './stairSpiralRun.ts';
 import { activeTone, buildItems, hintText, warningText } from './stairView.ts';
 import { DEFAULT_SNAP, type PointerInfo, type PreviewItem, type Tool } from './types.ts';
 
 const HINT = 'Escada: desenhe o limite esquerdo; Enter passa ao direito e outro Enter vai a Espelhos. Esc cancela a cadeia; outro Esc descarta o croqui.';
+
+/**
+ * Mensagem de Concluir (Enter nos espelhos faz o mesmo): com espelhos faltando, diz a conta e como completar. Concluir
+ * não bloqueia (há croquis parciais de propósito), então o aviso tem de bater com o que foi criado.
+ */
+const concluirText = (rep: DraftReport, base: 'Escada criada' | 'Croqui atualizado'): string => {
+  if (!missingText(rep)) return `${base}${base === 'Escada criada' ? `: ${rep.created} espelhos` : ''}. `;
+  return `${base} com ${rep.created} de ${rep.desired} espelhos: faltam ${rep.remaining} para chegar ao nível de cima. Edite o croqui para completar. `;
+};
 
 /** Estado do croqui para a interface: a análise, o contador, o sub-modo e "Pegar linhas". */
 export interface StairStatus extends DraftReport {
@@ -196,7 +206,8 @@ export class StairTool extends ToolBase {
       this.pickItems = this.pickPreview();
     } else {
       const inf = this.snap(p, this.snapExtra());
-      this.cursor = inf.point;
+      // Espelho: a prévia já mostra o ponto no limite (o mesmo que o clique vai gravar).
+      this.cursor = this.st.submode === 'espelhos' ? snapToBoundary(lastRun(this.st.parts), inf.point) : inf.point;
       this.pickItems = [];
     }
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);
@@ -241,9 +252,9 @@ export class StairTool extends ToolBase {
     return this.st.submode !== 'concluir' && this.st.stroke.prim === 'line' && this.st.stroke.last !== null ? 'Comprimento' : null;
   }
 
-  /** Enter: fecha o limite, a caminhada ou o patamar; em Concluir, grava. */
+  /** Enter: fecha o limite, a caminhada ou o patamar; em Concluir, grava. Nos espelhos (sem traçado), Enter é Concluir. */
   override confirm(): void {
-    if (this.st.submode === 'concluir') {
+    if (this.st.submode === 'concluir' || (this.st.submode === 'espelhos' && !strokeBusy(this.st.stroke))) {
       this.finish();
       return;
     }
@@ -258,7 +269,10 @@ export class StairTool extends ToolBase {
     this.setPrimitive(this.st.stroke.prim === 'line' ? 'arc' : 'line');
   }
 
-  /** Esc em dois passos: 1º cancela a cadeia ou o traçado em curso; 2º descarta o croqui e sai da ferramenta. */
+  /**
+   * Esc em dois passos: 1º cancela a cadeia ou o traçado em curso; 2º descarta o croqui e sai da ferramenta. O descarte
+   * avisa quantos espelhos perdeu (a mensagem vai depois do `done`, que volta ao seletor e sobrescreve a dica).
+   */
   override cancel(): void {
     this.clearPicks();
     if (strokeBusy(this.st.stroke)) {
@@ -267,8 +281,10 @@ export class StairTool extends ToolBase {
       this.note('Cadeia cancelada. Esc de novo descarta o croqui.');
       return;
     }
+    const perdidos = this.report.created;
     this.st.parts = cloneParts(this.original);
     this.env.done();
+    if (perdidos > 0) this.env.say(`Croqui descartado (${perdidos} espelhos). Ctrl+Z não recupera: use Concluir para guardar.`);
   }
 
   /**
@@ -410,14 +426,21 @@ export class StairTool extends ToolBase {
     this.clearPicks();
   }
 
-  /** Pontos de captura: escadas do nível e os pontos do croqui (todos os limites, espelhos e a cadeia em curso). */
+  /**
+   * Pontos de captura: escadas do nível e os pontos do croqui (limites, espelhos e a cadeia em curso). No modo de
+   * espelhos, os espelhos já desenhados e a grade ficam de fora: o clique do espelho seguinte seria puxado para a ponta
+   * do anterior, ou para a mesma coluna da grade (0,1 m), e dois espelhos cairiam no mesmo ponto do limite. O snap útil
+   * continua nos limites e na perpendicular.
+   */
   private snapExtra(): Partial<InferContext> {
     const p = this.env.project();
-    const draft = this.st.parts.flatMap(partPoints);
+    const espelhos = this.st.submode === 'espelhos';
+    const draft = this.st.parts.flatMap((part) => (espelhos && part.kind !== 'landing' ? [...part.run.boundaryLeft, ...part.run.boundaryRight].flatMap((c) => [c.a, c.b]) : partPoints(part)));
     const pending = this.st.stroke.chain.flatMap((c) => [c.a, c.b]);
     return {
       from: this.st.stroke.last ?? undefined,
       extraPoints: [...stairSnapPoints(p, this.env.levelId()), ...draft, ...pending],
+      ...(espelhos ? { noGrid: true, snap: { ...DEFAULT_SNAP, ...this.env.options().snap, grid: false } } : {}),
     };
   }
 
@@ -469,13 +492,13 @@ export class StairTool extends ToolBase {
       const r = updateStairComponents(this.env, this.stairId, kept);
       if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
       this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
-      this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);
+      this.env.say(`${concluirText(r.report, 'Croqui atualizado')}${warningText(r.report)}Ctrl+Z desfaz.`);
       return;
     }
     const r = createStairFromComponents(this.env, components, this.creationOptions());
     if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
     this.env.done();
-    this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);
+    this.env.say(`${concluirText(r.report, 'Escada criada')}${warningText(r.report)}Ctrl+Z desfaz.`);
   }
 }
 

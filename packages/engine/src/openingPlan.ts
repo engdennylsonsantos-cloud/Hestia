@@ -232,6 +232,60 @@ function addWindowOpening(out: OpeningPlanPath[], m: OpeningModel, o: LeafOpenin
   }
 }
 
+/** Guilhotina: as duas folhas aparecem como linhas defasadas, cada uma na sua pista. */
+function addHungLines(out: OpeningPlanPath[], m: OpeningModel): void {
+  for (const o of m.openings) {
+    const box = leafBox(m, o.leaf);
+    if (!box) continue;
+    const s = (box.s0 + box.s1) / 2;
+    out.push(line([{ t: box.t0, s }, { t: box.t1, s }], 'leaf', 'ink', 1));
+  }
+}
+
+/** Veneziana: três linhas do caixilho e traços diagonais curtos das aletas, tracejados. */
+function addLouverPlan(out: OpeningPlanPath[], m: OpeningModel): void {
+  const hw = m.width / 2;
+  const s = (m.core.s0 + m.core.s1) / 2;
+  let t = -hw + 0.08;
+  while (t + 0.06 <= hw - 0.06) {
+    out.push(line([{ t, s: s - 0.025 }, { t: t + 0.06, s: s + 0.025 }], 'leafPanel', 'soft', 0.7, [4, 3]));
+    t += 0.12;
+  }
+}
+
+/** Janela de abrir: folha aberta com espessura no `angle2d` e arco tracejado até a posição fechada. */
+function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+  for (const o of m.openings) {
+    if (o.kind !== 'side') continue;
+    const box = leafBox(m, o.leaf);
+    if (!box) continue;
+    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
+    const motion = leafMotion(m, o.leaf);
+    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
+    if (!opts.showSwing) continue;
+    const sign = openingSign(o, motion);
+    const center = { t: o.pivot.t, s: o.pivot.s };
+    addOpeningArc(out, center, { t: o.latchT, s: o.pivot.s }, sign * opts.angle, 'dash');
+  }
+}
+
+/** Janela pivotante: folha girada no eixo central e arcos curtos tracejados nas duas pontas. */
+function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+  for (const o of m.openings) {
+    if (o.kind !== 'pivot') continue;
+    const box = leafBox(m, o.leaf);
+    if (!box) continue;
+    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
+    const motion = leafMotion(m, o.leaf);
+    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
+    if (!opts.showSwing) continue;
+    const sign = openingSign(o, motion);
+    const center = { t: o.pivot.t, s: o.pivot.s };
+    addOpeningArc(out, center, { t: box.t0, s: o.pivot.s }, sign * opts.angle, 'dash');
+    addOpeningArc(out, center, { t: box.t1, s: o.pivot.s }, sign * opts.angle, 'dash');
+  }
+}
+
 /** Peças fora do corte que o nível alto mostra: alizar, peitoril, verga/contraverga e o vidro duplo. */
 function addHighExtras(out: OpeningPlanPath[], m: OpeningModel, z: number): void {
   for (const { part, ring } of slicePartsAtZ(m, z, CLOSED)) {
@@ -307,12 +361,34 @@ function windowPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanO
     addVoid(out, m);
     return;
   }
+  const hung = m.openings.some((o) => o.kind === 'slide' && o.slideAxis === 'z');
   if (level === 'low') {
-    addWindowLines(out, m);
+    if (hung) addHungLines(out, m);
+    else addWindowLines(out, m);
     return;
   }
   addFrameCut(out, m, opts.cutZ);
+  if (hung) {
+    addHungLines(out, m);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return;
+  }
   addWindowLines(out, m);
+  if (m.openings.some((o) => o.kind === 'louver')) {
+    addLouverPlan(out, m);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return;
+  }
+  if (m.openings.some((o) => o.kind === 'side')) {
+    addHingedPlan(out, m, opts, level);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return;
+  }
+  if (m.openings.some((o) => o.kind === 'pivot')) {
+    addPivotWinPlan(out, m, opts, level);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return;
+  }
   const sliding = m.openings.some((o) => o.kind === 'slide');
   const opening = m.openings.find((o) => o.kind === 'top' || o.kind === 'bottom');
   if (sliding) {

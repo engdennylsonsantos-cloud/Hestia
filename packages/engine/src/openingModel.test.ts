@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coreSpan, createEmptyProject, DEFAULT_OPENING_TYPES, makeWall, openingFrame, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
+import { coreSpan, createEmptyProject, makeWall, openingFrame, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
 import { buildOpeningModel } from './openingModel.ts';
@@ -215,11 +215,9 @@ describe('buildOpeningModel: porta dupla, pivotante, correr e vão livre', () =>
     }
     expect(Math.abs(folhas[0]!.box.s0 - folhas[1]!.box.s0)).toBeGreaterThan(0.02);
     const movel = folhas.find((f) => f.motion?.kind === 'slide' && (f.motion.dt !== 0 || f.motion.travel > 0));
-    expect(movel).toBeDefined();
-    if (movel.motion?.kind === 'slide') {
-      expect(Math.abs(movel.motion.dt)).toBe(1);
-      expect(movel.motion.travel).toBeCloseTo(0.72, 9);
-    }
+    if (!movel || movel.motion?.kind !== 'slide') throw new Error('sem folha móvel');
+    expect(Math.abs(movel.motion.dt)).toBe(1);
+    expect(movel.motion.travel).toBeCloseTo(0.72, 9);
   });
 
   it('vão livre: void = true e nenhuma peça de batente, folha ou vidro', () => {
@@ -296,6 +294,112 @@ describe('buildOpeningModel: janelas', () => {
     expect(de(m.parts, 'sillFrame')).toHaveLength(1);
     expect(m.parts.some((x) => x.role === 'jamb' || x.role === 'head' || x.role === 'leaf' || x.role === 'glass')).toBe(false);
     expect(m.openings).toHaveLength(0);
+  });
+});
+
+describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, alizar, peitoril e vergas)', () => {
+  it('leafStyle panel: quatro almofadas em relevo de 0,006 nas duas faces', () => {
+    const c = cena('ot_p90', { leafStyle: 'panel' });
+    const m = modelo(c);
+    const paineis = de(m.parts, 'leafPanel');
+    expect(paineis).toHaveLength(4);
+    const f = folha(m.parts);
+    for (const p of paineis) {
+      expect(p.box.s0).toBeCloseTo(f.box.s0 - 0.006, 9);
+      expect(p.box.s1).toBeCloseTo(f.box.s1 + 0.006, 9);
+    }
+  });
+
+  it('maçaneta lever padrão da porta de giro: roseta e haste nas duas faces', () => {
+    const m = modelo(cena('ot_p90'));
+    const handles = de(m.parts, 'handle');
+    expect(handles).toHaveLength(4);
+    expect(handles.every((x) => x.leaf === 0 && x.motion)).toBe(true);
+    const rosetas = handles.filter((x) => x.id.includes('rosette'));
+    expect(rosetas).toHaveLength(2);
+    for (const r of rosetas) {
+      expect(r.box.s1 - r.box.s0).toBeCloseTo(0.012, 9);
+      expect(r.box.t1 - r.box.t0).toBeCloseTo(0.05, 9);
+      expect(Math.abs((r.box.z0 + r.box.z1) / 2 - 1)).toBeLessThan(1e-9);
+    }
+  });
+
+  it('maçaneta knob e pull respeitam a forma e o lado', () => {
+    const knob = modelo(cena('ot_p90', { handle: 'knob' }));
+    expect(de(knob.parts, 'handle')).toHaveLength(2);
+    for (const k of de(knob.parts, 'handle')) expect(k.box.t1 - k.box.t0).toBeCloseTo(0.05, 9);
+    const pull = modelo(cena('ot_p90', { handle: 'pull' }));
+    const barra = de(pull.parts, 'handle')[0]!;
+    expect(barra.box.z1 - barra.box.z0).toBeCloseTo(0.4, 9);
+    expect(barra.box.s0).toBeGreaterThan(0);
+  });
+
+  it('grid 2×2 na janela fixa: um montante vertical e um horizontal', () => {
+    const c = cena('ot_jfixa60', { grid: { cols: 2, rows: 2 } });
+    const m = modelo(c);
+    const muntins = de(m.parts, 'muntin');
+    expect(muntins).toHaveLength(2);
+    const vertical = muntins.find((x) => x.box.t1 - x.box.t0 < x.box.z1 - x.box.z0)!;
+    const horizontal = muntins.find((x) => x.box.z1 - x.box.z0 < x.box.t1 - x.box.t0)!;
+    expect(vertical).toBeDefined();
+    expect(horizontal).toBeDefined();
+  });
+
+  it('bandeira superior: travessa e vidro fixo acima; a folha desce e não gera item', () => {
+    const c = cena('ot_p90', { transom: { height: 0.3 } });
+    const m = modelo(c);
+    const barra = m.parts.find((x) => x.id === 'transom-bar')!;
+    const vidro = m.parts.find((x) => x.id === 'transom-glass')!;
+    expect(barra).toBeDefined();
+    expect(vidro).toBeDefined();
+    expect(vidro.box.z1).toBeCloseTo(c.g.height - 0.05, 9);
+    expect(barra.box.z0).toBeCloseTo(c.g.height - 0.05 - 0.3 - 0.04, 9);
+    expect(folha(m.parts).box.z1).toBeLessThan(barra.box.z0);
+    expect(m.openings).toHaveLength(1);
+  });
+
+  it('bandeiras laterais: vidro fixo e montante de 0,04; a folha diminui e não gera item', () => {
+    const base = modelo(cena('ot_p90'));
+    const c = cena('ot_p90', { sidelights: { left: true, right: true, width: 0.2 } });
+    const m = modelo(c);
+    expect(m.parts.filter((x) => x.id.startsWith('sidelight-glass'))).toHaveLength(2);
+    const mullions = m.parts.filter((x) => x.id.startsWith('sidelight-mullion'));
+    expect(mullions).toHaveLength(2);
+    for (const x of mullions) expect(x.box.t1 - x.box.t0).toBeCloseTo(0.04, 9);
+    expect(largura(folha(m.parts).box)).toBeLessThan(largura(folha(base.parts).box));
+    expect(m.openings).toHaveLength(1);
+  });
+
+  it('alizar: 3 peças por face na porta e 4 na janela, encostadas nas faces', () => {
+    const porta = modelo(cena('ot_p90', { casing: { width: 0.05, thickness: 0.015 } }));
+    expect(de(porta.parts, 'casing')).toHaveLength(6);
+    const janela = modelo(cena('ot_j120', { casing: { width: 0.05, thickness: 0.015 } }));
+    expect(de(janela.parts, 'casing')).toHaveLength(8);
+    for (const x of de(janela.parts, 'casing')) {
+      expect(Math.min(Math.abs(x.box.s0), Math.abs(x.box.s1))).toBeGreaterThanOrEqual(0.184 / 2 - 1e-9);
+    }
+  });
+
+  it('peitoril saliente só em janela: projeta além das duas faces', () => {
+    const m = modelo(cena('ot_j120', { sillBoard: { projection: 0.03, thickness: 0.02 } }));
+    const s = de(m.parts, 'sillBoard');
+    expect(s).toHaveLength(1);
+    expect(s[0]!.box.t1 - s[0]!.box.t0).toBeCloseTo(1.2 + 0.06, 9);
+    expect(s[0]!.box.s1 - s[0]!.box.s0).toBeCloseTo(0.184 + 0.06, 9);
+    expect(s[0]!.box.z0).toBeCloseTo(-0.02, 9);
+    const porta = modelo(cena('ot_p90', { sillBoard: { projection: 0.03, thickness: 0.02 } }));
+    expect(de(porta.parts, 'sillBoard')).toHaveLength(0);
+  });
+
+  it('verga e contraverga de concreto com transpasse, fora do vão', () => {
+    const m = modelo(cena('ot_p90', { lintel: {}, sillBeam: { over: 0.2, height: 0.25 } }));
+    const verga = de(m.parts, 'lintel')[0]!;
+    const contra = de(m.parts, 'sillBeam')[0]!;
+    expect(verga.material).toBe('concrete');
+    expect(verga.box.t1 - verga.box.t0).toBeCloseTo(0.9 + 0.6, 9);
+    expect(verga.box.z0).toBeCloseTo(2.1, 9);
+    expect(contra.box.t1 - contra.box.t0).toBeCloseTo(0.9 + 0.4, 9);
+    expect(contra.box.z1).toBeCloseTo(0, 9);
   });
 });
 

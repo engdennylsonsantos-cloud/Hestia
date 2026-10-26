@@ -1,8 +1,10 @@
-import type { ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import * as THREE from 'three';
 import type { OpeningCheck } from '@hestia/engine';
-import type { OpeningType } from '@hestia/model';
+import type { OpeningLineConvention, OpeningType } from '@hestia/model';
 import { NumField } from '../../fields.tsx';
-import { TypePreview } from '../../TypePreview.tsx';
+import { Preview3D } from './Preview3D.tsx';
+import { previewElevationSvg, previewPlanSvg, previewSectionSvg } from './previewViews.ts';
 
 export type PreviewTab = 'plan' | 'elevation' | 'section' | 'lines3d' | 'shaded3d';
 
@@ -25,11 +27,34 @@ interface OpeningTypePreviewProps {
   angle: number;
   onAngle: (angle: number) => void;
   checks: readonly OpeningCheck[];
+  /** Convenção do V do projeto real (decisão 0034 §2); ausente usa o padrão. */
+  openingLine?: OpeningLineConvention;
+}
+
+/** Atraso do redesenho da prévia (ms): a digitação nos campos nunca espera o desenho. */
+const PREVIEW_DEBOUNCE_MS = 60;
+
+/** SVG da prévia 2D pelo mesmo pipeline das vistas do projeto; erro no dado vira aviso, não quebra o diálogo. */
+function previewSvg(
+  tab: PreviewTab,
+  d: OpeningType,
+  flipHand: boolean,
+  flipFacing: boolean,
+  angle: number,
+  openingLine: OpeningLineConvention | undefined,
+): string {
+  try {
+    if (tab === 'plan') return previewPlanSvg(d, { flipHand, flipFacing, angle, openingLine, width: 420, height: 300 });
+    if (tab === 'section') return previewSectionSvg(d, { flipHand, flipFacing, openingLine, width: 420, height: 300 });
+    return previewElevationSvg(d, { flipHand, flipFacing, openingLine, width: 420, height: 300 });
+  } catch {
+    return '';
+  }
 }
 
 /**
- * Coluna de prévia: abas das cinco vistas (só a elevação desenha nesta parte; as demais ficam "Em breve"), os
- * controles de dobradiça/sentido/ângulo (estado da prévia, não do tipo) e a faixa de verificações.
+ * Coluna de prévia: as cinco vistas desenhadas pelos pipelines do projeto (planta, seção e a cena 3D), os controles de
+ * dobradiça/sentido/ângulo (estado da prévia, não do tipo) e a faixa de verificações.
  */
 export function OpeningTypePreview({
   d,
@@ -42,33 +67,79 @@ export function OpeningTypePreview({
   angle,
   onAngle,
   checks,
+  openingLine,
 }: OpeningTypePreviewProps): ReactElement {
+  // O renderizador WebGL é único para o diálogo: nasce com a prévia (o diálogo aberto) e é descartado ao fechar.
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const [renderer, setRenderer] = useState<THREE.WebGLRenderer | null>(null);
+  const [webglFailed, setWebglFailed] = useState(false);
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      setWebglFailed(true);
+      return;
+    }
+    try {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      rendererRef.current = r;
+      setRenderer(r);
+    } catch {
+      setWebglFailed(true);
+    }
+    return () => {
+      const r = rendererRef.current;
+      rendererRef.current = null;
+      r?.dispose();
+      r?.domElement.remove();
+    };
+  }, []);
+  // Redesenho com debounce: o rascunho pode mudar a cada tecla, mas a prévia só refaz 60 ms depois.
+  const [debounced, setDebounced] = useState(d);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(d), PREVIEW_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [d]);
+  const is3d = tab === 'lines3d' || tab === 'shaded3d';
+  const noWebgl = webglFailed || typeof document === 'undefined';
+  const svg = useMemo(
+    () => (is3d ? '' : previewSvg(tab, debounced, flipHand, flipFacing, angle, openingLine)),
+    [debounced, tab, is3d, flipHand, flipFacing, angle, openingLine],
+  );
   return (
     <aside className="op-preview" aria-label="Pré-visualização do tipo">
       <div className="op-tabs" role="tablist" aria-label="Vistas da prévia">
-        {TABS.map((t) => {
-          const enabled = t.id === 'elevation';
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              className={`op-tab${t.id === tab ? ' on' : ''}`}
-              aria-selected={t.id === tab}
-              disabled={!enabled}
-              title={enabled ? t.label : 'Em breve'}
-              onClick={() => onTab(t.id)}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            className={`op-tab${t.id === tab ? ' on' : ''}`}
+            aria-selected={t.id === tab}
+            title={t.label}
+            onClick={() => onTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
       <div className="op-pv-box" role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label ?? 'Prévia'}>
-        {tab === 'elevation' ? (
-          <TypePreview subject={{ kind: d.kind, type: d }} />
+        {is3d ? (
+          noWebgl ? (
+            <div className="op-pv-soon">3D indisponível neste navegador</div>
+          ) : (
+            <Preview3D
+              renderer={renderer}
+              type={debounced}
+              style={tab === 'lines3d' ? 'lines' : 'shaded'}
+              angle={angle}
+              flipHand={flipHand}
+              flipFacing={flipFacing}
+              active={is3d}
+            />
+          )
+        ) : svg ? (
+          <div style={{ width: '100%', height: '100%', minHeight: 190 }} dangerouslySetInnerHTML={{ __html: svg }} />
         ) : (
-          <div className="op-pv-soon">Em breve</div>
+          <div className="op-pv-soon">Prévia indisponível</div>
         )}
       </div>
       <div className="op-pv-actions">

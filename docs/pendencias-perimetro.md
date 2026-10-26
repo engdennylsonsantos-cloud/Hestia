@@ -25,7 +25,7 @@ Modo único "Criar/Editar perímetro" para telhado, piso, laje e forro:
 - Conclusão e edição de elemento pronto: `perimeterCommit*.ts` (`commitPerimeter`, `draftFromElement`, recuperação de arcos em `perimeterArcFit.ts`).
 - Planta: `packages/render/src/plan/sketch*.ts` (esboço), `dim.ts` (esmaecer o resto da planta), `roofs*.ts` (telhado pronto).
 - App: `apps/web/src/editor/perimeter*.ts` (estado/controller), `apps/web/src/ui/perimeter/*` (faixa, galeria, barra de opções, propriedades), `ui/ribbon/*` (aba contextual, botões de Modificar).
-- Decisões: concluir só por botão; triângulo de inclinação só no telhado, fora da aresta, fixo na orientação; furos são laços internos; telhado cujo esqueleto não fecha é recusado com o ponto; contorno vinculado às paredes e forro "Por ambiente" voltaram.
+- Decisões: concluir só por botão; triângulo de inclinação só no telhado, fora da aresta, fixo na orientação; furos são laços internos; telhado cujo esqueleto não fecha é recusado com o ponto; o vínculo às paredes voltou por "Por perímetro" + "Vincular às paredes" (origem `perimeter`; `walls-finish` só na ferramenta antiga), e o forro "Por ambiente" voltou por "Por ambiente" + "Acompanhar o ambiente"; Desvincular/Revincular estão nos grupos "Contorno".
 
 ## 3. Pendências (ordem sugerida)
 
@@ -72,18 +72,52 @@ Observações herdadas: com "linhas finas" ligadas (padrão desde 2026-10-25, de
 - Cantos agudos abaixo de cerca de 11° são recusados (`MITER_LIMIT`).
 - Três arestas que definem inclinação dão 3 águas (a quarta vira empena): conferir com o usuário se é o esperado.
 - Telhado em L com duas águas e o resto empena é recusado (esqueleto não fecha, degrau de 0,60 m): decisão do usuário, teste ajustado.
-- Modos antigos de criação (`poly`, `rect`, `walls`, `room`, `paredes`, `perimetro`) ainda existem nas classes de `FloorTool`, `SlabTool`, `CeilingTool` e `RoofTool`, inalcançáveis pela faixa; os seletores "Modo do contorno" ainda os listam. Remover quando os testes dependentes forem migrados.
+- Modos antigos de criação (`poly`, `rect`, `walls`, `room`, `paredes`, `perimetro`) ainda existem nas classes de `FloorTool`, `SlabTool`, `CeilingTool` e `RoofTool`, inalcançáveis pela faixa; os seletores "Modo do contorno" ainda os listam. Plano de remoção e testes dependentes em §4.
+- Piso/laje pela face de acabamento (`walls-finish`), criados pela ferramenta antiga de piso por paredes, não são criados pelo modo; pela faixa só o perímetro externo (`perimeter`) é vinculável. Decidir se o modo ganha um "Por ambiente" de piso/laje ou se fica só o perímetro externo.
+- `tests/e2e/contorno.mjs` e `tests/e2e/forro-ambiente.mjs` ainda montam o vínculo pela API, com o comentário defasado de que o modo não o gravaria; migrar para "Por perímetro"/"Por ambiente".
 - Piso/laje já vinculados às paredes não se editam pelo perímetro (decisão 0031: desvincular antes).
 - `tests/e2e/visual-regression.mjs` falha em todos os casos porque a largura das capturas mudou de 672 para 908 px; revisar os baselines `telhado-*` antes de regenerar.
 - Aviso de lint antigo: `ShortcutsConfigDialog.tsx` (exhaustive-deps).
 - `activateView` em `viewTabActions.ts` adiciona a aba mesmo quando a navegação é recusada com o modo aberto.
 
-## 4. Links
+## 4. Plano de remoção dos modos antigos
+
+Os modos continuam nas classes e nos seletores "Modo do contorno" de `PlacementProperties.tsx` (linhas 49, 57, 65 e 71),
+mas não são alcançáveis pela faixa: `PerimeterMode.intercepta` abre o modo de perímetro para `floor`, `slab`, `ceiling`
+e `roof`. Antes de removê-los, migrar os testes abaixo para o perímetro/commit e trocar os roteiros e2e que ainda pedem
+o modo antigo (ver §3.4). Depois, apagar os ramos, as opções `floorMode`/`slabMode`/`ceilingMode`/`roofMode` e os
+seletores.
+
+- **FloorTool** (`floorTool.ts`): `poly`, `rect`, `walls` e `perimetro`.
+  - `poly`: `floorTool.test.ts`, bloco "contorno por cliques" (linhas 28–123).
+  - `rect`: `floorTool.test.ts` (125–143); `tests/e2e/parede-recorte.mjs` (linha 57) pede `floorMode: 'rect'`, mas
+    hoje `setTool('floor')` abre o perímetro, então o roteiro está defasado.
+  - `walls`: `floorTool.test.ts` (145–179), `floorExtend.test.ts` (70–92) e `outlineEdit.test.ts` (20–46).
+  - `perimetro`: `floorExtend.test.ts` (94–110) e `outlineEdit.test.ts` (48–54).
+- **SlabTool** (`slabTool.ts`): `poly`, `rect` e `perimetro`.
+  - `poly`: `slabTool.test.ts`, bloco "contorno por cliques" (27–130).
+  - `rect`: `slabTool.test.ts` (132–150) e `slabSlope.test.ts` (linha 12).
+  - `perimetro`: `slabTool.test.ts` (152–186) e `outlineEdit.test.ts` (56–64).
+- **CeilingTool** (`ceilingTool.ts`): `poly`, `rect` e `room`.
+  - `poly`: `ceilingTool.test.ts` (27–41).
+  - `rect`: `ceilingTool.test.ts` (43–68).
+  - `room`: `ceilingTool.test.ts` (71–105).
+- **RoofTool** (`roofTool.ts`): `poly`, `rect` e `paredes`; `extrusao` é ferramenta própria e, aqui, cai em `poly`.
+  - `poly`: `roofTool.test.ts` (casos de contorno por cliques, comprimento digitado e Enter/Esc), `roofPresets.test.ts`
+    (casos de criação) e `roofExtrusionTool.test.ts` (126–137, `roofMode: 'extrusao'` cai em poly).
+  - `rect`: `roofTool.test.ts` (casos de cumeeira, Tab, inclinação/cota, duas águas e beiral), `roofPresets.test.ts`,
+    `attachRoof.test.ts`, `roofEdit.test.ts`, `roofArrowTool.test.ts` e `roofExtrusionTool.test.ts` (112–124).
+  - `paredes`: `roofTool.test.ts` (blocos "pelas paredes com balanço" e "o beiral sai...").
+
+Os demais testes que só trazem `floorMode`/`slabMode` no fixture (`arcTools`, `roomSeparator*`, `sectionTool`,
+`selectModifiers`, `split*`, `tools`) não instanciam estas ferramentas; não bloqueiam a remoção.
+
+## 5. Links
 
 - App de teste (artefato, mesmo link, versão 9): https://claude.ai/artifact/1g2X1e1KYR8pYdD7t2N3P4
 - Mock da proposta de interface: https://claude.ai/artifact/5jViyGhcSPEr2rcLRrZifx
 - Proposta de cores e cumeeira: https://claude.ai/artifact/XBZeSVsH9QpyHUKU57qf82
 
-## 5. Lições do processo
+## 6. Lições do processo
 
 Validar só com testes passando deixou passar problemas de uso (seleção invisível, comandos sem ligação, planta do telhado fraca). Antes de entregar uma parte de interface ou de desenho: rodar o app com Playwright, tirar captura e olhar como o usuário olharia.

@@ -60,7 +60,7 @@ await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 s = await st();
 check('3 aberturas', s.openings.length === 3, `(${s.openings.length})`);
 
-// 4. seleção + mover: a vizinha não selecionada fica onde está
+// 4. seleção + mover: sem Desconectar (padrão), a vizinha não selecionada acompanha e se estica
 await click(5, 5.5);
 const sel = await page.evaluate(() => window.__hestia.useUi.getState().selection.length);
 check('seleção por clique', sel === 1);
@@ -70,7 +70,7 @@ s = await st();
 const top = s.walls.find((w) => Math.abs(w.a.y - 6.5) < 1e-6 && Math.abs(w.b.y - 6.5) < 1e-6);
 const left = s.walls.find((w) => Math.abs(w.a.x - 2) < 1e-6 && Math.abs(w.b.x - 2) < 1e-6);
 check('parede movida 1 m', !!top);
-check('vizinha ficou no lugar (sem esticar)', !!left && Math.max(left.a.y, left.b.y) < 5.6, left ? `${left.a.y},${left.b.y}` : '');
+check('vizinha acompanhou e continua ligada (esticou)', !!left && Math.min(left.a.y, left.b.y) < 1.6 && Math.max(left.a.y, left.b.y) > 6.4, left ? `${left.a.y},${left.b.y}` : '');
 await page.keyboard.press('Control+z');
 s = await st();
 check('desfazer volta a posição', s.walls.some((w) => Math.abs(w.a.y - 5.5) < 1e-6 && Math.abs(w.b.y - 5.5) < 1e-6));

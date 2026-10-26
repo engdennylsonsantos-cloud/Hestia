@@ -109,7 +109,7 @@ export const TAB_VISTA: RibbonTab = {
       soon(t('Fechar ocultas', 'Close Hidden'), 'soon'),
       soon(t('Janelas em cascata', 'Cascade'), 'soon'),
       soon(t('Lado a lado', 'Tile'), 'soon'),
-      split(act('browser', 'large', t('Interface do usuário', 'User Interface')), [act('properties', 'small'), act('browser', 'small'), act('browserSide', 'small'), act('shortcutsConfig', 'small'), act('shortcuts', 'small')]),
+      split(act('browser', 'large', t('Interface do usuário', 'User Interface')), [act('properties', 'small'), act('browser', 'small'), act('propsSide', 'small'), act('browserSide', 'small'), act('resetDock', 'small'), act('shortcutsConfig', 'small'), act('shortcuts', 'small')]),
     ),
   ],
 };

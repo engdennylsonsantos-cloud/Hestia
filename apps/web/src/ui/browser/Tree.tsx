@@ -17,6 +17,10 @@ export interface MenuItem {
   hint?: string;
 }
 
+/** Estado da árvore que sobrevive quando o painel é remontado (ex.: movido para o outro lado): nós abertos e nó selecionado. */
+const openState = new Map<string, boolean>();
+let lastSelected: string | null = null;
+
 interface Sel {
   id: string | null;
   set: (id: string) => void;
@@ -57,7 +61,11 @@ function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: Me
 
 /** Raiz da árvore: guarda o nó selecionado e o menu de contexto aberto. */
 export function Tree({ children, label }: { children: ReactNode; label: string }): ReactElement {
-  const [id, setId] = useState<string | null>(null);
+  const [id, setIdState] = useState<string | null>(lastSelected);
+  const setId = (v: string): void => {
+    lastSelected = v;
+    setIdState(v);
+  };
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const ctx: Sel = {
     id,
@@ -101,10 +109,14 @@ export interface NodeProps {
 /** Um nó da árvore. Grupos abrem e fecham pela caixa, pela seta do teclado ou por duplo clique. */
 export function Node({ id, label, icon, group = false, open: initial = false, bold = false, title, empty, onOpen, onSelect, menu, children, after }: NodeProps): ReactElement {
   const t = useContext(TreeCtx);
-  const [open, setOpen] = useState(initial);
+  const [open, setOpenState] = useState(() => openState.get(id) ?? initial);
+  const setOpen = (v: boolean): void => {
+    openState.set(id, v);
+    setOpenState(v);
+  };
   const selected = t.id === id;
   const has = group || !!children;
-  const toggle = (): void => setOpen((v) => !v);
+  const toggle = (): void => setOpen(!open);
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Enter') { e.preventDefault(); if (onOpen) onOpen(); else if (has) toggle(); }
     else if (e.key === 'ArrowRight' && has && !open) { e.preventDefault(); setOpen(true); }

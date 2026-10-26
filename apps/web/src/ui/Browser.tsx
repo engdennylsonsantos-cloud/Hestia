@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react';
 import { useProject } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
 import { FamiliesTree } from './browser/Families.tsx';
 import { Node, Tree } from './browser/Tree.tsx';
 import { SchedulesTree, SheetsTree, ViewsTree } from './browser/Views.tsx';
+import { PanelHead } from './PanelHead.tsx';
 
 /**
  * Navegador de projeto no padrão Revit: "Vistas (todas)", "Tabelas/Quantidades (todas)", "Pranchas (todas)", "Famílias",
@@ -14,10 +14,9 @@ export function Browser(): ReactElement {
   const p = useProject();
   return (
     <aside className="side" aria-label="Navegador de projeto">
-      <div className="panel-head">
-        <span className="ph-title" title={`Navegador de projeto - ${p.name}`}>Navegador de projeto - {p.name}</span>
-        <button className="ph-x" aria-label="Fechar o navegador de projeto" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ browserOpen: false })}>✕</button>
-      </div>
+      <PanelHead panel="browser" name={`Navegador de projeto - ${p.name}`} closeLabel="Fechar o navegador de projeto">
+        Navegador de projeto - {p.name}
+      </PanelHead>
       <div className="panel-scroll">
         <Tree label="Navegador de projeto">
           <ViewsTree />

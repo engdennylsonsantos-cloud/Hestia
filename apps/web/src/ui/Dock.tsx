@@ -1,6 +1,6 @@
-import { useRef, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import { Fragment, useRef, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import { setDock } from '../editor/dockActions.ts';
-import { saveDock, type DockLayout } from '../editor/dockLayout.ts';
+import { dockPanels, saveDock, type DockSide } from '../editor/dockLayout.ts';
 import { useUi } from '../editor/state.ts';
 import { Browser } from './Browser.tsx';
 import { Properties } from './Properties.tsx';
@@ -24,27 +24,19 @@ function drag(e: ReactPointerEvent, move: (dx: number, dy: number) => void): voi
   el.addEventListener('pointercancel', onUp);
 }
 
-/** Largura de cada dock (0 quando não tem painel aberto), para a grade da área de trabalho. */
-export function dockWidths(propsOpen: boolean, browserOpen: boolean, dock: DockLayout): { left: number; right: number } {
-  const left = propsOpen || (browserOpen && dock.browserSide === 'left');
-  const right = browserOpen && dock.browserSide === 'right';
-  return { left: left ? dock.leftW : 0, right: right ? dock.rightW : 0 };
-}
-
 /**
- * Dock de painéis: o esquerdo leva Propriedades (e o Navegador, no padrão do Revit), o direito leva o Navegador quando ele
- * foi movido para lá. Uma divisória vertical muda a largura; entre os dois painéis, uma horizontal muda a altura de cada um.
+ * Dock de painéis: mostra os painéis abertos que estão deste lado, na ordem `first` (de cima para baixo). Uma divisória
+ * vertical muda a largura do dock; quando há dois painéis, uma horizontal muda a altura do de cima.
  */
-export function Dock({ side }: { side: 'left' | 'right' }): ReactElement {
+export function Dock({ side }: { side: DockSide }): ReactElement {
   const propsOpen = useUi((s) => s.propsOpen);
   const browserOpen = useUi((s) => s.browserOpen);
   const dock = useUi((s) => s.dock);
   const ref = useRef<HTMLDivElement>(null);
-  const showProps = side === 'left' && propsOpen;
-  const showBrowser = browserOpen && dock.browserSide === side;
-  if (!showProps && !showBrowser) return <div className={`dock ${side} empty`} />;
+  const panels = dockPanels(dock, side, { props: propsOpen, browser: browserOpen });
+  if (panels.length === 0) return <div className={`dock ${side} empty`} />;
   const w = side === 'left' ? dock.leftW : dock.rightW;
-  const both = showProps && showBrowser;
+  const both = panels.length === 2;
 
   const resizeWidth = (e: ReactPointerEvent): void => {
     const w0 = w;
@@ -58,15 +50,19 @@ export function Dock({ side }: { side: 'left' | 'right' }): ReactElement {
 
   return (
     <div ref={ref} className={`dock ${side}`} style={{ width: w }}>
-      {showProps && <div className="dock-pane" style={both ? { flex: `${dock.split} 1 0` } : { flex: 1 }}><Properties /></div>}
-      {both && (
-        <div className="dock-split h" role="separator" aria-orientation="horizontal" aria-label="Altura dos painéis" tabIndex={0} onPointerDown={resizeSplit}
-          onKeyDown={(e) => { if (e.key === 'ArrowUp') setDock({ split: dock.split - 0.03 }); if (e.key === 'ArrowDown') setDock({ split: dock.split + 0.03 }); }} />
-      )}
-      {showBrowser && <div className="dock-pane" style={both ? { flex: `${1 - dock.split} 1 0` } : { flex: 1 }}><Browser /></div>}
+      {panels.map((p, i) => (
+        <Fragment key={p}>
+          {both && i === 1 && (
+            <div className="dock-split h" role="separator" aria-orientation="horizontal" aria-label="Altura dos painéis" tabIndex={0} onPointerDown={resizeSplit}
+              onKeyDown={(e) => { if (e.key === 'ArrowUp') setDock({ split: dock.split - 0.03 }); if (e.key === 'ArrowDown') setDock({ split: dock.split + 0.03 }); }} />
+          )}
+          <div className="dock-pane" data-dock-panel={p} style={{ flex: both ? `${i === 0 ? dock.split : 1 - dock.split} 1 0` : 1 }}>
+            {p === 'props' ? <Properties /> : <Browser />}
+          </div>
+        </Fragment>
+      ))}
       <div className={`dock-split v ${side}`} role="separator" aria-orientation="vertical" aria-label="Largura do painel" tabIndex={0} onPointerDown={resizeWidth}
         onKeyDown={(e) => { const d = e.key === 'ArrowLeft' ? -16 : e.key === 'ArrowRight' ? 16 : 0; if (d) setDock(side === 'left' ? { leftW: w + d } : { rightW: w - d }); }} />
     </div>
   );
 }
-

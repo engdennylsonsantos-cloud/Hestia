@@ -42,6 +42,7 @@ import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
 import { LabelScroll } from './LabelScroll.tsx';
+import { PanelHead } from './PanelHead.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
@@ -378,13 +379,9 @@ export function Properties(): ReactElement {
   const tool = useUi((s) => s.tool);
   return (
     <aside className="side" aria-label="Propriedades">
-      <div className="panel-head">
-        <span>Propriedades</span>
-        <span className="ph-right">
-          <span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>
-          <button className="ph-x" aria-label="Fechar as propriedades" title="Fechar (reabra em Vista ▸ Interface do usuário)" onClick={() => useUi.setState({ propsOpen: false })}>✕</button>
-        </span>
-      </div>
+      <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>}>
+        Propriedades
+      </PanelHead>
       <LabelScroll>
         {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
           : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />

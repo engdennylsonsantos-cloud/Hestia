@@ -1,12 +1,21 @@
 import { isCeiling, isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project } from '@hestia/model';
 import type { ToolOptions } from '@hestia/tools';
 import { editor } from '../../editor/controller.ts';
-import { setDock } from '../../editor/dockActions.ts';
+import { resetDock, setDock } from '../../editor/dockActions.ts';
+import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
 import { toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
+import { applyDrop } from '../dockDrag.ts';
 import { t, type ActionId, type Txt } from './model.ts';
+
+/** Leva o painel para o outro dock (esquerdo <-> direito), pela mesma regra de soltura do arraste. */
+function flipSide(panel: DockPanel): void {
+  const d = useUi.getState().dock;
+  const to: DockSide = d.sides[panel] === 'left' ? 'right' : 'left';
+  setDock(applyDrop(d, panel, to));
+}
 
 /** Estado que a faixa lê para decidir "pressionado" e "desabilitado". */
 export interface RibbonCtx {
@@ -19,7 +28,8 @@ export interface RibbonCtx {
   showRoofProjection: boolean;
   propsOpen: boolean;
   browserOpen: boolean;
-  browserSide: 'left' | 'right';
+  /** Dock de cada painel (Propriedades e Navegador). */
+  sides: DockLayout['sides'];
   options: ToolOptions;
   p: Project;
 }
@@ -107,12 +117,25 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     run: () => useUi.setState((s) => ({ browserOpen: !s.browserOpen })),
     pressed: (c) => c.browserOpen,
   },
+  propsSide: {
+    label: t('Propriedades à direita', 'Properties on the Right'),
+    icon: 'props',
+    hint: t('Alterna o lado das propriedades entre a esquerda (padrão do Revit) e a direita.', 'Switch the Properties palette between the left and right sides.'),
+    run: () => flipSide('props'),
+    pressed: (c) => c.sides.props === 'right',
+  },
   browserSide: {
     label: t('Navegador à direita', 'Project Browser on the Right'),
     icon: 'levels',
-    hint: t('Move o navegador de projeto para o lado direito (padrão do Revit: à esquerda, sob as propriedades).', 'Move the Project Browser to the right side.'),
-    run: () => setDock({ browserSide: useUi.getState().dock.browserSide === 'left' ? 'right' : 'left' }),
-    pressed: (c) => c.browserSide === 'right',
+    hint: t('Alterna o lado do navegador de projeto entre a esquerda (padrão do Revit) e a direita.', 'Switch the Project Browser between the left and right sides.'),
+    run: () => flipSide('browser'),
+    pressed: (c) => c.sides.browser === 'right',
+  },
+  resetDock: {
+    label: t('Restaurar disposição dos painéis', 'Reset Panel Layout'),
+    icon: 'levels',
+    hint: t('Volta Propriedades e Navegador ao padrão: à esquerda, com as propriedades em cima.', 'Put Properties and Project Browser back in the default layout.'),
+    run: () => resetDock(),
   },
   sameType: {
     label: t('Mesmo tipo', 'Same Type'),
@@ -230,6 +253,6 @@ export function ctxNow(): RibbonCtx {
   const s = useUi.getState();
   return {
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
-    showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, browserSide: s.dock.browserSide, options: s.options, p: editor.project,
+    showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options, p: editor.project,
   };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TOOL_LABEL } from '@hestia/tools';
 import { createEmptyProject } from '@hestia/model';
-import { ACTIONS } from './actions.ts';
+import { ACTIONS, type RibbonCtx } from './actions.ts';
 import { contextTab } from './context.ts';
 import { txt, type RibbonItem, type RibbonPanel } from './model.ts';
 import { TABS, TAB_ORDER } from './tabs.ts';
@@ -62,5 +62,20 @@ describe('aba contextual', () => {
   it('ferramenta de edição e nada selecionado não abrem aba', () => {
     expect(contextTab('move', [], p)).toBeNull();
     expect(contextTab('select', [], p)).toBeNull();
+  });
+});
+
+describe('disposição dos painéis na faixa', () => {
+  const comLados = (sides: RibbonCtx['sides']): RibbonCtx => ({ sides } as RibbonCtx);
+
+  it('ações de lado e de restaurar estão no menu Interface do usuário', () => {
+    const acoes = leaves(allPanels().flatMap((pn) => pn.items)).flatMap((it) => (it.kind === 'action' ? [it.action] : []));
+    expect(acoes).toEqual(expect.arrayContaining(['propsSide', 'browserSide', 'resetDock']));
+  });
+
+  it('"pressionado" só quando o painel está à direita', () => {
+    const sides = { props: 'right' as const, browser: 'left' as const };
+    expect(ACTIONS.propsSide.pressed?.(comLados(sides))).toBe(true);
+    expect(ACTIONS.browserSide.pressed?.(comLados(sides))).toBe(false);
   });
 });

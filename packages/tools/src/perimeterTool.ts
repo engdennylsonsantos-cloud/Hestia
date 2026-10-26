@@ -312,7 +312,7 @@ export class PerimeterTool extends ToolBase {
       this.box = { a: p.raw, b: p.raw };
       return;
     }
-    if (this.shape === null && !this.mod.active() && this.line === 'boundary') this.sel.down(p);
+    if (this.shape === null && this.line === 'boundary' && (!this.mod.active() || this.mod.picking())) this.sel.down(p);
   }
 
   drag(p: PointerInfo): void {
@@ -330,7 +330,10 @@ export class PerimeterTool extends ToolBase {
 
   /** Solta a caixa: contorno das paredes ou janela de seleção. Avisos vão para a barra de status. */
   up(p: PointerInfo): void {
-    if (this.sel.up(p)) return;
+    if (this.sel.up(p)) {
+      this.mod.afterWindowPick();
+      return;
+    }
     const box = this.box;
     if (!box) return;
     this.reset();

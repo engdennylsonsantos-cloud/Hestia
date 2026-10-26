@@ -30,12 +30,12 @@ export const SEM_ESBOCO_AINDA = 'Ainda não existe para as linhas do esboço.';
 export const DICA_COMANDO: Record<PerimeterModifyKind, string> = {
   trim: 'Aparar/Estender: clique em duas linhas para formar o canto. Tab alterna o modo.',
   split: 'Dividir elemento: clique no ponto da linha onde ela será dividida. Tab alterna o modo.',
-  offset: 'Deslocar: digite a distância ou clique do lado para onde deslocar.',
-  move: 'Mover: escolha o ponto de origem e depois o de destino.',
-  copy: 'Copiar: escolha o ponto de origem e depois o de destino.',
-  rotate: 'Rotacionar: escolha o centro e depois o ângulo.',
-  mirror: 'Espelhar: clique em dois pontos do eixo. Tab copia.',
-  array: 'Matriz: escolha a linha a repetir e depois a distância.',
+  offset: 'Deslocar: clique na linha a deslocar; depois digite a distância ou clique do lado.',
+  move: 'Mover: clique na linha a mover e depois no ponto de origem e no de destino.',
+  copy: 'Copiar: clique na linha a copiar e depois no ponto de origem e no de destino.',
+  rotate: 'Rotacionar: clique na linha a rotacionar e depois no centro e no ângulo.',
+  mirror: 'Espelhar: clique na linha a espelhar e depois em dois pontos do eixo. Tab copia.',
+  array: 'Matriz: clique na linha a repetir e depois no passo e na quantidade.',
   align: 'Alinhar: clique na linha a alinhar e depois na linha de referência.',
   delete: 'Excluir: clique nas linhas a remover. Delete remove as selecionadas.',
 };

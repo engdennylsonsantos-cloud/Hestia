@@ -7,6 +7,7 @@ import type { PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
 export const VISAO_FECHADA: PerimeterView = {
   active: false,
   modify: null,
+  selecting: false,
   target: 'roof',
   draft: null,
   result: null,

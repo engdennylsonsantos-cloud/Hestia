@@ -31,6 +31,7 @@ import { safeFilename } from './nomeArquivo.ts';
 import { FluxoEdicao } from './fluxoEdicao.ts';
 import { CacheGeometria } from './geometryCache.ts';
 import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
+import { atalhoSelecionarTudo } from './perimeterTeclas.ts';
 
 
 /**
@@ -220,6 +221,7 @@ export class Editor {
     const k = e.key;
     // Na aba de prancha, as teclas de ferramenta e de seleção não valem (o desfazer, com Ctrl, vale).
     if (ui.view === 'sheet' && !mod) return false;
+    if (atalhoSelecionarTudo(this.perimetro, e)) return true;
     if (mod && (k === 'z' || k === 'Z')) {
       if (this.stairPickHistory(e.shiftKey)) return true;
       if (e.shiftKey) this.redo();
@@ -263,7 +265,7 @@ export class Editor {
       casador.limpar();
       if (ui.typed) useUi.setState({ typed: '' });
       // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
-      if (!ui.typed || this.tool.freeText) this.tool.cancel();
+      if (!ui.typed || this.tool.freeText) { if (!this.perimetro.esc()) this.tool.cancel(); }
       this.bump();
       return true;
     }

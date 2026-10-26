@@ -144,6 +144,8 @@ export interface PlanTheme {
   stairTread: string;
   /** Pegada do telhado com balanço: contorno tracejado de 1 px (o desenho que o usuário traçou, sem o beiral). */
   roofFootprint: string;
+  /** Seta de caimento do telhado na planta (1 px): verde, para não se confundir com a tinta do desenho. */
+  roofSlope: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -162,6 +164,7 @@ export const LIGHT: PlanTheme = {
   stairLanding: '#7e22ce',
   stairTread: '#64748b',
   roofFootprint: '#c2185b',
+  roofSlope: '#1f6f5c',
 };
 
 export const DARK: PlanTheme = {
@@ -180,4 +183,5 @@ export const DARK: PlanTheme = {
   stairLanding: '#c084fc',
   stairTread: '#94a3b8',
   roofFootprint: '#ff6fb0',
+  roofSlope: '#5cc3a6',
 };

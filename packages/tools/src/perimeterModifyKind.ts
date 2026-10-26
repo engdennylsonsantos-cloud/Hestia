@@ -20,7 +20,7 @@ export const PERIMETER_MODIFY_LABEL: Record<PerimeterModifyKind, string> = {
   offset: 'Deslocar',
   move: 'Mover',
   copy: 'Copiar',
-  rotate: 'Girar',
+  rotate: 'Rotacionar',
   mirror: 'Espelhar',
   array: 'Matriz',
   align: 'Alinhar',

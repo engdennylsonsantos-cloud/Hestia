@@ -134,7 +134,7 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   window: 'Janela',
   move: 'Mover',
   copy: 'Copiar',
-  rotate: 'Girar',
+  rotate: 'Rotacionar',
   mirror: 'Espelhar',
   array: 'Matriz',
   offset: 'Deslocar',

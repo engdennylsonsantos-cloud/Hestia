@@ -241,8 +241,8 @@ export class MoveTool extends SelectionTool {
 
 export class RotateTool extends SelectionTool {
   readonly id = 'rotate';
-  readonly label = 'Girar';
-  readonly hint = 'Girar: clique no centro, depois na direção de referência e na direção final — ou digite o ângulo em graus.';
+  readonly label = 'Rotacionar';
+  readonly hint = 'Rotacionar: clique no centro, depois na direção de referência e na direção final — ou digite o ângulo em graus.';
   private center: Vec2 | null = null;
   private ref: Vec2 | null = null;
 
@@ -292,10 +292,10 @@ export class RotateTool extends SelectionTool {
     const views = this.views();
     const t = { kind: 'rotate', about: this.center, angle } as const;
     const copy = this.env.options().rotateCopy;
-    this.env.transaction(copy ? 'Girar e copiar' : 'Girar', () => {
+    this.env.transaction(copy ? 'Rotacionar e copiar' : 'Rotacionar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else transformWalls(this.env, els, t, 'Girar');
+        else transformWalls(this.env, els, t, 'Rotacionar');
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });

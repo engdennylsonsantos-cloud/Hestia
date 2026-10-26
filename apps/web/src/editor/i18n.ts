@@ -78,7 +78,7 @@ export const I18N = {
     // Modificadores
     tool_move: 'Mover',
     tool_copy: 'Copiar',
-    tool_rotate: 'Girar',
+    tool_rotate: 'Rotacionar',
     tool_mirror: 'Espelhar',
     tool_array: 'Matriz',
     tool_offset: 'Deslocar',

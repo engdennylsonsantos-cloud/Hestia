@@ -362,24 +362,24 @@ describe('serialização dos gráficos (abrir e salvar)', () => {
 });
 
 describe('linhas finas (decisão 0015, só na tela)', () => {
-  it('padrão desligado: sem o campo salvo, a planta e o corte leem false', () => {
+  it('padrão ligado: sem o campo salvo, a planta e o corte leem true', () => {
     const s = new ProjectStore(createEmptyProject());
-    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(false);
-    expect(sectionGraphicsOf(s.project).thinLines).toBe(false);
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(true);
+    expect(sectionGraphicsOf(s.project).thinLines).toBe(true);
     expect(s.project.levels[0]!.graphics).toBeUndefined();
   });
 
-  it('liga na planta e no corte, grava no projeto e desfaz', () => {
+  it('desliga na planta e no corte, grava no projeto e desfaz', () => {
     const s = new ProjectStore(createEmptyProject());
-    s.exec(lg({ thinLines: true }));
-    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(true);
-    s.exec({ type: 'setSectionGraphics', patch: { thinLines: true } });
-    expect(s.project.sectionGraphics?.thinLines).toBe(true);
-    expect(sectionGraphicsOf(s.project).thinLines).toBe(true);
-    s.undo();
+    s.exec(lg({ thinLines: false }));
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(false);
+    s.exec({ type: 'setSectionGraphics', patch: { thinLines: false } });
+    expect(s.project.sectionGraphics?.thinLines).toBe(false);
     expect(sectionGraphicsOf(s.project).thinLines).toBe(false);
     s.undo();
-    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(false);
+    expect(sectionGraphicsOf(s.project).thinLines).toBe(true);
+    s.undo();
+    expect(levelGraphicsOf(s.project, LV0).thinLines).toBe(true);
   });
 
   it('recusa valor que não é sim ou não, com mensagem pt-BR, e não grava', () => {

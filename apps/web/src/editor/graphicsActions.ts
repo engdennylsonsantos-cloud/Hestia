@@ -121,7 +121,7 @@ export function restoreProjectGraphicsDefault(store: ProjectStore): GraphicsEdit
 /** Alvo das linhas finas (decisão 0015): a planta de um nível, ou o corte/elevação aberto (um conjunto para todos os cortes). */
 export type ThinLinesTarget = { levelId: Id } | 'section';
 
-/** Linhas finas da vista ativa ligadas? Sem o campo salvo, desligadas. */
+/** Linhas finas da vista ativa ligadas? Sem o campo salvo, ligadas (padrão do Hestia). */
 export function thinLinesOn(p: Project, target: ThinLinesTarget): boolean {
   return (target === 'section' ? sectionGraphicsOf(p) : levelGraphicsOf(p, target.levelId)).thinLines === true;
 }

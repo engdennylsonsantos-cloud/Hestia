@@ -44,7 +44,7 @@ gráficos por categoria; nível de detalhe por vista; exibição parcial de estr
 - Diálogo de projeto "Pesos de linha" (Gerenciar): tabela 16 × 3 editável, pesos por categoria e limites de detalhe.
 
 ## 6 · Linhas finas por vista (só na tela)
-- `ViewGraphics.thinLines?: boolean` (planta do nível e `Project.sectionGraphics`; padrão false; sem migração). Comandos `setLevelGraphics` e `setSectionGraphics`, com desfazer; botão "Linhas finas" na aba Vista (planta e corte; desabilitado no 3D e na prancha) e caixa "Linhas finas (só na tela)" nas propriedades da vista.
+- `ViewGraphics.thinLines?: boolean` (planta do nível e `Project.sectionGraphics`; padrão true desde 2026-10-25: todo projeto abre com linhas finas, e o usuário desliga na vista quando quiser; sem migração). Comandos `setLevelGraphics` e `setSectionGraphics`, com desfazer; botão "Linhas finas" na aba Vista (planta e corte; desabilitado no 3D e na prancha) e caixa "Linhas finas (só na tela)" nas propriedades da vista.
 - Com o modo ligado, a tela desenha os traços da vista com 1 px (`thinStrokes`, opção `thinLines` de `buildPlanDrawList` e `buildSectionDrawList`). Seleção, cursor, cotas temporárias e guias mantêm a largura própria. Hachuras e preenchimentos não mudam.
 - A plotagem nunca usa o modo: a prancha, o PDF e o DXF não passam a opção e seguem com os pesos da tabela (código 370 por camada no DXF). A opção é de entrada: as funções não leem o modelo.
 

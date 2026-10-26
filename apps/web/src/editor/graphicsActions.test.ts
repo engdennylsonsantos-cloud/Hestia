@@ -201,22 +201,23 @@ describe('restauração (planta, 3D)', () => {
 });
 
 describe('editThinLines (linhas finas da vista ativa, só na tela)', () => {
-  it('liga na planta, grava no projeto, desfaz e volta a desligada', () => {
+  it('desliga na planta, grava no projeto, desfaz e volta a ligada', () => {
     const s = store();
-    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
-    expect(editThinLines(s, { levelId: 'lv_0' }, true)).toEqual({ ok: true, error: null });
     expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(true);
-    expect(s.project.levels[0]!.graphics?.thinLines).toBe(true);
+    expect(editThinLines(s, { levelId: 'lv_0' }, false)).toEqual({ ok: true, error: null });
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+    expect(s.project.levels[0]!.graphics?.thinLines).toBe(false);
     expect(s.undoLabel).toBe('Alternar linhas finas da planta');
     s.undo();
-    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(true);
   });
 
   it('no corte, grava no conjunto do projeto (não no nível) e tem o próprio rótulo de desfazer', () => {
     const s = store();
-    expect(editThinLines(s, 'section', true).ok).toBe(true);
-    expect(thinLinesOn(s.project, 'section')).toBe(true);
-    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(false);
+    expect(editThinLines(s, 'section', false).ok).toBe(true);
+    expect(thinLinesOn(s.project, 'section')).toBe(false);
+    expect(s.project.sectionGraphics?.thinLines).toBe(false);
+    expect(thinLinesOn(s.project, { levelId: 'lv_0' })).toBe(true);
     expect(s.undoLabel).toBe('Alternar linhas finas do corte');
   });
 });

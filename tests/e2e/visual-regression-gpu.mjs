@@ -55,6 +55,8 @@ async function desenhar(page, items, vista) {
   await page.evaluate(([ws, v]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
+    // O padrão do Hestia é linhas finas ligadas; as baselines fixam o desenho com os pesos de linha (modo desligado).
+    editor.store.exec({ type: 'setLevelGraphics', levelId: 'lv_0', patch: { thinLines: false } });
     for (const w of ws) editor.store.exec(w.kind === 'roof' ? { type: 'addRoof', roof: w } : w.kind === 'slab' ? { type: 'addSlab', slab: w } : w.kind === 'floor' ? { type: 'addFloor', floor: w } : w.kind === 'opening' ? { type: 'addOpening', opening: w.opening } : { type: 'addWall', wall: w });
     if (v) editor.store.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: v });
   }, [items, vista]);

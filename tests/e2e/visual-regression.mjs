@@ -196,6 +196,10 @@ for (const [name, items] of Object.entries({ ...CASES, ...FLOOR_CASES, ...SLAB_C
   await page.evaluate(([ws, v, sec]) => {
     const { editor } = window.__hestia;
     editor.newProject('blank');
+    // O padrão do Hestia é linhas finas ligadas; as baselines fixam o desenho com os pesos de linha (modo desligado)
+    // para comparar a espessura das junções.
+    editor.store.exec({ type: 'setLevelGraphics', levelId: 'lv_0', patch: { thinLines: false } });
+    editor.store.exec({ type: 'setSectionGraphics', patch: { thinLines: false } });
     for (const w of ws) {
       if (w.kind === 'room') editor.store.exec({ type: 'addRoom', room: w });
       else if (w.kind === 'roof') editor.store.exec({ type: 'addRoof', roof: w });

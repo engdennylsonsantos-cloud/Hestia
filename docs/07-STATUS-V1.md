@@ -109,7 +109,8 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
 - **3D** orbital com plano próximo dinâmico, sombras, sol e estilos (0015); seleção por clique com BVH (`triBvh.ts`);
   ViewCube com 26 zonas e alternância entre perspectiva e ortográfica.
 - **Gráficos de vista** (0015): escala, detalhe, estilo e substituições por categoria; pesos de linha reais nas pranchas,
-  PDF e DXF (código 370). **Linhas finas** só na tela (botão na aba Vista; desabilitado no 3D e na prancha).
+  PDF e DXF (código 370). **Linhas finas** vêm ligadas por padrão em todo projeto e valem só na tela (botão na aba
+  Vista; desabilitado no 3D e na prancha); o usuário desliga na vista quando quiser.
 - **IFC4 (exportação)**: **Exportar IFC** com IfcSite, IfcBuilding, IfcBuildingStorey, IfcWall, IfcDoor, IfcWindow,
   IfcOpeningElement (com relações de vazio e preenchimento), IfcSlab, IfcRoof, IfcStair, IfcStairFlight e camadas de
   material. Não exporta IfcSpace nem IfcCovering.

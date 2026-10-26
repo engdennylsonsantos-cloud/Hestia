@@ -77,8 +77,8 @@ export interface ViewGraphics {
   partialStructure: PartialStructure;
   overrides: Record<GraphicsCategory, CategoryOverride>;
   /**
-   * Linhas finas só na tela (padrão false): a vista desenha todos os traços com 1 px, sem os pesos por categoria e escala.
-   * A plotagem (prancha, PDF e DXF) nunca usa este modo. Ausente = desligado (sem migração).
+   * Linhas finas só na tela (padrão true): a vista desenha todos os traços com 1 px, sem os pesos por categoria e escala.
+   * A plotagem (prancha, PDF e DXF) nunca usa este modo. Ausente = ligado (sem migração; o usuário desliga na vista).
    */
   thinLines?: boolean;
 }
@@ -163,7 +163,7 @@ export const DEFAULT_VIEW_GRAPHICS: ViewGraphics = {
   style: 'hiddenLine',
   partialStructure: 'entire',
   overrides: defaultOverrides(),
-  thinLines: false,
+  thinLines: true,
 };
 
 /**

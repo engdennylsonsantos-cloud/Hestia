@@ -1,0 +1,421 @@
+{
+  "geradoEm": "2026-10-26T21:48:53.849Z",
+  "url": "file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-a2-visual/apps/web/dist/index.html?debug=1",
+  "navegador": "155.0.8059.86 (C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe)",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "total": 45,
+  "pass": 44,
+  "fail": 1,
+  "pendente": 0,
+  "resultados": [
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 12",
+      "esperado": "texto \"8,00 m\" visível",
+      "observado": "1/1 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z12"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 12: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z12"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "texto da cota no zoom 12",
+      "esperado": "corpo em px > 0 (papel 2,5 mm)",
+      "observado": "3.0 px",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z12"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 12",
+      "esperado": "textos \"2,00 m\", \"1,50 m\" e \"1,00 m\" visíveis",
+      "observado": "3/3 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z12"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 12: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z12"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 60",
+      "esperado": "texto \"8,00 m\" visível",
+      "observado": "1/1 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z60"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 60: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z60"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "texto da cota no zoom 60",
+      "esperado": "corpo em px > 0 (papel 2,5 mm)",
+      "observado": "15.0 px",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z60"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 60",
+      "esperado": "textos \"2,00 m\", \"1,50 m\" e \"1,00 m\" visíveis",
+      "observado": "3/3 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z60"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 60: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z60"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 220",
+      "esperado": "texto \"8,00 m\" visível",
+      "observado": "1/1 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z220"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota individual no zoom 220: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z220"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "texto da cota no zoom 220",
+      "esperado": "corpo em px > 0 (papel 2,5 mm)",
+      "observado": "55.0 px",
+      "veredito": "PASS",
+      "imagem": "1-cota-individual-z220"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 220",
+      "esperado": "textos \"2,00 m\", \"1,50 m\" e \"1,00 m\" visíveis",
+      "observado": "3/3 textos visíveis",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z220"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "cota cadeia no zoom 220: texto dentro da tela",
+      "esperado": "todos os textos da cota dentro do canvas",
+      "observado": "todos dentro",
+      "veredito": "PASS",
+      "imagem": "1-cota-cadeia-z220"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "texto da cota escala com o zoom",
+      "esperado": "12 < 60 < 220 (proporcional ao zoom)",
+      "observado": "3.0 px → 15.0 px → 55.0 px",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "controle: seleção de cota muda o desenho",
+      "esperado": "traço/texto na cor de seleção (azul)",
+      "observado": "1282 px alterados, 1282 azuis",
+      "veredito": "PASS",
+      "imagem": "1-controle-selecao-cota-ativa"
+    },
+    {
+      "item": "cotas",
+      "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "texto em negrito",
+      "esperado": "font-weight 700",
+      "observado": "font-weight 700",
+      "veredito": "PASS",
+      "imagem": "2-texto-caixa"
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "texto em itálico",
+      "esperado": "font-style italic",
+      "observado": "font-style italic",
+      "veredito": "PASS",
+      "imagem": "2-texto-caixa"
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "caixa de texto com alinhamento à direita e quebra",
+      "esperado": "text-align right, white-space normal e mais de uma linha",
+      "observado": "text-align right, white-space normal, 60 px de altura para 17.3 px de fonte",
+      "veredito": "PASS",
+      "imagem": "2-texto-caixa-detalhe"
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "texto com líder",
+      "esperado": "linha de chamada entre o texto e o modelo",
+      "observado": "texto \"Líder\" presente (38×20 px)",
+      "veredito": "PASS",
+      "imagem": "2-texto-caixa"
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "máscara de região de detalhe cobre o preenchimento",
+      "esperado": "centro da máscara na cor do papel e faixa vizinha ainda amarela",
+      "observado": "antes: centro 231,226,208 / faixa 231,226,208; depois: centro 251,251,250 / faixa 231,226,208",
+      "veredito": "PASS",
+      "imagem": "2-mascara-antes / 2-texto-caixa"
+    },
+    {
+      "item": "texto",
+      "itemNome": "2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara)",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "etiquetas",
+      "itemNome": "3 · Etiquetas, líderes e \"Etiquetar todos\"",
+      "criterio": "etiqueta com líder",
+      "esperado": "texto de etiqueta e linha de chamada visíveis",
+      "observado": "texto \"PA-14\"; 4/4 pontos do líder com tinta",
+      "veredito": "PASS",
+      "imagem": "3-etiqueta-lider"
+    },
+    {
+      "item": "etiquetas",
+      "itemNome": "3 · Etiquetas, líderes e \"Etiquetar todos\"",
+      "criterio": "\"Etiquetar todos\" cria uma etiqueta por elemento sem etiqueta",
+      "esperado": "6 etiquetas (4 paredes + porta + janela)",
+      "observado": "6 etiquetas; status \"5 etiquetas criadas.\"",
+      "veredito": "PASS",
+      "imagem": "3-etiquetar-todos"
+    },
+    {
+      "item": "etiquetas",
+      "itemNome": "3 · Etiquetas, líderes e \"Etiquetar todos\"",
+      "criterio": "etiquetas aparecem na vista",
+      "esperado": "rótulos não vazios para as etiquetas criadas",
+      "observado": "6 rótulos (3 textos distintos)",
+      "veredito": "PASS",
+      "imagem": "3-etiquetar-todos-detalhe"
+    },
+    {
+      "item": "etiquetas",
+      "itemNome": "3 · Etiquetas, líderes e \"Etiquetar todos\"",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "linha de detalhe contínua",
+      "esperado": "traço contínuo (1 ciclo)",
+      "observado": "1 ciclos, ocupação 100.0%",
+      "veredito": "PASS",
+      "imagem": "4-linhas-detalhe"
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "linha de detalhe tracejada",
+      "esperado": "traços e espaços (7/4 px)",
+      "observado": "21 ciclos, ocupação 81.6%",
+      "veredito": "PASS",
+      "imagem": "4-linhas-detalhe"
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "linha de detalhe pontilhada",
+      "esperado": "pontos (1/3 px)",
+      "observado": "57 ciclos, ocupação 74.9%",
+      "veredito": "PASS",
+      "imagem": "4-linhas-detalhe"
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "tracejado e pontilhado são distintos",
+      "esperado": "pontilhada tem mais ciclos que a tracejada",
+      "observado": "21 × 57 ciclos",
+      "veredito": "PASS",
+      "imagem": "4-linhas-detalhe"
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "seleção da linha de detalhe em 1,7×",
+      "esperado": "traço mais grosso (1,7×) e na cor de seleção",
+      "observado": "0 px alterados (0.000%), 0 px azuis; selection=[\"dl-dash\"], hover=\"dl-dash\"",
+      "veredito": "FAIL",
+      "imagem": "4-selecao-1.7x"
+    },
+    {
+      "item": "linhas",
+      "itemNome": "4 · Linha de detalhe tracejada/pontilhada e seleção 1,7×",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "cortes",
+      "itemNome": "5 · Rótulos de corte/elevação",
+      "criterio": "rótulo do corte nas duas pontas",
+      "esperado": "dois \"A\" (placement both)",
+      "observado": "2 rótulo(s) \"A\"",
+      "veredito": "PASS",
+      "imagem": "5-cortes-elevacoes"
+    },
+    {
+      "item": "cortes",
+      "itemNome": "5 · Rótulos de corte/elevação",
+      "criterio": "rótulo da elevação nas duas pontas",
+      "esperado": "dois \"Sul\" (placement both)",
+      "observado": "2 rótulo(s) \"Sul\"",
+      "veredito": "PASS",
+      "imagem": "5-cortes-elevacoes"
+    },
+    {
+      "item": "cortes",
+      "itemNome": "5 · Rótulos de corte/elevação",
+      "criterio": "linha de corte em traço-ponto",
+      "esperado": "vários ciclos (tracejado)",
+      "observado": "34 ciclos, ocupação 81.9%",
+      "veredito": "PASS",
+      "imagem": "5-cortes-elevacoes"
+    },
+    {
+      "item": "cortes",
+      "itemNome": "5 · Rótulos de corte/elevação",
+      "criterio": "linha de elevação contínua",
+      "esperado": "traço contínuo (1–3 ciclos)",
+      "observado": "1 ciclos, ocupação 100.0%",
+      "veredito": "PASS",
+      "imagem": "5-cortes-elevacoes"
+    },
+    {
+      "item": "cortes",
+      "itemNome": "5 · Rótulos de corte/elevação",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "3D aberto",
+      "esperado": "vista 3D ativa com o modelo enquadrado",
+      "observado": "view=3d; caixa -0.09/-0.09/0.00–8.09/6.09/2.80",
+      "veredito": "PASS",
+      "imagem": "6-3d-caixas"
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "paredes retas em caixas instanciadas",
+      "esperado": "pelo menos uma InstancedMesh de parede (4 paredes retas)",
+      "observado": "89 caixas de parede em 6 InstancedMesh; 3 malha(s) de parede fora do caminho instanciado",
+      "veredito": "PASS",
+      "imagem": "6-3d-caixas"
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "portas e janelas em caixas instanciadas",
+      "esperado": "caixas de porta e de janela",
+      "observado": "4 peças de porta, 7 peças de janela",
+      "veredito": "PASS",
+      "imagem": "6-3d-caixas"
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "silhueta vem das caixas instanciadas",
+      "esperado": "esconder a camada instanciada muda a imagem (paredes/aberturas somem)",
+      "observado": "18.0% dos pixels mudam",
+      "veredito": "PASS",
+      "imagem": "6-3d-silhueta-sem-instancias"
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "seleção 3D realça a parede",
+      "esperado": "pixels na cor de seleção (azul) sem refazer o modelo",
+      "observado": "44712 px alterados, 42134 azuis",
+      "veredito": "PASS",
+      "imagem": "6-3d-selecao"
+    },
+    {
+      "item": "3d",
+      "itemNome": "6 · 3D com caixas instanciadas (paredes, aberturas, silhueta, seleção)",
+      "criterio": "sem erro de página",
+      "esperado": "nenhum erro de console/pageerror",
+      "observado": "0 erro(s)",
+      "veredito": "PASS",
+      "imagem": ""
+    }
+  ],
+  "errosGlobais": []
+}

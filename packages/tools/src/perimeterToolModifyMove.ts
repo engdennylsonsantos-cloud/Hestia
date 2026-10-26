@@ -37,8 +37,8 @@ export function transformHint(kind: PerimeterModifyKind, st: Step): string {
       return st.stage === 1 ? 'Copiar: clique no ponto de base.' : 'Copiar: clique no destino (Ctrl repete), ou digite a distância.';
     case 'rotate':
       return st.stage === 1
-        ? `Girar: clique no centro. Tab: ${mode}.`
-        : `Girar: clique para o ângulo (a referência segue o cursor), ou digite graus. Tab: ${mode}.`;
+        ? `Rotacionar: clique no centro. Tab: ${mode}.`
+        : `Rotacionar: clique para o ângulo (a referência segue o cursor), ou digite graus. Tab: ${mode}.`;
     case 'mirror':
       return st.stage === 1 ? `Espelhar: clique no primeiro ponto do eixo. Tab: ${mode}.` : 'Espelhar: clique no segundo ponto do eixo.';
     case 'array':

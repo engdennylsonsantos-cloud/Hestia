@@ -21,6 +21,8 @@ export interface PerimeterView {
   lineKind: PerimeterLineKind;
   /** Comando de Modificar ativo sobre as linhas do rascunho; null = seleção de linhas. */
   modify: PerimeterModifyKind | null;
+  /** Verdadeiro no Selecionar do esboço: sem forma escolhida e sem comando de Modificar. */
+  selecting?: boolean;
   options: PerimeterOptions;
   /** Linha sob o cursor, para o realce de `sketchOps`. */
   hoverId: string | null;

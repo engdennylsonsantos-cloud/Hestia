@@ -93,6 +93,14 @@ export class PerimeterMode {
     return this.sessao !== null;
   }
 
+  /**
+   * Verdadeiro no Selecionar do esboço: sem forma escolhida e sem comando de Modificar. É o estado em que o clique e a
+   * caixa escolhem linhas (o botão Selecionar da faixa fica pressionado e o Shift soma em vez de travar o desenho).
+   */
+  get selecionando(): boolean {
+    return this.selecionandoLinhas();
+  }
+
   /** Abre o modo para criar um elemento do alvo, no nível atual, com a forma padrão (linha). */
   begin(target: SketchTarget): void {
     if (this.recusaSeAberto()) return;
@@ -162,10 +170,31 @@ export class PerimeterMode {
     const s = this.sessao;
     if (!s) return;
     const alvo = k === null || k === s.tool.modifyKind() ? null : k;
-    if (alvo !== null) s.tool.setShape(null);
+    if (alvo === null) {
+      this.voltaSelecao(s);
+      this.dizer('Comando desligado: clique numa linha para selecionar.');
+      return;
+    }
+    s.tool.setShape(null);
     const ok = s.tool.setModify(alvo);
-    if (alvo === null) this.dizer('Comando desligado: clique numa linha para selecionar.');
-    else this.dizer(ok ? DICA_COMANDO[alvo] : COMANDO_RECUSADO);
+    this.dizer(ok ? DICA_COMANDO[alvo] : COMANDO_RECUSADO);
+  }
+
+  /**
+   * Esc com o modo aberto. A ferramenta trata o passo e a forma; a camada do app completa o retorno ao Selecionar quando a
+   * linha escolhida era a seta de inclinação (não é uma forma e ficaria ligada): sem comando de Modificar, o Esc volta à
+   * linha de limite, e o clique seguinte já escolhe linhas. Devolve false sem modo.
+   */
+  esc(): boolean {
+    const s = this.sessao;
+    if (!s) return false;
+    if (s.tool.modifyKind() === null && s.tool.activeShape() === null && s.tool.lineKind() === 'slope') {
+      s.tool.setLineKind('boundary');
+      this.porta.atualizar();
+      return true;
+    }
+    s.tool.cancel();
+    return true;
   }
 
   setLineKind(k: PerimeterLineKind): void {
@@ -174,15 +203,6 @@ export class PerimeterMode {
       s.tool.setLineKind(k);
       if (k === 'boundary' && s.tool.activeShape() === null) s.tool.setShape('line');
     });
-  }
-
-  /** Ctrl+A com o modo aberto: todas as linhas do esboço viram a seleção. Devolve false sem modo. */
-  selecionarTudo(): boolean {
-    const s = this.sessao;
-    if (!s) return false;
-    s.tool.selectAll();
-    this.porta.atualizar();
-    return true;
   }
 
   /** Seleção de linhas sem forma nem comando: Shift soma à seleção, como na ferramenta Selecionar. */
@@ -201,6 +221,24 @@ export class PerimeterMode {
     const ok = refazer ? s.tool.redoDraft() : s.tool.undoDraft();
     if (ok) this.dizer(refazer ? 'Refeito no rascunho do perímetro.' : 'Desfeito no rascunho do perímetro.');
     else this.dizer(refazer ? 'Nada a refazer no perímetro.' : 'Nada a desfazer no perímetro.');
+    return true;
+  }
+
+  /**
+   * Ctrl+A no esboço: seleciona todas as linhas. A troca de seleção é um `replace` no histórico do rascunho (como o
+   * clique), então não cria passo de desfazer, não mexe na geometria nem na origem do contorno. Fora do modo devolve
+   * false, para o controlador seguir com a seleção do projeto.
+   */
+  selecionarTudo(): boolean {
+    const s = this.sessao;
+    if (!s) return false;
+    const d = s.tool.draft();
+    if (d.segs.length === 0) {
+      this.dizer('Não há linhas no esboço para selecionar.');
+      return true;
+    }
+    s.tool.draftHistory.replace({ ...d, selected: d.segs.map((x) => x.id) });
+    this.dizer(`${d.segs.length} linha(s) selecionada(s).`);
     return true;
   }
 
@@ -276,6 +314,7 @@ export class PerimeterMode {
     return {
       active: true,
       modify: s.tool.modifyKind(),
+      selecting: s.tool.activeShape() === null && s.tool.modifyKind() === null,
       target: s.target,
       ...(s.editing ? { editing: s.editing } : {}),
       draft: d,
@@ -308,9 +347,13 @@ export class PerimeterMode {
     if (s.tool.modifyKind() !== null) s.tool.setModify(null);
   }
 
-  /** Selecionar: tira o comando e a forma, e a ferramenta volta a selecionar linhas. */
+  /**
+   * Selecionar: tira o comando, volta a linha de limite (a seta de inclinação também não é seleção) e tira a forma, para
+   * o clique e a caixa escolherem linhas.
+   */
   private voltaSelecao(s: Sessao): void {
     this.desligaComando(s);
+    if (s.tool.lineKind() !== 'boundary') s.tool.setLineKind('boundary');
     s.tool.setShape(null);
   }
 

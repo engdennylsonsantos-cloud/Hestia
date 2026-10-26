@@ -263,7 +263,7 @@ export class Editor {
       casador.limpar();
       if (ui.typed) useUi.setState({ typed: '' });
       // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
-      if (!ui.typed || this.tool.freeText) this.tool.cancel();
+      if (!ui.typed || this.tool.freeText) { if (!this.perimetro.esc()) this.tool.cancel(); }
       this.bump();
       return true;
     }

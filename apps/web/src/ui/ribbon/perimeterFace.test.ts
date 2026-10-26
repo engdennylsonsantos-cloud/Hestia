@@ -7,8 +7,8 @@ import { act, soonS, tool, type RibbonItem } from './model.ts';
 import { P_MODIFY } from './panelsShared.ts';
 
 /** Contexto da faixa com o modo aberto (ou fechado, com `perimetro: null`). */
-const ctxCom = (modify: 'move' | 'trim' | 'delete' | null | undefined, selection: string[] = []): RibbonCtx =>
-  ({ tool: 'perimeter', selection, perimetro: modify === undefined ? null : { modify }, p: createEmptyProject('vazio') }) as unknown as RibbonCtx;
+const ctxCom = (modify: 'move' | 'trim' | 'delete' | null | undefined, selection: string[] = [], selecting = false): RibbonCtx =>
+  ({ tool: 'perimeter', selection, perimetro: modify === undefined ? null : { modify, selecting }, p: createEmptyProject('vazio') }) as unknown as RibbonCtx;
 
 const folhas = (items: RibbonItem[]): RibbonItem[] => items.flatMap((it) => (it.kind === 'stack' ? folhas(it.items) : [it]));
 
@@ -17,6 +17,13 @@ describe('faixa com o modo de perímetro aberto', () => {
     expect(estadoNoEsboco(tool('move'), ctxCom('move'))).toEqual({ on: true, disabled: false });
     expect(estadoNoEsboco(tool('move'), ctxCom('trim'))).toEqual({ on: false, disabled: false });
     expect(estadoNoEsboco(tool('move'), ctxCom(null))).toEqual({ on: false, disabled: false });
+  });
+
+  it('Selecionar fica pressionado só quando o esboço está no modo de seleção de linhas', () => {
+    expect(estadoNoEsboco(tool('select'), ctxCom(null, [], true))).toEqual({ on: true, disabled: false });
+    expect(estadoNoEsboco(tool('select'), ctxCom(null))).toEqual({ on: false, disabled: false });
+    expect(estadoNoEsboco(tool('select'), ctxCom('move', [], false))).toEqual({ on: false, disabled: false });
+    expect(estadoNoEsboco(tool('select'), ctxCom(undefined))).toBeNull();
   });
 
   it('Excluir é o comando "delete" do esboço e não precisa de seleção', () => {

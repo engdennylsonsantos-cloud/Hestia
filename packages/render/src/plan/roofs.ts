@@ -239,7 +239,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const matColor = m?.color?.trim() || theme.roofTile;
     // Pouca mistura com o papel: a água deve ler na cor do material (o telhado é o assunto da vista), e não num tom lavado.
     const base = surfaceColor(matColor, fillBase, dark ? 0.2 : 0.25, paint);
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.4), alpha: 0.55 } : undefined;
+    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.4), alpha: 0.42 } : undefined;
     const aresta = corDaAresta(base);
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: tomDaAgua(base, pl.up, pl.percent), alpha, hatch });
     const model = p.elements[r.roofId];

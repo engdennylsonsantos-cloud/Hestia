@@ -9,7 +9,18 @@ import {
   type SketchTarget,
   type Vec2,
 } from '@hestia/geom';
+import type { Id } from '@hestia/model';
+import { fitRing } from './perimeterArcFit.ts';
 import { sideSegs } from './perimeterSessionEdges.ts';
+
+/**
+ * De onde veio o esboço, para o vínculo do contorno: `walls` quando foi montado por "Por perímetro" (caixa sobre as
+ * paredes); `roomId` quando um lado veio do contorno de um ambiente ("Por ambiente"). Só a ferramenta sabe.
+ */
+export interface SketchOrigin {
+  walls?: boolean;
+  roomId?: Id;
+}
 
 /** Flags de inclinação/balanço de uma linha (só telhado as usa). Ausente = padrão do rascunho. */
 export interface SegFlags {
@@ -82,10 +93,11 @@ function openRing(ring: Vec2[]): Vec2[] {
   return n > 1 && equal(ring[0]!, ring[n - 1]!) ? ring.slice(0, -1) : ring.slice();
 }
 
+/** Lados de um anel, com arcos recuperados (sequências sobre um círculo viram um arco com flecha; ver `fitRing`). */
 function sidesOf(elementId: string, tag: string, ring: Vec2[], flags?: SegFlags[]): SketchSeg[] {
   const pts = openRing(ring);
   if (pts.length < 2) return [];
-  return pts.map((a, i) => withFlags({ id: `${elementId}:${tag}${i}`, a, b: pts[(i + 1) % pts.length]! }, flags?.[i]));
+  return fitRing(pts, flags ?? []).map((f, i) => withFlags({ id: `${elementId}:${tag}${i}`, a: f.a, b: f.b, ...(f.sag ? { sag: f.sag } : {}) }, f.flags));
 }
 
 function assignFlag<K extends keyof SegFlags>(out: SketchSeg, k: K, v: SegFlagsPatch[K]): void {

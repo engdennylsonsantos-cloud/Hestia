@@ -3,7 +3,7 @@ import { createEmptyProject } from '@hestia/model';
 import { SEM_ESBOCO, SEM_ESBOCO_AINDA } from '../../editor/perimeterComandos.ts';
 import { ACTIONS, type RibbonCtx } from './actions.ts';
 import { estadoNoEsboco } from './perimeterFace.ts';
-import { act, soonS, stack, tool, type RibbonItem } from './model.ts';
+import { act, soonS, tool, type RibbonItem } from './model.ts';
 import { P_MODIFY } from './panelsShared.ts';
 
 /** Contexto da faixa com o modo aberto (ou fechado, com `perimetro: null`). */
@@ -49,6 +49,5 @@ describe('faixa com o modo de perímetro aberto', () => {
     const pilhas = P_MODIFY.items.filter((it) => it.kind === 'stack');
     expect(pilhas.length).toBe(5);
     expect(pilhas.every((it) => it.kind === 'stack' && it.items.length <= 3)).toBe(true);
-    expect(stack(tool('move')).kind).toBe('stack');
   });
 });

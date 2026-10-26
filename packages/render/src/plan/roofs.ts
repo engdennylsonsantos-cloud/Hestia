@@ -9,7 +9,9 @@ import { zoomAtinge } from './limiares.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
 import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
-import { defaultPaint, espessuraDeCorte, espessuraDeProjecao, surfaceColor, type PlanPaint } from './style.ts';
+import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
+import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
+import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
@@ -99,11 +101,12 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorO
   const b = r.boundary;
   const ccw = ringArea(b) > 0;
   const slopes = edgeSlopesOf(r);
+  const visivel = ladosComSimbolo(r);
   const w = 4.5;
   const h = 8;
   b.forEach((a, i) => {
     const c = b[(i + 1) % b.length]!;
-    if (dist(a, c) < 1e-6) return;
+    if (dist(a, c) < 1e-6 || !visivel[i]) return;
     const t = norm(sub(c, a));
     const left = perp(t);
     const inward = ccw ? left : scale(left, -1);
@@ -161,13 +164,16 @@ function selectedRingOps(r: ResolvedRoof, roof: Roof, theme: PlanTheme): StrokeO
   return out;
 }
 
+/** Telhado com pegada gravada e algum balanço positivo: só ele tem pegada a mostrar (rosa). */
+const temBalanco = (roof: Roof): boolean => !!roof.footprint && roof.edgeOverhangs.some((o) => o > 0);
+
 /**
- * Pegada tracejada de um telhado com balanço (rosa, 1 px): o contorno desenhado pelo usuário, sem o beiral. Só existe com
- * `footprint` gravado e algum balanço positivo; sem balanço, o beiral já é a pegada e não há o que mostrar.
+ * Pegada tracejada de um telhado com balanço (rosa, espessura de projeção): o contorno desenhado pelo usuário, sem o
+ * beiral. Sem balanço, o beiral já é a pegada e não há o que mostrar.
  */
-function pegadaOps(roof: Roof, theme: PlanTheme): StrokeOp[] {
-  if (!roof.footprint || !roof.edgeOverhangs.some((o) => o > 0)) return [];
-  return [{ pts: roof.footprint, closed: true, widthPx: 1, color: theme.roofFootprint, alpha: 1, dash: [6, 3] }];
+function pegadaOps(roof: Roof, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
+  if (!temBalanco(roof)) return [];
+  return [{ pts: roof.footprint!, closed: true, ...espessura, color: theme.roofFootprint, alpha: 1, dash: [6, 3] }];
 }
 
 /** Opções de desenho dos telhados (D6). */
@@ -205,6 +211,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   const alpha = planMode ? 1 : coarse ? 0.8 : 0.55;
   // Espessuras do telhado (decisão 0015 §2.1): cumeeira, espigão, rincão, beiral, empena e setas são de corte.
   const paint = opts.paint ?? defaultPaint('roof', v.zoom);
+  const esp = espessurasDoTelhado(paint);
   for (const r of roofs) {
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
@@ -212,24 +219,29 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: waterTone(base, pl.up), alpha, hatch });
     const model = p.elements[r.roofId];
-    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme));
+    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, esp.projecao));
     const foot = roofFootprint(r);
     if (!coarse) {
-      out.fills.push({ polygons: foot, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: espessuraDeCorte(paint) });
+      out.fills.push({ polygons: foot, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: esp.beiral });
+      // Arestas internas de um arco (geratrizes entre facetas do mesmo trecho curvo) não são cumeeira nem espigão: saem.
+      // Um trecho curvo leva uma seta e um percentual só, na faceta do meio (`comSinal`).
+      const arco = arcoDoTelhado(p, r);
       for (const ln of r.lines) {
-        if (ln.kind === 'eave') continue;
+        if (ln.kind === 'eave' || arco.deArco(ln)) continue;
         if (ln.kind === 'gable') {
-          out.strokes.push(...gableLineOps(ln.a, ln.b, theme, espessuraDeCorte(paint)));
+          out.strokes.push(...gableLineOps(ln.a, ln.b, theme, esp.empena));
           continue;
         }
+        const espessura = ln.kind === 'ridge' ? esp.cumeeira : ln.kind === 'hip' ? esp.espigao : esp.rincao;
         const dash: [number, number] | undefined = ln.kind === 'valley' ? [6, 3] : undefined;
-        out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...espessuraDeCorte(paint), color: theme.ink, alpha: 1, ...(dash ? { dash } : {}) });
+        out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...espessura, color: theme.ink, alpha: 1, ...(dash ? { dash } : {}) });
       }
-      for (const pl of r.planes) {
+      for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);
-        if (!at) continue;
+        if (!at || !arco.comSinal(k)) continue;
         const down = { x: -pl.up.x, y: -pl.up.y };
-        out.strokes.push(...slopeArrow(down, at, v, theme, espessuraDeCorte(paint)));
+        // Seta de caimento em verde (tinta própria do caimento), na espessura de projeção.
+        out.strokes.push(...slopeArrow(down, at, v, { ...theme, ink: theme.roofSlope }, esp.projecao));
         // Deslocamento lateral em mm de papel: 2 mm garantem que a etiqueta não cruze a haste da seta.
         out.labels.push({ at, text: fmtPercent(pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
       }
@@ -260,13 +272,15 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
   // Telhados ocultos: a pegada com balanço aparece também fora do intervalo; a projeção, só com a opção ligada.
-  const proj = espessuraDeProjecao(opts.paint ?? defaultPaint('roof', v.zoom));
+  const proj = espessurasDoTelhado(opts.paint ?? defaultPaint('roof', v.zoom)).projecao;
   for (const r of all) {
     if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
     const model = p.elements[r.roofId];
-    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme));
+    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, proj));
     if (opts.showProjection === true) {
-      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+      // Projeção da cobertura fora do intervalo de vista: rosa tracejada com balanço (é a pegada projetada); sem balanço, tinta.
+      const cor = isRoof(model) && temBalanco(model) ? theme.roofFootprint : theme.ink;
+      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...proj, color: cor, alpha: 0.9, dash: [6, 3] });
     }
   }
   return out;
@@ -296,7 +310,7 @@ export function roofSelectionOps(
     const roof = p.elements[r.roofId];
     if (!sel.has(r.roofId) || !isRoof(roof)) continue;
     out.strokes.push(...selectedRingOps(r, roof, theme));
-    const sym = defineSlopeOps(roof, theme, espessuraDeProjecao(paint));
+    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao);
     out.fills.push(...sym.fills);
     out.strokes.push(...sym.strokes);
     out.labels.push(...sym.labels);

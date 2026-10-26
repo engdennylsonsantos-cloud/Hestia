@@ -10,6 +10,8 @@ import { perimeterFromBox } from './sketchByPerimeter.ts';
 import { faceAt } from './sketchPickFace.ts';
 import type { ShapeKindId } from './sketchShapes.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
+import { DraftHistory } from './perimeterToolModifyHistory.ts';
+import { ModifyFlow } from './perimeterToolModify.ts';
 
 /** Tolerância de captura de face, eixo ou borda, em px de tela (como as outras ferramentas de captura). */
 const PICK_PX = 10;
@@ -37,14 +39,17 @@ function applySegs(d: SketchDraft, segs: SketchSeg[]): SketchDraft {
 
 /**
  * Esboço de perímetro (Criar/Editar perímetro). A ferramenta guarda o `SketchDraft` e só o altera pelas funções puras
- * de `perimeterSession`. Esc cancela o passo em andamento (e, sem passo, tira a forma escolhida); Enter não conclui;
- * concluir e descartar são botões (`finish`, `discard`), e `finish` devolve o resultado para quem cria o elemento.
+ * de `perimeterSession` e de `perimeterModify`. Esc cancela o passo em andamento (e, sem passo, tira a forma escolhida
+ * ou desliga o comando de Modificar); Enter não conclui; concluir e descartar são botões (`finish`, `discard`), e
+ * `finish` devolve o resultado para quem cria o elemento. Toda mudança de geometria é um passo de `draftHistory`.
  */
 export class PerimeterTool extends ToolBase {
   readonly id = 'perimeter';
   readonly label = 'Perímetro';
   readonly hint = PERIMETER_HINT;
-  private d: SketchDraft;
+  /** Passos de desfazer do rascunho. A UI desfaz e refaz com `undoDraft` e `redoDraft` (Ctrl+Z, Ctrl+Y). */
+  readonly draftHistory: DraftHistory;
+  private readonly mod: ModifyFlow;
   private shape: PerimeterShape | null = null;
   private line: LineKind = 'boundary';
   private step: ShapeStep | null = null;
@@ -59,12 +64,26 @@ export class PerimeterTool extends ToolBase {
   constructor(env: ToolEnv, target: SketchTarget = 'roof') {
     super(env);
     const o = env.options();
-    this.d = newDraft(target, { slopePct: o.roofSlope ?? SKETCH_DEFAULTS.slopePct, overhang: o.roofOverhang ?? SKETCH_DEFAULTS.overhang });
+    this.draftHistory = new DraftHistory(newDraft(target, { slopePct: o.roofSlope ?? SKETCH_DEFAULTS.slopePct, overhang: o.roofOverhang ?? SKETCH_DEFAULTS.overhang }));
+    this.mod = new ModifyFlow({
+      draft: () => this.d,
+      commit: (next) => this.draftHistory.push(next),
+      replace: (next) => this.draftHistory.replace(next),
+      say: (msg) => this.env.say(msg),
+      mpp: () => this.env.metersPerPixel(),
+      snap: (p) => this.snap(p, this.snapExtra(null)).point,
+      options: () => this.env.options(),
+    });
   }
 
   /** Rascunho corrente (dado puro, para a planta desenhar). */
   draft(): SketchDraft {
     return this.d;
+  }
+
+  /** Rascunho corrente, lido do histórico. */
+  private get d(): SketchDraft {
+    return this.draftHistory.current();
   }
 
   /** Forma escolhida na barra, ou null (modo de seleção). */
@@ -81,38 +100,70 @@ export class PerimeterTool extends ToolBase {
     return closeAnalysis(this.d);
   }
 
-  /** Linha sob o cursor no modo de seleção, para a planta destacar (`sketchOps` recebe o id). */
+  /** Linha sob o cursor no modo de seleção (ou no comando de Modificar), para a planta destacar. */
   hoverId(): string | null {
-    return this.hover;
+    return this.mod.active() ? this.mod.hoverId() : this.hover;
+  }
+
+  override preview(): PreviewItem[] {
+    return this.mod.active() ? this.mod.preview() : this.items;
   }
 
   previews(): PreviewItem[] {
-    return this.items;
+    return this.preview();
   }
 
-  /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento. */
+  /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento e desliga o comando de Modificar. */
   setShape(kind: PerimeterShape | null): void {
+    this.mod.stop();
     this.shape = kind;
     this.flags = {};
     this.reset();
     this.env.say(kind === null ? SELECT_HINT : this.shapeHint(kind));
   }
 
-  /** Linha de limite ou de inclinação. Inclinação só existe no telhado e leva o modo de seleção (clique no triângulo). */
-  /** Comando de Modificar ativo sobre as linhas do rascunho (stub: a implementação entra na onda 4). */
+  /** Comando de Modificar ativo, ou null (seleção de linhas). */
   modifyKind(): PerimeterModifyKind | null {
-    return null;
+    return this.mod.kind();
   }
 
-  setModify(_kind: PerimeterModifyKind | null): boolean {
-    return false;
+  /**
+   * Liga um comando de Modificar sobre as linhas do rascunho (null volta à seleção de linhas). Recusa, com aviso, quando
+   * não há linhas para modificar. Limpa o passo em andamento.
+   */
+  setModify(kind: PerimeterModifyKind | null): boolean {
+    if (kind === null) {
+      this.mod.stop();
+      this.shape = null;
+      this.reset();
+      this.env.say(SELECT_HINT);
+      return true;
+    }
+    if (this.d.segs.length === 0) return this.refuse('Desenhe linhas antes de modificar.');
+    this.shape = null;
+    this.flags = {};
+    this.reset();
+    this.mod.start(kind);
+    return true;
   }
 
+  /** Desfaz o último passo do rascunho. Devolve false se não há o que desfazer. */
+  undoDraft(): boolean {
+    return this.walkHistory(this.draftHistory.undo(), 'Desfeito.', 'Nada a desfazer.');
+  }
+
+  /** Refaz o passo desfeito. Devolve false se não há o que refazer. */
+  redoDraft(): boolean {
+    return this.walkHistory(this.draftHistory.redo(), 'Refeito.', 'Nada a refazer.');
+  }
+
+  /** Linha de limite ou de inclinação. Inclinação só existe no telhado e leva o modo de seleção (clique no triângulo). */
   setLineKind(kind: LineKind): boolean {
     if (kind === 'slope' && this.d.target !== 'roof') {
       this.env.say('Inclinação por aresta só existe no telhado.');
       return false;
     }
+    this.mod.stop();
     this.line = kind;
     if (kind === 'slope') this.shape = null;
     this.flags = {};
@@ -128,7 +179,8 @@ export class PerimeterTool extends ToolBase {
       this.env.say(r.issues[0]?.message ?? 'Esboço incompleto.');
       return r;
     }
-    this.d = newDraft(this.d.target, this.d.defaults);
+    this.draftHistory.reset(newDraft(this.d.target, this.d.defaults));
+    this.mod.stop();
     this.reset();
     this.env.say('Perímetro concluído.');
     return r;
@@ -136,25 +188,33 @@ export class PerimeterTool extends ToolBase {
 
   /** Botão Cancelar: descarta o rascunho inteiro. O Esc não faz isto (ver `cancel`). */
   discard(): void {
-    this.d = newDraft(this.d.target, this.d.defaults);
+    this.draftHistory.reset(newDraft(this.d.target, this.d.defaults));
     this.shape = null;
     this.flags = {};
+    this.mod.stop();
     this.reset();
     this.env.say('Perímetro descartado.');
   }
 
-  /** Carrega um rascunho (Editar perímetro). Não mexe na forma escolhida nem nos sinalizadores. */
+  /**
+   * Carrega um rascunho (Editar perímetro, ou ajuste de padrões e flags). Troca o rascunho corrente sem passo de
+   * desfazer: o histórico de Criar não volta ao contorno carregado.
+   */
   loadDraft(d: SketchDraft): void {
-    this.d = d;
+    this.draftHistory.replace(d);
     this.reset();
     this.env.say(this.hint);
   }
 
   /**
-   * Esc (contrato `Tool.cancel`): cancela o passo em andamento; sem passo, tira a forma escolhida. Nunca conclui nem
-   * descarta o rascunho, e não sai da ferramenta.
+   * Esc (contrato `Tool.cancel`). Com comando de Modificar: cancela o passo, e sem passo desliga o comando. Sem
+   * comando: cancela o passo da forma; sem passo, tira a forma escolhida. Nunca conclui nem descarta o rascunho.
    */
   override cancel(): void {
+    if (this.mod.active()) {
+      if (this.mod.cancel()) this.setModify(null);
+      return;
+    }
     if (this.step || this.box) {
       this.reset();
       this.env.say('Passo cancelado. Esc de novo tira a forma escolhida.');
@@ -167,8 +227,9 @@ export class PerimeterTool extends ToolBase {
     this.env.say(SELECT_HINT);
   }
 
-  /** Enter não conclui: só avisa onde está o botão. */
+  /** Enter não conclui: só avisa onde está o botão. Com Modificar, confirma a seleção ou a matriz. */
   override confirm(): void {
+    if (this.mod.active()) return this.mod.confirm();
     if (this.d.segs.length > 0) this.env.say('Enter não conclui o perímetro: use o botão Concluir.');
   }
 
@@ -179,6 +240,7 @@ export class PerimeterTool extends ToolBase {
     this.hover = null;
     this.box = null;
     this.cycle = 0;
+    this.mod.clearStep();
   }
 
   protected busy(): boolean {
@@ -186,6 +248,7 @@ export class PerimeterTool extends ToolBase {
   }
 
   override inputPrompt(): string | null {
+    if (this.mod.active()) return this.mod.prompt();
     const st = this.step;
     const input = st ? stepsOf(st.shape)[st.idx] : undefined;
     if (!st || !input) return null;
@@ -199,6 +262,10 @@ export class PerimeterTool extends ToolBase {
     this.items = [];
     this.inf = null;
     this.hover = null;
+    if (this.mod.active()) {
+      this.mod.move(p);
+      return;
+    }
     const id = this.shapeId();
     if (this.shape === null) {
       if (this.line === 'boundary') this.hover = hitSeg(this.d.segs, p.raw, SELECT_PX * this.env.metersPerPixel());
@@ -210,7 +277,8 @@ export class PerimeterTool extends ToolBase {
 
   override click(p: PointerInfo): void {
     this.raw = p.raw;
-    if (this.shape === null) this.clickSelect(p);
+    if (this.mod.active()) this.mod.click(p);
+    else if (this.shape === null) this.clickSelect(p);
     else if (this.shape === 'pickFace') this.clickPick(p);
     else if (this.shape === 'byPerimeter') return;
     else this.clickShape(p, this.shape);
@@ -240,12 +308,13 @@ export class PerimeterTool extends ToolBase {
       this.env.say(r.warnings.join(' ') || 'Nenhuma parede nesta caixa.');
       return;
     }
-    this.d = applySegs(this.d, r.segs);
+    this.commit(applySegs(this.d, r.segs));
     this.env.say([...r.warnings, `Contorno pela caixa: ${r.segs.length} linha(s) adicionadas.`].join(' '));
   }
 
-  /** Tab: alterna o candidato sob o cursor (face) ou o sinalizador da forma (ex.: sentido do arco). */
+  /** Tab: alterna o candidato sob o cursor (face), o sinalizador da forma (ex.: sentido do arco), ou a variante de Modificar. */
   override tab(): void {
+    if (this.mod.active()) return this.mod.tab();
     if (this.shape === 'pickFace') {
       this.cycle += 1;
       this.items = [];
@@ -261,6 +330,7 @@ export class PerimeterTool extends ToolBase {
 
   /** Digitação: medida, ângulo (graus) ou contagem para a entrada pendente. Na linha, digitar o comprimento põe o fim na direção do cursor. */
   override type(text: string): boolean {
+    if (this.mod.active()) return this.mod.type(text);
     const st = this.step;
     const input = st ? stepsOf(st.shape)[st.idx] : undefined;
     if (!st || !input) return false;
@@ -286,9 +356,24 @@ export class PerimeterTool extends ToolBase {
   deleteKey(): boolean {
     const ids = this.d.selected;
     if (ids.length === 0) return false;
-    this.d = removeSegs(this.d, ids);
+    this.commit(removeSegs(this.d, ids));
     this.hover = null;
     this.env.say(`${ids.length} linha(s) removida(s).`);
+    return true;
+  }
+
+  /** Muda o rascunho como passo de desfazer (geometria). Seleção só troca o corrente, sem passo. */
+  private commit(next: SketchDraft): void {
+    this.draftHistory.push(next);
+  }
+
+  private walkHistory(moved: boolean, ok: string, none: string): boolean {
+    if (!moved) {
+      this.env.say(none);
+      return false;
+    }
+    this.reset();
+    this.env.say(ok);
     return true;
   }
 
@@ -364,12 +449,12 @@ export class PerimeterTool extends ToolBase {
         return;
       }
       const on = effectiveSeg(this.d, this.d.segs.find((s) => s.id === id)!).definesSlope;
-      this.d = setSegSlope(this.d, id, { definesSlope: !on });
+      this.commit(setSegSlope(this.d, id, { definesSlope: !on }));
       this.env.say(on ? 'Aresta sem inclinação definida.' : 'Aresta define a inclinação.');
       return;
     }
     const id = hitSeg(this.d.segs, p.raw, SELECT_PX * mpp);
-    this.d = selectSegs(this.d, id ? [id] : [], p.shift);
+    this.draftHistory.replace(selectSegs(this.d, id ? [id] : [], p.shift));
     const n = this.d.selected.length;
     this.env.say(n > 0 ? `${n} linha(s) selecionada(s). Delete remove; Shift soma.` : SELECT_HINT);
   }
@@ -384,7 +469,7 @@ export class PerimeterTool extends ToolBase {
       this.env.say('Essa linha já está no esboço.');
       return;
     }
-    this.d = addSegs(this.d, [pick.seg]);
+    this.commit(addSegs(this.d, [pick.seg]));
     this.cycle = 0;
     this.env.say(`${pick.label} adicionada.`);
   }
@@ -441,7 +526,7 @@ export class PerimeterTool extends ToolBase {
       this.env.say('Forma degenerada com esses pontos: escolha outro.');
       return;
     }
-    this.d = applySegs(this.d, segs);
+    this.commit(applySegs(this.d, segs));
     this.items = [];
     this.inf = null;
     if (st.shape.id === 'line') {

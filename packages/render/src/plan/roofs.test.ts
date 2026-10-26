@@ -116,27 +116,32 @@ describe('telhado na planta (D1)', () => {
     expect(multiArea(band.polygons)).toBeLessThan(multiArea(roofFootprint(gable())) * 0.2);
   });
 
-  it('linhas notáveis: cumeeira, espigão e rincão na espessura de corte do telhado; rincão tracejado; beiral não tem traço', () => {
+  it('linhas notáveis: cumeeira > espigão > rincão, na proporção da proposta sobre o corte; rincão tracejado', () => {
     // Linhas do telhado têm alpha 1; as setas de caimento têm 0,9 (ver o teste das setas).
     const CUT = defaultPaint('roof', 100).cutPx;
     const strokes = ops([gable()]).strokes.filter((s) => s.alpha === 1 && !s.closed);
     expect(strokes).toHaveLength(3);
     const ridge = strokes.find((s) => s.pts.length === 2 && s.pts[0]!.y === 3 && s.pts[1]!.y === 3)!;
-    expect(ridge.widthPx).toBe(CUT);
+    expect(ridge.widthPx).toBeCloseTo(CUT * 1.5, 9);
     expect(ridge.color).toBe(LIGHT.ink);
     expect(ridge.pts).toEqual([P(0, 3), P(8, 3)]);
     const hip = strokes.find((s) => !s.dash && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
     expect(hip.pts).toEqual([P(0, 0), P(2, 2)]);
-    expect(hip.widthPx).toBe(CUT);
+    expect(hip.widthPx).toBeCloseTo(CUT * 1.25, 9);
     const valley = strokes.find((s) => s.dash)!;
     expect(valley.widthPx).toBe(CUT);
     expect(valley.dash).toEqual([6, 3]);
+    expect(ridge.widthPx).toBeGreaterThan(hip.widthPx);
+    expect(hip.widthPx).toBeGreaterThan(valley.widthPx);
   });
 
   it('seta de caimento por água, da subida para a descida, com o percentual', () => {
     const o = ops([gable()]);
     const arrows = o.strokes.filter((s) => s.alpha === 0.9 && !s.closed);
     expect(arrows).toHaveLength(4);
+    // Verde do caimento (não a tinta), na espessura de projeção (1 px na proposta).
+    expect(arrows.every((a) => a.color === LIGHT.roofSlope)).toBe(true);
+    expect(arrows[0]!.widthPx).toBeCloseTo(defaultPaint('roof', 100).projPx, 9);
     // água de baixo (sobe para +y): a ponta fica para −y, no centroide (4, 1,5)
     const shaft = arrows[0]!.pts;
     expect(shaft[1]!.y).toBeLessThan(1.5);
@@ -244,7 +249,7 @@ describe('aresta de empena e símbolo "define inclinação" (A10/A11)', () => {
     expect(dashed).toHaveLength(1);
     expect(dashed[0]!.dash).toEqual([12, 5]);
     expect(dashed[0]!.pts).toEqual([P(0, 0), P(8, 0)]);
-    const tick = o.strokes.find((s) => !s.dash && s.pts.length === 2 && s.pts[0]!.x === 4 && s.widthPx === defaultPaint('roof', 100).cutPx)!;
+    const tick = o.strokes.find((s) => !s.dash && s.pts.length === 2 && s.pts[0]!.x === 4 && Math.abs(s.widthPx - defaultPaint('roof', 100).cutPx * 0.75) < 1e-9)!;
     expect(tick.pts[0]!.y).toBeCloseTo(-0.06, 9);
     expect(tick.pts[1]!.y).toBeCloseTo(0.06, 9);
   });
@@ -310,5 +315,41 @@ describe('cota da cumeeira e planta de cobertura (D6)', () => {
     const planeFill = dl.fills.find((f) => JSON.stringify(f.polygons) === JSON.stringify(below.planes[0]!.polygon));
     expect(planeFill?.alpha).toBe(1);
     expect(dl.fills.some((f) => f.color === LIGHT.underlay && f.alpha === 0.22)).toBe(false);
+  });
+});
+
+/** Contorno com trecho em arco (semicírculo de raio 3 m à direita de (8,3)), amostrado em `n` lados, e as demais arestas. */
+function arcBoundary(n: number): Vec2[] {
+  const arc = Array.from({ length: n + 1 }, (_, i) => {
+    const a = -Math.PI / 2 + (i * Math.PI) / n;
+    return P(8 + 3 * Math.cos(a), 3 + 3 * Math.sin(a));
+  });
+  return [P(0, 0), P(8, 0), ...arc.slice(1, -1), P(8, 6), P(0, 6)];
+}
+
+describe('telhado com trecho em arco (pegada amostrada)', () => {
+  it('as geratrizes entre facetas do mesmo arco não viram espigão; a cumeeira entre as águas do arco e a divisa com a outra água fica', () => {
+    const boundary = arcBoundary(24);
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary, heightOffset: 2.8, shape: 'edges', edgeSlopes: boundary.map(() => 30), edgeOverhangs: boundary.map(() => 0) }) });
+    const p = s.project;
+    const [r] = resolveRoofs(p, 'lv_0');
+    const raw = r!.lines.filter((l) => l.kind === 'hip' || l.kind === 'ridge' || l.kind === 'valley');
+    const drawn = ops([r!], 'medium', 100, false, p).strokes.filter((s) => s.alpha === 1 && !s.closed && s.color === LIGHT.ink);
+    // O motor gera uma divisa por faceta do arco; o desenho guarda só as que não são amostragem do arco.
+    expect(raw.length).toBeGreaterThan(24);
+    expect(drawn.length).toBeLessThan(raw.length / 4);
+    // A cumeeira horizontal que separa a água de cima da de baixo (ambas do arco e dos lados retos) segue desenhada.
+    expect(drawn.some((s) => s.pts.length === 2 && s.pts[0]!.y === 3 && s.pts[1]!.y === 3)).toBe(true);
+  });
+
+  it('o contorno de um arco não gera cumeeira nem espigão para cada lado amostrado (o beiral sai como faixa suave)', () => {
+    const boundary = arcBoundary(24);
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary, heightOffset: 2.8, shape: 'edges', edgeSlopes: boundary.map(() => 30), edgeOverhangs: boundary.map(() => 0) }) });
+    const o = roofFills(s.project, 'lv_0', LIGHT, false, 'medium', VIEW(100));
+    const beiral = o.fills.filter((f) => f.contour);
+    expect(beiral).toHaveLength(1);
+    expect(o.strokes.filter((st) => st.alpha === 1 && !st.closed && st.color === LIGHT.ink).length).toBeLessThan(12);
   });
 });

@@ -1,5 +1,6 @@
 import type { SketchIssue, Vec2 } from '@hestia/geom';
 import type { Command, Id } from '@hestia/model';
+import type { SketchOrigin } from './perimeterSession.ts';
 
 /** Opções da barra do modo de perímetro, lidas de um elemento (mesmos campos da barra da interface). */
 export interface PerimeterBarOptions {
@@ -11,6 +12,10 @@ export interface PerimeterBarOptions {
   extendToCore: boolean;
   /** Deslocamento do nível (m). */
   heightOffset: number;
+  /** Vincular às paredes (piso e laje): o contorno está vinculado à origem `perimeter`. Ausente = desmarcada. */
+  linkToWalls?: boolean;
+  /** Acompanhar o ambiente (forro): o forro segue o contorno do ambiente. Ausente = desmarcada. */
+  followRoom?: boolean;
 }
 
 /** Opções de `commitPerimeter`. Ausente = o elemento guarda o seu valor (ao editar) ou o padrão do tipo (ao criar). */
@@ -29,6 +34,12 @@ export interface CommitPerimeterOptions {
   heightOffset?: number;
   /** Só telhado: eixo da cumeeira ou da subida. Ausente = lado maior da pegada ao criar; ao editar, mantém o atual. */
   axis?: Vec2;
+  /** Vincular às paredes (piso e laje). Só vincula quando o esboço veio de "Por perímetro" (`origin.walls`). */
+  linkToWalls?: boolean;
+  /** Acompanhar o ambiente (forro). Usa o ambiente de `origin.roomId` quando o esboço tem o contorno dele. */
+  followRoom?: boolean;
+  /** De onde veio o esboço (ver `SketchOrigin`). Ausente = desenhado à mão. */
+  origin?: SketchOrigin;
   mark?: string;
   comments?: string;
 }

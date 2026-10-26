@@ -4,6 +4,7 @@ import { boundaryKindsOf } from '@hestia/engine/src/roofShapes.ts';
 import { ProjectStore, createEmptyProject, makeRoof, type Project, type Roof } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
 import { roofFills, roofSelectionOps } from './roofs.ts';
+import { defaultPaint } from './style.ts';
 import { DARK, LIGHT, type StrokeOp } from './types.ts';
 import type { Viewport } from '../viewport.ts';
 
@@ -70,13 +71,13 @@ describe('pegada tracejada rosa com balanço', () => {
     projetoCom(makeRoof({ id: 'r', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: EAVE, footprint: FOOT, edgeOverhangs: [0.5, 0.5, 0.5, 0.5], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: P(1, 0), ...over }));
   const rosas = (strokes: StrokeOp[]) => strokes.filter((s) => s.color === LIGHT.roofFootprint);
 
-  it('telhado visível com footprint 4×2 e balanço 0,5: uma linha tracejada rosa de 1 px no contorno da pegada', () => {
+  it('telhado visível com footprint 4×2 e balanço 0,5: uma linha tracejada rosa na espessura de projeção no contorno da pegada', () => {
     const fills = roofFills(roofCom({}), 'lv_0', LIGHT, false, 'medium', VIEW);
     const pink = rosas(fills.strokes);
     expect(pink).toHaveLength(1);
     expect(pink[0]!.pts).toEqual(FOOT);
     expect(pink[0]!.closed).toBe(true);
-    expect(pink[0]!.widthPx).toBe(1);
+    expect(pink[0]!.widthPx).toBe(defaultPaint('roof', 100).projPx);
     expect(pink[0]!.dash).toEqual([6, 3]);
   });
 
@@ -90,6 +91,15 @@ describe('pegada tracejada rosa com balanço', () => {
     const p = roofCom({ edgeOverhangs: [0, 0, 0, 0], boundary: FOOT });
     expect(rosas(roofFills(p, 'lv_0', LIGHT, false, 'medium', VIEW).strokes)).toHaveLength(0);
     expect(rosas(buildPlanDrawList(input(p)).strokes)).toHaveLength(0);
+  });
+
+  it('projeção de telhado oculto sem balanço é tinta, não rosa; com balanço, a projeção sai rosa', () => {
+    const semBalanco = roofCom({ edgeOverhangs: [0, 0, 0, 0], boundary: FOOT });
+    const proj = roofFills(semBalanco, 'lv_0', LIGHT, false, 'medium', VIEW, { hidden: new Set(['r']), showProjection: true }).strokes;
+    expect(proj.filter((s) => s.dash && s.closed)).toHaveLength(1);
+    expect(proj.filter((s) => s.dash && s.closed)[0]!.color).toBe(LIGHT.ink);
+    const comBalanco = roofFills(roofCom({}), 'lv_0', LIGHT, false, 'medium', VIEW, { hidden: new Set(['r']), showProjection: true }).strokes;
+    expect(comBalanco.filter((s) => s.dash && s.closed && s.color === LIGHT.roofFootprint)).toHaveLength(2);
   });
 
   it('sem footprint gravado, nenhuma linha rosa mesmo com balanço', () => {

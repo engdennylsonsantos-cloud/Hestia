@@ -134,8 +134,8 @@ describe('regressão do 3D aberto', () => {
     return Math.sign((folha.x - folha.hinge.at) * Math.sin(folha.hinge.angle));
   }
 
-  it('dimensões das peças iguais fechado × aberto nos 14 tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(14);
+  it('dimensões das peças iguais fechado × aberto nos 18 tipos padrão', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(18);
     for (const t of DEFAULT_OPENING_TYPES) {
       const c = cena(t.id);
       expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));
@@ -149,7 +149,8 @@ describe('regressão do 3D aberto', () => {
       const h = alturaDe(c);
       const pc = pecas(c);
       const vidros = pc.filter((x) => x.material === 'glass');
-      expect(vidros.length, t.id).toBeGreaterThan(0);
+      // A veneziana não tem vidro: as aletas substituem o pano (spec E §3.5).
+      if (t.plan !== 'louver') expect(vidros.length, t.id).toBeGreaterThan(0);
       for (const v of vidros) {
         expect(v.z - v.h / 2, t.id).toBeGreaterThanOrEqual(jamb - 1e-9);
         expect(v.z + v.h / 2, t.id).toBeLessThanOrEqual(h - jamb + 1e-9);

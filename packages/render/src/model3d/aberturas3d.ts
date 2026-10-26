@@ -48,20 +48,30 @@ export function montarAbertura(
     if (piece.hinge) {
       const pivot = new THREE.Group();
       let dx = 0;
+      let dy = 0;
+      const atS = piece.hinge.atS ?? 0;
       if (piece.hinge.axis === 'z') {
+        // Eixo vertical em (t, s) = (at, atS).
         pivot.position.x = piece.hinge.at;
+        pivot.position.y = atS;
         pivot.rotation.z = piece.hinge.angle;
         dx = piece.hinge.at;
+        dy = atS;
       } else {
+        // Eixo horizontal paralelo a `t` (maxim-ar/basculante): passa por (s, z) = (atS, at).
+        pivot.position.y = atS;
         pivot.position.z = piece.hinge.at;
         pivot.rotation.x = piece.hinge.angle;
+        dy = atS;
       }
-      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x - dx, piece.y, piece.z - (piece.hinge.axis === 'x' ? piece.hinge.at : 0));
+      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x - dx, piece.y - dy, piece.z - (piece.hinge.axis === 'x' ? piece.hinge.at : 0));
       desenhar(pivot, box, p.materials[piece.materialId], cat, linhas, range(box.index?.count ?? 0));
       grupo.add(pivot);
     } else {
-      // Peça fixa: a caixa em coordenadas do vão (o grupo leva a transformação), como lote da esquadria.
-      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x, piece.y, piece.z);
+      // Peça fixa (ou folha de correr): a caixa em coordenadas do vão (o grupo leva a transformação), como lote da
+      // esquadria. O deslocamento do estado aberto entra na posição da caixa.
+      const s = piece.slide;
+      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x + (s?.dx ?? 0), piece.y + (s?.dy ?? 0), piece.z + (s?.dz ?? 0));
       lotes.push(loteDeGeometria(box, piece.materialId, cat, o.id));
     }
   }
@@ -96,19 +106,24 @@ export function caixasDaAbertura(
   for (const piece of openingPieces(p, o, g, f, H, view.openOpenings === true)) {
     const m = vao.clone();
     let dx = 0;
+    let dy = 0;
     let dz = 0;
     if (piece.hinge) {
       const pivo = new THREE.Matrix4();
+      const atS = piece.hinge.atS ?? 0;
       if (piece.hinge.axis === 'z') {
-        pivo.makeRotationZ(piece.hinge.angle).setPosition(piece.hinge.at, 0, 0);
+        pivo.makeRotationZ(piece.hinge.angle).setPosition(piece.hinge.at, atS, 0);
         dx = piece.hinge.at;
+        dy = atS;
       } else {
-        pivo.makeRotationX(piece.hinge.angle).setPosition(0, 0, piece.hinge.at);
+        pivo.makeRotationX(piece.hinge.angle).setPosition(0, atS, piece.hinge.at);
+        dy = atS;
         dz = piece.hinge.at;
       }
       m.multiply(pivo);
     }
-    m.multiply(new THREE.Matrix4().makeTranslation(piece.x - dx, piece.y, piece.z - dz)).multiply(new THREE.Matrix4().makeScale(piece.w, piece.d, piece.h));
+    const s = piece.slide;
+    m.multiply(new THREE.Matrix4().makeTranslation(piece.x - dx + (s?.dx ?? 0), piece.y - dy + (s?.dy ?? 0), piece.z - dz + (s?.dz ?? 0))).multiply(new THREE.Matrix4().makeScale(piece.w, piece.d, piece.h));
     out.push({ materialId: piece.materialId, matriz: m.toArray() });
   }
   return out;

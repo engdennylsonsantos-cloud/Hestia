@@ -55,7 +55,6 @@ const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
   'threshold',
   'track',
   'muntin',
-  'pocket',
 ]);
 
 const line = (pts: OpeningPlanPoint[], role: OpeningPlanRole, tone: OpeningPlanTone = 'ink', weight = 1, dash?: [number, number]): OpeningPlanPath => ({
@@ -254,6 +253,125 @@ function addHighExtras(out: OpeningPlanPath[], m: OpeningModel, z: number): void
   }
 }
 
+/** Seta com ponta entre dois pontos da planta. */
+function addPlanArrow(out: OpeningPlanPath[], from: OpeningPlanPoint, to: OpeningPlanPoint): void {
+  out.push(line([from, to], 'arrow', 'ink', 0.8));
+  const dt = to.t - from.t;
+  const ds = to.s - from.s;
+  const len = Math.hypot(dt, ds);
+  if (len < EPS) return;
+  const ut = dt / len;
+  const us = ds / len;
+  const head = Math.min(0.12, len * 0.35);
+  const base = { t: to.t - ut * head, s: to.s - us * head };
+  out.push(line([{ t: base.t - us * head * 0.6, s: base.s + ut * head * 0.6 }, to, { t: base.t + us * head * 0.6, s: base.s - ut * head * 0.6 }], 'arrow', 'ink', 0.8));
+}
+
+/** Família nova de porta inferida do modelo único (o modelo não guarda o nome da família). */
+function newDoorFamily(m: OpeningModel): 'dblact' | 'pocket' | 'fold' | 'garage' | null {
+  if (m.openings.some((o) => o.kind === 'overhead')) return 'garage';
+  if (m.parts.some((p) => p.role === 'pocket')) return 'pocket';
+  if (m.openings.some((o) => o.kind === 'fold')) return 'fold';
+  if (m.openings.some((o) => o.kind === 'side' && o.both)) return 'dblact';
+  return null;
+}
+
+/** Folhas fechadas como linha no plano médio (nível baixo das famílias novas). */
+function addNewDoorLow(out: OpeningPlanPath[], m: OpeningModel): void {
+  const vistas = new Set<string>();
+  for (const part of m.parts) {
+    if (part.role !== 'leaf') continue;
+    const s = (part.box.s0 + part.box.s1) / 2;
+    const chave = `${part.box.t0};${part.box.t1};${s}`;
+    if (vistas.has(chave)) continue;
+    vistas.add(chave);
+    out.push(line([{ t: part.box.t0, s }, { t: part.box.t1, s }], 'leaf', 'ink', 1));
+  }
+}
+
+/** Linhas dos trilhos no sentido da profundidade (portão seccionado). */
+function addDeepTracks(out: OpeningPlanPath[], m: OpeningModel): void {
+  for (const part of m.parts) {
+    if (part.role !== 'track') continue;
+    const t = (part.box.t0 + part.box.t1) / 2;
+    out.push(line([{ t, s: part.box.s0 }, { t, s: part.box.s1 }], 'track', 'soft', 0.6, [4, 3]));
+  }
+}
+
+/** Planta das cinco famílias novas (spec E §4.1 e §3.5); false quando a porta é de outra família. */
+function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): boolean {
+  const family = newDoorFamily(m);
+  if (!family) return false;
+  const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
+  if (level === 'low') {
+    addNewDoorLow(out, m);
+    return true;
+  }
+  addFrameCut(out, m, opts.cutZ);
+  if (family === 'pocket') {
+    for (const part of m.parts.filter((x) => x.role === 'leaf')) out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
+    for (const part of m.parts.filter((x) => x.role === 'pocket')) out.push(polygon(boxRing(part.box), 'pocket', 'soft', 0.8, [6, 3]));
+    const movel = m.parts.find((x) => x.role === 'leaf' && x.motion?.kind === 'slide')?.motion;
+    if (movel && movel.kind === 'slide') {
+      const s = (m.core.s0 + m.core.s1) / 2;
+      addPlanArrow(out, { t: 0, s }, { t: movel.dt * movel.travel, s });
+    }
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return true;
+  }
+  if (family === 'garage') {
+    let t0 = Infinity;
+    let t1 = -Infinity;
+    let sFolha = 0;
+    for (const part of m.parts.filter((x) => x.role === 'leaf')) {
+      t0 = Math.min(t0, part.box.t0);
+      t1 = Math.max(t1, part.box.t1);
+      sFolha = (part.box.s0 + part.box.s1) / 2;
+      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
+    }
+    if (Number.isFinite(t0) && Number.isFinite(t1)) {
+      out.push(line([{ t: t0, s: sFolha }, { t: t1, s: sFolha }], 'leaf', 'ink', 1));
+    }
+    const opening = m.openings.find((x) => x.kind === 'overhead');
+    const side = opening?.side || 1;
+    const face = side * (m.thickness / 2);
+    const comprimento = Math.min(m.height, 2.5);
+    if (Number.isFinite(t0) && Number.isFinite(t1)) {
+      out.push(polygon(boxRing({ t0, t1, s0: face, s1: face + side * comprimento, z0: 0, z1: 1 }), 'leaf', 'soft', 0.7, [6, 3]));
+    }
+    addDeepTracks(out, m);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return true;
+  }
+  if (family === 'fold') {
+    for (const part of m.parts.filter((x) => x.role === 'leaf')) {
+      const motion = part.motion;
+      out.push(polygon(transformedRing(part.box, motion, opts.angle), 'leaf', 'cut', 1));
+      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
+    }
+    addTracks(out, m);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return true;
+  }
+  // Vai-e-vem: folha aberta dos dois lados, arco principal contínuo e o outro tracejado.
+  for (const o of m.openings) {
+    const box = leafBox(m, o.leaf);
+    if (!box) continue;
+    const motion = leafMotion(m, o.leaf);
+    const sign = openingSign(o, motion);
+    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
+    out.push(polygon(transformedRing(box, motion, -opts.angle), 'leaf', 'cut', 1));
+    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
+    if (!opts.showSwing) continue;
+    const center = { t: o.pivot.t, s: o.pivot.s };
+    const closedEnd = { t: o.latchT, s: o.pivot.s };
+    addOpeningArc(out, center, closedEnd, sign * opts.angle, opts.swingStyle);
+    addOpeningArc(out, center, closedEnd, -sign * opts.angle, 'dash');
+  }
+  if (level === 'high') addHighExtras(out, m, opts.cutZ);
+  return true;
+}
+
 /** Desenho de uma porta (giro, dupla, pivotante, correr e vão livre) nos níveis baixo/médio/alto. */
 function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
@@ -261,6 +379,7 @@ function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOpt
     addVoid(out, m);
     return;
   }
+  if (addNewDoorPlan(out, m, opts)) return;
   if (level === 'low') {
     for (const o of m.openings) {
       const box = leafBox(m, o.leaf);

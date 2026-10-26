@@ -126,3 +126,55 @@ describe('openingLinePaths: janelas e famílias sem linha', () => {
     expect(perto(linhas[1]!.pts[1]!.z, linhas[0]!.pts[0]!.z)).toBe(true);
   });
 });
+
+describe('openingLinePaths: portas novas (spec E §3.5)', () => {
+  it('vai-e-vem: V contínuo e V tracejado superpostos', () => {
+    const linhas = openingLinePaths(modelo(cena('ot_pvv90')), 1, PADRAO, 'elevation');
+    expect(linhas).toHaveLength(2);
+    expect(linhas.filter((l) => l.dashed)).toHaveLength(1);
+    expect(linhas[0]!.pts).toEqual(linhas[1]!.pts);
+    expect(linhas[0]!.pts).toHaveLength(3);
+  });
+
+  it('embutir: seta horizontal aponta para a cavidade', () => {
+    for (const flipHand of [false, true]) {
+      const m = modelo(cena('ot_pe80', {}, { flipHand }));
+      const folha = m.parts.find((p) => p.role === 'leaf' && p.motion?.kind === 'slide')!;
+      const motion = folha.motion;
+      if (!motion || motion.kind !== 'slide') throw new Error('folha sem deslizamento');
+      const linhas = openingLinePaths(m, 1, PADRAO, 'elevation');
+      expect(linhas).toHaveLength(2);
+      expect(linhas[0]!.pts).toHaveLength(2);
+      expect(linhas[0]!.dashed).toBe(true);
+      const destino = -1 * motion.dt * motion.travel;
+      const chegada = linhas[0]!.pts[1]!;
+      expect(chegada.u).toBeCloseTo(destino, 9);
+      expect(linhas[1]!.pts).toHaveLength(3);
+    }
+  });
+
+  it('dobrável e sanfonada: zigue-zague com um segmento por painel e sem V', () => {
+    for (const [base, extra, cadeias, paineis] of [
+      ['ot_pd120', {}, 1, 2],
+      ['ot_pd120', { leaves: 4 }, 2, 2],
+      ['ot_ps90', {}, 1, 9],
+    ] as const) {
+      const linhas = openingLinePaths(modelo(cena(base, extra as never)), 1, PADRAO, 'elevation');
+      expect(linhas, base).toHaveLength(cadeias);
+      for (const l of linhas) expect(l.pts.length - 1).toBe(paineis);
+    }
+  });
+
+  it('seccionada: juntas horizontais e seta para cima', () => {
+    const linhas = openingLinePaths(modelo(cena('ot_pg300')), 1, PADRAO, 'elevation');
+    const horizontais = linhas.filter((l) => l.pts.length === 2 && perto(l.pts[0]!.z, l.pts[1]!.z));
+    expect(horizontais).toHaveLength(4);
+    const haste = linhas.find((l) => l.pts.length === 2 && !perto(l.pts[0]!.z, l.pts[1]!.z))!;
+    expect(haste).toBeDefined();
+    expect(haste.pts[1]!.z).toBeGreaterThan(haste.pts[0]!.z);
+    expect(haste.pts[1]!.u).toBeCloseTo(haste.pts[0]!.u, 9);
+    const ponta = linhas.find((l) => l.pts.length === 3 && perto(l.pts[0]!.z, l.pts[2]!.z))!;
+    expect(ponta).toBeDefined();
+    expect(ponta.pts[1]!.z).toBeCloseTo(haste.pts[1]!.z, 9);
+  });
+});

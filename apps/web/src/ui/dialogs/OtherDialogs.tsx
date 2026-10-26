@@ -3,6 +3,7 @@ import { COMANDOS_COM_ATALHO, TOOL_GROUPS, type ShortcutCommand } from '@hestia/
 import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
 import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId, type Wall } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
+import { hasAutosave } from '../../editor/storage.ts';
 import { useUi } from '../../editor/state.ts';
 import { useAtalhos } from '../../editor/shortcutConfig.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -266,7 +267,7 @@ function Thumb({ walls }: { walls: Wall[] }): ReactElement {
 }
 
 export function StartDialog(): ReactElement {
-  const [has] = useState(() => editor.hasAutosave());
+  const [has] = useState(() => hasAutosave());
   // Cada exemplo é montado uma vez: a miniatura usa as mesmas paredes que a contagem mostra.
   const cards = useMemo(
     () =>

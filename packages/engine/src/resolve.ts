@@ -38,6 +38,8 @@ import { endReturns, insertMode, insertReturns } from './wrap.ts';
 import { attachTargets } from './attachTargets.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { wallZRange, type WallZ } from './wallZ.ts';
+import { withWallZ } from './wallFrameZ.ts';
+import { round, ringsOfShape, sigOf } from './geomSig.ts';
 import type { LayerBand, OpeningGeometry, Region, ResolvedCluster, ResolvedLayer, ResolvedLevel, ResolvedWall } from './types.ts';
 
 const MIN_AREA = 1e-9;
@@ -70,7 +72,6 @@ interface Item {
   box: Box;
 }
 
-const ringsOfShape = (m: MultiPolygon): string => m.map((p) => p.map((r) => r.map((v) => `${round(v.x)},${round(v.y)}`).join(';')).join('|')).join('/');
 
 /** Altura (relativa à base) do plano de corte da planta: faixas que não o atravessam não aparecem em planta. */
 const PLAN_CUT = 1.2;
@@ -248,7 +249,6 @@ const openingRect = (g: OpeningGeometry): MultiPolygon => [
   [orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.roughWidth / 2, g.thickness / 2 + 0.02)],
 ];
 
-const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
   const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}:${i.outline ? 1 : 0}|${ringsOfShape(i.shape)}`);
@@ -268,7 +268,6 @@ interface ZRange {
   z1: number;
 }
 
-const sigOf = (m: MultiPolygon): string => ringsOfShape(m);
 
 /** Pontos de quebra vertical: bases, topos, limites das faixas e dos vãos de todas as paredes do cluster. */
 function breakpoints(items: Item[], zr: Map<Id, ZRange>, opens: OpeningGeometry[]): number[] {
@@ -389,26 +388,9 @@ export function frameOfWall(p: Project, wallId: Id): WallFrame | null {
   return buildFrame(w, wallType(p, w));
 }
 
-/**
- * Faixa vertical de cada parede (base e topo, sem o ajuste por piso e telhado), para a junção só unir paredes que se
- * encontram em altura (J-04). Não resolve pisos aqui: levelFrames é chamado por eles e isso faria um ciclo.
- * Quadros são construídos a cada chamada: anota no próprio objeto (copiar quebraria a identidade usada pela junção).
- */
-export function withWallZ(p: Project, frames: WallFrame[]): WallFrame[] {
-  for (const f of frames) {
-    const z0 = wallBaseElevation(p, f.wall);
-    f.z = { z0, top: z0 + wallMaxHeight(p, f.wall) };
-  }
-  return frames;
-}
-
 export function levelFrames(p: Project, levelId: Id): WallFrame[] {
-  return withWallZ(
-    p,
-    wallsOnLevel(p, levelId)
-      .map((w) => buildFrame(w, wallType(p, w)))
-      .filter((f): f is WallFrame => f !== null),
-  );
+  const frames = wallsOnLevel(p, levelId).map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
+  return withWallZ(p, frames);
 }
 
 export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = sharedCache, opts: PlanResolveOptions = {}): ResolvedLevel {

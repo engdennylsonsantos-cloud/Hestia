@@ -1,6 +1,7 @@
 import { useEffect, type ReactElement } from 'react';
 import { isWall, type Wall } from '@hestia/model';
 import { editor, useProject, useProjectVersion } from '../editor/controller.ts';
+import { markTutorialSeen, tutorialSeen } from '../editor/storage.ts';
 import { useUi } from '../editor/state.ts';
 import { sufixoAtalho } from '../editor/shortcutConfig.ts';
 
@@ -31,7 +32,7 @@ export function temCircuito(paredes: Wall[]): boolean {
 
 export function Tutorial(): ReactElement | null {
   // Fechado uma vez (Dispensar ou Concluir, ou quando os 5 passos se cumprem), não volta nos próximos projetos em branco (localStorage, ver markTutorialSeen).
-  const on = useUi((s) => s.tutorial) && !editor.tutorialSeen();
+  const on = useUi((s) => s.tutorial) && !tutorialSeen();
   const seen3d = useUi((s) => s.seen3d);
   const view = useUi((s) => s.view);
   const p = useProject();
@@ -51,12 +52,12 @@ export function Tutorial(): ReactElement | null {
   // Cumpridos os 5 passos, a faixa some e fica marcada como vista (igual a Concluir).
   useEffect(() => {
     if (!on || !feito) return;
-    editor.markTutorialSeen();
+    markTutorialSeen();
     useUi.setState({ tutorial: false });
   }, [on, feito]);
   if (!on || feito) return null;
   const close = (): void => {
-    editor.markTutorialSeen();
+    markTutorialSeen();
     useUi.setState({ tutorial: false });
   };
   return (

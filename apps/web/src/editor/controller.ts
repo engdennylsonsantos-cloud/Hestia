@@ -17,7 +17,7 @@ import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, typ
 import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts';
-import { safeGet, safeSet } from './storage.ts';
+import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
@@ -32,8 +32,6 @@ import { FluxoEdicao } from './fluxoEdicao.ts';
 import { CacheGeometria } from './geometryCache.ts';
 import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
 
-const STORAGE_KEY = 'hestia.autosave.v1';
-const TUTORIAL_KEY = 'hestia.tutorial.v1';
 
 /**
  * Controlador do editor: junta projeto (histórico), ferramenta ativa, seleção e vistas.
@@ -153,10 +151,7 @@ export class Editor {
     if (v) this.setViewport(zoomAt(v, screen, Math.exp(-deltaY * 0.0015)));
   }
 
-  pan(dx: number, dy: number): void {
-    const v = this.viewport();
-    if (v) this.setViewport(panBy(v, dx, dy));
-  }
+  pan(dx: number, dy: number): void { const v = this.viewport(); if (v) this.setViewport(panBy(v, dx, dy)); }
 
   resolved(levelId: Id, exigirExato = true): ResolvedLevel { return this.fluxo.resolvido(levelId, () => this.levels.get(this.project, levelId), levelId === useUi.getState().levelId, exigirExato); }
 
@@ -468,7 +463,7 @@ export class Editor {
   async save(): Promise<void> {
     const text = this.serialize();
     const name = safeFilename(`${this.project.name.trim() || 'projeto'}.hestia.json`);
-    safeSet(STORAGE_KEY, text);
+    safeSet(AUTOSAVE_KEY, text);
     const entrega = await entregarArquivo({ nome: name, conteudo: text });
     if (entrega === 'salvo') {
       this.store.markSaved();
@@ -491,11 +486,11 @@ export class Editor {
 
   private scheduleAutosave(): void {
     if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
-    this.autosaveTimer = setTimeout(() => safeSet(STORAGE_KEY, this.serialize()), 800);
+    this.autosaveTimer = setTimeout(() => safeSet(AUTOSAVE_KEY, this.serialize()), 800);
   }
 
   restoreAutosave(): boolean {
-    const raw = safeGet(STORAGE_KEY);
+    const raw = safeGet(AUTOSAVE_KEY);
     if (!raw) return false;
     try {
       this.load(migrateProject(JSON.parse(raw)), 'projeto.hestia.json');
@@ -505,16 +500,6 @@ export class Editor {
     }
   }
 
-  hasAutosave(): boolean {
-    return safeGet(STORAGE_KEY) !== null;
-  }
-
-  tutorialSeen(): boolean {
-    return safeGet(TUTORIAL_KEY) === '1';
-  }
-  markTutorialSeen(): void {
-    safeSet(TUTORIAL_KEY, '1');
-  }
 
 }
 

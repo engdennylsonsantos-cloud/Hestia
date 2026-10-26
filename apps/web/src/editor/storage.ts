@@ -14,3 +14,15 @@ export function safeSet(k: string, v: string): void {
     /* armazenamento indisponível: o app segue funcionando sem autosave */
   }
 }
+
+/** Chave do autosave (projeto em andamento, restaurado ao abrir o app). */
+export const AUTOSAVE_KEY = 'hestia.autosave.v1';
+const TUTORIAL_KEY = 'hestia.tutorial.v1';
+
+/** Existe um autosave guardado neste navegador. */
+export const hasAutosave = (): boolean => safeGet(AUTOSAVE_KEY) !== null;
+
+/** O tutorial já foi fechado uma vez neste navegador. */
+export const tutorialSeen = (): boolean => safeGet(TUTORIAL_KEY) === '1';
+
+export const markTutorialSeen = (): void => safeSet(TUTORIAL_KEY, '1');

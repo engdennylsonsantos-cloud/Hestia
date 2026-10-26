@@ -229,6 +229,10 @@ export class OpeningTool extends ToolBase {
       mark: options.placementMark ?? '',
     };
     this.env.exec({ type: 'addOpening', opening: o });
+    // Revit "Tag on Placement": a etiqueta do tipo nasce junto com a esquadria (a opção desliga só esta ligação).
+    if (options.openingTagOnPlace !== false && !this.env.project().settings.showOpeningTags) {
+      this.env.exec({ type: 'setSettings', patch: { showOpeningTags: true } });
+    }
     const pr = this.env.project();
     this.env.say(`${openingType(pr, o).name} inserida.`);
   }

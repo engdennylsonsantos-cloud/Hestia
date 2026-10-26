@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { climbWalk, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfLayersOf,
   dxfLineRoleOf,
@@ -17,9 +17,10 @@ import {
   type DxfPoint,
   type DxfSectionGeometry,
   type DxfSectionItem,
+  type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -177,9 +178,22 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
       const state = shown(o.kind) ? dxfStateOf(view.cls.get(o.id)) : null;
       if (state === null) return [];
       const g = openingGeometry(p, o, f);
-      // Símbolo de planta da família, o mesmo da tela (decisão X1): vale no corte (camada ABERTURAS) e na projeção
-      // (ABERTURA_ACIMA/ABAIXO/ALEM). O DXF põe a camada; o desenho vem da mesma função pura da planta.
-      const symbol = openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
+      // Planta da esquadria pelo modelo único (spec E §4.1), no nível médio: o mesmo desenho da tela. O DXF põe a
+      // camada; o desenho vem de `openingPlanPaths` e vale no corte (ABERTURAS) e na projeção (ABERTURA_*).
+      const type = p.openingTypes[o.typeId];
+      const model = type ? buildOpeningModel(p, o, g, f) : null;
+      // No corte, a cota local desconta a base da parede e a soleira; na projeção, corta no meio do modelo.
+      const cutZ = state === 'cut' ? view.cutZ - (f.z?.z0 ?? 0) - g.sill : (model?.height ?? 0) / 2;
+      const symbol: DxfSymbolPath[] = type && model
+        ? openingPlanWorldPaths(g, model, {
+            detail: 'mid',
+            angle: (openingAngle2d(type) * Math.PI) / 180,
+            planDisplay: openingPlanDisplay(type),
+            showSwing: openingShowSwing(type),
+            swingStyle: openingSwingStyle(type),
+            cutZ,
+          }).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }))
+        : openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));
       return [{ center: g.center, u: g.u, width: g.width, thickness: g.thickness, state, symbol }];
     }),
   );

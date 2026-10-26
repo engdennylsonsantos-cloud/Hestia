@@ -1,6 +1,6 @@
 import { add, boxOf, mul, norm, perp, ringArea, sub, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { dimensionPoints, levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
+import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
+import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -19,6 +19,7 @@ import { wallTagLabels } from './tags.ts';
 import { noteOps } from './notes.ts';
 import { elementTagOps } from './tags.ts';
 import { openingViewOps, wallOutlineOps } from './view.ts';
+import { openingPlanDetail } from './symbols.ts';
 import { espessuraDeCorte, espessuraDeProjecao, paintOps, surfaceColor, type PlanPaint } from './style.ts';
 import { espessuraAtinge, Limiares, zoomAtinge, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
@@ -269,8 +270,26 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       if (!f) continue;
       for (const o of aberturasDaParede(p, w.id)) {
         const g = openingGeometry(p, o, f);
+        const type = p.openingTypes[o.typeId];
+        if (!type) continue;
         const pt = paint[g.kind];
-        const sym = openingViewOps(g, view?.cls.get(o.id), theme, { cut: espessuraDeCorte(pt), proj: espessuraDeProjecao(pt) });
+        const model = buildOpeningModel(p, o, g, f);
+        // O nível de detalhe pelo zoom entra nos limiares da geometria: o quadro só a refaz quando cruza 1 px = 0,012 m
+        // ou 1 px = 0,004 m (ver `limiares.ts`), e a lista de desenho continua a mesma entre os limiares.
+        const detail = openingPlanDetail(openingDetail2d(type), input.viewport.zoom, limiares);
+        const cls = view?.cls.get(o.id);
+        // A cota do corte é absoluta na vista; o modelo usa z local (soleira = 0, base da parede descontada). Fora do
+        // corte (projeção), o símbolo mostra o vão inteiro e corta no meio do modelo.
+        const cutLocal = view ? view.cutZ - (f.z?.z0 ?? 0) - g.sill : model.height / 2;
+        const sym = openingViewOps(g, cls, theme, { cut: espessuraDeCorte(pt), proj: espessuraDeProjecao(pt) }, {
+          model,
+          detail,
+          angle: (openingAngle2d(type) * Math.PI) / 180,
+          planDisplay: openingPlanDisplay(type),
+          showSwing: openingShowSwing(type),
+          swingStyle: openingSwingStyle(type),
+          cutZ: cls === undefined || cls === 'cut' ? cutLocal : model.height / 2,
+        });
         strokes.push(...paintOps({ fills: [], strokes: sym, labels: [] }, pt, fillBase).strokes);
       }
     }

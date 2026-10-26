@@ -162,7 +162,8 @@ export class SelectTool extends ToolBase {
 
   override inputPrompt(): string | null {
     if (this.mode !== 'idle') return null;
-    return this.singleWall() ? 'Comprimento' : null;
+    if (!this.singleWall()) return null;
+    return 'Comprimento · Num nó, arrastar move todas as paredes ligadas. Alt solta só a pegada.';
   }
 
   /** Enter sem valor digitado: abre o campo de cota (a mensagem indica como digitar). */

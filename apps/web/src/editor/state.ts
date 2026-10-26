@@ -61,7 +61,7 @@ export interface UiState {
 }
 
 const SNAP_KEY = 'hestia.snap';
-const SNAP_FLAGS = Object.keys(DEFAULT_SNAP) as Array<keyof SnapOptions>;
+const SNAP_FLAGS = Object.keys(DEFAULT_SNAP).filter((k) => k !== 'gridStep') as Array<Exclude<keyof SnapOptions, 'gridStep'>>;
 
 /** Capturas guardadas no navegador (preferência da tela, não do projeto). Sem armazenamento ou dado inválido: padrão. */
 function loadSnap(): SnapOptions {
@@ -74,6 +74,7 @@ function loadSnap(): SnapOptions {
       const v = saved[k];
       if (typeof v === 'boolean') out[k] = v;
     }
+    if (typeof saved.gridStep === 'number') out.gridStep = saved.gridStep;
     return out;
   } catch {
     return DEFAULT_SNAP;

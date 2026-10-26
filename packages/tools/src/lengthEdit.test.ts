@@ -17,7 +17,7 @@ describe('cota temporária: editar comprimento (F5)', () => {
     const [a] = walls(store) as [Wall];
     env.setSelection([a.id]);
     const s = tool('select', env);
-    expect(s.inputPrompt()).toBe('Comprimento');
+    expect(s.inputPrompt()).toContain('Comprimento');
     expect(s.type('3,5')).toBe(true);
     const [a2] = walls(store) as [Wall];
     expect(a2.a.x).toBeCloseTo(0);

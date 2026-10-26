@@ -149,6 +149,18 @@ export function SnapButton(): ReactElement {
             })}
           </div>
 
+          <div className="snap-row snap-grid-step">
+            <label htmlFor={`${popId}-grid`}>Espaçamento da grade</label>
+            <select id={`${popId}-grid`} value={String(snap.gridStep ?? 0)} onChange={(e) => setSnap({ gridStep: Number(e.target.value) })}>
+              <option value="0">Automático (pelo zoom)</option>
+              <option value="0.05">0,05 m</option>
+              <option value="0.1">0,10 m</option>
+              <option value="0.25">0,25 m</option>
+              <option value="0.5">0,50 m</option>
+              <option value="1">1,00 m</option>
+            </select>
+          </div>
+
           <div className="snap-actions">
             <button type="button" className="btn small" onClick={() => setSnap(ALL_ON)}>Tudo</button>
             <button type="button" className="btn small" onClick={() => setSnap(DEFAULT_SNAP)}>Padrão</button>

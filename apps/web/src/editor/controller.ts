@@ -78,7 +78,7 @@ export class Editor {
     exec: (c) => this.store.exec(c),
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
-    gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
+    gridStep: () => useUi.getState().options.snap?.gridStep || visibleGridStep(this.viewport()?.zoom ?? 60),
     say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang,
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),

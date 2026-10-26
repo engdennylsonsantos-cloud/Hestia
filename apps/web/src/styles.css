@@ -327,7 +327,7 @@ svg { display: block; }
 .cpu-note { position: absolute; left: 12px; top: 10px; background: var(--panel); border: 1px solid var(--warn); color: var(--warn); border-radius: 4px; padding: 3px 8px; font-size: 11px; }
 
 /* ---- barra de status ---- */
-.statusbar { display: flex; gap: 14px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--line-strong); background: var(--chrome); color: var(--fg-soft); min-height: 26px; min-width: 0; overflow: hidden; }
+.statusbar { display: flex; gap: 14px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--line-strong); background: var(--chrome); color: var(--fg-soft); min-height: 26px; min-width: 0; }
 .statusbar .msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
 .statusbar .mono { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
 /* Larguras reservadas: o texto que muda não empurra os outros itens (e portanto o desenho). */

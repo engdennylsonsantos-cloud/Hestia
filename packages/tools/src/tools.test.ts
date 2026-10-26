@@ -1,3 +1,4 @@
+import { DEFAULT_SNAP } from './types.ts';
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, makeWall, openingsOfWall, wallsOnLevel, type Id, type Wall } from '@hestia/model';
 import { infer, parseNumber, createTool, type PointerInfo, type Tool, type ToolEnv, type ToolId, type ToolOptions } from './index.ts';
@@ -50,9 +51,9 @@ describe('inferência', () => {
     expect(r.kind).toBe('endpoint');
     expect(r.point.x).toBeCloseTo(3.03);
   });
-  it('cai na grade quando nada está perto', () => {
+  it('cai na grade quando nada está perto (com a grade ligada)', () => {
     const { store } = makeEnv();
-    const r = infer({ x: 1.04, y: 2.07 }, { project: store.project, levelId: 'lv_0', mpp: 0.01, gridStep: 0.1 });
+    const r = infer({ x: 1.04, y: 2.07 }, { project: store.project, levelId: 'lv_0', mpp: 0.01, gridStep: 0.1, snap: { ...DEFAULT_SNAP, grid: true } });
     expect(r.kind).toBe('grid');
     expect(r.point.x).toBeCloseTo(1.0);
     expect(r.point.y).toBeCloseTo(2.1);

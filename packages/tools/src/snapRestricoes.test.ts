@@ -57,7 +57,7 @@ describe('grade e captura de eixo (S-03 e S-04)', () => {
 
   it('grade ligada quantiza o mesmo alinhamento (x = 1,0)', () => {
     const p = walls([[0, 2], [0, 3]]);
-    const r = at(p, 1.03, 0.03, { snap: { ...DEFAULT_SNAP, faces: false }, extraPoints: [v2(2, 0)] });
+    const r = at(p, 1.03, 0.03, { snap: { ...DEFAULT_SNAP, grid: true, faces: false }, extraPoints: [v2(2, 0)] });
     expect(r.kind).toBe('alignment');
     expect(r.point.x).toBeCloseTo(1.0, 9);
   });
@@ -154,8 +154,12 @@ describe('paredes curvas (S-09): a perpendicular cai sobre o arco', () => {
 });
 
 describe('projeto vazio', () => {
-  it('sem elementos cai na grade (grade ligada por padrão)', () => {
-    expect(at(createEmptyProject(), 1.04, 1.06).kind).toBe('grid');
+  it('grade desligada por padrão: sem elementos não cai na grade', () => {
+    expect(at(createEmptyProject(), 1.04, 1.06).kind).toBe('none');
+  });
+
+  it('com a grade ligada, sem elementos cai na grade', () => {
+    expect(at(createEmptyProject(), 1.04, 1.06, { snap: { ...DEFAULT_SNAP, grid: true } }).kind).toBe('grid');
   });
 });
 

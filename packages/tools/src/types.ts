@@ -104,11 +104,14 @@ export interface SnapOptions {
   endpoint?: boolean;
   /** Captura de pontos médios (AutoCAD Midpoint - triângulo). */
   midpoint?: boolean;
+  /** Espaçamento da grade de captura, em metros. Ausente ou 0 = automático pelo zoom. */
+  gridStep?: number;
 }
 
 export const DEFAULT_SNAP: SnapOptions = {
   enabled: true,
-  grid: true,
+  // Grade desligada por padrão: a captura usa os pontos reais, e a grade entra só quando o usuário pede.
+  grid: false,
   axis: true,
   faces: true,
   core: false,

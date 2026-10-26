@@ -19,6 +19,8 @@ export interface PlanViewState {
   dark: boolean;
   gpu: boolean;
   showGrid: boolean;
+  /** Espaçamento da grade em metros (0 ou ausente = automático pelo zoom). */
+  gridStep?: number;
   showUnderlay: boolean;
   showRoofProjection: boolean;
   thinLines: boolean;
@@ -45,12 +47,13 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   // A planta normal não usa a resolução do nível atual: `planViewOf` refaz a geometria com o corte (ver `planContext`).
   // Só a planta de cobertura (`roofPlanMode`) lê `resolved`, e este quadro não a liga. Por isso não se resolve o nível
   // atual aqui: resolvê-lo seria o dobro de trabalho na abertura. O nível de baixo continua resolvido (ver `planBelowOf`).
-  const base = { project: p, levelId, resolved: resolucaoVazia(levelId), viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection };
+  const base = { project: p, levelId, resolved: resolucaoVazia(levelId), viewport: v, theme, dark, showGrid: s.showGrid, gridStep: s.gridStep, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection };
   return {
     v,
     theme,
     gpu: s.gpu,
     showGrid: s.showGrid,
+    gridStep: s.gridStep,
     geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.showRoofProjection}|${geoSel.join(',')}`,
     overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
@@ -66,6 +69,8 @@ export interface PlanFrameUpdate {
   /** Desenha na cena da GPU. Sem ela (modo CPU) as chaves e as camadas em memória continuam valendo. */
   gpu: boolean;
   showGrid: boolean;
+  /** Espaçamento da grade em metros (0 ou ausente = automático pelo zoom). */
+  gridStep?: number;
   /**
    * Chave da geometria do nível: projeto, nível, tema, opções de vista e o que a geometria lê da seleção (só as cotas).
    * Pan, zoom, cursor, ferramenta e a maior parte da seleção ficam fora dela. O zoom só refaz a geometria quando passa de um
@@ -176,9 +181,9 @@ export class PlanFrame {
       this.gridKey = null;
       this.grid = null;
     } else {
-      const gk = `${v.zoom}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
+      const gk = `${v.zoom}|${u.gridStep ?? 0}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
       if (this.grid === null || this.gridKey !== gk || !gridCovers(this.grid, v)) {
-        this.grid = gridLayer(v, theme);
+        this.grid = gridLayer(v, theme, u.gridStep);
         this.gridKey = gk;
         this.setSlot(sink, 'grid', [], this.grid.strokes, v);
       }

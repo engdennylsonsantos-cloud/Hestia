@@ -16,8 +16,9 @@ export function visibleGridStep(zoom: number): number {
  * nos cruzamentos, e os eixos, por último. Assim a grade vira 5 lotes (um por cor e direção, mais os eixos), e não uma
  * malha por troca de cor.
  */
-export function gridStrokes(v: Viewport, theme: PlanTheme): StrokeOp[] {
-  const step = visibleGridStep(v.zoom);
+export function gridStrokes(v: Viewport, theme: PlanTheme, stepM?: number): StrokeOp[] {
+  // Passo configurado (metros) ou, sem configuração, o menor que deixa ~14 px entre linhas.
+  const step = stepM && stepM > 0 ? stepM : visibleGridStep(v.zoom);
   const b = visibleBounds(v);
   const major = step * 5;
   const x0 = Math.floor(b.minX / step) * step;
@@ -64,11 +65,11 @@ export interface GridLayer {
  * Grade da vista com folga de uma tela para cada lado (a mesma `gridStrokes`, sobre uma vista três vezes maior). Se a
  * grade cheia passa do limite de linhas, sai sem folga; se a folga passa e a vista sozinha cabe, sai a da vista.
  */
-export function gridLayer(v: Viewport, theme: PlanTheme): GridLayer {
-  const exact = gridStrokes(v, theme);
+export function gridLayer(v: Viewport, theme: PlanTheme, stepM?: number): GridLayer {
+  const exact = gridStrokes(v, theme, stepM);
   if (exact.length === 0) return { strokes: [], cover: visibleBounds(v) };
   const wide = { ...v, width: v.width * 3, height: v.height * 3 };
-  const padded = gridStrokes(wide, theme);
+  const padded = gridStrokes(wide, theme, stepM);
   if (padded.length > 0) return { strokes: padded, cover: visibleBounds(wide) };
   return { strokes: exact, cover: visibleBounds(v) };
 }

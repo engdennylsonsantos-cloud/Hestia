@@ -174,8 +174,8 @@ describe('seleção e hover de telhado (D1)', () => {
     const ops1 = roofSelectionOps(p, 'lv_0', [real[0]!.roofId], null, LIGHT, VIEW(100));
     expect(ops1.fills[0]).toMatchObject({ color: LIGHT.select, alpha: 0.26 });
     expect(ops1.strokes.some((s) => s.widthPx === 2)).toBe(true);
-    // área real e, com o telhado selecionado, o percentual de cada aresta que define inclinação (A11)
-    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`, '30 %', '30 %', '30 %', '30 %']);
+    // área real e, com o telhado selecionado, o percentual de cada aresta que define inclinação (A11): forma gable, só as 2 beiradas
+    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`, '30 %', '30 %']);
   });
 
   it('hover: só o azul translúcido', () => {

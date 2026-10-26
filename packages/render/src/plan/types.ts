@@ -142,6 +142,8 @@ export interface PlanTheme {
   stairPath: string;
   stairLanding: string;
   stairTread: string;
+  /** Pegada do telhado com balanço: contorno tracejado de 1 px (o desenho que o usuário traçou, sem o beiral). */
+  roofFootprint: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -159,6 +161,7 @@ export const LIGHT: PlanTheme = {
   stairPath: '#15803d',
   stairLanding: '#7e22ce',
   stairTread: '#64748b',
+  roofFootprint: '#c2185b',
 };
 
 export const DARK: PlanTheme = {
@@ -176,4 +179,5 @@ export const DARK: PlanTheme = {
   stairPath: '#4ade80',
   stairLanding: '#c084fc',
   stairTread: '#94a3b8',
+  roofFootprint: '#ff6fb0',
 };

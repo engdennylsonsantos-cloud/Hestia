@@ -1,5 +1,6 @@
 import { add, closestOnSegment, dist, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
+import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
 import { isRoof, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -90,12 +91,14 @@ function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura):
  * Símbolo "define inclinação" de cada aresta do contorno (A11, como no Revit): triângulo no meio da aresta, apontando
  * para dentro. Cheio na cor de destaque quando a aresta define inclinação (com o percentual ao lado, para fora);
  * vazado e cinza quando não define. `espessura`: a da projeção do telhado (linha fina de anotação). O triângulo é um
- * marcador em pixels (4,5 px de meia base, 8 px de altura): tem o mesmo tamanho na tela para qualquer zoom.
+ * marcador em pixels (4,5 px de meia base, 8 px de altura): tem o mesmo tamanho na tela para qualquer zoom. O percentual
+ * vem de `edgeSlopesOf`, a mesma leitura do motor (forma e direção), e não da lista guardada: só vale o positivo.
  */
 function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorOps {
   const out = empty();
   const b = r.boundary;
   const ccw = ringArea(b) > 0;
+  const slopes = edgeSlopesOf(r);
   const w = 4.5;
   const h = 8;
   b.forEach((a, i) => {
@@ -106,8 +109,8 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorO
     const inward = ccw ? left : scale(left, -1);
     const m = mid(a, c);
     const tri: Vec2[] = [scale(t, -w), scale(t, w), scale(inward, h)];
-    const slope = r.edgeSlopes[i] ?? null;
-    if (slope === null) {
+    const slope = slopes[i] ?? null;
+    if (slope === null || slope <= 0) {
       out.strokes.push({ ...tracoEm(m, tri, true), ...espessura, color: theme.inkSoft, alpha: 1 });
       return;
     }
@@ -122,9 +125,11 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorO
  * (arestas sem inclinação). Os segmentos do anel são agrupados em corridas contínuas do mesmo tipo.
  */
 function selectedRingOps(r: ResolvedRoof, roof: Roof, theme: PlanTheme): StrokeOp[] {
+  // Empenas pelo tipo de cada aresta no motor (`boundaryKindsOf`), o mesmo critério das linhas de empena da planta.
+  const kinds = boundaryKindsOf(roof);
   const gables: Array<[Vec2, Vec2]> = roof.boundary.flatMap((a, i): Array<[Vec2, Vec2]> => {
     const c = roof.boundary[(i + 1) % roof.boundary.length]!;
-    return roof.edgeSlopes[i] === null || roof.edgeSlopes[i] === undefined ? [[a, c]] : [];
+    return kinds[i] === 'gable' ? [[a, c]] : [];
   });
   const onGable = (p: Vec2, q: Vec2): boolean => {
     const m = mid(p, q);
@@ -156,6 +161,15 @@ function selectedRingOps(r: ResolvedRoof, roof: Roof, theme: PlanTheme): StrokeO
   return out;
 }
 
+/**
+ * Pegada tracejada de um telhado com balanço (rosa, 1 px): o contorno desenhado pelo usuário, sem o beiral. Só existe com
+ * `footprint` gravado e algum balanço positivo; sem balanço, o beiral já é a pegada e não há o que mostrar.
+ */
+function pegadaOps(roof: Roof, theme: PlanTheme): StrokeOp[] {
+  if (!roof.footprint || !roof.edgeOverhangs.some((o) => o > 0)) return [];
+  return [{ pts: roof.footprint, closed: true, widthPx: 1, color: theme.roofFootprint, alpha: 1, dash: [6, 3] }];
+}
+
 /** Opções de desenho dos telhados (D6). */
 export interface RoofOpsOptions {
   /**
@@ -178,8 +192,9 @@ export interface RoofOpsOptions {
  * escuro) e um tom por orientação; o telhado é semitransparente (0,55; 0,8 no grosseiro) para ver as paredes por
  * baixo, e opaco na planta de cobertura. Fora do grosseiro: hachura em médio/fino com zoom suficiente, contorno do
  * beiral como faixa, cumeeira e espigão em traço, rincão tracejado, empena (aresta sem inclinação) tracejada e, por
- * água, seta de caimento (da subida para a descida) com o percentual. A cumeeira mais alta leva a cota absoluta
- * ("▲ +5,70") com etiquetas ligadas ou na planta de cobertura. Com etiquetas ligadas, código e área real no centroide.
+ * água, seta de caimento (da subida para a descida) com o percentual; com balanço, a pegada tracejada rosa (`pegadaOps`).
+ * A cumeeira mais alta leva a cota absoluta ("▲ +5,70") com etiquetas ligadas ou na planta de cobertura. Com etiquetas
+ * ligadas, código e área real no centroide.
  */
 export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const out = empty();
@@ -196,6 +211,8 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const base = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.3 : 0.5, paint);
     const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: waterTone(base, pl.up), alpha, hatch });
+    const model = p.elements[r.roofId];
+    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme));
     const foot = roofFootprint(r);
     if (!coarse) {
       out.fills.push({ polygons: foot, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: espessuraDeCorte(paint) });
@@ -242,10 +259,13 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
-  if (opts.showProjection === true) {
-    const proj = espessuraDeProjecao(opts.paint ?? defaultPaint('roof', v.zoom));
-    for (const r of all) {
-      if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
+  // Telhados ocultos: a pegada com balanço aparece também fora do intervalo; a projeção, só com a opção ligada.
+  const proj = espessuraDeProjecao(opts.paint ?? defaultPaint('roof', v.zoom));
+  for (const r of all) {
+    if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
+    const model = p.elements[r.roofId];
+    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme));
+    if (opts.showProjection === true) {
       for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }

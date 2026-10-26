@@ -1,11 +1,12 @@
 import { useState, type ReactElement } from 'react';
-import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
+import { DEFAULT_DISJOIN, TOOL_LABEL, type FloorMode } from '@hestia/tools';
 import { addRoomsAllCircuits } from '../editor/roomActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { perimeterActions, usePerimeter } from '../editor/perimeter.ts';
 import { PerimeterOptionsBar } from './perimeter/PerimeterOptionsBar.tsx';
 import { Check, NumField } from './fields.tsx';
+import { DisjoinCheck } from './DisjoinCheck.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { CeilingOptionsBar } from './CeilingOptionsBar.tsx';
 import { RoofOptionsBar } from './RoofOptionsBar.tsx';
@@ -214,8 +215,19 @@ export function OptionsBar(): ReactElement {
           onChange={(id) => set(tool === 'door' ? { doorTypeId: id } : { windowTypeId: id })}
         />
       )}
-      {tool === 'rotate' && <Check id="opt-rcopy" checked={o.rotateCopy} onChange={(v) => set({ rotateCopy: v })}>Copiar</Check>}
-      {tool === 'mirror' && <Check id="opt-mcopy" checked={o.mirrorCopy} onChange={(v) => set({ mirrorCopy: v })}>Copiar</Check>}
+      {tool === 'move' && <DisjoinCheck id="opt-mdisjoin" checked={o.moveDisjoin ?? DEFAULT_DISJOIN.move} onChange={(v) => set({ moveDisjoin: v })} />}
+      {tool === 'rotate' && (
+        <>
+          <Check id="opt-rcopy" checked={o.rotateCopy} onChange={(v) => set({ rotateCopy: v })}>Copiar</Check>
+          <DisjoinCheck id="opt-rdisjoin" checked={o.rotateDisjoin ?? DEFAULT_DISJOIN.rotate} onChange={(v) => set({ rotateDisjoin: v })} />
+        </>
+      )}
+      {tool === 'mirror' && (
+        <>
+          <Check id="opt-mcopy" checked={o.mirrorCopy} onChange={(v) => set({ mirrorCopy: v })}>Copiar</Check>
+          <DisjoinCheck id="opt-mirrordisjoin" checked={o.mirrorDisjoin ?? DEFAULT_DISJOIN.mirror} onChange={(v) => set({ mirrorDisjoin: v })} />
+        </>
+      )}
       {tool === 'array' && <ArrayOptionsBar />}
       {tool === 'offset' && (
         <>

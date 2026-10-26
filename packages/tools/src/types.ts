@@ -111,6 +111,9 @@ export const DEFAULT_SNAP: SnapOptions = {
   midpoint: true,
 };
 
+/** Padrões do "Desconectar": Mover e Espelhar acompanham a vizinha (falso) e Rotacionar é livre (verdadeiro). */
+export const DEFAULT_DISJOIN = { move: false, rotate: true, mirror: false } as const;
+
 export interface ToolOptions {
   /** Capturas ligadas; ausente = padrão. */
   snap?: SnapOptions;
@@ -170,6 +173,12 @@ export interface ToolOptions {
   rotateCopy: boolean;
   mirrorCopy: boolean;
   offsetCopy: boolean;
+  /** Mover: "Desconectar" solta a ponta das vizinhas em vez de esticá-las. Ausente = falso (padrão do Revit). */
+  moveDisjoin?: boolean;
+  /** Rotacionar: "Desconectar" solta a ponta das vizinhas. Ausente = verdadeiro (giro livre). */
+  rotateDisjoin?: boolean;
+  /** Espelhar: "Desconectar" solta a ponta das vizinhas. Ausente = falso (a vizinha acompanha). */
+  mirrorDisjoin?: boolean;
   floorTypeId: Id;
   /** Deslocamento do topo do piso em relação ao nível (m). */
   floorOffset: number;

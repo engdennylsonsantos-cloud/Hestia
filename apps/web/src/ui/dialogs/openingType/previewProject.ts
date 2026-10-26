@@ -9,7 +9,7 @@ import {
 } from '@hestia/model';
 
 /** Ids fixos do projeto mínimo de prévia (um nível, uma parede reta e a abertura no centro). */
-export const PREVIEW_LEVEL_ID = 'pv_nivel';
+export const PREVIEW_LEVEL_ID = 'lv_0';
 export const PREVIEW_WALL_ID = 'pv_parede';
 export const PREVIEW_OPENING_ID = 'pv_abertura';
 

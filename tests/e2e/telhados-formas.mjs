@@ -37,7 +37,7 @@ const L = [[0, 0], [8, 0], [8, 4], [4, 4], [4, 8], [0, 8]];
 let r = await drawRoof('L-quatro-aguas', L, 'hip');
 check(r.length === 1, 'telhado em L criado (antes sumia)');
 r = await drawRoof('L-duas-aguas', L, 'gable');
-check(r.length === 1, 'telhado em L com duas águas criado');
+check(r.length === 0, 'telhado em L com duas águas recusado (esqueleto não fecha nos cantos reentrantes)');
 const T = [[0, 0], [9, 0], [9, 3], [6, 3], [6, 8], [3, 8], [3, 3], [0, 3]];
 r = await drawRoof('T-quatro-aguas', T, 'hip');
 check(r.length === 1, 'telhado em T criado');

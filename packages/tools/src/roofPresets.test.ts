@@ -33,16 +33,13 @@ describe('telhado nunca some (A12): criação', () => {
     expect(roofProblem(ctx.store.project, [{ ...r, order: 0 }])).toMatch(/nenhuma aresta define inclinação/);
   });
 
-  it('L com duas águas: cria e tem águas', () => {
+  it('L com duas águas: o esqueleto não fecha nos cantos reentrantes, então avisa e não cria', () => {
     const ctx = roofCtx('poly', 'gable');
     const t = tool('roof', ctx.env);
     for (const q of L) clickAt(t, q.x, q.y);
     clickAt(t, 0, 0);
-    expect(roofs(ctx.store.project)).toHaveLength(1);
-    const res = resolveRoofs(ctx.store.project, 'lv_0')[0]!;
-    expect(res.planes.length).toBeGreaterThan(0);
-    expect(res.problem).toBeUndefined();
-    expect(ctx.msgs.at(-1)).toMatch(/Telhado criado/);
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toMatch(/esqueleto não fecha em \(/);
   });
 
   it('L com quatro águas (todas as arestas definem): cria com 6 águas', () => {

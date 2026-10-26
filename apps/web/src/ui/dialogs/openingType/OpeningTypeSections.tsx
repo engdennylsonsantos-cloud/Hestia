@@ -1,7 +1,9 @@
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useDeferredValue, useState, type ReactElement, type ReactNode } from 'react';
 import {
   OPENING_FRAME_DEFAULTS,
   openingCasing,
+  openingHandle,
+  openingLeafStyle,
   openingLintel,
   openingSillBeam,
   openingSillBoard,
@@ -11,6 +13,7 @@ import {
 } from '@hestia/model';
 import { Check, NumField, TextField } from '../../fields.tsx';
 import { alternarAcabamento, alternarSidelight, alternarTransom } from '../openingTypeForm.ts';
+import { OpeningTypeThumb } from './OpeningTypeThumb.tsx';
 
 interface OpeningTypeSectionsProps {
   d: OpeningType;
@@ -54,9 +57,43 @@ const FIELD_FRAME = [
   ['block', 'Bloco (sem perfil)'],
 ] as const;
 
+/** Galeria de escolhas com a elevação em miniatura gerada pelo mesmo caminho da prévia (projeto mínimo + seção). */
+function Miniaturas<T extends string>({
+  value,
+  options,
+  onPick,
+  preview,
+}: {
+  value: T;
+  options: ReadonlyArray<readonly [T, string]>;
+  onPick: (v: T) => void;
+  preview: (v: T) => OpeningType;
+}): ReactElement {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, margin: '2px 0 6px 0' }}>
+      {options.map(([v, label]) => (
+        <button
+          key={v}
+          type="button"
+          className={`btn small${v === value ? ' primary' : ''}`}
+          title={label}
+          aria-label={label}
+          aria-pressed={v === value}
+          style={{ width: 52, height: 36, padding: 1, overflow: 'hidden' }}
+          onClick={() => onPick(v)}
+        >
+          <OpeningTypeThumb type={preview(v)} width={52} height={34} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** As sete seções recolhíveis do diálogo, na ordem da decisão 0034. */
 export function OpeningTypeSections({ d, onChange, families, family, leaves, materials }: OpeningTypeSectionsProps): ReactElement {
   const set = (patch: Partial<OpeningType>): void => onChange({ ...d, ...patch });
+  // As miniaturas são caras: o React atualiza o tipo adiado sem segurar a digitação nos campos.
+  const thumbnailType = useDeferredValue(d);
   const setTexto = (campo: 'code' | 'description' | 'manufacturer' | 'fireRating', v: string): void => {
     set({ [campo]: v === '' ? undefined : v });
   };
@@ -88,6 +125,12 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
             {FIELD_LEAF.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </div>
+        <Miniaturas
+          value={openingLeafStyle(d)}
+          options={FIELD_LEAF}
+          onPick={(v) => set({ leafStyle: v })}
+          preview={(v) => ({ ...thumbnailType, leafStyle: v })}
+        />
         <div className="field-row">
           <label htmlFor="op-leaves">Folhas</label>
           <select id="op-leaves" className="select" value={d.leaves} disabled={leaves.length <= 1} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
@@ -107,6 +150,12 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
             {FIELD_HANDLE.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </div>
+        <Miniaturas
+          value={openingHandle(d)}
+          options={FIELD_HANDLE}
+          onPick={(v) => set({ handle: v })}
+          preview={(v) => ({ ...thumbnailType, handle: v })}
+        />
         <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={d.angle2d ?? 90} decimals={0} unit="°" onCommit={(v) => set({ angle2d: v })} /></div>
         <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={d.angle3d ?? (family?.id === 'window_casement' || family?.id === 'window_tilt' ? 30 : 90)} decimals={0} unit="°" onCommit={(v) => set({ angle3d: v })} /></div>
         <div className="field-row"><label htmlFor="op-transom" title="Vidro fixo acima da folha">Bandeira superior</label><Check id="op-transom" checked={temBandeira} onChange={(v) => onChange(alternarTransom(d, v))} /></div>

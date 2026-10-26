@@ -1,8 +1,11 @@
-import type { ReactElement } from 'react';
-import type { OpeningFamily } from '@hestia/model';
-import type { OpeningVariant } from '../openingTypeForm.ts';
+import { useDeferredValue, type ReactElement } from 'react';
+import type { OpeningFamily, OpeningType } from '@hestia/model';
+import { applyVariant, type OpeningVariant } from '../openingTypeForm.ts';
+import { OpeningTypeThumb } from './OpeningTypeThumb.tsx';
 
 interface OpeningTypeLibraryProps {
+  /** Tipo em edição: a miniatura de cada variante é a elevação dele com a variante aplicada. */
+  type: OpeningType;
   families: readonly OpeningFamily[];
   familyId: string | null;
   /** Quantidade de tipos do projeto em cada família. */
@@ -16,9 +19,10 @@ interface OpeningTypeLibraryProps {
 
 /**
  * Coluna da biblioteca: árvore das famílias da categoria (com a contagem de tipos do projeto) e grade de variantes.
- * A miniatura desenhada de cada variante fica reservada em `.th` (parte B).
+ * A miniatura de cada variante é a elevação do tipo pelo mesmo caminho da prévia (projeto mínimo + seção).
  */
 export function OpeningTypeLibrary({
+  type,
   families,
   familyId,
   counts,
@@ -28,6 +32,8 @@ export function OpeningTypeLibrary({
   onFamily,
   onVariant,
 }: OpeningTypeLibraryProps): ReactElement {
+  // Miniaturas adiadas: a lista acompanha a edição sem refazer a elevação a cada tecla.
+  const previewType = useDeferredValue(type);
   return (
     <aside className="op-lib" aria-label="Biblioteca de tipos" data-collapsed={open ? undefined : 'true'}>
       <div className="op-lib-head">
@@ -63,7 +69,9 @@ export function OpeningTypeLibrary({
           <div className="op-variants">
             {variants.map((v) => (
               <button key={v.id} type="button" className="op-variant" title={v.name} onClick={() => onVariant(v)}>
-                <span className="th" aria-hidden="true" />
+                <span className="th" aria-hidden="true">
+                  <OpeningTypeThumb type={applyVariant(previewType, v)} width={96} height={48} />
+                </span>
                 <span className="op-variant-name">{v.name}</span>
               </button>
             ))}

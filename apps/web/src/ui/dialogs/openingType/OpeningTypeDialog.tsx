@@ -6,6 +6,7 @@ import {
   openingAngle2d,
   openingFamilyOf,
   openingFavorites,
+  openingLineConvention,
   type Id,
   type Opening,
   type OpeningType,
@@ -165,6 +166,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
         />
         <div className={`op-main${libOpen ? '' : ' lib-off'}`}>
           <OpeningTypeLibrary
+            type={d}
             families={families}
             familyId={family?.id ?? null}
             counts={counts}
@@ -189,6 +191,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
             angle={previewAngle}
             onAngle={setPreviewAngle}
             checks={checks}
+            openingLine={openingLineConvention(p)}
           />
         </div>
       </div>

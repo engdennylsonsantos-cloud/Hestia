@@ -52,7 +52,7 @@ describe('holeMarkOps (X do furo de piso e laje)', () => {
   });
 
   it('o X usa a largura de projeção da categoria e a cor secundária', () => {
-    const ops = holeMarkOps(quadHole, LIGHT, { ...paint, projPx: 0.7 }, 'fine');
+    const ops = holeMarkOps(quadHole, LIGHT, { ...paint, proj: { widthPx: 0.7 } }, 'fine');
     expect(ops.every((o) => o.widthPx === 0.7 && o.color === LIGHT.inkSoft)).toBe(true);
   });
 });

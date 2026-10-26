@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { multiArea, type Vec2 } from '@hestia/geom';
 import { resolveLevel, resolveRoofs, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeRoof, makeWall, type DetailLevel, type Project } from '@hestia/model';
@@ -42,7 +43,7 @@ function gable(extra: Partial<ResolvedRoof> = {}): ResolvedRoof {
 }
 
 const ops = (rs: ResolvedRoof[], detail: DetailLevel = 'medium', zoom = 100, dark = false, p: Project = createEmptyProject()) =>
-  roofOps(rs, p, dark ? DARK : LIGHT, dark, detail, VIEW(zoom));
+  resolverZoom(roofOps(rs, p, dark ? DARK : LIGHT, dark, detail, VIEW(zoom)), zoom);
 
 function projectWithRoof(showTags = false): Project {
   const s = new ProjectStore(createEmptyProject());

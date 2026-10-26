@@ -1,12 +1,13 @@
 import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { sampleChain, spiralParamsOf, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
-import { isStair, paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
+import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
-import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
-import type { PlanTheme, StrokeOp } from './types.ts';
+import { tracoEm } from './marcadores.ts';
+import { defaultPaint, espessuraDeCorte, espessuraDeProjecao, surfaceColor, type PlanPaint } from './style.ts';
+import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
 /**
  * Cota de corte padrão, em m acima da base do lance (1,20 m, como o corte padrão do intervalo de vista). A planta usa a
@@ -63,9 +64,16 @@ export interface StairCut {
   walk: Vec2;
   /** Sentido do corte, perpendicular à caminhada. */
   across: Vec2;
-  /** Meia-largura do símbolo (m): meia largura do lance mais um pequeno avanço de cada lado. */
+  /** Meia-largura do símbolo (m): meia largura do lance mais um pequeno avanço de cada lado (`AVANCO_CORTE_PX` em pixels). */
   half: number;
 }
+
+/** Avanço do símbolo de corte além de cada lado do lance, em pixels de tela. */
+export const AVANCO_CORTE_PX = 8;
+/** Amplitude dos dentes do símbolo de corte, em pixels de tela. */
+const DENTE_CORTE_PX = 4;
+/** Comprimento da ponta da seta de subida, em pixels de tela. */
+const PONTA_SETA_PX = 7;
 
 const chord = (r: ResolvedStairRiser): number => dist(r.a, r.b);
 
@@ -75,6 +83,12 @@ const chord = (r: ResolvedStairRiser): number => dist(r.a, r.b);
  * tem dois espelhos): o símbolo de corte só aparece onde o plano cruza a escada.
  */
 export function stairCut(s: ResolvedStair, risers: ResolvedStairRiser[], zoom: number, cutZ: number = s.baseZ + STAIR_CUT_HEIGHT): StairCut | null {
+  const c = stairCutBase(s, risers, cutZ);
+  return c ? { ...c, half: c.half + AVANCO_CORTE_PX / zoom } : null;
+}
+
+/** Corte da escada sem o avanço em pixels: `half` é só a meia largura do lance (m). O avanço o desenho aplica em pixels. */
+export function stairCutBase(s: ResolvedStair, risers: ResolvedStairRiser[], cutZ: number = s.baseZ + STAIR_CUT_HEIGHT): StairCut | null {
   const mids = risers.map((r) => polyMid(riserPoints(r)));
   for (let i = 0; i + 1 < risers.length; i++) {
     const h0 = (risers[i]!.z0 + risers[i]!.z1) / 2;
@@ -84,21 +98,26 @@ export function stairCut(s: ResolvedStair, risers: ResolvedStairRiser[], zoom: n
     if (dist(mids[i + 1]!, mids[i]!) < 1e-9) return null;
     const walk = norm(walkVec);
     const width = (chord(risers[i]!) + chord(risers[i + 1]!)) / 2;
-    return { at: lerp(mids[i]!, mids[i + 1]!, (cutZ - h0) / (h1 - h0)), walk, across: perp(walk), half: width / 2 + 8 / zoom };
+    return { at: lerp(mids[i]!, mids[i + 1]!, (cutZ - h0) / (h1 - h0)), walk, across: perp(walk), half: width / 2 };
   }
   return null;
 }
 
-/** Símbolo de corte: zigue-zague curto que cruza a caminhada na cota de corte (oito dentes), na espessura `widthPx`. */
-function cutSymbol(c: StairCut, zoom: number, color: string, widthPx: number): StrokeOp {
+/**
+ * Símbolo de corte: zigue-zague curto que cruza a caminhada na cota de corte (oito dentes), na espessura dada. A meia
+ * largura do lance fica em metros; o avanço de 8 px de cada lado e os dentes de 4 px são marcadores em pixels.
+ */
+function cutSymbol(c: StairCut, color: string, espessura: Espessura): StrokeOp {
   const teeth = 8;
-  const amp = 4 / zoom;
   const pts: Vec2[] = [];
+  const deslocamentoPx: Vec2[] = [];
   for (let j = 0; j <= teeth; j++) {
     const s = -c.half + (2 * c.half * j) / teeth;
-    pts.push(add(add(c.at, mul(c.across, s)), mul(c.walk, j % 2 === 0 ? -amp : amp)));
+    const sPx = -AVANCO_CORTE_PX + (2 * AVANCO_CORTE_PX * j) / teeth;
+    pts.push(add(c.at, mul(c.across, s)));
+    deslocamentoPx.push(add(mul(c.across, sPx), mul(c.walk, j % 2 === 0 ? -DENTE_CORTE_PX : DENTE_CORTE_PX)));
   }
-  return { pts, closed: false, widthPx, color, alpha: 1 };
+  return { pts, closed: false, deslocamentoPx, ...espessura, color, alpha: 1 };
 }
 
 /**
@@ -121,28 +140,27 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
   return out;
 }
 
-/** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px no último espelho, na espessura `widthPx`. */
-function climbArrow(pts: Vec2[], zoom: number, color: string, widthPx: number): StrokeOp[] {
+/** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px (marcador em pixels) no último espelho, na espessura dada. */
+function climbArrow(pts: Vec2[], color: string, espessura: Espessura): StrokeOp[] {
   if (pts.length < 2) return [];
   const tip = pts[pts.length - 1]!;
   const back = mul(norm(sub(tip, pts[pts.length - 2]!)), -1);
-  const head = 7 / zoom;
-  const wing = (a: number): Vec2 => add(tip, mul(rotate(back, a), head));
-  const style = { widthPx, color, alpha: 0.9 };
+  const wing = (a: number): Vec2 => mul(rotate(back, a), PONTA_SETA_PX);
+  const style = { ...espessura, color, alpha: 0.9 };
   return [
     { pts, closed: false, ...style },
-    { pts: [wing(Math.PI / 6), tip, wing(-Math.PI / 6)], closed: false, ...style },
+    { ...tracoEm(tip, [wing(Math.PI / 6), { x: 0, y: 0 }, wing(-Math.PI / 6)], false), ...style },
   ];
 }
 
 /** Contorno de um degrau ou patamar (linha fina, `widthPx`): tracejado quando o topo fica acima da cota de corte. */
-function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number, widthPx: number): StrokeOp {
+function outlineOps(polygon: Vec2[], z: number, color: string, cutZ: number, espessura: Espessura): StrokeOp {
   const above = z > cutZ + 1e-9;
-  return { pts: polygon, closed: true, widthPx, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
+  return { pts: polygon, closed: true, ...espessura, color, alpha: 1, ...(above ? { dash: STAIR_DASH } : {}) };
 }
 
-/** Desloca a etiqueta para um lado da seta (perpendicular ao primeiro trecho), para não cruzar a linha. */
-const beside = (u: Vec2, px: number): { dx: number; dy: number } => ({ dx: -px * u.y, dy: -px * u.x });
+/** Desloca a etiqueta `mm` de papel para um lado da seta (perpendicular ao primeiro trecho), para não cruzar a linha. */
+const beside = (u: Vec2, mm: number, escala: number): PapelRotulo => ({ escala, desvio: { mm, ux: -u.y, uy: -u.x } });
 
 /** Lados do círculo do poste de caracol (decisão 0014 §1 item 9): entre 24 e 48. Planta e DXF usam o mesmo. */
 export const SPIRAL_POST_SIDES = 48;
@@ -226,7 +244,7 @@ function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, Spir
   for (const sp of spirals.values()) {
     const ring = spiralPostRing(sp.center, sp.rInner);
     if (!above && s.type.runStyle === 'post') out.fills.push({ polygons: [[ring]], color, alpha: 1 });
-    out.strokes.push(outlineOps(ring, s.baseZ, lineColor, cutZ, paint.projPx));
+    out.strokes.push(outlineOps(ring, s.baseZ, lineColor, cutZ, espessuraDeProjecao(paint)));
   }
   return out;
 }
@@ -256,9 +274,8 @@ export function stairFills(
   scale = 100,
 ): FloorOps {
   const out = empty();
-  const fontPx = paperMmToPx(STAIR_TEXT_MM, v.zoom, scale);
-  const tagFontPx = paperMmToPx(STAIR_TAG_MM, v.zoom, scale);
-  const besidePx = paperMmToPx(STAIR_SOBE_OFFSET_MM, v.zoom, scale);
+  const corte = espessuraDeCorte(paint);
+  const projecao = espessuraDeProjecao(paint);
   const fillBase = dark ? theme.bg : '#ffffff';
   const lineColor = mix(theme.ink, fillBase, 0.35);
   for (const s of stairs) {
@@ -282,31 +299,31 @@ export function stairFills(
     for (const st of steps) {
       const fill = st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
-      out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, paint.projPx));
+      out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, projecao));
     }
     out.fills.push(...post.fills);
     out.strokes.push(...post.strokes);
     const risers = risersInClimbOrder(s).filter((r) => r.z1 <= topZ + 1e-9);
-    for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, widthPx: paint.cutPx, color: theme.ink, alpha: 1 });
+    for (const r of risers) out.strokes.push({ pts: riserPoints(r), closed: false, ...corte, color: theme.ink, alpha: 1 });
     const walk = climbWalk(p, s, risers);
-    out.strokes.push(...climbArrow(walk, v.zoom, theme.ink, paint.cutPx));
+    out.strokes.push(...climbArrow(walk, theme.ink, corte));
     if (walk.length >= 2) {
       const u = norm(sub(walk[1]!, walk[0]!));
-      out.labels.push({ at: walk[0]!, text: 'SOBE', ...beside(u, besidePx), fontPx });
+      out.labels.push({ at: walk[0]!, text: 'SOBE', papel: { ...beside(u, STAIR_SOBE_OFFSET_MM, scale), fontMm: STAIR_TEXT_MM } });
     }
-    const cut = stairCut(s, risers, v.zoom, cutZ);
-    if (cut) out.strokes.push(cutSymbol(cut, v.zoom, theme.ink, paint.cutPx));
+    const cut = stairCutBase(s, risers, cutZ);
+    if (cut) out.strokes.push(cutSymbol(cut, theme.ink, corte));
     if (detail === 'fine') {
       // Só os degraus dentro do topo da vista: os de cima não saem, nem o rótulo (decisão 0013 §4).
       for (const st of steps) {
         if (st.kind !== 'tread') continue;
         const at = treadLabelAt(st, steps, spirals);
-        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), fontPx, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
+        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
       }
     }
     if (p.settings.showTags) {
       const at = labelPoint(s.footprint);
-      if (at) out.labels.push({ at, text: s.type.code, fontPx: tagFontPx });
+      if (at) out.labels.push({ at, text: s.type.code, papel: { escala: scale, fontMm: STAIR_TAG_MM } });
     }
   }
   return out;

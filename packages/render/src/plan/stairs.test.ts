@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import type { ResolvedStairStep } from '@hestia/engine';
@@ -18,7 +19,7 @@ const VIEW: Viewport = { cx: 0.5, cy: 1.5, zoom: ZOOM, width: 800, height: 600 }
 const PROJECT: Project = createEmptyProject();
 
 const stair = () => straightStair({ risers: N, tread: P, riserH: H, width: 1 });
-const ops = (detail: DetailLevel = 'medium', s = stair()) => stairFills(PROJECT, [s], LIGHT, false, detail, VIEW);
+const ops = (detail: DetailLevel = 'medium', s = stair()) => resolverZoom(stairFills(PROJECT, [s], LIGHT, false, detail, VIEW), VIEW.zoom);
 
 /** Linhas de espelho: abertas, de dois pontos, sem tracejado (o único tipo de traço com 2 pontos). */
 const risersOf = (strokes: ReturnType<typeof ops>['strokes']) => strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === RISER_PX);

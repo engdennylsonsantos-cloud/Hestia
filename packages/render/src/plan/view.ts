@@ -34,7 +34,7 @@ import {
 import { roofFootprint } from './roofs.ts';
 import { openingSymbol } from './symbols.ts';
 import { contextoDaVista, projetoDaJuncao } from './viewContext.ts';
-import type { PlanTheme, StrokeOp } from './types.ts';
+import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
 
 /** Estados de parede que a planta desenha só como contorno (fora do corte, dentro do intervalo). */
 type OutlineClass = 'projection-above' | 'projection-below' | 'beyond';
@@ -172,13 +172,14 @@ type OutlineStyle = Omit<StrokeOp, 'pts' | 'closed'>;
 /**
  * Contorno das paredes fora do corte (decisão 0013 §4): projeção acima do corte tracejada e fina; abaixo do corte e
  * "além", linha fina clara (a "além", mais clara ainda). Sem preenchimento. A parte que cai sobre a silhueta cortada já
- * saiu em `computePlanView`. `projPx`: largura de projeção da parede (decisão 0015 §2.1).
+ * saiu em `computePlanView`. `proj`: largura de projeção da parede (decisão 0015 §2.1), em papel ou em px.
  */
-export function wallOutlineOps(view: PlanView, theme: PlanTheme, projPx: number): StrokeOp[] {
+export function wallOutlineOps(view: PlanView, theme: PlanTheme, proj: number | Espessura): StrokeOp[] {
+  const e: Espessura = typeof proj === 'number' ? { widthPx: proj } : proj;
   const styles: Record<OutlineClass, OutlineStyle> = {
-    'projection-above': { widthPx: projPx, color: theme.inkSoft, alpha: 1, dash: [6, 3] },
-    'projection-below': { widthPx: projPx, color: theme.inkSoft, alpha: 0.8 },
-    beyond: { widthPx: projPx, color: theme.underlay, alpha: 0.9 },
+    'projection-above': { ...e, color: theme.inkSoft, alpha: 1, dash: [6, 3] },
+    'projection-below': { ...e, color: theme.inkSoft, alpha: 0.8 },
+    beyond: { ...e, color: theme.underlay, alpha: 0.9 },
   };
   const out: StrokeOp[] = [];
   for (const o of view.outlines) {
@@ -191,13 +192,13 @@ export function wallOutlineOps(view: PlanView, theme: PlanTheme, projPx: number)
  * Símbolo de uma abertura conforme o estado na vista (decisão 0013 §4). `cut`, ou sem classificação: símbolo normal, com
  * a espessura de corte. `projection-above` (peitoril acima do corte): tracejado sobre a parede inteira. `projection-below`
  * e `beyond`: símbolo leve, na cor de traço secundária. Os dois últimos e o tracejado usam a espessura de projeção.
- * `hidden`: nada. `widths` vem de `PlanPaint` da categoria (porta ou janela), em px de tela.
+ * `hidden`: nada. `widths` vem de `PlanPaint` da categoria (porta ou janela), com o peso de papel de cada espessura.
  */
-export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, theme: PlanTheme, widths: { cutPx: number; projPx: number }): StrokeOp[] {
+export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, theme: PlanTheme, widths: { cut: Espessura; proj: Espessura }): StrokeOp[] {
   if (cls === 'hidden') return [];
-  if (cls === 'projection-above') return openingSymbol(g, theme, widths.projPx).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
-  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft }, widths.projPx);
-  return openingSymbol(g, theme, widths.cutPx);
+  if (cls === 'projection-above') return openingSymbol(g, theme, widths.proj).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
+  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft }, widths.proj);
+  return openingSymbol(g, theme, widths.cut);
 }
 
 /**

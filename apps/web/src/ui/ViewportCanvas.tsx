@@ -14,6 +14,7 @@ import { CanvasContextMenu } from './CanvasContextMenu.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
+import { QuadroPlanta } from './quadroPlanta.ts';
 
 interface Pt {
   x: number;
@@ -31,10 +32,8 @@ export function ViewportCanvas(): ReactElement {
   const cpuRef = useRef<HTMLCanvasElement | null>(null);
   const plan = useRef(new PlanScene());
   const model = useRef(new ModelScene());
-  // Gancho de depuração (?debug=1): câmera orbital do 3D para os testes no navegador.
-  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3d?: unknown }).__hestia3d = model.current.orbit;
-  // Mesmo gancho para o e2e contar as peças da cena 3D (`scene`, o grupo com as malhas do modelo).
-  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) (window as unknown as { __hestia3dModel?: unknown }).__hestia3dModel = model.current;
+  // Ganchos de depuração (?debug=1): câmera orbital do 3D e a cena 3D (o e2e conta as peças do modelo).
+  if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) Object.assign(window, { __hestia3d: model.current.orbit, __hestia3dModel: model.current });
   const modelKey = useRef('');
   const montagem = useRef<Montagem3dProgressiva | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -48,6 +47,7 @@ export function ViewportCanvas(): ReactElement {
   const frame = useRef(0);
   const dprRef = useRef(1);
   const planFrame = useRef<PlanFrame | null>(null);
+  const quadroRef = useRef<QuadroPlanta | null>(null); // provisório na hora, exato depois da pintura (quadroPlanta.ts)
   const shownLabels = useRef<LabelOp[]>(NO_LABELS);
   const shownView = useRef<Viewport | null>(null);
 
@@ -88,7 +88,7 @@ export function ViewportCanvas(): ReactElement {
       }
       modelKey.current = '';
       // Troca de dispositivo (GPU ou CPU): a cena da planta começa do zero.
-      planFrame.current?.reset();
+      planFrame.current?.reset(); quadroRef.current?.invalidar();
       setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
       setReady(true);
       useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
@@ -143,7 +143,7 @@ export function ViewportCanvas(): ReactElement {
       if (key !== modelKey.current) {
         modelKey.current = key;
         // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
-        montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id));
+        montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id), (id) => editor.resolucaoPronta(id));
         montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
       }
       // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).
@@ -162,7 +162,7 @@ export function ViewportCanvas(): ReactElement {
     const pf = (planFrame.current ??= new PlanFrame(plan.current));
     // Vista de corte: a cena é refeita por inteiro (ver `PlanFrame`).
     if (st.view === 'section') {
-      pf.reset();
+      pf.reset(); quadroRef.current?.invalidar();
       const dl: PlanDrawList = buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] };
       if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); plan.current.setDrawList(dl, v); safeRender(g, plan.current.scene, plan.current.camera); }
       else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, dl, v, dpr);
@@ -171,13 +171,13 @@ export function ViewportCanvas(): ReactElement {
       return;
     }
     // Planta: pan e zoom mudam a câmera; geometria, sobreposição e grade só são refeitas quando a chave muda (PlanFrame).
-    const tool = editor.activeTool;
-    pf.update(planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: st.showGrid, showUnderlay: st.showUnderlay, showRoofProjection: st.showRoofProjection, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: tool.preview(), inference: tool.inference(), resolve: (id) => editor.resolved(id) }));
+    const quadro = (quadroRef.current ??= new QuadroPlanta({ provisorios: editor.provisorios, resolverReferencia: (id) => editor.resolved(id, false), pendente: (id) => editor.fluxo.pendente(id), pedirQuadro: () => useUi.setState((x) => ({ previewTick: x.previewTick + 1 })) }));
+    const extra = quadro.desenhar({ quadro: pf, cena: g ? plan.current : null, v, tema: theme, nivel: st.levelId, versao: editor.store.version, contexto: [dark, !!g, v.zoom, st.showUnderlay, st.showRoofProjection, st.showGrid].join('|'), atualizar: () => planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: st.showGrid, showUnderlay: st.showUnderlay, showRoofProjection: st.showRoofProjection, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: editor.activeTool.preview(), inference: editor.activeTool.inference(), resolve: quadro.resolver }) });
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
       safeRender(g, plan.current.scene, plan.current.camera);
-    } else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, pf.drawList(theme), v, dpr);
+    } else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, QuadroPlanta.comProvisorio(pf.drawList(theme), extra), v, dpr);
     publish(pf.labels, v);
     // Alinha a camada HTML de texto no mesmo requestAnimationFrame do canvas da planta.
     // Isso evita o atraso de um render React entre a câmera e o texto da cota durante pan/zoom.

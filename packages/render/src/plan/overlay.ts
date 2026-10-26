@@ -2,7 +2,7 @@ import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, typ
 import type { Guide, Inference, PreviewItem, StairTone } from '@hestia/tools';
 import { sectionMarkOps } from './sectionMarks.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
-import type { Viewport } from '../viewport.ts';
+import { cantosDoQuadrado, tracoEm } from './marcadores.ts';
 
 export interface Overlay {
   fills: FillOp[];
@@ -10,42 +10,40 @@ export interface Overlay {
   labels: LabelOp[];
 }
 
-const px = (v: Viewport, n: number): number => n / v.zoom;
+const P = (x: number, y: number): Vec2 => ({ x, y });
 
-function squareAt(c: Vec2, half: number): Vec2[] {
-  return [
-    { x: c.x - half, y: c.y - half },
-    { x: c.x + half, y: c.y - half },
-    { x: c.x + half, y: c.y + half },
-    { x: c.x - half, y: c.y + half },
-  ];
-}
+/** Meio lado do marcador de captura, em pixels de tela. */
+const CAPTURA_PX = 6;
 
-/** Marcador de captura: a forma diz qual regra foi usada (extremidade, meio, interseção…). */
-export function snapMarker(inf: Inference, v: Viewport, theme: PlanTheme): StrokeOp[] {
+/**
+ * Marcador de captura: a forma diz qual regra foi usada (extremidade, meio, interseção…). É um marcador em pixels
+ * ancorado no ponto capturado (ver `marcadores.ts`): tem o mesmo tamanho na tela para qualquer zoom.
+ */
+export function snapMarker(inf: Inference, theme: PlanTheme): StrokeOp[] {
   const c = inf.point;
-  const h = px(v, 6);
-  const mk = (pts: Vec2[], closed: boolean): StrokeOp => ({ pts, closed, widthPx: 2, color: theme.accent, alpha: 1 });
+  const h = CAPTURA_PX;
+  const mk = (offs: Vec2[], closed: boolean): StrokeOp => ({ ...tracoEm(c, offs, closed), widthPx: 2, color: theme.accent, alpha: 1 });
+  const fino = (offs: Vec2[]): StrokeOp => ({ ...tracoEm(c, offs, false), widthPx: 1.2, color: theme.accent, alpha: 0.9 });
   switch (inf.kind) {
     case 'endpoint':
-      return [mk(squareAt(c, h), true)];
+      return [mk(cantosDoQuadrado(h), true)];
     case 'face':
       // Canto de face: quadrado com ponto central (diferencia do extremo do eixo).
-      return [mk(squareAt(c, h), true), mk([{ x: c.x - h * 0.2, y: c.y }, { x: c.x + h * 0.2, y: c.y }], false)];
+      return [mk(cantosDoQuadrado(h), true), mk([P(-h * 0.2, 0), P(h * 0.2, 0)], false)];
     case 'core':
-      return [mk([{ x: c.x, y: c.y - h * 1.2 }, { x: c.x + h * 1.2, y: c.y }, { x: c.x, y: c.y + h * 1.2 }, { x: c.x - h * 1.2, y: c.y }], true)];
+      return [mk([P(0, -h * 1.2), P(h * 1.2, 0), P(0, h * 1.2), P(-h * 1.2, 0)], true)];
     case 'midpoint':
-      return [mk([{ x: c.x - h, y: c.y - h }, { x: c.x + h, y: c.y - h }, { x: c.x, y: c.y + h }], true)];
+      return [mk([P(-h, -h), P(h, -h), P(0, h)], true)];
     case 'intersection':
-      return [mk([{ x: c.x - h, y: c.y - h }, { x: c.x + h, y: c.y + h }], false), mk([{ x: c.x - h, y: c.y + h }, { x: c.x + h, y: c.y - h }], false)];
+      return [mk([P(-h, -h), P(h, h)], false), mk([P(-h, h), P(h, -h)], false)];
     case 'perpendicular':
-      return [mk([{ x: c.x - h, y: c.y + h }, { x: c.x - h, y: c.y - h }, { x: c.x + h, y: c.y - h }], false)];
+      return [mk([P(-h, h), P(-h, -h), P(h, -h)], false)];
     case 'nearest':
-      return [mk([{ x: c.x - h * 0.8, y: c.y - h }, { x: c.x + h * 0.8, y: c.y - h }, { x: c.x - h * 0.8, y: c.y + h }, { x: c.x + h * 0.8, y: c.y + h }], true)];
+      return [mk([P(-h * 0.8, -h), P(h * 0.8, -h), P(-h * 0.8, h), P(h * 0.8, h)], true)];
     case 'alignment':
-      return [mk([{ x: c.x - h * 0.7, y: c.y - h * 0.7 }, { x: c.x + h * 0.7, y: c.y + h * 0.7 }], false), mk([{ x: c.x - h * 0.7, y: c.y + h * 0.7 }, { x: c.x + h * 0.7, y: c.y - h * 0.7 }], false)];
+      return [mk([P(-h * 0.7, -h * 0.7), P(h * 0.7, h * 0.7)], false), mk([P(-h * 0.7, h * 0.7), P(h * 0.7, -h * 0.7)], false)];
     case 'grid':
-      return [{ pts: [{ x: c.x - h * 0.6, y: c.y }, { x: c.x + h * 0.6, y: c.y }], closed: false, widthPx: 1.2, color: theme.accent, alpha: 0.9 }, { pts: [{ x: c.x, y: c.y - h * 0.6 }, { x: c.x, y: c.y + h * 0.6 }], closed: false, widthPx: 1.2, color: theme.accent, alpha: 0.9 }];
+      return [fino([P(-h * 0.6, 0), P(h * 0.6, 0)]), fino([P(0, -h * 0.6), P(0, h * 0.6)])];
     default:
       return [];
   }
@@ -122,7 +120,7 @@ export function toneColor(tone: StairTone | undefined, theme: PlanTheme): string
 }
 
 /** Pré-visualização da ferramenta ativa. Itens com tom (escada) usam a cor do tom; os demais, a de destaque. */
-export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanTheme, highlight: (ids: string[]) => FillOp[]): Overlay {
+export function previewOverlay(items: PreviewItem[], theme: PlanTheme, highlight: (ids: string[]) => FillOp[]): Overlay {
   const o: Overlay = { fills: [], strokes: [], labels: [] };
   for (const it of items) {
     switch (it.kind) {
@@ -154,13 +152,13 @@ export function previewOverlay(items: PreviewItem[], v: Viewport, theme: PlanThe
         o.labels.push({ at: it.at, text: it.text, dx: 10, dy: -14, tone: 'accent' });
         break;
       case 'point':
-        o.strokes.push({ pts: squareAt(it.at, px(v, 3)), closed: true, widthPx: 1.5, color: theme.accent, alpha: 1 });
+        o.strokes.push({ ...tracoEm(it.at, cantosDoQuadrado(3), true), widthPx: 1.5, color: theme.accent, alpha: 1 });
         break;
       case 'highlight':
         o.fills.push(...highlight(it.ids));
         break;
       case 'sectionLine': {
-        const m = sectionMarkOps(it, v, theme);
+        const m = sectionMarkOps(it, theme);
         o.fills.push(...m.fills);
         o.strokes.push(...m.strokes);
         o.labels.push(...m.labels);

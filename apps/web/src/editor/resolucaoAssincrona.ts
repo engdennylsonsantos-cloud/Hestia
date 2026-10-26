@@ -168,6 +168,21 @@ export class ResolucaoProgressiva {
     return this.prontos.get(id)?.nivel ?? null;
   }
 
+  /**
+   * Põe um resultado já conhecido como pronto do nível (ex.: restaurado do cache de geometria na abertura). Não mexe no
+   * nível em voo nem no calculado na hora. Devolve false se não coube (nível em voo, já pronto ou calculado).
+   */
+  semear(id: Id, valor: ResolvedLevel): boolean {
+    if (!this.projeto || this.voo?.nivel === id || this.sincronos.has(id) || this.prontos.get(id)?.nivel) return false;
+    const e: Pronto = this.prontos.get(id) ?? {};
+    e.nivel = valor;
+    this.prontos.set(id, e);
+    this.anteriores.set(id, { versao: this.versaoProjeto, valor });
+    this.versaoResolucao++;
+    this.avisar();
+    return true;
+  }
+
   /** Junções de um nível, se já estiverem prontas em segundo plano (senão `null`). */
   juncoes(id: Id): JunctionLevel | null {
     return this.prontos.get(id)?.juncoes ?? null;

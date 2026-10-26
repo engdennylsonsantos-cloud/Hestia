@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { resolveLevel, resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type Project } from '@hestia/model';
 import { buildPlanDrawList, type PlanInput } from './build.ts';
@@ -48,7 +49,7 @@ describe('ambiente na planta (D1, E3)', () => {
 
   it('desenha o preenchimento e a etiqueta do ambiente, com a área do circuito (4 × 6 menos as paredes)', () => {
     const p = sala();
-    const ops = roomOps(p, 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, defaultPaint('room', 100));
+    const ops = resolverZoom(roomOps(p, 'lv_0', LIGHT, false, 'fine', 100, undefined, defaultPaint('room', 100)), 50);
     expect(ops.fills).toHaveLength(1);
     expect(ops.labels).toHaveLength(1);
     expect(ops.labels[0]!.fontPx).toBeGreaterThan(0);
@@ -62,17 +63,17 @@ describe('ambiente na planta (D1, E3)', () => {
   it('ambiente oculto ou sem circuito não é desenhado', () => {
     const p = sala();
     const paint = defaultPaint('room', 100);
-    expect(roomOps(p, 'lv_0', LIGHT, false, 'fine', 50, 100, new Set(['r1']), paint).fills).toHaveLength(0);
+    expect(roomOps(p, 'lv_0', LIGHT, false, 'fine', 100, new Set(['r1']), paint).fills).toHaveLength(0);
     const aberto = sala('Sala', '101', { point: P(20, 20) });
-    expect(roomOps(aberto, 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills).toHaveLength(0);
+    expect(roomOps(aberto, 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills).toHaveLength(0);
   });
 
   it('cor própria do ambiente substitui o padrão; no tema escuro o preenchimento muda', () => {
     const paint = defaultPaint('room', 100);
-    const claro = roomOps(sala('Sala', '101', { color: '#ff0000' }), 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills[0]!.color;
-    const escuro = roomOps(sala(), 'lv_0', DARK, true, 'fine', 50, 100, undefined, paint).fills[0]!.color;
+    const claro = roomOps(sala('Sala', '101', { color: '#ff0000' }), 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills[0]!.color;
+    const escuro = roomOps(sala(), 'lv_0', DARK, true, 'fine', 100, undefined, paint).fills[0]!.color;
     expect(claro).toMatch(/^#/);
-    expect(claro).not.toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', 50, 100, undefined, paint).fills[0]!.color);
+    expect(claro).not.toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills[0]!.color);
     expect(escuro).not.toBe(claro);
   });
 

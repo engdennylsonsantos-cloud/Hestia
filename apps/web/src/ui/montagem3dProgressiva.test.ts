@@ -222,4 +222,29 @@ describe('Montagem3dProgressiva: resultado igual à montagem completa', () => {
       expect(parcial.orbit.sceneRadius).toBe(cheia.orbit.sceneRadius);
     }, 120_000);
   }
+
+  it('caminho pronto (resolução já em segundo plano) dá a mesma cena final que o caminho com resolução', () => {
+    const p = projetoComPavimentos(20);
+    const ids = p.levels.map((l) => l.id);
+    const prontos = new LevelResolveCache();
+    const niveisProntos = new Map(ids.map((id) => [id, prontos.get(p, id)] as const));
+
+    const cheia = new ModelScene();
+    cheia.update(p, ids.map((id) => niveisProntos.get(id)!), OPT);
+
+    const comPronto = new ModelScene();
+    const fila = filaManual();
+    const m = new Montagem3dProgressiva({
+      cena: { update: (proj, niveis, o) => comPronto.update(proj, niveis, o) },
+      // Sem `resolver` útil: se a montagem calculasse algum nível, o teste acusaria a volta do cálculo na hora.
+      fonte: { resolver: () => { throw new Error('não devia calcular: o nível já está pronto'); }, pronto: (id) => niveisProntos.get(id) ?? null },
+      aoAtualizar: () => undefined,
+      aoConcluir: () => undefined,
+      agendar: fila.agendar,
+    });
+    m.iniciar(p, OPT, 'pav_10');
+    fila.rodar();
+
+    expect(assinatura(comPronto)).toEqual(assinatura(cheia));
+  }, 120_000);
 });

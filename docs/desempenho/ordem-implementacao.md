@@ -125,3 +125,24 @@ Cada etapa só entra com medição antes e depois. Etapas 2 a 6 podem rodar em p
 | Clique 3D | 49 | 57 |
 
 Atenção: a medição foi feita com 19 processos node ativos na máquina (restos de subagentes). Pan e zoom subiram em relação à onda 5, o que provavelmente é carga. Repetir com a máquina limpa antes de comparar.
+
+## Resultado da onda 7 (branch de integração, 2026-10-26, 20 pavimentos)
+
+Medição: `scripts/perf-baselines/browser-20-pav-2026-10-26-integrado.json` (mediana, ms).
+
+| Medida | Etapa 0 | Integrado |
+|---|---|---|
+| Abrir projeto | 408 | 311 |
+| Planta do nível do meio | 75 | 62 |
+| Seleção | 21 | 12 |
+| Editar parede | 135 | 44 |
+| Porta na parede | 227 | 17 |
+| Janela na parede | 237 | 16 |
+| Parede nova | 242 | 16 |
+| Pan | 53 | 34 |
+| Zoom | 29 | 22 |
+| Clique 3D | 57 | 35 |
+
+Entregas: edição na tela (provisório imediato), abertura com cache e resolução pronta, 3D com caixas instanciadas (picking e silhueta provados em Node), zoom da planta sem recriar geometria (imagem igual nos zooms 12, 60 e 220), cache de cortadores pela chave do conteúdo, pesos de papel no shader.
+
+Ainda abertos: abertura de 20 pavimentos (311 ms, meta 300 ms); pisos, lajes, telhados e escadas seguem como geometria; verificação visual no navegador; cortes por recorte na GPU (etapa 5); WebGPU e WASM (etapas 7 e 8), só se a medição pedir.

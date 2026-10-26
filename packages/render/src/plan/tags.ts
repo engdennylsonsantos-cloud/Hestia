@@ -1,9 +1,9 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingType, paperMmToPx, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
+import { openingType, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { aberturasDaParede } from './resolucao.ts';
-import type { LabelOp } from './types.ts';
-import type { PlanPaint } from './style.ts';
+import type { LabelOp, StrokeOp } from './types.ts';
+import { espessuraDeProjecao, type PlanPaint } from './style.ts';
 
 /** Medidas em mm de papel (anotação, decisão 0019). */
 const TAG_TEXT_MM = 1.6;
@@ -33,11 +33,10 @@ function longestFree(lo: number, hi: number, blocked: Array<[number, number]>): 
  * do eixo, deslocado ao longo da parede para não cair sobre um vão (com folga do tamanho do texto). A fonte segue
  * a categoria 'anotação' (visibilidade e tamanho em mm de papel).
  */
-export function wallTagLabels(p: Project, levelId: Id, zoom: number, paint: PlanPaint, scale: number, hidden?: ReadonlySet<Id>): LabelOp[] {
+export function wallTagLabels(p: Project, levelId: Id, paint: PlanPaint, scale: number, hidden?: ReadonlySet<Id>): LabelOp[] {
   const out: LabelOp[] = [];
   if (!paint.visible) return out;
   const mPerMm = scale / 1000;
-  const fontPx = paperMmToPx(TAG_TEXT_MM, zoom, scale);
   const halfPad = PAD_MM * mPerMm;
   const chW = CHAR_W_MM * mPerMm;
   for (const f of levelFrames(p, levelId)) {
@@ -52,13 +51,13 @@ export function wallTagLabels(p: Project, levelId: Id, zoom: number, paint: Plan
     const span = longestFree(0, f.length, blocked);
     if (!span) continue;
     const t = (span[0] + span[1]) / 2;
-    out.push({ at: pointAt(f, t, f.sMid), text: code, dy: -paperMmToPx(TAG_DY_MM, zoom, scale), fontPx });
+    out.push({ at: pointAt(f, t, f.sMid), text: code, papel: { escala: scale, fontMm: TAG_TEXT_MM, desvio: { mm: TAG_DY_MM, uy: -1 } } });
   }
   return out;
 }
 
-/** Rótulo de anotação (cota ou texto, decisão 0019): centrado em `at`, na fonte e na rotação do papel. */
-export const noteLabel = (at: Vec2, text: string, fontPx: number, rotation: number): LabelOp => ({ at, text, fontPx, rotation, center: true });
+/** Rótulo de anotação (cota ou texto, decisão 0019): centrado em `at`, na fonte (mm de papel) e na rotação do papel. */
+export const noteLabel = (at: Vec2, text: string, fontMm: number, escala: number, rotation: number): LabelOp => ({ at, text, rotation, center: true, papel: { escala, fontMm } });
 
 /** Valor associativo de uma etiqueta: consultas ao tipo/anfitrião são resolvidas de novo a cada quadro do projeto. */
 export function elementTagText(p: Project, tag: ElementTag): string {
@@ -106,17 +105,17 @@ function tagAnchor(p: Project, tag: ElementTag): Vec2 | null {
 }
 
 /** Etiquetas persistentes da vista: rótulo e líder acompanham a posição do elemento associado. */
-export function elementTagOps(p: Project, levelId: Id, zoom: number, paint: PlanPaint, scale: number): { labels: LabelOp[]; strokes: Array<{ pts: Vec2[]; closed: false; widthPx: number; color: string; alpha: number }> } {
+export function elementTagOps(p: Project, levelId: Id, paint: PlanPaint, scale: number): { labels: LabelOp[]; strokes: StrokeOp[] } {
   const labels: LabelOp[] = [];
-  const strokes: Array<{ pts: Vec2[]; closed: false; widthPx: number; color: string; alpha: number }> = [];
+  const strokes: StrokeOp[] = [];
   if (!paint.visible) return { labels, strokes };
   const color = paint.color ?? '#16181c';
   for (const tag of p.levels.find((l) => l.id === levelId)?.tags ?? []) {
     const text = elementTagText(p, tag);
     if (!text) continue;
     const anchor = tagAnchor(p, tag);
-    if (tag.leader && anchor) strokes.push({ pts: [anchor, tag.at], closed: false, widthPx: paint.projPx, color, alpha: 1 });
-    labels.push({ at: tag.at, text, fontPx: paperMmToPx(TAG_TEXT_MM, zoom, scale), center: true, rotation: tag.orientation === 'vertical' ? 90 : 0 });
+    if (tag.leader && anchor) strokes.push({ pts: [anchor, tag.at], closed: false, ...espessuraDeProjecao(paint), color, alpha: 1 });
+    labels.push(noteLabel(tag.at, text, TAG_TEXT_MM, scale, tag.orientation === 'vertical' ? 90 : 0));
   }
   return { labels, strokes };
 }

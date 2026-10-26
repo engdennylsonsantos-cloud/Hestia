@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Viewport } from '../viewport.ts';
 import { PlanScene } from './gpuPlan.ts';
 import { hatchSegments, DOT_PX, HATCH_PX } from './hatch.ts';
+import { espessuraDePapel, larguraEmPx } from './espessura.ts';
 import { dashSegments, edges, montarLotesCamada } from './lotesGpu.ts';
 import { malhasNaOrdem, rasterizarCena, rasterizarMalhas, verticeEmulado } from './rasterSoftware.ts';
 import type { FillOp, PlanDrawList, StrokeOp } from './types.ts';
@@ -22,6 +23,8 @@ const TRACOS: StrokeOp[] = [
   { pts: [{ x: 0.5, y: 1 }, { x: 9.3, y: 2.2 }, { x: 12, y: 6 }], closed: false, widthPx: 3, color: '#222222', alpha: 1 },
   { pts: [{ x: 2, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 6 }, { x: 2, y: 6 }], closed: true, widthPx: 2, color: '#aa3300', alpha: 0.8, dash: [6, 3] },
   { pts: [{ x: 0, y: 8 }, { x: 14, y: 0 }], closed: false, widthPx: 1, color: '#0055aa', alpha: 0.9, dash: [4, 2] },
+  // Traço de papel (1 mm na escala 1:200): a espessura em px sai do zoom no shader (2,4 px no zoom 12, 12 px no 60).
+  { pts: [{ x: 1, y: 4.2 }, { x: 11, y: 6.9 }, { x: 12.5, y: 3.3 }], closed: false, ...espessuraDePapel(1, 60, 200), color: '#118822', alpha: 1 },
 ];
 
 const RETANGULO: FillOp = {
@@ -71,7 +74,8 @@ function tracosAntigos(strokes: readonly StrokeOp[], zoom: number, ordemBase: nu
   return strokes.map((s, i) => {
     const pos: number[] = [];
     const idx: number[] = [];
-    const w = s.widthPx / zoom;
+    // Largura do zoom: a do papel (com piso de 1 px) para o traço de papel, a de `widthPx` para o resto.
+    const w = larguraEmPx(s, zoom) / zoom;
     const trechos = s.dash ? dashSegments(s.pts, s.closed, s.dash[0] / zoom, s.dash[1] / zoom) : edges(s.pts, s.closed);
     for (const [p, q] of trechos) quadAntigo(pos, idx, p, q, w);
     return malhaReferencia(pos, idx, s.color, s.alpha, ordemBase + i);
@@ -167,7 +171,7 @@ describe('zoom só muda a câmera e o uniform (a geometria não é reconstruída
 });
 
 describe('imagem igual à da geometria antiga, em vários zooms', () => {
-  it.each([12, 40, 90])('zoom %s: fundo, hachura, traços sólidos e tracejados batem com a referência', (zoom) => {
+  it.each([12, 60, 220])('zoom %s: fundo, hachura, traços sólidos, tracejados e de papel batem com a referência', (zoom) => {
     const cena = new PlanScene();
     cena.setDrawList(listaDeTeste(), vista(zoom));
     const imagem = rasterizarCena(cena, vista(zoom), W, H);
@@ -181,7 +185,7 @@ describe('imagem igual à da geometria antiga, em vários zooms', () => {
   it('a mesma cena, vista em três zooms sem refazer a geometria, dá a imagem de cada zoom', () => {
     const cena = new PlanScene();
     cena.setDrawList(listaDeTeste(), vista(12));
-    for (const zoom of [12, 40, 90]) {
+    for (const zoom of [12, 60, 220]) {
       const imagem = rasterizarCena(cena, vista(zoom), W, H);
       const referencia = rasterizarMalhas(referenciaAntiga(zoom), camaraDe(vista(zoom)), zoom, W, H);
       imagensIguaisExceto(imagem, referencia, 40);
@@ -219,7 +223,7 @@ describe('espessura em pixels de tela não depende do zoom', () => {
     const cena = new PlanScene();
     cena.setDrawList({ background: '#fff', fills: [], strokes: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 0 }], closed: false, widthPx: 3, color: '#000', alpha: 1 }], labels: [] }, vista(zoom));
     const malha = malhasNaOrdem(cena)[0]!;
-    const ys = Array.from({ length: malha.geometry.getAttribute('position').count }, (_, k) => verticeEmulado(malha.geometry, k, zoom).y);
+    const ys = Array.from({ length: 4 }, (_, k) => verticeEmulado(malha.geometry, k, zoom).y);
     expect((Math.max(...ys) - Math.min(...ys)) * zoom).toBeCloseTo(3, 6);
     cena.dispose();
   });

@@ -1,10 +1,11 @@
-import { difference, multiArea, offsetMulti } from '@hestia/geom';
+import { multiArea } from '@hestia/geom';
 import { resolveCeilings, type ResolvedCeiling } from '@hestia/engine';
-import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
+import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
+import { zoomAtinge } from './limiares.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
-import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
+import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
@@ -38,19 +39,17 @@ export function ceilingFills(
     const materialId = ceilingFillMaterial(c);
     const m = materialId ? p.materials[materialId] : undefined;
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     out.fills.push({ polygons: c.polygon, color, alpha: 1, hatch });
     const at = labelPoint(c.polygon);
     if (detail !== 'coarse') {
-      const band = difference(c.polygon, offsetMulti(c.polygon, -paint.cutPx / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+      out.fills.push({ polygons: c.polygon, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: espessuraDeCorte(paint) });
     }
     if (p.settings.showTags && at) {
       const e = p.elements[c.ceilingId];
       const mark = e && e.kind === 'ceiling' ? e.mark : '';
       const text = [mark, fmtArea(multiArea(c.polygon), 1)].filter(Boolean).join(' · ');
-      const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
-      out.labels.push({ at, text, fontPx });
+      out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM } });
     }
   }
   return out;

@@ -1,5 +1,6 @@
 import type { BufferGeometry, Group, Object3D } from 'three';
 import type { GraphicsCategory, Id } from '@hestia/model';
+import type { ColecaoCaixas } from './caixasDoNivel3d.ts';
 import type { ElementRange } from './solids.ts';
 
 /**
@@ -30,6 +31,10 @@ export interface EntradaNivel {
   readonly mats: string[];
   /** Bytes estimados das geometrias do nível (o que o cache conta contra o teto). */
   readonly bytes: number;
+  /** Caixas instanciadas do nível (paredes retas e esquadrias): as matrizes que a cena junta com as dos outros níveis. */
+  readonly instancias?: readonly ColecaoCaixas[];
+  /** Arestas das caixas do nível (pares de pontos); a cena junta as de todos os níveis numa linha só. */
+  readonly arestasCaixas?: Float32Array;
 }
 
 /** Bytes de uma geometria: os arrays dos atributos e o de índices. */
@@ -39,8 +44,8 @@ function bytesDeGeometria(g: BufferGeometry): number {
   return n;
 }
 
-/** Bytes estimados das geometrias de um nível (grupo e peças de picking, sem contar duas vezes a mesma). */
-export function bytesDeNivel(grupo: Group, picks: PickSource[]): number {
+/** Bytes estimados de um nível: as geometrias (grupo e peças de picking, sem contar duas vezes a mesma) e as matrizes das caixas. */
+export function bytesDeNivel(grupo: Group, picks: PickSource[], instancias: readonly ColecaoCaixas[] = [], arestasCaixas?: Float32Array): number {
   const geos = new Set<BufferGeometry>();
   grupo.traverse((o) => {
     const g = (o as { geometry?: BufferGeometry }).geometry;
@@ -49,6 +54,8 @@ export function bytesDeNivel(grupo: Group, picks: PickSource[]): number {
   for (const s of picks) geos.add(s.geo);
   let total = 0;
   for (const g of geos) total += bytesDeGeometria(g);
+  for (const c of instancias) total += c.matrizes.byteLength;
+  total += arestasCaixas?.byteLength ?? 0;
   return total;
 }
 

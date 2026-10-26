@@ -1,13 +1,15 @@
-import { difference, multiArea, offsetMulti, type Vec2 } from '@hestia/geom';
+import { multiArea, type Vec2 } from '@hestia/geom';
 import { fillRegionOf, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
-import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
+import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { juncaoDoNivel, lajesDoNivel } from './resolucao.ts';
 import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { holeMarkOps } from './holeMarks.ts';
-import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
-import type { PlanTheme, StrokeOp } from './types.ts';
+import { zoomAtinge } from './limiares.ts';
+import { tracoEm } from './marcadores.ts';
+import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
+import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
@@ -19,23 +21,24 @@ export function structuralLayer(p: Project, s: ResolvedSlab): ResolvedSlabLayer 
 
 /**
  * Seta de caimento: segmento de 80 px centrado no ponto, na direção `dir` da inclinação (para onde a face sobe), com
- * cabeça de 7 px e espessura `widthPx` (a do corte da categoria).
+ * cabeça de 7 px e a espessura `espessura` (a do corte da categoria). Marcador em pixels: a seta tem o mesmo tamanho na
+ * tela para qualquer zoom (ver `marcadores.ts`).
  */
-export function slopeArrow(dir: Vec2, at: Vec2, v: Viewport, theme: PlanTheme, widthPx: number): StrokeOp[] {
+export function slopeArrow(dir: Vec2, at: Vec2, _v: Viewport | undefined, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
   const k = Math.hypot(dir.x, dir.y) || 1;
   const u = { x: dir.x / k, y: dir.y / k };
-  const half = 40 / v.zoom;
-  const head = 7 / v.zoom;
-  const tip = { x: at.x + u.x * half, y: at.y + u.y * half };
+  const half = 40;
+  const head = 7;
+  const tip = { x: u.x * half, y: u.y * half };
   const back = { x: -u.x, y: -u.y };
   const wing = (a: number): Vec2 => ({
     x: tip.x + head * (back.x * Math.cos(a) - back.y * Math.sin(a)),
     y: tip.y + head * (back.x * Math.sin(a) + back.y * Math.cos(a)),
   });
-  const style = { widthPx, color: theme.ink, alpha: 0.9 };
+  const style = { ...espessura, color: theme.ink, alpha: 0.9 };
   return [
-    { pts: [{ x: at.x - u.x * half, y: at.y - u.y * half }, tip], closed: false, ...style },
-    { pts: [wing(Math.PI / 6), tip, wing(-Math.PI / 6)], closed: false, ...style },
+    { ...tracoEm(at, [{ x: -u.x * half, y: -u.y * half }, tip], false), ...style },
+    { ...tracoEm(at, [wing(Math.PI / 6), tip, wing(-Math.PI / 6)], false), ...style },
   ];
 }
 
@@ -79,29 +82,25 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   const layer = structuralLayer(p, s);
   const m = layer ? p.materials[layer.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
   out.strokes.push(...holeMarkOps(s.polygon, theme, paint, detail));
   const at = labelPoint(s.polygon);
   if (detail !== 'coarse') {
-    const band = difference(region, offsetMulti(region, -paint.cutPx / v.zoom));
-    if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+    out.fills.push({ polygons: region, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: espessuraDeCorte(paint) });
     // Linha de membrana na face da própria camada (P8): ela pode ir ao núcleo da parede.
     for (const l of s.layers) if (l.membrane) out.strokes.push(...membraneLineOps(l.polygon, theme));
     if (s.slope && at) {
-      // Deslocamento vertical da etiqueta de percentual: equivalente a 12 px de tela no zoom/escala padrão.
-      const slopeDyPx = paperMmToPx(1.2, v.zoom, scale);
-      out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, paint.cutPx));
-      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, dy: slopeDyPx, fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
+      // Deslocamento vertical da etiqueta de percentual: equivalente a 12 px de tela no zoom/escala padrão (1,2 mm de papel).
+      out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, espessuraDeCorte(paint)));
+      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 1.2, uy: 1 } } });
     }
   }
   if (p.settings.showTags && at) {
     const code = p.slabTypes[s.typeId]?.code;
     const text = [code, fmtArea(multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
-    const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
-    // Quando há inclinação, a seta de caimento ocupa espaço abaixo do ponto: desloca a etiqueta para cima.
-    const dy = s.slope ? -paperMmToPx(1.0, v.zoom, scale) : undefined;
-    out.labels.push({ at, text, fontPx, ...(dy !== undefined ? { dy } : {}) });
+    // Quando há inclinação, a seta de caimento ocupa espaço abaixo do ponto: desloca a etiqueta para cima (1,0 mm de papel).
+    out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, ...(s.slope ? { desvio: { mm: 1.0, uy: -1 } } : {}) } });
   }
   return out;
 }

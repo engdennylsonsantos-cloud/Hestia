@@ -58,10 +58,27 @@ function dependenciasDoNivel(p: Project, nivel: Id): { deps: Set<Id>; tudo: bool
  * Níveis a recalcular para ir de `antes` até `depois`. Compara elementos por referência (o motor é imutável: elemento
  * não editado mantém o objeto) e as demais chaves do projeto pela mesma regra. Quando não dá para dizer, devolve `'todos'`.
  */
+/**
+ * Mesma lista de níveis, com o mesmo conteúdo na mesma ordem. O store pode recriar o objeto de nível e acrescentar
+ * `tags: []` vazio (padrão), sem mudar nada que a resolução leia: esse campo vazio não conta como mudança.
+ */
+function mesmosNiveis(a: readonly unknown[], b: readonly unknown[]): boolean {
+  const norm = (x: unknown): string => {
+    if (x && typeof x === 'object' && Array.isArray((x as { tags?: unknown }).tags) && (x as { tags: unknown[] }).tags.length === 0) {
+      const { tags: _vazio, ...resto } = x as { tags: unknown[] } & Record<string, unknown>;
+      return JSON.stringify(resto);
+    }
+    return JSON.stringify(x);
+  };
+  return a.length === b.length && a.every((x, i) => x === b[i] || norm(x) === norm(b[i]));
+}
+
 export function niveisAfetados(antes: Project, depois: Project): NiveisAfetados {
   const chaves = new Set([...Object.keys(antes), ...Object.keys(depois)]);
   for (const k of chaves) {
     if (FORA_DA_RESOLUCAO.has(k)) continue;
+    // A lista de níveis pode ser nova sem que nenhum nível mude: vale o conteúdo, não a identidade da lista.
+    if (k === 'levels' && mesmosNiveis(antes.levels, depois.levels)) continue;
     if ((antes as unknown as Record<string, unknown>)[k] !== (depois as unknown as Record<string, unknown>)[k]) return 'todos';
   }
   const tocados = new Set<Id>();

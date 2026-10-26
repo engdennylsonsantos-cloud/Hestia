@@ -70,10 +70,10 @@ function iniciais(target: SketchTarget, o: ToolOptions): { typeId?: Id; opts: Pe
  * e a cota. A cota do telhado não vai: a barra não a mostra, e o motor a calcula na criação.
  */
 function opcoesDe(s: Sessao): CommitPerimeterOptions {
-  const base = { typeId: s.typeId, levelId: s.levelId };
+  const base = { typeId: s.typeId, levelId: s.levelId, origin: s.tool.origin() };
   const o = s.opts;
   if (s.target === 'roof') return { ...base, overhang: o.overhang, slopePct: o.slopePct };
-  return { ...base, extendToCore: o.extendToCore, heightOffset: o.heightOffset };
+  return { ...base, extendToCore: o.extendToCore, heightOffset: o.heightOffset, linkToWalls: o.linkToWalls, followRoom: o.followRoom };
 }
 
 /**

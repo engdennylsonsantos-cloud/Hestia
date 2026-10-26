@@ -1,3 +1,4 @@
+import type { PerimeterModifyKind } from '@hestia/tools';
 import { useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { SketchResult, SketchTarget } from '@hestia/geom';
 import type { RibbonPanel } from '../ribbon/model.ts';
@@ -82,6 +83,8 @@ export interface PerimeterRibbonProps {
   result: SketchResult | null;
   lineKind: PerimeterLineKind;
   shape: PerimeterShape;
+  /** Comando de Modificar ativo: com ele ligado nenhuma forma da galeria fica marcada. */
+  modify?: PerimeterModifyKind | null;
   onLineKind: (kind: PerimeterLineKind) => void;
   onShape: (shape: PerimeterShape) => void;
   onFinish: () => void;
@@ -95,7 +98,7 @@ const STEP = 30;
  * Painéis "Modo" (Concluir/Cancelar) e "Desenhar" (linha de limite, seta de inclinação só no telhado, e a galeria de
  * formas em caixa com rolagem). Vêm na aba contextual: ver `perimeterContextTab`.
  */
-export function PerimeterRibbonPanels({ target, result, lineKind, shape, onLineKind, onShape, onFinish, onCancel }: PerimeterRibbonProps): ReactElement {
+export function PerimeterRibbonPanels({ target, result, lineKind, shape, modify, onLineKind, onShape, onFinish, onCancel }: PerimeterRibbonProps): ReactElement {
   const roof = target === 'roof';
   const kind: PerimeterLineKind = roof ? lineKind : 'boundary';
   const canFinish = result?.ok === true;
@@ -126,7 +129,7 @@ export function PerimeterRibbonPanels({ target, result, lineKind, shape, onLineK
       <div className="rb-panel" role="group" aria-label="Desenhar">
         <div className="rb-cols">
           <div className="rb-stack">
-            <button className={cls('rb-btn rb-small', kind === 'boundary' && 'on')} title="Linha de limite" aria-label="Linha de limite" aria-pressed={kind === 'boundary'} onClick={() => onLineKind('boundary')}>
+            <button className={cls('rb-btn rb-small', !modify && kind === 'boundary' && 'on')} title="Linha de limite" aria-label="Linha de limite" aria-pressed={!modify && kind === 'boundary'} onClick={() => onLineKind('boundary')}>
               <Ic size={16}>
                 <path className="ic-s1" d="M4 8H28V24H4Z" />
                 <path className="ic-ac" d="M4 8H28V24H4Z" strokeDasharray="3 2" />
@@ -148,10 +151,10 @@ export function PerimeterRibbonPanels({ target, result, lineKind, shape, onLineK
               {perimeterShapesFor(target).map((s) => (
                 <button
                   key={s.id}
-                  className={cls('pm-gi', s.isNew && 'new', shape === s.id && 'on')}
+                  className={cls('pm-gi', s.isNew && 'new', !modify && shape === s.id && 'on')}
                   title={s.label}
                   aria-label={s.label}
-                  aria-pressed={shape === s.id}
+                  aria-pressed={!modify && shape === s.id}
                   onClick={() => onShape(s.id)}
                 >
                   <Ic>{s.icon}</Ic>

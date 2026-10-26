@@ -60,18 +60,18 @@ await rep.step('abre o modo de piso sobre a casa, com 4 linhas que passam dos ca
   check('modo de piso aberto com 4 linhas', s.ativo && s.segs === 4, `segs=${s.segs}`);
   check('contorno ainda aberto (linhas passam dos cantos)', !s.ok);
   check('Escala desabilitada no esboço', await botao('Escala').isDisabled());
-  check('Trocar anfitriã desabilitado no esboço', await page.getByRole('button', { name: /Trocar anfitri/ }).first().isDisabled());
+  check('Trocar anfitriã desabilitado no esboço', await page.getByRole('button', { name: /Trocar hosped/ }).first().isDisabled());
   await page.screenshot({ path: `${OUT}/95-perimetro-modificar-inicio.png` });
   geo = { x0, x1, y0, y1, e };
 });
 
 await rep.step('Aparar/Estender liga pelo botão, fica pressionado e desliga ao clicar de novo', async () => {
-  await botao('Aparar').click();
-  check('botão Aparar pressionado', (await botao('Aparar').getAttribute('aria-pressed')) === 'true');
+  await botao('Aparar/Estender').click();
+  check('botão Aparar pressionado', (await botao('Aparar/Estender').getAttribute('aria-pressed')) === 'true');
   check('modo do esboço = trim', (await estado()).modo === 'trim');
-  await botao('Aparar').click();
+  await botao('Aparar/Estender').click();
   check('segundo clique desliga o comando', (await estado()).modo === null);
-  await botao('Aparar').click();
+  await botao('Aparar/Estender').click();
 });
 
 await rep.step('Aparar nos 4 cantos, com cliques de verdade no canvas', async () => {
@@ -96,28 +96,32 @@ await rep.step('Aparar nos 4 cantos, com cliques de verdade no canvas', async ()
 
 await rep.step('Dividir elemento divide a linha do topo', async () => {
   const antes = (await estado()).segs;
-  await botao('Dividir').click();
-  check('botão Dividir pressionado', (await botao('Dividir').getAttribute('aria-pressed')) === 'true');
+  await botao('Dividir elemento').click();
+  check('botão Dividir pressionado', (await botao('Dividir elemento').getAttribute('aria-pressed')) === 'true');
   const { x0, x1, y1 } = geo;
   await clickWorld(page, (x0 + x1) / 2, y1);
   await page.waitForTimeout(120);
   const s = await estado();
   check('uma linha a mais no esboço', s.segs === antes + 1, `${antes} -> ${s.segs}`);
   check('contorno continua fechado', s.ok);
-  await botao('Dividir').click();
+  await botao('Dividir elemento').click();
 });
 
 await rep.step('Deslocar desloca o laço por 0,2 m, e Ctrl+Z desfaz só o rascunho', async () => {
   const antes = await estado();
   const elementos = antes.elementos;
+  const { x0, x1, y0, y1 } = geo;
+  // O laço inteiro (inclusive as metades da linha dividida): seleciona todas as linhas antes de ligar o comando.
+  await page.evaluate(() => { const t = window.__hestia.editor.activeTool; const d = t.draft(); t.loadDraft({ ...d, selected: d.segs.map((x) => x.id) }); });
   await botao('Deslocar').click();
   await page.keyboard.type('0.2');
-  const { x1, y0, y1 } = geo;
+  await page.keyboard.press('Enter');
   await clickWorld(page, x1 + 0.5, (y0 + y1) / 2);
   await page.waitForTimeout(150);
   const depois = await estado();
   check('deslocamento aumenta a largura do laço', depois.largura > antes.largura + 0.15, `${antes.largura.toFixed(2)} -> ${depois.largura.toFixed(2)}`);
-  check('laço continua fechado', depois.ok);
+  const issues = await page.evaluate(() => window.__hestia.editor.perimetro.view().result.issues.map((i) => i.code + ':' + i.message));
+  check('laço continua fechado', depois.ok, issues.join(' | '));
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(120);
   const desfeito = await estado();
@@ -139,7 +143,7 @@ await rep.step('Concluir cria o piso e fecha o modo; a faixa volta ao normal', a
 });
 
 await rep.step('fora do modo, Mover continua a ferramenta normal do app', async () => {
-  await page.getByRole('button', { name: 'Modificar', exact: true }).click();
+  await page.locator('.rtab', { hasText: 'Modificar' }).first().click();
   await botao('Mover').click();
   const tool = await page.evaluate(() => window.__hestia.useUi.getState().tool);
   check('ferramenta Mover ativa', tool === 'move', tool);

@@ -235,7 +235,7 @@ export class Editor {
       this.save();
       return true;
     }
-    if (mod && ui.view === 'plan' && /^[cv]$/i.test(k)) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
+    if (mod && ui.view === 'plan' && /^[cv]$/i.test(k) && !this.perimetro.ativo) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
     if (mod) return false;
     if (k === 'F3') {
       const cur = (useUi.getState().options.snap ?? DEFAULT_SNAP).enabled !== false;

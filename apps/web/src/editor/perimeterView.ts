@@ -32,6 +32,7 @@ const PARA_FERRAMENTA: Record<PerimeterShape, FerramentaForma> = {
   ellipse: 'ellipse',
   'pick-face': 'pickFace',
   'by-perimeter': 'byPerimeter',
+  'pick-room': 'pickRoom',
 };
 
 /** Forma da ferramenta para a galeria. Sem forma (modo de seleção) a galeria mostra "Linha", a forma padrão. */

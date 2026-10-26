@@ -48,6 +48,7 @@ export function Ribbon(): ReactElement {
           result={perim.result}
           lineKind={perim.lineKind}
           shape={perim.shape}
+          modify={perim.modify}
           onLineKind={perimeterActions.setLineKind}
           onShape={perimeterActions.setShape}
           onFinish={perimeterActions.finish}

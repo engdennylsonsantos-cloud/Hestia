@@ -3,25 +3,23 @@ import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchR
 import { ToolBase } from './base.ts';
 import type { InferContext } from './infer.ts';
 import { parseNumber } from './numeric.ts';
-import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, type FinishResult } from './perimeterSession.ts';
+import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, type FinishResult, type SketchOrigin } from './perimeterSession.ts';
 import { anchorOf, buildShape, kindOf, pointsOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
-import { SELECT_PX, boxRing, draftEdges, draftPoints, hitSeg, segLines } from './perimeterToolPick.ts';
-import { boxPick, facePick, facePreview, selectClick } from './perimeterToolInput.ts';
+import { SELECT_PX, boxRing, draftEdges, draftPoints, hitSeg, roomClick, roomHover, segLines } from './perimeterToolPick.ts';
+import { boxPick, facePick, facePreview, selectClick, shapeHintOf } from './perimeterToolInput.ts';
 import type { ShapeKindId } from './sketchShapes.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 import { DraftHistory } from './perimeterToolModifyHistory.ts';
 import { ModifyFlow } from './perimeterToolModify.ts';
 
 /** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
-export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter';
+export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter' | 'pickRoom';
 
 /** Linha de limite (clique seleciona e desenha) ou inclinação (clique no triângulo de uma aresta, só telhado). */
 export type LineKind = 'boundary' | 'slope';
 
 export const PERIMETER_HINT = 'Perímetro: escolha uma forma na barra, ou clique numa linha para selecionar. Concluir fecha o contorno.';
 const SELECT_HINT = 'Selecione linhas: clique numa linha (Shift soma), Delete remove. Escolha uma forma na barra para desenhar.';
-const PICK_HINT = 'Linha numa face: passe sobre uma face, eixo ou borda do nível. Tab alterna; clique adiciona.';
-const BOX_HINT = 'Contorno pela caixa: arraste uma caixa sobre as paredes e solte.';
 const SLOPE_HINT = 'Inclinação: clique no triângulo de uma aresta do contorno para ligar ou desligar.';
 
 /** Substitui as linhas com o mesmo id (fileta, por exemplo) e acrescenta as demais, com ids novos. */
@@ -45,6 +43,7 @@ export class PerimeterTool extends ToolBase {
   readonly draftHistory: DraftHistory;
   private readonly mod: ModifyFlow;
   private shape: PerimeterShape | null = null;
+  private originInfo: SketchOrigin = {};
   private line: LineKind = 'boundary';
   private step: ShapeStep | null = null;
   /** Sinalizadores da forma (Tab), ex.: sentido do arco. */
@@ -71,6 +70,11 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Rascunho corrente (dado puro, para a planta desenhar). */
+  /** De onde veio o esboço: caixa sobre as paredes (`walls`) e ambiente escolhido (`roomId`). Para o vínculo do contorno. */
+  origin(): SketchOrigin {
+    return this.originInfo;
+  }
+
   draft(): SketchDraft {
     return this.d;
   }
@@ -113,7 +117,7 @@ export class PerimeterTool extends ToolBase {
     this.shape = kind;
     this.flags = {};
     this.reset();
-    this.env.say(kind === null ? SELECT_HINT : this.shapeHint(kind));
+    this.env.say(kind === null ? SELECT_HINT : shapeHintOf(kind));
   }
 
   /** Comando de Modificar ativo, ou null (seleção de linhas). */
@@ -180,6 +184,7 @@ export class PerimeterTool extends ToolBase {
       return r;
     }
     this.draftHistory.reset(newDraft(this.d.target, this.d.defaults));
+    this.originInfo = {};
     this.mod.stop();
     this.reset();
     this.env.say('Perímetro concluído.');
@@ -202,6 +207,7 @@ export class PerimeterTool extends ToolBase {
    */
   loadDraft(d: SketchDraft): void {
     this.draftHistory.replace(d);
+    this.originInfo = {};
     this.reset();
     this.env.say(this.hint);
   }
@@ -272,7 +278,11 @@ export class PerimeterTool extends ToolBase {
       return;
     }
     if (this.shape === 'pickFace') this.movePick(p.raw);
-    else if (id) this.moveShape(p, id);
+    else if (this.shape === 'pickRoom') {
+      const h = roomHover(this.env, p.raw);
+      this.items = h.items;
+      this.env.say(h.say);
+    } else if (id) this.moveShape(p, id);
   }
 
   override click(p: PointerInfo): void {
@@ -280,6 +290,7 @@ export class PerimeterTool extends ToolBase {
     if (this.mod.active()) this.mod.click(p);
     else if (this.shape === null) this.clickSelect(p);
     else if (this.shape === 'pickFace') this.clickPick(p);
+    else if (this.shape === 'pickRoom') this.roomStep(roomClick(this.env, p.raw, this.d));
     else if (this.shape === 'byPerimeter') return;
     else this.clickShape(p, this.shape);
   }
@@ -305,6 +316,7 @@ export class PerimeterTool extends ToolBase {
     const r = boxPick(this.env, box.a, p.raw);
     if (!r) return;
     if (r.segs.length > 0) this.commit(applySegs(this.d, r.segs));
+    if (r.segs.length > 0) this.originInfo = { ...this.originInfo, walls: true };
     this.env.say(r.msg);
   }
 
@@ -364,14 +376,7 @@ export class PerimeterTool extends ToolBase {
   }
 
   private shapeId(): ShapeKindId | null {
-    return this.shape === null || this.shape === 'pickFace' || this.shape === 'byPerimeter' ? null : this.shape;
-  }
-
-  private shapeHint(kind: PerimeterShape): string {
-    if (kind === 'pickFace') return PICK_HINT;
-    if (kind === 'byPerimeter') return BOX_HINT;
-    const k = kindOf(kind);
-    return `${k.label}: ${promptOf({ shape: k, idx: 0, vals: {} })}.`;
+    return this.shape === null || this.shape === 'pickFace' || this.shape === 'byPerimeter' || this.shape === 'pickRoom' ? null : this.shape;
   }
 
   private refuse(msg: string): false {
@@ -387,6 +392,13 @@ export class PerimeterTool extends ToolBase {
       extraPoints: [...draftPoints(this.d.segs), ...pointsOf(st)],
       extraSegments: draftEdges(this.d.segs),
     };
+  }
+
+  /** "Por ambiente": o contorno do ambiente entra no esboço e o id do ambiente vai para a origem. */
+  private roomStep(r: ReturnType<typeof roomClick>): void {
+    if (r.roomId) this.originInfo = { ...this.originInfo, roomId: r.roomId };
+    if (r.draft !== this.d) this.commit(r.draft);
+    this.env.say(r.say);
   }
 
   private movePick(at: Vec2): void {

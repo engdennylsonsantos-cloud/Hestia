@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import type { SketchTarget } from '@hestia/geom';
+import { PERIMETER_MODIFY_LABEL, type PerimeterModifyKind } from '@hestia/tools';
 import { Check, NumField } from '../fields.tsx';
 import { PERIMETER_TOOL } from './PerimeterStatus.ts';
 
@@ -22,15 +23,17 @@ export interface PerimeterOptions {
 export interface PerimeterOptionsBarProps {
   target: SketchTarget;
   options: PerimeterOptions;
+  /** Comando de Modificar ativo sobre o esboço: o nome aparece ao lado do título. */
+  modify?: PerimeterModifyKind | null;
   onChange: (patch: Partial<PerimeterOptions>) => void;
 }
 
 /** Barra de opções (`.optbar`) do modo de perímetro, com as mesmas classes das outras barras. */
-export function PerimeterOptionsBar({ target, options: o, onChange }: PerimeterOptionsBarProps): ReactElement {
+export function PerimeterOptionsBar({ target, options: o, modify, onChange }: PerimeterOptionsBarProps): ReactElement {
   const roof = target === 'roof';
   return (
     <div className="optbar" role="group" aria-label="Opções da ferramenta">
-      <span className="tool-name">{PERIMETER_TOOL[target]}</span>
+      <span className="tool-name">{modify ? `${PERIMETER_TOOL[target]} · ${PERIMETER_MODIFY_LABEL[modify]}` : PERIMETER_TOOL[target]}</span>
       {roof && (
         <label>
           Balanço

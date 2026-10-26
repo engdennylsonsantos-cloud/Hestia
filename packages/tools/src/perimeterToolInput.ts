@@ -1,7 +1,8 @@
 import { dist, mid, type SketchDraft, type SketchSeg, type Vec2 } from '@hestia/geom';
 import { selectSegs, setSegSlope, effectiveSeg } from './perimeterSession.ts';
-import { SELECT_PX, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
+import { ROOM_HINT, SELECT_PX, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
 import { perimeterFromBox } from './sketchByPerimeter.ts';
+import { kindOf, promptOf } from './perimeterToolShape.ts';
 import { faceAt } from './sketchPickFace.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 
@@ -51,4 +52,16 @@ export function boxPick(env: ToolEnv, a: Vec2, b: Vec2): { segs: SketchSeg[]; ms
   const r = perimeterFromBox(env, a, b);
   if (r.segs.length === 0) return { segs: [], msg: r.warnings.join(' ') || 'Nenhuma parede nesta caixa.' };
   return { segs: r.segs, msg: [...r.warnings, `Contorno pela caixa: ${r.segs.length} linha(s) adicionadas.`].join(' ') };
+}
+
+const PICK_HINT = 'Linha numa face: passe sobre uma face, eixo ou borda do nível. Tab alterna; clique adiciona.';
+const BOX_HINT = 'Contorno pela caixa: arraste uma caixa sobre as paredes e solte.';
+
+/** Dica da barra de status ao escolher uma forma da galeria (ou uma das capturas). */
+export function shapeHintOf(kind: string): string {
+  if (kind === 'pickFace') return PICK_HINT;
+  if (kind === 'byPerimeter') return BOX_HINT;
+  if (kind === 'pickRoom') return ROOM_HINT;
+  const k = kindOf(kind as Parameters<typeof kindOf>[0]);
+  return `${k.label}: ${promptOf({ shape: k, idx: 0, vals: {} })}.`;
 }

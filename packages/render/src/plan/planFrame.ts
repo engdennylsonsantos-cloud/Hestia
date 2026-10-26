@@ -11,6 +11,7 @@ import { resolverRotulos, resolverZoom } from './zoomOps.ts';
 import { dimPlanOps } from './dim.ts';
 import { sketchOps } from './sketch.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
+import { contadores } from '../perf/registro.ts';
 
 /** Esboço do perímetro em edição (só na planta): o rascunho, a validação dele e a linha sob o cursor. */
 export interface PlanSketch {
@@ -213,6 +214,7 @@ export class PlanFrame {
         this.grid = gridLayer(v, theme);
         this.gridKey = gk;
         this.setSlot(sink, 'grid', this.grid.fills, this.grid.strokes, v);
+        contadores.contarRebuild('grade');
       }
     }
 
@@ -226,6 +228,7 @@ export class PlanFrame {
       this.assinatura = assinaturaDeZoom(this.limiares, v.zoom);
       this.setSlot(sink, 'fillsBase', this.geom.fills, [], v);
       this.setSlot(sink, 'strokesBase', [], this.geom.strokes, v);
+      contadores.contarRebuild('geometria');
       labelsChanged = true;
     }
     if (u.overlayKey !== this.ovKey) {
@@ -233,6 +236,7 @@ export class PlanFrame {
       const next = u.overlay();
       this.setSlot(sink, 'fillsOver', next.fills, [], v);
       this.setSlot(sink, 'strokesOver', [], next.strokes, v);
+      contadores.contarRebuild('sobreposicao');
       // Rótulos iguais aos de antes mantêm a referência: a sobreposição muda a cada movimento sem mudar as etiquetas.
       const same = sameLabels(this.ov.labels, next.labels);
       if (!same) labelsChanged = true;

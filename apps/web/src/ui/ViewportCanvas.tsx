@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, contadores, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
@@ -16,6 +16,7 @@ import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
 import { QuadroPlanta } from './quadroPlanta.ts';
+import { medirQuadro, useContarCommitPerf, usePerfDaUrl } from '../debug/perf/index.ts';
 
 interface Pt {
   x: number;
@@ -55,6 +56,11 @@ export function ViewportCanvas(): ReactElement {
   const shownLabels = useRef<LabelOp[]>(NO_LABELS);
   const shownView = useRef<Viewport | null>(null);
 
+  // Instrumentação de desempenho (Fase 0.2): só liga com `?perf=1`; sem o parâmetro não há medição nem overlay.
+  // Os hooks rodam antes do boot para que o contexto criado em seguida já saia instrumentado.
+  usePerfDaUrl();
+  useContarCommitPerf();
+
   // ---- inicialização: GPU primeiro, CPU só sem suporte ----
   const bootRef = useRef<(prefer: 'auto' | 'webgl2' | 'cpu') => Promise<void>>(async () => {});
   useEffect(() => {
@@ -89,6 +95,8 @@ export function ViewportCanvas(): ReactElement {
         el.prepend(c);
         cpuRef.current = c;
         useUi.setState({ gpu: 'cpu' });
+        contadores.definirBackend('cpu');
+        contadores.marcarTimerGpu('sem-gpu');
       }
       modelKey.current = '';
       // Troca de dispositivo (GPU ou CPU): a cena da planta começa do zero.
@@ -129,7 +137,7 @@ export function ViewportCanvas(): ReactElement {
   };
 
   // ---- desenho ----
-  const render = useCallback(() => {
+  const renderQuadro = useCallback(() => {
     const st = useUi.getState();
     const { w, h } = size;
     if (!ready || w < 10 || h < 10) return;
@@ -189,6 +197,10 @@ export function ViewportCanvas(): ReactElement {
     // Isso evita o atraso de um render React entre a câmera e o texto da cota durante pan/zoom.
     labelLayer.current?.syncView(v);
   }, [size, ready, dark, sketch]);
+
+  // Um quadro do rAF: o trabalho de CPU é medido do começo ao fim do desenho; com `?perf=1`, os contadores agrupam
+  // draw calls/upload/rebuilds entre estes dois pontos. Sem perf, os métodos são no-op.
+  const render = useCallback(() => medirQuadro(renderQuadro), [renderQuadro]);
 
   // Qualquer mudança do estado agenda um quadro; o quadro decide o que refazer (ver PlanFrame).
   useEffect(() => {

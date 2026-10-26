@@ -14,6 +14,7 @@ export const VISAO_FECHADA: PerimeterView = {
   lineKind: 'boundary',
   options: { overhang: 0.5, slopePct: 30, extendToCore: false, heightOffset: 0 },
   hoverId: null,
+  selectionBox: null,
   selectedEdge: null,
   status: '',
 };

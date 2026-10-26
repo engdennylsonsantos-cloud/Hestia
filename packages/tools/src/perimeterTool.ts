@@ -1,16 +1,17 @@
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
-import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchResult, type SketchSeg, type SketchTarget, type Vec2 } from '@hestia/geom';
+import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchResult, type SketchTarget, type Vec2 } from '@hestia/geom';
 import { ToolBase } from './base.ts';
-import type { InferContext } from './infer.ts';
 import { parseNumber } from './numeric.ts';
-import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, type FinishResult, type SketchOrigin } from './perimeterSession.ts';
-import { anchorOf, buildShape, kindOf, pointsOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
-import { SELECT_PX, boxRing, draftEdges, draftPoints, hitSeg, roomClick, roomHover, segLines } from './perimeterToolPick.ts';
-import { boxPick, facePick, facePreview, selectClick, shapeHintOf } from './perimeterToolInput.ts';
+import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, selectAllSegs, type FinishResult, type SketchOrigin } from './perimeterSession.ts';
+import { anchorOf, buildShape, kindOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
+import { SELECT_PX, boxRing, hitSeg, roomClick, roomHover, segLines } from './perimeterToolPick.ts';
+import { boxPick, facePick, selectClick, shapeHintOf } from './perimeterToolInput.ts';
+import { applySegs, faceMove, refuse, shapeIdOf, snapExtraOf } from './perimeterToolHelpers.ts';
 import type { ShapeKindId } from './sketchShapes.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 import { DraftHistory } from './perimeterToolModifyHistory.ts';
 import { ModifyFlow } from './perimeterToolModify.ts';
+import { BoxSelection, type SelectionBox } from './perimeterToolSelect.ts';
 
 /** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
 export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter' | 'pickRoom';
@@ -19,15 +20,8 @@ export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter' | 'pickRoo
 export type LineKind = 'boundary' | 'slope';
 
 export const PERIMETER_HINT = 'Perímetro: escolha uma forma na barra, ou clique numa linha para selecionar. Concluir fecha o contorno.';
-const SELECT_HINT = 'Selecione linhas: clique numa linha (Shift soma), Delete remove. Escolha uma forma na barra para desenhar.';
+const SELECT_HINT = 'Selecione linhas: clique ou arraste uma janela (Shift soma, Ctrl subtrai, Ctrl+A todas). Delete remove.';
 const SLOPE_HINT = 'Inclinação: clique no triângulo de uma aresta do contorno para ligar ou desligar.';
-
-/** Substitui as linhas com o mesmo id (fileta, por exemplo) e acrescenta as demais, com ids novos. */
-function applySegs(d: SketchDraft, segs: SketchSeg[]): SketchDraft {
-  const byId = new Map(segs.map((s) => [s.id, s] as const));
-  const known = new Set(d.segs.map((s) => s.id));
-  return addSegs({ ...d, segs: d.segs.map((s) => byId.get(s.id) ?? s) }, segs.filter((s) => !known.has(s.id)));
-}
 
 /**
  * Esboço de perímetro (Criar/Editar perímetro). A ferramenta guarda o `SketchDraft` e só o altera pelas funções puras
@@ -42,6 +36,7 @@ export class PerimeterTool extends ToolBase {
   /** Passos de desfazer do rascunho. A UI desfaz e refaz com `undoDraft` e `redoDraft` (Ctrl+Z, Ctrl+Y). */
   readonly draftHistory: DraftHistory;
   private readonly mod: ModifyFlow;
+  private readonly sel: BoxSelection;
   private shape: PerimeterShape | null = null;
   private originInfo: SketchOrigin = {};
   private line: LineKind = 'boundary';
@@ -64,8 +59,14 @@ export class PerimeterTool extends ToolBase {
       replace: (next) => this.draftHistory.replace(next),
       say: (msg) => this.env.say(msg),
       mpp: () => this.env.metersPerPixel(),
-      snap: (p) => this.snap(p, this.snapExtra(null)).point,
+      snap: (p) => this.snap(p, snapExtraOf(this.d, null)).point,
       options: () => this.env.options(),
+    });
+    this.sel = new BoxSelection({
+      draft: () => this.d,
+      mpp: () => this.env.metersPerPixel(),
+      replace: (next) => this.draftHistory.replace(next),
+      say: (msg) => this.env.say(msg),
     });
   }
 
@@ -103,12 +104,20 @@ export class PerimeterTool extends ToolBase {
     return this.mod.active() ? this.mod.hoverId() : this.hover;
   }
 
-  override preview(): PreviewItem[] {
-    return this.mod.active() ? this.mod.preview() : this.items;
+  /** Caixa de seleção em arraste, para a planta desenhar. */
+  selectionBox(): SelectionBox | null {
+    return this.sel.current();
   }
 
-  previews(): PreviewItem[] {
-    return this.preview();
+  /** Ctrl+A: seleciona todas as linhas do esboço, sem passo de desfazer. */
+  selectAll(): void {
+    const next = selectAllSegs(this.d);
+    this.draftHistory.replace(next);
+    this.env.say(`${next.selected.length} linha(s) selecionada(s).`);
+  }
+
+  override preview(): PreviewItem[] {
+    return this.mod.active() ? this.mod.preview() : this.items;
   }
 
   /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento e desliga o comando de Modificar. */
@@ -137,7 +146,7 @@ export class PerimeterTool extends ToolBase {
       this.env.say(SELECT_HINT);
       return true;
     }
-    if (this.d.segs.length === 0) return this.refuse('Desenhe linhas antes de modificar.');
+    if (this.d.segs.length === 0) return refuse(this.env, 'Desenhe linhas antes de modificar.');
     this.shape = null;
     this.flags = {};
     this.reset();
@@ -147,7 +156,7 @@ export class PerimeterTool extends ToolBase {
 
   /** Desfaz o último passo do rascunho. Devolve false se não há o que desfazer. */
   undoDraft(): boolean {
-    if (!this.draftHistory.undo()) return this.refuse('Nada a desfazer.');
+    if (!this.draftHistory.undo()) return refuse(this.env, 'Nada a desfazer.');
     this.reset();
     this.env.say('Desfeito.');
     return true;
@@ -155,7 +164,7 @@ export class PerimeterTool extends ToolBase {
 
   /** Refaz o passo desfeito. Devolve false se não há o que refazer. */
   redoDraft(): boolean {
-    if (!this.draftHistory.redo()) return this.refuse('Nada a refazer.');
+    if (!this.draftHistory.redo()) return refuse(this.env, 'Nada a refazer.');
     this.reset();
     this.env.say('Refeito.');
     return true;
@@ -221,7 +230,7 @@ export class PerimeterTool extends ToolBase {
       if (this.mod.cancel()) this.setModify(null);
       return;
     }
-    if (this.step || this.box) {
+    if (this.step || this.box || this.sel.active()) {
       this.reset();
       this.env.say('Passo cancelado. Esc de novo tira a forma escolhida.');
       return;
@@ -246,11 +255,12 @@ export class PerimeterTool extends ToolBase {
     this.hover = null;
     this.box = null;
     this.cycle = 0;
+    this.sel.reset();
     this.mod.clearStep();
   }
 
   protected busy(): boolean {
-    return this.step !== null || this.box !== null;
+    return this.step !== null || this.box !== null || this.sel.active();
   }
 
   override inputPrompt(): string | null {
@@ -272,12 +282,12 @@ export class PerimeterTool extends ToolBase {
       this.mod.move(p);
       return;
     }
-    const id = this.shapeId();
+    const id = shapeIdOf(this.shape);
     if (this.shape === null) {
       if (this.line === 'boundary') this.hover = hitSeg(this.d.segs, p.raw, SELECT_PX * this.env.metersPerPixel());
       return;
     }
-    if (this.shape === 'pickFace') this.movePick(p.raw);
+    if (this.shape === 'pickFace') faceMove(this.env, p.raw, this.cycle, this.items);
     else if (this.shape === 'pickRoom') {
       const h = roomHover(this.env, p.raw);
       this.items = h.items;
@@ -295,21 +305,32 @@ export class PerimeterTool extends ToolBase {
     else this.clickShape(p, this.shape);
   }
 
-  /** Arrasto do contorno pela caixa: começa a caixa no ponto. */
+  /** Arrasto: a caixa do contorno pela caixa (no vazio, a janela de seleção das linhas). */
   down(p: PointerInfo): void {
-    if (this.shape !== 'byPerimeter') return;
     this.raw = p.raw;
-    this.box = { a: p.raw, b: p.raw };
+    if (this.shape === 'byPerimeter') {
+      this.box = { a: p.raw, b: p.raw };
+      return;
+    }
+    if (this.shape === null && !this.mod.active() && this.line === 'boundary') this.sel.down(p);
   }
 
   drag(p: PointerInfo): void {
-    if (!this.box) return;
+    if (this.sel.active()) {
+      this.sel.drag(p);
+      return;
+    }
+    if (!this.box) {
+      this.move(p);
+      return;
+    }
     this.box = { a: this.box.a, b: p.raw };
     this.items = [{ kind: 'polygon', ring: boxRing(this.box.a, this.box.b), dashed: true }];
   }
 
-  /** Solta a caixa: adiciona o contorno externo das paredes que ela pega. Avisos vão para a barra de status. */
+  /** Solta a caixa: contorno das paredes ou janela de seleção. Avisos vão para a barra de status. */
   up(p: PointerInfo): void {
+    if (this.sel.up(p)) return;
     const box = this.box;
     if (!box) return;
     this.reset();
@@ -326,10 +347,10 @@ export class PerimeterTool extends ToolBase {
     if (this.shape === 'pickFace') {
       this.cycle += 1;
       this.items = [];
-      this.movePick(this.raw);
+      faceMove(this.env, this.raw, this.cycle, this.items);
       return;
     }
-    const id = this.shapeId();
+    const id = shapeIdOf(this.shape);
     const flag = id ? kindOf(id).inputs.find((i) => i.kind === 'flag') : undefined;
     if (!flag) return;
     this.flags[flag.key] = !this.flags[flag.key];
@@ -344,16 +365,16 @@ export class PerimeterTool extends ToolBase {
     if (!st || !input) return false;
     const v = parseNumber(text);
     if (input.kind === 'length' || input.kind === 'angle' || input.kind === 'count') {
-      if (v === null) return this.refuse('Valor inválido. Digite um número.');
-      if (input.kind === 'length' && v <= 0) return this.refuse('Digite um comprimento maior que zero, em metros.');
-      if (input.kind === 'count' && (!Number.isInteger(v) || v < 3)) return this.refuse('Lados: um inteiro de 3 para cima.');
+      if (v === null) return refuse(this.env, 'Valor inválido. Digite um número.');
+      if (input.kind === 'length' && v <= 0) return refuse(this.env, 'Digite um comprimento maior que zero, em metros.');
+      if (input.kind === 'count' && (!Number.isInteger(v) || v < 3)) return refuse(this.env, 'Lados: um inteiro de 3 para cima.');
       this.setInput(st, input.key, input.kind === 'angle' ? (v * Math.PI) / 180 : v);
       return true;
     }
     const anchor = anchorOf(st);
     if (input.kind !== 'point' || st.shape.id !== 'line' || !anchor) return false;
-    if (v === null) return this.refuse('Valor inválido. Digite um número em metros.');
-    if (v <= 0) return this.refuse('Digite um comprimento maior que zero, em metros.');
+    if (v === null) return refuse(this.env, 'Valor inválido. Digite um número em metros.');
+    if (v <= 0) return refuse(this.env, 'Digite um comprimento maior que zero, em metros.');
     const dir = sub(this.inf?.point ?? this.raw, anchor);
     const u = len(dir) < 1e-9 ? { x: 1, y: 0 } : norm(dir);
     this.setInput(st, input.key, add(anchor, mul(u, v)));
@@ -375,36 +396,11 @@ export class PerimeterTool extends ToolBase {
     this.draftHistory.push(next);
   }
 
-  private shapeId(): ShapeKindId | null {
-    return this.shape === null || this.shape === 'pickFace' || this.shape === 'byPerimeter' || this.shape === 'pickRoom' ? null : this.shape;
-  }
-
-  private refuse(msg: string): false {
-    this.env.say(msg);
-    return false;
-  }
-
-  /** Captura para os pontos: vértices e linhas do rascunho, mais os pontos do passo, e o ponto anterior da forma. */
-  private snapExtra(st: ShapeStep | null): Partial<InferContext> {
-    const anchor = anchorOf(st);
-    return {
-      ...(anchor ? { from: anchor } : {}),
-      extraPoints: [...draftPoints(this.d.segs), ...pointsOf(st)],
-      extraSegments: draftEdges(this.d.segs),
-    };
-  }
-
   /** "Por ambiente": o contorno do ambiente entra no esboço e o id do ambiente vai para a origem. */
   private roomStep(r: ReturnType<typeof roomClick>): void {
     if (r.roomId) this.originInfo = { ...this.originInfo, roomId: r.roomId };
     if (r.draft !== this.d) this.commit(r.draft);
     this.env.say(r.say);
-  }
-
-  private movePick(at: Vec2): void {
-    const r = facePreview(this.env, at, this.cycle);
-    this.items.push(...r.items);
-    this.env.say(r.msg);
   }
 
   private moveShape(p: PointerInfo, id: ShapeKindId): void {
@@ -422,7 +418,7 @@ export class PerimeterTool extends ToolBase {
     let value: unknown = null;
     let cursor: Vec2 = p.raw;
     if (input.kind === 'point') {
-      const inf = this.snap(p, this.snapExtra(st));
+      const inf = this.snap(p, snapExtraOf(this.d, st));
       value = inf.point;
       cursor = inf.point;
     } else if (input.kind === 'length' && anchor) {
@@ -450,12 +446,12 @@ export class PerimeterTool extends ToolBase {
   }
 
   private clickShape(p: PointerInfo, id: ShapeKindId): void {
-    const st = this.step ?? this.begin(id);
+    const st = this.step ?? (this.step = { shape: kindOf(id), idx: 0, vals: {} });
     const input = stepsOf(st.shape)[st.idx];
     if (!input) return;
     const anchor = anchorOf(st);
     if (input.kind === 'point') {
-      const q = this.snap(p, this.snapExtra(st)).point;
+      const q = this.snap(p, snapExtraOf(this.d, st)).point;
       if (anchor && dist(q, anchor) < 1e-9) {
         this.env.say('Ponto repetido: clique noutro lugar.');
         return;
@@ -476,11 +472,6 @@ export class PerimeterTool extends ToolBase {
       return;
     }
     this.env.say(`Digite ${input.label.toLowerCase()}.`);
-  }
-
-  private begin(id: ShapeKindId): ShapeStep {
-    this.step = { shape: kindOf(id), idx: 0, vals: {} };
-    return this.step;
   }
 
   /** Grava a entrada pendente e avança; ao fechar todas, cria a forma. */

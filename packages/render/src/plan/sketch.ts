@@ -1,10 +1,22 @@
-import { closestOnSegment, dist, SLOPE_HALF_PX, validateSketch, type SketchDraft, type SketchResult, type Vec2 } from '@hestia/geom';
+import {
+  arcFromSagitta,
+  arcPointAt,
+  closestOnSegment,
+  dist,
+  mid,
+  SLOPE_HALF_PX,
+  validateSketch,
+  type SketchDraft,
+  type SketchResult,
+  type SketchSeg,
+  type Vec2,
+} from '@hestia/geom';
 import { worldToScreen, type Viewport } from '../viewport.ts';
 import { labelPoint } from './floors.ts';
 import { quadradoEm, poligonoEm, tracoEm } from './marcadores.ts';
 import { polyOf, outerLoop } from './sketchGeom.ts';
 import { slopeMarks, slopeOps, triangleCenterPx } from './sketchSlope.ts';
-import type { PlanOps, PlanTheme, StrokeOp } from './types.ts';
+import type { PlanOps, PlanTheme } from './types.ts';
 
 /** Vermelho dos problemas: fica legível sobre o claro e o escuro, e não se confunde com o rosa do rascunho. */
 export const SKETCH_ISSUE = '#e53935';
@@ -15,23 +27,64 @@ const VERTEX_HALF_PX = 3;
 const BALLOON_PX = 8;
 /** Erro máximo da poligonal dos arcos, em pixels de tela: arco liso em qualquer zoom. */
 const CHORD_PX = 0.5;
+/** Destaque da linha selecionada: mais grosso que a linha rosa, com disco cheio nas pontas e no meio. */
+const SELECT_WIDTH_PX = 4;
+const HOVER_WIDTH_PX = 3;
+const SELECT_VERTEX_PX = 4.5;
+const SELECT_MID_PX = 4;
 
 const BALLOON_OFFS: Vec2[] = Array.from({ length: 16 }, (_, i) => {
   const a = (i / 16) * Math.PI * 2;
   return { x: BALLOON_PX * Math.cos(a), y: BALLOON_PX * Math.sin(a) };
 });
 
+const discOffs = (r: number): Vec2[] =>
+  Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2;
+    return { x: r * Math.cos(a), y: r * Math.sin(a) };
+  });
+
+const SELECT_VERTEX_OFFS = discOffs(SELECT_VERTEX_PX);
+const SELECT_MID_OFFS = discOffs(SELECT_MID_PX);
+
+/** Caixa da janela de seleção em arraste: `window` (da esquerda para a direita) é preenchida. */
+export interface SketchSelectionBox {
+  a: Vec2;
+  b: Vec2;
+  window: boolean;
+}
+
 const keyOf = (p: Vec2): string => `${Math.round(p.x * 1e6)},${Math.round(p.y * 1e6)}`;
 
-/** Destaque sob o traço: as selecionadas em faixa larga; a do cursor, mais fina. */
-function highlightOps(draft: SketchDraft, theme: PlanTheme, view: Viewport, hover: string | null): StrokeOp[] {
+/** Meio da linha: no arco, o ponto do arco; na reta, o meio da corda. */
+function midPointOf(seg: SketchSeg): Vec2 {
+  const arc = seg.sag ? arcFromSagitta(seg.a, seg.b, seg.sag) : null;
+  return arc ? arcPointAt(arc, arc.length / 2) : mid(seg.a, seg.b);
+}
+
+/** Linha selecionada em azul sólido, com os vértices e o meio cheios; a do cursor em azul claro e mais fina. */
+function highlightOps(draft: SketchDraft, theme: PlanTheme, view: Viewport, hover: string | null): PlanOps {
   const selected = new Set(draft.selected);
-  const out: StrokeOp[] = [];
+  const out: PlanOps = { fills: [], strokes: [], labels: [] };
+  const tol = CHORD_PX / view.zoom;
   for (const s of draft.segs) {
     const on = selected.has(s.id);
     if (!on && s.id !== hover) continue;
-    out.push({ pts: polyOf(s, CHORD_PX / view.zoom), closed: false, widthPx: on ? 4 : 3, color: theme.select, alpha: on ? 0.5 : 0.3 });
+    out.strokes.push({ pts: polyOf(s, tol), closed: false, widthPx: on ? SELECT_WIDTH_PX : HOVER_WIDTH_PX, color: on ? theme.select : theme.selectHover, alpha: 1 });
+    if (!on) continue;
+    out.fills.push({ ...poligonoEm(s.a, SELECT_VERTEX_OFFS), color: theme.select, alpha: 1 });
+    out.fills.push({ ...poligonoEm(s.b, SELECT_VERTEX_OFFS), color: theme.select, alpha: 1 });
+    out.fills.push({ ...poligonoEm(midPointOf(s), SELECT_MID_OFFS), color: theme.select, alpha: 1 });
   }
+  return out;
+}
+
+/** Retângulo tracejado do arrasto; preenchido quando a janela pega as linhas inteiras (esquerda para a direita). */
+function selectionBoxOps(box: SketchSelectionBox, theme: PlanTheme): PlanOps {
+  const ring = [box.a, { x: box.b.x, y: box.a.y }, box.b, { x: box.a.x, y: box.b.y }];
+  const out: PlanOps = { fills: [], strokes: [], labels: [] };
+  if (box.window) out.fills.push({ polygons: [[ring]], color: theme.select, alpha: 0.12 });
+  out.strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.select, alpha: 0.9, dash: [6, 4] });
   return out;
 }
 
@@ -47,12 +100,18 @@ function balloonOps(at: Vec2, out: PlanOps): void {
  * quadradinhos, realce das selecionadas e do cursor, furos com hachura e legenda, linhas dos problemas em vermelho com
  * balão, e (só no telhado) o triângulo de inclinação por aresta do laço externo.
  */
-export function sketchOps(draft: SketchDraft, result: SketchResult, theme: PlanTheme, view: Viewport, hover: string | null = null): PlanOps {
+export function sketchOps(
+  draft: SketchDraft,
+  result: SketchResult,
+  theme: PlanTheme,
+  view: Viewport,
+  hover: string | null = null,
+  box: SketchSelectionBox | null = null,
+): PlanOps {
   const rose = theme.roofFootprint;
   const out: PlanOps = { fills: [], strokes: [], labels: [] };
   const tol = CHORD_PX / view.zoom;
 
-  out.strokes.push(...highlightOps(draft, theme, view, hover));
   for (const s of draft.segs) out.strokes.push({ pts: polyOf(s, tol), closed: false, widthPx: 1.5, color: rose, alpha: 1 });
 
   const seen = new Set<string>();
@@ -77,6 +136,10 @@ export function sketchOps(draft: SketchDraft, result: SketchResult, theme: PlanT
   }
   for (const issue of result.issues) if (issue.at) balloonOps(issue.at, out);
 
+  const hi = highlightOps(draft, theme, view, hover);
+  out.strokes.push(...hi.strokes);
+  out.fills.push(...hi.fills);
+
   if (draft.target === 'roof') {
     const outer = outerLoop(result.loops);
     if (outer) {
@@ -85,6 +148,11 @@ export function sketchOps(draft: SketchDraft, result: SketchResult, theme: PlanT
       out.strokes.push(...sl.strokes);
       out.labels.push(...sl.labels);
     }
+  }
+  if (box) {
+    const b = selectionBoxOps(box, theme);
+    out.fills.push(...b.fills);
+    out.strokes.push(...b.strokes);
   }
   return out;
 }

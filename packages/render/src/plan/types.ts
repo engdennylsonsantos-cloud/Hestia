@@ -135,6 +135,8 @@ export interface PlanTheme {
   accent: string;
   guide: string;
   select: string;
+  /** Linha do esboço sob o cursor, antes do clique: azul claro para não se confundir com a linha selecionada. */
+  selectHover: string;
   underlay: string;
   /** Prévia da escada por tom (limites, espelhos, caminhada, patamar e degraus calculados). */
   stairBoundary: string;
@@ -157,6 +159,7 @@ export const LIGHT: PlanTheme = {
   accent: '#0f766e',
   guide: '#c2410c',
   select: '#1d6fe0',
+  selectHover: '#5b9bf0',
   underlay: '#b7bec7',
   stairBoundary: '#2563eb',
   stairRiser: '#ea580c',
@@ -176,6 +179,7 @@ export const DARK: PlanTheme = {
   accent: '#2dd4bf',
   guide: '#fb923c',
   select: '#5aa2ff',
+  selectHover: '#8fc0ff',
   underlay: '#4b5560',
   stairBoundary: '#60a5fa',
   stairRiser: '#fb923c',

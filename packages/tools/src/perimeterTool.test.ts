@@ -53,7 +53,7 @@ describe('PerimeterTool: desenho', () => {
     clickAt(t, 0, 0);
     expect(t.inputPrompt()).toBe('Comprimento');
     t.move(P(1, 0));
-    expect(t.previews().length).toBeGreaterThan(0);
+    expect(t.preview().length).toBeGreaterThan(0);
     expect(t.type('3')).toBe(true);
     const segs = t.draft().segs;
     expect(segs).toHaveLength(1);
@@ -161,7 +161,7 @@ describe('PerimeterTool: pela face', () => {
     t.start();
     t.setShape('pickFace');
     t.move(P(12, 0));
-    expect(t.previews().some((i) => i.kind === 'label' && /Borda/.test(i.text))).toBe(true);
+    expect(t.preview().some((i) => i.kind === 'label' && /Borda/.test(i.text))).toBe(true);
     clickAt(t, 12, 0);
     const segs = t.draft().segs;
     expect(segs).toHaveLength(1);
@@ -181,7 +181,7 @@ describe('PerimeterTool: pela caixa', () => {
     t.setShape('byPerimeter');
     t.down(P(-2, -2));
     t.drag(P(10, 8));
-    expect(t.previews()).toHaveLength(1);
+    expect(t.preview()).toHaveLength(1);
     t.up(P(10, 8));
     expect(t.draft().segs).toHaveLength(4);
     expect(t.closeInfo().ok).toBe(true);

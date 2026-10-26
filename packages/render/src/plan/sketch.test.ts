@@ -64,12 +64,44 @@ describe('sketchOps: linhas e vértices', () => {
     expect(ops.strokes.some((s) => s.color === LIGHT.roofFootprint)).toBe(false);
   });
 
-  it('seleção e cursor: faixa azul sob as linhas, mais larga na selecionada', () => {
+  it('seleção: azul sólido mais grosso que a linha rosa, com discos nas pontas e no meio; cursor em azul claro', () => {
     const segs = segsOf(SQUARE);
     const ops = sketchOps(draftOf('floor', segs, { selected: ['s0'] }), outerOf(segs, SQUARE), LIGHT, VIEW, 's2');
-    const halo = ops.strokes.filter((s) => s.color === LIGHT.select);
-    expect(halo.map((s) => s.widthPx)).toEqual([4, 3]);
-    expect(halo.findIndex((s) => s.widthPx === 4)).toBeLessThan(ops.strokes.findIndex((s) => s.color === LIGHT.roofFootprint));
+    const selected = ops.strokes.find((s) => s.color === LIGHT.select)!;
+    const hover = ops.strokes.find((s) => s.color === LIGHT.selectHover)!;
+    expect(selected).toMatchObject({ widthPx: 4, alpha: 1 });
+    expect(hover).toMatchObject({ widthPx: 3, alpha: 1 });
+    expect(ops.strokes.indexOf(selected)).toBeGreaterThan(ops.strokes.findIndex((s) => s.color === LIGHT.roofFootprint));
+    const discs = ops.fills.filter((f) => f.color === LIGHT.select);
+    expect(discs).toHaveLength(3);
+    expect(discs.map((f) => f.polygons[0]![0]![0])).toEqual([P(0, 0), P(1, 0), P(0.5, 0)]);
+  });
+
+  it('tema escuro: seleção em azul sólido e cursor em azul claro, com os discos do tema', () => {
+    const segs = segsOf(SQUARE);
+    const ops = sketchOps(draftOf('floor', segs, { selected: ['s0'] }), outerOf(segs, SQUARE), DARK, VIEW, 's2');
+    expect(ops.strokes.find((s) => s.color === DARK.select)).toMatchObject({ widthPx: 4, alpha: 1 });
+    expect(ops.strokes.find((s) => s.color === DARK.selectHover)).toMatchObject({ widthPx: 3, alpha: 1 });
+    expect(ops.fills.filter((f) => f.color === DARK.select)).toHaveLength(3);
+  });
+
+  it('cursor sem seleção: só a linha clara, sem discos', () => {
+    const segs = segsOf(SQUARE);
+    const ops = sketchOps(draftOf('floor', segs), outerOf(segs, SQUARE), LIGHT, VIEW, 's2');
+    expect(ops.strokes.filter((s) => s.color === LIGHT.selectHover)).toHaveLength(1);
+    expect(ops.fills.some((f) => f.color === LIGHT.select)).toBe(false);
+  });
+
+  it('janela de seleção: retângulo tracejado; preenchido só da esquerda para a direita', () => {
+    const segs = segsOf(SQUARE);
+    const draft = draftOf('floor', segs);
+    const result = outerOf(segs, SQUARE);
+    const win = sketchOps(draft, result, LIGHT, VIEW, null, { a: P(0, 0), b: P(1, 1), window: true });
+    const cross = sketchOps(draft, result, LIGHT, VIEW, null, { a: P(1, 1), b: P(0, 0), window: false });
+    expect(win.fills.some((f) => f.color === LIGHT.select && f.alpha === 0.12)).toBe(true);
+    expect(cross.fills.some((f) => f.color === LIGHT.select && f.alpha === 0.12)).toBe(false);
+    const boxStroke = win.strokes.at(-1)!;
+    expect(boxStroke).toMatchObject({ closed: true, color: LIGHT.select, dash: [6, 4] });
   });
 
   it('esboço vazio, sem laço externo, não quebra e não desenha triângulo', () => {

@@ -45,7 +45,10 @@ export function ViewportCanvas(): ReactElement {
   const dark = useDark();
   // Esboço do perímetro em edição: só a planta o desenha; o quadro refaz a sobreposição quando ele muda.
   const perim = usePerimeter();
-  const sketch = useMemo(() => (perim.active && perim.draft && perim.result ? { draft: perim.draft, result: perim.result, hover: perim.hoverId } : null), [perim.active, perim.draft, perim.result, perim.hoverId]);
+  const sketch = useMemo(
+    () => (perim.active && perim.draft && perim.result ? { draft: perim.draft, result: perim.result, hover: perim.hoverId, box: perim.selectionBox } : null),
+    [perim.active, perim.draft, perim.result, perim.hoverId, perim.selectionBox],
+  );
   // Só o que a própria tela lê: a mudança de outros campos não re-renderiza a planta (o redesenho sai do agendamento abaixo).
   const ui = useUi(useShallow((s) => ({ view: s.view, gpu: s.gpu, prompt: s.prompt, typed: s.typed, hover: s.hover, tool: s.tool })));
   const frame = useRef(0);
@@ -272,8 +275,9 @@ export function ViewportCanvas(): ReactElement {
     const isOrbitReq = (isMiddleBtn && e.shiftKey) || (e.button === 0 && e.altKey);
     // Na planta, Shift com a Selecionar é da seleção (soma e janela). Com ferramenta de desenho, Shift sem arrasto trava
     // ortogonal (vai à ferramenta com shift); só vira pan se o ponteiro se mover (onMove). Na vista de corte, Shift arrasta a vista.
-    const shiftDraw = view === 'plan' && e.button === 0 && e.shiftKey && !spaceDown.current && editor.activeTool.id !== 'select';
-    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select' && !shiftDraw;
+    const perimSelect = editor.perimetro.selecionandoLinhas();
+    const shiftDraw = view === 'plan' && e.button === 0 && e.shiftKey && !spaceDown.current && editor.activeTool.id !== 'select' && !perimSelect;
+    const shiftPan = view !== '3d' && e.shiftKey && editor.activeTool.id !== 'select' && !shiftDraw && !perimSelect;
     const isPanReq = (isMiddleBtn && !e.shiftKey) || (e.button === 0 && (spaceDown.current || shiftPan));
     // Botão direito: o menu abre ao soltar sem arrasto (onUp). Não cancela a ferramenta: "Cancelar" está no menu.
     if (e.button === 2) { rightPress.current = { start: s, moved: false }; return; }

@@ -1,9 +1,9 @@
 // Comandos de Modificar sobre o esboço do perímetro, no app real: 4 linhas de um retângulo que passam dos cantos são aparadas
 // com cliques no canvas, depois divididas, deslocadas (com Ctrl+Z no rascunho), e o perímetro vira um piso.
-import { existsSync, mkdirSync } from 'node:fs';
-import { clickWorld, launch, makeReporter, openApp } from './helpers.mjs';
+import { mkdirSync } from 'node:fs';
+import { clickWorld, launch, makeReporter, openApp, worldToPage } from './helpers.mjs';
 
-const OUT = process.env.SHOTS ?? 'test-results/shots';
+const OUT = process.env.SHOTS ?? 'test-results/modificar';
 mkdirSync(OUT, { recursive: true });
 const browser = await launch();
 const { page, errors } = await openApp(browser);
@@ -30,6 +30,34 @@ const estado = () => page.evaluate(() => {
     pisos: Object.values(editor.project.elements).filter((e) => e.kind === 'floor').length,
   };
 });
+
+/** Prévia do comando ativo: realce (halo) do alvo, resultado tracejado e o próximo passo na barra. */
+const previa = () => page.evaluate(() => {
+  const { editor, useUi } = window.__hestia;
+  const t = editor.activeTool;
+  const itens = t.preview();
+  return {
+    halos: itens.filter((i) => i.kind === 'line' && i.halo).length,
+    tracejadas: itens.filter((i) => i.kind === 'line' && i.dashed).length,
+    selected: [...t.draft().selected],
+    prompt: t.inputPrompt(),
+    status: useUi.getState().status,
+  };
+});
+
+/** Limpa a seleção do esboço sem mexer na geometria (para testar os comandos sem seleção prévia). */
+const semSelecao = () => page.evaluate(() => {
+  const t = window.__hestia.editor.activeTool;
+  const d = t.draft();
+  t.loadDraft({ ...d, selected: [] });
+});
+
+/** Leva o mouse a um ponto de mundo (para ver o hover e a prévia sem clicar). */
+async function passarPor(x, y) {
+  const p = await worldToPage(page, x, y);
+  await page.mouse.move(p.x, p.y);
+  await page.waitForTimeout(120);
+}
 
 /** Botão da faixa pelo nome (rótulo exato), com o estado de pressionado e de desabilitado. */
 const botao = (nome) => page.getByRole('button', { name: nome, exact: true });
@@ -127,6 +155,98 @@ await rep.step('Deslocar desloca o laço por 0,2 m, e Ctrl+Z desfaz só o rascun
   const desfeito = await estado();
   check('Ctrl+Z volta o rascunho ao contorno anterior', Math.abs(desfeito.largura - antes.largura) < 0.01, desfeito.largura.toFixed(2));
   check('Ctrl+Z não mexe no projeto (mesmo número de elementos)', desfeito.elementos === elementos);
+  await botao('Deslocar').click();
+});
+
+await rep.step('Deslocar sem seleção: escolhe a linha pelo mouse, vê a prévia e confirma pelo clique do lado', async () => {
+  const antes = await estado();
+  const { x0, x1, y0 } = geo;
+  const mid = (x0 + x1) / 2;
+  await semSelecao();
+  await botao('Deslocar').click();
+  let p = await previa();
+  check('comando liga sem seleção e pede a linha', (await estado()).modo === 'offset' && p.selected.length === 0 && /clique na linha a deslocar/.test(p.status), p.status);
+  await passarPor(mid, y0);
+  p = await previa();
+  check('hover realça a linha sob o cursor', p.halos >= 1, `halos=${p.halos}`);
+  await page.screenshot({ path: `${OUT}/90-deslocar-alvo.png` });
+  await clickWorld(page, mid, y0);
+  p = await previa();
+  check('um clique escolhe a linha e avança para a distância', p.selected.length === 1 && p.prompt === 'Distância (ou clique do lado)', `${p.selected.length}/${p.prompt}`);
+  await passarPor(mid, y0 - 0.4);
+  p = await previa();
+  check('prévia tracejada da cópia do lado do cursor', p.tracejadas > 0, `tracejadas=${p.tracejadas}`);
+  check('barra de status pede a distância ou o lado', /distância|clique do lado/i.test(p.status), p.status);
+  await page.screenshot({ path: `${OUT}/91-deslocar-previa.png` });
+  await clickWorld(page, mid, y0 - 0.4);
+  await page.waitForTimeout(150);
+  const depois = await estado();
+  check('clique do lado aplica o deslocamento', depois.segs === antes.segs + 1 && depois.altura > antes.altura + 0.3, `segs ${antes.segs}->${depois.segs}, altura ${antes.altura.toFixed(2)}->${depois.altura.toFixed(2)}`);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(120);
+  const desfeito = await estado();
+  check('Ctrl+Z desfaz o deslocamento', Math.abs(desfeito.altura - antes.altura) < 0.01, desfeito.altura.toFixed(2));
+});
+
+await rep.step('Deslocar com distância digitada (vírgula decimal) e confirmada pelo lado', async () => {
+  const antes = await estado();
+  const { x0, x1, y0 } = geo;
+  const mid = (x0 + x1) / 2;
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(120);
+  let p = await previa();
+  check('Esc volta a escolher o alvo sem sair do comando', (await estado()).modo === 'offset' && p.selected.length === 0, `${p.selected.length} selecionada(s)`);
+  await clickWorld(page, mid, y0);
+  await page.keyboard.type('0,30');
+  await page.keyboard.press('Enter');
+  p = await previa();
+  check('a vírgula decimal foi aceita na distância', /Distância 0\.3 m/.test(p.status), p.status);
+  await passarPor(mid, y0 - 0.6);
+  p = await previa();
+  check('prévia tracejada com a distância digitada', p.tracejadas > 0, `tracejadas=${p.tracejadas}`);
+  await page.screenshot({ path: `${OUT}/92-deslocar-distancia.png` });
+  await clickWorld(page, mid, y0 - 0.6);
+  await page.waitForTimeout(150);
+  const depois = await estado();
+  check('deslocamento de 0,30 m', Math.abs(depois.altura - antes.altura - 0.3) < 0.02, (depois.altura - antes.altura).toFixed(2));
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(120);
+  const desfeito = await estado();
+  check('Ctrl+Z volta a altura anterior', Math.abs(desfeito.altura - antes.altura) < 0.01, desfeito.altura.toFixed(2));
+  await botao('Deslocar').click();
+});
+
+await rep.step('Tab alterna para todo o laço conectado, realça e escolhe as linhas ligadas', async () => {
+  const antes = await estado();
+  const { x0, x1, y0 } = geo;
+  const mid = (x0 + x1) / 2;
+  const n = antes.segs;
+  await semSelecao();
+  await botao('Deslocar').click();
+  await passarPor(mid, y0);
+  let p = await previa();
+  check('antes do Tab, só a linha sob o cursor', p.halos === 1, `halos=${p.halos}`);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(120);
+  p = await previa();
+  check('a barra informa o laço conectado', /laço conectado/.test(p.status), p.status);
+  check('o realce mostra todas as linhas do laço', p.halos === n, `halos=${p.halos}, laço=${n}`);
+  await page.screenshot({ path: `${OUT}/93-laco-conectado.png` });
+  await clickWorld(page, mid, y0);
+  p = await previa();
+  check('um clique escolhe o laço inteiro e avança', p.selected.length === n, `${p.selected.length}/${n}`);
+  await page.keyboard.type('0,20');
+  await page.keyboard.press('Enter');
+  await passarPor(mid, y0 - 0.6);
+  p = await previa();
+  check('prévia tracejada do laço deslocado', p.tracejadas > 0, `tracejadas=${p.tracejadas}`);
+  await page.screenshot({ path: `${OUT}/94-laco-previa.png` });
+  await clickWorld(page, mid, y0 - 0.6);
+  await page.waitForTimeout(150);
+  const depois = await estado();
+  check('o laço deslocado tem o mesmo número de linhas novas', depois.segs === n * 2, `${n} -> ${depois.segs}`);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(120);
   await botao('Deslocar').click();
 });
 

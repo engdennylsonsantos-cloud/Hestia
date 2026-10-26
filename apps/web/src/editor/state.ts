@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
-import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { DEFAULT_DISJOIN, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
 import { activeViewOf, addView, type OpenView } from './openViews.ts';
@@ -151,6 +151,9 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   rotateCopy: false,
   mirrorCopy: true,
   offsetCopy: true,
+  moveDisjoin: DEFAULT_DISJOIN.move,
+  rotateDisjoin: DEFAULT_DISJOIN.rotate,
+  mirrorDisjoin: DEFAULT_DISJOIN.mirror,
   floorTypeId: 'ft_ceram',
   floorOffset: 0,
   floorMode: 'poly',

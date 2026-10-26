@@ -3,6 +3,7 @@ export * from './joins.ts';
 export * from './types.ts';
 export * from './openingModelTypes.ts';
 export * from './openingModel.ts';
+export * from './openingPlan.ts';
 export * from './resolve.ts';
 export * from './quantities.ts';
 export * from './schedule.ts';

@@ -105,7 +105,7 @@ export class RoofTool extends ToolBase {
    * não têm eixo: nada é desenhado. Usa a mesma direção que o commit.
    */
   private ridgePreview(ring: Vec2[]): PreviewItem[] {
-    const shape = this.env.options().roofShape ?? 'gable';
+    const shape = this.env.options().roofShape ?? 'edges';
     if (shape !== 'shed' && shape !== 'gable') return [];
     if (ring.length < 3) return [];
     const dir = roofDirFor(shape, defaultRoofDir(ring), this.axisAlt);
@@ -267,7 +267,7 @@ export class RoofTool extends ToolBase {
   /** Tab: troca o eixo da cumeeira (ou da subida) entre os dois eixos ortogonais, e mostra a prévia de novo. */
   override tab(): void {
     this.axisAlt = !this.axisAlt;
-    const shape = this.env.options().roofShape ?? 'gable';
+    const shape = this.env.options().roofShape ?? 'edges';
     const eixo = this.axisAlt ? 'transversal' : 'longitudinal';
     const usesAxis = shape === 'shed' || shape === 'gable' || shape === 'extrusion';
     const nome = shape === 'shed' ? 'subida' : shape === 'extrusion' ? 'extrusão' : 'cumeeira';
@@ -289,7 +289,7 @@ export class RoofTool extends ToolBase {
       this.env.say('O projeto não tem tipo de telhado.');
       return;
     }
-    const shape: RoofShape = o.roofShape ?? 'gable';
+    const shape: RoofShape = o.roofShape ?? 'edges';
     const extrusion = shape === 'extrusion';
     const preset: EdgePresetShape = shape === 'shed' || shape === 'gable' || shape === 'hip' ? shape : 'edges';
     const slope = o.roofSlope ?? 30;

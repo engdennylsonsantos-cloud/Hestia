@@ -39,7 +39,7 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(polygonArea([r.boundary])).toBeCloseTo(35, 6);
     // A forma da barra (duas águas, padrão) vira predefinições por aresta: lados longos definem, curtos são empenas.
     expect(r.shape).toBe('edges');
-    expect(r.edgeSlopes).toEqual([30, null, 30, null]);
+    expect(r.edgeSlopes).toEqual([30, 30, 30, 30]);
     expect(r.slopePercent).toBe(30);
     expect(r.heightOffset).toBe(2.8);
     expect(ctx.sel()).toEqual([r.id]);

@@ -60,7 +60,9 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
   // A altura das peças é limitada pela parede, como antes (o modelo usa a altura nominal do tipo).
   const geom = g.height > H - g.sill ? { ...g, height: H - g.sill } : g;
   const model = buildOpeningModel(p, o, geom, f);
-  const angle = open ? (openingAngle3d(t) * Math.PI) / 180 : 0;
+  // A veneziana tem limite próprio de 70° (spec E §3.5); o padrão do tipo é 45°.
+  const abertura = t.plan === 'louver' ? Math.min(70, openingAngle3d(t)) : openingAngle3d(t);
+  const angle = open ? (abertura * Math.PI) / 180 : 0;
   const state = { angle, slide: open ? 1 : 0 };
   const out: OpeningPiece[] = [];
   for (const part of model.parts) {

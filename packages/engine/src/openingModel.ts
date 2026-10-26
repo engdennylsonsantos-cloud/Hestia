@@ -21,6 +21,7 @@ import {
   type Project,
 } from '@hestia/model';
 import type { WallFrame } from './frame.ts';
+import { buildWindowNew } from './openingModelWindowsNew.ts';
 import type { OpeningGeometry } from './types.ts';
 import type {
   LeafOpening,
@@ -660,7 +661,7 @@ function buildWindow(c: Ctx): void {
       buildWindowVoid(c);
       break;
     default:
-      buildFixedWindow(c);
+      if (!buildWindowNew(c, family)) buildFixedWindow(c);
   }
 }
 

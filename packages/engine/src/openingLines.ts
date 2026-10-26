@@ -105,6 +105,27 @@ export function openingLinePaths(
       });
       continue;
     }
+    if (opening.kind === 'slide' && opening.slideAxis === 'z') {
+      if (slideDone) continue;
+      slideDone = true;
+      // Guilhotina: seta vertical no meio da folha móvel, da posição fechada para a aberta.
+      const span = leafSpan(m, opening);
+      const center = u((span.t0 + span.t1) / 2);
+      const dir = opening.z1 >= opening.z0 ? 1 : -1;
+      const tip = dir > 0 ? opening.z1 : opening.z0;
+      const tail = dir > 0 ? opening.z0 : opening.z1;
+      out.push({ pts: [{ u: center, z: tail }, { u: center, z: tip }], dashed: true });
+      const head = tip - dir * 0.1;
+      out.push({
+        pts: [
+          { u: center - 0.04, z: head },
+          { u: center, z: tip },
+          { u: center + 0.04, z: head },
+        ],
+        dashed: true,
+      });
+      continue;
+    }
     if (opening.kind === 'slide') {
       if (slideDone) continue;
       slideDone = true;

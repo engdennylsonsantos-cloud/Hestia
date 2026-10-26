@@ -1,7 +1,8 @@
 import { resolveLevel } from '@hestia/engine';
 import { DEFAULT_VIEW_3D, type OpeningType, type Project, type View3DSettings } from '@hestia/model';
 import { ModelScene } from '@hestia/render';
-import { previewProject } from './previewProject.ts';
+import { applyPreviewCamera, previewCamera } from './previewCamera.ts';
+import { previewOpening, previewProject } from './previewProject.ts';
 
 /** Estilos das duas abas 3D do diálogo. */
 export type Preview3DStyle = 'lines' | 'shaded';
@@ -50,5 +51,10 @@ export function previewScene(
   flipFacing = false,
 ): ModelScene {
   const withAngle: OpeningType = { ...type, angle3d: clampAngle(angle ?? type.angle3d ?? 90) };
-  return buildPreviewScene(previewProject(withAngle, flipHand, flipFacing), style, dark);
+  const project = previewProject(withAngle, flipHand, flipFacing);
+  const scene = buildPreviewScene(project, style, dark);
+  const opening = previewOpening(project);
+  // Enquadra a esquadria (folha aberta e alizar), não a parede inteira: o vão ocupa ~70% da altura da prévia.
+  if (opening) applyPreviewCamera(scene.orbit, previewCamera(project, opening));
+  return scene;
 }

@@ -373,8 +373,8 @@ svg { display: block; }
 .op-dlg { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .op-head { grid-template-columns: auto minmax(130px, 1fr) auto auto minmax(160px, 1.2fr) auto; margin: 0; padding: 8px 12px; }
 .op-star { min-width: 28px; justify-content: center; font-size: 14px; line-height: 1; }
-.op-main { display: grid; grid-template-columns: 200px minmax(0, 1fr) 340px; flex: 1; min-height: 0; }
-.op-main.lib-off { grid-template-columns: 34px minmax(0, 1fr) 340px; }
+.op-main { display: grid; grid-template-columns: 200px minmax(0, 1fr) 460px; flex: 1; min-height: 0; }
+.op-main.lib-off { grid-template-columns: 34px minmax(0, 1fr) 460px; }
 .op-lib { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--chrome); border-right: 1px solid var(--line-strong); }
 .op-lib-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--fg-soft); }
 .op-lib[data-collapsed='true'] .op-lib-head { flex-direction: column; padding: 6px 2px; }
@@ -405,8 +405,19 @@ svg { display: block; }
 .op-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--fg-soft); padding: 4px 7px; margin-bottom: -1px; font-size: 11.5px; }
 .op-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
 .op-tab:disabled { color: var(--fg-faint); opacity: 0.55; }
-.op-pv-box { min-height: 190px; border: 1px solid var(--line-strong); background: linear-gradient(#f7fafc, #e3e9ee); display: grid; place-items: center; overflow: hidden; }
-.op-pv-box .rv-preview { margin: 0; height: 100%; min-height: 190px; width: 100%; }
+.op-pv-box { min-height: 340px; aspect-ratio: 4 / 3; border: 1px solid var(--line-strong); background: linear-gradient(#f7fafc, #e3e9ee); display: grid; place-items: center; overflow: hidden; }
+.op-pv-box .rv-preview { margin: 0; height: 100%; min-height: 340px; width: 100%; }
+/* Corte da prévia: o corte inteiro à esquerda e os detalhes ampliados (cabeça e soleira) empilhados à direita. */
+.dialog.xl .op-section-frames { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 6px; width: 100%; height: 100%; min-height: 340px; }
+.dialog.xl .op-frame { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; margin: 0; border: 1px solid var(--line); border-radius: 2px; background: var(--sheet); overflow: hidden; }
+.dialog.xl .op-frame > .op-frame-svg { flex: 1; min-height: 0; }
+.dialog.xl .op-frame figcaption { padding: 1px 4px; border-top: 1px solid var(--line); color: var(--fg-soft); font-size: 10.5px; line-height: 1.3; }
+.dialog.xl .op-frame-details { display: grid; grid-template-rows: 1fr 1fr; gap: 6px; min-height: 0; }
+/* Miniaturas de escolha: legíveis e com o realce do tema na escolhida. */
+.dialog.xl .op-choices { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px 0; }
+.dialog.xl .op-choice { width: 60px; height: 46px; padding: 1px; overflow: hidden; border: 1px solid var(--line-strong); background: var(--sheet); }
+.dialog.xl .op-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
+.dialog.xl .op-choice.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .op-pv-soon { color: var(--fg-faint); font-size: 12px; }
 .op-pv-actions { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 5px; align-items: center; }
 .op-pv-actions > label { color: var(--fg-soft); font-size: 11px; }

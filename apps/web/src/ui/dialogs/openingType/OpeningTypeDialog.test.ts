@@ -169,6 +169,37 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('Porta de giro');
   });
 
+  it('o seletor de maçaneta mostra o valor efetivo: lever no ot_p90 e none quando o tipo grava none', () => {
+    const family = openingFamilies('door').find((f) => f.id === 'door_swing')!;
+    const render = (d: OpeningType): string =>
+      renderToStaticMarkup(
+        createElement(OpeningTypeSections, {
+          d,
+          onChange: vazio,
+          families: openingFamilies('door'),
+          family,
+          leaves: leavesChoicesFor(family),
+          materials: {},
+        }),
+      );
+    const selectedValue = (html: string, id: string): string | null => {
+      const start = html.indexOf(`id="${id}"`);
+      const end = html.indexOf('</select>', start);
+      const select = html.slice(start, end);
+      const tag = select.split('<option').find((t) => t.includes('selected')) ?? '';
+      return /value="([^"]+)"/.exec(tag)?.[1] ?? null;
+    };
+    const padrao = tipo('ot_p90');
+    expect(padrao.handle).toBeUndefined();
+    expect(selectedValue(render(padrao), 'op-handle')).toBe('lever');
+    expect(selectedValue(render({ ...padrao, handle: 'none' }), 'op-handle')).toBe('none');
+    // O estilo da folha, o batente e os detalhes também mostram o efetivo (não o campo vazio).
+    expect(selectedValue(render(padrao), 'op-leaf')).toBe('flush');
+    expect(selectedValue(render(padrao), 'op-frame')).toBe('rebate');
+    expect(selectedValue(render(padrao), 'op-d2')).toBe('scale');
+    expect(selectedValue(render(padrao), 'op-d3')).toBe('view');
+  });
+
   it('o seletor de famílias do formulário só traz as portas', () => {
     expect(familyOptionsFor('door').map((f) => f.name)).toEqual([
       'Porta de giro',

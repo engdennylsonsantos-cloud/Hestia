@@ -16,25 +16,25 @@ export const PREVIEW_OPENING_ID = 'pv_abertura';
 /** Parede de prévia: alvenaria 14 cm com reboco e pintura, o tipo usado como padrão no editor. */
 export const PREVIEW_WALL_TYPE_ID = 'wt_alv14';
 
-/** Vão mínimo entre o centro da abertura e as pontas da parede (m). */
-const WALL_END_MARGIN = 1.2;
+/** Vão entre o centro da abertura e as pontas da parede (m). A prévia enquadra a esquadria, não a parede. */
+const WALL_END_MARGIN = 0.6;
 
-/** Comprimento do vão da prévia: `max(3,6; largura + 2,4)` (spec E §4.4). */
+/** Folga acima do vão para a verga, o alizar e o peitoril saliente aparecerem inteiros (m). */
+const WALL_TOP_MARGIN = 0.5;
+
+/** Comprimento da parede da prévia: `largura + 1,2` (spec E §4.4, acabamento visual). */
 export function previewWallLength(type: Pick<OpeningType, 'width'>): number {
-  return Math.max(3.6, Math.max(0, type.width) + 2 * WALL_END_MARGIN);
+  return Math.max(0, type.width) + 2 * WALL_END_MARGIN;
 }
 
-/**
- * Altura da parede da prévia: a do editor (2,8 m) ou o necessário para o vão mais o peitoril caberem com folga
- * (assim a verga, o alizar e o peitoril saliente também aparecem inteiros).
- */
+/** Altura da parede da prévia: `altura + peitoril + 0,5` (spec E §4.4, acabamento visual). */
 export function previewWallHeight(type: Pick<OpeningType, 'height' | 'sill'>): number {
-  return Math.max(2.8, Math.max(0, type.sill) + Math.max(0, type.height) + 0.4);
+  return Math.max(0, type.sill) + Math.max(0, type.height) + WALL_TOP_MARGIN;
 }
 
 /**
  * Projeto mínimo da prévia do diálogo (spec E §4.4): um nível, uma parede reta `wt_alv14` de comprimento
- * `max(3,6; largura + 2,4)` e o próprio tipo no catálogo, com a abertura hospedada no centro. Todos os campos v2 do
+ * `largura + 1,2` e altura `altura + peitoril + 0,5`, com a abertura hospedada no centro. Todos os campos v2 do
  * rascunho são preservados; o peitoril de janela vem do tipo. `flipHand` e `flipFacing` são da instância de prévia.
  */
 export function previewProject(type: OpeningType, flipHand = false, flipFacing = false): Project {

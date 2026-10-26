@@ -1,12 +1,20 @@
 import { useDeferredValue, useState, type ReactElement, type ReactNode } from 'react';
 import {
   OPENING_FRAME_DEFAULTS,
+  openingAngle2d,
+  openingAngle3d,
   openingCasing,
+  openingDetail2d,
+  openingDetail3d,
+  openingFrameStyle,
+  openingGrid,
   openingHandle,
   openingLeafStyle,
   openingLintel,
+  openingPlanDisplay,
   openingSillBeam,
   openingSillBoard,
+  openingSwingStyle,
   type Material,
   type OpeningFamily,
   type OpeningType,
@@ -14,6 +22,7 @@ import {
 import { Check, NumField, TextField } from '../../fields.tsx';
 import { alternarAcabamento, alternarSidelight, alternarTransom } from '../openingTypeForm.ts';
 import { OpeningTypeThumb } from './OpeningTypeThumb.tsx';
+import { withOpeningField } from './openingTypeFields.ts';
 
 interface OpeningTypeSectionsProps {
   d: OpeningType;
@@ -70,19 +79,18 @@ function Miniaturas<T extends string>({
   preview: (v: T) => OpeningType;
 }): ReactElement {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, margin: '2px 0 6px 0' }}>
+    <div className="op-choices">
       {options.map(([v, label]) => (
         <button
           key={v}
           type="button"
-          className={`btn small${v === value ? ' primary' : ''}`}
+          className={`btn small op-choice${v === value ? ' on' : ''}`}
           title={label}
           aria-label={label}
           aria-pressed={v === value}
-          style={{ width: 52, height: 36, padding: 1, overflow: 'hidden' }}
           onClick={() => onPick(v)}
         >
-          <OpeningTypeThumb type={preview(v)} width={52} height={34} />
+          <OpeningTypeThumb type={preview(v)} width={58} height={42} />
         </button>
       ))}
     </div>
@@ -90,8 +98,28 @@ function Miniaturas<T extends string>({
 }
 
 /** As sete seções recolhíveis do diálogo, na ordem da decisão 0034. */
-export function OpeningTypeSections({ d, onChange, families, family, leaves, materials }: OpeningTypeSectionsProps): ReactElement {
+export function OpeningTypeSections({ d, onChange, families, leaves, materials }: OpeningTypeSectionsProps): ReactElement {
   const set = (patch: Partial<OpeningType>): void => onChange({ ...d, ...patch });
+  // Valores efetivos (padrão por leitura) e os padrões de cada campo v2: o seletor mostra o efetivo e só grava o que difere.
+  const leafStyle = openingLeafStyle(d);
+  const handle = openingHandle(d);
+  const frameStyle = openingFrameStyle(d);
+  const angle2d = openingAngle2d(d);
+  const angle3d = openingAngle3d(d);
+  const grid = openingGrid(d);
+  const detail2d = openingDetail2d(d);
+  const detail3d = openingDetail3d(d);
+  const setField = (field: Parameters<typeof withOpeningField>[1], value: unknown, fallback: unknown): void => {
+    onChange(withOpeningField(d, field, value, fallback));
+  };
+  const leafFallback = openingLeafStyle({ kind: d.kind });
+  const handleFallback = openingHandle({ kind: d.kind, plan: d.plan, leaves: d.leaves });
+  const frameFallback = openingFrameStyle({});
+  const angle2dFallback = openingAngle2d({});
+  const angle3dFallback = openingAngle3d({ kind: d.kind, plan: d.plan });
+  const gridFallback = openingGrid({});
+  const detail2dFallback = openingDetail2d({});
+  const detail3dFallback = openingDetail3d({});
   // As miniaturas são caras: o React atualiza o tipo adiado sem segurar a digitação nos campos.
   const thumbnailType = useDeferredValue(d);
   const setTexto = (campo: 'code' | 'description' | 'manufacturer' | 'fireRating', v: string): void => {
@@ -121,14 +149,14 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
       <Secao title="Definições da folha">
         <div className="field-row">
           <label htmlFor="op-leaf">Estilo da folha</label>
-          <select id="op-leaf" className="select" value={d.leafStyle ?? (d.kind === 'door' ? 'flush' : 'glass')} onChange={(e) => set({ leafStyle: e.target.value as OpeningType['leafStyle'] })}>
+          <select id="op-leaf" className="select" value={leafStyle} onChange={(e) => setField('leafStyle', e.target.value, leafFallback)}>
             {FIELD_LEAF.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </div>
         <Miniaturas
-          value={openingLeafStyle(d)}
+          value={leafStyle}
           options={FIELD_LEAF}
-          onPick={(v) => set({ leafStyle: v })}
+          onPick={(v) => setField('leafStyle', v, leafFallback)}
           preview={(v) => ({ ...thumbnailType, leafStyle: v })}
         />
         <div className="field-row">
@@ -146,18 +174,18 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
         <div className="field-row"><label htmlFor="op-lt">Espessura da folha</label><NumField id="op-lt" value={d.leafThickness ?? (d.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ leafThickness: v })} /></div>
         <div className="field-row">
           <label htmlFor="op-handle">Maçaneta</label>
-          <select id="op-handle" className="select" value={d.handle ?? 'none'} onChange={(e) => set({ handle: e.target.value as OpeningType['handle'] })}>
+          <select id="op-handle" className="select" value={handle} onChange={(e) => setField('handle', e.target.value, handleFallback)}>
             {FIELD_HANDLE.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </div>
         <Miniaturas
-          value={openingHandle(d)}
+          value={handle}
           options={FIELD_HANDLE}
-          onPick={(v) => set({ handle: v })}
+          onPick={(v) => setField('handle', v, handleFallback)}
           preview={(v) => ({ ...thumbnailType, handle: v })}
         />
-        <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={d.angle2d ?? 90} decimals={0} unit="°" onCommit={(v) => set({ angle2d: v })} /></div>
-        <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={d.angle3d ?? (family?.id === 'window_casement' || family?.id === 'window_tilt' ? 30 : 90)} decimals={0} unit="°" onCommit={(v) => set({ angle3d: v })} /></div>
+        <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={angle2d} decimals={0} unit="°" onCommit={(v) => setField('angle2d', v, angle2dFallback)} /></div>
+        <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={angle3d} decimals={0} unit="°" onCommit={(v) => setField('angle3d', v, angle3dFallback)} /></div>
         <div className="field-row"><label htmlFor="op-transom" title="Vidro fixo acima da folha">Bandeira superior</label><Check id="op-transom" checked={temBandeira} onChange={(v) => onChange(alternarTransom(d, v))} /></div>
         {temBandeira ? (
           <div className="field-row"><label htmlFor="op-transom-h">Bandeira: altura</label><NumField id="op-transom-h" value={d.transom?.height ?? 0} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ transom: { height: v, fixed: d.transom?.fixed !== false } })} /></div>
@@ -172,7 +200,7 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
       <Secao title="Moldura e vidro">
         <div className="field-row">
           <label htmlFor="op-frame">Estilo do batente</label>
-          <select id="op-frame" className="select" value={d.frameStyle ?? 'rebate'} onChange={(e) => set({ frameStyle: e.target.value as OpeningType['frameStyle'] })}>
+          <select id="op-frame" className="select" value={frameStyle} onChange={(e) => setField('frameStyle', e.target.value, frameFallback)}>
             {FIELD_FRAME.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
         </div>
@@ -180,8 +208,8 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
         <div className="field-row"><label htmlFor="op-fd" title="Profundidade do batente na espessura da parede (limitada ao núcleo)">Profundidade do batente</label><NumField id="op-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
         {janela ? (
           <>
-            <div className="field-row"><label htmlFor="op-grid-c">Divisões: colunas</label><NumField id="op-grid-c" value={d.grid?.cols ?? 1} decimals={0} onCommit={(v) => set({ grid: { cols: v, rows: d.grid?.rows ?? 1 } })} /></div>
-            <div className="field-row"><label htmlFor="op-grid-r">Divisões: linhas</label><NumField id="op-grid-r" value={d.grid?.rows ?? 1} decimals={0} onCommit={(v) => set({ grid: { cols: d.grid?.cols ?? 1, rows: v } })} /></div>
+            <div className="field-row"><label htmlFor="op-grid-c">Divisões: colunas</label><NumField id="op-grid-c" value={grid.cols} decimals={0} onCommit={(v) => setField('grid', { cols: v, rows: grid.rows }, gridFallback)} /></div>
+            <div className="field-row"><label htmlFor="op-grid-r">Divisões: linhas</label><NumField id="op-grid-r" value={grid.rows} decimals={0} onCommit={(v) => setField('grid', { cols: grid.cols, rows: v }, gridFallback)} /></div>
           </>
         ) : null}
         <div className="field-row">
@@ -196,7 +224,7 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
       <Secao title="Planta e corte">
         <div className="field-row">
           <label htmlFor="op-plan">Exibição em planta</label>
-          <select id="op-plan" className="select" value={d.planDisplay ?? 'symbolic'} onChange={(e) => set({ planDisplay: e.target.value as OpeningType['planDisplay'] })}>
+          <select id="op-plan" className="select" value={openingPlanDisplay(d)} onChange={(e) => setField('planDisplay', e.target.value, openingPlanDisplay({}))}>
             <option value="symbolic">Simbólica</option>
             <option value="projected">Projetada</option>
           </select>
@@ -204,7 +232,7 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
         <div className="field-row"><label htmlFor="op-swing" title="Arco do fecho desenhado na planta">Mostrar arco</label><Check id="op-swing" checked={d.showSwing !== false} onChange={(v) => { const next: OpeningType = { ...d }; if (v) delete next.showSwing; else next.showSwing = false; onChange(next); }} /></div>
         <div className="field-row">
           <label htmlFor="op-swing-style">Estilo do arco</label>
-          <select id="op-swing-style" className="select" value={d.swingStyle ?? 'arc'} onChange={(e) => set({ swingStyle: e.target.value as OpeningType['swingStyle'] })}>
+          <select id="op-swing-style" className="select" value={openingSwingStyle(d)} onChange={(e) => setField('swingStyle', e.target.value, openingSwingStyle({}))}>
             <option value="arc">Arco</option>
             <option value="dash">Tracejado</option>
             <option value="line">Linha</option>
@@ -215,7 +243,7 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
       <Secao title="Nível de detalhe" highlight>
         <div className="field-row">
           <label htmlFor="op-d2">2D</label>
-          <select id="op-d2" className="select" value={d.detail2d ?? 'scale'} onChange={(e) => set({ detail2d: e.target.value as OpeningType['detail2d'] })}>
+          <select id="op-d2" className="select" value={detail2d} onChange={(e) => setField('detail2d', e.target.value, detail2dFallback)}>
             <option value="scale">Sensível à escala</option>
             <option value="low">1:50 (baixo)</option>
             <option value="mid">1:100 (médio)</option>
@@ -225,7 +253,7 @@ export function OpeningTypeSections({ d, onChange, families, family, leaves, mat
         </div>
         <div className="field-row">
           <label htmlFor="op-d3">3D</label>
-          <select id="op-d3" className="select" value={d.detail3d ?? 'view'} onChange={(e) => set({ detail3d: e.target.value as OpeningType['detail3d'] })}>
+          <select id="op-d3" className="select" value={detail3d} onChange={(e) => setField('detail3d', e.target.value, detail3dFallback)}>
             <option value="view">Por vista</option>
             <option value="schematic">Esquemático</option>
             <option value="simple">Simplificado</option>

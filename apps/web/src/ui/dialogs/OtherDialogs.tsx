@@ -1,23 +1,18 @@
-import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { COMANDOS_COM_ATALHO, TOOL_GROUPS, type ShortcutCommand } from '@hestia/tools';
 import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
-import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId, type Wall } from '@hestia/model';
+import { TEMPLATES, buildTemplate, isWall, makeLevel, newId, type TemplateId, type Wall } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { hasAutosave } from '../../editor/storage.ts';
 import { useUi } from '../../editor/state.ts';
 import { useAtalhos } from '../../editor/shortcutConfig.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
-import { TypeDialogHeader } from './TypeDialogHeader.tsx';
-import { TypePreview } from '../TypePreview.tsx';
-import { openingFamilyName } from '../typeFamilies.ts';
-import { alternarAcabamento, applyFamily, familyOptionsFor, leavesChoicesFor, leavesLabel, newOpeningTypeFromFamily } from './openingTypeForm.ts';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
-// Seções nomeadas do formulário do tipo (padrão Revit/ArchiCAD), no mesmo estilo do antigo bloco "Esquadria".
-const SECTION: CSSProperties = { border: 0, padding: 0, margin: '12px 0 0' };
-const LEGEND: CSSProperties = { color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' };
+// O diálogo do tipo de abertura vive em `openingType/`; o nome antigo continua sendo a porta de entrada do App.
+export { OpeningTypeDialog } from './openingType/OpeningTypeDialog.tsx';
 
 export function LevelsDialog(): ReactElement {
   const p = useProject();
@@ -48,185 +43,6 @@ export function LevelsDialog(): ReactElement {
       <p>
         <button className="btn small" onClick={() => run(() => editor.store.exec({ type: 'upsertLevel', level: makeLevel({ id: newId('lv'), name: `Pavimento ${p.levels.length + 1}`, elevation: (p.levels[p.levels.length - 1]?.elevation ?? 0) + 3 }) }))}>+ Novo nível</button>
       </p>
-    </Dialog>
-  );
-}
-
-export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
-  const p = useProject();
-  const src = p.openingTypes[typeId];
-  const [d, setD] = useState<OpeningType | null>(src ? { ...src } : null);
-  const [err, setErr] = useState('');
-  // Trocar o tipo pelo cabeçalho recomeça o rascunho com o tipo escolhido.
-  const [current, setCurrent] = useState(typeId);
-  if (current !== typeId) {
-    setCurrent(typeId);
-    setD(p.openingTypes[typeId] ? { ...p.openingTypes[typeId]! } : null);
-    setErr('');
-  }
-  if (!d) return null;
-  const set = (patch: Partial<OpeningType>): void => setD({ ...d, ...patch });
-  const used = Object.values(p.elements).filter((e) => (e.kind === 'door' || e.kind === 'window') && e.typeId === d.id).length;
-  const families = familyOptionsFor(d.kind);
-  const family = openingFamilyOf(d);
-  // Folhas aceitas pela família escolhida; sem família válida (dado fora do contrato) mostra só a contagem atual.
-  const leaves = family ? leavesChoicesFor(family) : [{ value: d.leaves, label: leavesLabel(d.leaves) }];
-  // Acabamento: valores lidos (com padrão do modelo) de cada peça; ausente = peça desligada (não mostra os campos).
-  const cas = d.casing;
-  const sb = d.sillBoard;
-  const lin = openingLintel(d);
-  const beam = openingSillBeam(d);
-  /** Grava pelo comando; a mensagem de erro do modelo aparece no diálogo, que continua aberto. */
-  const run = (fn: () => void): boolean => {
-    try {
-      fn();
-      setErr('');
-      return true;
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Erro');
-      return false;
-    }
-  };
-  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
-  const apply = (): void => {
-    run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura'));
-  };
-  const ok = (): void => {
-    if (run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: d }, 'Editar tipo de abertura'))) close();
-  };
-  const dup = (): void => {
-    const copy = { ...d, id: newId('ot'), name: `${d.name} (cópia)` };
-    if (!run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: copy }, 'Duplicar tipo'))) return;
-    useUi.setState({ dialogArg: copy.id });
-    setD(copy);
-  };
-  /** Tipo novo da família escolhida; passa a editar o tipo criado (no Revit: Duplicate → novo tipo). */
-  const create = (): void => {
-    const fam = family ?? families[0];
-    if (!fam) return;
-    const created = newOpeningTypeFromFamily(fam);
-    if (!run(() => editor.store.exec({ type: 'upsertOpeningType', openingType: created }, 'Novo tipo de abertura'))) return;
-    useUi.setState({ dialogArg: created.id });
-    setD(created);
-  };
-  return (
-    <Dialog
-      title="Propriedades do tipo"
-      sub={`${d.kind === 'door' ? 'Porta' : 'Janela'} · usado em ${used}`}
-      size="mid"
-      onClose={close}
-      footer={
-        <>
-          <button className="btn" onClick={create}>+ Novo tipo</button>
-          <span style={{ flex: 1 }} />
-          <button className="btn" onClick={close}>Cancelar</button>
-          <button className="btn" onClick={apply}>Aplicar</button>
-          <button className="btn primary" onClick={ok}>OK</button>
-        </>
-      }
-    >
-      <TypeDialogHeader family={openingFamilyName(d)} types={Object.values(p.openingTypes).filter((t) => t.kind === d.kind)} currentId={d.id} nameFieldId="ot-name" onDuplicate={dup} />
-      <div className="tdlg-mid">
-      <div className="tdlg-params">
-      <fieldset style={SECTION}>
-        <legend style={LEGEND}>Dimensões</legend>
-        <div className="field-row"><label htmlFor="ot-w">Largura</label><NumField id="ot-w" value={d.width} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ width: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-h">Altura</label><NumField id="ot-h" value={d.height} scale={100} decimals={0} unit="cm" min={0.2} onCommit={(v) => set({ height: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-s">Peitoril</label><NumField id="ot-s" value={d.sill} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ sill: v })} /></div>
-      </fieldset>
-      <fieldset style={SECTION}>
-        <legend style={LEGEND}>Família e folhas</legend>
-        <div className="field-row">
-          <label htmlFor="ot-fam" title="Comportamento e símbolo de planta do tipo (família da porta ou janela)">Família</label>
-          <select id="ot-fam" className="select" value={family?.id ?? ''} onChange={(e) => { const fam = families.find((f) => f.id === e.target.value); if (fam) setD(applyFamily(d, fam)); }}>
-            {families.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        </div>
-        <div className="field-row">
-          <label htmlFor="ot-l">Folhas</label>
-          <select id="ot-l" className="select" value={d.leaves} disabled={leaves.length <= 1} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
-            {leaves.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-      </fieldset>
-      <fieldset style={SECTION}>
-        <legend style={LEGEND}>Fechamento do vão</legend>
-        <div className="field-row">
-          <label htmlFor="ot-clos" title="Substitui o retorno de acabamento definido no tipo de parede">Retorno do vão</label>
-          <select id="ot-clos" className="select" value={d.closure} onChange={(e) => set({ closure: e.target.value as OpeningType['closure'] })}>
-            <option value="inherit">Seguir o tipo de parede</option>
-            <option value="none">Sem retorno</option>
-            <option value="both">Retorno dos dois lados</option>
-            <option value="exterior">Só lado externo</option>
-            <option value="interior">Só lado interno</option>
-          </select>
-        </div>
-      </fieldset>
-      <fieldset style={SECTION}>
-        <legend style={LEGEND}>Identidade</legend>
-        <div className="field-row"><label htmlFor="ot-name">Nome</label><TextField id="ot-name" value={d.name} onCommit={(v) => set({ name: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-code">Código</label><TextField id="ot-code" value={d.code ?? ''} onCommit={(v) => set({ code: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-desc">Descrição</label><TextField id="ot-desc" value={d.description ?? ''} onCommit={(v) => set({ description: v })} /></div>
-      </fieldset>
-      {/* Espessuras da esquadria (cm). Campos vazios no tipo valem o padrão mostrado; a profundidade do batente é limitada à parede. */}
-      <fieldset style={SECTION}>
-        <legend style={LEGEND}>Esquadria</legend>
-        <div className="field-row">
-          <label htmlFor="ot-fm">Material do caixilho</label>
-          <select id="ot-fm" className="select" value={d.frameMaterialId} onChange={(e) => set({ frameMaterialId: e.target.value })}>
-            {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-        </div>
-        <div className="field-row"><label htmlFor="ot-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="ot-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameWidth: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-fd" title="Profundidade do batente na espessura da parede (limitada a ela)">Profundidade do batente</label><NumField id="ot-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-lt">Espessura da folha</label><NumField id="ot-lt" value={d.leafThickness ?? (d.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ leafThickness: v })} /></div>
-        <div className="field-row"><label htmlFor="ot-gt">Espessura do vidro</label><NumField id="ot-gt" value={d.glassThickness ?? OPENING_FRAME_DEFAULTS.glass} scale={100} decimals={1} unit="cm" min={0.001} onCommit={(v) => set({ glassThickness: v })} /></div>
-      </fieldset>
-      {/* Acabamento (recolhível): folga do vão bruto e peças em volta do vão. Desligar tira o campo (volta ao padrão). Sem `min`: o modelo recusa valor fora da faixa e o erro aparece aqui. */}
-      <details style={{ margin: '12px 0 0' }}>
-        <summary style={{ ...LEGEND, cursor: 'pointer' }}>Acabamento</summary>
-        <div className="field-row"><label htmlFor="ot-ac-fw" title="Folga do vão bruto (furo na parede) em relação à largura do tipo; a esquadria não muda">Folga: largura</label><NumField id="ot-ac-fw" value={d.roughOversize?.w ?? 0} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ roughOversize: { w: v, h: d.roughOversize?.h ?? 0 } })} /></div>
-        <div className="field-row"><label htmlFor="ot-ac-fh" title="Folga do vão bruto (furo na parede) em relação à altura do tipo">Folga: altura</label><NumField id="ot-ac-fh" value={d.roughOversize?.h ?? 0} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ roughOversize: { w: d.roughOversize?.w ?? 0, h: v } })} /></div>
-        <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><input id="ot-ac-al" type="checkbox" checked={cas !== undefined} onChange={(e) => setD(alternarAcabamento(d, 'casing', e.target.checked))} /></div>
-        {cas ? (
-          <>
-            <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-ale">Alizar: espessura</label><NumField id="ot-ac-ale" value={cas.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, thickness: v } })} /></div>
-          </>
-        ) : null}
-        {d.kind === 'window' ? (
-          <>
-            <div className="field-row"><label htmlFor="ot-ac-sb" title="Peitoril saliente, só de janela: projeção além de cada face da parede">Soleira saliente</label><input id="ot-ac-sb" type="checkbox" checked={sb !== undefined} onChange={(e) => setD(alternarAcabamento(d, 'sillBoard', e.target.checked))} /></div>
-            {sb ? (
-              <>
-                <div className="field-row"><label htmlFor="ot-ac-sbp">Soleira: projeção</label><NumField id="ot-ac-sbp" value={sb.projection} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBoard: { ...sb, projection: v } })} /></div>
-                <div className="field-row"><label htmlFor="ot-ac-sbe">Soleira: espessura</label><NumField id="ot-ac-sbe" value={sb.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBoard: { ...sb, thickness: v } })} /></div>
-              </>
-            ) : null}
-          </>
-        ) : null}
-        <div className="field-row"><label htmlFor="ot-ac-vg" title="Verga: peça de concreto sobre o vão">Verga</label><input id="ot-ac-vg" type="checkbox" checked={lin !== null} onChange={(e) => setD(alternarAcabamento(d, 'lintel', e.target.checked))} /></div>
-        {lin ? (
-          <>
-            <div className="field-row"><label htmlFor="ot-ac-vgo">Verga: transpasse</label><NumField id="ot-ac-vgo" value={lin.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, over: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-vgh">Verga: altura</label><NumField id="ot-ac-vgh" value={lin.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, height: v } })} /></div>
-          </>
-        ) : null}
-        <div className="field-row"><label htmlFor="ot-ac-cv" title="Contraverga: peça de concreto sob o vão">Contraverga</label><input id="ot-ac-cv" type="checkbox" checked={beam !== null} onChange={(e) => setD(alternarAcabamento(d, 'sillBeam', e.target.checked))} /></div>
-        {beam ? (
-          <>
-            <div className="field-row"><label htmlFor="ot-ac-cvo">Contrav.: transpasse</label><NumField id="ot-ac-cvo" value={beam.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, over: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-cvh">Contrav.: altura</label><NumField id="ot-ac-cvh" value={beam.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, height: v } })} /></div>
-          </>
-        ) : null}
-      </details>
-      {err ? <p className="error" role="alert">{err}</p> : null}
-      </div>
-      <aside className="tdlg-pv">
-        <TypePreview subject={{ kind: d.kind, type: d }} />
-        <p className="tdlg-caption">Pré-visualização atualizada conforme os parâmetros do tipo mudam.</p>
-      </aside>
-      </div>
     </Dialog>
   );
 }

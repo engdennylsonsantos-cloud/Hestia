@@ -219,13 +219,121 @@ function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: num
   });
 }
 
-/** Porta de giro de uma folha (etapa atual do núcleo). */
+/** Porta de giro de uma folha. */
 function buildSwingDoor(c: Ctx): void {
   buildDoorFrame(c);
   const span = leafSpan(c);
   const hingeT = span.center + c.h * span.half;
   const latchT = span.center - c.h * span.half;
   addSwingLeaf(c, 0, latchT, hingeT, hingeT, latchT);
+}
+
+/** Porta dupla: duas folhas de `lh − 0,002`, dobradiças nas ombreiras, as duas para `side`. */
+function buildDoubleDoor(c: Ctx): void {
+  buildDoorFrame(c);
+  const span = leafSpan(c);
+  const leftHinge = span.center - span.half;
+  const rightHinge = span.center + span.half;
+  const centerL = span.center - 0.002;
+  const centerR = span.center + 0.002;
+  addSwingLeaf(c, 0, centerL, leftHinge, leftHinge, centerL);
+  addSwingLeaf(c, 1, centerR, rightHinge, rightHinge, centerR);
+}
+
+/** Porta pivotante: folha inteira girando em torno do eixo vertical a W/4 da ombreira da dobradiça. */
+function buildPivotDoor(c: Ctx): void {
+  buildDoorFrame(c);
+  const span = leafSpan(c);
+  const z = leafZ(c);
+  const sSpan = leafS(c);
+  const axis = c.h * (c.hw / 2);
+  const sMid = (sSpan.s0 + sSpan.s1) / 2;
+  const sign = (c.side * c.h) as 1 | -1;
+  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: sMid, sign };
+  addPart(c, 'leaf-0', 'leaf', 'leaf', box(span.center - span.half, span.center + span.half, sSpan.s0, sSpan.s1, z.z0, z.z1), {
+    motion,
+    leaf: 0,
+  });
+  c.openings.push({
+    leaf: 0,
+    kind: 'pivot',
+    side: c.side,
+    hingeT: axis,
+    latchT: -axis,
+    pivot: { t: axis, s: sMid },
+    radius: (3 * c.hw) / 2,
+    z0: z.z0,
+    z1: z.z1,
+  });
+}
+
+/** Batente de correr: caixa J×D sem batedor, com trilhos metálicos no topo e no piso. */
+function buildSlidingDoorFrame(c: Ctx): void {
+  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  for (const j of [-1, 1] as const) {
+    addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
+  }
+  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
+  const inner = c.hw - c.J;
+  addPart(c, 'track-head', 'track', 'metal', box(-inner, inner, body.s0, body.s1, c.H - c.J - GAP - 0.01, c.H - c.J - GAP));
+  addPart(c, 'track-floor', 'track', 'metal', box(-inner, inner, body.s0, body.s1, 0, 0.01));
+}
+
+/** Porta de correr de duas folhas: pistas opostas, sobreposição central e uma folha que desliza. */
+function buildSlidingDoor(c: Ctx): void {
+  buildSlidingDoorFrame(c);
+  const inner = 2 * (c.hw - c.J);
+  const leafW = (inner + 0.06) / 2;
+  const spacing = leafW - 0.06;
+  const travel = leafW - 0.06;
+  const z0 = 0.008;
+  const z1 = c.H - c.J - GAP;
+  const moving = c.h === 1 ? 0 : 1;
+  for (let k = 0; k < 2; k++) {
+    const center = (k - 0.5) * spacing;
+    const sCenter = c.C + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
+    const motion: PartMotion =
+      k === moving ? { kind: 'slide', dt: k === 1 ? -1 : 1, ds: 0, dz: 0, travel } : { kind: 'slide', dt: 0, ds: 0, dz: 0, travel: 0 };
+    addPart(c, `leaf-${k}`, 'leaf', 'leaf', box(center - leafW / 2, center + leafW / 2, sCenter - c.L / 2, sCenter + c.L / 2, z0, z1), {
+      motion,
+      leaf: k,
+    });
+    c.openings.push({
+      leaf: k,
+      kind: 'slide',
+      side: 0,
+      hingeT: 0,
+      latchT: 0,
+      pivot: { t: 0, s: sCenter },
+      radius: leafW,
+      z0,
+      z1,
+    });
+  }
+}
+
+function buildVoid(c: Ctx): void {
+  void c;
+}
+
+function buildDoor(c: Ctx): void {
+  const family = openingFamilyOf(c.t)?.id;
+  switch (family) {
+    case 'door_double':
+      buildDoubleDoor(c);
+      break;
+    case 'door_pivot':
+      buildPivotDoor(c);
+      break;
+    case 'door_sliding':
+      buildSlidingDoor(c);
+      break;
+    case 'door_void':
+      buildVoid(c);
+      break;
+    default:
+      buildSwingDoor(c);
+  }
 }
 
 export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): OpeningModel {
@@ -242,11 +350,11 @@ export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f:
       void: g.leaves === 0,
     };
   }
-  const family = openingFamilyOf(c.t)?.id;
   if (g.leaves === 0) {
     // Vão livre: sem batente, folha ou vidro; só o acabamento que existir.
+    buildVoid(c);
   } else if (c.t.kind === 'door') {
-    if (family === 'door_swing' || family === 'door_double') buildSwingDoor(c);
+    buildDoor(c);
   }
   return {
     kind: c.t.kind,

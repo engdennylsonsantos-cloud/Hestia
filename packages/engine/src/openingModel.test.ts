@@ -174,6 +174,63 @@ describe('buildOpeningModel: estilos de batente da porta de giro', () => {
   });
 });
 
+describe('buildOpeningModel: porta dupla, pivotante, correr e vão livre', () => {
+  it('dupla: duas folhas de lh − 0,002, dobradiças em ±lh e dois itens de abertura', () => {
+    const c = cena('ot_p160');
+    const m = modelo(c);
+    const folhas = de(m.parts, 'leaf');
+    expect(folhas).toHaveLength(2);
+    for (const f of folhas) expect(largura(f.box)).toBeCloseTo(0.761 - 0.002, 9);
+    expect(m.openings).toHaveLength(2);
+    expect(m.openings.map((x) => x.hingeT).sort((a, b) => a - b)).toEqual([-0.761, 0.761]);
+    expect(m.openings.every((x) => x.kind === 'side' && x.side === 1)).toBe(true);
+  });
+
+  it('pivotante: folha inteira, eixo a W/4 da ombreira da dobradiça e raio 3·hw/2', () => {
+    for (const flipHand of [false, true]) {
+      for (const flipFacing of [false, true]) {
+        const c = cena('ot_pp80', {}, { flipHand, flipFacing });
+        const m = modelo(c);
+        const f = folha(m.parts);
+        expect(largura(f.box)).toBeCloseTo(2 * 0.361, 9);
+        const a = m.openings[0]!;
+        expect(a.kind).toBe('pivot');
+        expect(a.hingeT).toBeCloseTo((flipHand ? 1 : -1) * (c.g.width / 4), 9);
+        expect(a.radius).toBeCloseTo((3 * c.g.width) / 4, 9);
+        expect(a.side).toBe(flipFacing ? -1 : 1);
+      }
+    }
+  });
+
+  it('correr: batente sem batedor, dois trilhos, duas folhas em pistas opostas e uma móvel', () => {
+    const c = cena('ot_pc160');
+    const m = modelo(c);
+    expect(de(m.parts, 'stop')).toHaveLength(0);
+    expect(de(m.parts, 'track')).toHaveLength(2);
+    const folhas = de(m.parts, 'leaf');
+    expect(folhas).toHaveLength(2);
+    for (const f of folhas) {
+      expect(largura(f.box)).toBeCloseTo(0.78, 9);
+      expect(f.box.s1 - f.box.s0).toBeCloseTo(0.04, 9);
+    }
+    expect(Math.abs(folhas[0]!.box.s0 - folhas[1]!.box.s0)).toBeGreaterThan(0.02);
+    const movel = folhas.find((f) => f.motion?.kind === 'slide' && (f.motion.dt !== 0 || f.motion.travel > 0));
+    expect(movel).toBeDefined();
+    if (movel.motion?.kind === 'slide') {
+      expect(Math.abs(movel.motion.dt)).toBe(1);
+      expect(movel.motion.travel).toBeCloseTo(0.72, 9);
+    }
+  });
+
+  it('vão livre: void = true e nenhuma peça de batente, folha ou vidro', () => {
+    const c = cena('ot_vao90');
+    const m = modelo(c);
+    expect(m.void).toBe(true);
+    expect(m.parts.some((x) => x.role === 'jamb' || x.role === 'stop' || x.role === 'head' || x.role === 'leaf' || x.role === 'glass')).toBe(false);
+    expect(m.openings).toHaveLength(0);
+  });
+});
+
 describe('buildOpeningModel: geometria do batente no núcleo', () => {
   it('profundidade do batente limitada ao núcleo (DEC-1): D = 0,09 < 0,14', () => {
     const c = cena('ot_p90');

@@ -5,10 +5,12 @@ import { editor } from '../../editor/controller.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
 import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
+import { perimeterActions } from '../../editor/perimeter.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
 import { toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { applyDrop } from '../dockDrag.ts';
+import { idPerimetroEditavel } from '../perimeter/perimeterEditavel.ts';
 import { t, type ActionId, type Txt } from './model.ts';
 
 /** Leva o painel para o outro dock (esquerdo <-> direito), pela mesma regra de soltura do arraste. */
@@ -171,6 +173,16 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     hint: t('Move a seleção para outro nível.', 'Move the selection to another level.'),
     run: () => useUi.setState({ dialog: 'moveLevel', dialogArg: null }),
     disabled: noSel,
+  },
+  editPerimeter: {
+    label: t('Editar perímetro', 'Edit Perimeter'),
+    icon: 'edit',
+    hint: t('Reabre o contorno do elemento selecionado na planta, para ajustar linhas, inclinação e balanço.', 'Reopens the outline of the selected element on the plan, to adjust lines, slope and overhang.'),
+    run: () => {
+      const id = idPerimetroEditavel(editor.project, useUi.getState().selection);
+      if (id) perimeterActions.edit(id);
+    },
+    disabled: (c) => (idPerimetroEditavel(c.p, c.selection) ? false : t('Selecione um telhado, piso, laje ou forro', 'Select a roof, floor, slab or ceiling')),
   },
   delete: {
     label: t('Excluir', 'Delete'),

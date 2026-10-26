@@ -1,6 +1,8 @@
 import type { Project, Id } from '@hestia/model';
 import type { ToolId, ToolOptions } from '@hestia/tools';
+import type { SketchTarget } from '@hestia/geom';
 import { toolLabel } from '../../editor/i18n.ts';
+import { perimeterContextTab, type PerimeterContextTab } from '../perimeter/PerimeterRibbonPanels.tsx';
 import { act, option, panel, soonS, stack, t, tool, type RibbonPanel, type RibbonTab, type Txt } from './model.ts';
 import { P_CLIPBOARD, P_CREATE, P_GEOMETRY, P_MEASURE, P_MODIFY, P_PROPS, P_SELECT, P_SELECTION_EXTRA, P_VIEW_MOD } from './panelsShared.ts';
 
@@ -62,15 +64,18 @@ function drawPanel(id: ToolId): RibbonPanel | null {
   }
 }
 
+/** Painel "Editar perímetro" das categorias que têm contorno (telhado, piso, laje, forro). */
+const PERIMETRO = panel('perimetro', t('Perímetro', 'Perimeter'), act('editPerimeter'));
+
 /** Painéis do assunto de cada categoria selecionada. */
 const CATEGORY: Record<string, { label: Txt; panels: RibbonPanel[] }> = {
   wall: { label: t('Paredes', 'Walls'), panels: [panel('modificar-parede', t('Modificar parede', 'Modify Wall'), stack(tool('attachroof', 'small'), tool('detachroof', 'small'), soonS(t('Editar perfil', 'Edit Profile'), 'soon')))] },
   door: { label: t('Portas', 'Doors'), panels: [panel('hospedeiro', t('Hospedeiro', 'Host'), tool('rehost'))] },
   window: { label: t('Janelas', 'Windows'), panels: [panel('hospedeiro', t('Hospedeiro', 'Host'), tool('rehost'))] },
-  floor: { label: t('Pisos', 'Floors'), panels: [] },
-  slab: { label: t('Lajes', 'Slabs'), panels: [panel('editar-forma', t('Editar forma', 'Shape Editing'), tool('slope'))] },
-  ceiling: { label: t('Forros', 'Ceilings'), panels: [] },
-  roof: { label: t('Telhados', 'Roofs'), panels: [panel('modificar-telhado', t('Modificar telhado', 'Modify Roof'), tool('roofarrow'))] },
+  floor: { label: t('Pisos', 'Floors'), panels: [PERIMETRO] },
+  slab: { label: t('Lajes', 'Slabs'), panels: [panel('editar-forma', t('Editar forma', 'Shape Editing'), tool('slope')), PERIMETRO] },
+  ceiling: { label: t('Forros', 'Ceilings'), panels: [PERIMETRO] },
+  roof: { label: t('Telhados', 'Roofs'), panels: [panel('modificar-telhado', t('Modificar telhado', 'Modify Roof'), tool('roofarrow')), PERIMETRO] },
   stair: { label: t('Escadas', 'Stairs'), panels: [panel('escada', t('Escada', 'Stair'), act('stairSketch'), act('stairTypes'), act('schedStairs', 'large', t('Tabela de escadas', 'Stair Schedule')))] },
   room: { label: t('Ambientes', 'Rooms'), panels: [panel('ambiente', t('Ambiente', 'Room'), tool('roomsep'))] },
 };
@@ -102,6 +107,24 @@ export function contextTab(toolId: ToolId, selection: readonly Id[], p: Project)
   const cat = CATEGORY[kind];
   const label: Txt = cat ? { pt: `Modificar | ${txtPt(cat.label)}`, en: `Modify | ${txtEn(cat.label)}` } : t('Modificar | Elementos', 'Modify | Elements');
   return { key: `sel:${kind}`, tab: { id: 'ctx', label, panels: base(...(cat?.panels ?? []), P_SELECTION_EXTRA) } };
+}
+
+/** Títulos da aba do modo de perímetro quando se edita um elemento existente ("Editar perímetro do …"). */
+const EDITAR_PERIMETRO: Record<SketchTarget, { pt: string; en: string }> = {
+  roof: { pt: 'Editar perímetro do telhado', en: 'Edit Roof Perimeter' },
+  floor: { pt: 'Editar perímetro do piso', en: 'Edit Floor Perimeter' },
+  slab: { pt: 'Editar perímetro da laje', en: 'Edit Slab Perimeter' },
+  ceiling: { pt: 'Editar perímetro do forro', en: 'Edit Ceiling Perimeter' },
+};
+
+/**
+ * Aba contextual do modo de perímetro. Ao criar, é a de `perimeterContextTab` ("Criar perímetro …"); ao editar um
+ * elemento (`editing`), o título muda e a chave inclui o elemento, para a faixa selecionar a aba de novo.
+ */
+export function perimeterTab(target: SketchTarget, editing?: Id): PerimeterContextTab {
+  const tab = perimeterContextTab(target);
+  if (!editing) return tab;
+  return { ...tab, key: `perimeter:${target}:${editing}`, label: { pt: `Modificar | ${EDITAR_PERIMETRO[target].pt}`, en: `Modify | ${EDITAR_PERIMETRO[target].en}` } };
 }
 
 const txtPt = (x: Txt): string => (typeof x === 'string' ? x : x.pt);

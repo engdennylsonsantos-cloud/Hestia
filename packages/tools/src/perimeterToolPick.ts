@@ -11,6 +11,8 @@ import {
   norm,
   perp,
   pointInMulti,
+  SLOPE_GAP_PX,
+  SLOPE_HALF_PX,
   sub,
   validateSketch,
   type SketchDraft,
@@ -25,9 +27,6 @@ import type { PreviewItem } from './types.ts';
  * `metersPerPixel` do ambiente.
  */
 
-/** Meia-base e recuo do triângulo de inclinação, em px de tela. Iguais a render/plan/sketchSlope.ts (o tools não importa render). */
-export const SLOPE_HALF_PX = 9;
-export const SLOPE_GAP_PX = 38;
 /** Tolerância de clique numa linha do esboço, em px de tela (como `sketchHitSeg`). */
 export const SELECT_PX = 6;
 

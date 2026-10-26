@@ -1,4 +1,6 @@
+import type { SketchTarget } from '@hestia/geom';
 import type { Tool, ToolEnv } from './types.ts';
+import { PerimeterTool } from './perimeterTool.ts';
 import { WallTool } from './wallTool.ts';
 import { OpeningTool } from './openingTool.ts';
 import { SelectTool } from './selectTool.ts';
@@ -29,7 +31,7 @@ import { DetailLineTool } from './detailLineTool.ts';
 import { DetailRegionTool } from './detailRegionTool.ts';
 import { TagTool } from './tagTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag' | 'perimeter';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'room'] },
@@ -38,10 +40,13 @@ export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Medir', tools: ['measure'] },
 ];
 
-export function createTool(id: ToolId, env: ToolEnv): Tool {
+/** Cria a ferramenta. `perimeterTarget` só vale para 'perimeter' (o elemento que o perímetro cria ou edita). */
+export function createTool(id: ToolId, env: ToolEnv, perimeterTarget: SketchTarget = 'roof'): Tool {
   switch (id) {
     case 'select':
       return new SelectTool(env);
+    case 'perimeter':
+      return new PerimeterTool(env, perimeterTarget);
     case 'wall':
       return new WallTool(env);
     case 'floor':
@@ -152,5 +157,6 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   detailLine: 'Linha de detalhe',
   filledRegion: 'Região preenchida',
   tag: 'Etiqueta',
+  perimeter: 'Perímetro',
 };
 

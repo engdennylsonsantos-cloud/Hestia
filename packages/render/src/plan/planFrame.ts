@@ -1,13 +1,22 @@
 import type { Id, Project } from '@hestia/model';
 import type { ResolvedLevel } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
+import type { SketchDraft, SketchResult } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
+import { sketchOps } from './sketch.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
+
+/** Esboço do perímetro em edição (só na planta): o rascunho, a validação dele e a linha sob o cursor. */
+export interface PlanSketch {
+  draft: SketchDraft;
+  result: SketchResult;
+  hover: string | null;
+}
 
 /** Estado da planta que o quadro lê: o projeto, o nível, a vista e as opções; `version` é a versão do projeto. */
 export interface PlanViewState {
@@ -30,6 +39,8 @@ export interface PlanViewState {
   inference: Inference | null;
   /** Resolução do nível (o app a guarda em cache). */
   resolve: (id: Id) => ResolvedLevel;
+  /** Esboço do perímetro em edição, desenhado sobre a planta (ausente fora do modo). */
+  sketch?: PlanSketch | null;
 }
 
 /** Resolução vazia do nível atual: a planta normal não a lê (ver `planFrameUpdateOf`). */
@@ -54,11 +65,23 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     gpu: s.gpu,
     showGrid: s.showGrid,
     geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${geoSel.join(',')}`,
-    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}`,
+    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel), selection: geoSel, hover: null, preview: [], inference: null }),
-    overlay: () => buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }),
+    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
   };
+}
+
+/** Chave do esboço na sobreposição: conteúdo e zoom (as linhas dos arcos e o balão dependem do zoom); vazia fora do modo. */
+function sketchKey(sk: PlanSketch | null | undefined, zoom: number): string {
+  return sk ? `${zoom}|${JSON.stringify(sk)}` : '';
+}
+
+/** Junta as operações do esboço à sobreposição da planta (sem esboço, a sobreposição sai como está). */
+function comEsboco(o: PlanOps, sk: PlanSketch | null | undefined, theme: PlanTheme, v: Viewport): PlanOps {
+  if (!sk) return o;
+  const k = sketchOps(sk.draft, sk.result, theme, v, sk.hover);
+  return { fills: [...o.fills, ...k.fills], strokes: [...o.strokes, ...k.strokes], labels: [...o.labels, ...k.labels] };
 }
 
 /** O que a cena da planta precisa de uma vez: as chaves dizem quando cada camada muda; as funções a refazem. */

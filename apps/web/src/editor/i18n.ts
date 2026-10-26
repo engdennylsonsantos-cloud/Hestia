@@ -72,6 +72,7 @@ export const I18N = {
     tool_detailLine: 'Linha de detalhe',
     tool_filledRegion: 'Região preenchida',
     tool_tag: 'Etiqueta',
+    tool_perimeter: 'Perímetro',
     tool_cotasAuto: 'Cotas automáticas',
 
     // Modificadores
@@ -201,6 +202,7 @@ export const I18N = {
     tool_detailLine: 'Detail Line',
     tool_filledRegion: 'Filled Region',
     tool_tag: 'Tag by Category',
+    tool_perimeter: 'Perimeter',
     tool_cotasAuto: 'Auto Dimensions',
 
     // Modifiers

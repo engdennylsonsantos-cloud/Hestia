@@ -3,6 +3,8 @@ import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
 import { addRoomsAllCircuits } from '../editor/roomActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { perimeterActions, usePerimeter } from '../editor/perimeter.ts';
+import { PerimeterOptionsBar } from './perimeter/PerimeterOptionsBar.tsx';
 import { Check, NumField } from './fields.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { CeilingOptionsBar } from './CeilingOptionsBar.tsx';
@@ -83,10 +85,12 @@ function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window';
 
 export function OptionsBar(): ReactElement {
   const p = useProject();
+  const perim = usePerimeter();
   const tool = useUi((s) => s.tool);
   const o = useUi((s) => s.options);
   const sel = useUi((s) => s.selection);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...o, ...patch } });
+  if (perim.active) return <PerimeterOptionsBar target={perim.target} options={perim.options} onChange={perimeterActions.setOptions} />;
   // A paleta Propriedades é a fonte de configuração antes da colocação; a barra superior fica como indicação da ferramenta.
   if (['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'stairrun', 'roof', 'roofextrusion'].includes(tool)) {
     return <div className="optbar" role="group" aria-label="Opções da ferramenta"><span className="tool-name">{TOOL_LABEL[tool]}</span><span style={{ color: 'var(--fg-soft)' }}>Configurações em Propriedades</span></div>;

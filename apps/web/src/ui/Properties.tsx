@@ -50,6 +50,9 @@ import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
 import { changeOpeningType } from '../editor/openingTypeActions.ts';
 import { hasPlacementProperties, PlacementProperties } from './PlacementProperties.tsx';
 import { TOOL_LABEL } from '@hestia/tools';
+import { usePerimeter } from '../editor/perimeter.ts';
+import { PerimeterEdgePanel } from './perimeter/PerimeterEdgePanel.tsx';
+import { PERIMETER_TITLE } from './perimeter/PerimeterStatus.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -381,14 +384,16 @@ export function Properties(): ReactElement {
   const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
-  const panelLabel = placing ? `Colocar ${TOOL_LABEL[tool]}` : label;
+  const perim = usePerimeter();
+  const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : label;
   return (
     <aside className="side" aria-label="Propriedades">
       <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{panelLabel}</span>}>
         Propriedades
       </PanelHead>
       <LabelScroll>
-        {kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
+        {perim.active ? <PerimeterEdgePanel />
+          : kinds === 1 && walls.length > 0 ? <WallProps walls={walls} />
           : kinds === 1 && ops.length > 0 ? <OpeningProps items={ops} />
           : kinds === 1 && floors.length > 0 ? <FloorProperties floors={floors} />
           : kinds === 1 && slabs.length > 0 ? <SlabProperties slabs={slabs} />

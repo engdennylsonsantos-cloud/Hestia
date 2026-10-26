@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useUi } from '../editor/state.ts';
 import { useAtalhos } from '../editor/shortcutConfig.ts';
 import { useI18n } from '../editor/i18n.ts';
+import { usePerimeter } from '../editor/perimeter.ts';
 import { Icon } from './Icon.tsx';
 import { IssuesButton } from './IssuesButton.tsx';
 import { SnapButton } from './SnapButton.tsx';
@@ -22,7 +23,9 @@ const SNAP: Record<string, string> = {
 const f = (n: number): string => n.toFixed(2).replace('.', ',');
 
 export function StatusBar(): ReactElement {
-  const status = useUi((s) => s.status);
+  const uiStatus = useUi((s) => s.status);
+  const perim = usePerimeter();
+  const status = perim.active && perim.status ? perim.status : uiStatus;
   const cursor = useUi((s) => s.cursor);
   const snap = useUi((s) => s.snapKind);
   const view = useUi((s) => s.view);

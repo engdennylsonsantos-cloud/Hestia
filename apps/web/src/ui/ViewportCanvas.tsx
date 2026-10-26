@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
 import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
+import { usePerimeter } from '../editor/perimeter.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
@@ -42,6 +43,9 @@ export function ViewportCanvas(): ReactElement {
   const [labelView, setLabelView] = useState<Viewport | null>(null);
   const [ready, setReady] = useState(false);
   const dark = useDark();
+  // Esboço do perímetro em edição: só a planta o desenha; o quadro refaz a sobreposição quando ele muda.
+  const perim = usePerimeter();
+  const sketch = useMemo(() => (perim.active && perim.draft && perim.result ? { draft: perim.draft, result: perim.result, hover: perim.hoverId } : null), [perim.active, perim.draft, perim.result, perim.hoverId]);
   // Só o que a própria tela lê: a mudança de outros campos não re-renderiza a planta (o redesenho sai do agendamento abaixo).
   const ui = useUi(useShallow((s) => ({ view: s.view, gpu: s.gpu, prompt: s.prompt, typed: s.typed, hover: s.hover, tool: s.tool })));
   const frame = useRef(0);
@@ -174,7 +178,7 @@ export function ViewportCanvas(): ReactElement {
     const quadro = (quadroRef.current ??= new QuadroPlanta({ provisorios: editor.provisorios, resolverReferencia: (id) => editor.resolved(id, false), pendente: (id) => editor.fluxo.pendente(id), pedirQuadro: () => useUi.setState((x) => ({ previewTick: x.previewTick + 1 })) }));
     // Grade visível quando o botão de grade está ligado ou quando a captura por grade está ativa (o que se captura, se vê).
     const gridOn = st.showGrid || (st.options.snap?.enabled !== false && !!st.options.snap?.grid);
-    const extra = quadro.desenhar({ quadro: pf, cena: g ? plan.current : null, v, tema: theme, nivel: st.levelId, versao: editor.store.version, contexto: [dark, !!g, v.zoom, st.showUnderlay, st.underlayLevel, st.showRoofProjection, gridOn].join('|'), atualizar: () => planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: gridOn, showUnderlay: st.showUnderlay, underlayLevel: st.underlayLevel, showRoofProjection: st.showRoofProjection, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: editor.activeTool.preview(), inference: editor.activeTool.inference(), resolve: quadro.resolver }) });
+    const extra = quadro.desenhar({ quadro: pf, cena: g ? plan.current : null, v, tema: theme, nivel: st.levelId, versao: editor.store.version, contexto: [dark, !!g, v.zoom, st.showUnderlay, st.underlayLevel, st.showRoofProjection, gridOn].join('|'), atualizar: () => planFrameUpdateOf({ project: p, version: editor.store.version, levelId: st.levelId, v, theme, dark, gpu: !!g, showGrid: gridOn, showUnderlay: st.showUnderlay, underlayLevel: st.underlayLevel, showRoofProjection: st.showRoofProjection, thinLines: thinLinesOn(p, { levelId: st.levelId }), selection: st.selection, hover: st.hover, preview: editor.activeTool.preview(), inference: editor.activeTool.inference(), resolve: quadro.resolver, sketch }) });
     if (g) {
       g.gpu.setSize(w, h, dpr);
       plan.current.setViewport(v);
@@ -184,7 +188,7 @@ export function ViewportCanvas(): ReactElement {
     // Alinha a camada HTML de texto no mesmo requestAnimationFrame do canvas da planta.
     // Isso evita o atraso de um render React entre a câmera e o texto da cota durante pan/zoom.
     labelLayer.current?.syncView(v);
-  }, [size, ready, dark]);
+  }, [size, ready, dark, sketch]);
 
   // Qualquer mudança do estado agenda um quadro; o quadro decide o que refazer (ver PlanFrame).
   useEffect(() => {

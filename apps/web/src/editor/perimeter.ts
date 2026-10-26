@@ -1,28 +1,25 @@
+import { useUi } from './state.ts';
+import { editor } from './controller.ts';
 import type { PerimeterActions, PerimeterView } from './perimeterApi.ts';
 
-const IDLE: PerimeterView = {
-  active: false,
-  target: 'roof',
-  draft: null,
-  result: null,
-  shape: 'line',
-  lineKind: 'boundary',
-  options: { overhang: 0.5, slopePct: 30, extendToCore: false, heightOffset: 0 },
-  hoverId: null,
-  selectedEdge: null,
-  status: '',
+/**
+ * Estado do modo de perímetro para a tela. Assina o contador de pré-visualização e a barra de status: toda mudança do
+ * editor (ação, evento de ponteiro, tecla) os atualiza, e a tela relê a visão (`PerimeterMode.view`, com cache).
+ */
+export const usePerimeter = (): PerimeterView => {
+  useUi((s) => s.previewTick);
+  useUi((s) => s.status);
+  return editor.perimetro.view();
 };
 
-/** Estado do modo de perímetro para a tela. (Stub: a lógica entra na onda 2b.) */
-export const usePerimeter = (): PerimeterView => IDLE;
-
+/** Ações do modo para a tela (faixa, barra de opções, propriedades e botões Concluir e Cancelar). */
 export const perimeterActions: PerimeterActions = {
-  begin: () => {},
-  edit: () => {},
-  setShape: () => {},
-  setLineKind: () => {},
-  setOptions: () => {},
-  finish: () => {},
-  cancel: () => {},
-  setEdge: () => {},
+  begin: (target) => editor.perimetro.begin(target),
+  edit: (id) => editor.perimetro.edit(id),
+  setShape: (s) => editor.perimetro.setShape(s),
+  setLineKind: (k) => editor.perimetro.setLineKind(k),
+  setOptions: (patch) => editor.perimetro.setOptions(patch),
+  finish: () => editor.perimetro.finish(),
+  cancel: () => editor.perimetro.cancel(),
+  setEdge: (patch) => editor.perimetro.setEdge(patch),
 };

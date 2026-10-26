@@ -1,4 +1,4 @@
-import { dist, type SketchDraft, type SketchLoop, type SketchSeg, type Vec2 } from '@hestia/geom';
+import { dist, SLOPE_GAP_PX, SLOPE_HALF_PX, type SketchDraft, type SketchLoop, type SketchSeg, type Vec2 } from '@hestia/geom';
 import { worldToScreen, type Viewport } from '../viewport.ts';
 import { fmtPercent } from './roofs.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
@@ -10,11 +10,6 @@ import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
  * ficam sempre nos eixos da tela, afastado `SLOPE_GAP_PX` da aresta para fora do laço. Cheio quando a aresta define
  * inclinação; vazado quando não. O texto da inclinação sai ao lado, só nas arestas que definem.
  */
-
-/** Meia-base e altura do triângulo, em pixels de tela. */
-export const SLOPE_HALF_PX = 9;
-/** Distância do centro do triângulo à aresta, em pixels de tela. */
-export const SLOPE_GAP_PX = 38;
 
 /** Vértices do triângulo em eixos de tela (y para baixo): ângulo reto em (-9, +9). */
 const TRI_SCREEN: Vec2[] = [

@@ -1,12 +1,10 @@
-import { closestOnSegment, dist, validateSketch, type SketchDraft, type SketchResult, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, dist, SLOPE_HALF_PX, validateSketch, type SketchDraft, type SketchResult, type Vec2 } from '@hestia/geom';
 import { worldToScreen, type Viewport } from '../viewport.ts';
 import { labelPoint } from './floors.ts';
 import { quadradoEm, poligonoEm, tracoEm } from './marcadores.ts';
 import { polyOf, outerLoop } from './sketchGeom.ts';
-import { SLOPE_HALF_PX, slopeMarks, slopeOps, triangleCenterPx } from './sketchSlope.ts';
+import { slopeMarks, slopeOps, triangleCenterPx } from './sketchSlope.ts';
 import type { PlanOps, PlanTheme, StrokeOp } from './types.ts';
-
-export { SLOPE_GAP_PX, SLOPE_HALF_PX } from './sketchSlope.ts';
 
 /** Vermelho dos problemas: fica legível sobre o claro e o escuro, e não se confunde com o rosa do rascunho. */
 export const SKETCH_ISSUE = '#e53935';

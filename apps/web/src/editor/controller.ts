@@ -16,7 +16,7 @@ import {
 import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
-import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts';
+import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts'; import { PerimeterMode } from './perimeterMode.ts';
 import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, underlayIdOf, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
@@ -46,6 +46,8 @@ export class Editor {
   private readonly levels = new LevelResolveCache();
   readonly fluxo = new FluxoEdicao({ aoMudar: () => this.bump(), exatoAssincrono: true }); // provisório na hora, exato em segundo plano (fluxoEdicao.ts)
   readonly provisorios = this.fluxo.provisorios; // a planta os desenha (ui/quadroPlanta.ts); ler aqui liga o cálculo a cada edição
+  /** Modo "Criar/Editar perímetro" (perimeterMode.ts): abre-se pelas ferramentas Telhado, Piso, Laje e Forro. */
+  readonly perimetro = new PerimeterMode({ env: () => this.env, projeto: () => this.project, ativar: (t) => (t ? this.activate('perimeter', t) : this.activate('select')), atualizar: () => this.bump() });
   /** Cache de geometria por projeto: na abertura restaura os níveis (ver `geometriaAbertura.ts`); só a abertura grava. */
   private readonly portasAbertura: PortasAbertura = {
     cache: new CacheGeometria({ tetoBytes: TETO_GEOMETRIA_BYTES }),
@@ -167,14 +169,15 @@ export class Editor {
   // ---------- ferramentas ----------
   get activeTool(): Tool { return this.tool; }
 
-  private activate(id: ToolId): void {
-    this.tool = createTool(id, this.env);
+  private activate(id: ToolId, tool: Tool = createTool(id, this.env)): void {
+    this.tool = tool;
     useUi.setState({ tool: id, typed: '', prompt: null, hover: null });
     this.tool.start();
     this.bump();
   }
 
-  setTool(id: ToolId): void {
+  // Perímetro: Telhado, Piso, Laje e Forro abrem o modo; com o modo aberto, trocar de ferramenta não conclui (a barra pede Concluir ou Cancelar).
+  setTool(id: ToolId): void { if (this.perimetro.intercepta(id)) return;
     // Ferramentas de desenho são da planta: escolher uma delas na vista de corte volta à planta.
     if (useUi.getState().view === 'section') useUi.setState({ view: 'plan', sectionId: null });
     if (clearSelectionForTool(id, useUi.getState().options)) useUi.setState({ selection: [], roofEdge: null });
@@ -288,7 +291,7 @@ export class Editor {
         this.bump();
         return true;
       }
-      if (ui.selection.length) { this.deleteSelection(); return true; }
+      if (ui.selection.length && !this.perimetro.ativo) { this.deleteSelection(); return true; }
     }
     if (k === 'Tab') {
       this.tool.tab();
@@ -336,7 +339,7 @@ export class Editor {
   // ---------- cortes e elevações ----------
   /** Abre um corte ou elevação na área central, com viewport próprio. */
   openSection(id: Id): void {
-    if (!this.project.views.some((v) => v.id === id)) return;
+    if (this.perimetro.bloqueiaNavegacao() || !this.project.views.some((v) => v.id === id)) return;
     // Ao abrir, enquadra de novo: descarta o viewport guardado desta vista.
     this.viewports.delete(`sec:${id}`);
     useUi.setState({ view: 'section', sectionId: id, selection: [], hover: null });
@@ -419,12 +422,12 @@ export class Editor {
   }
 
   selectLevel(id: Id): void {
-    useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan', sectionId: null });
+    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan', sectionId: null });
     this.setTool('select');
   }
 
   setView(v: 'plan' | '3d'): void {
-    useUi.setState({ view: v, hover: null });
+    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ view: v, hover: null });
   }
 
   // ---------- arquivo ----------
@@ -433,7 +436,7 @@ export class Editor {
   }
 
   load(p: Project, name: string): void {
-    this.store.load(p);
+    this.perimetro.encerrar(); this.store.load(p);
     this.fileName = name;
     this.levels.clear(); this.fluxo.abrir(p, this.store.version).forEach((id) => this.resolved(id));
     void abrirComCache(this.portasAbertura, p);

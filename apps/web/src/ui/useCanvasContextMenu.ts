@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import type { Id } from '@hestia/model';
 import { selectedTypeId, type ToolId } from '@hestia/tools';
 import { editor } from '../editor/controller.ts';
+import { perimeterActions } from '../editor/perimeter.ts';
 import { buildContextMenu, type ContextMenuCtx, type MenuEntry, type MenuView } from '../editor/contextMenu.ts';
 import { useI18n, toolLabel } from '../editor/i18n.ts';
 import { repeatLast, selectPrevious, useRecent } from '../editor/recentCommands.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
+import { comEditarPerimetro, EDITAR_PERIMETRO_ID, idPerimetroEditavel } from './perimeter/perimeterEditavel.ts';
 
 /** Menu aberto: posição na tela, o contexto em que foi montado e as entradas. */
 export interface CanvasMenu {
@@ -55,7 +57,8 @@ export function abrirMenuDeContexto(x: number, y: number, alvo: Id | null | unde
   if (alvo && !useUi.getState().selection.includes(alvo)) clickSelect3d(alvo, false);
   const ctx = contextoAtual(view);
   const noVazio = alvo === null ? { ...ctx, hasSelection: false, selectionKinds: [], singleType: false } : ctx;
-  useCanvasMenu.setState({ menu: { x, y, ctx: noVazio, items: buildContextMenu(noVazio) } });
+  const editavel = noVazio.hasSelection && idPerimetroEditavel(editor.project, useUi.getState().selection) !== null;
+  useCanvasMenu.setState({ menu: { x, y, ctx: noVazio, items: comEditarPerimetro(buildContextMenu(noVazio), noVazio.lang, editavel) } });
 }
 
 export function fecharMenuDeContexto(): void {
@@ -90,6 +93,12 @@ function criarSemelhante(): void {
   editor.setTool(alvo.tool);
 }
 
+/** "Editar perímetro" do elemento selecionado (o menu só oferece com um elemento editável). */
+function editarPerimetroSelecionado(): void {
+  const id = idPerimetroEditavel(editor.project, useUi.getState().selection);
+  if (id) perimeterActions.edit(id);
+}
+
 /** Executa o comando de uma entrada. Entradas desabilitadas ("ainda não disponível") não chegam aqui. */
 export function executaComandoDoMenu(id: string, view: MenuView, camera: Camera3dMenu, centro: { x: number; y: number }): void {
   if (id.startsWith('recent:')) { editor.setTool(id.slice('recent:'.length) as ToolId); return; }
@@ -114,6 +123,7 @@ export function executaComandoDoMenu(id: string, view: MenuView, camera: Camera3
     case 'delete': editor.deleteSelection(); return;
     case 'selectAllView': editor.selectAllOfSelectedType(); return;
     case 'createSimilar': criarSemelhante(); return;
+    case EDITAR_PERIMETRO_ID: editarPerimetroSelecionado(); return;
     default:
   }
 }

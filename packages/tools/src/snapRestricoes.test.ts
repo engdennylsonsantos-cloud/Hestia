@@ -206,3 +206,15 @@ describe('centro e tangente de arco (S-09)', () => {
     expect(dist(r.point, T)).toBeLessThan(1e-6);
   });
 });
+
+describe('pavimento de referência (o que se vê, se captura)', () => {
+  it('no pavimento 2, a ponta do pavimento 1 é capturada quando ele aparece como referência', () => {
+    const p = walls([[0, 0], [4, 0]]); // parede no lv_0 (pavimento 1)
+    const cursor = { x: 4, y: 0.01 };
+    const semRef = infer(cursor, { project: p, levelId: 'lv_1', mpp: MPP, gridStep: 0.1 });
+    expect(semRef.kind).not.toBe('endpoint'); // cai na grade, nunca na ponta do pavimento de baixo
+    const comRef = infer(cursor, { project: p, levelId: 'lv_1', mpp: MPP, gridStep: 0.1, underlayLevelId: 'lv_0' });
+    expect(comRef.kind).toBe('endpoint');
+    expect(dist(comRef.point, v2(4, 0))).toBeLessThan(1e-9);
+  });
+});

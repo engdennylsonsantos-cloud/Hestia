@@ -15,7 +15,7 @@ import {
   type Arc,
   type Vec2,
 } from '@hestia/geom';
-import { frameOfWall, wallFacesCached as facesOf } from '@hestia/engine';
+import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia/engine';
 import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
@@ -48,6 +48,8 @@ export interface InferContext {
   cycle?: number;
   /** Captura escolhida na posição anterior do cursor: mantém-na enquanto continuar valendo (histerese). */
   previous?: Inference | null;
+  /** Pavimento de referência visível na planta: paredes e faces dele também são alvo (o que se vê, se captura). */
+  underlayLevelId?: Id | null;
   /** Filtro de visibilidade: paredes ocultas ou fora do recorte da vista não são alvo. Ausente = todas. */
   isVisible?: (w: Wall) => boolean;
 }
@@ -200,7 +202,10 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   // Grade só quantiza quando está ligada e a ferramenta não a dispensou (S-03).
   const g = ctx.noGrid || !sn.grid ? 0 : ctx.gridStep;
   const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
-  const walls = wallsOnLevel(ctx.project, ctx.levelId).filter((w) => !ctx.ignore?.has(w.id) && (ctx.isVisible?.(w) ?? true));
+  // Pavimento atual e, se visível como referência, o de baixo: o que se vê na planta é o que se captura.
+  const levels: Id[] = ctx.underlayLevelId ? [ctx.levelId, ctx.underlayLevelId] : [ctx.levelId];
+  const facesIn = (): WallFaces[] => levels.flatMap((l) => facesOf(ctx.project, l));
+  const walls = levels.flatMap((l) => wallsOnLevel(ctx.project, l)).filter((w) => !ctx.ignore?.has(w.id) && (ctx.isVisible?.(w) ?? true));
   const cands: Cand[] = [];
   const add = (point: Vec2, kind: SnapKind, guides: Guide[] = [], hostId?: Id, weight: number = WEIGHT[kind]): void => {
     cands.push({ point, kind, weight, guides, hostId });
@@ -273,7 +278,7 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   // Faces seguem o contorno real da parede (`outline`, com as esquadrias das junções), não a corda das tampas.
   const outlineSegs = (ring: Vec2[]): Array<[Vec2, Vec2]> => ring.map((p, i) => [p, ring[(i + 1) % ring.length]!] as [Vec2, Vec2]);
   if (sn.faces || sn.core) {
-    for (const wf of facesOf(ctx.project, ctx.levelId)) {
+    for (const wf of facesIn()) {
       if (ctx.ignore?.has(wf.wallId)) continue;
       // Índice barato: contorno longe do cursor (além da tolerância) não tem captura. Evita varrer todas as arestas.
       if (!boxNear(cursor, wf.outline, tol)) continue;
@@ -332,7 +337,7 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   }
   const faceTracks: TrackLine[] = [];
   if (sn.alignment && sn.faces) {
-    for (const wf of facesOf(ctx.project, ctx.levelId)) {
+    for (const wf of facesIn()) {
       if (ctx.ignore?.has(wf.wallId)) continue;
       // wallFaces ordena primeiro as duas laterais longitudinais e depois as tampas. Só as laterais viram trecho.
       for (const seg of wf.faces.slice(0, 2)) {

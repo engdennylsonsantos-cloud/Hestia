@@ -63,18 +63,21 @@ export abstract class ToolBase implements Tool {
     const project = this.env.project();
     const levelId = this.env.levelId();
     const hidden = this.env.hiddenInView?.();
+    const under = this.env.underlayLevelId?.() ?? null;
+    const levelsIn = (l: string): string[] => (under ? [l, under] : [l]);
     return {
       project,
       levelId,
       isVisible: hidden ? (w) => !hidden.has(w.id) : undefined,
+      underlayLevelId: under,
       mpp: this.env.metersPerPixel(),
       gridStep: this.env.gridStep(),
       orthoLock: this.env.options().orthoLock,
       snap: this.env.options().snap,
       ...extra,
       // Vértices dos pisos do nível entram sempre; os pontos que a ferramenta passa (contorno em construção) somam-se a eles.
-      extraPoints: [...floorVertices(project, levelId), ...(extra.extraPoints ?? [])],
-      extraSegments: [...floorEdges(project, levelId), ...(extra.extraSegments ?? [])],
+      extraPoints: [...levelsIn(levelId).flatMap((l) => floorVertices(project, l)), ...(extra.extraPoints ?? [])],
+      extraSegments: [...levelsIn(levelId).flatMap((l) => floorEdges(project, l)), ...(extra.extraSegments ?? [])],
     };
   }
 

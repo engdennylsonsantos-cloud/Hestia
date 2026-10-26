@@ -18,6 +18,7 @@ import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts';
 import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
+import { underlayLevelOf } from './underlay.ts';
 import { useI18n } from './i18n.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
@@ -71,6 +72,7 @@ export class Editor {
     project: () => this.store.project,
     levelId: () => useUi.getState().levelId,
     hiddenInView: () => planViewOf(this.store.project, useUi.getState().levelId).hidden,
+    underlayLevelId: () => underlayLevelOf(this.store.project, useUi.getState().levelId, useUi.getState().showUnderlay),
     selection: () => useUi.getState().selection,
     setSelection: (ids) => useUi.setState({ selection: ids, roofEdge: ids.length === 1 && useUi.getState().roofEdge?.roofId === ids[0] ? useUi.getState().roofEdge : null }),
     exec: (c) => this.store.exec(c),
@@ -146,10 +148,7 @@ export class Editor {
     return value;
   }
 
-  zoomWheel(screen: { x: number; y: number }, deltaY: number): void {
-    const v = this.viewport();
-    if (v) this.setViewport(zoomAt(v, screen, Math.exp(-deltaY * 0.0015)));
-  }
+  zoomWheel(screen: { x: number; y: number }, deltaY: number): void { const v = this.viewport(); if (v) this.setViewport(zoomAt(v, screen, Math.exp(-deltaY * 0.0015))); }
 
   pan(dx: number, dy: number): void { const v = this.viewport(); if (v) this.setViewport(panBy(v, dx, dy)); }
 

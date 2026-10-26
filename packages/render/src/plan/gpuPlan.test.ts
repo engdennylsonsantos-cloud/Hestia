@@ -129,8 +129,10 @@ describe('PlanScene: ordem de desenho segue a lista (como o CPU)', () => {
     const scene = new PlanScene();
     scene.setDrawList(dl, VIEW);
     const meshes = meshesOf(scene);
-    // Preenchimento, hachura e parede: três malhas em ordem crescente de `renderOrder`.
-    expect(meshes.map((m) => m.renderOrder)).toEqual([0, 1, 2]);
+    // Preenchimento, hachura e parede: três malhas em ordem crescente de `renderOrder` (a grade ocupa a primeira faixa).
+    const ordens = meshes.map((m) => m.renderOrder);
+    expect(ordens[0]).toBeLessThan(ordens[1]!);
+    expect(ordens[1]).toBeLessThan(ordens[2]!);
     // Transparente é o que põe todas as malhas no mesmo grupo de ordenação: a parede cobre a hachura por `renderOrder`.
     expect(meshes.every((m) => (m.material as THREE.MeshBasicMaterial).transparent)).toBe(true);
     scene.dispose();

@@ -30,7 +30,7 @@ function gradeAntiga(v: Viewport, theme: PlanTheme): StrokeOp[] {
 
 /** Malhas da camada da grade, na ordem de desenho. */
 function malhasDaGrade(scene: PlanScene): THREE.Mesh[] {
-  const grupo = scene.scene.children[2] as THREE.Group;
+  const grupo = scene.scene.children[0] as THREE.Group;
   return grupo.children as THREE.Mesh[];
 }
 

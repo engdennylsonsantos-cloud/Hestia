@@ -148,6 +148,8 @@ export interface PlanTheme {
   roofFootprint: string;
   /** Seta de caimento do telhado na planta (1 px): verde, para não se confundir com a tinta do desenho. */
   roofSlope: string;
+  /** Cor de telha quando o material do tipo de telhado não tem cor: terracota discreta, legível nos dois temas. */
+  roofTile: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -168,6 +170,7 @@ export const LIGHT: PlanTheme = {
   stairTread: '#64748b',
   roofFootprint: '#c2185b',
   roofSlope: '#1f6f5c',
+  roofTile: '#c9795a',
 };
 
 export const DARK: PlanTheme = {
@@ -188,4 +191,5 @@ export const DARK: PlanTheme = {
   stairTread: '#94a3b8',
   roofFootprint: '#ff6fb0',
   roofSlope: '#5cc3a6',
+  roofTile: '#8a4f3b',
 };

@@ -65,11 +65,14 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('id="ot-name"');
     expect(html).toContain('Resistência ao fogo');
     expect(html).not.toContain('Fator solar');
+    // Estilo da folha (5) e maçaneta (4): cada escolha mostra a elevação em miniatura pelo mesmo caminho.
+    expect((html.match(/<svg/g) ?? []).length).toBeGreaterThanOrEqual(9);
   });
 
   it('a biblioteca lista as famílias de porta com a contagem e as variantes', () => {
     const html = renderToStaticMarkup(
       createElement(OpeningTypeLibrary, {
+        type: tipo('ot_p90'),
         families: openingFamilies('door'),
         familyId: 'door_swing',
         counts: { door_swing: 2, door_double: 1 },
@@ -86,9 +89,11 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('>2<');
     expect(html).toContain('Lisa');
     expect(html).toContain('class="th"');
+    expect(html).toContain('<svg');
+    expect(html).toContain('data-op="stroke"');
   });
 
-  it('a prévia mostra as abas (só a elevação habilitada) e a faixa de verificações', () => {
+  it('a prévia habilita as cinco abas e mostra a faixa de verificações', () => {
     const d = tipo('ot_p90');
     const checks = openingChecks(d, 0.14);
     const html = renderToStaticMarkup(
@@ -110,13 +115,35 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('Corte');
     expect(html).toContain('3D linhas');
     expect(html).toContain('3D sombreado');
-    expect(html).toContain('disabled');
+    expect(html).not.toContain('disabled');
     expect(html).toContain('Verificações');
     expect(html).toContain('Largura livre 0,80 m');
     expect(html).toContain('Altura livre 2,05 m');
     expect(html).toContain('Verga ausente');
     expect(html).toContain('Inverter dobradiça');
     expect(html).toContain('Inverter sentido');
+  });
+
+  it('sem WebGL (render em string), o 3D avisa e as outras abas continuam disponíveis', () => {
+    const d = tipo('ot_p90');
+    const html = renderToStaticMarkup(
+      createElement(OpeningTypePreview, {
+        d,
+        tab: 'lines3d',
+        onTab: vazio,
+        flipHand: false,
+        flipFacing: false,
+        onFlipHand: vazio,
+        onFlipFacing: vazio,
+        angle: 90,
+        onAngle: vazio,
+        checks: [],
+      }),
+    );
+    expect(html).toContain('3D indisponível neste navegador');
+    expect(html).not.toContain('disabled');
+    expect(html).toContain('Planta');
+    expect(html).toContain('Corte');
   });
 
   it('o cabeçalho oferece família, tipo, duplicar, renomear e favorito', () => {

@@ -209,44 +209,65 @@ async function quadroCheio(page, acao, janelaMs) {
   return qs.reduce((a, b) => (b.calls > a.calls ? b : a));
 }
 
-/** Malhas da cena 3D: total, visíveis (com os pais visíveis) e triângulos da geometria das malhas visíveis. */
+/** Malhas da cena 3D: total, visíveis (com os pais visíveis), triângulos da geometria das visíveis e instâncias. */
 const contarMalhas3d = (page) => page.evaluate(() => {
   const m = window.__hestia3dModel;
   let total = 0;
   let visiveis = 0;
   let triangulos = 0;
+  let instancias = 0;
   m.scene.traverse((o) => {
     if (!o.isMesh) return;
     total++;
     for (let p = o; p; p = p.parent) if (!p.visible) return;
     visiveis++;
+    if (o.isInstancedMesh) {
+      instancias += o.count;
+      return;
+    }
     const g = o.geometry;
     triangulos += (g.index ? g.index.count : g.attributes.position.count) / 3;
   });
-  return { total, visiveis, triangulosGeometria: Math.round(triangulos) };
+  return { total, visiveis, triangulosGeometria: Math.round(triangulos), instancias };
+});
+
+/** Assinatura do conteúdo da cena para saber se a montagem progressiva ainda está acrescentando níveis. */
+const assinaturaCena3d = (page) => page.evaluate(() => {
+  let malhas = 0;
+  let triangulos = 0;
+  let instancias = 0;
+  window.__hestia3dModel?.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    malhas++;
+    if (o.isInstancedMesh) {
+      instancias += o.count;
+      return;
+    }
+    const g = o.geometry;
+    triangulos += (g.index ? g.index.count : g.attributes.position.count) / 3;
+  });
+  return { malhas, triangulos: Math.round(triangulos), instancias };
 });
 
 /**
- * Espera a montagem progressiva da 3D parar de acrescentar malhas (a cena monta por fatias; medir no meio subestima
- * draw calls e malhas). Considera estável depois de 1,5 s sem mudança; devolve o total e o tempo de espera.
+ * Espera a montagem progressiva da 3D parar de acrescentar conteúdo (a cena monta por fatias; medir no meio subestima
+ * draw calls e triângulos). Com lotes globais a contagem de malhas para de crescer cedo, então a assinatura inclui
+ * triângulos dos lotes de geometria e instâncias. Considera estável depois de 1,5 s sem mudança.
  */
 async function esperarCena3dEstavel(page, timeoutMs) {
   const inicio = Date.now();
-  let anterior = -1;
+  let anterior = '';
   let desde = Date.now();
   for (;;) {
-    const total = await page.evaluate(() => {
-      let n = 0;
-      window.__hestia3dModel?.scene.traverse((o) => { if (o.isMesh) n++; });
-      return n;
-    });
-    if (total !== anterior) {
-      anterior = total;
+    const atual = await assinaturaCena3d(page);
+    const chave = JSON.stringify(atual);
+    if (chave !== anterior) {
+      anterior = chave;
       desde = Date.now();
     } else if (Date.now() - desde >= 1500) {
-      return { total, ms: Date.now() - inicio, estavel: true };
+      return { ...atual, ms: Date.now() - inicio, estavel: true };
     }
-    if (Date.now() - inicio >= timeoutMs) return { total: anterior, ms: Date.now() - inicio, estavel: false };
+    if (Date.now() - inicio >= timeoutMs) return { ...atual, ms: Date.now() - inicio, estavel: false };
     await page.waitForTimeout(250);
   }
 }
@@ -317,7 +338,7 @@ async function medirProjeto(browser, app, cenario, pendencias, amostrador) {
   await page.waitForTimeout(ESPERA_3D_MS);
   const montagem = await esperarCena3dEstavel(page, TIMEOUT_MS);
   montagem.ms = Date.now() - inicio3d;
-  if (!montagem.estavel) pendencias.push(`[${rotulo}] 3D: montagem não estabilizou em ${montagem.ms} ms (${montagem.total} malhas)`);
+  if (!montagem.estavel) pendencias.push(`[${rotulo}] 3D: montagem não estabilizou em ${montagem.ms} ms (${montagem.malhas} malhas, ${montagem.triangulos} tris, ${montagem.instancias} instâncias)`);
   // Enquadra e força um quadro novo; o renderer desenha sob demanda. O primeiro quadro depois da montagem atualiza o
   // shadow map (se ligado) e desenha a cena duas vezes; por isso ele é registrado à parte e serve de aquecimento.
   const enquadrar = () =>
@@ -362,6 +383,7 @@ async function medirProjeto(browser, app, cenario, pendencias, amostrador) {
       malhas,
       montagemMs: faixa([montagem.ms]),
       montagemEstavel: montagem.estavel,
+      montagemConteudo: { malhas: montagem.malhas, triangulos: montagem.triangulos, instancias: montagem.instancias },
     },
     memoria: {
       jsHeapMB: { antes: memAntes.jsMB, picoAbertura: MB(picoAbertura), picoTotal: MB(picoTotalJs), estavel: memEstavel.jsMB },
@@ -420,8 +442,8 @@ const data = {
     gerador: `scripts/perf-baselines/projeto-sintetico.mts (${CENARIOS.map((c) => `${c.pavimentos}×${c.paredes}`).join(', ')})`,
     draws: 'interceptação de drawArrays/drawElements (e instanciadas) do WebGL2, por quadro (rAF); mediana e faixa entre repetições do quadro cheio',
     planta: `nível do meio após troca de nível, viewport do roteiro de navegador (zoom 30)`,
-    modelo3d: `troca para a aba 3D, espera de ${ESPERA_3D_MS} ms e espera a montagem progressiva estabilizar (malhas paradas por 1,5 s) antes do enquadramento (fit); o primeiro quadro depois da montagem (com atualização do shadow map) vai em primeiroQuadro, e as repetições seguintes medem o quadro estável`,
-    montagem3d: 'da abertura da vista (depois de MEDIR_ESPERA_3D_MS) até a contagem de malhas parar por 1,5 s (limite: MEDIR_TIMEOUT_MS)',
+    modelo3d: `troca para a aba 3D, espera de ${ESPERA_3D_MS} ms e espera a montagem progressiva estabilizar (malhas, triângulos e instâncias parados por 1,5 s) antes do enquadramento (fit); o primeiro quadro depois da montagem (com atualização do shadow map) vai em primeiroQuadro, e as repetições seguintes medem o quadro estável`,
+    montagem3d: 'da abertura da vista (depois de MEDIR_ESPERA_3D_MS) até a contagem de malhas, triângulos e instâncias parar por 1,5 s (limite: MEDIR_TIMEOUT_MS)',
     abertura: 'openFromText até o segundo quadro pintado (rAF duplo), na página já carregada',
     malhas: 'Mesh na cena do ModelScene (apenas 3D)',
     memoria: 'heap JS (performance.memory, pico amostrado a 50 ms; neste Chrome o valor não acompanha o projeto, ver isolateUsadoMB) e heap do V8 via CDP (Runtime.getHeapUsage) após coleta de lixo; processos do Chrome por WorkingSetSize (Windows)',

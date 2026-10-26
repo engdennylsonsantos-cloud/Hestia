@@ -11,15 +11,15 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — A1 integrado; inserção na meta, abertura pendente. R1 em execução.
-**Em execução:** R1 (fundação 3D GPU).
-**Próxima ação:** aguardar R1 para rodar M0 em janela exclusiva; depois abrir A1b (abertura ≤300 ms).
+**Última atualização:** 2026-10-26 — R1 integrado (251→14 draws); M0 em preparação.
+**Em execução:** M0 (baseline 10/30/60) e ajuste da estabilização do `medir:gpu`.
+**Próxima ação:** rodar M0, A2 no build integrado e liberar R2/R3/R5 + A1b.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
 | 0 — Verdade | G0 | 🟨 em andamento | S0, S1, S2, M0 | — | — |
 | 1 — Estabilização | G1 | 🟨 parcial: inserção ok; abertura pendente (A1b) | A1, A1b, A2, I1 | 2026-10-26 | inserção 19–25 ms; abertura 445–465 ms |
-| 2 — Fundação GPU | G2 | ⬜ aguarda G1 | R1–R5 | — | — |
+| 2 — Fundação GPU | G2 | 🟨 R1 ok; R2–R5 pendentes | R1–R5 | 2026-10-26 | 60×128: 251→14 draws, 1,0 ms |
 | 3 — WebGPU | G3 | ⬜ aguarda G2 | W1, W2 | — | — |
 | 4 — CPU/workers | G4 | ⬜ paralela à 2/3 | P1, P2 | — | — |
 | 5 — Endurecimento | G5 | ⬜ aguarda todas | H1 | — | — |
@@ -34,7 +34,7 @@
 - [ ] **A1b** abertura ≤300 ms (cache por nível, avisos adiados, desenho inicial)
 - [x] **A2** verificação visual — concluído em `763b890`; 44 PASS, 1 FAIL (realce de linha de detalhe)
 - [ ] **I1** integração da Fase 1
-- [ ] **R1** fundação 3D GPU — em execução (worktree `gpu-r1-foundation`)
+- [x] **R1** fundação 3D GPU — concluído em `ba4b4e6`; 251→14 draw calls, 3,2→1,0 ms
 - [ ] **R2** culling/LOD/sombras/precisão
 - [ ] **R3** picking/realce GPU
 - [ ] **R4** clipping planes
@@ -126,6 +126,20 @@
 - **Novos achados para A1b:** `avisosDoProjeto` gasta 115–140 ms 300 ms após cada edição; o cache de geometria só
   grava quando **todos** os níveis ficam prontos (~2 s), então quase nunca é reaproveitado na abertura seguinte.
 - **Ambiente:** a máquina estava compartilhada com S2/A2; o mesmo build base deu 435–474 ms. M0 precisa ser exclusivo.
+
+### Achados R1 (2026-10-26)
+
+- **Draw calls:** 60×128 251 → **14**; 30×256 131 → **14**; 60×256 251 → **14** (não cresce com pavimentos).
+- **Frame CPU:** 3,2 → **1,0 ms** em 60×128; 2,2 → **1,0 ms** em 30×256.
+- **Montagem 3D:** 60×128 32,5 → **17,8 s**; 60×256 56,0 → **38,8 s**.
+- **Uploads de montagem:** 60×128 581,6 → **111,5 MB**; 30×256 295,0 → **95,2 MB**.
+- **Triângulos estáveis:** 0,85 M em 60×128/30×256, 1,71 M em 60×256; 1º quadro de 60×256 ainda 3,41 M (R2).
+- **VRAM contábil:** 18,9 / 18,5 / 37,0 MiB (teto 256 MiB).
+- **Quadro parado:** uploads e rebuilds = 0 em 60 amostras.
+- **Picking/realce:** preservados por faixas globais; BVH invalidado por versão; `instanciar: false` intacto.
+- **Ajuste necessário no M0:** `medir:gpu` estabilizava pela contagem de malhas; com lotes globais, passa a acompanhar
+  triângulos + instâncias (corrigido em `scripts/medir-gpu-memoria.mjs`).
+- **Testes:** 36 arquivos / 546 testes verdes; typecheck verde.
 
 ## 1. Regras do board
 

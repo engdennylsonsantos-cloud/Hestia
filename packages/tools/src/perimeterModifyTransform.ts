@@ -42,7 +42,7 @@ export function mirrorSegs(d: SketchDraft, ids: string[], axisA: Vec2, axisB: Ve
 }
 
 /**
- * Girar (Revit: Rotate) em torno de `center`, `angle` em radianos. Com `copy`, as originais ficam.
+ * Rotacionar (Revit: Rotate) em torno de `center`, `angle` em radianos. Com `copy`, as originais ficam.
  * Null se o ângulo é zero ou não há linhas.
  */
 export function rotateSegs(d: SketchDraft, ids: string[], center: Vec2, angle: number, copy: boolean): SketchDraft | null {

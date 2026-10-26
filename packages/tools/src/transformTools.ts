@@ -192,7 +192,7 @@ export class MoveTool extends SelectionTool {
         if (els.length) copyWalls(this.env, els, t);
         if (views.length) transformViews(this.env, views, t, true);
       } else {
-        if (els.length) moveWalls(this.env, els, d);
+        if (els.length) moveWalls(this.env, els, d, false);
         else if (this.openings().length) slideOpenings(this.env, this.openings(), d);
         if (views.length) transformViews(this.env, views, t);
         if (seps.length) moveRoomSeparators(this.env, seps, d);
@@ -295,7 +295,7 @@ export class RotateTool extends SelectionTool {
     this.env.transaction(copy ? 'Rotacionar e copiar' : 'Rotacionar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else transformWalls(this.env, els, t, 'Rotacionar');
+        else transformWalls(this.env, els, t, 'Rotacionar', false);
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });
@@ -391,7 +391,7 @@ export class MirrorTool extends SelectionTool {
     this.env.transaction(copy ? 'Espelhar e copiar' : 'Espelhar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else transformWalls(this.env, els, t, 'Espelhar');
+        else transformWalls(this.env, els, t, 'Espelhar', false);
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });

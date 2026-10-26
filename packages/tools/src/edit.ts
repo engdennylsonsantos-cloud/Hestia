@@ -98,8 +98,9 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
 }
 
 /**
- * Mover, girar ou espelhar paredes (`t`), com o mesmo critério de junção do Mover: a parede não selecionada que
- * termina numa extremidade movida é esticada até o novo ponto dela. Um passo de desfazer, com o rótulo `label`.
+ * Mover, girar ou espelhar paredes (`t`). Com `follow` (padrão), a parede não selecionada que termina numa
+ * extremidade movida é esticada até o novo ponto dela; as ferramentas Mover, Rotacionar e Espelhar passam `false`
+ * para deixar a vizinha onde está (a ponta movida se solta). Um passo de desfazer, com o rótulo `label`.
  */
 export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();

@@ -160,6 +160,7 @@ describe('Rotacionar, mover e espelhar sem cópia: só os selecionados mudam', (
     drawWall(ctx.env, [4, 0], [4, 3]); // w1
     const [w0, w1] = walls(ctx.store);
     ctx.env.setSelection([w0!.id]);
+    ctx.options.moveDisjoin = true;
     const m = tool('move', ctx.env);
     clickAt(m, 0, 0);
     clickAt(m, 0, 1);
@@ -194,6 +195,7 @@ describe('Rotacionar, mover e espelhar sem cópia: só os selecionados mudam', (
     drawWall(ctx.env, [4, 0], [4, 3]); // w1
     const [w0, w1] = walls(ctx.store);
     ctx.env.setSelection([w0!.id]);
+    ctx.options.mirrorDisjoin = true;
     const m = tool('mirror', ctx.env);
     clickAt(m, -1, -1); // eixo vertical x = -1
     clickAt(m, -1, 5);

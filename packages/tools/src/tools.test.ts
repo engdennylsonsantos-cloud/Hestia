@@ -139,9 +139,11 @@ describe('seleção e edição', () => {
     expect(sel()).toHaveLength(2);
   });
   it('mover solta a vizinha pela extremidade comum em vez de arrastá-la', () => {
-    const { store, env, sel } = house();
+    const ctx = house();
+    const { store, env, sel, options } = ctx;
     const first = walls(store)[0]!;
     env.setSelection([first.id]);
+    options.moveDisjoin = true;
     const m = tool('move', env);
     clickAt(m, 0, 0); clickAt(m, 0, 1);
     const [a, b] = walls(store) as [Wall, Wall];

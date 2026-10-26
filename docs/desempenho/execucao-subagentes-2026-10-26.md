@@ -11,13 +11,13 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — R1 integrado (251→14 draws); M0 em preparação.
-**Em execução:** M0 (baseline 10/30/60) e ajuste da estabilização do `medir:gpu`.
-**Próxima ação:** rodar M0, A2 no build integrado e liberar R2/R3/R5 + A1b.
+**Última atualização:** 2026-10-26 — G0 fechado; M0 e A2 integrados. Próxima onda disparada.
+**Em execução:** A1b (abertura), R2 (culling/LOD/sombras/precisão), R3 (picking/realce GPU), R5 (planta GPU).
+**Próxima ação:** revisar as quatro entregas, integrar e rodar M1 em janela exclusiva.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
-| 0 — Verdade | G0 | 🟨 em andamento | S0, S1, S2, M0 | — | — |
+| 0 — Verdade | G0 | ✅ fechado | S0, S1, S2, M0 | 2026-10-26 | WebGPU viável; baseline 10/30/60; top 5 de custo |
 | 1 — Estabilização | G1 | 🟨 parcial: inserção ok; abertura pendente (A1b) | A1, A1b, A2, I1 | 2026-10-26 | inserção 19–25 ms; abertura 445–465 ms |
 | 2 — Fundação GPU | G2 | 🟨 R1 ok; R2–R5 pendentes | R1–R5 | 2026-10-26 | 60×128: 251→14 draws, 1,0 ms |
 | 3 — WebGPU | G3 | ⬜ aguarda G2 | W1, W2 | — | — |
@@ -29,16 +29,16 @@
 - [x] **S0** sonda de GPU real (RX 580) — concluído em `6a87455`; ver `docs/desempenho/gpu-capacidade.md`
 - [x] **S1** instrumentação (`?perf=1`, timers, contadores) — concluído em `2a4ec8e`; ver `docs/desempenho/instrumentacao-s1-2026-10-26.md`
 - [x] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes) — concluído em `f494263`; ver `docs/desempenho/s2-projeto-grande-2026-10-26.md`
-- [ ] **M0** baseline 10/30/60
+- [x] **M0** baseline 10/30/60 — concluído; `gpu-memoria-m0-2026-10-26.json` e `browser-...-m0-http-...json`
 - [x] **A1** inserção/abertura — concluído em `1a7883c`/`16f9658`; inserção na meta, abertura ainda 445–465 ms
 - [ ] **A1b** abertura ≤300 ms (cache por nível, avisos adiados, desenho inicial)
 - [x] **A2** verificação visual — concluído em `763b890`; 44 PASS, 1 FAIL (realce de linha de detalhe)
 - [ ] **I1** integração da Fase 1
 - [x] **R1** fundação 3D GPU — concluído em `ba4b4e6`; 251→14 draw calls, 3,2→1,0 ms
-- [ ] **R2** culling/LOD/sombras/precisão
-- [ ] **R3** picking/realce GPU
+- [ ] **R2** culling/LOD/sombras/precisão — em execução
+- [ ] **R3** picking/realce GPU — em execução
 - [ ] **R4** clipping planes
-- [ ] **R5** planta GPU
+- [ ] **R5** planta GPU — em execução (inclui realce de linha de detalhe)
 - [ ] **W1** WebGPU
 - [ ] **W2** compute medido
 - [ ] **P1** workers
@@ -140,6 +140,33 @@
 - **Ajuste necessário no M0:** `medir:gpu` estabilizava pela contagem de malhas; com lotes globais, passa a acompanhar
   triângulos + instâncias (corrigido em `scripts/medir-gpu-memoria.mjs`).
 - **Testes:** 36 arquivos / 546 testes verdes; typecheck verde.
+
+### M0 — baseline oficial (2026-10-26, HTTP, 10 repetições)
+
+| Medida (20 pav) | Valor |
+|---|---:|
+| Abrir projeto | **313,0 ms** (p95 336,9) |
+| Porta / janela / parede nova | **20,8 / 20,8 / 20,5 ms** |
+| Pan / zoom | 18,7 / 16,6 ms |
+| Seleção / edição | 16,3 / 40,3 ms |
+| Pick 3D | 30,0 ms |
+
+Escala (`medir:gpu`, 2 repetições, WebGL2, headed):
+
+| Cenário | Abertura | 3D estável | Montagem 3D | Processo pico |
+|---|---:|---|---:|---:|
+| 10×32 | 341 ms | 14 draws / 29 k tris | 4,4 s | 656 MB |
+| 30×128 | 1.769 ms | 14 draws / 427 k tris | 12,0 s | 999 MB |
+| 60×128 | 2.582 ms | 14 draws / 853 k tris | 29,7 s | 1.196 MB |
+
+**Top 5 de custo da abertura (A1):** resolução exata de dois níveis (~184–200 ms), primeiro desenho exato
+(~118–138 ms), estilo/layout do DOM novo (~119 ms), `avisosDoProjeto` 300 ms após a edição (~115–140 ms) e
+cache de geometria que só grava quando todos os níveis ficam prontos (~2 s). Por isso a abertura cresce com
+o número de níveis e o G1 fica parcial.
+
+**A2 no build integrado:** 43 PASS, 2 FAIL — um falso positivo de 404 (favicon no servidor de teste) e o FAIL real
+de realce de linha de detalhe, já atribuído ao R5. A 3D passou inteira após o R1 (89 caixas de parede, portas/janelas,
+silhueta e seleção).
 
 ## 1. Regras do board
 

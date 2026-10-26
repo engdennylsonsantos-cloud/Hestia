@@ -1,14 +1,14 @@
 {
-  "geradoEm": "2026-10-26T21:48:53.849Z",
-  "url": "file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-a2-visual/apps/web/dist/index.html?debug=1",
+  "geradoEm": "2026-10-26T23:55:14.239Z",
+  "url": "http://localhost:8123/index.html?debug=1",
   "navegador": "155.0.8059.86 (C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe)",
   "viewport": {
     "width": 1440,
     "height": 900
   },
   "total": 45,
-  "pass": 44,
-  "fail": 1,
+  "pass": 43,
+  "fail": 2,
   "pendente": 0,
   "resultados": [
     {
@@ -169,8 +169,8 @@
       "itemNome": "1 · Cotas individual e em cadeia (zooms 12/60/220)",
       "criterio": "sem erro de página",
       "esperado": "nenhum erro de console/pageerror",
-      "observado": "0 erro(s)",
-      "veredito": "PASS",
+      "observado": "1 erro(s): Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "veredito": "FAIL",
       "imagem": ""
     },
     {
@@ -417,5 +417,7 @@
       "imagem": ""
     }
   ],
-  "errosGlobais": []
+  "errosGlobais": [
+    "cotas: Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
 }

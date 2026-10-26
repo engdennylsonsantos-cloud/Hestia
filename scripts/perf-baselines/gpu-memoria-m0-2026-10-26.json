@@ -1,0 +1,355 @@
+{
+  "geradoEm": "2026-10-26T23:52:01.537Z",
+  "rotulo": "m0-2026-10-26",
+  "navegador": {
+    "executavel": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "versao": "155.0.8059.86",
+    "headless": false
+  },
+  "app": {
+    "endereco": "http://localhost:8123/index.html",
+    "modo": "producao"
+  },
+  "maquina": {
+    "so": "win32 10.0.19045",
+    "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+    "ramTotalGB": 15.8
+  },
+  "cenarios": [
+    {
+      "pavimentos": 10,
+      "paredes": 32
+    },
+    {
+      "pavimentos": 30,
+      "paredes": 128
+    },
+    {
+      "pavimentos": 60,
+      "paredes": 128
+    }
+  ],
+  "metodo": {
+    "repeticoes": 2,
+    "gerador": "scripts/perf-baselines/projeto-sintetico.mts (10×32, 30×128, 60×128)",
+    "draws": "interceptação de drawArrays/drawElements (e instanciadas) do WebGL2, por quadro (rAF); mediana e faixa entre repetições do quadro cheio",
+    "planta": "nível do meio após troca de nível, viewport do roteiro de navegador (zoom 30)",
+    "modelo3d": "troca para a aba 3D, espera de 2000 ms e espera a montagem progressiva estabilizar (malhas, triângulos e instâncias parados por 1,5 s) antes do enquadramento (fit); o primeiro quadro depois da montagem (com atualização do shadow map) vai em primeiroQuadro, e as repetições seguintes medem o quadro estável",
+    "montagem3d": "da abertura da vista (depois de MEDIR_ESPERA_3D_MS) até a contagem de malhas, triângulos e instâncias parar por 1,5 s (limite: MEDIR_TIMEOUT_MS)",
+    "abertura": "openFromText até o segundo quadro pintado (rAF duplo), na página já carregada",
+    "malhas": "Mesh na cena do ModelScene (apenas 3D)",
+    "memoria": "heap JS (performance.memory, pico amostrado a 50 ms; neste Chrome o valor não acompanha o projeto, ver isolateUsadoMB) e heap do V8 via CDP (Runtime.getHeapUsage) após coleta de lixo; processos do Chrome por WorkingSetSize (Windows)"
+  },
+  "projetos": {
+    "10Pavimentos": {
+      "pavimentos": 10,
+      "paredesPorPavimento": 32,
+      "paredes": 320,
+      "gpu": "webgl2",
+      "arquivo": {
+        "bytes": 252542,
+        "mb": 0.24,
+        "geracaoMs": 1963
+      },
+      "aberturaMs": 341.4,
+      "elementos": {
+        "total": 351,
+        "paredes": 320,
+        "aberturas": 10,
+        "ambientes": 0,
+        "pisos": 10,
+        "lajes": 10,
+        "telhados": 1
+      },
+      "planta": {
+        "drawCalls": {
+          "mediana": 26,
+          "minimo": 26,
+          "maximo": 26,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 2974,
+          "minimo": 2974,
+          "maximo": 2974,
+          "n": 2
+        }
+      },
+      "modelo3d": {
+        "drawCalls": {
+          "mediana": 14,
+          "minimo": 14,
+          "maximo": 14,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 29342,
+          "minimo": 29342,
+          "maximo": 29342,
+          "n": 2
+        },
+        "primeiroQuadro": {
+          "drawCalls": {
+            "mediana": 25,
+            "minimo": 25,
+            "maximo": 25,
+            "n": 1
+          },
+          "triangulos": {
+            "mediana": 58682,
+            "minimo": 58682,
+            "maximo": 58682,
+            "n": 1
+          }
+        },
+        "malhas": {
+          "total": 72,
+          "visiveis": 12,
+          "triangulosGeometria": 1382,
+          "instancias": 2330
+        },
+        "montagemMs": {
+          "mediana": 4417,
+          "minimo": 4417,
+          "maximo": 4417,
+          "n": 1
+        },
+        "montagemEstavel": true,
+        "montagemConteudo": {
+          "malhas": 72,
+          "triangulos": 29342,
+          "instancias": 2330
+        }
+      },
+      "memoria": {
+        "jsHeapMB": {
+          "antes": 19.4,
+          "picoAbertura": 23.4,
+          "picoTotal": 53,
+          "estavel": 49.6
+        },
+        "isolateUsadoMB": {
+          "antes": 12.6,
+          "estavel": 22.1
+        },
+        "processosChromeMB": {
+          "pico": {
+            "wsMB": 656.4,
+            "processos": 8
+          },
+          "estavel": {
+            "wsMB": 611.2,
+            "processos": 8
+          }
+        }
+      }
+    },
+    "30Pavimentos-128Paredes": {
+      "pavimentos": 30,
+      "paredesPorPavimento": 128,
+      "paredes": 3840,
+      "gpu": "webgl2",
+      "arquivo": {
+        "bytes": 3037259,
+        "mb": 2.9,
+        "geracaoMs": 1760
+      },
+      "aberturaMs": 1768.6,
+      "elementos": {
+        "total": 5221,
+        "paredes": 3840,
+        "aberturas": 480,
+        "ambientes": 840,
+        "pisos": 30,
+        "lajes": 30,
+        "telhados": 1
+      },
+      "planta": {
+        "drawCalls": {
+          "mediana": 58,
+          "minimo": 58,
+          "maximo": 61,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 10644,
+          "minimo": 10644,
+          "maximo": 12460,
+          "n": 2
+        }
+      },
+      "modelo3d": {
+        "drawCalls": {
+          "mediana": 14,
+          "minimo": 14,
+          "maximo": 14,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 426542,
+          "minimo": 426542,
+          "maximo": 426542,
+          "n": 2
+        },
+        "primeiroQuadro": {
+          "drawCalls": {
+            "mediana": 25,
+            "minimo": 25,
+            "maximo": 25,
+            "n": 1
+          },
+          "triangulos": {
+            "mediana": 853082,
+            "minimo": 853082,
+            "maximo": 853082,
+            "n": 1
+          }
+        },
+        "malhas": {
+          "total": 192,
+          "visiveis": 12,
+          "triangulosGeometria": 5342,
+          "instancias": 35100
+        },
+        "montagemMs": {
+          "mediana": 12045,
+          "minimo": 12045,
+          "maximo": 12045,
+          "n": 1
+        },
+        "montagemEstavel": true,
+        "montagemConteudo": {
+          "malhas": 192,
+          "triangulos": 426542,
+          "instancias": 35100
+        }
+      },
+      "memoria": {
+        "jsHeapMB": {
+          "antes": 20.4,
+          "picoAbertura": 56.5,
+          "picoTotal": 246.4,
+          "estavel": 167.7
+        },
+        "isolateUsadoMB": {
+          "antes": 13,
+          "estavel": 85
+        },
+        "processosChromeMB": {
+          "pico": {
+            "wsMB": 998.6,
+            "processos": 8
+          },
+          "estavel": {
+            "wsMB": 803.6,
+            "processos": 8
+          }
+        }
+      }
+    },
+    "60Pavimentos-128Paredes": {
+      "pavimentos": 60,
+      "paredesPorPavimento": 128,
+      "paredes": 7680,
+      "gpu": "webgl2",
+      "arquivo": {
+        "bytes": 6059005,
+        "mb": 5.78,
+        "geracaoMs": 2077
+      },
+      "aberturaMs": 2582.2,
+      "elementos": {
+        "total": 10441,
+        "paredes": 7680,
+        "aberturas": 960,
+        "ambientes": 1680,
+        "pisos": 60,
+        "lajes": 60,
+        "telhados": 1
+      },
+      "planta": {
+        "drawCalls": {
+          "mediana": 58,
+          "minimo": 58,
+          "maximo": 61,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 10644,
+          "minimo": 10644,
+          "maximo": 12460,
+          "n": 2
+        }
+      },
+      "modelo3d": {
+        "drawCalls": {
+          "mediana": 14,
+          "minimo": 14,
+          "maximo": 14,
+          "n": 2
+        },
+        "triangulos": {
+          "mediana": 853022,
+          "minimo": 853022,
+          "maximo": 853022,
+          "n": 2
+        },
+        "primeiroQuadro": {
+          "drawCalls": {
+            "mediana": 25,
+            "minimo": 25,
+            "maximo": 25,
+            "n": 1
+          },
+          "triangulos": {
+            "mediana": 1706042,
+            "minimo": 1706042,
+            "maximo": 1706042,
+            "n": 1
+          }
+        },
+        "malhas": {
+          "total": 372,
+          "visiveis": 12,
+          "triangulosGeometria": 10622,
+          "instancias": 70200
+        },
+        "montagemMs": {
+          "mediana": 29686,
+          "minimo": 29686,
+          "maximo": 29686,
+          "n": 1
+        },
+        "montagemEstavel": true,
+        "montagemConteudo": {
+          "malhas": 372,
+          "triangulos": 853022,
+          "instancias": 70200
+        }
+      },
+      "memoria": {
+        "jsHeapMB": {
+          "antes": 20.6,
+          "picoAbertura": 85.3,
+          "picoTotal": 382.6,
+          "estavel": 304.8
+        },
+        "isolateUsadoMB": {
+          "antes": 13,
+          "estavel": 133.1
+        },
+        "processosChromeMB": {
+          "pico": {
+            "wsMB": 1195.7,
+            "processos": 8
+          },
+          "estavel": {
+            "wsMB": 976.5,
+            "processos": 8
+          }
+        }
+      }
+    }
+  },
+  "pendencias": []
+}

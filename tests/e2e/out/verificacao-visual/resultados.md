@@ -1,10 +1,10 @@
 # Verificação visual — resultados da execução
 
-- **Gerado em:** 2026-10-26T21:48:53.849Z
-- **URL:** `file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-a2-visual/apps/web/dist/index.html?debug=1`
+- **Gerado em:** 2026-10-26T23:55:14.239Z
+- **URL:** `http://localhost:8123/index.html?debug=1`
 - **Navegador:** 155.0.8059.86 (C:\Program Files\Google\Chrome\Application\chrome.exe)
 - **Viewport:** 1440×900 (deviceScaleFactor 1)
-- **Resumo:** 44 PASS · 1 FAIL · 0 PENDENTE
+- **Resumo:** 43 PASS · 2 FAIL · 0 PENDENTE
 
 | Item | Critério | Esperado | Observado | Veredito | Captura |
 |---|---|---|---|---|---|
@@ -25,7 +25,7 @@
 | 1 · Cotas individual e em cadeia (zooms 12/60/220) | cota cadeia no zoom 220: texto dentro da tela | todos os textos da cota dentro do canvas | todos dentro | **PASS** | [`1-cota-cadeia-z220.png`](./1-cota-cadeia-z220.png) |
 | 1 · Cotas individual e em cadeia (zooms 12/60/220) | texto da cota escala com o zoom | 12 < 60 < 220 (proporcional ao zoom) | 3.0 px → 15.0 px → 55.0 px | **PASS** | — |
 | 1 · Cotas individual e em cadeia (zooms 12/60/220) | controle: seleção de cota muda o desenho | traço/texto na cor de seleção (azul) | 1282 px alterados, 1282 azuis | **PASS** | [`1-controle-selecao-cota-ativa.png`](./1-controle-selecao-cota-ativa.png) |
-| 1 · Cotas individual e em cadeia (zooms 12/60/220) | sem erro de página | nenhum erro de console/pageerror | 0 erro(s) | **PASS** | — |
+| 1 · Cotas individual e em cadeia (zooms 12/60/220) | sem erro de página | nenhum erro de console/pageerror | 1 erro(s): Failed to load resource: the server responded with a status of 404 (Not Found) | **FAIL** | — |
 | 2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara) | texto em negrito | font-weight 700 | font-weight 700 | **PASS** | [`2-texto-caixa.png`](./2-texto-caixa.png) |
 | 2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara) | texto em itálico | font-style italic | font-style italic | **PASS** | [`2-texto-caixa.png`](./2-texto-caixa.png) |
 | 2 · Texto com caixa (negrito, itálico, alinhamento, quebra, máscara) | caixa de texto com alinhamento à direita e quebra | text-align right, white-space normal e mais de uma linha | text-align right, white-space normal, 60 px de altura para 17.3 px de fonte | **PASS** | [`2-texto-caixa-detalhe.png`](./2-texto-caixa-detalhe.png) |
@@ -56,4 +56,4 @@
 
 ## Erros de página
 
-Nenhum.
+- cotas: Failed to load resource: the server responded with a status of 404 (Not Found)

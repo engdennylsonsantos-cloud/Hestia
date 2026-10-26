@@ -143,7 +143,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
               <NumField id="p-rdir" value={axisDeg(single)} decimals={1} unit="°" onCommit={(v) => patch(ids, { dir: { x: Math.cos((v * Math.PI) / 180), y: Math.sin((v * Math.PI) / 180) } })} />
             </Row>
             <div className="row">
-              <button className="btn small" onClick={() => patch(ids, { dir: rotatedDir(single, 90) })}>Girar 90°</button>
+              <button className="btn small" onClick={() => patch(ids, { dir: rotatedDir(single, 90) })}>Rotacionar 90°</button>
             </div>
           </>
         ) : (

@@ -10,7 +10,6 @@ const MODES: Array<[CeilingMode, string]> = [
   ['poly', 'Contorno por pontos'],
   ['rect', 'Retângulo (2 cantos)'],
   ['room', 'No ambiente (clique no ambiente)'],
-  ['hole', 'Furo (forro selecionado)'],
 ];
 
 /** Opções da ferramenta Forro: tipo, modo e cota do topo. Fica fora do OptionsBar, como a da laje. */

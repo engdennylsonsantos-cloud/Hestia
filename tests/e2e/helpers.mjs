@@ -86,21 +86,78 @@ export async function clickWorld(page, x, y) {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(40);
 }
-
-/** Sequências de teclas do perfil de atalhos padrão (Revit, duas letras) para as ferramentas que os roteiros acionam. */
-export const TOOL_SEQ = { w: 'wa', d: 'dr', j: 'wn', m: 'mv', r: 'ro', k: 'ct', b: 'lj', q: 'le', i: 'es' };
-
-/**
- * Aciona uma ferramenta pela letra que os roteiros antigos usavam. Com o atalho em sequência, digita as duas teclas; `v` (Selecionar) não tem
- * tecla: Esc cancela o passo e Esc de novo volta à seleção.
- */
-export async function pressTool(page, letter) {
-  if (letter === 'v') {
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
-    return;
-  }
-  const seq = TOOL_SEQ[letter];
-  if (!seq) throw new Error(`sem sequência de atalho para '${letter}'`);
-  for (const k of seq) await page.keyboard.press(k);
-}
+
+
+/** Sequências de teclas do perfil de atalhos padrão (Revit, duas letras) para as ferramentas que os roteiros acionam. */
+
+export const TOOL_SEQ = { w: 'wa', d: 'dr', j: 'wn', m: 'mv', r: 'ro', k: 'ct', b: 'lj', q: 'le', i: 'es' };
+
+
+
+/**
+
+ * Aciona uma ferramenta pela letra que os roteiros antigos usavam. Com o atalho em sequência, digita as duas teclas; `v` (Selecionar) não tem
+
+ * tecla: Esc cancela o passo e Esc de novo volta à seleção.
+
+ */
+
+export async function pressTool(page, letter) {
+
+  if (letter === 'v') {
+
+    await page.keyboard.press('Escape');
+
+    await page.keyboard.press('Escape');
+
+    return;
+
+  }
+
+  const seq = TOOL_SEQ[letter];
+
+  if (!seq) throw new Error(`sem sequência de atalho para '${letter}'`);
+
+  for (const k of seq) await page.keyboard.press(k);
+
+}
+
+
+/**
+ * Desenha um perímetro pelo modo "Criar/Editar perímetro", sem cliques: abre o modo para o alvo (`floor`, `slab`, `ceiling`
+ * ou `roof`), carrega um rascunho de uma linha por lado (anel `pontos`, em metros, na ordem do contorno) e conclui. Em
+ * `inclina(i, a, b)` diz se o lado i define inclinação (só telhado; ausente = todos, como o padrão do modo). Devolve
+ * `{ ok, msg }`: `ok` é se o modo fechou, `msg` a mensagem da barra. Em recusa, o modo é cancelado. As opções de tipo e
+ * balanço vêm das opções da ferramenta (`useUi.options`), como ao começar o modo pela faixa.
+ */
+export async function perimetroPorPontos(page, alvo, pontos, { inclina = () => true } = {}) {
+  const flags = pontos.map((a, i) => inclina(i, a, pontos[(i + 1) % pontos.length]));
+  return page.evaluate(({ alvo, pontos, flags }) => {
+    const { editor, useUi } = window.__hestia;
+    editor.perimetro.begin(alvo);
+    const segs = pontos.map((a, i) => {
+      const b = pontos[(i + 1) % pontos.length];
+      return { id: `e2e${i}`, a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, definesSlope: flags[i] };
+    });
+    editor.activeTool.loadDraft({ target: alvo, segs, selected: [], defaults: { definesSlope: true, slopePct: 30, overhang: 0.5 } });
+    editor.perimetro.finish();
+    const ok = !editor.perimetro.ativo;
+    const msg = useUi.getState().status;
+    if (!ok) editor.perimetro.cancel();
+    return { ok, msg };
+  }, { alvo, pontos, flags });
+}
+
+/**
+ * Abre a vista 3D como a barra de vistas faz: a tela passa a 3D e a aba "Modelo 3D" entra na lista de vistas abertas (o padrão
+ * de um projeto é só a planta, então a aba não existe antes disso).
+ */
+export async function abreVista3d(page) {
+  await page.evaluate(() => {
+    const { editor, useUi } = window.__hestia;
+    editor.setView('3d');
+    const s = useUi.getState();
+    if (!s.openViews.some((v) => v.kind === '3d')) useUi.setState({ openViews: [...s.openViews, { kind: '3d' }] });
+  });
+  await page.waitForTimeout(300);
+}

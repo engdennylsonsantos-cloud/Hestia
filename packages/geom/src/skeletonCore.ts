@@ -1,7 +1,17 @@
 import { dot, type Vec2 } from './vec.ts';
 
-/** Falha de validação ou de topologia do esqueleto; vira ok:false com `reason`. */
-export class SkeletonFail extends Error {}
+/**
+ * Falha de validação ou de topologia do esqueleto; vira ok:false com `reason`. `at` são os pontos (em planta) onde a
+ * frente de onda não fecha, quando a falha tem um lugar definido; o engine os mostra ao usuário.
+ */
+export class SkeletonFail extends Error {
+  constructor(
+    message: string,
+    readonly at: Vec2[] = [],
+  ) {
+    super(message);
+  }
+}
 
 /** Tolerância para unir nós coincidentes (metros e alturas). */
 const NODE_TOL = 1e-7;
@@ -94,7 +104,7 @@ export function mkVtx(inL: Line, outL: Line, X: Vec2, T: number, node: number): 
   const v = solveVel(inL, outL);
   if (v) return { p0: { x: X.x - v.x * T, y: X.y - v.y * T }, v, inL, outL, node };
   if (dot(inL.n, outL.n) < 0) return { p0: X, v: { x: 0, y: 0 }, inL, outL, node };
-  throw new SkeletonFail('vértice reto entre trechos colineares de pesos diferentes (limite conhecido do esqueleto)');
+  throw new SkeletonFail('vértice reto entre trechos colineares de pesos diferentes (limite conhecido do esqueleto)', [X]);
 }
 
 /** Encerra a trajetória de um vértice no instante T; devolve o nó final. */

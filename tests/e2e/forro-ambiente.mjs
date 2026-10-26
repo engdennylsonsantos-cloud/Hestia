@@ -61,12 +61,21 @@ await rep.step('criar paredes de um cômodo 4 × 3 m, o ambiente e o forro no am
   await page.mouse.click(at.x, at.y);
   await page.waitForTimeout(300);
   check('ambiente criado clicando na sala', (await roomCount()) === 1);
-  await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, ceilingMode: 'room' } }); editor.setTool('ceiling'); });
-  await page.mouse.move(at.x, at.y);
-  await page.mouse.click(at.x, at.y);
-  await page.waitForTimeout(400);
+  // Forro "No ambiente": a ferramenta antiga o criava ao clicar no ambiente, e o modo de perímetro não tem esse modo. O
+  // roteiro grava o forro pela API, com o contorno do ambiente e o vínculo (roomId, sem roomLinked falso), e testa o
+  // acompanhamento: é o comportamento que importa aqui.
+  const rid = await page.evaluate(() => Object.values(window.__hestia.editor.project.elements).find((e) => e.kind === 'room')?.id ?? null);
+  await page.evaluate((r) => {
+    const { editor } = window.__hestia; const p = editor.project;
+    // O ambiente não tem contorno próprio (vem do circuito de paredes): o contorno guardado é a face interna das paredes, e
+    // o forro que acompanha o ambiente o recalcula a partir dele.
+    const T = 0.184;
+    const boundary = [{ x: T / 2, y: T / 2 }, { x: 4 - T / 2, y: T / 2 }, { x: 4 - T / 2, y: 3 - T / 2 }, { x: T / 2, y: 3 - T / 2 }];
+    editor.store.exec({ type: 'addCeiling', ceiling: { id: 'c_e2e', kind: 'ceiling', typeId: Object.keys(p.ceilingTypes)[0], levelId: 'lv_0', boundary, holes: [], roomId: r, heightOffset: 2.6, mark: '', comments: '' } });
+  }, rid);
+  await page.evaluate(() => { const { editor } = window.__hestia; editor.setTool('select'); });
   const id = await ceilingId();
-  check('forro criado "No ambiente" (com vínculo ao ambiente)', id !== null && (await page.evaluate((fid) => window.__hestia.editor.project.elements[fid]?.roomId ?? null, id)) !== null);
+  check('forro criado no ambiente (com vínculo ao ambiente)', id !== null && rid !== null && (await page.evaluate((fid) => window.__hestia.editor.project.elements[fid]?.roomId ?? null, id)) === rid);
   await page.evaluate((fid) => { const { editor, useUi } = window.__hestia; editor.setTool('select'); useUi.setState({ selection: [fid] }); }, id);
   await page.waitForTimeout(300);
   const a0 = await areaM2();

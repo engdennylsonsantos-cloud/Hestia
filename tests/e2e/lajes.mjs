@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { abreVista3d, perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -45,14 +46,13 @@ const kind = await page.evaluate(() => window.__hestia.useUi.getState().snapKind
 check(kind === 'face', `captura no canto externo da face da casa (tipo: ${kind})`);
 await page.keyboard.press('Escape');
 
-// 2) Laje pelo perímetro externo.
-await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, slabMode: 'perimetro', slabTypeId: 'ls_mac15' } }); editor.setTool('slab'); });
-const onWall = await screenOf(bounds.minX, (bounds.minY + bounds.maxY) / 2);
-await page.mouse.move(onWall.x, onWall.y);
-await page.mouse.click(onWall.x, onWall.y);
+// 2) Laje pelo modo de perímetro: o rascunho é o retângulo a 0,135 m do eixo das paredes (face externa).
+await page.evaluate(() => { const { useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, slabTypeId: 'ls_mac15' } }); });
+const f = 0.135;
+const res = await perimetroPorPontos(page, 'slab', [[bounds.minX - f, bounds.minY - f], [bounds.maxX + f, bounds.minY - f], [bounds.maxX + f, bounds.maxY + f], [bounds.minX - f, bounds.maxY + f]]);
 await page.waitForTimeout(400);
 const s = await slabs();
-check(s.length === 1, 'laje criada pelo perímetro externo');
+check(s.length === 1 && res.ok, 'laje criada pelo modo de perímetro (contorno por fora das paredes)', res.msg);
 const area = s[0] ? Math.abs(s[0].boundary.reduce((acc, a, i) => { const b = s[0].boundary[(i + 1) % s[0].boundary.length]; return acc + (a.x * b.y - b.x * a.y); }, 0) / 2) : 0;
 const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
 check(area > w * h && area < (w + 0.6) * (h + 0.6), `área da laje > área dos eixos e < eixos + 0,3 de cada lado (${area.toFixed(2)} m²)`);
@@ -66,6 +66,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/81-laje-inclinada.png` });
+await abreVista3d(page);
 await page.getByRole('tab', { name: /Modelo 3D/ }).click();
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${OUT}/82-laje-3d.png` });

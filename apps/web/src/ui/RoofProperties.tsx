@@ -8,7 +8,6 @@ import { useUi } from '../editor/state.ts';
 import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
-import { RoofEdgeSection, RoofEdgeTable } from './RoofEdgeProps.tsx';
 import { RoofPlanesSection } from './RoofPlanesProps.tsx';
 import { RoofProfileRow } from './RoofProfileRow.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
@@ -43,8 +42,8 @@ const SHAPE_OPTIONS: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'free', 'ex
 
 /**
  * Propriedades de um ou mais telhados: tipo, nível, cota do beiral, forma (predefinições por aresta ou águas livres),
- * inclinação, cumeeira, beiral e acabamentos, camadas, quantitativos e identidade. Com uma aresta escolhida na planta,
- * mostra a seção "Aresta N"; a tabela de arestas lista todas. O contorno se edita pelas alças na planta.
+ * inclinação, cumeeira, beiral e acabamentos, camadas, quantitativos e identidade. As arestas (inclinação e balanço) se
+ * editam em "Editar perímetro"; o contorno, pelas alças na planta.
  */
 export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
   const p = useProject();
@@ -76,9 +75,6 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
   const planes = sum((q) => q.planes.length);
   const resolved = picked.length > 0 && picked.some((q) => q.planes.length > 0);
   const freeRoof = single?.shape === 'free' ? single : null;
-  const roofEdge = useUi((s) => s.roofEdge);
-  const edgeSel = single && roofEdge && roofEdge.roofId === single.id && roofEdge.index < single.boundary.length ? roofEdge : null;
-  const edgeCapable = single !== null && single.shape !== 'free' && single.shape !== 'extrusion';
 
   const setSlope = (v: number): void => {
     const err = roofSlopeError(v);
@@ -153,19 +149,17 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         ) : (
           <div className="hint">
             {freeRoof ? 'Águas livres: cada água tem inclinação e subida próprias (lista abaixo).'
-              : single?.shape === 'edges' && roofPresetOf(single) === 'gable' ? 'Duas águas: a inclinação vale para as arestas paralelas à cumeeira. Escolha uma aresta na planta para editá-la.'
-              : single?.shape === 'edges' && roofPresetOf(single) === 'hip' ? 'Quatro águas: a inclinação vale para todas as arestas do contorno. Escolha uma aresta na planta para editá-la.'
-              : single?.shape === 'edges' ? 'Por arestas: inclinação só nas arestas que a definem. Escolha uma aresta na planta para editá-la.'
+              : single?.shape === 'edges' && roofPresetOf(single) === 'gable' ? 'Duas águas: a inclinação vale para as arestas paralelas à cumeeira. Para editar uma aresta, use Editar perímetro.'
+              : single?.shape === 'edges' && roofPresetOf(single) === 'hip' ? 'Quatro águas: a inclinação vale para todas as arestas do contorno. Para editar uma aresta, use Editar perímetro.'
+              : single?.shape === 'edges' ? 'Por arestas: inclinação só nas arestas que a definem. Para editar uma aresta, use Editar perímetro.'
               : single?.shape === 'extrusion' ? 'Telhado por extrusão: o perfil (altura por transversal) se edita pelo botão abaixo.'
               : single ? 'Forma de uma água, duas águas ou quatro águas: troque por Por arestas para editar cada aresta.'
               : 'Selecione um telhado para editar a direção da cumeeira.'}
           </div>
         )}
         {single?.shape === 'extrusion' && <RoofProfileRow key={single.id} roof={single} />}
-        <div className="hint">O balanço do beiral se define por aresta na planta. O contorno se ajusta pelas alças.</div>
+        <div className="hint">O balanço do beiral se define por aresta, em Editar perímetro. O contorno se ajusta pelas alças.</div>
       </Group>
-      {edgeSel && single && <RoofEdgeSection roof={single} index={edgeSel.index} />}
-      {edgeCapable && single && <RoofEdgeTable roof={single} />}
       {freeRoof && <RoofPlanesSection roof={freeRoof} />}
       <Group title="Beiral e acabamentos">
         <Row label="Unir telhados" htmlFor="p-rjoin">

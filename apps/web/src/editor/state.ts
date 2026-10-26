@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Id, LocationLine } from '@hestia/model';
 import type { Backend } from '@hestia/render';
-import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type RoofEdgeSel, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
 import { activeViewOf, addView, type OpenView } from './openViews.ts';
@@ -53,8 +53,6 @@ export interface UiState {
   ribbonBack: RibbonTabId;
   /** Menu Arquivo aberto (aba Arquivo da faixa). */
   fileMenu: boolean;
-  /** Aresta de telhado escolhida na planta (seção "Aresta N" em Propriedades). */
-  roofEdge: RoofEdgeSel | null;
   /**
    * Vistas abertas na barra, na ordem das abas (sessão, não vai para o projeto). A vista ativa é sempre uma delas:
    * `view`/`levelId`/`sectionId`/`sheetId` continuam sendo a fonte da vista ativa, e esta lista é sincronizada com eles.
@@ -122,7 +120,7 @@ export function toggleRoofProjection(): void {
 export function clickSelect3d(hit: Id | null, additive: boolean): void {
   const ui = useUi.getState();
   const next = selectionAfterClick(ui.selection, hit, additive);
-  useUi.setState({ selection: next, roofEdge: next.length === 1 && ui.roofEdge?.roofId === next[0] ? ui.roofEdge : null });
+  useUi.setState({ selection: next });
 }
 
 /**
@@ -210,7 +208,6 @@ export const useUi = create<UiState>(() => ({
   ribbon: 'arquitetura',
   ribbonBack: 'arquitetura',
   fileMenu: false,
-  roofEdge: null,
   openViews: DEFAULT_OPEN_VIEWS.map((v) => ({ ...v })),
 }));
 

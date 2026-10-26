@@ -18,7 +18,7 @@ Convenção de evidência: `arquivo:função` ou `arquivo:linha`. Quando não h�
    deixa `escadas` sair de `nao-iniciado` enquanto telhados não tiver 95 % e zero bloqueantes pendentes. O item A5
    precisa ser fechado, ou marcado `[-]` com motivo escrito pelo dono do projeto.
 2. **Não existe modo de croqui com várias camadas de linhas.** O telhado tem contorno do beiral (`boundary`), alças de
-   vértice e de aresta, seleção de aresta (`roofEdgeAt`) e predefinições por aresta (`presetEdgeSlopes`). Não há linhas
+   vértice e de aresta, edição de aresta pelo modo de perímetro (decisão 0033) e predefinições por aresta (`presetEdgeSlopes`). Não há linhas
    separadas para contorno, inclinação e furos. A "contorno qualquer" citada no checklist de telhados (item A10) é a forma
    `edges`, não um modo de desenho em camadas.
 3. **Recorte automático de laje ou piso por escada não existe.** `resolveSlabs` e `resolveFloors` usam só o contorno e os
@@ -183,7 +183,7 @@ Lista mínima que a escada precisa tocar, derivada desse histórico:
   e `busy()`. `cancel()`: se há passo em curso, reinicia; senão `env.done()` (volta à seleção). `ctx()` monta
   `InferContext` e acrescenta `floorVertices(project, levelId)` (base.ts). `snap(p, extra)` chama `infer`.
 - Ambiente `ToolEnv` (`types.ts`): `project()`, `levelId()`, `selection()`, `setSelection`, `exec`, `transaction`,
-  `metersPerPixel`, `gridStep`, `say` (barra de status), `done`, `options()`, `roofEdge?()`, `setRoofEdge?()`.
+  `metersPerPixel`, `gridStep`, `say` (barra de status), `done`, `options()`.
 - `packages/tools/src/registry.ts`: `ToolId` (união de strings, linha ~22), `TOOL_GROUPS` (não é usado: `Ribbon.tsx`
   faz `void TOOL_GROUPS`), `createTool(id, env)` (switch), `TOOL_LABEL: Record<ToolId, string>` (exige todas as chaves),
   `TOOL_SHORTCUT` (parcial). Atalhos de teclado em `apps/web/src/editor/controller.ts` (`key`, mapa na linha ~260).
@@ -194,7 +194,7 @@ Lista mínima que a escada precisa tocar, derivada desse histórico:
 - `SlabTool` (`packages/tools/src/slabTool.ts`, 207 linhas): modos `SlabMode` = `poly | rect | perimetro | hole`.
   Estado: `pts: Vec2[]`, `startPt`. Métodos: `movePoly`, `moveRect`, `movePerimeter`, `clickPoly` (fecha por duplo clique
   ou clique no primeiro ponto a 10 px, em `finishContour`), `clickRect`, `type` (medida digitada, `parseNumber`),
-  `commit(boundary)` (emite `addSlab` com `makeSlab`), `commitHole(ring)` (emite `updateElements` com `holes`).
+  `commit(boundary)` (emite `addSlab` com `makeSlab`). O furo saiu com o modo `hole` (decisão 0033).
 - `RoofTool` (`packages/tools/src/roofTool.ts`, 276 linhas): modos `RoofMode` = `poly | rect | paredes | hole | extrusao`.
   `extrusao` troca para `RoofExtrusionTool`. `Tab` alterna `axisAlt` (eixo da cumeeira ou da subida). O comando só sai se
   `roofProblem` aprovar (o motor gera águas); caso contrário, mostra o motivo.
@@ -231,24 +231,23 @@ Lista mínima que a escada precisa tocar, derivada desse histórico:
 - Edição do contorno: `ringMoveVertex`, `ringInsertAfter`, `ringRemoveVertex` (`floorPick.ts`). Para telhado, o contorno
   passa por `roofRingPatch` (`roofEdges.ts`) e `commitRoofPatch` (`roofCheck.ts`), que mantêm `edgeSlopes` e
   `edgeOverhangs` do mesmo tamanho de `boundary`. Escada com listas por aresta precisa do mesmo cuidado.
-- Furos **não têm alça**: só o contorno. Furo nasce só pelo modo `hole` (`commitHole`).
+- Furos **não têm alça**: só o contorno. Furo nasce só como laço interno do modo de perímetro (decisão 0033).
 - Tecla Delete com vértice em foco: `deleteKey?()` (contrato de `Tool`), implementado em `SelectTool` (`selectTool.ts`) e acionado pelo `controller.ts`.
 - Arrasto: `down/drag/up` no contrato; `SelectTool` implementa o arrasto de alça.
 
-### 2.6 Edição de aresta de telhado (painel "Aresta N")
+### 2.6 Edição de aresta de telhado
 
-- `roofEdgeAt` (`roofPick.ts`): aresta sob o cursor, tolerância 8 px, só com um telhado selecionado.
-- `RoofEdgeSel { roofId, index }` (`types.ts`), guardado em `UiState.roofEdge`. `roofEdgePreview` destaca a aresta.
-- Painel: `apps/web/src/ui/RoofEdgeProps.tsx` (inclinação por aresta, balanço, "define inclinação" com `I`).
+- Pelo modo "Criar/Editar perímetro" (decisão 0033): inclinação e balanço por aresta, no grupo de propriedades do perímetro.
 - Predefinições por forma: `presetEdgeSlopes` (`roofEdges.ts`).
+- A escolha de aresta por clique na planta (`roofEdgeAt`, painel "Aresta N") foi removida.
 
 ### 2.7 "Modo de edição de croqui com várias camadas de linhas"
 
 **Não existe.** Resumo do que existe:
 
 - um contorno por elemento, com alças de vértice e de aresta;
-- um modo `hole` para furos novos, sem alça de furo;
-- seleção de aresta do telhado (`roofEdgeAt`) e seta de inclinação (`RoofArrowTool`, item A5 parcial);
+- furos só como laços internos do modo de perímetro (decisão 0033), sem alça de furo;
+- seta de inclinação (`RoofArrowTool`, item A5 parcial);
 - nenhuma linha persistente além do contorno e das guias temporárias de captura.
 
 Para a escada, o croqui precisa de algo novo: limites (contorno), direção de subida (seta) e, se for o caso, linhas de

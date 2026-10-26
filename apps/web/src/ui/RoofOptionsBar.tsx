@@ -11,7 +11,6 @@ const MODES: Array<[RoofMode, string]> = [
   ['rect', 'Retângulo (2 cantos)'],
   ['paredes', 'Pelas paredes (com balanço)'],
   ['extrusao', 'Por extrusão (perfil)'],
-  ['hole', 'Abertura no telhado selecionado'],
 ];
 
 /** Predefinições por aresta (Revit: Define Slope): cada forma preenche as arestas que definem inclinação. Extrusão tem perfil. */

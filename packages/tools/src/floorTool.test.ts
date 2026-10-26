@@ -7,7 +7,7 @@ import { clickAt, makeEnv, tool, P } from './testEnv.ts';
 
 const floors = (store: { project: import('@hestia/model').Project }): Floor[] => floorsOnLevel(store.project, 'lv_0');
 
-function floorCtx(mode: 'poly' | 'rect' | 'walls' | 'hole') {
+function floorCtx(mode: 'poly' | 'rect' | 'walls') {
   const ctx = makeEnv();
   ctx.options.floorMode = mode;
   const msgs: string[] = [];
@@ -122,7 +122,7 @@ describe('ferramenta Piso: contorno por cliques (A1)', () => {
   });
 });
 
-describe('ferramenta Piso: retângulo, paredes e furo (A2, A3, A4)', () => {
+describe('ferramenta Piso: retângulo e paredes (A2, A4)', () => {
   it('retângulo por dois cantos cria quatro vértices e a altura digitada na opção', () => {
     const ctx = floorCtx('rect');
     const t = tool('floor', ctx.env);
@@ -175,49 +175,6 @@ describe('ferramenta Piso: retângulo, paredes e furo (A2, A3, A4)', () => {
     const f = floors(ctx.store)[0]!;
     expect(f.holes).toHaveLength(1);
     expect(multiArea([[f.boundary, ...f.holes]])).toBeCloseTo((4 - t) * (3 - t) - 2 * t, 3);
-  });
-
-  it('furo: contorno interno dentro do piso selecionado vira holes via updateElements', () => {
-    const ctx = floorCtx('rect');
-    const r = tool('floor', ctx.env);
-    clickAt(r, 0, 0);
-    clickAt(r, 4, 3);
-    const id = floors(ctx.store)[0]!.id;
-    ctx.env.setSelection([id]);
-    ctx.options.floorMode = 'hole';
-    const h = tool('floor', ctx.env);
-    clickAt(h, 1, 1);
-    clickAt(h, 2, 1);
-    clickAt(h, 1.5, 2);
-    h.confirm();
-    const f = floors(ctx.store)[0]!;
-    expect(f.holes).toHaveLength(1);
-    expect(f.holes[0]).toHaveLength(3);
-    // Área líquida: 4 × 3 menos o furo triangular (base 1, altura 1: 0,5 m²).
-    expect(polygonArea([f.boundary, f.holes[0]!])).toBeCloseTo(11.5, 6);
-  });
-
-  it('furo fora do piso é recusado', () => {
-    const ctx = floorCtx('rect');
-    const r = tool('floor', ctx.env);
-    clickAt(r, 0, 0);
-    clickAt(r, 4, 3);
-    ctx.env.setSelection([floors(ctx.store)[0]!.id]);
-    ctx.options.floorMode = 'hole';
-    const h = tool('floor', ctx.env);
-    clickAt(h, 5, 5);
-    clickAt(h, 6, 5);
-    clickAt(h, 5.5, 6);
-    h.confirm();
-    expect(floors(ctx.store)[0]!.holes).toHaveLength(0);
-    expect(ctx.msgs).toContain('O furo precisa ficar dentro do piso.');
-  });
-
-  it('furo sem piso selecionado pede a seleção', () => {
-    const ctx = floorCtx('hole');
-    const h = tool('floor', ctx.env);
-    clickAt(h, 1, 1);
-    expect(ctx.msgs.some((m) => m.startsWith('Furo: selecione'))).toBe(true);
   });
 });
 

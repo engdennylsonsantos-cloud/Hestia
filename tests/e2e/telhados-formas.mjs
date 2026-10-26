@@ -1,8 +1,9 @@
-// Telhados por arestas no app real: L, T, três águas, dez águas, empena; criação pela ferramenta (pontos) e edição por aresta.
+// Telhados por arestas no app real: L, T, três águas, dez águas, empena; criação pelo modo de perímetro (contorno por pontos) e edição por aresta.
 import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -17,25 +18,17 @@ await page.waitForFunction(() => window.__hestia);
 let fails = 0;
 const check = (ok, msg) => { console.log(`${ok ? 'OK  ' : 'FAIL'} ${msg}`); if (!ok) fails++; };
 const roofs = () => page.evaluate(() => Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'roof'));
-const status = () => page.evaluate(() => window.__hestia.useUi.getState().status);
-const screenOf = (wx, wy) => page.evaluate(([x, y]) => {
-  const { editor } = window.__hestia; const canvas = document.querySelector('.canvas-wrap canvas'); const r = canvas.getBoundingClientRect();
-  const v = editor.ensureViewport(r.width, r.height);
-  return { x: r.left + (x - v.cx) * v.zoom + v.width / 2, y: r.top + v.height / 2 - (y - v.cy) * v.zoom };
-}, [wx, wy]);
-
-async function drawRoof(name, pts, shape, slope = 30) {
+/**
+ * Telhado pelo modo de perímetro, com o contorno `pts` (um lado por par de pontos). `gable`: só os lados horizontais
+ * (paralelos à cumeeira) definem inclinação, como duas águas; `hip`: todos os lados definem.
+ */
+async function drawRoof(name, pts, shape) {
   await page.evaluate(() => { const { editor } = window.__hestia; editor.newProject('blank'); });
-  await page.evaluate(() => {
-    const { editor } = window.__hestia; const c = document.querySelector('.canvas-wrap canvas').getBoundingClientRect();
-    const v = editor.ensureViewport(c.width, c.height); editor.setViewport({ ...v, cx: 4.5, cy: 4, zoom: 32 });
-  });
-  await page.evaluate(([s, sl]) => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, roofMode: 'poly', roofShape: s, roofSlope: sl } }); editor.setTool('roof'); }, [shape, slope]);
-  for (const [x, y] of pts) { const p = await screenOf(x, y); await page.mouse.move(p.x, p.y, { steps: 2 }); await page.mouse.click(p.x, p.y); }
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(400);
+  const inclina = shape === 'gable' ? (i, p, q) => Math.abs(p[1] - q[1]) < 1e-9 : () => true;
+  const res = await perimetroPorPontos(page, 'roof', pts, { inclina });
+  await page.waitForTimeout(300);
   const r = await roofs();
-  console.log(`  ${name}: ${r.length} telhado(s); status: ${await status()}`);
+  console.log(`  ${name}: ${r.length} telhado(s); status: ${res.msg}`);
   await page.screenshot({ path: `${OUT}/95-${name}.png` });
   return r;
 }

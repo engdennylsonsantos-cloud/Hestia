@@ -1,7 +1,7 @@
 // Contorno associativo de piso no app real (decisão 0023 §8.2, §9.2): cria o piso pelas paredes, move uma parede (a área
 // acompanha), desvincula (a área fica) e revincula (volta a acompanhar). Sem erros de console. Código de saída 1 se algo falhou.
 import { mkdirSync } from 'node:fs';
-import { openApp, launch, makeReporter } from './helpers.mjs';
+import { openApp, launch, makeReporter, perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -56,13 +56,14 @@ await rep.step('criar piso pelas paredes de um cômodo 4 × 3 m', async () => {
   const nWalls = await page.evaluate(() => Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'wall').length);
   check('quatro paredes do cômodo desenhadas', nWalls === 4, `(${nWalls})`);
   await page.waitForTimeout(300);
-  const at = await screenOf(2, 1.5);
-  await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, floorMode: 'walls' } }); editor.setTool('floor'); });
-  await page.mouse.move(at.x, at.y);
-  await page.mouse.click(at.x, at.y);
+  // Piso pelo modo de perímetro: o rascunho é a face interna das paredes. O modo não grava a origem ligada às paredes
+  // (só a ferramenta antiga, ao clicar na sala, a gravava): o roteiro a põe pela API, do mesmo jeito, e testa o vínculo.
+  const res = await perimetroPorPontos(page, 'floor', [[T / 2, T / 2], [4 - T / 2, T / 2], [4 - T / 2, 3 - T / 2], [T / 2, 3 - T / 2]]);
   await page.waitForTimeout(400);
   const id = await floorId();
-  check('piso criado clicando na sala (modo paredes)', id !== null);
+  check('piso criado pelo modo de perímetro (face interna das paredes)', res.ok && id !== null, res.msg);
+  await page.evaluate((fid) => { window.__hestia.editor.store.exec({ type: 'updateElements', ids: [fid], patch: { outlineSource: { mode: 'walls-finish', seed: { x: 2, y: 1.5 }, linked: true } } }); }, id);
+  await page.waitForTimeout(300);
   const src = await page.evaluate((fid) => window.__hestia.editor.project.elements[fid]?.outlineSource ?? null, id);
   check('piso guarda a origem pelas paredes (face de acabamento, vinculado)', src?.mode === 'walls-finish' && src?.linked === true, JSON.stringify(src));
   await page.evaluate((fid) => { const { editor, useUi } = window.__hestia; editor.setTool('select'); useUi.setState({ selection: [fid] }); }, id);

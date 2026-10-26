@@ -94,8 +94,6 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
 
   // Pré-visualização, guias e marcador de captura.
   add(previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));
-  // Aresta de telhado sob o cursor (antes do clique): traço grosso na cor de seleção; sem aresta, nada.
-  for (const it of input.preview) if (it.kind === 'roofEdgeHover') strokes.push({ pts: [it.a, it.b], closed: false, widthPx: 4, color: theme.select, alpha: 1 });
   if (input.inference) {
     strokes.push(...guideStrokes(input.inference.guides, theme));
     strokes.push(...snapMarker(input.inference, theme));

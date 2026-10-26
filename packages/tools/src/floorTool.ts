@@ -1,8 +1,8 @@
-import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { isFloor, makeFloor, type Floor, type Id, type OutlineSource, type Project } from '@hestia/model';
+import { add, dist, len, mul, multiArea, norm, sub, v2, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { makeFloor, type Id, type OutlineSource, type Project } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { enclosedRooms, outerPerimeter, roomAt } from './enclosed.ts';
-import { ringAreaAbs, ringPerimeter, selectedFloors } from './floorPick.ts';
+import { ringAreaAbs, ringPerimeter } from './floorPick.ts';
 import { parseNumber } from './numeric.ts';
 import type { FloorMode, PointerInfo } from './types.ts';
 
@@ -12,7 +12,6 @@ const MODE_HINT: Record<FloorMode, string> = {
   poly: 'Piso: clique nos vértices. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Piso retangular: clique no primeiro canto e depois no canto oposto.',
   walls: 'Piso por paredes: clique numa área fechada pelas paredes (face interna). Tab alterna para a face externa da edificação.',
-  hole: 'Furo: clique nos vértices do contorno do furo, dentro do piso selecionado. Enter fecha.',
   perimetro: 'Perímetro: clique numa parede (ou perto da casa) para criar o piso pela face externa da edificação.',
 };
 
@@ -21,7 +20,7 @@ const rectRing = (a: Vec2, c: Vec2): Vec2[] => [a, { x: c.x, y: a.y }, c, { x: a
 
 /**
  * Piso (Revit: Floor). Modos: contorno por cliques, retângulo, área fechada pelas paredes (face interna, ou
- * externa com Tab), furo num piso selecionado e perímetro externo da edificação. A ferramenta só emite comandos
+ * externa com Tab) e perímetro externo da edificação. A ferramenta só emite comandos
  * (`addFloor`, `updateElements`).
  */
 export class FloorTool extends ToolBase {
@@ -62,16 +61,7 @@ export class FloorTool extends ToolBase {
   }
 
   private isContour(): boolean {
-    return this.mode() === 'poly' || this.mode() === 'hole';
-  }
-
-  /** Piso alvo do modo furo: exatamente um piso selecionado. */
-  private target(): Floor | null {
-    const p = this.env.project();
-    const ids = selectedFloors(p, this.env.selection());
-    if (ids.length !== 1) return null;
-    const f = p.elements[ids[0]!];
-    return isFloor(f) ? f : null;
+    return this.mode() === 'poly';
   }
 
   private roomList(): Polygon[] {
@@ -91,11 +81,6 @@ export class FloorTool extends ToolBase {
       return ring ? [ring] : null;
     }
     return roomAt(this.roomList(), at);
-  }
-
-  /** Vértices que a captura deve aceitar além das paredes: o contorno em construção e, no furo, o piso alvo. */
-  private snapPoints(): Vec2[] {
-    return [...this.pts, ...(this.mode() === 'hole' ? (this.target()?.boundary ?? []) : [])];
   }
 
   override move(p: PointerInfo): void {
@@ -142,11 +127,7 @@ export class FloorTool extends ToolBase {
 
   private movePoly(p: PointerInfo): void {
     const last = this.pts[this.pts.length - 1];
-    const inf = this.snap(p, { from: last, extraPoints: this.snapPoints() });
-    if (this.mode() === 'hole') {
-      const t = this.target();
-      if (t) this.items.push({ kind: 'highlight', ids: [t.id] });
-    }
+    const inf = this.snap(p, { from: last, extraPoints: this.pts });
     if (!last) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -208,12 +189,8 @@ export class FloorTool extends ToolBase {
   }
 
   private clickPoly(p: PointerInfo): void {
-    if (this.mode() === 'hole' && !this.target()) {
-      this.env.say('Furo: selecione um único piso (Selecionar) e escolha Piso de novo.');
-      return;
-    }
     const last = this.pts[this.pts.length - 1];
-    const inf = this.snap(p, { from: last, extraPoints: this.snapPoints() });
+    const inf = this.snap(p, { from: last, extraPoints: this.pts });
     const q = inf.point;
     const tol = 10 * this.env.metersPerPixel();
     if (this.pts.length >= 3 && dist(q, this.pts[0]!) <= tol) {
@@ -228,11 +205,10 @@ export class FloorTool extends ToolBase {
     this.pts.push(q);
   }
 
-  /** Fecha o contorno (ou furo) em construção. */
+  /** Fecha o contorno em construção. */
   private finishContour(): void {
     const ring = this.pts;
-    if (this.mode() === 'hole') this.commitHole(ring);
-    else if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
+    if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
     else this.commit(ring);
     this.reset();
   }
@@ -247,7 +223,6 @@ export class FloorTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.isContour() || this.pts.length === 0) return false;
-    if (this.mode() === 'hole' && !this.target()) return false;
     const v = parseNumber(text);
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');
@@ -278,17 +253,5 @@ export class FloorTool extends ToolBase {
     this.env.setSelection([id]);
     const area = multiArea([[boundary, ...holes]]);
     this.env.say(`Piso criado: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);
-  }
-
-  /** Furo: acrescenta o contorno a `holes` do piso alvo, se ficar dentro dele. */
-  private commitHole(ring: Vec2[]): void {
-    const t = this.target();
-    if (!t) return;
-    if (!ring.every((q) => pointInRing(q, t.boundary))) {
-      this.env.say('O furo precisa ficar dentro do piso.');
-      return;
-    }
-    this.env.exec({ type: 'updateElements', ids: [t.id], patch: { holes: [...t.holes, ring] } });
-    this.env.say('Furo criado. Ctrl+Z desfaz.');
   }
 }

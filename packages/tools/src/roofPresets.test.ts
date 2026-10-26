@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { polygonArea } from '@hestia/geom';
 import { roofsOnLevel, type Project, type Roof } from '@hestia/model';
 import { resolveRoofs } from '@hestia/engine';
 import { roofProblem, roofPatchProblem } from './roofCheck.ts';
-import { roofEdgeAt, pickRoofAt } from './roofPick.ts';
 import { clickAt, makeEnv, P, tool } from './testEnv.ts';
 import type { RoofMode } from './types.ts';
 
@@ -79,72 +77,6 @@ describe('telhado nunca some (A12): edição', () => {
     expect(roofPatchProblem(ctx.store.project, [id], { edgeSlopes: [null, null, null, null] })).toMatch(/nenhuma aresta/);
     expect(roofPatchProblem(ctx.store.project, [id], { mark: 'A-1' })).toBeNull();
     expect(roofs(ctx.store.project)[0]!.edgeSlopes).toEqual(before);
-  });
-});
-
-describe('abertura no telhado (C4)', () => {
-  it('modo abertura com o telhado selecionado cria um furo dentro do beiral', () => {
-    const ctx = roofCtx('rect', 'gable');
-    ctx.options.roofOverhang = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
-    ctx.options.roofMode = 'hole';
-    const h = tool('roof', ctx.env);
-    clickAt(h, 2, 2);
-    clickAt(h, 3, 2);
-    clickAt(h, 3, 3);
-    h.confirm();
-    const r = roofs(ctx.store.project)[0]!;
-    expect(r.holes).toHaveLength(1);
-    // Beiral 8 × 6 = 48 m² menos o triângulo da abertura (0,5 m²).
-    expect(polygonArea([r.boundary, ...r.holes])).toBeCloseTo(47.5, 6);
-  });
-
-  it('abertura fora do beiral não é criada', () => {
-    const ctx = roofCtx('rect', 'gable');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
-    ctx.options.roofMode = 'hole';
-    const h = tool('roof', ctx.env);
-    clickAt(h, 9, 2);
-    clickAt(h, 10, 2);
-    clickAt(h, 10, 3);
-    h.confirm();
-    expect(roofs(ctx.store.project)[0]!.holes).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/dentro do beiral/);
-  });
-});
-
-describe('aresta na planta (A11)', () => {
-  it('clique perto do meio de uma aresta de telhado selecionado escolhe essa aresta', () => {
-    const ctx = roofCtx('rect', 'gable');
-    ctx.options.roofOverhang = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
-    const r = roofs(ctx.store.project)[0]!;
-    expect(roofEdgeAt(ctx.store.project, [r.id], P(1.5, 0.02).raw, 0.01)).toEqual({ roofId: r.id, index: 0 });
-    expect(roofEdgeAt(ctx.store.project, [r.id], P(4, 3).raw, 0.01)).toBeNull();
-    expect(roofEdgeAt(ctx.store.project, [], P(1.5, 0).raw, 0.01)).toBeNull();
-  });
-
-  it('clicar numa aresta do telhado selecionado registra a aresta sem mover o telhado', () => {
-    const ctx = roofCtx('rect', 'gable');
-    ctx.options.roofOverhang = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
-    const r = roofs(ctx.store.project)[0]!;
-    const before = JSON.stringify(r.boundary);
-    const sel = tool('select', ctx.env);
-    sel.move(P(1.5, 0));
-    sel.down?.(P(1.5, 0));
-    sel.up?.(P(1.5, 0));
-    expect(ctx.env.roofEdge?.()).toEqual({ roofId: r.id, index: 0 });
-    expect(JSON.stringify(roofs(ctx.store.project)[0]!.boundary)).toBe(before);
-    expect(pickRoofAt(ctx.store.project, 'lv_0', P(4, 3).raw, 0.01)).toBe(r.id);
   });
 });
 

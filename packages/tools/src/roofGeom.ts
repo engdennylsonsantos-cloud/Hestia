@@ -1,4 +1,4 @@
-import { asMulti, cross, dot, len, norm, offsetMulti, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
+import { asMulti, closestOnSegment, cross, dist, dot, intersectSegments, len, norm, offsetMulti, perp, pointInRing, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import { wallMaxHeight, wallsOnLevel, type Id, type Project, type RoofShape } from '@hestia/model';
 
 /** Maior inclinação aceita para telhado, em % (200 % = 63,4°). Acima disso o telhado vira parede. */
@@ -152,4 +152,99 @@ export const uniformEdges = (n: number, v: number): number[] => Array.from({ len
 /** Dois contornos com os mesmos vértices, na mesma ordem e a menos de 1 µm. */
 export function sameRing(a: Ring, b: Ring): boolean {
   return a.length === b.length && a.every((q, i) => Math.hypot(q.x - b[i]!.x, q.y - b[i]!.y) < 1e-6);
+}
+
+/**
+ * Desvio de direção (graus) abaixo do qual dois lados seguidos, com os mesmos valores, são um só trecho. Um arco do
+ * esboço chega amostrado em lados de corda 2 mm (sketchLoops); cada lado vira ~4° no vértice seguinte, então o arco
+ * inteiro fica num trecho. Arco e retas tangentes a ele (mesma inclinação e balanço) também se juntam.
+ * Decisão: o motor guarda um valor por lado (o arco não é um lado só); a contagem de águas e a mensagem usam trechos.
+ * Beiral de arco: o balanço d sobre um arco de raio R sai a R + d/cos(θ/2) nos vértices amostrados, com θ = 2·acos(1 − tol/R);
+ * o erro sobre o raio R + d é d·tol/R (ex.: d = 0,5 m e R = 3 m dá 0,3 mm), dentro de 2 mm.
+ */
+export const ARC_TURN_DEG = 15;
+
+/** Esquadria máxima do beiral: distância do vértice do beiral à pegada, em múltiplos do maior balanço vizinho. */
+export const MITER_LIMIT = 10;
+
+/**
+ * Trecho lógico de cada lado do contorno. Lados seguidos com a mesma inclinação e o mesmo balanço, que viram menos de
+ * `ARC_TURN_DEG` entre si, são um trecho só: um arco amostrado em muitos lados vira um trecho. Canto de 90° separa.
+ * Devolve o índice do trecho de cada lado (0, 1, …); contorno fechado sem canto devolve tudo 0.
+ */
+export function edgeGroupsOf(boundary: Vec2[], edgeSlopes: Array<number | null>, edgeOverhangs: number[]): number[] {
+  const n = boundary.length;
+  const sideOf = (i: number): Vec2 => sub(boundary[(i + 1) % n]!, boundary[i]!);
+  const sameValues = (i: number, j: number): boolean => {
+    const a = edgeSlopes[i] ?? null;
+    const b = edgeSlopes[j] ?? null;
+    const slopeSame = a === null || b === null ? a === b : Math.abs(a - b) < 1e-9;
+    return slopeSame && Math.abs((edgeOverhangs[i] ?? 0) - (edgeOverhangs[j] ?? 0)) < 1e-9;
+  };
+  // O lado i continua o trecho do lado anterior: mesmos valores e desvio pequeno no vértice que os separa.
+  const continues = (i: number): boolean => {
+    const prev = (i - 1 + n) % n;
+    if (!sameValues(prev, i)) return false;
+    const a = sideOf(prev);
+    const b = sideOf(i);
+    if (len(a) < 1e-9 || len(b) < 1e-9) return true;
+    return (Math.abs(Math.atan2(cross(a, b), dot(a, b))) * 180) / Math.PI < ARC_TURN_DEG;
+  };
+  const out = new Array<number>(n).fill(0);
+  const breaks = [...Array(n).keys()].filter((i) => !continues(i));
+  if (breaks.length === 0) return out;
+  let g = -1;
+  for (let k = 0; k < n; k++) {
+    const i = (breaks[0]! + k) % n;
+    if (!continues(i)) g++;
+    out[i] = g;
+  }
+  return out;
+}
+
+/** Número de águas que o contorno gera: trechos lógicos que definem inclinação (um arco conta uma vez). */
+export function waterGroupCount(boundary: Vec2[], edgeSlopes: Array<number | null>, edgeOverhangs: number[]): number {
+  const groups = edgeGroupsOf(boundary, edgeSlopes, edgeOverhangs);
+  const defining = new Set<number>();
+  edgeSlopes.forEach((s, i) => {
+    if (s !== null && s !== undefined && s > 0) defining.add(groups[i] ?? 0);
+  });
+  return defining.size;
+}
+
+/** Distância do ponto ao contorno (menor distância a qualquer lado). */
+const distToRing = (p: Vec2, ring: Ring): number => {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) best = Math.min(best, dist(p, closestOnSegment(p, ring[i]!, ring[(i + 1) % ring.length]!)));
+  return best;
+};
+
+/** Algum par de lados não adjacentes do anel se cruza (o anel se corta sozinho). */
+function ringCrosses(ring: Ring): boolean {
+  const n = ring.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      if (intersectSegments(ring[i]!, ring[(i + 1) % n]!, ring[j]!, ring[(j + 1) % n]!)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Motivo para o beiral (contorno com balanço) não representar a pegada, ou null. Duas falhas: a esquadria dispara num
+ * canto agudo demais (vértice do beiral mais longe que MITER_LIMIT vezes o balanço); e o beiral se corta ou deixa a
+ * pegada para fora, o que acontece quando o balanço é maior que o raio de um trecho côncavo e o arco se inverte.
+ */
+export function eaveProblem(footprint: Vec2[], eave: Vec2[], overhangs: number[]): string | null {
+  const n = footprint.length;
+  if (eave.length !== n) return 'o beiral não tem o mesmo número de vértices da pegada';
+  for (let j = 0; j < n; j++) {
+    const d = Math.max(overhangs[j] ?? 0, overhangs[(j - 1 + n) % n] ?? 0);
+    if (d > 1e-9 && dist(footprint[j]!, eave[j]!) > MITER_LIMIT * d) {
+      return 'o balanço não cabe num canto agudo da planta (a esquadria do beiral dispara); reduza o balanço ou aumente o ângulo';
+    }
+  }
+  const holds = !ringCrosses(eave) && footprint.every((q) => pointInRing(q, eave) || distToRing(q, eave) < 1e-6);
+  return holds ? null : 'o balanço é maior que o raio de um trecho côncavo e o beiral se cruza; reduza o balanço';
 }

@@ -25,7 +25,6 @@ import { defaultOpenViews } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
-import { toggleRoofEdgeDefines } from './roofEdgeActions.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
@@ -76,7 +75,7 @@ export class Editor {
     hiddenInView: () => planViewOf(this.store.project, useUi.getState().levelId).hidden,
     underlayLevelId: () => { const st = useUi.getState(); return underlayIdOf(this.store.project, st.levelId, st.showUnderlay, st.underlayLevel); },
     selection: () => useUi.getState().selection,
-    setSelection: (ids) => useUi.setState({ selection: ids, roofEdge: ids.length === 1 && useUi.getState().roofEdge?.roofId === ids[0] ? useUi.getState().roofEdge : null }),
+    setSelection: (ids) => useUi.setState({ selection: ids }),
     exec: (c) => this.store.exec(c),
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
@@ -85,8 +84,6 @@ export class Editor {
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
-    roofEdge: () => useUi.getState().roofEdge, setRoofEdge: (sel) => useUi.setState({ roofEdge: sel }),
-    toggleRoofEdge: (roofId, index) => toggleRoofEdgeDefines(this.store, { roofId, index }),
   };
 
   get project(): Project { return this.store.project; }
@@ -180,7 +177,7 @@ export class Editor {
   setTool(id: ToolId): void { if (this.perimetro.intercepta(id)) return;
     // Ferramentas de desenho são da planta: escolher uma delas na vista de corte volta à planta.
     if (useUi.getState().view === 'section') useUi.setState({ view: 'plan', sectionId: null });
-    if (clearSelectionForTool(id, useUi.getState().options)) useUi.setState({ selection: [], roofEdge: null });
+    if (clearSelectionForTool(id)) useUi.setState({ selection: [] });
     this.activate(id);
   }
 

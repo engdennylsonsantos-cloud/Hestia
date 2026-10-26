@@ -29,7 +29,7 @@ export interface PerimeterPropsProps {
 
 /**
  * Grupo "Perímetro do …" da paleta de propriedades: aresta selecionada, comprimento e, no telhado, inclinação
- * (liga/desliga, % e °) e balanço da aresta. Mesmas linhas de `RoofEdgeProps`, com rótulos de até 22 caracteres.
+ * (liga/desliga, % e °) e balanço da aresta, com rótulos de até 22 caracteres.
  */
 export function PerimeterProps({ target, edge, onDefinesSlope, onSlopePct, onOverhang }: PerimeterPropsProps): ReactElement {
   const roof = target === 'roof';

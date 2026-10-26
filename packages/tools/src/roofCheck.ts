@@ -1,5 +1,7 @@
+import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
 import { isRoof, type Id, type Project, type Roof } from '@hestia/model';
+import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Chaves que mudam a geometria das águas. Só uma alteração delas é conferida pelo motor. */
@@ -15,9 +17,19 @@ function noWaterReason(r: Roof): string {
 }
 
 /**
+ * Motivo de o esqueleto não fechar: vértices onde as águas se encontram em cotas diferentes (degrau), com a diferença.
+ * Recusa a criação ou a alteração em vez de deixar um aviso: o usuário vê onde corrigir a planta.
+ */
+function stepsReason(steps: SkeletonStep[]): string {
+  const at = steps.map((s) => `${pointsText([s])} m, com degrau de ${s.dz.toFixed(2).replace('.', ',')} m`).join('; ');
+  return `o esqueleto não fecha em ${at}`;
+}
+
+/**
  * Motivo pelo qual o motor não gera águas para `roofs` no estado dado, ou null quando todos têm águas. Usa o projeto com
  * estes telhados no lugar dos guardados; os demais telhados do nível não são conferidos. A ferramenta usa antes de criar
- * ou alterar, para que o telhado nunca desapareça em silêncio.
+ * ou alterar, para que o telhado nunca desapareça em silêncio. Também recusa o esqueleto que não fecha (degrau entre
+ * águas, com os pontos) e o beiral que se corta ou não cabe na pegada.
  */
 export function roofProblem(p: Project, roofs: Roof[]): string | null {
   if (roofs.length === 0) return null;
@@ -28,10 +40,16 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
     if (!p.levels.some((l) => l.id === r.levelId)) return 'o nível do telhado não existe';
     if (!p.roofTypes[r.typeId]) return 'o tipo de telhado não existe no projeto';
     if (r.boundary.length < 3) return 'o contorno tem menos de 3 pontos';
+    // Antes do motor: um beiral que se corta faz o esqueleto falhar com uma mensagem genérica.
+    if (r.footprint && r.shape !== 'free' && r.shape !== 'extrusion') {
+      const eave = eaveProblem(r.footprint, r.boundary, r.edgeOverhangs);
+      if (eave) return eave;
+    }
     const res = resolveRoofs(q, r.levelId).find((x) => x.roofId === r.id);
     if (!res) return 'o telhado não pôde ser resolvido';
     if (res.problem) return res.problem;
     if (res.planes.length === 0) return noWaterReason(r);
+    if (res.steps?.length) return stepsReason(res.steps);
   }
   return null;
 }

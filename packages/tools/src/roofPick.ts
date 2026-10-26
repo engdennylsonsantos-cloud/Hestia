@@ -1,6 +1,5 @@
 import { boxOf, closestOnSegment, dist, intersectSegments, pointInRing, type Vec2 } from '@hestia/geom';
 import { isRoof, roofsOnLevel, type Id, type Project, type Roof } from '@hestia/model';
-import type { PreviewItem, RoofEdgeSel } from './types.ts';
 
 /** Telhados entre os selecionados. */
 export const selectedRoofs = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isRoof(p.elements[id]));
@@ -69,57 +68,4 @@ export function roofGripAt(p: Project, ids: Id[], at: Vec2, mpp: number): RoofGr
     }
   }
   return null;
-}
-
-/** Índice da aresta do contorno de `r` mais perto de `at`, dentro de `tol` (em empate, a última); -1 se nenhuma. */
-function edgeIndexAt(r: Roof, at: Vec2, tol: number): number {
-  const n = r.boundary.length;
-  let index = -1;
-  let best = tol;
-  for (let i = 0; i < n; i++) {
-    const d = distToEdge(at, r.boundary[i]!, r.boundary[(i + 1) % n]!);
-    if (d <= best) {
-      best = d;
-      index = i;
-    }
-  }
-  return index;
-}
-
-/** Aresta do contorno do beiral sob o cursor (tolerância de 8 px), quando só um telhado está selecionado. A mais próxima vence. */
-export function roofEdgeAt(p: Project, ids: Id[], at: Vec2, mpp: number): RoofEdgeSel | null {
-  const roofs = selectedRoofs(p, ids).map((id) => p.elements[id]).filter(isRoof);
-  if (roofs.length !== 1) return null;
-  const r = roofs[0]!;
-  const index = edgeIndexAt(r, at, 8 * mpp);
-  return index >= 0 ? { roofId: r.id, index } : null;
-}
-
-/**
- * Aresta do contorno de um telhado do nível que NÃO está entre `ids` (mesma tolerância de 8 px). O mais recente vence
- * entre telhados. Só vale quando não há a aresta de um telhado selecionado: `roofEdgeAt` tem a preferência.
- */
-export function roofEdgeOnLevel(p: Project, levelId: Id, ids: Id[], at: Vec2, mpp: number): RoofEdgeSel | null {
-  const sel = new Set(ids);
-  const roofs = roofsOnLevel(p, levelId).filter((r) => !sel.has(r.id));
-  for (let k = roofs.length - 1; k >= 0; k--) {
-    const r = roofs[k]!;
-    const index = edgeIndexAt(r, at, 8 * mpp);
-    if (index >= 0) return { roofId: r.id, index };
-  }
-  return null;
-}
-
-/** Prévia da aresta escolhida na planta (destaque), enquanto o telhado segue selecionado. */
-export function roofEdgePreview(p: Project, ids: Id[], sel: RoofEdgeSel | null): PreviewItem[] {
-  const r = sel ? p.elements[sel.roofId] : undefined;
-  if (!sel || !isRoof(r) || !r.boundary[sel.index] || !ids.includes(sel.roofId)) return [];
-  return [{ kind: 'line', a: r.boundary[sel.index]!, b: r.boundary[(sel.index + 1) % r.boundary.length]! }, { kind: 'highlight', ids: [sel.roofId] }];
-}
-
-/** Pré-destaque da aresta sob o cursor (com ou sem o telhado selecionado): a planta o desenha em traço grosso. */
-export function roofEdgeHoverPreview(p: Project, hover: RoofEdgeSel | null): PreviewItem[] {
-  const r = hover ? p.elements[hover.roofId] : undefined;
-  if (!hover || !isRoof(r) || !r.boundary[hover.index]) return [];
-  return [{ kind: 'roofEdgeHover', a: r.boundary[hover.index]!, b: r.boundary[(hover.index + 1) % r.boundary.length]! }];
 }

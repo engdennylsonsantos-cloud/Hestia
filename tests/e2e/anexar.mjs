@@ -1,7 +1,7 @@
 // Anexar topo na vista 3D: duas paredes seguidas (seleção 3D, Enter na 3D, clique no telhado) e o aviso quando o clique não
 // acha parede. Roteiro com asserções; relatório passo a passo; código de saída 1 se algo falhou.
 import { mkdirSync } from 'node:fs';
-import { openApp, launch, makeReporter } from './helpers.mjs';
+import { abreVista3d, openApp, launch, makeReporter, perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -36,19 +36,12 @@ await rep.step('desenhar casa com telhado pelas paredes', async () => {
   const b = await page.evaluate(() => {
     const ws = Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'wall');
     const xs = ws.flatMap((w) => [w.a.x, w.b.x]); const ys = ws.flatMap((w) => [w.a.y, w.b.y]);
-    return { minX: Math.min(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
   });
-  const at = await page.evaluate(([x, y]) => {
-    const { editor } = window.__hestia; const r = document.querySelector('.canvas-wrap canvas').getBoundingClientRect();
-    const v = editor.ensureViewport(r.width, r.height);
-    return { x: r.left + (x - v.cx) * v.zoom + v.width / 2, y: r.top + v.height / 2 - (y - v.cy) * v.zoom };
-  }, [b.minX, (b.minY + b.maxY) / 2]);
-  await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, roofMode: 'paredes', roofShape: 'gable', roofSlope: 30 } }); editor.setTool('roof'); });
-  await page.mouse.move(at.x, at.y, { steps: 3 });
-  await page.mouse.click(at.x, at.y);
+  // Telhado por fora das paredes, pelo modo de perímetro (rascunho a 0,135 m do eixo; lados horizontais definem inclinação).
+  const f = 0.135;
+  await perimetroPorPontos(page, 'roof', [[b.minX - f, b.minY - f], [b.maxX + f, b.minY - f], [b.maxX + f, b.maxY + f], [b.minX - f, b.maxY + f]], { inclina: (i, p, q) => Math.abs(p[1] - q[1]) < 1e-9 });
   await page.waitForTimeout(400);
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
   check('telhado criado', !!(await roofId()));
   await page.evaluate(() => {
     window.__k3 = { n: 0 };
@@ -57,6 +50,7 @@ await rep.step('desenhar casa com telhado pelas paredes', async () => {
 });
 
 await rep.step('localizar duas paredes e o telhado no 3D', async () => {
+  await abreVista3d(page);
   await page.getByRole('tab', { name: /Modelo 3D/ }).click();
   await page.waitForTimeout(1200);
   await page.getByRole('button', { name: 'Enquadrar tudo' }).click();
@@ -95,6 +89,8 @@ await rep.step('anexar a primeira parede: seleção 3D, Anexar topo, clique no t
 await rep.step('anexar a segunda parede logo em seguida, na 3D, com Enter', async () => {
   const id = visibleWalls;
   const roof = await roofId();
+  // A ferramenta conclui a cada anexo (AttachRoofTool.apply), então o segundo começa com ela de novo.
+  await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ selection: [] }); editor.setTool('attachroof'); });
   await clickMs(found3d[id[1]]);
   check('segunda parede escolhida pelo clique na 3D', (await st()).includes('1 parede(s) escolhida(s)'), await st());
   await page.keyboard.press('Enter');

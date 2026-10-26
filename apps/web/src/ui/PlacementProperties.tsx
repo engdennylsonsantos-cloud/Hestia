@@ -46,7 +46,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {tool === 'floor' && (
         <Group title="Colocação · Piso">
-          <Row label="Modo do contorno" htmlFor="place-floor-mode"><select id="place-floor-mode" className="select" value={o.floorMode} onChange={(e) => { set({ floorMode: e.target.value as typeof o.floorMode }); editor.setTool('floor'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="walls">Área fechada por paredes</option><option value="perimetro">Perímetro externo</option><option value="hole">Furo no piso selecionado</option></select></Row>
+          <Row label="Modo do contorno" htmlFor="place-floor-mode"><select id="place-floor-mode" className="select" value={o.floorMode} onChange={(e) => { set({ floorMode: e.target.value as typeof o.floorMode }); editor.setTool('floor'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="walls">Área fechada por paredes</option><option value="perimetro">Perímetro externo</option></select></Row>
           <Row label="Desloc. do topo" htmlFor="place-floor-offset"><NumField id="place-floor-offset" value={o.floorOffset} unit="m" onCommit={(v) => set({ floorOffset: v })} /></Row>
           {o.floorMode === 'walls' && <Row label="Estender até o núcleo"><Check id="place-floor-core" checked={o.floorCore === true} onChange={(v) => set({ floorCore: v })} /></Row>}
         </Group>
@@ -54,7 +54,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       {(tool === 'slab' || tool === 'slope') && (
         <Group title={`Colocação · ${tool === 'slope' ? 'Inclinação' : 'Laje'}`}>
           {tool === 'slab' && <>
-            <Row label="Modo do contorno" htmlFor="place-slab-mode"><select id="place-slab-mode" className="select" value={o.slabMode} onChange={(e) => { set({ slabMode: e.target.value as typeof o.slabMode }); editor.setTool('slab'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="perimetro">Perímetro externo</option><option value="hole">Furo na laje selecionada</option></select></Row>
+            <Row label="Modo do contorno" htmlFor="place-slab-mode"><select id="place-slab-mode" className="select" value={o.slabMode} onChange={(e) => { set({ slabMode: e.target.value as typeof o.slabMode }); editor.setTool('slab'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="perimetro">Perímetro externo</option></select></Row>
             <Row label="Desloc. do topo" htmlFor="place-slab-offset"><NumField id="place-slab-offset" value={o.slabOffset} unit="m" onCommit={(v) => set({ slabOffset: v })} /></Row>
           </>}
           <Row label="Caimento" htmlFor="place-slab-slope"><NumField id="place-slab-slope" value={o.slabSlopePercent} unit="%" onCommit={(v) => set({ slabSlopePercent: v })} /></Row>
@@ -62,7 +62,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {tool === 'ceiling' && (
         <Group title="Colocação · Forro">
-          <Row label="Modo do contorno" htmlFor="place-ceiling-mode"><select id="place-ceiling-mode" className="select" value={o.ceilingMode ?? 'poly'} onChange={(e) => { set({ ceilingMode: e.target.value as NonNullable<typeof o.ceilingMode> }); editor.setTool('ceiling'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="room">No ambiente</option><option value="hole">Furo no forro selecionado</option></select></Row>
+          <Row label="Modo do contorno" htmlFor="place-ceiling-mode"><select id="place-ceiling-mode" className="select" value={o.ceilingMode ?? 'poly'} onChange={(e) => { set({ ceilingMode: e.target.value as NonNullable<typeof o.ceilingMode> }); editor.setTool('ceiling'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="room">No ambiente</option></select></Row>
           <Row label="Cota do topo" htmlFor="place-ceiling-offset"><NumField id="place-ceiling-offset" value={o.ceilingOffset ?? 2.6} unit="m" onCommit={(v) => set({ ceilingOffset: v })} /></Row>
         </Group>
       )}

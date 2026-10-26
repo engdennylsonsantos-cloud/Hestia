@@ -8,7 +8,6 @@ const MODES: Array<[SlabMode, string]> = [
   ['poly', 'Contorno por pontos'],
   ['rect', 'Retângulo (2 cantos)'],
   ['perimetro', 'Perímetro externo (perto de parede)'],
-  ['hole', 'Furo na laje selecionada'],
 ];
 
 /**

@@ -23,8 +23,17 @@ export interface SkeletonArc {
   a: Vec2; b: Vec2; za: number; zb: number;   // segmento do esqueleto (cumeeira/espigão/rincão) com as alturas nas pontas
   faces: [number, number];  // índices (em `faces`) das duas águas que ele separa
 }
-/** `steps`: vértices onde as águas se encontram em cotas diferentes (degrau); geometria devolvida não muda. */
-export interface SkeletonResult { faces: SkeletonFace[]; arcs: SkeletonArc[]; ok: boolean; reason?: string; steps?: SkeletonStep[] }
+/**
+ * `steps`: vértices onde as águas se encontram em cotas diferentes (degrau); geometria devolvida não muda.
+ * `points`: onde a frente de onda não fecha, quando a falha tem lugar definido (ok falso).
+ */
+export interface SkeletonResult { faces: SkeletonFace[]; arcs: SkeletonArc[]; ok: boolean; reason?: string; steps?: SkeletonStep[]; points?: Vec2[] }
+
+/** Metros com duas casas e vírgula decimal, como no resto da interface. */
+const fmtM = (v: number): string => v.toFixed(2).replace('.', ',');
+
+/** Pontos em planta (m) em texto pt-BR, como "(5,50; 4,50)". Usado nos motivos de recusa do telhado. */
+export const pointsText = (ps: Vec2[]): string => ps.map((p) => `(${fmtM(p.x)}; ${fmtM(p.y)})`).join(', ');
 
 /**
  * Esqueleto reto com pesos de um polígono simples com furos.
@@ -46,14 +55,16 @@ export function weightedSkeleton(input: SkeletonInput): SkeletonResult {
     // Soma certa não garante superfície contínua. Caso típico: vértice reentrante (ângulo > 180°) entre uma aresta
     // com inclinação (cota 0 nesse vértice, pois é beiral) e uma empena (sem água). Só a água do beiral chega ao vértice
     // com cota 0, e meio plano não cobre um ângulo > 180°; as outras águas dão cota > 0 ali. Não há superfície contínua
-    // com águas planas nesse caso: a geometria é devolvida como está e os vértices com degrau vão em `steps`, para o
-    // engine avisar (aviso não bloqueante). Medido em 400 contornos: todo contorno com esse vértice tem degrau; a
+    // com águas planas nesse caso: a geometria é devolvida como está e os vértices com degrau vão em `steps`. O engine
+    // avisa em telhado já existente e a criação ou alteração por esboço recusa, listando os pontos (roofCheck).
+    // Medido em 400 contornos: todo contorno com esse vértice tem degrau; a
     // falha também ocorre em poucos casos com dois nulos no mesmo vértice reentrante (não analisados).
     const steps = findSteps([input.outer, ...input.holes], input.weights, out.faces);
     return { faces: out.faces, arcs: out.arcs, ok: true, steps };
   } catch (e) {
     const reason =
       e instanceof SkeletonFail ? e.message : `falha interna do esqueleto: ${e instanceof Error ? e.message : String(e)}`;
-    return { faces: [], arcs: [], ok: false, reason };
+    const points = e instanceof SkeletonFail && e.at.length > 0 ? e.at : undefined;
+    return { faces: [], arcs: [], ok: false, reason, ...(points ? { points } : {}) };
   }
 }

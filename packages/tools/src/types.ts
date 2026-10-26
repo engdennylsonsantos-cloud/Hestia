@@ -28,8 +28,6 @@ export type PreviewItem =
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
   | { kind: 'highlight'; ids: Id[] }
-  /** Aresta de telhado sob o cursor, antes do clique: a planta a desenha em traço grosso na cor de seleção. */
-  | { kind: 'roofEdgeHover'; a: Vec2; b: Vec2 }
   /** Linha de corte ou elevação com a seta do lado de visão (a pré-visualização usa `dashed`). */
   | { kind: 'sectionLine'; a: Vec2; b: Vec2; dashed?: boolean; label?: string; elevation?: boolean };
 
@@ -58,24 +56,13 @@ export interface ToolEnv {
   options(): ToolOptions;
   /** Idioma da interface: as mensagens traduzíveis das ferramentas (ex.: Matriz) saem nele. Ausente = português. */
   lang?(): 'pt' | 'en';
-  /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */
-  roofEdge?(): RoofEdgeSel | null;
-  setRoofEdge?(sel: RoofEdgeSel | null): void;
-  /** Alterna "define inclinação" da aresta `index` do telhado `roofId`, selecionado ou não. Devolve true se aplicou. Ausente = o clique numa aresta de telhado não selecionado não faz nada. */
-  toggleRoofEdge?(roofId: Id, index: number): boolean;
 }
 
-/** Aresta do contorno de um telhado selecionado: `index` é a aresta de boundary[index] a boundary[index+1]. */
-export interface RoofEdgeSel {
-  roofId: Id;
-  index: number;
-}
+/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou perímetro externo da edificação. */
+export type FloorMode = 'poly' | 'rect' | 'walls' | 'perimetro';
 
-/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, furo num piso selecionado, ou perímetro externo da edificação. */
-export type FloorMode = 'poly' | 'rect' | 'walls' | 'hole' | 'perimetro';
-
-/** Modo da ferramenta Laje: contorno por cliques, retângulo, perímetro externo das paredes, ou furo numa laje selecionada. */
-export type SlabMode = 'poly' | 'rect' | 'perimetro' | 'hole';
+/** Modo da ferramenta Laje: contorno por cliques, retângulo ou perímetro externo das paredes. */
+export type SlabMode = 'poly' | 'rect' | 'perimetro';
 
 /** Tipo da ferramenta Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). */
 export type ArrayKind = 'linear' | 'radial';
@@ -84,10 +71,10 @@ export type ArrayKind = 'linear' | 'radial';
 export type ArrayAnchor = 'second' | 'last';
 
 /** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
-export type CeilingMode = 'poly' | 'rect' | 'room' | 'hole';
+export type CeilingMode = 'poly' | 'rect' | 'room';
 
-/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo, pelo perímetro externo das paredes (com balanço), ou abertura (furo) no telhado selecionado. 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
-export type RoofMode = 'poly' | 'rect' | 'paredes' | 'hole' | 'extrusao';
+/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo ou pelo perímetro externo das paredes (com balanço). 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
+export type RoofMode = 'poly' | 'rect' | 'paredes' | 'extrusao';
 
 /** Quais capturas estão ligadas (AutoCAD / Revit Snaps). */
 export interface SnapOptions {

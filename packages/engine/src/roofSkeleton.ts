@@ -1,4 +1,4 @@
-import { ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
+import { pointsText, ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
 import { crossingParams, perpOf, planeHas, unitOf } from './roofGeom.ts';
 import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
 
@@ -64,7 +64,11 @@ export function skeletonPlanes(boundary: Vec2[], holes: Vec2[][], edgeSlopes: Ar
   } catch (e) {
     return { planes: [], problem: `falha no cálculo das águas (${e instanceof Error ? e.message : String(e)})` };
   }
-  if (!res.ok) return { planes: [], problem: res.reason ?? 'o contorno não gerou águas' };
+  if (!res.ok) {
+    const reason = res.reason ?? 'o contorno não gerou águas';
+    // Com lugar definido, a recusa diz onde a frente de onda não fecha (o usuário vê os pontos, não só a falha).
+    return { planes: [], problem: res.points?.length ? `o esqueleto não fecha em ${pointsText(res.points)} m (${reason})` : reason };
+  }
   const planes: ResolvedRoofPlane[] = [];
   for (const f of res.faces) {
     if (f.ring !== 0) continue;

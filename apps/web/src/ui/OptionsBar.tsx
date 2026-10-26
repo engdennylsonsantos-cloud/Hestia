@@ -189,7 +189,6 @@ export function OptionsBar(): ReactElement {
               <option value="poly">Contorno por pontos</option>
               <option value="rect">Retângulo (2 cantos)</option>
               <option value="walls">Área fechada por paredes</option>
-              <option value="hole">Furo no piso selecionado</option>
               <option value="perimetro">Perímetro externo da edificação</option>
             </select>
           </label>

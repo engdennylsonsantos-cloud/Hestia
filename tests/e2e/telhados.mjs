@@ -3,6 +3,7 @@ import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { abreVista3d, perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/shots';
 mkdirSync(OUT, { recursive: true });
@@ -18,11 +19,6 @@ await page.evaluate(() => { const { editor } = window.__hestia; editor.newProjec
 await page.waitForTimeout(500);
 let fails = 0;
 const check = (ok, msg) => { console.log(`${ok ? 'OK  ' : 'FAIL'} ${msg}`); if (!ok) fails++; };
-const screenOf = (wx, wy) => page.evaluate(([x, y]) => {
-  const { editor } = window.__hestia; const canvas = document.querySelector('.canvas-wrap canvas'); const r = canvas.getBoundingClientRect();
-  const v = editor.ensureViewport(r.width, r.height);
-  return { x: r.left + (x - v.cx) * v.zoom + v.width / 2, y: r.top + v.height / 2 - (y - v.cy) * v.zoom };
-}, [wx, wy]);
 const roofs = () => page.evaluate(() => Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'roof'));
 const b = await page.evaluate(() => {
   const ws = Object.values(window.__hestia.editor.project.elements).filter((e) => e.kind === 'wall');
@@ -30,14 +26,13 @@ const b = await page.evaluate(() => {
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
 });
 
-// Telhado pelas paredes (duas águas).
-await page.evaluate(() => { const { editor, useUi } = window.__hestia; useUi.setState({ options: { ...useUi.getState().options, roofMode: 'paredes', roofShape: 'gable', roofSlope: 30 } }); editor.setTool('roof'); });
-const onWall = await screenOf(b.minX, (b.minY + b.maxY) / 2);
-await page.mouse.move(onWall.x, onWall.y, { steps: 3 });
-await page.mouse.click(onWall.x, onWall.y);
-await page.waitForTimeout(500);
+// Telhado por fora das paredes (duas águas): o rascunho do modo de perímetro é o retângulo a 0,135 m do eixo das paredes,
+// e os lados horizontais (paralelos à cumeeira) definem inclinação.
+const f = 0.135;
+const res = await perimetroPorPontos(page, 'roof', [[b.minX - f, b.minY - f], [b.maxX + f, b.minY - f], [b.maxX + f, b.maxY + f], [b.minX - f, b.maxY + f]], { inclina: (i, p, q) => Math.abs(p[1] - q[1]) < 1e-9 });
+await page.waitForTimeout(300);
 const r = await roofs();
-check(r.length === 1, 'telhado criado pelas paredes');
+check(res.ok && r.length === 1, 'telhado criado pelo modo de perímetro', res.msg);
 // Telhado novo é por arestas (decisão 0008): duas águas = exatamente 2 arestas com inclinação (as outras são empenas).
 const caem = (r[0]?.edgeSlopes ?? []).filter((s) => s !== null && s > 0).length;
 check(r[0]?.shape === 'edges' && caem === 2, `forma duas águas (por arestas, ${caem} arestas com inclinação)`);
@@ -53,6 +48,7 @@ await page.evaluate(() => {
   const ws = Object.values(editor.project.elements).filter((e) => e.kind === 'wall');
   editor.store.exec({ type: 'updateElements', ids: ws.map((x) => x.id), patch: { attachTopToRoof: true } });
 });
+await abreVista3d(page);
 await page.getByRole('tab', { name: /Modelo 3D/ }).click();
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${OUT}/91-telhado-3d.png` });

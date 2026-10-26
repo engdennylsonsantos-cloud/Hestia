@@ -1,6 +1,5 @@
-import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Vec2 } from '@hestia/geom';
-import { ceilingOutline } from '@hestia/engine';
-import { DEFAULT_CEILING_HEIGHT, ceilingsOnLevel, followsRoom, isCeiling, makeCeiling, newId, type Ceiling, type Id } from '@hestia/model';
+import { add, dist, len, mul, multiArea, norm, sub, v2, type Vec2 } from '@hestia/geom';
+import { DEFAULT_CEILING_HEIGHT, ceilingsOnLevel, makeCeiling, newId, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ringAreaAbs, ringPerimeter } from './floorPick.ts';
 import { roomCeilingAt } from './ceilingRoom.ts';
@@ -13,7 +12,6 @@ const MODE_HINT: Record<CeilingMode, string> = {
   poly: 'Forro: clique nos vértices. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Forro retangular: clique no primeiro canto e depois no canto oposto.',
   room: 'Forro no ambiente: clique dentro de um ambiente. O forro segue o contorno e o pé-direito dele.',
-  hole: 'Furo: selecione um único forro e clique nos vértices do contorno do furo, dentro do forro. Enter fecha.',
 };
 
 /** Retângulo com dois cantos opostos, em ordem de contorno. */
@@ -54,17 +52,9 @@ export class CeilingTool extends ToolBase {
     return this.isContour() && this.pts.length > 0 ? 'Comprimento' : null;
   }
 
-  /** Modos de contorno por cliques: o contorno do forro (poly) e o do furo (hole). */
+  /** Modo de contorno por cliques (poly). */
   private isContour(): boolean {
-    return this.mode() === 'poly' || this.mode() === 'hole';
-  }
-
-  /** Forro alvo do modo furo: exatamente um forro selecionado. */
-  private target(): Ceiling | null {
-    const p = this.env.project();
-    const ids = this.env.selection().filter((id) => isCeiling(p.elements[id]));
-    if (ids.length !== 1) return null;
-    return p.elements[ids[0]!] as Ceiling;
+    return this.mode() === 'poly';
   }
 
   override move(p: PointerInfo): void {
@@ -98,9 +88,7 @@ export class CeilingTool extends ToolBase {
 
   private movePoly(p: PointerInfo): void {
     const last = this.pts[this.pts.length - 1];
-    const t = this.mode() === 'hole' ? this.target() : null;
-    const inf = this.snap(p, { from: last, extraPoints: t ? this.targetRing() : [] });
-    if (t) this.items.push({ kind: 'highlight', ids: [t.id] });
+    const inf = this.snap(p, { from: last });
     if (!last) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -151,12 +139,8 @@ export class CeilingTool extends ToolBase {
   }
 
   private clickPoly(p: PointerInfo): void {
-    if (this.mode() === 'hole' && !this.target()) {
-      this.env.say('Furo: selecione um único forro (Selecionar) e escolha Forro de novo.');
-      return;
-    }
     const last = this.pts[this.pts.length - 1];
-    const inf = this.snap(p, { from: last, extraPoints: this.mode() === 'hole' ? this.targetRing() : [] });
+    const inf = this.snap(p, { from: last });
     const q = inf.point;
     const tol = 10 * this.env.metersPerPixel();
     if (this.pts.length >= 3 && dist(q, this.pts[0]!) <= tol) {
@@ -174,40 +158,9 @@ export class CeilingTool extends ToolBase {
   /** Fecha o contorno em construção. */
   private finishContour(): void {
     const ring = this.pts;
-    if (this.mode() === 'hole') this.commitHole(ring);
-    else if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
+    if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
     else this.commit(ring);
     this.reset();
-  }
-
-  /** Contorno efetivo do forro alvo (o do ambiente, quando acompanha): é nele que o furo e a captura se apoiam. */
-  private targetRing(): Vec2[] {
-    const t = this.target();
-    return t ? ceilingOutline(this.env.project(), t).boundary : [];
-  }
-
-  /**
-   * Furo: acrescenta o contorno a `holes` do forro alvo, se ficar dentro dele (um só Ctrl+Z). Forro que acompanha o ambiente
-   * se solta no mesmo passo: o furo é uma edição à mão, e o contorno visível vira estático (decisão 0023 §13, P-5).
-   */
-  private commitHole(ring: Vec2[]): void {
-    const t = this.target();
-    if (!t) return;
-    const outline = ceilingOutline(this.env.project(), t);
-    if (!ring.every((q) => pointInRing(q, outline.boundary))) {
-      this.env.say('O furo precisa ficar dentro do forro.');
-      return;
-    }
-    if (!followsRoom(t)) {
-      this.env.exec({ type: 'updateElements', ids: [t.id], patch: { holes: [...t.holes, ring] } });
-      this.env.say('Furo criado. Ctrl+Z desfaz.');
-      return;
-    }
-    this.env.transaction('Criar furo', () => {
-      this.env.exec({ type: 'updateElements', ids: [t.id], patch: { boundary: outline.boundary, holes: [...outline.holes, ring] } });
-      this.env.exec({ type: 'detachCeilingRoom', id: t.id });
-    });
-    this.env.say('Furo criado: o forro deixou de acompanhar o ambiente (solto). Ctrl+Z desfaz.');
   }
 
   override confirm(): void {
@@ -220,7 +173,6 @@ export class CeilingTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.isContour() || this.pts.length === 0) return false;
-    if (this.mode() === 'hole' && !this.target()) return false;
     const v = parseNumber(text);
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');

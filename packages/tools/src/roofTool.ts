@@ -1,5 +1,5 @@
-import { boxOf, dist, mul, norm, add, sub, len, pointInRing, v2, type Ring, type Vec2 } from '@hestia/geom';
-import { isRoof, makeRoof, newId, type Roof, type RoofShape } from '@hestia/model';
+import { boxOf, dist, mul, norm, add, sub, len, v2, type Ring, type Vec2 } from '@hestia/geom';
+import { makeRoof, newId, type Roof, type RoofShape } from '@hestia/model';
 import { defaultExtrusionProfile, resolveRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { extrusionCreatedMessage } from './roofExtrusionTool.ts';
@@ -9,7 +9,7 @@ import { parseNumber } from './numeric.ts';
 import { pickAt } from './pick.ts';
 import { defaultRoofDir, eaveOutline, eaveOutlinePerEdge, rectRing, roofAutoOffset, roofDirFor, roofSlopeError, sameRing, uniformEdges } from './roofGeom.ts';
 import { presetEdgeSlopes, type EdgePresetShape } from './roofEdges.ts';
-import { roofPatchProblem, roofProblem } from './roofCheck.ts';
+import { roofProblem } from './roofCheck.ts';
 import { fmtPercent, slopePreview } from './slabSlope.ts';
 import type { PointerInfo, PreviewItem, RoofMode } from './types.ts';
 
@@ -22,15 +22,14 @@ const MODE_HINT: Record<ToolMode, string> = {
   poly: 'Telhado: clique nos vértices da pegada (o contorno sem balanço). Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. O beiral sai pelo balanço da barra. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Telhado retangular: clique no primeiro canto e depois no canto oposto. O beiral sai pelo balanço da barra.',
   paredes: 'Telhado pelas paredes: clique perto de uma parede do nível. O beiral sai do perímetro externo pelo balanço da barra de opções.',
-  hole: 'Abertura no telhado: selecione um telhado e clique nos vértices da abertura, dentro do beiral. Duplo clique ou Enter fecham.',
 };
 
 /** Balanço do beiral quando a barra de opções não traz um valor (m). */
 const DEFAULT_OVERHANG = 0.5;
 
 /**
- * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). Modos: pegada por cliques, retângulo, pelo perímetro externo das
- * paredes do nível (os três com o beiral saindo para fora pelo balanço), ou abertura (furo) no telhado selecionado. Tab
+ * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). Modos: pegada por cliques, retângulo e pelo perímetro externo das
+ * paredes do nível (os três com o beiral saindo para fora pelo balanço). Tab
  * troca o eixo da cumeeira (ou da subida). A forma vira predefinições por aresta (`edgeSlopes`). A ferramenta só emite
  * comandos, e só cria ou altera um telhado se o motor gerar águas para ele: caso contrário mostra o motivo na barra de
  * status.
@@ -49,10 +48,9 @@ export class RoofTool extends ToolBase {
     return m === undefined || m === 'extrusao' ? 'poly' : m;
   }
 
-  /** Modos que fecham um contorno por cliques (contorno do beiral ou abertura). */
+  /** Modo que fecha um contorno por cliques (a pegada do beiral). */
   private polyLike(): boolean {
-    const m = this.mode();
-    return m === 'poly' || m === 'hole';
+    return this.mode() === 'poly';
   }
 
   /** Tipo do telhado: o da barra de opções se existir no projeto, senão o primeiro. */
@@ -214,11 +212,10 @@ export class RoofTool extends ToolBase {
     this.pts.push(q);
   }
 
-  /** Fecha o contorno em construção: do beiral (cria o telhado) ou da abertura (furo no telhado selecionado). */
+  /** Fecha o contorno em construção e cria o telhado com o beiral. */
   private finishContour(): void {
     const ring = this.pts;
     if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
-    else if (this.mode() === 'hole') this.commitHole(ring);
     else this.commit(ring, this.overhang());
     this.reset();
   }
@@ -326,29 +323,6 @@ export class RoofTool extends ToolBase {
     this.env.exec({ type: 'addRoof', roof });
     this.env.setSelection([id]);
     this.env.say(extrusion ? extrusionCreatedMessage(roof.profile) : this.created(id, preset, slope));
-  }
-
-  /** Abertura (furo) no telhado selecionado: o contorno precisa ficar dentro do beiral e o motor precisa manter águas. */
-  private commitHole(ring: Vec2[]): void {
-    const p = this.env.project();
-    const ids = this.env.selection().filter((id) => isRoof(p.elements[id]));
-    if (ids.length !== 1) {
-      this.env.say('Selecione um telhado para fazer a abertura.');
-      return;
-    }
-    const roof = p.elements[ids[0]!] as Roof;
-    if (!ring.every((q) => pointInRing(q, roof.boundary))) {
-      this.env.say('A abertura precisa ficar dentro do beiral do telhado.');
-      return;
-    }
-    const patch: Partial<Roof> = { holes: [...roof.holes, ring] };
-    const problem = roofPatchProblem(p, ids, patch);
-    if (problem) {
-      this.env.say(`Não foi possível fazer a abertura: ${problem}`);
-      return;
-    }
-    this.env.exec({ type: 'updateElements', ids, patch });
-    this.env.say('Abertura criada no telhado. Ctrl+Z desfaz.');
   }
 
   /** Mensagem de criação: com o motor, águas e cumeeira reais; sem ele, a forma e a inclinação. */

@@ -36,28 +36,24 @@ function drawPanel(id: ToolId): RibbonPanel | null {
         option(t('Retângulo', 'Rectangle'), 'plan', same('floorMode', 'rect'), { floorMode: 'rect' }, 'floor'),
         option(t('Área fechada por paredes', 'Pick Walls'), 'room', same('floorMode', 'walls'), { floorMode: 'walls' }, 'floor'),
         option(t('Perímetro externo', 'Outer Perimeter'), 'floor', same('floorMode', 'perimetro'), { floorMode: 'perimetro' }, 'floor'),
-        option(t('Furo no piso', 'Hole'), 'close', same('floorMode', 'hole'), { floorMode: 'hole' }, 'floor'),
       );
     case 'slab':
       return mk(
         option(t('Contorno por pontos', 'Sketch'), 'filledRegion', same('slabMode', 'poly'), { slabMode: 'poly' }, 'slab'),
         option(t('Retângulo', 'Rectangle'), 'plan', same('slabMode', 'rect'), { slabMode: 'rect' }, 'slab'),
         option(t('Perímetro externo', 'Outer Perimeter'), 'slab', same('slabMode', 'perimetro'), { slabMode: 'perimetro' }, 'slab'),
-        option(t('Furo na laje', 'Hole'), 'close', same('slabMode', 'hole'), { slabMode: 'hole' }, 'slab'),
       );
     case 'ceiling':
       return mk(
         option(t('Contorno por pontos', 'Sketch'), 'filledRegion', (o) => (o.ceilingMode ?? 'poly') === 'poly', { ceilingMode: 'poly' }, 'ceiling'),
         option(t('Retângulo', 'Rectangle'), 'plan', same('ceilingMode', 'rect'), { ceilingMode: 'rect' }, 'ceiling'),
         option(t('Por ambiente', 'By Room'), 'room', same('ceilingMode', 'room'), { ceilingMode: 'room' }, 'ceiling'),
-        option(t('Furo no forro', 'Hole'), 'close', same('ceilingMode', 'hole'), { ceilingMode: 'hole' }, 'ceiling'),
       );
     case 'roof':
       return mk(
         option(t('Contorno por pontos', 'Sketch'), 'filledRegion', (o) => (o.roofMode ?? 'poly') === 'poly', { roofMode: 'poly' }, 'roof'),
         option(t('Retângulo', 'Rectangle'), 'plan', same('roofMode', 'rect'), { roofMode: 'rect' }, 'roof'),
         option(t('Por paredes', 'Pick Walls'), 'room', same('roofMode', 'paredes'), { roofMode: 'paredes' }, 'roof'),
-        option(t('Furo no telhado', 'Hole'), 'close', same('roofMode', 'hole'), { roofMode: 'hole' }, 'roof'),
       );
     default:
       return null;

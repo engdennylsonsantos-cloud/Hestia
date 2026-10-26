@@ -1,9 +1,9 @@
 import type { Vec2 } from '@hestia/geom';
 import { isRoof, makeRoof, newId, validateProject, type Project, type Roof } from '@hestia/model';
 import { roofProblem } from './roofCheck.ts';
-import { defaultRoofDir, eaveOutlinePerEdge, roofAutoOffset, roofSlopeError } from './roofGeom.ts';
+import { defaultRoofDir, eaveOutlinePerEdge, roofAutoOffset, roofSlopeError, waterGroupCount } from './roofGeom.ts';
 import type { EditFlags, FinishEdge } from './perimeterSession.ts';
-import { axisOr, keepOrder, newError, pickTypeId, refuse, waterCount, withElement } from './perimeterCommitShared.ts';
+import { axisOr, keepOrder, newError, pickTypeId, refuse, withElement } from './perimeterCommitShared.ts';
 import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
 
 /** Telhado com forma por arestas: as únicas que o perímetro sabe ler e regravar. Livre e extrusão têm ferramenta própria. */
@@ -96,7 +96,7 @@ function createRoof(p: Project, f: RoofFields, slopeDefault: number, opts: Commi
   const after = withElement(p, candidate);
   const problem = roofProblem(p, [candidate]) ?? newError(p, after, id, validateProject);
   if (problem) return refuse(`Não foi possível criar o telhado: ${problem}`);
-  const n = waterCount(after, levelId, id);
+  const n = waterGroupCount(roof.boundary, roof.edgeSlopes, roof.edgeOverhangs);
   return { ok: true, id, commands: [{ type: 'addRoof', roof }], message: `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}.` };
 }
 
@@ -113,6 +113,6 @@ function editRoof(p: Project, id: string, f: RoofFields, opts: CommitPerimeterOp
   const after = withElement(p, next);
   const problem = roofProblem(p, [next]) ?? newError(p, after, id, validateProject);
   if (problem) return refuse(`Alteração não aplicada: ${problem}`);
-  const n = waterCount(after, el.levelId, id);
+  const n = waterGroupCount(next.boundary, next.edgeSlopes, next.edgeOverhangs);
   return { ok: true, id, commands: [{ type: 'updateElements', ids: [id], patch }], message: `Telhado atualizado: ${n} ${n === 1 ? 'água' : 'águas'}.` };
 }

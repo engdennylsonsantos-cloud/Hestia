@@ -1,11 +1,10 @@
-import { add, dist, len, mul, multiArea, norm, pointInRing, sub, v2, type Ring, type Vec2 } from '@hestia/geom';
-import { isSlab, makeSlab, newId, type OutlineSource, type Slab } from '@hestia/model';
+import { add, dist, len, mul, multiArea, norm, sub, v2, type Ring, type Vec2 } from '@hestia/geom';
+import { makeSlab, newId, type OutlineSource } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ringAreaAbs, ringPerimeter } from './floorPick.ts';
 import { outerPerimeter } from './enclosed.ts';
 import { parseNumber } from './numeric.ts';
 import { pickAt } from './pick.ts';
-import { selectedSlabs } from './slabPick.ts';
 import type { PointerInfo, SlabMode } from './types.ts';
 
 const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -14,15 +13,14 @@ const MODE_HINT: Record<SlabMode, string> = {
   poly: 'Laje: clique nos vértices. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Laje retangular: clique no primeiro canto e depois no canto oposto.',
   perimetro: 'Laje pelo perímetro externo: clique perto de uma parede. O contorno segue a face externa da edificação, sem furos.',
-  hole: 'Furo na laje: clique nos vértices do contorno dentro da laje selecionada. Enter fecha.',
 };
 
 /** Retângulo com dois cantos opostos, em ordem de contorno. */
 const rectRing = (a: Vec2, c: Vec2): Vec2[] => [a, { x: c.x, y: a.y }, c, { x: a.x, y: c.y }];
 
 /**
- * Laje (Revit: Floor estrutural / ArchiCAD: Slab). Modos: contorno por cliques, retângulo, perímetro externo das
- * paredes do nível e furo numa laje selecionada. A ferramenta só emite comandos (`addSlab`, `updateElements`).
+ * Laje (Revit: Floor estrutural / ArchiCAD: Slab). Modos: contorno por cliques, retângulo e perímetro externo das
+ * paredes do nível. A ferramenta só emite comandos (`addSlab`).
  */
 export class SlabTool extends ToolBase {
   readonly id = 'slab';
@@ -56,16 +54,7 @@ export class SlabTool extends ToolBase {
   }
 
   private isContour(): boolean {
-    return this.mode() === 'poly' || this.mode() === 'hole';
-  }
-
-  /** Laje alvo do modo furo: exatamente uma laje selecionada. */
-  private target(): Slab | null {
-    const p = this.env.project();
-    const ids = selectedSlabs(p, this.env.selection());
-    if (ids.length !== 1) return null;
-    const s = p.elements[ids[0]!];
-    return isSlab(s) ? s : null;
+    return this.mode() === 'poly';
   }
 
   /** Contorno externo sob o cursor, ou null quando o cursor não está perto de uma parede do nível. */
@@ -74,11 +63,6 @@ export class SlabTool extends ToolBase {
     const levelId = this.env.levelId();
     if (!pickAt(p, levelId, at, this.env.metersPerPixel())) return null;
     return outerPerimeter(p, levelId, at);
-  }
-
-  /** Vértices que a captura deve aceitar além das paredes: o contorno em construção e, no furo, a laje alvo. */
-  private snapPoints(): Vec2[] {
-    return [...this.pts, ...(this.mode() === 'hole' ? (this.target()?.boundary ?? []) : [])];
   }
 
   override move(p: PointerInfo): void {
@@ -112,11 +96,7 @@ export class SlabTool extends ToolBase {
 
   private movePoly(p: PointerInfo): void {
     const last = this.pts[this.pts.length - 1];
-    const inf = this.snap(p, { from: last, extraPoints: this.snapPoints() });
-    if (this.mode() === 'hole') {
-      const t = this.target();
-      if (t) this.items.push({ kind: 'highlight', ids: [t.id] });
-    }
+    const inf = this.snap(p, { from: last, extraPoints: this.pts });
     if (!last) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -159,12 +139,8 @@ export class SlabTool extends ToolBase {
   }
 
   private clickPoly(p: PointerInfo): void {
-    if (this.mode() === 'hole' && !this.target()) {
-      this.env.say('Furo: selecione uma única laje (Selecionar) e escolha Laje de novo.');
-      return;
-    }
     const last = this.pts[this.pts.length - 1];
-    const inf = this.snap(p, { from: last, extraPoints: this.snapPoints() });
+    const inf = this.snap(p, { from: last, extraPoints: this.pts });
     const q = inf.point;
     const tol = 10 * this.env.metersPerPixel();
     if (this.pts.length >= 3 && dist(q, this.pts[0]!) <= tol) {
@@ -179,11 +155,10 @@ export class SlabTool extends ToolBase {
     this.pts.push(q);
   }
 
-  /** Fecha o contorno (ou furo) em construção. */
+  /** Fecha o contorno em construção. */
   private finishContour(): void {
     const ring = this.pts;
-    if (this.mode() === 'hole') this.commitHole(ring);
-    else if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
+    if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
     else this.commit(ring);
     this.reset();
   }
@@ -198,7 +173,6 @@ export class SlabTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.isContour() || this.pts.length === 0) return false;
-    if (this.mode() === 'hole' && !this.target()) return false;
     const v = parseNumber(text);
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');
@@ -229,17 +203,5 @@ export class SlabTool extends ToolBase {
     this.env.setSelection([id]);
     const area = multiArea([[boundary]]);
     this.env.say(`Laje criada: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);
-  }
-
-  /** Furo: acrescenta o contorno a `holes` da laje alvo, se ficar dentro dela. */
-  private commitHole(ring: Vec2[]): void {
-    const t = this.target();
-    if (!t) return;
-    if (!ring.every((q) => pointInRing(q, t.boundary))) {
-      this.env.say('O furo precisa ficar dentro da laje.');
-      return;
-    }
-    this.env.exec({ type: 'updateElements', ids: [t.id], patch: { holes: [...t.holes, ring] } });
-    this.env.say('Furo criado. Ctrl+Z desfaz.');
   }
 }

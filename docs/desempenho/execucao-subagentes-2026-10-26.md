@@ -11,9 +11,9 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — S0 e S1 integrados; A1 adiantado; S2 e A2 em execução.
-**Em execução:** S2 (projeto grande), A2 (verificação visual), A1 (inserção/abertura).
-**Próxima ação:** aguardar S2/A2/A1; rodar M0 com a instrumentação do S1 e fechar G0.
+**Última atualização:** 2026-10-26 — S0, S1 e S2 integrados; R1 iniciado com G0 parcial.
+**Em execução:** A1 (inserção/abertura), A2 (verificação visual), R1 (fundação 3D GPU).
+**Próxima ação:** aguardar A1/A2 para rodar M0 sem ruído; R1 usa os cenários do S2 e a instrumentação do S1.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
@@ -28,12 +28,12 @@
 
 - [x] **S0** sonda de GPU real (RX 580) — concluído em `6a87455`; ver `docs/desempenho/gpu-capacidade.md`
 - [x] **S1** instrumentação (`?perf=1`, timers, contadores) — concluído em `2a4ec8e`; ver `docs/desempenho/instrumentacao-s1-2026-10-26.md`
-- [ ] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes)
+- [x] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes) — concluído em `f494263`; ver `docs/desempenho/s2-projeto-grande-2026-10-26.md`
 - [ ] **M0** baseline 10/30/60
 - [ ] **A1** inserção/abertura
 - [ ] **A2** verificação visual
 - [ ] **I1** integração da Fase 1
-- [ ] **R1** fundação 3D GPU
+- [ ] **R1** fundação 3D GPU — em execução (worktree `gpu-r1-foundation`)
 - [ ] **R2** culling/LOD/sombras/precisão
 - [ ] **R3** picking/realce GPU
 - [ ] **R4** clipping planes
@@ -85,6 +85,18 @@
 - **Números do exemplo são de Chrome headless/SwiftShader**, não baseline de hardware; M0 mede na GPU real.
 - **Nota de ambiente:** o worktree do S1 usa uma junção local `apps/web/node_modules/@hestia/render` para o pacote do ramo;
   não versionada. O repo principal resolve pelo workspace normal.
+
+### Achados S2 (2026-10-26)
+
+- **Cenários grandes existem e abrem:** 30×128, 30×256, 60×128 e 60×256, sem erro; JSON determinístico (mesmo SHA-256).
+- **60×256 não estoura memória** (pico ~1,8 GB de processo), mas é lento: 8,66 s de abertura e 56 s de montagem 3D.
+- **Quadro estável cabe na meta:** 60×256 = 251 draw calls / 1,71 M triângulos; 30×256 = 131 / 0,85 M.
+- **O 1º quadro não cabe:** 60×256 = 439 draw calls / 3,41 M triângulos, acima do teto de 3 M. O R2 (culling/LOD)
+  e o R1 (instancing) têm de atacar isso.
+- **Cenário de iteração:** 60×128 ou 30×256. 60×256 só em rodada curta/soak.
+- **Bug corrigido:** `medir:gpu` abria a 3D por `button.leaf`, que não existe mais; agora usa `treeitem “Modelo 3D”`.
+- **Padrão preservado:** `npm run medir:gpu` sem variáveis continua 10/20/30 × 32, sem pendências.
+- **Exceção de tamanho:** `scripts/medir-gpu-memoria.mjs` ficou com ~443 linhas (levemente acima de ~400); refatorar em H1.
 
 ## 1. Regras do board
 

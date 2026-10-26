@@ -4,9 +4,11 @@ import { PERIMETER_MODIFY_LABEL, type PerimeterModifyKind } from './perimeterMod
 import { deleteSegs } from './perimeterModify.ts';
 import { selectSegs } from './perimeterSession.ts';
 import { edgeClick, edgeHint, edgePreview } from './perimeterToolModifyEdge.ts';
+import { parseDelta } from './perimeterToolInput.ts';
 import {
   transformClick,
   transformConfirm,
+  transformDelta,
   transformHint,
   transformPreview,
   transformPrompt,
@@ -16,9 +18,10 @@ import {
 import { EDGE, SOURCED, clearData, freshStep, halo, hasData, lineAt, type ModHost, type Step } from './perimeterToolModifyStep.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
-/** O clique captura ponto (snap) nos estágios de ponto dos comandos de transformação; o resto usa o cursor cru. */
+/** O clique captura ponto (snap) em todos os estágios de ponto, como o esboço; só o teste de linha usa o cursor cru. */
 function snapsAt(kind: PerimeterModifyKind, st: Step): boolean {
-  if (kind === 'rotate') return st.stage === 1;
+  if (kind === 'trim' || kind === 'split' || kind === 'offset') return true;
+  if (kind === 'rotate') return st.stage >= 1;
   if (kind === 'move' || kind === 'copy' || kind === 'mirror' || kind === 'array') return st.stage === 1 || st.stage === 2;
   return false;
 }
@@ -100,7 +103,7 @@ export class ModifyFlow {
     if (this.needsSource()) return this.pickSource(p);
     const at = this.pointAt(p);
     this.at = at;
-    if (EDGE.has(kind)) edgeClick(this.h, kind, this.st, p);
+    if (EDGE.has(kind)) edgeClick(this.h, kind, this.st, p, at);
     else transformClick(this.h, kind, this.st, p, at);
   }
 
@@ -108,6 +111,11 @@ export class ModifyFlow {
   type(text: string): boolean {
     const kind = this.cmd;
     if (!kind || this.needsSource() || transformPrompt(kind, this.st) === null) return false;
+    // Mover/Copiar no destino: aceita também o deslocamento digitado "dx,dy" (ou "dx;dy"), em metros.
+    if ((kind === 'move' || kind === 'copy') && this.st.stage === 2) {
+      const delta = parseDelta(text);
+      if (delta) return transformDelta(this.h, kind, this.st, delta);
+    }
     const v = parseNumber(text);
     if (v === null) return this.refuse('Valor inválido. Digite um número.');
     return transformType(this.h, kind, this.st, v, this.raw);
@@ -164,7 +172,7 @@ export class ModifyFlow {
   preview(): PreviewItem[] {
     const kind = this.cmd;
     if (!kind) return [];
-    if (EDGE.has(kind)) return edgePreview(this.h, kind, this.st, this.at);
+    if (EDGE.has(kind)) return edgePreview(this.h, kind, this.st, this.at, this.raw);
     if (this.needsSource()) return this.over ? halo(this.h.draft(), this.over) : [];
     return transformPreview(this.h, kind, this.st, this.at);
   }

@@ -1,7 +1,8 @@
-import { add, closestOnSegment, dist, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { add, closestOnSegment, cross, dist, dot, len, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
 import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
 import { isRoof, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { ARC_TURN_DEG } from '@hestia/tools/src/roofGeom.ts';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
@@ -26,6 +27,32 @@ const scale = (v: Vec2, k: number): Vec2 => ({ x: v.x * k, y: v.y * k });
 
 /** Contorno do telhado em planta: união das águas (as divisas internas somem). */
 export const roofFootprint = (r: ResolvedRoof): MultiPolygon => union(...r.planes.map((pl) => pl.polygon));
+
+/**
+ * Cantos lógicos do contorno (os vértices que recebem alça). Um ponto interno de um arco amostrado tem a virada de
+ * `ARC_TURN_DEG` ou menos entre os dois lados vizinhos e lados de comprimento parecido; um canto de verdade vira mais,
+ * ou junta um lado longo a um lado curto (o encontro entre a aresta reta e o arco). Um ponto só colinear também não
+ * é canto. Anel inteiro quase sem virada (círculo amostrado) não tem canto nenhum. (Mesmo critério de trecho de
+ * `edgeGroupsOf`.)
+ */
+export function cantosLogicos(ring: Ring): boolean[] {
+  const n = ring.length;
+  if (n < 3) return ring.map(() => true);
+  const sides = ring.map((p, i) => sub(ring[(i + 1) % n]!, p));
+  const lens = sides.map(len);
+  const similar = (a: number, b: number): boolean => {
+    const maior = Math.max(a, b);
+    return maior > 1e-9 && Math.min(a, b) >= 0.75 * maior;
+  };
+  const turns = ring.map((_, i) => {
+    const prev = sides[(i - 1 + n) % n]!;
+    const cur = sides[i]!;
+    if (len(prev) < 1e-9 || len(cur) < 1e-9) return 180;
+    return (Math.abs(Math.atan2(cross(prev, cur), dot(prev, cur))) * 180) / Math.PI;
+  });
+  if (turns.every((t) => t <= ARC_TURN_DEG)) return ring.map(() => false);
+  return ring.map((_, i) => !(turns[i]! < ARC_TURN_DEG && similar(lens[(i - 1 + n) % n]!, lens[i]!)));
+}
 
 /** Área real de todas as águas (m²): a área em planta de cada água vezes √(1 + i²), com i = percent/100. */
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
@@ -301,7 +328,8 @@ export function roofSelectionOps(
   paint: PlanPaint = defaultPaint('roof', v.zoom),
 ): FloorOps {
   const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
-  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r) }));
+  // Alças só nos cantos lógicos: um arco amostrado não vira uma fileira de quadradinhos.
+  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: cantosLogicos }));
   const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).
   const out: FloorOps = { fills: base.fills, strokes: base.strokes.filter((s) => !(s.closed && s.widthPx === 2)), labels: base.labels };

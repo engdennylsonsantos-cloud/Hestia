@@ -352,4 +352,13 @@ describe('telhado com trecho em arco (pegada amostrada)', () => {
     expect(beiral).toHaveLength(1);
     expect(o.strokes.filter((st) => st.alpha === 1 && !st.closed && st.color === LIGHT.ink).length).toBeLessThan(12);
   });
+
+  it('selecionado: alças só nos cantos lógicos, não em cada vértice amostrado do arco', () => {
+    const boundary = arcBoundary(24);
+    expect(boundary.length).toBe(27);
+    const p = edgesProject(boundary, boundary.map(() => 30));
+    const o = roofSelectionOps(p, 'lv_0', ['r'], null, LIGHT, VIEW(100));
+    // Quadradinhos de alça são preenchimentos brancos; o arco tem 23 pontos internos que não os recebem.
+    expect(o.fills.filter((f) => f.color === '#ffffff' && f.alpha === 1)).toHaveLength(4);
+  });
 });

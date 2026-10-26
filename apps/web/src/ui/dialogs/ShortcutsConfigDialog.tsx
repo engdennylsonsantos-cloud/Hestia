@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactElement } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { COMANDOS_COM_ATALHO, PERFIL_NOMES, TOOL_GROUPS, type ShortcutCommand, type ShortcutProfile } from '@hestia/tools';
 import { nomeComandoLang, useI18n } from '../../editor/i18n.ts';
 import { useUi } from '../../editor/state.ts';
@@ -39,12 +39,12 @@ export function ShortcutsConfigDialog(): ReactElement {
   };
 
   /** Encerra a captura em curso (Remover, Restaurar e Restaurar tudo não podem deixar as teclas irem ao rascunho). */
-  const encerraCaptura = (): void => {
+  const encerraCaptura = useCallback((): void => {
     setAtivo(null);
     setRascunho('');
-  };
+  }, []);
 
-  const grava = (cmd: ShortcutCommand, texto: string): void => {
+  const grava = useCallback((cmd: ShortcutCommand, texto: string): void => {
     encerraCaptura();
     if (!texto) {
       setMsg('Nenhuma tecla foi digitada: atalho não alterado.');
@@ -52,7 +52,7 @@ export function ShortcutsConfigDialog(): ReactElement {
     }
     const r = atribuirAtalho(cmd, texto);
     setMsg(r.ok ? r.mensagem : r.erro);
-  };
+  }, [encerraCaptura]);
 
   useEffect(() => {
     if (!ativo) return;
@@ -70,8 +70,7 @@ export function ShortcutsConfigDialog(): ReactElement {
     };
     window.addEventListener('keydown', h, true);
     return () => window.removeEventListener('keydown', h, true);
-    // grava() só usa setters e atribuirAtalho; a sequência atual vem de `rascunho`.
-  }, [ativo, rascunho]);
+  }, [ativo, rascunho, grava]);
 
   const termo = filtro.trim().toLowerCase();
   const visiveis = grupos()

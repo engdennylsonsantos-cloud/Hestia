@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { contadores } from './perf/registro.ts';
+import { instrumentarWebGl2, type InstrumentacaoGl } from './perf/webgl.ts';
+import { instrumentarWebGpu, type InstrumentacaoWebGpu } from './perf/webgpu.ts';
 
 export type Backend = 'webgpu' | 'webgl2' | 'none';
 
@@ -32,7 +35,12 @@ async function tryWebGpu(canvas: HTMLCanvasElement): Promise<GpuContext | null> 
       return null; // o three caiu sozinho para WebGL: seguimos o caminho WebGL2 padrão, com canvas novo
     }
     const ctx = wrap(r, 'webgpu');
+    contadores.marcarTimerGpu('indisponivel', 'WebGPU: timestamp queries não expostas pelo three (pendente na Fase 3)');
     const dev = (r.backend as unknown as { device?: { lost?: Promise<{ message?: string }> } } | undefined)?.device;
+    if (contadores.ativo) {
+      const instr = instrumentarWebGpu(dev, contadores);
+      if (instr) wgpuInstr.set(ctx, instr);
+    }
     dev?.lost?.then((info) => lostCbs.get(ctx)?.(info?.message ?? 'dispositivo perdido'));
     return ctx;
   } catch {
@@ -41,8 +49,32 @@ async function tryWebGpu(canvas: HTMLCanvasElement): Promise<GpuContext | null> 
 }
 
 const lostCbs = new WeakMap<GpuContext, (reason: string) => void>();
+/** Interceção de `queue.writeBuffer` por contexto WebGPU (para desfazer no `dispose`). */
+const wgpuInstr = new WeakMap<GpuContext, InstrumentacaoWebGpu>();
+
+/** Instrumentação do contexto WebGL2 do three: draw calls, triângulos, uploads e timer de GPU (se ativa). */
+function instrumentarContextoGl(r: THREE.WebGLRenderer): InstrumentacaoGl | null {
+  try {
+    const gl = r.getContext() as WebGL2RenderingContext | null;
+    return gl ? instrumentarWebGl2(gl, contadores) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fallback quando não há interceção do contexto (WebGPU) ou ela não viu desenho: o renderer informa o último render. */
+function contarInfoDoRenderer(r: THREE.WebGLRenderer): void {
+  if (!contadores.ativo) return;
+  const info = (r as unknown as { info?: { render?: { calls?: number; triangles?: number } } }).info?.render;
+  if (!info) return;
+  const chamadas = Number(info.calls);
+  if (!Number.isFinite(chamadas) || chamadas <= 0) return;
+  contadores.contarDesenho(chamadas, Number(info.triangles) || 0);
+}
 
 function wrap(r: THREE.WebGLRenderer, backend: Backend): GpuContext {
+  contadores.definirBackend(backend);
+  const glInstr = backend === 'webgl2' && contadores.ativo ? instrumentarContextoGl(r) : null;
   const ctx: GpuContext = {
     backend,
     renderer: r,
@@ -51,7 +83,13 @@ function wrap(r: THREE.WebGLRenderer, backend: Backend): GpuContext {
       r.setSize(w, h, false);
     },
     render(scene, camera) {
-      r.render(scene, camera);
+      glInstr?.iniciar();
+      try {
+        r.render(scene, camera);
+      } finally {
+        glInstr?.encerrar();
+        if (!glInstr || !glInstr.desenhouNoQuadro()) contarInfoDoRenderer(r);
+      }
     },
     onLost(cb) {
       lostCbs.set(ctx, cb);
@@ -61,6 +99,8 @@ function wrap(r: THREE.WebGLRenderer, backend: Backend): GpuContext {
       });
     },
     dispose() {
+      glInstr?.remover();
+      wgpuInstr.get(ctx)?.remover();
       r.dispose();
     },
   };

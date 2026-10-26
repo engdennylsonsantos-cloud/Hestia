@@ -429,6 +429,11 @@ describe('buildOpeningModel: as dez famílias nas quatro combinações', () => {
           const caso = `${familia.nome} hand=${flipHand} facing=${flipFacing}`;
           expect(new Set(m.parts.map((x) => x.id)).size, caso).toBe(m.parts.length);
           expect(m.parts.map((x) => x.id)).toEqual(modelo(c).parts.map((x) => x.id));
+          expect(m, caso).toEqual(modelo(c));
+          const batente = m.parts.filter((x) => x.role === 'jamb' || x.role === 'stop' || x.role === 'head');
+          for (const folhaPart of m.parts.filter((x) => x.role === 'leaf')) {
+            for (const b of batente) expect(volumeComum(folhaPart.box, b.box), `${caso} ${folhaPart.id} × ${b.id}`).toBe(false);
+          }
           for (const p of m.parts) {
             expect(p.box.t1 - p.box.t0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);
             expect(p.box.s1 - p.box.s0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);

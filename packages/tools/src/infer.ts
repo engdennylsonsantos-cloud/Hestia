@@ -483,12 +483,12 @@ function bestOf(
  * Parede sobre a qual o cursor está (para portas e janelas). A faixa é a espessura da parede; com a captura
  * ligada, soma a tolerância visual (~10 px). Com F3 (captura desligada) vale só a espessura desenhada.
  */
-export function hostUnder(cursor: Vec2, p: Project, levelId: Id, mpp: number, snapOn = true): { wallId: Id; offset: number; point: Vec2 } | null {
+export function hostUnder(cursor: Vec2, p: Project, levelId: Id, mpp: number, snapOn = true, tolPx = TOL_PX): { wallId: Id; offset: number; point: Vec2 } | null {
   let best: { wallId: Id; offset: number; point: Vec2; d: number } | null = null;
   for (const w of wallsOnLevel(p, levelId)) {
     const near = closestOnWall(w, cursor);
     const type = p.wallTypes[w.typeId];
-    const half = (type ? totalThickness(type) : 0.2) / 2 + (snapOn ? TOL_PX * mpp : 0);
+    const half = (type ? totalThickness(type) : 0.2) / 2 + (snapOn ? tolPx * mpp : 0);
     if (near.dist > half) continue;
     if (!best || near.dist < best.d) best = { wallId: w.id, offset: near.t, point: near.point, d: near.dist };
   }

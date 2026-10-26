@@ -22,9 +22,15 @@ const counter = () => {
 
 const near = (p: Vec2, q: Vec2, tol = 1e-9) => expect(dist(p, q)).toBeLessThan(tol);
 
-/** Verifica que a sequência de segmentos fecha: cada ponta é o início do próximo. */
+/** Cadeia aberta: cada ponta é o início do próximo. */
+function expectChained(segs: SketchSeg[]) {
+  for (let i = 0; i + 1 < segs.length; i++) near(segs[i]!.b, segs[i + 1]!.a);
+}
+
+/** Laço fechado: cadeia + a última ponta volta ao início do primeiro. */
 function expectClosed(segs: SketchSeg[]) {
-  for (let i = 0; i < segs.length; i++) near(segs[i]!.b, segs[(i + 1) % segs.length]!.a);
+  expectChained(segs);
+  near(segs[segs.length - 1]!.b, segs[0]!.a);
 }
 
 /** Área (valor absoluto) do polígono formado pelas pontas, na ordem das linhas. */
@@ -130,9 +136,9 @@ describe('circumscribedPolygon', () => {
     }
   });
 
-  it('inscrito e circunscrito com o mesmo número de lados: área circunscrita > inscrita', () => {
+  it('mesmo círculo (raio 1): área circunscrita > inscrita, com o mesmo número de lados', () => {
     const inn = inscribedPolygon({ x: 0, y: 0 }, { x: 1, y: 0 }, 5);
-    const out = circumscribedPolygon({ x: 0, y: 0 }, { x: Math.cos(Math.PI / 5), y: Math.sin(Math.PI / 5) * 0 }, 5);
+    const out = circumscribedPolygon({ x: 0, y: 0 }, { x: 1, y: 0 }, 5);
     expect(areaOf(out)).toBeGreaterThan(areaOf(inn));
   });
 
@@ -182,7 +188,7 @@ describe('arcThreePoints', () => {
     // Início (1,0), fim (0,1) e ponto (−1,0): o caminho pelo ponto dá 270°.
     const segs = arcThreePoints({ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 });
     expect(segs).toHaveLength(2);
-    expectClosed(segs);
+    expectChained(segs);
     near(segs[0]!.a, { x: 1, y: 0 });
     near(segs[1]!.b, { x: 0, y: 1 });
     const total = segs.reduce((s, g) => s + arcOf(g).length, 0);
@@ -209,7 +215,7 @@ describe('arcCenterEnds', () => {
   it('o mesmo par no sentido horário dá 270° (dois arcos)', () => {
     const segs = arcCenterEnds({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, false);
     expect(segs).toHaveLength(2);
-    expectClosed(segs);
+    expectChained(segs);
     const total = segs.reduce((s, g) => s + arcOf(g).length, 0);
     expect(total).toBeCloseTo(1.5 * Math.PI, 9);
     near(segs[0]!.a, { x: 1, y: 0 });
@@ -243,7 +249,7 @@ describe('arcTangent', () => {
     for (const [s, dir, e] of cases) {
       const segs = arcTangent(s, dir, e);
       expect(segs.length).toBeGreaterThan(0);
-      expectClosed(segs);
+      expectChained(segs);
       near(segs[0]!.a, s);
       near(segs[segs.length - 1]!.b, e);
       const u = { x: dir.x / Math.hypot(dir.x, dir.y), y: dir.y / Math.hypot(dir.x, dir.y) };
@@ -294,10 +300,8 @@ describe('filletShape', () => {
     const ub = { x: -1.5, y: 3 * Math.sin((2 * Math.PI) / 3) };
     const dB = Math.abs(ub.x * g.center.y - ub.y * g.center.x) / Math.hypot(ub.x, ub.y);
     expect(dB).toBeCloseTo(0.5, 9);
-    // Tangência: o raio até o ponto de tangência é perpendicular à linha.
-    const ta = r!.arc.a;
-    expect(Math.abs((ta.x - g.center.x) * 1 + (ta.y - g.center.y) * 0)).toBeCloseTo(0.5 * 0 + Math.abs(ta.x - g.center.x), 9);
-    near(ta, { x: g.center.x, y: 0 }, 1e-9);
+    // Tangência em A (eixo x): o ponto de tangência é a projeção do centro sobre a reta.
+    near(r!.arc.a, { x: g.center.x, y: 0 }, 1e-9);
   });
 
   it('linha dentro do canto (ponto P no meio de uma linha) é null', () => {

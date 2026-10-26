@@ -2,7 +2,7 @@ import { dist, type SketchDraft, type SketchLoop, type SketchSeg, type Vec2 } fr
 import { worldToScreen, type Viewport } from '../viewport.ts';
 import { fmtPercent } from './roofs.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
-import { edgeFrame, outerLoop, outwardNormal } from './sketchGeom.ts';
+import { edgeFrame, outwardNormal } from './sketchGeom.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 
 /**

@@ -48,6 +48,8 @@ function vãos(hostId: string, kind: 'door' | 'window', prefixo: string): Openin
 export function esquadrias(cmds: Command[]): void {
   // Um nível: o mostruário é uma planta única.
   cmds.push({ type: 'deleteLevel', id: 'lv_1' });
+  // Etiquetas de código ligadas: no mostruário o código é o jeito de saber qual tipo está em cada vão.
+  cmds.push({ type: 'setSettings', patch: { showOpeningTags: true } });
   const portas = parede('eq_w_portas', 0);
   const janelas = parede('eq_w_janelas', Y_JANELAS);
   cmds.push({ type: 'addWall', wall: portas }, { type: 'addWall', wall: janelas });

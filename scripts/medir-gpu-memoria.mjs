@@ -1,9 +1,12 @@
-// Medição de GPU e de memória do navegador (linha de base antes da onda 5): quantas chamadas de desenho (draw calls),
-// triângulos e malhas a planta e a 3D enviam por quadro, e quanta memória a aba e o Chrome usam, nos projetos sintéticos
-// de 10, 20 e 30 pavimentos (scripts/perf-baselines/projeto-sintetico.mts).
+// Medição de GPU e de memória do navegador: quantas chamadas de desenho (draw calls), triângulos e malhas a planta e a 3D
+// enviam por quadro, e quanta memória a aba e o Chrome usam, nos projetos sintéticos gerados por
+// scripts/perf-baselines/projeto-sintetico.mts.
 //   npm run medir:gpu                  (mede e grava scripts/perf-baselines/gpu-memoria-<rotulo>.json)
 //   Variáveis: PERF_ROTULO (rótulo do arquivo, padrão `antes`), PERF_RUNS (repetições por cenário, padrão 3),
 //   CHROME_PATH (Chrome ou Edge), APP_URL (padrão: apps/web/dist, o build de produção), PERF_HEADED=1 (janela visível),
+//   MEDIR_PROJETOS (lista de cenários, padrão `10,20,30`; cada item é `pavimentos` ou `pavimentos:paredesPorPavimento`,
+//     ex.: `10,30:128,60:256`; MEDIR_PAREDES define as paredes de quem não traz `:paredes`, padrão 32),
+//   MEDIR_TIMEOUT_MS (espera por app/cena, padrão 120000), MEDIR_ESPERA_3D_MS (espera da montagem 3D, padrão 2000),
 //   MEDIR_VITE_NODE_CONFIG (config extra do vite-node; só para worktree sem node_modules, ver o relatório da frente).
 // Método:
 //   - Draw calls e triângulos: a página intercepta as chamadas de desenho do WebGL2 (drawArrays, drawElements e as
@@ -28,10 +31,44 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUNS = Math.max(1, Number(process.env.PERF_RUNS ?? 3));
 const ROTULO = (process.env.PERF_ROTULO ?? 'antes').replace(/[^\w-]/g, '-');
 const SAVE = process.argv.includes('--save');
-const PROJETOS = [10, 20, 30];
 const JANELA_PLANTA_MS = 800;
 const JANELA_3D_MS = 1200;
+const TIMEOUT_MS = Math.max(5000, Number(process.env.MEDIR_TIMEOUT_MS ?? 120000));
+const ESPERA_3D_MS = Math.max(0, Number(process.env.MEDIR_ESPERA_3D_MS ?? 2000));
 const MB = (bytes) => Number((bytes / 2 ** 20).toFixed(1));
+
+/**
+ * Cenários a medir: `MEDIR_PROJETOS` separado por vírgula, cada item `pavimentos` ou
+ * `pavimentos:paredesPorPavimento`. `MEDIR_PAREDES` vale para quem não traz `:paredes`. Padrão: 10, 20 e 30
+ * pavimentos × 32 paredes (o comportamento anterior).
+ */
+function lerCenarios() {
+  const bruto = process.env.MEDIR_PROJETOS ?? '10,20,30';
+  const paredesPadrao = Number(process.env.MEDIR_PAREDES ?? 32);
+  if (!Number.isInteger(paredesPadrao) || paredesPadrao < 4) throw new Error(`MEDIR_PAREDES deve ser inteiro ≥ 4; recebi "${process.env.MEDIR_PAREDES}".`);
+  const vistos = new Set();
+  return bruto
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => {
+      const [pav, par] = t.split(':');
+      const pavimentos = Number(pav);
+      const paredes = par === undefined || par === '' ? paredesPadrao : Number(par);
+      if (!Number.isInteger(pavimentos) || pavimentos < 1) throw new Error(`Cenário "${t}": pavimentos deve ser inteiro ≥ 1.`);
+      if (!Number.isInteger(paredes) || paredes < 4) throw new Error(`Cenário "${t}": paredes deve ser inteiro ≥ 4.`);
+      return { pavimentos, paredes };
+    })
+    .filter((c) => {
+      const chave = `${c.pavimentos}:${c.paredes}`;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+}
+const CENARIOS = lerCenarios();
+/** Chave do cenário no JSON; mantém `10Pavimentos` para o padrão e diferencia quando há outra contagem de paredes. */
+const chaveCenario = (c) => (c.paredes === 32 ? `${c.pavimentos}Pavimentos` : `${c.pavimentos}Pavimentos-${c.paredes}Paredes`);
 
 /** Mediana (metade inferior em par), mínimo e máximo de uma lista de números. */
 const mediana = (v) => {
@@ -63,19 +100,22 @@ function acharApp() {
   return existsSync(dist) ? pathToFileURL(dist).href : null;
 }
 
-/** Gera o projeto de `n` pavimentos com o gerador da frente de desempenho e devolve o texto do .hestia.json. */
-function gerarProjeto(n) {
+/** Gera o projeto de `n` pavimentos × `paredes` paredes por pavimento e devolve o texto, o tamanho e o tempo. */
+function gerarProjeto(n, paredes) {
   const requerer = createRequire(import.meta.url);
   const pastaVN = path.dirname(requerer.resolve('vite-node/package.json'));
   const bin = path.join(pastaVN, 'vite-node.mjs');
   const cfg = process.env.MEDIR_VITE_NODE_CONFIG ? ['-c', process.env.MEDIR_VITE_NODE_CONFIG] : [];
-  const saida = path.join(os.tmpdir(), `hestia-gpu-${n}.hestia.json`);
+  const saida = path.join(os.tmpdir(), `hestia-gpu-${n}-${paredes}.hestia.json`);
+  const inicio = Date.now();
   execFileSync(process.execPath, [bin, ...cfg, 'scripts/perf-baselines/projeto-sintetico.mts', String(n)], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, PROJETO_SAIDA: saida },
+    env: { ...process.env, PROJETO_SAIDA: saida, PROJETO_PAVIMENTOS: String(n), PROJETO_PAREDES: String(paredes) },
   });
-  return readFileSync(saida, 'utf8');
+  const geracaoMs = Date.now() - inicio;
+  const texto = readFileSync(saida, 'utf8');
+  return { texto, bytes: Buffer.byteLength(texto), geracaoMs };
 }
 
 /** Soma de WorkingSetSize da árvore do Chrome que tem a marca na linha de comando (só Windows; null nos demais). */
@@ -186,21 +226,48 @@ const contarMalhas3d = (page) => page.evaluate(() => {
   return { total, visiveis, triangulosGeometria: Math.round(triangulos) };
 });
 
+/**
+ * Espera a montagem progressiva da 3D parar de acrescentar malhas (a cena monta por fatias; medir no meio subestima
+ * draw calls e malhas). Considera estável depois de 1,5 s sem mudança; devolve o total e o tempo de espera.
+ */
+async function esperarCena3dEstavel(page, timeoutMs) {
+  const inicio = Date.now();
+  let anterior = -1;
+  let desde = Date.now();
+  for (;;) {
+    const total = await page.evaluate(() => {
+      let n = 0;
+      window.__hestia3dModel?.scene.traverse((o) => { if (o.isMesh) n++; });
+      return n;
+    });
+    if (total !== anterior) {
+      anterior = total;
+      desde = Date.now();
+    } else if (Date.now() - desde >= 1500) {
+      return { total, ms: Date.now() - inicio, estavel: true };
+    }
+    if (Date.now() - inicio >= timeoutMs) return { total: anterior, ms: Date.now() - inicio, estavel: false };
+    await page.waitForTimeout(250);
+  }
+}
+
 /** Id do pavimento i (mesma convenção de projeto-sintetico.mts). */
 const idNivel = (i) => (i === 0 ? 'lv_0' : i === 1 ? 'lv_1' : `perf_lv_${i}`);
 
 /** Medição de um projeto: planta e 3D (draw calls, triângulos, malhas) e memória (pico e estável). */
-async function medirProjeto(browser, app, n, pendencias, amostrador) {
-  const rotulo = `${n} pav`;
-  const texto = gerarProjeto(n);
+async function medirProjeto(browser, app, cenario, pendencias, amostrador) {
+  const { pavimentos: n, paredes } = cenario;
+  const rotulo = `${n} pav × ${paredes} paredes`;
+  const arquivo = gerarProjeto(n, paredes);
+  const texto = arquivo.texto;
   const idMeio = idNivel(Math.floor(n / 2));
   const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
   const erros = [];
   page.on('pageerror', (e) => erros.push(e.message));
   await page.addInitScript(INSTRUMENTO);
   await page.goto(`${app}?debug=1`);
-  await page.waitForSelector('.canvas-wrap canvas', { timeout: 60000 });
-  await page.waitForFunction(() => window.__hestia, null, { timeout: 60000 });
+  await page.waitForSelector('.canvas-wrap canvas', { timeout: TIMEOUT_MS });
+  await page.waitForFunction(() => window.__hestia, null, { timeout: TIMEOUT_MS });
   const cdp = await page.context().newCDPSession(page);
   const heapCDP = async () => {
     await cdp.send('HeapProfiler.collectGarbage');
@@ -214,36 +281,55 @@ async function medirProjeto(browser, app, n, pendencias, amostrador) {
   if (gpu !== 'webgl2' && gpu !== 'webgpu') pendencias.push(`[${rotulo}] sem GPU (backend ${gpu}): draw calls não medidas`);
 
   await page.evaluate(() => { window.__heapPico = 0; });
-  await page.evaluate((t) => {
+  // Abertura: do openFromText ao segundo quadro pintado (mesmo critério do perf-browser).
+  const aberturaMs = await page.evaluate(async (t) => {
+    const t0 = performance.now();
     const ok = window.__hestia.editor.openFromText(t, 'perf.hestia.json');
     if (!ok.ok) throw new Error(ok.error);
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    return performance.now() - t0;
   }, texto);
   await page.waitForTimeout(500);
   const picoAbertura = await page.evaluate(() => window.__heapPico);
   if (erros.length) pendencias.push(`[${rotulo}] erros de página: ${erros.slice(0, 3).join(' | ')}`);
+  const elementos = await page.evaluate(() => {
+    const els = Object.values(window.__hestia.editor.project.elements);
+    const contar = (kind) => els.filter((e) => e.kind === kind).length;
+    return { total: els.length, paredes: contar('wall'), aberturas: els.filter((e) => e.kind === 'door' || e.kind === 'window').length, ambientes: contar('room'), pisos: contar('floor'), lajes: contar('slab'), telhados: contar('roof') };
+  });
 
   const planta = [];
   const modelo = [];
+  // Planta: cada repetição volta ao térreo e troca para o nível do meio (o quadro cheio é o de maior número de draw calls).
   for (let r = 0; r < RUNS; r++) {
-    // Planta: volta ao térreo, depois troca para o nível do meio (o quadro cheio é o de maior número de draw calls).
     await page.evaluate(() => window.__hestia.editor.selectLevel('lv_0'));
     await page.waitForTimeout(JANELA_PLANTA_MS);
     const p = await quadroCheio(page, () => page.evaluate((id) => window.__hestia.editor.selectLevel(id), idMeio), JANELA_PLANTA_MS);
     if (p) planta.push(p);
-    // 3D: troca para a aba, espera a montagem da cena, enquadra e força um quadro novo (o renderer desenha sob demanda:
-    // sem a troca de `previewTick` o quadro cheio pode não sair). O quadro cheio é o de maior número de draw calls.
-    const d = await quadroCheio(
-      page,
-      async () => {
-        await page.locator('button.leaf', { hasText: 'Modelo 3D' }).click();
-        await page.waitForTimeout(2000);
-        await page.evaluate(() => {
-          window.__hestia3dModel.fit();
-          window.__hestia.useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
-        });
-      },
-      JANELA_3D_MS,
-    );
+  }
+  // 3D: abre a vista uma vez, espera a montagem progressiva estabilizar (medir no meio subestima) e repete só o quadro
+  // cheio. Reabrir a vista a cada repetição reiniciava a montagem e deixava a medida dependente de uma fatia parcial.
+  const inicio3d = Date.now();
+  const item3d = page.getByRole('treeitem', { name: 'Modelo 3D' });
+  if (await item3d.count()) await item3d.dblclick();
+  else await page.locator('button.leaf', { hasText: 'Modelo 3D' }).click();
+  await page.waitForFunction(() => window.__hestia3dModel, null, { timeout: TIMEOUT_MS });
+  await page.waitForTimeout(ESPERA_3D_MS);
+  const montagem = await esperarCena3dEstavel(page, TIMEOUT_MS);
+  montagem.ms = Date.now() - inicio3d;
+  if (!montagem.estavel) pendencias.push(`[${rotulo}] 3D: montagem não estabilizou em ${montagem.ms} ms (${montagem.total} malhas)`);
+  // Enquadra e força um quadro novo; o renderer desenha sob demanda. O primeiro quadro depois da montagem atualiza o
+  // shadow map (se ligado) e desenha a cena duas vezes; por isso ele é registrado à parte e serve de aquecimento.
+  const enquadrar = () =>
+    page.evaluate(() => {
+      window.__hestia3dModel.fit();
+      window.__hestia.useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+    });
+  const primeiroQuadro = await quadroCheio(page, enquadrar, JANELA_3D_MS);
+  for (let r = 0; r < RUNS; r++) {
+    // Quadro estável: sem reabrir a vista e com o shadow map já em cache (o custo do primeiro quadro fica em
+    // `primeiroQuadro`). Reabrir a vista a cada repetição reiniciava a montagem e deixava a medida parcial.
+    const d = await quadroCheio(page, enquadrar, JANELA_3D_MS);
     if (d) modelo.push(d);
   }
   const malhas = await contarMalhas3d(page);
@@ -263,9 +349,20 @@ async function medirProjeto(browser, app, n, pendencias, amostrador) {
   if (!modelo.length) pendencias.push(`[${rotulo}] 3D: nenhum quadro com draw call`);
   return {
     pavimentos: n,
-    paredes: n * 32,
+    paredesPorPavimento: paredes,
+    paredes: n * paredes,
+    gpu: gpu === 'webgl2' || gpu === 'webgpu' ? gpu : 'sem-gpu',
+    arquivo: { bytes: arquivo.bytes, mb: Number((arquivo.bytes / 2 ** 20).toFixed(2)), geracaoMs: arquivo.geracaoMs },
+    aberturaMs: Number(aberturaMs.toFixed(1)),
+    elementos,
     planta: resumoDesenho(planta),
-    modelo3d: { ...resumoDesenho(modelo), malhas },
+    modelo3d: {
+      ...resumoDesenho(modelo),
+      primeiroQuadro: resumoDesenho(primeiroQuadro ? [primeiroQuadro] : []),
+      malhas,
+      montagemMs: faixa([montagem.ms]),
+      montagemEstavel: montagem.estavel,
+    },
     memoria: {
       jsHeapMB: { antes: memAntes.jsMB, picoAbertura: MB(picoAbertura), picoTotal: MB(picoTotalJs), estavel: memEstavel.jsMB },
       isolateUsadoMB: { antes: memAntes.isolateMB, estavel: memEstavel.isolateMB },
@@ -301,10 +398,10 @@ const modo = await (async () => {
 if (modo === 'dev') pendencias.push('app é servidor de desenvolvimento: números NÃO são baseline');
 
 // Um amostrador de processos por projeto; o pico do processo é o maior visto durante a medição do projeto.
-for (const n of PROJETOS) {
+for (const cenario of CENARIOS) {
   const amostrador = criarAmostrador(nomeExe, marca);
   try {
-    projetos[`${n}Pavimentos`] = await medirProjeto(browser, app, n, pendencias, amostrador);
+    projetos[chaveCenario(cenario)] = await medirProjeto(browser, app, cenario, pendencias, amostrador);
   } finally {
     amostrador.parar();
   }
@@ -317,11 +414,15 @@ const data = {
   navegador: { executavel: chrome, versao, headless: process.env.PERF_HEADED !== '1' },
   app: { endereco: app, modo },
   maquina: { so: `${os.platform()} ${os.release()}`, cpu: os.cpus()[0]?.model ?? '?', ramTotalGB: Number((os.totalmem() / 2 ** 30).toFixed(1)) },
+  cenarios: CENARIOS,
   metodo: {
     repeticoes: RUNS,
+    gerador: `scripts/perf-baselines/projeto-sintetico.mts (${CENARIOS.map((c) => `${c.pavimentos}×${c.paredes}`).join(', ')})`,
     draws: 'interceptação de drawArrays/drawElements (e instanciadas) do WebGL2, por quadro (rAF); mediana e faixa entre repetições do quadro cheio',
     planta: `nível do meio após troca de nível, viewport do roteiro de navegador (zoom 30)`,
-    modelo3d: 'troca para a aba 3D e enquadramento (fit), quadro cheio entre repetições',
+    modelo3d: `troca para a aba 3D, espera de ${ESPERA_3D_MS} ms e espera a montagem progressiva estabilizar (malhas paradas por 1,5 s) antes do enquadramento (fit); o primeiro quadro depois da montagem (com atualização do shadow map) vai em primeiroQuadro, e as repetições seguintes medem o quadro estável`,
+    montagem3d: 'da abertura da vista (depois de MEDIR_ESPERA_3D_MS) até a contagem de malhas parar por 1,5 s (limite: MEDIR_TIMEOUT_MS)',
+    abertura: 'openFromText até o segundo quadro pintado (rAF duplo), na página já carregada',
     malhas: 'Mesh na cena do ModelScene (apenas 3D)',
     memoria: 'heap JS (performance.memory, pico amostrado a 50 ms; neste Chrome o valor não acompanha o projeto, ver isolateUsadoMB) e heap do V8 via CDP (Runtime.getHeapUsage) após coleta de lixo; processos do Chrome por WorkingSetSize (Windows)',
   },

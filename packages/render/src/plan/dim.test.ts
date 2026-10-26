@@ -17,7 +17,7 @@ describe('dimPlanOps', () => {
 
   it('mantém a geometria e só troca as cores', () => {
     const o = dimPlanOps(
-      { fills: [{ polygons: [[[{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]]], color: '#b45309', alpha: 1, hatch: { kind: 'diag', color: '#16181c' } }], strokes: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 1 }], closed: false, widthPx: 2, color: '#000000', alpha: 1 }], labels: [] },
+      { fills: [{ polygons: [[[{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]]], color: '#b45309', alpha: 1, hatch: { kind: 'diagonal', color: '#16181c' } }], strokes: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 1 }], closed: false, widthPx: 2, color: '#000000', alpha: 1 }], labels: [] },
       '#fbfbfa',
     );
     expect(o.strokes[0]!.widthPx).toBe(2);

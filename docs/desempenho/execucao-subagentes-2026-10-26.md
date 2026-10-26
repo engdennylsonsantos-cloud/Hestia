@@ -11,9 +11,9 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — S0 e S1 concluídos e integrados; S2 e A2 em execução.
-**Em execução:** S2 (projeto grande), A2 (verificação visual).
-**Próxima ação:** aguardar S2, rodar M0 com a instrumentação do S1 e fechar G0.
+**Última atualização:** 2026-10-26 — S0 e S1 integrados; A1 adiantado; S2 e A2 em execução.
+**Em execução:** S2 (projeto grande), A2 (verificação visual), A1 (inserção/abertura).
+**Próxima ação:** aguardar S2/A2/A1; rodar M0 com a instrumentação do S1 e fechar G0.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|

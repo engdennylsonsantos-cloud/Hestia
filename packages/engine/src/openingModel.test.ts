@@ -231,6 +231,74 @@ describe('buildOpeningModel: porta dupla, pivotante, correr e vão livre', () =>
   });
 });
 
+describe('buildOpeningModel: janelas', () => {
+  it('fixa: caixilho, vidro no vão interno e item kind fixed', () => {
+    const c = cena('ot_jfixa60');
+    const m = modelo(c);
+    expect(de(m.parts, 'jamb')).toHaveLength(2);
+    expect(de(m.parts, 'head')).toHaveLength(1);
+    expect(de(m.parts, 'sillFrame')).toHaveLength(1);
+    expect(de(m.parts, 'glass')).toHaveLength(1);
+    expect(de(m.parts, 'leaf')).toHaveLength(0);
+    const g = de(m.parts, 'glass')[0]!;
+    expect(largura(g.box)).toBeCloseTo(0.5, 9);
+    expect(g.box.z0).toBeCloseTo(0.05, 9);
+    expect(g.box.z1).toBeCloseTo(0.55, 9);
+    expect(m.openings[0]!.kind).toBe('fixed');
+  });
+
+  it('maxim-ar: moldura de folha com vidro, eixo no topo e kind top', () => {
+    const c = cena('ot_j60');
+    const m = modelo(c);
+    expect(de(m.parts, 'leaf')).toHaveLength(4);
+    expect(de(m.parts, 'glass')).toHaveLength(1);
+    const a = m.openings[0]!;
+    expect(a.kind).toBe('top');
+    const folha = de(m.parts, 'leaf')[0]!;
+    const motion = folha.motion;
+    if (!motion || motion.kind !== 'rotate' || motion.axis !== 't') throw new Error('maxim-ar sem giro em t');
+    expect(motion.z).toBeCloseTo(c.g.height - 0.05, 9);
+    expect(motion.s).toBeCloseTo(0, 9);
+    expect(motion.sign).toBe(1);
+  });
+
+  it('basculante: eixo na base e kind bottom', () => {
+    const c = cena('ot_j60', { plan: 'tilt' });
+    const m = modelo(c);
+    expect(m.openings[0]!.kind).toBe('bottom');
+    const motion = de(m.parts, 'leaf')[0]!.motion;
+    if (!motion || motion.kind !== 'rotate' || motion.axis !== 't') throw new Error('basculante sem giro em t');
+    expect(motion.z).toBeCloseTo(0.05, 9);
+    expect(motion.sign).toBe(-1);
+  });
+
+  it('correr 2 e 3 folhas: folhas em pistas defasadas, trilhos e itens de correr', () => {
+    for (const [id, n] of [
+      ['ot_j120', 2],
+      ['ot_j240', 3],
+    ] as const) {
+      const c = cena(id);
+      const m = modelo(c);
+      expect(de(m.parts, 'glass'), id).toHaveLength(n);
+      expect(de(m.parts, 'leaf'), id).toHaveLength(4 * n);
+      expect(de(m.parts, 'track'), id).toHaveLength(2);
+      expect(m.openings.filter((x) => x.kind === 'slide'), id).toHaveLength(n);
+      const vidros = de(m.parts, 'glass');
+      const sCenters = vidros.map((x) => (x.box.s0 + x.box.s1) / 2);
+      expect(new Set(sCenters.map((x) => Math.round(x * 1000))).size, id).toBe(n);
+    }
+  });
+
+  it('vão livre de janela: só a soleira, sem batente, folha ou vidro', () => {
+    const c = cena('ot_jv120');
+    const m = modelo(c);
+    expect(m.void).toBe(true);
+    expect(de(m.parts, 'sillFrame')).toHaveLength(1);
+    expect(m.parts.some((x) => x.role === 'jamb' || x.role === 'head' || x.role === 'leaf' || x.role === 'glass')).toBe(false);
+    expect(m.openings).toHaveLength(0);
+  });
+});
+
 describe('buildOpeningModel: geometria do batente no núcleo', () => {
   it('profundidade do batente limitada ao núcleo (DEC-1): D = 0,09 < 0,14', () => {
     const c = cena('ot_p90');

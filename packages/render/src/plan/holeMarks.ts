@@ -1,6 +1,6 @@
 import { voidCrossPaths, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { DetailLevel } from '@hestia/model';
-import type { PlanPaint } from './style.ts';
+import { espessuraDeProjecao, type PlanPaint } from './style.ts';
 import type { PlanTheme, StrokeOp } from './types.ts';
 
 /**
@@ -16,7 +16,7 @@ export function holeMarkOps(polygon: MultiPolygon, theme: PlanTheme, paint: Plan
     for (const hole of poly.slice(1)) {
       const q = quadOf(hole);
       if (!q) continue;
-      for (const seg of voidCrossPaths(q)) out.push({ pts: seg, closed: false, widthPx: paint.projPx, color: theme.inkSoft, alpha: 1 });
+      for (const seg of voidCrossPaths(q)) out.push({ pts: seg, closed: false, ...espessuraDeProjecao(paint), color: theme.inkSoft, alpha: 1 });
     }
   }
   return out;

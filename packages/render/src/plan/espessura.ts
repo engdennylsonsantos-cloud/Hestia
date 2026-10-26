@@ -13,7 +13,15 @@ export function kPapel(peso: PesoPapel): number {
 
 /** Largura em pixels de tela de um traço no `zoom` dado: a do papel (piso de 1 px) se há `papel`, senão `widthPx`. */
 export function larguraEmPx(s: Pick<StrokeOp, 'widthPx' | 'papel'>, zoom: number): number {
-  return s.papel ? paperMmToPx(s.papel.mm, zoom, s.papel.escala) : s.widthPx;
+  const pp = s.papel;
+  if (!pp) return s.widthPx;
+  const w = paperMmToPx(pp.mm, zoom, pp.escala) * (pp.fator ?? 1);
+  return pp.teto !== undefined ? Math.min(pp.teto, w) : w;
+}
+
+/** Espessura `e` multiplicada por `fator` (largura em px e peso de papel): a largura do símbolo é o peso vezes a da categoria. */
+export function espessuraVezes(e: Espessura, fator: number): Espessura {
+  return e.papel ? { widthPx: e.widthPx * fator, papel: { ...e.papel, fator: (e.papel.fator ?? 1) * fator } } : { widthPx: e.widthPx * fator };
 }
 
 /** Espessura de papel de `mm` na escala 1:`escala`, com a largura em px já calculada para o `zoom` de construção. */

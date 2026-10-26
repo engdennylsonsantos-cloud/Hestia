@@ -1,6 +1,6 @@
-import { boxOf, ringArea, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { boxOf, ringArea, type MultiPolygon, type Ring } from '@hestia/geom';
 import { cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { levelDimensions, levelRoomSeparators, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -18,7 +18,10 @@ import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import { noteOps } from './notes.ts';
 import { openingViewOps, wallOutlineOps } from './view.ts';
-import { paintOps, surfaceColor, type PlanPaint } from './style.ts';
+import { espessuraDeCorte, espessuraDeProjecao, paintOps, surfaceColor, type PlanPaint } from './style.ts';
+import { espessuraAtinge, Limiares, zoomAtinge, type VistaComLimiares } from './limiares.ts';
+import { tracoEm } from './marcadores.ts';
+import { resolverZoom } from './zoomOps.ts';
 import { planContext } from './planContext.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
 
@@ -72,8 +75,8 @@ export interface PlanInput {
 
 const ringsOf = (m: MultiPolygon): Ring[] => m.flatMap((p) => p);
 
-/** Espessura equivalente (2·área/perímetro) em pixels: decide quanto detalhe vale a pena desenhar. */
-function thicknessPx(poly: Ring[], zoom: number): number {
+/** Espessura equivalente (2·área/perímetro) em metros: com o zoom, decide quanto detalhe vale a pena desenhar. */
+function espessuraEquivalente(poly: Ring[]): number {
   const outer = poly[0];
   if (!outer) return 0;
   let per = 0;
@@ -82,7 +85,29 @@ function thicknessPx(poly: Ring[], zoom: number): number {
     const b = outer[(i + 1) % outer.length]!;
     per += Math.hypot(a.x - b.x, a.y - b.y);
   }
-  return per > 0 ? ((2 * Math.abs(ringArea(outer))) / per) * zoom : 0;
+  return per > 0 ? (2 * Math.abs(ringArea(outer))) / per : 0;
+}
+
+/** Zoom máximo da vista (px/m): acima dele nada muda, então o que só aparece além dele nunca é desenhado. */
+const ZOOM_MAXIMO = 4000;
+
+/** Zoom (px/m) em que uma região de espessura equivalente `emMetros` chega a `px` pixels; `Infinity` se ela não tem espessura. */
+const zoomDaEspessura = (emMetros: number, px: number): number => (emMetros > 0 ? px / emMetros : Number.POSITIVE_INFINITY);
+
+/**
+ * Hachura de uma região de parede (decisão 0015 §2.2): no fino, sempre; nos demais, a partir de 40 px/m e só onde a região
+ * tem 5 px de espessura equivalente. O 40 é um limiar da geometria (ela só ganha hachura a partir dele); os 5 px viram o
+ * `zoomMin` da hachura, que o shader aplica com o zoom corrente. Hachura sólida é só cor de preenchimento (não tem o que
+ * esconder no shader), então a espessura de 5 px continua sendo decidida na geometria (limiar registrado).
+ */
+function hachuraDaRegiao(v: Viewport, m: Material | undefined, espessura: number, fine: boolean, color: string): FillOp['hatch'] {
+  if (!m || m.hatch === 'none') return undefined;
+  if (fine) return { kind: m.hatch, color };
+  if (m.hatch === 'solid') return espessuraAtinge(v, espessura, 5) && zoomAtinge(v, 40) ? { kind: m.hatch, color } : undefined;
+  if (!zoomAtinge(v, 40)) return undefined;
+  const zoomMin = zoomDaEspessura(espessura, 5);
+  if (zoomMin > ZOOM_MAXIMO) return undefined;
+  return { kind: m.hatch, color, ...(zoomMin > 40 ? { zoomMin } : {}) };
 }
 
 /**
@@ -97,11 +122,14 @@ export function planGeometrySelection(p: Project, levelId: Id, selection: readon
 
 /**
  * Geometria do nível (decisão 0013, D1–D6): pisos, lajes, ambientes, escadas, paredes, aberturas, telhados, forros,
- * cotas e etiquetas. Não depende de pan, de seleção (exceto as cotas), de cursor, de ferramenta nem da grade; o zoom
- * entra porque o desenho usa tamanhos em pixels de tela. A sobreposição fica em `buildPlanOverlay`.
+ * cotas e etiquetas. Não depende de pan, de seleção (exceto as cotas), de cursor, de ferramenta nem da grade. O zoom só
+ * entra nas decisões de detalhe (hachura, interface entre materiais), registradas em `limiares`; faixas, marcadores e
+ * rótulos saem em papel e em pixels, e `resolverZoom` os converte (ver `zoomOps.ts`). A sobreposição fica em `buildPlanOverlay`.
  */
 export function buildPlanGeometry(input: PlanInput): PlanOps {
-  const { project: p, viewport: v, theme } = input;
+  const { project: p, theme } = input;
+  const limiares = new Limiares();
+  const v: VistaComLimiares = { ...input.viewport, limiares };
   const fills: FillOp[] = [];
   const strokes: StrokeOp[] = [];
   const labels: LabelOp[] = [];
@@ -177,7 +205,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Lajes e pisos pela cota da face superior (decisão 0023 §3): o mais alto desenha por último; pisos antes das paredes.
   for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint, style.scale)) addOps(sf.ops, sf.paint, !rp);
   // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
-  addOps(roomOps(p, input.levelId, theme, input.dark, detail, v.zoom, style.scale, hidden, paint.room), paint.room, !rp);
+  addOps(roomOps(p, input.levelId, theme, input.dark, detail, style.scale, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
   addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
   // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
@@ -194,20 +222,21 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       const m = p.materials[r.materialId];
       const color = surfaceColor(m?.color ?? '#999999', fillBase, fillT, paint.wall);
       const polys = r.polygons;
-      const thick = Math.max(0, ...polys.map((poly) => thicknessPx(poly, v.zoom)));
-      const hatchOn = m && m.hatch !== 'none' && (fine || (thick >= 5 && v.zoom >= 40));
-      const hatch = hatchOn ? { kind: m.hatch, color: mix(paint.wall.color ?? m.color, input.dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+      const thick = Math.max(0, ...polys.map((poly) => espessuraEquivalente(poly)));
+      const hatch = hachuraDaRegiao(v, m, thick, fine, mix(paint.wall.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45));
       wallOps.fills.push({ polygons: polys, color, alpha: 1, hatch });
       // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre). Linhas finas: peso de projeção.
+      // O traço leva o zoom a partir do qual cabe (`zoomMin`) e o shader o esconde abaixo dele: a geometria não muda com o zoom.
       for (const poly of polys) {
-        if (!fine && thicknessPx(poly, v.zoom) < 1.6) continue;
-        for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: mix(theme.ink, fillBase, 0.35), alpha: 1 });
+        const zoomMin = fine ? undefined : zoomDaEspessura(espessuraEquivalente(poly), 1.6);
+        if (zoomMin !== undefined && zoomMin > ZOOM_MAXIMO) continue;
+        for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: mix(theme.ink, fillBase, 0.35), alpha: 1, ...(zoomMin !== undefined ? { zoomMin } : {}) });
       }
     }
     for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.cut, color: theme.ink, alpha: 1 });
   }
   // Paredes fora do corte (decisão 0013 §4): contorno; projeção acima tracejada, abaixo e "além" em linha clara.
-  if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, paint.wall.projPx));
+  if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, espessuraDeProjecao(paint.wall)));
 
   // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino, paredes cortadas).
   if (fine && !rp) {
@@ -223,10 +252,11 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
     if (hidden?.has(w.id)) continue;
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
       if (!off) continue;
-      const r = 5 / v.zoom;
-      const ring: Vec2[] = Array.from({ length: 12 }, (_, i) => ({ x: pt.x + Math.cos((i * Math.PI) / 6) * r, y: pt.y + Math.sin((i * Math.PI) / 6) * r }));
-      strokes.push({ pts: ring, closed: true, widthPx: 1.4, color: theme.guide, alpha: 0.95 });
-      strokes.push({ pts: [{ x: pt.x - r * 0.7, y: pt.y - r * 0.7 }, { x: pt.x + r * 0.7, y: pt.y + r * 0.7 }], closed: false, widthPx: 1.4, color: theme.guide, alpha: 0.95 });
+      // Anel de 5 px de raio e uma diagonal: marcadores em pixels ancorados na ponta (mesmo tamanho para qualquer zoom).
+      const r = 5;
+      const anel = Array.from({ length: 12 }, (_, i) => ({ x: Math.cos((i * Math.PI) / 6) * r, y: Math.sin((i * Math.PI) / 6) * r }));
+      strokes.push({ ...tracoEm(pt, anel, true), widthPx: 1.4, color: theme.guide, alpha: 0.95 });
+      strokes.push({ ...tracoEm(pt, [{ x: -r * 0.7, y: -r * 0.7 }, { x: r * 0.7, y: r * 0.7 }], false), widthPx: 1.4, color: theme.guide, alpha: 0.95 });
     }
   }
 
@@ -239,7 +269,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       for (const o of aberturasDaParede(p, w.id)) {
         const g = openingGeometry(p, o, f);
         const pt = paint[g.kind];
-        const sym = openingViewOps(g, view?.cls.get(o.id), theme, { cutPx: pt.cutPx, projPx: pt.projPx });
+        const sym = openingViewOps(g, view?.cls.get(o.id), theme, { cut: espessuraDeCorte(pt), proj: espessuraDeProjecao(pt) });
         strokes.push(...paintOps({ fills: [], strokes: sym, labels: [] }, pt, fillBase).strokes);
       }
     }
@@ -261,24 +291,24 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria
   // 'anotação' (visibilidade, cor e peso) e a escala da vista, com geometria em mm de papel.
-  const marks = sectionMarksOf(p, v, theme, paint.annotation, style.scale, input.selection);
+  const marks = sectionMarksOf(p, theme, paint.annotation, style.scale, input.selection);
   fills.push(...marks.fills);
   strokes.push(...marks.strokes);
   labels.push(...marks.labels);
 
   // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'.
-  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, selection: input.selection }, v.zoom, style.scale);
+  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, selection: input.selection }, style.scale);
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
 
   // Etiquetas de tipo (G4) seguem a categoria 'anotação' (visibilidade e mm de papel).
-  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, paint.annotation, style.scale, hidden));
+  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,
   // pré-visualização e guias) mantém a largura própria.
   if (input.thinLines) thinStrokes(strokes);
-  return { fills, strokes, labels };
+  return { fills, strokes, labels, limiares: limiares.lista() };
 }
 
 /**
@@ -286,8 +316,9 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
  * usa: separa as camadas (ver `PlanFrame`). Continua para a plotagem, o modo CPU e os testes.
  */
 export function buildPlanDrawList(input: PlanInput): PlanDrawList {
-  const g = buildPlanGeometry(input);
-  const o = buildPlanOverlay(input);
+  const zoom = input.viewport.zoom;
+  const g = resolverZoom(buildPlanGeometry(input), zoom);
+  const o = resolverZoom(buildPlanOverlay(input), zoom);
   const grid = input.showGrid ? gridStrokes(input.viewport, input.theme) : [];
   return {
     background: input.theme.bg,

@@ -44,8 +44,8 @@ describe('linha de separação selecionada na planta', () => {
   it('noteOps usa look.selection para destacar a linha selecionada', () => {
     const p = comSeparador().project;
     const pt = defaultPaint('annotation', ZOOM);
-    const sel = noteOps(p, LV0, pt, { ...LOOK, selection: ['s1'] }, ZOOM, SCALE).strokes.filter((s) => s.dash);
-    const nao = noteOps(p, LV0, pt, LOOK, ZOOM, SCALE).strokes.filter((s) => s.dash);
+    const sel = noteOps(p, LV0, pt, { ...LOOK, selection: ['s1'] }, SCALE).strokes.filter((s) => s.dash);
+    const nao = noteOps(p, LV0, pt, LOOK, SCALE).strokes.filter((s) => s.dash);
     expect(sel).toHaveLength(1);
     expect(sel[0]!.color).toBe(SELECT);
     expect(sel[0]!.widthPx).toBeGreaterThan(nao[0]!.widthPx);

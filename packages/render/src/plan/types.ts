@@ -5,19 +5,37 @@ export interface FillOp {
   polygons: MultiPolygon;
   color: string;
   alpha: number;
-  /** Hachura por cima do preenchimento; `alpha` (0..1) é a transparência da categoria (decisão 0015 §2.4). */
-  hatch?: { kind: HatchKind; color: string; alpha?: number };
+  /**
+   * Hachura por cima do preenchimento; `alpha` (0..1) é a transparência da categoria (decisão 0015 §2.4). `zoomMin`: só
+   * aparece a partir deste zoom (px/m): o shader a esconde abaixo dele, e a geometria não muda com o zoom.
+   */
+  hatch?: { kind: HatchKind; color: string; alpha?: number; zoomMin?: number };
   /** Faixa de contorno do elemento (não é superfície): fica no estilo arame e não sofre a transparência da categoria. */
   contour?: boolean;
+  /**
+   * Faixa de contorno em papel: `polygons` é a região do elemento, e a faixa (que `contour` marca) é a região menos o
+   * recuo dela pela espessura corrente (`larguraEmPx`), calculada com o zoom por quem consome (`resolverZoom`, ou a
+   * cena da GPU). Assim a geometria do nível não guarda polígono nenhum que dependa do zoom.
+   */
+  faixa?: Espessura;
+  /**
+   * Marcador em pixels de tela: o mesmo formato de `polygons`; cada vértice sai deslocado de `deslocamentoPx / zoom`
+   * (em metros) da posição de `polygons`. O tamanho do marcador não muda com o zoom na tela.
+   */
+  deslocamentoPx?: Vec2[][][];
 }
 
 /**
- * Espessura em mm de papel na escala 1:`escala`. A GPU converte com o zoom corrente (piso de 1 px), então o zoom não
- * entra na geometria do traço.
+ * Espessura em mm de papel na escala 1:`escala`. A GPU converte com o zoom corrente (piso de 1 px, depois `fator` e
+ * `teto`), então o zoom não entra na geometria do traço.
  */
 export interface PesoPapel {
   mm: number;
   escala: number;
+  /** Fator sobre a largura já com o piso de 1 px (peso do traço dentro de um símbolo, seleção); ausente = 1. */
+  fator?: number;
+  /** Largura máxima em px (linhas finas da tela: nunca passam de 1 px); ausente = sem teto. */
+  teto?: number;
 }
 
 /** Espessura de um traço: `widthPx` é a largura em pixels no zoom de construção; `papel`, quando existe, manda na GPU. */
@@ -40,6 +58,20 @@ export interface StrokeOp {
   alpha: number;
   /** [traço, vão] em pixels. */
   dash?: [number, number];
+  /** Marcador em pixels de tela: cada ponto sai deslocado de `deslocamentoPx[i] / zoom` (m); mesmo tamanho para qualquer zoom. */
+  deslocamentoPx?: Vec2[];
+  /** Só aparece a partir deste zoom (px/m): o shader esconde o traço abaixo dele; ausente = sempre. */
+  zoomMin?: number;
+}
+
+/**
+ * Medidas de um rótulo em mm de papel (a conta com o zoom e a escala é feita no quadro, não na geometria): o corpo da
+ * fonte e um deslocamento ao longo de (`ux`, `uy`). `ux` e `uy` ausentes não geram `dx` e `dy`.
+ */
+export interface PapelRotulo {
+  escala: number;
+  fontMm?: number;
+  desvio?: { mm: number; ux?: number; uy?: number };
 }
 
 export interface LabelOp {
@@ -54,6 +86,8 @@ export interface LabelOp {
   fontPx?: number;
   rotation?: number;
   center?: boolean;
+  /** Medidas em papel: `resolverZoom` as converte em `fontPx`, `dx` e `dy` com o zoom corrente. */
+  papel?: PapelRotulo;
 }
 
 /** Lista de desenho neutra: tanto o renderizador de GPU quanto o de CPU a consomem. */
@@ -64,11 +98,21 @@ export interface PlanDrawList {
   labels: LabelOp[];
 }
 
-/** Uma camada da planta (geometria do nível ou sobreposição), sem o fundo. */
+/**
+ * Uma camada da planta (geometria do nível ou sobreposição), sem o fundo. A geometria do nível não guarda medida em
+ * pixels resolvida com o zoom: faixas, marcadores e rótulos levam a especificação (`faixa`, `deslocamentoPx`, `papel`),
+ * e `resolverZoom` a converte no zoom corrente. As decisões que mudam com o zoom (hachura, detalhe) ficam em `limiares`.
+ */
 export interface PlanOps {
   fills: FillOp[];
   strokes: StrokeOp[];
   labels: LabelOp[];
+  /**
+   * Zooms em que alguma decisão da geometria muda de lado (hachura a partir de 40 px/m, espessura equivalente de uma região
+   * a 5 px, interface entre materiais a 1,6 px...), em ordem crescente e sem repetição. Entre dois limiares seguidos a
+   * geometria é a mesma; só a camada que os guarda precisa saber disso (ver `assinaturaDeZoom`).
+   */
+  limiares?: number[];
 }
 
 export interface PlanTheme {

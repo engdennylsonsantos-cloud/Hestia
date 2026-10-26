@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { generateSpiralRun, resolveStairsOnLevel, type ResolvedStair } from '@hestia/engine';
 import { intersection, multiArea, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
@@ -44,7 +45,7 @@ const numbers = (labels: Array<{ text: string }>) => labels.map((l) => l.text).f
 describe('caracol de 540° na planta (decisão 0014 §1 item 9)', () => {
   const p = spiralProject(540, 19);
   const st = resolved(p);
-  const ops = stairFills(p, [st], LIGHT, false, 'fine', VIEW, { cutZ: CUT, topZ: TOP_ALL });
+  const ops = resolverZoom(stairFills(p, [st], LIGHT, false, 'fine', VIEW, { cutZ: CUT, topZ: TOP_ALL }), VIEW.zoom);
 
   it('volta de baixo cheia, volta de cima tracejada: o contorno de cada degrau acima do corte é tracejado', () => {
     const steps = closedStrokes(ops.strokes).filter((s) => !isPost(s.pts));

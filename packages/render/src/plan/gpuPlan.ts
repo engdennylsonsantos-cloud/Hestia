@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Viewport } from '../viewport.ts';
 import type { FillOp, PlanDrawList, StrokeOp } from './types.ts';
 import { CamadaGpu } from './camadaGpu.ts';
-import { montarLotesCamada, type LoteGpu } from './lotesGpu.ts';
+import { montarLotesCamada, SEM_TETO, type LoteGpu } from './lotesGpu.ts';
 
 export { PlanFrame, planFrameUpdateOf, sameView } from './planFrame.ts';
 
@@ -16,30 +16,33 @@ const SLOTS: readonly PlanSlot[] = ['fillsBase', 'fillsOver', 'grid', 'strokesBa
 const SLOT_STRIDE = 1_000_000;
 
 /**
- * Traço no vertex shader: cada vértice é deslocado em tela (metros = pixels / zoom). `aExt` é (ao longo, lado, largura),
- * `aDir` é (ux, uy, distância ao início do traço em metros) e `aPadrao` é (traço, período) em px. Com `uPapel` ligado,
- * a largura é `kPapel` (mm × escala ÷ 1000) e vira pixels pelo zoom, com piso de 1 px (como `paperMmToPx`); senão, é
- * a largura em pixels de `aExt.z`.
+ * Traço no vertex shader: cada vértice é deslocado em tela (metros = pixels / zoom). `aExt` é (ao longo, lado, largura, fator),
+ * `aDir` é (ux, uy, distância ao início do traço em metros) e `aPadrao` é (traço, período em px, zoom mínimo). Com `uPapel` ligado,
+ * a largura é `kPapel` (mm × escala ÷ 1000) e vira pixels pelo zoom, com piso de 1 px (como `paperMmToPx`), depois o
+ * fator (`aExt.w`) e o teto (`uTeto`) do peso de papel; senão, é a largura em pixels de `aExt.z`.
  */
 const VERTEX_TRACO = /* glsl */ `
-attribute vec3 aExt;
+attribute vec4 aExt;
 attribute vec3 aDir;
-attribute vec2 aPadrao;
+attribute vec3 aPadrao;
 uniform float uZoom;
 uniform float uPapel;
+uniform float uTeto;
 varying float vDist;
 varying float vMeia;
 varying vec2 vPadrao;
 void main() {
-  float larg = uPapel > 0.5 ? max(1.0, aExt.z * uZoom) : aExt.z;
+  float larg = uPapel > 0.5 ? min(uTeto, aExt.w * max(1.0, aExt.z * uZoom)) : aExt.z;
   float meia = 0.5 * larg / uZoom;
   vec2 u = aDir.xy;
   vec2 n = vec2(-u.y, u.x);
   vec2 p = position.xy + u * (aExt.x * meia) + n * (aExt.y * meia);
   vDist = aDir.z * uZoom + aExt.x * 0.5 * larg;
   vMeia = 0.5 * larg;
-  vPadrao = aPadrao;
+  vPadrao = aPadrao.xy;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, position.z, 1.0);
+  // Zoom mínimo do traço (hachura e linhas de interface): abaixo dele o vértice sai da tela e o traço some.
+  if (uZoom < aPadrao.z) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
 `;
 
@@ -66,6 +69,8 @@ export class PlanScene {
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   /** Zoom da vista, compartilhado por todos os materiais de traço: trocá-lo não refaz a geometria. */
   private readonly uZoom = { value: 1 };
+  /** Zoom em que os lotes dinâmicos das camadas foram montados. */
+  private zoomDosLotes = Number.NaN;
   private camadas = new Map<PlanSlot, CamadaGpu>();
   private mats = new Map<string, THREE.Material>();
 
@@ -84,7 +89,7 @@ export class PlanScene {
    * como no CPU (decisão 0015 §2.4). A hachura é vetorial (linhas e pontos), então não há textura para amostrar com o zoom.
    */
   private materialDo(lote: LoteGpu): THREE.Material {
-    const key = lote.key;
+    const key = lote.material ?? lote.key;
     let m = this.mats.get(key);
     if (!m) {
       m = lote.traco ? this.materialTraco(lote) : this.materialPreenchimento(lote);
@@ -107,7 +112,7 @@ export class PlanScene {
   /** Material de traço: a espessura e o tracejado saem do shader, com o zoom compartilhado (`uZoom`). */
   private materialTraco(lote: LoteGpu): THREE.ShaderMaterial {
     return new THREE.ShaderMaterial({
-      uniforms: { uZoom: this.uZoom, uPapel: { value: lote.papel ? 1 : 0 }, uCor: { value: new THREE.Color(lote.color) }, uAlfa: { value: lote.alpha } },
+      uniforms: { uZoom: this.uZoom, uPapel: { value: lote.papel ? 1 : 0 }, uTeto: { value: lote.papel?.teto ?? SEM_TETO }, uCor: { value: new THREE.Color(lote.color) }, uAlfa: { value: lote.alpha } },
       vertexShader: VERTEX_TRACO,
       fragmentShader: FRAGMENT_TRACO,
       transparent: true,
@@ -126,7 +131,25 @@ export class PlanScene {
     this.camera.bottom = -hh;
     this.camera.position.set(v.cx, v.cy, 10);
     this.camera.updateProjectionMatrix();
-    this.uZoom.value = v.zoom;
+    this.ajustarZoom(v.zoom);
+  }
+
+  /**
+   * Põe o zoom corrente. Os traços e o tracejado o leem do uniform; só os lotes dinâmicos (faixas de contorno e marcadores
+   * em pixels, ver `lotesGpu.ts`) são montados de novo, e só quando o zoom mudou. Os demais lotes e buffers não se mexem.
+   */
+  private ajustarZoom(zoom: number): void {
+    this.uZoom.value = zoom;
+    if (zoom === this.zoomDosLotes) return;
+    this.zoomDosLotes = zoom;
+    for (const c of this.camadas.values()) c.reexpandir(zoom);
+  }
+
+  /** Quantos lotes de toda a cena dependem do zoom: o que a troca de zoom reescreve, além da câmera e do uniform. */
+  lotesDinamicos(): number {
+    let n = 0;
+    for (const c of this.camadas.values()) n += c.dinamicos;
+    return n;
   }
 
   setBackground(color: string): void {
@@ -139,8 +162,8 @@ export class PlanScene {
    * que já existem são reaproveitados.
    */
   setSlot(slot: PlanSlot, fills: FillOp[], strokes: StrokeOp[], v: Viewport): void {
-    this.uZoom.value = v.zoom;
-    this.camadas.get(slot)!.aplicar(montarLotesCamada(fills, strokes));
+    this.ajustarZoom(v.zoom);
+    this.camadas.get(slot)!.aplicar(montarLotesCamada(fills, strokes, v.zoom));
   }
 
   /** Lista de desenho inteira (fundo, preenchimentos e traços) numa só troca: as camadas de sobreposição e grade ficam vazias. */

@@ -58,7 +58,7 @@ describe('quad: traço em pixels, deslocado pelo shader', () => {
     expect(b.pos).toHaveLength(12);
     expect(b.idx).toEqual([0, 1, 2, 0, 2, 3]);
     // Cada vértice leva (ao longo, lado, largura em px), a direção (1, 0) e a distância do início do trecho.
-    expect(b.traco!.ext).toEqual([-1, 1, 2, -1, -1, 2, 1, -1, 2, 1, 1, 2]);
+    expect(b.traco!.ext).toEqual([-1, 1, 2, 1, -1, -1, 2, 1, 1, -1, 2, 1, 1, 1, 2, 1]);
     expect(b.traco!.dir).toEqual([1, 0, 0, 1, 0, 0, 1, 0, 2, 1, 0, 2]);
   });
 

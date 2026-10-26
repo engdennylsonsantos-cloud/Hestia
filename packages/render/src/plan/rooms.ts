@@ -1,6 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import type { ResolvedRoom } from '@hestia/engine';
-import { paperMmToPx, type DetailLevel, type Id, type Project } from '@hestia/model';
+import type { DetailLevel, Id, Project } from '@hestia/model';
 import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
 import { ambientesDoNivel } from './resolucao.ts';
 import { surfaceColor, type PlanPaint } from './style.ts';
@@ -39,20 +39,18 @@ export function roomOps(
   theme: PlanTheme,
   dark: boolean,
   detail: DetailLevel,
-  zoom: number,
   scale: number,
   hidden: ReadonlySet<Id> | undefined,
   paint: PlanPaint,
 ): FloorOps {
   const out = empty();
-  const fontPx = paperMmToPx(ROOM_TEXT_MM, zoom, scale);
   const fillBase = dark ? theme.bg : '#ffffff';
   for (const r of ambientesDoNivel(p, levelId)) {
     if (!r.polygon || hidden?.has(r.roomId)) continue;
     const color = surfaceColor(r.color ?? ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
     out.fills.push({ polygons: [r.polygon], color, alpha: 0.7 });
     const at = roomLabelAt(r);
-    if (at) out.labels.push({ at, text: roomLabelText(r, detail), fontPx, tone: 'info' });
+    if (at) out.labels.push({ at, text: roomLabelText(r, detail), papel: { escala: scale, fontMm: ROOM_TEXT_MM }, tone: 'info' });
   }
   return out;
 }

@@ -2,6 +2,7 @@ import { orientedRect, union, type MultiPolygon, type Ring, type Vec2 } from '@h
 import { frameOfWall, openingGeometry, type ResolvedLevel } from '@hestia/engine';
 import { isOpening, isWall, type Id, type Project } from '@hestia/model';
 import { floorSelectionOps } from './floors.ts';
+import { ALCA_PX, quadradoEm } from './marcadores.ts';
 import { slabSelectionOps } from './slabs.ts';
 import { roomSelectionOps } from './rooms.ts';
 import { ceilingSelectionOps } from './ceilings.ts';
@@ -81,25 +82,19 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
         const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
         labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: `${len.toFixed(3).replace('.', ',')} m`, dy: -12, tone: 'info' });
       }
-      const half = 4.5 / v.zoom;
       for (const pt of [e.a, e.b] as Vec2[]) {
-        const sq: Vec2[] = [
-          { x: pt.x - half, y: pt.y - half },
-          { x: pt.x + half, y: pt.y - half },
-          { x: pt.x + half, y: pt.y + half },
-          { x: pt.x - half, y: pt.y + half },
-        ];
-        fills.push({ polygons: [[sq]], color: '#ffffff', alpha: 1 });
-        strokes.push({ pts: sq, closed: true, widthPx: 1.6, color: theme.select, alpha: 1 });
+        const q = quadradoEm(pt, ALCA_PX);
+        fills.push({ ...q.fill, color: '#ffffff', alpha: 1 });
+        strokes.push({ ...q.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
       }
     }
   }
 
   // Pré-visualização, guias e marcador de captura.
-  add(previewOverlay(input.preview, v, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));
+  add(previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));
   if (input.inference) {
     strokes.push(...guideStrokes(input.inference.guides, theme));
-    strokes.push(...snapMarker(input.inference, v, theme));
+    strokes.push(...snapMarker(input.inference, theme));
     const tip = snapTooltipLabel(input.inference);
     if (tip) labels.push(tip);
   }

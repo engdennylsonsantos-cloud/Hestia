@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { multiArea, pointInPolygon, type Vec2 } from '@hestia/geom';
 import { resolveLevel, resolveSlabs } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeFloor, makeSlab, type DetailLevel, type Project, type Slab } from '@hestia/model';
@@ -22,7 +23,7 @@ function slabProject(extra: Partial<Slab> = {}, settings: Partial<Project['setti
 }
 
 const slabOps = (p: Project, detail: DetailLevel = 'medium', zoom = 100, dark = false) =>
-  slabFills(p, 'lv_0', dark ? DARK : LIGHT, dark, detail, VIEW(zoom));
+  resolverZoom(slabFills(p, 'lv_0', dark ? DARK : LIGHT, dark, detail, VIEW(zoom)), zoom);
 
 function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
   return {

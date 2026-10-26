@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverRotulo } from './zoomOps.ts';
 import { ProjectStore, createEmptyProject, paperMmToPx } from '@hestia/model';
 import { noteOps } from './notes.ts';
 import { defaultPaint } from './style.ts';
@@ -18,39 +19,39 @@ function comCota(): ProjectStore {
 describe('anotações na planta', () => {
   it('cota: texto do valor "4,00 m" centrado acima da linha, com a fonte em mm de papel × escala', () => {
     const p = comCota().project;
-    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);
+    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
     const cota = ops.labels[0]!;
     expect(cota.text).toBe('4,00 m');
     expect(cota.center).toBe(true);
     expect(cota.rotation).toBe(0);
-    expect(cota.fontPx).toBeCloseTo(paperMmToPx(2.5, ZOOM, SCALE), 9);
+    expect(resolverRotulo(cota, ZOOM).fontPx).toBeCloseTo(paperMmToPx(2.5, ZOOM, SCALE), 9);
     expect(cota.at.y).toBeGreaterThan(1);
   });
 
   it('cota gera linha, duas chamadas e duas marcas: 5 traços com a espessura de corte da categoria', () => {
     const p = comCota().project;
     const pt = defaultPaint('annotation', ZOOM);
-    const ops = noteOps(p, LV0, pt, LOOK, ZOOM, SCALE);
+    const ops = noteOps(p, LV0, pt, LOOK, SCALE);
     expect(ops.strokes).toHaveLength(5);
     for (const st of ops.strokes) expect(st.widthPx).toBe(pt.cutPx);
   });
 
   it('texto livre: valor, altura em mm de papel e rotação do próprio texto', () => {
     const p = comCota().project;
-    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);
+    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
     const t = ops.labels[1]!;
     expect(t).toMatchObject({ text: 'Sala', rotation: 90, at: { x: 2, y: 2 } });
-    expect(t.fontPx).toBeCloseTo(paperMmToPx(3, ZOOM, SCALE), 9);
+    expect(resolverRotulo(t, ZOOM).fontPx).toBeCloseTo(paperMmToPx(3, ZOOM, SCALE), 9);
   });
 
   it('categoria anotação oculta: nada sai', () => {
     const p = comCota().project;
     const off = { ...defaultPaint('annotation', ZOOM), visible: false };
-    expect(noteOps(p, LV0, off, LOOK, ZOOM, SCALE)).toEqual({ strokes: [], labels: [] });
+    expect(noteOps(p, LV0, off, LOOK, SCALE)).toEqual({ strokes: [], labels: [] });
   });
 
   it('nível sem anotações: nada sai', () => {
     const p = createEmptyProject();
-    expect(noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE)).toEqual({ strokes: [], labels: [] });
+    expect(noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE)).toEqual({ strokes: [], labels: [] });
   });
 });

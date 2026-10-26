@@ -77,7 +77,7 @@ describe('quadro da planta (PlanFrame)', () => {
     scene.dispose();
   });
 
-  it('mudança da chave da geometria (zoom ou nível) refaz a geometria', () => {
+  it('mudança da chave da geometria (nível, por exemplo) refaz a geometria', () => {
     const frame = new PlanFrame(NULL_SINK);
     const count = { g: 0, o: 0 };
     const { geometry, overlay } = ops(count);
@@ -215,12 +215,12 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     ...over,
   });
 
-  it('a geometria só muda pelo que ela lê (zoom, versão, cotas selecionadas); seleção de parede e cursor não', () => {
+  it('a geometria só muda pelo que ela lê (versão, cotas selecionadas); zoom, seleção de parede e cursor não', () => {
     const base = planFrameUpdateOf(state());
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).geometryKey).toBe(base.geometryKey);
     expect(planFrameUpdateOf(state({ hover: 'w1' })).geometryKey).toBe(base.geometryKey);
     expect(planFrameUpdateOf(state({ selection: ['d1'] })).geometryKey).not.toBe(base.geometryKey);
-    expect(planFrameUpdateOf(state({ v: { ...V, zoom: 80 } })).geometryKey).not.toBe(base.geometryKey);
+    expect(planFrameUpdateOf(state({ v: { ...V, zoom: 80 } })).geometryKey).toBe(base.geometryKey);
     expect(planFrameUpdateOf(state({ version: 2 })).geometryKey).not.toBe(base.geometryKey);
   });
 
@@ -242,5 +242,6 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).not.toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).overlayKey).not.toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ v: { ...V, cx: 9 } })).overlayKey).toBe(base.overlayKey);
+    expect(planFrameUpdateOf(state({ v: { ...V, zoom: 220 } })).overlayKey).toBe(base.overlayKey);
   });
 });

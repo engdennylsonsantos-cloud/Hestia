@@ -29,7 +29,7 @@ const TONED: PreviewItem[] = [
 
 /** Cor do traço (ou do preenchimento, se o item só tem polígono) de cada item, na ordem. */
 function colorsOf(items: PreviewItem[], theme: PlanTheme): string[] {
-  const ov = previewOverlay(items, VIEW, theme, noHighlight);
+  const ov = previewOverlay(items, theme, noHighlight);
   return items.map((_, i) => {
     const stroke = ov.strokes[i];
     return stroke?.color ?? '';
@@ -50,13 +50,13 @@ describe('prévia da escada por tom (decisão 0011 · interface)', () => {
   }
 
   it('os degraus calculados saem translúcidos, com contorno fino', () => {
-    const ov = previewOverlay([TONED[4]!], VIEW, LIGHT, noHighlight);
+    const ov = previewOverlay([TONED[4]!], LIGHT, noHighlight);
     expect(ov.fills[0]).toMatchObject({ color: LIGHT.stairTread, alpha: 0.2 });
     expect(ov.strokes[0]).toMatchObject({ closed: true, widthPx: 1, color: LIGHT.stairTread });
   });
 
   it('itens sem tom saem exatamente como antes (cor de destaque, mesmos traços e alfas)', () => {
-    const ov = previewOverlay([{ kind: 'line', a: A, b: B }, { kind: 'polygon', ring: RING }], VIEW, LIGHT, noHighlight);
+    const ov = previewOverlay([{ kind: 'line', a: A, b: B }, { kind: 'polygon', ring: RING }], LIGHT, noHighlight);
     expect(ov.strokes[0]).toEqual({ pts: [A, B], closed: false, widthPx: 1.5, color: LIGHT.accent, alpha: 0.95, dash: undefined });
     expect(ov.fills[0]).toEqual({ polygons: [[RING]], color: LIGHT.accent, alpha: 0.14 });
     expect(ov.strokes[1]).toEqual({ pts: RING, closed: true, widthPx: 1.5, color: LIGHT.accent, alpha: 0.95, dash: undefined });

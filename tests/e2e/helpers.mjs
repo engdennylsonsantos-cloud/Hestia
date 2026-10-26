@@ -7,8 +7,8 @@ import path from 'node:path';
 
 export const CHROME_ARGS = ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
-/** Chromium do sistema (o mesmo que os outros e2e usam). */
-export const chromeExecutable = () => ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find(existsSync);
+/** Chromium do sistema (o mesmo que os outros e2e usam). `CHROME_PATH` (definido no ambiente) tem prioridade. */
+export const chromeExecutable = () => [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => p && existsSync(p));
 
 export const distUrl = () => pathToFileURL(path.resolve('apps/web/dist/index.html')).href;
 

@@ -183,12 +183,25 @@ export function moveSegs(d: SketchDraft, ids: string[], delta: Vec2): SketchDraf
   };
 }
 
+/** Como um clique ou uma janela mexe na seleção: substitui, soma (Shift) ou subtrai (Ctrl). */
+export type SelectionMode = 'replace' | 'add' | 'subtract';
+
+/** Seleciona linhas com o modo dado. Ids desconhecidos são ignorados. */
+export function selectSegsMode(d: SketchDraft, ids: string[], mode: SelectionMode = 'replace'): SketchDraft {
+  const known = new Set(d.segs.map((s) => s.id));
+  const picked = new Set(ids.filter((id) => known.has(id)));
+  const base = mode === 'replace' ? [] : mode === 'add' ? d.selected : d.selected.filter((id) => !picked.has(id));
+  return { ...d, selected: [...new Set([...base, ...(mode === 'subtract' ? [] : [...picked])])] };
+}
+
 /** Seleciona linhas. `additive` soma à seleção atual; senão substitui. Ids desconhecidos são ignorados. */
 export function selectSegs(d: SketchDraft, ids: string[], additive = false): SketchDraft {
-  const known = new Set(d.segs.map((s) => s.id));
-  const picked = ids.filter((id) => known.has(id));
-  const base = additive ? d.selected : [];
-  return { ...d, selected: [...new Set([...base, ...picked])] };
+  return selectSegsMode(d, ids, additive ? 'add' : 'replace');
+}
+
+/** Seleciona todas as linhas do esboço (Ctrl+A). */
+export function selectAllSegs(d: SketchDraft): SketchDraft {
+  return selectSegsMode(d, d.segs.map((s) => s.id));
 }
 
 /** Ajusta flags próprios de uma linha (telhado). */

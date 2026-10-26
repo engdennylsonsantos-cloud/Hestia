@@ -176,6 +176,21 @@ export class PerimeterMode {
     });
   }
 
+  /** Ctrl+A com o modo aberto: todas as linhas do esboço viram a seleção. Devolve false sem modo. */
+  selecionarTudo(): boolean {
+    const s = this.sessao;
+    if (!s) return false;
+    s.tool.selectAll();
+    this.porta.atualizar();
+    return true;
+  }
+
+  /** Seleção de linhas sem forma nem comando: Shift soma à seleção, como na ferramenta Selecionar. */
+  selecionandoLinhas(): boolean {
+    const s = this.sessao;
+    return s !== null && s.tool.activeShape() === null && s.tool.modifyKind() === null && s.tool.lineKind() === 'boundary';
+  }
+
   /**
    * Ctrl+Z (`refazer` falso) e Ctrl+Y (verdadeiro) com o modo aberto: desfazem ou refazem o rascunho do perímetro, nunca o
    * projeto. Devolve false sem modo, para o controlador seguir com o histórico do projeto.
@@ -269,6 +284,7 @@ export class PerimeterMode {
       lineKind: s.tool.lineKind(),
       options: s.opts,
       hoverId: s.tool.hoverId(),
+      selectionBox: s.tool.selectionBox(),
       selectedEdge: arestaDe(d),
       status,
     };

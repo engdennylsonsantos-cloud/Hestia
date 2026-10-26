@@ -1,9 +1,10 @@
 import { dist, mid, type SketchDraft, type SketchSeg, type Vec2 } from '@hestia/geom';
-import { selectSegs, setSegSlope, effectiveSeg } from './perimeterSession.ts';
+import { selectSegsMode, setSegSlope, effectiveSeg } from './perimeterSession.ts';
 import { ROOM_HINT, SELECT_PX, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
 import { perimeterFromBox } from './sketchByPerimeter.ts';
 import { kindOf, promptOf } from './perimeterToolShape.ts';
 import { faceAt } from './sketchPickFace.ts';
+import { selectionModeOf } from './perimeterToolSelect.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 
 /** Tolerância de captura de face, eixo ou borda, em px de tela (como as outras ferramentas de captura). */
@@ -30,7 +31,7 @@ export function facePick(env: ToolEnv, at: Vec2, cycle: number, d: SketchDraft):
 }
 
 /**
- * Clique no modo de seleção. Linha de limite: seleciona a linha sob o cursor (Shift soma), e `geom` é false. Inclinação:
+ * Clique no modo de seleção. Linha de limite: seleciona a linha sob o cursor (Shift soma, Ctrl subtrai), e `geom` é false. Inclinação:
  * liga ou desliga o `definesSlope` da aresta do triângulo, e `geom` é true (muda a geometria do passo).
  */
 export function selectClick(d: SketchDraft, p: PointerInfo, slope: boolean, mpp: number, selectHint: string): { next: SketchDraft; geom: boolean; msg: string } {
@@ -41,9 +42,10 @@ export function selectClick(d: SketchDraft, p: PointerInfo, slope: boolean, mpp:
     return { next: setSegSlope(d, id, { definesSlope: !on }), geom: true, msg: on ? 'Aresta sem inclinação definida.' : 'Aresta define a inclinação.' };
   }
   const id = hitSeg(d.segs, p.raw, SELECT_PX * mpp);
-  const next = selectSegs(d, id ? [id] : [], p.shift);
+  const mode = id === null && !p.shift ? 'replace' : selectionModeOf(p);
+  const next = selectSegsMode(d, id ? [id] : [], mode);
   const n = next.selected.length;
-  return { next, geom: false, msg: n > 0 ? `${n} linha(s) selecionada(s). Delete remove; Shift soma.` : selectHint };
+  return { next, geom: false, msg: n > 0 ? `${n} linha(s) selecionada(s). Delete remove; Shift soma, Ctrl subtrai.` : selectHint };
 }
 
 /** Contorno pelas paredes da caixa de `a` a `b`, ou null se a caixa é um clique. `segs` vazio = nada pego (aviso em `msg`). */

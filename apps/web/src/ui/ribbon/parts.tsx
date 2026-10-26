@@ -6,6 +6,7 @@ import { toolLabel, type Lang } from '../../editor/i18n.ts';
 import { useUi } from '../../editor/state.ts';
 import { Icon } from '../Icon.tsx';
 import { ACTIONS, type RibbonCtx } from './actions.ts';
+import { estadoNoEsboco } from './perimeterFace.ts';
 import { txt, type RibbonItem, type RibbonPanel, type Size } from './model.ts';
 
 /** Tudo que um botão da faixa precisa para se desenhar e reagir; vem de `useFace` a partir do item do modelo. */
@@ -24,12 +25,23 @@ interface Face {
 const SOON_PT = 'ainda não disponível';
 const SOON_EN = 'not available yet';
 
-/** Resolve rótulo, ícone, tooltip, estado e clique de um item folha (ferramenta, ação, opção ou "em breve"). */
+/**
+ * Resolve rótulo, ícone, tooltip, estado e clique de um item folha (ferramenta, ação, opção ou "em breve"). Com o modo de
+ * perímetro aberto, `estadoNoEsboco` põe o que o esboço pede (comando ligado, item desabilitado e o motivo).
+ */
 function useFace(entry: RibbonItem, ctx: RibbonCtx, lang: Lang): Face {
   const item = entry.kind === 'split' ? entry.main : entry;
   const toolId = item.kind === 'tool' ? item.tool : null;
   const active = useUi((s) => toolId !== null && s.tool === toolId);
   const sc = useAtalhos((s) => (toolId ? s.mapa[toolId] : undefined));
+  const face = faceBase(item, ctx, lang, active, sc);
+  const noEsboco = estadoNoEsboco(item, ctx);
+  if (!noEsboco) return face;
+  return { ...face, on: noEsboco.on, disabled: noEsboco.disabled, title: noEsboco.motivo ? `${face.label}\n— ${noEsboco.motivo}` : face.title };
+}
+
+/** Rótulo, tooltip, estado e clique de um item fora do modo de perímetro (ou sem regra própria dele). */
+function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, active: boolean, sc: string | undefined): Face {
   switch (item.kind) {
     case 'tool': {
       const label = item.label ? txt(item.label, lang) : toolLabel(item.tool, lang);

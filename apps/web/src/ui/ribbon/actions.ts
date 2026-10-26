@@ -1,5 +1,5 @@
 import { isCeiling, isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project } from '@hestia/model';
-import type { ToolOptions } from '@hestia/tools';
+import type { PerimeterModifyKind, ToolOptions } from '@hestia/tools';
 import { tagAllNotTagged } from '../../editor/tagActions.ts';
 import { editor } from '../../editor/controller.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
@@ -35,6 +35,8 @@ export interface RibbonCtx {
   sides: DockLayout['sides'];
   options: ToolOptions;
   p: Project;
+  /** Com o modo de perímetro aberto: o comando de Modificar ligado sobre o esboço (null = seleção de linhas). */
+  perimetro?: { modify: PerimeterModifyKind | null } | null;
 }
 
 export interface ActionDef {
@@ -187,8 +189,9 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   delete: {
     label: t('Excluir', 'Delete'),
     icon: 'close',
-    run: () => editor.deleteSelection(),
-    disabled: noSel,
+    // No modo de perímetro, Excluir é o comando sobre as linhas do esboço (não apaga o projeto) e não precisa de seleção.
+    run: () => { if (editor.perimetro.ativo) editor.perimetro.setModify('delete'); else editor.deleteSelection(); },
+    disabled: (c) => (c.perimetro ? false : noSel(c)),
   },
   zoomFit: {
     label: t('Enquadrar tudo', 'Zoom to Fit'),
@@ -277,8 +280,10 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
 /** Contexto lido na hora do clique (os `run` nunca usam o valor de um render antigo). */
 export function ctxNow(): RibbonCtx {
   const s = useUi.getState();
+  const perim = editor.perimetro.view();
   return {
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
     showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options, p: editor.project,
+    perimetro: perim.active ? { modify: perim.modify } : null,
   };
 }

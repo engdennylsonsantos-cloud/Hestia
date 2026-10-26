@@ -397,8 +397,9 @@ export class Editor {
     return done;
   }
 
-  undo(): void { desfazerOuRefazer(this.store, 'undo'); }
-  redo(): void { desfazerOuRefazer(this.store, 'redo'); }
+  // Com o modo de perímetro aberto, desfazer e refazer valem para o rascunho do esboço, nunca para o projeto.
+  undo(): void { if (!this.perimetro.historico(false)) desfazerOuRefazer(this.store, 'undo'); }
+  redo(): void { if (!this.perimetro.historico(true)) desfazerOuRefazer(this.store, 'redo'); }
 
   /**
    * Cotas automáticas da planta (camadas por lado: aberturas → paredes → contorno → total). As cotas entram como

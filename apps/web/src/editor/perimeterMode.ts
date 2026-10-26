@@ -17,6 +17,7 @@ import {
   type ToolOptions,
 } from '@hestia/tools';
 import type { PerimeterView } from './perimeterApi.ts';
+import { COMANDO_DO_ESBOCO, COMANDO_RECUSADO, DICA_COMANDO, SEM_ESBOCO } from './perimeterComandos.ts';
 import { VISAO_FECHADA, alvoDaFerramenta, arestaDe, formaDaFerramenta, formaDaTela } from './perimeterView.ts';
 import { useUi } from './state.ts';
 import type { PerimeterLineKind, PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
@@ -145,20 +146,47 @@ export class PerimeterMode {
     this.dizer(s.editing ? 'Edição do perímetro cancelada. O elemento não mudou.' : 'Perímetro descartado.');
   }
 
+  /** Forma da galeria. Escolher uma forma desliga o comando de Modificar ligado. */
   setShape(f: PerimeterShape): void {
-    this.comSessao((s) => s.tool.setShape(formaDaTela(f)));
+    this.comSessao((s) => {
+      this.desligaComando(s);
+      s.tool.setShape(formaDaTela(f));
+    });
   }
 
-  /** Linha de limite ou seta de inclinação. Voltar a limite com a seleção vazia põe a linha, a forma padrão. */
+  /**
+   * Liga um comando de Modificar sobre as linhas do esboço, ou desliga (null, ou o mesmo comando de novo). Ligar tira a
+   * forma da galeria: comando e forma não ficam ligados juntos.
+   */
   setModify(k: PerimeterModifyKind | null): void {
-    this.sessao?.tool.setModify(k);
+    const s = this.sessao;
+    if (!s) return;
+    const alvo = k === null || k === s.tool.modifyKind() ? null : k;
+    if (alvo !== null) s.tool.setShape(null);
+    const ok = s.tool.setModify(alvo);
+    if (alvo === null) this.dizer('Comando desligado: clique numa linha para selecionar.');
+    else this.dizer(ok ? DICA_COMANDO[alvo] : COMANDO_RECUSADO);
   }
 
   setLineKind(k: PerimeterLineKind): void {
     this.comSessao((s) => {
+      this.desligaComando(s);
       s.tool.setLineKind(k);
       if (k === 'boundary' && s.tool.activeShape() === null) s.tool.setShape('line');
     });
+  }
+
+  /**
+   * Ctrl+Z (`refazer` falso) e Ctrl+Y (verdadeiro) com o modo aberto: desfazem ou refazem o rascunho do perímetro, nunca o
+   * projeto. Devolve false sem modo, para o controlador seguir com o histórico do projeto.
+   */
+  historico(refazer: boolean): boolean {
+    const s = this.sessao;
+    if (!s) return false;
+    const ok = refazer ? s.tool.redoDraft() : s.tool.undoDraft();
+    if (ok) this.dizer(refazer ? 'Refeito no rascunho do perímetro.' : 'Desfeito no rascunho do perímetro.');
+    else this.dizer(refazer ? 'Nada a refazer no perímetro.' : 'Nada a desfazer no perímetro.');
+    return true;
   }
 
   /**
@@ -187,17 +215,22 @@ export class PerimeterMode {
   }
 
   /**
-   * Escolha de ferramenta da faixa. Com o modo aberto, qualquer troca é recusada e o modo fica. Fora dele, Telhado,
-   * Piso, Laje e Forro abrem o modo para o alvo. Devolve true quando a escolha foi tratada aqui.
+   * Escolha de ferramenta da faixa (e atalho de teclado). Fora do modo, Telhado, Piso, Laje e Forro abrem o modo para o
+   * alvo. Dentro dele, os comandos de Modificar viram comando sobre o esboço (`COMANDO_DO_ESBOCO`), Selecionar volta
+   * às linhas, e as ferramentas sem sentido no esboço avisam por quê; qualquer outra troca é recusada e o modo fica.
+   * Devolve true quando a escolha foi tratada aqui.
    */
   intercepta(id: ToolId): boolean {
-    if (this.ativo) {
-      this.dizer(ABERTO_FERRAMENTA);
-      return true;
+    if (!this.ativo) {
+      const alvo = alvoDaFerramenta(id);
+      if (alvo) this.begin(alvo);
+      return alvo !== null;
     }
-    const alvo = alvoDaFerramenta(id);
-    if (alvo) this.begin(alvo);
-    return alvo !== null;
+    const comando = COMANDO_DO_ESBOCO[id];
+    if (comando) this.setModify(comando);
+    else if (id === 'select') this.comSessao((s) => this.voltaSelecao(s));
+    else this.dizer(SEM_ESBOCO[id] ?? ABERTO_FERRAMENTA);
+    return true;
   }
 
   /** Troca de vista ou de nível com o modo aberto: recusada (true), e o modo fica. */
@@ -252,6 +285,17 @@ export class PerimeterMode {
   private fechar(): void {
     this.sessao = null;
     this.porta.ativar(null);
+  }
+
+  /** Desliga o comando de Modificar ligado, se houver (a ferramenta volta às linhas). */
+  private desligaComando(s: Sessao): void {
+    if (s.tool.modifyKind() !== null) s.tool.setModify(null);
+  }
+
+  /** Selecionar: tira o comando e a forma, e a ferramenta volta a selecionar linhas. */
+  private voltaSelecao(s: Sessao): void {
+    this.desligaComando(s);
+    s.tool.setShape(null);
   }
 
   /** Aplica `fn` à sessão aberta e avisa a interface. Sem sessão, nada acontece. */

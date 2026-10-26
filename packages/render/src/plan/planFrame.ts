@@ -8,6 +8,7 @@ import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
+import { dimPlanOps } from './dim.ts';
 import { sketchOps } from './sketch.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
 
@@ -64,10 +65,14 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     theme,
     gpu: s.gpu,
     showGrid: s.showGrid,
-    geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${geoSel.join(',')}`,
+    geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}`,
     overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
-    geometry: () => buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel), selection: geoSel, hover: null, preview: [], inference: null }),
+    geometry: () => {
+      const g = buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel), selection: geoSel, hover: null, preview: [], inference: null });
+      // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
+      return s.sketch ? dimPlanOps(g, theme.bg) : g;
+    },
     overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
   };
 }

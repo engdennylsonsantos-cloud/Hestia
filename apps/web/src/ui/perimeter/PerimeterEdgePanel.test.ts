@@ -14,6 +14,7 @@ const { PerimeterEdgePanel } = await import('./PerimeterEdgePanel.tsx');
 
 const base: PerimeterView = {
   active: true,
+  modify: null,
   target: 'roof',
   draft: null,
   result: null,

@@ -6,6 +6,7 @@ import type { PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
 /** Visão do modo quando ele está fechado. Os padrões de opções são os da barra (ver `perimeterMode.ts`). */
 export const VISAO_FECHADA: PerimeterView = {
   active: false,
+  modify: null,
   target: 'roof',
   draft: null,
   result: null,

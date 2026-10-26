@@ -1,4 +1,5 @@
 import type { SketchDraft, SketchTarget } from '@hestia/geom';
+import type { PerimeterModifyKind } from '@hestia/tools';
 import { DEFAULT_CEILING_HEIGHT, type Id, type Project } from '@hestia/model';
 import {
   PerimeterTool,
@@ -149,6 +150,10 @@ export class PerimeterMode {
   }
 
   /** Linha de limite ou seta de inclinação. Voltar a limite com a seleção vazia põe a linha, a forma padrão. */
+  setModify(k: PerimeterModifyKind | null): void {
+    this.sessao?.tool.setModify(k);
+  }
+
   setLineKind(k: PerimeterLineKind): void {
     this.comSessao((s) => {
       s.tool.setLineKind(k);
@@ -222,6 +227,7 @@ export class PerimeterMode {
     const d: SketchDraft = s.tool.draft();
     return {
       active: true,
+      modify: s.tool.modifyKind(),
       target: s.target,
       ...(s.editing ? { editing: s.editing } : {}),
       draft: d,

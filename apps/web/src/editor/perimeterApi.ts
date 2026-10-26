@@ -1,5 +1,6 @@
 import type { Id } from '@hestia/model';
 import type { SketchDraft, SketchResult, SketchTarget } from '@hestia/geom';
+import type { PerimeterModifyKind } from '@hestia/tools';
 import type { PerimeterOptions } from '../ui/perimeter/PerimeterOptionsBar.tsx';
 import type { PerimeterLineKind, PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
 
@@ -18,6 +19,8 @@ export interface PerimeterView {
   result: SketchResult | null;
   shape: PerimeterShape;
   lineKind: PerimeterLineKind;
+  /** Comando de Modificar ativo sobre as linhas do rascunho; null = seleção de linhas. */
+  modify: PerimeterModifyKind | null;
   options: PerimeterOptions;
   /** Linha sob o cursor, para o realce de `sketchOps`. */
   hoverId: string | null;
@@ -34,6 +37,8 @@ export interface PerimeterActions {
   edit: (elementId: Id) => void;
   setShape: (s: PerimeterShape) => void;
   setLineKind: (k: PerimeterLineKind) => void;
+  /** Liga/desliga um comando de Modificar sobre as linhas do esboço (null volta à seleção). */
+  setModify: (k: PerimeterModifyKind | null) => void;
   setOptions: (patch: Partial<PerimeterOptions>) => void;
   /** Botão Concluir: valida, grava o elemento e fecha o modo. Em falha mantém o modo aberto e informa em `status`. */
   finish: () => void;

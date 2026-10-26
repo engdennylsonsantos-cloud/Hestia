@@ -18,6 +18,7 @@ export const perimeterActions: PerimeterActions = {
   edit: (id) => editor.perimetro.edit(id),
   setShape: (s) => editor.perimetro.setShape(s),
   setLineKind: (k) => editor.perimetro.setLineKind(k),
+  setModify: (k) => editor.perimetro.setModify(k),
   setOptions: (patch) => editor.perimetro.setOptions(patch),
   finish: () => editor.perimetro.finish(),
   cancel: () => editor.perimetro.cancel(),

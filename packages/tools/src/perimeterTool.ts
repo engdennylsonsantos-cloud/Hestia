@@ -1,3 +1,4 @@
+import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { add, angleOf, dist, len, mid, mul, norm, sub, type SketchDraft, type SketchResult, type SketchSeg, type SketchTarget, type Vec2 } from '@hestia/geom';
 import { ToolBase } from './base.ts';
 import type { InferContext } from './infer.ts';
@@ -98,6 +99,15 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Linha de limite ou de inclinação. Inclinação só existe no telhado e leva o modo de seleção (clique no triângulo). */
+  /** Comando de Modificar ativo sobre as linhas do rascunho (stub: a implementação entra na onda 4). */
+  modifyKind(): PerimeterModifyKind | null {
+    return null;
+  }
+
+  setModify(_kind: PerimeterModifyKind | null): boolean {
+    return false;
+  }
+
   setLineKind(kind: LineKind): boolean {
     if (kind === 'slope' && this.d.target !== 'roof') {
       this.env.say('Inclinação por aresta só existe no telhado.');

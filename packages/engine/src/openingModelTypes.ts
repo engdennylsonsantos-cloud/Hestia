@@ -51,7 +51,14 @@ export interface PartBox {
 export type PartMotion =
   | { kind: 'rotate'; axis: 'z'; t: number; s: number; sign: 1 | -1 }
   | { kind: 'rotate'; axis: 't'; s: number; z: number; sign: 1 | -1 }
-  | { kind: 'slide'; dt: number; ds: number; dz: number; travel: number };
+  | { kind: 'slide'; dt: number; ds: number; dz: number; travel: number }
+  /**
+   * Folha dobrável/sanfonada: painéis articulados em cadeia a partir de uma ombreira. `index` (0..) é a posição do painel na
+   * cadeia, `tAnchor` a posição t da ombreira fixa, `dir` o sentido de t em que a cadeia se estende no estado fechado, `s` o
+   * plano médio da folha e `panelWidth` a largura de cada painel. Com ângulo θ os painéis alternam ±θ e a ponta livre recua.
+   * `sign` leva o ângulo positivo para o lado de abertura.
+   */
+  | { kind: 'fold'; tAnchor: number; dir: 1 | -1; s: number; sign: 1 | -1; index: number; panelWidth: number };
 
 export interface OpeningPart {
   /** Estável entre chamadas (ex.: 'jamb-left', 'leaf-0', 'glass-0-1'). */
@@ -70,7 +77,11 @@ export interface OpeningPart {
 /** Como a folha se abre, para as linhas de abertura (V) e o arco de giro. */
 export interface LeafOpening {
   leaf: number;
-  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'fixed';
+  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'louver' | 'fixed';
+  /** Abre para os dois lados (porta vai-e-vem): `side` é o lado principal. */
+  both?: boolean;
+  /** Eixo do deslizamento: 't' (horizontal, padrão) ou 'z' (vertical: guilhotina, portão seccionado). */
+  slideAxis?: 't' | 'z';
   /** Lado em que a folha abre: +1 para o lado de `n`, −1 para o oposto. 0 em correr/fixa. */
   side: 1 | -1 | 0;
   /** Posição t da dobradiça (giro lateral/pivô) ou 0. */

@@ -860,6 +860,27 @@ function boxCorners(b: PartBox): ModelPoint[] {
   ];
 }
 
+/**
+ * Painel `index` de uma cadeia dobrável: gira em torno da própria dobradiça de ângulo alternado (±θ) e a dobradiça anda
+ * junto com o fim do painel anterior; a ponta livre recua ao dobrar. Com θ = 0 todo painel fica onde estava.
+ */
+function foldPoint(p: ModelPoint, m: Extract<PartMotion, { kind: 'fold' }>, theta: number): ModelPoint {
+  let ht = m.tAnchor;
+  let hs = m.s;
+  for (let j = 0; j < m.index; j++) {
+    const a = (j % 2 === 0 ? 1 : -1) * m.sign * theta;
+    ht += m.panelWidth * m.dir * Math.cos(a);
+    hs += m.panelWidth * Math.sin(a);
+  }
+  const alpha = (m.index % 2 === 0 ? 1 : -1) * m.sign * theta;
+  const phi = m.dir * alpha;
+  const cos = Math.cos(phi);
+  const sin = Math.sin(phi);
+  const dt = p.t - (m.tAnchor + m.dir * m.index * m.panelWidth);
+  const ds = p.s - m.s;
+  return { t: ht + dt * cos - ds * sin, s: hs + dt * sin + ds * cos, z: p.z };
+}
+
 function movePoint(p: ModelPoint, motion: PartMotion | undefined, state: OpenState): ModelPoint {
   if (!motion) return { ...p };
   if (motion.kind === 'slide') {
@@ -871,6 +892,7 @@ function movePoint(p: ModelPoint, motion: PartMotion | undefined, state: OpenSta
     };
   }
   const angle = Number.isFinite(state.angle) ? state.angle : 0;
+  if (motion.kind === 'fold') return foldPoint(p, motion, angle);
   const phi = motion.sign * angle;
   const cos = Math.cos(phi);
   const sin = Math.sin(phi);

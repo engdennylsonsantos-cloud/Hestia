@@ -652,6 +652,8 @@ export interface ProjectSettings {
   favoriteOpeningTypes?: Id[];
   /** Convenção da linha de abertura (ausente = vértice no lado do trinco, tracejada ao abrir para o observador). */
   openingLine?: OpeningLineConvention;
+  /** Mostra o código do tipo de cada porta e janela na planta (Revit: Tag on Placement). Ausente = não mostra. */
+  showOpeningTags?: boolean;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */

@@ -9,7 +9,6 @@ import {
   intersectCircles,
   intersectLines,
   mul,
-  perp,
   sagFromThreePoints,
   sub,
   type Arc,
@@ -166,6 +165,3 @@ export function moveEnd(seg: SketchSeg, which: 'a' | 'b', p: Vec2): SketchSeg | 
   const sag = sagThrough(a, pointAt(c, c.len / 2), b);
   return sag === null ? null : withGeom(seg, { a, b, sag });
 }
-
-/** Perpendicular à esquerda do sentido a→b, com o comprimento dado. */
-export const leftOf = (c: Curve, d: number): Vec2 => mul(perp(c.u), d);

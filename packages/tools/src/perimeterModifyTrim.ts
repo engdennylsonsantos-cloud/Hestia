@@ -32,8 +32,9 @@ export function trimExtendToCorner(
   segB: string,
   pickB: Vec2,
 ): SketchDraft | null {
-  const A = segA === segB ? undefined : findSeg(d, segA);
-  const B = segA === segB ? undefined : findSeg(d, segB);
+  if (segA === segB) return null;
+  const A = findSeg(d, segA);
+  const B = findSeg(d, segB);
   if (!A || !B) return null;
   const cA = curveOf(A);
   const cB = curveOf(B);
@@ -61,8 +62,9 @@ export function trimExtendToCorner(
  * mantém o trecho que contém o clique. Null se o limite não cruza a linha por dentro.
  */
 export function trimToBoundary(d: SketchDraft, segId: string, pick: Vec2, boundaryId: string): SketchDraft | null {
-  const S = segId === boundaryId ? undefined : findSeg(d, segId);
-  const L = segId === boundaryId ? undefined : findSeg(d, boundaryId);
+  if (segId === boundaryId) return null;
+  const S = findSeg(d, segId);
+  const L = findSeg(d, boundaryId);
   if (!S || !L) return null;
   const c = curveOf(S);
   const tp = traceParam(c, pick);
@@ -85,8 +87,9 @@ export function trimToBoundary(d: SketchDraft, segId: string, pick: Vec2, bounda
  * com o limite à frente dela. Null se não há cruzamento nessa direção.
  */
 export function extendToBoundary(d: SketchDraft, segId: string, pick: Vec2, boundaryId: string): SketchDraft | null {
-  const S = segId === boundaryId ? undefined : findSeg(d, segId);
-  const L = segId === boundaryId ? undefined : findSeg(d, boundaryId);
+  if (segId === boundaryId) return null;
+  const S = findSeg(d, segId);
+  const L = findSeg(d, boundaryId);
   if (!S || !L) return null;
   const c = curveOf(S);
   const nearA = gap(pick, S.a) <= gap(pick, S.b);

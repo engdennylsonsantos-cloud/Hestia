@@ -149,6 +149,7 @@ function elemOf(it: Oriented, D: number): Elem | null {
   const seg: SketchSeg = withGeom(it.src, it.g);
   const c = curveOf(seg);
   if (!c.arc) {
+    // Reta: `lp`/`ld` definem a reta deslocada; `cc`/`r2` não são usados.
     return { src: it.src, rev: it.rev, g: it.g, c, D, lp: add(seg.a, mul(perp(c.u), D)), ld: sub(seg.b, seg.a), cc: seg.a, r2: 0 };
   }
   const r2 = c.arc.radius + c.arc.k * D;

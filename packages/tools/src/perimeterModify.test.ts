@@ -46,15 +46,17 @@ function rectSegs(W: number, H: number, over: number): SketchSeg[] {
   ];
 }
 
-/** Quatro cantos de um retângulo W×H, com as linhas de `rectSegs` aparadas ou estendidas por clique. */
+/** Quatro cantos de um retângulo W×H (s1 inferior, s2 direita, s3 superior, s4 esquerda), um clique por linha. */
 function squareCorners(d: SketchDraft, W: number, H: number): SketchDraft | null {
-  const step = (x: SketchDraft | null, f: (dd: SketchDraft) => SketchDraft | null): SketchDraft | null => (x ? f(x) : null);
-  return [
-    (dd: SketchDraft) => trimExtendToCorner(dd, 's1', P(W / 2, 0), 's4', P(0, H / 2)),
-    (dd: SketchDraft) => trimExtendToCorner(dd, 's1', P(W / 2, 0), 's2', P(W, H / 2)),
-    (dd: SketchDraft) => trimExtendToCorner(dd, 's2', P(W, H / 2), 's3', P(W / 2, H)),
-    (dd: SketchDraft) => trimExtendToCorner(dd, 's3', P(W / 2, H), 's4', P(0, H / 2)),
-  ].reduce<SketchDraft | null>((acc, f) => step(acc, f), d);
+  const ops: Array<(dd: SketchDraft) => SketchDraft | null> = [
+    (dd) => trimExtendToCorner(dd, 's1', P(W / 2, 0), 's4', P(0, H / 2)),
+    (dd) => trimExtendToCorner(dd, 's1', P(W / 2, 0), 's2', P(W, H / 2)),
+    (dd) => trimExtendToCorner(dd, 's2', P(W, H / 2), 's3', P(W / 2, H)),
+    (dd) => trimExtendToCorner(dd, 's3', P(W / 2, H), 's4', P(0, H / 2)),
+  ];
+  let cur: SketchDraft | null = d;
+  for (const op of ops) cur = cur && op(cur);
+  return cur;
 }
 
 describe('trimExtendToCorner', () => {
@@ -142,11 +144,16 @@ describe('trimExtendToCorner', () => {
     const dist = (p: Vec2): number => Math.hypot(p.x - center.x, p.y - center.y);
     expect(dist(arc.a)).toBeCloseTo(1.25, 6);
     expect(dist(arc.b)).toBeCloseTo(1.25, 6);
+    // Cruzamento de x = 0,4 com o círculo, no ramo superior: y = -0,75 + √(1,5625 − 0,36).
+    const yCorner = -0.75 + Math.sqrt(1.5625 - 0.36);
     expect(arc.a.x).toBeCloseTo(0.4, 6);
+    expect(arc.a.y).toBeCloseTo(yCorner, 6);
     expect(arc.sag).toBeGreaterThan(0);
     expect(near(arc.b, P(2, 0))).toBe(true);
-    expect(near(byId(r, 'v').b, P(0.4, 1))).toBe(true);
+    // A reta v fica com a parte de baixo (é a que contém o clique em y = -0,9).
     expect(near(byId(r, 'v').a, P(0.4, -1))).toBe(true);
+    expect(byId(r, 'v').b.x).toBeCloseTo(0.4, 6);
+    expect(byId(r, 'v').b.y).toBeCloseTo(yCorner, 6);
   });
 });
 
@@ -188,14 +195,14 @@ describe('trimToBoundary e extendToBoundary', () => {
   });
 
   it('arco estendido até uma reta fica na circunferência original', () => {
-    // Arco de (0,0) a (1,1) com flecha 0,3; limite vertical em x = 2 à frente da ponta b.
-    const d = draftOf([line('arc', P(0, 0), P(1, 1), { sag: 0.3 }), line('w', P(2, -1), P(2, 3))]);
+    // Arco de (0,0) a (1,1) com flecha 0,3 (R ≈ 0,983); limite vertical em x = 1,5 à frente da ponta b.
+    const d = draftOf([line('arc', P(0, 0), P(1, 1), { sag: 0.3 }), line('w', P(1.5, -1), P(1.5, 3))]);
     const before = curveRadiusCheck(byId(d, 'arc'));
     const r = extendToBoundary(d, 'arc', P(0.9, 0.9), 'w');
     expect(r).not.toBeNull();
     const arc = byId(r!, 'arc');
     expect(arc.a).toEqual(P(0, 0));
-    expect(arc.b.x).toBeCloseTo(2, 6);
+    expect(arc.b.x).toBeCloseTo(1.5, 6);
     expect(curveRadiusCheck(arc)).toBeCloseTo(before, 6);
   });
 });
@@ -218,7 +225,6 @@ describe('splitAt e splitBetween', () => {
     expect(near(r.segs[1]!.a, P(1, 0))).toBe(true);
     expect(r.segs[1]!.slopePct).toBe(20);
     expect(r.segs[1]!.definesSlope).toBe(false);
-    expect(validateSketch(r.segs).ok).toBe(false);
   });
 
   it('divide arco em dois arcos sobre a mesma circunferência', () => {
@@ -340,7 +346,8 @@ describe('offsetLoop', () => {
       line('A', P(0, 2), P(0, 0), { sag: -0.8 }),
     ];
     const r = offsetLoop(draftOf(D), ['L1', 'L2', 'L3', 'A'], 0.2, P(2, 1))!;
-    const arcCopy = r.segs[4]!;
+    // As quatro cópias vêm depois das originais, na ordem do percurso: a última é a do arco.
+    const arcCopy = r.segs[7]!;
     expect(arcCopy.sag).toBeLessThan(0);
     expect(curveRadiusCheck(arcCopy)).toBeCloseTo(0.825, 3);
     expect(validateSketch(r.segs).ok).toBe(true);

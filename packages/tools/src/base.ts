@@ -77,7 +77,7 @@ export abstract class ToolBase implements Tool {
 
   protected snap(p: PointerInfo, extra: Partial<InferContext> = {}): Inference {
     this.raw = p.raw;
-    const ctx = this.ctx(extra);
+    const ctx = this.ctx({ previous: this.inf, ...extra });
     if (p.shift) ctx.orthoLock = true;
     this.inf = infer(p.raw, ctx);
     return this.inf;

@@ -1,18 +1,26 @@
 import {
+  arcFromSagitta,
+  arcLocal,
   closestOnSegment,
   dist,
   dot,
+  intersectCircleLine,
+  intersectCircles,
   intersectSegments,
   len,
   norm,
   sub,
   v2,
+  type Arc,
   type Vec2,
 } from '@hestia/geom';
 import { wallFaces, type WallFaces } from '@hestia/engine';
-import { openingsOfWall, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
+import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
+
+/** Ponto extra de captura. `hostId` é o elemento dono: some da captura quando ele está em `ignore` (ex.: o piso sendo movido). */
+export type SnapPoint = Vec2 & { hostId?: Id };
 
 export interface InferContext {
   project: Project;
@@ -30,36 +38,49 @@ export interface InferContext {
   /** Candidato exclusivo: só pontos sobre paredes. */
   onWallsOnly?: boolean;
   /** Pontos extras de captura (vértices de pisos, contorno em construção). */
-  extraPoints?: Vec2[];
+  extraPoints?: SnapPoint[];
   /** Capturas ligadas (padrão: DEFAULT_SNAP). */
   snap?: SnapOptions;
-  /** Índice usado para ciclar referências de alinhamento equivalentes/próximas (Tab na ferramenta Parede). */
-  alignmentCycle?: number;
+  /** Tab: índice do candidato escolhido entre todos os que estão ao alcance (ordenados por custo). */
+  cycle?: number;
+  /** Captura escolhida na posição anterior do cursor: mantém-na enquanto continuar valendo (histerese). */
+  previous?: Inference | null;
+  /** Filtro de visibilidade: paredes ocultas ou fora do recorte da vista não são alvo. Ausente = todas. */
+  isVisible?: (w: Wall) => boolean;
 }
 
 const TOL_PX = 10;
+/** Bônus (em tolerâncias) para manter a captura anterior. Evita que o alvo pisque entre dois candidatos quase iguais. */
+const HYSTERESIS = 0.15;
+
+/**
+ * Custo por tipo, somado à distância do cursor normalizada pela tolerância (menor vence). A ordem dos pesos é a
+ * da intenção: vértice, depois cruzamento de restrições, depois aresta, e alinhamento simples por último. Um vértice
+ * dentro da abertura vence a aresta; alinhamento simples não puxa o ponto para fora de uma face.
+ */
+const WEIGHT: Record<SnapKind, number> = {
+  endpoint: 0,
+  face: 0.1,
+  intersection: 0.1,
+  midpoint: 0.25,
+  perpendicular: 0.3,
+  core: 0.4,
+  nearest: 0.7,
+  alignment: 0.9,
+  ortho: 1,
+  grid: 1.5,
+  none: 9,
+};
+/** Cruzamento de duas restrições (x × y, x × face, face × face): o ponto que o usuário mira. */
+const WEIGHT_ALIGN_CROSS = 0.3;
 
 interface Cand {
   point: Vec2;
   kind: SnapKind;
-  score: number;
-  guides?: Guide[];
+  weight: number;
+  guides: Guide[];
   hostId?: Id;
 }
-
-const PRIORITY: Record<SnapKind, number> = {
-  endpoint: 0,
-  face: 1,
-  core: 1.5,
-  intersection: 2,
-  midpoint: 3,
-  perpendicular: 4,
-  alignment: 5,
-  nearest: 6,
-  ortho: 7,
-  grid: 8,
-  none: 9,
-};
 
 /** Faces das paredes por projeto e nível: o projeto é imutável (Immer), então a identidade serve de chave de cache. */
 const facesCache = new WeakMap<Project, Map<Id, WallFaces[]>>();
@@ -77,9 +98,92 @@ function facesOf(p: Project, levelId: Id): WallFaces[] {
   return f;
 }
 
+/** Arco do eixo da parede, ou null se for reta. */
+const curveOf = (w: Wall): Arc | null => arcFromSagitta(w.a, w.b, w.sag);
+
+/** Ponto está dentro do trecho do arco (não só no círculo). */
+function onArc(arc: Arc, p: Vec2): boolean {
+  const { t } = arcLocal(arc, p);
+  return t >= -1e-9 && t <= arc.length + 1e-9;
+}
+
+/** Ponto está dentro do segmento a→b. */
+function onSegment(a: Vec2, b: Vec2, p: Vec2): boolean {
+  const d = sub(b, a);
+  const ll = dot(d, d);
+  if (ll < 1e-12) return false;
+  const t = dot(sub(p, a), d) / ll;
+  return t >= -1e-9 && t <= 1 + 1e-9;
+}
+
+/** Interseções entre os eixos de duas paredes (reta ou arco), só nos trechos que existem. */
+export function wallCrossings(w1: Wall, w2: Wall): Vec2[] {
+  const c1 = curveOf(w1);
+  const c2 = curveOf(w2);
+  if (!c1 && !c2) {
+    const p = intersectSegments(w1.a, w1.b, w2.a, w2.b);
+    return p ? [p] : [];
+  }
+  if (c1 && c2) {
+    return intersectCircles(c1.center, c1.radius, c2.center, c2.radius).filter((p) => onArc(c1, p) && onArc(c2, p));
+  }
+  const [arc, seg] = c1 ? [c1, w2] : [c2!, w1];
+  return intersectCircleLine(arc.center, arc.radius, seg.a, sub(seg.b, seg.a)).filter((p) => onArc(arc, p) && onSegment(seg.a, seg.b, p));
+}
+
+/** Pés da perpendicular a partir de `from` sobre a parede (reta ou arco), só nos trechos reais. */
+function perpendicularFeet(w: Wall, from: Vec2): Vec2[] {
+  const arc = curveOf(w);
+  if (arc) {
+    const d = sub(from, arc.center);
+    const l = len(d);
+    if (l < 1e-9) return [];
+    const u = { x: d.x / l, y: d.y / l };
+    // Perpendicular a um círculo: o pé fica sobre a reta que liga o centro ao ponto de origem.
+    return [v2(arc.center.x + u.x * arc.radius, arc.center.y + u.y * arc.radius), v2(arc.center.x - u.x * arc.radius, arc.center.y - u.y * arc.radius)].filter((p) => onArc(arc, p));
+  }
+  const ab = sub(w.b, w.a);
+  const abLen = len(ab);
+  const t = abLen > 1e-9 ? dot(sub(from, w.a), norm(ab)) : -1;
+  if (!(t > 0 && t < abLen)) return [];
+  return [closestOnSegment(from, w.a, w.b)];
+}
+
+/** Linha de referência de alinhamento: vertical (x = valor) ou horizontal (y = valor). */
+interface AxisLine {
+  value: number;
+  from: Vec2;
+}
+
+/** Trecho de face usado como restrição de alinhamento (reta infinita que passa por a e b). */
+interface TrackLine {
+  a: Vec2;
+  b: Vec2;
+}
+
+/** Interseção de duas retas infinitas (p1 + k·d1 e p2 + m·d2), ou null se paralelas. */
+function intersectLines(p1: Vec2, d1: Vec2, p2: Vec2, d2: Vec2): Vec2 | null {
+  const cross = d1.x * d2.y - d1.y * d2.x;
+  if (Math.abs(cross) < 1e-12) return null;
+  const k = ((p2.x - p1.x) * d2.y - (p2.y - p1.y) * d2.x) / cross;
+  return v2(p1.x + d1.x * k, p1.y + d1.y * k);
+}
+
+/** Interseção de uma reta infinita com a linha x = v (ou y = v). */
+function crossAxis(p: Vec2, d: Vec2, axis: 'x' | 'y', v: number): Vec2 | null {
+  const dd = axis === 'x' ? d.x : d.y;
+  if (Math.abs(dd) < 1e-12) return null;
+  const k = (v - (axis === 'x' ? p.x : p.y)) / dd;
+  return v2(p.x + d.x * k, p.y + d.y * k);
+}
+
 /**
  * Motor de inferência único (docs/01 §8): função pura que devolve o melhor ponto e as guias.
  * Todas as ferramentas o consomem; o cursor "adivinha" o que o usuário quer.
+ *
+ * Cada captura é um candidato com custo = distância normalizada pela tolerância + peso do tipo. Alinhamentos
+ * são restrições (x = ref, y = ref, trecho de face); as interseções entre restrições viram candidatos próprios,
+ * então face + alinhamento e dois alinhamentos cruzados produzem o mesmo ponto que o usuário vê.
  */
 export function infer(cursor: Vec2, ctx: InferContext): Inference {
   const sn = { ...DEFAULT_SNAP, ...ctx.snap };
@@ -88,52 +192,45 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   }
 
   const tol = TOL_PX * ctx.mpp;
-  const walls = wallsOnLevel(ctx.project, ctx.levelId).filter((w) => !ctx.ignore?.has(w.id));
+  // Grade só quantiza quando está ligada e a ferramenta não a dispensou (S-03).
+  const g = ctx.noGrid || !sn.grid ? 0 : ctx.gridStep;
+  const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
+  const walls = wallsOnLevel(ctx.project, ctx.levelId).filter((w) => !ctx.ignore?.has(w.id) && (ctx.isVisible?.(w) ?? true));
   const cands: Cand[] = [];
-  const add = (c: Cand): void => {
-    cands.push(c);
+  const add = (point: Vec2, kind: SnapKind, guides: Guide[] = [], hostId?: Id, weight: number = WEIGHT[kind]): void => {
+    cands.push({ point, kind, weight, guides, hostId });
   };
 
   const ends: Vec2[] = [];
-  /** Paredes cujo eixo (corda) passa pela tolerância: só elas podem formar uma interseção ao alcance do cursor. */
+  /** Paredes cujo eixo passa pela tolerância: só elas podem formar uma interseção ao alcance do cursor. */
   const nearWalls: Wall[] = [];
   for (const w of walls) {
     ends.push(w.a, w.b);
-    if (dist(cursor, closestOnSegment(cursor, w.a, w.b)) <= tol) nearWalls.push(w);
-    if (sn.axis) {
-      if (sn.endpoint !== false) {
-        for (const p of [w.a, w.b]) {
-          const d = dist(cursor, p);
-          if (d <= tol) add({ point: p, kind: 'endpoint', score: d });
-        }
-      }
-      if (sn.midpoint !== false) {
-        const m = wallMid(w);
-        const dm = dist(cursor, m);
-        if (dm <= tol) add({ point: m, kind: 'midpoint', score: dm });
+    const near = closestOnWall(w, cursor);
+    if (near.dist <= tol) nearWalls.push(w);
+    // Cada captura tem a sua chave: extremidade e ponto médio não dependem do eixo, que controla a captura "nearest".
+    if (sn.endpoint !== false) {
+      for (const p of [w.a, w.b]) {
+        if (dist(cursor, p) <= tol) add(p, 'endpoint');
       }
     }
-    const near = closestOnWall(w, cursor);
+    if (sn.midpoint !== false) {
+      const m = wallMid(w);
+      if (dist(cursor, m) <= tol) add(m, 'midpoint');
+    }
     // Sobre o eixo: também é o ponto de hospedagem de portas e janelas, por isso fica ligado com a captura de eixo.
-    if (sn.axis && near.dist <= tol) add({ point: near.point, kind: 'nearest', score: near.dist + tol * 0.5, hostId: w.id });
+    if (sn.axis && near.dist <= tol) add(near.point, 'nearest', [], w.id);
     if (sn.perpendicular && ctx.from) {
-      const ab = sub(w.b, w.a);
-      const abLen = len(ab);
-      const t = abLen > 1e-9 ? dot(sub(ctx.from, w.a), norm(ab)) : -1;
-      if (t > 0 && t < abLen) {
-        const foot = closestOnSegment(ctx.from, w.a, w.b);
-        const dp = dist(cursor, foot);
-        if (dp <= tol && dist(foot, ctx.from) > 1e-6) {
-          add({ point: foot, kind: 'perpendicular', score: dp, guides: [{ from: ctx.from, to: foot, kind: 'perpendicular' }] });
-        }
+      for (const foot of perpendicularFeet(w, ctx.from)) {
+        if (dist(cursor, foot) <= tol && dist(foot, ctx.from) > 1e-6) add(foot, 'perpendicular', [{ from: ctx.from, to: foot, kind: 'perpendicular' }]);
       }
     }
   }
   // Pontos extras (vértices de pisos, contorno em construção) não entram na captura exclusiva de paredes (aberturas).
   if (sn.endpoint !== false) {
     for (const q of ctx.onWallsOnly ? [] : (ctx.extraPoints ?? [])) {
-      const d = dist(cursor, q);
-      if (d <= tol) add({ point: q, kind: 'endpoint', score: d });
+      if (q.hostId !== undefined && ctx.ignore?.has(q.hostId)) continue;
+      if (dist(cursor, q) <= tol) add(v2(q.x, q.y), 'endpoint');
     }
   }
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
@@ -142,56 +239,53 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       if (dist(a, b) < 1e-9) continue;
       if (sn.endpoint !== false) {
         for (const q of [a, b]) {
-          const d = dist(cursor, q);
-          if (d <= tol) add({ point: q, kind, score: d });
+          if (dist(cursor, q) <= tol) add(q, kind);
         }
       }
       if (sn.midpoint !== false) {
         const mid = v2((a.x + b.x) / 2, (a.y + b.y) / 2);
-        const dm = dist(cursor, mid);
-        if (dm <= tol) add({ point: mid, kind: 'midpoint', score: dm + tol * 0.1 });
+        if (dist(cursor, mid) <= tol) add(mid, 'midpoint');
       }
       const foot = closestOnSegment(cursor, a, b);
-      const df = dist(cursor, foot);
-      if (df <= tol) add({ point: foot, kind: 'nearest', score: df + tol * 0.5 });
+      if (dist(cursor, foot) <= tol) add(foot, 'nearest');
       if (sn.perpendicular && ctx.from) {
         const pf = closestOnSegment(ctx.from, a, b);
-        const dp = dist(cursor, pf);
-        if (dp <= tol && dist(pf, ctx.from) > 1e-6) add({ point: pf, kind: 'perpendicular', score: dp, guides: [{ from: ctx.from, to: pf, kind: 'perpendicular' }] });
+        if (dist(cursor, pf) <= tol && dist(pf, ctx.from) > 1e-6) add(pf, 'perpendicular', [{ from: ctx.from, to: pf, kind: 'perpendicular' }]);
       }
     }
   };
+  // Faces seguem o contorno real da parede (`outline`, com as esquadrias das junções), não a corda das tampas.
+  const outlineSegs = (ring: Vec2[]): Array<[Vec2, Vec2]> => ring.map((p, i) => [p, ring[(i + 1) % ring.length]!] as [Vec2, Vec2]);
   if (sn.faces || sn.core) {
     for (const wf of facesOf(ctx.project, ctx.levelId)) {
       if (ctx.ignore?.has(wf.wallId)) continue;
-      if (sn.faces) addSegs(wf.faces, 'face');
-      if (sn.core) addSegs(wf.core, 'core');
+      if (sn.faces) addSegs(wf.outline.length >= 3 ? outlineSegs(wf.outline) : wf.faces, 'face');
+      if (sn.core) addSegs(wf.coreOutline.length >= 3 ? outlineSegs(wf.coreOutline) : wf.core, 'core');
     }
   }
-  // Interseções de eixos.
+  // Interseções de eixos (reta ou arco).
   for (let i = 0; sn.intersections && i < nearWalls.length; i++) {
     for (let j = i + 1; j < nearWalls.length; j++) {
-      const p = intersectSegments(nearWalls[i]!.a, nearWalls[i]!.b, nearWalls[j]!.a, nearWalls[j]!.b);
-      if (!p) continue;
-      const d = dist(cursor, p);
-      if (d <= tol) add({ point: p, kind: 'intersection', score: d });
+      for (const p of wallCrossings(nearWalls[i]!, nearWalls[j]!)) {
+        if (dist(cursor, p) <= tol) add(p, 'intersection');
+      }
     }
   }
-  if (ctx.onWallsOnly) return pickBest(cands, cursor, [], undefined);
+  if (ctx.onWallsOnly) return bestOf(cands, cursor, tol, ctx.previous, ctx.cycle, [], undefined);
 
-  // Alinhamento dinâmico horizontal/vertical parte de eixos, faces e pontos extra.
+  // Restrições de alinhamento: referências (pontos) e trechos de face. Cada uma dá uma linha; as linhas que
+  // passam ao alcance do cursor viram candidatos, e os cruzamentos entre elas viram candidatos de peso menor.
   const refs: Vec2[] = [];
   if (ctx.from) refs.push(ctx.from);
   refs.push(...ends);
   if (sn.midpoint !== false) {
     for (const w of walls) refs.push(wallMid(w));
   }
-  const faceTracks: Array<{ a: Vec2; b: Vec2 }> = [];
+  const faceTracks: TrackLine[] = [];
   if (sn.alignment && sn.faces) {
     for (const wf of facesOf(ctx.project, ctx.levelId)) {
       if (ctx.ignore?.has(wf.wallId)) continue;
-      // wallFaces ordena primeiro as duas laterais longitudinais e depois as tampas.
-      // Curvas não fornecem faces laterais lineares nessa API.
+      // wallFaces ordena primeiro as duas laterais longitudinais e depois as tampas. Só as laterais viram trecho.
       for (const seg of wf.faces.slice(0, 2)) {
         if (dist(seg[0], seg[1]) < 1e-9) continue;
         faceTracks.push({ a: seg[0], b: seg[1] });
@@ -200,106 +294,167 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     }
   }
   if (!ctx.onWallsOnly && ctx.extraPoints) {
-    refs.push(...ctx.extraPoints);
+    for (const q of ctx.extraPoints) {
+      if (q.hostId !== undefined && ctx.ignore?.has(q.hostId)) continue;
+      refs.push(v2(q.x, q.y));
+    }
   }
 
-  const alignments: Array<{ point: Vec2; score: number; guides: Guide[] }> = [];
-  // Uma linha por coordenada evita que dois pontos da mesma face criem candidatos duplicados.
-  const addAxisRef = (axis: 'x' | 'y', ref: Vec2): void => {
-    const delta = Math.abs(cursor[axis] - ref[axis]);
-    if (delta > tol || alignments.some((c) => c.guides[0]?.from[axis] === ref[axis] && c.guides[0]?.kind === 'alignment')) return;
-    const g = ctx.noGrid ? 0 : ctx.gridStep;
-    const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
-    const point = axis === 'x' ? v2(ref.x, free(cursor.y)) : v2(free(cursor.x), ref.y);
-    alignments.push({ point, score: delta + tol * 0.25, guides: [{ from: ref, to: point, kind: 'alignment' }] });
-  };
   if (sn.alignment) {
-    const cursorOnFace = faceTracks.some(({ a, b }) => {
-      const d = sub(b, a);
-      const ll = dot(d, d);
-      if (ll < 1e-12) return false;
-      const t = dot(sub(cursor, a), d) / ll;
-      if (t < 0 || t > 1) return false;
-      return dist(cursor, v2(a.x + d.x * t, a.y + d.y * t)) <= tol;
+    const xLines: AxisLine[] = [];
+    const yLines: AxisLine[] = [];
+    const seenX = new Set<number>();
+    const seenY = new Set<number>();
+    for (const r of refs) {
+      if (Math.abs(cursor.x - r.x) <= tol && !seenX.has(r.x)) {
+        seenX.add(r.x);
+        xLines.push({ value: r.x, from: r });
+      }
+      if (Math.abs(cursor.y - r.y) <= tol && !seenY.has(r.y)) {
+        seenY.add(r.y);
+        yLines.push({ value: r.y, from: r });
+      }
+    }
+
+    // Alinhamento simples: uma linha só, com o outro eixo livre (grade, se ligada).
+    for (const l of xLines) {
+      const p = v2(l.value, free(cursor.y));
+      add(p, 'alignment', [{ from: l.from, to: p, kind: 'alignment' }]);
+    }
+    for (const l of yLines) {
+      const p = v2(free(cursor.x), l.value);
+      add(p, 'alignment', [{ from: l.from, to: p, kind: 'alignment' }]);
+    }
+
+    // Trechos de face: a projeção do cursor sobre a face vira alinhamento quando está fora do segmento
+    // (dentro do segmento a captura "nearest" já cobre o ponto).
+    const tracks = faceTracks.filter((tr) => {
+      const d = sub(tr.b, tr.a);
+      return dot(d, d) >= 1e-12;
     });
-    if (!cursorOnFace) {
-      for (const r of refs) {
-        addAxisRef('x', r);
-        addAxisRef('y', r);
+    for (const tr of tracks) {
+      const d = sub(tr.b, tr.a);
+      const t = dot(sub(cursor, tr.a), d) / dot(d, d);
+      const projected = v2(tr.a.x + d.x * t, tr.a.y + d.y * t);
+      if (dist(cursor, projected) <= tol && (t < 0 || t > 1)) {
+        const anchor = closestOnSegment(projected, tr.a, tr.b);
+        add(projected, 'alignment', [{ from: anchor, to: projected, kind: 'alignment' }]);
       }
     }
-    // Rastreia a extensão das faces laterais, inclusive em paredes oblíquas. A âncora da guia
-    // fica no trecho real da face mais próximo da projeção, e o ponto pode cair fora do segmento.
-    for (const { a, b } of faceTracks) {
-      const d = sub(b, a);
-      const ll = dot(d, d);
-      if (ll < 1e-12) continue;
-      const t = dot(sub(cursor, a), d) / ll;
-      const projected = v2(a.x + d.x * t, a.y + d.y * t);
-      const off = dist(cursor, projected);
-      if (off <= tol && (t < 0 || t > 1)) {
-        const anchor = closestOnSegment(projected, a, b);
-        alignments.push({ point: projected, score: off + tol * 0.25, guides: [{ from: anchor, to: projected, kind: 'alignment' }] });
+
+    // Cruzamentos entre restrições: x × y, x × face, y × face e face × face. São o ponto que o usuário quer.
+    const near = (p: Vec2): boolean => dist(cursor, p) <= tol * Math.SQRT2;
+    for (const xl of xLines) {
+      for (const yl of yLines) {
+        const p = v2(xl.value, yl.value);
+        if (near(p)) add(p, 'alignment', [{ from: xl.from, to: p, kind: 'alignment' }, { from: yl.from, to: p, kind: 'alignment' }], undefined, WEIGHT_ALIGN_CROSS);
       }
     }
-  }
-  const hasGeometrySnap = cands.some((c) => PRIORITY[c.kind] < PRIORITY.alignment);
-  if (alignments.length && !hasGeometrySnap) {
-    alignments.sort((a, b) => a.score - b.score);
-    const index = ((ctx.alignmentCycle ?? 0) % alignments.length + alignments.length) % alignments.length;
-    const selected = alignments[index]!;
-    add({ point: selected.point, kind: 'alignment', score: selected.score, guides: selected.guides });
+    for (const tr of tracks) {
+      const d = sub(tr.b, tr.a);
+      const anchorOf = (p: Vec2): Vec2 => closestOnSegment(p, tr.a, tr.b);
+      for (const xl of xLines) {
+        const p = crossAxis(tr.a, d, 'x', xl.value);
+        if (p && near(p)) add(p, 'alignment', [{ from: xl.from, to: p, kind: 'alignment' }, { from: anchorOf(p), to: p, kind: 'alignment' }], undefined, WEIGHT_ALIGN_CROSS);
+      }
+      for (const yl of yLines) {
+        const p = crossAxis(tr.a, d, 'y', yl.value);
+        if (p && near(p)) add(p, 'alignment', [{ from: yl.from, to: p, kind: 'alignment' }, { from: anchorOf(p), to: p, kind: 'alignment' }], undefined, WEIGHT_ALIGN_CROSS);
+      }
+    }
+    for (let i = 0; i < tracks.length; i++) {
+      for (let j = i + 1; j < tracks.length; j++) {
+        const t1 = tracks[i]!;
+        const t2 = tracks[j]!;
+        const p = intersectLines(t1.a, sub(t1.b, t1.a), t2.a, sub(t2.b, t2.a));
+        if (p && near(p)) {
+          add(p, 'alignment', [{ from: closestOnSegment(p, t1.a, t1.b), to: p, kind: 'alignment' }, { from: closestOnSegment(p, t2.a, t2.b), to: p, kind: 'alignment' }], undefined, WEIGHT_ALIGN_CROSS);
+        }
+      }
+    }
   }
 
   // Ortogonal a partir do ponto anterior: sempre ativo quando próximo, travado com Shift/opção.
   if ((sn.alignment || ctx.orthoLock) && ctx.from) {
     const d = sub(cursor, ctx.from);
-    const l = len(d);
-    if (l > 1e-6) {
+    if (len(d) > 1e-6) {
       const horiz = Math.abs(d.y) <= Math.abs(d.x);
-      const g = ctx.noGrid ? 0 : ctx.gridStep;
-      const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
       const snapped = horiz ? v2(free(cursor.x), ctx.from.y) : v2(ctx.from.x, free(cursor.y));
       const off = horiz ? Math.abs(d.y) : Math.abs(d.x);
       if (ctx.orthoLock || off <= tol * 0.7) {
-        add({ point: snapped, kind: 'ortho', score: ctx.orthoLock ? 0 : off + tol * 0.4, guides: [{ from: ctx.from, to: snapped, kind: 'ortho' }] });
+        add(snapped, 'ortho', [{ from: ctx.from, to: snapped, kind: 'ortho' }], undefined, ctx.orthoLock ? 0.4 : WEIGHT.ortho);
       }
     }
   }
 
-  return pickBest(cands, cursor, [], ctx.noGrid || !sn.grid ? undefined : ctx.gridStep);
+  return bestOf(cands, cursor, tol, ctx.previous, ctx.cycle, [], g > 0 ? g : undefined);
 }
 
-function pickBest(cands: Cand[], cursor: Vec2, guides: Guide[], grid: number | undefined): Inference {
-  let best: Cand | null = null;
-  for (const c of cands) {
-    if (!best) best = c;
-    else if (PRIORITY[c.kind] < PRIORITY[best.kind] || (PRIORITY[c.kind] === PRIORITY[best.kind] && c.score < best.score)) best = c;
+/**
+ * Escolhe o candidato: menor custo (distância normalizada + peso do tipo), com histerese para a captura anterior.
+ * `cycle` percorre a lista ordenada (Tab). Sem candidato, cai na grade, se houver grade.
+ */
+function bestOf(
+  cands: Cand[],
+  cursor: Vec2,
+  tol: number,
+  previous: Inference | null | undefined,
+  cycle: number | undefined,
+  guides: Guide[],
+  grid: number | undefined,
+): Inference {
+  const ranked = cands
+    .map((c) => {
+      const keep = previous && previous.kind === c.kind && dist(previous.point, c.point) <= 1e-9;
+      return { c, rank: dist(cursor, c.point) / tol + c.weight - (keep ? HYSTERESIS : 0) };
+    })
+    .sort((a, b) => a.rank - b.rank);
+  // Mesmo ponto com o mesmo tipo aparece uma vez só, para o Tab não repetir a mesma captura.
+  const list: Cand[] = [];
+  for (const { c } of ranked) {
+    if (!list.some((o) => o.kind === c.kind && dist(o.point, c.point) <= 1e-9)) list.push(c);
   }
-  // Pontos de alta prioridade vencem; alinhamento só vence se nada de geometria real estiver perto.
-  if (best) return { point: best.point, kind: best.kind, guides: best.guides ?? guides, hostId: best.hostId };
+  if (list.length) {
+    const n = list.length;
+    const best = list[((cycle ?? 0) % n + n) % n]!;
+    return { point: best.point, kind: best.kind, guides: best.guides.length ? best.guides : guides, hostId: best.hostId };
+  }
   if (grid && grid > 0) {
     return { point: v2(Math.round(cursor.x / grid) * grid, Math.round(cursor.y / grid) * grid), kind: 'grid', guides };
   }
   return { point: cursor, kind: 'none', guides };
 }
 
-/** Parede mais próxima do cursor dentro da tolerância (para hospedar aberturas). */
-export function hostUnder(cursor: Vec2, p: Project, levelId: Id, mpp: number): { wallId: Id; offset: number; point: Vec2 } | null {
+/**
+ * Parede sobre a qual o cursor está (para portas e janelas). A faixa é a espessura da parede; com a captura
+ * ligada, soma a tolerância visual (~10 px). Com F3 (captura desligada) vale só a espessura desenhada.
+ */
+export function hostUnder(cursor: Vec2, p: Project, levelId: Id, mpp: number, snapOn = true): { wallId: Id; offset: number; point: Vec2 } | null {
   let best: { wallId: Id; offset: number; point: Vec2; d: number } | null = null;
   for (const w of wallsOnLevel(p, levelId)) {
     const near = closestOnWall(w, cursor);
-    const half = 0.3 + 10 * mpp;
+    const type = p.wallTypes[w.typeId];
+    const half = (type ? totalThickness(type) : 0.2) / 2 + (snapOn ? TOL_PX * mpp : 0);
     if (near.dist > half) continue;
     if (!best || near.dist < best.d) best = { wallId: w.id, offset: near.t, point: near.point, d: near.dist };
   }
   return best ? { wallId: best.wallId, offset: best.offset, point: best.point } : null;
 }
 
-/** Aberturas já existentes numa parede, para evitar sobreposição ao inserir. */
-export function occupiedRanges(p: Project, wallId: Id, ignoreId?: Id): Array<[number, number]> {
+/**
+ * Aberturas já existentes numa parede, para evitar sobreposição ao inserir. Com `vertical` (peitoril e altura
+ * da abertura nova), só conta as que se sobrepõem na altura: janela acima de porta não é conflito.
+ */
+export function occupiedRanges(p: Project, wallId: Id, ignoreId?: Id, vertical?: [number, number]): Array<[number, number]> {
   return openingsOfWall(p, wallId)
     .filter((o) => o.id !== ignoreId)
+    .filter((o) => {
+      if (!vertical) return true;
+      const t = p.openingTypes[o.typeId];
+      const sill = o.sillOverride ?? t?.sill ?? 0;
+      const top = sill + (t?.height ?? 2.1);
+      return sill < vertical[1] - 1e-6 && top > vertical[0] + 1e-6;
+    })
     .map((o) => {
       const t = p.openingTypes[o.typeId];
       const h = (t?.width ?? 0.8) / 2;

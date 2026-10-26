@@ -56,7 +56,7 @@ export class OpeningTool extends ToolBase {
     const half = t.width / 2;
     if (f.length < t.width + 0.02) return null;
     const o = Math.max(half + 0.01, Math.min(f.length - half - 0.01, offset));
-    for (const [a, b] of occupiedRanges(p, wallId)) {
+    for (const [a, b] of occupiedRanges(p, wallId, undefined, [t.sill, t.sill + t.height])) {
       if (o + half > a + 1e-6 && o - half < b - 1e-6) return null;
     }
     return o;
@@ -66,7 +66,7 @@ export class OpeningTool extends ToolBase {
     this.items = [];
     this.raw = p.raw;
     const pr = this.env.project();
-    const host = hostUnder(p.raw, pr, this.env.levelId(), this.env.metersPerPixel());
+    const host = hostUnder(p.raw, pr, this.env.levelId(), this.env.metersPerPixel(), this.env.options().snap?.enabled !== false);
     this.inf = null;
     this.current = null;
     if (!host) {

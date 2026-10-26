@@ -13,8 +13,9 @@ interface SnapItemDef {
 
 /** Capturas do popover, inspiradas no AutoCAD e Revit. */
 const ITEMS: SnapItemDef[] = [
-  { key: 'endpoint', label: 'Extremidade', symbol: '□', hint: 'Pontas de paredes, eixos e vértices' },
+  { key: 'endpoint', label: 'Extremidade', symbol: '□', hint: 'Pontas de paredes e vértices' },
   { key: 'midpoint', label: 'Ponto Médio', symbol: '△', hint: 'Centro das paredes e arestas' },
+  { key: 'axis', label: 'Eixos de Parede', symbol: '┼', hint: 'Pé sobre o eixo da parede (hospeda portas e janelas)' },
   { key: 'intersections', label: 'Interseção', symbol: '✕', hint: 'Cruzamento de eixos e quinas' },
   { key: 'perpendicular', label: 'Perpendicular', symbol: '⟂', hint: 'Ângulo reto a partir do ponto anterior' },
   { key: 'alignment', label: 'Rastreamento Dinâmico', symbol: '☩', shortcut: 'F11', hint: 'Linhas-guia pontilhadas de alinhamento com outros pontos' },

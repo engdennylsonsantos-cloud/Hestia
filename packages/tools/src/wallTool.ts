@@ -73,7 +73,7 @@ export class WallTool extends ToolBase {
   }
 
   private snapWall(p: PointerInfo, extra: Partial<InferContext> = {}) {
-    return this.snap(p, { ...extra, alignmentCycle: this.alignmentCycle });
+    return this.snap(p, { ...extra, cycle: this.alignmentCycle });
   }
 
   private band() {

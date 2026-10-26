@@ -191,7 +191,7 @@ describe('capturas inteligentes e rastreamento dinâmico (Smart Snaps)', () => {
     const { store } = oneWall();
     const base = { project: store.project, levelId: 'lv_0' as const, mpp: MPP, gridStep: 0.1, snap: { ...DEFAULT_SNAP, grid: false } };
     const axis = infer({ x: 5, y: 0.045 }, base);
-    const face = infer({ x: 5, y: 0.045 }, { ...base, alignmentCycle: 1 });
+    const face = infer({ x: 5, y: 0.045 }, { ...base, cycle: 1 });
     expect(axis.kind).toBe('alignment');
     expect(face.kind).toBe('alignment');
     expect(axis.point.y).toBeCloseTo(0, 6);

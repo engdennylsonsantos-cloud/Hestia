@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { generateFanRun, generateLShape, resolveStairsOnLevel, type StairComponentSketch } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
@@ -45,7 +46,7 @@ function straightWithPath(N: number, sag: number | null): StairRun {
 function arrowOf(p: Project) {
   const [st] = resolveStairsOnLevel(p, 'lv_0');
   expect(st!.issues.filter((i) => i.severity === 'error')).toEqual([]);
-  const ops = stairFills(p, [st!], LIGHT, false, 'medium', VIEW).strokes;
+  const ops = resolverZoom(stairFills(p, [st!], LIGHT, false, 'medium', VIEW), VIEW.zoom).strokes;
   const arrow = ops.filter((s) => !s.closed && s.widthPx === RISER_PX && s.alpha === 0.9);
   expect(arrow).toHaveLength(2);
   return { st: st!, shaft: arrow[0]!, head: arrow[1]! };
@@ -111,7 +112,7 @@ describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => 
   it('o rótulo SOBE continua junto ao início da seta, mesmo com a caminhada curva', () => {
     const p = projectWith([straightWithPath(17, 0.3)]);
     const [st] = resolveStairsOnLevel(p, 'lv_0');
-    const sobe = stairFills(p, [st!], LIGHT, false, 'medium', VIEW).labels.find((l) => l.text === 'SOBE')!;
+    const sobe = resolverZoom(stairFills(p, [st!], LIGHT, false, 'medium', VIEW), VIEW.zoom).labels.find((l) => l.text === 'SOBE')!;
     expect(sobe.at.x).toBeCloseTo(P, 9);
     expect(sobe.at.y).toBeCloseTo(0, 9);
     expect(sobe.fontPx).toBeGreaterThan(0);

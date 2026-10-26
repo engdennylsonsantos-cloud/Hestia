@@ -90,6 +90,14 @@ export function planStyleOf(p: Project, levelId: Id, zoom: number): PlanStyle {
   return { scale: g.scale, detail, visual, partial: g.partialStructure, paint };
 }
 
+/**
+ * Espessura de corte da categoria como `Espessura` (papel + largura do zoom de construção): é o que o traço leva para a
+ * GPU aplicar o zoom. Estilo montado à mão, sem `cut` (testes), cai na largura em px.
+ */
+export const espessuraDeCorte = (pt: Pick<PlanPaint, 'cutPx' | 'cut'>): Espessura => pt.cut ?? { widthPx: pt.cutPx };
+/** Espessura de projeção da categoria como `Espessura` (ver `espessuraDeCorte`). */
+export const espessuraDeProjecao = (pt: Pick<PlanPaint, 'projPx' | 'proj'>): Espessura => pt.proj ?? { widthPx: pt.projPx };
+
 /** Estilo de uma categoria sem substituição nenhuma (padrão do Hestia) no `zoom` dado. */
 export function defaultPaint(c: GraphicsCategory, zoom: number): PlanPaint {
   return paintOf(graphicsOf({}), c, defaultOverride(), zoom, DEFAULT_VIEW_GRAPHICS.scale, 'hiddenLine');
@@ -123,7 +131,9 @@ export function paintOps(ops: Ops, pt: PlanPaint, paper: string): Ops {
     const k = f.contour ? 1 : pt.alpha;
     const out: FillOp = { polygons: f.polygons, color: pt.halftone ? mix(f.color, paper, 0.5) : f.color, alpha: f.alpha * k };
     if (f.contour) out.contour = true;
-    if (f.hatch) out.hatch = { kind: f.hatch.kind, color: pt.halftone ? mix(f.hatch.color, paper, 0.5) : f.hatch.color, alpha: (f.hatch.alpha ?? 1) * k };
+    if (f.faixa) out.faixa = f.faixa;
+    if (f.deslocamentoPx) out.deslocamentoPx = f.deslocamentoPx;
+    if (f.hatch) out.hatch = { kind: f.hatch.kind, color: pt.halftone ? mix(f.hatch.color, paper, 0.5) : f.hatch.color, alpha: (f.hatch.alpha ?? 1) * k, ...(f.hatch.zoomMin !== undefined ? { zoomMin: f.hatch.zoomMin } : {}) };
     fills.push(out);
   }
   const strokes = pt.halftone ? ops.strokes.map((s) => ({ ...s, color: mix(s.color, paper, 0.5) })) : ops.strokes;

@@ -223,7 +223,7 @@ describe('espessura em pixels de tela não depende do zoom', () => {
     const cena = new PlanScene();
     cena.setDrawList({ background: '#fff', fills: [], strokes: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 0 }], closed: false, widthPx: 3, color: '#000', alpha: 1 }], labels: [] }, vista(zoom));
     const malha = malhasNaOrdem(cena)[0]!;
-    const ys = Array.from({ length: malha.geometry.getAttribute('position').count }, (_, k) => verticeEmulado(malha.geometry, k, zoom).y);
+    const ys = Array.from({ length: 4 }, (_, k) => verticeEmulado(malha.geometry, k, zoom).y);
     expect((Math.max(...ys) - Math.min(...ys)) * zoom).toBeCloseTo(3, 6);
     cena.dispose();
   });

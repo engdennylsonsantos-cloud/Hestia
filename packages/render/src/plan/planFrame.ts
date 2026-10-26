@@ -5,6 +5,8 @@ import type { Viewport } from '../viewport.ts';
 import { gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
+import { assinaturaDeZoom } from './limiares.ts';
+import { resolverRotulos, resolverZoom } from './zoomOps.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
 
 /** Estado da planta que o quadro lê: o projeto, o nível, a vista e as opções; `version` é a versão do projeto. */
@@ -49,8 +51,8 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     theme,
     gpu: s.gpu,
     showGrid: s.showGrid,
-    geometryKey: `${s.version}|${levelId}|${dark}|${v.zoom}|${s.showUnderlay}|${s.showRoofProjection}|${geoSel.join(',')}`,
-    overlayKey: `${s.version}|${levelId}|${dark}|${v.zoom}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}`,
+    geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.showRoofProjection}|${geoSel.join(',')}`,
+    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay), selection: geoSel, hover: null, preview: [], inference: null }),
     overlay: () => buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }),
@@ -65,11 +67,12 @@ export interface PlanFrameUpdate {
   gpu: boolean;
   showGrid: boolean;
   /**
-   * Chave da geometria do nível: projeto, nível, tema, zoom, opções de vista e o que a geometria lê da seleção (só as
-   * cotas). Pan, cursor, ferramenta e a maior parte da seleção ficam fora dela.
+   * Chave da geometria do nível: projeto, nível, tema, opções de vista e o que a geometria lê da seleção (só as cotas).
+   * Pan, zoom, cursor, ferramenta e a maior parte da seleção ficam fora dela. O zoom só refaz a geometria quando passa de um
+   * limiar de detalhe (hachura, interface entre materiais): ver `PlanOps.limiares` e `assinaturaDeZoom`.
    */
   geometryKey: string;
-  /** Chave da sobreposição: projeto, nível, tema, zoom, seleção, cursor, pré-visualização e ferramenta. */
+  /** Chave da sobreposição: projeto, nível, tema, seleção, cursor, pré-visualização e ferramenta (o zoom não entra). */
   overlayKey: string;
   geometry: () => PlanOps;
   overlay: () => PlanOps;
@@ -87,6 +90,9 @@ export function sameView(a: Viewport | null, b: Viewport | null): boolean {
 }
 
 /** Dois conjuntos de rótulos com o mesmo conteúdo (texto, posição e estilo), na mesma ordem. */
+const samePapel = (a: LabelOp['papel'], b: LabelOp['papel']): boolean =>
+  a === b || (!!a && !!b && a.escala === b.escala && a.fontMm === b.fontMm && a.desvio?.mm === b.desvio?.mm && a.desvio?.ux === b.desvio?.ux && a.desvio?.uy === b.desvio?.uy);
+
 export function sameLabels(a: readonly LabelOp[], b: readonly LabelOp[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -94,7 +100,7 @@ export function sameLabels(a: readonly LabelOp[], b: readonly LabelOp[]): boolea
     const x = a[i]!;
     const y = b[i]!;
     if (x.at.x !== y.at.x || x.at.y !== y.at.y || x.text !== y.text || x.dx !== y.dx || x.dy !== y.dy) return false;
-    if (x.tone !== y.tone || x.fontPx !== y.fontPx || x.rotation !== y.rotation || x.center !== y.center) return false;
+    if (x.tone !== y.tone || x.fontPx !== y.fontPx || x.rotation !== y.rotation || x.center !== y.center || !samePapel(x.papel, y.papel)) return false;
   }
   return true;
 }
@@ -113,8 +119,18 @@ export class PlanFrame {
   private geom: PlanOps = EMPTY;
   private ov: PlanOps = EMPTY;
   private bg: string | null = null;
-  /** Rótulos da planta (geometria e sobreposição). Trocam de referência só quando o conteúdo muda. */
+  /** Rótulos da planta (geometria e sobreposição) no zoom corrente. Trocam de referência só quando o conteúdo muda. */
   private labelsValue: LabelOp[] = [];
+  /** Rótulos sem o zoom aplicado (medidas em papel), na ordem: os da geometria e os da sobreposição. */
+  private labelsLivres: LabelOp[] = [];
+  /** Limiares de detalhe da geometria atual e a assinatura do zoom em que ela foi feita. */
+  private limiares: number[] = [];
+  private assinatura = 0;
+  /** Zoom do último quadro e o dos rótulos resolvidos. */
+  private zoom = Number.NaN;
+  private zoomRotulos = Number.NaN;
+  /** Camadas resolvidas para o zoom (modo CPU e conferência), guardadas por camada e zoom. */
+  private resolvidas: { geom: PlanOps; ov: PlanOps; zoom: number; geomRes: PlanOps; ovRes: PlanOps } | null = null;
 
   constructor(private readonly scene: PlanSceneSink) {}
 
@@ -134,6 +150,12 @@ export class PlanFrame {
     this.ov = EMPTY;
     this.bg = null;
     this.labelsValue = [];
+    this.labelsLivres = [];
+    this.limiares = [];
+    this.assinatura = 0;
+    this.zoom = Number.NaN;
+    this.zoomRotulos = Number.NaN;
+    this.resolvidas = null;
   }
 
   update(u: PlanFrameUpdate): void {
@@ -159,10 +181,14 @@ export class PlanFrame {
       }
     }
 
+    this.zoom = v.zoom;
     let labelsChanged = false;
-    if (u.geometryKey !== this.geomKey) {
+    // A geometria é refeita quando a chave muda ou quando o zoom passa de um limiar de detalhe (hachura, interface).
+    if (u.geometryKey !== this.geomKey || assinaturaDeZoom(this.limiares, v.zoom) !== this.assinatura) {
       this.geomKey = u.geometryKey;
       this.geom = u.geometry();
+      this.limiares = this.geom.limiares ?? [];
+      this.assinatura = assinaturaDeZoom(this.limiares, v.zoom);
       this.setSlot(sink, 'fillsBase', this.geom.fills, [], v);
       this.setSlot(sink, 'strokesBase', [], this.geom.strokes, v);
       labelsChanged = true;
@@ -177,15 +203,27 @@ export class PlanFrame {
       if (!same) labelsChanged = true;
       this.ov = { fills: next.fills, strokes: next.strokes, labels: same ? this.ov.labels : next.labels };
     }
-    if (labelsChanged) this.labelsValue = [...this.geom.labels, ...this.ov.labels];
+    if (labelsChanged) this.labelsLivres = [...this.geom.labels, ...this.ov.labels];
+    // Os rótulos levam as medidas em papel; a fonte e o deslocamento em px saem aqui, com o zoom do quadro.
+    if (labelsChanged || this.zoomRotulos !== v.zoom) {
+      this.zoomRotulos = v.zoom;
+      const next = resolverRotulos(this.labelsLivres, v.zoom);
+      if (!sameLabels(this.labelsValue, next)) this.labelsValue = next === this.labelsLivres ? [...next] : next;
+    }
   }
 
   /** Lista de desenho completa (para o modo CPU e para a conferência): mesma ordem de desenho da cena. */
   drawList(theme: PlanTheme): PlanDrawList {
+    // Faixas e marcadores saem do zoom do último quadro; o resultado fica guardado enquanto as camadas e o zoom não mudam.
+    let r = this.resolvidas;
+    if (!r || r.geom !== this.geom || r.ov !== this.ov || r.zoom !== this.zoom) {
+      r = { geom: this.geom, ov: this.ov, zoom: this.zoom, geomRes: resolverZoom(this.geom, this.zoom), ovRes: resolverZoom(this.ov, this.zoom) };
+      this.resolvidas = r;
+    }
     return {
       background: theme.bg,
-      fills: [...this.geom.fills, ...this.ov.fills],
-      strokes: [...(this.gridOn && this.grid ? this.grid.strokes : []), ...this.geom.strokes, ...this.ov.strokes],
+      fills: [...r.geomRes.fills, ...r.ovRes.fills],
+      strokes: [...(this.gridOn && this.grid ? this.grid.strokes : []), ...r.geomRes.strokes, ...r.ovRes.strokes],
       labels: this.labelsValue,
     };
   }

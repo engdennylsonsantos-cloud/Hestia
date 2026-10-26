@@ -17,7 +17,7 @@ function comSeparador(): ProjectStore {
 describe('linhas de separação de ambiente na planta', () => {
   it('uma linha de separação gera um traço tracejado que cobre exatamente a linha', () => {
     const p = comSeparador().project;
-    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);
+    const ops = noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
     const sep = ops.strokes.filter((s) => s.dash);
     expect(sep).toHaveLength(1);
     expect(sep[0]!.closed).toBe(false);
@@ -40,7 +40,7 @@ describe('linhas de separação de ambiente na planta', () => {
 
   it('outro nível (ou nível inexistente) não recebe a linha deste nível', () => {
     const p = comSeparador().project;
-    const ops = noteOps(p, 'lv_inexistente', defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE);
+    const ops = noteOps(p, 'lv_inexistente', defaultPaint('annotation', ZOOM), LOOK, SCALE);
     expect(ops.strokes.filter((s) => s.dash)).toEqual([]);
   });
 });

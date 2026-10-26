@@ -14,20 +14,23 @@ export interface VerticeEmulado {
   dist: number;
   meia: number;
   padrao: [number, number];
+  /** O traço aparece neste zoom? (`aPadrao.z`, o zoom mínimo, como o vertex shader o aplica). Preenchimento: sim. */
+  visivel: boolean;
 }
 
 /**
  * Vértice `k` da geometria com o deslocamento do shader para o zoom dado. Geometria sem `aExt` (preenchimento) devolve só a
  * posição, sem deslocamento nem tracejado.
  */
-export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: number, papel = false): VerticeEmulado {
+export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: number, papel: boolean | { teto: number } = false): VerticeEmulado {
   const pos = geo.getAttribute('position');
   const ext = geo.getAttribute('aExt');
-  if (!ext) return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0] };
+  if (!ext) return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0], visivel: true };
   const dir = geo.getAttribute('aDir');
   const pad = geo.getAttribute('aPadrao');
-  // Com `papel`, `aExt.z` é kPapel e a largura em pixels sai do zoom, com piso de 1 px (como o vertex shader).
-  const larg = papel ? Math.max(1, ext.getZ(k) * zoom) : ext.getZ(k);
+  // Com `papel`, `aExt.z` é kPapel e a largura em pixels sai do zoom, com piso de 1 px, o fator e o teto (como o vertex shader).
+  const pp = papel === true ? { teto: 1e9 } : papel;
+  const larg = pp ? Math.min(pp.teto, ext.getW(k) * Math.max(1, ext.getZ(k) * zoom)) : ext.getZ(k);
   const meia = (0.5 * larg) / zoom;
   const along = ext.getX(k);
   const side = ext.getY(k);
@@ -39,7 +42,14 @@ export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: numbe
     dist: dir.getZ(k) * zoom + along * 0.5 * larg,
     meia: 0.5 * larg,
     padrao: [pad.getX(k), pad.getY(k)],
+    visivel: zoom >= pad.getZ(k),
   };
+}
+
+/** Vértice de preenchimento: a posição, sem deslocamento nem tracejado. */
+export function verticePlano(geo: THREE.BufferGeometry, k: number): VerticeEmulado {
+  const pos = geo.getAttribute('position');
+  return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0], visivel: true };
 }
 
 /** Malhas da cena na ordem de desenho (`renderOrder`), todas as camadas juntas. */
@@ -62,16 +72,22 @@ export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.Ortho
   for (const m of malhas) {
     const geo = m.geometry;
     const idx = geo.getIndex()!;
-    const traco = geo.getAttribute('aExt') !== undefined;
     const mat = m.material as THREE.MeshBasicMaterial & { uniforms?: Record<string, { value: unknown }> };
+    // Traço é o material de shader; a malha reaproveitada de um lote de traço pode guardar `aExt` velho e ser preenchimento agora.
+    const traco = mat.uniforms !== undefined;
     const cor = traco ? (mat.uniforms!.uCor!.value as THREE.Color) : mat.color;
     const a = traco ? (mat.uniforms!.uAlfa!.value as number) : mat.opacity;
-    const papel = traco && mat.uniforms!.uPapel!.value === 1;
+    const papel = traco && mat.uniforms!.uPapel!.value === 1 ? { teto: (mat.uniforms!.uTeto?.value as number | undefined) ?? 1e9 } : false;
     const { r, g, b } = cor;
     const vs = [0, 1, 2].map(() => ({ x: 0, y: 0, dist: 0, meia: 0, padrao: [0, 0] as [number, number] }));
-    for (let t = 0; t < idx.count; t += 3) {
+    // Só a faixa de desenho conta: o buffer pode ter capacidade sobrando (e restos de uma versão anterior do lote).
+    const n = Math.min(idx.count, geo.drawRange.count);
+    for (let t = 0; t < n; t += 3) {
+      let escondido = false;
       for (let c = 0; c < 3; c++) {
-        const e = verticeEmulado(geo, idx.getX(t + c), zoom, papel);
+        const k = idx.getX(t + c);
+        const e = traco ? verticeEmulado(geo, k, zoom, papel) : verticePlano(geo, k);
+        if (!e.visivel) escondido = true;
         vs[c] = {
           x: ((e.x - esq) / (dir - esq)) * W,
           y: ((topo - e.y) / (topo - base)) * H,
@@ -80,6 +96,8 @@ export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.Ortho
           padrao: e.padrao,
         };
       }
+      // Abaixo do zoom mínimo o shader tira os vértices da tela: o triângulo não é desenhado.
+      if (escondido) continue;
       const [v0, v1, v2] = vs as [(typeof vs)[0], (typeof vs)[0], (typeof vs)[0]];
       const area = funcaoAresta(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y);
       if (area === 0) continue;

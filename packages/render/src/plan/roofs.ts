@@ -1,13 +1,15 @@
-import { add, closestOnSegment, difference, dist, mid, multiArea, norm, offsetMulti, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { add, closestOnSegment, dist, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer } from '@hestia/engine';
-import { isRoof, paperMmToPx, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { isRoof, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
+import { zoomAtinge } from './limiares.ts';
+import { poligonoEm, tracoEm } from './marcadores.ts';
 import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
-import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
-import type { PlanTheme, StrokeOp } from './types.ts';
+import { defaultPaint, espessuraDeCorte, espessuraDeProjecao, surfaceColor, type PlanPaint } from './style.ts';
+import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
@@ -43,10 +45,10 @@ function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
 }
 
 /**
- * Desloca a etiqueta `offsetPx` pixels para o lado da seta (perpendicular a ela, y da tela cresce para baixo),
- * para não cruzar a haste. O chamador passa o valor já convertido para px de tela.
+ * Desloca a etiqueta `mm` de papel para o lado da seta (perpendicular a ela, y da tela cresce para baixo), para não
+ * cruzar a haste. A conversão em pixels, com o zoom e a escala, é feita no quadro (`resolverRotulo`).
  */
-const beside = (u: Vec2, offsetPx: number): { dx: number; dy: number } => ({ dx: -offsetPx * u.y, dy: -offsetPx * u.x });
+const beside = (u: Vec2, mm: number, escala: number): PapelRotulo => ({ escala, desvio: { mm, ux: -u.y, uy: -u.x } });
 
 /** Deslocamento em pixels de tela de um vetor do mundo (y da tela cresce para baixo). */
 const screenOffset = (w: Vec2, px: number): { dx: number; dy: number } => ({ dx: w.x * px, dy: -w.y * px });
@@ -73,28 +75,29 @@ export function highestRidge(r: ResolvedRoof): { at: Vec2; z: number } | null {
   return best;
 }
 
-/** Aresta sem inclinação (empena, kind 'gable'): tracejado longo com um traço perpendicular no meio, na espessura de corte. */
-function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, v: Viewport, widthPx: number): StrokeOp[] {
+/** Aresta sem inclinação (empena, kind 'gable'): tracejado longo com um traço perpendicular (6 px de cada lado, marcador em pixels) no meio, na espessura de corte. */
+function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
   const m = mid(a, b);
   const n = perp(norm(sub(b, a)));
-  const half = 6 / v.zoom;
+  const half = 6;
   return [
-    { pts: [a, b], closed: false, widthPx, color: theme.ink, alpha: 1, dash: [12, 5] },
-    { pts: [add(m, scale(n, -half)), add(m, scale(n, half))], closed: false, widthPx, color: theme.ink, alpha: 1 },
+    { pts: [a, b], closed: false, ...espessura, color: theme.ink, alpha: 1, dash: [12, 5] },
+    { ...tracoEm(m, [scale(n, -half), scale(n, half)], false), ...espessura, color: theme.ink, alpha: 1 },
   ];
 }
 
 /**
  * Símbolo "define inclinação" de cada aresta do contorno (A11, como no Revit): triângulo no meio da aresta, apontando
  * para dentro. Cheio na cor de destaque quando a aresta define inclinação (com o percentual ao lado, para fora);
- * vazado e cinza quando não define. `widthPx`: a espessura da projeção do telhado (linha fina de anotação).
+ * vazado e cinza quando não define. `espessura`: a da projeção do telhado (linha fina de anotação). O triângulo é um
+ * marcador em pixels (4,5 px de meia base, 8 px de altura): tem o mesmo tamanho na tela para qualquer zoom.
  */
-function defineSlopeOps(r: Roof, theme: PlanTheme, v: Viewport, widthPx: number): FloorOps {
+function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorOps {
   const out = empty();
   const b = r.boundary;
   const ccw = ringArea(b) > 0;
-  const w = 4.5 / v.zoom;
-  const h = 8 / v.zoom;
+  const w = 4.5;
+  const h = 8;
   b.forEach((a, i) => {
     const c = b[(i + 1) % b.length]!;
     if (dist(a, c) < 1e-6) return;
@@ -102,13 +105,13 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, v: Viewport, widthPx: number)
     const left = perp(t);
     const inward = ccw ? left : scale(left, -1);
     const m = mid(a, c);
-    const tri: Ring = [sub(m, scale(t, w)), add(m, scale(t, w)), add(m, scale(inward, h))];
+    const tri: Vec2[] = [scale(t, -w), scale(t, w), scale(inward, h)];
     const slope = r.edgeSlopes[i] ?? null;
     if (slope === null) {
-      out.strokes.push({ pts: tri, closed: true, widthPx, color: theme.inkSoft, alpha: 1 });
+      out.strokes.push({ ...tracoEm(m, tri, true), ...espessura, color: theme.inkSoft, alpha: 1 });
       return;
     }
-    out.fills.push({ polygons: [[tri]], color: theme.accent, alpha: 1 });
+    out.fills.push({ ...poligonoEm(m, tri), color: theme.accent, alpha: 1 });
     out.labels.push({ at: m, text: fmtPercent(slope), ...screenOffset(scale(inward, -1), 14) });
   });
   return out;
@@ -191,44 +194,40 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
     const base = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.3 : 0.5, paint);
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || v.zoom >= 40) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: waterTone(base, pl.up), alpha, hatch });
     const foot = roofFootprint(r);
     if (!coarse) {
-      const band = difference(foot, offsetMulti(foot, -paint.cutPx / v.zoom));
-      if (band.length) out.fills.push({ polygons: band, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true });
+      out.fills.push({ polygons: foot, color: mix(theme.ink, fillBase, 0.35), alpha: 1, contour: true, faixa: espessuraDeCorte(paint) });
       for (const ln of r.lines) {
         if (ln.kind === 'eave') continue;
         if (ln.kind === 'gable') {
-          out.strokes.push(...gableLineOps(ln.a, ln.b, theme, v, paint.cutPx));
+          out.strokes.push(...gableLineOps(ln.a, ln.b, theme, espessuraDeCorte(paint)));
           continue;
         }
         const dash: [number, number] | undefined = ln.kind === 'valley' ? [6, 3] : undefined;
-        out.strokes.push({ pts: [ln.a, ln.b], closed: false, widthPx: paint.cutPx, color: theme.ink, alpha: 1, ...(dash ? { dash } : {}) });
+        out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...espessuraDeCorte(paint), color: theme.ink, alpha: 1, ...(dash ? { dash } : {}) });
       }
       for (const pl of r.planes) {
         const at = labelPoint(pl.polygon);
         if (!at) continue;
         const down = { x: -pl.up.x, y: -pl.up.y };
-        out.strokes.push(...slopeArrow(down, at, v, theme, paint.cutPx));
+        out.strokes.push(...slopeArrow(down, at, v, theme, espessuraDeCorte(paint)));
         // Deslocamento lateral em mm de papel: 2 mm garantem que a etiqueta não cruze a haste da seta.
-        const sidePx = paperMmToPx(2.0, v.zoom, scale);
-        out.labels.push({ at, text: fmtPercent(pl.percent), ...beside(down, sidePx), fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
+        out.labels.push({ at, text: fmtPercent(pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
       }
     }
     if (planMode || p.settings.showTags) {
       const rd = highestRidge(r);
       // Deslocamento vertical da cota da cumeeira: equivalente a 12 px de tela no zoom/escala padrão.
-      if (rd) out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, dy: -paperMmToPx(1.2, v.zoom, scale), fontPx: paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale) });
+      if (rd) out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 1.2, uy: -1 } } });
     }
     if (p.settings.showTags) {
       const at = labelPoint(foot);
       const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
-      const fontPx = paperMmToPx(SURFACE_TEXT_MM, v.zoom, scale);
       // Grosseiro: deslocamento leve acima (-10 px ≈ -1,0 mm). Fino: a seta de caimento tem 80 px de semilado;
       // deslocamento de -52 px ≈ -5,2 mm garante que a etiqueta fique acima dela.
-      const dy = coarse ? -paperMmToPx(1.0, v.zoom, scale) : -paperMmToPx(5.2, v.zoom, scale);
-      if (at) out.labels.push({ at, text, dy, fontPx });
+      if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: coarse ? 1.0 : 5.2, uy: -1 } } });
     }
   }
   return out;
@@ -244,10 +243,10 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
   if (opts.showProjection === true) {
-    const projPx = (opts.paint ?? defaultPaint('roof', v.zoom)).projPx;
+    const proj = espessuraDeProjecao(opts.paint ?? defaultPaint('roof', v.zoom));
     for (const r of all) {
       if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
-      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, widthPx: projPx, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }
   return out;
@@ -277,7 +276,7 @@ export function roofSelectionOps(
     const roof = p.elements[r.roofId];
     if (!sel.has(r.roofId) || !isRoof(roof)) continue;
     out.strokes.push(...selectedRingOps(r, roof, theme));
-    const sym = defineSlopeOps(roof, theme, v, paint.projPx);
+    const sym = defineSlopeOps(roof, theme, espessuraDeProjecao(paint));
     out.fills.push(...sym.fills);
     out.strokes.push(...sym.strokes);
     out.labels.push(...sym.labels);

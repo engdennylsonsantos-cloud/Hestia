@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { LoteGpu } from './lotesGpu.ts';
+import { reexpandirLote, type LoteGpu } from './lotesGpu.ts';
 
 /**
  * Folga de capacidade ao crescer um buffer: quando o uso passa da capacidade, o buffer novo tem esta vez o uso. Assim, uma
@@ -80,6 +80,8 @@ export type FabricaMaterial = (lote: LoteGpu) => THREE.Material;
 export class CamadaGpu {
   private ativas: THREE.Mesh[] = [];
   private livres: THREE.Mesh[] = [];
+  /** Lotes da última aplicação (a posição é a da malha em `ativas`). */
+  private lotes: readonly LoteGpu[] = [];
 
   constructor(
     private readonly grupo: THREE.Group,
@@ -92,8 +94,40 @@ export class CamadaGpu {
     return this.ativas.length;
   }
 
+  /** Quantos lotes dependem do zoom (faixas de contorno e marcadores em pixels): só eles são refeitos quando o zoom muda. */
+  get dinamicos(): number {
+    return this.lotes.filter((l) => l.fonte).length;
+  }
+
+  /** Escreve os buffers de um lote na malha dele (posições, índices e, no traço, os atributos de espessura e tracejado). */
+  private escrever(m: THREE.Mesh, lote: LoteGpu): void {
+    escreverPosicoes(m.geometry, lote.pos);
+    escreverIndices(m.geometry, lote.idx);
+    if (lote.traco) {
+      escreverAtributo(m.geometry, 'aExt', lote.traco.ext, 4);
+      escreverAtributo(m.geometry, 'aDir', lote.traco.dir, 3);
+      escreverAtributo(m.geometry, 'aPadrao', lote.traco.padrao, 3);
+    }
+  }
+
+  /**
+   * Refaz só os lotes dinâmicos (faixas de contorno e marcadores em pixels) no zoom dado e reescreve os buffers deles: as
+   * malhas e os lotes estáticos não se mexem, e a ordem de desenho é a mesma. Devolve quantos lotes refez.
+   */
+  reexpandir(zoom: number): number {
+    let n = 0;
+    this.lotes.forEach((lote, i) => {
+      if (!lote.fonte) return;
+      reexpandirLote(lote, zoom);
+      this.escrever(this.ativas[i]!, lote);
+      n++;
+    });
+    return n;
+  }
+
   /** Refaz a camada com estes lotes: a ordem é a do vetor. Lista vazia limpa a camada (as malhas ficam livres). */
   aplicar(lotes: readonly LoteGpu[]): void {
+    this.lotes = lotes;
     lotes.forEach((lote, i) => {
       let m = this.ativas[i];
       if (!m) {
@@ -102,13 +136,7 @@ export class CamadaGpu {
         this.ativas.push(m);
         this.grupo.add(m);
       }
-      escreverPosicoes(m.geometry, lote.pos);
-      escreverIndices(m.geometry, lote.idx);
-      if (lote.traco) {
-        escreverAtributo(m.geometry, 'aExt', lote.traco.ext, 3);
-        escreverAtributo(m.geometry, 'aDir', lote.traco.dir, 3);
-        escreverAtributo(m.geometry, 'aPadrao', lote.traco.padrao, 2);
-      }
+      this.escrever(m, lote);
       m.material = this.material(lote);
       m.renderOrder = this.ordemBase + i;
     });

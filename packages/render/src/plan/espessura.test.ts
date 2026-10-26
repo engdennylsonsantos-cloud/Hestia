@@ -3,7 +3,7 @@ import { paperMmToPx } from '@hestia/model';
 import { describe, expect, it } from 'vitest';
 import { defaultPaint } from './style.ts';
 import { espessuraDePapel, kPapel, larguraEmPx } from './espessura.ts';
-import { montarLotesCamada } from './lotesGpu.ts';
+import { montarLotesCamada, SEM_TETO } from './lotesGpu.ts';
 import { verticeEmulado } from './rasterSoftware.ts';
 import { thinStrokes } from './thin.ts';
 import type { StrokeOp } from './types.ts';
@@ -16,9 +16,9 @@ function geometriaDoLote(s: StrokeOp): { geo: THREE.BufferGeometry; lote: Return
   const [lote] = montarLotesCamada([], [s]);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(lote!.pos, 3));
-  geo.setAttribute('aExt', new THREE.Float32BufferAttribute(lote!.traco!.ext, 3));
+  geo.setAttribute('aExt', new THREE.Float32BufferAttribute(lote!.traco!.ext, 4));
   geo.setAttribute('aDir', new THREE.Float32BufferAttribute(lote!.traco!.dir, 3));
-  geo.setAttribute('aPadrao', new THREE.Float32BufferAttribute(lote!.traco!.padrao, 2));
+  geo.setAttribute('aPadrao', new THREE.Float32BufferAttribute(lote!.traco!.padrao, 3));
   geo.setIndex(lote!.idx);
   return { geo, lote: lote! };
 }
@@ -26,7 +26,7 @@ function geometriaDoLote(s: StrokeOp): { geo: THREE.BufferGeometry; lote: Return
 /** Espessura em pixels que o shader dá ao traço no zoom (diferença de y dos vértices de um traço horizontal). */
 function espessuraEmTela(s: StrokeOp, zoom: number): number {
   const { geo, lote } = geometriaDoLote(s);
-  const papel = lote.papel === true;
+  const papel = lote.papel ?? false;
   const ys = Array.from({ length: geo.getAttribute('position').count }, (_, k) => verticeEmulado(geo, k, zoom, papel).y);
   return (Math.max(...ys) - Math.min(...ys)) * zoom;
 }
@@ -68,7 +68,7 @@ describe('lotes de traço separam o papel do px', () => {
   it('um traço de papel e um de px da mesma cor e alfa vão em lotes diferentes (material diferente)', () => {
     const lotes = montarLotesCamada([], [TRACO_PAPEL, { ...TRACO_PX, color: TRACO_PAPEL.color }]);
     expect(lotes).toHaveLength(2);
-    expect(lotes[0]!.papel).toBe(true);
+    expect(lotes[0]!.papel).toEqual({ teto: SEM_TETO });
     expect(lotes[1]!.papel).toBeUndefined();
     expect(lotes[0]!.key).not.toBe(lotes[1]!.key);
   });
@@ -79,7 +79,9 @@ describe('thinStrokes com traço de papel', () => {
     const lista = [{ ...TRACO_PAPEL }];
     thinStrokes(lista);
     expect(lista[0]!.widthPx).toBe(1);
-    expect(lista[0]!.papel).toBeUndefined();
+    // O peso de papel fica, limitado a 1 px (a GPU aplica o limite com o zoom corrente).
+    expect(lista[0]!.papel).toMatchObject({ mm: 0.3, escala: 100, teto: 1 });
+    expect(larguraEmPx(lista[0]!, 220)).toBe(1);
   });
 
   it('traço em px acima de 1 px sai em 1 px; abaixo ou igual fica como estava', () => {

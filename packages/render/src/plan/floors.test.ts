@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolverZoom } from './zoomOps.ts';
 import { multiArea, pointInPolygon, type Vec2 } from '@hestia/geom';
 import { resolveFloors, resolveLevel } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeFloor, makeWall, type DetailLevel, type Project } from '@hestia/model';
@@ -39,7 +40,7 @@ function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
   };
 }
 
-const floorFill = (p: Project, detail: DetailLevel, zoom = 100) => floorFills(p, 'lv_0', LIGHT, false, detail, VIEW(zoom));
+const floorFill = (p: Project, detail: DetailLevel, zoom = 100) => resolverZoom(floorFills(p, 'lv_0', LIGHT, false, detail, VIEW(zoom)), zoom);
 
 describe('piso na planta (D1)', () => {
   it('é desenhado antes das paredes: o primeiro preenchimento é o do piso', () => {

@@ -1,0 +1,108 @@
+import { useCallback, useEffect, useMemo, type CSSProperties, type ReactElement } from 'react';
+import { frameOfWall } from '@hestia/engine';
+import { isOpening, type Id } from '@hestia/model';
+import { worldToScreen } from '@hestia/render';
+import { nextOpeningFlip, openingGripPlacements, openingHasHinge, type OpeningFlipKind } from '@hestia/tools';
+import { editor, useProject } from '../editor/controller.ts';
+import { useUi } from '../editor/state.ts';
+
+const BASE: CSSProperties = {
+  position: 'absolute',
+  transform: 'translate(-50%, -50%)',
+  width: 26,
+  height: 26,
+  padding: 0,
+  borderRadius: '50%',
+  border: '1px solid var(--accent)',
+  background: 'var(--panel)',
+  color: 'var(--fg)',
+  display: 'grid',
+  placeItems: 'center',
+  font: '600 13px var(--font-ui)',
+  lineHeight: 1,
+  cursor: 'pointer',
+  pointerEvents: 'auto',
+  boxShadow: 'var(--shadow)',
+};
+
+/** Para os eventos do ponteiro não chegarem ao canvas (que selecionaria/arrastaria a vista por baixo). */
+const stop = (e: { stopPropagation(): void }): void => e.stopPropagation();
+
+/**
+ * Alças de inverter a abertura selecionada na planta (Revit: flip controls). Ficam do lado oposto ao da abertura,
+ * acompanham pan/zoom (posição calculada do mundo para a tela) e gravam pelo comando `updateElements`, num passo de
+ * desfazer. Tab inverte o sentido e Espaço a dobradiça, com a Selecionar ativa.
+ */
+export function OpeningFlipGrips({ openingId }: { openingId: Id }): ReactElement | null {
+  const p = useProject();
+  const tick = useUi((s) => s.previewTick);
+  const apply = useCallback((kind: OpeningFlipKind): void => {
+    const current = editor.project.elements[openingId];
+    if (!current || !isOpening(current)) return;
+    editor.store.exec({ type: 'updateElements', ids: [openingId], patch: nextOpeningFlip(current, kind) });
+    useUi.setState({ status: kind === 'facing' ? 'Sentido de abertura invertido.' : 'Dobradiça invertida.' });
+  }, [openingId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const isFacing = e.key === 'Tab';
+      const isHand = e.code === 'Space';
+      if ((!isFacing && !isHand) || e.ctrlKey || e.altKey || e.metaKey) return;
+      const st = useUi.getState();
+      if (st.tool !== 'select' || st.view !== 'plan' || st.typed || st.dialog || st.fileMenu) return;
+      if (st.selection.length !== 1 || st.selection[0] !== openingId) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.tagName === 'BUTTON' || target.tagName === 'A' || target.isContentEditable)) return;
+      const current = editor.project.elements[openingId];
+      if (!current || !isOpening(current)) return;
+      if (isHand) {
+        const type = editor.project.openingTypes[current.typeId];
+        if (!type || !openingHasHinge(type)) return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      apply(isFacing ? 'facing' : 'hand');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [openingId, apply]);
+
+  const viewport = useMemo(() => editor.viewport(), [tick]);
+  const opening = p.elements[openingId];
+  if (!opening || !isOpening(opening) || !viewport) return null;
+  const frame = frameOfWall(p, opening.hostId);
+  const type = p.openingTypes[opening.typeId];
+  if (!frame || !type) return null;
+  const grips = openingGripPlacements(frame, opening, type);
+  const facing = worldToScreen(viewport, grips.facing);
+  const hand = grips.hand ? worldToScreen(viewport, grips.hand) : null;
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 12, pointerEvents: 'none' }}>
+      <button
+        type="button"
+        title="Inverter sentido (Tab)"
+        aria-label="Inverter sentido"
+        style={{ ...BASE, left: facing.x, top: facing.y }}
+        onPointerDown={stop}
+        onPointerUp={stop}
+        onClick={(e) => { stop(e); apply('facing'); }}
+      >
+        ⇅
+      </button>
+      {hand && (
+        <button
+          type="button"
+          title="Inverter dobradiça (Espaço)"
+          aria-label="Inverter dobradiça"
+          style={{ ...BASE, left: hand.x, top: hand.y }}
+          onPointerDown={stop}
+          onPointerUp={stop}
+          onClick={(e) => { stop(e); apply('hand'); }}
+        >
+          ⇄
+        </button>
+      )}
+    </div>
+  );
+}

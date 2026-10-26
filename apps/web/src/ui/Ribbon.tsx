@@ -1,7 +1,11 @@
 import { useEffect, useMemo, type ReactElement } from 'react';
+import type { Opening, Project } from '@hestia/model';
+import { openingHasHinge } from '@hestia/tools';
+import { editor } from '../editor/controller.ts';
 import { useI18n } from '../editor/i18n.ts';
 import { perimeterActions, usePerimeter } from '../editor/perimeter.ts';
 import { useUi } from '../editor/state.ts';
+import { Icon } from './Icon.tsx';
 import { txt, type RibbonTab, type RibbonTabId } from './ribbon/model.ts';
 import { PanelView } from './ribbon/parts.tsx';
 import { contextTab, perimeterTab } from './ribbon/context.ts';
@@ -9,6 +13,36 @@ import { TABS } from './ribbon/tabs.ts';
 import { useRibbonCtx } from './ribbon/useCtx.ts';
 import { PerimeterRibbonPanels } from './perimeter/PerimeterRibbonPanels.tsx';
 import './perimeter/perimeter.css';
+
+/**
+ * Painel extra da aba contextual de Portas/Janelas: inverte a dobradiça e o sentido da instância selecionada e liga as
+ * etiquetas das esquadrias na planta. Usa os mesmos comandos da paleta de propriedades (`updateElements`/`setSettings`).
+ */
+function OpeningActions({ opening, p }: { opening: Opening; p: Project }): ReactElement {
+  const type = p.openingTypes[opening.typeId];
+  const hinge = !!type && openingHasHinge(type);
+  const tags = p.settings.showOpeningTags === true;
+  const set = (patch: Partial<Opening>): void => editor.store.exec({ type: 'updateElements', ids: [opening.id], patch });
+  return (
+    <div className="rb-panel" role="group" aria-label="Abertura">
+      <div className="rb-cols">
+        <button className="rb-btn rb-small" title="Inverter sentido (Tab)" aria-label="Inverter sentido" onClick={() => set({ flipFacing: !opening.flipFacing })}>
+          <Icon name="rehost" size={16} />
+          <span className="rb-lbl">Inverter sentido</span>
+        </button>
+        <button className="rb-btn rb-small" title="Inverter dobradiça (Espaço)" aria-label="Inverter dobradiça" disabled={!hinge} onClick={() => set({ flipHand: !opening.flipHand })}>
+          <Icon name="door" size={16} />
+          <span className="rb-lbl">Inverter dobradiça</span>
+        </button>
+        <button className={`rb-btn rb-small${tags ? ' on' : ''}`} title="Etiquetas de portas e janelas" aria-label="Etiquetas de portas e janelas" aria-pressed={tags} onClick={() => editor.store.exec({ type: 'setSettings', patch: { showOpeningTags: !tags } })}>
+          <Icon name="tag" size={16} />
+          <span className="rb-lbl">Etiquetas de portas e janelas</span>
+        </button>
+      </div>
+      <div className="rb-title">Abertura</div>
+    </div>
+  );
+}
 
 /**
  * Faixa de ferramentas no padrão Revit: aba Arquivo, 14 abas na ordem do Revit e, depois de Modificar, a aba contextual
@@ -38,7 +72,13 @@ export function Ribbon(): ReactElement {
   const select = (id: RibbonTabId): void => useUi.setState({ ribbon: id });
 
   const body = (): ReactElement[] | undefined => {
-    if (activeId !== 'ctx' || !pTab) return active?.panels.map((panel) => <PanelView key={panel.id} panel={panel} ctx={ctx} lang={lang} />);
+    if (activeId !== 'ctx' || !pTab) {
+      const panels = active?.panels.map((panel) => <PanelView key={panel.id} panel={panel} ctx={ctx} lang={lang} />) ?? [];
+      // Com uma porta/janela selecionada, a aba contextual ganha os controles de inversão e o alternador de etiquetas.
+      const only = activeId === 'ctx' && ctx.selection.length === 1 ? ctx.p.elements[ctx.selection[0]!] : undefined;
+      if (only && (only.kind === 'door' || only.kind === 'window')) panels.push(<OpeningActions key="abertura" opening={only} p={ctx.p} />);
+      return panels;
+    }
     return pTab.slots.map((slot) => slot.kind === 'panel'
       ? <PanelView key={slot.panel.id} panel={slot.panel} ctx={ctx} lang={lang} />
       : (

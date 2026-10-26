@@ -142,6 +142,8 @@ export interface ToolOptions {
   openingClear?: number;
   /** Cotas temporárias: do eixo da abertura ao eixo da perpendicular (padrão) ou da borda à face. */
   openingDimMode?: 'axis' | 'face';
+  /** Etiquetar ao inserir (Revit: Tag on Placement): liga `settings.showOpeningTags` ao colocar. Ausente = ligado. */
+  openingTagOnPlace?: boolean;
   openingSillOverride?: number | null;
   placementMark?: string;
   placementComments?: string;

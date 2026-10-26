@@ -1,6 +1,6 @@
 import { arcFromSagitta, arcSample, orientedRect, perp, sub, norm, add, mul, type Vec2 } from '@hestia/geom';
 import type { Project } from '@hestia/model';
-import type { Guide, Inference, PreviewItem, StairTone } from '@hestia/tools';
+import type { Guide, Inference, PreviewItem, PreviewTone } from '@hestia/tools';
 import { sectionMarkOps } from './sectionMarks.ts';
 import type { FillOp, LabelOp, PlanTheme, StrokeOp } from './types.ts';
 import { cantosDoQuadrado, tracoEm } from './marcadores.ts';
@@ -112,9 +112,11 @@ function bandRing(a: Vec2, b: Vec2, thickness: number, sMid: number, sag = 0): V
   return [p(a, lo), p(b, lo), p(b, hi), p(a, hi)];
 }
 
-/** Cor de um tom da prévia da escada; sem tom, a cor de destaque da ferramenta. */
-export function toneColor(tone: StairTone | undefined, theme: PlanTheme): string {
+/** Cor de um tom da prévia; sem tom, a cor de destaque da ferramenta. `invalid` é a abertura sem espaço (vermelho). */
+export function toneColor(tone: PreviewTone | undefined, theme: PlanTheme): string {
   switch (tone) {
+    case 'invalid':
+      return '#dc2626';
     case 'boundary':
       return theme.stairBoundary;
     case 'riser':

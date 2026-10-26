@@ -41,6 +41,8 @@ export interface ToolEnv {
   transaction(label: string, fn: () => void, session?: object): void;
   /** Metros por pixel na vista atual; usado para tolerâncias de clique. */
   metersPerPixel(): number;
+  /** Elementos ocultos na planta atual (fora do intervalo de vista ou categoria oculta): não são alvo de captura (S-07). Ausente = nenhum. */
+  hiddenInView?(): ReadonlySet<Id>;
   gridStep(): number;
   /** Mensagem da barra de status. */
   say(msg: string): void;

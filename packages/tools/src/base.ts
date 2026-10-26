@@ -62,9 +62,11 @@ export abstract class ToolBase implements Tool {
   protected ctx(extra: Partial<InferContext> = {}): InferContext {
     const project = this.env.project();
     const levelId = this.env.levelId();
+    const hidden = this.env.hiddenInView?.();
     return {
       project,
       levelId,
+      isVisible: hidden ? (w) => !hidden.has(w.id) : undefined,
       mpp: this.env.metersPerPixel(),
       gridStep: this.env.gridStep(),
       orthoLock: this.env.options().orthoLock,

@@ -1,6 +1,7 @@
 import {
   arcFromSagitta,
   arcLocal,
+  arcPointAt,
   closestOnSegment,
   dist,
   dot,
@@ -14,7 +15,7 @@ import {
   type Arc,
   type Vec2,
 } from '@hestia/geom';
-import { wallFacesCached as facesOf } from '@hestia/engine';
+import { frameOfWall, wallFacesCached as facesOf } from '@hestia/engine';
 import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
@@ -245,6 +246,27 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       if (ctx.ignore?.has(wf.wallId)) continue;
       if (sn.faces) addSegs(wf.outline.length >= 3 ? outlineSegs(wf.outline) : wf.faces, 'face');
       if (sn.core) addSegs(wf.coreOutline.length >= 3 ? outlineSegs(wf.coreOutline) : wf.core, 'core');
+    }
+  }
+  // Faces de parede curva: as laterais são arcos concêntricos (raio R ± meia espessura), não a corda. A captura é
+  // analítica: pontas do arco, ponto médio e pé radial sobre o arco da face (S-09).
+  if (sn.faces) {
+    for (const w of walls) {
+      const arc = curveOf(w);
+      if (!arc) continue;
+      const fr = frameOfWall(ctx.project, w.id);
+      if (!fr) continue;
+      const local = arcLocal(arc, cursor);
+      const t = Math.max(0, Math.min(arc.length, local.t));
+      for (const side of [fr.sHi, fr.sLo]) {
+        for (const q of [arcPointAt(arc, 0, side), arcPointAt(arc, arc.length, side)]) {
+          if (dist(cursor, q) <= tol) add(q, 'face');
+        }
+        const mid = arcPointAt(arc, arc.length / 2, side);
+        if (sn.midpoint !== false && dist(cursor, mid) <= tol) add(mid, 'midpoint');
+        const foot = arcPointAt(arc, t, side);
+        if (dist(cursor, foot) <= tol) add(foot, 'nearest');
+      }
     }
   }
   // Interseções de eixos (reta ou arco).

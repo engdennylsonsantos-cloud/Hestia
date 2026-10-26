@@ -158,3 +158,29 @@ describe('projeto vazio', () => {
     expect(at(createEmptyProject(), 1.04, 1.06).kind).toBe('grid');
   });
 });
+
+describe('faces de parede curva (S-09): arcos concêntricos, não a corda', () => {
+  it('cursor sobre a face externa do arco cai no arco de raio R ± meia espessura', () => {
+    // Arco de flecha 1 m sobre (0;0)–(4;0); espessura 0,184 m, meia 0,092 m. Pé radial do cursor no arco externo.
+    const p = curved(walls([[0, 0], [4, 0]]), 1);
+    const arc = arcFromSagitta(v2(0, 0), v2(4, 0), 1)!;
+    const u = { x: 0.6, y: 0.8 };
+    const onFace = v2(arc.center.x + u.x * (arc.radius + 0.092), arc.center.y + u.y * (arc.radius + 0.092));
+    const r = at(p, onFace.x + 0.005, onFace.y + 0.005, { snap: { ...DEFAULT_SNAP, grid: false, alignment: false, intersections: false, perpendicular: false, endpoint: false, midpoint: false } });
+    const d = dist(r.point, arc.center);
+    const onOuter = Math.abs(d - (arc.radius + 0.092)) < 1e-6;
+    const onInner = Math.abs(d - (arc.radius - 0.092)) < 1e-6;
+    expect(onOuter || onInner).toBe(true);
+    expect(r.kind).toBe('nearest');
+  });
+});
+
+describe('visibilidade (S-07): elemento oculto não é alvo de captura', () => {
+  it('parede fora da vista não gera ponta de captura', () => {
+    const p = walls([[0, 0], [4, 0]]);
+    const id = Object.keys(p.elements).find((k) => p.elements[k]!.kind === 'wall')!;
+    const cursorAtEnd = { x: 4, y: 0.01 };
+    expect(at(p, cursorAtEnd.x, cursorAtEnd.y).kind).toBe('endpoint');
+    expect(at(p, cursorAtEnd.x, cursorAtEnd.y, { isVisible: (w) => w.id !== id }).kind).not.toBe('endpoint');
+  });
+});

@@ -35,15 +35,15 @@ export function StatusBar(): ReactElement {
     <footer className="statusbar" role="status">
       <span className="msg" title={status}>{status}</span>
       {pendente ? <span className="mono" aria-label="Sequência de atalho em andamento">{pendente}…</span> : null}
-      {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
-      {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}
+      {view === 'plan' && cursor ? <span className="mono sb-coords">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
+      <span className="mono sb-snap">{view === 'plan' && snap && SNAP[snap] ? SNAP[snap] : ''}</span>
       <SnapButton />
       <span className="sb-filter" title={pt ? `Filtro de seleção: ${nSel} elemento${nSel === 1 ? '' : 's'} selecionado${nSel === 1 ? '' : 's'}` : `Selection filter: ${nSel} selected`}>
         <Icon name="funnel" size={12} />
         <span className="mono">:{nSel}</span>
       </span>
       <IssuesButton />
-      <span className={`badge ${gpu === 'cpu' ? 'cpu' : 'gpu'}`} title={pt ? 'Motor de desenho em uso' : 'Rendering engine in use'}>{engine}</span>
+      <span className={`badge sb-engine ${gpu === 'cpu' ? 'cpu' : 'gpu'}`} title={pt ? 'Motor de desenho em uso' : 'Rendering engine in use'}>{engine}</span>
     </footer>
   );
 }

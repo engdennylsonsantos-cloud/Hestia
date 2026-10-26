@@ -59,6 +59,15 @@ export function doorOperation(t: Pick<OpeningType, 'plan'>, flipHand: boolean): 
       return flipHand ? 'SLIDING_TO_RIGHT' : 'SLIDING_TO_LEFT';
     case 'pivot':
       return 'REVOLVING';
+    case 'dblact':
+      return flipHand ? 'DOUBLE_SWING_RIGHT' : 'DOUBLE_SWING_LEFT';
+    case 'pocket':
+      return flipHand ? 'SLIDING_TO_RIGHT' : 'SLIDING_TO_LEFT';
+    case 'bifold':
+    case 'accordion':
+      return flipHand ? 'FOLDING_TO_RIGHT' : 'FOLDING_TO_LEFT';
+    case 'garage':
+      return 'SECTIONAL_OVERHEAD';
     default:
       return 'NOTDEFINED';
   }

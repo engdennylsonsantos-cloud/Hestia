@@ -1,6 +1,81 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
 import { acabamentoIssue, type OpeningAcabamento } from './openingExtras.ts';
 
+/** Campos v2 do tipo conferidos ao salvar (todos opcionais: ausente vale o padrão por leitura). */
+type OpeningTypeRuleFields = Partial<
+  Pick<
+    OpeningType,
+    | 'width'
+    | 'height'
+    | 'leafStyle'
+    | 'handle'
+    | 'frameStyle'
+    | 'grid'
+    | 'transom'
+    | 'sidelights'
+    | 'angle2d'
+    | 'angle3d'
+    | 'planDisplay'
+    | 'detail2d'
+    | 'detail3d'
+    | 'showSwing'
+    | 'swingStyle'
+    | 'leafSide'
+  >
+>;
+
+type OpeningTypeRules = Pick<OpeningType, 'kind' | 'plan' | 'leaves'> & OpeningAcabamento & OpeningTypeRuleFields;
+
+const LEAF_STYLES = ['flush', 'panel', 'glass', 'louver', 'grille'] as const;
+const HANDLES = ['none', 'lever', 'knob', 'pull'] as const;
+const FRAME_STYLES = ['rebate', 'simple', 'aduela', 'block'] as const;
+const PLAN_DISPLAYS = ['symbolic', 'projected'] as const;
+const DETAIL_2D = ['scale', 'low', 'mid', 'high', 'off'] as const;
+const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
+const SWING_STYLES = ['arc', 'dash', 'line'] as const;
+const LEAF_SIDES = ['swing', 'opposite'] as const;
+
+const inSet = (v: unknown, valid: readonly string[]): boolean => typeof v === 'string' && valid.includes(v);
+
+/** Ângulo de abertura em graus, dentro de 0..120. */
+const angleOk = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 120;
+
+/** Divisões do caixilho: inteiros de 1 a 8. */
+const gridOk = (g: { cols: number; rows: number }): boolean =>
+  Number.isInteger(g?.cols) && Number.isInteger(g?.rows) && g.cols >= 1 && g.cols <= 8 && g.rows >= 1 && g.rows <= 8;
+
+/**
+ * Confere os campos v2 opcionais (ângulos, divisões, bandeiras, conjuntos de estilo). Devolve a 1ª mensagem, ou null.
+ * Campo ausente não é conferido: vale o padrão por leitura (`openingStyle.ts`).
+ */
+function openingStyleIssue(t: OpeningTypeRules): string | null {
+  if (t.angle2d !== undefined && !angleOk(t.angle2d)) return 'Ângulo de abertura 2D: use um valor de 0 a 120°.';
+  if (t.angle3d !== undefined && !angleOk(t.angle3d)) return 'Ângulo de abertura 3D: use um valor de 0 a 120°.';
+  if (t.grid !== undefined && !gridOk(t.grid)) return 'Divisões do caixilho: use colunas e linhas inteiras de 1 a 8.';
+  if (t.transom !== undefined) {
+    const h = t.transom.height;
+    if (typeof h !== 'number' || !Number.isFinite(h) || h <= 0 || (t.height !== undefined && h >= t.height)) {
+      return 'Bandeira: a altura deve ser maior que 0 e menor que a altura do tipo.';
+    }
+  }
+  if (t.sidelights !== undefined) {
+    const w = t.sidelights.width;
+    if (typeof w !== 'number' || !Number.isFinite(w) || w <= 0 || (t.width !== undefined && w >= t.width)) {
+      return 'Bandeira lateral: a largura deve ser maior que 0 e menor que a largura do tipo.';
+    }
+  }
+  if (t.leafStyle !== undefined && !inSet(t.leafStyle, LEAF_STYLES)) return 'Estilo da folha desconhecido.';
+  if (t.handle !== undefined && !inSet(t.handle, HANDLES)) return 'Maçaneta desconhecida.';
+  if (t.frameStyle !== undefined && !inSet(t.frameStyle, FRAME_STYLES)) return 'Estilo do batente desconhecido.';
+  if (t.planDisplay !== undefined && !inSet(t.planDisplay, PLAN_DISPLAYS)) return 'Exibição em planta desconhecida.';
+  if (t.detail2d !== undefined && !inSet(t.detail2d, DETAIL_2D)) return 'Nível de detalhe 2D desconhecido.';
+  if (t.detail3d !== undefined && !inSet(t.detail3d, DETAIL_3D)) return 'Nível de detalhe 3D desconhecido.';
+  if (t.showSwing !== undefined && typeof t.showSwing !== 'boolean') return 'Arco de giro em planta: valor inválido.';
+  if (t.swingStyle !== undefined && !inSet(t.swingStyle, SWING_STYLES)) return 'Estilo do arco de giro desconhecido.';
+  if (t.leafSide !== undefined && !inSet(t.leafSide, LEAF_SIDES)) return 'Posição da folha desconhecida.';
+  return null;
+}
+
 /**
  * Família de abertura (Revit: família da porta/janela; ArchiCAD: Library Part). A família define o COMPORTAMENTO e o
  * SÍMBOLO de planta e quais contagens de folhas ela aceita; o tipo (`OpeningType`) escolhe a família e os valores; a
@@ -89,13 +164,13 @@ export function openingFamilyName(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves
  * Devolve a 1ª mensagem, ou null. O tipo é um schema fechado (nada de parâmetros autorais como no Revit): o que não
  * está em `OPENING_FAMILIES` não é desenhável e por isso é recusado.
  */
-export function openingTypeIssue(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves'> & OpeningAcabamento): string | null {
+export function openingTypeIssue(t: OpeningTypeRules): string | null {
   if (!openingFamilyOf(t)) {
     const kind = t.kind === 'door' ? 'porta' : 'janela';
     const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
     return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
   }
-  return acabamentoIssue(t);
+  return acabamentoIssue(t) ?? openingStyleIssue(t);
 }
 
 /** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */

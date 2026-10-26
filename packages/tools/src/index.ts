@@ -59,3 +59,6 @@ export * from './perimeterSession.ts';
 export * from './sketchShapes.ts';
 export * from './sketchPickFace.ts';
 export * from './sketchByPerimeter.ts';
+export * from './perimeterModify.ts';
+export * from './perimeterTool.ts';
+export * from './perimeterCommit.ts';

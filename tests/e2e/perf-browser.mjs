@@ -266,7 +266,9 @@ async function medirProjeto(n) {
   if (!zoom.length) pendencias.push(`[${rotulo}] zoom: nenhuma amostra (a roda não chegou ao canvas da planta)`);
 
   // 6. Clique de pick na 3D: pointerup até a seleção mudar.
-  await page.locator('button.leaf', { hasText: 'Modelo 3D' }).click();
+  // A interface nova abre as vistas pelo navegador de projeto (árvore, duplo clique) em vez do antigo botão da lista.
+  await page.getByRole('treeitem', { name: 'Modelo 3D' }).dblclick();
+  await page.waitForFunction(() => window.__hestia3dModel, null, { timeout: 60000 });
   await page.waitForTimeout(2000);
   await page.evaluate(() => window.__hestia3dModel.fit());
   await page.waitForTimeout(400);

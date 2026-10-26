@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { SketchResult, SketchTarget } from '@hestia/geom';
-import type { RibbonPanel, Txt } from '../ribbon/model.ts';
+import type { RibbonPanel } from '../ribbon/model.ts';
 import { P_MEASURE, P_MODIFY, P_PROPS, P_SELECT } from '../ribbon/panelsShared.ts';
 import { finishTitle, PERIMETER_TOOL, PERIMETER_TOOL_EN } from './PerimeterStatus.ts';
 
@@ -176,7 +176,7 @@ export type PerimeterTabSlot = { kind: 'panel'; panel: RibbonPanel } | { kind: '
 /** Descrição da aba "Modificar | Criar perímetro …". `key` identifica o assunto, como em `contextTab`. */
 export interface PerimeterContextTab {
   key: string;
-  label: Txt;
+  label: { pt: string; en: string };
   slots: PerimeterTabSlot[];
 }
 

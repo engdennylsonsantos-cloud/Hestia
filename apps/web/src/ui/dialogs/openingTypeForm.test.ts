@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_OPENING_TYPES, ProjectStore, buildTemplate, createEmptyProject, makeWall, type Opening, type OpeningType } from '@hestia/model';
 import { buildOpeningSchedule, frameOfWall, openingGeometry, type OpeningGeometry, type OpeningScheduleRow } from '@hestia/engine';
 import { openingPieces, type OpeningPiece } from '@hestia/render';
-import { alternarAcabamento, applyFamily, familyOptionsFor, leavesChoicesFor, leavesLabel, newOpeningTypeFromFamily } from './openingTypeForm.ts';
+import {
+  alternarAcabamento,
+  alternarSidelight,
+  alternarTransom,
+  applyFamily,
+  applyVariant,
+  defaultTransomHeight,
+  familyOptionsFor,
+  leavesChoicesFor,
+  leavesLabel,
+  newOpeningTypeFromFamily,
+  openingVariants,
+} from './openingTypeForm.ts';
 
 const store = (): ProjectStore => new ProjectStore(buildTemplate('house2'));
 
@@ -29,6 +41,87 @@ describe('famílias de abertura no formulário', () => {
     const next = applyFamily(base, correr);
     expect(next.plan).toBe('sliding');
     expect(next.leaves).toBe(2);
+  });
+});
+
+const familia = (kind: 'door' | 'window', id: string): ReturnType<typeof familyOptionsFor>[number] =>
+  familyOptionsFor(kind).find((f) => f.id === id)!;
+
+describe('campos v2 ao trocar de família', () => {
+  it('preserva leafStyle e grid válidos para a nova família', () => {
+    const base: OpeningType = {
+      ...newOpeningTypeFromFamily(familia('window', 'window_fixed')),
+      leafStyle: 'glass',
+      grid: { cols: 2, rows: 3 },
+    };
+    const next = applyFamily(base, familia('window', 'window_sliding'));
+    expect(next.plan).toBe('sliding');
+    expect(next.leafStyle).toBe('glass');
+    expect(next.grid).toEqual({ cols: 2, rows: 3 });
+  });
+
+  it('redefine o leafStyle inválido e remove o grid ao ir para porta', () => {
+    const janela: OpeningType = {
+      ...newOpeningTypeFromFamily(familia('window', 'window_fixed')),
+      leafStyle: 'panel',
+      grid: { cols: 2, rows: 2 },
+    };
+    const fixa = applyFamily(janela, familia('window', 'window_casement'));
+    expect(fixa.leafStyle).toBe('glass');
+    const porta = applyFamily(fixa, familia('door', 'door_swing'));
+    expect(porta.leafStyle).toBe('glass');
+    expect('grid' in porta).toBe(false);
+  });
+});
+
+describe('tipo novo com padrões v2 coerentes', () => {
+  it('porta de giro: folha lisa, maçaneta de haste e sem grid', () => {
+    const t = newOpeningTypeFromFamily(familia('door', 'door_swing'));
+    expect(t.leafStyle).toBe('flush');
+    expect(t.handle).toBe('lever');
+    expect(t.frameStyle).toBe('rebate');
+    expect(t.angle2d).toBe(90);
+    expect(t.angle3d).toBe(90);
+    expect('grid' in t).toBe(false);
+  });
+
+  it('janela de correr: vidro, grid 1 × 1 e maçaneta nenhuma; maxim-ar abre 30°', () => {
+    const t = newOpeningTypeFromFamily(familia('window', 'window_sliding'));
+    expect(t.leafStyle).toBe('glass');
+    expect(t.handle).toBe('none');
+    expect(t.grid).toEqual({ cols: 1, rows: 1 });
+    expect(t.angle3d).toBe(90);
+    expect(newOpeningTypeFromFamily(familia('window', 'window_casement')).angle3d).toBe(30);
+  });
+});
+
+describe('bandeiras e variantes do formulário', () => {
+  const base = newOpeningTypeFromFamily(familia('window', 'window_fixed'));
+
+  it('ligar a bandeira grava altura padrão fixa; desligar tira o campo', () => {
+    const ligada = alternarTransom({ ...base, height: 2.2 }, true);
+    expect(ligada.transom).toEqual({ height: 0.4, fixed: true });
+    expect(defaultTransomHeight(0.9)).toBe(0.3);
+    const desligada = alternarTransom(ligada, false);
+    expect('transom' in desligada).toBe(false);
+  });
+
+  it('ligar e desligar bandeiras laterais mantém a largura e remove o campo sem lados', () => {
+    const esquerda = alternarSidelight(base, 'left', true);
+    expect(esquerda.sidelights).toEqual({ left: true, right: false, width: 0.3 });
+    const duas = alternarSidelight(esquerda, 'right', true);
+    expect(duas.sidelights).toEqual({ left: true, right: true, width: 0.3 });
+    expect('sidelights' in alternarSidelight(duas, 'left', false)).toBe(true);
+    expect('sidelights' in alternarSidelight(alternarSidelight(duas, 'left', false), 'right', false)).toBe(false);
+  });
+
+  it('variante de janela grava o grid e a de porta grava o estilo', () => {
+    expect(openingVariants('door').map((v) => v.id)).toContain('veneziana');
+    const janela = applyVariant(base, openingVariants('window').find((v) => v.id === '2x2')!);
+    expect(janela.leafStyle).toBe('glass');
+    expect(janela.grid).toEqual({ cols: 2, rows: 2 });
+    const porta = applyVariant(newOpeningTypeFromFamily(familia('door', 'door_swing')), openingVariants('door').find((v) => v.id === 'painel')!);
+    expect(porta.leafStyle).toBe('panel');
   });
 });
 

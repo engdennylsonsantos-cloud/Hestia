@@ -1,4 +1,54 @@
-import { OPENING_LINTEL_DEFAULTS, newId, openingFamilies, type OpeningFamily, type OpeningLeaves, type OpeningType } from '@hestia/model';
+import {
+  OPENING_LINTEL_DEFAULTS,
+  newId,
+  openingFamilies,
+  type Id,
+  type OpeningFamily,
+  type OpeningFrameStyle,
+  type OpeningHandle,
+  type OpeningLeafStyle,
+  type OpeningLeaves,
+  type OpeningType,
+} from '@hestia/model';
+
+/** Estilos de folha aceitos por categoria (o schema é fechado; o diálogo só oferece estes). */
+const LEAF_STYLES_BY_KIND: Record<'door' | 'window', readonly OpeningLeafStyle[]> = {
+  door: ['flush', 'panel', 'glass', 'louver', 'grille'],
+  window: ['glass', 'louver', 'grille'],
+};
+
+/** Estilo de folha padrão da categoria (o mesmo de `openingStyle.ts`). */
+export function defaultLeafStyle(kind: OpeningType['kind']): OpeningLeafStyle {
+  return kind === 'door' ? 'flush' : 'glass';
+}
+
+/** Estilo de folha válido para a família (por categoria). */
+export function leafStyleValidFor(family: OpeningFamily, style: OpeningLeafStyle | undefined): boolean {
+  return style !== undefined && LEAF_STYLES_BY_KIND[family.kind].includes(style);
+}
+
+/** Divisões do caixilho dentro do contrato (inteiros de 1 a 8). */
+export function gridValid(grid: { cols: number; rows: number } | undefined): boolean {
+  return (
+    grid !== undefined &&
+    Number.isInteger(grid.cols) &&
+    Number.isInteger(grid.rows) &&
+    grid.cols >= 1 &&
+    grid.cols <= 8 &&
+    grid.rows >= 1 &&
+    grid.rows <= 8
+  );
+}
+
+/** Maçaneta coerente com a família: haste só na porta de giro e na dupla. */
+export function defaultHandleFor(family: OpeningFamily): OpeningHandle {
+  return family.id === 'door_swing' || family.id === 'door_double' ? 'lever' : 'none';
+}
+
+/** Ângulo 3D coerente: maxim-ar e basculante abrem 30°; as demais famílias, 90°. */
+export function defaultAngle3dFor(family: OpeningFamily): number {
+  return family.id === 'window_casement' || family.id === 'window_tilt' ? 30 : 90;
+}
 
 /** Famílias oferecidas ao tipo (portas ou janelas), na ordem da interface. */
 export function familyOptionsFor(kind: OpeningType['kind']): OpeningFamily[] {
@@ -16,15 +66,28 @@ export function leavesChoicesFor(family: OpeningFamily): Array<{ value: OpeningL
   return family.leaves.map((value) => ({ value, label: leavesLabel(value) }));
 }
 
-/** Aplica a família escolhida ao tipo: grava o símbolo e a 1ª contagem de folhas que ela aceita. */
+/**
+ * Aplica a família escolhida ao tipo: grava o símbolo e a 1ª contagem de folhas que ela aceita. O estilo da folha é
+ * preservado quando válido para a nova categoria e volta ao padrão quando não; o grid só existe em janela (em porta o
+ * campo é removido, voltando ao padrão por leitura).
+ */
 export function applyFamily(t: OpeningType, family: OpeningFamily): OpeningType {
-  return { ...t, plan: family.plan, leaves: family.leaves[0] ?? t.leaves };
+  const next: OpeningType = { ...t, plan: family.plan, leaves: family.leaves[0] ?? t.leaves };
+  if (t.leafStyle !== undefined && !leafStyleValidFor(family, t.leafStyle)) {
+    next.leafStyle = defaultLeafStyle(family.kind);
+  }
+  if (family.kind === 'window') {
+    if (t.grid !== undefined) next.grid = gridValid(t.grid) ? t.grid : { cols: 1, rows: 1 };
+  } else {
+    delete next.grid;
+  }
+  return next;
 }
 
-/** Tipo novo a partir da família escolhida, com nome e medidas padrão da porta ou da janela. */
+/** Tipo novo a partir da família escolhida, com nome, medidas e campos v2 padrão coerentes com a família. */
 export function newOpeningTypeFromFamily(family: OpeningFamily): OpeningType {
   const door = family.kind === 'door';
-  return {
+  const base: OpeningType = {
     id: newId('ot'),
     kind: family.kind,
     name: door ? 'Nova porta' : 'Nova janela',
@@ -38,7 +101,87 @@ export function newOpeningTypeFromFamily(family: OpeningFamily): OpeningType {
     frameMaterialId: door ? 'mat_madeira' : 'mat_aluminio',
     glassMaterialId: 'mat_vidro',
     closure: 'inherit',
+    leafStyle: defaultLeafStyle(family.kind),
+    handle: defaultHandleFor(family),
+    frameStyle: 'rebate',
+    angle2d: 90,
+    angle3d: defaultAngle3dFor(family),
   };
+  return door ? base : { ...base, grid: { cols: 1, rows: 1 } };
+}
+
+/** Altura padrão da bandeira ao ligá-la: 0,40 m ou 0,60 m abaixo do topo, o que for menor. */
+export function defaultTransomHeight(height: number): number {
+  return Math.round(Math.min(0.4, Math.max(0.1, height - 0.6)) * 100) / 100;
+}
+
+/** Liga (altura padrão fixa) ou desliga a bandeira superior; desligar tira o campo (volta ao padrão por leitura). */
+export function alternarTransom(t: OpeningType, ligado: boolean): OpeningType {
+  const next: OpeningType = { ...t };
+  delete next.transom;
+  return ligado ? { ...next, transom: { height: defaultTransomHeight(t.height), fixed: true } } : next;
+}
+
+/** Largura padrão da bandeira lateral ao ligá-la: até 0,30 m, um quarto do vão. */
+export function defaultSidelightWidth(width: number): number {
+  return Math.round(Math.min(0.3, Math.max(0.05, width / 4)) * 100) / 100;
+}
+
+/**
+ * Liga ou desliga a bandeira lateral de um lado. Sem nenhum lado ligado, o campo sai do tipo; ligar grava a largura
+ * padrão (a já existente é preservada).
+ */
+export function alternarSidelight(t: OpeningType, side: 'left' | 'right', ligado: boolean): OpeningType {
+  const cur = t.sidelights;
+  const left = side === 'left' ? ligado : cur?.left === true;
+  const right = side === 'right' ? ligado : cur?.right === true;
+  const next: OpeningType = { ...t };
+  delete next.sidelights;
+  if (!left && !right) return next;
+  const width = cur && cur.width > 0 ? cur.width : defaultSidelightWidth(t.width);
+  return { ...next, sidelights: { left, right, width } };
+}
+
+/** Variante da biblioteca: escreve o estilo da folha, as divisões e/ou o perfil no rascunho. */
+export interface OpeningVariant {
+  id: string;
+  name: string;
+  leafStyle?: OpeningLeafStyle;
+  grid?: { cols: number; rows: number };
+  frameStyle?: OpeningFrameStyle;
+  frameMaterialId?: Id;
+}
+
+const DOOR_VARIANTS: readonly OpeningVariant[] = [
+  { id: 'lisa', name: 'Lisa', leafStyle: 'flush' },
+  { id: 'painel', name: 'Painel', leafStyle: 'panel' },
+  { id: 'vidro', name: 'Vidro', leafStyle: 'glass' },
+  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver' },
+  { id: 'grade', name: 'Grade', leafStyle: 'grille' },
+];
+
+const WINDOW_VARIANTS: readonly OpeningVariant[] = [
+  { id: '1x1', name: '1 × 1', leafStyle: 'glass', grid: { cols: 1, rows: 1 } },
+  { id: '2x1', name: '2 × 1', leafStyle: 'glass', grid: { cols: 2, rows: 1 } },
+  { id: '2x2', name: '2 × 2', leafStyle: 'glass', grid: { cols: 2, rows: 2 } },
+  { id: '3x1', name: '3 × 1', leafStyle: 'glass', grid: { cols: 3, rows: 1 } },
+  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver' },
+  { id: 'perfil-simples', name: 'Perfil simples', frameStyle: 'simple' },
+];
+
+/** Variantes oferecidas para a categoria (porta: estilo da folha; janela: divisões e perfil). */
+export function openingVariants(kind: OpeningType['kind']): readonly OpeningVariant[] {
+  return kind === 'door' ? DOOR_VARIANTS : WINDOW_VARIANTS;
+}
+
+/** Aplica a variante ao rascunho: grava o estilo, o grid, o perfil e o material que ela define. */
+export function applyVariant(t: OpeningType, variant: OpeningVariant): OpeningType {
+  const next: OpeningType = { ...t };
+  if (variant.leafStyle !== undefined) next.leafStyle = variant.leafStyle;
+  if (variant.grid !== undefined) next.grid = { ...variant.grid };
+  if (variant.frameStyle !== undefined) next.frameStyle = variant.frameStyle;
+  if (variant.frameMaterialId !== undefined) next.frameMaterialId = variant.frameMaterialId;
+  return next;
 }
 
 /** Acabamentos que o diálogo liga e desliga (alizar, soleira saliente, verga e contraverga). */

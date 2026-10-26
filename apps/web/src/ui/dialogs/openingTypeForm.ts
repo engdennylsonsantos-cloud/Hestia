@@ -153,20 +153,20 @@ export interface OpeningVariant {
 }
 
 const DOOR_VARIANTS: readonly OpeningVariant[] = [
-  { id: 'lisa', name: 'Lisa', leafStyle: 'flush' },
-  { id: 'painel', name: 'Painel', leafStyle: 'panel' },
-  { id: 'vidro', name: 'Vidro', leafStyle: 'glass' },
-  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver' },
-  { id: 'grade', name: 'Grade', leafStyle: 'grille' },
+  { id: 'lisa', name: 'Lisa', leafStyle: 'flush', frameMaterialId: 'mat_madeira' },
+  { id: 'painel', name: 'Painel', leafStyle: 'panel', frameMaterialId: 'mat_madeira' },
+  { id: 'vidro', name: 'Vidro', leafStyle: 'glass', frameMaterialId: 'mat_madeira' },
+  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver', frameMaterialId: 'mat_madeira' },
+  { id: 'grade', name: 'Grade', leafStyle: 'grille', frameMaterialId: 'mat_madeira' },
 ];
 
 const WINDOW_VARIANTS: readonly OpeningVariant[] = [
-  { id: '1x1', name: '1 × 1', leafStyle: 'glass', grid: { cols: 1, rows: 1 } },
-  { id: '2x1', name: '2 × 1', leafStyle: 'glass', grid: { cols: 2, rows: 1 } },
-  { id: '2x2', name: '2 × 2', leafStyle: 'glass', grid: { cols: 2, rows: 2 } },
-  { id: '3x1', name: '3 × 1', leafStyle: 'glass', grid: { cols: 3, rows: 1 } },
-  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver' },
-  { id: 'perfil-simples', name: 'Perfil simples', frameStyle: 'simple' },
+  { id: '1x1', name: '1 × 1', leafStyle: 'glass', grid: { cols: 1, rows: 1 }, frameMaterialId: 'mat_aluminio' },
+  { id: '2x1', name: '2 × 1', leafStyle: 'glass', grid: { cols: 2, rows: 1 }, frameMaterialId: 'mat_aluminio' },
+  { id: '2x2', name: '2 × 2', leafStyle: 'glass', grid: { cols: 2, rows: 2 }, frameMaterialId: 'mat_aluminio' },
+  { id: '3x1', name: '3 × 1', leafStyle: 'glass', grid: { cols: 3, rows: 1 }, frameMaterialId: 'mat_aluminio' },
+  { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver', frameMaterialId: 'mat_aluminio' },
+  { id: 'perfil-simples', name: 'Perfil simples', frameStyle: 'simple', frameMaterialId: 'mat_aluminio' },
 ];
 
 /** Variantes oferecidas para a categoria (porta: estilo da folha; janela: divisões e perfil). */

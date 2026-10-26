@@ -120,8 +120,10 @@ describe('bandeiras e variantes do formulário', () => {
     const janela = applyVariant(base, openingVariants('window').find((v) => v.id === '2x2')!);
     expect(janela.leafStyle).toBe('glass');
     expect(janela.grid).toEqual({ cols: 2, rows: 2 });
+    expect(janela.frameMaterialId).toBe('mat_aluminio');
     const porta = applyVariant(newOpeningTypeFromFamily(familia('door', 'door_swing')), openingVariants('door').find((v) => v.id === 'painel')!);
     expect(porta.leafStyle).toBe('panel');
+    expect(porta.frameMaterialId).toBe('mat_madeira');
   });
 });
 

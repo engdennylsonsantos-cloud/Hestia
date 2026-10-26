@@ -36,7 +36,7 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
-import { transformCeiling, transformFloor, transformSlab } from './transformPlanar.ts';
+import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { comTerminoValido } from './termino.ts';
@@ -142,27 +142,6 @@ function removeIds(p: Project, ids: Id[]): void {
   const doomed = new Set(ids);
   for (const e of Object.values(p.elements)) if (isOpening(e) && doomed.has(e.hostId)) doomed.add(e.id);
   for (const id of doomed) delete p.elements[id];
-}
-
-/** Move/gira/espelha um telhado: contorno, furos, direção e águas livres (origem e direção de subida). */
-function transformRoof(r: Roof, t: Transform): Roof {
-  const pts = (ring: Vec2[]): Vec2[] => {
-    const out = ring.map((q) => applyTransform(t, q));
-    return t.kind === 'mirror' ? out.reverse() : out;
-  };
-  const dirOf = (o: Vec2, d: Vec2): Vec2 => {
-    const e = applyTransform(t, { x: o.x + d.x, y: o.y + d.y });
-    const a = applyTransform(t, o);
-    const l = Math.hypot(e.x - a.x, e.y - a.y) || 1;
-    return { x: (e.x - a.x) / l, y: (e.y - a.y) / l };
-  };
-  return {
-    ...r,
-    boundary: pts(r.boundary),
-    holes: r.holes.map(pts),
-    dir: dirOf(r.boundary[0] ?? { x: 0, y: 0 }, r.dir),
-    planes: r.planes.map((pl) => ({ ...pl, polygon: pts(pl.polygon), origin: applyTransform(t, pl.origin), up: dirOf(pl.origin, pl.up) })),
-  };
 }
 
 /** Move/gira/espelha cada elemento do tipo pedido (mesmo padrão para piso, laje, telhado, escada e ambiente). */

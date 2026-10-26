@@ -9,6 +9,8 @@ import { clickAt, drawWall, makeEnv, P, tool } from './testEnv.ts';
 /** Telhado retangular 6 × 4 criado pela ferramenta e selecionado. */
 function withRoof() {
   const ctx = makeEnv();
+  // Balanço zero: o beiral é o próprio retângulo desenhado, como os testes de edição esperam.
+  ctx.options.roofOverhang = 0;
   ctx.options.roofMode = 'rect';
   const t = tool('roof', ctx.env);
   clickAt(t, 0, 0);

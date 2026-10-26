@@ -15,6 +15,8 @@ function ctxWithSay() {
 /** Telhado retangular 6 × 4 (x 0..6, y 0..4) criado pela ferramenta Telhado, como em roofEdit.test. */
 function withRoof() {
   const ctx = ctxWithSay();
+  // Balanço zero: o beiral é o retângulo 6 × 4 desenhado, como os cálculos de cobertura destes testes esperam.
+  ctx.options.roofOverhang = 0;
   ctx.options.roofMode = 'rect';
   const t = tool('roof', ctx.env);
   clickAt(t, 0, 0);

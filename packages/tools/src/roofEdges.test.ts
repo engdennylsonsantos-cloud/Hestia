@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { polygonArea, ringArea, type Vec2 } from '@hestia/geom';
 import { makeRoof, type Roof } from '@hestia/model';
-import { editRingEdges, offsetEdge, presetEdgeSlopes, roofShapePatch } from './roofEdges.ts';
+import { editRingEdges, offsetEdge, presetEdgeSlopes, roofOverhangPatch, roofRingPatch, roofShapePatch } from './roofEdges.ts';
+import { eaveOutlinePerEdge } from './roofGeom.ts';
 
 const rect = (w: number, h: number): Vec2[] => [
   { x: 0, y: 0 },
@@ -125,5 +126,48 @@ describe('troca de forma pelas Propriedades', () => {
   it('mesma forma ou extrusão não muda nada', () => {
     expect(roofShapePatch(base, 'shed')).toEqual({});
     expect(roofShapePatch(base, 'extrusion')).toEqual({});
+  });
+});
+
+describe('telhado: balanço por aresta com pegada (roofOverhangPatch)', () => {
+  /** Telhado 4 × 3 com pegada e beiral de 0,5 m em todas as arestas. */
+  const withFootprint = (): Roof => {
+    const footprint = rect(4, 3);
+    return { ...makeRoof({ id: 't', typeId: 'rt_ceramica', levelId: 'lv_0', footprint, boundary: eaveOutlinePerEdge(footprint, [0.5, 0.5, 0.5, 0.5]), edgeOverhangs: [0.5, 0.5, 0.5, 0.5] }), order: 0 };
+  };
+
+  it('com pegada, mudar o balanço de uma aresta refaz o beiral da pegada', () => {
+    const r = withFootprint();
+    const patch = roofOverhangPatch(r, 1, 1)!;
+    expect(patch.edgeOverhangs).toEqual([0.5, 1, 0.5, 0.5]);
+    // A aresta 1 é a direita (x = 4): sai 1 m, então o beiral vai até x = 5.
+    expect(Math.max(...patch.boundary!.map((q) => q.x))).toBeCloseTo(5, 9);
+    expect(patch.boundary).toHaveLength(4);
+  });
+
+  it('voltar ao balanço anterior recria o mesmo beiral (sem deriva acumulada)', () => {
+    const r = withFootprint();
+    const moved = { ...r, ...roofOverhangPatch(r, 1, 1)! };
+    const back = roofOverhangPatch(moved, 1, 0.5)!;
+    back.boundary!.forEach((q, i) => {
+      expect(q.x).toBeCloseTo(r.boundary[i]!.x, 9);
+      expect(q.y).toBeCloseTo(r.boundary[i]!.y, 9);
+    });
+  });
+
+  it('sem pegada, a aresta anda pela diferença para o balanço anterior, como antes', () => {
+    const r = { ...makeRoof({ id: 't', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: rect(4, 3) }), order: 0 };
+    const patch = roofOverhangPatch(r, 1, 1)!;
+    expect(patch.edgeOverhangs).toEqual([0, 1, 0, 0]);
+    expect(Math.max(...patch.boundary!.map((q) => q.x))).toBeCloseTo(5, 9);
+    expect(polygonArea([patch.boundary!])).toBeCloseTo(4 * 3 + 3, 6);
+  });
+
+  it('editar um vértice à mão tira a pegada: o contorno editado passa a valer', () => {
+    const r = withFootprint();
+    const ring = r.boundary.map((q, i) => (i === 2 ? { x: q.x + 1, y: q.y } : q));
+    const patch = roofRingPatch(r, ring, null);
+    expect(patch.footprint).toBeUndefined();
+    expect(patch.boundary).toEqual(ring);
   });
 });

@@ -1,4 +1,4 @@
-import { offsetEdge, roofPatchProblem, roofSlopeError, type RoofEdgeSel } from '@hestia/tools';
+import { roofOverhangPatch, roofPatchProblem, roofSlopeError, type RoofEdgeSel } from '@hestia/tools';
 import { isRoof, type Id, type Project, type ProjectStore, type Roof } from '@hestia/model';
 import { useUi } from './state.ts';
 import { ehPrefixo } from './shortcuts.ts';
@@ -49,18 +49,16 @@ export function setEdgeSlope(store: ProjectStore, r: Roof, index: number, percen
 }
 
 /**
- * Balanço da aresta: a aresta anda para fora (positivo) ou para dentro, pela diferença para o balanço anterior, e o
- * vetor `edgeOverhangs` guarda o novo valor. Se a aresta não puder andar (vizinhas paralelas), não altera nada.
+ * Balanço da aresta (m, valor absoluto): com pegada, o beiral se refaz dela; sem, a aresta anda para fora (positivo) ou
+ * para dentro pela diferença para o balanço anterior. Se a aresta não puder andar (vizinhas paralelas), não altera nada.
  */
 export function setEdgeOverhang(store: ProjectStore, r: Roof, index: number, overhang: number): boolean {
-  const delta = overhang - (r.edgeOverhangs[index] ?? 0);
-  const ring = Math.abs(delta) < 1e-9 ? r.boundary : offsetEdge(r.boundary, index, delta);
-  if (!ring) {
+  const patch = roofOverhangPatch(r, index, overhang);
+  if (!patch) {
     say('Esta aresta não pode ser deslocada: a aresta vizinha é paralela a ela.');
     return false;
   }
-  const edgeOverhangs = r.edgeOverhangs.map((v, k) => (k === index ? overhang : v));
-  return applyRoofPatch(store, [r.id], { boundary: ring, edgeOverhangs });
+  return applyRoofPatch(store, [r.id], patch);
 }
 
 /** Alterna "define inclinação" da aresta escolhida na planta. */

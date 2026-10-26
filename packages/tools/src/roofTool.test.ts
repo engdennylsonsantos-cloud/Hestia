@@ -34,7 +34,9 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(r.typeId).toBe('rt_ceramica');
     expect(r.levelId).toBe('lv_0');
     expect(r.boundary).toHaveLength(4);
-    expect(polygonArea([r.boundary])).toBeCloseTo(24, 6);
+    // A pegada é o retângulo clicado; o beiral sai dele pelo balanço padrão de 0,5 m (cantos em esquadria: 7 × 5).
+    expect(polygonArea([r.footprint!])).toBeCloseTo(24, 6);
+    expect(polygonArea([r.boundary])).toBeCloseTo(35, 6);
     // A forma da barra (duas águas, padrão) vira predefinições por aresta: lados longos definem, curtos são empenas.
     expect(r.shape).toBe('edges');
     expect(r.edgeSlopes).toEqual([30, null, 30, null]);
@@ -72,9 +74,9 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     clickAt(t, 0, 3);
     t.confirm();
     const r = roofs(ctx.store.project)[0]!;
-    expect(r.boundary[1]!.x).toBeCloseTo(3);
-    expect(r.boundary[1]!.y).toBeCloseTo(0);
-    expect(polygonArea([r.boundary])).toBeCloseTo(9, 6);
+    expect(r.footprint![1]!.x).toBeCloseTo(3);
+    expect(r.footprint![1]!.y).toBeCloseTo(0);
+    expect(polygonArea([r.footprint!])).toBeCloseTo(9, 6);
   });
 
   it('contorno de área zero não cria telhado e avisa', () => {
@@ -210,5 +212,67 @@ describe('ferramenta Telhado: duas águas sem arestas paralelas (defeito 3)', ()
     clickAt(t, 0, 0);
     clickAt(t, 6, 4);
     expect(ctx.msgs.at(-1)).toMatch(/Telhado criado: 2 águas/);
+  });
+});
+
+describe('ferramenta Telhado: o beiral sai para fora da pegada (balanço)', () => {
+  it('contorno clicado com balanço 0,5 m: a pegada é o desenho e o beiral tem área pegada + 0,5 × perímetro + 1', () => {
+    const ctx = roofCtx('poly');
+    ctx.options.roofOverhang = 0.5;
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    clickAt(t, 4, 3);
+    clickAt(t, 0, 3);
+    clickAt(t, 0, 0);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(polygonArea([r.footprint!])).toBeCloseTo(12, 6);
+    expect(polygonArea([r.boundary])).toBeCloseTo(12 + 0.5 * 14 + 1, 6);
+    expect(r.edgeOverhangs).toEqual([0.5, 0.5, 0.5, 0.5]);
+  });
+
+  it('retângulo com balanço 0,5 m: o beiral sai pelos quatro lados (6 × 4 vira 7 × 5)', () => {
+    const ctx = roofCtx('rect');
+    ctx.options.roofOverhang = 0.5;
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 4);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(polygonArea([r.footprint!])).toBeCloseTo(24, 6);
+    expect(polygonArea([r.boundary])).toBeCloseTo(35, 6);
+    expect(Math.min(...r.boundary.map((q) => q.x))).toBeCloseTo(-0.5, 6);
+    expect(Math.max(...r.boundary.map((q) => q.y))).toBeCloseTo(4.5, 6);
+  });
+
+  it('balanço zero: o beiral é a própria pegada', () => {
+    const ctx = roofCtx('poly');
+    ctx.options.roofOverhang = 0;
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 6, 4);
+    clickAt(t, 0, 4);
+    clickAt(t, 0, 0);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(r.boundary).toHaveLength(4);
+    r.boundary.forEach((q, i) => {
+      expect(q.x).toBeCloseTo(r.footprint![i]!.x, 9);
+      expect(q.y).toBeCloseTo(r.footprint![i]!.y, 9);
+    });
+  });
+
+  it('pelas paredes: a pegada é o perímetro externo e o beiral sai dele pelo balanço', () => {
+    const ctx = roofCtx('paredes');
+    drawWall(ctx.env, [0, 0], [4, 0]);
+    drawWall(ctx.env, [4, 0], [4, 3]);
+    drawWall(ctx.env, [4, 3], [0, 3]);
+    drawWall(ctx.env, [0, 3], [0, 0]);
+    const outer = outerPerimeter(ctx.store.project, 'lv_0', { x: 2, y: 0 })!;
+    ctx.options.roofOverhang = 0.5;
+    clickAt(tool('roof', ctx.env), 2, 0);
+    const r = roofs(ctx.store.project)[0]!;
+    expect(r.footprint).toBeDefined();
+    expect(polygonArea([r.footprint!])).toBeCloseTo(polygonArea([outer]), 6);
+    expect(polygonArea([r.boundary])).toBeCloseTo(polygonArea([outer]) + 0.5 * ringPerimeter(outer) + 1, 2);
   });
 });

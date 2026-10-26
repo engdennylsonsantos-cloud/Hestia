@@ -531,8 +531,14 @@ export interface Roof {
    * vetor; 'free' e 'extrusion' ignoram-no.
    */
   edgeSlopes: Array<number | null>;
-  /** Balanço do beiral por aresta (m), informativo e usado ao recriar o contorno; mesmo comprimento de `boundary`. */
+  /** Balanço do beiral por aresta (m); mesmo comprimento de `boundary`. Com `footprint`, o beiral se refaz dele. */
   edgeOverhangs: number[];
+  /**
+   * Pegada: contorno desenhado, sem balanço, de onde o beiral saiu (modos de contorno, retângulo e paredes). Com ela,
+   * `boundary = eaveOutlinePerEdge(footprint, edgeOverhangs)`. Ausente em telhados antigos e depois de editar vértices
+   * do beiral: então o `boundary` é o que vale.
+   */
+  footprint?: Vec2[];
   /** Forma 'extrusion': perfil (altura em função de t) extrudado ao longo de `dir` (t cresce na transversal à esquerda de dir). */
   profile: RoofProfilePoint[];
   /** Telhados do mesmo nível que se sobrepõem se unem: vale a maior cota (Revit: Join Roof). */

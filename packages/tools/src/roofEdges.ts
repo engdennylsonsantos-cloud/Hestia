@@ -1,5 +1,6 @@
 import { cross, dot, len, sub, type Vec2 } from '@hestia/geom';
 import type { Roof, RoofShape } from '@hestia/model';
+import { eaveOutlinePerEdge } from './roofGeom.ts';
 
 /** Formas que viram predefinições por aresta (Revit: Define Slope). Free e extrusion têm cálculo próprio. */
 export type EdgePresetShape = 'shed' | 'gable' | 'hip' | 'edges';
@@ -104,11 +105,25 @@ export function editRingEdges<T>(values: readonly T[], edit: RingEdit): T[] {
 
 /**
  * Patch de um telhado depois de uma edição de vértice: o vetor por aresta (inclinação e balanço) acompanha a inserção na
- * aresta ou a remoção de vértice (`edit`). Sem `edit` (vértice movido), só o contorno muda.
+ * aresta ou a remoção de vértice (`edit`). Sem `edit` (vértice movido), só o contorno muda. A pegada some: o contorno
+ * editado à mão passa a valer, e o balanço por aresta volta a andar a aresta pelo contorno.
  */
 export function roofRingPatch(r: Roof, ring: Vec2[], edit: RingEdit | null): Partial<Roof> {
-  if (!edit) return { boundary: ring };
-  return { boundary: ring, edgeSlopes: editRingEdges(r.edgeSlopes, edit), edgeOverhangs: editRingEdges(r.edgeOverhangs, edit) };
+  if (!edit) return { boundary: ring, footprint: undefined };
+  return { boundary: ring, footprint: undefined, edgeSlopes: editRingEdges(r.edgeSlopes, edit), edgeOverhangs: editRingEdges(r.edgeOverhangs, edit) };
+}
+
+/**
+ * Patch do balanço da aresta `index` (valor absoluto, m). Com pegada, o beiral se refaz dela com o vetor de balanços
+ * (cantos em esquadria, sem deriva acumulada). Sem pegada (telhado antigo ou contorno editado à mão), a aresta anda pela
+ * diferença para o balanço anterior, como antes. Null quando a aresta não pode andar (vizinhas paralelas a ela).
+ */
+export function roofOverhangPatch(r: Roof, index: number, overhang: number): Partial<Roof> | null {
+  const edgeOverhangs = r.edgeOverhangs.map((v, k) => (k === index ? overhang : v));
+  if (r.footprint) return { boundary: eaveOutlinePerEdge(r.footprint, edgeOverhangs), edgeOverhangs };
+  const delta = overhang - (r.edgeOverhangs[index] ?? 0);
+  const ring = Math.abs(delta) < 1e-9 ? r.boundary : offsetEdge(r.boundary, index, delta);
+  return ring ? { boundary: ring, edgeOverhangs } : null;
 }
 
 /** Vértice mais baixo do contorno em relação à subida `up` (ponto de origem da água). */

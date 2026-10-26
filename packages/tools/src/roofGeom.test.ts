@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { polygonArea, ringArea, type Vec2 } from '@hestia/geom';
-import { roofAutoOffset, degToPercent, defaultRoofDir, eaveOutline, percentToDeg, roofDirFor, roofSlopeError, roofSlopeFromDegField, ROOF_DEFAULT_OFFSET } from './roofGeom.ts';
+import { roofAutoOffset, degToPercent, defaultRoofDir, eaveOutline, eaveOutlinePerEdge, percentToDeg, roofDirFor, roofSlopeError, roofSlopeFromDegField, ROOF_DEFAULT_OFFSET } from './roofGeom.ts';
 import { makeEnv } from './testEnv.ts';
 
 const rect = (w: number, h: number): Vec2[] => [
@@ -90,5 +90,60 @@ describe('telhado: altura padrão do beiral (B3)', () => {
 describe('telhado: área de polígono usada nos testes', () => {
   it('retângulo 4 × 3', () => {
     expect(polygonArea([rect(4, 3)])).toBeCloseTo(12, 9);
+  });
+});
+
+describe('telhado: balanço por aresta (eaveOutlinePerEdge)', () => {
+  /** Mesmos vértices, na mesma quantidade (a ordem e o vértice inicial podem diferir). */
+  const sameVertices = (a: Vec2[], b: Vec2[]): boolean => a.length === b.length && a.every((q) => b.some((z) => Math.hypot(q.x - z.x, q.y - z.y) < 1e-6));
+  const L: Vec2[] = [
+    { x: 0, y: 0 },
+    { x: 6, y: 0 },
+    { x: 6, y: 2 },
+    { x: 2, y: 2 },
+    { x: 2, y: 4 },
+    { x: 0, y: 4 },
+  ];
+
+  it('com balanços iguais coincide com eaveOutline (retângulo)', () => {
+    const r = rect(4, 3);
+    expect(sameVertices(eaveOutlinePerEdge(r, [0.5, 0.5, 0.5, 0.5]), eaveOutline(r, 0.5))).toBe(true);
+  });
+
+  it('com balanços iguais coincide com eaveOutline (L, com canto côncavo)', () => {
+    expect(sameVertices(eaveOutlinePerEdge(L, [0.3, 0.3, 0.3, 0.3, 0.3, 0.3]), eaveOutline(L, 0.3))).toBe(true);
+  });
+
+  it('retângulo 4 × 2 com balanços por aresta (topo 0,5; direita 0,2; base 0,5; esquerda 0,2): 4,4 × 3, área 13,2', () => {
+    // Contorno em sentido horário (topo, direita, base, esquerda): o sinal da área escolhe a normal para fora.
+    const ring: Vec2[] = [
+      { x: 0, y: 2 },
+      { x: 4, y: 2 },
+      { x: 4, y: 0 },
+      { x: 0, y: 0 },
+    ];
+    const out = eaveOutlinePerEdge(ring, [0.5, 0.2, 0.5, 0.2]);
+    const xs = out.map((q) => q.x);
+    const ys = out.map((q) => q.y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(4.4, 9);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(3, 9);
+    expect(polygonArea([out])).toBeCloseTo(13.2, 9);
+  });
+
+  it('balanço zero mantém a aresta no lugar', () => {
+    // Base (0,0)–(4,0) com balanço zero; a direita sai 0,5 m.
+    const r = rect(4, 3);
+    const out = eaveOutlinePerEdge(r, [0, 0.5, 0, 0]);
+    expect(out[0]!.x).toBeCloseTo(0, 9);
+    expect(out[0]!.y).toBeCloseTo(0, 9);
+    expect(out[1]!.x).toBeCloseTo(4.5, 9);
+    expect(out[1]!.y).toBeCloseTo(0, 9);
+  });
+
+  it('vértice de arestas colineares anda pelo balanço da aresta (meio da base sai 0,5 m)', () => {
+    const out = eaveOutlinePerEdge([{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }], [0.5, 0.5, 0.5, 0.5, 0.5]);
+    expect(out).toHaveLength(5);
+    expect(out[1]!.x).toBeCloseTo(2, 9);
+    expect(out[1]!.y).toBeCloseTo(-0.5, 9);
   });
 });

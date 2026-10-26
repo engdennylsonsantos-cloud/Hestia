@@ -127,7 +127,7 @@ describe('telhado por extrusão pela ferramenta Telhado (forma "Por extrusão" d
     const ctx = ctxWithMessages();
     ctx.options.roofMode = 'extrusao';
     const t = tool('roof', ctx.env);
-    expect(ctx.msgs[0]).toMatch(/clique nos vértices do beiral/);
+    expect(ctx.msgs[0]).toMatch(/clique nos vértices da pegada/);
     clickAt(t, 0, 0);
     clickAt(t, 6, 0);
     clickAt(t, 6, 4);

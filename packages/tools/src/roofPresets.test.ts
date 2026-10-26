@@ -85,6 +85,7 @@ describe('telhado nunca some (A12): edição', () => {
 describe('abertura no telhado (C4)', () => {
   it('modo abertura com o telhado selecionado cria um furo dentro do beiral', () => {
     const ctx = roofCtx('rect', 'gable');
+    ctx.options.roofOverhang = 0;
     const t = tool('roof', ctx.env);
     clickAt(t, 0, 0);
     clickAt(t, 8, 6);
@@ -119,6 +120,7 @@ describe('abertura no telhado (C4)', () => {
 describe('aresta na planta (A11)', () => {
   it('clique perto do meio de uma aresta de telhado selecionado escolhe essa aresta', () => {
     const ctx = roofCtx('rect', 'gable');
+    ctx.options.roofOverhang = 0;
     const t = tool('roof', ctx.env);
     clickAt(t, 0, 0);
     clickAt(t, 8, 6);
@@ -130,6 +132,7 @@ describe('aresta na planta (A11)', () => {
 
   it('clicar numa aresta do telhado selecionado registra a aresta sem mover o telhado', () => {
     const ctx = roofCtx('rect', 'gable');
+    ctx.options.roofOverhang = 0;
     const t = tool('roof', ctx.env);
     clickAt(t, 0, 0);
     clickAt(t, 8, 6);
@@ -153,6 +156,7 @@ function roofBase(): Omit<Roof, 'order'> {
 describe('vértices e vetor por aresta (A11)', () => {
   it('inserir vértice no meio da aresta 0 divide a aresta e duplica a inclinação dela', () => {
     const ctx = roofCtx('rect', 'gable');
+    ctx.options.roofOverhang = 0;
     const t = tool('roof', ctx.env);
     clickAt(t, 0, 0);
     clickAt(t, 8, 6);

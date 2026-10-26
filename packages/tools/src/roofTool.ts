@@ -7,7 +7,7 @@ import { ringAreaAbs } from './floorPick.ts';
 import { outerPerimeter } from './enclosed.ts';
 import { parseNumber } from './numeric.ts';
 import { pickAt } from './pick.ts';
-import { defaultRoofDir, eaveOutline, rectRing, roofAutoOffset, roofDirFor, roofSlopeError } from './roofGeom.ts';
+import { defaultRoofDir, eaveOutline, eaveOutlinePerEdge, rectRing, roofAutoOffset, roofDirFor, roofSlopeError, sameRing, uniformEdges } from './roofGeom.ts';
 import { presetEdgeSlopes, type EdgePresetShape } from './roofEdges.ts';
 import { roofPatchProblem, roofProblem } from './roofCheck.ts';
 import { fmtPercent, slopePreview } from './slabSlope.ts';
@@ -19,8 +19,8 @@ const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 type ToolMode = Exclude<RoofMode, 'extrusao'>;
 
 const MODE_HINT: Record<ToolMode, string> = {
-  poly: 'Telhado: clique nos vértices do beiral. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
-  rect: 'Telhado retangular: clique no primeiro canto e depois no canto oposto.',
+  poly: 'Telhado: clique nos vértices da pegada (o contorno sem balanço). Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. O beiral sai pelo balanço da barra. Digite o comprimento e Enter para um segmento exato.',
+  rect: 'Telhado retangular: clique no primeiro canto e depois no canto oposto. O beiral sai pelo balanço da barra.',
   paredes: 'Telhado pelas paredes: clique perto de uma parede do nível. O beiral sai do perímetro externo pelo balanço da barra de opções.',
   hole: 'Abertura no telhado: selecione um telhado e clique nos vértices da abertura, dentro do beiral. Duplo clique ou Enter fecham.',
 };
@@ -29,10 +29,11 @@ const MODE_HINT: Record<ToolMode, string> = {
 const DEFAULT_OVERHANG = 0.5;
 
 /**
- * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). Modos: contorno do beiral por cliques, retângulo, pelo perímetro
- * externo das paredes do nível com balanço, ou abertura (furo) no telhado selecionado. Tab troca o eixo da cumeeira (ou da
- * subida). A forma vira predefinições por aresta (`edgeSlopes`). A ferramenta só emite comandos, e só cria ou altera um
- * telhado se o motor gerar águas para ele: caso contrário mostra o motivo na barra de status.
+ * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). Modos: pegada por cliques, retângulo, pelo perímetro externo das
+ * paredes do nível (os três com o beiral saindo para fora pelo balanço), ou abertura (furo) no telhado selecionado. Tab
+ * troca o eixo da cumeeira (ou da subida). A forma vira predefinições por aresta (`edgeSlopes`). A ferramenta só emite
+ * comandos, e só cria ou altera um telhado se o motor gerar águas para ele: caso contrário mostra o motivo na barra de
+ * status.
  */
 export class RoofTool extends ToolBase {
   readonly id = 'roof';
@@ -84,6 +85,11 @@ export class RoofTool extends ToolBase {
 
   override inputPrompt(): string | null {
     return this.polyLike() && this.pts.length > 0 ? 'Comprimento' : null;
+  }
+
+  /** Beiral de uma pegada desenhada: cada aresta sai para fora pelo balanço da barra, com cantos em esquadria. */
+  private eaveOf(footprint: Vec2[]): Vec2[] {
+    return eaveOutlinePerEdge(footprint, uniformEdges(footprint.length, this.overhang()));
   }
 
   /** Contorno externo sob o cursor, ou null quando o cursor não está perto de uma parede do nível. */
@@ -138,7 +144,8 @@ export class RoofTool extends ToolBase {
     }
     const c = inf.point;
     const ring = rectRing(this.startPt, c);
-    this.items.push({ kind: 'polygon', ring }, ...this.ridgePreview(ring));
+    const eave = this.eaveOf(ring);
+    this.items.push({ kind: 'polygon', ring, dashed: true }, { kind: 'polygon', ring: eave }, ...this.ridgePreview(eave));
     this.items.push({ kind: 'label', at: c, text: `${fmt(Math.abs(c.x - this.startPt.x))} × ${fmt(Math.abs(c.y - this.startPt.y))}` });
   }
 
@@ -150,7 +157,10 @@ export class RoofTool extends ToolBase {
       return;
     }
     this.items.push({ kind: 'line', a: last, b: inf.point, dashed: true });
-    if (this.pts.length >= 2) this.items.push({ kind: 'polygon', ring: [...this.pts, inf.point], dashed: true });
+    if (this.pts.length >= 2) {
+      const ring = [...this.pts, inf.point];
+      this.items.push({ kind: 'polygon', ring, dashed: true }, { kind: 'polygon', ring: this.eaveOf(ring) });
+    }
     this.items.push({ kind: 'label', at: inf.point, text: fmt(dist(last, inf.point)) });
   }
 
@@ -168,7 +178,7 @@ export class RoofTool extends ToolBase {
       this.env.say('Clique perto de uma parede do nível.');
       return;
     }
-    this.commit(eaveOutline(outer, this.overhang()), this.overhang());
+    this.commit(outer, this.overhang(), eaveOutline(outer, this.overhang()));
   }
 
   private clickRect(p: PointerInfo): void {
@@ -183,7 +193,7 @@ export class RoofTool extends ToolBase {
       this.env.say('Retângulo muito estreito: afaste o canto oposto.');
       return;
     }
-    this.commit(rectRing(a, c));
+    this.commit(rectRing(a, c), this.overhang());
     this.reset();
   }
 
@@ -209,7 +219,7 @@ export class RoofTool extends ToolBase {
     const ring = this.pts;
     if (ringAreaAbs(ring) < 1e-4) this.env.say('Contorno de área zero: afaste os pontos.');
     else if (this.mode() === 'hole') this.commitHole(ring);
-    else this.commit(ring);
+    else this.commit(ring, this.overhang());
     this.reset();
   }
 
@@ -265,10 +275,12 @@ export class RoofTool extends ToolBase {
   }
 
   /**
-   * Cria o telhado no nível ativo com o tipo e as opções da barra. A forma da barra vira predefinições por aresta
-   * (shape 'edges'). Se o motor não gerar águas, não cria nada e diz o motivo.
+   * Cria o telhado no nível ativo com o tipo e as opções da barra. `footprint` é o contorno desenhado (sem balanço) e
+   * `eave` o beiral, que sai dele pelo `overhang` (padrão: deslocamento uniforme por aresta). A pegada só é guardada
+   * quando o beiral se refaz dela por aresta; senão o telhado segue como os antigos. A forma da barra vira predefinições
+   * por aresta (shape 'edges'). Se o motor não gerar águas, não cria nada e diz o motivo.
    */
-  private commit(boundary: Vec2[], overhang = 0): void {
+  private commit(footprint: Vec2[], overhang: number, eave: Vec2[] = eaveOutlinePerEdge(footprint, uniformEdges(footprint.length, overhang))): void {
     const o = this.env.options();
     const p = this.env.project();
     const levelId = this.env.levelId();
@@ -287,20 +299,22 @@ export class RoofTool extends ToolBase {
       return;
     }
     const id = newId('t');
-    const dir = roofDirFor(preset, defaultRoofDir(boundary), this.axisAlt);
+    const dir = roofDirFor(preset, defaultRoofDir(eave), this.axisAlt);
     const heightOffset = o.roofOffset ?? roofAutoOffset(p, levelId);
+    const keepFootprint = sameRing(eave, eaveOutlinePerEdge(footprint, uniformEdges(footprint.length, overhang)));
     const roof = makeRoof({
       id,
       typeId,
       levelId,
-      boundary,
+      boundary: eave,
+      ...(keepFootprint ? { footprint } : {}),
       heightOffset,
       shape: extrusion ? 'extrusion' : 'edges',
       slopePercent: slope,
       dir,
-      edgeSlopes: presetEdgeSlopes(boundary, preset, dir, slope),
-      edgeOverhangs: boundary.map(() => overhang),
-      profile: extrusion ? defaultExtrusionProfile(boundary, dir) : [],
+      edgeSlopes: presetEdgeSlopes(eave, preset, dir, slope),
+      edgeOverhangs: uniformEdges(eave.length, overhang),
+      profile: extrusion ? defaultExtrusionProfile(eave, dir) : [],
       mark: o.placementMark ?? '',
       comments: o.placementComments ?? '',
     });

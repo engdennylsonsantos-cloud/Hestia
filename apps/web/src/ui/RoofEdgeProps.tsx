@@ -41,10 +41,14 @@ export function RoofEdgeSection({ roof, index }: { roof: Roof; index: number }):
   );
 }
 
-/** Tabela de todas as arestas do telhado: nº (clique seleciona na planta), comprimento, define inclinação e %. */
+/**
+ * Tabela de todas as arestas do telhado: nº (clique seleciona na planta), comprimento, define inclinação e %. Com pegada,
+ * uma coluna com o balanço de cada aresta (o beiral se refaz da pegada).
+ */
 export function RoofEdgeTable({ roof }: { roof: Roof }): ReactElement {
   const n = roof.boundary.length;
   const edge = useUi((s) => s.roofEdge);
+  const withOverhang = roof.footprint !== undefined;
   return (
     <Group title={`Arestas (${n})`} open={n > 4}>
       <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
@@ -54,6 +58,7 @@ export function RoofEdgeTable({ roof }: { roof: Roof }): ReactElement {
             <th style={{ textAlign: 'left' }}>Comp.</th>
             <th style={{ textAlign: 'left' }}>Define</th>
             <th style={{ textAlign: 'left' }}>%</th>
+            {withOverhang && <th style={{ textAlign: 'left' }}>Balanço (m)</th>}
           </tr>
         </thead>
         <tbody>
@@ -72,6 +77,11 @@ export function RoofEdgeTable({ roof }: { roof: Roof }): ReactElement {
                   <input type="checkbox" aria-label={`Aresta ${i + 1} define inclinação`} checked={v !== null} onChange={(e) => setEdgeDefines(editor.store, roof, i, e.target.checked)} />
                 </td>
                 <td>{v === null ? '—' : <NumField value={v} width={64} onCommit={(x) => setEdgeSlope(editor.store, roof, i, x)} min={0.1} max={200} />}</td>
+                {withOverhang && (
+                  <td>
+                    <NumField value={roof.edgeOverhangs[i] ?? 0} width={64} onCommit={(x) => setEdgeOverhang(editor.store, roof, i, x)} />
+                  </td>
+                )}
               </tr>
             );
           })}

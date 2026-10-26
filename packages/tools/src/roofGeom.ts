@@ -1,4 +1,4 @@
-import { asMulti, dot, len, norm, offsetMulti, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
+import { asMulti, cross, dot, len, norm, offsetMulti, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import { wallMaxHeight, wallsOnLevel, type Id, type Project, type RoofShape } from '@hestia/model';
 
 /** Maior inclinação aceita para telhado, em % (200 % = 63,4°). Acima disso o telhado vira parede. */
@@ -108,4 +108,48 @@ export function eaveOutline(outer: Ring, overhang: number): Ring {
     }
   }
   return best ?? outer;
+}
+
+/** Normal unitária de `a` até `b` apontando para fora do contorno; zero quando a aresta é nula. */
+function outwardNormal(a: Vec2, b: Vec2, sign: number): Vec2 {
+  const e = sub(b, a);
+  if (len(e) < 1e-9) return { x: 0, y: 0 };
+  const u = norm(e);
+  // Contorno anti-horário (área positiva): a normal para fora é a direita da aresta; no sentido horário, a esquerda.
+  return { x: sign * u.y, y: -sign * u.x };
+}
+
+/**
+ * Contorno do beiral com balanço por aresta: cada aresta i (de outer[i] a outer[i+1]) anda para fora `overhangs[i]`
+ * metros, e cada vértice vira a interseção das duas arestas deslocadas que o cercam (cantos em esquadria). Com todos
+ * os balanços iguais, coincide com `eaveOutline`. Balanço zero mantém a aresta no lugar. Em vértice de arestas
+ * paralelas não há interseção: o vértice anda a média dos deslocamentos das duas arestas.
+ */
+export function eaveOutlinePerEdge(outer: Ring, overhangs: number[]): Ring {
+  const n = outer.length;
+  if (n < 3) return outer;
+  const sign = ringArea(outer) >= 0 ? 1 : -1;
+  const normals = outer.map((a, i) => outwardNormal(a, outer[(i + 1) % n]!, sign));
+  return outer.map((p, j) => {
+    const i1 = (j - 1 + n) % n;
+    const n1 = normals[i1]!;
+    const n2 = normals[j]!;
+    const d1 = overhangs[i1] ?? 0;
+    const d2 = overhangs[j] ?? 0;
+    // Deslocamento δ do vértice: n1·δ = d1 e n2·δ = d2 (regra de Cramer; det = cross(n1, n2)).
+    const det = cross(n1, n2);
+    if (Math.abs(det) < 1e-9) {
+      const d = (d1 + d2) / 2;
+      return { x: p.x + ((n1.x + n2.x) / 2) * d, y: p.y + ((n1.y + n2.y) / 2) * d };
+    }
+    return { x: p.x + (n2.y * d1 - n1.y * d2) / det, y: p.y + (n1.x * d2 - n2.x * d1) / det };
+  });
+}
+
+/** Vetor de `n` balanços iguais a `v` (m), um por aresta. */
+export const uniformEdges = (n: number, v: number): number[] => Array.from({ length: n }, () => v);
+
+/** Dois contornos com os mesmos vértices, na mesma ordem e a menos de 1 µm. */
+export function sameRing(a: Ring, b: Ring): boolean {
+  return a.length === b.length && a.every((q, i) => Math.hypot(q.x - b[i]!.x, q.y - b[i]!.y) < 1e-6);
 }

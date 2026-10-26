@@ -19,7 +19,10 @@ import {
   type SketchSeg,
   type Vec2,
 } from '@hestia/geom';
-import { segDistance } from './sketchPickFaceGeom.ts';
+import type { Id } from '@hestia/model';
+import { addSegs } from './perimeterSession.ts';
+import { roomAt } from './sketchPickRoom.ts';
+import { segDistance, type SketchCtx } from './sketchPickFaceGeom.ts';
 import type { PreviewItem } from './types.ts';
 
 /**
@@ -115,4 +118,29 @@ export function triangleHit(draft: SketchDraft, p: Vec2, mpp: number): string | 
     if (d <= SLOPE_HALF_PX * Math.SQRT2 * mpp && (!best || d < best.d)) best = { id: seg.id, d };
   }
   return best?.id ?? null;
+}
+
+/** Dica da forma "Por ambiente" na barra de status. */
+export const ROOM_HINT = 'Por ambiente: clique dentro de um ambiente com circuito fechado. O contorno dele entra no esboço.';
+
+/** Prévia do ambiente sob o cursor (contorno tracejado e o nome). Fora de ambiente, a prévia fica vazia. */
+export function roomHover(ctx: SketchCtx, at: Vec2): { items: PreviewItem[]; say: string } {
+  const r = roomAt(ctx, at);
+  if (!r) return { items: [], say: 'Aponte para dentro de um ambiente fechado.' };
+  const name = r.name || 'Ambiente';
+  const items: PreviewItem[] = [...r.segs.flatMap((s) => segLines(s, { dashed: true, halo: true })), { kind: 'label', at: r.point, text: name }];
+  return { items, say: `${name}. Clique adiciona o contorno.` };
+}
+
+/**
+ * Clique em "Por ambiente": adiciona o contorno do ambiente ao rascunho (sem repetir as linhas que já estão nele) e
+ * devolve o id do ambiente, que o forro usa em "Acompanhar o ambiente".
+ */
+export function roomClick(ctx: SketchCtx, at: Vec2, d: SketchDraft): { draft: SketchDraft; roomId?: Id; say: string } {
+  const r = roomAt(ctx, at);
+  if (!r) return { draft: d, say: 'Nada aqui: clique dentro de um ambiente com circuito fechado.' };
+  const name = r.name || 'Ambiente';
+  const fresh = r.segs.filter((s) => !hasSeg(d.segs, s));
+  if (fresh.length === 0) return { draft: d, roomId: r.roomId, say: `${name}: o contorno já está no esboço.` };
+  return { draft: addSegs(d, fresh), roomId: r.roomId, say: `Contorno do ambiente ${name} adicionado.` };
 }

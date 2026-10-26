@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SketchIssueCode, SketchResult, SketchTarget } from '@hestia/geom';
-import { PERIMETER_SHAPES, PerimeterRibbonPanels, perimeterContextTab, type PerimeterRibbonProps } from './PerimeterRibbonPanels.tsx';
+import { PERIMETER_SHAPES, PerimeterRibbonPanels, perimeterContextTab, perimeterShapesFor, type PerimeterRibbonProps } from './PerimeterRibbonPanels.tsx';
 import { PerimeterOptionsBar, type PerimeterOptions } from './PerimeterOptionsBar.tsx';
 import { PerimeterProps, type PerimeterEdgeInfo } from './PerimeterProps.tsx';
 import { edgeStatus, finishTitle, issueLines, issueText, sketchStatus } from './PerimeterStatus.ts';
@@ -22,15 +22,20 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const botao = (markup: string, label: string): string => markup.match(new RegExp(`<button[^>]*aria-label="${escapeRe(label)}"[^>]*>`))?.[0] ?? '';
 
 describe('painéis Modo e Desenhar', () => {
-  it('renderiza Modo, Desenhar, linha de limite e a galeria com todas as formas', () => {
+  it('renderiza Modo, Desenhar, linha de limite e a galeria com as formas do alvo', () => {
     const m = ribbon('floor');
     expect(m).toContain('aria-label="Modo"');
     expect(m).toContain('aria-label="Desenhar"');
     expect(m).toContain('aria-label="Linha de limite"');
     expect(m).toContain('aria-label="Formas de desenho"');
     expect(m).toContain('class="pm-galbox"');
-    for (const s of PERIMETER_SHAPES) expect(m).toContain(`aria-label="${s.label}"`);
-    expect(PERIMETER_SHAPES.map((s) => s.id)).toHaveLength(12);
+    for (const s of perimeterShapesFor('floor')) expect(m).toContain(`aria-label="${s.label}"`);
+    expect(PERIMETER_SHAPES.map((s) => s.id)).toHaveLength(13);
+  });
+
+  it('"Por ambiente" só aparece no forro', () => {
+    expect(ribbon('ceiling')).toContain('aria-label="Por ambiente (contorno do ambiente fechado)"');
+    for (const t of ['roof', 'floor', 'slab'] as const) expect(ribbon(t)).not.toContain('Por ambiente');
   });
 
   it('seta de inclinação só aparece no telhado', () => {

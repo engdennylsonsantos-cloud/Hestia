@@ -7,7 +7,7 @@ import { finishTitle, PERIMETER_TOOL, PERIMETER_TOOL_EN } from './PerimeterStatu
 /** Forma da galeria "Desenhar". `isNew` marca o que o programa ainda não tem (ponto azul no canto). */
 export type PerimeterShape =
   | 'line' | 'rect' | 'poly-inscribed' | 'poly-circumscribed' | 'circle' | 'arc-3pt' | 'arc-center' | 'arc-tangent'
-  | 'fillet' | 'ellipse' | 'pick-face' | 'by-perimeter';
+  | 'fillet' | 'ellipse' | 'pick-face' | 'by-perimeter' | 'pick-room';
 
 /** Linha que o próximo clique desenha: linha de limite (padrão) ou seta de inclinação (só telhado). */
 export type PerimeterLineKind = 'boundary' | 'slope';
@@ -17,6 +17,8 @@ interface ShapeDef {
   label: string;
   isNew: boolean;
   icon: ReactNode;
+  /** Alvos que mostram a forma. Ausente = todos. */
+  targets?: readonly SketchTarget[];
 }
 
 const cls = (...c: Array<string | false | null | undefined>): string => c.filter(Boolean).join(' ');
@@ -65,7 +67,14 @@ export const PERIMETER_SHAPES: readonly ShapeDef[] = [
     id: 'by-perimeter', label: 'Por perímetro (caixa de seleção, contorno externo)', isNew: true,
     icon: <><path className="ic-ln" d="M3 3H29V29H3Z" strokeDasharray="3 2" /><path className="ic-s1" d="M8 9H24V16H20V23H8Z" /></>,
   },
+  {
+    id: 'pick-room', label: 'Por ambiente (contorno do ambiente fechado)', isNew: false, targets: ['ceiling'],
+    icon: <><path className="ic-ln" d="M3 6H29V26H3Z" /><path className="ic-s1" d="M7 10H21V22H7Z" /><path className="ic-ac" d="M17 15L26 26L22 19L18 21Z" /></>,
+  },
 ];
+
+/** Formas da galeria para o alvo: as de `PERIMETER_SHAPES` que o alvo usa. */
+export const perimeterShapesFor = (target: SketchTarget): readonly ShapeDef[] => PERIMETER_SHAPES.filter((s) => !s.targets || s.targets.includes(target));
 
 export interface PerimeterRibbonProps {
   target: SketchTarget;
@@ -136,7 +145,7 @@ export function PerimeterRibbonPanels({ target, result, lineKind, shape, onLineK
           </div>
           <div className={cls('pm-galbox', expanded && 'pm-expanded')} role="group" aria-label="Formas de desenho">
             <div className="pm-gal" ref={galRef}>
-              {PERIMETER_SHAPES.map((s) => (
+              {perimeterShapesFor(target).map((s) => (
                 <button
                   key={s.id}
                   className={cls('pm-gi', s.isNew && 'new', shape === s.id && 'on')}

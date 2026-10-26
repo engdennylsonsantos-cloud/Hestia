@@ -1,4 +1,4 @@
-import { equal, len, multiArea, norm, type SketchDraft, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, dist, equal, len, multiArea, norm, type SketchDraft, type Vec2 } from '@hestia/geom';
 import { resolveRoofs } from '@hestia/engine';
 import { validateProject, type Element, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { setDefaults } from './perimeterSession.ts';
@@ -74,4 +74,47 @@ export function waterCount(p: Project, levelId: Id, id: Id): number {
 /** Área líquida (contorno menos furos) em m², com vírgula decimal. */
 export function areaText(outer: Vec2[], holes: Vec2[][]): string {
   return `${multiArea([[outer, ...holes]]).toFixed(2).replace('.', ',')} m²`;
+}
+
+/** Tolerância (m) para dois contornos serem o mesmo: cada vértice de um fica a até isto do traço do outro. */
+export const SAME_OUTLINE_TOL = 0.005;
+
+/** Distância de `p` ao traço do anel (lados retos). */
+function distToRing(p: Vec2, ring: Vec2[]): number {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) best = Math.min(best, dist(p, closestOnSegment(p, ring[i]!, ring[(i + 1) % ring.length]!)));
+  return best;
+}
+
+/** Os dois anéis são o mesmo contorno: cada vértice de um está a até `SAME_OUTLINE_TOL` do traço do outro, nos dois sentidos. */
+export function sameRing(a: Vec2[], b: Vec2[]): boolean {
+  return a.every((p) => distToRing(p, b) <= SAME_OUTLINE_TOL) && b.every((p) => distToRing(p, a) <= SAME_OUTLINE_TOL);
+}
+
+/** Mesmos anéis (externo e furos), em qualquer ordem. */
+export function sameRings(a: Vec2[][], b: Vec2[][]): boolean {
+  if (a.length !== b.length) return false;
+  const rest = b.slice();
+  return a.every((ra) => {
+    const k = rest.findIndex((rb) => sameRing(ra, rb));
+    if (k < 0) return false;
+    rest.splice(k, 1);
+    return true;
+  });
+}
+
+/** Ponto médio do lado mais longo do anel: um ponto sobre a face, para achar a edificação das paredes. */
+export function longestSideMid(ring: Vec2[]): Vec2 {
+  let best = 0;
+  let bestLen = -1;
+  for (let i = 0; i < ring.length; i++) {
+    const l = dist(ring[i]!, ring[(i + 1) % ring.length]!);
+    if (l > bestLen) {
+      best = i;
+      bestLen = l;
+    }
+  }
+  const a = ring[best]!;
+  const b = ring[(best + 1) % ring.length]!;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }

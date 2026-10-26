@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import { parseNumber } from './numeric.ts';
 import { PERIMETER_MODIFY_LABEL, type PerimeterModifyKind } from './perimeterModifyKind.ts';
+import { deleteSegs } from './perimeterModify.ts';
 import { selectSegs } from './perimeterSession.ts';
 import { edgeClick, edgeHint, edgePreview } from './perimeterToolModifyEdge.ts';
 import {
@@ -49,10 +50,20 @@ export class ModifyFlow {
     return this.over;
   }
 
-  /** Liga o comando. Com linhas selecionadas (comandos sobre a seleção), começa direto no passo de operação. */
+  /**
+   * Liga o comando. Com linhas selecionadas (comandos sobre a seleção), começa direto no passo de operação. Excluir com
+   * seleção apaga a seleção já, num passo de desfazer, e segue ligado para os cliques.
+   */
   start(kind: PerimeterModifyKind): void {
     const o = this.h.options();
     this.cmd = kind;
+    const d = this.h.draft();
+    if (kind === 'delete' && d.selected.length > 0) {
+      const next = deleteSegs(d, d.selected);
+      if (next) this.h.commit(next);
+      this.h.say(`${d.selected.length} linha(s) excluída(s). Clique numa linha para excluir outra, ou Esc sai.`);
+      return;
+    }
     const copy = kind === 'offset' ? o.offsetCopy : kind === 'rotate' ? o.rotateCopy : kind === 'mirror' ? o.mirrorCopy : false;
     this.st = freshStep(copy);
     if (SOURCED.has(kind) && this.h.draft().selected.length > 0) this.st.stage = 1;

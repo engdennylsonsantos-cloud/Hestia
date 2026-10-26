@@ -2,6 +2,7 @@ import { difference, ringArea, triangulate, union, type MultiPolygon, type Polyg
 import { bandTopAt, fuseBands, layerPartsOf, planeZ, slabRiseAt, wallLayerBandsAfterJunction, type JunctionLevel, type LayerBand, type ResolvedCeiling, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedSlab, type ResolvedWall } from '@hestia/engine';
 import type { GraphicsCategory, Id } from '@hestia/model';
 import { splitTJunctions, weldBands } from './layerTopology.ts';
+import { emendaDaAgua } from './roofEmendas3d.ts';
 
 /**
  * Faixa de `indices` de um lote que pertence a um elemento: `indices[start .. start + count)`, sempre múltiplo de 3
@@ -479,18 +480,34 @@ export function buildSlabSolids(slabs: ResolvedSlab[], jl?: JunctionLevel): Soli
 export function buildRoofSolids(roofs: ResolvedRoof[]): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();
   for (const r of roofs) {
-    for (const pl of r.planes) {
+    r.planes.forEach((pl, k) => {
+      // As emendas entre águas de mesma cota (facetas de um arco) não levam parede: sem elas, a vista de arestas não
+      // desenha um raio em cada lado amostrado.
+      const emenda = emendaDaAgua(r, k);
       for (const l of r.layers) {
         if (l.thickness < 1e-6) continue;
         const b = batchOf(byMat, l.materialId, 'roof');
         const topAt = (x: number, y: number): number => planeZ(pl, { x, y }) - l.below;
         const bottomAt = (x: number, y: number): number => topAt(x, y) - l.thickness;
-        // z0 = 0 e z1 = espessura só passam pelo guarda de extrusão; a cota vem de topAt e bottomAt.
         ofElement(b, r.roofId, () => {
-          for (const poly of pl.polygon) extrudePolygon(b, poly, 0, l.thickness, topAt, bottomAt);
+          for (const poly of pl.polygon) extrudeRoofPolygon(b, poly, l.thickness, topAt, bottomAt, emenda);
         });
       }
-    }
+    });
   }
   return [...byMat.values()];
+}
+
+/** Extrusão de uma água por camada (como `extrudePolygon`), sem a parede das emendas com outra água (`emenda`). */
+function extrudeRoofPolygon(b: SolidBatch, poly: Polygon, espessura: number, topAt: (x: number, y: number) => number, bottomAt: (x: number, y: number) => number, emenda: (p: Vec2, q: Vec2) => boolean): void {
+  if (espessura < 1e-6 || !poly[0]) return;
+  extrudeCaps(b, poly, 0, espessura, topAt, bottomAt);
+  for (const ring of poly.map((r, i) => oriented(r, i === 0))) {
+    for (let i = 0; i < ring.length; i++) {
+      const p = ring[i]!;
+      const q = ring[(i + 1) % ring.length]!;
+      if (emenda(p, q)) continue;
+      pushWall(b, p, q, bottomAt(p.x, p.y), bottomAt(q.x, q.y), topAt(p.x, p.y), topAt(q.x, q.y));
+    }
+  }
 }

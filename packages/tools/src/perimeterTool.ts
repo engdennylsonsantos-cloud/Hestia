@@ -1,22 +1,16 @@
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
-import { add, angleOf, dist, len, mid, mul, norm, sub, type SketchDraft, type SketchResult, type SketchSeg, type SketchTarget, type Vec2 } from '@hestia/geom';
+import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchResult, type SketchSeg, type SketchTarget, type Vec2 } from '@hestia/geom';
 import { ToolBase } from './base.ts';
 import type { InferContext } from './infer.ts';
 import { parseNumber } from './numeric.ts';
-import { SKETCH_DEFAULTS, addSegs, closeAnalysis, effectiveSeg, finish as finishSketch, newDraft, removeSegs, selectSegs, setSegSlope, type FinishResult } from './perimeterSession.ts';
+import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, type FinishResult } from './perimeterSession.ts';
 import { anchorOf, buildShape, kindOf, pointsOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
-import { SELECT_PX, boxRing, draftEdges, draftPoints, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
-import { perimeterFromBox } from './sketchByPerimeter.ts';
-import { faceAt } from './sketchPickFace.ts';
+import { SELECT_PX, boxRing, draftEdges, draftPoints, hitSeg, segLines } from './perimeterToolPick.ts';
+import { boxPick, facePick, facePreview, selectClick } from './perimeterToolInput.ts';
 import type { ShapeKindId } from './sketchShapes.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 import { DraftHistory } from './perimeterToolModifyHistory.ts';
 import { ModifyFlow } from './perimeterToolModify.ts';
-
-/** Tolerância de captura de face, eixo ou borda, em px de tela (como as outras ferramentas de captura). */
-const PICK_PX = 10;
-/** Caixa menor que isto (em px) é clique, não contorno. */
-const BOX_MIN_PX = 4;
 
 /** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
 export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter';
@@ -149,12 +143,18 @@ export class PerimeterTool extends ToolBase {
 
   /** Desfaz o último passo do rascunho. Devolve false se não há o que desfazer. */
   undoDraft(): boolean {
-    return this.walkHistory(this.draftHistory.undo(), 'Desfeito.', 'Nada a desfazer.');
+    if (!this.draftHistory.undo()) return this.refuse('Nada a desfazer.');
+    this.reset();
+    this.env.say('Desfeito.');
+    return true;
   }
 
   /** Refaz o passo desfeito. Devolve false se não há o que refazer. */
   redoDraft(): boolean {
-    return this.walkHistory(this.draftHistory.redo(), 'Refeito.', 'Nada a refazer.');
+    if (!this.draftHistory.redo()) return this.refuse('Nada a refazer.');
+    this.reset();
+    this.env.say('Refeito.');
+    return true;
   }
 
   /** Linha de limite ou de inclinação. Inclinação só existe no telhado e leva o modo de seleção (clique no triângulo). */
@@ -302,14 +302,10 @@ export class PerimeterTool extends ToolBase {
     const box = this.box;
     if (!box) return;
     this.reset();
-    if (dist(box.a, p.raw) < BOX_MIN_PX * this.env.metersPerPixel()) return;
-    const r = perimeterFromBox(this.env, box.a, p.raw);
-    if (r.segs.length === 0) {
-      this.env.say(r.warnings.join(' ') || 'Nenhuma parede nesta caixa.');
-      return;
-    }
-    this.commit(applySegs(this.d, r.segs));
-    this.env.say([...r.warnings, `Contorno pela caixa: ${r.segs.length} linha(s) adicionadas.`].join(' '));
+    const r = boxPick(this.env, box.a, p.raw);
+    if (!r) return;
+    if (r.segs.length > 0) this.commit(applySegs(this.d, r.segs));
+    this.env.say(r.msg);
   }
 
   /** Tab: alterna o candidato sob o cursor (face), o sinalizador da forma (ex.: sentido do arco), ou a variante de Modificar. */
@@ -367,16 +363,6 @@ export class PerimeterTool extends ToolBase {
     this.draftHistory.push(next);
   }
 
-  private walkHistory(moved: boolean, ok: string, none: string): boolean {
-    if (!moved) {
-      this.env.say(none);
-      return false;
-    }
-    this.reset();
-    this.env.say(ok);
-    return true;
-  }
-
   private shapeId(): ShapeKindId | null {
     return this.shape === null || this.shape === 'pickFace' || this.shape === 'byPerimeter' ? null : this.shape;
   }
@@ -404,13 +390,9 @@ export class PerimeterTool extends ToolBase {
   }
 
   private movePick(at: Vec2): void {
-    const pick = faceAt(this.env, at, PICK_PX * this.env.metersPerPixel(), this.cycle);
-    if (!pick) {
-      this.env.say('Aponte para uma face, eixo ou borda do nível.');
-      return;
-    }
-    this.items.push(...segLines(pick.seg, { halo: true }), { kind: 'label', at: mid(pick.seg.a, pick.seg.b), text: pick.label });
-    this.env.say(`${pick.label}. Clique adiciona; Tab alterna.`);
+    const r = facePreview(this.env, at, this.cycle);
+    this.items.push(...r.items);
+    this.env.say(r.msg);
   }
 
   private moveShape(p: PointerInfo, id: ShapeKindId): void {
@@ -441,37 +423,18 @@ export class PerimeterTool extends ToolBase {
   }
 
   private clickSelect(p: PointerInfo): void {
-    const mpp = this.env.metersPerPixel();
-    if (this.line === 'slope') {
-      const id = triangleHit(this.d, p.raw, mpp);
-      if (!id) {
-        this.env.say('Clique no triângulo de uma aresta do contorno.');
-        return;
-      }
-      const on = effectiveSeg(this.d, this.d.segs.find((s) => s.id === id)!).definesSlope;
-      this.commit(setSegSlope(this.d, id, { definesSlope: !on }));
-      this.env.say(on ? 'Aresta sem inclinação definida.' : 'Aresta define a inclinação.');
-      return;
-    }
-    const id = hitSeg(this.d.segs, p.raw, SELECT_PX * mpp);
-    this.draftHistory.replace(selectSegs(this.d, id ? [id] : [], p.shift));
-    const n = this.d.selected.length;
-    this.env.say(n > 0 ? `${n} linha(s) selecionada(s). Delete remove; Shift soma.` : SELECT_HINT);
+    const r = selectClick(this.d, p, this.line === 'slope', this.env.metersPerPixel(), SELECT_HINT);
+    if (r.geom) this.commit(r.next);
+    else this.draftHistory.replace(r.next);
+    this.env.say(r.msg);
   }
 
   private clickPick(p: PointerInfo): void {
-    const pick = faceAt(this.env, p.raw, PICK_PX * this.env.metersPerPixel(), this.cycle);
-    if (!pick) {
-      this.env.say('Nada aqui: aponte para uma face, eixo ou borda.');
-      return;
-    }
-    if (hasSeg(this.d.segs, pick.seg)) {
-      this.env.say('Essa linha já está no esboço.');
-      return;
-    }
-    this.commit(addSegs(this.d, [pick.seg]));
+    const r = facePick(this.env, p.raw, this.cycle, this.d);
+    if ('msg' in r) return this.env.say(r.msg);
+    this.commit(addSegs(this.d, [r.seg]));
     this.cycle = 0;
-    this.env.say(`${pick.label} adicionada.`);
+    this.env.say(`${r.label} adicionada.`);
   }
 
   private clickShape(p: PointerInfo, id: ShapeKindId): void {

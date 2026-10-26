@@ -26,8 +26,6 @@ function distToLine(p: Vec2, s: { a: Vec2; b: Vec2; sag?: number }): number {
   return best;
 }
 
-const arcs = (segs: ReturnType<typeof fitRing>) => segs.filter((s) => s.sag !== undefined);
-
 describe('fitRing: recuperação de arcos do anel', () => {
   it('quadrado continua com quatro retas', () => {
     const sq: Vec2[] = [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }];
@@ -45,6 +43,16 @@ describe('fitRing: recuperação de arcos do anel', () => {
     expect(Math.abs(ar.sag!)).toBeCloseTo(2, 6);
     expect(line.sag).toBeUndefined();
     for (const p of arc) expect(distToLine(p, ar)).toBeLessThan(0.003);
+  });
+
+  it('arco que cruza o vértice 0 (o anel começa no meio do arco) sai inteiro, não cortado', () => {
+    const arc = sampled({ x: 0, y: 0 }, 2, 0, Math.PI);
+    const k = Math.floor(arc.length / 2);
+    const rotated = [...arc.slice(k), ...arc.slice(0, k)];
+    const out = fitRing(rotated);
+    expect(out).toHaveLength(2);
+    expect(out.filter((s) => s.sag !== undefined)).toHaveLength(1);
+    expect(Math.abs(out.find((s) => s.sag !== undefined)!.sag!)).toBeCloseTo(2, 2);
   });
 
   it('círculo inteiro amostrado vira dois arcos, cada um de no máximo 180°', () => {

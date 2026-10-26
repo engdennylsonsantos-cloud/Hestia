@@ -13,6 +13,10 @@ export interface PerimeterOptions {
   extendToCore: boolean;
   /** Deslocamento do nível (m). Piso, laje e forro. */
   heightOffset: number;
+  /** Vincular às paredes (piso e laje). Só com o esboço de "Por perímetro". Ausente = desmarcada. */
+  linkToWalls?: boolean;
+  /** Acompanhar o ambiente (forro). Só com o contorno de "Por ambiente". Ausente = desmarcada. */
+  followRoom?: boolean;
 }
 
 export interface PerimeterOptionsBarProps {
@@ -39,7 +43,22 @@ export function PerimeterOptionsBar({ target, options: o, onChange }: PerimeterO
           <NumField id="opt-pm-offset" value={o.heightOffset} onCommit={(v) => onChange({ heightOffset: v })} unit="m" />
         </label>
       )}
-      <Check id="opt-pm-extend" checked={o.extendToCore} onChange={(v) => onChange({ extendToCore: v })}>
+      {(target === 'floor' || target === 'slab') && (
+        <Check
+          id="opt-pm-link"
+          checked={!!o.linkToWalls}
+          disabled={!o.linkToWalls && o.extendToCore}
+          onChange={(v) => onChange({ linkToWalls: v })}
+        >
+          Vincular às paredes (esboço por perímetro)
+        </Check>
+      )}
+      {target === 'ceiling' && (
+        <Check id="opt-pm-room" checked={!!o.followRoom} onChange={(v) => onChange({ followRoom: v })}>
+          Acompanhar o ambiente (esboço por ambiente)
+        </Check>
+      )}
+      <Check id="opt-pm-extend" checked={o.extendToCore} disabled={!!o.linkToWalls} onChange={(v) => onChange({ extendToCore: v })}>
         Estender até o núcleo da parede
       </Check>
       {roof && (

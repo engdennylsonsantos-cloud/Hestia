@@ -1,5 +1,5 @@
 import type { SketchDraft } from '@hestia/geom';
-import { isCeiling, isFloor, isRoof, isSlab, type Id, type Project } from '@hestia/model';
+import { followsRoom, isCeiling, isFloor, isRoof, isSlab, type Id, type Project } from '@hestia/model';
 import { editDraft, finish, SKETCH_DEFAULTS } from './perimeterSession.ts';
 import { areaSides, commitArea } from './perimeterCommitArea.ts';
 import { commitRoof, roofSides } from './perimeterCommitRoof.ts';
@@ -25,7 +25,8 @@ function mostCommon(values: number[]): number | undefined {
 
 /**
  * Opções iniciais da barra de perímetro para o elemento: balanço (o mais comum entre as arestas do telhado), inclinação
- * padrão (a do telhado), estender até o núcleo e deslocamento do nível. Null quando o id não é um elemento de contorno.
+ * padrão (a do telhado), estender até o núcleo, deslocamento do nível, vínculo às paredes (piso e laje) e acompanhar o
+ * ambiente (forro). Null quando o id não é um elemento de contorno.
  */
 export function perimeterOptionsOf(project: Project, elementId: Id): PerimeterBarOptions | null {
   const el = project.elements[elementId];
@@ -38,10 +39,11 @@ export function perimeterOptionsOf(project: Project, elementId: Id): PerimeterBa
     };
   }
   if (isFloor(el) || isSlab(el)) {
-    return { overhang: SKETCH_DEFAULTS.overhang, slopePct: SKETCH_DEFAULTS.slopePct, extendToCore: el.outlineSource?.extend === 'core', heightOffset: el.heightOffset };
+    const linkToWalls = !!el.outlineSource?.linked;
+    return { overhang: SKETCH_DEFAULTS.overhang, slopePct: SKETCH_DEFAULTS.slopePct, extendToCore: el.outlineSource?.extend === 'core', heightOffset: el.heightOffset, linkToWalls };
   }
   if (isCeiling(el)) {
-    return { overhang: SKETCH_DEFAULTS.overhang, slopePct: SKETCH_DEFAULTS.slopePct, extendToCore: false, heightOffset: el.heightOffset };
+    return { overhang: SKETCH_DEFAULTS.overhang, slopePct: SKETCH_DEFAULTS.slopePct, extendToCore: false, heightOffset: el.heightOffset, followRoom: followsRoom(el) };
   }
   return null;
 }

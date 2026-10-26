@@ -130,6 +130,56 @@ describe('acabamento na regra do tipo e no comando', () => {
   });
 });
 
+describe('campos v2 na regra do tipo', () => {
+  const porta = DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_p90')!;
+  const janela = DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_j120')!;
+
+  it('aceita os valores padrão (campos v2 ausentes)', () => {
+    expect(openingTypeIssue(porta)).toBeNull();
+    expect(openingTypeIssue(janela)).toBeNull();
+    expect(openingTypeIssue({ ...porta, angle2d: 0, angle3d: 120 })).toBeNull();
+    expect(openingTypeIssue({ ...janela, grid: { cols: 1, rows: 8 } })).toBeNull();
+  });
+
+  it('recusa ângulo fora de 0..120', () => {
+    expect(openingTypeIssue({ ...porta, angle2d: 150 })).toBe('Ângulo de abertura 2D: use um valor de 0 a 120°.');
+    expect(openingTypeIssue({ ...porta, angle3d: -1 })).toBe('Ângulo de abertura 3D: use um valor de 0 a 120°.');
+  });
+
+  it('recusa grid fora de 1..8 ou fracionário', () => {
+    const msg = 'Divisões do caixilho: use colunas e linhas inteiras de 1 a 8.';
+    expect(openingTypeIssue({ ...janela, grid: { cols: 0, rows: 2 } })).toBe(msg);
+    expect(openingTypeIssue({ ...janela, grid: { cols: 9, rows: 2 } })).toBe(msg);
+    expect(openingTypeIssue({ ...janela, grid: { cols: 2, rows: 2.5 } })).toBe(msg);
+  });
+
+  it('recusa bandeira com altura maior ou igual à do tipo e lateral com largura não positiva', () => {
+    expect(openingTypeIssue({ ...porta, transom: { height: porta.height } })).toBe(
+      'Bandeira: a altura deve ser maior que 0 e menor que a altura do tipo.',
+    );
+    expect(openingTypeIssue({ ...porta, sidelights: { left: true, width: 0 } })).toBe(
+      'Bandeira lateral: a largura deve ser maior que 0 e menor que a largura do tipo.',
+    );
+    expect(openingTypeIssue({ ...porta, sidelights: { right: true, width: porta.width } })).toBe(
+      'Bandeira lateral: a largura deve ser maior que 0 e menor que a largura do tipo.',
+    );
+  });
+
+  it('recusa estilos fora dos conjuntos fechados', () => {
+    expect(openingTypeIssue({ ...porta, leafStyle: 'desconhecido' as never })).toBe('Estilo da folha desconhecido.');
+    expect(openingTypeIssue({ ...porta, handle: 'puxador' as never })).toBe('Maçaneta desconhecida.');
+    expect(openingTypeIssue({ ...porta, frameStyle: 'x' as never })).toBe('Estilo do batente desconhecido.');
+  });
+
+  it('o comando recusa o tipo inválido com a mensagem e não grava', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(() => s.exec({ type: 'upsertOpeningType', openingType: { ...porta, id: 'ot_v2', angle2d: 150 } })).toThrow(
+      'Ângulo de abertura 2D: use um valor de 0 a 120°.',
+    );
+    expect(s.project.openingTypes['ot_v2']).toBeUndefined();
+  });
+});
+
 describe('favoritos de tipo de abertura', () => {
   it('o comando liga e desliga o favorito e o desfazer volta a lista', () => {
     const s = new ProjectStore(createEmptyProject());

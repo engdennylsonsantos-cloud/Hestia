@@ -1,10 +1,13 @@
 import { arcFromSagitta, arcLocal, arcTangentAt, cross, dist, dot, len, norm, sub, type Arc, type Vec2 } from '@hestia/geom';
 import { totalThickness } from './wallType.ts';
 import type { ValidationIssue } from './validate.ts';
+import { wallBaseElevation, wallMaxHeight } from './queries.ts';
 import type { Project, Wall } from './types.ts';
 
-/** Tolerância de encontro das pontas (mesma do motor: Project.settings.joinTolerance padrão). */
-const JOIN_TOL = 0.02;
+/** Tolerância de encontro das pontas: a mesma do motor (Project.settings.joinTolerance, padrão 2 cm). */
+const joinTolOf = (p: Project): number => p.settings?.joinTolerance ?? 0.02;
+/** Ângulo interno abaixo do qual a esquadria não tem solução limpa: avisa em vez de deixar o vão em silêncio (J-04). */
+const ACUTE_CORNER_DEG = 60;
 /** Domínio suportado das junções curvas (docs/08 §6.5). */
 const MIN_RADIUS = 3;
 const MIN_CORNER_DEG = 60;
@@ -131,6 +134,7 @@ function axisPosition(w: Wall, p: Vec2): { t: number; lateral: number; length: n
 
 /** Avisos de junção curva fora do domínio suportado (CV-2): raio < 3 m ou quina fora de 60°–120°. */
 export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssue[] {
+  const JOIN_TOL = joinTolOf(p);
   const out: ValidationIssue[] = [];
   const ends = walls.flatMap((w) => [endInfo(w, 'a'), endInfo(w, 'b')]);
   const grouped = new Set<End>();
@@ -145,9 +149,23 @@ export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssu
       if (b.wall.id === a.wall.id || noJoin(b)) continue;
       if (dist(a.at, b.at) <= JOIN_TOL) partners.push(b);
     }
-    if (!partners.length || (!a.arc && partners.every((b) => !b.arc))) continue;
+    if (!partners.length) continue;
     grouped.add(a);
     for (const b of partners) grouped.add(b);
+    if (!a.arc && partners.every((b) => !b.arc)) {
+      for (const b of partners) {
+        const interior = (180 * angleBetween(a.dir, b.dir)) / Math.PI;
+        if (interior > 1 && interior < ACUTE_CORNER_DEG) {
+          out.push({
+            severity: 'warning',
+            code: 'wall-acute-join',
+            message: `Junção de "${a.wall.mark || a.wall.id}" com "${b.wall.mark || b.wall.id}" em ângulo de ${fmt(interior)}°: a esquadria não cabe e o corte fica reto, deixando vão. Abra o ângulo ou use outra junção.`,
+            elementId: a.wall.id,
+          });
+        }
+      }
+      continue;
+    }
     const reasons = new Set<string>();
     for (const b of partners) {
       for (const r of domainReasons([a, b], angleBetween(a.dir, b.dir))) reasons.add(r);
@@ -185,5 +203,51 @@ export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssu
     if (reasons.length) out.push(joinIssue(e.wall.id, [label(e.wall), label(host.wall)], reasons));
   }
 
+  return out;
+}
+
+/** Ponto cai sobre o trecho do eixo de `w` (dentro dos extremos, não só perto do ponto final), a até `tol` lateralmente. */
+function insideAxis(pt: Vec2, w: Wall, tol: number): boolean {
+  const d = sub(w.b, w.a);
+  const l = len(d);
+  if (l < 1e-9) return false;
+  const t = dot(sub(pt, w.a), d) / l;
+  if (t <= 0 || t >= l) return false;
+  return Math.abs(cross(norm(d), sub(pt, w.a))) <= tol;
+}
+
+/**
+ * Pontas quase encostadas (J-04): mais longe que a tolerância (não unem) e até duas tolerâncias. Sem aviso, a ponta
+ * fica solta sem explicação. Só conta paredes que se encontram em altura.
+ */
+export function nearMissIssues(p: Project, walls: Wall[]): ValidationIssue[] {
+  const JOIN_TOL = joinTolOf(p);
+  const out: ValidationIssue[] = [];
+  const ends = walls.flatMap((w) => [endInfo(w, 'a'), endInfo(w, 'b')]);
+  const zRange = (w: Wall): [number, number] => {
+    const z0 = wallBaseElevation(p, w);
+    return [z0, z0 + wallMaxHeight(p, w)];
+  };
+  for (let i = 0; i < ends.length; i++) {
+    const a = ends[i]!;
+    if (noJoin(a)) continue;
+    for (let j = i + 1; j < ends.length; j++) {
+      const b = ends[j]!;
+      if (b.wall.id === a.wall.id || b.wall.levelId !== a.wall.levelId || noJoin(b)) continue;
+      const d = dist(a.at, b.at);
+      if (d <= JOIN_TOL || d > 2 * JOIN_TOL) continue;
+      // Ponta que cai sobre o eixo da outra parede é sobreposição (aviso próprio), não quase-encosto.
+      if (insideAxis(a.at, b.wall, 2 * JOIN_TOL) || insideAxis(b.at, a.wall, 2 * JOIN_TOL)) continue;
+      const za = zRange(a.wall);
+      const zb = zRange(b.wall);
+      if (!(za[0] < zb[1] - 1e-6 && zb[0] < za[1] - 1e-6)) continue;
+      out.push({
+        severity: 'warning',
+        code: 'wall-end-near-miss',
+        message: `A ponta de "${a.wall.mark || a.wall.id}" está a ${(d * 100).toFixed(1).replace('.', ',')} cm da ponta de "${b.wall.mark || b.wall.id}": quase encostada, não une (tolerância de ${(JOIN_TOL * 100).toFixed(0)} cm). Encoste as pontas ou ajuste a tolerância do projeto.`,
+        elementId: a.wall.id,
+      });
+    }
+  }
   return out;
 }

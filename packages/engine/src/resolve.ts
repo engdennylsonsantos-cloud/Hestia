@@ -389,10 +389,26 @@ export function frameOfWall(p: Project, wallId: Id): WallFrame | null {
   return buildFrame(w, wallType(p, w));
 }
 
+/**
+ * Faixa vertical de cada parede (base e topo, sem o ajuste por piso e telhado), para a junção só unir paredes que se
+ * encontram em altura (J-04). Não resolve pisos aqui: levelFrames é chamado por eles e isso faria um ciclo.
+ * Quadros são construídos a cada chamada: anota no próprio objeto (copiar quebraria a identidade usada pela junção).
+ */
+export function withWallZ(p: Project, frames: WallFrame[]): WallFrame[] {
+  for (const f of frames) {
+    const z0 = wallBaseElevation(p, f.wall);
+    f.z = { z0, top: z0 + wallMaxHeight(p, f.wall) };
+  }
+  return frames;
+}
+
 export function levelFrames(p: Project, levelId: Id): WallFrame[] {
-  return wallsOnLevel(p, levelId)
-    .map((w) => buildFrame(w, wallType(p, w)))
-    .filter((f): f is WallFrame => f !== null);
+  return withWallZ(
+    p,
+    wallsOnLevel(p, levelId)
+      .map((w) => buildFrame(w, wallType(p, w)))
+      .filter((f): f is WallFrame => f !== null),
+  );
 }
 
 export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = sharedCache, opts: PlanResolveOptions = {}): ResolvedLevel {
@@ -401,7 +417,7 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
   const planOpen = (id: Id): boolean => !planOpenSet || planOpenSet.has(id);
   // Chave das opções de planta: só o que muda a geometria de planta (o corte já entra pelo `inPlan` dos itens).
   const planSig = planOpenSet ? `open:${[...planOpenSet].sort().join(',')}` : 'open:*';
-  const frames = walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null);
+  const frames = withWallZ(p, walls.map((w) => buildFrame(w, wallType(p, w))).filter((f): f is WallFrame => f !== null));
   const ends = computeEnds(frames, p.settings?.joinTolerance);
   const out: ResolvedLevel = { levelId, walls: {}, clusters: [] };
   // Parede anexada enxerga o piso e a laje por camada (término esvazia o contorno); o próprio término usa o contorno

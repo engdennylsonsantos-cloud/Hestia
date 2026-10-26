@@ -8,18 +8,19 @@ import type { PointerInfo } from './types.ts';
 const ORDER: JoinKind[] = ['butt', 'miter'];
 const LABEL: Record<JoinKind, string> = { butt: 'Encosto', miter: 'Esquadria' };
 
-interface Node {
-  at: Vec2;
-  ends: Array<{ wallId: string; end: 'a' | 'b' }>;
-  kind: JoinKind;
-  flip: boolean;
-}
+/**
+ * Ponto de junção sob o cursor. `pair` tem tipo e dominância (clique alterna, Tab inverte). `tee`, `node` e
+ * `disallowed` não têm tipo para alternar: o clique liga/desliga "não unir" na ponta sob o cursor (J-03).
+ */
+type Node =
+  | { at: Vec2; status: 'pair'; ends: Array<{ wallId: string; end: 'a' | 'b' }>; kind: JoinKind; flip: boolean }
+  | { at: Vec2; status: 'tee' | 'node' | 'disallowed'; ends: Array<{ wallId: string; end: 'a' | 'b' }>; clicked: { wallId: string; end: 'a' | 'b' }; count: number };
 
-/** Ferramenta Junção (Revit: Wall Joins): clique num canto para alternar encosto e esquadria. */
+/** Ferramenta Junção (Revit: Wall Joins): clique num canto para alternar encosto e esquadria; em T ou nó, liga/desliga "não unir". */
 export class JoinTool extends ToolBase {
   readonly id = 'joins';
   readonly label = 'Junção';
-  readonly hint = 'Junção: clique num canto de duas paredes para alternar Encosto e Esquadria. Tab inverte qual parede domina.';
+  readonly hint = 'Junção: clique num canto de duas paredes para alternar Encosto e Esquadria (Tab inverte a dominância). Em T ou nó, clique para não unir a ponta.';
   private node: Node | null = null;
 
   protected reset(): void {
@@ -41,14 +42,24 @@ export class JoinTool extends ToolBase {
         const d = dist(at, p);
         if (d > tol || (best && d >= best.d)) continue;
         const st = joinStatus(frames, f.wall.id, end, pr.settings.joinTolerance);
-        if (st.kind !== 'pair') continue;
-        const ends = [{ wallId: f.wall.id, end }, ...st.partners];
-        const other = pr.elements[st.partners[0]!.wallId];
-        const mine = f.wall;
-        const first = other && other.kind === 'wall' && other.order < mine.order ? other : mine;
-        const firstEnd = first === mine ? end : st.partners[0]!.end;
-        const cfg = firstEnd === 'a' ? first.joinStart : first.joinEnd;
-        best = { n: { at, ends, kind: cfg.kind, flip: cfg.flip }, d };
+        const clicked = { wallId: f.wall.id, end };
+        let n: Node;
+        if (st.kind === 'pair') {
+          const ends = [clicked, ...st.partners];
+          const other = pr.elements[st.partners[0]!.wallId];
+          const mine = f.wall;
+          const first = other && other.kind === 'wall' && other.order < mine.order ? other : mine;
+          const firstEnd = first === mine ? end : st.partners[0]!.end;
+          const cfg = firstEnd === 'a' ? first.joinStart : first.joinEnd;
+          n = { at, status: 'pair', ends, kind: cfg.kind, flip: cfg.flip };
+        } else if (st.kind === 'tee') {
+          n = { at, status: 'tee', ends: [clicked], clicked, count: 2 };
+        } else if (st.kind === 'node') {
+          n = { at, status: 'node', ends: [clicked, ...st.partners], clicked, count: st.partners.length + 1 };
+        } else if (st.kind === 'disallowed') {
+          n = { at, status: 'disallowed', ends: [clicked], clicked, count: 1 };
+        } else continue;
+        best = { n, d };
       }
     }
     return best ? best.n : null;
@@ -57,18 +68,41 @@ export class JoinTool extends ToolBase {
   override move(p: PointerInfo): void {
     this.node = this.find(p.raw);
     this.items = [];
-    if (this.node) {
-      this.items.push({ kind: 'point', at: this.node.at });
-      this.items.push({ kind: 'label', at: this.node.at, text: `${LABEL[this.node.kind]}${this.node.flip ? ' (ordem invertida)' : ''}` });
-      this.items.push({ kind: 'highlight', ids: this.node.ends.map((e) => e.wallId) });
+    const n = this.node;
+    if (!n) return;
+    this.items.push({ kind: 'point', at: n.at });
+    this.items.push({ kind: 'label', at: n.at, text: this.labelOf(n) });
+    this.items.push({ kind: 'highlight', ids: n.ends.map((e) => e.wallId) });
+  }
+
+  private labelOf(n: Node): string {
+    switch (n.status) {
+      case 'pair':
+        return `${LABEL[n.kind]}${n.flip ? ' (ordem invertida)' : ''}`;
+      case 'tee':
+        return 'Em T (encosto fixo) · clique: não unir';
+      case 'node':
+        return `Nó de ${n.count} paredes · clique: não unir esta ponta`;
+      case 'disallowed':
+        return 'Não unida · clique: unir de novo';
     }
   }
 
   private apply(kind: JoinKind, flip: boolean): void {
-    if (!this.node) return;
+    if (!this.node || this.node.status !== 'pair') return;
     this.env.exec({ type: 'setJoin', ends: this.node.ends, config: { kind, flip } });
     this.node = { ...this.node, kind, flip };
     this.env.say(`Junção: ${LABEL[kind]}${flip ? ', ordem invertida' : ''}.`);
+  }
+
+  /** Liga ou desliga "não unir" na ponta clicada (T e nó: limpa a junção dessa ponta; "não unida": religa). */
+  private toggleNoJoin(n: Node & { status: 'tee' | 'node' | 'disallowed' }): void {
+    const w = this.env.project().elements[n.clicked.wallId];
+    if (!w || w.kind !== 'wall') return;
+    const key = n.clicked.end === 'a' ? 'noJoinStart' : 'noJoinEnd';
+    const off = n.status === 'disallowed';
+    this.env.exec({ type: 'updateElements', ids: [w.id], patch: { [key]: !off } });
+    this.env.say(off ? 'Ponta unida de novo.' : 'Ponta marcada como não unida.');
   }
 
   /** Motivo do clique ignorado: ponta sem parceira, meio do vão (cruzamento) ou fora de paredes. */
@@ -91,15 +125,17 @@ export class JoinTool extends ToolBase {
 
   override click(p: PointerInfo): void {
     this.node = this.find(p.raw);
-    if (!this.node) {
+    const n = this.node;
+    if (!n) {
       this.env.say(this.miss(p.raw));
       return;
     }
-    this.apply(ORDER[(ORDER.indexOf(this.node.kind) + 1) % ORDER.length]!, this.node.flip);
+    if (n.status === 'pair') this.apply(ORDER[(ORDER.indexOf(n.kind) + 1) % ORDER.length]!, n.flip);
+    else this.toggleNoJoin(n);
     this.move(p);
   }
 
   override tab(): void {
-    if (this.node) this.apply(this.node.kind, !this.node.flip);
+    if (this.node?.status === 'pair') this.apply(this.node.kind, !this.node.flip);
   }
 }

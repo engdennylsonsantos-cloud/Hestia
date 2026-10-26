@@ -13,6 +13,12 @@ export const DEFAULT_JOIN_TOL = 0.02;
 /** ~2° — abaixo disso as paredes são consideradas colineares. */
 const COLLINEAR_SIN = 0.035;
 
+/** Duas paredes se encontram em altura (faixas verticais se sobrepõem). Sem faixa conhecida, assume que sim. */
+function zOverlap(a: WallFrame, b: WallFrame): boolean {
+  if (!a.z || !b.z) return true;
+  return a.z.z0 < b.z.top - 1e-6 && b.z.z0 < a.z.top - 1e-6;
+}
+
 function groupEnds(refs: EndRef[], tol: number): EndRef[][] {
   const parent = refs.map((_, i) => i);
   const find = (i: number): number => {
@@ -23,6 +29,7 @@ function groupEnds(refs: EndRef[], tol: number): EndRef[][] {
   for (let i = 0; i < refs.length; i++) {
     for (let j = i + 1; j < refs.length; j++) {
       if (refs[i]!.f === refs[j]!.f) continue;
+      if (!zOverlap(refs[i]!.f, refs[j]!.f)) continue;
       if (dist(refs[i]!.o, refs[j]!.o) <= tol) parent[find(i)] = find(j);
     }
   }
@@ -43,11 +50,32 @@ export function endPartners(frames: WallFrame[], wallId: string, which: 'a' | 'b
   const o = which === 'a' ? me.a : me.b;
   const out: Array<{ wallId: string; end: 'a' | 'b' }> = [];
   for (const f of frames) {
-    if (f === me) continue;
+    if (f === me || !zOverlap(me, f)) continue;
     if (dist(f.a, o) <= tol) out.push({ wallId: f.wall.id, end: 'a' });
     if (dist(f.b, o) <= tol) out.push({ wallId: f.wall.id, end: 'b' });
   }
   return out;
+}
+
+/**
+ * Canto com a extremidade de outra parede: a ponta cai sobre a tampa da outra (até a tolerância do plano da
+ * extremidade, e até meia espessura para os lados, incluindo a face externa). Pega o caso de desenhar pela face: o eixo
+ * fica a meia espessura do eixo vizinho, então a junção por eixo não encontra par, mas a geometria mostra um canto (J-01).
+ * Ponta mais longe do plano da tampa não é canto: fica como T ou livre.
+ */
+function cornerHostOf(r: EndRef, refs: EndRef[], tol: number, taken: Set<EndRef>): EndRef | null {
+  let best: { h: EndRef; d: number } | null = null;
+  for (const h of refs) {
+    if (h.f === r.f || taken.has(h) || !zOverlap(r.f, h.f)) continue;
+    if (Math.abs(cross(r.dir, h.dir)) < COLLINEAR_SIN) continue;
+    const loc = toLocal(h.f, r.o);
+    const tEnd = h.which === 'a' ? 0 : h.f.length;
+    if (Math.abs(loc.t - tEnd) > tol) continue;
+    if (Math.abs(loc.s - h.f.sMid) > h.f.thickness / 2 + tol) continue;
+    const d = dist(r.o, h.o);
+    if (!best || d < best.d) best = { h, d };
+  }
+  return best ? best.h : null;
 }
 
 function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
@@ -80,7 +108,7 @@ function resolveNode(out: Map<string, WallEnds>, g: EndRef[]): void {
 function findTee(r: EndRef, frames: WallFrame[], tol: number): WallFrame | null {
   let best: { g: WallFrame; sd: number } | null = null;
   for (const g of frames) {
-    if (g === r.f) continue;
+    if (g === r.f || !zOverlap(r.f, g)) continue;
     const loc = toLocal(g, r.o);
     const sd = Math.abs(loc.s - g.sMid);
     if (loc.t < -tol || loc.t > g.length + tol) continue;
@@ -121,10 +149,25 @@ export function joinStatus(frames: WallFrame[], wallId: string, which: 'a' | 'b'
   });
   if (partners.length === 1) return { kind: 'pair', partners };
   if (partners.length > 1) return { kind: 'node', partners };
+  // Sem par pelo eixo: se a ponta cai na zona de extremidade de outra parede, é canto com ela (mesma regra do motor).
+  const refs = refsOf(frames);
+  const me = refs.find((r) => r.f === f && r.which === which);
+  const corner = me ? cornerHostOf(me, refs, tol, new Set()) : null;
+  if (corner) return { kind: 'pair', partners: [{ wallId: corner.f.wall.id, end: corner.which }] };
   const o = which === 'a' ? f.a : f.b;
   const tg = endTangent(f, which);
   const host = findTee({ f, which, o, dir: which === 'a' ? tg : { x: -tg.x, y: -tg.y } }, frames, tol);
   return host ? { kind: 'tee', hostId: host.wall.id } : { kind: 'free' };
+}
+
+/** Extremidades que podem se unir (as de `noJoin` ficam de fora), com o ponto e a direção de cada uma. */
+function refsOf(frames: WallFrame[]): EndRef[] {
+  const refs: EndRef[] = [];
+  for (const f of frames) {
+    if (!f.wall.noJoinStart) refs.push({ f, which: 'a', o: pointAt(f, 0, 0), dir: endTangent(f, 'a') });
+    if (!f.wall.noJoinEnd) refs.push({ f, which: 'b', o: pointAt(f, f.length, 0), dir: ((u) => ({ x: -u.x, y: -u.y }))(endTangent(f, 'b')) });
+  }
+  return refs;
 }
 
 /** Calcula como cada fim de parede é cortado, levando em conta as demais paredes do nível. */
@@ -133,17 +176,22 @@ export function computeEnds(frames: WallFrame[], tol = DEFAULT_JOIN_TOL): Map<st
   for (const f of frames) {
     out.set(f.wall.id, { a: flatEnd(0), b: flatEnd(f.length) });
   }
-  const refs: EndRef[] = [];
-  for (const f of frames) {
-    if (!f.wall.noJoinStart) refs.push({ f, which: 'a', o: pointAt(f, 0, 0), dir: endTangent(f, 'a') });
-    if (!f.wall.noJoinEnd) refs.push({ f, which: 'b', o: pointAt(f, f.length, 0), dir: ((u) => ({ x: -u.x, y: -u.y }))(endTangent(f, 'b')) });
-  }
+  const refs = refsOf(frames);
   const grouped = new Set<EndRef>();
   for (const g of groupEnds(refs, tol)) {
     if (g.length >= 2) {
       g.forEach((r) => grouped.add(r));
       resolveNode(out, g);
     }
+  }
+  // Canto por geometria: ponta livre na zona de extremidade de outra parede livre forma canto com ela, não T.
+  for (const r of refs) {
+    if (grouped.has(r)) continue;
+    const h = cornerHostOf(r, refs, tol, grouped);
+    if (!h) continue;
+    grouped.add(r);
+    grouped.add(h);
+    resolveNode(out, [r, h]);
   }
   for (const r of refs) if (!grouped.has(r)) tryTee(out, r, frames, tol);
   return out;

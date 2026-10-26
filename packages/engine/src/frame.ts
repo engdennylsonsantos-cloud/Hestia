@@ -26,6 +26,8 @@ export interface WallFrame {
   sHi: number;
   sLo: number;
   sMid: number;
+  /** Faixa vertical da parede (cota da base e cota do topo). Ausente = desconhecida: a junção não filtra por altura. */
+  z?: { z0: number; top: number };
 }
 
 /** Distância da face externa até a linha de localização escolhida. */

@@ -163,6 +163,22 @@ const meio = (polys: MultiPolygon): number => {
 };
 const comTipo = (base: OpeningType, patch: Partial<OpeningType>): OpeningType => ({ ...base, ...patch });
 
+describe('portas novas no corte e na elevação (tarefa F1)', () => {
+  it('embutir desenha a cavidade tracejada e a seccionada desenha os trilhos tracejados', () => {
+    const pe = buildSectionDrawList(facade([op('p', 'door', 'ot_pe80', 'frente')]));
+    expect(pe.strokes.some((s) => s.closed && s.dash?.[0] === 6)).toBe(true);
+    const pg = buildSectionDrawList(facade([op('p', 'door', 'ot_pg300', 'frente')]));
+    expect(pg.strokes.some((s) => s.closed && s.dash?.[0] === 6)).toBe(true);
+  });
+
+  it('as cinco famílias produzem contornos de folha na elevação', () => {
+    for (const id of ['ot_pvv90', 'ot_pe80', 'ot_pd120', 'ot_ps90', 'ot_pg300']) {
+      const d = buildSectionDrawList(facade([op('p', 'door', id, 'frente')]));
+      expect(d.strokes.filter((s) => s.closed).length, id).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('esquadria no corte e na elevação (tipo e família)', () => {
   it('C1: o batente da janela tem a espessura do perfil (frameWidth) do tipo, dentro do vão', () => {
     const d = buildSectionDrawList(facade([op('j', 'window', 'ot_jfixa60', 'frente')]));

@@ -83,6 +83,29 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
           part.motion.axis === 'z'
             ? { axis: 'z', at: part.motion.t, atS: part.motion.s, angle: part.motion.sign * angle }
             : { axis: 'x', at: part.motion.z, atS: part.motion.s, angle: part.motion.sign * angle };
+      } else if (part.motion.kind === 'fold') {
+        // A cadeia dobrável gira em torno de uma dobradiça que anda com os painéis anteriores. A cena aceita um pivô
+        // só, então o centro da caixa é recuado pela rotação inversa: pivô em (at, atS) + giro `phi` devolve o centro
+        // exato de `partTransformed`.
+        const m = part.motion;
+        let at = m.tAnchor;
+        let atS = m.s;
+        for (let j = 0; j < m.index; j++) {
+          const a = (j % 2 === 0 ? 1 : -1) * m.sign * angle;
+          at += m.panelWidth * m.dir * Math.cos(a);
+          atS += m.panelWidth * Math.sin(a);
+        }
+        const alpha = (m.index % 2 === 0 ? 1 : -1) * m.sign * angle;
+        const phi = m.dir * alpha;
+        const depois = partTransformed(part, state);
+        const cos = Math.cos(phi);
+        const sin = Math.sin(phi);
+        const dt = depois.center.t - at;
+        const ds = depois.center.s - atS;
+        piece.x = at + dt * cos + ds * sin;
+        piece.y = atS - dt * sin + ds * cos;
+        piece.z = depois.center.z;
+        piece.hinge = { axis: 'z', at, atS, angle: phi };
       } else {
         const antes = partTransformed(part, CLOSED);
         const depois = partTransformed(part, state);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { frameOfWall, openingGeometry, resolveLevel, toLocal, type OpeningGeometry, type WallFrame } from '@hestia/engine';
+import { buildOpeningModel, frameOfWall, openingGeometry, partTransformed, resolveLevel, toLocal, type OpeningGeometry, type WallFrame } from '@hestia/engine';
 import { openingSymbolPaths, type MultiPolygon } from '@hestia/geom';
 import { DEFAULT_OPENING_TYPES, ProjectStore, coreSpan, createEmptyProject, makeWall, openingFrame, view3dOf, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { caixasDaAbertura, montarAbertura } from './aberturas3d.ts';
@@ -135,7 +135,7 @@ describe('regressão do 3D aberto', () => {
   }
 
   it('dimensões das peças iguais fechado × aberto nos 14 tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(14);
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(19);
     for (const t of DEFAULT_OPENING_TYPES) {
       const c = cena(t.id);
       expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));
@@ -262,6 +262,115 @@ describe('folhas de correr abertas dentro do vão', () => {
     }
     // Dois trilhos metálicos no head e no piso.
     expect(pecas(c).filter((x) => x.role === 'track')).toHaveLength(2);
+  });
+});
+
+describe('portas novas no 3D (spec E §3.5)', () => {
+  it('todas as peças presentes em cada família', () => {
+    const vv = pecas(cena('ot_pvv90'));
+    expect(vv.filter((x) => x.role === 'jamb')).toHaveLength(2);
+    expect(vv.filter((x) => x.role === 'head')).toHaveLength(1);
+    expect(vv.filter((x) => x.role === 'leaf')).toHaveLength(1);
+
+    const pe = pecas(cena('ot_pe80'));
+    expect(pe.filter((x) => x.role === 'jamb')).toHaveLength(1);
+    expect(pe.filter((x) => x.role === 'head')).toHaveLength(1);
+    expect(pe.filter((x) => x.role === 'leaf')).toHaveLength(1);
+    expect(pe.filter((x) => x.role === 'pocket')).toHaveLength(1);
+
+    expect(pecas(cena('ot_pd120')).filter((x) => x.role === 'leaf')).toHaveLength(2);
+    expect(pecas(cena('ot_pd120', { leaves: 4 })).filter((x) => x.role === 'leaf')).toHaveLength(4);
+    expect(pecas(cena('ot_ps90')).filter((x) => x.role === 'leaf')).toHaveLength(9);
+
+    const pg = pecas(cena('ot_pg300'));
+    expect(pg.filter((x) => x.role === 'leaf')).toHaveLength(5);
+    expect(pg.filter((x) => x.role === 'leafPanel')).toHaveLength(5);
+    expect(pg.filter((x) => x.role === 'track')).toHaveLength(2);
+  });
+
+  it('abrir muda a posição: giro no vai-e-vem e no dobrável, deslizamento no embutir e na seccionada', () => {
+    const casos: Array<{ id: string; extra?: Partial<OpeningType>; esperado: 'z' | 'slide' }> = [
+      { id: 'ot_pvv90', esperado: 'z' },
+      { id: 'ot_pd120', esperado: 'z' },
+      { id: 'ot_ps90', esperado: 'z' },
+      { id: 'ot_pe80', esperado: 'slide' },
+      { id: 'ot_pg300', esperado: 'slide' },
+    ];
+    for (const caso of casos) {
+      const c = cena(caso.id, caso.extra ?? {});
+      const aberta = pecas(c, true);
+      if (caso.esperado === 'z') expect(aberta.some((x) => x.hinge?.axis === 'z'), caso.id).toBe(true);
+      else expect(aberta.some((x) => x.slide && (Math.abs(x.slide.dx) > 1e-9 || Math.abs(x.slide.dz) > 1e-9)), caso.id).toBe(true);
+    }
+    const dobravel = pecas(cena('ot_pd120'), true).filter((x) => x.role === 'leaf');
+    for (const p of dobravel) expect(Math.abs(p.hinge!.angle)).toBeCloseTo((70 * Math.PI) / 180, 9);
+    const sanfonada = pecas(cena('ot_ps90'), true).filter((x) => x.role === 'leaf');
+    for (const p of sanfonada) expect(Math.abs(p.hinge!.angle)).toBeCloseTo((75 * Math.PI) / 180, 9);
+  });
+
+  it('o pivô de cada painel dobrado devolve o mesmo centro de partTransformed', () => {
+    for (const [id, graus, paineis] of [
+      ['ot_pd120', 70, 2],
+      ['ot_pd120', 70, 4],
+      ['ot_ps90', 75, 9],
+    ] as const) {
+      const c = cena(id, paineis === 4 ? { leaves: 4 } : {});
+      const f = frameOfWall(c.p, 'w')!;
+      const model = buildOpeningModel(c.p, c.o, openingGeometry(c.p, c.o, f), f);
+      const estado = { angle: (graus * Math.PI) / 180, slide: 1 };
+      const folhasModelo = model.parts.filter((p) => p.role === 'leaf');
+      const folhas3d = pecas(c, true).filter((p) => p.role === 'leaf');
+      expect(folhas3d).toHaveLength(folhasModelo.length);
+      for (let i = 0; i < folhasModelo.length; i++) {
+        const ob = partTransformed(folhasModelo[i]!, estado);
+        const p = folhas3d[i]!;
+        const centro = transformar({ x: p.x, y: p.y, z: p.z }, p);
+        expect(centro.x, `${id} painel ${i}`).toBeCloseTo(ob.center.t, 9);
+        expect(centro.y, `${id} painel ${i}`).toBeCloseTo(ob.center.s, 9);
+        expect(centro.z, `${id} painel ${i}`).toBeCloseTo(ob.center.z, 9);
+      }
+    }
+  });
+
+  it('fechadas, as peças ficam dentro do vão (exceto pocket, alizar, peitoril e vergas)', () => {
+    const fora = new Set<OpeningPiece['role']>(['casing', 'sillBoard', 'lintel', 'sillBeam', 'pocket']);
+    const familias: Array<{ base: string; extra?: Partial<OpeningType> }> = [
+      { base: 'ot_pvv90' },
+      { base: 'ot_pe80' },
+      { base: 'ot_pd120' },
+      { base: 'ot_pd120', extra: { leaves: 4 } },
+      { base: 'ot_ps90' },
+      { base: 'ot_pg300' },
+    ];
+    for (const familia of familias) {
+      const c = cena(familia.base, familia.extra ?? {});
+      const hw = c.g.width / 2;
+      const H = Math.min(c.g.height, 2.8 - c.g.sill);
+      for (const p of pecas(c, false)) {
+        if (fora.has(p.role)) continue;
+        const b = caixaDaPeca(p);
+        const caso = `${familia.base} ${p.role}`;
+        expect(b.x0, caso).toBeGreaterThanOrEqual(-hw - 1e-9);
+        expect(b.x1, caso).toBeLessThanOrEqual(hw + 1e-9);
+        expect(b.z0, caso).toBeGreaterThanOrEqual(-1e-9);
+        expect(b.z1, caso).toBeLessThanOrEqual(H + 1e-9);
+      }
+    }
+  });
+
+  it('abertas, vai-e-vem e dobráveis continuam dentro do vão em x e z', () => {
+    for (const id of ['ot_pvv90', 'ot_pd120', 'ot_ps90']) {
+      const c = cena(id);
+      const hw = c.g.width / 2;
+      const H = Math.min(c.g.height, 2.8 - c.g.sill);
+      for (const p of pecas(c, true)) {
+        const b = caixaDaPeca(p);
+        expect(b.x0, id).toBeGreaterThanOrEqual(-hw - 1e-9);
+        expect(b.x1, id).toBeLessThanOrEqual(hw + 1e-9);
+        expect(b.z0, id).toBeGreaterThanOrEqual(-1e-9);
+        expect(b.z1, id).toBeLessThanOrEqual(H + 1e-9);
+      }
+    }
   });
 });
 

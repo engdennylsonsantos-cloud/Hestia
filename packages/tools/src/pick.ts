@@ -1,7 +1,7 @@
 import { dist, boxesOverlap, boxOf, intersectSegments, type Vec2 } from '@hestia/geom';
 import { wallMid } from './wallGeom.ts';
 import { wallsOnLevel, type Id, type Project } from '@hestia/model';
-import { toLocal } from '@hestia/engine';
+import { toLocal, wallEndCorners } from '@hestia/engine';
 import { candidatesAt, wallIndexOf } from './pickIndex.ts';
 
 export interface Hit {
@@ -38,26 +38,48 @@ export interface Grip {
   wallId: Id;
   /** 'mid' é a alça do meio do arco (muda a flecha). */
   end: 'a' | 'b' | 'mid';
+  /** Extremidade do eixo (a linha de locação que a parede move). */
   at: Vec2;
+  /**
+   * Ponto pegado: a própria extremidade ou um canto visível dela. O arrasto leva este ponto ao destino e o eixo
+   * acompanha com o mesmo deslocamento, então pegar o canto que se vê não faz a parede saltar.
+   */
+  grab: Vec2;
 }
 
+/** Alça sob `at` entre as paredes selecionadas: a mais próxima vence (várias selecionadas não escolhem pela ordem). */
 export function gripAt(p: Project, ids: Id[], at: Vec2, mpp: number): Grip | null {
   const tol = 9 * mpp;
+  let best: (Grip & { d: number }) | null = null;
+  const offer = (g: Grip, d: number): void => {
+    if (d <= tol && (!best || d < best.d)) best = { ...g, d };
+  };
   for (const id of ids) {
     const w = p.elements[id];
     if (!w || w.kind !== 'wall') continue;
-    if (dist(w.a, at) <= tol) return { wallId: id, end: 'a', at: w.a };
-    if (dist(w.b, at) <= tol) return { wallId: id, end: 'b', at: w.b };
+    const corners = wallEndCorners(p, w);
+    for (const end of ['a', 'b'] as const) {
+      const axis = w[end];
+      for (const q of [axis, ...corners[end]]) offer({ wallId: id, end, at: axis, grab: q }, dist(q, at));
+    }
     if (Math.abs(w.sag) > 1e-6) {
       const m = wallMid(w);
-      if (dist(m, at) <= tol) return { wallId: id, end: 'mid', at: m };
+      offer({ wallId: id, end: 'mid', at: m, grab: m }, dist(m, at));
     }
   }
-  return null;
+  if (!best) return null;
+  const { d: _d, ...grip } = best as Grip & { d: number };
+  return grip;
 }
 
+/** Tolerância de junção do projeto: a mesma que o motor usa para unir pontas (uma só fonte, J-02). */
+export const joinTol = (p: Project): number => p.settings?.joinTolerance ?? 0.02;
+
+/** Comprimento mínimo de parede: abaixo disso a parede some do motor. Arrastar uma ponta até a outra é recusado. */
+export const MIN_WALL_LENGTH = 0.01;
+
 /** Paredes (fora de `exclude`) com uma extremidade em `pt`: acompanham o movimento da parede ligada. */
-export function connectedEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id>, tol = 0.02): Array<{ wallId: Id; end: 'a' | 'b' }> {
+export function connectedEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id>, tol = joinTol(p)): Array<{ wallId: Id; end: 'a' | 'b' }> {
   const out: Array<{ wallId: Id; end: 'a' | 'b' }> = [];
   for (const w of wallsOnLevel(p, levelId)) {
     if (exclude.has(w.id)) continue;
@@ -68,16 +90,11 @@ export function connectedEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id
 }
 
 /**
- * Quem acompanha uma extremidade movida. Padrão: só em canto simples (exatamente uma outra parede termina ali),
- * como o Revit mantém o canto de duas paredes ligado. Num nó de 3 ou mais paredes (ex.: ramal chegando num canto)
- * a parede se solta sozinha, para não arrastar a casa junto. `invert` (Alt) troca o comportamento: num canto simples
- * solta, num nó leva todas.
+ * Quem acompanha uma extremidade movida: todas as paredes ligadas nesse nó (canto, T ou nó de 3+), como o Revit
+ * mantém a junção. `invert` (Alt) solta só a parede pegada: o nó não acompanha ninguém.
  */
-export function followingEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id>, invert = false, tol = 0.02): Array<{ wallId: Id; end: 'a' | 'b' }> {
-  const all = connectedEnds(p, levelId, pt, exclude, tol);
-  const wallsHere = new Set(all.map((c) => c.wallId));
-  const simple = wallsHere.size === 1;
-  return simple !== invert ? all : [];
+export function followingEnds(p: Project, levelId: Id, pt: Vec2, exclude: Set<Id>, invert = false, tol = joinTol(p)): Array<{ wallId: Id; end: 'a' | 'b' }> {
+  return invert ? [] : connectedEnds(p, levelId, pt, exclude, tol);
 }
 
 export function idsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {

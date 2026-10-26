@@ -1,9 +1,9 @@
-import { dist, sagFromThreePoints, type Vec2 } from '@hestia/geom';
+import { add, dist, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { ceilingOutline } from '@hestia/engine';
 import { isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
-import { followingEnds, gripAt, type Grip } from './pick.ts';
+import { followingEnds, gripAt, MIN_WALL_LENGTH, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
 import { slabGripAt } from './slabPick.ts';
 import { roofGripAt } from './roofPick.ts';
@@ -91,11 +91,14 @@ const ROOF_OWNER: RingOwner = {
 /** Contorno com o vértice `index` levado a `pt`, ou com um vértice novo logo depois dele (meio da aresta). */
 const ringAfter = (ring: Vec2[], vertex: boolean, index: number, pt: Vec2): Vec2[] => (vertex ? ringMoveVertex(ring, index, pt) : ringInsertAfter(ring, index, pt));
 
-/** Alça de parede: extremidade `a` ou `b` (arrasta o nó e as vizinhas que acompanham) ou o meio do arco (muda a flecha). */
+/** Alça de parede: extremidade `a` ou `b` (arrasta o nó e as paredes ligadas) ou o meio do arco (muda a flecha). */
 function wallHold(env: ToolEnv, g: Grip): GripHold {
   let point: Vec2 | null = null;
+  // Deslocamento do eixo em relação ao ponto pegado (canto visível): zero quando pegou o próprio eixo.
+  const offset = sub(g.at, g.grab);
+  const followers = (p: PointerInfo) => followingEnds(env.project(), env.levelId(), g.at, new Set([g.wallId]), p.alt);
   return {
-    at: g.at,
+    at: g.grab,
     keepsFocus: false,
     drag(p, snap) {
       const pr = env.project();
@@ -110,19 +113,27 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
         return items;
       }
       const other = g.end === 'a' ? w.b : w.a;
-      const inf = snap({ from: other, ignore: new Set([w.id]) });
-      point = inf;
+      const follow = followers(p);
+      // Paredes que acompanham não são alvo da captura: senão a própria ponta vizinha vira referência e colapsa.
+      const ignore = new Set([w.id, ...follow.map((c) => c.wallId)]);
+      const inf = snap({ from: other, ignore });
+      const pt = add(inf, offset);
+      point = pt;
       if (f) {
-        const a = g.end === 'a' ? inf : w.a;
-        const b = g.end === 'b' ? inf : w.b;
+        const a = g.end === 'a' ? pt : w.a;
+        const b = g.end === 'b' ? pt : w.b;
         items.push({ kind: 'wallBand', a, b, thickness: f.thickness, sMid: f.sMid, sag: w.sag });
+        // Cota temporária: comprimento e Δx/Δy do eixo, como no Revit ao arrastar uma ponta.
+        const dx = pt.x - other.x;
+        const dy = pt.y - other.y;
+        items.push({ kind: 'label', at: { x: (pt.x + other.x) / 2, y: (pt.y + other.y) / 2 }, text: `${Math.hypot(dx, dy).toFixed(3).replace('.', ',')} m  Δx ${dx.toFixed(3).replace('.', ',')}  Δy ${dy.toFixed(3).replace('.', ',')}` });
       }
-      // Vizinhas que vão acompanhar (canto simples; Alt inverte): aparecem na prévia para não haver surpresa.
-      for (const c of followingEnds(pr, env.levelId(), g.at, new Set([w.id]), p.alt)) {
+      // Vizinhas que vão acompanhar: aparecem na prévia para não haver surpresa.
+      for (const c of follow) {
         const nw = pr.elements[c.wallId];
         const nf = frameOfWall(pr, c.wallId);
         if (!isWall(nw) || !nf) continue;
-        items.push({ kind: 'wallBand', a: c.end === 'a' ? inf : nw.a, b: c.end === 'b' ? inf : nw.b, thickness: nf.thickness, sMid: nf.sMid, sag: nw.sag });
+        items.push({ kind: 'wallBand', a: c.end === 'a' ? pt : nw.a, b: c.end === 'b' ? pt : nw.b, thickness: nf.thickness, sMid: nf.sMid, sag: nw.sag });
       }
       return items;
     },
@@ -134,8 +145,24 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
         if (isWall(wall)) env.exec({ type: 'updateElements', ids: [g.wallId], patch: { sag: sagFromThreePoints(wall.a, point, wall.b) } });
         return;
       }
+      if (!isWall(wall)) return;
       const pt = point;
-      const follow = followingEnds(pr, env.levelId(), g.at, new Set([g.wallId]), p.alt);
+      const follow = followers(p);
+      // Comprimento zero: a parede (ou uma vizinha que acompanha) cairia sobre a outra ponta e sumiria do motor.
+      const other = g.end === 'a' ? wall.b : wall.a;
+      if (dist(pt, other) < MIN_WALL_LENGTH) {
+        env.say('Parede com comprimento zero não existe: a ponta não pode encostar na outra. Use Excluir ou Juntar.');
+        return;
+      }
+      for (const c of follow) {
+        const nw = pr.elements[c.wallId];
+        if (!isWall(nw)) continue;
+        const far = c.end === 'a' ? nw.b : nw.a;
+        if (dist(pt, far) < MIN_WALL_LENGTH) {
+          env.say('Uma parede ligada ficaria com comprimento zero. Alt solta a parede pegada.');
+          return;
+        }
+      }
       env.transaction('Ajustar parede', () => {
         env.exec({ type: 'setWallEnds', id: g.wallId, [g.end]: pt });
         for (const c of follow) env.exec({ type: 'setWallEnds', id: c.wallId, [c.end]: pt });

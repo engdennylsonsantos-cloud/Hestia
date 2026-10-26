@@ -1,5 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
-import { coreSpan, type Id, type Project } from '@hestia/model';
+import { coreSpan, totalThickness, type Id, type Project, type Wall } from '@hestia/model';
 import { sAtDepth } from './frame.ts';
 import { computeEnds } from './joins.ts';
 import { endPoint, layerQuad } from './layerGeom.ts';
@@ -39,4 +39,39 @@ export function wallFaces(p: Project, levelId: Id): WallFaces[] {
     const coreOutline = layerQuad(f, e, sCore[0]!, sCore[1]!);
     return { wallId: f.wall.id, faces: [...sides, cap('a'), cap('b')], core, outline, coreOutline };
   });
+}
+
+/** Faces do nível em cache por projeto (o projeto é imutável, com Immer): captura, alças e desenho usam a mesma conta. */
+const facesCache = new WeakMap<Project, Map<Id, WallFaces[]>>();
+export function wallFacesCached(p: Project, levelId: Id): WallFaces[] {
+  let byLevel = facesCache.get(p);
+  if (!byLevel) {
+    byLevel = new Map();
+    facesCache.set(p, byLevel);
+  }
+  let f = byLevel.get(levelId);
+  if (!f) {
+    f = wallFaces(p, levelId);
+    byLevel.set(levelId, f);
+  }
+  return f;
+}
+
+/**
+ * Cantos visíveis das duas extremidades de uma parede: os vértices do contorno real que ficam na ponta, a até um
+ * espessura da linha de locação. A ponta que o usuário enxerga não é o eixo (que é a linha de locação).
+ */
+export function wallEndCorners(p: Project, w: Wall): { a: Vec2[]; b: Vec2[] } {
+  const out = { a: [] as Vec2[], b: [] as Vec2[] };
+  const wf = wallFacesCached(p, w.levelId).find((x) => x.wallId === w.id);
+  const type = p.wallTypes[w.typeId];
+  if (!wf || !type) return out;
+  const reach = totalThickness(type) * 0.8;
+  for (const q of wf.outline) {
+    const da = Math.hypot(q.x - w.a.x, q.y - w.a.y);
+    const db = Math.hypot(q.x - w.b.x, q.y - w.b.y);
+    if (da <= reach && da <= db) out.a.push(q);
+    else if (db <= reach) out.b.push(q);
+  }
+  return out;
 }

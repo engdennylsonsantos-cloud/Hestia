@@ -50,6 +50,8 @@ export class SelectTool extends ToolBase {
   /** Vértice de piso, laje ou telhado em foco (clicado com a alça): o Delete o remove. */
   private focus: GripFocus | null = null;
   private delta: Vec2 = { x: 0, y: 0 };
+  /** Base capturada do arrasto direto (a mesma regra da ferramenta Mover): o deslocamento parte dela, não do clique cru. */
+  private moveBase: Vec2 | null = null;
   private hover: Id | null = null;
   private openingId: Id | null = null;
   /** Alça de deslocamento da cota selecionada (decisão 0019) e o deslocamento que ela assume ao soltar. */
@@ -219,6 +221,7 @@ export class SelectTool extends ToolBase {
     const pr = this.env.project();
     const mpp = this.env.metersPerPixel();
     this.downPt = p.raw;
+    this.moveBase = null;
     const sel = this.env.selection();
     const hold = gripHoldAt(this.env, p.raw);
     if (hold) {
@@ -271,8 +274,10 @@ export class SelectTool extends ToolBase {
       }
       case 'moving': {
         const els = selectedMovables(pr, this.env.selection());
-        const inf = this.snap(p, { from: this.downPt, ignore: new Set(els) });
-        this.delta = sub(inf.point, this.downPt);
+        const ignore = new Set(els);
+        this.moveBase ??= this.snap({ ...p, raw: this.downPt, shift: false }, { ignore }).point;
+        const inf = this.snap(p, { from: this.moveBase, ignore });
+        this.delta = sub(inf.point, this.moveBase);
         const t = { kind: 'translate' as const, d: this.delta };
         this.items.push(...ghostBands(pr, els, t), ...ghostViews(pr, this.env.selection(), t));
         break;

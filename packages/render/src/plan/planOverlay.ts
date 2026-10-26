@@ -1,5 +1,5 @@
 import { orientedRect, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, type ResolvedLevel } from '@hestia/engine';
+import { frameOfWall, openingGeometry, wallEndCorners, type ResolvedLevel } from '@hestia/engine';
 import { isOpening, isWall, type Id, type Project } from '@hestia/model';
 import { floorSelectionOps } from './floors.ts';
 import { ALCA_PX, quadradoEm } from './marcadores.ts';
@@ -82,7 +82,9 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
         const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
         labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: `${len.toFixed(3).replace('.', ',')} m`, dy: -12, tone: 'info' });
       }
-      for (const pt of [e.a, e.b] as Vec2[]) {
+      // Alças nas pontas do eixo e nos cantos visíveis (a ponta que se vê): é lá que o arrasto pega a parede.
+      const corners = wallEndCorners(p, e);
+      for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
         const q = quadradoEm(pt, ALCA_PX);
         fills.push({ ...q.fill, color: '#ffffff', alpha: 1 });
         strokes.push({ ...q.traco, widthPx: 1.6, color: theme.select, alpha: 1 });

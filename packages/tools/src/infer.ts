@@ -14,7 +14,7 @@ import {
   type Arc,
   type Vec2,
 } from '@hestia/geom';
-import { wallFaces, type WallFaces } from '@hestia/engine';
+import { wallFacesCached as facesOf } from '@hestia/engine';
 import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
@@ -80,22 +80,6 @@ interface Cand {
   weight: number;
   guides: Guide[];
   hostId?: Id;
-}
-
-/** Faces das paredes por projeto e nível: o projeto é imutável (Immer), então a identidade serve de chave de cache. */
-const facesCache = new WeakMap<Project, Map<Id, WallFaces[]>>();
-function facesOf(p: Project, levelId: Id): WallFaces[] {
-  let byLevel = facesCache.get(p);
-  if (!byLevel) {
-    byLevel = new Map();
-    facesCache.set(p, byLevel);
-  }
-  let f = byLevel.get(levelId);
-  if (!f) {
-    f = wallFaces(p, levelId);
-    byLevel.set(levelId, f);
-  }
-  return f;
 }
 
 /** Arco do eixo da parede, ou null se for reta. */

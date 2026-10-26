@@ -69,6 +69,26 @@ describe('famílias de abertura', () => {
   });
 });
 
+describe('catálogo: portas novas (tarefa F1)', () => {
+  it('os cinco tipos pré-cadastrados têm código, família certa e passam na regra do tipo', () => {
+    const novos: Array<[string, string, string]> = [
+      ['ot_pvv90', 'P-07', 'door_dblact'],
+      ['ot_pe80', 'P-08', 'door_pocket'],
+      ['ot_pd120', 'P-09', 'door_bifold'],
+      ['ot_ps90', 'P-10', 'door_accordion'],
+      ['ot_pg300', 'P-11', 'door_garage'],
+    ];
+    for (const [id, code, familia] of novos) {
+      const t = tipo(id);
+      expect(t.code, id).toBe(code);
+      expect(openingFamilyOf(t)?.id, id).toBe(familia);
+      expect(openingTypeIssue(t), id).toBeNull();
+    }
+    expect(tipo('ot_pd120').leaves).toBe(2);
+    expect(tipo('ot_pg300').frameMaterialId).toBe('mat_aco');
+  });
+});
+
 describe('regra do tipo no comando', () => {
   it('grava o tipo válido e recusa o inválido, sem alterar o projeto', () => {
     const s = new ProjectStore(createEmptyProject());

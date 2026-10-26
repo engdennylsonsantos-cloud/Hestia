@@ -22,6 +22,7 @@ import {
 } from '@hestia/model';
 import type { WallFrame } from './frame.ts';
 import { buildWindowNew } from './openingModelWindowsNew.ts';
+import { buildNewDoorParts } from './openingModelDoorsNew.ts';
 import type { OpeningGeometry } from './types.ts';
 import type {
   LeafOpening,
@@ -742,6 +743,12 @@ function buildLintelBeams(c: Ctx): void {
 
 function buildDoor(c: Ctx): void {
   const family = openingFamilyOf(c.t)?.id;
+  const novas = buildNewDoorParts(c.p, c.o, c.g, c.f);
+  if (novas) {
+    c.parts.push(...novas.parts);
+    c.openings.push(...novas.openings);
+    return;
+  }
   switch (family) {
     case 'door_double':
       buildDoubleDoor(c);

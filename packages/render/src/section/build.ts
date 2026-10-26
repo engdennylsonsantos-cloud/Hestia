@@ -154,7 +154,8 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       if (ring.length < 3) continue;
       const hatch = hatchOf(item.part);
       if (!noFill) fills.push({ polygons: [[ring]], color: halftone(colorOf(item.part), pt), alpha: pt.alpha, ...(hatch ? { hatch } : {}) });
-      strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1 });
+      const dash = item.part.dashed ? { dash: [6, 3] as [number, number] } : {};
+      strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1, ...dash });
     }
     // Linha central só na janela de correr (2 ou 3 folhas), como antes (C6).
     const slides = model.openings.filter((x) => x.kind === 'slide').length;

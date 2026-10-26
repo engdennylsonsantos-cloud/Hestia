@@ -222,3 +222,77 @@ describe('openingPlanPaths: janelas', () => {
     }
   });
 });
+
+describe('openingPlanPaths: portas novas (spec E §3.5)', () => {
+  it('vai-e-vem: dois arcos (principal contínuo, o outro tracejado) e a folha aberta dos dois lados', () => {
+    for (const flips of [
+      { flipHand: false, flipFacing: false },
+      { flipHand: true, flipFacing: true },
+    ]) {
+      const paths = openingPlanPaths(modelo(cena('ot_pvv90', {}, flips)), opts({ detail: 'mid' }));
+      const arcos = paths.filter((p) => p.role === 'swing');
+      expect(arcos).toHaveLength(2);
+      expect(arcos.filter((p) => p.dash?.[0] === 4)).toHaveLength(1);
+      const folhasAbertas = folhas(paths);
+      expect(folhasAbertas).toHaveLength(2);
+      expect(Math.sign(boxOf(folhasAbertas[0]!).s0 - boxOf(folhasAbertas[1]!).s0)).not.toBe(0);
+      const alto = openingPlanPaths(modelo(cena('ot_pvv90', {}, flips)), opts({ detail: 'high' }));
+      expect(folhas(alto).length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('embutir: folha fechada, cavidade tracejada e seta para a cavidade', () => {
+    for (const flips of [
+      { flipHand: false, flipFacing: false },
+      { flipHand: true, flipFacing: false },
+    ]) {
+      const paths = openingPlanPaths(modelo(cena('ot_pe80', {}, flips)), opts({ detail: 'mid' }));
+      expect(paths.some((p) => p.role === 'leaf' && p.closed)).toBe(true);
+      const pocket = paths.find((p) => p.role === 'pocket' && p.closed)!;
+      expect(pocket).toBeDefined();
+      expect(pocket.dash).toEqual([6, 3]);
+      const seta = paths.find((p) => p.role === 'arrow')!;
+      expect(seta).toBeDefined();
+      const b = boxOf(pocket);
+      expect(Math.abs(b.t1 - b.t0)).toBeGreaterThan(0.5);
+      const alto = openingPlanPaths(modelo(cena('ot_pe80', {}, flips)), opts({ detail: 'high' }));
+      expect(alto.some((p) => p.role === 'pocket' && p.closed)).toBe(true);
+    }
+  });
+
+  it('dobrável e sanfonada: zigue-zague com o número certo de segmentos', () => {
+    for (const [base, leaves, esperado] of [
+      ['ot_pd120', 2, 2],
+      ['ot_pd120', 4, 4],
+      ['ot_ps90', 1, 9],
+    ] as const) {
+      const c = cena(base, leaves === 4 ? { leaves: 4 } : {});
+      const paths = openingPlanPaths(modelo(c), opts({ detail: 'mid' }));
+      const paineis = folhas(paths);
+      expect(paineis, `${base} ${leaves}`).toHaveLength(esperado);
+      for (const p of paineis) {
+        const b = boxOf(p);
+        expect(largura(b) + profundidade(b)).toBeGreaterThan(0.01);
+      }
+      const alto = openingPlanPaths(modelo(c), opts({ detail: 'high' }));
+      expect(folhas(alto).length).toBeGreaterThanOrEqual(esperado * 2);
+    }
+  });
+
+  it('seccionada: linha da folha fechada e retângulo tracejado do painel recolhido para o lado de abertura', () => {
+    for (const flipFacing of [false, true]) {
+      const paths = openingPlanPaths(modelo(cena('ot_pg300', {}, { flipFacing })), opts({ detail: 'mid' }));
+      const linhas = paths.filter((p) => p.role === 'leaf' && !p.closed);
+      expect(linhas).toHaveLength(1);
+      const recolhido = paths.find((p) => p.role === 'leaf' && p.closed && p.dash?.[0] === 6)!;
+      expect(recolhido).toBeDefined();
+      const b = boxOf(recolhido);
+      expect(profundidade(b)).toBeCloseTo(Math.min(2.2, 2.5), 9);
+      const side = flipFacing ? -1 : 1;
+      expect(Math.sign((b.s0 + b.s1) / 2)).toBe(side);
+      expect(paths.some((p) => p.role === 'track' && p.dash?.[0] === 4)).toBe(true);
+      const alto = openingPlanPaths(modelo(cena('ot_pg300', {}, { flipFacing })), opts({ detail: 'high' }));
+      expect(alto.filter((p) => p.role === 'leaf' && p.closed).length).toBeGreaterThanOrEqual(5);
+    }
+  });
+});

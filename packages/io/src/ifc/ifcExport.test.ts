@@ -16,7 +16,7 @@ import {
   type Stair,
   type Wall,
 } from '@hestia/model';
-import { exportIfc } from './ifcExport.ts';
+import { doorOperation, exportIfc } from './ifcExport.ts';
 import { ifcGuid } from './ifcGuid.ts';
 import type { IfcGeometry, IfcOpeningGeo, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
 
@@ -79,6 +79,21 @@ function danglingRefs(text: string): number[] {
   const defined = new Set([...text.matchAll(/^#(\d+)=/gm)].map((m) => Number(m[1])));
   return [...text.matchAll(/#(\d+)/g)].map((m) => Number(m[1])).filter((id) => !defined.has(id));
 }
+
+describe('doorOperation: famílias novas', () => {
+  it('vai-e-vem, embutir, dobrável, sanfonada e seccionada têm a operação da spec', () => {
+    expect(doorOperation({ plan: 'dblact' }, false)).toBe('DOUBLE_SWING_LEFT');
+    expect(doorOperation({ plan: 'dblact' }, true)).toBe('DOUBLE_SWING_RIGHT');
+    expect(doorOperation({ plan: 'pocket' }, false)).toBe('SLIDING_TO_LEFT');
+    expect(doorOperation({ plan: 'pocket' }, true)).toBe('SLIDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'bifold' }, false)).toBe('FOLDING_TO_LEFT');
+    expect(doorOperation({ plan: 'bifold' }, true)).toBe('FOLDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'accordion' }, false)).toBe('FOLDING_TO_LEFT');
+    expect(doorOperation({ plan: 'accordion' }, true)).toBe('FOLDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'garage' }, false)).toBe('SECTIONAL_OVERHEAD');
+    expect(doorOperation({ plan: 'garage' }, true)).toBe('SECTIONAL_OVERHEAD');
+  });
+});
 
 describe('exportIfc', () => {
   const p = buildTemplate('house2');

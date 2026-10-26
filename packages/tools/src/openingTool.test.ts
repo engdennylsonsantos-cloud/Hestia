@@ -206,6 +206,24 @@ describe('colocação da abertura: prévia e cotas', () => {
   });
 });
 
+describe('colocação da abertura: etiquetar ao inserir', () => {
+  it('inserir uma porta liga showOpeningTags quando estava desligado', () => {
+    const ctx = makeEnv();
+    makeWall(ctx, [0, 0], [4, 0]);
+    expect(ctx.store.project.settings.showOpeningTags).not.toBe(true);
+    moveAndClick(ctx, 2, 0.1);
+    expect(ctx.store.project.settings.showOpeningTags).toBe(true);
+  });
+
+  it('openingTagOnPlace desligado mantém a configuração', () => {
+    const ctx = makeEnv();
+    ctx.options.openingTagOnPlace = false;
+    makeWall(ctx, [0, 0], [4, 0]);
+    moveAndClick(ctx, 2, 0.1);
+    expect(ctx.store.project.settings.showOpeningTags).not.toBe(true);
+  });
+});
+
 describe('colocação da abertura: zona de captura da parede', () => {
   it('aceita o cursor a até 16 px da face e recusa além disso', () => {
     const dentro = makeEnv();

@@ -10,6 +10,8 @@ import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
+import { OpeningFlipGrips } from './OpeningFlipGrips.tsx';
+import { OpeningTempDims } from './OpeningTempDims.tsx';
 import { NavBar } from './NavBar.tsx';
 import { CanvasContextMenu } from './CanvasContextMenu.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
@@ -49,6 +51,7 @@ export function ViewportCanvas(): ReactElement {
   const sketch = useMemo(() => (perim.active && perim.draft && perim.result ? { draft: perim.draft, result: perim.result, hover: perim.hoverId } : null), [perim.active, perim.draft, perim.result, perim.hoverId]);
   // Só o que a própria tela lê: a mudança de outros campos não re-renderiza a planta (o redesenho sai do agendamento abaixo).
   const ui = useUi(useShallow((s) => ({ view: s.view, gpu: s.gpu, prompt: s.prompt, typed: s.typed, hover: s.hover, tool: s.tool })));
+  const selection = useUi((s) => s.selection);
   const frame = useRef(0);
   const dprRef = useRef(1);
   const planFrame = useRef<PlanFrame | null>(null);
@@ -460,6 +463,9 @@ export function ViewportCanvas(): ReactElement {
     : ui.tool === 'select'
     ? 'default'
     : 'crosshair';
+  // Alças e cotas editáveis só com UMA esquadria selecionada na planta (Revit: depois de inserir).
+  const only = selection.length === 1 ? editor.project.elements[selection[0]!] : undefined;
+  const selectedOpeningId = only && (only.kind === 'door' || only.kind === 'window') ? only.id : null;
   return (
     <div
       ref={host}
@@ -473,6 +479,8 @@ export function ViewportCanvas(): ReactElement {
       onContextMenu={(e) => e.preventDefault()}
     >
       <PlanLabels ref={labelLayer} labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
+      {ui.view === 'plan' && selectedOpeningId ? <OpeningFlipGrips openingId={selectedOpeningId} /> : null}
+      {ui.view === 'plan' && selectedOpeningId ? <OpeningTempDims openingId={selectedOpeningId} /> : null}
       {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
       {ui.gpu === 'cpu' && ui.view === '3d' && (
         <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>

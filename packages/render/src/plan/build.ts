@@ -16,6 +16,7 @@ import { roofFills, roofFootprint, roofOps } from './roofs.ts';
 import { belowStairOps, stairFills } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
+import { openingTagLabels } from './openingTags.ts';
 import { noteOps } from './notes.ts';
 import { elementTagOps } from './tags.ts';
 import { openingViewOps, wallOutlineOps } from './view.ts';
@@ -328,6 +329,8 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 
   // Etiquetas de tipo (G4) seguem a categoria 'anotação' (visibilidade e mm de papel).
   if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
+  // Etiquetas de portas e janelas (Tag on Placement): desligadas por padrão, ligadas ao inserir.
+  if (p.settings.showOpeningTags) labels.push(...openingTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,

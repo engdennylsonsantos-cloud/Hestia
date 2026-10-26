@@ -142,6 +142,40 @@ export interface TemporaryDimension {
 }
 
 /**
+ * Referências das duas cotas de uma abertura já colocada: o `t` do alvo fixo (eixo da perpendicular no modo `axis` ou
+ * face dela no modo `face`) e a medida até a abertura. É a conta que a prévia da colocação e as cotas editáveis usam;
+ * fica aqui para não haver duas regras de cota.
+ */
+export interface DimensionRefs {
+  leftEdge: number;
+  rightEdge: number;
+  leftT: number;
+  rightT: number;
+  leftValue: number;
+  rightValue: number;
+}
+
+/** Referências das cotas laterais da abertura (ver `DimensionRefs`). */
+export function dimensionRefs(
+  center: number,
+  width: number,
+  length: number,
+  neighbors: PerpendicularWall[],
+  mode: NonNullable<ToolOptions['openingDimMode']>,
+): DimensionRefs {
+  const leftEdge = center - width / 2;
+  const rightEdge = center + width / 2;
+  if (mode === 'face') {
+    const leftT = Math.max(0, ...neighbors.filter((n) => n.faceHi <= leftEdge + EPS).map((n) => n.faceHi));
+    const rightT = Math.min(length, ...neighbors.filter((n) => n.faceLo >= rightEdge - EPS).map((n) => n.faceLo));
+    return { leftEdge, rightEdge, leftT, rightT, leftValue: Math.max(0, leftEdge - leftT), rightValue: Math.max(0, rightT - rightEdge) };
+  }
+  const leftT = Math.max(0, ...neighbors.filter((n) => n.axisT < center - EPS).map((n) => n.axisT));
+  const rightT = Math.min(length, ...neighbors.filter((n) => n.axisT > center + EPS).map((n) => n.axisT));
+  return { leftEdge, rightEdge, leftT, rightT, leftValue: Math.max(0, center - leftT), rightValue: Math.max(0, rightT - center) };
+}
+
+/**
  * Duas cotas da abertura para as paredes perpendiculares vizinhas (ou as pontas da parede, se não houver):
  * do eixo da abertura ao eixo da perpendicular (`axis`) ou da borda da abertura à face (`face`). O traço fica
  * deslocado para o lado do cursor (`side`).
@@ -157,30 +191,14 @@ export function temporaryDimensions(
   const length = frame.length;
   const sDim = side * (frame.thickness / 2 + 0.25);
   const point = (t: number): Vec2 => ({ x: frame.a.x + frame.u.x * t + frame.n.x * sDim, y: frame.a.y + frame.u.y * t + frame.n.y * sDim });
-  const leftEdge = center - width / 2;
-  const rightEdge = center + width / 2;
-  let leftT: number;
-  let rightT: number;
-  let leftValue: number;
-  let rightValue: number;
-  if (mode === 'face') {
-    leftT = Math.max(0, ...neighbors.filter((n) => n.faceHi <= leftEdge + EPS).map((n) => n.faceHi));
-    rightT = Math.min(length, ...neighbors.filter((n) => n.faceLo >= rightEdge - EPS).map((n) => n.faceLo));
-    leftValue = Math.max(0, leftEdge - leftT);
-    rightValue = Math.max(0, rightT - rightEdge);
-  } else {
-    leftT = Math.max(0, ...neighbors.filter((n) => n.axisT < center - EPS).map((n) => n.axisT));
-    rightT = Math.min(length, ...neighbors.filter((n) => n.axisT > center + EPS).map((n) => n.axisT));
-    leftValue = Math.max(0, center - leftT);
-    rightValue = Math.max(0, rightT - center);
-  }
-  const leftA = point(leftT);
-  const leftB = point(mode === 'face' ? leftEdge : center);
-  const rightA = point(mode === 'face' ? rightEdge : center);
-  const rightB = point(rightT);
+  const refs = dimensionRefs(center, width, length, neighbors, mode);
+  const leftA = point(refs.leftT);
+  const leftB = point(mode === 'face' ? refs.leftEdge : center);
+  const rightA = point(mode === 'face' ? refs.rightEdge : center);
+  const rightB = point(refs.rightT);
   return [
-    { a: leftA, b: leftB, at: point((leftT + (mode === 'face' ? leftEdge : center)) / 2), value: leftValue },
-    { a: rightA, b: rightB, at: point(((mode === 'face' ? rightEdge : center) + rightT) / 2), value: rightValue },
+    { a: leftA, b: leftB, at: point((refs.leftT + (mode === 'face' ? refs.leftEdge : center)) / 2), value: refs.leftValue },
+    { a: rightA, b: rightB, at: point(((mode === 'face' ? refs.rightEdge : center) + refs.rightT) / 2), value: refs.rightValue },
   ];
 }
 

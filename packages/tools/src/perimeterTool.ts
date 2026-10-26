@@ -1,1 +1,446 @@
-export {};
+import { add, angleOf, dist, len, mid, mul, norm, sub, type SketchDraft, type SketchResult, type SketchSeg, type SketchTarget, type Vec2 } from '@hestia/geom';
+import { ToolBase } from './base.ts';
+import type { InferContext } from './infer.ts';
+import { parseNumber } from './numeric.ts';
+import { SKETCH_DEFAULTS, addSegs, closeAnalysis, effectiveSeg, finish as finishSketch, newDraft, removeSegs, selectSegs, setSegSlope, type FinishResult } from './perimeterSession.ts';
+import { anchorOf, buildShape, kindOf, pointsOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
+import { SELECT_PX, boxRing, draftEdges, draftPoints, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
+import { perimeterFromBox } from './sketchByPerimeter.ts';
+import { faceAt } from './sketchPickFace.ts';
+import type { ShapeKindId } from './sketchShapes.ts';
+import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
+
+/** Tolerância de captura de face, eixo ou borda, em px de tela (como as outras ferramentas de captura). */
+const PICK_PX = 10;
+/** Caixa menor que isto (em px) é clique, não contorno. */
+const BOX_MIN_PX = 4;
+
+/** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
+export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter';
+
+/** Linha de limite (clique seleciona e desenha) ou inclinação (clique no triângulo de uma aresta, só telhado). */
+export type LineKind = 'boundary' | 'slope';
+
+export const PERIMETER_HINT = 'Perímetro: escolha uma forma na barra, ou clique numa linha para selecionar. Concluir fecha o contorno.';
+const SELECT_HINT = 'Selecione linhas: clique numa linha (Shift soma), Delete remove. Escolha uma forma na barra para desenhar.';
+const PICK_HINT = 'Linha numa face: passe sobre uma face, eixo ou borda do nível. Tab alterna; clique adiciona.';
+const BOX_HINT = 'Contorno pela caixa: arraste uma caixa sobre as paredes e solte.';
+const SLOPE_HINT = 'Inclinação: clique no triângulo de uma aresta do contorno para ligar ou desligar.';
+
+/** Substitui as linhas com o mesmo id (fileta, por exemplo) e acrescenta as demais, com ids novos. */
+function applySegs(d: SketchDraft, segs: SketchSeg[]): SketchDraft {
+  const byId = new Map(segs.map((s) => [s.id, s] as const));
+  const known = new Set(d.segs.map((s) => s.id));
+  return addSegs({ ...d, segs: d.segs.map((s) => byId.get(s.id) ?? s) }, segs.filter((s) => !known.has(s.id)));
+}
+
+/**
+ * Esboço de perímetro (Criar/Editar perímetro). A ferramenta guarda o `SketchDraft` e só o altera pelas funções puras
+ * de `perimeterSession`. Esc cancela o passo em andamento (e, sem passo, tira a forma escolhida); Enter não conclui;
+ * concluir e descartar são botões (`finish`, `discard`), e `finish` devolve o resultado para quem cria o elemento.
+ */
+export class PerimeterTool extends ToolBase {
+  readonly id = 'perimeter';
+  readonly label = 'Perímetro';
+  readonly hint = PERIMETER_HINT;
+  private d: SketchDraft;
+  private shape: PerimeterShape | null = null;
+  private line: LineKind = 'boundary';
+  private step: ShapeStep | null = null;
+  /** Sinalizadores da forma (Tab), ex.: sentido do arco. */
+  private flags: Record<string, boolean> = {};
+  /** Tab em "pela face": qual candidato entre os ao alcance do cursor. */
+  private cycle = 0;
+  private hover: string | null = null;
+  /** Caixa do arrasto em "pela caixa", ou null. */
+  private box: { a: Vec2; b: Vec2 } | null = null;
+
+  constructor(env: ToolEnv, target: SketchTarget = 'roof') {
+    super(env);
+    const o = env.options();
+    this.d = newDraft(target, { slopePct: o.roofSlope ?? SKETCH_DEFAULTS.slopePct, overhang: o.roofOverhang ?? SKETCH_DEFAULTS.overhang });
+  }
+
+  /** Rascunho corrente (dado puro, para a planta desenhar). */
+  draft(): SketchDraft {
+    return this.d;
+  }
+
+  /** Forma escolhida na barra, ou null (modo de seleção). */
+  activeShape(): PerimeterShape | null {
+    return this.shape;
+  }
+
+  lineKind(): LineKind {
+    return this.line;
+  }
+
+  /** Validação corrente do rascunho, para a barra de status e o botão Concluir. */
+  closeInfo(): SketchResult {
+    return closeAnalysis(this.d);
+  }
+
+  /** Linha sob o cursor no modo de seleção, para a planta destacar (`sketchOps` recebe o id). */
+  hoverId(): string | null {
+    return this.hover;
+  }
+
+  previews(): PreviewItem[] {
+    return this.items;
+  }
+
+  /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento. */
+  setShape(kind: PerimeterShape | null): void {
+    this.shape = kind;
+    this.flags = {};
+    this.reset();
+    this.env.say(kind === null ? SELECT_HINT : this.shapeHint(kind));
+  }
+
+  /** Linha de limite ou de inclinação. Inclinação só existe no telhado e leva o modo de seleção (clique no triângulo). */
+  setLineKind(kind: LineKind): boolean {
+    if (kind === 'slope' && this.d.target !== 'roof') {
+      this.env.say('Inclinação por aresta só existe no telhado.');
+      return false;
+    }
+    this.line = kind;
+    if (kind === 'slope') this.shape = null;
+    this.flags = {};
+    this.reset();
+    this.env.say(kind === 'slope' ? SLOPE_HINT : SELECT_HINT);
+    return true;
+  }
+
+  /** Botão Concluir: valida o esboço. Se fecha, devolve o contorno e os furos (com as flags das arestas) e limpa o rascunho. */
+  finish(): FinishResult {
+    const r = finishSketch(this.d);
+    if (!r.ok) {
+      this.env.say(r.issues[0]?.message ?? 'Esboço incompleto.');
+      return r;
+    }
+    this.d = newDraft(this.d.target, this.d.defaults);
+    this.reset();
+    this.env.say('Perímetro concluído.');
+    return r;
+  }
+
+  /** Botão Cancelar: descarta o rascunho inteiro. O Esc não faz isto (ver `cancel`). */
+  discard(): void {
+    this.d = newDraft(this.d.target, this.d.defaults);
+    this.shape = null;
+    this.flags = {};
+    this.reset();
+    this.env.say('Perímetro descartado.');
+  }
+
+  /** Carrega um rascunho (Editar perímetro). Não mexe na forma escolhida nem nos sinalizadores. */
+  loadDraft(d: SketchDraft): void {
+    this.d = d;
+    this.reset();
+    this.env.say(this.hint);
+  }
+
+  /**
+   * Esc (contrato `Tool.cancel`): cancela o passo em andamento; sem passo, tira a forma escolhida. Nunca conclui nem
+   * descarta o rascunho, e não sai da ferramenta.
+   */
+  override cancel(): void {
+    if (this.step || this.box) {
+      this.reset();
+      this.env.say('Passo cancelado. Esc de novo tira a forma escolhida.');
+      return;
+    }
+    if (this.shape !== null) {
+      this.setShape(null);
+      return;
+    }
+    this.env.say(SELECT_HINT);
+  }
+
+  /** Enter não conclui: só avisa onde está o botão. */
+  override confirm(): void {
+    if (this.d.segs.length > 0) this.env.say('Enter não conclui o perímetro: use o botão Concluir.');
+  }
+
+  protected reset(): void {
+    this.step = null;
+    this.items = [];
+    this.inf = null;
+    this.hover = null;
+    this.box = null;
+    this.cycle = 0;
+  }
+
+  protected busy(): boolean {
+    return this.step !== null || this.box !== null;
+  }
+
+  override inputPrompt(): string | null {
+    const st = this.step;
+    const input = st ? stepsOf(st.shape)[st.idx] : undefined;
+    if (!st || !input) return null;
+    if (input.kind === 'length' || input.kind === 'angle' || input.kind === 'count') return input.label;
+    return input.kind === 'point' && st.shape.id === 'line' && anchorOf(st) ? 'Comprimento' : null;
+  }
+
+  override move(p: PointerInfo): void {
+    this.raw = p.raw;
+    if (this.box) return;
+    this.items = [];
+    this.inf = null;
+    this.hover = null;
+    const id = this.shapeId();
+    if (this.shape === null) {
+      if (this.line === 'boundary') this.hover = hitSeg(this.d.segs, p.raw, SELECT_PX * this.env.metersPerPixel());
+      return;
+    }
+    if (this.shape === 'pickFace') this.movePick(p.raw);
+    else if (id) this.moveShape(p, id);
+  }
+
+  override click(p: PointerInfo): void {
+    this.raw = p.raw;
+    if (this.shape === null) this.clickSelect(p);
+    else if (this.shape === 'pickFace') this.clickPick(p);
+    else if (this.shape === 'byPerimeter') return;
+    else this.clickShape(p, this.shape);
+  }
+
+  /** Arrasto do contorno pela caixa: começa a caixa no ponto. */
+  down(p: PointerInfo): void {
+    if (this.shape !== 'byPerimeter') return;
+    this.raw = p.raw;
+    this.box = { a: p.raw, b: p.raw };
+  }
+
+  drag(p: PointerInfo): void {
+    if (!this.box) return;
+    this.box = { a: this.box.a, b: p.raw };
+    this.items = [{ kind: 'polygon', ring: boxRing(this.box.a, this.box.b), dashed: true }];
+  }
+
+  /** Solta a caixa: adiciona o contorno externo das paredes que ela pega. Avisos vão para a barra de status. */
+  up(p: PointerInfo): void {
+    const box = this.box;
+    if (!box) return;
+    this.reset();
+    if (dist(box.a, p.raw) < BOX_MIN_PX * this.env.metersPerPixel()) return;
+    const r = perimeterFromBox(this.env, box.a, p.raw);
+    if (r.segs.length === 0) {
+      this.env.say(r.warnings.join(' ') || 'Nenhuma parede nesta caixa.');
+      return;
+    }
+    this.d = applySegs(this.d, r.segs);
+    this.env.say([...r.warnings, `Contorno pela caixa: ${r.segs.length} linha(s) adicionadas.`].join(' '));
+  }
+
+  /** Tab: alterna o candidato sob o cursor (face) ou o sinalizador da forma (ex.: sentido do arco). */
+  override tab(): void {
+    if (this.shape === 'pickFace') {
+      this.cycle += 1;
+      this.items = [];
+      this.movePick(this.raw);
+      return;
+    }
+    const id = this.shapeId();
+    const flag = id ? kindOf(id).inputs.find((i) => i.kind === 'flag') : undefined;
+    if (!flag) return;
+    this.flags[flag.key] = !this.flags[flag.key];
+    this.env.say(`${flag.label}: ${this.flags[flag.key] ? 'sim' : 'não'} (Tab alterna).`);
+  }
+
+  /** Digitação: medida, ângulo (graus) ou contagem para a entrada pendente. Na linha, digitar o comprimento põe o fim na direção do cursor. */
+  override type(text: string): boolean {
+    const st = this.step;
+    const input = st ? stepsOf(st.shape)[st.idx] : undefined;
+    if (!st || !input) return false;
+    const v = parseNumber(text);
+    if (input.kind === 'length' || input.kind === 'angle' || input.kind === 'count') {
+      if (v === null) return this.refuse('Valor inválido. Digite um número.');
+      if (input.kind === 'length' && v <= 0) return this.refuse('Digite um comprimento maior que zero, em metros.');
+      if (input.kind === 'count' && (!Number.isInteger(v) || v < 3)) return this.refuse('Lados: um inteiro de 3 para cima.');
+      this.setInput(st, input.key, input.kind === 'angle' ? (v * Math.PI) / 180 : v);
+      return true;
+    }
+    const anchor = anchorOf(st);
+    if (input.kind !== 'point' || st.shape.id !== 'line' || !anchor) return false;
+    if (v === null) return this.refuse('Valor inválido. Digite um número em metros.');
+    if (v <= 0) return this.refuse('Digite um comprimento maior que zero, em metros.');
+    const dir = sub(this.inf?.point ?? this.raw, anchor);
+    const u = len(dir) < 1e-9 ? { x: 1, y: 0 } : norm(dir);
+    this.setInput(st, input.key, add(anchor, mul(u, v)));
+    return true;
+  }
+
+  /** Delete: remove as linhas selecionadas. Sem seleção, deixa o Delete seguir para a seleção do projeto. */
+  deleteKey(): boolean {
+    const ids = this.d.selected;
+    if (ids.length === 0) return false;
+    this.d = removeSegs(this.d, ids);
+    this.hover = null;
+    this.env.say(`${ids.length} linha(s) removida(s).`);
+    return true;
+  }
+
+  private shapeId(): ShapeKindId | null {
+    return this.shape === null || this.shape === 'pickFace' || this.shape === 'byPerimeter' ? null : this.shape;
+  }
+
+  private shapeHint(kind: PerimeterShape): string {
+    if (kind === 'pickFace') return PICK_HINT;
+    if (kind === 'byPerimeter') return BOX_HINT;
+    const k = kindOf(kind);
+    return `${k.label}: ${promptOf({ shape: k, idx: 0, vals: {} })}.`;
+  }
+
+  private refuse(msg: string): false {
+    this.env.say(msg);
+    return false;
+  }
+
+  /** Captura para os pontos: vértices e linhas do rascunho, mais os pontos do passo, e o ponto anterior da forma. */
+  private snapExtra(st: ShapeStep | null): Partial<InferContext> {
+    const anchor = anchorOf(st);
+    return {
+      ...(anchor ? { from: anchor } : {}),
+      extraPoints: [...draftPoints(this.d.segs), ...pointsOf(st)],
+      extraSegments: draftEdges(this.d.segs),
+    };
+  }
+
+  private movePick(at: Vec2): void {
+    const pick = faceAt(this.env, at, PICK_PX * this.env.metersPerPixel(), this.cycle);
+    if (!pick) {
+      this.env.say('Aponte para uma face, eixo ou borda do nível.');
+      return;
+    }
+    this.items.push(...segLines(pick.seg, { halo: true }), { kind: 'label', at: mid(pick.seg.a, pick.seg.b), text: pick.label });
+    this.env.say(`${pick.label}. Clique adiciona; Tab alterna.`);
+  }
+
+  private moveShape(p: PointerInfo, id: ShapeKindId): void {
+    const st: ShapeStep = this.step ?? { shape: kindOf(id), idx: 0, vals: {} };
+    const input = stepsOf(st.shape)[st.idx];
+    if (!input) return;
+    const anchor = anchorOf(st);
+    if (input.kind === 'segment') {
+      const sid = hitSeg(this.d.segs, p.raw, SELECT_PX * this.env.metersPerPixel());
+      const seg = this.d.segs.find((s) => s.id === sid);
+      if (seg) this.items.push(...segLines(seg, { halo: true }));
+      this.env.say(seg ? `${input.label}: clique para escolher.` : `Clique numa linha do esboço (${input.label.toLowerCase()}).`);
+      return;
+    }
+    let value: unknown = null;
+    let cursor: Vec2 = p.raw;
+    if (input.kind === 'point') {
+      const inf = this.snap(p, this.snapExtra(st));
+      value = inf.point;
+      cursor = inf.point;
+    } else if (input.kind === 'length' && anchor) {
+      value = dist(p.raw, anchor);
+    } else if (input.kind === 'angle' && anchor) {
+      value = angleOf(sub(p.raw, anchor));
+    }
+    this.items.push(...stepPreview(st, value, anchor, cursor, this.flags));
+    this.env.say(`${st.shape.label}: ${promptOf(st)}.`);
+  }
+
+  private clickSelect(p: PointerInfo): void {
+    const mpp = this.env.metersPerPixel();
+    if (this.line === 'slope') {
+      const id = triangleHit(this.d, p.raw, mpp);
+      if (!id) {
+        this.env.say('Clique no triângulo de uma aresta do contorno.');
+        return;
+      }
+      const on = effectiveSeg(this.d, this.d.segs.find((s) => s.id === id)!).definesSlope;
+      this.d = setSegSlope(this.d, id, { definesSlope: !on });
+      this.env.say(on ? 'Aresta sem inclinação definida.' : 'Aresta define a inclinação.');
+      return;
+    }
+    const id = hitSeg(this.d.segs, p.raw, SELECT_PX * mpp);
+    this.d = selectSegs(this.d, id ? [id] : [], p.shift);
+    const n = this.d.selected.length;
+    this.env.say(n > 0 ? `${n} linha(s) selecionada(s). Delete remove; Shift soma.` : SELECT_HINT);
+  }
+
+  private clickPick(p: PointerInfo): void {
+    const pick = faceAt(this.env, p.raw, PICK_PX * this.env.metersPerPixel(), this.cycle);
+    if (!pick) {
+      this.env.say('Nada aqui: aponte para uma face, eixo ou borda.');
+      return;
+    }
+    if (hasSeg(this.d.segs, pick.seg)) {
+      this.env.say('Essa linha já está no esboço.');
+      return;
+    }
+    this.d = addSegs(this.d, [pick.seg]);
+    this.cycle = 0;
+    this.env.say(`${pick.label} adicionada.`);
+  }
+
+  private clickShape(p: PointerInfo, id: ShapeKindId): void {
+    const st = this.step ?? this.begin(id);
+    const input = stepsOf(st.shape)[st.idx];
+    if (!input) return;
+    const anchor = anchorOf(st);
+    if (input.kind === 'point') {
+      const q = this.snap(p, this.snapExtra(st)).point;
+      if (anchor && dist(q, anchor) < 1e-9) {
+        this.env.say('Ponto repetido: clique noutro lugar.');
+        return;
+      }
+      this.setInput(st, input.key, q);
+      return;
+    }
+    if (input.kind === 'segment') {
+      const seg = this.d.segs.find((s) => s.id === hitSeg(this.d.segs, p.raw, SELECT_PX * this.env.metersPerPixel()));
+      if (!seg) this.env.say('Clique numa linha do esboço.');
+      else this.setInput(st, input.key, seg);
+      return;
+    }
+    if ((input.kind === 'length' || input.kind === 'angle') && anchor) {
+      const v = input.kind === 'length' ? dist(p.raw, anchor) : angleOf(sub(p.raw, anchor));
+      if (input.kind === 'length' && v < 1e-9) return;
+      this.setInput(st, input.key, v);
+      return;
+    }
+    this.env.say(`Digite ${input.label.toLowerCase()}.`);
+  }
+
+  private begin(id: ShapeKindId): ShapeStep {
+    this.step = { shape: kindOf(id), idx: 0, vals: {} };
+    return this.step;
+  }
+
+  /** Grava a entrada pendente e avança; ao fechar todas, cria a forma. */
+  private setInput(st: ShapeStep, key: string, value: unknown): void {
+    st.vals[key] = value;
+    st.idx += 1;
+    this.items = [];
+    if (st.idx >= stepsOf(st.shape).length) this.complete(st);
+    else this.env.say(`${st.shape.label}: ${promptOf(st)}.`);
+  }
+
+  private complete(st: ShapeStep): void {
+    const segs = buildShape(st.shape.id, st.vals, this.flags);
+    if (segs.length === 0) {
+      const last = stepsOf(st.shape)[st.idx - 1]!;
+      st.idx -= 1;
+      delete st.vals[last.key];
+      this.env.say('Forma degenerada com esses pontos: escolha outro.');
+      return;
+    }
+    this.d = applySegs(this.d, segs);
+    this.items = [];
+    this.inf = null;
+    if (st.shape.id === 'line') {
+      // Linha de limite: a próxima começa na ponta desta, até Esc.
+      this.step = { shape: st.shape, idx: 1, vals: { a: st.vals.b } };
+      this.env.say('Linha criada. Clique no próximo ponto; Esc encerra.');
+      return;
+    }
+    this.step = null;
+    this.env.say(`${st.shape.label} adicionada. Escolha outra forma ou clique numa linha.`);
+  }
+}

@@ -17,7 +17,7 @@ import {
   type ToolOptions,
 } from '@hestia/tools';
 import type { PerimeterView } from './perimeterApi.ts';
-import { COMANDO_DO_ESBOCO, COMANDO_RECUSADO, DICA_COMANDO, SEM_ESBOCO } from './perimeterComandos.ts';
+import { COMANDO_DO_ESBOCO, COMANDO_RECUSADO, SEM_ESBOCO } from './perimeterComandos.ts';
 import { VISAO_FECHADA, alvoDaFerramenta, arestaDe, formaDaFerramenta, formaDaTela } from './perimeterView.ts';
 import { useUi } from './state.ts';
 import type { PerimeterLineKind, PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
@@ -176,8 +176,9 @@ export class PerimeterMode {
       return;
     }
     s.tool.setShape(null);
-    const ok = s.tool.setModify(alvo);
-    this.dizer(ok ? DICA_COMANDO[alvo] : COMANDO_RECUSADO);
+    // A ferramenta já publica o próximo passo na barra (escolher o alvo, distância, ponto de base…).
+    if (!s.tool.setModify(alvo)) return this.dizer(COMANDO_RECUSADO);
+    this.porta.atualizar();
   }
 
   /**

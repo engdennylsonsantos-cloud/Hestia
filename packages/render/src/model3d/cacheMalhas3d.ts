@@ -1,7 +1,7 @@
 import type { BufferGeometry, Group, Object3D } from 'three';
-import type { GraphicsCategory, Id } from '@hestia/model';
+import type { GraphicsCategory, Id, Material } from '@hestia/model';
 import type { ColecaoCaixas } from './caixasDoNivel3d.ts';
-import type { ElementRange } from './solids.ts';
+import type { ElementRange, SolidBatch } from './solids.ts';
 
 /**
  * Teto padrão do cache de malhas por nível, em bytes estimados (vértices, normais, índices e arestas). 128 MB: cabe no
@@ -35,6 +35,14 @@ export interface EntradaNivel {
   readonly instancias?: readonly ColecaoCaixas[];
   /** Arestas das caixas do nível (pares de pontos); a cena junta as de todos os níveis numa linha só. */
   readonly arestasCaixas?: Float32Array;
+  /** Sólidos do nível fora das caixas (pisos, lajes, telhados, beirais, escadas e paredes não retangulares). */
+  readonly lotes?: readonly SolidBatch[];
+  /** Arestas dos sólidos do nível (pares de pontos), quando a vista as pede. */
+  readonly arestasSolidas?: Float32Array;
+  /** Arestas de sólidos e caixas do nível já juntas (o que o gestor de GPU envia). */
+  readonly arestas?: Float32Array;
+  /** Materiais que não estão no projeto (acabamentos de beiral): a cena os usa na cor da peça. */
+  readonly materiais?: Readonly<Record<Id, Material>>;
 }
 
 /** Bytes de uma geometria: os arrays dos atributos e o de índices. */
@@ -44,8 +52,16 @@ function bytesDeGeometria(g: BufferGeometry): number {
   return n;
 }
 
-/** Bytes estimados de um nível: as geometrias (grupo e peças de picking, sem contar duas vezes a mesma) e as matrizes das caixas. */
-export function bytesDeNivel(grupo: Group, picks: PickSource[], instancias: readonly ColecaoCaixas[] = [], arestasCaixas?: Float32Array): number {
+/** Bytes estimados de um nível: as geometrias (grupo e peças de picking, sem contar duas vezes a mesma), as matrizes das
+ * caixas, as arrays dos sólidos e as arestas que a GPU envia. */
+export function bytesDeNivel(
+  grupo: Group,
+  picks: PickSource[],
+  instancias: readonly ColecaoCaixas[] = [],
+  arestasCaixas?: Float32Array,
+  lotes: readonly SolidBatch[] = [],
+  arestasSolidas?: Float32Array,
+): number {
   const geos = new Set<BufferGeometry>();
   grupo.traverse((o) => {
     const g = (o as { geometry?: BufferGeometry }).geometry;
@@ -55,7 +71,11 @@ export function bytesDeNivel(grupo: Group, picks: PickSource[], instancias: read
   let total = 0;
   for (const g of geos) total += bytesDeGeometria(g);
   for (const c of instancias) total += c.matrizes.byteLength;
+  for (const b of lotes) {
+    total += b.positions.length * 4 + b.normals.length * 4 + b.indices.length * 4;
+  }
   total += arestasCaixas?.byteLength ?? 0;
+  total += arestasSolidas?.byteLength ?? 0;
   return total;
 }
 

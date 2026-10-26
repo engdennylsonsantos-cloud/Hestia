@@ -243,6 +243,26 @@ describe('arestas', () => {
   });
 });
 
+describe('caminho instanciado: todas as categorias em lotes globais', () => {
+  it('pisos, telhado e escada viram lote global; as arestas saem numa linha só', () => {
+    const p = comVista(casa({ telhado: true, escada: true }), { edges: true });
+    const ms = new ModelScene();
+    ms.update(p, niveis(p), { edges: true, shadows: false, dark: false });
+    const porKind = new Map<string, number>();
+    modelo(ms).traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || o.userData.kind === undefined) return;
+      const k = String(o.userData.kind);
+      porKind.set(k, (porKind.get(k) ?? 0) + 1);
+    });
+    expect(porKind.get('floor')).toBeGreaterThan(0);
+    expect(porKind.get('roof')).toBeGreaterThan(0);
+    expect(porKind.get('stair')).toBeGreaterThan(0);
+    expect(linhas(ms)).toHaveLength(1);
+    expect(ms.memoriaGpu).toBeGreaterThan(0);
+    expect(ms.orcamentoVram.excedido).toBe(false);
+  });
+});
+
 describe('exibição por categoria (substituições)', () => {
   it('ocultar porta tira as 4 peças da porta; janela tira 7; a linha não muda', () => {
     const p = casa();

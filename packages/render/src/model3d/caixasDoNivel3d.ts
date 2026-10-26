@@ -5,7 +5,7 @@ import type { ElementRange } from './solids.ts';
 
 /**
  * Caixas de um nível agrupadas por categoria e material. O nível guarda as matrizes (`ColecaoCaixas`), e a cena as junta com as
- * dos outros níveis numa malha instanciada por grupo (`malhasInstanciadas3d.ts`). O que o picking, o realce e a seleção leem
+ * dos outros níveis numa `InstancedMesh` por grupo (`gpu/instanciasGpu.ts`). O que o picking, o realce e a seleção leem
  * não vem da malha instanciada: vem de uma malha de picking por grupo, com os triângulos das caixas no mundo e as faixas de
  * elemento (decisão 0016), invisível e dentro do grupo do nível.
  */

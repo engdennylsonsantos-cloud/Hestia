@@ -202,6 +202,32 @@ describe('desempenho: menos chamadas de desenho e menos malhas', () => {
     expect(a).toBeLessThan(12);
   });
 
+  it('pisos e lajes viram um lote global por categoria/material, e a cena não ganha malhas com pavimentos', () => {
+    const porKind = (n: number): Map<string, number> => {
+      const ms = montar(predio(n, { aberturas: true }), true);
+      const out = new Map<string, number>();
+      ms.scene.traverse((o) => {
+        if (!(o instanceof THREE.Mesh) || o.userData.kind === undefined) return;
+        let visivel = true;
+        for (let p: THREE.Object3D | null = o; p; p = p.parent) visivel &&= p.visible;
+        if (!visivel) return;
+        const k = String(o.userData.kind);
+        out.set(k, (out.get(k) ?? 0) + 1);
+      });
+      return out;
+    };
+    const a = porKind(6);
+    const b = porKind(20);
+    // Um lote de piso e um de laje para todos os níveis, não um por nível.
+    expect(a.get('floor')).toBe(1);
+    expect(a.get('slab')).toBe(1);
+    expect(b.get('floor')).toBe(1);
+    expect(b.get('slab')).toBe(1);
+    // O número de malhas de face não cresce com os pavimentos (as caixas são instâncias; os sólidos são lotes globais).
+    const faces = (m: Map<string, number>): number => [...m.values()].reduce((s, x) => s + x, 0);
+    expect(faces(b)).toBe(faces(a));
+  });
+
   it('as paredes retas não passam pela extrusão: sem aberturas, nenhum sólido de parede entra no cache de camadas', () => {
     clearWallLayerCache();
     montar(predio(10, { aberturas: false }), true);
@@ -285,14 +311,14 @@ describe('estilos, categorias e ciclo de vida da cena com caixas', () => {
     expect(Math.abs(vA.get('door')! - vR.get('door')!)).toBeLessThan(1e-5);
   });
 
-  it('dispose libera as malhas instanciadas; a atualização seguinte troca por novas', () => {
+  it('a atualização reaproveita as malhas instanciadas (sem alocar por quadro); dispose as libera', () => {
     const ms = montarVista(p, {});
     const antes = instanciadas(ms);
     const espia = vi.spyOn(THREE.InstancedMesh.prototype, 'dispose');
     ms.update(p, p.levels.map((l) => resolveLevel(p, l.id)), { edges: true, shadows: false, dark: false });
-    expect(espia).toHaveBeenCalledTimes(antes.length);
-    expect(instanciadas(ms).some((m) => antes.includes(m))).toBe(false);
-    espia.mockClear();
+    // Reuso: nada é descartado e os objetos são os mesmos.
+    expect(espia).not.toHaveBeenCalled();
+    expect(instanciadas(ms).every((m) => antes.includes(m))).toBe(true);
     const n = instanciadas(ms).length;
     ms.dispose();
     expect(espia).toHaveBeenCalledTimes(n);

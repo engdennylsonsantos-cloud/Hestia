@@ -14,12 +14,12 @@ import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
 import { CaixasDoNivel } from './caixasDoNivel3d.ts';
 import { criarCaixaUnitaria } from './caixas3d.ts';
-import { arestasInstanciadas, liberarMalhasInstanciadas, malhasInstanciadas } from './malhasInstanciadas3d.ts';
 import { buildCeilingSolids, buildFloorSolids, buildLevelSolids, buildRoofSolids, buildSlabSolids, type ElementRange, type SolidBatch } from './solids.ts';
 import { Materiais3D } from './materiais3d.ts';
 import { CacheMalhas, bytesDeNivel, disposeNivel, type EntradaNivel, type PickSource } from './cacheMalhas3d.ts';
 import { chavesDeNivel } from './chaveNivel3d.ts';
 import { caixaDaSelecao } from './selecao3d.ts';
+import { GestorRecursosGpu } from '../gpu/gestorRecursos.ts';
 
 /**
  * Opções herdadas. A vista 3D lê arestas e sombras de `view3dOf(p)` (decisão 0015 §2.2): `edges` e `shadows` são
@@ -71,13 +71,13 @@ export class ModelScene {
   private pickLayer = new THREE.Object3D();
   /** Peças de picking do nível que se monta agora (no wireframe a malha não entra na cena: vai para cá). */
   private picks: PickSource[] = [];
-  /** Malhas e arestas das caixas (paredes retas e esquadrias), fora do modelo: o picking lê as malhas de picking dos níveis. */
-  private instLayer = new THREE.Object3D();
-  private malhasInst: THREE.InstancedMesh[] = [];
-  private arestasInst: THREE.LineSegments | null = null;
   private caixaUnitaria = criarCaixaUnitaria();
   /** Paredes retas e esquadrias como caixas instanciadas (padrão); falso: tudo como geometria, o caminho de referência. */
   private readonly instanciar: boolean;
+  /** Gestor dos buffers globais por categoria/material (só no caminho instanciado). */
+  private gerente: GestorRecursosGpu;
+  /** Projeto da atualização corrente (o gestor resolve os materiais por id). */
+  private projeto: Project | null = null;
   /** Materiais por chave (ver `Materiais3D`). */
   private mats = new Materiais3D();
   /** Níveis que a cena mostra agora, e o cache de malhas por nível (ver `update`). */
@@ -104,11 +104,15 @@ export class ModelScene {
     this.cache = new CacheMalhas(opcoes.tetoMalhasBytes);
     this.reduzirJuncao = opcoes.reduzirJuncao ?? true;
     this.instanciar = opcoes.instanciar ?? true;
+    this.gerente = new GestorRecursosGpu({
+      caixaUnitaria: this.caixaUnitaria,
+      material: (categoria, materialId, extras) => this.mats.face(extras ?? this.projeto?.materials[materialId], categoria),
+      materialArestas: () => this.mats.edge(),
+    });
     // O zoom da órbita não atravessa as paredes do modelo (a cena fornece a primeira superfície sobre o eixo de visão).
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
-    this.scene.add(this.instLayer);
     this.scene.add(this.realces.camada);
     const hemi = new THREE.HemisphereLight(0xf4f7fb, 0xb9b2a4, 1.25);
     hemi.position.set(0, 0, 1);
@@ -224,11 +228,29 @@ export class ModelScene {
       atuais.push(nova);
     }
     const expulsas = this.cache.enforcar();
+    this.projeto = p;
     this.detach();
     this.cenaNiveis = atuais;
     for (const e of atuais) this.model.add(e.grupo);
+    if (this.instanciar) {
+      const wireframe = view.style === 'wireframe';
+      const res = this.gerente.atualizar(
+        atuais,
+        { instanciar: !wireframe, arestas: this.frame.edges, sombras: this.frame.shadows },
+        levels.length === p.levels.length,
+      );
+      if (wireframe) {
+        for (const m of res.solidas) {
+          m.visible = false;
+          this.pickLayer.add(m);
+        }
+      } else {
+        for (const m of res.solidas) this.model.add(m);
+        for (const m of res.instanciadas) this.model.add(m);
+      }
+      if (res.arestas) this.model.add(res.arestas);
+    }
     this.buildPickLayer();
-    this.montarInstancias(p, atuais);
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
     const saiu = new Set([...antes, ...sobras, ...expulsas]);
     for (const e of atuais) saiu.delete(e);
@@ -269,6 +291,7 @@ export class ModelScene {
     const view = this.frame.view;
     const shown = (c: GraphicsCategory): boolean => view.overrides[c].visible;
     const grupo = new THREE.Group();
+    grupo.userData = { levelId: lv0.levelId };
     const picks: PickSource[] = [];
     const mats = new Set<string>();
     const picksAnt = this.picks;
@@ -301,8 +324,16 @@ export class ModelScene {
       ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
     ];
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];
-    // Lotes do nível juntados por categoria e material: uma malha por grupo (ver `lotesMalha3d.ts`).
-    this.desenharLotes(grupo, batches, this.frame.edges, materialOf);
+    // Caminho de referência (`instanciar: false`): cada nível tem as suas malhas. Caminho padrão: os sólidos vão para os
+    // lotes globais por categoria/material (o gestor de GPU os junta e atualiza por faixa).
+    const lotes: SolidBatch[] = [];
+    if (!this.instanciar) {
+      // Lotes do nível juntados por categoria e material: uma malha por grupo (ver `lotesMalha3d.ts`).
+      this.desenharLotes(grupo, batches, this.frame.edges, materialOf);
+    } else {
+      lotes.push(...batches);
+      for (const b of batches) this.mats.face(materialOf(b.materialId), b.category);
+    }
     // Esquadrias: cada uma tem o seu grupo (no vão); as peças fixas são juntadas por material dentro dele, e a folha aberta
     // fica no pivô da dobradiça.
     for (const w of wallsOnLevel(p, lv.levelId)) {
@@ -328,27 +359,41 @@ export class ModelScene {
     }
     // Malhas de picking (invisíveis) e arestas das caixas: no grupo do nível, para o cache, o picking e o realce as acharem.
     const montadas = caixas?.montar(grupo, this.mats.cached('pick', () => new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })));
+    let arestasSolidas: Float32Array | undefined;
+    let arestas: Float32Array | undefined;
+    if (this.instanciar) {
+      for (const c of montadas?.colecoes ?? []) this.mats.face(p.materials[c.materialId], c.categoria);
+      if (this.frame.edges) {
+        this.mats.edge();
+        if (lotes.length) {
+          const g = arestasDosLotes(lotes, EDGE_ANGLE);
+          if (g) {
+            arestasSolidas = Float32Array.from(g.getAttribute('position').array);
+            g.dispose();
+          }
+        }
+      }
+      const arestasCaixas = montadas?.arestas;
+      const total = (arestasSolidas?.length ?? 0) + (arestasCaixas?.length ?? 0);
+      if (total) {
+        arestas = new Float32Array(total);
+        if (arestasSolidas) arestas.set(arestasSolidas, 0);
+        if (arestasCaixas) arestas.set(arestasCaixas, arestasSolidas?.length ?? 0);
+      }
+    }
     this.picks = picksAnt;
     this.mats.noNivel = matsAnt;
-    return { levelId: lv0.levelId, chave, grupo, picks, mats: [...mats], bytes: bytesDeNivel(grupo, picks, montadas?.colecoes, montadas?.arestas), instancias: montadas?.colecoes, arestasCaixas: montadas?.arestas };
-  }
-
-  /** Refaz as malhas instanciadas e a linha de arestas da cena a partir das caixas dos níveis mostrados (no wireframe, só as arestas). */
-  private montarInstancias(p: Project, niveis: readonly EntradaNivel[]): void {
-    this.soltarInstancias();
-    if (this.frame.view.style !== 'wireframe') {
-      this.malhasInst = malhasInstanciadas(niveis.flatMap((e) => e.instancias ?? []), this.caixaUnitaria, (cat, id) => this.mats.face(p.materials[id], cat), this.frame.shadows);
-      if (this.malhasInst.length) this.instLayer.add(...this.malhasInst);
-    }
-    this.arestasInst = arestasInstanciadas(niveis.flatMap((e) => (e.arestasCaixas ? [e.arestasCaixas] : [])), this.mats.edge());
-    if (this.arestasInst) this.instLayer.add(this.arestasInst);
-  }
-
-  private soltarInstancias(): void {
-    this.instLayer.clear();
-    liberarMalhasInstanciadas(this.malhasInst, this.arestasInst);
-    this.malhasInst = [];
-    this.arestasInst = null;
+    const bytes = bytesDeNivel(grupo, picks, montadas?.colecoes, montadas?.arestas, this.instanciar ? lotes : [], arestasSolidas);
+    return {
+      levelId: lv0.levelId,
+      chave,
+      grupo,
+      picks,
+      mats: [...mats],
+      bytes: bytes + (arestas?.byteLength ?? 0),
+      ...(montadas ? { instancias: montadas.colecoes, arestasCaixas: montadas.arestas } : {}),
+      ...(this.instanciar ? { lotes, materiais: eave.materials, ...(arestasSolidas ? { arestasSolidas } : {}), ...(arestas ? { arestas } : {}) } : {}),
+    };
   }
 
   /**
@@ -371,6 +416,16 @@ export class ModelScene {
     return this.cache.total;
   }
 
+  /** Bytes estimados dos buffers globais na GPU (lotes, instâncias e arestas). */
+  get memoriaGpu(): number {
+    return this.gerente.bytes;
+  }
+
+  /** Orçamento de VRAM contábil da cena (teto e usado). */
+  get orcamentoVram(): { usado: number; teto: number; excedido: boolean } {
+    return { usado: this.gerente.orcamento.usado, teto: this.gerente.orcamento.teto, excedido: this.gerente.orcamento.excedido };
+  }
+
   /** Caixa delimitadora (mundo) dos elementos dados (seleção), ou null se vazia/não encontrada. */
   selectionBounds(ids: readonly Id[]): THREE.Box3 | null {
     return caixaDaSelecao(this.model, ids);
@@ -386,7 +441,7 @@ export class ModelScene {
 
   dispose(): void {
     this.detach();
-    this.soltarInstancias();
+    this.gerente.dispose();
     this.caixaUnitaria.dispose();
     this.realces.soltarTodos();
     const todas = new Set([...this.cenaNiveis, ...this.cache.limpar()]);

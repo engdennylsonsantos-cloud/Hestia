@@ -74,7 +74,8 @@ export function triangulos(ms: ModelScene): TrianguloMundo[] {
   const empurrar = (kind: string, cor: number, geo: THREE.BufferGeometry, m: THREE.Matrix4): void => {
     const pos = geo.getAttribute('position');
     const idx = geo.index!;
-    for (let t = 0; t < idx.count; t += 3) {
+    const limite = Number.isFinite(geo.drawRange.count) ? Math.min(geo.drawRange.count, idx.count) : idx.count;
+    for (let t = 0; t < limite; t += 3) {
       const v: number[] = [];
       for (let k = 0; k < 3; k++) {
         a.fromBufferAttribute(pos, idx.getX(t + k)).applyMatrix4(m);
@@ -104,9 +105,10 @@ export function segmentos(ms: ModelScene): number[][] {
   ms.scene.traverse((o) => {
     if (!(o instanceof THREE.LineSegments) || o instanceof THREE.GridHelper) return;
     const pos = o.geometry.getAttribute('position');
+    const limite = Number.isFinite(o.geometry.drawRange.count) ? Math.min(o.geometry.drawRange.count, pos.count) : pos.count;
     const a = new THREE.Vector3();
     const b = new THREE.Vector3();
-    for (let i = 0; i + 1 < pos.count; i += 2) {
+    for (let i = 0; i + 1 < limite; i += 2) {
       a.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
       b.fromBufferAttribute(pos, i + 1).applyMatrix4(o.matrixWorld);
       out.push([a.x, a.y, a.z, b.x, b.y, b.z]);

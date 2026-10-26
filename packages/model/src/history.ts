@@ -278,6 +278,24 @@ export function labelOf(c: Command): string {
       return 'Excluir linha de separação';
     case 'updateRoomSeparator':
       return 'Editar linha de separação';
+    case 'addDetailLine':
+      return 'Criar linha de detalhe';
+    case 'updateDetailLine':
+      return 'Editar linha de detalhe';
+    case 'removeDetailLine':
+      return 'Excluir linha de detalhe';
+    case 'addDetailRegion':
+      return 'Criar região de detalhe';
+    case 'updateDetailRegion':
+      return 'Editar região de detalhe';
+    case 'removeDetailRegion':
+      return 'Excluir região de detalhe';
+    case 'addTag':
+      return 'Criar etiqueta';
+    case 'updateTag':
+      return 'Editar etiqueta';
+    case 'removeTag':
+      return 'Excluir etiqueta';
     case 'addText':
       return 'Criar texto';
     case 'updateText':

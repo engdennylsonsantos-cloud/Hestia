@@ -28,7 +28,11 @@ export function dimensionPoints(p: Pick<Project, 'elements'>, d: Dimension): { a
     if (ref.axis === 'y') return { x: fallback.x, y: pt.y };
     return { ...pt };
   };
-  return { a: at(d.refs?.a, d.a), b: at(d.refs?.b, d.b) };
+  const a = at(d.refs?.a, d.a);
+  const b = at(d.refs?.b, d.b);
+  if (d.mode === 'horizontal') return { a, b: { x: b.x, y: a.y } };
+  if (d.mode === 'vertical') return { a, b: { x: a.x, y: b.y } };
+  return { a, b };
 }
 
 /** Valor da cota em metros, arredondado a 1 mm. */
@@ -40,10 +44,20 @@ export function dimensionValue(p: Pick<Project, 'elements'>, d: Dimension): numb
 /** Texto do valor: duas casas decimais em metros, com vírgula ("3,50 m"). */
 export const formatDimensionValue = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 
-/** Texto mostrado na cota: o texto fixo, se houver algum (sem espaços nas pontas); senão, o valor medido. */
+/** Formatação de valor para cotas (m padrão), mantendo casas decimais previsíveis. */
+export function formatDimension(d: Dimension, meters: number): string {
+  const unit = d.unit ?? 'm';
+  const factor = unit === 'mm' ? 1000 : unit === 'cm' ? 100 : 1;
+  const digits = d.precision ?? 2;
+  const value = (meters * factor).toFixed(digits).replace('.', ',');
+  const suffix = d.suffix || (unit === 'm' ? ' m' : ` ${unit}`);
+  return `${d.prefix ?? ''}${value}${suffix}`;
+}
+
+/** Texto mostrado na cota: o texto fixo, se houver algum (sem espaços nas pontas); senão, o valor medido com a formatação da cota. */
 export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension): string {
   const fixed = d.text?.trim();
-  return fixed ? fixed : formatDimensionValue(dimensionValue(p, d));
+  return fixed ? fixed : formatDimension(d, dimensionValue(p, d));
 }
 
 export interface DimensionGeometry {
@@ -66,7 +80,7 @@ export interface DimensionGeometry {
  * (escala da vista / 1000); assim as distâncias de papel (folga, marcas, texto) ficam legíveis em qualquer escala.
  * `offset` leva a linha de cota para o lado esquerdo de a→b (negativo, para o direito).
  */
-export function dimensionGeometry(a: Vec2, b: Vec2, offset: number, mPerMm: number, textMm = DIM_TEXT_MM): DimensionGeometry {
+export function dimensionGeometry(a: Vec2, b: Vec2, offset: number, mPerMm: number, textMm = DIM_TEXT_MM, textAt?: Vec2): DimensionGeometry {
   const d = sub(b, a);
   const length = len(d);
   const u: Vec2 = length > 0 ? { x: d.x / length, y: d.y / length } : { x: 1, y: 0 };
@@ -97,7 +111,7 @@ export function dimensionGeometry(a: Vec2, b: Vec2, offset: number, mPerMm: numb
       [sub(ta, t), add(ta, t)],
       [sub(tb, t), add(tb, t)],
     ],
-    textAt: add(mid, mul(up, gap + (textMm * mPerMm) / 2)),
+    textAt: textAt ?? add(mid, mul(up, gap + (textMm * mPerMm) / 2)),
     textRotation,
     length,
   };

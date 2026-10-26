@@ -48,7 +48,19 @@ export class RoomTool extends ToolBase {
     }
     const polygon = region.polygon;
     const repeated = roomsOnLevel(project, levelId).some((r) => pointInPolygon(r.point, polygon));
-    const room = roomDraft(project, levelId, p.raw);
+    const draft = roomDraft(project, levelId, p.raw);
+    const options = this.env.options();
+    const room = {
+      ...draft,
+      name: options.roomName?.trim() || draft.name,
+      number: options.roomNumber?.trim() || draft.number,
+      heightOffset: options.roomHeightOffset ?? 0,
+      ceilingHeight: options.roomCeilingHeight,
+      floorFinish: options.roomFloorFinish ?? '',
+      wallFinish: options.roomWallFinish ?? '',
+      ceilingFinish: options.roomCeilingFinish ?? '',
+      ...(options.roomColor ? { color: options.roomColor } : {}),
+    };
     this.env.exec({ type: 'addRoom', room });
     this.env.setSelection([room.id]);
     this.env.say(`Ambiente ${room.number} criado: ${fmtArea(polygonArea(polygon))}.${repeated ? ' Este circuito já tinha ambiente (aviso de duplicado).' : ''} Ctrl+Z desfaz.`);

@@ -57,13 +57,43 @@ export function textHit(t: TextNote, scale: number, at: Vec2, tol: number): bool
   return Math.abs(u) <= hw && Math.abs(v) <= hh;
 }
 
-/** Cota ou texto de anotação sob o cursor (tolerância de 6 px, como a cota; o texto vale pelo retângulo, não só pela âncora). */
+/** Detalhes desenhados por cima do modelo têm prioridade de seleção quando suas áreas se sobrepõem. */
+export function detailItemAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
+  const level = p.levels.find((l) => l.id === levelId);
+  for (const region of [...(level?.detailRegions ?? [])].reverse()) {
+    let inside = false;
+    for (let i = 0, j = region.boundary.length - 1; i < region.boundary.length; j = i++) {
+      const a = region.boundary[i]!; const b = region.boundary[j]!;
+      if ((a.y > at.y) !== (b.y > at.y) && at.x < ((b.x - a.x) * (at.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    if (inside) return region.id;
+  }
+  for (const line of [...(level?.detailLines ?? [])].reverse()) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return line.id;
+  return null;
+}
+
+/** Cota, etiqueta, texto ou detalhe sob o cursor (tolerância de 6 px; o texto vale pelo retângulo, não só pela âncora). */
 export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number): { id: Id; kind: 'dimension' | 'text' } | null {
   const scale = levelGraphicsOf(p, levelId).scale;
-  for (const t of levelTexts(p, levelId)) if (textHit(t, scale, at, 6 * mpp)) return { id: t.id, kind: 'text' };
+  const level = p.levels.find((l) => l.id === levelId);
+  for (const tag of level?.tags ?? []) if (dist(at, tag.at) <= 14 * mpp) return { id: tag.id, kind: 'text' };
+  for (const t of levelTexts(p, levelId)) {
+    if (textHit(t, scale, at, 6 * mpp)) return { id: t.id, kind: 'text' };
+    if (t.leader?.some((q, i) => i > 0 && distToSegment(at, t.leader![i - 1]!, q) <= 6 * mpp)) return { id: t.id, kind: 'text' };
+  }
+  for (const line of level?.detailLines ?? []) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return { id: line.id, kind: 'text' };
+  for (const region of level?.detailRegions ?? []) {
+    let inside = false;
+    for (let i = 0, j = region.boundary.length - 1; i < region.boundary.length; j = i++) {
+      const a = region.boundary[i]!; const b = region.boundary[j]!;
+      if ((a.y > at.y) !== (b.y > at.y) && at.x < ((b.x - a.x) * (at.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    if (inside) return { id: region.id, kind: 'text' };
+  }
   for (const d of levelDimensions(p, levelId)) {
     const pts = dimensionPoints(p, d);
-    const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);
+    const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
+    if (dist(at, g.textAt) <= 10 * mpp) return { id: d.id, kind: 'dimension' };
     for (const [s, e] of [g.line, ...g.extensions]) if (distToSegment(at, s, e) <= 6 * mpp) return { id: d.id, kind: 'dimension' };
   }
   return null;
@@ -77,6 +107,16 @@ export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: num
   const pts = dimensionPoints(p, d);
   const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);
   return dist(at, mid(g.line[0], g.line[1])) <= 6 * mpp ? d.id : null;
+}
+
+/** Alça do texto da cota, que pode ser deslocado sem alterar os pontos medidos nem o afastamento da linha. */
+export function dimTextGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number): Id | null {
+  if (sel.length !== 1) return null;
+  const d = levelDimensions(p, levelId).find((x) => x.id === sel[0]);
+  if (!d) return null;
+  const pts = dimensionPoints(p, d);
+  const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
+  return dist(at, g.textAt) <= 9 * mpp ? d.id : null;
 }
 
 /** Ponto médio de um segmento. */

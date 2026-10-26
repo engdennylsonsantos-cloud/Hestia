@@ -319,9 +319,11 @@ export function applyCommand(p: Project, c: Command): void {
       break;
     case 'splitWall':
       splitWall(p, c);
+      for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => Boolean(p.elements[tag.hostId]));
       break;
     case 'deleteElements':
       removeIds(p, c.ids);
+      for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => !c.ids.includes(tag.hostId));
       break;
     case 'upsertWallType':
       p.wallTypes[c.wallType.id] = c.wallType;
@@ -364,6 +366,9 @@ export function applyCommand(p: Project, c: Command): void {
     case 'addRoomSeparator':
     case 'removeRoomSeparator':
     case 'updateRoomSeparator':
+    case 'addDetailLine': case 'updateDetailLine': case 'removeDetailLine':
+    case 'addDetailRegion': case 'updateDetailRegion': case 'removeDetailRegion':
+    case 'addTag': case 'updateTag': case 'removeTag':
       applyAnnotationCommand(p, c);
       break;
     case 'addSheet':

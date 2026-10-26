@@ -118,11 +118,47 @@ export interface ToolOptions {
   wallTypeId: Id;
   locationLine: LocationLine;
   wallHeight: number;
+  /** Restrições padrão para paredes novas. `null` mantém o topo livre e usa `wallHeight`. */
+  wallBaseOffset?: number;
+  wallTopLevelId?: Id | null;
+  wallTopOffset?: number;
+  wallFlipped?: boolean;
   chain: boolean;
   /** Forma da parede ao desenhar: reta, arco por três pontos ou retângulo por dois cantos opostos. */
   wallShape: 'line' | 'arc' | 'rect';
   doorTypeId: Id;
   windowTypeId: Id;
+  openingFlipHand?: boolean;
+  openingFlipFacing?: boolean;
+  openingSillOverride?: number | null;
+  placementMark?: string;
+  placementComments?: string;
+  roomName?: string;
+  roomNumber?: string;
+  roomHeightOffset?: number;
+  roomCeilingHeight?: number;
+  roomFloorFinish?: string;
+  roomWallFinish?: string;
+  roomCeilingFinish?: string;
+  roomColor?: string;
+  textHeight?: number;
+  textRotation?: number;
+  textWidth?: number;
+  textLeader?: 'none' | 'straight' | 'elbow';
+  dimensionMode?: 'aligned' | 'horizontal' | 'vertical';
+  dimensionString?: 'single' | 'continuous' | 'baseline';
+  dimensionUnit?: 'm' | 'cm' | 'mm';
+  dimensionPrecision?: 0 | 1 | 2 | 3;
+  dimensionPrefix?: string;
+  dimensionSuffix?: string;
+  dimensionTextHeight?: number;
+  dimensionTickStyle?: 'slash' | 'arrow' | 'dot';
+  tagProperty?: 'type' | 'name' | 'mark' | 'level' | 'width' | 'height';
+  tagLeader?: boolean;
+  tagOrientation?: 'horizontal' | 'vertical';
+  regionMask?: boolean;
+  regionColor?: string;
+  detailLineStyle?: 'solid' | 'dashed' | 'dotted';
   orthoLock: boolean;
   arrayCount: number;
   /** Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). Ausente = linear. */

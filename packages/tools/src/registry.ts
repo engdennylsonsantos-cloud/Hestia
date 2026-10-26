@@ -25,13 +25,16 @@ import { DimensionTool } from './dimensionTool.ts';
 import { TextTool } from './textTool.ts';
 import { RoomTool } from './roomTool.ts';
 import { RoomSeparatorTool } from './roomSeparatorTool.ts';
+import { DetailLineTool } from './detailLineTool.ts';
+import { DetailRegionTool } from './detailRegionTool.ts';
+import { TagTool } from './tagTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
   { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'room'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
-  { title: 'Anotar', tools: ['dimension', 'text'] },
+  { title: 'Anotar', tools: ['dimension', 'text', 'detailLine', 'filledRegion', 'tag'] },
   { title: 'Medir', tools: ['measure'] },
 ];
 
@@ -71,6 +74,12 @@ export function createTool(id: ToolId, env: ToolEnv): Tool {
       return new RoomTool(env);
     case 'roomsep':
       return new RoomSeparatorTool(env);
+    case 'detailLine':
+      return new DetailLineTool(env);
+    case 'filledRegion':
+      return new DetailRegionTool(env);
+    case 'tag':
+      return new TagTool(env);
     case 'door':
       return new OpeningTool(env, 'door');
     case 'window':
@@ -140,5 +149,8 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   text: 'Texto',
   room: 'Ambiente',
   roomsep: 'Separador de ambiente',
+  detailLine: 'Linha de detalhe',
+  filledRegion: 'Região preenchida',
+  tag: 'Etiqueta',
 };
 

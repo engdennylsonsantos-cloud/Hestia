@@ -17,14 +17,14 @@ import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
-import { annotationAt, dimGripAt, signedOffset } from './annotationPick.ts';
+import { annotationAt, detailItemAt, dimGripAt, dimTextGripAt, signedOffset } from './annotationPick.ts';
 import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo, RoofEdgeSel } from './types.ts';
 
-type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge' | 'dimgrip';
+type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'roofedge' | 'dimgrip' | 'dimtext';
 
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
@@ -55,6 +55,8 @@ export class SelectTool extends ToolBase {
   /** Alça de deslocamento da cota selecionada (decisão 0019) e o deslocamento que ela assume ao soltar. */
   private dimGrip: Id | null = null;
   private dimOffset: number | null = null;
+  private dimTextGrip: Id | null = null;
+  private dimTextAt: Vec2 | null = null;
 
   /** Arrasto da alça da cota: o deslocamento é a distância do cursor à linha a–b, no lado do cursor. */
   private dragDimGrip(p: PointerInfo): void {
@@ -76,6 +78,8 @@ export class SelectTool extends ToolBase {
     this.roofEdgeDown = null;
     this.delta = { x: 0, y: 0 };
     this.openingId = null;
+    this.dimTextGrip = null;
+    this.dimTextAt = null;
   }
 
   protected busy(): boolean {
@@ -93,6 +97,8 @@ export class SelectTool extends ToolBase {
     const pr = this.env.project();
     const lv = this.env.levelId();
     const mpp = this.env.metersPerPixel();
+    const detail = detailItemAt(pr, lv, at, mpp);
+    if (detail) return { id: detail, kind: 'annotation' };
     const hit = pickAt(pr, lv, at, mpp);
     if (hit) return hit;
     // Linha de separação de ambiente (guardada no nível, fora de project.elements): tem prioridade sobre piso, laje, forro,
@@ -222,6 +228,8 @@ export class SelectTool extends ToolBase {
     }
     const re = roofEdgeAt(pr, sel, p.raw, mpp);
     if (re) { this.roofEdgeDown = re; this.mode = 'roofedge'; return; }
+    const dt = dimTextGripAt(pr, this.env.levelId(), sel, p.raw, mpp);
+    if (dt) { this.dimTextGrip = dt; this.dimTextAt = null; this.mode = 'dimtext'; return; }
     const dg = dimGripAt(pr, this.env.levelId(), sel, p.raw, mpp);
     if (dg) { this.dimGrip = dg; this.dimOffset = null; this.mode = 'dimgrip'; return; }
     const hit = this.hitAt(p.raw);
@@ -245,6 +253,11 @@ export class SelectTool extends ToolBase {
     if (this.mode === 'dragwait' && moved) this.mode = 'moving';
     this.items = [];
     if (this.mode === 'dimgrip') this.dragDimGrip(p);
+    if (this.mode === 'dimtext') {
+      this.dimTextAt = p.raw;
+      const d = levelDimensions(pr, this.env.levelId()).find((x) => x.id === this.dimTextGrip);
+      if (d) { const pts = dimensionPoints(pr, d); const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4); this.items = [{ kind: 'line', a: { x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, b: p.raw, dashed: true }]; }
+    }
     switch (this.mode) {
       case 'window': {
         const a = this.downPt;
@@ -294,6 +307,12 @@ export class SelectTool extends ToolBase {
       }
       case 'dimgrip': {
         if (this.dimGrip && this.dimOffset !== null) this.env.exec({ type: 'updateDimension', levelId: this.env.levelId(), id: this.dimGrip, patch: { offset: this.dimOffset } });
+        break;
+      }
+      case 'dimtext': {
+        if (this.dimTextGrip && this.dimTextAt) this.env.exec({ type: 'updateDimension', levelId: this.env.levelId(), id: this.dimTextGrip, patch: { textAt: this.dimTextAt } });
+        this.dimTextGrip = null;
+        this.dimTextAt = null;
         break;
       }
       case 'roofedge': {

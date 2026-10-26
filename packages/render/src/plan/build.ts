@@ -17,6 +17,7 @@ import { belowStairOps, stairFills } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import { noteOps } from './notes.ts';
+import { elementTagOps } from './tags.ts';
 import { openingViewOps, wallOutlineOps } from './view.ts';
 import { paintOps, surfaceColor, type PlanPaint } from './style.ts';
 import { planContext } from './planContext.ts';
@@ -267,9 +268,14 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   labels.push(...marks.labels);
 
   // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'.
-  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, selection: input.selection }, v.zoom, style.scale);
+  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, v.zoom, style.scale);
+  fills.push(...notes.fills);
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
+
+  const tagged = elementTagOps(p, input.levelId, v.zoom, paint.annotation, style.scale);
+  strokes.push(...tagged.strokes);
+  labels.push(...tagged.labels);
 
   // Etiquetas de tipo (G4) seguem a categoria 'anotação' (visibilidade e mm de papel).
   if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, v.zoom, paint.annotation, style.scale, hidden));

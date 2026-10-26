@@ -46,11 +46,11 @@ describe('anotações na planta', () => {
   it('categoria anotação oculta: nada sai', () => {
     const p = comCota().project;
     const off = { ...defaultPaint('annotation', ZOOM), visible: false };
-    expect(noteOps(p, LV0, off, LOOK, ZOOM, SCALE)).toEqual({ strokes: [], labels: [] });
+    expect(noteOps(p, LV0, off, LOOK, ZOOM, SCALE)).toEqual({ fills: [], strokes: [], labels: [] });
   });
 
   it('nível sem anotações: nada sai', () => {
     const p = createEmptyProject();
-    expect(noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE)).toEqual({ strokes: [], labels: [] });
+    expect(noteOps(p, LV0, defaultPaint('annotation', ZOOM), LOOK, ZOOM, SCALE)).toEqual({ fills: [], strokes: [], labels: [] });
   });
 });

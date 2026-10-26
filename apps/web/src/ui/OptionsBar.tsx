@@ -87,6 +87,10 @@ export function OptionsBar(): ReactElement {
   const o = useUi((s) => s.options);
   const sel = useUi((s) => s.selection);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...o, ...patch } });
+  // A paleta Propriedades é a fonte de configuração antes da colocação; a barra superior fica como indicação da ferramenta.
+  if (['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'stairrun', 'roof', 'roofextrusion'].includes(tool)) {
+    return <div className="optbar" role="group" aria-label="Opções da ferramenta"><span className="tool-name">{TOOL_LABEL[tool]}</span><span style={{ color: 'var(--fg-soft)' }}>Configurações em Propriedades</span></div>;
+  }
   return (
     <div className="optbar" role="group" aria-label="Opções da ferramenta">
       <span className="tool-name">{TOOL_LABEL[tool]}</span>
@@ -128,6 +132,33 @@ export function OptionsBar(): ReactElement {
         <button id="opt-roomall" className="btn small" onClick={() => addRoomsAllCircuits()} title="Cria um ambiente em cada circuito fechado que ainda não tem um; um só Ctrl+Z desfaz tudo">
           Ambientes em todos os circuitos fechados
         </button>
+      )}
+      {tool === 'dimension' && (
+        <>
+          <label>Direção<select className="select" value={o.dimensionMode ?? 'aligned'} onChange={(e) => set({ dimensionMode: e.target.value as 'aligned' | 'horizontal' | 'vertical' })}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+          <label>Sequência<select className="select" value={o.dimensionString ?? 'single'} onChange={(e) => set({ dimensionString: e.target.value as 'single' | 'continuous' | 'baseline' })}><option value="single">Individual</option><option value="continuous">Contínua</option><option value="baseline">A partir de uma base</option></select></label>
+          <label>Unidade<select className="select" value={o.dimensionUnit ?? 'm'} onChange={(e) => set({ dimensionUnit: e.target.value as 'm' | 'cm' | 'mm' })}><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option></select></label>
+          <label>Casas<select className="select" value={o.dimensionPrecision ?? 2} onChange={(e) => set({ dimensionPrecision: Number(e.target.value) as 0 | 1 | 2 | 3 })}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+          <label>Marca<select className="select" value={o.dimensionTickStyle ?? 'slash'} onChange={(e) => set({ dimensionTickStyle: e.target.value as 'slash' | 'arrow' | 'dot' })}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></label>
+          <label>Altura do texto<NumField id="opt-dimheight" value={o.dimensionTextHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => set({ dimensionTextHeight: v })} /></label>
+        </>
+      )}
+      {tool === 'text' && (
+        <>
+          <label>Altura<NumField id="opt-textheight" value={o.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => set({ textHeight: v })} /></label>
+          <label>Largura<NumField id="opt-textwidth" value={o.textWidth ?? 60} decimals={0} unit="mm" min={5} onCommit={(v) => set({ textWidth: v })} /></label>
+          <label>Chamada<select className="select" value={o.textLeader ?? 'none'} onChange={(e) => set({ textLeader: e.target.value as 'none' | 'straight' | 'elbow' })}><option value="none">Sem líder</option><option value="straight">Reta</option><option value="elbow">Com dobra</option></select></label>
+        </>
+      )}
+      {tool === 'filledRegion' && <Check id="opt-region-mask" checked={o.regionMask === true} onChange={(v) => set({ regionMask: v })}>Mascarar elementos atrás</Check>}
+      {tool === 'filledRegion' && <label>Cor<input className="input" type="color" value={o.regionColor ?? '#f5d782'} onChange={(e) => set({ regionColor: e.target.value })} /></label>}
+      {tool === 'detailLine' && <label>Traço<select className="select" value={o.detailLineStyle ?? 'solid'} onChange={(e) => set({ detailLineStyle: e.target.value as 'solid' | 'dashed' | 'dotted' })}><option value="solid">Contínuo</option><option value="dashed">Tracejado</option><option value="dotted">Pontilhado</option></select></label>}
+      {tool === 'tag' && (
+        <>
+          <label>Informação<select className="select" value={o.tagProperty ?? 'type'} onChange={(e) => set({ tagProperty: e.target.value as NonNullable<typeof o.tagProperty> })}><option value="type">Tipo</option><option value="name">Nome</option><option value="mark">Marca</option><option value="level">Nível</option><option value="width">Largura</option><option value="height">Altura</option></select></label>
+          <label>Orientação<select className="select" value={o.tagOrientation ?? 'horizontal'} onChange={(e) => set({ tagOrientation: e.target.value as 'horizontal' | 'vertical' })}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+          <Check id="opt-tag-leader" checked={o.tagLeader !== false} onChange={(v) => set({ tagLeader: v })}>Líder</Check>
+        </>
       )}
       {tool === 'floor' && (
         <>

@@ -34,6 +34,15 @@ export interface LabelOp {
   fontPx?: number;
   rotation?: number;
   center?: boolean;
+  widthPx?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  align?: 'left' | 'center' | 'right';
+  /** Polígono de máscara em coordenadas de modelo, desenhado sobre o canvas na camada sincronizada de anotação. */
+  maskBoundary?: Vec2[];
+  maskColor?: string;
+  maskBorderColor?: string;
 }
 
 /** Lista de desenho neutra: tanto o renderizador de GPU quanto o de CPU a consomem. */

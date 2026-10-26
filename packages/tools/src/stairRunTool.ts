@@ -225,6 +225,8 @@ export class StairRunTool extends ToolBase {
       baseOffset: so.baseOffset,
       topOffset: so.topOffset,
       height: so.height,
+      mark: this.env.options().placementMark ?? '',
+      comments: this.env.options().placementComments ?? '',
     };
   }
 

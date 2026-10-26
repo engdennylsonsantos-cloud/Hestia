@@ -90,16 +90,17 @@ export class OpeningTool extends ToolBase {
   }
 
   private place(wallId: string, offset: number): void {
+    const options = this.env.options();
     const o: Opening = {
       id: makeId(this.id === 'door' ? 'd' : 'j'),
       kind: this.id,
       typeId: this.typeId(),
       hostId: wallId,
       offset,
-      flipHand: this.flipHand,
-      flipFacing: this.flipFacing,
-      sillOverride: null,
-      mark: '',
+      flipHand: (options.openingFlipHand ?? false) !== this.flipHand,
+      flipFacing: (options.openingFlipFacing ?? false) !== this.flipFacing,
+      sillOverride: options.openingSillOverride ?? null,
+      mark: options.placementMark ?? '',
     };
     this.env.exec({ type: 'addOpening', opening: o });
     const pr = this.env.project();

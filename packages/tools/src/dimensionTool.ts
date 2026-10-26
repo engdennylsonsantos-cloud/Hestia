@@ -1,5 +1,5 @@
 import { dist, type Vec2 } from '@hestia/geom';
-import { DIM_MIN_LENGTH, dimensionGeometry, formatDimensionValue, newId, roundMm, type DimensionRef } from '@hestia/model';
+import { DIM_MIN_LENGTH, dimensionGeometry, dimensionValue, formatDimension, newId, roundMm, type Dimension, type DimensionRef } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { endRefAt, signedOffset } from './annotationPick.ts';
 import { parseNumber } from './numeric.ts';
@@ -17,27 +17,54 @@ export class DimensionTool extends ToolBase {
   private b: Vec2 | null = null;
   private refA: DimensionRef | undefined;
   private refB: DimensionRef | undefined;
+  private chain: Vec2[] = [];
+  private chainRefs: Array<DimensionRef | undefined> = [];
+  private offsetStage = false;
+  private chainOffset = 0;
+  private measuredPoints(): { a: Vec2; b: Vec2 } {
+    const mode = this.env.options().dimensionMode ?? 'aligned';
+    if (mode === 'horizontal') return { a: this.a!, b: { x: this.b!.x, y: this.a!.y } };
+    if (mode === 'vertical') return { a: this.a!, b: { x: this.a!.x, y: this.b!.y } };
+    return { a: this.a!, b: this.b! };
+  }
 
   protected reset(): void {
     this.a = null;
     this.b = null;
     this.refA = undefined;
     this.refB = undefined;
+    this.chain = [];
+    this.chainRefs = [];
+    this.offsetStage = false;
     this.items = [];
     this.inf = null;
   }
 
   protected busy(): boolean {
-    return this.a !== null;
+    return this.a !== null || this.chain.length > 0;
   }
 
   override inputPrompt(): string | null {
-    return this.a && this.b ? 'Deslocamento' : null;
+    return (this.a && this.b) || this.offsetStage ? 'Deslocamento' : null;
+  }
+
+  override confirm(): void {
+    if ((this.env.options().dimensionString ?? 'single') !== 'single' && this.chain.length >= 2 && !this.offsetStage) {
+      this.offsetStage = true;
+      this.env.say('Sequência definida. Clique no lado da linha ou digite o afastamento e Enter.');
+      return;
+    }
+    if (this.chain.length && this.chain.length < 2) { this.reset(); this.env.say(this.hint); return; }
+    super.confirm();
   }
 
   override move(p: PointerInfo): void {
     this.raw = p.raw;
     const inf = this.snap(p);
+    if (this.chain.length && !this.a) {
+      this.items = this.offsetStage ? this.chainPreview(this.side(p.raw)) : [{ kind: 'point', at: this.chain[0]! }, { kind: 'line', a: this.chain[this.chain.length - 1]!, b: inf.point, dashed: true }];
+      return;
+    }
     if (this.a && !this.b) this.items = [{ kind: 'point', at: this.a }, { kind: 'line', a: this.a, b: inf.point, dashed: true }];
     if (this.a && this.b) this.items = this.previewOf(this.side(p.raw));
   }
@@ -45,6 +72,20 @@ export class DimensionTool extends ToolBase {
   override click(p: PointerInfo): void {
     const inf = this.snap(p);
     const point = inf.point;
+    if ((this.env.options().dimensionString ?? 'single') !== 'single') {
+      if (this.offsetStage) { this.commitChain(this.side(p.raw) * roundMm(this.distanceToLine(p.raw))); return; }
+      if (!this.chain.length) {
+        this.chain = [point];
+        this.chainRefs = [endRefAt(this.env.project(), this.env.levelId(), point)];
+      } else {
+        const last = this.chain[this.chain.length - 1]!;
+        if (dist(last, point) < DIM_MIN_LENGTH) return;
+        this.chain.push(point);
+        this.chainRefs.push(endRefAt(this.env.project(), this.env.levelId(), point));
+      }
+      this.env.say(`${this.chain.length} referências selecionadas. Continue os cliques e pressione Enter para concluir a sequência.`);
+      return;
+    }
     if (!this.a) {
       this.a = point;
       this.refA = endRefAt(this.env.project(), this.env.levelId(), point);
@@ -52,7 +93,10 @@ export class DimensionTool extends ToolBase {
       return;
     }
     if (!this.b) {
-      if (dist(this.a, point) < DIM_MIN_LENGTH) {
+      this.b = point;
+      const measured = this.measuredPoints();
+      this.b = null;
+      if (dist(measured.a, measured.b) < DIM_MIN_LENGTH) {
         this.env.say('Os dois pontos da cota são o mesmo: escolha outro ponto.');
         return;
       }
@@ -65,6 +109,12 @@ export class DimensionTool extends ToolBase {
   }
 
   override type(text: string): boolean {
+    if (this.offsetStage) {
+      const value = parseNumber(text);
+      if (value === null || value <= 0) { this.env.say('Digite o afastamento em metros, maior que zero.'); return false; }
+      this.commitChain(this.side(this.raw) * value);
+      return true;
+    }
     if (!this.a || !this.b) return false;
     const v = parseNumber(text);
     if (v === null || v === 0) {
@@ -79,23 +129,85 @@ export class DimensionTool extends ToolBase {
 
   /** Lado da linha de cota pelo cursor: +1 à esquerda de a→b, −1 à direita. */
   private side(q: Vec2): number {
-    return signedOffset(this.a!, this.b!, q) >= 0 ? 1 : -1;
+    const { a, b } = this.referenceLine();
+    return signedOffset(a, b, q) >= 0 ? 1 : -1;
   }
 
   private distanceToLine(q: Vec2): number {
-    return Math.abs(signedOffset(this.a!, this.b!, q));
+    const { a, b } = this.referenceLine();
+    return Math.abs(signedOffset(a, b, q));
+  }
+
+  private referenceLine(): { a: Vec2; b: Vec2 } {
+    if (this.chain.length >= 2 && !this.a) {
+      const a = this.chain[0]!; const last = this.chain[this.chain.length - 1]!;
+      const mode = this.env.options().dimensionMode ?? 'aligned';
+      return mode === 'horizontal' ? { a, b: { x: last.x, y: a.y } } : mode === 'vertical' ? { a, b: { x: a.x, y: last.y } } : { a, b: last };
+    }
+    return this.measuredPoints();
   }
 
   private previewOf(offset: number): PreviewItem[] {
     // Pré-visualização: 1 mm de papel ≈ 4 px de tela; a cota final sai na escala da vista.
     const mPerMm = this.env.metersPerPixel() * 4;
-    const g = dimensionGeometry(this.a!, this.b!, offset, mPerMm);
+    const { a, b } = this.measuredPoints();
+    const g = dimensionGeometry(a, b, offset, mPerMm, this.env.options().dimensionTextHeight ?? 2.5);
     const out: PreviewItem[] = [
       { kind: 'line', a: g.line[0], b: g.line[1] },
       ...g.extensions.map(([p, q]): PreviewItem => ({ kind: 'line', a: p, b: q, dashed: true })),
     ];
-    out.push({ kind: 'label', at: g.textAt, text: formatDimensionValue(g.length) });
+    const opts = this.env.options();
+    const dim: Dimension = { id: 'preview', a, b, offset, mode: opts.dimensionMode, unit: opts.dimensionUnit, precision: opts.dimensionPrecision, prefix: opts.dimensionPrefix, suffix: opts.dimensionSuffix };
+    out.push({ kind: 'label', at: g.textAt, text: formatDimension(dim, dimensionValue({ elements: this.env.project().elements }, dim)) });
     return out;
+  }
+
+  private chainPairs(): Array<{ a: Vec2; b: Vec2; ra?: DimensionRef; rb?: DimensionRef; offset: number }> {
+    const mode = this.env.options().dimensionString ?? 'continuous';
+    const out: Array<{ a: Vec2; b: Vec2; ra?: DimensionRef; rb?: DimensionRef; offset: number }> = [];
+    const project = (a: Vec2, b: Vec2): { a: Vec2; b: Vec2 } => {
+      const dir = this.env.options().dimensionMode ?? 'aligned';
+      return dir === 'horizontal' ? { a, b: { x: b.x, y: a.y } } : dir === 'vertical' ? { a, b: { x: a.x, y: b.y } } : { a, b };
+    };
+    if (mode === 'continuous') {
+      for (let i = 1; i < this.chain.length; i++) {
+        const a = this.chain[i - 1]!; const b = this.chain[i]!; const pts = project(a, b);
+        if (dist(pts.a, pts.b) >= DIM_MIN_LENGTH) out.push({ ...pts, ra: this.chainRefs[i - 1], rb: this.chainRefs[i], offset: this.chainOffset });
+      }
+    } else {
+      const a = this.chain[0]!;
+      const step = this.env.options().dimensionTextHeight ?? 2.5;
+      const mPerMm = this.env.metersPerPixel() * 4;
+      for (let i = 1; i < this.chain.length; i++) {
+        const b = this.chain[i]!; const pts = project(a, b);
+        if (dist(pts.a, pts.b) >= DIM_MIN_LENGTH) out.push({ ...pts, ra: this.chainRefs[0], rb: this.chainRefs[i], offset: this.chainOffset + (this.chainOffset >= 0 ? 1 : -1) * (i - 1) * step * mPerMm * 2.5 });
+      }
+    }
+    return out;
+  }
+
+  private chainPreview(offset: number): PreviewItem[] {
+    this.chainOffset = offset;
+    return this.chainPairs().flatMap((d) => {
+      const g = dimensionGeometry(d.a, d.b, d.offset, this.env.metersPerPixel() * 4);
+      return [{ kind: 'line' as const, a: g.line[0], b: g.line[1] }, ...g.extensions.map(([a, b]) => ({ kind: 'line' as const, a, b, dashed: true }))];
+    });
+  }
+
+  private commitChain(offset: number): void {
+    if (!Number.isFinite(offset) || Math.abs(offset) < 1e-6) { this.env.say('O afastamento da cota não pode ser zero.'); return; }
+    this.chainOffset = offset;
+    const opts = this.env.options();
+    const pairs = this.chainPairs();
+    if (!pairs.length) { this.env.say('A sequência não contém segmentos mensuráveis.'); return; }
+    this.env.transaction('Criar sequência de cotas', () => {
+      for (const d of pairs) {
+        const refs = { ...(d.ra ? { a: d.ra } : {}), ...(d.rb ? { b: d.rb } : {}) };
+        this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension: { id: newId('dim'), a: d.a, b: d.b, offset: d.offset, mode: opts.dimensionMode ?? 'aligned', unit: opts.dimensionUnit ?? 'm', precision: opts.dimensionPrecision ?? 2, textHeight: opts.dimensionTextHeight ?? 2.5, tickStyle: opts.dimensionTickStyle ?? 'slash', ...(opts.dimensionPrefix ? { prefix: opts.dimensionPrefix } : {}), ...(opts.dimensionSuffix ? { suffix: opts.dimensionSuffix } : {}), ...(Object.keys(refs).length ? { refs } : {}) } });
+      }
+    });
+    this.reset();
+    this.env.say(`${pairs.length} cotas criadas na sequência.`);
   }
 
   private commit(offset: number): void {
@@ -106,7 +218,8 @@ export class DimensionTool extends ToolBase {
       return;
     }
     const refs = { ...(this.refA ? { a: this.refA } : {}), ...(this.refB ? { b: this.refB } : {}) };
-    const dimension = { id: newId('dim'), a, b, offset, ...(Object.keys(refs).length ? { refs } : {}) };
+    const o = this.env.options();
+    const dimension = { id: newId('dim'), a, b, offset, mode: o.dimensionMode ?? 'aligned', unit: o.dimensionUnit ?? 'm', precision: o.dimensionPrecision ?? 2, prefix: o.dimensionPrefix ?? '', suffix: o.dimensionSuffix ?? '', textHeight: o.dimensionTextHeight ?? 2.5, tickStyle: o.dimensionTickStyle ?? 'slash', ...(Object.keys(refs).length ? { refs } : {}) };
     this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension });
     this.reset();
     this.env.say(this.hint);

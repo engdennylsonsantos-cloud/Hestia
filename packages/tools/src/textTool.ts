@@ -15,42 +15,56 @@ export class TextTool extends ToolBase {
   readonly hint = 'Texto: clique no ponto onde o texto fica, digite o texto e Enter.';
   /** O campo aceita letras e espaços (não só números): a interface envia cada tecla digitável. */
   readonly freeText = true;
-  private at: { x: number; y: number } | null = null;
+  private points: Array<{ x: number; y: number }> = [];
 
   protected reset(): void {
-    this.at = null;
+    this.points = [];
     this.items = [];
     this.inf = null;
   }
 
   protected busy(): boolean {
-    return this.at !== null;
+    return this.points.length > 0;
   }
 
   override inputPrompt(): string | null {
-    return this.at ? 'Texto' : null;
+    return this.points.length ? 'Texto' : null;
   }
 
   override move(p: PointerInfo): void {
     this.raw = p.raw;
     const inf = this.snap(p);
-    this.items = this.at ? [{ kind: 'point', at: this.at }] : [{ kind: 'point', at: inf.point }];
+    const leader = this.env.options().textLeader ?? 'none';
+    if (!this.points.length) this.items = [{ kind: 'point', at: inf.point }];
+    else if (leader === 'straight' && this.points.length === 1) this.items = [{ kind: 'line', a: this.points[0]!, b: inf.point, dashed: true }, { kind: 'point', at: inf.point }];
+    else if (leader === 'elbow' && this.points.length <= 2) this.items = [{ kind: 'line', a: this.points[0]!, b: this.points[1] ?? inf.point, dashed: true }, { kind: 'line', a: this.points[1] ?? inf.point, b: inf.point, dashed: true }, { kind: 'point', at: inf.point }];
   }
 
   override click(p: PointerInfo): void {
-    this.at = this.snap(p).point;
-    this.items = [{ kind: 'point', at: this.at }];
+    const point = this.snap(p).point;
+    const leader = this.env.options().textLeader ?? 'none';
+    const required = leader === 'none' ? 1 : leader === 'straight' ? 2 : 3;
+    this.points.push(point);
+    if (this.points.length < required) {
+      this.items = this.points.slice(1).map((b, i) => ({ kind: 'line' as const, a: this.points[i]!, b, dashed: true }));
+      this.env.say(leader === 'elbow' && this.points.length === 1 ? 'Clique para definir a dobra da chamada.' : 'Clique para posicionar o texto.');
+      return;
+    }
+    this.items = this.points.slice(1).map((b, i) => ({ kind: 'line' as const, a: this.points[i]!, b }));
     this.env.say('Digite o texto e Enter.');
   }
 
   override type(text: string): boolean {
-    if (!this.at) return false;
+    if (!this.points.length) return false;
     const t = text.trim();
     if (t === '') {
       this.env.say('O texto não pode ser vazio.');
       return false;
     }
-    const note: TextNote = { id: newId('txt'), at: { ...this.at }, text: t, height: TEXT_DEFAULT_HEIGHT_MM, rotation: 0 };
+    const options = this.env.options();
+    const at = this.points[this.points.length - 1]!;
+    const leader = this.points.length > 1 ? this.points.map((p) => ({ ...p })) : undefined;
+    const note: TextNote = { id: newId('txt'), at: { ...at }, text: t, height: options.textHeight ?? TEXT_DEFAULT_HEIGHT_MM, rotation: options.textRotation ?? 0, width: options.textWidth, leader, align: 'left' };
     this.env.exec({ type: 'addText', levelId: this.env.levelId(), text: note });
     this.reset();
     this.env.say(this.hint);

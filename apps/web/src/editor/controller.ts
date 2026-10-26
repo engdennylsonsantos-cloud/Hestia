@@ -5,8 +5,6 @@ import {
   annotationIdsIn,
   buildTemplate,
   createEmptyProject,
-  isOpening,
-  isWall,
   migrateProject,
   newId,
   sectionPoints,
@@ -24,7 +22,7 @@ import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews } from './openViews.ts';
-import { casador } from './shortcutConfig.ts';
+import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
 import { deleteViewAction, renameViewAction, updateViewAction } from './sectionViewActions.ts';
@@ -76,9 +74,7 @@ export class Editor {
     roofEdge: () => useUi.getState().roofEdge, setRoofEdge: (sel) => useUi.setState({ roofEdge: sel }),
   };
 
-  get project(): Project {
-    return this.store.project;
-  }
+  get project(): Project { return this.store.project; }
 
   // ---------- vistas ----------
   /** Chave do viewport: cada planta tem o seu; cada corte ou elevação tem o próprio. */
@@ -159,9 +155,7 @@ export class Editor {
   }
 
   // ---------- ferramentas ----------
-  get activeTool(): Tool {
-    return this.tool;
-  }
+  get activeTool(): Tool { return this.tool; }
 
   private activate(id: ToolId): void {
     this.tool = createTool(id, this.env);
@@ -173,6 +167,7 @@ export class Editor {
   setTool(id: ToolId): void {
     // Ferramentas de desenho são da planta: escolher uma delas na vista de corte volta à planta.
     if (useUi.getState().view === 'section') useUi.setState({ view: 'plan', sectionId: null });
+    if (clearSelectionForTool(id, useUi.getState().options)) useUi.setState({ selection: [], roofEdge: null });
     this.activate(id);
   }
 
@@ -505,17 +500,6 @@ export class Editor {
     safeSet(TUTORIAL_KEY, '1');
   }
 
-  // ---------- consultas úteis para a UI ----------
-  selectedWalls(): Id[] {
-    return useUi.getState().selection.filter((id) => isWall(this.project.elements[id]));
-  }
-  selectedOpenings(): Id[] {
-    return useUi.getState().selection.filter((id) => isOpening(this.project.elements[id]));
-  }
-
-  newTypeId(prefix: string): string {
-    return newId(prefix);
-  }
 }
 
 export const editor = new Editor();

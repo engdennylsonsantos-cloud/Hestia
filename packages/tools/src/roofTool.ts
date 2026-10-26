@@ -301,6 +301,8 @@ export class RoofTool extends ToolBase {
       edgeSlopes: presetEdgeSlopes(boundary, preset, dir, slope),
       edgeOverhangs: boundary.map(() => overhang),
       profile: extrusion ? defaultExtrusionProfile(boundary, dir) : [],
+      mark: o.placementMark ?? '',
+      comments: o.placementComments ?? '',
     });
     const problem = roofProblem(p, [{ ...roof, order: p.nextOrder }]);
     if (problem) {

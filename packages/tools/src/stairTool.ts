@@ -462,6 +462,8 @@ export class StairTool extends ToolBase {
       baseOffset: o.baseOffset,
       topOffset: o.topOffset,
       height: o.height,
+      mark: this.env.options().placementMark ?? '',
+      comments: this.env.options().placementComments ?? '',
     };
   }
 

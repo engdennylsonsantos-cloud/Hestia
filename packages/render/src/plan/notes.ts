@@ -1,12 +1,13 @@
 import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, paperMmToPx, type Id, type Project } from '@hestia/model';
 import { noteLabel } from './tags.ts';
 import type { PlanPaint } from './style.ts';
-import type { LabelOp, StrokeOp } from './types.ts';
+import type { FillOp, LabelOp, StrokeOp } from './types.ts';
 
 /** Cores e seleção para desenhar as anotações. */
 export interface NoteLook {
   ink: string;
   select: string;
+  paper?: string;
   selection: Id[];
 }
 
@@ -14,8 +15,23 @@ export interface NoteLook {
 const SEPARATOR_SELECTED_WIDTH = 1.5;
 
 export interface NoteOps {
+  fills: FillOp[];
   strokes: StrokeOp[];
   labels: LabelOp[];
+}
+
+/** Marcas configuráveis no extremo da linha de cota, medidas em papel para preservar legibilidade. */
+function dimensionMarkStrokes(g: ReturnType<typeof dimensionGeometry>, style: 'slash' | 'arrow' | 'dot', mPerMm: number, color: string, widthPx: number): StrokeOp[] {
+  if (style === 'slash') return g.ticks.map((pts): StrokeOp => ({ pts: [...pts], closed: false, widthPx, color, alpha: 1 }));
+  const a = g.line[0]; const b = g.line[1];
+  const dx = b.x - a.x; const dy = b.y - a.y; const length = Math.hypot(dx, dy) || 1;
+  const u = { x: dx / length, y: dy / length }; const n = { x: -u.y, y: u.x };
+  const r = (style === 'dot' ? 1.2 : 2.5) * mPerMm;
+  if (style === 'arrow') return [a, b].flatMap((tip, i) => {
+    const inward = i === 0 ? u : { x: -u.x, y: -u.y };
+    return [-1, 1].map((side): StrokeOp => ({ pts: [tip, { x: tip.x + inward.x * r + n.x * r * 0.45 * side, y: tip.y + inward.y * r + n.y * r * 0.45 * side }], closed: false, widthPx, color, alpha: 1 }));
+  });
+  return [a, b].map((center): StrokeOp => ({ pts: Array.from({ length: 16 }, (_, i) => ({ x: center.x + Math.cos(i * Math.PI / 8) * r, y: center.y + Math.sin(i * Math.PI / 8) * r })), closed: true, widthPx, color, alpha: 1 }));
 }
 
 /**
@@ -23,20 +39,40 @@ export interface NoteOps {
  * corte dela. O texto do valor sai centrado acima da linha de cota, com o tamanho de `DIM_TEXT_MM` em papel.
  */
 export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, zoom: number, scale: number): NoteOps {
-  const out: NoteOps = { strokes: [], labels: [] };
+  const out: NoteOps = { fills: [], strokes: [], labels: [] };
   if (!pt.visible) return out;
   const color = pt.color ?? look.ink;
   const picked = (id: Id): boolean => look.selection.includes(id);
   const mPerMm = scale / 1000;
-  const fontPx = paperMmToPx(DIM_TEXT_MM, zoom, scale);
+  const level = p.levels.find((x) => x.id === levelId);
   for (const d of levelDimensions(p, levelId)) {
     const { a, b } = dimensionPoints(p, d);
-    const g = dimensionGeometry(a, b, d.offset, mPerMm);
+    const textMm = d.textHeight ?? DIM_TEXT_MM;
+    const base = dimensionGeometry(a, b, d.offset, mPerMm, textMm);
+    const g = d.textAt ? dimensionGeometry(a, b, d.offset, mPerMm, textMm, d.textAt) : base;
     const c = picked(d.id) ? look.select : color;
-    for (const seg of [g.line, ...g.extensions, ...g.ticks]) out.strokes.push({ pts: [...seg], closed: false, widthPx: pt.cutPx, color: c, alpha: 1 });
-    out.labels.push(noteLabel(g.textAt, dimensionText(p, d), fontPx, g.textRotation));
+    for (const seg of [g.line, ...g.extensions]) out.strokes.push({ pts: [...seg], closed: false, widthPx: pt.cutPx, color: c, alpha: 1 });
+    out.strokes.push(...dimensionMarkStrokes(g, d.tickStyle ?? 'slash', mPerMm, c, pt.cutPx));
+    if (d.textAt && Math.hypot(d.textAt.x - base.textAt.x, d.textAt.y - base.textAt.y) > 0.002) out.strokes.push({ pts: [{ x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, d.textAt], closed: false, widthPx: pt.projPx, color: c, alpha: 1 });
+    out.labels.push(noteLabel(g.textAt, dimensionText(p, d), paperMmToPx(textMm, zoom, scale), g.textRotation));
   }
-  for (const t of levelTexts(p, levelId)) out.labels.push(noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation));
+  for (const t of levelTexts(p, levelId)) {
+    if (t.leader) for (let i = 0; i < t.leader.length - 1; i++) out.strokes.push({ pts: [t.leader[i]!, t.leader[i + 1]!], closed: false, widthPx: pt.projPx, color, alpha: 1 });
+    out.labels.push({ ...noteLabel(t.at, t.text, paperMmToPx(t.height, zoom, scale), t.rotation), widthPx: t.width ? paperMmToPx(t.width, zoom, scale) : undefined, bold: t.bold, italic: t.italic, underline: t.underline, align: t.align });
+  }
+  for (const line of level?.detailLines ?? []) {
+    const selected = picked(line.id);
+    out.strokes.push({ pts: [line.a, line.b], closed: false, widthPx: selected ? pt.projPx * 1.7 : pt.projPx, color: selected ? look.select : color, alpha: 1, dash: line.style === 'dashed' ? [7, 4] : line.style === 'dotted' ? [1, 3] : undefined });
+  }
+  for (const region of level?.detailRegions ?? []) {
+    const ink = picked(region.id) ? look.select : color;
+    if (region.mask) {
+      out.labels.push({ at: region.boundary[0]!, text: '', maskBoundary: region.boundary, maskColor: look.paper ?? '#fbfbfa', maskBorderColor: ink });
+    } else {
+      out.fills.push({ polygons: [[region.boundary]], color: region.color ?? '#f5d782', alpha: 0.48 });
+      out.strokes.push({ pts: region.boundary, closed: true, widthPx: pt.projPx, color: ink, alpha: 1 });
+    }
+  }
   out.strokes.push(...roomSeparatorStrokes(p, levelId, pt, color, new Set(look.selection), look.select));
   return out;
 }

@@ -274,7 +274,7 @@ export class FloorTool extends ToolBase {
       return;
     }
     const id = makeId('f');
-    this.env.exec({ type: 'addFloor', floor: makeFloor({ id, typeId, levelId: this.env.levelId(), boundary, holes, heightOffset: o.floorOffset, ...(outline ? { outlineSource: outline } : {}) }) });
+    this.env.exec({ type: 'addFloor', floor: makeFloor({ id, typeId, levelId: this.env.levelId(), boundary, holes, heightOffset: o.floorOffset, mark: o.placementMark ?? '', comments: o.placementComments ?? '', ...(outline ? { outlineSource: outline } : {}) }) });
     this.env.setSelection([id]);
     const area = multiArea([[boundary, ...holes]]);
     this.env.say(`Piso criado: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);

@@ -32,12 +32,16 @@ export const I18N = {
     // Abas do Ribbon
     ribbon_arch: 'Arquitetura',
     ribbon_modify: 'Modificar',
+    ribbon_annotate: 'Anotar',
     ribbon_view: 'Vista',
     contextual_modify: 'Modificar',
 
     // Grupos
     grp_build: 'Construir',
     grp_annotate: 'Anotar',
+    grp_dimensions: 'Cotas',
+    grp_text: 'Texto',
+    grp_tags: 'Etiquetas',
     grp_rooms: 'Ambientes',
     grp_selection: 'Seleção',
     grp_modify: 'Modificar',
@@ -65,6 +69,9 @@ export const I18N = {
     tool_dimension: 'Cota alinhada',
     tool_roomsep: 'Separador de ambiente',
     tool_text: 'Texto',
+    tool_detailLine: 'Linha de detalhe',
+    tool_filledRegion: 'Região preenchida',
+    tool_tag: 'Etiqueta',
     tool_cotasAuto: 'Cotas automáticas',
 
     // Modificadores
@@ -154,12 +161,16 @@ export const I18N = {
     // Ribbon Tabs
     ribbon_arch: 'Architecture',
     ribbon_modify: 'Modify',
+    ribbon_annotate: 'Annotate',
     ribbon_view: 'View',
     contextual_modify: 'Modify',
 
     // Groups
     grp_build: 'Build',
     grp_annotate: 'Annotate',
+    grp_dimensions: 'Dimensions',
+    grp_text: 'Text',
+    grp_tags: 'Tags',
     grp_rooms: 'Room & Area',
     grp_selection: 'Select',
     grp_modify: 'Modify',
@@ -187,6 +198,9 @@ export const I18N = {
     tool_dimension: 'Aligned Dimension',
     tool_roomsep: 'Room Separator',
     tool_text: 'Text',
+    tool_detailLine: 'Detail Line',
+    tool_filledRegion: 'Filled Region',
+    tool_tag: 'Tag by Category',
     tool_cotasAuto: 'Auto Dimensions',
 
     // Modifiers

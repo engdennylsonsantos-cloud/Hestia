@@ -1,5 +1,5 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { paperMmToPx, wallType, type Id, type Project } from '@hestia/model';
+import { openingType, paperMmToPx, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp } from './types.ts';
@@ -59,3 +59,64 @@ export function wallTagLabels(p: Project, levelId: Id, zoom: number, paint: Plan
 
 /** Rótulo de anotação (cota ou texto, decisão 0019): centrado em `at`, na fonte e na rotação do papel. */
 export const noteLabel = (at: Vec2, text: string, fontPx: number, rotation: number): LabelOp => ({ at, text, fontPx, rotation, center: true });
+
+/** Valor associativo de uma etiqueta: consultas ao tipo/anfitrião são resolvidas de novo a cada quadro do projeto. */
+export function elementTagText(p: Project, tag: ElementTag): string {
+  const e = p.elements[tag.hostId];
+  if (!e) return '';
+  const levelId = 'levelId' in e ? e.levelId : e.kind === 'door' || e.kind === 'window' ? (() => { const host = p.elements[e.hostId]; return host && 'levelId' in host ? host.levelId : null; })() : null;
+  const type = e.kind === 'wall' ? p.wallTypes[e.typeId]
+    : e.kind === 'door' || e.kind === 'window' ? p.openingTypes[e.typeId]
+    : e.kind === 'floor' ? p.floorTypes[e.typeId]
+    : e.kind === 'slab' ? p.slabTypes[e.typeId]
+    : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]
+    : e.kind === 'roof' ? p.roofTypes[e.typeId]
+    : e.kind === 'stair' ? p.stairTypes[e.typeId] : undefined;
+  switch (tag.property) {
+    case 'type': return (type && 'code' in type ? type.code : '') || (type && 'name' in type ? type.name : '') || e.kind;
+    case 'name': return e.kind === 'room' ? e.name : type && 'name' in type ? type.name : e.kind;
+    case 'mark': return 'mark' in e ? e.mark : '';
+    case 'level': return p.levels.find((l) => l.id === levelId)?.name ?? '';
+    case 'width':
+      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).width * 100).toFixed(0)} cm`;
+      if (e.kind === 'wall') return `${(wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100).toFixed(0)} cm`;
+      return '';
+    case 'height':
+      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).height * 100).toFixed(0)} cm`;
+      if (e.kind === 'wall') return `${wallHeight(p, e).toFixed(2)} m`;
+      if (e.kind === 'room') return `${(e.ceilingHeight ?? p.defaults.wallHeight).toFixed(2)} m`;
+      return '';
+  }
+}
+
+function tagAnchor(p: Project, tag: ElementTag): Vec2 | null {
+  const e = p.elements[tag.hostId];
+  if (!e) return null;
+  if (e.kind === 'wall') return { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 };
+  if (e.kind === 'door' || e.kind === 'window') {
+    const host = p.elements[e.hostId];
+    if (host?.kind === 'wall') {
+      const f = levelFrames(p, host.levelId).find((x) => x.wall.id === host.id);
+      if (f) return pointAt(f, e.offset, f.sMid);
+    }
+  }
+  if (e.kind === 'room') return e.point;
+  if ('boundary' in e && e.boundary.length) return { x: e.boundary.reduce((s, q) => s + q.x, 0) / e.boundary.length, y: e.boundary.reduce((s, q) => s + q.y, 0) / e.boundary.length };
+  return null;
+}
+
+/** Etiquetas persistentes da vista: rótulo e líder acompanham a posição do elemento associado. */
+export function elementTagOps(p: Project, levelId: Id, zoom: number, paint: PlanPaint, scale: number): { labels: LabelOp[]; strokes: Array<{ pts: Vec2[]; closed: false; widthPx: number; color: string; alpha: number }> } {
+  const labels: LabelOp[] = [];
+  const strokes: Array<{ pts: Vec2[]; closed: false; widthPx: number; color: string; alpha: number }> = [];
+  if (!paint.visible) return { labels, strokes };
+  const color = paint.color ?? '#16181c';
+  for (const tag of p.levels.find((l) => l.id === levelId)?.tags ?? []) {
+    const text = elementTagText(p, tag);
+    if (!text) continue;
+    const anchor = tagAnchor(p, tag);
+    if (tag.leader && anchor) strokes.push({ pts: [anchor, tag.at], closed: false, widthPx: paint.projPx, color, alpha: 1 });
+    labels.push({ at: tag.at, text, fontPx: paperMmToPx(TAG_TEXT_MM, zoom, scale), center: true, rotation: tag.orientation === 'vertical' ? 90 : 0 });
+  }
+  return { labels, strokes };
+}

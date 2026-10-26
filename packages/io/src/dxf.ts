@@ -1,5 +1,5 @@
 import type { GraphicsCategory, Id, Project } from '@hestia/model';
-import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextRecords, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
+import { DXF_LAYER_COTAS, DXF_LAYER_DETALHE, DXF_LAYER_ETIQUETAS, DXF_LAYER_TEXTOS, dxfTextRecords, type DxfNoteText, type DxfNotes } from './dxfNotes.ts';
 
 /** Ponto em metros: x para a direita, y para cima (planta). */
 export interface DxfPoint {
@@ -309,6 +309,8 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_STAIR_CUT, 'annotation'],
   [DXF_LAYER_COTAS, 'annotation'],
   [DXF_LAYER_TEXTOS, 'annotation'],
+  [DXF_LAYER_DETALHE, 'annotation'],
+  [DXF_LAYER_ETIQUETAS, 'annotation'],
   // A marca é desenho, não texto: usa o peso de corte da categoria 'anotação' (as camadas de texto ficam em 0).
   [DXF_LAYER_CORTES, cut('annotation')],
   [DXF_LAYER_ELEVACOES, cut('annotation')],
@@ -328,6 +330,7 @@ export function dxfLineRoleOf(layer: string): DxfLineRole | undefined {
 /** Linhas de cumeeira, espigão e rincão dos telhados do nível (LINE), e as de espelho e seta das escadas. */
 function linesOf(geo: DxfLevelGeometry): Line[] {
   const notes = (geo.notes?.lines ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_COTAS, a, b }));
+  const noteLeaders = (geo.notes?.otherLines ?? []).map((l): Line => ({ layer: l.layer, a: l.a, b: l.b }));
   const roof = (geo.roofs ?? []).flatMap((r) => [
     ...r.ridges.map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
     ...(r.gables ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
@@ -337,7 +340,7 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
     ...s.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_ARROW, a, b })),
   ]);
   const marks = (geo.sectionMarks?.lines ?? []).map((l): Line => ({ layer: l.layer, a: l.a, b: l.b }));
-  return [...roof, ...stair, ...marks, ...notes];
+  return [...roof, ...stair, ...marks, ...notes, ...noteLeaders];
 }
 
 /**
@@ -386,6 +389,7 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     const layer = state === 'cut' ? DXF_LAYER_OPENING_SYMBOL : OPENING_LAYER[state];
     for (const s of o.symbol) out.push({ layer, pts: s.pts, closed: s.closed, dashed: s.dashed === true });
   }
+  for (const boundary of geo.notes?.regions ?? []) if (boundary.length >= 3) push(DXF_LAYER_DETALHE, [[boundary]]);
   return out;
 }
 

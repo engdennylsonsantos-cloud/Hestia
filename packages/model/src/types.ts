@@ -136,6 +136,12 @@ export interface Level {
   dimensions?: Dimension[];
   /** Textos de anotação da planta (decisão 0019); ausente = nenhum. */
   texts?: TextNote[];
+  /** Linhas de detalhe independentes do modelo, específicas desta vista. */
+  detailLines?: DetailLine[];
+  /** Regiões preenchidas/de máscara específicas desta vista. */
+  detailRegions?: DetailRegion[];
+  /** Etiquetas associativas de elementos nesta vista. */
+  tags?: ElementTag[];
   /** Linhas de separação de ambiente (decisão 0031 §3; Revit: Room Separation Line); ausente = nenhuma. */
   roomSeparators?: RoomSeparator[];
 }
@@ -170,6 +176,18 @@ export interface Dimension {
   refs?: { a?: DimensionRef; b?: DimensionRef };
   /** Texto fixo que substitui o valor medido no desenho; vazio ou ausente mostra o valor medido. */
   text?: string;
+  /** Direção de medida. Ausente mantém compatibilidade com cotas alinhadas antigas. */
+  mode?: 'aligned' | 'horizontal' | 'vertical';
+  /** Formatação opcional da leitura, em metros por padrão. */
+  unit?: 'm' | 'cm' | 'mm';
+  precision?: 0 | 1 | 2 | 3;
+  prefix?: string;
+  suffix?: string;
+  /** Altura em mm de papel; ausente usa o padrão da categoria. */
+  textHeight?: number;
+  tickStyle?: 'slash' | 'arrow' | 'dot';
+  /** Posição manual do texto em coordenadas do modelo. */
+  textAt?: Vec2;
 }
 
 /** Texto de anotação: `at` é o ponto de inserção (centro), `height` em mm de papel, `rotation` em graus. */
@@ -179,7 +197,24 @@ export interface TextNote {
   text: string;
   height: number;
   rotation: number;
+  /** Largura da caixa em mm de papel; ausente mantém texto sem quebra. */
+  width?: number;
+  /** Pontos de chamada em coordenadas de modelo, do elemento até a caixa. */
+  leader?: Vec2[];
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  align?: 'left' | 'center' | 'right';
 }
+
+/** Linha gráfica de detalhamento, vista-específica. */
+export interface DetailLine { id: Id; a: Vec2; b: Vec2; style?: 'solid' | 'dashed' | 'dotted'; }
+
+/** Região 2D vista-específica; `mask` cobre a geometria atrás da região. */
+export interface DetailRegion { id: Id; boundary: Vec2[]; color?: string; mask?: boolean; }
+
+/** Etiqueta vinculada ao elemento: o valor é consultado no modelo e se atualiza junto com ele. */
+export interface ElementTag { id: Id; hostId: Id; at: Vec2; property: 'type' | 'name' | 'mark' | 'level' | 'width' | 'height'; leader?: boolean; orientation?: 'horizontal' | 'vertical'; }
 
 /** Ponto do perfil superior: `t` = distância ao longo de a→b; `h` = altura do topo acima da base da parede. */
 export interface ProfilePoint {

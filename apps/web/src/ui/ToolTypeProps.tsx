@@ -7,7 +7,7 @@ import { floorOptions, ceilingOptions, openingOptions, roofOptions, slabOptions,
 import { setStairOpt } from './StairOptionsBar.tsx';
 
 /** Ferramentas de colocação com tipo: a paleta mostra o tipo escolhido antes de desenhar (o mesmo valor da barra de opções). */
-export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'stairrun';
+export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'roofextrusion' | 'stair' | 'stairrun';
 const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   wall: 'Colocar Parede',
   door: 'Colocar Porta',
@@ -16,6 +16,7 @@ const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   slab: 'Colocar Laje',
   ceiling: 'Colocar Forro',
   roof: 'Colocar Telhado',
+  roofextrusion: 'Colocar Telhado por extrusão',
   stair: 'Colocar Escada (croqui)',
   stairrun: 'Colocar Escada',
 };
@@ -65,6 +66,7 @@ export function ToolTypeProps({ tool }: { tool: ToolTypeKind }): ReactElement {
           onSelect={(id) => setOpt({ ceilingTypeId: id })} onEdit={() => edit('ceilingType', o.ceilingTypeId)} />
       );
     case 'roof':
+    case 'roofextrusion':
       return (
         <TypeSelector categoryLabel={categoryLabel} triggerId="prop-rooftype" label="Tipo de telhado" options={roofOptions(p)} selectedId={o.roofTypeId ?? null}
           onSelect={(id) => setOpt({ roofTypeId: id })} onEdit={() => edit('roofType', o.roofTypeId)} />

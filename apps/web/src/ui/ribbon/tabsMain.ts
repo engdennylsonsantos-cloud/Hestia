@@ -65,9 +65,9 @@ export const TAB_ANOTAR: RibbonTab = {
       act('cotasAuto'),
       stack(soonS(t('Cota de elevação', 'Spot Elevation'), 'dimension'), soonS(t('Coordenada de ponto', 'Spot Coordinate'), 'soon'), soonS(t('Inclinação de ponto', 'Spot Slope'), 'soon')),
     ),
-    panel('detalhe', t('Detalhe', 'Detail'), soon(t('Linha de detalhe', 'Detail Line'), 'detailLine'), soon(t('Região', 'Region'), 'filledRegion'), soon(t('Componente de detalhe', 'Detail Component'), 'component'), soon(t('Nuvem de revisão', 'Revision Cloud'), 'soon')),
+    panel('detalhe', t('Detalhe', 'Detail'), tool('detailLine'), tool('filledRegion'), soon(t('Componente de detalhe', 'Detail Component'), 'component'), soon(t('Nuvem de revisão', 'Revision Cloud'), 'soon')),
     panel('texto', t('Texto', 'Text'), tool('text'), stack(soonS(t('Verificar ortografia', 'Spelling'), 'soon'), soonS(t('Localizar/substituir', 'Find/Replace'), 'search'))),
-    panel('etiqueta', t('Etiqueta', 'Tag'), soon(t('Etiquetar por categoria', 'Tag by Category'), 'tag'), soon(t('Etiquetar todos', 'Tag All'), 'tag')),
+    panel('etiqueta', t('Etiqueta', 'Tag'), tool('tag', 'large', { label: t('Etiquetar por categoria', 'Tag by Category') }), act('tagAll'), act('wallTags')),
     panel('simbolo', t('Símbolo', 'Symbol'), soon(t('Símbolo', 'Symbol'), 'soon'), stack(soonS(t('Seta norte', 'North Arrow'), 'soon'), soonS(t('Caminho da escada', 'Stair Path'), 'soon'))),
   ],
 };

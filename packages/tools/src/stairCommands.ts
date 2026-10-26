@@ -10,6 +10,8 @@ export interface StairCreateOptions {
   baseOffset?: number;
   topOffset?: number;
   height?: number;
+  mark?: string;
+  comments?: string;
 }
 
 export type StairCommandResult = { id: Id; report: DraftReport } | { error: string };
@@ -67,6 +69,8 @@ export function createStairFromComponents(env: ToolEnv, components: Array<StairR
     topOffset: ref.topOffset,
     height: ref.height,
     components,
+      mark: opts.mark ?? '',
+      comments: opts.comments ?? '',
   });
   env.exec({ type: 'addStair', stair });
   env.setSelection([id]);

@@ -122,6 +122,8 @@ export class RoofExtrusionTool extends ToolBase {
       slopePercent,
       dir,
       profile: defaultExtrusionProfile(boundary, dir),
+      mark: o.placementMark ?? '',
+      comments: o.placementComments ?? '',
     });
     const problem = roofProblem(p, [{ ...roof, order: p.nextOrder }]);
     if (problem) {

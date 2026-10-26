@@ -47,6 +47,8 @@ import { TypeSelector } from './TypeSelector.tsx';
 import { openingOptions, wallOptions } from './typeOptions.ts';
 import { ToolTypeProps, isToolTypeKind } from './ToolTypeProps.tsx';
 import { changeOpeningType } from '../editor/openingTypeActions.ts';
+import { hasPlacementProperties, PlacementProperties } from './PlacementProperties.tsx';
+import { TOOL_LABEL } from '@hestia/tools';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -334,7 +336,6 @@ function ViewProps(): ReactElement {
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
         <Row label="Projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => setRoofProjection(v)} /></Row>
-        <Row label="Etiquetas de parede"><Check id="v-tags" checked={p.settings.showTags} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showTags: v } })} /></Row>
         <Row label="Depurar junções"><Check id="v-debugjoins" checked={p.settings.debugJoins} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { debugJoins: v } })} /></Row>
         <Row label="Nível de detalhe" htmlFor="v-detail">
           <select id="v-detail" className="select" value={p.settings.detail} onChange={(e) => editor.store.exec({ type: 'setSettings', patch: { detail: e.target.value as DetailLevel } })}>
@@ -377,9 +378,11 @@ export function Properties(): ReactElement {
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
   const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
+  const placing = count === 0 && hasPlacementProperties(tool);
+  const panelLabel = placing ? `Colocar ${TOOL_LABEL[tool]}` : label;
   return (
     <aside className="side" aria-label="Propriedades">
-      <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{label}</span>}>
+      <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{panelLabel}</span>}>
         Propriedades
       </PanelHead>
       <LabelScroll>
@@ -391,14 +394,14 @@ export function Properties(): ReactElement {
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
-          : note ? <AnnotationProps dim={note.dim} text={note.text} />
+          : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} />
           : view ? <SectionViewProps view={view} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada ou ambiente) para editar propriedades.</div>
         ) : (
           <>
             {isToolTypeKind(tool) && <ToolTypeProps tool={tool} />}
-            <ViewProps />
+            {placing ? <PlacementProperties tool={tool} /> : <ViewProps />}
           </>
         )}
       </LabelScroll>

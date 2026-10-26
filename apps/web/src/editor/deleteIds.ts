@@ -16,8 +16,8 @@ export function deleteSelectionIn(store: ProjectStore): void {
   const sepIds = new Set(separators);
   const elems = ids.filter((id) => !noteIds.has(id) && !viewIds.has(id) && !sepIds.has(id));
   store.transaction('Excluir', () => {
-    if (elems.length) store.exec({ type: 'deleteElements', ids: elems });
     for (const c of notes) store.exec(c);
+    if (elems.length) store.exec({ type: 'deleteElements', ids: elems });
     for (const c of views) store.exec(c);
     for (const id of separators) store.exec({ type: 'removeRoomSeparator', levelId, id });
   });

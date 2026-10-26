@@ -178,9 +178,14 @@ export class WallTool extends ToolBase {
       levelId: this.env.levelId(),
       a,
       b,
+      baseOffset: o.wallBaseOffset ?? 0,
+      topLevelId: o.wallTopLevelId ?? null,
+      topOffset: o.wallTopLevelId ? (o.wallTopOffset ?? 0) : 0,
       height: o.wallHeight,
+      mark: o.placementMark ?? '',
+      comments: o.placementComments ?? '',
       locationLine: o.locationLine,
-      flipped: this.sideFlip(),
+      flipped: (o.wallFlipped ?? false) !== this.sideFlip(),
       sag,
     });
     this.env.transaction('Criar parede', () => {

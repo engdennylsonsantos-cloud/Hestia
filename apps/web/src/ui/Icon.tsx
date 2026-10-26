@@ -45,8 +45,11 @@ const R: Record<string, string> = {
   room: p('s1', 'M3 3H29V29H3Z') + p('bl', 'M7 11H25V25H7Z') + p('ln', 'M7 11L25 25M25 11L7 25'),
   dimension: p('ln', 'M5 6V24M27 6V24M5 18H27') + p('ac', 'M3 20L7 16M25 20L29 16') + '<text class="ic-tx" x="16" y="15" text-anchor="middle">12</text>',
   text: p('ln2', 'M6 27L16 5L26 27M10 20H22'),
+  detailLine: p('ln2', 'M4 24L11 9L18 21L27 7') + p('ac', 'M3 27H29'),
+  filledRegion: p('bl', 'M5 5H27V27H5Z') + p('ln', 'M5 5L27 27M27 5L5 27'),
 
   // Documentação e vista
+  tag: p('s2', 'M3 6H17L28 17L17 28L3 17Z') + '<circle class="ic-ac" cx="10" cy="13" r="1.5"/>',
   cotasAuto: p('ln', 'M4 4V18M14 4V18M28 4V18M4 14H28') + p('ac', 'M2 16L6 12M12 16L16 12M26 16L30 12') + p('s2', 'M4 21H28V29H4Z') + p('fa', 'M21 3L22 6L25 7L22 8L21 11L20 8L17 7L20 6Z'),
   section: p('s3', 'M2 17L8 11V23Z') + p('s3', 'M30 17L24 11V23Z') + p('ln ic-ds', 'M8 17H24') + p('ac', 'M16 17V9') + p('fa', 'M16 3L12 9H20Z'),
   plan: p('s1', 'M4 4H28V28H4Z') + p('ln2', 'M16 4V16H28M4 21H12') + p('ac', 'M12 21A6 6 0 0 1 18 27'),

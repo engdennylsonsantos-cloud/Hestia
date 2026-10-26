@@ -8,7 +8,7 @@ import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
-import { PlanLabels } from './PlanLabels';
+import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
 import { NavBar } from './NavBar.tsx';
 import { CanvasContextMenu } from './CanvasContextMenu.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
@@ -26,6 +26,7 @@ const NO_LABELS: LabelOp[] = [];
 /** Desenha o plano (GPU ou CPU) e o 3D, e traduz o ponteiro em chamadas ao editor. */
 export function ViewportCanvas(): ReactElement {
   const host = useRef<HTMLDivElement>(null);
+  const labelLayer = useRef<PlanLabelsHandle>(null);
   const gpuRef = useRef<{ gpu: GpuContext; canvas: HTMLCanvasElement } | null>(null);
   const cpuRef = useRef<HTMLCanvasElement | null>(null);
   const plan = useRef(new PlanScene());
@@ -166,6 +167,7 @@ export function ViewportCanvas(): ReactElement {
       if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); plan.current.setDrawList(dl, v); safeRender(g, plan.current.scene, plan.current.camera); }
       else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, dl, v, dpr);
       publish(dl.labels, v);
+      labelLayer.current?.syncView(v);
       return;
     }
     // Planta: pan e zoom mudam a câmera; geometria, sobreposição e grade só são refeitas quando a chave muda (PlanFrame).
@@ -177,6 +179,9 @@ export function ViewportCanvas(): ReactElement {
       safeRender(g, plan.current.scene, plan.current.camera);
     } else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, pf.drawList(theme), v, dpr);
     publish(pf.labels, v);
+    // Alinha a camada HTML de texto no mesmo requestAnimationFrame do canvas da planta.
+    // Isso evita o atraso de um render React entre a câmera e o texto da cota durante pan/zoom.
+    labelLayer.current?.syncView(v);
   }, [size, ready, dark]);
 
   // Qualquer mudança do estado agenda um quadro; o quadro decide o que refazer (ver PlanFrame).
@@ -449,7 +454,7 @@ export function ViewportCanvas(): ReactElement {
       onPointerLeave={onLeave}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <PlanLabels labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
+      <PlanLabels ref={labelLayer} labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
       {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
       {ui.gpu === 'cpu' && ui.view === '3d' && (
         <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>

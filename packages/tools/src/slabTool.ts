@@ -225,7 +225,7 @@ export class SlabTool extends ToolBase {
       return;
     }
     const id = newId('l');
-    this.env.exec({ type: 'addSlab', slab: makeSlab({ id, typeId, levelId: this.env.levelId(), boundary, holes: [], heightOffset: o.slabOffset, ...(outline ? { outlineSource: outline } : {}) }) });
+    this.env.exec({ type: 'addSlab', slab: makeSlab({ id, typeId, levelId: this.env.levelId(), boundary, holes: [], heightOffset: o.slabOffset, mark: o.placementMark ?? '', comments: o.placementComments ?? '', ...(outline ? { outlineSource: outline } : {}) }) });
     this.env.setSelection([id]);
     const area = multiArea([[boundary]]);
     this.env.say(`Laje criada: ${area.toFixed(2).replace('.', ',')} m² (perímetro ${fmt(ringPerimeter(boundary))}). Ctrl+Z desfaz.`);

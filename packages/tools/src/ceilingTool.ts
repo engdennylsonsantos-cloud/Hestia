@@ -248,7 +248,7 @@ export class CeilingTool extends ToolBase {
     const heightOffset = extra.heightOffset ?? this.env.options().ceilingOffset ?? DEFAULT_CEILING_HEIGHT;
     this.env.exec({
       type: 'addCeiling',
-      ceiling: makeCeiling({ id, typeId, levelId: this.env.levelId(), boundary, holes: extra.holes ?? [], roomId: extra.roomId ?? null, heightOffset, mark: extra.mark ?? '' }),
+      ceiling: makeCeiling({ id, typeId, levelId: this.env.levelId(), boundary, holes: extra.holes ?? [], roomId: extra.roomId ?? null, heightOffset, mark: extra.mark ?? this.env.options().placementMark ?? '', comments: this.env.options().placementComments ?? '' }),
     });
     this.env.setSelection([id]);
     const area = multiArea([[boundary, ...(extra.holes ?? [])]]);

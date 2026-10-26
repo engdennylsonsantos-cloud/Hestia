@@ -1,5 +1,6 @@
 import { isCeiling, isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project } from '@hestia/model';
 import type { ToolOptions } from '@hestia/tools';
+import { tagAllNotTagged } from '../../editor/tagActions.ts';
 import { editor } from '../../editor/controller.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
 import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
@@ -123,6 +124,19 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     hint: t('Alterna o lado das propriedades entre a esquerda (padrão do Revit) e a direita.', 'Switch the Properties palette between the left and right sides.'),
     run: () => flipSide('props'),
     pressed: (c) => c.sides.props === 'right',
+  },
+  tagAll: {
+    label: t('Etiquetar todos', 'Tag All'),
+    icon: 'tag',
+    hint: t('Etiqueta todos os elementos sem etiqueta desta vista.', 'Tag every untagged element in this view.'),
+    run: () => { tagAllNotTagged(); },
+  },
+  wallTags: {
+    label: t('Códigos de parede', 'Wall Type Codes'),
+    icon: 'tag',
+    hint: t('Mostra ou oculta as etiquetas de elementos na vista.', 'Show or hide element labels in the view.'),
+    run: () => editor.store.exec({ type: 'setSettings', patch: { showTags: !editor.project.settings.showTags } }, 'Alternar etiquetas do modelo'),
+    pressed: (c) => c.p.settings.showTags,
   },
   browserSide: {
     label: t('Navegador à direita', 'Project Browser on the Right'),

@@ -206,6 +206,64 @@ describe('Modificar: deslocar, espelhar, girar, mover, copiar, matriz, alinhar',
     expect(near(byId(t, 's1').a, 2, 0) && near(byId(t, 's1').b, 3, 0)).toBe(true);
   });
 
+  it('mover: "2,3" sem espaço é um número só (vírgula decimal) e continua sendo distância', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('move');
+    clickAt(t, 0, 0);
+    t.move(P(10, 0));
+    expect(t.type('2,3')).toBe(true);
+    expect(near(byId(t, 's1').a, 2.3, 0) && near(byId(t, 's1').b, 3.3, 0)).toBe(true);
+  });
+
+  it('mover: destino digitado aceita "dx, dy" com vírgula seguida de espaço', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('move');
+    clickAt(t, 0, 0);
+    expect(t.type('2, 3')).toBe(true);
+    expect(near(byId(t, 's1').a, 2, 3) && near(byId(t, 's1').b, 3, 3)).toBe(true);
+  });
+
+  it('mover: destino digitado aceita "dx;dy" com vírgula decimal nas partes', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('move');
+    clickAt(t, 0, 0);
+    expect(t.type('2,5;3')).toBe(true);
+    expect(near(byId(t, 's1').a, 2.5, 3) && near(byId(t, 's1').b, 3.5, 3)).toBe(true);
+  });
+
+  it('mover: número sem separador continua sendo distância na direção do cursor', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('move');
+    clickAt(t, 0, 0);
+    t.move(P(10, 0));
+    expect(t.type('2.5')).toBe(true);
+    expect(near(byId(t, 's1').a, 2.5, 0) && near(byId(t, 's1').b, 3.5, 0)).toBe(true);
+  });
+
+  it('copiar: "2,5, 3,5" tem um ", " e vale como par com vírgula decimal nas partes', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('copy');
+    clickAt(t, 0, 0);
+    expect(t.type('2,5, 3,5')).toBe(true);
+    const copia = t.draft().segs[1]!;
+    expect(near(copia.a, 2.5, 3.5) && near(copia.b, 3.5, 3.5)).toBe(true);
+  });
+
+  it('copiar: "2;3" sem vírgula decimal também aceita o par', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
+    select(t, [[0.5, 0]]);
+    t.setModify('copy');
+    clickAt(t, 0, 0);
+    expect(t.type('2;3')).toBe(true);
+    const copia = t.draft().segs[1]!;
+    expect(near(copia.a, 2, 3) && near(copia.b, 3, 3)).toBe(true);
+  });
+
   it('copiar com Ctrl repete a partir da mesma base; Esc encerra a repetição', () => {
     const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 1, y: 0 })]);
     select(t, [[0.5, 0]]);
@@ -238,6 +296,46 @@ describe('Modificar: deslocar, espelhar, girar, mover, copiar, matriz, alinhar',
     clickAt(t, 2, 0);
     clickAt(t, 2, 1.5);
     expect(near(byId(t, 's2').a, 0, 0) && near(byId(t, 's2').b, 4, 0)).toBe(true);
+  });
+});
+
+describe('Modificar: captura (snap) igual à do esboço', () => {
+  it('dividir usa o ponto capturado: clicar perto de um vértice corta nele', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 4, y: 0 }), seg('s2', { x: 2, y: 0 }, { x: 2, y: 1 })]);
+    t.setModify('split');
+    clickAt(t, 2.004, 0.001);
+    const partes = t.draft().segs.filter((s) => s.id !== 's2');
+    expect(partes).toHaveLength(2);
+    expect(partes.some((s) => near(s.b, 2, 0))).toBe(true);
+    expect(partes.some((s) => near(s.a, 2, 0))).toBe(true);
+  });
+
+  it('deslocar usa o ponto capturado do lado: a distância sai exata do esboço', () => {
+    const { t } = setup([seg('s1', { x: 0, y: 0 }, { x: 4, y: 0 }), seg('guia', { x: 0, y: 2 }, { x: 4, y: 2 })]);
+    select(t, [[2, 0]]);
+    t.setModify('offset');
+    clickAt(t, 2.004, 1.999);
+    const copia = t.draft().segs.find((s) => s.id !== 's1' && s.id !== 'guia')!;
+    const emY2 = (p: Vec2, x: number): boolean => near(p, x, 2);
+    expect((emY2(copia.a, 0) && emY2(copia.b, 4)) || (emY2(copia.a, 4) && emY2(copia.b, 0))).toBe(true);
+  });
+
+  it('o ângulo da rotação usa o ponto capturado do esboço', () => {
+    const { t } = setup([seg('s1', { x: 1, y: 0 }, { x: 2, y: 0 }), seg('ref', { x: 0, y: 1 }, { x: 0, y: 2 })]);
+    select(t, [[1.5, 0]]);
+    t.setModify('rotate');
+    clickAt(t, 0, 0);
+    clickAt(t, 0.004, 1.003);
+    expect(near(byId(t, 's1').a, 0, 1) && near(byId(t, 's1').b, 0, 2)).toBe(true);
+  });
+
+  it('aparar ao canto usa o ponto capturado para escolher o lado da linha', () => {
+    // Cursor cru à esquerda do canto (4,0); a captura o leva ao canto/vértice próximo, e a linha fica à direita.
+    const { t } = setup([seg('s1', { x: -1, y: 0 }, { x: 5, y: 0 }), seg('s2', { x: 4, y: -1 }, { x: 4, y: 4 }), seg('ref', { x: 4.05, y: 0 }, { x: 4.05, y: 1 })]);
+    t.setModify('trim');
+    clickAt(t, 3.98, 0.001);
+    clickAt(t, 4, 2);
+    expect(near(byId(t, 's1').a, 4, 0) && near(byId(t, 's1').b, 5, 0)).toBe(true);
   });
 });
 

@@ -1,4 +1,4 @@
-import { angleOf, len, sub, type SketchDraft, type Vec2 } from '@hestia/geom';
+import { add, angleOf, len, sub, type SketchDraft, type Vec2 } from '@hestia/geom';
 import { arraySegs, copySegs, mirrorSegs, offsetLoop, offsetSegs, rotateSegs } from './perimeterModify.ts';
 import { MOD_TOL, curveOf, traceDist } from './perimeterModifyCurve.ts';
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
@@ -151,6 +151,13 @@ function destAt(h: ModHost, kind: PerimeterModifyKind, st: Step, dest: Vec2, ctr
   clearData(kind, st);
   h.say(`Copiada. ${transformHint(kind, st)}`);
   return true;
+}
+
+/** Destino digitado como deslocamento (dx,dy) no estágio de destino de Mover/Copiar, sem depender do cursor. */
+export function transformDelta(h: ModHost, kind: PerimeterModifyKind, st: Step, delta: Vec2): boolean {
+  const base = st.pts[0];
+  if (!base || st.stage !== 2) return false;
+  return destAt(h, kind, st, add(base, delta), false);
 }
 
 /** Matriz: quantidade de itens (inclui o original). Devolve false se a quantidade ou o passo não servem. */

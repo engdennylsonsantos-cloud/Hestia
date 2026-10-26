@@ -129,9 +129,10 @@ function angle3dPadrao(plan: OpeningType['plan']): number {
   }
 }
 
-/** Ângulo de abertura no 3D (graus): padrão por família, limitado a 0..120. */
+/** Ângulo de abertura no 3D (graus): padrão por família, limitado a 0..120 (70 na veneziana). */
 export function openingAngle3d(t: Pick<OpeningType, 'kind' | 'plan' | 'angle3d'>): number {
-  return angleOr(t.angle3d, angle3dPadrao(t.plan));
+  const graus = angleOr(t.angle3d, angle3dPadrao(t.plan));
+  return t.plan === 'louver' ? Math.min(70, graus) : graus;
 }
 
 /** Exibição em planta: 'symbolic' (padrão) ou 'projected'. */

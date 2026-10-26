@@ -88,6 +88,9 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingAngle3d(semAngulo('ot_pe80'))).toBe(90);
     expect(openingAngle3d(semAngulo('ot_pg300'))).toBe(90);
     expect(openingAngle3d(semAngulo('ot_jg90'))).toBe(90);
+    // A veneziana tem limite próprio de 70° (spec E §3.5).
+    expect(openingAngle3d(com('ot_jv80', { angle3d: 120 }))).toBe(70);
+    expect(openingAngle3d(com('ot_jv80', { angle3d: 60 }))).toBe(60);
   });
 
   it('valores inválidos caem no padrão; ângulos limitam 0..120 e grid 1..8', () => {

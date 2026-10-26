@@ -11,9 +11,9 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — S0 concluído e integrado; S1, S2 e A2 em execução.
-**Em execução:** S1 (instrumentação), S2 (projeto grande), A2 (verificação visual).
-**Próxima ação:** aguardar S1/S2, rodar M0 e fechar G0. S0 já respondeu: WebGPU viável na RX 580 (condicional).
+**Última atualização:** 2026-10-26 — S0 e S1 concluídos e integrados; S2 e A2 em execução.
+**Em execução:** S2 (projeto grande), A2 (verificação visual).
+**Próxima ação:** aguardar S2, rodar M0 com a instrumentação do S1 e fechar G0.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
@@ -27,7 +27,7 @@
 ### Checklist de agentes
 
 - [x] **S0** sonda de GPU real (RX 580) — concluído em `6a87455`; ver `docs/desempenho/gpu-capacidade.md`
-- [ ] **S1** instrumentação (`?perf=1`, timers, contadores)
+- [x] **S1** instrumentação (`?perf=1`, timers, contadores) — concluído em `2a4ec8e`; ver `docs/desempenho/instrumentacao-s1-2026-10-26.md`
 - [ ] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes)
 - [ ] **M0** baseline 10/30/60
 - [ ] **A1** inserção/abertura
@@ -72,6 +72,19 @@
 - **Limite de buffer:** `maxBufferSize` = 2 GiB; um buffer por categoria, nunca um buffer único do modelo inteiro.
 - **Exceção de tamanho:** `tests/e2e/gpu-probe.mjs` ficou com ~1011 linhas (acima da regra de ~400). É script de
   sonda, não produto; fica registrado para refatorar em H1, sem bloquear a Fase 0.
+
+### Achados S1 (2026-10-26)
+
+- **Instrumentação ligada só com `?perf=1`:** sem o parâmetro, os métodos são no-op e não há overlay; o layout não muda.
+- **API:** `window.__hestiaPerf.snapshot()` / `.reset()`; overlay com FPS, frame ms, draw calls, triângulos, uploads e rebuilds.
+- **Mede:** frame CPU (rAF), timer GPU WebGL2 (`EXT_disjoint_timer_query_webgl2`), draw calls/triângulos, uploads de buffer,
+  rebuilds por camada (geometria/sobreposição/grade) e commits do `ViewportCanvas`.
+- **Contraprova:** troca de nível gerou uploads/rebuilds; edição de parede mudou triângulos e rebuilds. Não são zeros falsos.
+- **Pendências registradas:** timer WebGPU (three não expõe timestamp), draw calls WebGPU por interceção, tempo de worker
+  (A1/P1), rebuild da vista de corte (R4), uploads de textura e commits do app inteiro.
+- **Números do exemplo são de Chrome headless/SwiftShader**, não baseline de hardware; M0 mede na GPU real.
+- **Nota de ambiente:** o worktree do S1 usa uma junção local `apps/web/node_modules/@hestia/render` para o pacote do ramo;
+  não versionada. O repo principal resolve pelo workspace normal.
 
 ## 1. Regras do board
 

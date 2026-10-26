@@ -55,3 +55,7 @@ export {
 } from './stairSpiralRun.ts';
 export { spiralGripAt, spiralHandles, spiralHandlePoints, spiralHold, type SpiralGrip, type SpiralHandle } from './stairSpiralGrips.ts';
 export * from './shortcutDefaults.ts';
+export * from './perimeterSession.ts';
+export * from './sketchShapes.ts';
+export * from './sketchPickFace.ts';
+export * from './sketchByPerimeter.ts';

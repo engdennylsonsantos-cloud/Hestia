@@ -7,3 +7,5 @@ export * from './transform.ts';
 export * from './arc.ts';
 export * from './skeleton.ts';
 export * from './openingSymbol.ts';
+export * from './sketchTypes.ts';
+export * from './sketchValidate.ts';

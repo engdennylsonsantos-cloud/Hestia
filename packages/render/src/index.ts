@@ -26,3 +26,4 @@ export * from './sheet/build.ts';
 export { STAMP_H, STAMP_W } from './sheet/frame.ts';
 // Ambientes (decisão 0018): rótulo e centro de cada ambiente, o mesmo texto da planta e do DXF.
 export { roomLabelAt, roomLabelText } from './plan/rooms.ts';
+export * from './plan/sketch.ts';

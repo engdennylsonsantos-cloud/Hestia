@@ -199,7 +199,7 @@ describe('campos de acabamento: cada um muda a peça no 3D e o quadro', () => {
   it('soleira saliente: projeção e espessura viram o peitoril além das duas faces da parede', () => {
     const c = cenaJanela({ ...base, sillBoard: { projection: 0.04, thickness: 0.03 } });
     expect(c.pecas.length - sem.pecas.length).toBe(1);
-    expect(c.pecas.some((x) => perto(x.w, W) && perto(x.d, c.g.thickness + 0.08) && perto(x.h, 0.03))).toBe(true);
+    expect(c.pecas.some((x) => perto(x.w, W + 0.06) && perto(x.d, c.g.thickness + 0.08) && perto(x.h, 0.03))).toBe(true);
   });
 
   it('verga: transpasse e altura viram a peça sobre o vão e o comprimento total no quadro', () => {

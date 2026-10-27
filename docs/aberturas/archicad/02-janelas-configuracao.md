@@ -223,3 +223,273 @@ O que se pode afirmar com segurança:
 | Curvas | `Curve Resolution` divide componentes curvos em segmentos; aumenta o arquivo | [DOC AC28 151-14] |
 
 **Não confundir:** “Glass Thickness” é geometria; “Glass Material/Surface” é atributo; “Double Glazing” é detalhe de desenho. O ArchiCAD não tem, na Basic Window, um campo “tipo de vidro” (laminado, temperado, low-e) — isso é material/classificação ou parâmetro de biblioteca específica. **NÃO CONFIRMADO** para todas as variantes.
+
+---
+
+## 7. Abertura na parede: reveal, assentamento e âncora
+
+### 7.1 Wall Opening (Abertura da Parede)
+
+**Página:** Wall Opening. [DOC AC28 151-15]
+
+| Campo | O que faz | Valores/opções | Padrão | Onde |
+|---|---|---|---|---|
+| **Reveal Type** | Tipo de requadro/assentamento | lista de tipos + opções “No Reveal” | depende da biblioteca | Wall Opening |
+| **Reveal Depth** | Profundidade do requadro (quanto a janela entra na parede) | medida | — | Wall Opening, Reveal, Preview and Positioning |
+| **Wall Closure** | Fechamento das camadas da parede composta | predefined / custom / No Closure | No Closure | Wall Opening |
+| **Masonry Arch** | Liga o arco de alvenaria | on/off + tipo | off | Wall Opening |
+| **Opening Oversizes** | Aumenta o furo à esquerda, direita, acima e abaixo | medidas | 0 | Wall Opening |
+| **Wall Opening Surface** | Superfície aplicada às paredes do vão | **Same as Wall Edge** / **Same as Wall Side** | — | Wall Opening |
+
+**Wall Opening Surface — o que muda:**
+
+- `Same as Wall Edge`: a superfície da **borda** da parede é aplicada às paredes do vão.
+- `Same as Wall Side`: as superfícies **externa e interna** da parede são aplicadas às paredes do vão, com o **Reveal Depth como linha de divisão** entre elas.
+- Em parede curva, a divisão entre as duas superfícies pode ser reta ou em arco (`Hole Surface’s Split is Curved`). [DOC AC28 151-15/21]
+
+### 7.2 Reveal Settings (Definições do Requadro)
+
+**Página:** Reveal Settings. [DOC AC28 151-16; AC18 65; AC17 62]
+
+| Campo | O que faz | Onde |
+|---|---|---|
+| **Reveal Type** | Escolhe o tipo construtivo do requadro | Reveal |
+| **Head dimension** | Dimensão do requadro no topo (verga) | Reveal |
+| **Jamb dimension** | Dimensão do requadro nas laterais (ombreiras) | Reveal |
+| **Reveal Depth** | Profundidade; é o mesmo valor do Preview and Positioning | Reveal |
+
+A página só entrega tipo + dimensões de cabeça/ombreira + profundidade. **Não há**, na janela padrão, campos separados para “recuo superior”, “recuo inferior” e “recuo lateral” — o controle fino é feito pelo tipo de reveal e pelo `Reveal Depth`. [DOC AC28 151-16]
+
+### 7.3 Anchor Reveal (âncora do requadro)
+
+O Reveal pode ser ancorado em:
+
+- **Wall Face** — face da parede (superfície acabada);
+- **Wall Core** — núcleo (a camada estrutural mais próxima, se houver várias).
+
+**Efeito prático:** ancorar no núcleo mantém a janela alinhada quando a espessura do acabamento muda (por exemplo, isolamento mais grosso) e alinha aberturas em paredes compostas que só diferem no revestimento. Se a parede deixar de ter núcleo, a âncora volta automaticamente para “Wall Face” e a profundidade é recalculada para manter a posição. [DOC AC28 040-312]
+
+**Relação com o nosso DEC-1:** o ArchiCAD permite ancorar no núcleo ou na face; o Hestia limita o batente ao núcleo. Não são a mesma decisão: aqui a âncora é uma **referência de posicionamento**, não um limite de profundidade. [INFERIDO]
+
+### 7.4 Assentamento externo (lado de fora)
+
+- O ícone de **sol** e a linha grossa, durante a colocação, indicam o lado **externo** (reveal side); mover o cursor para o lado oposto da parede troca o lado. [DOC AC28 040-306]
+- O `Flip` troca o sentido de abertura mantendo a moldura no lugar. [DOC AC28 150-16]
+- Em parede inclinada, `Opening Plane` decide se a janela acompanha o plano da parede (`Associated to Wall`) ou fica vertical (`Vertical`). Em parede de perfil complexo, a inclinação vem da `Opening Reference Layer` do perfil. [DOC AC28 040-309]
+
+### 7.5 Parede curva, poligonal e inclinada
+
+| Situação | Comportamento | Fonte |
+|---|---|---|
+| Parede curva | A janela acompanha a curvatura; o vão é recortado na parede curva; superfícies do vão podem dividir-se em arco | [DOC AC28 040-315; 151-21] |
+| Parede poligonal | O `Board` pode seguir o polígono da parede ou ficar paralelo à janela | [DOC AC28 151-25] |
+| Parede inclinada | `Opening Plane` = Associated to Wall ou Vertical | [DOC AC28 040-309] |
+| Parede de perfil complexo | A inclinação é definida no Profile Manager pela Opening Reference Layer | [DOC AC28 040-309] |
+
+---
+
+## 8. Fechamento da parede (Wall Closure) e alizar (Casing)
+
+### 8.1 Wall Closure (Fechamento da Parede)
+
+**Página:** Wall Closure. [DOC AC28 151-17; AC18 66; AC17 63]
+
+Só é relevante em **parede composta**. A ajuda é explícita: “these settings only affect the display of openings in 2D views”; o Turn Plaster também aparece em corte/elevação e, se `Show in 3D` estiver ligado, no 3D. [DOC AC28 151-17]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Closure Type** | Tipo de fechamento | No Closure; tipos predefinidos; Custom Closure | Wall Closure |
+| **Turn Skin on Side** | Em que lados as camadas viram para dentro | Left / Right / Both | Wall Closure |
+| **Number of Skins to Turn** | Quantas camadas viram | inteiro | Wall Closure |
+| **Number from** | De onde a contagem começa | Outside face / Inside face | Wall Closure |
+| **Profile Width** | Largura do elemento de fechamento pré-fabricado (cavity closure) | medida | Wall Closure |
+| **Insulation Strip** | Faixa de isolamento no fechamento | on/off + espessura | Wall Closure |
+| **Turn Plaster** | Faz o reboco virar no vão | Automatically / número de camadas | Wall Closure |
+| **Plaster Skin Definition** | Define o que é “reboco” | Use Wall Finish Component / Plaster Thickness Limit | Wall Closure |
+| **Custom Closure** | Fechamento por camada | Select Skin to Edit: Left jamb / Right jamb / Both; escolha da skin; Turn-in Skin; thickness; hatch orientation; separating line pen; Consider Skin as Plaster | Wall Closure |
+
+**Tipos de fechamento predefinidos (AC17 New Features, histórico):** Variable Cavity Closure, Plaster Reveal, Insulated Reveal, Insulation Closure for Renovation, Finish Closure, Air Space Closure. A lista atual pode variar; a ajuda do AC28 só diz “predefined or custom”. [DOC AC17 NewFeatures-43] + [DOC AC28 151-17]
+
+### 8.2 Turn Plaster — posição em relação à espessura e ao acabamento
+
+Regras que importam para o nosso mapeamento:
+
+1. O `Turn Plaster` vira a camada de reboco **para fora do contorno da parede** definido no Reveal. [DOC AC28 151-17]
+2. `Use Wall Finish Component` considera reboco a camada marcada como **Finish** na parede composta; `Plaster Thickness Limit` considera reboco toda camada até uma espessura limite (ex.: 40 mm). [DOC AC28 151-17]
+3. Com reboco virado como “plaster skin”, a **profundidade do jamb é medida na camada resistente** e a largura nominal do reveal pode ficar **maior** que a medida entre as faces de reboco. Sem `Consider Skin as Plaster`, a camada é envolvida como fechamento comum e a largura nominal coincide com a medida entre as camadas envolvidas. [DOC AC28 151-17; AC18 66 — exemplo de 60 mm de jamb e 780 mm nominais]
+4. `Turn Plaster` e `Casing` **não podem coexistir** no mesmo lado; se o Turn Plaster estiver cinza, desligue o Casing interno/externo. [DOC AC28 151-17/26]
+5. O número de camadas pode ser contado a partir da **face externa** ou da **face interna**; a escolha muda o resultado em paredes com acabamentos diferentes. [DOC AC28 151-17]
+
+### 8.3 Casing Outside/Inside (Alizar externo/interno)
+
+**Páginas:** Casing Outside / Casing Inside. [DOC AC28 151-26; AC18 68/69]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Outside Casing / Inside Casing** | Liga o alizar no lado externo/interno | on/off | Casing Outside/Inside |
+| **Casing parameters** | Largura, espessura, offset, overhang, material | medidas/atributos | Casing Outside/Inside |
+| **Casing below Sill** | Acrescenta alizar abaixo do peitoril | on/off (só se houver sill) | Casing Inside (AC18) |
+| **Attributes** | Fill, material e pen do alizar | atributos | subpágina Attributes |
+
+**Posição:** o alizar é aplicado na **face** da parede (interna ou externa), em volta do vão; a espessura do alizar acrescenta ao volume, mas não altera o furo. Nas pré-visualizações, a espessura da parede é usada para mostrar o alizar no contexto. [DOC AC28 040-307]
+
+**Relação com o acabamento:** como o Casing é aplicado na face, ele cobre a junta entre moldura e parede; é a alternativa ao `Turn Plaster`, que faz o acabamento entrar no vão. O ArchiCAD trata os dois como **exclusivos**. [DOC AC28 151-17/26]
+
+**Não confundir:** `Casing` (alizar/guarnição) não é `Wall Closure` (fechamento das camadas). O primeiro é uma peça de acabamento; o segundo é a continuação das camadas da parede dentro do vão. [INFERIDO a partir das definições]
+
+---
+
+## 9. Peitoril, tábua interna, soleira e pingadeira
+
+### 9.1 Sill (peitoril externo)
+
+**Página:** Sill Settings. [DOC AC28 151-24; AC18 70]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Sill** | Liga o peitoril | on/off | Sill |
+| **Sill Type** | Tipo de peitoril | pop-up dependente da biblioteca | Sill |
+| **3D Detail** | Nível de detalhe do peitoril no 3D | **Simple** / **Detailed** | Sill |
+| **Thickness** | Espessura | medida | Sill |
+| **Width** | Largura | medida | Sill |
+| **Angle** | Inclinação/queda | graus | Sill |
+| **Nosing** | Nariz/saliência frontal | medida | Sill |
+| **Slip in Depth** | Quanto o peitoril entra sob a moldura; **máximo = espessura da moldura**; soma-se à Sill Width | medida | Sill |
+| **Sill Oversize** (AC18) | Faz a altura do peitoril incluir a espessura; se desligado, vai só até a base | on/off | Sill (AC18) |
+| **Is Curved in Curved Walls** | Curva o peitoril em parede curva | on/off | Sill |
+| **Attributes** | Fill, material, pen | atributos | subpágina |
+
+**Pingadeira:** não há campo “drip” separado; o efeito de pingadeira é obtido pelo **nosing** + **angle** do tipo de sill. **NÃO CONFIRMADO** como peça independente — na Basic Window não achei um controle com esse nome. [INFERIDO]
+
+### 9.2 Board (tábua/peitoril interno)
+
+**Página:** Board Settings. [DOC AC28 151-25; AC18 71]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Board** | Liga a tábua interna | on/off | Board |
+| **Is Curved in Curved Walls** | Acompanha a parede curva | on/off | Board |
+| **Board edge** | Em parede poligonal: segue o polígono ou fica paralelo à janela | **Parallel to Wall Polygon** / paralelo à janela | Board |
+| **Attributes** | Fill, material, pen (visível em janelas de corte) | atributos | subpágina |
+
+**Semântica:** no ArchiCAD, `Sill` é o peitoril **externo** (a pedra/soleira que joga água para fora) e `Board` é a **tábua interna** (o “peitoril” de dentro). A tradução PT-BR chama Board de “Peitoril Interno” ou “Bordo”. [DOC AC28/BRA 151-24/25] Isso é o inverso de alguns usos brasileiros; no nosso modelo, convém separar `sillExterno` e `boardInterno` para não herdar a ambiguidade.
+
+### 9.3 Threshold (soleira de porta)
+
+**Página:** Threshold. [DOC AC28 151-23]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Threshold Type** | Tipo de soleira | pop-up | Threshold |
+| **Threshold Thickness** | Espessura | medida | Threshold |
+| **Nosing / side overhangs** | Transpasse frontal e lateral (tipos “Extended”) | medidas | Threshold |
+
+Só aparece em portas (e porta-balcão quando o objeto oferece). A `Sill` é de janela; `Threshold` é de porta. [DOC AC28 151-23/24]
+
+### 9.4 Resumo semântico
+
+| Termo nosso | Peça no ArchiCAD | Onde |
+|---|---|---|
+| Peitoril externo | `Sill` | Sill Settings |
+| Peitoril interno / tábua | `Board` | Board Settings |
+| Soleira de porta | `Threshold` | Threshold Settings |
+| Pingadeira | `Nosing` + `Angle` do Sill | Sill Settings (sem peça separada) |
+| Soleira saliente | `Sill` com nosing/width; ou `Threshold` estendido, em porta | Sill/Threshold |
+
+---
+
+## 10. Wall Inset (recorte abaixo da janela)
+
+**Página:** Wall Inset (só janela). [DOC AC28 151-18; AC24 141-20]
+
+Serve para criar um nicho/recorte abaixo da janela, por exemplo para radiador.
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Wall Inset Size** | Modo de dimensionamento | **Automatic** / **Symmetric** / **Asymmetric** | Wall Inset |
+| **Automatic** | Largura do recorte = largura da janela | — | Wall Inset |
+| **Symmetric** | Largura e altura fixas, centralizadas na janela | medidas | Wall Inset |
+| **Asymmetric** | Transpasses diferentes à direita e à esquerda; altura única | medidas L/R + altura | Wall Inset |
+| **Bottom elevation** | Base do recorte; 0 = até o piso | medida | Wall Inset |
+| **Depth** | Profundidade do recorte | medida | Wall Inset |
+| **Show Hidden Parapet on 2D** | Mostra a linha de parapeito em 2D mesmo quando escondida pela parede/janela | on/off | Wall Inset |
+
+**Lógica:** o Wall Inset é um **segundo recorte** na parede, abaixo do vão principal. Ele não muda a Nominal Size da janela; é geometria de parede. O `Hidden Parapet` é só representação 2D. [DOC AC28 151-18]
+
+---
+
+## 11. Masonry Arch (arco de alvenaria)
+
+**Página:** Masonry Arch. [DOC AC28 151-19; AC18 74]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Masonry Arch** | Liga o arco | on/off | Masonry Arch |
+| **Style** | Estilo do arco | lista (ex.: Jack, arco pleno etc.) | Masonry Arch |
+| **Rise** | Flecha do arco | medida | Masonry Arch |
+| **Skewback angle** | Ângulo de arranque (estilos “Jack”) | graus | Masonry Arch |
+| **Type** | Material do arco | **Stucco** / **Brick** | Masonry Arch |
+| **Brick / Mortar thickness** | Dimensões dos tijolos e juntas (se Brick) | medidas | Masonry Arch |
+| **Keystone** | Chave do arco | width / oversize / projection | Masonry Arch |
+| **Arch height/depth** | Altura e profundidade do arco | medidas | Masonry Arch |
+| **Rear Hold Depth** | Profundidade do vão atrás do arco | medida | Masonry Arch |
+| **Arch projection** | Saliência horizontal do arco | medida | Masonry Arch |
+| **Arch on Header** | Coloca o arco diretamente sobre a verga | on/off | Masonry Arch |
+| **Distance arch–header** | Distância se não estiver sobre a verga | medida | Masonry Arch |
+| **Niche below Arch** | Cria nicho sob o arco | on/off | Masonry Arch |
+| **Horizontal Overhang L/R** | Transpasse horizontal do arco | medidas | Masonry Arch |
+
+**Atributos:** a subpágina `Model Attributes of Wall Opening` permite superfícies/pens do arco; em parede curva, `Hole Surface’s Split is Curved` divide as superfícies do vão em arco. [DOC AC28 151-21]
+
+**Custo:** a própria ajuda alerta que muitos arcos de tijolo aumentam significativamente o tamanho do modelo. [DOC AC28 151-19]
+
+---
+
+## 12. Sunshade (brise/toldo)
+
+**Página:** Sunshade. [DOC AC28 151-27; AC18 73]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Sunshade** | Liga o brise | on/off | Sunshade |
+| **Type** | Tipo de brise | pop-up | Sunshade |
+| **Open in 3D** | Mostra as folhas móveis abertas no 3D | on/off | Sunshade |
+| **3D Opening (Angle)** | Ângulo de abertura no 3D | graus | Sunshade |
+| **2D Symbol** | Mostra o símbolo do brise em 2D | on/off; no AC18 não aparece em escalas < 1:100 | Sunshade |
+| **Extra Frame** | Mostra o quadro do brise ao lado da janela no 3D | on/off | Sunshade |
+| **Shutter Height** | Altura da folha | medida / **Automatic Shutter Height** | Sunshade |
+| **Attributes** | Fill, material, pen | atributos | subpágina |
+
+**Restrição:** não está disponível se a janela tiver **luz lateral elevada** (“raised sidelight”). [DOC AC28 151-27]
+
+**Não confundir:** o Sunshade é acessório da janela (persiana/brise). O sombreamento solar do edifício (Solar Study, Sun) é outro assunto. [INFERIDO]
+
+---
+
+## 13. Equipamentos, ganging, espaço mínimo e puxadores
+
+### 13.1 Fixtures and Fittings
+
+**Página:** Fixtures and Fittings. [DOC AC28 151-22]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Casing Outside / Inside** | Liga alizares | on/off | Fixtures |
+| **Ganging** | Alinha aberturas vizinhas na horizontal/vertical | on/off por lado | Fixtures |
+| **Threshold / Sill / Board / Sunshade** | Liga e escolhe o acessório | on/off + pop-up | Fixtures |
+| **Custom Corner** | Adiciona canto personalizado à janela | Right / Left | Fixtures |
+| **Handles** | Puxadores (porta; em janela, conforme objeto) | on/off no MVO | Fixtures / MVO |
+
+**Ganging:** é preciso marcar nos **dois** elementos vizinhos; as linhas de encontro (casing, sill, threshold) desaparecem e o conjunto parece uma peça única. Algumas opções ficam cinzas quando o ganging está ativo. [DOC AC28 151-22]
+
+### 13.2 Minimal Space
+
+**Página:** Minimal Space. [DOC AC28 151-30]
+
+Define folgas mínimas de circulação/abertura ao lado da porta (e, conforme o objeto, da janela). A exibição em planta é controlada por Model View Options > Detail Level of Door and Window Symbols > **Minimal Space of Doors**, com pen, tipo de linha e fill. [DOC AC28 151-30; 140-40]
+
+### 13.3 Puxadores e acessórios
+
+- `Accessories in 3D` no MVO liga/desliga puxadores de porta e janela. [DOC AC28 140-40]
+- Em portas, a página Handle and Kick Board define puxador por folha, `Uniform Handles`, altura, distância da borda e chapa de proteção (kick board). Em janelas, o puxador depende do objeto. [DOC AC28 151-8]
+- O `Minimal Space` de objetos é um parâmetro separado; não confundir com a folga da janela. [DOC AC28 150-11]

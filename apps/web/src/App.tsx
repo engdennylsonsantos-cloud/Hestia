@@ -17,6 +17,8 @@ import { SheetDialog } from './ui/dialogs/SheetDialog.tsx';
 import { AddViewDialog } from './ui/dialogs/AddViewDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
+import { ShortcutConfigDialog } from './ui/dialogs/ShortcutConfigDialog.tsx';
+import { useAtalhos } from './editor/shortcutConfig.ts';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
@@ -111,6 +113,8 @@ function Dialogs(): ReactElement | null {
       return <LevelsDialog />;
     case 'start':
       return <StartDialog />;
+    case 'atalhosTeclado':
+      return <ShortcutConfigDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
     case 'schedule':
@@ -148,7 +152,8 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (!editor.restoreAutosave()) editor.newProject('house2');
-    useUi.setState({ status: 'Pronto. Pressione W para desenhar paredes, ou selecione para editar.' });
+    const sc = useAtalhos.getState().atalhos.wall;
+    useUi.setState({ status: sc ? `Pronto. Pressione ${sc} para desenhar paredes, ou selecione para editar.` : 'Pronto. Selecione para editar.' });
   }, []);
 
   useEffect(() => {

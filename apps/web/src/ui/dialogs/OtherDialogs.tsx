@@ -1,6 +1,9 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import { OPENING_FRAME_DEFAULTS, TEMPLATES, buildTemplate, isWall, makeLevel, newId, openingFamilyOf, openingLintel, openingSillBeam, type OpeningType, type TemplateId } from '@hestia/model';
+import { TODOS_COMANDOS_ATALHO, TOOL_GROUPS, type ComandoAtalho } from '@hestia/tools';
 import { editor, useProject } from '../../editor/controller.ts';
+import { useAtalhos } from '../../editor/shortcutConfig.ts';
+import { rotuloComando } from '../../editor/shortcuts.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
@@ -243,12 +246,9 @@ export function StartDialog(): ReactElement {
   );
 }
 
+/** Teclas que não são ferramentas: texto fixo, pois o código as trata diretamente. As ferramentas vêm da configuração (ShortcutsDialog). */
 const KEYS: Array<[string, string]> = [
-  ['V', 'Selecionar'], ['W', 'Parede'], ['F', 'Piso'], ['B', 'Laje'], ['U', 'Telhado'], ['D', 'Porta'], ['J', 'Janela'],
-  ['M', 'Mover'], ['C', 'Copiar'], ['R', 'Girar'], ['S', 'Espelhar'],
-  ['A', 'Matriz'], ['O', 'Deslocar'], ['T', 'Aparar/Estender'], ['L', 'Alinhar'], ['N', 'Junção de canto'], ['P', 'Dividir parede'], ['E', 'Medir'], ['K', 'Corte (duas marcas na planta)'],
-  ['I', 'Escada (croqui: limites, espelhos, caminhada, patamar)'], ['Q', 'Escada reta, em L, em U ou com leque'],
-  ['Esc', 'Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
+  ['Esc','Cancela o passo; segundo Esc sai da ferramenta. Na vista de corte, volta à planta'],
   ['Enter', 'Confirma o valor digitado'],
   ['0–9 , + − × ÷', 'Digitar medida durante o desenho (aceita expressões)'],
   ['Tab', 'Alterna opção (lado externo da parede, sentido da porta, linha e arco no croqui da escada)'],
@@ -263,11 +263,22 @@ const KEYS: Array<[string, string]> = [
   ['Botão direito', 'Cancela o passo'],
 ];
 
+/** Ferramentas (na ordem da faixa) com a sequência atual da configuração. */
 export function ShortcutsDialog(): ReactElement {
+  const atalhos = useAtalhos((s) => s.atalhos);
+  const ferramentas: ComandoAtalho[] = [...new Set<ComandoAtalho>([...TOOL_GROUPS.flatMap((g) => g.tools), ...TODOS_COMANDOS_ATALHO])].filter((c) => c !== 'atalhos');
   return (
-    <Dialog title="Atalhos" size="mid" onClose={close} footer={<button className="btn primary" onClick={close}>Fechar</button>}>
+    <Dialog title="Atalhos" size="mid" onClose={close} footer={
+      <>
+        <button className="btn" onClick={() => useUi.setState({ dialog: 'atalhosTeclado' })}>Editar atalhos…</button>
+        <button className="btn primary" onClick={close}>Fechar</button>
+      </>
+    }>
       <table className="kbtable">
-        <tbody>{KEYS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}</tbody>
+        <tbody>
+          {ferramentas.map((c) => <tr key={c}><td><kbd>{atalhos[c] ?? '—'}</kbd></td><td>{rotuloComando(c)}</td></tr>)}
+          {KEYS.map(([k, d]) => <tr key={k}><td><kbd>{k}</kbd></td><td>{d}</td></tr>)}
+        </tbody>
       </table>
     </Dialog>
   );

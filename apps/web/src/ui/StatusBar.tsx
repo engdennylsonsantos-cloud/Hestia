@@ -23,9 +23,11 @@ export function StatusBar(): ReactElement {
   const cursor = useUi((s) => s.cursor);
   const snap = useUi((s) => s.snapKind);
   const view = useUi((s) => s.view);
+  const buffer = useUi((s) => s.atalhoBuffer);
   return (
     <footer className="statusbar" role="status">
       <span className="msg">{status}</span>
+      {buffer ? <span className="mono" style={{ color: 'var(--accent)' }}>{buffer}…</span> : null}
       {view === 'plan' && cursor ? <span className="mono">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
       {view === 'plan' && snap && SNAP[snap] ? <span className="mono" style={{ color: 'var(--accent)' }}>{SNAP[snap]}</span> : null}
       <SnapButton />

@@ -7,7 +7,7 @@ import { selectionAfterClick } from './selectionClick.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'atalhosTeclado' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -24,6 +24,8 @@ export interface UiState {
   gpu: Backend | 'cpu' | 'pending';
   status: string;
   typed: string;
+  /** Sequência de atalho digitada e ainda sem efeito (ex.: W enquanto se espera o A de WA). */
+  atalhoBuffer: string;
   prompt: string | null;
   dialog: DialogKind;
   dialogArg: string | null;
@@ -165,6 +167,7 @@ export const useUi = create<UiState>(() => ({
   gpu: 'pending',
   status: 'Pronto.',
   typed: '',
+  atalhoBuffer: '',
   prompt: null,
   dialog: null,
   dialogArg: null,

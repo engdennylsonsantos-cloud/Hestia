@@ -19,7 +19,7 @@ import { keptSlabType } from './slabTypeActions.ts';
 import { safeGet, safeSet } from './storage.ts';
 import { fitBox, levelBox, panBy, sectionBox, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, useUi } from './state.ts';
-import { toolForKey } from './toolKeys.ts';
+import { SequenciaAtalhos } from './atalhoRunner.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
 import { entregarArquivo } from './entregarArquivo.ts';
@@ -36,6 +36,8 @@ export class Editor {
   readonly store = new ProjectStore(createEmptyProject());
   private tool: Tool;
   private viewports = new Map<Id, Viewport>();
+  /** Sequência de teclas de atalho em andamento (ex.: W à espera do A de WA). */
+  private seq = new SequenciaAtalhos();
   private resolveCache = new Map<Id, { project: Project; value: ResolvedLevel }>();
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -202,6 +204,8 @@ export class Editor {
     const ui = useUi.getState();
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;
+    // Sequência de atalho só continua com letra ou dígito sem modificador: qualquer outra tecla a interrompe.
+    if (!/^[A-Za-z0-9]$/.test(k) || e.altKey || mod) this.seq.reset();
     // Na aba de prancha, as teclas de ferramenta e de seleção não valem (o desfazer, com Ctrl, vale).
     if (ui.view === 'sheet' && !mod) return false;
     if (mod && (k === 'z' || k === 'Z')) {
@@ -272,10 +276,15 @@ export class Editor {
       (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
       return true;
     }
-    const id = toolForKey(k);
-    if (id && !e.altKey) {
-      this.setTool(id);
-      return true;
+    // Letras não iniciam atalho com um valor digitado pendente (typed).
+    if (!e.altKey && !ui.typed) {
+      const r = this.seq.tecla(k);
+      if (r === 'espera') return true;
+      if (r) {
+        if (r.comando === 'atalhos') useUi.setState({ dialog: 'atalhosTeclado' });
+        else this.setTool(r.comando as ToolId);
+        return true;
+      }
     }
     return false;
   }

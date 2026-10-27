@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { TOOL_GROUPS, TOOL_LABEL, TOOL_SHORTCUT, type ToolId } from '@hestia/tools';
+import { TOOL_GROUPS, TOOL_LABEL, type ToolId } from '@hestia/tools';
+import { useAtalhos } from '../editor/shortcutConfig.ts';
 import { isStair, view3dOf, type Id, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { editThinLines, editView3D, thinLinesOn } from '../editor/graphicsActions.ts';
@@ -23,7 +24,8 @@ const GROUP_BY_TAB: Record<string, Array<{ title: string; tools: ToolId[] }>> = 
 
 function ToolButton({ id }: { id: ToolId }): ReactElement {
   const active = useUi((s) => s.tool === id);
-  const sc = TOOL_SHORTCUT[id];
+  // Atalho atual da configuração (muda com o perfil ou a tela Atalhos de teclado).
+  const sc = useAtalhos((s) => s.atalhos[id]);
   return (
     <button className={`tbtn${active ? ' on' : ''}`} onClick={() => editor.setTool(id)} title={`${TOOL_LABEL[id]}${sc ? ` (${sc})` : ''}`}>
       <Icon name={id} size={22} />

@@ -183,7 +183,10 @@ void main() {
   if (uZoom < uZoomMin) discard;
   float meiaLinha = 0.5 * uLinhaPx;
   float c = 0.0;
-  if (uKind == 1 || uKind == 2) {
+  if (uKind == 0) {
+    // Sólido: a cor de preenchimento inteira (o zoom mínimo continua valendo).
+    c = 1.0;
+  } else if (uKind == 1 || uKind == 2) {
     c = max(c, perto((-vMundo.x + vMundo.y) * COS45, meiaLinha));
     if (uKind == 2) c = max(c, perto((vMundo.x + vMundo.y) * COS45, meiaLinha));
   } else if (uKind == 3) {

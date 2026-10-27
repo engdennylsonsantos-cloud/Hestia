@@ -108,12 +108,9 @@ function acrescentarPreenchimento(para: ParaLote, f: FillOp): void {
   const { kind, color } = f.hatch;
   const alpha = f.hatch.alpha ?? 1;
   const zoomMin = f.hatch.zoomMin ?? 0;
-  if (kind === 'solid') {
-    for (const poly of f.polygons) fillPolygon(poly, color, alpha);
-    return;
-  }
   const codigo = CODIGO_HACHURA[kind];
-  if (codigo === 0) return;
+  // Sólido também é um lote com zoom mínimo: abaixo dele o fragmento some, sem refazer a geometria ao cruzar o limiar.
+  if (kind !== 'solid' && codigo === 0) return;
   // Hachura procedural: o polígono é só o recorte (triangulado); as linhas/pontos saem do fragment shader em coordenadas do
   // mundo. Não há mais milhares de segmentos gerados na CPU nem um quad por trecho no buffer.
   for (const poly of f.polygons) {

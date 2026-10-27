@@ -101,6 +101,7 @@ export function malhasNaOrdem(scene: PlanScene): THREE.Mesh[] {
 /** A hachura cobre este ponto do mundo? Mesma conta do fragment shader (`FRAGMENT_HACHURA`). */
 export function hachuraCobre(kind: number, x: number, y: number, zoom: number, zoomMin: number, espaco: number, linhaPx: number, pontoPx: number, pontoM: number): boolean {
   if (zoom < zoomMin) return false;
+  if (kind === 0) return true;
   const COS45 = 0.7071067811865476;
   const perto = (s: number, meia: number): boolean => {
     const k = Math.floor(s / espaco + 0.5);

@@ -276,7 +276,7 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
             <option value="interior">Só lado interno</option>
           </select>
         </div>
-        <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><Check id="ot-ac-al" checked={cas !== undefined} onChange={(v) => onChange(alternarAcabamento(d, 'casing', v))} /></div>
+        <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><Check id="ot-ac-al" checked={cas !== null} onChange={(v) => onChange(alternarAcabamento(d, 'casing', v))} /></div>
         {cas ? (
           <>
             <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
@@ -285,7 +285,7 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
         ) : null}
         {janela ? (
           <>
-            <div className="field-row"><label htmlFor="ot-ac-sb" title="Peitoril saliente, só de janela: projeção além de cada face da parede">Soleira saliente</label><Check id="ot-ac-sb" checked={sb !== undefined} onChange={(v) => onChange(alternarAcabamento(d, 'sillBoard', v))} /></div>
+            <div className="field-row"><label htmlFor="ot-ac-sb" title="Peitoril saliente, só de janela: projeção além de cada face da parede">Soleira saliente</label><Check id="ot-ac-sb" checked={sb !== null} onChange={(v) => onChange(alternarAcabamento(d, 'sillBoard', v))} /></div>
             {sb ? (
               <>
                 <div className="field-row"><label htmlFor="ot-ac-sbp">Soleira: projeção</label><NumField id="ot-ac-sbp" value={sb.projection} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBoard: { ...sb, projection: v } })} /></div>

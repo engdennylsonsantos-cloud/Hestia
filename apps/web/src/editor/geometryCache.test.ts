@@ -284,3 +284,78 @@ describe('persistência e falhas', () => {
     expect(segunda.bytesOcupados).toBeLessThanOrEqual(bytes * 2);
   });
 });
+
+describe('leitura em lote da abertura', () => {
+  /** Armazenamento com contador de chamadas, para provar que o lote é uma leitura só. */
+  function contado() {
+    const base = criarArmazenamentoMemoria();
+    const chamadas = { ler: 0, lerVarios: 0 };
+    const arm: ArmazenamentoGeometria = {
+      ler: (c) => {
+        chamadas.ler++;
+        return base.ler(c);
+      },
+      lerVarios: (c) => {
+        chamadas.lerVarios++;
+        return base.lerVarios!(c);
+      },
+      gravar: (c, t) => base.gravar(c, t),
+      apagar: (c) => base.apagar(c),
+    };
+    return { arm, chamadas };
+  }
+
+  it('obterVarios devolve acertos e faltas na ordem e faz uma leitura em lote', async () => {
+    const { arm, chamadas } = contado();
+    const cache = new CacheGeometria({ tetoBytes: 10_000, armazenamento: arm });
+    await cache.gravar('a', { n: 1 });
+    await cache.gravar('c', { n: 3 });
+    chamadas.ler = 0;
+    chamadas.lerVarios = 0;
+    const achados = await cache.obterVarios(['a', 'b', 'c']);
+    expect(achados).toEqual([{ achou: true, valor: { n: 1 } }, { achou: false }, { achou: true, valor: { n: 3 } }]);
+    expect(chamadas.lerVarios).toBe(1);
+    expect(chamadas.ler).toBe(0);
+  });
+
+  it('sem lerVarios no armazenamento, obterVarios lê uma a uma e o resultado é o mesmo', async () => {
+    const base = criarArmazenamentoMemoria();
+    const arm: ArmazenamentoGeometria = { ler: base.ler, gravar: base.gravar, apagar: base.apagar };
+    const cache = new CacheGeometria({ tetoBytes: 10_000, armazenamento: arm });
+    await cache.gravar('a', [1]);
+    const achados = await cache.obterVarios(['a', 'z']);
+    expect(achados).toEqual([{ achou: true, valor: [1] }, { achou: false }]);
+  });
+
+  it('texto corrompido no lote só derruba aquela chave (as outras voltam)', async () => {
+    const arm = criarArmazenamentoMemoria();
+    const cache = new CacheGeometria({ tetoBytes: 10_000, armazenamento: arm });
+    await cache.gravar('a', { n: 1 });
+    await arm.gravar('b', '{quebrado');
+    await cache.gravar('c', { n: 3 });
+    const achados = await cache.obterVarios(['a', 'b', 'c']);
+    expect(achados[0]).toEqual({ achou: true, valor: { n: 1 } });
+    expect(achados[1]).toEqual({ achou: false });
+    expect(achados[2]).toEqual({ achou: true, valor: { n: 3 } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await arm.ler('b')).toBeNull();
+  });
+
+  it('carregado só fica verdadeiro depois de preparar; preparar duas vezes lê o índice uma vez', async () => {
+    const { arm, chamadas } = contado();
+    const cache = new CacheGeometria({ tetoBytes: 10_000, armazenamento: arm });
+    expect(cache.carregado).toBe(false);
+    await cache.preparar();
+    expect(cache.carregado).toBe(true);
+    expect(chamadas.ler).toBe(1);
+    await cache.preparar();
+    expect(chamadas.ler).toBe(1);
+  });
+
+  it('armazenamento que lança: obterVarios devolve tudo como falta e preparar não lança', async () => {
+    const cache = new CacheGeometria({ tetoBytes: 10_000, armazenamento: armazenamentoQuebrado() });
+    await expect(cache.preparar()).resolves.toBeUndefined();
+    expect(cache.carregado).toBe(true);
+    await expect(cache.obterVarios(['a', 'b'])).resolves.toEqual([{ achou: false }, { achou: false }]);
+  });
+});

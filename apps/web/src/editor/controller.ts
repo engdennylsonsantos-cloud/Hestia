@@ -30,7 +30,7 @@ import { entregarArquivo } from './entregarArquivo.ts';
 import { safeFilename } from './nomeArquivo.ts';
 import { FluxoEdicao } from './fluxoEdicao.ts';
 import { CacheGeometria } from './geometryCache.ts';
-import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
+import { abrirNiveisComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
 
 
 /**
@@ -54,6 +54,7 @@ export class Editor {
     lerNivel: (id) => this.fluxo.nivelPronto(id) ?? this.levels.get(this.store.project, id),
     pendente: (id) => this.fluxo.pendente(id),
     semear: (id, valor) => this.fluxo.resolucao.semear(id, valor),
+    semearVarios: (itens) => this.fluxo.resolucao.semearVarios(itens),
   };
   private sectionCache = new Map<Id, { project: Project; value: SectionResult }>();
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -61,6 +62,9 @@ export class Editor {
 
   constructor() {
     this.tool = createTool('select', this.env);
+    // O índice do cache de geometria é lido no boot: quando o usuário abre um projeto, a abertura pode tentar o cache antes
+    // de resolver o nível visível (ver `abrirNiveisComCache`). A leitura é assíncrona e nunca lança.
+    void this.portasAbertura.cache.preparar();
     this.store.subscribe(() => {
       this.pruneSelection();
       this.scheduleAutosave(); this.fluxo.atualizar(this.project, this.store.version);
@@ -436,8 +440,8 @@ export class Editor {
   load(p: Project, name: string): void {
     this.perimetro.encerrar(); this.store.load(p);
     this.fileName = name;
-    this.levels.clear(); this.fluxo.abrir(p, this.store.version).forEach((id) => this.resolved(id));
-    void abrirComCache(this.portasAbertura, p);
+    this.levels.clear();
+    abrirNiveisComCache(this.portasAbertura, p, this.fluxo.abrir(p, this.store.version), (id) => this.resolved(id));
     this.viewports.clear();
     // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
     useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });

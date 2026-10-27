@@ -1,0 +1,295 @@
+{
+  "geradoEm": "2026-10-27T02:31:17.248Z",
+  "navegador": {
+    "executavel": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "versao": "155.0.8059.86",
+    "cabecalhoGPU": "padrão do navegador (sem --use-angle=swiftshader)",
+    "headless": true
+  },
+  "app": {
+    "endereco": "http://127.0.0.1:8130/index.html",
+    "modo": "producao"
+  },
+  "maquina": {
+    "so": "win32 10.0.19045",
+    "cpu": "Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz",
+    "ramTotalGB": 15.8
+  },
+  "metodo": {
+    "repeticoes": 5,
+    "panPassos": 60,
+    "zoomPassos": 30,
+    "medida": "do evento ao quadro seguinte pintado (rAF duplo)",
+    "rotulo": "a1b-final",
+    "parede": "perf_w_<nivel do meio>_25, de (6,4) a (6,8)",
+    "edicao": "setWallEnds pelo store (editor.store.exec), deslocamento de 0.3 m alternado"
+  },
+  "medidas": {
+    "10Pavimentos": {
+      "pavimentos": 10,
+      "paredes": 320,
+      "abrirProjeto": {
+        "n": 5,
+        "medianaMs": 403.8,
+        "p95Ms": 407.7,
+        "mediaMs": 399.56,
+        "minMs": 383.2,
+        "maxMs": 407.7
+      },
+      "carregarPaginaAteAppPronto": {
+        "n": 5,
+        "medianaMs": 1746,
+        "p95Ms": 1889,
+        "mediaMs": 1748.6,
+        "minMs": 1606,
+        "maxMs": 1889
+      },
+      "primeiraPinturaFCP": {
+        "n": 5,
+        "medianaMs": 1100,
+        "p95Ms": 1228,
+        "mediaMs": 1116,
+        "minMs": 1016,
+        "maxMs": 1228
+      },
+      "plantaNivelDoMeio": {
+        "n": 5,
+        "medianaMs": 43.7,
+        "p95Ms": 465.1,
+        "mediaMs": 128.52,
+        "minMs": 41.4,
+        "maxMs": 465.1
+      },
+      "selecaoPorCliqueNaPlanta": {
+        "cliques": 5,
+        "acertouParede": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 28.6,
+          "p95Ms": 57.7,
+          "mediaMs": 34.14,
+          "minMs": 26.7,
+          "maxMs": 57.7
+        }
+      },
+      "edicaoParede": {
+        "edicoes": 5,
+        "confirmadasNoStore": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 41.9,
+          "p95Ms": 82.1,
+          "mediaMs": 50.8,
+          "minMs": 29.1,
+          "maxMs": 82.1
+        }
+      },
+      "portaNaParede": {
+        "inseridas": 3,
+        "tempo": {
+          "n": 3,
+          "medianaMs": 212,
+          "p95Ms": 214,
+          "mediaMs": 210.77,
+          "minMs": 206.3,
+          "maxMs": 214
+        }
+      },
+      "janelaNaParede": {
+        "inseridas": 2,
+        "tempo": {
+          "n": 2,
+          "medianaMs": 202.3,
+          "p95Ms": 206.6,
+          "mediaMs": 204.45,
+          "minMs": 202.3,
+          "maxMs": 206.6
+        }
+      },
+      "paredeNova": {
+        "criadas": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 21.2,
+          "p95Ms": 25,
+          "mediaMs": 22.04,
+          "minMs": 20.2,
+          "maxMs": 25
+        }
+      },
+      "pan": {
+        "n": 300,
+        "medianaMs": 20.3,
+        "p95Ms": 21.5,
+        "mediaMs": 20.2,
+        "minMs": 9.8,
+        "maxMs": 40.6
+      },
+      "zoom": {
+        "n": 150,
+        "medianaMs": 16.5,
+        "p95Ms": 16.9,
+        "mediaMs": 16.51,
+        "minMs": 14.5,
+        "maxMs": 17.5
+      },
+      "pick3D": {
+        "cliques": 20,
+        "tempo": {
+          "n": 20,
+          "medianaMs": 58.4,
+          "p95Ms": 81.9,
+          "mediaMs": 60.49,
+          "minMs": 35,
+          "maxMs": 84.2
+        }
+      }
+    },
+    "20Pavimentos": {
+      "pavimentos": 20,
+      "paredes": 640,
+      "abrirProjeto": {
+        "n": 5,
+        "medianaMs": 470.2,
+        "p95Ms": 486.9,
+        "mediaMs": 470.2,
+        "minMs": 446.9,
+        "maxMs": 486.9
+      },
+      "carregarPaginaAteAppPronto": {
+        "n": 5,
+        "medianaMs": 1835,
+        "p95Ms": 2004,
+        "mediaMs": 1836.6,
+        "minMs": 1733,
+        "maxMs": 2004
+      },
+      "primeiraPinturaFCP": {
+        "n": 5,
+        "medianaMs": 1164,
+        "p95Ms": 1320,
+        "mediaMs": 1174.4,
+        "minMs": 1096,
+        "maxMs": 1320
+      },
+      "plantaNivelDoMeio": {
+        "n": 5,
+        "medianaMs": 64.6,
+        "p95Ms": 502.6,
+        "mediaMs": 152.38,
+        "minMs": 64.3,
+        "maxMs": 502.6
+      },
+      "selecaoPorCliqueNaPlanta": {
+        "cliques": 5,
+        "acertouParede": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 32.8,
+          "p95Ms": 74.7,
+          "mediaMs": 40.84,
+          "minMs": 31.1,
+          "maxMs": 74.7
+        }
+      },
+      "edicaoParede": {
+        "edicoes": 5,
+        "confirmadasNoStore": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 67,
+          "p95Ms": 73.4,
+          "mediaMs": 61.94,
+          "minMs": 32.6,
+          "maxMs": 73.4
+        }
+      },
+      "portaNaParede": {
+        "inseridas": 3,
+        "tempo": {
+          "n": 3,
+          "medianaMs": 219.7,
+          "p95Ms": 232,
+          "mediaMs": 222.9,
+          "minMs": 217,
+          "maxMs": 232
+        }
+      },
+      "janelaNaParede": {
+        "inseridas": 2,
+        "tempo": {
+          "n": 2,
+          "medianaMs": 218.2,
+          "p95Ms": 228.9,
+          "mediaMs": 223.55,
+          "minMs": 218.2,
+          "maxMs": 228.9
+        }
+      },
+      "paredeNova": {
+        "criadas": 5,
+        "tempo": {
+          "n": 5,
+          "medianaMs": 25.6,
+          "p95Ms": 32.7,
+          "mediaMs": 26.9,
+          "minMs": 23.6,
+          "maxMs": 32.7
+        }
+      },
+      "pan": {
+        "n": 300,
+        "medianaMs": 20.3,
+        "p95Ms": 20.9,
+        "mediaMs": 20.24,
+        "minMs": 13.4,
+        "maxMs": 47.9
+      },
+      "zoom": {
+        "n": 150,
+        "medianaMs": 16.5,
+        "p95Ms": 16.7,
+        "mediaMs": 16.51,
+        "minMs": 16.1,
+        "maxMs": 17
+      },
+      "pick3D": {
+        "cliques": 20,
+        "tempo": {
+          "n": 20,
+          "medianaMs": 52.4,
+          "p95Ms": 63.3,
+          "mediaMs": 52.42,
+          "minMs": 32.8,
+          "maxMs": 65
+        }
+      }
+    }
+  },
+  "pendencias": [
+    "[10 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] door: só 3 de 5 inserções confirmadas pela contagem",
+    "[10 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[10 pav] window: só 2 de 5 inserções confirmadas pela contagem",
+    "[20 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] door: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] door: só 3 de 5 inserções confirmadas pela contagem",
+    "[20 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] window: o desfazer não restaurou a contagem de aberturas da parede",
+    "[20 pav] window: só 2 de 5 inserções confirmadas pela contagem"
+  ]
+}

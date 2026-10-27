@@ -170,17 +170,32 @@ export class ResolucaoProgressiva {
 
   /**
    * Põe um resultado já conhecido como pronto do nível (ex.: restaurado do cache de geometria na abertura). Não mexe no
-   * nível em voo nem no calculado na hora. Devolve false se não coube (nível em voo, já pronto ou calculado).
+   * nível calculado na hora. Devolve false se não coube (já pronto ou calculado).
    */
   semear(id: Id, valor: ResolvedLevel): boolean {
-    if (!this.projeto || this.voo?.nivel === id || this.sincronos.has(id) || this.prontos.get(id)?.nivel) return false;
-    const e: Pronto = this.prontos.get(id) ?? {};
-    e.nivel = valor;
-    this.prontos.set(id, e);
-    this.anteriores.set(id, { versao: this.versaoProjeto, valor });
+    return this.semearVarios([[id, valor]]) > 0;
+  }
+
+  /**
+   * Põe vários resultados já conhecidos como prontos de uma vez (a abertura restaura todos os níveis do cache numa leitura
+   * só). Um pedido em curso de um nível semeado é cancelado: o cache chegou antes. Devolve quantos níveis entraram.
+   */
+  semearVarios(itens: ReadonlyArray<readonly [Id, ResolvedLevel]>): number {
+    if (!this.projeto) return 0;
+    let entraram = 0;
+    for (const [id, valor] of itens) {
+      if (this.sincronos.has(id) || this.prontos.get(id)?.nivel) continue;
+      const e: Pronto = this.prontos.get(id) ?? {};
+      e.nivel = valor;
+      this.prontos.set(id, e);
+      this.anteriores.set(id, { versao: this.versaoProjeto, valor });
+      entraram++;
+    }
+    if (entraram === 0) return 0;
+    if (this.voo && this.prontos.get(this.voo.nivel)?.nivel) this.cancelarVoo();
     this.versaoResolucao++;
     this.avisar();
-    return true;
+    return entraram;
   }
 
   /** Junções de um nível, se já estiverem prontas em segundo plano (senão `null`). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LevelResolveCache } from '@hestia/engine';
+import { LevelResolveCache, type ResolvedLevel } from '@hestia/engine';
 import { ClienteResolucao } from '@hestia/engine/src/worker/cliente.ts';
 import { executarResolucao } from '@hestia/engine/src/worker/executor.ts';
 import { projetoComPavimentos } from '@hestia/engine/src/worker/fixturePavimentos.ts';
@@ -146,5 +146,37 @@ describe('ResolucaoProgressiva.semear', () => {
     const sincrono = new LevelResolveCache();
     r.resolvido('pav_0', () => sincrono.get(p, 'pav_0'));
     expect(r.semear('pav_0', sincrono.get(p, 'pav_0'))).toBe(false);
+  });
+
+  it('semear um nível com pedido em curso cancela o pedido: o cache chegou antes', async () => {
+    const p = projetoComPavimentos(3);
+    const cliente = new Gravador({ usarWorker: true, criarWorker: () => criarWorkerSimulado() });
+    const r = new ResolucaoProgressiva({ cliente });
+    r.abrir(p);
+    await esperarAte(() => cliente.log.length === 1);
+    const valor = new LevelResolveCache().get(p, 'pav_0');
+    expect(r.semear('pav_0', valor)).toBe(true);
+    expect(r.nivelPronto('pav_0')).toBe(valor);
+    // A fila segue: o pedido do nível semeado não se repete (o que falta dele são as junções).
+    await esperarAte(() => cliente.log.includes('juncoes:pav_0'));
+    expect(cliente.log.filter((s) => s === 'patchNivel:pav_0')).toHaveLength(1);
+  });
+
+  it('semearVarios põe todos os níveis de uma vez, num lote só, sem pedir de novo o nível', async () => {
+    const p = projetoComPavimentos(3);
+    const cliente = new Gravador({ usarWorker: true, criarWorker: () => criarWorkerSimulado() });
+    const r = new ResolucaoProgressiva({ cliente });
+    r.abrir(p);
+    const sincrono = new LevelResolveCache();
+    const itens: [Id, ResolvedLevel][] = [
+      ['pav_0', sincrono.get(p, 'pav_0')],
+      ['pav_2', sincrono.get(p, 'pav_2')],
+    ];
+    expect(r.semearVarios(itens)).toBe(2);
+    expect(r.nivelPronto('pav_0')).toEqual(itens[0]![1]);
+    expect(r.nivelPronto('pav_2')).toEqual(itens[1]![1]);
+    expect(r.semearVarios(itens)).toBe(0); // já prontos: nada entra de novo
+    await esperarAte(() => r.juncoes('pav_2') !== null);
+    expect(cliente.log.filter((s) => s === 'patchNivel:pav_0' || s === 'patchNivel:pav_2')).toHaveLength(0);
   });
 });

@@ -9,6 +9,8 @@ export interface ArmazenamentoGeometria {
   ler(chave: string): Promise<string | null>;
   gravar(chave: string, texto: string): Promise<boolean>;
   apagar(chave: string): Promise<void>;
+  /** Lê várias chaves de uma vez (o IndexedDB faz numa transação). Opcional: sem ela, o cache lê uma a uma. */
+  lerVarios?(chaves: readonly string[]): Promise<(string | null)[]>;
 }
 
 /** Armazenamento só em memória (Map). Reserva do IndexedDB e base do teste. */
@@ -17,6 +19,9 @@ export function criarArmazenamentoMemoria(): ArmazenamentoGeometria {
   return {
     async ler(chave) {
       return mapa.get(chave) ?? null;
+    },
+    async lerVarios(chaves) {
+      return chaves.map((c) => mapa.get(c) ?? null);
     },
     async gravar(chave, texto) {
       mapa.set(chave, texto);
@@ -69,6 +74,23 @@ export function criarArmazenamentoIndexedDB(nome = 'hestia-geometria', loja = 'n
       } catch {
         quebrar();
         return null;
+      }
+    },
+    async lerVarios(chaves) {
+      if (quebrou) return reserva.lerVarios!(chaves);
+      try {
+        const db = await abrir();
+        return await new Promise<(string | null)[]>((resolve, reject) => {
+          const tx = db.transaction(loja, 'readonly');
+          const st = tx.objectStore(loja);
+          const pedidos = chaves.map((c) => st.get(c));
+          tx.oncomplete = () => resolve(pedidos.map((r) => (typeof r.result === 'string' ? r.result : null)));
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
+        });
+      } catch {
+        quebrar();
+        return reserva.lerVarios!(chaves);
       }
     },
     async gravar(chave, texto) {
@@ -257,7 +279,8 @@ export interface OpcoesCacheGeometria {
 export class CacheGeometria {
   private readonly indice: IndiceLru;
   private readonly armazenamento: ArmazenamentoGeometria;
-  private carregado: Promise<void> | null = null;
+  private carregando: Promise<void> | null = null;
+  private indiceLido = false;
 
   constructor(opcoes: OpcoesCacheGeometria) {
     this.indice = new IndiceLru(opcoes.tetoBytes);
@@ -272,17 +295,29 @@ export class CacheGeometria {
     return this.indice.quantidade;
   }
 
+  /** Verdadeiro depois que o índice persistido foi lido: as leituras seguintes não esperam a abertura do armazenamento. */
+  get carregado(): boolean {
+    return this.indiceLido;
+  }
+
+  /** Lê o índice agora (a abertura pode chamar antes, para a primeira leitura não esperar). Nunca lança. */
+  preparar(): Promise<void> {
+    return this.carregar();
+  }
+
   /** Lê o índice persistido uma vez. Índice ilegível começa vazio. */
   private carregar(): Promise<void> {
-    this.carregado ??= (async () => {
+    this.carregando ??= (async () => {
       try {
         const texto = await this.armazenamento.ler(CHAVE_INDICE);
         if (texto) this.indice.importar(JSON.parse(texto));
       } catch {
         /* índice ilegível ou armazenamento indisponível: começa vazio */
+      } finally {
+        this.indiceLido = true;
       }
     })();
-    return this.carregado;
+    return this.carregando;
   }
 
   private async salvarIndice(): Promise<void> {
@@ -310,6 +345,40 @@ export class CacheGeometria {
       await this.descartar(chave);
       return { achou: false };
     }
+  }
+
+  /**
+   * Versão de `obter` para várias chaves: uma transação no IndexedDB em vez de uma por chave (a abertura lê todos os níveis
+   * de uma vez). Uma leitura que falha vale "não achei"; a chave sai do índice.
+   */
+  async obterVarios(chaves: readonly string[]): Promise<({ achou: true; valor: unknown } | { achou: false })[]> {
+    await this.carregar();
+    let textos: (string | null)[];
+    try {
+      textos = this.armazenamento.lerVarios
+        ? await this.armazenamento.lerVarios(chaves)
+        : await Promise.all(chaves.map((c) => this.armazenamento.ler(c)));
+    } catch {
+      textos = chaves.map(() => null);
+    }
+    const resultados: ({ achou: true; valor: unknown } | { achou: false })[] = [];
+    chaves.forEach((chave, i) => {
+      const texto = textos[i];
+      if (texto === null || texto === undefined) {
+        this.indice.remover(chave);
+        resultados.push({ achou: false });
+        return;
+      }
+      try {
+        const valor: unknown = JSON.parse(texto);
+        this.indice.tocar(chave);
+        resultados.push({ achou: true, valor });
+      } catch {
+        void this.descartar(chave);
+        resultados.push({ achou: false });
+      }
+    });
+    return resultados;
   }
 
   /**

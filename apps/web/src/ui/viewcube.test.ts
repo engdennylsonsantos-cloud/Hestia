@@ -52,7 +52,7 @@ describe('zonas do ViewCube', () => {
 
   it('rótulos em pt-BR nas faces; nomes de vista para qualquer zona', () => {
     const labels = CUBE_ZONES.filter((z) => z.kind === 'face').map((z) => z.label).sort();
-    expect(labels).toEqual(['BASE', 'DIREITA', 'ESQUERDA', 'FRENTE', 'TOPO', 'TRASEIRA']);
+    expect(labels).toEqual(['DIREITA', 'ESQUERDA', 'FRONTAL', 'INFERIOR', 'POSTERIOR', 'SUPERIOR']);
     expect(zoneById('front').name).toBe('Vista de frente');
     expect(zoneById('front-right').name).toBe('Vista de frente e direita');
     expect(zoneById('top-front-right').name).toBe('Vista de topo, frente e direita');

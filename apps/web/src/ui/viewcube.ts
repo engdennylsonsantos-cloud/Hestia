@@ -2,7 +2,7 @@ import { POLE_ELEVATION, cameraBasis } from '@hestia/render';
 
 /**
  * Lógica do ViewCube (cubo de navegação da vista 3D), sem DOM. Convenção dos eixos do app: x leste, y norte, z para
- * cima. FRENTE é a face sul (a câmera olha de sul para norte); DIREITA é a face leste; TRASEIRA, a norte; ESQUERDA, a oeste.
+ * cima. FRONTAL é a face sul (a câmera olha de sul para norte); DIREITA é a face leste; POSTERIOR, a norte; ESQUERDA, a oeste.
  */
 
 /** Sinais de uma zona nos eixos (x, y, z), cada um em {−1, 0, 1}. Zero = a zona não está nesse eixo. */
@@ -32,11 +32,12 @@ const FACE_NAME: Record<Face, string> = {
   right: 'direita',
   left: 'esquerda',
 };
+/** Rótulos visíveis das faces, iguais aos do Revit em pt-BR. Para trocar o texto, mude só aqui. */
 const FACE_LABEL: Record<Face, string> = {
-  top: 'TOPO',
-  bottom: 'BASE',
-  front: 'FRENTE',
-  back: 'TRASEIRA',
+  top: 'SUPERIOR',
+  bottom: 'INFERIOR',
+  front: 'FRONTAL',
+  back: 'POSTERIOR',
   right: 'DIREITA',
   left: 'ESQUERDA',
 };

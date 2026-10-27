@@ -1,6 +1,6 @@
 // ViewCube com anel de bússola (vista 3D do "Casa premium"). Salva capturas do cubo em três poses (padrão, de cima e de
 // lado) nos dois temas, e uma com o cursor sobre uma célula. Afirma que clicar numa letra do anel muda o azimute para o
-// dela (mantendo a elevação) e que clicar na face FRENTE ainda leva à vista frontal. Não compara pixels.
+// dela (mantendo a elevação) e que clicar na face FRONTAL ainda leva à vista frontal. Não compara pixels.
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { launch, openApp } from './helpers.mjs';
@@ -122,7 +122,7 @@ await setPose(POSES[0]);
   } else check('letra S do anel está do lado da câmera na vista padrão', false);
 }
 
-// Clicar na face FRENTE (o centro da face, que tem pointer-events: none, então o clique cai no palco) leva à vista frontal.
+// Clicar na face FRONTAL (o centro da face, que tem pointer-events: none, então o clique cai no palco) leva à vista frontal.
 // Na vista padrão a frente está voltada para a câmera (numa vista de costas, o clique cairia na aresta visível).
 await setPose(POSES[0]);
 {
@@ -131,7 +131,7 @@ await setPose(POSES[0]);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
   await reach(-Math.PI / 2, 0);
   const after = await camera();
-  check('clicar em FRENTE leva à vista frontal (azimute -90°, elevação 0)', Math.abs(angleDiff(after.azimuth, -Math.PI / 2)) < 0.02 && Math.abs(after.elevation) < 0.02, `(az=${after.azimuth.toFixed(3)}, el=${after.elevation.toFixed(3)})`);
+  check('clicar em FRONTAL leva à vista frontal (azimute -90°, elevação 0)',Math.abs(angleDiff(after.azimuth, -Math.PI / 2)) < 0.02 && Math.abs(after.elevation) < 0.02, `(az=${after.azimuth.toFixed(3)}, el=${after.elevation.toFixed(3)})`);
 }
 
 // Arrastar sobre o anel gira o azimute e não muda a elevação.

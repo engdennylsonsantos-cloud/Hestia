@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { resolveLevel } from '@hestia/engine';
+import { buildOpeningModel, frameOfWall, openingGeometry, resolveLevel } from '@hestia/engine';
 import { DEFAULT_OPENING_TYPES, type OpeningType, type Project } from '@hestia/model';
 import { buildLevelSolids, type ElementRange, type ModelScene } from '@hestia/render';
-import { PREVIEW_WALL_ID, previewProject } from './previewProject.ts';
+import { PREVIEW_WALL_ID, previewOpening, previewProject } from './previewProject.ts';
 import { buildPreviewScene, previewScene } from './previewScene.ts';
 
 const tipo = (id: string): OpeningType => DEFAULT_OPENING_TYPES.find((t) => t.id === id)!;
@@ -46,6 +46,22 @@ describe('cena 3D da prévia', () => {
     expect(paredes).toHaveLength(lotes.length);
     const ids = new Set(paredes.flatMap((m) => (m.userData.ranges as ElementRange[]).map((r) => r.id)));
     expect([...ids]).toEqual([PREVIEW_WALL_ID]);
+    scene.dispose();
+  });
+
+  it('a prévia 3D usa o caminho de montagem (sem instâncias): as peças são exatamente as do modelo único', () => {
+    const p = previewProject(tipo('ot_p90'));
+    const scene = buildPreviewScene(p, 'lines');
+    let instanciadas = 0;
+    scene.scene.traverse((o) => {
+      if (o instanceof THREE.InstancedMesh) instanciadas++;
+    });
+    expect(instanciadas).toBe(0);
+    const opening = previewOpening(p)!;
+    const f = frameOfWall(p, PREVIEW_WALL_ID)!;
+    const model = buildOpeningModel(p, opening, openingGeometry(p, opening, f), f);
+    // Uma faixa por peça; a peça com seção (batente em L) entra por este mesmo caminho quando o motor a produzir.
+    expect(pecasDe(scene, 'door')).toBe(model.parts.length);
     scene.dispose();
   });
 

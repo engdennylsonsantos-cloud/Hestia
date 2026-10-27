@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { quantifyRoofs, ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { FUNCTION_LABEL, roofTypeThickness, type Id, type Roof, type RoofShape } from '@hestia/model';
 import { defaultExtrusionProfile } from '@hestia/engine';
-import { roofPresetOf, roofShapePatch, roofSlopeError, roofSlopeFromDegField, percentToDeg } from '@hestia/tools';
+import { roofPresetOf, roofShapePatch, roofSlopeError, roofSlopeFromDegField, percentToDeg, roofToFreePatch } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
@@ -91,7 +91,11 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
     editor.store.transaction('Forma do telhado', () => {
       for (const r of roofs) {
         // Por extrusão: começa com o perfil padrão (arco de 1 m) se o telhado ainda não tem um; a água é conferida pelo motor.
-        const next: Partial<Roof> = v === 'extrusion' ? { shape: 'extrusion', profile: r.profile.length >= 2 ? r.profile : defaultExtrusionProfile(r.boundary, r.dir) } : roofShapePatch(r, v);
+        // Águas livres preserva as águas atuais (quatro águas viram quatro planos); a conversão simples perderia as cotas.
+        const next: Partial<Roof> =
+          v === 'extrusion' ? { shape: 'extrusion', profile: r.profile.length >= 2 ? r.profile : defaultExtrusionProfile(r.boundary, r.dir) }
+          : v === 'free' ? roofToFreePatch(r)
+          : roofShapePatch(r, v);
         if (Object.keys(next).length) patch([r.id], next);
       }
     });

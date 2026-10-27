@@ -49,8 +49,9 @@ function edgeProblems(r: Roof, name: string): ValidationIssue[] {
     }
   }
   if (r.shape !== 'edges') return out;
+  // Sem nenhuma aresta com inclinação o telhado é plano (como no Revit): aviso, não erro.
   if (!r.edgeSlopes.some((s) => s !== null && s !== undefined)) {
-    push('roof-all-flat', `Telhado ${name} é por arestas e nenhuma aresta define inclinação: sem água não há telhado.`);
+    out.push({ severity: 'warning', code: 'roof-all-flat', message: `Telhado ${name} é plano: nenhuma aresta define inclinação; a água fica na cota do beiral.`, elementId: r.id });
   }
   r.edgeSlopes.forEach((s, i) => {
     if (s === null || s === undefined) return;

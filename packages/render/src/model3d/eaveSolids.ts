@@ -66,7 +66,8 @@ function piecesOf(r: ResolvedRoof): Piece[] {
         const nIn = vscale(left, s);
         const plane = r.planes.find((pl) => pointInMulti(vadd(m, vscale(nIn, EPS_IN)), pl.polygon));
         if (plane) {
-          const descends = vdot(gradOf(plane), vscale(nIn, -1)) < -1e-9;
+          // Água plana (inclinação 0) também é beiral: a cota não sobe nem desce, então não é empena.
+          const descends = plane.percent === 0 || vdot(gradOf(plane), vscale(nIn, -1)) < -1e-9;
           return { a: l.a, b: l.b, t, nIn, plane: descends ? plane : null };
         }
       }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { roofsOnLevel, type Project, type ProjectStore, type Roof } from '@hestia/model';
-import { resolveRoofs } from '@hestia/engine';
+import { resolveRoofs, roofTopAt } from '@hestia/engine';
 import { roofProblem, roofPatchProblem } from './roofCheck.ts';
 import { commitPerimeter } from './perimeterCommit.ts';
 import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
@@ -37,19 +37,32 @@ function criar(store: ProjectStore, segs: NewSeg[], opts: CommitPerimeterOptions
 }
 
 describe('telhado nunca some (A12): criação', () => {
-  it('L com todas as arestas sem inclinação: não cria e diz o motivo', () => {
+  it('L com todas as arestas sem inclinação: telhado plano, aceito (sem recusa)', () => {
     const ctx = makeEnv();
     const r = { ...roofBase(), boundary: L, edgeSlopes: L.map(() => null), shape: 'edges' as const };
-    expect(roofProblem(ctx.store.project, [{ ...r, order: 0 }])).toMatch(/nenhuma aresta define inclinação/);
+    expect(roofProblem(ctx.store.project, [{ ...r, order: 0 }])).toBeNull();
   });
 
-  it('L com duas águas: o esqueleto não fecha nos cantos reentrantes, então avisa e não cria', () => {
+  it('L com duas águas (só as arestas paralelas ao eixo x definem): a envoltória fecha e cria', () => {
     const ctx = makeEnv();
-    // Só as arestas paralelas ao eixo x definem inclinação (as verticais ficam sem).
+    // Só as arestas paralelas ao eixo x definem inclinação (as verticais ficam sem): antes o esqueleto não fechava.
     const r = criar(ctx.store, sidesOf(L), {}, [1, 3, 5]);
-    expect(r.ok).toBe(false);
-    expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(r.message).toMatch(/não fecha .*degrau.*define inclinação/);
+    expect(r.ok).toBe(true);
+    expect(roofs(ctx.store.project)).toHaveLength(1);
+    expect(resolveRoofs(ctx.store.project, 'lv_0')[0]!.problem).toBeUndefined();
+  });
+
+  it('L com os dois lados internos sem inclinação (Revit): cria pelo perímetro e a cota confere', () => {
+    // Lados 2 e 3 do esboço são os internos do L (o degrau de 4 × 2 do canto). Sem balanço (overhang 0), a água sobe 30 %
+    // da distância ao lado de fora mais próximo: em (1; 1) e (4; 1) a cota é 0,3 m acima do beiral.
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf(L), { overhang: 0 }, [2, 3]);
+    expect(r.ok).toBe(true);
+    const [roof] = resolveRoofs(ctx.store.project, 'lv_0');
+    expect(roof!.problem).toBeUndefined();
+    expect(roof!.steps).toBeUndefined();
+    expect(roofTopAt(roof!, { x: 1, y: 1 })! - roof!.eaveZ).toBeCloseTo(0.3, 6);
+    expect(roofTopAt(roof!, { x: 4, y: 1 })! - roof!.eaveZ).toBeCloseTo(0.3, 6);
   });
 
   it('L com quatro águas (todas as arestas definem): cria com 6 águas', () => {
@@ -71,14 +84,12 @@ describe('telhado nunca some (A12): criação', () => {
 });
 
 describe('telhado nunca some (A12): edição', () => {
-  it('alterar a aresta que deixaria o telhado sem águas não aplica', () => {
+  it('alterar a aresta que deixaria o telhado sem inclinação é aceito: vira plano, sem recusa', () => {
     const ctx = makeEnv();
     criar(ctx.store, sidesOf(retangulo(8, 6)), {}, [1, 3]);
     const id = roofs(ctx.store.project)[0]!.id;
-    const before = roofs(ctx.store.project)[0]!.edgeSlopes;
-    expect(roofPatchProblem(ctx.store.project, [id], { edgeSlopes: [null, null, null, null] })).toMatch(/nenhuma aresta/);
+    expect(roofPatchProblem(ctx.store.project, [id], { edgeSlopes: [null, null, null, null] })).toBeNull();
     expect(roofPatchProblem(ctx.store.project, [id], { mark: 'A-1' })).toBeNull();
-    expect(roofs(ctx.store.project)[0]!.edgeSlopes).toEqual(before);
   });
 });
 

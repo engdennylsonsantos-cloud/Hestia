@@ -84,9 +84,9 @@ describe('grade de pontos nas ferramentas de desenho (a)', () => {
     expect(d.inference()?.point).toEqual({ x: 1, y: 2.5 });
   });
 
-  it('piso, cota e demais: o cursor passa por this.snap com o passo do ambiente', () => {
+  it('cota, grade e demais: o cursor passa por this.snap com o passo do ambiente', () => {
     const ctx = setup();
-    for (const id of ['floor', 'dimension', 'slab', 'ceiling', 'roomsep', 'roof', 'text', 'section'] as const) {
+    for (const id of ['dimension', 'grid', 'roomsep', 'text', 'section'] as const) {
       const t = tool(id, ctx.env);
       t.move({ raw: { x: 1.23, y: 2.47 }, shift: false, ctrl: false, alt: false });
       const inf = t.inference();

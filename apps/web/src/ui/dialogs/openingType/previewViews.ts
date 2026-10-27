@@ -1,6 +1,6 @@
-import { computeSection, frameOfWall, openingGeometry, resolveLevel, type OpeningGeometry, type SectionLine, type SectionResult } from '@hestia/engine';
+import { buildOpeningModel, computeSection, frameOfWall, openingGeometry, resolveLevel, type OpeningGeometry, type OpeningModel, type SectionLine, type SectionResult } from '@hestia/engine';
 import { buildPlanDrawList, buildSectionDrawList, DARK, LIGHT, sectionBox, type PlanDrawList, type PlanTheme } from '@hestia/render';
-import { openingAngle2d, type Opening, type OpeningLineConvention, type OpeningType, type Project } from '@hestia/model';
+import { openingAngle2d, openingDetail2d, type Opening, type OpeningLineConvention, type OpeningType, type Project } from '@hestia/model';
 import { drawListToSvg, expandDrawBox, type DrawBox } from './drawListToSvg.ts';
 import { previewOpening, previewProject, previewWall } from './previewProject.ts';
 
@@ -25,10 +25,23 @@ export interface PreviewDraw {
   svg: string;
 }
 
-const MARGIN = 0.5;
+/** Margens de enquadramento (m): a planta abre espaço para o arco; a elevação mostra um pouco do piso. */
+const MARGIN_PLAN = 0.6;
+const MARGIN_ELEVATION = 0.3;
+const MARGIN_SECTION = 0.5;
+
+/** Folga horizontal dos detalhes do corte em volta da espessura da parede (m), para eles ficarem ampliados. */
+const DETAIL_SIDE_MARGIN = 0.12;
+const DETAIL_SILL_SIDE_MARGIN = 0.18;
 
 const themeOf = (dark: boolean): PlanTheme => (dark ? DARK : LIGHT);
 const clampAngle = (angle: number): number => Math.max(0, Math.min(120, angle));
+
+/** Detalhe efetivo da planta da prévia: em `'scale'` a prévia é ampliada, então usa o desenho alto (folha aberta e fechada). */
+export function previewPlanDetail(type: Pick<OpeningType, 'detail2d'>): 'low' | 'mid' | 'high' | 'off' {
+  const detail = openingDetail2d(type);
+  return detail === 'scale' ? 'high' : detail;
+}
 
 /** Projeto com o tipo de prévia trocado no catálogo (para o plano usar o detalhe e o ângulo do diálogo). */
 function withType(p: Project, type: OpeningType): Project {
@@ -41,31 +54,35 @@ function withSettings(p: Project, options: PreviewViewOptions): Project {
   return { ...p, settings: { ...p.settings, openingLine: options.openingLine } };
 }
 
-function openingOf(p: Project): { opening: Opening; geometry: OpeningGeometry } | null {
+function openingOf(p: Project): { opening: Opening; geometry: OpeningGeometry; model: OpeningModel } | null {
   const opening = previewOpening(p);
   if (!opening) return null;
   const frame = frameOfWall(p, opening.hostId);
   if (!frame) return null;
-  return { opening, geometry: openingGeometry(p, opening, frame) };
+  const geometry = openingGeometry(p, opening, frame);
+  return { opening, geometry, model: buildOpeningModel(p, opening, geometry, frame) };
 }
 
-/** Caixa do vão no mundo, com a margem de 0,5 m em volta da largura e da espessura. */
-function planBox(p: Project, margin = MARGIN): DrawBox {
+/**
+ * Caixa do vão no mundo: a largura, a espessura e o alcance do arco da folha aberta (raio do modelo único), com 0,6 m
+ * de margem. É o enquadramento pedido para a planta ampliada da prévia.
+ */
+function planBox(p: Project, margin = MARGIN_PLAN): DrawBox {
   const found = openingOf(p);
   if (!found) return { minX: -1, minY: -1, maxX: 1, maxY: 1 };
-  const { geometry: g } = found;
+  const { geometry: g, model } = found;
+  const reach = Math.max(g.thickness / 2, ...model.openings.map((o) => o.radius));
   return {
     minX: g.center.x - g.width / 2 - margin,
     maxX: g.center.x + g.width / 2 + margin,
-    minY: g.center.y - g.thickness / 2 - margin,
-    maxY: g.center.y + g.thickness / 2 + margin,
+    minY: g.center.y - reach - margin,
+    maxY: g.center.y + reach + margin,
   };
 }
 
-/** Tipo para o plano: `detail2d` efetivo (em `'scale'` usa o médio) e o `angle2d` do controle. */
+/** Tipo para o plano: o detalhe efetivo da prévia e o `angle2d` do controle. */
 function planType(type: OpeningType, angle: number | undefined): OpeningType {
-  const detail = type.detail2d && type.detail2d !== 'scale' ? type.detail2d : 'mid';
-  return { ...type, detail2d: detail, angle2d: clampAngle(angle ?? openingAngle2d(type)) };
+  return { ...type, detail2d: previewPlanDetail(type), angle2d: clampAngle(angle ?? openingAngle2d(type)) };
 }
 
 /**
@@ -110,36 +127,47 @@ function crossLine(p: Project): SectionLine {
   return { a: { x, y: -1 }, b: { x, y: 1 }, depth: 2 };
 }
 
-/** Caixa da vista de seção em (distância ao longo da linha, cota), com a margem de 0,5 m. */
-function sectionViewBox(section: SectionResult, cut: boolean): DrawBox {
+/** Caixa da vista de seção em (distância ao longo da linha, cota), com a margem dada. */
+function sectionViewBox(section: SectionResult, cut: boolean, margin: number): DrawBox {
   const opening = section.openings[0];
   if (!opening) {
     const b = sectionBox(section);
-    return expandDrawBox(b, MARGIN);
+    return expandDrawBox(b, margin);
   }
   const cx = (opening.t0 + opening.t1) / 2;
   const span = cut ? opening.model.thickness : opening.model.width;
   return {
-    minX: cx - span / 2 - MARGIN,
-    maxX: cx + span / 2 + MARGIN,
-    minY: opening.z0 - MARGIN,
-    maxY: opening.z1 + MARGIN,
+    minX: cx - span / 2 - margin,
+    maxX: cx + span / 2 + margin,
+    minY: opening.z0 - margin,
+    maxY: opening.z1 + margin,
   };
 }
 
-function sectionDraw(type: OpeningType, cut: boolean, options: PreviewViewOptions): { drawList: PlanDrawList; box: DrawBox } {
-  const p = withSettings(previewProject(type, options.flipHand ?? false, options.flipFacing ?? false), options);
-  const section = computeSection(p, cut ? crossLine(p) : elevationLine(p));
+interface SectionPreviewScene {
+  section: SectionResult;
+  drawList: PlanDrawList;
+}
+
+/** Cena da seção da prévia: o projeto mínimo, o resultado do motor e a lista de desenho do render. */
+function sectionScene(type: OpeningType, cut: boolean, options: PreviewViewOptions): SectionPreviewScene {
+  const project = withSettings(previewProject(type, options.flipHand ?? false, options.flipFacing ?? false), options);
+  const section = computeSection(project, cut ? crossLine(project) : elevationLine(project));
   const dark = options.dark ?? false;
   const drawList = buildSectionDrawList({
-    project: p,
+    project,
     section,
     viewport: { cx: 0, cy: 1.5, zoom: 100, width: 800, height: 600 },
     theme: themeOf(dark),
     dark,
     showGrid: false,
   });
-  return { drawList, box: sectionViewBox(section, cut) };
+  return { section, drawList };
+}
+
+function sectionDraw(type: OpeningType, cut: boolean, options: PreviewViewOptions): { drawList: PlanDrawList; box: DrawBox } {
+  const scene = sectionScene(type, cut, options);
+  return { drawList: scene.drawList, box: sectionViewBox(scene.section, cut, cut ? MARGIN_SECTION : MARGIN_ELEVATION) };
 }
 
 /** Lista de desenho da elevação pelo pipeline de seção (`engine/section` + `render/section`). */
@@ -150,6 +178,63 @@ export function previewElevationDrawList(type: OpeningType, options: PreviewView
 /** Lista de desenho do corte transversal pelo pipeline de seção, com a linha passando no centro do vão. */
 export function previewSectionDrawList(type: OpeningType, options: PreviewViewOptions = {}): { drawList: PlanDrawList; box: DrawBox } {
   return sectionDraw(type, true, options);
+}
+
+/** Quadro do corte da prévia: o corte inteiro e os detalhes ampliados da cabeça e da soleira. */
+export interface PreviewSectionFrame {
+  id: 'full' | 'head' | 'sill';
+  title: string;
+  drawList: PlanDrawList;
+  box: DrawBox;
+  svg: string;
+}
+
+/** Caixa do detalhe da cabeça: `H − 0,40` a `H + 0,35` em volta da espessura da parede. */
+function headBox(section: SectionResult): DrawBox | null {
+  const opening = section.openings[0];
+  if (!opening) return null;
+  const cx = (opening.t0 + opening.t1) / 2;
+  const half = opening.model.thickness / 2 + DETAIL_SIDE_MARGIN;
+  return {
+    minX: cx - half,
+    maxX: cx + half,
+    minY: opening.z0 + opening.model.height - 0.4,
+    maxY: opening.z0 + opening.model.height + 0.35,
+  };
+}
+
+/** Caixa do detalhe da soleira: porta de −0,15 a +0,35; janela de −0,35 a +0,35 (peitoril, soleira e contraverga). */
+function sillBox(section: SectionResult, kind: OpeningType['kind']): DrawBox | null {
+  const opening = section.openings[0];
+  if (!opening) return null;
+  const cx = (opening.t0 + opening.t1) / 2;
+  const half = opening.model.thickness / 2 + DETAIL_SILL_SIDE_MARGIN;
+  const below = kind === 'door' ? 0.15 : 0.35;
+  return {
+    minX: cx - half,
+    maxX: cx + half,
+    minY: opening.z0 - below,
+    maxY: opening.z0 + 0.35,
+  };
+}
+
+/**
+ * Os três quadros do corte transversal da prévia, todos desenhados pelo pipeline do projeto: o corte inteiro (pequeno)
+ * e dois detalhes ampliados, "Cabeça" e "Soleira". Cada quadro tem o seu enquadramento e o seu SVG.
+ */
+export function previewSectionFrames(type: OpeningType, options: PreviewViewOptions = {}): PreviewSectionFrame[] {
+  const scene = sectionScene(type, true, options);
+  const full = sectionViewBox(scene.section, true, MARGIN_SECTION);
+  const head = headBox(scene.section) ?? full;
+  const sill = sillBox(scene.section, type.kind) ?? full;
+  const frame = (id: PreviewSectionFrame['id'], title: string, box: DrawBox): PreviewSectionFrame => ({
+    id,
+    title,
+    drawList: scene.drawList,
+    box,
+    svg: svgOf(scene.drawList, box, options, title),
+  });
+  return [frame('full', 'Corte', full), frame('head', 'Cabeça', head), frame('sill', 'Soleira', sill)];
 }
 
 function svgOf(drawList: PlanDrawList, box: DrawBox, options: PreviewViewOptions, title: string): string {

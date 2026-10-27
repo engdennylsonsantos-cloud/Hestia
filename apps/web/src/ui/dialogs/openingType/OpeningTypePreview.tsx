@@ -4,7 +4,7 @@ import type { OpeningCheck } from '@hestia/engine';
 import type { OpeningLineConvention, OpeningType } from '@hestia/model';
 import { NumField } from '../../fields.tsx';
 import { Preview3D } from './Preview3D.tsx';
-import { previewElevationSvg, previewPlanSvg, previewSectionSvg } from './previewViews.ts';
+import { previewElevationSvg, previewPlanSvg, previewSectionFrames } from './previewViews.ts';
 
 export type PreviewTab = 'plan' | 'elevation' | 'section' | 'lines3d' | 'shaded3d';
 
@@ -34,6 +34,10 @@ interface OpeningTypePreviewProps {
 /** Atraso do redesenho da prévia (ms): a digitação nos campos nunca espera o desenho. */
 const PREVIEW_DEBOUNCE_MS = 60;
 
+/** Tamanho interno dos SVGs da prévia: a área é 4:3 e ampliada (coluna de 460 px, altura mínima de 340 px). */
+const PREVIEW_W = 440;
+const PREVIEW_H = 330;
+
 /** SVG da prévia 2D pelo mesmo pipeline das vistas do projeto; erro no dado vira aviso, não quebra o diálogo. */
 function previewSvg(
   tab: PreviewTab,
@@ -44,9 +48,8 @@ function previewSvg(
   openingLine: OpeningLineConvention | undefined,
 ): string {
   try {
-    if (tab === 'plan') return previewPlanSvg(d, { flipHand, flipFacing, angle, openingLine, width: 420, height: 300 });
-    if (tab === 'section') return previewSectionSvg(d, { flipHand, flipFacing, openingLine, width: 420, height: 300 });
-    return previewElevationSvg(d, { flipHand, flipFacing, openingLine, width: 420, height: 300 });
+    if (tab === 'plan') return previewPlanSvg(d, { flipHand, flipFacing, angle, openingLine, width: PREVIEW_W, height: PREVIEW_H });
+    return previewElevationSvg(d, { flipHand, flipFacing, openingLine, width: PREVIEW_W, height: PREVIEW_H });
   } catch {
     return '';
   }
@@ -101,9 +104,24 @@ export function OpeningTypePreview({
   const is3d = tab === 'lines3d' || tab === 'shaded3d';
   const noWebgl = webglFailed || typeof document === 'undefined';
   const svg = useMemo(
-    () => (is3d ? '' : previewSvg(tab, debounced, flipHand, flipFacing, angle, openingLine)),
+    () => (is3d || tab === 'section' ? '' : previewSvg(tab, debounced, flipHand, flipFacing, angle, openingLine)),
     [debounced, tab, is3d, flipHand, flipFacing, angle, openingLine],
   );
+  // O corte vira três quadros (inteiro + cabeça + soleira), todos pelo pipeline de seção do projeto.
+  const sectionFrames = useMemo(() => {
+    if (tab !== 'section') return null;
+    try {
+      return previewSectionFrames(debounced, {
+        flipHand,
+        flipFacing,
+        openingLine,
+        width: PREVIEW_W,
+        height: PREVIEW_H,
+      });
+    } catch {
+      return null;
+    }
+  }, [debounced, tab, flipHand, flipFacing, openingLine]);
   return (
     <aside className="op-preview" aria-label="Pré-visualização do tipo">
       <div className="op-tabs" role="tablist" aria-label="Vistas da prévia">
@@ -136,8 +154,23 @@ export function OpeningTypePreview({
               active={is3d}
             />
           )
+        ) : tab === 'section' && sectionFrames ? (
+          <div className="op-section-frames">
+            <figure className="op-frame">
+              <div className="op-frame-svg" dangerouslySetInnerHTML={{ __html: sectionFrames[0]!.svg }} />
+              <figcaption>{sectionFrames[0]!.title}</figcaption>
+            </figure>
+            <div className="op-frame-details">
+              {sectionFrames.slice(1).map((f) => (
+                <figure key={f.id} className="op-frame">
+                  <div className="op-frame-svg" dangerouslySetInnerHTML={{ __html: f.svg }} />
+                  <figcaption>{f.title}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
         ) : svg ? (
-          <div style={{ width: '100%', height: '100%', minHeight: 190 }} dangerouslySetInnerHTML={{ __html: svg }} />
+          <div style={{ width: '100%', height: '100%', minHeight: 340 }} dangerouslySetInnerHTML={{ __html: svg }} />
         ) : (
           <div className="op-pv-soon">Prévia indisponível</div>
         )}

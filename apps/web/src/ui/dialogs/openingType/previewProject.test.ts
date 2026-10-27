@@ -36,15 +36,18 @@ describe('projeto mínimo da prévia', () => {
     expect(o.offset).toBeCloseTo(comprimento(p) / 2, 9);
   });
 
-  it('o comprimento é max(3,6; largura + 2,4) e a altura comporta o vão e o peitoril', () => {
-    expect(previewWallLength({ width: 0.9 })).toBeCloseTo(3.6, 9);
-    expect(previewWallLength({ width: 2.4 })).toBeCloseTo(4.8, 9);
+  it('a parede mede largura + 1,2 e altura + peitoril + 0,5 (enquadra a esquadria, não a parede do editor)', () => {
+    expect(previewWallLength({ width: 0.9 })).toBeCloseTo(2.1, 9);
+    expect(previewWallLength({ width: 2.4 })).toBeCloseTo(3.6, 9);
+    expect(previewWallHeight({ height: 2.1, sill: 0 })).toBeCloseTo(2.6, 9);
     const p = previewProject(tipo('ot_j240'));
-    expect(comprimento(p)).toBeCloseTo(4.8, 9);
+    expect(comprimento(p)).toBeCloseTo(3.6, 9);
     const j = tipo('ot_j120');
     const parede = previewWall(p)!;
-    expect(parede.height).toBe(previewWallHeight(j));
-    expect(parede.height).toBeGreaterThanOrEqual(j.sill + j.height);
+    expect(parede.height).toBeCloseTo(j.sill + j.height + 0.5, 9);
+    const porta = previewWall(previewProject(tipo('ot_p90')))!;
+    expect(comprimento(previewProject(tipo('ot_p90')))).toBeCloseTo(0.9 + 1.2, 9);
+    expect(porta.height).toBeCloseTo(2.1 + 0.5, 9);
   });
 
   it('preserva todos os campos v2 do rascunho no catálogo do projeto', () => {

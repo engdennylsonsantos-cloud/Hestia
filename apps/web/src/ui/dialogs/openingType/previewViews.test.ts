@@ -6,7 +6,10 @@ import {
   previewElevationDrawList,
   previewElevationSvg,
   previewMiniatureSvg,
+  previewPlanDetail,
+  previewPlanDrawList,
   previewPlanSvg,
+  previewSectionFrames,
   previewSectionSvg,
   previewTypeSignature,
 } from './previewViews.ts';
@@ -59,5 +62,43 @@ describe('prévias de planta, elevação e corte', () => {
     const b = previewMiniatureSvg({ ...d, name: 'Outro nome', cost: 999 });
     expect(a).toBe(b);
     expect(temDesenho(a)).toBe(true);
+  });
+
+  it('o corte devolve três quadros (inteiro, cabeça e soleira) com enquadramentos distintos, nos 23 tipos padrão', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(23);
+    for (const d of DEFAULT_OPENING_TYPES) {
+      const frames = previewSectionFrames(d);
+      expect(frames.map((f) => f.id)).toEqual(['full', 'head', 'sill']);
+      for (const f of frames) expect(temDesenho(f.svg), `${d.id}/${f.id}`).toBe(true);
+      expect(new Set(frames.map((f) => JSON.stringify(f.box))).size).toBe(3);
+    }
+  });
+
+  it('a planta enquadra o vão mais o arco com 0,6 m de margem', () => {
+    const { box } = previewPlanDrawList({ ...tipo('ot_p90'), detail2d: 'scale' });
+    // Parede de 0,9 + 1,2 = 2,1 m; o vão fica no centro, com 0,6 m até cada ponta.
+    expect(box.minX).toBeCloseTo(0, 6);
+    expect(box.maxX).toBeCloseTo(2.1, 6);
+    // A folha aberta alcança além da espessura da parede nos dois sentidos.
+    expect(box.minY).toBeLessThan(-0.6);
+    expect(box.maxY).toBeGreaterThan(0.6);
+  });
+
+  it('a elevação enquadra o vão com 0,3 m de margem', () => {
+    const d = tipo('ot_j120');
+    const { box } = previewElevationDrawList(d);
+    expect(box.minY).toBeCloseTo(d.sill - 0.3, 6);
+    expect(box.maxY).toBeCloseTo(d.sill + d.height + 0.3, 6);
+    expect(box.maxX - box.minX).toBeCloseTo(d.width + 0.6, 6);
+  });
+
+  it('a planta usa o detalhe alto em scale e respeita o detalhe fixo', () => {
+    expect(previewPlanDetail(tipo('ot_p90'))).toBe('high');
+    expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'scale' })).toBe('high');
+    expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'low' })).toBe('low');
+    expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'mid' })).toBe('mid');
+    const alto = previewPlanDrawList({ ...tipo('ot_p90'), detail2d: 'scale' });
+    const baixo = previewPlanDrawList({ ...tipo('ot_p90'), detail2d: 'low' });
+    expect(alto.drawList.strokes.length).toBeGreaterThan(baixo.drawList.strokes.length);
   });
 });

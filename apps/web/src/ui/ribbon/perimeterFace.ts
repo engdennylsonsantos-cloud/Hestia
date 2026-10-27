@@ -19,6 +19,9 @@ export function estadoNoEsboco(item: RibbonItem, ctx: RibbonCtx): FaceNoEsboco |
   const perim = ctx.perimetro;
   if (!perim) return null;
   if (item.kind === 'tool') {
+    // Selecionar não troca a ferramenta ativa (o perímetro segue aberto): mostra pressionado quando o esboço está no
+    // modo de seleção de linhas, que é o mesmo gesto de clique e caixa do resto do app.
+    if (item.tool === 'select') return { on: perim.selecting === true, disabled: false };
     const comando = COMANDO_DO_ESBOCO[item.tool];
     if (comando) return { on: perim.modify === comando, disabled: false };
     const motivo = SEM_ESBOCO[item.tool];

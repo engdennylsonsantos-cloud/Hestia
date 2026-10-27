@@ -3,7 +3,7 @@ import { createTool, type ToolEnv, type ToolId } from './index.ts';
 import { makeEnv } from './testEnv.ts';
 
 /**
- * Sem seleção, Girar/Espelhar/Matriz avisam e saem para Selecionar. Como no app, sair troca para Selecionar,
+ * Sem seleção, Rotacionar/Espelhar/Matriz avisam e saem para Selecionar. Como no app, sair troca para Selecionar,
  * que põe a própria dica na barra: o aviso precisa ficar por último para continuar visível.
  */
 describe('ferramentas de transformação sem seleção', () => {

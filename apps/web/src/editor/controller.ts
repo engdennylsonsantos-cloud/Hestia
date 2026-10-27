@@ -236,7 +236,7 @@ export class Editor {
       return true;
     }
     if (mod && ui.view === 'plan' && /^[cv]$/i.test(k) && !this.perimetro.ativo) return k.toLowerCase() === 'c' ? this.copySelection() : this.pasteAligned(ui.levelId);
-    if (mod) return false;
+    if (mod) return /^a$/i.test(k) && this.perimetro.selecionarTudo();
     if (k === 'F3') {
       const cur = (useUi.getState().options.snap ?? DEFAULT_SNAP).enabled !== false;
       setSnap({ enabled: !cur });
@@ -263,7 +263,7 @@ export class Editor {
       casador.limpar();
       if (ui.typed) useUi.setState({ typed: '' });
       // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
-      if (!ui.typed || this.tool.freeText) this.tool.cancel();
+      if (!ui.typed || this.tool.freeText) { if (!this.perimetro.esc()) this.tool.cancel(); }
       this.bump();
       return true;
     }

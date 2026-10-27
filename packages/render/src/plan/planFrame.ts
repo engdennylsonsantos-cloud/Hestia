@@ -9,15 +9,17 @@ import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySel
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
 import { dimPlanOps } from './dim.ts';
-import { sketchOps } from './sketch.ts';
+import { sketchOps, type SketchSelectionBox } from './sketch.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from './types.ts';
 import { contadores } from '../perf/registro.ts';
 
-/** Esboço do perímetro em edição (só na planta): o rascunho, a validação dele e a linha sob o cursor. */
+/** Esboço do perímetro em edição (só na planta): o rascunho, a validação dele, a linha sob o cursor e a caixa de seleção. */
 export interface PlanSketch {
   draft: SketchDraft;
   result: SketchResult;
   hover: string | null;
+  /** Caixa da janela de seleção em arraste, desenhada sobre o esboço. */
+  box?: SketchSelectionBox | null;
 }
 
 /** Estado da planta que o quadro lê: o projeto, o nível, a vista e as opções; `version` é a versão do projeto. */
@@ -86,7 +88,7 @@ function sketchKey(sk: PlanSketch | null | undefined, zoom: number): string {
 /** Junta as operações do esboço à sobreposição da planta (sem esboço, a sobreposição sai como está). */
 function comEsboco(o: PlanOps, sk: PlanSketch | null | undefined, theme: PlanTheme, v: Viewport): PlanOps {
   if (!sk) return o;
-  const k = sketchOps(sk.draft, sk.result, theme, v, sk.hover);
+  const k = sketchOps(sk.draft, sk.result, theme, v, sk.hover, sk.box ?? null);
   return { fills: [...o.fills, ...k.fills], strokes: [...o.strokes, ...k.strokes], labels: [...o.labels, ...k.labels] };
 }
 

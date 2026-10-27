@@ -7,11 +7,13 @@ import { montarLotesCamada, SEM_TETO, type LoteGpu } from './lotesGpu.ts';
 export { PlanFrame, planFrameUpdateOf, sameView } from './planFrame.ts';
 
 /**
- * Camadas da cena da planta, na ordem de desenho: preenchimentos da geometria, preenchimentos da sobreposição, grade,
- * traços da geometria e traços da sobreposição. Cada uma tem o seu grupo e as suas malhas: refazer a sobreposição não toca as outras.
+ * Camadas da cena da planta, na ordem de desenho: grade, preenchimentos da geometria, preenchimentos da sobreposição,
+ * traços da geometria e traços da sobreposição. A grade fica atrás dos preenchimentos: as águas do telhado são quase
+ * opacas e a grade não deve aparecer por cima delas como num CAD. Cada camada tem o seu grupo e as suas malhas: refazer
+ * a sobreposição não toca as outras.
  */
 export type PlanSlot = 'fillsBase' | 'fillsOver' | 'grid' | 'strokesBase' | 'strokesOver';
-const SLOTS: readonly PlanSlot[] = ['fillsBase', 'fillsOver', 'grid', 'strokesBase', 'strokesOver'];
+const SLOTS: readonly PlanSlot[] = ['grid', 'fillsBase', 'fillsOver', 'strokesBase', 'strokesOver'];
 /** Faixa de `renderOrder` por camada: a ordem dentro de uma camada não alcança a seguinte. */
 const SLOT_STRIDE = 1_000_000;
 

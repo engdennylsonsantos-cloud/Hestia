@@ -9,7 +9,7 @@ import { perimeterActions, usePerimeter } from './perimeter.ts';
 import { DEFAULT_OPTIONS, useUi } from './state.ts';
 
 /** Tecla sem modificadores, como o `KeyboardEvent` que o App entrega ao controlador. */
-const tecla = (key: string): KeyboardEvent => ({ key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false }) as unknown as KeyboardEvent;
+const tecla = (key: string, ctrl = false): KeyboardEvent => ({ key, ctrlKey: ctrl, metaKey: false, shiftKey: false, altKey: false }) as unknown as KeyboardEvent;
 
 const retangulo = (x0: number, y0: number, x1: number, y1: number): NewSeg[] => [
   { a: { x: x0, y: y0 }, b: { x: x1, y: y0 } },
@@ -230,6 +230,13 @@ describe('modo de perímetro: barra, forma e aresta', () => {
     expect(aresta).toMatchObject({ index: 0, total: 4, length: 6, definesSlope: true, slopePct: 45 });
     perimeterActions.finish();
     expect(conta('roof')).toBe(1);
+  });
+
+  it('Ctrl+A com o modo aberto seleciona todas as linhas do esboço', () => {
+    editor.setTool('floor');
+    desenhar('floor', retangulo(0, 0, 4, 3));
+    expect(editor.key(tecla('a', true))).toBe(true);
+    expect(ferramenta().draft().selected).toHaveLength(4);
   });
 
   it('sem aresta selecionada, a visão não tem aresta', () => {

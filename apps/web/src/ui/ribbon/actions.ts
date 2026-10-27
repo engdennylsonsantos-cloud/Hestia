@@ -36,7 +36,7 @@ export interface RibbonCtx {
   options: ToolOptions;
   p: Project;
   /** Com o modo de perímetro aberto: o comando de Modificar ligado sobre o esboço (null = seleção de linhas). */
-  perimetro?: { modify: PerimeterModifyKind | null } | null;
+  perimetro?: { modify: PerimeterModifyKind | null; selecting?: boolean } | null;
 }
 
 export interface ActionDef {
@@ -284,6 +284,6 @@ export function ctxNow(): RibbonCtx {
   return {
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
     showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options, p: editor.project,
-    perimetro: perim.active ? { modify: perim.modify } : null,
+    perimetro: perim.active ? { modify: perim.modify, selecting: perim.selecting === true } : null,
   };
 }

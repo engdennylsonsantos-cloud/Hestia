@@ -1,7 +1,7 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
-import { followingEnds } from './pick.ts';
+import { followingEnds, MIN_WALL_LENGTH } from './pick.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
 import { selectedFloors } from './floorPick.ts';
@@ -98,13 +98,15 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
 }
 
 /**
- * Mover, girar ou espelhar paredes (`t`), com o mesmo critério de junção do Mover: a parede não selecionada que
- * termina numa extremidade movida é esticada até o novo ponto dela. Um passo de desfazer, com o rótulo `label`.
+ * Mover, girar ou espelhar paredes (`t`). Com `follow` (padrão), a parede não selecionada que termina numa
+ * extremidade movida é esticada até o novo ponto dela; as ferramentas passam `follow = !disjoin` conforme a opção
+ * "Desconectar" (ligada, a vizinha fica onde está e a ponta movida se solta). Um passo de desfazer, com o rótulo.
  */
 export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();
   const exclude = new Set(wallIds);
   const followers = new Map<Id, { a?: Vec2; b?: Vec2 }>();
+  const released = new Set<Id>();
   if (follow) {
     for (const id of wallIds) {
       const w = p.elements[id];
@@ -115,6 +117,12 @@ export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label:
         for (const c of followingEnds(p, env.levelId(), pt, exclude, invert)) {
           const other = p.elements[c.wallId];
           if (!isWall(other)) continue;
+          const far = c.end === 'a' ? other.b : other.a;
+          // Vizinha degenerada (girar/mover até a outra ponta): solta a ponta em vez de sumir com a parede.
+          if (dist(far, to) < MIN_WALL_LENGTH) {
+            released.add(c.wallId);
+            continue;
+          }
           const cur = followers.get(c.wallId) ?? {};
           cur[c.end] = to;
           followers.set(c.wallId, cur);
@@ -126,6 +134,7 @@ export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label:
     env.exec({ type: 'transform', ids: wallIds, transform: t });
     for (const [id, ends] of followers) env.exec({ type: 'setWallEnds', id, ...ends });
   });
+  if (released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
 }
 
 /** Desliza aberturas ao longo da parede anfitriã. */

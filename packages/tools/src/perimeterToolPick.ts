@@ -86,6 +86,49 @@ export function hasSeg(segs: SketchSeg[], seg: SketchSeg): boolean {
 /** Vértices do retângulo de dois cantos opostos (prévia da caixa). */
 export const boxRing = (a: Vec2, b: Vec2): Vec2[] => [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }];
 
+const inBox = (p: Vec2, x0: number, y0: number, x1: number, y1: number): boolean =>
+  p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
+
+/** Segmento toca o retângulo (inclusive na borda e no caso colinear), por recorte de Liang–Barsky. */
+function segHitsBox(a: Vec2, b: Vec2, x0: number, y0: number, x1: number, y1: number): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const p = [-dx, dx, -dy, dy];
+  const q = [a.x - x0, x1 - a.x, a.y - y0, y1 - a.y];
+  let t0 = 0;
+  let t1 = 1;
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) {
+      if (q[i]! < 0) return false;
+      continue;
+    }
+    const r = q[i]! / p[i]!;
+    if (p[i]! < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+/**
+ * Ids das linhas que a janela de `a` a `b` pega. Da esquerda para a direita (janela), só as linhas inteiras dentro do
+ * retângulo; da direita para a esquerda (cruzamento), as que o tocam. Arcos são testados pela poligonal que se desenha.
+ */
+export function boxSelection(segs: SketchSeg[], a: Vec2, b: Vec2): string[] {
+  const x0 = Math.min(a.x, b.x);
+  const x1 = Math.max(a.x, b.x);
+  const y0 = Math.min(a.y, b.y);
+  const y1 = Math.max(a.y, b.y);
+  const window = b.x >= a.x;
+  return segs
+    .filter((seg) => {
+      const pts = chords(seg);
+      if (window) return pts.every((p) => inBox(p, x0, y0, x1, y1));
+      return pts.slice(0, -1).some((p, i) => segHitsBox(p, pts[i + 1]!, x0, y0, x1, y1));
+    })
+    .map((s) => s.id);
+}
+
 /** Ponto de referência de uma linha (meio da corda, ou o meio sobre o arco) e a tangente unitária de `a` para `b`. */
 function edgeFrame(seg: SketchSeg): { at: Vec2; t: Vec2 } {
   const arc = seg.sag ? arcFromSagitta(seg.a, seg.b, seg.sag) : null;

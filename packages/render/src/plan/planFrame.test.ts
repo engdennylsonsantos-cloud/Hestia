@@ -29,7 +29,7 @@ function ops(count: { g: number; o: number }) {
   return { geometry, overlay };
 }
 
-/** Malhas de cada camada da cena, na ordem (fillsBase, fillsOver, grid, strokesBase, strokesOver). */
+/** Malhas de cada camada da cena, na ordem (grid, fillsBase, fillsOver, strokesBase, strokesOver). */
 const slotMeshes = (scene: PlanScene): unknown[][] => scene.scene.children.map((g) => [...g.children]);
 /** Mesmas malhas, na mesma ordem (identidade, não igualdade estrutural). */
 const sameMeshes = (a: unknown[], b: unknown[]): boolean => a.length === b.length && a.every((m, i) => m === b[i]);
@@ -51,7 +51,7 @@ describe('quadro da planta (PlanFrame)', () => {
     expect(count).toEqual({ g: 1, o: 1 });
     const after = slotMeshes(scene);
     // Geometria (fillsBase, strokesBase) e sobreposição (fillsOver, strokesOver): mesmas malhas. A grade pode ser refeita.
-    for (const i of [0, 1, 3, 4]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
+    for (const i of [1, 2, 3, 4]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
     scene.dispose();
   });
 
@@ -66,12 +66,12 @@ describe('quadro da planta (PlanFrame)', () => {
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g1', overlayKey: 'o2', geometry, overlay });
     expect(count).toEqual({ g: 1, o: 2 });
     const after = slotMeshes(scene);
-    expect(sameMeshes(after[0]!, before[0]!)).toBe(true);
+    expect(sameMeshes(after[1]!, before[1]!)).toBe(true);
     expect(sameMeshes(after[3]!, before[3]!)).toBe(true);
     // A sobreposição é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
     expect(sameMeshes(after[4]!, before[4]!)).toBe(true);
     const versoesDepois = versoesDasPosicoes(scene);
-    expect(versoesDepois[0]).toEqual(versoesAntes[0]);
+    expect(versoesDepois[1]).toEqual(versoesAntes[1]);
     expect(versoesDepois[3]).toEqual(versoesAntes[3]);
     expect(versoesDepois[4]![0]).not.toBe(versoesAntes[4]![0]);
     scene.dispose();
@@ -110,9 +110,9 @@ describe('quadro da planta (PlanFrame)', () => {
     const count = { g: 0, o: 0 };
     const { geometry, overlay } = ops(count);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: true, geometryKey: 'g', overlayKey: 'o', geometry, overlay });
-    expect(scene.scene.children[2]!.children.length).toBeGreaterThan(0);
+    expect(scene.scene.children[0]!.children.length).toBeGreaterThan(0);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g', overlayKey: 'o', geometry, overlay });
-    expect(scene.scene.children[2]!.children.length).toBe(0);
+    expect(scene.scene.children[0]!.children.length).toBe(0);
     scene.dispose();
   });
 

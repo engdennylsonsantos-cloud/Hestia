@@ -1,5 +1,5 @@
 import type { Id } from '@hestia/model';
-import type { SketchDraft, SketchResult, SketchTarget } from '@hestia/geom';
+import type { SketchDraft, SketchResult, SketchTarget, Vec2 } from '@hestia/geom';
 import type { PerimeterModifyKind } from '@hestia/tools';
 import type { PerimeterOptions } from '../ui/perimeter/PerimeterOptionsBar.tsx';
 import type { PerimeterLineKind, PerimeterShape } from '../ui/perimeter/PerimeterRibbonPanels.tsx';
@@ -21,9 +21,13 @@ export interface PerimeterView {
   lineKind: PerimeterLineKind;
   /** Comando de Modificar ativo sobre as linhas do rascunho; null = seleção de linhas. */
   modify: PerimeterModifyKind | null;
+  /** Verdadeiro no Selecionar do esboço: sem forma escolhida e sem comando de Modificar. */
+  selecting?: boolean;
   options: PerimeterOptions;
   /** Linha sob o cursor, para o realce de `sketchOps`. */
   hoverId: string | null;
+  /** Janela de seleção em arraste: `window` (da esquerda para a direita) pega as linhas inteiras. */
+  selectionBox?: { a: Vec2; b: Vec2; window: boolean } | null;
   /** Aresta selecionada (primeira de `draft.selected`), para o grupo de propriedades. */
   selectedEdge: { id: string; index: number; total: number; length: number; definesSlope: boolean; slopePct: number; overhang: number } | null;
   /** Mensagem atual da barra de status (dica, aviso ou erro de conclusão). */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { connectedEnds } from './pick.ts';
 import { clickAt, drawWall, makeEnv, tool, walls } from './testEnv.ts';
 
 describe('Copiar: sessão em um passo de desfazer', () => {
@@ -98,15 +99,48 @@ describe('Esc em Copiar e Mover', () => {
   });
 });
 
-describe('Girar e espelhar sem cópia: as paredes unidas acompanham', () => {
-  it('girar a parede selecionada estica a vizinha que termina na ponta movida', () => {
+describe('Rotacionar, mover e espelhar sem cópia: só os selecionados mudam', () => {
+  it('rotacionar uma parede solta a vizinha ligada na ponta em vez de arrastá-la', () => {
     const ctx = makeEnv();
     drawWall(ctx.env, [0, 0], [4, 0]); // w0 (selecionada)
-    drawWall(ctx.env, [4, 0], [4, 3]); // w1: começa em (4,0)
+    drawWall(ctx.env, [4, 0], [4, 3]); // w1: começa em (4,0), ligada à ponta de w0
     const [w0, w1] = walls(ctx.store);
+    expect(connectedEnds(ctx.store.project, 'lv_0', { x: 4, y: 0 }, new Set())).toHaveLength(2);
     ctx.env.setSelection([w0!.id]);
     const r = tool('rotate', ctx.env);
     clickAt(r, 0, 0); // centro
+    expect(r.type('30')).toBe(true);
+    const after = walls(ctx.store);
+    const a0 = after.find((w) => w.id === w0!.id)!;
+    const a1 = after.find((w) => w.id === w1!.id)!;
+    expect(a0.b.x).toBeCloseTo(4 * Math.cos(Math.PI / 6), 6);
+    expect(a0.b.y).toBeCloseTo(2, 6);
+    // A vizinha não selecionada fica exatamente onde estava.
+    expect(a1.a.x).toBeCloseTo(4);
+    expect(a1.a.y).toBeCloseTo(0);
+    expect(a1.b.x).toBeCloseTo(4);
+    expect(a1.b.y).toBeCloseTo(3);
+    // A ponta girada não tem mais vínculo com a vizinha.
+    expect(connectedEnds(ctx.store.project, 'lv_0', a0.b, new Set([a0.id]))).toHaveLength(0);
+    ctx.store.undo(); // um só passo de desfazer para o giro inteiro
+    const back = walls(ctx.store);
+    expect(back.find((w) => w.id === w0!.id)!.b.y).toBeCloseTo(0);
+    expect(back.find((w) => w.id === w1!.id)!.a.x).toBeCloseTo(4);
+    // Refazer volta ao giro e a vizinha continua intacta.
+    ctx.store.redo();
+    const again = walls(ctx.store);
+    expect(again.find((w) => w.id === w0!.id)!.b.y).toBeCloseTo(2);
+    expect(again.find((w) => w.id === w1!.id)!.a.x).toBeCloseTo(4);
+  });
+
+  it('rotacionar as duas paredes selecionadas gira o conjunto e mantém o vínculo', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]); // w0
+    drawWall(ctx.env, [4, 0], [4, 3]); // w1
+    const [w0, w1] = walls(ctx.store);
+    ctx.env.setSelection([w0!.id, w1!.id]);
+    const r = tool('rotate', ctx.env);
+    clickAt(r, 0, 0);
     expect(r.type('90')).toBe(true);
     const after = walls(ctx.store);
     const a0 = after.find((w) => w.id === w0!.id)!;
@@ -115,17 +149,53 @@ describe('Girar e espelhar sem cópia: as paredes unidas acompanham', () => {
     expect(a0.b.y).toBeCloseTo(4);
     expect(a1.a.x).toBeCloseTo(0);
     expect(a1.a.y).toBeCloseTo(4);
-    ctx.store.undo(); // um só passo de desfazer para o giro inteiro
-    const back = walls(ctx.store);
-    expect(back.find((w) => w.id === w1!.id)!.a.x).toBeCloseTo(4);
+    expect(a1.b.x).toBeCloseTo(-3);
+    expect(a1.b.y).toBeCloseTo(4);
+    expect(connectedEnds(ctx.store.project, 'lv_0', { x: 0, y: 4 }, new Set())).toHaveLength(2);
   });
 
-  it('espelhar a parede selecionada estica a vizinha que termina na ponta movida', () => {
+  it('mover uma parede não arrasta a vizinha ligada na ponta', () => {
     const ctx = makeEnv();
     drawWall(ctx.env, [0, 0], [4, 0]); // w0 (selecionada)
-    drawWall(ctx.env, [4, 0], [4, 3]); // w1: começa em (4,0)
+    drawWall(ctx.env, [4, 0], [4, 3]); // w1
     const [w0, w1] = walls(ctx.store);
     ctx.env.setSelection([w0!.id]);
+    ctx.options.moveDisjoin = true;
+    const m = tool('move', ctx.env);
+    clickAt(m, 0, 0);
+    clickAt(m, 0, 1);
+    const after = walls(ctx.store);
+    const a0 = after.find((w) => w.id === w0!.id)!;
+    const a1 = after.find((w) => w.id === w1!.id)!;
+    expect(a0.a.y).toBeCloseTo(1);
+    expect(a0.b.y).toBeCloseTo(1);
+    expect(a1.a.x).toBeCloseTo(4);
+    expect(a1.a.y).toBeCloseTo(0);
+  });
+
+  it('mover as duas paredes selecionadas mantém o vínculo entre elas', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]); // w0
+    drawWall(ctx.env, [4, 0], [4, 3]); // w1
+    const [w0, w1] = walls(ctx.store);
+    ctx.env.setSelection([w0!.id, w1!.id]);
+    const m = tool('move', ctx.env);
+    clickAt(m, 0, 0);
+    clickAt(m, 0, 1);
+    const after = walls(ctx.store);
+    const a1 = after.find((w) => w.id === w1!.id)!;
+    expect(a1.a.x).toBeCloseTo(4);
+    expect(a1.a.y).toBeCloseTo(1);
+    expect(connectedEnds(ctx.store.project, 'lv_0', a1.a, new Set())).toHaveLength(2);
+  });
+
+  it('espelhar uma parede solta a vizinha ligada na ponta em vez de arrastá-la', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]); // w0 (selecionada)
+    drawWall(ctx.env, [4, 0], [4, 3]); // w1
+    const [w0, w1] = walls(ctx.store);
+    ctx.env.setSelection([w0!.id]);
+    ctx.options.mirrorDisjoin = true;
     const m = tool('mirror', ctx.env);
     clickAt(m, -1, -1); // eixo vertical x = -1
     clickAt(m, -1, 5);
@@ -134,7 +204,11 @@ describe('Girar e espelhar sem cópia: as paredes unidas acompanham', () => {
     const a1 = after.find((w) => w.id === w1!.id)!;
     expect(a0.a.x).toBeCloseTo(-2);
     expect(a0.b.x).toBeCloseTo(-6);
-    expect(a1.a.x).toBeCloseTo(-6);
+    // A vizinha não selecionada fica exatamente onde estava.
+    expect(a1.a.x).toBeCloseTo(4);
     expect(a1.a.y).toBeCloseTo(0);
+    expect(a1.b.x).toBeCloseTo(4);
+    expect(a1.b.y).toBeCloseTo(3);
+    expect(connectedEnds(ctx.store.project, 'lv_0', a0.b, new Set([a0.id]))).toHaveLength(0);
   });
 });

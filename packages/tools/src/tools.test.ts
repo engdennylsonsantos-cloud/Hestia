@@ -138,15 +138,17 @@ describe('seleção e edição', () => {
     s.down!(P(5, 1)); s.drag!(P(-1, -1)); s.up!(P(-1, -1));
     expect(sel()).toHaveLength(2);
   });
-  it('mover leva a vizinha junto pela extremidade comum', () => {
-    const { store, env, sel } = house();
+  it('mover solta a vizinha pela extremidade comum em vez de arrastá-la', () => {
+    const ctx = house();
+    const { store, env, sel, options } = ctx;
     const first = walls(store)[0]!;
     env.setSelection([first.id]);
+    options.moveDisjoin = true;
     const m = tool('move', env);
     clickAt(m, 0, 0); clickAt(m, 0, 1);
     const [a, b] = walls(store) as [Wall, Wall];
     expect(a.a.y).toBeCloseTo(1);
-    expect(b.a.y).toBeCloseTo(1); // a vizinha acompanhou
+    expect(b.a.y).toBeCloseTo(0); // a vizinha não selecionada fica onde estava
     expect(b.b.y).toBeCloseTo(3);
     expect(sel()).toEqual([first.id]);
     store.undo(); // um único passo

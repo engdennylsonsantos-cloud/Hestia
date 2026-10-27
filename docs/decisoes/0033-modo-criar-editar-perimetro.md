@@ -46,9 +46,19 @@ perímetro, com a aresta selecionada.
 
 ## 7. Pendências
 
-- **Contorno vinculado às paredes** (origem `walls-finish`, com Desvincular e Revincular): o modo não grava o vínculo. Só a
-  ferramenta antiga de piso por paredes o criava. Hoje não há como criar um piso ou forro vinculado pela interface. A
-  decidir: levar o vínculo ao modo (a partir da face escolhida) ou tirar da interface o que não se cria mais.
-- **Forro "No ambiente"** (ligado ao ambiente, decisão 0021) também não é alcançado pela faixa. Mesma decisão.
-- Os modos de criação antigos (poly, rect, walls, room, paredes, perímetro) continuam no código, com testes, porque o
-  pacote ainda os testa. Remover quando a decisão de cima estiver tomada.
+- **Contorno vinculado às paredes: resolvido no modo, com uma diferença de origem.** Piso e laje vinculam por "Por
+  perímetro" (caixa sobre as paredes) + "Vincular às paredes"; a gravação usa a origem `perimeter` (face externa,
+  `linked: true`, semente no lado maior do contorno), não `walls-finish`. A origem `walls-finish` (face de acabamento a
+  partir do clique numa área fechada) só existe na ferramenta antiga de piso por paredes, fora da faixa; decidir se ela
+  volta ao modo como um "Por ambiente" de piso/laje ou se fica só o perímetro externo. Desvincular e Revincular às
+  paredes estão no grupo "Contorno" de piso e laje; piso/laje vinculado continua travado para edição até Desvincular
+  (decisão 0031).
+- **Forro "No ambiente": resolvido.** A galeria do forro tem "Por ambiente"; com "Acompanhar o ambiente" o forro nasce
+  com `roomId` e `roomLinked: true` e o contorno do ambiente (decisão 0021). Desvincular e Revincular ao ambiente estão
+  no grupo "Contorno" do forro.
+- **Modos de criação antigos** (poly, rect, walls, room, paredes, perímetro): continuam no código, com testes, porque o
+  pacote ainda os testa, mas não são alcançáveis pela faixa. O plano de remoção está em
+  `docs/pendencias-perimetro.md` §4.
+- **Roteiros e2e do vínculo**: `tests/e2e/contorno.mjs` e `tests/e2e/forro-ambiente.mjs` ainda gravam a origem pela API,
+  com o comentário defasado de que o modo não a gravaria. Migrar para "Por perímetro"/"Por ambiente" ao revisar os
+  roteiros.

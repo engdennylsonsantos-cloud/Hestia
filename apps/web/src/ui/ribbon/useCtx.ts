@@ -12,5 +12,5 @@ export function useRibbonCtx(): RibbonCtx {
     tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
     showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options,
   })));
-  return { ...ui, p, perimetro: perim.active ? { modify: perim.modify } : null };
+  return { ...ui, p, perimetro: perim.active ? { modify: perim.modify, selecting: perim.selecting === true } : null };
 }

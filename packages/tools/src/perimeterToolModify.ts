@@ -2,11 +2,15 @@ import type { Vec2 } from '@hestia/geom';
 import { parseNumber } from './numeric.ts';
 import { PERIMETER_MODIFY_LABEL, type PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { deleteSegs } from './perimeterModify.ts';
-import { selectSegs } from './perimeterSession.ts';
+import { selectSegsMode } from './perimeterSession.ts';
+import { chainIds } from './perimeterToolModifyChain.ts';
 import { edgeClick, edgeHint, edgePreview } from './perimeterToolModifyEdge.ts';
+import { selectionModeOf } from './perimeterToolSelect.ts';
+import { parseDelta } from './perimeterToolInput.ts';
 import {
   transformClick,
   transformConfirm,
+  transformDelta,
   transformHint,
   transformPreview,
   transformPrompt,
@@ -16,17 +20,31 @@ import {
 import { EDGE, SOURCED, clearData, freshStep, halo, hasData, lineAt, type ModHost, type Step } from './perimeterToolModifyStep.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
-/** O clique captura ponto (snap) nos estágios de ponto dos comandos de transformação; o resto usa o cursor cru. */
+/** O clique captura ponto (snap) em todos os estágios de ponto, como o esboço; só o teste de linha usa o cursor cru. */
 function snapsAt(kind: PerimeterModifyKind, st: Step): boolean {
-  if (kind === 'rotate') return st.stage === 1;
+  if (kind === 'trim' || kind === 'split' || kind === 'offset') return true;
+  if (kind === 'rotate') return st.stage >= 1;
   if (kind === 'move' || kind === 'copy' || kind === 'mirror' || kind === 'array') return st.stage === 1 || st.stage === 2;
   return false;
 }
+
+/** Verbo da etapa de escolher o alvo, por comando (a barra de status diz o próximo passo). */
+const TARGET_VERB: Partial<Record<PerimeterModifyKind, string>> = {
+  offset: 'deslocar',
+  move: 'mover',
+  copy: 'copiar',
+  rotate: 'rotacionar',
+  mirror: 'espelhar',
+  array: 'repetir',
+};
 
 /**
  * Comando de Modificar ativo sobre as linhas do rascunho. Guarda o comando e o passo; cada clique ou valor digitado
  * avança o passo, e a operação aplicada vai para `h.commit` (um passo de desfazer). Esc cancela o passo e, sem passo,
  * desliga o comando; Enter confirma a seleção e a quantidade da matriz; Tab alterna a variante do comando.
+ *
+ * Sem seleção prévia, os comandos sobre a seleção começam na etapa de escolher o alvo: o clique numa linha a escolhe e
+ * já avança para a operação (como no Revit). Tab alterna entre só a linha e todo o laço conectado pelas pontas.
  */
 export class ModifyFlow {
   private cmd: PerimeterModifyKind | null = null;
@@ -34,6 +52,8 @@ export class ModifyFlow {
   private raw: Vec2 = { x: 0, y: 0 };
   private at: Vec2 = { x: 0, y: 0 };
   private over: string | null = null;
+  /** Na etapa de escolher o alvo: Tab está em "todo o laço conectado" (false = só a linha). */
+  private pickChain = false;
 
   constructor(private readonly h: ModHost) {}
 
@@ -50,6 +70,29 @@ export class ModifyFlow {
     return this.over;
   }
 
+  /** Verdadeiro na etapa de escolher o alvo (inclusive Excluir): a janela de seleção vale nessa etapa. */
+  picking(): boolean {
+    return this.cmd !== null && (this.needsSource() || this.cmd === 'delete');
+  }
+
+  /** Depois de uma janela de seleção: avança o comando (ou exclui, no comando Excluir). */
+  afterWindowPick(): void {
+    const kind = this.cmd;
+    if (!kind) return;
+    const d = this.h.draft();
+    if (d.selected.length === 0) return;
+    if (kind === 'delete') {
+      const next = deleteSegs(d, d.selected);
+      if (next) this.h.commit(next);
+      this.h.replace(selectSegsMode(this.h.draft(), [], 'replace'));
+      this.h.say(`${d.selected.length} linha(s) excluída(s). Clique numa linha para excluir outra, ou Esc sai.`);
+      return;
+    }
+    if (!SOURCED.has(kind) || this.st.stage !== 0) return;
+    this.st.stage = 1;
+    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st)}`);
+  }
+
   /**
    * Liga o comando. Com linhas selecionadas (comandos sobre a seleção), começa direto no passo de operação. Excluir com
    * seleção apaga a seleção já, num passo de desfazer, e segue ligado para os cliques.
@@ -57,6 +100,7 @@ export class ModifyFlow {
   start(kind: PerimeterModifyKind): void {
     const o = this.h.options();
     this.cmd = kind;
+    this.pickChain = false;
     const d = this.h.draft();
     if (kind === 'delete' && d.selected.length > 0) {
       const next = deleteSegs(d, d.selected);
@@ -67,13 +111,14 @@ export class ModifyFlow {
     const copy = kind === 'offset' ? o.offsetCopy : kind === 'rotate' ? o.rotateCopy : kind === 'mirror' ? o.mirrorCopy : false;
     this.st = freshStep(copy);
     if (SOURCED.has(kind) && this.h.draft().selected.length > 0) this.st.stage = 1;
-    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${this.hint()}`);
+    this.h.say(this.hint());
   }
 
   stop(): void {
     this.cmd = null;
     this.st = freshStep(false);
     this.over = null;
+    this.pickChain = false;
   }
 
   /** Limpa o passo em andamento (desfazer, troca de rascunho). O comando segue ligado. */
@@ -97,10 +142,11 @@ export class ModifyFlow {
     const kind = this.cmd;
     if (!kind) return;
     this.raw = p.raw;
-    if (this.needsSource()) return this.pickSource(p);
+    if (this.needsSource()) return this.pickTarget(p);
+    if (kind === 'offset' && this.st.stage === 1 && p.shift) return this.addOffsetSource(p);
     const at = this.pointAt(p);
     this.at = at;
-    if (EDGE.has(kind)) edgeClick(this.h, kind, this.st, p);
+    if (EDGE.has(kind)) edgeClick(this.h, kind, this.st, p, at);
     else transformClick(this.h, kind, this.st, p, at);
   }
 
@@ -108,6 +154,11 @@ export class ModifyFlow {
   type(text: string): boolean {
     const kind = this.cmd;
     if (!kind || this.needsSource() || transformPrompt(kind, this.st) === null) return false;
+    // Mover/Copiar no destino: aceita também o deslocamento digitado "dx,dy" (ou "dx;dy"), em metros.
+    if ((kind === 'move' || kind === 'copy') && this.st.stage === 2) {
+      const delta = parseDelta(text);
+      if (delta) return transformDelta(this.h, kind, this.st, delta);
+    }
     const v = parseNumber(text);
     if (v === null) return this.refuse('Valor inválido. Digite um número.');
     return transformType(this.h, kind, this.st, v, this.raw);
@@ -117,6 +168,11 @@ export class ModifyFlow {
   tab(): void {
     const kind = this.cmd;
     if (!kind) return;
+    if (this.needsSource()) {
+      this.pickChain = !this.pickChain;
+      this.h.say(this.targetHint(kind));
+      return;
+    }
     if (kind === 'trim' || kind === 'split') {
       this.st.mode = kind === 'trim' ? (this.st.mode + 1) % 3 : (this.st.mode + 1) % 2;
       clearData(kind, this.st);
@@ -135,8 +191,17 @@ export class ModifyFlow {
       this.h.say(this.hint());
       return false;
     }
+    if (kind === 'offset' && this.st.stage > 0) {
+      this.st.stage = 0;
+      this.st.ids = [];
+      this.st.pts = [];
+      this.st.num = null;
+      this.h.replace(selectSegsMode(d, [], 'replace'));
+      this.h.say(this.targetHint(kind));
+      return false;
+    }
     if (SOURCED.has(kind) && this.st.stage === 0 && d.selected.length > 0) {
-      this.h.replace(selectSegs(d, [], false));
+      this.h.replace(selectSegsMode(d, [], 'replace'));
       this.h.say('Seleção limpa. Esc de novo desliga o comando.');
       return false;
     }
@@ -164,8 +229,8 @@ export class ModifyFlow {
   preview(): PreviewItem[] {
     const kind = this.cmd;
     if (!kind) return [];
-    if (EDGE.has(kind)) return edgePreview(this.h, kind, this.st, this.at);
-    if (this.needsSource()) return this.over ? halo(this.h.draft(), this.over) : [];
+    if (EDGE.has(kind)) return edgePreview(this.h, kind, this.st, this.at, this.raw);
+    if (this.needsSource()) return this.pickPreview();
     return transformPreview(this.h, kind, this.st, this.at);
   }
 
@@ -181,18 +246,60 @@ export class ModifyFlow {
     return snapsAt(this.cmd!, this.st) ? this.h.snap(p) : p.raw;
   }
 
-  /** Clique no estágio de escolha: seleciona a linha (Shift soma) e segue até o Enter. */
-  private pickSource(p: PointerInfo): void {
+  /** Prévia da etapa de escolher o alvo: a linha ou o laço conectado sob o cursor, realçados. */
+  private pickPreview(): PreviewItem[] {
+    const d = this.h.draft();
+    if (!this.over) return [];
+    const ids = this.pickChain ? chainIds(d.segs, this.over) : [this.over];
+    return ids.flatMap((id) => halo(d, id));
+  }
+
+  /**
+   * Clique na etapa de escolher o alvo: escolhe a linha (ou o laço com o Tab) e, sem modificador, já avança para a
+   * operação. Shift soma e Ctrl subtrai sem avançar, para escolher mais linhas antes da operação.
+   */
+  private pickTarget(p: PointerInfo): void {
+    const kind = this.cmd!;
     const d = this.h.draft();
     const id = lineAt(d, p.raw, this.h.mpp());
-    if (!id) return this.h.say('Clique numa linha; Enter confirma a seleção.');
-    this.h.replace(selectSegs(d, [id], p.shift));
-    this.h.say(`${this.h.draft().selected.length} linha(s) escolhida(s). Clique mais (Shift soma); Enter confirma.`);
+    if (!id) return this.h.say(this.targetHint(kind));
+    const ids = this.pickChain ? chainIds(d.segs, id) : [id];
+    const mode = selectionModeOf(p);
+    const next = selectSegsMode(d, ids, mode);
+    this.h.replace(next);
+    if (next.selected.length === 0) return this.h.say('Nenhuma linha escolhida.');
+    if (mode !== 'replace') {
+      this.h.say(`${next.selected.length} linha(s) escolhida(s). Clique mais (Shift soma, Ctrl subtrai); Enter confirma.`);
+      return;
+    }
+    this.st.stage = 1;
+    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st)}`);
+  }
+
+  /**
+   * Deslocar já na operação: Shift sobre outra linha soma à origem (o laço de várias linhas continua escolhível sem
+   * sair do comando). Clique sem Shift segue sendo o lado do deslocamento.
+   */
+  private addOffsetSource(p: PointerInfo): void {
+    const d = this.h.draft();
+    const id = lineAt(d, p.raw, this.h.mpp());
+    if (!id) return;
+    const next = selectSegsMode(d, [id], 'add');
+    this.h.replace(next);
+    this.h.say(`${next.selected.length} linha(s) na origem. ${transformHint('offset', this.st)}`);
+  }
+
+  /** Dica da etapa de escolher o alvo, com o estado do Tab (só a linha ou o laço conectado). */
+  private targetHint(kind: PerimeterModifyKind): string {
+    const label = PERIMETER_MODIFY_LABEL[kind];
+    if (this.pickChain) return `${label}: clique no laço conectado (linhas ligadas pelas pontas). Agora: laço conectado (Tab: só a linha).`;
+    const verb = TARGET_VERB[kind] ?? 'modificar';
+    return `${label}: clique na linha a ${verb}. Agora: só a linha (Tab: laço conectado).`;
   }
 
   private hint(): string {
     const kind = this.cmd!;
-    if (this.needsSource()) return 'Escolha as linhas: clique numa linha (Shift soma) e Enter confirma.';
+    if (this.needsSource()) return this.targetHint(kind);
     if (EDGE.has(kind)) return edgeHint(kind, this.st);
     return transformHint(kind, this.st);
   }

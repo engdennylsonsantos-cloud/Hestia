@@ -4,7 +4,7 @@ import type { Backend } from '@hestia/render';
 import { DEFAULT_DISJOIN, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
-import { activeViewOf, addView, type OpenView } from './openViews.ts';
+import { activeViewOf, addView, type OpenView, type PlanKind } from './openViews.ts';
 import type { RibbonTabId } from '../ui/ribbon/model.ts';
 import { loadDock, type DockLayout } from './dockLayout.ts';
 
@@ -20,6 +20,8 @@ export interface UiState {
   sectionId: Id | null;
   /** Prancha aberta quando `view` é 'sheet' (decisão 0022). */
   sheetId: Id | null;
+  /** Planta de piso ou de cobertura quando `view` é 'plan' (sessão; a cobertura liga o modo `roofPlanMode`). */
+  planKind: PlanKind;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -212,6 +214,7 @@ export const useUi = create<UiState>(() => ({
   tool: 'select',
   view: 'plan',
   levelId: 'lv_0',
+  planKind: 'floor',
   sectionId: null,
   sheetId: null,
   selection: [],
@@ -250,7 +253,7 @@ export const useUi = create<UiState>(() => ({
  * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em ui/ViewTabs.tsx).
  */
 useUi.subscribe((s, prev) => {
-  if (s.view === prev.view && s.levelId === prev.levelId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
+  if (s.view === prev.view && s.levelId === prev.levelId && s.planKind === prev.planKind && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
   const active = activeViewOf(s);
   if (!active) return;
   const next = addView(s.openViews, active);

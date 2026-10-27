@@ -1,11 +1,12 @@
 import type { Id, Project } from '@hestia/model';
-import type { ResolvedLevel } from '@hestia/engine';
+import type { ResolvedLevel, ResolvedRoof } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { SketchDraft, SketchResult } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
+import { telhadosDoNivel } from './resolucao.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
 import { dimPlanOps } from './dim.ts';
@@ -45,6 +46,11 @@ export interface PlanViewState {
   resolve: (id: Id) => ResolvedLevel;
   /** Esboço do perímetro em edição, desenhado sobre a planta (ausente fora do modo). */
   sketch?: PlanSketch | null;
+  /**
+   * Planta de cobertura (`roofPlanMode`): a geometria lê o nível resolvido (sem intervalo de vista) e os telhados de todos
+   * os níveis abaixo. As chaves incluem o modo, então trocar entre piso e cobertura refaz as camadas.
+   */
+  roofPlanMode?: boolean;
 }
 
 /** Resolução vazia do nível atual: a planta normal não a lê (ver `planFrameUpdateOf`). */
@@ -58,26 +64,39 @@ export function resolucaoVazia(levelId: Id): ResolvedLevel {
  */
 export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   const { project: p, levelId, v, theme, dark } = s;
+  const rp = s.roofPlanMode === true;
   const geoSel = planGeometrySelection(p, levelId, s.selection);
   // A planta normal não usa a resolução do nível atual: `planViewOf` refaz a geometria com o corte (ver `planContext`).
-  // Só a planta de cobertura (`roofPlanMode`) lê `resolved`, e este quadro não a liga. Por isso não se resolve o nível
-  // atual aqui: resolvê-lo seria o dobro de trabalho na abertura. O nível de baixo continua resolvido (ver `planBelowOf`).
-  const base = { project: p, levelId, resolved: resolucaoVazia(levelId), viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection };
+  // Só a planta de cobertura lê `resolved`: o nível atual é resolvido só quando ela é desenhada, nunca na planta de piso.
+  // O nível de baixo continua resolvido apenas quando a geometria é refeita (ver `planBelowOf`).
+  const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp };
+  const resolvido = (): ResolvedLevel => (rp ? s.resolve(levelId) : resolucaoVazia(levelId));
+  // O modo de cobertura entra nas duas chaves: sem isso, trocar piso e cobertura do mesmo nível reaproveitaria a geometria antiga.
+  const modo = rp ? 'cobertura' : 'piso';
   return {
     v,
     theme,
     gpu: s.gpu,
     showGrid: s.showGrid,
-    geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}`,
-    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
+    geometryKey: `${s.version}|${levelId}|${modo}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}`,
+    overlayKey: `${s.version}|${levelId}|${modo}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => {
-      const g = buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel), selection: geoSel, hover: null, preview: [], inference: null });
+      const abaixo = planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel);
+      // Cobertura: os telhados de todos os níveis abaixo (`planBelowOf` só dá os do pavimento de referência).
+      const telhados = rp ? { belowRoofs: telhadosDosNiveisAbaixo(p, levelId) } : {};
+      const g = buildPlanGeometry({ ...base, resolved: resolvido(), ...abaixo, ...telhados, selection: geoSel, hover: null, preview: [], inference: null });
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
+    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
   };
+}
+
+/** Telhados de todos os níveis abaixo do atual (planta de cobertura). Sem níveis abaixo, nenhum. */
+function telhadosDosNiveisAbaixo(p: Project, levelId: Id): ResolvedRoof[] {
+  const i = p.levels.findIndex((l) => l.id === levelId);
+  return p.levels.slice(0, Math.max(0, i)).flatMap((l) => telhadosDoNivel(p, l.id));
 }
 
 /** Chave do esboço na sobreposição: conteúdo e zoom (as linhas dos arcos e o balão dependem do zoom); vazia fora do modo. */

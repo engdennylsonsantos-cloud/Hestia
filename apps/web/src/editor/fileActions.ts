@@ -18,6 +18,8 @@ export async function openProjectFile(f: File | undefined): Promise<void> {
 
 export async function exportDxf(): Promise<void> {
   const ui = useUi.getState();
+  // A planta de cobertura não tem DXF próprio: sairia a planta de piso do nível, como se fosse a que está na tela.
+  if (ui.view === 'plan' && ui.planKind === 'roof') return say('A planta de cobertura ainda não exporta DXF: abra a planta de piso do nível.');
   try {
     say(ui.view === 'section' && ui.sectionId ? await saveSectionDxf(editor.project, ui.sectionId) : await savePlanDxf(editor.project, ui.levelId, ui.showRoofProjection));
   } catch (e) {

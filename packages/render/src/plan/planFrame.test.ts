@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type * as THREE from 'three';
 import { resolveLevel } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeWall, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeRoof, makeWall, type Project } from '@hestia/model';
 import { buildPlanGeometry, buildPlanOverlay, planGeometrySelection, type PlanInput } from './build.ts';
 import { PlanFrame, planFrameUpdateOf, sameLabels, type PlanViewState } from './planFrame.ts';
 import { PlanScene } from './gpuPlan.ts';
@@ -243,5 +243,59 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).overlayKey).not.toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ v: { ...V, cx: 9 } })).overlayKey).toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ v: { ...V, zoom: 220 } })).overlayKey).toBe(base.overlayKey);
+  });
+
+  it('planta de cobertura tem chaves próprias: a geometria de piso do mesmo nível não é reaproveitada', () => {
+    const piso = planFrameUpdateOf(state());
+    const cob = planFrameUpdateOf(state({ roofPlanMode: true }));
+    expect(cob.geometryKey).not.toBe(piso.geometryKey);
+    expect(cob.overlayKey).not.toBe(piso.overlayKey);
+    expect(planFrameUpdateOf(state({ roofPlanMode: false })).geometryKey).toBe(piso.geometryKey);
+  });
+
+  it('planta de cobertura resolve o nível atual; a de piso não o resolve (só o de baixo, se houver)', () => {
+    const chamadas: string[] = [];
+    const resolve = (id: string) => {
+      chamadas.push(id);
+      return resolveLevel(p, id, new Map());
+    };
+    planFrameUpdateOf(state({ roofPlanMode: true, resolve })).geometry();
+    expect(chamadas).toContain('lv_0');
+  });
+
+  it('alternar piso e cobertura do mesmo nível não deixa resíduo: voltar ao piso reproduz o desenho de piso', () => {
+    const quadro = new PlanFrame(NULL_SINK);
+    const atualiza = (over: Partial<PlanViewState>): void => quadro.update({ ...planFrameUpdateOf(state(over)), gpu: false });
+    atualiza({});
+    const piso = JSON.stringify(quadro.drawList(LIGHT));
+    atualiza({ roofPlanMode: true });
+    expect(JSON.stringify(quadro.drawList(LIGHT))).not.toBe(piso);
+    atualiza({});
+    expect(JSON.stringify(quadro.drawList(LIGHT))).toBe(piso);
+  });
+
+  it('cobertura: o telhado do nível abaixo entra na planta, só com a referência de baixo ligada', () => {
+    const comTelhadoBaixo = (): Project => {
+      const s = new ProjectStore(createEmptyProject());
+      s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r0', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [{ x: -0.3, y: -0.3 }, { x: 8.3, y: -0.3 }, { x: 8.3, y: 6.3 }, { x: -0.3, y: 6.3 }], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 } }) });
+      return s.project;
+    };
+    const semTelhadoBaixo = createEmptyProject();
+    const fills = (proj: Project, showUnderlay: boolean): number =>
+      planFrameUpdateOf(state({ project: proj, levelId: 'lv_1', roofPlanMode: true, showUnderlay, resolve: (id) => resolveLevel(proj, id, new Map()) })).geometry().fills.length;
+    expect(fills(comTelhadoBaixo(), true)).toBeGreaterThan(fills(semTelhadoBaixo, true));
+    expect(fills(comTelhadoBaixo(), false)).toBe(fills(semTelhadoBaixo, false));
+  });
+
+  it('cobertura: o telhado de um nível mais abaixo (não o de referência) também entra', () => {
+    const tres = (com: boolean): Project => {
+      const s = new ProjectStore(createEmptyProject());
+      s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_2', name: 'Cobertura', elevation: 6 }) });
+      if (com) s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r0', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [{ x: -0.3, y: -0.3 }, { x: 8.3, y: -0.3 }, { x: 8.3, y: 6.3 }, { x: -0.3, y: 6.3 }], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 } }) });
+      return s.project;
+    };
+    const fills = (proj: Project): number =>
+      planFrameUpdateOf(state({ project: proj, levelId: 'lv_2', roofPlanMode: true, showUnderlay: true, resolve: (id) => resolveLevel(proj, id, new Map()) })).geometry().fills.length;
+    expect(fills(tres(true))).toBeGreaterThan(fills(tres(false)));
   });
 });

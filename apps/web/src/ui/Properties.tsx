@@ -325,8 +325,10 @@ function ViewProps(): ReactElement {
   const s = useUi();
   const lvl = p.levels.find((l) => l.id === s.levelId);
   const section = s.view === 'section' ? p.views.find((v) => v.id === s.sectionId) : undefined;
-  const title = s.view === 'plan' ? `Planta · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
-  const kindLabel = s.view === 'plan' ? 'Planta de piso' : s.view === 'section' ? (section?.kind === 'elevation' ? 'Elevação' : 'Corte') : 'Modelo 3D';
+  // A planta de cobertura mostra as mesmas propriedades da de piso do nível; só o nome do tipo muda.
+  const roof = s.view === 'plan' && s.planKind === 'roof';
+  const title = s.view === 'plan' ? `${roof ? 'Planta de cobertura' : 'Planta'} · ${lvl?.name ?? ''}` : s.view === 'section' ? `${section?.kind === 'elevation' ? 'Elevação' : 'Corte'} · ${section?.name ?? ''}` : 'Modelo 3D';
+  const kindLabel = s.view === 'plan' ? (roof ? 'Planta de cobertura' : 'Planta de piso') : s.view === 'section' ? (section?.kind === 'elevation' ? 'Elevação' : 'Corte') : 'Modelo 3D';
   return (
     <>
       <div className="rv-stick">
@@ -334,7 +336,7 @@ function ViewProps(): ReactElement {
       </div>
       <Group title="Vista">
         <Row label="Nível" htmlFor="v-level">
-          <select id="v-level" className="select" value={s.levelId} onChange={(e) => editor.selectLevel(e.target.value)}>
+          <select id="v-level" className="select" value={s.levelId} onChange={(e) => editor.selectLevel(e.target.value, s.planKind)}>
             {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </Row>

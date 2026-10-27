@@ -27,6 +27,14 @@ describe('activateView com o modo de perímetro aberto', () => {
     expect(useUi.getState().openViews).toContainEqual({ kind: '3d' });
   });
 
+  it('abrir a planta de cobertura de um nível põe a aba de cobertura, distinta da de piso', () => {
+    const { levelId } = useUi.getState();
+    activateView({ kind: 'plan', levelId });
+    activateView({ kind: 'plan', levelId, planKind: 'roof' });
+    expect(useUi.getState().planKind).toBe('roof');
+    expect(useUi.getState().openViews).toEqual([{ kind: 'plan', levelId }, { kind: 'plan', levelId, planKind: 'roof' }]);
+  });
+
   it('reabrir a vista já ativa com o modo aberto ainda garante a aba', () => {
     editor.setTool('floor');
     const { levelId } = useUi.getState();

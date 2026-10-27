@@ -4,6 +4,7 @@ import { editor, useProject, useProjectVersion } from '../editor/controller.ts';
 import { openProjectFile } from '../editor/fileActions.ts';
 import { useI18n } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
+import type { PlanKind } from '../editor/openViews.ts';
 import { Icon } from './Icon.tsx';
 import { InfoCenter } from './InfoCenter.tsx';
 import { act, tool, type RibbonItem } from './ribbon/model.ts';
@@ -13,8 +14,8 @@ import { useRibbonCtx } from './ribbon/useCtx.ts';
 /** Barra de Acesso Rápido: só ícones, os mesmos comandos da faixa (Medir, Cota, Texto, 3D, Corte, Linhas finas). */
 const QUICK: RibbonItem[] = [tool('measure', 'small'), tool('dimension', 'small'), tool('text', 'small'), act('view3d', 'small'), tool('section', 'small'), act('thinLines', 'small')];
 
-/** "Planta de piso: Térreo", "Vista 3D: Modelo 3D"… como o Revit mostra na barra de título. */
-function viewTitle(p: Project, view: string, levelId: string, sectionId: string | null, sheetId: string | null, pt: boolean): string {
+/** "Planta de piso: Térreo", "Planta de cobertura: Cobertura", "Vista 3D: Modelo 3D"… como o Revit mostra na barra de título. */
+function viewTitle(p: Project, view: string, levelId: string, sectionId: string | null, sheetId: string | null, pt: boolean, planKind: PlanKind): string {
   if (view === '3d') return pt ? 'Vista 3D: Modelo 3D' : '3D View: 3D Model';
   if (view === 'section') {
     const v = p.views.find((x) => x.id === sectionId);
@@ -24,7 +25,8 @@ function viewTitle(p: Project, view: string, levelId: string, sectionId: string 
     const sh = sheetId ? sheetOf(p, sheetId) : undefined;
     return `${pt ? 'Prancha' : 'Sheet'}: ${sh ? `${sh.number} ${sh.name}` : ''}`;
   }
-  return `${pt ? 'Planta de piso' : 'Floor Plan'}: ${p.levels.find((l) => l.id === levelId)?.name ?? ''}`;
+  const tipo = planKind === 'roof' ? (pt ? 'Planta de cobertura' : 'Roof Plan') : pt ? 'Planta de piso' : 'Floor Plan';
+  return `${tipo}: ${p.levels.find((l) => l.id === levelId)?.name ?? ''}`;
 }
 
 export function TitleBar(): ReactElement {
@@ -35,9 +37,10 @@ export function TitleBar(): ReactElement {
   const pt = lang === 'pt';
   const sectionId = useUi((s) => s.sectionId);
   const sheetId = useUi((s) => s.sheetId);
+  const planKind = useUi((s) => s.planKind);
   const fileRef = useRef<HTMLInputElement>(null);
   const store = editor.store;
-  const title = `Hestia - [${project.name}${store.dirty ? ' *' : ''}] - ${viewTitle(project, ctx.view, ctx.levelId, sectionId, sheetId, pt)}`;
+  const title = `Hestia - [${project.name}${store.dirty ? ' *' : ''}] - ${viewTitle(project, ctx.view, ctx.levelId, sectionId, sheetId, pt, planKind)}`;
   const open = pt ? 'Abrir' : 'Open';
   const save = pt ? 'Salvar' : 'Save';
   const undo = pt ? 'Desfazer' : 'Undo';

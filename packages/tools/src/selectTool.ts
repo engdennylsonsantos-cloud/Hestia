@@ -20,6 +20,7 @@ import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
 import { annotationAt, detailItemAt, dimGripAt, dimTextGripAt, signedOffset } from './annotationPick.ts';
 import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
+import { gridGhosts, gridHandlePreview, gridIdsInBox, moveGrids, pickGridAt, selectedGrids } from './gridGeom.ts';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
 import type { PointerInfo } from './types.ts';
@@ -29,7 +30,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view' | 'grid';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -104,6 +105,9 @@ export class SelectTool extends ToolBase {
     // telhado e escada que estejam embaixo dela, como no Revit. Parede e abertura continuam ganhando o clique.
     const rs = pickRoomSeparatorAt(pr, lv, at, mpp);
     if (rs) return { id: rs.id, kind: 'roomSeparator' };
+    // Grade (do projeto, fora de project.elements): acima de escada, piso e demais áreas; abaixo de parede e abertura.
+    const gr = pickGridAt(pr, at, mpp);
+    if (gr) return { id: gr, kind: 'grid' };
     const st = pickStairAt(pr, lv, at, mpp);
     if (st) return { id: st, kind: 'stair' };
     const f = pickFloorAt(pr, lv, at, mpp);
@@ -134,7 +138,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()));
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
@@ -267,12 +271,13 @@ export class SelectTool extends ToolBase {
       }
       case 'moving': {
         const els = selectedMovables(pr, this.env.selection());
+        const grids = selectedGrids(pr, this.env.selection());
         const ignore = new Set(els);
         this.moveBase ??= this.snap({ ...p, raw: this.downPt, shift: false }, { ignore }).point;
         const inf = this.snap(p, { from: this.moveBase, ignore });
         this.delta = sub(inf.point, this.moveBase);
         const t = { kind: 'translate' as const, d: this.delta };
-        this.items.push(...ghostBands(pr, els, t), ...ghostViews(pr, this.env.selection(), t));
+        this.items.push(...ghostBands(pr, els, t), ...ghostViews(pr, this.env.selection(), t), ...gridGhosts(pr, grids, this.delta));
         break;
       }
       case 'opening': {
@@ -316,9 +321,11 @@ export class SelectTool extends ToolBase {
         const sel = this.env.selection();
         const els = selectedMovables(pr, sel);
         const views = selectedViews(pr, sel);
-        if ((els.length || views.length) && (this.delta.x || this.delta.y)) {
+        const grids = selectedGrids(pr, sel);
+        if ((els.length || views.length || grids.length) && (this.delta.x || this.delta.y)) {
           if (els.length) moveWalls(this.env, els, this.delta, true, p.alt);
           if (views.length) transformViews(this.env, views, { kind: 'translate', d: this.delta });
+          if (grids.length) this.env.transaction('Mover grade', () => moveGrids(this.env, grids, this.delta, false));
         }
         break;
       }
@@ -334,6 +341,7 @@ export class SelectTool extends ToolBase {
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...gridIdsInBox(pr, this.downPt, p.raw),
           ...sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
         const cur = this.env.selection();

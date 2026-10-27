@@ -1,4 +1,4 @@
-import { annotationRemovals, levelRoomSeparators, viewRemovals, type ProjectStore } from '@hestia/model';
+import { annotationRemovals, levelRoomSeparators, projectGrids, viewRemovals, type ProjectStore } from '@hestia/model';
 import { useUi } from './state.ts';
 
 /**
@@ -11,15 +11,19 @@ export function deleteSelectionIn(store: ProjectStore): void {
   const notes = annotationRemovals(store.project, levelId, ids);
   const views = viewRemovals(store.project, ids);
   const separators = levelRoomSeparators(store.project, levelId).filter((r) => ids.includes(r.id)).map((r) => r.id);
+  // Grades pertencem ao projeto (fora de project.elements e dos níveis): removeGrid.
+  const grids = projectGrids(store.project).filter((g) => ids.includes(g.id)).map((g) => g.id);
+  const gridIds = new Set(grids);
   const noteIds = new Set(notes.map((c) => c.id));
   const viewIds = new Set(views.map((c) => c.id));
   const sepIds = new Set(separators);
-  const elems = ids.filter((id) => !noteIds.has(id) && !viewIds.has(id) && !sepIds.has(id));
+  const elems = ids.filter((id) => !noteIds.has(id) && !viewIds.has(id) && !sepIds.has(id) && !gridIds.has(id));
   store.transaction('Excluir', () => {
     for (const c of notes) store.exec(c);
     if (elems.length) store.exec({ type: 'deleteElements', ids: elems });
     for (const c of views) store.exec(c);
     for (const id of separators) store.exec({ type: 'removeRoomSeparator', levelId, id });
+    for (const id of grids) store.exec({ type: 'removeGrid', id });
   });
   useUi.setState({ selection: [], status: 'Seleção excluída.' });
 }

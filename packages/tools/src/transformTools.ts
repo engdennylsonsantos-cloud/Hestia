@@ -2,6 +2,7 @@ import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom'
 import { frameOfWall } from '@hestia/engine';
 import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { gridGhosts, moveGrids, selectedGrids } from './gridGeom.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews, transformWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
 import { parseNumber } from './numeric.ts';
@@ -28,7 +29,7 @@ export abstract class SelectionTool extends ToolBase {
     return selectedViews(this.env.project(), this.env.selection());
   }
   protected hasSelection(): boolean {
-    return this.movables().length + this.openings().length + this.views().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length > 0;
+    return this.movables().length + this.openings().length + this.views().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length + selectedGrids(this.env.project(), this.env.selection()).length > 0;
   }
   override start(): void {
     this.reset();
@@ -176,7 +177,7 @@ export class MoveTool extends SelectionTool {
     const d = sub(inf.point, this.base);
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     const t = { kind: 'translate' as const, d };
-    this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t));
+    this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t), ...gridGhosts(this.env.project(), selectedGrids(this.env.project(), this.env.selection()), d));
     if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
     this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
   }
@@ -203,6 +204,8 @@ export class MoveTool extends SelectionTool {
         if (seps.length) moveRoomSeparators(this.env, seps, d);
       }
       for (const c of notes) this.env.exec(c);
+      // Grades são do projeto: movem ou copiam (nome automático novo) junto.
+      moveGrids(this.env, selectedGrids(this.env.project(), this.env.selection()), d, this.copy);
     }, this.copy ? this.session : undefined);
     if (this.copy && (els.length || views.length)) this.copies += 1;
   }

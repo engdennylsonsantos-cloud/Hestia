@@ -124,3 +124,7 @@ export function moveGrids(env: Pick<ToolEnv, 'project' | 'exec'>, ids: Id[], d: 
     } else env.exec({ type: 'updateGrid', id, patch: { points } });
   }
 }
+
+/** Prévia tracejada das grades `ids` deslocadas por `d`. */
+export const gridGhosts = (pr: Project, ids: Id[], d: Vec2): PreviewItem[] =>
+  projectGrids(pr).filter((g) => ids.includes(g.id)).flatMap((g) => gridPreviewItems({ points: g.points.map((q) => ({ x: q.x + d.x, y: q.y + d.y })), sag: g.sag }));

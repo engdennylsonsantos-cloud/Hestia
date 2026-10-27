@@ -1,11 +1,17 @@
 import type { Id } from '@hestia/model';
 
 /**
+ * Planta de piso (padrão) ou de cobertura: a de cobertura é a planta do nível com o telhado completo e opaco (`roofPlanMode`
+ * do desenho). É estado de sessão, como as demais vistas.
+ */
+export type PlanKind = 'floor' | 'roof';
+
+/**
  * Vista aberta na barra de vistas. É estado de sessão (não é salvo no projeto): separa "níveis do projeto"
- * de "vistas abertas". Plantas são por nível; corte/elevação por id da vista; prancha por id da folha.
+ * de "vistas abertas". Plantas são por nível (`planKind` ausente = piso); corte/elevação por id da vista; prancha por id da folha.
  */
 export type OpenView =
-  | { kind: 'plan'; levelId: Id }
+  | { kind: 'plan'; levelId: Id; planKind?: PlanKind }
   | { kind: '3d' }
   | { kind: 'section'; viewId: Id }
   | { kind: 'sheet'; sheetId: Id };
@@ -16,6 +22,13 @@ export interface ActiveViewFields {
   levelId: Id;
   sectionId: Id | null;
   sheetId: Id | null;
+  /** Tipo da planta quando `view` é 'plan'; ausente = piso. */
+  planKind?: PlanKind;
+}
+
+/** Tipo da planta de uma vista: 'floor' para qualquer vista que não seja de cobertura. */
+export function planKindOf(v: { planKind?: PlanKind }): PlanKind {
+  return v.planKind === 'roof' ? 'roof' : 'floor';
 }
 
 /** Padrão ao abrir um projeto: só o nível ativo, que é o primeiro nível do projeto. */
@@ -23,11 +36,11 @@ export function defaultOpenViews(levelIds: readonly Id[]): OpenView[] {
   return [{ kind: 'plan', levelId: levelIds[0] ?? 'lv_0' }];
 }
 
-/** Chave estável de uma vista (serve de `key` na barra e para comparar vistas). */
+/** Chave estável de uma vista (serve de `key` na barra e para comparar vistas). Piso e cobertura do mesmo nível são distintas. */
 export function viewKey(v: OpenView): string {
   switch (v.kind) {
     case 'plan':
-      return `plan:${v.levelId}`;
+      return planKindOf(v) === 'roof' ? `roof:${v.levelId}` : `plan:${v.levelId}`;
     case '3d':
       return '3d';
     case 'section':
@@ -89,9 +102,12 @@ export function closeView(list: readonly OpenView[], target: OpenView, active: O
   return { list: removeView(list, target), activate: wasActive ? neighborOf(list, target) : null };
 }
 
-/** Nível cuja planta é liberada ao fechar a aba (só plantas têm nível); null para as demais vistas. */
+/**
+ * Nível cuja planta é liberada ao fechar a aba; null para as demais vistas. A de cobertura não libera: usa a mesma
+ * resolução do nível que a de piso, que pode estar aberta ao lado.
+ */
 export function levelToRelease(v: OpenView): Id | null {
-  return v.kind === 'plan' ? v.levelId : null;
+  return v.kind === 'plan' && planKindOf(v) === 'floor' ? v.levelId : null;
 }
 
 /**
@@ -105,7 +121,7 @@ export function pruneViews(list: readonly OpenView[], exists: (v: OpenView) => b
 export function activeViewOf(ui: ActiveViewFields): OpenView | null {
   switch (ui.view) {
     case 'plan':
-      return { kind: 'plan', levelId: ui.levelId };
+      return planKindOf(ui) === 'roof' ? { kind: 'plan', levelId: ui.levelId, planKind: 'roof' } : { kind: 'plan', levelId: ui.levelId };
     case '3d':
       return { kind: '3d' };
     case 'section':

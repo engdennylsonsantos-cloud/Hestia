@@ -151,6 +151,35 @@ describe('vista ativa (activeViewOf)', () => {
   });
 });
 
+describe('planta de cobertura (planKind)', () => {
+  const R0: OpenView = { kind: 'plan', levelId: 'lv_0', planKind: 'roof' };
+
+  it('piso e cobertura do mesmo nível têm chaves diferentes; planKind ausente é piso', () => {
+    expect(viewKey(R0)).toBe('roof:lv_0');
+    expect(viewKey(T0)).toBe('plan:lv_0');
+    expect(viewKey({ kind: 'plan', levelId: 'lv_0', planKind: 'floor' })).toBe('plan:lv_0');
+    expect(sameView(R0, T0)).toBe(false);
+  });
+
+  it('activeViewOf: a cobertura só aparece quando o tipo da planta é roof', () => {
+    const base = { view: 'plan' as const, levelId: 'lv_0', sectionId: null, sheetId: null };
+    expect(activeViewOf({ ...base, planKind: 'roof' })).toEqual(R0);
+    expect(activeViewOf({ ...base, planKind: 'floor' })).toEqual(T0);
+    expect(activeViewOf(base)).toEqual(T0);
+  });
+
+  it('levelToRelease: a cobertura não libera o nível (a planta de piso pode estar aberta ao lado)', () => {
+    expect(levelToRelease(R0)).toBeNull();
+    expect(levelToRelease(T0)).toBe('lv_0');
+  });
+
+  it('fechar a cobertura ativa deixa a planta de piso do mesmo nível como vizinha', () => {
+    const r = closeView([T0, R0], R0, R0);
+    expect(r.list).toEqual([T0]);
+    expect(r.activate).toEqual(T0);
+  });
+});
+
 describe('padrão ao abrir o projeto (defaultOpenViews)', () => {
   it('abre só o primeiro nível do projeto', () => {
     expect(defaultOpenViews(['lv_2', 'lv_0'])).toEqual([{ kind: 'plan', levelId: 'lv_2' }]);
@@ -163,7 +192,12 @@ describe('padrão ao abrir o projeto (defaultOpenViews)', () => {
 
 describe('estado de vistas abertas no store (sessão)', () => {
   beforeEach(() => {
-    useUi.setState({ view: 'plan', levelId: 'lv_0', sectionId: null, sheetId: null, openViews: DEFAULT_OPEN_VIEWS.map((v) => ({ ...v })) });
+    useUi.setState({ view: 'plan', levelId: 'lv_0', planKind: 'floor', sectionId: null, sheetId: null, openViews: DEFAULT_OPEN_VIEWS.map((v) => ({ ...v })) });
+  });
+
+  it('trocar o tipo da planta do mesmo nível abre a aba de cobertura ao lado da de piso', () => {
+    useUi.setState({ planKind: 'roof' });
+    expect(useUi.getState().openViews).toEqual([T0, { kind: 'plan', levelId: 'lv_0', planKind: 'roof' }]);
   });
 
   it('o padrão ao abrir é só o nível ativo', () => {

@@ -21,7 +21,7 @@ import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, underlayIdOf, effectiveGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
-import { defaultOpenViews } from './openViews.ts';
+import { defaultOpenViews, type PlanKind } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
 import { elevationCommand, type PlanBox } from './elevations.ts';
 import { deleteSelectionIn } from './deleteIds.ts';
@@ -89,10 +89,10 @@ export class Editor {
   get project(): Project { return this.store.project; }
 
   // ---------- vistas ----------
-  /** Chave do viewport: cada planta tem o seu; cada corte ou elevação tem o próprio. */
+  /** Chave do viewport: cada planta tem o seu (a de cobertura tem outro, do mesmo nível); cada corte ou elevação tem o próprio. */
   private viewKey(): Id {
     const st = useUi.getState();
-    return st.view === 'section' ? `sec:${st.sectionId}` : st.levelId;
+    return st.view === 'section' ? `sec:${st.sectionId}` : st.planKind === 'roof' ? `roof:${st.levelId}` : st.levelId;
   }
 
   viewport(): Viewport | null {
@@ -423,8 +423,8 @@ export class Editor {
     });
   }
 
-  selectLevel(id: Id): void {
-    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ levelId: id, selection: [], hover: null, view: 'plan', sectionId: null });
+  selectLevel(id: Id, kind: PlanKind = 'floor'): void {
+    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ levelId: id, planKind: kind, selection: [], hover: null, view: 'plan', sectionId: null });
     this.setTool('select');
   }
 
@@ -444,7 +444,7 @@ export class Editor {
     void abrirComCache(this.portasAbertura, p);
     this.viewports.clear();
     // Abas de vista são da sessão: projeto novo começa só com o nível ativo, sem herdar abas do anterior.
-    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });
+    useUi.setState({ selection: [], levelId: p.levels[0]?.id ?? 'lv_0', view: 'plan', planKind: 'floor', sectionId: null, openViews: defaultOpenViews(p.levels.map((l) => l.id)), options: { ...useUi.getState().options, wallTypeId: p.defaults.wallTypeId, doorTypeId: p.defaults.doorTypeId, windowTypeId: p.defaults.windowTypeId, floorTypeId: keptFloorType(p, useUi.getState().options.floorTypeId), slabTypeId: keptSlabType(p, useUi.getState().options.slabTypeId) } });
     this.setTool('select');
   }
 

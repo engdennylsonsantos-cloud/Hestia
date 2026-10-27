@@ -30,12 +30,18 @@ interface FitRowProps {
 
 const MORE_FALLBACK = 30;
 
-/** Largura natural de cada item (medida numa linha escondida) e quais cabem na largura da caixa. */
+/**
+ * Largura natural de cada item (medida numa linha escondida, uma célula por item) e quais cabem na largura útil da caixa
+ * (descontado o padding; cada item leva o `gap` da caixa, como na linha de verdade).
+ */
 function countFit(box: HTMLElement | null, measure: HTMLElement | null, more: HTMLElement | null, moreW: { w: number }, priorities: readonly number[]): boolean[] {
   if (!box || !measure) return [];
+  const cs = getComputedStyle(box);
+  const gap = parseFloat(cs.columnGap) || 0;
+  const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
   if (more) moreW.w = more.getBoundingClientRect().width || moreW.w;
-  const widths = Array.from(measure.children, (c) => c.getBoundingClientRect().width);
-  return fitMask(widths, priorities, box.clientWidth, moreW.w);
+  const widths = Array.from(measure.children, (c) => c.getBoundingClientRect().width + gap);
+  return fitMask(widths, priorities, box.clientWidth - pad, moreW.w + gap);
 }
 
 const mesmaMascara = (a: readonly boolean[], b: readonly boolean[]): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -83,7 +89,7 @@ export function FitRow({ items, className, role, ariaLabel, moreLabel, moreConte
 
   // Ao abrir, o foco vai para o primeiro botão do popup (teclado).
   useEffect(() => {
-    if (open) pop.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+    if (open) pop.current?.querySelector<HTMLElement>('button:not(:disabled), select:not(:disabled)')?.focus();
   }, [open]);
 
   // Fecha com Escape (devolve o foco ao botão "mais") ou com um clique fora do popup e do botão.
@@ -117,7 +123,7 @@ export function FitRow({ items, className, role, ariaLabel, moreLabel, moreConte
     <>
       <div className={className} ref={box} role={role} aria-label={ariaLabel}>
         <div className="fit-measure" ref={measure} aria-hidden="true">
-          {items.map((it) => <Fragment key={it.key}>{it.node}</Fragment>)}
+          {items.map((it) => <div key={it.key} className="fit-cell">{it.node}</div>)}
         </div>
         {shown.map((it) => <Fragment key={it.key}>{it.node}</Fragment>)}
         {hidden.length > 0 && (
@@ -133,8 +139,9 @@ export function FitRow({ items, className, role, ariaLabel, moreLabel, moreConte
           role="dialog"
           aria-label={moreLabel}
           style={{ left: pos.left, top: pos.top }}
-          onClickCapture={(e) => {
-            // Escolher um item fecha o popup; o botão que abre outro menu (▾) continua aberto.
+          onClick={(e) => {
+            // Escolher um item fecha o popup; o botão que abre outro menu (▾) continua aberto. Na fase de borbulhamento
+            // (não na de captura): fechar antes desmontava o botão e a ação do item não rodava.
             const b = (e.target as Element).closest('button');
             if (b && !b.hasAttribute('aria-haspopup') && !b.disabled) setOpen(false);
           }}

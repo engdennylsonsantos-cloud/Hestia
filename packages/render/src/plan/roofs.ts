@@ -92,6 +92,32 @@ const beside = (u: Vec2, mm: number, escala: number): PapelRotulo => ({ escala, 
 /** Deslocamento em pixels de tela de um vetor do mundo (y da tela cresce para baixo). */
 const screenOffset = (w: Vec2, px: number): { dx: number; dy: number } => ({ dx: w.x * px, dy: -w.y * px });
 
+/**
+ * Desvio do rótulo de área: para cima e para o lado do eixo da seta de caimento, de modo que o texto não fique rente à
+ * haste. O afastamento lateral é a metade da altura do texto (corpo × 1,2) mais uma folga; o desvio para cima tira o
+ * rótulo da ponta da seta, como antes. Sem seta (grosseiro), só sobe um pouco.
+ */
+function areaLabelOffset(up: Vec2 | undefined, coarse: boolean): NonNullable<PapelRotulo['desvio']> {
+  if (coarse || !up) return { mm: coarse ? 1.0 : 5.2, ux: 0, uy: -1 };
+  const len = Math.hypot(up.x, up.y);
+  if (len < 1e-9) return { mm: 5.2, ux: 0, uy: -1 };
+  // Descida da água em coordenadas de tela (y para baixo) e a normal à esquerda dela.
+  const sx = -up.x / len;
+  const sy = up.y / len;
+  let px = -sy;
+  let py = sx;
+  // Lado em que o texto cresce para a direita (fora do eixo) ou, na seta vertical, para cima.
+  if (px < -1e-9 || (Math.abs(px) <= 1e-9 && py > 0)) {
+    px = -px;
+    py = -py;
+  }
+  const lateral = (SURFACE_TEXT_MM * 1.2) / 2 + 1.2;
+  const dx = px * lateral;
+  const dy = py * lateral - 5.2;
+  const mm = Math.hypot(dx, dy);
+  return { mm, ux: dx / mm, uy: dy / mm };
+}
+
 /** Cota absoluta de uma divisa entre águas (cumeeira, espigão ou rincão) no ponto médio: a maior das águas que a encostam; null se nenhuma. */
 export function ridgeElevation(r: ResolvedRoof, a: Vec2, b: Vec2): number | null {
   const m = mid(a, b);
@@ -340,8 +366,8 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       for (const pl of r.planes) if (maior && multiArea(pl.polygon) > multiArea(maior.polygon)) maior = pl;
       const at = maior ? labelPoint(maior.polygon) : labelPoint(foot);
       const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
-      // Grosseiro: deslocamento leve acima. Fino/médio: acima da seta de caimento, que sai do mesmo centroide.
-      if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: coarse ? 1.0 : 5.2, uy: -1 } } });
+      // Fino/médio: acima e ao lado do eixo da seta de caimento, que sai do mesmo centroide; grosseiro: só acima.
+      if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: areaLabelOffset(maior?.up, coarse) } });
     }
   }
   evitarSobreposicao(out.labels);

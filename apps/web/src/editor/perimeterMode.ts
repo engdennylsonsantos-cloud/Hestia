@@ -39,6 +39,8 @@ interface Sessao {
   target: SketchTarget;
   /** Elemento em edição; ausente = criando. */
   editing?: Id;
+  /** Seleção de antes de abrir a edição: o Cancelar a devolve, já que abrir o modo a limpa. */
+  selecaoAnterior?: Id[];
   levelId: Id;
   typeId?: Id;
   opts: PerimeterBarOptions;
@@ -128,7 +130,8 @@ export class PerimeterMode {
     }
     const tool = new PerimeterTool(this.porta.env(), d.target);
     tool.loadDraft(d);
-    this.abrir({ tool, target: d.target, editing: id, levelId: el.levelId, opts });
+    const selecaoAnterior = [...useUi.getState().selection];
+    this.abrir({ tool, target: d.target, editing: id, levelId: el.levelId, opts, selecaoAnterior });
   }
 
   /**
@@ -152,11 +155,15 @@ export class PerimeterMode {
     this.dizer(r.message);
   }
 
-  /** Cancelar: descarta o rascunho e fecha o modo. O elemento em edição não muda. */
+  /**
+   * Cancelar: descarta o rascunho e fecha o modo. O elemento em edição não muda, e a seleção de antes de abrir a edição
+   * volta (na criação, a seleção segue como está).
+   */
   cancel(): void {
     const s = this.sessao;
     if (!s) return;
     this.fechar();
+    if (s.editing) useUi.setState({ selection: s.selecaoAnterior ?? [] });
     this.dizer(s.editing ? 'Edição do perímetro cancelada. O elemento não mudou.' : 'Perímetro descartado.');
   }
 

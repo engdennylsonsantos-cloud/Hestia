@@ -294,3 +294,46 @@ describe('usePerimeter (tela)', () => {
     perimeterActions.cancel();
   });
 });
+
+describe('modo de perímetro: seleção ao cancelar a edição', () => {
+  beforeEach(iniciar);
+
+  /** Cria um piso ou telhado com o modo e Concluir, que já deixa o elemento selecionado. */
+  const criar = (target: 'floor' | 'roof', x = 0) => {
+    editor.setTool(target);
+    desenhar(target, retangulo(x, 0, x + 6, 4));
+    perimeterActions.finish();
+    return useUi.getState().selection[0]!;
+  };
+
+  it.each(['floor', 'roof'] as const)('editar um %s e cancelar devolve a seleção de antes, e o elemento fica intacto', (target) => {
+    const a = criar(target);
+    const b = criar(target, 10);
+    useUi.setState({ selection: [a, b] });
+    const original = editor.project.elements[a];
+    perimeterActions.edit(a);
+    expect(useUi.getState().selection).toEqual([]);
+    perimeterActions.cancel();
+    expect(useUi.getState().selection).toEqual([a, b]);
+    expect(editor.project.elements[a]).toBe(original);
+    expect(editor.perimetro.view().active).toBe(false);
+  });
+
+  it('Concluir a edição continua selecionando o elemento regravado', () => {
+    const a = criar('floor');
+    perimeterActions.edit(a);
+    perimeterActions.finish();
+    expect(useUi.getState().selection).toEqual([a]);
+    expect(editor.project.elements[a]?.kind).toBe('floor');
+  });
+
+  it('cancelar uma criação não seleciona nada', () => {
+    const a = criar('floor');
+    useUi.setState({ selection: [a] });
+    editor.setTool('slab');
+    perimeterActions.cancel();
+    expect(useUi.getState().selection).toEqual([]);
+    expect(conta('slab')).toBe(0);
+    expect(conta('floor')).toBe(1);
+  });
+});

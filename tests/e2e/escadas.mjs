@@ -304,7 +304,7 @@ try {
   });
 
   await rep.step('11 · Tabela de escadas (Vista > Documentar) e exportação CSV', async () => {
-    await page.locator('.rtab', { hasText: 'Vista' }).click();
+    await page.locator('.rtab:visible', { hasText: 'Vista' }).click();
     await page.locator('.rb-bottom', { hasText: 'Tabelas' }).click();
     await page.getByRole('menuitem', { name: 'Tabela de escadas' }).click();
     await page.waitForTimeout(300);

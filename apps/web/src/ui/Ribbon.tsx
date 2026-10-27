@@ -118,6 +118,8 @@ export function Ribbon(): ReactElement {
       node: <button className={`rtab${activeId === tb.id ? ' on' : ''}`} onClick={() => select(tb.id)}>{label}</button>,
       menu: <button className={`fit-tab${activeId === tb.id ? ' on' : ''}`} onClick={() => select(tb.id)}>{label}</button>,
       active: activeId === tb.id,
+      // Modificar e a aba aberta ficam na linha; as demais saem para o "»" na ordem de sempre (as últimas primeiro).
+      priority: tb.id === 'modificar' || activeId === tb.id ? 5 : 0,
     };
   });
 

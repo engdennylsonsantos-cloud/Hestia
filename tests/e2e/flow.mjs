@@ -95,7 +95,7 @@ await page.keyboard.press('Control+z');
 check('desfazer edição de tipo', (await page.evaluate(() => window.__hestia.editor.project.wallTypes.wt_alv14.layers.length)) === 5);
 
 // 7. materiais
-await page.locator('.rtab', { hasText: 'Gerenciar' }).click();
+await page.locator('.rtab:visible', { hasText: 'Gerenciar' }).click();
 await page.getByRole('button', { name: /Materiais/ }).click();
 await page.screenshot({ path: `${OUT}/21-materials.png` });
 await page.keyboard.press('Escape');

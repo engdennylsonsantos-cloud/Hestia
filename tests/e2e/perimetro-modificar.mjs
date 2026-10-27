@@ -263,7 +263,7 @@ await rep.step('Concluir cria o piso e fecha o modo; a faixa volta ao normal', a
 });
 
 await rep.step('fora do modo, Mover continua a ferramenta normal do app', async () => {
-  await page.locator('.rtab', { hasText: 'Modificar' }).first().click();
+  await page.locator('.rtab:visible', { hasText: 'Modificar' }).first().click();
   await botao('Mover').click();
   const tool = await page.evaluate(() => window.__hestia.useUi.getState().tool);
   check('ferramenta Mover ativa', tool === 'move', tool);

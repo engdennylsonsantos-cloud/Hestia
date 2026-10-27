@@ -472,7 +472,7 @@ async function itemEtiquetas(page) {
   await tirar(page, '3-etiqueta-lider-detalhe');
   await enquadrar(page, { x0: -1.5, y0: -3.2, x1: 9.5, y1: 7.2 });
 
-  await page.locator('.rtab', { hasText: /Anotar|Annotate/ }).click();
+  await page.locator('.rtab:visible', { hasText: /Anotar|Annotate/ }).click();
   const botao = page.locator('button[aria-label="Etiquetar todos"], button[aria-label="Tag All"]');
   await botao.first().waitFor({ state: 'visible' });
   await botao.first().click();

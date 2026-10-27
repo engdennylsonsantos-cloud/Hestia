@@ -14,6 +14,7 @@ export * from './templates.ts';
 export * from './wall.ts';
 export * from './validate.ts';
 export { STAIR_MIN_HEIGHT } from './validateStairs.ts';
+export { mansardProblems } from './validateRoofMansard.ts';
 export * from './profile.ts';
 export * from './floor.ts';
 export * from './slab.ts';

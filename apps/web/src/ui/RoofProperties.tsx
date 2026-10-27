@@ -8,6 +8,7 @@ import { useUi } from '../editor/state.ts';
 import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
+import { RoofMansardSection } from './RoofMansardProps.tsx';
 import { RoofPlanesSection } from './RoofPlanesProps.tsx';
 import { RoofProfileRow } from './RoofProfileRow.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
@@ -161,6 +162,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         <div className="hint">O balanço do beiral se define por aresta, em Editar perímetro. O contorno se ajusta pelas alças.</div>
       </Group>
       {freeRoof && <RoofPlanesSection roof={freeRoof} />}
+      {single && <RoofMansardSection roof={single} />}
       <Group title="Beiral e acabamentos">
         <Row label="Unir telhados" htmlFor="p-rjoin">
           <Check id="p-rjoin" checked={joinOthers.value} mixed={joinOthers.mixed} onChange={(v) => patch(ids, { joinOthers: v })}>Unir telhados que se sobrepõem</Check>

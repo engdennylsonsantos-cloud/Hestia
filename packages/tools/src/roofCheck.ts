@@ -1,6 +1,6 @@
 import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
-import { isRoof, type Id, type Project, type Roof } from '@hestia/model';
+import { isRoof, mansardProblems, type Id, type Project, type Roof } from '@hestia/model';
 import { hasRoofArcs, roofEaveArcsProblem } from './perimeterRoofArcs.ts';
 import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
@@ -113,7 +113,9 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
 export function roofPatchProblem(p: Project, ids: Id[], patch: Partial<Roof>): string | null {
   if (!Object.keys(patch).some((k) => GEOMETRY_KEYS.includes(k as keyof Roof))) return null;
   const roofs = ids.map((id) => p.elements[id]).filter(isRoof).map((r) => ({ ...r, ...patch }));
-  return roofProblem(p, roofs);
+  // Mansarda com número inválido ou larga demais: recusa com a mensagem da validação do modelo.
+  const mansard = roofs.flatMap((r) => mansardProblems(r, `"${r.mark || r.id}"`))[0];
+  return mansard ? mansard.message : roofProblem(p, roofs);
 }
 
 /** Aplica a alteração de telhados pelo ambiente da ferramenta, se o motor ainda gerar águas; senão não aplica e avisa. */

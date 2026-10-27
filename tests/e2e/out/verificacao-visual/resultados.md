@@ -1,6 +1,6 @@
 # Verificação visual — resultados da execução
 
-- **Gerado em:** 2026-10-27T01:25:20.719Z
+- **Gerado em:** 2026-10-27T03:10:29.047Z
 - **URL:** `file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-r3-picking/apps/web/dist/index.html?debug=1`
 - **Navegador:** 155.0.8059.86 (C:\Program Files\Google\Chrome\Application\chrome.exe)
 - **Viewport:** 1440×900 (deviceScaleFactor 1)

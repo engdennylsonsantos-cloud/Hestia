@@ -1,31 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { polygonArea, ringArea } from '@hestia/geom';
-import { roofsOnLevel, type Project, type Roof } from '@hestia/model';
+import { polygonArea, ringArea, type Vec2 } from '@hestia/geom';
+import { roofsOnLevel, type Project, type ProjectStore, type Roof } from '@hestia/model';
 import { roofDirFor } from './roofGeom.ts';
 import { ringPerimeter } from './floorPick.ts';
 import { outerPerimeter } from './enclosed.ts';
-import { clickAt, drawWall, makeEnv, P, tool } from './testEnv.ts';
-import type { RoofMode } from './types.ts';
+import { commitPerimeter } from './perimeterCommit.ts';
+import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
+import { addSegs, newDraft, setSegSlope, type NewSeg } from './perimeterSession.ts';
+import { drawWall, makeEnv } from './testEnv.ts';
 
 const roofs = (p: Project): Roof[] => roofsOnLevel(p, 'lv_0');
 
-function roofCtx(mode: RoofMode) {
-  const ctx = makeEnv();
-  ctx.options.roofMode = mode;
-  const msgs: string[] = [];
-  ctx.env.say = (m: string) => msgs.push(m);
-  return { ...ctx, msgs };
+/** Lados de um anel, na ordem do contorno: cada lado vai de um vértice ao seguinte. */
+const sidesOf = (ring: Vec2[]): NewSeg[] => ring.map((a, i) => ({ a, b: ring[(i + 1) % ring.length]! }));
+const retangulo = (w: number, h: number): Vec2[] => [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }];
+
+/**
+ * Cria o telhado pelo commit do perímetro (o caminho da faixa) e o aplica à loja. `semAguas` são os índices dos lados
+ * que não definem inclinação; as demais opções substituem o padrão do rascunho.
+ */
+function criar(store: ProjectStore, segs: NewSeg[], opts: CommitPerimeterOptions = {}, semAguas: number[] = []): CommitPerimeterResult {
+  let d = addSegs(newDraft('roof'), segs);
+  for (const i of semAguas) d = setSegSlope(d, d.segs[i]!.id, { definesSlope: false });
+  const r = commitPerimeter(store.project, d, { typeId: 'rt_ceramica', levelId: 'lv_0', ...opts });
+  if (r.ok) for (const c of r.commands) store.exec(c);
+  return r;
 }
 
-describe('ferramenta Telhado: contorno por cliques (A1)', () => {
-  it('quatro cliques e o primeiro ponto criam o telhado com forma, inclinação e cota padrão, selecionado', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 0);
-    clickAt(t, 6, 4);
-    clickAt(t, 0, 4);
-    clickAt(t, 0, 0);
+describe('ferramenta Telhado: criação pelo perímetro (A1)', () => {
+  it('retângulo 6 × 4 cria o telhado com forma, inclinação e cota padrão', () => {
+    const ctx = makeEnv();
+    expect(criar(ctx.store, sidesOf(retangulo(6, 4))).ok).toBe(true);
     const rs = roofs(ctx.store.project);
     expect(rs).toHaveLength(1);
     const r = rs[0]!;
@@ -34,197 +39,110 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(r.typeId).toBe('rt_ceramica');
     expect(r.levelId).toBe('lv_0');
     expect(r.boundary).toHaveLength(4);
-    // A pegada é o retângulo clicado; o beiral sai dele pelo balanço padrão de 0,5 m (cantos em esquadria: 7 × 5).
+    // A pegada é o retângulo desenhado; o beiral sai dele pelo balanço padrão de 0,5 m (cantos em esquadria: 7 × 5).
     expect(polygonArea([r.footprint!])).toBeCloseTo(24, 6);
     expect(polygonArea([r.boundary])).toBeCloseTo(35, 6);
-    // A forma da barra (duas águas, padrão) vira predefinições por aresta: lados longos definem, curtos são empenas.
+    // Todas as arestas definem inclinação por padrão: o motor lê isso como forma por arestas.
     expect(r.shape).toBe('edges');
     expect(r.edgeSlopes).toEqual([30, 30, 30, 30]);
     expect(r.slopePercent).toBe(30);
     expect(r.heightOffset).toBe(2.8);
-    expect(ctx.sel()).toEqual([r.id]);
-    expect(ctx.msgs.at(-1)).toMatch(/Telhado criado.*Ctrl\+Z desfaz/);
   });
 
   it('a cumeeira sai ao longo do lado maior do contorno', () => {
-    const ctx = roofCtx('rect');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(6, 4)));
     expect(roofs(ctx.store.project)[0]!.dir).toEqual({ x: 1, y: 0 });
   });
 
-  it('Tab inverte o eixo da cumeeira antes de criar', () => {
-    const ctx = roofCtx('rect');
-    const t = tool('roof', ctx.env);
-    t.tab();
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
-    expect(roofs(ctx.store.project)[0]!.dir).toEqual(roofDirFor('gable', { x: 1, y: 0 }, true));
+  it('o eixo ortogonal (opção axis) põe a cumeeira no outro sentido', () => {
+    const ctx = makeEnv();
+    const axis = roofDirFor('gable', { x: 1, y: 0 }, true);
+    criar(ctx.store, sidesOf(retangulo(6, 4)), { axis });
+    expect(roofs(ctx.store.project)[0]!.dir).toEqual(axis);
   });
 
-  it('digitar o comprimento do segmento segue a direção do cursor', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    t.move(P(1, 0));
-    expect(t.inputPrompt()).toBe('Comprimento');
-    expect(t.type('3')).toBe(true);
-    clickAt(t, 3, 3);
-    clickAt(t, 0, 3);
-    t.confirm();
+  it('cota do beiral, tipo e inclinação vêm das opções', () => {
+    const ctx = makeEnv();
+    expect(criar(ctx.store, sidesOf(retangulo(6, 4)), { heightOffset: 3.2, typeId: 'rt_fibro', slopePct: 15 }).ok).toBe(true);
     const r = roofs(ctx.store.project)[0]!;
-    expect(r.footprint![1]!.x).toBeCloseTo(3);
-    expect(r.footprint![1]!.y).toBeCloseTo(0);
-    expect(polygonArea([r.footprint!])).toBeCloseTo(9, 6);
-  });
-
-  it('contorno de área zero não cria telhado e avisa', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 1, 0);
-    clickAt(t, 2, 0);
-    t.confirm();
-    expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/área zero/);
-  });
-
-  it('Enter fecha com três pontos ou mais', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 3, 0);
-    clickAt(t, 0, 3);
-    t.confirm();
-    expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
-  });
-
-  it('Enter com dois pontos não cria telhado, avisa do mínimo e mantém os pontos para continuar', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 3, 0);
-    t.confirm();
-    expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/Contorno precisa de ao menos 3 pontos/);
-    clickAt(t, 0, 3);
-    t.confirm();
-    expect(roofs(ctx.store.project)[0]!.boundary).toHaveLength(3);
-  });
-
-  it('Esc no meio do contorno descarta os pontos, avisa e deixa claro que outro Esc sai da ferramenta', () => {
-    const ctx = roofCtx('poly');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 3, 0);
-    t.cancel();
-    expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/Contorno cancelado.*Esc de novo sai da ferramenta/);
+    expect(r.heightOffset).toBe(3.2);
+    expect(r.typeId).toBe('rt_fibro');
+    expect(r.slopePercent).toBe(15);
+    expect(r.edgeSlopes).toEqual([15, 15, 15, 15]);
   });
 
   it('inclinação inválida nas opções não cria telhado', () => {
-    const ctx = roofCtx('rect');
-    ctx.options.roofSlope = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf(retangulo(6, 4)), { slopePct: 0 });
+    expect(r.ok).toBe(false);
     expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/maior que zero/);
+    expect(r.message).toMatch(/maior que zero/);
   });
 
-  it('cota do beiral digitada nas opções vale; forma e tipo vêm da barra', () => {
-    const ctx = roofCtx('rect');
-    ctx.options.roofOffset = 3.2;
-    ctx.options.roofShape = 'shed';
-    ctx.options.roofSlope = 15;
-    ctx.options.roofTypeId = 'rt_fibro';
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
-    const r = roofs(ctx.store.project)[0]!;
-    expect(r.heightOffset).toBe(3.2);
-    expect(r.shape).toBe('edges');
-    // Uma água sobe no eixo curto (y): só a aresta mais baixa (y = 0) define inclinação.
-    expect(r.edgeSlopes).toEqual([15, null, null, null]);
-    expect(r.slopePercent).toBe(15);
-    expect(r.typeId).toBe('rt_fibro');
+  it('contorno de área zero não cria telhado', () => {
+    const ctx = makeEnv();
+    const colinear: NewSeg[] = [
+      { a: { x: 0, y: 0 }, b: { x: 1, y: 0 } },
+      { a: { x: 1, y: 0 }, b: { x: 2, y: 0 } },
+      { a: { x: 2, y: 0 }, b: { x: 0, y: 0 } },
+    ];
+    expect(criar(ctx.store, colinear).ok).toBe(false);
+    expect(roofs(ctx.store.project)).toHaveLength(0);
   });
 });
 
-describe('ferramenta Telhado: pelas paredes com balanço (A2)', () => {
-  it('o beiral sai do perímetro externo pelo balanço, com cantos em esquadria', () => {
-    const ctx = roofCtx('paredes');
+describe('ferramenta Telhado: beiral a partir das paredes externas (A2)', () => {
+  /** Quatro paredes de um retângulo 4 × 3 (x 0..4, y 0..3). */
+  function casa(ctx: ReturnType<typeof makeEnv>): void {
     drawWall(ctx.env, [0, 0], [4, 0]);
     drawWall(ctx.env, [4, 0], [4, 3]);
     drawWall(ctx.env, [4, 3], [0, 3]);
     drawWall(ctx.env, [0, 3], [0, 0]);
+  }
+
+  it('a pegada é o perímetro externo e o beiral sai dele pelo balanço, com cantos em esquadria', () => {
+    const ctx = makeEnv();
+    casa(ctx);
     const outer = outerPerimeter(ctx.store.project, 'lv_0', { x: 2, y: 0 })!;
-    ctx.options.roofOverhang = 0.5;
-    clickAt(tool('roof', ctx.env), 2, 0);
+    expect(criar(ctx.store, sidesOf(outer), { overhang: 0.5 }).ok).toBe(true);
     const r = roofs(ctx.store.project)[0]!;
+    expect(r.footprint).toBeDefined();
+    expect(polygonArea([r.footprint!])).toBeCloseTo(polygonArea([outer]), 6);
     // Retângulo com cantos em esquadria: área = A + P·d + 4·d² (d = balanço).
-    const area = Math.abs(ringArea(outer));
-    expect(Math.abs(ringArea(r.boundary))).toBeCloseTo(area + 0.5 * ringPerimeter(outer) + 4 * 0.25, 2);
+    expect(Math.abs(ringArea(r.boundary))).toBeCloseTo(Math.abs(ringArea(outer)) + 0.5 * ringPerimeter(outer) + 4 * 0.25, 2);
   });
 
   it('balanço zero deixa o beiral igual ao perímetro externo', () => {
-    const ctx = roofCtx('paredes');
-    drawWall(ctx.env, [0, 0], [4, 0]);
-    drawWall(ctx.env, [4, 0], [4, 3]);
-    drawWall(ctx.env, [4, 3], [0, 3]);
-    drawWall(ctx.env, [0, 3], [0, 0]);
+    const ctx = makeEnv();
+    casa(ctx);
     const outer = outerPerimeter(ctx.store.project, 'lv_0', { x: 2, y: 0 })!;
-    ctx.options.roofOverhang = 0;
-    clickAt(tool('roof', ctx.env), 2, 0);
+    criar(ctx.store, sidesOf(outer), { overhang: 0 });
     expect(Math.abs(ringArea(roofs(ctx.store.project)[0]!.boundary))).toBeCloseTo(Math.abs(ringArea(outer)), 6);
-  });
-
-  it('clique longe das paredes não cria telhado e pede uma parede', () => {
-    const ctx = roofCtx('paredes');
-    drawWall(ctx.env, [0, 0], [4, 0]);
-    const t = tool('roof', ctx.env);
-    clickAt(t, 20, 20);
-    expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/parede do nível/);
   });
 });
 
 describe('ferramenta Telhado: duas águas sem arestas paralelas (defeito 3)', () => {
-  it('triângulo em duas águas avisa que só uma aresta define a cumeeira e diz como resolver', () => {
-    const ctx = roofCtx('poly');
-    ctx.options.roofShape = 'gable';
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 0);
-    clickAt(t, 3, 4);
-    clickAt(t, 0, 0);
-    const r = roofs(ctx.store.project)[0]!;
-    expect(r.edgeSlopes.filter((s) => s !== null)).toHaveLength(1);
-    expect(ctx.msgs.at(-1)).toMatch(/só 1 aresta paralela à cumeeira/);
-    expect(ctx.msgs.at(-1)).toMatch(/Quatro águas/);
+  it('triângulo com só uma aresta definindo inclinação sai com uma água', () => {
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf([{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 3, y: 4 }]), {}, [1, 2]);
+    expect(r.ok).toBe(true);
+    expect(roofs(ctx.store.project)[0]!.edgeSlopes.filter((s) => s !== null)).toHaveLength(1);
+    expect(r.message).toMatch(/1 água/);
   });
 
-  it('retângulo em duas águas não avisa', () => {
-    const ctx = roofCtx('rect');
-    ctx.options.roofShape = 'gable';
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
-    expect(ctx.msgs.at(-1)).toMatch(/Telhado criado: 2 águas/);
+  it('retângulo com as arestas curtas sem inclinação sai com duas águas', () => {
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf(retangulo(6, 4)), {}, [1, 3]);
+    expect(r.ok).toBe(true);
+    expect(r.message).toMatch(/2 águas/);
   });
 });
 
 describe('ferramenta Telhado: o beiral sai para fora da pegada (balanço)', () => {
-  it('contorno clicado com balanço 0,5 m: a pegada é o desenho e o beiral tem área pegada + 0,5 × perímetro + 1', () => {
-    const ctx = roofCtx('poly');
-    ctx.options.roofOverhang = 0.5;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 4, 0);
-    clickAt(t, 4, 3);
-    clickAt(t, 0, 3);
-    clickAt(t, 0, 0);
+  it('contorno 4 × 3 com balanço 0,5 m: a pegada é o desenho e o beiral tem área pegada + 0,5 × perímetro + 1', () => {
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf([{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 3 }, { x: 0, y: 3 }]), { overhang: 0.5 });
     const r = roofs(ctx.store.project)[0]!;
     expect(polygonArea([r.footprint!])).toBeCloseTo(12, 6);
     expect(polygonArea([r.boundary])).toBeCloseTo(12 + 0.5 * 14 + 1, 6);
@@ -232,11 +150,8 @@ describe('ferramenta Telhado: o beiral sai para fora da pegada (balanço)', () =
   });
 
   it('retângulo com balanço 0,5 m: o beiral sai pelos quatro lados (6 × 4 vira 7 × 5)', () => {
-    const ctx = roofCtx('rect');
-    ctx.options.roofOverhang = 0.5;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 4);
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(6, 4)), { overhang: 0.5 });
     const r = roofs(ctx.store.project)[0]!;
     expect(polygonArea([r.footprint!])).toBeCloseTo(24, 6);
     expect(polygonArea([r.boundary])).toBeCloseTo(35, 6);
@@ -245,34 +160,13 @@ describe('ferramenta Telhado: o beiral sai para fora da pegada (balanço)', () =
   });
 
   it('balanço zero: o beiral é a própria pegada', () => {
-    const ctx = roofCtx('poly');
-    ctx.options.roofOverhang = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 0);
-    clickAt(t, 6, 4);
-    clickAt(t, 0, 4);
-    clickAt(t, 0, 0);
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(6, 4)), { overhang: 0 });
     const r = roofs(ctx.store.project)[0]!;
     expect(r.boundary).toHaveLength(4);
     r.boundary.forEach((q, i) => {
       expect(q.x).toBeCloseTo(r.footprint![i]!.x, 9);
       expect(q.y).toBeCloseTo(r.footprint![i]!.y, 9);
     });
-  });
-
-  it('pelas paredes: a pegada é o perímetro externo e o beiral sai dele pelo balanço', () => {
-    const ctx = roofCtx('paredes');
-    drawWall(ctx.env, [0, 0], [4, 0]);
-    drawWall(ctx.env, [4, 0], [4, 3]);
-    drawWall(ctx.env, [4, 3], [0, 3]);
-    drawWall(ctx.env, [0, 3], [0, 0]);
-    const outer = outerPerimeter(ctx.store.project, 'lv_0', { x: 2, y: 0 })!;
-    ctx.options.roofOverhang = 0.5;
-    clickAt(tool('roof', ctx.env), 2, 0);
-    const r = roofs(ctx.store.project)[0]!;
-    expect(r.footprint).toBeDefined();
-    expect(polygonArea([r.footprint!])).toBeCloseTo(polygonArea([outer]), 6);
-    expect(polygonArea([r.boundary])).toBeCloseTo(polygonArea([outer]) + 0.5 * ringPerimeter(outer) + 1, 2);
   });
 });

@@ -49,12 +49,6 @@ function drawPanel(id: ToolId): RibbonPanel | null {
         option(t('Retângulo', 'Rectangle'), 'plan', same('ceilingMode', 'rect'), { ceilingMode: 'rect' }, 'ceiling'),
         option(t('Por ambiente', 'By Room'), 'room', same('ceilingMode', 'room'), { ceilingMode: 'room' }, 'ceiling'),
       );
-    case 'roof':
-      return mk(
-        option(t('Contorno por pontos', 'Sketch'), 'filledRegion', (o) => (o.roofMode ?? 'poly') === 'poly', { roofMode: 'poly' }, 'roof'),
-        option(t('Retângulo', 'Rectangle'), 'plan', same('roofMode', 'rect'), { roofMode: 'rect' }, 'roof'),
-        option(t('Por paredes', 'Pick Walls'), 'room', same('roofMode', 'paredes'), { roofMode: 'paredes' }, 'roof'),
-      );
     default:
       return null;
   }

@@ -82,9 +82,6 @@ export type TrimMode = 'canto' | 'unico' | 'varios';
 /** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
 export type CeilingMode = 'poly' | 'rect' | 'room';
 
-/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo ou pelo perímetro externo das paredes (com balanço). 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
-export type RoofMode = 'poly' | 'rect' | 'paredes' | 'extrusao';
-
 /** Quais capturas estão ligadas (AutoCAD / Revit Snaps). */
 export interface SnapOptions {
   /** Chave mestre: se falso, desativa todas as capturas temporariamente (AutoCAD F3 / Revit SO). */
@@ -224,9 +221,8 @@ export interface ToolOptions {
   ceilingTypeId?: Id;
   ceilingOffset?: number;
   ceilingMode?: CeilingMode;
-  /** Telhado: tipo, modo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
+  /** Telhado: tipo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
   roofTypeId?: Id;
-  roofMode?: RoofMode;
   roofShape?: RoofShape;
   roofSlope?: number;
   roofOverhang?: number;

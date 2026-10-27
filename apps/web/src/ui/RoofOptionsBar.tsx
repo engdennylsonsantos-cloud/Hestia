@@ -1,34 +1,26 @@
 import type { ReactElement } from 'react';
 import { ROOF_SHAPE_LABEL } from '@hestia/engine';
-import { percentToDeg, roofAutoOffset, roofSlopeFromDegField, type RoofMode } from '@hestia/tools';
+import { percentToDeg, roofAutoOffset, roofSlopeFromDegField } from '@hestia/tools';
 import type { RoofShape } from '@hestia/model';
-import { editor, useProject } from '../editor/controller.ts';
+import { useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
-
-const MODES: Array<[RoofMode, string]> = [
-  ['poly', 'Contorno por pontos'],
-  ['rect', 'Retângulo (2 cantos)'],
-  ['paredes', 'Pelas paredes (com balanço)'],
-  ['extrusao', 'Por extrusão (perfil)'],
-];
 
 /** Predefinições por aresta (Revit: Define Slope): cada forma preenche as arestas que definem inclinação. Extrusão tem perfil. */
 const SHAPES: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'extrusion'];
 
 /**
- * Opções da ferramenta Telhado: tipo, modo, forma, inclinação (% e graus, convertidos entre si), balanço do beiral e
- * cota do beiral. Cota "Automática" usa a altura da parede mais alta do nível (2,8 m sem paredes).
+ * Opções da ferramenta Telhado: tipo, forma, inclinação (% e graus, convertidos entre si), balanço do beiral e cota do
+ * beiral. Cota "Automática" usa a altura da parede mais alta do nível (2,8 m sem paredes).
  */
-export function RoofOptionsBar({ tool }: { tool: 'roof' | 'roofextrusion' }): ReactElement {
+// A prop `tool` ainda vem de OptionsBar; o seletor de modo que a lia saiu.
+export function RoofOptionsBar(_props: { tool: 'roof' | 'roofextrusion' }): ReactElement {
   const p = useProject();
   const o = useUi((s) => s.options);
   const levelId = useUi((s) => s.levelId);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...useUi.getState().options, ...patch } });
   const slope = o.roofSlope ?? 30;
   const offsetAuto = roofAutoOffset(p, levelId);
-  // O modo "extrusao" só vale com a ferramenta própria ativa; na ferramenta Telhado o seletor mostra o contorno.
-  const modeValue: RoofMode = tool === 'roofextrusion' ? 'extrusao' : o.roofMode === 'extrusao' ? 'poly' : (o.roofMode ?? 'poly');
   return (
     <>
       <label>
@@ -36,24 +28,6 @@ export function RoofOptionsBar({ tool }: { tool: 'roof' | 'roofextrusion' }): Re
         <select id="opt-rooftype" className="select" value={o.roofTypeId ?? ''} onChange={(e) => set({ roofTypeId: e.target.value })}>
           {Object.values(p.roofTypes).map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Modo
-        <select
-          id="opt-roofmode"
-          className="select"
-          value={modeValue}
-          onChange={(e) => {
-            // Trocar o modo reinicia o desenho em andamento (o modo é lido pela ferramenta a cada passo).
-            // "Por extrusão" é a ferramenta própria (roofextrusion); os demais modos ficam na ferramenta Telhado.
-            set({ roofMode: e.target.value as RoofMode });
-            editor.setTool(e.target.value === 'extrusao' ? 'roofextrusion' : 'roof');
-          }}
-        >
-          {MODES.map(([id, label]) => (
-            <option key={id} value={id}>{label}</option>
           ))}
         </select>
       </label>

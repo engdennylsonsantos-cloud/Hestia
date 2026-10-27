@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject, makeRoof, makeWall, roofsOnLevel, wallsOnLevel, type Project, type Roof, type Wall } from '@hestia/model';
 import { roofWallIssues, wallZRange } from '@hestia/engine';
 import { TOOL_LABEL, TOOL_GROUPS, createTool, type ToolEnv } from './index.ts';
+import { commitPerimeter } from './perimeterCommit.ts';
+import { addSegs, newDraft } from './perimeterSession.ts';
 import { clickAt, drawWall, makeEnv, tool } from './testEnv.ts';
 
 /** Ambiente com a captura das mensagens da barra de status. */
@@ -12,15 +14,14 @@ function ctxWithSay() {
   return { ...ctx, env, msgs, last: () => msgs[msgs.length - 1] ?? '' };
 }
 
-/** Telhado retangular 6 × 4 (x 0..6, y 0..4) criado pela ferramenta Telhado, como em roofEdit.test. */
+/** Telhado retangular 6 × 4 (x 0..6, y 0..4) criado pelo commit do perímetro, como em roofEdit.test. */
 function withRoof() {
   const ctx = ctxWithSay();
+  const cantos = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }];
   // Balanço zero: o beiral é o retângulo 6 × 4 desenhado, como os cálculos de cobertura destes testes esperam.
-  ctx.options.roofOverhang = 0;
-  ctx.options.roofMode = 'rect';
-  const t = tool('roof', ctx.env);
-  clickAt(t, 0, 0);
-  clickAt(t, 6, 4);
+  const res = commitPerimeter(ctx.store.project, addSegs(newDraft('roof'), cantos.map((a, i) => ({ a, b: cantos[(i + 1) % 4]! }))), { typeId: 'rt_ceramica', levelId: 'lv_0', overhang: 0 });
+  if (!res.ok) throw new Error(res.message);
+  for (const c of res.commands) ctx.store.exec(c);
   const r = roofsOnLevel(ctx.store.project, 'lv_0')[0]!;
   return { ...ctx, roofId: r.id, roof: () => ctx.store.project.elements[r.id] as Roof };
 }

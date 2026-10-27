@@ -172,7 +172,6 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   ceilingOffset: 2.6,
   ceilingMode: 'poly',
   roofTypeId: 'rt_ceramica',
-  roofMode: 'poly',
   roofShape: 'edges',
   roofSlope: 30,
   roofOverhang: 0.5,

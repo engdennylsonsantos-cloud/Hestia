@@ -75,7 +75,6 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {(tool === 'roof' || tool === 'roofextrusion') && (
         <Group title="Colocação · Telhado">
-          <Row label="Modo" htmlFor="place-roof-mode"><select id="place-roof-mode" className="select" value={tool === 'roofextrusion' ? 'extrusao' : o.roofMode ?? 'poly'} onChange={(e) => { set({ roofMode: e.target.value as NonNullable<typeof o.roofMode> }); editor.setTool(e.target.value === 'extrusao' ? 'roofextrusion' : 'roof'); }}><option value="poly">Contorno por pontos</option><option value="rect">Retângulo</option><option value="paredes">Pelas paredes</option><option value="extrusao">Por extrusão</option></select></Row>
           <Row label="Forma" htmlFor="place-roof-shape"><select id="place-roof-shape" className="select" value={o.roofShape ?? 'gable'} onChange={(e) => set({ roofShape: e.target.value as NonNullable<typeof o.roofShape> })}><option value="shed">Uma água</option><option value="gable">Duas águas</option><option value="hip">Quatro águas</option><option value="edges">Por arestas</option><option value="extrusion">Extrusão</option></select></Row>
           <Row label="Inclinação" htmlFor="place-roof-slope"><NumField id="place-roof-slope" value={o.roofSlope ?? 30} unit="%" min={0.1} onCommit={(v) => set({ roofSlope: v })} /></Row>
           <Row label="Balanço do beiral" htmlFor="place-roof-overhang"><NumField id="place-roof-overhang" value={o.roofOverhang ?? 0.5} unit="m" min={0} onCommit={(v) => set({ roofOverhang: v })} /></Row>

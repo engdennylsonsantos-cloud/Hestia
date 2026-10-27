@@ -52,8 +52,8 @@ const sup = (o: Partial<OpeningOptionSupport>): OpeningOptionSupport => ({ ...NO
 const DOOR_LEAF = { leafStyle: true, glassRatio: true, handle: true, threshold: true, glassKind: true, grid: true, casing: true, lintel: true, frame: true, reveal: true };
 
 const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
-  door_swing: sup({ ...DOOR_LEAF, transom: true, sidelights: true, hinges: true, nominalRef: true, angle: true }),
-  door_double: sup({ ...DOOR_LEAF, transom: true, sidelights: true, hinges: true, nominalRef: true, angle: true }),
+  door_swing: sup({ ...DOOR_LEAF, transom: true, sidelights: true, hinges: true, angle: true }),
+  door_double: sup({ ...DOOR_LEAF, transom: true, sidelights: true, hinges: true, angle: true }),
   door_dblact: sup({ ...DOOR_LEAF, hinges: false, angle: true }),
   door_pivot: sup({ ...DOOR_LEAF, transom: true, angle: true }),
   door_sliding: sup({ ...DOOR_LEAF, transom: true }),

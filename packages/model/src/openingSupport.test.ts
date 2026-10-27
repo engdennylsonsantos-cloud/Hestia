@@ -11,9 +11,9 @@ describe('opções por família', () => {
     expect(openingOptionSupport('window_casement').transom).toBe(true);
     for (const id of ['window_hung', 'window_louver', 'window_void', 'door_void', 'door_garage'] as const) expect(openingOptionSupport(id).transom, id).toBe(false);
   });
-  it('só a basculante tem eixo; só portas de giro têm referência de folha', () => {
+  it('só a basculante tem eixo; a referência nominal da folha ainda não é oferecida (fica fora do diálogo)', () => {
     expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).tiltAxis).map((f) => f.id)).toEqual(['window_tilt']);
-    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).nominalRef).map((f) => f.id)).toEqual(['door_swing', 'door_double']);
+    expect(OPENING_FAMILIES.some((f) => openingOptionSupport(f.id).nominalRef)).toBe(false);
   });
   it('família nula ou desconhecida: nada se aplica', () => {
     expect(Object.values(openingOptionSupport(null)).every((v) => v === false)).toBe(true);

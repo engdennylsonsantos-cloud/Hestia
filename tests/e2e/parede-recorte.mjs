@@ -4,7 +4,7 @@
 // se algo falhou (ou se houver erro de console).
 //   npm run build && node tests/e2e/parede-recorte.mjs
 import { mkdirSync } from 'node:fs';
-import { launch, makeReporter, openApp } from './helpers.mjs';
+import { launch, makeReporter, openApp, perimetroPorPontos } from './helpers.mjs';
 
 const OUT = process.env.SHOTS ?? 'test-results/parede-recorte';
 mkdirSync(OUT, { recursive: true });
@@ -54,12 +54,10 @@ await rep.step('desenhar a sala 4 × 3 m e uma parede solta', async () => {
 });
 
 await rep.step('criar um piso retangular que atravessa as quatro paredes da sala', async () => {
-  await options({ floorMode: 'rect', floorTypeId: 'ft_ceram' });
-  await tool('floor');
-  await page.waitForTimeout(150);
-  await click(-0.2, -0.2);
-  await click(4.2, 3.2);
-  await page.keyboard.press('Escape');
+  // Pelo modo de perímetro: o retângulo é o esboço de quatro lados (o tipo vem das opções, como ao começar pela faixa).
+  await options({ floorTypeId: 'ft_ceram' });
+  const res = await perimetroPorPontos(page, 'floor', [[-0.2, -0.2], [4.2, -0.2], [4.2, 3.2], [-0.2, 3.2]]);
+  check('piso criado pelo modo de perímetro', res.ok, res.msg);
   await page.waitForTimeout(300);
   const info = await page.evaluate(() => {
     const { editor } = window.__hestia;
@@ -72,7 +70,7 @@ await rep.step('criar um piso retangular que atravessa as quatro paredes da sala
     return { id: f.id, area, heightOffset: f.heightOffset };
   });
   check('piso criado por retângulo', info !== null);
-  check('retângulo cobrindo as quatro paredes (≈ 15 m², com snap)', !!info && info.area > 14.5, info ? `${info.area.toFixed(3)} m²` : '');
+  check('retângulo cobrindo as quatro paredes (≈ 15 m²)',!!info && info.area > 14.5, info ? `${info.area.toFixed(3)} m²` : '');
   // O piso do térreo nasce com o topo em 0; subir o topo para 0,05 m faz as camadas dele cruzarem a base da parede.
   await page.evaluate((id) => window.__hestia.editor.store.exec({ type: 'updateElements', ids: [id], patch: { heightOffset: 0.05 } }), info.id);
   await page.waitForTimeout(300);

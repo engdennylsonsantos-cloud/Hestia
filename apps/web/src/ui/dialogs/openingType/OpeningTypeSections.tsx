@@ -115,7 +115,7 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
   const leafFallback = openingLeafStyle({ kind: d.kind });
   const handleFallback = openingHandle({ kind: d.kind, plan: d.plan, leaves: d.leaves });
   const frameFallback = openingFrameStyle({});
-  const angle2dFallback = openingAngle2d({});
+  const angle2dFallback = openingAngle2d({ plan: d.plan });
   const angle3dFallback = openingAngle3d({ kind: d.kind, plan: d.plan });
   const gridFallback = openingGrid({});
   const detail2dFallback = openingDetail2d({});

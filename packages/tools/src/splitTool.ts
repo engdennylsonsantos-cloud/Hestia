@@ -25,7 +25,7 @@ const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 export class SplitTool extends ToolBase {
   readonly id = 'split';
   readonly label = 'Dividir';
-  readonly hint = 'Dividir: passe sobre a parede e clique no ponto de corte. Digite a distância e Enter para medida exata. Tab: com intervalo.';
+  readonly hint = 'Dividir: passe sobre a parede e clique no ponto de corte. Digite a distância do início do trecho e Enter para medida exata. Tab: com intervalo.';
   private hoverId: Id | null = null;
   private gapStart: Cut | null = null;
   private withGap = false;
@@ -49,7 +49,7 @@ export class SplitTool extends ToolBase {
   }
 
   override inputPrompt(): string | null {
-    return this.hoverId && !this.withGap ? 'Distância do início da parede' : null;
+    return this.hoverId && !this.withGap ? 'Distância do início do trecho' : null;
   }
 
   /** Parede sob o cursor; uma abertura conta como a parede que a hospeda. */
@@ -97,7 +97,7 @@ export class SplitTool extends ToolBase {
       return;
     }
     this.items.push({ kind: 'point', at: cut.at });
-    this.items.push({ kind: 'label', at: cut.at, text: `${fmt(cut.t)} do início` });
+    this.items.push({ kind: 'label', at: cut.at, text: `${fmt(cut.t)} do início do trecho` });
   }
 
   override click(p: PointerInfo): void {
@@ -134,7 +134,7 @@ export class SplitTool extends ToolBase {
     if (this.withGap || !this.hoverId) return false;
     const v = parseNumber(text);
     if (v === null) {
-      this.env.say('Valor inválido. Digite a distância em metros desde o início da parede.');
+      this.env.say('Valor inválido. Digite a distância em metros, medida do início do trecho sob o cursor.');
       return false;
     }
     if (!this.split(this.hoverId, v, 0)) return false;
@@ -150,7 +150,7 @@ export class SplitTool extends ToolBase {
       this.env.say(e instanceof Error ? e.message : 'Não foi possível dividir a parede.');
       return false;
     }
-    this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(gap)}.` : `Parede dividida em ${fmt(t)} do início.`);
+    this.env.say(gap > 0 ? `Trecho removido com intervalo de ${fmt(gap)}.` : `Parede dividida a ${fmt(t)} do início do trecho.`);
     return true;
   }
 }

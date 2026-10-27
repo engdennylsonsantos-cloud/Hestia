@@ -1,5 +1,5 @@
-import { useState, type ReactElement } from 'react';
-import { TOOL_LABEL, type FloorMode } from '@hestia/tools';
+import { useEffect, useState, type ReactElement } from 'react';
+import { TOOL_LABEL, parseNumber, type FloorMode } from '@hestia/tools';
 import { addRoomsAllCircuits } from '../editor/roomActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -76,6 +76,48 @@ function OpeningTypePicker({ kind, value, onChange }: { kind: 'door' | 'window';
         {favSet.has(value) ? '★' : '☆'}
       </button>
     </>
+  );
+}
+
+/**
+ * Distância do Deslocar: precisa ser maior que zero. Valor inválido ("abc", "-2", "0") mostra aviso na barra de status
+ * e mantém o valor anterior válido (o campo não aceita mais o mínimo silencioso de 0,01 m).
+ */
+function OffsetDistanceField({ value, onCommit }: { value: number; onCommit: (v: number) => void }): ReactElement {
+  const show = (v: number): string => v.toFixed(2).replace('.', ',');
+  const [text, setText] = useState(show(value));
+  useEffect(() => setText(show(value)), [value]);
+  const commit = (): void => {
+    const n = parseNumber(text);
+    if (n === null || n <= 0) {
+      useUi.setState({ status: `Distância inválida (${text.trim() || 'vazia'}): digite um valor maior que zero, em metros. Mantida ${show(value)} m.` });
+      setText(show(value));
+      return;
+    }
+    if (Math.abs(n - value) > 1e-9) onCommit(n);
+    setText(show(n));
+  };
+  return (
+    <span className="numwrap">
+      <input
+        id="opt-offset"
+        className="input num"
+        value={text}
+        inputMode="decimal"
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          if (e.key === 'Escape') {
+            setText(show(value));
+            (e.target as HTMLInputElement).blur();
+          }
+          e.stopPropagation();
+        }}
+      />
+      <span className="unit">m</span>
+    </span>
   );
 }
 
@@ -189,7 +231,7 @@ export function OptionsBar(): ReactElement {
         <>
           <label>
             Distância
-            <NumField id="opt-offset" value={o.offsetDistance} onCommit={(v) => set({ offsetDistance: v })} unit="m" min={0.01} />
+            <OffsetDistanceField value={o.offsetDistance} onCommit={(v) => set({ offsetDistance: v })} />
           </label>
           <Check id="opt-ocopy" checked={o.offsetCopy} onChange={(v) => set({ offsetCopy: v })}>Copiar</Check>
         </>
@@ -198,9 +240,10 @@ export function OptionsBar(): ReactElement {
         <label>
           Distância entre
           <select id="opt-offsetfrom" className="select" value={o.offsetFrom ?? 'face'} onChange={(e) => set({ offsetFrom: e.target.value as 'axis' | 'face' })}>
-            <option value="face">Faces (padrão)</option>
-            <option value="axis">Eixos</option>
+            <option value="face">Face a face (padrão)</option>
+            <option value="axis">Entre eixos</option>
           </select>
+          <span style={{ color: 'var(--fg-soft)' }}>{(o.offsetFrom ?? 'face') === 'face' ? 'Modo: da face da base à face da nova parede' : 'Modo: de eixo a eixo (linhas de centro)'}</span>
         </label>
       )}
       {tool === 'select' && (

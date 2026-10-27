@@ -121,11 +121,11 @@ export function Ribbon(): ReactElement {
         {tab === 'modificar' && (
           <div className="rgroup">
             <div className="rgroup-tools">
-              <button className="tbtn" onClick={() => editor.selectAllOfSelectedType()} title="Selecionar todas as instâncias do tipo da seleção (mesmo nível)">
+              <button className="tbtn" disabled={s.selection.length === 0} onClick={() => editor.selectAllOfSelectedType()} title={s.selection.length ? 'Selecionar todas as instâncias do tipo da seleção (mesmo nível)' : 'Selecione um elemento primeiro'}>
                 <Icon name="sametype" size={22} />
                 <span>Mesmo tipo</span>
               </button>
-              <button className="tbtn" onClick={() => editor.selectAllOfSelectedName()} title="Selecionar todos os ambientes com o mesmo nome dos selecionados (mesmo nível)">
+              <button className="tbtn" disabled={s.selection.length === 0} onClick={() => editor.selectAllOfSelectedName()} title={s.selection.length ? 'Selecionar todos os ambientes com o mesmo nome dos selecionados (mesmo nível)' : 'Selecione um ambiente primeiro'}>
                 <Icon name="sametype" size={22} />
                 <span>Mesmo nome</span>
               </button>

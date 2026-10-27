@@ -18,7 +18,7 @@ interface Node {
 export class JoinTool extends ToolBase {
   readonly id = 'joins';
   readonly label = 'Junção';
-  readonly hint = 'Junção: clique num canto de duas paredes para alternar Encosto e Esquadria. Tab inverte qual parede domina.';
+  readonly hint = 'Junção: clique no canto ou ponta onde duas paredes se encontram para alternar Encosto e Esquadria. Só atua nas pontas, não no meio do vão. Tab inverte qual parede domina.';
   private node: Node | null = null;
 
   protected reset(): void {
@@ -70,10 +70,31 @@ export class JoinTool extends ToolBase {
     this.env.say(`Junção: ${LABEL[kind]}${flip ? ', ordem invertida' : ''}.`);
   }
 
+  /** Por que o clique não virou canto: a ponta mais próxima e o estado dela, ou a falta de ponta perto do clique. */
+  private explain(p: Vec2): string {
+    const pr = this.env.project();
+    const tol = 12 * this.env.metersPerPixel();
+    const frames = levelFrames(pr, this.env.levelId());
+    let near: { wallId: string; end: 'a' | 'b'; d: number } | null = null;
+    for (const f of frames) {
+      for (const end of ['a', 'b'] as const) {
+        const d = dist(end === 'a' ? f.a : f.b, p);
+        if (d <= tol && (!near || d < near.d)) near = { wallId: f.wall.id, end, d };
+      }
+    }
+    if (!near) return 'Clique no canto ou ponta onde duas paredes se encontram. No meio de uma parede não há canto para unir.';
+    const st = joinStatus(frames, near.wallId, near.end, pr.settings.joinTolerance);
+    if (st.kind === 'free') return 'Esta ponta não encontra outra parede: não há canto para unir.';
+    if (st.kind === 'tee') return 'Esta ponta encosta no meio de outra parede (encosto fixo): não há canto para unir.';
+    if (st.kind === 'node') return 'Três ou mais paredes se encontram neste ponto: a junção não se altera por aqui.';
+    if (st.kind === 'disallowed') return 'A junção desta ponta está desativada.';
+    return 'Clique no canto ou ponta onde duas paredes se encontram.';
+  }
+
   override click(p: PointerInfo): void {
     this.node = this.find(p.raw);
     if (!this.node) {
-      this.env.say('Clique perto de um canto onde duas paredes se encontram.');
+      this.env.say(this.explain(p.raw));
       return;
     }
     this.apply(ORDER[(ORDER.indexOf(this.node.kind) + 1) % ORDER.length]!, this.node.flip);

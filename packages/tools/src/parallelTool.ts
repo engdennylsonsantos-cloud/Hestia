@@ -48,6 +48,17 @@ export class ParallelTool extends ToolBase {
     return (this.env.options().offsetFrom ?? 'face') === 'face';
   }
 
+  /** Nome do modo de medida, para as mensagens: "face a face" (padrão) ou "entre eixos". */
+  private modo(): string {
+    return this.byFace() ? 'face a face' : 'entre eixos';
+  }
+
+  /** Ao ativar, a barra de status já diz qual modo está valendo (antes do primeiro clique). */
+  override start(): void {
+    super.start();
+    this.env.say(`Parede paralela (${this.modo()}): clique na parede de base e depois do lado desejado, ou digite a distância e Enter. Tab inverte o lado.`);
+  }
+
   /** Parede sob o cursor (dentro da faixa da parede, ou a até um pixel da faixa). Mais próxima do eixo vence. */
   private pick(at: Vec2): { id: Id; f: WallFrame } | null {
     const pr = this.env.project();
@@ -124,8 +135,8 @@ export class ParallelTool extends ToolBase {
     } else {
       this.items.push(...ghostBands(pr, [this.base!], { kind: 'translate', d: plan.d }));
     }
-    this.items.push({ kind: 'label', at, text: fmtM(d) });
-    this.env.say('Clique para criar a parede paralela nesta distância, ou digite a distância e Enter.');
+    this.items.push({ kind: 'label', at, text: `${fmtM(d)} ${this.modo()}` });
+    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}), ou digite a distância e Enter.`);
   }
 
   override click(p: PointerInfo): void {
@@ -135,7 +146,7 @@ export class ParallelTool extends ToolBase {
       this.base = hit.id;
       this.frame = hit.f;
       this.side = this.sideAt(toLocal(hit.f, p.raw).s);
-      this.env.say('Lado escolhido. Clique a distância desejada, ou digite-a e Enter.');
+      this.env.say(`Lado escolhido. Medida ${this.modo()}: clique a distância desejada, ou digite-a e Enter.`);
       this.move(p);
       return;
     }

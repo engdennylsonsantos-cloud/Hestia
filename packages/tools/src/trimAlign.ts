@@ -4,7 +4,7 @@ import type { Id, Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { moveWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
-import type { PointerInfo } from './types.ts';
+import type { PointerInfo, PreviewItem } from './types.ts';
 
 type Axis = { kind: 'line'; p: Vec2; d: Vec2 } | { kind: 'circle'; c: Vec2; r: number };
 
@@ -275,23 +275,40 @@ export class AlignTool extends ToolBase {
   }
 }
 
+/** Medição: dois cliques. Depois do segundo, a cota fica desenhada (só na tela) até Esc ou um novo clique. */
 export class MeasureTool extends ToolBase {
   readonly id = 'measure';
   readonly label = 'Medir';
-  readonly hint = 'Medir: clique em dois pontos.';
+  readonly hint = 'Medir: clique em dois pontos. A cota fica na tela até Esc ou um novo clique.';
   private a: Vec2 | null = null;
+  /** Cota temporária da última medição (não entra no modelo nem no desfazer). */
+  private cota: { a: Vec2; b: Vec2 } | null = null;
 
   protected reset(): void {
     this.a = null;
+    this.cota = null;
     this.items = [];
   }
   protected busy(): boolean {
-    return this.a !== null;
+    return this.a !== null || this.cota !== null;
+  }
+
+  /** Linha entre os pontos, as marcas, a distância no meio e ΔX/ΔY na ponta final. Só pré-visualização. */
+  private dimension(a: Vec2, b: Vec2): PreviewItem[] {
+    const fmtN = (n: number): string => n.toFixed(3).replace('.', ',');
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    return [
+      { kind: 'line', a, b },
+      { kind: 'point', at: a },
+      { kind: 'point', at: b },
+      { kind: 'label', at: mid, text: `${fmtN(dist(a, b))} m` },
+      { kind: 'label', at: b, text: `ΔX ${fmtN(b.x - a.x)} · ΔY ${fmtN(b.y - a.y)}` },
+    ];
   }
 
   override move(p: PointerInfo): void {
     const inf = this.snap(p, { from: this.a ?? undefined });
-    this.items = [];
+    this.items = this.cota ? this.dimension(this.cota.a, this.cota.b) : [];
     if (!this.a) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -302,14 +319,20 @@ export class MeasureTool extends ToolBase {
 
   override click(p: PointerInfo): void {
     const inf = this.snap(p, { from: this.a ?? undefined });
+    // Um clique novo apaga a cota anterior e começa outra medição.
+    this.cota = null;
     if (!this.a) {
       this.a = inf.point;
+      this.items = [];
       return;
     }
-    const d = dist(this.a, inf.point);
-    const ang = (Math.atan2(inf.point.y - this.a.y, inf.point.x - this.a.x) * 180) / Math.PI;
-    this.env.say(`Distância ${d.toFixed(3).replace('.', ',')} m · ΔX ${(inf.point.x - this.a.x).toFixed(3).replace('.', ',')} · ΔY ${(inf.point.y - this.a.y).toFixed(3).replace('.', ',')} · ${((ang + 360) % 360).toFixed(1).replace('.', ',')}°`);
+    const a = this.a;
+    const b = inf.point;
+    const d = dist(a, b);
+    const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    this.env.say(`Distância ${d.toFixed(3).replace('.', ',')} m · ΔX ${(b.x - a.x).toFixed(3).replace('.', ',')} · ΔY ${(b.y - a.y).toFixed(3).replace('.', ',')} · ${((ang + 360) % 360).toFixed(1).replace('.', ',')}° · Esc apaga a cota`);
     this.a = null;
-    this.items = [];
+    this.cota = { a, b };
+    this.items = this.dimension(a, b);
   }
 }

@@ -11,9 +11,9 @@
 
 ## 0. Status de execução
 
-**Última atualização:** 2026-10-26 — G0 fechado; M0 e A2 integrados. Próxima onda disparada.
-**Em execução:** A1b (abertura), R2 (culling/LOD/sombras/precisão), R3 (picking/realce GPU), R5 (planta GPU).
-**Próxima ação:** revisar as quatro entregas, integrar e rodar M1 em janela exclusiva.
+**Última atualização:** 2026-10-26 22:4x — **PAUSADO**. Retomada em 2026-10-27.
+**Em execução:** nenhum agente novo; os quatro WIP foram commitados e estão nos ramos abaixo.
+**Próxima ação:** ler `HANDOFF-GPU-2026-10-26.md`, integrar A1b → R5 → R2 → R3 e rodar M1.
 
 | Fase | Gate | Status | Dono | Data | Resultado |
 |---|---|---|---|---|---|
@@ -31,14 +31,14 @@
 - [x] **S2** gerador de projeto grande (30/60 pav, 128/256 paredes) — concluído em `f494263`; ver `docs/desempenho/s2-projeto-grande-2026-10-26.md`
 - [x] **M0** baseline 10/30/60 — concluído; `gpu-memoria-m0-2026-10-26.json` e `browser-...-m0-http-...json`
 - [x] **A1** inserção/abertura — concluído em `1a7883c`/`16f9658`; inserção na meta, abertura ainda 445–465 ms
-- [ ] **A1b** abertura ≤300 ms (cache por nível, avisos adiados, desenho inicial)
+- [ ] **A1b** abertura ≤300 ms (cache por nível, avisos adiados, desenho inicial) — **WIP `ebd5ea7`**
 - [x] **A2** verificação visual — concluído em `763b890`; 44 PASS, 1 FAIL (realce de linha de detalhe)
 - [ ] **I1** integração da Fase 1
 - [x] **R1** fundação 3D GPU — concluído em `ba4b4e6`; 251→14 draw calls, 3,2→1,0 ms
-- [ ] **R2** culling/LOD/sombras/precisão — em execução
-- [ ] **R3** picking/realce GPU — em execução
+- [ ] **R2** culling/LOD/sombras/precisão — **WIP `95c9917`**
+- [ ] **R3** picking/realce GPU — **WIP `a0416ab` + `30348f1`**
 - [ ] **R4** clipping planes
-- [ ] **R5** planta GPU — em execução (inclui realce de linha de detalhe)
+- [ ] **R5** planta GPU — **WIP `783a5c1`** (inclui realce de linha de detalhe)
 - [ ] **W1** WebGPU
 - [ ] **W2** compute medido
 - [ ] **P1** workers
@@ -167,6 +167,20 @@ o número de níveis e o G1 fica parcial.
 **A2 no build integrado:** 43 PASS, 2 FAIL — um falso positivo de 404 (favicon no servidor de teste) e o FAIL real
 de realce de linha de detalhe, já atribuído ao R5. A 3D passou inteira após o R1 (89 caixas de parede, portas/janelas,
 silhueta e seleção).
+
+### Checkpoint de pausa (2026-10-26 22:4x)
+
+| Agente | Ramo | Commit WIP | Worktree |
+|---|---|---|---|
+| A1b | `gpu/a1b-opening` | `ebd5ea7` | `...\8fed4c\gpu-a1b-opening` |
+| R2 | `gpu/r2-visibility` | `95c9917` | `...\8fed4c\gpu-r2-visibility` |
+| R3 | `gpu/r3-picking` | `a0416ab` + `30348f1` | `...\8fed4c\gpu-r3-picking` |
+| R5 | `gpu/r5-plan` | `783a5c1` | `...\8fed4c\gpu-r5-plan` |
+
+- **Nenhum WIP está validado por completo**; são checkpoints para não perder trabalho.
+- Os worktrees partiram de `1914fa0`, antes dos 82 commits de esquadrias; a integração exige rebase/cherry-pick.
+- Handoff completo: `HANDOFF-GPU-2026-10-26.md`.
+- Ordem de retomada: ler handoff → integrar A1b → R5 → R2 → R3 → M1.
 
 ## 1. Regras do board
 

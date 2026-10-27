@@ -74,7 +74,7 @@ const cacheDasCaixas = new WeakMap<THREE.BufferGeometry, CacheDeCaixas>();
 /**
  * Caixa do intervalo do índice no espaço **local** da malha, em cache por versão da geometria. Só as posições dos
  * vértices do intervalo entram: o resultado é o mesmo de varrer os triângulos do elemento, sem repetir a varredura a cada
- * clique.
+ * clique. A caixa devolvida é **do cache**: quem chama não pode alterá-la (use `union`/`clone`).
  */
 export function caixaDoIntervalo(geo: THREE.BufferGeometry, index: THREE.BufferAttribute, start: number, count: number): THREE.Box3 {
   const versao = Number(geo.userData.versao ?? 0);

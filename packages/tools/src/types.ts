@@ -232,6 +232,8 @@ export interface ToolOptions {
   roofOverhang?: number;
   /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */
   roofOffset?: number | null;
+  /** Grade (ferramenta `grid`): modo de desenho e tipo. Ausente = linha, primeiro tipo padrão. */
+  grid?: GridToolOptions;
   /** Escada por croqui: tipo, sub-modo, primitiva, N para distribuir e cotas da criação. Ausente = padrão. */
   stair?: StairToolOptions;
   /** Escada reta, em L, em U ou com leque, criada pronta por cliques (ferramenta `stairrun`). Ausente = reta, 1,20 m, giro à esquerda. */
@@ -252,6 +254,14 @@ export interface PointerInfo {
 }
 
 /** Contrato único de ferramenta (docs/01 §7). A ferramenta nunca altera o modelo: ela emite comandos. */
+/** Como a Grade é desenhada: linha (2 cliques), arco (início, fim e flecha), escolher linhas (paredes) ou multissegmento. */
+export type GridMode = 'line' | 'arc' | 'pick' | 'multi';
+
+export interface GridToolOptions {
+  mode: GridMode;
+  typeId: Id;
+}
+
 export interface Tool {
   readonly id: string;
   readonly label: string;

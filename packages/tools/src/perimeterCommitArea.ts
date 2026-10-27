@@ -1,7 +1,8 @@
 import type { Polygon, Vec2 } from '@hestia/geom';
-import { ceilingIssues, ceilingOutline, outerPerimeter } from '@hestia/engine';
+import { ceilingIssues, ceilingOutline, outerPerimeter, resolveRooms } from '@hestia/engine';
 import {
   DEFAULT_CEILING_HEIGHT,
+  ceilingsOnLevel,
   followsRoom,
   isCeiling,
   isFloor,
@@ -36,6 +37,8 @@ const LINK_NO_WALLS_MSG = 'Vincular às paredes: não há paredes com contorno e
 const LINK_MISMATCH_MSG = 'Vincular às paredes: o esboço não coincide com o contorno externo das paredes. Refaça pela caixa (Por perímetro) sobre a edificação inteira, ou desmarque Vincular.';
 const ROOM_NONE_MSG = 'Acompanhar o ambiente: escolha o ambiente pela galeria "Por ambiente", ou desmarque a opção.';
 const ROOM_MISMATCH_MSG = 'Acompanhar o ambiente: o contorno do esboço não é o do ambiente. Refaça por "Por ambiente", ou desmarque a opção.';
+// Um ambiente tem um forro só: o segundo não empilha (regra do "Forro no ambiente" antigo, decisão 0021).
+const ROOM_HAS_CEILING_MSG = 'Este ambiente já tem forro. Selecione-o para editar.';
 
 /** Contorno e furos de um piso, laje ou forro para o rascunho. O forro que acompanha o ambiente usa o contorno do ambiente. */
 export function areaSides(p: Project, el: AreaElement): { outer: Vec2[]; holes: Vec2[][] } {
@@ -128,7 +131,10 @@ function createArea(p: Project, target: AreaTarget, outer: Vec2[], holes: Vec2[]
   return checked(p, id, { type: 'addSlab', slab }, { ...slab, order: p.nextOrder }, validateProject, message);
 }
 
-/** Forro novo. Com "Acompanhar o ambiente", o forro leva o `roomId` e o contorno do ambiente (que tem de ser o do esboço). */
+/**
+ * Forro novo. Com "Acompanhar o ambiente", o forro leva o `roomId` e o contorno do ambiente (que tem de ser o do esboço),
+ * e o pé-direito e o número do ambiente (como o "Forro no ambiente" antigo). Ambiente que já tem forro no nível recusa.
+ */
 function createCeiling(p: Project, levelId: Id, outer: Vec2[], holes: Vec2[][], opts: CommitPerimeterOptions): CommitPerimeterResult {
   const typeId = pickTypeId(p.ceilingTypes, opts.typeId);
   if (!typeId) return refuse('O projeto não tem tipo de forro.');
@@ -139,14 +145,16 @@ function createCeiling(p: Project, levelId: Id, outer: Vec2[], holes: Vec2[][], 
     if (!poly) return refuse(roomId ? ROOM_MISMATCH_MSG : ROOM_NONE_MSG);
     shape = { boundary: poly[0]!, holes: poly.slice(1) };
   }
+  if (roomId && ceilingsOnLevel(p, levelId).some((c) => c.roomId === roomId)) return refuse(ROOM_HAS_CEILING_MSG);
+  const room = roomId ? resolveRooms(p, levelId).find((r) => r.roomId === roomId) : undefined;
   const id = newId('f');
   const ceiling = makeCeiling({
     id,
     levelId,
     typeId,
     ...shape,
-    heightOffset: opts.heightOffset ?? DEFAULT_CEILING_HEIGHT,
-    mark: opts.mark ?? '',
+    heightOffset: room ? room.ceilingHeight : (opts.heightOffset ?? DEFAULT_CEILING_HEIGHT),
+    mark: opts.mark ?? room?.number ?? '',
     comments: opts.comments ?? '',
     ...(roomId ? { roomId, roomLinked: true } : {}),
   });
@@ -208,6 +216,7 @@ function editCeiling(p: Project, el: Ceiling, outer: Vec2[], holes: Vec2[][], op
   const poly = roomMatch(p, el.levelId, outer, holes, want);
   if (poly && want) {
     const relink = !followsRoom(el) || el.roomId !== want;
+    if (relink && ceilingsOnLevel(p, el.levelId).some((c) => c.id !== el.id && c.roomId === want)) return refuse(ROOM_HAS_CEILING_MSG);
     const patch: Partial<Ceiling> = { boundary: poly[0]!, holes: poly.slice(1) };
     if (opts.heightOffset !== undefined) patch.heightOffset = opts.heightOffset;
     if (opts.mark !== undefined) patch.mark = opts.mark;

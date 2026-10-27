@@ -13,6 +13,7 @@ import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
+import { gableSymbolOps } from './roofsEmpena.ts';
 import { evitarSobreposicao } from './roofsRotulos.ts';
 import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
@@ -99,8 +100,9 @@ export function highestRidge(r: ResolvedRoof): { at: Vec2; z: number; a: Vec2; b
 }
 
 /**
- * Empena (aresta sem inclinação, kind 'gable'): traço cheio e mais escuro que as arestas internas. Não há base de
- * simbologia de perfil no app; a aresta distinta é a representação de empena da planta, sem o tracejado de CAD.
+ * Empena (aresta sem inclinação, kind 'gable'): traço cheio e mais escuro que as arestas internas. O símbolo de perfil
+ * (triângulo) é desenhado uma vez por aresta do contorno (`gableSymbolOps`), e não por trecho que o motor parte nas
+ * águas.
  */
 function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
   return [{ pts: [a, b], closed: false, ...espessura, color: theme.ink, alpha: 1 }];
@@ -289,6 +291,17 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
         // Cumeeira, espigão e rincão são arestas finas entre superfícies (sem a hierarquia grossa e preta do CAD).
         const dash: [number, number] | undefined = ln.kind === 'valley' ? [6, 3] : undefined;
         out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...esp.projecao, color: aresta, alpha: 1, ...(dash ? { dash } : {}) });
+      }
+      // Símbolo de perfil da empena: um por aresta do contorno do telhado (o motor parte a aresta nas águas, mas o
+      // símbolo é da empena inteira).
+      if (isRoof(model)) {
+        const kinds = boundaryKindsOf(model);
+        model.boundary.forEach((a, i) => {
+          if (kinds[i] !== 'gable') return;
+          const c = model.boundary[(i + 1) % model.boundary.length]!;
+          if (dist(a, c) < 1e-6) return;
+          out.strokes.push(...gableSymbolOps(a, c, foot, theme, esp.empena, scale));
+        });
       }
       for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);

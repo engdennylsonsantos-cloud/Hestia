@@ -193,6 +193,17 @@ describe('modo de perímetro: Concluir, Cancelar e edição', () => {
     expect(editor.project.elements[id]?.kind === 'floor' && editor.project.elements[id].heightOffset).toBe(0);
   });
 
+  it('editar piso ou laje vinculado às paredes é recusado já na abertura, com o caminho (Desvincular)', () => {
+    editor.setTool('floor');
+    desenhar('floor', retangulo(0, 0, 4, 3));
+    perimeterActions.finish();
+    const id = useUi.getState().selection[0]!;
+    editor.store.exec({ type: 'updateElements', ids: [id], patch: { outlineSource: { mode: 'perimeter', linked: true, seed: { x: 2, y: 1.5 } } } });
+    perimeterActions.edit(id);
+    expect(editor.perimetro.view().active).toBe(false);
+    expect(useUi.getState().status).toContain('Desvincular');
+  });
+
   it('editar um elemento sem perímetro (parede) é recusado na barra', () => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });

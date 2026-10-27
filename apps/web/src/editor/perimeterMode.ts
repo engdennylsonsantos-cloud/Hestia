@@ -1,7 +1,8 @@
 import type { SketchDraft, SketchTarget } from '@hestia/geom';
 import type { PerimeterModifyKind } from '@hestia/tools';
-import { DEFAULT_CEILING_HEIGHT, type Id, type Project } from '@hestia/model';
+import { DEFAULT_CEILING_HEIGHT, isFloor, isSlab, type Id, type Project } from '@hestia/model';
 import {
+  OUTLINE_LOCKED_MSG,
   PerimeterTool,
   type ToolId,
   SKETCH_DEFAULTS,
@@ -118,6 +119,11 @@ export class PerimeterMode {
     const opts = perimeterOptionsOf(p, id);
     if (!el || !d || !opts || !('levelId' in el)) {
       this.dizer('Este elemento não tem perímetro editável.');
+      return;
+    }
+    // Piso ou laje vinculado às paredes: o contorno é travado (decisão 0031). Recusa já na abertura, com o caminho.
+    if ((isFloor(el) || isSlab(el)) && el.outlineSource?.linked) {
+      this.dizer(OUTLINE_LOCKED_MSG);
       return;
     }
     const tool = new PerimeterTool(this.porta.env(), d.target);

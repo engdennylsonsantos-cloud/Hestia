@@ -7,6 +7,7 @@ import { refuse, withDefaults } from './perimeterCommitShared.ts';
 import type { CommitPerimeterOptions, CommitPerimeterResult, PerimeterBarOptions } from './perimeterCommitTypes.ts';
 
 export type { CommitPerimeterOptions, CommitPerimeterResult, PerimeterBarOptions } from './perimeterCommitTypes.ts';
+export { OUTLINE_LOCKED_MSG } from './outlineEdit.ts';
 
 /** Valor mais frequente (empate: o que aparece primeiro). Undefined para lista vazia. */
 function mostCommon(values: number[]): number | undefined {

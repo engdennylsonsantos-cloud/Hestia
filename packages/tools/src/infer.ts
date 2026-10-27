@@ -18,6 +18,7 @@ import {
 import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia/engine';
 import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
+import { addGridSnaps } from './gridSnapPoints.ts';
 import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
@@ -243,6 +244,8 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   addExtraPoints(ctx, sn, cursor, tol, add);
   // Arestas de pisos e lajes e ombreiras de aberturas: o pé sobre a aresta é captura de aresta, com o dono para o ignore.
   if (!ctx.onWallsOnly) addExtraSegments(ctx, sn, cursor, tol, add);
+  // Grades de eixos (do projeto): pontas, cruzamentos com grades e paredes e o ponto sobre a linha.
+  if (!ctx.onWallsOnly) addGridSnaps(ctx.project, sn, cursor, tol, walls, ctx.ignore, add);
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
   const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core', hostId?: Id): void => {
     for (const [a, b] of segs) {

@@ -13,7 +13,7 @@ import type { PlanTheme, StrokeOp } from './types.ts';
  * Opacidade do preenchimento leve da projeção. Baixa de propósito: a água fora do intervalo de vista só mostra a forma e
  * o tom por água, e o que está por baixo (paredes, grade) continua legível.
  */
-export const PREENCHIMENTO_PROJECAO = 0.22;
+export const PREENCHIMENTO_PROJECAO = 0.3;
 /** Opacidade das linhas internas tracejadas: um pouco mais leves que o beiral, que é o contorno principal. */
 export const ALPHA_LINHA_PROJECAO = 0.75;
 /** Tracejado do beiral, da cumeeira, do espigão e do desnível (traço e vão, em px de tela). */

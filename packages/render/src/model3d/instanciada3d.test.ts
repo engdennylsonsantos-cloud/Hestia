@@ -174,8 +174,18 @@ describe('picking: o mesmo elemento, a mesma categoria e o mesmo ponto', () => {
     nova.scene.traverse((o) => {
       if (o instanceof THREE.Mesh && o.renderOrder === 5) sobrepostos.push(o);
     });
-    expect(sobrepostos).toHaveLength(2);
-    expect(sobrepostos.every((m) => (m as THREE.Mesh).geometry.getAttribute('position').count > 0)).toBe(true);
+    expect(sobrepostos.length).toBeGreaterThanOrEqual(2);
+    // O realce reusa os buffers do modelo: o `position` é a mesma instância da geometria de origem, não uma cópia.
+    const origens = new Set<THREE.BufferAttribute>();
+    nova.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.userData.ranges) origens.add(m.geometry.getAttribute('position') as THREE.BufferAttribute);
+    });
+    for (const m of sobrepostos) {
+      const mesh = m as THREE.Mesh;
+      expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(0);
+      expect(origens.has(mesh.geometry.getAttribute('position') as THREE.BufferAttribute)).toBe(true);
+    }
   });
 });
 

@@ -20,7 +20,7 @@ import {
 /** Batente de porta: ombreiras e travessa; com rebaixo (batedor) ou caixa única. */
 function buildDoorFrame(c: Ctx): void {
   if (c.frameStyle === 'block') return;
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   for (const j of [-1, 1] as const) {
     const name = j < 0 ? 'left' : 'right';
     if (c.frameStyle === 'simple') {
@@ -272,7 +272,7 @@ function buildPivotDoor(c: Ctx): void {
 
 /** Batente de correr: caixa J×D sem batedor, com trilhos metálicos no topo e no piso. */
 function buildSlidingDoorFrame(c: Ctx): void {
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   for (const j of [-1, 1] as const) {
     addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
   }
@@ -296,7 +296,7 @@ function buildSlidingDoor(c: Ctx): void {
   const moving = c.h === 1 ? 0 : 1;
   for (let k = 0; k < 2; k++) {
     const center = center0 + (k - 0.5) * spacing;
-    const sCenter = c.C + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
+    const sCenter = c.Cd + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
     const motion: PartMotion =
       k === moving ? { kind: 'slide', dt: k === 1 ? -1 : 1, ds: 0, dz: 0, travel } : { kind: 'slide', dt: 0, ds: 0, dz: 0, travel: 0 };
     const latchT = center + (k <= 0 ? leafW / 2 : -leafW / 2);

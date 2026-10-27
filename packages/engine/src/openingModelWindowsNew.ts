@@ -31,6 +31,7 @@ export interface WindowCtx {
   t: OpeningType;
   g: OpeningGeometry;
   C: number;
+  Cd: number;
   hw: number;
   H: number;
   J: number;
@@ -74,7 +75,7 @@ function addPart(c: WindowCtx, id: string, role: PartRole, material: PartMateria
 
 /** Caixilho de janela: duas ombreiras, travessa e soleira, com a profundidade no núcleo (mesma regra das antigas). */
 function buildWindowFrame(c: WindowCtx): void {
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   for (const j of [-1, 1] as const) {
     addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
   }
@@ -162,15 +163,15 @@ function buildHinged(c: WindowCtx): void {
     const hingeT = two ? (index === 0 ? span.t0 : span.t1) : c.h < 0 ? span.t0 : span.t1;
     const latchT = hingeT === span.t0 ? span.t1 : span.t0;
     const sign = sideSign(c, hingeT, latchT);
-    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.C, sign };
-    addWindowLeaf(c, index, span.t0, span.t1, z0, z1, c.C, motion);
+    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.Cd, sign };
+    addWindowLeaf(c, index, span.t0, span.t1, z0, z1, c.Cd, motion);
     c.openings.push({
       leaf: index,
       kind: 'side',
       side: c.side,
       hingeT,
       latchT,
-      pivot: { t: hingeT, s: c.C },
+      pivot: { t: hingeT, s: c.Cd },
       radius: Math.abs(span.t1 - span.t0),
       z0,
       z1,
@@ -188,8 +189,8 @@ function buildHung(c: WindowCtx): void {
   const half = (inner.z1 - inner.z0) / 2;
   const travel = Math.max(0, half - HUNG_OVERLAP);
   const pitch = Math.max(c.L, 0.02) + 0.004;
-  const sBottom = c.C - pitch / 2;
-  const sTop = c.C + pitch / 2;
+  const sBottom = c.Cd - pitch / 2;
+  const sTop = c.Cd + pitch / 2;
   const bottom = { z0: inner.z0, z1: mid + HUNG_OVERLAP };
   const top = { z0: mid - HUNG_OVERLAP, z1: inner.z1 };
   const up: PartMotion = { kind: 'slide', dt: 0, ds: 0, dz: 1, travel };
@@ -229,15 +230,15 @@ function buildPivotWin(c: WindowCtx): void {
   const z0 = inner.z0 + GAP;
   const z1 = inner.z1 - GAP;
   const sign = c.side;
-  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: 0, s: c.C, sign };
-  addWindowLeaf(c, 0, t0, t1, z0, z1, c.C, motion);
+  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: 0, s: c.Cd, sign };
+  addWindowLeaf(c, 0, t0, t1, z0, z1, c.Cd, motion);
   c.openings.push({
     leaf: 0,
     kind: 'pivot',
     side: c.side,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: c.hw - c.J,
     z0,
     z1,
@@ -250,13 +251,13 @@ function buildLouver(c: WindowCtx): void {
   const inner = windowInner(c);
   const t0 = inner.t0;
   const t1 = inner.t1;
-  const s0 = c.C - LOUVER_THICKNESS / 2;
-  const s1 = c.C + LOUVER_THICKNESS / 2;
+  const s0 = c.Cd - LOUVER_THICKNESS / 2;
+  const s1 = c.Cd + LOUVER_THICKNESS / 2;
   let z = inner.z0;
   let index = 0;
   while (z + LOUVER_HEIGHT <= inner.z1 + 1e-9) {
     const center = z + LOUVER_HEIGHT / 2;
-    const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.C, z: center, sign: 1 };
+    const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.Cd, z: center, sign: 1 };
     addPart(c, `louver-${index}`, 'leafPanel', 'leaf', box(t0, t1, s0, s1, z, z + LOUVER_HEIGHT), { motion, leaf: 0 });
     z += LOUVER_PITCH;
     index++;
@@ -267,7 +268,7 @@ function buildLouver(c: WindowCtx): void {
     side: 0,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: (t1 - t0) / 2,
     z0: inner.z0,
     z1: inner.z1,

@@ -1,6 +1,7 @@
 import {
   coreSpan,
   openingFrame,
+  openingFrameDepth,
   openingFrameStyle,
   openingHandle,
   openingLeafStyle,
@@ -26,6 +27,7 @@ interface Ctx {
   t: OpeningType;
   core: { s0: number; s1: number };
   C: number;
+  Cd: number;
   hw: number;
   H: number;
   thickness: number;
@@ -85,7 +87,15 @@ function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx 
   const fr = openingFrame(t, coreWidth);
   const frameStyle = openingFrameStyle(t);
   const J = frameStyle === 'aduela' ? 0.03 : fr.frameWidth;
-  const D = frameStyle === 'aduela' ? coreWidth : fr.frameDepth;
+  const fd = openingFrameDepth(t, f.thickness, coreWidth);
+  const mode = t.frameDepthMode ?? 'wall';
+  const D = frameStyle === 'aduela' ? coreWidth : fd.depth;
+  const Cd =
+    frameStyle === 'aduela' || mode === 'core'
+      ? (core.s0 + core.s1) / 2
+      : mode === 'fixed'
+        ? Math.min(f.thickness / 2 - D / 2, Math.max(-f.thickness / 2 + D / 2, (core.s0 + core.s1) / 2))
+        : fd.centerOffset;
   return {
     p,
     o,
@@ -94,6 +104,7 @@ function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx 
     t,
     core,
     C: (core.s0 + core.s1) / 2,
+    Cd,
     hw: g.width / 2,
     H: g.height,
     thickness: f.thickness,
@@ -112,14 +123,14 @@ function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx 
 
 /** Batente simples (caixa J × D, sem batedor): duas ombreiras e a travessa. */
 function buildSimpleFrame(c: Ctx, jambs: Array<1 | -1> = [-1, 1]): void {
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   for (const j of jambs) {
     addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
   }
   addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
 }
 
-const leafS = (c: Ctx): { s0: number; s1: number } => ({ s0: c.C - c.L / 2, s1: c.C + c.L / 2 });
+const leafS = (c: Ctx): { s0: number; s1: number } => ({ s0: c.Cd - c.L / 2, s1: c.Cd + c.L / 2 });
 const leafZ = (c: Ctx): { z0: number; z1: number } => ({ z0: 0.008, z1: Math.max(0.008, c.H - c.J - GAP) });
 
 /** Maçaneta presa à folha (mesmo movimento), a 0,06 m do lado do trinco. */
@@ -185,7 +196,7 @@ function buildDoubleAction(c: Ctx): void {
     const hingeT = j * half;
     const latchT = hingeT - j * width;
     const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
-    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.C, sign };
+    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.Cd, sign };
     addLeaf(c, i, hingeT, latchT, z, motion, latchT);
     c.openings.push({
       leaf: i,
@@ -194,7 +205,7 @@ function buildDoubleAction(c: Ctx): void {
       side: c.side,
       hingeT,
       latchT,
-      pivot: { t: hingeT, s: c.C },
+      pivot: { t: hingeT, s: c.Cd },
       radius: width,
       z0: z.z0,
       z1: z.z1,
@@ -224,7 +235,7 @@ function buildPocketDoor(c: Ctx): void {
     side: 0,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: width,
     z0: z.z0,
     z1: z.z1,
@@ -246,8 +257,8 @@ function addFoldChains(c: Ctx, panels: number, chains: Array<1 | -1>, firstLeaf:
     for (let i = 0; i < perChain; i++) {
       const a = tAnchor + dir * i * panelWidth;
       const b = a + dir * panelWidth;
-      const motion: PartMotion = { kind: 'fold', tAnchor, dir, s: c.C, sign, index: i, panelWidth };
-      addPart(c, `leaf-${leaf}`, 'leaf', 'leaf', box(a, b, c.C - c.L / 2, c.C + c.L / 2, z.z0, z.z1), motion, leaf);
+      const motion: PartMotion = { kind: 'fold', tAnchor, dir, s: c.Cd, sign, index: i, panelWidth };
+      addPart(c, `leaf-${leaf}`, 'leaf', 'leaf', box(a, b, c.Cd - c.L / 2, c.Cd + c.L / 2, z.z0, z.z1), motion, leaf);
       leaf++;
     }
     c.openings.push({
@@ -256,14 +267,14 @@ function addFoldChains(c: Ctx, panels: number, chains: Array<1 | -1>, firstLeaf:
       side: c.side,
       hingeT: tAnchor,
       latchT: tAnchor + dir * perChain * panelWidth,
-      pivot: { t: tAnchor, s: c.C },
+      pivot: { t: tAnchor, s: c.Cd },
       radius: perChain * panelWidth,
       z0: z.z0,
       z1: z.z1,
     });
   }
   if (panels === 2 || panels === 4) {
-    addPart(c, 'track-head', 'track', 'metal', box(-c.hw + c.J, c.hw - c.J, c.C - c.D / 2, c.C + c.D / 2, c.H - c.J - GAP - 0.01, c.H - c.J - GAP));
+    addPart(c, 'track-head', 'track', 'metal', box(-c.hw + c.J, c.hw - c.J, c.Cd - c.D / 2, c.Cd + c.D / 2, c.H - c.J - GAP - 0.01, c.H - c.J - GAP));
   }
   return leaf;
 }
@@ -324,7 +335,7 @@ function buildGarageDoor(c: Ctx): void {
     side: c.side,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: c.H,
     z0: z.z0,
     z1: z.z1,

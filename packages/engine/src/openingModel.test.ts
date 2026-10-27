@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coreSpan, createEmptyProject, makeWall, openingFrame, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
+import { createEmptyProject, makeWall, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
 import { buildOpeningModel, partTransformed, projectParts, slicePartsAtZ } from './openingModel.ts';
@@ -113,15 +113,16 @@ describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
     expect(f.box.z1).toBeLessThanOrEqual(c.g.height + 1e-9);
   });
 
-  it('peças de batente ficam dentro do núcleo e do vão', () => {
+  it('peças de batente ficam dentro da parede e do vão (padrão frameDepthMode wall)', () => {
     for (const flipHand of [false, true]) {
       for (const flipFacing of [false, true]) {
         const c = cena('ot_p90', {}, { flipHand, flipFacing });
         const m = modelo(c);
         expect(m.core.s1 - m.core.s0).toBeCloseTo(0.14, 9);
+        expect(m.thickness).toBeCloseTo(0.184, 9);
         for (const p of m.parts.filter((x) => x.role === 'jamb' || x.role === 'stop' || x.role === 'head')) {
-          expect(p.box.s0, p.id).toBeGreaterThanOrEqual(m.core.s0 - 1e-9);
-          expect(p.box.s1, p.id).toBeLessThanOrEqual(m.core.s1 + 1e-9);
+          expect(p.box.s0, p.id).toBeGreaterThanOrEqual(-m.thickness / 2 - 1e-9);
+          expect(p.box.s1, p.id).toBeLessThanOrEqual(m.thickness / 2 + 1e-9);
           expect(Math.abs(p.box.t0), p.id).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
           expect(Math.abs(p.box.t1), p.id).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
           expect(p.box.z0, p.id).toBeGreaterThanOrEqual(0);
@@ -445,8 +446,8 @@ describe('buildOpeningModel: as dez famílias nas quatro combinações', () => {
               expect(p.box.z1, `${caso} ${p.id}`).toBeLessThanOrEqual(c.g.height + 1e-9);
             }
             if (deBatente.has(p.role)) {
-              expect(p.box.s0, `${caso} ${p.id}`).toBeGreaterThanOrEqual(m.core.s0 - 1e-9);
-              expect(p.box.s1, `${caso} ${p.id}`).toBeLessThanOrEqual(m.core.s1 + 1e-9);
+              expect(p.box.s0, `${caso} ${p.id}`).toBeGreaterThanOrEqual(-m.thickness / 2 - 1e-9);
+              expect(p.box.s1, `${caso} ${p.id}`).toBeLessThanOrEqual(m.thickness / 2 + 1e-9);
             }
           }
         }
@@ -563,16 +564,16 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
   });
 });
 
-describe('buildOpeningModel: geometria do batente no núcleo', () => {
-  it('profundidade do batente limitada ao núcleo (DEC-1): D = 0,09 < 0,14', () => {
+describe('buildOpeningModel: geometria do batente na parede', () => {
+  it('padrão wall: D = 0,184 da parede; core: D = 0,14 do núcleo; fixed: valor do tipo', () => {
     const c = cena('ot_p90');
     const m = modelo(c);
-    const f = frameOfWall(c.p, 'w')!;
-    const core = coreSpan(f.type);
-    const fr = openingFrame(c.t, core.to - core.from);
-    expect(fr.frameDepth).toBeCloseTo(0.09, 9);
     const jamb = de(m.parts, 'jamb')[0]!;
-    expect(jamb.box.s1 - jamb.box.s0).toBeCloseTo(0.09, 9);
+    expect(jamb.box.s1 - jamb.box.s0).toBeCloseTo(0.184, 9);
+    const core = modelo(cena('ot_p90', { frameDepthMode: 'core' }));
+    expect(de(core.parts, 'jamb')[0]!.box.s1 - de(core.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.14, 9);
+    const fixo = modelo(cena('ot_p90', { frameDepthMode: 'fixed', frameDepth: 0.09 }));
+    expect(de(fixo.parts, 'jamb')[0]!.box.s1 - de(fixo.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.09, 9);
   });
 
   it('cada ombreira tem corpo e batedor; a travessa tem o batedor embaixo do corpo', () => {

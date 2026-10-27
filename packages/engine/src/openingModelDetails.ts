@@ -21,14 +21,14 @@ export function buildSidelights(c: Ctx): void {
   const z0 = c.t.kind === 'window' ? c.J : 0;
   let z1 = c.H - c.J;
   if (c.transom) z1 = Math.min(z1, c.H - c.J - c.transom.height - TRANSOM_BAR);
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   if (s.left) {
-    addPart(c, 'sidelight-glass-left', 'glass', 'glass', box(base.t0, base.t0 + s.width, c.C - c.G / 2, c.C + c.G / 2, z0, z1));
+    addPart(c, 'sidelight-glass-left', 'glass', 'glass', box(base.t0, base.t0 + s.width, c.Cd - c.G / 2, c.Cd + c.G / 2, z0, z1));
     const m0 = base.t0 + s.width;
     addPart(c, 'sidelight-mullion-left', 'leaf', 'frame', box(m0, m0 + SIDELIGHT_MULLION, body.s0, body.s1, z0, z1));
   }
   if (s.right) {
-    addPart(c, 'sidelight-glass-right', 'glass', 'glass', box(base.t1 - s.width, base.t1, c.C - c.G / 2, c.C + c.G / 2, z0, z1));
+    addPart(c, 'sidelight-glass-right', 'glass', 'glass', box(base.t1 - s.width, base.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, z0, z1));
     const m1 = base.t1 - s.width;
     addPart(c, 'sidelight-mullion-right', 'leaf', 'frame', box(m1 - SIDELIGHT_MULLION, m1, body.s0, body.s1, z0, z1));
   }
@@ -41,8 +41,8 @@ export function buildTransom(c: Ctx): void {
   const inner = innerT(c);
   const barZ0 = c.H - c.J - tr.height - TRANSOM_BAR;
   const barZ1 = c.H - c.J - tr.height;
-  addPart(c, 'transom-bar', 'leaf', 'leaf', box(inner.t0, inner.t1, c.C - c.L / 2, c.C + c.L / 2, barZ0, barZ1));
-  addPart(c, 'transom-glass', 'glass', 'glass', box(inner.t0, inner.t1, c.C - c.G / 2, c.C + c.G / 2, barZ1, c.H - c.J));
+  addPart(c, 'transom-bar', 'leaf', 'leaf', box(inner.t0, inner.t1, c.Cd - c.L / 2, c.Cd + c.L / 2, barZ0, barZ1));
+  addPart(c, 'transom-glass', 'glass', 'glass', box(inner.t0, inner.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, barZ1, c.H - c.J));
 }
 
 /** Alizar em volta do vão, encostado nas duas faces da parede (3 caixas na porta, 4 na janela). */

@@ -5,6 +5,7 @@ import {
   openingAngle3d,
   openingDetail2d,
   openingDetail3d,
+  openingFrameDepth,
   openingFrameStyle,
   openingGrid,
   openingHandle,
@@ -58,6 +59,22 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingDetail2d(com('ot_p90', { detail2d: 'high' }))).toBe('high');
     expect(openingDetail3d(tipo('ot_p90'))).toBe('view');
     expect(openingDetail3d(com('ot_p90', { detail3d: 'full' }))).toBe('full');
+  });
+
+  it('profundidade do batente: parede total (padrão), núcleo ou valor fixo limitado à parede', () => {
+    const base = tipo('ot_p90');
+    expect(openingFrameDepth(base, 0.184, 0.14)).toEqual({ depth: 0.184, centerOffset: 0 });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'core' }, 0.184, 0.14)).toEqual({ depth: 0.14, centerOffset: 0 });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed', frameDepth: 0.09 }, 0.184, 0.14)).toEqual({
+      depth: 0.09,
+      centerOffset: 0,
+    });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed', frameDepth: 0.5 }, 0.184, 0.14)).toEqual({
+      depth: 0.184,
+      centerOffset: 0,
+    });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed' }, 0.184, 0.14).depth).toBeCloseTo(0.09, 9);
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'x' as never }, 0.184, 0.14)).toEqual({ depth: 0.184, centerOffset: 0 });
   });
 
   it('ângulos: 90 em planta; 3D 90 na porta e na janela de giro, 30 na maxim-ar e basculante', () => {

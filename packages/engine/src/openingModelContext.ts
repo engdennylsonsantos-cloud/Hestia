@@ -1,6 +1,7 @@
 import {
   coreSpan,
   openingFrame,
+  openingFrameDepth,
   openingFrameStyle,
   openingGrid,
   openingHandle,
@@ -42,7 +43,10 @@ export interface Ctx {
   f: WallFrame;
   t: OpeningType;
   core: { s0: number; s1: number };
+  /** Centro do núcleo em `s` (posição das folhas nas famílias que giram em torno dele). */
   C: number;
+  /** Centro do batente em `s`, resolvido por `frameDepthMode` (`wall` = plano médio da parede). */
+  Cd: number;
   hw: number;
   H: number;
   thickness: number;
@@ -70,6 +74,27 @@ export function openingCore(f: WallFrame): { s0: number; s1: number } {
   const a = f.sExt + dir * cs.from - f.sMid;
   const b = f.sExt + dir * cs.to - f.sMid;
   return { s0: Math.min(a, b), s1: Math.max(a, b) };
+}
+
+/**
+ * Profundidade `D` e centro `Cd` do batente em `s` local, por `frameDepthMode` (decisão 0035 §1). A aduela usa o
+ * núcleo inteiro (spec E §3.1). No modo `fixed` o centro parte do núcleo e é ajustado para caber entre as faces.
+ */
+export function openingFramePlacement(f: WallFrame, t: OpeningType): { D: number; Cd: number } {
+  const core = openingCore(f);
+  const coreWidth = core.s1 - core.s0;
+  const fd = openingFrameDepth(t, f.thickness, coreWidth);
+  const style = openingFrameStyle(t);
+  if (style === 'aduela') return { D: coreWidth, Cd: (core.s0 + core.s1) / 2 };
+  const mode = t.frameDepthMode ?? 'wall';
+  if (mode === 'core') return { D: fd.depth, Cd: (core.s0 + core.s1) / 2 };
+  if (mode === 'fixed') {
+    const half = fd.depth / 2;
+    const lo = -f.thickness / 2 + half;
+    const hi = f.thickness / 2 - half;
+    return { D: fd.depth, Cd: Math.min(hi, Math.max(lo, (core.s0 + core.s1) / 2)) };
+  }
+  return { D: fd.depth, Cd: fd.centerOffset };
 }
 
 export function box(t0: number, t1: number, s0: number, s1: number, z0: number, z1: number): PartBox {
@@ -101,11 +126,10 @@ export function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame
   const t = p.openingTypes[o.typeId];
   if (!t) return null;
   const core = openingCore(f);
-  const coreWidth = core.s1 - core.s0;
-  const fr = openingFrame(t, coreWidth);
+  const fr = openingFrame(t, core.s1 - core.s0);
   const frameStyle = openingFrameStyle(t);
   const J = frameStyle === 'aduela' ? 0.03 : fr.frameWidth;
-  const D = frameStyle === 'aduela' ? coreWidth : fr.frameDepth;
+  const { D, Cd } = openingFramePlacement(f, t);
   return {
     p,
     o,
@@ -114,6 +138,7 @@ export function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame
     t,
     core,
     C: (core.s0 + core.s1) / 2,
+    Cd,
     hw: g.width / 2,
     H: g.height,
     thickness: f.thickness,
@@ -147,16 +172,16 @@ export function leafSpan(c: Ctx): { center: number; half: number } {
 
 /** Faixa `s` da folha no batente: do lado da abertura ('swing') ou o oposto. */
 export function leafS(c: Ctx): { s0: number; s1: number } {
-  if (c.frameStyle === 'simple' || c.frameStyle === 'block') return { s0: c.C - c.L / 2, s1: c.C + c.L / 2 };
+  if (c.frameStyle === 'simple' || c.frameStyle === 'block') return { s0: c.Cd - c.L / 2, s1: c.Cd + c.L / 2 };
   const lside = c.leafSide === 'opposite' ? -c.side : c.side;
-  const start = c.C + lside * (c.D / 2 - (c.L + GAP));
+  const start = c.Cd + lside * (c.D / 2 - (c.L + GAP));
   return { s0: start, s1: start + lside * c.L };
 }
 
 /** Faixa `s` do batedor: no lado oposto ao da abertura (espelhada com `leafSide = 'opposite'`). */
 export function stopS(c: Ctx): { s0: number; s1: number } {
   const stopSide = c.leafSide === 'opposite' ? c.side : -c.side;
-  const start = c.C + stopSide * (c.D / 2);
+  const start = c.Cd + stopSide * (c.D / 2);
   const end = start - stopSide * (c.D - (c.L + GAP));
   return { s0: start, s1: end };
 }

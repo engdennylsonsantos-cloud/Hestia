@@ -57,6 +57,7 @@ Quatro agentes Haiku em paralelo (R1 a R4), revisados e mesclados no mesmo ramo;
 | R2 · Planta de cobertura | Vista nova no Navegador ("Plantas de cobertura", um item por nível), aba própria (`planKind: 'roof'`), título "Planta de cobertura: <nível>", `roofPlanMode` no quadro incremental, DXF recusado nessa vista com mensagem. e2e `planta-cobertura.mjs` |
 | R3 · Qualquer formato | Decisão 0036: telhado plano aceito; L com os dois lados internos sem inclinação aceito; fallback "planos estendidos" (`roofEnvelope.ts`) |
 | R4 · Limpezas | Opção "Forma" removida da criação; "Forma → Águas livres" de um telhado existente preserva as águas; forro "Por ambiente" volta a recusar um segundo forro (e usa pé-direito e número do ambiente); nomes de acessibilidade do ViewCube; teste de mansarda em arco |
+| Corte do telhado | O telhado atravessado pelo plano de corte é cortado de verdade (só a parte abaixo do plano, com contorno de corte), em `roofsCorte.ts`. A regressão visual dos 7 casos `telhado-*` passou do corte em 2,75 m (abaixo do beiral) para 3,20 m, para continuar exercitando o corte |
 | Minhas correções | Mansarda só recusa quando a faixa de baixo cobre o telhado inteiro (antes uma água-lasca de faceta de arco recusava arco forte); DXF com a camada `TELHADO_DESNIVEL`; telhado plano sem seta e sem "0,0 %", mensagem "Telhado plano criado"; mais contraste de tom na projeção; ouro do zoom regravado (66 chaves, 22 cenários com telhado projetado); espelhar reordena `edgeSag` |
 
 ### Pendências novas (nenhuma bloqueia)

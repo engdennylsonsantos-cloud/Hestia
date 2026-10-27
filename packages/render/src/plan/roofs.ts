@@ -12,6 +12,7 @@ import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
+import { aplicarCorte, telhadoOriginal } from './roofsCorte.ts';
 import { gripsDoTelhado } from './roofsArcoEdge.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
 import { gableSymbolOps } from './roofsEmpena.ts';
@@ -262,6 +263,8 @@ export interface RoofOpsOptions {
    * corte, cheio no corte). Ausente = telhado cortado (comportamento antigo).
    */
   classes?: ReadonlyMap<Id, ViewClass>;
+  /** Cota do plano de corte da planta (m): o telhado `cut` só aparece abaixo dela. Ausente = sem corte. */
+  cutZ?: number;
   /** Azimute do sol (graus, 0 = leste) para o tom das águas; padrão = o sol da vista 3D do projeto. */
   sunAzimuth?: number;
 }
@@ -289,7 +292,8 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   const paint = opts.paint ?? defaultPaint('roof', v.zoom);
   const esp = espessurasDoTelhado(paint);
   const sunAzimuth = opts.sunAzimuth ?? view3dOf(p).sunAzimuth;
-  for (const r of roofs) {
+  // Telhado atravessado pelo plano de corte: só a parte abaixo do plano é vista (a linha de corte é o contorno dela).
+  for (const r of aplicarCorte(roofs, opts.classes, opts.cutZ, planMode).roofs) {
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
     const base = roofFillBase(p, r, theme, dark, paint);
@@ -352,7 +356,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       let maior = r.planes[0];
       for (const pl of r.planes) if (maior && multiArea(pl.polygon) > multiArea(maior.polygon)) maior = pl;
       const at = maior ? labelPoint(maior.polygon) : labelPoint(foot);
-      const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
+      const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(telhadoOriginal.get(r) ?? r), 1)].filter(Boolean).join(' · ');
       // Fino/médio: acima e ao lado do eixo da seta de caimento, que sai do mesmo centroide; grosseiro: só acima.
       if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: areaLabelOffset(maior?.up, coarse) } });
     }

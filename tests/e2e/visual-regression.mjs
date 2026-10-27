@@ -67,9 +67,10 @@ const RECT_WALLS = [[0, 0], [8, 0], [8, 6], [0, 6]];
 const RECT_EAVE = [[-0.3, -0.3], [8.3, -0.3], [8.3, 6.3], [-0.3, 6.3]];
 
 // Decisão 0013: com o padrão (corte 1,20 m) o telhado a 2,80 m fica acima do corte e só aparece tracejado. Os casos de telhado
-// usam topo 6,0 m e corte 2,75 m: a face inferior do beiral (2,80 − 0,095) fica ≤ corte ≤ cumeeira, então o telhado é cortado,
-// e o corte (2,75 m) ainda atravessa as paredes de 2,80 m, que mantêm a hachura da baseline.
-const VISTA_COBERTURA = { top: 6, cut: 2.75 };
+// usam topo 6,0 m e corte 3,20 m: o plano atravessa o telhado (beiral em 2,80 m, cumeeira acima de 3,20 m), então ele é CORTADO:
+// só a parte da superfície abaixo do plano aparece, com contorno de corte onde a superfície cruza o plano. As paredes de
+// 2,80 m ficam abaixo do corte (projeção).
+const VISTA_COBERTURA = { top: 6, cut: 3.2 };
 const ROOF_CASES = {
   'telhado-duas-aguas': [...HOUSE, R('t1', 'gable', { x: 1, y: 0 })],
   'telhado-quatro-aguas': [...HOUSE, R('t1', 'hip', { x: 1, y: 0 })],

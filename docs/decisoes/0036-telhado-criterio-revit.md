@@ -21,3 +21,9 @@ critério do Revit". Código: `packages/engine/src/roofSkeleton.ts` (esqueleto r
    e rincões tracejados finos (rincão pontilhado), empena e desnível, e preenchimento leve por água (opacidade 0,30, tom
    por água com o contraste do cortado aplicado duas vezes); sem seta nem rótulo. A vista **Planta de cobertura** (Navegador,
    um item por nível, aba própria `roof:<nível>`) mostra o telhado completo e opaco (`roofPlanMode`).
+
+6. **Corte pelo plano da planta.** Telhado que o plano de corte atravessa (classe `cut`, faixa de cotas do beiral à cumeeira) é
+   cortado de verdade (`packages/render/src/plan/roofsCorte.ts`): cada água fica só com a parte abaixo do plano
+   (`d ≤ (cutZ − z0) / inclinação`, recorte por semiplano), cumeeira e espigões somem acima do plano e são aparados nele, e o
+   contorno do que sobrou é cheio no peso de corte. A área da etiqueta continua sendo a do telhado inteiro. Telhado inteiro
+   acima do plano segue como projeção (se ligada) e abaixo dele aparece inteiro. A planta de cobertura não corta.

@@ -184,6 +184,7 @@ describe('bandeira em janela: cobertura e grupos físicos', () => {
       for (const flips of combos) {
         const c = cena(base, { transom: { height: 0.3, fixed: false } }, flips);
         const m = modelo(c);
+        expect(new Set(m.parts.map((p) => p.id)).size, base).toBe(m.parts.length);
         const bandeira = m.openings.find((o) => o.kind === 'top')!;
         expect(bandeira, base).toBeDefined();
         const folha = m.parts.filter((p) => p.leaf === bandeira.leaf && (p.role === 'leaf' || p.role === 'glass'));

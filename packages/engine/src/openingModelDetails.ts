@@ -57,7 +57,11 @@ export function buildWindowTransom(c: Ctx): void {
     return;
   }
   // Bandeira maxim-ar: folha pequena com folga em volta, girando no topo para o lado da abertura.
-  const index = c.parts.reduce((mx, p) => (p.leaf !== undefined ? Math.max(mx, p.leaf) : mx), -1) + 1;
+  let index = c.parts.reduce((mx, p) => (p.leaf !== undefined ? Math.max(mx, p.leaf) : mx), -1) + 1;
+  for (const p of c.parts) {
+    const m = /^(?:glass|leaf)-(\d+)/.exec(p.id);
+    if (m) index = Math.max(index, Number(m[1]) + 1);
+  }
   const t0 = l.fullT0 + GAP;
   const t1 = l.fullT1 - GAP;
   const z0 = bandZ0 + GAP;

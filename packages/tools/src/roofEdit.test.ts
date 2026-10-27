@@ -4,17 +4,18 @@ import { clipboardFrom, pasteAlignedCommand } from './clipboard.ts';
 import { copyWalls, selectedMovables } from './edit.ts';
 import { idsOfCategory, selectedTypeId } from './selectionFilters.ts';
 import { pickRoofAt, roofGripAt, roofIdsInBox } from './roofPick.ts';
-import { clickAt, drawWall, makeEnv, P, tool } from './testEnv.ts';
+import { drawWall, makeEnv, P, tool } from './testEnv.ts';
+import { commitPerimeter } from './perimeterCommit.ts';
+import { addSegs, newDraft } from './perimeterSession.ts';
 
-/** Telhado retangular 6 × 4 criado pela ferramenta e selecionado. */
+/** Telhado retangular 6 × 4 criado pelo commit do perímetro e selecionado. */
 function withRoof() {
   const ctx = makeEnv();
+  const cantos = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 4 }, { x: 0, y: 4 }];
   // Balanço zero: o beiral é o próprio retângulo desenhado, como os testes de edição esperam.
-  ctx.options.roofOverhang = 0;
-  ctx.options.roofMode = 'rect';
-  const t = tool('roof', ctx.env);
-  clickAt(t, 0, 0);
-  clickAt(t, 6, 4);
+  const res = commitPerimeter(ctx.store.project, addSegs(newDraft('roof'), cantos.map((a, i) => ({ a, b: cantos[(i + 1) % 4]! }))), { typeId: 'rt_ceramica', levelId: 'lv_0', overhang: 0 });
+  if (!res.ok) throw new Error(res.message);
+  for (const c of res.commands) ctx.store.exec(c);
   const r = roofsOnLevel(ctx.store.project, 'lv_0')[0]!;
   ctx.env.setSelection([r.id]);
   return { ...ctx, roof: () => ctx.store.project.elements[r.id] as Roof, id: r.id };

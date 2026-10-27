@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { roofsOnLevel, type Project, type Roof } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
+import { roofsOnLevel, type Project, type ProjectStore, type Roof } from '@hestia/model';
 import { resolveRoofs } from '@hestia/engine';
 import { roofProblem, roofPatchProblem } from './roofCheck.ts';
-import { clickAt, makeEnv, P, tool } from './testEnv.ts';
-import type { RoofMode } from './types.ts';
+import { commitPerimeter } from './perimeterCommit.ts';
+import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
+import { addSegs, newDraft, setSegSlope, type NewSeg } from './perimeterSession.ts';
+import { makeEnv, P, tool } from './testEnv.ts';
 
 /** Contorno em L de 6 × 4 com o degrau de 4 × 2 (anti-horário). */
 const L = [
@@ -15,48 +18,52 @@ const L = [
   { x: 0, y: 4 },
 ];
 
-function roofCtx(mode: RoofMode, shape: 'shed' | 'gable' | 'hip' | 'edges' = 'gable') {
-  const ctx = makeEnv();
-  ctx.options.roofMode = mode;
-  ctx.options.roofShape = shape;
-  const msgs: string[] = [];
-  ctx.env.say = (m: string) => msgs.push(m);
-  return { ...ctx, msgs };
-}
-
 const roofs = (p: Project): Roof[] => roofsOnLevel(p, 'lv_0');
+
+/** Lados de um anel, na ordem do contorno: cada lado vai de um vértice ao seguinte. */
+const sidesOf = (ring: Vec2[]): NewSeg[] => ring.map((a, i) => ({ a, b: ring[(i + 1) % ring.length]! }));
+const retangulo = (w: number, h: number): Vec2[] => [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }];
+
+/**
+ * Cria o telhado pelo commit do perímetro (o caminho da faixa) e o aplica à loja. `semAguas` são os índices dos lados
+ * que não definem inclinação (a forma "duas águas" deixava as curtas de fora).
+ */
+function criar(store: ProjectStore, segs: NewSeg[], opts: CommitPerimeterOptions = {}, semAguas: number[] = []): CommitPerimeterResult {
+  let d = addSegs(newDraft('roof'), segs);
+  for (const i of semAguas) d = setSegSlope(d, d.segs[i]!.id, { definesSlope: false });
+  const r = commitPerimeter(store.project, d, { typeId: 'rt_ceramica', levelId: 'lv_0', ...opts });
+  if (r.ok) for (const c of r.commands) store.exec(c);
+  return r;
+}
 
 describe('telhado nunca some (A12): criação', () => {
   it('L com todas as arestas sem inclinação: não cria e diz o motivo', () => {
-    const ctx = roofCtx('poly');
+    const ctx = makeEnv();
     const r = { ...roofBase(), boundary: L, edgeSlopes: L.map(() => null), shape: 'edges' as const };
     expect(roofProblem(ctx.store.project, [{ ...r, order: 0 }])).toMatch(/nenhuma aresta define inclinação/);
   });
 
   it('L com duas águas: o esqueleto não fecha nos cantos reentrantes, então avisa e não cria', () => {
-    const ctx = roofCtx('poly', 'gable');
-    const t = tool('roof', ctx.env);
-    for (const q of L) clickAt(t, q.x, q.y);
-    clickAt(t, 0, 0);
+    const ctx = makeEnv();
+    // Só as arestas paralelas ao eixo x definem inclinação (as verticais ficam sem).
+    const r = criar(ctx.store, sidesOf(L), {}, [1, 3, 5]);
+    expect(r.ok).toBe(false);
     expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/não fecha .*degrau.*define inclinação/);
+    expect(r.message).toMatch(/não fecha .*degrau.*define inclinação/);
   });
 
   it('L com quatro águas (todas as arestas definem): cria com 6 águas', () => {
-    const ctx = roofCtx('poly', 'hip');
-    const t = tool('roof', ctx.env);
-    for (const q of L) clickAt(t, q.x, q.y);
-    clickAt(t, 0, 0);
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf(L));
+    expect(r.ok).toBe(true);
     expect(roofs(ctx.store.project)).toHaveLength(1);
     expect(resolveRoofs(ctx.store.project, 'lv_0')[0]!.planes).toHaveLength(6);
-    expect(ctx.msgs.at(-1)).toMatch(/6 águas/);
+    expect(r.message).toMatch(/6 águas/);
   });
 
-  it('a forma da barra vira predefinições por aresta: duas águas com empenas nas arestas curtas', () => {
-    const ctx = roofCtx('rect', 'gable');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
+  it('duas águas: as arestas curtas ficam sem inclinação (empenas) e as longas definem', () => {
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(8, 6)), {}, [1, 3]);
     const r = roofs(ctx.store.project)[0]!;
     expect(r.shape).toBe('edges');
     expect(r.edgeSlopes).toEqual([30, null, 30, null]);
@@ -65,10 +72,8 @@ describe('telhado nunca some (A12): criação', () => {
 
 describe('telhado nunca some (A12): edição', () => {
   it('alterar a aresta que deixaria o telhado sem águas não aplica', () => {
-    const ctx = roofCtx('rect', 'gable');
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(8, 6)), {}, [1, 3]);
     const id = roofs(ctx.store.project)[0]!.id;
     const before = roofs(ctx.store.project)[0]!.edgeSlopes;
     expect(roofPatchProblem(ctx.store.project, [id], { edgeSlopes: [null, null, null, null] })).toMatch(/nenhuma aresta/);
@@ -84,11 +89,8 @@ function roofBase(): Omit<Roof, 'order'> {
 
 describe('vértices e vetor por aresta (A11)', () => {
   it('inserir vértice no meio da aresta 0 divide a aresta e duplica a inclinação dela', () => {
-    const ctx = roofCtx('rect', 'gable');
-    ctx.options.roofOverhang = 0;
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 8, 6);
+    const ctx = makeEnv();
+    criar(ctx.store, sidesOf(retangulo(8, 6)), { overhang: 0 }, [1, 3]);
     const id = roofs(ctx.store.project)[0]!.id;
     ctx.env.setSelection([id]);
     const sel = tool('select', ctx.env);

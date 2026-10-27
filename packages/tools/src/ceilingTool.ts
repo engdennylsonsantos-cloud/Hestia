@@ -12,9 +12,12 @@ const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
 const MODE_HINT: Record<CeilingMode, string> = {
   poly: 'Forro: clique nos vértices. Clique no primeiro ponto, duplo clique ou Enter fecham o contorno. Digite o comprimento e Enter para um segmento exato.',
   rect: 'Forro retangular: clique no primeiro canto e depois no canto oposto.',
-  room: 'Forro no ambiente: clique dentro de um ambiente. O forro segue o contorno e o pé-direito dele.',
+  room: 'Forro no ambiente: clique dentro de um ambiente. O forro segue o contorno dele, na cota do topo das opções.',
   hole: 'Furo: selecione um único forro e clique nos vértices do contorno do furo, dentro do forro. Enter fecha.',
 };
+
+/** Clique fora de um ambiente: diz o que fazer (fechar o contorno), sem mudar o que a ferramenta faz. */
+const NO_ROOM_TEXT = 'Nenhum ambiente aqui: feche o contorno com paredes (sem vãos) e clique dentro dele.';
 
 /** Retângulo com dois cantos opostos, em ordem de contorno. */
 const rectRing = (a: Vec2, c: Vec2): Vec2[] => [a, { x: c.x, y: a.y }, c, { x: a.x, y: c.y }];
@@ -78,11 +81,11 @@ export class CeilingTool extends ToolBase {
   private moveRoom(p: PointerInfo): void {
     const d = roomCeilingAt(this.env.project(), this.env.levelId(), p.raw, this.typeId());
     if (!d) {
-      this.env.say('Clique dentro de um ambiente com circuito fechado de paredes.');
+      this.env.say(NO_ROOM_TEXT);
       return;
     }
     this.items.push({ kind: 'polygon', ring: d.boundary });
-    this.items.push({ kind: 'label', at: p.raw, text: `${d.mark || 'Ambiente'} · pé-direito ${fmt(d.heightOffset)}` });
+    this.items.push({ kind: 'label', at: p.raw, text: `${d.mark || 'Ambiente'} · topo ${fmt(this.roomOffset())} (pé-direito do ambiente ${fmt(d.heightOffset)})` });
   }
 
   private moveRect(p: PointerInfo): void {
@@ -120,10 +123,11 @@ export class CeilingTool extends ToolBase {
   private clickRoom(p: PointerInfo): void {
     const d = roomCeilingAt(this.env.project(), this.env.levelId(), p.raw, this.typeId());
     if (!d) {
-      this.env.say('Clique dentro de um ambiente com circuito fechado de paredes.');
+      this.env.say(NO_ROOM_TEXT);
       return;
     }
-    this.commit(d.boundary, { holes: d.holes, roomId: d.roomId, heightOffset: d.heightOffset, mark: d.mark });
+    // Cota do topo das opções, como no Revit (Height Offset From Level): o pé-direito do ambiente não entra.
+    this.commit(d.boundary, { holes: d.holes, roomId: d.roomId, heightOffset: this.roomOffset(), mark: d.mark });
   }
 
   private clickRect(p: PointerInfo): void {
@@ -227,6 +231,11 @@ export class CeilingTool extends ToolBase {
     const d = len(dir) < 1e-9 ? v2(1, 0) : dir;
     this.pts.push(add(last, mul(d, v)));
     return true;
+  }
+
+  /** Cota do topo das opções (padrão 2,60 m), usada também no modo "No ambiente". */
+  private roomOffset(): number {
+    return this.env.options().ceilingOffset ?? DEFAULT_CEILING_HEIGHT;
   }
 
   /** Tipo de forro das opções, ou o primeiro do projeto quando o escolhido não existe. */

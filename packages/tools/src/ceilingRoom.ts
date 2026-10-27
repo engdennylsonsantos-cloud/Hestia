@@ -17,10 +17,13 @@ export function roomCeilingAt(p: Project, levelId: Id, at: Vec2, typeId: Id): Ce
  * fechado. Ambiente que já tem forro no nível fica de fora. O tipo é o preferido das opções, se existir; senão, o primeiro
  * do projeto. Null quando não há o que criar.
  */
-export function ceilingsForAllRooms(p: Project, levelId: Id, preferredTypeId: Id | undefined): Extract<Command, { type: 'addCeilings' }> | null {
+export function ceilingsForAllRooms(p: Project, levelId: Id, preferredTypeId: Id | undefined, offset?: number): Extract<Command, { type: 'addCeilings' }> | null {
   const typeId = preferredTypeId && p.ceilingTypes[preferredTypeId] ? preferredTypeId : Object.keys(p.ceilingTypes)[0];
   if (!typeId) return null;
   const withCeiling = new Set(ceilingsOnLevel(p, levelId).map((c) => c.roomId).filter((id): id is Id => !!id));
-  const ceilings = ceilingDraftsFromRooms(p, levelId, typeId, () => newId('f')).filter((d) => !d.roomId || !withCeiling.has(d.roomId));
+  // `offset` (cota do topo das opções) substitui o pé-direito de cada ambiente, como no modo "No ambiente".
+  const ceilings = ceilingDraftsFromRooms(p, levelId, typeId, () => newId('f'))
+    .filter((d) => !d.roomId || !withCeiling.has(d.roomId))
+    .map((d) => (offset === undefined ? d : { ...d, heightOffset: offset }));
   return ceilings.length ? { type: 'addCeilings', ceilings } : null;
 }

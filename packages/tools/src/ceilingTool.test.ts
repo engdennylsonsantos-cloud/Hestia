@@ -69,14 +69,14 @@ describe('ferramenta Forro: contorno por cliques', () => {
 });
 
 describe('ferramenta Forro: no ambiente', () => {
-  it('clique dentro do ambiente cria o forro com o contorno, o número e o pé-direito do ambiente', () => {
+  it('clique dentro do ambiente cria o forro com o contorno, o número e a cota do topo das opções (como o Revit, não o pé-direito do ambiente)', () => {
     const c = ctx('room');
     room(c);
     c.env.exec({ type: 'addRoom', room: makeRoom({ id: 'r1', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 2, y: 1.5 }, ceilingHeight: 2.9 }) });
     const t = tool('ceiling', c.env);
     clickAt(t, 2, 1.5);
     expect(ceilings(c.store)).toHaveLength(1);
-    expect(ceilings(c.store)[0]).toMatchObject({ roomId: 'r1', heightOffset: 2.9, mark: '101' });
+    expect(ceilings(c.store)[0]).toMatchObject({ roomId: 'r1', heightOffset: 2.6, mark: '101' });
     // Contorno do ambiente = face interna das paredes (o mesmo polígono do motor de ambientes).
     const [r] = resolveRooms(c.store.project, 'lv_0');
     expect(multiArea([r!.polygon!])).toBeCloseTo(multiArea([[ceilings(c.store)[0]!.boundary]]), 6);
@@ -88,7 +88,7 @@ describe('ferramenta Forro: no ambiente', () => {
     const t = tool('ceiling', c.env);
     clickAt(t, 10, 10);
     expect(ceilings(c.store)).toHaveLength(0);
-    expect(c.msgs.at(-1)).toContain('Clique dentro de um ambiente');
+    expect(c.msgs.at(-1)).toContain('feche o contorno com paredes');
   });
 });
 

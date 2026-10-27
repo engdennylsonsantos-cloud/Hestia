@@ -22,10 +22,12 @@ interface NumProps {
   placeholder?: string;
   /** Campo vazio confirmado: o valor volta a "nenhum" (null). Sem ele, campo vazio não grava nada. */
   onClear?: () => void;
+  /** Texto que não vira número: o campo volta ao valor anterior e este aviso é chamado (sem ele, a volta é silenciosa). */
+  onInvalid?: () => void;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid }: NumProps): ReactElement {
   const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -41,6 +43,7 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
     const n = parseNumber(text);
     if (n === null) {
       setText(show(value));
+      onInvalid?.();
       return;
     }
     let v = n / scale;

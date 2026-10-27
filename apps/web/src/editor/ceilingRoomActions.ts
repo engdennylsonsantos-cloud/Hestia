@@ -9,7 +9,7 @@ import { useUi } from './state.ts';
  */
 export function addCeilingsAllRooms(): { count: number; message: string } {
   const ui = useUi.getState();
-  const cmd = ceilingsForAllRooms(editor.project, ui.levelId, ui.options.ceilingTypeId);
+  const cmd = ceilingsForAllRooms(editor.project, ui.levelId, ui.options.ceilingTypeId, ui.options.ceilingOffset);
   if (!cmd) {
     const message = 'Nenhum ambiente de circuito fechado sem forro neste nível (ou o projeto não tem tipo de forro).';
     useUi.setState({ status: message });

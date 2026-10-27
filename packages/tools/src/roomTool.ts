@@ -7,7 +7,7 @@ import type { PointerInfo } from './types.ts';
 
 /** Motivo, em português, de o cursor não estar num circuito fechado (`problem` do motor). */
 export const ROOM_PROBLEM_TEXT: Record<RoomProblem, string> = {
-  fora: 'Aponte para dentro de um circuito fechado de paredes.',
+  fora: 'Ponto em espaço aberto: feche o contorno com paredes (sem vãos) e clique dentro dele.',
   aberto: 'Circuito aberto: há um vão entre as paredes, feche-o para criar o ambiente.',
 };
 

@@ -36,6 +36,12 @@ describe('ceilingsForAllRooms (E6: forro em todos os ambientes do nível)', () =
     expect(cmd?.ceilings.map((c) => c.roomId)).toEqual(['r2']);
   });
 
+  it('com a cota das opções, cada forro usa essa cota (não o pé-direito do ambiente)', () => {
+    const s = twoRooms();
+    const cmd = ceilingsForAllRooms(s.project, 'lv_0', 'ct_gesso', 3.1);
+    expect(cmd?.ceilings.map((c) => c.heightOffset)).toEqual([3.1, 3.1]);
+  });
+
   it('nada a criar devolve null; tipo preferido ausente cai no primeiro tipo do projeto', () => {
     const s = twoRooms();
     expect(ceilingsForAllRooms(s.project, 'lv_1', 'ct_gesso')).toBeNull();

@@ -41,6 +41,7 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { patchOpenings } from './openingPatch.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
 
@@ -239,7 +240,7 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
   return (
     <>
       <div className="typesel">
-        <select id="prop-opentype" className="select" value={typeId.mixed ? '' : typeId.value} disabled={!kind} onChange={(e) => e.target.value && patch(ids, { typeId: e.target.value })} aria-label="Tipo de abertura">
+        <select id="prop-opentype" className="select" value={typeId.mixed ? '' : typeId.value} disabled={!kind} onChange={(e) => e.target.value && patchOpenings(ids, { typeId: e.target.value })} aria-label="Tipo de abertura">
           {typeId.mixed && <option value="">variados</option>}
           {Object.values(p.openingTypes).filter((t) => !kind || t.kind === kind).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
@@ -250,17 +251,17 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
       <Group title="Restrições">
         {single && (
           <>
-            <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} unit="m" /></Row>
+            <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patchOpenings(ids, { offset: v })} unit="m" /></Row>
             <Row label="Peitoril" htmlFor="p-sill">
-              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} />
+              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros. O valor anterior foi mantido.' })} />
             </Row>
             {single.sillOverride !== null && (
               <div className="prow"><span /><button className="chiplink" onClick={() => patch(ids, { sillOverride: null })}>Usar peitoril do tipo</button></div>
             )}
           </>
         )}
-        <Row label="Inverter dobradiça"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
-        <Row label="Inverter sentido"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
+        <Row label="Inverter dobradiça" htmlFor="p-hand"><Check id="p-hand" checked={hand.value} mixed={hand.mixed} onChange={(v) => patch(ids, { flipHand: v })} /></Row>
+        <Row label="Inverter sentido" htmlFor="p-facing"><Check id="p-facing" checked={facing.value} mixed={facing.mixed} onChange={(v) => patch(ids, { flipFacing: v })} /></Row>
       </Group>
       <Group title="Dimensões" open={!!single}>
         {type && (

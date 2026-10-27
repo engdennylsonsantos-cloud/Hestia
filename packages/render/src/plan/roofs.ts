@@ -12,6 +12,7 @@ import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
+import { gripsDoTelhado } from './roofsArcoEdge.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
 import { gableSymbolOps } from './roofsEmpena.ts';
 import { evitarSobreposicao } from './roofsRotulos.ts';
@@ -396,7 +397,7 @@ export function roofSelectionOps(
 ): FloorOps {
   const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
   // Alças só nos cantos lógicos: um arco amostrado não vira uma fileira de quadradinhos.
-  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: cantosLogicos }));
+  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: gripsDoTelhado(p.elements[r.roofId], cantosLogicos) }));
   const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).
   const out: FloorOps = { fills: base.fills, strokes: base.strokes.filter((s) => !(s.closed && s.widthPx === 2)), labels: base.labels };

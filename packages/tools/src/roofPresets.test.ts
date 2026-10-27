@@ -39,7 +39,7 @@ describe('telhado nunca some (A12): criação', () => {
     for (const q of L) clickAt(t, q.x, q.y);
     clickAt(t, 0, 0);
     expect(roofs(ctx.store.project)).toHaveLength(0);
-    expect(ctx.msgs.at(-1)).toMatch(/esqueleto não fecha em \(/);
+    expect(ctx.msgs.at(-1)).toMatch(/não fecha .*degrau.*define inclinação/);
   });
 
   it('L com quatro águas (todas as arestas definem): cria com 6 águas', () => {

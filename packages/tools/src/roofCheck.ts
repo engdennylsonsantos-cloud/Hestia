@@ -16,13 +16,64 @@ function noWaterReason(r: Roof): string {
   return 'o contorno não gera águas com esta forma';
 }
 
+/** Lista em português: "1", "1 e 2", "1, 2 e 3". */
+function joinAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+}
+
+/** Índice do vértice do contorno onde está o degrau, ou null quando o degrau é interno (cruzamento de águas). */
+function cornerAt(step: SkeletonStep, roof: Roof): number | null {
+  for (let i = 0; i < roof.boundary.length; i++) {
+    const v = roof.boundary[i]!;
+    if (Math.hypot(v.x - step.x, v.y - step.y) <= 1e-6) return i;
+  }
+  return null;
+}
+
 /**
- * Motivo de o esqueleto não fechar: vértices onde as águas se encontram em cotas diferentes (degrau), com a diferença.
- * Recusa a criação ou a alteração em vez de deixar um aviso: o usuário vê onde corrigir a planta.
+ * Arestas (numeradas a partir de 1, como na barra) sem inclinação que chegam ao canto onde as águas dão o degrau.
+ * Vazio quando o degrau não está num vértice do contorno: aí a dica não cita aresta.
  */
-function stepsReason(steps: SkeletonStep[]): string {
-  const at = steps.map((s) => `${pointsText([s])} m, com degrau de ${s.dz.toFixed(2).replace('.', ',')} m`).join('; ');
-  return `o esqueleto não fecha em ${at}`;
+function gableEdgesAt(step: SkeletonStep, roof: Roof): number[] {
+  const i = cornerAt(step, roof);
+  if (i === null) return [];
+  const n = roof.boundary.length;
+  const out: number[] = [];
+  for (const e of [(i - 1 + n) % n, i]) {
+    const s = roof.edgeSlopes[e];
+    if (s !== null && s !== undefined && s > 0) continue;
+    if (!out.includes(e + 1)) out.push(e + 1);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * Motivo de o telhado não fechar: vértices onde as águas se encontram em cotas diferentes (degrau), com a diferença,
+ * a causa e a saída. Cita as arestas sem inclinação que chegam ali, quando o motor as identifica. Recusa a criação ou a
+ * alteração em vez de deixar um aviso: o usuário vê onde corrigir e o que fazer.
+ */
+function stepsReason(steps: SkeletonStep[], roof: Roof): string {
+  const points = pointsText(steps);
+  const corners = steps.every((s) => cornerAt(s, roof) !== null);
+  const where =
+    corners && steps.length === 1
+      ? `no canto reentrante em ${points} m`
+      : corners
+        ? `nos cantos reentrantes em ${points} m`
+        : `em ${points} m`;
+  const degraus = steps.map((s) => s.dz.toFixed(2).replace('.', ','));
+  const cause =
+    steps.length === 1
+      ? `as águas que chegam ali ficam com um degrau de ${degraus[0]} m`
+      : `as águas que chegam ali ficam com degraus de ${joinAnd(degraus)} m`;
+  const edges = [...new Set(steps.flatMap((s) => gableEdgesAt(s, roof)))].sort((a, b) => a - b);
+  const alvo = edges.length === 1 ? `a aresta ${edges[0]}` : `as arestas ${joinAnd(edges.map(String))}`;
+  const fix =
+    edges.length > 0
+      ? `Marque também ${alvo} como "define inclinação" (triângulo) ou ajuste o contorno.`
+      : 'Marque as arestas que chegam ali como "define inclinação" (triângulo) ou ajuste o contorno.';
+  return `não fecha ${where}: ${cause}. ${fix}`;
 }
 
 /**
@@ -49,7 +100,7 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
     if (!res) return 'o telhado não pôde ser resolvido';
     if (res.problem) return res.problem;
     if (res.planes.length === 0) return noWaterReason(r);
-    if (res.steps?.length) return stepsReason(res.steps);
+    if (res.steps?.length) return stepsReason(res.steps, r);
   }
   return null;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { intersection, multiArea } from '@hestia/geom';
 import {
   DEFAULT_OPENING_TYPES,
   buildTemplate,
@@ -15,7 +16,7 @@ import {
 } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
-import { buildOpeningModel, partTransformed } from './openingModel.ts';
+import { buildOpeningModel, partTransformed, slicePartsAtZ } from './openingModel.ts';
 import { CLOSED, type OpeningModel, type OpeningPart, type PartBox } from './openingModelTypes.ts';
 import { openingPlanPaths, type OpeningPlanOptions, type OpeningPlanPath } from './openingPlan.ts';
 import { buildOpeningSchedule } from './openingSchedule.ts';
@@ -95,13 +96,24 @@ const familia = (id: string): string => {
   return expectedFamily.get(id)!;
 };
 
-function volumeComum(a: PartBox, b: PartBox): boolean {
-  const e = 1e-9;
-  return (
-    Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0) > e &&
-    Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0) > e &&
-    Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > e
-  );
+const multi = (ring: Array<{ t: number; s: number }>): Array<Array<Array<{ x: number; y: number }>>> => [
+  [ring.map((p) => ({ x: p.t, y: p.s }))],
+];
+
+/** Interseção real (perfil em L incluído) na faixa de z comum às duas peças. */
+function temIntersecao(m: OpeningModel, a: OpeningPart, b: OpeningPart): boolean {
+  const z0 = Math.max(a.box.z0, b.box.z0);
+  const z1 = Math.min(a.box.z1, b.box.z1);
+  if (z1 - z0 <= 1e-9) return false;
+  const passos = Math.max(2, Math.min(60, Math.ceil((z1 - z0) / 0.01)));
+  for (let i = 0; i <= passos; i++) {
+    const z = z0 + ((z1 - z0) * i) / passos;
+    const corte = slicePartsAtZ(m, z, CLOSED);
+    const ra = corte.find((x) => x.part.id === a.id)?.ring;
+    const rb = corte.find((x) => x.part.id === b.id)?.ring;
+    if (ra && rb && multiArea(intersection(multi(ra), multi(rb))) > 1e-7) return true;
+  }
+  return false;
 }
 
 /** As 12 arestas da caixa orientada continuam com as três medidas originais (movimento é isometria). */
@@ -215,7 +227,7 @@ describe('catálogo completo: modelo único', () => {
         const caso = `${base} hand=${flips.flipHand} facing=${flips.flipFacing}`;
         const fixos = m.parts.filter((p) => p.role === 'jamb' || p.role === 'stop' || p.role === 'head' || p.role === 'sillFrame');
         for (const folha of m.parts.filter((p) => p.role === 'leaf' || p.role === 'leafPanel')) {
-          for (const fixo of fixos) expect(volumeComum(folha.box, fixo.box), `${caso} ${folha.id} × ${fixo.id}`).toBe(false);
+          for (const fixo of fixos) expect(temIntersecao(m, folha, fixo), `${caso} ${folha.id} × ${fixo.id}`).toBe(false);
         }
       }
     }

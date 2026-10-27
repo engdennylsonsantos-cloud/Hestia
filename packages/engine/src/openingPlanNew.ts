@@ -259,7 +259,8 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
   const family = newDoorFamily(m);
   if (!family) return false;
   const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
-  if (level === 'low') {
+  // Vai-e-vem é família de giro: mostra a folha aberta (e os dois arcos) em todos os níveis (spec E3 §6).
+  if (level === 'low' && family !== 'dblact') {
     addNewDoorLow(out, m);
     return true;
   }
@@ -317,7 +318,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
     const sign = openingSign(o, motion);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     out.push(polygon(transformedRing(box, motion, -opts.angle), 'leaf', 'cut', 1));
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;
     const center = { t: o.pivot.t, s: o.pivot.s };
     const closedEnd = { t: o.latchT, s: o.pivot.s };
@@ -350,12 +350,11 @@ export function addLouverPlan(out: OpeningPlanPath[], m: OpeningModel): void {
 }
 
 /** Janela de abrir: folha aberta com espessura no `angle2d` e arco tracejado até a posição fechada. */
-export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   for (const o of m.openings) {
     if (o.kind !== 'side') continue;
     const box = leafBox(m, o.leaf);
     if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     const motion = leafMotion(m, o.leaf);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;
@@ -366,12 +365,11 @@ export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Ope
 }
 
 /** Janela pivotante: folha girada no eixo central e arcos curtos tracejados nas duas pontas. */
-export function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+export function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   for (const o of m.openings) {
     if (o.kind !== 'pivot') continue;
     const box = leafBox(m, o.leaf);
     if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     const motion = leafMotion(m, o.leaf);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;

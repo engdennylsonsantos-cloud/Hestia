@@ -299,25 +299,47 @@ svg { display: block; }
 .typebox .cap { font-family: var(--font-ui); color: var(--fg-soft); }
 .typebox .buf { min-width: 60px; font-size: 14px; }
 .typebox .buf:empty::after { content: '…'; color: var(--fg-faint); }
-/* ViewCube (vista 3D): cubo CSS 3D pequeno, discreto, abaixo do botão de enquadrar. Repouso em 85% de opacidade. */
-.viewcube { position: absolute; right: 10px; top: 46px; z-index: 2; width: 104px; max-width: calc(100% - 16px); display: grid; justify-items: center; gap: 2px; user-select: none; -webkit-user-select: none; opacity: 0.85; transition: opacity 0.15s ease; }
+/* ViewCube (vista 3D): cubo CSS 3D de 64 px sobre um anel de bússola no chão, num palco de 132 px. Repouso em 85% de opacidade. A coluna da direita (52 px) fica para a barra de navegação (.navbar), que está logo abaixo. */
+.viewcube { --vc-font: 'Arial Narrow', 'Roboto Condensed', 'Liberation Sans Narrow', 'Helvetica Neue', Arial, sans-serif; position: absolute; right: 52px; top: 46px; z-index: 2; width: 132px; max-width: calc(100% - 16px); display: grid; justify-items: center; gap: 0; user-select: none; -webkit-user-select: none; opacity: 0.85; transition: opacity 0.15s ease; }
 .viewcube:hover, .viewcube:focus-within { opacity: 1; }
-.vc-stage { width: 104px; height: 104px; display: grid; place-items: center; touch-action: none; cursor: pointer; }
+.vc-stage { position: relative; width: 132px; height: 132px; display: grid; place-items: center; touch-action: none; cursor: pointer; }
 .vc-stage:active { cursor: grabbing; }
+/* Anel e sombra: duas camadas SVG em volta do cubo (a de trás sob ele, a da frente sobre ele). Não recebem o ponteiro. */
+.vc-ring { position: absolute; left: 0; top: 0; width: 132px; height: 132px; overflow: visible; pointer-events: none; }
+.vc-ring--back { z-index: 0; }
+.vc-ring--front { z-index: 1; }
+.vc-shadow { fill: rgba(0, 0, 0, 0.3); filter: blur(3px); }
+.vc-band { fill: color-mix(in srgb, var(--sheet) 80%, transparent); stroke: color-mix(in srgb, var(--fg) 30%, transparent); stroke-width: 0.8; stroke-linejoin: round; }
+.vc-letter { font-family: var(--font-ui); font-size: 12px; font-weight: 700; fill: var(--fg-soft); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: color-mix(in srgb, var(--sheet) 85%, transparent); stroke-width: 2.4px; stroke-linejoin: round; }
+.vc-letter.is-north { fill: var(--accent); }
+.vc-letter.is-hover { fill: var(--select); }
+.vc-letter.is-back { opacity: 0.6; }
 /* --vc-half (metade do lado, 32 px: cubo de 64 px) é definido inline pelo componente: a mesma constante que a geometria de clique usa. */
 .vc-cube { position: relative; width: calc(var(--vc-half) * 2); height: calc(var(--vc-half) * 2); transform-style: preserve-3d; }
-/* Faces e células não recebem o ponteiro: o palco resolve o clique pela geometria. As células continuam focáveis. */
-.vc-face { position: absolute; inset: 0; display: grid; grid-template-columns: 22% 56% 22%; grid-template-rows: 22% 56% 22%; backface-visibility: hidden; -webkit-backface-visibility: hidden; pointer-events: none; }
-/* Arestas finas e claras; o rótulo da face é pequeno e sem negrito, para não pesar sobre a vista. */
-.vc-cell { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0.5px solid var(--line-strong); background: var(--panel); color: var(--fg-soft); font-size: 7px; font-weight: 500; line-height: 1; letter-spacing: 0; box-sizing: border-box; pointer-events: none; white-space: nowrap; }
-.vc-cell--face { background: var(--sheet); color: var(--fg-soft); }
-/* Destaque sutil: tinta da cor de seleção do tema, sem bloco chapado. */
-.vc-cell.is-hover { background: color-mix(in srgb, var(--select) 22%, transparent); border-color: var(--select); color: var(--fg); }
+/* Faces: degradê cinza com luz de cima à esquerda (topo mais claro; esquerda média; frente e direita mais escuras). Cantos arredondados. */
+.vc-face { position: absolute; inset: 0; display: grid; grid-template-columns: 22% 56% 22%; grid-template-rows: 22% 56% 22%; border-radius: 5px; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; pointer-events: none; }
+.vc-face--top { background: linear-gradient(150deg, #f7f8fa 0%, #d9dee4 100%); }
+.vc-face--left { background: linear-gradient(170deg, #d4d9df 0%, #b3bac3 100%); }
+.vc-face--front { background: linear-gradient(170deg, #bfc5cd 0%, #959ca8 100%); }
+.vc-face--right { background: linear-gradient(190deg, #a4acb6 0%, #7d8590 100%); }
+.vc-face--back, .vc-face--bottom { background: #868d98; }
+/* Células: as de face são transparentes (mostram o degradê); as de borda e canto têm um chanfro mais claro e uma linha fina. */
+.vc-cell { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0; background: transparent; color: #1b2028; font-family: var(--vc-font); font-size: 9px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; box-sizing: border-box; box-shadow: inset 0 0 0 0.5px rgba(28, 33, 40, 0.3); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3); pointer-events: none; white-space: nowrap; }
+.vc-cell--edge, .vc-cell--corner { background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.07)); box-shadow: inset 0 0 0 0.5px rgba(28, 33, 40, 0.34), inset 1px 1px 0 rgba(255, 255, 255, 0.28); }
+/* Cantos externos da face (os vértices do cubo): arredondados. A grade é em linha, então :nth-child(1), (3), (7) e (9) são os quatro cantos. */
+.vc-cell--corner:nth-child(1) { border-top-left-radius: 4px; }
+.vc-cell--corner:nth-child(3) { border-top-right-radius: 4px; }
+.vc-cell--corner:nth-child(7) { border-bottom-left-radius: 4px; }
+.vc-cell--corner:nth-child(9) { border-bottom-right-radius: 4px; }
+.vc-cell--face { font-size: 9px; }
+/* Destaque sob o ponteiro: azul da cor de seleção do tema, sobre a célula inteira. */
+.vc-cell.is-hover { background: color-mix(in srgb, var(--select) 62%, transparent); box-shadow: inset 0 0 0 1px var(--select); color: #ffffff; text-shadow: none; }
 .vc-cell:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; z-index: 1; }
 /* Giros e Início numa fileira; Perspectiva/Ortogonal quebra para a linha de baixo. Sem caixa de fundo em repouso. */
-.vc-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; width: 100%; }
+.vc-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px; width: 100%; margin-top: 2px; }
 .vc-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 4px; border: 1px solid transparent; background: transparent; color: var(--fg-soft); border-radius: var(--r); font-size: 10px; cursor: pointer; }
 .vc-btn svg { width: 12px; height: 12px; }
+.vc-btn--home svg { width: 13px; height: 13px; }
 .vc-btn--wide { order: 3; min-width: 88px; }
 /* Com o cursor sobre o cubo, os botões ganham uma caixa fina; em repouso ficam só como ícones. */
 .viewcube:hover .vc-btn { background: var(--panel); border-color: var(--line); color: var(--fg); }

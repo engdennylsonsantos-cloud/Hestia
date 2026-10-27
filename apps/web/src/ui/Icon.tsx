@@ -29,6 +29,9 @@ const R: Record<string, string> = {
   sametype: p('bl', 'M4 4H14V14H4Z') + p('bl', 'M18 4H28V14H18Z') + p('bl', 'M4 18H14V28H4Z') + p('bl', 'M18 18H28V28H18Z'),
   samename: p('s1', 'M3 7H29V25H3Z') + '<text class="ic-tx" x="16" y="20" text-anchor="middle">Aa</text>',
 
+  // Editar perímetro (Revit: contorno em L com lápis): L azul com traço laranja e vértices, lápis cinza com ponta laranja.
+  editperimeter: p('bl', 'M3 4H17V13H24V24H3Z') + p('ac', 'M3 4H17V13H24V24H3Z') + p('fa', 'M1.8 2.8H4.2V5.2H1.8ZM15.8 2.8H18.2V5.2H15.8ZM15.8 11.8H18.2V14.2H15.8Z') + p('s1', 'M16.6 22.6L24.6 14.6L27.4 17.4L19.4 25.4Z') + p('s3', 'M24.6 14.6L26.2 13L29 15.8L27.4 17.4Z') + p('s3', 'M16.6 22.6L19.4 25.4L13.5 28.5Z') + p('fa', 'M15.2 25.3L16.7 26.8L13.5 28.5Z'),
+
   // Elementos de arquitetura
   wall: p('s1', 'M4 12L12 7H28L20 12Z') + p('s2', 'M4 12H20V25H4Z') + p('s3', 'M20 12L28 7V20L20 25Z'),
   door: p('s3', 'M8 4H24V28H8Z') + p('s2', 'M8 4L19 6.5V30L8 28Z') + '<circle class="ic-fa" cx="16" cy="18" r="1.3"/>',

@@ -178,7 +178,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   },
   editPerimeter: {
     label: t('Editar perímetro', 'Edit Perimeter'),
-    icon: 'edit',
+    icon: 'editperimeter',
     hint: t('Reabre o contorno do elemento selecionado na planta, para ajustar linhas, inclinação e balanço.', 'Reopens the outline of the selected element on the plan, to adjust lines, slope and overhang.'),
     run: () => {
       const id = idPerimetroEditavel(editor.project, useUi.getState().selection);

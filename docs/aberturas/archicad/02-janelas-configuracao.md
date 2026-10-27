@@ -800,6 +800,8 @@ Base: `https://help.graphisoft.com/AC/28/INT/_AC28_Help/`
 | 040-305 a 040-319 | `040_ElementsVB/040_ElementsVB-N.htm` | [DOC] | Doors/Windows (305), placement (306), previews (307), floor plan display (308), slanted walls (309), sill/header (310), subfloor (311), anchor reveal (312), empty opening (313), moving (314), curved wall (315), **corner windows (316)**, **skylights (317–319)**. |
 | 140-39 a 140-43 | `140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-N.htm` | [DOC] | MVO Construction Elements (39), **Detail Level of Door and Window Symbols (40)**, Elevator (41), Miscellaneous Library Parts (42), Detail Level of Skylight Symbols (43). |
 
+**Nota:** as páginas `150-22` a `150-35` tratam de Dimension, Elevator, Wall End e outras ferramentas; não acrescentam parâmetros de janela. As páginas `151-32` a `151-34` não existem (404). No AC24, as páginas 32/33 (Minimal Space/Custom Corner) foram cobertas pelo equivalente AC28 `151-30/31`.
+
 ### 22.2 Ajuda oficial AC24 (INT) — abas que o AC28 reorganizou
 
 Base: `https://help.graphisoft.com/AC/24/INT/_AC24_Help/141_DoorWindowCustomSettings/`

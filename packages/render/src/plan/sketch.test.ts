@@ -182,7 +182,7 @@ describe('sketchOps: triângulo de inclinação (só telhado)', () => {
 });
 
 describe('sketchOps: furos, problemas', () => {
-  it('laço hole: hachura rosa e legenda "furo"', () => {
+  it('laço hole: laranja translúcido sem hachura e legenda "furo"', () => {
     const outer = segsOf(SQUARE, 'o');
     const hole = segsOf([P(0.3, 0.3), P(0.6, 0.3), P(0.6, 0.6), P(0.3, 0.6)], 'h');
     const result = resultOf([
@@ -190,7 +190,11 @@ describe('sketchOps: furos, problemas', () => {
       { role: 'hole', segs: hole, ring: hole.map((s) => s.a) },
     ]);
     const ops = sketchOps(draftOf('floor', [...outer, ...hole]), result, LIGHT, VIEW);
-    expect(ops.fills.filter((f) => f.hatch?.kind === 'diagonal')).toHaveLength(1);
+    const furo = ops.fills.filter((f) => f.color === LIGHT.sketchHole);
+    expect(furo).toHaveLength(1);
+    expect(furo[0]).toMatchObject({ alpha: 0.28 });
+    expect(furo[0]!.hatch).toBeUndefined();
+    expect(ops.fills.some((f) => f.hatch !== undefined)).toBe(false);
     expect(ops.labels.filter((l) => l.text === 'furo')).toHaveLength(1);
   });
 

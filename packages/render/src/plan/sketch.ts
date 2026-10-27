@@ -97,7 +97,7 @@ function balloonOps(at: Vec2, out: PlanOps): void {
 
 /**
  * Operações de desenho do esboço em planta: linhas em rosa (1,5 px, arcos amostrados como arcos), vértices como
- * quadradinhos, realce das selecionadas e do cursor, furos com hachura e legenda, linhas dos problemas em vermelho com
+ * quadradinhos, realce das selecionadas e do cursor, furos em laranja translúcido e legenda, linhas dos problemas em vermelho com
  * balão, e (só no telhado) o triângulo de inclinação por aresta do laço externo.
  */
 export function sketchOps(
@@ -125,7 +125,7 @@ export function sketchOps(
 
   for (const loop of result.loops) {
     if (loop.role !== 'hole') continue;
-    out.fills.push({ polygons: [[loop.ring]], color: rose, alpha: 0.12, hatch: { kind: 'diagonal', color: rose, alpha: 0.6 } });
+    out.fills.push({ polygons: [[loop.ring]], color: theme.sketchHole, alpha: 0.28 });
     const at = labelPoint([[loop.ring]]);
     if (at) out.labels.push({ at, text: 'furo', center: true });
   }

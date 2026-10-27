@@ -150,6 +150,8 @@ export interface PlanTheme {
   roofSlope: string;
   /** Cor de telha quando o material do tipo de telhado não tem cor: terracota discreta, legível nos dois temas. */
   roofTile: string;
+  /** Laço de furo do esboço (preenchimento translúcido): laranja, para indicar abertura, legível nos dois temas. */
+  sketchHole: string;
 }
 
 export const LIGHT: PlanTheme = {
@@ -171,6 +173,7 @@ export const LIGHT: PlanTheme = {
   roofFootprint: '#c2185b',
   roofSlope: '#1f6f5c',
   roofTile: '#c9795a',
+  sketchHole: '#e8890c',
 };
 
 export const DARK: PlanTheme = {
@@ -192,4 +195,5 @@ export const DARK: PlanTheme = {
   roofFootprint: '#ff6fb0',
   roofSlope: '#5cc3a6',
   roofTile: '#8a4f3b',
+  sketchHole: '#ffb04d',
 };

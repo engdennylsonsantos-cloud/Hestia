@@ -689,7 +689,7 @@ A NBR 14718 (edição lida: 2001; há revisão de 2019) fixa [S23]:
 | Ancoragem no concreto | penetração recomendada ≥ 90 mm |
 | Vidro | conforme NBR 7199; não usar massa de gesso/óleo |
 
-**Relação com janelas**: a NBR 14718 não diz “toda janela precisa de guarda-corpo”. Ela se aplica a guarda-corpos de sacadas, escadas, rampas, mezaninos e passarelas. Quando a janela tem peitoril baixo e abertura que permite queda, o projeto deve prever proteção (guarda-corpo, peitoril ou limitador), por análise de segurança e pelas normas de acessibilidade/desempenho. [INFERIDO; não é uma regra automática da NBR 14718]. Para o editor, `sillHeight` + `guardrailRequired` deve ser uma regra configurável, não um default cego.
+**Atenção de nomenclatura**: na NBR 14718, **“peitoril” é a travessa superior do guarda-corpo**, não o peitoril da janela. O mesmo termo tem dois sentidos no Brasil; no editor, use `guardrailTopRail` para a NBR 14718 e `windowSill` para a janela [S23]. **Relação com janelas**: a NBR 14718 não diz “toda janela precisa de guarda-corpo”. Ela se aplica a guarda-corpos de sacadas, escadas, rampas, mezaninos e passarelas. Quando a janela tem peitoril baixo e abertura que permite queda, o projeto deve prever proteção (guarda-corpo, peitoril ou limitador), por análise de segurança e pelas normas de acessibilidade/desempenho. [INFERIDO; não é uma regra automática da NBR 14718]. Para o editor, `sillHeight` + `guardrailRequired` deve ser uma regra configurável, não um default cego.
 
 ### 6.6 NBR 11742 — porta corta-fogo
 

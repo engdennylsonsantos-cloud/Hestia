@@ -7,13 +7,9 @@ import { usePerimeter } from '../editor/perimeter.ts';
 import { hoverSectionAt, sectionPickAt } from '../editor/sectionPick.ts';
 import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
-import { SectionBadge, buildSectionFrame } from './SectionCanvas.tsx';
-import { ViewCube } from './ViewCube.tsx';
+import { buildSectionFrame } from './SectionCanvas.tsx';
 import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
-import { OpeningFlipGrips } from './OpeningFlipGrips.tsx';
-import { OpeningTempDims } from './OpeningTempDims.tsx';
-import { NavBar } from './NavBar.tsx';
-import { CanvasContextMenu } from './CanvasContextMenu.tsx';
+import { ViewportOverlays } from './ViewportOverlays.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
 import { useDark } from './useDark.ts';
 import { criarMontagemVista3d, type Montagem3dProgressiva } from './montagem3dProgressiva.ts';
@@ -463,9 +459,6 @@ export function ViewportCanvas(): ReactElement {
     : ui.tool === 'select'
     ? 'default'
     : 'crosshair';
-  // Alças e cotas editáveis só com UMA esquadria selecionada na planta (Revit: depois de inserir).
-  const only = selection.length === 1 ? editor.project.elements[selection[0]!] : undefined;
-  const selectedOpeningId = only && (only.kind === 'door' || only.kind === 'window') ? only.id : null;
   return (
     <div
       ref={host}
@@ -479,25 +472,7 @@ export function ViewportCanvas(): ReactElement {
       onContextMenu={(e) => e.preventDefault()}
     >
       <PlanLabels ref={labelLayer} labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
-      {ui.view === 'plan' && selectedOpeningId ? <OpeningFlipGrips openingId={selectedOpeningId} /> : null}
-      {ui.view === 'plan' && selectedOpeningId ? <OpeningTempDims openingId={selectedOpeningId} /> : null}
-      {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
-      {ui.gpu === 'cpu' && ui.view === '3d' && (
-        <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>
-          Este navegador não oferece WebGL nem WebGPU. Use a planta.
-        </div>
-      )}
-      <NavBar model={model.current} center={() => { const r = host.current?.getBoundingClientRect(); return { x: (r?.width ?? 0) / 2, y: (r?.height ?? 0) / 2 }; }} />
-      <CanvasContextMenu model={model.current} host={host} />
-      {ui.view === '3d' && ui.gpu !== 'cpu' ? <ViewCube model={model.current} /> : null}
-      {ui.view === 'section' ? <SectionBadge /> : null}
-      {ui.view === 'plan' && ui.prompt ? (
-        <div className="typebox" role="status">
-          <span className="cap">{ui.prompt}</span>
-          <span className="buf" aria-live="polite">{ui.typed}</span>
-          <span className="cap">Enter confirma</span>
-        </div>
-      ) : null}
+      <ViewportOverlays host={host} model={model.current} selection={selection} ui={ui} />
     </div>
   );
 }

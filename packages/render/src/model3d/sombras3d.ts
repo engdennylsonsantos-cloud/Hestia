@@ -1,6 +1,8 @@
+import * as THREE from 'three';
+
 /** Campos do renderer que a sombra sob demanda usa (`WebGLRenderer.shadowMap` tem estes dois). */
 export interface MapaDeSombraRenderer {
-  shadowMap: { autoUpdate: boolean; needsUpdate: boolean };
+  shadowMap: { autoUpdate: boolean; needsUpdate: boolean; enabled?: boolean };
 }
 
 /**
@@ -30,5 +32,203 @@ export class SombraSobDemanda {
     renderer.shadowMap.needsUpdate = true;
     this.suja = false;
     return true;
+  }
+}
+
+/**
+ * Teto padrão de triângulos do passe de sombra (Fase 2.7, orçamento de sombra). O passe de sombra desenha a cena uma
+ * segunda vez; em 60 pavimentos × 256 paredes ele sozinho dobra os 1,7 M triângulos do quadro. Com o teto, só as faixas
+ * mais próximas do alvo projetam sombra quando a cena inteira passaria do orçamento. Valor escolhido para o primeiro
+ * quadro de 60 × 256 ficar abaixo de 3 M (1,70 M de cor + até 1,25 M de sombra).
+ */
+export const SOMBRA_MAX_TRIANGULOS = 1_250_000;
+
+/** Uma faixa que pode projetar sombra: a caixa (mundo), os triângulos e os objetos que o orçamento liga/desliga. */
+export interface FaixaDeSombra {
+  caixa: THREE.Box3 | null;
+  triangulos: number;
+  alvos: readonly THREE.Mesh[];
+}
+
+/** Faixas escolhidas para o passe de sombra e o resultado do orçamento. */
+export interface EscolhaDeSombra {
+  /** Índices (na lista de faixas) que projetam sombra, na ordem de inclusão. */
+  incluidas: readonly number[];
+  /** Triângulos que o passe de sombra vai desenhar. */
+  triangulos: number;
+  /** Triângulos de todas as faixas (antes do orçamento). */
+  triangulosDisponiveis: number;
+  /** Caixa (mundo) das faixas incluídas; null sem geometria. */
+  caixa: THREE.Box3 | null;
+  /** Alguma faixa ficou de fora do passe de sombra. */
+  limitada: boolean;
+}
+
+/**
+ * Orçamento de sombra: inclui as faixas por ordem de distância ao alvo (o ponto de interesse da câmera) até o teto de
+ * triângulos. A faixa mais próxima entra sempre, mesmo que sozinha passe do teto: uma cena sem nenhuma sombra mudaria
+ * muito mais a imagem do que uma sombra sem a caixa distante.
+ */
+export function orcamentoDeSombra(
+  faixas: readonly FaixaDeSombra[],
+  alvo: THREE.Vector3,
+  teto = SOMBRA_MAX_TRIANGULOS,
+): EscolhaDeSombra {
+  const limite = Number.isFinite(teto) ? Math.max(0, teto) : SOMBRA_MAX_TRIANGULOS;
+  const ordem = faixas
+    .map((f, i) => ({ i, d: f.caixa && !f.caixa.isEmpty() ? f.caixa.distanceToPoint(alvo) : Number.POSITIVE_INFINITY }))
+    .filter((x) => faixas[x.i]!.triangulos > 0)
+    .sort((a, b) => a.d - b.d || a.i - b.i);
+  const incluidas: number[] = [];
+  const caixa = new THREE.Box3();
+  let triangulos = 0;
+  let triangulosDisponiveis = 0;
+  for (const f of faixas) triangulosDisponiveis += Math.max(0, f.triangulos);
+  for (const { i } of ordem) {
+    const f = faixas[i]!;
+    // Contíguo a partir do alvo: a primeira faixa que não cabe encerra a seleção (sem buraco no mapa de sombra).
+    if (incluidas.length > 0 && triangulos + f.triangulos > limite) break;
+    incluidas.push(i);
+    triangulos += f.triangulos;
+    if (f.caixa && !f.caixa.isEmpty()) caixa.union(f.caixa);
+  }
+  return {
+    incluidas,
+    triangulos,
+    triangulosDisponiveis,
+    caixa: caixa.isEmpty() ? null : caixa,
+    limitada: incluidas.length < ordem.length,
+  };
+}
+
+/** Liga `castShadow` só nas faixas escolhidas (as demais deixam de desenhar no passe de sombra). */
+export function aplicarSombra(faixas: readonly FaixaDeSombra[], escolha: EscolhaDeSombra): void {
+  const dentro = new Set(escolha.incluidas);
+  faixas.forEach((f, i) => {
+    const projetar = dentro.has(i);
+    for (const m of f.alvos) m.castShadow = projetar;
+  });
+}
+
+/** Medidas do enquadramento da câmera do sol (para o relatório e os testes). */
+export interface EnquadramentoSombra {
+  largura: number;
+  altura: number;
+  /** Tamanho (m) de um texel do mapa de sombra no chão: a medida da nitidez da sombra. */
+  texelM: number;
+  near: number;
+  far: number;
+}
+
+/**
+ * Enquadra a câmera ortográfica do sol na caixa dada (Fase 2.7). O enquadramento antigo usava um cubo de lado igual à
+ * diagonal do modelo (≈ 380 m em 60 pavimentos), o que dava ~19 cm por texel num mapa de 2048²; a caixa justa usa a
+ * projeção da caixa nos eixos da luz e devolve a nitidez possível. Com o orçamento de sombra a caixa é a das faixas que
+ * projetam, então ela encolhe quando a câmera se aproxima.
+ */
+export function enquadrarSombra(
+  sol: THREE.DirectionalLight,
+  caixa: THREE.Box3,
+  direcao: THREE.Vector3,
+): EnquadramentoSombra | null {
+  if (caixa.isEmpty()) return null;
+  const centro = caixa.getCenter(new THREE.Vector3());
+  const tamanho = caixa.getSize(new THREE.Vector3());
+  const raio = tamanho.length() / 2;
+  const dir = direcao.clone();
+  if (dir.lengthSq() === 0) return null;
+  dir.normalize();
+  const cam = sol.shadow.camera;
+  const distancia = Math.max(1, raio * 2 + 1);
+  cam.position.copy(centro).addScaledVector(dir, distancia);
+  cam.up.set(0, 0, 1);
+  cam.lookAt(centro);
+  cam.updateMatrixWorld();
+  const inv = cam.matrixWorldInverse;
+  const canto = new THREE.Vector3();
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let z0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  let z1 = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    canto.set(i & 1 ? caixa.max.x : caixa.min.x, i & 2 ? caixa.max.y : caixa.min.y, i & 4 ? caixa.max.z : caixa.min.z);
+    canto.applyMatrix4(inv);
+    if (canto.x < x0) x0 = canto.x;
+    if (canto.y < y0) y0 = canto.y;
+    if (canto.z < z0) z0 = canto.z;
+    if (canto.x > x1) x1 = canto.x;
+    if (canto.y > y1) y1 = canto.y;
+    if (canto.z > z1) z1 = canto.z;
+  }
+  // Folga de um texel em cada lado (evita perder a borda por arredondamento da matriz).
+  const folgaLateral = Math.max(0.05, raio * 0.01);
+  cam.left = x0 - folgaLateral;
+  cam.right = x1 + folgaLateral;
+  cam.bottom = y0 - folgaLateral;
+  cam.top = y1 + folgaLateral;
+  cam.near = Math.max(0.05, -z1 - folgaLateral);
+  cam.far = Math.max(cam.near + 1, -z0 + folgaLateral);
+  cam.updateProjectionMatrix();
+  sol.position.copy(cam.position);
+  sol.target.position.copy(centro);
+  sol.target.updateMatrixWorld();
+  const largura = cam.right - cam.left;
+  const altura = cam.top - cam.bottom;
+  const mapa = sol.shadow.mapSize;
+  const texelM = Math.max(largura / Math.max(1, mapa.x), altura / Math.max(1, mapa.y));
+  return { largura, altura, texelM, near: cam.near, far: cam.far };
+}
+
+/**
+ * Política de sombra da cena: mantém a sombra sob demanda e, quando o mapa vai mesmo ser refeito, aplica o orçamento de
+ * triângulos por faixa e enquadra o sol na caixa das faixas escolhidas. É o gancho do `scene.onBeforeRender`, que o three
+ * chama antes de montar a lista de desenho e antes do passe de sombra — o mesmo ponto em que a câmera já é a do quadro.
+ */
+export class SombrasDaCena {
+  readonly sobDemanda = new SombraSobDemanda();
+  private _ultima: EscolhaDeSombra | null = null;
+  private _enquadramento: EnquadramentoSombra | null = null;
+
+  /** Último orçamento aplicado (null enquanto não houve passe de sombra). */
+  get ultima(): EscolhaDeSombra | null {
+    return this._ultima;
+  }
+
+  /** Último enquadramento da câmera do sol. */
+  get enquadramento(): EnquadramentoSombra | null {
+    return this._enquadramento;
+  }
+
+  /** Marca o mapa como sujo (o modelo ou o sol mudaram). */
+  marcar(): void {
+    this.sobDemanda.marcar();
+  }
+
+  /** Sombra sob demanda: chamado pela vista antes de desenhar. */
+  aplicar(renderer: MapaDeSombraRenderer): boolean {
+    return this.sobDemanda.aplicar(renderer);
+  }
+
+  /**
+   * Prepara o passe de sombra do quadro: se o renderer vai refazer o mapa, escolhe as faixas dentro do orçamento e
+   * enquadra o sol. Sem refazer o mapa, não faz nada (a câmera do sol não pode mudar com o mapa velho).
+   */
+  preparar(
+    renderer: MapaDeSombraRenderer,
+    faixas: readonly FaixaDeSombra[],
+    sol: THREE.DirectionalLight,
+    alvo: THREE.Vector3,
+    direcao: THREE.Vector3,
+    teto = SOMBRA_MAX_TRIANGULOS,
+  ): EscolhaDeSombra | null {
+    const sm = renderer.shadowMap;
+    if (sm.enabled === false || !sm.needsUpdate) return null;
+    const escolha = orcamentoDeSombra(faixas, alvo, teto);
+    aplicarSombra(faixas, escolha);
+    this._ultima = escolha;
+    this._enquadramento = escolha.caixa ? enquadrarSombra(sol, escolha.caixa, direcao) : null;
+    return escolha;
   }
 }

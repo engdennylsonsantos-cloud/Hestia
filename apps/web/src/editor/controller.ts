@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { computeSection, cotasAutomaticas, LevelResolveCache, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';
 import {
   ProjectStore,
-  annotationIdsIn,
+  annotationIdsIn, projectGrids,
   buildTemplate,
   createEmptyProject,
   migrateProject,
@@ -329,7 +329,7 @@ export class Editor {
     // A seleção guarda ids de elementos, cotas/textos e vistas: só sai o que realmente sumiu do projeto.
     const notes = new Set(annotationIdsIn(p, useUi.getState().levelId, sel));
     const views = new Set(p.views.map((v) => v.id));
-    const keep = sel.filter((id) => p.elements[id] || notes.has(id) || views.has(id));
+    const keep = sel.filter((id) => p.elements[id] || notes.has(id) || views.has(id) || projectGrids(p).some((g) => g.id === id));
     if (keep.length !== sel.length) useUi.setState({ selection: keep });
     const lv = useUi.getState().levelId;
     if (!p.levels.some((l) => l.id === lv)) useUi.setState({ levelId: p.levels[0]?.id ?? 'lv_0' });

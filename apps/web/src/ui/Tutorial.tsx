@@ -7,9 +7,11 @@ export function Tutorial(): ReactElement | null {
   const on = useUi((s) => s.tutorial);
   const seen3d = useUi((s) => s.seen3d);
   const view = useUi((s) => s.view);
+  const tool = useUi((s) => s.tool);
   const p = useProject();
   useProjectVersion();
-  if (!on) return null;
+  // Dispensado uma vez, não volta (a lembrança fica no localStorage, lida com try/catch em controller.ts).
+  if (!on || editor.tutorialSeen()) return null;
   const els = Object.values(p.elements);
   const walls = els.filter(isWall);
   const steps: Array<[string, boolean]> = [
@@ -26,7 +28,8 @@ export function Tutorial(): ReactElement | null {
   };
   const shown = now === -1 ? steps.length : now + 1;
   return (
-    <div className="tutorial" role="region" aria-label="Primeiros passos">
+    // Com uma ferramenta de desenho ativa, a faixa encolhe para o contador: o texto não cobre o desenho.
+    <div className={`tutorial${tool !== 'select' ? ' compact' : ''}`} role="region" aria-label="Primeiros passos">
       <span className="step-count">{now === -1 ? 'Concluído' : `Passo ${shown} de ${steps.length}`}</span>
       <span className="step-text">{now === -1 ? 'Você usou as ferramentas principais. Explore os demais tipos e o 3D.' : steps[now]![0]}</span>
       <span className="dots" aria-hidden="true">

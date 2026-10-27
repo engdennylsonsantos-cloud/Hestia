@@ -307,6 +307,11 @@ svg { display: block; }
 .tutorial .pip { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
 .tutorial .pip.done { background: var(--ok); border-color: var(--ok); }
 .tutorial .pip.now { border-color: var(--accent); background: var(--accent-soft); }
+/* A faixa não recebe cliques (o desenho passa por ela); só o botão Dispensar é clicável. Com ferramenta de desenho, vira um contador. */
+.tutorial { pointer-events: none; }
+.tutorial button { pointer-events: auto; }
+.tutorial.compact { right: auto; max-width: 60%; }
+.tutorial.compact .step-text, .tutorial.compact .dots { display: none; }
 
 /* ---- telas estreitas: painéis viram gavetas ---- */
 @media (max-width: 700px) {

@@ -1,11 +1,12 @@
 import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { CLOSED, openingLinePaths, projectParts, type SectionBeyond, type SectionOpening, type SectionOrigin, type SectionResult } from '@hestia/engine';
+import { CLOSED, openingLinePaths, type ProjectedRing, type SectionBeyond, type SectionOpening, type SectionOrigin, type SectionResult } from '@hestia/engine';
 import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import { thinStrokes } from '../plan/thin.ts';
 import type { PlanPaint } from '../plan/style.ts';
 import type { FillOp, LabelOp, PlanDrawList, PlanTheme, StrokeOp } from '../plan/types.ts';
 import type { Viewport } from '../viewport.ts';
+import { projetarComPerfis } from './perfis.ts';
 import { ownerOf, sectionItems, type SectionItem } from './pick.ts';
 import { sectionStyleOf } from './style.ts';
 
@@ -140,22 +141,42 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       return { kind: mat.hatch, color: mix(mat.color, input.dark ? '#ffffff' : '#000000', 0.45) };
     };
     const toScreen = (u: number, z: number): Vec2 => (faceOn ? { x: cx - o.viewSide * u, y: z0 + z } : { x: cx + o.sSign * u, y: z0 + z });
-    const projected = projectParts(model, faceOn ? 's' : 't', CLOSED);
-    const ordered = [...projected].sort((a, b) => {
-      const ca = isCut(a.part) ? 1 : 0;
-      const cb = isCut(b.part) ? 1 : 0;
-      if (ca !== cb) return ca - cb;
+    // Peças do mesmo `group` são UMA peça física (alizar): o contorno e o preenchimento são a união delas.
+    type Unidade = { itens: ProjectedRing[]; depth: number; cut: boolean };
+    const porGrupo = new Map<string, Unidade>();
+    const unidades: Unidade[] = [];
+    for (const item of projetarComPerfis(model, faceOn ? 's' : 't', CLOSED)) {
+      if (!item.part.group) {
+        unidades.push({ itens: [item], depth: item.depth, cut: isCut(item.part) });
+        continue;
+      }
+      let u = porGrupo.get(item.part.group);
+      if (!u) {
+        u = { itens: [], depth: 0, cut: false };
+        porGrupo.set(item.part.group, u);
+        unidades.push(u);
+      }
+      u.itens.push(item);
+      u.depth += item.depth;
+      u.cut ||= isCut(item.part);
+    }
+    for (const u of porGrupo.values()) u.depth /= u.itens.length;
+    const ordered = unidades.sort((a, b) => {
+      if (a.cut !== b.cut) return Number(a.cut) - Number(b.cut);
       return faceOn ? (a.depth - b.depth) * o.viewSide : a.depth - b.depth;
     });
     // Vão livre: só contorno, sem X; a janela sem folha mostra a soleira, como no modelo (decisão 0024 §3).
     outline();
     for (const item of ordered) {
-      const ring = item.ring.map((q) => toScreen(q.u, q.z));
-      if (ring.length < 3) continue;
-      const hatch = hatchOf(item.part);
-      if (!noFill) fills.push({ polygons: [[ring]], color: halftone(colorOf(item.part), pt), alpha: pt.alpha, ...(hatch ? { hatch } : {}) });
-      const dash = item.part.dashed ? { dash: [6, 3] as [number, number] } : {};
-      strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1, ...dash });
+      const rings = item.itens.map((x) => x.ring.map((q) => toScreen(q.u, q.z))).filter((r) => r.length >= 3);
+      if (!rings.length) continue;
+      const polygons: MultiPolygon = rings.length === 1 ? [[rings[0]!]] : union(...rings.map((r): MultiPolygon => [[r]]));
+      const primeira = item.itens[0]!.part;
+      const cortada = item.itens.find((x) => isCut(x.part))?.part;
+      const hatch = cortada ? hatchOf(cortada) : undefined;
+      if (!noFill) fills.push({ polygons, color: halftone(colorOf(primeira), pt), alpha: pt.alpha, ...(hatch ? { hatch } : {}) });
+      const dash = primeira.dashed ? { dash: [6, 3] as [number, number] } : {};
+      for (const ring of ringsOf(polygons)) strokes.push({ pts: ring, closed: true, widthPx: edge, color: halftone(theme.ink, pt), alpha: 1, ...dash });
     }
     // Linha central só na janela de correr (2 ou 3 folhas), como antes (C6).
     const slides = model.openings.filter((x) => x.kind === 'slide').length;

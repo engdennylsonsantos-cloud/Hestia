@@ -10,6 +10,7 @@ import { addSheetAction } from '../../editor/sheetActions.ts';
 import { toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { applyDrop } from '../dockDrag.ts';
+import { gridToolOf } from '../gridUi.ts';
 import { idPerimetroEditavel } from '../perimeter/perimeterEditavel.ts';
 import { t, type ActionId, type Txt } from './model.ts';
 
@@ -65,6 +66,7 @@ function typeDialogFor(c: RibbonCtx): { dialog: DialogKind; arg: string } | null
       case 'ceiling': return o.ceilingTypeId ? { dialog: 'ceilingType', arg: o.ceilingTypeId } : null;
       case 'roof': case 'roofextrusion': case 'roofarrow': return o.roofTypeId ? { dialog: 'roofType', arg: o.roofTypeId } : null;
       case 'stair': case 'stairrun': return o.stair?.typeId ? { dialog: 'stairType', arg: o.stair.typeId } : null;
+      case 'grid': return { dialog: 'gridType', arg: gridToolOf(o, c.p).typeId };
       default: return null;
     }
   }

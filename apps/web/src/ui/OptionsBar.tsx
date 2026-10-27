@@ -14,6 +14,7 @@ import { RoofArrowOptionsBar } from './RoofArrowOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
 import { ArrayOptionsBar } from './ArrayOptionsBar.tsx';
+import { GridOptionsBar } from './GridOptionsBar.tsx';
 import { openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
@@ -248,6 +249,7 @@ export function OptionsBar(): ReactElement {
         </>
       )}
       {tool === 'array' && <ArrayOptionsBar />}
+      {tool === 'grid' && <GridOptionsBar />}
       {tool === 'align' && (
         <label>
           Preferir

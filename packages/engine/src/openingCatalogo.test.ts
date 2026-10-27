@@ -105,7 +105,7 @@ function temIntersecao(m: OpeningModel, a: OpeningPart, b: OpeningPart): boolean
   const z0 = Math.max(a.box.z0, b.box.z0);
   const z1 = Math.min(a.box.z1, b.box.z1);
   if (z1 - z0 <= 1e-9) return false;
-  const passos = Math.max(2, Math.min(60, Math.ceil((z1 - z0) / 0.01)));
+  const passos = Math.max(2, Math.min(6, Math.ceil((z1 - z0) / 0.02)));
   for (let i = 0; i <= passos; i++) {
     const z = z0 + ((z1 - z0) * i) / passos;
     const corte = slicePartsAtZ(m, z, CLOSED);

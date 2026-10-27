@@ -116,8 +116,23 @@ export interface EnquadramentoSombra {
   altura: number;
   /** Tamanho (m) de um texel do mapa de sombra no chão: a medida da nitidez da sombra. */
   texelM: number;
+  /** Lado do mapa de sombra usado neste enquadramento (potência de 2). */
+  mapa: number;
   near: number;
   far: number;
+}
+
+/**
+ * Lado do mapa de sombra (potência de 2) para a região enquadrada: um texel por pixel de tela na distância do alvo.
+ * Um mapa maior que a tela não melhora nada e paga fill rate em dobro (o mapa de 2048² com a caixa justa do prédio
+ * custava ~8 ms no primeiro quadro da RX 580). Um mapa menor que a tela serrilha a sombra.
+ */
+export function tamanhoDoMapaDeSombra(regiaoM: number, metrosPorPixel: number, min = 512, max = 2048): number {
+  const regiao = Number.isFinite(regiaoM) ? Math.max(1, regiaoM) : 1;
+  const densidade = Number.isFinite(metrosPorPixel) && metrosPorPixel > 0 ? metrosPorPixel : regiao / max;
+  const texels = regiao / densidade;
+  const potencia = 2 ** Math.ceil(Math.log2(Math.max(1, texels)));
+  return Math.max(min, Math.min(max, potencia));
 }
 
 /**

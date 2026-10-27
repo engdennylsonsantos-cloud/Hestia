@@ -44,6 +44,8 @@ export interface ToolEnv {
   say(msg: string): void;
   /** Pede à interface para voltar à ferramenta de seleção. */
   done(): void;
+  /** Abre a vista de corte criada (opcional: sem ele, a ferramenta só avisa). */
+  openSection?(id: string): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
   /** Aresta de telhado escolhida na planta (painel "Aresta N"), ou null. Ausente = a interface não guarda a escolha. */

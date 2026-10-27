@@ -71,6 +71,12 @@ export function SectionViewProps({ view }: { view: SectionView }): ReactElement 
         <Row label="Fim Y" htmlFor="sv-by">
           <NumField id="sv-by" value={view.b.y} unit="m" onCommit={(v) => setB(view.b.x, v)} />
         </Row>
+        {/* Observador fica à esquerda de início→fim: trocar os pontos inverte o lado visto (e as referências). */}
+        <Row label="Direção">
+          <button className="btn" type="button" title="Troca início e fim: o corte passa a ser visto pelo outro lado" onClick={() => update({ a: view.b, b: view.a, refs: view.refs ? { a: view.refs.b, b: view.refs.a } : undefined })}>
+            Inverter lado
+          </button>
+        </Row>
       </Group>
 
       <Group title="Marca">

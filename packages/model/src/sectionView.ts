@@ -206,7 +206,9 @@ export function sectionMarkGeometry(
       ? [{ at: mul(add(a, b), 0.5), side: 0 }]
       : ends.map((e) => ({ at: e, side: e === a ? -1 : 1 }));
     for (const { at, side } of anchors) {
-      const base = add(at, mul(n, look.labelOffsetMm.y * mPerMm));
+      // O rótulo fica depois da seta (que sai ao longo de n), para não sobrepor a ponta da seta.
+      const arrowHere = look.showArrow && look.placement !== 'middle';
+      const base = add(at, mul(n, (look.labelOffsetMm.y + (arrowHere ? look.arrowMm : 0)) * mPerMm));
       const pos = add(base, mul(u, side * look.labelOffsetMm.x * mPerMm));
       out.labels.push({ at: pos, text, rotation: textRotation(u) });
     }

@@ -67,7 +67,7 @@ describe('vistas de corte e elevação: identidade e geometria', () => {
     expect(g.arrows[0]![1]!.x).toBeCloseTo(0);
     expect(g.arrows[0]![1]!.y).toBeCloseTo(0.3);
     expect(g.labels.map((l) => l.text)).toEqual(['Corte A', 'Corte A']);
-    expect(g.labels[0]!.at.y).toBeCloseTo(0.15);
+    expect(g.labels[0]!.at.y).toBeCloseTo(0.45); // depois da seta (3 mm) + 1,5 mm de folga
   });
 
   it('respeita visibilidade, setas, rótulo e posição no meio', () => {

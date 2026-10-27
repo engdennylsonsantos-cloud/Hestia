@@ -35,8 +35,29 @@ describe('ferramenta Cota', () => {
     const t = tool('dimension', ctx.env);
     clickAt(t, 0, 0);
     clickAt(t, 4, 0);
-    expect(t.type('-1')).toBe(false);
+    expect(t.type('abc')).toBe(false);
+    expect(t.type('0')).toBe(false);
     expect(dims(ctx.store)).toHaveLength(0);
+  });
+
+  it('o sinal negativo digitado escolhe o lado da linha de cota', () => {
+    const ctx = makeEnv();
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    t.move(P(2, 3)); // cursor à esquerda, mas o sinal manda
+    expect(t.type('-0,6')).toBe(true);
+    expect(dims(ctx.store)[0]!.offset).toBeCloseTo(-0.6, 9);
+  });
+
+  it('0,6 digitado vira 0,6 m exatos (sem arredondar para baixo)', () => {
+    const ctx = makeEnv();
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    t.move(P(2, 3));
+    expect(t.type('0,6')).toBe(true);
+    expect(dims(ctx.store)[0]!.offset).toBe(0.6);
   });
 
   it('dois pontos iguais não criam cota', () => {

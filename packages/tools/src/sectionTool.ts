@@ -83,7 +83,13 @@ export class SectionTool extends ToolBase {
         : {}),
     };
     this.env.exec({ type: 'addView', view });
+    // Abre o corte logo após criá-lo (como Revit/ArchiCAD); sem o gancho, avisa como abrir.
+    if (this.env.openSection) {
+      this.env.openSection(view.id);
+      this.env.say(`${view.name} criado e aberto. Nas Propriedades, "Inverter lado" troca o lado que o observador vê.`);
+    } else {
+      this.env.say(`${view.name} criado. Duplo clique no navegador abre o corte.`);
+    }
     this.env.done();
-    this.env.say(`${view.name} criado. Duplo clique no navegador abre o corte.`);
   }
 }

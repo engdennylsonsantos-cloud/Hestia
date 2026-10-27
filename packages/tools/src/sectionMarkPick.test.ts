@@ -18,7 +18,7 @@ describe('seleção da marca de corte/elevação', () => {
     p.views = [view({ label: 'A' })];
     expect(sectionMarkAt(p, 'lv_0', { x: 2, y: 0 }, 0.01)).toBe('v1');
     expect(sectionMarkAt(p, 'lv_0', { x: 0, y: 0.3 }, 0.01)).toBe('v1');
-    expect(sectionMarkAt(p, 'lv_0', { x: -0.2, y: 0.15 }, 0.01)).toBe('v1');
+    expect(sectionMarkAt(p, 'lv_0', { x: -0.2, y: 0.45 }, 0.01)).toBe('v1');
     expect(sectionMarkAt(p, 'lv_0', { x: 2, y: 1 }, 0.01)).toBeNull();
   });
 

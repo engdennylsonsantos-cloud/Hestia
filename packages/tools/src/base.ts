@@ -1,7 +1,8 @@
-import { newId } from '@hestia/model';
+import { newId, type Wall } from '@hestia/model';
 import type { Inference, PointerInfo, PreviewItem, Tool, ToolEnv } from './types.ts';
 import { infer, type InferContext } from './infer.ts';
 import { floorEdges, floorVertices } from './floorPick.ts';
+import { openingSnapGeometry } from './openingSnapPoints.ts';
 import type { Vec2 } from '@hestia/geom';
 
 /** Implementação comum: Esc em dois passos, inferência e rótulos. */
@@ -65,10 +66,14 @@ export abstract class ToolBase implements Tool {
     const hidden = this.env.hiddenInView?.();
     const under = this.env.underlayLevelId?.() ?? null;
     const levelsIn = (l: string): string[] => (under ? [l, under] : [l]);
+    const visible = hidden ? (w: Wall) => !hidden.has(w.id) : undefined;
+    const levels = levelsIn(levelId);
+    // Aberturas entram na captura com cantos, centro e ombreiras; na inserção de abertura (só paredes) ficam de fora.
+    const openings = extra.onWallsOnly ? [] : levels.flatMap((l) => openingSnapGeometry(project, l, visible));
     return {
       project,
       levelId,
-      isVisible: hidden ? (w) => !hidden.has(w.id) : undefined,
+      isVisible: visible,
       underlayLevelId: under,
       mpp: this.env.metersPerPixel(),
       gridStep: this.env.gridStep(),
@@ -76,8 +81,8 @@ export abstract class ToolBase implements Tool {
       snap: this.env.options().snap,
       ...extra,
       // Vértices dos pisos do nível entram sempre; os pontos que a ferramenta passa (contorno em construção) somam-se a eles.
-      extraPoints: [...levelsIn(levelId).flatMap((l) => floorVertices(project, l)), ...(extra.extraPoints ?? [])],
-      extraSegments: [...levelsIn(levelId).flatMap((l) => floorEdges(project, l)), ...(extra.extraSegments ?? [])],
+      extraPoints: [...levels.flatMap((l) => floorVertices(project, l)), ...openings.flatMap((g) => g.points), ...(extra.extraPoints ?? [])],
+      extraSegments: [...levels.flatMap((l) => floorEdges(project, l)), ...openings.flatMap((g) => g.segments), ...(extra.extraSegments ?? [])],
     };
   }
 

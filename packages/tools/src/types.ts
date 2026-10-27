@@ -73,6 +73,12 @@ export type ArrayKind = 'linear' | 'radial';
 /** "Mover para" da Matriz: Segundo (o valor vai do 1º ao 2º item) ou Último (vai do 1º ao último, dividido entre os itens). */
 export type ArrayAnchor = 'second' | 'last';
 
+/**
+ * Modo do Aparar/Estender (Revit): 'canto' ajusta as duas paredes ao canto; 'unico' mantém a referência e muda só a
+ * segunda parede; 'varios' acumula paredes com Shift e aplica todas na referência.
+ */
+export type TrimMode = 'canto' | 'unico' | 'varios';
+
 /** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
 export type CeilingMode = 'poly' | 'rect' | 'room';
 
@@ -116,6 +122,9 @@ export const DEFAULT_SNAP: SnapOptions = {
 
 /** Padrões do "Desconectar": Mover e Espelhar acompanham a vizinha (falso) e Rotacionar é livre (verdadeiro). */
 export const DEFAULT_DISJOIN = { move: false, rotate: true, mirror: false } as const;
+
+/** Alinhar: feição inicial oferecida nas paredes (Faces, Eixos ou Núcleo). */
+export type AlignPrefer = 'faces' | 'eixos' | 'nucleo';
 
 export interface ToolOptions {
   /** Capturas ligadas; ausente = padrão. */
@@ -184,7 +193,11 @@ export interface ToolOptions {
   arrayAngle?: number;
   /** Matriz: "Mover para". Segundo = o espaçamento/ângulo é o do 1º ao 2º item; Último = o do 1º ao último. Ausente = Segundo. */
   arrayAnchor?: ArrayAnchor;
+  /** Alinhar: qual feição da parede é a candidata inicial sob o cursor. Ausente = faces. */
+  alignPrefer?: AlignPrefer;
   offsetDistance: number;
+  /** Aparar/Estender: canto (duas paredes), um elemento (só a segunda muda) ou vários (Shift+clique). Ausente = vários. */
+  trimMode?: TrimMode;
   rotateCopy: boolean;
   mirrorCopy: boolean;
   offsetCopy: boolean;

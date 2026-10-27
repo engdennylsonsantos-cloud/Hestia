@@ -133,7 +133,9 @@ describe('caso 4: mista = cumeeira do esqueleto das arestas que definem; águas 
     // O degrau fica no beiral (5,5; 4,5), com 1,50 m de diferença de cota.
     const r = commitPerimeter(new ProjectStore(createEmptyProject()).project, sketch(L, [30, 30, null, 30, null, null]), { typeId: 'rt_ceramica', levelId: 'lv_0' });
     expect(r.ok).toBe(false);
-    expect(r.message).toBe('Não foi possível criar o telhado: o esqueleto não fecha em (5,50; 4,50) m, com degrau de 1,50 m');
+    expect(r.message).toBe(
+      'Não foi possível criar o telhado: não fecha no canto reentrante em (5,50; 4,50) m: as águas que chegam ali ficam com um degrau de 1,50 m. Marque também a aresta 3 como "define inclinação" (triângulo) ou ajuste o contorno.',
+    );
   });
 });
 

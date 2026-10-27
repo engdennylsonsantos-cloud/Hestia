@@ -215,6 +215,25 @@ export function OptionsBar(): ReactElement {
           onChange={(id) => set(tool === 'door' ? { doorTypeId: id } : { windowTypeId: id })}
         />
       )}
+      {tool === 'trim' && (
+        <label>
+          Modo
+          <select
+            id="opt-trimmode"
+            className="select"
+            value={o.trimMode ?? 'unico'}
+            onChange={(e) => {
+              // Trocar o modo recomeça a escolha (como no modo do Piso).
+              useUi.setState({ options: { ...useUi.getState().options, trimMode: e.target.value as 'canto' | 'unico' | 'varios' } });
+              editor.setTool('trim');
+            }}
+          >
+            <option value="canto">Ao canto</option>
+            <option value="unico">Um elemento</option>
+            <option value="varios">Vários</option>
+          </select>
+        </label>
+      )}
       {tool === 'move' && <DisjoinCheck id="opt-mdisjoin" checked={o.moveDisjoin ?? DEFAULT_DISJOIN.move} onChange={(v) => set({ moveDisjoin: v })} />}
       {tool === 'rotate' && (
         <>
@@ -229,6 +248,21 @@ export function OptionsBar(): ReactElement {
         </>
       )}
       {tool === 'array' && <ArrayOptionsBar />}
+      {tool === 'align' && (
+        <label>
+          Preferir
+          <select
+            id="opt-alignprefer"
+            className="select"
+            value={o.alignPrefer ?? 'faces'}
+            onChange={(e) => set({ alignPrefer: e.target.value as NonNullable<typeof o.alignPrefer> })}
+          >
+            <option value="faces">Faces da parede</option>
+            <option value="eixos">Eixos da parede</option>
+            <option value="nucleo">Face do núcleo</option>
+          </select>
+        </label>
+      )}
       {tool === 'offset' && (
         <>
           <label>

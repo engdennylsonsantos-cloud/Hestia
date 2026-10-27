@@ -200,6 +200,41 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(selectedValue(render(padrao), 'op-d3')).toBe('view');
   });
 
+  it('os acabamentos de alizar e soleira marcam a caixa só quando a peça existe de fato', () => {
+    const family = openingFamilies('window').find((f) => f.id === 'window_sliding')!;
+    const render = (d: OpeningType): string =>
+      renderToStaticMarkup(
+        createElement(OpeningTypeSections, {
+          d,
+          onChange: vazio,
+          families: openingFamilies('window'),
+          family,
+          leaves: leavesChoicesFor(family),
+          materials: {},
+        }),
+      );
+    const marcada = (html: string, id: string): boolean => {
+      const idPos = html.indexOf(`id="${id}"`);
+      const tag = html.slice(html.lastIndexOf('<input', idPos), html.indexOf('>', idPos));
+      return tag.includes('checked');
+    };
+    const janela = tipo('ot_j120');
+    const semAcabamento = render(janela);
+    expect(marcada(semAcabamento, 'ot-ac-al')).toBe(false);
+    expect(marcada(semAcabamento, 'ot-ac-sb')).toBe(false);
+    const comAcabamento = render({
+      ...janela,
+      casing: { width: 0.05, thickness: 0.015 },
+      sillBoard: { projection: 0.03, thickness: 0.03 },
+    });
+    expect(marcada(comAcabamento, 'ot-ac-al')).toBe(true);
+    expect(marcada(comAcabamento, 'ot-ac-sb')).toBe(true);
+    // Medida zerada equivale a não desenhar a peça (`openingCasing`/`openingSillBoard` devolvem null).
+    const zerado = render({ ...janela, casing: { width: 0, thickness: 0.015 }, sillBoard: { projection: 0, thickness: 0.03 } });
+    expect(marcada(zerado, 'ot-ac-al')).toBe(false);
+    expect(marcada(zerado, 'ot-ac-sb')).toBe(false);
+  });
+
   it('o seletor de famílias do formulário só traz as portas', () => {
     expect(familyOptionsFor('door').map((f) => f.name)).toEqual([
       'Porta de giro',

@@ -53,11 +53,16 @@ export function boundaryKindsOf(r: Roof): Array<Extract<RoofLine['kind'], 'eave'
   if (r.shape === 'free') return r.boundary.map(() => 'eave');
   if (r.shape === 'extrusion') return extrusionEdgeKinds(r);
   const slopes = edgeSlopesOf(r);
+  // Telhado plano (nenhuma aresta com inclinação): a água chega a todo o contorno na cota do beiral, então é beiral.
+  if (!hasSlope(slopes)) return r.boundary.map(() => 'eave');
   return r.boundary.map((_, i) => {
     const s = slopes[i];
     return s !== null && s !== undefined && s > 0 ? 'eave' : 'gable';
   });
 }
+
+/** Alguma aresta define inclinação (com percentual positivo). */
+const hasSlope = (slopes: Array<number | null>): boolean => slopes.some((s) => s !== null && s !== undefined && s > 0);
 
 /** Águas livres: cada polígono recortado pelo contorno do beiral; a cota é eaveZ + z0 do plano. */
 export function freePlanes(boundary: Vec2[], defs: RoofPlaneDef[], eaveZ: number): ResolvedRoofPlane[] {
@@ -79,7 +84,8 @@ export function waterPlanesOf(r: Roof, eaveZ: number): WaterSolution {
       return { planes: extrusionPlanes(r, eaveZ) };
     default: {
       const slopes = edgeSlopesOf(r);
-      if (!r.mansard) return skeletonPlanes(r.boundary, r.holes, slopes, eaveZ);
+      // Telhado plano não tem desnível para a mansarda cortar: a água fica plana, como sem mansarda.
+      if (!r.mansard || !hasSlope(slopes)) return skeletonPlanes(r.boundary, r.holes, slopes, eaveZ);
       // Mansarda: pesos iguais nas arestas com água (a altura passa a depender só da distância), depois o corte por faixa.
       const uniform = slopes.map((s) => (s !== null && s !== undefined && s > 0 ? 100 : null));
       return applyMansard(skeletonPlanes(r.boundary, r.holes, uniform, eaveZ), r.mansard);

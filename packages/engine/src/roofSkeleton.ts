@@ -1,5 +1,6 @@
-import { pointsText, ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
+import { asMulti, pointsText, ringArea, sub, weightedSkeleton, type SkeletonInput, type SkeletonResult, type SkeletonStep, type Vec2 } from '@hestia/geom';
 import { crossingParams, perpOf, planeHas, unitOf } from './roofGeom.ts';
+import { envelopePlanes } from './roofEnvelope.ts';
 import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
 
 /** Solver do esqueleto reto com pesos (`weightedSkeleton`, em @hestia/geom); trocável pelos testes. */
@@ -39,17 +40,47 @@ const zeroPos = (v: number): number => (v === 0 ? 0 : v);
 const reversedIndex = (k: number, n: number): number => (((n - 2 - k) % n) + n) % n;
 
 /**
+ * Telhado plano (nenhuma aresta define inclinação): uma água horizontal, na cota do beiral, sobre o contorno (os furos
+ * saem depois, em `roofs.ts`). Sem caimento: `percent` 0 e subida fixa para cima, então a cota é a do beiral em toda parte.
+ */
+function flatPlanes(boundary: Vec2[], eaveZ: number): WaterSolution {
+  const ring = ringArea(boundary) >= 0 ? boundary : [...boundary].reverse();
+  return { planes: [{ polygon: asMulti(ring), origin: boundary[0]!, up: { x: 0, y: 1 }, percent: 0, z0: eaveZ }] };
+}
+
+/**
  * Águas pelo esqueleto reto com pesos: cada aresta com inclinação gera a água da face dela, com a cota
  * z = eaveZ + inclinação × distância à aresta. Arestas sem inclinação são empenas (sem água). O solver recebe o contorno
  * anti-horário (e os furos, se `HOLES_IN_SKELETON`); a ordem das arestas volta à original pelo índice.
+ *
+ * Sem inclinação nenhuma, o telhado é plano. Quando o esqueleto não fecha, não gera água ou deixa degrau (superfície
+ * descontínua), o cálculo cai na envoltória dos planos das arestas inclinadas (roofEnvelope.ts), como o Revit: a recusa
+ * só sobra para região sem aresta inclinada que a cubra.
  */
 export function skeletonPlanes(boundary: Vec2[], holes: Vec2[][], edgeSlopes: Array<number | null>, eaveZ: number): WaterSolution {
   const n = boundary.length;
   if (edgeSlopes.length !== n) {
     return { planes: [], problem: `as inclinações (${edgeSlopes.length}) não batem com as arestas do contorno (${n})` };
   }
+  if (n < 3) return { planes: [], problem: 'o contorno tem menos de 3 pontos' };
   const weights = edgeSlopes.map(weightOf);
-  if (!weights.some((w) => w > 0)) return { planes: [], problem: 'nenhuma aresta define inclinação' };
+  if (!weights.some((w) => w > 0)) return flatPlanes(boundary, eaveZ);
+  const skeleton = skeletonWater(boundary, holes, edgeSlopes, weights, eaveZ);
+  // Esqueleto que fecha sem degrau fica como está. Com degrau (superfície descontínua) ou sem água, vale a envoltória.
+  if (skeleton.planes.length && !skeleton.steps) return skeleton;
+  let envelope: WaterSolution;
+  try {
+    envelope = envelopePlanes(boundary, edgeSlopes, eaveZ);
+  } catch {
+    // A envoltória não conseguiu recortar o contorno (topologia que o recorte não aceita): vale o motivo do esqueleto.
+    return skeleton;
+  }
+  return envelope.planes.length || envelope.problem ? envelope : skeleton;
+}
+
+/** Águas do esqueleto reto com pesos (sem o fallback): vazias, com `problem`, quando ele não fecha. */
+function skeletonWater(boundary: Vec2[], holes: Vec2[][], edgeSlopes: Array<number | null>, weights: number[], eaveZ: number): WaterSolution {
+  const n = boundary.length;
   const ccw = ringArea(boundary) >= 0;
   const outer = ccw ? boundary : [...boundary].reverse();
   const origOf = (k: number): number => (ccw ? k : reversedIndex(k, n));

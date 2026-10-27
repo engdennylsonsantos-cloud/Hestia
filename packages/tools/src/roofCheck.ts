@@ -10,7 +10,6 @@ const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlo
 
 /** Motivo para um telhado com forma que não produz água, em português. */
 function noWaterReason(r: Roof): string {
-  if (r.shape === 'edges' && r.edgeSlopes.every((v) => v === null)) return 'nenhuma aresta define inclinação; marque ao menos uma aresta';
   if (r.shape === 'free') return 'nenhuma água fica sobre o beiral';
   if (r.shape === 'edges') return 'as arestas que definem inclinação não formam águas';
   if (r.shape === 'extrusion') return roofProfileError(r.profile) ?? 'o perfil não cobre o contorno';

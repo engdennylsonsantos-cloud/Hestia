@@ -2,10 +2,16 @@ import { hexToRgb, mix, rgbToHex } from './color.ts';
 import type { FillOp, LabelOp, PlanOps, StrokeOp } from './types.ts';
 
 /**
- * Quanto da cor some no fundo: 0 = cor original, 1 = só o fundo. O resto do desenho fica num cinza claro, ainda legível
- * como referência (era 0,88, claro demais).
+ * Quanto da cor some no fundo nos preenchimentos: 0 = cor original, 1 = só o fundo. O resto do desenho fica num cinza
+ * claro, ainda legível como referência (era 0,88, que sumia com a planta).
  */
-export const DIM_AMOUNT = 0.65;
+export const DIM_AMOUNT = 0.6;
+
+/**
+ * Traços finos (1 px, antialiasing) e hachura perdem mais contraste que um preenchimento do mesmo valor; por isso
+ * esmaecem só esta fração do valor dos preenchimentos, e a planta continua legível para posicionar o perímetro.
+ */
+export const DIM_STROKE_RATIO = 0.65;
 
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -26,8 +32,8 @@ export function dimColor(color: string, bg: string, amount: number = dimAmount()
   return mix(rgbToHex(y, y, y), bg, amount);
 }
 
-const dimFill = (f: FillOp, bg: string, amount: number): FillOp => ({ ...f, color: dimColor(f.color, bg, amount), ...(f.hatch ? { hatch: { ...f.hatch, color: dimColor(f.hatch.color, bg, amount) } } : {}) });
-const dimStroke = (s: StrokeOp, bg: string, amount: number): StrokeOp => ({ ...s, color: dimColor(s.color, bg, amount) });
+const dimFill = (f: FillOp, bg: string, amount: number): FillOp => ({ ...f, color: dimColor(f.color, bg, amount), ...(f.hatch ? { hatch: { ...f.hatch, color: dimColor(f.hatch.color, bg, amount * DIM_STROKE_RATIO) } } : {}) });
+const dimStroke = (s: StrokeOp, bg: string, amount: number): StrokeOp => ({ ...s, color: dimColor(s.color, bg, amount * DIM_STROKE_RATIO) });
 const dimLabel = (l: LabelOp): LabelOp => ({ ...l, tone: 'soft' });
 
 /**

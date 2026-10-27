@@ -104,18 +104,17 @@ describe('openingPlanPaths: porta de giro ot_p90 (nível médio)', () => {
     }
   });
 
-  it('arco de raio 0,822 centrado em t = −0,411, da posição fechada à folha aberta a 90°', () => {
+  it('arco de raio 0,822 centrado no pivô da folha, da posição fechada à folha aberta a 90°', () => {
     const c = cena('ot_p90');
     const m = modelo(c);
     const arc = openingPlanPaths(m, opts()).find((p) => p.role === 'swing')!;
-    const leaf = m.parts.find((p) => p.role === 'leaf')!;
-    const leafS = (leaf.box.s0 + leaf.box.s1) / 2;
-    const center = { t: -0.411, s: leafS };
+    const o = m.openings[0]!;
+    const center = { t: o.pivot.t, s: o.pivot.s };
     for (const q of arc.pts) expect(Math.hypot(q.t - center.t, q.s - center.s)).toBeCloseTo(0.822, 9);
     const first = arc.pts[0]!;
     const last = arc.pts.at(-1)!;
-    const fechada = { t: 0.411, s: leafS };
-    const aberta = { t: -0.411, s: leafS + 0.822 };
+    const fechada = { t: o.latchT, s: o.pivot.s };
+    const aberta = { t: o.hingeT, s: o.pivot.s + 0.822 };
     expect(Math.hypot(first.t - fechada.t, first.s - fechada.s)).toBeCloseTo(0, 9);
     expect(Math.hypot(last.t - aberta.t, last.s - aberta.s)).toBeCloseTo(0, 9);
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { intersection, multiArea } from '@hestia/geom';
-import { createEmptyProject, makeWall, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
+import { createEmptyProject, makeWall, openingAngle3d, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
 import { buildOpeningModel, partTransformed, projectParts, slicePartsAtZ } from './openingModel.ts';
@@ -66,6 +66,29 @@ function temIntersecao(m: ReturnType<typeof modelo>, a: OpeningPart, b: OpeningP
   }
   return false;
 }
+
+/** Colisão de área entre dois grupos de peças em cotas representativas (ombreira e travessa), com perfil e movimento. */
+function colide(
+  m: ReturnType<typeof modelo>,
+  aIds: ReadonlySet<string>,
+  bIds: ReadonlySet<string>,
+  state: { angle: number; slide: number },
+): boolean {
+  const zs = [1.5, m.height - 0.05 + 0.005];
+  for (const z of zs) {
+    const corte = slicePartsAtZ(m, z, state);
+    const a = corte.filter((x) => aIds.has(x.part.id));
+    const b = corte.filter((x) => bIds.has(x.part.id));
+    for (const ra of a) {
+      for (const rb of b) {
+        if (multiArea(intersection(multi(ra.ring), multi(rb.ring))) > 1e-7) return true;
+      }
+    }
+  }
+  return false;
+}
+
+const ids = (parts: OpeningPart[], filtro: (p: OpeningPart) => boolean): Set<string> => new Set(parts.filter(filtro).map((p) => p.id));
 
 describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
   it('medidas exatas da folha, altura e dobradiça nas quatro combinações', () => {
@@ -205,7 +228,7 @@ describe('buildOpeningModel: porta dupla, pivotante, correr e vão livre', () =>
         const c = cena('ot_pp80', {}, { flipHand, flipFacing });
         const m = modelo(c);
         const f = folha(m.parts);
-        expect(largura(f.box)).toBeCloseTo(2 * 0.361, 9);
+        expect(largura(f.box)).toBeCloseTo(2 * (c.g.width / 2 - 0.05 - (0.04 / 2 + 0.004)), 9);
         const a = m.openings[0]!;
         expect(a.kind).toBe('pivot');
         expect(a.hingeT).toBeCloseTo((flipHand ? 1 : -1) * (c.g.width / 4), 9);
@@ -499,12 +522,6 @@ describe('buildOpeningModel: as dez famílias nas quatro combinações', () => {
 });
 
 describe('partTransformed, slicePartsAtZ e projectParts', () => {
-  const media = (a: { t: number; s: number; z: number }, b: { t: number; s: number; z: number }) => ({
-    t: (a.t + b.t) / 2,
-    s: (a.s + b.s) / 2,
-    z: (a.z + b.z) / 2,
-  });
-
   it('folha de giro a π/2: centro vai para o lado side, a dobradiça fica e o comprimento se mantém', () => {
     for (const flipHand of [false, true]) {
       for (const flipFacing of [false, true]) {
@@ -514,17 +531,22 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
         if (!motion || motion.kind !== 'rotate' || motion.axis !== 'z') throw new Error('folha sem giro em z');
         const ob = partTransformed(f, { angle: Math.PI / 2, slide: 0 });
         const caso = `hand=${flipHand} facing=${flipFacing}`;
-        expect(ob.center.t, caso).toBeCloseTo(motion.t, 9);
         expect(Math.sign(ob.center.s - motion.s), caso).toBe(flipFacing ? -1 : 1);
         expect(Math.abs(ob.center.s - motion.s), caso).toBeCloseTo((f.box.t1 - f.box.t0) / 2, 9);
-        const hingeLeft = Math.abs(f.box.t0 - motion.t) < 1e-9;
-        const [hi0, hi1, li0, li1] = hingeLeft ? [0, 3, 1, 2] : [1, 2, 0, 3];
-        const hinge = media(ob.corners[hi0]!, ob.corners[hi1]!);
-        expect(hinge.t, caso).toBeCloseTo(motion.t, 9);
-        expect(hinge.s, caso).toBeCloseTo(motion.s, 9);
+        const base = ob.corners.slice(0, 4);
+        // O canto da face de articulação fica no eixo; o canto oposto descreve o comprimento da folha.
+        const d = (p: { t: number; s: number }): number => Math.hypot(p.t - motion.t, p.s - motion.s);
+        const hinge = base.reduce((a, b) => (d(a) <= d(b) ? a : b));
+        expect(d(hinge), caso).toBeCloseTo(0, 9);
         expect(hinge.z, caso).toBeCloseTo(f.box.z0, 9);
-        const latch = media(ob.corners[li0]!, ob.corners[li1]!);
-        expect(Math.hypot(latch.t - hinge.t, latch.s - hinge.s), caso).toBeCloseTo(f.box.t1 - f.box.t0, 9);
+        const arestas: Array<[number, number]> = [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 0],
+        ];
+        const lados = arestas.map(([i, j]) => Math.hypot(base[i]!.t - base[j]!.t, base[i]!.s - base[j]!.s)).sort((a, b) => b - a);
+        expect(lados[0], caso).toBeCloseTo(f.box.t1 - f.box.t0, 9);
       }
     }
   });
@@ -644,6 +666,72 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
     const ss = folhaProj.ring.map((p) => p.u);
     expect(Math.max(...ss) - Math.min(...ss)).toBeCloseTo(0.04, 9);
     expect(Number.isFinite(folhaProj.depth)).toBe(true);
+  });
+});
+
+describe('folha × batente: varredura de abertura sem interseção (spec E3 §5)', () => {
+  const combos = [
+    { flipHand: false, flipFacing: false },
+    { flipHand: false, flipFacing: true },
+    { flipHand: true, flipFacing: false },
+    { flipHand: true, flipFacing: true },
+  ];
+
+  it('giro, dupla, pivotante e vai-e-vem: volume zero de 0 até angle3d, a cada 5°, nos 4 flips', () => {
+    for (const [base, leaves] of [
+      ['ot_p90', 1],
+      ['ot_p160', 2],
+      ['ot_pp80', 1],
+      ['ot_pvv90', 1],
+    ] as const) {
+      for (const flips of combos) {
+        const c = cena(base, {}, flips);
+        const m = modelo(c);
+        const batente = ids(m.parts, (p) => p.role === 'jamb' || p.role === 'head');
+        const max = (openingAngle3d(c.t) * Math.PI) / 180;
+        for (let g = 0; g <= Math.round((max * 180) / Math.PI); g += 5) {
+          const state = { angle: (g * Math.PI) / 180, slide: 0 };
+          for (let leaf = 0; leaf < leaves; leaf++) {
+            const folha = ids(m.parts, (p) => p.leaf === leaf && (p.role === 'leaf' || p.role === 'glass' || p.role === 'leafPanel' || p.role === 'handle'));
+            const caso = `${base} hand=${flips.flipHand} facing=${flips.flipFacing} ${g}° folha ${leaf}`;
+            expect(colide(m, folha, batente, state), caso).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('dupla: as duas folhas não se interseccionam em nenhum ângulo', () => {
+    for (const flips of combos) {
+      const c = cena('ot_p160', {}, flips);
+      const m = modelo(c);
+      const max = (openingAngle3d(c.t) * Math.PI) / 180;
+      for (let g = 0; g <= Math.round((max * 180) / Math.PI); g += 5) {
+        const state = { angle: (g * Math.PI) / 180, slide: 0 };
+        const a = ids(m.parts, (p) => p.leaf === 0 && p.role === 'leaf');
+        const b = ids(m.parts, (p) => p.leaf === 1 && p.role === 'leaf');
+        expect(colide(m, a, b, state), `${g}°`).toBe(false);
+      }
+    }
+  });
+
+  it('correr, embutir, dobrável e sanfonada: sem interseção ao longo do deslocamento/dobra', () => {
+    const casos: Array<{ base: string; passos: number; estado: (k: number) => { angle: number; slide: number } }> = [
+      { base: 'ot_pc160', passos: 10, estado: (k) => ({ angle: 0, slide: k / 10 }) },
+      { base: 'ot_pe80', passos: 10, estado: (k) => ({ angle: 0, slide: k / 10 }) },
+      { base: 'ot_pd120', passos: 14, estado: (k) => ({ angle: (k * Math.PI) / 28, slide: 0 }) },
+      { base: 'ot_ps90', passos: 15, estado: (k) => ({ angle: (k * Math.PI) / 36, slide: 0 }) },
+    ];
+    for (const caso of casos) {
+      for (const flips of combos) {
+        const m = modelo(cena(caso.base, {}, flips));
+        const batente = ids(m.parts, (p) => p.role === 'jamb' || p.role === 'head');
+        const folhas = ids(m.parts, (p) => p.role === 'leaf' || p.role === 'leafPanel' || p.role === 'glass');
+        for (let k = 0; k <= caso.passos; k++) {
+          expect(colide(m, folhas, batente, caso.estado(k)), `${caso.base} k=${k} hand=${flips.flipHand} facing=${flips.flipFacing}`).toBe(false);
+        }
+      }
+    }
   });
 });
 

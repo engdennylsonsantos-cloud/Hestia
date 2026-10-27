@@ -252,10 +252,16 @@ function addDoorLeaf(
 function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: number, latchT: number): void {
   const span = leafS(c);
   const z = leafZ(c);
+  // Dobradiça na face da folha voltada para o lado de abertura. O eixo no plano médio fazia a folha atravessar o
+  // batedor; na face oposta (a do rebaixo) o canto de espessura ainda varria o lábio do perfil em L. Esta é a face que
+  // mantém o giro afastado do batente durante toda a varredura (spec E3 §5; divergência registrada no relatório).
+  const lside = c.leafSide === 'opposite' ? -c.side : c.side;
+  const inicio = c.Cd + lside * (c.D / 2 - (c.L + GAP));
+  const hingeS = c.leafSide === 'opposite' ? inicio : inicio + lside * c.L;
   // O sinal depende do lado da dobradiça: com a folha à direita do eixo (h = +1) o mesmo ângulo a levaria ao lado
   // oposto ao da abertura.
   const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
-  const rotate: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: (span.s0 + span.s1) / 2, sign };
+  const rotate: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: hingeS, sign };
   addDoorLeaf(c, index, t0, t1, span, z, rotate, latchT);
   c.openings.push({
     leaf: index,
@@ -263,7 +269,7 @@ function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: num
     side: c.side,
     hingeT,
     latchT,
-    pivot: { t: hingeT, s: (span.s0 + span.s1) / 2 },
+    pivot: { t: hingeT, s: hingeS },
     radius: Math.abs(t1 - t0),
     z0: z.z0,
     z1: z.z1,
@@ -298,20 +304,28 @@ function buildPivotDoor(c: Ctx): void {
   const z = leafZ(c);
   const sSpan = leafS(c);
   const axis = c.h * (c.hw / 2);
-  const sMid = (sSpan.s0 + sSpan.s1) / 2;
+  // Pivotante: a folha inteira gira em torno do eixo no meio de `t`; o eixo em `s` fica na face encostada no batedor,
+  // que é a que varre para dentro (afastando-se do lábio do batente) durante o giro. A folha recua `L/2 + folga` da
+  // face interna do batente para o giro não varrer o batente do lado oposto (spec E3 §5).
+  const lside = c.leafSide === 'opposite' ? -c.side : c.side;
+  const inicio = c.Cd + lside * (c.D / 2 - (c.L + GAP));
+  const contact = c.leafSide === 'opposite' ? inicio + lside * c.L : inicio;
   const sign = (c.side * c.h) as 1 | -1;
-  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: sMid, sign };
-  addDoorLeaf(c, 0, span.center - span.half, span.center + span.half, sSpan, z, motion, -axis);
+  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: contact, sign };
+  const half = Math.max(0, c.hw - c.J - (c.L / 2 + GAP));
+  // O topo da folha fica abaixo da face inferior da travessa: o giro para o lado oposto não varre o batedor da verga.
+  const zPivot = { z0: z.z0, z1: Math.min(z.z1, c.H - c.J) };
+  addDoorLeaf(c, 0, span.center - half, span.center + half, sSpan, zPivot, motion, -axis);
   c.openings.push({
     leaf: 0,
     kind: 'pivot',
     side: c.side,
     hingeT: axis,
     latchT: -axis,
-    pivot: { t: axis, s: sMid },
+    pivot: { t: axis, s: contact },
     radius: (3 * c.hw) / 2,
-    z0: z.z0,
-    z1: z.z1,
+    z0: zPivot.z0,
+    z1: zPivot.z1,
   });
 }
 

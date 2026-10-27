@@ -190,10 +190,13 @@ function buildDoubleAction(c: Ctx): void {
   const z = leafZ(c);
   const half = c.hw - c.J;
   const n = c.g.leaves >= 2 ? 2 : 1;
-  const width = n === 1 ? 2 * half : half - 0.002;
+  // Vai-e-vem gira nos dois sentidos a partir do plano médio: a folga lateral `L/2 + 0,004` recua o eixo para a
+  // espessura não varrer a ombreira (spec E3 §5).
+  const folga = c.L / 2 + GAP;
+  const width = n === 1 ? 2 * half - folga : half - folga - 0.002;
   for (let i = 0; i < n; i++) {
     const j = n === 1 ? c.h : i === 0 ? -1 : 1;
-    const hingeT = j * half;
+    const hingeT = j * (half - folga);
     const latchT = hingeT - j * width;
     const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
     const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.Cd, sign };
@@ -246,12 +249,16 @@ function buildPocketDoor(c: Ctx): void {
 function addFoldChains(c: Ctx, panels: number, chains: Array<1 | -1>, firstLeaf: number): number {
   buildSimpleFrame(c);
   const z = leafZ(c);
-  const lh = c.hw - c.J - GAP;
-  const panelWidth = (2 * lh) / panels;
+  const half = c.hw - c.J;
+  const recuo = c.L / 2 + GAP;
   const perChain = panels / chains.length;
+  // A cadeia recua `L/2 + folga` da ombreira de ancoragem e termina na ombreira oposta (uma cadeia) ou no centro (duas).
+  const comprimento = chains.length === 1 ? 2 * half - recuo : half - recuo;
+  const panelWidth = comprimento / perChain;
   let leaf = firstLeaf;
   for (const anchorSide of chains) {
-    const tAnchor = anchorSide * (c.hw - c.J);
+    // A cadeia recua `L/2 + folga` da face interna do batente: a espessura do painel não varre o batente ao dobrar.
+    const tAnchor = anchorSide * (c.hw - c.J - (c.L / 2 + GAP));
     const dir = (-anchorSide) as 1 | -1;
     const sign = (dir * c.side) as 1 | -1;
     for (let i = 0; i < perChain; i++) {

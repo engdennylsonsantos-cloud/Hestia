@@ -163,7 +163,9 @@ function buildHinged(c: WindowCtx): void {
     const hingeT = two ? (index === 0 ? span.t0 : span.t1) : c.h < 0 ? span.t0 : span.t1;
     const latchT = hingeT === span.t0 ? span.t1 : span.t0;
     const sign = sideSign(c, hingeT, latchT);
-    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.Cd, sign };
+    // Eixo na face da folha oposta ao lado de abertura (spec E3 §5).
+    const hingeS = c.Cd - c.side * (c.L / 2);
+    const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: hingeS, sign };
     addWindowLeaf(c, index, span.t0, span.t1, z0, z1, c.Cd, motion);
     c.openings.push({
       leaf: index,
@@ -171,7 +173,7 @@ function buildHinged(c: WindowCtx): void {
       side: c.side,
       hingeT,
       latchT,
-      pivot: { t: hingeT, s: c.Cd },
+      pivot: { t: hingeT, s: hingeS },
       radius: Math.abs(span.t1 - span.t0),
       z0,
       z1,

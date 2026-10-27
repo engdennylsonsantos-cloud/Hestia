@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { DEFAULT_DISJOIN, TOOL_LABEL, type FloorMode } from '@hestia/tools';
+import { DEFAULT_DISJOIN, TOOL_LABEL } from '@hestia/tools';
 import { addRoomsAllCircuits } from '../editor/roomActions.ts';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
@@ -175,27 +175,6 @@ export function OptionsBar(): ReactElement {
               ))}
             </select>
           </label>
-          <label>
-            Modo
-            <select
-              id="opt-floormode"
-              className="select"
-              value={o.floorMode}
-              onChange={(e) => {
-                // Trocar o modo reinicia o desenho em andamento (o modo é lido pela ferramenta a cada passo).
-                useUi.setState({ options: { ...useUi.getState().options, floorMode: e.target.value as FloorMode } });
-                editor.setTool('floor');
-              }}
-            >
-              <option value="poly">Contorno por pontos</option>
-              <option value="rect">Retângulo (2 cantos)</option>
-              <option value="walls">Área fechada por paredes</option>
-              <option value="perimetro">Perímetro externo da edificação</option>
-            </select>
-          </label>
-          {o.floorMode === 'walls' && (
-            <Check id="opt-floorcore" checked={o.floorCore === true} onChange={(v) => set({ floorCore: v })}>Estender até o núcleo</Check>
-          )}
           <label>
             Deslocamento do topo
             <NumField id="opt-flooroffset" value={o.floorOffset} onCommit={(v) => set({ floorOffset: v })} unit="m" />

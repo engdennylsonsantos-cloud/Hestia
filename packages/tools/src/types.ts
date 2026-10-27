@@ -61,12 +61,6 @@ export interface ToolEnv {
   lang?(): 'pt' | 'en';
 }
 
-/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou perímetro externo da edificação. */
-export type FloorMode = 'poly' | 'rect' | 'walls' | 'perimetro';
-
-/** Modo da ferramenta Laje: contorno por cliques, retângulo ou perímetro externo das paredes. */
-export type SlabMode = 'poly' | 'rect' | 'perimetro';
-
 /** Tipo da ferramenta Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). */
 export type ArrayKind = 'linear' | 'radial';
 
@@ -78,9 +72,6 @@ export type ArrayAnchor = 'second' | 'last';
  * segunda parede; 'varios' acumula paredes com Shift e aplica todas na referência.
  */
 export type TrimMode = 'canto' | 'unico' | 'varios';
-
-/** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
-export type CeilingMode = 'poly' | 'rect' | 'room';
 
 /** Quais capturas estão ligadas (AutoCAD / Revit Snaps). */
 export interface SnapOptions {
@@ -207,20 +198,17 @@ export interface ToolOptions {
   floorTypeId: Id;
   /** Deslocamento do topo do piso em relação ao nível (m). */
   floorOffset: number;
-  floorMode: FloorMode;
-  /** Modo paredes: o piso avança por baixo do reboco até a face do núcleo. Ausente = falso. */
+  /** Estender até o núcleo (perímetro do piso): o contorno avança por baixo do reboco até a face do núcleo. Ausente = falso. */
   floorCore?: boolean;
   /** Parede paralela: distância medida entre faces (padrão) ou entre eixos. */
   offsetFrom?: 'axis' | 'face';
-  /** Tipo, deslocamento do topo (m), modo e inclinação (%) da ferramenta Laje e de "Definir inclinação". */
+  /** Tipo, deslocamento do topo (m) e inclinação (%) da ferramenta Laje e de "Definir inclinação". */
   slabTypeId: Id;
   slabOffset: number;
-  slabMode: SlabMode;
   slabSlopePercent: number;
-  /** Forro: tipo, cota do topo (m, relativa ao nível) e modo. Ausentes = padrão (primeiro tipo, 2,60 m, contorno). */
+  /** Forro: tipo e cota do topo (m, relativa ao nível). Ausentes = padrão (primeiro tipo, 2,60 m). */
   ceilingTypeId?: Id;
   ceilingOffset?: number;
-  ceilingMode?: CeilingMode;
   /** Telhado: tipo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
   roofTypeId?: Id;
   roofShape?: RoofShape;

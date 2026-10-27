@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea } from '@hestia/geom';
-import { coreSpan, floorsOnLevel, totalThickness, type Floor } from '@hestia/model';
+import { coreSpan, totalThickness } from '@hestia/model';
 import { enclosedRooms, outerPerimeter } from './enclosed.ts';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 
@@ -18,8 +18,6 @@ function rectHouse(w: number, h: number) {
   const fi = t - coreSpan(type).to;
   return { ...ctx, t, fi };
 }
-
-const floors = (p: ReturnType<typeof makeEnv>['store']): Floor[] => floorsOnLevel(p.project, 'lv_0');
 
 describe('piso até o núcleo: região das paredes com extend (enclosed)', () => {
   it('extend core: o espaço avança pelo reboco até a face do núcleo', () => {
@@ -64,48 +62,5 @@ describe('contorno pela face externa da edificação (outerPerimeter)', () => {
   it('nível sem paredes não tem perímetro', () => {
     const { store } = makeEnv();
     expect(outerPerimeter(store.project, 'lv_1')).toBeNull();
-  });
-});
-
-describe('ferramenta Piso: extensão, Tab interna/externa e perímetro', () => {
-  it('paredes + Estender até o núcleo: o piso segue a face do núcleo', () => {
-    const ctx = rectHouse(4, 3);
-    ctx.options.floorMode = 'walls';
-    ctx.options.floorCore = true;
-    const f = tool('floor', ctx.env);
-    clickAt(f, 2, 1.5);
-    const fs = floors(ctx.store);
-    expect(fs).toHaveLength(1);
-    expect(multiArea([[fs[0]!.boundary]])).toBeCloseTo((4 - ctx.t + 2 * ctx.fi) * (3 - ctx.t + 2 * ctx.fi), 6);
-  });
-
-  it('paredes + Tab: o piso vai pela face externa da edificação', () => {
-    const ctx = rectHouse(4, 3);
-    ctx.options.floorMode = 'walls';
-    const f = tool('floor', ctx.env);
-    f.move({ raw: { x: 2, y: 1.5 }, shift: false, ctrl: false, alt: false });
-    f.tab();
-    clickAt(f, 2, 1.5);
-    const fs = floors(ctx.store);
-    expect(fs).toHaveLength(1);
-    expect(multiArea([[fs[0]!.boundary]])).toBeCloseTo((4 + ctx.t) * (3 + ctx.t), 6);
-  });
-
-  it('modo perímetro: clicar numa parede cria o piso pela face externa (25,87 m² na casa 6 × 4)', () => {
-    const ctx = rectHouse(6, 4);
-    ctx.options.floorMode = 'perimetro';
-    const f = tool('floor', ctx.env);
-    clickAt(f, 6, 2);
-    const fs = floors(ctx.store);
-    expect(fs).toHaveLength(1);
-    expect(multiArea([[fs[0]!.boundary]]).toFixed(2)).toBe('25.87');
-  });
-
-  it('modo perímetro longe da casa não cria piso', () => {
-    const ctx = rectHouse(6, 4);
-    ctx.options.floorMode = 'perimetro';
-    const f = tool('floor', ctx.env);
-    clickAt(f, 30, 30);
-    expect(floors(ctx.store)).toHaveLength(0);
   });
 });

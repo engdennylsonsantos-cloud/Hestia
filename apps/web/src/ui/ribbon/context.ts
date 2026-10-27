@@ -30,25 +30,6 @@ function drawPanel(id: ToolId): RibbonPanel | null {
         option(t('Arco (3 pontos)', 'Arc (3 points)'), 'detailLine', same('wallShape', 'arc'), { wallShape: 'arc' }),
         option(t('Retângulo', 'Rectangle'), 'plan', same('wallShape', 'rect'), { wallShape: 'rect' }),
       );
-    case 'floor':
-      return mk(
-        option(t('Contorno por pontos', 'Sketch'), 'filledRegion', same('floorMode', 'poly'), { floorMode: 'poly' }, 'floor'),
-        option(t('Retângulo', 'Rectangle'), 'plan', same('floorMode', 'rect'), { floorMode: 'rect' }, 'floor'),
-        option(t('Área fechada por paredes', 'Pick Walls'), 'room', same('floorMode', 'walls'), { floorMode: 'walls' }, 'floor'),
-        option(t('Perímetro externo', 'Outer Perimeter'), 'floor', same('floorMode', 'perimetro'), { floorMode: 'perimetro' }, 'floor'),
-      );
-    case 'slab':
-      return mk(
-        option(t('Contorno por pontos', 'Sketch'), 'filledRegion', same('slabMode', 'poly'), { slabMode: 'poly' }, 'slab'),
-        option(t('Retângulo', 'Rectangle'), 'plan', same('slabMode', 'rect'), { slabMode: 'rect' }, 'slab'),
-        option(t('Perímetro externo', 'Outer Perimeter'), 'slab', same('slabMode', 'perimetro'), { slabMode: 'perimetro' }, 'slab'),
-      );
-    case 'ceiling':
-      return mk(
-        option(t('Contorno por pontos', 'Sketch'), 'filledRegion', (o) => (o.ceilingMode ?? 'poly') === 'poly', { ceilingMode: 'poly' }, 'ceiling'),
-        option(t('Retângulo', 'Rectangle'), 'plan', same('ceilingMode', 'rect'), { ceilingMode: 'rect' }, 'ceiling'),
-        option(t('Por ambiente', 'By Room'), 'room', same('ceilingMode', 'room'), { ceilingMode: 'room' }, 'ceiling'),
-      );
     default:
       return null;
   }

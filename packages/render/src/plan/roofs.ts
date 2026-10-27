@@ -16,6 +16,7 @@ import { gripsDoTelhado } from './roofsArcoEdge.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
 import { gableSymbolOps } from './roofsEmpena.ts';
 import { evitarSobreposicao } from './roofsRotulos.ts';
+import { projecaoDoTelhado } from './roofsProjecao.ts';
 import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
@@ -362,21 +363,24 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
 
 /**
  * Telhados do nível na planta (D1), antes das etiquetas e depois das paredes e aberturas. Os `hidden` (fora do intervalo
- * de vista) saem; com `showProjection`, cada um deixa o contorno do beiral tracejado (projeção da cobertura).
+ * de vista) saem; com `showProjection`, cada um deixa a sua projeção (`projecaoDoTelhado`): contorno, linhas internas e
+ * preenchimento leve. Na planta de cobertura fica só o contorno.
  */
 export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const all = telhadosDoNivel(p, levelId);
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
-  // Telhados ocultos: a projeção do beiral só aparece com a opção ligada.
-  const esp = espessurasDoTelhado(opts.paint ?? defaultPaint('roof', v.zoom));
+  // Telhados ocultos: a projeção só aparece com a opção ligada (o rosa é só do modo de edição).
+  const paint = opts.paint ?? defaultPaint('roof', v.zoom);
+  const esp = espessurasDoTelhado(paint);
+  const sunAzimuth = opts.sunAzimuth ?? view3dOf(p).sunAzimuth;
   for (const r of all) {
-    if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
-    if (opts.showProjection === true) {
-      // Projeção da cobertura fora do intervalo de vista: traço de projeção na tinta (o rosa é só do modo de edição).
-      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...esp.projecao, color: theme.ink, alpha: 0.9, dash: [6, 3] });
-    }
+    if (!hidden?.has(r.roofId) || off?.has(r.roofId) || opts.showProjection !== true) continue;
+    const rica = opts.planMode !== true;
+    const pr = projecaoDoTelhado(r, p, roofFootprint(r), roofFillBase(p, r, theme, dark, paint), theme, esp, sunAzimuth, scale, { rica, coarse: detail === 'coarse' });
+    out.fills.push(...pr.fills);
+    out.strokes.push(...pr.strokes);
   }
   return out;
 }

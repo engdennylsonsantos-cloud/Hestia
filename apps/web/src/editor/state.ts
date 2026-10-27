@@ -195,7 +195,6 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   ceilingTypeId: 'ct_gesso',
   ceilingOffset: 2.6,
   roofTypeId: 'rt_ceramica',
-  roofShape: 'edges',
   roofSlope: 30,
   roofOverhang: 0.5,
   roofOffset: null,

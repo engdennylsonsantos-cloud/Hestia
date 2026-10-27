@@ -184,7 +184,7 @@ export function OptionsBar(): ReactElement {
       )}
       {(tool === 'slab' || tool === 'slope') && <SlabOptionsBar tool={tool} />}
       {tool === 'ceiling' && <CeilingOptionsBar />}
-      {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar tool={tool} />}
+      {(tool === 'roof' || tool === 'roofextrusion') && <RoofOptionsBar />}
       {tool === 'roofarrow' && <RoofArrowOptionsBar />}
       {tool === 'stair' && <StairOptionsBar />}
       {tool === 'stairrun' && <StairRunOptionsBar />}

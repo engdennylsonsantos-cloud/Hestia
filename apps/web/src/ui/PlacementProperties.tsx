@@ -71,7 +71,6 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {(tool === 'roof' || tool === 'roofextrusion') && (
         <Group title="Colocação · Telhado">
-          <Row label="Forma" htmlFor="place-roof-shape"><select id="place-roof-shape" className="select" value={o.roofShape ?? 'gable'} onChange={(e) => set({ roofShape: e.target.value as NonNullable<typeof o.roofShape> })}><option value="shed">Uma água</option><option value="gable">Duas águas</option><option value="hip">Quatro águas</option><option value="edges">Por arestas</option><option value="extrusion">Extrusão</option></select></Row>
           <Row label="Inclinação" htmlFor="place-roof-slope"><NumField id="place-roof-slope" value={o.roofSlope ?? 30} unit="%" min={0.1} onCommit={(v) => set({ roofSlope: v })} /></Row>
           <Row label="Balanço do beiral" htmlFor="place-roof-overhang"><NumField id="place-roof-overhang" value={o.roofOverhang ?? 0.5} unit="m" min={0} onCommit={(v) => set({ roofOverhang: v })} /></Row>
           <Row label="Cota do beiral" htmlFor="place-roof-offset"><NumField id="place-roof-offset" value={o.roofOffset ?? roofAutoOffset(p, levelId)} unit="m" onCommit={(v) => set({ roofOffset: v })} /></Row>

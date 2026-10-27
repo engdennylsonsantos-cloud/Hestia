@@ -1,5 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
-import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
+import type { Command, Id, LocationLine, Project } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
 import type { StairRunToolOptions } from './stairRunPlan.ts';
 
@@ -209,9 +209,8 @@ export interface ToolOptions {
   /** Forro: tipo e cota do topo (m, relativa ao nível). Ausentes = padrão (primeiro tipo, 2,60 m). */
   ceilingTypeId?: Id;
   ceilingOffset?: number;
-  /** Telhado: tipo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
+  /** Telhado: tipo, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
   roofTypeId?: Id;
-  roofShape?: RoofShape;
   roofSlope?: number;
   roofOverhang?: number;
   /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */

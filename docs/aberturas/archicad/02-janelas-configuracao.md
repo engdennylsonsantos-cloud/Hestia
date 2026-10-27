@@ -173,8 +173,8 @@ O que se pode afirmar com segurança:
 | Nosso termo | Nome provável no ArchiCAD | Ressalva |
 |---|---|---|
 | Fixa | Fixed Glass / Fixed Sash | “Glass” = só vidro; “Sash” = caixilho fixo |
-| Giro / maxim-ar | Side Hung / Side Hung Mirrored | “Side Hung” é eixo vertical; não confundir com “maxim-ar” brasileiro, que costuma ser top-hung |
-| Maxim-ar (top-hung) | Awning / Top Hung | o nome varia com a biblioteca |
+| Giro (eixo vertical) | Side Hung / Side Hung Mirrored | “Side Hung” é eixo vertical; não confundir com “maxim-ar” brasileiro |
+| Maxim-ar (top-hung) | Awning / Top Hung | o nome varia com a biblioteca; abre pelo topo, para fora |
 | Basculante | Hopper / Bottom Hung / Tilt | “Tilt and Turn” é o sistema duplo |
 | Giro-basculante | Tilt and Turn | um sash, dois modos |
 | Correr | Sliding | usa distância, não ângulo |
@@ -644,7 +644,7 @@ Se o objeto não tiver parâmetro GDL correspondente, o painel simplificado vale
 - `Opening Line (Floor Plan)` e `Opening Line (Section/Elevation & 3D)`: liga/desliga, tipo de linha, símbolos (inclusive portas de correr).
 - `Opening Line (Global)`: pens para todas as portas/janelas do projeto.
 - `Line orientation`: **Hinges** ou **Handle** (afeta a direção da linha em corte/elevação/3D).
-- `Arrow orientation` (AC30): Opening / Closing / Adaptive.
+- `Arrow orientation` (AC30, via snippet): Opening / Closing / Adaptive.
 
 Fonte: [DOC AC28 140-40; AC24 141-14/15; DOC support “How to make opening lines … dashed”]
 
@@ -761,3 +761,155 @@ Fonte: [DOC AC24 141-4]
 | MVO / LOD / Symbolic x Projected | `detailLevel`, `planDisplay` | hoje só simbólico |
 
 **Prioridade sugerida:** (1) nominalBasis; (2) transom/sidelight; (3) grid; (4) wall closure/turn plaster; (5) sill x board x threshold; (6) wall inset; (7) corner/skylight. [INFERIDO]
+
+---
+
+## 21. Checklist dos itens obrigatórios
+
+| Item do pedido | Onde está coberto | Situação |
+|---|---|---|
+| (a) Lista completa de abas/painéis e conteúdo | §2, §3–§13 | Coberto para a Basic Window INT; a lista varia por objeto |
+| (b) Folhas: quantidade, divisões, grade, formas | §4, §19 | Coberto; quantidade depende da variante |
+| (c) Opening Type por folha, ângulos 2D/3D, tipos oferecidos | §5 | Coberto; lista exata por objeto é NÃO CONFIRMADA |
+| (d) Moldura: larguras, profundidade, estilos | §6 | Coberto; nomes dos 3 estilos de porta NÃO CONFIRMADOS |
+| (e) Vidro: espessura, tipos, painéis | §6.3 | Coberto; “tipo de vidro” não é campo da Basic Window |
+| (f) Peitoril interno/externo, board, pingadeira, wall inset, masonry arch, sunshade | §9–§12 | Coberto |
+| (g) Alizar interno e wall closure: posição na espessura/acabamento | §8 | Coberto em detalhe |
+| (h) Assentamento/reveal e âncora, lado externo | §7 | Coberto |
+| (i) Ventilação natural | §17 | Coberto |
+| (j) Bandeira (transom) | §4.1, §5 | Coberto |
+| (k) Linhas de abertura em planta/elevação/3D | §18.3 | Coberto; muda entre AC24 e AC28 |
+| (l) Nível de detalhe 2D/3D | §18.4 | Coberto |
+
+---
+
+## 22. Fontes
+
+### 22.1 Ajuda oficial AC28 (INT) — janela
+
+Base: `https://help.graphisoft.com/AC/28/INT/_AC28_Help/`
+
+| Página(s) | URL (modelo) | Tipo | Conteúdo |
+|---|---|---|---|
+| 151-1 a 151-31 | `151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-N.htm` | [DOC] | Todas as páginas do Custom Settings Panel da janela/porta: nominal, shape, general, frame, sash, opening type, model attributes, wall opening, reveal, closure, wall inset, masonry arch, tolerances, fixtures, threshold, sill, board, casing, sunshade, floor plan/section, minimal space, custom corner. Páginas 32–34 retornaram 404. |
+| 150-10 a 150-21 | `150_UserInterfaceToolSettings/150_UserInterfaceToolSettings-N.htm` | [DOC] | Object Tool (10–14), **Door/Window Tool Settings (15)**, Preview and Positioning (16), where to set parameters (17), Symbolic vs Projected (18), other panels/marker (19), **Skylight Tool Settings (20)**, dimension tool (21). |
+| 040-305 a 040-319 | `040_ElementsVB/040_ElementsVB-N.htm` | [DOC] | Doors/Windows (305), placement (306), previews (307), floor plan display (308), slanted walls (309), sill/header (310), subfloor (311), anchor reveal (312), empty opening (313), moving (314), curved wall (315), **corner windows (316)**, **skylights (317–319)**. |
+| 140-39 a 140-43 | `140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-N.htm` | [DOC] | MVO Construction Elements (39), **Detail Level of Door and Window Symbols (40)**, Elevator (41), Miscellaneous Library Parts (42), Detail Level of Skylight Symbols (43). |
+
+### 22.2 Ajuda oficial AC24 (INT) — abas que o AC28 reorganizou
+
+Base: `https://help.graphisoft.com/AC/24/INT/_AC24_Help/141_DoorWindowCustomSettings/`
+
+| Página | URL | Tipo | Conteúdo |
+|---|---|---|---|
+| 1 | `141_DoorWindowCustomSettings-1.htm` | [DOC] | Índice completo das abas, incluindo Opening Lines. |
+| 2 | `...-2.htm` | [DOC] | Nominal Sizes e tolerâncias. |
+| 3 | `...-3.htm` | [DOC] | Shape. |
+| 4 | `...-4.htm` | [DOC] | Settings and Opening + **Detail Level 2D/3D**. |
+| 13 | `...-13.htm` | [DOC] | Opening Type and Angle. |
+| 14 | `...-14.htm` | [DOC] | **Opening Lines (por elemento)**. |
+| 15 | `...-15.htm` | [DOC] | Opening Lines — Sidelight/Transom. |
+| 18 | `...-18.htm` | [DOC] | Reveal. |
+| 20 | `...-20.htm` | [DOC] | **Wall Inset**. |
+| 24 | `...-24.htm` | [DOC] | Fixtures and Fittings. |
+| 25 | `...-25.htm` | [DOC] | Threshold. |
+| 31 | `...-31.htm` | [DOC] | Floor Plan and Section. |
+
+### 22.3 Ajuda oficial AC18 (INT) — hierarquia antiga rica em abas
+
+Base: `https://help.graphisoft.com/AC/18/INT/AC18Help/Appendix_Tools/`
+
+| Página(s) | URL (modelo) | Tipo | Conteúdo |
+|---|---|---|---|
+| 25–30 | `Appendix_Tools-N.htm` | [DOC] | Door/Window Tool Settings (26), estrutura do diálogo (27), Preview/Positioning (28), where to set (29), Symbolic vs Projected (30). |
+| 41 | `Appendix_Tools-41.htm` | [DOC] | Opening Type and Angle de porta: `Double-Acting` / `Side Hung`. |
+| 56–74 | `Appendix_Tools-N.htm` | [DOC] | **Graphical Interface Panel for a Window (56)**: Nominal (57), General (58), Shape (59), Frame and Sash (60), Frame Widths (61), Sash Options (62), Opening (63), **Opening Lines (64)**, Reveal (65), Wall Closure (66), Custom Corner (67), Inside Casing (68), Outside Casing (69), Sill (70), Board (71), **Wall Inset (72)**, Sunshade (73), Masonry Arch (74). |
+
+### 22.4 Ajuda oficial AC17 (INT)
+
+Base: `https://help.graphisoft.com/AC/17/INT/AC17Help/Appendix_Tools/`
+
+| Página | URL | Tipo | Conteúdo |
+|---|---|---|---|
+| 43 | `Appendix_Tools-43.htm` | [DOC] | Wall Closure de porta (mesma lógica da janela). |
+| 56 | `...-56.htm` | [DOC] | Shape. |
+| 59 | `...-59.htm` | [DOC] | Sash Options. |
+| 60 | `...-60.htm` | [DOC] | Opening. |
+| 61 | `...-61.htm` | [DOC] | Opening Lines. |
+| 63 | `...-63.htm` | [DOC] | Wall Closure. |
+| 64 | `...-64.htm` | [DOC] | Custom Corner. |
+| NewFeatures-43 | `../NewFeatures/NewFeatures-43.htm` | [DOC] | Tipos de closure predefinidos; sill em terrace doors; melhorias de documentação. |
+
+### 22.5 Ajuda oficial AC26 (INT) — Elementos
+
+Base: `https://help.graphisoft.com/AC/26/INT/_AC26_Help/040_ElementsVB/`
+
+| Página | URL | Tipo | Conteúdo |
+|---|---|---|---|
+| 290 | `040_ElementsVB-290.htm` | [DOC] | Save 2D Symbols as Objects (contexto de componentes). |
+| 305 | `...-305.htm` | [DOC] | Doors/Windows. |
+| 316 | `...-316.htm` | [DOC] | Skylights. |
+| 317 | `...-317.htm` | [DOC] | Placing/moving skylight. |
+| 318 | `...-318.htm` | [DOC] | Skylight constraint relative to roof. |
+| 319 | `...-319.htm` | [DOC] | Wall Ends (fim do intervalo de janelas). |
+
+**Nota:** o intervalo 290–330 foi percorrido nos pontos com conteúdo de janela; as páginas 291–304 e 320–330 são objetos/componentes e wall ends, sem parâmetros novos de janela.
+
+### 22.6 Português (oficial)
+
+| URL | Tipo | Conteúdo |
+|---|---|---|
+| `https://help.graphisoft.com/AC/28/BRA/_AC28_Help/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-1.htm` | [DOC] | Índice PT-BR com todos os nomes de abas. |
+| `https://help.graphisoft.com/AC/28/BRA/_AC28_Help/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-13.htm` | [DOC] | “Tipo de Abertura e Ângulo”, “luz lateral e bandeira”. |
+| `https://help.graphisoft.com/AC/28/POR/_AC28_Help/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-1.htm` | [DOC] | Índice PT-PT; confirma “Reveal = Gola”, “Board = Bordo”, “Casing = Aro”. |
+
+### 22.7 Apoio (comunidade, suporte, material antigo)
+
+| URL | Tipo | Conteúdo |
+|---|---|---|
+| `https://community.graphisoft.com/t5/Getting-started/Get-to-Know-Doors-and-Windows/ta-p/303969` | [FÓRUM] | Tutorial de colocação; anchor, reveal, preview. Acesso direto 403; conteúdo lido por snippet de busca. |
+| `https://community.graphisoft.com/t5/Project-data-BIM/Window-Schedule/td-p/385987` | [FÓRUM] | Parâmetro `stOpeningType` e nomes `Fixed Glass`, `Fixed Sash`, `Side Hung`, `Side Hung Mirrored`, `Tilt and Turn`. |
+| `https://community.graphisoft.com/t5/Libraries-objects/specific-type-of-window-in-Archicad/td-p/695574` | [FÓRUM] | Shape checkboxes (operable/fixed/fixed glass); `Divided Frame` não disponível em janela. |
+| `https://community.graphisoft.com/t5/Libraries-objects/Reveal-for-Terrace-Door/td-p/207762` | [FÓRUM] | Terrace door é objeto de janela; reveal desabilitado por alturas diferentes. |
+| `https://community.graphisoft.com/t5/Libraries-objects/Balcony-door-amp-window-reveal-settings/td-p/669594` | [FÓRUM] | Porta-balcão classificada como Window; reveal limitado. |
+| `https://community.graphisoft.com/t5/Libraries-objects/window-parameters-in-AC19/td-p/293733` | [FÓRUM] | Multi-Sash Window e “Multiply Units”. |
+| `https://community.graphisoft.com/t5/Modeling/Segmental-Arched-Transom-or-Window/td-p/144897` | [FÓRUM] | Janelas em arco vêm de objetos próprios da biblioteca; `Curve resolution`. |
+| `https://support.graphisoft.com/hc/en-us/articles/28855124123281-How-to-create-corner-windows-in-Archicad` | [DOC suporte] | Comparação Corner Window tool x duas janelas + Custom Corner. |
+| `https://support.graphisoft.com/hc/en-us/articles/30483904951953-How-can-I-increase-the-detail-level-of-doors-and-windows-on-floor-plan` | [DOC suporte] | `Full-Opened Leaf`, `Full-with Double Glazing Line`. |
+| `https://support.graphisoft.com/hc/en-us/articles/35602813633297-How-to-make-opening-lines-of-windows-and-doors-display-as-dashed-lines-in-elevations` | [DOC suporte] | AC28 centraliza linhas de abertura no MVO; versões antigas têm “Use MVO Settings”. |
+| `https://support.graphisoft.com/hc/en-us/articles/22920168965137-How-to-remove-door-and-window-lines-in-3D` | [DOC suporte] | `Show Opening Line in 3D` no MVO. |
+| `https://community.graphisoft.com/gowhw84577/attachments/gowhw84577/gs-insights/511/1/AC29%20LU2%20-%20Release%20Note.pdf` | [DOC] | 5 tipos de linha de abertura por sash; padrão Type 1 para portas e Type 3 para janelas; renomeações. |
+| `https://gsdownloads.blob.core.windows.net/archive/ftp/techsupport/downloads/library_updates/documentation/AC9_SE_Illustrated_Windows.pdf` | [DOC antigo] | Lista histórica de Sash Style (No Mullions, H-V Grid, H-V Grid Custom, Prairie, Custom Panel), Sill/Stool/Apron. Texto lido por snippet de busca (o PDF bruto não é legível diretamente). **Não é a INT atual.** |
+| `https://helpcenter.graphisoft.com/user-guide-chapter/85215/` | [DOC/índice] | Índice de páginas do Custom Settings, incluindo Opening Lines; acesso direto 403, TOC via snippet. |
+| `https://community.graphisoft.com/t5/Graphisoft-Insights/Archicad-29-Library-Update-2-Available/ba-p/704217` | [FÓRUM] | Reorganização das abas de abertura e 5 tipos de linha. |
+
+---
+
+## 23. Lacunas (o que não foi possível confirmar)
+
+1. **Lista exata e atual dos Sash Types.** A ajuda mostra a galeria, mas não enumera; a lista de seis valores é do material AC9 Special Edition, não da INT atual. Onde provavelmente está: GDL/UI do objeto Basic Window e o “ArchiCAD Library Reference” da versão instalada. **NÃO CONFIRMADO.**
+2. **Nomes dos três estilos de moldura de porta.** Só `Block` é nomeado. Onde: UI do objeto de porta / biblioteca INT. **NÃO CONFIRMADO.**
+3. **Lista exata de Opening Types por objeto.** Os nomes confirmados vêm de um parâmetro de quadro (`stOpeningType`) e de discussões; a ajuda só diz “depende do objeto”. Onde: lista de valores do parâmetro no GDL. **NÃO CONFIRMADO para todas as variantes.**
+4. **Tipos de vidro (laminado, temperado, low-e, duplo).** A Basic Window expõe espessura/material e uma representação de vidro duplo; não há um campo “tipo de vidro”. Onde: parâmetros de biblioteca específicos ou materiais/classificação. **NÃO CONFIRMADO.**
+5. **Controle de forma de janela em arco na Basic Window.** A documentação atual não mostra “shoulder/radius” na Basic Window; os arcos vêm de objetos próprios. Onde: objetos “W Arched/ Segmented” da biblioteca. **NÃO CONFIRMADO para a Basic Window.**
+6. **Lista de Reveal Types e suas dimensões.** A página só diz que há tipos e parâmetros de head/jamb/depth; não enumera. Onde: UI do objeto. **NÃO CONFIRMADO.**
+7. **Lista de Closure Types no AC28.** A lista de seis tipos é do AC17 New Features; a página atual só diz “predefined or custom”. **NÃO CONFIRMADO para AC28.**
+8. **Lista de Sill Types e Board Types.** A página descreve campos comuns (thickness, width, angle, nosing, slip-in), mas não enumera os tipos. **NÃO CONFIRMADO.**
+9. **Lista de estilos de Masonry Arch.** A página cita “Jack” e estilos com keystone, mas não dá a lista completa. **NÃO CONFIRMADO.**
+10. **Lista de tipos de Sunshade.** A página diz que os controles variam com o tipo, sem enumerar. **NÃO CONFIRMADO.**
+11. **Abas específicas da Corner Window.** A ajuda diz que o diálogo é “similar” ao da janela, mas não detalha quais abas somem/aparecem. **NÃO CONFIRMADO.**
+12. **Lista completa de painéis da Skylight Settings.** A página descreve Preview/Positioning, Settings e Floor Plan/Marker; o conjunto exato de abas do objeto varia. **NÃO CONFIRMADO.**
+13. **Comportamento da porta-balcão na INT atual.** A evidência é de fóruns e de versões antigas; o objeto pode ter mudado. **NÃO CONFIRMADO para AC28.**
+14. **A página “Opening Lines” por elemento no AC28.** O AC24 tem; o AC28 não a lista no índice, e o suporte diz que o controle é centralizado no MVO. Não achei uma página AC28 que declare explicitamente a remoção. **NÃO CONFIRMADO.**
+15. **Terminologia PT-BR de “maxim-ar” x “basculante”.** A ajuda usa “Side Hung”, “Top Hung”, “Tilt and Turn”; a tradução brasileira varia. Usei os nomes ingleses como âncora. **NÃO CONFIRMADO como tradução única.**
+16. **Mapeamento IFC/Classification das janelas.** Não pesquisei as propriedades IFC do objeto; o painel Classification and Properties existe, mas os campos não foram lidos. **NÃO CONFIRMADO.**
+17. **Cobertura integral dos intervalos AC18 25–75 e AC26 290–330.** Li as páginas com conteúdo de janela; a seção de portas (AC18 31–55) e páginas de objetos/wall ends (AC26 291–304, 320–330) não foram percorridas em detalhe. Onde: ajuda oficial, seção Door. **LACUNA DE COBERTURA, não de conteúdo de janela.**
+18. **Valores padrão (defaults) de cada campo.** A ajuda raramente informa o default; na maioria dos casos só descreve o controle. **NÃO CONFIRMADO.**
+
+---
+
+## 24. Observações finais de uso
+
+- Este dossiê descreve o **diálogo e a lógica**, não prescreve que o Hestia copie a árvore GDL. O valor está em: (a) separar nominal de furo; (b) separar folha de caixilho e de vidro; (c) separar peitoril externo de tábua interna; (d) tratar wall closure e alizar como alternativas; (e) tratar corner/skylight como ferramentas próprias.
+- Onde a fonte é fórum, o dado foi marcado; onde a fonte é documentação antiga, também. Nenhuma lista foi inventada: o que não fechou está em §23.
+- Para uma próxima rodada, os alvos mais rentáveis são: (1) abrir a UI de uma Basic Window INT e capturar as listas reais de Sash Type, Opening Type, Sill Type, Reveal Type e Closure Type; (2) ler o “ArchiCAD Library Reference” da versão; (3) testar uma janela em parede composta com `Turn Plaster` + `Casing` para fixar a geometria do encontro.

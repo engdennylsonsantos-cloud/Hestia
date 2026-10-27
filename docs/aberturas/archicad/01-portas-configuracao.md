@@ -54,7 +54,7 @@ O botão **Empty Opening** limpa a escolha de biblioteca e usa um **vão vazio**
 
 ### 2.3 Onde ficam os parâmetros
 
-A Graphisoft explica que os mesmos parâmetros existem em dois formatos: **Custom Settings** (gráfico, agrupado em abas, com figuras) e **All Parameters** (lista). No AC28 o formulário antigo “Parameters” foi substituído pelo Custom Settings; no AC18 os dois conviviam [DOC AC28 150-17; DOC AC18 150-29].
+A Graphisoft explica que os mesmos parâmetros existem em dois formatos: **Custom Settings** (gráfico, agrupado em abas, com figuras) e **All Parameters** (lista). No AC28 o diálogo lista o painel **Custom Settings**; no AC18 havia também um painel **Parameters** separado e a opção *All Parameters* [DOC AC28 150-17; DOC AC18 150-29].
 
 ---
 
@@ -68,8 +68,8 @@ A Graphisoft explica que os mesmos parâmetros existem em dois formatos: **Custo
 | Unit Dimensions | Tamanho da estrutura completa da abertura (batente incluso) | L × A | — |
 | Egress Dimensions | Vão livre de passagem = largura Unit − largura do batente | L | — |
 | Leaf Dimensions | Dimensão da folha | L × A | — |
-| **Set as Nominal** | Escolhe qual das quatro réguas é o “Nominal Size” | Wallhole / Unit / Egress / Leaf | Unit (implícito) |
-| **Transfer Current Nominal Size to Selection** | Ao trocar a régua nominal, transfere os valores antigos para a nova régua e recalcula o resto | on/off | off |
+| **Set as Nominal** | Escolhe qual das quatro réguas é o “Nominal Size” | Wallhole / Unit / Egress / Leaf | — |
+| **Transfer Current Nominal Size to Selection** | Ao trocar a régua nominal, transfere os valores antigos para a nova régua e recalcula o resto | on/off | — |
 | **Show Dimensions in Marker** | Dimensão exibida no marcador | Wallhole / Unit / Leaf / Egress | — |
 | **Uniform Tolerances** | Uma tolerância para todos os lados + tolerância superior | on/off | on |
 | Tolerances (atalho) | Vai à aba Tolerances para variar por lado | — | — |
@@ -104,6 +104,8 @@ Cada campo tem um ícone à direita que “salta” para a aba detalhada corresp
 | Leaf / Glass thickness | Espessura da folha e do vidro | mm | conforme o estilo |
 
 A documentação cita “frame width and thickness, and the thickness of the leaf and glass”, sem nomes de campo individuais [DOC AC28 151-5; DOC AC18 151-37].
+
+**Em janelas**, as abas equivalentes são **Frame and Sash** (joinery **Mitered/Butt Joint**, **Uniform Frame Width**) e **Frame Widths** (largura por lado quando a uniforme está desligada) [DOC AC28 151-11/12]. O mesmo conceito aparece no batente da porta, mas com nomes de aba próprios.
 
 ### 3.5 Natural Ventilation (Ventilação Natural)
 
@@ -168,8 +170,9 @@ Define **espessura e largura** da folha, dos caixilhos e do vidro [DOC AC28 151-
 | **Sidelight/Transom: Opening Direction** | Relação com a folha | **Same as Leaf** / **Opposite to Leaf** |
 | Sidelight/Transom Opening Type | Modo próprio | pop-up |
 | Sidelight/Transom 3D angle/distance | Abertura da luz/bandeira | graus ou mm |
+| **2D & 3D Line Pen** | Caneta das linhas de abertura | número de caneta |
 
-Os ângulos também podem ser editados **graficamente por hotspots** no projeto. O tipo de abertura escolhido **limita o Frame Style** [DOC AC28 151-13].
+Os ângulos também podem ser editados **graficamente por hotspots** no projeto. O tipo de abertura escolhido **limita o Frame Style** [DOC AC28 151-13; AC18 151-41].
 
 ### 3.11 Model Attributes of Door/Window Opening (Atributos do Modelo)
 
@@ -283,6 +286,8 @@ Usado quando há **luz lateral elevada**. Campos: **Board** on/off; **Is Curved 
 
 Liga **Outside Casing** e/ou **Inside Casing** e define os parâmetros do alizar. **Não pode coexistir com Turn Plaster** [DOC AC28 151-26].
 
+**Relação com a parede**: o alizar é aplicado na **face externa** e/ou **interna** da parede, envolvendo o vão; a profundidade do requadro é a linha de divisão entre as duas faces (é o mesmo conceito de `Wall Opening Surface = Same as Wall Side`) [DOC AC28 151-15; 151-26]. A documentação **não publica** os offsets/afastamentos do alizar em relação à face: eles vêm do tipo escolhido e do script do objeto. **[INFERIDO]** Como o alizar é uma “fixture” opcional, o posicionamento deve ser calculado a partir da face da parede (não do eixo), para permanecer correto quando a espessura ou o acabamento mudam.
+
 ### 3.23 Sunshade Settings (Toldo)
 
 | Campo | O que faz |
@@ -383,7 +388,7 @@ Fonte: páginas `/BRA/` correspondentes [DOC AC28 BRA 151-1/2/4/5/7/8/13/15/16/1
 
 ---
 
-## 6 · Fontes desta parte
+## 6 · Fontes consultadas — parte 1 (abas do diálogo)
 
 | URL | Versão | Tipo | Conteúdo |
 |---|---|---|---|
@@ -397,6 +402,8 @@ Fonte: páginas `/BRA/` correspondentes [DOC AC28 BRA 151-1/2/4/5/7/8/13/15/16/1
 | .../151_DoorWindowCustomSettings-8.htm | AC28 INT | DOC | Handle and Kick Board |
 | .../151_DoorWindowCustomSettings-9.htm | AC28 INT | DOC | Leaf and Sash Dimension |
 | .../151_DoorWindowCustomSettings-10.htm | AC28 INT | DOC | Sash Type/Options |
+| .../151_DoorWindowCustomSettings-11.htm | AC28 INT | DOC | Frame and Sash (janelas) |
+| .../151_DoorWindowCustomSettings-12.htm | AC28 INT | DOC | Frame Widths (janelas) |
 | .../151_DoorWindowCustomSettings-13.htm | AC28 INT | DOC | Opening Type and Angle |
 | .../151_DoorWindowCustomSettings-14.htm | AC28 INT | DOC | Model Attributes of Opening |
 | .../151_DoorWindowCustomSettings-15.htm | AC28 INT | DOC | Wall Opening |
@@ -430,6 +437,8 @@ Fonte: páginas `/BRA/` correspondentes [DOC AC28 BRA 151-1/2/4/5/7/8/13/15/16/1
 ## 7 · Colocação, Flip, Tab e lado externo
 
 ### 7.1 Sequência de colocação [DOC AC28 040-306]
+
+Portas e janelas **só podem ser inseridas em paredes**; não são colocadas soltas no projeto [DOC AC28 040-306].
 
 1. Ativar a ferramenta **Porta** (ou Janela) em planta ou 3D e escolher o objeto no browser.
 2. Passar o cursor sobre a parede: aparece a **pré-visualização** do vão na posição atual.
@@ -578,7 +587,7 @@ O painel **Classification and Properties** (dentro do diálogo do elemento) perm
 - manter o valor **ligado ao default** (ícone de corrente) ou sobrescrever;
 - usar os valores em **schedule**, **labels**, **markers** e exportação IFC.
 
-Fonte: [DOC AC28 045-4/5/6]. Para portas, os campos típicos são classificação (ex.: `IfcDoor`), fire rating, acoustic rating, manufacturer, type mark etc. — mas **quais propriedades aparecem depende do template e do Classification System do projeto**, não do objeto porta em si. **NÃO CONFIRMADO**: lista exata de propriedades padrão da biblioteca INT 28 para portas.
+Fonte: [DOC AC28 045-4/5/6]. **[INFERIDO]** Para portas, os campos usuais são classificação (ex.: `IfcDoor`), fire rating, acoustic rating, manufacturer, type mark etc. — mas **quais propriedades aparecem depende do template e do Classification System do projeto**, não do objeto porta em si. **NÃO CONFIRMADO**: lista exata de propriedades padrão da biblioteca INT 28 para portas.
 
 ---
 
@@ -587,7 +596,8 @@ Fonte: [DOC AC28 045-4/5/6]. Para portas, os campos típicos são classificaçã
 - As **Opening Lines** são as linhas que representam o movimento da folha (arco no giro, seta no correr) em planta e/ou em corte/elevação/3D.
 - Por padrão são **globais**, definidas no **Model View Options > Detail Level of Door and Window Symbols > Opening Line**; o objeto porta pode **sobrescrever** com **Override Model View Options** na aba *Opening Lines* [DOC AC18 151-42/43; DOC AC28 140-40].
 - Há controles separados para **2D Symbolic Display** e **3D Projections**, com caneta própria (“2D & 3D Line Pen”).
-- No MVO, para **portas de correr**, a opening line pode ser **None** ou **Arrow**; há tipos de linha **curva** ou **reta** [DOC AC28 140-40; DOC AC26 140-41].
+- No MVO, para **portas de correr**, a opening line pode ser **None** ou **Arrow**; há tipos de linha **curva** ou **reta** [DOC AC26 140-41].
+- No MVO de **3D**, as opening lines podem ser **dashed / solid / dotted**, com orientação **Handle** ou **Hinges**, no lado da abertura e no lado oposto; são **dependentes de escala** e geralmente não aparecem em escalas pequenas [DOC AC26 140-41].
 - Em **Sidelight/Transom**, a aba própria controla apenas as **3D Projections**; a 2D simbólica fica na aba da folha [DOC AC18 151-43].
 
 ---
@@ -598,7 +608,7 @@ Fonte: [DOC AC28 045-4/5/6]. Para portas, os campos típicos são classificaçã
 |---|---|---|
 | **Planta simbólica** | Símbolo 2D: folha, arco/seta, batente, guarnição, soleira | script 2D do GDL + atributos 2D |
 | **Planta projetada** | Corte do modelo 3D + partes abaixo/acima | geometria 3D + plano de corte + atributos de projeção |
-| **Corte/Elevação** | Vão real, batente, folha, vidro (vidro aparece como sólido), guarnições, soleira, peitoril, wall closure/turn plaster | geometria 3D + materiais + atributos de corte |
+| **Corte/Elevação** | Vão real, batente, folha, vidro (vidro aparece como sólido), guarnições, soleira, peitoril, **Turn Plaster** (o Wall Closure comum é só 2D) | geometria 3D + materiais + atributos de corte |
 | **3D** | Objeto completo, com sombra, resolução de curva, materiais; vidro transparente | geometria 3D + materiais + opções de 3D |
 | **Wall Closure** | Só 2D; em corte/elevação só o **Turn Plaster** aparece; no 3D só com **Show in 3D** | configuração da parede composta |
 | **Opening Lines** | 2D e/ou 3D, conforme MVO/override | MVO + objeto |
@@ -609,7 +619,7 @@ Fontes: [DOC AC28 040-305; AC28 151-17; AC28 151-29; AC18 151-31].
 
 ---
 
-## 13 · Fontes desta parte
+## 13 · Fontes consultadas — parte 2 (colocação e documentação)
 
 | URL | Versão | Tipo | Conteúdo |
 |---|---|---|---|
@@ -630,6 +640,7 @@ Fontes: [DOC AC28 040-305; AC28 151-17; AC28 151-29; AC18 151-31].
 | https://help.graphisoft.com/AC/28/INT/_AC28_Help/140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-39.htm | AC28 | DOC | MVO Construction Elements |
 | .../140_UserInterfaceDialogBoxes-40.htm | AC28 | DOC | MVO Detail Level de portas/janelas |
 | .../140_UserInterfaceDialogBoxes-42.htm | AC28 | DOC | MVO Miscellaneous (library parts) |
+| https://help.graphisoft.com/AC/26/INT/_AC26_Help/140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-41.htm | AC26 | DOC | Opening Line no MVO: Curved/Straight, None/Arrow, 3D dashed/solid/dotted, Handle/Hinges |
 | https://help.graphisoft.com/AC/28/INT/_AC28_Help/045_PropertiesClassifications/045_PropertiesClassifications-4.htm | AC28 | DOC | Default Property Value |
 | .../045_PropertiesClassifications-5.htm | AC28 | DOC | Property Manager |
 | .../045_PropertiesClassifications-6.htm | AC28 | DOC | Property Availability |
@@ -641,4 +652,264 @@ Fontes: [DOC AC28 040-305; AC28 151-17; AC28 151-29; AC18 151-31].
 | https://help.graphisoft.com/AC/30/INT/Topics/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-31.html | AC30 | DOC | Detail Level (By MVO/Fixed) |
 | https://community.graphisoft.com/t5/Libraries-objects/Changing-door-swing/td-p/216484 | — | FÓRUM | Trocar outside/inside após colocação via Flip |
 
-*(Arquivos seguintes completam esta lista.)*
+---
+
+## 14 · Lógica de modelagem (como o ArchiCAD constrói a porta)
+
+### 14.1 Sistema de coordenadas do objeto
+
+A documentação de GDL é explícita [DOC GDL “Doors and Windows”]:
+
+- Ao inserir a porta na parede, o sistema local é **rotacionado**: o plano **X-Y fica vertical** e o **eixo Z aponta horizontalmente para dentro da parede**.
+- A **origem** fica no **centro da base do vão**, na **face externa** da parede.
+- Portanto: **X** = largura ao longo da parede; **Y** = altura; **Z** = profundidade (para dentro da parede).
+- O **zero do projeto** (no script) corresponde à **superfície externa** da parede.
+- Elementos que ficam **dentro** da parede (batente) ficam **acima do zero** em Z; folhas que abrem **para fora** ficam **abaixo do zero**.
+
+Essa é a referência que explica por que “lado externo”, “reveal” e “profundidade do batente” são conceitos separados: o objeto é modelado a partir da face externa, não do eixo da parede.
+
+### 14.2 Os 8 estados de posição
+
+O GDL representa a posição da abertura com **três variáveis** [DOC GDL “Doors and Windows”]:
+
+| Variável | Efeito |
+|---|---|
+| `SYMB_MIRRORED` | Espelha no plano Y-Z (3D) / eixo Y (2D): troca a **mão** |
+| `SYMB_ROTANGLE` | Rotação de **180°** em torno do eixo longitudinal da parede: troca o **sentido** (facing) |
+| `WIDO_REVEAL_SIDE` | **Flip** do lado externo/interno: espelha e “puxa de volta” pela espessura nominal do batente |
+
+Com 3 booleanos → **8 combinações** (2³), que cobrem as orientações possíveis de uma porta/janela numa parede. O script precisa decidir **o que acompanha cada transformação**: a folha acompanha; o fechamento de cavidade, não. Na troca de reveal side, o objeto é **espelhado e deslocado** pela espessura nominal do batente.
+
+**Para o nosso editor**: não guardar “hand” e “facing” como ângulos; guardar dois booleanos (`mirrored`, `rotated`) + `revealSide`, e derivar a geometria. Isso evita estados inconsistentes e reproduz o modelo do ArchiCAD.
+
+### 14.3 Cadeia de dependências (ordem de cálculo)
+
+A ordem inferida a partir das abas e do GDL:
+
+```
+1. Parede anfitriã
+   └─ face externa / side / espessura / composite / curvatura
+2. Colocação
+   ├─ anchor point (centro ou lado)
+   ├─ reveal side (cursor/Tab)
+   └─ opening plane (associado à parede ou vertical)
+3. Tamanho nominal
+   ├─ definição: Wallhole | Unit | Egress | Leaf
+   └─ Width / Height
+4. Vão
+   ├─ tolerâncias (laterais + superior)
+   ├─ oversizes (esq/dir/cima/baixo)
+   └─ Wallhole (Unit + tolerances / oversizes)
+5. Requadro
+   ├─ Reveal Type
+   ├─ Reveal Depth
+   └─ âncora: face ou núcleo
+6. Batente
+   ├─ Frame Style
+   ├─ Frame Width (uniforme ou por lado)
+   ├─ Frame Thickness (= parede?)
+   └─ joinery (mitered/butt)
+7. Folha(s)
+   ├─ Leaf Type / Leaf Dimensions / thickness
+   ├─ Handle / Kick Board
+   └─ Opening Type + ângulo 2D/3D
+8. Sidelight / Transom
+   ├─ Shape (quantidade/posição)
+   ├─ Sash Type / grid
+   ├─ Opening Type + direção (same/opposite)
+   └─ ângulo/distância
+9. Fixtures
+   ├─ Threshold
+   ├─ Sill (janela)
+   ├─ Board (sidelight elevada)
+   ├─ Casing in/out
+   └─ Sunshade
+10. Representação
+    ├─ Floor Plan Display (symbolic/projected)
+    ├─ atributos GDL ou override
+    ├─ Opening Lines (MVO/override)
+    └─ detail level
+11. Documentação
+    ├─ Dimension Marker + Subfloor Thickness
+    ├─ Classification/Properties
+    └─ Schedule/IFC
+```
+
+### 14.4 Dependências que “amarram” o modelo
+
+| Se mudar… | Afeta… |
+|---|---|
+| **Definição do nominal** | valor de Width/Height, marcador, cota automática, schedule |
+| **Tolerância** | apenas o vão (Wallhole); **não** o nominal |
+| **Oversize** | apenas o corte; **não** o nominal |
+| **Reveal Depth / âncora** | posição do batente, wall closure, turn plaster, casing, aparência em corte |
+| **Frame Thickness = Wall Thickness** | libera ou não **Uniform Frame Thickness** |
+| **Opening Type** | limita os **Frame Styles** disponíveis; em double-egress força **Block** |
+| **Shape (sidelight/transom)** | habilita **Board**, **Sunshade** (não com sidelight elevada), muda a grade de caixilhos |
+| **Sidelight/Transom direction** | abre igual ou oposto à folha; ângulo/distância independentes |
+| **Casing** | impede **Turn Plaster** (mutuamente exclusivos) |
+| **Floor Plan Display** | simbólico (script 2D) × projetado (3D + plano de corte) |
+| **MVO** | detalhe, opening lines, marcadores, maçanetas, minimal space |
+| **Override do objeto** | vence o MVO nas opening lines |
+
+### 14.5 Geometria não retangular
+
+Por padrão, a porta/janela **corta um retângulo** na parede, dimensionado pelos parâmetros A e B do objeto. Para arco, oculus ou forma livre, o script 3D usa **`WALLHOLE`** (ou `WALLNICHE` para nicho). Se existir pelo menos um `WALLHOLE`, **nenhum retângulo automático** é gerado. O **reveal 3D não é automático** nesse caso: precisa ser modelado no script. `WALLHOLE` **não afeta a planta 2D**; para o símbolo 2D usa-se `WALLHOLE2`/`WALLBLOCK2`/`WALLLINE2`/`WALLARC2` [DOC GDL “Doors and Windows”].
+
+**[INFERIDO]** **Consequência**: portas em arco (Masonry Arch) e portas de forma livre são “buracos compostos”, não apenas um parâmetro de altura. No nosso editor, o arquétipo de vão precisa suportar **contorno poligonal** além do retângulo.
+
+### 14.6 Símbolo 2D
+
+O símbolo 2D não é uma projeção comum: é gerado por uma **projeção embutida especial** (vista lateral de 90° “de cabeça para baixo”), e o símbolo + a forma 3D são ajustados à origem da porta pelo **centro inferior** da bounding box, sem ajuste em Z. Isso permite que o objeto se estenda para fora da parede nos dois sentidos [DOC GDL “Doors and Windows”].
+
+É por isso que:
+- o símbolo pode ser completamente diferente do 3D;
+- `Symbolic` e `Projected` são caminhos de desenho distintos;
+- o eixo de referência do símbolo é o **centro da base do vão**.
+
+---
+
+## 15 · Biblioteca INT: famílias e o que muda
+
+### 15.1 Como a biblioteca é organizada
+
+- No AC28 a biblioteca é a **Global Library**, composta por **pacotes**; os objetos não têm mais sufixo de versão e o conteúdo é compartilhado entre idiomas. O **template** define idioma, tamanhos padrão, atributos, superfícies e canetas; a **Library Localization Preferences** troca idioma e estrutura de pastas [DOC AC28 020-41].
+- Cada porta é um **objeto GDL separado**. O nome do painel Custom Settings e as abas disponíveis **mudam com o objeto**: “Hinged Door Settings”, “Sliding Door Settings” etc. [DOC AC28 150-15/17].
+- Os **macros GDL** (frames, panels, sashes) são compartilhados; por isso várias portas têm o mesmo conjunto de parâmetros [DOC GDL “Doors and Windows”].
+
+### 15.2 Famílias confirmadas ou prováveis
+
+| Família / objeto | O que é | Controles que mudam | Confirmação |
+|---|---|---|---|
+| **Hinged Door** (porta de abrir) | 1 folha, giro lateral ou vai-e-vem | Opening Type **Side Hung / Double-Acting**; 3 Frame Styles; handle; kick board | [DOC AC18 151-35/41] |
+| **Double Door / Arch Double Door** | 2 folhas, simétricas ou assimétricas, com/sem bandeira e luz lateral | 2 folhas, double acting/double egress, sidelight/transom | [FÓRUM BIMcomponents: “Hinged, double acting or double egress double door with arch top, sidelight and transom”] |
+| **Sliding Door** (correr) | Folhas transladam; pode ter 1–4 painéis (limite do objeto clássico) | Abertura por **distância**; opening line com seta; trilhos | [DOC AC28 151-13; FÓRUM community “Customize sliding doors”] |
+| **Sliding Folding Multipanel / Bifold** | Folhas dobram e empilham | Nº de folhas, largura de abertura, configuração de dobra | [FÓRUM BIMcomponents: “Sliding folding double door with optional number of leaves”] |
+| **Multipanel Sliding Door** (AC28 LU1) | Correr com muitas folhas | **2–10 folhas**, **1–4 trilhos**, distribuição **equal/custom**, dentro/fora da parede, 1 ou 2 “winged”, até 3 esquemas de folhas | [FÓRUM release note AC28 LU1] |
+| **Pocket Door** | Corre para dentro de um nicho na parede | Trilho/bolsão; abertura por distância | [FÓRUM community AC28 migration cita “pocket door”; comportamento é INFERIDO do nome] |
+| **Top Hinged / Bottom Hinged** | Basculante (eixo superior/inferior) | Handle em posição predefinida (não editável) | [FÓRUM release note AC29] |
+| **Bi-Fold Lift Up** | Dobra e levanta | Handle predefinido | [FÓRUM release note AC29] |
+| **Elevator Doors** (stand-alone) | Portas de elevador, simples/duplas | 1 ou 2 “winged”, dentro/fora da parede | [FÓRUM release note AC28 LU1] |
+| **Empty Opening** | Sem objeto; só o vão | Width/Height, reveal, sem folha | [DOC AC28 040-312] |
+| **Garage Door** | Porta de garagem | — | **NÃO CONFIRMADO** na biblioteca INT 28; provavelmente é objeto separado ou de fabricante [INFERIDO] |
+
+**NÃO CONFIRMADO**: a lista fechada de pastas/objetos da biblioteca INT 28. A documentação não publica um catálogo; as notas de versão e o BIMcomponents mostram exemplos, não o inventário completo. Para o nosso editor, o importante é o **contrato**: cada família declara quais abas/opções aceita.
+
+### 15.3 O que é “da biblioteca” e não do ArchiCAD
+
+| Item | Onde é definido |
+|---|---|
+| Lista de **Opening Types** | script de interface do objeto (GDL) |
+| Lista de **Leaf Types** e **Handles** | objeto GDL (miniaturas) |
+| Lista de **Frame Styles** | objeto (a doc do Hinged diz 3) |
+| Lista de **Sill/Threshold/Casing/Sunshade Types** | objeto |
+| **Nº máximo de folhas/painéis** | objeto (ex.: sliding clássico 4; multipanel 10) |
+| **Custom Leaf / Custom Sash** | componentes salvos pelo usuário na Embedded Library |
+| **Nomes das abas** | interface do objeto |
+
+**Custom Door Leaf**: pode ser desenhado com elementos 3D e salvo como *Door Leaf*. Ao aplicar, o ArchiCAD **redimensiona proporcionalmente** para caber no vão: um leaf de 1000×2000 usado numa porta de 800×2000 com trim de 50 mm vira 700×1950 mm [DOC AC26 040-295]. Isso é diferente de “esticar” a porta: o componente é reescalado.
+
+---
+
+## 16 · Atalhos e comportamentos de teclado (confirmados)
+
+| Tecla / ação | Efeito | Fonte |
+|---|---|---|
+| **Tab** | Alterna entre paredes sobrepostas sob o cursor | [DOC AC28 040-306] |
+| **Tab** (durante a colocação) | Alterna o **lado externo** (reveal side) | [DOC AC28 040-306] |
+| **Tab** (hotspot editável) | Entra com valor numérico no **Tracker** | [DOC AC30 040-287] |
+| **Ctrl/Cmd + M** | **Mirror** da porta/janela | [DOC AC28 040-314] |
+| **Rotate** (comando) | Gira 180° em torno do centro, sem desenhar vetor | [DOC AC28 040-314] |
+| **Flip** (botão) | Inverte o sentido mantendo o batente | [DOC AC28 040-306; 150-16] |
+| **Anchor Point** (Info Box) | Troca centro/lado durante a colocação | [DOC AC28 040-306] |
+
+**NÃO CONFIRMADO**: atalho de teclado exclusivo para Flip ou para trocar o lado externo depois de colocada. A documentação só cita o botão/Info Box e o Tab durante a colocação. **[INFERIDO]** **Space não é usado** para inverter dobradiça no ArchiCAD (isso é convenção do Revit); não transportar esse atalho.
+
+---
+
+## 17 · O que isso significa para o nosso editor
+
+1. **Separar três coisas** que o ArchiCAD separa: (a) **vão** (wallhole + tolerances + oversizes), (b) **objeto** (batente/folha/acessórios), (c) **representação** (symbolic/projected + opening lines). Vale avaliar se o Hestia deve tratar o vão como entidade própria, em vez de guardá-lo só como atributos da esquadria.
+2. **Nominal é uma escolha, não um número**: guardar `nominalDefinition` (`wallhole|unit|egress|leaf`) e derivar as demais dimensões. O usuário vê “L×A” e o mapa usa a mesma definição.
+3. **Orientação com 3 booleanos** (`mirrored`, `rotated`, `revealSide`) em vez de ângulos; expor na UI como “mão”, “sentido” e “lado externo”.
+4. **Opening Type como enum por família**, com fallback “custom”; não tentar uma lista única global. Guardar `openingAngle2D` e `openingAngle3D` separados; para correr, `openingDistance`.
+5. **Frame Style + dimensões** independentes; o estilo só deve limitar opções quando a família declarar (ex.: double-egress → Block).
+6. **Sidelight/Transom como componentes** com próprio tipo de abertura e direção; o `Shape` é a árvore de composição.
+7. **Fixtures opcionais** (threshold, sill, board, casing, sunshade) como lista de componentes, não como dezenas de campos fixos.
+8. **Representação em dois caminhos**: símbolo 2D desenhado (paramétrico) e projeção do 3D; o usuário escolhe `Symbolic`/`Projected` por instância/tipo, e o MVO global filtra.
+9. **Detail level** por tipo com opção “By MVO” ou “Fixed” (como no AC30) — atende tanto escritório que quer controle global quanto projeto que quer exceção.
+10. **Marcador e classificação** desacoplados: o marcador lê dimensões/sill; a classificação/IFC lê propriedades. Não são “campos da porta”, são camadas de documentação.
+
+---
+
+## 18 · Lacunas
+
+| Lacuna | Onde provavelmente está |
+|---|---|
+| Lista completa de valores dos pop-ups (Opening Type, Leaf Type, Handle, Frame Style, Sill, Threshold, Casing) | Script de interface GDL de cada objeto; não publicado na ajuda |
+| Nomes exatos dos campos de **Leaf and Sash Dimension** | A página AC28 151-9 só mostra a figura |
+| Nomes exatos dos campos de **Shape** | A página AC28 151-3 só mostra a figura |
+| Controle exato para trocar o **lado externo** depois de colocada | Provavelmente `WIDO_REVEAL_SIDE` no diálogo/Info Box; a ajuda só descreve durante a colocação |
+| Página AC28 do **Detail Level** | Existe no AC30 (151-31); no AC28 a lista de Custom Settings vai até 31 e a 31 é Custom Corner. O recurso foi restaurado no LU2, mas a página não aparece no índice |
+| Lista de **Opening Lines** no AC28 | As abas existem no AC18 (151-42/43); no AC28 o índice não as lista — podem ter sido absorvidas pelo MVO |
+| Catálogo completo da **biblioteca INT 28** | Notas de versão e BIMcomponents mostram exemplos; não há inventário oficial |
+| **Garage Door** na biblioteca INT | Provavelmente objeto separado ou de fabricante; não confirmado |
+| Propriedades padrão de **Classification/Properties** para portas | Depende do template e do Classification System do projeto |
+| Acesso à comunidade Graphisoft | Páginas bloqueadas por CAPTCHA/403 nesta sessão; usamos apenas snippets indexados |
+| Nomes em português de alguns campos | A tradução BRA é inconsistente (ex.: “Rotacionar” para Flip; “Soleira/Peitoril” para Sill; “Tudo em Projeção” para Overhead All) |
+
+---
+
+## 19 · Fontes consultadas — parte 3 (GDL e biblioteca)
+
+### 19.1 Lógica GDL
+
+| URL | Tipo | Conteúdo |
+|---|---|---|
+| https://gdl.graphisoft.com/reference-guide/doors-and-windows/ | DOC | Sistema de coordenadas, origem, 8 estados (`SYMB_MIRRORED`, `SYMB_ROTANGLE`, `WIDO_REVEAL_SIDE`), `WALLHOLE`, `WALLHOLE2`, `WALLNICHE`, símbolo 2D |
+| https://gdl.graphisoft.com/reference-guide/doorwindow-parameters-for-markers/ | DOC | Parâmetros do marcador (`ac_wido_*`, `ac_sill_*`, `ac_wido_reveal_side_2`) |
+| https://gdl.graphisoft.com/reference-guide/opening-parameters/ | DOC | `OPENING_WIDTH/HEIGHT`, dicionários de sill/header/center, `OPENING_SYMBOL_DISPLAY` |
+
+### 19.2 Biblioteca e custom components
+
+| URL | Versão | Tipo | Conteúdo |
+|---|---|---|---|
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/020_Configuration/020_Configuration-41.htm | AC28 | DOC | Global Library, pacotes, template, localização |
+| https://help.graphisoft.com/AC/26/INT/_AC26_Help/040_ElementsVB/040_ElementsVB-295.htm | AC26 | DOC | Custom components e redimensionamento proporcional |
+| .../040_ElementsVB-296.htm | AC26 | DOC | Workflows de custom components |
+| .../040_ElementsVB-297.htm | AC26 | DOC | Custom Door Leaf passo a passo |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/040_ElementsVB/040_ElementsVB-293.htm | AC28 | DOC | Salvar porta/janela retangular a partir de 3D |
+| .../040_ElementsVB-294.htm | AC28 | DOC | Salvar porta/janela de forma customizada |
+| https://community.graphisoft.com/gowhw84577/attachments/gowhw84577/forum-gdl/8468/2/AC28%20LU1%20-%20Release%20Note.pdf | AC28 LU1 | FÓRUM | Multipanel Sliding, elevator doors |
+| .../3/AC28%20LU2%20-%20Release%20Note.pdf | AC28 LU2 | FÓRUM | Detail Level Override restaurado |
+| .../5/AC29%20Library%20-%20Release%20Note.pdf | AC29 | FÓRUM | Top/Bottom Hinged, Bi-Fold Lift Up |
+| https://bimcomponents.com/GSM/Details/16350 | AC17 | FÓRUM/LOJA | Arch Double Door com sidelight/transom (descrição) |
+| https://bimcomponents.com/GSM/Details/7394 | AC17 | FÓRUM/LOJA | Sliding Folding Multipanel Bifold |
+| https://community.graphisoft.com/t5/Libraries-objects/Customize-sliding-doors/td-p/628918 | — | FÓRUM | Limite de 4 painéis no sliding clássico |
+
+### 19.3 Colocação/edição (já citadas acima)
+
+- AC28 040-304 a 040-315 (índice, Doors/Windows, placement, previews, floor plan display, plane, sill, subfloor, anchor reveal, empty opening, moving, curved wall).
+- AC28 150-16/18/19; 140-39/40/42; 045-4/5/6.
+- AC18 151-35/41/42/43.
+- AC30 040-287 (hotspots) e 151-31 (Detail Level).
+
+---
+
+## 20 · Resumo final em uma página
+
+**O que parametrizar primeiro (MVP do nosso editor):**
+
+1. **Vão**: largura, altura, definição do nominal, tolerâncias, oversizes.
+2. **Assentamento**: lado externo, anchor point, reveal depth + âncora (face/núcleo), opening plane.
+3. **Batente**: estilo (3), largura (uniforme/por lado), espessura (= parede?), joinery.
+4. **Folha**: tipo, dimensões, espessura, maçaneta, kick board.
+5. **Abertura**: tipo por componente, ângulo 2D, ângulo/distância 3D, direção de sidelight/transom.
+6. **Composição**: shape (folhas + sidelights + transom), sash/grid.
+7. **Acabamentos**: threshold, sill, board, casing in/out, sunshade.
+8. **Representação**: symbolic/projected, atributos 2D, opening lines, detail level.
+9. **Documentação**: marcador, subfloor thickness, classificação/propriedades.
+
+**O que não copiar do ArchiCAD**: a explosão de abas e a dependência de GDL para listas de valores. O Hestia pode ter um schema fechado com enums próprios e um “modo avançado” para o que a família declarar.
+
+**O que copiar**: a separação **vão × objeto × representação**, os **3 booleanos de orientação**, o **nominal como escolha**, o **ângulo 2D separado do 3D**, e a **árvore de componentes** (folha, sidelight, transom, fixtures).

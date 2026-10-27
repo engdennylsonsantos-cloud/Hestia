@@ -41,6 +41,7 @@ import { OpeningScheduleDialog } from './ui/dialogs/OpeningScheduleDialog.tsx';
 import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.tsx';
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
 import { MoveLevelDialog } from './ui/MoveLevel.tsx';
+import { GridTypeDialog } from './ui/dialogs/GridTypeDialog.tsx';
 
 function Dialogs(): ReactElement | null {
   const d = useUi((s) => s.dialog);
@@ -66,6 +67,8 @@ function Dialogs(): ReactElement | null {
       return arg ? <RoofTypeDialog typeId={arg} /> : null;
     case 'roofSchedule':
       return <RoofScheduleDialog />;
+    case 'gridType':
+      return arg ? <GridTypeDialog typeId={arg} /> : null;
     case 'stairType':
       return arg ? <StairTypeDialog typeId={arg} /> : null;
     case 'stairSchedule':

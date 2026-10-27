@@ -207,3 +207,201 @@ Fontes: [DOC: Ajuda “Preview and Positioning”; “Other Panels in Door/Windo
 - Modos: **Automatic** (largura = largura da janela), **Symmetric** (largura e altura fixas, centrado), **Asymmetric** (overhangs esquerdo/direito diferentes, altura única). Tem elevação de fundo (0 = até o piso), profundidade e “Show Hidden Parapet on 2D” [DOC: Ajuda “Wall Inset”].
 
 ---
+
+## 5 · Pergunta 3 — Wall Closure (retorno do acabamento)
+
+### 5.1 O que é
+
+- **Wall Closure** é a regra que define **como as camadas (skins) da parede composta fecham em volta do vão**. Não é um sólido novo: é uma **representação** das skins dobradas para dentro do vão [DOC: Ajuda “Wall Closure”].
+- Só se aplica a **paredes compostas**; em parede simples não há skins para dobrar [DOC: ibid.].
+- Na biblioteca INT, o closure afeta **a planta 2D**. O **Turn Plaster** (reboco dobrado) é a parte que aparece em **corte/elevação** como extensão da parede até o batente, e só vai ao 3D se **Show in 3D** estiver marcado [DOC: ibid.].
+
+> Importante para o nosso editor: **Wall Closure não “corta” o batente nem faz boolean**. Ele desenha o acabamento no espaço entre o núcleo e o batente. A ausência de colisão é resolvida por **ordem de desenho** e por **exclusividade com o alizar**, não por geometria de interseção.
+
+### 5.2 Como evita sobreposição com o batente
+
+O mecanismo é indireto, em três travas:
+
+1. O **reveal** define o contorno do vão e a profundidade até o batente. O closure é desenhado **para dentro desse contorno**, ou seja, ocupa exatamente o espaço do revelo [DOC: “the turned plaster skin will be turned outside of the wall contour, as defined in Reveal Settings”].
+2. O **Turn Plaster** “entra no batente” (extensão do composto até o frame) — é assim que o corte mostra o reboco encostando no batente, sem invadir o batente [DOC: ibid.].
+3. **Alizar e Turn Plaster são mutuamente exclusivos.** Se o alizar está ligado, o Turn Plaster fica cinza; para usar Turn Plaster é preciso desligar `Inside Casing` e `Outside Casing` [DOC: Ajuda “Wall Closure” e “Casing”].
+
+*[INFERIDO]* A profundidade do retorno é, na prática, a **profundidade do revelo** (`WIDO_SILL`): a skin é dobrada até a face do batente. Não achamos um campo “closure depth” separado; o controle é o reveal + o número de skins + a espessura de cada skin.
+
+### 5.3 Tipos de closure
+
+| Closure Type | O que é | Campos típicos |
+|---|---|---|
+| **No Closure** | nenhuma skin dobra | — |
+| **Traditional Cavity Closure** | closure de cavidade “tradicional”; pode incluir tira de isolamento | `Insulation Strip` + espessura; atributos de fill/pen |
+| **Prefabricated** | perfil pré-fabricado de fechamento de cavidade | `Profile Width`; atributos próprios |
+| **Insulated Reveal** | revelo com retorno de isolamento (muito usado em fachada) | `Turn-in Skin`, espessura por skin; `Reveal to Wall Core` para alinhar com o isolamento [FÓRUM/suporte oficial] |
+| **Custom Closure** | configuração skin a skin | `Select Skin to Edit`, `Turn-in Skin`, espessura, orientação de hatch, pena de linha, `Consider Skin as Plaster` |
+
+Fonte: [DOC: Ajuda “Wall Closure”; AC18 “Wall Closure”; suporte Graphisoft “How to add an Insulated Reveal”].
+
+### 5.4 Campos do Wall Closure
+
+| Campo (EN) | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| `Closure Type` | escolhe o tipo ou nenhum | No Closure / Traditional Cavity Closure / Prefabricated / Insulated Reveal / Custom | Wall Closure / Wall Opening |
+| `Turn Skin on Side` | em que lados a skin dobra | Right / Left / Both | Wall Closure |
+| `Number of Skins to Turn` | quantas skins dobram | inteiro | Wall Closure |
+| `Number from` | de que face se conta a skin | Outside face / Inside face | Wall Closure |
+| `Profile Width` | largura do perfil pré-fabricado | comprimento | Wall Closure (prefabricated) |
+| `Insulation Strip` + thickness | tira de isolamento no closure | on/off + comprimento | Wall Closure (traditional) |
+| `Select Skin to Edit` | escolhe o lado a editar no custom | Left jamb / Right jamb / Both | Custom Closure |
+| `Turn-in Skin` | liga/desliga a dobra da skin selecionada | checkbox | Custom Closure |
+| `Consider Skin as Plaster` | trata a skin como reboco (dobra conforme o reveal) | checkbox; **não funciona em skin Core** | Custom Closure |
+| `Plaster Skin Definition` | como identificar o reboco | `Use Wall Finish Component` (skin tipo Finish) ou `Plaster Thickness Limit` (ex.: ≤ 40 mm) | Turn Plaster |
+| `Turn Plaster` | modo de dobra do reboco | `Automatically` (todas as skins de reboco) ou `Number of Skins to Turn` | Turn Plaster |
+| `Show in 3D` | mostra o turn plaster no 3D | checkbox | Turn Plaster |
+| `Hatch orientation`, `Separating line pen` | aparência da skin dobrada | atributos | Custom Closure |
+
+Fonte: [DOC: Ajuda “Wall Closure” (AC28/AC30); AC18 “Wall Closure”].
+
+### 5.5 Regras de projeto que o editor deve reproduzir
+
+- **Core não é reboco.** `Consider Skin as Plaster` não tem efeito em skin definida como Core; o core nunca “vira” acabamento [DOC: Ajuda “Wall Closure”].
+- **Skins de core precisam ser adjacentes**; skins de finish também, e devem incluir uma ou ambas as faces externas [DOC: Ajuda “How to Define Components as Core or Finish”].
+- **Closure não altera quantitativos.** As skins dobradas são representação; não entram nos volumes/áreas calculados da parede [FÓRUM: resposta oficial Graphisoft].
+- **Closure em 3D é limitado.** A biblioteca stock gera a geometria de contorno, mas o turn-in pode não aparecer no 3D; em corte, o que vale é a extensão do composto até o frame [FÓRUM oficial; DOC “Show in 3D”].
+- **Closure × alizar:** nunca os dois. O alizar cobre o encontro; o Turn Plaster mostra o reboco. Escolha de representação, não de construção [DOC: Ajuda “Wall Closure”; “Casing”].
+
+---
+
+## 6 · Pergunta 4 — alizar (casing): posição e dimensionamento
+
+### 6.1 Duas faces, dois nomes
+
+| Face | Nome na biblioteca | O que é |
+|---|---|---|
+| **Interna** | **Casing Trim** / `Inside Casing` | guarnição que cobre a junta entre batente e parede no lado interno |
+| **Externa** | **Brick Molding** / `Outside Casing` | perfil externo que arremata e decora o batente |
+
+Fonte: [DOC: AC9 SE “Graphic User Interface” §5.4 Casing; Ajuda “Casing Outside/Inside Settings”].
+
+### 6.2 Como é posicionado e dimensionado
+
+- **Largura e espessura** são independentes para interna e externa; a largura do **head casing** pode ser diferente da largura dos lados [DOC: AC9 SE §5.4].
+- **Offset interno:** `Casing Trim Offset` = distância do **trim** à **aresta interna do batente**. Ou seja, o alizar interno “entra” sobre o batente; offset 0 = encostado na aresta interna [DOC: AC9 SE §5.4].
+- **Offset externo:** `Brick Molding Offset` = distância do **molding** à **borda do vão** (opening edge). Offsets aplicam-se a **esquerda, direita e topo**, não à base (no peitoril) [DOC: AC9 SE §5.4].
+- **Overhang:** `Head Casing Trim Overhang` e `Bottom Casing Trim Overhang` (e equivalentes do brick molding) permitem o alizar “passar” além do encontro, no estilo tradicional [DOC: AC9 SE §5.4].
+- **Bottom Brick Molding** pode ser ligado/desligado (há casos em que a base é resolvida pelo peitoril) [DOC: AC9 SE §5.4].
+- **Jamb Extension:** peça opcional Acrescentada ao batente para **estender a profundidade até a espessura da parede**; tem espessura configurável e pode ser desligada. É o recurso histórico para batente mais raso que a parede [DOC: AC9 SE §5.4].
+- **Masonry Opening:** em parede com revestimento de alvenaria, a abertura externa pode ser calculada como `Unit + Masonry Opening Extra` ou `Unit + Brick Molding Width + Brick Molding Offset` [DOC: AC9 SE §5.4].
+
+### 6.3 O que a biblioteca moderna expõe
+
+- A UI moderna (AC18–AC30) mostra **checkbox `Outside Casing` / `Inside Casing`** e, ao ligar, um conjunto de parâmetros (a página é essencialmente uma imagem na ajuda) [DOC: Ajuda “Casing Outside/Inside Settings”].
+- Não há, na ajuda moderna lida, uma lista textual dos nomes exatos de largura/espessura/offset. Os nomes históricos (`Casing Trim Width/Thickness/Offset`, `Brick Molding Width/Thickness/Offset`, `Overhang`) são a melhor referência disponível [DOC: AC9 SE; *[NÃO CONFIRMADO]* se a biblioteca AC28+ usa exatamente esses nomes].
+- A comunidade relata que, em algumas versões, **não é possível especificar offset do casing** e que larguras diferentes por lado dependem de “ganging”/shim space [FÓRUM]. Tratar como limitação de biblioteca, não como regra de modelagem.
+
+### 6.4 Sobreposição e ordem
+
+- O alizar é desenhado **depois** do batente e cobre a junta batente×parede; o offset positivo o afasta da aresta interna, o negativo o faz invadir o batente [DOC: AC9 SE; *[INFERIDO]* o sinal negativo é consequência direta da definição “distância à aresta”].
+- **Não há detecção automática de colisão** com a folha ou com o closure. A biblioteca apenas posiciona o perfil; se o offset for grande demais, ele pode cobrir o batente/folha (relatos de campo) [FÓRUM].
+- **Alizar × Turn Plaster:** mutuamente exclusivos [DOC].
+- **Alizar × Wall Closure:** o closure desenha as skins no vão; o alizar cobre a transição na face. Como o Turn Plaster é desligado quando há alizar, o encontro é resolvido pelo perfil, não pelo reboco [DOC + INFERIDO].
+
+### 6.5 Tabela-resumo do alizar
+
+| Campo | Face | O que faz | Observação |
+|---|---|---|---|
+| `Inside Casing` / `Casing Trim` | interna | liga o alizar interno | — |
+| `Outside Casing` / `Brick Molding` | externa | liga o alizar externo | — |
+| `Casing Trim Width` | interna | largura do perfil | head pode diferir dos lados |
+| `Casing Trim Thickness` | interna | espessura (salto) | valores usuais em lista |
+| `Casing Trim Offset` | interna | distância à aresta interna do batente | 0 = encostado |
+| `Brick Molding Width` | externa | largura do perfil | — |
+| `Brick Molding Thickness` | externa | espessura | — |
+| `Brick Molding Offset` | externa | distância à borda do vão | esquerda/direita/topo |
+| `Head/Bottom Overhang` | ambas | transpasse no topo/base | estilo tradicional |
+| `Bottom Brick Molding` | externa | liga/desliga o perfil na base | — |
+| `Jamb Extension` + thickness | batente | estende o batente até a parede | recurso histórico |
+| `Masonry Opening Extra` | externa | folga para a abertura na alvenaria | alternativa ao offset |
+
+Fonte principal: [DOC: AC9 SE “Illustrated Windows/Doors” §5.4; Ajuda “Casing Outside/Inside Settings”].
+
+---
+
+## 7 · Pergunta 5 — folha × batente: rebaixo, batedor, folga, dobradiça e ângulo
+
+### 7.1 Estilos de batente (Frame Style)
+
+| Frame Style | O que tem | Consequência para a folha |
+|---|---|---|
+| **Style 1** | batente simples (bloco) | folha encosta na face; sem batedor |
+| **Style 2** | batente com **door stop** (batedor) | folha para no batedor; recobrimento maior |
+| **Style 3** | batente com batedor **e rebaixo** para embutir a folha | folha recuada dentro do batente; junta mais protegida |
+
+Fonte: [DOC: AC18 “Frame Style and Dimensions”; AC30 “Frame Style and Dimensions”].
+
+- Com **double egress** (dupla saída), o estilo é forçado para o mais simples (Block) e a opção de Frame Style desaparece [DOC: Ajuda “Frame Style and Dimensions”].
+- `Frame Width` pode ser **uniforme** ou **por lado** (Uniform Frame Width); `Frame Thickness` idem (Uniform Frame Thickness) [DOC: AC18].
+- **Frame Thickness = Wall Thickness** é o atalho para batente com a espessura da parede; se desligado, `Frame Thickness` vira livre — mas em muitas portas o checkbox está travado (ver §4.3) [DOC].
+
+### 7.2 O encaixe da folha: rebate e fórmulas
+
+A folha **não** é simplesmente “unit − 2·batente”. Ela **recobre** o batente pelo rebate:
+
+```
+ac_leaf_width  = ac_unit_width  - 2 * (gs_frame_width - gs_rebate_width)
+ac_leaf_height = ac_unit_height - (gs_frame_width - gs_rebate_width)
+```
+
+- `gs_rebate_width` é a **largura do rebate** (o quanto a folha avança sobre o batente).
+- Se `gs_rebate_width = 0`, a folha é exatamente o vão livre entre batentes (egress).
+- Se `gs_rebate_width > 0`, a folha é **maior** que o egress e cobre o batente — é o que fecha a junta e forma o “batedor”.
+- A **folga** folha×batente não é um campo separado: ela é o resultado de `gs_frame_width`, `gs_rebate_width` e `gs_leaf_thk`. O único campo explícito de folga é o **leaf undercut** (folga inferior), e existe só em algumas bibliotecas/portas [DOC: GDL Tips “Nominal sizes”; FÓRUM].
+
+Fonte: [DOC: GDL Tips “Nominal sizes – Automatic dimensioning”; FÓRUM “Door's clear opening width” (fórmulas `gs_frame_width`, `gs_rebate_width`, `gs_leaf_thk`)].
+
+### 7.3 Dimensões da folha, sash e vidro
+
+| Campo (EN) | O que define | Onde |
+|---|---|---|
+| `Leaf Thickness` / `gs_leaf_thk` | espessura da folha | Leaf and Sash Dimension |
+| `Leaf Width` / `gs_leaf_panel_width` | largura do painel da folha | Leaf and Sash Dimension / parâmetro |
+| `Sash Width` / `gs_sash_width` | largura do perfil do sash (janela) | Frame and Sash / Leaf and Sash |
+| `Sash Thickness` / `gs_sash_thk` | espessura do sash | idem |
+| `Glass Thickness` | espessura do vidro | idem |
+| `Rebate Width` / `gs_rebate_width` | recobrimento folha×batente | Frame Style / parâmetro |
+| `Leaf Undercut` | folga inferior da folha | algumas portas (não todas) |
+
+Fonte: [DOC: Ajuda “Leaf and Sash Dimension”; GDL Basics 17 (exemplo de frame/sash/glass com `gs_frame_width`, `gs_sash_width`, `gs_sash_thk`); FÓRUM para undercut].
+
+### 7.4 Eixo da dobradiça
+
+- A folha gira em torno de um **eixo vertical no lado da dobradiça**, que fica no **batente**, na região do rebate. O lado é determinado por **opening side** (L/R) + `SYMB_MIRRORED` (espelhamento) + `SYMB_ROTANGLE` (rotação 180°) [DOC: GDL Reference “Doors and Windows” (8 estados); GDL `WIDO_ORIENTATION`; `ac_openingside`].
+- Em portas pivotantes, a biblioteca expõe um **offset de pivô** (`gs_pivotOffset`), que desloca o eixo para dentro da folha [FÓRMUM: parâmetro citado em fio técnico; *[NÃO CONFIRMADO]* o nome em todas as versões].
+- **Nós não encontramos** uma página que declare “o eixo fica a X mm da face do batente”. A posição é consequência da geometria do batente + rebate + espessura da folha [*NÃO CONFIRMADO*].
+
+*[INFERIDO]* Modelo mental correto: o eixo é **solidário ao batente**, não ao centro do vão. Por isso o Flip troca o lado de abertura **mantendo o batente no lugar** (§4.4) e a folha “nasce” do lado da dobradiça. Se o eixo ficasse no centro, o Flip teria de mover o batente.
+
+### 7.5 Ângulo de abertura e não-colisão
+
+- A biblioteca INT tem **2D/3D Opening Angle** por componente (folha, sidelight, transom): o ângulo **2D** controla a folha no símbolo de planta; o **3D** controla o modelo. São independentes [DOC: Ajuda “Opening Type and Angle”].
+- O ângulo também pode ser editado por **hotspots** no desenho [DOC: ibid.].
+- Em portas de correr, o campo vira **opening distance**, não ângulo [DOC: ibid.].
+- **Não há documentação de “colisão automática”** entre folha e batente. A biblioteca gira a folha em torno do eixo; se o ângulo for muito grande, a folha pode atravessar o batente/parede. O que a biblioteca faz é **limitar o intervalo** do parâmetro e posicionar o eixo/rebate de modo que o giro “caiba” [*[INFERIDO]*; *[NÃO CONFIRMADO]* o teste exato].
+- **Abertura além de 90°**: a folha pode girar mais que 90°; o “clear opening” real depende do cosseno da espessura no ângulo, o que a biblioteca stock não calcula [FÓRUM técnico].
+
+### 7.6 Tabela-resumo da folha
+
+| Campo (EN) | O que faz | Valores | Aba |
+|---|---|---|---|
+| `Frame Style` | estilo do batente (1/2/3) | 1, 2, 3 | Frame Style and Dimensions |
+| `Frame Width` | largura do batente | comprimento / por lado | Frame Style and Dimensions |
+| `Frame Thickness` | profundidade do batente | comprimento / por lado | Frame Style and Dimensions |
+| `Frame Thickness = Wall Thickness` | iguala batente à parede | checkbox (às vezes travado) | Frame Style and Dimensions |
+| `Uniform Frame Width/Thickness` | permite variar por lado | checkbox | Frame Style and Dimensions |
+| `Leaf Thickness` | espessura da folha | comprimento | Leaf and Sash |
+| `Sash Width` | largura do sash | comprimento | Frame and Sash |
+| `Glass Thickness` | espessura do vidro | comprimento | Leaf and Sash |
+| `Opening Type` | tipo de abertura por componente | Side Hung / Double Egress / Sliding / Pivot / etc. | Opening Type and Angle |
+| `2D Opening Angle` | ângulo no símbolo | graus | Opening Type and Angle |
+| `3D Opening Angle` | ângulo no modelo | graus (ou distância, se correr) | Opening Type and Angle |
+| `Sidelight/Transom Opening Direction` | direção relativa à folha | Same as Leaf / Opposite to Leaf | Opening Type and Angle |
+
+---

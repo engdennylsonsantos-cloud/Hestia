@@ -42,6 +42,8 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { GridProperties } from './GridProperties.tsx';
+import { gradeDaSelecao } from './gridUi.ts';
 import { LabelScroll } from './LabelScroll.tsx';
 import { PanelHead } from './PanelHead.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
@@ -379,9 +381,11 @@ export function Properties(): ReactElement {
   const roofs = els.filter(isRoof);
   const stairs = els.filter(isStair);
   const rooms = els.filter(isRoom);
+  // Grade é do projeto, não elemento: a seleção dela é um id que não está em `elements`.
+  const grade = gradeDaSelecao(p, sel);
   const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length;
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
-  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
+  const label = grade ? `Grade ${grade.name}` : walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
   const perim = usePerimeter();
@@ -401,6 +405,7 @@ export function Properties(): ReactElement {
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
+          : grade ? <GridProperties grid={grade} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} />
           : view ? <SectionViewProps view={view} />
           : count > 0 ? (

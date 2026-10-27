@@ -1,80 +1,110 @@
 import { describe, expect, it } from 'vitest';
-import type { OpeningGeometry } from '@hestia/engine';
+import { createEmptyProject, makeWall, ProjectStore, type Opening } from '@hestia/model';
+import { buildOpeningModel, frameOfWall, openingGeometry, type OpeningGeometry, type OpeningModel } from '@hestia/engine';
 import { LIGHT } from './types.ts';
-import { openingSymbol } from './symbols.ts';
+import { openingDetailByZoom, openingPlanDetail, openingPlanWorldPaths, openingSymbol, type OpeningSymbolOptions } from './symbols.ts';
+import { openingViewOps } from './view.ts';
 
-const geom = (over: Partial<OpeningGeometry>): OpeningGeometry => ({
-  openingId: 'o',
-  hostId: 'w',
-  kind: 'door',
-  center: { x: 0, y: 0 },
-  u: { x: 1, y: 0 },
-  n: { x: 0, y: 1 },
-  width: 0.9,
-  height: 2.1,
-  roughWidth: 0.9,
-  roughHeight: 2.1,
-  sill: 0,
-  thickness: 0.14,
-  sHi: 0.07,
-  sLo: -0.07,
-  leaves: 1,
-  plan: 'swing',
-  flipHand: false,
-  flipFacing: false,
-  offset: 0,
+interface Cena {
+  g: OpeningGeometry;
+  model: OpeningModel;
+}
+
+function cena(over: { typeId?: string; flipHand?: boolean; flipFacing?: boolean } = {}): Cena {
+  const s = new ProjectStore(createEmptyProject());
+  const typeId = over.typeId ?? 'ot_p90';
+  const t = s.project.openingTypes[typeId]!;
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+  s.exec({
+    type: 'addOpening',
+    opening: {
+      id: 'v',
+      kind: t.kind,
+      typeId,
+      hostId: 'w',
+      offset: 2,
+      flipHand: over.flipHand ?? false,
+      flipFacing: over.flipFacing ?? false,
+      sillOverride: null,
+      mark: '',
+    },
+  });
+  const p = s.project;
+  const o = p.elements.v as Opening;
+  const f = frameOfWall(p, 'w')!;
+  const g = openingGeometry(p, o, f);
+  return { g, model: buildOpeningModel(p, o, g, f) };
+}
+
+const options = (over: Partial<OpeningSymbolOptions> = {}): OpeningSymbolOptions => ({
+  detail: 'mid',
+  angle: Math.PI / 2,
+  planDisplay: 'symbolic',
+  showSwing: true,
+  swingStyle: 'arc',
+  cutZ: 1,
   ...over,
 });
 
-const count = (over: Partial<OpeningGeometry>): number => openingSymbol(geom(over), LIGHT).length;
+describe('openingSymbol: modelo único na planta', () => {
+  it('low: só a linha da folha; mid: perfis cortados, folha aberta e arco; high: mais a folha fechada', () => {
+    const c = cena();
+    expect(openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail: 'low' }))).toHaveLength(1);
+    const mid = openingSymbol(c.g, c.model, LIGHT, 1.2, options());
+    expect(mid.filter((s) => s.closed)).toHaveLength(5);
+    expect(mid.length).toBe(6);
+    const high = openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail: 'high' }));
+    expect(high.filter((s) => s.closed)).toHaveLength(6);
+  });
 
-describe('vão livre (leaves 0)', () => {
-  it('vão livre: duas linhas tracejadas nas faces da parede, sem X, sem folha nem caixilho', () => {
-    const s = openingSymbol(geom({ leaves: 0 }), LIGHT);
-    expect(s).toHaveLength(2);
-    expect(s.every((x) => x.dash !== undefined)).toBe(true);
-    expect(s[0]!.pts[0]!.y).toBeCloseTo(0.07);
-    expect(s[0]!.pts[1]!.y).toBeCloseTo(0.07);
-    expect(s[1]!.pts[0]!.y).toBeCloseTo(-0.07);
-    expect(s[0]!.pts[0]!.x).toBeCloseTo(-0.45);
-    expect(s[0]!.pts[1]!.x).toBeCloseTo(0.45);
+  it("detail off não gera traços", () => {
+    const c = cena();
+    expect(openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail: 'off' }))).toEqual([]);
   });
-});
 
-describe('símbolo por família de planta', () => {
-  it('porta de uma folha: folha e arco', () => {
-    expect(count({ kind: 'door', plan: 'swing', leaves: 1 })).toBe(2);
+  it("detail 'scale' escolhe low/mid/high pelo zoom", () => {
+    expect(openingPlanDetail('scale', 15)).toBe('low');
+    expect(openingPlanDetail('scale', 60)).toBe('mid');
+    expect(openingPlanDetail('scale', 400)).toBe('high');
+    expect(openingDetailByZoom(20)).toBe('low');
+    expect(openingDetailByZoom(100)).toBe('mid');
+    expect(openingDetailByZoom(1000)).toBe('high');
+    expect(openingPlanDetail('off', 400)).toBe('off');
   });
-  it('porta dupla: duas folhas e dois arcos', () => {
-    expect(count({ kind: 'door', plan: 'double', leaves: 2 })).toBe(4);
+
+  it('a folha aberta é um retângulo com espessura, não uma linha', () => {
+    const c = cena();
+    const leaf = openingPlanWorldPaths(c.g, c.model, options()).find((p) => p.role === 'leaf' && p.closed)!;
+    const xs = leaf.pts.map((p) => p.x);
+    const ys = leaf.pts.map((p) => p.y);
+    const lados = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)].sort((a, b) => a - b);
+    expect(lados[0]).toBeCloseTo(0.04, 9);
+    expect(lados[1]).toBeCloseTo(0.822, 9);
   });
-  it('porta de correr: dois retângulos fechados e seta', () => {
-    const s = openingSymbol(geom({ kind: 'door', plan: 'sliding', leaves: 2 }), LIGHT);
-    expect(s).toHaveLength(4);
-    expect(s.filter((x) => x.closed)).toHaveLength(2);
+
+  it('projection-above continua tracejado; projection-below e beyond saem leves', () => {
+    const c = cena();
+    const widths = { cut: { widthPx: 1.2 }, proj: { widthPx: 0.6 } };
+    const above = openingViewOps(c.g, 'projection-above', LIGHT, widths, { ...options(), model: c.model });
+    expect(above.length).toBeGreaterThan(0);
+    expect(above.every((s) => s.dash?.[0] === 6)).toBe(true);
+    const below = openingViewOps(c.g, 'projection-below', LIGHT, widths, { ...options(), model: c.model });
+    expect(below.every((s) => s.color === LIGHT.inkSoft)).toBe(true);
+    const beyond = openingViewOps(c.g, 'beyond', LIGHT, widths, { ...options(), model: c.model });
+    expect(beyond.every((s) => s.color === LIGHT.inkSoft)).toBe(true);
+    expect(openingViewOps(c.g, 'hidden', LIGHT, widths, { ...options(), model: c.model })).toEqual([]);
   });
-  it('porta pivotante: círculo do eixo, folha aberta e dois arcos (um por banda)', () => {
-    const s = openingSymbol(geom({ kind: 'door', plan: 'pivot', leaves: 1 }), LIGHT);
-    expect(s).toHaveLength(4);
-    expect(s[0]!.closed).toBe(true);
-  });
-  it('janela fixa: duas faces, plano médio e duas ombreiras', () => {
-    expect(count({ kind: 'window', plan: 'fixed', leaves: 2 })).toBe(5);
-  });
-  it('janela basculante acrescenta a folha em V', () => {
-    expect(count({ kind: 'window', plan: 'tilt', leaves: 1 })).toBe(6);
-  });
-  it('maxim-ar acrescenta um arco tracejado', () => {
-    const s = openingSymbol(geom({ kind: 'window', plan: 'casement', leaves: 1 }), LIGHT);
-    expect(s).toHaveLength(6);
-    expect(s.at(-1)!.dash).toBeDefined();
-  });
-  it('janela de correr: sem plano médio, com duas folhas deslocadas e seta', () => {
-    expect(count({ kind: 'window', plan: 'sliding', leaves: 2 })).toBe(8);
-  });
-  it('famílias diferentes geram desenhos diferentes', () => {
-    const sig = (over: Partial<OpeningGeometry>): string => JSON.stringify(openingSymbol(geom({ kind: 'door', ...over }), LIGHT));
-    const all = [sig({ plan: 'swing', leaves: 1 }), sig({ plan: 'double', leaves: 2 }), sig({ plan: 'sliding', leaves: 1 }), sig({ plan: 'pivot', leaves: 1 })];
+
+  it('as famílias geram desenhos diferentes e o vão livre são duas linhas tracejadas', () => {
+    const sig = (typeId: string): string => {
+      const c = cena({ typeId });
+      return JSON.stringify(openingPlanWorldPaths(c.g, c.model, options()));
+    };
+    const all = [sig('ot_p90'), sig('ot_p160'), sig('ot_pc160'), sig('ot_pp80')];
     expect(new Set(all).size).toBe(all.length);
+    const vazio = cena({ typeId: 'ot_vao90' });
+    const paths = openingPlanWorldPaths(vazio.g, vazio.model, options());
+    expect(paths).toHaveLength(2);
+    expect(paths.every((p) => p.dash !== undefined && !p.closed)).toBe(true);
   });
 });

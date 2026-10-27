@@ -1,9 +1,22 @@
-import { orientedRect, v2 } from '@hestia/geom';
-import { frameOfWall, pointAt } from '@hestia/engine';
+import { orientedRect } from '@hestia/geom';
+import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
 import { openingType, openingsOfWall, type Opening } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
 import { parseNumber } from './numeric.ts';
+import {
+  anchorCenter,
+  clampOpeningCenter,
+  facingForCursor,
+  formatMeters,
+  freeSpans,
+  overlapsPerpendicular,
+  perpendicularNeighbors,
+  sideWithHysteresis,
+  symbolPreviewItems,
+  temporaryDimensions,
+  type PerpendicularWall,
+} from './openingPlacement.ts';
 import type { PointerInfo } from './types.ts';
 
 /** Porta e janela: hospedadas na parede sob o cursor (docs/02 §5). */
@@ -13,18 +26,20 @@ export class OpeningTool extends ToolBase {
   readonly hint: string;
   private flipHand = false;
   private flipFacing = false;
+  private lastSide: 1 | -1 = 1;
   private current: { wallId: string; offset: number } | null = null;
 
   constructor(env: ConstructorParameters<typeof ToolBase>[0], kind: 'door' | 'window') {
     super(env);
     this.id = kind;
     this.label = kind === 'door' ? 'Porta' : 'Janela';
-    this.hint = `${this.label}: passe o cursor sobre uma parede e clique. Tab inverte o lado, Espaço a dobradiça.`;
+    this.hint = `${this.label}: o lado do cursor define para onde abre; passe o cursor sobre uma parede e clique. Tab inverte o sentido, Espaço a dobradiça.`;
   }
 
   protected reset(): void {
     this.items = [];
     this.current = null;
+    this.lastSide = 1;
   }
 
   protected busy(): boolean {
@@ -44,11 +59,24 @@ export class OpeningTool extends ToolBase {
     this.flipHand = !this.flipHand;
   }
 
+  override space(): void {
+    this.flipHandToggle();
+  }
+
+  /** Intenção corrente: dobradiça e sentido já com os toggles (Espaço/Tab) por cima do modo das opções. */
+  private intent(): { flipHand: boolean; flipFacing: boolean } {
+    const o = this.env.options();
+    return {
+      flipHand: (o.openingFlipHand ?? false) !== this.flipHand,
+      flipFacing: facingForCursor(this.lastSide, o) !== this.flipFacing,
+    };
+  }
+
   override inputPrompt(): string | null {
     return this.current ? 'Distância do início da parede' : null;
   }
 
-  private resolve(offset: number, wallId: string): number | null {
+  private resolve(offset: number, wallId: string, neighbors = perpendicularNeighbors(this.env.project(), wallId, this.env.levelId())): number | null {
     const p = this.env.project();
     const t = p.openingTypes[this.typeId()];
     const f = frameOfWall(p, wallId);
@@ -56,6 +84,8 @@ export class OpeningTool extends ToolBase {
     const half = t.width / 2;
     if (f.length < t.width + 0.02) return null;
     const o = Math.max(half + 0.01, Math.min(f.length - half - 0.01, offset));
+    // A abertura fica no trecho livre: não atravessa parede perpendicular que encosta na hospedeira.
+    if (overlapsPerpendicular(neighbors, o, t.width)) return null;
     for (const [a, b] of occupiedRanges(p, wallId, undefined, [t.sill, t.sill + t.height])) {
       if (o + half > a + 1e-6 && o - half < b - 1e-6) return null;
     }
@@ -64,9 +94,10 @@ export class OpeningTool extends ToolBase {
 
   /**
    * Captura da posição na parede (S-11): a borda da abertura encosta na ponta da parede, em outra abertura (encosto,
-   * batente ou centro). Só com a captura ligada (F3 desliga). Digitar a distância não passa por aqui: é exata.
+   * batente ou eixo), no centro do trecho livre entre as perpendiculares, ou a `openingClear` da face delas. Só com a
+   * captura ligada (F3 desliga). Digitar a distância não passa por aqui: é exata.
    */
-  private snapOffset(offset: number, wallId: string, width: number): { offset: number; note: string | null } {
+  private snapOffset(offset: number, wallId: string, width: number, neighbors: PerpendicularWall[]): { offset: number; note: string | null } {
     if (this.env.options().snap?.enabled === false) return { offset, note: null };
     const pr = this.env.project();
     const f = frameOfWall(pr, wallId);
@@ -77,6 +108,18 @@ export class OpeningTool extends ToolBase {
       { c: h + 0.01, note: 'início da parede' },
       { c: f.length - h - 0.01, note: 'fim da parede' },
     ];
+    // Centro do trecho livre entre as paredes perpendiculares vizinhas.
+    for (const span of freeSpans(neighbors, f.length)) {
+      if (span.hi - span.lo >= width + 0.02) targets.push({ c: (span.lo + span.hi) / 2, note: 'centro do trecho' });
+    }
+    // Folga da quina: a borda da abertura fica a `openingClear` da face da perpendicular.
+    const clear = this.env.options().openingClear ?? 0.1;
+    for (const n of neighbors) {
+      for (const [face, dir] of [[n.faceLo, -1], [n.faceHi, 1]] as Array<[number, 1 | -1]>) {
+        const c = face + dir * (clear + h);
+        if (c > 0 && c < f.length) targets.push({ c, note: `a ${Math.round(clear * 100)} cm da parede` });
+      }
+    }
     for (const o of openingsOfWall(pr, wallId)) {
       const ot = pr.openingTypes[o.typeId];
       const ow = (ot?.width ?? 0.8) / 2;
@@ -85,7 +128,7 @@ export class OpeningTool extends ToolBase {
         { c: o.offset + ow + h, note: 'encosto na abertura' },
         { c: o.offset - ow + h, note: 'batente alinhado' },
         { c: o.offset + ow - h, note: 'batente alinhado' },
-        { c: o.offset, note: 'centro alinhado' },
+        { c: o.offset, note: 'eixo alinhado' },
       );
     }
     let best: { c: number; note: string; d: number } | null = null;
@@ -100,7 +143,11 @@ export class OpeningTool extends ToolBase {
     this.items = [];
     this.raw = p.raw;
     const pr = this.env.project();
-    const host = hostUnder(p.raw, pr, this.env.levelId(), this.env.metersPerPixel(), this.env.options().snap?.enabled !== false);
+    const mpp = this.env.metersPerPixel();
+    const options = this.env.options();
+    const snapOn = options.snap?.enabled !== false;
+    // A abertura é mais tolerante que o resto: 16 px além da face ainda conta como sobre a parede.
+    const host = hostUnder(p.raw, pr, this.env.levelId(), mpp, snapOn, 16);
     this.inf = null;
     this.current = null;
     if (!host) {
@@ -110,34 +157,82 @@ export class OpeningTool extends ToolBase {
     const f = frameOfWall(pr, host.wallId);
     const t = pr.openingTypes[this.typeId()];
     if (!f || !t) return;
-    const aligned = this.snapOffset(host.offset, host.wallId, t.width);
-    const off = this.resolve(aligned.offset, host.wallId);
+    const neighbors = perpendicularNeighbors(pr, host.wallId, this.env.levelId());
+    // O lado do cursor define o sentido, com histerese de 3 px perto do eixo.
+    this.lastSide = sideWithHysteresis(toLocal(f, p.raw).s, this.lastSide, 3 * mpp);
+    const { flipHand, flipFacing } = this.intent();
+    const center = anchorCenter(host.offset, t.width, flipHand, options.openingAnchor);
+    const aligned = this.snapOffset(center, host.wallId, t.width, neighbors);
+    const off = this.resolve(aligned.offset, host.wallId, neighbors);
+    const preview = off ?? clampOpeningCenter(aligned.offset, t.width, f.length, host.offset);
     this.items.push({ kind: 'highlight', ids: [host.wallId] });
+    this.drawPreview(host.wallId, f, t.width, preview, flipHand, flipFacing, off !== null, neighbors);
     if (off === null) {
       this.env.say('Sem espaço livre neste ponto da parede.');
       return;
     }
     this.current = { wallId: host.wallId, offset: off };
-    const c = pointAt(f, off, f.sMid);
-    this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, t.width / 2, f.thickness / 2 + 0.02) });
-    this.items.push({ kind: 'label', at: v2(c.x, c.y), text: `${(off).toFixed(2).replace('.', ',')} m${aligned.note ? ` · ${aligned.note}` : ''}` });
-    this.env.say(`${t.name}: clique para inserir. Digite a distância ao início da parede e Enter para posição exata.`);
+    const hinge = flipHand ? 'direita' : 'esquerda';
+    const abre = flipFacing === (this.lastSide < 0) ? 'para este lado' : 'para o lado oposto';
+    this.env.say(
+      `${t.name}: dobradiça à ${hinge} · abre ${abre}${aligned.note ? ` · ${aligned.note}` : ''}. ` +
+        'Clique para inserir. Digite a distância ao início da parede e Enter para posição exata.',
+    );
+  }
+
+  /** Prévia: símbolo real da esquadria + retângulo do vão + duas cotas temporárias. Inválida em vermelho. */
+  private drawPreview(
+    wallId: string,
+    f: NonNullable<ReturnType<typeof frameOfWall>>,
+    width: number,
+    offset: number,
+    flipHand: boolean,
+    flipFacing: boolean,
+    valid: boolean,
+    neighbors: PerpendicularWall[],
+  ): void {
+    const options = this.env.options();
+    const tone = valid ? undefined : ('invalid' as const);
+    const temp: Opening = {
+      id: 'preview',
+      kind: this.id,
+      typeId: this.typeId(),
+      hostId: wallId,
+      offset,
+      flipHand,
+      flipFacing,
+      sillOverride: options.openingSillOverride ?? null,
+      mark: '',
+    };
+    const pr = this.env.project();
+    this.items.push(...symbolPreviewItems(pr, f, temp, tone));
+    const c = pointAt(f, offset, f.sMid);
+    this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, width / 2, f.thickness / 2 + 0.02), tone });
+    for (const d of temporaryDimensions(f, offset, width, neighbors, options.openingDimMode ?? 'axis', this.lastSide)) {
+      this.items.push({ kind: 'line', a: d.a, b: d.b, tone });
+      this.items.push({ kind: 'label', at: d.at, text: formatMeters(d.value) });
+    }
   }
 
   private place(wallId: string, offset: number): void {
     const options = this.env.options();
+    const { flipHand, flipFacing } = this.intent();
     const o: Opening = {
       id: makeId(this.id === 'door' ? 'd' : 'j'),
       kind: this.id,
       typeId: this.typeId(),
       hostId: wallId,
       offset,
-      flipHand: (options.openingFlipHand ?? false) !== this.flipHand,
-      flipFacing: (options.openingFlipFacing ?? false) !== this.flipFacing,
+      flipHand,
+      flipFacing,
       sillOverride: options.openingSillOverride ?? null,
       mark: options.placementMark ?? '',
     };
     this.env.exec({ type: 'addOpening', opening: o });
+    // Revit "Tag on Placement": a etiqueta do tipo nasce junto com a esquadria (a opção desliga só esta ligação).
+    if (options.openingTagOnPlace !== false && !this.env.project().settings.showOpeningTags) {
+      this.env.exec({ type: 'setSettings', patch: { showOpeningTags: true } });
+    }
     const pr = this.env.project();
     this.env.say(`${openingType(pr, o).name} inserida.`);
   }

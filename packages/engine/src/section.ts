@@ -1,5 +1,5 @@
 import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
-import { coreSpan, type HatchKind, openingCasing, openingFamilyOf, openingFrame, openingLintel, openingSillBeam, openingSillBoard, openingType, openingsOfWall, wallsOnLevel, type Id, type OpeningCasing, type OpeningFamilyId, type OpeningLeaves, type OpeningLintel, type OpeningSillBoard, type PlanSymbol, type Project } from '@hestia/model';
+import { openingLineConvention, openingType, openingsOfWall, wallsOnLevel, type HatchKind, type Id, type OpeningLineConvention, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
 import { resolveFloors } from './floors.ts';
@@ -8,6 +8,8 @@ import { resolveSlabs, slabRiseAt } from './slabs.ts';
 import { sectionOfCeilings } from './sectionCeilings.ts';
 import { planeZ, resolveRoofs, type ResolvedRoof } from './roofs.ts';
 import { frameOfWall, openingGeometry, resolveLevel } from './resolve.ts';
+import { buildOpeningModel } from './openingModel.ts';
+import type { OpeningModel } from './openingModelTypes.ts';
 import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, slabQuad, type SectionLine } from './sectionGeom.ts';
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
@@ -75,35 +77,6 @@ export interface SectionBeyond extends SectionOrigin {
   polygons: MultiPolygon;
 }
 
-/**
- * Esquadria do vão no corte e na elevação: família, folhas e espessuras do tipo (`openingFrame`), com a profundidade
- * do batente já limitada ao núcleo da parede. Permite ao desenho montar batente, vidro, folha e símbolos por família.
- */
-export interface SectionEsquadria {
-  /** Família (`opening.ts`); null quando a combinação (símbolo × folhas) do tipo não existe. */
-  family: OpeningFamilyId | null;
-  leaves: OpeningLeaves;
-  plan: PlanSymbol;
-  /** Largura do vão e espessura total da parede anfitriã: distinguem a vista face do corte transversal. */
-  width: number;
-  thickness: number;
-  frameWidth: number;
-  frameDepth: number;
-  glassThickness: number;
-  leafThickness: number;
-  flipHand: boolean;
-  flipFacing: boolean;
-  /** Folha abre para o observador da elevação (decisão 0024 §2): giro tracejado; contrário, contínuo. */
-  swingTowardViewer: boolean;
-  frameMaterialId: Id;
-  glassMaterialId: Id;
-  /** Alizar, peitoril saliente, verga e contraverga do tipo; ausentes = não desenhar. */
-  casing: OpeningCasing | null;
-  sillBoard: OpeningSillBoard | null;
-  lintel: OpeningLintel | null;
-  sillBeam: OpeningLintel | null;
-}
-
 /** Vão de porta ou janela. `t0..z1` é a caixa do vão; `polygons` é a parte visível (sem o que está na frente). */
 export interface SectionOpening {
   openingId: Id;
@@ -116,8 +89,19 @@ export interface SectionOpening {
   /** O plano de corte atravessa o vão. */
   cut: boolean;
   polygons: MultiPolygon;
-  /** Esquadria do tipo e da família (para o desenho do corte e da elevação). Ausente = desenho antigo. */
-  esquadria?: SectionEsquadria;
+  /** Modelo único da esquadria: a vista só desenha estas peças (E-spec §0). */
+  model: OpeningModel;
+  /** Convenção do V do projeto (`ProjectSettings.openingLine`). */
+  openingLine: OpeningLineConvention;
+  /** Observador da elevação no lado de `n` (+1) ou no oposto (−1); a tela usa `x = −viewSide·t`. */
+  viewSide: 1 | -1;
+  /** Sinal de `s` no eixo da seção transversal (o corte pela espessura). */
+  sSign: 1 | -1;
+  /** Posição `t` local em que o plano da seção transversal atravessa o vão. */
+  cutT: number;
+  /** Materiais do tipo, para a cor e a hachura das peças do modelo. */
+  frameMaterialId: Id;
+  glassMaterialId: Id;
 }
 
 export interface SectionLevelMark {
@@ -333,8 +317,10 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
         const t1 = Math.min(length, Math.max(...foot.map(along)));
         if (t1 - t0 < EPS_T) continue;
         const z0 = rw.baseZ + g.sill;
+        const model = buildOpeningModel(p, o, g, f);
         const ot = openingType(p, o);
-        const fr = openingFrame(ot, coreSpan(f.type).to - coreSpan(f.type).from);
+        const du = d.x * g.u.x + d.y * g.u.y;
+        const dn = d.x * g.n.x + d.y * g.n.y;
         openings.push({
           openingId: o.id,
           kind: g.kind,
@@ -345,27 +331,14 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
           depth: Math.max(0, Math.min(...foot.map(dist))),
           cut: crossing,
           polygons: [[rect(t0, t1, z0, z0 + g.height)]],
-          esquadria: {
-            family: openingFamilyOf(ot)?.id ?? null,
-            leaves: ot.leaves,
-            plan: ot.plan,
-            width: ot.width,
-            thickness: g.thickness,
-            frameWidth: fr.frameWidth,
-            frameDepth: fr.frameDepth,
-            glassThickness: fr.glassThickness,
-            leafThickness: fr.leafThickness,
-            flipHand: o.flipHand,
-            flipFacing: o.flipFacing,
-            // Folha gira para +n se `flipFacing` é falso (`openingSymbol.ts`); o observador está em −n.
-            swingTowardViewer: (g.n.x * n.x + g.n.y * n.y) * (o.flipFacing ? -1 : 1) < 0,
-            frameMaterialId: ot.frameMaterialId,
-            glassMaterialId: ot.glassMaterialId,
-            casing: openingCasing(ot),
-            sillBoard: openingSillBoard(ot),
-            lintel: openingLintel(ot),
-            sillBeam: openingSillBeam(ot),
-          },
+          model,
+          openingLine: openingLineConvention(p),
+          // A tela cresce no sentido de `d`; `x = −viewSide·t` equivale a `x = sign(d·u)·t`.
+          viewSide: du >= 0 ? -1 : 1,
+          sSign: dn >= 0 ? 1 : -1,
+          cutT: (line.a.x - g.center.x) * g.u.x + (line.a.y - g.center.y) * g.u.y,
+          frameMaterialId: ot.frameMaterialId,
+          glassMaterialId: ot.glassMaterialId,
         });
       }
     }

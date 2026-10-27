@@ -16,7 +16,7 @@ import {
   type Stair,
   type Wall,
 } from '@hestia/model';
-import { exportIfc } from './ifcExport.ts';
+import { doorOperation, exportIfc, windowOperation } from './ifcExport.ts';
 import { ifcGuid } from './ifcGuid.ts';
 import type { IfcGeometry, IfcOpeningGeo, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
 
@@ -79,6 +79,56 @@ function danglingRefs(text: string): number[] {
   const defined = new Set([...text.matchAll(/^#(\d+)=/gm)].map((m) => Number(m[1])));
   return [...text.matchAll(/#(\d+)/g)].map((m) => Number(m[1])).filter((id) => !defined.has(id));
 }
+
+describe('doorOperation: famílias novas', () => {
+  it('vai-e-vem, embutir, dobrável, sanfonada e seccionada têm a operação da spec', () => {
+    expect(doorOperation({ plan: 'dblact' }, false)).toBe('DOUBLE_SWING_LEFT');
+    expect(doorOperation({ plan: 'dblact' }, true)).toBe('DOUBLE_SWING_RIGHT');
+    expect(doorOperation({ plan: 'pocket' }, false)).toBe('SLIDING_TO_LEFT');
+    expect(doorOperation({ plan: 'pocket' }, true)).toBe('SLIDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'bifold' }, false)).toBe('FOLDING_TO_LEFT');
+    expect(doorOperation({ plan: 'bifold' }, true)).toBe('FOLDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'accordion' }, false)).toBe('FOLDING_TO_LEFT');
+    expect(doorOperation({ plan: 'accordion' }, true)).toBe('FOLDING_TO_RIGHT');
+    expect(doorOperation({ plan: 'garage' }, false)).toBe('SECTIONAL_OVERHEAD');
+    expect(doorOperation({ plan: 'garage' }, true)).toBe('SECTIONAL_OVERHEAD');
+  });
+});
+
+describe('exportIfc: catálogo completo no mostruário', () => {
+  const p = buildTemplate('esquadrias');
+  const geo = geometryFromModel(p);
+  const text = exportIfc(p, geo, { timestamp: TS });
+  const opens = Object.values(p.elements).filter(isOpening);
+  const portas = opens.filter((o) => o.kind === 'door');
+  const janelas = opens.filter((o) => o.kind === 'window');
+
+  it('sai sem exceção, com referências íntegras e uma porta ou janela por vão', () => {
+    expect(text.startsWith('ISO-10303-21;')).toBe(true);
+    expect(danglingRefs(text)).toEqual([]);
+    expect(p.levels).toHaveLength(1);
+    expect(portas.length).toBe(12);
+    expect(janelas.length).toBe(11);
+    expect(count(text, 'IFCDOOR')).toBe(portas.length);
+    expect(count(text, 'IFCWINDOW')).toBe(janelas.length);
+    expect(count(text, 'IFCOPENINGELEMENT')).toBe(opens.length);
+    expect(count(text, 'IFCRELVOIDSELEMENT')).toBe(opens.length);
+    expect(count(text, 'IFCRELFILLSELEMENT')).toBe(opens.length);
+  });
+
+  it('tem uma Operation por porta e um painel por janela, sem NOTDEFINED', () => {
+    for (const o of portas) {
+      const t = p.openingTypes[o.typeId]!;
+      expect(doorOperation(t, o.flipHand), `${o.id} ${t.plan}`).not.toBe('NOTDEFINED');
+    }
+    for (const o of janelas) {
+      const t = p.openingTypes[o.typeId]!;
+      expect(windowOperation(t, o.flipHand), `${o.id} ${t.plan}`).not.toBe('NOTDEFINED');
+    }
+    expect(count(text, 'IFCWINDOWPANELPROPERTIES')).toBe(janelas.length);
+    expect(text.includes("'NOTDEFINED'")).toBe(false);
+  });
+});
 
 describe('exportIfc', () => {
   const p = buildTemplate('house2');

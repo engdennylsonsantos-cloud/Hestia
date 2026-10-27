@@ -23,11 +23,13 @@ export * from './section/pick.ts';
 export { sectionStyleOf, type SectionStyle } from './section/style.ts';
 // Vista da planta (decisão 0013) e o que a exportação DXF reaproveita dela: a mesma geometria, o mesmo corte e a mesma pegada.
 export { planViewOf, hiddenSelectionOps, type PlanView } from './plan/view.ts';
+export { openingPlanWorldPaths, openingPlanDetail, openingDetailByZoom, type OpeningPlanWorldPath, type OpeningSymbolDetail, type OpeningSymbolOptions } from './plan/symbols.ts';
 // Gráficos da vista (decisão 0015): estilo resolvido por nível, com o zoom corrente, e o padrão de uma categoria.
 export { defaultPaint, planStyleOf, type PlanPaint, type PlanStyle, type PlanVisual } from './plan/style.ts';
 export { climbWalk, spiralByComponent, spiralPostRing, stairCut, type StairCut } from './plan/stairs.ts';
 export { risersInClimbOrder } from './stairRisers.ts';
 export { roofFootprint } from './plan/roofs.ts';
+export { openingTagLabels } from './plan/openingTags.ts';
 // Pranchas (decisão 0022): lista de desenho da folha em mm de papel, para a tela e o PDF.
 export * from './sheet/types.ts';
 export * from './sheet/build.ts';

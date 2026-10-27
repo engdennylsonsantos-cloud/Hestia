@@ -3,11 +3,13 @@ import type { Stair, StairType } from './stairTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 import type { Sheet } from './sheet.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
+import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 19;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
+export type * from './openingTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
 export type LayerFunction = 'structure' | 'substrate' | 'thermal' | 'membrane' | 'finish1' | 'finish2';
@@ -273,73 +275,6 @@ export interface Wall {
   order: number;
 }
 
-/**
- * Família do símbolo de planta. Portas: arco com folha (swing), dupla, correr, pivotante.
- * Janelas: fixa, basculante, maxim-ar (arco tracejado) e correr.
- */
-export type PlanSymbol = 'swing' | 'double' | 'sliding' | 'pivot' | 'fixed' | 'tilt' | 'casement';
-
-/** Contagem de folhas de uma abertura. 0 = vão livre (sem folha nem caixilho). As famílias aceitas estão em `opening.ts`. */
-export type OpeningLeaves = 0 | 1 | 2 | 3;
-
-export interface OpeningType {
-  id: Id;
-  kind: 'door' | 'window';
-  name: string;
-  /** Código do tipo (Revit: Type Mark), como "P-01" ou "J-02"; vazio quando não informado. */
-  code?: string;
-  /** Descrição livre do tipo; vazio quando não informada. */
-  description?: string;
-  width: number;
-  height: number;
-  /** Peitoril padrão (0 para porta). */
-  sill: number;
-  /** Folhas. 0 = vão livre: só o recorte e a soleira, sem folha nem caixilho. */
-  leaves: OpeningLeaves;
-  /** Símbolo de planta da família. */
-  plan: PlanSymbol;
-  frameMaterialId: Id;
-  glassMaterialId: Id;
-  /** Fechamento do vão (Revit: Wall Closure): substitui o retorno do tipo de parede quando não é 'inherit'. */
-  closure: 'inherit' | WrapMode;
-  /*
-   * Esquadria (m). Opcionais: arquivos antigos não os têm e a leitura usa o padrão (`openingFrame`, em defaults.ts).
-   * Largura do perfil do batente e do caixilho; profundidade do batente na parede (limitada à espessura da parede);
-   * espessura da folha; espessura do vidro.
-   */
-  frameWidth?: number;
-  frameDepth?: number;
-  leafThickness?: number;
-  glassThickness?: number;
-  /*
-   * Acabamento e vão bruto (m), todos opcionais: ausente vale o padrão por leitura (`openingExtras.ts`), sem migração.
-   * `roughOversize`: folga total do vão bruto em relação à largura e à altura do tipo (o furo cresce, a esquadria não).
-   * `casing`: alizar em volta do vão nas duas faces da parede (largura vista e espessura saliente).
-   * `sillBoard`: peitoril saliente de janela (projeção além de cada face e espessura).
-   * `lintel`/`sillBeam`: verga e contraverga (transpasse para cada lado e altura; padrão do transpasse 0,30 m).
-   */
-  roughOversize?: { w: number; h: number };
-  casing?: { width: number; thickness: number };
-  sillBoard?: { projection: number; thickness: number };
-  lintel?: { over?: number; height?: number };
-  sillBeam?: { over?: number; height?: number };
-}
-
-export interface Opening {
-  id: Id;
-  kind: 'door' | 'window';
-  typeId: Id;
-  hostId: Id;
-  /** Distância do centro da abertura ao início (a) da parede, ao longo do eixo. */
-  offset: number;
-  /** Inverte o lado da dobradiça. */
-  flipHand: boolean;
-  /** Inverte o sentido de abertura (para qual lado a folha gira). */
-  flipFacing: boolean;
-  sillOverride: number | null;
-  mark: string;
-}
-
 /** Tipo de piso: camadas do topo para baixo (acabamento, contrapiso, estrutura). `wraps` não é usado. */
 export interface FloorType {
   id: Id;
@@ -600,6 +535,10 @@ export interface ProjectSettings {
   detail: DetailLevel;
   /** Tipos de abertura favoritos (ArchiCAD: Favorites), na ordem em que aparecem no seletor. Ausente = nenhum. */
   favoriteOpeningTypes?: Id[];
+  /** Convenção da linha de abertura (ausente = vértice no lado do trinco, tracejada ao abrir para o observador). */
+  openingLine?: OpeningLineConvention;
+  /** Mostra o código do tipo de cada porta e janela na planta (Revit: Tag on Placement). Ausente = não mostra. */
+  showOpeningTags?: boolean;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */

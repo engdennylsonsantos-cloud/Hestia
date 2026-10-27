@@ -109,7 +109,7 @@ export interface OpeningGeometry {
   sHi: number;
   sLo: number;
   /** 0 = vão livre: sem folha nem caixilho (só o recorte e a soleira). Janela de correr aceita até 3. */
-  leaves: 0 | 1 | 2 | 3;
+  leaves: 0 | 1 | 2 | 3 | 4;
   /** Família do símbolo de planta. */
   plan: PlanSymbol;
   flipHand: boolean;

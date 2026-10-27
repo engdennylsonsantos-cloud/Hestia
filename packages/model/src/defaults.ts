@@ -144,6 +144,11 @@ export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_pc160', kind: 'door', name: 'Porta de correr 160 x 210', code: 'P-05', width: 1.6, height: 2.1, sill: 0, leaves: 2, plan: 'sliding' }),
   ot({ id: 'ot_pp80', kind: 'door', name: 'Porta pivotante 80 x 210', code: 'P-06', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'pivot' }),
   ot({ id: 'ot_vao90', kind: 'door', name: 'Vão livre 90 x 210', code: 'V-01', width: 0.9, height: 2.1, sill: 0, leaves: 0, plan: 'swing' }),
+  ot({ id: 'ot_pvv90', kind: 'door', name: 'Porta vai-e-vem 90 x 210', code: 'P-07', width: 0.9, height: 2.1, sill: 0, leaves: 1, plan: 'dblact' }),
+  ot({ id: 'ot_pe80', kind: 'door', name: 'Porta de embutir 80 x 210', code: 'P-08', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'pocket' }),
+  ot({ id: 'ot_pd120', kind: 'door', name: 'Porta dobrável 2 folhas 120 x 210', code: 'P-09', width: 1.2, height: 2.1, sill: 0, leaves: 2, plan: 'bifold', angle2d: 55, angle3d: 70 }),
+  ot({ id: 'ot_ps90', kind: 'door', name: 'Porta sanfonada 90 x 210', code: 'P-10', width: 0.9, height: 2.1, sill: 0, leaves: 1, plan: 'accordion', angle3d: 75 }),
+  ot({ id: 'ot_pg300', kind: 'door', name: 'Portão seccionado 300 x 220', code: 'P-11', width: 3.0, height: 2.2, sill: 0, leaves: 1, plan: 'garage' }, 'mat_aco'),
   ot({ id: 'ot_j120', kind: 'window', name: 'Janela 120 x 120', code: 'J-01', width: 1.2, height: 1.2, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
   ot({ id: 'ot_j150', kind: 'window', name: 'Janela 150 x 100', code: 'J-02', width: 1.5, height: 1.0, sill: 1.1, leaves: 2, plan: 'sliding' }, 'mat_aluminio'),
   ot({ id: 'ot_j60', kind: 'window', name: 'Janela 60 x 60', code: 'J-03', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'casement' }, 'mat_aluminio'),
@@ -151,6 +156,10 @@ export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_jfixa60', kind: 'window', name: 'Janela fixa 60 x 60', code: 'J-05', width: 0.6, height: 0.6, sill: 1.5, leaves: 1, plan: 'fixed' }, 'mat_aluminio'),
   ot({ id: 'ot_j240', kind: 'window', name: 'Janela de correr 240 x 120 (3 folhas)', code: 'J-06', width: 2.4, height: 1.2, sill: 1.1, leaves: 3, plan: 'sliding' }, 'mat_aluminio'),
   ot({ id: 'ot_jv120', kind: 'window', name: 'Vão livre de janela 120 x 120', code: 'V-02', width: 1.2, height: 1.2, sill: 1.0, leaves: 0, plan: 'fixed' }, 'mat_aluminio'),
+  ot({ id: 'ot_ja120', kind: 'window', name: 'Janela de abrir 120 x 120 (2 folhas)', code: 'J-07', width: 1.2, height: 1.2, sill: 1.1, leaves: 2, plan: 'hinged' }, 'mat_aluminio'),
+  ot({ id: 'ot_jg90', kind: 'window', name: 'Janela guilhotina 90 x 150', code: 'J-08', width: 0.9, height: 1.5, sill: 0.9, leaves: 2, plan: 'hung' }, 'mat_aluminio'),
+  ot({ id: 'ot_jp80', kind: 'window', name: 'Janela pivotante 80 x 120', code: 'J-09', width: 0.8, height: 1.2, sill: 1.0, leaves: 1, plan: 'pivotwin' }, 'mat_aluminio'),
+  ot({ id: 'ot_jv80', kind: 'window', name: 'Janela veneziana 80 x 60', code: 'J-10', width: 0.8, height: 0.6, sill: 1.5, leaves: 1, plan: 'louver', angle3d: 45 }, 'mat_aluminio'),
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>

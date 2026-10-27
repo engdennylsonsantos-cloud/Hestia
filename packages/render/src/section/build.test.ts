@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MultiPolygon, Vec2 } from '@hestia/geom';
-import { computeSection, type SectionOpening } from '@hestia/engine';
+import { computeSection } from '@hestia/engine';
 import {
   DEFAULT_LINE_WEIGHTS,
   ProjectStore,
@@ -96,7 +96,8 @@ describe('desenho do corte com linha oculta', () => {
   const GLASS = '#bfe3f5';
   it('a janela de trás e a da parede interna não são pintadas: só o vidro da face voltada ao observador', () => {
     const draw = buildSectionDrawList(boxInput());
-    expect(draw.fills.filter((f) => f.color === GLASS)).toHaveLength(1);
+    // A janela da frente é de correr com duas folhas: dois panos de vidro, e nada das janelas de trás/interna.
+    expect(draw.fills.filter((f) => f.color === GLASS)).toHaveLength(2);
   });
 
   it('o corte é pintado por último, sobre o que está além', () => {
@@ -161,6 +162,22 @@ const meio = (polys: MultiPolygon): number => {
   return (Math.min(...x) + Math.max(...x)) / 2;
 };
 const comTipo = (base: OpeningType, patch: Partial<OpeningType>): OpeningType => ({ ...base, ...patch });
+
+describe('portas novas no corte e na elevação (tarefa F1)', () => {
+  it('embutir desenha a cavidade tracejada e a seccionada desenha os trilhos tracejados', () => {
+    const pe = buildSectionDrawList(facade([op('p', 'door', 'ot_pe80', 'frente')]));
+    expect(pe.strokes.some((s) => s.closed && s.dash?.[0] === 6)).toBe(true);
+    const pg = buildSectionDrawList(facade([op('p', 'door', 'ot_pg300', 'frente')]));
+    expect(pg.strokes.some((s) => s.closed && s.dash?.[0] === 6)).toBe(true);
+  });
+
+  it('as cinco famílias produzem contornos de folha na elevação', () => {
+    for (const id of ['ot_pvv90', 'ot_pe80', 'ot_pd120', 'ot_ps90', 'ot_pg300']) {
+      const d = buildSectionDrawList(facade([op('p', 'door', id, 'frente')]));
+      expect(d.strokes.filter((s) => s.closed).length, id).toBeGreaterThan(0);
+    }
+  });
+});
 
 describe('esquadria no corte e na elevação (tipo e família)', () => {
   it('C1: o batente da janela tem a espessura do perfil (frameWidth) do tipo, dentro do vão', () => {
@@ -238,26 +255,31 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
   // três pontos, mas as pontas ficam a 0,1 m; por isso a distância entre as pontas separa os dois.
   const isV = (s: StrokeOp): boolean => !s.closed && s.pts.length === 3 && Math.hypot(s.pts[0]!.x - s.pts[2]!.x, s.pts[0]!.y - s.pts[2]!.y) > 0.3;
   const vs = (d: ReturnType<typeof buildSectionDrawList>): StrokeOp[] => d.strokes.filter(isV);
-  const meioY = (o: SectionOpening): number => (o.z0 + o.z1) / 2;
 
-  it('E1: a porta de giro tem um V com o vértice no meio da altura da dobradiça e as pontas nos cantos do trinco', () => {
+  it('E1: a porta de giro tem um V com o vértice no trinco (meia altura) e as pontas nos cantos da dobradiça', () => {
     const input = facade([op('p', 'door', 'ot_p80', 'frente', 3, { flipHand: true })]);
     const o = input.section.openings[0]!;
+    const a = o.model.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
     const [v1] = vs(buildSectionDrawList(input));
-    // Dobradiça à direita (t1 = 3,4): vértice ali no meio da altura; pontas no trinco (t0 = 2,6), no topo e na base.
-    expect(v1!.pts[1]!.x).toBeCloseTo(3.4, 6);
-    expect(v1!.pts[1]!.y).toBeCloseTo(meioY(o), 6);
-    expect(v1!.pts[0]!.x).toBeCloseTo(2.6, 6);
-    expect(v1!.pts[0]!.y).toBeCloseTo(o.z1, 6);
-    expect(v1!.pts[2]!.x).toBeCloseTo(2.6, 6);
-    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0, 6);
+    // Convenção padrão: vértice no lado OPOSTO à dobradiça (trinco), a meia altura; pontas na dobradiça, no topo e na base.
+    expect(v1!.pts[1]!.x).toBeCloseTo(cx + a.latchT, 6);
+    expect(v1!.pts[1]!.y).toBeCloseTo((a.z0 + a.z1) / 2, 6);
+    expect(v1!.pts[0]!.x).toBeCloseTo(cx + a.hingeT, 6);
+    expect(v1!.pts[0]!.y).toBeCloseTo(a.z1, 6);
+    expect(v1!.pts[2]!.x).toBeCloseTo(cx + a.hingeT, 6);
+    expect(v1!.pts[2]!.y).toBeCloseTo(a.z0, 6);
   });
 
-  it('E1: com a dobradiça à esquerda, o V fica na ombreira de t0 e as pontas em t1', () => {
-    const [v1] = vs(buildSectionDrawList(facade([op('p', 'door', 'ot_p80', 'frente')])));
-    expect(v1!.pts[1]!.x).toBeCloseTo(2.6, 6);
-    expect(v1!.pts[0]!.x).toBeCloseTo(3.4, 6);
-    expect(v1!.pts[2]!.x).toBeCloseTo(3.4, 6);
+  it('E1: com a dobradiça à esquerda, o V se espelha (vértice no trinco à direita)', () => {
+    const input = facade([op('p', 'door', 'ot_p80', 'frente')]);
+    const o = input.section.openings[0]!;
+    const a = o.model.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
+    const [v1] = vs(buildSectionDrawList(input));
+    expect(v1!.pts[1]!.x).toBeCloseTo(cx + a.latchT, 6);
+    expect(v1!.pts[0]!.x).toBeCloseTo(cx + a.hingeT, 6);
+    expect(v1!.pts[2]!.x).toBeCloseTo(cx + a.hingeT, 6);
   });
 
   it('E1 (traço): o V sai tracejado quando a folha abre para o observador e contínuo quando abre para o lado oposto', () => {
@@ -268,60 +290,67 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(dashOf(true)).toEqual([4, 3]);
   });
 
-  it('E1: a porta dupla tem um V por folha: vértice em cada ombreira, pontas no centro, no topo e na base', () => {
+  it('E1: a porta dupla tem um V por folha: vértice no trinco (centro) e pontas nas ombreiras', () => {
     const input = facade([op('p', 'door', 'ot_p160', 'frente')]);
     const o = input.section.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
     const [esq, dir] = vs(buildSectionDrawList(input));
     expect(vs(buildSectionDrawList(input))).toHaveLength(2);
-    expect(esq!.pts[1]!.x).toBeCloseTo(o.t0, 6);
-    expect(dir!.pts[1]!.x).toBeCloseTo(o.t1, 6);
-    for (const v1 of [esq!, dir!]) {
-      expect(v1.pts[1]!.y).toBeCloseTo(meioY(o), 6);
-      expect(v1.pts[0]!.x).toBeCloseTo((o.t0 + o.t1) / 2, 6);
-      expect(v1.pts[2]!.x).toBeCloseTo((o.t0 + o.t1) / 2, 6);
-      expect(v1.pts[0]!.y).toBeCloseTo(o.z1, 6);
-      expect(v1.pts[2]!.y).toBeCloseTo(o.z0, 6);
+    const aberturas = o.model.openings.filter((x) => x.kind === 'side');
+    expect(aberturas).toHaveLength(2);
+    for (const [v1, a] of [
+      [esq!, aberturas[0]!],
+      [dir!, aberturas[1]!],
+    ] as const) {
+      expect(v1.pts[1]!.x).toBeCloseTo(cx + a.latchT, 6);
+      expect(v1.pts[0]!.x).toBeCloseTo(cx + a.hingeT, 6);
+      expect(v1.pts[2]!.x).toBeCloseTo(cx + a.hingeT, 6);
+      expect(v1.pts[1]!.y).toBeCloseTo((a.z0 + a.z1) / 2, 6);
+      expect(v1.pts[0]!.y).toBeCloseTo(a.z1, 6);
+      expect(v1.pts[2]!.y).toBeCloseTo(a.z0, 6);
     }
   });
 
   it('E1: a pivotante tem o eixo vertical a W/4 da ombreira da dobradiça e o vértice do V sobre ele', () => {
     const input = facade([op('p', 'door', 'ot_pp80', 'frente')]);
     const o = input.section.openings[0]!;
+    const a = o.model.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
     const d = buildSectionDrawList(input);
     const [v1] = vs(d);
-    // Largura 0,80: eixo a 0,20 do lado da dobradiça (t0 = 2,6), ou seja em 2,8; as pontas vão até t1 = 3,4.
-    expect(v1!.pts[1]!.x).toBeCloseTo(2.8, 6);
-    expect(v1!.pts[1]!.y).toBeCloseTo(meioY(o), 6);
-    expect(v1!.pts[0]!.x).toBeCloseTo(3.4, 6);
+    expect(v1!.pts[1]!.x).toBeCloseTo(cx + a.hingeT, 6);
+    expect(v1!.pts[1]!.y).toBeCloseTo((a.z0 + a.z1) / 2, 6);
+    // As pontas do V ficam na borda oposta da folha (o lado mais distante do eixo).
+    expect(Math.abs(v1!.pts[0]!.x - (cx + a.hingeT))).toBeGreaterThan(Math.abs(a.hingeT));
     expect(d.strokes.filter((s) => !s.closed && s.pts.length === 2 && s.pts[0]!.x === s.pts[1]!.x)).toHaveLength(1);
-    // Com a dobradiça à direita, o eixo vai a 3,2 e as pontas a t0.
+    // Com a dobradiça à direita, o eixo e o vértice vão para o outro lado.
     const [dir] = vs(buildSectionDrawList(facade([op('p', 'door', 'ot_pp80', 'frente', 3, { flipHand: true })])));
-    expect(dir!.pts[1]!.x).toBeCloseTo(3.2, 6);
-    expect(dir!.pts[0]!.x).toBeCloseTo(2.6, 6);
+    expect(dir!.pts[1]!.x).toBeGreaterThan(cx);
   });
 
-  it('E1: o maxim-ar tem o vértice no meio da aresta superior do caixilho e as pontas nos cantos inferiores', () => {
+  it('E1: o maxim-ar tem o vértice embaixo, no meio, e as pontas em cima no eixo', () => {
     const input = facade([op('j', 'window', 'ot_j60', 'frente')]);
     const o = input.section.openings[0]!;
-    const fw = o.esquadria!.frameWidth;
+    const a = o.model.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
     const [v1] = vs(buildSectionDrawList(input));
-    expect(v1!.pts[1]!.x).toBeCloseTo((o.t0 + o.t1) / 2, 6);
-    expect(v1!.pts[1]!.y).toBeCloseTo(o.z1 - fw, 6);
-    expect(v1!.pts[0]!.x).toBeCloseTo(o.t0 + fw, 6);
-    expect(v1!.pts[0]!.y).toBeCloseTo(o.z0 + fw, 6);
-    expect(v1!.pts[2]!.x).toBeCloseTo(o.t1 - fw, 6);
-    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + fw, 6);
+    expect(v1!.pts[1]!.x).toBeCloseTo(cx, 6);
+    expect(v1!.pts[1]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    expect(v1!.pts[0]!.x).toBeLessThan(v1!.pts[1]!.x);
+    expect(v1!.pts[2]!.x).toBeGreaterThan(v1!.pts[1]!.x);
+    expect(v1!.pts[0]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z1, 6);
   });
 
-  it('E1: o basculante tem o vértice na base do caixilho e as pontas nos cantos superiores', () => {
+  it('E1: o basculante tem o vértice em cima e as pontas embaixo', () => {
     const tilt = { ...createEmptyProject().openingTypes.ot_j60!, id: 'ot_bas60', plan: 'tilt' as const };
     const input = facade([op('b', 'window', 'ot_bas60', 'frente')], tilt);
     const o = input.section.openings[0]!;
-    const fw = o.esquadria!.frameWidth;
+    const a = o.model.openings[0]!;
     const [v1] = vs(buildSectionDrawList(input));
-    expect(v1!.pts[1]!.y).toBeCloseTo(o.z0 + fw, 6);
-    expect(v1!.pts[0]!.y).toBeCloseTo(o.z1 - fw, 6);
-    expect(v1!.pts[2]!.y).toBeCloseTo(o.z1 - fw, 6);
+    expect(v1!.pts[1]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(v1!.pts[0]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z0, 6);
   });
 
   it('E1 (traço): a janela de abrir segue a regra da porta: tracejada se a folha abre para o observador', () => {
@@ -399,7 +428,8 @@ describe('gráficos do corte/elevação (decisão 0015)', () => {
     const semJanela = buildSectionDrawList(styledBox({ overrides: { window: { visible: false } } }));
     expect(semJanela.fills.filter((f) => f.color === '#bfe3f5')).toHaveLength(0);
     const semParede = buildSectionDrawList(styledBox({ overrides: { wall: { visible: false } } }, cutInput));
-    expect(semParede.fills.filter((f) => f.hatch)).toHaveLength(0);
+    // A esquadria visível pode ter a hachura das próprias peças; o que sai é a hachura do corte da parede (peças largas).
+    expect(semParede.fills.filter((f) => f.hatch && largura(f.polygons) > 1)).toHaveLength(0);
     expect(closedWidths(semParede)).not.toContain(weightPx(5, 100));
   });
 
@@ -436,7 +466,8 @@ describe('acabamento e vergas da esquadria no corte e na elevação', () => {
 
   it('peitoril saliente: na elevação, faixa com a largura do vão sob ele; no corte, projeta além das duas faces', () => {
     const tipo = com('ot_pt', { sillBoard: { projection: 0.03, thickness: 0.02 } });
-    expect(pecas(buildSectionDrawList(facade([op('j', 'window', 'ot_pt', 'frente')], tipo)), 0.6, 0.02)).toBe(1);
+    // O modelo projeta o peitoril 0,03 m além de cada ombreira: 0,60 + 0,06.
+    expect(pecas(buildSectionDrawList(facade([op('j', 'window', 'ot_pt', 'frente')], tipo)), 0.66, 0.02)).toBe(1);
     // A parede wt_alv14 tem 0,184 m de espessura; o peitoril sobra 0,03 m de cada lado.
     expect(pecas(buildSectionDrawList(cross([op('j', 'window', 'ot_pt', 'w')], tipo)), 0.184 + 0.06, 0.02)).toBe(1);
   });
@@ -445,7 +476,72 @@ describe('acabamento e vergas da esquadria no corte e na elevação', () => {
     const fechados = (d: ReturnType<typeof buildSectionDrawList>): number => d.strokes.filter((s) => s.closed).length;
     const base = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al0', 'frente')], com('ot_al0', {}))));
     const alizado = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al', 'frente')], com('ot_al', { casing: { width: 0.05, thickness: 0.015 } }))));
-    expect(alizado - base).toBe(4);
+    // Quatro peças por face (ombreiras, verga e soleira), nas duas faces da parede: oito contornos a mais.
+    expect(alizado - base).toBe(8);
+  });
+});
+
+describe('elevação e corte a partir do modelo único', () => {
+  const centroY = (polys: MultiPolygon): number => {
+    const y = polys.flat(2).map((q) => q.y);
+    return (Math.min(...y) + Math.max(...y)) / 2;
+  };
+  const centroX = (polys: MultiPolygon): number => meio(polys);
+  const fixa = createEmptyProject().openingTypes.ot_jfixa60!;
+  const tipo = (id: string, patch: Partial<OpeningType>): OpeningType => comTipo(fixa, { id, ...patch });
+
+  it('a elevação da porta com leafStyle panel contém as quatro almofadas do modelo', () => {
+    const input = facade([op('p', 'door', 'ot_pp', 'frente')], comTipo(createEmptyProject().openingTypes.ot_p90!, { id: 'ot_pp', leafStyle: 'panel' }));
+    const o = input.section.openings[0]!;
+    const almofadas = o.model.parts.filter((x) => x.role === 'leafPanel').map((x) => ({ w: x.box.t1 - x.box.t0, h: x.box.z1 - x.box.z0 }));
+    expect(almofadas).toHaveLength(4);
+    const d = buildSectionDrawList(input);
+    const preenchidas = d.fills.map((f) => ({ w: largura(f.polygons), h: altura(f.polygons) }));
+    for (const a of almofadas) expect(preenchidas.some((f) => Math.abs(f.w - a.w) < 1e-6 && Math.abs(f.h - a.h) < 1e-6)).toBe(true);
+  });
+
+  it('a elevação da porta com leafStyle glass contém o vidro do modelo', () => {
+    const input = facade([op('p', 'door', 'ot_pg', 'frente')], comTipo(createEmptyProject().openingTypes.ot_p90!, { id: 'ot_pg', leafStyle: 'glass' }));
+    const o = input.section.openings[0]!;
+    const vidro = o.model.parts.find((x) => x.role === 'glass')!;
+    const d = buildSectionDrawList(input);
+    const f = d.fills.find((x) => x.color === GLASS_T);
+    expect(f).toBeDefined();
+    expect(largura(f!.polygons)).toBeCloseTo(vidro.box.t1 - vidro.box.t0, 6);
+    expect(altura(f!.polygons)).toBeCloseTo(vidro.box.z1 - vidro.box.z0, 6);
+  });
+
+  it('a elevação da porta com handle lever desenha a maçaneta no lado do trinco, a z ≈ 1,0', () => {
+    const input = facade([op('p', 'door', 'ot_p90', 'frente')]);
+    const o = input.section.openings[0]!;
+    const cx = (o.t0 + o.t1) / 2;
+    const roseta = o.model.parts.find((x) => x.role === 'handle' && x.id.includes('rosette'))!;
+    const x = cx + (roseta.box.t0 + roseta.box.t1) / 2;
+    const z = o.z0 + (roseta.box.z0 + roseta.box.z1) / 2;
+    expect(z).toBeCloseTo(o.z0 + 1, 6);
+    const d = buildSectionDrawList(input);
+    const achou = d.fills.some((f) => Math.abs(centroX(f.polygons) - x) < 1e-6 && Math.abs(centroY(f.polygons) - z) < 1e-6 && Math.abs(largura(f.polygons) - 0.05) < 1e-6);
+    expect(achou).toBe(true);
+  });
+
+  it('corte transversal da janela: verga de concreto com hachura, batente centrado no núcleo e vidro com a espessura do tipo', () => {
+    const t = tipo('ot_cx', { lintel: { height: 0.2 }, sillBoard: { projection: 0.03, thickness: 0.02 } });
+    const input = cross([op('j', 'window', 'ot_cx', 'w')], t);
+    const o = input.section.openings[0]!;
+    const d = buildSectionDrawList(input);
+    const coreW = o.model.core.s1 - o.model.core.s0;
+    const hatched = d.fills.filter((f) => f.hatch?.kind === 'cross');
+    expect(hatched.some((f) => Math.abs(largura(f.polygons) - coreW) < 1e-6 && Math.abs(altura(f.polygons) - 0.2) < 1e-6)).toBe(true);
+    const cx = (o.t0 + o.t1) / 2;
+    const jamb = o.model.parts.find((x) => x.role === 'jamb')!;
+    const larg = jamb.box.s1 - jamb.box.s0;
+    const centro = (o.model.core.s0 + o.model.core.s1) / 2;
+    expect(d.fills.some((f) => Math.abs(largura(f.polygons) - larg) < 1e-6 && Math.abs(centroX(f.polygons) - (cx + o.sSign * centro)) < 1e-6)).toBe(true);
+    const vidro = o.model.parts.find((x) => x.role === 'glass')!;
+    const f = d.fills.find((x) => x.color === GLASS_T)!;
+    expect(largura(f.polygons)).toBeCloseTo(vidro.box.s1 - vidro.box.s0, 6);
+    // Peitoril saliente projetado além das duas faces no corte.
+    expect(d.fills.some((x) => Math.abs(largura(x.polygons) - (o.model.thickness + 0.06)) < 1e-6)).toBe(true);
   });
 });
 

@@ -8,9 +8,9 @@ const tipo = (id: string): OpeningType => {
 };
 
 describe('famílias de abertura', () => {
-  it('porta e janela têm cinco famílias cada, na ordem da interface', () => {
-    expect(openingFamilies('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_void']);
-    expect(openingFamilies('window').map((f) => f.id)).toEqual(['window_fixed', 'window_tilt', 'window_casement', 'window_sliding', 'window_void']);
+  it('famílias de porta (10) e de janela (9), na ordem da interface', () => {
+    expect(openingFamilies('door').map((f) => f.id)).toEqual(['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_dblact', 'door_pocket', 'door_bifold', 'door_accordion', 'door_garage', 'door_void']);
+    expect(openingFamilies('window').map((f) => f.id)).toEqual(['window_fixed', 'window_hinged', 'window_tilt', 'window_casement', 'window_sliding', 'window_hung', 'window_pivot', 'window_louver', 'window_void']);
   });
 
   it('cada tipo do catálogo cai na família do seu comportamento', () => {
@@ -39,10 +39,10 @@ describe('famílias de abertura', () => {
   it('folhas aceitas por família: giro 1, dupla 2, correr 2, pivotante 1, vão livre 0; janela de correr 2 e 3', () => {
     expect(openingLeaves({ kind: 'door', plan: 'swing', leaves: 1 })).toEqual([1]);
     expect(openingLeaves({ kind: 'door', plan: 'double', leaves: 2 })).toEqual([2]);
-    expect(openingLeaves({ kind: 'door', plan: 'sliding', leaves: 2 })).toEqual([2]);
+    expect(openingLeaves({ kind: 'door', plan: 'sliding', leaves: 2 })).toEqual([2, 1]);
     expect(openingLeaves({ kind: 'door', plan: 'pivot', leaves: 1 })).toEqual([1]);
     expect(openingLeaves({ kind: 'door', plan: 'swing', leaves: 0 })).toEqual([0]);
-    expect(openingLeaves({ kind: 'window', plan: 'sliding', leaves: 3 })).toEqual([2, 3]);
+    expect(openingLeaves({ kind: 'window', plan: 'sliding', leaves: 3 })).toEqual([2, 3, 4]);
     expect(openingLeaves({ kind: 'window', plan: 'tilt', leaves: 1 })).toEqual([1]);
   });
 
@@ -66,6 +66,26 @@ describe('famílias de abertura', () => {
     for (const f of [...openingFamilies('door'), ...openingFamilies('window')]) {
       for (const leaves of f.leaves) expect(openingTypeIssue({ kind: f.kind, plan: f.plan, leaves })).toBeNull();
     }
+  });
+});
+
+describe('catálogo: portas novas (tarefa F1)', () => {
+  it('os cinco tipos pré-cadastrados têm código, família certa e passam na regra do tipo', () => {
+    const novos: Array<[string, string, string]> = [
+      ['ot_pvv90', 'P-07', 'door_dblact'],
+      ['ot_pe80', 'P-08', 'door_pocket'],
+      ['ot_pd120', 'P-09', 'door_bifold'],
+      ['ot_ps90', 'P-10', 'door_accordion'],
+      ['ot_pg300', 'P-11', 'door_garage'],
+    ];
+    for (const [id, code, familia] of novos) {
+      const t = tipo(id);
+      expect(t.code, id).toBe(code);
+      expect(openingFamilyOf(t)?.id, id).toBe(familia);
+      expect(openingTypeIssue(t), id).toBeNull();
+    }
+    expect(tipo('ot_pd120').leaves).toBe(2);
+    expect(tipo('ot_pg300').frameMaterialId).toBe('mat_aco');
   });
 });
 
@@ -127,6 +147,56 @@ describe('acabamento na regra do tipo e no comando', () => {
     expect(s.project.openingTypes['ot_x']).toBeUndefined();
     s.exec({ type: 'upsertOpeningType', openingType: { ...t, id: 'ot_x', lintel: { over: 0.3, height: 0.2 } } });
     expect(s.project.openingTypes['ot_x']?.lintel).toEqual({ over: 0.3, height: 0.2 });
+  });
+});
+
+describe('campos v2 na regra do tipo', () => {
+  const porta = DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_p90')!;
+  const janela = DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_j120')!;
+
+  it('aceita os valores padrão (campos v2 ausentes)', () => {
+    expect(openingTypeIssue(porta)).toBeNull();
+    expect(openingTypeIssue(janela)).toBeNull();
+    expect(openingTypeIssue({ ...porta, angle2d: 0, angle3d: 120 })).toBeNull();
+    expect(openingTypeIssue({ ...janela, grid: { cols: 1, rows: 8 } })).toBeNull();
+  });
+
+  it('recusa ângulo fora de 0..120', () => {
+    expect(openingTypeIssue({ ...porta, angle2d: 150 })).toBe('Ângulo de abertura 2D: use um valor de 0 a 120°.');
+    expect(openingTypeIssue({ ...porta, angle3d: -1 })).toBe('Ângulo de abertura 3D: use um valor de 0 a 120°.');
+  });
+
+  it('recusa grid fora de 1..8 ou fracionário', () => {
+    const msg = 'Divisões do caixilho: use colunas e linhas inteiras de 1 a 8.';
+    expect(openingTypeIssue({ ...janela, grid: { cols: 0, rows: 2 } })).toBe(msg);
+    expect(openingTypeIssue({ ...janela, grid: { cols: 9, rows: 2 } })).toBe(msg);
+    expect(openingTypeIssue({ ...janela, grid: { cols: 2, rows: 2.5 } })).toBe(msg);
+  });
+
+  it('recusa bandeira com altura maior ou igual à do tipo e lateral com largura não positiva', () => {
+    expect(openingTypeIssue({ ...porta, transom: { height: porta.height } })).toBe(
+      'Bandeira: a altura deve ser maior que 0 e menor que a altura do tipo.',
+    );
+    expect(openingTypeIssue({ ...porta, sidelights: { left: true, width: 0 } })).toBe(
+      'Bandeira lateral: a largura deve ser maior que 0 e menor que a largura do tipo.',
+    );
+    expect(openingTypeIssue({ ...porta, sidelights: { right: true, width: porta.width } })).toBe(
+      'Bandeira lateral: a largura deve ser maior que 0 e menor que a largura do tipo.',
+    );
+  });
+
+  it('recusa estilos fora dos conjuntos fechados', () => {
+    expect(openingTypeIssue({ ...porta, leafStyle: 'desconhecido' as never })).toBe('Estilo da folha desconhecido.');
+    expect(openingTypeIssue({ ...porta, handle: 'puxador' as never })).toBe('Maçaneta desconhecida.');
+    expect(openingTypeIssue({ ...porta, frameStyle: 'x' as never })).toBe('Estilo do batente desconhecido.');
+  });
+
+  it('o comando recusa o tipo inválido com a mensagem e não grava', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(() => s.exec({ type: 'upsertOpeningType', openingType: { ...porta, id: 'ot_v2', angle2d: 150 } })).toThrow(
+      'Ângulo de abertura 2D: use um valor de 0 a 120°.',
+    );
+    expect(s.project.openingTypes['ot_v2']).toBeUndefined();
   });
 });
 

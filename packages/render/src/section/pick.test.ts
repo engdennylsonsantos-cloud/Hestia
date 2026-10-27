@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea, pointInMulti, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { computeSection, type SectionResult } from '@hestia/engine';
+import { computeSection, type SectionOpening, type SectionResult } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeRoof, makeSlab, makeStair, makeWall, type Project, type StairCurve, type StairRun } from '@hestia/model';
 import { LIGHT } from '../plan/types.ts';
 import { buildSectionDrawList, type SectionInput } from './build.ts';
@@ -180,7 +180,25 @@ describe('ordem do picking', () => {
 
   it('em profundidade igual, o vão vence o além (ordem de oclusão do motor)', () => {
     const wall = { wallId: 'w', materialId: 'm', layerIndex: 0, depth: 2, polygons: quad(0, 0, 4, 3) };
-    const opening = { openingId: 'j', kind: 'window' as const, t0: 1, t1: 2, z0: 1, z1: 2, depth: 2, cut: false, polygons: quad(1, 1, 2, 2) };
+    const model: SectionOpening['model'] = { kind: 'window', width: 1, height: 1, thickness: 0.1, core: { s0: -0.05, s1: 0.05 }, parts: [], openings: [], void: false };
+    const opening: SectionOpening = {
+      openingId: 'j',
+      kind: 'window',
+      t0: 1,
+      t1: 2,
+      z0: 1,
+      z1: 2,
+      depth: 2,
+      cut: false,
+      polygons: quad(1, 1, 2, 2),
+      model,
+      openingLine: { apex: 'latch', dashed: 'toward' },
+      viewSide: 1,
+      sSign: 1,
+      cutT: 0,
+      frameMaterialId: 'm',
+      glassMaterialId: 'm',
+    };
     expect(pickSection(synthetic([wall], [opening]), v(1.5, 1.5))).toEqual({ id: 'j', kind: 'window' });
   });
 

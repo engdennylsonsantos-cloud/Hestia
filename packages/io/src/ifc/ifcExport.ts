@@ -59,6 +59,43 @@ export function doorOperation(t: Pick<OpeningType, 'plan'>, flipHand: boolean): 
       return flipHand ? 'SLIDING_TO_RIGHT' : 'SLIDING_TO_LEFT';
     case 'pivot':
       return 'REVOLVING';
+    case 'dblact':
+      return flipHand ? 'DOUBLE_SWING_RIGHT' : 'DOUBLE_SWING_LEFT';
+    case 'pocket':
+      return flipHand ? 'SLIDING_TO_RIGHT' : 'SLIDING_TO_LEFT';
+    case 'bifold':
+    case 'accordion':
+      return flipHand ? 'FOLDING_TO_RIGHT' : 'FOLDING_TO_LEFT';
+    case 'garage':
+      return 'SECTIONAL_OVERHEAD';
+    default:
+      return 'NOTDEFINED';
+  }
+}
+
+/**
+ * Operação da janela pela família (IfcWindowPanelOperationEnum), com `flipHand` invertendo a dobradiça. O IFC4 não tem
+ * `Operation` no IFCWINDOW (esse atributo é do IFCWINDOWPANELPROPERTIES); a função centraliza o mapeamento mais próximo
+ * para o exportador e para o teste. A veneziana não tem valor próprio no enum e usa o `TILTANDTURN` mais próximo.
+ */
+export function windowOperation(t: Pick<OpeningType, 'plan'>, flipHand: boolean): string {
+  switch (t.plan) {
+    case 'hinged':
+      return flipHand ? 'SIDEHUNGRIGHTHAND' : 'SIDEHUNGLEFTHAND';
+    case 'hung':
+      return 'SLIDINGVERTICAL';
+    case 'pivotwin':
+      return 'PIVOTVERTICAL';
+    case 'louver':
+      return flipHand ? 'TILTANDTURNRIGHTHAND' : 'TILTANDTURNLEFTHAND';
+    case 'casement':
+      return 'TOPHUNG';
+    case 'tilt':
+      return 'BOTTOMHUNG';
+    case 'sliding':
+      return 'SLIDINGHORIZONTAL';
+    case 'fixed':
+      return 'FIXEDCASEMENT';
     default:
       return 'NOTDEFINED';
   }
@@ -101,6 +138,20 @@ function addOpenings(c: IfcCtx, openings: IfcOpeningGeo[]): void {
         : c.w.add('IFCWINDOW', [gid(`window:${g.openingId}`), OMIT, name, OMIT, family, ref(atZ(g.sillZ - st.elev)), ref(shape), optStr(o.mark), num(g.height), num(g.width), en('WINDOW'), en(windowPartition(t.leaves)), OMIT]);
     st.contained.push(fillId);
     c.w.add('IFCRELFILLSELEMENT', [gid(`rfill:${g.openingId}`), OMIT, OMIT, OMIT, ref(voidId), ref(fillId)]);
+    if (o.kind === 'window') {
+      // O atributo Operation do IFC4 fica no IFCWINDOWPANELPROPERTIES, não no IFCWINDOW: um painel por janela.
+      const panel = c.w.add('IFCWINDOWPANELPROPERTIES', [
+        gid(`winpanel:${g.openingId}`),
+        OMIT,
+        name,
+        OMIT,
+        en(windowOperation(t, o.flipHand)),
+        en('NOTDEFINED'),
+        OMIT,
+        OMIT,
+      ]);
+      c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`winpanelrel:${g.openingId}`), OMIT, OMIT, OMIT, list([ref(fillId)]), ref(panel)]);
+    }
   }
 }
 

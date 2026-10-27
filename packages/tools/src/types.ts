@@ -19,11 +19,14 @@ export interface Inference {
   hostId?: Id;
 }
 
+/** Tom da prévia: os da escada e o de erro (abertura sem espaço, em vermelho). */
+export type PreviewTone = StairTone | 'invalid';
+
 /** O que a ferramenta mostra antes do clique (docs/03 §5: pré-visualização sempre). */
 export type PreviewItem =
   /** `halo`: linha de cota do Medir, mais grossa e com contorno claro por baixo (legível sobre hachura de parede). */
-  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: StairTone; halo?: boolean }
-  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: StairTone }
+  | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: PreviewTone; halo?: boolean }
+  | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: PreviewTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
   | { kind: 'label'; at: Vec2; text: string }
   | { kind: 'point'; at: Vec2 }
@@ -129,6 +132,18 @@ export interface ToolOptions {
   windowTypeId: Id;
   openingFlipHand?: boolean;
   openingFlipFacing?: boolean;
+  /** Sentido da abertura na colocação: pelo lado do cursor (padrão) ou manual (`openingFlipFacing`). */
+  openingFacingMode?: 'cursor' | 'fixed';
+  /** Com sentido pelo cursor: abre para o lado do cursor (padrão) ou para o lado oposto. */
+  openingToward?: 'cursor' | 'away';
+  /** Ponto do cursor na abertura: centro (padrão), ombreira da dobradiça ou ombreira do trinco. */
+  openingAnchor?: 'center' | 'hinge' | 'latch';
+  /** Folga (m) da borda da abertura até a face da parede perpendicular. Ausente = 0,10 m. */
+  openingClear?: number;
+  /** Cotas temporárias: do eixo da abertura ao eixo da perpendicular (padrão) ou da borda à face. */
+  openingDimMode?: 'axis' | 'face';
+  /** Etiquetar ao inserir (Revit: Tag on Placement): liga `settings.showOpeningTags` ao colocar. Ausente = ligado. */
+  openingTagOnPlace?: boolean;
   openingSillOverride?: number | null;
   placementMark?: string;
   placementComments?: string;

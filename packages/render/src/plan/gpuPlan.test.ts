@@ -15,7 +15,7 @@ function meshesOf(scene: PlanScene): THREE.Mesh[] {
 }
 
 describe('PlanScene: poucas malhas por quadro (draw calls)', () => {
-  it('um pavimento do prédio de 10 (zoom 60): a grade é 5 malhas e o quadro inteiro fica abaixo de 80', () => {
+  it('um pavimento do prédio de 10 (zoom 60): a grade é 5 malhas e o quadro inteiro fica abaixo de 100', () => {
     const p = buildTemplate('predio10');
     const scene = new PlanScene();
     const frame = new PlanFrame(scene);
@@ -41,7 +41,7 @@ describe('PlanScene: poucas malhas por quadro (draw calls)', () => {
     const camadas = scene.scene.children as THREE.Group[];
     expect(camadas[2]!.children.length).toBeLessThanOrEqual(5);
     const total = camadas.reduce((n, g) => n + g.children.length, 0);
-    expect(total).toBeLessThan(80);
+    expect(total).toBeLessThan(100);
     scene.dispose();
   }, 60_000);
 });

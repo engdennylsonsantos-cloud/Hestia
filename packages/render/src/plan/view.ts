@@ -13,6 +13,7 @@ import {
   resolveSlabs,
   resolveStairsOnLevel,
   type OpeningGeometry,
+  type OpeningModel,
   type ResolvedLevel,
   type ViewClass,
 } from '@hestia/engine';
@@ -32,7 +33,7 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
-import { openingSymbol } from './symbols.ts';
+import { openingSymbol, type OpeningSymbolOptions } from './symbols.ts';
 import { contextoDaVista, projetoDaJuncao } from './viewContext.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
 
@@ -193,12 +194,19 @@ export function wallOutlineOps(view: PlanView, theme: PlanTheme, proj: number | 
  * a espessura de corte. `projection-above` (peitoril acima do corte): tracejado sobre a parede inteira. `projection-below`
  * e `beyond`: símbolo leve, na cor de traço secundária. Os dois últimos e o tracejado usam a espessura de projeção.
  * `hidden`: nada. `widths` vem de `PlanPaint` da categoria (porta ou janela), com o peso de papel de cada espessura.
+ * O desenho vem do modelo único (`openingPlanPaths`), com o nível de detalhe e a convenção de abertura da vista.
  */
-export function openingViewOps(g: OpeningGeometry, cls: ViewClass | undefined, theme: PlanTheme, widths: { cut: Espessura; proj: Espessura }): StrokeOp[] {
+export function openingViewOps(
+  g: OpeningGeometry,
+  cls: ViewClass | undefined,
+  theme: PlanTheme,
+  widths: { cut: Espessura; proj: Espessura },
+  opts: OpeningSymbolOptions & { model: OpeningModel },
+): StrokeOp[] {
   if (cls === 'hidden') return [];
-  if (cls === 'projection-above') return openingSymbol(g, theme, widths.proj).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
-  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, { ...theme, ink: theme.inkSoft }, widths.proj);
-  return openingSymbol(g, theme, widths.cut);
+  if (cls === 'projection-above') return openingSymbol(g, opts.model, theme, widths.proj, opts).map((s) => ({ ...s, dash: [6, 3] as [number, number] }));
+  if (cls === 'projection-below' || cls === 'beyond') return openingSymbol(g, opts.model, { ...theme, ink: theme.inkSoft }, widths.proj, opts);
+  return openingSymbol(g, opts.model, theme, widths.cut, opts);
 }
 
 /**

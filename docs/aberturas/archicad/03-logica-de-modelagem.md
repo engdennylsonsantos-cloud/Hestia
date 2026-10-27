@@ -164,6 +164,7 @@ Fonte: [DOC: Ajuda “Wall Opening”; “Nominal Sizes and Tolerance”; “Tol
 - **Não por padrão conceitual.** O checkbox **Frame Thickness = Wall Thickness** força o batente a ter a espessura da parede; quando desligado, a espessura do batente é um parâmetro independente (`gs_frame_thk` / “Frame Thickness”) [DOC: Ajuda “Frame Style and Dimensions”; GDL Basics 17].
 - Em várias portas da biblioteca, esse checkbox vem **ligado e cinza** (não editável); ele só se torna editável em certas combinações (ex.: `Frame Thickness = Wall Thickness` ligado e todas as folhas abrindo no mesmo sentido) [DOC: Ajuda “Frame Style and Dimensions”]. Em versões antigas, dependia também do “Wall Type” (Stud/Solid) [FÓRUM].
 - Quando o batente é mais raso que a parede, a biblioteca histórica resolve com **Jamb Extension** (extensão de batente) e/ou com o próprio **Reveal** [DOC: AC9 SE “Casing”; Ajuda “Wall Closure” (reveal to wall core)].
+- **Não existe opção “centralizado”** na UI. O batente é posicionado pelo **reveal depth** a partir de uma face/core; para centralizar é preciso calcular `reveal = (WALL_THICKNESS − gs_frame_thk) / 2` [*[INFERIDO]* da ausência de controle “center” + do modelo Z de §4.4].
 
 ### 4.4 Modelo numérico da posição
 
@@ -222,11 +223,13 @@ Fontes: [DOC: Ajuda “Preview and Positioning”; “Other Panels in Door/Windo
 
 O mecanismo é indireto, em três travas:
 
-1. O **reveal** define o contorno do vão e a profundidade até o batente. O closure é desenhado **para dentro desse contorno**, ou seja, ocupa exatamente o espaço do revelo [DOC: “the turned plaster skin will be turned outside of the wall contour, as defined in Reveal Settings”].
+1. O **reveal** define o contorno do vão e a profundidade até o batente. O closure é desenhado **no espaço do revelo**, para fora do contorno do núcleo, limitado pelo contorno definido no Reveal Settings [DOC: “the turned plaster skin will be turned outside of the wall contour, as defined in Reveal Settings”].
 2. O **Turn Plaster** “entra no batente” (extensão do composto até o frame) — é assim que o corte mostra o reboco encostando no batente, sem invadir o batente [DOC: ibid.].
 3. **Alizar e Turn Plaster são mutuamente exclusivos.** Se o alizar está ligado, o Turn Plaster fica cinza; para usar Turn Plaster é preciso desligar `Inside Casing` e `Outside Casing` [DOC: Ajuda “Wall Closure” e “Casing”].
 
 *[INFERIDO]* A profundidade do retorno é, na prática, a **profundidade do revelo** (`WIDO_SILL`): a skin é dobrada até a face do batente. Não achamos um campo “closure depth” separado; o controle é o reveal + o número de skins + a espessura de cada skin.
+
+**Quando encosta no batente × quando entra no vão:** com `Reveal = 0` e batente rente à face, o reboco dobra praticamente no plano da face e encontra o batente ali; com `Reveal > 0`, o reboco **acompanha a profundidade do revelo** e só encontra o batente no fundo do vão. O `Turn Plaster` é justamente a extensão do composto “até o frame” mostrada no corte [DOC: Ajuda “Wall Closure”; AC18 “Wall Closure”].
 
 ### 5.3 Tipos de closure
 
@@ -235,7 +238,7 @@ O mecanismo é indireto, em três travas:
 | **No Closure** | nenhuma skin dobra | — |
 | **Traditional Cavity Closure** | closure de cavidade “tradicional”; pode incluir tira de isolamento | `Insulation Strip` + espessura; atributos de fill/pen |
 | **Prefabricated** | perfil pré-fabricado de fechamento de cavidade | `Profile Width`; atributos próprios |
-| **Insulated Reveal** | revelo com retorno de isolamento (muito usado em fachada) | `Turn-in Skin`, espessura por skin; `Reveal to Wall Core` para alinhar com o isolamento [FÓRUM/suporte oficial] |
+| **Insulated Reveal** | revelo com retorno de isolamento (muito usado em fachada) | `Turn-in Skin`, espessura por skin; `Reveal to Wall Core` para alinhar com o isolamento [FÓRUM (suporte Graphisoft)] |
 | **Custom Closure** | configuração skin a skin | `Select Skin to Edit`, `Turn-in Skin`, espessura, orientação de hatch, pena de linha, `Consider Skin as Plaster` |
 
 Fonte: [DOC: Ajuda “Wall Closure”; AC18 “Wall Closure”; suporte Graphisoft “How to add an Insulated Reveal”].
@@ -374,7 +377,7 @@ Fonte: [DOC: Ajuda “Leaf and Sash Dimension”; GDL Basics 17 (exemplo de fram
 ### 7.4 Eixo da dobradiça
 
 - A folha gira em torno de um **eixo vertical no lado da dobradiça**, que fica no **batente**, na região do rebate. O lado é determinado por **opening side** (L/R) + `SYMB_MIRRORED` (espelhamento) + `SYMB_ROTANGLE` (rotação 180°) [DOC: GDL Reference “Doors and Windows” (8 estados); GDL `WIDO_ORIENTATION`; `ac_openingside`].
-- Em portas pivotantes, a biblioteca expõe um **offset de pivô** (`gs_pivotOffset`), que desloca o eixo para dentro da folha [FÓRMUM: parâmetro citado em fio técnico; *[NÃO CONFIRMADO]* o nome em todas as versões].
+- Em portas pivotantes, a biblioteca expõe um **offset de pivô** (`gs_pivotOffset`), que desloca o eixo para dentro da folha [FÓRUM: parâmetro citado em fio técnico; *[NÃO CONFIRMADO]* o nome em todas as versões].
 - **Nós não encontramos** uma página que declare “o eixo fica a X mm da face do batente”. A posição é consequência da geometria do batente + rebate + espessura da folha [*NÃO CONFIRMADO*].
 
 *[INFERIDO]* Modelo mental correto: o eixo é **solidário ao batente**, não ao centro do vão. Por isso o Flip troca o lado de abertura **mantendo o batente no lugar** (§4.4) e a folha “nasce” do lado da dobradiça. Se o eixo ficasse no centro, o Flip teria de mover o batente.
@@ -405,3 +408,397 @@ Fonte: [DOC: Ajuda “Leaf and Sash Dimension”; GDL Basics 17 (exemplo de fram
 | `Sidelight/Transom Opening Direction` | direção relativa à folha | Same as Leaf / Opposite to Leaf | Opening Type and Angle |
 
 ---
+
+## 8 · Pergunta 6 — bandeira e laterais (sidelight/transom)
+
+### 8.1 O que são
+
+- **Sidelight** = painel lateral fixo ou operável ao lado da folha.
+- **Transom** (bandeira/overlight) = painel superior, acima da folha e/ou dos sidelights.
+- Ambos são **componentes do mesmo Library Part**, não objetos separados. O arranjo é escolhido na página **Shape** [DOC: Ajuda “Shape”; “Door/Window Settings and Opening”].
+- A página Shape é essencialmente gráfica: mostra as configurações de folha + sidelight(s) + transom, com divisões e hotspots. A ajuda não lista os campos textualmente (a página é uma imagem) [DOC: Ajuda “Shape”].
+
+### 8.2 Como dividem largura e altura
+
+Modelo geométrico *[INFERIDO]* a partir da composição e das dimensões nominais:
+
+```
+LARGURA (A / wallhole / unit)
+| frame | sidelight | mullion | leaf | frame |
+        ↑ largura do sidelight ↑       ↑ largura da folha ↑
+
+ALTURA (B / wallhole / unit)
+| frame |
+| transom (bandeira) |
+| mullion horizontal |
+| leaf / sidelight |
+| frame / peitoril |
+```
+
+- O **unit** cobre o conjunto inteiro; o **wallhole** cobre o unit + tolerâncias. Portanto `A` é a largura total, **não** a largura da folha [DOC: Ajuda “Nominal Sizes and Tolerance”; LPM].
+- A **folha** tem largura própria (`ac_leaf_width` / `gs_leaf_panel_width`); o **sidelight** recebe o restante depois de descontar batentes e montantes.
+- A **bandeira** tem altura própria; a folha/sidelight recebem o restante depois do transom e do batente.
+- Rateio aproximado *[INFERIDO]*: `A ≈ 2·frame + Σ sidelights + Σ montantes + leaf` e `B ≈ 2·frame + transom + max(leaf, sidelight)`. O `unit` é sempre o **todo**; a folha é um dos parcelas. O valor exato de cada parcela é calculado no Parameter Script, não na UI.
+- As divisões são editáveis por **hotspots**; ao arrastar, a folha pode manter o tamanho e o sidelight esticar (relato consistente) [FÓRUM: “Door with sidelight sizing”].
+- Há um diálogo **“Sidelight Width”** acessível por **Tab** durante a edição por hotspot [FÓRUM: “Setting sidelight width”].
+
+> **NÃO CONFIRMADO:** as fórmulas exatas de rateio (se o montante conta como frame width, se o transom usa frame width ou largura própria). A documentação lida não traz a equação; os valores são calculados no Parameter Script da biblioteca. Provável local: scripts `gs_general_lt_door` / `GS Door Functions` da library INT.
+
+### 8.3 Abertura, tipo e ângulo por componente
+
+- **Opening Direction** do sidelight/transom: `Same as Leaf` ou `Opposite to Leaf` [DOC: Ajuda “Opening Type and Angle”; AC18 “Leaf, Sash and Opening Direction”].
+- **Opening Type** e **3D Opening Angle/Distance** são definidos **por componente** (folha, sidelight, transom). Em correr, o campo é distância, não ângulo [DOC: Ajuda “Opening Type and Angle”].
+- O **2D Opening Angle** também é por componente; o símbolo pode mostrar a folha e os painéis em posições diferentes das do 3D [DOC: ibid.].
+- **Flip** inverte a direção da folha e dos sidelights/transom de uma vez, mantendo o batente [DOC: Ajuda “Leaf, Sash and Opening Direction”; “Preview and Positioning”].
+
+### 8.4 Sash/grid dos painéis
+
+- A página **Sash Type** permite escolher o tipo de sash/transom, a divisão (nº de panes horizontal/vertical), a posição do grid (`Inside`, `Outside`, `Throughout`) e `Uniform Sashes` para usar o mesmo tipo em todos [DOC: AC18 “Sidelight and Transom Sash Type”].
+- O tipo **Editable Grid** permite editar as divisões graficamente por hotspots [DOC: ibid.].
+
+### 8.5 Tabela-resumo
+
+| Campo (EN) | O que faz | Valores | Onde |
+|---|---|---|---|
+| `Shape` (configuração) | liga/desliga e arranja folha, sidelight(s), transom | combinações gráficas | Shape |
+| `Sidelight Width` | largura do sidelight | comprimento (hotspot/Tab) | Shape / hotspot |
+| `Transom Height` | altura da bandeira | comprimento (hotspot) | Shape / hotspot |
+| `Opening Direction` (sidelight/transom) | direção relativa à folha | Same as Leaf / Opposite to Leaf | Opening Type and Angle |
+| `Opening Type` (por componente) | modo de abertura | Side Hung / Fixed / Sliding / etc. | Opening Type and Angle |
+| `2D Opening Angle` | ângulo no símbolo | graus | Opening Type and Angle |
+| `3D Opening Angle/Distance` | ângulo/distância no modelo | graus ou comprimento | Opening Type and Angle |
+| `Sash Type` | tipo de sash/transom | lista | Sash Type |
+| `Uniform Sashes` | mesmo tipo para todos | checkbox | Sash Type |
+| `Grid Position` | grid dentro/fora/atravessando | Inside / Outside / Throughout | Sash Type |
+| `Editable Grid` | divisões editáveis por hotspot | tipo de sash | Sash Type |
+
+Fonte: [DOC: Ajuda “Shape”; “Opening Type and Angle”; AC18 “Sidelight and Transom Sash Type”; FÓRUM “Setting sidelight width”].
+
+---
+
+## 9 · Pergunta 7 — símbolo 2D × modelo 3D
+
+### 9.1 O símbolo não é um corte “comum”
+
+- O GDL tem um comportamento especial: **o símbolo 2D é gerado a partir de uma projeção interna própria**, que o usuário não acessa — descrita como “vista lateral de cabeça para baixo, a 90°” [DOC: GDL Reference “Doors and Windows”].
+- O símbolo e a forma 3D são ajustados à origem pelo **centro inferior da bounding box**; **não há ajuste em Z**. Isso permite projetar o objeto para fora da parede [DOC: ibid.].
+- Na prática, o autor do objeto desenha o **símbolo 2D no 2D Script** (`POLY2`, `LINE2`, `ARC2`, `HOTSPOT2`), e o **modelo 3D no 3D Script** (`PRISM_`, `RECT`, `BLOCK`, etc.). São dois desenhos independentes que compartilham parâmetros [DOC: GDL Basics 17].
+- Por isso o símbolo pode mostrar a folha aberta a 90° enquanto o 3D está fechado, ou usar um ângulo 2D diferente do 3D [DOC: Ajuda “Opening Type and Angle”].
+
+### 9.2 Modos de exibição em planta
+
+| `Floor Plan Display` | O que mostra | Quando usar |
+|---|---|---|
+| **Symbolic** (padrão) | símbolo padrão do objeto, definido no 2D Script, **independente** do 3D | planta padrão; esquadria “desenhada” |
+| **Overhead All** | símbolo com atributos de “acima do plano de corte” | elementos acima do cut plane |
+| **Projected** | parte **cortada** do modelo 3D + parte não cortada abaixo | parede inclinada/complexa, quando se quer o corte real |
+| **Projected with Overhead** | parte cortada + parte acima do cut plane + parte abaixo | idem, com overhead |
+
+Fonte: [DOC: Ajuda “Symbolic vs. Projected”; “Floor Plan Display of Doors/Windows”].
+
+- Em **parede inclinada**, a recomendação oficial é usar **Projected** ou **Projected with Overhead** para ver o corte real [DOC: Ajuda “Symbolic vs. Projected”].
+- No modo **Projected**, as partes do frame/sash usam a **Contour Pen** para as superfícies cortadas; no modo **Projected with Overhead**, as partes 3D usam as penas 3D [DOC: AC18 “Frame Style and Dimensions”].
+- O símbolo simbólico pode ser **desligado** (`Detail Level 2D = Off`) ou **sensível à escala** [DOC: Ajuda “Detail Level”].
+
+### 9.3 Níveis de detalhe
+
+| Dimensão | Opções | Padrão | Onde |
+|---|---|---|---|
+| **3D Detail Level** | By MVO / Full / Simplified / Schematic / Off | By MVO | Settings and Opening → Detail Level |
+| **2D Detail Level** | By MVO / Scale Sensitive / fixed scale (ex.: 1:200) / Off | By MVO | idem |
+| **MVO – Detail Level of Door and Window Symbols** | níveis por vista (planta, corte/elevação, 3D) | conforme combination | Document → Model View → Model View Options |
+
+- **Off** no 3D mostra **apenas o vão vazio**; **Off** no 2D não mostra símbolo nenhum [DOC: Ajuda “Detail Level”; “Door/Window Settings and Opening” (AC27)].
+- As opções de **2D** e **3D** são independentes; é possível ter símbolo completo em planta e modelo esquemático em 3D [DOC: Ajuda “Detail Level”].
+- A página **Floor Plan and Section** controla: `Show Reveal on Symbol` (escala mínima para mostrar o revelo), `Wall Contour Lines`, `Use Fills`, penas de corte/não cortado/overhead [DOC: Ajuda “Floor Plan and Section Tab Page”].
+- **Opening Lines** (linhas de abertura/arco) são configuradas separadamente para **2D simbólico** e **projeções 3D**, com orientação `Hinges` ou `Handle` [DOC: Ajuda “Opening Lines”; MVO “Detail Level of Door and Window Symbols”].
+
+### 9.4 Resumo da resposta
+
+**O símbolo 2D padrão é simbólico (script), não um corte automático do 3D.** O ArchiCAD oferece o modo **Projected** justamente para quem quer o corte do modelo; mas o padrão da biblioteca INT é **Symbolic**, com desenho próprio e ângulo 2D próprio. O acoplamento com o 3D é feito **pelos mesmos parâmetros**, não pela geometria [DOC: GDL Reference; Ajuda “Symbolic vs. Projected”; “Opening Type and Angle”].
+
+---
+
+## 10 · Pergunta 8 — parâmetros-chave da biblioteca INT e relações
+
+### 10.1 Parâmetros de dimensão (fix named, `ac_*`)
+
+| Parâmetro | Tipo | Significado | Relação | Onde |
+|---|---|---|---|---|
+| `A` / `B` | length | par nominal exposto (largura/altura) | recebe o par escolhido | Parameter Script |
+| `ac_wallhole_width` / `_height` | length | vão cortado | = unit + tolerâncias | Nominal Sizes |
+| `ac_unit_width` / `_height` | length | esquadria completa (batente incluso) | = wallhole − tolerâncias | Nominal Sizes |
+| `ac_reveal_width` / `_height` | length | vão livre entre revelos | = wallhole − 2·reveal | Nominal Sizes |
+| `ac_egress_width` / `_height` | length | vão livre entre batentes (portas) | = unit − 2·frame_width | Nominal Sizes |
+| `ac_leaf_width` / `_height` | length | largura/altura da folha (portas) | = unit − 2·(frame_width − rebate) | Nominal Sizes |
+| `tolerance` | length | folga unit×wallhole | usada nas fórmulas | Tolerances |
+| `revealSize` / `bReveal` | length/bool | profundidade/flag do revelo | usado em `ac_reveal_*` | Reveal |
+| `gs_frame_width` | length | largura do batente | base de egress/leaf | Frame Style |
+| `gs_frame_thk` | length | espessura do batente | posição Z do batente | Frame Style |
+| `gs_rebate_width` | length | rebate folha×batente | base de leaf | Frame Style |
+| `gs_leaf_thk` | length | espessura da folha | clareira/egress real | Leaf and Sash |
+| `gs_sash_width` / `gs_sash_thk` | length | perfil do sash | janela | Frame and Sash |
+| `gs_leaf_panel_width` | length | largura do painel | folha | Leaf |
+| `gs_secondleaf_w` | length | largura da 2ª folha | porta dupla | Leaf |
+| `gs_pivotOffset` | length | offset do eixo pivotante | porta pivotante | [FÓRUM] |
+| `gs_list_doorleafwidths` | string | lista das larguras das folhas | listagem | [FÓRUM] |
+
+### 10.2 Parâmetros de posição e orientação
+
+| Parâmetro | Tipo | Significado | Valores | Onde |
+|---|---|---|---|---|
+| `WIDO_SILL` | length (global) | profundidade do revelo / sill depth | ≥ 0 | GDL global |
+| `WIDO_FRAME_THICKNESS` | length (global) | espessura nominal do batente | > 0 | GDL global |
+| `WALL_THICKNESS` | length (global) | espessura da parede no eixo do vão | > 0 | GDL global |
+| `WIDO_REVEAL_SIDE` | int (global) | lado do revelo (1 = lado oposto ao opening side) | 0/1; default 0 janela, 1 porta | GDL global |
+| `WIDO_LEFT_JAMB` / `WIDO_RIGHT_JAMB` | length (global) | profundidade do revelo à esquerda/direita | ≥ 0 | Reveal |
+| `WIDO_HEAD_DEPTH` / `WIDO_THRES_DEPTH` | length (global) | revelo no topo/peitoril | ≥ 0 | Reveal |
+| `WIDO_SILL_HEIGHT` / `WIDO_HEAD_HEIGHT` | length (global) | altura nominal do peitoril/verga | ≥ 0 | Preview |
+| `WIDO_RSIDE_*` / `WIDO_OPRSIDE_*` | length (global) | medidas no lado do revelo/oposto | — | GDL |
+| `WIDO_ORIG_DIST` | length (global) | distância ao centro de curvatura | 0 em reta | GDL |
+| `WIDO_POSITION` | length/angle (global) | offset ao longo da parede | — | GDL |
+| `WIDO_ORIENTATION` | string (global) | orientação L/R | L/R | GDL |
+| `SYMB_MIRRORED` | bool (global) | espelhamento em Y | 0/1 | GDL |
+| `SYMB_ROTANGLE` | angle (global) | rotação 180° | 0/180 | GDL |
+| `ac_revealAnchorPos` | int | âncora do revelo | 1 Face, 2 Core | dw-params |
+| `ac_revealToWallCore` | length | revelo medido do core | ≥ 0 | dw-params |
+| `ac_vertAnchorPos` | int | âncora vertical | 1 Sill, 2 Header | dw-params |
+| `ac_hole_direction_type` | int | plano do vão | 1 Associated to Wall, 2 Vertical | dw-params |
+| `ac_hole_display_option` | int | exibição em planta | 1 Projected, 2 Projected+Overhead, 3 Symbolic, 5 Overhead All | dw-params |
+| `ac_openingside` | string | orientação para listagem | L/R/Custom/Fix/Sliding | dw-params |
+| `ac_wido_rotation` | angle | rotação do objeto no corte | — | dw-params |
+| `ac_walltype` / `ac_wallContourPolygon` | int/array | parede poligonal | 1/2 | dw-params |
+
+### 10.3 Como se ligam (grafo de dependência)
+
+```
+A/B  ──escolha do nominal──►  ac_wallhole_*  ──tolerância──►  ac_unit_*
+                                   │                              │
+                                   │                              ├─► ac_egress_* ──► ac_leaf_*
+                                   │                              │        (frame_width)   (rebate)
+                                   ▼                              ▼
+                             corte da parede               posição do batente
+                             (WALLHOLE/A×B)                (WIDO_SILL + gs_frame_thk)
+                                   │                              │
+                                   └──────────► reveal ◄──────────┘
+                                                  │
+                                                  ▼
+                                         Wall Closure / Turn Plaster
+                                                  │
+                                                  ▼
+                                         alizar / peitoril / soleira
+```
+
+**Regra de ouro:** só **A/B** são “esticados” diretamente pelo usuário; todo o resto é **derivado** no Parameter Script. O par nominal escolhido (`Set as Nominal`) define qual família de dimensões A/B representa. Mudar A/B dispara recálculo em cadeia (o script testa `GLOB_MODPAR_NAME`) [DOC: GDL Tips “Nominal sizes”].
+
+---
+
+## 11 · Lógica de modelagem (síntese operacional)
+
+### 11.1 Ordem de cálculo, do geral para o particular
+
+1. **Parede** existe e tem espessura/camadas. O objeto é colocado **numa** parede; Tab escolhe entre paredes sobrepostas [DOC: Ajuda “Placing Doors or Windows”].
+2. **Reveal side** é escolhido (lado “externo”, sol). Isso fixa de que face se mede o recuo [DOC].
+3. **Âncora horizontal** (centro/lado) fixa o ponto de inserção [DOC].
+4. **Nominal** (Wallhole/Unit/Reveal/Egress/Leaf) é escolhido; A/B recebem esse par [DOC].
+5. **Tolerâncias** geram o **wallhole** a partir do unit; **oversizes** ampliam o furo [DOC].
+6. **Corte** retangular A×B (ou `WALLHOLE`/`WALLNICHE`) atravessa a parede [DOC].
+7. **Reveal** recua a esquadria a partir da face/core; `WIDO_SILL` posiciona o batente em Z [DOC].
+8. **Batente** é gerado com `gs_frame_width`/`gs_frame_thk`; pode ou não igualar a parede [DOC].
+9. **Folha/sash** são gerados com rebate e ângulo; egress/leaf derivam do unit [DOC].
+10. **Wall Closure/Turn Plaster** desenham as skins no vão (2D; corte/elevação; 3D opcional) [DOC].
+11. **Alizar/peitoril/soleira** são acrescentados nas faces, com offsets e overhangs [DOC].
+12. **Símbolo 2D** é escolhido (Symbolic/Projected) e o **LOD** (2D/3D) é aplicado [DOC].
+13. **Listagem/IFC** recebem dimensões nominais, orientação e operação [DOC].
+
+### 11.2 O que depende do quê (para o nosso modelo de dados)
+
+| Nosso campo | Depende de | Não pode ser independente de |
+|---|---|---|
+| Largura/altura nominal | escolha do tipo de nominal | wallhole, unit, reveal, egress, leaf |
+| Wallhole | unit + tolerâncias + oversize | nominal escolhido |
+| Reveal depth | face/core + espessura da parede | posição do batente |
+| Profundidade do batente | `gs_frame_thk` ou `WALL_THICKNESS` | revelo, closure |
+| Largura da folha | unit − 2·(frame − rebate) | largura do batente, rebate |
+| Altura da folha | unit − (frame − rebate) | idem |
+| Egress | unit − frame | largura do batente |
+| Posição do alizar | aresta do batente / borda do vão | offset, espessura, overhang |
+| Wall closure | nº de skins + face de contagem + reveal | composição da parede |
+| Símbolo 2D | parâmetros + LOD + modo de exibição | ângulo 2D |
+| Modelo 3D | parâmetros + LOD + ângulo 3D | ângulo 2D |
+
+### 11.3 Os 8 estados de orientação
+
+O ArchiCAD representa a orientação com **três variáveis**: `SYMB_MIRRORED` (espelho em Y), `SYMB_ROTANGLE` (180° no eixo longitudinal da parede) e `WIDO_REVEAL_SIDE` (flip). As combinações geram **8 estados**; a biblioteca precisa **desfazer** as transformações automáticas para as partes que não devem virar (peitoril, alizar, toldo) e **deixar** as que devem (folha) [DOC: GDL Reference “Doors and Windows”; GDL Basics 17].
+
+Código oficial para desfazer (2D/3D):
+
+```
+! 2D
+if round_int(SYMB_ROTANGLE) = 180 then rot2 180
+if SYMB_MIRRORED then mul2 -1, 1
+if WIDO_REVEAL_SIDE exor bRotated then add2 0, WALL_THICKNESS
+
+! 3D
+if round_int(SYMB_ROTANGLE) = 180 then roty 180
+if SYMB_MIRRORED then mulx -1
+if WIDO_REVEAL_SIDE exor bRotated then addz -WALL_THICKNESS
+```
+
+Isso é a chave para entender por que **Flip mantém o batente no lugar**: o flip espelha e desloca de volta por `WIDO_FRAME_THICKNESS` [DOC: GDL Reference; `WIDO_FRAME_THICKNESS`].
+
+### 11.4 O que o nosso editor deve copiar (e o que não deve)
+
+**Copiar:**
+- A **cadeia de dimensionamento** com um único par nominal e derivados.
+- O conceito de **reveal side** separado do **opening side**.
+- O **reveal anchor** face/core.
+- A distinção **wallhole × unit × reveal × egress × leaf**.
+- O **rebate** como mecanismo de encaixe da folha.
+- **Ângulo 2D e 3D separados**.
+- **Wall closure** como representação de camadas, não como boolean.
+- **LOD 2D/3D independentes** e modo **Symbolic × Projected**.
+
+**Não copiar (ou simplificar):**
+- A dependência de scripts GDL e macros da biblioteca.
+- O checkbox “Frame Thickness = Wall Thickness” travado por combinações.
+- A ausência de colisão automática folha×batente.
+- O modelo de “8 estados” com transformações automáticas — no nosso editor, o estado pode ser explícito (lado, sentido, flip) sem espelhar geometria.
+
+---
+
+## 12 · Fontes
+
+### 12.1 Ajuda oficial (Graphisoft)
+
+| URL | Versão | Tipo | O que continha |
+|---|---|---|---|
+| https://help.graphisoft.com/AC/30/BRA/Topics/046_LibraryPartMaker/046_LibraryPartMaker-16.html | AC30 BRA | DOC | LPM: LOD 2D/3D, origens 2D/3D, tolerância×wallhole, fixtures padrão, parâmetros de sistema |
+| https://help.graphisoft.com/AC/30/BRA/Topics/046_LibraryPartMaker/046_LibraryPartMaker-12.html | AC30 BRA | DOC | índice de atribuições LPM |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/046_LibraryPartMaker/046_LibraryPartMaker-16.htm | AC28 INT | DOC | mesma matéria em inglês (conferência) |
+| https://help.graphisoft.com/AC/20/INT/AC20Help/03_1_Elements_Virtual_Building/03_1_Elements_Virtual_Building-209.htm | AC20 INT | DOC | custom components; redimensionamento proporcional do Door Leaf |
+| https://help.graphisoft.com/AC/27/INT/_AC27_Help/040_ElementsVB/040_ElementsVB-297.htm | AC27 INT | DOC | exemplo de folha customizada; rotação 90° do desenho de planta |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-1.htm | AC28 INT | DOC | índice do Custom Settings |
+| .../151_DoorWindowCustomSettings-2.htm | AC28 INT | DOC | Nominal Sizes and Tolerance; wallhole/unit/egress/leaf |
+| .../151_DoorWindowCustomSettings-3.htm | AC30 INT | DOC | Shape (imagem) |
+| .../151_DoorWindowCustomSettings-4.htm | AC28 INT | DOC | Settings and Opening; Frame Style; Natural Ventilation |
+| .../151_DoorWindowCustomSettings-5.htm | AC28 INT | DOC | Frame Style and Dimensions; Frame Thickness = Wall Thickness |
+| .../151_DoorWindowCustomSettings-9.htm | AC28 INT | DOC | Leaf and Sash Dimension |
+| .../151_DoorWindowCustomSettings-13.htm | AC28 INT | DOC | Opening Type and Angle; 2D/3D; sidelight/transom |
+| .../151_DoorWindowCustomSettings-15.htm | AC28 INT | DOC | Wall Opening; oversizes; wall opening surface |
+| .../151_DoorWindowCustomSettings-16.htm | AC28 INT | DOC | Reveal Settings |
+| .../151_DoorWindowCustomSettings-17.htm | AC28 INT | DOC | Wall Closure; closure types; turn plaster; custom closure |
+| .../151_DoorWindowCustomSettings-18.htm | AC28 INT | DOC | Wall Inset |
+| .../151_DoorWindowCustomSettings-20.htm | AC28 INT | DOC | Tolerances |
+| .../151_DoorWindowCustomSettings-21.htm | AC28 INT | DOC | Hole Surface’s Split is Curved |
+| .../151_DoorWindowCustomSettings-26.htm | AC28 INT | DOC | Casing Outside/Inside |
+| .../151_DoorWindowCustomSettings-29.htm | AC28 INT | DOC | Floor Plan and Section; override de atributos |
+| https://help.graphisoft.com/AC/30/INT/Topics/150_UserInterfaceToolSettings/150_UserInterfaceToolSettings-10.html | AC30 INT | DOC | Settings of Library Part Elements |
+| .../150_UserInterfaceToolSettings-16.html | AC30 INT | DOC | Door/Window Tool Settings; painéis |
+| .../150_UserInterfaceToolSettings-17.html | AC30 INT | DOC | Preview and Positioning; Reveal; Anchor face/core; Flip; Anchor Point; Opening Plane |
+| .../150_UserInterfaceToolSettings-18.html | AC30 INT | DOC | Where to Set Door/Window Parameters |
+| .../150_UserInterfaceToolSettings-19.html | AC30 INT | DOC | Symbolic vs Projected |
+| .../150_UserInterfaceToolSettings-20.html | AC30 INT | DOC | Other panels; reveal controls legado; dimension marker; subfloor |
+| https://help.graphisoft.com/AC/30/INT/Topics/040_ElementsVB/040_ElementsVB-306.html | AC30 INT | DOC | Placing Doors or Windows; sol/reveal side; 4 setas; Flip |
+| .../040_ElementsVB-308.html | AC30 INT | DOC | Floor Plan Display; MVO |
+| .../040_ElementsVB-309.html | AC30 INT | DOC | Slanted/complex walls; Opening Plane |
+| .../040_ElementsVB-310.html | AC30 INT | DOC | Sill/Header Heights; referências |
+| .../040_ElementsVB-312.html | AC30 INT | DOC | Anchor Reveal (face/core) |
+| .../040_ElementsVB-313.html | AC30 INT | DOC | Empty Opening |
+| https://help.graphisoft.com/AC/30/INT/Topics/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-3.html | AC30 INT | DOC | Shape |
+| .../151_DoorWindowCustomSettings-31.html | AC30 INT | DOC | Detail Level (By MVO / Fixed) |
+| https://help.graphisoft.com/AC/30/INT/Topics/140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-40.html | AC30 INT | DOC | MVO Detail Level of Door and Window Symbols |
+| https://help.graphisoft.com/AC/27/INT/_AC27_Help/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-4.htm | AC27 INT | DOC | Detail Level 2D/3D; Off = vão vazio |
+| https://help.graphisoft.com/AC/26/INT/_AC26_Help/150-1_DoorWindowCustomSettings/150-1_DoorWindowCustomSettings-14.htm | AC26 INT | DOC | Opening Lines; 2D simbólico × 3D |
+| https://help.graphisoft.com/AC/26/INT/_AC26_Help/150-1_DoorWindowCustomSettings/150-1_DoorWindowCustomSettings-15.htm | AC26 INT | DOC | Opening Lines – Sidelight/Transom |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/050_ViewsVB/050_ViewsVB-117.htm | AC28 INT | DOC | Core/Finish/Other; skins adjacentes |
+| https://help.graphisoft.com/AC/25/INT/_AC25_Help/020_Configuration/020_Configuration-54.htm | AC25 INT | DOC | Composite Structures; skins/core |
+| https://help.graphisoft.com/AC/18/INT/AC18Help/Appendix_Tools/Appendix_Tools-33.htm | AC18 INT | DOC | índice da GUI do Door |
+| .../Appendix_Tools-37.htm | AC18 INT | DOC | Frame Style 1/2/3; door stop; recess |
+| .../Appendix_Tools-38.htm | AC18 INT | DOC | Leaf/Sash; Same as Leaf/Opposite |
+| .../Appendix_Tools-40.htm | AC18 INT | DOC | Sidelight/Transom Sash Type |
+| .../Appendix_Tools-46.htm | AC18 INT | DOC | Wall Closure detalhado; plaster wrapped × custom |
+| .../Appendix_Tools-48.htm | AC18 INT | DOC | Inside Casing |
+| .../Appendix_Tools-66.htm | AC18 INT | DOC | Wall Closure (janela) |
+
+### 12.2 GDL Center (oficial)
+
+| URL | Tipo | O que continha |
+|---|---|---|
+| https://gdl.graphisoft.com/ | DOC | índice |
+| https://gdl.graphisoft.com/reference-guide | DOC | índice do Reference Guide |
+| https://gdl.graphisoft.com/reference-guide/doors-and-windows/ | DOC | origem 3D/2D, projeção especial do símbolo, 8 estados, WALLHOLE/WALLNICHE/WALLHOLE2/WALLBLOCK2/WALLLINE2/WALLARC2 |
+| https://gdl.graphisoft.com/reference-guide/wall-door-window-and-wall-end-parameters/ | DOC | WIDO_*, WALL_*, skins |
+| https://gdl.graphisoft.com/reference-guide/dw-params/ | DOC | ac_hole_*, ac_revealAnchorPos, ac_revealToWallCore, ac_openingside |
+| https://gdl.graphisoft.com/reference-guide/opening-parameters/ | DOC | OPENING_* (altura/largura/peitoril/verga; símbolo) |
+| https://gdl.graphisoft.com/gdl-basics/simple-doors-and-windows/ | DOC | origem, A/B, WIDO_SILL, frame/sash/glass, flipping, 2D symbol |
+| https://gdl.graphisoft.com/gdl-basics/advanced-doorwindow-functions/ | DOC | trapezoid/curved/slanted; WALLHOLE/WALLNICHE |
+| https://gdl.graphisoft.com/tips-and-tricks/nominal-sizes-automatic-dimensioning/ | DOC | fórmulas wallhole/unit/reveal/egress/leaf; GLOB_MODPAR_NAME |
+| https://gdl.graphisoft.com/tips-and-tricks/reveal-options-automatic-or-scripted/ | DOC | reveal automático × script; WIDO_*_JAMB/HEAD/THRES; ac_wido_hide_options; AC_WallContours |
+| https://gdl.graphisoft.com/tips-and-tricks/door-window-orientation/ | DOC | WIDO_ORIENTATION; ac_openingside; L/R/Fix/Sliding |
+
+### 12.3 API e suporte
+
+| URL | Tipo | O que continha |
+|---|---|---|
+| https://archicadapi.graphisoft.com/documentation/api_windowtype-api_doortype | DOC (API) | `revealDepthLocation` (Side/Core), `revealDepthOffset`, `revealDepthFromSide`, `jambDepth*`, `fixPoint` |
+| https://support.graphisoft.com/hc/en-us/articles/20228579684881-How-to-add-an-Insulated-Reveal-to-a-Window-in-Archicad | Suporte oficial | Insulated Reveal; Turn-in Skin; Reveal to Wall Core |
+| https://support.graphisoft.com/hc/en-us/articles/25932544502545-Can-I-control-the-skin-end-lines-on-my-composite-wall | Suporte oficial | skin end lines em aberturas |
+| https://support.graphisoft.com/hc/en-us/articles/37841033418897-Edges-of-composite-walls-are-invisible-at-door-openings | Suporte oficial | linhas de fim de skin em portas |
+| https://support.graphisoft.com/hc/en-us/articles/22598312495761-Door-leaf-type-not-updating-on-elevation | Suporte oficial | MVO Detail Level em corte/elevação |
+| https://support.graphisoft.com/hc/en-us/articles/24257450192529-Opening-lines-of-Doors-and-Windows-are-not-showing-in-schedules | Suporte oficial | opening lines em schedules |
+
+### 12.4 Biblioteca AC9 SE (documentação oficial arquivada)
+
+| URL | Tipo | O que continha |
+|---|---|---|
+| https://graphisoft.com/support/archicad/documentation/library-2/archive_ac9_se/us/windows/5-2/ | DOC (AC9 SE; URL hoje 404, conteúdo indexado) | Casing Trim, Brick Molding, offsets, overhang, jamb extension, masonry opening |
+| https://gsdownloads.blob.core.windows.net/archive/ftp/techsupport/downloads/library_updates/documentation/AC9_SE_Illustrated_Windows.pdf | DOC (PDF oficial) | mesma matéria, §5.4 |
+| https://gsdownloads.blob.core.windows.net/archive/ftp/techsupport/downloads/library_updates/documentation/AC9_SE_Illustrated_Doors.pdf | DOC (PDF oficial) | idem para portas |
+
+### 12.5 Comunidade (apoio)
+
+| URL | Tipo | O que continha |
+|---|---|---|
+| https://community.graphisoft.com/t5/Libraries-objects/Finish-Issue-for-Wall-Cavity-Closure-on-Empty-Door-Openings/td-p/290089 | FÓRUM (resposta oficial) | closure não é 3D; “Symbolic” resolve planta; “Projected” não mostra skin |
+| https://community.graphisoft.com/t5/Libraries-objects/Turning-skins-in-composite-walls/td-p/163232 | FÓRUM (resposta oficial) | skins dobradas não entram em quantitativos |
+| https://community.graphisoft.com/t5/Libraries-objects/Setting-sidelight-width-Part-1/td-p/231572 | FÓRUM | “Sidelight Width” via hotspot/Tab |
+| https://community.graphisoft.com/t5/Libraries-objects/Door-with-sidelight-sizing/td-p/229144 | FÓRUM | esticar sidelight mantendo a folha |
+| https://community.graphisoft.com/t5/Libraries-objects/Various-Casing-Dimensions/td-p/241040 | FÓRUM | larguras de casing por lado/ganging |
+| https://community.graphisoft.com/t5/Libraries-objects/Casing-overlap-dimension/td-p/373157 | FÓRUM | offset de casing limitado; leitura da parede |
+| https://community.graphisoft.com/t5/Libraries-objects/Door-Jamb-Glitch/td-p/238022 | FÓRUM | reveal depth × frame thickness; leaf rebate depth |
+| https://community.graphisoft.com/t5/Libraries-objects/Frame-Depth-in-Door-Schedule/td-p/281611 | FÓRUM | “frame depth” não existe; é Frame Thickness |
+| https://community.graphisoft.com/t5/Libraries-objects/Door-and-Window-Frame-to-Match-wall-depth/td-p/31026 | FÓRUM | frame thickness = wall thickness |
+| https://community.graphisoft.com/t5/Libraries-objects/door-frame-and-wall-thickness/td-p/108475 | FÓRUM | dependência de “Wall Type” (Stud/Solid) |
+| https://community.graphisoft.com/t5/Libraries-objects/Door-s-clear-opening-width-UK-Documentation-for-planning/td-p/630470 | FÓRUM | fórmulas `gs_frame_width`, `gs_rebate_width`, `gs_leaf_thk` |
+| https://gdl.graphisoft.com/forums/topic/find-number-of-hinge-door-leafs/ | FÓRUM | `gs_pivotOffset`, `gs_secondleaf_w`, `gs_list_doorleafwidths` |
+
+---
+
+## 13 · Lacunas (o que não fechamos)
+
+| # | Lacuna | Status | Onde provavelmente está |
+|---|---|---|---|
+| 1 | Frase literal de que o wallhole **atravessa todas as skins** | *[INFERIDO]* | GDL Reference de `WALLHOLE` + help de Wall Closure; não há frase única |
+| 2 | Equação exata da **posição Z do batente** (face, core, centro) | *[INFERIDO]* | GDL `WIDO_SILL` + `gs_frame_thk`; scripts da library |
+| 3 | Offset exato do **eixo da dobradiça** em relação à face do batente | *[NÃO CONFIRMADO]* | macros `gs_general_lt_door` / door panel; não há doc |
+| 4 | **Colisão automática** folha×batente/parede | *[NÃO CONFIRMADO]* — provavelmente **não existe** | não há doc; a biblioteca só limita ranges |
+| 5 | Nomes exatos dos campos de **casing** na library AC28+ (width/thickness/offset) | *[NÃO CONFIRMADO]* | help moderno é imagem; AC9 SE tem os nomes históricos |
+| 6 | Fórmulas de **rateio sidelight/transom** (montante, transom, frame) | *[NÃO CONFIRMADO]* | Parameter Script da library INT |
+| 7 | Nome exato de **Transom Height** / **Sidelight Width** na UI moderna | *[NÃO CONFIRMADO]* | página Shape (imagem); hotspots |
+| 8 | Profundidade do **Wall Closure** como campo separado | *[NÃO CONFIRMADO]* — aparenta ser o reveal | help não expõe campo |
+| 9 | Lista completa dos **Closure Types** por versão | Parcial [DOC] | help diz “varia conforme o reveal”; AC18 lista Traditional/Prefabricated/Custom; suporte lista Insulated Reveal |
+| 10 | Se **Wall Closure afeta 3D** na library atual | Parcial [DOC] — só Turn Plaster com “Show in 3D” | help AC28/AC30; fórum diz que stock não mostra skin em 3D |
+| 11 | Disponibilidade de **Leaf Undercut** por país/biblioteca | *[NÃO CONFIRMADO]* | varia (FR tem; UK/US não) |
+| 12 | Semântica do **reveal side** para portas (default 1) × janelas (default 0) | [DOC] para o default; semântica de colocação | GDL `WIDO_REVEAL_SIDE`; help “Placing” |
+| 13 | Diferenças **LPM × INT library** na parametrização | Parcial [DOC] | LPM docs; library packages |
+| 14 | Valores **default** de muitos campos (tolerância, frame width, rebate) | *[NÃO CONFIRMADO]* | variam por library/versão; não são universais |
+| 15 | `gs_pivotOffset` — nome e disponibilidade em todas as versões | *[FÓRUM]* | scripts de portas pivotantes |
+
+### 13.1 O que faria fechar as lacunas
+
+- Abrir os **scripts GDL** da library INT (Parameter Script de `gs_general_lt_door` e `GS Door Functions`) — é onde estão as fórmulas de rateio, o eixo e os defaults.
+- Comparar **AC27 × AC28 × AC30** no Library Part Editor, com “All Parameters” visível.
+- Testar no ArchiCAD: variar `WIDO_SILL`, `gs_frame_thk`, `gs_rebate_width` e medir o 3D; variar ângulo 3D e verificar interseção.
+- Consultar o **Profile Manager** para paredes complexas (o plano do vão em paredes complexas é definido pela camada “Opening Reference”).
+

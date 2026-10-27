@@ -40,6 +40,13 @@ function edgeProblems(r: Roof, name: string): ValidationIssue[] {
   if (r.edgeSlopes.length !== n || r.edgeOverhangs.length !== n) {
     push('roof-edges-length', `Telhado ${name}: a lista de arestas (${r.edgeSlopes.length} inclinações, ${r.edgeOverhangs.length} balanços) não bate com o contorno (${n} arestas).`);
   }
+  if (r.edgeSag) {
+    if (r.edgeSag.length !== n) {
+      push('roof-edge-sag-length', `Telhado ${name}: a lista de flechas (${r.edgeSag.length}) não bate com o contorno (${n} arestas).`);
+    } else if (r.edgeSag.some((v, i) => !Number.isFinite(v) || Math.abs(v) > Math.hypot(r.boundary[(i + 1) % n]!.x - r.boundary[i]!.x, r.boundary[(i + 1) % n]!.y - r.boundary[i]!.y) / 2 + 1e-9)) {
+      push('roof-edge-sag-invalid', `Telhado ${name}: a flecha de uma aresta passa de metade da corda ou não é um número finito.`);
+    }
+  }
   if (r.shape !== 'edges') return out;
   if (!r.edgeSlopes.some((s) => s !== null && s !== undefined)) {
     push('roof-all-flat', `Telhado ${name} é por arestas e nenhuma aresta define inclinação: sem água não há telhado.`);

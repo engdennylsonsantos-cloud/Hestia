@@ -314,5 +314,17 @@ export function labelOf(c: Command): string {
       return 'Mover vista da prancha';
     case 'removeViewport':
       return 'Excluir vista da prancha';
+    case 'addGrid':
+      return 'Criar grade';
+    case 'updateGrid':
+      return 'Editar grade';
+    case 'removeGrid':
+      return 'Excluir grade';
+    case 'addGridType':
+      return 'Criar tipo de grade';
+    case 'updateGridType':
+      return 'Editar tipo de grade';
+    case 'removeGridType':
+      return 'Excluir tipo de grade';
   }
 }

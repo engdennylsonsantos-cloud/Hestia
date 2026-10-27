@@ -36,6 +36,9 @@ export const roofsOnLevel = (p: Project, levelId: Id): Roof[] =>
 
 export const roofTypeThickness = (t: RoofType): number => t.layers.reduce((s, l) => s + l.thickness, 0);
 
+/** Flecha do arco da aresta `i` (m); 0 = reta (campo ausente em telhados antigos). */
+export const roofEdgeSag = (r: Roof, i: number): number => r.edgeSag?.[i] ?? 0;
+
 export const roofPolygon = (r: Roof): Polygon => [r.boundary, ...r.holes];
 
 /** Área em planta (contorno menos furos), m². */

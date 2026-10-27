@@ -54,6 +54,7 @@ import {
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
 import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
+import { applyGridCommand, type GridCommand } from './grid.ts';
 import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
 import { applyRoomCommand } from './roomCommands.ts';
@@ -102,6 +103,7 @@ export type Command =
   | { type: 'upsertLevel'; level: Level }
   | AnnotationCommand
   | SheetCommand
+  | GridCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
@@ -357,6 +359,14 @@ export function applyCommand(p: Project, c: Command): void {
     case 'updateViewport':
     case 'removeViewport':
       applySheetCommand(p, c);
+      break;
+    case 'addGrid':
+    case 'updateGrid':
+    case 'removeGrid':
+    case 'addGridType':
+    case 'updateGridType':
+    case 'removeGridType':
+      applyGridCommand(p, c);
       break;
     case 'setLevelViewRange': {
       const l = p.levels.find((x) => x.id === c.levelId);

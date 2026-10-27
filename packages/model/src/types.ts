@@ -2,6 +2,7 @@ import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 import type { Sheet } from './sheet.ts';
+import type { Grid, GridType } from './grid.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
 
@@ -469,6 +470,12 @@ export interface Roof {
   /** Balanço do beiral por aresta (m); mesmo comprimento de `boundary`. Com `footprint`, o beiral se refaz dele. */
   edgeOverhangs: number[];
   /**
+   * Flecha do arco por aresta (m), como `Wall.sag`: distância do meio do arco à corda, positiva à esquerda de i → i+1.
+   * Ausente ou 0 = aresta reta. O motor divide a aresta em trechos só por dentro, antes do esqueleto; o contorno gravado
+   * em `boundary` continua sendo os vértices (cantos lógicos). Mesmo comprimento de `boundary` quando presente.
+   */
+  edgeSag?: number[];
+  /**
    * Pegada: contorno desenhado, sem balanço, de onde o beiral saiu (modos de contorno, retângulo e paredes). Com ela,
    * `boundary = eaveOutlinePerEdge(footprint, edgeOverhangs)`. Ausente em telhados antigos e depois de editar vértices
    * do beiral: então o `boundary` é o que vale.
@@ -624,6 +631,10 @@ export interface Project {
   sectionGraphics?: ViewGraphics;
   /** Pranchas (decisão 0022); ausente = nenhuma. */
   sheets?: Sheet[];
+  /** Grades de eixos (Revit: Grid); ausente = nenhuma. Ver `grid.ts`. */
+  grids?: Grid[];
+  /** Tipos de grade gravados; os padrão (`DEFAULT_GRID_TYPES`) valem sem estar aqui. */
+  gridTypes?: Record<Id, GridType>;
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

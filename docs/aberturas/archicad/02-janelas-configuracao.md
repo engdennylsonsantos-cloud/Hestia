@@ -493,3 +493,271 @@ Define folgas mínimas de circulação/abertura ao lado da porta (e, conforme o 
 - `Accessories in 3D` no MVO liga/desliga puxadores de porta e janela. [DOC AC28 140-40]
 - Em portas, a página Handle and Kick Board define puxador por folha, `Uniform Handles`, altura, distância da borda e chapa de proteção (kick board). Em janelas, o puxador depende do objeto. [DOC AC28 151-8]
 - O `Minimal Space` de objetos é um parâmetro separado; não confundir com a folga da janela. [DOC AC28 150-11]
+
+---
+
+## 14. Janela de canto (Corner Window)
+
+### 14.1 Ferramenta própria
+
+O ArchiCAD tem uma **ferramenta Corner Window** separada (na seção “More” da caixa de ferramentas, na versão INT). O diálogo é semelhante ao da janela comum e **não há um objeto de biblioteca específico**: a maioria das janelas da biblioteca padrão pode ser usada. [DOC AC28 040-316]
+
+| Regra | Consequência | Fonte |
+|---|---|---|
+| Só em cantos de parede **reta** | não aceita parede de perfil, trapezoidal ou curva | [DOC AC28 040-316] |
+| Um clique em qualquer ponto da parede | encaixa no canto mais próximo e cria uma **cópia espelhada** na parede adjacente | [DOC AC28 040-316] |
+| Parâmetros e propriedades | a segunda janela é **idêntica** à primeira; ângulo e posição são ajustados automaticamente | [DOC AC28 040-316] |
+| Um par por canto | não se coloca mais de um par no mesmo canto | [DOC AC28 040-316] |
+| Ângulo entre paredes | não pode ser 0° nem 180° | [DOC AC28 040-316] |
+| Esticar individualmente | permitido, sem quebrar o vínculo entre as duas | [DOC AC28 040-316] |
+| Vira janela simples se | arrastar/mirror/rotacionar uma das duas; ângulo virar 0/180°; uma parede for elevada; parede conectada for apagada/arrastada | [DOC AC28 040-316] |
+
+### 14.2 Custom Corner (para duas janelas comuns)
+
+Quando não se usa a ferramenta Corner Window, duas janelas comuns podem ser unidas pelo **Custom Corner** (na página Fixtures and Fittings, marcar Right/Left). [DOC AC28 151-22/31]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Corner Connection Type** | Como as duas janelas se encontram | **Frame** (molduras se tocam) / **Corner Column** (coluna entre elas) / **Glass** (vidro entre as molduras) | Custom Corner |
+| **Angle** | Ângulo entre as paredes | graus | Custom Corner |
+| **Different Connecting Wall Thickness** | Permite espessuras diferentes nas duas paredes | on/off + espessuras | Custom Corner |
+
+**Comparação (suporte oficial):**
+
+| Aspecto | Corner Window tool | Duas janelas + Custom Corner |
+|---|---|---|
+| Tipo de elemento | reconhecido como “Corner Window” | duas “Windows” separadas |
+| Automação | encaixa no canto e espelha | ajuste manual do ângulo |
+| Flexibilidade | não aceita parede perfilada/inclinada | aceita perfilada, inclinada e dupla-inclinada |
+| Assimetria | não é possível sobrescrever | cada lado é independente (ex.: fixa de um lado, correr do outro) |
+| Quadro | uma linha | duas linhas (as duas janelas) |
+
+Fonte: [DOC support “How to create corner windows in Archicad?”]
+
+**Leitura para o nosso editor:** a ferramenta Corner Window é um **par vinculado** com geometria derivada; o Custom Corner é uma **relação entre duas instâncias independentes**. São dois modelos diferentes — não dá para representar os dois com um único campo “é canto”. [INFERIDO]
+
+---
+
+## 15. Claraboia / janela de telhado (Skylight)
+
+### 15.1 Ferramenta e colocação
+
+- Ferramenta **Skylight** própria, separada de Door/Window. [DOC AC28 150-20; 040-317]
+- Só pode ser inserida em **Telhado (Roof)** ou **Shell**; é automaticamente incorporada ao elemento hospedeiro. Em telhado, ajusta-se à inclinação da água. [DOC AC28 040-317]
+- Ao arrastar dentro de um Shell ou de uma água para outra, reposiciona-se e se ajusta automaticamente. [DOC AC28 040-318]
+- Em telhado curvo, a opção `Skylights treat segments as curves` (nas Roof Settings) decide se a claraboia acompanha a curvatura ou se comporta como plano. [DOC AC28 040-318]
+
+### 15.2 Skylight Settings
+
+**Painel:** Skylight Preview and Positioning. [DOC AC28 150-20]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Width / Height** | Dimensões da claraboia | medidas | Preview and Positioning |
+| **Constraint in Roof** | Como a claraboia se mantém quando o telhado muda | **Horizontal** (mantém posição em planta) / **Vertical** (mantém cota) | Preview and Positioning |
+| **Sill or header height** | Altura do ponto de âncora | medida + referência: uma história ou a **Roof Pivot line** | Preview and Positioning |
+| **Âncora (sill/header)** | Escolhe o ponto de referência no preview | hotspot no topo ou na base | Preview and Positioning |
+| **Flip in Shell** | Inverte a orientação dentro do Shell (de “inside” para “outside” ou vice-versa) | botão | Preview and Positioning |
+| **Mirror Library Part** | Espelha o objeto | on/off | Preview and Positioning |
+
+**Painéis semelhantes aos da janela:** Skylight Settings, Floor Plan and Section, Dimension Marker e Marker Settings. O `Sill Height` do marcador pode considerar a diferença entre o nível da história e o peitoril, sem alterar a posição. [DOC AC28 150-20]
+
+### 15.3 Representação em planta
+
+- Por padrão, a claraboia é desenhada em planta por **projeção 3D**, não por símbolo. [DOC AC28 040-317; 150-20]
+- Exceção: claraboias migradas de projetos antigos (AC14 ou anterior) podem usar representação **simbólica** por preferência legada. [DOC AC28 150-20]
+- A exibição segue as configurações de `Floor Plan Display` (ex.: Show on Story) do **telhado/shell hospedeiro**. [DOC AC28 040-317]
+- MVO tem painel próprio `Detail Level of Skylight Symbols` e opções de Construction Elements análogas às de portas/janelas. [DOC AC28 140-39/43]
+
+### 15.4 “Roof window” x “Skylight”
+
+O ArchiCAD não tem uma ferramenta “Roof Window” separada: janelas de telhado são **objetos de biblioteca** (ex.: “Sunlight Pivot Hung”) colocados com a ferramenta **Skylight**. A biblioteca pode oferecer modelos fixos, pivotantes, projetantes etc.; a mecânica de inserção e de representação é a da claraboia. [DOC AC28 150-20] + [FÓRUM: roteiro de telhado que usa “SUNLIGHT PIVOT HUNG 19” com a ferramenta Skylight] + [INFERIDO]
+
+---
+
+## 16. Porta-balcão (Terrace Door)
+
+**Natureza:** no INT, a porta-balcão é normalmente um **objeto da biblioteca de janelas** (pasta “Terrace Doors”), colocado com a ferramenta **Window** e classificado como janela. Isso tem consequências práticas: ela aparece no quadro de janelas, não no de portas. [FÓRUM community “Reveal for Terrace Door”; “Balcony door & window reveal settings”]
+
+| Aspecto | Comportamento | Fonte |
+|---|---|---|
+| Ferramenta | Window (não Door) | [FÓRUM] |
+| Altura | folha vai até o piso; pode ter banda/fixed panel | [INFERIDO] |
+| Peitoril | `Sill` disponível em Terrace Doors (novidade AC17) | [DOC AC17 NewFeatures-43] |
+| Reveal | em muitos objetos fica **desabilitado** porque a janela tem peitoril e a porta não, e o reveal não consegue ter alturas diferentes dos dois lados | [FÓRUM] |
+| Casing/closure | depende do objeto; alguns têm closure de cavidade, outros não | [FÓRUM] |
+| Configuração | a mesma das janelas (Shape, Sash, Opening Type, Frame, etc.), com as abas que o objeto expõe | [DOC AC28 151-1] |
+
+**Leitura para o nosso editor:** a porta-balcão não é uma família nova; é uma **janela de altura total** com soleira/limiar e, opcionalmente, bandeira. O nosso `door_swing`/`window_fixed` não cobre bem o caso; o mais próximo é uma janela de 1 ou 2 folhas com `sill = 0` e `threshold`. [INFERIDO]
+
+---
+
+## 17. Ventilação natural
+
+**Página:** Natural Ventilation. [DOC AC28 151-6]
+
+| Campo | O que faz | Valores/opções | Onde |
+|---|---|---|---|
+| **Natural Ventilation** | Liga o componente de ventilação | on/off | Natural Ventilation |
+| **Position** | Onde fica o perfil de ventilação | **over Frame** / **over Glazing** | Natural Ventilation |
+| **Profile height/width** | Dimensões do perfil de ventilação (por folha, se aplicável) | medidas | Natural Ventilation |
+| **Fill attributes** | Atributos de preenchimento do perfil em corte | fill/pen | Floor Plan and Section |
+
+**O que é:** é uma **peça física** (perfil) desenhada sobre a moldura ou sobre o vidro, com altura/largura próprias. Não é cálculo de vazão nem abertura operável; é representação construtiva do ventilador. [DOC AC28 151-6]
+
+---
+
+## 18. Representação 2D, elevação e 3D
+
+### 18.1 Floor Plan Display
+
+**Controle:** `Floor Plan Display`, no painel Floor Plan and Section. [DOC AC28 150-18; 040-308]
+
+| Opção | O que mostra | Quando usar |
+|---|---|---|
+| **Symbolic** (padrão) | símbolo 2D do objeto, independente do modelo 3D | planta padrão |
+| **Overhead All** | contorno do elemento com atributos de “overhead” | elementos acima do plano de corte |
+| **Projected** | parte cortada do modelo 3D + parte não cortada (para baixo) | parede inclinada, visual mais realista |
+| **Projected with Overhead** | parte cortada + parte acima do plano de corte + parte não cortada | parede inclinada com peças acima do corte |
+
+**Ponto-chave:** `Symbolic` e `Projected` podem dar desenhos diferentes para a mesma janela. O Hestia hoje desenha sempre o símbolo simbólico; o ArchiCAD permite os dois. [DOC AC28 150-18] + [INFERIDO]
+
+### 18.2 Atributos 2D: GDL x painel simplificado
+
+Há dois caminhos:
+
+1. **Atributos GDL** definidos na página Floor Plan and Section do Custom Settings (muitos parâmetros por componente: moldura, folha, vidro, grade, alizar, peitoril etc.).
+2. **Atributos simplificados** do painel Floor Plan and Section do diálogo (cut/uncut/overhead lines e pens), com checkboxes `Override Object’s Line Types/Pens/Attributes`.
+
+Se o objeto não tiver parâmetro GDL correspondente, o painel simplificado vale sempre. [DOC AC28 151-29]
+
+**Wall Contour Lines:** liga/desliga as linhas de contorno do vão na parede, com opção de linha visível/oculta. [DOC AC28 151-29]
+
+**Use Fills:** liga todos os fills do objeto; desligado, nenhum componente usa fill. [DOC AC28 151-29]
+
+### 18.3 Linhas de abertura
+
+**Versão AC24 (por elemento):** a página `Opening Lines (Door/Window)` permite sobrescrever o MVO só para aquela janela, com opções separadas para **2D Symbolic Display** e **3D Projections**, incluindo pen. Havia também uma página específica para luz lateral/bandeira. [DOC AC24 141-14/15]
+
+**Versão AC28 (centralizado):** o controle é global em **Model View Options > Detail Level of Door and Window Symbols**:
+
+- `Opening Line (Floor Plan)` e `Opening Line (Section/Elevation & 3D)`: liga/desliga, tipo de linha, símbolos (inclusive portas de correr).
+- `Opening Line (Global)`: pens para todas as portas/janelas do projeto.
+- `Line orientation`: **Hinges** ou **Handle** (afeta a direção da linha em corte/elevação/3D).
+- `Arrow orientation` (AC30): Opening / Closing / Adaptive.
+
+Fonte: [DOC AC28 140-40; AC24 141-14/15; DOC support “How to make opening lines … dashed”]
+
+**AC29 LU2:** passa a haver **5 tipos** de linha de abertura, atribuíveis por folha/sash; o padrão é Type 1 para portas e Type 3 para janelas. [DOC AC29 LU2 release note] Isso ainda não vale para AC28.
+
+**O que a linha representa:** a “opening line” é a linha simbólica de abertura (dobradiça, correr, basculante etc.), não a junta física. Em 3D, pode ser desenhada no lado da abertura e no lado oposto, com tipos de linha distintos. [DOC AC28 140-40]
+
+### 18.4 Nível de detalhe (LOD)
+
+**Por elemento (AC24):**
+
+| Campo | Valores | Efeito |
+|---|---|---|
+| **3D Detail Level** | By MVO / **Schematic** / **Simplified** / **Full** / **Off** | Off = só vão vazio |
+| **2D Detail Level** | By MVO / **Scale Sensitive** / escala fixa (ex.: 1:200) / Off | Off = nenhum símbolo 2D |
+
+Fonte: [DOC AC24 141-4]
+
+**Por MVO:**
+
+- `Object and Lamp Detail Level`: 2D Full/Medium/Low; corte/elevação/3D Full/Simplified/Schematic. [DOC AC28 140-42]
+- `Detail Level of Door and Window Symbols`: níveis de símbolo de porta/janela; exemplos citados pelo suporte: `Full-Opened Leaf` (porta) e `Full-with Double Glazing Line` (janela). [DOC AC28 140-40; DOC support “How can I increase the detail level…”]
+- `Detail Level of Skylight Symbols`: painel próprio. [DOC AC28 140-43]
+
+### 18.5 Model Attributes (atributos 3D)
+
+**Página:** Model Attributes of Door/Window Opening. [DOC AC28 151-14]
+
+| Campo | O que faz |
+|---|---|
+| **Shadow** | Liga sombra do objeto no 3D |
+| **Curve Resolution** | Nº de segmentos para componentes curvos; mais detalhe = mais arquivo |
+| **Frame Element Joinery** | Mitered / Butt Joint |
+| **Frame and Leaf (Sash) 3D Pen** | Pente das partes visíveis no 3D e nas projeções 3D da planta |
+| **Surface materials** | Materiais por componente (folha, moldura, grade, vidro, puxador) |
+
+**Model Attributes of Fixtures and Fittings:** materiais/pens de threshold, sill, casing, board e sunshade. [DOC AC28 151-28]
+
+### 18.6 MVO — visibilidade global
+
+**Construction Elements > Door/Window:** [DOC AC28 140-39]
+
+| Opção | Efeito |
+|---|---|
+| **Show entire Door/Window** | desenha o símbolo completo em planta e corte/elevação |
+| **with Marker** | acrescenta o marcador, se houver |
+| **Show Opening Only** | mostra só o vão na parede, sem o objeto |
+| **with Contours** | o vão mostra contornos em planta |
+| **Hide on Floor Plan** | esconde objeto e vão em planta; em corte, só o vão |
+
+**Skylight:** opções análogas (Show Entire / with Markers / Show Opening Only / Hide on Floor Plan). **Opening** (vão livre): Show with Symbol / Show Opening Only / Hide. [DOC AC28 140-39]
+
+---
+
+## 19. Lógica de modelagem (como o ArchiCAD constrói a peça)
+
+### 19.1 Ordem de cálculo
+
+1. **Parede hospedeira e lado externo.** A janela só existe dentro de uma parede; o lado de fora é escolhido na colocação (ícone de sol) e pode ser trocado por Tab/Flip. [DOC AC28 040-306]
+2. **Dimensão nominal.** O usuário escolhe se a nominal é Wallhole, Unit, Egress ou Leaf; o valor nominal alimenta Width/Height do diálogo e o quadro. [DOC AC28 151-2]
+3. **Furo bruto.** O Wallhole é Unit + tolerâncias laterais/superior. O Oversize, se usado, amplia o furo sem mexer na nominal. [DOC AC28 151-2/15]
+4. **Recorte e reveal.** O furo é cortado; o Reveal Type + Reveal Depth posicionam o conjunto na espessura. A âncora (face/núcleo) define a referência. [DOC AC28 151-15/16; 040-312]
+5. **Conjunto (Unit).** A moldura ocupa o perímetro; as folhas são repartidas conforme a Shape/variante; cada folha recebe sash type e subdivisões. [DOC AC28 151-3/10/11]
+6. **Abertura.** O Opening Type de cada componente define a transformação da folha; os ângulos 2D e 3D são independentes; correr usa distância. [DOC AC28 151-13]
+7. **Vidro e grades.** O vidro é uma peça por pane; a grade é posicionada dentro/fora/atravessando; a espessura do vidro e dos montantes é paramétrica. [DOC AC28 151-10/11]
+8. **Fechamento da parede.** As camadas da parede composta viram para dentro do vão; o reboco pode virar para fora do contorno do reveal. [DOC AC28 151-17]
+9. **Acabamentos.** Alizar nas faces; sill/board/threshold; wall inset como segundo recorte; arco de alvenaria acima; sunshade do lado externo. [DOC AC28 151-18..27]
+10. **Representação.** O símbolo 2D é gerado pelo script GDL (ou projetado do 3D); as linhas de abertura vêm do MVO; o nível de detalhe filtra o que aparece. [DOC AC28 151-29; 150-18; 140-40]
+
+### 19.2 Dependências (o que limita o quê)
+
+| Dependência | Efeito | Fonte |
+|---|---|---|
+| Opening Type → Frame Style (porta) | certos tipos limitam os estilos de moldura; double-egress força Block | [DOC AC28 151-4/5] |
+| Frame Thickness = Wall Thickness → Uniform Frame Thickness | só libera a espessura variável se o batente igualar a parede e todas as folhas abrirem no mesmo sentido | [DOC AC28 151-5] |
+| Reveal Type → Closure Type | os tipos de fechamento disponíveis variam com o reveal | [DOC AC28 151-15/17] |
+| Casing ↔ Turn Plaster | mutuamente exclusivos no mesmo lado | [DOC AC28 151-17/26] |
+| Ganging → acessórios | suprime linhas de encontro e desabilita opções de sill/board/sunshade | [DOC AC28 151-22] |
+| Raised sidelight → Sunshade | sunshade indisponível | [DOC AC28 151-27] |
+| Corner Window ↔ par | qualquer edição que desfaça o canto transforma em janelas simples | [DOC AC28 040-316] |
+| Skylight → Roof/Shell | não existe fora de telhado/shell; constraint muda com a geometria | [DOC AC28 040-317/319] |
+| MVO → representação | o MVO pode esconder, simplificar ou trocar a linha de abertura de todas as janelas | [DOC AC28 140-39/40] |
+
+### 19.3 Geometria: o que é “de verdade” e o que é desenho
+
+- **Modelo 3D:** furo + moldura + folha + vidro + grades + acessórios (sill, board, casing, sunshade, arco). O vidro é sólido em elevação, mas transparente em renderização. [DOC AC28 040-305]
+- **Símbolo 2D:** script GDL próprio; pode ser completamente diferente do 3D. `Symbolic` usa o símbolo; `Projected` deriva do 3D. [DOC AC28 150-18]
+- **Linhas de abertura:** simbólicas, não geométricas; controladas por MVO (AC28) ou override por elemento (AC24). [DOC AC28 140-40; AC24 141-14]
+- **Wall Closure / Turn Plaster:** afetam principalmente o desenho 2D; o Turn Plaster pode aparecer em corte/elevação e, com `Show in 3D`, no 3D. [DOC AC28 151-17]
+- **Nominal x real:** a nominal é uma convenção de medição/quadro; o furo real é wallhole; o desenho pode usar tolerâncias e oversizes que não aparecem na nominal. [DOC AC28 151-2/15]
+
+---
+
+## 20. Leitura para o Hestia (o que vale parametrizar)
+
+| Conceito do ArchiCAD | Tradução proposta no nosso modelo | Observação |
+|---|---|---|
+| Nominal Size (Wallhole/Unit/Egress/Leaf) | `nominalBasis` no tipo | precisamos de um campo para saber o que o Width/Height significa |
+| Tolerance + Oversize | `tolerance`, `roughOversize` | já temos `roughOversize`; a tolerância é outra coisa |
+| Shape / transom / sidelight | `leaves`, `transom`, `sidelight` | não tentar replicar a árvore GDL |
+| Sash Type / panes / grid position | `grid` (H/V, panes, position) | o “Editable Grid” é hotspot, não paramétrico |
+| Opening Type + 2D/3D angle | `operation`, `openAngle2D`, `openAngle3D` | correr usa distância |
+| Frame width/thickness/joinery | `frameWidth`, `frameDepth`, `joinery` | já temos frameWidth/frameDepth |
+| Glass thickness/material | `glassThickness`, `glassMaterial` | “double glazing” é representação |
+| Reveal Type/Depth + anchor | `reveal`, `anchor` (face/core) | decidir se o nosso batente é limitado ao núcleo |
+| Wall Closure / Turn Plaster | `wallClosure`, `turnPlaster` | conflita com casing |
+| Casing in/out | `casing` | já temos casing |
+| Sill / Board / Threshold | `sill`, `board`, `threshold` | separar externo/interno |
+| Wall Inset | `wallInset` | recorte secundário |
+| Masonry Arch | `masonryArch` | peça opcional |
+| Sunshade | `sunshade` | brise |
+| Corner Window / Custom Corner | `corner` (linked pair) ou `cornerConnection` | dois modelos distintos |
+| Skylight | família/tipo próprio | host roof/shell |
+| MVO / LOD / Symbolic x Projected | `detailLevel`, `planDisplay` | hoje só simbólico |
+
+**Prioridade sugerida:** (1) nominalBasis; (2) transom/sidelight; (3) grid; (4) wall closure/turn plaster; (5) sill x board x threshold; (6) wall inset; (7) corner/skylight. [INFERIDO]

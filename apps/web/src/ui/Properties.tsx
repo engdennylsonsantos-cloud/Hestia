@@ -26,7 +26,7 @@ import {
 } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActions.ts';
-import { setRoofProjection, useUi } from '../editor/state.ts';
+import { setGridStep, setRoofProjection, setSnap, useUi } from '../editor/state.ts';
 import { avisoSemNivelAcima, proximoNivelAcima, setBaseNoPiso, setTopoNoPiso } from '../editor/wallFloorActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
@@ -339,7 +339,13 @@ function ViewProps(): ReactElement {
           </select>
         </Row>
         <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
-        <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => useUi.setState({ showGrid: v })} /></Row>
+        <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => setSnap({ grid: v })} /></Row>
+        <Row label="Intervalo da grade" htmlFor="v-grid-step">
+          <select id="v-grid-step" className="select" value={String(s.gridStep)} onChange={(e) => setGridStep(Number(e.target.value))}>
+            <option value="0">Automático</option>
+            {GRID_STEPS.map((g) => <option key={g} value={String(g)}>{fmt(g)} m</option>)}
+          </select>
+        </Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
         <UnderlayRow />
         <Row label="Projeção da cobertura"><Check id="v-roofproj" checked={s.showRoofProjection} onChange={(v) => setRoofProjection(v)} /></Row>
@@ -366,6 +372,9 @@ function ViewProps(): ReactElement {
     </>
   );
 }
+
+/** Intervalos de grade oferecidos (m), além do automático pelo zoom. */
+const GRID_STEPS = [0.05, 0.1, 0.25, 0.5, 1, 2, 5];
 
 export function Properties(): ReactElement {
   const p = useProject();

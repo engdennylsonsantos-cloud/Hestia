@@ -31,6 +31,8 @@ export interface UiState {
   dialog: DialogKind;
   dialogArg: string | null;
   showGrid: boolean;
+  /** Intervalo da grade de pontos (m); 0 = automático pelo zoom. Vale para o desenho e para a captura. */
+  gridStep: number;
   showUnderlay: boolean;
   /** Pavimento de referência escolhido nas propriedades da vista (null = o de baixo). */
   underlayLevel: string | null;
@@ -80,10 +82,34 @@ function loadSnap(): SnapOptions {
   }
 }
 
+const GRID_STEP_KEY = 'hestia.gridStep';
+
+/** Intervalo da grade guardado no navegador; sem armazenamento ou valor inválido: automático (0). */
+function loadGridStep(): number {
+  try {
+    const n = Number(localStorage.getItem(GRID_STEP_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Define o intervalo da grade (m; 0 = automático) e o guarda no navegador. */
+export function setGridStep(step: number): void {
+  const n = Number.isFinite(step) && step > 0 ? step : 0;
+  useUi.setState({ gridStep: n });
+  try {
+    localStorage.setItem(GRID_STEP_KEY, String(n));
+  } catch {
+    // Armazenamento indisponível: o intervalo vale só nesta sessão.
+  }
+}
+
 /** Altera capturas (em parte ou todas) e guarda no navegador para sobreviver ao recarregamento. */
 export function setSnap(patch: Partial<SnapOptions>): void {
   const snap: SnapOptions = { ...(useUi.getState().options.snap ?? DEFAULT_SNAP), ...patch };
-  useUi.setState((s) => ({ options: { ...s.options, snap } }));
+  // A grade de pontos e a captura por grade são uma chave só: o que se vê é o que se captura.
+  useUi.setState((s) => ({ options: { ...s.options, snap }, ...(patch.grid === undefined ? {} : { showGrid: patch.grid }) }));
   try {
     localStorage.setItem(SNAP_KEY, JSON.stringify(snap));
   } catch {
@@ -199,7 +225,9 @@ export const useUi = create<UiState>(() => ({
   prompt: null,
   dialog: null,
   dialogArg: null,
-  showGrid: true,
+  // Os pontos e a captura por grade são uma chave só: abrem como a captura foi deixada (`setSnap({ grid })` mantém os dois juntos).
+  showGrid: loadSnap().grid,
+  gridStep: loadGridStep(),
   showUnderlay: true,
   underlayLevel: null,
   showRoofProjection: readRoofProjection(),

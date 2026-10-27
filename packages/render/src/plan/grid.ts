@@ -10,6 +10,17 @@ export function visibleGridStep(zoom: number): number {
   return STEPS.find((s) => s * zoom >= 14) ?? 100;
 }
 
+/** Menor distância em pixels entre pontos da grade para um intervalo escolhido pelo usuário valer; abaixo disso, automático. */
+const MIN_USER_STEP_PX = 6;
+
+/**
+ * Intervalo da grade (m) para um zoom: o escolhido pelo usuário, se legível, senão o automático. É o mesmo valor do
+ * desenho dos pontos e da captura por grade (os pontos desenhados são os pontos em que o cursor pega).
+ */
+export function effectiveGridStep(zoom: number, userStep?: number): number {
+  return userStep !== undefined && userStep > 0 && userStep * zoom >= MIN_USER_STEP_PX ? userStep : visibleGridStep(zoom);
+}
+
 /**
  * Linhas da grade, na ordem: verticais (menores, depois maiores), horizontais (menores, depois maiores) e os eixos.
  * Linhas de uma mesma direção não se sobrepõem (estão a pelo menos `step` px de distância, com 1 px de espessura), então
@@ -18,7 +29,7 @@ export function visibleGridStep(zoom: number): number {
  * malha por troca de cor.
  */
 export function gridStrokes(v: Viewport, theme: PlanTheme): StrokeOp[] {
-  const step = visibleGridStep(v.zoom);
+  const step = effectiveGridStep(v.zoom, v.gridStep);
   const b = visibleBounds(v);
   const major = step * 5;
   const x0 = Math.floor(b.minX / step) * step;
@@ -81,7 +92,7 @@ export function gridLayer(v: Viewport, theme: PlanTheme): GridLayer {
  * O tamanho é fixo em pixels; o maior pontinho é o de interseção de eixo múltiplo de cinco (a mesma régua da grade).
  */
 export function gridDotFills(v: Viewport, theme: PlanTheme): FillOp[] {
-  const step = visibleGridStep(v.zoom);
+  const step = effectiveGridStep(v.zoom, v.gridStep);
   const b = visibleBounds(v);
   const nx = Math.floor((b.maxX - b.minX) / step) + 2;
   const ny = Math.floor((b.maxY - b.minY) / step) + 2;

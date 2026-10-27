@@ -21,7 +21,7 @@ const ITEMS: SnapItemDef[] = [
   { key: 'alignment', label: 'Rastreamento Dinâmico', symbol: '☩', shortcut: 'F11', hint: 'Linhas-guia pontilhadas de alinhamento com outros pontos' },
   { key: 'faces', label: 'Faces de Parede', symbol: '⚏', hint: 'Cantos e arestas das faces de acabamento' },
   { key: 'core', label: 'Faces do Núcleo', symbol: '◇', hint: 'Cantos e arestas da alvenaria estrutural' },
-  { key: 'grid', label: 'Pela grade', symbol: '⊞', hint: 'Captura nos pontos da grade visível (passo automático pelo zoom)' },
+  { key: 'grid', label: 'Pela grade', symbol: '⊞', hint: 'Captura nos pontos da grade visível (intervalo em Propriedades da vista; automático pelo zoom)' },
 ];
 
 const ALL_ON: SnapOptions = {

@@ -7,6 +7,8 @@ export interface Viewport {
   zoom: number;
   width: number;
   height: number;
+  /** Intervalo da grade de pontos (m); ausente ou 0 = automático pelo zoom (ver `gridStepOf`). */
+  gridStep?: number;
 }
 
 export const worldToScreen = (v: Viewport, p: Vec2): Vec2 => ({

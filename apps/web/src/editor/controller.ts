@@ -19,7 +19,7 @@ import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts'; import { PerimeterMode } from './perimeterMode.ts';
 import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
-import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, underlayIdOf, visibleGridStep, zoomAt, type Viewport } from '@hestia/render';
+import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, underlayIdOf, effectiveGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews } from './openViews.ts';
 import { casador } from './shortcutConfig.ts'; import { clearSelectionForTool } from './toolSelection.ts';
@@ -79,7 +79,7 @@ export class Editor {
     exec: (c) => this.store.exec(c),
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
-    gridStep: () => visibleGridStep(this.viewport()?.zoom ?? 60),
+    gridStep: () => effectiveGridStep(this.viewport()?.zoom ?? 60, useUi.getState().gridStep),
     say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang,
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),

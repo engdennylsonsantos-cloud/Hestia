@@ -211,7 +211,7 @@ export class PlanFrame {
       this.gridKey = null;
       this.grid = null;
     } else {
-      const gk = `${v.zoom}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
+      const gk = `${v.zoom}|${v.gridStep ?? 0}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
       if (this.grid === null || this.gridKey !== gk || !gridCovers(this.grid, v)) {
         this.grid = gridLayer(v, theme);
         this.gridKey = gk;

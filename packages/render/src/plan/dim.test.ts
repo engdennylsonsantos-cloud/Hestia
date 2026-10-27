@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DIM_AMOUNT, dimAmount, dimColor, dimPlanOps } from './dim.ts';
+import { DIM_AMOUNT, DIM_STROKE_RATIO, dimAmount, dimColor, dimPlanOps } from './dim.ts';
 
 const lum = (hex: string): number => {
   const n = parseInt(hex.slice(1), 16);
@@ -13,9 +13,17 @@ afterEach(() => {
 });
 
 describe('dimPlanOps', () => {
-  it('usa 0,65 por padrão: a planta continua legível como referência', () => {
-    expect(DIM_AMOUNT).toBe(0.65);
-    expect(dimColor('#000000', '#ffffff')).toBe('#a6a6a6');
+  it('usa 0,6 nos preenchimentos por padrão: a planta continua legível como referência', () => {
+    expect(DIM_AMOUNT).toBe(0.6);
+    expect(dimColor('#000000', '#ffffff')).toBe('#999999');
+  });
+
+  it('traços e hachura esmaecem menos que os preenchimentos, para não sumirem', () => {
+    expect(DIM_STROKE_RATIO).toBeLessThan(1);
+    const o = dimPlanOps({ fills: [], strokes: [{ pts: [{ x: 0, y: 0 }, { x: 1, y: 1 }], closed: false, widthPx: 1, color: '#000000', alpha: 1 }], labels: [] }, '#ffffff');
+    expect(o.strokes[0]!.color).toBe(dimColor('#000000', '#ffffff', DIM_AMOUNT * DIM_STROKE_RATIO));
+    // Contraste do traço contra o fundo branco (WCAG): precisa passar de 4,5 para ler como referência de trabalho.
+    expect(lum(o.strokes[0]!.color)).toBeLessThan(120);
   });
 
   it('mistura o cinza com o fundo na proporção pedida', () => {
@@ -28,7 +36,7 @@ describe('dimPlanOps', () => {
   it('leva qualquer cor a um cinza claro, sem passar do fundo', () => {
     for (const c of ['#000000', '#16181c', '#c2185b', '#1d6fe0', '#b45309']) {
       const d = dimColor(c, BG);
-      expect(lum(d)).toBeGreaterThan(160);
+      expect(lum(d)).toBeGreaterThan(130);
       expect(lum(d)).toBeLessThanOrEqual(lum(BG));
     }
   });
@@ -48,10 +56,11 @@ describe('dimPlanOps', () => {
       0.6,
     );
     expect(o.strokes[0]!.widthPx).toBe(2);
+    expect(o.strokes[0]!.color).toBe(dimColor('#000000', '#ffffff', 0.6 * DIM_STROKE_RATIO));
     expect(o.fills[0]!.polygons).toHaveLength(1);
     expect(o.fills[0]!.color).toBe(dimColor('#b45309', '#ffffff', 0.6));
     expect(o.fills[0]!.color).not.toBe('#b45309');
-    expect(o.fills[0]!.hatch!.color).toBe(dimColor('#16181c', '#ffffff', 0.6));
+    expect(o.fills[0]!.hatch!.color).toBe(dimColor('#16181c', '#ffffff', 0.6 * DIM_STROKE_RATIO));
     expect(o.fills[0]!.hatch!.color).not.toBe('#16181c');
   });
 

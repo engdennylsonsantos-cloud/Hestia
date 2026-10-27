@@ -1,6 +1,14 @@
 import { configDefaults, defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
+
+const workspaceAliases = ['geom', 'model', 'engine', 'tools', 'render', 'io'].map((name) => ({
+  find: `@hestia/${name}`,
+  replacement: fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url)),
+}));
 
 export default defineConfig({
+  // Keep tests bound to this checkout's workspace sources even when node_modules is shared by multiple worktrees.
+  resolve: { alias: workspaceAliases },
   test: {
     include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts', 'tests/**/*.test.ts'],
     // Testes de desempenho (limites de razão) não entram no portão normal: rodam em `npm run test:perf`

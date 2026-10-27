@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-10-24T18:57:56.811Z",
+  "node": "v24.14.1",
+  "platform": "win32/x64",
+  "logicalCpus": 12,
+  "totalMemoryBytes": 17013121024,
+  "runs": 1,
+  "warmups": 0,
+  "project": {
+    "levels": 20,
+    "walls": 640,
+    "wallType": "wt_ext19",
+    "openings": 20,
+    "floors": 20,
+    "slabs": 20,
+    "roofs": 1
+  },
+  "measurements": {
+    "resolveLevelColdTop": {
+      "samplesMs": [
+        445.49
+      ],
+      "medianMs": 445.49,
+      "minMs": 445.49,
+      "maxMs": 445.49
+    },
+    "resolveLevelWarmTop": {
+      "samplesMs": [
+        86.35
+      ],
+      "medianMs": 86.35,
+      "minMs": 86.35,
+      "maxMs": 86.35
+    },
+    "resolveAllCold": {
+      "samplesMs": [
+        4099.2
+      ],
+      "medianMs": 4099.2,
+      "minMs": 4099.2,
+      "maxMs": 4099.2
+    },
+    "resolveAllWarm": {
+      "samplesMs": [
+        1008.97
+      ],
+      "medianMs": 1008.97,
+      "minMs": 1008.97,
+      "maxMs": 1008.97
+    },
+    "resolveAllAfterTopEdit": {
+      "samplesMs": [
+        3059.69
+      ],
+      "medianMs": 3059.69,
+      "minMs": 3059.69,
+      "maxMs": 3059.69
+    },
+    "junctionLevelsAll": {
+      "samplesMs": [
+        25299.02
+      ],
+      "medianMs": 25299.02,
+      "minMs": 25299.02,
+      "maxMs": 25299.02
+    },
+    "wallSolidBuildAllCold": {
+      "samplesMs": [
+        16036.55
+      ],
+      "medianMs": 16036.55,
+      "minMs": 16036.55,
+      "maxMs": 16036.55
+    },
+    "surfaceSolidBuildAll": {
+      "samplesMs": [
+        69.02
+      ],
+      "medianMs": 69.02,
+      "minMs": 69.02,
+      "maxMs": 69.02
+    },
+    "modelSceneUpdate": {
+      "samplesMs": [
+        51548.59
+      ],
+      "medianMs": 51548.59,
+      "minMs": 51548.59,
+      "maxMs": 51548.59
+    }
+  },
+  "meshTriangles": 57034,
+  "heapUsedBytes": 350682688,
+  "rssBytes": 526983168,
+  "note": "Node CPU geometry and scene assembly only; no browser paint, GPU draw, FPS, long-task, or heap-profiler measurement."
+}

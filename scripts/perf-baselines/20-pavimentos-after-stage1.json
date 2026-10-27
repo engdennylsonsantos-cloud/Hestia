@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-10-24T19:48:39.055Z",
+  "node": "v24.14.1",
+  "platform": "win32/x64",
+  "logicalCpus": 12,
+  "totalMemoryBytes": 17013121024,
+  "runs": 1,
+  "warmups": 0,
+  "project": {
+    "levels": 20,
+    "walls": 640,
+    "wallType": "wt_ext19",
+    "openings": 20,
+    "floors": 20,
+    "slabs": 20,
+    "roofs": 1
+  },
+  "measurements": {
+    "resolveLevelColdTop": {
+      "samplesMs": [
+        196.99
+      ],
+      "medianMs": 196.99,
+      "minMs": 196.99,
+      "maxMs": 196.99
+    },
+    "resolveLevelWarmTop": {
+      "samplesMs": [
+        28.29
+      ],
+      "medianMs": 28.29,
+      "minMs": 28.29,
+      "maxMs": 28.29
+    },
+    "resolveAllCold": {
+      "samplesMs": [
+        1599.94
+      ],
+      "medianMs": 1599.94,
+      "minMs": 1599.94,
+      "maxMs": 1599.94
+    },
+    "resolveAllWarm": {
+      "samplesMs": [
+        414.59
+      ],
+      "medianMs": 414.59,
+      "minMs": 414.59,
+      "maxMs": 414.59
+    },
+    "resolveAllAfterTopEdit": {
+      "samplesMs": [
+        1370.94
+      ],
+      "medianMs": 1370.94,
+      "minMs": 1370.94,
+      "maxMs": 1370.94
+    },
+    "junctionLevelsAll": {
+      "samplesMs": [
+        1730.92
+      ],
+      "medianMs": 1730.92,
+      "minMs": 1730.92,
+      "maxMs": 1730.92
+    },
+    "junctionLevelsAllAfterTopEdit": {
+      "samplesMs": [
+        99.84
+      ],
+      "medianMs": 99.84,
+      "minMs": 99.84,
+      "maxMs": 99.84
+    },
+    "wallSolidBuildAllCold": {
+      "samplesMs": [
+        1081.81
+      ],
+      "medianMs": 1081.81,
+      "minMs": 1081.81,
+      "maxMs": 1081.81
+    },
+    "surfaceSolidBuildAll": {
+      "samplesMs": [
+        25.81
+      ],
+      "medianMs": 25.81,
+      "minMs": 25.81,
+      "maxMs": 25.81
+    },
+    "modelSceneUpdate": {
+      "samplesMs": [
+        1636.96
+      ],
+      "medianMs": 1636.96,
+      "minMs": 1636.96,
+      "maxMs": 1636.96
+    },
+    "modelSceneUpdateWarm": {
+      "samplesMs": [
+        634.96
+      ],
+      "medianMs": 634.96,
+      "minMs": 634.96,
+      "maxMs": 634.96
+    }
+  },
+  "wallLayerCacheAfterColdBuild": {
+    "hits": 0,
+    "misses": 3200,
+    "size": 3200,
+    "estimatedBytes": 9220200,
+    "maxBytes": 67108864
+  },
+  "wallBooleanStats": {
+    "calls": {
+      "union": 6120,
+      "difference": 400,
+      "intersection": 80
+    },
+    "exactTries": 6600,
+    "exactFails": 0,
+    "clipperDirect": 0,
+    "failMs": 0,
+    "okMs": 323.5447000001168,
+    "failVertices": 0,
+    "failReasons": {}
+  },
+  "wallLayerCacheAfterSceneUpdate": {
+    "hits": 0,
+    "misses": 3200,
+    "size": 3200,
+    "estimatedBytes": 9220200,
+    "maxBytes": 67108864
+  },
+  "wallLayerCacheAfterWarmSceneUpdate": {
+    "hits": 3200,
+    "misses": 3200,
+    "size": 3200,
+    "estimatedBytes": 9220200,
+    "maxBytes": 67108864
+  },
+  "meshTriangles": 57034,
+  "note": "Node CPU geometry and scene assembly only; no browser paint, GPU draw, FPS, long-task, or heap-profiler measurement.",
+  "heapUsedBytes": 131795656,
+  "rssBytes": 359022592
+}

@@ -28,6 +28,7 @@ describe('cache de camadas de parede (desempenho da vista 3D)', () => {
     const second = buildLevelSolids(lv);
     expect(wallLayerCacheStats().hits).toBe(n);
     expect(second).toEqual(first);
+    expect(wallLayerCacheStats().estimatedBytes).toBeLessThanOrEqual(wallLayerCacheStats().maxBytes);
   });
 
   it('a malha com cache é igual à malha sem cache', () => {

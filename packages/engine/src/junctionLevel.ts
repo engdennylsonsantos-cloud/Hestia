@@ -1,7 +1,7 @@
 import { multiArea, union, type MultiPolygon } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import type { LayerBand, ResolvedLayer, ResolvedWall } from './types.ts';
-import { levelCutterSet, type SolidPiece } from './junctionNet.ts';
+import { levelCutterSet, type LevelCutters, type SolidPiece } from './junctionNet.ts';
 import { resolveJunction, type PlanarPiece, type ResolvedPrism } from './junctionPlanar.ts';
 
 /**
@@ -88,6 +88,10 @@ function signature(tagged: readonly Tagged[]): string {
 
 /** Cache por nível e por conteúdo (como o circuito de ambientes, decisão 0023 §11): nível não editado = mesmo resultado. */
 const levelCache = new Map<Id, { sig: string; value: JunctionLevel }>();
+/** Atalho por snapshot imutável: evita reconstruir assinatura e cortadores quando o mesmo nível é consultado de novo. */
+const projectLevelCache = new WeakMap<Project, Map<Id, JunctionLevel>>();
+/** Conteúdo de cortadores compartilhado entre snapshots também compartilha a junção e sua assinatura. */
+const cutterSetResultCache = new WeakMap<LevelCutters, JunctionLevel>();
 
 /** Volume (m³) das partes de uma camada: área em planta vezes a altura de cada parte. */
 const volumeOfParts = (parts: readonly ResolvedPrism[]): number => parts.reduce((s, x) => s + multiArea(x.poly) * (x.z1 - x.z0), 0);
@@ -105,9 +109,22 @@ const lostVolume = (t: PlanarPiece, parts: readonly ResolvedPrism[]): boolean =>
  * porque a faixa inclinada não se recorta por aproximação plana (quantitativos já integram).
  */
 export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
+  const exact = projectLevelCache.get(p)?.get(levelId);
+  if (exact) return exact;
+  const remember = (value: JunctionLevel): JunctionLevel => {
+    let byLevel = projectLevelCache.get(p);
+    if (!byLevel) {
+      byLevel = new Map();
+      projectLevelCache.set(p, byLevel);
+    }
+    byLevel.set(levelId, value);
+    return value;
+  };
+  const cutters = levelCutterSet(p, levelId);
+  const cutterResult = cutterSetResultCache.get(cutters);
+  if (cutterResult) return remember(cutterResult);
   // Cortadores do nível e dos níveis que o alcançam (F1b). Laje com caimento fica de fora da junção.
   const tagged: Tagged[] = [];
-  const cutters = levelCutterSet(p, levelId);
   for (const sp of [...cutters.floors, ...cutters.slabs, ...cutters.walls].flatMap((c) => c.pieces)) {
     const meta = sp.meta;
     if (!meta || (meta.kind === 'slab' && !sp.flat)) continue;
@@ -123,7 +140,10 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
 
   const sig = signature(tagged);
   const hit = levelCache.get(levelId);
-  if (hit && hit.sig === sig) return hit.value;
+  if (hit && hit.sig === sig) {
+    cutterSetResultCache.set(cutters, hit.value);
+    return remember(hit.value);
+  }
 
   const res = resolveJunction(tagged.map((t) => t.piece));
   const elements = new Map<Id, ElementJunction>();
@@ -155,7 +175,8 @@ export function junctionLevel(p: Project, levelId: Id): JunctionLevel {
   }
   const value: JunctionLevel = { levelId, elements, walls };
   levelCache.set(levelId, { sig, value });
-  return value;
+  cutterSetResultCache.set(cutters, value);
+  return remember(value);
 }
 
 /**

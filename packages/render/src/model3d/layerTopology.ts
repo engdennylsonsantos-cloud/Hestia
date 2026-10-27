@@ -46,7 +46,8 @@ export function weldBands(bands: LayerBand[]): LayerBand[] {
 export function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: number): void {
   const pos = b.positions;
   const nVert = pos.length / 3;
-  // Grade de vértices da camada: célula de ~1/40 da maior dimensão (mínimo 2 cm).
+  // Grade de vértices da camada: célula de ~1/12 da maior dimensão (mínimo 2 cm).
+  // A busca verifica a distância exata depois; a célula mais grossa reduz consultas sem perder candidatos.
   const mn = [Infinity, Infinity, Infinity];
   const mx = [-Infinity, -Infinity, -Infinity];
   for (let i = firstVert; i < nVert; i++) {
@@ -55,10 +56,12 @@ export function splitTJunctions(b: SolidBatch, firstTri: number, firstVert: numb
       mx[k] = Math.max(mx[k]!, pos[i * 3 + k]!);
     }
   }
-  const h = Math.max(0.02, Math.max(mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!) / 40);
+  const h = Math.max(0.02, Math.max(mx[0]! - mn[0]!, mx[1]! - mn[1]!, mx[2]! - mn[2]!) / 12);
   const cell = (v: number, k: number): number => Math.floor((v - mn[k]!) / h);
-  const grid = new Map<string, number[]>();
-  const keyOf = (ix: number, iy: number, iz: number): string => `${ix},${iy},${iz}`;
+  // Cada eixo ocupa no máximo 13 células (12 divisões + extremidade); base 64 evita
+  // colisões e dispensa montar strings na consulta, que acontece para cada aresta do triângulo.
+  const grid = new Map<number, number[]>();
+  const keyOf = (ix: number, iy: number, iz: number): number => (ix * 64 + iy) * 64 + iz;
   for (let i = firstVert; i < nVert; i++) {
     const k = keyOf(cell(pos[i * 3]!, 0), cell(pos[i * 3 + 1]!, 1), cell(pos[i * 3 + 2]!, 2));
     const list = grid.get(k);

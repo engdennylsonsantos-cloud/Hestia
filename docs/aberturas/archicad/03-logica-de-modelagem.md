@@ -152,7 +152,7 @@ Fonte: [DOC: Ajuda “Wall Opening”; “Nominal Sizes and Tolerance”; “Tol
 
 | `ac_revealAnchorPos` | Nome na UI | Comportamento |
 |---|---|---|
-| `1` | **Face** | o reveal depth é medido da **face** da parede (lado do reveal side) |
+| `1` | **Face** | o reveal depth é medido da **face** da parede **do lado do reveal side** |
 | `2` | **Core** | medido do **core** (a skin core mais próxima, se houver várias) |
 
 - Ancorar no **core** é o que mantém a janela alinhada quando se engorda o isolamento ou se troca o acabamento externo: o recuo se ajusta sozinho para manter a distância ao core [DOC: Ajuda “Anchor Reveal”; API `APIWDRevealDepth_Core`].
@@ -164,7 +164,7 @@ Fonte: [DOC: Ajuda “Wall Opening”; “Nominal Sizes and Tolerance”; “Tol
 - **Não por padrão conceitual.** O checkbox **Frame Thickness = Wall Thickness** força o batente a ter a espessura da parede; quando desligado, a espessura do batente é um parâmetro independente (`gs_frame_thk` / “Frame Thickness”) [DOC: Ajuda “Frame Style and Dimensions”; GDL Basics 17].
 - Em várias portas da biblioteca, esse checkbox vem **ligado e cinza** (não editável); ele só se torna editável em certas combinações (ex.: `Frame Thickness = Wall Thickness` ligado e todas as folhas abrindo no mesmo sentido) [DOC: Ajuda “Frame Style and Dimensions”]. Em versões antigas, dependia também do “Wall Type” (Stud/Solid) [FÓRUM].
 - Quando o batente é mais raso que a parede, a biblioteca histórica resolve com **Jamb Extension** (extensão de batente) e/ou com o próprio **Reveal** [DOC: AC9 SE “Casing”; Ajuda “Wall Closure” (reveal to wall core)].
-- **Não existe opção “centralizado”** na UI. O batente é posicionado pelo **reveal depth** a partir de uma face/core; para centralizar é preciso calcular `reveal = (WALL_THICKNESS − gs_frame_thk) / 2` [*[INFERIDO]* da ausência de controle “center” + do modelo Z de §4.4].
+- **Não existe opção “centralizado”** na UI. Quem a UI ancora é o **reveal depth** (`ac_revealAnchorPos`), não o batente diretamente; o batente é desenhado a partir daí. Para centralizar é preciso calcular `reveal = (WALL_THICKNESS − gs_frame_thk) / 2` [*[INFERIDO]* da ausência de controle “center” + do modelo Z de §4.4].
 
 ### 4.4 Modelo numérico da posição
 

@@ -57,6 +57,7 @@ export function ViewsTree(): ReactElement {
   const p = useProject();
   const view = useUi((s) => s.view);
   const levelId = useUi((s) => s.levelId);
+  const planKind = useUi((s) => s.planKind);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   const genMenu: MenuItem[] = [{ label: 'Gerar elevações (Norte, Sul, Leste, Oeste)', run: () => editor.generateElevations(), hint: 'Cria as quatro em volta das paredes do nível ativo; substitui as de mesmo nome.' }];
@@ -69,10 +70,25 @@ export function ViewsTree(): ReactElement {
             id={`plan:${l.id}`}
             label={l.name}
             icon="plan"
-            bold={view === 'plan' && levelId === l.id}
+            bold={view === 'plan' && planKind === 'floor' && levelId === l.id}
             title={`Elevação ${l.elevation.toFixed(2).replace('.', ',')} m. Duplo clique abre a planta.`}
             onOpen={() => activateView({ kind: 'plan', levelId: l.id })}
             menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
+          />
+        ))}
+      </Node>
+      {/* Cobertura: a planta do nível com o telhado completo e opaco (ver `roofPlanMode`); mesmos níveis do projeto. */}
+      <Node id="g:roofs" label="Plantas de cobertura (Planta de cobertura)" group open menu={[{ label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }) }]}>
+        {p.levels.map((l) => (
+          <Node
+            key={`roof:${l.id}`}
+            id={`roof:${l.id}`}
+            label={l.name}
+            icon="roof"
+            bold={view === 'plan' && planKind === 'roof' && levelId === l.id}
+            title={`Planta de cobertura do nível ${l.name}. Duplo clique abre.`}
+            onOpen={() => activateView({ kind: 'plan', levelId: l.id, planKind: 'roof' })}
+            menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id, planKind: 'roof' }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
           />
         ))}
       </Node>

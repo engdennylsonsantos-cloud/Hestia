@@ -144,6 +144,8 @@ export interface OutlinedPart {
   id: Id;
   polygon: MultiPolygon;
   area?: number;
+  /** Quais vértices do anel recebem quadradinho de alça; ausente = todos (telhado em arco mostra só os cantos lógicos). */
+  grips?: (ring: Ring) => boolean[];
 }
 
 /**
@@ -162,11 +164,13 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
     if (!isSel) continue;
     for (const ring of f.polygon.flat()) {
       out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      for (const pt of ring) {
+      const grips = f.grips?.(ring);
+      ring.forEach((pt, i) => {
+        if (grips && !grips[i]) return;
         const quadrado = quadradoEm(pt, ALCA_PX);
         out.fills.push({ ...quadrado.fill, color: '#ffffff', alpha: 1 });
         out.strokes.push({ ...quadrado.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
-      }
+      });
     }
     if (areaLabel) {
       const at = labelPoint(f.polygon);

@@ -9,7 +9,7 @@ import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
 import { moveRoomSeparators, movableSeparatorIds, separatorGhostItems } from './roomSeparatorPick.ts';
 import type { EdgePick } from './ringEdge.ts';
-import type { PointerInfo, ToolEnv } from './types.ts';
+import { DEFAULT_DISJOIN, type PointerInfo, type ToolEnv } from './types.ts';
 
 const deg = (r: number): number => (r * 180) / Math.PI;
 export const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
@@ -56,6 +56,8 @@ export class MoveTool extends SelectionTool {
   private session: object = {};
   /** Quantas cópias a sessão já fez (Esc, com cópias feitas, encerra a sessão). */
   private copies = 0;
+  /** Alt segurado: alterna o "Desconectar" na hora de confirmar o Mover (como no Archicad). */
+  private alt = false;
 
   constructor(env: ToolEnv, private copy: boolean) {
     super(env);
@@ -160,6 +162,7 @@ export class MoveTool extends SelectionTool {
 
   override move(p: PointerInfo): void {
     this.items = [];
+    this.alt = p.alt;
     if (!this.hasSelection()) {
       this.edgeMove(p);
       return;
@@ -186,13 +189,15 @@ export class MoveTool extends SelectionTool {
     const seps = movableSeparatorIds(this.env, this.copy);
     // Cotas, textos (decisão 0019) e marcas de corte/elevação seguem a seleção e entram no mesmo passo de desfazer.
     const notes = annotationMoveCommands(this.env.project(), this.env.levelId(), this.env.selection(), d, this.copy);
+    // Desconectar (opção ou Alt na confirmação): a parede se solta das vizinhas em vez de esticá-las.
+    const disjoin = (this.env.options().moveDisjoin ?? DEFAULT_DISJOIN.move) !== this.alt;
     // Copiar: a sessão junta as cópias num só passo de desfazer; Mover segue num passo próprio.
     this.env.transaction(this.copy ? 'Copiar' : 'Mover', () => {
       if (this.copy) {
         if (els.length) copyWalls(this.env, els, t);
         if (views.length) transformViews(this.env, views, t, true);
       } else {
-        if (els.length) moveWalls(this.env, els, d);
+        if (els.length) moveWalls(this.env, els, d, !disjoin);
         else if (this.openings().length) slideOpenings(this.env, this.openings(), d);
         if (views.length) transformViews(this.env, views, t);
         if (seps.length) moveRoomSeparators(this.env, seps, d);
@@ -203,6 +208,7 @@ export class MoveTool extends SelectionTool {
   }
 
   override click(p: PointerInfo): void {
+    this.alt = p.alt;
     if (!this.hasSelection()) {
       this.edgeClick(p);
       return;
@@ -241,8 +247,8 @@ export class MoveTool extends SelectionTool {
 
 export class RotateTool extends SelectionTool {
   readonly id = 'rotate';
-  readonly label = 'Girar';
-  readonly hint = 'Girar: clique no centro, depois na direção de referência e na direção final — ou digite o ângulo em graus.';
+  readonly label = 'Rotacionar';
+  readonly hint = 'Rotacionar: clique no centro, depois na direção de referência e na direção final — ou digite o ângulo em graus.';
   private center: Vec2 | null = null;
   private ref: Vec2 | null = null;
 
@@ -292,10 +298,11 @@ export class RotateTool extends SelectionTool {
     const views = this.views();
     const t = { kind: 'rotate', about: this.center, angle } as const;
     const copy = this.env.options().rotateCopy;
-    this.env.transaction(copy ? 'Girar e copiar' : 'Girar', () => {
+    const disjoin = this.env.options().rotateDisjoin ?? DEFAULT_DISJOIN.rotate;
+    this.env.transaction(copy ? 'Rotacionar e copiar' : 'Rotacionar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else transformWalls(this.env, els, t, 'Girar');
+        else transformWalls(this.env, els, t, 'Rotacionar', !disjoin);
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });
@@ -388,10 +395,11 @@ export class MirrorTool extends SelectionTool {
     const views = this.views();
     const t = { kind: 'mirror', a, b } as const;
     const copy = this.env.options().mirrorCopy;
+    const disjoin = this.env.options().mirrorDisjoin ?? DEFAULT_DISJOIN.mirror;
     this.env.transaction(copy ? 'Espelhar e copiar' : 'Espelhar', () => {
       if (els.length) {
         if (copy) copyWalls(this.env, els, t);
-        else transformWalls(this.env, els, t, 'Espelhar');
+        else transformWalls(this.env, els, t, 'Espelhar', !disjoin);
       }
       if (views.length) transformViews(this.env, views, t, copy);
     });

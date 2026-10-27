@@ -105,20 +105,26 @@ function deleteClick(h: ModHost, id: string): void {
   h.say('Linha excluída. Clique noutra linha, ou Esc sai do comando.');
 }
 
-/** Clique num comando de linha. `p.raw` é o cursor; a linha é a que está sob ele. */
-export function edgeClick(h: ModHost, kind: PerimeterModifyKind, st: Step, p: PointerInfo): void {
+/**
+ * Clique num comando de linha. `p.raw` escolhe a linha sob o cursor; `at` (capturado) é o ponto da operação
+ * (aparar, dividir ou o lado do deslocamento).
+ */
+export function edgeClick(h: ModHost, kind: PerimeterModifyKind, st: Step, p: PointerInfo, at: Vec2 = p.raw): void {
   const id = lineAt(h.draft(), p.raw, h.mpp());
   if (!id) return h.say('Clique numa linha do esboço.');
-  if (kind === 'trim') return trimClick(h, st, id, p.raw);
-  if (kind === 'split') return splitClick(h, st, id, p.raw);
+  if (kind === 'trim') return trimClick(h, st, id, at);
+  if (kind === 'split') return splitClick(h, st, id, at);
   if (kind === 'align') return alignClick(h, st, id);
   deleteClick(h, id);
 }
 
-/** Prévia de um comando de linha com o cursor em `at`: realce da linha sob o cursor e o resultado da operação. */
-export function edgePreview(h: ModHost, kind: PerimeterModifyKind, st: Step, at: Vec2): PreviewItem[] {
+/**
+ * Prévia de um comando de linha com o cursor em `raw`: realce da linha sob o cursor e o resultado da operação no ponto
+ * capturado `at` (que pode diferir do cursor).
+ */
+export function edgePreview(h: ModHost, kind: PerimeterModifyKind, st: Step, at: Vec2, raw: Vec2 = at): PreviewItem[] {
   const d = h.draft();
-  const id = lineAt(d, at, h.mpp());
+  const id = lineAt(d, raw, h.mpp());
   const under = id ? halo(d, id) : [];
   if (kind === 'delete' || st.stage === 0) return under;
   const first = halo(d, st.ids[0]!);

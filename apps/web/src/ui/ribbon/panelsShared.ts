@@ -6,7 +6,7 @@ export const P_SELECT: RibbonPanel = panel('selecionar', t('Selecionar', 'Select
 
 export const P_PROPS: RibbonPanel = panel('propriedades', t('Propriedades', 'Properties'), act('typeProps'), act('properties'));
 
-/** Alinhar, Deslocar, Espelhar · Mover, Copiar, Girar · Aparar, Dividir, Matriz · Escala, Fixar, Excluir · extras do Hestia. */
+/** Alinhar, Deslocar, Espelhar · Mover, Copiar, Rotacionar · Aparar, Dividir, Matriz · Escala, Fixar, Excluir · extras do Hestia. */
 export const P_MODIFY: RibbonPanel = panel(
   'modificar',
   t('Modificar', 'Modify'),

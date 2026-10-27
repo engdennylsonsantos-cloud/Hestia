@@ -33,25 +33,35 @@ function releaseLevel(levelId: Id): void {
 }
 
 /**
- * Abre ou ativa uma vista (aba). Plantas passam por `selectLevel`, que já aponta a planta.
- * Garante a aba na lista mesmo quando a vista já é a ativa (caso de reabrir depois de fechar a última aba,
- * em que a vista ativa não muda e a sincronização de `state.ts` não percebe a mudança).
+ * Navega até a vista e diz se a navegação foi aceita. Com o modo de perímetro aberto, o controlador recusa trocar de
+ * vista ou de nível: nesse caso o estado não muda para a vista pedida (mas reabrir a vista já ativa continua valendo).
  */
-export function activateView(v: OpenView): void {
+function navega(v: OpenView): boolean {
   switch (v.kind) {
     case 'plan':
       editor.selectLevel(v.levelId);
-      break;
+      return useUi.getState().view === 'plan' && useUi.getState().levelId === v.levelId;
     case '3d':
       editor.setView('3d');
-      break;
+      return useUi.getState().view === '3d';
     case 'section':
       editor.openSection(v.viewId);
-      break;
+      return useUi.getState().view === 'section' && useUi.getState().sectionId === v.viewId;
     case 'sheet':
+      if (editor.perimetro.bloqueiaNavegacao()) return false;
       useUi.setState({ view: 'sheet', sheetId: v.sheetId });
-      break;
+      return true;
   }
+}
+
+/**
+ * Abre ou ativa uma vista (aba). Plantas passam por `selectLevel`, que já aponta a planta.
+ * Garante a aba na lista mesmo quando a vista já é a ativa (caso de reabrir depois de fechar a última aba,
+ * em que a vista ativa não muda e a sincronização de `state.ts` não percebe a mudança). A aba só entra se a
+ * navegação for aceita: com o modo de perímetro aberto, trocar de vista não pode abrir uma aba nova.
+ */
+export function activateView(v: OpenView): void {
+  if (!navega(v)) return;
   const s = useUi.getState();
   if (!tabOf(editor.project, v)) return;
   const next = addView(s.openViews, v);

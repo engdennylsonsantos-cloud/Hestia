@@ -203,6 +203,13 @@ describe('openingPlanPaths: níveis low e high', () => {
             });
             expect(noPivo, `${caso} arco no pivô`).toBe(true);
           }
+          // Arco do giro lateral termina na posição fechada e a folha aberta fica a `radius` do pivô.
+          for (const o of m.openings.filter((x) => x.kind === 'side')) {
+            const arco = arcos.find((a) => Math.abs(a.pts[0]!.t - o.latchT) < 1e-9 && Math.abs(a.pts[0]!.s - o.pivot.s) < 1e-9)!;
+            expect(arco, `${caso} arco do trinco`).toBeDefined();
+            const fim = arco.pts.at(-1)!;
+            expect(Math.hypot(fim.t - o.pivot.t, fim.s - o.pivot.s), `${caso} raio`).toBeCloseTo(o.radius, 9);
+          }
         }
       }
     }

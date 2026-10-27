@@ -1,18 +1,21 @@
 import { add, dot, len, mul, norm, sub, type Vec2 } from '@hestia/geom';
-import { isRoof, type Roof } from '@hestia/model';
+import { isRoof, type Roof, type RoofPlaneDef } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { roofSlopeError } from './roofGeom.ts';
 import { lowestVertex } from './roofEdges.ts';
+import { planeIndexAt, roofToFreePatch } from './roofFreeConvert.ts';
 import { fmtPercent } from './slabSlope.ts';
 import type { PointerInfo } from './types.ts';
 
-const HINT = 'Seta de inclinação: clique no beiral da água e depois no ponto para onde ela sobe. A água cobre o contorno do telhado.';
+const HINT = 'Seta de inclinação: clique no beiral da água e depois no ponto para onde ela sobe. A água sob o primeiro clique é alterada; fora de toda água, uma nova água cobre o contorno.';
 
 /**
- * Seta de inclinação (A5, Revit: águas livres). Em um telhado de águas livres selecionado, dois cliques definem uma água:
- * o primeiro fixa a linha de beiral (perpendicular à subida, no lado mais baixo do contorno) e o segundo, a direção de
- * subida. A água usa o contorno inteiro e a inclinação da barra de opções. A água é acrescentada a `planes`.
+ * Seta de inclinação (A5, Revit: águas livres). Com um telhado de qualquer forma selecionado, dois cliques definem uma
+ * água: o primeiro fixa a linha de beiral (perpendicular à subida, no lado mais baixo da água) e o segundo, a direção de
+ * subida; a inclinação vem da barra de opções. Se o telhado ainda não é de águas livres, a primeira seta o converte
+ * (as águas atuais viram planos, `roofToFreePatch`) na mesma alteração, então um Ctrl+Z desfaz tudo. A água que contém
+ * o primeiro clique é alterada (nova subida, inclinação e beiral); fora de toda água, uma nova água cobre o contorno.
  */
 export class RoofArrowTool extends ToolBase {
   readonly id = 'roofarrow';
@@ -31,8 +34,8 @@ export class RoofArrowTool extends ToolBase {
   /** Mensagem para o estado da seleção: o que falta para a seta funcionar. */
   private stateHint(): string {
     const r = this.roof();
-    if (!r) return 'Selecione um telhado de águas livres (Propriedades → Forma → Águas livres).';
-    if (r.shape !== 'free') return 'A seta só vale em telhado de águas livres. Clique em Converter para águas livres na barra, ou troque a Forma em Propriedades.';
+    if (!r) return 'Selecione um telhado (qualquer forma) e use a seta de inclinação.';
+    if (r.shape !== 'free') return 'Clique no beiral da água e depois para onde ela sobe: o telhado vira de águas livres e as águas atuais viram planos editáveis.';
     return HINT;
   }
 
@@ -87,7 +90,7 @@ export class RoofArrowTool extends ToolBase {
   override click(p: PointerInfo): void {
     this.raw = p.raw;
     const r = this.roof();
-    if (!r || r.shape !== 'free') {
+    if (!r) {
       this.env.say(this.stateHint());
       return;
     }
@@ -100,7 +103,11 @@ export class RoofArrowTool extends ToolBase {
     this.commit(r, inf.point);
   }
 
-  /** Acrescenta a água ao telhado: linha de beiral no lado mais baixo do contorno, subida na direção dos dois cliques. */
+  /**
+   * Define a água: altera a que contém o primeiro clique (nova subida, inclinação e beiral; a cota mais baixa da água é
+   * mantida) ou, fora de toda água, acrescenta uma água sobre o contorno. Telhado que não é livre é convertido antes,
+   * na mesma alteração.
+   */
   private commit(r: Roof, to: Vec2): void {
     const up = this.upOf(to);
     if (!up || !this.first) {
@@ -113,11 +120,27 @@ export class RoofArrowTool extends ToolBase {
       this.env.say(err);
       return;
     }
-    // A origem fica na reta de beiral: o vértice mais baixo na subida, na mesma posição transversal do primeiro clique.
-    const low = lowestVertex(r.boundary, up);
-    const origin = add(this.first, mul(up, dot(low, up) - dot(this.first, up)));
-    const patch: Partial<Roof> = { planes: [...r.planes, { polygon: r.boundary, origin, up, percent: slope, z0: 0 }] };
-    if (commitRoofPatch(this.env, [r.id], patch)) this.env.say(`Água adicionada com inclinação de ${fmtPercent(slope)}. Ctrl+Z desfaz.`);
+    const convert = r.shape === 'free' ? {} : roofToFreePatch(r, slope);
+    const boundary = convert.boundary ?? r.boundary;
+    const planes = [...(convert.planes ?? r.planes)];
+    const centroid = { x: boundary.reduce((s, q) => s + q.x, 0) / boundary.length, y: boundary.reduce((s, q) => s + q.y, 0) / boundary.length };
+    const k = planeIndexAt(planes, this.first, centroid);
+    const place = (ring: Vec2[]): Vec2 => {
+      // A origem fica na reta de beiral: o vértice mais baixo na subida, na mesma posição transversal do primeiro clique.
+      const low = lowestVertex(ring, up);
+      return add(this.first!, mul(up, dot(low, up) - dot(this.first!, up)));
+    };
+    if (k >= 0) {
+      const old = planes[k]!;
+      const base = Math.min(...old.polygon.map((q) => old.z0 + (old.percent / 100) * dot(sub(q, old.origin), old.up)));
+      planes[k] = { polygon: old.polygon, origin: place(old.polygon), up, percent: slope, z0: base } satisfies RoofPlaneDef;
+    } else {
+      planes.push({ polygon: boundary, origin: place(boundary), up, percent: slope, z0: 0 });
+    }
+    const patch: Partial<Roof> = { ...convert, planes };
+    const was = r.shape === 'free' ? '' : ' O telhado virou de águas livres.';
+    const verb = k >= 0 ? `Água ${k + 1} alterada` : 'Água adicionada';
+    if (commitRoofPatch(this.env, [r.id], patch)) this.env.say(`${verb} com inclinação de ${fmtPercent(slope)}.${was} Ctrl+Z desfaz.`);
     this.reset();
   }
 }

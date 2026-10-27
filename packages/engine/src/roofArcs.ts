@@ -13,7 +13,9 @@ const hasSag = (r: Roof): boolean => (r.edgeSag ?? []).some((s) => Number.isFini
 export function roofArcInnerPoints(a: Vec2, b: Vec2, sag: number): Vec2[] {
   const arc = arcFromSagitta(a, b, sag);
   if (!arc) return [];
-  const n = Math.max(2, Math.min(ROOF_ARC_MAX_SEGMENTS, Math.ceil((Math.abs(arc.sweep) * 180) / Math.PI / ROOF_ARC_STEP_DEG)));
+  const raw = Math.max(2, Math.min(ROOF_ARC_MAX_SEGMENTS, Math.ceil((Math.abs(arc.sweep) * 180) / Math.PI / ROOF_ARC_STEP_DEG)));
+  // Número par: o meio do arco é sempre um vértice (a alça do meio e o símbolo da planta caem nele).
+  const n = raw % 2 === 0 ? raw : raw + 1;
   const out: Vec2[] = [];
   for (let i = 1; i < n; i++) out.push(arcPointAt(arc, (arc.length * i) / n));
   return out;

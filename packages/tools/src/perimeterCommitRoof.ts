@@ -5,7 +5,7 @@ import { roofProblem } from './roofCheck.ts';
 import { defaultRoofDir, eaveOutlinePerEdge, roofAutoOffset, roofSlopeError, waterGroupCount } from './roofGeom.ts';
 import type { EditFlags, FinishEdge } from './perimeterSession.ts';
 import { axisOr, keepOrder, newError, pickTypeId, refuse, withElement } from './perimeterCommitShared.ts';
-import { arcCuspProblem, collapseSketchArcs, eaveOutlineArcs, footprintOf, footprintSag, hasRoofArcs, isCcw, offsetSag, sampleSagRing } from './perimeterRoofArcs.ts';
+import { arcCuspProblem, collapseSketchArcs, eaveFromFootprint, footprintOf, footprintSag, hasRoofArcs, sampleSagRing } from './perimeterRoofArcs.ts';
 import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
 
 /** Telhado com forma por arestas: as únicas que o perímetro sabe ler e regravar. Livre e extrusão têm ferramenta própria. */
@@ -66,19 +66,15 @@ function fieldsOf(outer: Vec2[], holes: Vec2[][], edges: FinishEdge[], segs: Ske
   const overhangs = es.map((e) => e.overhang);
   const cusp = logical ? arcCuspProblem(ring, logical.sag, overhangs) : null;
   if (cusp) return cusp;
-  const boundary = logical ? eaveOutlineArcs(ring, logical.sag, overhangs) : eaveOutlinePerEdge(ring, overhangs);
+  const eave = logical ? eaveFromFootprint(ring, logical.sag, overhangs) : { boundary: eaveOutlinePerEdge(ring, overhangs), edgeSag: undefined };
   const out: RoofFields = {
-    boundary,
+    boundary: eave.boundary,
     footprint: ring.slice(),
     holes,
     edgeSlopes: es.map((e) => (e.definesSlope ? e.slopePct : null)),
     edgeOverhangs: overhangs,
   };
-  if (logical) {
-    const ccw = isCcw(ring);
-    const n = ring.length;
-    out.edgeSag = logical.sag.map((sg, i) => offsetSag(ring[i]!, ring[(i + 1) % n]!, sg, boundary[i]!, boundary[(i + 1) % n]!, overhangs[i]!, ccw));
-  }
+  if (eave.edgeSag) out.edgeSag = eave.edgeSag;
   return out;
 }
 

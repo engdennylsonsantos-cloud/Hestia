@@ -215,3 +215,31 @@ export function arcCuspProblem(ring: Vec2[], sag: number[], overhangs: number[])
   }
   return null;
 }
+
+/**
+ * Beiral a partir da pegada com arcos: contorno (cantos em esquadria pelas tangentes) e a flecha de cada aresta,
+ * concêntrica à da pegada. É o inverso de `footprintSag`.
+ */
+export function eaveFromFootprint(foot: Vec2[], footSag: number[], overhangs: number[]): { boundary: Vec2[]; edgeSag: number[] } {
+  const n = foot.length;
+  const boundary = eaveOutlineArcs(foot, footSag, overhangs);
+  const ccw = isCcw(foot);
+  const edgeSag = footSag.map((sg, i) => offsetSag(foot[i]!, foot[(i + 1) % n]!, sg, boundary[i]!, boundary[(i + 1) % n]!, overhangs[i] ?? 0, ccw));
+  return { boundary, edgeSag };
+}
+
+/** Contorno do telhado como polilinha fina: os arcos amostrados (erro de corda de 2 mm); sem arco, o próprio contorno. */
+export function roofOutline(r: Roof): Vec2[] {
+  return hasRoofArcs(r) ? sampleSagRing(r.boundary, r.edgeSag ?? []).pts : r.boundary;
+}
+
+/** Flecha sem o limite de metade da corda, do arco por a, m e b (para recusar o que passa do semicírculo). */
+export function rawSag(a: Vec2, m: Vec2, b: Vec2): number {
+  const chord = len(sub(b, a));
+  const u = norm(sub(b, a));
+  const dm = (m.x - a.x) * -u.y + (m.y - a.y) * u.x;
+  const tm = (m.x - a.x) * u.x + (m.y - a.y) * u.y;
+  if (Math.abs(dm) < 1e-6 || chord < 1e-6) return 0;
+  const hc = (tm * (tm - chord) + dm * dm) / (2 * dm);
+  return hc + Math.sign(dm) * Math.hypot(chord / 2, hc);
+}

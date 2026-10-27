@@ -1,13 +1,17 @@
-import { boxOf, closestOnSegment, dist, intersectSegments, pointInRing, type Vec2 } from '@hestia/geom';
-import { isRoof, roofsOnLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { arcFromSagitta, arcPointAt, boxOf, closestOnSegment, dist, intersectSegments, pointInRing, type Vec2 } from '@hestia/geom';
+import { roofOutline } from './perimeterRoofArcs.ts';
+import { isRoof, roofEdgeSag, roofsOnLevel, type Id, type Project, type Roof } from '@hestia/model';
 
 /** Telhados entre os selecionados. */
 export const selectedRoofs = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isRoof(p.elements[id]));
 
-/** Alça de um telhado: vértice (índice do contorno do beiral) ou meio de uma aresta (aresta i vai de i a i+1). */
+/**
+ * Alça de um telhado: vértice (índice do contorno do beiral), meio de uma aresta reta (aresta i vai de i a i+1; insere
+ * vértice) ou meio de um arco ('sag': arrastar muda a flecha `edgeSag`, `at` é o meio do arco).
+ */
 export interface RoofGrip {
   roofId: Id;
-  kind: 'vertex' | 'edge';
+  kind: 'vertex' | 'edge' | 'sag';
   index: number;
   at: Vec2;
 }
@@ -15,7 +19,7 @@ export interface RoofGrip {
 const distToEdge = (q: Vec2, a: Vec2, b: Vec2): number => dist(q, closestOnSegment(q, a, b));
 
 function onBoundary(r: Roof, at: Vec2, tol: number): boolean {
-  const rings = [r.boundary, ...r.holes];
+  const rings = [roofOutline(r), ...r.holes];
   return rings.some((ring) => ring.some((a, i) => distToEdge(at, a, ring[(i + 1) % ring.length]!) <= tol));
 }
 
@@ -29,7 +33,7 @@ export function pickRoofAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id |
   for (let i = roofs.length - 1; i >= 0; i--) {
     const r = roofs[i]!;
     if (onBoundary(r, at, tol)) return r.id;
-    if (pointInRing(at, r.boundary) && !r.holes.some((h) => pointInRing(at, h))) return r.id;
+    if (pointInRing(at, roofOutline(r)) && !r.holes.some((h) => pointInRing(at, h))) return r.id;
   }
   return null;
 }
@@ -48,7 +52,7 @@ export function roofIdsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {
   const hits = (ring: Vec2[]): boolean =>
     ring.some((q, i) => inside(q) || corners.some((c, k) => intersectSegments(q, ring[(i + 1) % ring.length]!, c, corners[(k + 1) % 4]!) !== null));
   return roofsOnLevel(p, levelId)
-    .filter((r) => (r.boundary.every(inside) ? true : crossing && hits(r.boundary)))
+    .filter((r) => (roofOutline(r).every(inside) ? true : crossing && hits(roofOutline(r))))
     .map((r) => r.id);
 }
 
@@ -63,9 +67,17 @@ export function roofGripAt(p: Project, ids: Id[], at: Vec2, mpp: number): RoofGr
   for (const r of roofs) {
     const ring = r.boundary;
     for (let i = 0; i < ring.length; i++) {
-      const m = { x: (ring[i]!.x + ring[(i + 1) % ring.length]!.x) / 2, y: (ring[i]!.y + ring[(i + 1) % ring.length]!.y) / 2 };
-      if (dist(m, at) <= tol) return { roofId: r.id, kind: 'edge', index: i, at: m };
+      const m = edgeGripPoint(r, i);
+      if (dist(m, at) <= tol) return { roofId: r.id, kind: roofEdgeSag(r, i) !== 0 ? 'sag' : 'edge', index: i, at: m };
     }
   }
   return null;
+}
+
+/** Ponto da alça do meio da aresta `i`: o meio da corda, ou o meio do arco quando a aresta tem flecha. */
+export function edgeGripPoint(r: Roof, i: number): Vec2 {
+  const a = r.boundary[i]!;
+  const b = r.boundary[(i + 1) % r.boundary.length]!;
+  const arc = arcFromSagitta(a, b, roofEdgeSag(r, i));
+  return arc ? arcPointAt(arc, arc.length / 2) : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }

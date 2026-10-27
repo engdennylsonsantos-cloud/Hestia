@@ -6,7 +6,8 @@ import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, MIN_WALL_LENGTH, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
 import { slabGripAt } from './slabPick.ts';
-import { roofGripAt } from './roofPick.ts';
+import { edgeGripPoint, roofGripAt } from './roofPick.ts';
+import { roofSagHold } from './roofSagGrip.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { ceilingGripAt } from './ceilingPick.ts';
@@ -262,7 +263,8 @@ const ceilingGrip: GripProvider = (env, at) => {
 
 const roofGrip: GripProvider = (env, at) => {
   const g = roofGripAt(env.project(), env.selection(), at, env.metersPerPixel());
-  return g ? ringHold(env, ROOF_OWNER, g.roofId, g) : null;
+  if (g?.kind === 'sag') return roofSagHold(env, g);
+  return g ? ringHold(env, ROOF_OWNER, g.roofId, g as typeof g & { kind: 'vertex' | 'edge' }) : null;
 };
 
 /** Alça de caracol (centro, raios, ângulos inicial e final) de escada selecionada (`stairSpiralGrips.ts`). Vem antes da comum. */
@@ -304,7 +306,8 @@ export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null
   for (let i = 0; i < n; i++) {
     const a = f.boundary[i]!;
     const b = f.boundary[(i + 1) % n]!;
-    items.push({ kind: 'point', at: a }, { kind: 'point', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
+    // Telhado com arco: a alça do meio fica no meio do arco, não no meio da corda.
+    items.push({ kind: 'point', at: a }, { kind: 'point', at: isRoof(f) ? edgeGripPoint(f, i) : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
   }
   if (focus?.id === f.id && f.boundary[focus.index]) items.push({ kind: 'highlight', ids: [f.id] });
   // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.

@@ -1,5 +1,5 @@
 import { mid, norm, perp, pointInMulti, ringArea, sub, type Vec2 } from '@hestia/geom';
-import type { ResolvedRoof, RoofLine } from '@hestia/engine';
+import { expandRoofArcs, type ResolvedRoof, type RoofLine } from '@hestia/engine';
 import { edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
 import { isRoof, type Project, type Roof } from '@hestia/model';
 import { ARC_TURN_DEG, edgeGroupsOf } from '@hestia/tools/src/roofGeom.ts';
@@ -47,7 +47,9 @@ export function ladosComSimbolo(roof: Roof): boolean[] {
  * soltas), tudo sai como antes.
  */
 export function arcoDoTelhado(p: Project, r: ResolvedRoof): { deArco: (ln: RoofLine) => boolean; comSinal: (k: number) => boolean } {
-  const model = p.elements[r.roofId];
+  const raw = p.elements[r.roofId];
+  // Arcos gravados como flecha: as águas vêm do contorno subdividido pelo motor, então os trechos também.
+  const model = isRoof(raw) ? expandRoofArcs(raw) : raw;
   const padrao = { deArco: (): boolean => false, comSinal: (): boolean => true };
   if (!isRoof(model) || !SHAPES_DE_CONTORNO.has(model.shape) || model.boundary.length < 3) return padrao;
   const b = model.boundary;

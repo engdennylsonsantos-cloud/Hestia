@@ -96,6 +96,8 @@ function angle2dPadrao(plan: OpeningType['plan']): number {
   switch (plan) {
     case 'bifold':
       return 55;
+    case 'accordion':
+      return 75;
     case 'hinged':
       return 60;
     default:

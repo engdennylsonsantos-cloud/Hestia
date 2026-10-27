@@ -47,7 +47,7 @@ export const PREVIEW_CAMERA = {
   aspect: 4 / 3,
   occupancy: 0.7,
   /** Folga horizontal desejada, para o vão nunca encostar nas laterais. */
-  sideFill: 0.82,
+  sideFill: 0.7,
 } as const;
 
 interface Basis {

@@ -1,169 +1,33 @@
-import { partTransformed, slicePartsAtZ } from './openingModel.ts';
+import type { LeafOpening, OpeningModel } from './openingModelTypes.ts';
 import {
-  CLOSED,
-  type LeafOpening,
-  type OpeningModel,
-  type OpeningPart,
-  type PartBox,
-  type PartMotion,
-  type PartRole,
-} from './openingModelTypes.ts';
+  addFrameCut,
+  addHighExtras,
+  addHingedPlan,
+  addHungLines,
+  addLouverPlan,
+  addNewDoorPlan,
+  addOpeningArc,
+  addPivotWinPlan,
+  addTracks,
+  boxRing,
+  leafBox,
+  leafMotion,
+  line,
+  openingSign,
+  polygon,
+  transformedRing,
+  type OpeningPlanOptions,
+  type OpeningPlanPath,
+  type OpeningPlanPoint,
+} from './openingPlanNew.ts';
 
-/** Tom do traço na planta: `cut` é o perfil cortado (tinta forte), `ink` o desenho de tinta e `soft` o secundário. */
-export type OpeningPlanTone = 'cut' | 'ink' | 'soft';
-
-/** Papel do traço: o da peça do modelo, ou um símbolo da planta (arco, seta, marca). */
-export type OpeningPlanRole = PartRole | 'swing' | 'arrow' | 'mark';
-
-/** Ponto no sistema local do vão (`t` ao longo da parede, `s` na profundidade). */
-export interface OpeningPlanPoint {
-  t: number;
-  s: number;
-}
-
-/** Um traço da planta da esquadria, em coordenadas locais do vão. */
-export interface OpeningPlanPath {
-  pts: OpeningPlanPoint[];
-  closed: boolean;
-  /** Fator sobre a espessura base do desenho (1 = traço principal). */
-  weight: number;
-  tone: OpeningPlanTone;
-  dash?: [number, number];
-  role: OpeningPlanRole;
-}
-
-/** Opções da planta: nível de detalhe, abertura, convenção de exibição e cota de corte (z local do modelo). */
-export interface OpeningPlanOptions {
-  detail: 'low' | 'mid' | 'high';
-  /** Ângulo de abertura em planta (radianos), como `OpenState.angle`. */
-  angle: number;
-  planDisplay: 'symbolic' | 'projected';
-  showSwing: boolean;
-  swingStyle: 'arc' | 'dash' | 'line';
-  /** Cota de corte no z local do modelo (0 = soleira do vão). */
-  cutZ: number;
-}
-
-const EPS = 1e-9;
-const ARC_STEP = Math.PI / 18;
-
-const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
-  'jamb',
-  'stop',
-  'head',
-  'sillFrame',
-  'threshold',
-  'track',
-  'muntin',
-]);
-
-const line = (pts: OpeningPlanPoint[], role: OpeningPlanRole, tone: OpeningPlanTone = 'ink', weight = 1, dash?: [number, number]): OpeningPlanPath => ({
-  pts,
-  closed: false,
-  weight,
-  tone,
-  ...(dash ? { dash } : {}),
-  role,
-});
-
-const polygon = (pts: OpeningPlanPoint[], role: OpeningPlanRole, tone: OpeningPlanTone = 'cut', weight = 1, dash?: [number, number]): OpeningPlanPath => ({
-  pts,
-  closed: true,
-  weight,
-  tone,
-  ...(dash ? { dash } : {}),
-  role,
-});
-
-/** Anel do retângulo da caixa (t0,s0) → (t1,s0) → (t1,s1) → (t0,s1). */
-function boxRing(b: PartBox): OpeningPlanPoint[] {
-  return [
-    { t: b.t0, s: b.s0 },
-    { t: b.t1, s: b.s0 },
-    { t: b.t1, s: b.s1 },
-    { t: b.t0, s: b.s1 },
-  ];
-}
-
-function unionBox(a: PartBox | null, b: PartBox): PartBox {
-  if (!a) return { ...b };
-  return {
-    t0: Math.min(a.t0, b.t0),
-    t1: Math.max(a.t1, b.t1),
-    s0: Math.min(a.s0, b.s0),
-    s1: Math.max(a.s1, b.s1),
-    z0: Math.min(a.z0, b.z0),
-    z1: Math.max(a.z1, b.z1),
-  };
-}
-
-/** Caixa da folha `index` (união das peças `leaf` dela); null se não houver. */
-function leafBox(m: OpeningModel, index: number): PartBox | null {
-  let out: PartBox | null = null;
-  for (const part of m.parts) {
-    if (part.role === 'leaf' && part.leaf === index) out = unionBox(out, part.box);
-  }
-  return out;
-}
-
-/** Movimento da folha `index` (a primeira peça com movimento), ou undefined. */
-function leafMotion(m: OpeningModel, index: number): PartMotion | undefined {
-  return m.parts.find((p) => p.role === 'leaf' && p.leaf === index && p.motion)?.motion;
-}
-
-/** Anel da caixa depois do movimento (face inferior; para giro em z e deslizamento é a mesma planta). */
-function transformedRing(box: PartBox, motion: PartMotion | undefined, angle: number): OpeningPlanPoint[] {
-  const synthetic: OpeningPart = { id: '__leaf', role: 'leaf', material: 'leaf', box, ...(motion ? { motion } : {}) };
-  const ob = partTransformed(synthetic, { angle, slide: 0 });
-  return ob.corners.slice(0, 4).map((p) => ({ t: p.t, s: p.s }));
-}
-
-function rotatePoint(p: OpeningPlanPoint, center: OpeningPlanPoint, phi: number): OpeningPlanPoint {
-  const cos = Math.cos(phi);
-  const sin = Math.sin(phi);
-  const dt = p.t - center.t;
-  const ds = p.s - center.s;
-  return { t: center.t + dt * cos - ds * sin, s: center.s + dt * sin + ds * cos };
-}
-
-/** Arco de `from` em torno de `center`, varrendo `sweep` radianos (o sinal define o sentido). */
-function arcPoints(center: OpeningPlanPoint, from: OpeningPlanPoint, sweep: number): OpeningPlanPoint[] {
-  const r = Math.hypot(from.t - center.t, from.s - center.s);
-  if (r < EPS) return [];
-  const a0 = Math.atan2(from.s - center.s, from.t - center.t);
-  const steps = Math.max(8, Math.ceil(Math.abs(sweep) / ARC_STEP));
-  const pts: OpeningPlanPoint[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const a = a0 + (sweep * i) / steps;
-    pts.push({ t: center.t + Math.cos(a) * r, s: center.s + Math.sin(a) * r });
-  }
-  return pts;
-}
-
-/** Sinal do giro da folha, o mesmo de `partTransformed`: peça em `z` com movimento, ou a regra do lado. */
-function openingSign(o: LeafOpening, motion: PartMotion | undefined): 1 | -1 {
-  if (motion && motion.kind === 'rotate' && motion.axis === 'z') return motion.sign;
-  return (o.side * (o.latchT > o.hingeT ? 1 : -1)) as 1 | -1;
-}
-
-/** Arco (ou reta) do fecho de `closedEnd` até a folha aberta, no estilo pedido. */
-function addOpeningArc(out: OpeningPlanPath[], center: OpeningPlanPoint, closedEnd: OpeningPlanPoint, sweep: number, style: 'arc' | 'dash' | 'line'): void {
-  if (Math.abs(sweep) < EPS) return;
-  const openEnd = rotatePoint(closedEnd, center, sweep);
-  if (style === 'line') {
-    out.push(line([closedEnd, openEnd], 'swing', 'soft', 0.7));
-    return;
-  }
-  const pts = arcPoints(center, closedEnd, sweep);
-  if (pts.length >= 2) out.push(line(pts, 'swing', 'soft', 0.7, style === 'dash' ? [4, 3] : undefined));
-}
-
-/** Perfis do batente/caixilho cortados na cota `z` (peças fixas). */
-function addFrameCut(out: OpeningPlanPath[], m: OpeningModel, z: number): void {
-  for (const { part, ring } of slicePartsAtZ(m, z, CLOSED)) {
-    if (FRAME_ROLES.has(part.role)) out.push(polygon(ring, part.role, 'cut', 1));
-  }
-}
+export type {
+  OpeningPlanOptions,
+  OpeningPlanPath,
+  OpeningPlanPoint,
+  OpeningPlanRole,
+  OpeningPlanTone,
+} from './openingPlanNew.ts';
 
 /** Três linhas da janela (faces do caixilho e plano médio), de `-W/2` a `+W/2`. */
 function addWindowLines(out: OpeningPlanPath[], m: OpeningModel): void {
@@ -178,15 +42,6 @@ function addWindowLines(out: OpeningPlanPath[], m: OpeningModel): void {
   out.push(line([{ t: -hw, s: s0 }, { t: hw, s: s0 }], 'jamb', 'ink', 1));
   out.push(line([{ t: -hw, s: s1 }, { t: hw, s: s1 }], 'jamb', 'ink', 1));
   out.push(line([{ t: -hw, s: (s0 + s1) / 2 }, { t: hw, s: (s0 + s1) / 2 }], 'glass', 'ink', 0.8));
-}
-
-/** Pistas dos trilhos: duas linhas por trilho, ao longo do vão. */
-function addTracks(out: OpeningPlanPath[], m: OpeningModel): void {
-  for (const part of m.parts) {
-    if (part.role !== 'track') continue;
-    out.push(line([{ t: part.box.t0, s: part.box.s0 }, { t: part.box.t1, s: part.box.s0 }], 'track', 'soft', 0.6));
-    out.push(line([{ t: part.box.t0, s: part.box.s1 }, { t: part.box.t1, s: part.box.s1 }], 'track', 'soft', 0.6));
-  }
 }
 
 /** Seta de deslocamento das folhas de correr, no sentido do movimento. */
@@ -229,201 +84,6 @@ function addWindowOpening(out: OpeningPlanPath[], m: OpeningModel, o: LeafOpenin
   if (o.kind === 'bottom') {
     out.push(line([{ t: -hw, s }, { t: 0, s: s + o.side * hw * 0.5 }, { t: hw, s }], 'swing', 'soft', 0.8));
   }
-}
-
-/** Guilhotina: as duas folhas aparecem como linhas defasadas, cada uma na sua pista. */
-function addHungLines(out: OpeningPlanPath[], m: OpeningModel): void {
-  for (const o of m.openings) {
-    const box = leafBox(m, o.leaf);
-    if (!box) continue;
-    const s = (box.s0 + box.s1) / 2;
-    out.push(line([{ t: box.t0, s }, { t: box.t1, s }], 'leaf', 'ink', 1));
-  }
-}
-
-/** Veneziana: três linhas do caixilho e traços diagonais curtos das aletas, tracejados. */
-function addLouverPlan(out: OpeningPlanPath[], m: OpeningModel): void {
-  const hw = m.width / 2;
-  const s = (m.core.s0 + m.core.s1) / 2;
-  let t = -hw + 0.08;
-  while (t + 0.06 <= hw - 0.06) {
-    out.push(line([{ t, s: s - 0.025 }, { t: t + 0.06, s: s + 0.025 }], 'leafPanel', 'soft', 0.7, [4, 3]));
-    t += 0.12;
-  }
-}
-
-/** Janela de abrir: folha aberta com espessura no `angle2d` e arco tracejado até a posição fechada. */
-function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
-  for (const o of m.openings) {
-    if (o.kind !== 'side') continue;
-    const box = leafBox(m, o.leaf);
-    if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
-    const motion = leafMotion(m, o.leaf);
-    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
-    if (!opts.showSwing) continue;
-    const sign = openingSign(o, motion);
-    const center = { t: o.pivot.t, s: o.pivot.s };
-    addOpeningArc(out, center, { t: o.latchT, s: o.pivot.s }, sign * opts.angle, 'dash');
-  }
-}
-
-/** Janela pivotante: folha girada no eixo central e arcos curtos tracejados nas duas pontas. */
-function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
-  for (const o of m.openings) {
-    if (o.kind !== 'pivot') continue;
-    const box = leafBox(m, o.leaf);
-    if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
-    const motion = leafMotion(m, o.leaf);
-    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
-    if (!opts.showSwing) continue;
-    const sign = openingSign(o, motion);
-    const center = { t: o.pivot.t, s: o.pivot.s };
-    addOpeningArc(out, center, { t: box.t0, s: o.pivot.s }, sign * opts.angle, 'dash');
-    addOpeningArc(out, center, { t: box.t1, s: o.pivot.s }, sign * opts.angle, 'dash');
-  }
-}
-
-/** Peças fora do corte que o nível alto mostra: alizar, peitoril, verga/contraverga e o vidro duplo. */
-function addHighExtras(out: OpeningPlanPath[], m: OpeningModel, z: number): void {
-  for (const { part, ring } of slicePartsAtZ(m, z, CLOSED)) {
-    if (part.role === 'casing') out.push(polygon(ring, 'casing', 'ink', 0.8));
-  }
-  for (const part of m.parts) {
-    if (part.role === 'sillBoard') {
-      out.push(polygon(boxRing(part.box), 'sillBoard', 'soft', 0.7, [6, 3]));
-    } else if (part.role === 'lintel' || part.role === 'sillBeam') {
-      const above = part.box.z0 >= z - EPS;
-      const below = part.box.z1 <= z + EPS;
-      if (above || below) out.push(polygon(boxRing(part.box), part.role, 'soft', 0.7, [6, 3]));
-      else out.push(polygon(boxRing(part.box), part.role, 'cut', 1));
-    } else if (part.role === 'glass') {
-      out.push(line([{ t: part.box.t0, s: part.box.s0 }, { t: part.box.t1, s: part.box.s0 }], 'glass', 'soft', 0.5));
-      out.push(line([{ t: part.box.t0, s: part.box.s1 }, { t: part.box.t1, s: part.box.s1 }], 'glass', 'soft', 0.5));
-    } else if (part.role === 'leaf' && part.leaf === undefined) {
-      out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
-    }
-  }
-}
-
-/** Seta com ponta entre dois pontos da planta. */
-function addPlanArrow(out: OpeningPlanPath[], from: OpeningPlanPoint, to: OpeningPlanPoint): void {
-  out.push(line([from, to], 'arrow', 'ink', 0.8));
-  const dt = to.t - from.t;
-  const ds = to.s - from.s;
-  const len = Math.hypot(dt, ds);
-  if (len < EPS) return;
-  const ut = dt / len;
-  const us = ds / len;
-  const head = Math.min(0.12, len * 0.35);
-  const base = { t: to.t - ut * head, s: to.s - us * head };
-  out.push(line([{ t: base.t - us * head * 0.6, s: base.s + ut * head * 0.6 }, to, { t: base.t + us * head * 0.6, s: base.s - ut * head * 0.6 }], 'arrow', 'ink', 0.8));
-}
-
-/** Família nova de porta inferida do modelo único (o modelo não guarda o nome da família). */
-function newDoorFamily(m: OpeningModel): 'dblact' | 'pocket' | 'fold' | 'garage' | null {
-  if (m.openings.some((o) => o.kind === 'overhead')) return 'garage';
-  if (m.parts.some((p) => p.role === 'pocket')) return 'pocket';
-  if (m.openings.some((o) => o.kind === 'fold')) return 'fold';
-  if (m.openings.some((o) => o.kind === 'side' && o.both)) return 'dblact';
-  return null;
-}
-
-/** Folhas fechadas como linha no plano médio (nível baixo das famílias novas). */
-function addNewDoorLow(out: OpeningPlanPath[], m: OpeningModel): void {
-  const vistas = new Set<string>();
-  for (const part of m.parts) {
-    if (part.role !== 'leaf') continue;
-    const s = (part.box.s0 + part.box.s1) / 2;
-    const chave = `${part.box.t0};${part.box.t1};${s}`;
-    if (vistas.has(chave)) continue;
-    vistas.add(chave);
-    out.push(line([{ t: part.box.t0, s }, { t: part.box.t1, s }], 'leaf', 'ink', 1));
-  }
-}
-
-/** Linhas dos trilhos no sentido da profundidade (portão seccionado). */
-function addDeepTracks(out: OpeningPlanPath[], m: OpeningModel): void {
-  for (const part of m.parts) {
-    if (part.role !== 'track') continue;
-    const t = (part.box.t0 + part.box.t1) / 2;
-    out.push(line([{ t, s: part.box.s0 }, { t, s: part.box.s1 }], 'track', 'soft', 0.6, [4, 3]));
-  }
-}
-
-/** Planta das cinco famílias novas (spec E §4.1 e §3.5); false quando a porta é de outra família. */
-function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): boolean {
-  const family = newDoorFamily(m);
-  if (!family) return false;
-  const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
-  if (level === 'low') {
-    addNewDoorLow(out, m);
-    return true;
-  }
-  addFrameCut(out, m, opts.cutZ);
-  if (family === 'pocket') {
-    for (const part of m.parts.filter((x) => x.role === 'leaf')) out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
-    for (const part of m.parts.filter((x) => x.role === 'pocket')) out.push(polygon(boxRing(part.box), 'pocket', 'soft', 0.8, [6, 3]));
-    const movel = m.parts.find((x) => x.role === 'leaf' && x.motion?.kind === 'slide')?.motion;
-    if (movel && movel.kind === 'slide') {
-      const s = (m.core.s0 + m.core.s1) / 2;
-      addPlanArrow(out, { t: 0, s }, { t: movel.dt * movel.travel, s });
-    }
-    if (level === 'high') addHighExtras(out, m, opts.cutZ);
-    return true;
-  }
-  if (family === 'garage') {
-    let t0 = Infinity;
-    let t1 = -Infinity;
-    let sFolha = 0;
-    for (const part of m.parts.filter((x) => x.role === 'leaf')) {
-      t0 = Math.min(t0, part.box.t0);
-      t1 = Math.max(t1, part.box.t1);
-      sFolha = (part.box.s0 + part.box.s1) / 2;
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
-    }
-    if (Number.isFinite(t0) && Number.isFinite(t1)) {
-      out.push(line([{ t: t0, s: sFolha }, { t: t1, s: sFolha }], 'leaf', 'ink', 1));
-    }
-    const opening = m.openings.find((x) => x.kind === 'overhead');
-    const side = opening?.side || 1;
-    const face = side * (m.thickness / 2);
-    const comprimento = Math.min(m.height, 2.5);
-    if (Number.isFinite(t0) && Number.isFinite(t1)) {
-      out.push(polygon(boxRing({ t0, t1, s0: face, s1: face + side * comprimento, z0: 0, z1: 1 }), 'leaf', 'soft', 0.7, [6, 3]));
-    }
-    addDeepTracks(out, m);
-    if (level === 'high') addHighExtras(out, m, opts.cutZ);
-    return true;
-  }
-  if (family === 'fold') {
-    for (const part of m.parts.filter((x) => x.role === 'leaf')) {
-      const motion = part.motion;
-      out.push(polygon(transformedRing(part.box, motion, opts.angle), 'leaf', 'cut', 1));
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
-    }
-    addTracks(out, m);
-    if (level === 'high') addHighExtras(out, m, opts.cutZ);
-    return true;
-  }
-  // Vai-e-vem: folha aberta dos dois lados, arco principal contínuo e o outro tracejado.
-  for (const o of m.openings) {
-    const box = leafBox(m, o.leaf);
-    if (!box) continue;
-    const motion = leafMotion(m, o.leaf);
-    const sign = openingSign(o, motion);
-    out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
-    out.push(polygon(transformedRing(box, motion, -opts.angle), 'leaf', 'cut', 1));
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
-    if (!opts.showSwing) continue;
-    const center = { t: o.pivot.t, s: o.pivot.s };
-    const closedEnd = { t: o.latchT, s: o.pivot.s };
-    addOpeningArc(out, center, closedEnd, sign * opts.angle, opts.swingStyle);
-    addOpeningArc(out, center, closedEnd, -sign * opts.angle, 'dash');
-  }
-  if (level === 'high') addHighExtras(out, m, opts.cutZ);
-  return true;
 }
 
 /** Desenho de uma porta (giro, dupla, pivotante, correr e vão livre) nos níveis baixo/médio/alto. */

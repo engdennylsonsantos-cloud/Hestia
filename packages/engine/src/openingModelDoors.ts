@@ -1,0 +1,342 @@
+import { openingFamilyOf } from '@hestia/model';
+import { buildNewDoorParts } from './openingModelDoorsNew.ts';
+import { buildVoid } from './openingModelWindows.ts';
+import type { PartMotion } from './openingModelTypes.ts';
+import {
+  GAP,
+  OVERLAP,
+  TRANSOM_BAR,
+  addPart,
+  box,
+  innerT,
+  leafS,
+  leafSpan,
+  leafZ,
+  stopS,
+  type AddOptions,
+  type Ctx,
+} from './openingModelContext.ts';
+
+/** Batente de porta: ombreiras e travessa; com rebaixo (batedor) ou caixa única. */
+function buildDoorFrame(c: Ctx): void {
+  if (c.frameStyle === 'block') return;
+  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  for (const j of [-1, 1] as const) {
+    const name = j < 0 ? 'left' : 'right';
+    if (c.frameStyle === 'simple') {
+      addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
+      continue;
+    }
+    addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J + OVERLAP), j * c.hw, body.s0, body.s1, 0, c.H));
+    const stop = stopS(c);
+    addPart(c, `stop-${name}`, 'stop', 'frame', box(j * (c.hw - c.J), j * (c.hw - c.J + OVERLAP), stop.s0, stop.s1, 0, c.H));
+  }
+  if (c.frameStyle === 'simple') {
+    addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
+    return;
+  }
+  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J + OVERLAP, c.H));
+  const stop = stopS(c);
+  addPart(c, 'stop-head', 'stop', 'frame', box(-c.hw, c.hw, stop.s0, stop.s1, c.H - c.J, c.H - c.J + OVERLAP));
+}
+
+/** Almofadas, aletas ou grelhas sobre a folha (detalhe do estilo). */
+function addLeafDetails(
+  c: Ctx,
+  index: number,
+  t0: number,
+  t1: number,
+  sSpan: { s0: number; s1: number },
+  z0: number,
+  z1: number,
+  motion: PartMotion,
+): void {
+  const opts: AddOptions = { motion, leaf: index };
+  if (c.leafStyle === 'panel') {
+    const mt = Math.min(0.08, (t1 - t0) * 0.1);
+    const mz = Math.min(0.08, (z1 - z0) * 0.1);
+    const gapPanel = 0.03;
+    const a0 = t0 + mt;
+    const a1 = t1 - mt;
+    const b0 = z0 + mz;
+    const b1 = z1 - mz;
+    const colW = (a1 - a0 - gapPanel) / 2;
+    const rowH = (b1 - b0 - gapPanel) / 2;
+    if (colW > 0 && rowH > 0) {
+      for (let col = 0; col < 2; col++) {
+        for (let row = 0; row < 2; row++) {
+          const p0 = a0 + col * (colW + gapPanel);
+          const p1 = p0 + colW;
+          const q0 = b0 + row * (rowH + gapPanel);
+          const q1 = q0 + rowH;
+          addPart(
+            c,
+            `leaf-${index}-panel-${col}-${row}`,
+            'leafPanel',
+            'leaf',
+            box(p0, p1, sSpan.s0 - 0.006, sSpan.s1 + 0.006, q0, q1),
+            opts,
+          );
+        }
+      }
+    }
+    return;
+  }
+  if (c.leafStyle === 'louver') {
+    const t0i = t0 + 0.05;
+    const t1i = t1 - 0.05;
+    if (t1i > t0i) {
+      let z = z0 + 0.03;
+      let k = 0;
+      while (z + 0.035 <= z1 - 0.03) {
+        addPart(c, `leaf-${index}-louver-${k}`, 'leafPanel', 'leaf', box(t0i, t1i, sSpan.s0, sSpan.s1, z, z + 0.035), opts);
+        z += 0.055;
+        k++;
+      }
+    }
+    return;
+  }
+  if (c.leafStyle === 'grille') {
+    const z0i = z0 + 0.03;
+    const z1i = z1 - 0.03;
+    if (z1i > z0i) {
+      let t = t0 + 0.03;
+      let k = 0;
+      while (t + 0.025 <= t1 - 0.03) {
+        addPart(c, `leaf-${index}-grille-${k}`, 'leafPanel', 'leaf', box(t, t + 0.025, sSpan.s0 - 0.003, sSpan.s1 + 0.003, z0i, z1i), opts);
+        t += 0.08;
+        k++;
+      }
+    }
+  }
+}
+
+/** Maçaneta da folha, presa a ela (mesmo movimento), a 0,06 m do lado do trinco. */
+function addHandle(
+  c: Ctx,
+  index: number,
+  tCenter: number,
+  sSpan: { s0: number; s1: number },
+  z0: number,
+  z1: number,
+  latchT: number,
+  motion: PartMotion,
+): void {
+  if (c.handle === 'none') return;
+  const z = Math.min(Math.max(1.0, z0 + 0.05), z1 - 0.05);
+  const sMid = (sSpan.s0 + sSpan.s1) / 2;
+  const inward = Math.sign(tCenter - latchT) || 1;
+  const tR = latchT + inward * 0.06;
+  const opts: AddOptions = { motion, leaf: index };
+  if (c.handle === 'pull') {
+    const sCenter = sMid + c.side * (c.L / 2 + 0.015);
+    addPart(c, `handle-${index}-pull`, 'handle', 'metal', box(-0.01, 0.01, sCenter - 0.015, sCenter + 0.015, z - 0.2, z + 0.2), opts);
+    return;
+  }
+  if (c.handle === 'knob') {
+    for (const face of [-1, 1] as const) {
+      const sCenter = sMid + face * (c.L / 2 + 0.025);
+      addPart(
+        c,
+        `handle-${index}-knob-${face < 0 ? 'a' : 'b'}`,
+        'handle',
+        'metal',
+        box(tR - 0.025, tR + 0.025, sCenter - 0.025, sCenter + 0.025, z - 0.025, z + 0.025),
+        opts,
+      );
+    }
+    return;
+  }
+  for (const face of [-1, 1] as const) {
+    const sCenter = sMid + face * (c.L / 2 + 0.006);
+    addPart(
+      c,
+      `handle-${index}-rosette-${face < 0 ? 'a' : 'b'}`,
+      'handle',
+      'metal',
+      box(tR - 0.025, tR + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025),
+      opts,
+    );
+    const tHaste = tR + inward * 0.065;
+    addPart(
+      c,
+      `handle-${index}-lever-${face < 0 ? 'a' : 'b'}`,
+      'handle',
+      'metal',
+      box(tHaste - 0.065, tHaste + 0.065, sCenter - 0.006, sCenter + 0.006, z - 0.01, z + 0.01),
+      opts,
+    );
+  }
+}
+
+/** Folha de porta: vazada (glass) ou sólida com os detalhes do estilo e a maçaneta. */
+function addDoorLeaf(
+  c: Ctx,
+  index: number,
+  t0: number,
+  t1: number,
+  sSpan: { s0: number; s1: number },
+  z: { z0: number; z1: number },
+  motion: PartMotion,
+  latchT: number,
+): void {
+  const opts: AddOptions = { motion, leaf: index };
+  const ta = Math.min(t0, t1);
+  const tb = Math.max(t0, t1);
+  if (c.leafStyle === 'glass') {
+    const stile = 0.1;
+    const bottom = 0.22;
+    const innerL = ta + stile;
+    const innerR = tb - stile;
+    const innerZ0 = z.z0 + bottom;
+    const innerZ1 = z.z1 - stile;
+    addPart(c, `leaf-${index}-left`, 'leaf', 'leaf', box(ta, innerL, sSpan.s0, sSpan.s1, z.z0, z.z1), opts);
+    addPart(c, `leaf-${index}-right`, 'leaf', 'leaf', box(innerR, tb, sSpan.s0, sSpan.s1, z.z0, z.z1), opts);
+    addPart(c, `leaf-${index}-top`, 'leaf', 'leaf', box(innerL, innerR, sSpan.s0, sSpan.s1, innerZ1, z.z1), opts);
+    addPart(c, `leaf-${index}-bottom`, 'leaf', 'leaf', box(innerL, innerR, sSpan.s0, sSpan.s1, z.z0, innerZ0), opts);
+    const sMid = (sSpan.s0 + sSpan.s1) / 2;
+    addPart(c, `glass-${index}`, 'glass', 'glass', box(innerL, innerR, sMid - c.G / 2, sMid + c.G / 2, innerZ0, innerZ1), opts);
+  } else {
+    addPart(c, `leaf-${index}`, 'leaf', 'leaf', box(ta, tb, sSpan.s0, sSpan.s1, z.z0, z.z1), opts);
+    addLeafDetails(c, index, ta, tb, sSpan, z.z0, z.z1, motion);
+  }
+  addHandle(c, index, (ta + tb) / 2, sSpan, z.z0, z.z1, latchT, motion);
+}
+
+/** Folha de giro (uma ou duas), com a maçaneta e os detalhes do estilo. */
+function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: number, latchT: number): void {
+  const span = leafS(c);
+  const z = leafZ(c);
+  // O sinal depende do lado da dobradiça: com a folha à direita do eixo (h = +1) o mesmo ângulo a levaria ao lado
+  // oposto ao da abertura.
+  const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
+  const rotate: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: (span.s0 + span.s1) / 2, sign };
+  addDoorLeaf(c, index, t0, t1, span, z, rotate, latchT);
+  c.openings.push({
+    leaf: index,
+    kind: 'side',
+    side: c.side,
+    hingeT,
+    latchT,
+    pivot: { t: hingeT, s: (span.s0 + span.s1) / 2 },
+    radius: Math.abs(t1 - t0),
+    z0: z.z0,
+    z1: z.z1,
+  });
+}
+
+/** Porta de giro de uma folha. */
+function buildSwingDoor(c: Ctx): void {
+  buildDoorFrame(c);
+  const span = leafSpan(c);
+  const hingeT = span.center + c.h * span.half;
+  const latchT = span.center - c.h * span.half;
+  addSwingLeaf(c, 0, latchT, hingeT, hingeT, latchT);
+}
+
+/** Porta dupla: duas folhas de `lh − 0,002`, dobradiças nas ombreiras, as duas para `side`. */
+function buildDoubleDoor(c: Ctx): void {
+  buildDoorFrame(c);
+  const span = leafSpan(c);
+  const leftHinge = span.center - span.half;
+  const rightHinge = span.center + span.half;
+  const centerL = span.center - 0.002;
+  const centerR = span.center + 0.002;
+  addSwingLeaf(c, 0, centerL, leftHinge, leftHinge, centerL);
+  addSwingLeaf(c, 1, centerR, rightHinge, rightHinge, centerR);
+}
+
+/** Porta pivotante: folha inteira girando em torno do eixo vertical a W/4 da ombreira da dobradiça. */
+function buildPivotDoor(c: Ctx): void {
+  buildDoorFrame(c);
+  const span = leafSpan(c);
+  const z = leafZ(c);
+  const sSpan = leafS(c);
+  const axis = c.h * (c.hw / 2);
+  const sMid = (sSpan.s0 + sSpan.s1) / 2;
+  const sign = (c.side * c.h) as 1 | -1;
+  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: sMid, sign };
+  addDoorLeaf(c, 0, span.center - span.half, span.center + span.half, sSpan, z, motion, -axis);
+  c.openings.push({
+    leaf: 0,
+    kind: 'pivot',
+    side: c.side,
+    hingeT: axis,
+    latchT: -axis,
+    pivot: { t: axis, s: sMid },
+    radius: (3 * c.hw) / 2,
+    z0: z.z0,
+    z1: z.z1,
+  });
+}
+
+/** Batente de correr: caixa J×D sem batedor, com trilhos metálicos no topo e no piso. */
+function buildSlidingDoorFrame(c: Ctx): void {
+  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  for (const j of [-1, 1] as const) {
+    addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
+  }
+  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
+  const inner = c.hw - c.J;
+  addPart(c, 'track-head', 'track', 'metal', box(-inner, inner, body.s0, body.s1, c.H - c.J - GAP - 0.01, c.H - c.J - GAP));
+  addPart(c, 'track-floor', 'track', 'metal', box(-inner, inner, body.s0, body.s1, 0, 0.01));
+}
+
+/** Porta de correr de duas folhas: pistas opostas, sobreposição central e uma folha que desliza. */
+function buildSlidingDoor(c: Ctx): void {
+  buildSlidingDoorFrame(c);
+  const inner = innerT(c);
+  const innerWidth = inner.t1 - inner.t0;
+  const center0 = (inner.t0 + inner.t1) / 2;
+  const leafW = (innerWidth + 0.06) / 2;
+  const spacing = leafW - 0.06;
+  const travel = leafW - 0.06;
+  const z0 = 0.008;
+  const z1 = c.transom ? c.H - c.J - c.transom.height - TRANSOM_BAR - GAP : c.H - c.J - GAP;
+  const moving = c.h === 1 ? 0 : 1;
+  for (let k = 0; k < 2; k++) {
+    const center = center0 + (k - 0.5) * spacing;
+    const sCenter = c.C + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
+    const motion: PartMotion =
+      k === moving ? { kind: 'slide', dt: k === 1 ? -1 : 1, ds: 0, dz: 0, travel } : { kind: 'slide', dt: 0, ds: 0, dz: 0, travel: 0 };
+    const latchT = center + (k <= 0 ? leafW / 2 : -leafW / 2);
+    addDoorLeaf(c, k, center - leafW / 2, center + leafW / 2, { s0: sCenter - c.L / 2, s1: sCenter + c.L / 2 }, { z0, z1 }, motion, latchT);
+    c.openings.push({
+      leaf: k,
+      kind: 'slide',
+      side: 0,
+      hingeT: 0,
+      latchT: 0,
+      pivot: { t: 0, s: sCenter },
+      radius: leafW,
+      z0,
+      z1,
+    });
+  }
+}
+
+export function buildDoor(c: Ctx): void {
+  const family = openingFamilyOf(c.t)?.id;
+  const novas = buildNewDoorParts(c.p, c.o, c.g, c.f);
+  if (novas) {
+    c.parts.push(...novas.parts);
+    c.openings.push(...novas.openings);
+    return;
+  }
+  switch (family) {
+    case 'door_double':
+      buildDoubleDoor(c);
+      break;
+    case 'door_pivot':
+      buildPivotDoor(c);
+      break;
+    case 'door_sliding':
+      buildSlidingDoor(c);
+      break;
+    case 'door_void':
+      buildVoid(c);
+      break;
+    default:
+      buildSwingDoor(c);
+  }
+}

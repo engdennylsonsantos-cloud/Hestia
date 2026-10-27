@@ -441,6 +441,16 @@ export interface RoofPlaneDef {
   z0: number;
 }
 
+/** Mansarda automática do telhado por contorno: duas faixas por água (ver `Roof.mansard`). */
+export interface RoofMansard {
+  /** Inclinação da faixa de baixo, junto ao beiral (% , em (0, 300]). */
+  lowerPercent: number;
+  /** Inclinação da faixa de cima (% , em (0, 300]). */
+  upperPercent: number;
+  /** Largura em planta da faixa de baixo (m), medida do beiral para dentro; > 0. */
+  run: number;
+}
+
 /**
  * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). `boundary` é o contorno do beiral em planta (já com o balanço);
  * a cota do beiral é o nível + `heightOffset`. As águas vêm da forma: 'shed' (uma água subindo na direção `dir`),
@@ -475,6 +485,13 @@ export interface Roof {
    * em `boundary` continua sendo os vértices (cantos lógicos). Mesmo comprimento de `boundary` quando presente.
    */
   edgeSag?: number[];
+  /**
+   * Mansarda automática (só formas por contorno: 'edges', 'hip', 'gable', 'shed'): cada água se divide em duas faixas, a de
+   * baixo, junto ao beiral, com `lowerPercent` até a distância `run` (m, em planta) do beiral, e a de cima com
+   * `upperPercent`. Ausente = sem mansarda (sem migração). Com ela, as inclinações por aresta só dizem quais arestas têm
+   * água (as sem inclinação continuam empenas); o percentual vem de `lowerPercent` e `upperPercent`.
+   */
+  mansard?: RoofMansard;
   /**
    * Pegada: contorno desenhado, sem balanço, de onde o beiral saiu (modos de contorno, retângulo e paredes). Com ela,
    * `boundary = eaveOutlinePerEdge(footprint, edgeOverhangs)`. Ausente em telhados antigos e depois de editar vértices

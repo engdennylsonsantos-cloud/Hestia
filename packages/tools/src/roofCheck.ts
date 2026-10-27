@@ -6,7 +6,7 @@ import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Chaves que mudam a geometria das águas. Só uma alteração delas é conferida pelo motor. */
-const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
+const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'mansard', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
 
 /** Motivo para um telhado com forma que não produz água, em português. */
 function noWaterReason(r: Roof): string {

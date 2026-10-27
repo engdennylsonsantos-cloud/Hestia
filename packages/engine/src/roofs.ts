@@ -18,9 +18,9 @@ export interface ResolvedRoofPlane {
   z0: number;
 }
 
-/** Linha notável do telhado em planta (para desenho e quantitativos). 'gable' é a empena (aresta sem inclinação). */
+/** Linha notável do telhado em planta (para desenho e quantitativos). 'gable' é a empena (aresta sem inclinação); 'break' é o desnível entre duas águas de mesma subida e inclinações diferentes (mansarda). */
 export interface RoofLine {
-  kind: 'ridge' | 'hip' | 'valley' | 'eave' | 'gable';
+  kind: 'ridge' | 'hip' | 'valley' | 'eave' | 'gable' | 'break';
   a: Vec2;
   b: Vec2;
 }

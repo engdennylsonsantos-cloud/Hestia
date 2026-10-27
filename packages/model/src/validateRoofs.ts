@@ -2,6 +2,7 @@ import { boxOf, boxesOverlap, intersection, multiArea, ringArea, type Box, type 
 import { roofPolygon, roofPlanArea } from './roof.ts';
 import { isRoof, type Project, type Roof } from './types.ts';
 import type { ValidationIssue } from './validate.ts';
+import { mansardProblems } from './validateRoofMansard.ts';
 import { OVERLAP_MIN, ZERO_AREA, fmtArea, holeOutside, selfIntersects } from './validateFloors.ts';
 
 /** Erro de módulo do vetor de direção (a direção tem que ser unitária). */
@@ -121,6 +122,7 @@ function roofIssuesOf(p: Project, r: Roof): ValidationIssue[] {
   if (dir) push('error', 'roof-slope-invalid', `Direção do telhado ${name} inválida: ${dir}.`);
   out.push(...planeProblems(r, name));
   out.push(...edgeProblems(r, name));
+  out.push(...mansardProblems(r, name));
   if (r.boundary.length < 3) return out;
 
   if (selfIntersects(r.boundary)) push('error', 'roof-self-intersect', `O contorno do telhado ${name} se cruza consigo mesmo.`);

@@ -270,6 +270,8 @@ Fonte: [DOC: Ajuda “Wall Closure” (AC28/AC30); AC18 “Wall Closure”].
 - **Closure não altera quantitativos.** As skins dobradas são representação; não entram nos volumes/áreas calculados da parede [FÓRUM: resposta oficial Graphisoft].
 - **Closure em 3D é limitado.** A biblioteca stock gera a geometria de contorno, mas o turn-in pode não aparecer no 3D; em corte, o que vale é a extensão do composto até o frame [FÓRUM oficial; DOC “Show in 3D”].
 - **Closure × alizar:** nunca os dois. O alizar cobre o encontro; o Turn Plaster mostra o reboco. Escolha de representação, não de construção [DOC: Ajuda “Wall Closure”; “Casing”].
+- **Linhas de fim de skin no vão** são controladas em `Options > Element Attributes > Composites` (`Skin End Lines`), não no objeto da porta/janela. Se estiverem desligadas, as camadas parecem “sumir” no vão, mesmo com o closure ligado [DOC: suporte Graphisoft “Edges of composite walls are invisible at door openings”].
+- **Exceção de junção parede-laje:** se a abertura está **rente ao topo da laje**, as skins de acabamento da laje continuam através da parede, ignorando prioridades; se a abertura está elevada, valem as prioridades normais [DOC: Ajuda “Specific Element Intersections and Junctions”].
 
 ---
 
@@ -713,6 +715,7 @@ Isso é a chave para entender por que **Flip mantém o batente no lugar**: o fli
 | https://help.graphisoft.com/AC/26/INT/_AC26_Help/150-1_DoorWindowCustomSettings/150-1_DoorWindowCustomSettings-15.htm | AC26 INT | DOC | Opening Lines – Sidelight/Transom |
 | https://help.graphisoft.com/AC/28/INT/_AC28_Help/050_ViewsVB/050_ViewsVB-117.htm | AC28 INT | DOC | Core/Finish/Other; skins adjacentes |
 | https://help.graphisoft.com/AC/25/INT/_AC25_Help/020_Configuration/020_Configuration-54.htm | AC25 INT | DOC | Composite Structures; skins/core |
+| https://help.graphisoft.com/AC/29/INT/_AC29_Help/040_ElementsVB/040_ElementsVB-272.htm | AC29 INT | DOC | interseções; parede-laje com abertura rente ao topo da laje |
 | https://help.graphisoft.com/AC/18/INT/AC18Help/Appendix_Tools/Appendix_Tools-33.htm | AC18 INT | DOC | índice da GUI do Door |
 | .../Appendix_Tools-37.htm | AC18 INT | DOC | Frame Style 1/2/3; door stop; recess |
 | .../Appendix_Tools-38.htm | AC18 INT | DOC | Leaf/Sash; Same as Leaf/Opposite |

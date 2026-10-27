@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { intersection, multiArea } from '@hestia/geom';
 import { createEmptyProject, makeWall, ProjectStore, type Opening, type OpeningType, type Project } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
@@ -45,13 +46,25 @@ const folha = (parts: OpeningPart[]) => parts.find((x) => x.role === 'leaf')!;
 const largura = (b: PartBox) => b.t1 - b.t0;
 const altura = (b: PartBox) => b.z1 - b.z0;
 
-function volumeComum(a: PartBox, b: PartBox): boolean {
-  const e = 1e-9;
-  return (
-    Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0) > e &&
-    Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0) > e &&
-    Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > e
-  );
+const multi = (ring: Array<{ t: number; s: number }>): Array<Array<Array<{ x: number; y: number }>>> => [
+  [ring.map((p) => ({ x: p.t, y: p.s }))],
+];
+
+/** As duas peças se cruzam em algum z (perfil do batente considerado); amostra a faixa de z comum. */
+function temIntersecao(m: ReturnType<typeof modelo>, a: OpeningPart, b: OpeningPart, state = CLOSED): boolean {
+  const z0 = Math.max(a.box.z0, b.box.z0);
+  const z1 = Math.min(a.box.z1, b.box.z1);
+  if (z1 - z0 <= 1e-9) return false;
+  const passos = Math.max(2, Math.min(80, Math.ceil((z1 - z0) / 0.01)));
+  const corte = state === CLOSED ? (z: number) => slicePartsAtZ(m, z, CLOSED) : (z: number) => slicePartsAtZ(m, z, state);
+  for (let i = 0; i <= passos; i++) {
+    const z = z0 + ((z1 - z0) * i) / passos;
+    const rings = corte(z);
+    const ra = rings.find((x) => x.part.id === a.id)?.ring;
+    const rb = rings.find((x) => x.part.id === b.id)?.ring;
+    if (ra && rb && multiArea(intersection(multi(ra), multi(rb))) > 1e-7) return true;
+  }
+  return false;
 }
 
 describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
@@ -91,14 +104,14 @@ describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
     expect(modelo(c2).openings[0]!.side).toBe(-1);
   });
 
-  it('a folha fechada não tem volume em comum com ombreira, batedor ou travessa', () => {
+  it('a folha fechada não tem volume em comum com ombreira ou travessa (perfil em L)', () => {
     for (const flipHand of [false, true]) {
       for (const flipFacing of [false, true]) {
         const m = modelo(cena('ot_p90', {}, { flipHand, flipFacing }));
         const f = folha(m.parts);
         for (const p of m.parts) {
-          if (p.role !== 'jamb' && p.role !== 'stop' && p.role !== 'head') continue;
-          expect(volumeComum(f.box, p.box), `${p.id} hand=${flipHand} facing=${flipFacing}`).toBe(false);
+          if (p.role !== 'jamb' && p.role !== 'head') continue;
+          expect(temIntersecao(m, f, p), `${p.id} hand=${flipHand} facing=${flipFacing}`).toBe(false);
         }
       }
     }
@@ -153,15 +166,14 @@ describe('buildOpeningModel: estilos de batente da porta de giro', () => {
     expect(f.box.z1).toBeCloseTo(c.g.height - 0.05 - 0.004, 9);
   });
 
-  it('aduela: batente de 0,03 m de largura e profundidade do núcleo inteiro', () => {
+  it('aduela: batente de 0,03 m de largura, profundidade do núcleo inteiro e uma peça em L', () => {
     const c = cena('ot_p90', { frameStyle: 'aduela' });
     const m = modelo(c);
     const jamb = de(m.parts, 'jamb')[0]!;
-    const stop = de(m.parts, 'stop')[0]!;
-    const larguraTotal = Math.max(jamb.box.t1, stop.box.t1) - Math.min(jamb.box.t0, stop.box.t0);
-    expect(larguraTotal).toBeCloseTo(0.03, 9);
+    expect(jamb.box.t1 - jamb.box.t0).toBeCloseTo(0.03, 9);
     expect(jamb.box.s1 - jamb.box.s0).toBeCloseTo(0.14, 9);
-    expect(de(m.parts, 'stop')).toHaveLength(3);
+    expect(de(m.parts, 'stop')).toHaveLength(0);
+    expect(jamb.profile?.pts).toHaveLength(6);
   });
 
   it('block: sem batente, folha ocupa |t| ≤ hw − gap e articula em ±(hw − gap)', () => {
@@ -431,9 +443,9 @@ describe('buildOpeningModel: as dez famílias nas quatro combinações', () => {
           expect(new Set(m.parts.map((x) => x.id)).size, caso).toBe(m.parts.length);
           expect(m.parts.map((x) => x.id)).toEqual(modelo(c).parts.map((x) => x.id));
           expect(m, caso).toEqual(modelo(c));
-          const batente = m.parts.filter((x) => x.role === 'jamb' || x.role === 'stop' || x.role === 'head');
+          const batente = m.parts.filter((x) => x.role === 'jamb' || x.role === 'head');
           for (const folhaPart of m.parts.filter((x) => x.role === 'leaf')) {
-            for (const b of batente) expect(volumeComum(folhaPart.box, b.box), `${caso} ${folhaPart.id} × ${b.id}`).toBe(false);
+            for (const b of batente) expect(temIntersecao(m, folhaPart, b), `${caso} ${folhaPart.id} × ${b.id}`).toBe(false);
           }
           for (const p of m.parts) {
             expect(p.box.t1 - p.box.t0, `${caso} ${p.id}`).toBeGreaterThan(1e-9);
@@ -511,16 +523,57 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
     expect(depois.bounds.t1).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
   });
 
-  it('corte a 1,5 m da porta de giro: duas ombreiras (corpo e batedor, 4 anéis) e a folha', () => {
+  it('corte a 1,5 m da porta de giro: duas ombreiras em L (6 vértices cada) e a folha', () => {
     const m = modelo(cena('ot_p90'));
     const corte = slicePartsAtZ(m, 1.5, CLOSED);
-    expect(corte.filter((x) => x.part.role === 'jamb' || x.part.role === 'stop')).toHaveLength(4);
+    const ombreiras = corte.filter((x) => x.part.role === 'jamb');
+    expect(ombreiras).toHaveLength(2);
+    for (const o of ombreiras) expect(o.ring).toHaveLength(6);
     expect(corte.some((x) => x.part.role === 'head')).toBe(false);
     const f = corte.find((x) => x.part.role === 'leaf')!;
     const ts = f.ring.map((p) => p.t);
     const ss = f.ring.map((p) => p.s);
     expect(Math.max(...ts) - Math.min(...ts)).toBeCloseTo(2 * 0.411, 9);
     expect(Math.max(...ss) - Math.min(...ss)).toBeCloseTo(0.04, 9);
+  });
+
+  it('área do anel em L é J·D − ov·R nos dois lados', () => {
+    const m = modelo(cena('ot_p90'));
+    const corte = slicePartsAtZ(m, 1.5, CLOSED).filter((x) => x.part.role === 'jamb');
+    const areaCadarco = (ring: Array<{ t: number; s: number }>): number => {
+      let a = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i]!;
+        const q = ring[(i + 1) % ring.length]!;
+        a += p.t * q.s - q.t * p.s;
+      }
+      return Math.abs(a) / 2;
+    };
+    const esperada = 0.05 * 0.184 - 0.015 * (0.04 + 0.004);
+    for (const o of corte) {
+      expect(areaCadarco(o.ring)).toBeCloseTo(esperada, 9);
+      expect(o.ring).toHaveLength(6);
+    }
+  });
+
+  it('partTransformed de peça com perfil e sem movimento devolve a caixa envolvente', () => {
+    const m = modelo(cena('ot_p90'));
+    for (const p of [...de(m.parts, 'jamb'), de(m.parts, 'head')[0]!]) {
+      const ob = partTransformed(p, CLOSED);
+      expect(ob.bounds).toEqual(p.box);
+      expect(ob.corners).toHaveLength(8);
+    }
+  });
+
+  it('projectParts respeita o perfil: elevação retângulo, corte transversal da travessa em L', () => {
+    const m = modelo(cena('ot_p90'));
+    const elev = projectParts(m, 's', CLOSED);
+    for (const p of [...de(m.parts, 'jamb'), de(m.parts, 'head')[0]!]) {
+      expect(elev.find((x) => x.part.id === p.id)!.ring).toHaveLength(4);
+    }
+    const corte = projectParts(m, 't', CLOSED);
+    expect(corte.find((x) => x.part.role === 'head')!.ring).toHaveLength(6);
+    expect(corte.find((x) => x.part.role === 'jamb')!.ring).toHaveLength(4);
   });
 
   it('corte a 2,3 m devolve só a verga quando o tipo tem', () => {
@@ -533,7 +586,7 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
   it('elevação (axis s): retângulos de batente, folha, vidro e maçaneta', () => {
     const proj = projectParts(modelo(cena('ot_p90', { leafStyle: 'glass' })), 's', CLOSED);
     const roles = new Set(proj.map((x) => x.part.role));
-    for (const r of ['jamb', 'stop', 'head', 'leaf', 'glass', 'handle'] as const) expect(roles.has(r), r).toBe(true);
+    for (const r of ['jamb', 'head', 'leaf', 'glass', 'handle'] as const) expect(roles.has(r), r).toBe(true);
     for (const x of proj) expect(x.ring, x.part.id).toHaveLength(4);
   });
 
@@ -576,14 +629,30 @@ describe('buildOpeningModel: geometria do batente na parede', () => {
     expect(de(fixo.parts, 'jamb')[0]!.box.s1 - de(fixo.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.09, 9);
   });
 
-  it('cada ombreira tem corpo e batedor; a travessa tem o batedor embaixo do corpo', () => {
+  it('cada ombreira e a travessa são UMA peça com perfil em L e caixa envolvente exata', () => {
     const m = modelo(cena('ot_p90'));
     expect(de(m.parts, 'jamb')).toHaveLength(2);
-    expect(de(m.parts, 'stop')).toHaveLength(3);
+    expect(de(m.parts, 'stop')).toHaveLength(0);
     expect(de(m.parts, 'head')).toHaveLength(1);
     const head = de(m.parts, 'head')[0]!;
-    const stopHead = m.parts.find((x) => x.id === 'stop-head')!;
-    expect(stopHead.box.z1).toBeCloseTo(head.box.z0, 9);
-    expect(altura(head.box)).toBeLessThan(0.05);
+    expect(head.profile?.plane).toBe('sz');
+    expect(head.profile?.pts).toHaveLength(6);
+    expect(altura(head.box)).toBeCloseTo(0.05, 9);
+    for (const p of [...de(m.parts, 'jamb'), head]) {
+      const pts = p.profile!.pts;
+      const ts = pts.map((q) => (p.profile!.plane === 'ts' ? q[0] : q[1]));
+      const ss = pts.map((q) => (p.profile!.plane === 'ts' ? q[1] : q[0]));
+      if (p.profile!.plane === 'ts') {
+        expect(Math.min(...ts), p.id).toBeCloseTo(p.box.t0, 9);
+        expect(Math.max(...ts), p.id).toBeCloseTo(p.box.t1, 9);
+        expect(Math.min(...ss), p.id).toBeCloseTo(p.box.s0, 9);
+        expect(Math.max(...ss), p.id).toBeCloseTo(p.box.s1, 9);
+      } else {
+        expect(Math.min(...ts), p.id).toBeCloseTo(p.box.z0, 9);
+        expect(Math.max(...ts), p.id).toBeCloseTo(p.box.z1, 9);
+        expect(Math.min(...ss), p.id).toBeCloseTo(p.box.s0, 9);
+        expect(Math.max(...ss), p.id).toBeCloseTo(p.box.s1, 9);
+      }
+    }
   });
 });

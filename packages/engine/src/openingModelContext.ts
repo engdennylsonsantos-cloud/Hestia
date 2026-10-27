@@ -24,6 +24,7 @@ import type {
   PartBox,
   PartMaterial,
   PartMotion,
+  PartProfile,
   PartRole,
 } from './openingModelTypes.ts';
 
@@ -114,6 +115,8 @@ export interface AddOptions {
   motion?: PartMotion;
   leaf?: number;
   dashed?: boolean;
+  profile?: PartProfile;
+  group?: string;
 }
 
 export function addPart(c: Ctx, id: string, role: PartRole, material: PartMaterial, b: PartBox, opts: AddOptions = {}): void {
@@ -176,14 +179,6 @@ export function leafS(c: Ctx): { s0: number; s1: number } {
   const lside = c.leafSide === 'opposite' ? -c.side : c.side;
   const start = c.Cd + lside * (c.D / 2 - (c.L + GAP));
   return { s0: start, s1: start + lside * c.L };
-}
-
-/** Faixa `s` do batedor: no lado oposto ao da abertura (espelhada com `leafSide = 'opposite'`). */
-export function stopS(c: Ctx): { s0: number; s1: number } {
-  const stopSide = c.leafSide === 'opposite' ? c.side : -c.side;
-  const start = c.Cd + stopSide * (c.D / 2);
-  const end = start - stopSide * (c.D - (c.L + GAP));
-  return { s0: start, s1: end };
 }
 
 /** Altura (z) da folha fechada, já descontada a bandeira superior e o vão livre de batente. */

@@ -1,7 +1,7 @@
 import { openingFamilyOf } from '@hestia/model';
 import { buildNewDoorParts } from './openingModelDoorsNew.ts';
 import { buildVoid } from './openingModelWindows.ts';
-import type { PartMotion } from './openingModelTypes.ts';
+import type { PartMotion, PartProfile } from './openingModelTypes.ts';
 import {
   GAP,
   OVERLAP,
@@ -12,32 +12,77 @@ import {
   leafS,
   leafSpan,
   leafZ,
-  stopS,
   type AddOptions,
   type Ctx,
 } from './openingModelContext.ts';
 
-/** Batente de porta: ombreiras e travessa; com rebaixo (batedor) ou caixa única. */
+const signedArea = (pts: Array<[number, number]>): number => {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
+};
+
+/** Ordena o polígono em sentido anti-horário (a área assinada fica positiva). */
+const ccw = (pts: Array<[number, number]>): Array<[number, number]> => (signedArea(pts) < 0 ? [...pts].reverse() : pts);
+
+/**
+ * Seção em L do batente com rebaixo (spec E3 §2), no plano (t, s) da ombreira `j`. O rebaixo tem a largura do batedor
+ * (`OVERLAP`) e a profundidade da folha mais a folga (`R`); a peça é UMA, extrudada em z.
+ */
+export function jambProfile(c: Ctx, j: 1 | -1): PartProfile {
+  const R = c.L + GAP;
+  const outer = c.hw;
+  const inner = c.hw - c.J;
+  const lip = c.hw - c.J + OVERLAP;
+  const pts: Array<[number, number]> = [
+    [j * outer, c.Cd - c.side * (c.D / 2)],
+    [j * outer, c.Cd + c.side * (c.D / 2)],
+    [j * lip, c.Cd + c.side * (c.D / 2)],
+    [j * lip, c.Cd + c.side * (c.D / 2 - R)],
+    [j * inner, c.Cd + c.side * (c.D / 2 - R)],
+    [j * inner, c.Cd - c.side * (c.D / 2)],
+  ];
+  return { plane: 'ts', pts: ccw(pts) };
+}
+
+/** Seção em L da travessa, no plano (s, z), com o rebaixo embaixo (spec E3 §2). */
+export function headProfile(c: Ctx): PartProfile {
+  const R = c.L + GAP;
+  const pts: Array<[number, number]> = [
+    [c.Cd - c.side * (c.D / 2), c.H],
+    [c.Cd + c.side * (c.D / 2), c.H],
+    [c.Cd + c.side * (c.D / 2), c.H - c.J + OVERLAP],
+    [c.Cd + c.side * (c.D / 2 - R), c.H - c.J + OVERLAP],
+    [c.Cd + c.side * (c.D / 2 - R), c.H - c.J],
+    [c.Cd - c.side * (c.D / 2), c.H - c.J],
+  ];
+  return { plane: 'sz', pts: ccw(pts) };
+}
+
+/** Batente de porta: ombreiras e travessa; em L (uma peça com rebaixo) ou caixa única. */
 function buildDoorFrame(c: Ctx): void {
   if (c.frameStyle === 'block') return;
   const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
+  const zTop = c.frameStyle === 'simple' ? c.H : c.H - c.J;
   for (const j of [-1, 1] as const) {
     const name = j < 0 ? 'left' : 'right';
     if (c.frameStyle === 'simple') {
       addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
       continue;
     }
-    addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J + OVERLAP), j * c.hw, body.s0, body.s1, 0, c.H));
-    const stop = stopS(c);
-    addPart(c, `stop-${name}`, 'stop', 'frame', box(j * (c.hw - c.J), j * (c.hw - c.J + OVERLAP), stop.s0, stop.s1, 0, c.H));
+    addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, zTop), {
+      profile: jambProfile(c, j),
+    });
   }
   if (c.frameStyle === 'simple') {
     addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
     return;
   }
-  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J + OVERLAP, c.H));
-  const stop = stopS(c);
-  addPart(c, 'stop-head', 'stop', 'frame', box(-c.hw, c.hw, stop.s0, stop.s1, c.H - c.J, c.H - c.J + OVERLAP));
+  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H), { profile: headProfile(c) });
 }
 
 /** Almofadas, aletas ou grelhas sobre a folha (detalhe do estilo). */

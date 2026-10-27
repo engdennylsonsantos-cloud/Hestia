@@ -330,7 +330,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       }
       for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);
-        if (!at || !arco.comSinal(k)) continue;
+        if (!at || !arco.comSinal(k) || pl.percent === 0) continue; // telhado plano: sem seta nem "0,0 %"
         const down = { x: -pl.up.x, y: -pl.up.y };
         // Seta de caimento em verde (tinta própria do caimento), na espessura de projeção.
         out.strokes.push(...slopeArrow(down, at, v, { ...theme, ink: theme.roofSlope }, esp.projecao));

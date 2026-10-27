@@ -44,3 +44,8 @@ Modelo: `opencode-go/deepseek-v4.1-flash` (NUNCA o pro; `deepseek/deepseek-flash
 ## 7. Trabalho de outras sessões (também enviado)
 Havia alterações não commitadas em outras pastas/worktrees (desempenho GPU `gpu-r2/r3/r5`, `perf-web-20-pavimentos`, `baseline`, `BRD`, agentes antigos). Foram commitadas como snapshots `wip(snapshot)` nas próprias branches e enviadas; branches destacadas ganharam o nome `wip/<pasta>`. Um `stash` antigo (`wip angularNode`) virou a branch `wip/stash-angularNode`. Nada foi mesclado nem descartado: revisar uma a uma.
 No checkout principal havia uma correção em andamento do buffer numérico que prendia atalhos (`apps/web/src/editor/controller.ts` + teste `atalhoBufferPreso.test.ts`) e o script solto `packages/model/src/.edit_room_sep.cjs`; foram commitados como `wip:`.
+
+## 8. Itens que o GitHub recusou (token sem escopo `workflow`)
+- `wip/stash-angularNode` (stash antigo "wip angularNode (pre-merge zealous)"): so altera `packages/engine/src/joinNode.ts`; o patch esta em `docs/handoff-subagentes/stash-angularNode-joinNode.patch` (`git apply` sobre a base `claude/trusting-lamport-28zmit`).
+- `backup/pre-merge-4d2a73a` (branch de backup local antiga): contem alteracao em `.github/workflows/ci.yml`; so existe NESTE PC. Para envia-la, conceda o escopo `workflow` ao token (`gh auth refresh -s workflow`) e rode `git push origin backup/pre-merge-4d2a73a`.
+- `main` local (10aa3aa) e uma copia antiga/desatualizada e o push dela foi recusado pelo mesmo motivo do escopo `workflow`; nao e usada pelo trabalho do perimetro (a base e a `ccr-25143eb2-08pwa4`). Nada foi forcado.

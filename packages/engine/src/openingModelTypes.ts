@@ -91,7 +91,9 @@ export interface OpeningPart {
 /** Como a folha se abre, para as linhas de abertura (V) e o arco de giro. */
 export interface LeafOpening {
   leaf: number;
-  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'louver' | 'fixed';
+  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'louver' | 'tilt' | 'fixed';
+  /** Altura (z local) do eixo horizontal da janela basculante (`kind 'tilt'`). */
+  axisZ?: number;
   /** Abre para os dois lados (porta vai-e-vem): `side` é o lado principal. */
   both?: boolean;
   /** Eixo do deslizamento: 't' (horizontal, padrão) ou 'z' (vertical: guilhotina, portão seccionado). */

@@ -425,4 +425,220 @@ Fonte: páginas `/BRA/` correspondentes [DOC AC28 BRA 151-1/2/4/5/7/8/13/15/16/1
 | https://community.graphisoft.com/gowhw84577/attachments/gowhw84577/forum-gdl/8468/3/AC28%20LU2%20-%20Release%20Note.pdf | AC28 LU2 | FÓRUM | Correções e Detail Level Override |
 | https://community.graphisoft.com/gowhw84577/attachments/gowhw84577/forum-gdl/8468/5/AC29%20Library%20-%20Release%20Note.pdf | AC29 | FÓRUM | Top/Bottom Hinged, Bi-Fold Lift Up, multipanel |
 
+---
+
+## 7 · Colocação, Flip, Tab e lado externo
+
+### 7.1 Sequência de colocação [DOC AC28 040-306]
+
+1. Ativar a ferramenta **Porta** (ou Janela) em planta ou 3D e escolher o objeto no browser.
+2. Passar o cursor sobre a parede: aparece a **pré-visualização** do vão na posição atual.
+3. Se houver paredes sobrepostas no ponto, **Tab** alterna qual parede está destacada.
+4. O **ícone de sol** e a **linha grossa** indicam o lado **externo** (*reveal side*) da parede. Mover o cursor para o lado oposto troca o lado externo.
+5. Primeiro clique: fixa a posição. O **Anchor Point** decide se a porta é colocada pelo **centro** ou por um **lado**; pode ser trocado no Info Box durante a colocação.
+6. Segundo passo: escolher o **sentido de abertura** entre quatro posições (dentro/fora × esquerda/direita), mostradas por setas. **Tab** ainda alterna o lado externo nesse momento.
+7. Segundo clique: confirma a porta.
+
+### 7.2 Flip
+
+O botão **Flip** (Info Box ou diálogo) inverte o **sentido de abertura** de um lado para o outro, **mantendo o batente no lugar**. Não é o mesmo que girar a porta 180°: o eixo/posição do batente permanece [DOC AC28 040-306; DOC AC28 150-16].
+
+**Lado externo depois de colocada**: a documentação oficial só descreve a troca durante a colocação (cursor/Tab). A comunidade relata que, após inserir, abre-se o diálogo e usa-se **Flip** para trocar “outside/inside” [FÓRUM community “Changing door swing”]. Isso conflita parcialmente com a descrição oficial do Flip (sentido de abertura). **NÃO CONFIRMADO**: qual controle exato troca o *reveal side* depois de a porta estar colocada; provavelmente é um parâmetro GDL (`WIDO_REVEAL_SIDE`) exposto no diálogo, mas não localizamos a página que o nomeie.
+
+### 7.3 Edição posterior
+
+| Ação | Comportamento | Fonte |
+|---|---|---|
+| **Drag / Move / Multiply** | Move a porta dentro da parede; pode atravessar paredes diferentes se os planos de referência estiverem alinhados | [DOC AC28 040-314] |
+| **Rotate** | Gira 180° em torno do centro, sem vetor; troca sentido e lado da dobradiça | [DOC AC28 040-314] |
+| **Mirror** | Espelha a porta e inverte lateralmente o sentido; eixo é a parede ou uma perpendicular a ela | [DOC AC28 040-314] |
+| **Elevate** | Move verticalmente, disponível em planta/corte/3D para paredes retas ou inclinadas | [DOC AC28 040-314] |
+| **Stretch da parede / Marquee** | Portas dentro da marquise acompanham e mantêm a posição relativa | [DOC AC28 040-314] |
+| **Hotspots editáveis** | Losangos permitem editar ângulo/abertura/distância e larguras de caixilho diretamente no projeto; **Tab** no Tracker digita o valor | [DOC AC30 040-287; DOC AC18 151-41] |
+| **Curvar parede** | Diálogo pergunta **Keep distance** ou **Keep proportion** para reposicionar as aberturas | [DOC AC28 040-315] |
+
+### 7.4 Preview and Positioning — campos
+
+| Campo | O que faz | Valores / observações |
+|---|---|---|
+| **Width / Height** | Tamanho nominal da abertura | É o mesmo “Nominal Size” da aba Nominal Sizes |
+| **Sill/Header Value** | Altura do peitoril ou da padieira | valor numérico |
+| Referência do sill/header | De onde a altura é medida | **Sill to Wall Base**, **Sill to Wall Top**, **Sill to Story**, **Header to Wall Base**, **Header to Wall Top**, **Header to Story**, **Relink Anchor Story** |
+| **Reveal** | Profundidade do requadro | igual à aba Reveal |
+| **Reveal anchor** | Onde o requadro se ancora | **Wall Face** / **Wall Core** (camada de núcleo mais próxima) |
+| **Flip** | Inverte o sentido mantendo o batente | botão |
+| **Anchor Point** | Centro ou lado | trocável no Info Box |
+| **Opening Plane** | Plano em parede inclinada | **Associated to Wall** / **Vertical** |
+| **Preview** | 5 modos | 2D symbol, hidden line front, hidden line axonometry, 3D shaded axonometry, predefined picture |
+
+Fonte: [DOC AC28 150-16; AC28 040-309; AC28 040-310; AC28 040-311; AC18 151-28].
+
+**Sill/Header e Subfloor**: o peitoril é sempre medido a partir da base da parede (ou story). O campo **Subfloor Thickness** (no painel Dimension Marker) só corrige o **valor mostrado no marcador**, não move a porta. Exemplo: base da parede 100 mm abaixo do piso, peitoril 1000 mm → marcador mostra 900 mm [DOC AC28 040-310].
+
+**Reveal ancorado no núcleo**: se a parede composta ganhar isolamento mais grosso, a profundidade do requadro se ajusta para manter a porta alinhada ao núcleo; se a parede deixar de ter núcleo, a âncora volta para “Wall Face” e a profundidade é recalculada [DOC AC28 040-311].
+
+---
+
+## 8 · Exibição em planta: simbólica × projetada
+
+### 8.1 Floor Plan Display
+
+| Valor | O que mostra | Quando usar |
+|---|---|---|
+| **Symbolic** (padrão) | Símbolo 2D padrão do objeto, **independente** do modelo 3D | Documentação corrente; é o que dá o desenho “de arquiteto” |
+| **Overhead All** | O símbolo 2D inteiro com atributos de linha “acima” (*overhead*) | Quando se quer o contorno acima do plano de corte |
+| **Projected** | Parte cortada do modelo 3D + parte não cortada (para baixo) | Parede inclinada ou desejo de representação mais realista |
+| **Projected with Overhead** | Parte cortada + parte acima do plano de corte + parte não cortada | Idem, incluindo o que está acima do corte |
+
+Fonte: [DOC AC28 150-18; AC28 040-307].
+
+**Consequência para o nosso editor**: em `Symbolic`, o símbolo pode mostrar folha aberta, arco de giro e maçaneta sem que o 3D exista; em `Projected`, o desenho é derivado da geometria 3D e depende do plano de corte da vista. São dois “motores” de desenho distintos, não um modo de detalhe do mesmo desenho.
+
+### 8.2 Atributos 2D: GDL × override
+
+Há duas camadas de atributos [DOC AC28 040-307; AC28 151-29]:
+
+1. **Atributos GDL** definidos no Custom Settings / Parameters (linha, caneta, trama por componente: folha, batente, vidro, grade, guarnição, soleira etc.). São muitos e permitem controle fino.
+2. **Atributos 2D simplificados** no painel **Floor Plan and Section**: corte, vista e “acima” (cut/uncut/overhead), com tipos de linha e canetas. Só valem se as caixas **Override Object’s Line Types / Pens / Attributes** estiverem ligadas; caso contrário, o GDL manda.
+
+**Use Fills**: se estiver desligado, nenhum componente usa trama, mesmo que haja parâmetros de trama definidos [DOC AC28 151-29].
+
+**Paredes curvas**: a divisão entre as superfícies “Wall Side” pode ser **reta** ou **curva** (opção *Hole Surface’s Split is Curved*) [DOC AC28 151-21].
+
+---
+
+## 9 · Model View Options (global da vista)
+
+### 9.1 Porta/Janela — Construction Elements
+
+| Opção | Efeito |
+|---|---|
+| **Show entire Door/Window** | Porta/janela com símbolo completo em planta e cortes |
+| **with Marker** | Inclui o marcador, se atribuído |
+| **Show Opening Only** | Só o vão na parede; sem símbolo |
+| **with Contours** | O vão mostra contornos |
+| **Hide on Floor Plan** | Nada em planta; em corte, só o vão |
+
+As opções são separadas para **portas** e **janelas** [DOC AC28 140-39].
+
+### 9.2 Detail Level of Door and Window Symbols
+
+| Controle | Efeito |
+|---|---|
+| **Detail level** (planta / corte-elevação / projeções 3D) | Define o nível de detalhe dos símbolos; depende da biblioteca carregada |
+| **Minimal Space of Doors** | Mostra o espaço mínimo com contorno e trama; caneta, tipo de linha e trama configuráveis |
+| **Accessories in 3D** | Mostra ou esconde maçanetas |
+| **Opening Line (Floor Plan)** | Liga/desliga e escolhe tipo de linha/símbolo |
+| **Opening Line (Section/Elevation & 3D)** | Idem para corte/elevação/3D, inclusive portas de correr |
+| **Opening Line (Global)** | Canetas das opening lines em todo o projeto |
+
+Fonte: [DOC AC28 140-40].
+
+### 9.3 Nível de detalhe por esquadria
+
+- **AC18**: a aba *General Settings* tem **2D Detail Level** com **Scale Sensitive**, escala fixa (ex. 1:200) ou **Off**; **3D Detail Level** com **Detailed**, **Simple** ou **Off**; e **Show Reveal on Symbol** com escala limite [DOC AC18 151-35].
+- **AC28 LU2**: o *Detail Level Override* nas configurações de Porta/Janela/Skylight foi **restaurado** [FÓRUM release note AC28 LU2].
+- **AC30** (referência de continuidade): o Custom Settings ganhou aba **Detail Level** com **By Model View Options** (com *Set Limits*) ou **Fixed** [DOC AC30 151-31].
+
+**INFERIDO**: no AC28 o controle deve aparecer como “Detail Level” no painel Custom Settings/General, mas a página AC28 correspondente não foi localizada; a documentação AC28 lista 31 páginas de Custom Settings (1–31) e a 31 é *Custom Corner*, não *Detail Level*. Isso é uma lacuna da própria documentação.
+
+---
+
+## 10 · Marcador, cotas e classificação
+
+### 10.1 Dimension Marker
+
+| Campo | O que faz |
+|---|---|
+| **Marker** | Escolhe um marcador GDL predefinido ou navega por outro objeto |
+| **Preview** | Mostra como o marcador ficará |
+| **Subfloor Thickness** | Soma/subtrai do valor de peitoril **mostrado**, sem mover a porta |
+| **Marker Text Style** | Fonte, corpo, caneta, estilo |
+| **Marker Custom Settings** | Interface própria do marcador (se existir); fica cinza se o marcador não tiver UI |
+| **Size to Show** | Qual dimensão aparece: **Wallhole**, **Unit**, **Leaf** ou **Egress** |
+
+Unidades de cota e de peitoril são configuradas em *Options > Project Preferences > Dimensions* [DOC AC28 150-19; AC28 151-2].
+
+**Marcador × símbolo**: o marcador é um objeto GDL paramétrico **permanentemente ligado** à abertura; não é uma etiqueta solta. Para mostrar/esconder na planta, usa-se o Model View Options (Door/Window > with Marker) [DOC AC28 150-19].
+
+### 10.2 Cotas automáticas
+
+As definições de dimensão escolhidas em **Nominal Sizes and Tolerance** alimentam:
+- o campo **Nominal W x H Size** do mapa interativo;
+- o **Automatic Dimensioning**;
+- o **Dimension Marker**.
+
+O comando de cota linear tem ainda **Dimension Details > Display the Height of Openings as well**, com três modos: **Always with Oversize**, **Always without Oversize**, **Determined by Width** [DOC AC28 150-22].
+
+### 10.3 Classification and Properties
+
+O painel **Classification and Properties** (dentro do diálogo do elemento) permite:
+- associar o elemento a um **Classification System** (ex.: IFC, OmniClass, classificação do escritório);
+- preencher **Properties** (texto, número, inteiro, área, comprimento, ângulo, volume, tags, option set, true/false);
+- manter o valor **ligado ao default** (ícone de corrente) ou sobrescrever;
+- usar os valores em **schedule**, **labels**, **markers** e exportação IFC.
+
+Fonte: [DOC AC28 045-4/5/6]. Para portas, os campos típicos são classificação (ex.: `IfcDoor`), fire rating, acoustic rating, manufacturer, type mark etc. — mas **quais propriedades aparecem depende do template e do Classification System do projeto**, não do objeto porta em si. **NÃO CONFIRMADO**: lista exata de propriedades padrão da biblioteca INT 28 para portas.
+
+---
+
+## 11 · Opening Lines (linhas de abertura)
+
+- As **Opening Lines** são as linhas que representam o movimento da folha (arco no giro, seta no correr) em planta e/ou em corte/elevação/3D.
+- Por padrão são **globais**, definidas no **Model View Options > Detail Level of Door and Window Symbols > Opening Line**; o objeto porta pode **sobrescrever** com **Override Model View Options** na aba *Opening Lines* [DOC AC18 151-42/43; DOC AC28 140-40].
+- Há controles separados para **2D Symbolic Display** e **3D Projections**, com caneta própria (“2D & 3D Line Pen”).
+- No MVO, para **portas de correr**, a opening line pode ser **None** ou **Arrow**; há tipos de linha **curva** ou **reta** [DOC AC28 140-40; DOC AC26 140-41].
+- Em **Sidelight/Transom**, a aba própria controla apenas as **3D Projections**; a 2D simbólica fica na aba da folha [DOC AC18 151-43].
+
+---
+
+## 12 · Corte, elevação e 3D: o que depende de quê
+
+| Vista | O que a porta mostra | Depende de |
+|---|---|---|
+| **Planta simbólica** | Símbolo 2D: folha, arco/seta, batente, guarnição, soleira | script 2D do GDL + atributos 2D |
+| **Planta projetada** | Corte do modelo 3D + partes abaixo/acima | geometria 3D + plano de corte + atributos de projeção |
+| **Corte/Elevação** | Vão real, batente, folha, vidro (vidro aparece como sólido), guarnições, soleira, peitoril, wall closure/turn plaster | geometria 3D + materiais + atributos de corte |
+| **3D** | Objeto completo, com sombra, resolução de curva, materiais; vidro transparente | geometria 3D + materiais + opções de 3D |
+| **Wall Closure** | Só 2D; em corte/elevação só o **Turn Plaster** aparece; no 3D só com **Show in 3D** | configuração da parede composta |
+| **Opening Lines** | 2D e/ou 3D, conforme MVO/override | MVO + objeto |
+
+Fontes: [DOC AC28 040-305; AC28 151-17; AC28 151-29; AC18 151-31].
+
+**Porta corta a parede de verdade**: o vão é um buraco real no modelo 3D; o vidro deixa passar luz e é atravessável em renderização; em elevação, os vidros são representados como formas sólidas [DOC AC28 040-305].
+
+---
+
+## 13 · Fontes desta parte
+
+| URL | Versão | Tipo | Conteúdo |
+|---|---|---|---|
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/040_ElementsVB/040_ElementsVB-304.htm | AC28 | DOC | Índice de ferramentas de objeto |
+| .../040_ElementsVB-305.htm | AC28 | DOC | Doors/Windows (visão geral) |
+| .../040_ElementsVB-306.htm | AC28 | DOC | Colocação, Tab, lado externo, Flip |
+| .../040_ElementsVB-307.htm | AC28 | DOC | Floor Plan Display e atributos |
+| .../040_ElementsVB-308.htm | AC28 | DOC | Plano em parede inclinada |
+| .../040_ElementsVB-309.htm | AC28 | DOC | Sill/header e referências |
+| .../040_ElementsVB-310.htm | AC28 | DOC | Subfloor Thickness |
+| .../040_ElementsVB-311.htm | AC28 | DOC | Anchor Reveal |
+| .../040_ElementsVB-312.htm | AC28 | DOC | Empty Opening |
+| .../040_ElementsVB-314.htm | AC28 | DOC | Mover/rotacionar/mirror/elevate |
+| .../040_ElementsVB-315.htm | AC28 | DOC | Portas em parede curva |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/150_UserInterfaceToolSettings/150_UserInterfaceToolSettings-16.htm | AC28 | DOC | Preview and Positioning |
+| .../150_UserInterfaceToolSettings-18.htm | AC28 | DOC | Symbolic vs Projected |
+| .../150_UserInterfaceToolSettings-19.htm | AC28 | DOC | Model, Reveal legado, Dimension Marker |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/140_UserInterfaceDialogBoxes/140_UserInterfaceDialogBoxes-39.htm | AC28 | DOC | MVO Construction Elements |
+| .../140_UserInterfaceDialogBoxes-40.htm | AC28 | DOC | MVO Detail Level de portas/janelas |
+| .../140_UserInterfaceDialogBoxes-42.htm | AC28 | DOC | MVO Miscellaneous (library parts) |
+| https://help.graphisoft.com/AC/28/INT/_AC28_Help/045_PropertiesClassifications/045_PropertiesClassifications-4.htm | AC28 | DOC | Default Property Value |
+| .../045_PropertiesClassifications-5.htm | AC28 | DOC | Property Manager |
+| .../045_PropertiesClassifications-6.htm | AC28 | DOC | Property Availability |
+| https://help.graphisoft.com/AC/18/INT/AC18Help/Appendix_Tools/Appendix_Tools-35.htm | AC18 | DOC | General Settings (detail level 2D/3D) |
+| .../Appendix_Tools-41.htm | AC18 | DOC | Opening Type and Angle |
+| .../Appendix_Tools-42.htm | AC18 | DOC | Opening Lines – Door |
+| .../Appendix_Tools-43.htm | AC18 | DOC | Opening Lines – Sidelight/Transom |
+| https://help.graphisoft.com/AC/30/INT/Topics/040_ElementsVB/040_ElementsVB-287.html | AC30 | DOC | Editable hotspots (complemento) |
+| https://help.graphisoft.com/AC/30/INT/Topics/151_DoorWindowCustomSettings/151_DoorWindowCustomSettings-31.html | AC30 | DOC | Detail Level (By MVO/Fixed) |
+| https://community.graphisoft.com/t5/Libraries-objects/Changing-door-swing/td-p/216484 | — | FÓRUM | Trocar outside/inside após colocação via Flip |
+
 *(Arquivos seguintes completam esta lista.)*

@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { slabRiseAt } from '@hestia/engine';
-import { slabsOnLevel, type Slab } from '@hestia/model';
+import { type Slab } from '@hestia/model';
 import { fmtPercent, slopeError, slopeFrom, slopePreview } from './slabSlope.ts';
+import { commitPerimeter } from './perimeterCommit.ts';
+import { addSegs, newDraft } from './perimeterSession.ts';
 import { clickAt, makeEnv, P, tool } from './testEnv.ts';
 
-/** Laje retangular 4 × 3 criada pela ferramenta Laje e selecionada. */
+/** Laje retangular 4 × 3 criada pelo modo de perímetro (esboço de quatro lados) e selecionada. */
 function withSlab() {
   const ctx = makeEnv();
   const msgs: string[] = [];
   ctx.env.say = (m: string) => msgs.push(m);
-  ctx.options.slabMode = 'rect';
-  const t = tool('slab', ctx.env);
-  clickAt(t, 0, 0);
-  clickAt(t, 4, 3);
-  const s = slabsOnLevel(ctx.store.project, 'lv_0')[0]!;
+  const r = commitPerimeter(ctx.store.project, addSegs(newDraft('slab'), [
+    { a: { x: 0, y: 0 }, b: { x: 4, y: 0 } },
+    { a: { x: 4, y: 0 }, b: { x: 4, y: 3 } },
+    { a: { x: 4, y: 3 }, b: { x: 0, y: 3 } },
+    { a: { x: 0, y: 3 }, b: { x: 0, y: 0 } },
+  ]), { typeId: 'ls_mac12', levelId: 'lv_0' });
+  if (!r.ok) throw new Error(r.message);
+  for (const c of r.commands) ctx.store.exec(c);
+  const s = ctx.store.project.elements[r.id] as Slab;
   ctx.env.setSelection([s.id]);
   return { ...ctx, msgs, slab: () => ctx.store.project.elements[s.id] as Slab };
 }

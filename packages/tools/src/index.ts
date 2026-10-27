@@ -33,6 +33,7 @@ export * from './roofPick.ts';
 export { RoofTool } from './roofTool.ts';
 export * from './roofEdges.ts';
 export * from './roofCheck.ts';
+export * from './roofFreeConvert.ts';
 export * from './annotationPick.ts';
 export { DimensionTool } from './dimensionTool.ts';
 export { TextTool, TEXT_DEFAULT_HEIGHT_MM } from './textTool.ts';

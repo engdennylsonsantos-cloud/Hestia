@@ -1,12 +1,12 @@
 import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
-import { isRoof, type Id, type Project, type Roof } from '@hestia/model';
+import { isRoof, mansardProblems, type Id, type Project, type Roof } from '@hestia/model';
 import { hasRoofArcs, roofEaveArcsProblem } from './perimeterRoofArcs.ts';
 import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Chaves que mudam a geometria das águas. Só uma alteração delas é conferida pelo motor. */
-const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
+const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'mansard', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
 
 /** Motivo para um telhado com forma que não produz água, em português. */
 function noWaterReason(r: Roof): string {
@@ -113,7 +113,9 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
 export function roofPatchProblem(p: Project, ids: Id[], patch: Partial<Roof>): string | null {
   if (!Object.keys(patch).some((k) => GEOMETRY_KEYS.includes(k as keyof Roof))) return null;
   const roofs = ids.map((id) => p.elements[id]).filter(isRoof).map((r) => ({ ...r, ...patch }));
-  return roofProblem(p, roofs);
+  // Mansarda com número inválido ou larga demais: recusa com a mensagem da validação do modelo.
+  const mansard = roofs.flatMap((r) => mansardProblems(r, `"${r.mark || r.id}"`))[0];
+  return mansard ? mansard.message : roofProblem(p, roofs);
 }
 
 /** Aplica a alteração de telhados pelo ambiente da ferramenta, se o motor ainda gerar águas; senão não aplica e avisa. */

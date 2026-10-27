@@ -2,6 +2,7 @@ import { asMulti, dot, intersection, type Vec2 } from '@hestia/geom';
 import type { Roof, RoofPlaneDef } from '@hestia/model';
 import { extrusionEdgeKinds, extrusionPlanes } from './roofExtrusion.ts';
 import { unitOf } from './roofGeom.ts';
+import { applyMansard } from './roofMansard.ts';
 import { skeletonPlanes, type WaterSolution } from './roofSkeleton.ts';
 import type { ResolvedRoofPlane, RoofLine } from './roofs.ts';
 
@@ -76,7 +77,12 @@ export function waterPlanesOf(r: Roof, eaveZ: number): WaterSolution {
       return { planes: freePlanes(r.boundary, r.planes, eaveZ) };
     case 'extrusion':
       return { planes: extrusionPlanes(r, eaveZ) };
-    default:
-      return skeletonPlanes(r.boundary, r.holes, edgeSlopesOf(r), eaveZ);
+    default: {
+      const slopes = edgeSlopesOf(r);
+      if (!r.mansard) return skeletonPlanes(r.boundary, r.holes, slopes, eaveZ);
+      // Mansarda: pesos iguais nas arestas com água (a altura passa a depender só da distância), depois o corte por faixa.
+      const uniform = slopes.map((s) => (s !== null && s !== undefined && s > 0 ? 100 : null));
+      return applyMansard(skeletonPlanes(r.boundary, r.holes, uniform, eaveZ), r.mansard);
+    }
   }
 }

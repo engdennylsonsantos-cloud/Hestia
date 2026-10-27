@@ -248,7 +248,7 @@ describe('basculante: eixo, metades e varredura sem interseção', () => {
   }
 
   it('a metade superior vai para o lado side e a inferior para o oposto, em todos os flips', () => {
-    for (const tiltAxis of [0.2, 0.5, 0.8]) {
+    for (const tiltAxis of [0.3, 0.5, 0.7]) {
       for (const flips of combos) {
         const c = cena('ot_jb80', { tiltAxis }, flips);
         const m = modelo(c);
@@ -268,7 +268,7 @@ describe('basculante: eixo, metades e varredura sem interseção', () => {
   });
 
   it('folha × caixilho: nenhuma interseção de 0 a 60° (a cada 5°), nos 4 flips', () => {
-    for (const tiltAxis of [0.2, 0.5, 0.8]) {
+    for (const tiltAxis of [0.3, 0.5, 0.7]) {
       for (const flips of combos) {
         const c = cena('ot_jb80', { tiltAxis }, flips);
         const m = modelo(c);

@@ -117,6 +117,9 @@ export const DEFAULT_SNAP: SnapOptions = {
 /** Padrões do "Desconectar": Mover e Espelhar acompanham a vizinha (falso) e Rotacionar é livre (verdadeiro). */
 export const DEFAULT_DISJOIN = { move: false, rotate: true, mirror: false } as const;
 
+/** Alinhar: feição inicial oferecida nas paredes (Faces, Eixos ou Núcleo). */
+export type AlignPrefer = 'faces' | 'eixos' | 'nucleo';
+
 export interface ToolOptions {
   /** Capturas ligadas; ausente = padrão. */
   snap?: SnapOptions;
@@ -184,6 +187,8 @@ export interface ToolOptions {
   arrayAngle?: number;
   /** Matriz: "Mover para". Segundo = o espaçamento/ângulo é o do 1º ao 2º item; Último = o do 1º ao último. Ausente = Segundo. */
   arrayAnchor?: ArrayAnchor;
+  /** Alinhar: qual feição da parede é a candidata inicial sob o cursor. Ausente = faces. */
+  alignPrefer?: AlignPrefer;
   offsetDistance: number;
   rotateCopy: boolean;
   mirrorCopy: boolean;

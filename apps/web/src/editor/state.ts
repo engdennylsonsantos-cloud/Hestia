@@ -152,6 +152,7 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   arrayKind: 'linear',
   arrayAngle: 360,
   arrayAnchor: 'second',
+  alignPrefer: 'faces',
   offsetDistance: 1,
   rotateCopy: false,
   mirrorCopy: true,

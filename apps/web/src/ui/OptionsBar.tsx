@@ -229,6 +229,21 @@ export function OptionsBar(): ReactElement {
         </>
       )}
       {tool === 'array' && <ArrayOptionsBar />}
+      {tool === 'align' && (
+        <label>
+          Preferir
+          <select
+            id="opt-alignprefer"
+            className="select"
+            value={o.alignPrefer ?? 'faces'}
+            onChange={(e) => set({ alignPrefer: e.target.value as NonNullable<typeof o.alignPrefer> })}
+          >
+            <option value="faces">Faces da parede</option>
+            <option value="eixos">Eixos da parede</option>
+            <option value="nucleo">Face do núcleo</option>
+          </select>
+        </label>
+      )}
       {tool === 'offset' && (
         <>
           <label>

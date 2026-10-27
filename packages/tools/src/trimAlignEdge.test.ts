@@ -151,15 +151,17 @@ describe('alinhar a aresta (Alinhar em anéis)', () => {
     expect(store.undoLabel).not.toBe('Alinhar aresta');
   });
 
-  it('parede com aresta: avisa "mesma natureza" e não grava', () => {
+  it('parede perpendicular à aresta de referência: recusa com mensagem clara e não grava', () => {
     const ctx = scene();
     const { store, env, messages } = ctx;
     drawWall(env, [10, 0], [10, 5]);
     const t = tool('align', env);
 
     clickAt(t, 2, 0); // referência: aresta de f1
-    clickAt(t, 10, 2); // alvo: parede
-    expect(messages).toContain('Alinhar: mesma natureza (parede com parede, aresta com aresta).');
+    clickAt(t, 10, 2); // alvo: parede, sem face paralela à referência
+    expect(messages).toContain(
+      'A referência não é paralela a esta feição. Para estender uma parede até ela, escolha a extremidade da parede (Tab).',
+    );
     expect(walls(store)[0]!.a.x).toBeCloseTo(10);
   });
 });

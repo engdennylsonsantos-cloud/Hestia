@@ -60,7 +60,7 @@ describe('campos v2 ao trocar de família', () => {
     expect(next.grid).toEqual({ cols: 2, rows: 3 });
   });
 
-  it('redefine o leafStyle inválido e remove o grid ao ir para porta', () => {
+  it('redefine o leafStyle inválido para a categoria, mas preserva o grid ao ir para porta', () => {
     const janela: OpeningType = {
       ...newOpeningTypeFromFamily(familia('window', 'window_fixed')),
       leafStyle: 'panel',
@@ -70,7 +70,9 @@ describe('campos v2 ao trocar de família', () => {
     expect(fixa.leafStyle).toBe('glass');
     const porta = applyFamily(fixa, familia('door', 'door_swing'));
     expect(porta.leafStyle).toBe('glass');
-    expect('grid' in porta).toBe(false);
+    // Campo que deixa de se aplicar fica no tipo (oculto e sem efeito), pronto para reaparecer ao voltar à família.
+    expect(porta.grid).toEqual({ cols: 2, rows: 2 });
+    expect(applyFamily(porta, familia('window', 'window_fixed')).grid).toEqual({ cols: 2, rows: 2 });
   });
 });
 

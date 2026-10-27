@@ -418,6 +418,7 @@ svg { display: block; }
 .dialog.xl .op-choice { width: 60px; height: 46px; padding: 1px; overflow: hidden; border: 1px solid var(--line-strong); background: var(--sheet); }
 .dialog.xl .op-choice:hover { border-color: var(--accent); background: var(--accent-soft); }
 .dialog.xl .op-choice.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.dialog.xl .op-swatch { display: inline-block; width: 16px; height: 16px; margin-left: 6px; vertical-align: middle; border: 1px solid var(--line-strong); border-radius: 2px; }
 .op-pv-soon { color: var(--fg-faint); font-size: 12px; }
 .op-pv-actions { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 5px; align-items: center; }
 .op-pv-actions > label { color: var(--fg-soft); font-size: 11px; }

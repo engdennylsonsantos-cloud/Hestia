@@ -14,12 +14,15 @@ describe('modelo inicial "Mostruário de esquadrias"', () => {
     expect(t!.area).toBe('—');
   });
 
-  it('tem um nível e duas paredes de 40 m: portas embaixo e janelas na paralela acima', () => {
+  it('tem um nível e duas paredes do comprimento do catálogo: portas embaixo e janelas na paralela acima', () => {
     const p = projeto();
     expect(p.levels).toHaveLength(1);
     const ws = paredes(p);
     expect(ws).toHaveLength(2);
-    for (const w of ws) expect(Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y)).toBeCloseTo(40, 9);
+    const comprimento = (kind: 'door' | 'window'): number =>
+      1.5 + DEFAULT_OPENING_TYPES.filter((t) => t.kind === kind).reduce((soma, t) => soma + t.width + 1.5, 0);
+    const esperado = Math.max(40, comprimento('door'), comprimento('window'));
+    for (const w of ws) expect(Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y)).toBeCloseTo(esperado, 9);
     const portas = ws.find((w) => w.id === 'eq_w_portas')!;
     const janelas = ws.find((w) => w.id === 'eq_w_janelas')!;
     expect(portas.a.y).toBeCloseTo(0, 9);
@@ -28,7 +31,7 @@ describe('modelo inicial "Mostruário de esquadrias"', () => {
     expect(janelas.b.y).toBeCloseTo(8, 9);
   });
 
-  it('usa todos os 24 tipos do catálogo uma vez, na categoria certa', () => {
+  it('usa todos os tipos do catálogo uma vez, na categoria certa', () => {
     const p = projeto();
     const os = aberturas(p);
     expect(os).toHaveLength(DEFAULT_OPENING_TYPES.length);
@@ -42,14 +45,17 @@ describe('modelo inicial "Mostruário de esquadrias"', () => {
 
   it('deixa 1,5 m de folga entre vizinhos e nas pontas de cada parede', () => {
     const p = projeto();
+    const parede = paredes(p);
     for (const hostId of ['eq_w_portas', 'eq_w_janelas']) {
+      const w = parede.find((x) => x.id === hostId)!;
+      const L = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
       const faixas = aberturas(p)
         .filter((o) => o.hostId === hostId)
         .map((o) => ({ e: o.offset - openingType(p, o).width / 2, d: o.offset + openingType(p, o).width / 2 }))
         .sort((a, b) => a.e - b.e);
       expect(faixas.length).toBeGreaterThan(5);
       expect(faixas[0]!.e).toBeGreaterThanOrEqual(1.5 - 1e-9);
-      expect(faixas.at(-1)!.d).toBeLessThanOrEqual(40 - 1.5 + 1e-9);
+      expect(faixas.at(-1)!.d).toBeLessThanOrEqual(L - 1.5 + 1e-9);
       for (let i = 1; i < faixas.length; i++) expect(faixas[i]!.e - faixas[i - 1]!.d, hostId).toBeCloseTo(1.5, 9);
     }
   });

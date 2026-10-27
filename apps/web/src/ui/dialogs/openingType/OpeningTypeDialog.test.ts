@@ -1,10 +1,10 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_OPENING_TYPES, openingFamilies, type OpeningType } from '@hestia/model';
+import { DEFAULT_OPENING_TYPES, openingFamilies, openingFormFields, type OpeningFamilyId, type OpeningType } from '@hestia/model';
 import { openingChecks } from '@hestia/engine';
 import { editor } from '../../../editor/controller.ts';
-import { familyOptionsFor, leavesChoicesFor, openingVariants } from '../openingTypeForm.ts';
+import { familyOptionsFor, leavesChoicesFor, newOpeningTypeFromFamily, openingVariants } from '../openingTypeForm.ts';
 import { OpeningTypeDialog } from './OpeningTypeDialog.tsx';
 import { OpeningTypeHeader } from './OpeningTypeHeader.tsx';
 import { OpeningTypeLibrary } from './OpeningTypeLibrary.tsx';
@@ -213,5 +213,70 @@ describe('diálogo do tipo de abertura (render)', () => {
       'Portão seccionado',
       'Vão livre',
     ]);
+  });
+});
+
+/** Rótulo principal de cada campo de opção (o teste confere presença/ausência pelo texto do `<label>`). */
+const FIELD_LABEL: Record<string, string[]> = {
+  leafStyle: ['Estilo da folha'],
+  glassRatio: ['Fração de vidro'],
+  handle: ['Maçaneta'],
+  hinges: ['Dobradiças'],
+  angle: ['Ângulo 2D', 'Ângulo 3D'],
+  transom: ['Bandeira superior'],
+  sidelights: ['Bandeira esquerda', 'Bandeira direita'],
+  frame: ['Estilo do batente', 'Largura do perfil', 'Profundidade do batente'],
+  reveal: ['Recuo', 'Âncora do recuo'],
+  glassKind: ['Tipo de vidro'],
+  grid: ['Divisões: colunas', 'Divisões: linhas'],
+  tiltAxis: ['Eixo da basculante'],
+  threshold: ['Soleira'],
+  casing: ['Alizar'],
+  sillBoard: ['Soleira saliente'],
+  lintel: ['Verga'],
+  sillBeam: ['Contraverga'],
+};
+
+describe('diálogo: campos visíveis por família', () => {
+  const familia = (id: OpeningFamilyId): ReturnType<typeof openingFamilies>[number] =>
+    openingFamilies(id.startsWith('door') ? 'door' : 'window').find((f) => f.id === id)!;
+
+  const render = (id: OpeningFamilyId): string => {
+    const family = familia(id);
+    const d = newOpeningTypeFromFamily(family);
+    return renderToStaticMarkup(
+      createElement(OpeningTypeSections, {
+        d,
+        onChange: vazio,
+        families: familyOptionsFor(d.kind),
+        family,
+        leaves: leavesChoicesFor(family),
+        materials: {},
+      }),
+    );
+  };
+
+  for (const id of ['door_swing', 'door_sliding', 'window_fixed', 'window_tilt'] as const) {
+    it(`${id}: mostra exatamente os campos de openingFormFields`, () => {
+      const html = render(id);
+      const visiveis = new Set<string>(openingFormFields(id));
+      for (const [campo, rotulos] of Object.entries(FIELD_LABEL)) {
+        for (const rotulo of rotulos) {
+          const presente = html.includes(`>${rotulo}</label>`);
+          expect(presente, `${id}: ${campo} (${rotulo})`).toBe(visiveis.has(campo));
+        }
+      }
+    });
+  }
+
+  it('portão não mostra maçaneta, bandeira nem soleira; basculante mostra o eixo; veneziana não mostra grade', () => {
+    const portao = render('door_garage');
+    expect(portao.includes('>Maçaneta</label>')).toBe(false);
+    expect(portao.includes('>Bandeira superior</label>')).toBe(false);
+    expect(portao.includes('>Soleira</label>')).toBe(false);
+    expect(render('window_tilt').includes('>Eixo da basculante</label>')).toBe(true);
+    expect(render('window_louver').includes('>Divisões: colunas</label>')).toBe(false);
+    expect(render('door_swing').includes('>Lambri (macho e fêmea)<')).toBe(true);
+    expect(render('door_swing').includes('>Vidro total<')).toBe(true);
   });
 });

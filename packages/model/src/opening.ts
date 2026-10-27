@@ -21,14 +21,24 @@ type OpeningTypeRuleFields = Partial<
     | 'showSwing'
     | 'swingStyle'
     | 'leafSide'
+    | 'frameDepthMode'
+    | 'reveal'
+    | 'glassRatio'
+    | 'hinges'
+    | 'threshold'
+    | 'tiltAxis'
+    | 'glassKind'
   >
 >;
 
 type OpeningTypeRules = Pick<OpeningType, 'kind' | 'plan' | 'leaves'> & OpeningAcabamento & OpeningTypeRuleFields;
 
-const LEAF_STYLES = ['flush', 'panel', 'glass', 'louver', 'grille'] as const;
+const LEAF_STYLES = ['flush', 'panel', 'glass', 'louver', 'grille', 'boards', 'fullglass'] as const;
 const HANDLES = ['none', 'lever', 'knob', 'pull'] as const;
 const FRAME_STYLES = ['rebate', 'simple', 'aduela', 'block'] as const;
+const FRAME_DEPTH_MODES = ['wall', 'core', 'fixed'] as const;
+const CASING_SIDES = ['both', 'swing', 'opposite'] as const;
+const GLASS_KINDS = ['clear', 'ribbed', 'smoke', 'green', 'bronze', 'frosted', 'wired', 'laminated', 'tempered'] as const;
 const PLAN_DISPLAYS = ['symbolic', 'projected'] as const;
 const DETAIL_2D = ['scale', 'low', 'mid', 'high', 'off'] as const;
 const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
@@ -52,6 +62,28 @@ function openingStyleIssue(t: OpeningTypeRules): string | null {
   if (t.angle2d !== undefined && !angleOk(t.angle2d)) return 'Ângulo de abertura 2D: use um valor de 0 a 120°.';
   if (t.angle3d !== undefined && !angleOk(t.angle3d)) return 'Ângulo de abertura 3D: use um valor de 0 a 120°.';
   if (t.grid !== undefined && !gridOk(t.grid)) return 'Divisões do caixilho: use colunas e linhas inteiras de 1 a 8.';
+  if (t.frameDepthMode !== undefined && !inSet(t.frameDepthMode, FRAME_DEPTH_MODES)) return 'Profundidade do batente: modo desconhecido.';
+  if (t.reveal !== undefined) {
+    const d = t.reveal.depth;
+    if (typeof d !== 'number' || !Number.isFinite(d) || d < 0 || d > 0.15) return 'Recuo do batente: use um valor de 0 a 15 cm.';
+  }
+  if (t.casing?.sides !== undefined && !inSet(t.casing.sides, CASING_SIDES)) return 'Alizar: lados desconhecidos.';
+  if (t.glassRatio !== undefined) {
+    const r = t.glassRatio;
+    if (typeof r !== 'number' || !Number.isFinite(r) || r < 0.1 || r > 0.9) return 'Fração de vidro: use um valor de 0,1 a 0,9.';
+  }
+  if (t.hinges !== undefined && !(Number.isInteger(t.hinges) && t.hinges >= 2 && t.hinges <= 4)) {
+    return 'Dobradiças: use 2, 3 ou 4.';
+  }
+  if (t.threshold !== undefined) {
+    const e = t.threshold.thickness;
+    if (typeof e !== 'number' || !Number.isFinite(e) || e < 0.005 || e > 0.08) return 'Soleira: espessura entre 0,5 e 8 cm.';
+  }
+  if (t.tiltAxis !== undefined) {
+    const a = t.tiltAxis;
+    if (typeof a !== 'number' || !Number.isFinite(a) || a < 0.2 || a > 0.8) return 'Eixo da basculante: use uma fração de 0,2 a 0,8.';
+  }
+  if (t.glassKind !== undefined && !inSet(t.glassKind, GLASS_KINDS)) return 'Tipo de vidro desconhecido.';
   if (t.transom !== undefined) {
     const h = t.transom.height;
     if (typeof h !== 'number' || !Number.isFinite(h) || h <= 0 || (t.height !== undefined && h >= t.height)) {

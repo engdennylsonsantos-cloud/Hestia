@@ -91,6 +91,33 @@ const familia = (id: string): string => {
       ['ot_jp80', 'window_pivot'],
       ['ot_jv80', 'window_louver'],
       ['ot_jb80', 'window_tilt'],
+      ['ot_br_pm_lisa70', 'door_swing'],
+      ['ot_br_pm_lisa80', 'door_swing'],
+      ['ot_br_pm_lisa90', 'door_swing'],
+      ['ot_br_pm_almofadada80', 'door_swing'],
+      ['ot_br_pm_vidro50_80', 'door_swing'],
+      ['ot_br_pm_vidro75_80', 'door_swing'],
+      ['ot_br_pm_veneziana80', 'door_swing'],
+      ['ot_br_pm_lambri80', 'door_swing'],
+      ['ot_br_pm_bandeira80', 'door_swing'],
+      ['ot_br_pm_dupla160', 'door_double'],
+      ['ot_br_pm_correr_embutida80', 'door_pocket'],
+      ['ot_br_pm_banheiro70', 'door_swing'],
+      ['ot_br_al_giro80', 'door_swing'],
+      ['ot_br_al_balcao150', 'door_sliding'],
+      ['ot_br_vt_giro90', 'door_swing'],
+      ['ot_br_vt_correr160', 'door_sliding'],
+      ['ot_br_aco_p60_90', 'door_swing'],
+      ['ot_br_al_correr100', 'window_sliding'],
+      ['ot_br_al_correr150x120', 'window_sliding'],
+      ['ot_br_al_correr3_bandeira200', 'window_sliding'],
+      ['ot_br_al_correr4_240', 'window_sliding'],
+      ['ot_br_al_max100x60', 'window_casement'],
+      ['ot_br_al_max60x60', 'window_casement'],
+      ['ot_br_al_basc60', 'window_tilt'],
+      ['ot_br_al_basc40', 'window_tilt'],
+      ['ot_br_vt_fixa150x120', 'window_fixed'],
+      ['ot_br_al_canelado60', 'window_fixed'],
     ]);
   }
   return expectedFamily.get(id)!;
@@ -174,9 +201,9 @@ const areaComum = (a: PartBox, b: PartBox): number =>
   Math.max(0, Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0)) * Math.max(0, Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0));
 
 describe('catálogo completo: padrões do tipo', () => {
-  it('são 24 tipos, cada um na família esperada e sem problema de tipo', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(24);
-    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(24);
+  it('todos os tipos do catálogo estão na família esperada e sem problema de tipo', () => {
+    expect(DEFAULT_OPENING_TYPES.length).toBeGreaterThan(24);
+    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(DEFAULT_OPENING_TYPES.length);
     for (const t of DEFAULT_OPENING_TYPES) {
       expect(openingFamilyOf(t)?.id, t.id).toBe(familia(t.id));
       expect(openingTypeIssue(t), t.id).toBeNull();

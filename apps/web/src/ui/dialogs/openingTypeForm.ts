@@ -13,8 +13,8 @@ import {
 
 /** Estilos de folha aceitos por categoria (o schema é fechado; o diálogo só oferece estes). */
 const LEAF_STYLES_BY_KIND: Record<'door' | 'window', readonly OpeningLeafStyle[]> = {
-  door: ['flush', 'panel', 'glass', 'louver', 'grille'],
-  window: ['glass', 'louver', 'grille'],
+  door: ['flush', 'panel', 'glass', 'louver', 'grille', 'boards', 'fullglass'],
+  window: ['glass', 'louver', 'grille', 'fullglass'],
 };
 
 /** Estilo de folha padrão da categoria (o mesmo de `openingStyle.ts`). */
@@ -67,19 +67,15 @@ export function leavesChoicesFor(family: OpeningFamily): Array<{ value: OpeningL
 }
 
 /**
- * Aplica a família escolhida ao tipo: grava o símbolo e a 1ª contagem de folhas que ela aceita. O estilo da folha é
- * preservado quando válido para a nova categoria e volta ao padrão quando não; o grid só existe em janela (em porta o
- * campo é removido, voltando ao padrão por leitura).
+ * Aplica a família escolhida ao tipo: grava o símbolo e a 1ª contagem de folhas que ela aceita. Os campos que deixam
+ * de se aplicar NÃO são apagados: ficam ocultos e sem efeito no diálogo, e reaparecem se a família voltar (decisão BRD).
+ * O estilo da folha só é normalizado quando o valor não existe na categoria (porta × janela), para o seletor não ficar
+ * com uma opção inexistente.
  */
 export function applyFamily(t: OpeningType, family: OpeningFamily): OpeningType {
   const next: OpeningType = { ...t, plan: family.plan, leaves: family.leaves[0] ?? t.leaves };
   if (t.leafStyle !== undefined && !leafStyleValidFor(family, t.leafStyle)) {
     next.leafStyle = defaultLeafStyle(family.kind);
-  }
-  if (family.kind === 'window') {
-    if (t.grid !== undefined) next.grid = gridValid(t.grid) ? t.grid : { cols: 1, rows: 1 };
-  } else {
-    delete next.grid;
   }
   return next;
 }
@@ -158,6 +154,8 @@ const DOOR_VARIANTS: readonly OpeningVariant[] = [
   { id: 'vidro', name: 'Vidro', leafStyle: 'glass', frameMaterialId: 'mat_madeira' },
   { id: 'veneziana', name: 'Veneziana', leafStyle: 'louver', frameMaterialId: 'mat_madeira' },
   { id: 'grade', name: 'Grade', leafStyle: 'grille', frameMaterialId: 'mat_madeira' },
+  { id: 'lambri', name: 'Lambri', leafStyle: 'boards', frameMaterialId: 'mat_madeira' },
+  { id: 'vidro-total', name: 'Vidro total', leafStyle: 'fullglass', frameMaterialId: 'mat_aluminio' },
 ];
 
 const WINDOW_VARIANTS: readonly OpeningVariant[] = [

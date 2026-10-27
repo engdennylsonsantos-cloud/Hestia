@@ -77,3 +77,37 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
 export function openingOptionSupport(family: OpeningFamilyId | null | undefined): OpeningOptionSupport {
   return (family && TABLE[family]) || NONE;
 }
+
+/** Campo de opção do diálogo: uma chave de `OpeningOptionSupport` (o grupo inteiro, não cada controle interno). */
+export type OpeningFormFieldId = keyof OpeningOptionSupport;
+
+/** Ordem estável em que os campos aparecem no diálogo (as seções seguem esta ordem). */
+const FORM_ORDER: readonly OpeningFormFieldId[] = [
+  'leafStyle',
+  'glassRatio',
+  'handle',
+  'hinges',
+  'angle',
+  'transom',
+  'sidelights',
+  'frame',
+  'reveal',
+  'glassKind',
+  'grid',
+  'tiltAxis',
+  'threshold',
+  'casing',
+  'sillBoard',
+  'lintel',
+  'sillBeam',
+  'nominalRef',
+];
+
+/**
+ * Campos visíveis de uma família, na ordem de exibição: exatamente as opções marcadas em `openingOptionSupport`.
+ * O diálogo usa a lista para mostrar só o que se aplica; os testes usam a mesma fonte, sem tabela paralela.
+ */
+export function openingFormFields(family: OpeningFamilyId | null | undefined): OpeningFormFieldId[] {
+  const support = openingOptionSupport(family);
+  return FORM_ORDER.filter((field) => support[field]);
+}

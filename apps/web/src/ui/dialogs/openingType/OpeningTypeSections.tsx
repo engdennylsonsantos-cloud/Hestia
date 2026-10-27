@@ -6,11 +6,12 @@ import {
   openingCasing,
   openingDetail2d,
   openingDetail3d,
+  openingFormFields,
   openingFrameStyle,
   openingGrid,
   openingHandle,
-  openingLeafStyle,
   openingLintel,
+  openingOptionSupport,
   openingPlanDisplay,
   openingSillBeam,
   openingSillBoard,
@@ -22,7 +23,27 @@ import {
 import { Check, NumField, TextField } from '../../fields.tsx';
 import { alternarAcabamento, alternarSidelight, alternarTransom } from '../openingTypeForm.ts';
 import { OpeningTypeThumb } from './OpeningTypeThumb.tsx';
-import { withOpeningField } from './openingTypeFields.ts';
+import {
+  OPENING_FORM_DEFAULTS,
+  openingFormCasingSides,
+  openingFormFixedDepth,
+  openingFormFrameDepthMode,
+  openingFormGlassKind,
+  openingFormGlassRatio,
+  openingFormHinges,
+  openingFormLeafMaterial,
+  openingFormLeafStyle,
+  openingFormReveal,
+  openingFormThreshold,
+  openingFormTiltAxis,
+  setOpeningCasingSides,
+  setOpeningReveal,
+  setOpeningThreshold,
+  setOpeningThresholdMaterial,
+  setOpeningThresholdThickness,
+  setOpeningTransomFixed,
+  withOpeningField,
+} from './openingTypeFields.ts';
 
 interface OpeningTypeSectionsProps {
   d: OpeningType;
@@ -50,6 +71,8 @@ const FIELD_LEAF = [
   ['glass', 'Vidro'],
   ['louver', 'Veneziana'],
   ['grille', 'Grade'],
+  ['boards', 'Lambri (macho e fêmea)'],
+  ['fullglass', 'Vidro total'],
 ] as const;
 
 const FIELD_HANDLE = [
@@ -65,6 +88,59 @@ const FIELD_FRAME = [
   ['aduela', 'Aduela (pré-marco)'],
   ['block', 'Bloco (sem perfil)'],
 ] as const;
+
+const FIELD_DEPTH_MODE = [
+  ['wall', 'Acompanha a parede'],
+  ['core', 'Só o núcleo'],
+  ['fixed', 'Fixa'],
+] as const;
+
+const FIELD_CASING_SIDES = [
+  ['both', 'Ambas as faces'],
+  ['swing', 'Lado da abertura'],
+  ['opposite', 'Lado oposto'],
+] as const;
+
+const FIELD_GLASS_KIND = [
+  ['clear', 'Liso/cristal'],
+  ['ribbed', 'Canelado'],
+  ['smoke', 'Fumê'],
+  ['green', 'Verde'],
+  ['bronze', 'Bronze'],
+  ['frosted', 'Jateado/fosco'],
+  ['wired', 'Aramado'],
+  ['laminated', 'Laminado'],
+  ['tempered', 'Temperado'],
+] as const;
+
+const GLASS_RATIO_PRESETS = [
+  [0.25, '1/4'],
+  [0.5, '1/2'],
+  [0.75, '3/4'],
+] as const;
+
+/** Amostra do vidro com variáveis de tema (nenhuma cor fixa fora da amostra). */
+function glassSwatch(kind: string): string {
+  switch (kind) {
+    case 'green':
+      return 'color-mix(in srgb, var(--ok) 35%, transparent)';
+    case 'bronze':
+      return 'color-mix(in srgb, var(--warn) 35%, transparent)';
+    case 'smoke':
+      return 'color-mix(in srgb, var(--fg-soft) 35%, transparent)';
+    case 'frosted':
+      return 'color-mix(in srgb, var(--fg-faint) 25%, transparent)';
+    case 'wired':
+      return 'color-mix(in srgb, var(--fg) 22%, transparent)';
+    case 'laminated':
+    case 'tempered':
+      return 'color-mix(in srgb, var(--accent) 30%, transparent)';
+    case 'ribbed':
+      return 'repeating-linear-gradient(90deg, var(--accent-soft) 0 2px, transparent 2px 4px)';
+    default:
+      return 'color-mix(in srgb, var(--accent-soft) 55%, transparent)';
+  }
+}
 
 /** Galeria de escolhas com a elevação em miniatura gerada pelo mesmo caminho da prévia (projeto mínimo + seção). */
 function Miniaturas<T extends string>({
@@ -98,12 +174,25 @@ function Miniaturas<T extends string>({
 }
 
 /** As sete seções recolhíveis do diálogo, na ordem da decisão 0034. */
-export function OpeningTypeSections({ d, onChange, families, leaves, materials }: OpeningTypeSectionsProps): ReactElement {
+export function OpeningTypeSections({ d, onChange, families, family, leaves, materials }: OpeningTypeSectionsProps): ReactElement {
   const set = (patch: Partial<OpeningType>): void => onChange({ ...d, ...patch });
+  // Só as opções que se aplicam à família aparecem; a lista vem da tabela única (`openingOptionSupport`).
+  const support = openingOptionSupport(family?.id);
+  const visibleFields = new Set(openingFormFields(family?.id));
+  const mostra = (field: keyof typeof support): boolean => visibleFields.has(field);
   // Valores efetivos (padrão por leitura) e os padrões de cada campo v2: o seletor mostra o efetivo e só grava o que difere.
-  const leafStyle = openingLeafStyle(d);
+  const leafStyle = openingFormLeafStyle(d);
   const handle = openingHandle(d);
   const frameStyle = openingFrameStyle(d);
+  const frameDepthMode = openingFormFrameDepthMode(d);
+  const reveal = openingFormReveal(d);
+  const casingSides = openingFormCasingSides(d);
+  const glassRatio = openingFormGlassRatio(d);
+  const hinges = openingFormHinges(d);
+  const threshold = openingFormThreshold(d);
+  const glassKind = openingFormGlassKind(d);
+  const tiltAxis = openingFormTiltAxis(d);
+  const leafMaterial = openingFormLeafMaterial(d);
   const angle2d = openingAngle2d(d);
   const angle3d = openingAngle3d(d);
   const grid = openingGrid(d);
@@ -112,7 +201,7 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
   const setField = (field: Parameters<typeof withOpeningField>[1], value: unknown, fallback: unknown): void => {
     onChange(withOpeningField(d, field, value, fallback));
   };
-  const leafFallback = openingLeafStyle({ kind: d.kind });
+  const leafFallback = openingFormLeafStyle({ kind: d.kind });
   const handleFallback = openingHandle({ kind: d.kind, plan: d.plan, leaves: d.leaves });
   const frameFallback = openingFrameStyle({});
   const angle2dFallback = openingAngle2d({ plan: d.plan });
@@ -147,18 +236,48 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
       </Secao>
 
       <Secao title="Definições da folha">
-        <div className="field-row">
-          <label htmlFor="op-leaf">Estilo da folha</label>
-          <select id="op-leaf" className="select" value={leafStyle} onChange={(e) => setField('leafStyle', e.target.value, leafFallback)}>
-            {FIELD_LEAF.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-          </select>
-        </div>
-        <Miniaturas
-          value={leafStyle}
-          options={FIELD_LEAF}
-          onPick={(v) => setField('leafStyle', v, leafFallback)}
-          preview={(v) => ({ ...thumbnailType, leafStyle: v })}
-        />
+        {mostra('leafStyle') ? (
+          <>
+            <div className="field-row">
+              <label htmlFor="op-leaf">Estilo da folha</label>
+              <select id="op-leaf" className="select" value={leafStyle} onChange={(e) => setField('leafStyle', e.target.value, leafFallback)}>
+                {FIELD_LEAF.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
+            <Miniaturas
+              value={leafStyle}
+              options={FIELD_LEAF}
+              onPick={(v) => setField('leafStyle', v, leafFallback)}
+              preview={(v) => ({ ...thumbnailType, leafStyle: v })}
+            />
+            <div className="field-row">
+              <label htmlFor="op-leaf-mat">Material da folha</label>
+              <select id="op-leaf-mat" className="select" value={leafMaterial} onChange={(e) => setField('leafMaterialId', e.target.value, d.frameMaterialId)}>
+                {Object.values(materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              {materials[leafMaterial] ? <span className="op-swatch" style={{ background: materials[leafMaterial].color }} title={materials[leafMaterial].name} /> : null}
+            </div>
+          </>
+        ) : null}
+        {mostra('glassRatio') ? (
+          <>
+            <div className="field-row">
+              <label htmlFor="op-glass-ratio">Fração de vidro</label>
+              <select
+                id="op-glass-ratio"
+                className="select"
+                value={GLASS_RATIO_PRESETS.some(([v]) => v === glassRatio) ? String(glassRatio) : 'custom'}
+                onChange={(e) => {
+                  if (e.target.value !== 'custom') setField('glassRatio', Number(e.target.value), OPENING_FORM_DEFAULTS.glassRatio);
+                }}
+              >
+                {GLASS_RATIO_PRESETS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                <option value="custom">Livre</option>
+              </select>
+            </div>
+            <div className="field-row"><label htmlFor="op-glass-ratio-free">Vidro: valor livre</label><NumField id="op-glass-ratio-free" value={glassRatio} scale={100} decimals={0} unit="%" min={0.1} max={0.9} onCommit={(v) => setField('glassRatio', v, OPENING_FORM_DEFAULTS.glassRatio)} /></div>
+          </>
+        ) : null}
         <div className="field-row">
           <label htmlFor="op-leaves">Folhas</label>
           <select id="op-leaves" className="select" value={d.leaves} disabled={leaves.length <= 1} onChange={(e) => set({ leaves: Number(e.target.value) as OpeningType['leaves'] })}>
@@ -172,45 +291,114 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
           </select>
         </div>
         <div className="field-row"><label htmlFor="op-lt">Espessura da folha</label><NumField id="op-lt" value={d.leafThickness ?? (d.kind === 'door' ? OPENING_FRAME_DEFAULTS.doorLeaf : OPENING_FRAME_DEFAULTS.windowLeaf)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ leafThickness: v })} /></div>
-        <div className="field-row">
-          <label htmlFor="op-handle">Maçaneta</label>
-          <select id="op-handle" className="select" value={handle} onChange={(e) => setField('handle', e.target.value, handleFallback)}>
-            {FIELD_HANDLE.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-          </select>
-        </div>
-        <Miniaturas
-          value={handle}
-          options={FIELD_HANDLE}
-          onPick={(v) => setField('handle', v, handleFallback)}
-          preview={(v) => ({ ...thumbnailType, handle: v })}
-        />
-        <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={angle2d} decimals={0} unit="°" onCommit={(v) => setField('angle2d', v, angle2dFallback)} /></div>
-        <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={angle3d} decimals={0} unit="°" onCommit={(v) => setField('angle3d', v, angle3dFallback)} /></div>
-        <div className="field-row"><label htmlFor="op-transom" title="Vidro fixo acima da folha">Bandeira superior</label><Check id="op-transom" checked={temBandeira} onChange={(v) => onChange(alternarTransom(d, v))} /></div>
-        {temBandeira ? (
-          <div className="field-row"><label htmlFor="op-transom-h">Bandeira: altura</label><NumField id="op-transom-h" value={d.transom?.height ?? 0} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ transom: { height: v, fixed: d.transom?.fixed !== false } })} /></div>
+        {mostra('handle') ? (
+          <>
+            <div className="field-row">
+              <label htmlFor="op-handle">Maçaneta</label>
+              <select id="op-handle" className="select" value={handle} onChange={(e) => setField('handle', e.target.value, handleFallback)}>
+                {FIELD_HANDLE.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
+            <Miniaturas
+              value={handle}
+              options={FIELD_HANDLE}
+              onPick={(v) => setField('handle', v, handleFallback)}
+              preview={(v) => ({ ...thumbnailType, handle: v })}
+            />
+          </>
         ) : null}
-        <div className="field-row"><label htmlFor="op-side-left" title="Vidro fixo à esquerda da folha">Bandeira esquerda</label><Check id="op-side-left" checked={d.sidelights?.left === true} onChange={(v) => onChange(alternarSidelight(d, 'left', v))} /></div>
-        <div className="field-row"><label htmlFor="op-side-right" title="Vidro fixo à direita da folha">Bandeira direita</label><Check id="op-side-right" checked={d.sidelights?.right === true} onChange={(v) => onChange(alternarSidelight(d, 'right', v))} /></div>
-        {temLateral ? (
-          <div className="field-row"><label htmlFor="op-side-w">Bandeira: largura</label><NumField id="op-side-w" value={d.sidelights?.width ?? 0} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ sidelights: { left: d.sidelights?.left, right: d.sidelights?.right, width: v } })} /></div>
+        {mostra('hinges') ? (
+          <div className="field-row">
+            <label htmlFor="op-hinges">Dobradiças</label>
+            <select id="op-hinges" className="select" value={hinges} onChange={(e) => setField('hinges', Number(e.target.value), OPENING_FORM_DEFAULTS.hinges)}>
+              {[2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        ) : null}
+        {mostra('angle') ? (
+          <>
+            <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={angle2d} decimals={0} unit="°" onCommit={(v) => setField('angle2d', v, angle2dFallback)} /></div>
+            <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={angle3d} decimals={0} unit="°" onCommit={(v) => setField('angle3d', v, angle3dFallback)} /></div>
+          </>
+        ) : null}
+        {mostra('transom') ? (
+          <>
+            <div className="field-row"><label htmlFor="op-transom" title="Vidro fixo acima da folha">Bandeira superior</label><Check id="op-transom" checked={temBandeira} onChange={(v) => onChange(alternarTransom(d, v))} /></div>
+            {temBandeira ? (
+              <>
+                <div className="field-row"><label htmlFor="op-transom-h">Bandeira: altura</label><NumField id="op-transom-h" value={d.transom?.height ?? 0} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ transom: { height: v, fixed: d.transom?.fixed !== false } })} /></div>
+                <div className="field-row">
+                  <label htmlFor="op-transom-kind">Bandeira: tipo</label>
+                  <select id="op-transom-kind" className="select" value={d.transom?.fixed === false ? 'casement' : 'fixed'} onChange={(e) => onChange(setOpeningTransomFixed(d, e.target.value === 'fixed'))}>
+                    <option value="fixed">Fixa</option>
+                    <option value="casement">Maxim-ar</option>
+                  </select>
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : null}
+        {mostra('sidelights') ? (
+          <>
+            <div className="field-row"><label htmlFor="op-side-left" title="Vidro fixo à esquerda da folha">Bandeira esquerda</label><Check id="op-side-left" checked={d.sidelights?.left === true} onChange={(v) => onChange(alternarSidelight(d, 'left', v))} /></div>
+            <div className="field-row"><label htmlFor="op-side-right" title="Vidro fixo à direita da folha">Bandeira direita</label><Check id="op-side-right" checked={d.sidelights?.right === true} onChange={(v) => onChange(alternarSidelight(d, 'right', v))} /></div>
+            {temLateral ? (
+              <div className="field-row"><label htmlFor="op-side-w">Bandeira: largura</label><NumField id="op-side-w" value={d.sidelights?.width ?? 0} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ sidelights: { left: d.sidelights?.left, right: d.sidelights?.right, width: v } })} /></div>
+            ) : null}
+          </>
         ) : null}
       </Secao>
 
       <Secao title="Moldura e vidro">
-        <div className="field-row">
-          <label htmlFor="op-frame">Estilo do batente</label>
-          <select id="op-frame" className="select" value={frameStyle} onChange={(e) => setField('frameStyle', e.target.value, frameFallback)}>
-            {FIELD_FRAME.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-          </select>
-        </div>
-        <div className="field-row"><label htmlFor="op-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="op-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameWidth: v })} /></div>
-        <div className="field-row"><label htmlFor="op-fd" title="Profundidade do batente na espessura da parede (limitada ao núcleo)">Profundidade do batente</label><NumField id="op-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
-        {janela ? (
+        {mostra('frame') ? (
+          <>
+            <div className="field-row">
+              <label htmlFor="op-frame">Estilo do batente</label>
+              <select id="op-frame" className="select" value={frameStyle} onChange={(e) => setField('frameStyle', e.target.value, frameFallback)}>
+                {FIELD_FRAME.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
+            <div className="field-row"><label htmlFor="op-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="op-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameWidth: v })} /></div>
+            <div className="field-row">
+              <label htmlFor="op-fd-mode" title="Vínculo da profundidade do batente com a espessura da parede">Profundidade do batente</label>
+              <select id="op-fd-mode" className="select" value={frameDepthMode} onChange={(e) => setField('frameDepthMode', e.target.value, OPENING_FORM_DEFAULTS.frameDepthMode)}>
+                {FIELD_DEPTH_MODE.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
+            {frameDepthMode === 'fixed' ? (
+              <div className="field-row"><label htmlFor="op-fd-fixed">Batente: profundidade fixa</label><NumField id="op-fd-fixed" value={openingFormFixedDepth(d)} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => set({ frameDepth: v })} /></div>
+            ) : null}
+          </>
+        ) : null}
+        {mostra('reveal') ? (
+          <>
+            <div className="field-row"><label htmlFor="op-reveal" title="Recuo do batente em relação à face da parede">Recuo</label><NumField id="op-reveal" value={reveal.depth} scale={100} decimals={1} unit="cm" min={0} max={0.15} onCommit={(v) => onChange(setOpeningReveal(d, { ...reveal, depth: v }))} /></div>
+            <div className="field-row">
+              <label htmlFor="op-reveal-anchor">Âncora do recuo</label>
+              <select id="op-reveal-anchor" className="select" value={reveal.anchor} onChange={(e) => onChange(setOpeningReveal(d, { ...reveal, anchor: e.target.value === 'core' ? 'core' : 'face' }))}>
+                <option value="face">Face acabada</option>
+                <option value="core">Núcleo</option>
+              </select>
+            </div>
+          </>
+        ) : null}
+        {mostra('glassKind') ? (
+          <div className="field-row">
+            <label htmlFor="op-glass-kind">Tipo de vidro</label>
+            <select id="op-glass-kind" className="select" value={glassKind} onChange={(e) => setField('glassKind', e.target.value, OPENING_FORM_DEFAULTS.glassKind)}>
+              {FIELD_GLASS_KIND.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+            <span className="op-swatch" style={{ background: glassSwatch(glassKind) }} title={FIELD_GLASS_KIND.find(([v]) => v === glassKind)?.[1]} />
+          </div>
+        ) : null}
+        {mostra('grid') ? (
           <>
             <div className="field-row"><label htmlFor="op-grid-c">Divisões: colunas</label><NumField id="op-grid-c" value={grid.cols} decimals={0} onCommit={(v) => setField('grid', { cols: v, rows: grid.rows }, gridFallback)} /></div>
             <div className="field-row"><label htmlFor="op-grid-r">Divisões: linhas</label><NumField id="op-grid-r" value={grid.rows} decimals={0} onCommit={(v) => setField('grid', { cols: grid.cols, rows: v }, gridFallback)} /></div>
           </>
+        ) : null}
+        {mostra('tiltAxis') ? (
+          <div className="field-row"><label htmlFor="op-tilt-axis" title="Altura do eixo horizontal da basculante, em % da altura útil">Eixo da basculante</label><NumField id="op-tilt-axis" value={tiltAxis} scale={100} decimals={0} unit="%" min={0.2} max={0.8} onCommit={(v) => setField('tiltAxis', v, OPENING_FORM_DEFAULTS.tiltAxis)} /></div>
         ) : null}
         <div className="field-row">
           <label htmlFor="op-glass">Material do vidro</label>
@@ -276,14 +464,40 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
             <option value="interior">Só lado interno</option>
           </select>
         </div>
-        <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><Check id="ot-ac-al" checked={cas !== undefined} onChange={(v) => onChange(alternarAcabamento(d, 'casing', v))} /></div>
-        {cas ? (
+        {mostra('threshold') ? (
           <>
-            <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-ale">Alizar: espessura</label><NumField id="ot-ac-ale" value={cas.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, thickness: v } })} /></div>
+            <div className="field-row"><label htmlFor="op-threshold" title="Soleira/limiar no piso do vão">Soleira</label><Check id="op-threshold" checked={threshold !== null} onChange={(v) => onChange(setOpeningThreshold(d, v, 'mat_ceramica'))} /></div>
+            {threshold ? (
+              <>
+                <div className="field-row"><label htmlFor="op-threshold-t">Soleira: espessura</label><NumField id="op-threshold-t" value={threshold.thickness} scale={100} decimals={1} unit="cm" min={0.005} max={0.08} onCommit={(v) => onChange(setOpeningThresholdThickness(d, v))} /></div>
+                <div className="field-row">
+                  <label htmlFor="op-threshold-mat">Soleira: material</label>
+                  <select id="op-threshold-mat" className="select" value={threshold.materialId ?? ''} onChange={(e) => onChange(setOpeningThresholdMaterial(d, e.target.value))}>
+                    {Object.values(materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+              </>
+            ) : null}
           </>
         ) : null}
-        {janela ? (
+        {mostra('casing') ? (
+          <>
+            <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><Check id="ot-ac-al" checked={cas !== undefined} onChange={(v) => onChange(alternarAcabamento(d, 'casing', v))} /></div>
+            {cas ? (
+              <>
+                <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
+                <div className="field-row"><label htmlFor="ot-ac-ale">Alizar: espessura</label><NumField id="ot-ac-ale" value={cas.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, thickness: v } })} /></div>
+                <div className="field-row">
+                  <label htmlFor="ot-ac-als">Alizar: lados</label>
+                  <select id="ot-ac-als" className="select" value={casingSides} onChange={(e) => onChange(setOpeningCasingSides(d, e.target.value as 'both' | 'swing' | 'opposite'))}>
+                    {FIELD_CASING_SIDES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                  </select>
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : null}
+        {mostra('sillBoard') ? (
           <>
             <div className="field-row"><label htmlFor="ot-ac-sb" title="Peitoril saliente, só de janela: projeção além de cada face da parede">Soleira saliente</label><Check id="ot-ac-sb" checked={sb !== undefined} onChange={(v) => onChange(alternarAcabamento(d, 'sillBoard', v))} /></div>
             {sb ? (
@@ -294,18 +508,26 @@ export function OpeningTypeSections({ d, onChange, families, leaves, materials }
             ) : null}
           </>
         ) : null}
-        <div className="field-row"><label htmlFor="ot-ac-vg" title="Verga: peça de concreto sobre o vão">Verga</label><Check id="ot-ac-vg" checked={lin !== null} onChange={(v) => onChange(alternarAcabamento(d, 'lintel', v))} /></div>
-        {lin ? (
+        {mostra('lintel') ? (
           <>
-            <div className="field-row"><label htmlFor="ot-ac-vgo">Verga: transpasse</label><NumField id="ot-ac-vgo" value={lin.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, over: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-vgh">Verga: altura</label><NumField id="ot-ac-vgh" value={lin.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, height: v } })} /></div>
+            <div className="field-row"><label htmlFor="ot-ac-vg" title="Verga: peça de concreto sobre o vão">Verga</label><Check id="ot-ac-vg" checked={lin !== null} onChange={(v) => onChange(alternarAcabamento(d, 'lintel', v))} /></div>
+            {lin ? (
+              <>
+                <div className="field-row"><label htmlFor="ot-ac-vgo">Verga: transpasse</label><NumField id="ot-ac-vgo" value={lin.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, over: v } })} /></div>
+                <div className="field-row"><label htmlFor="ot-ac-vgh">Verga: altura</label><NumField id="ot-ac-vgh" value={lin.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ lintel: { ...lin, height: v } })} /></div>
+              </>
+            ) : null}
           </>
         ) : null}
-        <div className="field-row"><label htmlFor="ot-ac-cv" title="Contraverga: peça de concreto sob o vão">Contraverga</label><Check id="ot-ac-cv" checked={beam !== null} onChange={(v) => onChange(alternarAcabamento(d, 'sillBeam', v))} /></div>
-        {beam ? (
+        {mostra('sillBeam') ? (
           <>
-            <div className="field-row"><label htmlFor="ot-ac-cvo">Contrav.: transpasse</label><NumField id="ot-ac-cvo" value={beam.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, over: v } })} /></div>
-            <div className="field-row"><label htmlFor="ot-ac-cvh">Contrav.: altura</label><NumField id="ot-ac-cvh" value={beam.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, height: v } })} /></div>
+            <div className="field-row"><label htmlFor="ot-ac-cv" title="Contraverga: peça de concreto sob o vão">Contraverga</label><Check id="ot-ac-cv" checked={beam !== null} onChange={(v) => onChange(alternarAcabamento(d, 'sillBeam', v))} /></div>
+            {beam ? (
+              <>
+                <div className="field-row"><label htmlFor="ot-ac-cvo">Contrav.: transpasse</label><NumField id="ot-ac-cvo" value={beam.over} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, over: v } })} /></div>
+                <div className="field-row"><label htmlFor="ot-ac-cvh">Contrav.: altura</label><NumField id="ot-ac-cvh" value={beam.height} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBeam: { ...beam, height: v } })} /></div>
+              </>
+            ) : null}
           </>
         ) : null}
       </Secao>

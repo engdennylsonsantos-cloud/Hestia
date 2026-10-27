@@ -239,8 +239,9 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
           .filter((r) => !hidden.has(r.roofId))
           .map((r) => ({
             outline: p.elements[r.roofId]?.kind === 'roof' ? (p.elements[r.roofId] as { boundary: Array<{ x: number; y: number }> }).boundary : [],
-            ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+            ridges: r.lines.filter((l) => l.kind !== 'eave' && l.kind !== 'gable' && l.kind !== 'break').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
             gables: r.lines.filter((l) => l.kind === 'gable').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
+            breaks: r.lines.filter((l) => l.kind === 'break').map((l): [typeof l.a, typeof l.b] => [l.a, l.b]),
             typeCode: p.roofTypes[r.typeId]?.code ?? '',
           }))
       : [],

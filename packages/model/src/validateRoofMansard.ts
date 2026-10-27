@@ -8,7 +8,7 @@ const MAX_PERCENT = 300;
 const fmtM = (v: number): string => v.toFixed(2).replace('.', ',');
 
 /**
- * Maior `run` que ainda deixa as duas faixas em toda água: a menor, entre as águas do esqueleto reto (pesos 1 nas arestas
+ * Maior `run` que ainda deixa a faixa de cima em ao menos uma água: a maior, entre as águas do esqueleto reto (pesos 1 nas arestas
  * com água, 0 nas empenas), da maior distância de um vértice da água à reta da aresta dela. Null quando o esqueleto não
  * fecha (quem avisa é o motor) ou quando o contorno não é conhecido pelo modelo (formas 'gable' e 'shed' escolhem as
  * arestas com água no motor).
@@ -23,7 +23,7 @@ export function mansardRunLimit(boundary: Vec2[], slopes: Array<number | null | 
   try {
     const res = weightedSkeleton({ outer, holes: [], weights: [outer.map((_, k) => w(origOf(k)))] });
     if (!res.ok) return null;
-    let limit = Infinity;
+    let limit = 0;
     for (const f of res.faces) {
       if (f.ring !== 0) continue;
       const j = origOf(f.edge);
@@ -34,15 +34,15 @@ export function mansardRunLimit(boundary: Vec2[], slopes: Array<number | null | 
       if (l < 1e-9) continue;
       // Distância à reta da aresta (valor absoluto: vale para contorno horário e anti-horário).
       const far = Math.max(...f.polygon.map((v) => Math.abs(((v.x - a.x) * (c.y - a.y) - (v.y - a.y) * (c.x - a.x)) / l)));
-      limit = Math.min(limit, far);
+      limit = Math.max(limit, far);
     }
-    return Number.isFinite(limit) ? limit : null;
+    return limit > 0 ? limit : null;
   } catch {
     return null;
   }
 }
 
-/** Erros da mansarda: forma que não a aceita, números inválidos e `run` que não deixa a faixa de cima em toda água. */
+/** Erros da mansarda: forma que não a aceita, números inválidos e `run` que não deixa a faixa de cima em nenhuma água. */
 export function mansardProblems(r: Roof, name: string): ValidationIssue[] {
   const m = r.mansard;
   if (!m) return [];

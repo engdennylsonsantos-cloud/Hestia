@@ -83,7 +83,7 @@ export interface DxfLevelGeometry {
    * espigão e rincão em planta (LINE na camada `TELHADO_CUMEEIRA`, todos juntos) e de empena (LINE na camada
    * `TELHADO_EMPENA`). Quem monta a geometria é o engine.
    */
-  roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; gables?: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
+  roofs?: Array<{ outline: DxfPoint[]; ridges: Array<[DxfPoint, DxfPoint]>; gables?: Array<[DxfPoint, DxfPoint]>; breaks?: Array<[DxfPoint, DxfPoint]>; typeCode: string }>;
   /**
    * Escadas do nível: contornos dos degraus e patamares até a cota de corte (POLYLINE fechada na camada `ESCADA`),
    * os que estão acima dela e até o topo do intervalo (`outlinesAbove`, camada `ESCADA_ACIMA`, tracejada), linhas de espelho
@@ -142,6 +142,8 @@ export const DXF_LAYER_ROOF_PROJECTION = 'TELHADO_PROJECAO';
 export const DXF_LAYER_ROOF_RIDGE = 'TELHADO_CUMEEIRA';
 /** Camada das linhas de empena (aresta sem inclinação, LINE), separada da cumeeira. */
 export const DXF_LAYER_ROOF_GABLE = 'TELHADO_EMPENA';
+/** Camada da linha de desnível da mansarda (divisa entre a faixa íngreme e a suave, LINE), separada da cumeeira. */
+export const DXF_LAYER_ROOF_BREAK = 'TELHADO_DESNIVEL';
 /** Escadas: contorno dos degraus e patamares até a cota de corte (POLYLINE), linhas de espelho e seta de subida (LINE). */
 export const DXF_LAYER_STAIR = 'ESCADA';
 /** Degraus e patamares acima da cota de corte e até o topo: contorno tracejado (POLYLINE). */
@@ -299,6 +301,7 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_ROOF_PROJECTION, projection('roof')],
   [DXF_LAYER_ROOF_RIDGE, cut('roof')],
   [DXF_LAYER_ROOF_GABLE, cut('roof')],
+  [DXF_LAYER_ROOF_BREAK, cut('roof')],
   [DXF_LAYER_STAIR, cut('stair')],
   [DXF_LAYER_STAIR_ABOVE, projection('stair')],
   [DXF_LAYER_STAIR_RISER, cut('stair')],
@@ -334,6 +337,7 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
   const roof = (geo.roofs ?? []).flatMap((r) => [
     ...r.ridges.map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_RIDGE, a, b })),
     ...(r.gables ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_GABLE, a, b })),
+    ...(r.breaks ?? []).map(([a, b]): Line => ({ layer: DXF_LAYER_ROOF_BREAK, a, b })),
   ]);
   const stair = (geo.stairs ?? []).flatMap((s) => [
     ...s.risers.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_RISER, a, b })),

@@ -29,7 +29,9 @@ function stripOf(pl: ResolvedRoofPlane, run: number): Vec2[] {
  */
 export function applyMansard(water: WaterSolution, m: RoofMansard): WaterSolution {
   if (water.problem || water.planes.length === 0) return water;
-  const reach = Math.min(...water.planes.map((pl) => Math.max(...pl.polygon.flat(2).map((v) => dot(sub(v, pl.origin), pl.up)))));
+  // Só recusa quando a faixa de baixo cobre o telhado inteiro (nenhuma água com faixa de cima). Uma água-lasca (faceta de arco,
+  // trecho estreito) mais rasa que `run` fica toda na faixa de baixo; a altura continua contínua porque depende só da distância.
+  const reach = Math.max(...water.planes.map((pl) => Math.max(...pl.polygon.flat(2).map((v) => dot(sub(v, pl.origin), pl.up)))));
   if (m.run >= reach - 1e-9) {
     return { planes: [], problem: `a mansarda não cabe: a faixa de baixo (${fmtM(m.run)} m) chega ao centro do telhado; use menos que ${fmtM(reach)} m` };
   }

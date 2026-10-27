@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTemplate } from '@hestia/model';
-import { DXF_LAYER_ROOF_GABLE, DXF_LAYER_ROOF_RIDGE, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
+import { DXF_LAYER_ROOF_BREAK, DXF_LAYER_ROOF_GABLE, DXF_LAYER_ROOF_RIDGE, exportDxf, type DxfLevelGeometry, type DxfPoint } from './dxf.ts';
 
 /** Segmentos LINE do DXF: camada e extremos (pares de código/valor, um registro por código 0). */
 function lines(text: string): Array<{ layer: string; a: DxfPoint; b: DxfPoint }> {
@@ -45,5 +45,14 @@ describe('E4 · empenas no DXF', () => {
   it('sem empenas, nenhuma linha na camada de empena', () => {
     const geo: DxfLevelGeometry = { clusters: [], openings: [], roofs: [{ outline: [], ridges: [ridge], typeCode: 'TL-01' }] };
     expect(lines(exportDxf(project, 'lv_0', geo)).some((l) => l.layer === DXF_LAYER_ROOF_GABLE)).toBe(false);
+  });
+
+  it('a linha de desnível da mansarda vai para a camada TELHADO_DESNIVEL, não para a cumeeira', () => {
+    const desnivel: [DxfPoint, DxfPoint] = [{ x: 1, y: 1 }, { x: 7, y: 1 }];
+    const geo: DxfLevelGeometry = { clusters: [], openings: [], roofs: [{ outline: [], ridges: [ridge], breaks: [desnivel], typeCode: 'TL-01' }] };
+    const ls = lines(exportDxf(project, 'lv_0', geo));
+    expect(DXF_LAYER_ROOF_BREAK).toBe('TELHADO_DESNIVEL');
+    expect(ls.filter((l) => l.layer === DXF_LAYER_ROOF_BREAK)).toHaveLength(1);
+    expect(ls.filter((l) => l.layer === DXF_LAYER_ROOF_RIDGE)).toHaveLength(1);
   });
 });

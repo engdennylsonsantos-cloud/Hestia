@@ -182,7 +182,11 @@ export class Editor {
   }
 
   bump(): void {
-    useUi.setState((s) => ({ previewTick: s.previewTick + 1, prompt: this.tool.inputPrompt() }));
+    // Sem campo numérico a caixa some; o buffer digitado não pode sobreviver a ela, senão prende os atalhos de letra sem aviso.
+    useUi.setState((s) => {
+      const prompt = this.tool.inputPrompt();
+      return { previewTick: s.previewTick + 1, prompt, typed: prompt ? s.typed : '' };
+    });
   }
 
   pointer(kind: 'move' | 'down' | 'drag' | 'up' | 'click', info: PointerInfo): void {
@@ -425,7 +429,7 @@ export class Editor {
   }
 
   setView(v: 'plan' | '3d'): void {
-    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ view: v, hover: null });
+    if (this.perimetro.bloqueiaNavegacao()) return; useUi.setState({ view: v, hover: null, typed: '' });
   }
 
   // ---------- arquivo ----------

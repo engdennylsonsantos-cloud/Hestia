@@ -39,6 +39,11 @@ export interface OpeningType {
    */
   frameWidth?: number;
   frameDepth?: number;
+  /**
+   * Como a profundidade do batente se liga à parede (decisão 0035): 'wall' (padrão) = a espessura TOTAL da parede acabada (batente
+   * faceado com os acabamentos); 'core' = só o núcleo estrutural; 'fixed' = o valor de `frameDepth` (limitado à parede).
+   */
+  frameDepthMode?: OpeningFrameDepthMode;
   leafThickness?: number;
   glassThickness?: number;
   /*
@@ -49,7 +54,7 @@ export interface OpeningType {
    * `lintel`/`sillBeam`: verga e contraverga (transpasse para cada lado e altura; padrão do transpasse 0,30 m).
    */
   roughOversize?: { w: number; h: number };
-  casing?: { width: number; thickness: number };
+  casing?: { width: number; thickness: number; sides?: 'both' | 'swing' | 'opposite' };
   sillBoard?: { projection: number; thickness: number };
   lintel?: { over?: number; height?: number };
   sillBeam?: { over?: number; height?: number };
@@ -89,8 +94,18 @@ export interface OpeningType {
   solarFactor?: number;
   cost?: number;
   manufacturer?: string;
+  /** Material da folha (ausente = o do batente, `frameMaterialId`). */
+  leafMaterialId?: Id;
+  /** Tipo de vidro (ausente = liso). Muda a cor/transparência no 3D e a legenda do quadro. */
+  glassKind?: OpeningGlassKind;
+  /** Janela basculante: altura do eixo horizontal como fração do vão (0,2 a 0,8; padrão 0,5, eixo central). */
+  tiltAxis?: number;
 }
 
+/** Vínculo da profundidade do batente com a espessura da parede. */
+export type OpeningFrameDepthMode = 'wall' | 'core' | 'fixed';
+/** Vidro: liso/cristal, canelado, fumê, verde, bronze, jateado/fosco, aramado, laminado, temperado. */
+export type OpeningGlassKind = 'clear' | 'ribbed' | 'smoke' | 'green' | 'bronze' | 'frosted' | 'wired' | 'laminated' | 'tempered';
 export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille';
 export type OpeningHandle = 'none' | 'lever' | 'knob' | 'pull';
 export type OpeningFrameStyle = 'rebate' | 'simple' | 'aduela' | 'block';

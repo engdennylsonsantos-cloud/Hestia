@@ -46,7 +46,8 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
   it('reta com H = 2,80 m: 16 espelhos de 0,175 m e 15 degraus, sem erros; o 1º clique é o centro do 1º espelho', () => {
     const ctx = setup();
     const t = tool('stairrun', ctx.env);
-    draw(t, [0, 0], [0, 5]);
+    // Reta: o 2º clique é o fim do lance; 4,2 m (do 1º ao último espelho) dão 16 espelhos com piso de 28 cm.
+    draw(t, [0, 0], [0, 4.2]);
     const [s] = stairsOf(ctx);
     expect(s!.components).toHaveLength(1);
     const r = resolved(ctx);
@@ -194,7 +195,7 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
   it('sem nível acima, a altura vem de height (2,80 m a partir do nível 3 m)', () => {
     const ctx = setup({}, { height: 2.8 });
     ctx.env.levelId = () => 'lv_1';
-    draw(tool('stairrun', ctx.env), [0, 0], [0, 5]);
+    draw(tool('stairrun', ctx.env), [0, 0], [0, 4.2]);
     expect(stairsOf(ctx, 'lv_1')).toHaveLength(1);
     const r = resolved(ctx);
     expect(r.levelId).toBe('lv_1');

@@ -1,7 +1,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
 import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
-import { regenSpiralComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
+import { regenSpiralComponents, regenStraightComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
@@ -55,6 +55,21 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
       return;
     }
     patchStairs(editor.store, [single.id], { components: r.components }, 'Editar caracol');
+  };
+
+  // Lance reto gerado (um só lance, origem `straight`): o nº de espelhos é editável e regenera o lance (`regenStraightComponents`).
+  const c0 = single?.components[0];
+  const straightOk = single !== null && single.components.length === 1 && c0?.kind === 'run' && c0.generatedBy === 'straight';
+
+  /** Muda o nº de espelhos do lance reto, em UM passo de desfazer. A altura do espelho se ajusta (H ÷ N). */
+  const setRisers = (v: number): void => {
+    if (!single) return;
+    const r = regenStraightComponents(p, single, Math.round(v));
+    if ('error' in r) {
+      useUi.setState({ status: `Escada: ${r.error}` });
+      return;
+    }
+    patchStairs(editor.store, [single.id], { components: r.components }, 'Editar nº de espelhos');
   };
 
   const quantities = useMemo(() => {
@@ -158,7 +173,13 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
       <Group title="Dimensões">
         {single && quantities ? (
           <>
-            <Row label="Nº de espelhos"><span className="val">{quantities.riserCount}</span></Row>
+            {straightOk ? (
+              <Row label="Nº de espelhos" htmlFor="p-srisers">
+                <NumField id="p-srisers" value={quantities.riserCount} min={2} onCommit={setRisers} />
+              </Row>
+            ) : (
+              <Row label="Nº de espelhos"><span className="val">{quantities.riserCount}</span></Row>
+            )}
             <Row label="Altura do espelho"><span className="val">{fmt(quantities.riserHeight, 3)} m</span></Row>
             <Row label="Piso médio"><span className="val">{fmt(quantities.treadMean, 3)} m</span></Row>
             <Row label="Largura"><span className="val">{fmt(quantities.width)} m</span></Row>

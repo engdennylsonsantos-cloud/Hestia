@@ -52,7 +52,7 @@ export {
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
-export { validateRunSketch, type RunSketchOptions } from './stairSketchValidate.ts';
+export { riserGaps, snapToRunBoundary, validateRunSketch, type RunSketchOptions } from './stairSketchValidate.ts';
 
 export interface StairRunStepsOptions {
   /** Cota de base do lance (m). */

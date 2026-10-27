@@ -1,6 +1,6 @@
 import { dist } from '@hestia/geom';
 import { newId, type Id, type StairCurve, type StairGenerator, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
-import { stairLandingPolygon, trimRisers, validateRunSketch, type StairRunSketch, type StairSketchIssue } from '@hestia/engine';
+import { riserGaps, stairLandingPolygon, trimRisers, validateRunSketch, type StairRunSketch, type StairSketchIssue } from '@hestia/engine';
 
 /** Sub-modos do croqui (Revit: Boundary, Riser, Stair Path, Landing, Finish). A ordem é a dos botões da barra. */
 export const STAIR_SUBMODES = ['limites', 'espelhos', 'caminhada', 'patamar', 'concluir'] as const;
@@ -161,6 +161,38 @@ function issue(code: string, severity: 'error' | 'warning', message: string, ris
  * Analisa o croqui inteiro (decisão 0011 §3): erros de geometria e de completude (bloqueiam Concluir) e avisos de
  * norma e tipo (não bloqueiam). Com `limits` nulo (sem tipo), só a geometria é avaliada.
  */
+/**
+ * Texto de um erro de espelho para o usuário: o número do espelho (e do lance, se há mais de um), o limite que falhou e
+ * por quanto; e, no par na mesma posição, os dois números e a distância entre as extremidades. Os demais códigos ficam
+ * com a mensagem do motor.
+ */
+function riserIssueText(i: StairSketchIssue, r: RunDraft, runNo: number | null): StairSketchIssue {
+  if (i.riserIndex === undefined) return i;
+  const tag = runNo ? ` do lance ${runNo}` : '';
+  const n = i.riserIndex + 1;
+  if (i.code === 'stair-riser-not-spanning') {
+    const g = riserGaps(runSketch(r), i.riserIndex);
+    const lado = g.left >= g.right ? 'esquerdo' : 'direito';
+    return { ...i, message: `Espelho nº ${n}${tag} não liga o limite ${lado}: a extremidade mais próxima está a ${fmtM(Math.max(g.left, g.right))} m dele.` };
+  }
+  if (i.code === 'stair-riser-same-location' && i.otherIndex !== undefined) {
+    const ends = trimRisers(runSketch(r));
+    const A = ends[i.riserIndex]!;
+    const B = ends[i.otherIndex]!;
+    const gap = Math.max(dist(A.a, B.a), dist(A.b, B.b));
+    const cmTxt = (gap * 100).toFixed(1).replace('.', ',');
+    return { ...i, message: `Espelhos nº ${n} e nº ${i.otherIndex + 1}${tag} ocupam a mesma posição: as extremidades distam ${cmTxt} cm.` };
+  }
+  return i;
+}
+
+/** Quantos espelhos faltam (ou sobram) para o nº desejado, em pt-BR; null se bate. */
+export function missingText(rep: Pick<DraftReport, 'desired' | 'remaining'>): string | null {
+  if (rep.remaining > 0) return `Faltam ${rep.remaining} espelhos para concluir (de ${rep.desired}).`;
+  if (rep.remaining < 0) return `Há ${-rep.remaining} espelhos a mais (de ${rep.desired}).`;
+  return null;
+}
+
 export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): DraftReport {
   const issues: StairSketchIssue[] = [];
   const runs = parts.filter((p): p is { kind: 'run'; run: RunDraft } => p.kind === 'run').map((p) => p.run);
@@ -171,7 +203,8 @@ export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): Dr
     else if (r.boundaryRight.length === 0) issues.push(issue('stair-boundary-missing', 'error', 'Desenhe o limite direito do lance.'));
     else {
       if (r.risers.length === 0) issues.push(issue('stair-no-risers', 'error', 'Desenhe os espelhos.'));
-      const geo = validateRunSketch(runSketch(r));
+      const runNo = runs.length > 1 ? runs.indexOf(r) + 1 : null;
+      const geo = validateRunSketch(runSketch(r)).map((i) => riserIssueText(i, r, runNo));
       issues.push(...geo);
       if (geo.every((i) => i.severity !== 'error') && r.risers.length > 0 && limits) issues.push(...widthWarning(r, limits));
     }

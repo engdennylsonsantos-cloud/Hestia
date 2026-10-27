@@ -147,7 +147,13 @@ export class StairRunTool extends ToolBase {
       this.env.say('Afaste o cursor do ponto inicial para dar a direção.');
       return;
     }
-    this.create(dir);
+    // Reta: o 2º clique é o fim do lance (o comprimento vai ao cálculo); as outras formas usam só a direção.
+    this.create(dir, this.straightLength(dir));
+  }
+
+  /** Comprimento clicado do lance reto (início ao fim); undefined nas outras formas (a altura dá o piso). */
+  private straightLength(dir: Vec2): number | undefined {
+    return this.opts.shape === 'straight' ? len(dir) : undefined;
   }
 
   /** Enter: no caracol, confirma a varredura atual (com o cursor onde está); nas outras formas, o padrão. */
@@ -200,7 +206,7 @@ export class StairRunTool extends ToolBase {
     if (this.origin === null) return [{ kind: 'point', at: cursor }];
     const dir = sub(cursor, this.origin);
     if (len(dir) < MIN_DIRECTION) return [{ kind: 'point', at: this.origin }];
-    const b = this.build(dir);
+    const b = this.build(dir, this.straightLength(dir));
     if ('error' in b) {
       this.env.say(b.error);
       return [{ kind: 'point', at: this.origin }];
@@ -245,15 +251,15 @@ export class StairRunTool extends ToolBase {
   }
 
   /** Plano da escada reta/L/U/leque para a direção dada; erro com a mensagem de status em pt-BR. */
-  private build(dir: Vec2): StairRunPlan | { error: string } {
+  private build(dir: Vec2, length?: number): StairRunPlan | { error: string } {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options: this.opts });
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options: this.opts, length });
   }
 
-  /** Cria a escada com a direção dada, em um passo de desfazer. Mantém a ferramenta pronta para a próxima. */
-  private create(dir: Vec2): boolean {
-    const b = this.build(dir);
+  /** Cria a escada com a direção dada (e, na reta, o comprimento), em um passo de desfazer. Mantém a ferramenta pronta para a próxima. */
+  private create(dir: Vec2, length?: number): boolean {
+    const b = this.build(dir, length);
     if ('error' in b) {
       this.env.say(b.error);
       return false;

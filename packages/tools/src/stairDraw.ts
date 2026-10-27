@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '@hestia/geom';
-import { stairLandingPolygon } from '@hestia/engine';
+import { snapToRunBoundary, stairLandingPolygon } from '@hestia/engine';
 import type { StairCurve } from '@hestia/model';
-import { copyCurve, lastRun, partsFromComponents, componentsFromParts, type RunDraft, type StairPart, type StairSubmode } from './stairSketchState.ts';
+import { copyCurve, lastRun, partsFromComponents, componentsFromParts, runSketch, type RunDraft, type StairPart, type StairSubmode } from './stairSketchState.ts';
 import { CONNECT_TOL, chainEnd, emptyStroke, strokeClick, strokeUndo, type Stroke, type StrokeEvent } from './stairStroke.ts';
 import { reverseCurve } from './stairPickLines.ts';
 
@@ -33,7 +33,7 @@ export function drawPoint(st: DrawState, q: Vec2, mpp: number): string | undefin
       return ev.kind === 'reject' ? ev.message : undefined;
     }
     case 'espelhos':
-      return riserPoint(st, q);
+      return riserPoint(st, q, mpp);
     case 'caminhada': {
       if (!lastRun(st.parts)?.risers.length) return 'Desenhe os espelhos antes da caminhada.';
       const ev = step(st, q, true);
@@ -114,14 +114,18 @@ function step(st: DrawState, q: Vec2, chained: boolean): StrokeEvent {
   return r.event;
 }
 
+/** Raio de captura (px) das extremidades do espelho até o limite: o clique a até essa distância cai sobre o limite. */
+export const RISER_SNAP_PX = 30;
+
 /** Espelho: dois cliques (ou três, com arco) por espelho; cada um sai direto, sem cadeia. */
-function riserPoint(st: DrawState, q: Vec2): string | undefined {
+function riserPoint(st: DrawState, q: Vec2, mpp: number): string | undefined {
   const run = lastRun(st.parts);
   if (!run || run.boundaryLeft.length === 0 || run.boundaryRight.length === 0) {
     st.stroke = emptyStroke(st.stroke.prim);
     return 'Desenhe os limites antes dos espelhos.';
   }
-  const ev = step(st, q, false);
+  // Clique perto de um limite cai sobre ele: a precisão de centímetros não é exigida do usuário.
+  const ev = step(st, snapToRunBoundary(runSketch(run), q, RISER_SNAP_PX * mpp) ?? q, false);
   if (ev.kind === 'reject') return ev.message;
   if (ev.kind === 'segment') run.risers.push(copyCurve(ev.curve));
   return undefined;

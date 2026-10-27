@@ -39,6 +39,8 @@ export interface StairSketchIssue {
   message: string;
   /** Índice do espelho em `run.risers` (a ordem do vetor não tem relação com a subida). */
   riserIndex?: number;
+  /** Segundo espelho do par (em `run.risers`), no erro de dois espelhos na mesma posição. */
+  otherIndex?: number;
 }
 
 /** Erro máximo de corda ao amostrar arcos: flecha de 0,3 mm. */

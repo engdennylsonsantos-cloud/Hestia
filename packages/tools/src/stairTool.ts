@@ -11,6 +11,7 @@ import {
   componentsFromParts,
   copyCurve,
   lastRun,
+  missingText,
   partsFromComponents,
   runSketch,
   type DraftReport,
@@ -462,18 +463,21 @@ export class StairTool extends ToolBase {
   /** Concluir: grava a escada nova ou o croqui editado, em um passo de desfazer. Só com croqui sem erro. */
   private finish(): void {
     const components = componentsFromParts(this.st.parts);
+    // Com erro de croqui, a mensagem diz também quantos espelhos faltam (o nº desejado da análise).
+    const falta = missingText(this.report);
+    const aviso = falta ? ` ${falta}` : '';
     if (this.stairId) {
       // Editar limites ou espelhos à mão descarta o caracol (`spiral`); o generatedBy fica como origem (decisão 0011 §1, 14).
       const cur = this.env.project().elements[this.stairId];
       const kept = discardSpiralOnEdit(isStair(cur) ? cur.components : [], components);
       const r = updateStairComponents(this.env, this.stairId, kept);
-      if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
+      if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}${aviso}`);
       this.env.done(); // done() volta ao seletor, cuja dica sobrescreve a mensagem: dizer depois
       this.env.say(`Croqui atualizado. ${warningText(r.report)}Ctrl+Z desfaz.`);
       return;
     }
     const r = createStairFromComponents(this.env, components, this.creationOptions());
-    if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}`);
+    if ('error' in r) return this.env.say(`Não é possível concluir: ${r.error}${aviso}`);
     this.env.done();
     this.env.say(`Escada criada: ${r.report.created} espelhos. ${warningText(r.report)}Ctrl+Z desfaz.`);
   }

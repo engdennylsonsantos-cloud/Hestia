@@ -76,7 +76,7 @@ describe('ferramenta Escada: croqui reto por cliques', () => {
     boundaries(t);
     t.setSubmode('concluir');
     expect(stairsOf(ctx.store)).toHaveLength(0);
-    expect(ctx.last()).toBe('Não é possível concluir: Desenhe os espelhos.');
+    expect(ctx.last()).toBe('Não é possível concluir: Desenhe os espelhos. Faltam 17 espelhos para concluir (de 17).');
     expect(ctx.done()).toBe(0);
   });
 

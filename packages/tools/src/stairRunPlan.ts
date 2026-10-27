@@ -1,4 +1,4 @@
-import type { Vec2 } from '@hestia/geom';
+import { dist, len, sub, type Vec2 } from '@hestia/geom';
 import {
   generateLShape,
   generateStraightRun,
@@ -9,7 +9,7 @@ import {
   type StairComponentSketch,
   type StairRunSketch,
 } from '@hestia/engine';
-import type { Id, StairGenerator } from '@hestia/model';
+import { stairBaseZ, stairTopZ, type Id, type Project, type Stair, type StairGenerator, type StairLanding, type StairRun } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
 /**
@@ -72,6 +72,10 @@ export interface StairRunPlanInput {
   /** Piso mínimo do tipo (m). */
   minTread: number;
   options: StairRunToolOptions;
+  /**
+   * Reta: comprimento do lance, do 1º ao último espelho (m), dado pelo 2º clique. Ausente = o piso vem da altura (`treadFor`).
+   */
+  length?: number;
 }
 
 /** Plano calculado: componentes em ordem (como croqui), nº de espelhos N, altura real h e piso. */
@@ -89,6 +93,27 @@ export type StairRunPlanResult = StairRunPlan | { error: string };
  * gerador da forma. L e U dividem N com `risersFirst = ceil(N/2)`. O winder é fundido em um lance só (ver `mergeWinder`).
  * Sem efeito no modelo: só devolve o plano ou a mensagem de status em pt-BR.
  */
+/**
+ * Nº de espelhos do lance reto com comprimento `length` (início ao fim, nos centros dos espelhos). Para cada N a partir do
+ * mínimo da altura, o piso é L ÷ (N−1); escolhe o N cujo piso fica mais perto do piso calculado para h = H ÷ N (`treadFor`).
+ * Sem espelho a mais de 200 acima do mínimo (a busca é curta: o piso decresce com N).
+ */
+export function straightRiserCount(H: number, maxRiser: number, minTread: number, length: number): number {
+  const min = riserCountFor(H, maxRiser);
+  // Altura de menos de dois espelhos: devolve o mínimo, para `planStairRun` recusar o lance como antes.
+  if (min < 2) return min;
+  let best = min;
+  let bestErr = Infinity;
+  for (let N = min; N <= min + 200; N++) {
+    const err = Math.abs(length / (N - 1) - treadFor(H / N, minTread));
+    if (err < bestErr - 1e-12) {
+      best = N;
+      bestErr = err;
+    }
+  }
+  return best;
+}
+
 export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const { shape, width, turn } = i.options;
   if (shape === 'spiral') return { error: 'O caracol é planejado por planSpiralRun (3 cliques).' };
@@ -96,16 +121,21 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   if (!(width > 0)) return { error: 'A largura do lance deve ser positiva.' };
   if (shape === 'lshape' && !(landingDepth >= width)) return { error: 'O patamar da escada em L deve ter profundidade ≥ largura do lance.' };
   if (shape === 'ushape' && !(landingDepth > 0)) return { error: 'O patamar da escada em U deve ter profundidade positiva.' };
+  const byLength = shape === 'straight' && i.length !== undefined;
   let N: number;
   try {
-    N = riserCountFor(i.H, i.maxRiser);
+    N = byLength ? straightRiserCount(i.H, i.maxRiser, i.minTread, i.length!) : riserCountFor(i.H, i.maxRiser);
   } catch (e) {
     return { error: e instanceof RangeError ? e.message : 'Altura ou espelho máximo inválido.' };
   }
   if (N < 2) return { error: 'A altura é menor que um espelho: nada a gerar.' };
   if (N < MIN_RISERS[shape]) return { error: `Esta forma precisa de ao menos ${MIN_RISERS[shape]} espelhos; a altura dá ${N}.` };
   const riserHeight = i.H / N;
-  const tread = treadFor(riserHeight, i.minTread);
+  // Lance reto com comprimento: o piso é o do clique (L ÷ (N−1)); não pode ficar abaixo do mínimo do tipo.
+  const tread = byLength ? i.length! / (N - 1) : treadFor(riserHeight, i.minTread);
+  if (byLength && tread < i.minTread - 1e-9) {
+    return { error: `Lance curto demais: o piso (${cmText(tread)} cm) ficaria abaixo do mínimo do tipo (${cmText(i.minTread)} cm).` };
+  }
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];
   try {
@@ -121,6 +151,32 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
     return { error: e instanceof RangeError ? e.message : 'Não foi possível gerar a escada.' };
   }
   return { parts, risers: N, riserHeight, tread };
+}
+
+const cmText = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
+
+/**
+ * Regenera o lance reto de uma escada com `n` espelhos (campo "Nº de espelhos" das Propriedades). Mantém o 1º espelho, a
+ * direção, a largura e o piso do lance; a altura do espelho é H ÷ n e o lance se alonga ou encurta. Erro se a escada não é
+ * um lance reto gerado (um só lance, origem `straight`).
+ */
+export function regenStraightComponents(p: Project, stair: Stair, n: number): { components: Array<StairRun | StairLanding> } | { error: string } {
+  const c = stair.components[0];
+  if (stair.components.length !== 1 || c?.kind !== 'run' || c.generatedBy !== 'straight' || c.risers.length < 2) {
+    return { error: 'O número de espelhos só muda em escada reta gerada.' };
+  }
+  if (!(Number.isInteger(n) && n >= 2)) return { error: 'O nº de espelhos deve ser um inteiro de 2 para cima.' };
+  const mid = (k: { a: Vec2; b: Vec2 }): Vec2 => ({ x: (k.a.x + k.b.x) / 2, y: (k.a.y + k.b.y) / 2 });
+  const first = mid(c.risers[0]!);
+  const d = sub(mid(c.risers[1]!), first);
+  const tread = len(d);
+  if (!(tread > 1e-9)) return { error: 'Espelhos sem distância entre si: não há como regenerar.' };
+  const width = dist(c.risers[0]!.a, c.risers[0]!.b);
+  const H = stairTopZ(p, stair) - stairBaseZ(p, stair);
+  if (!(H > 0)) return { error: 'Altura inválida: a escada não tem altura positiva.' };
+  const g = generateStraightRun({ start: first, dir: { x: d.x / tread, y: d.y / tread }, width, tread, risers: n });
+  const run: StairRun = { id: c.id, kind: 'run', boundaryLeft: g.boundaryLeft, boundaryRight: g.boundaryRight, risers: g.risers, path: g.path, generatedBy: 'straight' };
+  return { components: [run] };
 }
 
 /** Componentes do gerador para o croqui (cada lance recebe a origem `generatedBy`). */

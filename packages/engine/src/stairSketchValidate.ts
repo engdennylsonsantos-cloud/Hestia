@@ -12,7 +12,7 @@ import {
   type StairRunSketch,
   type StairSketchIssue,
 } from './stairSketchGeom.ts';
-import { dist, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, dist, type Vec2 } from '@hestia/geom';
 import { spiralSweepOf } from './stairSpiral.ts';
 
 /**
@@ -60,6 +60,42 @@ export function turnsOf(run: StairRunSketch, P: Prepared, sweep: number): Map<nu
   return turn;
 }
 
+/**
+ * Folga de um espelho a cada limite: a distância da extremidade mais próxima ao limite (m). Um espelho que liga os dois
+ * limites tem folga zero nos dois; o limite que falhou é o de maior folga. Usado para dizer por quanto o espelho errou.
+ */
+export function riserGaps(run: StairRunSketch, index: number): { left: number; right: number } {
+  const P = prepareRun(run);
+  const g = P.risers.find((r) => r.index === index);
+  if (!g) return { left: 0, right: 0 };
+  const ends = [g.full.pts[0]!, g.full.pts[g.full.pts.length - 1]!];
+  return {
+    left: Math.min(...ends.map((e) => polyDist([e], P.L.pts))),
+    right: Math.min(...ends.map((e) => polyDist([e], P.R.pts))),
+  };
+}
+
+/**
+ * Ponto do limite mais próximo de `q`, se estiver a até `tol` (m); senão null. Serve ao croqui de espelhos: um clique perto
+ * de um limite cai sobre ele, e o espelho passa a ligar os dois limites sem precisão de centímetro.
+ */
+export function snapToRunBoundary(run: StairRunSketch, q: Vec2, tol: number): Vec2 | null {
+  const P = prepareRun(run);
+  let best: Vec2 | null = null;
+  let bestD = tol;
+  for (const poly of [P.L, P.R]) {
+    for (let i = 0; i + 1 < poly.pts.length; i++) {
+      const c = closestOnSegment(q, poly.pts[i]!, poly.pts[i + 1]!);
+      const d = dist(q, c);
+      if (d <= bestD) {
+        best = c;
+        bestD = d;
+      }
+    }
+  }
+  return best;
+}
+
 function checkRisers(P: Prepared, out: StairSketchIssue[]): void {
   for (const g of P.risers) {
     if (g.onBoundary) {
@@ -88,8 +124,11 @@ function checkRiserPairs(P: Prepared, out: StairSketchIssue[], turn?: Map<number
       const B = gb.trimmed!;
       const sameA = dist(A[0]!, B[0]!) <= TOUCH_TOL;
       const sameB = dist(A[A.length - 1]!, B[B.length - 1]!) <= TOUCH_TOL;
-      if (sameA && sameB) out.push(sketchIssue('stair-riser-same-location', ga.index));
-      else if (polyDist(A, B) <= TOUCH_TOL) out.push(sketchIssue('stair-riser-crossing', ga.index));
+      if (sameA && sameB) {
+        const iss = sketchIssue('stair-riser-same-location', ga.index);
+        iss.otherIndex = gb.index;
+        out.push(iss);
+      } else if (polyDist(A, B) <= TOUCH_TOL) out.push(sketchIssue('stair-riser-crossing', ga.index));
     }
   }
 }

@@ -259,8 +259,9 @@ describe('ferramenta Escada: forma caracol (3 cliques)', () => {
     const t = tool('stairrun', ctx.env);
     t.move(at(0, 0));
     t.click(at(0, 0));
-    t.move(at(1, 90));
-    t.click(at(1, 90));
+    // Reta: o 2º clique é o fim do lance (4,2 m dão 16 espelhos de 28 cm de piso; 1 m seria lance curto demais).
+    t.move(at(4.2, 90));
+    t.click(at(4.2, 90));
     expect(stairsOf(ctx)[0]!.typeId).toBe('stt_monolitica');
   });
 

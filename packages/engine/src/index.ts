@@ -33,6 +33,7 @@ export * from './ceilingQuantities.ts';
 export * from './ceilingSchedule.ts';
 export * from './ceilingIssues.ts';
 export * from './roofs.ts';
+export * from './roofArcs.ts';
 export * from './roofQuantities.ts';
 export * from './roofSchedule.ts';
 export * from './roofWall.ts';

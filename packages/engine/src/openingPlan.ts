@@ -106,18 +106,10 @@ function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOpt
     return;
   }
   if (addNewDoorPlan(out, m, opts)) return;
-  if (level === 'low') {
-    for (const o of m.openings) {
-      const box = leafBox(m, o.leaf);
-      if (!box) continue;
-      const s = (box.s0 + box.s1) / 2;
-      out.push(line([{ t: box.t0, s }, { t: box.t1, s }], 'leaf', 'ink', 1));
-    }
-    return;
-  }
   addFrameCut(out, m, opts.cutZ);
   const sliding = m.openings.some((o) => o.kind === 'slide');
   if (sliding) {
+    // Correr mantém o desenho próprio (folhas fechadas + pistas + seta).
     for (const o of m.openings) {
       const box = leafBox(m, o.leaf);
       if (box) out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
@@ -125,10 +117,10 @@ function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOpt
     addTracks(out, m);
     addSlideArrow(out, m);
   } else {
+    // Folhas de giro: só a folha ABERTA, em todos os níveis (spec E3 §6); a fechada não é desenhada.
     for (const o of m.openings) {
       const box = leafBox(m, o.leaf);
       if (!box) continue;
-      if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
       const motion = leafMotion(m, o.leaf);
       out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
       if (!opts.showSwing) continue;
@@ -171,12 +163,12 @@ function windowPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanO
     return;
   }
   if (m.openings.some((o) => o.kind === 'side')) {
-    addHingedPlan(out, m, opts, level);
+    addHingedPlan(out, m, opts);
     if (level === 'high') addHighExtras(out, m, opts.cutZ);
     return;
   }
   if (m.openings.some((o) => o.kind === 'pivot')) {
-    addPivotWinPlan(out, m, opts, level);
+    addPivotWinPlan(out, m, opts);
     if (level === 'high') addHighExtras(out, m, opts.cutZ);
     return;
   }
@@ -195,11 +187,8 @@ function windowPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanO
     addTracks(out, m);
     addSlideArrow(out, m);
   } else if (opening) {
+    // Maxim-ar/basculante: só o símbolo de abertura, sem a folha fechada (spec E3 §6).
     addWindowOpening(out, m, opening);
-    if (level === 'high') {
-      const box = leafBox(m, opening.leaf);
-      if (box) out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
-    }
   } else if (level === 'high') {
     for (const o of m.openings) {
       const box = leafBox(m, o.leaf);

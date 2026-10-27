@@ -57,6 +57,35 @@ export function openingFrameStyle(t: Pick<OpeningType, 'frameStyle'>): OpeningFr
   return oneOf(t.frameStyle, FRAME_STYLES, 'rebate');
 }
 
+/** Profundidade do batente e deslocamento do seu centro em relação ao plano médio da parede (m). */
+export interface OpeningFrameDepth {
+  depth: number;
+  centerOffset: number;
+}
+
+/**
+ * Profundidade do batente ligada à parede (decisão 0035 §1): `wall` acompanha a espessura total acabada (faceado com
+ * os acabamentos), `core` fica só no núcleo estrutural e `fixed` usa o `frameDepth` do tipo limitado à parede. O
+ * deslocamento do centro é relativo ao plano médio da parede; o núcleo é considerado centrado (padrão simétrico da
+ * `wt_alv14`), que é a informação que esta leitura recebe. A posição real do núcleo é ajustada no modelo, que conhece
+ * a parede inteira.
+ */
+export function openingFrameDepth(
+  t: Pick<OpeningType, 'frameDepthMode' | 'frameDepth'>,
+  wallThickness: number,
+  coreThickness: number,
+): OpeningFrameDepth {
+  const wall = Math.max(0, Number.isFinite(wallThickness) ? wallThickness : 0);
+  const core = Math.max(0, Number.isFinite(coreThickness) ? Math.min(coreThickness, wall) : wall);
+  const mode = oneOf(t.frameDepthMode, ['wall', 'core', 'fixed'] as const, 'wall');
+  if (mode === 'core') return { depth: core, centerOffset: 0 };
+  if (mode === 'fixed') {
+    const pedido = typeof t.frameDepth === 'number' && Number.isFinite(t.frameDepth) && t.frameDepth > 0 ? t.frameDepth : 0.09;
+    return { depth: Math.min(pedido, wall), centerOffset: 0 };
+  }
+  return { depth: wall, centerOffset: 0 };
+}
+
 /** Divisões do caixilho/vidro (colunas × linhas de vidro), 1..8; padrão 1 × 1. */
 export function openingGrid(t: Pick<OpeningType, 'grid'>): { cols: number; rows: number } {
   return { cols: gridAxis(t.grid?.cols), rows: gridAxis(t.grid?.rows) };

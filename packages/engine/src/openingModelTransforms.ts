@@ -4,6 +4,7 @@ import type {
   OpenState,
   PartBox,
   PartMotion,
+  PartProfile,
 } from './openingModelTypes.ts';
 
 /** Ponto no sistema local do vão. */
@@ -190,10 +191,44 @@ function crossSection(corners: ModelPoint[], z: number): Array<{ t: number; s: n
   return Math.abs(polygonArea(pts)) > 1e-12 ? pts : [];
 }
 
+/**
+ * Anel horizontal (t, s) do perfil na cota `z`. No plano `ts` a seção é o próprio polígono (extrudado em z); no plano
+ * `sz` o corte horizontal é o intervalo em `s` entre as interseções do polígono com a cota, ao longo de toda a extrusão
+ * em `t` (spec E3 §2).
+ */
+function profileRingAtZ(part: OpeningPart, profile: PartProfile, z: number): Array<{ t: number; s: number }> {
+  const { box: b } = part;
+  if (z < b.z0 - 1e-9 || z > b.z1 + 1e-9) return [];
+  if (profile.plane === 'ts') return profile.pts.map(([t, s]) => ({ t, s }));
+  const ss: number[] = [];
+  for (let i = 0; i < profile.pts.length; i++) {
+    const [sa, za] = profile.pts[i]!;
+    const [sb, zb] = profile.pts[(i + 1) % profile.pts.length]!;
+    if (Math.abs(za - z) <= 1e-9) ss.push(sa);
+    if (Math.abs(zb - z) <= 1e-9) ss.push(sb);
+    if ((za - z) * (zb - z) < 0) ss.push(sa + ((sb - sa) * (z - za)) / (zb - za));
+  }
+  if (ss.length < 2) return [];
+  const s0 = Math.min(...ss);
+  const s1 = Math.max(...ss);
+  if (s1 - s0 < 1e-9) return [];
+  return [
+    { t: b.t0, s: s0 },
+    { t: b.t1, s: s0 },
+    { t: b.t1, s: s1 },
+    { t: b.t0, s: s1 },
+  ];
+}
+
 /** Corte horizontal do modelo na altura `z`, no estado pedido: as peças que o plano atravessa com o anel (t, s). */
 export function slicePartsAtZ(m: OpeningModel, z: number, state: OpenState): SliceRing[] {
   const out: SliceRing[] = [];
   for (const part of m.parts) {
+    if (part.profile && !part.motion) {
+      const ring = profileRingAtZ(part, part.profile, z);
+      if (ring.length) out.push({ part, ring });
+      continue;
+    }
     const ob = partTransformed(part, state);
     if (z < ob.bounds.z0 - 1e-9 || z > ob.bounds.z1 + 1e-9) continue;
     const ring = crossSection(ob.corners, z);
@@ -235,6 +270,29 @@ function convexHull(points: Array<{ u: number; z: number }>): Array<{ u: number;
 export function projectParts(m: OpeningModel, axis: 's' | 't', state: OpenState): ProjectedRing[] {
   const out: ProjectedRing[] = [];
   for (const part of m.parts) {
+    if (part.profile && !part.motion) {
+      const b = part.box;
+      const depth = axis === 's' ? (b.s0 + b.s1) / 2 : (b.t0 + b.t1) / 2;
+      // Elevação: retângulo envolvente. Corte transversal: a travessa mostra o L em (s, z); a ombreira, o retângulo.
+      const ring: Array<{ u: number; z: number }> =
+        axis === 't' && part.profile.plane === 'sz'
+          ? part.profile.pts.map(([s, z]) => ({ u: s, z }))
+          : axis === 's'
+            ? [
+                { u: b.t0, z: b.z0 },
+                { u: b.t1, z: b.z0 },
+                { u: b.t1, z: b.z1 },
+                { u: b.t0, z: b.z1 },
+              ]
+            : [
+                { u: b.s0, z: b.z0 },
+                { u: b.s1, z: b.z0 },
+                { u: b.s1, z: b.z1 },
+                { u: b.s0, z: b.z1 },
+              ];
+      out.push({ part, ring, depth });
+      continue;
+    }
     const ob = partTransformed(part, state);
     let depth = 0;
     const projected = ob.corners.map((p) => {

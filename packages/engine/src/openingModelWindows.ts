@@ -19,11 +19,11 @@ function addGridMuntins(c: Ctx, t0: number, t1: number, z0: number, z1: number):
   const half = 0.0125;
   for (let i = 1; i < c.grid.cols; i++) {
     const t = t0 + ((t1 - t0) * i) / c.grid.cols;
-    addPart(c, `muntin-v-${i - 1}`, 'muntin', 'frame', box(t - half, t + half, c.C - depth / 2, c.C + depth / 2, z0, z1));
+    addPart(c, `muntin-v-${i - 1}`, 'muntin', 'frame', box(t - half, t + half, c.Cd - depth / 2, c.Cd + depth / 2, z0, z1));
   }
   for (let i = 1; i < c.grid.rows; i++) {
     const z = z0 + ((z1 - z0) * i) / c.grid.rows;
-    addPart(c, `muntin-h-${i - 1}`, 'muntin', 'frame', box(t0, t1, c.C - depth / 2, c.C + depth / 2, z - half, z + half));
+    addPart(c, `muntin-h-${i - 1}`, 'muntin', 'frame', box(t0, t1, c.Cd - depth / 2, c.Cd + depth / 2, z - half, z + half));
   }
 }
 
@@ -31,7 +31,7 @@ function addGridMuntins(c: Ctx, t0: number, t1: number, z0: number, z1: number):
 function buildFixedWindow(c: Ctx): void {
   buildWindowFrame(c);
   const l = windowLayout(c);
-  addPart(c, 'glass-0', 'glass', 'glass', box(l.t0, l.t1, c.C - c.G / 2, c.C + c.G / 2, l.z0, l.z1));
+  addPart(c, 'glass-0', 'glass', 'glass', box(l.t0, l.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, l.z0, l.z1));
   addGridMuntins(c, l.t0, l.t1, l.z0, l.z1);
   c.openings.push({
     leaf: 0,
@@ -39,7 +39,7 @@ function buildFixedWindow(c: Ctx): void {
     side: 0,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: 0,
     z0: l.z0,
     z1: l.z1,
@@ -54,15 +54,15 @@ function buildCasementWindow(c: Ctx): void {
   const t1 = l.t1 - GAP;
   const z0 = l.z0 + GAP;
   const z1 = l.z1;
-  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.C, z: z1, sign: c.side };
-  addWindowLeaf(c, 0, t0, t1, z0, z1, c.C, motion);
+  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.Cd, z: z1, sign: c.side };
+  addWindowLeaf(c, 0, t0, t1, z0, z1, c.Cd, motion);
   c.openings.push({
     leaf: 0,
     kind: 'top',
     side: c.side,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: z1 - z0,
     z0,
     z1,
@@ -81,15 +81,15 @@ function buildTiltWindow(c: Ctx): void {
   const z0 = l.z0 + GAP;
   const z1 = l.z1 - GAP;
   const axisZ = l.z0 + openingTiltAxis(c.t) * (l.z1 - l.z0);
-  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.C, z: axisZ, sign: (-c.side) as 1 | -1 };
-  addWindowLeaf(c, 0, t0, t1, z0, z1, c.C, motion);
+  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.Cd, z: axisZ, sign: (-c.side) as 1 | -1 };
+  addWindowLeaf(c, 0, t0, t1, z0, z1, c.Cd, motion);
   c.openings.push({
     leaf: 0,
     kind: 'tilt',
     side: c.side,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: Math.max(axisZ - z0, z1 - axisZ),
     axisZ,
     z0,
@@ -110,12 +110,12 @@ function buildSlidingWindow(c: Ctx): void {
   const travel = leafW - 0.05;
   const z0 = l.z0 + GAP;
   const z1 = l.z1 - GAP;
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   addPart(c, 'track-head', 'track', 'metal', box(l.t0, l.t1, body.s0, body.s1, l.z1 - GAP - 0.01, l.z1 - GAP));
   addPart(c, 'track-sill', 'track', 'metal', box(l.t0, l.t1, body.s0, body.s1, c.J, c.J + 0.01));
   for (let k = 0; k < n; k++) {
     const center = center0 + (k - (n - 1) / 2) * spacing;
-    const sCenter = c.C + (k - (n - 1) / 2) * pitch;
+    const sCenter = c.Cd + (k - (n - 1) / 2) * pitch;
     const moving = k % 2 === 1;
     const motion: PartMotion | undefined = moving ? { kind: 'slide', dt: -1, ds: 0, dz: 0, travel } : undefined;
     addWindowLeaf(c, k, center - leafW / 2, center + leafW / 2, z0, z1, sCenter, motion);
@@ -135,7 +135,7 @@ function buildSlidingWindow(c: Ctx): void {
 
 /** Vão livre de janela: só a soleira (sem batente, folha ou vidro). */
 export function buildWindowVoid(c: Ctx): void {
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   addPart(c, 'sill-frame', 'sillFrame', 'frame', box(-c.hw, c.hw, body.s0, body.s1, 0, c.J));
 }
 

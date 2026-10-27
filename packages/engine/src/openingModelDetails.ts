@@ -26,14 +26,14 @@ export function buildSidelights(c: Ctx): void {
   const base = { t0: -c.hw + c.J, t1: c.hw - c.J };
   const z0 = c.t.kind === 'window' ? c.J : 0;
   const z1 = c.t.kind === 'window' ? windowLayout(c).z1 : c.transom ? Math.min(c.H - c.J, c.H - c.J - c.transom.height - TRANSOM_BAR) : c.H - c.J;
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   if (s.left) {
-    addPart(c, 'sidelight-glass-left', 'glass', 'glass', box(base.t0, base.t0 + s.width, c.C - c.G / 2, c.C + c.G / 2, z0, z1));
+    addPart(c, 'sidelight-glass-left', 'glass', 'glass', box(base.t0, base.t0 + s.width, c.Cd - c.G / 2, c.Cd + c.G / 2, z0, z1));
     const m0 = base.t0 + s.width;
     addPart(c, 'sidelight-mullion-left', 'leaf', 'frame', box(m0, m0 + SIDELIGHT_MULLION, body.s0, body.s1, z0, z1));
   }
   if (s.right) {
-    addPart(c, 'sidelight-glass-right', 'glass', 'glass', box(base.t1 - s.width, base.t1, c.C - c.G / 2, c.C + c.G / 2, z0, z1));
+    addPart(c, 'sidelight-glass-right', 'glass', 'glass', box(base.t1 - s.width, base.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, z0, z1));
     const m1 = base.t1 - s.width;
     addPart(c, 'sidelight-mullion-right', 'leaf', 'frame', box(m1 - SIDELIGHT_MULLION, m1, body.s0, body.s1, z0, z1));
   }
@@ -49,11 +49,11 @@ export function buildWindowTransom(c: Ctx): void {
   if (!tr || !windowTransomApplies(c.t)) return;
   const l = windowLayout(c);
   if (!l.transom) return;
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   const { barZ0, barZ1, bandZ0, bandZ1, fixed } = l.transom;
   addPart(c, 'transom-bar', 'muntin', 'frame', box(l.fullT0, l.fullT1, body.s0, body.s1, barZ0, barZ1));
   if (fixed) {
-    addPart(c, 'transom-glass', 'glass', 'glass', box(l.fullT0, l.fullT1, c.C - c.G / 2, c.C + c.G / 2, bandZ0, bandZ1));
+    addPart(c, 'transom-glass', 'glass', 'glass', box(l.fullT0, l.fullT1, c.Cd - c.G / 2, c.Cd + c.G / 2, bandZ0, bandZ1));
     return;
   }
   // Bandeira maxim-ar: folha pequena com folga em volta, girando no topo para o lado da abertura.
@@ -66,15 +66,15 @@ export function buildWindowTransom(c: Ctx): void {
   const t1 = l.fullT1 - GAP;
   const z0 = bandZ0 + GAP;
   const z1 = bandZ1 - GAP;
-  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.C, z: z1, sign: c.side };
-  addWindowLeaf(c, index, t0, t1, z0, z1, c.C, motion);
+  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.Cd, z: z1, sign: c.side };
+  addWindowLeaf(c, index, t0, t1, z0, z1, c.Cd, motion);
   c.openings.push({
     leaf: index,
     kind: 'top',
     side: c.side,
     hingeT: 0,
     latchT: 0,
-    pivot: { t: 0, s: c.C },
+    pivot: { t: 0, s: c.Cd },
     radius: z1 - z0,
     z0,
     z1,
@@ -92,25 +92,37 @@ export function buildTransom(c: Ctx): void {
   const inner = innerT(c);
   const barZ0 = c.H - c.J - tr.height - TRANSOM_BAR;
   const barZ1 = c.H - c.J - tr.height;
-  addPart(c, 'transom-bar', 'leaf', 'leaf', box(inner.t0, inner.t1, c.C - c.L / 2, c.C + c.L / 2, barZ0, barZ1));
-  addPart(c, 'transom-glass', 'glass', 'glass', box(inner.t0, inner.t1, c.C - c.G / 2, c.C + c.G / 2, barZ1, c.H - c.J));
+  addPart(c, 'transom-bar', 'leaf', 'leaf', box(inner.t0, inner.t1, c.Cd - c.L / 2, c.Cd + c.L / 2, barZ0, barZ1));
+  addPart(c, 'transom-glass', 'glass', 'glass', box(inner.t0, inner.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, barZ1, c.H - c.J));
 }
 
-/** Alizar em volta do vão, encostado nas duas faces da parede (3 caixas na porta, 4 na janela). */
+/**
+ * Alizar (spec E3 §4): assenta SOBRE a face acabada da parede (`s` de `T/2` a `T/2 + thickness`), cobre a junta
+ * batente/parede com a borda interna na face interna do batente (`|t| = hw − J`) e forma UMA silhueta por face
+ * (`group 'casing-<face>'`). Porta: 3 lados; janela: 4.
+ */
 export function buildCasing(c: Ctx): void {
   const casing = openingCasing(c.t);
   if (!casing) return;
   const cw = casing.width;
   const ct = casing.thickness;
-  for (const side of [-1, 1] as const) {
-    const s0 = c.thickness / 2 + 0;
-    const sCenter = side * (s0 + ct / 2);
-    const tag = side < 0 ? 'a' : 'b';
-    addPart(c, `casing-left-${tag}`, 'casing', 'casing', box(-c.hw - cw, -c.hw, sCenter - ct / 2, sCenter + ct / 2, 0, c.H + cw));
-    addPart(c, `casing-right-${tag}`, 'casing', 'casing', box(c.hw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, 0, c.H + cw));
-    addPart(c, `casing-head-${tag}`, 'casing', 'casing', box(-c.hw - cw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, c.H, c.H + cw));
+  const lado = c.t.casing?.sides;
+  const faces =
+    lado === 'swing' ? [c.side] : lado === 'opposite' ? [(-c.side) as 1 | -1] : ([-1, 1] as const);
+  const inner = c.hw - c.J;
+  const outer = inner + cw;
+  const zTop = c.H - c.J;
+  const zBot = c.t.kind === 'window' ? c.J : 0;
+  for (const face of faces) {
+    const tag = face < 0 ? 'a' : 'b';
+    const group = `casing-${tag}`;
+    const s0 = face * (c.thickness / 2);
+    const s1 = face * (c.thickness / 2 + ct);
+    addPart(c, `casing-left-${tag}`, 'casing', 'casing', box(-outer, -inner, s0, s1, zBot, zTop), { group });
+    addPart(c, `casing-right-${tag}`, 'casing', 'casing', box(inner, outer, s0, s1, zBot, zTop), { group });
+    addPart(c, `casing-head-${tag}`, 'casing', 'casing', box(-outer, outer, s0, s1, zTop, zTop + cw), { group });
     if (c.t.kind === 'window') {
-      addPart(c, `casing-sill-${tag}`, 'casing', 'casing', box(-c.hw - cw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, -cw, 0));
+      addPart(c, `casing-sill-${tag}`, 'casing', 'casing', box(-outer, outer, s0, s1, zBot - cw, zBot), { group });
     }
   }
 }

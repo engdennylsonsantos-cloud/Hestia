@@ -18,10 +18,11 @@ import {
 import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia/engine';
 import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
+import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
 /** Ponto extra de captura. `hostId` é o elemento dono: some da captura quando ele está em `ignore` (ex.: o piso sendo movido). */
-export type SnapPoint = Vec2 & { hostId?: Id };
+export type SnapPoint = Vec2 & { hostId?: Id; kind?: SnapKind };
 
 export interface InferContext {
   project: Project;
@@ -42,8 +43,8 @@ export interface InferContext {
   extraPoints?: SnapPoint[];
   /** Capturas ligadas (padrão: DEFAULT_SNAP). */
   snap?: SnapOptions;
-  /** Arestas de captura (contornos de pisos e lajes): o pé da perpendicular sobre a aresta vira captura. */
-  extraSegments?: Array<{ a: Vec2; b: Vec2; hostId?: Id }>;
+  /** Arestas de captura (contornos de pisos e lajes, ombreiras de aberturas): o pé da perpendicular sobre a aresta vira captura. */
+  extraSegments?: Array<{ a: Vec2; b: Vec2; hostId?: Id; kind?: SnapKind }>;
   /** Tab: índice do candidato escolhido entre todos os que estão ao alcance (ordenados por custo). */
   cycle?: number;
   /** Captura escolhida na posição anterior do cursor: mantém-na enquanto continuar valendo (histerese). */
@@ -238,22 +239,10 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
       }
     }
   }
-  // Pontos extras (vértices de pisos, contorno em construção) não entram na captura exclusiva de paredes (aberturas).
-  if (sn.endpoint !== false) {
-    for (const q of ctx.onWallsOnly ? [] : (ctx.extraPoints ?? [])) {
-      if (q.hostId !== undefined && ctx.ignore?.has(q.hostId)) continue;
-      if (dist(cursor, q) <= tol) add(v2(q.x, q.y), 'endpoint');
-    }
-  }
-  // Arestas de pisos e lajes: o pé sobre a aresta é captura de aresta (P2), com o dono para o ignore.
-  if (sn.faces && !ctx.onWallsOnly) {
-    for (const e of ctx.extraSegments ?? []) {
-      if (e.hostId !== undefined && ctx.ignore?.has(e.hostId)) continue;
-      if (dist(e.a, e.b) < 1e-9) continue;
-      const foot = closestOnSegment(cursor, e.a, e.b);
-      if (dist(cursor, foot) <= tol) add(foot, 'nearest', [], e.hostId);
-    }
-  }
+  // Pontos extras (vértices de pisos, contorno em construção, aberturas) não entram na captura exclusiva de paredes.
+  addExtraPoints(ctx, sn, cursor, tol, add);
+  // Arestas de pisos e lajes e ombreiras de aberturas: o pé sobre a aresta é captura de aresta, com o dono para o ignore.
+  if (!ctx.onWallsOnly) addExtraSegments(ctx, sn, cursor, tol, add);
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
   const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core', hostId?: Id): void => {
     for (const [a, b] of segs) {
@@ -346,6 +335,8 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
         refs.push(seg[0], seg[1]);
       }
     }
+    // Ombreiras das aberturas também são trechos de alinhamento (a linha atravessa a espessura).
+    addExtraTracks(ctx, faceTracks, refs);
   }
   if (!ctx.onWallsOnly && ctx.extraPoints) {
     for (const q of ctx.extraPoints) {

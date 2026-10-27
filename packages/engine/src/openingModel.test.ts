@@ -260,13 +260,15 @@ describe('buildOpeningModel: janelas', () => {
     expect(motion.sign).toBe(1);
   });
 
-  it('basculante: eixo na base e kind bottom', () => {
+  it('basculante: eixo horizontal central, kind tilt e metade superior para o lado de abertura', () => {
     const c = cena('ot_j60', { plan: 'tilt' });
     const m = modelo(c);
-    expect(m.openings[0]!.kind).toBe('bottom');
+    const a = m.openings[0]!;
+    expect(a.kind).toBe('tilt');
+    expect(a.axisZ).toBeCloseTo(0.05 + 0.5 * (c.g.height - 0.1), 9);
     const motion = de(m.parts, 'leaf')[0]!.motion;
     if (!motion || motion.kind !== 'rotate' || motion.axis !== 't') throw new Error('basculante sem giro em t');
-    expect(motion.z).toBeCloseTo(0.05, 9);
+    expect(motion.z).toBeCloseTo(a.axisZ!, 9);
     expect(motion.sign).toBe(-1);
   });
 

@@ -86,6 +86,18 @@ function addWindowOpening(out: OpeningPlanPath[], m: OpeningModel, o: LeafOpenin
   }
 }
 
+/** Basculante: a folha em corte aparece como linha inclinada em torno do centro do eixo, com `angle2d` e sem arco. */
+function addTiltPlan(out: OpeningPlanPath[], m: OpeningModel, o: LeafOpening, angle: number): void {
+  const box = leafBox(m, o.leaf);
+  if (!box) return;
+  const center = { t: (box.t0 + box.t1) / 2, s: (box.s0 + box.s1) / 2 };
+  const half = (box.t1 - box.t0) / 2;
+  const side = o.side || 1;
+  const dt = half * Math.cos(angle);
+  const ds = half * Math.sin(angle) * side;
+  out.push(line([{ t: center.t - dt, s: center.s - ds }, { t: center.t + dt, s: center.s + ds }], 'leaf', 'ink', 1));
+}
+
 /** Desenho de uma porta (giro, dupla, pivotante, correr e vão livre) nos níveis baixo/médio/alto. */
 function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
@@ -165,6 +177,11 @@ function windowPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanO
   }
   if (m.openings.some((o) => o.kind === 'pivot')) {
     addPivotWinPlan(out, m, opts, level);
+    if (level === 'high') addHighExtras(out, m, opts.cutZ);
+    return;
+  }
+  if (m.openings.some((o) => o.kind === 'tilt')) {
+    for (const o of m.openings) if (o.kind === 'tilt') addTiltPlan(out, m, o, opts.angle);
     if (level === 'high') addHighExtras(out, m, opts.cutZ);
     return;
   }

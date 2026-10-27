@@ -5,7 +5,6 @@ import { isRoof, type DetailLevel, type Id, type Project, type Roof } from '@hes
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
-import { zoomAtinge } from './limiares.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
 import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
@@ -216,7 +215,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
     const base = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.3 : 0.5, paint);
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const hatch = m && m.hatch !== 'none' && !coarse ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45), ...(fine ? {} : { zoomMin: 40 }) } : undefined;
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: waterTone(base, pl.up), alpha, hatch });
     const model = p.elements[r.roofId];
     if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, esp.projecao));

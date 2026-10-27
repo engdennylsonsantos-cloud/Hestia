@@ -4,7 +4,6 @@ import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { holeMarkOps } from './holeMarks.ts';
-import { zoomAtinge } from './limiares.ts';
 import { ALCA_PX, quadradoEm } from './marcadores.ts';
 import { juncaoDoNivel, pisosDoNivel } from './resolucao.ts';
 import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
@@ -108,7 +107,7 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   const fine = detail === 'fine';
   const m = top ? p.materials[top.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
-  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45), ...(fine ? {} : { zoomMin: 40 }) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
   out.strokes.push(...holeMarkOps(f.polygon, theme, paint, detail));
   if (detail !== 'coarse') {

@@ -4,6 +4,7 @@ import { resolveLevel } from '@hestia/engine';
 import { buildTemplate } from '@hestia/model';
 import { PlanScene } from './gpuPlan.ts';
 import { PlanFrame, planFrameUpdateOf, type PlanViewState } from './planFrame.ts';
+import { rasterizarCena } from './rasterSoftware.ts';
 import { LIGHT, type PlanDrawList } from './types.ts';
 
 const VIEW = { cx: 0, cy: 0, zoom: 10, width: 400, height: 300 };
@@ -39,36 +40,13 @@ describe('PlanScene: poucas malhas por quadro (draw calls)', () => {
     };
     frame.update(planFrameUpdateOf(estado));
     const camadas = scene.scene.children as THREE.Group[];
-    expect(camadas[2]!.children.length).toBeLessThanOrEqual(5);
+    expect(camadas[5]!.children.length).toBeLessThanOrEqual(5);
     const total = camadas.reduce((n, g) => n + g.children.length, 0);
     expect(total).toBeLessThan(80);
     scene.dispose();
   }, 60_000);
 });
 
-/**
- * Triângulos desenhados de cada malha, por camada, na ordem da cena: as posições pelos índices, até a faixa de desenho, com
- * a cor, o alfa e a ordem. Duas cenas com a mesma imagem têm a mesma lista (buffers reaproveitados não aparecem aqui).
- */
-function triangulosDaCena(scene: PlanScene): unknown[][] {
-  return (scene.scene.children as THREE.Group[]).map((g) =>
-    (g.children as THREE.Mesh[]).map((m) => {
-      const geo = m.geometry;
-      const pos = geo.getAttribute('position').array;
-      const idx = geo.index!.array;
-      const n = geo.drawRange.count;
-      const mat = m.material as THREE.MeshBasicMaterial | THREE.ShaderMaterial;
-      // Traço usa o shader (cor e alfa nos uniforms); preenchimento usa o material básico.
-      const uni = 'uniforms' in mat ? mat.uniforms : null;
-      return {
-        ordem: m.renderOrder,
-        cor: uni ? (uni.uCor!.value as THREE.Color).getHexString() : (mat as THREE.MeshBasicMaterial).color.getHexString(),
-        alfa: uni ? (uni.uAlfa!.value as number) : mat.opacity,
-        vertices: Array.from(idx.slice(0, n), (k) => [pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]].join(',')),
-      };
-    }),
-  );
-}
 
 describe('PlanScene: atualização incremental igual à recriação completa', () => {
   it('uma sequência de mudanças (geometria, seleção, zoom, nível, grade) dá a mesma imagem que uma cena nova em cada passo', () => {
@@ -107,7 +85,11 @@ describe('PlanScene: atualização incremental igual à recriação completa', (
       quadro.update(planFrameUpdateOf(estado));
       const completa = new PlanScene();
       new PlanFrame(completa).update(planFrameUpdateOf(estado));
-      expect(triangulosDaCena(incremental), `passo ${i}`).toEqual(triangulosDaCena(completa));
+      // A imagem é a mesma: a atualização incremental reaproveita malhas e buffers (a grade pode ter mais linhas fora da
+      // vista, cobertas pela folga; a imagem visível não muda).
+      const W = 300;
+      const H = 200;
+      expect(rasterizarCena(incremental, estado.v, W, H), `passo ${i}`).toEqual(rasterizarCena(completa, estado.v, W, H));
       completa.dispose();
     }
     incremental.dispose();

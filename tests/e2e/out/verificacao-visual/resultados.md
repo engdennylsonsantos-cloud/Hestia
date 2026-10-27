@@ -1,10 +1,10 @@
 # Verificação visual — resultados da execução
 
-- **Gerado em:** 2026-10-26T21:48:53.849Z
-- **URL:** `file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-a2-visual/apps/web/dist/index.html?debug=1`
+- **Gerado em:** 2026-10-27T02:32:28.487Z
+- **URL:** `file:///<usuario-local>/.local/share/opencode/worktree/8fed4c/gpu-r5-plan/apps/web/dist/index.html?debug=1`
 - **Navegador:** 155.0.8059.86 (C:\Program Files\Google\Chrome\Application\chrome.exe)
 - **Viewport:** 1440×900 (deviceScaleFactor 1)
-- **Resumo:** 44 PASS · 1 FAIL · 0 PENDENTE
+- **Resumo:** 45 PASS · 0 FAIL · 0 PENDENTE
 
 | Item | Critério | Esperado | Observado | Veredito | Captura |
 |---|---|---|---|---|---|
@@ -40,7 +40,7 @@
 | 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | linha de detalhe tracejada | traços e espaços (7/4 px) | 21 ciclos, ocupação 81.6% | **PASS** | [`4-linhas-detalhe.png`](./4-linhas-detalhe.png) |
 | 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | linha de detalhe pontilhada | pontos (1/3 px) | 57 ciclos, ocupação 74.9% | **PASS** | [`4-linhas-detalhe.png`](./4-linhas-detalhe.png) |
 | 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | tracejado e pontilhado são distintos | pontilhada tem mais ciclos que a tracejada | 21 × 57 ciclos | **PASS** | [`4-linhas-detalhe.png`](./4-linhas-detalhe.png) |
-| 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | seleção da linha de detalhe em 1,7× | traço mais grosso (1,7×) e na cor de seleção | 0 px alterados (0.000%), 0 px azuis; selection=["dl-dash"], hover="dl-dash" | **FAIL** | [`4-selecao-1.7x.png`](./4-selecao-1.7x.png) |
+| 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | seleção da linha de detalhe em 1,7× | traço mais grosso (1,7×) e na cor de seleção | 396 px alterados (0.055%), 396 px azuis; selection=["dl-dash"], hover="dl-dash" | **PASS** | [`4-selecao-1.7x.png`](./4-selecao-1.7x.png) |
 | 4 · Linha de detalhe tracejada/pontilhada e seleção 1,7× | sem erro de página | nenhum erro de console/pageerror | 0 erro(s) | **PASS** | — |
 | 5 · Rótulos de corte/elevação | rótulo do corte nas duas pontas | dois "A" (placement both) | 2 rótulo(s) "A" | **PASS** | [`5-cortes-elevacoes.png`](./5-cortes-elevacoes.png) |
 | 5 · Rótulos de corte/elevação | rótulo da elevação nas duas pontas | dois "Sul" (placement both) | 2 rótulo(s) "Sul" | **PASS** | [`5-cortes-elevacoes.png`](./5-cortes-elevacoes.png) |

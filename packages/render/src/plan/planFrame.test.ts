@@ -29,7 +29,7 @@ function ops(count: { g: number; o: number }) {
   return { geometry, overlay };
 }
 
-/** Malhas de cada camada da cena, na ordem (fillsBase, fillsOver, grid, strokesBase, strokesOver). */
+/** Malhas de cada camada da cena, na ordem (base, seleção, hover, viva, provisória, grade, e os traços). */
 const slotMeshes = (scene: PlanScene): unknown[][] => scene.scene.children.map((g) => [...g.children]);
 /** Mesmas malhas, na mesma ordem (identidade, não igualdade estrutural). */
 const sameMeshes = (a: unknown[], b: unknown[]): boolean => a.length === b.length && a.every((m, i) => m === b[i]);
@@ -50,8 +50,8 @@ describe('quadro da planta (PlanFrame)', () => {
     upd({ ...V, cx: -0.3, cy: 0.1 });
     expect(count).toEqual({ g: 1, o: 1 });
     const after = slotMeshes(scene);
-    // Geometria (fillsBase, strokesBase) e sobreposição (fillsOver, strokesOver): mesmas malhas. A grade pode ser refeita.
-    for (const i of [0, 1, 3, 4]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
+    // Geometria (fillsBase, strokesBase) e seleção (fillsSel, strokesSel): mesmas malhas. A grade pode ser refeita.
+    for (const i of [0, 1, 6, 7]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
     scene.dispose();
   });
 
@@ -67,13 +67,13 @@ describe('quadro da planta (PlanFrame)', () => {
     expect(count).toEqual({ g: 1, o: 2 });
     const after = slotMeshes(scene);
     expect(sameMeshes(after[0]!, before[0]!)).toBe(true);
-    expect(sameMeshes(after[3]!, before[3]!)).toBe(true);
-    // A sobreposição é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
-    expect(sameMeshes(after[4]!, before[4]!)).toBe(true);
+    expect(sameMeshes(after[6]!, before[6]!)).toBe(true);
+    // A seleção é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
+    expect(sameMeshes(after[7]!, before[7]!)).toBe(true);
     const versoesDepois = versoesDasPosicoes(scene);
     expect(versoesDepois[0]).toEqual(versoesAntes[0]);
-    expect(versoesDepois[3]).toEqual(versoesAntes[3]);
-    expect(versoesDepois[4]![0]).not.toBe(versoesAntes[4]![0]);
+    expect(versoesDepois[6]).toEqual(versoesAntes[6]);
+    expect(versoesDepois[7]![0]).not.toBe(versoesAntes[7]![0]);
     scene.dispose();
   });
 
@@ -110,9 +110,9 @@ describe('quadro da planta (PlanFrame)', () => {
     const count = { g: 0, o: 0 };
     const { geometry, overlay } = ops(count);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: true, geometryKey: 'g', overlayKey: 'o', geometry, overlay });
-    expect(scene.scene.children[2]!.children.length).toBeGreaterThan(0);
+    expect(scene.scene.children[5]!.children.length).toBeGreaterThan(0);
     frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g', overlayKey: 'o', geometry, overlay });
-    expect(scene.scene.children[2]!.children.length).toBe(0);
+    expect(scene.scene.children[5]!.children.length).toBe(0);
     scene.dispose();
   });
 
@@ -152,6 +152,8 @@ describe('geometria e sobreposição separadas (build)', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
     s.exec({ type: 'addDimension', levelId: 'lv_0', dimension: { id: 'd1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1 } });
+    s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'dl1', a: { x: 0, y: 2 }, b: { x: 4, y: 2 }, style: 'dashed' } });
+    s.exec({ type: 'addDetailRegion', levelId: 'lv_0', item: { id: 'dr1', boundary: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] } });
     return s.project;
   }
   const input = (p: Project, selection: string[], hover: string | null = null): PlanInput => ({
@@ -169,13 +171,22 @@ describe('geometria e sobreposição separadas (build)', () => {
     showGrid: false,
   });
 
-  it('a seleção só entra na geometria pelas cotas do nível', () => {
+  it('a seleção entra na geometria pelas cotas e pelas linhas de detalhe do nível (achado A2)', () => {
     const p = proj();
     expect(planGeometrySelection(p, 'lv_0', ['w1', 'd1', 'x'])).toEqual(['d1']);
     expect(planGeometrySelection(p, 'lv_0', ['w1'])).toEqual([]);
+    expect(planGeometrySelection(p, 'lv_0', ['dl1', 'w1'])).toEqual(['dl1']);
+    expect(planGeometrySelection(p, 'lv_0', ['dr1', 'w1'])).toEqual(['dr1']);
     const semSel = buildPlanGeometry(input(p, []));
     expect(buildPlanGeometry(input(p, ['w1'])).strokes).toEqual(semSel.strokes);
     expect(buildPlanGeometry(input(p, ['d1'])).strokes).not.toEqual(semSel.strokes);
+    const linhaSel = buildPlanGeometry(input(p, ['dl1'])).strokes.find((s) => s.pts[0]!.y === 2)!;
+    const linhaSem = semSel.strokes.find((s) => s.pts[0]!.y === 2)!;
+    expect(linhaSel.color).not.toBe(linhaSem.color);
+    expect(linhaSel.widthPx).toBeGreaterThan(linhaSem.widthPx);
+    const regiaoSel = buildPlanGeometry(input(p, ['dr1'])).strokes.find((s) => s.pts.length === 4 && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
+    const regiaoSem = semSel.strokes.find((s) => s.pts.length === 4 && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
+    expect(regiaoSel.color).not.toBe(regiaoSem.color);
   });
 
   it('a sobreposição depende da seleção e do cursor, e a geometria não', () => {
@@ -215,7 +226,7 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     ...over,
   });
 
-  it('a geometria só muda pelo que ela lê (versão, cotas selecionadas); zoom, seleção de parede e cursor não', () => {
+  it('a geometria só muda pelo que ela lê (versão, cotas e linhas de detalhe selecionadas); zoom, seleção de parede e cursor não', () => {
     const base = planFrameUpdateOf(state());
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).geometryKey).toBe(base.geometryKey);
     expect(planFrameUpdateOf(state({ hover: 'w1' })).geometryKey).toBe(base.geometryKey);
@@ -237,11 +248,19 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     expect(chamadas).toEqual([]);
   });
 
-  it('a sobreposição muda com a seleção e o cursor, mas não com o pan', () => {
+  it('a seleção, o hover e a camada viva têm chaves próprias; nenhuma delas depende do pan ou do zoom', () => {
     const base = planFrameUpdateOf(state());
-    expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).not.toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).overlayKey).not.toBe(base.overlayKey);
-    expect(planFrameUpdateOf(state({ v: { ...V, cx: 9 } })).overlayKey).toBe(base.overlayKey);
-    expect(planFrameUpdateOf(state({ v: { ...V, zoom: 220 } })).overlayKey).toBe(base.overlayKey);
+    expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).toBe(base.overlayKey);
+    expect(planFrameUpdateOf(state({ hover: 'w1' })).hoverKey).not.toBe(base.hoverKey);
+    const previa = planFrameUpdateOf(state({ preview: [{ kind: 'point', at: { x: 0, y: 0 } }] }));
+    expect(previa.liveKey).not.toBe(base.liveKey);
+    expect(previa.hoverKey).toBe(base.hoverKey);
+    for (const v of [{ ...V, cx: 9 }, { ...V, zoom: 220 }]) {
+      const u = planFrameUpdateOf(state({ v }));
+      expect(u.overlayKey).toBe(base.overlayKey);
+      expect(u.hoverKey).toBe(base.hoverKey);
+      expect(u.liveKey).toBe(base.liveKey);
+    }
   });
 });

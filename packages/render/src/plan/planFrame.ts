@@ -3,9 +3,9 @@ import type { ResolvedLevel } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { SketchDraft, SketchResult } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
-import { gridCovers, gridLayer, type GridLayer } from './grid.ts';
+import { gridCovers, gridLayer, visibleGridStep, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
-import { buildPlanGeometry, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
+import { buildPlanGeometry, buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
 import { dimPlanOps } from './dim.ts';
@@ -67,14 +67,20 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     gpu: s.gpu,
     showGrid: s.showGrid,
     geometryKey: `${s.version}|${levelId}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}`,
-    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover}|${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
+    // Três chaves de sobreposição: a seleção, o alvo do cursor e a camada viva (prévia, guias e captura). Cursor e
+    // pré-visualização não refazem os destaques da seleção, e o hover não refaz a geometria do nível.
+    overlayKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}`,
+    hoverKey: `${s.version}|${levelId}|${dark}|${s.selection.join(',')}|${s.hover ?? ''}`,
+    liveKey: `${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => {
       const g = buildPlanGeometry({ ...base, ...planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel), selection: geoSel, hover: null, preview: [], inference: null });
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
+    overlay: () => buildPlanScreenOverlay({ ...base, below: null, selection: s.selection, hover: null, preview: [], inference: null }),
+    hover: () => buildPlanHoverOverlay({ ...base, below: null, selection: s.selection, hover: s.hover, preview: [], inference: null }),
+    live: () => comEsboco(buildPlanLiveOverlay({ ...base, below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
   };
 }
 
@@ -105,10 +111,19 @@ export interface PlanFrameUpdate {
    * limiar de detalhe (hachura, interface entre materiais): ver `PlanOps.limiares` e `assinaturaDeZoom`.
    */
   geometryKey: string;
-  /** Chave da sobreposição: projeto, nível, tema, seleção, cursor, pré-visualização e ferramenta (o zoom não entra). */
+  /**
+   * Chave da sobreposição de seleção: projeto, nível, tema e seleção. Pan, zoom, cursor, prévia e ferramenta ficam fora
+   * dela. Hover tem chave própria (`hoverKey`) e a camada viva (cursor, prévia, captura) tem `liveKey`.
+   */
   overlayKey: string;
+  /** Chave do realce do alvo sob o cursor: seleção + hover (o hover não refaz a sobreposição de seleção). */
+  hoverKey?: string;
+  /** Chave da camada viva: pré-visualização, inferência/captura e esboço (o cursor não refaz seleção nem hover). */
+  liveKey?: string;
   geometry: () => PlanOps;
   overlay: () => PlanOps;
+  hover?: () => PlanOps;
+  live?: () => PlanOps;
 }
 
 /** Cena que recebe as camadas (a GPU da planta). */
@@ -143,21 +158,26 @@ export function sameLabels(a: readonly LabelOp[], b: readonly LabelOp[]): boolea
 
 /**
  * Quadro da planta: decide, a cada atualização, quais camadas da cena refazer. A geometria do nível só é refeita quando
- * a sua chave muda; a sobreposição, quando a dela muda; a grade, quando o zoom, o tema ou a vista saem da área que ela
- * cobre. Pan dentro da área coberta não refaz nenhuma camada: só a câmera (feita por quem chama).
+ * a sua chave muda; a seleção, o hover e a camada viva têm chaves próprias (cursor e prévia não tocam os destaques da
+ * seleção), e a grade só é refeita quando o passo (que sai do zoom), o tema ou a área coberta mudam. Pan dentro da área
+ * coberta não refaz nenhuma camada: só a câmera (feita por quem chama).
  */
 export class PlanFrame {
   private geomKey: string | null = null;
   private ovKey: string | null = null;
+  private hovKey: string | null = null;
+  private livKey: string | null = null;
   private gridKey: string | null = null;
   private grid: GridLayer | null = null;
   private gridOn = false;
   private geom: PlanOps = EMPTY;
   private ov: PlanOps = EMPTY;
+  private hov: PlanOps = EMPTY;
+  private liv: PlanOps = EMPTY;
   private bg: string | null = null;
-  /** Rótulos da planta (geometria e sobreposição) no zoom corrente. Trocam de referência só quando o conteúdo muda. */
+  /** Rótulos da planta (geometria e sobreposições) no zoom corrente. Trocam de referência só quando o conteúdo muda. */
   private labelsValue: LabelOp[] = [];
-  /** Rótulos sem o zoom aplicado (medidas em papel), na ordem: os da geometria e os da sobreposição. */
+  /** Rótulos sem o zoom aplicado (medidas em papel), na ordem de desenho. */
   private labelsLivres: LabelOp[] = [];
   /** Limiares de detalhe da geometria atual e a assinatura do zoom em que ela foi feita. */
   private limiares: number[] = [];
@@ -166,7 +186,7 @@ export class PlanFrame {
   private zoom = Number.NaN;
   private zoomRotulos = Number.NaN;
   /** Camadas resolvidas para o zoom (modo CPU e conferência), guardadas por camada e zoom. */
-  private resolvidas: { geom: PlanOps; ov: PlanOps; zoom: number; geomRes: PlanOps; ovRes: PlanOps } | null = null;
+  private resolvidas: { geom: PlanOps; ov: PlanOps; hov: PlanOps; liv: PlanOps; zoom: number; geomRes: PlanOps; ovRes: PlanOps; hovRes: PlanOps; livRes: PlanOps } | null = null;
 
   constructor(private readonly scene: PlanSceneSink) {}
 
@@ -179,11 +199,15 @@ export class PlanFrame {
   reset(): void {
     this.geomKey = null;
     this.ovKey = null;
+    this.hovKey = null;
+    this.livKey = null;
     this.gridKey = null;
     this.grid = null;
     this.gridOn = false;
     this.geom = EMPTY;
     this.ov = EMPTY;
+    this.hov = EMPTY;
+    this.liv = EMPTY;
     this.bg = null;
     this.labelsValue = [];
     this.labelsLivres = [];
@@ -202,14 +226,15 @@ export class PlanFrame {
       sink?.setBackground(theme.bg);
     }
 
-    // Grade: só as linhas e a largura (que sai pelo zoom) dependem da vista; o pan dentro da área coberta não a refaz.
+    // Grade: o que muda com o zoom é o passo (e o tamanho dos pontinhos, que é em pixels). Enquanto o passo e a área
+    // coberta não mudam, o zoom não a refaz: as linhas têm 1 px no shader e os pontos são marcadores em pixels.
     this.gridOn = u.showGrid;
     if (!u.showGrid) {
       if (this.gridKey !== null) this.setSlot(sink, 'grid', [], [], v);
       this.gridKey = null;
       this.grid = null;
     } else {
-      const gk = `${v.zoom}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
+      const gk = `${visibleGridStep(v.zoom)}|${theme.gridMinor}|${theme.gridMajor}|${theme.inkSoft}`;
       if (this.grid === null || this.gridKey !== gk || !gridCovers(this.grid, v)) {
         this.grid = gridLayer(v, theme);
         this.gridKey = gk;
@@ -231,18 +256,38 @@ export class PlanFrame {
       contadores.contarRebuild('geometria');
       labelsChanged = true;
     }
+    // Seleção, hover e camada viva: três chaves e três pares de lotes. Rótulos iguais aos de antes mantêm a referência.
     if (u.overlayKey !== this.ovKey) {
       this.ovKey = u.overlayKey;
       const next = u.overlay();
-      this.setSlot(sink, 'fillsOver', next.fills, [], v);
-      this.setSlot(sink, 'strokesOver', [], next.strokes, v);
+      this.setSlot(sink, 'fillsSel', next.fills, [], v);
+      this.setSlot(sink, 'strokesSel', [], next.strokes, v);
       contadores.contarRebuild('sobreposicao');
-      // Rótulos iguais aos de antes mantêm a referência: a sobreposição muda a cada movimento sem mudar as etiquetas.
       const same = sameLabels(this.ov.labels, next.labels);
       if (!same) labelsChanged = true;
       this.ov = { fills: next.fills, strokes: next.strokes, labels: same ? this.ov.labels : next.labels };
     }
-    if (labelsChanged) this.labelsLivres = [...this.geom.labels, ...this.ov.labels];
+    if (u.hoverKey !== undefined && u.hoverKey !== this.hovKey) {
+      this.hovKey = u.hoverKey;
+      const next = u.hover?.() ?? EMPTY;
+      this.setSlot(sink, 'fillsHover', next.fills, [], v);
+      this.setSlot(sink, 'strokesHover', [], next.strokes, v);
+      contadores.contarRebuild('sobreposicao');
+      const same = sameLabels(this.hov.labels, next.labels);
+      if (!same) labelsChanged = true;
+      this.hov = { fills: next.fills, strokes: next.strokes, labels: same ? this.hov.labels : next.labels };
+    }
+    if (u.liveKey !== undefined && u.liveKey !== this.livKey) {
+      this.livKey = u.liveKey;
+      const next = u.live?.() ?? EMPTY;
+      this.setSlot(sink, 'fillsLive', next.fills, [], v);
+      this.setSlot(sink, 'strokesLive', [], next.strokes, v);
+      contadores.contarRebuild('sobreposicao');
+      const same = sameLabels(this.liv.labels, next.labels);
+      if (!same) labelsChanged = true;
+      this.liv = { fills: next.fills, strokes: next.strokes, labels: same ? this.liv.labels : next.labels };
+    }
+    if (labelsChanged) this.labelsLivres = [...this.geom.labels, ...this.ov.labels, ...this.hov.labels, ...this.liv.labels];
     // Os rótulos levam as medidas em papel; a fonte e o deslocamento em px saem aqui, com o zoom do quadro.
     if (labelsChanged || this.zoomRotulos !== v.zoom) {
       this.zoomRotulos = v.zoom;
@@ -255,14 +300,17 @@ export class PlanFrame {
   drawList(theme: PlanTheme): PlanDrawList {
     // Faixas e marcadores saem do zoom do último quadro; o resultado fica guardado enquanto as camadas e o zoom não mudam.
     let r = this.resolvidas;
-    if (!r || r.geom !== this.geom || r.ov !== this.ov || r.zoom !== this.zoom) {
-      r = { geom: this.geom, ov: this.ov, zoom: this.zoom, geomRes: resolverZoom(this.geom, this.zoom), ovRes: resolverZoom(this.ov, this.zoom) };
+    if (!r || r.geom !== this.geom || r.ov !== this.ov || r.hov !== this.hov || r.liv !== this.liv || r.zoom !== this.zoom) {
+      r = {
+        geom: this.geom, ov: this.ov, hov: this.hov, liv: this.liv, zoom: this.zoom,
+        geomRes: resolverZoom(this.geom, this.zoom), ovRes: resolverZoom(this.ov, this.zoom), hovRes: resolverZoom(this.hov, this.zoom), livRes: resolverZoom(this.liv, this.zoom),
+      };
       this.resolvidas = r;
     }
     return {
       background: theme.bg,
-      fills: [...r.geomRes.fills, ...r.ovRes.fills],
-      strokes: [...(this.gridOn && this.grid ? this.grid.strokes : []), ...r.geomRes.strokes, ...r.ovRes.strokes],
+      fills: [...r.geomRes.fills, ...r.ovRes.fills, ...r.hovRes.fills, ...r.livRes.fills],
+      strokes: [...(this.gridOn && this.grid ? this.grid.strokes : []), ...r.geomRes.strokes, ...r.ovRes.strokes, ...r.hovRes.strokes, ...r.livRes.strokes],
       labels: this.labelsValue,
     };
   }

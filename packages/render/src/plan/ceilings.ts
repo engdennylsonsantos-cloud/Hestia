@@ -3,7 +3,6 @@ import { resolveCeilings, type ResolvedCeiling } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
-import { zoomAtinge } from './limiares.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
@@ -39,7 +38,7 @@ export function ceilingFills(
     const materialId = ceilingFillMaterial(c);
     const m = materialId ? p.materials[materialId] : undefined;
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+    const hatch = m && m.hatch !== 'none' && detail !== 'coarse' ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45), ...(fine ? {} : { zoomMin: 40 }) } : undefined;
     out.fills.push({ polygons: c.polygon, color, alpha: 1, hatch });
     const at = labelPoint(c.polygon);
     if (detail !== 'coarse') {

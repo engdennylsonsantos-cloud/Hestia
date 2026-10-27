@@ -93,11 +93,8 @@ describe('trocar o zoom não recria geometria nem buffers', () => {
       expect(x.indice).toBe(y.indice);
       if (x.versoes.some((v, k) => v !== y.versoes[k]) || x.versaoIndice !== y.versaoIndice) reescritos++;
     });
-    // Só os lotes dinâmicos foram reescritos; os demais (a maior parte) ficaram como estavam.
-    const dinamicos = scene.lotesDinamicos();
-    expect(dinamicos).toBeGreaterThan(0);
-    expect(reescritos).toBeLessThanOrEqual(dinamicos);
-    expect(reescritos).toBeLessThan(depois.malhas.length / 2);
+    // Nenhum buffer foi reescrito: zoom só muda a câmera e o uniform (não há mais lote dinâmico).
+    expect(reescritos).toBe(0);
     scene.dispose();
   });
 

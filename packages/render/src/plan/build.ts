@@ -20,7 +20,7 @@ import { noteOps } from './notes.ts';
 import { elementTagOps } from './tags.ts';
 import { openingViewOps, wallOutlineOps } from './view.ts';
 import { espessuraDeCorte, espessuraDeProjecao, paintOps, surfaceColor, type PlanPaint } from './style.ts';
-import { espessuraAtinge, Limiares, zoomAtinge, type VistaComLimiares } from './limiares.ts';
+import { Limiares, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { resolverZoom } from './zoomOps.ts';
 import { planContext } from './planContext.ts';
@@ -28,7 +28,7 @@ import type { FillOp, LabelOp, PlanDrawList, PlanOps, PlanTheme, StrokeOp } from
 
 import { buildPlanOverlay } from './planOverlay.ts';
 
-export { buildPlanOverlay, buildPlanScreenOverlay } from './planOverlay.ts';
+export { buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanOverlay, buildPlanScreenOverlay, buildPlanSelectionOverlay } from './planOverlay.ts';
 export { planBelowOf, underlayIdOf } from './planContext.ts';
 
 export interface PlanInput {
@@ -96,28 +96,34 @@ const ZOOM_MAXIMO = 4000;
 const zoomDaEspessura = (emMetros: number, px: number): number => (emMetros > 0 ? px / emMetros : Number.POSITIVE_INFINITY);
 
 /**
- * Hachura de uma região de parede (decisão 0015 §2.2): no fino, sempre; nos demais, a partir de 40 px/m e só onde a região
- * tem 5 px de espessura equivalente. O 40 é um limiar da geometria (ela só ganha hachura a partir dele); os 5 px viram o
- * `zoomMin` da hachura, que o shader aplica com o zoom corrente. Hachura sólida é só cor de preenchimento (não tem o que
- * esconder no shader), então a espessura de 5 px continua sendo decidida na geometria (limiar registrado).
+ * Hachura de uma região de parede (decisão 0015 §2.2): no fino, sempre; nos demais, a partir de 40 px/m e com 5 px de
+ * espessura equivalente. Com a hachura procedural, o zoom mínimo vai para o shader (`zoomMin`) e a geometria não muda com
+ * o zoom: o fragmento some abaixo dele, e o `resolverZoom` faz o mesmo no caminho CPU.
  */
-function hachuraDaRegiao(v: Viewport, m: Material | undefined, espessura: number, fine: boolean, color: string): FillOp['hatch'] {
+function hachuraDaRegiao(m: Material | undefined, espessura: number, fine: boolean, color: string): FillOp['hatch'] {
   if (!m || m.hatch === 'none') return undefined;
   if (fine) return { kind: m.hatch, color };
-  if (m.hatch === 'solid') return espessuraAtinge(v, espessura, 5) && zoomAtinge(v, 40) ? { kind: m.hatch, color } : undefined;
-  if (!zoomAtinge(v, 40)) return undefined;
-  const zoomMin = zoomDaEspessura(espessura, 5);
-  if (zoomMin > ZOOM_MAXIMO) return undefined;
-  return { kind: m.hatch, color, ...(zoomMin > 40 ? { zoomMin } : {}) };
+  const zoomMin = Math.max(40, zoomDaEspessura(espessura, 5));
+  if (!(zoomMin <= ZOOM_MAXIMO)) return undefined;
+  return { kind: m.hatch, color, zoomMin };
 }
 
 /**
- * Parte da seleção que a geometria do nível usa: as cotas do nível (decisão 0019) e as marcas de corte e elevação
- * selecionadas mudam de cor com a seleção. A geometria depende só desse subconjunto; o resto é da sobreposição.
+ * Parte da seleção que a geometria do nível usa: as cotas do nível (decisão 0019), as linhas e regiões de detalhe e as
+ * marcas de corte e elevação selecionadas mudam de cor (e espessura) com a seleção. A geometria depende só desse
+ * subconjunto; o resto é da sobreposição. As linhas e regiões de detalhe ficam aqui porque o desenho delas (com o realce
+ * 1,7×) é feito por `notes.ts` na geometria — sem elas, a seleção não chegava ao desenho (achado A2).
  */
 export function planGeometrySelection(p: Project, levelId: Id, selection: readonly Id[]): Id[] {
   if (selection.length === 0) return [];
-  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...levelRoomSeparators(p, levelId).map((r) => r.id), ...p.views.map((v) => v.id)]);
+  const level = p.levels.find((l) => l.id === levelId);
+  const used = new Set<Id>([
+    ...levelDimensions(p, levelId).map((d) => d.id),
+    ...levelRoomSeparators(p, levelId).map((r) => r.id),
+    ...p.views.map((v) => v.id),
+    ...(level?.detailLines ?? []).map((l) => l.id),
+    ...(level?.detailRegions ?? []).map((r) => r.id),
+  ]);
   return selection.filter((id) => used.has(id));
 }
 
@@ -224,7 +230,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       const color = surfaceColor(m?.color ?? '#999999', fillBase, fillT, paint.wall);
       const polys = r.polygons;
       const thick = Math.max(0, ...polys.map((poly) => espessuraEquivalente(poly)));
-      const hatch = hachuraDaRegiao(v, m, thick, fine, mix(paint.wall.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45));
+      const hatch = hachuraDaRegiao(m, thick, fine, mix(paint.wall.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45));
       wallOps.fills.push({ polygons: polys, color, alpha: 1, hatch });
       // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre). Linhas finas: peso de projeção.
       // O traço leva o zoom a partir do qual cabe (`zoomMin`) e o shader o esconde abaixo dele: a geometria não muda com o zoom.

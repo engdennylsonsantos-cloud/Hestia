@@ -63,7 +63,7 @@ describe('telhado nunca some (A12): criação', () => {
     clickAt(t, 0, 0);
     clickAt(t, 8, 6);
     const r = roofs(ctx.store.project)[0]!;
-    expect(r.shape).toBe('edges');
+    expect(r.shape).toBe('gable');
     expect(r.edgeSlopes).toEqual([30, null, 30, null]);
   });
 });
@@ -76,7 +76,8 @@ describe('telhado nunca some (A12): edição', () => {
     clickAt(t, 8, 6);
     const id = roofs(ctx.store.project)[0]!.id;
     const before = roofs(ctx.store.project)[0]!.edgeSlopes;
-    expect(roofPatchProblem(ctx.store.project, [id], { edgeSlopes: [null, null, null, null] })).toMatch(/nenhuma aresta/);
+    // Como na edição de aresta (roofEdgeActions): a forma passa a 'edges', porque numa forma de predefinição as arestas vêm da forma.
+    expect(roofPatchProblem(ctx.store.project, [id], { shape: 'edges', edgeSlopes: [null, null, null, null] })).toMatch(/nenhuma aresta/);
     expect(roofPatchProblem(ctx.store.project, [id], { mark: 'A-1' })).toBeNull();
     expect(roofs(ctx.store.project)[0]!.edgeSlopes).toEqual(before);
   });

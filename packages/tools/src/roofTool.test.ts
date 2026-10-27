@@ -36,7 +36,7 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     expect(r.boundary).toHaveLength(4);
     expect(polygonArea([r.boundary])).toBeCloseTo(24, 6);
     // A forma da barra (duas águas, padrão) vira predefinições por aresta: lados longos definem, curtos são empenas.
-    expect(r.shape).toBe('edges');
+    expect(r.shape).toBe('gable');
     expect(r.edgeSlopes).toEqual([30, null, 30, null]);
     expect(r.slopePercent).toBe(30);
     expect(r.heightOffset).toBe(2.8);
@@ -119,11 +119,54 @@ describe('ferramenta Telhado: contorno por cliques (A1)', () => {
     clickAt(t, 6, 4);
     const r = roofs(ctx.store.project)[0]!;
     expect(r.heightOffset).toBe(3.2);
-    expect(r.shape).toBe('edges');
+    expect(r.shape).toBe('shed');
     // Uma água sobe no eixo curto (y): só a aresta mais baixa (y = 0) define inclinação.
     expect(r.edgeSlopes).toEqual([15, null, null, null]);
     expect(r.slopePercent).toBe(15);
     expect(r.typeId).toBe('rt_fibro');
+  });
+});
+
+describe('ferramenta Telhado: forma guardada e avisos de contorno (coberturas)', () => {
+  it('"Duas águas" guarda a forma gable (Propriedades mostra o mesmo nome que a barra)', () => {
+    const ctx = roofCtx('rect');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 8, 4);
+    expect(roofs(ctx.store.project)[0]!.shape).toBe('gable');
+  });
+
+  it('"Duas águas" num triângulo (uma só aresta paralela à cumeeira) avisa que a água não tem cumeeira', () => {
+    const ctx = roofCtx('poly');
+    ctx.options.roofShape = 'gable';
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 3, 4);
+    t.confirm();
+    expect(roofs(ctx.store.project)).toHaveLength(1);
+    expect(ctx.msgs.at(-1)).toContain('sem cumeeira');
+  });
+
+  it('Enter com dois pontos não fecha o contorno e diz o que falta; os pontos ficam', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    t.confirm();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toContain('menos de 3 pontos');
+  });
+
+  it('Esc no meio do contorno descarta os pontos e avisa', () => {
+    const ctx = roofCtx('poly');
+    const t = tool('roof', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    t.cancel();
+    expect(roofs(ctx.store.project)).toHaveLength(0);
+    expect(ctx.msgs.at(-1)).toContain('Contorno cancelado');
   });
 });
 

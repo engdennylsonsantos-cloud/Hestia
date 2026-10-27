@@ -72,7 +72,18 @@ export function RoofOptionsBar({ tool }: { tool: 'roof' | 'roofextrusion' }): Re
       </label>
       <label>
         Graus
-        <NumField id="opt-roofdeg" value={percentToDeg(slope)} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => set({ roofSlope: degToPercent(v) })} />
+        {/* Só regrava a % quando o campo em graus foi editado: o blur reenvia o valor arredondado exibido (24,2° viraria 44,94 %). */}
+        <NumField
+          id="opt-roofdeg"
+          value={percentToDeg(slope)}
+          decimals={1}
+          unit="°"
+          min={0.1}
+          max={63.4}
+          onCommit={(v) => {
+            if (Math.abs(v - Number(percentToDeg(slope).toFixed(1))) > 1e-9) set({ roofSlope: degToPercent(v) });
+          }}
+        />
       </label>
       <label>
         Balanço

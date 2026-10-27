@@ -218,7 +218,19 @@ export class RoofTool extends ToolBase {
       this.finishContour();
       return;
     }
+    // Com 1 ou 2 pontos o Enter não fecha nada: diz o que falta e mantém os pontos.
+    if (this.polyLike() && this.pts.length > 0) {
+      this.env.say('Contorno com menos de 3 pontos: clique mais pontos antes de fechar com Enter.');
+      return;
+    }
     super.confirm();
+  }
+
+  /** Esc no meio do desenho descarta os pontos e avisa; fora do desenho, o base sai da ferramenta. */
+  override cancel(): void {
+    const descartando = this.polyLike() && this.pts.length > 0;
+    super.cancel();
+    if (descartando) this.env.say('Contorno cancelado: os pontos foram descartados. Clique para recomeçar.');
   }
 
   override type(text: string): boolean {
@@ -251,7 +263,7 @@ export class RoofTool extends ToolBase {
 
   /**
    * Cria o telhado no nível ativo com o tipo e as opções da barra. A forma da barra vira predefinições por aresta
-   * (shape 'edges'). Se o motor não gerar águas, não cria nada e diz o motivo.
+   * (edgeSlopes) e guarda a forma escolhida. Se o motor não gerar águas, não cria nada e diz o motivo.
    */
   private commit(boundary: Vec2[], overhang = 0): void {
     const o = this.env.options();
@@ -280,7 +292,8 @@ export class RoofTool extends ToolBase {
       levelId,
       boundary,
       heightOffset,
-      shape: extrusion ? 'extrusion' : 'edges',
+      // A forma da barra fica guardada como está (Duas águas, Uma água, Quatro águas): Propriedades mostra o mesmo nome.
+      shape: extrusion ? 'extrusion' : preset,
       slopePercent: slope,
       dir,
       edgeSlopes: presetEdgeSlopes(boundary, preset, dir, slope),
@@ -326,6 +339,8 @@ export class RoofTool extends ToolBase {
     if (!r || r.planes.length === 0) return `Telhado criado: ${ROOF_SHAPE_LABEL[shape]}, inclinação ${fmtPercent(slope)}. Ctrl+Z desfaz.`;
     const n = r.planes.length;
     const ridge = r.lines.filter((l) => l.kind === 'ridge').reduce((s, l) => s + dist(l.a, l.b), 0);
+    // Duas águas sem cumeeira (contorno com uma só aresta paralela à cumeeira, p. ex. triângulo): avisa em vez de criar em silêncio.
+    if (shape === 'gable' && ridge < 1e-6) return `Telhado criado com ${n} água sem cumeeira: "Duas águas" precisa de arestas paralelas ao eixo (Tab troca). Ctrl+Z desfaz.`;
     return `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}, cumeeira ${fmt(ridge)}. Ctrl+Z desfaz.`;
   }
 }

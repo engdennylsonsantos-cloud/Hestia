@@ -678,14 +678,15 @@ describe('folha × batente: varredura de abertura sem interseção (spec E3 §5)
   ];
 
   it('giro, dupla, pivotante e vai-e-vem: volume zero de 0 até angle3d, a cada 5°, nos 4 flips', () => {
-    for (const [base, leaves] of [
-      ['ot_p90', 1],
-      ['ot_p160', 2],
-      ['ot_pp80', 1],
-      ['ot_pvv90', 1],
+    for (const [base, leaves, extra] of [
+      ['ot_p90', 1, {}],
+      ['ot_p160', 2, {}],
+      ['ot_pp80', 1, {}],
+      ['ot_pvv90', 1, {}],
+      ['ot_pvv90', 2, { leaves: 2 }],
     ] as const) {
       for (const flips of combos) {
-        const c = cena(base, {}, flips);
+        const c = cena(base, extra, flips);
         const m = modelo(c);
         const batente = ids(m.parts, (p) => p.role === 'jamb' || p.role === 'head');
         const max = (openingAngle3d(c.t) * Math.PI) / 180;
@@ -716,15 +717,16 @@ describe('folha × batente: varredura de abertura sem interseção (spec E3 §5)
   });
 
   it('correr, embutir, dobrável e sanfonada: sem interseção ao longo do deslocamento/dobra', () => {
-    const casos: Array<{ base: string; passos: number; estado: (k: number) => { angle: number; slide: number } }> = [
+    const casos: Array<{ base: string; passos: number; extra?: Partial<OpeningType>; estado: (k: number) => { angle: number; slide: number } }> = [
       { base: 'ot_pc160', passos: 10, estado: (k) => ({ angle: 0, slide: k / 10 }) },
       { base: 'ot_pe80', passos: 10, estado: (k) => ({ angle: 0, slide: k / 10 }) },
       { base: 'ot_pd120', passos: 14, estado: (k) => ({ angle: (k * Math.PI) / 28, slide: 0 }) },
+      { base: 'ot_pd120', passos: 14, extra: { leaves: 4 }, estado: (k) => ({ angle: (k * Math.PI) / 28, slide: 0 }) },
       { base: 'ot_ps90', passos: 15, estado: (k) => ({ angle: (k * Math.PI) / 36, slide: 0 }) },
     ];
     for (const caso of casos) {
       for (const flips of combos) {
-        const m = modelo(cena(caso.base, {}, flips));
+        const m = modelo(cena(caso.base, caso.extra ?? {}, flips));
         const batente = ids(m.parts, (p) => p.role === 'jamb' || p.role === 'head');
         const folhas = ids(m.parts, (p) => p.role === 'leaf' || p.role === 'leafPanel' || p.role === 'glass');
         for (let k = 0; k <= caso.passos; k++) {

@@ -81,6 +81,7 @@ const TOL_PX = 8;
 const line = (p: Vec2, d: Vec2): AlignLine => ({ p, d: norm(d) });
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 const segmentDistance = (at: Vec2, a: Vec2, b: Vec2): number => dist(at, closestOnSegment(at, a, b));
+const degenerate = (a: Vec2, b: Vec2): boolean => dist(a, b) < 1e-9;
 
 /** Tolerância lateral das feições de parede: pega o cursor em qualquer ponto da espessura. */
 const wallTol = (mpp: number, f: WallFrame): number => Math.max(TOL_PX * mpp, f.thickness / 2 + 2 * mpp);
@@ -210,6 +211,7 @@ function ringFeatures(p: Project, levelId: Id, at: Vec2, mpp: number, hidden?: R
       for (let i = 0; i < n; i++) {
         const a = ring[i]!;
         const b = ring[(i + 1) % n]!;
+        if (degenerate(a, b)) continue;
         const d = segmentDistance(at, a, b);
         if (d > tol) continue;
         const nome = ringLabel(e.kind);
@@ -243,6 +245,7 @@ function stairFeatures(p: Project, levelId: Id, at: Vec2, mpp: number, hidden?: 
       for (let i = 0; i + 1 < pl.length; i++) {
         const a = pl[i]!;
         const b = pl[i + 1]!;
+        if (degenerate(a, b)) continue;
         const d = segmentDistance(at, a, b);
         if (d > tol) continue;
         out.push(
@@ -269,7 +272,7 @@ function draftFeatures(draft: SketchDraft | undefined, at: Vec2, mpp: number): A
   const tol = TOL_PX * mpp;
   const out: AlignFeature[] = [];
   for (const s of draft.segs) {
-    if (s.sag) continue;
+    if (s.sag || degenerate(s.a, s.b)) continue;
     const d = segmentDistance(at, s.a, s.b);
     if (d > tol) continue;
     out.push(

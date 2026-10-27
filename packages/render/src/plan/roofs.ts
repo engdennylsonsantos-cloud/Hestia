@@ -224,18 +224,6 @@ function selectedRingOps(r: ResolvedRoof, roof: Roof, theme: PlanTheme): StrokeO
   return out;
 }
 
-/** Telhado com pegada gravada e algum balanço positivo: só ele tem pegada a mostrar (rosa). */
-const temBalanco = (roof: Roof): boolean => !!roof.footprint && roof.edgeOverhangs.some((o) => o > 0);
-
-/**
- * Pegada tracejada de um telhado com balanço (rosa, mais fina que as demais linhas): o contorno desenhado pelo usuário,
- * sem o beiral. Sem balanço, o beiral já é a pegada e não há o que mostrar.
- */
-function pegadaOps(roof: Roof, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
-  if (!temBalanco(roof)) return [];
-  return [{ pts: roof.footprint!, closed: true, ...espessura, color: theme.roofFootprint, alpha: 1, dash: [6, 3] }];
-}
-
 /**
  * Contorno do beiral (`roofFootprint`) conforme o intervalo de vista:
  * - telhado totalmente acima do plano de corte: traço de projeção tracejado na cor da aresta (sem rosa);
@@ -269,7 +257,7 @@ export interface RoofOpsOptions {
   paint?: PlanPaint;
   /**
    * Estado de cada telhado no intervalo de vista (`PlanView.cls`): decide o contorno do beiral (tracejado acima do
-   * corte, cheio no corte) e a pegada rosa (não aparece acima do corte). Ausente = telhado cortado (comportamento antigo).
+   * corte, cheio no corte). Ausente = telhado cortado (comportamento antigo).
    */
   classes?: ReadonlyMap<Id, ViewClass>;
   /** Azimute do sol (graus, 0 = leste) para o tom das águas; padrão = o sol da vista 3D do projeto. */
@@ -283,8 +271,7 @@ export interface RoofOpsOptions {
  * planta de cobertura), para a grade da planta não competir com o tom. Fora do grosseiro: o contorno do beiral segue o
  * intervalo de vista (`beiralOps`): tracejado de projeção na cor da aresta acima do corte, cheio no corte; cumeeira,
  * espigão e rincão como arestas finas (rincão tracejado); empena em traço cheio mais escuro; por água, seta de caimento
- * (da subida para a descida) com o percentual. A pegada rosa (`pegadaOps`) só aparece com balanço e nunca acima do
- * corte. A cumeeira mais alta leva a cota absoluta ("▲ +5,70") afastada da linha, com etiquetas ligadas ou na planta de
+ * (da subida para a descida) com o percentual. Não há rosa na planta pronta (a pegada rosa é só do modo de edição). A cumeeira mais alta leva a cota absoluta ("▲ +5,70") afastada da linha, com etiquetas ligadas ou na planta de
  * cobertura; com etiquetas ligadas, código e área real no centroide da água maior. Os rótulos são posicionados sem
  * sobreposição (`evitarSobreposicao`).
  */
@@ -315,8 +302,6 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       const beiral = beiralOps(foot, cls, theme, fillBase, esp, aresta);
       out.fills.push(...beiral.fills);
       out.strokes.push(...beiral.strokes);
-      // Acima do corte não há rosa: o beiral tracejado já representa a cobertura.
-      if (isRoof(model) && cls !== 'projection-above') out.strokes.push(...pegadaOps(model, theme, esp.pegada));
       // Arestas internas de um arco (geratrizes entre facetas do mesmo trecho curvo) não são cumeeira nem espigão: saem.
       // Um trecho curvo leva uma seta e um percentual só, na faceta do meio (`comSinal`).
       const arco = arcoDoTelhado(p, r);
@@ -383,16 +368,13 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
-  // Telhados ocultos: a pegada com balanço aparece também fora do intervalo; a projeção, só com a opção ligada.
+  // Telhados ocultos: a projeção do beiral só aparece com a opção ligada.
   const esp = espessurasDoTelhado(opts.paint ?? defaultPaint('roof', v.zoom));
   for (const r of all) {
     if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
-    const model = p.elements[r.roofId];
-    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, esp.pegada));
     if (opts.showProjection === true) {
-      // Projeção da cobertura fora do intervalo de vista: rosa tracejada com balanço (é a pegada projetada); sem balanço, tinta.
-      const cor = isRoof(model) && temBalanco(model) ? theme.roofFootprint : theme.ink;
-      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...esp.projecao, color: cor, alpha: 0.9, dash: [6, 3] });
+      // Projeção da cobertura fora do intervalo de vista: traço de projeção na tinta (o rosa é só do modo de edição).
+      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...esp.projecao, color: theme.ink, alpha: 0.9, dash: [6, 3] });
     }
   }
   return out;

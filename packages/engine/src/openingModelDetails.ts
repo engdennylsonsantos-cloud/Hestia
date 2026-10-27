@@ -45,21 +45,33 @@ export function buildTransom(c: Ctx): void {
   addPart(c, 'transom-glass', 'glass', 'glass', box(inner.t0, inner.t1, c.Cd - c.G / 2, c.Cd + c.G / 2, barZ1, c.H - c.J));
 }
 
-/** Alizar em volta do vão, encostado nas duas faces da parede (3 caixas na porta, 4 na janela). */
+/**
+ * Alizar (spec E3 §4): assenta SOBRE a face acabada da parede (`s` de `T/2` a `T/2 + thickness`), cobre a junta
+ * batente/parede com a borda interna na face interna do batente (`|t| = hw − J`) e forma UMA silhueta por face
+ * (`group 'casing-<face>'`). Porta: 3 lados; janela: 4.
+ */
 export function buildCasing(c: Ctx): void {
   const casing = openingCasing(c.t);
   if (!casing) return;
   const cw = casing.width;
   const ct = casing.thickness;
-  for (const side of [-1, 1] as const) {
-    const s0 = c.thickness / 2 + 0;
-    const sCenter = side * (s0 + ct / 2);
-    const tag = side < 0 ? 'a' : 'b';
-    addPart(c, `casing-left-${tag}`, 'casing', 'casing', box(-c.hw - cw, -c.hw, sCenter - ct / 2, sCenter + ct / 2, 0, c.H + cw));
-    addPart(c, `casing-right-${tag}`, 'casing', 'casing', box(c.hw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, 0, c.H + cw));
-    addPart(c, `casing-head-${tag}`, 'casing', 'casing', box(-c.hw - cw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, c.H, c.H + cw));
+  const lado = c.t.casing?.sides;
+  const faces =
+    lado === 'swing' ? [c.side] : lado === 'opposite' ? [(-c.side) as 1 | -1] : ([-1, 1] as const);
+  const inner = c.hw - c.J;
+  const outer = inner + cw;
+  const zTop = c.H - c.J;
+  const zBot = c.t.kind === 'window' ? c.J : 0;
+  for (const face of faces) {
+    const tag = face < 0 ? 'a' : 'b';
+    const group = `casing-${tag}`;
+    const s0 = face * (c.thickness / 2);
+    const s1 = face * (c.thickness / 2 + ct);
+    addPart(c, `casing-left-${tag}`, 'casing', 'casing', box(-outer, -inner, s0, s1, zBot, zTop), { group });
+    addPart(c, `casing-right-${tag}`, 'casing', 'casing', box(inner, outer, s0, s1, zBot, zTop), { group });
+    addPart(c, `casing-head-${tag}`, 'casing', 'casing', box(-outer, outer, s0, s1, zTop, zTop + cw), { group });
     if (c.t.kind === 'window') {
-      addPart(c, `casing-sill-${tag}`, 'casing', 'casing', box(-c.hw - cw, c.hw + cw, sCenter - ct / 2, sCenter + ct / 2, -cw, 0));
+      addPart(c, `casing-sill-${tag}`, 'casing', 'casing', box(-outer, outer, s0, s1, zBot - cw, zBot), { group });
     }
   }
 }

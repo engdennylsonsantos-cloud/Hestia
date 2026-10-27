@@ -383,14 +383,44 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
     expect(m.openings).toHaveLength(1);
   });
 
-  it('alizar: 3 peças por face na porta e 4 na janela, encostadas nas faces', () => {
-    const porta = modelo(cena('ot_p90', { casing: { width: 0.05, thickness: 0.015 } }));
+  it('alizar: 3 peças por face na porta e 4 na janela, sobre a face acabada', () => {
+    const porta = modelo(cena('ot_p90', { casing: { width: 0.07, thickness: 0.015 } }));
     expect(de(porta.parts, 'casing')).toHaveLength(6);
-    const janela = modelo(cena('ot_j120', { casing: { width: 0.05, thickness: 0.015 } }));
+    const janela = modelo(cena('ot_j120', { casing: { width: 0.07, thickness: 0.015 } }));
     expect(de(janela.parts, 'casing')).toHaveLength(8);
     for (const x of de(janela.parts, 'casing')) {
       expect(Math.min(Math.abs(x.box.s0), Math.abs(x.box.s1))).toBeGreaterThanOrEqual(0.184 / 2 - 1e-9);
+      expect(Math.max(Math.abs(x.box.s0), Math.abs(x.box.s1))).toBeCloseTo(0.184 / 2 + 0.015, 9);
     }
+  });
+
+  it('alizar: borda interna na face do batente, grupo por face e nenhum volume com parede/batente', () => {
+    const c = cena('ot_p90', { casing: { width: 0.07, thickness: 0.015 } });
+    const m = modelo(c);
+    const casing = de(m.parts, 'casing');
+    const grupos = new Map<string, number>();
+    for (const p of casing) {
+      expect(p.group, p.id).toBeDefined();
+      grupos.set(p.group!, (grupos.get(p.group!) ?? 0) + 1);
+      // Fora da parede (face acabada) e sem invadir o batente (que termina em T/2).
+      expect(Math.min(Math.abs(p.box.s0), Math.abs(p.box.s1))).toBeGreaterThanOrEqual(m.thickness / 2 - 1e-9);
+      for (const b of m.parts.filter((x) => x.role === 'jamb' || x.role === 'head')) {
+        expect(temIntersecao(m, p, b), `${p.id} × ${b.id}`).toBe(false);
+      }
+    }
+    expect([...grupos.values()].sort()).toEqual([3, 3]);
+    const lateral = casing.find((p) => p.id.startsWith('casing-left'))!;
+    expect(Math.max(Math.abs(lateral.box.t0), Math.abs(lateral.box.t1))).toBeCloseTo(0.4 + 0.07, 9);
+    expect(Math.min(Math.abs(lateral.box.t0), Math.abs(lateral.box.t1))).toBeCloseTo(0.4, 9);
+  });
+
+  it('alizar sides swing/opposite: só a face pedida', () => {
+    const swing = modelo(cena('ot_p90', { casing: { width: 0.07, thickness: 0.015, sides: 'swing' } }));
+    expect(de(swing.parts, 'casing')).toHaveLength(3);
+    for (const p of de(swing.parts, 'casing')) expect((p.box.s0 + p.box.s1) / 2).toBeGreaterThan(0);
+    const opposite = modelo(cena('ot_p90', { casing: { width: 0.07, thickness: 0.015, sides: 'opposite' } }));
+    expect(de(opposite.parts, 'casing')).toHaveLength(3);
+    for (const p of de(opposite.parts, 'casing')) expect((p.box.s0 + p.box.s1) / 2).toBeLessThan(0);
   });
 
   it('peitoril saliente só em janela: projeta além das duas faces', () => {

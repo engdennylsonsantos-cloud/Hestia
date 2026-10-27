@@ -155,6 +155,21 @@ describe('openingPlanPaths: níveis low e high', () => {
     expect(openingPlanPaths(modelo(janela), opts({ detail: 'high' })).some((p) => p.role === 'sillBoard')).toBe(true);
   });
 
+  it('alizar no nível alto: um contorno por lado e por face, unido pelo grupo', () => {
+    const c = cena('ot_p90', { casing: { width: 0.07, thickness: 0.015 } });
+    const paths = openingPlanPaths(modelo(c), opts({ detail: 'high', cutZ: 1.5 }));
+    const casings = paths.filter((p) => p.role === 'casing' && p.closed);
+    expect(casings).toHaveLength(4);
+    for (const p of casings) expect(p.pts).toHaveLength(4);
+    const porFace = [casings.filter((p) => boxOf(p).s0 > 0), casings.filter((p) => boxOf(p).s1 < 0)];
+    for (const face of porFace) {
+      expect(face).toHaveLength(2);
+      const lados = face.map((p) => boxOf(p)).sort((a, b) => a.t0 - b.t0);
+      expect(lados[0]!.t1).toBeCloseTo(-0.4, 9);
+      expect(lados[1]!.t0).toBeCloseTo(0.4, 9);
+    }
+  });
+
   it('em nenhum nível a folha fechada atravessa ombreira ou batedor', () => {
     for (const detail of ['low', 'mid', 'high'] as const) {
       for (const flipHand of [false, true]) {

@@ -1,3 +1,4 @@
+import { union, type MultiPolygon } from '@hestia/geom';
 import { partTransformed, slicePartsAtZ } from './openingModel.ts';
 import {
   CLOSED,
@@ -176,8 +177,20 @@ export function addTracks(out: OpeningPlanPath[], m: OpeningModel): void {
 
 /** Peças fora do corte que o nível alto mostra: alizar, peitoril, verga/contraverga e o vidro duplo. */
 export function addHighExtras(out: OpeningPlanPath[], m: OpeningModel, z: number): void {
+  // Alizar: uma silhueta unida por `group` (uma por face), não retângulos soltos sobrepostos (spec E3 §4).
+  const grupos = new Map<string, MultiPolygon>();
   for (const { part, ring } of slicePartsAtZ(m, z, CLOSED)) {
-    if (part.role === 'casing') out.push(polygon(ring, 'casing', 'ink', 0.8));
+    if (part.role !== 'casing') continue;
+    const chave = part.group ?? part.id;
+    const lista: MultiPolygon = grupos.get(chave) ?? [];
+    lista.push([ring.map((p) => ({ x: p.t, y: p.s }))]);
+    grupos.set(chave, lista);
+  }
+  for (const aneis of grupos.values()) {
+    for (const poly of union(aneis)) {
+      const contorno = poly[0];
+      if (contorno && contorno.length >= 3) out.push(polygon(contorno.map((p) => ({ t: p.x, s: p.y })), 'casing', 'ink', 0.8));
+    }
   }
   for (const part of m.parts) {
     if (part.role === 'sillBoard') {

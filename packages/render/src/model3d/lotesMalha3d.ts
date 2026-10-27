@@ -86,13 +86,16 @@ export function arestasDosLotes(lotes: readonly SolidBatch[], angulo: number): T
  * aplicada), com uma faixa que cobre a geometria inteira para o elemento `id`.
  */
 export function loteDeGeometria(g: THREE.BufferGeometry, materialId: Id, category: GraphicsCategory, id: Id): SolidBatch {
-  const index = g.index!;
+  const posicao = g.getAttribute('position');
+  if (!g.getAttribute('normal')) g.computeVertexNormals();
+  // Extrusão (batente em L) não é indexada: os índices saem na ordem dos vértices.
+  const indices = g.index ? Array.from(g.index.array) : Array.from({ length: posicao.count }, (_, i) => i);
   return {
     materialId,
     category,
-    positions: Array.from(g.getAttribute('position').array),
+    positions: Array.from(posicao.array),
     normals: Array.from(g.getAttribute('normal').array),
-    indices: Array.from(index.array),
-    ids: [{ id, start: 0, count: index.count }],
+    indices,
+    ids: [{ id, start: 0, count: indices.length }],
   };
 }

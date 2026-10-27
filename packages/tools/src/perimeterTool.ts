@@ -61,6 +61,8 @@ export class PerimeterTool extends ToolBase {
       mpp: () => this.env.metersPerPixel(),
       snap: (p) => this.snap(p, snapExtraOf(this.d, null)).point,
       options: () => this.env.options(),
+      project: () => this.env.project(),
+      levelId: () => this.env.levelId(),
     });
     this.sel = new BoxSelection({
       draft: () => this.d,

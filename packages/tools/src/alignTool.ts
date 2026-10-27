@@ -1,0 +1,191 @@
+import { add, mul, type Vec2 } from '@hestia/geom';
+import { alignFeaturesAt, type AlignFeature } from './alignFeatures.ts';
+import { applyAlignMany } from './alignApply.ts';
+import { solveAlign, type AlignSolution } from './alignSolve.ts';
+import { ToolBase } from './base.ts';
+import type { PointerInfo, PreviewItem } from './types.ts';
+
+const LABEL_HALF = 1.2;
+
+/**
+ * Alinhar universal (Revit: Align): o primeiro clique define a REFERÊNCIA e o segundo o que se move. Vale para
+ * qualquer feição reconhecida (face/eixo/núcleo/extremidade de parede, ombreira/centro de abertura, aresta de anel,
+ * linha do esboço e aresta de escada), inclusive misturando tipos. Ctrl+clique acumula vários alvos; Tab alterna a
+ * candidata sob o cursor; Esc volta um passo.
+ */
+export class AlignTool extends ToolBase {
+  readonly id = 'align';
+  readonly label = 'Alinhar';
+  readonly hint =
+    'Alinhar: clique na referência e depois no que deseja alinhar. Ctrl+clique acumula vários; Tab alterna a feição sob o cursor; Esc volta um passo.';
+  private ref: AlignFeature | null = null;
+  private queue: AlignFeature[] = [];
+  private hover: AlignFeature[] = [];
+  private hoverIndex = 0;
+
+  protected reset(): void {
+    this.ref = null;
+    this.queue = [];
+    this.hover = [];
+    this.hoverIndex = 0;
+    this.items = [];
+  }
+  protected busy(): boolean {
+    return this.ref !== null || this.queue.length > 0;
+  }
+
+  /** Candidatas sob o cursor, com a opção "Preferir" e a visibilidade da vista. */
+  private candidates(at: Vec2): AlignFeature[] {
+    return alignFeaturesAt({
+      project: this.env.project(),
+      levelId: this.env.levelId(),
+      at,
+      metersPerPixel: this.env.metersPerPixel(),
+      prefer: this.env.options().alignPrefer ?? 'faces',
+      hidden: this.env.hiddenInView?.(),
+    });
+  }
+
+  /** Recalcula o hover mantendo o índice do Tab na mesma feição (pela chave estável). */
+  private updateHover(at: Vec2): void {
+    const previous = this.hover[this.hoverIndex]?.key;
+    this.hover = this.candidates(at);
+    const found = previous ? this.hover.findIndex((f) => f.key === previous) : -1;
+    this.hoverIndex = found >= 0 ? found : 0;
+  }
+
+  private current(): AlignFeature | null {
+    return this.hover[this.hoverIndex] ?? null;
+  }
+
+  /** Realce de uma feição com o rótulo do tipo. `ref` usa traço cheio; alvo em espera usa tracejado. */
+  private featureItems(f: AlignFeature, prefix: string, dashed = false): PreviewItem[] {
+    const a = add(f.line.p, mul(f.line.d, -LABEL_HALF));
+    const b = add(f.line.p, mul(f.line.d, LABEL_HALF));
+    return [
+      { kind: 'line', a, b, halo: true, dashed },
+      { kind: 'label', at: f.line.p, text: `${prefix}${f.label}` },
+    ];
+  }
+
+  private refreshItems(): void {
+    const items: PreviewItem[] = [];
+    if (this.ref) items.push(...this.featureItems(this.ref, 'Referência: '));
+    for (const q of this.queue) items.push(...this.featureItems(q, 'Alinhar: ', true));
+    const cand = this.current();
+    if (cand) items.push(...this.featureItems(cand, this.ref ? 'Mover: ' : 'Referência: ', true));
+    this.items = items;
+  }
+
+  override move(p: PointerInfo): void {
+    this.raw = p.raw;
+    this.updateHover(p.raw);
+    this.refreshItems();
+  }
+
+  override tab(): void {
+    if (this.hover.length < 2) {
+      if (this.hover[0]) this.env.say(`${this.hover[0].label}. ${this.hint}`);
+      return;
+    }
+    this.hoverIndex = (this.hoverIndex + 1) % this.hover.length;
+    this.refreshItems();
+    this.env.say(`${this.current()!.label}. ${this.ref ? 'Clique para alinhar; Tab troca a feição.' : 'Clique para usar como referência; Tab troca a feição.'}`);
+  }
+
+  /** Texto de recusa/“já alinhado” a partir dos resultados calculados. */
+  private refusal(results: AlignSolution[], targets: AlignFeature[]): string {
+    const error = results.find((r): r is Extract<AlignSolution, { kind: 'erro' }> => r.kind === 'erro');
+    if (error) return error.mensagem;
+    if (results.length > 0 && results.every((r) => r.kind === 'nada')) {
+      return targets.every((t) => t.kind === 'arestaAnel') ? 'Já estão alinhadas.' : 'Já estão alinhados.';
+    }
+    return 'Nada a alinhar com essa referência.';
+  }
+
+  /** Calcula e aplica os alvos num só passo de desfazer; a referência continua escolhida. */
+  private applyTargets(targets: AlignFeature[]): void {
+    if (!this.ref || !targets.length) return;
+    const pr = this.env.project();
+    const results = targets.map((t) => solveAlign(this.ref!.line, t, pr));
+    const valid = results.filter((r): r is Exclude<AlignSolution, { kind: 'nada' } | { kind: 'erro' }> => r.kind !== 'nada' && r.kind !== 'erro');
+    if (!valid.length) {
+      this.env.say(this.refusal(results, targets));
+      return;
+    }
+    const label = valid.every((r) => r.kind === 'anel') ? 'Alinhar aresta' : 'Alinhar';
+    const { applied } = applyAlignMany(this.env, valid, label);
+    // Recusas individuais (vizinha curta, anel travado) já foram ditas por `applyAlign`.
+    if (!applied) return;
+    const ignored = results.filter((r) => r.kind === 'erro').length;
+    const extra = ignored ? ` ${ignored} alvo(s) ignorado(s): ${this.refusal(results, targets)}` : '';
+    this.env.say(`Alinhado. ${extra}Referência: ${this.ref.label}. Clique no próximo (Esc troca a referência).`);
+  }
+
+  override click(p: PointerInfo): void {
+    this.raw = p.raw;
+    this.updateHover(p.raw);
+    const cand = this.current();
+    if (!this.ref) {
+      if (!cand) {
+        this.env.say('Clique sobre uma face, eixo, aresta, ombreira, extremidade ou linha do esboço.');
+        return;
+      }
+      this.ref = cand;
+      this.queue = [];
+      this.refreshItems();
+      this.env.say(`Referência: ${cand.label}. Clique no que deseja alinhar (Tab troca a candidata).`);
+      return;
+    }
+    if (!cand) {
+      this.env.say('Clique sobre a feição que deseja mover.');
+      return;
+    }
+    if (p.ctrl) {
+      const i = this.queue.findIndex((q) => q.key === cand.key);
+      if (i >= 0) this.queue.splice(i, 1);
+      else this.queue.push(cand);
+      this.refreshItems();
+      this.env.say(
+        this.queue.length
+          ? `${this.queue.length} feição(ões) para alinhar. Ctrl+clique soma ou tira; clique sem Ctrl (ou Enter) aplica.`
+          : 'Seleção múltipla vazia. Ctrl+clique numa feição para acumular.',
+      );
+      return;
+    }
+    const targets = this.queue.length ? [...this.queue.filter((q) => q.key !== cand.key), cand] : [cand];
+    this.queue = [];
+    this.applyTargets(targets);
+    // O modelo mudou: refaz o hover para não deixar a prévia antiga no lugar onde a feição estava.
+    this.updateHover(this.raw);
+    this.refreshItems();
+  }
+
+  override confirm(): void {
+    if (this.ref && this.queue.length) {
+      const targets = this.queue;
+      this.queue = [];
+      this.applyTargets(targets);
+      this.updateHover(this.raw);
+      this.refreshItems();
+      return;
+    }
+    super.confirm();
+  }
+
+  override cancel(): void {
+    if (this.queue.length) {
+      this.queue = [];
+      this.refreshItems();
+      this.env.say(`Seleção múltipla cancelada. Referência: ${this.ref?.label ?? 'nenhuma'}. ${this.hint}`);
+      return;
+    }
+    if (this.ref) {
+      this.ref = null;
+      this.refreshItems();
+      this.env.say(this.hint);
+      return;
+    }
+    this.env.done();
+  }
+}

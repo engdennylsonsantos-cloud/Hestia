@@ -1,4 +1,5 @@
 import { add, len, mul, norm, sub, type SketchDraft, type SketchSeg, type Vec2 } from '@hestia/geom';
+import type { Id, Project } from '@hestia/model';
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { SELECT_PX, hitSeg, segLines } from './perimeterToolPick.ts';
 import type { PointerInfo, PreviewItem, ToolOptions } from './types.ts';
@@ -31,6 +32,9 @@ export interface ModHost {
   /** Ponto capturado (vértices do rascunho e inferência). */
   snap(p: PointerInfo): Vec2;
   options(): ToolOptions;
+  /** Projeto e nível: o Alinhar também usa faces e arestas de fora do esboço como referência. Ausentes = só esboço. */
+  project?(): Project;
+  levelId?(): Id;
 }
 
 /** Comandos que agem sobre a seleção: o primeiro estágio escolhe as linhas (Enter confirma). */

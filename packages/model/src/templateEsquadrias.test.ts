@@ -28,7 +28,7 @@ describe('modelo inicial "Mostruário de esquadrias"', () => {
     expect(janelas.b.y).toBeCloseTo(8, 9);
   });
 
-  it('usa todos os 23 tipos do catálogo uma vez, na categoria certa', () => {
+  it('usa todos os 24 tipos do catálogo uma vez, na categoria certa', () => {
     const p = projeto();
     const os = aberturas(p);
     expect(os).toHaveLength(DEFAULT_OPENING_TYPES.length);

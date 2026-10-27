@@ -1,4 +1,4 @@
-import type { OpeningHandle, OpeningLeafStyle, OpeningType } from '@hestia/model';
+import { openingFamilyOf, type OpeningHandle, type OpeningLeafStyle, type OpeningType } from '@hestia/model';
 import type { OpeningGeometry } from './types.ts';
 import type {
   LeafOpening,
@@ -19,8 +19,6 @@ const LOUVER_PITCH = 0.055;
 const LOUVER_THICKNESS = 0.008;
 /** Largura do montante entre a bandeira lateral e a folha (m). */
 const SIDELIGHT_MULLION = 0.04;
-/** Espessura da travessa da bandeira superior (m). */
-const TRANSOM_BAR = 0.04;
 
 /**
  * Contexto do vão que as famílias novas de janela precisam. É um subconjunto estrutural do contexto interno de
@@ -73,7 +71,7 @@ function addPart(c: WindowCtx, id: string, role: PartRole, material: PartMateria
 }
 
 /** Caixilho de janela: duas ombreiras, travessa e soleira, com a profundidade no núcleo (mesma regra das antigas). */
-function buildWindowFrame(c: WindowCtx): void {
+export function buildWindowFrame(c: WindowCtx): void {
   const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
   for (const j of [-1, 1] as const) {
     addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
@@ -82,28 +80,74 @@ function buildWindowFrame(c: WindowCtx): void {
   addPart(c, 'sill-frame', 'sillFrame', 'frame', box(-c.hw, c.hw, body.s0, body.s1, 0, c.J));
 }
 
-/** Faixa interna em `t`, já descontadas as bandeiras laterais. */
-function innerT(c: WindowCtx): { t0: number; t1: number } {
-  let t0 = -c.hw + c.J;
-  let t1 = c.hw - c.J;
-  if (c.sidelights) {
+/** Famílias de janela que aceitam bandeira superior (spec E3 §7). Guilhotina, veneziana e vão livre ignoram. */
+export function windowTransomApplies(t: Pick<OpeningType, 'kind' | 'plan' | 'leaves'>): boolean {
+  if (t.kind !== 'window' || t.leaves === 0) return false;
+  const family = openingFamilyOf(t)?.id;
+  return (
+    family === 'window_fixed' ||
+    family === 'window_hinged' ||
+    family === 'window_casement' ||
+    family === 'window_sliding' ||
+    family === 'window_tilt' ||
+    family === 'window_pivot'
+  );
+}
+
+/**
+ * Faixa interna de uma janela: o vão do caixilho (t) e a parte reservada às folhas/vidro (z). Com bandeira aplicável,
+ * o topo cede a altura da bandeira mais a travessa do caixilho (`J`), e o resto fica para as folhas. As bandeiras
+ * laterais só estreitam a janela fixa (nas demais famílias são ignoradas, spec E3 §7).
+ */
+export interface WindowLayout {
+  /** Faixa t das folhas/vidro central (descontadas as bandeiras laterais na janela fixa). */
+  t0: number;
+  t1: number;
+  /** Faixa t de todo o vão interno do caixilho (bandeira superior atravessa as laterais). */
+  fullT0: number;
+  fullT1: number;
+  /** Faixa z das folhas/vidro, abaixo da bandeira. */
+  z0: number;
+  z1: number;
+  transom: { barZ0: number; barZ1: number; bandZ0: number; bandZ1: number; fixed: boolean } | null;
+}
+
+export function windowLayout(c: Pick<WindowCtx, 't' | 'hw' | 'H' | 'J' | 'transom' | 'sidelights'>): WindowLayout {
+  const family = openingFamilyOf(c.t)?.id;
+  const fullT0 = -c.hw + c.J;
+  const fullT1 = c.hw - c.J;
+  let t0 = fullT0;
+  let t1 = fullT1;
+  if (family === 'window_fixed' && c.sidelights) {
     const w = c.sidelights.width + SIDELIGHT_MULLION;
     if (c.sidelights.left) t0 += w;
     if (c.sidelights.right) t1 -= w;
   }
-  return { t0, t1 };
+  let z0 = c.J;
+  let z1 = c.H - c.J;
+  let transom: WindowLayout['transom'] = null;
+  if (c.transom && windowTransomApplies(c.t)) {
+    const th = Math.min(c.transom.height, z1 - z0 - c.J - GAP);
+    if (th > GAP) {
+      const bandZ1 = z1;
+      const bandZ0 = bandZ1 - th;
+      const barZ1 = bandZ0;
+      const barZ0 = barZ1 - c.J;
+      z1 = barZ0;
+      transom = { barZ0, barZ1, bandZ0, bandZ1, fixed: c.transom.fixed };
+    }
+  }
+  return { t0, t1, fullT0, fullT1, z0, z1, transom };
 }
 
-/** Área interna do caixilho (t e z), já descontado o perímetro. */
+/** Área interna do caixilho reservada às folhas/vidro (t e z), já descontado o perímetro e a bandeira superior. */
 function windowInner(c: WindowCtx): { t0: number; t1: number; z0: number; z1: number } {
-  let z1 = c.H - c.J;
-  if (c.transom) z1 = Math.min(z1, c.H - c.J - c.transom.height - TRANSOM_BAR);
-  const t = innerT(c);
-  return { t0: t.t0, t1: t.t1, z0: c.J, z1 };
+  const l = windowLayout(c);
+  return { t0: l.t0, t1: l.t1, z0: l.z0, z1: l.z1 };
 }
 
 /** Moldura de folha de janela (4 peças `leaf`) com o vidro dentro; move junto com a folha. */
-function addWindowLeaf(
+export function addWindowLeaf(
   c: WindowCtx,
   index: number,
   t0: number,

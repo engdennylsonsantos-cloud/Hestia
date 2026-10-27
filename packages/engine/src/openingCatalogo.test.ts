@@ -90,6 +90,7 @@ const familia = (id: string): string => {
       ['ot_jg90', 'window_hung'],
       ['ot_jp80', 'window_pivot'],
       ['ot_jv80', 'window_louver'],
+      ['ot_jb80', 'window_tilt'],
     ]);
   }
   return expectedFamily.get(id)!;
@@ -173,9 +174,9 @@ const areaComum = (a: PartBox, b: PartBox): number =>
   Math.max(0, Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0)) * Math.max(0, Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0));
 
 describe('catálogo completo: padrões do tipo', () => {
-  it('são 23 tipos, cada um na família esperada e sem problema de tipo', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(23);
-    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(23);
+  it('são 24 tipos, cada um na família esperada e sem problema de tipo', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(24);
+    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(24);
     for (const t of DEFAULT_OPENING_TYPES) {
       expect(openingFamilyOf(t)?.id, t.id).toBe(familia(t.id));
       expect(openingTypeIssue(t), t.id).toBeNull();

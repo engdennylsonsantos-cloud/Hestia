@@ -221,6 +221,25 @@ describe('openingPlanPaths: janelas', () => {
       }
     }
   });
+
+  it('basculante: linha inclinada em torno do centro, sem arco, mais as três linhas do caixilho', () => {
+    const c = cena('ot_j60', { plan: 'tilt' });
+    const angle = (30 * Math.PI) / 180;
+    const paths = openingPlanPaths(modelo(c), opts({ angle }));
+    expect(paths.some((p) => p.role === 'swing')).toBe(false);
+    expect(paths.filter((p) => !p.closed && (p.role === 'jamb' || p.role === 'glass'))).toHaveLength(3);
+    const linha = paths.find((p) => p.role === 'leaf' && !p.closed)!;
+    expect(linha).toBeDefined();
+    const [a, b] = linha.pts;
+    const centro = { t: (a!.t + b!.t) / 2, s: (a!.s + b!.s) / 2 };
+    expect(centro.t).toBeCloseTo(0, 9);
+    const inclinacao = Math.atan2(Math.abs(b!.s - a!.s), Math.abs(b!.t - a!.t));
+    expect(inclinacao).toBeCloseTo(angle, 9);
+    for (const detail of ['mid', 'high'] as const) {
+      const p = openingPlanPaths(modelo(c), opts({ detail, angle }));
+      expect(p.some((x) => x.role === 'swing'), detail).toBe(false);
+    }
+  });
 });
 
 describe('openingPlanPaths: portas novas (spec E §3.5)', () => {

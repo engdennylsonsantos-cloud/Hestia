@@ -15,6 +15,7 @@ import {
   openingSidelights,
   openingShowSwing,
   openingSwingStyle,
+  openingTiltAxis,
   openingTransom,
 } from './openingStyle.ts';
 import type { OpeningType } from './types.ts';
@@ -102,13 +103,23 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingGrid(com('ot_p90', { grid: { cols: Number.NaN, rows: 2.6 } }))).toEqual({ cols: 1, rows: 3 });
   });
 
-  it('bandeira: ausente/inválida = nenhuma; altura limitada e fixa por padrão', () => {
+  it('bandeira: ausente/inválida = nenhuma; altura limitada a 40% do vão e fixa por padrão', () => {
     expect(openingTransom(tipo('ot_p90'))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: 0 } }))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: Number.NaN } }))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: 0.4 } }))).toEqual({ height: 0.4, fixed: true });
     expect(openingTransom(com('ot_p90', { transom: { height: 0.4, fixed: false } }))).toEqual({ height: 0.4, fixed: false });
-    expect(openingTransom(com('ot_p90', { transom: { height: 9 } }))!.height).toBe(2.1);
+    expect(openingTransom(com('ot_p90', { transom: { height: 9 } }))!.height).toBeCloseTo(2.1 * 0.4, 9);
+  });
+
+  it('basculante: eixo padrão 0,5 e limitado a 0,2..0,8; angle3d no máximo 60°', () => {
+    expect(openingTiltAxis(tipo('ot_j60'))).toBe(0.5);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.3 }))).toBe(0.3);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.1 }))).toBe(0.2);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.9 }))).toBe(0.8);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: Number.NaN }))).toBe(0.5);
+    expect(openingAngle3d(com('ot_j60', { plan: 'tilt', angle3d: 120 }))).toBe(60);
+    expect(openingAngle3d(com('ot_j60', { plan: 'tilt', angle3d: 45 }))).toBe(45);
   });
 
   it('bandeiras laterais: nenhum lado ligado = nenhuma; largura válida', () => {

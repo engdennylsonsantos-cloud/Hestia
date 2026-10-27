@@ -1,10 +1,12 @@
 import {
   openingCasing,
+  openingFamilyOf,
   openingLintel,
   openingSillBeam,
   openingSillBoard,
 } from '@hestia/model';
 import {
+  GAP,
   SIDELIGHT_MULLION,
   TRANSOM_BAR,
   addPart,
@@ -12,15 +14,18 @@ import {
   innerT,
   type Ctx,
 } from './openingModelContext.ts';
+import { addWindowLeaf, windowLayout, windowTransomApplies } from './openingModelWindowsNew.ts';
+import type { PartMotion } from './openingModelTypes.ts';
 
 /** Bandeiras laterais: vidro fixo de cada lado marcado, com montante entre ele e a folha. */
 export function buildSidelights(c: Ctx): void {
   const s = c.sidelights;
   if (!s) return;
+  // Bandeira lateral de janela só vale na janela fixa; nas demais famílias é ignorada (spec E3 §7).
+  if (c.t.kind === 'window' && openingFamilyOf(c.t)?.id !== 'window_fixed') return;
   const base = { t0: -c.hw + c.J, t1: c.hw - c.J };
   const z0 = c.t.kind === 'window' ? c.J : 0;
-  let z1 = c.H - c.J;
-  if (c.transom) z1 = Math.min(z1, c.H - c.J - c.transom.height - TRANSOM_BAR);
+  const z1 = c.t.kind === 'window' ? windowLayout(c).z1 : c.transom ? Math.min(c.H - c.J, c.H - c.J - c.transom.height - TRANSOM_BAR) : c.H - c.J;
   const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
   if (s.left) {
     addPart(c, 'sidelight-glass-left', 'glass', 'glass', box(base.t0, base.t0 + s.width, c.C - c.G / 2, c.C + c.G / 2, z0, z1));
@@ -34,8 +39,54 @@ export function buildSidelights(c: Ctx): void {
   }
 }
 
-/** Bandeira superior: travessa fixa de material de folha e vidro fixo acima; não gera item de abertura. */
+/**
+ * Bandeira superior de janela (spec E3 §7): faixa fixa de altura `transom.height` acima de uma travessa do caixilho
+ * (`J`) que a separa das folhas. `transom.fixed === false` vira uma folha maxim-ar pequena (kind 'top'). A bandeira
+ * ocupa toda a largura interna; as folhas ficam abaixo dela no `windowLayout`.
+ */
+export function buildWindowTransom(c: Ctx): void {
+  const tr = c.transom;
+  if (!tr || !windowTransomApplies(c.t)) return;
+  const l = windowLayout(c);
+  if (!l.transom) return;
+  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const { barZ0, barZ1, bandZ0, bandZ1, fixed } = l.transom;
+  addPart(c, 'transom-bar', 'muntin', 'frame', box(l.fullT0, l.fullT1, body.s0, body.s1, barZ0, barZ1));
+  if (fixed) {
+    addPart(c, 'transom-glass', 'glass', 'glass', box(l.fullT0, l.fullT1, c.C - c.G / 2, c.C + c.G / 2, bandZ0, bandZ1));
+    return;
+  }
+  // Bandeira maxim-ar: folha pequena com folga em volta, girando no topo para o lado da abertura.
+  let index = c.parts.reduce((mx, p) => (p.leaf !== undefined ? Math.max(mx, p.leaf) : mx), -1) + 1;
+  for (const p of c.parts) {
+    const m = /^(?:glass|leaf)-(\d+)/.exec(p.id);
+    if (m) index = Math.max(index, Number(m[1]) + 1);
+  }
+  const t0 = l.fullT0 + GAP;
+  const t1 = l.fullT1 - GAP;
+  const z0 = bandZ0 + GAP;
+  const z1 = bandZ1 - GAP;
+  const motion: PartMotion = { kind: 'rotate', axis: 't', s: c.C, z: z1, sign: c.side };
+  addWindowLeaf(c, index, t0, t1, z0, z1, c.C, motion);
+  c.openings.push({
+    leaf: index,
+    kind: 'top',
+    side: c.side,
+    hingeT: 0,
+    latchT: 0,
+    pivot: { t: 0, s: c.C },
+    radius: z1 - z0,
+    z0,
+    z1,
+  });
+}
+
+/** Bandeira superior: na porta, travessa de material de folha e vidro fixo acima; não gera item de abertura. */
 export function buildTransom(c: Ctx): void {
+  if (c.t.kind === 'window') {
+    buildWindowTransom(c);
+    return;
+  }
   const tr = c.transom;
   if (!tr) return;
   const inner = innerT(c);

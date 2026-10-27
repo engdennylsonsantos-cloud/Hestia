@@ -101,14 +101,30 @@ describe('openingLinePaths: janelas e famílias sem linha', () => {
     expect(Math.max(linha.pts[0]!.u, linha.pts[2]!.u)).toBeGreaterThan(0);
   });
 
-  it('basculante: vértice em cima e pontas embaixo', () => {
+  it('basculante: dois V com vértice no eixo central, pontas nos cantos superiores e inferiores', () => {
     const m = modelo(cena('ot_j60', { plan: 'tilt' }));
     const a = m.openings[0]!;
-    expect(a.kind).toBe('bottom');
-    const linha = openingLinePaths(m, 1, PADRAO, 'elevation')[0]!;
-    expect(linha.pts[1]!.z).toBeCloseTo(a.z1, 9);
-    expect(linha.pts[0]!.z).toBeCloseTo(a.z0, 9);
-    expect(linha.pts[2]!.z).toBeCloseTo(a.z0, 9);
+    expect(a.kind).toBe('tilt');
+    const linhas = openingLinePaths(m, 1, PADRAO, 'elevation');
+    expect(linhas).toHaveLength(2);
+    const eixo = a.axisZ!;
+    expect(linhas[0]!.pts[1]!.z).toBeCloseTo(eixo, 9);
+    expect(linhas[0]!.pts[0]!.z).toBeCloseTo(a.z1, 9);
+    expect(linhas[0]!.pts[2]!.z).toBeCloseTo(a.z1, 9);
+    expect(linhas[1]!.pts[1]!.z).toBeCloseTo(eixo, 9);
+    expect(linhas[1]!.pts[0]!.z).toBeCloseTo(a.z0, 9);
+    expect(linhas[1]!.pts[2]!.z).toBeCloseTo(a.z0, 9);
+    expect(linhas[0]!.pts[1]!.u).toBeCloseTo(0, 9);
+    expect(linhas[1]!.pts[1]!.u).toBeCloseTo(0, 9);
+    // Metade superior abre para o observador (tracejada); a inferior, para o lado oposto (contínua).
+    expect(linhas[0]!.dashed).toBe(true);
+    expect(linhas[1]!.dashed).toBe(false);
+  });
+
+  it('basculante: com a folha longe do observador o traço inverte entre as metades', () => {
+    const linhas = openingLinePaths(modelo(cena('ot_j60', { plan: 'tilt' }, { flipFacing: true })), 1, PADRAO, 'elevation');
+    expect(linhas[0]!.dashed).toBe(false);
+    expect(linhas[1]!.dashed).toBe(true);
   });
 
   it('vidro fixo e bandeira superior fixos não geram linha', () => {

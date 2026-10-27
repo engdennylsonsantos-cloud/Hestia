@@ -13,6 +13,7 @@ import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
+import { gableSymbolOps } from './roofsEmpena.ts';
 import { evitarSobreposicao } from './roofsRotulos.ts';
 import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
@@ -67,6 +68,21 @@ function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
   return r.layers.reduce<ResolvedRoofLayer | undefined>((best, l) => (!best || l.below < best.below ? l : best), undefined);
 }
 
+/** Cor base das águas: a do material da camada de topo (ou o token de telha) já misturada com o papel. */
+export function roofFillBase(p: Project, r: ResolvedRoof, theme: PlanTheme, dark: boolean, paint: PlanPaint): string {
+  const top = topLayer(r);
+  const m = top ? p.materials[top.materialId] : undefined;
+  // Sem cor no material do tipo, a água cai no token de telha (terracota), e não no cinza padrão.
+  const matColor = m?.color?.trim() || theme.roofTile;
+  // Pouca mistura com o papel: a água deve ler na cor do material (o telhado é o assunto da vista), e não num tom lavado.
+  return surfaceColor(matColor, dark ? theme.bg : '#ffffff', dark ? 0.2 : 0.25, paint);
+}
+
+/** Cor da aresta de um telhado: um pouco mais escura que o preenchimento das águas. */
+export function roofEdgeColor(p: Project, r: ResolvedRoof, theme: PlanTheme, dark: boolean, paint: PlanPaint): string {
+  return corDaAresta(roofFillBase(p, r, theme, dark, paint));
+}
+
 /**
  * Desloca a etiqueta `mm` de papel para o lado da seta (perpendicular a ela, y da tela cresce para baixo), para não
  * cruzar a haste. A conversão em pixels, com o zoom e a escala, é feita no quadro (`resolverRotulo`).
@@ -75,6 +91,32 @@ const beside = (u: Vec2, mm: number, escala: number): PapelRotulo => ({ escala, 
 
 /** Deslocamento em pixels de tela de um vetor do mundo (y da tela cresce para baixo). */
 const screenOffset = (w: Vec2, px: number): { dx: number; dy: number } => ({ dx: w.x * px, dy: -w.y * px });
+
+/**
+ * Desvio do rótulo de área: para cima e para o lado do eixo da seta de caimento, de modo que o texto não fique rente à
+ * haste. O afastamento lateral é a metade da altura do texto (corpo × 1,2) mais uma folga; o desvio para cima tira o
+ * rótulo da ponta da seta, como antes. Sem seta (grosseiro), só sobe um pouco.
+ */
+function areaLabelOffset(up: Vec2 | undefined, coarse: boolean): NonNullable<PapelRotulo['desvio']> {
+  if (coarse || !up) return { mm: coarse ? 1.0 : 5.2, ux: 0, uy: -1 };
+  const len = Math.hypot(up.x, up.y);
+  if (len < 1e-9) return { mm: 5.2, ux: 0, uy: -1 };
+  // Descida da água em coordenadas de tela (y para baixo) e a normal à esquerda dela.
+  const sx = -up.x / len;
+  const sy = up.y / len;
+  let px = -sy;
+  let py = sx;
+  // Lado em que o texto cresce para a direita (fora do eixo) ou, na seta vertical, para cima.
+  if (px < -1e-9 || (Math.abs(px) <= 1e-9 && py > 0)) {
+    px = -px;
+    py = -py;
+  }
+  const lateral = (SURFACE_TEXT_MM * 1.2) / 2 + 1.2;
+  const dx = px * lateral;
+  const dy = py * lateral - 5.2;
+  const mm = Math.hypot(dx, dy);
+  return { mm, ux: dx / mm, uy: dy / mm };
+}
 
 /** Cota absoluta de uma divisa entre águas (cumeeira, espigão ou rincão) no ponto médio: a maior das águas que a encostam; null se nenhuma. */
 export function ridgeElevation(r: ResolvedRoof, a: Vec2, b: Vec2): number | null {
@@ -99,8 +141,9 @@ export function highestRidge(r: ResolvedRoof): { at: Vec2; z: number; a: Vec2; b
 }
 
 /**
- * Empena (aresta sem inclinação, kind 'gable'): traço cheio e mais escuro que as arestas internas. Não há base de
- * simbologia de perfil no app; a aresta distinta é a representação de empena da planta, sem o tracejado de CAD.
+ * Empena (aresta sem inclinação, kind 'gable'): traço cheio e mais escuro que as arestas internas. O símbolo de perfil
+ * (triângulo) é desenhado uma vez por aresta do contorno (`gableSymbolOps`), e não por trecho que o motor parte nas
+ * águas.
  */
 function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
   return [{ pts: [a, b], closed: false, ...espessura, color: theme.ink, alpha: 1 }];
@@ -260,12 +303,9 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   for (const r of roofs) {
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
-    // Sem cor no material do tipo, a água cai no token de telha (terracota), e não no cinza padrão.
-    const matColor = m?.color?.trim() || theme.roofTile;
-    // Pouca mistura com o papel: a água deve ler na cor do material (o telhado é o assunto da vista), e não num tom lavado.
-    const base = surfaceColor(matColor, fillBase, dark ? 0.2 : 0.25, paint);
-    // Hachura bem discreta: o tom por água é que deve diferenciar as superfícies.
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.25), alpha: 0.1 } : undefined;
+    const base = roofFillBase(p, r, theme, dark, paint);
+    // Hachura discreta, mas visível: o tom por água continua sendo o que diferencia as superfícies.
+    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.35), alpha: 0.26 } : undefined;
     const aresta = corDaAresta(base);
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: tomDaAgua(base, pl.up, pl.percent, sunAzimuth), alpha, hatch });
     const model = p.elements[r.roofId];
@@ -289,6 +329,17 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
         // Cumeeira, espigão e rincão são arestas finas entre superfícies (sem a hierarquia grossa e preta do CAD).
         const dash: [number, number] | undefined = ln.kind === 'valley' ? [6, 3] : undefined;
         out.strokes.push({ pts: [ln.a, ln.b], closed: false, ...esp.projecao, color: aresta, alpha: 1, ...(dash ? { dash } : {}) });
+      }
+      // Símbolo de perfil da empena: um por aresta do contorno do telhado (o motor parte a aresta nas águas, mas o
+      // símbolo é da empena inteira).
+      if (isRoof(model)) {
+        const kinds = boundaryKindsOf(model);
+        model.boundary.forEach((a, i) => {
+          if (kinds[i] !== 'gable') return;
+          const c = model.boundary[(i + 1) % model.boundary.length]!;
+          if (dist(a, c) < 1e-6) return;
+          out.strokes.push(...gableSymbolOps(a, c, foot, theme, esp.empena, scale));
+        });
       }
       for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);
@@ -315,8 +366,8 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       for (const pl of r.planes) if (maior && multiArea(pl.polygon) > multiArea(maior.polygon)) maior = pl;
       const at = maior ? labelPoint(maior.polygon) : labelPoint(foot);
       const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
-      // Grosseiro: deslocamento leve acima. Fino/médio: acima da seta de caimento, que sai do mesmo centroide.
-      if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: coarse ? 1.0 : 5.2, uy: -1 } } });
+      // Fino/médio: acima e ao lado do eixo da seta de caimento, que sai do mesmo centroide; grosseiro: só acima.
+      if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: areaLabelOffset(maior?.up, coarse) } });
     }
   }
   evitarSobreposicao(out.labels);

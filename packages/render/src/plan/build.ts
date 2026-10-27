@@ -1,7 +1,7 @@
-import { add, boxOf, mul, norm, perp, ringArea, sub, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
 import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
-import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel } from './resolucao.ts';
+import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -12,7 +12,7 @@ import { belowFloorOps, type FloorOps } from './floors.ts';
 import { floorAndSlabOps } from './surfaces.ts';
 import { belowRoomOps, roomOps } from './rooms.ts';
 import { ceilingFills } from './ceilings.ts';
-import { roofFills, roofFootprint, roofOps } from './roofs.ts';
+import { roofEdgeColor, roofFills, roofFootprint, roofOps } from './roofs.ts';
 import { belowStairOps, stairFills } from './stairs.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
@@ -162,6 +162,22 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Pavimento de baixo (referência) com as paredes cortadas pela junção dele, como a planta do nível.
   const below = up || !input.below ? null : cutLevelByJunction(input.below, juncaoDoNivel(p, input.below.levelId));
 
+  // Telhados visíveis acima do plano de corte: a cobertura esconde as paredes por baixo. Elas voltam no fim, só como
+  // contorno esmaecido; as linhas e os símbolos das paredes sob a cobertura não sobem por cima do telhado.
+  const telhadosAcima = rp || !view ? [] : telhadosDoNivel(p, input.levelId).filter((r) => !roofHidden?.has(r.roofId) && view.cls.get(r.roofId) === 'projection-above');
+  const coberturaAcima: MultiPolygon = telhadosAcima.length > 0 ? union(...telhadosAcima.map((r) => roofFootprint(r))) : [];
+  const sobCobertura = (q: Vec2): boolean => coberturaAcima.length > 0 && pointInMulti(q, coberturaAcima);
+  const meioDoTraco = (s: StrokeOp): Vec2 => {
+    let x = 0;
+    let y = 0;
+    for (const q of s.pts) {
+      x += q.x;
+      y += q.y;
+    }
+    const n = s.pts.length || 1;
+    return { x: x / n, y: y / n };
+  };
+
   // Pavimento abaixo como subpiso apagado (referência): sem preenchimento no arame, linhas como antes.
   if (below) {
     for (const c of below.clusters) {
@@ -248,13 +264,15 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       for (const m of rw.membranes) wallOps.strokes.push({ pts: m.pts, closed: false, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
     }
   }
+  // Paredes sob um telhado acima do corte: o telhado cobre as linhas e os símbolos; o contorno esmaecido entra no fim.
+  if (coberturaAcima.length > 0) wallOps.strokes = wallOps.strokes.filter((s) => !sobCobertura(meioDoTraco(s)));
   addOps(wallOps, paint.wall, true);
 
   // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
   for (const w of rp ? [] : paredesDoNivel(p, input.levelId)) {
     if (hidden?.has(w.id)) continue;
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
-      if (!off) continue;
+      if (!off || sobCobertura(pt)) continue;
       // Anel de 5 px de raio e uma diagonal: marcadores em pixels ancorados na ponta (mesmo tamanho para qualquer zoom).
       const r = 5;
       const anel = Array.from({ length: 12 }, (_, i) => ({ x: Math.cos((i * Math.PI) / 6) * r, y: Math.sin((i * Math.PI) / 6) * r }));
@@ -271,6 +289,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       if (!f) continue;
       for (const o of aberturasDaParede(p, w.id)) {
         const g = openingGeometry(p, o, f);
+        if (sobCobertura(g.center)) continue;
         const type = p.openingTypes[o.typeId];
         if (!type) continue;
         const pt = paint[g.kind];
@@ -309,6 +328,20 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
   if (rp && paint.wall.visible) {
     for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
+  }
+  // Telhado acima do corte (projeção): o preenchimento quase opaco esconderia as paredes do nível. Os contornos finos,
+  // tracejados e esmaecidos, voltam por cima só para o usuário localizar as paredes; a grade continua atrás dos
+  // preenchimentos (não sobe com eles).
+  if (!rp && view && paint.wall.visible && telhadosAcima.length > 0) {
+    const cor = mix(roofEdgeColor(p, telhadosAcima[0]!, theme, input.dark, paint.roof), theme.ink, input.dark ? 0.55 : 0.25);
+    const esp = espessuraDeProjecao(paint.roof);
+    for (const w of Object.values(geo.walls)) {
+      if (w.layers.length === 0) continue;
+      // Só paredes que estão sob a cobertura (o meio do eixo cai na pegada do telhado).
+      if (!sobCobertura({ x: (w.a.x + w.b.x) / 2, y: (w.a.y + w.b.y) / 2 })) continue;
+      // O contorno da parede é a união das camadas (um só traço por face), sem os preenchimentos.
+      for (const ring of union(...w.layers.map((l) => l.cut)).flat()) strokes.push({ pts: ring, closed: true, ...esp, color: cor, alpha: 0.55, dash: [4, 2] });
+    }
   }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria

@@ -115,11 +115,12 @@ describe('telhado na planta (D1)', () => {
     expect(coarse.fills.map((f) => f.alpha)).toEqual([0.98, 0.98]);
   });
 
-  it('hachura do material só com zoom a partir de 40 px/m (médio), bem discreta; no grosseiro, nunca', () => {
+  it('hachura do material só com zoom a partir de 40 px/m (médio), discreta mas visível; no grosseiro, nunca', () => {
     // rt_ceramica: telha com hachura diagonal
     expect(ops([gable()], 'medium', 10).fills[0]!.hatch).toBeUndefined();
     expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.kind).toBe('diagonal');
-    expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeLessThanOrEqual(0.12);
+    expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeGreaterThanOrEqual(0.22);
+    expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeLessThanOrEqual(0.3);
     expect(ops([gable()], 'coarse', 100).fills[0]!.hatch).toBeUndefined();
   });
 

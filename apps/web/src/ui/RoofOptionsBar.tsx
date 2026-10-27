@@ -1,20 +1,15 @@
 import type { ReactElement } from 'react';
-import { ROOF_SHAPE_LABEL } from '@hestia/engine';
 import { percentToDeg, roofAutoOffset, roofSlopeFromDegField } from '@hestia/tools';
-import type { RoofShape } from '@hestia/model';
 import { useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
 
-/** Predefinições por aresta (Revit: Define Slope): cada forma preenche as arestas que definem inclinação. Extrusão tem perfil. */
-const SHAPES: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'extrusion'];
-
 /**
- * Opções da ferramenta Telhado: tipo, forma, inclinação (% e graus, convertidos entre si), balanço do beiral e cota do
- * beiral. Cota "Automática" usa a altura da parede mais alta do nível (2,8 m sem paredes).
+ * Opções da ferramenta Telhado: tipo, inclinação (% e graus, convertidos entre si), balanço do beiral e cota do beiral.
+ * Cota "Automática" usa a altura da parede mais alta do nível (2,8 m sem paredes). A forma não é opção: o telhado nasce
+ * do perímetro, e a forma de um telhado existente se troca nas Propriedades.
  */
-// A prop `tool` ainda vem de OptionsBar; o seletor de modo que a lia saiu.
-export function RoofOptionsBar(_props: { tool: 'roof' | 'roofextrusion' }): ReactElement {
+export function RoofOptionsBar(): ReactElement {
   const p = useProject();
   const o = useUi((s) => s.options);
   const levelId = useUi((s) => s.levelId);
@@ -28,14 +23,6 @@ export function RoofOptionsBar(_props: { tool: 'roof' | 'roofextrusion' }): Reac
         <select id="opt-rooftype" className="select" value={o.roofTypeId ?? ''} onChange={(e) => set({ roofTypeId: e.target.value })}>
           {Object.values(p.roofTypes).map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Forma
-        <select id="opt-roofshape" className="select" value={o.roofShape ?? 'gable'} onChange={(e) => set({ roofShape: e.target.value as RoofShape })}>
-          {SHAPES.map((s) => (
-            <option key={s} value={s}>{ROOF_SHAPE_LABEL[s]}</option>
           ))}
         </select>
       </label>
@@ -60,7 +47,7 @@ export function RoofOptionsBar(_props: { tool: 'roof' | 'roofextrusion' }): Reac
           Automática
         </button>
       )}
-      <span className="hint">Tab troca o eixo da cumeeira. Depois de criado, cada aresta se edita na planta.</span>
+      <span className="hint">Criar e editar o perímetro pela faixa. Depois de criado, cada aresta se edita na planta.</span>
     </>
   );
 }

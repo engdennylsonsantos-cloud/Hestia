@@ -24,11 +24,12 @@ export interface CubeZone {
 /** Ordem das faces no cubo. */
 export const CUBE_FACES: readonly Face[] = ['top', 'bottom', 'front', 'back', 'right', 'left'];
 
+/** Adjetivo de cada face no nome da vista ("Vista superior", "Vista frontal"…). Os rótulos visíveis ficam em `FACE_LABEL`. */
 const FACE_NAME: Record<Face, string> = {
-  top: 'topo',
-  bottom: 'base',
-  front: 'frente',
-  back: 'traseira',
+  top: 'superior',
+  bottom: 'inferior',
+  front: 'frontal',
+  back: 'posterior',
   right: 'direita',
   left: 'esquerda',
 };
@@ -73,7 +74,7 @@ function zoneOf(sign: Sign3): CubeZone {
     kind,
     sign,
     label: face ? FACE_LABEL[face] : '',
-    name: `Vista de ${joined}`,
+    name: `Vista ${joined}`,
   };
 }
 

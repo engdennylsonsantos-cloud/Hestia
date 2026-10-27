@@ -89,6 +89,11 @@ type DrawList = ReturnType<typeof draw>;
 
 /** Há preenchimento de parede (ou de qualquer outro elemento) cobrindo o ponto? */
 const filled = (dl: DrawList, x: number, y: number): boolean => dl.fills.some((f) => pointInMulti({ x, y }, f.polygons));
+/** Só o preenchimento leve da projeção da cobertura cobre o ponto: translúcido e sem hachura (nunca o telhado opaco do corte). */
+const soProjecaoLeve = (dl: DrawList, x: number, y: number): boolean => {
+  const fs = dl.fills.filter((f) => pointInMulti({ x, y }, f.polygons));
+  return fs.length > 0 && fs.every((f) => f.alpha <= 0.35 && !f.hatch);
+};
 
 /** Traços abertos de um símbolo de abertura: todos dentro de 0,7 m do centro (anéis fechados são outra coisa). */
 const symbolAt = (dl: DrawList, x: number, y: number): StrokeOp[] => dl.strokes.filter((s) => !s.closed && s.pts.every((q) => Math.hypot(q.x - x, q.y - y) <= 0.7));
@@ -198,10 +203,10 @@ describe('paredes fora do corte: contorno, sem preenchimento (decisão 0013 §4)
 });
 
 describe('telhado, laje e piso no intervalo de vista', () => {
-  it('telhado com beiral acima do topo: sai da planta; a projeção tracejada da cobertura fica', () => {
+  it('telhado com beiral acima do topo: sai da planta (sem corte); a projeção tracejada e o preenchimento leve da cobertura ficam', () => {
     const p = scene();
     const dl = draw(p);
-    expect(filled(dl, 12, 2)).toBe(false);
+    expect(soProjecaoLeve(dl, 12, 2)).toBe(true);
     const proj = dl.strokes.filter((s) => s.closed && s.dash && s.pts.every((q) => q.x > 9.9 && q.x < 14.1 && q.y > -0.1 && q.y < 4.1));
     expect(proj.length).toBeGreaterThan(0);
   });
@@ -326,11 +331,11 @@ describe('seleção de elemento oculto: contorno fantasma (decisão 0013 §4)', 
     expect(filled(dl, 1.5, 4)).toBe(true);
   });
 
-  it('telhado oculto selecionado: pegada tracejada, sem preenchimento sobre o telhado', () => {
+  it('telhado oculto selecionado: pegada tracejada, só com o preenchimento leve da projeção sobre o telhado', () => {
     const dl = drawSel(scene(), ['r']);
     const g = near(ghosts(dl), 12, 2, 3);
     expect(g).toHaveLength(1);
-    expect(filled(dl, 12, 2)).toBe(false);
+    expect(soProjecaoLeve(dl, 12, 2)).toBe(true);
   });
 
   it('laje oculta selecionada: contorno tracejado da laje', () => {

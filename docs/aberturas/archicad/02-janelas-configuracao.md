@@ -355,7 +355,7 @@ Regras que importam para o nosso mapeamento:
 | **Angle** | Inclinação/queda | graus | Sill |
 | **Nosing** | Nariz/saliência frontal | medida | Sill |
 | **Slip in Depth** | Quanto o peitoril entra sob a moldura; **máximo = espessura da moldura**; soma-se à Sill Width | medida | Sill |
-| **Sill Oversize** (AC18) | Faz a altura do peitoril incluir a espessura; se desligado, vai só até a base | on/off | Sill (AC18) |
+| **Sill Oversize** (AC18) | Faz a cota de altura do peitoril incluir a espessura do peitoril; se desligado, a cota vai só até a base | on/off | Sill (AC18) |
 | **Is Curved in Curved Walls** | Curva o peitoril em parede curva | on/off | Sill |
 | **Attributes** | Fill, material, pen | atributos | subpágina |
 

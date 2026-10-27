@@ -89,7 +89,7 @@ export function commitPerimeter(project: Project, draft: SketchDraft, opts: Comm
     if (!el || el.kind !== d.target) return refuse('Elemento em edição não encontrado.');
   }
   if (d.target === 'roof') {
-    return commitRoof(project, { editing: d.editing, slopeDefault: d.defaults.slopePct }, r.outer, r.holes, r.edges, opts);
+    return commitRoof(project, { editing: d.editing, slopeDefault: d.defaults.slopePct }, r.outer, r.holes, r.edges, opts, d.segs);
   }
   return commitArea(project, { target: d.target, editing: d.editing }, r.outer, r.holes, opts);
 }

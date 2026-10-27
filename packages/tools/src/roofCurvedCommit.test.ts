@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { type Vec2 } from '@hestia/geom';
 import { ProjectStore, createEmptyProject, type Roof } from '@hestia/model';
-import { resolveRoofs, roofTopAt } from '@hestia/engine';
+import { expandRoofArcs, resolveRoofs, roofTopAt } from '@hestia/engine';
 import { addSegs, newDraft, setSegSlope, type NewSeg } from './perimeterSession.ts';
 import { commitPerimeter, draftFromElement } from './perimeterCommit.ts';
 import { edgeGroupsOf, waterGroupCount } from './roofGeom.ts';
 
 /**
- * Telhado com pegada em arco (linha curva do esboço). O arco vira vários lados amostrados (erro de corda de 2 mm); o
- * balanço e a inclinação valem por trecho lógico, e o beiral de um arco tem que ser concêntrico ao arco.
+ * Telhado com pegada em arco (linha curva do esboço). O arco é gravado como uma aresta lógica com flecha (`edgeSag`); o
+ * motor a subdivide só por dentro (`expandRoofArcs`). O balanço e a inclinação valem por trecho lógico, e o beiral de um
+ * arco tem que ser concêntrico ao arco.
  */
 
 const P = (x: number, y: number): Vec2 => ({ x, y });
@@ -59,8 +60,8 @@ describe('arco no contorno: ponta a ponta (esboço + motor)', () => {
     if (!out.ok) return;
     expect(out.res.problem).toBeUndefined();
     expect(out.res.steps).toBeUndefined();
-    // Facetas do arco e das retas: muitas águas no motor, mas 2 trechos lógicos (varrida curva + lado direito).
-    expect(out.res.planes.length).toBeGreaterThan(40);
+    // Facetas do arco e das retas (subdivisão interna do motor): muitas águas no motor, mas 2 trechos lógicos (varrida curva + lado direito).
+    expect(out.res.planes.length).toBeGreaterThan(20);
     expect(out.message).toBe('Telhado criado: 2 águas.');
   });
 
@@ -100,11 +101,11 @@ describe('balanço sobre arco: beiral concêntrico (raio R + d na face externa, 
     const out = createRoof(semicircleAndLines(), ALL_EAVE(4), d);
     if (!out.ok) throw new Error(out.message);
     const c = P(0, 3);
-    const arcIdx = out.roof.footprint!.map((q, j) => ({ q, j })).filter(({ q }) => Math.abs(radialOf(q, c) - 3) < 1e-9 && q.x < -1e-6);
-    expect(arcIdx.length).toBeGreaterThan(20);
-    for (const { j } of arcIdx) {
-      expect(Math.abs(radialOf(out.roof.boundary[j]!, c) - (3 + d))).toBeLessThanOrEqual(CHORD_TOL);
-    }
+    // O contorno gravado só tem os cantos; os pontos do arco vêm da subdivisão interna do motor.
+    expect(out.roof.boundary).toHaveLength(4);
+    const pts = expandRoofArcs({ ...out.roof }).boundary.filter((q) => q.x <= 1e-6);
+    expect(pts.length).toBeGreaterThan(20);
+    for (const q of pts) expect(Math.abs(radialOf(q, c) - (3 + d))).toBeLessThanOrEqual(CHORD_TOL);
   });
 
   it('arco côncavo (bocado de raio 1,133 m) com balanço de 0,5 m: o beiral é concêntrico com raio 0,633 m', () => {
@@ -122,11 +123,9 @@ describe('balanço sobre arco: beiral concêntrico (raio R + d na face externa, 
     ];
     const out = createRoof(segs, ALL_EAVE(6));
     if (!out.ok) throw new Error(out.message);
-    const bite = out.roof.footprint!.map((q, j) => ({ q, j })).filter(({ q }) => Math.abs(radialOf(q, c) - r) < 1e-9 && q.y > 1e-6);
-    expect(bite.length).toBeGreaterThan(10);
-    for (const { j } of bite) {
-      expect(Math.abs(radialOf(out.roof.boundary[j]!, c) - (r - 0.5))).toBeLessThanOrEqual(CHORD_TOL);
-    }
+    const bite = expandRoofArcs({ ...out.roof }).boundary.filter((q) => q.y > 1e-6 && q.x > 3 && q.x < 7);
+    expect(bite.length).toBeGreaterThan(5);
+    for (const q of bite) expect(Math.abs(radialOf(q, c) - (r - 0.5))).toBeLessThanOrEqual(CHORD_TOL);
   });
 });
 
@@ -167,14 +166,16 @@ describe('arestas de um arco são um trecho lógico só', () => {
   it('um arco amostrado em muitos lados é um trecho; a reta de cima e a de baixo, tangentes ao arco, entram nele', () => {
     const out = createRoof(semicircleAndLines(), ALL_EAVE(4));
     if (!out.ok) throw new Error(out.message);
-    const groups = edgeGroupsOf(out.roof.boundary, out.roof.edgeSlopes, out.roof.edgeOverhangs);
-    expect(out.roof.edgeSlopes.length).toBeGreaterThan(40);
+    const e = expandRoofArcs({ ...out.roof });
+    const groups = edgeGroupsOf(e.boundary, e.edgeSlopes, e.edgeOverhangs);
+    expect(out.roof.edgeSlopes).toHaveLength(4);
+    expect(e.edgeSlopes.length).toBeGreaterThan(20);
     // Lados do arco e as duas retas tangentes no mesmo trecho; o lado direito (canto de 90°) é outro.
     const sweep = groups[0];
     expect(groups[1]).not.toBe(sweep);
     expect(groups[2]).toBe(sweep);
     expect(new Set(groups).size).toBe(2);
-    expect(waterGroupCount(out.roof.boundary, out.roof.edgeSlopes, out.roof.edgeOverhangs)).toBe(2);
+    expect(waterGroupCount(e.boundary, e.edgeSlopes, e.edgeOverhangs)).toBe(2);
   });
 
   it('arco de empena (sem inclinação) com três retas que definem: três águas, o arco é parede', () => {

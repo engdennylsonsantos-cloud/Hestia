@@ -1,5 +1,6 @@
-import { cross, dot, len, sub, type Vec2 } from '@hestia/geom';
+import { arcFromSagitta, cross, dot, len, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import type { Roof, RoofShape } from '@hestia/model';
+import { eaveFromFootprint, footprintOf, footprintSag, hasRoofArcs } from './perimeterRoofArcs.ts';
 import { eaveOutlinePerEdge } from './roofGeom.ts';
 
 /** Formas que viram predefinições por aresta (Revit: Define Slope). Free e extrusion têm cálculo próprio. */
@@ -109,8 +110,59 @@ export function editRingEdges<T>(values: readonly T[], edit: RingEdit): T[] {
  * editado à mão passa a valer, e o balanço por aresta volta a andar a aresta pelo contorno.
  */
 export function roofRingPatch(r: Roof, ring: Vec2[], edit: RingEdit | null): Partial<Roof> {
-  if (!edit) return { boundary: ring, footprint: undefined };
-  return { boundary: ring, footprint: undefined, edgeSlopes: editRingEdges(r.edgeSlopes, edit), edgeOverhangs: editRingEdges(r.edgeOverhangs, edit) };
+  if (!edit) return { boundary: ring, footprint: undefined, ...(r.edgeSag ? { edgeSag: clampSags(ring, r.edgeSag) } : {}) };
+  return {
+    boundary: ring,
+    footprint: undefined,
+    edgeSlopes: editRingEdges(r.edgeSlopes, edit),
+    edgeOverhangs: editRingEdges(r.edgeOverhangs, edit),
+    ...(r.edgeSag ? { edgeSag: editSags(r, ring, edit) } : {}),
+  };
+}
+
+/** Flechas limitadas a metade da corda atual (depois de mover um vértice a corda pode encolher). */
+function clampSags(ring: Vec2[], sags: number[]): number[] {
+  return sags.map((v, i) => {
+    const half = len(sub(ring[(i + 1) % ring.length]!, ring[i]!)) / 2;
+    return Math.sign(v) * Math.min(Math.abs(v), half);
+  });
+}
+
+/**
+ * Flechas depois de inserir ou remover um vértice. Inserir numa aresta em arco a parte em dois arcos do mesmo raio;
+ * remover um vértice funde as duas arestas: se alguma tem arco, o arco novo passa pelo vértice removido (exato quando
+ * as duas metades são do mesmo círculo). `ring` é o contorno já editado.
+ */
+function editSags(r: Roof, ring: Vec2[], edit: RingEdit): number[] {
+  const sags = r.edgeSag ?? [];
+  const n = r.boundary.length;
+  if (edit.kind === 'remove') {
+    const v = edit.vertex;
+    const prev = (v - 1 + n) % n;
+    const out = sags.filter((_, k) => k !== v);
+    const k = out.length === 0 ? 0 : v > prev ? prev : prev - 1;
+    if ((sags[prev] ?? 0) !== 0 || (sags[v] ?? 0) !== 0) {
+      out[k] = sagFromThreePoints(r.boundary[prev]!, r.boundary[v]!, r.boundary[(v + 1) % n]!);
+    }
+    return out;
+  }
+  const i = edit.edge;
+  const s = sags[i] ?? 0;
+  const out = [...sags];
+  if (Math.abs(s) < 1e-6) {
+    out.splice(i + 1, 0, s);
+    return out;
+  }
+  const arc = arcFromSagitta(r.boundary[i]!, r.boundary[(i + 1) % n]!, s);
+  const m = ring[i + 1]!;
+  const halves = [len(sub(m, ring[i]!)), len(sub(ring[(i + 2) % ring.length]!, m))].map((c) => {
+    if (!arc) return 0;
+    const half = c / 2;
+    const h = arc.radius <= half ? half : arc.radius - Math.sqrt(arc.radius * arc.radius - half * half);
+    return Math.sign(s) * Math.min(h, half);
+  });
+  out.splice(i, 1, halves[0]!, halves[1]!);
+  return out;
 }
 
 /**
@@ -120,6 +172,12 @@ export function roofRingPatch(r: Roof, ring: Vec2[], edit: RingEdit | null): Par
  */
 export function roofOverhangPatch(r: Roof, index: number, overhang: number): Partial<Roof> | null {
   const edgeOverhangs = r.edgeOverhangs.map((v, k) => (k === index ? overhang : v));
+  if (hasRoofArcs(r)) {
+    // Com arcos o beiral se refaz da pegada (a guardada ou a que sai de desfazer o balanço), concêntrico ao arco.
+    const foot = footprintOf(r);
+    const eave = eaveFromFootprint(foot, footprintSag(r, foot), edgeOverhangs);
+    return { ...eave, edgeOverhangs };
+  }
   if (r.footprint) return { boundary: eaveOutlinePerEdge(r.footprint, edgeOverhangs), edgeOverhangs };
   const delta = overhang - (r.edgeOverhangs[index] ?? 0);
   const ring = Math.abs(delta) < 1e-9 ? r.boundary : offsetEdge(r.boundary, index, delta);

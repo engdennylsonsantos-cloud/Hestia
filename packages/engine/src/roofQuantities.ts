@@ -3,6 +3,7 @@ import { roofPlanArea, type Id, type Project, type Roof, type RoofShape } from '
 import { crossingParams, planeHas } from './roofGeom.ts';
 import { extrusionGableArea } from './roofExtrusion.ts';
 import { planeZ, resolveRoofs, roofThickness, type ResolvedRoof, type ResolvedRoofPlane, type RoofLine } from './roofs.ts';
+import { expandRoofArcs } from './roofArcs.ts';
 import { edgeSlopesOf } from './roofShapes.ts';
 
 /**
@@ -146,7 +147,8 @@ function slopedEdgesOf(r: Roof): number | null {
 
 /** Quantitativos de um telhado; `planes` tem as águas do próprio telhado primeiro, depois as dos outros do nível. */
 function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]): RoofQuantity {
-  const r = p.elements[rr.roofId] as Roof;
+  const orig = p.elements[rr.roofId] as Roof;
+  const r = expandRoofArcs(orig);
   const planArea = roofPlanArea(r) - rr.joinedArea;
   const planesQ: RoofPlaneQuantity[] = rr.planes.map((pl) => {
     const area = multiArea(pl.polygon);
@@ -183,7 +185,7 @@ function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]):
     gableLength: rr.lines.filter((l) => l.kind === 'gable').reduce((s, l) => s + dist(l.a, l.b), 0),
     // Extrusão: a empena é a seção do perfil na extremidade (integral exata); as outras formas usam o trapézio por trecho.
     gableArea: r.shape === 'extrusion' ? extrusionGableArea(r) : gableAreaOf(rr),
-    slopedEdges: slopedEdgesOf(r),
+    slopedEdges: slopedEdgesOf(orig),
     ridgeHeight: heights.length ? Math.max(...heights) : null,
     maxHeight: tops.length ? Math.max(...tops) : rr.eaveZ,
     layers,

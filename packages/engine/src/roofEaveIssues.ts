@@ -1,6 +1,7 @@
 import { dot, sub, type Vec2 } from '@hestia/geom';
 import { isOpening, isRoof, isWall, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
 import { buildFrame, type WallFrame } from './frame.ts';
+import { expandRoofArcs } from './roofArcs.ts';
 
 /** Distância (m) do beiral à abertura abaixo da qual se avisa (checagem de proximidade, `roof-eave-opening`). */
 export const EAVE_OPENING_DISTANCE = 0.3;
@@ -119,7 +120,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
   for (const roof of roofs) {
     if (roof.boundary.length < 3) continue;
     const onLevel = bodies.filter((b) => b.wall.levelId === roof.levelId);
-    const edges = eaveEdges(roof.boundary);
+    const edges = eaveEdges(expandRoofArcs(roof).boundary);
 
     for (const b of onLevel) {
       const inner: Box = { x0: TOUCH_TOL, x1: b.L - TOUCH_TOL, y0: b.lo + TOUCH_TOL, y1: b.hi - TOUCH_TOL };

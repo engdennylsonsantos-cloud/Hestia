@@ -1,11 +1,12 @@
 import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
 import { isRoof, type Id, type Project, type Roof } from '@hestia/model';
+import { hasRoofArcs, roofEaveArcsProblem } from './perimeterRoofArcs.ts';
 import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Chaves que mudam a geometria das águas. Só uma alteração delas é conferida pelo motor. */
-const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
+const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
 
 /** Motivo para um telhado com forma que não produz água, em português. */
 function noWaterReason(r: Roof): string {
@@ -93,7 +94,7 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
     if (r.boundary.length < 3) return 'o contorno tem menos de 3 pontos';
     // Antes do motor: um beiral que se corta faz o esqueleto falhar com uma mensagem genérica.
     if (r.footprint && r.shape !== 'free' && r.shape !== 'extrusion') {
-      const eave = eaveProblem(r.footprint, r.boundary, r.edgeOverhangs);
+      const eave = hasRoofArcs(r) ? roofEaveArcsProblem(r) : eaveProblem(r.footprint, r.boundary, r.edgeOverhangs);
       if (eave) return eave;
     }
     const res = resolveRoofs(q, r.levelId).find((x) => x.roofId === r.id);

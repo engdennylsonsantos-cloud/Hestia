@@ -1,6 +1,7 @@
 import { asMulti, difference, dot, multiArea, sub, type MultiPolygon, type SkeletonStep, type Vec2 } from '@hestia/geom';
 import { levelElevation, roofsOnLevel, type Id, type Project, type RafterCut, type Roof, type RoofEave, type RoofType } from '@hestia/model';
 import { planeHas, WATER_MIN_AREA } from './roofGeom.ts';
+import { expandRoofArcs } from './roofArcs.ts';
 import { joinRoofs, type JoinItem } from './roofJoin.ts';
 import { roofLines } from './roofLines.ts';
 import { boundaryKindsOf, waterPlanesOf } from './roofShapes.ts';
@@ -77,7 +78,9 @@ export const roofThickness = (r: ResolvedRoof): number => r.layers.reduce((s, l)
 /** Telhado antes da junção: águas da forma menos os furos. Sem tipo ou contorno de três pontos, null. */
 type Base = JoinItem & { roof: Roof; type: RoofType; eaveZ: number; problem?: string; steps?: SkeletonStep[]; holeLines: RoofLine[] };
 
-function baseOf(p: Project, r: Roof): Base | null {
+function baseOf(p: Project, raw: Roof): Base | null {
+  // Arcos do contorno viram trechos retos só aqui dentro; o modelo gravado fica como está.
+  const r = expandRoofArcs(raw);
   const type = p.roofTypes[r.typeId];
   if (!type || r.boundary.length < 3) return null;
   const eaveZ = levelElevation(p, r.levelId) + r.heightOffset;

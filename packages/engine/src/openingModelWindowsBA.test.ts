@@ -199,6 +199,18 @@ describe('bandeira em janela: cobertura e grupos físicos', () => {
       }
     }
   });
+
+  it('bandeira alta demais não some com a folha: a altura é limitada a 40% e o maxim-ar continua inteiro', () => {
+    for (const base of ['ot_j60', 'ot_ja120', 'ot_jb80', 'ot_jp80', 'ot_j120']) {
+      const h = createEmptyProject().openingTypes[base]!.height;
+      const m = modelo(cena(base, { transom: { height: h * 0.95 } }));
+      expect(m.parts.filter((p) => p.role === 'leaf').length, base).toBeGreaterThanOrEqual(4);
+      expect(m.parts.filter((p) => p.role === 'glass').length, base).toBeGreaterThanOrEqual(1);
+      const { faltando, fora } = cobertura(m);
+      expect(faltando.slice(0, 5), base).toEqual([]);
+      expect(fora, base).toEqual([]);
+    }
+  });
 });
 
 describe('basculante: eixo, metades e varredura sem interseção', () => {

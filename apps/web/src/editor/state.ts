@@ -153,6 +153,7 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   arrayAngle: 360,
   arrayAnchor: 'second',
   offsetDistance: 1,
+  trimMode: 'unico',
   rotateCopy: false,
   mirrorCopy: true,
   offsetCopy: true,

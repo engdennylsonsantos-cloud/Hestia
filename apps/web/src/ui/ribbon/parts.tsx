@@ -76,12 +76,16 @@ function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, active: boolean,
 
 const cls = (...c: Array<string | false>): string => c.filter(Boolean).join(' ');
 
-/** Botão de uma peça só (grande ou pequeno). */
+/**
+ * Botão de uma peça só. O grande mostra ícone e rótulo; o pequeno é só ícone (o rótulo vai no tooltip e no aria-label,
+ * com o atalho quando há), como no Revit.
+ */
 function Btn({ f, size, arrow = false }: { f: Face; size: Size; arrow?: boolean }): ReactElement {
+  const large = size === 'large';
   return (
-    <button className={cls('rb-btn', size === 'large' ? 'rb-large' : 'rb-small', f.on && 'on', f.soon && 'soon')} title={f.title} aria-label={f.label} aria-pressed={f.on || undefined} disabled={f.disabled} onClick={f.onClick}>
-      <Icon name={f.icon} size={size === 'large' ? 32 : 16} />
-      <span className="rb-lbl">{f.label}{arrow ? ' ▾' : ''}</span>
+    <button className={cls('rb-btn', large ? 'rb-large' : 'rb-small rb-iconly', f.on && 'on', f.soon && 'soon')} title={f.title} aria-label={f.label} aria-pressed={f.on || undefined} disabled={f.disabled} onClick={f.onClick}>
+      <Icon name={f.icon} size={large ? 28 : 16} />
+      {large && <span className="rb-lbl">{f.label}{arrow ? ' ▾' : ''}</span>}
     </button>
   );
 }
@@ -135,8 +139,8 @@ function Split({ item, ctx, lang }: { item: Extract<RibbonItem, { kind: 'split' 
   if (item.size === 'small') {
     return (
       <div ref={box} className="rb-split small">
-        <button className={cls('rb-btn rb-small', f.on && 'on')} title={f.title} disabled={f.disabled} onClick={f.onClick}>
-          <Icon name={f.icon} size={16} /><span className="rb-lbl">{label}</span>
+        <button className={cls('rb-btn rb-small rb-iconly', f.on && 'on')} title={f.title} aria-label={label} disabled={f.disabled} onClick={f.onClick}>
+          <Icon name={f.icon} size={16} />
         </button>
         <button className="rb-btn rb-arrow" aria-haspopup="menu" aria-label={label} onClick={open}>▾</button>
         {menu}
@@ -146,7 +150,7 @@ function Split({ item, ctx, lang }: { item: Extract<RibbonItem, { kind: 'split' 
   return (
     <div ref={box} className={cls('rb-split large', f.on && 'on')}>
       <button className="rb-btn rb-large rb-top" title={f.title} aria-label={label} disabled={f.disabled} onClick={f.onClick}>
-        <Icon name={f.icon} size={32} />
+        <Icon name={f.icon} size={28} />
       </button>
       <button className="rb-btn rb-bottom" aria-haspopup="menu" title={f.title} onClick={open}>
         <span className="rb-lbl">{label} ▾</span>

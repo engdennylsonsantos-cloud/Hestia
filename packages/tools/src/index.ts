@@ -15,6 +15,7 @@ export * from './selectionFilters.ts';
 export * from './enclosed.ts';
 export * from './roomPick.ts';
 export * from './floorPick.ts';
+export * from './openingSnapPoints.ts';
 export { FloorTool } from './floorTool.ts';
 export * from './roomCreate.ts';
 export * from './ceilingRoom.ts';

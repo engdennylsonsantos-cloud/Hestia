@@ -9,6 +9,7 @@ import { labelPoint } from './floors.ts';
 import { roofFills, roofFootprint, roofOps, roofRealArea, roofSelectionOps, highestRidge } from './roofs.ts';
 import { corDaAresta, DEFAULT_SUN_AZIMUTH, direcaoDoSol, TONE_45, tomDaAgua } from './roofsAgua.ts';
 import { caixaDoRotulo, caixasSobrepostas } from './roofsRotulos.ts';
+import { espessurasDoTelhado } from './roofsTracos.ts';
 import { defaultPaint } from './style.ts';
 import { DARK, LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
@@ -361,14 +362,27 @@ describe('beiral e pegada pelo intervalo de vista', () => {
     expect(o.fills.some((f) => f.contour)).toBe(false);
   });
 
-  it('cortado pelo plano: contorno cheio e pegada rosa mais fina', () => {
+  it('cortado pelo plano: contorno cheio no peso de corte e nenhum rosa', () => {
     const { p, r } = comBalanco();
     const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'cut']]) });
-    expect(o.fills.some((f) => f.contour)).toBe(true);
-    const pink = o.strokes.filter((s) => s.color === LIGHT.roofFootprint);
-    expect(pink).toHaveLength(1);
-    expect(pink[0]!.pts).toEqual(FOOT);
-    expect(pink[0]!.widthPx).toBeLessThan(defaultPaint('roof', 100).projPx);
+    const contorno = o.fills.find((f) => f.contour)!;
+    expect(contorno.faixa).toEqual(espessurasDoTelhado(defaultPaint('roof', 100)).beiral);
+    expect(o.strokes.filter((s) => s.color === LIGHT.roofFootprint)).toHaveLength(0);
+  });
+
+  it('abaixo do corte: contorno contínuo de projeção, sem faixa de corte nem rosa', () => {
+    const { p, r } = comBalanco();
+    const o = roofOps([r], p, LIGHT, false, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'projection-below']]) });
+    expect(o.fills.some((f) => f.contour)).toBe(false);
+    expect(o.strokes.some((s) => s.closed && !s.dash && s.color === aresta)).toBe(true);
+    expect(o.strokes.some((s) => s.color === LIGHT.roofFootprint)).toBe(false);
+  });
+
+  it('acima do corte, no tema escuro, também sem rosa', () => {
+    const { p, r } = comBalanco();
+    const o = roofOps([r], p, DARK, true, 'medium', VIEW(100), { classes: new Map<Id, ViewClass>([['r', 'projection-above']]) });
+    expect(o.strokes.some((s) => s.color === DARK.roofFootprint)).toBe(false);
+    expect(o.strokes.some((s) => s.closed && s.dash)).toBe(true);
   });
 
   it('sem balanço não há pegada rosa; a projeção tracejada do beiral continua', () => {
@@ -380,7 +394,7 @@ describe('beiral e pegada pelo intervalo de vista', () => {
     expect(o.strokes.some((s) => s.closed && s.dash && s.color === aresta)).toBe(true);
   });
 
-  it('a planta real usa o plano de corte: acima não pinta de rosa; cortando o telhado, pinta', () => {
+  it('a planta real usa o plano de corte: nunca há rosa; cortando o telhado, o contorno é de corte', () => {
     const { p } = comBalanco();
     const acima = new ProjectStore(p);
     acima.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { top: 20 } });
@@ -391,7 +405,8 @@ describe('beiral e pegada pelo intervalo de vista', () => {
     const cortado = new ProjectStore(p);
     cortado.exec({ type: 'setLevelViewRange', levelId: 'lv_0', patch: { cut: 3.0, top: 20 } });
     const comRosa = buildPlanDrawList(input(cortado.project));
-    expect(comRosa.strokes.some((s) => s.color === LIGHT.roofFootprint && s.dash)).toBe(true);
+    expect(comRosa.strokes.some((s) => s.color === LIGHT.roofFootprint)).toBe(false);
+    expect(comRosa.fills.some((f) => f.contour)).toBe(true);
   });
 });
 

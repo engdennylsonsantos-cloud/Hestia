@@ -40,6 +40,8 @@
 | **Classification and Properties** | Classificação/IFC e propriedades | Painel de metadados. |
 | **Model** (oculto por padrão) | Uma única superfície para o objeto | Habilitar em Options > Work Environment > Tool Settings Dialog Boxes. [DOC AC28 150-19] |
 
+**Nota sobre padrões:** a ajuda oficial raramente declara o valor default de cada campo. Nas tabelas, “Onde” acumula aba/painel; o padrão aparece no texto ou na coluna de observações **somente quando a fonte o informa**. Campo sem indicação = padrão não documentado (ver §23, item 18).
+
 ### 2.2 Hierarquia das páginas principais (janela INT)
 
 O caminho curto é **Definições e Abertura → Abertura na Parede → Equipamentos e Acessórios**; o resto são subpáginas acessadas pelo ícone à direita do campo. [DOC AC28 150-17]
@@ -784,6 +786,8 @@ Fonte: [DOC AC24 141-4]
 ---
 
 ## 22. Fontes
+
+**Como ler as tabelas abaixo:** cada linha de intervalo foi percorrida página a página na numeração indicada (por exemplo, `151-1` a `151-31`); páginas inexistentes ou bloqueadas estão anotadas. Os títulos das páginas e o conteúdo foram conferidos, não apenas o índice.
 
 ### 22.1 Ajuda oficial AC28 (INT) — janela
 

@@ -22,6 +22,7 @@ export type PartRole =
   | 'muntin' // montante/travessa de divisão do vidro
   | 'handle'
   | 'casing' // alizar
+  | 'hinge' // dobradiça (ferragem)
   | 'sillBoard' // peitoril saliente
   | 'lintel' // verga
   | 'sillBeam' // contraverga

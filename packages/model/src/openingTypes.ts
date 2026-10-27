@@ -100,13 +100,26 @@ export interface OpeningType {
   glassKind?: OpeningGlassKind;
   /** Janela basculante: altura do eixo horizontal como fração do vão (0,2 a 0,8; padrão 0,5, eixo central). */
   tiltAxis?: number;
+  /**
+   * A que `width`/`height` se referem (ArchiCAD: Nominal Size Reference; NBR 15930: "80 x 210" é a FOLHA, não o vão): 'opening' (padrão) =
+   * o vão/batente; 'leaf' = a folha nominal, e o vão é calculado (folha + 2·(J − ov) + folgas). Só portas de giro.
+   */
+  nominalRef?: 'opening' | 'leaf';
+  /** Porta com vidro: fração da altura da folha ocupada pelo vidro, a partir do topo (0,25 / 0,5 / 0,75; 0,1 a 0,9). */
+  glassRatio?: number;
+  /** Dobradiças: quantidade (2 a 4; padrão 3 em porta de giro) — peças de ferragem no batente e na folha. */
+  hinges?: number;
+  /** Soleira/limiar da porta: espessura (m) e material (padrão pedra). Ausente = sem soleira. */
+  threshold?: { thickness: number; materialId?: Id };
+  /** Recuo do batente em relação à face da parede (ArchiCAD: Reveal) e a âncora do recuo: na face acabada ou no núcleo. */
+  reveal?: { depth: number; anchor?: 'face' | 'core' };
 }
 
 /** Vínculo da profundidade do batente com a espessura da parede. */
 export type OpeningFrameDepthMode = 'wall' | 'core' | 'fixed';
 /** Vidro: liso/cristal, canelado, fumê, verde, bronze, jateado/fosco, aramado, laminado, temperado. */
 export type OpeningGlassKind = 'clear' | 'ribbed' | 'smoke' | 'green' | 'bronze' | 'frosted' | 'wired' | 'laminated' | 'tempered';
-export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille';
+export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille' | 'boards' | 'fullglass';
 export type OpeningHandle = 'none' | 'lever' | 'knob' | 'pull';
 export type OpeningFrameStyle = 'rebate' | 'simple' | 'aduela' | 'block';
 

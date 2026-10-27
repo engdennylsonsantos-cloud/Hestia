@@ -120,7 +120,7 @@ function createRoof(p: Project, f: RoofFields, slopeDefault: number, opts: Commi
   const problem = roofProblem(p, [candidate]) ?? newError(p, after, id, validateProject);
   if (problem) return refuse(`Não foi possível criar o telhado: ${problem}`);
   const n = waterCount(roof);
-  return { ok: true, id, commands: [{ type: 'addRoof', roof }], message: `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}.` };
+  return { ok: true, id, commands: [{ type: 'addRoof', roof }], message: n === 0 ? 'Telhado plano criado: nenhuma aresta define inclinação.' : `Telhado criado: ${n} ${n === 1 ? 'água' : 'águas'}.` };
 }
 
 function editRoof(p: Project, id: string, f: RoofFields, opts: CommitPerimeterOptions): CommitPerimeterResult {

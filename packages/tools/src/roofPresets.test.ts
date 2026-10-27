@@ -115,3 +115,13 @@ describe('vértices e vetor por aresta (A11)', () => {
     expect(r.edgeOverhangs).toHaveLength(5);
   });
 });
+
+describe('telhado plano pelo perímetro (critério do Revit: nenhuma aresta com inclinação)', () => {
+  it('é criado e a mensagem diz que é plano, sem "0 águas"', () => {
+    const ctx = makeEnv();
+    const r = criar(ctx.store, sidesOf(retangulo(6, 4)), {}, [0, 1, 2, 3]);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.message).toBe('Telhado plano criado: nenhuma aresta define inclinação.');
+    expect(roofs(ctx.store.project)).toHaveLength(1);
+  });
+});

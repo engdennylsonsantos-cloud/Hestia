@@ -13,32 +13,32 @@
 
 O realce deixou de **copiar triângulos** e o picking ganhou o caminho de **ID buffer** (MRT + leitura assíncrona) pronto
 para ser ligado pelo integrador, com o BVH intacto como fallback. O que já está no caminho quente do app — o realce —
-saiu de **~7,5 ms por hover** para **~0,8 ms**, e a seleção de um pavimento inteiro (144 elementos) de **~212 ms** para
-**~3,3 ms**, sem mudar o resultado do picking (checksum idêntico) nem a caixa da seleção (erro 0 m).
+saiu de **~6,6 ms por hover** para **~0,74 ms**, e a seleção de um pavimento inteiro (144 elementos) de **~182 ms** para
+**~2,9 ms**, sem mudar o resultado do picking (checksum idêntico) nem a caixa da seleção (erro 0 m).
 
 | Medida (60 pav × 128 paredes) | Antes | Depois | Ganho |
 |---|---:|---:|---:|
-| Realce de 1 elemento (hover) | **7,491 ms** | **0,816 ms** | 9,2× |
-| Realce de 8 elementos | 19,426 ms | **1,720 ms** | 11× |
-| Realce do pavimento inteiro (144 elementos) | **211,783 ms** | **3,264 ms** | 65× |
-| Realce do mesmo elemento de novo | 7,491 ms | **0,700 ms** | 10,7× |
-| Caixa da seleção (144 elementos) | 5,596 ms | **2,158 ms** | 2,6× |
-| `pickElement` (BVH) | 1,231 ms | **1,231 ms** | igual |
-| `pickModelPoint` (BVH) | 0,969 ms | **0,969 ms** | igual |
+| Realce de 1 elemento (hover) | **6,588 ms** | **0,743 ms** | 8,9× |
+| Realce de 8 elementos | 15,119 ms | **1,223 ms** | 12,4× |
+| Realce do pavimento inteiro (144 elementos) | **181,981 ms** | **2,866 ms** | 63,5× |
+| Realce do mesmo elemento de novo | 6,588 ms | **0,646 ms** | 10,2× |
+| Caixa da seleção (144 elementos) | 5,579 ms | **2,203 ms** | 2,5× |
+| `pickElement` (BVH) | 1,233 ms | **1,233 ms** | igual |
+| `pickModelPoint` (BVH) | 0,802 ms | **0,802 ms** | igual |
 | Triângulos copiados por hover/seleção | O(triângulos do elemento) | **0** | — |
 
 | Medida (30 pav × 256 paredes) | Antes | Depois | Ganho |
 |---|---:|---:|---:|
-| Realce de 1 elemento (hover) | 6,079 ms | **0,437 ms** | 13,9× |
-| Realce de 8 elementos | 11,183 ms | **0,577 ms** | 19,4× |
-| Realce do pavimento inteiro (288 elementos) | **493,155 ms** | **2,619 ms** | 188× |
-| Caixa da seleção (288 elementos) | 7,877 ms | **1,937 ms** | 4,1× |
-| `pickElement` (BVH) | 1,127 ms | **1,127 ms** | igual |
+| Realce de 1 elemento (hover) | 6,375 ms | **0,391 ms** | 16,3× |
+| Realce de 8 elementos | 10,289 ms | **0,543 ms** | 19,0× |
+| Realce do pavimento inteiro (288 elementos) | **410,003 ms** | **2,700 ms** | 152× |
+| Caixa da seleção (288 elementos) | 7,797 ms | **1,664 ms** | 4,7× |
+| `pickElement` (BVH) | 0,938 ms | **0,938 ms** | igual |
 
 Leituras:
 
-- **Meta de hover/seleção (≤8 ms):** cumprida. Hover 0,44–0,82 ms; seleção de um elemento idem; seleção de um
-  pavimento inteiro 2,6–3,3 ms. Nenhum caso de uso corrente passa de 8 ms.
+- **Meta de hover/seleção (≤8 ms):** cumprida. Hover 0,39–0,74 ms; seleção de um elemento idem; seleção de um
+  pavimento inteiro 2,7–2,9 ms. Nenhum caso de uso corrente passa de 8 ms.
 - **Zero cópia de triângulos:** o preenchimento reusa a **mesma instância** de `position` e de `index` da geometria do
   modelo e recorta por `drawRange`; as arestas usam uma *view* do índice e ficam em cache por versão da geometria. Os
   testes provam a identidade dos atributos (`highlight3d.test.ts` e `instanciada3d.test.ts`).

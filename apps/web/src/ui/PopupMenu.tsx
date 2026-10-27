@@ -143,6 +143,7 @@ export function PopupMenu({ x, y, items, onPick, onClose }: PopupMenuProps): Rea
           className="rb-menu ctx-menu"
           role="menu"
           data-ctx-menu=""
+          onPointerDown={(e) => e.stopPropagation()}
           style={pos[nivel] ?? LONGE}
         >
           {lista.map((it, idx) => (

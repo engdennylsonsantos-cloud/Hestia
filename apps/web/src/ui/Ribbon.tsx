@@ -12,6 +12,7 @@ import { FitRow, type FitItem } from './ribbon/FitRow.tsx';
 import { contextTab, perimeterTab } from './ribbon/context.ts';
 import { TABS } from './ribbon/tabs.ts';
 import { useRibbonCtx } from './ribbon/useCtx.ts';
+import { prioridadeDoPainel } from './ribbon/panelPriority.ts';
 import { PerimeterRibbonPanels } from './perimeter/PerimeterRibbonPanels.tsx';
 import './perimeter/perimeter.css';
 
@@ -83,16 +84,17 @@ export function Ribbon(): ReactElement {
 
   const panelItems = (): FitItem[] => {
     if (activeId !== 'ctx' || !pTab) {
-      const items: FitItem[] = active?.panels.map((panel) => ({ key: panel.id, node: <PanelView panel={panel} ctx={ctx} lang={lang} /> })) ?? [];
+      const items: FitItem[] = active?.panels.map((panel) => ({ key: panel.id, priority: prioridadeDoPainel(panel.id), node: <PanelView panel={panel} ctx={ctx} lang={lang} /> })) ?? [];
       // Com uma porta/janela selecionada, a aba contextual ganha os controles de inversão e o alternador de etiquetas.
       const only = activeId === 'ctx' && ctx.selection.length === 1 ? ctx.p.elements[ctx.selection[0]!] : undefined;
-      if (only && (only.kind === 'door' || only.kind === 'window')) items.push({ key: 'abertura', node: <OpeningActions opening={only} p={ctx.p} /> });
+      if (only && (only.kind === 'door' || only.kind === 'window')) items.push({ key: 'abertura', priority: 2, node: <OpeningActions opening={only} p={ctx.p} /> });
       return items;
     }
     return pTab.slots.map((slot) => slot.kind === 'panel'
-      ? { key: slot.panel.id, node: <PanelView panel={slot.panel} ctx={ctx} lang={lang} /> }
+      ? { key: slot.panel.id, priority: prioridadeDoPainel(slot.panel.id), node: <PanelView panel={slot.panel} ctx={ctx} lang={lang} /> }
       : {
         key: 'perimetro',
+        priority: 2,
         node: (
           <PerimeterRibbonPanels
             target={perim.target}

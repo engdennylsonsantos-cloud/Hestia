@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { fitCount } from './fitCount.ts';
+import { fitMask } from './fitCount.ts';
 
 /**
  * Item recolhível de uma linha (painel da faixa ou aba). `node` aparece na linha; `menu`, se houver, é como ele aparece
@@ -12,6 +12,8 @@ export interface FitItem {
   menu?: ReactElement;
   /** Item ativo (aba selecionada): se ele for recolhido, o botão "mais" fica marcado. */
   active?: boolean;
+  /** Quanto maior, mais tarde o item é recolhido (padrão 0; empate recolhe o mais à direita primeiro). */
+  priority?: number;
 }
 
 interface FitRowProps {
@@ -28,13 +30,15 @@ interface FitRowProps {
 
 const MORE_FALLBACK = 30;
 
-/** Largura natural de cada item (medida numa linha escondida) e quantos cabem na largura da caixa. */
-function countFit(box: HTMLElement | null, measure: HTMLElement | null, more: HTMLElement | null, moreW: { w: number }): number {
-  if (!box || !measure) return 0;
+/** Largura natural de cada item (medida numa linha escondida) e quais cabem na largura da caixa. */
+function countFit(box: HTMLElement | null, measure: HTMLElement | null, more: HTMLElement | null, moreW: { w: number }, priorities: readonly number[]): boolean[] {
+  if (!box || !measure) return [];
   if (more) moreW.w = more.getBoundingClientRect().width || moreW.w;
   const widths = Array.from(measure.children, (c) => c.getBoundingClientRect().width);
-  return fitCount(widths, box.clientWidth, moreW.w);
+  return fitMask(widths, priorities, box.clientWidth, moreW.w);
 }
+
+const mesmaMascara = (a: readonly boolean[], b: readonly boolean[]): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
 
 /**
  * Linha que recolhe pelo fim: o que não cabe sai para um botão "mais", que abre um popup com esses itens. A medição
@@ -47,20 +51,23 @@ export function FitRow({ items, className, role, ariaLabel, moreLabel, moreConte
   const more = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   const moreW = useRef({ w: MORE_FALLBACK });
-  const [count, setCount] = useState(items.length);
+  const priorities = useRef<number[]>([]);
+  priorities.current = items.map((it) => it.priority ?? 0);
+  const [mask, setMaskState] = useState<boolean[]>(() => items.map(() => true));
+  const setMask = (m: boolean[]): void => setMaskState((old) => (mesmaMascara(old, m) ? old : m));
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ left: 0, top: 0 });
 
   // Lista nova (o pai redesenhou): confere se cabe. Sem laço: o estado só muda quando o número muda.
   useLayoutEffect(() => {
-    setCount(countFit(box.current, measure.current, more.current, moreW.current));
+    setMask(countFit(box.current, measure.current, more.current, moreW.current, priorities.current));
   }, [items]);
 
   // Largura da caixa muda (janela, painel acoplado): refaz a conta.
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
-    const ro = new ResizeObserver(() => setCount(countFit(box.current, measure.current, more.current, moreW.current)));
+    const ro = new ResizeObserver(() => setMask(countFit(box.current, measure.current, more.current, moreW.current, priorities.current)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -101,8 +108,9 @@ export function FitRow({ items, className, role, ariaLabel, moreLabel, moreConte
     };
   }, [open]);
 
-  const shown = items.slice(0, count);
-  const hidden = items.slice(count);
+  const ok = mask.length === items.length;
+  const shown = items.filter((_, i) => !ok || mask[i]);
+  const hidden = items.filter((_, i) => ok && !mask[i]);
   const showPop = open && hidden.length > 0;
 
   return (

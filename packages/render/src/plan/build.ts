@@ -1,12 +1,13 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
+import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { thinStrokes } from './thin.ts';
 import { gridStrokes } from './grid.ts';
+import { gridOps } from './grids.ts';
 import { sectionMarksOf } from './sectionMarks.ts';
 import { belowFloorOps, type FloorOps } from './floors.ts';
 import { floorAndSlabOps } from './surfaces.ts';
@@ -119,7 +120,7 @@ function hachuraDaRegiao(v: Viewport, m: Material | undefined, espessura: number
  */
 export function planGeometrySelection(p: Project, levelId: Id, selection: readonly Id[]): Id[] {
   if (selection.length === 0) return [];
-  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...levelRoomSeparators(p, levelId).map((r) => r.id), ...p.views.map((v) => v.id)]);
+  const used = new Set<Id>([...levelDimensions(p, levelId).map((d) => d.id), ...levelRoomSeparators(p, levelId).map((r) => r.id), ...p.views.map((v) => v.id), ...projectGrids(p).map((g) => g.id)]);
   return selection.filter((id) => used.has(id));
 }
 
@@ -343,6 +344,11 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       for (const ring of union(...w.layers.map((l) => l.cut)).flat()) strokes.push({ pts: ring, closed: true, ...esp, color: cor, alpha: 0.55, dash: [4, 2] });
     }
   }
+
+  // Grades de eixos: por cima do modelo e por baixo das anotações; valem em todos os níveis (ver `grids.ts`).
+  const grades = gridOps(p, style.scale, input.viewport.zoom, theme, input.selection);
+  strokes.push(...grades.strokes);
+  labels.push(...grades.labels);
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria
   // 'anotação' (visibilidade, cor e peso) e a escala da vista, com geometria em mm de papel.

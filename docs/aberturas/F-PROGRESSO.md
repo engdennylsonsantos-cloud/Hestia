@@ -9,7 +9,7 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 | Fase | O quê | Quem | Estado |
 |---|---|---|---|
 | F1 | Especificação e contrato | Sonnet | concluída |
-| F3 | Modelo, migração v19→v20, layout, presets | Sonnet | pendente |
+| F3 | Modelo, migração v19→v20, layout, presets | Sonnet | concluída e mesclada |
 | F2 | Testes de aceite do motor (spec §8) | Haiku | pendente |
 | F4 | Motor: quadro, membros, células, vidro, alizar | Sonnet | pendente |
 | F5a | Planta, corte e elevação | Haiku | pendente |
@@ -19,3 +19,7 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 | F7 | Catálogo de composições e mostruário | Haiku | pendente |
 | F9 | Goldens, e2e, revisão independente do motor, suíte completa, publicar no artifact | Haiku + Sonnet | pendente |
 | F8 | Bay, bow, canto | Sonnet | opcional, fora desta rodada |
+
+## Notas de decisão durante a implementação
+- Travessa-base sob vidro lateral até o piso (pergunta 2, aprovada): o modelo (F3) só cria o membro com `frame.sill` explícito, para os exemplos 1 a 4 da spec baterem em números. A F7 (catálogo) liga `frame.sill` nas composições com vidro lateral até o piso.
+- A ponte do esquema vive em `withBridgedComposition` (`openingCompositionOf.ts`).

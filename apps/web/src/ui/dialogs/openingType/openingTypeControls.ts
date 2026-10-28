@@ -1,4 +1,4 @@
-import type { OpeningType } from '@hestia/model';
+import type { OpeningGlassKind, OpeningType } from '@hestia/model';
 import { withOpeningField } from './openingTypeFields.ts';
 
 /** Recuo do batente (m): zero tira o campo, que volta ao padrão por leitura (0). Preserva a âncora. */
@@ -43,4 +43,27 @@ export function setThresholdThickness(t: OpeningType, thickness: number): Openin
 /** Eixo da basculante como fração da altura: 0,5 (central) tira o campo; o excêntrico grava o valor. */
 export function setTiltAxis(t: OpeningType, axis: number): OpeningType {
   return withOpeningField(t, 'tiltAxis', axis, 0.5);
+}
+
+/** Tipos de vidro do schema (`OpeningGlassKind`), com o rótulo da interface. */
+export const GLASS_KINDS: ReadonlyArray<readonly [OpeningGlassKind, string]> = [
+  ['clear', 'Liso/cristal'],
+  ['ribbed', 'Canelado'],
+  ['smoke', 'Fumê'],
+  ['green', 'Verde'],
+  ['bronze', 'Bronze'],
+  ['frosted', 'Jateado/fosco'],
+  ['wired', 'Aramado'],
+  ['laminated', 'Laminado'],
+  ['tempered', 'Temperado'],
+];
+
+/** Tipo de vidro: 'clear' (liso) é o padrão por leitura e tira o campo. */
+export function setGlassKind(t: OpeningType, kind: OpeningGlassKind): OpeningType {
+  return withOpeningField(t, 'glassKind', kind, 'clear');
+}
+
+/** Material da folha: ausente vale o do batente, então escolher o mesmo material tira o campo. */
+export function setLeafMaterialId(t: OpeningType, id: string): OpeningType {
+  return withOpeningField(t, 'leafMaterialId', id, t.frameMaterialId);
 }

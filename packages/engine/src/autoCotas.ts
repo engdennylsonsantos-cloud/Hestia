@@ -1,16 +1,19 @@
 import type { Vec2 } from '@hestia/geom';
 import {
-  openingTypeById,
-  coreSpan,
+  dimensionSettingsOf,
   isWall,
   type Dimension,
   type DimensionRef,
   type Id,
   type Opening,
+  type OpeningDimRef,
   type Project,
   type Wall,
+  type WallDimRef,
 } from '@hestia/model';
 import { buildFrame, type WallFrame } from './frame.ts';
+import { openingEdge, openingExtents } from './openingExtents.ts';
+import { wallPlanes } from './wallPlanes.ts';
 
 /**
  * Cotas automáticas de planta (inspirado no `generateAutoDimensions` do ArquiFácil). O gerador monta **camadas** de
@@ -32,7 +35,11 @@ const TOL_JUNCAO = 0.05;
 const TOL_SOMBRA = 0.05;
 
 export type LadoCota = 'sul' | 'norte' | 'oeste' | 'leste';
+/** @deprecated Vocabulário antigo; use `WallDimRef` (`externa`→`finish`, `nucleo`→`coreFace`, `eixo`→`axis`). */
 export type ReferenciaParede = 'externa' | 'nucleo' | 'eixo';
+
+const REFERENCIA_PAREDE: Readonly<Record<ReferenciaParede, WallDimRef>> = { externa: 'finish', nucleo: 'coreFace', eixo: 'axis' };
+const MODO_ABERTURA: Readonly<Record<'centro' | 'arestas', OpeningDimRef>> = { centro: 'center', arestas: 'frame' };
 
 export interface AutoCotaOptions {
   /** Lados cotados: os quatro (padrão), um lado só ou o mais próximo do clique. */
@@ -51,9 +58,13 @@ export interface AutoCotaOptions {
   paredes?: boolean;
   /** Cotar as aberturas. Padrão `true`. */
   aberturas?: boolean;
-  /** Abertura pelo centro ou pelas arestas. Padrão `arestas`. */
+  /** Referência das aberturas (centro, vão livre, vão externo, alizar). Padrão: a configuração de cotas do projeto. */
+  openingRef?: OpeningDimRef;
+  /** Referência das paredes (eixo, face acabada, eixo/face do núcleo). Padrão: a configuração de cotas do projeto. */
+  wallRef?: WallDimRef;
+  /** @deprecated Use `openingRef` (`centro`→`center`, `arestas`→`frame`). */
   modoAberturas?: 'centro' | 'arestas';
-  /** Face usada como referência da parede. Padrão `externa`. */
+  /** @deprecated Use `wallRef`. */
   referencia?: ReferenciaParede;
   /** Só o contorno externo, ignorando divisórias internas. Padrão `true`. */
   somenteExternas?: boolean;
@@ -124,12 +135,32 @@ const ehHorizontal = (w: Wall): boolean => Math.abs(w.a.y - w.b.y) <= MESMA;
 const ehVertical = (w: Wall): boolean => Math.abs(w.a.x - w.b.x) <= MESMA;
 const comprimento = (w: Wall): number => Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y);
 
-/** As duas faces da parede na referência escolhida: acabamento, núcleo ou eixo. */
-function facesS(f: WallFrame, ref: ReferenciaParede): [number, number] {
-  if (ref === 'eixo') return [0, 0];
-  if (ref === 'externa') return [f.sExt, f.sInt];
-  const core = coreSpan(f.type);
-  return [f.sign * (f.extOffset - core.from), f.sign * (f.extOffset - core.to)];
+/** Referência de parede efetiva: a nova opção, o apelido antigo ou a configuração do projeto. */
+function refParede(p: Project, opts: AutoCotaOptions): WallDimRef {
+  return opts.wallRef ?? (opts.referencia ? REFERENCIA_PAREDE[opts.referencia] : dimensionSettingsOf(p).wallRef);
+}
+
+/** Referência de abertura efetiva: a nova opção, o apelido antigo ou a configuração do projeto. */
+function refAbertura(p: Project, opts: AutoCotaOptions): OpeningDimRef {
+  return opts.openingRef ?? (opts.modoAberturas ? MODO_ABERTURA[opts.modoAberturas] : dimensionSettingsOf(p).openingRef);
+}
+
+/**
+ * Os dois planos da parede na referência escolhida (da face externa para a interna); eixo e eixo do núcleo colapsam
+ * num só. Uma regra só com as cotas dinâmicas: `wallPlanes`.
+ */
+function facesS(f: WallFrame, ref: WallDimRef): [number, number] {
+  const pl = wallPlanes(f);
+  switch (ref) {
+    case 'axis':
+      return [pl.axis, pl.axis];
+    case 'coreCenter':
+      return [pl.coreCenter, pl.coreCenter];
+    case 'finish':
+      return f.sign > 0 ? [pl.faceHi, pl.faceLo] : [pl.faceLo, pl.faceHi];
+    case 'coreFace':
+      return f.sign > 0 ? [pl.coreHi, pl.coreLo] : [pl.coreLo, pl.coreHi];
+  }
 }
 
 function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {
@@ -246,7 +277,7 @@ function paredesDoLado(
 }
 
 /** Coordenada perpendicular da face de referência mais externa do lado (independente do `flipped`). */
-function baseDoLado(paralelas: readonly Wall[], lado: LadoCota, ref: ReferenciaParede, frame: FrameDe): number {
+function baseDoLado(paralelas: readonly Wall[], lado: LadoCota, ref: WallDimRef, frame: FrameDe): number {
   const horizontal = lado === 'sul' || lado === 'norte';
   const paraFora = lado === 'norte' || lado === 'leste';
   let base = paraFora ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
@@ -274,7 +305,8 @@ function camadasDoLado(
   opts: AutoCotaOptions,
   frame: FrameDe,
 ): Trecho[][] {
-  const ref = opts.referencia ?? 'externa';
+  const ref = refParede(p, opts);
+  const refVao = refAbertura(p, opts);
   const coord = (v: Vec2): number => (lado.horizontal ? v.x : v.y);
   const ponta = (w: Wall, fim: 'a' | 'b'): Trecho => ({
     t: coord(fim === 'a' ? w.a : w.b),
@@ -307,13 +339,16 @@ function camadasDoLado(
   const vaos: Trecho[] = [];
   for (const o of aberturas) {
     const host = paralelas.find((w) => w.id === o.hostId);
-    const tipo = openingTypeById(p, o.typeId);
-    if (!host || !tipo) continue;
+    const fh = host ? frame(host) : null;
+    if (!host || !fh) continue;
     const comp = comprimento(host);
     if (comp <= 0) continue;
     const ux = (host.b.x - host.a.x) / comp;
     const uy = (host.b.y - host.a.y) / comp;
-    const pos = opts.modoAberturas === 'centro' ? [o.offset] : [o.offset - tipo.width / 2, o.offset + tipo.width / 2];
+    // O alizar conta o da face de fora do lado cotado (a normal da parede contra o sentido do lado).
+    const fora = lado.horizontal ? (lado.nome === 'norte' ? fh.n.y : -fh.n.y) : lado.nome === 'leste' ? fh.n.x : -fh.n.x;
+    const borda = openingEdge(openingExtents(p, o, fh, fora >= 0 ? 1 : -1), refVao);
+    const pos = refVao === 'center' ? [o.offset] : [o.offset - borda, o.offset + borda];
     for (const d of pos) vaos.push({ t: coord({ x: host.a.x + ux * d, y: host.a.y + uy * d }) });
   }
 
@@ -362,7 +397,7 @@ export function cotasAutomaticas(p: Project, levelId: Id, opts: AutoCotaOptions 
   for (const nome of ladosDe(opts, caixa)) {
     const { paralelas, perpendiculares } = paredesDoLado(paredes, nome, caixa, somenteExternas, frame);
     if (paralelas.length === 0) continue;
-    const base = baseDoLado(paralelas, nome, opts.referencia ?? 'externa', frame);
+    const base = baseDoLado(paralelas, nome, refParede(p, opts), frame);
     if (!Number.isFinite(base)) continue;
     const lado: Lado = { nome, horizontal: nome === 'sul' || nome === 'norte', base };
     const mid = lado.horizontal ? (caixa.x0 + caixa.x1) / 2 : (caixa.y0 + caixa.y1) / 2;

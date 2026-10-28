@@ -7,7 +7,7 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - [x] D3 resolvedores
 - [ ] D4 provedor de esquadrias + registro (código novo; integrar em `openingTool.ts` só depois do marco M4) -- PARCIAL: tipos, registro, `refs`, provedor `opening` e testes prontos; falta o passo 3 (religar `openingTool.ts`, apagar `openingDims*`, `dimensionRefs`/`temporaryDimensions`) depois de M4
 - [ ] D5 sobreposição única (só depois do marco M1)
-- [ ] D6 validação de hospedados
+- [x] D6 validação de hospedados
 - [ ] D7 alças trocam referência
 - [ ] D8 permanentes + autoCotas  → **D4–D8 integrados = marco M5**
 - [ ] D9 diálogo Cotas… + troca rápida (só depois do marco M3)
@@ -24,6 +24,8 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 
 - D3: `perpendicularNeighbors` agora devolve `frame` e `point` e testa perpendicularidade com a tangente da hospedeira no ponto de encosto (antes: tangente inicial; paredes curvas eram rejeitadas).
 - D4: chaves de override: por ponta `opening:wallLeft|openLeft|wallRight|openRight`; globais (troca rápida do D9) `opening:wall` e `opening:opening`; a específica vence. `DimProvider` ganhou `selectionSubject?` (necessário para o registro montar o sujeito do elemento selecionado). Ordem de `ends` = (a, b) com a ponta de parede em `a` nas duas cotas (a cota direita corre da parede para a esquadria, `offset` negativo).
+- D6 feito antes do M1 (puro). D8 parcial: `toPermanent` (sem `refs`: os pontos são faces/bordas, não extremidades de parede) e `autoCotas` com `wallRef`/`openingRef` (apelidos antigos mantidos e testados; 'eixo' agora é o centro da espessura) prontos; falta o botão "I" (overlay, depois do D5). `AutoCotaDialog.tsx` (propriedade UNID, `dialogs/**`) ainda usa os apelidos obsoletos: troco no fim, na Fase F, se a UNID não o fizer.
+- D11 parcial: `COMO-ADICIONAR-COTA.md`, `dims/providers/example.test.ts` e decisão `0037` escritos; revisar quando D5/D9 existirem.
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 

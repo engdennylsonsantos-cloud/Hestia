@@ -18,11 +18,15 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C1 painel de propriedades
 - [x] C2 diálogos
 - [x] C3 barras e chrome
-- [ ] C5 model e engine (`Dimension.unit 'project'`)
+- [ ] C5 model e engine (`Dimension.unit 'project'`) — PARCIAL: `dimension.ts`, avisos de `model`/`engine` e áreas; faltam quadros/CSV (C6/ESQ) e `stairIssues`/`stairSketchValidate`
 - [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
-- [ ] `npm run check` verde, integrado
+- [x] `npm run check` verde, integrado
 
 ## Desvios
+- C5 (parcial): `dimensionText`/`formatDimension` recebem `units` opcional (padrão `defaultUnits()`); `Dimension.unit` ganhou `'project'`; `formatDimensionValue` idem. Avisos de `validate*` e de `engine/*Issues` usam `unitsOf(p)`; helpers sem projeto recebem `units` opcional. Áreas minúsculas (`fmtArea`) continuam em cm² para não zerar.
+- C5: CSV (`csv.ts`, `*ScheduleToCsv`, cabeçalhos `(m²)/(m³)`) e os quantitativos que só têm comentários com unidade ficam para o C6 (ESQ) / C7, conforme a divisão do 03.
+- PEDIDO ESQ: `packages/tools/src/dimensionTool.ts` ainda grava `unit`/`precision` fixos ao criar cota (linhas ~161/207/223); remover em C4/C6 para a cota seguir o projeto.
+- PEDIDO ESQ: `packages/engine/src/stairIssues.ts` e `stairSketchValidate.ts` ainda usam `toFixed` em mensagens de norma do croqui; migrar com `units` ao passar pelo C6.
 - C3: inclui também `*Props`/`*Row` vizinhos (AnnotationProps, GraphicsProps, RoofPlanesProps, RoofMansardProps, ProfileRow, RoofProfileRow, GridProperties, LevelField); ângulos convertem graus↔radianos na borda, medidas em mm do modelo convertem para metros no campo. Coordenadas de `viewcube*` e a matriz CSS receberam `units-ok` (formato de máquina).
 - C2: quadros usam o helper `scheduleUnits.ts` (cabeçalho com o símbolo do projeto e célula convertida); os rótulos de `i18nTabelas.ts` perderam o sufixo fixo `(m)/(m²)/(m³)/(%)`. Campos cuja unidade nativa não é SI (grade em mm, margem de folha em mm, inclinação em %) passaram a converter na borda. Unidades técnicas fixas (W/m²K) e transparência (%) ficaram com `units-ok`.
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
@@ -32,8 +36,8 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - U6 (`npm run check` completo): a suíte inteira passou em lint/typecheck e 6369 testes; 6 testes de `shortcutConfig.test.ts` estouraram 5 s por contenção do paralelismo e passam isolados (11/11 em 15,5 s). Reexecutar o `check` no fim da fase.
 - U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
 ## Estado ao encerrar este turno
-- Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3) e C1. Faltam C2, C3, C5 e C7 (C7 só depois de ESQ C4/C6).
-- `npm run check` completo verde em 2026-10-28: 549 arquivos, 6415 testes, lint (inclui `check-units`) e typecheck ok.
+- Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3), C1, B5, C2 e C3. C5 está parcial (dimension + avisos); C7 só depois de ESQ C4/C6.
+- `npm run check` completo verde em 2026-10-28: 555 arquivos, 6439 testes, lint (inclui `check-units`) e typecheck ok.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

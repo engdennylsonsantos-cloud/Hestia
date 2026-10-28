@@ -1,5 +1,5 @@
 import { dot, sub, type Vec2 } from '@hestia/geom';
-import { openingTypeById, isOpening, isRoof, isWall, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { formatQuantity, openingTypeById, isOpening, isRoof, isWall, unitsOf, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
 import { buildFrame, type WallFrame } from './frame.ts';
 import { expandRoofArcs } from './roofArcs.ts';
 
@@ -26,8 +26,6 @@ interface Body {
 }
 
 const label = (e: { id: Id; mark: string }): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
-const cm = (m: number): string => `${(m * 100).toFixed(1).replace('.', ',')} cm`;
-
 /** Coordenadas locais da parede (isometria: as distâncias não mudam). */
 function local(f: WallFrame, p: Vec2): Vec2 {
   const d = sub(p, f.a);
@@ -111,6 +109,7 @@ function eaveEdges(boundary: Vec2[]): Array<{ p: Vec2; q: Vec2 }> {
  * Paredes curvas não são checadas. A cota do beiral não entra no cálculo (só a planta).
  */
 export function roofEaveIssues(p: Project): ValidationIssue[] {
+  const units = unitsOf(p);
   const roofs = Object.values(p.elements).filter(isRoof);
   if (roofs.length === 0) return [];
   const bodies = bodiesOf(p);
@@ -155,7 +154,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
         out.push({
           severity: 'warning',
           code: 'roof-eave-opening',
-          message: `Telhado ${label(roof)}: beiral a ${cm(best)} da abertura ${label(o)} (limite de ${cm(EAVE_OPENING_DISTANCE)}); ajuste o balanço ou a posição da abertura.`,
+          message: `Telhado ${label(roof)}: beiral a ${formatQuantity(units, 'smallLength', best)} da abertura ${label(o)} (limite de ${formatQuantity(units, 'smallLength', EAVE_OPENING_DISTANCE)}); ajuste o balanço ou a posição da abertura.`,
           elementId: roof.id,
           ids: [roof.id, o.id],
         });

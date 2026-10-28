@@ -1,5 +1,5 @@
 import { intersection, multiArea, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import type { Id, Project, ValidationIssue } from '@hestia/model';
+import { defaultUnits, formatQuantity, unitsOf, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveFloors } from './floors.ts';
 import { makeStairIssue, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
@@ -16,7 +16,6 @@ import { stairWallOverlapIssues } from './stairWallOverlap.ts';
 const EPS = 1e-9;
 const EPS_AREA = 1e-6;
 
-const num = (n: number, digits: number): string => n.toFixed(digits).replace('.', ',');
 
 /** Elemento do nível de topo: contorno resolvido (já com os furos das escadas) e cota da face inferior em cada ponto. */
 export interface TopCover {
@@ -39,7 +38,7 @@ export function topCovers(p: Project, levelId: Id): TopCover[] {
  * do modo (`openingHeadroom`, ou o mínimo do tipo): o que sobra tem folga maior, então sem aviso. Com `openingHeadroom`
  * abaixo do mínimo do tipo, os degraus entre os dois valores ficam sob a laje e avisam.
  */
-export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[]): StairIssueItem | null {
+export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[], units = defaultUnits()): StairIssueItem | null {
   let worst: { h: number; ci: number } | null = null;
   for (const st of rs.steps) {
     for (const c of covers) {
@@ -58,7 +57,7 @@ export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[]): Stair
     rs.id,
     'stair-headroom',
     'warning',
-    `Folga de cabeça de ${num(worst.h, 2)} m menor que a mínima do tipo (${num(rs.type.minHeadroom, 2)} m) sob a laje.`,
+    `Folga de cabeça de ${formatQuantity(units, 'length', worst.h)} menor que a mínima do tipo (${formatQuantity(units, 'length', rs.type.minHeadroom)}) sob a laje.`,
     worst.ci,
   );
 }
@@ -75,7 +74,7 @@ export function stairIssueList(p: Project): StairIssueItem[] {
         coversOnLevel = topCovers(p, r.topLevelId);
         covers.set(r.topLevelId, coversOnLevel);
       }
-      const h = stairHeadroomIssue(r, coversOnLevel);
+      const h = stairHeadroomIssue(r, coversOnLevel, unitsOf(p));
       if (h) list.push(h);
     }
     return list;

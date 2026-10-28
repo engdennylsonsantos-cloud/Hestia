@@ -1,12 +1,10 @@
-import { isWall, wallMaxHeight, wallBaseElevation, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, wallMaxHeight, wallBaseElevation, type Project, type ValidationIssue, type Wall } from '@hestia/model';
 import { resolveAllFloors } from './floors.ts';
 import { attachSpans } from './wallAttach.ts';
 import { resolveAllSlabs } from './slabs.ts';
 
 /** Trecho sem piso ou laje menor que isto (m) não é avisado. */
 const UNCOVERED_TOL = 1e-3;
-
-const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 
 /**
  * Avisos entre paredes e pisos/lajes (decisão 0023 §6, P9). `wall-floor-partial` (informativo): a base ou o topo anexado
@@ -27,14 +25,14 @@ export function wallFloorIssues(p: Project): ValidationIssue[] {
     const base = wallBaseElevation(p, e);
     const spans = attachSpans(e, base, base + wallMaxHeight(p, e), bottom ? e.levelId : null, top ? e.topLevelId : null, floors, slabs);
     const L = spans.reduce((s, sp) => s + (sp.t1 - sp.t0), 0);
-    if (bottom) out.push(...endIssues(e, 'base', L, spans.filter((s) => s.onBottom)));
-    if (top) out.push(...endIssues(e, 'topo', L, spans.filter((s) => s.onTop)));
+    if (bottom) out.push(...endIssues(e, 'base', L, spans.filter((s) => s.onBottom), unitsOf(p)));
+    if (top) out.push(...endIssues(e, 'topo', L, spans.filter((s) => s.onTop), unitsOf(p)));
   }
   return out;
 }
 
 /** Aviso de uma extremidade (base ou topo) pela soma dos trechos aplicados. */
-function endIssues(e: Wall, nome: 'base' | 'topo', L: number, aplicados: Array<{ t0: number; t1: number }>): ValidationIssue[] {
+function endIssues(e: Wall, nome: 'base' | 'topo', L: number, aplicados: Array<{ t0: number; t1: number }>, units: ReturnType<typeof unitsOf>): ValidationIssue[] {
   const coberto = aplicados.reduce((s, sp) => s + (sp.t1 - sp.t0), 0);
   if (coberto >= L - UNCOVERED_TOL) return [];
   const doAnexo = nome === 'base' ? 'à base' : 'ao topo';
@@ -47,7 +45,7 @@ function endIssues(e: Wall, nome: 'base' | 'topo', L: number, aplicados: Array<{
     {
       severity: 'info',
       code: 'wall-floor-partial',
-      message: `Parede "${e.id}" está anexada ${doAnexo} no piso, mas só ${fmt(coberto)} m dos ${fmt(L)} m do eixo estão sobre piso ou laje; só o trecho coberto foi ajustado.`,
+      message: `Parede "${e.id}" está anexada ${doAnexo} no piso, mas só ${formatQuantity(units, 'length', coberto)} dos ${formatQuantity(units, 'length', L)} do eixo estão sobre piso ou laje; só o trecho coberto foi ajustado.`,
       elementId: e.id,
     },
   ];

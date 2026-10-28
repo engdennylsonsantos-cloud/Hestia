@@ -1,4 +1,4 @@
-import { isWall, type Project, type ValidationIssue } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveAllFloors } from './floors.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { roofAxisReport } from './roofWall.ts';
@@ -9,8 +9,6 @@ import { wallZRange } from './wallZ.ts';
 const TOP_TOL = 1e-3;
 /** Trecho sem telhado menor que isto (m) não é avisado. */
 const UNCOVERED_TOL = 1e-3;
-
-const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 
 /**
  * Avisos entre paredes e telhados (docs/paridade/telhados C2). `wall-roof-uncovered`: parede anexada ao telhado cujo eixo
@@ -35,7 +33,7 @@ export function roofWallIssues(p: Project): ValidationIssue[] {
         code: 'wall-roof-uncovered',
         message: whole
           ? `Parede "${e.id}" está anexada ao telhado, mas o eixo não está sob telhado nenhum; o topo fica na altura normal.`
-          : `Parede "${e.id}" está anexada ao telhado, mas ${fmt(rep.uncovered)} m do eixo estão fora dele; esse trecho fica na altura normal.`,
+          : `Parede "${e.id}" está anexada ao telhado, mas ${formatQuantity(unitsOf(p), 'length', rep.uncovered)} do eixo estão fora dele; esse trecho fica na altura normal.`,
         elementId: e.id,
       });
     } else if (rep.minBottom !== null) {
@@ -45,7 +43,7 @@ export function roofWallIssues(p: Project): ValidationIssue[] {
         out.push({
           severity: 'warning',
           code: 'wall-roof-pierce',
-          message: `Parede "${e.id}" passa ${fmt(top - rep.minBottom)} m da face inferior do telhado; ative o topo ajustado ao telhado ou baixe a parede.`,
+          message: `Parede "${e.id}" passa ${formatQuantity(unitsOf(p), 'length', top - rep.minBottom)} da face inferior do telhado; ative o topo ajustado ao telhado ou baixe a parede.`,
           elementId: e.id,
         });
       }

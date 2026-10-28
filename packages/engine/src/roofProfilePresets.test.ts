@@ -123,7 +123,7 @@ describe('validação do perfil', () => {
   });
 
   it('trecho acima de 200 % é erro de inclinação (300 % aqui)', () => {
-    expect(roofProfileSlopeError([{ t: 0, z: 0 }, { t: 1, z: 3 }])).toMatch(/300 %/);
+    expect(roofProfileSlopeError([{ t: 0, z: 0 }, { t: 1, z: 3 }])).toMatch(/300,0%/);
     expect(roofProfileSlopeError([{ t: 0, z: 0 }, { t: 1, z: 2 }])).toBeNull();
   });
 });

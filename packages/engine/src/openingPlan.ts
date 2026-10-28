@@ -1,3 +1,4 @@
+import { machineNumber } from '@hestia/geom';
 import type { LeafOpening, OpeningModel } from './openingModelTypes.ts';
 import {
   addFrameCut,
@@ -207,7 +208,7 @@ function basePaths(m: OpeningModel, opts: OpeningPlanOptions): OpeningPlanPath[]
   return out;
 }
 
-const chave = (p: OpeningPlanPath): string => p.pts.map((q) => `${q.t.toFixed(4)},${q.s.toFixed(4)}`).join(';');
+const chave = (p: OpeningPlanPath): string => p.pts.map((q) => `${machineNumber(q.t, 4)},${machineNumber(q.s, 4)}`).join(';');
 
 /**
  * Planta da esquadria a partir do modelo único (spec E §4.1), em coordenadas locais do vão. `low` mostra as três

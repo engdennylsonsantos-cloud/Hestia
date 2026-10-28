@@ -1,4 +1,4 @@
-import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, intersection, machineNumber, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingLineConvention, openingType, openingsOfWall, wallsOnLevel, type HatchKind, type Id, type OpeningLineConvention, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
@@ -137,7 +137,7 @@ function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
   list.forEach((b, i) => {
     // Escadas e telhados ficam peça a peça (cada degrau, espelho e água é um item); paredes, pisos e lajes agrupam.
     const merge = b.wallId !== undefined || b.floorId !== undefined || b.slabId !== undefined || b.ceilingId !== undefined;
-    const key = merge ? [b.wallId, b.floorId, b.slabId, b.ceilingId, b.materialId, b.layerIndex, b.depth.toFixed(6)].join('|') : `#${i}`;
+    const key = merge ? [b.wallId, b.floorId, b.slabId, b.ceilingId, b.materialId, b.layerIndex, machineNumber(b.depth, 6)].join('|') : `#${i}`;
     const group = byKey.get(key);
     if (group) group.push(b);
     else byKey.set(key, [b]);

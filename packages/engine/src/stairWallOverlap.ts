@@ -1,5 +1,5 @@
 import { boxOf, boxesOverlap, intersection, multiArea, union, type Box, type MultiPolygon } from '@hestia/geom';
-import { isWall, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
+import { formatQuantity, unitsOf, isWall, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { resolveLevel } from './resolve.ts';
 import { makeStairIssue, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
@@ -17,7 +17,6 @@ export const STAIR_WALL_OVERLAP_MIN = 0.005;
 const EPS_Z = 1e-6;
 
 const label = (w: Wall): string => (w.mark ? `"${w.mark}" (${w.id})` : `"${w.id}"`);
-const m2 = (a: number): string => a.toFixed(2).replace('.', ',');
 
 /** Parede resolvida como corpo em planta (união das camadas) e faixa de altura em que existe. */
 interface WallSolid {
@@ -71,7 +70,7 @@ export function stairWallOverlapIssues(p: Project, resolved: ResolvedStair[] = r
           r.id,
           'stair-wall-overlap',
           'warning',
-          `A escada "${r.id}" invade a parede ${label(s.wall)} em ${m2(area)} m² na planta; afaste a escada ou a parede.`,
+          `A escada "${r.id}" invade a parede ${label(s.wall)} em ${formatQuantity(unitsOf(p), 'area', area)} na planta; afaste a escada ou a parede.`,
         );
         issue.ids = [r.id, s.wall.id];
         out.push(issue);

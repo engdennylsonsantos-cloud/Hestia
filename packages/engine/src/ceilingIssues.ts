@@ -1,4 +1,4 @@
-import { ceilingTypeThickness, followsRoom, isCeiling, isWall, levelElevation, wallsOnLevel, type Ceiling, type Id, type Project, type ValidationIssue } from '@hestia/model';
+import { ceilingTypeThickness, followsRoom, formatQuantity, isCeiling, isWall, levelElevation, unitsOf, wallsOnLevel, type Ceiling, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { ceilingOutline, roomsById, type CeilingRoomProblem, type RoomsById } from './ceilings.ts';
 import { elementZRange } from './viewClass.ts';
 
@@ -20,6 +20,7 @@ const ROOM_PROBLEM_TEXT: Record<CeilingRoomProblem, string> = {
  * ambiente apagado); o forro mantém o último contorno gravado.
  */
 export function ceilingIssues(p: Project): ValidationIssue[] {
+  const units = unitsOf(p);
   const out: ValidationIssue[] = [];
   const roomsCache = new Map<Id, RoomsById>();
   for (const c of Object.values(p.elements).filter(isCeiling)) {
@@ -53,7 +54,7 @@ export function ceilingIssues(p: Project): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'ceiling-above-wall',
-        message: `Forro ${name} fica acima da parede mais baixa do nível (face inferior em ${underside.toFixed(2).replace('.', ',')} m; parede em ${lowestTop.toFixed(2).replace('.', ',')} m).`,
+        message: `Forro ${name} fica acima da parede mais baixa do nível (face inferior em ${formatQuantity(units, 'length', underside)}; parede em ${formatQuantity(units, 'length', lowestTop)}).`,
         elementId: c.id,
       });
     }

@@ -68,9 +68,12 @@ export type PartMotion =
  * Seção da peça, para peças que não são caixas (batente com rebaixo). `plane 'ts'`: `pts` são (t, s) e a peça é extrudada em z entre
  * `box.z0` e `box.z1` (ombreira); `plane 'sz'`: `pts` são (s, z), extrudada em t entre `box.t0` e `box.t1` (travessa). `box` é sempre a caixa
  * envolvente exata do prisma. Uma peça com `profile` é UMA peça física (não duas caixas coladas).
+ *
+ * `plane 'tz'`: `pts` são (t, z) e a peça é extrudada em s entre `box.s0` e `box.s1` (disco ou cilindro com eixo perpendicular
+ * à folha: roseta, haste, bola).
  */
 export interface PartProfile {
-  plane: 'ts' | 'sz';
+  plane: 'ts' | 'sz' | 'tz';
   pts: Array<[number, number]>;
 }
 

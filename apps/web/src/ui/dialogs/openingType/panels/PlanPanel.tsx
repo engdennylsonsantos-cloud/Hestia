@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { openingPlanDisplay, openingSwingStyle } from '@hestia/model';
+import { openingLeafPlan, openingPlanDisplay, openingSwingStyle } from '@hestia/model';
 import { Check } from '../../../fields.tsx';
 import { usePanelKit, type PanelProps } from './panelKit.tsx';
 
@@ -17,6 +17,14 @@ export function PlanPanel({ d, onChange, support }: PanelProps): ReactElement {
       </div>
       {support.angle ? (
         <>
+          <div className="field-row">
+            <label htmlFor="op-leaf-plan" title="Folha desenhada na planta: só a aberta, só a fechada ou as duas">Folha em planta</label>
+            <select id="op-leaf-plan" className="select" value={openingLeafPlan(d)} onChange={(e) => k.setField('leafPlan', e.target.value, 'open')}>
+              <option value="open">Só a aberta</option>
+              <option value="closed">Só a fechada</option>
+              <option value="both">As duas</option>
+            </select>
+          </div>
           <div className="field-row"><label htmlFor="op-swing" title="Arco do fecho desenhado na planta">Mostrar arco</label><Check id="op-swing" checked={d.showSwing !== false} onChange={(v) => { if (v) k.limpar('showSwing'); else k.set({ showSwing: false }); }} /></div>
           <div className="field-row">
             <label htmlFor="op-swing-style">Estilo do arco</label>

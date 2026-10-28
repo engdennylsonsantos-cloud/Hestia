@@ -66,7 +66,7 @@ export function TempDimsOverlay(): ReactElement | null {
 
   const previewing = tool !== 'select';
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const dims: TempDim[] = useMemo(() => (previewing ? (ctx.settings.showOnPlacement ? toolDims() : []) : selDims), [previewing, ctx, selDims, tick]);
+  const dims: TempDim[] = useMemo(() => (previewing ? (ctx.settings.showOnPlacement ? toolDims(ctx.overrides) : []) : selDims), [previewing, ctx, selDims, tick]);
   if (!viewport || dims.length === 0) return null;
 
   const toScreen = (p: { x: number; y: number }): { x: number; y: number } => worldToScreen(viewport, p);

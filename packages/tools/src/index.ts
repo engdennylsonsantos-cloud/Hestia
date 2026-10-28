@@ -1,8 +1,7 @@
 export * from './types.ts';
 export * from './infer.ts';
 export * from './numeric.ts';
-export { formatMeters, perpendicularNeighbors, type PerpendicularWall } from './openingPlacement.ts';
-export * from './openingDims.ts';
+export { perpendicularNeighbors, type PerpendicularWall } from './openingPlacement.ts';
 export * from './openingGrips.ts';
 export * from './pick.ts';
 export * from './edit.ts';

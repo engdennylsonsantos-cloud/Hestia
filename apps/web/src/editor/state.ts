@@ -176,7 +176,6 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   openingToward: 'cursor',
   openingAnchor: 'center',
   openingClear: 0.1,
-  openingDimMode: 'axis',
   orthoLock: false,
   arrayCount: 3,
   arrayKind: 'linear',

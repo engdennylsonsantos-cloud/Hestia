@@ -26,7 +26,7 @@ export function useSelectionDims(): TempDim[] {
 }
 
 /** Cotas da prévia da ferramenta ativa (vazio para Selecionar ou ferramenta sem `tempDims`). */
-export function toolDims(): TempDim[] {
+export function toolDims(overrides: DimContext['overrides']): TempDim[] {
   const tool = editor.activeTool;
-  return tool.id === 'select' || !tool.tempDims ? [] : tool.tempDims();
+  return tool.id === 'select' || !tool.tempDims ? [] : tool.tempDims(overrides);
 }

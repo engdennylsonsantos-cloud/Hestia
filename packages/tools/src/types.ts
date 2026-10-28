@@ -1,4 +1,4 @@
-import type { TempDim } from './dims/types.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
@@ -141,8 +141,6 @@ export interface ToolOptions {
   openingAnchor?: 'center' | 'hinge' | 'latch';
   /** Folga (m) da borda da abertura até a face da parede perpendicular. Ausente = 0,10 m. */
   openingClear?: number;
-  /** Cotas temporárias: do eixo da abertura ao eixo da perpendicular (padrão) ou da borda à face. */
-  openingDimMode?: 'axis' | 'face';
   /** Etiquetar ao inserir (Revit: Tag on Placement): liga `settings.showOpeningTags` ao colocar. Ausente = ligado. */
   openingTagOnPlace?: boolean;
   openingSillOverride?: number | null;
@@ -274,7 +272,7 @@ export interface Tool {
   up?(p: PointerInfo): void;
   preview(): PreviewItem[];
   /** Cotas dinâmicas da prévia (sistema único de cotas); ausente = a ferramenta não mostra cotas ao desenhar. */
-  tempDims?(): TempDim[];
+  tempDims?(overrides?: Readonly<Record<string, DimRef>>): TempDim[];
   /** Inferência corrente, para o desenho de guias e marcadores. */
   inference(): Inference | null;
   /** Delete com um vértice de piso em foco: remove o vértice e devolve true; false deixa o Delete excluir a seleção. */

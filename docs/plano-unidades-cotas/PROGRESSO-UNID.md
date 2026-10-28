@@ -7,7 +7,8 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] U3 `ProjectSettings.units`
 - [x] U4 `parseQuantityText` (tools)
 - [x] U5 hook `useUnits`
-- [ ] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
+- [x] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
+- **MARCO M1 LIBERADO <a definir neste commit>** (Fase A até U6 integrada: `formatQuantity`, `parseQuantity`, `useUnits`/`useFormat`, `NumField quantity`)
 - [ ] U7 exportações independentes
 - [ ] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
 - [ ] B1–B4 diálogo Unidades (`02`)  → **marco M3**

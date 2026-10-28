@@ -317,7 +317,7 @@ export class Editor {
     if (e.altKey || ui.typed || this.tool.freeText) return false;
     const r = casador.tecla(k);
     if (!r.tratada) return false;
-    if (r.comando === 'atalhos') useUi.setState({ dialog: 'shortcutsConfig', dialogArg: null });
+    if (r.comando === 'atalhos' || r.comando === 'unidades') useUi.setState({ dialog: r.comando === 'atalhos' ? 'shortcutsConfig' : 'units', dialogArg: null });
     else if (r.comando) this.setTool(r.comando);
     return true;
   }

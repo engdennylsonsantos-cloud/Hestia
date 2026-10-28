@@ -1,10 +1,12 @@
 import type { ReactElement } from 'react';
-import type { LocationLine } from '@hestia/model';
+import { isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
 import { roofAutoOffset, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
+import { clearDimOverride, setDimOverride, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
+import { OPENING_OPTIONS, WALL_OPTIONS, sessionChoice } from './dialogs/dimensionSettingsModel.ts';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -15,8 +17,12 @@ export function hasPlacementProperties(tool: ToolId): boolean {
 /** Configurações de colocação ligadas ao mesmo ToolOptions que as ferramentas leem ao criar cada elemento. */
 export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const p = useProject();
+  const format = useFormat();
   const levelId = useUi((s) => s.levelId);
   const o = useUi((s) => s.options);
+  const dimOverrides = useUi((s) => s.dimOverrides);
+  // Troca rápida das cotas: vale só para a sessão ('' volta ao padrão do projeto).
+  const chooseDim = (key: string, v: string): void => (isWallDimRef(v) || isOpeningDimRef(v) ? setDimOverride(key, v) : clearDimOverride(key));
   const set = (patch: Partial<typeof o>): void => useUi.setState((s) => ({ options: { ...s.options, ...patch } }));
   const setStairRun = (patch: Partial<NonNullable<typeof o.stairRun>>): void => set({ stairRun: { ...(o.stairRun ?? { shape: 'straight', width: 1.2, turn: 'left' }), ...patch } });
   const setStair = (patch: Partial<NonNullable<typeof o.stair>>): void => set({ stair: { ...(o.stair ?? {}), ...patch } });
@@ -27,9 +33,9 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
         <Group title="Colocação · Parede">
           <Row label="Forma" htmlFor="place-wall-shape"><select id="place-wall-shape" className="select" value={o.wallShape} onChange={(e) => set({ wallShape: e.target.value as typeof o.wallShape })}><option value="line">Reta</option><option value="arc">Arco (3 pontos)</option><option value="rect">Retângulo</option></select></Row>
           <Row label="Nível base"><span className="val">{p.levels.find((l) => l.id === levelId)?.name ?? 'Nível ativo'}</span></Row>
-          <Row label="Desloc. da base" htmlFor="place-wall-base"><NumField id="place-wall-base" value={o.wallBaseOffset ?? 0} unit="m" onCommit={(v) => set({ wallBaseOffset: v })} /></Row>
+          <Row label="Desloc. da base" htmlFor="place-wall-base"><NumField id="place-wall-base" value={o.wallBaseOffset ?? 0} quantity="length" onCommit={(v) => set({ wallBaseOffset: v })} /></Row>
           <Row label="Nível superior" htmlFor="place-wall-top"><select id="place-wall-top" className="select" value={o.wallTopLevelId ?? ''} onChange={(e) => set({ wallTopLevelId: e.target.value || null })}><option value="">Por altura</option>{p.levels.filter((l) => l.id !== levelId).map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}</select></Row>
-          {o.wallTopLevelId ? <Row label="Desloc. do topo" htmlFor="place-wall-topoff"><NumField id="place-wall-topoff" value={o.wallTopOffset ?? 0} unit="m" onCommit={(v) => set({ wallTopOffset: v })} /></Row> : <Row label="Altura" htmlFor="place-wall-height"><NumField id="place-wall-height" value={o.wallHeight} unit="m" min={0.1} onCommit={(v) => set({ wallHeight: v })} /></Row>}
+          {o.wallTopLevelId ? <Row label="Desloc. do topo" htmlFor="place-wall-topoff"><NumField id="place-wall-topoff" value={o.wallTopOffset ?? 0} quantity="length" onCommit={(v) => set({ wallTopOffset: v })} /></Row> : <Row label="Altura" htmlFor="place-wall-height"><NumField id="place-wall-height" value={o.wallHeight} quantity="length" min={0.1} onCommit={(v) => set({ wallHeight: v })} /></Row>}
           <Row label="Linha de localização" htmlFor="place-wall-location"><select id="place-wall-location" className="select" value={o.locationLine} onChange={(e) => set({ locationLine: e.target.value as LocationLine })}>{Object.entries(LOCATION_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Row>
           <Row label="Inverter lado externo"><Check id="place-wall-flipped" checked={o.wallFlipped ?? false} onChange={(v) => set({ wallFlipped: v })} /></Row>
           <Row label="Encadear"><Check id="place-wall-chain" checked={o.chain} onChange={(v) => set({ chain: v })} /></Row>
@@ -43,54 +49,56 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           <Row label="Sentido" htmlFor="place-open-facing-mode"><select id="place-open-facing-mode" className="select" value={o.openingFacingMode ?? 'cursor'} onChange={(e) => set({ openingFacingMode: e.target.value as NonNullable<typeof o.openingFacingMode> })}><option value="cursor">Pelo cursor</option><option value="fixed">Manual</option></select></Row>
           <Row label="Abrir" htmlFor="place-open-toward"><select id="place-open-toward" className="select" value={o.openingToward ?? 'cursor'} onChange={(e) => set({ openingToward: e.target.value as NonNullable<typeof o.openingToward> })}><option value="cursor">para o lado do cursor</option><option value="away">para o lado oposto</option></select></Row>
           <Row label="Âncora" htmlFor="place-open-anchor"><select id="place-open-anchor" className="select" value={o.openingAnchor ?? 'center'} onChange={(e) => set({ openingAnchor: e.target.value as NonNullable<typeof o.openingAnchor> })}><option value="center">Centro</option><option value="hinge">Ombreira da dobradiça</option><option value="latch">Ombreira do trinco</option></select></Row>
-          <Row label="Folga da quina (cm)" htmlFor="place-open-clear"><NumField id="place-open-clear" value={o.openingClear ?? 0.1} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ openingClear: v })} /></Row>
-          <Row label="Cotas" htmlFor="place-open-dim"><select id="place-open-dim" className="select" value={o.openingDimMode ?? 'axis'} onChange={(e) => set({ openingDimMode: e.target.value as NonNullable<typeof o.openingDimMode> })}><option value="axis">Do eixo</option><option value="face">Da face do batente</option></select></Row>
+          <Row label="Folga da quina (cm)" htmlFor="place-open-clear"><NumField id="place-open-clear" value={o.openingClear ?? 0.1} quantity="smallLength" min={0} onCommit={(v) => set({ openingClear: v })} /></Row>
+          <Row label="Cota: parede" htmlFor="place-open-dim-wall"><select id="place-open-dim-wall" className="select" value={sessionChoice(dimOverrides, 'opening:wall')} onChange={(e) => chooseDim('opening:wall', e.target.value)}><option value="">Padrão do projeto</option>{WALL_OPTIONS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</select></Row>
+          <Row label="Cota: esquadria" htmlFor="place-open-dim-self"><select id="place-open-dim-self" className="select" value={sessionChoice(dimOverrides, 'opening:opening')} onChange={(e) => chooseDim('opening:opening', e.target.value)}><option value="">Padrão do projeto</option>{OPENING_OPTIONS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</select></Row>
           <Row label="Etiquetas de portas e janelas"><Check id="place-open-tags" checked={p.settings.showOpeningTags === true} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showOpeningTags: v } })} /></Row>
           <Row label="Etiquetar ao inserir"><Check id="place-open-tag-place" checked={o.openingTagOnPlace !== false} onChange={(v) => set({ openingTagOnPlace: v })} /></Row>
-          {(() => { const typeId = tool === 'door' ? o.doorTypeId : o.windowTypeId; const type = p.openingTypes[typeId]; return <Row label="Peitoril" htmlFor="place-opening-sill"><NumField id="place-opening-sill" value={o.openingSillOverride ?? type?.sill ?? 0} placeholder={type ? `${type.sill.toFixed(2).replace('.', ',')} m (tipo)` : undefined} onCommit={(v) => set({ openingSillOverride: v })} onClear={() => set({ openingSillOverride: null })} unit="m" min={0} /></Row>; })()}
+          {(() => { const typeId = tool === 'door' ? o.doorTypeId : o.windowTypeId; const type = p.openingTypes[typeId]; return <Row label="Peitoril" htmlFor="place-opening-sill"><NumField id="place-opening-sill" value={o.openingSillOverride ?? type?.sill ?? 0} placeholder={type ? `${format('length', type.sill)} (tipo)` : undefined} onCommit={(v) => set({ openingSillOverride: v })} onClear={() => set({ openingSillOverride: null })} quantity="length" min={0} /></Row>; })()}
           <div className="hint">A parede anfitriã e a posição são escolhidas na planta. Largura, altura e peitoril vêm do tipo selecionado.</div>
         </Group>
       )}
       {tool === 'floor' && (
         <Group title="Colocação · Piso">
-          <Row label="Desloc. do topo" htmlFor="place-floor-offset"><NumField id="place-floor-offset" value={o.floorOffset} unit="m" onCommit={(v) => set({ floorOffset: v })} /></Row>
+          <Row label="Desloc. do topo" htmlFor="place-floor-offset"><NumField id="place-floor-offset" value={o.floorOffset} quantity="length" onCommit={(v) => set({ floorOffset: v })} /></Row>
         </Group>
       )}
       {(tool === 'slab' || tool === 'slope') && (
         <Group title={`Colocação · ${tool === 'slope' ? 'Inclinação' : 'Laje'}`}>
           {tool === 'slab' && <>
-            <Row label="Desloc. do topo" htmlFor="place-slab-offset"><NumField id="place-slab-offset" value={o.slabOffset} unit="m" onCommit={(v) => set({ slabOffset: v })} /></Row>
+            <Row label="Desloc. do topo" htmlFor="place-slab-offset"><NumField id="place-slab-offset" value={o.slabOffset} quantity="length" onCommit={(v) => set({ slabOffset: v })} /></Row>
           </>}
-          <Row label="Caimento" htmlFor="place-slab-slope"><NumField id="place-slab-slope" value={o.slabSlopePercent} unit="%" onCommit={(v) => set({ slabSlopePercent: v })} /></Row>
+          <Row label="Caimento" htmlFor="place-slab-slope"><NumField id="place-slab-slope" value={o.slabSlopePercent / 100} quantity="slope" onCommit={(v) => set({ slabSlopePercent: v * 100 })} /></Row>
         </Group>
       )}
       {tool === 'ceiling' && (
         <Group title="Colocação · Forro">
-          <Row label="Cota do topo" htmlFor="place-ceiling-offset"><NumField id="place-ceiling-offset" value={o.ceilingOffset ?? 2.6} unit="m" onCommit={(v) => set({ ceilingOffset: v })} /></Row>
+          <Row label="Cota do topo" htmlFor="place-ceiling-offset"><NumField id="place-ceiling-offset" value={o.ceilingOffset ?? 2.6} quantity="length" onCommit={(v) => set({ ceilingOffset: v })} /></Row>
         </Group>
       )}
       {(tool === 'roof' || tool === 'roofextrusion') && (
         <Group title="Colocação · Telhado">
-          <Row label="Inclinação" htmlFor="place-roof-slope"><NumField id="place-roof-slope" value={o.roofSlope ?? 30} unit="%" min={0.1} onCommit={(v) => set({ roofSlope: v })} /></Row>
-          <Row label="Balanço do beiral" htmlFor="place-roof-overhang"><NumField id="place-roof-overhang" value={o.roofOverhang ?? 0.5} unit="m" min={0} onCommit={(v) => set({ roofOverhang: v })} /></Row>
-          <Row label="Cota do beiral" htmlFor="place-roof-offset"><NumField id="place-roof-offset" value={o.roofOffset ?? roofAutoOffset(p, levelId)} unit="m" onCommit={(v) => set({ roofOffset: v })} /></Row>
+          <Row label="Inclinação" htmlFor="place-roof-slope"><NumField id="place-roof-slope" value={(o.roofSlope ?? 30) / 100} quantity="slope" min={0.001} onCommit={(v) => set({ roofSlope: v * 100 })} /></Row>
+          <Row label="Balanço do beiral" htmlFor="place-roof-overhang"><NumField id="place-roof-overhang" value={o.roofOverhang ?? 0.5} quantity="length" min={0} onCommit={(v) => set({ roofOverhang: v })} /></Row>
+          <Row label="Cota do beiral" htmlFor="place-roof-offset"><NumField id="place-roof-offset" value={o.roofOffset ?? roofAutoOffset(p, levelId)} quantity="length" onCommit={(v) => set({ roofOffset: v })} /></Row>
           <div className="prow"><span /><button className="btn small" onClick={() => set({ roofOffset: null })}>Cota automática</button></div>
         </Group>
       )}
       {tool === 'stair' && (
         <Group title="Colocação · Escada">
           <Row label="Nível de topo" htmlFor="place-stair-top"><select id="place-stair-top" className="select" value={o.stair?.topLevelId ?? ''} onChange={(e) => setStair({ topLevelId: e.target.value || null })}><option value="">Automático (nível acima)</option>{p.levels.filter((l) => l.id !== levelId).map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}</select></Row>
-          <Row label="Desloc. da base" htmlFor="place-stair-base"><NumField id="place-stair-base" value={o.stair?.baseOffset ?? 0} unit="m" onCommit={(v) => setStair({ baseOffset: v })} /></Row>
-          <Row label="Desloc. do topo" htmlFor="place-stair-topoff"><NumField id="place-stair-topoff" value={o.stair?.topOffset ?? 0} unit="m" onCommit={(v) => setStair({ topOffset: v })} /></Row>
-          {!(o.stair?.topLevelId ?? p.levels.some((l) => l.elevation > (p.levels.find((x) => x.id === levelId)?.elevation ?? 0))) && <Row label="Altura" htmlFor="place-stair-height"><NumField id="place-stair-height" value={o.stair?.height ?? 2.8} unit="m" min={0.1} onCommit={(v) => setStair({ height: v })} /></Row>}
+          <Row label="Desloc. da base" htmlFor="place-stair-base"><NumField id="place-stair-base" value={o.stair?.baseOffset ?? 0} quantity="length" onCommit={(v) => setStair({ baseOffset: v })} /></Row>
+          <Row label="Desloc. do topo" htmlFor="place-stair-topoff"><NumField id="place-stair-topoff" value={o.stair?.topOffset ?? 0} quantity="length" onCommit={(v) => setStair({ topOffset: v })} /></Row>
+          {!(o.stair?.topLevelId ?? p.levels.some((l) => l.elevation > (p.levels.find((x) => x.id === levelId)?.elevation ?? 0))) && <Row label="Altura" htmlFor="place-stair-height"><NumField id="place-stair-height" value={o.stair?.height ?? 2.8} quantity="length" min={0.1} onCommit={(v) => setStair({ height: v })} /></Row>}
         </Group>
       )}
       {tool === 'stairrun' && (
         <Group title="Colocação · Escada por lance">
           <Row label="Forma" htmlFor="place-run-shape"><select id="place-run-shape" className="select" value={o.stairRun?.shape ?? 'straight'} onChange={(e) => setStairRun({ shape: e.target.value as NonNullable<typeof o.stairRun>['shape'] })}><option value="straight">Reta</option><option value="lshape">Em L</option><option value="ushape">Em U</option><option value="winder">Com leque</option><option value="spiral">Caracol</option></select></Row>
-          <Row label="Largura" htmlFor="place-run-width"><NumField id="place-run-width" value={o.stairRun?.width ?? 1.2} unit="m" min={0.4} onCommit={(v) => setStairRun({ width: v })} /></Row>
+          <Row label="Largura" htmlFor="place-run-width"><NumField id="place-run-width" value={o.stairRun?.width ?? 1.2} quantity="length" min={0.4} onCommit={(v) => setStairRun({ width: v })} /></Row>
           {o.stairRun?.shape !== 'straight' && <Row label="Giro" htmlFor="place-run-turn"><select id="place-run-turn" className="select" value={o.stairRun?.turn ?? 'left'} onChange={(e) => setStairRun({ turn: e.target.value as 'left' | 'right' })}><option value="left">Esquerda</option><option value="right">Direita</option></select></Row>}
-          {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} unit="m" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} unit="m" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={o.stairRun?.spiralSweep ?? 360} unit="°" min={30} max={720} onCommit={(v) => setStairRun({ spiralSweep: v })} /></Row></>}
+          {/* units-ok: varredura da escada em graus (valor gravado em graus) */}
+          {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={o.stairRun?.spiralSweep ?? 360} unit="°" min={30} max={720} onCommit={(v) => setStairRun({ spiralSweep: v })} /></Row></>}
         </Group>
       )}
       {tool === 'room' && (
@@ -98,8 +106,8 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           <Row label="Nível" htmlFor="place-room-level"><select id="place-room-level" className="select" value={levelId} onChange={(e) => useUi.setState({ levelId: e.target.value, selection: [] })}>{p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></Row>
           <Row label="Nome" htmlFor="place-room-name"><TextField id="place-room-name" value={o.roomName ?? ''} placeholder="Automático" onCommit={(v) => set({ roomName: v })} /></Row>
           <Row label="Número" htmlFor="place-room-number"><TextField id="place-room-number" value={o.roomNumber ?? ''} placeholder="Automático" onCommit={(v) => set({ roomNumber: v })} /></Row>
-          <Row label="Desloc. da base" htmlFor="place-room-offset"><NumField id="place-room-offset" value={o.roomHeightOffset ?? 0} unit="m" onCommit={(v) => set({ roomHeightOffset: v })} /></Row>
-          <Row label="Pé-direito" htmlFor="place-room-height"><NumField id="place-room-height" value={o.roomCeilingHeight ?? 2.8} unit="m" min={0.1} onCommit={(v) => set({ roomCeilingHeight: v })} /></Row>
+          <Row label="Desloc. da base" htmlFor="place-room-offset"><NumField id="place-room-offset" value={o.roomHeightOffset ?? 0} quantity="length" onCommit={(v) => set({ roomHeightOffset: v })} /></Row>
+          <Row label="Pé-direito" htmlFor="place-room-height"><NumField id="place-room-height" value={o.roomCeilingHeight ?? 2.8} quantity="length" min={0.1} onCommit={(v) => set({ roomCeilingHeight: v })} /></Row>
           <Row label="Acabamento do piso" htmlFor="place-room-floor"><TextField id="place-room-floor" value={o.roomFloorFinish ?? ''} onCommit={(v) => set({ roomFloorFinish: v })} /></Row>
           <Row label="Acabamento da parede" htmlFor="place-room-wall"><TextField id="place-room-wall" value={o.roomWallFinish ?? ''} onCommit={(v) => set({ roomWallFinish: v })} /></Row>
           <Row label="Acabamento do forro" htmlFor="place-room-ceiling"><TextField id="place-room-ceiling" value={o.roomCeilingFinish ?? ''} onCommit={(v) => set({ roomCeilingFinish: v })} /></Row>
@@ -108,7 +116,9 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {tool === 'text' && (
         <Group title="Colocação · Texto">
+          {/* units-ok: altura de texto em mm de papel, não é medida do modelo */}
           <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={o.textHeight ?? 2.5} unit="mm" min={0.1} onCommit={(v) => set({ textHeight: v })} /></Row>
+          {/* units-ok: rotação em graus de papel, valor do campo é o próprio grau */}
           <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={o.textRotation ?? 0} unit="°" onCommit={(v) => set({ textRotation: v })} /></Row>
           <div className="hint">Clique na planta e digite o conteúdo do texto.</div>
         </Group>

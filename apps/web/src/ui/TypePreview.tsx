@@ -17,6 +17,8 @@ import {
 import { FloorSectionPreview } from './dialogs/FloorSectionPreview.tsx';
 import { RoofSectionPreview } from './dialogs/RoofSectionPreview.tsx';
 import { SectionPreview } from './dialogs/SectionPreview.tsx';
+import { formatQuantity, type ResolvedUnits } from '@hestia/model';
+import { useUnits } from './useUnits.ts';
 import { SlabSectionPreview } from './dialogs/SlabSectionPreview.tsx';
 import { StairSectionPreview } from './dialogs/StairSectionPreview.tsx';
 
@@ -30,7 +32,7 @@ export type PreviewSubject =
   | { kind: 'stair'; type: StairType }
   | { kind: 'door' | 'window'; type: OpeningType };
 
-const fmt = (n: number, d: number): string => n.toFixed(d).replace('.', ',');
+
 
 /** Código do tipo (P-02, PA-14…), ou null quando o tipo não tem código. */
 function codeOf(s: PreviewSubject): string | null {
@@ -39,21 +41,21 @@ function codeOf(s: PreviewSubject): string | null {
 }
 
 /** Texto do canto inferior direito: dimensões da abertura ou espessura total das camadas. A escada não tem. */
-function dimsOf(s: PreviewSubject): string | null {
+function dimsOf(s: PreviewSubject, units: ResolvedUnits): string | null {
   switch (s.kind) {
     case 'door':
     case 'window':
-      return `${fmt(s.type.width * 100, 0)} × ${fmt(s.type.height * 100, 0)} cm`;
+      return `${formatQuantity(units, 'length', s.type.width, { withUnit: false })} × ${formatQuantity(units, 'length', s.type.height)}`;
     case 'wall':
-      return `${fmt(totalThickness(s.type) * 100, 1)} cm`;
+      return formatQuantity(units, 'smallLength', totalThickness(s.type));
     case 'floor':
-      return `${fmt(floorTypeThickness(s.type) * 100, 1)} cm`;
+      return formatQuantity(units, 'smallLength', floorTypeThickness(s.type));
     case 'slab':
-      return `${fmt(slabTypeThickness(s.type) * 100, 1)} cm`;
+      return formatQuantity(units, 'smallLength', slabTypeThickness(s.type));
     case 'ceiling':
-      return `${fmt(ceilingTypeThickness(s.type) * 100, 1)} cm`;
+      return formatQuantity(units, 'smallLength', ceilingTypeThickness(s.type));
     case 'roof':
-      return `${fmt(roofTypeThickness(s.type) * 100, 1)} cm`;
+      return formatQuantity(units, 'smallLength', roofTypeThickness(s.type));
     case 'stair':
       return null;
   }
@@ -85,8 +87,9 @@ function Drawing({ subject }: { subject: PreviewSubject }): ReactElement {
 
 /** Prévia da paleta e do diálogo: fundo claro nos dois temas, código no canto inferior esquerdo e dimensões à direita. */
 export function TypePreview({ subject }: { subject: PreviewSubject }): ReactElement {
+  const units = useUnits();
   const code = codeOf(subject);
-  const dims = dimsOf(subject);
+  const dims = dimsOf(subject, units);
   return (
     <div className="rv-preview">
       <Drawing subject={subject} />

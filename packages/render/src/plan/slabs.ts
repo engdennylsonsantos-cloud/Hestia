@@ -6,7 +6,6 @@ import { mix } from './color.ts';
 import { juncaoDoNivel, lajesDoNivel } from './resolucao.ts';
 import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { holeMarkOps } from './holeMarks.ts';
-import { zoomAtinge } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
@@ -82,7 +81,7 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   const layer = structuralLayer(p, s);
   const m = layer ? p.materials[layer.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45), ...(fine ? {} : { zoomMin: 40 }) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
   out.strokes.push(...holeMarkOps(s.polygon, theme, paint, detail));
   const at = labelPoint(s.polygon);

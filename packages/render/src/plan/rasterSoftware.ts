@@ -3,29 +3,49 @@ import type { Viewport } from '../viewport.ts';
 import type { PlanScene } from './gpuPlan.ts';
 
 /**
- * Rasterizador de software da planta, só para testes: emula o vertex e o fragment shader de traço (ver `gpuPlan.ts`) e a
- * mistura alfa de cada material, sem renderer. Serve para conferir que a imagem não muda quando só o zoom muda.
+ * Rasterizador de software da planta, só para testes: emula os vertex e fragment shaders da cena (traço, faixa, marcador
+ * e hachura procedural) e a mistura alfa de cada material, sem renderer. Serve para conferir que a imagem não muda quando
+ * só o zoom muda.
  */
 
-/** Vértice como o vertex shader de traço o põe em metros, com os varyings que o fragment shader lê. */
+/** Tipo de material, pelo uniform `uTipo` (0 preenchimento, 1 traço, 2 hachura, 3 preenchimento-marcador, 4 traço-marcador, 5 faixa). */
+export function tipoDoMaterial(m: THREE.Mesh): number {
+  const u = (m.material as THREE.ShaderMaterial & { uniforms?: Record<string, { value: unknown }> }).uniforms;
+  if (!u) return 0;
+  return (u.uTipo?.value as number | undefined) ?? 1;
+}
+
+/** Vértice como o vertex shader o põe em metros, com os varyings que o fragment shader lê. */
 export interface VerticeEmulado {
   x: number;
   y: number;
+  /** Coordenada do mundo antes do deslocamento de tela (para a hachura procedural). */
+  wx: number;
+  wy: number;
   dist: number;
   meia: number;
   padrao: [number, number];
+  /** Lado da região na faixa de contorno (`aBanda * aExt.y`); 1 nos demais materiais. */
+  lado: number;
+  /** Zoom mínimo da hachura (vem de `position.z`; 0 nos demais materiais). */
+  zoomMin: number;
   /** O traço aparece neste zoom? (`aPadrao.z`, o zoom mínimo, como o vertex shader o aplica). Preenchimento: sim. */
   visivel: boolean;
 }
 
 /**
- * Vértice `k` da geometria com o deslocamento do shader para o zoom dado. Geometria sem `aExt` (preenchimento) devolve só a
- * posição, sem deslocamento nem tracejado.
+ * Vértice `k` da geometria com o deslocamento do shader para o zoom dado. Sem `aExt` (preenchimento, hachura e marcador
+ * de preenchimento) devolve a posição (com `aDesl / zoom`, no marcador), sem tracejado.
  */
 export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: number, papel: boolean | { teto: number } = false): VerticeEmulado {
   const pos = geo.getAttribute('position');
+  const wx = pos.getX(k);
+  const wy = pos.getY(k);
+  const desl = geo.getAttribute('aDesl');
+  const x0 = desl ? wx + desl.getX(k) / zoom : wx;
+  const y0 = desl ? wy + desl.getY(k) / zoom : wy;
   const ext = geo.getAttribute('aExt');
-  if (!ext) return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0], visivel: true };
+  if (!ext) return { x: x0, y: y0, wx, wy, dist: 0, meia: 0, padrao: [0, 0], lado: 1, zoomMin: 0, visivel: true };
   const dir = geo.getAttribute('aDir');
   const pad = geo.getAttribute('aPadrao');
   // Com `papel`, `aExt.z` é kPapel e a largura em pixels sai do zoom, com piso de 1 px, o fator e o teto (como o vertex shader).
@@ -36,12 +56,17 @@ export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: numbe
   const side = ext.getY(k);
   const ux = dir.getX(k);
   const uy = dir.getY(k);
+  const banda = geo.getAttribute('aBanda');
   return {
-    x: pos.getX(k) + ux * along * meia - uy * side * meia,
-    y: pos.getY(k) + uy * along * meia + ux * side * meia,
+    x: x0 + ux * along * meia - uy * side * meia,
+    y: y0 + uy * along * meia + ux * side * meia,
+    wx,
+    wy,
     dist: dir.getZ(k) * zoom + along * 0.5 * larg,
     meia: 0.5 * larg,
     padrao: [pad.getX(k), pad.getY(k)],
+    lado: banda ? banda.getX(k) * side : 1,
+    zoomMin: 0,
     visivel: zoom >= pad.getZ(k),
   };
 }
@@ -49,7 +74,25 @@ export function verticeEmulado(geo: THREE.BufferGeometry, k: number, zoom: numbe
 /** Vértice de preenchimento: a posição, sem deslocamento nem tracejado. */
 export function verticePlano(geo: THREE.BufferGeometry, k: number): VerticeEmulado {
   const pos = geo.getAttribute('position');
-  return { x: pos.getX(k), y: pos.getY(k), dist: 0, meia: 0, padrao: [0, 0], visivel: true };
+  const x = pos.getX(k);
+  const y = pos.getY(k);
+  return { x, y, wx: x, wy: y, dist: 0, meia: 0, padrao: [0, 0], lado: 1, zoomMin: 0, visivel: true };
+}
+
+/** Vértice `k` da malha, com o shader do material dela. Preenchimento/hachura ignoram atributos de traço que a malha
+ * reaproveitada possa guardar (o teste não pode ler o que o material não declara). */
+export function verticeDaMalha(m: THREE.Mesh, k: number, zoom: number): VerticeEmulado {
+  const tipo = tipoDoMaterial(m);
+  if (tipo === 1 || tipo === 4 || tipo === 5) {
+    const u = (m.material as THREE.ShaderMaterial).uniforms;
+    const papel = u.uPapel?.value === 1 ? { teto: (u.uTeto?.value as number | undefined) ?? 1e9 } : false;
+    return verticeEmulado(m.geometry, k, zoom, papel);
+  }
+  const pos = m.geometry.getAttribute('position');
+  const wx = pos.getX(k);
+  const wy = pos.getY(k);
+  const desl = tipo === 3 ? m.geometry.getAttribute('aDesl') : undefined;
+  return { x: desl ? wx + desl.getX(k) / zoom : wx, y: desl ? wy + desl.getY(k) / zoom : wy, wx, wy, dist: 0, meia: 0, padrao: [0, 0], lado: 1, zoomMin: tipo === 2 ? pos.getZ(k) : 0, visivel: true };
 }
 
 /** Malhas da cena na ordem de desenho (`renderOrder`), todas as camadas juntas. */
@@ -58,10 +101,35 @@ export function malhasNaOrdem(scene: PlanScene): THREE.Mesh[] {
   return grupos.flatMap((g) => g.children as THREE.Mesh[]).sort((a, b) => a.renderOrder - b.renderOrder);
 }
 
+/** A hachura cobre este ponto do mundo? Mesma conta do fragment shader (`FRAGMENT_HACHURA`). */
+export function hachuraCobre(kind: number, x: number, y: number, zoom: number, zoomMin: number, espaco: number, linhaPx: number, pontoPx: number, pontoM: number): boolean {
+  if (zoom < zoomMin) return false;
+  if (kind === 0) return true;
+  const COS45 = 0.7071067811865476;
+  const perto = (s: number, meia: number): boolean => {
+    const k = Math.floor(s / espaco + 0.5);
+    return Math.abs(s - k * espaco) * zoom <= meia;
+  };
+  const meiaLinha = 0.5 * linhaPx;
+  let c = 0;
+  if (kind === 1 || kind === 2) {
+    if (perto((-x + y) * COS45, meiaLinha)) c = 1;
+    if (kind === 2 && perto((x + y) * COS45, meiaLinha)) c = 1;
+  } else if (kind === 3) {
+    const f = x / espaco - Math.floor(x / espaco);
+    c = perto(y, meiaLinha) && f <= 10 / 16 ? 1 : 0;
+  } else if (kind === 4) {
+    const f = x / espaco - Math.floor(x / espaco);
+    const dx = (f - 0.5) * espaco;
+    c = perto(y, 0.5 * pontoPx) && dx >= 0 && dx <= pontoM ? 1 : 0;
+  }
+  return c === 1;
+}
+
 /**
  * Rasteriza as malhas em `W × H` pixels com a câmera dada, na ordem de `renderOrder`. Cada fragmento é interpolado a partir
- * dos vértices emulados; um fragmento de traço fora do tracejado é descartado (como o `discard` do shader). A cor é a linear
- * do material, como no shader. Devolve RGB por pixel em `Float64Array`.
+ * dos vértices emulados; um fragmento de traço fora do tracejado, de faixa fora do lado da região ou de hachura fora do
+ * padrão é descartado (como o `discard` do shader). Devolve RGB por pixel em `Float64Array`.
  */
 export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.OrthographicCamera, zoom: number, W: number, H: number): Float64Array {
   const esq = cam.position.x + cam.left;
@@ -71,29 +139,33 @@ export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.Ortho
   const buf = new Float64Array(W * H * 3).fill(1);
   for (const m of malhas) {
     const geo = m.geometry;
-    const idx = geo.getIndex()!;
+    const idx = geo.getIndex();
+    if (!idx) continue;
+    const tipo = tipoDoMaterial(m);
     const mat = m.material as THREE.MeshBasicMaterial & { uniforms?: Record<string, { value: unknown }> };
-    // Traço é o material de shader; a malha reaproveitada de um lote de traço pode guardar `aExt` velho e ser preenchimento agora.
-    const traco = mat.uniforms !== undefined;
-    const cor = traco ? (mat.uniforms!.uCor!.value as THREE.Color) : mat.color;
-    const a = traco ? (mat.uniforms!.uAlfa!.value as number) : mat.opacity;
-    const papel = traco && mat.uniforms!.uPapel!.value === 1 ? { teto: (mat.uniforms!.uTeto?.value as number | undefined) ?? 1e9 } : false;
+    const traco = tipo === 1 || tipo === 4 || tipo === 5;
+    const cor = tipo > 0 ? (mat.uniforms!.uCor!.value as THREE.Color) : mat.color;
+    const a = tipo > 0 ? (mat.uniforms!.uAlfa!.value as number) : mat.opacity;
     const { r, g, b } = cor;
-    const vs = [0, 1, 2].map(() => ({ x: 0, y: 0, dist: 0, meia: 0, padrao: [0, 0] as [number, number] }));
+    const vs = [0, 1, 2].map(() => ({ x: 0, y: 0, wx: 0, wy: 0, dist: 0, meia: 0, padrao: [0, 0] as [number, number], lado: 1, zoomMin: 0 }));
     // Só a faixa de desenho conta: o buffer pode ter capacidade sobrando (e restos de uma versão anterior do lote).
     const n = Math.min(idx.count, geo.drawRange.count);
     for (let t = 0; t < n; t += 3) {
       let escondido = false;
       for (let c = 0; c < 3; c++) {
         const k = idx.getX(t + c);
-        const e = traco ? verticeEmulado(geo, k, zoom, papel) : verticePlano(geo, k);
+        const e = verticeDaMalha(m, k, zoom);
         if (!e.visivel) escondido = true;
         vs[c] = {
           x: ((e.x - esq) / (dir - esq)) * W,
           y: ((topo - e.y) / (topo - base)) * H,
+          wx: e.wx,
+          wy: e.wy,
           dist: e.dist,
           meia: e.meia,
           padrao: e.padrao,
+          lado: e.lado,
+          zoomMin: e.zoomMin,
         };
       }
       // Abaixo do zoom mínimo o shader tira os vértices da tela: o triângulo não é desenhado.
@@ -113,7 +185,18 @@ export function rasterizarMalhas(malhas: readonly THREE.Mesh[], cam: THREE.Ortho
           const w1 = funcaoAresta(v2.x, v2.y, v0.x, v0.y, cx, cy) / area;
           const w2 = funcaoAresta(v0.x, v0.y, v1.x, v1.y, cx, cy) / area;
           if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-          if (traco && descartado(w0 * v0.dist + w1 * v1.dist + w2 * v2.dist, v0.padrao, w0 * v0.meia + w1 * v1.meia + w2 * v2.meia)) continue;
+          if (tipo === 5 && w0 * v0.lado + w1 * v1.lado + w2 * v2.lado < 0) continue;
+          if (traco && tipo !== 5 && descartado(w0 * v0.dist + w1 * v1.dist + w2 * v2.dist, v0.padrao, w0 * v0.meia + w1 * v1.meia + w2 * v2.meia)) continue;
+          if (tipo === 2) {
+            const u = mat.uniforms!;
+            const wx = w0 * v0.wx + w1 * v1.wx + w2 * v2.wx;
+            const wy = w0 * v0.wy + w1 * v1.wy + w2 * v2.wy;
+            const ok = hachuraCobre(
+              u.uKind!.value as number, wx, wy, zoom, w0 * v0.zoomMin + w1 * v1.zoomMin + w2 * v2.zoomMin,
+              u.uEspaco!.value as number, u.uLinhaPx!.value as number, u.uPontoPx!.value as number, u.uPontoM!.value as number,
+            );
+            if (!ok) continue;
+          }
           const k = (y * W + x) * 3;
           buf[k] = r * a + buf[k]! * (1 - a);
           buf[k + 1] = g * a + buf[k + 1]! * (1 - a);

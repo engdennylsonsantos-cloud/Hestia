@@ -1,8 +1,8 @@
-import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, pointAt, tangentAt, toLocal, type WallFrame } from '@hestia/engine';
-import { wallsOnLevel, type Id, type Opening, type Project } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
+import { frameOfWall, pointAt, tangentAt, toLocal, type WallFrame } from '@hestia/engine';
+import { wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { wallCrossings } from './infer.ts';
-import type { PreviewItem, PreviewTone, ToolOptions } from './types.ts';
+import type { ToolOptions } from './types.ts';
 
 /** Parede perpendicular que encosta na hospedeira, com o eixo e as faces medidos em `t` da hospedeira. */
 export interface PerpendicularWall {
@@ -217,26 +217,4 @@ export function temporaryDimensions(
 /** Valor de cota em metros com vírgula e duas casas (ex.: `2,26`). */
 export function formatMeters(v: number): string {
   return v.toFixed(2).replace('.', ',');
-}
-
-/**
- * Símbolo real da esquadria na prévia, como itens `line` (tracejado quando o símbolo pede). Usa a mesma
- * `openingSymbolPaths` da planta, com uma abertura temporária montada por `openingGeometry`.
- */
-export function symbolPreviewItems(
-  p: Project,
-  frame: WallFrame,
-  opening: Opening,
-  tone: PreviewTone | undefined,
-): PreviewItem[] {
-  const g = openingGeometry(p, opening, frame);
-  const out: PreviewItem[] = [];
-  for (const stroke of openingSymbolPaths(g)) {
-    const pts = stroke.pts;
-    const count = stroke.closed ? pts.length : pts.length - 1;
-    for (let i = 0; i < count; i++) {
-      out.push({ kind: 'line', a: pts[i]!, b: pts[(i + 1) % pts.length]!, dashed: stroke.dash !== undefined, tone });
-    }
-  }
-  return out;
 }

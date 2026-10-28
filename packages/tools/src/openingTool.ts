@@ -1,6 +1,14 @@
 import { orientedRect } from '@hestia/geom';
-import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
-import { openingTypeById, openingType, openingsOfWall, type Opening } from '@hestia/model';
+import {
+  frameOfWall,
+  openingGeometry,
+  openingPlanPathsAt,
+  openingPreviewLocalPaths,
+  pointAt,
+  toLocal,
+  type OpeningPlanPath,
+} from '@hestia/engine';
+import { openingTypeById, openingType, openingsOfWall, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
 import { parseNumber } from './numeric.ts';
@@ -13,11 +21,25 @@ import {
   overlapsPerpendicular,
   perpendicularNeighbors,
   sideWithHysteresis,
-  symbolPreviewItems,
   temporaryDimensions,
   type PerpendicularWall,
 } from './openingPlacement.ts';
 import type { PointerInfo } from './types.ts';
+
+/**
+ * Cache da prévia: os traços LOCAIS do vão (não dependem do `offset`) valem enquanto o tipo, a parede, as inversões e o
+ * detalhe não mudarem de identidade. A cada movimento só se converte para o mundo, que é a translação ao longo da parede.
+ */
+interface PreviewCache {
+  type: OpeningType;
+  wall: Wall;
+  wallType: WallType;
+  thickness: number;
+  flipHand: boolean;
+  flipFacing: boolean;
+  detail: DetailLevel;
+  paths: OpeningPlanPath[];
+}
 
 /** Porta e janela: hospedadas na parede sob o cursor (docs/02 §5). */
 export class OpeningTool extends ToolBase {
@@ -28,6 +50,7 @@ export class OpeningTool extends ToolBase {
   private flipFacing = false;
   private lastSide: 1 | -1 = 1;
   private current: { wallId: string; offset: number } | null = null;
+  private previewCache: PreviewCache | null = null;
 
   constructor(env: ConstructorParameters<typeof ToolBase>[0], kind: 'door' | 'window') {
     super(env);
@@ -180,6 +203,38 @@ export class OpeningTool extends ToolBase {
     );
   }
 
+  /** Traços locais da prévia (cache): não dependem do `offset`, só do tipo, da parede, das inversões e do detalhe. */
+  private previewPaths(p: Project, temp: Opening, f: NonNullable<ReturnType<typeof frameOfWall>>): OpeningPlanPath[] {
+    const raw = p.openingTypes[temp.typeId];
+    if (!raw) return [];
+    const detail = p.settings.detail;
+    const c = this.previewCache;
+    if (
+      c &&
+      c.type === raw &&
+      c.wall === f.wall &&
+      c.wallType === f.type &&
+      c.thickness === f.thickness &&
+      c.flipHand === temp.flipHand &&
+      c.flipFacing === temp.flipFacing &&
+      c.detail === detail
+    ) {
+      return c.paths;
+    }
+    const paths = openingPreviewLocalPaths(p, temp, f, detail);
+    this.previewCache = {
+      type: raw,
+      wall: f.wall,
+      wallType: f.type,
+      thickness: f.thickness,
+      flipHand: temp.flipHand,
+      flipFacing: temp.flipFacing,
+      detail,
+      paths,
+    };
+    return paths;
+  }
+
   /** Prévia: símbolo real da esquadria + retângulo do vão + duas cotas temporárias. Inválida em vermelho. */
   private drawPreview(
     wallId: string,
@@ -205,7 +260,13 @@ export class OpeningTool extends ToolBase {
       mark: '',
     };
     const pr = this.env.project();
-    this.items.push(...symbolPreviewItems(pr, f, temp, tone));
+    const g = openingGeometry(pr, temp, f);
+    for (const s of openingPlanPathsAt(g, this.previewPaths(pr, temp, f))) {
+      const count = s.closed ? s.pts.length : s.pts.length - 1;
+      for (let i = 0; i < count; i++) {
+        this.items.push({ kind: 'line', a: s.pts[i]!, b: s.pts[(i + 1) % s.pts.length]!, dashed: s.dash !== undefined, tone });
+      }
+    }
     const c = pointAt(f, offset, f.sMid);
     this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, width / 2, f.thickness / 2 + 0.02), tone });
     for (const d of temporaryDimensions(f, offset, width, neighbors, options.openingDimMode ?? 'axis', this.lastSide)) {

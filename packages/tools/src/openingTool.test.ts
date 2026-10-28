@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { openingSymbolPaths } from '@hestia/geom';
-import { frameOfWall, openingGeometry } from '@hestia/engine';
-import { openingsOfWall, type Opening, type Wall } from '@hestia/model';
+import { frameOfWall, openingPreviewStrokes } from '@hestia/engine';
+import { openingsOfWall, openingTypeById, type Opening, type Wall } from '@hestia/model';
 import type { ToolEnv } from './types.ts';
 import { drawWall, makeEnv, P, tool, walls } from './testEnv.ts';
 
@@ -157,13 +156,38 @@ describe('colocação da abertura: prévia e cotas', () => {
       sillOverride: null,
       mark: '',
     };
-    const symbolLines = openingSymbolPaths(openingGeometry(ctx.store.project, temp, frameOfWall(ctx.store.project, temp.hostId)!)).reduce(
-      (n, s) => n + (s.closed ? s.pts.length : s.pts.length - 1),
-      0,
-    );
+    const symbolLines = openingPreviewStrokes(
+      ctx.store.project,
+      temp,
+      frameOfWall(ctx.store.project, temp.hostId)!,
+      ctx.store.project.settings.detail,
+    ).reduce((n, s) => n + (s.closed ? s.pts.length : s.pts.length - 1), 0);
     expect(items.filter((i) => i.kind === 'line')).toHaveLength(symbolLines + 2);
     const labels = items.filter((i) => i.kind === 'label').map((i) => i.text);
     expect(labels).toEqual(['2,26', '2,24']);
+  });
+
+  it('prévia da porta de duas folhas com bandeira tem mais traços e mostra o batente em volta do vão', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [5, 0]);
+    const simples = tool('door', ctx.env);
+    simples.move!(P(2.5, 0.05));
+    const linhasSimples = simples.preview().filter((i) => i.kind === 'line').length;
+
+    ctx.options.doorTypeId = 'ot_pbalcao_band120';
+    const composta = tool('door', ctx.env);
+    composta.move!(P(2.5, 0.05));
+    const linhas = composta.preview().filter((i) => i.kind === 'line');
+    expect(linhas.length).toBeGreaterThan(linhasSimples);
+
+    const largura = openingTypeById(ctx.store.project, 'ot_pbalcao_band120')!.width;
+    const ombreiras = linhas.filter((l) => {
+      if (l.kind !== 'line') return false;
+      const dy = Math.abs(l.b.y - l.a.y);
+      return dy > 0.1 && Math.abs(l.a.x - (2.5 - largura / 2)) < 0.02 && Math.abs(l.b.x - (2.5 - largura / 2)) < 0.02;
+    });
+    expect(ombreiras.length).toBeGreaterThan(0);
   });
 
   it('openingDimMode face cota da borda da abertura à face da perpendicular', () => {

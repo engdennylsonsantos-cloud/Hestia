@@ -66,5 +66,6 @@ export function openingSymbol(g: OpeningGeometry, model: OpeningModel, theme: Pl
     color: s.tone === 'soft' ? theme.inkSoft : theme.ink,
     alpha: 1,
     ...(s.dash ? { dash: s.dash } : {}),
+    role: s.role,
   }));
 }

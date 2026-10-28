@@ -4,7 +4,7 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - [x] D0 mapa (`04`)
 - [x] D1 configuração no modelo
 - [x] D2 wallPlanes e openingExtents
-- [ ] D3 resolvedores
+- [x] D3 resolvedores
 - [ ] D4 provedor de esquadrias + registro (código novo; integrar em `openingTool.ts` só depois do marco M4)
 - [ ] D5 sobreposição única (só depois do marco M1)
 - [ ] D6 validação de hospedados
@@ -22,6 +22,7 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - D2: `axis` = centro da espessura total (`sMid`), como o 04 manda; o `autoCotas` antigo usava `[0,0]` (linha de localização) para 'eixo': coincidem só com `wallCenter` (padrão). Ao migrar o autoCotas (D8) o 'eixo' passa a `sMid`.
 - D2: `openingExtents` usa o MODELO REAL (`buildOpeningModel`): `frame` = `model.width/2` (vão externo do conjunto), `clear` = borda interna das ombreiras externas, `casing` = maior |t| das peças `casing` da face pedida (a face de abertura da folha recua 14 mm). Recorte da parede = `roughWidth` = `t.width + roughOversize.w`; em tipos simples `frame` coincide com o recorte (testado); em tipos com composição `model.width` vem do vão nominal da composição e pode diferir de `t.width`. Padrão `openingRef` mantido em `frame`.
 
+- D3: `perpendicularNeighbors` agora devolve `frame` e `point` e testa perpendicularidade com a tangente da hospedeira no ponto de encosto (antes: tangente inicial; paredes curvas eram rejeitadas).
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 

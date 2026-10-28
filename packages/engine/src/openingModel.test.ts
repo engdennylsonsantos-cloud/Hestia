@@ -229,7 +229,10 @@ describe('buildOpeningModel: porta dupla, pivotante, correr e vão livre', () =>
         const c = cena('ot_pp80', {}, { flipHand, flipFacing });
         const m = modelo(c);
         const f = folha(m.parts);
-        expect(largura(f.box)).toBeCloseTo(2 * (c.g.width / 2 - 0.05 - (0.04 / 2 + 0.004)), 9);
+        // Metade da largura = eixo + o braço que o canto pode ter sem varrer a ombreira: √((face − eixo − 0,5 mm)² − L²).
+        const eixo = c.g.width / 4;
+        const face = c.g.width / 2 - 0.05;
+        expect(largura(f.box)).toBeCloseTo(2 * (eixo + Math.sqrt((face - eixo - 0.0005) ** 2 - 0.04 ** 2)), 9);
         const a = m.openings[0]!;
         expect(a.kind).toBe('pivot');
         expect(a.hingeT).toBeCloseTo((flipHand ? 1 : -1) * (c.g.width / 4), 9);

@@ -7,6 +7,7 @@ import {
   openingFamilyOf,
   openingFavorites,
   openingLineConvention,
+  openingProfilesOf,
   type Id,
   type Opening,
   type OpeningType,
@@ -19,11 +20,14 @@ import { openingFamilyName } from '../../typeFamilies.ts';
 import {
   applyFamily,
   applyVariant,
+  bridgeDraft,
   familyOptionsFor,
+  hasAuthoredComposition,
   leavesChoicesFor,
   leavesLabel,
   newOpeningTypeFromFamily,
   openingVariants,
+  syncFamilyInComposition,
 } from '../openingTypeForm.ts';
 import { DialogXL } from './DialogXL.tsx';
 import { OpeningTypeHeader } from './OpeningTypeHeader.tsx';
@@ -126,9 +130,20 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
     useUi.setState({ dialogArg: created.id });
     setD(created);
   };
+  /**
+   * Toda edição do rascunho passa pela ponte da composição: campos antigos (família, bandeira, medidas) regeneram a composição
+   * derivada, e a editada nos módulos é preservada. Sem isso o modelo e a prévia seguiam a composição velha.
+   */
+  const change = (next: OpeningType): void => {
+    const r = bridgeDraft(next, d, openingProfilesOf(p));
+    setD(r.type);
+    setErr(r.error ?? '');
+  };
   const changeFamily = (id: string): void => {
     const fam = families.find((f) => f.id === id);
-    if (fam) setD(applyFamily(d, fam));
+    if (!fam) return;
+    const next = applyFamily(d, fam);
+    change(hasAuthoredComposition(d) ? syncFamilyInComposition(next, fam) : next);
   };
   const toggleFavorite = (): void => {
     run(() =>
@@ -177,10 +192,10 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
             open={libOpen}
             onToggle={() => setLibOpen((v) => !v)}
             onFamily={changeFamily}
-            onVariant={(v) => setD(applyVariant(d, v))}
+            onVariant={(v) => change(applyVariant(d, v))}
           />
           <div className="op-center">
-            <OpeningTypeSections d={d} onChange={setD} family={family} leaves={leaves} materials={p.materials} active={componentToShow(d.kind, family?.id ?? null, active)} onActive={setActive} />
+            <OpeningTypeSections d={d} onChange={change} family={family} leaves={leaves} materials={p.materials} active={componentToShow(d.kind, family?.id ?? null, active)} onActive={setActive} />
             {err ? <p className="error" role="alert">{err}</p> : null}
           </div>
           <OpeningTypePreview

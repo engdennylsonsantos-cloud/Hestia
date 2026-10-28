@@ -1,12 +1,16 @@
 import type { ReactElement } from 'react';
 import { openingCasing, type OpeningType, type WrapMode } from '@hestia/model';
 import { Check, NumField } from '../../../fields.tsx';
-import { alternarAcabamento, alternarSidelight, alternarTransom } from '../../openingTypeForm.ts';
+import { alternarAcabamento, alternarSidelight, alternarTransom, hasAuthoredComposition } from '../../openingTypeForm.ts';
 import { usePanelKit, type PanelProps } from './panelKit.tsx';
 
 /** Bandeira superior e bandeiras laterais; cada um só aparece quando a tabela de suporte da família o aceita. */
 export function TransomRows({ d, onChange, support }: PanelProps): ReactElement {
   const { set } = usePanelKit(d, onChange);
+  // Com módulos editados, bandeira e laterais são células da composição: os campos antigos não valem mais.
+  if ((support.transom || support.sidelights) && hasAuthoredComposition(d)) {
+    return <p className="hint">Este tipo usa módulos: bandeira superior e laterais se editam no componente “Módulos”.</p>;
+  }
   return (
     <>
       {support.transom ? (

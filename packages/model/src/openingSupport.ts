@@ -71,7 +71,7 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   door_garage: sup({ leafStyle: true, leafThickness: true, lintel: true, frame: true, reveal: true, nominalRef: true }),
   door_void: sup({ casing: true, lintel: true }),
   window_fixed: sup({ transom: true, sidelights: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true }),
-  window_hinged: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, hinges: true, angle: true }),
+  window_hinged: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, angle: true }),
   window_tilt: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, tiltAxis: true, angle: true }),
   window_casement: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, angle: true }),
   window_sliding: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true }),

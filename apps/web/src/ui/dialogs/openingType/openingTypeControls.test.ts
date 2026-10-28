@@ -85,7 +85,7 @@ describe('controles novos: visibilidade derivada da tabela de suporte', () => {
   });
 
   it('casos medidos: maçaneta e dobradiças só em giro, dupla e basculante; folga inferior fora da garagem', () => {
-    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).hinges).map((f) => f.id)).toEqual(['door_swing', 'door_double', 'window_hinged']);
+    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).hinges).map((f) => f.id)).toEqual(['door_swing', 'door_double']);
     expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).handle).map((f) => f.id)).toEqual(['door_swing', 'door_double']);
     expect(tem(htmlDaFamilia('door_garage'), 'op-undercut')).toBe(false);
     expect(tem(htmlDaFamilia('door_sliding'), 'op-undercut')).toBe(true);

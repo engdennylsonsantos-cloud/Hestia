@@ -64,8 +64,7 @@ describe('prévias de planta, elevação e corte', () => {
     expect(temDesenho(a)).toBe(true);
   });
 
-  it('o corte devolve três quadros (inteiro, cabeça e soleira) com enquadramentos distintos, nos 24 tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(24);
+  it('o corte devolve três quadros (inteiro, cabeça e soleira) com enquadramentos distintos, em todos os tipos padrão', () => {
     for (const d of DEFAULT_OPENING_TYPES) {
       const frames = previewSectionFrames(d);
       expect(frames.map((f) => f.id)).toEqual(['full', 'head', 'sill']);

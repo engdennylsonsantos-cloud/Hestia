@@ -11,9 +11,11 @@ describe('opções por família', () => {
     expect(openingOptionSupport('window_casement').transom).toBe(true);
     for (const id of ['window_hung', 'window_louver', 'window_void', 'door_void', 'door_garage'] as const) expect(openingOptionSupport(id).transom, id).toBe(false);
   });
-  it('só a basculante tem eixo; a referência nominal da folha ainda não é oferecida (fica fora do diálogo)', () => {
+  it('só a basculante tem eixo; a referência nominal é oferecida nas portas com folha', () => {
     expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).tiltAxis).map((f) => f.id)).toEqual(['window_tilt']);
-    expect(OPENING_FAMILIES.some((f) => openingOptionSupport(f.id).nominalRef)).toBe(false);
+    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).nominalRef).map((f) => f.id)).toEqual(
+      OPENING_FAMILIES.filter((f) => f.kind === 'door' && f.leaves.some((n) => n > 0)).map((f) => f.id),
+    );
   });
   it('maçaneta só em porta de giro e dupla; grade só em janela; espessura da folha só onde há folha', () => {
     expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).handle).map((f) => f.id)).toEqual(['door_swing', 'door_double']);

@@ -1,5 +1,5 @@
 import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, toLocal, type WallFrame } from '@hestia/engine';
+import { frameOfWall, openingGeometry, pointAt, tangentAt, toLocal, type WallFrame } from '@hestia/engine';
 import { wallsOnLevel, type Id, type Opening, type Project } from '@hestia/model';
 import { wallCrossings } from './infer.ts';
 import type { PreviewItem, PreviewTone, ToolOptions } from './types.ts';
@@ -12,6 +12,10 @@ export interface PerpendicularWall {
   /** Faces da perpendicular, em `t` da hospedeira: a abertura não pode invadir esta faixa. */
   faceLo: number;
   faceHi: number;
+  /** Sistema de coordenadas da perpendicular: dele saem os planos (eixo, faces, núcleo) para as cotas. */
+  frame: WallFrame;
+  /** Ponto do mundo em que ela encosta na hospedeira (cruzamento dos eixos ou o topo que toca a face). */
+  point: Vec2;
 }
 
 /** Trecho livre da hospedeira entre as faces das paredes perpendiculares (ou as pontas da parede). */
@@ -42,27 +46,35 @@ export function perpendicularNeighbors(p: Project, hostId: Id, levelId: Id): Per
     if (wall.id === hostId) continue;
     const other = frameOfWall(p, wall.id);
     if (!other) continue;
-    const parallel = host.u.x * other.u.x + host.u.y * other.u.y;
-    if (Math.abs(parallel) > PERP_TOL) continue;
     const ts: number[] = [];
+    const points = new Map<number, Vec2>();
     for (const pt of wallCrossings(host.wall, wall)) {
       const loc = toLocal(host, pt);
-      if (loc.t >= -PERP_TOL && loc.t <= host.length + PERP_TOL) ts.push(clamp(loc.t, 0, host.length));
+      if (loc.t >= -PERP_TOL && loc.t <= host.length + PERP_TOL) {
+        ts.push(clamp(loc.t, 0, host.length));
+        points.set(clamp(loc.t, 0, host.length), pt);
+      }
     }
     // Parede que termina na face da hospedeira (sem cruzar o eixo): o topo é o ponto de encosto.
     if (ts.length === 0) {
       for (const end of [wall.a, wall.b]) {
         const loc = toLocal(host, end);
         if (loc.t < -PERP_TOL || loc.t > host.length + PERP_TOL) continue;
-        if (Math.abs(loc.s) <= host.thickness / 2 + other.thickness / 2 + 0.02) ts.push(clamp(loc.t, 0, host.length));
+        if (Math.abs(loc.s) <= host.thickness / 2 + other.thickness / 2 + 0.02) {
+          ts.push(clamp(loc.t, 0, host.length));
+          points.set(clamp(loc.t, 0, host.length), end);
+        }
       }
     }
-    // Projeção da normal da perpendicular sobre o eixo da hospedeira: converte s em t (paredes perpendiculares).
-    const k = host.u.x * other.n.x + host.u.y * other.n.y;
     for (const t of unique(ts)) {
+      // Perpendicular à tangente da hospedeira NO ponto de encosto (na curva a tangente inicial não serve).
+      const hu = tangentAt(host, t);
+      if (Math.abs(hu.x * other.u.x + hu.y * other.u.y) > PERP_TOL) continue;
+      // Projeção da normal da perpendicular sobre o eixo da hospedeira: converte s em t (paredes perpendiculares).
+      const k = hu.x * other.n.x + hu.y * other.n.y;
       const a = other.sHi * k;
       const b = other.sLo * k;
-      out.push({ wallId: wall.id, axisT: t, faceLo: t + Math.min(a, b), faceHi: t + Math.max(a, b) });
+      out.push({ wallId: wall.id, axisT: t, faceLo: t + Math.min(a, b), faceHi: t + Math.max(a, b), frame: other, point: points.get(t) ?? pointAt(host, t, 0) });
     }
   }
   return out;

@@ -15,6 +15,7 @@ import {
   openingPlanDisplay,
   openingSidelights,
   openingShowSwing,
+  openingLeafPlan,
   openingSwingStyle,
   openingTiltAxis,
   openingTransom,
@@ -154,6 +155,9 @@ describe('openingStyle: padrões por leitura', () => {
   it('giro, estilo do arco e lado da folha', () => {
     expect(openingShowSwing(tipo('ot_p90'))).toBe(true);
     expect(openingShowSwing(com('ot_p90', { showSwing: false }))).toBe(false);
+    expect(openingLeafPlan(tipo('ot_p90'))).toBe('open');
+    expect(openingLeafPlan(com('ot_p90', { leafPlan: 'both' }))).toBe('both');
+    expect(openingLeafPlan(com('ot_p90', { leafPlan: 'x' as never }))).toBe('open');
     expect(openingSwingStyle(tipo('ot_p90'))).toBe('arc');
     expect(openingSwingStyle(com('ot_p90', { swingStyle: 'dash' }))).toBe('dash');
     expect(openingSwingStyle(com('ot_p90', { swingStyle: 'x' as never }))).toBe('arc');

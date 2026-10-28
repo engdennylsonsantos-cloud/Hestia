@@ -224,6 +224,12 @@ describe('favoritos de tipo de abertura', () => {
 });
 
 describe('openingTypeWarning (alizar x retorno)', () => {
+  it('leafPlan: valores válidos passam e o desconhecido é erro de tipo', () => {
+    const t = DEFAULT_OPENING_TYPES.find((x) => x.id === 'ot_p90')!;
+    for (const v of ['open', 'closed', 'both'] as const) expect(openingTypeIssue({ ...t, leafPlan: v })).toBeNull();
+    expect(openingTypeIssue({ ...t, leafPlan: 'x' as never })).toMatch(/Folha em planta/);
+  });
+
   it('avisa só quando há alizar e closure explícito; nunca é erro', () => {
     const casing = { width: 0.07, thickness: 0.015 };
     expect(openingTypeWarning({ closure: 'both', casing })).toMatch(/alizar/);

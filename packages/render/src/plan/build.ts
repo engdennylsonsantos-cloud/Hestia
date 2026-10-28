@@ -1,6 +1,6 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
+import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -309,6 +309,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
           planDisplay: openingPlanDisplay(type),
           showSwing: openingShowSwing(type),
           swingStyle: openingSwingStyle(type),
+          leafPlan: openingLeafPlan(type),
           cutZ: cls === undefined || cls === 'cut' ? cutLocal : model.height / 2,
         });
         strokes.push(...paintOps({ fills: [], strokes: sym, labels: [] }, pt, fillBase).strokes);

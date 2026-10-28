@@ -85,6 +85,8 @@ export interface OpeningType {
   /** Arco de giro em planta: mostrar (padrão sim) e estilo. */
   showSwing?: boolean;
   swingStyle?: 'arc' | 'dash' | 'line';
+  /** Folha em planta: só a aberta (padrão), só a fechada ou as duas (desenho técnico antigo). */
+  leafPlan?: 'open' | 'closed' | 'both';
   /** Posição da folha na profundidade do batente: do lado em que ela abre (padrão) ou do lado oposto. */
   leafSide?: 'swing' | 'opposite';
   /** Dados BIM do tipo (quadro e IFC). */

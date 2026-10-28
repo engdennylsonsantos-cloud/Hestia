@@ -20,7 +20,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -191,6 +191,7 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
             planDisplay: openingPlanDisplay(type),
             showSwing: openingShowSwing(type),
             swingStyle: openingSwingStyle(type),
+            leafPlan: openingLeafPlan(type),
             cutZ,
           }).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }))
         : openingSymbolPaths(g).map((s) => ({ pts: s.pts, closed: s.closed, dashed: s.dash !== undefined }));

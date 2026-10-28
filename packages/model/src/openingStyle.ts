@@ -14,6 +14,7 @@ const PLAN_DISPLAYS = ['symbolic', 'projected'] as const;
 const DETAIL_2D = ['scale', 'low', 'mid', 'high', 'off'] as const;
 const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
 const SWING_STYLES = ['arc', 'dash', 'line'] as const;
+const LEAF_PLANS = ['open', 'closed', 'both'] as const;
 const LEAF_SIDES = ['swing', 'opposite'] as const;
 
 /** Ângulos de abertura do tipo (graus): limitados a 0..120. */
@@ -198,6 +199,11 @@ export function openingDetail3d(t: Pick<OpeningType, 'detail3d'>): 'view' | 'sch
 /** Arco de giro em planta: mostrar (padrão sim). */
 export function openingShowSwing(t: Pick<OpeningType, 'showSwing'>): boolean {
   return boolOr(t.showSwing, true);
+}
+
+/** Folha em planta: 'open' (padrão, só a aberta), 'closed' ou 'both'. */
+export function openingLeafPlan(t: Pick<OpeningType, 'leafPlan'>): 'open' | 'closed' | 'both' {
+  return oneOf(t.leafPlan, LEAF_PLANS, 'open');
 }
 
 /** Estilo do arco de giro em planta: 'arc' (padrão), 'dash' ou 'line'. */

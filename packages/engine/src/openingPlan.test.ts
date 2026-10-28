@@ -339,7 +339,9 @@ describe('openingPlanPaths: portas novas (spec E §3.5)', () => {
         expect(largura(b) + profundidade(b)).toBeGreaterThan(0.01);
       }
       const alto = openingPlanPaths(modelo(c), opts({ detail: 'high' }));
-      expect(folhas(alto).length).toBeGreaterThanOrEqual(esperado * 2);
+      // Só as folhas dobradas, em todos os níveis (sem a folha fechada por cima).
+      expect(folhas(alto), `${base} alto`).toHaveLength(esperado);
+      expect(folhas(openingPlanPaths(modelo(c), opts({ detail: 'low' }))), `${base} baixo`).toHaveLength(esperado);
     }
   });
 
@@ -356,7 +358,57 @@ describe('openingPlanPaths: portas novas (spec E §3.5)', () => {
       expect(Math.sign((b.s0 + b.s1) / 2)).toBe(side);
       expect(paths.some((p) => p.role === 'track' && p.dash?.[0] === 4)).toBe(true);
       const alto = openingPlanPaths(modelo(cena('ot_pg300', {}, { flipFacing })), opts({ detail: 'high' }));
-      expect(alto.filter((p) => p.role === 'leaf' && p.closed).length).toBeGreaterThanOrEqual(5);
+      // A seccionada só tem a linha da folha fechada (única representação) e o painel recolhido tracejado, no alto também.
+      expect(alto.filter((p) => p.role === 'leaf' && p.closed)).toHaveLength(1);
+      expect(alto.filter((p) => p.role === 'leaf' && !p.closed)).toHaveLength(1);
     }
+  });
+});
+
+describe('openingPlanPaths: leafPlan (folha aberta, fechada ou ambas)', () => {
+  const comprimento = (p: OpeningPlanPath): number => largura(boxOf(p));
+  it('padrão e open: só a folha aberta (a 90° a largura é a espessura)', () => {
+    const m = modelo(cena('ot_p90'));
+    for (const leafPlan of [undefined, 'open'] as const) {
+      const f = folhas(openingPlanPaths(m, opts(leafPlan ? { leafPlan } : {})));
+      expect(f).toHaveLength(1);
+      expect(comprimento(f[0]!)).toBeLessThan(0.1);
+    }
+  });
+
+  it('closed: só a folha fechada, sem o arco', () => {
+    for (const base of ['ot_p90', 'ot_p160', 'ot_pp80', 'ot_pvv90']) {
+      const m = modelo(cena(base));
+      const paths = openingPlanPaths(m, opts({ leafPlan: 'closed' }));
+      expect(paths.some((p) => p.role === 'swing'), base).toBe(false);
+      const f = folhas(paths);
+      expect(f.length, base).toBeGreaterThanOrEqual(m.openings.length);
+      for (const p of f) expect(comprimento(p), base).toBeGreaterThan(0.1);
+    }
+    const janela = openingPlanPaths(modelo(cena('ot_j60')), opts({ leafPlan: 'closed' }));
+    expect(folhas(janela).some((p) => comprimento(p) > 0.1)).toBe(true);
+  });
+
+  it('both: a aberta e a fechada juntas, com o arco', () => {
+    const m = modelo(cena('ot_p90'));
+    const paths = openingPlanPaths(m, opts({ leafPlan: 'both' }));
+    const f = folhas(paths);
+    expect(f).toHaveLength(2);
+    expect(f.filter((p) => comprimento(p) < 0.1)).toHaveLength(1);
+    expect(f.filter((p) => comprimento(p) > 0.8)).toHaveLength(1);
+    expect(paths.some((p) => p.role === 'swing')).toBe(true);
+  });
+
+  it('famílias de correr não duplicam a folha (já é fechada por natureza)', () => {
+    for (const base of ['ot_pc160', 'ot_j120', 'ot_pe80']) {
+      const m = modelo(cena(base));
+      const aberta = folhas(openingPlanPaths(m, opts())).length;
+      expect(folhas(openingPlanPaths(m, opts({ leafPlan: 'both' }))).length, base).toBe(aberta);
+    }
+  });
+
+  it('vão livre ignora leafPlan', () => {
+    const m = modelo(cena('ot_vao90'));
+    expect(openingPlanPaths(m, opts({ leafPlan: 'both' }))).toEqual(openingPlanPaths(m, opts()));
   });
 });

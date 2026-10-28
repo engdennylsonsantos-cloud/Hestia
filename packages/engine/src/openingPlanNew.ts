@@ -43,6 +43,8 @@ export interface OpeningPlanOptions {
   swingStyle: 'arc' | 'dash' | 'line';
   /** Cota de corte no z local do modelo (0 = soleira do vão). */
   cutZ: number;
+  /** Folha em planta: 'open' (padrão), 'closed' ou 'both'. */
+  leafPlan?: 'open' | 'closed' | 'both';
 }
 
 const EPS = 1e-9;
@@ -259,8 +261,9 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
   const family = newDoorFamily(m);
   if (!family) return false;
   const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
-  // Vai-e-vem é família de giro: mostra a folha aberta (e os dois arcos) em todos os níveis (spec E3 §6).
-  if (level === 'low' && family !== 'dblact') {
+  // Vai-e-vem é família de giro e a sanfonada mostra só as folhas dobradas: ambos desenham a folha aberta em todos os
+  // níveis (spec E3 §6). Embutir e garagem não têm "aberta" em planta: o nível baixo é a linha da folha.
+  if (level === 'low' && family !== 'dblact' && family !== 'fold') {
     addNewDoorLow(out, m);
     return true;
   }
@@ -284,7 +287,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
       t0 = Math.min(t0, part.box.t0);
       t1 = Math.max(t1, part.box.t1);
       sFolha = (part.box.s0 + part.box.s1) / 2;
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     }
     if (Number.isFinite(t0) && Number.isFinite(t1)) {
       out.push(line([{ t: t0, s: sFolha }, { t: t1, s: sFolha }], 'leaf', 'ink', 1));
@@ -304,7 +306,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
     for (const part of m.parts.filter((x) => x.role === 'leaf')) {
       const motion = part.motion;
       out.push(polygon(transformedRing(part.box, motion, opts.angle), 'leaf', 'cut', 1));
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     }
     addTracks(out, m);
     if (level === 'high') addHighExtras(out, m, opts.cutZ);

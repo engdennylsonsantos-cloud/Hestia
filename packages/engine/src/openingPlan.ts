@@ -198,14 +198,38 @@ function windowPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanO
   if (level === 'high') addHighExtras(out, m, opts.cutZ);
 }
 
-/**
- * Planta da esquadria a partir do modelo único (spec E §4.1), em coordenadas locais do vão. `low` só mostra a folha
- * fechada (e as três linhas da janela), `mid` corta os perfis e abre a folha com o arco, e `high` acrescenta a folha
- * fechada, alizar, peitoril, verga e o vidro duplo. `planDisplay = 'projected'` força o nível alto.
- */
-export function openingPlanPaths(m: OpeningModel, opts: OpeningPlanOptions): OpeningPlanPath[] {
+function basePaths(m: OpeningModel, opts: OpeningPlanOptions): OpeningPlanPath[] {
   const out: OpeningPlanPath[] = [];
   if (m.kind === 'door') doorPaths(out, m, opts);
   else windowPaths(out, m, opts);
   return out;
+}
+
+const chave = (p: OpeningPlanPath): string => p.pts.map((q) => `${q.t.toFixed(4)},${q.s.toFixed(4)}`).join(';');
+
+/**
+ * Planta da esquadria a partir do modelo único (spec E §4.1), em coordenadas locais do vão. `low` mostra as três
+ * linhas da janela (e a linha da folha das famílias que correm), `mid` corta os perfis e abre a folha com o arco, e
+ * `high` acrescenta alizar, peitoril, verga e o vidro duplo. `planDisplay = 'projected'` força o nível alto.
+ * `leafPlan` escolhe a folha: 'open' (padrão) só a aberta, 'closed' só a fechada, 'both' as duas.
+ */
+export function openingPlanPaths(m: OpeningModel, opts: OpeningPlanOptions): OpeningPlanPath[] {
+  const modo = opts.leafPlan ?? 'open';
+  if (modo === 'open' || m.void) return basePaths(m, opts);
+  // Fechada = a mesma planta com a folha em 0° e sem o arco; as folhas dela se somam (both) ou substituem (closed).
+  const fechada = basePaths(m, { ...opts, angle: 0, showSwing: false });
+  const folhas = fechada.filter((p) => p.role === 'leaf' && p.closed);
+  const extras: OpeningPlanPath[] = [];
+  const nivel = opts.planDisplay === 'projected' ? 'high' : opts.detail;
+  if (nivel !== 'low') {
+    for (const o of m.openings) {
+      const box = leafBox(m, o.leaf);
+      const nova = box ? polygon(boxRing(box), 'leaf', 'cut', 1) : null;
+      if (nova && !folhas.some((p) => chave(p) === chave(nova))) extras.push(nova);
+    }
+  }
+  if (modo === 'closed') return [...fechada, ...extras];
+  const aberta = basePaths(m, opts);
+  const vistas = new Set(aberta.filter((p) => p.role === 'leaf' && p.closed).map(chave));
+  return [...aberta, ...[...folhas, ...extras].filter((p) => !vistas.has(chave(p)))];
 }

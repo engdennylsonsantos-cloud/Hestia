@@ -20,6 +20,7 @@ type OpeningTypeRuleFields = Partial<
     | 'detail3d'
     | 'showSwing'
     | 'swingStyle'
+    | 'leafPlan'
     | 'leafSide'
   >
 >;
@@ -33,6 +34,7 @@ const PLAN_DISPLAYS = ['symbolic', 'projected'] as const;
 const DETAIL_2D = ['scale', 'low', 'mid', 'high', 'off'] as const;
 const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
 const SWING_STYLES = ['arc', 'dash', 'line'] as const;
+const LEAF_PLANS = ['open', 'closed', 'both'] as const;
 const LEAF_SIDES = ['swing', 'opposite'] as const;
 
 const inSet = (v: unknown, valid: readonly string[]): boolean => typeof v === 'string' && valid.includes(v);
@@ -72,6 +74,7 @@ function openingStyleIssue(t: OpeningTypeRules): string | null {
   if (t.detail3d !== undefined && !inSet(t.detail3d, DETAIL_3D)) return 'Nível de detalhe 3D desconhecido.';
   if (t.showSwing !== undefined && typeof t.showSwing !== 'boolean') return 'Arco de giro em planta: valor inválido.';
   if (t.swingStyle !== undefined && !inSet(t.swingStyle, SWING_STYLES)) return 'Estilo do arco de giro desconhecido.';
+  if (t.leafPlan !== undefined && !inSet(t.leafPlan, LEAF_PLANS)) return 'Folha em planta desconhecida (aberta, fechada ou ambas).';
   if (t.leafSide !== undefined && !inSet(t.leafSide, LEAF_SIDES)) return 'Posição da folha desconhecida.';
   return null;
 }

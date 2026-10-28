@@ -2,8 +2,8 @@
 Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste, 6163 testes, lint/typecheck/test ok (executado em 2026-10-28 antes de qualquer alteração).
 
 - [x] U0 inventário (`01`)
-- [ ] U1 tipos, padrões e formatação
-- [ ] U2 leitura de texto digitado
+- [x] U1 tipos, padrões e formatação
+- [x] U2 leitura de texto digitado
 - [ ] U3 `ProjectSettings.units`
 - [ ] U4 `parseQuantityText` (tools)
 - [ ] U5 hook `useUnits`
@@ -19,6 +19,8 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [ ] `npm run check` verde, integrado
 
 ## Desvios
-_(nenhum)_
+- U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
+- U1: `unitsOf` usa por enquanto um tipo estrutural mínimo (`{ settings?: { units?: UnitsSettings } }`) para compilar antes do campo em `ProjectSettings`; U3 troca para `Pick<Project,'settings'>`.
+- U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

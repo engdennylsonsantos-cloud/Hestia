@@ -369,7 +369,7 @@ function ViewProps(): ReactElement {
       <Group title="Padrões do projeto" open={false}>
         <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
         <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>
-        <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'units' })}>Unidades…</button></div>
+        <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'units' })}>Unidades…</button><button className="chiplink" onClick={() => useUi.setState({ dialog: 'dimensions' })}>Cotas…</button></div>
       </Group>
       <div className="hint">Selecione um elemento para ver e editar suas propriedades. Mudar o <em>tipo</em> altera todas as instâncias; mudar a <em>instância</em> altera só a selecionada.</div>
     </>

@@ -1,10 +1,11 @@
 import type { ReactElement } from 'react';
-import type { LocationLine } from '@hestia/model';
+import { isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
 import { roofAutoOffset, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
-import { useUi } from '../editor/state.ts';
+import { clearDimOverride, setDimOverride, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
+import { OPENING_OPTIONS, WALL_OPTIONS, sessionChoice } from './dialogs/dimensionSettingsModel.ts';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -17,6 +18,9 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const p = useProject();
   const levelId = useUi((s) => s.levelId);
   const o = useUi((s) => s.options);
+  const dimOverrides = useUi((s) => s.dimOverrides);
+  // Troca rápida das cotas: vale só para a sessão ('' volta ao padrão do projeto).
+  const chooseDim = (key: string, v: string): void => (isWallDimRef(v) || isOpeningDimRef(v) ? setDimOverride(key, v) : clearDimOverride(key));
   const set = (patch: Partial<typeof o>): void => useUi.setState((s) => ({ options: { ...s.options, ...patch } }));
   const setStairRun = (patch: Partial<NonNullable<typeof o.stairRun>>): void => set({ stairRun: { ...(o.stairRun ?? { shape: 'straight', width: 1.2, turn: 'left' }), ...patch } });
   const setStair = (patch: Partial<NonNullable<typeof o.stair>>): void => set({ stair: { ...(o.stair ?? {}), ...patch } });
@@ -44,7 +48,8 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           <Row label="Abrir" htmlFor="place-open-toward"><select id="place-open-toward" className="select" value={o.openingToward ?? 'cursor'} onChange={(e) => set({ openingToward: e.target.value as NonNullable<typeof o.openingToward> })}><option value="cursor">para o lado do cursor</option><option value="away">para o lado oposto</option></select></Row>
           <Row label="Âncora" htmlFor="place-open-anchor"><select id="place-open-anchor" className="select" value={o.openingAnchor ?? 'center'} onChange={(e) => set({ openingAnchor: e.target.value as NonNullable<typeof o.openingAnchor> })}><option value="center">Centro</option><option value="hinge">Ombreira da dobradiça</option><option value="latch">Ombreira do trinco</option></select></Row>
           <Row label="Folga da quina (cm)" htmlFor="place-open-clear"><NumField id="place-open-clear" value={o.openingClear ?? 0.1} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => set({ openingClear: v })} /></Row>
-          <Row label="Cotas" htmlFor="place-open-dim"><select id="place-open-dim" className="select" value={o.openingDimMode ?? 'axis'} onChange={(e) => set({ openingDimMode: e.target.value as NonNullable<typeof o.openingDimMode> })}><option value="axis">Do eixo</option><option value="face">Da face do batente</option></select></Row>
+          <Row label="Cota: parede" htmlFor="place-open-dim-wall"><select id="place-open-dim-wall" className="select" value={sessionChoice(dimOverrides, 'opening:wall')} onChange={(e) => chooseDim('opening:wall', e.target.value)}><option value="">Padrão do projeto</option>{WALL_OPTIONS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</select></Row>
+          <Row label="Cota: esquadria" htmlFor="place-open-dim-self"><select id="place-open-dim-self" className="select" value={sessionChoice(dimOverrides, 'opening:opening')} onChange={(e) => chooseDim('opening:opening', e.target.value)}><option value="">Padrão do projeto</option>{OPENING_OPTIONS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</select></Row>
           <Row label="Etiquetas de portas e janelas"><Check id="place-open-tags" checked={p.settings.showOpeningTags === true} onChange={(v) => editor.store.exec({ type: 'setSettings', patch: { showOpeningTags: v } })} /></Row>
           <Row label="Etiquetar ao inserir"><Check id="place-open-tag-place" checked={o.openingTagOnPlace !== false} onChange={(v) => set({ openingTagOnPlace: v })} /></Row>
           {(() => { const typeId = tool === 'door' ? o.doorTypeId : o.windowTypeId; const type = p.openingTypes[typeId]; return <Row label="Peitoril" htmlFor="place-opening-sill"><NumField id="place-opening-sill" value={o.openingSillOverride ?? type?.sill ?? 0} placeholder={type ? `${type.sill.toFixed(2).replace('.', ',')} m (tipo)` : undefined} onCommit={(v) => set({ openingSillOverride: v })} onClear={() => set({ openingSillOverride: null })} unit="m" min={0} /></Row>; })()}

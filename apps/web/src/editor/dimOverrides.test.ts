@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearDimOverrides, setDimOverride, useUi } from './state.ts';
+import { clearDimOverride, clearDimOverrides, setDimOverride, useUi } from './state.ts';
 
 describe('dimOverrides (referências de cota da sessão)', () => {
   beforeEach(() => {
@@ -12,6 +12,13 @@ describe('dimOverrides (referências de cota da sessão)', () => {
     expect(useUi.getState().dimOverrides).toEqual({ 'opening:wallLeft': 'axis', 'opening:openRight': 'casing' });
     setDimOverride('opening:wallLeft', 'coreFace');
     expect(useUi.getState().dimOverrides['opening:wallLeft']).toBe('coreFace');
+  });
+
+  it('clearDimOverride remove só a chave', () => {
+    setDimOverride('opening:wall', 'axis');
+    setDimOverride('opening:opening', 'clear');
+    clearDimOverride('opening:wall');
+    expect(useUi.getState().dimOverrides).toEqual({ 'opening:opening': 'clear' });
   });
 
   it('clearDimOverrides esvazia', () => {

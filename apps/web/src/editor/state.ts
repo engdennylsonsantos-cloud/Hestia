@@ -10,7 +10,7 @@ import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -266,6 +266,14 @@ useUi.subscribe((s, prev) => {
 /** Escolhe, só para a sessão, a referência de uma ponta de cota (alça ou troca rápida). */
 export function setDimOverride(key: string, ref: WallDimRef | OpeningDimRef): void {
   useUi.setState((s) => ({ dimOverrides: { ...s.dimOverrides, [key]: ref } }));
+}
+
+/** Remove a troca de uma ponta (volta ao padrão do projeto). */
+export function clearDimOverride(key: string): void {
+  useUi.setState((s) => {
+    const { [key]: _removida, ...resto } = s.dimOverrides;
+    return { dimOverrides: resto };
+  });
 }
 
 /** Limpa as referências de sessão (volta ao padrão do projeto). */

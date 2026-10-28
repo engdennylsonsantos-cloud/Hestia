@@ -3,6 +3,7 @@ import { OPENING_FRAME_DEFAULTS, type OpeningGlassKind, type OpeningType } from 
 import { NumField } from '../../../fields.tsx';
 import { GLASS_KINDS, setGlassKind, setLeafMaterialId } from '../openingTypeControls.ts';
 import { FIELD_HANDLE, FIELD_LEAF, MaterialSelect, Miniaturas, usePanelKit, type PanelProps } from './panelKit.tsx';
+import { HingesRow, LeafHardwareRows } from './hardwareRows.tsx';
 import { AngleRows, TransomRows } from './sharedRows.tsx';
 
 /** Folha (só portas): estilo, nº de folhas, espessura, vidro, maçaneta, ângulos e bandeiras, conforme a família. */
@@ -59,6 +60,8 @@ export function LeafPanel(props: PanelProps): ReactElement {
           <Miniaturas value={k.handle} options={FIELD_HANDLE} onPick={(v) => k.setField('handle', v, k.handleFallback)} preview={(v) => ({ ...k.thumbnailType, handle: v })} />
         </>
       ) : null}
+      <LeafHardwareRows {...props} />
+      <HingesRow {...props} />
       <AngleRows {...props} />
       <TransomRows {...props} />
     </>

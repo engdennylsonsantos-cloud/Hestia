@@ -72,3 +72,4 @@ export * from './perimeterModify.ts';
 export * from './perimeterTool.ts';
 export * from './perimeterCommit.ts';
 export * from './perimeterModifyKind.ts';
+export * from './dims/index.ts';

@@ -31,7 +31,13 @@ function cellsAt(l: ResolvedLayout, m: ResolvedMember, after: boolean): Resolved
 }
 
 const thicknessOf = (x: ResolvedCell, fallback: number): number =>
-  x.content.kind === 'glass' ? x.content.glass.thickness : x.content.kind === 'panel' ? x.content.thickness : fallback;
+  x.content.kind === 'glass'
+    ? x.content.glass.mounting === 'frameless'
+      ? 0
+      : x.content.glass.thickness
+    : x.content.kind === 'panel'
+      ? x.content.thickness
+      : fallback;
 
 /** Marcas de um lado do membro, olhando TODAS as células que o tocam (um membro pode tocar várias). */
 export function sideFlags(l: ResolvedLayout, m: ResolvedMember, after: boolean, fallbackT: number): SideFlags {

@@ -14,7 +14,7 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [ ] D10.3 eixos
 - [x] D10.4 piso/laje/telhado/forro (cotas de leitura)
 - [x] D10.5 mover/copiar
-- [ ] `npm run check` verde, integrado (pendente D10.2/D10.3)
+- [x] `npm run check` verde: 558 arquivos, 6447 testes (pendentes funcionais D10.2/D10.3)
 
 ## S1 — o que cada modo calcula (3 linhas)
 - `wall` (padrão): `D` = espessura TOTAL do tipo de parede (`totalThickness`, todas as camadas com revestimentos) e `Cd` = 0, o plano médio da parede.

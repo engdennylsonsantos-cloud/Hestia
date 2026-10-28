@@ -30,6 +30,13 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - D9 feito exceto a remoção de `ToolOptions.openingDimMode` (tools/types.ts, state.ts): `openingTool.ts` ainda a lê até o passo 3 do D4 (M4); removo junto com ele. O seletor "Cotas" de `PlacementProperties` já foi trocado por "Cota: parede" e "Cota: esquadria" (sessão, chaves `opening:wall` e `opening:opening`; `clearDimOverride` em state.ts). Diálogo: `DimensionSettingsDialog.tsx` + `dimensionSettingsModel.ts`; botão "Cotas…" ao lado de "Unidades…".
 - D4 passo 3 feito (M4 liberado): `openingTool.tempDims(overrides)` usa o provedor; prévia sem cotas em itens; removidos `openingDims*`, `dimensionRefs`, `temporaryDimensions`, `formatMeters`, `ToolOptions.openingDimMode`. `Tool.tempDims?(overrides?)` recebe as trocas de sessão (a ferramenta não enxerga o estado da UI). PlacementProperties migrado para unidades do projeto (PEDIDO da UNID) e linha de base de check-units atualizada.
 **MARCO M5 LIBERADO d91c6beb** (D4 a D8 integrados; D5, D7, D9 e D11 também)
+
+## M6 — registro de sujeitos fora de `project.elements` e unidades da ferramenta Cota
+- `dims/registry.ts` aceita `DimSubjectKind` = `ElementKind | 'detailLine' | 'perimeterLine' | 'grid'`. `selectionDims` procura primeiro em `project.elements`; se o id não for elemento, tenta os sujeitos na ordem `NON_ELEMENT_KINDS` e chama `selectionSubject(project, id, levelId)` do provedor. `subjectDims(ctx, kind, subject)` cobre sujeitos montados pela ferramenta (rascunho do Perímetro). Testes em `dims/registry.test.ts` (linha de detalhe, nível ativo, grade, id desconhecido, perímetro e precedência de elemento).
+- `ui/dims/useSelectionDims.ts`: só documenta que a seleção pode ser sujeito fora de `project.elements`; o overlay já era genérico (nada funcional mudou nele).
+- `COMO-ADICIONAR-COTA.md`: ponto de extensão dos três tipos e `subjectDims` documentados.
+- PEDIDO UNID atendido: `dimensionTool.ts` grava `Dimension.unit: 'project'` (sem `precision` fixa) nas cotas simples e em sequência; a prévia usa as unidades do projeto. Testes em `dimensionTool.test.ts`.
+**MARCO M6 LIBERADO (hash no commit seguinte)** — a ESQ já pode fazer D10.2 e D10.3.
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 

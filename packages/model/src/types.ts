@@ -7,6 +7,7 @@ import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.t
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
 import type { ProfilePreset } from './openingComposition.ts';
 import type { DimensionSettings } from './dimensionSettings.ts';
+import type { UnitsSettings } from './units.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 20;
@@ -567,6 +568,8 @@ export interface ProjectSettings {
   showOpeningTags?: boolean;
   /** Referências das cotas dinâmicas (ausente = padrões de `dimensionSettingsOf`). */
   dimensions?: DimensionSettings;
+  /** Unidades do projeto (ausente = padrões de `defaultUnits()`). */
+  units?: UnitsSettings;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */

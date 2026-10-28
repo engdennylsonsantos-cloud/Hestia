@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createEmptyProject } from './defaults.ts';
 import {
   defaultUnits,
   fromDisplay,
@@ -83,19 +84,21 @@ function solve(patch: UnitsSettings): ResolvedUnits {
 describe('unitsOf', () => {
   it('sem projeto ou sem units devolve a mesma referência dos padrões', () => {
     expect(unitsOf(undefined)).toBe(defaultUnits());
-    expect(unitsOf({})).toBe(defaultUnits());
-    expect(unitsOf({ settings: {} })).toBe(defaultUnits());
+    expect(unitsOf(createEmptyProject())).toBe(defaultUnits());
   });
 
   it('memoiza por identidade de settings.units', () => {
     const units: UnitsSettings = { length: { unit: 'cm', decimals: 1 } };
-    const projeto = { settings: { units } };
+    const projeto = createEmptyProject();
+    projeto.settings.units = units;
     const a = unitsOf(projeto);
     const b = unitsOf(projeto);
     expect(a).toBe(b);
     expect(a).not.toBe(defaultUnits());
     expect(a.length.unit).toBe('cm');
-    expect(unitsOf({ settings: { units: { ...units } } })).not.toBe(a);
+    const outro = createEmptyProject();
+    outro.settings.units = { ...units };
+    expect(unitsOf(outro)).not.toBe(a);
   });
 });
 

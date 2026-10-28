@@ -444,7 +444,10 @@ describe('retorno de acabamento (wrapping)', () => {
   });
   it('o fechamento explícito é recortado pelo batente; sem batente vale o da parede', () => {
     expect(silhouetteArea(withWindow({ wrapInserts: 'both' }, 'none'))).toBeCloseTo(base, 5);
-    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base, 5);
+    // Batente no núcleo (padrão, 0,14 m de 0,184 m): o batente recorta o fechamento só no núcleo. Sobram 4 faixas
+    // de reboco (2,2 cm × 2,2 cm) entre a face da parede e o núcleo nas ombreiras (medido: 1,936e-3 m²), e não
+    // dependem da largura nem da altura do vão.
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base + 4 * 0.022 * 0.022, 6);
     // Vão livre (sem batente) mantém o retorno da parede.
     const vao = setup([wall('a', 0, 0, 4, 0)]);
     vao.exec({ type: 'upsertWallType', wallType: { ...vao.project.wallTypes.wt_alv14!, wrapInserts: 'both' } });

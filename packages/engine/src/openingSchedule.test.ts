@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, type Opening, type OpeningType } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeWall, openingSpanOf, type Opening, type OpeningType } from '@hestia/model';
 import { buildOpeningSchedule, filterOpeningRows, openingScheduleToCsv, sumOpeningRows } from './index.ts';
 
 const opening = (o: Partial<Opening> & Pick<Opening, 'id' | 'kind' | 'typeId' | 'hostId'>): Opening => ({
@@ -128,5 +128,63 @@ describe('vão bruto e vergas no quadro', () => {
     expect(row.lintelLength).toBeCloseTo(1.8, 9);
     expect(row.sillBeamLength).toBeCloseTo(1.8, 9);
     expect(openingScheduleToCsv([row], sumOpeningRows([row]))).toContain('1,80;1,80;1;1,44;1,44');
+  });
+});
+
+describe('folha, material, ferragens e sentido no quadro', () => {
+  const base = createEmptyProject();
+  const s = new ProjectStore(base);
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 8, y: 0 } }) });
+  // Porta de giro pelo catálogo (P-14, nominalRef 'leaf'): 80 x 210 é a folha; o vão sai do motor.
+  const folha = base.openingTypes.ot_pgiro80!;
+  const colocada = (id: string, offset: number, flipHand: boolean, flipFacing: boolean): void =>
+    s.exec({ type: 'addOpening', opening: opening({ id, kind: 'door', typeId: 'ot_pgiro80', hostId: 'w', offset, flipHand, flipFacing }) });
+  colocada('a', 1, false, false);
+  colocada('b', 2.5, false, true);
+  colocada('c', 4, true, false);
+  colocada('d', 5.5, true, true);
+  colocada('e', 7, false, false); // repete o sentido de 'a': não entra de novo na lista
+  const row = buildOpeningSchedule(s.project).rows.find((r) => r.typeId === 'ot_pgiro80')!;
+
+  it('porta de folha: folha vem do tipo e o vão é o do motor (maior que a folha)', () => {
+    expect(row.count).toBe(5);
+    expect(row.leafWidth).toBeCloseTo(0.8, 9);
+    expect(row.leafHeight).toBeCloseTo(2.1, 9);
+    expect(row.width).toBeCloseTo(openingSpanOf(folha).width, 9);
+    expect(row.width).toBeGreaterThan(row.leafWidth);
+  });
+
+  it('sentido: os 4 casos de flipHand × flipFacing, distintos e na ordem de inserção', () => {
+    expect(row.sense.split('; ')).toEqual([
+      'dobradiça padrão, abre à esquerda de a→b',
+      'dobradiça padrão, abre à direita de a→b',
+      'dobradiça invertida, abre à esquerda de a→b',
+      'dobradiça invertida, abre à direita de a→b',
+    ]);
+  });
+
+  it('ferragens só do que a família oferece: maçaneta, dobradiças e folga inferior', () => {
+    expect(row.hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm');
+  });
+
+  it('material do batente vem do tipo; material da folha fica vazio quando o tipo não informa', () => {
+    expect(row.frameMaterial).toBe(base.materials[folha.frameMaterialId]!.name);
+    expect(row.leafMaterial).toBe('');
+  });
+
+  it('material da folha resolve pelo nome quando o tipo informa leafMaterialId', () => {
+    const s2 = new ProjectStore(createEmptyProject());
+    s2.exec({ type: 'addWall', wall: makeWall({ id: 'w', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    s2.exec({ type: 'upsertOpeningType', openingType: { ...folha, leafMaterialId: 'mat_aco' } });
+    s2.exec({ type: 'addOpening', opening: opening({ id: 'x', kind: 'door', typeId: 'ot_pgiro80', hostId: 'w', offset: 1 }) });
+    const r = buildOpeningSchedule(s2.project).rows[0]!;
+    expect(r.leafMaterial).toBe(s2.project.materials.mat_aco!.name);
+  });
+
+  it('janela não tem ferragens; vão livre não tem sentido, ferragens nem material da folha', () => {
+    const j = schedule.rows.find((r) => r.typeId === 'ot_j240')!;
+    expect(j.hardware).toBe('');
+    const v = schedule.rows.find((r) => r.typeId === 'ot_vao90')!;
+    expect(v).toMatchObject({ familyName: 'Vão livre', sense: '', hardware: '', leafMaterial: '' });
   });
 });

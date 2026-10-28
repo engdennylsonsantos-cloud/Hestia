@@ -5,6 +5,7 @@ export * from './openingModelTypes.ts';
 export * from './openingModel.ts';
 export * from './openingLines.ts';
 export * from './openingPlan.ts';
+export * from './openingPreview.ts';
 export * from './resolve.ts';
 export * from './quantities.ts';
 export * from './schedule.ts';

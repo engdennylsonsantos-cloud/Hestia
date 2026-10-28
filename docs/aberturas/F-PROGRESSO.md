@@ -11,7 +11,7 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 | F1 | Especificação e contrato | Sonnet | concluída |
 | F3 | Modelo, migração v19→v20, layout, presets | Sonnet | concluída e mesclada |
 | F2 | Testes de aceite do motor (spec §8) | Haiku | concluída e mesclada (71 testes vermelhos de propósito até a F4) |
-| F4 | Motor: quadro, membros, células, vidro, alizar | Sonnet | pendente |
+| F4 | Motor: quadro, membros, células, vidro, alizar | Sonnet | concluída e mesclada (engine+model verdes) |
 | F5a | Planta, corte e elevação | Haiku | pendente |
 | F5b | 3D | Haiku | pendente |
 | F5c | Quadro de esquadrias, IFC, DXF | Haiku | pendente |
@@ -25,3 +25,6 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 - A ponte do esquema vive em `withBridgedComposition` (`openingCompositionOf.ts`).
 
 - Ao mesclar a F2 o branch fica com `openingComposition.accept.test.ts` vermelho até a F4 entrar. Ids de célula dos testes: folha, band, lat-e, lat-d, fixa, abrir, painel. O item 7 do aceite ignora peças `stop` (a F4 não deve duplicar a cobertura com peça `stop` separada).
+- F4: composições de 2+ células usam o motor novo (`openingModelComposition.ts`, `Members`, `Cells`, `Casing`); tipos de UMA célula seguem nos builders antigos, exceto o alizar, que é o novo para todos (a posição já era a da spec). Papéis novos de peça: `mullion`, `transom`, `bead`. Ids: `jamb-left/right`, `head`, `threshold`, `sill-frame`, `mullion-<k>`, `transom-<k>`, `glass-<cellId>`, `leaf-<cellId>[-parte]`, `bead-<cellId>-<lado>`; alizar `group` `casing-exterior|interior`.
+- Correções do coordenador após F4: preset `prf_mad_divisor_5x9` sem rebaixo (como a spec §1); `withBridgedComposition` preserva composição editada direto; folga inferior padrão 7 mm (E2b) em vez de 8 mm; folha de janela fica dentro da luz com 4 mm de folga por lado (Ex. 5 da spec corrigido).
+- Fases F5a/b/c, F6a/b e F7 lançadas em paralelo após a F4 (6 agentes Haiku, arquivos disjuntos). A fiação de `components.ts` da interface é feita pelo coordenador ao mesclar F6a e F6b.

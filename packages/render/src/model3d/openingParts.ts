@@ -47,7 +47,8 @@ export interface OpeningPiece {
  */
 function mostraNoDetalhe(part: OpeningPart, detail: ReturnType<typeof openingDetail3d>): boolean {
   if (detail === 'off') return false;
-  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin' && part.role !== 'hinge';
+  // A baguete (`bead`) é divisão do vidro, como o `muntin`: some no esquemático.
+  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin' && part.role !== 'bead' && part.role !== 'hinge';
   if (detail === 'simple') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'hinge';
   return true;
 }
@@ -61,7 +62,7 @@ function materialIdOf(part: OpeningPart, p: Project, frameId: Id, glassId: Id): 
     if (p.materials['mat_perfil']) return 'mat_perfil';
     return frameId;
   }
-  // 'frame', 'leaf' e 'casing' usam o material do batente do tipo.
+  // 'frame' (batente, montantes, travessas, baguetes), 'leaf' e 'casing' usam o material do batente do tipo.
   return frameId;
 }
 

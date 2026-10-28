@@ -10,7 +10,8 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
 - **MARCO M1 LIBERADO 5926d8af** (Fase A até U6 integrada: `formatQuantity`, `parseQuantity`, `useUnits`/`useFormat`, `NumField quantity`)
 - [x] U7 exportações independentes
-- [ ] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
+- [x] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
+- **MARCO M2 LIBERADO <a definir neste commit>** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
 - [ ] B1–B4 diálogo Unidades (`02`)  → **marco M3**
 - [ ] C1 painel de propriedades
 - [ ] C2 diálogos
@@ -22,6 +23,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 ## Desvios
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
 - U1/U3: `unitsOf` começou com tipo estrutural mínimo e passou a `Pick<Project,'settings'>` quando U3 acrescentou `settings.units`.
+- C0: a linha de base tem 543 linhas em 191 arquivos (contagem por linha, não por ocorrência). O teste de fixtures roda em `tests/check-units.test.ts` porque o vitest não inclui `scripts/`; o teste importa `scanText` do `.mjs` (declaração em `scripts/check-units.d.mts`).
 - U6 (`npm run check` completo): a suíte inteira passou em lint/typecheck e 6369 testes; 6 testes de `shortcutConfig.test.ts` estouraram 5 s por contenção do paralelismo e passam isolados (11/11 em 15,5 s). Reexecutar o `check` no fim da fase.
 - U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
 ## Bloqueios e pedidos a outros agentes

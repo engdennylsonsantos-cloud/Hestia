@@ -11,7 +11,7 @@
     "dev": "npm run dev -w @hestia/web",
     "build": "npm run build -w @hestia/web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-parity.mjs && node scripts/check-props-density.mjs",
+    "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-parity.mjs && node scripts/check-props-density.mjs && node scripts/check-units.mjs",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "node tests/e2e/flow.mjs",

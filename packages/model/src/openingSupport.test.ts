@@ -15,6 +15,13 @@ describe('opções por família', () => {
     expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).tiltAxis).map((f) => f.id)).toEqual(['window_tilt']);
     expect(OPENING_FAMILIES.some((f) => openingOptionSupport(f.id).nominalRef)).toBe(false);
   });
+  it('maçaneta só em porta de giro e dupla; grade só em janela; espessura da folha só onde há folha', () => {
+    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).handle).map((f) => f.id)).toEqual(['door_swing', 'door_double']);
+    expect(OPENING_FAMILIES.filter((f) => openingOptionSupport(f.id).grid).every((f) => f.kind === 'window')).toBe(true);
+    for (const id of ['door_void', 'window_void', 'window_fixed'] as const) expect(openingOptionSupport(id).leafThickness, id).toBe(false);
+    expect(openingOptionSupport('door_swing').leafThickness).toBe(true);
+  });
+
   it('família nula ou desconhecida: nada se aplica', () => {
     expect(Object.values(openingOptionSupport(null)).every((v) => v === false)).toBe(true);
   });

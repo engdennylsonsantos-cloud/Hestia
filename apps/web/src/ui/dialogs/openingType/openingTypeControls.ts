@@ -1,11 +1,11 @@
-import { HARDWARE_DEFAULTS, OPENING_SPAN_GAP_DEFAULTS, openingSpanGap, type OpeningGlassKind, type OpeningType } from '@hestia/model';
+import { HARDWARE_DEFAULTS, OPENING_SPAN_GAP_DEFAULTS, formatQuantity, openingSpanGap, type OpeningGlassKind, type OpeningType, type ResolvedUnits } from '@hestia/model';
 import { withOpeningField } from './openingTypeFields.ts';
 
 /** Metros com 0,1 mm (a digitação em cm não deixa resto de ponto flutuante fora do padrão). */
 export const arredondaMetros = (m: number): number => Math.round(m * 1e4) / 1e4;
 
-/** Metros para o texto em cm, no formato pt-BR (88 ou 87,5). */
-export const cmTexto = (m: number): string => (m * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+/** Metros no texto de medida pequena do projeto (cm por padrão: 88 ou 87,5). */
+export const cmTexto = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'smallLength', m, { decimals: 1 });
 
 /** Ferragem e folga com padrão do modelo (`HARDWARE_DEFAULTS`): o padrão tira o campo, que volta à leitura. */
 const ferragem = (t: OpeningType, campo: 'leafUndercut' | 'handleHeight' | 'handleInset' | 'hinges', valor: number): OpeningType =>

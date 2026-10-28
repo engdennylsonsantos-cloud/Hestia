@@ -3,6 +3,7 @@ import {
   DIVIDER_WIDTH_DEFAULT,
   STOP_WIDTH_DEFAULT,
   compositionIssue,
+  formatQuantity,
   openingCompositionOf,
   openingProfilesOf,
   resolveProfile,
@@ -11,8 +12,10 @@ import {
   type ProfileRef,
   type ProfileRole,
   type ProfileSection,
+  type ResolvedUnits,
 } from '@hestia/model';
 import { useProject } from '../../../../editor/controller.ts';
+import { useUnits } from '../../../useUnits.ts';
 import { NumField } from '../../../fields.tsx';
 import type { PanelProps } from '../panels/panelKit.tsx';
 import { ajustarCampo, aValidar, comBatente, comDivisor, divisores, fonteDaRef, presetsParaPapel, trocarPreset, type Profiles } from './profileControls.ts';
@@ -45,13 +48,14 @@ interface PerfilRowsProps {
   /** Referência do perfil; ausente = divisor no padrão (sem campos para editar). */
   valor: ProfileRef | undefined;
   perfis: Profiles;
+  units: ResolvedUnits;
   onChange: (next: ProfileRef | undefined) => void;
   /** O divisor pode voltar ao padrão do modelo. */
   comPadrao?: boolean;
 }
 
 /** Um perfil do quadro: preset, campos de sobreposição (`override`) e leitura de material, seção e fonte. */
-function PerfilRows({ id, titulo, papel, valor, perfis, onChange, comPadrao }: PerfilRowsProps): ReactElement {
+function PerfilRows({ id, titulo, papel, valor, perfis, units, onChange, comPadrao }: PerfilRowsProps): ReactElement {
   const presets = presetsParaPapel(papel, perfis);
   const select = valor === undefined ? '' : 'presetId' in valor ? valor.presetId : 'inline';
   return (
@@ -70,20 +74,20 @@ function PerfilRows({ id, titulo, papel, valor, perfis, onChange, comPadrao }: P
         </select>
       </div>
       {valor === undefined ? (
-        <p className="hint">Divisor no padrão: largura {(DIVIDER_WIDTH_DEFAULT * 100).toLocaleString('pt-BR')} cm, material do batente.</p>
+        <p className="hint">Divisor no padrão: largura {formatQuantity(units, 'smallLength', DIVIDER_WIDTH_DEFAULT, { decimals: 1, trim: true })}, material do batente.</p>
       ) : (
         <>
           <div className="field-row">
             <label htmlFor={`${id}-w`} title="Largura visível na face da parede (o J do motor)">Largura visível<Validar on={aValidar(valor, perfis, 'visibleWidth')} /></label>
-            <NumField id={`${id}-w`} value={resolveProfile(valor, perfis).visibleWidth} scale={100} decimals={1} unit="cm" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'visibleWidth', v))} />
+            <NumField id={`${id}-w`} value={resolveProfile(valor, perfis).visibleWidth} quantity="smallLength" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'visibleWidth', v))} />
           </div>
           <div className="field-row">
             <label htmlFor={`${id}-d`} title="Profundidade na direção da parede (vale só com profundidade 'fixa' no quadro)">Profundidade<Validar on={aValidar(valor, perfis, 'depth')} /></label>
-            <NumField id={`${id}-d`} value={resolveProfile(valor, perfis).depth} scale={100} decimals={1} unit="cm" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'depth', v))} />
+            <NumField id={`${id}-d`} value={resolveProfile(valor, perfis).depth} quantity="smallLength" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'depth', v))} />
           </div>
           <div className="field-row">
             <label htmlFor={`${id}-s`} title="Batedor: lábio que encosta na folha (seções com rebaixo, L e T)">Batedor<Validar on={aValidar(valor, perfis, 'stopWidth')} /></label>
-            <NumField id={`${id}-s`} value={resolveProfile(valor, perfis).stopWidth ?? STOP_WIDTH_DEFAULT} scale={100} decimals={1} unit="cm" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'stopWidth', v))} />
+            <NumField id={`${id}-s`} value={resolveProfile(valor, perfis).stopWidth ?? STOP_WIDTH_DEFAULT} quantity="smallLength" min={0} onCommit={(v) => onChange(ajustarCampo(valor, perfis, 'stopWidth', v))} />
           </div>
           <div className="field-row">
             <label>Material e seção</label>
@@ -101,13 +105,14 @@ function PerfilRows({ id, titulo, papel, valor, perfis, onChange, comPadrao }: P
 
 /** Perfis do quadro: batente e divisores (cada divisão interna da composição). Escreve em `composition` do tipo. */
 export function ProfilePanel({ d, onChange }: PanelProps): ReactElement {
+  const units = useUnits();
   const perfis = useOpeningProfiles();
   const c: OpeningComposition = openingCompositionOf(d);
   const grava = (next: OpeningComposition): void => onChange({ ...d, composition: next });
   const erro = compositionIssue(c, perfis);
   return (
     <>
-      <PerfilRows id="op-pf-batente" titulo="Batente" papel="frame" valor={c.frame.profile} perfis={perfis} onChange={(r) => r && grava(comBatente(c, r))} />
+      <PerfilRows id="op-pf-batente" titulo="Batente" papel="frame" valor={c.frame.profile} perfis={perfis} units={units} onChange={(r) => r && grava(comBatente(c, r))} />
       {divisores(c.layout).map((s, i) => (
         <PerfilRows
           key={s.id}
@@ -116,6 +121,7 @@ export function ProfilePanel({ d, onChange }: PanelProps): ReactElement {
           papel="divider"
           valor={s.divider}
           perfis={perfis}
+          units={units}
           comPadrao
           onChange={(r) => grava(comDivisor(c, s.id, r))}
         />

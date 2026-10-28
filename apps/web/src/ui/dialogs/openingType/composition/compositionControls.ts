@@ -3,6 +3,7 @@ import {
   OPENING_FRAME_DEFAULTS,
   compositionCells,
   compositionIssue,
+  formatQuantity,
   nominalCellOf,
   openingCompositionOf,
   resolveLayout,
@@ -14,6 +15,7 @@ import {
   type OpeningFamilyId,
   type OpeningType,
   type ResolvedCell,
+  type ResolvedUnits,
   type SplitNode,
 } from '@hestia/model';
 
@@ -49,8 +51,8 @@ export const ACOES_JANELA: ReadonlyArray<readonly [Acao, string]> = [
   ['bandeira', 'Empilhar bandeira'],
 ];
 
-/** Metros em pt-BR com duas casas (0,88). */
-export const metrosTexto = (m: number): string => m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Comprimento nas unidades do projeto, com duas casas (ex.: "0,88 m"). */
+export const metrosTexto = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m, { decimals: 2 });
 
 /** Substitui a composição do tipo (o campo passa a ser a fonte; a ponte F3–F5 confere ao salvar). */
 export const comComposicao = (t: OpeningType, c: OpeningComposition): OpeningType => ({ ...t, composition: c });

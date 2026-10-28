@@ -11,7 +11,7 @@ export function GlazingPanel({ d, onChange, support, materials }: PanelProps): R
     <>
       {support.leafThickness ? (
         <>
-          <div className="field-row"><label htmlFor="op-lt">Espessura da folha</label><NumField id="op-lt" value={d.leafThickness ?? OPENING_FRAME_DEFAULTS.windowLeaf} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => k.set({ leafThickness: v })} /></div>
+          <div className="field-row"><label htmlFor="op-lt">Espessura da folha</label><NumField id="op-lt" value={d.leafThickness ?? OPENING_FRAME_DEFAULTS.windowLeaf} quantity="smallLength" min={0.01} onCommit={(v) => k.set({ leafThickness: v })} /></div>
           <MaterialSelect id="op-leaf-mat" label="Material da folha" value={d.leafMaterialId ?? d.frameMaterialId} materials={materials} onPick={(id) => onChange(setLeafMaterialId(d, id))} />
         </>
       ) : null}
@@ -24,7 +24,7 @@ export function GlazingPanel({ d, onChange, support, materials }: PanelProps): R
               {GLASS_KINDS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
             </select>
           </div>
-          <div className="field-row"><label htmlFor="op-gt">Espessura do vidro</label><NumField id="op-gt" value={d.glassThickness ?? OPENING_FRAME_DEFAULTS.glass} scale={100} decimals={1} unit="cm" min={0.001} onCommit={(v) => k.set({ glassThickness: v })} /></div>
+          <div className="field-row"><label htmlFor="op-gt">Espessura do vidro</label><NumField id="op-gt" value={d.glassThickness ?? OPENING_FRAME_DEFAULTS.glass} quantity="smallLength" min={0.001} onCommit={(v) => k.set({ glassThickness: v })} /></div>
         </>
       ) : null}
     </>

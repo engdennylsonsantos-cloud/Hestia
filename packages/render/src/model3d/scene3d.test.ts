@@ -264,17 +264,17 @@ describe('caminho instanciado: todas as categorias em lotes globais', () => {
 });
 
 describe('exibição por categoria (substituições)', () => {
-  it('ocultar porta tira as 13 peças da porta (batente em L, folha, ferragens e dobradiças); janela tira 16; a linha não muda', () => {
+  it('ocultar porta tira as 15 peças da porta (batente em L, folha, ferragens e dobradiças); janela tira 16; a linha não muda', () => {
     const p = casa();
     const base = cena(p);
     const semPorta = cena(comVista(p, { overrides: { ...defaultsOverrides(), door: { visible: false, transparency: 0, halftone: false } } }));
     const semJanela = cena(comVista(p, { overrides: { ...defaultsOverrides(), window: { visible: false, transparency: 0, halftone: false } } }));
-    expect(pecasDe(base, 'door')).toHaveLength(13);
+    expect(pecasDe(base, 'door')).toHaveLength(15);
     expect(pecasDe(base, 'window')).toHaveLength(16);
     expect(pecasDe(semPorta, 'door')).toHaveLength(0);
     expect(pecasDe(semPorta, 'window')).toHaveLength(16);
     expect(pecasDe(semJanela, 'window')).toHaveLength(0);
-    expect(pecasDe(semJanela, 'door')).toHaveLength(13);
+    expect(pecasDe(semJanela, 'door')).toHaveLength(15);
     expect(linhas(semPorta)).toHaveLength(linhas(base).length);
   });
 
@@ -432,8 +432,8 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
   it('porta de 1 folha: batente em L de 5 cm por lado (peça única), folha de 4 cm de espessura', () => {
     const ms = cena(casa());
     const portas = pecas(ms, 'door');
-    // 2 ombreiras + cabeça + folha + 6 de ferragem (maçaneta e fechadura) + 3 dobradiças (E2b).
-    expect(portas).toHaveLength(13);
+    // 2 ombreiras + cabeça + folha + 8 de ferragem (maçaneta: roseta, pescoço e braço nas duas faces, e fechadura) + 3 dobradiças (E2b).
+    expect(portas).toHaveLength(15);
     const [f] = folhas(ms);
     expect(f).toBeDefined();
     expect(folhas(ms)).toHaveLength(1);
@@ -448,8 +448,8 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
   it('porta dupla: duas folhas de lh − 0,002, centros em ±lh/2, dobradiças nas ombreiras', () => {
     const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_p160')!);
     const ms = cena(p);
-    // 2 ombreiras + cabeça + 2 folhas + 12 de ferragem (2 × maçaneta e fechadura) + 6 dobradiças (3 por folha).
-    expect(pecas(ms, 'door')).toHaveLength(23);
+    // 2 ombreiras + cabeça + 2 folhas + 16 de ferragem (2 × maçaneta e fechadura, 8 cada) + 6 dobradiças (3 por folha).
+    expect(pecas(ms, 'door')).toHaveLength(27);
     const dupla = folhas(ms);
     expect(dupla).toHaveLength(2);
     const lh = 1.6 / 2 - 0.05 + 0.015 - 0.004;

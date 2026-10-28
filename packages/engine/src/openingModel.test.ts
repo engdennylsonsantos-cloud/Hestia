@@ -352,8 +352,8 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
   it('maçaneta lever padrão da porta de giro: roseta e haste nas duas faces', () => {
     const m = modelo(cena('ot_p90'));
     const handles = de(m.parts, 'handle');
-    // 2 roseta + 2 haste + 2 placas da fechadura (espelho) abaixo da maçaneta.
-    expect(handles).toHaveLength(6);
+    // 2 roseta + 2 pescoço + 2 braço da alavanca + 2 placas da fechadura (espelho) abaixo da maçaneta.
+    expect(handles).toHaveLength(8);
     expect(handles.every((x) => x.leaf === 0 && x.motion)).toBe(true);
     const rosetas = handles.filter((x) => x.id.includes('rosette'));
     expect(rosetas).toHaveLength(2);
@@ -367,8 +367,9 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
 
   it('maçaneta knob e pull respeitam a forma e o lado', () => {
     const knob = modelo(cena('ot_p90', { handle: 'knob' }));
+    // 5 discos da bola × 2 faces.
     const botoes = de(knob.parts, 'handle').filter((x) => x.id.includes('knob'));
-    expect(botoes).toHaveLength(2);
+    expect(botoes).toHaveLength(10);
     for (const k of botoes) expect(k.box.t1 - k.box.t0).toBeCloseTo(0.05, 9);
     const pull = modelo(cena('ot_p90', { handle: 'pull' }));
     const barra = de(pull.parts, 'handle')[0]!;

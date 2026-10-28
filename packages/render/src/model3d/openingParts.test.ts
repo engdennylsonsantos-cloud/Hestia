@@ -38,13 +38,13 @@ describe('peças 3D do vão: acabamento, peitoril e vergas', () => {
   it('sem campos novos, a porta de giro fechada traz o modelo inteiro: batente com rebaixo, folha e maçaneta', () => {
     const pc = pecas(cena('ot_p80'));
     // Batente em L em peça única por lado: 2 ombreiras + cabeça (os batedores saíram das peças, batente em L da v3);
-    // folha; 6 peças de ferragem (maçaneta e fechadura, E2b); 3 dobradiças de batente (padrão da família de giro, E2b).
-    expect(pc).toHaveLength(13);
+    // folha; 8 peças de ferragem (maçaneta: roseta, pescoço e braço nas duas faces, e placa da fechadura, E2b); 3 dobradiças de batente (padrão da família de giro, E2b).
+    expect(pc).toHaveLength(15);
     expect(pc.filter((x) => x.role === 'jamb')).toHaveLength(2);
     expect(pc.filter((x) => x.role === 'head')).toHaveLength(1);
     expect(pc.filter((x) => x.role === 'stop')).toHaveLength(0);
     expect(pc.filter((x) => x.role === 'leaf')).toHaveLength(1);
-    expect(pc.filter((x) => x.role === 'handle')).toHaveLength(6);
+    expect(pc.filter((x) => x.role === 'handle')).toHaveLength(8);
     expect(pc.filter((x) => x.role === 'hinge')).toHaveLength(3);
   });
 

@@ -5,7 +5,6 @@ import {
   difference,
   expandBox,
   multiArea,
-  orientedRect,
   closeGapsSafe,
   unionClipper,
   type Box,

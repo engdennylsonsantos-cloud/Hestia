@@ -168,6 +168,18 @@ export function addFrameCut(out: OpeningPlanPath[], m: OpeningModel, z: number):
   }
 }
 
+/**
+ * Soleira em planta (níveis médio e alto): duas linhas da peça entre as ombreiras. A soleira fica abaixo do plano de corte,
+ * então `addFrameCut` não a corta; sem este traço ela não aparece na planta.
+ */
+export function addThresholdPlan(out: OpeningPlanPath[], m: OpeningModel): void {
+  for (const part of m.parts) {
+    if (part.role !== 'threshold') continue;
+    out.push(line([{ t: part.box.t0, s: part.box.s0 }, { t: part.box.t1, s: part.box.s0 }], 'threshold', 'ink', 1));
+    out.push(line([{ t: part.box.t0, s: part.box.s1 }, { t: part.box.t1, s: part.box.s1 }], 'threshold', 'ink', 1));
+  }
+}
+
 /** Pistas dos trilhos: duas linhas por trilho, ao longo do vão. */
 export function addTracks(out: OpeningPlanPath[], m: OpeningModel): void {
   for (const part of m.parts) {
@@ -268,6 +280,7 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
     return true;
   }
   addFrameCut(out, m, opts.cutZ);
+  if (level !== 'low') addThresholdPlan(out, m);
   if (family === 'pocket') {
     for (const part of m.parts.filter((x) => x.role === 'leaf')) out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     for (const part of m.parts.filter((x) => x.role === 'pocket')) out.push(polygon(boxRing(part.box), 'pocket', 'soft', 0.8, [6, 3]));

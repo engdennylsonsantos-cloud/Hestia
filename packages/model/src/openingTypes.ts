@@ -111,12 +111,22 @@ export interface OpeningType {
   spanGap?: { w: number; h: number };
   /** Porta com vidro: fração da altura da folha ocupada pelo vidro, a partir do topo (0,25 / 0,5 / 0,75; 0,1 a 0,9). */
   glassRatio?: number;
-  /** Dobradiças: quantidade (2 a 4; padrão 3 em porta de giro) — peças de ferragem no batente e na folha. */
+  /** Dobradiças: quantidade (0 a 6; padrão 3 em porta de giro, dupla e vai-e-vem) — peças de ferragem na face do batente do lado da folha. */
   hinges?: number;
   /** Soleira/limiar da porta: espessura (m) e material (padrão pedra). Ausente = sem soleira. */
   threshold?: { thickness: number; materialId?: Id };
   /** Recuo do batente em relação à face da parede (ArchiCAD: Reveal) e a âncora do recuo: na face acabada ou no núcleo. */
   reveal?: { depth: number; anchor?: 'face' | 'core' };
+  /*
+   * Esquadria v3 (ferragens e folga da porta). Bloco separado, ao fim do tipo: todos opcionais, com padrão por leitura
+   * (`openingHardware.ts`). Janela ignora. Os limites e as famílias que os usam estão em `openingHardware.ts` e `openingSupport.ts`.
+   */
+  /** Folga inferior da folha (m): a face inferior sobe do piso (ou da soleira) por este valor. Padrão 0,007 (piso seco; 0,017 úmido; 0,027 com ventilação, NBR 15930-2). */
+  leafUndercut?: number;
+  /** Altura da maçaneta (m, do piso). Padrão 1,00; NBR 9050 pede 0,80 a 1,10 m (aviso fora da faixa; erro só fora de 0,50 a 1,50). */
+  handleHeight?: number;
+  /** Distância (m) da borda livre da folha ao eixo da maçaneta. Padrão 0,06. */
+  handleInset?: number;
 }
 
 /** Vínculo da profundidade do batente com a espessura da parede. */

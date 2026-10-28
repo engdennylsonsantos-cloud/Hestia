@@ -328,6 +328,8 @@ export class ModelScene {
     // Caminho de referência (`instanciar: false`): cada nível tem as suas malhas. Caminho padrão: os sólidos vão para os
     // lotes globais por categoria/material (o gestor de GPU os junta e atualiza por faixa).
     const lotes: SolidBatch[] = [];
+    // Prismas das esquadrias (batente em L): como as caixas das esquadrias, só têm arestas nos estilos de linhas (igual ao caminho de geometria).
+    const prismasSemArestas = new Set<SolidBatch>();
     if (!this.instanciar) {
       // Lotes do nível juntados por categoria e material: uma malha por grupo (ver `lotesMalha3d.ts`).
       this.desenharLotes(grupo, batches, this.frame.edges, materialOf);
@@ -359,7 +361,9 @@ export class ModelScene {
             }
           }
           for (const pr of a.prismas) {
-            lotes.push(loteDeGeometria(pr.geometry, pr.materialId, o.kind, o.id));
+            const lote = loteDeGeometria(pr.geometry, pr.materialId, o.kind, o.id);
+            lotes.push(lote);
+            if (!linhas) prismasSemArestas.add(lote);
             this.mats.face(p.materials[pr.materialId], o.kind);
           }
           for (const matrizes of grupos.values()) caixas.adicionarArestas(arestasDaSilhuetaDeCaixas(matrizes));
@@ -383,7 +387,7 @@ export class ModelScene {
       if (this.frame.edges) {
         this.mats.edge();
         if (lotes.length) {
-          const g = arestasDosLotes(lotes, EDGE_ANGLE);
+          const g = arestasDosLotes(prismasSemArestas.size ? lotes.filter((l) => !prismasSemArestas.has(l)) : lotes, EDGE_ANGLE);
           if (g) {
             arestasSolidas = Float32Array.from(g.getAttribute('position').array);
             g.dispose();

@@ -82,6 +82,21 @@ describe('silhueta: a cena com caixas é a mesma da geometria', () => {
     }
   });
 
+  it('arestas do batente em L: sem linhas (estilo realista) nenhuma via as desenha; em linha oculta as duas desenham as mesmas', { timeout: 120000 }, () => {
+    const p = predio(2, { aberturas: true });
+    const comprimento = (ss: number[][]): number => ss.reduce((t, x) => t + Math.hypot(x[3]! - x[0]!, x[4]! - x[1]!, x[5]! - x[2]!), 0);
+    // Realista: degraus do perfil em L (x = 0,65 m, y = 0,026 m na porta) não aparecem em nenhuma das duas vias.
+    const nRealista = segmentos(montar(p, true));
+    const degraus = nRealista.filter((s) => [0, 3].every((o) => Math.abs(s[o + 1]! - 0.026) < 1e-4 && s[o]! > 0.61 && s[o]! < 1.39));
+    expect(degraus).toHaveLength(0);
+    // Linha oculta: as arestas do batente em L existem e conferem nas duas vias.
+    const sRef = segmentos(montar(p, false, 'hiddenLine'));
+    const sNova = segmentos(montar(p, true, 'hiddenLine'));
+    expect(comprimentoDescoberto(sRef, sNova, TOL)).toBeLessThan(1e-6);
+    expect(comprimentoDescoberto(sNova, sRef, TOL) / comprimento(sRef)).toBeLessThan(0.01);
+    expect(sNova.some((s) => [0, 3].every((o) => Math.abs(s[o + 1]! - 0.026) < 1e-4 && s[o]! > 0.61 && s[o]! < 1.39))).toBe(true);
+  });
+
   it('parede girada e parede curva: a silhueta também confere (curva pelo caminho de geometria)', () => {
     const p = predio(3, { aberturas: true, girada: true, curva: true });
     const ref = triangulos(montar(p, false));

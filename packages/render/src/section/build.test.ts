@@ -196,7 +196,7 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
   });
 
   it('C1: no corte transversal, a verga e a soleira têm a profundidade do batente (frameDepth), centradas na parede', () => {
-    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_jfd', frameDepth: 0.12 });
+    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_jfd', frameDepthMode: 'fixed', frameDepth: 0.12 });
     const d = buildSectionDrawList(cross([op('j', 'window', 'ot_jfd', 'w')], tipo));
     const verga = d.fills.filter((f) => Math.abs(largura(f.polygons) - 0.12) < 1e-6 && Math.abs(altura(f.polygons) - 0.05) < 1e-6);
     expect(verga).toHaveLength(2); // verga e soleira
@@ -220,7 +220,7 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
   });
 
   it('espessuras do tipo: frameWidth, frameDepth e glassThickness vêm do tipo', () => {
-    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_esp', width: 0.9, frameWidth: 0.07, frameDepth: 0.1, glassThickness: 0.02 });
+    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_esp', width: 0.9, frameWidth: 0.07, frameDepthMode: 'fixed', frameDepth: 0.1, glassThickness: 0.02 });
     const face = buildSectionDrawList(facade([op('j', 'window', 'ot_esp', 'frente')], tipo));
     expect(face.fills.map((f) => largura(f.polygons)).filter((w) => Math.abs(w - 0.07) < 1e-6)).toHaveLength(2); // ombreiras
     expect(largura(face.fills.find((f) => f.color === GLASS_T)!.polygons)).toBeCloseTo(0.9 - 2 * 0.07, 6);
@@ -482,8 +482,8 @@ describe('acabamento e vergas da esquadria no corte e na elevação', () => {
     const fechados = (d: ReturnType<typeof buildSectionDrawList>): number => d.strokes.filter((s) => s.closed).length;
     const base = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al0', 'frente')], com('ot_al0', {}))));
     const alizado = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al', 'frente')], com('ot_al', { casing: { width: 0.05, thickness: 0.015 } }))));
-    // Quatro peças por face (ombreiras, verga e soleira), nas duas faces da parede: oito contornos a mais.
-    expect(alizado - base).toBe(8);
+    // v3 (decisão 0035 §3): o alizar é uma silhueta única por face (contorno externo e do vão), nas duas faces: 4 contornos.
+    expect(alizado - base).toBe(4);
   });
 });
 

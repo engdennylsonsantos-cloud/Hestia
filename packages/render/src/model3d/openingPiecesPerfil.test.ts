@@ -189,7 +189,9 @@ describe('adaptador 3D do batente em peça única (fixture E3 §2)', () => {
     // FR1 ainda não integrado: sem profile no modelo real, o teste fica preparado para a comparação.
     if (!doModelo.some((x) => x.profile)) return;
     for (const part of doModelo) {
-      const piece = pecas.find((x) => x.role === part.role && x.profile)!;
+      // Duas ombreiras têm o mesmo papel: a peça certa é a que está na posição t da peça do modelo.
+      const cx = (part.box.t0 + part.box.t1) / 2;
+      const piece = pecas.find((x) => x.role === part.role && x.profile && Math.abs(x.x - cx) < 1e-9)!;
       expect(piece).toBeDefined();
       expect(piece.profile).toEqual(part.profile);
       expect(piece.x).toBeCloseTo((part.box.t0 + part.box.t1) / 2, 9);

@@ -494,7 +494,7 @@ describe('modelo único no 3D: todos os campos do tipo mudam a malha', () => {
     { nome: 'lintel', base: 'ot_p90', extra: { lintel: {} } },
     { nome: 'sillBeam', base: 'ot_p90', extra: { sillBeam: {} } },
     { nome: 'frameStyle', base: 'ot_p90', extra: { frameStyle: 'simple' } },
-    { nome: 'frameDepth', base: 'ot_p90', extra: { frameDepth: 0.14 } },
+    { nome: 'frameDepth', base: 'ot_p90', extra: { frameDepthMode: 'fixed', frameDepth: 0.09 } },
     { nome: 'frameWidth', base: 'ot_p90', extra: { frameWidth: 0.08 } },
     { nome: 'leafThickness', base: 'ot_p90', extra: { leafThickness: 0.06 } },
     { nome: 'glassThickness', base: 'ot_j120', extra: { glassThickness: 0.02 } },

@@ -22,6 +22,7 @@ export const list = (items: readonly string[]): string => `(${items.join(',')})`
 export function num(v: number): string {
   if (!Number.isFinite(v)) throw new Error(`Valor não finito no IFC: ${v}`);
   const x = Math.abs(v) < 5e-7 ? 0 : v;
+  // units-ok: coordenada IFC (formato de máquina)
   return x.toFixed(6);
 }
 

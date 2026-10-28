@@ -1,7 +1,7 @@
 import { add, closestOnSegment, cross, dist, dot, len, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer, type ViewClass } from '@hestia/engine';
 import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
-import { isRoof, view3dOf, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
 import { ARC_TURN_DEG } from '@hestia/tools/src/roofGeom.ts';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -57,14 +57,14 @@ export function cantosLogicos(ring: Ring): boolean[] {
   return ring.map((_, i) => !(turns[i]! < ARC_TURN_DEG && similar(lens[(i - 1 + n) % n]!, lens[i]!)));
 }
 
-/** Área real de todas as águas (m²): a área em planta de cada água vezes √(1 + i²), com i = percent/100. */
+/** Área real de todas as águas: a área em planta de cada água vezes √(1 + i²), com 1 = percent/100. */
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
 
 /** Percentual com vírgula decimal, como nas demais cotas da planta: "30 %", "27,5 %". */
 export const fmtPercent = (p: number): string => `${String(Math.round(p * 10) / 10).replace('.', ',')} %`;
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
-export const fmtElevation = (z: number): string => `+${z.toFixed(2).replace('.', ',')}`;
+export const fmtElevation = (u: ResolvedUnits, z: number): string => `+${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;
 
 /** Camada de topo: a de menor `below`, a que se vê de cima. */
 function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
@@ -348,7 +348,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       if (rd) {
         const n = perp(norm(sub(rd.b, rd.a)));
         const lado = Math.abs(n.y) > 1e-9 ? (n.y >= 0 ? n : { x: -n.x, y: -n.y }) : n.x >= 0 ? n : { x: -n.x, y: -n.y };
-        out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 3.0, ux: lado.x, uy: -lado.y } } });
+        out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(unitsOf(p), rd.z)}`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 3.0, ux: lado.x, uy: -lado.y } } });
       }
     }
     if (p.settings.showTags) {
@@ -356,7 +356,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       let maior = r.planes[0];
       for (const pl of r.planes) if (maior && multiArea(pl.polygon) > multiArea(maior.polygon)) maior = pl;
       const at = maior ? labelPoint(maior.polygon) : labelPoint(foot);
-      const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(telhadoOriginal.get(r) ?? r), 1)].filter(Boolean).join(' · ');
+      const text = [p.roofTypes[r.typeId]?.code, fmtArea(unitsOf(p), roofRealArea(telhadoOriginal.get(r) ?? r), 1)].filter(Boolean).join(' · ');
       // Fino/médio: acima e ao lado do eixo da seta de caimento, que sai do mesmo centroide; grosseiro: só acima.
       if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: areaLabelOffset(maior?.up, coarse) } });
     }
@@ -406,7 +406,7 @@ export function roofSelectionOps(
   const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
   // Alças só nos cantos lógicos: um arco amostrado não vira uma fileira de quadradinhos.
   const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: gripsDoTelhado(p.elements[r.roofId], cantosLogicos) }));
-  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).
   const out: FloorOps = { fills: base.fills, strokes: base.strokes.filter((s) => !(s.closed && s.widthPx === 2)), labels: base.labels };
   const sel = new Set(selection);

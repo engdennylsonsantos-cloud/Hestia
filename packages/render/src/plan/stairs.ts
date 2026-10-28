@@ -1,6 +1,6 @@
 import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { sampleChain, spiralParamsOf, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
-import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
+import { isStair, unitsOf, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { labelPoint, outlineSelectionOps, type FloorOps } from './floors.ts';
@@ -167,7 +167,7 @@ export const SPIRAL_POST_SIDES = 48;
 /** Fração do vão radial (de `rInner` a `rOuter`) em que o rótulo de uma volta de cima se põe quando coincide com a de baixo. */
 const SPIRAL_LABEL_FRACTION = 0.3;
 const EPS = 1e-9;
-/** Área (m²) abaixo da qual uma sobreposição é um traço, não uma região (ruído do recorte). */
+/** Área abaixo da qual uma sobreposição é um traço, não uma região (ruído do recorte). */
 const SLIVER = 1e-7;
 
 /** Anel do poste de caracol: círculo de raio `r` em `c`, com `SPIRAL_POST_SIDES` vértices. */
@@ -342,5 +342,5 @@ export function belowStairOps(stairs: ResolvedStair[], theme: PlanTheme): FloorO
 /** Destaque de seleção e de hover das escadas, no padrão dos pisos e lajes (contorno da pegada). */
 export function stairSelectionOps(p: Project, stairs: ResolvedStair[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
   const parts = stairs.map((s) => ({ id: s.id, polygon: s.footprint }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
 }

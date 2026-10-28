@@ -1,5 +1,5 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingTypeById, openingType, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
+import { formatQuantity, openingTypeById, openingType, unitsOf, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
@@ -77,13 +77,13 @@ export function elementTagText(p: Project, tag: ElementTag): string {
     case 'mark': return 'mark' in e ? e.mark : '';
     case 'level': return p.levels.find((l) => l.id === levelId)?.name ?? '';
     case 'width':
-      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).width * 100).toFixed(0)} cm`;
-      if (e.kind === 'wall') return `${(wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100).toFixed(0)} cm`;
+      if (e.kind === 'door' || e.kind === 'window') return formatQuantity(unitsOf(p), 'length', openingType(p, e).width);
+      if (e.kind === 'wall') return formatQuantity(unitsOf(p), 'smallLength', wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0));
       return '';
     case 'height':
-      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).height * 100).toFixed(0)} cm`;
-      if (e.kind === 'wall') return `${wallHeight(p, e).toFixed(2)} m`;
-      if (e.kind === 'room') return `${(e.ceilingHeight ?? p.defaults.wallHeight).toFixed(2)} m`;
+      if (e.kind === 'door' || e.kind === 'window') return formatQuantity(unitsOf(p), 'length', openingType(p, e).height);
+      if (e.kind === 'wall') return formatQuantity(unitsOf(p), 'length', wallHeight(p, e));
+      if (e.kind === 'room') return formatQuantity(unitsOf(p), 'length', e.ceilingHeight ?? p.defaults.wallHeight);
       return '';
   }
 }

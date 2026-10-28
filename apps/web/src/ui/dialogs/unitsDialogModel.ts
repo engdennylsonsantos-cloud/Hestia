@@ -43,10 +43,10 @@ export const UNIT_LABELS: Record<QuantityUnit, string> = {
   ft: 'Pés',
   in: 'Polegadas',
   'ft-in': 'Pés e polegadas',
-  m2: 'm²',
-  cm2: 'cm²',
+  m2: 'm²', // units-ok: rótulo de unidade
+  cm2: 'cm²', // units-ok: rótulo de unidade
   ft2: 'ft²',
-  m3: 'm³',
+  m3: 'm³', // units-ok: rótulo de unidade
   l: 'Litros',
   ft3: 'ft³',
   deg: 'Graus',

@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_OPENING_TYPES } from './defaults.ts';
+import { spanTypeOf } from './openingNominal.ts';
+import { compositionOfType } from './openingCompositionOf.ts';
 import {
   casingRings,
   compositionIssue,
@@ -231,5 +234,21 @@ describe('perfis (spec §2.3, §5)', () => {
     near(com.t1 - com.t0, 0.6 + 0.018);
     near(com.z1 - com.z0, 1 + 0.018);
     expect(glassPlateRect(luz, resolveProfile({ presetId: 'prf_mad_batente_5x9' }))).toEqual(luz);
+  });
+});
+
+describe('spanTypeOf com composição de várias células', () => {
+  it('width/height do tipo normalizado são o vão total da composição, mesmo com nominalRef opening', () => {
+    const t = { ...DEFAULT_OPENING_TYPES.find((x) => x.id === 'ot_p90')! };
+    const comp = compositionOfType(t);
+    expect(spanTypeOf(t)).toBe(t); // uma célula: identidade
+    const lateral = (id: string) => ({ kind: 'cell', id, content: { kind: 'glass', glass: { kind: 'clear', thickness: 0.012, mounting: 'rebate' } } });
+    const lado = (id: string) => ({ size: { mode: 'fixed', value: 0.4 }, node: lateral(id) });
+    const split = { kind: 'split', id: 'r', axis: 'cols', children: [lado('le'), { size: { mode: 'fill' }, node: comp.layout }, lado('ld')] };
+    // Folha nominal 0,90 + folga 0,08 + 2 × (lateral 0,40 + divisor 0,05) = 1,88, mesmo com o tipo ainda marcado 'opening'.
+    const multi = { ...t, composition: { ...comp, nominal: { ...comp.nominal, ref: 'leaf', width: 0.9, height: 2.1 }, layout: split } } as unknown as typeof t;
+    const s = spanTypeOf(multi);
+    expect(s.width).toBeCloseTo(1.88, 9);
+    expect(s.nominalRef).toBe('opening');
   });
 });

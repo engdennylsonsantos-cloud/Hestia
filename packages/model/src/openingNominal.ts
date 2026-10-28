@@ -47,7 +47,8 @@ export function leafSizeOf(t: NominalFields): { width: number; height: number } 
  * existente muda); com 'leaf' devolve uma cópia com `nominalRef` 'opening', para que o tipo normalizado não some a folga duas vezes.
  */
 export function spanTypeOf<T extends NominalFields>(t: T): T {
-  if (openingNominalRef(t) !== 'leaf') return t;
+  const varias = !!t.composition && t.composition.layout.kind === 'split'; // várias células: o vão é o da composição
+  if (!varias && openingNominalRef(t) !== 'leaf') return t;
   const s = openingSpanOf(t);
   return { ...t, width: s.width, height: s.height, nominalRef: 'opening' };
 }

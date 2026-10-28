@@ -47,14 +47,21 @@ const options = (over: Partial<OpeningSymbolOptions> = {}): OpeningSymbolOptions
 });
 
 describe('openingSymbol: modelo único na planta', () => {
-  it('low: só a linha da folha; mid: perfis cortados, folha aberta e arco; high: mais a folha fechada', () => {
+  it('porta de giro: só a folha aberta em todos os níveis (batente cortado, folha aberta e arco)', () => {
     const c = cena();
-    expect(openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail: 'low' }))).toHaveLength(1);
-    const mid = openingSymbol(c.g, c.model, LIGHT, 1.2, options());
-    expect(mid.filter((s) => s.closed)).toHaveLength(5);
-    expect(mid.length).toBe(6);
-    const high = openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail: 'high' }));
-    expect(high.filter((s) => s.closed)).toHaveLength(6);
+    for (const detail of ['low', 'mid', 'high'] as const) {
+      const s = openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail }));
+      expect(s, detail).toHaveLength(4);
+      expect(s.filter((x) => x.closed), detail).toHaveLength(3);
+    }
+  });
+
+  it('janela de correr cresce com o nível: low só a linha, mid com perfis, high com extras', () => {
+    const c = cena({ typeId: 'ot_j120' });
+    const n = (detail: 'low' | 'mid' | 'high') => openingSymbol(c.g, c.model, LIGHT, 1.2, options({ detail })).length;
+    expect(n('low')).toBe(3);
+    expect(n('mid')).toBe(13);
+    expect(n('high')).toBe(17);
   });
 
   it("detail off não gera traços", () => {

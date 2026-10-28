@@ -96,8 +96,9 @@ describe('prévias de planta, elevação e corte', () => {
     expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'scale' })).toBe('high');
     expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'low' })).toBe('low');
     expect(previewPlanDetail({ ...tipo('ot_p90'), detail2d: 'mid' })).toBe('mid');
-    const alto = previewPlanDrawList({ ...tipo('ot_p90'), detail2d: 'scale' });
-    const baixo = previewPlanDrawList({ ...tipo('ot_p90'), detail2d: 'low' });
+    // A porta de giro desenha igual em todos os níveis (só a folha aberta); a janela ainda ganha detalhe com o zoom.
+    const alto = previewPlanDrawList({ ...tipo('ot_j120'), detail2d: 'scale' });
+    const baixo = previewPlanDrawList({ ...tipo('ot_j120'), detail2d: 'low' });
     expect(alto.drawList.strokes.length).toBeGreaterThan(baixo.drawList.strokes.length);
   });
 });

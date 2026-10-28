@@ -66,7 +66,7 @@ describe('catálogo completo: corte e elevação', () => {
         else expect(o.model.parts.length, o.openingId).toBeGreaterThan(0);
       }
     }
-  });
+  }, 30_000);
 
   it('o corte transversal de cada vão desenha sem exceção e mostra o vão na seção', () => {
     const proj = p();

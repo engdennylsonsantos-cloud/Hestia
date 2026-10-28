@@ -88,16 +88,16 @@ describe('CSV da tabela de portas e janelas', () => {
   it('BOM UTF-8, separador ";", cabeçalho, uma linha por tipo e total', () => {
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(lines).toHaveLength(schedule.rows.length + 2);
-    expect(lines[0]).toBe('Código;Tipo;Família;Categoria;Largura (m);Altura (m);Largura bruta (m);Altura bruta (m);Peitoril (m);Folhas;Verga (m);Contraverga (m);Quantidade;Área unitária (m²);Área total (m²);Folha largura (m);Folha altura (m);Material do batente;Sentido');
+    expect(lines[0]).toBe('Código;Tipo;Família;Categoria;Largura (m);Altura (m);Largura bruta (m);Altura bruta (m);Peitoril (m);Folhas;Verga (m);Contraverga (m);Quantidade;Área unitária (m²);Área total (m²);Folha largura (m);Folha altura (m);Material do batente;Sentido;Material da folha;Ferragens');
   });
 
   it('decimal com vírgula e categoria Porta/Janela', () => {
-    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,80;2,10;0,00;1;0,00;0,00;1;1,68;1,68;0,72;2,05;Madeira;dobradiça padrão, abre à esquerda de a→b');
-    expect(lines[5]).toBe('J-06;Janela de correr 240 x 120 (3 folhas);Janela de correr;Janela;2,40;1,20;2,40;1,20;1,10;3;0,00;0,00;1;2,88;2,88;2,32;1,15;Alumínio;dobradiça padrão, abre à esquerda de a→b');
+    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,80;2,10;0,00;1;0,00;0,00;1;1,68;1,68;0,72;2,05;Madeira;dobradiça padrão, abre à esquerda de a→b;;"maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm"');
+    expect(lines[5]).toBe('J-06;Janela de correr 240 x 120 (3 folhas);Janela de correr;Janela;2,40;1,20;2,40;1,20;1,10;3;0,00;0,00;1;2,88;2,88;2,32;1,15;Alumínio;dobradiça padrão, abre à esquerda de a→b;;');
   });
 
   it('a linha de total traz a quantidade de instâncias e a área total', () => {
-    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '', '', '', '', '5', '', '13,17', '', '', '', ''].join(';'));
+    expect(lines.at(-1)).toBe(['Total', '', '', '', '', '', '', '', '', '', '', '', '5', '', '13,17', '', '', '', '', '', ''].join(';'));
   });
 });
 

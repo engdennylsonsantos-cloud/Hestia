@@ -35,6 +35,8 @@ const COLS: Col[] = [
   { key: 'leafHeight', labelKey: 'col_leaf_height', decimals: 2 },
   { key: 'frameMaterial', labelKey: 'col_frame_material' },
   { key: 'sense', labelKey: 'col_sense' },
+  { key: 'leafMaterial', labelKey: 'col_leaf_material' },
+  { key: 'hardware', labelKey: 'col_hardware' },
 ];
 
 interface Sort {

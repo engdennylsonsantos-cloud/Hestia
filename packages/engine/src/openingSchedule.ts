@@ -1,4 +1,24 @@
-import { isOpening, leafSizeOf, openingFamilyName, openingLintel, openingRough, openingSillBeam, spanTypeOf, type Id, type Opening, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
+import {
+  isOpening,
+  leafSizeOf,
+  openingFamilyName,
+  openingFamilyOf,
+  openingHandleHeight,
+  openingHinges,
+  openingLeafUndercut,
+  openingLintel,
+  openingOptionSupport,
+  openingRough,
+  openingSillBeam,
+  openingThreshold,
+  spanTypeOf,
+  type Id,
+  type Opening,
+  type OpeningLeaves,
+  type OpeningLintel,
+  type OpeningType,
+  type Project,
+} from '@hestia/model';
 import { csvDocument, csvText, formatDecimal } from './csv.ts';
 
 /**
@@ -40,6 +60,10 @@ export interface OpeningScheduleRow {
   frameMaterial: string;
   /** Sentido de abertura das instâncias do tipo, distintos e separados por "; "; vazio no vão livre (sem folha). */
   sense: string;
+  /** Material da folha (nome do material do tipo, `leafMaterialId`); vazio quando o tipo não informa ou o material não existe. */
+  leafMaterial: string;
+  /** Ferragens que a família do tipo oferece (openingSupport), em texto curto; vazio quando nada se aplica (vão livre, janela). */
+  hardware: string;
 }
 
 export interface OpeningScheduleTotals {
@@ -69,6 +93,22 @@ export interface OpeningScheduleFilter {
  */
 const senseText = (o: Opening): string =>
   `${o.flipHand ? 'dobradiça invertida' : 'dobradiça padrão'}, abre à ${o.flipFacing ? 'direita' : 'esquerda'} de a→b`;
+
+/**
+ * Ferragens do tipo, só as que a família oferece (openingSupport): maçaneta com a altura, dobradiças, folga inferior e
+ * soleira. Ex.: "maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm".
+ */
+function hardwareText(t: OpeningType): string {
+  const sup = openingOptionSupport(openingFamilyOf(t)?.id);
+  const parts: string[] = [];
+  if (sup.handle) parts.push(`maçaneta a ${formatDecimal(openingHandleHeight(t), 2)} m`);
+  const hinges = openingHinges(t);
+  if (sup.hinges && hinges > 0) parts.push(`${hinges} ${hinges === 1 ? 'dobradiça' : 'dobradiças'}`);
+  if (sup.leafUndercut) parts.push(`folga inferior ${formatDecimal(openingLeafUndercut(t) * 1000, 0)} mm`);
+  const sill = sup.threshold ? openingThreshold(t) : null;
+  if (sill) parts.push(`soleira ${formatDecimal(sill.thickness * 1000, 0)} mm`);
+  return parts.join('; ');
+}
 
 /** Ordem das categorias na tabela: portas antes de janelas. */
 const kindOrder = (k: 'door' | 'window'): number => (k === 'door' ? 0 : 1);
@@ -131,6 +171,8 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
       totalArea: unitArea * count,
       frameMaterial: p.materials[t.frameMaterialId]?.name ?? '',
       sense: t.leaves === 0 ? '' : [...(senses.get(typeId) ?? [])].join('; '),
+      leafMaterial: (t.leafMaterialId && p.materials[t.leafMaterialId]?.name) || '',
+      hardware: hardwareText(t),
     });
   }
   rows.sort(compareRows);
@@ -174,6 +216,8 @@ const CSV_HEADER = [
   'Folha altura (m)',
   'Material do batente',
   'Sentido',
+  'Material da folha',
+  'Ferragens',
 ];
 
 /**
@@ -202,7 +246,9 @@ export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: Opening
     n(r.leafHeight, 2),
     csvText(r.frameMaterial),
     csvText(r.sense),
+    csvText(r.leafMaterial),
+    csvText(r.hardware),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', '', '', ''];
+  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', '', '', '', '', ''];
   return csvDocument([CSV_HEADER, ...body, total]);
 }

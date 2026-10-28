@@ -2,6 +2,8 @@ import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThree
 import { exteriorOffset } from '@hestia/engine';
 import { formatQuantity, makeWall, totalThickness, unitsOf, type ResolvedUnits, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import { segmentLengthDim } from './dims/providers/wall.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { InferContext } from './infer.ts';
 import { parseQuantityText } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
@@ -24,6 +26,7 @@ export class WallTool extends ToolBase {
   private flip = false;
   private alignmentCycle = 0;
   private lastPointer: PointerInfo | null = null;
+  private lastPoint: Vec2 | null = null;
 
   protected reset(): void {
     this.startPt = null;
@@ -34,6 +37,7 @@ export class WallTool extends ToolBase {
     this.inf = null;
     this.alignmentCycle = 0;
     this.lastPointer = null;
+    this.lastPoint = null;
   }
 
   protected busy(): boolean {
@@ -136,6 +140,11 @@ export class WallTool extends ToolBase {
     this.env.say('Retângulo criado. Clique em outro canto para desenhar outro, ou Esc para sair.');
   }
 
+  tempDims(_overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    if (!this.startPt || !this.lastPoint || this.isRect()) return [];
+    return [segmentLengthDim(this.startPt, this.lastPoint)];
+  }
+
   override move(p: PointerInfo): void {
     this.lastPointer = p;
     if (this.isRect()) {
@@ -143,6 +152,7 @@ export class WallTool extends ToolBase {
       return;
     }
     const inf = this.snapWall(p, { from: this.chordEnd ?? this.startPt ?? undefined });
+    this.lastPoint = inf.point;
     this.items = [];
     if (!this.startPt) {
       this.items.push({ kind: 'point', at: inf.point });

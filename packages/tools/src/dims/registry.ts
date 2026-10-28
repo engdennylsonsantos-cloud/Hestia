@@ -1,6 +1,8 @@
 import type { Id } from '@hestia/model';
 import type { DimContext, DimProvider, ElementKind, TempDim } from './types.ts';
 import { openingDimProvider } from './providers/opening.ts';
+import { wallDimProvider } from './providers/wall.ts';
+import { outlineDimProvider } from './providers/outline.ts';
 
 // O sujeito varia por provedor; o registro guarda o contrato sem o parâmetro e só `selectionDims` o usa.
 type AnyProvider = DimProvider<never>;
@@ -42,4 +44,9 @@ export function registerBuiltinDimProviders(): void {
   builtinsDone = true;
   registerDimProvider('door', openingDimProvider);
   registerDimProvider('window', openingDimProvider);
+  registerDimProvider('wall', wallDimProvider);
+  registerDimProvider('floor', outlineDimProvider);
+  registerDimProvider('slab', outlineDimProvider);
+  registerDimProvider('ceiling', outlineDimProvider);
+  registerDimProvider('roof', outlineDimProvider);
 }

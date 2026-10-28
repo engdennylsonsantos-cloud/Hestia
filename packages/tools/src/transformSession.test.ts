@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { connectedEnds } from './pick.ts';
 import { clickAt, drawWall, makeEnv, tool, walls } from './testEnv.ts';
 
+describe('Cotas do deslocamento', () => {
+  it('Mover mostra a cota do ponto-base ao cursor', () => {
+    const ctx = makeEnv();
+    drawWall(ctx.env, [0, 0], [4, 0]);
+    ctx.env.setSelection([walls(ctx.store)[0]!.id]);
+    const m = tool('move', ctx.env);
+    clickAt(m, 0, 0);
+    m.move!({ raw: { x: 3, y: 4 }, shift: false, ctrl: false, alt: false });
+    const dims = m.tempDims!();
+    expect(dims).toHaveLength(1);
+    expect(dims[0]!.value).toBeCloseTo(5, 9);
+  });
+});
+
 describe('Copiar: sessão em um passo de desfazer', () => {
   it('várias cópias de uma mesma sessão viram um só Ctrl+Z', () => {
     const ctx = makeEnv();

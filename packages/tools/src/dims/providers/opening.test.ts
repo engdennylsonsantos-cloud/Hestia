@@ -209,7 +209,7 @@ describe('seleção pelo registro', () => {
     const p = cena();
     expect(selectionDims(ctxOf(p), [])).toEqual([]);
     expect(selectionDims(ctxOf(p), ['d1', 'h'])).toEqual([]);
-    expect(selectionDims(ctxOf(p), ['h'])).toEqual([]);
+    expect(selectionDims(ctxOf(p), ['h']).every((d) => d.key.startsWith('wall:'))).toBe(true);
     expect(selectionDims(ctxOf(p), ['nada'])).toEqual([]);
     expect(selectionDims(ctxOf(p, { showOnSelection: false }), ['d1'])).toEqual([]);
   });

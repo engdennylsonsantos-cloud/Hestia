@@ -1,6 +1,6 @@
 import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { annotationIdsIn, annotationMoveCommands, formatQuantity, isOpening, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
+import { annotationIdsIn, annotationMoveCommands, dimensionSettingsOf, formatQuantity, isOpening, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { gridGhosts, moveGrids, selectedGrids } from './gridGeom.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews, transformWalls } from './edit.ts';
@@ -11,6 +11,8 @@ import { ringOps } from './ringOps.ts';
 import { moveRoomSeparators, movableSeparatorIds, separatorGhostItems } from './roomSeparatorPick.ts';
 import type { EdgePick } from './ringEdge.ts';
 import { DEFAULT_DISJOIN, type PointerInfo, type ToolEnv } from './types.ts';
+import { displacementDimProvider } from './dims/providers/displacement.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 
 export const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
@@ -50,6 +52,8 @@ export class MoveTool extends SelectionTool {
   /** Dica quando não há seleção: a ferramenta espera um clique numa aresta de anel. */
   readonly edgeHint: string;
   private base: Vec2 | null = null;
+  /** Última posição capturada do cursor (cota do deslocamento). */
+  private cursor: Vec2 | null = null;
   /** Aresta escolhida no primeiro clique (só sem seleção). */
   private edgePick: EdgePick | null = null;
   /** Chave da sessão: todas as cópias de um mesmo Copiar entram num só passo de desfazer. */
@@ -96,6 +100,7 @@ export class MoveTool extends SelectionTool {
 
   protected reset(): void {
     this.base = null;
+    this.cursor = null;
     this.edgePick = null;
     this.items = [];
     this.inf = null;
@@ -116,6 +121,7 @@ export class MoveTool extends SelectionTool {
       return;
     }
     const inf = this.snap(p, { from: this.base });
+    this.cursor = inf.point;
     const d = sub(inf.point, this.base);
     const ring = ringOfRef(this.env.project(), this.edgePick.ref);
     if (!ring) return;
@@ -169,6 +175,7 @@ export class MoveTool extends SelectionTool {
     }
     const els = this.movables();
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(els) });
+    this.cursor = inf.point;
     if (!this.base) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -179,6 +186,16 @@ export class MoveTool extends SelectionTool {
     this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t), ...gridGhosts(this.env.project(), selectedGrids(this.env.project(), this.env.selection()), d));
     if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
     this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
+  }
+
+  /** Cota do deslocamento (ponto-base → cursor), pelo provedor do sistema único. */
+  tempDims(overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    if (!this.base || !this.cursor) return [];
+    const project = this.env.project();
+    return displacementDimProvider.compute(
+      { project, levelId: this.env.levelId(), settings: dimensionSettingsOf(project), overrides },
+      { from: this.base, to: this.cursor },
+    );
   }
 
   private apply(d: Vec2): void {

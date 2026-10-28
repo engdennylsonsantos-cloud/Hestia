@@ -66,6 +66,16 @@ describe('inferência', () => {
 });
 
 describe('ferramenta de parede', () => {
+  it('a prévia traz a cota do comprimento pelo sistema único', () => {
+    const { env } = makeEnv();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0);
+    t.move(P(3, 4));
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(1);
+    expect(dims[0]!.value).toBeCloseTo(5, 9);
+  });
+
   it('encadeia, fecha o circuito e cria uma parede por lado', () => {
     const { store, env } = makeEnv();
     const t = tool('wall', env);

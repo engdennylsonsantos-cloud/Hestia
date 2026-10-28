@@ -9,12 +9,12 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [x] S5 planta do modal
 - [x] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
 - [x] C6 `packages/render` e `packages/io`
-- [ ] D10.1 parede (`04`; só depois do marco M5)
+- [x] D10.1 parede (`04`; só depois do marco M5)
 - [ ] D10.2 linha e perímetro
 - [ ] D10.3 eixos
-- [ ] D10.4 piso/laje/telhado/forro
-- [ ] D10.5 mover/copiar
-- [ ] `npm run check` verde, integrado
+- [x] D10.4 piso/laje/telhado/forro (cotas de leitura)
+- [x] D10.5 mover/copiar
+- [ ] `npm run check` verde, integrado (pendente D10.2/D10.3)
 
 ## S1 — o que cada modo calcula (3 linhas)
 - `wall` (padrão): `D` = espessura TOTAL do tipo de parede (`totalThickness`, todas as camadas com revestimentos) e `Cd` = 0, o plano médio da parede.
@@ -57,6 +57,15 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - Formatos de máquina continuam em `toFixed`: DXF (coordenadas/notas), IFC e PDF levam `// units-ok: ... (formato de máquina)`. Nenhuma ocorrência sobra em render/io.
 - `ouroZoom.json` regenerado (69 entradas) porque etiquetas/cotas desenhadas mudaram de texto por causa das unidades; a geometria não mudou. Goldens de imagem/e2e (`tests/e2e/baseline*`) não foram regravados — seriam afetados nas etiquetas.
 - Teste com unidades não padrão: etiqueta de ambiente em ft² (`rooms.test.ts`).
+
+
+## D10 — provedores implementados e pendências
+- D10.1 parede: `dims/providers/wall.ts` mede o comprimento (edita a extremidade b via `resizeWallCommands` + `hostedConflicts`) e a distância perpendicular às paralelas vizinhas entre os planos de `wallRef` (edita transladando a parede; hospedados acompanham). Registrado para a seleção; `wallTool.tempDims()` mostra o comprimento do segmento em desenho. Falta só a distância à paralela na PRÉVIA da ferramenta (a seleção já a mostra).
+- D10.4 contorno: `dims/providers/outline.ts` cota cada lado de piso/laje/forro/telhado (somente leitura, porque `outlineEdit.ts` não tem operação pura de comprimento); registrado para os quatro tipos.
+- D10.5 deslocamento: `dims/providers/displacement.ts` mede ponto-base→cursor; `MoveTool.tempDims()` usa o provedor (Copiar herda).
+- PENDENTES: D10.2 (linhas de detalhe/perímetro) e D10.3 (grades) — as linhas/grades não são elementos de `project.elements`, então o `selectionDims` do registro (arquivo do COTAS) não as alcança; integrar exige ampliar o registro/overlay (PEDIDO COTAS) ou um caminho próprio de seleção. Não implementei para não invadir o arquivo do outro agente.
+- PEDIDO COTAS: `dims/registry.ts` recebeu só as linhas de registro dos provedores ESQ (wall/floor/slab/ceiling/roof); se o COTAS preferir registrar em outro lugar, é só mover essas linhas.
+- Escadas, ambientes e seções: não implementados (pendente de decisão do dono, como o plano pede).
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

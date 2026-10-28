@@ -378,7 +378,14 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     // (dentro do segmento a captura "nearest" já cobre o ponto).
     const tracks = faceTracks.filter((tr) => {
       const d = sub(tr.b, tr.a);
-      return dot(d, d) >= 1e-12;
+      const dd = dot(d, d);
+      if (dd < 1e-12) return false;
+      // Índice barato: um trecho cuja reta não passa perto do cursor não gera projeção, cruzamento com
+      // eixos nem par de faces perto dele. Sem isso, 200 paredes davam ~400 trechos e ~80 mil pares por
+      // chamada de `infer` (o snap ficava ~10× mais lento a cada movimento do mouse).
+      const t = dot(sub(cursor, tr.a), d) / dd;
+      const projected = v2(tr.a.x + d.x * t, tr.a.y + d.y * t);
+      return dist(cursor, projected) <= tol * Math.SQRT2;
     });
     for (const tr of tracks) {
       const d = sub(tr.b, tr.a);

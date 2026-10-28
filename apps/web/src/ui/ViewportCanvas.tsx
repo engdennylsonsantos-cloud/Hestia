@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, contadores, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, criarControladorGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
@@ -65,72 +65,57 @@ export function ViewportCanvas(): ReactElement {
   useContarCommitPerf();
 
   // ---- inicialização: GPU primeiro, CPU só sem suporte ----
-  const bootRef = useRef<(prefer: 'auto' | 'webgl2' | 'cpu') => Promise<void>>(async () => {});
+  const controlador = useRef<ControladorGpu | null>(null);
   useEffect(() => {
-    let cancelled = false;
     const el = host.current!;
     const qs = new URLSearchParams(location.search);
-    const teardown = (): void => {
-      gpuRef.current?.gpu.dispose();
-      gpuRef.current?.canvas.remove();
-      cpuRef.current?.remove();
+    // WebGPU só quando pedido (?gpu=webgpu) até ser validado em GPU real; o padrão é WebGL2 (docs/decisoes/0003).
+    const preferencia: PreferenciaGpu = qs.get('cpu') === '1' ? 'cpu' : qs.get('gpu') === 'webgpu' ? 'auto' : 'webgl2';
+    reiniciarEstadoGpu(preferencia);
+    // Troca de backend ou restauração do contexto: os recursos de GPU sumiram, então a cena é refeita.
+    const limpar = (): void => {
       gpuRef.current = null;
       cpuRef.current = null;
-    };
-    const boot = async (prefer: 'auto' | 'webgl2' | 'cpu'): Promise<void> => {
-      teardown();
-      const res = prefer === 'cpu' ? null : await createGpu(() => document.createElement('canvas'), prefer);
-      if (cancelled) return;
-      const rect = el.getBoundingClientRect();
-      if (res) {
-        res.canvas.setAttribute('aria-label', 'Área de desenho');
-        el.prepend(res.canvas);
-        res.gpu.renderer.shadowMap.enabled = true;
-        gpuRef.current = res;
-        res.gpu.onLost((reason) => {
-          useUi.setState({ status: `GPU reiniciada (${reason}). Trocando para WebGL2.` });
-          void boot(res.gpu.backend === 'webgpu' ? 'webgl2' : 'cpu');
-        });
-        useUi.setState({ gpu: res.gpu.backend });
-      } else {
-        const c = document.createElement('canvas');
-        c.setAttribute('aria-label', 'Área de desenho');
-        el.prepend(c);
-        cpuRef.current = c;
-        useUi.setState({ gpu: 'cpu' });
-        contadores.definirBackend('cpu');
-        contadores.marcarTimerGpu('sem-gpu');
-      }
       modelKey.current = '';
-      // Troca de dispositivo (GPU ou CPU): a cena da planta começa do zero.
-      planFrame.current?.reset(); quadroRef.current?.invalidar();
-      setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
-      setReady(true);
-      useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+      planFrame.current?.reset();
+      quadroRef.current?.invalidar();
     };
-    bootRef.current = boot;
-    // WebGPU só quando pedido (?gpu=webgpu) até ser validado em GPU real; o padrão é WebGL2 (docs/decisoes/0003).
-    const prefer = qs.get('cpu') === '1' ? 'cpu' : qs.get('gpu') === 'webgpu' ? 'auto' : 'webgl2';
-    void boot(prefer);
+    const c = criarControladorGpu({
+      host: el,
+      preferencia,
+      aoLimpar: limpar,
+      aoStatus: (status) => useUi.setState({ status }),
+      aoMontar: ({ gpu, canvas }) => {
+        if (gpu) {
+          gpu.gpu.renderer.shadowMap.enabled = true;
+          gpuRef.current = gpu;
+          useUi.setState({ gpu: gpu.gpu.backend });
+        } else {
+          cpuRef.current = canvas;
+          useUi.setState({ gpu: 'cpu' });
+        }
+        setSize({ w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) });
+        setReady(true);
+        useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+      },
+    });
+    controlador.current = c;
+    void c.iniciar();
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
       setSize({ w: Math.round(r.width), h: Math.round(r.height) });
     });
     ro.observe(el);
     return () => {
-      cancelled = true;
       montagem.current?.cancelar();
       ro.disconnect();
-      teardown();
+      c.dispose();
+      controlador.current = null;
     };
   }, []);
 
   const safeRender = (g: { gpu: GpuContext }, scene: Parameters<GpuContext['render']>[0], camera: Parameters<GpuContext['render']>[1]): void => {
-    try {
-      g.gpu.render(scene, camera);
-    } catch {
-      if (g.gpu.backend === 'webgpu') void bootRef.current('webgl2');
-    }
+    try { g.gpu.render(scene, camera); } catch { controlador.current?.falhouRender(); }
   };
 
   /** Publica os rótulos e a vista só quando mudam: a planta não re-renderiza a cada quadro (`null`: sem planta). */

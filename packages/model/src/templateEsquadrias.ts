@@ -1,5 +1,6 @@
 import type { Command } from './commands.ts';
 import { DEFAULT_OPENING_TYPES } from './defaults.ts';
+import { openingSpanOf } from './openingNominal.ts';
 import type { Opening } from './types.ts';
 import { makeWall } from './wall.ts';
 
@@ -21,7 +22,7 @@ const H = 2.8;
 const tipos = DEFAULT_OPENING_TYPES;
 
 /** Comprimento que uma categoria precisa: a soma das larguras com 1,5 m entre vizinhos e nas pontas. */
-const comprimentoDe = (kind: 'door' | 'window'): number => tipos.filter((t) => t.kind === kind).reduce((soma, t) => soma + t.width + FOLGA, FOLGA);
+const comprimentoDe = (kind: 'door' | 'window'): number => tipos.filter((t) => t.kind === kind).reduce((soma, t) => soma + openingSpanOf(t).width + FOLGA, FOLGA);
 const COMPRIMENTO = Math.max(COMPRIMENTO_MINIMO, comprimentoDe('door'), comprimentoDe('window'));
 
 function parede(id: string, y: number): ReturnType<typeof makeWall> {
@@ -33,8 +34,8 @@ function vãos(hostId: string, kind: 'door' | 'window', prefixo: string): Openin
   const lista = tipos.filter((t) => t.kind === kind);
   let cursor = FOLGA;
   return lista.map((t, i) => {
-    const offset = cursor + t.width / 2;
-    cursor += t.width + FOLGA;
+    const offset = cursor + openingSpanOf(t).width / 2;
+    cursor += openingSpanOf(t).width + FOLGA;
     return {
       id: `${prefixo}_${t.id}`,
       kind,

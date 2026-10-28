@@ -171,7 +171,9 @@ export function addHinges(c: Ctx, index: number, hingeT: number): void {
   const lside = (c.leafSide === 'opposite' ? -c.side : c.side) as 1 | -1;
   const sFace = c.Cd + lside * (c.D / 2 - GAP);
   const z = doorLeafZ(c);
-  hingeBoxes(hingeT, sFace, lside, hingeHeights(openingHinges(c.t), z.z0, z.z1)).forEach((b, k) =>
+  // Sem batente (porta de vidro) a borda da folha coincide com o vão: a dobradiça não pode passar dele.
+  const t = Math.max(-(c.hw - HINGE_HALF_T), Math.min(c.hw - HINGE_HALF_T, hingeT));
+  hingeBoxes(t, sFace, lside, hingeHeights(openingHinges(c.t), z.z0, z.z1)).forEach((b, k) =>
     addPart(c, `hinge-${index}-${k}`, 'hinge', 'metal', b),
   );
 }

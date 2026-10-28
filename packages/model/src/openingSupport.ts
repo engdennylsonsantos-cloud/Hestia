@@ -61,12 +61,12 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   door_swing: sup({ ...DOOR_LEAF, handle: true, transom: true, sidelights: true, hinges: true, angle: true }),
   door_double: sup({ ...DOOR_LEAF, handle: true, transom: true, sidelights: true, hinges: true, angle: true }),
   // Pivotante sem dobradiça de batente: os pivôs ficam no eixo, não na face do batente (sem peça de dobradiça).
-  door_dblact: sup({ ...DOOR_LEAF, hinges: true, angle: true }),
+  door_dblact: sup({ ...DOOR_LEAF, hinges: false, angle: true }),
   door_pivot: sup({ ...DOOR_LEAF, transom: true, angle: true }),
   // Correr e embutir: só soleira e folga (sem maçaneta nem dobradiça).
   door_sliding: sup({ ...DOOR_LEAF, handle: false, transom: true }),
   door_pocket: sup({ ...DOOR_LEAF, handle: false }),
-  door_bifold: sup({ leafStyle: true, handle: true, leafThickness: true, threshold: true, leafUndercut: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true, angle: true }),
+  door_bifold: sup({ leafStyle: true, leafThickness: true, threshold: true, leafUndercut: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true, angle: true }),
   door_accordion: sup({ leafThickness: true, threshold: true, leafUndercut: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true, angle: true }),
   door_garage: sup({ leafStyle: true, leafThickness: true, lintel: true, frame: true, reveal: true, nominalRef: true }),
   door_void: sup({ casing: true, lintel: true }),

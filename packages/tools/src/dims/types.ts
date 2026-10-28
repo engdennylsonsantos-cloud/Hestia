@@ -4,6 +4,18 @@ import type { Command, Element, Id, OpeningDimRef, Project, ResolvedDimensionSet
 /** Tipo de elemento ao qual um provedor de cotas se liga (o campo `kind` do elemento). */
 export type ElementKind = Element['kind'];
 
+/**
+ * Sujeitos de cota que não são elementos de `project.elements` (e por isso não têm `kind`): linhas de detalhe,
+ * linhas de perímetro do rascunho e grades/eixos. O provedor registrado resolve o sujeito pelo id da seleção.
+ */
+export type NonElementKind = 'detailLine' | 'perimeterLine' | 'grid';
+
+/** Chave de registro de um provedor: o tipo do elemento ou um sujeito fora de `project.elements`. */
+export type DimSubjectKind = ElementKind | NonElementKind;
+
+/** Ordem em que a seleção tenta os sujeitos fora de `project.elements` (os ids são únicos por tipo). */
+export const NON_ELEMENT_KINDS: readonly NonElementKind[] = ['detailLine', 'perimeterLine', 'grid'];
+
 /** Uma referência de cota de qualquer vocabulário (parede ou esquadria). */
 export type DimRef = WallDimRef | OpeningDimRef;
 
@@ -53,6 +65,9 @@ export interface DimContext {
 export interface DimProvider<S> {
   id: string;
   compute(ctx: DimContext, subject: S): TempDim[];
-  /** Sujeito do elemento selecionado; null se o elemento não pode ser cotado. */
-  selectionSubject?(project: Project, elementId: Id): S | null;
+  /**
+   * Sujeito do que está selecionado; null se este provedor não cota esse id. Vale para elementos (com o id do
+   * elemento) e para os `NonElementKind` (com o id da linha ou da grade); `levelId` é o nível ativo.
+   */
+  selectionSubject?(project: Project, selectionId: Id, levelId?: Id): S | null;
 }

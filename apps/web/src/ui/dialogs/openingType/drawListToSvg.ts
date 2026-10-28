@@ -207,8 +207,9 @@ export function drawListToSvg(list: PlanDrawList, box?: DrawBox | null, options:
     const opacity = s.alpha < 1 ? ` stroke-opacity="${fmt(Math.max(0, s.alpha))}"` : '';
     const dash = s.dash ? ` stroke-dasharray="${fmt(s.dash[0])} ${fmt(s.dash[1])}"` : '';
     const strokeWidth = fmt(Math.max(0.6, Math.min(8, s.widthPx)));
+    const role = s.role ? ` data-role="${esc(s.role)}"` : '';
     strokes.push(
-      `<path data-op="stroke" d="${d}" fill="none" stroke="${esc(color)}" stroke-width="${strokeWidth}"${opacity}${dash} stroke-linecap="round" stroke-linejoin="round"/>`,
+      `<path data-op="stroke"${role} d="${d}" fill="none" stroke="${esc(color)}" stroke-width="${strokeWidth}"${opacity}${dash} stroke-linecap="round" stroke-linejoin="round"/>`,
     );
   }
   const title = options.title ? `<title>${esc(options.title)}</title>` : '';

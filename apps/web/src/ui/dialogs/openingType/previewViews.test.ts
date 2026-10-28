@@ -17,6 +17,38 @@ import {
 const tipo = (id: string): OpeningType => DEFAULT_OPENING_TYPES.find((t) => t.id === id)!;
 const temDesenho = (svg: string): boolean => svg.startsWith('<svg') && /data-op="(fill|stroke)"/.test(svg);
 
+const roles = (svg: string): string[] => [...svg.matchAll(/data-role="([^"]+)"/g)].map((m) => m[1]!);
+
+describe('planta da prévia: batente, folha e montantes aparecem no SVG', () => {
+  it('porta de madeira: batente (ombreira) e folha, além do arco', () => {
+    const r = roles(previewPlanSvg(tipo('ot_p90')));
+    expect(r).toContain('jamb');
+    expect(r).toContain('leaf');
+    expect(r).toContain('swing');
+  });
+
+  it('porta de duas folhas com bandeira superior: folhas, batente e a bandeira (vidro)', () => {
+    const r = roles(previewPlanSvg(tipo('ot_pbalcao_band120')));
+    expect(r).toContain('jamb');
+    expect(r).toContain('leaf');
+    expect(r).toContain('glass');
+  });
+
+  it('janela combinada com bandeira lateral: montante entre os módulos e vidro', () => {
+    const r = roles(previewPlanSvg(tipo('ot_jcomb_fa150x120')));
+    expect(r).toContain('jamb');
+    expect(r).toContain('mullion');
+    expect(r).toContain('glass');
+  });
+
+  it('os traços do símbolo da esquadria levam data-role (a parede não tem papel)', () => {
+    const svg = previewPlanSvg(tipo('ot_p90'));
+    const doSimbolo = roles(svg);
+    expect(doSimbolo.length).toBeGreaterThanOrEqual(4);
+    expect(doSimbolo.every((r) => ['jamb', 'leaf', 'swing', 'head', 'glass', 'mullion', 'transom'].includes(r))).toBe(true);
+  });
+});
+
 describe('prévias de planta, elevação e corte', () => {
   it('a planta da porta ot_p90 tem desenho e muda com o ângulo do controle', () => {
     const a = previewPlanSvg(tipo('ot_p90'), { angle: 90 });

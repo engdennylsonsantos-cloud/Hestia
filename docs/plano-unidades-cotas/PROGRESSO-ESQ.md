@@ -5,8 +5,8 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [x] S2 prévia com a esquadria real
 - [x] S3 Espaço/Tab redesenham  → **S2 e S3 integrados = marco M4**
 - **MARCO M4 LIBERADO cdcd096a** (S2 e S3 integrados)
-- [ ] S4 alças de inversão
-- [ ] S5 planta do modal
+- [x] S4 alças de inversão (não reproduzido no navegador; ver nota)
+- [x] S5 planta do modal
 - [ ] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
 - [ ] C6 `packages/render` e `packages/io`
 - [ ] D10.1 parede (`04`; só depois do marco M5)
@@ -35,6 +35,16 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - S3: `lastPointer` guardado em `move`; `tab()` e `space()`/`flipHandToggle()` reexecutam `move(lastPointer)` quando há ponteiro. Em `apps/web/src/editor/controller.ts` o Espaço da porta/janela passou a chamar `tool.space()` e `bump()` (o Tab já chamava `bump()`), então o repintar usa o mesmo gancho existente.
 - S2: a conversão local→mundo virou `openingPlanPathsAt`/`openingPlanWorldPaths` no engine; a planta (`render/src/plan/symbols.ts`) passou a delegar para a MESMA função (nada de cópia).
 - S2: `symbolPreviewItems` apagada; a prévia usa o modelo único. O parâmetro `openingLine` do plano não existe nas opções da planta (é convenção de elevação/corte), então `openingPreviewStrokes` recebe só o detalhe.
+
+## S4 — reprodução no navegador (não reproduzido)
+- Passos: dev server (`npm run dev -w @hestia/web -- --port 5199`), Chromium do `playwright-core` (não há o pacote `playwright`; usei `CHROME_PATH`), projeto inicial, Selecionar, clique na porta `to_1` e clique nas alças do canvas (`.canvas-wrap button[aria-label="Inverter dobradiça"]` e `"Inverter sentido"`).
+- Resultado: `flipHand` false→true e `flipFacing` false→true no store; o canvas mudou em ambos os cliques (screenshot do canvas diferente); as duas alças mudaram de posição. Nada a corrigir.
+- Testes de unidade de `nextOpeningFlip` e `openingGripPlacements` já cobrem os patches e a posição; o ambiente de teste é `node` (sem DOM), então não há teste de componente de clique — a fiação é um único `store.exec({type:'updateElements'})` e foi verificada no navegador.
+
+## S5 — planta do modal (não reproduzido; atributo de teste)
+- `previewPlanDrawList(ot_p90)` já continha batente (papel `jamb`), folha (`leaf`) e arco (`swing`), e o SVG os desenhava (12 traços + 3 preenchimentos); abri o diálogo real (dev server + Chromium, aba Planta) e a captura mostra parede hachurada, batente, folha aberta e arco. O defeito relatado não se repete no código atual (o S1 também deixou o batente faceado visível).
+- Para o teste exigido pelo plano, `StrokeOp` ganhou `role` opcional e `drawListToSvg` emite `data-role` nos traços do símbolo (a parede continua sem papel). Testes novos em `previewViews.test.ts`: `ot_p90` (jamb/leaf/swing), `ot_pbalcao_band120` (jamb/leaf/glass) e `ot_jcomb_fa150x120` (jamb/mullion/glass).
+- Nada de estilo/espessura/cor precisou mudar: `strokeColor` já resolve as cores de tema e o pipeline da planta usa a caixa do vão com 0,6 m de margem.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

@@ -17,6 +17,7 @@ import { quadradoEm, poligonoEm, tracoEm } from './marcadores.ts';
 import { polyOf, outerLoop } from './sketchGeom.ts';
 import { slopeMarks, slopeOps, triangleCenterPx } from './sketchSlope.ts';
 import type { PlanOps, PlanTheme } from './types.ts';
+import { defaultUnits, type ResolvedUnits } from '@hestia/model';
 
 /** Vermelho dos problemas: fica legível sobre o claro e o escuro, e não se confunde com o rosa do rascunho. */
 export const SKETCH_ISSUE = '#e53935';
@@ -107,6 +108,7 @@ export function sketchOps(
   view: Viewport,
   hover: string | null = null,
   box: SketchSelectionBox | null = null,
+  units: ResolvedUnits = defaultUnits(),
 ): PlanOps {
   const rose = theme.roofFootprint;
   const out: PlanOps = { fills: [], strokes: [], labels: [] };
@@ -143,7 +145,7 @@ export function sketchOps(
   if (draft.target === 'roof') {
     const outer = outerLoop(result.loops);
     if (outer) {
-      const sl = slopeOps(slopeMarks(draft, outer), theme);
+      const sl = slopeOps(slopeMarks(draft, outer), theme, units);
       out.fills.push(...sl.fills);
       out.strokes.push(...sl.strokes);
       out.labels.push(...sl.labels);

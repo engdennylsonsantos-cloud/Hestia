@@ -367,8 +367,8 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
   }
   const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGapsSafe(unionClipper(...parts)) }));
   // Silhueta pela união das regiões por material. Unir todos os cortes numa só operação do Clipper foi tentado (semente 18
-  // dos testes de propriedade: um bolsão fechado de 0,029 m² entre três paredes que se cruzam fica preenchido nesta união),
-  // mas em outras sementes essa união única preencheu ambientes inteiros (até 8,9 m² a mais): o erro de 0,1% é o menor.
+  // dos testes de propriedade: um bolsão fechado de 0,029 metros quadrados entre três paredes que se cruzam fica preenchido nesta união),
+  // mas em outras sementes essa união única preencheu ambientes inteiros (até 8,9 metros quadrados a mais): o erro de 0,1% é o menor.
   const silhouette = closeGapsSafe(unionClipper(...regions.map((r) => r.polygons)));
   for (const arr of layers.values()) arr.sort((a, b) => a.layerIndex - b.layerIndex);
   return { layers, regions, silhouette };

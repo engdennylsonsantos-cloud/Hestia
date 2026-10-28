@@ -6,7 +6,7 @@ import type { ResolvedStair } from './stairs.ts';
 
 /** Profundidade (m) da faixa à frente do último espelho, no sentido da subida, que a laje precisa cobrir. */
 const COVER_DEPTH = 0.02;
-/** Área (m²) não coberta que ainda conta como coberta (tolerância dos booleanos). */
+/** Área (metros quadrados) não coberta que ainda conta como coberta (tolerância dos booleanos). */
 const COVER_TOL = 1e-6;
 
 /** Anel no sentido anti-horário (área positiva), como os contornos das lajes. */

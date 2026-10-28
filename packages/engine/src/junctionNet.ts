@@ -118,7 +118,7 @@ function zEnvelope(sp: SolidPiece): readonly [number, number] {
   return env;
 }
 
-/** Volume (m³) de `a` que está dentro de `b`: área da interseção em planta vezes a sobreposição de cota. */
+/** Volume (metros cúbicos) de `a` que está dentro de `b`: área da interseção em planta vezes a sobreposição de cota. */
 export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
   const [a0, a1] = zEnvelope(a);
   const [b0, b1] = zEnvelope(b);
@@ -135,7 +135,7 @@ export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
   return integrate(common, height);
 }
 
-/** Volume (m³) de um pedaço de tipo `kind` que cai dentro dos elementos que o cortam (padrão por tipo). */
+/** Volume (metros cúbicos) de um pedaço de tipo `kind` que cai dentro dos elementos que o cortam (padrão por tipo). */
 export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {
   let cut = 0;
   for (const c of cutters) {
@@ -145,7 +145,7 @@ export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readon
 }
 
 /**
- * Área (m²) de uma face de espessura zero (membrana) em `piece` que está numa faixa de cortador na cota `z`: a face
+ * Área (metros quadrados) de uma face de espessura zero (membrana) em `piece` que está numa faixa de cortador na cota `z`: a face
  * some onde o cortador a engloba. Sem sobreposição de cota vale zero.
  */
 export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {

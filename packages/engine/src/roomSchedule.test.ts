@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeRoom, makeWall, type Id, type Project } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeRoom, makeWall, type Id, type Project } from '@hestia/model';
 import { buildRoomSchedule, filterRoomRows, roomLevelTotals, roomScheduleToCsv, sumRoomRows } from './index.ts';
 
 const rectRing = (x0: number, y0: number, x1: number, y1: number): Vec2[] => [{ x: x0, y: y0 }, { x: x0, y: y1 }, { x: x1, y: y1 }, { x: x1, y: y0 }];
@@ -75,7 +75,7 @@ describe('tabela de ambientes', () => {
 
 describe('CSV da tabela de ambientes', () => {
   const schedule = buildRoomSchedule(project);
-  const text = roomScheduleToCsv(schedule.rows, schedule.totals);
+  const text = roomScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('tem BOM UTF-8, separador ";" e cabeçalho em português', () => {

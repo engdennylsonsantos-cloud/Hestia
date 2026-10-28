@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { multiArea, pointInMulti, type Vec2 } from '@hestia/geom';
-import {
+import { defaultUnits,
   DEFAULT_CEILING_TYPES,
   ProjectStore,
   createEmptyProject,
@@ -126,7 +126,7 @@ describe('quantitativos e tabela', () => {
   });
 
   it('CSV com ponto e vírgula, decimal com vírgula, BOM e linha de total', () => {
-    const csv = ceilingScheduleToCsv(buildCeilingSchedule(withCeiling({ mark: 'F;1' })).rows, buildCeilingSchedule(withCeiling()).totals);
+    const csv = ceilingScheduleToCsv(buildCeilingSchedule(withCeiling({ mark: 'F;1' })).rows, buildCeilingSchedule(withCeiling()).totals, defaultUnits());
     expect(csv.startsWith('﻿Marca;Tipo;Código;Nível;Ambiente;Área (m²);')).toBe(true);
     expect(csv).toContain('"F;1";Forro de gesso 12,5 mm;FR-01;Térreo;;20,00;');
     expect(csv.trimEnd().split('\r\n').at(-1)).toMatch(/^Total;;;;;20,00;/);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
+import { defaultUnits,
   ProjectStore,
   createEmptyProject,
   makeWall,
@@ -88,12 +88,12 @@ describe('tipo sem código na tabela de portas e janelas', () => {
   it('o código fica vazio e a linha continua na tabela', () => {
     expect(tab.rows).toHaveLength(1);
     expect(tab.rows[0]).toMatchObject({ code: '', typeName: 'Porta sem código', familyName: 'Porta de giro', count: 1 });
-    expect(openingScheduleToCsv(tab.rows, tab.totals)).toContain(';Porta sem código;');
+    expect(openingScheduleToCsv(tab.rows, tab.totals, defaultUnits())).toContain(';Porta sem código;');
   });
 });
 
 describe('CSV da tabela de portas e janelas', () => {
-  const text = openingScheduleToCsv(schedule.rows, schedule.totals);
+  const text = openingScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('BOM UTF-8, separador ";", cabeçalho, uma linha por tipo e total', () => {
@@ -103,7 +103,7 @@ describe('CSV da tabela de portas e janelas', () => {
   });
 
   it('decimal com vírgula e categoria Porta/Janela', () => {
-    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,80;2,10;0,00;1;0,00;0,00;1;1,68;1,68;0,72;2,05;Madeira;dobradiça padrão, abre à esquerda de a→b;;"maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm"');
+    expect(lines[1]).toBe('P-02;Porta 80 x 210;Porta de giro;Porta;0,80;2,10;0,80;2,10;0,00;1;0,00;0,00;1;1,68;1,68;0,72;2,05;Madeira;dobradiça padrão, abre à esquerda de a→b;;"maçaneta a 1,00 m; 3 dobradiças; folga inferior 0,7 cm"');
     expect(lines[5]).toBe('J-06;Janela de correr 240 x 120 (3 folhas);Janela de correr;Janela;2,40;1,20;2,40;1,20;1,10;3;0,00;0,00;1;2,88;2,88;2,32;1,15;Alumínio;dobradiça padrão, abre à esquerda de a→b;;');
   });
 
@@ -138,7 +138,7 @@ describe('vão bruto e vergas no quadro', () => {
     expect(row.sillBeam).toEqual({ over: 0.3, height: 0.2 }); // presente sem valores usa o padrão
     expect(row.lintelLength).toBeCloseTo(1.8, 9);
     expect(row.sillBeamLength).toBeCloseTo(1.8, 9);
-    expect(openingScheduleToCsv([row], sumOpeningRows([row]))).toContain('1,80;1,80;1;1,44;1,44');
+    expect(openingScheduleToCsv([row], sumOpeningRows([row]), defaultUnits())).toContain('1,80;1,80;1;1,44;1,44');
   });
 });
 
@@ -175,7 +175,7 @@ describe('folha, material, ferragens e sentido no quadro', () => {
   });
 
   it('ferragens só do que a família oferece: maçaneta, dobradiças e folga inferior', () => {
-    expect(row.hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm');
+    expect(row.hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 0,7 cm');
   });
 
   it('material do batente vem do tipo; material da folha fica vazio quando o tipo não informa', () => {
@@ -255,7 +255,7 @@ describe('quadro com composição de 2+ células', () => {
     expect(rowOf('ex5').leafHeight).toBeCloseTo(1.15, 6);
   });
   it('ferragens só das folhas: maçaneta, dobradiças e folga da folha; janela sem ferragem', () => {
-    expect(rowOf('ex3').hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm');
+    expect(rowOf('ex3').hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 0,7 cm');
     expect(rowOf('ex4').hardware).toBe(rowOf('ex3').hardware);
     expect(rowOf('ex5').hardware).toBe('');
   });
@@ -263,7 +263,7 @@ describe('quadro com composição de 2+ células', () => {
     expect(schedule.rows.every((r) => r.composition === '')).toBe(true);
   });
   it('CSV: coluna "Composição" no fim do cabeçalho e nas linhas, com o resumo de cada tipo', () => {
-    const text = openingScheduleToCsv(comp3.rows, comp3.totals);
+    const text = openingScheduleToCsv(comp3.rows, comp3.totals, defaultUnits());
     const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
     expect(lines[0]!.endsWith(';Ferragens;Composição')).toBe(true);
     expect(lines.some((l) => l.endsWith(';porta + 2 laterais'))).toBe(true);
@@ -272,7 +272,7 @@ describe('quadro com composição de 2+ células', () => {
     expect(lines.at(-1)!.split(';')).toHaveLength(22);
   });
   it('CSV sem composição mantém o cabeçalho de 21 colunas', () => {
-    const text = openingScheduleToCsv(schedule.rows, schedule.totals);
+    const text = openingScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
     expect(text.split('\r\n')[0]!.endsWith(';Ferragens')).toBe(true);
   });
 });

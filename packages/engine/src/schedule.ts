@@ -1,9 +1,10 @@
-import { totalThickness, wallType, wallsOnLevel, type Id, type Project, type Wall, type WallType } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { formatQuantity, totalThickness, unitSymbol, unitsOf, wallType, wallsOnLevel, type Id, type Project, type ResolvedUnits, type Wall, type WallType } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { quantifyLevel, type WallQuantity } from './quantities.ts';
 import { resolveLevel } from './resolve.ts';
 
-/** Uma parede na tabela de quantitativos. Unidades: m, m² e m³. */
+/** Uma parede na tabela de quantitativos. Valores em metros (SI). */
 export interface WallScheduleRow {
   wallId: Id;
   mark: string;
@@ -18,9 +19,9 @@ export interface WallScheduleRow {
   grossFaceArea: number;
   openingsArea: number;
   netFaceArea: number;
-  /** Volume líquido (m³): sem o que piso e laje do nível ocupam. */
+  /** Volume líquido (metros cúbicos): sem o que piso e laje do nível ocupam. */
   volume: number;
-  /** Volume bruto (m³), antes do desconto de piso e laje. */
+  /** Volume bruto (metros cúbicos), antes do desconto de piso e laje. */
   grossVolume: number;
   /** Camadas da face externa para a interna, em cm: "Reboco 2,0 | Bloco 14,0 | ...". */
   layersSummary: string;
@@ -49,8 +50,12 @@ export interface WallSchedule {
   volumeByMaterial: MaterialVolume[];
 }
 
-const layersSummary = (p: Project, t: WallType): string =>
-  t.layers.map((l) => `${p.materials[l.materialId]?.name ?? l.materialId} ${formatDecimal(l.thickness * 100, 1)}`).join(' | ');
+const layersSummary = (p: Project, t: WallType): string => {
+  const u = unitsOf(p);
+  return t.layers
+    .map((l) => `${p.materials[l.materialId]?.name ?? l.materialId} ${formatQuantity(u, 'smallLength', l.thickness, { decimals: 1, withUnit: false })}`)
+    .join(' | ');
+};
 
 function rowOf(p: Project, wall: Wall, levelName: string, q: WallQuantity): WallScheduleRow {
   const t = wallType(p, wall);
@@ -108,45 +113,45 @@ export function buildWallSchedule(p: Project): WallSchedule {
   return { rows, totals: sumWallRows(rows), volumeByMaterial };
 }
 
-const CSV_HEADER = [
+/** Cabeçalho do CSV com os símbolos das unidades do projeto. */
+const csvHeader = (u: ResolvedUnits): string[] => [
   'Marca',
   'Tipo',
   'Nível',
-  'Espessura (m)',
-  'Comprimento (m)',
-  'Altura (m)',
-  'Área bruta (m²)',
-  'Área de vãos (m²)',
-  'Área líquida (m²)',
-  'Volume (m³)',
-  'Camadas (cm)',
+  scheduleCsvHeader(u, 'Espessura', 'smallLength'),
+  scheduleCsvHeader(u, 'Comprimento', 'length'),
+  scheduleCsvHeader(u, 'Altura', 'length'),
+  scheduleCsvHeader(u, 'Área bruta', 'area'),
+  scheduleCsvHeader(u, 'Área de vãos', 'area'),
+  scheduleCsvHeader(u, 'Área líquida', 'area'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
+  `Camadas (${unitSymbol(u, 'smallLength')})`,
 ];
-
-/** Coluna extra do fim, só quando alguma parede perde volume para piso ou laje (bruto diferente do líquido). */
-const GROSS_VOLUME_HEADER = 'Volume bruto (m³)';
 
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8.
  * Uma linha por parede, seguida de uma linha de total.
  */
-export function scheduleToCsv(rows: WallScheduleRow[], totals: WallScheduleTotals): string {
-  const n = (v: number, d: number): string => formatDecimal(v, d);
+export function scheduleToCsv(rows: WallScheduleRow[], totals: WallScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'smallLength' | 'area' | 'volume', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const grossCut = rows.some((r) => Math.abs(r.grossVolume - r.volume) > 1e-9);
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
     csvText(r.levelName),
-    n(r.thickness, 3),
-    n(r.length, 2),
-    n(r.height, 2),
-    n(r.grossFaceArea, 2),
-    n(r.openingsArea, 2),
-    n(r.netFaceArea, 2),
-    n(r.volume, 3),
+    n('smallLength', r.thickness, 3),
+    n('length', r.length, 2),
+    n('length', r.height, 2),
+    n('area', r.grossFaceArea, 2),
+    n('area', r.openingsArea, 2),
+    n('area', r.netFaceArea, 2),
+    n('volume', r.volume, 3),
     csvText(r.layersSummary),
-    ...(grossCut ? [n(r.grossVolume, 3)] : []),
+    ...(grossCut ? [n('volume', r.grossVolume, 3)] : []),
   ]);
-  const total = ['Total', '', '', '', n(totals.length, 2), '', n(totals.grossFaceArea, 2), n(totals.openingsArea, 2), n(totals.netFaceArea, 2), n(totals.volume, 3), ''];
-  if (grossCut) total.push(n(totals.grossVolume, 3));
-  return csvDocument([grossCut ? [...CSV_HEADER, GROSS_VOLUME_HEADER] : CSV_HEADER, ...body, total]);
+  const total = ['Total', '', '', '', n('length', totals.length, 2), '', n('area', totals.grossFaceArea, 2), n('area', totals.openingsArea, 2), n('area', totals.netFaceArea, 2), n('volume', totals.volume, 3), ''];
+  if (grossCut) total.push(n('volume', totals.grossVolume, 3));
+  const header = csvHeader(units);
+  if (grossCut) header.push(scheduleCsvHeader(units, 'Volume bruto', 'volume'));
+  return csvDocument([header, ...body, total]);
 }

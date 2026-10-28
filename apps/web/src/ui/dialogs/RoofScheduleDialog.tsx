@@ -90,7 +90,7 @@ export function RoofScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-telhados.csv`, roofScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-telhados.csv`, roofScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };

@@ -33,13 +33,13 @@ export interface ResolvedRoom {
   problem: RoomProblem | null;
   /** Anel externo + furos de pilares/shafts internos; null quando há problema. */
   polygon: Polygon | null;
-  /** Área líquida (m²). */
+  /** Área líquida (metros quadrados). */
   area: number;
   /** Perímetro do contorno externo (m). */
   perimeter: number;
   /** Pé-direito (m). */
   ceilingHeight: number;
-  /** Volume (m³) = área × pé-direito. */
+  /** Volume (metros cúbicos) = área × pé-direito. */
   volume: number;
   floorFinish: string;
   wallFinish: string;

@@ -1,5 +1,6 @@
-import { isRoof, type Id, type Project, type RoofShape } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { isRoof, type Id, type Project, type ResolvedUnits, type RoofShape } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { quantifyRoofs, type RoofQuantity } from './roofQuantities.ts';
 
 /** Rótulo da forma na tabela. */
@@ -12,7 +13,7 @@ export const ROOF_SHAPE_LABEL: Record<RoofShape, string> = {
   extrusion: 'Por extrusão',
 };
 
-/** Um telhado na tabela. Unidades: m, m² e m³. */
+/** Um telhado na tabela. Valores em metros (SI). */
 export interface RoofScheduleRow {
   roofId: Id;
   mark: string;
@@ -25,9 +26,9 @@ export interface RoofScheduleRow {
   shapeLabel: string;
   /** Inclinação única em % (null nas águas livres, que têm uma inclinação por água). */
   slopePercent: number | null;
-  /** Área líquida em planta (m²). */
+  /** Área líquida em planta (metros quadrados). */
   planArea: number;
-  /** Soma das áreas reais das águas (m²). */
+  /** Soma das áreas reais das águas (metros quadrados). */
   faceArea: number;
   volume: number;
   /** Comprimento 3D das cumeeiras (m). */
@@ -116,19 +117,19 @@ export function sumRoofRows(rows: RoofScheduleRow[]): RoofScheduleTotals {
   );
 }
 
-const CSV_HEADER = [
+const csvHeader = (u: ResolvedUnits): string[] => [
   'Marca',
   'Tipo',
   'Código',
   'Nível',
   'Forma',
-  'Inclinação (%)',
-  'Área em planta (m²)',
-  'Área real (m²)',
-  'Volume (m³)',
-  'Cumeeira (m)',
-  'Beiral (m)',
-  'Empena (m)',
+  scheduleCsvHeader(u, 'Inclinação', 'slope'),
+  scheduleCsvHeader(u, 'Área em planta', 'area'),
+  scheduleCsvHeader(u, 'Área real', 'area'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
+  scheduleCsvHeader(u, 'Cumeeira', 'length'),
+  scheduleCsvHeader(u, 'Beiral', 'length'),
+  scheduleCsvHeader(u, 'Empena', 'length'),
   'Arestas com inclinação',
 ];
 
@@ -136,21 +137,21 @@ const CSV_HEADER = [
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das tabelas de pisos e
  * lajes). Uma linha por telhado, seguida de uma linha de total. Inclinação vazia nas águas livres.
  */
-export function roofScheduleToCsv(rows: RoofScheduleRow[], totals: RoofScheduleTotals): string {
-  const n = formatDecimal;
+export function roofScheduleToCsv(rows: RoofScheduleRow[], totals: RoofScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'area' | 'volume' | 'slope', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
     csvText(r.typeCode),
     csvText(r.levelName),
     csvText(r.shapeLabel),
-    r.slopePercent === null ? '' : n(r.slopePercent, 2),
-    n(r.planArea, 2),
-    n(r.faceArea, 2),
-    n(r.volume, 3),
-    n(r.ridgeLength, 2),
-    n(r.eaveLength, 2),
-    n(r.gableLength, 2),
+    r.slopePercent === null ? '' : n('slope', r.slopePercent / 100, 2),
+    n('area', r.planArea, 2),
+    n('area', r.faceArea, 2),
+    n('volume', r.volume, 3),
+    n('length', r.ridgeLength, 2),
+    n('length', r.eaveLength, 2),
+    n('length', r.gableLength, 2),
     r.slopedEdges === null ? '' : String(r.slopedEdges),
   ]);
   const total = [
@@ -160,13 +161,13 @@ export function roofScheduleToCsv(rows: RoofScheduleRow[], totals: RoofScheduleT
     '',
     '',
     '',
-    n(totals.planArea, 2),
-    n(totals.faceArea, 2),
-    n(totals.volume, 3),
-    n(totals.ridgeLength, 2),
-    n(totals.eaveLength, 2),
-    n(totals.gableLength, 2),
+    n('area', totals.planArea, 2),
+    n('area', totals.faceArea, 2),
+    n('volume', totals.volume, 3),
+    n('length', totals.ridgeLength, 2),
+    n('length', totals.eaveLength, 2),
+    n('length', totals.gableLength, 2),
     '',
   ];
-  return csvDocument([CSV_HEADER, ...body, total]);
+  return csvDocument([csvHeader(units), ...body, total]);
 }

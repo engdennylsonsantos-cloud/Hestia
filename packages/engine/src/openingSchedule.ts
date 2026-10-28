@@ -16,6 +16,7 @@ import {
   openingRough,
   openingSillBeam,
   openingThreshold,
+  formatQuantity,
   spanTypeOf,
   type CellNode,
   type CompositionNode,
@@ -26,12 +27,15 @@ import {
   type OpeningLintel,
   type OpeningType,
   type Project,
+  type ResolvedUnits,
+  unitsOf,
 } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 
 /**
  * Uma linha da tabela de portas e janelas: um TIPO de abertura (Revit: Type) com a contagem das instâncias dele no
- * projeto. É aqui que aparece o código do tipo (Revit: Type Mark). Unidades: m e m².
+ * projeto. É aqui que aparece o código do tipo (Revit: Type Mark). Valores em metros (SI).
  */
 export interface OpeningScheduleRow {
   typeId: Id;
@@ -60,9 +64,9 @@ export interface OpeningScheduleRow {
   sillBeamLength: number;
   /** Quantidade de instâncias deste tipo no projeto. */
   count: number;
-  /** Área do vão unitária (m²) = largura × altura. */
+  /** Área do vão unitária (metros quadrados) = largura × altura. */
   unitArea: number;
-  /** Área do vão total (m²) = unitArea × count. */
+  /** Área do vão total (metros quadrados) = unitArea × count. */
   totalArea: number;
   /** Material do batente (nome do material do tipo); vazio quando o material não existe no projeto. */
   frameMaterial: string;
@@ -84,7 +88,7 @@ export interface OpeningScheduleTotals {
   doorCount: number;
   /** Instâncias de janela. */
   windowCount: number;
-  /** Área de vão total (m²). */
+  /** Área de vão total (metros quadrados). */
   totalArea: number;
 }
 
@@ -109,22 +113,22 @@ const senseText = (o: Opening): string =>
  * Ferragens do tipo, só as que a família oferece (openingSupport): maçaneta com a altura, dobradiças, folga inferior e
  * soleira. Ex.: "maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm".
  */
-function hardwareText(t: OpeningType): string {
+function hardwareText(t: OpeningType, u: ResolvedUnits): string {
   const sup = openingOptionSupport(openingFamilyOf(t)?.id);
   const parts: string[] = [];
-  if (sup.handle) parts.push(`maçaneta a ${formatDecimal(openingHandleHeight(t), 2)} m`);
+  if (sup.handle) parts.push(`maçaneta a ${formatQuantity(u, 'length', openingHandleHeight(t), { decimals: 2 })}`);
   const hinges = openingHinges(t);
   if (sup.hinges && hinges > 0) parts.push(`${hinges} ${hinges === 1 ? 'dobradiça' : 'dobradiças'}`);
-  if (sup.leafUndercut) parts.push(`folga inferior ${formatDecimal(openingLeafUndercut(t) * 1000, 0)} mm`);
+  if (sup.leafUndercut) parts.push(`folga inferior ${formatQuantity(u, 'smallLength', openingLeafUndercut(t), { decimals: 1 })}`);
   const sill = sup.threshold ? openingThreshold(t) : null;
-  if (sill) parts.push(`soleira ${formatDecimal(sill.thickness * 1000, 0)} mm`);
+  if (sill) parts.push(`soleira ${formatQuantity(u, 'smallLength', sill.thickness, { decimals: 1 })}`);
   return parts.join('; ');
 }
 
 /** Ferragens de uma composição: só as das células `leaf`, cada uma como um tipo de uma folha, sem repetir (sem soleira: é do quadro). */
-function compositionHardware(t: OpeningType, cells: CellNode[]): string {
+function compositionHardware(t: OpeningType, cells: CellNode[], u: ResolvedUnits): string {
   const texts = cells.flatMap((x) => (x.content.kind === 'leaf' ? [x.content] : []));
-  const parts = texts.map((l) => hardwareText({ ...t, ...l.options, plan: l.plan, leaves: l.leaves, threshold: undefined }));
+  const parts = texts.map((l) => hardwareText({ ...t, ...l.options, plan: l.plan, leaves: l.leaves, threshold: undefined }, u));
   return [...new Set(parts.filter((x) => x !== ''))].join(' / ');
 }
 
@@ -215,6 +219,7 @@ function compareRows(a: OpeningScheduleRow, b: OpeningScheduleRow): number {
  * quantidade de instâncias. Tipo de abertura inexistente não conta (a instância aponta para um tipo ausente).
  */
 export function buildOpeningSchedule(p: Project): OpeningSchedule {
+  const u = unitsOf(p);
   const counts = new Map<Id, number>();
   const senses = new Map<Id, Set<string>>();
   for (const e of Object.values(p.elements)) {
@@ -262,7 +267,7 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
       frameMaterial: p.materials[t.frameMaterialId]?.name ?? '',
       sense: t.leaves === 0 ? '' : [...(senses.get(typeId) ?? [])].join('; '),
       leafMaterial: (t.leafMaterialId && p.materials[t.leafMaterialId]?.name) || '',
-      hardware: multi ? compositionHardware(t, cells) : hardwareText(t),
+      hardware: multi ? compositionHardware(t, cells, u) : hardwareText(t, u),
       composition: multi ? compositionSummary(comp) : '',
     });
   }
@@ -287,24 +292,24 @@ export function sumOpeningRows(rows: OpeningScheduleRow[]): OpeningScheduleTotal
   );
 }
 
-const CSV_HEADER = [
+const csvHeader = (u: ResolvedUnits): string[] => [
   'Código',
   'Tipo',
   'Família',
   'Categoria',
-  'Largura (m)',
-  'Altura (m)',
-  'Largura bruta (m)',
-  'Altura bruta (m)',
-  'Peitoril (m)',
+  scheduleCsvHeader(u, 'Largura', 'length'),
+  scheduleCsvHeader(u, 'Altura', 'length'),
+  scheduleCsvHeader(u, 'Largura bruta', 'length'),
+  scheduleCsvHeader(u, 'Altura bruta', 'length'),
+  scheduleCsvHeader(u, 'Peitoril', 'length'),
   'Folhas',
-  'Verga (m)',
-  'Contraverga (m)',
+  scheduleCsvHeader(u, 'Verga', 'length'),
+  scheduleCsvHeader(u, 'Contraverga', 'length'),
   'Quantidade',
-  'Área unitária (m²)',
-  'Área total (m²)',
-  'Folha largura (m)',
-  'Folha altura (m)',
+  scheduleCsvHeader(u, 'Área unitária', 'area'),
+  scheduleCsvHeader(u, 'Área total', 'area'),
+  scheduleCsvHeader(u, 'Folha largura', 'length'),
+  scheduleCsvHeader(u, 'Folha altura', 'length'),
   'Material do batente',
   'Sentido',
   'Material da folha',
@@ -317,33 +322,35 @@ const COMPOSITION_HEADER = 'Composição';
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das outras tabelas).
  * Uma linha por tipo, seguida de uma linha de total (quantidade de instâncias e área total).
  */
-export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: OpeningScheduleTotals): string {
-  const n = formatDecimal;
+export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: OpeningScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'area', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const withComposition = rows.some((r) => r.composition !== '');
   const body = rows.map((r) => [
     csvText(r.code),
     csvText(r.typeName),
     csvText(r.familyName),
     csvText(r.kind === 'door' ? 'Porta' : 'Janela'),
-    n(r.width, 2),
-    n(r.height, 2),
-    n(r.roughWidth, 2),
-    n(r.roughHeight, 2),
-    n(r.sill, 2),
+    n('length', r.width, 2),
+    n('length', r.height, 2),
+    n('length', r.roughWidth, 2),
+    n('length', r.roughHeight, 2),
+    n('length', r.sill, 2),
     String(r.leaves),
-    n(r.lintelLength, 2),
-    n(r.sillBeamLength, 2),
+    n('length', r.lintelLength, 2),
+    n('length', r.sillBeamLength, 2),
     String(r.count),
-    n(r.unitArea, 2),
-    n(r.totalArea, 2),
-    n(r.leafWidth, 2),
-    n(r.leafHeight, 2),
+    n('area', r.unitArea, 2),
+    n('area', r.totalArea, 2),
+    n('length', r.leafWidth, 2),
+    n('length', r.leafHeight, 2),
     csvText(r.frameMaterial),
     csvText(r.sense),
     csvText(r.leafMaterial),
     csvText(r.hardware),
     ...(withComposition ? [csvText(r.composition)] : []),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', '', '', '', '', '', ...(withComposition ? [''] : [])];
-  return csvDocument([withComposition ? [...CSV_HEADER, COMPOSITION_HEADER] : CSV_HEADER, ...body, total]);
+  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n('area', totals.totalArea, 2), '', '', '', '', '', '', ...(withComposition ? [''] : [])];
+  const header = csvHeader(units);
+  if (withComposition) header.push(COMPOSITION_HEADER);
+  return csvDocument([header, ...body, total]);
 }

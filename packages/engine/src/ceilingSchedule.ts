@@ -1,9 +1,10 @@
-import { isCeiling, levelElevation, type Id, type Project } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { isCeiling, levelElevation, type Id, type Project, type ResolvedUnits } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { quantifyCeilings } from './ceilingQuantities.ts';
 import { resolveCeilings } from './ceilings.ts';
 
-/** Um forro na tabela. Unidades: m, m² e m³. */
+/** Um forro na tabela. Valores em metros (SI). */
 export interface CeilingScheduleRow {
   ceilingId: Id;
   mark: string;
@@ -85,27 +86,39 @@ export function sumCeilingRows(rows: CeilingScheduleRow[]): CeilingScheduleTotal
   );
 }
 
-const CSV_HEADER = ['Marca', 'Tipo', 'Código', 'Nível', 'Ambiente', 'Área (m²)', 'Perímetro (m)', 'Espessura (m)', 'Volume (m³)', 'Topo (m)', 'Face inferior (m)'];
+const csvHeader = (u: ResolvedUnits): string[] => [
+  'Marca',
+  'Tipo',
+  'Código',
+  'Nível',
+  'Ambiente',
+  scheduleCsvHeader(u, 'Área', 'area'),
+  scheduleCsvHeader(u, 'Perímetro', 'length'),
+  scheduleCsvHeader(u, 'Espessura', 'smallLength'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
+  scheduleCsvHeader(u, 'Topo', 'length'),
+  scheduleCsvHeader(u, 'Face inferior', 'length'),
+];
 
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das outras tabelas).
  * Uma linha por forro, seguida de uma linha de total.
  */
-export function ceilingScheduleToCsv(rows: CeilingScheduleRow[], totals: CeilingScheduleTotals): string {
-  const n = formatDecimal;
+export function ceilingScheduleToCsv(rows: CeilingScheduleRow[], totals: CeilingScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'smallLength' | 'area' | 'volume', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
     csvText(r.typeCode),
     csvText(r.levelName),
     csvText(r.roomName),
-    n(r.area, 2),
-    n(r.perimeter, 2),
-    n(r.thickness, 3),
-    n(r.volume, 3),
-    n(r.heightOffset, 3),
-    n(r.underside, 3),
+    n('area', r.area, 2),
+    n('length', r.perimeter, 2),
+    n('smallLength', r.thickness, 3),
+    n('volume', r.volume, 3),
+    n('length', r.heightOffset, 3),
+    n('length', r.underside, 3),
   ]);
-  const total = ['Total', '', '', '', '', n(totals.area, 2), n(totals.perimeter, 2), '', n(totals.volume, 3), '', ''];
-  return csvDocument([CSV_HEADER, ...body, total]);
+  const total = ['Total', '', '', '', '', n('area', totals.area, 2), n('length', totals.perimeter, 2), '', n('volume', totals.volume, 3), '', ''];
+  return csvDocument([csvHeader(units), ...body, total]);
 }

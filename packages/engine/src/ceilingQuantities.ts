@@ -8,9 +8,9 @@ export interface CeilingLayerQuantity {
   layerIndex: number;
   materialId: Id;
   thickness: number;
-  /** Área líquida do forro (m²). */
+  /** Área líquida do forro (metros quadrados). */
   area: number;
-  /** Volume da camada (m³) = área × espessura. */
+  /** Volume da camada (metros cúbicos) = área × espessura. */
   volume: number;
 }
 
@@ -18,13 +18,13 @@ export interface CeilingQuantity {
   ceilingId: Id;
   typeId: Id;
   levelId: Id;
-  /** Área líquida em planta: contorno menos furos (m²). */
+  /** Área líquida em planta: contorno menos furos (metros quadrados). */
   area: number;
   /** Comprimento do contorno externo (m). */
   perimeter: number;
   /** Espessura total do forro (m). */
   thickness: number;
-  /** Volume total (m³) = soma das camadas. */
+  /** Volume total (metros cúbicos) = soma das camadas. */
   volume: number;
   layers: CeilingLayerQuantity[];
 }

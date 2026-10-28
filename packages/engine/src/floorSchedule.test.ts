@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeFloor, type Floor, type Project } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeFloor, type Floor, type Project } from '@hestia/model';
 import { buildFloorSchedule, filterFloorRows, floorScheduleToCsv, sumFloorRows } from './index.ts';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [
@@ -59,18 +59,18 @@ describe('tabela de pisos', () => {
 });
 
 describe('CSV da tabela de pisos', () => {
-  const text = floorScheduleToCsv(schedule.rows, schedule.totals);
+  const text = floorScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('tem BOM UTF-8, separador ";" e uma linha por piso mais cabeçalho e total', () => {
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(lines).toHaveLength(schedule.rows.length + 2);
-    expect(lines[0]).toBe('Marca;Tipo;Código;Nível;Área (m²);Perímetro (m);Espessura (m);Volume (m³);Deslocamento (m)');
+    expect(lines[0]).toBe('Marca;Tipo;Código;Nível;Área (m²);Perímetro (m);Espessura (cm);Volume (m³);Deslocamento (m)');
     expect(lines.at(-1)!.startsWith('Total;')).toBe(true);
   });
 
   it('decimal com vírgula e texto com ";" entre aspas', () => {
-    expect(lines[1]).toBe('P1;Cerâmico sobre contrapiso;PS-01;Térreo;12,00;14,00;0,190;2,280;0,000');
+    expect(lines[1]).toBe('P1;Cerâmico sobre contrapiso;PS-01;Térreo;12,00;14,00;19,000;2,280;0,000');
     expect(lines[2]!.startsWith('"P;2";')).toBe(true);
     expect(lines[2]!.endsWith(';0,050')).toBe(true);
   });

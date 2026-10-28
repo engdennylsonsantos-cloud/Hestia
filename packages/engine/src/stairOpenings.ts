@@ -2,7 +2,7 @@ import { asMulti, boxOf, boxesOverlap, difference, minAreaRect, multiPoints, off
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
 
-/** Tolerância de cota e de área (m, m²) nas comparações do furo. */
+/** Tolerância de cota e de área (m e metros quadrados) nas comparações do furo. */
 const EPS = 1e-9;
 
 /**

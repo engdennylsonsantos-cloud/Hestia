@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTemplate, isWall } from '@hestia/model';
+import { buildTemplate, defaultUnits, isWall } from '@hestia/model';
 import { buildWallSchedule, quantifyLevel, resolveLevel, scheduleToCsv, sumWallRows, type WallScheduleRow } from './index.ts';
 
 const project = buildTemplate('house2');
@@ -49,7 +49,7 @@ describe('tabela de paredes', () => {
 });
 
 describe('CSV da tabela de paredes', () => {
-  const csv = scheduleToCsv(schedule.rows, schedule.totals);
+  const csv = scheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = csv.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('começa com BOM UTF-8', () => {
@@ -76,7 +76,7 @@ describe('CSV da tabela de paredes', () => {
 
   it('texto com ";", aspas ou quebra vai entre aspas, e fórmula é neutralizada', () => {
     const row: WallScheduleRow = { ...schedule.rows[0]!, mark: 'A;"B"', typeName: '=SOMA(1)' };
-    const out = scheduleToCsv([row], sumWallRows([row]));
+    const out = scheduleToCsv([row], sumWallRows([row]), defaultUnits());
     expect(out).toContain(`"A;""B"""`);
     expect(out).toContain(`'=SOMA(1)`);
   });

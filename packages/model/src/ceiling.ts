@@ -25,7 +25,7 @@ export const ceilingTypeThickness = (t: CeilingType): number => t.layers.reduce(
 /** Polígono do forro (contorno + furos) para as operações de geometria. */
 export const ceilingPolygon = (c: Pick<Ceiling, 'boundary' | 'holes'>): Polygon => [c.boundary, ...c.holes];
 
-/** Área líquida em planta (contorno menos furos), m². */
+/** Área líquida em planta (contorno menos furos), metros quadrados. */
 export function ceilingArea(c: Pick<Ceiling, 'boundary' | 'holes'>): number {
   return multiArea([ceilingPolygon(c)]);
 }

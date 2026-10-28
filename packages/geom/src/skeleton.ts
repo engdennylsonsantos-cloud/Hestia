@@ -30,6 +30,7 @@ export interface SkeletonArc {
 export interface SkeletonResult { faces: SkeletonFace[]; arcs: SkeletonArc[]; ok: boolean; reason?: string; steps?: SkeletonStep[]; points?: Vec2[] }
 
 /** Metros com duas casas e vírgula decimal, como no resto da interface. */
+// units-ok: o geom não conhece as unidades do projeto; é diagnóstico interno (planta em metros)
 const fmtM = (v: number): string => v.toFixed(2).replace('.', ',');
 
 /** Pontos em planta (m) em texto pt-BR, como "(5,50; 4,50)". Usado nos motivos de recusa do telhado. */

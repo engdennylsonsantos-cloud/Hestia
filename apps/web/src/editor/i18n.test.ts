@@ -44,4 +44,9 @@ describe('nome de comando de atalho (diálogos de atalhos)', () => {
     expect(nomeComandoLang('atalhos', 'pt')).toBe('Atalhos de teclado');
     expect(nomeComandoLang('atalhos', 'en')).toBe('Keyboard shortcuts');
   });
+
+  it('o diálogo de unidades tem nome nos dois idiomas', () => {
+    expect(nomeComandoLang('unidades', 'pt')).toBe('Unidades do projeto');
+    expect(nomeComandoLang('unidades', 'en')).toBe('Project Units');
+  });
 });

@@ -13,7 +13,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
 - **MARCO M2 LIBERADO 680bd5aa** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
 - [x] B1–B4 diálogo Unidades (`02`)  → **marco M3**
-- [ ] B5 atalho `UN` abre o diálogo Unidades… (`02`, B5; pedido do dono)
+- [x] B5 atalho `UN` abre o diálogo Unidades… (`02`, B5; pedido do dono)
 - **MARCO M3 LIBERADO 6ad01c82** (`DialogKind` units, `UnitsDialog`/`unitsDialogModel` e botão em Padrões do projeto)
 - [x] C1 painel de propriedades
 - [ ] C2 diálogos

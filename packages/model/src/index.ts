@@ -46,3 +46,4 @@ export * from './annotations.ts';
 export * from './sheet.ts';
 export * from './sheetCommands.ts';
 export * from './grid.ts';
+export * from './dimensionSettings.ts';

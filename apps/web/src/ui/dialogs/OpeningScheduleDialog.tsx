@@ -31,6 +31,12 @@ const COLS: Col[] = [
   { key: 'count', labelKey: 'col_count', decimals: 0 },
   { key: 'unitArea', labelKey: 'col_unit_area', decimals: 2 },
   { key: 'totalArea', labelKey: 'col_total_area', decimals: 2 },
+  { key: 'leafWidth', labelKey: 'col_leaf_width', decimals: 2 },
+  { key: 'leafHeight', labelKey: 'col_leaf_height', decimals: 2 },
+  { key: 'frameMaterial', labelKey: 'col_frame_material' },
+  { key: 'sense', labelKey: 'col_sense' },
+  { key: 'leafMaterial', labelKey: 'col_leaf_material' },
+  { key: 'hardware', labelKey: 'col_hardware' },
 ];
 
 interface Sort {

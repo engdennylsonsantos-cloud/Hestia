@@ -49,3 +49,4 @@ export * from './grid.ts';
 export * from './dimensionSettings.ts';
 export * from './units.ts';
 export * from './unitsFormat.ts';
+export * from './unitsParse.ts';

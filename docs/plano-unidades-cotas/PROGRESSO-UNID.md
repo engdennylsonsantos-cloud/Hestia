@@ -3,7 +3,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 
 - [x] U0 inventário (`01`)
 - [x] U1 tipos, padrões e formatação
-- [ ] U2 leitura de texto digitado
+- [x] U2 leitura de texto digitado
 - [ ] U3 `ProjectSettings.units`
 - [ ] U4 `parseQuantityText` (tools)
 - [ ] U5 hook `useUnits`

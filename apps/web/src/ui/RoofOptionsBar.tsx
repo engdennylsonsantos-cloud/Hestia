@@ -28,19 +28,19 @@ export function RoofOptionsBar(): ReactElement {
       </label>
       <label>
         Inclinação
-        <NumField id="opt-roofslope" value={slope} onCommit={(v) => set({ roofSlope: v })} unit="%" min={0.1} max={200} />
+        <NumField id="opt-roofslope" value={slope / 100} onCommit={(v) => set({ roofSlope: v * 100 })} quantity="slope" min={0.001} max={2} />
       </label>
       <label>
         Graus
-        <NumField id="opt-roofdeg" value={percentToDeg(slope)} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => set({ roofSlope: roofSlopeFromDegField(v, percentToDeg(slope), slope) })} />
+        <NumField id="opt-roofdeg" value={(percentToDeg(slope) * Math.PI) / 180} quantity="angle" min={(0.1 * Math.PI) / 180} max={(63.4 * Math.PI) / 180} onCommit={(v) => set({ roofSlope: roofSlopeFromDegField((v * 180) / Math.PI, percentToDeg(slope), slope) })} />
       </label>
       <label>
         Balanço
-        <NumField id="opt-roofoverhang" value={o.roofOverhang ?? 0.5} onCommit={(v) => set({ roofOverhang: v })} unit="m" min={0} />
+        <NumField id="opt-roofoverhang" value={o.roofOverhang ?? 0.5} onCommit={(v) => set({ roofOverhang: v })} quantity="length" min={0} />
       </label>
       <label>
         Cota do beiral
-        <NumField id="opt-roofoffset" value={o.roofOffset ?? offsetAuto} onCommit={(v) => set({ roofOffset: v })} unit="m" />
+        <NumField id="opt-roofoffset" value={o.roofOffset ?? offsetAuto} onCommit={(v) => set({ roofOffset: v })} quantity="length" />
       </label>
       {o.roofOffset !== null && o.roofOffset !== undefined && (
         <button type="button" className="btn" onClick={() => set({ roofOffset: null })} title="Volta à altura da parede mais alta do nível">

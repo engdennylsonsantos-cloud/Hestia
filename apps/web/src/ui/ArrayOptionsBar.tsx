@@ -59,13 +59,12 @@ export function ArrayOptionsBar(): ReactElement {
           {t.arr_angle}
           <NumField
             id="opt-arrayangle"
-            value={o.arrayAngle ?? 360}
-            decimals={1}
-            unit="°"
+            value={((o.arrayAngle ?? 360) * Math.PI) / 180}
+            quantity="angle"
             onCommit={(v) => {
               // Ângulo 0 não gira nada: rejeita e mantém o último valor válido (D4).
               if (Math.abs(v) < 1e-6) useUi.setState({ status: t.arr_angle_zero });
-              else set({ arrayAngle: v });
+              else set({ arrayAngle: (v * 180) / Math.PI });
             }}
           />
         </label>

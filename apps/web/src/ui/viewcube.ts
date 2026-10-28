@@ -247,6 +247,7 @@ export function cubeMatrixValues(azimuth: number, elevation: number): number[] {
 
 /** Valor CSS `matrix3d(...)` da orientação do cubo. */
 export function cubeMatrix(azimuth: number, elevation: number): string {
+// units-ok: formato de máquina (matriz CSS)
   return `matrix3d(${cubeMatrixValues(azimuth, elevation).map((x) => (Math.abs(x) < 1e-12 ? 0 : x).toFixed(6)).join(',')})`;
 }
 

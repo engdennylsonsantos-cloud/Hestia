@@ -112,6 +112,7 @@ export interface RingGeometry {
   letters: RingLetter[];
 }
 
+// units-ok: formato de máquina (coordenada SVG)
 const num = (n: number): string => (Math.abs(n) < 1e-9 ? '0' : n.toFixed(2));
 
 function pathOf(pts: [number, number][]): string {

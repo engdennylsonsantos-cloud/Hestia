@@ -6,6 +6,7 @@ import { useUi } from '../editor/state.ts';
 import { perimeterActions, usePerimeter } from '../editor/perimeter.ts';
 import { PerimeterOptionsBar } from './perimeter/PerimeterOptionsBar.tsx';
 import { Check, NumField } from './fields.tsx';
+import { useUnits } from './useUnits.ts';
 import { DisjoinCheck } from './DisjoinCheck.tsx';
 import { SlabOptionsBar } from './SlabOptionsBar.tsx';
 import { CeilingOptionsBar } from './CeilingOptionsBar.tsx';
@@ -15,7 +16,7 @@ import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
 import { ArrayOptionsBar } from './ArrayOptionsBar.tsx';
 import { GridOptionsBar } from './GridOptionsBar.tsx';
-import { openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
+import { formatQuantity, openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
 
 export const LOCATION_LABEL: Record<LocationLine, string> = {
   wallCenter: 'Eixo da parede',
@@ -90,6 +91,7 @@ export function OptionsBar(): ReactElement {
   const perim = usePerimeter();
   const tool = useUi((s) => s.tool);
   const o = useUi((s) => s.options);
+  const units = useUnits();
   const sel = useUi((s) => s.selection);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...o, ...patch } });
   if (perim.active) return <PerimeterOptionsBar target={perim.target} modify={perim.modify} options={perim.options} onChange={perimeterActions.setOptions} />;
@@ -128,7 +130,7 @@ export function OptionsBar(): ReactElement {
           </label>
           <label>
             Altura
-            <NumField id="opt-height" value={o.wallHeight} onCommit={(v) => set({ wallHeight: v })} unit="m" min={0.1} />
+            <NumField id="opt-height" value={o.wallHeight} onCommit={(v) => set({ wallHeight: v })} quantity="length" min={0.1} />
           </label>
           <Check id="opt-chain" checked={o.chain} onChange={(v) => set({ chain: v })}>Encadear</Check>
           <Check id="opt-ortho" checked={o.orthoLock} onChange={(v) => set({ orthoLock: v })}>Travar em 0°/90°</Check>
@@ -146,13 +148,13 @@ export function OptionsBar(): ReactElement {
           <label>Unidade<select className="select" value={o.dimensionUnit ?? 'm'} onChange={(e) => set({ dimensionUnit: e.target.value as 'm' | 'cm' | 'mm' })}><option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option></select></label>
           <label>Casas<select className="select" value={o.dimensionPrecision ?? 2} onChange={(e) => set({ dimensionPrecision: Number(e.target.value) as 0 | 1 | 2 | 3 })}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
           <label>Marca<select className="select" value={o.dimensionTickStyle ?? 'slash'} onChange={(e) => set({ dimensionTickStyle: e.target.value as 'slash' | 'arrow' | 'dot' })}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></label>
-          <label>Altura do texto<NumField id="opt-dimheight" value={o.dimensionTextHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => set({ dimensionTextHeight: v })} /></label>
+          <label>Altura do texto<NumField id="opt-dimheight" value={(o.dimensionTextHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => set({ dimensionTextHeight: v * 1000 })} /></label>
         </>
       )}
       {tool === 'text' && (
         <>
-          <label>Altura<NumField id="opt-textheight" value={o.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => set({ textHeight: v })} /></label>
-          <label>Largura<NumField id="opt-textwidth" value={o.textWidth ?? 60} decimals={0} unit="mm" min={5} onCommit={(v) => set({ textWidth: v })} /></label>
+          <label>Altura<NumField id="opt-textheight" value={(o.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => set({ textHeight: v * 1000 })} /></label>
+          <label>Largura<NumField id="opt-textwidth" value={(o.textWidth ?? 60) / 1000} quantity="smallLength" min={0.005} onCommit={(v) => set({ textWidth: v * 1000 })} /></label>
           <label>Chamada<select className="select" value={o.textLeader ?? 'none'} onChange={(e) => set({ textLeader: e.target.value as 'none' | 'straight' | 'elbow' })}><option value="none">Sem líder</option><option value="straight">Reta</option><option value="elbow">Com dobra</option></select></label>
         </>
       )}
@@ -178,7 +180,7 @@ export function OptionsBar(): ReactElement {
           </label>
           <label>
             Deslocamento do topo
-            <NumField id="opt-flooroffset" value={o.floorOffset} onCommit={(v) => set({ floorOffset: v })} unit="m" />
+            <NumField id="opt-flooroffset" value={o.floorOffset} onCommit={(v) => set({ floorOffset: v })} quantity="length" />
           </label>
         </>
       )}
@@ -252,10 +254,10 @@ export function OptionsBar(): ReactElement {
               id="opt-offset"
               value={o.offsetDistance}
               onCommit={(v) => set({ offsetDistance: v })}
-              unit="m"
+              quantity="length"
               min={0.01}
               strictRange
-              onInvalid={(texto) => useUi.setState({ status: `Distância inválida (${texto.trim() || 'vazia'}): digite um valor em metros, maior que zero. Mantida: ${o.offsetDistance.toFixed(2).replace('.', ',')} m.` })}
+              onInvalid={(texto) => useUi.setState({ status: `Distância inválida (${texto.trim() || 'vazia'}): digite uma distância válida, maior que zero. Mantida: ${formatQuantity(units, 'length', o.offsetDistance)}.` })}
               onValid={() => { if (useUi.getState().status.startsWith('Distância inválida')) useUi.setState({ status: 'Pronto.' }); }}
             />
           </label>

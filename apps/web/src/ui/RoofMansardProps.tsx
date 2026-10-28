@@ -31,13 +31,13 @@ export function RoofMansardSection({ roof }: { roof: Roof }): ReactElement | nul
       {m && (
         <>
           <Row label="Inclinação de baixo" htmlFor="p-rmlow">
-            <NumField id="p-rmlow" value={m.lowerPercent} unit="%" min={0.1} max={300} onCommit={(v) => set({ lowerPercent: v })} />
+            <NumField id="p-rmlow" value={m.lowerPercent / 100} quantity="slope" min={0.001} max={3} onCommit={(v) => set({ lowerPercent: v * 100 })} />
           </Row>
           <Row label="Inclinação de cima" htmlFor="p-rmup">
-            <NumField id="p-rmup" value={m.upperPercent} unit="%" min={0.1} max={300} onCommit={(v) => set({ upperPercent: v })} />
+            <NumField id="p-rmup" value={m.upperPercent / 100} quantity="slope" min={0.001} max={3} onCommit={(v) => set({ upperPercent: v * 100 })} />
           </Row>
           <Row label="Largura da faixa de baixo" htmlFor="p-rmrun">
-            <NumField id="p-rmrun" value={m.run} unit="m" min={0.01} onCommit={(v) => set({ run: v })} />
+            <NumField id="p-rmrun" value={m.run} quantity="length" min={0.01} onCommit={(v) => set({ run: v })} />
           </Row>
         </>
       )}

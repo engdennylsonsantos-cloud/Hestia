@@ -41,14 +41,14 @@ export function AnnotationProps({ dim, text, line, region, tag }: { dim?: Dimens
           <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim))} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
         </Row>
         <Row label="Deslocamento" htmlFor="p-doff">
-          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} unit="m" />
+          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} quantity="length" />
         </Row>
         <Row label="Direção"><select className="select" value={dim.mode ?? 'aligned'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { mode: e.target.value as Dimension['mode'] } }))}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row>
         <Row label="Unidade"><select className="select" value={dim.unit ?? 'm'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
         <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
         <Row label="Prefixo" htmlFor="p-dprefix"><TextField id="p-dprefix" value={dim.prefix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { prefix: v } }))} /></Row>
         <Row label="Sufixo" htmlFor="p-dsuffix"><TextField id="p-dsuffix" value={dim.suffix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { suffix: v } }))} /></Row>
-        <Row label="Altura do texto" htmlFor="p-dheight"><NumField id="p-dheight" value={dim.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>
+        <Row label="Altura do texto" htmlFor="p-dheight"><NumField id="p-dheight" value={(dim.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>
         <Row label="Marca"><select className="select" value={dim.tickStyle ?? 'slash'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { tickStyle: e.target.value as Dimension['tickStyle'] } }))}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></Row>
         <div className="prow"><span className="soft">Acompanha a parede quando a extremidade está presa a uma parede. Texto vazio mostra o valor medido.</span></div>
       </Group>
@@ -64,12 +64,12 @@ export function AnnotationProps({ dim, text, line, region, tag }: { dim?: Dimens
         <TextField id="p-ttext" value={text.text} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { text: v } }))} />
       </Row>
       <Row label="Altura" htmlFor="p-theight">
-        <NumField id="p-theight" value={text.height} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { height: v } }))} />
+        <NumField id="p-theight" value={text.height / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { height: v } }))} />
       </Row>
       <Row label="Rotação" htmlFor="p-trot">
-        <NumField id="p-trot" value={text.rotation} decimals={0} unit="°" onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { rotation: v } }))} />
+        <NumField id="p-trot" value={(text.rotation * Math.PI) / 180} quantity="angle" onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { rotation: (v * 180) / Math.PI } }))} />
       </Row>
-      <Row label="Largura" htmlFor="p-twidth"><NumField id="p-twidth" value={text.width ?? 0} decimals={1} unit="mm" min={0} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { width: v || undefined } }))} /></Row>
+      <Row label="Largura" htmlFor="p-twidth"><NumField id="p-twidth" value={(text.width ?? 0) / 1000} quantity="smallLength" min={0} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { width: v ? v * 1000 : undefined } }))} /></Row>
       <Row label="Alinhamento"><select className="select" value={text.align ?? 'left'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { align: e.target.value as TextNote['align'] } }))}><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></Row>
       <Check id="p-tbold" checked={text.bold === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { bold: v } }))}>Negrito</Check>
       <Check id="p-titalic" checked={text.italic === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { italic: v } }))}>Itálico</Check>

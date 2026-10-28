@@ -44,5 +44,3 @@ export function gradeDaSelecao(p: Pick<Project, 'grids'>, sel: readonly Id[]): G
   return sel.length === 1 ? gridOf(p, sel[0]!) : undefined;
 }
 
-/** Número de medida de papel para mostrar (vírgula decimal, sem unidade). */
-export const fmtMm = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');

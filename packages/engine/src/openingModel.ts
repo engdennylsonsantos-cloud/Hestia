@@ -6,8 +6,8 @@ import { makeCtx, openingCore } from './openingModelContext.ts';
 import { buildDoor } from './openingModelDoors.ts';
 import { buildWindow, buildVoid } from './openingModelWindows.ts';
 import { buildCompositionModel, usesComposition } from './openingModelComposition.ts';
+import { buildCasing } from './openingModelCasing.ts';
 import {
-  buildCasing,
   buildLintelBeams,
   buildSidelights,
   buildSillBoard,
@@ -19,6 +19,7 @@ export * from './openingModelDoors.ts';
 export * from './openingModelWindows.ts';
 export * from './openingModelDetails.ts';
 export * from './openingModelComposition.ts';
+export * from './openingModelCasing.ts';
 export * from './openingModelTransforms.ts';
 
 export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): OpeningModel {

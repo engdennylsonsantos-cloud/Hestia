@@ -16,7 +16,8 @@ import { makeCtx, type Ctx } from './openingModelContext.ts';
 import { buildMembers } from './openingModelMembers.ts';
 import { buildGlassCell, buildLeafCell, buildLouverCell, buildPanelCell } from './openingModelCells.ts';
 import { windowTransomApplies } from './openingModelWindowsNew.ts';
-import { buildCasing, buildLintelBeams, buildSillBoard, thresholdPart } from './openingModelDetails.ts';
+import { buildCasing } from './openingModelCasing.ts';
+import { buildLintelBeams, buildSillBoard, thresholdPart } from './openingModelDetails.ts';
 
 /*
  * Montagem de uma composição de VÁRIAS células (spec F1 §3): quadro único (membros), conteúdo de cada célula, alizar do
@@ -79,7 +80,7 @@ export function buildCompositionModel(p: Project, o: Opening, g: OpeningGeometry
     else if (x.kind === 'panel') buildPanelCell(c, layout, cell, x.thickness);
     else buildLouverCell(c, cell, x.blades);
   }
-  buildCasing(c);
+  buildCasing(c, { comp, layout });
   buildSillBoard(c);
   buildLintelBeams(c);
   return {

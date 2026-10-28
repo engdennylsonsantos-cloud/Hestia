@@ -1,7 +1,7 @@
 # Progresso do agente UNID (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
-Linha de base antes de mexer (`npm run check`): _preencher_
+Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste, 6163 testes, lint/typecheck/test ok (executado em 2026-10-28 antes de qualquer alteração).
 
-- [ ] U0 inventário (`01`)
+- [x] U0 inventário (`01`)
 - [ ] U1 tipos, padrões e formatação
 - [ ] U2 leitura de texto digitado
 - [ ] U3 `ProjectSettings.units`

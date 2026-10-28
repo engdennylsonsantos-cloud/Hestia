@@ -1,4 +1,5 @@
 import type { OpeningType } from '@hestia/model';
+import { withOpeningField } from './openingTypeFields.ts';
 
 /** Recuo do batente (m): zero tira o campo, que volta ao padrão por leitura (0). Preserva a âncora. */
 export function setRevealDepth(t: OpeningType, depth: number): OpeningType {
@@ -37,4 +38,9 @@ export function setThresholdKind(t: OpeningType, kind: OpeningThresholdKind): Op
 /** Altura (espessura) da soleira; o material existente é preservado. */
 export function setThresholdThickness(t: OpeningType, thickness: number): OpeningType {
   return { ...t, threshold: soleira(t, thickness) };
+}
+
+/** Eixo da basculante como fração da altura: 0,5 (central) tira o campo; o excêntrico grava o valor. */
+export function setTiltAxis(t: OpeningType, axis: number): OpeningType {
+  return withOpeningField(t, 'tiltAxis', axis, 0.5);
 }

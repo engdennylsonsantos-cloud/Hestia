@@ -50,8 +50,11 @@ describe('catálogo completo: corte e elevação', () => {
     const proj = p();
     const portas = aberturas(proj).filter((o) => o.kind === 'door');
     const janelas = aberturas(proj).filter((o) => o.kind === 'window');
-    const elevPortas = secao(proj, { x: 0, y: -2 }, { x: 40, y: -2 }, 8);
-    const elevJanelas = secao(proj, { x: 0, y: 6 }, { x: 40, y: 6 }, 4);
+    // O corte percorre cada parede inteira (o mostruário tem o comprimento do catálogo, não 40 m fixos).
+    const fimPortas = (proj.elements['eq_w_portas'] as Wall).b.x;
+    const fimJanelas = (proj.elements['eq_w_janelas'] as Wall).b.x;
+    const elevPortas = secao(proj, { x: 0, y: -2 }, { x: fimPortas, y: -2 }, 8);
+    const elevJanelas = secao(proj, { x: 0, y: 6 }, { x: fimJanelas, y: 6 }, 4);
     expect(elevPortas.section.openings.map((o) => o.openingId).sort()).toEqual(portas.map((o) => o.id).sort());
     expect(elevJanelas.section.openings.map((o) => o.openingId).sort()).toEqual(janelas.map((o) => o.id).sort());
     for (const entrada of [elevPortas, elevJanelas]) {
@@ -103,8 +106,9 @@ describe('catálogo completo: corte e elevação', () => {
           expect(Math.abs(v!.pts[1]!.u + oo.hingeT), o.id).toBeLessThan(1e-9);
         }
         if ((oo.kind === 'side' || oo.kind === 'pivot' || oo.kind === 'top' || oo.kind === 'bottom') && oo.side === 1) {
-          const linha = linhas.find((l) => l.pts.length === 3);
-          expect(linha?.dashed, `${o.id} abre para o observador`).toBe(true);
+          // Vai-e-vem (dblact) tem uma linha em V por sentido de abertura: basta que uma delas seja tracejada.
+          const vs = linhas.filter((l) => l.pts.length === 3);
+          expect(vs.some((l) => l.dashed), `${o.id} abre para o observador`).toBe(true);
         }
       }
     }

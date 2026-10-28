@@ -134,8 +134,8 @@ describe('regressão do 3D aberto', () => {
     return Math.sign((folha.x - folha.hinge.at) * Math.sin(folha.hinge.angle));
   }
 
-  it('dimensões das peças iguais fechado × aberto nos 24 tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(24);
+  it('dimensões das peças iguais fechado × aberto nos tipos padrão', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(106);
     for (const t of DEFAULT_OPENING_TYPES) {
       const c = cena(t.id);
       expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));

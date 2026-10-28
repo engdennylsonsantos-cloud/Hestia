@@ -362,8 +362,8 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
     expect(rosetas).toHaveLength(2);
     expect(handles.filter((x) => x.id.includes('lock'))).toHaveLength(2);
     for (const r of rosetas) {
-      expect(r.box.s1 - r.box.s0).toBeCloseTo(0.012, 9);
-      expect(r.box.t1 - r.box.t0).toBeCloseTo(0.05, 9);
+      expect(r.box.s1 - r.box.s0).toBeCloseTo(0.008, 9); // roseta redonda Ø 52 mm × 8 mm
+      expect(r.box.t1 - r.box.t0).toBeCloseTo(0.052, 9);
       expect(Math.abs((r.box.z0 + r.box.z1) / 2 - 1)).toBeLessThan(1e-9);
     }
   });
@@ -373,7 +373,10 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
     // 5 discos da bola × 2 faces.
     const botoes = de(knob.parts, 'handle').filter((x) => x.id.includes('knob'));
     expect(botoes).toHaveLength(10);
-    for (const k of botoes) expect(k.box.t1 - k.box.t0).toBeCloseTo(0.05, 9);
+    // Bola Ø 50 mm aproximada por 5 discos empilhados (raios 13, 21, 25, 21 e 13 mm).
+    const diametros = botoes.map((k) => k.box.t1 - k.box.t0).sort((a, b) => a - b);
+    expect(diametros[0]!).toBeCloseTo(0.026, 9);
+    expect(diametros[diametros.length - 1]!).toBeCloseTo(0.05, 9);
     const pull = modelo(cena('ot_p90', { handle: 'pull' }));
     const barra = de(pull.parts, 'handle')[0]!;
     expect(barra.box.z1 - barra.box.z0).toBeCloseTo(0.4, 9);
@@ -656,7 +659,11 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
     const proj = projectParts(modelo(cena('ot_p90', { leafStyle: 'glass' })), 's', CLOSED);
     const roles = new Set(proj.map((x) => x.part.role));
     for (const r of ['jamb', 'head', 'leaf', 'glass', 'handle'] as const) expect(roles.has(r), r).toBe(true);
-    for (const x of proj) expect(x.ring, x.part.id).toHaveLength(4);
+    // Peças redondas (plano 'tz': roseta, haste, bola) saem como polígono de 12 a 16 lados; as demais, como retângulo.
+    for (const x of proj) {
+      if (x.part.profile?.plane === 'tz') expect(x.ring.length, x.part.id).toBeGreaterThanOrEqual(8);
+      else expect(x.ring, x.part.id).toHaveLength(4);
+    }
   });
 
   it('elevação: leafStyle panel devolve as 4 almofadas', () => {

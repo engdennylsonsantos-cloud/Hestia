@@ -297,7 +297,9 @@ describe('catálogo completo: 3D', () => {
           const foraPorProjeto =
             open &&
             ((family === 'door_garage' && (peca.role === 'leaf' || peca.role === 'leafPanel' || peca.role === 'track')) ||
-              (family === 'door_pocket' && peca.role === 'leaf'));
+              (family === 'door_pocket' && peca.role === 'leaf') ||
+              // A maçaneta sai da face da folha: com a folha aberta a 90° ela fica fora do vão em t (passa a ombreira no ar da sala).
+              peca.role === 'handle');
           if (foraPorProjeto) continue;
           const b = caixaDaPeca(peca);
           const caso = `${o.id} ${open ? 'aberta' : 'fechada'} ${peca.role}`;

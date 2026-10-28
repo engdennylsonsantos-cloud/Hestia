@@ -36,3 +36,9 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 - Achado baixo NÃO corrigido: ids de peça de célula podem colidir com ids internos da folha (ex.: célula `c1-left` e `leaf-0-left`). Mitigação: usar ids de célula sem hífen no editor.
 - Verificação visual (planta e elevação em CPU; 3D com SwiftShader): portas com bandeira, laterais, tudo e painel cego; janelas combinadas; montantes entre módulos; alizar contornando o conjunto. Defeito achado e corrigido: janela alta J-56/J-59 passava do topo da parede (peitoril 0,90 → 0,50; teste: peitoril + altura ≤ 2,80).
 - Estado final: composição implementada de F1 a F9. Fica para o dono: validar o alizar no 3D (spec §4), decidir sobre bay/bow/canto (F8), IFC com peças, e a mesclagem em integracao/telhados-grades e main.
+
+## Rodada de correções após o teste do dono (28/10)
+- Diálogo Editar tipo: toda edição do rascunho passa por `bridgeDraft` (ponte da composição); família e bandeira voltam a ter efeito; `previewTypeSignature` por regra de exclusão (campo novo sempre refaz a prévia); câmera do 3D preservada entre atualizações (`Preview3D`); controles antigos de bandeira avisam quando há módulos.
+- Pivotante: folha ocupa o vão com folga de poucos mm sem varrer a ombreira; arcos chegam ao batente; teste de varredura -90..90.
+- Alizar x folha: na face em que a folha abre, o alizar começa fora do envelope da folha de 0 a 90 graus (recuo simétrico, 14 mm no `ot_p90`, igual à aresta externa do rebaixo); a outra face segue com a aresta interna na luz. Nenhuma fonte oficial do Revit/ArchiCAD documenta isso (R6); regra derivada da geometria, a validar pelo dono.
+- Maçanetas: plano `tz` em PartProfile; alavanca (roseta Ø52, haste Ø16, braço Ø19 x 125), bola (5 discos), puxador tubular, placa da fechadura 30 x 75 x 4; módulo `openingModelHandles.ts`.

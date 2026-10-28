@@ -600,7 +600,7 @@ describe('movimento do modelo único no 3D', () => {
         const hw = c.g.width / 2;
         const H = Math.min(c.g.height, 2.8 - c.g.sill);
         for (const p of pecas(c, open)) {
-          if (fora.has(p.role)) continue;
+          if (fora.has(p.role) || (open && p.role === 'handle')) continue; // aberta, a maçaneta sai da face da folha e passa o vão em t
           const b = caixaDaPeca(p);
           const caso = `${familia.base}${open ? ' aberta' : ' fechada'} ${p.role}`;
           expect(b.x0, caso).toBeGreaterThanOrEqual(-hw - 1e-9);

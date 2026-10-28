@@ -165,7 +165,7 @@ describe('maçaneta: altura e recuo do tipo; placa da fechadura', () => {
     }
   });
 
-  it('a placa da fechadura fica 50 a 90 mm abaixo da maçaneta, no mesmo eixo, nas duas faces', () => {
+  it('a placa da fechadura (30 × 75 mm) fica centrada 70 mm abaixo da maçaneta, no mesmo eixo, nas duas faces', () => {
     const m = modelo(cena('ot_p90', { handleHeight: 0.9, handleInset: 0.1 }));
     const travas = de(m.parts, 'handle').filter((x) => x.id.includes('lock'));
     expect(travas).toHaveLength(2);
@@ -173,7 +173,8 @@ describe('maçaneta: altura e recuo do tipo; placa da fechadura', () => {
     for (const l of travas) {
       expect(centroZ(l.box)).toBeCloseTo(0.9 - 0.07, 9);
       expect(centroT(l.box)).toBeCloseTo(0.311, 6);
-      expect(l.box.z1).toBeLessThan(0.9 - 0.05 + 1e-9);
+      expect(l.box.z1 - l.box.z0).toBeCloseTo(0.075, 9);
+      expect(l.box.z1).toBeLessThan(0.9 - 0.026 + 1e-9); // abaixo da roseta (raio 26 mm), sem tocá-la
       expect(l.leaf).toBe(0);
       expect(l.motion).toBeDefined();
     }

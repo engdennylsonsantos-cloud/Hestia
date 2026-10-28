@@ -526,7 +526,7 @@ describe('elevação e corte a partir do modelo único', () => {
     const z = o.z0 + (roseta.box.z0 + roseta.box.z1) / 2;
     expect(z).toBeCloseTo(o.z0 + 1, 6);
     const d = buildSectionDrawList(input);
-    const achou = d.fills.some((f) => Math.abs(centroX(f.polygons) - x) < 1e-6 && Math.abs(centroY(f.polygons) - z) < 1e-6 && Math.abs(largura(f.polygons) - 0.05) < 1e-6);
+    const achou = d.fills.some((f) => Math.abs(centroX(f.polygons) - x) < 1e-6 && Math.abs(centroY(f.polygons) - z) < 1e-6 && Math.abs(largura(f.polygons) - 0.052) < 1e-6);
     expect(achou).toBe(true);
   });
 

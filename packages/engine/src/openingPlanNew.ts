@@ -50,6 +50,7 @@ export interface OpeningPlanOptions {
 const EPS = 1e-9;
 const ARC_STEP = Math.PI / 18;
 
+/** Peças do quadro cortadas em planta como o batente; `mullion`/`transom` são os divisores internos da composição. */
 const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
   'jamb',
   'stop',
@@ -58,6 +59,8 @@ const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
   'threshold',
   'track',
   'muntin',
+  'mullion',
+  'transom',
 ]);
 
 export const line = (pts: OpeningPlanPoint[], role: OpeningPlanRole, tone: OpeningPlanTone = 'ink', weight = 1, dash?: [number, number]): OpeningPlanPath => ({

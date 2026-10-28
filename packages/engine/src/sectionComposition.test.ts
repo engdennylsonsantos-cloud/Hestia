@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeSection } from './index.ts';
-import { cenaEsquadria, EX2, EX3, EX5 } from './openingCompositionCases.ts';
+import { cenaEsquadria, EX2, EX3, EX4, EX5 } from './openingCompositionCases.ts';
 import type { OpeningPart } from './openingModelTypes.ts';
 
 /** Corte e elevação de composição: o modelo do vão leva membros internos e vidro de bandeira/laterais. */
@@ -45,6 +45,18 @@ describe('seção · Ex. 3 (laterais)', () => {
     expect(peca(o.model.parts, 'mullion-0').box.z1).toBeCloseTo(2.1, 6);
     expect(peca(o.model.parts, 'glass-lat-e').material).toBe('glass');
     expect(peca(o.model.parts, 'glass-lat-d').material).toBe('glass');
+  });
+});
+
+describe('seção · Ex. 4 (laterais + bandeira)', () => {
+  const c = cenaEsquadria('ot_p90', EX4);
+
+  it('elevação: vão 1,88 × 2,60; travessa interna contínua e vidro da bandeira no modelo', () => {
+    const o = computeSection(c.p, ELEVACAO).openings[0]!;
+    expect(o.t1 - o.t0).toBeCloseTo(1.88, 6);
+    expect(o.z1 - o.z0).toBeCloseTo(2.6, 6);
+    expect(peca(o.model.parts, 'transom-0').box.t0).toBeCloseTo(-0.89, 6);
+    expect(peca(o.model.parts, 'glass-band').material).toBe('glass');
   });
 });
 

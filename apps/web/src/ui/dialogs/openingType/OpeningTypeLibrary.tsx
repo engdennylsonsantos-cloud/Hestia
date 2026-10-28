@@ -1,6 +1,7 @@
 import { useDeferredValue, type ReactElement } from 'react';
 import type { OpeningFamily, OpeningType } from '@hestia/model';
 import { applyVariant, type OpeningVariant } from '../openingTypeForm.ts';
+import { OpeningTypeLibraryActions } from './OpeningTypeLibraryActions.tsx';
 import { OpeningTypeThumb } from './OpeningTypeThumb.tsx';
 
 interface OpeningTypeLibraryProps {
@@ -50,6 +51,7 @@ export function OpeningTypeLibrary({
       </div>
       {open ? (
         <div className="op-lib-body">
+          <OpeningTypeLibraryActions type={type} />
           <div className="op-lib-title">Famílias</div>
           <nav className="op-lib-tree" aria-label="Famílias">
             {families.map((f) => (

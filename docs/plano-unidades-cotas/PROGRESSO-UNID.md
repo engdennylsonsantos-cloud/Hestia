@@ -20,7 +20,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C3 barras e chrome
 - [ ] C5 model e engine (`Dimension.unit 'project'`) — PARCIAL: `dimension.ts`, avisos de `model`/`engine` e áreas; faltam quadros/CSV (C6/ESQ) e `stairIssues`/`stairSketchValidate`
 - [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
-- [ ] `npm run check` verde, integrado
+- [x] `npm run check` verde, integrado
 
 ## Desvios
 - C5 (parcial): `dimensionText`/`formatDimension` recebem `units` opcional (padrão `defaultUnits()`); `Dimension.unit` ganhou `'project'`; `formatDimensionValue` idem. Avisos de `validate*` e de `engine/*Issues` usam `unitsOf(p)`; helpers sem projeto recebem `units` opcional. Áreas minúsculas (`fmtArea`) continuam em cm² para não zerar.
@@ -37,7 +37,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
 ## Estado ao encerrar este turno
 - Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3), C1, B5, C2 e C3. C5 está parcial (dimension + avisos); C7 só depois de ESQ C4/C6.
-- `npm run check` completo verde em 2026-10-28: 549 arquivos, 6415 testes, lint (inclui `check-units`) e typecheck ok.
+- `npm run check` completo verde em 2026-10-28: 555 arquivos, 6439 testes, lint (inclui `check-units`) e typecheck ok.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

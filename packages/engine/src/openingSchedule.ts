@@ -1,4 +1,4 @@
-import { isOpening, leafSizeOf, openingFamilyName, openingLintel, openingRough, openingSillBeam, spanTypeOf, type Id, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
+import { isOpening, leafSizeOf, openingFamilyName, openingLintel, openingRough, openingSillBeam, spanTypeOf, type Id, type Opening, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
 import { csvDocument, csvText, formatDecimal } from './csv.ts';
 
 /**
@@ -36,6 +36,10 @@ export interface OpeningScheduleRow {
   unitArea: number;
   /** Área do vão total (m²) = unitArea × count. */
   totalArea: number;
+  /** Material do batente (nome do material do tipo); vazio quando o material não existe no projeto. */
+  frameMaterial: string;
+  /** Sentido de abertura das instâncias do tipo, distintos e separados por "; "; vazio no vão livre (sem folha). */
+  sense: string;
 }
 
 export interface OpeningScheduleTotals {
@@ -59,6 +63,13 @@ export interface OpeningScheduleFilter {
   kind?: 'door' | 'window';
 }
 
+/**
+ * Sentido de uma instância: dobradiça (flipHand) e lado para onde a folha gira em relação ao eixo a→b da parede
+ * (flipFacing; `true` gira para a direita de a→b, como em templateCasaAltoPadrao.ts).
+ */
+const senseText = (o: Opening): string =>
+  `${o.flipHand ? 'dobradiça invertida' : 'dobradiça padrão'}, abre à ${o.flipFacing ? 'direita' : 'esquerda'} de a→b`;
+
 /** Ordem das categorias na tabela: portas antes de janelas. */
 const kindOrder = (k: 'door' | 'window'): number => (k === 'door' ? 0 : 1);
 
@@ -78,10 +89,14 @@ function compareRows(a: OpeningScheduleRow, b: OpeningScheduleRow): number {
  */
 export function buildOpeningSchedule(p: Project): OpeningSchedule {
   const counts = new Map<Id, number>();
+  const senses = new Map<Id, Set<string>>();
   for (const e of Object.values(p.elements)) {
     if (!isOpening(e)) continue;
     if (!p.openingTypes[e.typeId]) continue;
     counts.set(e.typeId, (counts.get(e.typeId) ?? 0) + 1);
+    const set = senses.get(e.typeId) ?? new Set<string>();
+    set.add(senseText(e));
+    senses.set(e.typeId, set);
   }
   const rows: OpeningScheduleRow[] = [];
   for (const [typeId, count] of counts) {
@@ -114,6 +129,8 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
       count,
       unitArea,
       totalArea: unitArea * count,
+      frameMaterial: p.materials[t.frameMaterialId]?.name ?? '',
+      sense: t.leaves === 0 ? '' : [...(senses.get(typeId) ?? [])].join('; '),
     });
   }
   rows.sort(compareRows);
@@ -155,6 +172,8 @@ const CSV_HEADER = [
   'Área total (m²)',
   'Folha largura (m)',
   'Folha altura (m)',
+  'Material do batente',
+  'Sentido',
 ];
 
 /**
@@ -181,7 +200,9 @@ export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: Opening
     n(r.totalArea, 2),
     n(r.leafWidth, 2),
     n(r.leafHeight, 2),
+    csvText(r.frameMaterial),
+    csvText(r.sense),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', ''];
+  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', '', '', ''];
   return csvDocument([CSV_HEADER, ...body, total]);
 }

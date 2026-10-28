@@ -557,8 +557,8 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     expect(pecas(ms, 'door')).toHaveLength(4);
     const [f] = folhas(ms);
     expect(f).toBeDefined();
-    // Folha medida: 0,074 m por lado do vão (0,652 m no vão de 0,8 m; origem do 0,024 a confirmar).
-    expect(medida(f!).x).toBeCloseTo(0.8 - 2 * 0.074, 6);
+    // Folha quase do tamanho do vão: metade = eixo (W/4) + braço sem varrer a ombreira, √((face − eixo − 0,5 mm)² − L²).
+    expect(medida(f!).x).toBeCloseTo(2 * (0.2 + Math.sqrt((0.35 - 0.2 - 0.0005) ** 2 - 0.04 ** 2)), 6);
     // Folha no núcleo, 4 mm da face do núcleo (±0,07 do plano médio): centro a 0,07 − 0,004 − 0,02 = 0,046 do plano médio.
     expect(centroDa(f!).y).toBeCloseTo(0.14 / 2 - 0.004 - 0.04 / 2, 6);
   });

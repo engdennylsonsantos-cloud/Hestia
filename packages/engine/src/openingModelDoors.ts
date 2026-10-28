@@ -297,6 +297,9 @@ function buildDoubleDoor(c: Ctx): void {
   addHinges(c, 1, rightHinge);
 }
 
+/** Folga mínima (m) entre o canto da folha pivotante e a ombreira durante o giro. */
+const PIVOT_MARGIN = 0.0005;
+
 /** Porta pivotante: folha inteira girando em torno do eixo vertical a W/4 da ombreira da dobradiça. */
 function buildPivotDoor(c: Ctx): void {
   buildDoorFrame(c);
@@ -312,7 +315,11 @@ function buildPivotDoor(c: Ctx): void {
   const contact = c.leafSide === 'opposite' ? inicio + lside * c.L : inicio;
   const sign = (c.side * c.h) as 1 | -1;
   const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: contact, sign };
-  const half = Math.max(0, c.hw - c.J - (c.L / 2 + GAP));
+  // A folha ocupa quase todo o vão: a ponta do lado do eixo recua só o necessário para o canto não varrer a ombreira no giro
+  // (o eixo está na face da folha, então o canto fica a √(braço² + L²) do eixo), e a do outro lado deixa a folga mínima.
+  const face = c.hw - c.J;
+  const braco = Math.sqrt(Math.max(0, (face - Math.abs(axis) - PIVOT_MARGIN) ** 2 - c.L ** 2));
+  const half = Math.max(0, Math.min(face - GAP, Math.abs(axis) + braco));
   // O topo da folha fica abaixo da face inferior da travessa: o giro para o lado oposto não varre o batedor da verga.
   const zPivot = { z0: z.z0, z1: Math.min(z.z1, c.H - c.J) };
   addDoorLeaf(c, 0, span.center - half, span.center + half, sSpan, zPivot, motion, -axis);

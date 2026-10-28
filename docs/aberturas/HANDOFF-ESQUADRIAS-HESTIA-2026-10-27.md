@@ -4,6 +4,8 @@ Continua o [HANDOFF da v3](HANDOFF-ESQUADRIAS-v3-2026-10-27.md). Ramo de integra
 `integracao/telhados-grades`; **nada foi enviado ao GitHub**). Cada agente trabalhou num ramo `esquadrias/<nome>` com worktree em
 `..\wt\<nome>` (fora do repositório).
 
+> **Em outro PC:** comece por [RETOMAR-EM-OUTRO-PC-E-PESQUISA-2026-10-27.md](RETOMAR-EM-OUTRO-PC-E-PESQUISA-2026-10-27.md) (comandos, prompt pronto e resumo da pesquisa). O prompt do E3b está em docs/aberturas/agentes/prompts/E3b.md.
+
 ## 0. PARADA DA SESSÃO (estado exato para retomar amanhã)
 
 Os agentes foram interrompidos por limite de sessão e o trabalho foi salvo em commits `wip` nos ramos abaixo (**nenhum foi validado por completo**).

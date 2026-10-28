@@ -141,7 +141,8 @@ export function buildMembers(c: Ctx, l: ResolvedLayout): void {
   const by = (role: ResolvedMember['role']) => l.members.filter((m) => m.role === role);
   for (const m of by('jamb')) addMember(c, l, m, m.id, 'jamb');
   for (const m of by('head')) addMember(c, l, m, 'head', 'head');
-  for (const m of by('sill')) addMember(c, l, m, 'sill-frame', 'sillFrame');
+  const bases = by('sill');
+  bases.forEach((m, k) => addMember(c, l, m, bases.length > 1 ? `sill-frame-${k}` : 'sill-frame', 'sillFrame'));
   for (const m of by('threshold')) {
     addPart(c, 'threshold', 'threshold', 'frame', box(m.rect.t0, m.rect.t1, c.Cd - c.D / 2, c.Cd + c.D / 2, m.rect.z0, m.rect.z1));
   }

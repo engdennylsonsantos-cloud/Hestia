@@ -119,7 +119,9 @@ export function resolveLayout(c: OpeningComposition, presets?: Presets, kind: 'd
   const sillRef = c.frame.sill === undefined ? (kind === 'window' ? c.frame.profile : null) : c.frame.sill;
   const sillSpec: ProfileSpec | null = !block && sillRef ? resolveProfile(sillRef, presets) : null;
   const sillW = sillSpec ? sillSpec.visibleWidth : 0;
-  const luz: Rect = { t0: -hw + J, t1: hw - J, z0: sillW, z1: span.height - J };
+  // Porta com `frame.sill`: travessa-base só sob o vidro/painel que chega ao piso (nunca sob a folha); janela: peitoril de largura total.
+  const doorBase = kind === 'door' && !!sillSpec;
+  const luz: Rect = { t0: -hw + J, t1: hw - J, z0: doorBase ? 0 : sillW, z1: span.height - J };
 
   const cells: ResolvedCell[] = [];
   const members: ResolvedMember[] = [];
@@ -146,6 +148,13 @@ export function resolveLayout(c: OpeningComposition, presets?: Presets, kind: 'd
     });
   };
   walk(c.layout, luz);
+  if (doorBase && sillSpec) {
+    for (const cell of cells) {
+      if (Math.abs(cell.luz.z0) > EPS || (cell.content.kind !== 'glass' && cell.content.kind !== 'panel')) continue;
+      members.push({ id: `sill-${cell.id}`, role: 'sill', rect: { t0: cell.luz.t0, t1: cell.luz.t1, z0: 0, z1: sillW }, profile: sillSpec, before: wall, after: wall });
+      cell.luz.z0 = sillW;
+    }
+  }
 
   if (!block) {
     const add = (id: string, role: MemberRole, rect: Rect, profile: ProfileSpec): void => {
@@ -154,7 +163,7 @@ export function resolveLayout(c: OpeningComposition, presets?: Presets, kind: 'd
     add('jamb-left', 'jamb', { t0: -hw, t1: -hw + J, z0: luz.z0, z1: luz.z1 }, frame);
     add('jamb-right', 'jamb', { t0: hw - J, t1: hw, z0: luz.z0, z1: luz.z1 }, frame);
     add('head', 'head', { t0: -hw, t1: hw, z0: luz.z1, z1: span.height }, frame);
-    if (sillSpec) add('sill', kind === 'window' ? 'sill' : 'threshold', { t0: -hw, t1: hw, z0: 0, z1: sillW }, sillSpec);
+    if (sillSpec && !doorBase) add('sill', 'sill', { t0: -hw, t1: hw, z0: 0, z1: sillW }, sillSpec);
   }
 
   // Vizinhos: a célula cuja luz encosta no membro, do lado de menor (before) e de maior (after) coordenada.

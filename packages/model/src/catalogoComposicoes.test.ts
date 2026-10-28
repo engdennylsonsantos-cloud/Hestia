@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_OPENING_TYPES } from './index.ts';
 import { CATALOGO_COMPOSICOES_BR } from './catalogoComposicoes.ts';
-import { compositionSpan } from './openingCompositionLayout.ts';
+import { compositionSpan, resolveLayout } from './openingCompositionLayout.ts';
 import { compositionIssue } from './openingCompositionRules.ts';
 
 const NOVOS = CATALOGO_COMPOSICOES_BR;
@@ -53,5 +53,23 @@ describe('catálogo de composições', () => {
         expect(span.height, t.id).toBeCloseTo(t.height, 9);
       }
     }
+  });
+});
+
+describe('travessa-base sob vidro lateral até o piso (spec F1 §10, pergunta 2)', () => {
+  it('porta com 2 laterais: uma travessa-base sob cada lateral, nenhuma sob a folha, e a folha segue do piso', () => {
+    const t = DEFAULT_OPENING_TYPES.find((x) => x.id === 'ot_plat2_90')!;
+    expect(t.composition?.frame.sill).toBeDefined();
+    const l = resolveLayout(t.composition!, undefined, 'door');
+    const bases = l.members.filter((m) => m.role === 'sill');
+    expect(bases.map((m) => m.id).sort()).toEqual(['sill-lat-dir', 'sill-lat-esq']);
+    const folha = l.cells.find((c) => c.id === 'folha')!;
+    expect(folha.luz.z0).toBe(0);
+    for (const b of bases) {
+      expect(b.rect.z0).toBe(0);
+      expect(b.rect.t1 <= folha.luz.t0 + 1e-9 || b.rect.t0 >= folha.luz.t1 - 1e-9).toBe(true);
+    }
+    const lat = l.cells.find((c) => c.id === 'lat-esq')!;
+    expect(lat.luz.z0).toBeCloseTo(bases[0]!.rect.z1, 9);
   });
 });

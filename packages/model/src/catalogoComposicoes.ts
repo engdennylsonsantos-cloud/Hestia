@@ -1,5 +1,6 @@
 import { otComposicao } from './catalogoAberturasBase.ts';
 import type { OpeningFamilyId } from './opening.ts';
+import { resolveLayout } from './openingCompositionLayout.ts';
 import {
   COMPOSITION_VERSION,
   type CellNode,
@@ -69,8 +70,13 @@ const janela = (p: Perfis, width: number, height: number, layout: CompositionNod
 
 type Base = Pick<OpeningType, 'id' | 'code' | 'name' | 'width' | 'leaves' | 'plan'>;
 /** Porta de composição: altura da folha (2,10), sem peitoril, referência nominal na folha. */
-const portaC = (p: Perfis, b: Base, layout: CompositionNode): OpeningType =>
-  otComposicao({ ...b, kind: 'door', height: 2.1, sill: 0, nominalRef: 'leaf' }, porta(p, b.width, layout), p.material);
+const portaC = (p: Perfis, b: Base, layout: CompositionNode): OpeningType => {
+  const comp = porta(p, b.width, layout);
+  // Vidro ou painel lateral que chega ao piso leva travessa-base (só sob ele, nunca sob a folha; spec F1 §10, pergunta 2).
+  const ate = resolveLayout(comp, undefined, 'door').cells.some((c) => Math.abs(c.luz.z0) < 1e-9 && (c.content.kind === 'glass' || c.content.kind === 'panel'));
+  const composition = ate ? { ...comp, frame: { ...comp.frame, sill: { presetId: p.divisor } } } : comp;
+  return otComposicao({ ...b, kind: 'door', height: 2.1, sill: 0, nominalRef: 'leaf' }, composition, p.material);
+};
 /** Janela de composição: medida do vão (como as janelas do catálogo). */
 const janelaC = (p: Perfis, b: Base & { height: number; sill: number }, layout: CompositionNode): OpeningType =>
   otComposicao({ ...b, kind: 'window' }, janela(p, b.width, b.height, layout), p.material);

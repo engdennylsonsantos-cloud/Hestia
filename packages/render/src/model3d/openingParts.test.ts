@@ -137,7 +137,7 @@ describe('regressão do 3D aberto', () => {
   }
 
   it('dimensões das peças iguais fechado × aberto nos tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(106);
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(130);
     for (const t of DEFAULT_OPENING_TYPES) {
       const c = cena(t.id);
       expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));
@@ -145,7 +145,8 @@ describe('regressão do 3D aberto', () => {
   });
 
   it('vidro e moldura de folha ficam dentro do vão interno do caixilho (jamb…h−jamb)', () => {
-    for (const t of DEFAULT_OPENING_TYPES.filter((x) => x.kind === 'window' && x.leaves > 0)) {
+    // Composições de várias células têm o vidro no rebaixo do perfil (placa = luz + 2 × (rebaixo − folga)): valem os testes do motor.
+    for (const t of DEFAULT_OPENING_TYPES.filter((x) => x.kind === 'window' && x.leaves > 0 && x.composition?.layout.kind !== 'split')) {
       const c = cena(t.id);
       const jamb = jambDe(c);
       const h = alturaDe(c);

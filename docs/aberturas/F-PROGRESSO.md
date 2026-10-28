@@ -12,11 +12,11 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 | F3 | Modelo, migração v19→v20, layout, presets | Sonnet | concluída e mesclada |
 | F2 | Testes de aceite do motor (spec §8) | Haiku | concluída e mesclada (71 testes vermelhos de propósito até a F4) |
 | F4 | Motor: quadro, membros, células, vidro, alizar | Sonnet | concluída e mesclada (engine+model verdes) |
-| F5a | Planta, corte e elevação | Haiku | pendente |
-| F5b | 3D | Haiku | pendente |
-| F5c | Quadro de esquadrias, IFC, DXF | Haiku | pendente |
-| F6 | Interface: editor de composição | Haiku | pendente |
-| F7 | Catálogo de composições e mostruário | Haiku | pendente |
+| F5a | Planta, corte e elevação | Haiku | concluída e mesclada |
+| F5b | 3D | Haiku | concluída e mesclada |
+| F5c | Quadro de esquadrias, IFC, DXF | Haiku | concluída (quadro e DXF; IFC fora: cada vão sai como caixa única) |
+| F6 | Interface: editor de composição (F6a células, F6b perfis/alizar/vidro) | Haiku | concluída, ligada em components.ts |
+| F7 | Catálogo de composições e mostruário (24 tipos, 130 no total) | Haiku | concluída e mesclada |
 | F9 | Goldens, e2e, revisão independente do motor, suíte completa, publicar no artifact | Haiku + Sonnet | pendente |
 | F8 | Bay, bow, canto | Sonnet | opcional, fora desta rodada |
 
@@ -28,3 +28,7 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 - F4: composições de 2+ células usam o motor novo (`openingModelComposition.ts`, `Members`, `Cells`, `Casing`); tipos de UMA célula seguem nos builders antigos, exceto o alizar, que é o novo para todos (a posição já era a da spec). Papéis novos de peça: `mullion`, `transom`, `bead`. Ids: `jamb-left/right`, `head`, `threshold`, `sill-frame`, `mullion-<k>`, `transom-<k>`, `glass-<cellId>`, `leaf-<cellId>[-parte]`, `bead-<cellId>-<lado>`; alizar `group` `casing-exterior|interior`.
 - Correções do coordenador após F4: preset `prf_mad_divisor_5x9` sem rebaixo (como a spec §1); `withBridgedComposition` preserva composição editada direto; folga inferior padrão 7 mm (E2b) em vez de 8 mm; folha de janela fica dentro da luz com 4 mm de folga por lado (Ex. 5 da spec corrigido).
 - Fases F5a/b/c, F6a/b e F7 lançadas em paralelo após a F4 (6 agentes Haiku, arquivos disjuntos). A fiação de `components.ts` da interface é feita pelo coordenador ao mesclar F6a e F6b.
+- Travessa-base (pergunta 2): em PORTA, `frame.sill` cria uma travessa-base só sob cada célula de vidro/painel que toca o piso (`sill-<cellId>`, ids de peça `sill-frame-<k>`); a folha não sobe. Janela mantém o peitoril de largura total. O catálogo liga `frame.sill` nas portas com vidro/painel lateral até o piso.
+- `spanTypeOf` usa sempre o vão da composição de várias células (corte da parede e seção).
+- IFC: não alterado (cada vão é exportado como caixa única); limitação registrada.
+- Falta: F9 (goldens, e2e, revisão independente do motor, suíte completa, build, publicar no artifact).

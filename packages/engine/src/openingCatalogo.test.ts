@@ -92,6 +92,89 @@ const familia = (id: string): string => {
       ['ot_jp80', 'window_pivot'],
       ['ot_jv80', 'window_louver'],
       ['ot_jb80', 'window_tilt'],
+      // Catálogo brasileiro (catalogoPortas.ts e catalogoJanelas.ts).
+      ['ot_pgiro60', 'door_swing'],
+      ['ot_pgiro70', 'door_swing'],
+      ['ot_pgiro80', 'door_swing'],
+      ['ot_pgiro90', 'door_swing'],
+      ['ot_pgiro100', 'door_swing'],
+      ['ot_pgiro2_120', 'door_double'],
+      ['ot_pgiro2_140', 'door_double'],
+      ['ot_pgiro2_160', 'door_double'],
+      ['ot_pgiro2_180', 'door_double'],
+      ['ot_pbalcao120', 'door_double'],
+      ['ot_pbalcao150', 'door_double'],
+      ['ot_pbalcao200', 'door_double'],
+      ['ot_pcorrer160', 'door_sliding'],
+      ['ot_pcorrer180', 'door_sliding'],
+      ['ot_pembutir80', 'door_pocket'],
+      ['ot_pembutir90', 'door_pocket'],
+      ['ot_ppiv100', 'door_pivot'],
+      ['ot_ppiv120', 'door_pivot'],
+      ['ot_pcamarao2_160', 'door_bifold'],
+      ['ot_pcamarao4_240', 'door_bifold'],
+      ['ot_pvai80', 'door_dblact'],
+      ['ot_pvai90', 'door_dblact'],
+      ['ot_pvai100', 'door_dblact'],
+      ['ot_psanf60', 'door_accordion'],
+      ['ot_psanf70', 'door_accordion'],
+      ['ot_psanf80', 'door_accordion'],
+      ['ot_psanf90', 'door_accordion'],
+      ['ot_pvid72_8', 'door_swing'],
+      ['ot_pvid72_10', 'door_swing'],
+      ['ot_pvid82_8', 'door_swing'],
+      ['ot_pvid82_10', 'door_swing'],
+      ['ot_pvid92_8', 'door_swing'],
+      ['ot_pvid92_10', 'door_swing'],
+      ['ot_pf30_80', 'door_swing'],
+      ['ot_pf30_90', 'door_swing'],
+      ['ot_pf60_80', 'door_swing'],
+      ['ot_pf60_90', 'door_swing'],
+      ['ot_pf90_80', 'door_swing'],
+      ['ot_pf90_90', 'door_swing'],
+      ['ot_pf120_80', 'door_swing'],
+      ['ot_pf120_90', 'door_swing'],
+      ['ot_pbasc250', 'door_garage'],
+      ['ot_penrol280', 'door_garage'],
+      ['ot_jc2_120x100', 'window_sliding'],
+      ['ot_jc2_150x120', 'window_sliding'],
+      ['ot_jc2_120x150', 'window_sliding'],
+      ['ot_jc3_150x100', 'window_sliding'],
+      ['ot_jc3_200x120', 'window_sliding'],
+      ['ot_jc4_200x100', 'window_sliding'],
+      ['ot_jc4_200x120', 'window_sliding'],
+      ['ot_jc4_240x120', 'window_sliding'],
+      ['ot_jm_40x40', 'window_casement'],
+      ['ot_jm_50x50', 'window_casement'],
+      ['ot_jm_80x60', 'window_casement'],
+      ['ot_jm_80x80', 'window_casement'],
+      ['ot_jm_100x100', 'window_casement'],
+      ['ot_jb_40x40', 'window_tilt'],
+      ['ot_jb_60x40', 'window_tilt'],
+      ['ot_jb_80x40', 'window_tilt'],
+      ['ot_jb_100x40', 'window_tilt'],
+      ['ot_jb_60x60', 'window_tilt'],
+      ['ot_jb_80x60', 'window_tilt'],
+      ['ot_jb_100x60', 'window_tilt'],
+      ['ot_jb_100x100', 'window_tilt'],
+      ['ot_jpv_60x60', 'window_pivot'],
+      ['ot_jpv_80x80', 'window_pivot'],
+      ['ot_jpv_100x100', 'window_pivot'],
+      ['ot_jpv_120x120', 'window_pivot'],
+      ['ot_jg_60x120', 'window_hung'],
+      ['ot_jg_80x120', 'window_hung'],
+      ['ot_jg_100x150', 'window_hung'],
+      ['ot_jab_60x60', 'window_hinged'],
+      ['ot_jab_80x80', 'window_hinged'],
+      ['ot_jab_100x100', 'window_hinged'],
+      ['ot_jab2_150x120', 'window_hinged'],
+      ['ot_jf_80x60', 'window_fixed'],
+      ['ot_jf_120x120', 'window_fixed'],
+      ['ot_jven_120x100', 'window_louver'],
+      ['ot_jven_150x100', 'window_louver'],
+      ['ot_jban_90x40', 'window_fixed'],
+      ['ot_jban_90x60', 'window_fixed'],
+      ['ot_jbanh_100x50', 'window_casement'],
     ]);
   }
   return expectedFamily.get(id)!;
@@ -186,9 +269,9 @@ const areaComum = (a: PartBox, b: PartBox): number =>
   Math.max(0, Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0)) * Math.max(0, Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0));
 
 describe('catálogo completo: padrões do tipo', () => {
-  it('são 24 tipos, cada um na família esperada e sem problema de tipo', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(24);
-    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(24);
+  it('são 106 tipos, cada um na família esperada e sem problema de tipo', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(106);
+    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(106);
     for (const t of DEFAULT_OPENING_TYPES) {
       expect(openingFamilyOf(t)?.id, t.id).toBe(familia(t.id));
       expect(openingTypeIssue(t), t.id).toBeNull();
@@ -232,7 +315,7 @@ describe('catálogo completo: modelo único', () => {
         }
       }
     }
-  });
+  }, 30_000); // Com o catálogo brasileiro (106 tipos × 4 combinações) passa dos 5 s padrão.
 
   it('movimento aberto preserva o tamanho de cada peça e a folha lateral fica no lado side', () => {
     for (const base of DEFAULT_OPENING_TYPES.map((t) => t.id)) {

@@ -90,7 +90,7 @@ export function StairOptionsBar(): ReactElement | null {
           </button>
           <label>
             Deslocamento (m)
-            <NumField id="opt-stairoffset" value={opts.pickOffset ?? 0} min={0} onCommit={(v) => setStairOpt({ pickOffset: v })} unit="m" />
+            <NumField id="opt-stairoffset" value={opts.pickOffset ?? 0} min={0} onCommit={(v) => setStairOpt({ pickOffset: v })} quantity="length" />
           </label>
         </>
       )}
@@ -123,16 +123,16 @@ export function StairOptionsBar(): ReactElement | null {
           </label>
           <label>
             Desloc. da base
-            <NumField id="opt-stairbase" value={opts.baseOffset ?? 0} onCommit={(v) => setStairOpt({ baseOffset: v })} unit="m" />
+            <NumField id="opt-stairbase" value={opts.baseOffset ?? 0} onCommit={(v) => setStairOpt({ baseOffset: v })} quantity="length" />
           </label>
           <label>
             Desloc. do topo
-            <NumField id="opt-stairtopoff" value={opts.topOffset ?? 0} onCommit={(v) => setStairOpt({ topOffset: v })} unit="m" />
+            <NumField id="opt-stairtopoff" value={opts.topOffset ?? 0} onCommit={(v) => setStairOpt({ topOffset: v })} quantity="length" />
           </label>
           {noLevelAbove && !opts.topLevelId && (
             <label>
               Altura
-              <NumField id="opt-stairheight" value={opts.height ?? 2.8} min={0.1} onCommit={(v) => setStairOpt({ height: v })} unit="m" />
+              <NumField id="opt-stairheight" value={opts.height ?? 2.8} min={0.1} onCommit={(v) => setStairOpt({ height: v })} quantity="length" />
             </label>
           )}
         </>

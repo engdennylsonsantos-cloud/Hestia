@@ -82,10 +82,10 @@ export function AutoCotaDialog(): ReactElement {
         </select>
       </Row>
       <Row label="Afastamento inicial" htmlFor="ac-offset">
-        <NumField id="ac-offset" value={offset} min={0.1} unit="m" onCommit={setOffset} />
+        <NumField id="ac-offset" value={offset} min={0.1} quantity="length" onCommit={setOffset} />
       </Row>
       <Row label="Entre camadas" htmlFor="ac-espaco">
-        <NumField id="ac-espaco" value={espacamento} min={0.1} unit="m" onCommit={setEspacamento} />
+        <NumField id="ac-espaco" value={espacamento} min={0.1} quantity="length" onCommit={setEspacamento} />
       </Row>
       <div style={{ marginTop: 6 }}>
         <Check id="ac-externas" checked={somenteExternas} onChange={setSomenteExternas}>Apenas o contorno externo (ignorar divisórias internas)</Check>

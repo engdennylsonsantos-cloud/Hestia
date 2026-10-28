@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { formatQuantity, type Quantity, type ResolvedUnits } from '@hestia/model';
 import { buildCeilingSchedule, ceilingScheduleToCsv, filterCeilingRows, sumCeilingRows, type CeilingScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
@@ -6,6 +7,8 @@ import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { scheduleCell, scheduleHeader } from './scheduleUnits.ts';
+import { useUnits } from '../useUnits.ts';
 
 interface Col {
   key: keyof CeilingScheduleRow;
@@ -13,6 +16,8 @@ interface Col {
   labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
+  /** Grandeza da coluna: converte o valor SI para a unidade do projeto. */
+  quantity?: Quantity;
 }
 
 const COLS: Col[] = [
@@ -21,22 +26,18 @@ const COLS: Col[] = [
   { key: 'typeCode', labelKey: 'col_code' },
   { key: 'levelName', labelKey: 'col_level' },
   { key: 'roomName', labelKey: 'col_room' },
-  { key: 'area', labelKey: 'col_area', decimals: 2 },
-  { key: 'perimeter', labelKey: 'col_perimeter', decimals: 2 },
-  { key: 'thickness', labelKey: 'col_thickness', decimals: 3 },
-  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
-  { key: 'heightOffset', labelKey: 'col_top', decimals: 3 },
-  { key: 'underside', labelKey: 'col_underside', decimals: 3 },
+  { key: 'area', labelKey: 'col_area', decimals: 2, quantity: 'area' },
+  { key: 'perimeter', labelKey: 'col_perimeter', decimals: 2, quantity: 'length' },
+  { key: 'thickness', labelKey: 'col_thickness', decimals: 3, quantity: 'smallLength' },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3, quantity: 'volume' },
+  { key: 'heightOffset', labelKey: 'col_top', decimals: 3, quantity: 'length' },
+  { key: 'underside', labelKey: 'col_underside', decimals: 3, quantity: 'length' },
 ];
 
 interface Sort {
   key: keyof CeilingScheduleRow;
   dir: 1 | -1;
 }
-
-/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
-const fmt = (v: number, decimals: number): string =>
-  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: CeilingScheduleRow, b: CeilingScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -45,15 +46,16 @@ const compare = (a: CeilingScheduleRow, b: CeilingScheduleRow, s: Sort): number 
   return r * s.dir;
 };
 
-const cellValue = (r: CeilingScheduleRow, c: Col): ReactNode => {
+const cellValue = (r: CeilingScheduleRow, c: Col, units: ResolvedUnits): ReactNode => {
   const v = r[c.key];
-  return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
+  return typeof v === 'number' ? (c.quantity ? scheduleCell(units, c.quantity, v, c.decimals) : String(v)) : v;
 };
 
 /** Tabela de forros com ordenação, filtros por nível e tipo, totais e exportação CSV (padrão da tabela de lajes). */
 export function CeilingScheduleDialog(): ReactElement {
   const p = useProject();
   const t = I18N[useI18n((s) => s.lang)];
+  const units = useUnits();
   const schedule = useMemo(() => buildCeilingSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -123,7 +125,7 @@ export function CeilingScheduleDialog(): ReactElement {
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                       <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
-                        {t[c.labelKey]}
+                        {c.quantity ? scheduleHeader(units, t[c.labelKey], c.quantity) : t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -135,7 +137,7 @@ export function CeilingScheduleDialog(): ReactElement {
                   <tr key={r.ceilingId}>
                     {COLS.map((c) => (
                       <td key={c.key} className={c.decimals !== undefined ? 'num' : undefined}>
-                        {cellValue(r, c)}
+                        {cellValue(r, c, units)}
                       </td>
                     ))}
                   </tr>
@@ -145,9 +147,9 @@ export function CeilingScheduleDialog(): ReactElement {
           </div>
           <div className="total">
             <span>{totals.count} {totals.count === 1 ? t.sched_noun_ceiling_one : t.sched_noun_ceiling}</span>
-            <span>{t.sched_total_area} {fmt(totals.area, 2)} m²</span>
-            <span>{t.sched_total_perimeter} {fmt(totals.perimeter, 2)} m</span>
-            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
+            <span>{t.sched_total_area} {formatQuantity(units, 'area', totals.area, { decimals: 2 })}</span>
+            <span>{t.sched_total_perimeter} {formatQuantity(units, 'length', totals.perimeter, { decimals: 2 })}</span>
+            <span>{t.sched_total_volume} {formatQuantity(units, 'volume', totals.volume, { decimals: 3 })}</span>
           </div>
         </>
       )}

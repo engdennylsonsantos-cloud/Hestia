@@ -137,8 +137,8 @@ export function View3DGroup(): ReactElement {
       </Row>
       <Row label="Sombras"><Check id="v3-shadows" checked={v.shadows} onChange={(x) => edit({ shadows: x })} /></Row>
       <Row label="Arestas"><Check id="v3-edges" checked={v.edges} onChange={(x) => edit({ edges: x })} /></Row>
-      <Row label="Sol: azimute" htmlFor="v3-az"><NumField id="v3-az" value={v.sunAzimuth} decimals={0} unit="°" min={0} max={360} onCommit={(x) => edit({ sunAzimuth: x })} /></Row>
-      <Row label="Sol: elevação" htmlFor="v3-el"><NumField id="v3-el" value={v.sunElevation} decimals={0} unit="°" min={0} max={90} onCommit={(x) => edit({ sunElevation: x })} /></Row>
+      <Row label="Sol: azimute" htmlFor="v3-az"><NumField id="v3-az" value={(v.sunAzimuth * Math.PI) / 180} quantity="angle" min={0} max={2 * Math.PI} onCommit={(x) => edit({ sunAzimuth: (x * 180) / Math.PI })} /></Row>
+      <Row label="Sol: elevação" htmlFor="v3-el"><NumField id="v3-el" value={(v.sunElevation * Math.PI) / 180} quantity="angle" min={0} max={Math.PI / 2} onCommit={(x) => edit({ sunElevation: (x * 180) / Math.PI })} /></Row>
       <Row label="Fundo">
         <span className="numwrap">
           <Check id="v3-bg-theme" checked={v.background === null} onChange={(x) => edit({ background: x ? null : '#f4f6f8' })}>Padrão do tema</Check>

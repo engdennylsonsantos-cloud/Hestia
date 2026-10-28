@@ -1,10 +1,11 @@
 import { useRef, useState, type ReactElement } from 'react';
-import { projectSheets, type Element, type SectionView } from '@hestia/model';
+import { formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { Node, type MenuItem } from './Tree.tsx';
+import { useUnits } from '../useUnits.ts';
 
 /** Seções "Vistas (todas)", "Tabelas/Quantidades (todas)" e "Pranchas (todas)" do navegador, no padrão Revit. */
 
@@ -55,6 +56,7 @@ function SectionNode({ view }: { view: SectionView }): ReactElement {
 
 export function ViewsTree(): ReactElement {
   const p = useProject();
+  const units = useUnits();
   const view = useUi((s) => s.view);
   const levelId = useUi((s) => s.levelId);
   const planKind = useUi((s) => s.planKind);
@@ -71,7 +73,7 @@ export function ViewsTree(): ReactElement {
             label={l.name}
             icon="plan"
             bold={view === 'plan' && planKind === 'floor' && levelId === l.id}
-            title={`Elevação ${l.elevation.toFixed(2).replace('.', ',')} m. Duplo clique abre a planta.`}
+            title={`Elevação ${formatQuantity(units, 'length', l.elevation)}. Duplo clique abre a planta.`}
             onOpen={() => activateView({ kind: 'plan', levelId: l.id })}
             menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
           />

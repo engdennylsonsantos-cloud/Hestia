@@ -1,13 +1,12 @@
 import { useState, type ReactElement } from 'react';
-import { getWall, profileError, profileMax, profileMean, wallHeight, wallLength, type Id, type ProfilePoint } from '@hestia/model';
+import { formatQuantity, getWall, profileError, profileMax, profileMean, wallHeight, wallLength, type Id, type ProfilePoint } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { NumField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
 import { ProfilePreview } from './ProfilePreview.tsx';
 import { insertPoint, presetDegrau, presetEmpena, presetInclinado, profileRangeError, straightProfile } from './profilePresets.ts';
-
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+import { useUnits } from '../useUnits.ts';
 
 /**
  * Editar perfil superior de uma parede reta (Revit: Editar perfil). `draft` null = topo reto por altura/nível;
@@ -15,6 +14,7 @@ const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
  */
 export function ProfileDialog({ wallId, onClose }: { wallId: Id; onClose: () => void }): ReactElement | null {
   const p = useProject();
+  const units = useUnits();
   const wall = getWall(p, wallId);
   const [draft, setDraft] = useState<ProfilePoint[] | null>(wall?.topProfile ? wall.topProfile.map((q) => ({ ...q })) : null);
   if (!wall) return null;
@@ -35,7 +35,7 @@ export function ProfileDialog({ wallId, onClose }: { wallId: Id; onClose: () => 
   return (
     <Dialog
       title="Perfil superior"
-      sub={`Comprimento ${fmt(L)} m · altura reta ${fmt(H)} m`}
+      sub={`Comprimento ${formatQuantity(units, 'length', L)} · altura reta ${formatQuantity(units, 'length', H)}`}
       size="mid"
       onClose={onClose}
       footer={
@@ -62,8 +62,8 @@ export function ProfileDialog({ wallId, onClose }: { wallId: Id; onClose: () => 
               {pts.map((q, i) => (
                 <tr key={i}>
                   <td className="mono">{i + 1}</td>
-                  <td><NumField id={`pf-t-${i}`} value={q.t} unit="m" onCommit={(v) => edit(i, { t: v })} /></td>
-                  <td><NumField id={`pf-h-${i}`} value={q.h} unit="m" onCommit={(v) => edit(i, { h: v })} /></td>
+                  <td><NumField id={`pf-t-${i}`} value={q.t} quantity="length" onCommit={(v) => edit(i, { t: v })} /></td>
+                  <td><NumField id={`pf-h-${i}`} value={q.h} quantity="length" onCommit={(v) => edit(i, { h: v })} /></td>
                   <td>
                     <button id={`pf-del-${i}`} className="ibtn" onClick={() => removeAt(i)} disabled={pts.length <= 2} aria-label={`Excluir ponto ${i + 1}`} title={pts.length <= 2 ? 'O perfil precisa de ao menos 2 pontos' : 'Excluir ponto'}>
                       <Icon name="close" size={14} />
@@ -82,9 +82,9 @@ export function ProfileDialog({ wallId, onClose }: { wallId: Id; onClose: () => 
         <div>
           <ProfilePreview pts={pts} length={L} height={H} />
           <dl className="profile-stats">
-            <div><dt>Altura máxima</dt><dd>{fmt(Math.max(0, profileMax(pts)))} m</dd></div>
-            <div><dt>Altura média</dt><dd>{fmt(profileMean(pts, L))} m</dd></div>
-            <div><dt>Comprimento</dt><dd>{fmt(L)} m</dd></div>
+            <div><dt>Altura máxima</dt><dd>{formatQuantity(units, 'length', Math.max(0, profileMax(pts)))}</dd></div>
+            <div><dt>Altura média</dt><dd>{formatQuantity(units, 'length', profileMean(pts, L))}</dd></div>
+            <div><dt>Comprimento</dt><dd>{formatQuantity(units, 'length', L)}</dd></div>
           </dl>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { coreRange, layerSpans, totalThickness, type Material, type WallType } from '@hestia/model';
+import { formatQuantity, coreRange, layerSpans, totalThickness, type Material, type WallType } from '@hestia/model';
+import { useUnits } from '../useUnits.ts';
 
 const HATCH_BG: Record<string, string> = {};
 void HATCH_BG;
@@ -13,6 +14,7 @@ function mixHex(a: string, b: string, t: number): string {
 
 /** Seção da parede desenhada ao vivo, na mesma convenção da planta (exterior à esquerda). */
 export function SectionPreview({ type, materials }: { type: WallType; materials: Record<string, Material> }): ReactElement {
+  const units = useUnits();
   const W = 340;
   const H = 150;
   const pad = 22;
@@ -48,7 +50,7 @@ export function SectionPreview({ type, materials }: { type: WallType; materials:
             )}
             {w > 14 && (
               <text x={x + w / 2} y={bot + 12} fontSize="9" textAnchor="middle" fill="var(--fg-soft)" fontFamily="var(--font-mono)">
-                {(sp.layer.thickness * 100).toFixed(1).replace('.', ',')}
+                {formatQuantity(units, 'smallLength', sp.layer.thickness)}
               </text>
             )}
           </g>
@@ -64,7 +66,7 @@ export function SectionPreview({ type, materials }: { type: WallType; materials:
         <path d={`M${pad} ${H - 14}H${W - pad}M${pad} ${H - 18}V${H - 10}M${W - pad} ${H - 18}V${H - 10}`} />
       </g>
       <text x={W / 2} y={H - 3} fontSize="10" textAnchor="middle" fill="var(--fg)" fontFamily="var(--font-mono)">
-        {(total * 100).toFixed(1).replace('.', ',')} cm
+        {formatQuantity(units, 'smallLength', total)}
       </text>
     </svg>
   );

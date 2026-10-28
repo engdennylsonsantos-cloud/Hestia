@@ -1,4 +1,4 @@
-import { coreRange, coreSpan, type Layer } from '@hestia/model';
+import { coreRange, coreSpan, formatQuantity, unitSymbol, type Layer, type ResolvedUnits } from '@hestia/model';
 
 export interface CoreHint {
   /** Nota para embaixo da tabela de camadas. */
@@ -7,18 +7,17 @@ export interface CoreHint {
   semEstrutura: boolean;
 }
 
-const cm = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
-
 /** Texto do núcleo para o editor de piso e de laje, medida a partir da face indicada. */
-export function coreHint(type: { layers: readonly Layer[] }, face = 'face de cima'): CoreHint {
+export function coreHint(type: { layers: readonly Layer[] }, units: ResolvedUnits, face = 'face de cima'): CoreHint {
   if (type.layers.length === 0) return { text: 'Sem camadas: não há núcleo.', semEstrutura: true };
   if (!type.layers.some((l) => l.function === 'structure')) {
     return { text: 'Sem camada Estrutura: o núcleo é o elemento inteiro.', semEstrutura: true };
   }
   const { first, last } = coreRange(type);
   const span = coreSpan(type);
+  const sem = (m: number): string => formatQuantity(units, 'smallLength', m, { withUnit: false });
   return {
-    text: `Núcleo: camadas ${first + 1} a ${last + 1}, de ${cm(span.from)} a ${cm(span.to)} cm da ${face}.`,
+    text: `Núcleo: camadas ${first + 1} a ${last + 1}, de ${sem(span.from)} a ${sem(span.to)} ${unitSymbol(units, 'smallLength')} da ${face}.`,
     semEstrutura: false,
   };
 }

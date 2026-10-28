@@ -98,12 +98,12 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
               {(Object.keys(STYLE_LABEL) as StairRunStyle[]).map((k) => <option key={k} value={k}>{STYLE_LABEL[k]}</option>)}
             </select>
           </div>
-          <div className="field-row"><label htmlFor="stt-riser">Espelho máximo (cm)</label><NumField id="stt-riser" value={draft.maxRiser} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ maxRiser: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-tread">Piso mínimo (cm)</label><NumField id="stt-tread" value={draft.minTread} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minTread: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-width">Largura mínima do lance (cm)</label><NumField id="stt-width" value={draft.minRunWidth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minRunWidth: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-riser">Espelho máximo</label><NumField id="stt-riser" value={draft.maxRiser} quantity="smallLength" min={0.01} onCommit={(v) => set({ maxRiser: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-tread">Piso mínimo</label><NumField id="stt-tread" value={draft.minTread} quantity="smallLength" min={0.01} onCommit={(v) => set({ minTread: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-width">Largura mínima do lance</label><NumField id="stt-width" value={draft.minRunWidth} quantity="smallLength" min={0.01} onCommit={(v) => set({ minRunWidth: v })} /></div>
           {mono ? (
             <>
-              <div className="field-row"><label htmlFor="stt-depth">Espessura estrutural (perpendicular à rampa) (cm)</label><NumField id="stt-depth" value={draft.structuralDepth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ structuralDepth: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-depth">Espessura estrutural (perpendicular à rampa)</label><NumField id="stt-depth" value={draft.structuralDepth} quantity="smallLength" min={0.01} onCommit={(v) => set({ structuralDepth: v })} /></div>
               <div className="field-row">
                 <label htmlFor="stt-underside">Face inferior</label>
                 <select id="stt-underside" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
@@ -113,8 +113,8 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
             </>
           ) : post ? (
             <>
-              <div className="field-row"><label htmlFor="stt-tt">Espessura do degrau (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
-              <div className="field-row"><label htmlFor="stt-overlap">Sobreposição dos degraus (cm)</label><NumField id="stt-overlap" value={draft.treadOverlap} scale={100} decimals={1} min={0} onCommit={(v) => set({ treadOverlap: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-tt">Espessura do degrau</label><NumField id="stt-tt" value={draft.treadThickness} quantity="smallLength" min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-overlap">Sobreposição dos degraus</label><NumField id="stt-overlap" value={draft.treadOverlap} quantity="smallLength" min={0} onCommit={(v) => set({ treadOverlap: v })} /></div>
               <div className="field-row">
                 <label htmlFor="stt-post-mat">Material do poste</label>
                 <select id="stt-post-mat" className="select" value={draft.postMaterialId} onChange={(e) => set({ postMaterialId: e.target.value })}>
@@ -124,12 +124,12 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
             </>
           ) : (
             <>
-              <div className="field-row"><label htmlFor="stt-tt">Espessura do piso (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
-              <div className="field-row"><label htmlFor="stt-rt">Espessura do espelho (cm)</label><NumField id="stt-rt" value={draft.riserThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ riserThickness: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-tt">Espessura do piso</label><NumField id="stt-tt" value={draft.treadThickness} quantity="smallLength" min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
+              <div className="field-row"><label htmlFor="stt-rt">Espessura do espelho</label><NumField id="stt-rt" value={draft.riserThickness} quantity="smallLength" min={0.01} onCommit={(v) => set({ riserThickness: v })} /></div>
             </>
           )}
-          <div className="field-row"><label htmlFor="stt-nosing">Nariz (cm)</label><NumField id="stt-nosing" value={draft.nosing} scale={100} decimals={1} min={0} onCommit={(v) => set({ nosing: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-land">Espessura do patamar (cm)</label><NumField id="stt-land" value={draft.landingThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ landingThickness: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-nosing">Nariz</label><NumField id="stt-nosing" value={draft.nosing} quantity="smallLength" min={0} onCommit={(v) => set({ nosing: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-land">Espessura do patamar</label><NumField id="stt-land" value={draft.landingThickness} quantity="smallLength" min={0.01} onCommit={(v) => set({ landingThickness: v })} /></div>
           <div className="field-row"><label htmlFor="stt-head">Folga de cabeça mínima (m)</label><NumField id="stt-head" value={draft.minHeadroom} decimals={2} min={0.01} onCommit={(v) => set({ minHeadroom: v })} /></div>
           <div className="field-row">
             <label htmlFor="stt-mat">Material</label>
@@ -139,7 +139,7 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
           </div>
           <div className="field-row"><label htmlFor="stt-code">Código</label><TextField id="stt-code" value={draft.code} onCommit={(v) => set({ code: v })} /></div>
           <div className="field-row"><label htmlFor="stt-desc">Descrição</label><TextField id="stt-desc" value={draft.description} onCommit={(v) => set({ description: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-cost" title="Custo informativo do tipo (R$)">Custo (R$)</label><NumField id="stt-cost" value={draft.cost} decimals={2} min={0} onCommit={(v) => set({ cost: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-cost" title="Custo informativo do tipo">Custo</label><NumField id="stt-cost" value={draft.cost} quantity="currency" min={0} onCommit={(v) => set({ cost: v })} /></div>
           {error && <p className="hint" role="alert" style={{ color: 'var(--danger, #b42318)', marginTop: 8 }}>{error}</p>}
         </div>
         <div>

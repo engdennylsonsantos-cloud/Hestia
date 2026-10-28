@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react';
-import { projectGridTypes, type Grid } from '@hestia/model';
+import { formatQuantity, projectGridTypes, type Grid } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, Row, TextField } from './fields.tsx';
-import { fmtMm } from './gridUi.ts';
+import { useUnits } from './useUnits.ts';
 
 /**
  * Propriedades de uma grade selecionada: nome, tipo e bolhas nas pontas. Cada alteração é um comando do modelo
@@ -11,6 +11,7 @@ import { fmtMm } from './gridUi.ts';
  */
 export function GridProperties({ grid }: { grid: Grid }): ReactElement {
   const p = useProject();
+  const units = useUnits();
   const types = projectGridTypes(p);
   const type = types.find((t) => t.id === grid.typeId);
   const change = (patch: Partial<Omit<Grid, 'id' | 'order'>>, label: string): void => {
@@ -37,7 +38,7 @@ export function GridProperties({ grid }: { grid: Grid }): ReactElement {
       </Group>
       <Group title="Geometria" open={false}>
         <Row label="Pontos" readOnly><span className="val">{grid.points.length}</span></Row>
-        {grid.sag !== 0 ? <Row label="Flecha do arco" readOnly><span className="val">{fmtMm(grid.sag * 1000, 0)} mm</span></Row> : null}
+        {grid.sag !== 0 ? <Row label="Flecha do arco" readOnly><span className="val">{formatQuantity(units, 'smallLength', grid.sag)}</span></Row> : null}
         {type ? <Row label="Segmento central" readOnly fromType><span className="val">{type.centerSegment === 'continuous' ? 'Contínuo' : type.centerSegment === 'none' ? 'Só as pontas' : 'Personalizado'}</span></Row> : null}
       </Group>
     </>

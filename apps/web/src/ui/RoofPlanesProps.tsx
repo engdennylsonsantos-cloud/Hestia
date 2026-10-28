@@ -39,11 +39,11 @@ export function RoofPlanesSection({ roof }: { roof: Roof }): ReactElement {
       {roof.planes.length === 0 && <div className="hint">Sem águas: o telhado precisa de ao menos uma. Acrescente uma água abaixo.</div>}
       {roof.planes.map((pl, i) => (
         <div key={i}>
-          <Row label={`Água ${i + 1} %`} htmlFor={`p-pl${i}`}>
-            <NumField id={`p-pl${i}`} value={pl.percent} decimals={1} unit="%" min={0.1} max={200} onCommit={(v) => setPlane(i, { percent: v })} />
+          <Row label={`Água ${i + 1} inclinação`} htmlFor={`p-pl${i}`}>
+            <NumField id={`p-pl${i}`} value={pl.percent / 100} quantity="slope" min={0.001} max={2} onCommit={(v) => setPlane(i, { percent: v * 100 })} />
           </Row>
           <Row label={`Água ${i + 1} subida`} htmlFor={`p-pld${i}`}>
-            <NumField id={`p-pld${i}`} value={upDeg(pl)} decimals={0} unit="°" onCommit={(v) => setPlane(i, { deg: v })} />
+            <NumField id={`p-pld${i}`} value={(upDeg(pl) * Math.PI) / 180} quantity="angle" onCommit={(v) => setPlane(i, { deg: (v * 180) / Math.PI })} />
           </Row>
           <div className="row">
             <button className="btn small" aria-label={`Excluir água ${i + 1}`} onClick={() => set(roof.planes.filter((_, k) => k !== i))}>

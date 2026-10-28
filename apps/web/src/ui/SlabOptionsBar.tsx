@@ -15,7 +15,7 @@ export function SlabOptionsBar({ tool }: { tool: 'slab' | 'slope' }): ReactEleme
   const slope = (
     <label>
       Inclinação
-      <NumField id="opt-slope" value={o.slabSlopePercent} onCommit={(v) => set({ slabSlopePercent: v })} unit="%" />
+      <NumField id="opt-slope" value={o.slabSlopePercent / 100} onCommit={(v) => set({ slabSlopePercent: v * 100 })} quantity="slope" />
     </label>
   );
   if (tool === 'slope') {
@@ -38,7 +38,7 @@ export function SlabOptionsBar({ tool }: { tool: 'slab' | 'slope' }): ReactEleme
       </label>
       <label>
         Deslocamento do topo
-        <NumField id="opt-slaboffset" value={o.slabOffset} onCommit={(v) => set({ slabOffset: v })} unit="m" />
+        <NumField id="opt-slaboffset" value={o.slabOffset} onCommit={(v) => set({ slabOffset: v })} quantity="length" />
       </label>
     </>
   );

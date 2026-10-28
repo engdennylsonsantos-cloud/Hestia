@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { formatQuantity } from '@hestia/model';
 import { useUi } from '../editor/state.ts';
 import { useAtalhos } from '../editor/shortcutConfig.ts';
 import { useI18n } from '../editor/i18n.ts';
@@ -6,6 +7,7 @@ import { usePerimeter } from '../editor/perimeter.ts';
 import { Icon } from './Icon.tsx';
 import { IssuesButton } from './IssuesButton.tsx';
 import { SnapButton } from './SnapButton.tsx';
+import { useUnits } from './useUnits.ts';
 
 const SNAP: Record<string, string> = {
   endpoint: 'Extremidade',
@@ -20,9 +22,8 @@ const SNAP: Record<string, string> = {
   grid: 'Grade',
 };
 
-const f = (n: number): string => n.toFixed(2).replace('.', ',');
-
 export function StatusBar(): ReactElement {
+  const units = useUnits();
   const uiStatus = useUi((s) => s.status);
   const perim = usePerimeter();
   const status = perim.active && perim.status ? perim.status : uiStatus;
@@ -38,7 +39,7 @@ export function StatusBar(): ReactElement {
     <footer className="statusbar" role="status">
       <span className="msg" title={status}>{status}</span>
       {pendente ? <span className="mono" aria-label="Sequência de atalho em andamento">{pendente}…</span> : null}
-      {view === 'plan' && cursor ? <span className="mono sb-coords">x {f(cursor.x)}  y {f(cursor.y)} m</span> : null}
+      {view === 'plan' && cursor ? <span className="mono sb-coords">x {formatQuantity(units, 'length', cursor.x)}  y {formatQuantity(units, 'length', cursor.y)}</span> : null}
       <span className="mono sb-snap">{view === 'plan' && snap && SNAP[snap] ? SNAP[snap] : ''}</span>
       <SnapButton />
       <span className="sb-filter" title={pt ? `Filtro de seleção: ${nSel} elemento${nSel === 1 ? '' : 's'} selecionado${nSel === 1 ? '' : 's'}` : `Selection filter: ${nSel} selected`}>

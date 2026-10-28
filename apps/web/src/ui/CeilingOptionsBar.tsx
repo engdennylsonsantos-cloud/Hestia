@@ -21,7 +21,7 @@ export function CeilingOptionsBar(): ReactElement {
       </label>
       <label>
         Cota do topo
-        <NumField id="opt-ceilingoffset" value={o.ceilingOffset ?? 2.6} onCommit={(v) => set({ ceilingOffset: v })} unit="m" />
+        <NumField id="opt-ceilingoffset" value={o.ceilingOffset ?? 2.6} onCommit={(v) => set({ ceilingOffset: v })} quantity="length" />
       </label>
       <button id="opt-ceilingall" className="btn small" onClick={() => addCeilingsAllRooms()} title="Cria um forro em cada ambiente de circuito fechado do nível que ainda não tem forro; um só Ctrl+Z desfaz tudo">
         Forro em todos os ambientes

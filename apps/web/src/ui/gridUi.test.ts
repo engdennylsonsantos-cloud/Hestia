@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyProject, DEFAULT_GRID_TYPE_ID, type Grid, type GridType } from '@hestia/model';
-import { camposDoSegmento, copiaDoTipo, fmtMm, gradeDaSelecao, gridToolOf } from './gridUi.ts';
+import { camposDoSegmento, copiaDoTipo, gradeDaSelecao, gridToolOf } from './gridUi.ts';
 
 const grade = (over: Partial<Grid> = {}): Grid => ({
   id: 'g1',
@@ -78,12 +78,5 @@ describe('grade selecionada', () => {
     expect(gradeDaSelecao(p, [])).toBeUndefined();
     expect(gradeDaSelecao(p, ['g1', 'g1'])).toBeUndefined();
     expect(gradeDaSelecao(p, ['parede_x'])).toBeUndefined();
-  });
-});
-
-describe('formatação de medidas', () => {
-  it('vírgula decimal e casas pedidas', () => {
-    expect(fmtMm(0.25)).toBe('0,25');
-    expect(fmtMm(1500, 0)).toBe('1500');
   });
 });

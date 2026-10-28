@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { roofTypeThickness, type Material, type RoofType } from '@hestia/model';
+import { formatQuantity, roofTypeThickness, type Material, type RoofType } from '@hestia/model';
+import { useUnits } from '../useUnits.ts';
 
 function mixHex(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16);
@@ -13,6 +14,7 @@ function mixHex(a: string, b: string, t: number): string {
  * na mesma convenção de cor e hachura do tipo de parede.
  */
 export function RoofSectionPreview({ type, materials }: { type: RoofType; materials: Record<string, Material> }): ReactElement {
+  const units = useUnits();
   const W = 340;
   const H = 230;
   const top = 26;
@@ -53,7 +55,7 @@ export function RoofSectionPreview({ type, materials }: { type: RoofType; materi
             )}
             {b.h > 11 && (
               <text x={x + 6} y={b.y + b.h / 2 + 3} fontSize="9" fill="var(--fg)" fontFamily="var(--font-ui)">
-                {(b.layer.thickness * 100).toFixed(1).replace('.', ',')} cm
+                {formatQuantity(units, 'smallLength', b.layer.thickness)}
               </text>
             )}
           </g>
@@ -63,7 +65,7 @@ export function RoofSectionPreview({ type, materials }: { type: RoofType; materi
         <path d={`M${W - 30} ${top}V${bottom}M${W - 34} ${top}H${W - 26}M${W - 34} ${bottom}H${W - 26}`} />
       </g>
       <text x={W - 36} y={(top + bottom) / 2 + 3} fontSize="10" textAnchor="end" fill="var(--fg)" fontFamily="var(--font-mono)">
-        {(total * 100).toFixed(1).replace('.', ',')} cm
+        {formatQuantity(units, 'smallLength', total)}
       </text>
     </svg>
   );

@@ -58,19 +58,19 @@ export function SectionViewProps({ view }: { view: SectionView }): ReactElement 
 
       <Group title="Geometria">
         <Row label="Profundidade" htmlFor="sv-depth">
-          <NumField id="sv-depth" value={view.depth} min={0.01} unit="m" onCommit={(v) => update({ depth: v })} />
+          <NumField id="sv-depth" value={view.depth} min={0.01} quantity="length" onCommit={(v) => update({ depth: v })} />
         </Row>
         <Row label="Início X" htmlFor="sv-ax">
-          <NumField id="sv-ax" value={view.a.x} unit="m" onCommit={(v) => setA(v, view.a.y)} />
+          <NumField id="sv-ax" value={view.a.x} quantity="length" onCommit={(v) => setA(v, view.a.y)} />
         </Row>
         <Row label="Início Y" htmlFor="sv-ay">
-          <NumField id="sv-ay" value={view.a.y} unit="m" onCommit={(v) => setA(view.a.x, v)} />
+          <NumField id="sv-ay" value={view.a.y} quantity="length" onCommit={(v) => setA(view.a.x, v)} />
         </Row>
         <Row label="Fim X" htmlFor="sv-bx">
-          <NumField id="sv-bx" value={view.b.x} unit="m" onCommit={(v) => setB(v, view.b.y)} />
+          <NumField id="sv-bx" value={view.b.x} quantity="length" onCommit={(v) => setB(v, view.b.y)} />
         </Row>
         <Row label="Fim Y" htmlFor="sv-by">
-          <NumField id="sv-by" value={view.b.y} unit="m" onCommit={(v) => setB(view.b.x, v)} />
+          <NumField id="sv-by" value={view.b.y} quantity="length" onCommit={(v) => setB(view.b.x, v)} />
         </Row>
         <Row label="Sentido">
           <button className="btn" type="button" onClick={() => update(sectionInvertPatch(view))}>Inverter direção</button>
@@ -103,16 +103,16 @@ export function SectionViewProps({ view }: { view: SectionView }): ReactElement 
           </select>
         </Row>
         <Row label="Seta (mm)" htmlFor="sv-arrow">
-          <NumField id="sv-arrow" value={view.mark?.arrowMm ?? SECTION_ARROW_MM} min={0.5} max={20} decimals={1} unit="mm" onCommit={(v) => setMark({ arrowMm: v })} />
+          <NumField id="sv-arrow" value={(view.mark?.arrowMm ?? SECTION_ARROW_MM) / 1000} min={0.0005} max={0.02} quantity="smallLength" onCommit={(v) => setMark({ arrowMm: v * 1000 })} />
         </Row>
         <Row label="Texto (mm)" htmlFor="sv-text">
-          <NumField id="sv-text" value={view.mark?.textMm ?? SECTION_TEXT_MM} min={1} max={20} decimals={1} unit="mm" onCommit={(v) => setMark({ textMm: v })} />
+          <NumField id="sv-text" value={(view.mark?.textMm ?? SECTION_TEXT_MM) / 1000} min={0.001} max={0.02} quantity="smallLength" onCommit={(v) => setMark({ textMm: v * 1000 })} />
         </Row>
         <Row label="Desloc. X" htmlFor="sv-offx">
-          <NumField id="sv-offx" value={offset.x} decimals={1} unit="mm" onCommit={(v) => setMark({ labelOffsetMm: { ...offset, x: v } })} />
+          <NumField id="sv-offx" value={offset.x / 1000} quantity="smallLength" onCommit={(v) => setMark({ labelOffsetMm: { ...offset, x: v * 1000 } })} />
         </Row>
         <Row label="Desloc. Y" htmlFor="sv-offy">
-          <NumField id="sv-offy" value={offset.y} decimals={1} unit="mm" onCommit={(v) => setMark({ labelOffsetMm: { ...offset, y: v } })} />
+          <NumField id="sv-offy" value={offset.y / 1000} quantity="smallLength" onCommit={(v) => setMark({ labelOffsetMm: { ...offset, y: v * 1000 } })} />
         </Row>
       </Group>
 

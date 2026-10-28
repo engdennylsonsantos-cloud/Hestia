@@ -49,7 +49,7 @@ Branch de trabalho: `claude/fervent-newton-rfgz3y`. Nada foi mesclado na `main` 
 - **Integração:** mesclar `claude/fervent-newton-rfgz3y` em `integracao/telhados-grades` e na `main` (aguarda o dono).
 
 ## E. Pesquisas
-- R7: cotas temporárias do Revit e equivalente no ArchiCAD (em andamento): `scratchpad/f0/R7-revit-cotas-temporarias.md`; copiar para `docs/aberturas/pesquisa-f0/` quando concluída.
+- R7 (concluída): `docs/aberturas/pesquisa-f0/R7-revit-cotas-temporarias.md`. Confirmado: cotas aparecem ao colocar e ao selecionar; medem até o perpendicular mais próximo; linhas de chamada podem ser movidas para trocar a referência; paredes: Centerlines | Faces | Core centerline | Core faces; portas e janelas: Centerlines | Openings; ajuste em Manage > Settings > Additional Settings > Temporary Dimensions; converter em permanente mantém a cota; porta fora da parede gera erro ("Can't cut instance ... out of wall"). Não confirmado: escopo (projeto ou usuário), digitar para mover, ícones, unidades.
 - Pesquisas anteriores salvas em `docs/aberturas/pesquisa-f0/` (R1 a R6).
 
 ## F. Processo

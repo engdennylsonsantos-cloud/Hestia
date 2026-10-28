@@ -1,0 +1,30 @@
+import type { ReactElement } from 'react';
+import { NumField, TextField } from '../../../fields.tsx';
+import { usePanelKit, type PanelProps } from './panelKit.tsx';
+
+/** Quadro e dados: código, descrição, fabricante, desempenho (fogo, acústica, térmica) e custo. */
+export function DataPanel({ d, onChange }: PanelProps): ReactElement {
+  const { set, limpar } = usePanelKit(d, onChange);
+  const setTexto = (campo: 'code' | 'description' | 'manufacturer' | 'fireRating', v: string): void => {
+    set({ [campo]: v === '' ? undefined : v });
+  };
+  const janela = d.kind === 'window';
+  return (
+    <>
+      <div className="field-row"><label htmlFor="ot-code">Código</label><TextField id="ot-code" value={d.code ?? ''} onCommit={(v) => setTexto('code', v)} /></div>
+      <div className="field-row"><label htmlFor="ot-desc">Descrição</label><TextField id="ot-desc" value={d.description ?? ''} onCommit={(v) => setTexto('description', v)} /></div>
+      <div className="field-row"><label htmlFor="op-manuf">Fabricante</label><TextField id="op-manuf" value={d.manufacturer ?? ''} onCommit={(v) => setTexto('manufacturer', v)} /></div>
+      {!janela ? (
+        <div className="field-row"><label htmlFor="op-fire">Resistência ao fogo</label><TextField id="op-fire" value={d.fireRating ?? ''} onCommit={(v) => setTexto('fireRating', v)} /></div>
+      ) : null}
+      <div className="field-row"><label htmlFor="op-rw">Rw (dB)</label><NumField id="op-rw" value={d.acousticRw ?? null} decimals={0} onCommit={(v) => set({ acousticRw: v })} onClear={() => limpar('acousticRw')} /></div>
+      {janela ? (
+        <>
+          <div className="field-row"><label htmlFor="op-u">U (W/m²K)</label><NumField id="op-u" value={d.uValue ?? null} decimals={2} onCommit={(v) => set({ uValue: v })} onClear={() => limpar('uValue')} /></div>
+          <div className="field-row"><label htmlFor="op-solar">Fator solar</label><NumField id="op-solar" value={d.solarFactor ?? null} decimals={2} onCommit={(v) => set({ solarFactor: v })} onClear={() => limpar('solarFactor')} /></div>
+        </>
+      ) : null}
+      <div className="field-row"><label htmlFor="op-cost">Custo (R$)</label><NumField id="op-cost" value={d.cost ?? null} decimals={2} onCommit={(v) => set({ cost: v })} onClear={() => limpar('cost')} /></div>
+    </>
+  );
+}

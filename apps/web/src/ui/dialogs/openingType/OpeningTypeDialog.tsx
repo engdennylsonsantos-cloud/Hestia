@@ -30,6 +30,7 @@ import { OpeningTypeHeader } from './OpeningTypeHeader.tsx';
 import { OpeningTypeLibrary } from './OpeningTypeLibrary.tsx';
 import { OpeningTypePreview, type PreviewTab } from './OpeningTypePreview.tsx';
 import { OpeningTypeSections } from './OpeningTypeSections.tsx';
+import { componentToShow, rememberComponent, type OpeningComponentId } from './components.ts';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
@@ -60,8 +61,8 @@ function familyCounts(p: Project, kind: OpeningType['kind']): Record<string, num
 }
 
 /**
- * "Propriedades do tipo" da porta/janela no padrão da decisão 0034: biblioteca à esquerda, seções recolhíveis no
- * centro e prévia com verificações à direita. O cabeçalho troca família/tipo, duplica, renomeia e favorita.
+ * "Propriedades do tipo" da porta/janela no padrão da decisão 0034: biblioteca à esquerda, no centro a lista de
+ * componentes (estilo ArchiCAD) com o painel do escolhido, e a prévia com verificações à direita. O cabeçalho troca família/tipo, duplica, renomeia e favorita.
  */
 export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
@@ -73,6 +74,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const [tab, setTab] = useState<PreviewTab>('elevation');
   const [flipHand, setFlipHand] = useState(false);
   const [flipFacing, setFlipFacing] = useState(false);
+  const [active, setActive] = useState<OpeningComponentId | undefined>(undefined);
   const [previewAngle, setPreviewAngle] = useState(() => (src ? openingAngle2d(src) : 90));
   if (current !== typeId) {
     setCurrent(typeId);
@@ -163,6 +165,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
           onType={(id) => useUi.setState({ dialogArg: id })}
           onDuplicate={dup}
           onFavorite={toggleFavorite}
+          onBeforeRename={() => { rememberComponent('overview'); setActive('overview'); }}
         />
         <div className={`op-main${libOpen ? '' : ' lib-off'}`}>
           <OpeningTypeLibrary
@@ -177,7 +180,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
             onVariant={(v) => setD(applyVariant(d, v))}
           />
           <div className="op-center">
-            <OpeningTypeSections d={d} onChange={setD} families={families} family={family} leaves={leaves} materials={p.materials} />
+            <OpeningTypeSections d={d} onChange={setD} family={family} leaves={leaves} materials={p.materials} active={componentToShow(d.kind, family?.id ?? null, active)} onActive={setActive} />
             {err ? <p className="error" role="alert">{err}</p> : null}
           </div>
           <OpeningTypePreview

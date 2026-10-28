@@ -158,6 +158,18 @@ export const I18N = {
     arr_hint_radial: 'Matriz radial: clique no centro da matriz. Depois clique para criar os itens, ou digite o ângulo em graus.',
     arr_count_min: 'Número de itens deve ser 2 ou mais; usando 2.',
     arr_angle_zero: 'O ângulo total deve ser diferente de 0°',
+    // Diálogo Editar tipo de abertura: lista de componentes
+    oc_overview: 'Visão geral',
+    oc_frame: 'Batente',
+    oc_leaf: 'Folha',
+    oc_sashes: 'Folhas e divisões',
+    oc_glazing: 'Caixilho e vidro',
+    oc_outer: 'Lado externo',
+    oc_inner: 'Lado interno',
+    oc_wall: 'Parede e vão',
+    oc_plan: 'Planta e corte',
+    oc_data: 'Quadro e dados',
+    oc_list: 'Componentes',
   },
   en: {
     // Ribbon Tabs
@@ -290,6 +302,18 @@ export const I18N = {
     arr_hint_radial: 'Radial array: click the array center. Then click to create the items, or type the angle in degrees.',
     arr_count_min: 'Number of items must be 2 or more; using 2.',
     arr_angle_zero: 'The total angle must be different from 0°',
+    // Diálogo Editar tipo de abertura: lista de componentes
+    oc_overview: 'Overview',
+    oc_frame: 'Frame',
+    oc_leaf: 'Leaf',
+    oc_sashes: 'Sashes and divisions',
+    oc_glazing: 'Sash frame and glass',
+    oc_outer: 'Exterior side',
+    oc_inner: 'Interior side',
+    oc_wall: 'Wall and opening',
+    oc_plan: 'Floor plan and section',
+    oc_data: 'Schedule and data',
+    oc_list: 'Components',
   },
 } as const;
 

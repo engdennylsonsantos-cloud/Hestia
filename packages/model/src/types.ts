@@ -6,6 +6,7 @@ import type { Grid, GridType } from './grid.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
 import type { ProfilePreset } from './openingComposition.ts';
+import type { DimensionSettings } from './dimensionSettings.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 20;
@@ -564,6 +565,8 @@ export interface ProjectSettings {
   openingLine?: OpeningLineConvention;
   /** Mostra o código do tipo de cada porta e janela na planta (Revit: Tag on Placement). Ausente = não mostra. */
   showOpeningTags?: boolean;
+  /** Referências das cotas dinâmicas (ausente = padrões de `dimensionSettingsOf`). */
+  dimensions?: DimensionSettings;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */

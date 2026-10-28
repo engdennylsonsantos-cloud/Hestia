@@ -3,7 +3,8 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 
 - [x] S1 batente = espessura acabada (`05`)
 - [x] S2 prévia com a esquadria real
-- [ ] S3 Espaço/Tab redesenham  → **S2 e S3 integrados = marco M4**
+- [x] S3 Espaço/Tab redesenham  → **S2 e S3 integrados = marco M4**
+- **MARCO M4 LIBERADO cdcd096a** (S2 e S3 integrados)
 - [ ] S4 alças de inversão
 - [ ] S5 planta do modal
 - [ ] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
@@ -31,6 +32,7 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - S1: `ouroZoom.json` foi regenerado (78 entradas) porque a planta agora desenha o batente cobrindo a espessura inteira (mudança intencional do S1); entradas sem aberturas ficaram idênticas.
 - S1: testes antigos de "padrão core" foram atualizados para o novo padrão `wall`; os que testam o modo `core` passaram a declará-lo explicitamente.
 
+- S3: `lastPointer` guardado em `move`; `tab()` e `space()`/`flipHandToggle()` reexecutam `move(lastPointer)` quando há ponteiro. Em `apps/web/src/editor/controller.ts` o Espaço da porta/janela passou a chamar `tool.space()` e `bump()` (o Tab já chamava `bump()`), então o repintar usa o mesmo gancho existente.
 - S2: a conversão local→mundo virou `openingPlanPathsAt`/`openingPlanWorldPaths` no engine; a planta (`render/src/plan/symbols.ts`) passou a delegar para a MESMA função (nada de cópia).
 - S2: `symbolPreviewItems` apagada; a prévia usa o modelo único. O parâmetro `openingLine` do plano não existe nas opções da planta (é convenção de elevação/corte), então `openingPreviewStrokes` recebe só o detalhe.
 

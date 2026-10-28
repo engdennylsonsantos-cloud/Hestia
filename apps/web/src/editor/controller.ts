@@ -310,7 +310,7 @@ export class Editor {
       return true;
     }
     if (k === ' ' && (this.tool.id === 'door' || this.tool.id === 'window')) {
-      (this.tool as unknown as { flipHandToggle?: () => void }).flipHandToggle?.();
+      this.tool.space?.(); this.bump();
       return true;
     }
     // Atalho por sequência (ex.: WA). Alt não dispara; digitação ativa ou ferramenta de texto (freeText, sem ponto) não deixa letras virarem atalho.

@@ -6,6 +6,9 @@ import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
+import { compositionOfType } from './openingCompositionOf.ts';
+import { defaultOpeningProfiles } from './openingProfiles.ts';
+import type { OpeningType } from './openingTypes.ts';
 
 type Migration = (raw: Record<string, unknown>) => Record<string, unknown>;
 
@@ -205,6 +208,25 @@ const migrations: Record<number, Migration> = {
   // v18 → v19: contorno associativo de piso e laje (decisão 0023 §8.2). Pisos e lajes existentes não têm `outlineSource`,
   // o que significa estáticos (o contorno gravado continua valendo). A migração só avança a versão.
   18: (raw) => ({ ...raw }),
+  // v19 → v20: composição das esquadrias (docs/aberturas/F1-spec-composicao.md §7). Cada tipo ganha `composition` (de uma
+  // célula, ou o layout da §7 se tinha bandeira/laterais) e o projeto recebe os presets de perfil. Instâncias não mudam.
+  // Idempotente: composição já gravada e presets editados do projeto são mantidos.
+  19: (raw) => {
+    const own = (raw.openingTypes as Record<string, OpeningType>) ?? {};
+    const types: Record<string, OpeningType> = {};
+    for (const [id, t] of Object.entries(own)) {
+      if (!t || typeof t !== 'object' || t.composition) {
+        types[id] = t;
+        continue;
+      }
+      try {
+        types[id] = { ...t, composition: compositionOfType(t) };
+      } catch {
+        types[id] = t; // tipo malformado: sem composição, o leitor deriva dos campos atuais
+      }
+    }
+    return { ...raw, openingTypes: types, openingProfiles: { ...defaultOpeningProfiles(), ...((raw.openingProfiles as object) ?? {}) } };
+  },
 };
 
 export class SchemaError extends Error {}

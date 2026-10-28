@@ -1,4 +1,5 @@
 import type { Id, OpeningType, Project } from './types.ts';
+import { compositionLeafSize, compositionSpan } from './openingCompositionLayout.ts';
 
 /**
  * Referência nominal do tipo (ArchiCAD: Nominal Size; NBR 15930-2). No Brasil "porta 80 x 210" é a FOLHA e o vão na
@@ -13,7 +14,7 @@ export const OPENING_SPAN_GAP_DEFAULTS = { w: 0.08, h: 0.05 } as const;
 /** Limite da folga (m) aceito ao salvar o tipo. */
 export const OPENING_SPAN_GAP_MAX = 0.3;
 
-type NominalFields = Pick<OpeningType, 'width' | 'height'> & Partial<Pick<OpeningType, 'nominalRef' | 'spanGap'>>;
+type NominalFields = Pick<OpeningType, 'width' | 'height'> & Partial<Pick<OpeningType, 'nominalRef' | 'spanGap' | 'composition'>>;
 
 const gapOr = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
 
@@ -27,6 +28,7 @@ export function openingSpanGap(t: Partial<Pick<OpeningType, 'spanGap'>>): { w: n
 
 /** Vão do tipo (m): o que o motor recorta na parede e onde o batente se assenta. */
 export function openingSpanOf(t: NominalFields): { width: number; height: number } {
+  if (t.composition && t.composition.layout.kind === 'split') return compositionSpan(t.composition); // várias células: a composição manda
   if (openingNominalRef(t) !== 'leaf') return { width: t.width, height: t.height };
   const g = openingSpanGap(t);
   return { width: t.width + g.w, height: t.height + g.h };
@@ -34,6 +36,7 @@ export function openingSpanOf(t: NominalFields): { width: number; height: number
 
 /** Folha nominal do tipo (m): `width`/`height` com 'leaf'; com 'opening', o vão menos a folga (nunca negativa). */
 export function leafSizeOf(t: NominalFields): { width: number; height: number } {
+  if (t.composition && t.composition.layout.kind === 'split') return compositionLeafSize(t.composition);
   if (openingNominalRef(t) === 'leaf') return { width: t.width, height: t.height };
   const g = openingSpanGap(t);
   return { width: Math.max(0, t.width - g.w), height: Math.max(0, t.height - g.h) };

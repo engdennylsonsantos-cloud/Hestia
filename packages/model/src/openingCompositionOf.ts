@@ -1,6 +1,7 @@
 import type { OpeningType } from './openingTypes.ts';
 import { openingFamilyOf, type OpeningFamilyId } from './opening.ts';
 import { openingNominalRef, openingSpanGap, openingSpanOf } from './openingNominal.ts';
+import { compositionIssue } from './openingCompositionRules.ts';
 import { profileMaterialOf } from './openingProfiles.ts';
 import {
   COMPOSITION_VERSION,
@@ -10,6 +11,7 @@ import {
   type CompositionNode,
   type LeafOptions,
   type OpeningComposition,
+  type ProfilePreset,
   type ProfileSpec,
   type SplitNode,
 } from './openingComposition.ts';
@@ -112,3 +114,17 @@ export function compositionOfType(t: OpeningType): OpeningComposition {
 
 /** Composição do tipo: a gravada, ou a derivada dos campos atuais (leitor da ponte F3–F5, spec §7). */
 export const openingCompositionOf = (t: OpeningType): OpeningComposition => t.composition ?? compositionOfType(t);
+
+/**
+ * Ponte F3–F5 (spec §7) para `upsertOpeningType`. Tipo que já tem composição (ele ou a versão gravada): se é de UMA célula, ou ainda
+ * traz bandeira/laterais antigas, a edição vem dos campos atuais e a composição é regenerada; a de várias células editada direto
+ * é preservada. Em qualquer caso valida com `compositionIssue` (lança `Error`). Tipo sem composição passa como está.
+ */
+export function withBridgedComposition(next: OpeningType, prev: OpeningType | undefined, profiles?: Record<string, ProfilePreset>): OpeningType {
+  if (!next.composition && !prev?.composition) return next;
+  const legacy = !next.composition || next.composition.layout.kind === 'cell' || !!next.transom || !!next.sidelights;
+  const out = legacy ? { ...next, composition: compositionOfType(next) } : next;
+  const issue = compositionIssue(out.composition!, profiles);
+  if (issue) throw new Error(issue);
+  return out;
+}

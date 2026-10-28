@@ -8,7 +8,7 @@ import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes
 import type { ProfilePreset } from './openingComposition.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
 export type * from './openingTypes.ts';

@@ -33,11 +33,21 @@ export function Preview3D({
 }: Preview3DProps): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const signature = previewTypeSignature(type);
+  // Câmera do usuário entre as atualizações da cena: ângulo, elevação e o zoom relativo ao enquadramento (a cena é refeita a cada edição).
+  const camera = useRef<{ azimuth: number; elevation: number; factor: number; typeId: string } | null>(null);
 
   useEffect(() => {
     const el = host.current;
     if (!renderer || !el || !active) return;
     const scene = previewScene(type, style, angle, dark, flipHand, flipFacing);
+    const fit = scene.orbit.distance;
+    const kept = camera.current;
+    if (kept && kept.typeId === type.id && fit > 0) {
+      scene.orbit.azimuth = kept.azimuth;
+      scene.orbit.elevation = kept.elevation;
+      scene.orbit.distance = fit * kept.factor;
+      scene.orbit.apply();
+    }
     const canvas = renderer.domElement;
     canvas.style.display = 'block';
     canvas.style.width = '100%';
@@ -87,6 +97,7 @@ export function Preview3D({
     el.addEventListener('pointercancel', up);
     el.addEventListener('wheel', wheel, { passive: false });
     return () => {
+      if (fit > 0) camera.current = { azimuth: scene.orbit.azimuth, elevation: scene.orbit.elevation, factor: scene.orbit.distance / fit, typeId: type.id };
       cancelAnimationFrame(frame);
       el.removeEventListener('pointerdown', down);
       el.removeEventListener('pointermove', move);

@@ -1,8 +1,14 @@
 import {
   OPENING_LINTEL_DEFAULTS,
+  canonComposition,
+  compositionOfType,
   newId,
   openingFamilies,
+  withBridgedComposition,
+  type CellNode,
+  type CompositionNode,
   type Id,
+  type ProfilePreset,
   type OpeningFamily,
   type OpeningFrameStyle,
   type OpeningHandle,
@@ -200,4 +206,42 @@ export function alternarAcabamento(t: OpeningType, campo: CampoAcabamento, ligad
   const next: OpeningType = { ...t };
   delete next[campo];
   return ligado ? Object.assign(next, { [campo]: { ...ACABAMENTO_PADRAO[campo] } }) : next;
+}
+
+/** A composição do tipo foi editada nos módulos (não é só a derivada dos campos antigos). */
+export function hasAuthoredComposition(t: OpeningType): boolean {
+  return !!t.composition && canonComposition(t.composition) !== canonComposition(compositionOfType(t));
+}
+
+/**
+ * Passa o rascunho pela ponte da composição, como o comando `upsertOpeningType` fará ao gravar: editar um campo antigo (família,
+ * bandeira, medidas...) regenera a composição derivada; a composição editada nos módulos é preservada. Composição inválida não
+ * bloqueia a edição do rascunho: o erro volta para o diálogo mostrar.
+ */
+export function bridgeDraft(next: OpeningType, prev: OpeningType, presets?: Record<string, ProfilePreset>): { type: OpeningType; error: string | null } {
+  try {
+    return { type: withBridgedComposition(next, prev, presets), error: null };
+  } catch (e) {
+    return { type: next, error: e instanceof Error ? e.message : 'Composição inválida' };
+  }
+}
+
+/**
+ * Troca de família num tipo cuja composição foi editada nos módulos: a composição não se regenera, então a célula de folha
+ * principal recebe a família, o símbolo e as folhas novas (senão a prévia e o modelo continuariam com a família antiga).
+ */
+export function syncFamilyInComposition(t: OpeningType, family: OpeningFamily): OpeningType {
+  const c = t.composition;
+  if (!c) return t;
+  let feito = false;
+  const mapa = (n: CompositionNode): CompositionNode => {
+    if (n.kind === 'cell') {
+      if (feito || n.content.kind !== 'leaf') return n;
+      feito = true;
+      const cell: CellNode = { ...n, content: { ...n.content, family: family.id, plan: t.plan, leaves: t.leaves } };
+      return cell;
+    }
+    return { ...n, children: n.children.map((ch) => ({ ...ch, node: mapa(ch.node) })) };
+  };
+  return { ...t, composition: { ...c, layout: mapa(c.layout) } };
 }

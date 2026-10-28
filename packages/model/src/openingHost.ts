@@ -1,6 +1,7 @@
 import type { Id, Project } from './types.ts';
 import { isOpening, isWall } from './types.ts';
 import { wallLength } from './queries.ts';
+import { openingTypeById } from './openingNominal.ts';
 
 /** Largura usada quando o tipo de abertura não existe (mesmo padrão de clampOffset e splitWall). */
 const DEFAULT_WIDTH = 0.8;
@@ -18,7 +19,7 @@ export function setOpeningHost(p: Project, c: { id: Id; hostId: Id; offset: numb
   if (!isWall(host)) throw new Error('A nova anfitriã precisa ser uma parede');
   const current = p.elements[o.hostId];
   if (isWall(current) && current.levelId !== host.levelId) throw new Error('A nova parede precisa estar no mesmo nível');
-  const width = p.openingTypes[o.typeId]?.width ?? DEFAULT_WIDTH;
+  const width = openingTypeById(p, o.typeId)?.width ?? DEFAULT_WIDTH;
   const half = width / 2;
   const L = wallLength(host);
   if (!(L >= width)) throw new Error('A abertura não cabe nesta parede');
@@ -28,7 +29,7 @@ export function setOpeningHost(p: Project, c: { id: Id; hostId: Id; offset: numb
   }
   for (const other of Object.values(p.elements).filter(isOpening)) {
     if (other.id === o.id || other.hostId !== host.id) continue;
-    const oh = (p.openingTypes[other.typeId]?.width ?? DEFAULT_WIDTH) / 2;
+    const oh = (openingTypeById(p, other.typeId)?.width ?? DEFAULT_WIDTH) / 2;
     if (c.offset + half > other.offset - oh + EPS && c.offset - half < other.offset + oh - EPS) {
       throw new Error('A abertura se sobreporia a outra abertura desta parede');
     }

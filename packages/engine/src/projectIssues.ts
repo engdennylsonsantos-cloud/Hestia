@@ -1,5 +1,6 @@
 import { cross, dist, dot, pointInMulti, sub, type Vec2 } from '@hestia/geom';
 import {
+  openingTypeById,
   isOpening,
   isSlab,
   isWall,
@@ -54,7 +55,7 @@ function openingOutside(p: Project): ValidationIssue[] {
   for (const e of Object.values(p.elements)) {
     if (!isOpening(e)) continue;
     const host = p.elements[e.hostId];
-    const type = p.openingTypes[e.typeId];
+    const type = openingTypeById(p, e.typeId);
     if (!isWall(host) || !type) continue;
     const L = dist(host.a, host.b);
     const end = e.offset + type.width;

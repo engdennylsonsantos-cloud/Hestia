@@ -1,4 +1,5 @@
 import {
+  openingTypeById,
   coreSpan,
   openingFrame,
   openingFrameDepth,
@@ -80,7 +81,7 @@ function addPart(
 }
 
 function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx | null {
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return null;
   const core = coreOf(f);
   const coreWidth = core.s1 - core.s0;

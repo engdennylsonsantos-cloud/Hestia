@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, wallHeight, wallType, type Id, type Project } from '@hestia/model';
+import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, wallHeight, wallType, type Id, type Project } from '@hestia/model';
 import type { DxfPoint } from './dxf.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
@@ -67,7 +67,7 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
     const e = p.elements[tag.hostId];
     if (!e) continue;
     const type = e.kind === 'wall' ? p.wallTypes[e.typeId]
-      : e.kind === 'door' || e.kind === 'window' ? p.openingTypes[e.typeId]
+      : e.kind === 'door' || e.kind === 'window' ? openingTypeById(p, e.typeId)
       : e.kind === 'floor' ? p.floorTypes[e.typeId]
       : e.kind === 'slab' ? p.slabTypes[e.typeId]
       : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]
@@ -79,8 +79,8 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
       : tag.property === 'name' ? e.kind === 'room' ? e.name : type && 'name' in type ? type.name : e.kind
       : tag.property === 'mark' ? ('mark' in e ? e.mark : '')
       : tag.property === 'level' ? p.levels.find((l) => l.id === tagLevelId)?.name ?? ''
-      : tag.property === 'width' ? isOpening(e) ? `${(p.openingTypes[e.typeId]?.width ?? 0) * 100} cm` : isWall(e) ? `${wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100} cm` : ''
-      : isOpening(e) ? `${p.openingTypes[e.typeId]?.height ?? 0} m` : isWall(e) ? `${wallHeight(p, e)} m` : '';
+      : tag.property === 'width' ? isOpening(e) ? `${(openingTypeById(p, e.typeId)?.width ?? 0) * 100} cm` : isWall(e) ? `${wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100} cm` : ''
+      : isOpening(e) ? `${openingTypeById(p, e.typeId)?.height ?? 0} m` : isWall(e) ? `${wallHeight(p, e)} m` : '';
     if (tag.leader) {
       const host = isOpening(e) ? p.elements[e.hostId] : e;
       const anchor = host ? isWall(host) ? { x: (host.a.x + host.b.x) / 2, y: (host.a.y + host.b.y) / 2 } : 'point' in host ? host.point : 'boundary' in host && host.boundary.length ? { x: host.boundary.reduce((s, q) => s + q.x, 0) / host.boundary.length, y: host.boundary.reduce((s, q) => s + q.y, 0) / host.boundary.length } : null : null;

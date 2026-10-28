@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildOpeningModel, frameOfWall, openingGeometry, type OpeningGeometry, type OpeningModel } from '@hestia/engine';
-import type { GraphicsCategory, Id, Material, Opening, Project, View3DSettings } from '@hestia/model';
+import { openingTypeById, type GraphicsCategory, type Id, type Material, type Opening, type Project, type View3DSettings } from '@hestia/model';
 import { pecasDoModelo } from './openingParts.ts';
 import { deslocamentoDaPeca, geometriaDaPeca, geometriaRelativaAoPivo } from './geometriaPeca3d.ts';
 import { arestasDaUniaoDeCaixas, type CaixaAlinhada } from './silhuetaCaixas3d.ts';
@@ -62,7 +62,7 @@ export function montarAberturaDoModelo(
 ): AberturaMontada | null {
   const cat: GraphicsCategory = o.kind;
   if (!view.overrides[cat].visible || (model.kind === 'door' && model.void)) return null;
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return null;
   const grupo = new THREE.Group();
   grupo.rotation.z = Math.atan2(g.u.y, g.u.x);
@@ -182,7 +182,7 @@ export function caixasEPrismasDoModelo(
   view: View3DSettings,
 ): AberturaEmCaixas | null {
   if (!view.overrides[o.kind].visible || (model.kind === 'door' && model.void)) return null;
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return null;
   const vao = new THREE.Matrix4().makeRotationZ(Math.atan2(g.u.y, g.u.x)).setPosition(g.center.x, g.center.y, baseZ + g.sill);
   const out: AberturaEmCaixas = { caixas: [], prismas: [] };

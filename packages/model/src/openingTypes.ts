@@ -104,9 +104,11 @@ export interface OpeningType {
   tiltAxis?: number;
   /**
    * A que `width`/`height` se referem (ArchiCAD: Nominal Size Reference; NBR 15930: "80 x 210" é a FOLHA, não o vão): 'opening' (padrão) =
-   * o vão/batente; 'leaf' = a folha nominal, e o vão é calculado (folha + 2·(J − ov) + folgas). Só portas de giro.
+   * o vão; 'leaf' = a folha nominal, e o vão é derivado (folha + `spanGap`). A fonte única está em `openingNominal.ts`.
    */
   nominalRef?: 'opening' | 'leaf';
+  /** Folga do vão sobre a folha com `nominalRef` 'leaf' (m); padrão 0,08 na largura e 0,05 na altura (NBR 15930-2). */
+  spanGap?: { w: number; h: number };
   /** Porta com vidro: fração da altura da folha ocupada pelo vidro, a partir do topo (0,25 / 0,5 / 0,75; 0,1 a 0,9). */
   glassRatio?: number;
   /** Dobradiças: quantidade (2 a 4; padrão 3 em porta de giro) — peças de ferragem no batente e na folha. */

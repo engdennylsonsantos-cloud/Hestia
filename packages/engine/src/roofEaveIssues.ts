@@ -1,5 +1,5 @@
 import { dot, sub, type Vec2 } from '@hestia/geom';
-import { isOpening, isRoof, isWall, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { openingTypeById, isOpening, isRoof, isWall, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
 import { buildFrame, type WallFrame } from './frame.ts';
 import { expandRoofArcs } from './roofArcs.ts';
 
@@ -146,7 +146,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
 
     for (const o of openings) {
       const host = bodyById.get(o.hostId);
-      const type = p.openingTypes[o.typeId];
+      const type = openingTypeById(p, o.typeId);
       if (!host || !type || host.wall.levelId !== roof.levelId) continue;
       const box: Box = { x0: o.offset - type.width / 2, x1: o.offset + type.width / 2, y0: host.lo, y1: host.hi };
       let best = Infinity;

@@ -1,4 +1,5 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
+import { OPENING_SPAN_GAP_MAX } from './openingNominal.ts';
 import { acabamentoIssue, openingCasing, type OpeningAcabamento } from './openingExtras.ts';
 
 /** Campos v2 do tipo conferidos ao salvar (todos opcionais: ausente vale o padrão por leitura). */
@@ -22,6 +23,9 @@ type OpeningTypeRuleFields = Partial<
     | 'swingStyle'
     | 'leafPlan'
     | 'leafSide'
+    | 'nominalRef'
+    | 'spanGap'
+    | 'reveal'
   >
 >;
 
@@ -36,6 +40,8 @@ const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
 const SWING_STYLES = ['arc', 'dash', 'line'] as const;
 const LEAF_PLANS = ['open', 'closed', 'both'] as const;
 const LEAF_SIDES = ['swing', 'opposite'] as const;
+const NOMINAL_REFS = ['opening', 'leaf'] as const;
+const REVEAL_MAX = 0.5;
 
 const inSet = (v: unknown, valid: readonly string[]): boolean => typeof v === 'string' && valid.includes(v);
 
@@ -76,6 +82,16 @@ function openingStyleIssue(t: OpeningTypeRules): string | null {
   if (t.swingStyle !== undefined && !inSet(t.swingStyle, SWING_STYLES)) return 'Estilo do arco de giro desconhecido.';
   if (t.leafPlan !== undefined && !inSet(t.leafPlan, LEAF_PLANS)) return 'Folha em planta desconhecida (aberta, fechada ou ambas).';
   if (t.leafSide !== undefined && !inSet(t.leafSide, LEAF_SIDES)) return 'Posição da folha desconhecida.';
+  if (t.nominalRef !== undefined && !inSet(t.nominalRef, NOMINAL_REFS)) return 'Referência nominal desconhecida (vão ou folha).';
+  if (t.spanGap !== undefined) {
+    const { w, h } = t.spanGap;
+    const ok = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= OPENING_SPAN_GAP_MAX;
+    if (!ok(w) || !ok(h)) return `Folga do vão sobre a folha: use valores de 0 a ${Math.round(OPENING_SPAN_GAP_MAX * 100)} cm.`;
+  }
+  if (t.reveal !== undefined) {
+    const d = t.reveal.depth;
+    if (typeof d !== 'number' || !Number.isFinite(d) || d < 0 || d > REVEAL_MAX) return `Recuo do batente: use um valor de 0 a ${Math.round(REVEAL_MAX * 100)} cm.`;
+  }
   return null;
 }
 

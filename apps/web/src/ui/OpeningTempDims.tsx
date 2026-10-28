@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties, type ReactElement } from 'react';
 import { frameOfWall } from '@hestia/engine';
-import { isOpening, type Id } from '@hestia/model';
+import { openingTypeById, isOpening, type Id } from '@hestia/model';
 import { worldToScreen } from '@hestia/render';
 import { editOpeningDim, formatMeters, occupiedRanges, openingDimLines, parseNumber, perpendicularNeighbors, type OpeningDimSide } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
@@ -39,7 +39,7 @@ export function OpeningTempDims({ openingId }: { openingId: Id }): ReactElement 
   const opening = p.elements[openingId];
   if (!opening || !isOpening(opening) || !viewport) return null;
   const frame = frameOfWall(p, opening.hostId);
-  const type = p.openingTypes[opening.typeId];
+  const type = openingTypeById(p, opening.typeId);
   if (!frame || !type) return null;
   // Cotas do lado da abertura (as alças de inversão ficam do lado oposto, para não se sobreporem).
   const dims = openingDimLines(frame, opening.offset, type.width, perpendicularNeighbors(p, opening.hostId, frame.wall.levelId), mode, opening.flipFacing ? -1 : 1);
@@ -54,7 +54,7 @@ export function OpeningTempDims({ openingId }: { openingId: Id }): ReactElement 
     const current = editor.project.elements[openingId];
     if (!current || !isOpening(current)) return;
     const f = frameOfWall(editor.project, current.hostId);
-    const t = editor.project.openingTypes[current.typeId];
+    const t = openingTypeById(editor.project, current.typeId);
     if (!f || !t) return;
     const currentDims = openingDimLines(f, current.offset, t.width, perpendicularNeighbors(editor.project, current.hostId, f.wall.levelId), mode, current.flipFacing ? -1 : 1);
     const result = editOpeningDim(currentDims, side, value, {

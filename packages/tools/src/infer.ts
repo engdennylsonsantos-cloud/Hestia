@@ -16,7 +16,7 @@ import {
   type Vec2,
 } from '@hestia/geom';
 import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia/engine';
-import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
+import { openingTypeById, openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
 import { addGridSnaps } from './gridSnapPoints.ts';
 import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
@@ -498,13 +498,13 @@ export function occupiedRanges(p: Project, wallId: Id, ignoreId?: Id, vertical?:
     .filter((o) => o.id !== ignoreId)
     .filter((o) => {
       if (!vertical) return true;
-      const t = p.openingTypes[o.typeId];
+      const t = openingTypeById(p, o.typeId);
       const sill = o.sillOverride ?? t?.sill ?? 0;
       const top = sill + (t?.height ?? 2.1);
       return sill < vertical[1] - 1e-6 && top > vertical[0] + 1e-6;
     })
     .map((o) => {
-      const t = p.openingTypes[o.typeId];
+      const t = openingTypeById(p, o.typeId);
       const h = (t?.width ?? 0.8) / 2;
       return [o.offset - h, o.offset + h] as [number, number];
     });

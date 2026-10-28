@@ -1,6 +1,6 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
+import { openingTypeById, dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -291,7 +291,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       for (const o of aberturasDaParede(p, w.id)) {
         const g = openingGeometry(p, o, f);
         if (sobCobertura(g.center)) continue;
-        const type = p.openingTypes[o.typeId];
+        const type = openingTypeById(p, o.typeId);
         if (!type) continue;
         const pt = paint[g.kind];
         const model = buildOpeningModel(p, o, g, f);

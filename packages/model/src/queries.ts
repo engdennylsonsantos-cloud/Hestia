@@ -1,4 +1,5 @@
 import { arcFromSagitta, dist } from '@hestia/geom';
+import { spanTypeOf } from './openingNominal.ts';
 import { profileMax } from './profile.ts';
 import { DEFAULT_VIEW_RANGE, type ViewRange } from './viewRange.ts';
 import { isOpening, isStair, isWall, type Id, type Level, type Opening, type OpeningType, type Project, type Stair, type Wall, type WallType } from './types.ts';
@@ -43,10 +44,11 @@ export const wallType = (p: Project, w: Wall): WallType => {
   return t;
 };
 
+/** Tipo da abertura já normalizado para o VÃO (`width`/`height` = vão, mesmo com `nominalRef` 'leaf'; ver `openingNominal.ts`). */
 export const openingType = (p: Project, o: Opening): OpeningType => {
   const t = p.openingTypes[o.typeId];
   if (!t) throw new Error(`Tipo de abertura ausente: ${o.typeId}`);
-  return t;
+  return spanTypeOf(t);
 };
 
 /** Arco do eixo, ou null se a parede for reta. */

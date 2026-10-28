@@ -1,5 +1,6 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import { wallLength } from './queries.ts';
+import { openingTypeById } from './openingNominal.ts';
 import {
   isOpening,
   isCeiling,
@@ -134,7 +135,7 @@ function transformWall(w: Wall, t: Transform): Wall {
 
 /** Garante que a abertura continue dentro da parede depois de qualquer edição. */
 export function clampOffset(p: Project, o: Opening, wall: Wall): number {
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   const half = (t?.width ?? 0.8) / 2;
   const l = wallLength(wall);
   return Math.max(Math.min(half, l / 2), Math.min(o.offset, l - Math.min(half, l / 2)));

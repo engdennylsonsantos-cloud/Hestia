@@ -2,6 +2,7 @@ import {
   OPENING_FRAME_DEFAULTS,
   openingFamilyOf,
   openingLintel,
+  spanTypeOf,
   type OpeningType,
 } from '@hestia/model';
 
@@ -54,7 +55,8 @@ export const openingClearHeight = (t: Pick<OpeningType, 'height' | 'frameWidth'>
   t.height - (t.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth);
 
 /** Área útil de ventilação (m²) da janela, pela fração da família; 0 para porta. */
-export function openingVentilationArea(t: OpeningType): number {
+export function openingVentilationArea(raw: OpeningType): number {
+  const t = spanTypeOf(raw);
   const factor = ventilationFactor(t);
   return factor === null ? 0 : t.width * t.height * factor;
 }
@@ -63,7 +65,8 @@ export function openingVentilationArea(t: OpeningType): number {
  * Lista de verificações do tipo, na ordem: largura livre (NBR 9050), altura livre, ventilação (janela), profundidade
  * do batente contra o núcleo da parede e presença de verga. `coreThickness` é a espessura do núcleo (DEC-1).
  */
-export function openingChecks(t: OpeningType, coreThickness: number): OpeningCheck[] {
+export function openingChecks(raw: OpeningType, coreThickness: number): OpeningCheck[] {
+  const t = spanTypeOf(raw); // as larguras e alturas abaixo são do VÃO (com `nominalRef` 'leaf' a folha ganha a folga)
   const out: OpeningCheck[] = [];
   const freeW = openingClearWidth(t);
   out.push(

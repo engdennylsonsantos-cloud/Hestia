@@ -20,7 +20,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { openingTypeById, GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -180,7 +180,7 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
       const g = openingGeometry(p, o, f);
       // Planta da esquadria pelo modelo único (spec E §4.1), no nível médio: o mesmo desenho da tela. O DXF põe a
       // camada; o desenho vem de `openingPlanPaths` e vale no corte (ABERTURAS) e na projeção (ABERTURA_*).
-      const type = p.openingTypes[o.typeId];
+      const type = openingTypeById(p, o.typeId);
       const model = type ? buildOpeningModel(p, o, g, f) : null;
       // No corte, a cota local desconta a base da parede e a soleira; na projeção, corta no meio do modelo.
       const cutZ = state === 'cut' ? view.cutZ - (f.z?.z0 ?? 0) - g.sill : (model?.height ?? 0) / 2;

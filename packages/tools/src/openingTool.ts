@@ -1,6 +1,6 @@
 import { orientedRect } from '@hestia/geom';
 import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
-import { openingType, openingsOfWall, type Opening } from '@hestia/model';
+import { openingTypeById, openingType, openingsOfWall, type Opening } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
 import { parseNumber } from './numeric.ts';
@@ -78,7 +78,7 @@ export class OpeningTool extends ToolBase {
 
   private resolve(offset: number, wallId: string, neighbors = perpendicularNeighbors(this.env.project(), wallId, this.env.levelId())): number | null {
     const p = this.env.project();
-    const t = p.openingTypes[this.typeId()];
+    const t = openingTypeById(p, this.typeId());
     const f = frameOfWall(p, wallId);
     if (!t || !f) return null;
     const half = t.width / 2;
@@ -121,7 +121,7 @@ export class OpeningTool extends ToolBase {
       }
     }
     for (const o of openingsOfWall(pr, wallId)) {
-      const ot = pr.openingTypes[o.typeId];
+      const ot = openingTypeById(pr, o.typeId);
       const ow = (ot?.width ?? 0.8) / 2;
       targets.push(
         { c: o.offset - ow - h, note: 'encosto na abertura' },
@@ -155,7 +155,7 @@ export class OpeningTool extends ToolBase {
       return;
     }
     const f = frameOfWall(pr, host.wallId);
-    const t = pr.openingTypes[this.typeId()];
+    const t = openingTypeById(pr, this.typeId());
     if (!f || !t) return;
     const neighbors = perpendicularNeighbors(pr, host.wallId, this.env.levelId());
     // O lado do cursor define o sentido, com histerese de 3 px perto do eixo.

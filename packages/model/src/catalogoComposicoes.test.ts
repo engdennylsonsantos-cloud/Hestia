@@ -73,3 +73,9 @@ describe('travessa-base sob vidro lateral até o piso (spec F1 §10, pergunta 2)
     expect(lat.luz.z0).toBeCloseTo(bases[0]!.rect.z1, 9);
   });
 });
+
+describe('janelas de composição cabem na parede padrão de 2,80 m', () => {
+  it('peitoril + altura não passa do topo da parede', () => {
+    for (const t of NOVOS.filter((x) => x.kind === 'window')) expect(t.sill + t.height, t.id).toBeLessThanOrEqual(2.8 + 1e-9);
+  });
+});

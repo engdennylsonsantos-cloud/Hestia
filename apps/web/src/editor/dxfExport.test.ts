@@ -698,9 +698,11 @@ describe('composição no DXF: as peças do vão vão para a camada do vão (sem
     expect(polylinesOf(text).some((x) => x.layer === 'ABERTURAS' || x.layer.startsWith('ABERTURA_ACIMA'))).toBe(false);
   });
 
-  // Pendente (fora desta tarefa): `FRAME_ROLES` (packages/engine/src/openingPlanNew.ts) não tem 'mullion', 'transom' nem 'bead', então a
-  // planta e o DXF não desenham os membros internos da composição. Quando entrarem, valer: todos saem em ABERTURA_SIMBOLO.
-  it.todo('Ex. 4: montantes, travessas e baguetes entram no símbolo (ABERTURA_SIMBOLO)');
+  it('Ex. 4 no corte: ombreiras, travessa superior, 2 montantes e a travessa interna (6 membros do quadro) entram no símbolo', () => {
+    const p = compPlan(EX4, 'door', 0).project;
+    const cut = polylinesOf(planDxf(p, 'lv_0')).filter((x) => x.layer === 'ABERTURA_SIMBOLO');
+    expect(cut.length).toBeGreaterThanOrEqual(6);
+  });
   it('Ex. 5 (janela) com peitoril 1,00 cruza o corte: o conjunto inteiro sai em ABERTURA_SIMBOLO', () => {
     const p = compPlan(EX5, 'window', 1).project;
     const text = planDxf(p, 'lv_0');

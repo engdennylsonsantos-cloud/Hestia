@@ -6,7 +6,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] U2 leitura de texto digitado
 - [x] U3 `ProjectSettings.units`
 - [x] U4 `parseQuantityText` (tools)
-- [ ] U5 hook `useUnits`
+- [x] U5 hook `useUnits`
 - [ ] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
 - [ ] U7 exportações independentes
 - [ ] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**

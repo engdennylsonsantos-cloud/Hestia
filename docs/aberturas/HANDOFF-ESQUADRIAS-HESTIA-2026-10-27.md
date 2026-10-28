@@ -4,6 +4,21 @@ Continua o [HANDOFF da v3](HANDOFF-ESQUADRIAS-v3-2026-10-27.md). Ramo de integra
 `integracao/telhados-grades`; **nada foi enviado ao GitHub**). Cada agente trabalhou num ramo `esquadrias/<nome>` com worktree em
 `..\wt\<nome>` (fora do repositório).
 
+## 0. PARADA DA SESSÃO (estado exato para retomar amanhã)
+
+Os agentes foram interrompidos por limite de sessão e o trabalho foi salvo em commits `wip` nos ramos abaixo (**nenhum foi validado por completo**).
+Rode `npx tsc -p tsconfig.json --noEmit` e os testes do pacote em cada ramo antes de mesclar.
+
+| Ramo | Commits | Estado |
+|---|---|---|
+| `esquadrias/E2a` | `52bb5c94` referência nominal folha × vão (`openingNominal.ts`, validado pelo agente); `c1b55979` parede curva (furo, retorno e batente na mesma geometria); `08d346c9` **wip** (`resolve.ts`, `openingCut.ts`) | parede curva e `nominalRef` feitos; **reveal (Tarefa 2) não confirmado**; falta rodar tsc/testes |
+| `esquadrias/E2b` | `141de252` **wip** único: soleira, folga inferior (`leafUndercut`), ferragens (`openingHardware.ts` + peças em `openingModelDoors*.ts`, `openingModelDetails.ts`) | o agente estava rodando typecheck e lint finais; 5 falhas de teste que já existiam em `esquadrias/v3`; **precisa validar tsc, lint e testes dos arquivos novos** |
+| `esquadrias/E3b` | `6f6a9d69` `leafPlan` no painel Planta e corte; `360df0f7` **wip** (`nominalRef` na Visão geral) | feito pelo `opencode` (DeepSeek flash); **o processo `opencode` pode continuar rodando em `..wtE3b`**: se estiver, feche-o (Gerenciador de Tarefas, `opencode.exe`/node) antes de mexer no ramo; restam `reveal`, soleira, `tiltAxis`, `leafMaterialId`, `glassKind` |
+| `esquadrias/v3` | v3 + E1a + E3a + E3c + E4 mesclados | base para mesclar os três acima na ordem E2a, E2b, E3b |
+| `integracao/telhados-grades` | rodada de telhados, grades e planta de cobertura (67 commits sobre a `main`) | `npm run check` verde; ver `docs/handoff/retomada-2026-10-27-telhados-grades.md` |
+
+Ordem de amanhã: (1) conferir/fechar E2a, E2b e E3b e mesclá-los em `esquadrias/v3`; (2) E3b2, E4b, E1b conforme §3; (3) verificação visual; (4) `npm run check`; (5) mesclar `esquadrias/v3` em `integracao/telhados-grades` e esta na `main` **só com confirmação do dono**.
+
 ## 1. Regras decididas pelo dono (não reverter)
 
 1. **Batente no núcleo** por padrão (`frameDepthMode: 'core'`). Opções por tipo: `'wall'` (espessura total da parede, como a caixa

@@ -1,4 +1,6 @@
 import {
+  canonComposition,
+  compositionIssue,
   compositionOfType,
   openingFamilyOf,
   openingProfilesOf,
@@ -38,12 +40,6 @@ function effectiveComposition(t: OpeningType): OpeningComposition {
   return compositionOfType(legacy as unknown as OpeningType);
 }
 
-/** JSON com chaves em ordem, para comparar composições sem depender da ordem dos campos. */
-const canon = (v: unknown): string =>
-  JSON.stringify(v, (_k, x: unknown) =>
-    x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x,
-  );
-
 /**
  * O caminho novo vale para composição de várias células e para uma célula AUTORAL (gravada e diferente da derivada dos
  * campos do tipo: perfis de preset, alizar próprio...). Uma célula igual à derivada segue nos builders por família, que
@@ -53,7 +49,7 @@ export function usesComposition(t: OpeningType, g: OpeningGeometry): OpeningComp
   if (g.leaves === 0) return null;
   const comp = effectiveComposition(t);
   if (comp.layout.kind === 'split') return comp;
-  return t.composition && canon(t.composition) !== canon(compositionOfType(t)) ? comp : null;
+  return t.composition && canonComposition(t.composition) !== canonComposition(compositionOfType(t)) ? comp : null;
 }
 
 /** O tipo com o quadro (estilo, modo de profundidade, J e profundidade) lido da composição: ela é a fonte do batente. */
@@ -69,6 +65,7 @@ function frameSyncedType(t: OpeningType, comp: OpeningComposition, p: Project): 
 }
 
 export function buildCompositionModel(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame, comp: OpeningComposition): OpeningModel | null {
+  if (compositionIssue(comp, openingProfilesOf(p))) return null; // inválida (arquivo antigo ou editado à mão): cai nos builders por família
   const base = makeCtx(p, o, g, f);
   if (!base) return null;
   const p2: Project = { ...p, openingTypes: { ...p.openingTypes, [o.typeId]: frameSyncedType(base.t, comp, p) } };

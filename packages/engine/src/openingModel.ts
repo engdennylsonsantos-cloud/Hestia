@@ -37,7 +37,7 @@ export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f:
     };
   }
   // Composição de várias células (bandeira, laterais, combinada): quadro único e células (spec F1 §3).
-  const comp = usesComposition(c.t, g);
+  const comp = usesComposition(p.openingTypes[o.typeId] ?? c.t, g); // tipo bruto: `c.t` já vem normalizado para o vão
   if (comp) {
     const m = buildCompositionModel(p, o, g, f, comp);
     if (m) return m;

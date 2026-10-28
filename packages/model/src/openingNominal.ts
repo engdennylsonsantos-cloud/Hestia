@@ -28,7 +28,7 @@ export function openingSpanGap(t: Partial<Pick<OpeningType, 'spanGap'>>): { w: n
 
 /** Vão do tipo (m): o que o motor recorta na parede e onde o batente se assenta. */
 export function openingSpanOf(t: NominalFields): { width: number; height: number } {
-  if (t.composition && t.composition.layout.kind === 'split') return compositionSpan(t.composition); // várias células: a composição manda
+  if (t.composition) return compositionSpan(t.composition); // a composição é a fonte do vão (uma célula: igual aos campos do tipo)
   if (openingNominalRef(t) !== 'leaf') return { width: t.width, height: t.height };
   const g = openingSpanGap(t);
   return { width: t.width + g.w, height: t.height + g.h };
@@ -36,7 +36,7 @@ export function openingSpanOf(t: NominalFields): { width: number; height: number
 
 /** Folha nominal do tipo (m): `width`/`height` com 'leaf'; com 'opening', o vão menos a folga (nunca negativa). */
 export function leafSizeOf(t: NominalFields): { width: number; height: number } {
-  if (t.composition && t.composition.layout.kind === 'split') return compositionLeafSize(t.composition);
+  if (t.composition) return compositionLeafSize(t.composition);
   if (openingNominalRef(t) === 'leaf') return { width: t.width, height: t.height };
   const g = openingSpanGap(t);
   return { width: Math.max(0, t.width - g.w), height: Math.max(0, t.height - g.h) };
@@ -47,9 +47,10 @@ export function leafSizeOf(t: NominalFields): { width: number; height: number } 
  * existente muda); com 'leaf' devolve uma cópia com `nominalRef` 'opening', para que o tipo normalizado não some a folga duas vezes.
  */
 export function spanTypeOf<T extends NominalFields>(t: T): T {
-  const varias = !!t.composition && t.composition.layout.kind === 'split'; // várias células: o vão é o da composição
-  if (!varias && openingNominalRef(t) !== 'leaf') return t;
+  const leaf = openingNominalRef(t) === 'leaf';
+  if (!t.composition && !leaf) return t;
   const s = openingSpanOf(t);
+  if (!leaf && s.width === t.width && s.height === t.height) return t; // vão igual ao do tipo: identidade
   return { ...t, width: s.width, height: s.height, nominalRef: 'opening' };
 }
 

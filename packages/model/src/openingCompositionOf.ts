@@ -55,6 +55,15 @@ const dividerOf = (frame: ProfileSpec, width: number) => ({ inline: { ...frame, 
  * mapeamento da §7 (bandeira acima da folha, vidros nas laterais; a célula principal é `fill`); `nominalRef 'leaf'` vira
  * 'opening' com o vão atual. Lê só campos do tipo; nunca lança (valores inválidos caem nos padrões).
  */
+/** JSON com chaves em ordem, para comparar composições sem depender da ordem dos campos. */
+export const canonComposition = (v: unknown): string =>
+  JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x,
+  );
+
+/** Famílias de janela que aceitam bandeira superior (E3 §7) e a única que aceita lateral (`window_fixed`). */
+const FAMILIAS_COM_BANDEIRA = new Set(['window_fixed', 'window_hinged', 'window_casement', 'window_sliding', 'window_tilt', 'window_pivot']);
+
 export function compositionOfType(t: OpeningType): OpeningComposition {
   const style = t.frameStyle ?? 'rebate';
   const frame: ProfileSpec = {
@@ -67,8 +76,11 @@ export function compositionOfType(t: OpeningType): OpeningComposition {
     ? { faces: t.casing.sides ?? ('both' as const), width: t.casing.width, thickness: t.casing.thickness, setback: 0 }
     : undefined;
   const head = { frame: { style, profile: { inline: frame }, depthMode: t.frameDepthMode ?? ('core' as const) }, ...(casing ? { casing } : {}) };
-  const sl = t.sidelights && (t.sidelights.left || t.sidelights.right) ? t.sidelights : undefined;
-  const tr = t.transom && t.transom.height > 0 ? t.transom : undefined;
+  // Janela: bandeira e laterais só onde o E3 §7 permite (o motor antigo ignorava nas demais famílias).
+  const fam = openingFamilyOf(t)?.id;
+  const janela = t.kind === 'window';
+  const sl = t.sidelights && (t.sidelights.left || t.sidelights.right) && (!janela || fam === 'window_fixed') ? t.sidelights : undefined;
+  const tr = t.transom && t.transom.height > 0 && (!janela || (t.leaves > 0 && !!fam && FAMILIAS_COM_BANDEIRA.has(fam))) ? t.transom : undefined;
 
   if (!sl && !tr) {
     const leaf = openingNominalRef(t) === 'leaf';
@@ -123,8 +135,10 @@ export const openingCompositionOf = (t: OpeningType): OpeningComposition => t.co
 export function withBridgedComposition(next: OpeningType, prev: OpeningType | undefined, profiles?: Record<string, ProfilePreset>): OpeningType {
   if (!next.composition && !prev?.composition) return next;
   // Composição editada direto (nova ou diferente da gravada) é preservada; os campos obsoletos só regeneram a composição intocada.
-  const edited = !!next.composition && (!prev?.composition || JSON.stringify(next.composition) !== JSON.stringify(prev.composition));
-  const legacy = !next.composition || (!edited && (next.composition.layout.kind === 'cell' || !!next.transom || !!next.sidelights));
+  const edited = !!next.composition && (!prev?.composition || canonComposition(next.composition) !== canonComposition(prev.composition));
+  // Só a composição DERIVADA dos campos antigos é regenerada quando eles mudam; a autoral (perfis, alizar, células) é preservada.
+  const derivada = !prev?.composition || canonComposition(prev.composition) === canonComposition(compositionOfType(prev));
+  const legacy = !next.composition || (!edited && derivada && (next.composition.layout.kind === 'cell' || !!next.transom || !!next.sidelights));
   const out = legacy ? { ...next, composition: compositionOfType(next) } : next;
   const issue = compositionIssue(out.composition!, profiles);
   if (issue) throw new Error(issue);

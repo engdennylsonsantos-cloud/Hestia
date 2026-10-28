@@ -87,7 +87,7 @@ export function openingFramePlacement(f: WallFrame, t: OpeningType): { D: number
   const fd = openingFrameDepth(t, f.thickness, coreWidth);
   const style = openingFrameStyle(t);
   if (style === 'aduela') return { D: coreWidth, Cd: (core.s0 + core.s1) / 2 };
-  const mode = t.frameDepthMode ?? 'wall';
+  const mode = t.frameDepthMode ?? 'core';
   if (mode === 'core') return { D: fd.depth, Cd: (core.s0 + core.s1) / 2 };
   if (mode === 'fixed') {
     const half = fd.depth / 2;

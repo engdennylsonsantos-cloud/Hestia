@@ -40,8 +40,8 @@ export interface OpeningType {
   frameWidth?: number;
   frameDepth?: number;
   /**
-   * Como a profundidade do batente se liga à parede (decisão 0035): 'wall' (padrão) = a espessura TOTAL da parede acabada (batente
-   * faceado com os acabamentos); 'core' = só o núcleo estrutural; 'fixed' = o valor de `frameDepth` (limitado à parede).
+   * Como a profundidade do batente se liga à parede (decisão 0035): 'core' (padrão) = só o núcleo estrutural; 'wall' = a espessura TOTAL da parede acabada (batente
+   * faceado com os acabamentos); 'fixed' = o valor de `frameDepth` (limitado à parede).
    */
   frameDepthMode?: OpeningFrameDepthMode;
   leafThickness?: number;

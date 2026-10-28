@@ -149,7 +149,7 @@ describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
     expect(f.box.z1).toBeLessThanOrEqual(c.g.height + 1e-9);
   });
 
-  it('peças de batente ficam dentro da parede e do vão (padrão frameDepthMode wall)', () => {
+  it('peças de batente ficam dentro da parede e do vão (padrão frameDepthMode core)', () => {
     for (const flipHand of [false, true]) {
       for (const flipFacing of [false, true]) {
         const c = cena('ot_p90', {}, { flipHand, flipFacing });
@@ -603,7 +603,7 @@ describe('partTransformed, slicePartsAtZ e projectParts', () => {
       }
       return Math.abs(a) / 2;
     };
-    const esperada = 0.05 * 0.184 - 0.015 * (0.04 + 0.004);
+    const esperada = 0.05 * 0.14 - 0.015 * (0.04 + 0.004);
     for (const o of corte) {
       expect(areaCadarco(o.ring)).toBeCloseTo(esperada, 9);
       expect(o.ring).toHaveLength(6);
@@ -738,13 +738,13 @@ describe('folha × batente: varredura de abertura sem interseção (spec E3 §5)
 });
 
 describe('buildOpeningModel: geometria do batente na parede', () => {
-  it('padrão wall: D = 0,184 da parede; core: D = 0,14 do núcleo; fixed: valor do tipo', () => {
+  it('padrão core: D = 0,14 do núcleo; wall: D = 0,184 da parede; fixed: valor do tipo', () => {
     const c = cena('ot_p90');
     const m = modelo(c);
     const jamb = de(m.parts, 'jamb')[0]!;
-    expect(jamb.box.s1 - jamb.box.s0).toBeCloseTo(0.184, 9);
-    const core = modelo(cena('ot_p90', { frameDepthMode: 'core' }));
-    expect(de(core.parts, 'jamb')[0]!.box.s1 - de(core.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.14, 9);
+    expect(jamb.box.s1 - jamb.box.s0).toBeCloseTo(0.14, 9);
+    const parede = modelo(cena('ot_p90', { frameDepthMode: 'wall' }));
+    expect(de(parede.parts, 'jamb')[0]!.box.s1 - de(parede.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.184, 9);
     const fixo = modelo(cena('ot_p90', { frameDepthMode: 'fixed', frameDepth: 0.09 }));
     expect(de(fixo.parts, 'jamb')[0]!.box.s1 - de(fixo.parts, 'jamb')[0]!.box.s0).toBeCloseTo(0.09, 9);
   });

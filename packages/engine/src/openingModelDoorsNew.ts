@@ -88,7 +88,7 @@ function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx 
   const frameStyle = openingFrameStyle(t);
   const J = frameStyle === 'aduela' ? 0.03 : fr.frameWidth;
   const fd = openingFrameDepth(t, f.thickness, coreWidth);
-  const mode = t.frameDepthMode ?? 'wall';
+  const mode = t.frameDepthMode ?? 'core';
   const D = frameStyle === 'aduela' ? coreWidth : fd.depth;
   const Cd =
     frameStyle === 'aduela' || mode === 'core'

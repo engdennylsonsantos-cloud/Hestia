@@ -3,8 +3,9 @@
 Decidido em 2026-10-26 com o dono, após a revisão da v2. Especificação: [E3](../aberturas/E3-spec-correcoes-v3.md).
 Pesquisa do ArchiCAD (abas, opções e lógica de modelagem) e do catálogo brasileiro: `docs/aberturas/archicad/`.
 
-1. O batente é **uma peça** com seção em L (rebaixo), não duas caixas; o profundidade do batente é configurável e, por padrão,
-   **acompanha a espessura total da parede acabada** (`frameDepthMode: 'wall'`), podendo ser só o núcleo ou um valor fixo.
+1. O batente é **uma peça** com seção em L (rebaixo), não duas caixas; a profundidade do batente é configurável e, por padrão,
+   **fica no núcleo da parede** (`frameDepthMode: 'core'`, decisão do dono). Opções por tipo: `'wall'` (espessura total da parede
+   acabada, como o "Frame Thickness = Wall Thickness" do ArchiCAD) e `'fixed'` (valor de `frameDepth`).
 2. O acabamento da parede **encosta no batente** (sem retorno por cima dele); retorno explícito é recortado pelo batente.
 3. O alizar assenta sobre a face acabada, cobre a junta e é uma silhueta única por face.
 4. A folha articula pela face oposta ao lado de abertura: aberta ou fechada nunca se sobrepõe ao batente nem a si mesma.

@@ -124,7 +124,7 @@ export function windowLayout(c: Pick<WindowCtx, 't' | 'hw' | 'H' | 'J' | 'transo
     if (c.sidelights.left) t0 += w;
     if (c.sidelights.right) t1 -= w;
   }
-  let z0 = c.J;
+  const z0 = c.J;
   let z1 = c.H - c.J;
   let transom: WindowLayout['transom'] = null;
   if (c.transom && windowTransomApplies(c.t)) {

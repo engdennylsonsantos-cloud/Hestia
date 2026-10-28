@@ -409,15 +409,15 @@ describe('porta pivotante aberta', () => {
   });
 
   it('fechada: folha no centro de t, apoiada no batente (sem dobradiça)', () => {
-    const c = cena('ot_pp80');
+    const c = cena('ot_pp80', { frameDepthMode: 'core' });
     const fechada = pecas(c, false);
     expect(fechada.some((x) => x.hinge)).toBe(false);
     const folha = fechada.find((x) => x.role === 'leaf')!;
     const f = frameOfWall(c.p, 'w')!;
     const core = coreSpan(f.type);
     const fr = openingFrame(c.p.openingTypes[c.o.typeId]!, core.to - core.from);
-    // Batente no núcleo: a folha fica 4 mm da face do núcleo (y = início do núcleo + folga + meia espessura). A folha ocupa
-    // quase todo o vão: metade da largura = eixo + braço sem varrer a ombreira, √((face − eixo − 0,5 mm)² − L²).
+    // Batente no núcleo (modo core): a folha fica 4 mm da face do núcleo (y = início do núcleo + folga + meia espessura).
+    // A folha ocupa quase todo o vão: metade da largura = eixo + braço sem varrer a ombreira, √((face − eixo − 0,5 mm)² − L²).
     const eixo = c.g.width / 4;
     const face = c.g.width / 2 - 0.05;
     expect(folha.w).toBeCloseTo(2 * (eixo + Math.sqrt((face - eixo - 0.0005) ** 2 - fr.leafThickness ** 2)), 9);

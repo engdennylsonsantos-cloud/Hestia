@@ -1,6 +1,6 @@
 import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
-import { isRoof, mansardProblems, type Id, type Project, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, mansardProblems, unitsOf, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
 import { hasRoofArcs, roofEaveArcsProblem } from './perimeterRoofArcs.ts';
 import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
@@ -53,7 +53,7 @@ function gableEdgesAt(step: SkeletonStep, roof: Roof): number[] {
  * a causa e a saída. Cita as arestas sem inclinação que chegam ali, quando o motor as identifica. Recusa a criação ou a
  * alteração em vez de deixar um aviso: o usuário vê onde corrigir e o que fazer.
  */
-function stepsReason(steps: SkeletonStep[], roof: Roof): string {
+function stepsReason(steps: SkeletonStep[], roof: Roof, u: ResolvedUnits): string {
   const points = pointsText(steps);
   const corners = steps.every((s) => cornerAt(s, roof) !== null);
   const where =
@@ -62,7 +62,7 @@ function stepsReason(steps: SkeletonStep[], roof: Roof): string {
       : corners
         ? `nos cantos reentrantes em ${points} m`
         : `em ${points} m`;
-  const degraus = steps.map((s) => s.dz.toFixed(2).replace('.', ','));
+  const degraus = steps.map((s) => formatQuantity(u, 'length', s.dz, { withUnit: false }));
   const cause =
     steps.length === 1
       ? `as águas que chegam ali ficam com um degrau de ${degraus[0]} m`
@@ -100,7 +100,7 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
     if (!res) return 'o telhado não pôde ser resolvido';
     if (res.problem) return res.problem;
     if (res.planes.length === 0) return noWaterReason(r);
-    if (res.steps?.length) return stepsReason(res.steps, r);
+    if (res.steps?.length) return stepsReason(res.steps, r, unitsOf(p));
   }
   return null;
 }

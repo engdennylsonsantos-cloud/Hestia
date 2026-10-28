@@ -1,5 +1,5 @@
 import { add, len, mul, norm, sub, type SketchDraft, type SketchSeg, type Vec2 } from '@hestia/geom';
-import type { Id, Project } from '@hestia/model';
+import { formatQuantity, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { SELECT_PX, hitSeg, segLines } from './perimeterToolPick.ts';
 import type { PointerInfo, PreviewItem, ToolOptions } from './types.ts';
@@ -91,4 +91,4 @@ export function alongTo(from: Vec2, to: Vec2, v: number): Vec2 {
 }
 
 /** Número para a barra de status: até o milímetro, sem zeros à direita. */
-export const fmt = (v: number): string => String(Number(v.toFixed(3)));
+export const fmt = (u: ResolvedUnits, v: number): string => formatQuantity(u, 'length', v, { withUnit: false, trim: true });

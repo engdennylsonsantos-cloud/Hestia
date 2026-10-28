@@ -1,8 +1,9 @@
 import { dist, type Vec2 } from '@hestia/geom';
+import { formatQuantity, unitsOf, type ResolvedUnits } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import type { PointerInfo } from './types.ts';
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /**
  * Linha de separação de ambiente (Revit: Room Separation Line). Clique no ponto inicial e depois no final; a linha
@@ -31,7 +32,7 @@ export class RoomSeparatorTool extends ToolBase {
     this.items = [
       { kind: 'point', at: this.a },
       { kind: 'line', a: this.a, b, dashed: true },
-      { kind: 'label', at: { x: (this.a.x + b.x) / 2, y: (this.a.y + b.y) / 2 }, text: fmt(dist(this.a, b)) },
+      { kind: 'label', at: { x: (this.a.x + b.x) / 2, y: (this.a.y + b.y) / 2 }, text: fmt(unitsOf(this.env.project()), dist(this.a, b)) },
     ];
   }
 

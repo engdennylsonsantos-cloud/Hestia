@@ -1,12 +1,12 @@
 import { add, dist, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
-import { DEFAULT_GRID_TYPE_ID, GRID_MIN_SEGMENT, isWall, nextGridName, newId, type Grid } from '@hestia/model';
+import { DEFAULT_GRID_TYPE_ID, GRID_MIN_SEGMENT, formatQuantity, isWall, nextGridName, newId, unitsOf, type Grid, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { clampSag, gridPreviewItems } from './gridGeom.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { pickAt } from './pick.ts';
 import type { GridMode, PointerInfo } from './types.ts';
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 const HINTS: Record<GridMode, string> = {
   line: 'Grade: clique no início e no fim do eixo, ou digite o comprimento e Enter.',
@@ -100,13 +100,13 @@ export class GridTool extends ToolBase {
     }
     if (mode === 'arc' && this.pts.length === 2) {
       const sag = this.sagFor(at);
-      this.items.push(...gridPreviewItems({ points: this.pts, sag }), { kind: 'label', at, text: `flecha ${fmt(Math.abs(sag))}` });
+      this.items.push(...gridPreviewItems({ points: this.pts, sag }), { kind: 'label', at, text: `flecha ${fmt(unitsOf(this.env.project()), Math.abs(sag))}` });
       return;
     }
     if (dist(last, at) < 1e-6) return;
     const fixed = mode === 'multi' ? this.pts : [last];
     this.items.push(...gridPreviewItems({ points: [...fixed, at], sag: 0 }));
-    this.items.push({ kind: 'label', at: add(last, mul(sub(at, last), 0.5)), text: fmt(dist(last, at)) });
+    this.items.push({ kind: 'label', at: add(last, mul(sub(at, last), 0.5)), text: fmt(unitsOf(this.env.project()), dist(last, at)) });
   }
 
   override click(p: PointerInfo): void {
@@ -159,7 +159,7 @@ export class GridTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.pts.length || this.mode() === 'pick') return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');
       return false;

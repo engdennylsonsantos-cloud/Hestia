@@ -88,7 +88,7 @@ describe('escada reta: "Nº de espelhos" editado nas Propriedades', () => {
     const ctx = setup();
     drawTo(tool('stairrun', ctx.env), [0, 4.2]);
     const r = regenStraightComponents(stairsOf(ctx.store)[0]!, 30, 0.2);
-    expect(r).toEqual({ error: 'com 30 espelhos o piso ficaria em 14,5 cm, abaixo do mínimo do tipo (20 cm).' });
+    expect(r).toEqual({ error: 'com 30 espelhos o piso ficaria em 14,5 cm, abaixo do mínimo do tipo (20,0 cm).' });
   });
 
   it('escada que não é reta gerada não tem o nº de espelhos editável', () => {

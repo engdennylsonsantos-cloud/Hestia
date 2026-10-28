@@ -1,6 +1,6 @@
 import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
-import { isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
+import { formatQuantity, isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
@@ -13,7 +13,7 @@ import { pickRoofAt, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
@@ -33,7 +33,7 @@ interface AnyHit {
   kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view' | 'grid';
 }
 
-const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmtLen = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Shift ou Ctrl (Cmd no Mac): o clique e a janela somam à seleção (Ctrl alterna quem já está selecionado). */
 const soma = (p: PointerInfo): boolean => p.shift || p.ctrl;
@@ -147,7 +147,7 @@ export class SelectTool extends ToolBase {
     if (w && this.mode === 'idle') {
       const a = w.a;
       const b = w.b;
-      this.items.push({ kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: fmtLen(dist(a, b)) });
+      this.items.push({ kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: fmtLen(unitsOf(this.env.project()), dist(a, b)) });
     }
   }
 
@@ -178,7 +178,7 @@ export class SelectTool extends ToolBase {
   override type(text: string): boolean {
     const w = this.singleWall();
     if (!w) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
       this.env.say('Valor inválido. Digite um número em metros.');
       return false;
@@ -191,7 +191,7 @@ export class SelectTool extends ToolBase {
     this.env.transaction('Alterar comprimento', () => {
       for (const c of r.commands) this.env.exec(c);
     });
-    this.env.say(`Comprimento alterado para ${fmtLen(v)}. Ctrl+Z desfaz.`);
+    this.env.say(`Comprimento alterado para ${fmtLen(unitsOf(this.env.project()), v)}. Ctrl+Z desfaz.`);
     return true;
   }
 

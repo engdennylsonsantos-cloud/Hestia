@@ -1,5 +1,5 @@
 import { add, len, mul, norm, sub } from '@hestia/geom';
-import { isWall, type Command, type Id, type Project } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, type Command, type Id, type Project } from '@hestia/model';
 import { followingEnds } from './pick.ts';
 
 /** Comprimento mínimo aceito pela cota temporária (mesmo limite da ferramenta Parede). */
@@ -15,7 +15,7 @@ export function resizeWallCommands(p: Project, levelId: Id, wallId: Id, length: 
   if (!isWall(w)) return { error: 'Selecione uma parede.' };
   if (w.sag !== 0) return { error: 'Alterar o comprimento por cota ainda não é suportado em parede curva.' };
   // Negação escrita como comparação positiva: NaN também é rejeitado.
-  if (!(length >= MIN_EDIT_LENGTH)) return { error: `Comprimento mínimo: ${MIN_EDIT_LENGTH.toFixed(2).replace('.', ',')} m.` };
+  if (!(length >= MIN_EDIT_LENGTH)) return { error: `Comprimento mínimo: ${formatQuantity(unitsOf(p), 'length', MIN_EDIT_LENGTH)}.` };
   const d = sub(w.b, w.a);
   if (len(d) < 1e-9) return { error: 'A parede não tem direção definida.' };
   const newB = add(w.a, mul(norm(d), length));

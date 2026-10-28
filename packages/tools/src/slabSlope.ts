@@ -1,5 +1,5 @@
 import { add, boxOf, dist, mul, norm, rotate, sub, type Vec2 } from '@hestia/geom';
-import type { SlabSlope } from '@hestia/model';
+import { defaultUnits, formatQuantity, type ResolvedUnits, type SlabSlope } from '@hestia/model';
 import type { PreviewItem } from './types.ts';
 
 /** Maior inclinação aceita, em módulo (100 % = 45°). */
@@ -12,7 +12,7 @@ export function slopeArrowLength(boundary: Vec2[]): number {
 }
 
 /** Percentual para texto: "5,0 %". */
-export const fmtPercent = (v: number): string => `${v.toFixed(1).replace('.', ',')} %`;
+export const fmtPercent = (u: ResolvedUnits, v: number): string => formatQuantity(u, 'slope', v / 100);
 
 /** Erro do percentual (não finito ou acima do limite), ou null quando é aceito. */
 export function slopeError(percent: number): string | null {
@@ -31,7 +31,7 @@ export function slopeFrom(o: Vec2, d: Vec2, percent: number): SlabSlope | null {
  * Prévia da linha de caimento: seta tracejada a partir da origem, na direção do caimento, com o percentual
  * ao lado da seta. `length` é o comprimento da seta em metros (ajustado à laje pela ferramenta).
  */
-export function slopePreview(slope: Pick<SlabSlope, 'origin' | 'dir' | 'percent'>, length: number): PreviewItem[] {
+export function slopePreview(slope: Pick<SlabSlope, 'origin' | 'dir' | 'percent'>, length: number, u: ResolvedUnits = defaultUnits()): PreviewItem[] {
   const a = slope.origin;
   const b = add(a, mul(slope.dir, length));
   const head = length * 0.12;
@@ -43,6 +43,6 @@ export function slopePreview(slope: Pick<SlabSlope, 'origin' | 'dir' | 'percent'
     { kind: 'line', a, b, dashed: true },
     { kind: 'line', a: b, b: wing1 },
     { kind: 'line', a: b, b: wing2 },
-    { kind: 'label', at: mid, text: fmtPercent(slope.percent) },
+    { kind: 'label', at: mid, text: fmtPercent(u, slope.percent) },
   ];
 }

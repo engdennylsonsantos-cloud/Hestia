@@ -2,7 +2,8 @@ import { dist, type Vec2 } from '@hestia/geom';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionValue, formatDimension, newId, roundMm, type Dimension, type DimensionRef } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { endRefAt, signedOffset } from './annotationPick.ts';
-import { parseNumber } from './numeric.ts';
+import { unitsOf } from '@hestia/model';
+import { parseQuantityText } from './numeric.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
 /**
@@ -110,13 +111,13 @@ export class DimensionTool extends ToolBase {
 
   override type(text: string): boolean {
     if (this.offsetStage) {
-      const value = parseNumber(text);
+      const value = parseQuantityText(text, unitsOf(this.env.project()), 'length');
       if (value === null || value <= 0) { this.env.say('Digite o afastamento em metros, maior que zero.'); return false; }
       this.commitChain(this.side(this.raw) * value);
       return true;
     }
     if (!this.a || !this.b) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null || v === 0) {
       this.env.say('Digite o deslocamento em metros, diferente de zero. Com sinal negativo, a cota vai para o lado direito de a→b.');
       return false;

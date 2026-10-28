@@ -1,5 +1,6 @@
 import { dist, mid, type SketchDraft, type SketchSeg, type Vec2 } from '@hestia/geom';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
+import type { ResolvedUnits } from '@hestia/model';
 import { selectSegsMode, setSegSlope, effectiveSeg } from './perimeterSession.ts';
 import { ROOM_HINT, SELECT_PX, hasSeg, hitSeg, segLines, triangleHit } from './perimeterToolPick.ts';
 import { perimeterFromBox } from './sketchByPerimeter.ts';
@@ -18,13 +19,13 @@ export const BOX_MIN_PX = 4;
  * Com ";" cada parte pode usar vírgula decimal ("2,5;3"); com ", " o par precisa de exatamente um separador com espaço
  * ("2, 3", "2,5, 3,5"). Vírgula sem espaço é decimal: "2,5" continua sendo o número único 2,5 (distância), não um par.
  */
-export function parseDelta(text: string): Vec2 | null {
+export function parseDelta(text: string, u: ResolvedUnits): Vec2 | null {
   const t = text.trim();
   if (!t) return null;
   const parts = t.includes(';') ? t.split(';') : t.split(', ');
   if (parts.length !== 2) return null;
-  const x = parseNumber(parts[0]!);
-  const y = parseNumber(parts[1]!);
+  const x = parseQuantityText(parts[0]!, u, 'length');
+  const y = parseQuantityText(parts[1]!, u, 'length');
   return x === null || y === null ? null : { x, y };
 }
 

@@ -20,6 +20,7 @@ import {
   type Project,
   type Slab,
   type ValidationIssue,
+unitsOf,
 } from '@hestia/model';
 import { OUTLINE_LOCKED_MSG } from './outlineEdit.ts';
 import { areaText, keepOrder, longestSideMid, newError, pickTypeId, refuse, sameRing, sameRings, withElement } from './perimeterCommitShared.ts';
@@ -118,7 +119,7 @@ function createArea(p: Project, target: AreaTarget, outer: Vec2[], holes: Vec2[]
   const boundary = link ? link.boundary : outer;
   const common = { id, levelId, boundary, holes, mark: opts.mark ?? '', comments: opts.comments ?? '' };
   const origin = link ? { outlineSource: link.outline } : opts.extendToCore ? { outlineSource: coreOutline() } : {};
-  const message = `${NAME[target]} criado: ${areaText(boundary, holes)}.${unlinkedNote(opts)}`;
+  const message = `${NAME[target]} criado: ${areaText(unitsOf(p), boundary, holes)}.${unlinkedNote(opts)}`;
   if (target === 'floor') {
     const typeId = pickTypeId(p.floorTypes, opts.typeId);
     if (!typeId) return refuse('O projeto não tem tipo de piso.');
@@ -158,7 +159,7 @@ function createCeiling(p: Project, levelId: Id, outer: Vec2[], holes: Vec2[][], 
     comments: opts.comments ?? '',
     ...(roomId ? { roomId, roomLinked: true } : {}),
   });
-  const message = `Forro criado: ${areaText(shape.boundary, shape.holes)}${roomId ? ' (acompanha o ambiente)' : ''}.`;
+  const message = `Forro criado: ${areaText(unitsOf(p), shape.boundary, shape.holes)}${roomId ? ' (acompanha o ambiente)' : ''}.`;
   return checked(p, id, { type: 'addCeiling', ceiling }, { ...ceiling, order: p.nextOrder }, ceilingIssues, message);
 }
 
@@ -201,7 +202,7 @@ function editPlate(p: Project, el: Floor | Slab, outer: Vec2[], holes: Vec2[][],
   const problem = newError(p, withElement(p, next), el.id, validateProject);
   if (problem) return refuse(`Alteração não aplicada: ${problem}`);
   const label = NAME[el.kind];
-  const message = `${label} atualizado: ${areaText(patch.boundary ?? outer, patch.holes ?? holes)}.${link ? ' Vinculado às paredes.' : unlinkedNote(opts)}`;
+  const message = `${label} atualizado: ${areaText(unitsOf(p), patch.boundary ?? outer, patch.holes ?? holes)}.${link ? ' Vinculado às paredes.' : unlinkedNote(opts)}`;
   return { ok: true, id: el.id, commands: [{ type: 'updateElements', ids: [el.id], patch }], message };
 }
 
@@ -226,7 +227,7 @@ function editCeiling(p: Project, el: Ceiling, outer: Vec2[], holes: Vec2[][], op
     if (problem) return refuse(`Alteração não aplicada: ${problem}`);
     const update: Command = { type: 'updateElements', ids: [el.id], patch };
     const commands: Command[] = relink ? [{ type: 'relinkCeilingRoom', id: el.id, roomId: want }, update] : [update];
-    return { ok: true, id: el.id, commands, message: `Forro atualizado: ${areaText(poly[0]!, poly.slice(1))} (acompanha o ambiente).` };
+    return { ok: true, id: el.id, commands, message: `Forro atualizado: ${areaText(unitsOf(p), poly[0]!, poly.slice(1))} (acompanha o ambiente).` };
   }
   const patch: Partial<Ceiling> = { boundary: outer, holes: keepOrder(areaSides(p, el).holes, holes) };
   if (opts.heightOffset !== undefined) patch.heightOffset = opts.heightOffset;
@@ -238,5 +239,5 @@ function editCeiling(p: Project, el: Ceiling, outer: Vec2[], holes: Vec2[][], op
   if (problem) return refuse(`Alteração não aplicada: ${problem}`);
   const update: Command = { type: 'updateElements', ids: [el.id], patch };
   const commands: Command[] = detach ? [{ type: 'detachCeilingRoom', id: el.id }, update] : [update];
-  return { ok: true, id: el.id, commands, message: `Forro atualizado: ${areaText(outer, patch.holes ?? holes)}.` };
+  return { ok: true, id: el.id, commands, message: `Forro atualizado: ${areaText(unitsOf(p), outer, patch.holes ?? holes)}.` };
 }

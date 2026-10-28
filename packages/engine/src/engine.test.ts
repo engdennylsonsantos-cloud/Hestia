@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { closeGaps, multiArea, union } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeWall, type Wall } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeWall, type OpeningType, type Wall } from '@hestia/model';
 import { buildFrame, computeEnds, endPartners, joinStatus, quantifyLevel, resolveLevel } from './index.ts';
 
 const T14 = 0.184;
@@ -426,10 +426,10 @@ describe('tolerância de junção', () => {
 });
 
 describe('retorno de acabamento (wrapping)', () => {
-  const withWindow = (wt: Partial<{ wrapInserts: 'none' | 'interior' | 'exterior' | 'both'; wrapEnds: 'none' | 'interior' | 'exterior' | 'both' }>, closure?: 'inherit' | 'none' | 'interior' | 'exterior' | 'both') => {
+  const withWindow = (wt: Partial<{ wrapInserts: 'none' | 'interior' | 'exterior' | 'both'; wrapEnds: 'none' | 'interior' | 'exterior' | 'both' }>, closure?: 'inherit' | 'none' | 'interior' | 'exterior' | 'both', extra: Partial<OpeningType> = {}) => {
     const s = setup([wall('a', 0, 0, 4, 0)]);
     s.exec({ type: 'upsertWallType', wallType: { ...s.project.wallTypes.wt_alv14!, ...wt } });
-    if (closure) s.exec({ type: 'upsertOpeningType', openingType: { ...s.project.openingTypes.ot_j120!, closure } });
+    if (closure || Object.keys(extra).length) s.exec({ type: 'upsertOpeningType', openingType: { ...s.project.openingTypes.ot_j120!, ...(closure ? { closure } : {}), ...extra } });
     s.exec({ type: 'addOpening', opening: { id: 'j', kind: 'window', typeId: 'ot_j120', hostId: 'a', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
     return s;
   };
@@ -444,10 +444,11 @@ describe('retorno de acabamento (wrapping)', () => {
   });
   it('o fechamento explícito é recortado pelo batente; sem batente vale o da parede', () => {
     expect(silhouetteArea(withWindow({ wrapInserts: 'both' }, 'none'))).toBeCloseTo(base, 5);
-    // Batente no núcleo (padrão, 0,14 m de 0,184 m): o batente recorta o fechamento só no núcleo. Sobram 4 faixas
+    // Batente no núcleo (0,14 m de 0,184 m): o batente recorta o fechamento só no núcleo. Sobram 4 faixas
     // de reboco (2,2 cm × 2,2 cm) entre a face da parede e o núcleo nas ombreiras (medido: 1,936e-3 m²), e não
-    // dependem da largura nem da altura do vão.
-    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base + 4 * 0.022 * 0.022, 6);
+    // dependem da largura nem da altura do vão. Com o batente faceado (padrão) não sobra retorno.
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both', { frameDepthMode: 'core' }))).toBeCloseTo(base + 4 * 0.022 * 0.022, 6);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base, 6);
     // Vão livre (sem batente) mantém o retorno da parede.
     const vao = setup([wall('a', 0, 0, 4, 0)]);
     vao.exec({ type: 'upsertWallType', wallType: { ...vao.project.wallTypes.wt_alv14!, wrapInserts: 'both' } });

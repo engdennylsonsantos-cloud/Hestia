@@ -110,6 +110,7 @@ export function newOpeningTypeFromFamily(family: OpeningFamily): OpeningType {
     leafStyle: defaultLeafStyle(family.kind),
     handle: defaultHandleFor(family),
     frameStyle: 'rebate',
+    frameDepthMode: 'wall',
     angle2d: 90,
     angle3d: defaultAngle3dFor(family),
   };

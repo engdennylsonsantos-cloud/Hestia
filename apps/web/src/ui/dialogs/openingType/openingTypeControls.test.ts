@@ -65,7 +65,8 @@ const selectedValue = (html: string, id: string): string | null => {
 describe('controles novos: visibilidade derivada da tabela de suporte', () => {
   it.each(OPENING_FAMILIES.map((f) => f.id))('%s', (familyId) => {
     const sup = openingOptionSupport(familyId);
-    const html = htmlDaFamilia(familyId);
+    // O recuo só aparece fora do modo "parede inteira" (padrão hoje); o teste da tabela usa o núcleo.
+    const html = htmlDaFamilia(familyId, { frameDepthMode: 'core' });
     expect(tem(html, 'op-leaf-plan'), 'folha em planta').toBe(sup.angle);
     expect(tem(html, 'op-nominal'), 'referência do tamanho').toBe(sup.nominalRef);
     expect(tem(html, 'op-reveal'), 'recuo do batente').toBe(sup.reveal);

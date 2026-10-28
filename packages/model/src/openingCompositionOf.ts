@@ -75,7 +75,7 @@ export function compositionOfType(t: OpeningType): OpeningComposition {
   const casing = t.casing
     ? { faces: t.casing.sides ?? ('both' as const), width: t.casing.width, thickness: t.casing.thickness, setback: 0 }
     : undefined;
-  const head = { frame: { style, profile: { inline: frame }, depthMode: t.frameDepthMode ?? ('core' as const) }, ...(casing ? { casing } : {}) };
+  const head = { frame: { style, profile: { inline: frame }, depthMode: t.frameDepthMode ?? ('wall' as const) }, ...(casing ? { casing } : {}) };
   // Janela: bandeira e laterais só onde o E3 §7 permite (o motor antigo ignorava nas demais famílias).
   const fam = openingFamilyOf(t)?.id;
   const janela = t.kind === 'window';

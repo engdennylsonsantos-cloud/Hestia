@@ -58,13 +58,13 @@ const divisao = (p: Perfis, id: string, axis: 'cols' | 'rows', children: Child[]
 const porta = (p: Perfis, width: number, layout: CompositionNode): OpeningComposition => ({
   version: COMPOSITION_VERSION,
   nominal: { ref: 'leaf', width, height: 2.1, gap: { w: 0.08, h: 0.05 }, nominalCellId: 'folha' } satisfies NominalSpec,
-  frame: { style: 'rebate', profile: { presetId: p.batente }, depthMode: 'core' },
+  frame: { style: 'rebate', profile: { presetId: p.batente }, depthMode: 'wall' },
   layout,
 });
 const janela = (p: Perfis, width: number, height: number, layout: CompositionNode): OpeningComposition => ({
   version: COMPOSITION_VERSION,
   nominal: { ref: 'opening', width, height },
-  frame: { style: 'rebate', profile: { presetId: p.batente }, depthMode: 'core' },
+  frame: { style: 'rebate', profile: { presetId: p.batente }, depthMode: 'wall' },
   layout,
 });
 

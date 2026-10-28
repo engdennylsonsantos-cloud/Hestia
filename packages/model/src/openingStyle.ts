@@ -78,7 +78,7 @@ export function openingFrameDepth(
 ): OpeningFrameDepth {
   const wall = Math.max(0, Number.isFinite(wallThickness) ? wallThickness : 0);
   const core = Math.max(0, Number.isFinite(coreThickness) ? Math.min(coreThickness, wall) : wall);
-  const mode = oneOf(t.frameDepthMode, ['wall', 'core', 'fixed'] as const, 'core');
+  const mode = oneOf(t.frameDepthMode, ['wall', 'core', 'fixed'] as const, 'wall');
   if (mode === 'core') return { depth: core, centerOffset: 0 };
   if (mode === 'fixed') {
     const pedido = typeof t.frameDepth === 'number' && Number.isFinite(t.frameDepth) && t.frameDepth > 0 ? t.frameDepth : 0.09;

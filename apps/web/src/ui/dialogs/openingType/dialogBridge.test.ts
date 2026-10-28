@@ -45,6 +45,6 @@ describe('assinatura da prévia', () => {
     const sig = previewTypeSignature(t);
     expect(previewTypeSignature({ ...t, name: 'Outro nome', cost: 99, code: 'X' })).toBe(sig);
     expect(previewTypeSignature({ ...t, reveal: { depth: 0.02 } })).not.toBe(sig);
-    expect(previewTypeSignature({ ...t, composition: { ...t.composition!, frame: { ...t.composition!.frame, depthMode: 'wall' } } })).not.toBe(sig);
+    expect(previewTypeSignature({ ...t, composition: { ...t.composition!, frame: { ...t.composition!.frame, depthMode: 'core' } } })).not.toBe(sig);
   });
 });

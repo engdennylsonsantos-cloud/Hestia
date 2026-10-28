@@ -170,7 +170,7 @@ describe('normalizeComposition', () => {
     for (const c of [EX1, EX3, EX5]) expect(normalizeComposition(JSON.parse(JSON.stringify(c)))).toEqual(c);
     const n = normalizeComposition({ nominal: { width: 1, height: 2 }, frame: { profile: BAT }, layout: leaf(), casing: { width: 0.07, thickness: 0.015 } });
     expect(n.frame.style).toBe('rebate');
-    expect(n.frame.depthMode).toBe('core');
+    expect(n.frame.depthMode).toBe('wall');
     expect(n.casing).toMatchObject({ faces: 'both', setback: 0 });
   });
   it('lança em entrada que não é composição', () => {

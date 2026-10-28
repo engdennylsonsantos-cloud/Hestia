@@ -115,7 +115,8 @@ describe('retorno do acabamento: opt-in com batente, livre sem batente, exclusiv
 
   it('closure explícito com batente gera retorno e ele não tem área comum com o batente', () => {
     for (const closure of ['both', 'exterior', 'interior'] as const) {
-      const c = cena('ot_p90', { closure });
+      // Batente no núcleo: com o batente faceado (padrão) ele ocupa a parede inteira e não sobra retorno.
+      const c = cena('ot_p90', { closure, frameDepthMode: 'core' });
       const modo = insertMode(c.f.type, c.t);
       expect(modo).toBe(closure);
       const rets = insertReturns(c.f, c.o.offset, c.t.width, modo, { ot: c.t, side: 1 });

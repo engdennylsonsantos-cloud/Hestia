@@ -5,15 +5,15 @@ import { setRevealDepth } from '../openingTypeControls.ts';
 import { FIELD_FRAME, MaterialSelect, usePanelKit, type PanelProps } from './panelKit.tsx';
 
 const MODOS: ReadonlyArray<readonly [OpeningFrameDepthMode, string]> = [
-  ['core', 'Só o núcleo da parede'],
-  ['wall', 'Parede inteira (faceado)'],
+  ['wall', 'Espessura acabada da parede'],
+  ['core', 'Espessura do núcleo'],
   ['fixed', 'Valor fixo'],
 ];
 
 /** Batente: estilo, perfil, profundidade (e como ela se liga à parede) e material. */
 export function FramePanel({ d, onChange, materials }: PanelProps): ReactElement {
   const k = usePanelKit(d, onChange);
-  const modo = d.frameDepthMode ?? 'core';
+  const modo = d.frameDepthMode ?? 'wall';
   return (
     <>
       <div className="field-row">
@@ -24,12 +24,12 @@ export function FramePanel({ d, onChange, materials }: PanelProps): ReactElement
       </div>
       <div className="field-row"><label htmlFor="op-fw" title="Largura do perfil visto de frente (ombreiras, verga, soleira)">Largura do perfil</label><NumField id="op-fw" value={d.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => k.set({ frameWidth: v })} /></div>
       <div className="field-row">
-        <label htmlFor="op-fdm" title="Como a profundidade do batente se liga à espessura da parede">Profundidade: modo</label>
+        <label htmlFor="op-fdm" title="Como a profundidade do batente se liga à espessura da parede">Profundidade do batente</label>
         <select
           id="op-fdm"
           className="select"
           value={modo}
-          onChange={(e) => (e.target.value === 'core' ? k.limpar('frameDepthMode') : k.set({ frameDepthMode: e.target.value as OpeningFrameDepthMode }))}
+          onChange={(e) => (e.target.value === 'wall' ? k.limpar('frameDepthMode') : k.set({ frameDepthMode: e.target.value as OpeningFrameDepthMode }))}
         >
           {MODOS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
         </select>

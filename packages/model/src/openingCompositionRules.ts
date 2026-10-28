@@ -59,7 +59,7 @@ export function normalizeComposition(c: unknown): OpeningComposition {
       ...(n.ref === 'leaf' ? { gap: g ?? { w: 0.08, h: 0.05 } } : {}),
       ...(typeof n.nominalCellId === 'string' ? { nominalCellId: n.nominalCellId } : {}),
     },
-    frame: { ...(c.frame as unknown as OpeningComposition['frame']), style: (c.frame.style as OpeningComposition['frame']['style']) ?? 'rebate', depthMode: (c.frame.depthMode as OpeningComposition['frame']['depthMode']) ?? 'core' },
+    frame: { ...(c.frame as unknown as OpeningComposition['frame']), style: (c.frame.style as OpeningComposition['frame']['style']) ?? 'rebate', depthMode: (c.frame.depthMode as OpeningComposition['frame']['depthMode']) ?? 'wall' },
     layout: normalizeNode(c.layout, 'layout'),
   };
   if (isObj(c.casing)) {

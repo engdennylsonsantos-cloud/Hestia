@@ -42,3 +42,4 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 - Pivotante: folha ocupa o vão com folga de poucos mm sem varrer a ombreira; arcos chegam ao batente; teste de varredura -90..90.
 - Alizar x folha: na face em que a folha abre, o alizar começa fora do envelope da folha de 0 a 90 graus (recuo simétrico, 14 mm no `ot_p90`, igual à aresta externa do rebaixo); a outra face segue com a aresta interna na luz. Nenhuma fonte oficial do Revit/ArchiCAD documenta isso (R6); regra derivada da geometria, a validar pelo dono.
 - Maçanetas: plano `tz` em PartProfile; alavanca (roseta Ø52, haste Ø16, braço Ø19 x 125), bola (5 discos), puxador tubular, placa da fechadura 30 x 75 x 4; módulo `openingModelHandles.ts`.
+- Batente: padrão = espessura acabada (2026-10-28)

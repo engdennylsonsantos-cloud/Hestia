@@ -190,6 +190,36 @@ describe('colocação da abertura: prévia e cotas', () => {
     expect(ombreiras.length).toBeGreaterThan(0);
   });
 
+  it('Espaço e Tab redesenham a prévia sem novo movimento do mouse', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [5, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(2.5, 0.05));
+    const inicial = JSON.stringify(t.preview());
+    expect(t.preview().length).toBeGreaterThan(0);
+
+    t.tab!();
+    const aposTab = JSON.stringify(t.preview());
+    expect(aposTab).not.toBe(inicial);
+    expect(t.preview().length).toBeGreaterThan(0);
+
+    t.space!();
+    expect(JSON.stringify(t.preview())).not.toBe(aposTab);
+    expect(t.preview().filter((i) => i.kind === 'line').length).toBeGreaterThan(0);
+  });
+
+  it('sem ponteiro, Espaço e Tab não quebram e não desenham nada', () => {
+    const ctx = makeEnv();
+    makeWall(ctx, [0, 0], [5, 0]);
+    const t = tool('door', ctx.env);
+    expect(() => {
+      t.tab!();
+      t.space!();
+    }).not.toThrow();
+    expect(t.preview()).toEqual([]);
+  });
+
   it('openingDimMode face cota da borda da abertura à face da perpendicular', () => {
     const ctx = makeEnv();
     withSnapOff(ctx);

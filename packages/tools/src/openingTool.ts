@@ -50,6 +50,7 @@ export class OpeningTool extends ToolBase {
   private flipFacing = false;
   private lastSide: 1 | -1 = 1;
   private current: { wallId: string; offset: number } | null = null;
+  private lastPointer: PointerInfo | null = null;
   private previewCache: PreviewCache | null = null;
 
   constructor(env: ConstructorParameters<typeof ToolBase>[0], kind: 'door' | 'window') {
@@ -63,6 +64,7 @@ export class OpeningTool extends ToolBase {
     this.items = [];
     this.current = null;
     this.lastSide = 1;
+    this.lastPointer = null;
   }
 
   protected busy(): boolean {
@@ -74,12 +76,19 @@ export class OpeningTool extends ToolBase {
     return this.id === 'door' ? o.doorTypeId : o.windowTypeId;
   }
 
+  /** Redesenha a prévia na hora: reexecuta o cálculo na última posição do ponteiro, sem esperar o próximo movimento. */
+  private refreshPreview(): void {
+    if (this.lastPointer) this.move(this.lastPointer);
+  }
+
   override tab(): void {
     this.flipFacing = !this.flipFacing;
+    this.refreshPreview();
   }
 
   flipHandToggle(): void {
     this.flipHand = !this.flipHand;
+    this.refreshPreview();
   }
 
   override space(): void {
@@ -165,6 +174,7 @@ export class OpeningTool extends ToolBase {
   override move(p: PointerInfo): void {
     this.items = [];
     this.raw = p.raw;
+    this.lastPointer = p;
     const pr = this.env.project();
     const mpp = this.env.metersPerPixel();
     const options = this.env.options();

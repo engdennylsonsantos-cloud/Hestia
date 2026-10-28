@@ -5,6 +5,7 @@ import type { PartMotion, PartProfile } from './openingModelTypes.ts';
 import {
   GAP,
   OVERLAP,
+  jambSection,
   TRANSOM_BAR,
   addPart,
   box,
@@ -34,19 +35,7 @@ const ccw = (pts: Array<[number, number]>): Array<[number, number]> => (signedAr
  * (`OVERLAP`) e a profundidade da folha mais a folga (`R`); a peça é UMA, extrudada em z.
  */
 export function jambProfile(c: Ctx, j: 1 | -1): PartProfile {
-  const R = c.L + GAP;
-  const outer = c.hw;
-  const inner = c.hw - c.J;
-  const lip = c.hw - c.J + OVERLAP;
-  const pts: Array<[number, number]> = [
-    [j * outer, c.Cd - c.side * (c.D / 2)],
-    [j * outer, c.Cd + c.side * (c.D / 2)],
-    [j * lip, c.Cd + c.side * (c.D / 2)],
-    [j * lip, c.Cd + c.side * (c.D / 2 - R)],
-    [j * inner, c.Cd + c.side * (c.D / 2 - R)],
-    [j * inner, c.Cd - c.side * (c.D / 2)],
-  ];
-  return { plane: 'ts', pts: ccw(pts) };
+  return { plane: 'ts', pts: ccw(jambSection(c, c.hw, c.side, j)) };
 }
 
 /** Seção em L da travessa, no plano (s, z), com o rebaixo embaixo (spec E3 §2). */

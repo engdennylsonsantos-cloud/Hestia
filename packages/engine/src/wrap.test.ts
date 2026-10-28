@@ -91,3 +91,48 @@ describe('acabamento x batente (decisão 0035 §2)', () => {
     expect(multiArea(intersection(todos, footprint))).toBeCloseTo(0, 9);
   });
 });
+
+describe('retorno do acabamento: opt-in com batente, livre sem batente, exclusivo com alizar (decisão 0036)', () => {
+  it('vão livre (leaves 0) e estilo block dobram o acabamento como a parede manda', () => {
+    const vaio = cena('ot_vao90');
+    const modo = insertMode(vaio.f.type, vaio.t);
+    expect(modo).toBe(vaio.f.type.wrapInserts);
+    if (modo !== 'none') expect(insertReturns(vaio.f, vaio.o.offset, vaio.t.width, modo).length).toBeGreaterThan(0);
+    const bloco = cena('ot_p90', { frameStyle: 'block' });
+    expect(insertMode(bloco.f.type, bloco.t)).toBe(bloco.f.type.wrapInserts);
+  });
+
+  it('a pegada do retorno vem da mesma seção da peça jamb do modelo', () => {
+    const c = cena('ot_p90');
+    const m = buildOpeningModel(c.p, c.o, openingGeometry(c.p, c.o, c.f), c.f);
+    const aneis: MultiPolygon = m.parts
+      .filter((x) => x.role === 'jamb')
+      .map((x) => [x.profile!.pts.map(([t, s]) => pointAt(c.f, c.o.offset + t, c.f.sMid + s))]);
+    const pegada = insertFrameFootprint(c.f, c.o.offset, c.t, 1)!;
+    expect(multiArea(pegada)).toBeCloseTo(multiArea(aneis), 9);
+    expect(multiArea(intersection(pegada, aneis))).toBeCloseTo(multiArea(aneis), 9);
+  });
+
+  it('closure explícito com batente gera retorno e ele não tem área comum com o batente', () => {
+    for (const closure of ['both', 'exterior', 'interior'] as const) {
+      const c = cena('ot_p90', { closure });
+      const modo = insertMode(c.f.type, c.t);
+      expect(modo).toBe(closure);
+      const rets = insertReturns(c.f, c.o.offset, c.t.width, modo, { ot: c.t, side: 1 });
+      expect(rets.length, closure).toBeGreaterThan(0);
+      const pegada = insertFrameFootprint(c.f, c.o.offset, c.t, 1)!;
+      expect(multiArea(intersection(rets.flatMap((r) => r.poly), pegada)), closure).toBeCloseTo(0, 9);
+    }
+  });
+
+  it('alizar desliga o retorno, mesmo com closure explícito (R3)', () => {
+    const casing = { width: 0.07, thickness: 0.015 };
+    for (const closure of ['inherit', 'both', 'exterior', 'interior'] as const) {
+      const c = cena('ot_p90', { closure, casing });
+      expect(insertMode(c.f.type, c.t), closure).toBe('none');
+    }
+    const vaio = cena('ot_vao90', { casing });
+    expect(insertMode(vaio.f.type, vaio.t)).toBe('none');
+  });
+});
+

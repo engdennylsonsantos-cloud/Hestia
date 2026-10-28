@@ -1,5 +1,5 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
-import { acabamentoIssue, type OpeningAcabamento } from './openingExtras.ts';
+import { acabamentoIssue, openingCasing, type OpeningAcabamento } from './openingExtras.ts';
 
 /** Campos v2 do tipo conferidos ao salvar (todos opcionais: ausente vale o padrão por leitura). */
 type OpeningTypeRuleFields = Partial<
@@ -189,6 +189,17 @@ export function openingTypeIssue(t: OpeningTypeRules): string | null {
     return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
   }
   return acabamentoIssue(t) ?? openingStyleIssue(t);
+}
+
+/**
+ * Aviso (não erro) do tipo: alizar e retorno do acabamento são exclusivos (como no ArchiCAD); com alizar, o
+ * `closure` explícito é ignorado e o vão não ganha retorno. A interface pode mostrar o texto.
+ */
+export function openingTypeWarning(t: Pick<OpeningType, 'closure' | 'casing'>): string | null {
+  if (t.closure !== undefined && t.closure !== 'inherit' && openingCasing(t)) {
+    return 'Com alizar, o retorno do acabamento no vão não é gerado (os dois são exclusivos).';
+  }
+  return null;
 }
 
 /** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */

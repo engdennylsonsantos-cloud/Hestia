@@ -125,6 +125,41 @@ export function addPart(c: Ctx, id: string, role: PartRole, material: PartMateri
 }
 
 /** Contexto de um vão; a folha é montada por família em `buildDoor`/`buildWindow`. */
+/** Dimensões do batente em `s`/`t` locais: a ÚNICA fonte para o modelo (peças) e para o recorte do retorno (wrap.ts). */
+export interface FrameDims {
+  J: number;
+  D: number;
+  Cd: number;
+  L: number;
+}
+
+export function openingFrameDims(f: WallFrame, t: OpeningType): FrameDims {
+  const core = openingCore(f);
+  const fr = openingFrame(t, core.s1 - core.s0);
+  const J = openingFrameStyle(t) === 'aduela' ? 0.03 : fr.frameWidth;
+  const { D, Cd } = openingFramePlacement(f, t);
+  return { J, D, Cd, L: fr.leafThickness };
+}
+
+/**
+ * Seção em L da ombreira `j` com rebaixo (spec E3 §2), no plano (t, s), sem ordenar o sentido: largura do batedor
+ * `OVERLAP`, profundidade do rebaixo = folha + folga. Usada pela peça `jamb` e pelo contorno que recorta o retorno.
+ */
+export function jambSection(d: FrameDims, hw: number, side: 1 | -1, j: 1 | -1, offset = 0): Array<[number, number]> {
+  const R = d.L + GAP;
+  const outer = hw;
+  const inner = hw - d.J;
+  const lip = hw - d.J + OVERLAP;
+  return [
+    [offset + j * outer, d.Cd - side * (d.D / 2)],
+    [offset + j * outer, d.Cd + side * (d.D / 2)],
+    [offset + j * lip, d.Cd + side * (d.D / 2)],
+    [offset + j * lip, d.Cd + side * (d.D / 2 - R)],
+    [offset + j * inner, d.Cd + side * (d.D / 2 - R)],
+    [offset + j * inner, d.Cd - side * (d.D / 2)],
+  ];
+}
+
 export function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx | null {
   const t = p.openingTypes[o.typeId];
   if (!t) return null;

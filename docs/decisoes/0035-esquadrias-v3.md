@@ -7,6 +7,10 @@ Pesquisa do ArchiCAD (abas, opções e lógica de modelagem) e do catálogo bras
    **fica no núcleo da parede** (`frameDepthMode: 'core'`, decisão do dono). Opções por tipo: `'wall'` (espessura total da parede
    acabada, como o "Frame Thickness = Wall Thickness" do ArchiCAD) e `'fixed'` (valor de `frameDepth`).
 2. O acabamento da parede **encosta no batente** (sem retorno por cima dele); retorno explícito é recortado pelo batente.
+   Retorno com batente é **opt-in** (como o "Wrapping at Inserts" do Revit): só com `closure` explícito no tipo. Sem
+   porta/janela (vão livre ou `block`) vale o `wrapInserts` da parede. **Alizar e retorno são exclusivos** (como no
+   ArchiCAD): com `casing` o retorno é `none`, mesmo com `closure` explícito (aviso em `openingTypeWarning`). A pegada
+   do batente que recorta o retorno usa a mesma seção da peça `jamb` (`jambSection`, uma só fonte da geometria).
 3. O alizar assenta sobre a face acabada, cobre a junta e é uma silhueta única por face.
 4. A folha articula pela face oposta ao lado de abertura: aberta ou fechada nunca se sobrepõe ao batente nem a si mesma.
 5. Em planta, porta de giro/dupla/pivotante/vai-e-vem mostra **só a folha aberta** (com o arco).

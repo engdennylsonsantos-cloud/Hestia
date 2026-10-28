@@ -1,14 +1,14 @@
 import { difference, type MultiPolygon, type Ring } from '@hestia/geom';
 import {
   coreRange,
-  openingFrame,
+  openingCasing,
   openingFrameStyle,
   type OpeningType,
   type WallType,
   type WrapMode,
 } from '@hestia/model';
 import { pointAt, type WallFrame } from './frame.ts';
-import { openingCore, openingFramePlacement } from './openingModelContext.ts';
+import { jambSection, openingFrameDims } from './openingModelContext.ts';
 
 export type Side = 'exterior' | 'interior';
 
@@ -38,35 +38,31 @@ export function wrappingLayers(type: WallType, side: Side): Wrapper[] {
 export const sidesOf = (m: WrapMode): Side[] => (m === 'both' ? ['exterior', 'interior'] : m === 'none' ? [] : [m]);
 
 /**
- * Fechamento efetivo do vão (decisão 0035 §2): o tipo com batente encosta o acabamento nele, então `inherit` vira
- * `none` (o reboco vai até o batente). O fechamento explícito continua valendo e é recortado pelo batente.
+ * Fechamento efetivo do vão (decisão 0035 §2 e 0036):
+ * - com alizar (`casing`), o retorno é sempre `none`: alizar e retorno são exclusivos (como no ArchiCAD, onde o
+ *   Turn Plaster some com o casing ligado), mesmo com `closure` explícito;
+ * - `inherit` com batente vira `none` (o reboco vai até o batente; retorno com batente é opt-in, como o "Wrapping at
+ *   Inserts" do Revit); sem porta/janela (vão livre ou estilo `block`) vale `wrapInserts` da parede;
+ * - `closure` explícito ('both', 'exterior', 'interior') gera o retorno, recortado pela pegada do batente.
  */
-export const insertMode = (wt: WallType, ot: OpeningType): WrapMode =>
-  ot.closure === 'inherit' ? (ot.leaves > 0 && openingFrameStyle(ot) !== 'block' ? 'none' : wt.wrapInserts) : ot.closure;
+export const insertMode = (wt: WallType, ot: OpeningType): WrapMode => {
+  if (openingCasing(ot)) return 'none';
+  if (ot.closure !== 'inherit') return ot.closure;
+  return ot.leaves > 0 && openingFrameStyle(ot) !== 'block' ? 'none' : wt.wrapInserts;
+};
 
 /** Contorno do batente na planta, em coordenadas do mundo: o que o retorno do acabamento não pode invadir. */
 export function insertFrameFootprint(f: WallFrame, offset: number, ot: OpeningType, side: 1 | -1): MultiPolygon | null {
   if (ot.leaves === 0 || openingFrameStyle(ot) === 'block') return null;
-  const { D, Cd } = openingFramePlacement(f, ot);
   const style = openingFrameStyle(ot);
-  const coreWidth = openingCore(f).s1 - openingCore(f).s0;
-  const J = style === 'aduela' ? 0.03 : openingFrame(ot, coreWidth).frameWidth;
+  const dims = openingFrameDims(f, ot);
+  const { D, Cd, J } = dims;
   const hw = ot.width / 2;
   const toWorld = (t: number, s: number): { x: number; y: number } => pointAt(f, t, f.sMid + s);
   const out: MultiPolygon = [];
   if (ot.kind === 'door' && (style === 'rebate' || style === 'aduela')) {
-    const R = (ot.leafThickness ?? (ot.kind === 'door' ? 0.04 : 0.03)) + 0.004;
-    for (const j of [-1, 1] as const) {
-      const pts: Array<[number, number]> = [
-        [offset + j * hw, Cd - side * (D / 2)],
-        [offset + j * hw, Cd + side * (D / 2)],
-        [offset + j * (hw - J + 0.015), Cd + side * (D / 2)],
-        [offset + j * (hw - J + 0.015), Cd + side * (D / 2 - R)],
-        [offset + j * (hw - J), Cd + side * (D / 2 - R)],
-        [offset + j * (hw - J), Cd - side * (D / 2)],
-      ];
-      out.push([pts.map(([t, s]) => toWorld(t, s))]);
-    }
+    // Mesma seção da peça `jamb` do modelo (uma única fonte da geometria).
+    for (const j of [-1, 1] as const) out.push([jambSection(dims, hw, side, j, offset).map(([t, s]) => toWorld(t, s))]);
     return out;
   }
   // Caixilho simples (janelas e batente 'simple'): duas caixas J × D nas ombreiras.

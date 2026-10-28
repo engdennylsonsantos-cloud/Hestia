@@ -1,9 +1,15 @@
 import {
+  hingeHeights,
   openingCasing,
   openingFamilyOf,
+  openingHinges,
+  openingLeafBottom,
   openingLintel,
+  openingOptionSupport,
   openingSillBeam,
   openingSillBoard,
+  openingThreshold,
+  type OpeningType,
 } from '@hestia/model';
 import {
   GAP,
@@ -12,10 +18,11 @@ import {
   addPart,
   box,
   innerT,
+  leafZ,
   type Ctx,
 } from './openingModelContext.ts';
 import { addWindowLeaf, windowLayout, windowTransomApplies } from './openingModelWindowsNew.ts';
-import type { PartMotion } from './openingModelTypes.ts';
+import type { OpeningPart, PartBox, PartMotion } from './openingModelTypes.ts';
 
 /** Bandeiras laterais: vidro fixo de cada lado marcado, com montante entre ele e a folha. */
 export function buildSidelights(c: Ctx): void {
@@ -146,3 +153,67 @@ export function buildLintelBeams(c: Ctx): void {
     addPart(c, 'sill-beam', 'sillBeam', 'concrete', box(-c.hw - beam.over, c.hw + beam.over, c.core.s0, c.core.s1, -beam.height, 0));
   }
 }
+
+/**
+ * Faixa z da folha de giro, dupla, pivotante e correr: a face inferior sobe da soleira (quando há) pela folga inferior
+ * (`leafUndercut`); o topo segue o da folha padrão.
+ */
+export function doorLeafZ(c: Ctx): { z0: number; z1: number } {
+  return { z0: openingLeafBottom(c.t), z1: leafZ(c).z1 };
+}
+
+/**
+ * Dobradiças na face do batente do lado da folha (peças fixas, fora do movimento). Só a família que a tabela marca
+ * (giro e dupla); quantidade e alturas pelo tipo (`hinges`, padrão 3, a 0,25 m das bordas da folha).
+ */
+export function addHinges(c: Ctx, index: number, hingeT: number): void {
+  if (!openingOptionSupport(openingFamilyOf(c.t)?.id).hinges) return;
+  const lside = (c.leafSide === 'opposite' ? -c.side : c.side) as 1 | -1;
+  const sFace = c.Cd + lside * (c.D / 2 - GAP);
+  const z = doorLeafZ(c);
+  hingeBoxes(hingeT, sFace, lside, hingeHeights(openingHinges(c.t), z.z0, z.z1)).forEach((b, k) =>
+    addPart(c, `hinge-${index}-${k}`, 'hinge', 'metal', b),
+  );
+}
+
+/** Meia espessura (m) das peças de ferragem: dobradiça (na face da folha) e placa da fechadura. */
+const HINGE_HALF_T = 0.006;
+const HINGE_HALF_S = 0.004;
+const HINGE_HALF_Z = 0.05;
+
+/**
+ * Soleira de porta (peça fixa): prisma sob a folha, entre as ombreiras (`t` de −(hw − J) a hw − J), de z = 0 a
+ * `espessura`, na profundidade do batente (`Cd` ± `D/2`). Só as famílias que a tabela marca têm soleira; null quando o
+ * tipo não tem soleira ou a família não a desenha.
+ */
+export function thresholdPart(t: OpeningType, hw: number, J: number, Cd: number, D: number): OpeningPart | null {
+  const sill = openingThreshold(t);
+  if (!sill || !openingOptionSupport(openingFamilyOf(t)?.id).threshold) return null;
+  return { id: 'threshold', role: 'threshold', material: 'concrete', box: box(-(hw - J), hw - J, Cd - D / 2, Cd + D / 2, 0, sill.thickness) };
+}
+
+/**
+ * Dobradiças como caixas pequenas centradas na junta batente/folha: `t` é o eixo da dobradiça (a borda da folha do lado
+ * do batente), `sFace` a face da folha de onde ela sai e `dir` (±1) o lado de fora dessa face. Uma caixa por altura de `zs`.
+ */
+export function hingeBoxes(t: number, sFace: number, dir: 1 | -1, zs: number[]): PartBox[] {
+  return zs.map((z) =>
+    box(t - HINGE_HALF_T, t + HINGE_HALF_T, sFace - dir * HINGE_HALF_S, sFace + dir * HINGE_HALF_S, z - HINGE_HALF_Z, z + HINGE_HALF_Z),
+  );
+}
+
+/**
+ * Placa da fechadura (espelho pequeno) logo abaixo da maçaneta, uma em cada face da folha: centrada em `tR` (eixo da
+ * maçaneta), 24 mm de largura e 40 mm de altura, de 50 a 90 mm abaixo de `zH`. `sMid` é o plano médio da folha e `L` a
+ * espessura. `face` é 'a' (lado −) ou 'b' (lado +), como nas roseta.
+ */
+export function lockBoxes(tR: number, zH: number, sMid: number, L: number): Array<{ face: 'a' | 'b'; box: PartBox }> {
+  return ([-1, 1] as const).map((f) => {
+    const sCenter = sMid + f * (L / 2 + HINGE_HALF_S);
+    return {
+      face: f < 0 ? 'a' : 'b',
+      box: box(tR - 0.012, tR + 0.012, sCenter - HINGE_HALF_S, sCenter + HINGE_HALF_S, zH - 0.09, zH - 0.05),
+    };
+  });
+}
+

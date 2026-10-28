@@ -1,5 +1,7 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
 import { acabamentoIssue, openingCasing, type OpeningAcabamento } from './openingExtras.ts';
+import { openingHardwareIssue, openingHardwareWarning } from './openingHardware.ts';
+import { openingOptionSupport } from './openingSupport.ts';
 
 /** Campos v2 do tipo conferidos ao salvar (todos opcionais: ausente vale o padrão por leitura). */
 type OpeningTypeRuleFields = Partial<
@@ -22,6 +24,11 @@ type OpeningTypeRuleFields = Partial<
     | 'swingStyle'
     | 'leafPlan'
     | 'leafSide'
+    | 'leafUndercut'
+    | 'handleHeight'
+    | 'handleInset'
+    | 'hinges'
+    | 'threshold'
   >
 >;
 
@@ -191,18 +198,20 @@ export function openingTypeIssue(t: OpeningTypeRules): string | null {
     const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
     return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
   }
-  return acabamentoIssue(t) ?? openingStyleIssue(t);
+  return acabamentoIssue(t) ?? openingStyleIssue(t) ?? openingHardwareIssue(t, openingOptionSupport(openingFamilyOf(t)?.id));
 }
 
 /**
  * Aviso (não erro) do tipo: alizar e retorno do acabamento são exclusivos (como no ArchiCAD); com alizar, o
  * `closure` explícito é ignorado e o vão não ganha retorno. A interface pode mostrar o texto.
  */
-export function openingTypeWarning(t: Pick<OpeningType, 'closure' | 'casing'>): string | null {
+export function openingTypeWarning(t: Pick<OpeningType, 'closure' | 'casing'> & Partial<Pick<OpeningType, 'kind' | 'plan' | 'leaves' | 'handleHeight'>>): string | null {
   if (t.closure !== undefined && t.closure !== 'inherit' && openingCasing(t)) {
     return 'Com alizar, o retorno do acabamento no vão não é gerado (os dois são exclusivos).';
   }
-  return null;
+  // Sem a família (tipo parcial), não há como saber se a maçaneta vale: o aviso da altura só sai com o tipo completo.
+  if (t.kind === undefined || t.plan === undefined || t.leaves === undefined) return null;
+  return openingHardwareWarning(t, openingOptionSupport(openingFamilyOf({ kind: t.kind, plan: t.plan, leaves: t.leaves })?.id));
 }
 
 /** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */

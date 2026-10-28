@@ -1,10 +1,17 @@
 import {
   coreSpan,
+  hingeHeights,
+  openingFamilyOf,
   openingFrame,
   openingFrameDepth,
   openingFrameStyle,
   openingHandle,
+  openingHandleHeight,
+  openingHandleInset,
+  openingHinges,
+  openingLeafBottom,
   openingLeafStyle,
+  openingOptionSupport,
   type Opening,
   type OpeningFrameStyle,
   type OpeningHandle,
@@ -15,6 +22,10 @@ import {
 import type { WallFrame } from './frame.ts';
 import type { OpeningGeometry } from './types.ts';
 import type { LeafOpening, OpeningPart, PartBox, PartMaterial, PartMotion, PartRole } from './openingModelTypes.ts';
+import { hingeBoxes, lockBoxes, thresholdPart } from './openingModelDetails.ts';
+
+/** Folga do vão do portão seccionado (m): o portão não tem folga inferior de tabela e mantém o valor antigo. */
+const PORTAO_FOLGA = 0.008;
 
 /** Mesmas folgas da porta de giro (spec E §3). */
 const GAP = 0.004;
@@ -39,6 +50,8 @@ interface Ctx {
   frameStyle: OpeningFrameStyle;
   leafStyle: OpeningLeafStyle;
   handle: OpeningHandle;
+  /** Face inferior da folha (m do piso): soleira mais folga inferior (portão: folga antiga). */
+  zBottom: number;
   parts: OpeningPart[];
   openings: LeafOpening[];
 }
@@ -116,6 +129,7 @@ function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx 
     frameStyle,
     leafStyle: openingLeafStyle(t),
     handle: openingHandle(t),
+    zBottom: t.plan === 'garage' ? PORTAO_FOLGA : openingLeafBottom(t),
     parts: [],
     openings: [],
   };
@@ -131,9 +145,12 @@ function buildSimpleFrame(c: Ctx, jambs: Array<1 | -1> = [-1, 1]): void {
 }
 
 const leafS = (c: Ctx): { s0: number; s1: number } => ({ s0: c.Cd - c.L / 2, s1: c.Cd + c.L / 2 });
-const leafZ = (c: Ctx): { z0: number; z1: number } => ({ z0: 0.008, z1: Math.max(0.008, c.H - c.J - GAP) });
+const leafZ = (c: Ctx): { z0: number; z1: number } => ({ z0: c.zBottom, z1: Math.max(c.zBottom, c.H - c.J - GAP) });
 
-/** Maçaneta presa à folha (mesmo movimento), a 0,06 m do lado do trinco. */
+/**
+ * Maçaneta presa à folha (mesmo movimento), a `handleInset` do lado do trinco e na `handleHeight` do tipo. Com alavanca
+ * ou botão, a placa da fechadura fica logo abaixo (como na porta de giro).
+ */
 function addHandle(
   c: Ctx,
   index: number,
@@ -145,9 +162,13 @@ function addHandle(
   motion: PartMotion,
 ): void {
   if (c.handle === 'none') return;
-  const z = Math.min(Math.max(1.0, z0 + 0.05), z1 - 0.05);
+  const z = Math.min(Math.max(openingHandleHeight(c.t), z0 + 0.05), z1 - 0.05);
   const sMid = (sSpan.s0 + sSpan.s1) / 2;
   const inward = Math.sign(tCenter - latchT) || 1;
+  const tR = latchT + inward * openingHandleInset(c.t);
+  const fechadura = (): void => {
+    for (const k of lockBoxes(tR, z, sMid, c.L)) addPart(c, `handle-${index}-lock-${k.face}`, 'handle', 'metal', k.box, motion, index);
+  };
   if (c.handle === 'pull') {
     const sCenter = sMid + c.side * (c.L / 2 + 0.015);
     addPart(c, `handle-${index}-pull`, 'handle', 'metal', box(-0.01, 0.01, sCenter - 0.015, sCenter + 0.015, z - 0.2, z + 0.2), motion, index);
@@ -156,16 +177,18 @@ function addHandle(
   if (c.handle === 'knob') {
     for (const face of [-1, 1] as const) {
       const sCenter = sMid + face * (c.L / 2 + 0.025);
-      addPart(c, `handle-${index}-knob-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tCenter - 0.025, tCenter + 0.025, sCenter - 0.025, sCenter + 0.025, z - 0.025, z + 0.025), motion, index);
+      addPart(c, `handle-${index}-knob-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tR - 0.025, tR + 0.025, sCenter - 0.025, sCenter + 0.025, z - 0.025, z + 0.025), motion, index);
     }
+    fechadura();
     return;
   }
   for (const face of [-1, 1] as const) {
     const sCenter = sMid + face * (c.L / 2 + 0.006);
-    addPart(c, `handle-${index}-rosette-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tCenter - 0.025, tCenter + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025), motion, index);
-    const tHaste = tCenter + inward * 0.065;
+    addPart(c, `handle-${index}-rosette-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tR - 0.025, tR + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025), motion, index);
+    const tHaste = tR + inward * 0.065;
     addPart(c, `handle-${index}-lever-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tHaste - 0.065, tHaste + 0.065, sCenter - 0.006, sCenter + 0.006, z - 0.01, z + 0.01), motion, index);
   }
+  fechadura();
 }
 
 /** Folha sólida com a espessura L no plano do núcleo; a maçaneta entra no lado do trinco. */
@@ -201,6 +224,11 @@ function buildDoubleAction(c: Ctx): void {
     const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
     const motion: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: c.Cd, sign };
     addLeaf(c, i, hingeT, latchT, z, motion, latchT);
+    if (openingOptionSupport(openingFamilyOf(c.t)?.id).hinges) {
+      hingeBoxes(hingeT, c.Cd + c.side * (c.L / 2), c.side, hingeHeights(openingHinges(c.t), z.z0, z.z1)).forEach((b, k) =>
+        addPart(c, `hinge-${i}-${k}`, 'hinge', 'metal', b),
+      );
+    }
     c.openings.push({
       leaf: i,
       kind: 'side',
@@ -377,5 +405,8 @@ export function buildNewDoorParts(
     default:
       return null;
   }
+  // Soleira da família (tabela): peça fixa entre as ombreiras; o portão não tem.
+  const sill = thresholdPart(c.t, c.hw, c.J, c.Cd, c.D);
+  if (sill) c.parts.push(sill);
   return { parts: c.parts, openings: c.openings };
 }

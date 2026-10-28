@@ -2,6 +2,7 @@ import type { LeafOpening, OpeningModel } from './openingModelTypes.ts';
 import {
   addFrameCut,
   addHighExtras,
+  addThresholdPlan,
   addHingedPlan,
   addHungLines,
   addLouverPlan,
@@ -107,6 +108,7 @@ function doorPaths(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOpt
   }
   if (addNewDoorPlan(out, m, opts)) return;
   addFrameCut(out, m, opts.cutZ);
+  if (level !== 'low') addThresholdPlan(out, m);
   const sliding = m.openings.some((o) => o.kind === 'slide');
   if (sliding) {
     // Correr mantém o desenho próprio (folhas fechadas + pistas + seta).

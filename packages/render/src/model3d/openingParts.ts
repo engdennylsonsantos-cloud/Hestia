@@ -41,11 +41,14 @@ export interface OpeningPiece {
   group?: string;
 }
 
-/** Papéis que cada nível de detalhe 3D mostra (o modelo é a fonte; o detalhe só filtra o que desenhar). */
+/**
+ * Papéis que cada nível de detalhe 3D mostra (o modelo é a fonte; o detalhe só filtra o que desenhar). Ferragens (maçaneta,
+ * fechadura e dobradiça) só no nível completo; a soleira aparece em todos os níveis.
+ */
 function mostraNoDetalhe(part: OpeningPart, detail: ReturnType<typeof openingDetail3d>): boolean {
   if (detail === 'off') return false;
-  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin';
-  if (detail === 'simple') return part.role !== 'handle' && part.role !== 'leafPanel';
+  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin' && part.role !== 'hinge';
+  if (detail === 'simple') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'hinge';
   return true;
 }
 

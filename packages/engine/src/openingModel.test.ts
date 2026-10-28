@@ -98,7 +98,8 @@ describe('buildOpeningModel: porta de giro padrão ot_p90', () => {
     expect(largura(f.box)).toBeCloseTo(2 * 0.411, 9);
     expect(f.box.t0).toBeCloseTo(-0.411, 9);
     expect(f.box.t1).toBeCloseTo(0.411, 9);
-    expect(f.box.z0).toBeCloseTo(0.008, 9);
+    // Folga inferior padrão (`leafUndercut`, 0,007 m: piso seco, NBR 15930-2).
+    expect(f.box.z0).toBeCloseTo(0.007, 9);
     expect(f.box.z1).toBeCloseTo(2.061, 9);
     expect(f.box.s1 - f.box.s0).toBeCloseTo(0.04, 9);
 
@@ -351,10 +352,12 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
   it('maçaneta lever padrão da porta de giro: roseta e haste nas duas faces', () => {
     const m = modelo(cena('ot_p90'));
     const handles = de(m.parts, 'handle');
-    expect(handles).toHaveLength(4);
+    // 2 roseta + 2 haste + 2 placas da fechadura (espelho) abaixo da maçaneta.
+    expect(handles).toHaveLength(6);
     expect(handles.every((x) => x.leaf === 0 && x.motion)).toBe(true);
     const rosetas = handles.filter((x) => x.id.includes('rosette'));
     expect(rosetas).toHaveLength(2);
+    expect(handles.filter((x) => x.id.includes('lock'))).toHaveLength(2);
     for (const r of rosetas) {
       expect(r.box.s1 - r.box.s0).toBeCloseTo(0.012, 9);
       expect(r.box.t1 - r.box.t0).toBeCloseTo(0.05, 9);
@@ -364,8 +367,9 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
 
   it('maçaneta knob e pull respeitam a forma e o lado', () => {
     const knob = modelo(cena('ot_p90', { handle: 'knob' }));
-    expect(de(knob.parts, 'handle')).toHaveLength(2);
-    for (const k of de(knob.parts, 'handle')) expect(k.box.t1 - k.box.t0).toBeCloseTo(0.05, 9);
+    const botoes = de(knob.parts, 'handle').filter((x) => x.id.includes('knob'));
+    expect(botoes).toHaveLength(2);
+    for (const k of botoes) expect(k.box.t1 - k.box.t0).toBeCloseTo(0.05, 9);
     const pull = modelo(cena('ot_p90', { handle: 'pull' }));
     const barra = de(pull.parts, 'handle')[0]!;
     expect(barra.box.z1 - barra.box.z0).toBeCloseTo(0.4, 9);

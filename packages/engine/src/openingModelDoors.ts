@@ -1,6 +1,7 @@
-import { openingFamilyOf } from '@hestia/model';
+import { openingFamilyOf, openingHandleHeight, openingHandleInset, openingLeafBottom } from '@hestia/model';
 import { buildNewDoorParts } from './openingModelDoorsNew.ts';
 import { buildVoid } from './openingModelWindows.ts';
+import { addHinges, doorLeafZ, lockBoxes, thresholdPart } from './openingModelDetails.ts';
 import type { PartMotion, PartProfile } from './openingModelTypes.ts';
 import {
   GAP,
@@ -12,7 +13,6 @@ import {
   innerT,
   leafS,
   leafSpan,
-  leafZ,
   type AddOptions,
   type Ctx,
 } from './openingModelContext.ts';
@@ -145,7 +145,10 @@ function addLeafDetails(
   }
 }
 
-/** Maçaneta da folha, presa a ela (mesmo movimento), a 0,06 m do lado do trinco. */
+/**
+ * Maçaneta da folha, presa a ela (mesmo movimento). A altura (`handleHeight`, do piso) e o recuo (`handleInset`, da borda
+ * livre até o eixo) vêm do tipo. Com alavanca ou puxador de botão, a placa da fechadura (espelho) fica logo abaixo.
+ */
 function addHandle(
   c: Ctx,
   index: number,
@@ -157,11 +160,14 @@ function addHandle(
   motion: PartMotion,
 ): void {
   if (c.handle === 'none') return;
-  const z = Math.min(Math.max(1.0, z0 + 0.05), z1 - 0.05);
+  const z = Math.min(Math.max(openingHandleHeight(c.t), z0 + 0.05), z1 - 0.05);
   const sMid = (sSpan.s0 + sSpan.s1) / 2;
   const inward = Math.sign(tCenter - latchT) || 1;
-  const tR = latchT + inward * 0.06;
+  const tR = latchT + inward * openingHandleInset(c.t);
   const opts: AddOptions = { motion, leaf: index };
+  const fechadura = (): void => {
+    for (const k of lockBoxes(tR, z, sMid, c.L)) addPart(c, `handle-${index}-lock-${k.face}`, 'handle', 'metal', k.box, opts);
+  };
   if (c.handle === 'pull') {
     const sCenter = sMid + c.side * (c.L / 2 + 0.015);
     addPart(c, `handle-${index}-pull`, 'handle', 'metal', box(-0.01, 0.01, sCenter - 0.015, sCenter + 0.015, z - 0.2, z + 0.2), opts);
@@ -179,6 +185,7 @@ function addHandle(
         opts,
       );
     }
+    fechadura();
     return;
   }
   for (const face of [-1, 1] as const) {
@@ -201,6 +208,7 @@ function addHandle(
       opts,
     );
   }
+  fechadura();
 }
 
 /** Folha de porta: vazada (glass) ou sólida com os detalhes do estilo e a maçaneta. */
@@ -240,7 +248,7 @@ function addDoorLeaf(
 /** Folha de giro (uma ou duas), com a maçaneta e os detalhes do estilo. */
 function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: number, latchT: number): void {
   const span = leafS(c);
-  const z = leafZ(c);
+  const z = doorLeafZ(c);
   // Dobradiça na face da folha voltada para o lado de abertura. O eixo no plano médio fazia a folha atravessar o
   // batedor; na face oposta (a do rebaixo) o canto de espessura ainda varria o lábio do perfil em L. Esta é a face que
   // mantém o giro afastado do batente durante toda a varredura (spec E3 §5; divergência registrada no relatório).
@@ -272,6 +280,7 @@ function buildSwingDoor(c: Ctx): void {
   const hingeT = span.center + c.h * span.half;
   const latchT = span.center - c.h * span.half;
   addSwingLeaf(c, 0, latchT, hingeT, hingeT, latchT);
+  addHinges(c, 0, hingeT);
 }
 
 /** Porta dupla: duas folhas de `lh − 0,002`, dobradiças nas ombreiras, as duas para `side`. */
@@ -284,13 +293,15 @@ function buildDoubleDoor(c: Ctx): void {
   const centerR = span.center + 0.002;
   addSwingLeaf(c, 0, centerL, leftHinge, leftHinge, centerL);
   addSwingLeaf(c, 1, centerR, rightHinge, rightHinge, centerR);
+  addHinges(c, 0, leftHinge);
+  addHinges(c, 1, rightHinge);
 }
 
 /** Porta pivotante: folha inteira girando em torno do eixo vertical a W/4 da ombreira da dobradiça. */
 function buildPivotDoor(c: Ctx): void {
   buildDoorFrame(c);
   const span = leafSpan(c);
-  const z = leafZ(c);
+  const z = doorLeafZ(c);
   const sSpan = leafS(c);
   const axis = c.h * (c.hw / 2);
   // Pivotante: a folha inteira gira em torno do eixo no meio de `t`; o eixo em `s` fica na face encostada no batedor,
@@ -332,6 +343,8 @@ function buildSlidingDoorFrame(c: Ctx): void {
 
 /** Porta de correr de duas folhas: pistas opostas, sobreposição central e uma folha que desliza. */
 function buildSlidingDoor(c: Ctx): void {
+  // Correr não tem maçaneta (tabela `openingSupport`): o motor ignora o campo do tipo.
+  c.handle = 'none';
   buildSlidingDoorFrame(c);
   const inner = innerT(c);
   const innerWidth = inner.t1 - inner.t0;
@@ -339,7 +352,7 @@ function buildSlidingDoor(c: Ctx): void {
   const leafW = (innerWidth + 0.06) / 2;
   const spacing = leafW - 0.06;
   const travel = leafW - 0.06;
-  const z0 = 0.008;
+  const z0 = openingLeafBottom(c.t);
   const z1 = c.transom ? c.H - c.J - c.transom.height - TRANSOM_BAR - GAP : c.H - c.J - GAP;
   const moving = c.h === 1 ? 0 : 1;
   for (let k = 0; k < 2; k++) {
@@ -387,4 +400,7 @@ export function buildDoor(c: Ctx): void {
     default:
       buildSwingDoor(c);
   }
+  // Soleira da família (tabela): peça fixa entre as ombreiras. Vão livre e portão não têm.
+  const sill = thresholdPart(c.t, c.hw, c.J, c.Cd, c.D);
+  if (sill) c.parts.push(sill);
 }

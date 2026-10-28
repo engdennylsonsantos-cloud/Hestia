@@ -30,6 +30,7 @@ export * from './level.ts';
 export * from './elementLevel.ts';
 export * from './opening.ts';
 export * from './openingExtras.ts';
+export * from './openingHardware.ts';
 export * from './openingStyle.ts';
 export * from './openingSupport.ts';
 export * from './dimension.ts';

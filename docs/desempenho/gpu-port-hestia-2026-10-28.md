@@ -41,7 +41,7 @@ O `renderer.render(cena, câmera, alvo)` do three 0.180 ignora o terceiro argume
 | `planta-cobertura.mjs` | **6/6**, telhado opaco e troca piso↔cobertura sem geometria velha |
 | `npm test` (suíte completa) | **496 arquivos / 5.651 testes**, 0 falhas |
 | Soak 60×128 (5 min) | **52 ciclos, 0 erros**, 5,1 min, heap estável ~395–449 MB, V8 173 MB após GC |
-| `verificacao-visual.mjs --strict` | **42 PASS / 1 FAIL / 0 PENDENTE**; falha só no botão “Etiquetar todos” oculto no ribbon compacto do Hestia |
+| `verificacao-visual.mjs --strict` | **45 PASS / 0 FAIL / 0 PENDENTE** |
 | Soak 60×128 (1 min) | **7 ciclos, 0 erros**, abertura 2.640 ms, heap estável ~418 MB |
 
 ## 4. Interação no navegador (3 repetições, build de produção)
@@ -61,8 +61,7 @@ O `renderer.render(cena, câmera, alvo)` do three 0.180 ignora o terceiro argume
 
 ## 5. O que ainda falta
 
-1. **A2 — “Etiquetar todos”**: botão não visível no ribbon compacto; é UI/Hestia, não geometria.
-2. **Inserção de porta/janela**: 135–157 ms e pendências de undo; exige port próprio de A1c/esquadrias.
-3. **Soak de 10 min/1 h**: o smoke de 5 min passou (52 ciclos, 0 erros); a versão longa fica como validação extra.
-4. **Suíte completa**: verde no commit do port (ver seção 3).
-5. **Crop/section box**: `clip.ts` é biblioteca, sem UI (mesmo estado do MiniBIM2).
+1. **Inserção de porta/janela**: 135–157 ms e pendências de undo; exige port próprio de A1c/esquadrias.
+2. **Soak de 10 min/1 h**: o smoke de 5 min passou (52 ciclos, 0 erros); a versão longa fica como validação extra.
+3. **Suíte completa**: verde no commit do port (ver seção 3).
+4. **Crop/section box**: `clip.ts` é biblioteca, sem UI (mesmo estado do MiniBIM2).

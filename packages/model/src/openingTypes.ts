@@ -1,4 +1,5 @@
 import type { Id, WrapMode } from './types.ts';
+import type { OpeningComposition } from './openingComposition.ts';
 
 /**
  * Família do símbolo de planta. Portas: arco com folha (swing), dupla, correr, pivotante.
@@ -127,6 +128,8 @@ export interface OpeningType {
   handleHeight?: number;
   /** Distância (m) da borda livre da folha ao eixo da maçaneta. Padrão 0,06. */
   handleInset?: number;
+  /** Composição (células + perfis; docs/aberturas/F1-spec-composicao.md). Ausente = derivada dos campos atuais por `openingCompositionOf`. */
+  composition?: OpeningComposition;
 }
 
 /** Vínculo da profundidade do batente com a espessura da parede. */

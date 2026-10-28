@@ -40,6 +40,7 @@ import { transformStair } from './stairTransform.ts';
 import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
+import { withBridgedComposition } from './openingCompositionOf.ts';
 import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
@@ -322,7 +323,8 @@ export function applyCommand(p: Project, c: Command): void {
     case 'upsertOpeningType': {
       const issue = openingTypeIssue(c.openingType);
       if (issue) throw new Error(issue);
-      p.openingTypes[c.openingType.id] = c.openingType;
+      const next = withBridgedComposition(c.openingType, p.openingTypes[c.openingType.id], p.openingProfiles);
+      p.openingTypes[next.id] = next;
       break;
     }
     case 'upsertLevel': {

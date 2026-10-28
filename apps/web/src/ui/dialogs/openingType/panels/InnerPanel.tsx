@@ -8,6 +8,7 @@ export function InnerPanel(props: PanelProps): ReactElement {
     <>
       <ClosureSideRow d={props.d} onChange={props.onChange} lado="interior" />
       <CasingRows {...props} />
+      {props.support.threshold ? <p className="hint">A soleira vale para os dois lados (veja Lado externo)</p> : null}
     </>
   );
 }

@@ -81,6 +81,12 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   window_void: sup({ casing: true, sillBoard: true, lintel: true, sillBeam: true }),
 };
 
+// E3b: a referência nominal do tamanho (NBR 15930: "80 × 210" é a folha) só se aplica onde há folha para medir.
+// Linha nova, separada da tabela acima: portas com folha; o vão livre fica de fora.
+for (const id of ['door_swing', 'door_double', 'door_sliding', 'door_pivot', 'door_dblact', 'door_pocket', 'door_bifold', 'door_accordion', 'door_garage'] as const) {
+  TABLE[id].nominalRef = true;
+}
+
 /** Opções aplicáveis à família (id de `OPENING_FAMILIES`). Família desconhecida: nada se aplica. */
 export function openingOptionSupport(family: OpeningFamilyId | null | undefined): OpeningOptionSupport {
   return (family && TABLE[family]) || NONE;

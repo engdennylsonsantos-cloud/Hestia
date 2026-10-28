@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { OPENING_FRAME_DEFAULTS, type OpeningFrameDepthMode } from '@hestia/model';
 import { NumField } from '../../../fields.tsx';
+import { setRevealDepth } from '../openingTypeControls.ts';
 import { FIELD_FRAME, MaterialSelect, usePanelKit, type PanelProps } from './panelKit.tsx';
 
 const MODOS: ReadonlyArray<readonly [OpeningFrameDepthMode, string]> = [
@@ -35,6 +36,9 @@ export function FramePanel({ d, onChange, materials }: PanelProps): ReactElement
       </div>
       {modo === 'fixed' ? (
         <div className="field-row"><label htmlFor="op-fd" title="Profundidade do batente na espessura da parede (limitada à parede)">Profundidade do batente</label><NumField id="op-fd" value={d.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => k.set({ frameDepth: v })} /></div>
+      ) : null}
+      {modo !== 'wall' ? (
+        <div className="field-row"><label htmlFor="op-reveal" title="Recuo do batente em relação à face da parede (ArchiCAD: Reveal)">Recuo do batente</label><NumField id="op-reveal" value={d.reveal?.depth ?? 0} scale={100} decimals={1} unit="cm" min={0} onCommit={(v) => onChange(setRevealDepth(d, v))} /></div>
       ) : null}
       <MaterialSelect id="op-mat" label="Material do caixilho" value={d.frameMaterialId} materials={materials} onPick={(id) => k.set({ frameMaterialId: id })} />
     </>

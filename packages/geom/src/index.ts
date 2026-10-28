@@ -10,3 +10,4 @@ export * from './openingSymbol.ts';
 export * from './sketchTypes.ts';
 export * from './sketchValidate.ts';
 export * from './sketchConst.ts';
+export * from './numberText.ts';

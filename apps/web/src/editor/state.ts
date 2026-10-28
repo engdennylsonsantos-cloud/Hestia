@@ -10,7 +10,7 @@ import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | 'gridType' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | null;
 
 export interface UiState {
   tool: ToolId;

@@ -36,7 +36,14 @@ function shiftMotion(m: PartMotion, dt: number, dz: number): PartMotion {
 function shiftPart(p: OpeningPart, id: string, dt: number, dz: number, leafBase: number): OpeningPart {
   const b = p.box;
   const out: OpeningPart = { ...p, id, box: { ...b, t0: b.t0 + dt, t1: b.t1 + dt, z0: b.z0 + dz, z1: b.z1 + dz } };
-  if (p.profile) out.profile = { plane: p.profile.plane, pts: p.profile.pts.map(([a, v]) => (p.profile!.plane === 'ts' ? [a + dt, v] : [a, v + dz])) };
+  if (p.profile) {
+    // 'ts' (t, s) desloca t; 'sz' (s, z) desloca z; 'tz' (t, z) desloca t e z.
+    const plano = p.profile.plane;
+    out.profile = {
+      plane: plano,
+      pts: p.profile.pts.map(([a, v]) => [plano === 'sz' ? a : a + dt, plano === 'ts' ? v : v + dz]),
+    };
+  }
   if (p.motion) out.motion = shiftMotion(p.motion, dt, dz);
   if (p.leaf !== undefined) out.leaf = p.leaf + leafBase;
   return out;

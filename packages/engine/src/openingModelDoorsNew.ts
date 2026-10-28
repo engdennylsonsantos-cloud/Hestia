@@ -22,8 +22,9 @@ import {
 } from '@hestia/model';
 import type { WallFrame } from './frame.ts';
 import type { OpeningGeometry } from './types.ts';
-import type { LeafOpening, OpeningPart, PartBox, PartMaterial, PartMotion, PartRole } from './openingModelTypes.ts';
-import { hingeBoxes, lockBoxes, thresholdPart } from './openingModelDetails.ts';
+import type { LeafOpening, OpeningPart, PartBox, PartMaterial, PartMotion, PartProfile, PartRole } from './openingModelTypes.ts';
+import { hingeBoxes, thresholdPart } from './openingModelDetails.ts';
+import { handleParts } from './openingModelHandles.ts';
 
 /** Folga do vão do portão seccionado (m): o portão não tem folga inferior de tabela e mantém o valor antigo. */
 const PORTAO_FOLGA = 0.008;
@@ -88,9 +89,19 @@ function addPart(
   motion?: PartMotion,
   leaf?: number,
   dashed?: boolean,
+  profile?: PartProfile,
 ): void {
   if (!validBox(b)) return;
-  c.parts.push({ id, role, material, box: b, ...(motion ? { motion } : {}), ...(leaf !== undefined ? { leaf } : {}), ...(dashed ? { dashed } : {}) });
+  c.parts.push({
+    id,
+    role,
+    material,
+    box: b,
+    ...(motion ? { motion } : {}),
+    ...(leaf !== undefined ? { leaf } : {}),
+    ...(dashed ? { dashed } : {}),
+    ...(profile ? { profile } : {}),
+  });
 }
 
 function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx | null {
@@ -164,32 +175,10 @@ function addHandle(
 ): void {
   if (c.handle === 'none') return;
   const z = Math.min(Math.max(openingHandleHeight(c.t), z0 + 0.05), z1 - 0.05);
-  const sMid = (sSpan.s0 + sSpan.s1) / 2;
-  const inward = Math.sign(tCenter - latchT) || 1;
+  const inward = (Math.sign(tCenter - latchT) || 1) as 1 | -1;
   const tR = latchT + inward * openingHandleInset(c.t);
-  const fechadura = (): void => {
-    for (const k of lockBoxes(tR, z, sMid, c.L)) addPart(c, `handle-${index}-lock-${k.face}`, 'handle', 'metal', k.box, motion, index);
-  };
-  if (c.handle === 'pull') {
-    const sCenter = sMid + c.side * (c.L / 2 + 0.015);
-    addPart(c, `handle-${index}-pull`, 'handle', 'metal', box(-0.01, 0.01, sCenter - 0.015, sCenter + 0.015, z - 0.2, z + 0.2), motion, index);
-    return;
-  }
-  if (c.handle === 'knob') {
-    for (const face of [-1, 1] as const) {
-      const sCenter = sMid + face * (c.L / 2 + 0.025);
-      addPart(c, `handle-${index}-knob-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tR - 0.025, tR + 0.025, sCenter - 0.025, sCenter + 0.025, z - 0.025, z + 0.025), motion, index);
-    }
-    fechadura();
-    return;
-  }
-  for (const face of [-1, 1] as const) {
-    const sCenter = sMid + face * (c.L / 2 + 0.006);
-    addPart(c, `handle-${index}-rosette-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tR - 0.025, tR + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025), motion, index);
-    const tHaste = tR + inward * 0.065;
-    addPart(c, `handle-${index}-lever-${face < 0 ? 'a' : 'b'}`, 'handle', 'metal', box(tHaste - 0.065, tHaste + 0.065, sCenter - 0.006, sCenter + 0.006, z - 0.01, z + 0.01), motion, index);
-  }
-  fechadura();
+  const pecas = handleParts({ index, style: c.handle, tR, z, sMid: (sSpan.s0 + sSpan.s1) / 2, L: c.L, side: c.side, inward });
+  for (const p of pecas) addPart(c, p.id, 'handle', 'metal', p.box, motion, index, undefined, p.profile);
 }
 
 /** Folha sólida com a espessura L no plano do núcleo; a maçaneta entra no lado do trinco. */

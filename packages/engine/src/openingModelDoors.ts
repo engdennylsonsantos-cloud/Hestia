@@ -1,7 +1,8 @@
 import { openingFamilyOf, openingHandleHeight, openingHandleInset, openingLeafBottom } from '@hestia/model';
 import { buildNewDoorParts } from './openingModelDoorsNew.ts';
 import { buildVoid } from './openingModelWindows.ts';
-import { addHinges, doorLeafZ, lockBoxes, thresholdPart } from './openingModelDetails.ts';
+import { addHinges, doorLeafZ, thresholdPart } from './openingModelDetails.ts';
+import { handleParts } from './openingModelHandles.ts';
 import type { PartMotion, PartProfile } from './openingModelTypes.ts';
 import {
   GAP,
@@ -161,54 +162,11 @@ function addHandle(
 ): void {
   if (c.handle === 'none') return;
   const z = Math.min(Math.max(openingHandleHeight(c.t), z0 + 0.05), z1 - 0.05);
-  const sMid = (sSpan.s0 + sSpan.s1) / 2;
-  const inward = Math.sign(tCenter - latchT) || 1;
+  const inward = (Math.sign(tCenter - latchT) || 1) as 1 | -1;
   const tR = latchT + inward * openingHandleInset(c.t);
   const opts: AddOptions = { motion, leaf: index };
-  const fechadura = (): void => {
-    for (const k of lockBoxes(tR, z, sMid, c.L)) addPart(c, `handle-${index}-lock-${k.face}`, 'handle', 'metal', k.box, opts);
-  };
-  if (c.handle === 'pull') {
-    const sCenter = sMid + c.side * (c.L / 2 + 0.015);
-    addPart(c, `handle-${index}-pull`, 'handle', 'metal', box(-0.01, 0.01, sCenter - 0.015, sCenter + 0.015, z - 0.2, z + 0.2), opts);
-    return;
-  }
-  if (c.handle === 'knob') {
-    for (const face of [-1, 1] as const) {
-      const sCenter = sMid + face * (c.L / 2 + 0.025);
-      addPart(
-        c,
-        `handle-${index}-knob-${face < 0 ? 'a' : 'b'}`,
-        'handle',
-        'metal',
-        box(tR - 0.025, tR + 0.025, sCenter - 0.025, sCenter + 0.025, z - 0.025, z + 0.025),
-        opts,
-      );
-    }
-    fechadura();
-    return;
-  }
-  for (const face of [-1, 1] as const) {
-    const sCenter = sMid + face * (c.L / 2 + 0.006);
-    addPart(
-      c,
-      `handle-${index}-rosette-${face < 0 ? 'a' : 'b'}`,
-      'handle',
-      'metal',
-      box(tR - 0.025, tR + 0.025, sCenter - 0.006, sCenter + 0.006, z - 0.025, z + 0.025),
-      opts,
-    );
-    const tHaste = tR + inward * 0.065;
-    addPart(
-      c,
-      `handle-${index}-lever-${face < 0 ? 'a' : 'b'}`,
-      'handle',
-      'metal',
-      box(tHaste - 0.065, tHaste + 0.065, sCenter - 0.006, sCenter + 0.006, z - 0.01, z + 0.01),
-      opts,
-    );
-  }
-  fechadura();
+  const pecas = handleParts({ index, style: c.handle, tR, z, sMid: (sSpan.s0 + sSpan.s1) / 2, L: c.L, side: c.side, inward });
+  for (const p of pecas) addPart(c, p.id, 'handle', 'metal', p.box, p.profile ? { ...opts, profile: p.profile } : opts);
 }
 
 /** Folha de porta: vazada (glass) ou sólida com os detalhes do estilo e a maçaneta. */

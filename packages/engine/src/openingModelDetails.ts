@@ -172,18 +172,4 @@ export function hingeBoxes(t: number, sFace: number, dir: 1 | -1, zs: number[]):
   );
 }
 
-/**
- * Placa da fechadura (espelho pequeno) logo abaixo da maçaneta, uma em cada face da folha: centrada em `tR` (eixo da
- * maçaneta), 24 mm de largura e 40 mm de altura, de 50 a 90 mm abaixo de `zH`. `sMid` é o plano médio da folha e `L` a
- * espessura. `face` é 'a' (lado −) ou 'b' (lado +), como nas roseta.
- */
-export function lockBoxes(tR: number, zH: number, sMid: number, L: number): Array<{ face: 'a' | 'b'; box: PartBox }> {
-  return ([-1, 1] as const).map((f) => {
-    const sCenter = sMid + f * (L / 2 + HINGE_HALF_S);
-    return {
-      face: f < 0 ? 'a' : 'b',
-      box: box(tR - 0.012, tR + 0.012, sCenter - HINGE_HALF_S, sCenter + HINGE_HALF_S, zH - 0.09, zH - 0.05),
-    };
-  });
-}
 

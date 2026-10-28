@@ -42,15 +42,11 @@ function forma(pts: PartProfile['pts']): THREE.Shape {
   return new THREE.Shape(p.map(([a, b]) => new THREE.Vector2(a, b)));
 }
 
-/** Troca o 2.º e o 3.º vértice de cada triângulo: uma reflexão inverte o enrolamento (e a normal voltaria para dentro). */
+/**
+ * Troca o 2.º e o 3.º vértice de cada triângulo de uma geometria não indexada (a extrusão): uma reflexão inverte o
+ * enrolamento e a normal voltaria para dentro.
+ */
 function inverteTriangulos(g: THREE.BufferGeometry): void {
-  const idx = g.getIndex();
-  if (idx) {
-    const a = idx.array;
-    for (let i = 0; i + 2 < a.length; i += 3) [a[i + 1], a[i + 2]] = [a[i + 2]!, a[i + 1]!];
-    idx.needsUpdate = true;
-    return;
-  }
   for (const attr of Object.values(g.attributes)) {
     const a = attr.array as Float32Array;
     const n = attr.itemSize;
@@ -66,6 +62,16 @@ function inverteTriangulos(g: THREE.BufferGeometry): void {
 }
 
 /**
+ * Fecha a geometria da extrusão: índice sequencial (a extrusão não é indexada e o pipeline espera índice; os vértices não
+ * são fundidos, então a normal continua plana por triângulo) e normais recalculadas.
+ */
+function finaliza(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  g.setIndex(Array.from({ length: g.attributes.position!.count }, (_, i) => i));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
  * Prisma da seção. Em `'ts'` os pontos são (t, s) e a extrusão corre em z a partir de `box.z0`; em `'sz'` os pontos são
  * (s, z) e a extrusão corre em t a partir de `box.t0`; em `'tz'` são (t, z) e a extrusão corre em s a partir de `box.s0`
  * (disco, cilindro). A permutação final põe a geometria no sistema da peça (t, s, z).
@@ -75,22 +81,19 @@ export function geometriaDoPerfil(profile: PartProfile, box: PartBox): THREE.Buf
   if (profile.plane === 'ts') {
     const g = new THREE.ExtrudeGeometry(s, { depth: box.z1 - box.z0, bevelEnabled: false, steps: 1 });
     g.translate(0, 0, box.z0);
-    g.computeVertexNormals();
-    return g;
+    return finaliza(g);
   }
   if (profile.plane === 'tz') {
     const g = new THREE.ExtrudeGeometry(s, { depth: box.s1 - box.s0, bevelEnabled: false, steps: 1 });
     // (t, z, d) → (t, s, z): a extrusão em d vira s, deslocada para a face s0 da caixa. Trocar z por s é uma reflexão.
     g.applyMatrix4(new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, box.s0, 0, 1, 0, 0, 0, 0, 0, 1));
     inverteTriangulos(g);
-    g.computeVertexNormals();
-    return g;
+    return finaliza(g);
   }
   const g = new THREE.ExtrudeGeometry(s, { depth: box.t1 - box.t0, bevelEnabled: false, steps: 1 });
   // (s, z, d) → (t, s, z): a extrusão em d vira t, deslocada para a face t0 da caixa.
   g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, box.t0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
-  g.computeVertexNormals();
-  return g;
+  return finaliza(g);
 }
 
 /** Posição do pivô da dobradiça no sistema local do vão, ou null se a peça não gira. */

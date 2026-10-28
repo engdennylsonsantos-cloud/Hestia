@@ -1,6 +1,6 @@
 # Fase E: sistema único de cotas dinâmicas e referências
 
-Pré-requisitos: Fase A (formatação/entrada), Fase D (batente e prévia real). Leia antes: `docs/aberturas/pesquisa-f0/R7-revit-cotas-temporarias.md` e `docs/PENDENCIAS-2026-10-28-cotas-padroes-esquadrias.md` (seção A).
+**Donos:** COTAS faz D0–D9 e D11; ESQ faz D10 (depois que o COTAS integrar D4–D8). Pré-requisitos: Fase A (formatação/entrada, integrada pela UNID até U6) e Fase D (S2 e S3 integrados pela ESQ, porque tocam `openingTool.ts`). Sem eles, o COTAS faz antes só os passos puros (D0–D3 e o código novo do D4 em arquivos novos) — veja `07-DIVISAO-AGENTES.md`. Leia antes: `docs/aberturas/pesquisa-f0/R7-revit-cotas-temporarias.md` e `docs/PENDENCIAS-2026-10-28-cotas-padroes-esquadrias.md` (seção A).
 
 ## 1. Objetivo
 Um **único** sistema para cotas dinâmicas ("cotas temporárias"), usado por todas as ferramentas e pela seleção:
@@ -30,7 +30,7 @@ export interface ResolvedDimensionSettings { wallRef: WallDimRef; openingRef: Op
 ```
 Padrões: `wallRef 'finish'`, `openingRef 'frame'`, `showOnPlacement true`, `showOnSelection true`.
 "Face voltada para o elemento medido" = a face do plano de parede que fica do lado de onde se mede (entre a parede e o elemento).
-Mapeamento dos vocabulários antigos: `axis`→`wallRef 'axis'` + `openingRef 'center'`; `face`→`wallRef 'finish'` + `openingRef 'frame'`; `autoCotas`: `ReferenciaParede 'externa'→'finish'`, `'nucleo'→'coreFace'`, `'eixo'→'axis'`; `modoAberturas 'centro'→'center'`, `'arestas'→'frame'` (**confirme lendo `autoCotas.ts`** o que cada um mede de fato e ajuste o mapeamento se divergir; anote em `PROGRESSO.md`).
+Mapeamento dos vocabulários antigos: `axis`→`wallRef 'axis'` + `openingRef 'center'`; `face`→`wallRef 'finish'` + `openingRef 'frame'`; `autoCotas`: `ReferenciaParede 'externa'→'finish'`, `'nucleo'→'coreFace'`, `'eixo'→'axis'`; `modoAberturas 'centro'→'center'`, `'arestas'→'frame'` (**confirme lendo `autoCotas.ts`** o que cada um mede de fato e ajuste o mapeamento se divergir; anote em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`)).
 
 ## 3. Arquitetura (arquivos novos)
 ```
@@ -104,7 +104,7 @@ export interface OpeningExtents { center: 0; clear: number; frame: number; casin
 export function openingExtents(p: Project, opening: Pick<Opening,'typeId'|'hostId'|'flipFacing'|...>, frame: WallFrame, face: 1 | -1): OpeningExtents;
 export function openingEdge(ext: OpeningExtents, ref: OpeningDimRef): number; // meia-largura da referência
 ```
-Calcule a partir do **modelo real** (`compositionOfType`, largura do batente/peças `frame`, alizar `casing` da face `face`; **leia** `openingComposition.ts`, `openingModelCasing.ts`). Garantias testadas: `0 < clear ≤ frame ≤ casing`; sem alizar → `casing === frame`; porta com bandeira lateral: `frame` cobre o conjunto inteiro (vão externo do conjunto, não só da folha); `frame` coincide com a largura do recorte da parede (**verifique** com `buildOpeningModel`/`openingGeometry` e registre em `PROGRESSO.md` a relação; se o recorte for outro valor, ajuste o padrão `openingRef` em D1 para a referência que coincide com o recorte).
+Calcule a partir do **modelo real** (`compositionOfType`, largura do batente/peças `frame`, alizar `casing` da face `face`; **leia** `openingComposition.ts`, `openingModelCasing.ts`). Garantias testadas: `0 < clear ≤ frame ≤ casing`; sem alizar → `casing === frame`; porta com bandeira lateral: `frame` cobre o conjunto inteiro (vão externo do conjunto, não só da folha); `frame` coincide com a largura do recorte da parede (**verifique** com `buildOpeningModel`/`openingGeometry` e registre em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`) a relação; se o recorte for outro valor, ajuste o padrão `openingRef` em D1 para a referência que coincide com o recorte).
 Commit: `feat(cotas): D2 wallPlanes e openingExtents`.
 
 ### D3: resolvedores puros (tools)
@@ -175,7 +175,7 @@ Para **cada** provedor: arquivo em `dims/providers/`, registro, teste do `comput
 3. **grid.ts** — eixos/grades (`gridTool.ts`, `gridGeom.ts`): ao selecionar, distância às grades paralelas vizinhas dos dois lados (edit: move a grade; verifique a regra de alinhamento/eixos existente em `gridUi.ts`).
 4. **outline.ts** — piso, laje, telhado, forro (`floorTool`, `slabTool`, `roofTool`, `ceilingTool`, `outlineEdit.ts`): ao desenhar, comprimento do lado atual e fechamento; ao selecionar, comprimento de cada lado (somente leitura se `outlineEdit.ts` não oferece função pura para alterar o comprimento de um lado; se oferecer, editável).
 5. **displacement.ts** — mover/copiar (`transformTools.ts`): durante o gesto, cota do deslocamento (distância e ângulo) do ponto-base ao cursor; digitar o valor já existe nessas ferramentas: a cota apenas o exibe com o mesmo `parseQuantityText`.
-6. Pendente de decisão do dono (**não implemente**, só liste em `PROGRESSO.md` como possível extensão): escadas, ambientes, seções.
+6. Pendente de decisão do dono (**não implemente**, só liste em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`) como possível extensão): escadas, ambientes, seções.
 Cada integração: um commit (`feat(cotas): D10.<n> <provedor>`). Para cada uma, teste de ferramenta: preview contém a cota esperada (`tempDims()`), e a seleção devolve a cota.
 
 ### D11: documentação de reaproveitamento e aceite

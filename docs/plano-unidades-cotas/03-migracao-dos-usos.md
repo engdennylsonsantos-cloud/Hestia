@@ -2,6 +2,8 @@
 
 Pré-requisito: Fases A e B. Objetivo: nenhum texto de interface com número/unidade sai de `toFixed`, `replace('.', ',')`, `"m²"` literal, `unit="m"`, `scale={100}` etc. Tudo passa por `formatQuantity` / `NumField quantity` / `parseQuantityText`. Uma **trava automática** impede regressão.
 
+**Donos:** UNID faz C0–C3, C5 e C7; ESQ faz C4 e C6 (depois que a UNID integrar C0 e a Fase A). **Arquivos reservados ao COTAS (não migre; ficam na linha de base até o COTAS removê-los na Fase E):** `packages/tools/src/openingPlacement.ts`, `openingDims.ts`, `openingTool.ts`, `apps/web/src/ui/OpeningTempDims.tsx`, `ViewportOverlays.tsx`, `PlacementProperties.tsx` (linha do select "Cotas"), `packages/engine/src/autoCotas.ts` (só a unificação de referências; a retirada de `unit`/`precision` fixos ao criar cotas é da UNID em C5 nos demais arquivos).
+
 ## C0: a trava (faça primeiro)
 1. Crie `scripts/check-units.mjs` (Node, sem dependências, estilo de `scripts/check-boundaries.mjs` — leia-o antes). Varre `packages/*/src/**/*.{ts,tsx}` e `apps/web/src/**/*.{ts,tsx}`, **exceto** `*.test.*`, `*.stories.*`, e os arquivos do próprio serviço (`packages/model/src/units*.ts`). Conta, por arquivo, linhas que casam com **qualquer** destes padrões:
    - `\.toFixed\(`
@@ -37,7 +39,7 @@ Se estiver em dúvida entre `length` e `smallLength`, use o que a maioria dos ca
    - **Formato de máquina**: `machineNumber` do `geom`.
 3. Atualize os testes. Teste que falha porque o formato mudou (ex.: `1.5` → `1,50 m`) é atualizado **depois de conferir** que o valor novo está correto nas unidades padrão. Acrescente, por lote, **pelo menos um teste com unidades não padrão** (ex.: `length: cm`, `area: ft2`) provando que o texto acompanha.
 4. `node scripts/check-units.mjs --update` (a base só diminui) e o checklist de verificação (regra 8 do LEIA-ME).
-5. Commit por lote: `refactor(unidades): C<n> <lote>`; push; marcar em `PROGRESSO.md`.
+5. Commit por lote: `refactor(unidades): C<n> <lote>`; push; marcar em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`).
 
 ## Lotes (nesta ordem)
 - **C1**: painel de propriedades — `apps/web/src/ui/Properties.tsx`, `*Properties.tsx` (parede, piso, laje, telhado, ambiente, forro, escada, grade, anotação), `PlacementProperties.tsx`, `ToolTypeProps.tsx`, `TypeRow.tsx`, `TypePreview.tsx`.
@@ -58,4 +60,4 @@ Se estiver em dúvida entre `length` e `smallLength`, use o que a maioria dos ca
 - Rótulos dentro de canvas/SVG no `render` são desenhados com a fonte do app: o texto novo (com unidade) pode ser mais longo; confira cortes/sobreposição nos rótulos de cota e ambiente.
 - Cache: `resolveLevel` e afins têm cache por projeto. **Texto de unidade não pode entrar em geometria cacheada.** Se uma geometria cacheada carrega texto formatado, mova a formatação para o ponto de desenho.
 - Desempenho: `formatQuantity` é chamado em laço de desenho; mantenha-o sem alocar objetos além da string (nada de `Intl.NumberFormat` por chamada).
-- Testes de imagem/goldens (`tests/e2e/baseline*`): não regrave; anote em `PROGRESSO.md` quais seriam afetados.
+- Testes de imagem/goldens (`tests/e2e/baseline*`): não regrave; anote em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`) quais seriam afetados.

@@ -1,0 +1,24 @@
+# Progresso do agente UNID (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
+Linha de base antes de mexer (`npm run check`): _preencher_
+
+- [ ] U0 inventário (`01`)
+- [ ] U1 tipos, padrões e formatação
+- [ ] U2 leitura de texto digitado
+- [ ] U3 `ProjectSettings.units`
+- [ ] U4 `parseQuantityText` (tools)
+- [ ] U5 hook `useUnits`
+- [ ] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
+- [ ] U7 exportações independentes
+- [ ] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
+- [ ] B1–B4 diálogo Unidades (`02`)  → **marco M3**
+- [ ] C1 painel de propriedades
+- [ ] C2 diálogos
+- [ ] C3 barras e chrome
+- [ ] C5 model e engine (`Dimension.unit 'project'`)
+- [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
+- [ ] `npm run check` verde, integrado
+
+## Desvios
+_(nenhum)_
+## Bloqueios e pedidos a outros agentes
+_(nenhum)_

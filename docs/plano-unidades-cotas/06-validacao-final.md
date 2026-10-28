@@ -1,19 +1,19 @@
 # Fase F: validação final e entrega
 
-Faça somente depois das Fases A a E concluídas (ou marcadas com BLOQUEIO justificado em `PROGRESSO.md`).
+**Dono: COTAS.** Faça somente depois das Fases A a E concluídas (confira os três arquivos de progresso) (ou marcadas com BLOQUEIO justificado em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`)).
 
 ## F1: suíte e construção
 ```bash
 npm run check
 npm run build
 ```
-- Tudo verde. Se falhar algo que **não** é seu (linha de base anotada no passo 1 do LEIA-ME), liste em `PROGRESSO.md` e siga.
+- Tudo verde. Se falhar algo que **não** é seu (linha de base anotada no passo 1 do LEIA-ME), liste em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`) e siga.
 - `node scripts/check-units.mjs --report` deve mostrar 0 ocorrências sem justificativa.
 - `grep -rn "openingDimMode\|temporaryDimensions\|OpeningTempDims\|formatMeters" packages apps` deve retornar vazio.
 - Nenhum arquivo não-teste acima de 420 linhas (eslint garante).
 
 ## F2: verificação no navegador (Playwright, já instalado)
-Suba o app (`npm run dev -w @hestia/web`, veja o README). Roteiro, anotando o resultado de cada item em `PROGRESSO.md` (OK ou defeito + o que fez):
+Suba o app (`npm run dev -w @hestia/web`, veja o README). Roteiro, anotando o resultado de cada item em seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`) (OK ou defeito + o que fez):
 1. Projeto novo → Propriedades → Padrões do projeto → **Unidades…**: mudar Comprimento para cm, Área para ft², Ângulo para rad; conferir painel de propriedades, barra de status, quadro de ambientes e cotas; desfazer volta tudo.
 2. **Cotas…**: mudar referência de parede para "Face do núcleo" e de esquadria para "Vão livre"; colocar uma porta em parede de 3 camadas; conferir que as 2 cotas aparecem na prévia, mudam ao clicar nas alças, e o valor bate com a medição manual.
 3. Selecionar a porta: cotas reaparecem; digitar um valor novo move a porta; digitar valor que a tira da parede mostra alerta e não muda; desfazer volta.

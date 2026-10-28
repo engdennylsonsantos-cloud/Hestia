@@ -112,4 +112,4 @@ Confirme (leitura + teste) que DXF (`$INSUNITS`) e IFC (`METRE`) **não** mudam 
 Commit: `test(unidades): U7 exportações independentes da unidade de exibição`.
 
 ### Verificação da fase A
-`npm run check` verde. Atualize `PROGRESSO.md`. Push.
+`npm run check` verde. Atualize seu arquivo de progresso (`PROGRESSO-<PAPEL>.md`). Push.

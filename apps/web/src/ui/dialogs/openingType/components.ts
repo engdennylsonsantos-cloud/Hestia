@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react';
 import { OPENING_FAMILIES, openingOptionSupport, type OpeningFamilyId, type OpeningType } from '@hestia/model';
 import type { I18N } from '../../../editor/i18n.ts';
+import { COMPOSITION_COMPONENTS } from './composition/index.ts';
+import { PROFILE_COMPONENTS } from './composition/profileComponents.ts';
 import { DataPanel } from './panels/DataPanel.tsx';
 import { FramePanel } from './panels/FramePanel.tsx';
 import { GlazingPanel } from './panels/GlazingPanel.tsx';
@@ -28,7 +30,7 @@ import { WallPanel } from './panels/WallPanel.tsx';
  *     `visible(kind, família)` deve derivar da tabela de suporte: painel sem nenhum campo aplicável não aparece.
  */
 
-export type OpeningComponentId = 'overview' | 'frame' | 'leaf' | 'sashes' | 'glazing' | 'outer' | 'inner' | 'wall' | 'plan' | 'data';
+export type OpeningComponentId = 'overview' | 'frame' | 'leaf' | 'sashes' | 'glazing' | 'outer' | 'inner' | 'wall' | 'plan' | 'data' | 'composition' | 'profile' | 'casing' | 'glass';
 
 export interface OpeningComponent {
   id: OpeningComponentId;
@@ -49,6 +51,7 @@ const variasFolhas = (family: OpeningFamilyId | null): boolean => (OPENING_FAMIL
 /** Os componentes na ordem do ArchiCAD (Door/Window Custom Settings). */
 export const OPENING_COMPONENTS: readonly OpeningComponent[] = [
   { id: 'overview', labelKey: 'oc_overview', icon: 'M3 20h18M5 20V6h14v14M8 20v-6h8v6M8 10h2m4 0h2', visible: sempre, Panel: OverviewPanel },
+  ...COMPOSITION_COMPONENTS,
   { id: 'frame', labelKey: 'oc_frame', icon: 'M4 4h16v16H4zM8 8h8v12H8z', visible: (_k, f) => openingOptionSupport(f).frame, Panel: FramePanel },
   { id: 'leaf', labelKey: 'oc_leaf', icon: 'M7 3h10v18H7zM14 12h.01M7 3l-3 2v14l3 2', visible: (k, f) => k === 'door' && openingOptionSupport(f).leafThickness, Panel: LeafPanel },
   {
@@ -62,6 +65,7 @@ export const OPENING_COMPONENTS: readonly OpeningComponent[] = [
     Panel: SashesPanel,
   },
   { id: 'glazing', labelKey: 'oc_glazing', icon: 'M5 4h14v16H5zM9 8l6 8M9 14l3-3', visible: (k, f) => k === 'window' && (openingOptionSupport(f).glassKind || openingOptionSupport(f).leafThickness), Panel: GlazingPanel },
+  ...PROFILE_COMPONENTS,
   { id: 'outer', labelKey: 'oc_outer', icon: 'M4 20V6h8v14M12 8h8M16 4v8', visible: sempre, Panel: OuterPanel },
   { id: 'inner', labelKey: 'oc_inner', icon: 'M20 20V6h-8v14M12 8H4M8 4v8', visible: sempre, Panel: InnerPanel },
   { id: 'wall', labelKey: 'oc_wall', icon: 'M3 8h18M3 16h18M8 3v5m8 0v8m-8 0v5', visible: sempre, Panel: WallPanel },

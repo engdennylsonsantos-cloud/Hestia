@@ -30,8 +30,8 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('Propriedades do tipo');
     expect(html).toContain('Porta de teste');
     expect(html).toContain('Biblioteca');
-    // Porta de giro: oito componentes visíveis (sem os de janela); a Visão geral aberta traz o nome.
-    expect((html.match(/class="op-nav-item/g) ?? []).length).toBe(8);
+    // Porta de giro: doze componentes visíveis (sem os de janela; com Módulos, Perfis, Alizar e Vidro); a Visão geral aberta traz o nome.
+    expect((html.match(/class="op-nav-item/g) ?? []).length).toBe(12);
     expect(html).toContain('id="ot-name"');
     expect(html).toContain('Verificações');
     expect(html).toContain('Inverter dobradiça');

@@ -1,5 +1,5 @@
 import { generateSpiralRun, riserCountFor, SPIRAL_MAX_SWEEP, SPIRAL_MIN_INNER, type SpiralParams, type SpiralRunSketch } from '@hestia/engine';
-import type { Id, Project, Stair, StairLanding, StairRun, StairSpiralParams } from '@hestia/model';
+import { defaultUnits, formatQuantity, type Id, type Project, type ResolvedUnits, type Stair, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { stairLimits } from './stairCommands.ts';
 
@@ -21,6 +21,8 @@ export interface SpiralPlanInput extends SpiralParams {
   H: number;
   /** Espelho máximo do tipo (m). */
   maxRiser: number;
+  /** Unidades do projeto para as mensagens (ausente usa o padrão, para testes e chamadas antigas). */
+  units?: ResolvedUnits;
 }
 
 export interface SpiralPlan {
@@ -31,14 +33,13 @@ export interface SpiralPlan {
   riserHeight: number;
 }
 
-const fmt = (v: number, d = 2): string => v.toFixed(d).replace('.', ',');
-
 /**
  * Plano do caracol para os parâmetros dados: valida os limites da ferramenta (raios, varredura entre 30° e 720°) e gera o
  * croqui com N pela altura. Devolve a mensagem de status em pt-BR quando não dá.
  */
 export function planSpiralRun(i: SpiralPlanInput): SpiralPlan | { error: string } {
-  if (!(i.rInner >= SPIRAL_MIN_INNER)) return { error: `O raio interno deve ser de ao menos ${fmt(SPIRAL_MIN_INNER)} m.` };
+  const u = i.units ?? defaultUnits();
+  if (!(i.rInner >= SPIRAL_MIN_INNER)) return { error: `O raio interno deve ser de ao menos ${formatQuantity(u, 'length', SPIRAL_MIN_INNER)}.` };
   if (!(i.rOuter > i.rInner)) return { error: 'O raio externo deve ser maior que o interno.' };
   const sw = Math.abs(i.sweep);
   if (!(sw >= SPIRAL_MIN_SWEEP - 1e-9)) return { error: 'A varredura mínima do caracol é de 30°.' };

@@ -65,7 +65,7 @@ describe('análise do croqui', () => {
     const rep = analyzeDraft([run([0, 1])], LIM);
     const alt = rep.issues.find((i) => i.code === 'stair-riser-too-high');
     expect(alt?.severity).toBe('warning');
-    expect(alt?.message).toMatch(/1,500 m\) excede a máxima do tipo \(0,180 m\)/);
+    expect(alt?.message).toMatch(/1,50 m\) excede a máxima do tipo \(0,18 m\)/);
     expect(rep.canFinish).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe('análise do croqui', () => {
     const rep = analyzeDraft([run([0, 1, 2], 0.6)], { ...LIM, minRunWidth: 0.8 });
     const w = rep.issues.find((i) => i.code === 'stair-width-min');
     expect(w?.severity).toBe('warning');
-    expect(w?.message).toMatch(/0,600 m\)/);
+    expect(w?.message).toMatch(/0,60 m\)/);
   });
 
   it('patamar aberto é erro com a mensagem da decisão 0011', () => {

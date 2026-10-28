@@ -1,4 +1,4 @@
-import { isOpening, isRoof, isWall, type Id, type Project, type Roof, type Wall } from '@hestia/model';
+import { formatQuantity, isOpening, isRoof, isWall, unitsOf, type Id, type Project, type ResolvedUnits, type Roof, type Wall } from '@hestia/model';
 import { resolveAllRoofs, roofAxisReport } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { pickAt } from './pick.ts';
@@ -8,7 +8,7 @@ import type { PointerInfo } from './types.ts';
 /** Trecho do eixo fora do telhado menor que isto (m) não é avisado (mesma folga do C2). */
 const UNCOVERED_TOL = 1e-3;
 
-const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m, { withUnit: false });
 
 /**
  * Parede sob o cursor. Na 3D, é o elemento que a própria vista destaca (`hit3d`): escolher pelo ponto projetado na planta
@@ -47,7 +47,7 @@ export function roofCoverNote(p: Project, w: Wall, roofId: Id): string | null {
   const rep = roofAxisReport({ ...w, attachTopRoofId: roofId }, rs);
   if (!rep || rep.uncovered <= UNCOVERED_TOL) return null;
   if (rep.uncovered >= rep.length - UNCOVERED_TOL) return `"${w.id}" está fora deste telhado; o topo fica na altura normal`;
-  return `"${w.id}" tem ${fmt(rep.uncovered)} m do eixo fora do telhado`;
+  return `"${w.id}" tem ${fmt(unitsOf(p), rep.uncovered)} m do eixo fora do telhado`;
 }
 
 const WALLS_HINT = 'Anexar topo: clique nas paredes (ou selecione-as antes) e depois Enter. Esc sai.';

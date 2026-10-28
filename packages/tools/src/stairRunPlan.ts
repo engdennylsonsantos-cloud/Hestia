@@ -9,7 +9,7 @@ import {
   type StairComponentSketch,
   type StairRunSketch,
 } from '@hestia/engine';
-import type { Id, StairGenerator } from '@hestia/model';
+import { defaultUnits, formatQuantity, type Id, type ResolvedUnits, type StairGenerator } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
 /**
@@ -67,7 +67,7 @@ export const WINDER_FAN_RISERS = 3;
  * (N ≥ ceil(H ÷ espelho máximo)), fica o de piso mais perto do piso ideal do tipo (`treadFor`, 0,63 − 2·h); o piso não
  * pode ficar abaixo do mínimo. Erro se nem o menor N dá piso mínimo: o lance é curto demais.
  */
-export function risersForLength(H: number, maxRiser: number, minTread: number, length: number): { risers: number; tread: number } | { error: string } {
+export function risersForLength(H: number, maxRiser: number, minTread: number, length: number, u: ResolvedUnits = defaultUnits()): { risers: number; tread: number } | { error: string } {
   const N0 = riserCountFor(H, maxRiser);
   let best: { risers: number; tread: number; score: number } | null = null;
   for (let N = Math.max(2, N0); N <= N0 + 400; N++) {
@@ -77,7 +77,7 @@ export function risersForLength(H: number, maxRiser: number, minTread: number, l
     const score = Math.abs(tread - treadFor(H / N, minTread));
     if (!best || score < best.score) best = { risers: N, tread, score };
   }
-  if (!best) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${Math.max(2, N0)} espelhos: o piso ficaria abaixo do mínimo (${(minTread * 100).toFixed(0)} cm).` };
+  if (!best) return { error: `O comprimento (${formatQuantity(u, 'smallLength', length, { decimals: 0 })}) é curto para ${Math.max(2, N0)} espelhos: o piso ficaria abaixo do mínimo (${formatQuantity(u, 'smallLength', minTread, { decimals: 0 })}).` };
   return { risers: best.risers, tread: best.tread };
 }
 
@@ -93,6 +93,8 @@ export interface StairRunPlanInput {
   /** Piso mínimo do tipo (m). */
   minTread: number;
   options: StairRunToolOptions;
+  /** Unidades do projeto para as mensagens (ausente usa o padrão, para testes e chamadas antigas). */
+  units?: ResolvedUnits;
 }
 
 /** Plano calculado: componentes em ordem (como croqui), nº de espelhos N, altura real h e piso. */
@@ -110,10 +112,9 @@ export interface StairRunPlan {
  * entre os que a altura permite (N ≥ N0), no piso mais perto do ideal (`treadFor`); para N0, o comprimento que dá o piso
  * ideal é (N0 − 1) × treadFor(H ÷ N0).
  */
-function lengthNote(H: number, minTread: number, length: number, N: number, N0: number): string {
+function lengthNote(H: number, minTread: number, length: number, N: number, N0: number, u: ResolvedUnits): string {
   const L0 = (N0 - 1) * treadFor(H / N0, minTread);
-  const m = (v: number): string => v.toFixed(2).replace('.', ',');
-  return `(o comprimento de ${m(length)} m permite ${N}; o ideal pela altura é ${N0}: ajuste o comprimento para ${m(L0)} m ou edite o nº de espelhos).`;
+  return `(o comprimento de ${formatQuantity(u, 'length', length)} permite ${N}; o ideal pela altura é ${N0}: ajuste o comprimento para ${formatQuantity(u, 'length', L0)} ou edite o nº de espelhos).`;
 }
 
 export type StairRunPlanResult = StairRunPlan | { error: string };
@@ -142,13 +143,13 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const N0 = N;
   const byLength = shape === 'straight' && i.options.length !== undefined;
   if (byLength) {
-    const sized = risersForLength(i.H, i.maxRiser, i.minTread, i.options.length!);
+    const sized = risersForLength(i.H, i.maxRiser, i.minTread, i.options.length!, i.units);
     if ('error' in sized) return sized;
     N = sized.risers;
   }
   const riserHeight = i.H / N;
   const tread = byLength ? (i.options.length! / (N - 1)) : treadFor(riserHeight, i.minTread);
-  const note = byLength && N !== N0 ? lengthNote(i.H, i.minTread, i.options.length!, N, N0) : undefined;
+  const note = byLength && N !== N0 ? lengthNote(i.H, i.minTread, i.options.length!, N, N0, i.units ?? defaultUnits()) : undefined;
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];
   try {

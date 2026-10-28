@@ -1,8 +1,8 @@
 import { pointInRing, type Vec2 } from '@hestia/geom';
-import { isFloor, isOpening, isRoof, isSlab, isWall, makeFloor, makeSlab, type Floor, type Id, type Slab, type Wall } from '@hestia/model';
+import { formatQuantity, isFloor, isOpening, isRoof, isSlab, isWall, makeFloor, makeSlab, unitsOf, type Floor, type Id, type ResolvedUnits, type Slab, type Wall } from '@hestia/model';
 import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
 import { ToolBase, makeId } from './base.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { pickAt } from './pick.ts';
 import { pickFloorAt } from './floorPick.ts';
 import { pickSlabAt } from './slabPick.ts';
@@ -30,7 +30,7 @@ interface SlabStart {
   at: Vec2;
 }
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /**
  * Dividir (Revit: Split Element / Split with Gap). Parede: clique no ponto de corte; Tab alterna o modo "com intervalo"
@@ -136,11 +136,11 @@ export class SplitTool extends ToolBase {
     if (this.gapStart && this.gapStart.wallId === w.id) {
       this.items.push({ kind: 'point', at: this.gapStart.at });
       this.items.push({ kind: 'line', a: this.gapStart.at, b: cut.at, dashed: true });
-      this.items.push({ kind: 'label', at: cut.at, text: `intervalo ${fmt(Math.abs(cut.t - this.gapStart.t))}` });
+      this.items.push({ kind: 'label', at: cut.at, text: `intervalo ${fmt(unitsOf(this.env.project()), Math.abs(cut.t - this.gapStart.t))}` });
       return;
     }
     this.items.push({ kind: 'point', at: cut.at });
-    this.items.push({ kind: 'label', at: cut.at, text: `a ${fmt(cut.t)} do início do trecho` });
+    this.items.push({ kind: 'label', at: cut.at, text: `a ${fmt(unitsOf(this.env.project()), cut.t)} do início do trecho` });
   }
 
   /** Sem parede sob o cursor: aresta de anel (Dividir aresta) ou piso/laje (para a divisão em dois cliques). */
@@ -278,7 +278,7 @@ export class SplitTool extends ToolBase {
 
   override type(text: string): boolean {
     if (this.withGap || !this.hoverId) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
       this.env.say('Valor inválido. Digite a distância em metros, medida desde o início do trecho sob o cursor.');
       return false;
@@ -296,7 +296,7 @@ export class SplitTool extends ToolBase {
       this.env.say(e instanceof Error ? e.message : 'Não foi possível dividir a parede.');
       return false;
     }
-    this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(gap)}.` : `Parede dividida a ${fmt(t)} do início do trecho.`);
+    this.env.say(gap > 0 ? `Parede dividida, com intervalo de ${fmt(unitsOf(this.env.project()), gap)}.` : `Parede dividida a ${fmt(unitsOf(this.env.project()), t)} do início do trecho.`);
     return true;
   }
 }

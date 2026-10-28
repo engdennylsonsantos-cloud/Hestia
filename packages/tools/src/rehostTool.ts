@@ -1,4 +1,4 @@
-import { openingTypeById, isOpening, isWall, wallLength, type Id } from '@hestia/model';
+import { formatQuantity, openingTypeById, isOpening, isWall, unitsOf, wallLength, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { closestOnWall } from './wallGeom.ts';
 import { pickAt } from './pick.ts';
@@ -60,7 +60,7 @@ export class RehostTool extends ToolBase {
     this.items.push({ kind: 'highlight', ids: [wallId] });
     const at = closestOnWall(w, p.raw);
     this.items.push({ kind: 'point', at: at.point });
-    this.items.push({ kind: 'label', at: at.point, text: `${at.t.toFixed(2).replace('.', ',')} m do início` });
+    this.items.push({ kind: 'label', at: at.point, text: `${formatQuantity(unitsOf(pr), 'length', at.t)} do início` });
   }
 
   override click(p: PointerInfo): void {

@@ -1,19 +1,18 @@
 import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
+import { annotationIdsIn, annotationMoveCommands, formatQuantity, isOpening, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { gridGhosts, moveGrids, selectedGrids } from './gridGeom.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews, transformWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
 import { moveRoomSeparators, movableSeparatorIds, separatorGhostItems } from './roomSeparatorPick.ts';
 import type { EdgePick } from './ringEdge.ts';
 import { DEFAULT_DISJOIN, type PointerInfo, type ToolEnv } from './types.ts';
 
-const deg = (r: number): number => (r * 180) / Math.PI;
-export const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+export const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Base das ferramentas que exigem seleção prévia. */
 export abstract class SelectionTool extends ToolBase {
@@ -124,7 +123,7 @@ export class MoveTool extends SelectionTool {
     const i = this.edgePick.ref.index;
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     this.items.push({ kind: 'line', a: moved[i]!, b: moved[(i + 1) % ring.length]!, dashed: true });
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
   }
 
   /** Move só a aresta pelo vetor d (Mover aresta). Copiar aresta não existe nesta versão. */
@@ -179,7 +178,7 @@ export class MoveTool extends SelectionTool {
     const t = { kind: 'translate' as const, d };
     this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t), ...gridGhosts(this.env.project(), selectedGrids(this.env.project(), this.env.selection()), d));
     if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
   }
 
   private apply(d: Vec2): void {
@@ -229,7 +228,7 @@ export class MoveTool extends SelectionTool {
 
   override type(text: string): boolean {
     if (!this.base) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) return false;
     const dir = norm(sub(this.inf?.point ?? this.raw, this.base));
     if (!this.hasSelection()) {
@@ -291,7 +290,7 @@ export class RotateTool extends SelectionTool {
       const ang = this.angleTo(p.raw);
       const t = { kind: 'rotate', about: this.center, angle: ang } as const;
       this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
-      this.items.push({ kind: 'label', at: p.raw, text: `${deg(ang).toFixed(1).replace('.', ',')}°` });
+      this.items.push({ kind: 'label', at: p.raw, text: formatQuantity(unitsOf(this.env.project()), 'angle', ang) });
     }
   }
 
@@ -326,9 +325,9 @@ export class RotateTool extends SelectionTool {
 
   override type(text: string): boolean {
     if (!this.center) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'angle');
     if (v === null) return false;
-    this.commit((v * Math.PI) / 180);
+    this.commit(v);
     return true;
   }
 }

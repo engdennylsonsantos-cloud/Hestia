@@ -1,7 +1,8 @@
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchResult, type SketchTarget, type Vec2 } from '@hestia/geom';
 import { ToolBase } from './base.ts';
-import { parseNumber } from './numeric.ts';
+import { unitsOf } from '@hestia/model';
+import { parseNumber, parseQuantityText } from './numeric.ts';
 import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, selectAllSegs, type FinishResult, type SketchOrigin } from './perimeterSession.ts';
 import { anchorOf, buildShape, kindOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
 import { SELECT_PX, boxRing, hitSeg, roomClick, roomHover, segLines } from './perimeterToolPick.ts';
@@ -368,12 +369,13 @@ export class PerimeterTool extends ToolBase {
     const st = this.step;
     const input = st ? stepsOf(st.shape)[st.idx] : undefined;
     if (!st || !input) return false;
-    const v = parseNumber(text);
+    const q = input.kind === 'length' ? 'length' : input.kind === 'angle' ? 'angle' : null;
+    const v = q ? parseQuantityText(text, unitsOf(this.env.project()), q) : parseNumber(text);
     if (input.kind === 'length' || input.kind === 'angle' || input.kind === 'count') {
       if (v === null) return refuse(this.env, 'Valor inválido. Digite um número.');
       if (input.kind === 'length' && v <= 0) return refuse(this.env, 'Digite um comprimento maior que zero, em metros.');
       if (input.kind === 'count' && (!Number.isInteger(v) || v < 3)) return refuse(this.env, 'Lados: um inteiro de 3 para cima.');
-      this.setInput(st, input.key, input.kind === 'angle' ? (v * Math.PI) / 180 : v);
+      this.setInput(st, input.key, v);
       return true;
     }
     const anchor = anchorOf(st);

@@ -1,5 +1,5 @@
 import { dist, mid, type Vec2 } from '@hestia/geom';
-import type { SectionView } from '@hestia/model';
+import { formatQuantity, unitsOf, type ResolvedUnits, type SectionView } from '@hestia/model';
 import { endRefAt } from './annotationPick.ts';
 import { ToolBase, makeId } from './base.ts';
 import type { PointerInfo } from './types.ts';
@@ -7,7 +7,7 @@ import type { PointerInfo } from './types.ts';
 /** Profundidade padrão do corte: quanto do modelo fica visível além do plano. */
 export const DEFAULT_SECTION_DEPTH = 6;
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Próximo nome livre "Corte A", "Corte B"… (depois de Z, "Corte 27", "Corte 28"…). */
 export function nextSectionName(views: SectionView[]): string {
@@ -55,7 +55,7 @@ export class SectionTool extends ToolBase {
     const l = dist(a, b);
     if (l < 1e-6) return;
     this.items.push({ kind: 'sectionLine', a, b, dashed: true });
-    this.items.push({ kind: 'label', at: mid(a, b), text: fmt(l) });
+    this.items.push({ kind: 'label', at: mid(a, b), text: fmt(unitsOf(this.env.project()), l) });
     this.env.say('Clique no fim da linha. A seta mostra o lado que o observador vê.');
   }
 

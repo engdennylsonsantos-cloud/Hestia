@@ -8,7 +8,7 @@ import {
   toLocal,
   type OpeningPlanPath,
 } from '@hestia/engine';
-import { openingTypeById, openingType, openingsOfWall, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
+import { dimensionSettingsOf, openingTypeById, openingType, openingsOfWall, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
 import { parseNumber } from './numeric.ts';
@@ -16,14 +16,14 @@ import {
   anchorCenter,
   clampOpeningCenter,
   facingForCursor,
-  formatMeters,
   freeSpans,
   overlapsPerpendicular,
   perpendicularNeighbors,
   sideWithHysteresis,
-  temporaryDimensions,
   type PerpendicularWall,
 } from './openingPlacement.ts';
+import { openingDimProvider, type OpeningDimSubject } from './dims/providers/opening.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { PointerInfo } from './types.ts';
 
 /**
@@ -52,6 +52,8 @@ export class OpeningTool extends ToolBase {
   private current: { wallId: string; offset: number } | null = null;
   private lastPointer: PointerInfo | null = null;
   private previewCache: PreviewCache | null = null;
+  /** Esquadria da prévia para as cotas dinâmicas; null sem parede sob o cursor. */
+  private dimSubject: OpeningDimSubject | null = null;
 
   constructor(env: ConstructorParameters<typeof ToolBase>[0], kind: 'door' | 'window') {
     super(env);
@@ -62,6 +64,7 @@ export class OpeningTool extends ToolBase {
 
   protected reset(): void {
     this.items = [];
+    this.dimSubject = null;
     this.current = null;
     this.lastSide = 1;
     this.lastPointer = null;
@@ -173,6 +176,7 @@ export class OpeningTool extends ToolBase {
 
   override move(p: PointerInfo): void {
     this.items = [];
+    this.dimSubject = null;
     this.raw = p.raw;
     this.lastPointer = p;
     const pr = this.env.project();
@@ -199,7 +203,7 @@ export class OpeningTool extends ToolBase {
     const off = this.resolve(aligned.offset, host.wallId, neighbors);
     const preview = off ?? clampOpeningCenter(aligned.offset, t.width, f.length, host.offset);
     this.items.push({ kind: 'highlight', ids: [host.wallId] });
-    this.drawPreview(host.wallId, f, t.width, preview, flipHand, flipFacing, off !== null, neighbors);
+    this.drawPreview(host.wallId, f, t.width, preview, flipHand, flipFacing, off !== null);
     if (off === null) {
       this.env.say('Sem espaço livre neste ponto da parede.');
       return;
@@ -254,7 +258,6 @@ export class OpeningTool extends ToolBase {
     flipHand: boolean,
     flipFacing: boolean,
     valid: boolean,
-    neighbors: PerpendicularWall[],
   ): void {
     const options = this.env.options();
     const tone = valid ? undefined : ('invalid' as const);
@@ -279,10 +282,15 @@ export class OpeningTool extends ToolBase {
     }
     const c = pointAt(f, offset, f.sMid);
     this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, width / 2, f.thickness / 2 + 0.02), tone });
-    for (const d of temporaryDimensions(f, offset, width, neighbors, options.openingDimMode ?? 'axis', this.lastSide)) {
-      this.items.push({ kind: 'line', a: d.a, b: d.b, tone });
-      this.items.push({ kind: 'label', at: d.at, text: formatMeters(d.value) });
-    }
+    this.dimSubject = { hostId: wallId, offset, typeId: this.typeId(), flipFacing, flipHand, side: this.lastSide };
+  }
+
+  /** Cotas dinâmicas da prévia (duas, só de leitura): o sistema único de cotas cuida do desenho. */
+  tempDims(overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    const subject = this.dimSubject;
+    if (!subject) return [];
+    const project = this.env.project();
+    return openingDimProvider.compute({ project, levelId: this.env.levelId(), settings: dimensionSettingsOf(project), overrides }, subject);
   }
 
   private place(wallId: string, offset: number): void {

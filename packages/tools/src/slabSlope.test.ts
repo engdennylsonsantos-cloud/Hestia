@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { slabRiseAt } from '@hestia/engine';
 import { type Slab } from '@hestia/model';
+import { defaultUnits } from '@hestia/model';
 import { fmtPercent, slopeError, slopeFrom, slopePreview } from './slabSlope.ts';
 import { commitPerimeter } from './perimeterCommit.ts';
 import { addSegs, newDraft } from './perimeterSession.ts';
@@ -26,8 +27,8 @@ function withSlab() {
 
 describe('inclinação: funções puras (A5, G1)', () => {
   it('rótulo do percentual usa vírgula e uma casa', () => {
-    expect(fmtPercent(5)).toBe('5,0 %');
-    expect(fmtPercent(2.25)).toBe('2,3 %');
+    expect(fmtPercent(defaultUnits(), 5)).toBe('5,0%');
+    expect(fmtPercent(defaultUnits(), 2.25)).toBe('2,3%');
   });
 
   it('erro para percentual não finito ou acima de 100 %', () => {
@@ -48,7 +49,7 @@ describe('inclinação: funções puras (A5, G1)', () => {
   it('prévia: seta tracejada com o rótulo do percentual', () => {
     const items = slopePreview({ origin: { x: 0, y: 0 }, dir: { x: 1, y: 0 }, percent: 5 }, 2);
     expect(items[0]).toMatchObject({ kind: 'line', dashed: true });
-    expect(items.some((i) => i.kind === 'label' && i.text === '5,0 %')).toBe(true);
+    expect(items.some((i) => i.kind === 'label' && i.text === '5,0%')).toBe(true);
   });
 
   it('cota da face superior cresce com a distância da origem ao longo da direção (engine)', () => {

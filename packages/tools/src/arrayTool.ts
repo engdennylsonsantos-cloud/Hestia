@@ -1,7 +1,8 @@
 import { len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
+import { formatQuantity, unitsOf, type ResolvedUnits } from '@hestia/model';
 import { copyWalls, ghostBands, ghostViews, transformViews } from './edit.ts';
 import { fmtM, SelectionTool } from './transformTools.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { arraySet, commitRadial, fmtXY, itensSobrepostos, linearStep, radialAngles, radialGhosts } from './arrayRadial.ts';
 import type { PointerInfo } from './types.ts';
 
@@ -47,6 +48,9 @@ export const AVISO_HOSPEDEIRA = TEXTOS.pt.hospedeira;
 /** Aviso dos itens da radial que caíram sobre elementos existentes (a cópia é feita mesmo assim). */
 const avisoSobrepostos = (itens: number[]): string =>
   itens.length === 1 ? `O item ${itens[0]} ficou sobre um elemento existente.` : `Os itens ${itens.join(', ')} ficaram sobre elementos existentes.`;
+
+/** Ângulo em graus como número (sem a unidade), para as mensagens que já trazem o `°`. */
+const angleText = (u: ResolvedUnits, deg: number): string => formatQuantity(u, 'angle', (deg * Math.PI) / 180, { withUnit: false });
 
 /** Ângulo total 0 não gira nada: a matriz radial rejeita e mantém o último valor válido (D4). */
 export const AVISO_ANGULO_ZERO = TEXTOS.pt.anguloZero;
@@ -155,7 +159,7 @@ export class ArrayTool extends SelectionTool {
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     const step = linearStep(d, this.count(), this.anchor());
     this.ghosts(step);
-    this.items.push({ kind: 'label', at: inf.point, text: `${this.count()} × ${fmtM(len(step))}` });
+    this.items.push({ kind: 'label', at: inf.point, text: `${this.count()} × ${fmtM(unitsOf(this.env.project()), len(step))}` });
   }
 
   /** Radial: antes do centro, mostra a dica no cursor; depois, a pré-visualização dos itens nos ângulos da barra. */
@@ -168,7 +172,7 @@ export class ArrayTool extends SelectionTool {
     this.items.push({ kind: 'point', at: this.base }, { kind: 'line', a: this.base, b: inf.point, dashed: true });
     const angles = radialAngles(this.count(), this.angleDeg(), this.anchor());
     this.items.push(...radialGhosts(this.env, arraySet(this.env.project(), this.env.selection()), this.base, angles));
-    this.items.push({ kind: 'label', at: inf.point, text: `${this.count()} × ${this.angleDeg().toFixed(1).replace('.', ',')}°` });
+    this.items.push({ kind: 'label', at: inf.point, text: `${this.count()} × ${angleText(unitsOf(this.env.project()), this.angleDeg())}°` });
   }
 
   private commit(d: Vec2): void {
@@ -204,7 +208,7 @@ export class ArrayTool extends SelectionTool {
     const sobre = itensSobrepostos(p, this.env.levelId(), set, center, angles);
     commitRadial(this.env, set, center, angles);
     const aviso = sobre.length ? ` ${avisoSobrepostos(sobre)}` : '';
-    const msg = t.resumoRadial(n, angleDeg.toFixed(1).replace('.', ','), fmtXY(center)) + aviso;
+    const msg = t.resumoRadial(n, angleText(unitsOf(p), angleDeg), fmtXY(unitsOf(p), center)) + aviso;
     this.reset();
     this.env.done();
     this.env.say(msg);
@@ -216,7 +220,7 @@ export class ArrayTool extends SelectionTool {
     if (this.radial()) {
       if (!this.base) {
         this.startStep(inf.point);
-        this.env.say(TEXTOS[this.lang()].centroDefinido(fmtXY(inf.point)));
+        this.env.say(TEXTOS[this.lang()].centroDefinido(fmtXY(unitsOf(this.env.project()), inf.point)));
         return;
       }
       this.applyRadial(this.angleDeg());
@@ -232,10 +236,10 @@ export class ArrayTool extends SelectionTool {
   override type(text: string): boolean {
     this.checkStep();
     if (!this.base) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), this.radial() ? 'angle' : 'length');
     if (v === null) return false;
     if (this.radial()) {
-      this.applyRadial(v);
+      this.applyRadial((v * 180) / Math.PI);
       return true;
     }
     const dir = norm(sub(this.inf?.point ?? this.raw, this.base));

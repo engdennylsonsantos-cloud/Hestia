@@ -7,7 +7,7 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - **MARCO M4 LIBERADO cdcd096a** (S2 e S3 integrados)
 - [x] S4 alças de inversão (não reproduzido no navegador; ver nota)
 - [x] S5 planta do modal
-- [ ] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
+- [x] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
 - [ ] C6 `packages/render` e `packages/io`
 - [ ] D10.1 parede (`04`; só depois do marco M5)
 - [ ] D10.2 linha e perímetro
@@ -45,6 +45,12 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - `previewPlanDrawList(ot_p90)` já continha batente (papel `jamb`), folha (`leaf`) e arco (`swing`), e o SVG os desenhava (12 traços + 3 preenchimentos); abri o diálogo real (dev server + Chromium, aba Planta) e a captura mostra parede hachurada, batente, folha aberta e arco. O defeito relatado não se repete no código atual (o S1 também deixou o batente faceado visível).
 - Para o teste exigido pelo plano, `StrokeOp` ganhou `role` opcional e `drawListToSvg` emite `data-role` nos traços do símbolo (a parede continua sem papel). Testes novos em `previewViews.test.ts`: `ot_p90` (jamb/leaf/swing), `ot_pbalcao_band120` (jamb/leaf/glass) e `ot_jcomb_fa150x120` (jamb/mullion/glass).
 - Nada de estilo/espessura/cor precisou mudar: `strokeColor` já resolve as cores de tema e o pipeline da planta usa a caixa do vão com 0,6 m de margem.
+
+## C4 — tools migrados
+- Todos os textos de `packages/tools` passam por `formatQuantity`/`unitsOf(project)` (comprimento, comprimento pequeno em cm, área, ângulo, inclinação) e as entradas de comprimento/ângulo por `parseQuantityText`. Helpers puros recebem `ResolvedUnits` (com `defaultUnits()` só como fallback de testes/chamadas antigas).
+- `formatMeters` saiu; `fmtXY`, `fmtM`, `fmt`, `cm`/`mText`/`degText`, `areaText`, `fmtPercent`, `fmtM` das escadas etc. agora recebem as unidades do projeto.
+- Ficam na linha de base (reservados ao COTAS, Fase E): `openingPlacement.ts` (1 ocorrência de `formatMeters`). Nada mais em `packages/tools` tem ocorrência.
+- Teste com unidades não padrão: cota de 3 m vira `300,0 cm` em `medirFrenteG.test.ts`. `node scripts/units-baseline.json` reduzido com `--update`.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

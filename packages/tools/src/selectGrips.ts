@@ -1,7 +1,7 @@
 import { add, dist, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { ceilingOutline } from '@hestia/engine';
-import { isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, type Id, type Project } from '@hestia/model';
+import { formatQuantity, isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, unitsOf, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, MIN_WALL_LENGTH, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
@@ -128,7 +128,7 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
         // Cota temporária: comprimento e Δx/Δy do eixo, como no Revit ao arrastar uma ponta.
         const dx = pt.x - other.x;
         const dy = pt.y - other.y;
-        items.push({ kind: 'label', at: { x: (pt.x + other.x) / 2, y: (pt.y + other.y) / 2 }, text: `${Math.hypot(dx, dy).toFixed(3).replace('.', ',')} m  Δx ${dx.toFixed(3).replace('.', ',')}  Δy ${dy.toFixed(3).replace('.', ',')}` });
+        items.push({ kind: 'label', at: { x: (pt.x + other.x) / 2, y: (pt.y + other.y) / 2 }, text: `${formatQuantity(unitsOf(pr), 'length', Math.hypot(dx, dy))}  Δx ${formatQuantity(unitsOf(pr), 'length', dx, { withUnit: false })}  Δy ${formatQuantity(unitsOf(pr), 'length', dy, { withUnit: false })}` });
       }
       // Vizinhas que vão acompanhar: aparecem na prévia para não haver surpresa.
       for (const c of follow) {
@@ -312,6 +312,6 @@ export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null
   }
   if (focus?.id === f.id && f.boundary[focus.index]) items.push({ kind: 'highlight', ids: [f.id] });
   // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.
-  if (isSlab(f) && f.slope) items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary)));
+  if (isSlab(f) && f.slope) items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary), unitsOf(p)));
   return items;
 }

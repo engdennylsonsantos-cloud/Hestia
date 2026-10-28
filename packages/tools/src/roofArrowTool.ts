@@ -1,5 +1,5 @@
 import { add, dot, len, mul, norm, sub, type Vec2 } from '@hestia/geom';
-import { isRoof, type Roof, type RoofPlaneDef } from '@hestia/model';
+import { isRoof, unitsOf, type Roof, type RoofPlaneDef } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { roofSlopeError } from './roofGeom.ts';
@@ -77,7 +77,7 @@ export class RoofArrowTool extends ToolBase {
     this.items.push({ kind: 'line', a: this.first, b: inf.point });
     const r = this.roof();
     if (r) this.items.push({ kind: 'polygon', ring: r.boundary, dashed: true });
-    this.items.push({ kind: 'label', at: inf.point, text: fmtPercent(this.env.options().roofSlope ?? 30) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtPercent(unitsOf(this.env.project()), this.env.options().roofSlope ?? 30) });
   }
 
   /** Direção de subida unitária do primeiro clique até `q`, ou null quando os pontos coincidem. */
@@ -140,7 +140,7 @@ export class RoofArrowTool extends ToolBase {
     const patch: Partial<Roof> = { ...convert, planes };
     const was = r.shape === 'free' ? '' : ' O telhado virou de águas livres.';
     const verb = k >= 0 ? `Água ${k + 1} alterada` : 'Água adicionada';
-    if (commitRoofPatch(this.env, [r.id], patch)) this.env.say(`${verb} com inclinação de ${fmtPercent(slope)}.${was} Ctrl+Z desfaz.`);
+    if (commitRoofPatch(this.env, [r.id], patch)) this.env.say(`${verb} com inclinação de ${fmtPercent(unitsOf(this.env.project()), slope)}.${was} Ctrl+Z desfaz.`);
     this.reset();
   }
 }

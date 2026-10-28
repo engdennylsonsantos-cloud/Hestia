@@ -4,6 +4,10 @@ import { DXF_LAYER_CORTES, DXF_LAYER_ELEVACOES, dxfLayerOfFloor, dxfLayerOfMater
 import {
   ProjectStore,
   buildTemplate,
+  type CellNode,
+  type CompositionNode,
+  type OpeningComposition,
+  type SplitNode,
   graphicsOf,
   lineWeightMm,
   makeFloor,
@@ -652,5 +656,56 @@ describe('linhas finas não mudam o DXF (decisão 0015, só na tela)', () => {
     expect(planDxf(fina, 'lv_0')).toBe(planDxf(p, 'lv_0'));
     const table = layerTable(planDxf(fina, 'lv_0'));
     for (const layer of wallMaterialLayers(p)) expect(table.get(layer)).toBe(50);
+  });
+});
+
+/** Composição de 2+ células num vão de parede de 6 m (spec F1 §1): porta com laterais e bandeira superior (Ex. 4) ou janela (Ex. 5). */
+const cellOf = (id: string, kind: 'leaf' | 'glass', door = true): CellNode =>
+  kind === 'glass'
+    ? { kind: 'cell', id, content: { kind: 'glass', glass: { kind: 'clear', thickness: 0.012, mounting: 'rebate' } } }
+    : { kind: 'cell', id, content: { kind: 'leaf', family: door ? 'door_swing' : 'window_hinged', plan: door ? 'swing' : 'hinged', leaves: 1, options: {} } };
+const splitOf = (id: string, axis: 'cols' | 'rows', children: SplitNode['children']): SplitNode => ({ kind: 'split', id, axis, divider: { presetId: 'prf_mad_divisor_5x9' }, children });
+const fixedOf = (value: number, node: CompositionNode) => ({ size: { mode: 'fixed' as const, value }, node });
+const fillOf = (node: CompositionNode) => ({ size: { mode: 'fill' as const }, node });
+const compOf = (layout: CompositionNode, nominal: OpeningComposition['nominal']): OpeningComposition => ({
+  version: 1,
+  nominal,
+  frame: { style: 'rebate', profile: { presetId: 'prf_mad_batente_5x9' }, depthMode: 'core' },
+  layout,
+});
+const COLS3: SplitNode = splitOf('cols', 'cols', [fixedOf(0.4, cellOf('lat-e', 'glass')), fillOf(cellOf('folha', 'leaf')), fixedOf(0.4, cellOf('lat-d', 'glass'))]);
+const EX4 = compOf(splitOf('rows', 'rows', [fillOf(COLS3), fixedOf(0.4, cellOf('band', 'glass'))]), { ref: 'leaf', width: 0.9, height: 2.1, gap: { w: 0.08, h: 0.05 } });
+const EX5 = compOf(splitOf('cols', 'cols', [fixedOf(0.6, cellOf('fixa', 'glass')), fillOf(cellOf('abrir', 'leaf', false))]), { ref: 'opening', width: 1.6, height: 1.2 });
+
+/** Parede de 6 m com um vão de composição `comp` (`kind`) no meio, peitoril `sill` (m). */
+function compPlan(comp: OpeningComposition, kind: 'door' | 'window', sill: number): ProjectStore {
+  const store = new ProjectStore(buildTemplate('blank'));
+  const base = store.project.openingTypes[kind === 'door' ? store.project.defaults.doorTypeId : store.project.defaults.windowTypeId]!;
+  store.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: store.project.defaults.wallTypeId, levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 6, y: 0 } }) });
+  store.exec({ type: 'upsertOpeningType', openingType: { ...base, id: 'ot_comp', composition: comp } });
+  store.exec({ type: 'addOpening', opening: { id: 'o_comp', kind, typeId: 'ot_comp', hostId: 'w1', offset: 2, flipHand: false, flipFacing: false, sillOverride: sill, mark: '' } });
+  return store;
+}
+
+describe('composição no DXF: as peças do vão vão para a camada do vão (sem camada nova)', () => {
+  it('Ex. 4 no corte: montantes, travessas e baguetes saem em ABERTURA_SIMBOLO, a camada do batente, e nenhuma outra camada de vão', () => {
+    const p = compPlan(EX4, 'door', 0).project;
+    const text = planDxf(p, 'lv_0');
+    const o = p.elements['o_comp'] as Opening;
+    const f = levelFrames(p, 'lv_0').find((x) => x.wall.id === o.hostId)!;
+    const cut = polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO');
+    expect(cut).toHaveLength(expectedSymbol(p, o, f, 'cut').length);
+    expect(polylinesOf(text).some((x) => x.layer === 'ABERTURAS' || x.layer.startsWith('ABERTURA_ACIMA'))).toBe(false);
+  });
+
+  // Pendente (fora desta tarefa): `FRAME_ROLES` (packages/engine/src/openingPlanNew.ts) não tem 'mullion', 'transom' nem 'bead', então a
+  // planta e o DXF não desenham os membros internos da composição. Quando entrarem, valer: todos saem em ABERTURA_SIMBOLO.
+  it.todo('Ex. 4: montantes, travessas e baguetes entram no símbolo (ABERTURA_SIMBOLO)');
+  it('Ex. 5 (janela) com peitoril 1,00 cruza o corte: o conjunto inteiro sai em ABERTURA_SIMBOLO', () => {
+    const p = compPlan(EX5, 'window', 1).project;
+    const text = planDxf(p, 'lv_0');
+    const o = p.elements['o_comp'] as Opening;
+    const f = levelFrames(p, 'lv_0').find((x) => x.wall.id === o.hostId)!;
+    expect(polylinesOf(text).filter((x) => x.layer === 'ABERTURA_SIMBOLO')).toHaveLength(expectedSymbol(p, o, f, 'cut').length);
   });
 });

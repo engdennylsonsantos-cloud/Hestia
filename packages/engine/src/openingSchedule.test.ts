@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeWall, openingSpanOf, type Opening, type OpeningType } from '@hestia/model';
+import {
+  ProjectStore,
+  createEmptyProject,
+  makeWall,
+  openingSpanOf,
+  type CellNode,
+  type CompositionNode,
+  type Opening,
+  type OpeningComposition,
+  type OpeningType,
+  type SplitNode,
+} from '@hestia/model';
 import { buildOpeningSchedule, filterOpeningRows, openingScheduleToCsv, sumOpeningRows } from './index.ts';
 
 const opening = (o: Partial<Opening> & Pick<Opening, 'id' | 'kind' | 'typeId' | 'hostId'>): Opening => ({
@@ -186,5 +197,82 @@ describe('folha, material, ferragens e sentido no quadro', () => {
     expect(j.hardware).toBe('');
     const v = schedule.rows.find((r) => r.typeId === 'ot_vao90')!;
     expect(v).toMatchObject({ familyName: 'Vão livre', sense: '', hardware: '', leafMaterial: '' });
+  });
+});
+
+/*
+ * Composições de 2+ células no quadro (spec F1 §1, exemplos 3, 4 e 5): resumo, vão, folha nominal e ferragens só das folhas.
+ */
+const leafCell = (id: string, door = true): CellNode =>
+  door
+    ? { kind: 'cell', id, content: { kind: 'leaf', family: 'door_swing', plan: 'swing', leaves: 1, options: { handle: 'lever', handleHeight: 1, hinges: 3, leafUndercut: 0.007 } } }
+    : { kind: 'cell', id, content: { kind: 'leaf', family: 'window_hinged', plan: 'hinged', leaves: 1, options: {} } };
+const glassCell = (id: string): CellNode => ({ kind: 'cell', id, content: { kind: 'glass', glass: { kind: 'clear', thickness: 0.012, mounting: 'rebate' } } });
+const divisor = { presetId: 'prf_mad_divisor_5x9' };
+const split = (id: string, axis: 'cols' | 'rows', children: SplitNode['children']): SplitNode => ({ kind: 'split', id, axis, divider: divisor, children });
+const fixo = (value: number, node: CompositionNode) => ({ size: { mode: 'fixed' as const, value }, node });
+const fill = (node: CompositionNode) => ({ size: { mode: 'fill' as const }, node });
+const cols3 = (): SplitNode => split('cols', 'cols', [fixo(0.4, glassCell('lat-e')), fill(leafCell('folha')), fixo(0.4, glassCell('lat-d'))]);
+const comp = (layout: CompositionNode, nominal: OpeningComposition['nominal']): OpeningComposition => ({
+  version: 1,
+  nominal,
+  frame: { style: 'rebate', profile: { presetId: 'prf_mad_batente_5x9' }, depthMode: 'core' },
+  layout,
+});
+
+const exemplos = new ProjectStore(createEmptyProject());
+exemplos.exec({ type: 'addWall', wall: makeWall({ id: 'wc', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 8, y: 0 } }) });
+const baseDoor = exemplos.project.openingTypes.ot_p90!;
+const baseWindow = exemplos.project.openingTypes.ot_j120!;
+const ex3 = comp(cols3(), { ref: 'leaf', width: 0.9, height: 2.1, gap: { w: 0.08, h: 0.05 } });
+const ex4 = comp(split('rows', 'rows', [fill(cols3()), fixo(0.4, glassCell('band'))]), { ref: 'leaf', width: 0.9, height: 2.1, gap: { w: 0.08, h: 0.05 } });
+const ex5 = comp(split('cols', 'cols', [fixo(0.6, glassCell('fixa')), fill(leafCell('abrir', false))]), { ref: 'opening', width: 1.6, height: 1.2 });
+const exemplosTipos: Array<[string, OpeningComposition, OpeningType]> = [
+  ['ex3', ex3, baseDoor],
+  ['ex4', ex4, baseDoor],
+  ['ex5', ex5, baseWindow],
+];
+exemplosTipos.forEach(([id, c, base], k) => {
+  exemplos.exec({ type: 'upsertOpeningType', openingType: { ...base, id: `ot_${id}`, composition: c } });
+  exemplos.exec({
+    type: 'addOpening',
+    opening: opening({ id: `o_${id}`, kind: base.kind, typeId: `ot_${id}`, hostId: 'wc', offset: 1 + 2.5 * k }),
+  });
+});
+const comp3 = buildOpeningSchedule(exemplos.project);
+const rowOf = (id: string) => comp3.rows.find((r) => r.typeId === `ot_${id}`)!;
+
+describe('quadro com composição de 2+ células', () => {
+  it('Ex. 3: resumo "porta + 2 laterais", vão 1,88 × 2,15, folha nominal 0,90 × 2,10', () => {
+    expect(rowOf('ex3')).toMatchObject({ composition: 'porta + 2 laterais', width: 1.88, height: 2.15, leafWidth: 0.9, leafHeight: 2.1 });
+  });
+  it('Ex. 4: resumo com bandeira superior, vão 1,88 × 2,60', () => {
+    expect(rowOf('ex4')).toMatchObject({ composition: 'porta + 2 laterais + bandeira superior', width: 1.88, height: 2.6, leafWidth: 0.9, leafHeight: 2.1 });
+  });
+  it('Ex. 5: janela por módulos, vão 1,60 × 1,20 e folha = vão menos a folga e os demais módulos', () => {
+    expect(rowOf('ex5')).toMatchObject({ kind: 'window', composition: 'janela 2 módulos (fixa + abrir)', width: 1.6, height: 1.2 });
+    expect(rowOf('ex5').leafWidth).toBeCloseTo(0.87, 6);
+    expect(rowOf('ex5').leafHeight).toBeCloseTo(1.15, 6);
+  });
+  it('ferragens só das folhas: maçaneta, dobradiças e folga da folha; janela sem ferragem', () => {
+    expect(rowOf('ex3').hardware).toBe('maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm');
+    expect(rowOf('ex4').hardware).toBe(rowOf('ex3').hardware);
+    expect(rowOf('ex5').hardware).toBe('');
+  });
+  it('tipo de uma célula não tem resumo (a coluna fica vazia)', () => {
+    expect(schedule.rows.every((r) => r.composition === '')).toBe(true);
+  });
+  it('CSV: coluna "Composição" no fim do cabeçalho e nas linhas, com o resumo de cada tipo', () => {
+    const text = openingScheduleToCsv(comp3.rows, comp3.totals);
+    const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
+    expect(lines[0]!.endsWith(';Ferragens;Composição')).toBe(true);
+    expect(lines.some((l) => l.endsWith(';porta + 2 laterais'))).toBe(true);
+    expect(lines.some((l) => l.endsWith(';porta + 2 laterais + bandeira superior'))).toBe(true);
+    expect(lines.some((l) => l.endsWith(';janela 2 módulos (fixa + abrir)'))).toBe(true);
+    expect(lines.at(-1)!.split(';')).toHaveLength(22);
+  });
+  it('CSV sem composição mantém o cabeçalho de 21 colunas', () => {
+    const text = openingScheduleToCsv(schedule.rows, schedule.totals);
+    expect(text.split('\r\n')[0]!.endsWith(';Ferragens')).toBe(true);
   });
 });

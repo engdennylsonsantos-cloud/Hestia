@@ -264,17 +264,17 @@ describe('caminho instanciado: todas as categorias em lotes globais', () => {
 });
 
 describe('exibição por categoria (substituições)', () => {
-  it('ocultar porta tira as 11 peças da porta; janela tira 16; a linha não muda', () => {
+  it('ocultar porta tira as 13 peças da porta (batente em L, folha, ferragens e dobradiças); janela tira 16; a linha não muda', () => {
     const p = casa();
     const base = cena(p);
     const semPorta = cena(comVista(p, { overrides: { ...defaultsOverrides(), door: { visible: false, transparency: 0, halftone: false } } }));
     const semJanela = cena(comVista(p, { overrides: { ...defaultsOverrides(), window: { visible: false, transparency: 0, halftone: false } } }));
-    expect(pecasDe(base, 'door')).toHaveLength(11);
+    expect(pecasDe(base, 'door')).toHaveLength(13);
     expect(pecasDe(base, 'window')).toHaveLength(16);
     expect(pecasDe(semPorta, 'door')).toHaveLength(0);
     expect(pecasDe(semPorta, 'window')).toHaveLength(16);
     expect(pecasDe(semJanela, 'window')).toHaveLength(0);
-    expect(pecasDe(semJanela, 'door')).toHaveLength(11);
+    expect(pecasDe(semJanela, 'door')).toHaveLength(13);
     expect(linhas(semPorta)).toHaveLength(linhas(base).length);
   });
 
@@ -422,29 +422,34 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     m.geometry.computeBoundingBox();
     return m.geometry.boundingBox!.getCenter(new THREE.Vector3());
   };
-  /** Folhas de porta: peças de altura entre 1 m e 2,10 m (menos que as ombreiras, que têm a altura do vão). */
-  const folhas = (ms: ModelScene): THREE.Mesh[] => pecas(ms, 'door').filter((m) => medida(m).z < 2.1 - 1e-6 && medida(m).z > 1);
+  /** Folhas de porta: altura entre 1 m e 2,10 m e espessura de folha (< 10 cm). As ombreiras têm 14 cm de profundidade. */
+  const folhas = (ms: ModelScene): THREE.Mesh[] => pecas(ms, 'door').filter((m) => medida(m).z < 2.1 - 1e-6 && medida(m).z > 1 && medida(m).y < 0.1);
+  /** Ombreiras do batente: peças altas (mais de 1,5 m) e com a profundidade do núcleo (mais de 10 cm). */
+  const ombreiras = (ms: ModelScene): THREE.Mesh[] => pecas(ms, 'door').filter((m) => medida(m).z > 1.5 && medida(m).y > 0.1);
   /** Porta da parede 'a' (casa) com o tipo dado. */
   const comTipo = (p: Project, tipo: OpeningType, id = 'd1'): Project => ({ ...p, openingTypes: { ...p.openingTypes, [tipo.id]: tipo }, elements: { ...p.elements, [id]: { ...(p.elements[id] as Opening), typeId: tipo.id } } });
 
-  it('porta de 1 folha: batente de 5 cm com rebaixo, folha de 4 cm de espessura apoiada no batedor', () => {
+  it('porta de 1 folha: batente em L de 5 cm por lado (peça única), folha de 4 cm de espessura', () => {
     const ms = cena(casa());
     const portas = pecas(ms, 'door');
-    expect(portas).toHaveLength(11);
+    // 2 ombreiras + cabeça + folha + 6 de ferragem (maçaneta e fechadura) + 3 dobradiças (E2b).
+    expect(portas).toHaveLength(13);
     const [f] = folhas(ms);
     expect(f).toBeDefined();
+    expect(folhas(ms)).toHaveLength(1);
     // A folha ocupa o vão interno mais o rebaixo (0,015) menos a folga (0,004).
     expect(medida(f!).x).toBeCloseTo(0.8 - 0.1 + 2 * (0.015 - 0.004), 6);
     expect(medida(f!).y).toBeCloseTo(0.04, 6);
-    // Ombreira (corpo de 3,5 cm) e batedor (1,5 cm) somam o perfil de 5 cm.
-    expect(portas.filter((m) => Math.abs(medida(m).x - 0.035) < 1e-6)).toHaveLength(2);
-    expect(portas.filter((m) => Math.abs(medida(m).x - 0.015) < 1e-6)).toHaveLength(2);
+    // Cada ombreira tem a largura do perfil (5 cm) em peça única.
+    expect(ombreiras(ms)).toHaveLength(2);
+    for (const m of ombreiras(ms)) expect(medida(m).x).toBeCloseTo(0.05, 6);
   });
 
   it('porta dupla: duas folhas de lh − 0,002, centros em ±lh/2, dobradiças nas ombreiras', () => {
     const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_p160')!);
     const ms = cena(p);
-    expect(pecas(ms, 'door')).toHaveLength(16);
+    // 2 ombreiras + cabeça + 2 folhas + 12 de ferragem (2 × maçaneta e fechadura) + 6 dobradiças (3 por folha).
+    expect(pecas(ms, 'door')).toHaveLength(23);
     const dupla = folhas(ms);
     expect(dupla).toHaveLength(2);
     const lh = 1.6 / 2 - 0.05 + 0.015 - 0.004;
@@ -479,14 +484,13 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     const p = casa();
     const tipo = { ...p.openingTypes.ot_p80!, id: 'ot_fino', frameWidth: 0.08, frameDepth: 0.2, leafThickness: 0.02 };
     const ms = cena(comTipo(p, tipo));
-    const portas = pecas(ms, 'door');
-    // Perfil de 8 cm = corpo da ombreira (6,5 cm) + batedor (1,5 cm).
-    expect(portas.filter((m) => Math.abs(medida(m).x - 0.065) < 1e-6)).toHaveLength(2);
-    expect(portas.filter((m) => Math.abs(medida(m).x - 0.015) < 1e-6)).toHaveLength(2);
+    // Perfil de 8 cm em peça única por ombreira (o batente em L não tem mais batedor à parte).
+    expect(ombreiras(ms)).toHaveLength(2);
+    for (const m of ombreiras(ms)) expect(medida(m).x).toBeCloseTo(0.08, 6);
     expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.02, 6);
     // Profundidade pedida 0,20 m, mas o NÚCLEO da parede tem 0,14 m (a espessura total, com reboco e tinta, é 0,184 m):
     // o batente fica com 0,14 m, limitado ao núcleo (DEC-1).
-    expect(medida(portas[0]!).y).toBeCloseTo(0.14, 6);
+    for (const m of ombreiras(ms)) expect(medida(m).y).toBeCloseTo(0.14, 6);
     const vidro = comTipo(p, { ...p.openingTypes.ot_j120!, id: 'ot_vid', glassThickness: 0.02 }, 'j1');
     expect(pecas(cena(vidro), 'window').some((m) => Math.abs(medida(m).y - 0.02) < 1e-6)).toBe(true);
   });
@@ -495,8 +499,8 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     const ms = cena(casa());
     expect(medida(folhas(ms)[0]!).y).toBeCloseTo(0.04, 6);
     expect(pecas(ms, 'window').some((m) => Math.abs(medida(m).y - 0.012) < 1e-6)).toBe(true);
-    // Ombreiras e verga da porta têm a profundidade de 9 cm (núcleo de 14 cm, o padrão de 9 cm vale).
-    expect(pecas(ms, 'door').filter((m) => Math.abs(medida(m).y - 0.09) < 1e-6)).toHaveLength(3);
+    // Padrão do batente: no núcleo (regra 1 do §1 do handoff), não mais 9 cm. Ombreiras e cabeça têm 14 cm.
+    expect(pecas(ms, 'door').filter((m) => Math.abs(medida(m).y - 0.14) < 1e-6)).toHaveLength(3);
   });
 
   it('porta de correr: dois painéis de (2·(hw − J) + 0,06)/2, um em cada face da parede (defasados na profundidade)', () => {
@@ -539,10 +543,9 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
     const p = casa();
     const tipo = { ...p.openingTypes.ot_p80!, id: 'ot_core', frameDepth: 0.5 };
     const ms = cena(comTipo(p, tipo));
-    // Ombreira = corpo de 3,5 cm (o batedor de 1,5 cm fica ao lado).
-    const ombreiras = pecas(ms, 'door').filter((m) => Math.abs(medida(m).x - 0.035) < 1e-6);
-    expect(ombreiras).toHaveLength(2);
-    for (const m of ombreiras) expect(medida(m).y).toBeCloseTo(0.14, 6);
+    // Ombreira em peça única por lado (perfil de 5 cm no x, o núcleo no y).
+    expect(ombreiras(ms)).toHaveLength(2);
+    for (const m of ombreiras(ms)) expect(medida(m).y).toBeCloseTo(0.14, 6);
     // Nenhuma peça da porta usa a espessura total da parede (0,184 m).
     expect(pecas(ms, 'door').every((m) => Math.abs(medida(m).y - 0.184) > 1e-6)).toBe(true);
   });
@@ -550,12 +553,14 @@ describe('esquadrias no 3D: folhas e espessuras do tipo', () => {
   it('porta pivotante: uma folha no vão interno mais o rebaixo, apoiada no batedor', () => {
     const p = comTipo(casa(), DEFAULT_OPENING_TYPES.find((t) => t.id === 'ot_pp80')!);
     const ms = cena(p);
-    expect(pecas(ms, 'door')).toHaveLength(7);
+    // 2 ombreiras + cabeça + folha (sem dobradiça de batente: o pivô fica no eixo).
+    expect(pecas(ms, 'door')).toHaveLength(4);
     const [f] = folhas(ms);
     expect(f).toBeDefined();
-    expect(medida(f!).x).toBeCloseTo(0.8 - 0.1 + 2 * (0.015 - 0.004), 6);
-    // Folha apoiada no batedor: centro a D/2 − folga − L/2 do plano médio da parede.
-    expect(centroDa(f!).y).toBeCloseTo(0.09 / 2 - 0.004 - 0.04 / 2, 6);
+    // Folha medida: 0,074 m por lado do vão (0,652 m no vão de 0,8 m; origem do 0,024 a confirmar).
+    expect(medida(f!).x).toBeCloseTo(0.8 - 2 * 0.074, 6);
+    // Folha no núcleo, 4 mm da face do núcleo (±0,07 do plano médio): centro a 0,07 − 0,004 − 0,02 = 0,046 do plano médio.
+    expect(centroDa(f!).y).toBeCloseTo(0.14 / 2 - 0.004 - 0.04 / 2, 6);
   });
 });
 

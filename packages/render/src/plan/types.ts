@@ -62,6 +62,8 @@ export interface StrokeOp {
   deslocamentoPx?: Vec2[];
   /** Só aparece a partir deste zoom (px/m): o shader esconde o traço abaixo dele; ausente = sempre. */
   zoomMin?: number;
+  /** Papel do traço na esquadria (ombreira, folha, arco...), para depuração e testes da prévia. */
+  role?: string;
 }
 
 /**

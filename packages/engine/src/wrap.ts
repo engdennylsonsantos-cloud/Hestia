@@ -37,6 +37,12 @@ export function wrappingLayers(type: WallType, side: Side): Wrapper[] {
 
 export const sidesOf = (m: WrapMode): Side[] => (m === 'both' ? ['exterior', 'interior'] : m === 'none' ? [] : [m]);
 
+/** Alizar da composição gravada no tipo (faces diferentes de 'none' e largura positiva). */
+const compositionCasing = (ot: OpeningType): boolean => {
+  const k = ot.composition?.casing;
+  return !!k && k.faces !== 'none' && k.width > 0;
+};
+
 /**
  * Fechamento efetivo do vão (decisão 0035 §2 e 0036):
  * - com alizar (`casing`), o retorno é sempre `none`: alizar e retorno são exclusivos (como no ArchiCAD, onde o
@@ -46,7 +52,7 @@ export const sidesOf = (m: WrapMode): Side[] => (m === 'both' ? ['exterior', 'in
  * - `closure` explícito ('both', 'exterior', 'interior') gera o retorno, recortado pela pegada do batente.
  */
 export const insertMode = (wt: WallType, ot: OpeningType): WrapMode => {
-  if (openingCasing(ot)) return 'none';
+  if (openingCasing(ot) || compositionCasing(ot)) return 'none';
   if (ot.closure !== 'inherit') return ot.closure;
   return ot.leaves > 0 && openingFrameStyle(ot) !== 'block' ? 'none' : wt.wrapInserts;
 };

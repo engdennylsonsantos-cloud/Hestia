@@ -65,7 +65,7 @@ const volumeComum = (a: PartBox, b: PartBox): boolean =>
 /** Grupo físico da peça para o teste de sobreposição (caixilho × folha × vidro × bandeira). */
 function grupoFisico(part: OpeningPart): string | null {
   if (part.id.startsWith('transom-bar')) return 'frame';
-  if (part.role === 'jamb' || part.role === 'head' || part.role === 'sillFrame') return 'frame';
+  if (part.role === 'jamb' || part.role === 'head' || part.role === 'sillFrame' || part.role === 'mullion' || part.role === 'transom') return 'frame';
   if (part.role === 'muntin') return null;
   if (part.id.startsWith('sidelight')) return 'sidelight';
   if (part.role === 'leaf' || part.role === 'glass') {
@@ -80,6 +80,8 @@ const cobre = (part: OpeningPart): boolean =>
   part.role === 'jamb' ||
   part.role === 'head' ||
   part.role === 'sillFrame' ||
+  part.role === 'mullion' ||
+  part.role === 'transom' ||
   part.role === 'leaf' ||
   part.role === 'glass' ||
   part.role === 'muntin';
@@ -176,7 +178,7 @@ describe('bandeira em janela: cobertura e grupos físicos', () => {
       expect(com.parts, base).toEqual(sem.parts);
     }
     const fixa = modelo(cena('ot_jfixa60', { sidelights: { left: true, width: 0.2 } }));
-    expect(fixa.parts.some((p) => p.id === 'sidelight-glass-left')).toBe(true);
+    expect(fixa.parts.some((p) => p.id === 'glass-side-left')).toBe(true);
   });
 
   it('transom.fixed = false vira folha maxim-ar pequena (kind top), sem perder a cobertura', () => {

@@ -156,12 +156,14 @@ describe('openingPlanPaths: níveis low e high', () => {
     expect(casings).toHaveLength(4);
     for (const p of casings) expect(p.pts).toHaveLength(4);
     const porFace = [casings.filter((p) => boxOf(p).s0 > 0), casings.filter((p) => boxOf(p).s1 < 0)];
-    for (const face of porFace) {
+    // A primeira face (s > 0) é a de abertura: o alizar começa fora do rebaixo (0,414); a outra, na luz (0,40).
+    porFace.forEach((face, i) => {
       expect(face).toHaveLength(2);
       const lados = face.map((p) => boxOf(p)).sort((a, b) => a.t0 - b.t0);
-      expect(lados[0]!.t1).toBeCloseTo(-0.4, 9);
-      expect(lados[1]!.t0).toBeCloseTo(0.4, 9);
-    }
+      const borda = i === 0 ? 0.414 : 0.4;
+      expect(lados[0]!.t1).toBeCloseTo(-borda, 9);
+      expect(lados[1]!.t0).toBeCloseTo(borda, 9);
+    });
   });
 
   it('em nenhum nível a folha fechada atravessa ombreira ou batedor', () => {

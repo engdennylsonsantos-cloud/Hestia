@@ -137,13 +137,28 @@ const alizarDe = (m: OpeningModel, face: 'exterior' | 'interior') => m.parts.fil
 const quad = (q: OpeningPart) => [q.box.t0, q.box.t1, q.box.z0, q.box.z1];
 const ordena = (xs: number[][]) => [...xs].sort((a, b) => a[0]! - b[0]! || a[2]! - b[2]!);
 
-/** Alizar: em CADA face habilitada, exatamente as peças esperadas (t0, t1, z0, z1). */
+/** Recuo (m) do alizar da face de abertura: a folha sai por ali, então ele começa fora do rebaixo do batente (11 mm + 3 mm de margem). */
+const RECUO_ABERTURA = 0.014;
+/** O alizar esperado da face de abertura: verticais e cabeceira afastados de `RECUO_ABERTURA` para fora. */
+const naAbertura = (esperado: number[][]): number[][] =>
+  esperado.map(([t0, t1, z0, z1]) => (t1! <= 0 ? [t0! - RECUO_ABERTURA, t1! - RECUO_ABERTURA, z0!, z1!] : t0! >= 0 ? [t0! + RECUO_ABERTURA, t1! + RECUO_ABERTURA, z0!, z1!] : [t0! - RECUO_ABERTURA, t1! + RECUO_ABERTURA, z0!, z1!]));
+const confere = (real: number[][], alvo: number[][]): boolean =>
+  real.length === alvo.length && ordena(alvo).every((e, i) => e.every((v, k) => Math.abs(real[i]![k]! - v) < 5e-7));
+
+/**
+ * Alizar: em CADA face habilitada, exatamente as peças esperadas (t0, t1, z0, z1). A face em que a folha abre (no máximo uma)
+ * pode ter o alizar recuado do rebaixo (`RECUO_ABERTURA`); só acontece quando a folha chega ao alizar (nos exemplos com laterais não).
+ */
 function esperaAlizar(m: OpeningModel, esperado: number[][], faces: Array<'exterior' | 'interior'> = ['exterior', 'interior']): void {
+  let recuadas = 0;
   for (const face of faces) {
     const real = ordena(alizarDe(m, face).map(quad));
     expect(real.length, `alizar ${face}: nº de peças`).toBe(esperado.length);
-    ordena(esperado).forEach((e, i) => e.forEach((v, k) => expect(real[i]![k], `alizar ${face} #${i} [${k}]`).toBeCloseTo(v, TOL)));
+    if (confere(real, esperado)) continue;
+    expect(confere(real, naAbertura(esperado)), `alizar ${face}: igual ao esperado ou recuado na face de abertura`).toBe(true);
+    recuadas++;
   }
+  expect(recuadas, 'só a face de abertura recua').toBeLessThanOrEqual(1);
 }
 
 const ov = (a0: number, a1: number, b0: number, b1: number) => Math.min(a1, b1) - Math.max(a0, b0);
@@ -368,8 +383,9 @@ describe('item 9 · alizar', () => {
     const c = cena('ot_p90', comp(leafC('folha'), { casing: { ...CASING, setback: 0.01 } }));
     const lateral = alizarDe(c.m, 'exterior').find((q) => q.box.z1 - q.box.z0 > 1)!;
     const cabeceira = alizarDe(c.m, 'exterior').find((q) => q.box.z1 - q.box.z0 < 0.2)!;
-    expect(lateral.box.t0).toBeCloseTo(-0.52, TOL);
-    expect(lateral.box.t1).toBeCloseTo(-0.45, TOL);
+    // Face de abertura (exterior nesta cena): o recuo do rebaixo (0,014) vence o `setback` de 0,01.
+    expect(lateral.box.t0).toBeCloseTo(-0.524, TOL);
+    expect(lateral.box.t1).toBeCloseTo(-0.454, TOL);
     expect(cabeceira.box.z0).toBeCloseTo(2.11, TOL);
   });
 

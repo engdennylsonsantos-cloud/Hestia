@@ -442,9 +442,15 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
       }
     }
     expect([...grupos.values()].sort()).toEqual([3, 3]);
-    const lateral = casing.find((p) => p.id.startsWith('casing-left'))!;
-    expect(Math.max(Math.abs(lateral.box.t0), Math.abs(lateral.box.t1))).toBeCloseTo(0.4 + 0.07, 9);
-    expect(Math.min(Math.abs(lateral.box.t0), Math.abs(lateral.box.t1))).toBeCloseTo(0.4, 9);
+    // Uma face tem a borda interna na luz (0,40); a de abertura, fora do rebaixo (0,414). Largura 0,07 nas duas.
+    const laterais = casing.filter((p) => p.id.startsWith('casing-left'));
+    expect(laterais).toHaveLength(2);
+    const internas = laterais.map((p) => Math.min(Math.abs(p.box.t0), Math.abs(p.box.t1))).sort((a, b) => a - b);
+    const externas = laterais.map((p) => Math.max(Math.abs(p.box.t0), Math.abs(p.box.t1))).sort((a, b) => a - b);
+    expect(internas[0]!).toBeCloseTo(0.4, 9);
+    expect(internas[1]!).toBeCloseTo(0.414, 9);
+    expect(externas[0]!).toBeCloseTo(0.4 + 0.07, 9);
+    expect(externas[1]!).toBeCloseTo(0.414 + 0.07, 9);
   });
 
   it('alizar sides swing/opposite: só a face pedida', () => {

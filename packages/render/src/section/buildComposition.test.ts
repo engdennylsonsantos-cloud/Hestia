@@ -100,11 +100,12 @@ describe('elevação · composição com bandeira', () => {
     expect(travessa!.color).not.toBe(GLASS_T);
   });
 
-  it('alizar do conjunto: uma silhueta por face (externa e interna), em volta do vão 1,02 × 2,62', () => {
+  it('alizar do conjunto: uma silhueta por face (externa e interna), em volta do vão 1,02 × 2,62 (1,048 na face de abertura)', () => {
     const alizar = draw.fills.filter((f) => {
       const [y0, y1] = faixa(f.polygons, 'y');
       const [x0, x1] = faixa(f.polygons, 'x');
-      return perto(y0, 0) && perto(y1, 2.62) && perto(x1 - x0, 1.02);
+      // Face em que a porta abre: o alizar começa fora do rebaixo (1,02 + 2 × 0,014 = 1,048); a outra, na luz (1,02).
+      return perto(y0, 0) && perto(y1, 2.62) && (perto(x1 - x0, 1.02) || perto(x1 - x0, 1.048));
     });
     expect(alizar).toHaveLength(2);
     for (const f of alizar) expect(f.polygons).toHaveLength(1);

@@ -3,6 +3,7 @@ import { openingTiltAxis, type OpeningType } from '@hestia/model';
 import { NumField } from '../../../fields.tsx';
 import { setTiltAxis } from '../openingTypeControls.ts';
 import { usePanelKit, type PanelProps } from './panelKit.tsx';
+import { HingesRow } from './hardwareRows.tsx';
 import { AngleRows, TransomRows } from './sharedRows.tsx';
 
 /** Folhas e divisões (só janelas): tipo de abertura, nº de folhas, ângulos, grade, bandeira e luzes laterais. */
@@ -46,6 +47,7 @@ export function SashesPanel(props: PanelProps): ReactElement {
           <div className="field-row"><label htmlFor="op-grid-r">Divisões: linhas</label><NumField id="op-grid-r" value={k.grid.rows} decimals={0} onCommit={(v) => k.setField('grid', { cols: k.grid.cols, rows: v }, k.gridFallback)} /></div>
         </>
       ) : null}
+      <HingesRow {...props} />
       <TransomRows {...props} />
     </>
   );

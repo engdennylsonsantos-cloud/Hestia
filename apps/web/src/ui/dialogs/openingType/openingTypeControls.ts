@@ -1,5 +1,25 @@
-import type { OpeningGlassKind, OpeningType } from '@hestia/model';
+import { HARDWARE_DEFAULTS, OPENING_SPAN_GAP_DEFAULTS, openingSpanGap, type OpeningGlassKind, type OpeningType } from '@hestia/model';
 import { withOpeningField } from './openingTypeFields.ts';
+
+/** Metros com 0,1 mm (a digitação em cm não deixa resto de ponto flutuante fora do padrão). */
+export const arredondaMetros = (m: number): number => Math.round(m * 1e4) / 1e4;
+
+/** Metros para o texto em cm, no formato pt-BR (88 ou 87,5). */
+export const cmTexto = (m: number): string => (m * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+
+/** Ferragem e folga com padrão do modelo (`HARDWARE_DEFAULTS`): o padrão tira o campo, que volta à leitura. */
+const ferragem = (t: OpeningType, campo: 'leafUndercut' | 'handleHeight' | 'handleInset' | 'hinges', valor: number): OpeningType =>
+  withOpeningField(t, campo, valor, HARDWARE_DEFAULTS[campo]);
+
+export const setLeafUndercut = (t: OpeningType, metros: number): OpeningType => ferragem(t, 'leafUndercut', arredondaMetros(metros));
+export const setHandleHeight = (t: OpeningType, metros: number): OpeningType => ferragem(t, 'handleHeight', arredondaMetros(metros));
+export const setHandleInset = (t: OpeningType, metros: number): OpeningType => ferragem(t, 'handleInset', arredondaMetros(metros));
+export const setHinges = (t: OpeningType, quantidade: number): OpeningType => ferragem(t, 'hinges', Math.round(quantidade));
+
+/** Folga do vão (m) de um eixo ('w' ou 'h'); o outro eixo mantém o valor efetivo. Igual ao padrão NBR 15930-2 tira o campo. */
+export function setSpanGap(t: OpeningType, eixo: 'w' | 'h', metros: number): OpeningType {
+  return withOpeningField(t, 'spanGap', { ...openingSpanGap(t), [eixo]: arredondaMetros(metros) }, OPENING_SPAN_GAP_DEFAULTS);
+}
 
 /** Recuo do batente (m): zero tira o campo, que volta ao padrão por leitura (0). Preserva a âncora. */
 export function setRevealDepth(t: OpeningType, depth: number): OpeningType {

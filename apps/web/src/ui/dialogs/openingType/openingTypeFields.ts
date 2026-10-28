@@ -19,7 +19,12 @@ export type ReadDefaultField =
   | 'nominalRef'
   | 'tiltAxis'
   | 'glassKind'
-  | 'leafMaterialId';
+  | 'leafMaterialId'
+  | 'spanGap'
+  | 'leafUndercut'
+  | 'handleHeight'
+  | 'handleInset'
+  | 'hinges';
 
 const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 

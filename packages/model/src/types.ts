@@ -5,6 +5,7 @@ import type { Sheet } from './sheet.ts';
 import type { Grid, GridType } from './grid.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
+import type { ProfilePreset } from './openingComposition.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 19;
@@ -634,6 +635,8 @@ export interface Project {
   /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
   stairTypes: Record<Id, StairType>;
   openingTypes: Record<Id, OpeningType>;
+  /** Presets de perfil das esquadrias (editáveis); a migração 19 → 20 semeia os iniciais. Ausente = os iniciais por leitura. */
+  openingProfiles?: Record<Id, ProfilePreset>;
   elements: Record<Id, Element>;
   nextOrder: number;
   defaults: ProjectDefaults;

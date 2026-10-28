@@ -90,9 +90,10 @@ describe('dobradiças da porta de giro', () => {
     expect(de(modelo(cena('ot_vao90')).parts, 'hinge')).toHaveLength(0);
   });
 
-  it('vai-e-vem sem dobradiça de batente, como a pivotante (d6ce597: a folha gira no pivô de piso)', () => {
+  it('vai-e-vem tem dobradiças por folha de giro (padrão 3)', () => {
     const m = modelo(cena('ot_pvv90'));
-    expect(de(m.parts, 'hinge')).toHaveLength(0);
+    const giros = m.openings.filter((o) => o.kind === 'side');
+    expect(de(m.parts, 'hinge')).toHaveLength(3 * giros.length);
   });
 });
 

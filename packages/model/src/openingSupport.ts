@@ -61,7 +61,7 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   door_swing: sup({ ...DOOR_LEAF, handle: true, transom: true, sidelights: true, hinges: true, angle: true }),
   door_double: sup({ ...DOOR_LEAF, handle: true, transom: true, sidelights: true, hinges: true, angle: true }),
   // Pivotante sem dobradiça de batente: os pivôs ficam no eixo, não na face do batente (sem peça de dobradiça).
-  door_dblact: sup({ ...DOOR_LEAF, hinges: false, angle: true }),
+  door_dblact: sup({ ...DOOR_LEAF, hinges: true, angle: true }),
   door_pivot: sup({ ...DOOR_LEAF, transom: true, angle: true }),
   // Correr e embutir: só soleira e folga (sem maçaneta nem dobradiça).
   door_sliding: sup({ ...DOOR_LEAF, handle: false, transom: true }),

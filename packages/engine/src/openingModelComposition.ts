@@ -38,11 +38,22 @@ function effectiveComposition(t: OpeningType): OpeningComposition {
   return compositionOfType(legacy as unknown as OpeningType);
 }
 
-/** A composição tem mais de uma célula e o vão tem folha: o caminho novo vale (vão livre segue o caminho antigo). */
+/** JSON com chaves em ordem, para comparar composições sem depender da ordem dos campos. */
+const canon = (v: unknown): string =>
+  JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x,
+  );
+
+/**
+ * O caminho novo vale para composição de várias células e para uma célula AUTORAL (gravada e diferente da derivada dos
+ * campos do tipo: perfis de preset, alizar próprio...). Uma célula igual à derivada segue nos builders por família, que
+ * dão as mesmas peças dos 106 tipos atuais. Vão livre (sem folha) fica no caminho antigo.
+ */
 export function usesComposition(t: OpeningType, g: OpeningGeometry): OpeningComposition | null {
   if (g.leaves === 0) return null;
   const comp = effectiveComposition(t);
-  return comp.layout.kind === 'split' ? comp : null;
+  if (comp.layout.kind === 'split') return comp;
+  return t.composition && canon(t.composition) !== canon(compositionOfType(t)) ? comp : null;
 }
 
 /** O tipo com o quadro (estilo, modo de profundidade, J e profundidade) lido da composição: ela é a fonte do batente. */

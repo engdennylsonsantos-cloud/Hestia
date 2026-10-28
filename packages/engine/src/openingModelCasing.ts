@@ -14,7 +14,7 @@ import { addPart, box, type Ctx } from './openingModelContext.ts';
  * Alizar (spec F1 §4), para TODO caminho de montagem. Contorna o CONJUNTO: anel interno = envoltória das luzes das células
  * (+ recuo `setback`, 0 = aresta alinhada à face interna do batente), anel externo = interno + largura. Porta: 3 lados;
  * janela: 4. Nenhum alizar em divisores internos. Assenta sobre a face acabada (`s` de T/2 a T/2 + espessura) e forma UMA
- * silhueta por face (`group 'casing-<a|b>'`, `a` = lado de s negativo).
+ * silhueta por face (`group 'casing-<exterior|interior>'`; ids `casing-<lado>-a|b`, `a` = lado de s negativo).
  */
 
 /** Face da parede (`exterior`/`interior`) no sinal de `s`: o lado da face externa/interna em relação ao plano médio. */
@@ -39,13 +39,12 @@ function singleCellLayout(c: Ctx): { comp: OpeningComposition; layout: ResolvedL
 
 function addRing(c: Ctx, r: CasingRing): void {
   const sign = faceSign(c, r.face);
-  const tag = sign < 0 ? 'a' : 'b';
-  const group = `casing-${tag}`;
+  const group = `casing-${r.face}`;
   const s0 = sign * (c.thickness / 2);
   const s1 = sign * (c.thickness / 2 + r.thickness);
   const { inner, outer } = r;
   const add = (id: string, t0: number, t1: number, z0: number, z1: number): void =>
-    addPart(c, `casing-${id}-${tag}`, 'casing', 'casing', box(t0, t1, s0, s1, z0, z1), { group });
+    addPart(c, `casing-${id}-${sign < 0 ? 'a' : 'b'}`, 'casing', 'casing', box(t0, t1, s0, s1, z0, z1), { group });
   add('left', outer.t0, inner.t0, inner.z0, inner.z1);
   add('right', inner.t1, outer.t1, inner.z0, inner.z1);
   add('head', outer.t0, outer.t1, inner.z1, outer.z1);

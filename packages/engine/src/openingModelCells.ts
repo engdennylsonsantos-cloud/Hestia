@@ -56,11 +56,14 @@ function shiftOpening(o: LeafOpening, dt: number, dz: number, leafBase: number):
   };
 }
 
-/** Nome da peça na composição: `leaf-<célula>` (ou `-<i>` com várias folhas), o resto ganha o sufixo da célula. */
+/**
+ * Nome da peça na composição: o índice local da folha vira o id da célula (`leaf-0` → `leaf-<célula>`, `leaf-0-left` →
+ * `leaf-<célula>-left`; com várias folhas o índice fica: `leaf-<célula>-1`). Sem índice, a peça ganha o sufixo da célula.
+ */
 function cellPartId(id: string, cellId: string, leaves: number): string {
-  const m = /^(leaf|glass)-(\d+)$/.exec(id);
+  const m = /^(leaf|glass|handle|hinge|muntin)-(\d+)(.*)$/.exec(id);
   if (!m) return `${id}-${cellId}`;
-  return leaves > 1 ? `${m[1]}-${cellId}-${m[2]}` : `${m[1]}-${cellId}`;
+  return `${m[1]}-${cellId}${leaves > 1 ? `-${m[2]}` : ''}${m[3]}`;
 }
 
 /** Tipo sintético da célula: o do pai sem bandeiras/detalhes, no tamanho do vão da luz, com família e opções da célula. */

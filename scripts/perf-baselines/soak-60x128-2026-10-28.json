@@ -1,0 +1,29 @@
+{
+  "geradoEm": "2026-10-28T02:52:07.850Z",
+  "projeto": {
+    "pavimentos": 60,
+    "paredesPorPavimento": 128,
+    "geracaoMs": 1902
+  },
+  "duracaoMin": 5.1,
+  "ciclos": 52,
+  "gpu": "webgl2",
+  "aberturaMs": 2552.3,
+  "heapMB": {
+    "inicioIsolado": 28.2,
+    "fimIsolado": 173.3,
+    "picoJs": 467.69,
+    "crescimentoIsolado": 145.1,
+    "amostras": 62
+  },
+  "residuo": {
+    "niveis": 60,
+    "elementos": 10441
+  },
+  "erros": [],
+  "navegador": {
+    "versao": "156.0.8078.48",
+    "headless": true,
+    "executavel": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+  }
+}

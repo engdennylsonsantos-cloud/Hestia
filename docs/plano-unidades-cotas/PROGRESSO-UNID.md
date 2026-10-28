@@ -13,7 +13,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
 - **MARCO M2 LIBERADO 680bd5aa** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
 - [x] B1–B4 diálogo Unidades (`02`)  → **marco M3**
-- [ ] B5 atalho `UN` abre o diálogo Unidades… (`02`, B5; pedido do dono)
+- [x] B5 atalho `UN` abre o diálogo Unidades… (`02`, B5; pedido do dono)
 - **MARCO M3 LIBERADO 6ad01c82** (`DialogKind` units, `UnitsDialog`/`unitsDialogModel` e botão em Padrões do projeto)
 - [x] C1 painel de propriedades
 - [ ] C2 diálogos
@@ -26,8 +26,12 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
 - U1/U3: `unitsOf` começou com tipo estrutural mínimo e passou a `Pick<Project,'settings'>` quando U3 acrescentou `settings.units`.
 - B4: sem testing-library/jsdom no repositório, os fluxos de OK/Cancelar/Esc são cobertos pelos testes puros do rascunho + comando `setSettings`/undo e por render estático do diálogo; a conferência visual no navegador fica pendente.
-- C0: a linha de base tem 543 linhas em 191 arquivos (contagem por linha, não por ocorrência). O teste de fixtures roda em `tests/check-units.test.ts` porque o vitest não inclui `scripts/`; o teste importa `scanText` do `.mjs` (declaração em `scripts/check-units.d.mts`).
+- C0: a linha de base começou com 543 linhas em 191 arquivos; após o C1 está em 183 arquivos (PlacementProperties e openingType ficam com os donos). (contagem por linha, não por ocorrência). O teste de fixtures roda em `tests/check-units.test.ts` porque o vitest não inclui `scripts/`; o teste importa `scanText` do `.mjs` (declaração em `scripts/check-units.d.mts`).
 - U6 (`npm run check` completo): a suíte inteira passou em lint/typecheck e 6369 testes; 6 testes de `shortcutConfig.test.ts` estouraram 5 s por contenção do paralelismo e passam isolados (11/11 em 15,5 s). Reexecutar o `check` no fim da fase.
 - U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
+## Estado ao encerrar este turno
+- Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3) e C1. Faltam C2, C3, C5 e C7 (C7 só depois de ESQ C4/C6).
+- `npm run check` completo verde em 2026-10-28: 549 arquivos, 6415 testes, lint (inclui `check-units`) e typecheck ok.
+
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

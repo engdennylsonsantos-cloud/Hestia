@@ -132,6 +132,15 @@ describe('CasadorSequencia', () => {
     expect(casa.tecla('8')).toEqual({ comando: 'atalhos', tratada: true });
   });
 
+  it('UN abre Unidades do projeto no Revit; no simples, é VU', () => {
+    casa = monta(PERFIL_REVIT);
+    expect(casa.tecla('u')).toEqual({ tratada: true });
+    expect(casa.tecla('n')).toEqual({ comando: 'unidades', tratada: true });
+    casa = monta(PERFIL_SIMPLES);
+    expect(casa.tecla('v')).toEqual({ tratada: true });
+    expect(casa.tecla('u')).toEqual({ comando: 'unidades', tratada: true });
+  });
+
   it('limpar() zera o buffer e cancela o tempo', () => {
     casa = monta(PERFIL_REVIT);
     casa.tecla('W');

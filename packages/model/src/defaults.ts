@@ -7,6 +7,7 @@ import { makeLevel } from './level.ts';
 import { ot } from './catalogoAberturasBase.ts';
 import { CATALOGO_JANELAS_BR } from './catalogoJanelas.ts';
 import { CATALOGO_PORTAS_BR } from './catalogoPortas.ts';
+import { CATALOGO_COMPOSICOES_BR } from './catalogoComposicoes.ts';
 import { SCHEMA_VERSION, type Layer, type Material, type OpeningType, type Project, type WallType } from './types.ts';
 
 const mat = (id: string, name: string, color: string, hatch: Material['hatch'], extra: Partial<Material> = {}): Material => ({
@@ -159,6 +160,7 @@ export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_jb80', kind: 'window', name: 'Janela basculante 80 x 50', code: 'J-11', width: 0.8, height: 0.5, sill: 1.7, leaves: 1, plan: 'tilt' }, 'mat_aluminio'),
   ...CATALOGO_PORTAS_BR,
   ...CATALOGO_JANELAS_BR,
+  ...CATALOGO_COMPOSICOES_BR,
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>

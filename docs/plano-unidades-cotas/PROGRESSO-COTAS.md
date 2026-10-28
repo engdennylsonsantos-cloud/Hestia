@@ -36,7 +36,7 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - `ui/dims/useSelectionDims.ts`: só documenta que a seleção pode ser sujeito fora de `project.elements`; o overlay já era genérico (nada funcional mudou nele).
 - `COMO-ADICIONAR-COTA.md`: ponto de extensão dos três tipos e `subjectDims` documentados.
 - PEDIDO UNID atendido: `dimensionTool.ts` grava `Dimension.unit: 'project'` (sem `precision` fixa) nas cotas simples e em sequência; a prévia usa as unidades do projeto. Testes em `dimensionTool.test.ts`.
-**MARCO M6 LIBERADO (hash no commit seguinte)** — a ESQ já pode fazer D10.2 e D10.3.
+**MARCO M6 LIBERADO 3913e67a** (registro de sujeitos fora de `project.elements`; a ESQ já pode fazer D10.2 e D10.3).
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 

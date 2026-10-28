@@ -1,3 +1,4 @@
+import { machineNumber } from '@hestia/geom';
 import type { Id } from './types.ts';
 import {
   CASING_RULES,
@@ -115,7 +116,7 @@ export function compositionIssue(c: OpeningComposition, presets?: Presets): stri
     const lens = childLengths(node, total, presets);
     const sum = lens.reduce((a, b) => a + b, 0) + (node.children.length - 1) * dividerWidth(node, presets);
     if (Math.abs(sum - total) > TOL) {
-      issue = `Divisão ${node.id}: luzes + divisores (${sum.toFixed(3)}) diferem da luz do pai (${total.toFixed(3)})`;
+      issue = `Divisão ${node.id}: luzes + divisores (${machineNumber(sum, 3)}) diferem da luz do pai (${machineNumber(total, 3)})`;
       return;
     }
     node.children.forEach((ch, i) => visit(ch.node, cols ? { cols: lens[i]!, rows: len.rows } : { cols: len.cols, rows: lens[i]! }));

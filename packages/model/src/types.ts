@@ -185,7 +185,8 @@ export interface Dimension {
   /** Direção de medida. Ausente mantém compatibilidade com cotas alinhadas antigas. */
   mode?: 'aligned' | 'horizontal' | 'vertical';
   /** Formatação opcional da leitura, em metros por padrão. */
-  unit?: 'm' | 'cm' | 'mm';
+  /** Unidade da cota: 'project' (ou ausente) segue as unidades do projeto; valores antigos m/cm/mm são mantidos. */
+  unit?: 'm' | 'cm' | 'mm' | 'project';
   precision?: 0 | 1 | 2 | 3;
   prefix?: string;
   suffix?: string;

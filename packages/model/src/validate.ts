@@ -14,6 +14,8 @@ import { projectSheets } from './sheet.ts';
 import { viewSourceIssue } from './sheetCommands.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 import { openingTypeById } from './openingNominal.ts';
+import { formatQuantity } from './unitsFormat.ts';
+import { unitsOf } from './units.ts';
 
 /** `info`: aviso informativo (não é problema; ex.: parede anexada só em parte ao piso). */
 export type ValidationSeverity = 'error' | 'warning' | 'info';
@@ -41,7 +43,6 @@ const COLLINEAR_ANGLE = (1 * Math.PI) / 180;
 const COLLINEAR_OFFSET = 0.01;
 
 const label = (e: Element): string => ('mark' in e && e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
-const fmt = (n: number): string => (Number.isFinite(n) ? n.toFixed(3) : String(n));
 
 function wallIssues(p: Project, w: Wall): ValidationIssue[] {
   const out: ValidationIssue[] = [];
@@ -51,7 +52,7 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
     out.push({
       severity: 'error',
       code: 'wall-zero-length',
-      message: `Parede ${name} tem comprimento de ${fmt(len * 1000)} mm; o mínimo é 1 mm.`,
+      message: `Parede ${name} tem comprimento de ${formatQuantity(unitsOf(p), 'smallLength', len)}; o mínimo é 1 mm.`,
       elementId: w.id,
     });
   }
@@ -93,7 +94,7 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
       out.push({
         severity: 'error',
         code: 'wall-height-invalid',
-        message: `Altura da parede ${name} é ${fmt(h)} m; precisa ser maior que zero.`,
+        message: `Altura da parede ${name} é ${formatQuantity(unitsOf(p), 'length', h)}; precisa ser maior que zero.`,
         elementId: w.id,
       });
     }
@@ -131,7 +132,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'opening-out-of-wall',
-        message: `Abertura ${name} não cabe na parede ${label(host)}: vão de ${fmt(start)} m a ${fmt(end)} m, parede com ${fmt(L)} m.`,
+        message: `Abertura ${name} não cabe na parede ${label(host)}: vão de ${formatQuantity(unitsOf(p), 'length', start)} a ${formatQuantity(unitsOf(p), 'length', end)}, parede com ${formatQuantity(unitsOf(p), 'length', L)}.`,
         elementId: o.id,
       });
     }

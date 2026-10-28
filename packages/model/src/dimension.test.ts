@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimensionValue, makeWall, type Dimension } from './index.ts';
+import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, type Dimension } from './index.ts';
 
 const LV0 = 'lv_0';
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -32,6 +32,18 @@ describe('valor da cota', () => {
   it('é a distância a–b arredondada a 1 mm', () => {
     const s = new ProjectStore(createEmptyProject());
     expect(dimensionValue(s.project, dim({ b: { x: 3.4564, y: 0 } }))).toBe(3.456);
+  });
+
+  it('segue as unidades do projeto quando a cota não fixa unidade', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(dimensionText(s.project, dim(), resolveUnits({ length: { unit: 'cm', decimals: 1 } }))).toBe('400,0 cm');
+    expect(dimensionText(s.project, dim({ unit: 'project' }), resolveUnits({ length: { unit: 'mm', decimals: 0 } }))).toBe('4000 mm');
+  });
+
+  it('mantém a unidade explícita de arquivos antigos e a precisão da cota', () => {
+    expect(formatDimension(dim({ unit: 'mm' }), 4)).toBe('4000,00 mm');
+    expect(formatDimension(dim({ precision: 1 }), 4)).toBe('4,0 m');
+    expect(formatDimension(dim({ suffix: ' cm', precision: 0 }), 4)).toBe('4 cm');
   });
 
   it('formata com duas casas e vírgula, em metros', () => {

@@ -1,6 +1,8 @@
 import { arcFromSagitta, arcLocal, arcTangentAt, cross, dist, dot, len, norm, sub, type Arc, type Vec2 } from '@hestia/geom';
 import { totalThickness } from './wallType.ts';
 import type { ValidationIssue } from './validate.ts';
+import { unitsOf } from './units.ts';
+import { formatQuantity } from './unitsFormat.ts';
 import { wallBaseElevation, wallMaxHeight } from './queries.ts';
 import type { Project, Wall } from './types.ts';
 
@@ -17,7 +19,6 @@ const TANGENT_KINK_DEG = 10;
 const DEG = 180 / Math.PI;
 
 const label = (w: Wall): string => (w.mark ? `"${w.mark}" (${w.id})` : `"${w.id}"`);
-const fmt = (n: number): string => n.toFixed(2).replace('.', ',');
 
 /** Distância de um ponto ao segmento a–b. */
 function distToSegment(pt: Vec2, a: Vec2, b: Vec2): number {
@@ -97,15 +98,15 @@ function cornerOutOfDomain(angle: number): boolean {
 }
 
 /** Motivos para uma junção com parede curva sair do domínio suportado (vazio = dentro). */
-function domainReasons(ends: End[], angle: number): string[] {
+function domainReasons(ends: End[], angle: number, units: ReturnType<typeof unitsOf>): string[] {
   const reasons: string[] = [];
   const seen = new Set<string>();
   for (const e of ends) {
     if (!e.arc || e.arc.radius >= MIN_RADIUS - 1e-9 || seen.has(e.wall.id)) continue;
     seen.add(e.wall.id);
-    reasons.push(`a parede ${label(e.wall)} tem raio de ${fmt(e.arc.radius)} m (mínimo 3,00 m)`);
+    reasons.push(`a parede ${label(e.wall)} tem raio de ${formatQuantity(units, 'length', e.arc.radius)} (mínimo ${formatQuantity(units, 'length', 3)})`);
   }
-  if (cornerOutOfDomain(angle)) reasons.push(`quina de ${(angle * DEG).toFixed(1).replace('.', ',')}° fora de 60° a 120°`);
+  if (cornerOutOfDomain(angle)) reasons.push(`quina de ${formatQuantity(units, 'angle', angle)} fora de 60° a 120°`);
   return reasons;
 }
 
@@ -159,7 +160,7 @@ export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssu
           out.push({
             severity: 'warning',
             code: 'wall-acute-join',
-            message: `Junção de "${a.wall.mark || a.wall.id}" com "${b.wall.mark || b.wall.id}" em ângulo de ${fmt(interior)}°: a esquadria não cabe e o corte fica reto, deixando vão. Abra o ângulo ou use outra junção.`,
+            message: `Junção de "${a.wall.mark || a.wall.id}" com "${b.wall.mark || b.wall.id}" em ângulo de ${formatQuantity(unitsOf(p), 'angle', (interior * Math.PI) / 180)}: a esquadria não cabe e o corte fica reto, deixando vão. Abra o ângulo ou use outra junção.`,
             elementId: a.wall.id,
           });
         }
@@ -168,7 +169,7 @@ export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssu
     }
     const reasons = new Set<string>();
     for (const b of partners) {
-      for (const r of domainReasons([a, b], angleBetween(a.dir, b.dir))) reasons.add(r);
+      for (const r of domainReasons([a, b], angleBetween(a.dir, b.dir), unitsOf(p))) reasons.add(r);
     }
     if (reasons.size) out.push(joinIssue(a.wall.id, [label(a.wall), ...partners.map((b) => label(b.wall))], [...reasons]));
   }
@@ -195,11 +196,11 @@ export function curveJoinDomainIssues(p: Project, walls: Wall[]): ValidationIssu
     for (const arc of [e.arc, host.arc]) {
       if (arc && arc.radius < MIN_RADIUS - 1e-9) {
         const owner = arc === e.arc ? e.wall : host.wall;
-        const reason = `a parede ${label(owner)} tem raio de ${fmt(arc.radius)} m (mínimo 3,00 m)`;
+        const reason = `a parede ${label(owner)} tem raio de ${formatQuantity(unitsOf(p), 'length', arc.radius)} (mínimo ${formatQuantity(unitsOf(p), 'length', 3)})`;
         if (!reasons.includes(reason)) reasons.push(reason);
       }
     }
-    if (cornerOutOfDomain(host.angle)) reasons.push(`quina de ${(host.angle * DEG).toFixed(1).replace('.', ',')}° fora de 60° a 120°`);
+    if (cornerOutOfDomain(host.angle)) reasons.push(`quina de ${formatQuantity(unitsOf(p), 'angle', host.angle)} fora de 60° a 120°`);
     if (reasons.length) out.push(joinIssue(e.wall.id, [label(e.wall), label(host.wall)], reasons));
   }
 
@@ -244,7 +245,7 @@ export function nearMissIssues(p: Project, walls: Wall[]): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'wall-end-near-miss',
-        message: `A ponta de "${a.wall.mark || a.wall.id}" está a ${(d * 100).toFixed(1).replace('.', ',')} cm da ponta de "${b.wall.mark || b.wall.id}": quase encostada, não une (tolerância de ${(JOIN_TOL * 100).toFixed(0)} cm). Encoste as pontas ou ajuste a tolerância do projeto.`,
+        message: `A ponta de "${a.wall.mark || a.wall.id}" está a ${formatQuantity(unitsOf(p), 'smallLength', d)} da ponta de "${b.wall.mark || b.wall.id}": quase encostada, não une (tolerância de ${formatQuantity(unitsOf(p), 'smallLength', JOIN_TOL)}). Encoste as pontas ou ajuste a tolerância do projeto.`,
         elementId: a.wall.id,
       });
     }

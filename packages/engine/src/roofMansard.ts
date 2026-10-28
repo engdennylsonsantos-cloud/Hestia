@@ -1,10 +1,10 @@
 import { asMulti, difference, dot, intersection, multiArea, sub, type Vec2 } from '@hestia/geom';
+import { defaultUnits } from '@hestia/model';
+import { formatQuantity } from '@hestia/model';
 import type { RoofMansard } from '@hestia/model';
 import { perpOf, WATER_MIN_AREA } from './roofGeom.ts';
 import type { ResolvedRoofPlane } from './roofs.ts';
 import type { WaterSolution } from './roofSkeleton.ts';
-
-const fmtM = (v: number): string => v.toFixed(2).replace('.', ',');
 
 /** Faixa da água a menos de `run` do beiral: retângulo no sistema (distância à aresta, ao longo da aresta) da água. */
 function stripOf(pl: ResolvedRoofPlane, run: number): Vec2[] {
@@ -27,13 +27,13 @@ function stripOf(pl: ResolvedRoofPlane, run: number): Vec2[] {
  * a altura dependa só da distância à aresta e as águas vizinhas se encontrem na mesma cota. A água de cima mantém a
  * origem da aresta, com a cota do desnível embutida em `z0`.
  */
-export function applyMansard(water: WaterSolution, m: RoofMansard): WaterSolution {
+export function applyMansard(water: WaterSolution, m: RoofMansard, units = defaultUnits()): WaterSolution {
   if (water.problem || water.planes.length === 0) return water;
   // Só recusa quando a faixa de baixo cobre o telhado inteiro (nenhuma água com faixa de cima). Uma água-lasca (faceta de arco,
   // trecho estreito) mais rasa que `run` fica toda na faixa de baixo; a altura continua contínua porque depende só da distância.
   const reach = Math.max(...water.planes.map((pl) => Math.max(...pl.polygon.flat(2).map((v) => dot(sub(v, pl.origin), pl.up)))));
   if (m.run >= reach - 1e-9) {
-    return { planes: [], problem: `a mansarda não cabe: a faixa de baixo (${fmtM(m.run)} m) chega ao centro do telhado; use menos que ${fmtM(reach)} m` };
+    return { planes: [], problem: `a mansarda não cabe: a faixa de baixo (${formatQuantity(units, 'length', m.run)}) chega ao centro do telhado; use menos que ${formatQuantity(units, 'length', reach)}` };
   }
   const planes: ResolvedRoofPlane[] = [];
   for (const pl of water.planes) {

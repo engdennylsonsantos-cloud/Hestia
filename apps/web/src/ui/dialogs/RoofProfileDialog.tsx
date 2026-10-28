@@ -88,7 +88,7 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
   const base = frame.tMin;
   const width = frame.tMax - frame.tMin;
   const rel = draft.map((q) => ({ t: q.t - base, z: q.z }));
-  const err = roofProfileError(draft) ?? roofProfileSlopeError(draft);
+  const err = roofProfileError(draft) ?? roofProfileSlopeError(draft, units);
   const setPts = (next: RoofProfilePoint[]): void => setDraft(next.map((q) => ({ t: q.t, z: q.z })));
   const applyPreset = (pts: RoofProfilePoint[]): void => setDraft(shiftProfile(pts, base));
   const edit = (i: number, change: Partial<RoofProfilePoint>): void => setPts(draft.map((q, k) => (k === i ? { ...q, ...change } : q)));

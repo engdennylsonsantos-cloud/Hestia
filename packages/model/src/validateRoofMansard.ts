@@ -1,11 +1,11 @@
 import { ringArea, weightedSkeleton, type Vec2 } from '@hestia/geom';
 import type { Roof } from './types.ts';
 import type { ValidationIssue } from './validate.ts';
+import { defaultUnits } from './units.ts';
+import { formatQuantity } from './unitsFormat.ts';
 
 /** Percentual máximo de cada faixa da mansarda (mesmo teto das demais inclinações do telhado). */
 const MAX_PERCENT = 300;
-
-const fmtM = (v: number): string => v.toFixed(2).replace('.', ',');
 
 /**
  * Maior `run` que ainda deixa a faixa de cima em ao menos uma água: a maior, entre as águas do esqueleto reto (pesos 1 nas arestas
@@ -43,7 +43,7 @@ export function mansardRunLimit(boundary: Vec2[], slopes: Array<number | null | 
 }
 
 /** Erros da mansarda: forma que não a aceita, números inválidos e `run` que não deixa a faixa de cima em nenhuma água. */
-export function mansardProblems(r: Roof, name: string): ValidationIssue[] {
+export function mansardProblems(r: Roof, name: string, units = defaultUnits()): ValidationIssue[] {
   const m = r.mansard;
   if (!m) return [];
   const out: ValidationIssue[] = [];
@@ -55,20 +55,20 @@ export function mansardProblems(r: Roof, name: string): ValidationIssue[] {
   let ok = true;
   if (!Number.isFinite(m.run) || m.run <= 0) {
     ok = false;
-    push('roof-mansard-run', `Mansarda do telhado ${name}: a largura da faixa de baixo (${m.run} m) precisa ser maior que zero.`);
+    push('roof-mansard-run', `Mansarda do telhado ${name}: a largura da faixa de baixo (${formatQuantity(units, 'length', m.run)}) precisa ser maior que zero.`);
   }
   const pcts: Array<[string, number]> = [['de baixo', m.lowerPercent], ['de cima', m.upperPercent]];
   for (const [which, v] of pcts) {
     if (!Number.isFinite(v) || v <= 0 || v > MAX_PERCENT) {
       ok = false;
-      push('roof-mansard-slope', `Mansarda do telhado ${name}: a inclinação ${which} (${v} %) precisa estar entre 0 e ${MAX_PERCENT} %.`);
+      push('roof-mansard-slope', `Mansarda do telhado ${name}: a inclinação ${which} (${formatQuantity(units, 'slope', v / 100)}) precisa estar entre 0 e ${MAX_PERCENT} %.`);
     }
   }
   if (!ok) return out;
   const slopes = r.shape === 'edges' ? r.edgeSlopes : r.shape === 'hip' ? r.boundary.map(() => 1) : null;
   const limit = slopes ? mansardRunLimit(r.boundary, slopes) : null;
   if (limit !== null && m.run >= limit - 1e-9) {
-    push('roof-mansard-run', `Mansarda do telhado ${name}: a faixa de baixo (${fmtM(m.run)} m) chega ao centro do telhado; use menos que ${fmtM(limit)} m.`);
+    push('roof-mansard-run', `Mansarda do telhado ${name}: a faixa de baixo (${formatQuantity(units, 'length', m.run)}) chega ao centro do telhado; use menos que ${formatQuantity(units, 'length', limit)}.`);
   }
   return out;
 }

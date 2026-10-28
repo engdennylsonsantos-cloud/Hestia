@@ -390,13 +390,14 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
   it('bandeira superior: travessa e vidro fixo acima; a folha desce e não gera item', () => {
     const c = cena('ot_p90', { transom: { height: 0.3 } });
     const m = modelo(c);
-    const barra = m.parts.find((x) => x.id === 'transom-bar')!;
-    const vidro = m.parts.find((x) => x.id === 'transom-glass')!;
+    const barra = m.parts.find((x) => x.id === 'transom-0')!;
+    const vidro = m.parts.find((x) => x.id === 'glass-transom')!;
     expect(barra).toBeDefined();
     expect(vidro).toBeDefined();
     expect(vidro.box.z1).toBeCloseTo(c.g.height - 0.05, 9);
     expect(barra.box.z0).toBeCloseTo(c.g.height - 0.05 - 0.3 - 0.04, 9);
-    expect(folha(m.parts).box.z1).toBeLessThan(barra.box.z0);
+    // A folha entra no rebaixo da travessa (batedor 0,015 − folga 0,004), como sob a travessa superior (spec F1 §1).
+    expect(folha(m.parts).box.z1).toBeCloseTo(barra.box.z0 + 0.011, 9);
     expect(m.openings).toHaveLength(1);
   });
 
@@ -404,8 +405,8 @@ describe('buildOpeningModel: detalhes (estilo, maçaneta, grade, bandeiras, aliz
     const base = modelo(cena('ot_p90'));
     const c = cena('ot_p90', { sidelights: { left: true, right: true, width: 0.2 } });
     const m = modelo(c);
-    expect(m.parts.filter((x) => x.id.startsWith('sidelight-glass'))).toHaveLength(2);
-    const mullions = m.parts.filter((x) => x.id.startsWith('sidelight-mullion'));
+    expect(m.parts.filter((x) => x.id.startsWith('glass-side-'))).toHaveLength(2);
+    const mullions = de(m.parts, 'mullion');
     expect(mullions).toHaveLength(2);
     for (const x of mullions) expect(x.box.t1 - x.box.t0).toBeCloseTo(0.04, 9);
     expect(largura(folha(m.parts).box)).toBeLessThan(largura(folha(base.parts).box));

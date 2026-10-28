@@ -209,7 +209,7 @@ function extrudeLayer(b: SolidBatch, bands: LayerBand[], baseZ: number): void {
   // união também podem ficar a 0,1 mm de vizinhos de outra faixa.
   const cleaned = weldBands(weldBands(bands).map((b) => ({ ...b, poly: union(b.poly) })));
   // Faixas planas viram uma região por fatia de cota (união das que cobrem a fatia): sobreposições minúsculas do motor
-  // (1e-8 m², arredondamento das booleanas) somem, e as arestas quase coincidentes se fundem. Faixas inclinadas seguem.
+  // (1e-8 em área, arredondamento das booleanas) somem, e as arestas quase coincidentes se fundem. Faixas inclinadas seguem.
   const flat = cleaned.filter((b) => !b.slope);
   const zsFlat: number[] = [];
   for (const b of flat) for (const z of [b.z0, b.z1]) if (!zsFlat.some((q) => Math.abs(q - z) < Z_EPS)) zsFlat.push(z);

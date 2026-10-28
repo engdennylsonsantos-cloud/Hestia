@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultUnits } from '@hestia/model';
 import { resolverZoom } from './zoomOps.ts';
 import { resolveLevel, resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeRoom, makeWall, type Project } from '@hestia/model';
@@ -39,12 +40,18 @@ function input(p: Project, over: Partial<PlanInput> = {}): PlanInput {
 }
 
 describe('ambiente na planta (D1, E3)', () => {
+  it('etiqueta segue as unidades do projeto (área em ft²)', () => {
+    const r = { name: 'Sala', number: '101', area: 20 } as ResolvedRoom;
+    const u = { ...defaultUnits(), area: { unit: 'ft2' as const, decimals: 2, suppressZeros: false, denominator: 16 as const } };
+    expect(roomLabelText(r, 'fine', u)).toBe('Sala (101) · 215,28 ft²');
+  });
+
   it('etiqueta: nome, número entre parênteses e área com 2 casas; no grosso, só o nome', () => {
     const r = { name: 'Sala', number: '101', area: 20 } as ResolvedRoom;
-    expect(roomLabelText(r, 'fine')).toBe('Sala (101) · 20,00 m²');
-    expect(roomLabelText(r, 'medium')).toBe('Sala (101) · 20,00 m²');
-    expect(roomLabelText(r, 'coarse')).toBe('Sala');
-    expect(roomLabelText({ name: '', number: '7', area: 1.5 } as ResolvedRoom, 'fine')).toBe('Ambiente 7 (7) · 1,50 m²');
+    expect(roomLabelText(r, 'fine', defaultUnits())).toBe('Sala (101) · 20,00 m²');
+    expect(roomLabelText(r, 'medium', defaultUnits())).toBe('Sala (101) · 20,00 m²');
+    expect(roomLabelText(r, 'coarse', defaultUnits())).toBe('Sala');
+    expect(roomLabelText({ name: '', number: '7', area: 1.5 } as ResolvedRoom, 'fine', defaultUnits())).toBe('Ambiente 7 (7) · 1,50 m²');
   });
 
   it('desenha o preenchimento e a etiqueta do ambiente, com a área do circuito (4 × 6 menos as paredes)', () => {

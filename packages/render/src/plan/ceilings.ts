@@ -4,6 +4,7 @@ import type { DetailLevel, Id, Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { zoomAtinge } from './limiares.ts';
+import { unitsOf } from '@hestia/model';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
 import type { PlanTheme } from './types.ts';
@@ -48,7 +49,7 @@ export function ceilingFills(
     if (p.settings.showTags && at) {
       const e = p.elements[c.ceilingId];
       const mark = e && e.kind === 'ceiling' ? e.mark : '';
-      const text = [mark, fmtArea(multiArea(c.polygon), 1)].filter(Boolean).join(' · ');
+      const text = [mark, fmtArea(unitsOf(p), multiArea(c.polygon), 1)].filter(Boolean).join(' · ');
       out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM } });
     }
   }
@@ -60,5 +61,5 @@ export function ceilingSelectionOps(p: Project, levelId: Id, selection: Id[], ho
   const parts = resolveCeilings(p, levelId)
     .filter((c) => !hidden?.has(c.ceilingId))
     .map((c) => ({ id: c.ceilingId, polygon: c.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
 }

@@ -1,6 +1,6 @@
 import { multiArea, pointInPolygon, polygonArea, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { fillRegionOf, lineIntervals, type ElementJunction, type ResolvedFloor } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { formatQuantity, unitsOf, type DetailLevel, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { holeMarkOps } from './holeMarks.ts';
@@ -23,8 +23,8 @@ export function membraneLineOps(polygon: MultiPolygon, theme: PlanTheme): Stroke
   return polygon.flat().map((ring) => ({ pts: ring, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] }));
 }
 
-/** Área em m² com vírgula decimal, como nas demais etiquetas da planta. */
-export const fmtArea = (a: number, digits: number): string => `${a.toFixed(digits).replace('.', ',')} m²`;
+/** Área nas unidades do projeto, com o número de casas pedido, como nas demais etiquetas da planta. */
+export const fmtArea = (u: ResolvedUnits, a: number, digits: number): string => formatQuantity(u, 'area', a, { decimals: digits });
 
 /** Centroide de um anel (fórmula da área); cai na média dos vértices quando a área é zero. */
 function ringCentroid(r: Ring): Vec2 {
@@ -122,7 +122,7 @@ export function floorOpsOf(p: Project, f: ResolvedFloor, theme: PlanTheme, dark:
   if (p.settings.showTags) {
     const code = p.floorTypes[f.typeId]?.code;
     const at = labelPoint(f.polygon);
-    const text = [code, fmtArea(multiArea(f.polygon), 1)].filter(Boolean).join(' · ');
+    const text = [code, fmtArea(unitsOf(p), multiArea(f.polygon), 1)].filter(Boolean).join(' · ');
     if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM } });
   }
   return out;
@@ -153,7 +153,7 @@ export interface OutlinedPart {
  * quadradinhos nos vértices e, quando `areaLabel` está ligado, a área no centroide (a etiqueta de tipo já a mostra
  * com as etiquetas ligadas).
  */
-export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hover: Id | null, areaLabel: boolean, theme: PlanTheme, _v?: Viewport): FloorOps {
+export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hover: Id | null, areaLabel: boolean, theme: PlanTheme, u: ResolvedUnits, _v?: Viewport): FloorOps {
   const out = empty();
   const sel = new Set(selection);
   for (const f of parts) {
@@ -174,7 +174,7 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
     }
     if (areaLabel) {
       const at = labelPoint(f.polygon);
-      if (at) out.labels.push({ at, text: fmtArea(f.area ?? multiArea(f.polygon), 2), dy: -12, tone: 'info' });
+      if (at) out.labels.push({ at, text: fmtArea(u, f.area ?? multiArea(f.polygon), 2), dy: -12, tone: 'info' });
     }
   }
   return out;
@@ -185,7 +185,7 @@ export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hove
   const parts = pisosDoNivel(p, levelId)
     .filter((f) => !hidden?.has(f.floorId))
     .map((f) => ({ id: f.floorId, polygon: f.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
 }
 
 /** Pisos do nível abaixo, como referência apagada (D4): mesma linguagem do subpavimento das paredes. */

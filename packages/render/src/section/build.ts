@@ -1,6 +1,6 @@
 import { union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { CLOSED, openingLinePaths, type ProjectedRing, type SectionBeyond, type SectionOpening, type SectionOrigin, type SectionResult } from '@hestia/engine';
-import { GRAPHICS_CATEGORIES, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { formatQuantity, GRAPHICS_CATEGORIES, unitsOf, type GraphicsCategory, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import { mix } from '../plan/color.ts';
 import { thinStrokes } from '../plan/thin.ts';
 import type { PlanPaint } from '../plan/style.ts';
@@ -29,7 +29,7 @@ const DOOR_FILL = '#e6d2ae';
 
 const ringsOf = (m: MultiPolygon): Ring[] => m.flatMap((p) => p);
 
-const fmt = (z: number): string => `${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(2).replace('.', ',')}`;
+const fmt = (u: ResolvedUnits, z: number): string => `${z >= 0 ? '+' : '−'}${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;
 
 /** Categoria gráfica de uma origem do motor (parede, piso, laje, telhado ou escada). */
 const categoryOf = (o: SectionOrigin): GraphicsCategory => ownerOf(o)?.kind ?? 'wall';
@@ -67,7 +67,7 @@ export function buildSectionDrawList(input: SectionInput): PlanDrawList {
       { x: s.length + 0.5, y: l.z },
     ];
     strokes.push({ pts: edge, closed: false, widthPx: 1, color: theme.inkSoft, alpha: 0.9, dash: [10, 5] });
-    labels.push({ at: edge[1]!, text: `${l.name} ${fmt(l.z)}`, dx: 6, dy: -8, tone: 'info' });
+    labels.push({ at: edge[1]!, text: `${l.name} ${fmt(unitsOf(input.project), l.z)}`, dx: 6, dy: -8, tone: 'info' });
   }
 
   const drawBeyond = (b: SectionBeyond): void => {

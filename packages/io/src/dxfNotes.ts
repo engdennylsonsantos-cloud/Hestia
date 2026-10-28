@@ -93,7 +93,9 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
 
 /** Registros do TEXT (centrado no ponto de alinhamento, código 72=1 e 73=2) como pares [código, valor]. */
 export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]> {
+  // units-ok: coordenada DXF (formato de máquina)
   const x = t.at.x.toFixed(6);
+  // units-ok: coordenada DXF (formato de máquina)
   const y = t.at.y.toFixed(6);
   return [
     [0, 'TEXT'],
@@ -101,8 +103,10 @@ export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]>
     [10, x],
     [20, y],
     [30, '0.000000'],
+    // units-ok: altura de texto DXF (formato de máquina)
     [40, t.height.toFixed(6)],
     [1, t.text],
+    // units-ok: ângulo DXF (formato de máquina)
     [50, t.rotation.toFixed(6)],
     [72, 1],
     [73, 2],

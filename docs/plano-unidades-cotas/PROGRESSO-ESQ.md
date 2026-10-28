@@ -8,7 +8,7 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [x] S4 alças de inversão (não reproduzido no navegador; ver nota)
 - [x] S5 planta do modal
 - [x] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
-- [ ] C6 `packages/render` e `packages/io`
+- [x] C6 `packages/render` e `packages/io`
 - [ ] D10.1 parede (`04`; só depois do marco M5)
 - [ ] D10.2 linha e perímetro
 - [ ] D10.3 eixos
@@ -51,6 +51,12 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - `formatMeters` saiu; `fmtXY`, `fmtM`, `fmt`, `cm`/`mText`/`degText`, `areaText`, `fmtPercent`, `fmtM` das escadas etc. agora recebem as unidades do projeto.
 - Ficam na linha de base (reservados ao COTAS, Fase E): `openingPlacement.ts` (1 ocorrência de `formatMeters`). Nada mais em `packages/tools` tem ocorrência.
 - Teste com unidades não padrão: cota de 3 m vira `300,0 cm` em `medirFrenteG.test.ts`. `node scripts/units-baseline.json` reduzido com `--update`.
+
+## C6 — render e io migrados
+- Textos desenhados (áreas de piso/laje/forro/telhado/ambiente, elevações de telhado/seção, percentual de caimento, cotas de seleção e etiquetas de tipo) usam `formatQuantity` com `unitsOf(project)`; a assinatura de `fmtArea`/`fmtElevation`/`roomLabelText`/`outlineSelectionOps` recebeu as unidades e os chamadores passam o projeto.
+- Formatos de máquina continuam em `toFixed`: DXF (coordenadas/notas), IFC e PDF levam `// units-ok: ... (formato de máquina)`. Nenhuma ocorrência sobra em render/io.
+- `ouroZoom.json` regenerado (69 entradas) porque etiquetas/cotas desenhadas mudaram de texto por causa das unidades; a geometria não mudou. Goldens de imagem/e2e (`tests/e2e/baseline*`) não foram regravados — seriam afetados nas etiquetas.
+- Teste com unidades não padrão: etiqueta de ambiente em ft² (`rooms.test.ts`).
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

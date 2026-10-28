@@ -67,6 +67,7 @@ export function dxfSectionLineRoleOf(layer: string): DxfSectionRole | 'annotatio
   return undefined;
 }
 
+// units-ok: coordenada DXF (formato de máquina)
 const fmt = (v: number): string => (Math.abs(v) < 5e-7 ? 0 : v).toFixed(6);
 
 /** Anel sem o vértice de fechamento repetido; com menos de 3 vértices não há área. */

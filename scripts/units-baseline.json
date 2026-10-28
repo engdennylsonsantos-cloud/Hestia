@@ -119,11 +119,6 @@
   "packages/geom/src/arc.ts": 1,
   "packages/geom/src/numberText.ts": 1,
   "packages/geom/src/skeleton.ts": 1,
-  "packages/io/src/dxf.ts": 1,
-  "packages/io/src/dxfNotes.ts": 4,
-  "packages/io/src/dxfSection.ts": 1,
-  "packages/io/src/ifc/ifcStep.ts": 1,
-  "packages/io/src/pdf/pdfWriter.ts": 1,
   "packages/model/src/ceiling.ts": 1,
   "packages/model/src/dimension.ts": 2,
   "packages/model/src/floor.ts": 1,
@@ -139,15 +134,5 @@
   "packages/model/src/validateRoofMansard.ts": 1,
   "packages/model/src/validateRoofs.ts": 3,
   "packages/model/src/validateSlabs.ts": 4,
-  "packages/render/src/model3d/solids.ts": 1,
-  "packages/render/src/model3d/stairSolids.ts": 1,
-  "packages/render/src/plan/floors.ts": 2,
-  "packages/render/src/plan/joinDebug.ts": 1,
-  "packages/render/src/plan/planOverlay.ts": 1,
-  "packages/render/src/plan/roofs.ts": 3,
-  "packages/render/src/plan/rooms.ts": 1,
-  "packages/render/src/plan/slabs.ts": 1,
-  "packages/render/src/plan/stairs.ts": 1,
-  "packages/render/src/plan/tags.ts": 5,
-  "packages/render/src/section/build.ts": 1
+  "packages/render/src/plan/roofs.ts": 1
 }

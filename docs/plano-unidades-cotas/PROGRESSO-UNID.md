@@ -4,7 +4,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] U0 inventário (`01`)
 - [x] U1 tipos, padrões e formatação
 - [x] U2 leitura de texto digitado
-- [ ] U3 `ProjectSettings.units`
+- [x] U3 `ProjectSettings.units`
 - [ ] U4 `parseQuantityText` (tools)
 - [ ] U5 hook `useUnits`
 - [ ] U6 `NumField quantity`  → **INTEGRAR e avisar (marco M1)**
@@ -20,7 +20,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 
 ## Desvios
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
-- U1: `unitsOf` usa por enquanto um tipo estrutural mínimo (`{ settings?: { units?: UnitsSettings } }`) para compilar antes do campo em `ProjectSettings`; U3 troca para `Pick<Project,'settings'>`.
+- U1/U3: `unitsOf` começou com tipo estrutural mínimo e passou a `Pick<Project,'settings'>` quando U3 acrescentou `settings.units`.
 - U1: valor de base (SI) da grandeza `angle` é o radiano (como no modelo); `slope` usa a razão (rise/run) — `slopePercent` do modelo é razão × 100, documentado no cabeçalho de `units.ts`.
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

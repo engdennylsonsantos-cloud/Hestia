@@ -8,6 +8,7 @@
  * **razão** (rise/run), então quem vem de `slopePercent` divide por 100 e quem volta multiplica por 100.
  * Percentual exibido = razão × 100; graus = atan(razão) em graus.
  */
+import type { Project } from './types.ts';
 
 export type LengthUnit = 'm' | 'cm' | 'mm' | 'ft' | 'in' | 'ft-in';
 export type AreaUnit = 'm2' | 'cm2' | 'ft2';
@@ -134,16 +135,13 @@ export function resolveUnits(u: UnitsSettings | undefined): ResolvedUnits {
   };
 }
 
-/** Forma mínima lida de um projeto (o campo `settings.units` só existe a partir de U3). */
-type ProjectWithUnits = { settings?: { units?: UnitsSettings } };
-
 const cache = new WeakMap<object, ResolvedUnits>();
 
 /**
  * Unidades de um projeto, memoizadas pela identidade de `settings.units`. Sem `units` devolve a referência
  * de `defaultUnits()`.
  */
-export function unitsOf(p: ProjectWithUnits | undefined): ResolvedUnits {
+export function unitsOf(p: Pick<Project, 'settings'> | undefined): ResolvedUnits {
   const settings = p?.settings?.units;
   if (!settings) return DEFAULT_UNITS;
   const hit = cache.get(settings);

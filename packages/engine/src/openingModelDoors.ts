@@ -1,7 +1,7 @@
 import { openingFamilyOf } from '@hestia/model';
 import { buildNewDoorParts } from './openingModelDoorsNew.ts';
 import { buildVoid } from './openingModelWindows.ts';
-import type { PartMotion } from './openingModelTypes.ts';
+import type { PartMotion, PartProfile } from './openingModelTypes.ts';
 import {
   GAP,
   OVERLAP,
@@ -12,32 +12,77 @@ import {
   leafS,
   leafSpan,
   leafZ,
-  stopS,
   type AddOptions,
   type Ctx,
 } from './openingModelContext.ts';
 
-/** Batente de porta: ombreiras e travessa; com rebaixo (batedor) ou caixa única. */
+const signedArea = (pts: Array<[number, number]>): number => {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % pts.length]!;
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return a / 2;
+};
+
+/** Ordena o polígono em sentido anti-horário (a área assinada fica positiva). */
+const ccw = (pts: Array<[number, number]>): Array<[number, number]> => (signedArea(pts) < 0 ? [...pts].reverse() : pts);
+
+/**
+ * Seção em L do batente com rebaixo (spec E3 §2), no plano (t, s) da ombreira `j`. O rebaixo tem a largura do batedor
+ * (`OVERLAP`) e a profundidade da folha mais a folga (`R`); a peça é UMA, extrudada em z.
+ */
+export function jambProfile(c: Ctx, j: 1 | -1): PartProfile {
+  const R = c.L + GAP;
+  const outer = c.hw;
+  const inner = c.hw - c.J;
+  const lip = c.hw - c.J + OVERLAP;
+  const pts: Array<[number, number]> = [
+    [j * outer, c.Cd - c.side * (c.D / 2)],
+    [j * outer, c.Cd + c.side * (c.D / 2)],
+    [j * lip, c.Cd + c.side * (c.D / 2)],
+    [j * lip, c.Cd + c.side * (c.D / 2 - R)],
+    [j * inner, c.Cd + c.side * (c.D / 2 - R)],
+    [j * inner, c.Cd - c.side * (c.D / 2)],
+  ];
+  return { plane: 'ts', pts: ccw(pts) };
+}
+
+/** Seção em L da travessa, no plano (s, z), com o rebaixo embaixo (spec E3 §2). */
+export function headProfile(c: Ctx): PartProfile {
+  const R = c.L + GAP;
+  const pts: Array<[number, number]> = [
+    [c.Cd - c.side * (c.D / 2), c.H],
+    [c.Cd + c.side * (c.D / 2), c.H],
+    [c.Cd + c.side * (c.D / 2), c.H - c.J + OVERLAP],
+    [c.Cd + c.side * (c.D / 2 - R), c.H - c.J + OVERLAP],
+    [c.Cd + c.side * (c.D / 2 - R), c.H - c.J],
+    [c.Cd - c.side * (c.D / 2), c.H - c.J],
+  ];
+  return { plane: 'sz', pts: ccw(pts) };
+}
+
+/** Batente de porta: ombreiras e travessa; em L (uma peça com rebaixo) ou caixa única. */
 function buildDoorFrame(c: Ctx): void {
   if (c.frameStyle === 'block') return;
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
+  const zTop = c.frameStyle === 'simple' ? c.H : c.H - c.J;
   for (const j of [-1, 1] as const) {
     const name = j < 0 ? 'left' : 'right';
     if (c.frameStyle === 'simple') {
       addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
       continue;
     }
-    addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J + OVERLAP), j * c.hw, body.s0, body.s1, 0, c.H));
-    const stop = stopS(c);
-    addPart(c, `stop-${name}`, 'stop', 'frame', box(j * (c.hw - c.J), j * (c.hw - c.J + OVERLAP), stop.s0, stop.s1, 0, c.H));
+    addPart(c, `jamb-${name}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, zTop), {
+      profile: jambProfile(c, j),
+    });
   }
   if (c.frameStyle === 'simple') {
     addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H));
     return;
   }
-  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J + OVERLAP, c.H));
-  const stop = stopS(c);
-  addPart(c, 'stop-head', 'stop', 'frame', box(-c.hw, c.hw, stop.s0, stop.s1, c.H - c.J, c.H - c.J + OVERLAP));
+  addPart(c, 'head', 'head', 'frame', box(-c.hw, c.hw, body.s0, body.s1, c.H - c.J, c.H), { profile: headProfile(c) });
 }
 
 /** Almofadas, aletas ou grelhas sobre a folha (detalhe do estilo). */
@@ -207,10 +252,16 @@ function addDoorLeaf(
 function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: number, latchT: number): void {
   const span = leafS(c);
   const z = leafZ(c);
+  // Dobradiça na face da folha voltada para o lado de abertura. O eixo no plano médio fazia a folha atravessar o
+  // batedor; na face oposta (a do rebaixo) o canto de espessura ainda varria o lábio do perfil em L. Esta é a face que
+  // mantém o giro afastado do batente durante toda a varredura (spec E3 §5; divergência registrada no relatório).
+  const lside = c.leafSide === 'opposite' ? -c.side : c.side;
+  const inicio = c.Cd + lside * (c.D / 2 - (c.L + GAP));
+  const hingeS = c.leafSide === 'opposite' ? inicio : inicio + lside * c.L;
   // O sinal depende do lado da dobradiça: com a folha à direita do eixo (h = +1) o mesmo ângulo a levaria ao lado
   // oposto ao da abertura.
   const sign = (c.side * (hingeT < latchT ? 1 : -1)) as 1 | -1;
-  const rotate: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: (span.s0 + span.s1) / 2, sign };
+  const rotate: PartMotion = { kind: 'rotate', axis: 'z', t: hingeT, s: hingeS, sign };
   addDoorLeaf(c, index, t0, t1, span, z, rotate, latchT);
   c.openings.push({
     leaf: index,
@@ -218,7 +269,7 @@ function addSwingLeaf(c: Ctx, index: number, t0: number, t1: number, hingeT: num
     side: c.side,
     hingeT,
     latchT,
-    pivot: { t: hingeT, s: (span.s0 + span.s1) / 2 },
+    pivot: { t: hingeT, s: hingeS },
     radius: Math.abs(t1 - t0),
     z0: z.z0,
     z1: z.z1,
@@ -253,26 +304,34 @@ function buildPivotDoor(c: Ctx): void {
   const z = leafZ(c);
   const sSpan = leafS(c);
   const axis = c.h * (c.hw / 2);
-  const sMid = (sSpan.s0 + sSpan.s1) / 2;
+  // Pivotante: a folha inteira gira em torno do eixo no meio de `t`; o eixo em `s` fica na face encostada no batedor,
+  // que é a que varre para dentro (afastando-se do lábio do batente) durante o giro. A folha recua `L/2 + folga` da
+  // face interna do batente para o giro não varrer o batente do lado oposto (spec E3 §5).
+  const lside = c.leafSide === 'opposite' ? -c.side : c.side;
+  const inicio = c.Cd + lside * (c.D / 2 - (c.L + GAP));
+  const contact = c.leafSide === 'opposite' ? inicio + lside * c.L : inicio;
   const sign = (c.side * c.h) as 1 | -1;
-  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: sMid, sign };
-  addDoorLeaf(c, 0, span.center - span.half, span.center + span.half, sSpan, z, motion, -axis);
+  const motion: PartMotion = { kind: 'rotate', axis: 'z', t: axis, s: contact, sign };
+  const half = Math.max(0, c.hw - c.J - (c.L / 2 + GAP));
+  // O topo da folha fica abaixo da face inferior da travessa: o giro para o lado oposto não varre o batedor da verga.
+  const zPivot = { z0: z.z0, z1: Math.min(z.z1, c.H - c.J) };
+  addDoorLeaf(c, 0, span.center - half, span.center + half, sSpan, zPivot, motion, -axis);
   c.openings.push({
     leaf: 0,
     kind: 'pivot',
     side: c.side,
     hingeT: axis,
     latchT: -axis,
-    pivot: { t: axis, s: sMid },
+    pivot: { t: axis, s: contact },
     radius: (3 * c.hw) / 2,
-    z0: z.z0,
-    z1: z.z1,
+    z0: zPivot.z0,
+    z1: zPivot.z1,
   });
 }
 
 /** Batente de correr: caixa J×D sem batedor, com trilhos metálicos no topo e no piso. */
 function buildSlidingDoorFrame(c: Ctx): void {
-  const body = { s0: c.C - c.D / 2, s1: c.C + c.D / 2 };
+  const body = { s0: c.Cd - c.D / 2, s1: c.Cd + c.D / 2 };
   for (const j of [-1, 1] as const) {
     addPart(c, `jamb-${j < 0 ? 'left' : 'right'}`, 'jamb', 'frame', box(j * (c.hw - c.J), j * c.hw, body.s0, body.s1, 0, c.H));
   }
@@ -296,7 +355,7 @@ function buildSlidingDoor(c: Ctx): void {
   const moving = c.h === 1 ? 0 : 1;
   for (let k = 0; k < 2; k++) {
     const center = center0 + (k - 0.5) * spacing;
-    const sCenter = c.C + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
+    const sCenter = c.Cd + (k === 0 ? -1 : 1) * (c.L / 2 + 0.003);
     const motion: PartMotion =
       k === moving ? { kind: 'slide', dt: k === 1 ? -1 : 1, ds: 0, dz: 0, travel } : { kind: 'slide', dt: 0, ds: 0, dz: 0, travel: 0 };
     const latchT = center + (k <= 0 ? leafW / 2 : -leafW / 2);

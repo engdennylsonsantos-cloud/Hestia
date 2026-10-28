@@ -24,6 +24,8 @@ export interface SolidBatch {
   indices: number[];
   /** Elemento de cada faixa de `indices` (picking e realce na vista 3D, decisão 0016). */
   ids: ElementRange[];
+  /** Peças do mesmo `group` formam uma peça física: as arestas internas do grupo não são desenhadas. */
+  group?: string;
 }
 
 /** Registra as faixas de `indices` que `fn` acrescenta ao lote `b` como pertencentes ao elemento `id`. */

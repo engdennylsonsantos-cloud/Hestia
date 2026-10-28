@@ -160,6 +160,7 @@ export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_jg90', kind: 'window', name: 'Janela guilhotina 90 x 150', code: 'J-08', width: 0.9, height: 1.5, sill: 0.9, leaves: 2, plan: 'hung' }, 'mat_aluminio'),
   ot({ id: 'ot_jp80', kind: 'window', name: 'Janela pivotante 80 x 120', code: 'J-09', width: 0.8, height: 1.2, sill: 1.0, leaves: 1, plan: 'pivotwin' }, 'mat_aluminio'),
   ot({ id: 'ot_jv80', kind: 'window', name: 'Janela veneziana 80 x 60', code: 'J-10', width: 0.8, height: 0.6, sill: 1.5, leaves: 1, plan: 'louver', angle3d: 45 }, 'mat_aluminio'),
+  ot({ id: 'ot_jb80', kind: 'window', name: 'Janela basculante 80 x 50', code: 'J-11', width: 0.8, height: 0.5, sill: 1.7, leaves: 1, plan: 'tilt' }, 'mat_aluminio'),
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>

@@ -104,18 +104,17 @@ describe('openingPlanPaths: porta de giro ot_p90 (nível médio)', () => {
     }
   });
 
-  it('arco de raio 0,822 centrado em t = −0,411, da posição fechada à folha aberta a 90°', () => {
+  it('arco de raio 0,822 centrado no pivô da folha, da posição fechada à folha aberta a 90°', () => {
     const c = cena('ot_p90');
     const m = modelo(c);
     const arc = openingPlanPaths(m, opts()).find((p) => p.role === 'swing')!;
-    const leaf = m.parts.find((p) => p.role === 'leaf')!;
-    const leafS = (leaf.box.s0 + leaf.box.s1) / 2;
-    const center = { t: -0.411, s: leafS };
+    const o = m.openings[0]!;
+    const center = { t: o.pivot.t, s: o.pivot.s };
     for (const q of arc.pts) expect(Math.hypot(q.t - center.t, q.s - center.s)).toBeCloseTo(0.822, 9);
     const first = arc.pts[0]!;
     const last = arc.pts.at(-1)!;
-    const fechada = { t: 0.411, s: leafS };
-    const aberta = { t: -0.411, s: leafS + 0.822 };
+    const fechada = { t: o.latchT, s: o.pivot.s };
+    const aberta = { t: o.hingeT, s: o.pivot.s + 0.822 };
     expect(Math.hypot(first.t - fechada.t, first.s - fechada.s)).toBeCloseTo(0, 9);
     expect(Math.hypot(last.t - aberta.t, last.s - aberta.s)).toBeCloseTo(0, 9);
   });
@@ -134,25 +133,35 @@ describe('openingPlanPaths: porta de giro ot_p90 (nível médio)', () => {
 });
 
 describe('openingPlanPaths: níveis low e high', () => {
-  it('low: só a linha da folha fechada, sem arco', () => {
+  it('low: folha aberta com arco, sem a folha fechada', () => {
     const paths = openingPlanPaths(modelo(cena('ot_p90')), opts({ detail: 'low' }));
-    expect(paths).toHaveLength(1);
-    expect(paths[0]!.role).toBe('leaf');
-    expect(paths[0]!.closed).toBe(false);
-    expect(paths.some((p) => p.role === 'swing')).toBe(false);
-    expect(largura(boxOf(paths[0]!))).toBeCloseTo(0.822, 9);
+    expect(folhas(paths)).toHaveLength(1);
+    expect(paths.some((p) => p.role === 'swing')).toBe(true);
+    expect(largura(boxOf(folhas(paths)[0]!))).toBeLessThan(0.822);
   });
 
-  it('high: acrescenta a folha fechada (0,822 × 0,04) e o alizar/peitoril do tipo', () => {
+  it('high: mantém só a folha aberta e acrescenta o alizar/peitoril do tipo', () => {
     const c = cena('ot_p90', { casing: { width: 0.05, thickness: 0.015 } });
     const paths = openingPlanPaths(modelo(c), opts({ detail: 'high' }));
-    const fechadas = folhas(paths).filter((p) => largura(boxOf(p)) > 0.8);
-    expect(fechadas).toHaveLength(1);
-    expect(largura(boxOf(fechadas[0]!))).toBeCloseTo(0.822, 9);
-    expect(profundidade(boxOf(fechadas[0]!))).toBeCloseTo(0.04, 9);
+    expect(folhas(paths).filter((p) => largura(boxOf(p)) > 0.8)).toHaveLength(0);
     expect(paths.some((p) => p.role === 'casing' && p.closed)).toBe(true);
     const janela = cena('ot_j120', { sillBoard: { projection: 0.03, thickness: 0.02 } });
     expect(openingPlanPaths(modelo(janela), opts({ detail: 'high' })).some((p) => p.role === 'sillBoard')).toBe(true);
+  });
+
+  it('alizar no nível alto: um contorno por lado e por face, unido pelo grupo', () => {
+    const c = cena('ot_p90', { casing: { width: 0.07, thickness: 0.015 } });
+    const paths = openingPlanPaths(modelo(c), opts({ detail: 'high', cutZ: 1.5 }));
+    const casings = paths.filter((p) => p.role === 'casing' && p.closed);
+    expect(casings).toHaveLength(4);
+    for (const p of casings) expect(p.pts).toHaveLength(4);
+    const porFace = [casings.filter((p) => boxOf(p).s0 > 0), casings.filter((p) => boxOf(p).s1 < 0)];
+    for (const face of porFace) {
+      expect(face).toHaveLength(2);
+      const lados = face.map((p) => boxOf(p)).sort((a, b) => a.t0 - b.t0);
+      expect(lados[0]!.t1).toBeCloseTo(-0.4, 9);
+      expect(lados[1]!.t0).toBeCloseTo(0.4, 9);
+    }
   });
 
   it('em nenhum nível a folha fechada atravessa ombreira ou batedor', () => {
@@ -164,6 +173,42 @@ describe('openingPlanPaths: níveis low e high', () => {
           // A folha fechada é o retângulo de largura cheia; no low ela é uma linha (sem área).
           for (const f of folhas(paths).filter((p) => largura(boxOf(p)) > 0.8)) {
             for (const b of batente) expect(areaComum(boxOf(f), boxOf(b)), `${detail} ${f.role}`).toBeCloseTo(0, 12);
+          }
+        }
+      }
+    }
+  });
+
+  it('folhas de giro: nenhuma folha fechada em low/mid/high/projected; só a aberta e o arco no pivô', () => {
+    for (const base of ['ot_p90', 'ot_p160', 'ot_pp80', 'ot_pvv90']) {
+      const c = cena(base);
+      const m = modelo(c);
+      for (const detail of ['low', 'mid', 'high'] as const) {
+        for (const planDisplay of ['symbolic', 'projected'] as const) {
+          const paths = openingPlanPaths(m, opts({ detail, planDisplay, angle: Math.PI / 2 }));
+          const caso = `${base} ${detail} ${planDisplay}`;
+          const abertas = folhas(paths);
+          expect(abertas.length, caso).toBeGreaterThanOrEqual(m.openings.length);
+          for (const p of abertas) {
+            // A folha fechada teria comprimento da folha em `t`; a aberta a 90° tem só a espessura.
+            const b = boxOf(p);
+            expect(largura(b), `${caso} folha fechada`).toBeLessThan(0.1);
+          }
+          const arcos = paths.filter((p) => p.role === 'swing');
+          expect(arcos.length, caso).toBeGreaterThanOrEqual(m.openings.length);
+          for (const a of arcos) {
+            const noPivo = m.openings.some((o) => {
+              const raios = a.pts.map((q) => Math.hypot(q.t - o.pivot.t, q.s - o.pivot.s));
+              return Math.max(...raios) - Math.min(...raios) < 1e-7;
+            });
+            expect(noPivo, `${caso} arco no pivô`).toBe(true);
+          }
+          // Arco do giro lateral termina na posição fechada e a folha aberta fica a `radius` do pivô.
+          for (const o of m.openings.filter((x) => x.kind === 'side')) {
+            const arco = arcos.find((a) => Math.abs(a.pts[0]!.t - o.latchT) < 1e-9 && Math.abs(a.pts[0]!.s - o.pivot.s) < 1e-9)!;
+            expect(arco, `${caso} arco do trinco`).toBeDefined();
+            const fim = arco.pts.at(-1)!;
+            expect(Math.hypot(fim.t - o.pivot.t, fim.s - o.pivot.s), `${caso} raio`).toBeCloseTo(o.radius, 9);
           }
         }
       }
@@ -221,6 +266,25 @@ describe('openingPlanPaths: janelas', () => {
       }
     }
   });
+
+  it('basculante: linha inclinada em torno do centro, sem arco, mais as três linhas do caixilho', () => {
+    const c = cena('ot_j60', { plan: 'tilt' });
+    const angle = (30 * Math.PI) / 180;
+    const paths = openingPlanPaths(modelo(c), opts({ angle }));
+    expect(paths.some((p) => p.role === 'swing')).toBe(false);
+    expect(paths.filter((p) => !p.closed && (p.role === 'jamb' || p.role === 'glass'))).toHaveLength(3);
+    const linha = paths.find((p) => p.role === 'leaf' && !p.closed)!;
+    expect(linha).toBeDefined();
+    const [a, b] = linha.pts;
+    const centro = { t: (a!.t + b!.t) / 2, s: (a!.s + b!.s) / 2 };
+    expect(centro.t).toBeCloseTo(0, 9);
+    const inclinacao = Math.atan2(Math.abs(b!.s - a!.s), Math.abs(b!.t - a!.t));
+    expect(inclinacao).toBeCloseTo(angle, 9);
+    for (const detail of ['mid', 'high'] as const) {
+      const p = openingPlanPaths(modelo(c), opts({ detail, angle }));
+      expect(p.some((x) => x.role === 'swing'), detail).toBe(false);
+    }
+  });
 });
 
 describe('openingPlanPaths: portas novas (spec E §3.5)', () => {
@@ -237,7 +301,7 @@ describe('openingPlanPaths: portas novas (spec E §3.5)', () => {
       expect(folhasAbertas).toHaveLength(2);
       expect(Math.sign(boxOf(folhasAbertas[0]!).s0 - boxOf(folhasAbertas[1]!).s0)).not.toBe(0);
       const alto = openingPlanPaths(modelo(cena('ot_pvv90', {}, flips)), opts({ detail: 'high' }));
-      expect(folhas(alto).length).toBeGreaterThanOrEqual(3);
+      expect(folhas(alto)).toHaveLength(2);
     }
   });
 

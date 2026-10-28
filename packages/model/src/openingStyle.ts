@@ -18,6 +18,8 @@ const LEAF_SIDES = ['swing', 'opposite'] as const;
 
 /** Ângulos de abertura do tipo (graus): limitados a 0..120. */
 export const OPENING_ANGLE_LIMITS = { min: 0, max: 120 } as const;
+/** Fração da altura útil do eixo da basculante: limitada a 0,2..0,8 (padrão 0,5, eixo central). */
+export const OPENING_TILT_AXIS_LIMITS = { min: 0.2, max: 0.8 } as const;
 /** Divisões do caixilho (colunas × linhas): limitadas a 1..8. */
 export const OPENING_GRID_LIMITS = { min: 1, max: 8 } as const;
 
@@ -55,6 +57,35 @@ export function openingFrameStyle(t: Pick<OpeningType, 'frameStyle'>): OpeningFr
   return oneOf(t.frameStyle, FRAME_STYLES, 'rebate');
 }
 
+/** Profundidade do batente e deslocamento do seu centro em relação ao plano médio da parede (m). */
+export interface OpeningFrameDepth {
+  depth: number;
+  centerOffset: number;
+}
+
+/**
+ * Profundidade do batente ligada à parede (decisão 0035 §1): `wall` acompanha a espessura total acabada (faceado com
+ * os acabamentos), `core` fica só no núcleo estrutural e `fixed` usa o `frameDepth` do tipo limitado à parede. O
+ * deslocamento do centro é relativo ao plano médio da parede; o núcleo é considerado centrado (padrão simétrico da
+ * `wt_alv14`), que é a informação que esta leitura recebe. A posição real do núcleo é ajustada no modelo, que conhece
+ * a parede inteira.
+ */
+export function openingFrameDepth(
+  t: Pick<OpeningType, 'frameDepthMode' | 'frameDepth'>,
+  wallThickness: number,
+  coreThickness: number,
+): OpeningFrameDepth {
+  const wall = Math.max(0, Number.isFinite(wallThickness) ? wallThickness : 0);
+  const core = Math.max(0, Number.isFinite(coreThickness) ? Math.min(coreThickness, wall) : wall);
+  const mode = oneOf(t.frameDepthMode, ['wall', 'core', 'fixed'] as const, 'wall');
+  if (mode === 'core') return { depth: core, centerOffset: 0 };
+  if (mode === 'fixed') {
+    const pedido = typeof t.frameDepth === 'number' && Number.isFinite(t.frameDepth) && t.frameDepth > 0 ? t.frameDepth : 0.09;
+    return { depth: Math.min(pedido, wall), centerOffset: 0 };
+  }
+  return { depth: wall, centerOffset: 0 };
+}
+
 /** Divisões do caixilho/vidro (colunas × linhas de vidro), 1..8; padrão 1 × 1. */
 export function openingGrid(t: Pick<OpeningType, 'grid'>): { cols: number; rows: number } {
   return { cols: gridAxis(t.grid?.cols), rows: gridAxis(t.grid?.rows) };
@@ -67,11 +98,14 @@ export interface OpeningTransom {
   fixed: boolean;
 }
 
-/** Bandeira superior do tipo, ou null quando ausente/inválida. A altura é limitada à do tipo. */
+/**
+ * Bandeira superior do tipo, ou null quando ausente/inválida. A altura é limitada a 40% da altura do vão (spec E3 §7),
+ * para a bandeira não engolir a folha.
+ */
 export function openingTransom(t: Pick<OpeningType, 'height' | 'transom'>): OpeningTransom | null {
   const x = t.transom;
   if (!x || typeof x.height !== 'number' || !Number.isFinite(x.height) || x.height <= 0) return null;
-  return { height: Math.min(t.height, x.height), fixed: x.fixed !== false };
+  return { height: Math.min(t.height * 0.4, x.height), fixed: x.fixed !== false };
 }
 
 export interface OpeningSidelights {
@@ -131,10 +165,19 @@ function angle3dPadrao(plan: OpeningType['plan']): number {
   }
 }
 
-/** Ângulo de abertura no 3D (graus): padrão por família, limitado a 0..120 (70 na veneziana). */
+/** Ângulo de abertura no 3D (graus): padrão por família, limitado a 0..120 (70 na veneziana, 60 na basculante). */
 export function openingAngle3d(t: Pick<OpeningType, 'kind' | 'plan' | 'angle3d'>): number {
   const graus = angleOr(t.angle3d, angle3dPadrao(t.plan));
-  return t.plan === 'louver' ? Math.min(70, graus) : graus;
+  if (t.plan === 'louver') return Math.min(70, graus);
+  if (t.plan === 'tilt') return Math.min(60, graus);
+  return graus;
+}
+
+/** Eixo horizontal da basculante como fração da altura útil (0,2 a 0,8; padrão 0,5, eixo central). */
+export function openingTiltAxis(t: Pick<OpeningType, 'tiltAxis'>): number {
+  const v = t.tiltAxis;
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 0.5;
+  return Math.min(OPENING_TILT_AXIS_LIMITS.max, Math.max(OPENING_TILT_AXIS_LIMITS.min, v));
 }
 
 /** Exibição em planta: 'symbolic' (padrão) ou 'projected'. */

@@ -15,11 +15,13 @@ const cutArea = (opening: Partial<Opening> | null, typeId: string): number => {
 };
 
 describe('vão livre no motor', () => {
-  it('recorta as camadas como uma porta de mesma medida', () => {
+  it('recorta as camadas e mantém o retorno da parede, ao contrário da porta com batente', () => {
     const semVao = cutArea(null, 'ot_p90');
     const vaoLivre = cutArea({}, 'ot_vao90');
     const porta = cutArea({}, 'ot_p90');
     expect(vaoLivre).toBeLessThan(semVao);
-    expect(vaoLivre).toBeCloseTo(porta, 9);
+    expect(porta).toBeLessThan(semVao);
+    // O vão livre (leaves = 0) herda o fechamento da parede; a porta com batente encosta o acabamento (sem retorno).
+    expect(vaoLivre).toBeGreaterThan(porta);
   });
 });

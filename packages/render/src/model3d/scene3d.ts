@@ -5,8 +5,9 @@ import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
 import { OrbitCamera } from './orbit.ts';
 import { firstSurfaceDistance } from './pick3d.ts';
-import { caixasDaAbertura, montarAbertura } from './aberturas3d.ts';
-import { arestasDosLotes, geometriaDoLote, juntarLotes } from './lotesMalha3d.ts';
+import { caixasEPrismasDaAbertura, montarAbertura } from './aberturas3d.ts';
+import { arestasDaSilhuetaDeCaixas } from './silhuetaCaixas3d.ts';
+import { arestasDosLotes, geometriaDoLote, juntarLotes, loteDeGeometria } from './lotesMalha3d.ts';
 import { SombraSobDemanda } from './sombras3d.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
@@ -344,13 +345,29 @@ export class ModelScene {
         const rw = lv.walls[w.id];
         const linhas = isLineStyle(view.style);
         if (caixas) {
-          // Esquadria em caixas instanciadas: todas as peças, fixas ou articuladas, são caixas do material delas.
-          for (const c of caixasDaAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view) ?? []) caixas.adicionar(o.kind, c.materialId, o.id, c.matriz, linhas);
+          // Esquadria em caixas instanciadas: as peças em caixa viram instâncias; as peças com seção (batente em L)
+          // viram prismas nos lotes de geometria. As arestas do alizar saem da silhueta do grupo, sem as juntas internas.
+          const a = caixasEPrismasDaAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view);
+          if (!a) continue;
+          const grupos = new Map<string, number[]>();
+          for (const c of a.caixas) {
+            caixas.adicionar(o.kind, c.materialId, o.id, c.matriz, linhas && !c.group);
+            if (linhas && c.group) {
+              const arr = grupos.get(c.group) ?? [];
+              for (let i = 0; i < 16; i++) arr.push(c.matriz[i]!);
+              grupos.set(c.group, arr);
+            }
+          }
+          for (const pr of a.prismas) {
+            lotes.push(loteDeGeometria(pr.geometry, pr.materialId, o.kind, o.id));
+            this.mats.face(p.materials[pr.materialId], o.kind);
+          }
+          for (const matrizes of grupos.values()) caixas.adicionarArestas(arestasDaSilhuetaDeCaixas(matrizes));
           continue;
         }
         const m = montarAbertura(p, o, f, rw?.baseZ ?? wallBaseElevation(p, w), rw?.height ?? wallHeight(p, w), view, linhas, (parent, geo, mat, cat, edges, ranges) => this.draw(parent, geo, mat, cat, edges, ranges));
         if (!m) continue;
-        this.desenharLotes(m.grupo, m.lotes, linhas, materialOf);
+        this.desenharLotes(m.grupo, m.lotes, linhas, materialOf, m.arestasGrupos);
         m.grupo.traverse((c) => {
           c.userData.elementId = o.id;
         });
@@ -401,10 +418,16 @@ export class ModelScene {
    * elemento deslocadas (picking e realce continuam por triângulo). As arestas de todos os lotes saem numa linha só, com o
    * mesmo ângulo de antes, e só quando `edges`.
    */
-  private desenharLotes(parent: THREE.Object3D, lotes: SolidBatch[], edges: boolean, materialOf: (id: Id) => Material | undefined): void {
+  private desenharLotes(parent: THREE.Object3D, lotes: SolidBatch[], edges: boolean, materialOf: (id: Id) => Material | undefined, arestasGrupos: readonly number[] = []): void {
     for (const b of juntarLotes(lotes)) this.draw(parent, geometriaDoLote(b), materialOf(b.materialId), b.category, false, b.ids);
-    const arestas = edges ? arestasDosLotes(lotes, EDGE_ANGLE) : null;
+    // Peças de um grupo físico desenham uma silhueta só: as arestas internas do grupo não entram na linha.
+    const arestas = edges ? arestasDosLotes(lotes.filter((b) => !b.group), EDGE_ANGLE) : null;
     if (arestas) parent.add(new THREE.LineSegments(arestas, this.mats.edge()));
+    if (edges && arestasGrupos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(arestasGrupos, 3));
+      parent.add(new THREE.LineSegments(g, this.mats.edge()));
+    }
   }
 
   bounds(): THREE.Box3 {

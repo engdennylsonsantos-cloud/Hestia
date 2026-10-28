@@ -10,7 +10,7 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 |---|---|---|---|
 | F1 | Especificação e contrato | Sonnet | concluída |
 | F3 | Modelo, migração v19→v20, layout, presets | Sonnet | concluída e mesclada |
-| F2 | Testes de aceite do motor (spec §8) | Haiku | pendente |
+| F2 | Testes de aceite do motor (spec §8) | Haiku | concluída e mesclada (71 testes vermelhos de propósito até a F4) |
 | F4 | Motor: quadro, membros, células, vidro, alizar | Sonnet | pendente |
 | F5a | Planta, corte e elevação | Haiku | pendente |
 | F5b | 3D | Haiku | pendente |
@@ -23,3 +23,5 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 ## Notas de decisão durante a implementação
 - Travessa-base sob vidro lateral até o piso (pergunta 2, aprovada): o modelo (F3) só cria o membro com `frame.sill` explícito, para os exemplos 1 a 4 da spec baterem em números. A F7 (catálogo) liga `frame.sill` nas composições com vidro lateral até o piso.
 - A ponte do esquema vive em `withBridgedComposition` (`openingCompositionOf.ts`).
+
+- Ao mesclar a F2 o branch fica com `openingComposition.accept.test.ts` vermelho até a F4 entrar. Ids de célula dos testes: folha, band, lat-e, lat-d, fixa, abrir, painel. O item 7 do aceite ignora peças `stop` (a F4 não deve duplicar a cobertura com peça `stop` separada).

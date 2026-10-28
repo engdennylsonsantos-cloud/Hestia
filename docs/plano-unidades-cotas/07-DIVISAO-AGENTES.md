@@ -1,10 +1,12 @@
 # Divisão do trabalho em 3 agentes
 
+> **Modo de execução:** um único agente **orquestrador** lê `08-ORQUESTRADOR.md`, cria os 3 subagentes abaixo (com os prompts de `prompts/`) e os coordena. Os papéis, marcos e regras abaixo valem para os subagentes.
+
 | Papel | Quem | Modelo | Resumo |
 |---|---|---|---|
 | **UNID** | agente 1 (PC do dono) | DeepSeek v4.1 flash | Unidades do projeto: Fases A, B e o grosso da C |
 | **ESQ** | agente 2 (PC do dono) | DeepSeek v4.1 flash | Correções de portas e janelas (D), migração de `tools`/`render`/`io` (C4, C6) e provedores de cota (D10) |
-| **COTAS** | agente 3 | Sonnet (esforço médio) | Núcleo do sistema de cotas (D0–D9, D11) e validação final (F) |
+| **COTAS** | agente 3 | modelo mais capaz disponível (Sonnet, esforço médio) | Núcleo do sistema de cotas (D0–D9, D11) e validação final (F) |
 
 Cada agente trabalha em **pasta e branch locais próprias** e integra tudo na branch única `claude/fervent-newton-rfgz3y` (seção 5).
 
@@ -52,5 +54,5 @@ git merge origin/claude/fervent-newton-rfgz3y
 3. **Nunca** `--force`, nunca outra branch remota, nunca PR.
 4. Ao fim de cada fase sua: `npm run check` completo antes do push.
 
-## 6. Prompts de cada agente
-Os prompts prontos estão na conversa com o dono; resumo: UNID e ESQ → preparar pasta (LEIA-ME seção 1), ler `00`, `07` e o `PROGRESSO-<PAPEL>.md`, executar os passos do papel respeitando marcos e propriedade; COTAS idem, e ao final executa a Fase F.
+## 6. Prompts
+Em `prompts/comum.md` (todos) e `prompts/unid.md`, `prompts/esq.md`, `prompts/cotas.md` (por papel). Quem lança os subagentes é o orquestrador (`08-ORQUESTRADOR.md`).

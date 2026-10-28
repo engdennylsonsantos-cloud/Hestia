@@ -5,12 +5,13 @@ import { ringPerimeter } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { LevelField } from './LevelField.tsx';
 import { OutlineGroup } from './OutlineGroup.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { floorOptions } from './typeOptions.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 
 /** Valor comum a todos os selecionados, ou `mixed` quando divergem. */
 function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean } {
@@ -30,6 +31,7 @@ function resolvedAreas(p: Project, floors: Floor[]): Map<Id, number> {
 
 /** Propriedades de um ou mais pisos selecionados (tipo, deslocamento, marca, área e perímetro). */
 export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
+  const fmt = useFormat();
   const p = useProject();
   const ids = floors.map((f) => f.id);
   const typeId = common(floors, (f) => f.typeId);
@@ -58,18 +60,18 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Desloc. do topo" htmlFor="p-foff">
-          <NumField id="p-foff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
+          <NumField id="p-foff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} quantity="length" />
         </Row>
       </Group>
       <OutlineGroup elements={floors} />
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(floorTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt('smallLength', floorTypeThickness(type))}</span></Row>
             {type.layers.map((l, i) => (
               <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
-                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
+                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt('smallLength', l.thickness)}</span>
               </div>
             ))}
           </>
@@ -80,14 +82,14 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
       <Group title="Dimensões">
         {single ? (
           <>
-            <Row label="Área líquida"><span className="val">{fmt(areaOf(single))} m²</span></Row>
-            <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(single.boundary))} m</span></Row>
+            <Row label="Área líquida"><span className="val">{fmt('area', areaOf(single))}</span></Row>
+            <Row label="Perímetro"><span className="val">{fmt('length', ringPerimeter(single.boundary))}</span></Row>
             <Row label="Furos"><span className="val">{single.holes.length}</span></Row>
           </>
         ) : (
           <>
-            <Row label="Área líquida total"><span className="val">{fmt(area)} m²</span></Row>
-            <Row label="Perímetro total"><span className="val">{fmt(perimeter)} m</span></Row>
+            <Row label="Área líquida total"><span className="val">{fmt('area', area)}</span></Row>
+            <Row label="Perímetro total"><span className="val">{fmt('length', perimeter)}</span></Row>
           </>
         )}
       </Group>
@@ -98,3 +100,4 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
     </>
   );
 }
+

@@ -3,8 +3,9 @@ import { resolveRooms, type ResolvedRoom } from '@hestia/engine';
 import { roomCeilingHeight, type Id, type Project, type Room } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 const ROOM_DEFAULT_COLOR = '#b8c4d4';
 
 /** Valor comum a todos os selecionados, ou `mixed` quando divergem. */
@@ -27,6 +28,7 @@ export function roomWarning(r: ResolvedRoom): string | null {
 
 /** Propriedades de um ou mais ambientes: nome, número, ponto interior (leitura), deslocamento, pé-direito, acabamentos e cor, com área, perímetro e volume. */
 export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
+  const fmt = useFormat();
   const p: Project = useProject();
   const ids = rooms.map((r) => r.id);
   const name = common(rooms, (r) => r.name);
@@ -53,23 +55,23 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
         <Row label="Nome" htmlFor="p-rname"><TextField id="p-rname" value={name.value} mixed={name.mixed} onCommit={(v) => patch(ids, { name: v })} /></Row>
         <Row label="Número" htmlFor="p-rnum"><TextField id="p-rnum" value={number.value} mixed={number.mixed} onCommit={(v) => patch(ids, { number: v })} /></Row>
         {single && (
-          <Row label="Ponto interior (m)">
+          <Row label="Ponto interior">
             <span className="val" title="Ponto usado para achar o circuito de paredes (somente leitura)">
-              {fmt(single.point.x)}; {fmt(single.point.y)}
+              {fmt('length', single.point.x)}; {fmt('length', single.point.y)}
             </span>
           </Row>
         )}
       </Group>
       <Group title="Dimensões">
         <Row label="Desloc. da base" htmlFor="p-roff">
-          <NumField id="p-roff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
+          <NumField id="p-roff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} quantity="length" />
         </Row>
         <Row label="Pé-direito" htmlFor="p-rceil">
-          <NumField id="p-rceil" value={ceiling.value} mixed={ceiling.mixed} min={0.1} onCommit={(v) => patch(ids, { ceilingHeight: v })} unit="m" />
+          <NumField id="p-rceil" value={ceiling.value} mixed={ceiling.mixed} min={0.1} onCommit={(v) => patch(ids, { ceilingHeight: v })} quantity="length" />
         </Row>
-        <Row label={rooms.length > 1 ? 'Área total' : 'Área líquida'}><span className="val">{fmt(sum((r) => r.area))} m²</span></Row>
-        <Row label={rooms.length > 1 ? 'Perímetro total' : 'Perímetro'}><span className="val">{fmt(sum((r) => r.perimeter))} m</span></Row>
-        <Row label={rooms.length > 1 ? 'Volume total' : 'Volume'}><span className="val">{fmt(sum((r) => r.volume), 3)} m³</span></Row>
+        <Row label={rooms.length > 1 ? 'Área total' : 'Área líquida'}><span className="val">{fmt('area', sum((r) => r.area))}</span></Row>
+        <Row label={rooms.length > 1 ? 'Perímetro total' : 'Perímetro'}><span className="val">{fmt('length', sum((r) => r.perimeter))}</span></Row>
+        <Row label={rooms.length > 1 ? 'Volume total' : 'Volume'}><span className="val">{fmt('volume', sum((r) => r.volume))}</span></Row>
       </Group>
       <Group title="Acabamentos">
         <Row label="Piso" htmlFor="p-rfloor"><TextField id="p-rfloor" value={floorFin.value} mixed={floorFin.mixed} onCommit={(v) => patch(ids, { floorFinish: v })} /></Row>
@@ -87,3 +89,4 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
     </>
   );
 }
+

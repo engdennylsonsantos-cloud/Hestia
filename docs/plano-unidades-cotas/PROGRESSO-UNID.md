@@ -14,7 +14,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - **MARCO M2 LIBERADO 680bd5aa** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
 - [x] B1–B4 diálogo Unidades (`02`)  → **marco M3**
 - **MARCO M3 LIBERADO 6ad01c82** (`DialogKind` units, `UnitsDialog`/`unitsDialogModel` e botão em Padrões do projeto)
-- [ ] C1 painel de propriedades
+- [x] C1 painel de propriedades
 - [ ] C2 diálogos
 - [ ] C3 barras e chrome
 - [ ] C5 model e engine (`Dimension.unit 'project'`)

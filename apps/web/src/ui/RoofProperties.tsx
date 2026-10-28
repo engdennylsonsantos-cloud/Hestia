@@ -7,6 +7,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { applyRoofPatch } from '../editor/roofEdgeActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { LevelField } from './LevelField.tsx';
 import { RoofMansardSection } from './RoofMansardProps.tsx';
 import { RoofPlanesSection } from './RoofPlanesProps.tsx';
@@ -14,7 +15,7 @@ import { RoofProfileRow } from './RoofProfileRow.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { roofOptions } from './typeOptions.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 
 /** Valor comum a todos os selecionados, ou `mixed` quando divergem. */
 function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean } {
@@ -47,6 +48,7 @@ const SHAPE_OPTIONS: RoofShape[] = ['shed', 'gable', 'hip', 'edges', 'free', 'ex
  * editam em "Editar perímetro"; o contorno, pelas alças na planta.
  */
 export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
+  const fmt = useFormat();
   const p = useProject();
   const ids = roofs.map((r) => r.id);
   const single = roofs.length === 1 ? roofs[0]! : null;
@@ -123,7 +125,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Cota do beiral" htmlFor="p-roff">
-          <NumField id="p-roff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
+          <NumField id="p-roff" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} quantity="length" />
         </Row>
       </Group>
       <Group title="Forma">
@@ -137,15 +139,15 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
           </select>
         </Row>
         <Row label="Inclinação" htmlFor="p-rslope">
-          <NumField id="p-rslope" value={slope.value} mixed={slope.mixed} onCommit={setSlope} unit="%" min={0.1} max={200} />
+          <NumField id="p-rslope" value={slope.value / 100} mixed={slope.mixed} onCommit={(v) => setSlope(v * 100)} quantity="slope" min={0.001} max={2} />
         </Row>
-        <Row label="Inclinação (°)" htmlFor="p-rdeg">
-          <NumField id="p-rdeg" value={percentToDeg(slope.value)} mixed={slope.mixed} decimals={1} unit="°" min={0.1} max={63.4} onCommit={(v) => setSlope(roofSlopeFromDegField(v, percentToDeg(slope.value), slope.value))} />
+        <Row label="Inclinação" htmlFor="p-rdeg">
+          <NumField id="p-rdeg" value={(percentToDeg(slope.value) * Math.PI) / 180} mixed={slope.mixed} quantity="angle" min={(0.1 * Math.PI) / 180} max={(63.4 * Math.PI) / 180} onCommit={(v) => setSlope(roofSlopeFromDegField((v * 180) / Math.PI, percentToDeg(slope.value), slope.value))} />
         </Row>
         {hasRidge && single ? (
           <>
-            <Row label={single.shape === 'shed' ? 'Subida (°)' : 'Cumeeira (°)'} htmlFor="p-rdir">
-              <NumField id="p-rdir" value={axisDeg(single)} decimals={1} unit="°" onCommit={(v) => patch(ids, { dir: { x: Math.cos((v * Math.PI) / 180), y: Math.sin((v * Math.PI) / 180) } })} />
+            <Row label={single.shape === 'shed' ? 'Subida' : 'Cumeeira'} htmlFor="p-rdir">
+              <NumField id="p-rdir" value={(axisDeg(single) * Math.PI) / 180} quantity="angle" onCommit={(v) => patch(ids, { dir: { x: Math.cos(v), y: Math.sin(v) } })} />
             </Row>
             <div className="row">
               <button className="btn small" onClick={() => patch(ids, { dir: rotatedDir(single, 90) })}>Rotacionar 90°</button>
@@ -182,7 +184,7 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
           <Check id="p-rfascia" checked={fascia.value} mixed={fascia.mixed} onChange={(v) => setEave({ fascia: v })}>Testeira</Check>
         </Row>
         <Row label="Altura da testeira" htmlFor="p-rfh">
-          <NumField id="p-rfh" value={fasciaHeight.value} mixed={fasciaHeight.mixed} scale={100} decimals={0} unit="cm" min={0} onCommit={(v) => setEave({ fasciaHeight: v })} />
+          <NumField id="p-rfh" value={fasciaHeight.value} mixed={fasciaHeight.mixed} quantity="length" min={0} onCommit={(v) => setEave({ fasciaHeight: v })} />
         </Row>
         <Row label="Calha" htmlFor="p-rgutter">
           <Check id="p-rgutter" checked={gutter.value} mixed={gutter.mixed} onChange={(v) => setEave({ gutter: v })}>Calha</Check>
@@ -194,11 +196,11 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(roofTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt('smallLength', roofTypeThickness(type))}</span></Row>
             {type.layers.map((l, i) => (
               <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
-                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
+                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt('smallLength', l.thickness)}</span>
               </div>
             ))}
           </>
@@ -207,13 +209,13 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
         )}
       </Group>
       <Group title="Quantitativos" open={false}>
-        <Row label="Área em planta"><span className="val">{fmt(planArea)} m²</span></Row>
-        <Row label="Área real"><span className="val">{resolved ? `${fmt(realArea)} m²` : '—'}</span></Row>
+        <Row label="Área em planta"><span className="val">{fmt('area', planArea)}</span></Row>
+        <Row label="Área real"><span className="val">{resolved ? fmt('area', realArea) : '—'}</span></Row>
         <Row label="Águas"><span className="val">{planes || '—'}</span></Row>
-        <Row label="Beiral"><span className="val">{fmt(eaveLength)} m</span></Row>
-        <Row label="Cumeeira"><span className="val">{fmt(ridgeLength)} m</span></Row>
-        <Row label="Espigão"><span className="val">{fmt(hipLength)} m</span></Row>
-        <Row label="Rincão"><span className="val">{fmt(valleyLength)} m</span></Row>
+        <Row label="Beiral"><span className="val">{fmt('length', eaveLength)}</span></Row>
+        <Row label="Cumeeira"><span className="val">{fmt('length', ridgeLength)}</span></Row>
+        <Row label="Espigão"><span className="val">{fmt('length', hipLength)}</span></Row>
+        <Row label="Rincão"><span className="val">{fmt('length', valleyLength)}</span></Row>
       </Group>
       <Group title="Dados de identidade" open={false}>
         <Row label="Marca" htmlFor="p-rmark"><TextField id="p-rmark" value={mark.value} mixed={mark.mixed} onCommit={(v) => patch(ids, { mark: v })} /></Row>
@@ -222,3 +224,4 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
     </>
   );
 }
+

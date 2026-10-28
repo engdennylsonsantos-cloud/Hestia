@@ -29,6 +29,7 @@ import { editViewRange, restoreViewRangeDefault } from '../editor/viewRangeActio
 import { setGridStep, setRoofProjection, setSnap, useUi } from '../editor/state.ts';
 import { avisoSemNivelAcima, proximoNivelAcima, setBaseNoPiso, setTopoNoPiso } from '../editor/wallFloorActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
 import { SectionViewProps, selectedView } from './SectionViewProps.tsx';
 import { LevelGraphicsGroup, SectionGraphicsGroup, View3DGroup } from './GraphicsProps.tsx';
@@ -56,7 +57,7 @@ import { usePerimeter } from '../editor/perimeter.ts';
 import { PerimeterEdgePanel } from './perimeter/PerimeterEdgePanel.tsx';
 import { PERIMETER_TITLE } from './perimeter/PerimeterStatus.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 
 function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean } {
   const first = get(items[0]!);
@@ -105,7 +106,7 @@ function JoinRows({ wall }: { wall: Wall }): ReactElement {
 }
 
 function WallProps({ walls }: { walls: Wall[] }): ReactElement {
-  const p = useProject();
+  const fmt = useFormat(); const p = useProject();
   const ids = walls.map((w) => w.id);
   const typeId = common(walls, (w) => w.typeId);
   const base = common(walls, (w) => w.baseOffset);
@@ -147,7 +148,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
       />
       <Group title="Restrições">
         <LevelField ids={ids} label="Nível base" />
-        <Row label="Desloc. da base" htmlFor="p-base"><NumField id="p-base" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} unit="m" /></Row>
+        <Row label="Desloc. da base" htmlFor="p-base"><NumField id="p-base" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} quantity="length" /></Row>
         <Row label="Nível superior" htmlFor="p-top">
           <select id="p-top" className="select" value={top.mixed ? '' : top.value} onChange={(e) => patch(ids, { topLevelId: e.target.value || null })}>
             {top.mixed && <option value="">variados</option>}
@@ -156,9 +157,9 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
           </select>
         </Row>
         {!top.mixed && top.value === '' ? (
-          <Row label="Altura" htmlFor="p-height"><NumField id="p-height" value={height.value} mixed={height.mixed} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} unit="m" /></Row>
+          <Row label="Altura" htmlFor="p-height"><NumField id="p-height" value={height.value} mixed={height.mixed} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} quantity="length" /></Row>
         ) : (
-          <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
+          <Row label="Desloc. do topo" htmlFor="p-topoff"><NumField id="p-topoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} quantity="length" /></Row>
         )}
         <Row label="Topo no telhado"><Check id="p-attachroof" checked={attachRoof.value} mixed={attachRoof.mixed} onChange={(v) => patch(ids, { attachTopToRoof: v })} /></Row>
         <Row label="Base no piso"><button id="p-base-piso" className="btn small" onClick={() => setBaseNoPiso(editor.store, ids, !baseLigada)}>{baseLigada ? 'Desanexar' : 'Anexar'}</button></Row>
@@ -178,7 +179,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
             {(Object.keys(LOCATION_LABEL) as LocationLine[]).map((k) => <option key={k} value={k}>{LOCATION_LABEL[k]}</option>)}
           </select>
         </Row>
-        <Row label="Flecha do arco" htmlFor="p-sag"><NumField id="p-sag" value={sag.value} mixed={sag.mixed} onCommit={(v) => patch(ids, { sag: v })} unit="m" /></Row>
+        <Row label="Flecha do arco" htmlFor="p-sag"><NumField id="p-sag" value={sag.value} mixed={sag.mixed} onCommit={(v) => patch(ids, { sag: v })} quantity="length" /></Row>
         <Row label="Inverter lado externo"><Check id="p-flip" checked={flipped.value} mixed={flipped.mixed} onChange={(v) => patch(ids, { flipped: v })} /></Row>
         <Row label="Não unir no início"><Check id="p-nos" checked={noS.value} mixed={noS.mixed} onChange={(v) => patch(ids, { noJoinStart: v })} /></Row>
         <Row label="Não unir no fim"><Check id="p-noe" checked={noE.value} mixed={noE.mixed} onChange={(v) => patch(ids, { noJoinEnd: v })} /></Row>
@@ -186,11 +187,11 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
       <Group title="Construção" open={false}>
         {t ? (
           <>
-            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(totalThickness(t) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt('smallLength', totalThickness(t))}</span></Row>
             {t.layers.map((l, i) => (
               <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
-                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
+                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt('smallLength', l.thickness)}</span>
               </div>
             ))}
           </>
@@ -201,13 +202,13 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
       <Group title="Dimensões" open={!!single}>
         {single ? (
           <>
-            <Row label="Comprimento"><span className="val">{fmt(wallLength(single), 3)} m</span></Row>
-            {wallArc(single) && <Row label="Raio do eixo"><span className="val">{fmt(wallArc(single)!.radius, 3)} m</span></Row>}
-            <Row label="Área líquida"><span className="val">{fmt(q?.netFaceArea ?? 0)} m²</span></Row>
-            <Row label="Volume"><span className="val">{fmt(q?.volume ?? 0, 3)} m³</span></Row>
+            <Row label="Comprimento"><span className="val">{fmt('length', wallLength(single))}</span></Row>
+            {wallArc(single) && <Row label="Raio do eixo"><span className="val">{fmt('length', wallArc(single)!.radius)}</span></Row>}
+            <Row label="Área líquida"><span className="val">{fmt('area', q?.netFaceArea ?? 0)}</span></Row>
+            <Row label="Volume"><span className="val">{fmt('volume', q?.volume ?? 0)}</span></Row>
           </>
         ) : (
-          <Row label="Comprimento total"><span className="val">{fmt(walls.reduce((s, w) => s + wallLength(w), 0), 2)} m</span></Row>
+          <Row label="Comprimento total"><span className="val">{fmt('length', walls.reduce((s, w) => s + wallLength(w), 0))}</span></Row>
         )}
       </Group>
       {single && (
@@ -224,7 +225,7 @@ function WallProps({ walls }: { walls: Wall[] }): ReactElement {
 }
 
 function OpeningProps({ items }: { items: Opening[] }): ReactElement {
-  const p = useProject();
+  const fmt = useFormat(); const p = useProject();
   const ids = items.map((o) => o.id);
   const kinds = new Set(items.map((o) => o.kind));
   const kind = kinds.size === 1 ? items[0]!.kind : null;
@@ -252,9 +253,9 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
       <Group title="Restrições">
         {single && (
           <>
-            <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} unit="m" /></Row>
+            <Row label="Distância ao início" htmlFor="p-off"><NumField id="p-off" value={single.offset} onCommit={(v) => patch(ids, { offset: v })} quantity="length" /></Row>
             <Row label="Peitoril" htmlFor="p-sill">
-              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} unit="m" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros, como 0,90.' })} onValid={() => { if (useUi.getState().status.startsWith('Peitoril inválido')) useUi.setState({ status: 'Pronto.' }); }} />
+              <NumField id="p-sill" value={type ? openingSill(type, single) : 0} onCommit={(v) => patch(ids, { sillOverride: v })} quantity="length" min={0} onInvalid={() => useUi.setState({ status: 'Peitoril inválido: digite um número em metros, como 0,90.' })} onValid={() => { if (useUi.getState().status.startsWith('Peitoril inválido')) useUi.setState({ status: 'Pronto.' }); }} />
             </Row>
             {single.sillOverride !== null && (
               <div className="prow"><span /><button className="chiplink" onClick={() => patch(ids, { sillOverride: null })}>Usar peitoril do tipo</button></div>
@@ -267,8 +268,8 @@ function OpeningProps({ items }: { items: Opening[] }): ReactElement {
       <Group title="Dimensões" open={!!single}>
         {type && (
           <>
-            <Row label="Largura" readOnly fromType><span className="val">{fmt(type.width * 100, 0)} cm</span></Row>
-            <Row label="Altura" readOnly fromType><span className="val">{fmt(type.height * 100, 0)} cm</span></Row>
+            <Row label="Largura" readOnly fromType><span className="val">{fmt('length', type.width)}</span></Row>
+            <Row label="Altura" readOnly fromType><span className="val">{fmt('length', type.height)}</span></Row>
             <Row label="Anfitriã" readOnly><span className="val soft">{host && isWall(host) ? p.wallTypes[host.typeId]?.name ?? '' : ''}</span></Row>
           </>
         )}
@@ -293,10 +294,10 @@ function ViewRangeGroup({ levelId }: { levelId: Id }): ReactElement {
   const edit = (patch: Partial<ViewRange>): void => setError(editViewRange(editor.store, levelId, patch).error);
   return (
     <Group title="Intervalo de vista">
-      <Row label="Topo" htmlFor="vr-top"><NumField id="vr-top" value={range.top} unit="m" onCommit={(v) => edit({ top: v })} /></Row>
-      <Row label="Plano de corte" htmlFor="vr-cut"><NumField id="vr-cut" value={range.cut} unit="m" onCommit={(v) => edit({ cut: v })} /></Row>
-      <Row label="Base" htmlFor="vr-bottom"><NumField id="vr-bottom" value={range.bottom} unit="m" onCommit={(v) => edit({ bottom: v })} /></Row>
-      <Row label="Profundidade" htmlFor="vr-depth"><NumField id="vr-depth" value={range.depth} unit="m" onCommit={(v) => edit({ depth: v })} /></Row>
+      <Row label="Topo" htmlFor="vr-top"><NumField id="vr-top" value={range.top} quantity="length" onCommit={(v) => edit({ top: v })} /></Row>
+      <Row label="Plano de corte" htmlFor="vr-cut"><NumField id="vr-cut" value={range.cut} quantity="length" onCommit={(v) => edit({ cut: v })} /></Row>
+      <Row label="Base" htmlFor="vr-bottom"><NumField id="vr-bottom" value={range.bottom} quantity="length" onCommit={(v) => edit({ bottom: v })} /></Row>
+      <Row label="Profundidade" htmlFor="vr-depth"><NumField id="vr-depth" value={range.depth} quantity="length" onCommit={(v) => edit({ depth: v })} /></Row>
       <Row label="Direção da vista" htmlFor="vr-dir">
         <select id="vr-dir" className="select" value={range.direction} onChange={(e) => edit({ direction: e.target.value as ViewRange['direction'] })}>
           <option value="down">Para baixo</option>
@@ -321,7 +322,7 @@ function ViewRangeGroup({ levelId }: { levelId: Id }): ReactElement {
 }
 
 function ViewProps(): ReactElement {
-  const p = useProject();
+  const fmt = useFormat(); const p = useProject();
   const s = useUi();
   const lvl = p.levels.find((l) => l.id === s.levelId);
   const section = s.view === 'section' ? p.views.find((v) => v.id === s.sectionId) : undefined;
@@ -340,12 +341,12 @@ function ViewProps(): ReactElement {
             {p.levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </Row>
-        <Row label="Elevação"><span className="val">{fmt(lvl?.elevation ?? 0)} m</span></Row>
+        <Row label="Elevação"><span className="val">{fmt('length', lvl?.elevation ?? 0)}</span></Row>
         <Row label="Grade"><Check id="v-grid" checked={s.showGrid} onChange={(v) => setSnap({ grid: v })} /></Row>
         <Row label="Intervalo da grade" htmlFor="v-grid-step">
           <select id="v-grid-step" className="select" value={String(s.gridStep)} onChange={(e) => setGridStep(Number(e.target.value))}>
             <option value="0">Automático</option>
-            {GRID_STEPS.map((g) => <option key={g} value={String(g)}>{fmt(g)} m</option>)}
+            {GRID_STEPS.map((g) => <option key={g} value={String(g)}>{fmt('length', g)}</option>)}
           </select>
         </Row>
         <Row label="Subpavimento"><Check id="v-under" checked={s.showUnderlay} onChange={(v) => useUi.setState({ showUnderlay: v })} /></Row>
@@ -367,8 +368,8 @@ function ViewProps(): ReactElement {
       {s.view === 'section' && <SectionGraphicsGroup />}
       {s.view === 'section' && section ? <SectionViewProps view={section} /> : null}
       <Group title="Padrões do projeto" open={false}>
-        <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} scale={100} decimals={1} unit="cm" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
-        <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} unit="m" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>
+        <Row label="Tolerância de junção" htmlFor="v-jt"><NumField id="v-jt" value={p.settings.joinTolerance} quantity="smallLength" min={0.1} onCommit={(v) => editor.store.exec({ type: 'setSettings', patch: { joinTolerance: v } })} /></Row>
+        <Row label="Altura de parede" htmlFor="v-wh"><NumField id="v-wh" value={s.options.wallHeight} quantity="length" onCommit={(v) => useUi.setState({ options: { ...s.options, wallHeight: v } })} /></Row>
         <div className="prow"><span /><button className="chiplink" onClick={() => useUi.setState({ dialog: 'units' })}>Unidades…</button></div>
       </Group>
       <div className="hint">Selecione um elemento para ver e editar suas propriedades. Mudar o <em>tipo</em> altera todas as instâncias; mudar a <em>instância</em> altera só a selecionada.</div>
@@ -437,3 +438,4 @@ export function Properties(): ReactElement {
     </aside>
   );
 }
+

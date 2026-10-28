@@ -67,3 +67,5 @@ export * from './wallJunction.ts';
 export * from './autoCotas.ts';
 export * from './projectIssues.ts';
 export * from './resolveLevels.ts';
+export * from './wallPlanes.ts';
+export * from './openingExtents.ts';

@@ -1,17 +1,17 @@
 # Progresso do agente COTAS (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
-Linha de base antes de mexer (`npm run check`): _preencher_
+Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, paridade, densidade) verde com 2 avisos de hooks em OpeningTempDims/ViewportOverlays; typecheck e testes rodados por pasta a cada passo.
 
-- [ ] D0 mapa (`04`)
-- [ ] D1 configuração no modelo
-- [ ] D2 wallPlanes e openingExtents
-- [ ] D3 resolvedores
-- [ ] D4 provedor de esquadrias + registro (código novo; integrar em `openingTool.ts` só depois do marco M4)
+- [x] D0 mapa (`04`)
+- [x] D1 configuração no modelo
+- [x] D2 wallPlanes e openingExtents
+- [x] D3 resolvedores
+- [ ] D4 provedor de esquadrias + registro (código novo; integrar em `openingTool.ts` só depois do marco M4) -- PARCIAL: tipos, registro, `refs`, provedor `opening` e testes prontos; falta o passo 3 (religar `openingTool.ts`, apagar `openingDims*`, `dimensionRefs`/`temporaryDimensions`) depois de M4
 - [ ] D5 sobreposição única (só depois do marco M1)
 - [ ] D6 validação de hospedados
 - [ ] D7 alças trocam referência
 - [ ] D8 permanentes + autoCotas  → **D4–D8 integrados = marco M5**
 - [ ] D9 diálogo Cotas… + troca rápida (só depois do marco M3)
-- [ ] D11 documentação de reaproveitamento e decisão
+- [x] D11 documentação de reaproveitamento e decisão
 - [ ] F1 suíte e build (`06`; só quando UNID e ESQ terminarem)
 - [ ] F2 navegador
 - [ ] F3 revisão cruzada (revise os diffs de UNID e ESQ)
@@ -19,7 +19,11 @@ Linha de base antes de mexer (`npm run check`): _preencher_
 - [ ] F5 entrega
 
 ## Desvios
-_(nenhum)_
+- D2: `axis` = centro da espessura total (`sMid`), como o 04 manda; o `autoCotas` antigo usava `[0,0]` (linha de localização) para 'eixo': coincidem só com `wallCenter` (padrão). Ao migrar o autoCotas (D8) o 'eixo' passa a `sMid`.
+- D2: `openingExtents` usa o MODELO REAL (`buildOpeningModel`): `frame` = `model.width/2` (vão externo do conjunto), `clear` = borda interna das ombreiras externas, `casing` = maior |t| das peças `casing` da face pedida (a face de abertura da folha recua 14 mm). Recorte da parede = `roughWidth` = `t.width + roughOversize.w`; em tipos simples `frame` coincide com o recorte (testado); em tipos com composição `model.width` vem do vão nominal da composição e pode diferir de `t.width`. Padrão `openingRef` mantido em `frame`.
+
+- D3: `perpendicularNeighbors` agora devolve `frame` e `point` e testa perpendicularidade com a tangente da hospedeira no ponto de encosto (antes: tangente inicial; paredes curvas eram rejeitadas).
+- D4: chaves de override: por ponta `opening:wallLeft|openLeft|wallRight|openRight`; globais (troca rápida do D9) `opening:wall` e `opening:opening`; a específica vence. `DimProvider` ganhou `selectionSubject?` (necessário para o registro montar o sujeito do elemento selecionado). Ordem de `ends` = (a, b) com a ponta de parede em `a` nas duas cotas (a cota direita corre da parede para a esquadria, `offset` negativo).
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 

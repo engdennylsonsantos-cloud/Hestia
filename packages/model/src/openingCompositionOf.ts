@@ -122,7 +122,9 @@ export const openingCompositionOf = (t: OpeningType): OpeningComposition => t.co
  */
 export function withBridgedComposition(next: OpeningType, prev: OpeningType | undefined, profiles?: Record<string, ProfilePreset>): OpeningType {
   if (!next.composition && !prev?.composition) return next;
-  const legacy = !next.composition || next.composition.layout.kind === 'cell' || !!next.transom || !!next.sidelights;
+  // Composição editada direto (nova ou diferente da gravada) é preservada; os campos obsoletos só regeneram a composição intocada.
+  const edited = !!next.composition && (!prev?.composition || JSON.stringify(next.composition) !== JSON.stringify(prev.composition));
+  const legacy = !next.composition || (!edited && (next.composition.layout.kind === 'cell' || !!next.transom || !!next.sidelights));
   const out = legacy ? { ...next, composition: compositionOfType(next) } : next;
   const issue = compositionIssue(out.composition!, profiles);
   if (issue) throw new Error(issue);

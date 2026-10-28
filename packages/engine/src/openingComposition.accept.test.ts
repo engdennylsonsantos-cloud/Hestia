@@ -208,8 +208,8 @@ describe('Ex. 1 · porta 90 sem bandeira (vão 0,98 × 2,15)', () => {
     caixa(c.m, 'jamb-right', [0.44, 0.49], [0, 2.1]);
     caixa(c.m, 'head', [-0.49, 0.49], [2.1, 2.15]);
   });
-  it('folha t ±0,451, z [0,008; 2,111]', () => {
-    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.008, 2.111]);
+  it('folha t ±0,451, z [0,007; 2,111]', () => {
+    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.007, 2.111]);
   });
   it('alizar: 3 peças por face (6 no total), sem inferior', () => {
     esperaAlizar(c.m, [
@@ -234,7 +234,7 @@ describe('Ex. 2 · porta 90 + bandeira superior 40 (vão 0,98 × 2,60)', () => {
   });
   it('vidro fixo z [2,15; 2,55]; folha como no Ex. 1', () => {
     caixa(c.m, 'glass-band', [-0.44, 0.44], [2.15, 2.55]);
-    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.008, 2.111]);
+    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.007, 2.111]);
   });
   it('alizar topo 2,62; laterais até 2,55; nenhuma peça na travessa interna', () => {
     esperaAlizar(c.m, [
@@ -261,7 +261,7 @@ describe('Ex. 3 · porta 90 + 2 laterais de 40 (vão 1,88 × 2,15)', () => {
   it('vidros laterais de 0,40 e folha', () => {
     caixa(c.m, 'glass-lat-e', [-0.89, -0.49], [0, 2.1]);
     caixa(c.m, 'glass-lat-d', [0.49, 0.89], [0, 2.1]);
-    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.008, 2.111]);
+    caixa(c.m, 'leaf-folha', [-0.451, 0.451], [0.007, 2.111]);
   });
   it('alizar externo t ±0,96; nenhuma peça com |t| < 0,89', () => {
     esperaAlizar(c.m, [
@@ -314,9 +314,15 @@ describe('Ex. 5 · janela combinada, 2 células (vão 1,60 × 1,20)', () => {
     caixa(c.m, 'head', [-0.8, 0.8], [1.15, 1.2]);
     caixa(c.m, 'mullion-0', [-0.15, -0.1], [0.05, 1.15]);
   });
-  it('células: fixa [-0,75; -0,15], abrir [-0,10; 0,75]; folha t [-0,111; 0,761]', () => {
+  it('células: fixa [-0,75; -0,15], abrir [-0,10; 0,75]; folha t [-0,096; 0,746]', () => {
     caixa(c.m, 'glass-fixa', [-0.75, -0.15], [0.05, 1.15]);
-    caixa(c.m, 'leaf-abrir', [-0.111, 0.761], [0.05, 1.15]);
+    // A folha de janela é feita de barras e vidro (`leaf-abrir-*`) e fica DENTRO da luz com folga de 4 mm por lado (regra do motor de janelas); confere o envelope das peças.
+    const folha = c.m.parts.filter((q) => q.id.startsWith('leaf-abrir'));
+    expect(folha.length, 'peças leaf-abrir*').toBeGreaterThan(0);
+    expect(Math.min(...folha.map((q) => q.box.t0))).toBeCloseTo(-0.096, TOL);
+    expect(Math.max(...folha.map((q) => q.box.t1))).toBeCloseTo(0.746, TOL);
+    expect(Math.min(...folha.map((q) => q.box.z0))).toBeCloseTo(0.054, TOL);
+    expect(Math.max(...folha.map((q) => q.box.z1))).toBeCloseTo(1.146, TOL);
   });
   it('alizar de 4 lados por face, soleira z [-0,02; 0,05]', () => {
     esperaAlizar(c.m, [
@@ -414,7 +420,9 @@ describe('item 15 · planta com leafPlan "open": folha só para a célula de fol
     const folhas = openingPlanPaths(c.m, plano).filter((q) => q.role === 'leaf' && q.closed);
     expect(folhas).toHaveLength(1);
     const ts = folhas[0]!.pts.map((q) => q.t);
-    expect(Math.min(...ts)).toBeCloseTo(-0.451, TOL);
-    expect(Math.max(...ts)).toBeCloseTo(0.451, TOL);
+    // Folha aberta (90°): gira em torno da dobradiça, no limite da folha (|t| = 0,451); fica dentro dela e nunca na área de vidro ou painel.
+    expect(Math.max(Math.abs(Math.min(...ts)), Math.abs(Math.max(...ts)))).toBeCloseTo(0.451, TOL);
+    expect(Math.min(...ts)).toBeGreaterThanOrEqual(-0.451 - 1e-6);
+    expect(Math.max(...ts)).toBeLessThanOrEqual(0.451 + 1e-6);
   });
 });

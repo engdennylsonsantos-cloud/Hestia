@@ -8,7 +8,7 @@ A esquadria passa a ser uma **composição**: um conjunto (o vão) dividido em *
 
 Valores usados nos exemplos (perfil "Madeira batente 5×9" para o batente e "Madeira divisor 5×9" para divisores, ambos sem rebaixo de vidro): `J = 0,05` (largura visível), `D = 0,09`, `OVERLAP = 0,015`, `GAP = 0,004`, alizar 0,07 × 0,015, recuo 0. Coordenadas locais `t` (largura, 0 no centro do vão) e `z` (0 no piso/soleira do vão). Folha efetiva = luz + 2·(0,015 − 0,004) = luz + 0,022 (regra atual do motor).
 
-**Ex. 1 · Porta 90, sem bandeira.** `nominalRef 'leaf'`: folha 0,90 × 2,10, vão = 0,98 × 2,15 (folga NBR 0,08/0,05). Luz `t ∈ [−0,44; 0,44]`, `z ∈ [0; 2,10]`. Célula única (folha). Membros: ombreira esquerda `t [−0,49; −0,44]`, direita `[0,44; 0,49]`, ambas `z [0; 2,10]`; travessa superior `t [−0,49; 0,49]`, `z [2,10; 2,15]`. Folha: `t ±0,451`, `z [0,008; 2,111]`. Alizar (por face): anel interno = luz, externo `t ±0,51`, topo `z 2,17`: lateral esquerda `t [−0,51; −0,44]`, direita `[0,44; 0,51]` (`z [0; 2,10]`), cabeceira `t ±0,51`, `z [2,10; 2,17]`; 3 lados, sem inferior.
+**Ex. 1 · Porta 90, sem bandeira.** `nominalRef 'leaf'`: folha 0,90 × 2,10, vão = 0,98 × 2,15 (folga NBR 0,08/0,05). Luz `t ∈ [−0,44; 0,44]`, `z ∈ [0; 2,10]`. Célula única (folha). Membros: ombreira esquerda `t [−0,49; −0,44]`, direita `[0,44; 0,49]`, ambas `z [0; 2,10]`; travessa superior `t [−0,49; 0,49]`, `z [2,10; 2,15]`. Folha: `t ±0,451`, `z [0,007; 2,111]`. Alizar (por face): anel interno = luz, externo `t ±0,51`, topo `z 2,17`: lateral esquerda `t [−0,51; −0,44]`, direita `[0,44; 0,51]` (`z [0; 2,10]`), cabeceira `t ±0,51`, `z [2,10; 2,17]`; 3 lados, sem inferior.
 
 **Ex. 2 · Porta 90 + bandeira superior 40.** Camadas de baixo para cima: folha (luz 2,10) · travessa 0,05 · vidro fixo (luz 0,40). Vão = 0,98 × (2,10 + 0,05 + 0,40 + 0,05) = **0,98 × 2,60**; luz total `z [0; 2,55]`. Membros: ombreiras `z [0; 2,55]`; travessa interna `t [−0,44; 0,44]`, `z [2,10; 2,15]`; travessa superior `z [2,55; 2,60]`, `t ±0,49`. Células: folha luz `[−0,44; 0,44] × [0; 2,10]` (folha como no Ex. 1); vidro `[−0,44; 0,44] × [2,15; 2,55]`. Alizar: anel interno = luz `[−0,44; 0,44] × [0; 2,55]`, externo `t ±0,51`, topo `z 2,62`: laterais `z [0; 2,55]`, cabeceira `z [2,55; 2,62]`. Nenhum alizar na travessa interna.
 
@@ -16,7 +16,7 @@ Valores usados nos exemplos (perfil "Madeira batente 5×9" para o batente e "Mad
 
 **Ex. 4 · Porta 90 + laterais + superior.** Raiz em linhas: [colunas do Ex. 3] · travessa 0,05 · vidro superior (luz 0,40, largura total). Vão = **1,88 × 2,60**. Membros: ombreiras `z [0; 2,55]`; travessa interna **contínua** `t [−0,89; 0,89]`, `z [2,10; 2,15]`; montantes `z [0; 2,10]` (terminam na travessa); travessa superior `t ±0,94`, `z [2,55; 2,60]`. Alizar: interno `[−0,89; 0,89] × [0; 2,55]`, externo `t ±0,96`, topo `2,62`; laterais `z [0; 2,55]`, cabeceira `z [2,55; 2,62]`.
 
-**Ex. 5 · Janela combinada, 2 células.** Vão 1,60 × 1,20, peitoril 1,00, `nominalRef 'opening'`. Colunas: vidro fixo (luz 0,60) · montante 0,05 · janela de abrir 1 folha (`fill` = 1,50 − 0,60 − 0,05 = 0,85). Luz `t ±0,75`, `z [0,05; 1,15]`. Membros: ombreiras `t [−0,80; −0,75]` e `[0,75; 0,80]` (`z [0,05; 1,15]`); peitoril do caixilho `t ±0,80`, `z [0; 0,05]`; travessa superior `t ±0,80`, `z [1,15; 1,20]`; montante `t [−0,15; −0,10]`, `z [0,05; 1,15]`. Células: fixa `[−0,75; −0,15]`; abrir `[−0,10; 0,75]`, folha `t [−0,111; 0,761]`. Alizar (4 lados): interno = luz, externo `t ±0,82`; laterais `z [0,05; 1,15]`, cabeceira `z [1,15; 1,22]`, soleira do alizar `z [−0,02; 0,05]`.
+**Ex. 5 · Janela combinada, 2 células.** Vão 1,60 × 1,20, peitoril 1,00, `nominalRef 'opening'`. Colunas: vidro fixo (luz 0,60) · montante 0,05 · janela de abrir 1 folha (`fill` = 1,50 − 0,60 − 0,05 = 0,85). Luz `t ±0,75`, `z [0,05; 1,15]`. Membros: ombreiras `t [−0,80; −0,75]` e `[0,75; 0,80]` (`z [0,05; 1,15]`); peitoril do caixilho `t ±0,80`, `z [0; 0,05]`; travessa superior `t ±0,80`, `z [1,15; 1,20]`; montante `t [−0,15; −0,10]`, `z [0,05; 1,15]`. Células: fixa `[−0,75; −0,15]`; abrir `[−0,10; 0,75]`, folha `t [−0,096; 0,746]` (janela: dentro da luz, folga de 4 mm por lado). Alizar (4 lados): interno = luz, externo `t ±0,82`; laterais `z [0,05; 1,15]`, cabeceira `z [1,15; 1,22]`, soleira do alizar `z [−0,02; 0,05]`.
 
 ## 2 · Modelo de dados
 
@@ -169,11 +169,11 @@ Permanecem no tipo: `id, kind, name, code, description, sill, frameMaterialId, g
 ## 8 · Plano de testes de aceite (para F2)
 
 Exemplos em `buildOpeningModel`, parede 0,20 com núcleo, perfis do §1, tolerância 1e-6:
-1. Ex. 1: vão 0,98 × 2,15; ombreiras e travessa nas caixas do §1; folha `t ±0,451`, `z [0,008; 2,111]`; 3 peças de alizar por face (6 no total).
+1. Ex. 1: vão 0,98 × 2,15; ombreiras e travessa nas caixas do §1; folha `t ±0,451`, `z [0,007; 2,111]`; 3 peças de alizar por face (6 no total).
 2. Ex. 2: vão 0,98 × 2,60; travessa interna `z [2,10; 2,15]`; vidro `z [2,15; 2,55]`; alizar topo 2,62, sem barra na travessa interna.
 3. Ex. 3: vão 1,88 × 2,15; montantes `[−0,49; −0,44]`/`[0,44; 0,49]`; vidros de 0,40; alizar externo `t ±0,96`; nenhuma peça de alizar com `|t| < 0,89`.
 4. Ex. 4: vão 1,88 × 2,60; travessa interna contínua `t ±0,89`; montantes até `z 2,10`; alizar topo 2,62, laterais `z [0; 2,55]`.
-5. Ex. 5: vão 1,60 × 1,20; células 0,60 e 0,85; montante `[−0,15; −0,10]`; folha `t [−0,111; 0,761]`; alizar de 4 lados, soleira `z [−0,02; 0,05]`.
+5. Ex. 5: vão 1,60 × 1,20; células 0,60 e 0,85; montante `[−0,15; −0,10]`; folha `t [−0,096; 0,746]` (janela: dentro da luz, folga de 4 mm por lado); alizar de 4 lados, soleira `z [−0,02; 0,05]`.
 6. `resolveLayout`: soma das luzes + divisores = luz do pai; ids únicos; no máximo um `fill` por divisão (`compositionIssue`).
 7. Cobertura: para os Ex. 1–5, flips e `leaves` variados, a união de membros + luzes das células cobre 100% do vão (folgas ≤ 0,01) e membros não se sobrepõem (área de interseção 0).
 8. Sem sobreposição de volumes entre membros, folha, vidro e alizar, fechado e aberto (varredura de 5°, E3 §5).

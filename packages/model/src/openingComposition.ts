@@ -97,7 +97,7 @@ export const OPENING_PROFILE_PRESETS: readonly ProfilePreset[] = [
   preset('prf_mad_caixilho_35x70', 'Madeira caixilho 3,5×7', ['sash', 'frame'], { material: 'wood', section: 'rect_rebate', visibleWidth: 0.035, depth: 0.07, glassRebate: GR }, ['visibleWidth', 'depth'], 'R2 (caixilho 3,5×7 cm)'),
   preset('prf_mad_folha_35', 'Madeira folha 3,5', ['sash'], { material: 'wood', section: 'rect', visibleWidth: 0.07, depth: 0.035, glassRebate: GR }, ['depth'], 'R2 (folha de porta 3,5 cm, edital Joinville)'),
   preset('prf_mad_montante_4x9', 'Madeira montante 4×9', ['divider'], { material: 'wood', section: 'T', visibleWidth: 0.04, depth: 0.09, stopWidth: 0.015, glassRebate: GR }, [], 'openingModelContext.ts (SIDELIGHT_MULLION 0,04)'),
-  preset('prf_mad_divisor_5x9', 'Madeira divisor 5×9', ['divider'], { material: 'wood', section: 'T', visibleWidth: 0.05, depth: 0.09, stopWidth: 0.015, glassRebate: GR }, [], 'derivado do batente 5×9'),
+  preset('prf_mad_divisor_5x9', 'Madeira divisor 5×9', ['divider'], { material: 'wood', section: 'T', visibleWidth: 0.05, depth: 0.09, stopWidth: 0.015 }, [], 'derivado do batente 5×9'),
   preset('prf_alu_l25', 'Alumínio linha 25', ['frame', 'sash'], { material: 'aluminum', section: 'L', visibleWidth: 0.03, depth: 0.06, glassRebate: GR }, ['depth'], 'R2 (batente 60–70 mm linha 25; largura visível a validar)'),
   preset('prf_alu_l25_110', 'Alumínio linha 25 moldura 11', ['frame'], { material: 'aluminum', section: 'L', visibleWidth: 0.03, depth: 0.11, glassRebate: GR }, ['depth'], 'R2 (moldura 110 mm, varejo Bergamo)'),
   preset('prf_alu_l20', 'Alumínio linha 20', ['frame', 'sash'], { material: 'aluminum', section: 'L', visibleWidth: 0.025, depth: 0.08, glassRebate: GR }, ['depth'], 'R2 (moldura 80 mm, varejo Bergamo)'),

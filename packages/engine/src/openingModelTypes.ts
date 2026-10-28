@@ -20,6 +20,9 @@ export type PartRole =
   | 'leafPanel' // almofada/aleta/grelha (detalhe da folha)
   | 'glass'
   | 'muntin' // montante/travessa de divisão do vidro
+  | 'mullion' // divisor de colunas do quadro (composição)
+  | 'transom' // divisor de linhas do quadro (composição)
+  | 'bead' // baguete do vidro (composição)
   | 'handle'
   | 'casing' // alizar
   | 'hinge' // dobradiça (ferragem)

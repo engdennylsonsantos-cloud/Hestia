@@ -16,13 +16,14 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] B5 atalho `UN` abre o diálogo Unidades… (`02`, B5; pedido do dono)
 - **MARCO M3 LIBERADO 6ad01c82** (`DialogKind` units, `UnitsDialog`/`unitsDialogModel` e botão em Padrões do projeto)
 - [x] C1 painel de propriedades
-- [ ] C2 diálogos
+- [x] C2 diálogos
 - [ ] C3 barras e chrome
 - [ ] C5 model e engine (`Dimension.unit 'project'`)
 - [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
 - [ ] `npm run check` verde, integrado
 
 ## Desvios
+- C2: quadros usam o helper `scheduleUnits.ts` (cabeçalho com o símbolo do projeto e célula convertida); os rótulos de `i18nTabelas.ts` perderam o sufixo fixo `(m)/(m²)/(m³)/(%)`. Campos cuja unidade nativa não é SI (grade em mm, margem de folha em mm, inclinação em %) passaram a converter na borda. Unidades técnicas fixas (W/m²K) e transparência (%) ficaram com `units-ok`.
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
 - U1/U3: `unitsOf` começou com tipo estrutural mínimo e passou a `Pick<Project,'settings'>` quando U3 acrescentou `settings.units`.
 - B4: sem testing-library/jsdom no repositório, os fluxos de OK/Cancelar/Esc são cobertos pelos testes puros do rascunho + comando `setSettings`/undo e por render estático do diálogo; a conferência visual no navegador fica pendente.

@@ -104,17 +104,17 @@ export function GridTypeDialog({ typeId }: { typeId: string }): ReactElement | n
           {SEGMENTS.map((s) => <option key={s} value={s}>{SEGMENT_LABEL[s]}</option>)}
         </select>
       </Row>
-      <Row label="Espessura (mm)" htmlFor="gt-weight"><NumField id="gt-weight" value={draft.weightMm} decimals={2} unit="mm" onCommit={(v) => set({ weightMm: v })} /></Row>
+      <Row label="Espessura" htmlFor="gt-weight"><NumField id="gt-weight" value={draft.weightMm / 1000} quantity="smallLength" onCommit={(v) => set({ weightMm: v * 1000 })} /></Row>
       <Row label="Traço" htmlFor="gt-pattern">
         <select id="gt-pattern" className="select" value={draft.pattern} onChange={(e) => set({ pattern: e.target.value as GridLinePattern })}>
           {PATTERNS.map((s) => <option key={s} value={s}>{PATTERN_LABEL[s]}</option>)}
         </select>
       </Row>
       <CorField id="gt-color" label="Cor" cor={draft.color} onChange={(c) => set({ color: c })} />
-      {campos.pontas ? <Row label="Comprimento das pontas (mm)" htmlFor="gt-end"><NumField id="gt-end" value={draft.endLengthMm} decimals={1} unit="mm" min={0} onCommit={(v) => set({ endLengthMm: v })} /></Row> : null}
+      {campos.pontas ? <Row label="Comprimento das pontas" htmlFor="gt-end"><NumField id="gt-end" value={draft.endLengthMm / 1000} quantity="smallLength" min={0} onCommit={(v) => set({ endLengthMm: v * 1000 })} /></Row> : null}
       {campos.centro ? (
         <>
-          <Row label="Espessura do centro (mm)" htmlFor="gt-cweight"><NumField id="gt-cweight" value={draft.centerWeightMm} decimals={2} unit="mm" onCommit={(v) => set({ centerWeightMm: v })} /></Row>
+          <Row label="Espessura do centro" htmlFor="gt-cweight"><NumField id="gt-cweight" value={draft.centerWeightMm / 1000} quantity="smallLength" onCommit={(v) => set({ centerWeightMm: v * 1000 })} /></Row>
           <Row label="Traço do centro" htmlFor="gt-cpattern">
             <select id="gt-cpattern" className="select" value={draft.centerPattern} onChange={(e) => set({ centerPattern: e.target.value as GridLinePattern })}>
               {PATTERNS.map((s) => <option key={s} value={s}>{PATTERN_LABEL[s]}</option>)}
@@ -123,8 +123,8 @@ export function GridTypeDialog({ typeId }: { typeId: string }): ReactElement | n
           <CorField id="gt-ccolor" label="Cor do centro" cor={draft.centerColor} onChange={(c) => set({ centerColor: c })} />
         </>
       ) : null}
-      <Row label="Diâmetro da bolha (mm)" htmlFor="gt-bdiam"><NumField id="gt-bdiam" value={draft.bubbleDiameterMm} decimals={1} unit="mm" onCommit={(v) => set({ bubbleDiameterMm: v })} /></Row>
-      <Row label="Altura do texto (mm)" htmlFor="gt-btext"><NumField id="gt-btext" value={draft.bubbleTextMm} decimals={1} unit="mm" onCommit={(v) => set({ bubbleTextMm: v })} /></Row>
+      <Row label="Diâmetro da bolha" htmlFor="gt-bdiam"><NumField id="gt-bdiam" value={draft.bubbleDiameterMm / 1000} quantity="smallLength" onCommit={(v) => set({ bubbleDiameterMm: v * 1000 })} /></Row>
+      <Row label="Altura do texto" htmlFor="gt-btext"><NumField id="gt-btext" value={draft.bubbleTextMm / 1000} quantity="smallLength" onCommit={(v) => set({ bubbleTextMm: v * 1000 })} /></Row>
     </Dialog>
   );
 }

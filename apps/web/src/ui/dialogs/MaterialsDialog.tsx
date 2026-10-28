@@ -94,11 +94,13 @@ export function MaterialsDialog({ pickFor, onPick, onClose }: { pickFor?: string
             )}
             {tab === 'fisico' && (
               <>
-                <div className="field-row"><label htmlFor="mat-cost">Custo</label><NumField id="mat-cost" value={draft.cost} decimals={2} onCommit={(v) => change({ cost: v }, true)} unit="R$" /></div>
+                <div className="field-row"><label htmlFor="mat-cost">Custo</label><NumField id="mat-cost" value={draft.cost} quantity="currency" onCommit={(v) => change({ cost: v }, true)} /></div>
                 <div className="field-row">
                   <label htmlFor="mat-unit">Unidade</label>
                   <select id="mat-unit" className="select" value={draft.unit} onChange={(e) => change({ unit: e.target.value as Material['unit'] }, true)}>
+                    {/* units-ok: unidade do material (identificador) */}
                     <option value="m2">m²</option>
+                    {/* units-ok: unidade do material (identificador) */}
                     <option value="m3">m³</option>
                     <option value="m">m</option>
                   </select>

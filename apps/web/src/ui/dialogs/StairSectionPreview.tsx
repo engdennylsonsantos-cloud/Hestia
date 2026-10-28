@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
-import type { StairType } from '@hestia/model';
+import { formatQuantity, unitSymbol, type StairType } from '@hestia/model';
+import { machineNumber } from '@hestia/geom';
+import { useUnits } from '../useUnits.ts';
 import { stairPostTreads, stairSectionProfile, type ProfilePoint } from './stairSectionProfile.ts';
 
 /**
@@ -8,6 +10,7 @@ import { stairPostTreads, stairSectionProfile, type ProfilePoint } from './stair
  * (caracol com poste central), os degraus são soltos e não há espelho. Ilustrativa, não é o corte do projeto.
  */
 export function StairSectionPreview({ type }: { type: StairType }): ReactElement {
+  const units = useUnits();
   const r = Math.max(type.maxRiser, 0.05);
   const t = Math.max(type.minTread, 0.1);
   const post = type.runStyle === 'post';
@@ -24,13 +27,13 @@ export function StairSectionPreview({ type }: { type: StairType }): ReactElement
   const maxY = Math.max(...ys) + pad;
   const H = maxY - minY;
   const sy = (y: number): number => maxY - y;
-  const toPts = (poly: ProfilePoint[]): string => poly.map(([x, y]) => `${(x - minX).toFixed(3)},${sy(y).toFixed(3)}`).join(' ');
-  const cm = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
+  const toPts = (poly: ProfilePoint[]): string => poly.map(([x, y]) => `${machineNumber(x - minX, 3)},${machineNumber(sy(y), 3)}`).join(' ');
+  const cm = (m: number): string => formatQuantity(units, 'smallLength', m, { withUnit: false });
   const label = post
-    ? `Sem espelho · Piso ${cm(t)} cm · Degrau ${cm(type.treadThickness)} cm · Sobreposição ${cm(type.treadOverlap)} cm`
-    : `Espelho ${cm(r)} cm · Piso ${cm(t)} cm${mono ? ` · Estrutura ${cm(d)} cm · Face ${type.undersideStyle === 'stepped' ? 'escalonada' : 'lisa'}` : ''}`;
+    ? `Sem espelho · Piso ${cm(t)} ${unitSymbol(units, 'smallLength')} · Degrau ${cm(type.treadThickness)} ${unitSymbol(units, 'smallLength')} · Sobreposição ${cm(type.treadOverlap)} ${unitSymbol(units, 'smallLength')}`
+    : `Espelho ${cm(r)} ${unitSymbol(units, 'smallLength')} · Piso ${cm(t)} cm${mono ? ` · Estrutura ${cm(d)} ${unitSymbol(units, 'smallLength')} · Face ${type.undersideStyle === 'stepped' ? 'escalonada' : 'lisa'}` : ''}`;
   return (
-    <svg viewBox={`0 0 ${(maxX - minX).toFixed(3)} ${H.toFixed(3)}`} width="100%" role="img" aria-label="Prévia do corte da escada" style={{ background: 'var(--bg-soft, transparent)', borderRadius: 6 }}>
+    <svg viewBox={`0 0 ${machineNumber(maxX - minX, 3)} ${machineNumber(H, 3)}`} width="100%" role="img" aria-label="Prévia do corte da escada" style={{ background: 'var(--bg-soft, transparent)', borderRadius: 6 }}>
       {polygons.map((poly, i) => (
         <polygon key={i} points={toPts(poly)} fill="var(--accent-soft, rgba(60,110,200,.18))" stroke="var(--fg, #333)" strokeWidth={0.02} />
       ))}

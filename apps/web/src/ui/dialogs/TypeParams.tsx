@@ -36,8 +36,9 @@ export function TypeParams({ type, onChange }: { type: WallType; onChange: (patc
       <legend style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Desempenho e custo</legend>
       <div className="field-row">
         <label htmlFor="wt-cost" title="Custo por metro quadrado de face de parede, usado em estimativas">Custo</label>
-        <NumField id="wt-cost" value={type.cost ?? 0} decimals={2} unit="R$/m²" min={0} onCommit={(v) => onChange({ cost: v })} />
+        <NumField id="wt-cost" value={type.cost ?? 0} quantity="currency" min={0} onCommit={(v) => onChange({ cost: v })} />
       </div>
+      {/* units-ok: unidade técnica de transmitância */}
       <OptionalNum id="wt-u" label="Transmitância U" value={type.thermalU ?? null} decimals={2} unit="W/m²K" min={0} onChange={(v) => onChange({ thermalU: v })} />
       <OptionalNum id="wt-rw" label="Isolamento Rw" value={type.acousticRw ?? null} decimals={0} unit="dB" min={0} onChange={(v) => onChange({ acousticRw: v })} />
       <OptionalNum id="wt-fire" label="Resistência ao fogo" value={type.fireRating ?? null} decimals={0} unit="min" min={0} onChange={(v) => onChange({ fireRating: v })} />

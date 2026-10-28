@@ -33,7 +33,7 @@ export function LevelsDialog(): ReactElement {
           {p.levels.map((l) => (
             <tr key={l.id}>
               <td><TextField value={l.name} onCommit={(v) => run(() => editor.store.exec({ type: 'upsertLevel', level: { ...l, name: v || l.name } }))} /></td>
-              <td><NumField value={l.elevation} unit="m" onCommit={(v) => run(() => editor.store.exec({ type: 'upsertLevel', level: { ...l, elevation: v } }))} /></td>
+              <td><NumField value={l.elevation} quantity="length" onCommit={(v) => run(() => editor.store.exec({ type: 'upsertLevel', level: { ...l, elevation: v } }))} /></td>
               <td><button className="btn small danger" onClick={() => run(() => editor.store.exec({ type: 'deleteLevel', id: l.id }))}>Excluir</button></td>
             </tr>
           ))}

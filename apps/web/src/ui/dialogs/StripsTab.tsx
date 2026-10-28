@@ -72,9 +72,9 @@ export function StripsTab({ strips, materials, onChange, onPickMaterial }: Strip
                       </button>
                     </td>
                     {/* min em metros: 0,001 m = 0,1 cm */}
-                    <td><NumField id={`st-${s.id}-esp`} value={s.thickness} scale={100} decimals={1} min={0.001} onCommit={(v) => update(i, { thickness: v })} /></td>
-                    <td><NumField id={`st-${s.id}-de`} value={s.z0} scale={100} decimals={1} min={0} onCommit={(v) => update(i, { z0: v })} /></td>
-                    <td><NumField id={`st-${s.id}-ate`} value={s.z1} scale={100} decimals={1} min={0} onCommit={(v) => update(i, { z1: v })} /></td>
+                    <td><NumField id={`st-${s.id}-esp`} value={s.thickness} quantity="smallLength" min={0.001} onCommit={(v) => update(i, { thickness: v })} /></td>
+                    <td><NumField id={`st-${s.id}-de`} value={s.z0} quantity="smallLength" min={0} onCommit={(v) => update(i, { z0: v })} /></td>
+                    <td><NumField id={`st-${s.id}-ate`} value={s.z1} quantity="smallLength" min={0} onCommit={(v) => update(i, { z1: v })} /></td>
                     <td>
                       <button id={`st-${s.id}-del`} className="ibtn" onClick={() => remove(i)} aria-label={`Remover faixa ${i + 1}`}><Icon name="close" size={14} /></button>
                     </td>

@@ -50,7 +50,7 @@ export function SheetDialog({ sheetId }: { sheetId: string }): ReactElement | nu
           </select>
         </Row>
         <Row label="Margem" htmlFor="sh-margin">
-          <NumField id="sh-margin" value={s.margin} unit="mm" decimals={0} min={0} onCommit={(v) => patch({ margin: v })} />
+          <NumField id="sh-margin" value={s.margin / 1000} quantity="length" min={0} onCommit={(v) => patch({ margin: v * 1000 })} />
         </Row>
       </Group>
       <Group title="Carimbo">

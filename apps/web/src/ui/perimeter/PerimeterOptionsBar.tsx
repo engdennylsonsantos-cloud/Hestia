@@ -37,13 +37,13 @@ export function PerimeterOptionsBar({ target, options: o, modify, onChange }: Pe
       {roof && (
         <label>
           Balanço
-          <NumField id="opt-pm-overhang" value={o.overhang} onCommit={(v) => onChange({ overhang: v })} unit="m" min={0} />
+          <NumField id="opt-pm-overhang" value={o.overhang} onCommit={(v) => onChange({ overhang: v })} quantity="length" min={0} />
         </label>
       )}
       {!roof && (
         <label>
           Deslocamento do nível
-          <NumField id="opt-pm-offset" value={o.heightOffset} onCommit={(v) => onChange({ heightOffset: v })} unit="m" />
+          <NumField id="opt-pm-offset" value={o.heightOffset} onCommit={(v) => onChange({ heightOffset: v })} quantity="length" />
         </label>
       )}
       {(target === 'floor' || target === 'slab') && (
@@ -67,7 +67,7 @@ export function PerimeterOptionsBar({ target, options: o, modify, onChange }: Pe
       {roof && (
         <label>
           Inclinação padrão das arestas
-          <NumField id="opt-pm-slope" value={o.slopePct} onCommit={(v) => onChange({ slopePct: v })} unit="%" min={0.1} max={200} />
+          <NumField id="opt-pm-slope" value={o.slopePct / 100} onCommit={(v) => onChange({ slopePct: v * 100 })} quantity="slope" min={0.001} max={2} />
         </label>
       )}
     </div>

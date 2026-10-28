@@ -126,9 +126,8 @@ describe('aberturas', () => {
   };
   it('recorta todas as camadas em planta', () => {
     const s = build();
-    // + retornos de acabamento nos dois vãos (reboco e tinta nos dois lados, até a metade da espessura)
-    const returns = 2 * 4 * (0.022 * (T14 / 2));
-    expect(silhouetteArea(s)).toBeCloseTo((4 - 0.8 - 1.2) * T14 + returns, 5);
+    // Tipo com batente e `closure: inherit`: o acabamento encosta no batente, sem retorno (decisão 0035 §2).
+    expect(silhouetteArea(s)).toBeCloseTo((4 - 0.8 - 1.2) * T14, 5);
   });
   it('3D: faixas verticais — o vão só fura a altura que atravessa', () => {
     const s = build();
@@ -395,7 +394,7 @@ describe('paredes em arco', () => {
     const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
     const before = silhouetteArea(s);
     s.exec({ type: 'addOpening', opening: { id: 'd', kind: 'door', typeId: 'ot_p80', hostId: 'c', offset: 2.3, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
-    expect(before - silhouetteArea(s)).toBeCloseTo(0.8 * T14 - 4 * 0.022 * (T14 / 2), 2); // vão menos os retornos
+    expect(before - silhouetteArea(s)).toBeCloseTo(0.8 * T14, 2); // vão; o acabamento encosta no batente
   });
   it('quantitativo usa o comprimento do arco', () => {
     const s = setup([arcWall('c', 0, 0, 4, 0, 1)]);
@@ -438,24 +437,29 @@ describe('retorno de acabamento (wrapping)', () => {
   it('sem retorno o vão é só um recorte', () => {
     expect(silhouetteArea(withWindow({ wrapInserts: 'none' }))).toBeCloseTo(base, 5);
   });
-  it('dos dois lados: reboco e tinta voltam até a metade da espessura', () => {
-    expect(silhouetteArea(withWindow({ wrapInserts: 'both' }))).toBeCloseTo(base + 4 * 0.022 * (T14 / 2), 5);
+  it('tipo com batente: `inherit` encosta no batente e não cria retorno', () => {
+    expect(silhouetteArea(withWindow({ wrapInserts: 'both' }))).toBeCloseTo(base, 5);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'exterior' }))).toBeCloseTo(base, 5);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'interior' }))).toBeCloseTo(base, 5);
   });
-  it('de um lado só: o retorno atravessa a espessura inteira', () => {
-    expect(silhouetteArea(withWindow({ wrapInserts: 'exterior' }))).toBeCloseTo(base + 2 * 0.022 * T14, 5);
-    expect(silhouetteArea(withWindow({ wrapInserts: 'interior' }))).toBeCloseTo(base + 2 * 0.022 * T14, 5);
-  });
-  it('o fechamento da família da abertura substitui o da parede', () => {
+  it('o fechamento explícito é recortado pelo batente; sem batente vale o da parede', () => {
     expect(silhouetteArea(withWindow({ wrapInserts: 'both' }, 'none'))).toBeCloseTo(base, 5);
-    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base + 4 * 0.022 * (T14 / 2), 5);
+    expect(silhouetteArea(withWindow({ wrapInserts: 'none' }, 'both'))).toBeCloseTo(base, 5);
+    // Vão livre (sem batente) mantém o retorno da parede.
+    const vao = setup([wall('a', 0, 0, 4, 0)]);
+    vao.exec({ type: 'upsertWallType', wallType: { ...vao.project.wallTypes.wt_alv14!, wrapInserts: 'both' } });
+    vao.exec({ type: 'addOpening', opening: { id: 'v', kind: 'window', typeId: 'ot_jv120', hostId: 'a', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
+    expect(silhouetteArea(vao)).toBeCloseTo((4 - 1.2) * T14 + 4 * 0.022 * (T14 / 2), 5);
   });
-  it('3D: o retorno só existe na altura do vão', () => {
-    const s = withWindow({ wrapInserts: 'both' });
+  it('3D: o retorno só existe na altura do vão (vão livre)', () => {
+    const s = setup([wall('a', 0, 0, 4, 0)]);
+    s.exec({ type: 'upsertWallType', wallType: { ...s.project.wallTypes.wt_alv14!, wrapInserts: 'both' } });
+    s.exec({ type: 'addOpening', opening: { id: 'v', kind: 'window', typeId: 'ot_jv120', hostId: 'a', offset: 2, flipHand: false, flipFacing: false, sillOverride: null, mark: '' } });
     const layers = resolveLevel(s.project, 'lv_0').walls.a!.layers;
     const reboco = layers.find((l) => l.layerIndex === 1)!; // reboco externo (2 cm), envolve
     const area = (z: number) => multiArea(reboco.bands.find((b) => z > b.z0 && z < b.z1)!.poly);
     expect(reboco.bands).toHaveLength(3); // abaixo do peitoril, no vão, acima da verga
-    const lost = 1.2 * 0.02; // área da camada removida pelo vão
+    const lost = 1.2 * 0.02; // área da camada removida pelo vão de 1,2 m
     const kept = 2 * 0.02 * (T14 / 2); // retorno desta camada (dois cantos) até a metade da espessura
     expect(area(0.5) - area(1.7)).toBeCloseTo(lost - kept, 5);
     expect(area(0.5)).toBeCloseTo(area(2.5), 9);

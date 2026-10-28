@@ -342,15 +342,21 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z1, 6);
   });
 
-  it('E1: o basculante tem o vértice em cima e as pontas embaixo', () => {
+  it('E1: o basculante tem dois V com vértice no eixo central e pontas nos cantos de cima e de baixo', () => {
     const tilt = { ...createEmptyProject().openingTypes.ot_j60!, id: 'ot_bas60', plan: 'tilt' as const };
     const input = facade([op('b', 'window', 'ot_bas60', 'frente')], tilt);
     const o = input.section.openings[0]!;
     const a = o.model.openings[0]!;
-    const [v1] = vs(buildSectionDrawList(input));
-    expect(v1!.pts[1]!.y).toBeCloseTo(o.z0 + a.z1, 6);
-    expect(v1!.pts[0]!.y).toBeCloseTo(o.z0 + a.z0, 6);
-    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    const vss = vs(buildSectionDrawList(input));
+    expect(vss).toHaveLength(2);
+    const eixo = o.z0 + a.axisZ!;
+    for (const v1 of vss) expect(v1.pts[1]!.y).toBeCloseTo(eixo, 6);
+    const superior = vss.find((x) => x.pts[0]!.y > eixo)!;
+    const inferior = vss.find((x) => x.pts[0]!.y < eixo)!;
+    expect(superior.pts[0]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(superior.pts[2]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(inferior.pts[0]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    expect(inferior.pts[2]!.y).toBeCloseTo(o.z0 + a.z0, 6);
   });
 
   it('E1 (traço): a janela de abrir segue a regra da porta: tracejada se a folha abre para o observador', () => {

@@ -435,7 +435,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
     for (const f of group) {
       for (const o of openingsOfWall(p, f.wall.id)) {
         const ot = openingType(p, o);
-        for (const r of insertReturns(f, o.offset, ot.width, insertMode(f.type, ot))) {
+        const mode = insertMode(f.type, ot);
+        for (const r of insertReturns(f, o.offset, ot.width, mode, { ot, side: o.flipFacing ? -1 : 1 })) {
           const key = `${f.wall.id}|${r.layerIndex}`;
           returns.set(key, [...(returns.get(key) ?? []), { openingId: o.id, poly: r.poly }]);
         }

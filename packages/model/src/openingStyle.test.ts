@@ -5,6 +5,7 @@ import {
   openingAngle3d,
   openingDetail2d,
   openingDetail3d,
+  openingFrameDepth,
   openingFrameStyle,
   openingGrid,
   openingHandle,
@@ -15,6 +16,7 @@ import {
   openingSidelights,
   openingShowSwing,
   openingSwingStyle,
+  openingTiltAxis,
   openingTransom,
 } from './openingStyle.ts';
 import type { OpeningType } from './types.ts';
@@ -60,6 +62,22 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingDetail3d(com('ot_p90', { detail3d: 'full' }))).toBe('full');
   });
 
+  it('profundidade do batente: parede total (padrão), núcleo ou valor fixo limitado à parede', () => {
+    const base = tipo('ot_p90');
+    expect(openingFrameDepth(base, 0.184, 0.14)).toEqual({ depth: 0.184, centerOffset: 0 });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'core' }, 0.184, 0.14)).toEqual({ depth: 0.14, centerOffset: 0 });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed', frameDepth: 0.09 }, 0.184, 0.14)).toEqual({
+      depth: 0.09,
+      centerOffset: 0,
+    });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed', frameDepth: 0.5 }, 0.184, 0.14)).toEqual({
+      depth: 0.184,
+      centerOffset: 0,
+    });
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'fixed' }, 0.184, 0.14).depth).toBeCloseTo(0.09, 9);
+    expect(openingFrameDepth({ ...base, frameDepthMode: 'x' as never }, 0.184, 0.14)).toEqual({ depth: 0.184, centerOffset: 0 });
+  });
+
   it('ângulos: 90 em planta; 3D 90 na porta e na janela de giro, 30 na maxim-ar e basculante', () => {
     expect(openingAngle2d(tipo('ot_p90'))).toBe(90);
     expect(openingAngle3d(tipo('ot_p90'))).toBe(90);
@@ -102,13 +120,23 @@ describe('openingStyle: padrões por leitura', () => {
     expect(openingGrid(com('ot_p90', { grid: { cols: Number.NaN, rows: 2.6 } }))).toEqual({ cols: 1, rows: 3 });
   });
 
-  it('bandeira: ausente/inválida = nenhuma; altura limitada e fixa por padrão', () => {
+  it('bandeira: ausente/inválida = nenhuma; altura limitada a 40% do vão e fixa por padrão', () => {
     expect(openingTransom(tipo('ot_p90'))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: 0 } }))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: Number.NaN } }))).toBeNull();
     expect(openingTransom(com('ot_p90', { transom: { height: 0.4 } }))).toEqual({ height: 0.4, fixed: true });
     expect(openingTransom(com('ot_p90', { transom: { height: 0.4, fixed: false } }))).toEqual({ height: 0.4, fixed: false });
-    expect(openingTransom(com('ot_p90', { transom: { height: 9 } }))!.height).toBe(2.1);
+    expect(openingTransom(com('ot_p90', { transom: { height: 9 } }))!.height).toBeCloseTo(2.1 * 0.4, 9);
+  });
+
+  it('basculante: eixo padrão 0,5 e limitado a 0,2..0,8; angle3d no máximo 60°', () => {
+    expect(openingTiltAxis(tipo('ot_j60'))).toBe(0.5);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.3 }))).toBe(0.3);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.1 }))).toBe(0.2);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: 0.9 }))).toBe(0.8);
+    expect(openingTiltAxis(com('ot_j60', { tiltAxis: Number.NaN }))).toBe(0.5);
+    expect(openingAngle3d(com('ot_j60', { plan: 'tilt', angle3d: 120 }))).toBe(60);
+    expect(openingAngle3d(com('ot_j60', { plan: 'tilt', angle3d: 45 }))).toBe(45);
   });
 
   it('bandeiras laterais: nenhum lado ligado = nenhuma; largura válida', () => {

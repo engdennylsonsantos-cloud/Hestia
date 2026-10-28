@@ -39,6 +39,11 @@ export interface OpeningType {
    */
   frameWidth?: number;
   frameDepth?: number;
+  /**
+   * Como a profundidade do batente se liga à parede (decisão 0035): 'wall' (padrão) = a espessura TOTAL da parede acabada (batente
+   * faceado com os acabamentos); 'core' = só o núcleo estrutural; 'fixed' = o valor de `frameDepth` (limitado à parede).
+   */
+  frameDepthMode?: OpeningFrameDepthMode;
   leafThickness?: number;
   glassThickness?: number;
   /*
@@ -49,7 +54,7 @@ export interface OpeningType {
    * `lintel`/`sillBeam`: verga e contraverga (transpasse para cada lado e altura; padrão do transpasse 0,30 m).
    */
   roughOversize?: { w: number; h: number };
-  casing?: { width: number; thickness: number };
+  casing?: { width: number; thickness: number; sides?: 'both' | 'swing' | 'opposite' };
   sillBoard?: { projection: number; thickness: number };
   lintel?: { over?: number; height?: number };
   sillBeam?: { over?: number; height?: number };
@@ -89,9 +94,32 @@ export interface OpeningType {
   solarFactor?: number;
   cost?: number;
   manufacturer?: string;
+  /** Material da folha (ausente = o do batente, `frameMaterialId`). */
+  leafMaterialId?: Id;
+  /** Tipo de vidro (ausente = liso). Muda a cor/transparência no 3D e a legenda do quadro. */
+  glassKind?: OpeningGlassKind;
+  /** Janela basculante: altura do eixo horizontal como fração do vão (0,2 a 0,8; padrão 0,5, eixo central). */
+  tiltAxis?: number;
+  /**
+   * A que `width`/`height` se referem (ArchiCAD: Nominal Size Reference; NBR 15930: "80 x 210" é a FOLHA, não o vão): 'opening' (padrão) =
+   * o vão/batente; 'leaf' = a folha nominal, e o vão é calculado (folha + 2·(J − ov) + folgas). Só portas de giro.
+   */
+  nominalRef?: 'opening' | 'leaf';
+  /** Porta com vidro: fração da altura da folha ocupada pelo vidro, a partir do topo (0,25 / 0,5 / 0,75; 0,1 a 0,9). */
+  glassRatio?: number;
+  /** Dobradiças: quantidade (2 a 4; padrão 3 em porta de giro) — peças de ferragem no batente e na folha. */
+  hinges?: number;
+  /** Soleira/limiar da porta: espessura (m) e material (padrão pedra). Ausente = sem soleira. */
+  threshold?: { thickness: number; materialId?: Id };
+  /** Recuo do batente em relação à face da parede (ArchiCAD: Reveal) e a âncora do recuo: na face acabada ou no núcleo. */
+  reveal?: { depth: number; anchor?: 'face' | 'core' };
 }
 
-export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille';
+/** Vínculo da profundidade do batente com a espessura da parede. */
+export type OpeningFrameDepthMode = 'wall' | 'core' | 'fixed';
+/** Vidro: liso/cristal, canelado, fumê, verde, bronze, jateado/fosco, aramado, laminado, temperado. */
+export type OpeningGlassKind = 'clear' | 'ribbed' | 'smoke' | 'green' | 'bronze' | 'frosted' | 'wired' | 'laminated' | 'tempered';
+export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille' | 'boards' | 'fullglass';
 export type OpeningHandle = 'none' | 'lever' | 'knob' | 'pull';
 export type OpeningFrameStyle = 'rebate' | 'simple' | 'aduela' | 'block';
 

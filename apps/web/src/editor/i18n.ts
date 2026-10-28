@@ -170,6 +170,7 @@ export const I18N = {
     oc_plan: 'Planta e corte',
     oc_data: 'Quadro e dados',
     oc_list: 'Componentes',
+    oc_composition: 'Módulos',
   },
   en: {
     // Ribbon Tabs
@@ -314,6 +315,7 @@ export const I18N = {
     oc_plan: 'Floor plan and section',
     oc_data: 'Schedule and data',
     oc_list: 'Components',
+    oc_composition: 'Modules',
   },
 } as const;
 

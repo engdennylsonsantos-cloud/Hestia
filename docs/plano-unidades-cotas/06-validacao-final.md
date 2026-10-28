@@ -30,7 +30,7 @@ Releia seu próprio diff completo (`git diff origin/main...HEAD -- packages apps
 ## F4: documentação
 - `docs/07-STATUS-V1.md` **não** editar. Em vez disso atualize `docs/PENDENCIAS-2026-10-28-cotas-padroes-esquadrias.md`: marque como **feito** os itens das seções A, B e C com o hash do commit; mantenha D, E e F.
 - `docs/aberturas/F-PROGRESSO.md`: nota curta sobre S1 a S5.
-- `docs/plano-unidades-cotas/PROGRESSO.md`: resumo final.
+- os três `PROGRESSO-*.md`: resumo final (o COTAS consolida no `PROGRESSO-COTAS.md`).
 
 ## F5: entrega
 ```bash

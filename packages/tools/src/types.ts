@@ -1,3 +1,4 @@
+import type { TempDim } from './dims/types.ts';
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
@@ -272,6 +273,8 @@ export interface Tool {
   drag?(p: PointerInfo): void;
   up?(p: PointerInfo): void;
   preview(): PreviewItem[];
+  /** Cotas dinâmicas da prévia (sistema único de cotas); ausente = a ferramenta não mostra cotas ao desenhar. */
+  tempDims?(): TempDim[];
   /** Inferência corrente, para o desenho de guias e marcadores. */
   inference(): Inference | null;
   /** Delete com um vértice de piso em foco: remove o vértice e devolve true; false deixa o Delete excluir a seleção. */

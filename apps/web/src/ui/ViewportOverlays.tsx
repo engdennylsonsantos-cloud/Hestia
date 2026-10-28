@@ -6,7 +6,7 @@ import type { ViewKind } from '../editor/state.ts';
 import { SectionBadge } from './SectionCanvas.tsx';
 import { ViewCube } from './ViewCube.tsx';
 import { OpeningFlipGrips } from './OpeningFlipGrips.tsx';
-import { OpeningTempDims } from './OpeningTempDims.tsx';
+import { TempDimsOverlay } from './dims/TempDimsOverlay.tsx';
 import { NavBar } from './NavBar.tsx';
 import { CanvasContextMenu } from './CanvasContextMenu.tsx';
 
@@ -31,7 +31,7 @@ export function ViewportOverlays({
   return (
     <>
       {ui.view === 'plan' && selectedOpeningId ? <OpeningFlipGrips openingId={selectedOpeningId} /> : null}
-      {ui.view === 'plan' && selectedOpeningId ? <OpeningTempDims openingId={selectedOpeningId} /> : null}
+      {ui.view === 'plan' ? <TempDimsOverlay /> : null}
       {ui.gpu === 'cpu' && <div className="cpu-note">Sem GPU: planta em modo CPU. O 3D fica indisponível.</div>}
       {ui.gpu === 'cpu' && ui.view === '3d' && (
         <div className="hint" style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'var(--sheet)' }}>

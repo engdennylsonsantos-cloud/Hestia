@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Id, LocationLine } from '@hestia/model';
+import type { Id, LocationLine, OpeningDimRef, WallDimRef } from '@hestia/model';
 import type { Backend } from '@hestia/render';
 import { DEFAULT_DISJOIN, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
@@ -48,6 +48,8 @@ export interface UiState {
   tutorial: boolean;
   /** Incrementa quando a pré-visualização da ferramenta muda (força novo desenho). */
   previewTick: number;
+  /** Referências de cota escolhidas na sessão (`${provedor}:${ponta}` → referência); somem ao trocar de ferramenta ou seleção. */
+  dimOverrides: Record<string, WallDimRef | OpeningDimRef>;
   cursor: { x: number; y: number } | null;
   snapKind: string;
   seen3d: boolean;
@@ -238,6 +240,7 @@ export const useUi = create<UiState>(() => ({
   dock: loadDock(),
   tutorial: false,
   previewTick: 0,
+  dimOverrides: {},
   cursor: null,
   snapKind: '',
   seen3d: false,
@@ -258,4 +261,19 @@ useUi.subscribe((s, prev) => {
   if (!active) return;
   const next = addView(s.openViews, active);
   if (next !== s.openViews) useUi.setState({ openViews: next });
+});
+
+/** Escolhe, só para a sessão, a referência de uma ponta de cota (alça ou troca rápida). */
+export function setDimOverride(key: string, ref: WallDimRef | OpeningDimRef): void {
+  useUi.setState((s) => ({ dimOverrides: { ...s.dimOverrides, [key]: ref } }));
+}
+
+/** Limpa as referências de sessão (volta ao padrão do projeto). */
+export function clearDimOverrides(): void {
+  if (Object.keys(useUi.getState().dimOverrides).length > 0) useUi.setState({ dimOverrides: {} });
+}
+
+// As trocas rápidas valem para a ferramenta e a seleção em que foram feitas.
+useUi.subscribe((s, prev) => {
+  if (s.tool !== prev.tool || s.selection !== prev.selection) clearDimOverrides();
 });

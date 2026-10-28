@@ -1,5 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import {
+  openingTypeById,
   coreSpan,
   isWall,
   type Dimension,
@@ -306,7 +307,7 @@ function camadasDoLado(
   const vaos: Trecho[] = [];
   for (const o of aberturas) {
     const host = paralelas.find((w) => w.id === o.hostId);
-    const tipo = p.openingTypes[o.typeId];
+    const tipo = openingTypeById(p, o.typeId);
     if (!host || !tipo) continue;
     const comp = comprimento(host);
     if (comp <= 0) continue;

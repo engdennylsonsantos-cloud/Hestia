@@ -116,4 +116,9 @@ export interface OpeningGeometry {
   flipFacing: boolean;
   /** Distância ao longo do eixo a partir de `a`. */
   offset: number;
+  /**
+   * Meia profundidade do retângulo que fura a parede (m). Ausente = espessura/2 + 0,02. Em parede curva cresce com o desvio
+   * da face nas ombreiras (o furo é reto pela tangente no centro; a face se afasta dele ao longo da corda do vão).
+   */
+  cutHalf?: number;
 }

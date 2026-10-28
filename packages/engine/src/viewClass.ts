@@ -1,4 +1,5 @@
 import {
+  openingTypeById,
   ceilingTypeThickness,
   ceilingsOnLevel,
   isCeiling,
@@ -125,7 +126,7 @@ export function elementZRange(p: Project, e: Element, ctx: Partial<ViewContext> 
   }
   if (isOpening(e)) {
     const host = p.elements[e.hostId];
-    const t = p.openingTypes[e.typeId];
+    const t = openingTypeById(p, e.typeId);
     if (!isWall(host) || !t) return null;
     const z0 = wallZRange(p, host, ctx.floors, ctx.slabs, ctx.roofs).z0 + openingSill(t, e);
     return { z0, z1: z0 + t.height };

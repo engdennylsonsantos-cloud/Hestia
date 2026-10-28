@@ -53,7 +53,7 @@ const NONE: OpeningOptionSupport = {
 const sup = (o: Partial<OpeningOptionSupport>): OpeningOptionSupport => ({ ...NONE, ...o });
 
 // Maçaneta só nas portas de giro e dupla; grade (divisões do vidro) só em janela.
-const DOOR_LEAF = { leafStyle: true, leafThickness: true, glassRatio: true, threshold: true, glassKind: true, casing: true, lintel: true, frame: true, reveal: true };
+const DOOR_LEAF = { leafStyle: true, leafThickness: true, glassRatio: true, threshold: true, glassKind: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true };
 
 const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   door_swing: sup({ ...DOOR_LEAF, handle: true, transom: true, sidelights: true, hinges: true, angle: true }),
@@ -62,18 +62,18 @@ const TABLE: Record<OpeningFamilyId, OpeningOptionSupport> = {
   door_pivot: sup({ ...DOOR_LEAF, transom: true, angle: true }),
   door_sliding: sup({ ...DOOR_LEAF, transom: true }),
   door_pocket: sup({ ...DOOR_LEAF }),
-  door_bifold: sup({ leafStyle: true, leafThickness: true, threshold: true, casing: true, lintel: true, frame: true, reveal: true, angle: true }),
-  door_accordion: sup({ leafThickness: true, casing: true, lintel: true, frame: true, reveal: true, angle: true }),
-  door_garage: sup({ leafStyle: true, leafThickness: true, lintel: true, frame: true, reveal: true }),
+  door_bifold: sup({ leafStyle: true, leafThickness: true, threshold: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true, angle: true }),
+  door_accordion: sup({ leafThickness: true, casing: true, lintel: true, frame: true, reveal: true, nominalRef: true, angle: true }),
+  door_garage: sup({ leafStyle: true, leafThickness: true, lintel: true, frame: true, reveal: true, nominalRef: true }),
   door_void: sup({ casing: true, lintel: true }),
-  window_fixed: sup({ transom: true, sidelights: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true }),
-  window_hinged: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, hinges: true, angle: true }),
-  window_tilt: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, tiltAxis: true, angle: true }),
-  window_casement: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, angle: true }),
-  window_sliding: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true }),
-  window_hung: sup({ leafThickness: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true }),
-  window_pivot: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, angle: true }),
-  window_louver: sup({ leafThickness: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, angle: true }),
+  window_fixed: sup({ transom: true, sidelights: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true }),
+  window_hinged: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, hinges: true, angle: true }),
+  window_tilt: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, tiltAxis: true, angle: true }),
+  window_casement: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, angle: true }),
+  window_sliding: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true }),
+  window_hung: sup({ leafThickness: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true }),
+  window_pivot: sup({ leafThickness: true, transom: true, grid: true, glassKind: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, angle: true }),
+  window_louver: sup({ leafThickness: true, casing: true, sillBoard: true, lintel: true, sillBeam: true, frame: true, reveal: true, nominalRef: true, angle: true }),
   window_void: sup({ casing: true, sillBoard: true, lintel: true, sillBeam: true }),
 };
 

@@ -1,5 +1,5 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingType, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
+import { openingTypeById, openingType, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
@@ -45,7 +45,7 @@ export function wallTagLabels(p: Project, levelId: Id, paint: PlanPaint, scale: 
     if (!code) continue;
     const halfText = (code.length * chW) / 2 + halfPad;
     const blocked = aberturasDaParede(p, f.wall.id).map((o): [number, number] => {
-      const half = (p.openingTypes[o.typeId]?.width ?? 0) / 2;
+      const half = (openingTypeById(p, o.typeId)?.width ?? 0) / 2;
       return [o.offset - half - halfText, o.offset + half + halfText];
     });
     const span = longestFree(0, f.length, blocked);
@@ -65,7 +65,7 @@ export function elementTagText(p: Project, tag: ElementTag): string {
   if (!e) return '';
   const levelId = 'levelId' in e ? e.levelId : e.kind === 'door' || e.kind === 'window' ? (() => { const host = p.elements[e.hostId]; return host && 'levelId' in host ? host.levelId : null; })() : null;
   const type = e.kind === 'wall' ? p.wallTypes[e.typeId]
-    : e.kind === 'door' || e.kind === 'window' ? p.openingTypes[e.typeId]
+    : e.kind === 'door' || e.kind === 'window' ? openingTypeById(p, e.typeId)
     : e.kind === 'floor' ? p.floorTypes[e.typeId]
     : e.kind === 'slab' ? p.slabTypes[e.typeId]
     : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]

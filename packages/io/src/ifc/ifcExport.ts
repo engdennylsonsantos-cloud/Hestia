@@ -1,4 +1,4 @@
-import { isOpening, isWall, levelElevation, openingFamilyName, type OpeningType, type Project } from '@hestia/model';
+import { openingTypeById, isOpening, isWall, levelElevation, openingFamilyName, type OpeningType, type Project } from '@hestia/model';
 import { addPlates, addRoofs, addStairs } from './ifcElements.ts';
 import { gid, materialOf, optStr, storeyOf, type IfcCtx } from './ifcCtx.ts';
 import { axis3, bodyShape, extrudeSolid, localPlacement } from './ifcSolids.ts';
@@ -120,7 +120,7 @@ function addOpenings(c: IfcCtx, openings: IfcOpeningGeo[]): void {
     const host = c.p.elements[o.hostId];
     const wallId = isWall(host) ? c.walls.get(host.id) : undefined;
     const st = isWall(host) ? storeyOf(c, host.levelId) : undefined;
-    const t = c.p.openingTypes[o.typeId];
+    const t = openingTypeById(c.p, o.typeId);
     if (wallId === undefined || !st || !t) continue;
     const axis: IfcPoint = g.u;
     const atZ = (z: number): ReturnType<typeof localPlacement> => localPlacement(c.w, st.place, [g.center.x, g.center.y, z], axis);

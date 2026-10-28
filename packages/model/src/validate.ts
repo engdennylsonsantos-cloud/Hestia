@@ -13,6 +13,7 @@ import { sectionRefIssues, sectionViewIssue } from './sectionView.ts';
 import { projectSheets } from './sheet.ts';
 import { viewSourceIssue } from './sheetCommands.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
+import { openingTypeById } from './openingNominal.ts';
 
 /** `info`: aviso informativo (não é problema; ex.: parede anexada só em parte ao piso). */
 export type ValidationSeverity = 'error' | 'warning' | 'info';
@@ -104,7 +105,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
   const out: ValidationIssue[] = [];
   const name = label(o);
   const host = p.elements[o.hostId];
-  const type = p.openingTypes[o.typeId];
+  const type = openingTypeById(p, o.typeId);
   if (!isWall(host)) {
     out.push({
       severity: 'error',
@@ -142,7 +143,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
 function openingOverlaps(p: Project, openings: Opening[]): ValidationIssue[] {
   const byHost = new Map<Id, Array<{ o: Opening; lo: number; hi: number }>>();
   for (const o of openings) {
-    const type = p.openingTypes[o.typeId];
+    const type = openingTypeById(p, o.typeId);
     if (!type || !isWall(p.elements[o.hostId])) continue;
     const list = byHost.get(o.hostId) ?? [];
     list.push({ o, lo: o.offset - type.width / 2, hi: o.offset + type.width / 2 });

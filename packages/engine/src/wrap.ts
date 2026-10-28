@@ -1,4 +1,4 @@
-import { difference, type MultiPolygon, type Ring } from '@hestia/geom';
+import { difference, intersection, perp, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import {
   coreRange,
   openingCasing,
@@ -7,7 +7,7 @@ import {
   type WallType,
   type WrapMode,
 } from '@hestia/model';
-import { pointAt, type WallFrame } from './frame.ts';
+import { pointAt, tangentAt, type WallFrame } from './frame.ts';
 import { jambSection, openingFrameDims } from './openingModelContext.ts';
 
 export type Side = 'exterior' | 'interior';
@@ -51,6 +51,19 @@ export const insertMode = (wt: WallType, ot: OpeningType): WrapMode => {
   return ot.leaves > 0 && openingFrameStyle(ot) !== 'block' ? 'none' : wt.wrapInserts;
 };
 
+/**
+ * Ponto do mundo em (t, s) no sistema do VÃO. Parede reta: o próprio `pointAt`. Parede curva: o sistema é RETO, orientado
+ * pela tangente no centro do vão (o mesmo do furo em `resolve.ts`, do batente e da folha); um `pointAt` radial não
+ * coincide com o furo e deixa cunhas de acabamento junto às ombreiras.
+ */
+export function vaoPoint(f: WallFrame, offset: number): (t: number, s: number) => Vec2 {
+  if (!f.arc) return (t, s) => pointAt(f, t, s);
+  const c = pointAt(f, offset, f.sMid);
+  const u = tangentAt(f, offset);
+  const n = perp(u);
+  return (t, s) => ({ x: c.x + u.x * (t - offset) + n.x * (s - f.sMid), y: c.y + u.y * (t - offset) + n.y * (s - f.sMid) });
+}
+
 /** Contorno do batente na planta, em coordenadas do mundo: o que o retorno do acabamento não pode invadir. */
 export function insertFrameFootprint(f: WallFrame, offset: number, ot: OpeningType, side: 1 | -1): MultiPolygon | null {
   if (ot.leaves === 0 || openingFrameStyle(ot) === 'block') return null;
@@ -58,7 +71,8 @@ export function insertFrameFootprint(f: WallFrame, offset: number, ot: OpeningTy
   const dims = openingFrameDims(f, ot);
   const { D, Cd, J } = dims;
   const hw = ot.width / 2;
-  const toWorld = (t: number, s: number): { x: number; y: number } => pointAt(f, t, f.sMid + s);
+  const at = vaoPoint(f, offset);
+  const toWorld = (t: number, s: number): { x: number; y: number } => at(t, f.sMid + s);
   const out: MultiPolygon = [];
   if (ot.kind === 'door' && (style === 'rebate' || style === 'aduela')) {
     // Mesma seção da peça `jamb` do modelo (uma única fonte da geometria).
@@ -94,8 +108,27 @@ function depthRange(f: WallFrame, side: Side, both: boolean): [number, number] {
   return [Math.min(a, b), Math.max(a, b)];
 }
 
-function rect(f: WallFrame, t0: number, t1: number, s0: number, s1: number): Ring {
+function ringRect(f: WallFrame, t0: number, t1: number, s0: number, s1: number): Ring {
   return [pointAt(f, t0, s0), pointAt(f, t1, s0), pointAt(f, t1, s1), pointAt(f, t0, s1)];
+}
+
+/** Faixa da parede curva entre as curvas de profundidade `s0` e `s1`, ao longo de [t0, t1] (aproxima os arcos por segmentos). */
+function wallBand(f: WallFrame, t0: number, t1: number, s0: number, s1: number): MultiPolygon {
+  const N = 16;
+  const ts = Array.from({ length: N + 1 }, (_, i) => t0 + ((t1 - t0) * i) / N);
+  return [[[...ts.map((t) => pointAt(f, t, s1)), ...[...ts].reverse().map((t) => pointAt(f, t, s0))]]];
+}
+
+/**
+ * Retângulo do retorno no sistema do vão. Parede curva: as bordas laterais são retas (as do furo), mas a faixa de profundidade
+ * [s0, s1] segue as curvas da parede (faces e plano médio), senão a divisão entre as faces externa e interna sai deslocada.
+ */
+function rect(f: WallFrame, offset: number, t0: number, t1: number, s0: number, s1: number): MultiPolygon {
+  const at = vaoPoint(f, offset);
+  if (!f.arc) return [[[at(t0, s0), at(t1, s0), at(t1, s1), at(t0, s1)]]];
+  const big = f.thickness + 0.5;
+  const tall: MultiPolygon = [[[at(t0, f.sMid - big), at(t1, f.sMid - big), at(t1, f.sMid + big), at(t0, f.sMid + big)]]];
+  return intersection(tall, wallBand(f, Math.min(t0, t1) - 0.2, Math.max(t0, t1) + 0.2, s0, s1));
 }
 
 export interface LayerReturn {
@@ -117,10 +150,7 @@ export function insertReturns(f: WallFrame, offset: number, width: number, mode:
       if (w.off + w.thickness >= width / 2 - 1e-3) continue; // não cabe no vão
       const a0 = offset - width / 2 + w.off;
       const b1 = offset + width / 2 - w.off;
-      const cru: MultiPolygon = [
-        [rect(f, a0, a0 + w.thickness, s0, s1)],
-        [rect(f, b1 - w.thickness, b1, s0, s1)],
-      ];
+      const cru: MultiPolygon = [...rect(f, offset, a0, a0 + w.thickness, s0, s1), ...rect(f, offset, b1 - w.thickness, b1, s0, s1)];
       const poly = footprint ? difference(cru, footprint) : cru;
       if (poly.length > 0) out.push({ layerIndex: w.index, poly });
     }
@@ -136,7 +166,7 @@ export function endReturns(f: WallFrame, which: 'a' | 'b', mode: WrapMode): Laye
     const [s0, s1] = depthRange(f, side, sides.length === 2);
     for (const w of wrappingLayers(f.type, side)) {
       const [t0, t1] = which === 'a' ? [-(w.off + w.thickness), -w.off] : [f.length + w.off, f.length + w.off + w.thickness];
-      out.push({ layerIndex: w.index, poly: [[rect(f, t0, t1, s0, s1)]] });
+      out.push({ layerIndex: w.index, poly: [[ringRect(f, t0, t1, s0, s1)]] });
     }
   }
   return out;

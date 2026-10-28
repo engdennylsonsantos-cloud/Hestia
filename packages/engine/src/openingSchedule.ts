@@ -1,4 +1,4 @@
-import { isOpening, openingFamilyName, openingLintel, openingRough, openingSillBeam, type Id, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
+import { isOpening, leafSizeOf, openingFamilyName, openingLintel, openingRough, openingSillBeam, spanTypeOf, type Id, type OpeningLeaves, type OpeningLintel, type Project } from '@hestia/model';
 import { csvDocument, csvText, formatDecimal } from './csv.ts';
 
 /**
@@ -13,8 +13,12 @@ export interface OpeningScheduleRow {
   typeName: string;
   /** Nome da família (openingFamilyName), como "Porta de giro"; vazio quando a combinação (símbolo × folhas) não existe. */
   familyName: string;
+  /** Vão (m): com `nominalRef` 'leaf' é a folha mais a folga; nos demais, o próprio `width`/`height` do tipo. */
   width: number;
   height: number;
+  /** Folha nominal (m): a "80 x 210" do comércio. Igual ao vão menos a folga quando o tipo é dado pelo vão. */
+  leafWidth: number;
+  leafHeight: number;
   /** Vão bruto (furo na parede): largura e altura do tipo mais a folga `roughOversize`. */
   roughWidth: number;
   roughHeight: number;
@@ -81,8 +85,10 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
   }
   const rows: OpeningScheduleRow[] = [];
   for (const [typeId, count] of counts) {
-    const t = p.openingTypes[typeId];
-    if (!t) continue;
+    const raw = p.openingTypes[typeId];
+    if (!raw) continue;
+    const t = spanTypeOf(raw);
+    const leaf = leafSizeOf(raw);
     const unitArea = t.width * t.height;
     const rough = openingRough(t);
     const lintel = openingLintel(t);
@@ -95,6 +101,8 @@ export function buildOpeningSchedule(p: Project): OpeningSchedule {
       familyName: openingFamilyName(t) ?? '',
       width: t.width,
       height: t.height,
+      leafWidth: leaf.width,
+      leafHeight: leaf.height,
       roughWidth: rough.width,
       roughHeight: rough.height,
       sill: t.sill,
@@ -145,6 +153,8 @@ const CSV_HEADER = [
   'Quantidade',
   'Área unitária (m²)',
   'Área total (m²)',
+  'Folha largura (m)',
+  'Folha altura (m)',
 ];
 
 /**
@@ -169,7 +179,9 @@ export function openingScheduleToCsv(rows: OpeningScheduleRow[], totals: Opening
     String(r.count),
     n(r.unitArea, 2),
     n(r.totalArea, 2),
+    n(r.leafWidth, 2),
+    n(r.leafHeight, 2),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2)];
+  const total = ['Total', '', '', '', '', '', '', '', '', '', '', '', String(totals.count), '', n(totals.totalArea, 2), '', ''];
   return csvDocument([CSV_HEADER, ...body, total]);
 }

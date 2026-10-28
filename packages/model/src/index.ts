@@ -31,6 +31,7 @@ export * from './elementLevel.ts';
 export * from './opening.ts';
 export * from './openingTypeLibrary.ts';
 export * from './openingExtras.ts';
+export * from './openingNominal.ts';
 export * from './openingStyle.ts';
 export * from './openingSupport.ts';
 export * from './dimension.ts';

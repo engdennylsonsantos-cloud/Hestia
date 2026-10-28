@@ -10,7 +10,7 @@ import {
   type PartRole,
   type WallFrame,
 } from '@hestia/engine';
-import { openingAngle3d, openingDetail3d, type Id, type Opening, type OpeningType, type Project } from '@hestia/model';
+import { openingTypeById, openingAngle3d, openingDetail3d, type Id, type Opening, type OpeningType, type Project } from '@hestia/model';
 
 /**
  * Peça da esquadria no 3D, em coordenadas locais do vão: x ao longo da parede, y na profundidade (0 = eixo da
@@ -69,7 +69,7 @@ function materialIdOf(part: OpeningPart, p: Project, frameId: Id, glassId: Id): 
  * do tipo (graus → rad) e `partTransformed`; o detalhe 3D (`detail3d`) só filtra os papéis que a vista mostra.
  */
 export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame, H: number, open: boolean): OpeningPiece[] {
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return [];
   // A altura das peças é limitada pela parede, como antes (o modelo usa a altura nominal do tipo).
   const geom = g.height > H - g.sill ? { ...g, height: H - g.sill } : g;

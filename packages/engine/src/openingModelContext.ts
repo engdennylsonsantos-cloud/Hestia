@@ -1,4 +1,5 @@
 import {
+  openingTypeById,
   coreSpan,
   openingFrame,
   openingFrameDepth,
@@ -161,7 +162,7 @@ export function jambSection(d: FrameDims, hw: number, side: 1 | -1, j: 1 | -1, o
 }
 
 export function makeCtx(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): Ctx | null {
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return null;
   const core = openingCore(f);
   const fr = openingFrame(t, core.s1 - core.s0);

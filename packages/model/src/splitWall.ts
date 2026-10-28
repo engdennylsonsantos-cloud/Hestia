@@ -3,6 +3,7 @@ import type { Command } from './commands.ts';
 import { DEFAULT_JOIN } from './wall.ts';
 import { splitProfile } from './profile.ts';
 import { isOpening, isWall, type Opening, type Project, type Wall } from './types.ts';
+import { openingTypeById } from './openingNominal.ts';
 
 const EPS = 1e-9;
 /** Largura usada quando o tipo de abertura não existe (mesmo padrão de clampOffset). */
@@ -38,7 +39,7 @@ export function splitWall(p: Project, c: Extract<Command, { type: 'splitWall' }>
   const newLen = L - hi;
 
   for (const o of Object.values(p.elements).filter(isOpening).filter((x) => x.hostId === w.id)) {
-    const half = (p.openingTypes[o.typeId]?.width ?? DEFAULT_WIDTH) / 2;
+    const half = (openingTypeById(p, o.typeId)?.width ?? DEFAULT_WIDTH) / 2;
     if (o.offset < lo) {
       // Fica na original: só cabe se o vão terminar antes do novo fim.
       if (o.offset - half < -EPS || o.offset + half > lo + EPS) delete p.elements[o.id];

@@ -35,6 +35,7 @@ import { flatEnd } from './joinSides.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
+import { cutHalfOf, openingRect } from './openingCut.ts';
 import { attachTargets } from './attachTargets.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { wallZRange, type WallZ } from './wallZ.ts';
@@ -242,17 +243,13 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
     flipHand: o.flipHand,
     flipFacing: o.flipFacing,
     offset: o.offset,
+    ...(f.arc ? { cutHalf: cutHalfOf(f, rough.width / 2) } : {}),
   };
 }
 
-const openingRect = (g: OpeningGeometry): MultiPolygon => [
-  [orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.roughWidth / 2, g.thickness / 2 + 0.02)],
-];
-
-
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
   const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}:${i.outline ? 1 : 0}|${ringsOfShape(i.shape)}`);
-  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.roughWidth)}|${round(g.roughHeight)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
+  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.roughWidth)}|${round(g.roughHeight)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}|${round(g.cutHalf ?? 0)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
 

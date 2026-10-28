@@ -1,4 +1,4 @@
-import { clampOffset, isOpening, isWall, type Id, type Opening, type Project, type ProjectStore, wallLength } from '@hestia/model';
+import { openingTypeById, clampOffset, isOpening, isWall, type Id, type Opening, type Project, type ProjectStore, wallLength } from '@hestia/model';
 
 const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 
@@ -13,7 +13,7 @@ export type OpeningTypePlan =
  * sobrepõe outra abertura da mesma parede (decisão de segurança: nada muda em silêncio).
  */
 export function planOpeningTypeChange(p: Project, ids: Id[], typeId: Id): OpeningTypePlan {
-  const t = p.openingTypes[typeId];
+  const t = openingTypeById(p, typeId);
   if (!t) return { ok: false, message: 'Tipo de abertura inexistente.' };
   const updates: Array<{ id: Id; offset: number; from: number }> = [];
   for (const id of ids) {
@@ -28,7 +28,7 @@ export function planOpeningTypeChange(p: Project, ids: Id[], typeId: Id): Openin
     // Outras aberturas da mesma parede (as da própria seleção ficam de fora: mudam juntas, com o mesmo tipo).
     const clash = Object.values(p.elements).some((e) => {
       if (!isOpening(e) || e.hostId !== host.id || ids.includes(e.id)) return false;
-      const w = (p.openingTypes[e.typeId]?.width ?? 0.8) / 2;
+      const w = (openingTypeById(p, e.typeId)?.width ?? 0.8) / 2;
       return offset + half > e.offset - w + 1e-6 && offset - half < e.offset + w - 1e-6;
     });
     if (clash) return { ok: false, message: `Sem espaço para ${t.name} nesta parede: a abertura sobreporia outra.` };

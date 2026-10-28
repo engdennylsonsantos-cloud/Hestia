@@ -24,7 +24,7 @@ import { buildSectionDrawList, type SectionInput } from './section/build.ts';
 import { openingSymbol } from './plan/symbols.ts';
 import { LIGHT } from './plan/types.ts';
 import { openingPieces, type OpeningPiece } from './model3d/openingParts.ts';
-import { caixasDaAbertura, montarAbertura } from './model3d/aberturas3d.ts';
+import { caixasEPrismasDaAbertura, montarAbertura } from './model3d/aberturas3d.ts';
 
 const p = (): Project => buildTemplate('esquadrias');
 const aberturas = (proj: Project): Opening[] => Object.values(proj.elements).filter(isOpening);
@@ -221,7 +221,8 @@ describe('catálogo completo: 3D', () => {
       for (const open of [false, true]) {
         const pecas = openingPieces(proj, o, g, f, 2.8, open);
         const montada = montarAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open }, false, desenhar);
-        const caixas = caixasDaAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open });
+        const em = caixasEPrismasDaAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open });
+        const caixas = em?.caixas ?? null;
         if (vazio) {
           expect(pecas).toHaveLength(0);
           expect(montada).toBeNull();
@@ -230,9 +231,14 @@ describe('catálogo completo: 3D', () => {
         }
         expect(montada, o.id).not.toBeNull();
         expect(caixas, o.id).not.toBeNull();
-        expect(caixas!.length, `${o.id} ${open ? 'aberta' : 'fechada'}`).toBe(pecas.length);
-        for (let i = 0; i < pecas.length; i++) {
-          const esperado = centroEsperado(pecas[i]!, g, 0);
+        // Peças com perfil (batente em L, alizar em silhueta) viram prismas; as demais, caixas unitárias. A cena
+        // equivalente tem uma caixa por peça sem perfil e um prisma por peça com perfil.
+        const emCaixa = pecas.filter((x) => !x.profile);
+        const emPrisma = pecas.filter((x) => x.profile);
+        expect(caixas!.length, `${o.id} ${open ? 'aberta' : 'fechada'} caixas`).toBe(emCaixa.length);
+        expect(em!.prismas.length, `${o.id} ${open ? 'aberta' : 'fechada'} prismas`).toBe(emPrisma.length);
+        for (let i = 0; i < emCaixa.length; i++) {
+          const esperado = centroEsperado(emCaixa[i]!, g, 0);
           const pos = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(caixas![i]!.matriz));
           expect(pos.x, `${o.id} peça ${i}`).toBeCloseTo(esperado.x, 9);
           expect(pos.y, `${o.id} peça ${i}`).toBeCloseTo(esperado.y, 9);

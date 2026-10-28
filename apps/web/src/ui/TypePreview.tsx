@@ -217,4 +217,3 @@ function WindowDrawing({ t, uid }: { t: OpeningType; uid: string }): ReactElemen
     </svg>
   );
 }
-

@@ -89,4 +89,3 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
     </>
   );
 }
-

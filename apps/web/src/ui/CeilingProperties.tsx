@@ -102,4 +102,3 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
     </>
   );
 }
-

@@ -438,4 +438,3 @@ export function Properties(): ReactElement {
     </aside>
   );
 }
-

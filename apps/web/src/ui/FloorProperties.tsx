@@ -100,4 +100,3 @@ export function FloorProperties({ floors }: { floors: Floor[] }): ReactElement {
     </>
   );
 }
-

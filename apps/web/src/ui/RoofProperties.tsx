@@ -224,4 +224,3 @@ export function RoofProperties({ roofs }: { roofs: Roof[] }): ReactElement {
     </>
   );
 }
-

@@ -140,4 +140,3 @@ export function SlabProperties({ slabs }: { slabs: Slab[] }): ReactElement {
     </>
   );
 }
-

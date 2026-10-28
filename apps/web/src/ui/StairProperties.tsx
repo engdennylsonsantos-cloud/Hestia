@@ -208,4 +208,3 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
     </>
   );
 }
-

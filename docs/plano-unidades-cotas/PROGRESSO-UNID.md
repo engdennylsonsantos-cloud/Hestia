@@ -11,7 +11,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - **MARCO M1 LIBERADO 5926d8af** (Fase A até U6 integrada: `formatQuantity`, `parseQuantity`, `useUnits`/`useFormat`, `NumField quantity`)
 - [x] U7 exportações independentes
 - [x] C0 trava `check-units` + base + script lint (`03`)  → **marco M2**
-- **MARCO M2 LIBERADO <a definir neste commit>** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
+- **MARCO M2 LIBERADO 680bd5aa** (`scripts/check-units.mjs`, `scripts/units-baseline.json` e `machineNumber`)
 - [ ] B1–B4 diálogo Unidades (`02`)  → **marco M3**
 - [ ] C1 painel de propriedades
 - [ ] C2 diálogos

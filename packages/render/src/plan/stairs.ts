@@ -255,8 +255,8 @@ function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, Spir
  * de corte e seta de subida "SOBE" pela caminhada (explícita, se válida, senão automática). No grosseiro, só o preenchimento do contorno. No fino,
  * número de cada degrau (`treadNumber`: contínuo na escada, o espelho que o degrau alcança). Com etiquetas ligadas, o código do tipo no centroide.
  *
- * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e o que está acima do topo não sai:
- * degrau ou espelho com topo acima de `view.topZ` é omitido. Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
+ * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e a escada que começa acima de `view.topZ`
+ * não sai; a que começa abaixo sai inteira, até o seu próprio topo (o fim do lance não some por passar do topo da vista). Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
  *
  * Caracol (decisão 0014 §1 item 9): as voltas sobrepõem-se em planta. Degrau acima do corte não pinta sobre a volta de
  * baixo (`aboveFill`); o rótulo de cima sai para dentro do setor (`treadLabelAt`) e, acima do corte, em tom claro
@@ -280,8 +280,10 @@ export function stairFills(
   const lineColor = mix(theme.ink, fillBase, 0.35);
   for (const s of stairs) {
     const cutZ = view?.cutZ ?? s.baseZ + STAIR_CUT_HEIGHT;
-    const topZ = view?.topZ ?? Infinity;
-    if (s.baseZ > topZ + 1e-9) continue;
+    // Escada que começa abaixo do topo da vista sai inteira, até o próprio topo: cortar no topo da vista (2,30 m) tirava o fim do lance.
+    const viewTop = view?.topZ ?? Infinity;
+    if (s.baseZ > viewTop + 1e-9) continue;
+    const topZ = Math.max(viewTop, s.topZ);
     const steps = s.steps.filter((st) => st.z <= topZ + 1e-9);
     const m = p.materials[s.type.materialId];
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);

@@ -248,15 +248,15 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   const risers = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === RISER_PX);
   const treads = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => s.closed);
 
-  it('corte baixo (0,50 m) e topo (1,00 m): degraus acima do topo saem; acima do corte, tracejados; espelhos acima do topo saem', () => {
+  it('corte baixo (0,50 m) e topo (1,00 m): a escada sai inteira (o topo da vista não corta o lance); acima do corte, tracejados', () => {
     const o = ops({ cutZ: 0.5, topZ: 1.0 });
-    // Degraus com topo em k·H: k = 1..5 (até 0,875 m) estão na vista; k = 6..9 (1,05 a 1,575 m) saem.
-    expect(treads(o)).toHaveLength(5);
-    // Acima do corte (0,50 m): k = 3, 4, 5 (0,525; 0,70; 0,875 m) tracejados; k = 1 e 2 contínuos.
-    expect(dashed(treads(o))).toHaveLength(3);
+    // Degraus com topo em k·H: k = 1..9 saem todos, mesmo os de 1,05 a 1,575 m acima do topo da vista.
+    expect(treads(o)).toHaveLength(N - 1);
+    // Acima do corte (0,50 m): k = 3..9 tracejados; k = 1 e 2 contínuos.
+    expect(dashed(treads(o))).toHaveLength(7);
     expect(solid(treads(o))).toHaveLength(2);
-    // Espelhos com topo até 1,00 m: k = 1..5.
-    expect(risers(o)).toHaveLength(5);
+    // Todos os espelhos (k = 1..10).
+    expect(risers(o)).toHaveLength(N);
     // O plano de corte (0,50 m) cruza a escada: símbolo de corte presente.
     expect(o.strokes.some((s) => !s.closed && s.pts.length === 9)).toBe(true);
   });

@@ -1,9 +1,22 @@
-import { describe, expect, it } from 'vitest';
-import { ProjectStore, areaPlanOf, createEmptyProject, levelDimensions, levelTexts, makeWall, planAnnotationsOf } from '@hestia/model';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ProjectStore, areaPlanOf, createEmptyProject, levelDimensions, levelTexts, makeWall, planAnnotationsOf, type Dimension } from '@hestia/model';
 import { createAreaPlanAction } from '../editor/areaPlanActions.ts';
+import { editor } from '../editor/controller.ts';
 import { deleteSelectionIn } from '../editor/deleteIds.ts';
 import { useUi } from '../editor/state.ts';
-import { selectedNote, updateTextIn } from './AnnotationProps.tsx';
+import { AnnotationProps, selectedNote, updateTextIn } from './AnnotationProps.tsx';
+
+// O painel real assina o projeto pelo editor; no teste basta o projeto atual (sem `getServerSnapshot` no render de servidor).
+vi.mock('../editor/controller.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../editor/controller.ts')>();
+  return { ...actual, useProject: () => actual.editor.project };
+});
+
+afterEach(() => {
+  editor.store.exec({ type: 'setSettings', patch: { units: undefined } });
+});
 
 const LV0 = 'lv_0';
 
@@ -78,5 +91,13 @@ describe('anotações da planta de área no painel', () => {
     expect(useUi.getState().selection).toEqual([]);
     s.undo();
     expect(planAnnotationsOf(areaPlanOf(s.project, planId)!).texts).toHaveLength(1);
+  });
+
+  it('o valor da cota e a unidade seguem as unidades do projeto', () => {
+    editor.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const dim: Dimension = { id: 'd1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1 };
+    const html = renderToStaticMarkup(createElement(AnnotationProps, { dim }));
+    expect(html).toContain('400,0 cm');
+    expect(html).toContain('value="project" selected=""');
   });
 });

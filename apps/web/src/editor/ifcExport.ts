@@ -8,13 +8,16 @@ import {
   resolveRoofs,
   resolveSlabs,
   resolveStairs,
+  resolveRamps,
+  rampBody,
   roofThickness,
   stairArrivalTopZ,
   stairBody,
+  type ResolvedRamp,
   type ResolvedStair,
 } from '@hestia/engine';
-import { exportIfc, type IfcGeometry, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcStairGeo } from '@hestia/io';
-import { isOpening, openingSill, openingType, wallBaseElevation, type Id, type Project, type Wall } from '@hestia/model';
+import { exportIfc, type IfcGeometry, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcRampGeo, type IfcStairGeo } from '@hestia/io';
+import { isOpening, isRamp, openingSill, openingType, wallBaseElevation, type Id, type Project, type Wall } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /** Cota constante (sem inclinação). */
@@ -104,6 +107,29 @@ function stairOf(p: Project, s: ResolvedStair): IfcStairGeo {
   };
 }
 
+/** Rampa resolvida em lances (prismas de topo inclinado) e patamares, com o comprimento horizontal de cada lance. */
+function rampOf(p: Project, rr: ResolvedRamp): IfcRampGeo {
+  const { pieces } = rampBody(rr);
+  const prismOf = (pc: (typeof pieces)[number]): IfcPrism => ({
+    polygon: [pc.polygon],
+    top: { a: pc.top.a, b: pc.top.b, c: pc.top.c },
+    bottom: { a: pc.bottom.a, b: pc.bottom.b, c: pc.bottom.c },
+  });
+  const el = p.elements[rr.id];
+  const flights = rr.flights.flatMap((f) => {
+    const piece = pieces.find((pc) => pc.kind === 'flight' && pc.componentIndex === f.componentIndex);
+    return piece ? [{ componentIndex: f.componentIndex, prism: prismOf(piece), length: f.length }] : [];
+  });
+  return {
+    rampId: rr.id,
+    levelId: rr.levelId,
+    shape: isRamp(el) ? el.shape : 'straight',
+    slope: rr.slope,
+    flights,
+    landings: pieces.filter((pc) => pc.kind === 'landing').map(prismOf),
+  };
+}
+
 
 /** Pisos do nível com o contorno da região resolvida pela junção (F7.1): a região quando houve corte, senão o contorno. */
 function resolveFloorsWithJunction(p: Project, levelId: Id) {
@@ -151,7 +177,8 @@ export function ifcGeometryOf(p: Project): IfcGeometry {
     return { roofId: r.roofId, planes };
   });
   const stairs = resolveStairs(p).map((s) => stairOf(p, s));
-  return { walls, openings: openingsOf(p), floors, slabs, roofs, stairs };
+  const ramps = resolveRamps(p).map((rr) => rampOf(p, rr));
+  return { walls, openings: openingsOf(p), floors, slabs, roofs, stairs, ramps };
 }
 
 /** Texto IFC4 (STEP) do projeto inteiro, com a data atual no cabeçalho. */

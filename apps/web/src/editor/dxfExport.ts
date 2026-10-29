@@ -1,9 +1,10 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfLayersOf,
   dxfLineRoleOf,
+  DXF_LAYER_RAMP_TEXT,
   DXF_LAYER_ROOM_TEXT,
   dxfLineWeight,
   dxfSectionLayersOf,
@@ -20,7 +21,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { GRAPHICS_CATEGORIES, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -33,6 +34,7 @@ function resolvedRegion(jl: JunctionLevel, id: Id, polygon: MultiPolygon): Multi
 }
 
 type StairDxf = NonNullable<DxfLevelGeometry['stairs']>[number];
+type RampDxf = NonNullable<DxfLevelGeometry['ramps']>[number];
 
 /** Tolerância (m) nas comparações de cota, como na tela (a borda exata conta como dentro). */
 const EPS = 1e-9;
@@ -123,6 +125,48 @@ export function stairDxf(p: Project, r: ResolvedStair, view: { cutZ: number; top
     cut: cut ? cutSymbolDxf(cut) : undefined,
     ...(posts.length > 0 ? { posts } : {}),
   };
+}
+
+/**
+ * Rampa resolvida em geometria de DXF: lances e patamares até o topo do intervalo, divididos pela cota de corte (cheios
+ * até ela, tracejados acima); seta por lance no eixo `start → end`; linha de corte transversal no lance cruzado e o texto
+ * da inclinação no meio do primeiro lance, girado com o eixo. O lance que cruza o corte aparece nas duas camadas.
+ */
+export function rampDxf(_p: Project, rr: ResolvedRamp, view: { cutZ: number; topZ: number }): RampDxf {
+  const outline = (ring: { x: number; y: number }[]): DxfPoint[] => ring.map((q) => ({ x: q.x, y: q.y }));
+  const outlines: DxfPoint[][] = [];
+  const outlinesAbove: DxfPoint[][] = [];
+  for (const f of rr.flights) {
+    const poly = outline(f.polygon);
+    if (f.z0 <= view.cutZ + EPS) outlines.push(poly);
+    if (f.z1 > view.cutZ + EPS && f.z1 <= view.topZ + EPS) outlinesAbove.push(poly);
+  }
+  for (const l of rr.landings) {
+    if (l.z > view.topZ + EPS) continue;
+    if (l.z <= view.cutZ + EPS) outlines.push(outline(l.polygon));
+    else outlinesAbove.push(outline(l.polygon));
+  }
+  const arrow = rr.flights.flatMap((f) => stairArrow({ x: f.start.x, y: f.start.y }, { x: f.end.x, y: f.end.y }));
+  const cut = rr.flights
+    .filter((f) => f.z0 < view.cutZ && view.cutZ < f.z1)
+    .map((f): [DxfPoint, DxfPoint] => {
+      const t = (view.cutZ - f.z0) / (f.z1 - f.z0);
+      const at = (a: { x: number; y: number }, b: { x: number; y: number }): DxfPoint => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      return [at(f.startEdge[0], f.endEdge[0]), at(f.startEdge[1], f.endEdge[1])];
+    });
+  const first = rr.flights[0];
+  const texts = first
+    ? [
+        {
+          at: { x: (first.start.x + first.end.x) / 2, y: (first.start.y + first.end.y) / 2 },
+          text: formatRampSlope(rr.slope),
+          height: ROOM_TEXT_HEIGHT_M,
+          rotation: (Math.atan2(first.end.y - first.start.y, first.end.x - first.start.x) * 180) / Math.PI,
+          layer: DXF_LAYER_RAMP_TEXT,
+        },
+      ]
+    : [];
+  return { outlines, outlinesAbove, arrow, cut, texts };
 }
 
 /**
@@ -233,6 +277,12 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
           .filter((s) => !hidden.has(s.id))
           .map((s) => stairDxf(p, s, { cutZ: view.cutZ, topZ: view.topZ }))
       : [],
+    // Rampas: mesma categoria gráfica da escada; contornos, seta, corte e inclinação.
+    ramps: shown('stair')
+      ? resolveRampsOnLevel(p, levelId)
+          .filter((rr) => !hidden.has(rr.id))
+          .map((rr) => rampDxf(p, rr, { cutZ: view.cutZ, topZ: view.topZ }))
+      : undefined,
     // Telhado: contorno do beiral e linhas de cumeeira, espigão e rincão (as de beiral já estão no contorno).
     roofs: shown('roof')
       ? roofs

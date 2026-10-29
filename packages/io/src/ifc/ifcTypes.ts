@@ -69,6 +69,23 @@ export interface IfcStairGeo {
   landings: IfcPrism[];
 }
 
+/** Lance da rampa resolvido: prisma do corpo (topo inclinado) e comprimento horizontal. */
+export interface IfcRampFlightGeo {
+  componentIndex: number;
+  prism: IfcPrism;
+  length: number;
+}
+
+/** Rampa resolvida: lances (IfcRampFlight), patamares (IfcSlab LANDING) e forma do percurso. */
+export interface IfcRampGeo {
+  rampId: Id;
+  levelId: Id;
+  shape: 'straight' | 'lshape' | 'ushape';
+  slope: number;
+  flights: IfcRampFlightGeo[];
+  landings: IfcPrism[];
+}
+
 /**
  * Geometria RESOLVIDA do projeto, montada por quem pode importar o engine (apps/web): o io não importa o engine
  * (docs/01 §1). Pisos, lajes e águas de telhado vêm como prismas; as cotas são absolutas e o io as põe na cota do nível.
@@ -80,4 +97,6 @@ export interface IfcGeometry {
   slabs: Array<{ slabId: Id; prisms: IfcPrism[] }>;
   roofs: Array<{ roofId: Id; planes: IfcPrism[] }>;
   stairs: IfcStairGeo[];
+  /** Rampas resolvidas. Ausente = nenhuma (mantém os montadores antigos de geometria válidos). */
+  ramps?: IfcRampGeo[];
 }

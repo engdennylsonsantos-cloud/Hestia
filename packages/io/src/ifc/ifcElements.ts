@@ -1,8 +1,8 @@
-import { isFloor, isRoof, isSlab, isStair, type Roof } from '@hestia/model';
+import { isFloor, isRamp, isRoof, isSlab, isStair, type Roof } from '@hestia/model';
 import { gid, storeyOf, type IfcCtx, type IfcStorey } from './ifcCtx.ts';
 import { localPlacement, prismsShape } from './ifcSolids.ts';
 import { en, int, list, num, OMIT, ref, stepString } from './ifcStep.ts';
-import type { IfcGeometry, IfcPrism } from './ifcTypes.ts';
+import type { IfcGeometry, IfcPrism, IfcRampGeo } from './ifcTypes.ts';
 
 /** Tipo de laje: fundação ou radier vira BASESLAB; o resto, FLOOR (IfcSlabTypeEnum). */
 export const slabKindOf = (typeName: string): 'BASESLAB' | 'FLOOR' => (/fund|radier|baldr/i.test(typeName) ? 'BASESLAB' : 'FLOOR');
@@ -100,6 +100,50 @@ export function addStairs(c: IfcCtx, geo: IfcGeometry): void {
     if (flights.length > 0) c.w.add('IFCRELAGGREGATES', [gid(`stairagg:${s.stairId}`), OMIT, OMIT, OMIT, ref(stair), list(flights.map(ref))]);
     s.landings.forEach((pr, i) => {
       st.contained.push(slabEntity(c, st, `landing:${s.stairId}:${i}`, `${name} - patamar ${i + 1}`, [pr], 'LANDING'));
+    });
+  }
+}
+
+/** Tipo da rampa no IFC (IfcRampTypeEnum): pela forma e pelo número de lances. */
+export function rampKindOf(shape: IfcRampGeo['shape'], flights: number): string {
+  if (shape === 'lshape') return 'QUARTER_TURN_RAMP';
+  if (shape === 'ushape') return 'HALF_TURN_RAMP';
+  if (shape === 'straight' && flights === 1) return 'STRAIGHT_RUN_RAMP';
+  if (shape === 'straight' && flights === 2) return 'TWO_STRAIGHT_RUN_RAMP';
+  return 'NOTDEFINED';
+}
+
+/**
+ * Rampas: IFCRAMP contido no pavimento de base, agregando um IFCRAMPFLIGHT por lance (prisma de topo inclinado) e um IFCSLAB
+ * LANDING por patamar, contido no pavimento. O tipo do IFCRAMP segue a forma e o número de lances.
+ */
+export function addRamps(c: IfcCtx, geo: IfcGeometry): void {
+  for (const r of geo.ramps ?? []) {
+    const el = c.p.elements[r.rampId];
+    const st = isRamp(el) ? storeyOf(c, el.levelId) : undefined;
+    if (!isRamp(el) || !st) continue;
+    const name = c.p.rampTypes[el.typeId]?.name ?? 'Rampa';
+    const place = localPlacement(c.w, st.place, [0, 0, 0]);
+    const ramp = c.w.add('IFCRAMP', [gid(`ramp:${r.rampId}`), OMIT, stepString(name), OMIT, OMIT, ref(place), OMIT, OMIT, en(rampKindOf(r.shape, r.flights.length))]);
+    st.contained.push(ramp);
+    const flights = r.flights.map((f) => {
+      const fPlace = localPlacement(c.w, st.place, [0, 0, 0]);
+      const shape = prismsShape(c.w, c.ctx, [f.prism], st.elev);
+      return c.w.add('IFCRAMPFLIGHT', [
+        gid(`rampflight:${r.rampId}:${f.componentIndex}`),
+        OMIT,
+        stepString(`${name} - lance ${f.componentIndex}`),
+        OMIT,
+        OMIT,
+        ref(fPlace),
+        ref(shape),
+        OMIT,
+        en('STRAIGHT'),
+      ]);
+    });
+    if (flights.length > 0) c.w.add('IFCRELAGGREGATES', [gid(`rampagg:${r.rampId}`), OMIT, OMIT, OMIT, ref(ramp), list(flights.map(ref))]);
+    r.landings.forEach((pr, i) => {
+      st.contained.push(slabEntity(c, st, `landing:${r.rampId}:${i}`, `${name} - patamar ${i + 1}`, [pr], 'LANDING'));
     });
   }
 }

@@ -54,9 +54,17 @@ for (const nome of arquivos) {
 
 const volta = viteNode(join('scripts', 'ifc-quality', 'roundtrip.mts'));
 const roundtripOk = (volta.stdout ?? '').includes('todos os modelos');
+const comparacao = viteNode(join('scripts', 'ifc-quality', 'compare.mts'));
+process.stdout.write(comparacao.stdout ?? '');
+let n2: unknown = null;
+try {
+  n2 = JSON.parse(readFileSync(join(saida, 'compare.json'), 'utf8'));
+} catch {
+  n2 = null;
+}
 writeFileSync(
   join(saida, 'report.json'),
-  JSON.stringify({ data: new Date().toISOString(), roundtripOk, modelos: relatorio }, null, 2),
+  JSON.stringify({ data: new Date().toISOString(), roundtripOk, n2, modelos: relatorio }, null, 2),
 );
 
 console.log('| modelo | erros | paredes | portas | janelas | lajes | telhados | escadas | ambientes | eixos | volume | arquivo |');

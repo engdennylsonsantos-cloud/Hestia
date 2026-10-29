@@ -76,9 +76,23 @@ O harness já achou e corrigiu um erro de schema (`IfcWindowPanelProperties` com
 Cada lane roda `tsc` a cada commit e **`npm run test:ifc-export`** ao terminar. A suíte completa é do integrador, 1×
 por onda. Integração: o integrador liga as chamadas no `ifcExport.ts`.
 
-**Onda 2 — 4 lanes**
-F: materiais/cores/transparência de todos os nativos. G: georreferência/unidades/determinismo/tamanho.
-H: correções de interoperabilidade Revit/ArchiCAD. I: regressão visual, docs e CI.
+**Onda 2 — feita**
+F: cores/opacidade/brilho por material (`IfcMaterialDefinitionRepresentation` + `IfcSurfaceStyle`), incluindo vidro das
+esquadrias. G: comparação N2 motor × IfcOpenShell (`scripts/ifc-quality/compare.mts`, `npm run ifc:compare [-- --strict]`).
+H (georreferência) e I (matriz visual/CI) ficam para a onda 3.
+
+### N2 — divergências conhecidas (relatório, ainda sem gate estrito)
+
+`ifc:compare` mede 16 totais; 8 ficam fora da tolerância de 0,5% (volume). Causas verificadas:
+
+- **Paredes −0,4% a −0,9%**: o IFC desconta o vão bruto; o motor desconta vão + retorno de acabamento. Paredes sem vão
+  batem exato (0,000%).
+- **Escadas +3,1%**: a peça de chegada entra no `IFCSTAIRFLIGHT` e fica fora do `stairQuantities` (decisão 0012 §2).
+- **`predio10` pisos +45%**: o IFC tem a laje de piso inteira (90 m² × 0,15 m); o motor devolve 0,13 m³ nos pavimentos
+  superiores porque o quantificador desconta o volume coberto pela laje. É divergência do **motor**, não do exportador —
+  o piso exportado coincide com o desenho. Vira tarefa de engine.
+- **`predio10` lajes +2,3%**: a região exportada avança até o núcleo da parede (P8); o quantitativo não desconta.
+- **Telhados e ambientes**: 0,000%. **Forros**: ainda não exportados (sem `ceilings` no `IfcGeometry`).
 
 ## Comandos
 
@@ -86,5 +100,7 @@ H: correções de interoperabilidade Revit/ArchiCAD. I: regressão visual, docs 
 npx vite-node scripts/ifc-quality/export-fixtures.mts
 python scripts/ifc-quality/validate.py test-results/ifc-quality/house2.ifc --geometry
 npx vite-node scripts/ifc-quality/roundtrip.mts --strict
+npm run ifc:compare            # relatório N2
+npm run ifc:compare -- --strict # gate quando as divergências forem resolvidas
 npm run test:ifc-export
 ```

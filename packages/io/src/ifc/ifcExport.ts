@@ -18,6 +18,7 @@ import { externalWalls, outwardNormal, wallAxis } from './ifcExterior.ts';
 import { addGrids } from './ifcGrids.ts';
 import { addQuantities } from './ifcQuantities.ts';
 import { addSpaces } from './ifcSpaces.ts';
+import { addStyles } from './ifcStyles.ts';
 import { gid, materialOf, optStr, storeyOf, type IfcCtx, type IfcStorey } from './ifcCtx.ts';
 import { axis3, bodyShape, direction, extrudeSolid, localPlacement } from './ifcSolids.ts';
 import { en, int, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
@@ -404,6 +405,24 @@ function addOpenings(c: IfcCtx, openings: readonly IfcOpeningGeo[]): void {
   addTypeRelations(c);
 }
 
+/**
+ * Materiais citados por tipos que não escrevem `IFCMATERIAL` por conta própria: esquadrias (batente e vidro de cada
+ * tipo de abertura) e tipos de piso, laje, forro, telhado e escada (camadas e material estrutural). Só entram no arquivo
+ * para receberem estilo; nenhuma geometria é escrita aqui.
+ */
+function registerTypeMaterials(c: IfcCtx): void {
+  for (const t of Object.values(c.p.openingTypes)) {
+    materialOf(c, t.frameMaterialId);
+    materialOf(c, t.glassMaterialId);
+  }
+  for (const types of [c.p.floorTypes, c.p.slabTypes, c.p.ceilingTypes, c.p.roofTypes]) {
+    for (const t of Object.values(types)) {
+      for (const layer of t.layers) materialOf(c, layer.materialId);
+    }
+  }
+  for (const t of Object.values(c.p.stairTypes)) materialOf(c, t.materialId);
+}
+
 /** Exporta o projeto como IFC4 (texto STEP): IfcProject > IfcSite > IfcBuilding > IfcBuildingStorey (um por nível) e os elementos. */
 export { externalWalls } from './ifcExterior.ts';
 
@@ -457,5 +476,8 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
       w.add('IFCRELCONTAINEDINSPATIALSTRUCTURE', [gid(`contain:${lv.id}`), OMIT, OMIT, OMIT, list(st.contained.map(ref)), ref(st.id)]);
     }
   }
+  // Estilos por último: os materiais das esquadrias e dos tipos sem geometria própria entram só para receber cor.
+  registerTypeMaterials(c);
+  addStyles(c);
   return w.text({ fileName: `${p.name}.ifc`, timestamp: opts.timestamp ?? '1970-01-01T00:00:00' });
 }

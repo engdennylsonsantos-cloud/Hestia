@@ -16,17 +16,22 @@ import type { StairPart } from './stairSketchState.ts';
 /**
  * Formas da ferramenta Escada por cliques (decisão 0011 §5; caracol, decisão 0014 §1 item 12). Os valores de reta, L, U e
  * leque são os nomes dos geradores do modelo; `spiral` é o caracol (gerador `generateSpiralRun`, `stairSpiralRun.ts`).
+ * `free` é a escada livre: já é um valor do modelo (`generatedBy`), mas a ferramenta ainda não a desenha, então fica fora
+ * de `STAIR_RUN_SHAPES` (o seletor não a mostra) até a ferramenta existir.
  */
 export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder', 'spiral'] as const;
-export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number];
+export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number] | 'free';
 
-export const STAIR_RUN_SHAPE_LABEL: Record<StairRunShape, string> = {
+/** Rótulos das formas que a ferramenta oferece; a livre fica de fora até a ferramenta existir. */
+export const STAIR_RUN_SHAPE_LABEL: Record<Exclude<StairRunShape, 'free'>, string> = {
   straight: 'Reta',
   lshape: 'Em L',
   ushape: 'Em U',
   winder: 'Com leque',
   spiral: 'Caracol',
 };
+/** Rótulo da escada livre, ainda oculta no seletor da ferramenta. */
+export const STAIR_RUN_SHAPE_FREE_LABEL = 'Livre';
 
 /** Opções da ferramenta Escada reta/L/U/leque/caracol (`ToolOptions.stairRun`). */
 export interface StairRunToolOptions {
@@ -57,7 +62,7 @@ export const DEFAULT_STAIR_RUN_OPTIONS: StairRunToolOptions = { shape: 'straight
  * Espelhos mínimos por forma: L e U têm dois lances de 2; o leque precisa de 5 (ver `planStairRun`); o caracol, 2 (um
  * degrau; a forma é validada pelo gerador de caracol).
  */
-export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5, spiral: 2 };
+export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5, spiral: 2, free: 2 };
 
 /** Winder: espelhos do 1º lance reto; espelhos radiais do leque (padrão do gerador); o resto vai ao último lance. */
 export const WINDER_FIRST_RISERS = 2;
@@ -134,6 +139,7 @@ export type StairRunPlanResult = StairRunPlan | { error: string };
 export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const { shape, width, turn } = i.options;
   if (shape === 'spiral') return { error: 'O caracol é planejado por planSpiralRun (3 cliques).' };
+  if (shape === 'free') return { error: 'A escada livre é planejada pelo trajeto de cliques.' };
   const landingDepth = i.options.landingDepth ?? width;
   if (!(width > 0)) return { error: 'A largura do lance deve ser positiva.' };
   if (shape === 'lshape' && !(landingDepth >= width)) return { error: 'O patamar da escada em L deve ter profundidade ≥ largura do lance.' };

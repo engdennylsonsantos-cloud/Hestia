@@ -57,11 +57,20 @@ function tessellatedShape(w: StepWriter, ctx: number, faceSet: number): number {
 function addPropertySets(c: IfcCtx, g: Generic, object: number): void {
   const props = g.ifcProperties ?? [];
   if (props.length === 0) return;
-  const singles = props.map((p) =>
-    ref(c.w.add('IFCPROPERTYSINGLEVALUE', [stepString(p.name), OMIT, ifcValue(p.value), OMIT])),
-  );
-  const pset = c.w.add('IFCPROPERTYSET', [gid(`pset:${g.id}`), OMIT, stepString(PSET_NAME), OMIT, list(singles)]);
-  c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`psetrel:${g.id}`), OMIT, OMIT, OMIT, list([ref(object)]), ref(pset)]);
+  const groups = new Map<string, IfcProperty[]>();
+  for (const p of props) {
+    const name = p.pset?.trim() || PSET_NAME;
+    const list = groups.get(name);
+    if (list) list.push(p);
+    else groups.set(name, [p]);
+  }
+  for (const name of [...groups.keys()].sort()) {
+    const singles = (groups.get(name) ?? []).map((p) =>
+      ref(c.w.add('IFCPROPERTYSINGLEVALUE', [stepString(p.name), OMIT, ifcValue(p.value), OMIT])),
+    );
+    const pset = c.w.add('IFCPROPERTYSET', [gid(`pset:${g.id}:${name}`), OMIT, stepString(name), OMIT, list(singles)]);
+    c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`psetrel:${g.id}:${name}`), OMIT, OMIT, OMIT, list([ref(object)]), ref(pset)]);
+  }
 }
 
 /**

@@ -3,6 +3,7 @@ import { joinStatus, levelFrames, quantifyLevel, viewRangeWarnings } from '@hest
 import {
   FUNCTION_LABEL,
   isFloor,
+  isGeneric,
   isOpening,
   isRoof,
   isRoom,
@@ -42,6 +43,7 @@ import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { GenericProps, selectionLabel } from './GenericProps.tsx';
 import { GridProperties } from './GridProperties.tsx';
 import { gradeDaSelecao } from './gridUi.ts';
 import { LabelScroll } from './LabelScroll.tsx';
@@ -391,16 +393,15 @@ export function Properties(): ReactElement {
   const ceilings = els.filter(isCeiling);
   const roofs = els.filter(isRoof);
   const stairs = els.filter(isStair);
-  const rooms = els.filter(isRoom);
+  const rooms = els.filter(isRoom), generics = els.filter(isGeneric);
   // Grade é do projeto, não elemento: a seleção dela é um id que não está em `elements`.
   const grade = gradeDaSelecao(p, sel);
-  const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length;
-  const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
-  const label = grade ? `Grade ${grade.name}` : walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
+  const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length + generics.length;
+  const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms, generics].filter((g) => g.length > 0).length;
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
   const perim = usePerimeter();
-  const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : label;
+  const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : selectionLabel({ walls: walls.length, ops: ops.length, floors: floors.length, slabs: slabs.length, ceilings: ceilings.length, roofs: roofs.length, stairs: stairs.length, rooms: rooms.length, generics: generics.length, grade, view });
   return (
     <aside className="side" aria-label="Propriedades">
       <PanelHead panel="props" name="Propriedades" closeLabel="Fechar as propriedades" extra={<span style={{ color: 'var(--fg-faint)', fontWeight: 400 }}>{panelLabel}</span>}>
@@ -416,6 +417,7 @@ export function Properties(): ReactElement {
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
+          : kinds === 1 && generics.length > 0 ? <GenericProps items={generics} />
           : grade ? <GridProperties grid={grade} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} />
           : view ? <SectionViewProps view={view} />

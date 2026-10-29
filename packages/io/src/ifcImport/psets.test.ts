@@ -90,12 +90,12 @@ describe('propriedades e cores do IFC (psets/quantities)', () => {
     const file = new IfcFile(text);
     const props = propertiesOf(file, file.entity(10)!, file.entity(30));
     expect(props).toEqual([
-      { name: 'Area', value: 7.25 },
-      { name: 'External', value: true },
-      { name: 'Length', value: 2.5 },
-      { name: 'Status', value: 'A, B' },
-      { name: 'Tags', value: 'x, y' },
-      { name: 'TypeOnly', value: 'ok' },
+      { name: 'Area', value: 7.25, pset: 'BaseQuantities' },
+      { name: 'External', value: true, pset: 'Pset_Test' },
+      { name: 'Length', value: 2.5, pset: 'BaseQuantities' },
+      { name: 'Status', value: 'A, B', pset: 'Pset_Test' },
+      { name: 'Tags', value: 'x, y', pset: 'Pset_Test' },
+      { name: 'TypeOnly', value: 'ok', pset: 'Pset_Type' },
     ]);
   });
 });

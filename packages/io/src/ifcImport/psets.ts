@@ -55,31 +55,32 @@ export function propertiesOf(f: IfcFile, product: StepEntity, type?: StepEntity)
   const index = indexOf(f);
   const defs = [...(index.byObject.get(product.id) ?? [])];
   if (type) defs.push(...(index.byObject.get(type.id) ?? []));
-  const byName = new Map<string, Scalar>();
+  const byName = new Map<string, { value: Scalar; pset: string }>();
   for (const def of defs) readDefinition(f, def, byName);
   return [...byName.entries()]
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
     .slice(0, MAX_PROPERTIES)
-    .map(([name, value]) => ({ name, value }));
+    .map(([name, entry]) => ({ name, value: entry.value, pset: entry.pset }));
 }
 
-function readDefinition(f: IfcFile, def: StepEntity, out: Map<string, Scalar>): void {
+function readDefinition(f: IfcFile, def: StepEntity, out: Map<string, { value: Scalar; pset: string }>): void {
+  const pset = f.text(def, 2).trim() || 'Pset';
   if (def.type === 'IFCPROPERTYSET') {
-    for (const prop of f.list(def, 4)) addValue(f, prop, 2, out);
+    for (const prop of f.list(def, 4)) addValue(f, prop, 2, out, pset);
     return;
   }
   if (def.type === 'IFCELEMENTQUANTITY') {
-    for (const quantity of f.list(def, 5)) addValue(f, quantity, 3, out);
+    for (const quantity of f.list(def, 5)) addValue(f, quantity, 3, out, pset);
   }
 }
 
 /** Nome + valor de uma propriedade/quantidade; vazio, repetido ou ilegível fica de fora. */
-function addValue(f: IfcFile, e: StepEntity, valueIndex: number, out: Map<string, Scalar>): void {
+function addValue(f: IfcFile, e: StepEntity, valueIndex: number, out: Map<string, { value: Scalar; pset: string }>, pset: string): void {
   if (!READABLE.test(e.type)) return;
   const name = f.text(e, 0).trim();
   if (!name || out.has(name)) return;
   const value = scalar(e.args[valueIndex]);
-  if (value != null) out.set(name, value);
+  if (value != null) out.set(name, { value, pset });
 }
 
 /** Converte um `StepValue` para o valor gravado no modelo (ou `null` quando vazio/ilegível). */

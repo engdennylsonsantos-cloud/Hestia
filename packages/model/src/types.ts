@@ -554,13 +554,14 @@ export interface Room {
 export interface IfcProperty {
   name: string;
   value: string | number | boolean;
+  /** Conjunto de origem no IFC (`Pset_WallCommon`, `Qto_BeamBaseQuantities`...); ausente = conjunto do importador. */
+  pset?: string;
 }
 
 /**
  * Objeto importado de outro programa (IFC) sem equivalente nativo: viga, pilar, escada, mobiliário, MEP, curtain wall...
  * Guarda a classe de origem, a malha triangular em coordenadas de mundo (m), o contorno em planta e as propriedades do IFC.
  * Entra no 3D, no DXF e nos quantitativos (volume/área por triângulos) e volta no IFC como `IfcBuildingElementProxy`.
- */
  */
 export interface Generic {
   id: Id;

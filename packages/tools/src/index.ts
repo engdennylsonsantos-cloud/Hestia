@@ -57,6 +57,7 @@ export { RampTool } from './rampTool.ts';
 export { rampGripAt, rampHandlePreview, rampHold, type RampGrip } from './rampGrips.ts';
 export { StairRunTool } from './stairRunTool.ts';
 export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';
+export { stairFreeGripAt, stairFreeHandlePreview, stairFreeHold, type StairFreeGrip } from './stairFreeGrips.ts';
 export * from './stairRunTypes.ts';
 export {
   discardSpiralOnEdit,

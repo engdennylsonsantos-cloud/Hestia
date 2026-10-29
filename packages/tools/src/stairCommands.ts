@@ -97,6 +97,7 @@ export function updateStairComponents(env: ToolEnv, stairId: Id, components: Arr
   if (!isStair(s)) return { error: 'Escada não encontrada.' };
   const report = analyzeDraft(partsFromComponents(components), stairLimits(p, s), unitsOf(p));
   if (report.errors > 0) return { error: report.firstError ?? 'Croqui inválido.' };
-  env.transaction('Editar croqui da escada', () => env.exec({ type: 'updateElements', ids: [stairId], patch: { components } }));
+  // Editar o croqui à mão descarta o trajeto livre (como o caracol descarta `spiral`).
+  env.transaction('Editar croqui da escada', () => env.exec({ type: 'updateElements', ids: [stairId], patch: { components, freePath: undefined, manualLandings: undefined } }));
   return { report };
 }

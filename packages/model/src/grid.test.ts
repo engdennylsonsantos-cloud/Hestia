@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_GRID_TYPE_ID, ProjectStore, createEmptyProject, gridIssue, gridOf, makeRoof, nextGridName, projectGridTypes, projectGrids, roofEdgeSag, validateProject, type Grid } from './index.ts';
+import { DEFAULT_GRID_TYPE_ID, ProjectStore, createEmptyProject, gridIssue, gridOf, makeRoof, nextGridName, projectGridTypes, projectGrids, resolveUnits, roofEdgeSag, validateProject, type Grid } from './index.ts';
 
 const g = (id: string, name: string, over: Partial<Grid> = {}): Omit<Grid, 'order'> => ({
   id,
@@ -36,6 +36,9 @@ describe('grades (modelo)', () => {
     s.exec({ type: 'addGrid', grid: g('gr1', '1') });
     expect(() => s.exec({ type: 'addGrid', grid: g('gr2', '1') })).toThrow('Já existe uma grade chamada "1"');
     expect(gridIssue(g('x', 'B', { points: [{ x: 0, y: 0 }, { x: 0.01, y: 0 }] }))).toMatch(/5 cm/);
+    expect(gridIssue(g('x', 'B', { points: [{ x: 0, y: 0 }, { x: 0.01, y: 0 }] }), resolveUnits({ smallLength: { unit: 'mm', decimals: 0 } }))).toBe(
+      'Cada trecho da grade precisa ter pelo menos 50 mm.',
+    );
     expect(gridIssue(g('x', 'B', { points: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }], sag: 0.5 }))).toMatch(/dois pontos/);
     expect(gridIssue(g('x', 'B', { points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], sag: 3 }))).toMatch(/metade da corda/);
     expect(gridIssue(g('x', 'B', { points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], sag: 2 }))).toBeNull();

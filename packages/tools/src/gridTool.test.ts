@@ -177,7 +177,7 @@ describe('ferramenta Grade: recusas e histórico', () => {
     clickAt(t, 0, 0);
     clickAt(t, 0.02, 0);
     expect(grids()).toHaveLength(0);
-    expect(messages.at(-1)).toMatch(/5,0 cm/);
+    expect(messages.at(-1)).toMatch(/5 cm/);
   });
 
   it('nome repetido: sucessor livre quando a letra já existe', () => {

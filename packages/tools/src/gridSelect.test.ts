@@ -77,6 +77,15 @@ describe('seleção e edição de grades', () => {
     expect(messages.at(-1)).toMatch(/5 cm/);
   });
 
+  it('o aviso de trecho curto segue a unidade do projeto', () => {
+    const { st, grids, messages, store } = setup();
+    store.exec({ type: 'setSettings', patch: { units: { smallLength: { unit: 'mm', decimals: 0 } } } });
+    click(st, 3, 0);
+    drag(st, [6, 0], [0.01, 0]);
+    expect(grids()[0]!.points[1]).toEqual({ x: 6, y: 0 });
+    expect(messages.at(-1)).toBe('Cada trecho da grade precisa ter pelo menos 50 mm.');
+  });
+
   it('arrastar a grade selecionada a move', () => {
     const { st, grids } = setup();
     click(st, 3, 0);

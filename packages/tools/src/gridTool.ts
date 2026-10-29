@@ -149,7 +149,7 @@ export class GridTool extends ToolBase {
     if (dist(last, at) < GRID_MIN_SEGMENT) {
       // Duplo clique no multissegmento termina; nos outros modos o ponto repetido é recusado.
       if (mode === 'multi' && this.pts.length >= 2) this.commit(this.pts, 0);
-      else this.env.say(`O ponto está perto demais do anterior: afaste-o pelo menos ${formatQuantity(unitsOf(this.env.project()), 'smallLength', GRID_MIN_SEGMENT)}.`);
+      else this.env.say(`O ponto está perto demais do anterior: afaste-o pelo menos ${formatQuantity(unitsOf(this.env.project()), 'smallLength', GRID_MIN_SEGMENT, { trim: true })}.`);
       return;
     }
     if (mode === 'line') this.commit([last, at], 0);

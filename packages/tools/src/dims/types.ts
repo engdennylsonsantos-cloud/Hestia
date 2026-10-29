@@ -1,5 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
-import type { Command, Element, Id, OpeningDimRef, Project, ResolvedDimensionSettings, WallDimRef } from '@hestia/model';
+import type { Command, Element, Id, OpeningDimRef, Project, Quantity, ResolvedDimensionSettings, WallDimRef } from '@hestia/model';
 
 /** Tipo de elemento ao qual um provedor de cotas se liga (o campo `kind` do elemento). */
 export type ElementKind = Element['kind'];
@@ -34,6 +34,13 @@ export interface DimEnd {
 /** Resultado puro de uma edição: comandos para executar (num único passo) ou a mensagem que explica a recusa. */
 export type DimEditResult = { commands: Command[]; note?: string } | { error: string };
 
+/** Medida informativa exibida junto do valor principal (ex.: o ângulo do deslocamento). Sempre só de leitura. */
+export interface DimSecondaryMeasure {
+  quantity: 'length' | 'angle';
+  /** Valor em SI (metros ou radianos), como `TempDim.value`. */
+  value: number;
+}
+
 export interface TempDim {
   /** Estável entre quadros: `${provider}:${subjectId}:${slot}`. */
   key: string;
@@ -41,8 +48,12 @@ export interface TempDim {
   b: Vec2;
   /** Afastamento da linha de cota (m): positivo = lado esquerdo de a→b, negativo = direito. */
   offset: number;
-  /** Medida em metros. */
+  /** Medida principal em SI: metros para `length`, radianos para `angle`. */
   value: number;
+  /** Grandeza de `value` (padrão `'length'`); o overlay formata pela unidade do projeto. */
+  quantity?: Quantity;
+  /** Medida informativa exibida ao lado da principal (ex.: ângulo do deslocamento). */
+  secondary?: DimSecondaryMeasure;
   /** Pontas na ordem de `a` e `b`. */
   ends: [DimEnd, DimEnd];
   tone?: 'valid' | 'invalid';

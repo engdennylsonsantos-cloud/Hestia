@@ -13,6 +13,9 @@ describe('Cotas do deslocamento', () => {
     const dims = m.tempDims!();
     expect(dims).toHaveLength(1);
     expect(dims[0]!.value).toBeCloseTo(5, 9);
+    expect(dims[0]!.secondary).toEqual({ quantity: 'angle', value: expect.closeTo(Math.atan2(4, 3), 9) });
+    // O rótulo da ferramenta também traz distância e ângulo.
+    expect(m.preview()).toContainEqual(expect.objectContaining({ kind: 'label', text: '5,00 m · 53,1°' }));
   });
 });
 

@@ -12,8 +12,13 @@ export const INVALID_FLASH_MS = 4000;
  */
 export function resolveDimEdit(dim: TempDim, text: string, units: ResolvedUnits): DimEditOutcome {
   if (!dim.edit) return { kind: 'error', message: 'Esta cota é só de leitura.' };
-  const si = parseQuantityText(text, units, 'length');
-  if (si === null) return { kind: 'error', message: `Medida inválida: digite uma distância, como ${formatQuantity(units, 'length', 1.2, { trim: true })}.` };
+  const q = dim.quantity ?? 'length';
+  const si = parseQuantityText(text, units, q);
+  if (si === null) {
+    const exemplo = formatQuantity(units, q, q === 'angle' ? Math.PI / 4 : 1.2, { trim: true });
+    const nome = q === 'angle' ? 'um ângulo' : 'uma distância';
+    return { kind: 'error', message: `Medida inválida: digite ${nome}, como ${exemplo}.` };
+  }
   const r = dim.edit(si);
   if ('error' in r) return { kind: 'error', message: r.error };
   return { kind: 'done', commands: r.commands, ...(r.note ? { note: r.note } : {}) };

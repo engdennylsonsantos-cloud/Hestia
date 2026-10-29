@@ -41,7 +41,7 @@ export function RampOptionsBar(): ReactElement {
       <label>
         Forma
         <select id="opt-rampshape" className="select" value={o.shape} onChange={(e) => set({ shape: e.target.value as RampShape })}>
-          {(Object.keys(SHAPE_LABEL) as RampShape[]).map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
+          {(Object.keys(SHAPE_LABEL) as RampShape[]).map((s) => <option key={s} value={s}>{s === 'free' ? t.ramp_shape_free : SHAPE_LABEL[s]}</option>)}
         </select>
       </label>
       <label>

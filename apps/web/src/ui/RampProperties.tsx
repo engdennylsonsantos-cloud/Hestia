@@ -167,7 +167,7 @@ export function RampProperties({ ramps }: { ramps: Ramp[] }): ReactElement {
                 {fieldError('length')}
               </>
             )}
-            <Row label="Forma"><span className="val">{SHAPE_LABEL[single.shape]}</span></Row>
+            <Row label="Forma"><span className="val">{single.shape === 'free' ? t.ramp_shape_free : SHAPE_LABEL[single.shape]}</span></Row>
             <Row label="Giro"><span className="val">{TURN_LABEL[single.turn]}</span></Row>
             <Row label={t.ramp_adjust}>
               <button id="p-radjust" className="chiplink" title={t.ramp_adjust_title} onClick={adjust}>{t.ramp_adjust}</button>

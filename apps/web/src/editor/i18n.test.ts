@@ -53,4 +53,13 @@ describe('nome de comando de atalho (diálogos de atalhos)', () => {
     expect(nomeComandoLang('atalhos', 'pt')).toBe('Atalhos de teclado');
     expect(nomeComandoLang('atalhos', 'en')).toBe('Keyboard shortcuts');
   });
+
+  it('os textos novos da rampa (Livre, Ajustar) existem nos dois idiomas', () => {
+    for (const k of ['ramp_shape_free', 'ramp_adjust', 'ramp_adjust_title'] as const) {
+      expect(I18N.pt[k]).toBeTruthy();
+      expect(I18N.en[k]).toBeTruthy();
+    }
+    expect(I18N.pt.ramp_shape_free).toBe('Livre');
+    expect(I18N.en.ramp_shape_free).toBe('Free');
+  });
 });

@@ -70,7 +70,8 @@ export function elementTagText(p: Project, tag: ElementTag): string {
     : e.kind === 'slab' ? p.slabTypes[e.typeId]
     : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]
     : e.kind === 'roof' ? p.roofTypes[e.typeId]
-    : e.kind === 'stair' ? p.stairTypes[e.typeId] : undefined;
+    : e.kind === 'stair' ? p.stairTypes[e.typeId]
+    : e.kind === 'ramp' ? p.rampTypes[e.typeId] : undefined;
   switch (tag.property) {
     case 'type': return (type && 'code' in type ? type.code : '') || (type && 'name' in type ? type.name : '') || e.kind;
     case 'name': return e.kind === 'room' ? e.name : type && 'name' in type ? type.name : e.kind;

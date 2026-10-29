@@ -12,6 +12,7 @@ export * from './wrap.ts';
 export * from './section.ts';
 export * from './sectionMembrane.ts';
 export * from './sectionStairs.ts';
+export * from './sectionRamps.ts';
 export * from './profile.ts';
 export * from './bandFuse.ts';
 export * from './floors.ts';

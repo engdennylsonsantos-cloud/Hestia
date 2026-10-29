@@ -13,6 +13,8 @@ import type { OpeningModel } from './openingModelTypes.ts';
 import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, slabQuad, type SectionLine } from './sectionGeom.ts';
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
+import { resolveRampsOnLevel } from './ramps.ts';
+import { sectionOfRamps } from './sectionRamps.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
 import { uniqueOrigins, type SectionPart } from './sectionParts.ts';
 import { cutPieces, cutRegions, type CutPiece } from './sectionCut.ts';
@@ -44,6 +46,7 @@ export interface SectionOrigin {
   ceilingId?: Id;
   roofId?: Id;
   stairId?: Id;
+  rampId?: Id;
   openingId?: Id;
 }
 
@@ -268,6 +271,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     for (const c of sk.cut) addCut(c.materialId, c.polygon, { stairId: c.stairId });
     beyond.push(...sk.beyond);
     grow(sk.zMin, sk.zMax);
+    // Rampas da rampa §4.3: mesma leitura das escadas monolíticas, com `rampId` na origem.
+    const rk = sectionOfRamps(resolveRampsOnLevel(p, levelId), line, p);
+    for (const c of rk.cut) addCut(c.materialId, c.polygon, { rampId: c.rampId });
+    beyond.push(...rk.beyond);
+    grow(rk.zMin, rk.zMax);
     for (const w of wallsOnLevel(p, levelId)) {
       const rw = resolved.walls[w.id];
       if (!rw) continue;

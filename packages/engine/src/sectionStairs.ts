@@ -57,7 +57,7 @@ export function riserBoards(risers: ResolvedStairRiser[], rt: number): StairBloc
 }
 
 /** Envoltória convexa (cadeia monótona), anel anti-horário; com menos de 3 vértices, pontos colineares. */
-function convexHull(pts: Vec2[]): Ring {
+export function convexHull(pts: Vec2[]): Ring {
   const s = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
   const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
   const chain = (seq: Vec2[]): Vec2[] => {

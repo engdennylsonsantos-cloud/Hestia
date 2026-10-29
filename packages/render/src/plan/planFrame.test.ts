@@ -231,6 +231,12 @@ describe('geometria e sobreposição separadas (build)', () => {
     expect(buildPlanOverlay(input(p, [], 'w1')).fills.length).toBeGreaterThan(0);
     expect(base.fills).toHaveLength(0);
   });
+
+  it('a parede selecionada não ganha rótulo com o próprio comprimento (a cota é até a vizinha)', () => {
+    const p = proj();
+    expect(buildPlanOverlay(input(p, ['w1'])).labels).toEqual([]);
+    expect(buildPlanOverlay(input(p, ['w1'], 'w1')).labels).toEqual([]);
+  });
 });
 
 describe('estado da planta para o quadro (planFrameUpdateOf)', () => {

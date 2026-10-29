@@ -1,6 +1,6 @@
 import { orientedRect, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { frameOfWall, openingGeometry, wallEndCorners, type ResolvedLevel } from '@hestia/engine';
-import { formatQuantity, isOpening, isWall, unitsOf, type Id, type Project } from '@hestia/model';
+import { isOpening, isWall, type Id, type Project } from '@hestia/model';
 import { floorSelectionOps } from './floors.ts';
 import { ALCA_PX, quadradoEm } from './marcadores.ts';
 import { slabSelectionOps } from './slabs.ts';
@@ -76,11 +76,6 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
       const e = p.elements[id];
       if (!isWall(e) || hidden?.has(id)) continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      if (selection.length === 1) {
-        // Cota temporária: comprimento do eixo, como no Revit ao selecionar.
-        const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
-        out.labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: formatQuantity(unitsOf(p), 'length', len), dy: -12, tone: 'info' });
-      }
       // Alças nas pontas do eixo e nos cantos visíveis (a ponta que se vê): é lá que o arrasto pega a parede.
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
@@ -167,10 +162,6 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
       const e = p.elements[id];
       if (!isWall(e) || hidden?.has(id)) continue;
       for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      if (selection.length === 1) {
-        const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
-        out.labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: formatQuantity(unitsOf(p), 'length', len), dy: -12, tone: 'info' });
-      }
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
         const q = quadradoEm(pt, ALCA_PX);

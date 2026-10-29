@@ -142,13 +142,6 @@ export class SelectTool extends ToolBase {
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
-    // Cota temporária: com uma parede selecionada, mostra o comprimento no meio dela.
-    const w = this.singleWall();
-    if (w && this.mode === 'idle') {
-      const a = w.a;
-      const b = w.b;
-      this.items.push({ kind: 'label', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, text: fmtLen(unitsOf(this.env.project()), dist(a, b)) });
-    }
   }
 
   /** A única seleção é uma parede (aberturas e pluralidades não entram na cota temporária). */

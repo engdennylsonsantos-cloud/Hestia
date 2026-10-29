@@ -38,6 +38,15 @@ describe('cota temporária: editar comprimento (F5)', () => {
     expect(b2.b.y).toBeCloseTo(3); // a outra extremidade de B não muda
   });
 
+  it('a parede selecionada não mostra o próprio comprimento como cota (nem ao mover o cursor)', () => {
+    const { store, env } = pair();
+    const [a] = walls(store) as [Wall];
+    env.setSelection([a.id]);
+    const s = tool('select', env);
+    s.move(P(2, 1));
+    expect(s.preview().filter((i) => i.kind === 'label')).toEqual([]);
+  });
+
   it('aceita expressões aritméticas', () => {
     const { store, env } = pair();
     const [a] = walls(store) as [Wall];

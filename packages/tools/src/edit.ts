@@ -1,7 +1,8 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Command, type Id, type Project } from '@hestia/model';
 import { followerCommands, planWallFollowers } from './wallFollow.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
 import { selectedFloors } from './floorPick.ts';
@@ -105,11 +106,11 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
 export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();
   const plan = follow ? planWallFollowers(p, env.levelId(), wallIds, t, invert) : null;
-  env.transaction(label, () => {
-    env.exec({ type: 'transform', ids: wallIds, transform: t });
-    if (plan) for (const c of followerCommands(plan)) env.exec(c);
-  });
+  const commands: Command[] = [{ type: 'transform', ids: wallIds, transform: t }, ...(plan ? followerCommands(plan) : [])];
+  const result = execWithHostedLoss(env, label, commands);
   if (plan?.released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
+  else if (result.status === 'cancelled') env.say('Nada foi alterado.');
+  else if (result.status === 'pending') env.say('Confirme o diálogo para aplicar.');
 }
 
 /** Desliza aberturas ao longo da parede anfitriã. */

@@ -2,6 +2,7 @@ import { dist, type Vec2 } from '@hestia/geom';
 import { joinStatus, levelFrames } from '@hestia/engine';
 import { totalThickness, type JoinKind } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 import { pickAt } from './pick.ts';
 import type { PointerInfo } from './types.ts';
 
@@ -159,8 +160,9 @@ export class JoinTool extends ToolBase {
       this.env.say('Não vira canto: a ponta está longe da extremidade da outra parede (no meio do vão).');
       return;
     }
-    this.env.exec({ type: 'setWallEnds', id: wall.id, [n.clicked.end]: near });
-    this.env.say('T transformado em canto.');
+    const result = execWithHostedLoss(this.env, 'Transformar T em canto', [{ type: 'setWallEnds', id: wall.id, [n.clicked.end]: near }]);
+    if (result.status === 'cancelled') return;
+    this.env.say(result.status === 'pending' ? 'Confirme o diálogo para aplicar.' : 'T transformado em canto.');
     this.move({ raw: near, shift: false, ctrl: false, alt: false });
   }
 }

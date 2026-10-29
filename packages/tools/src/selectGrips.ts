@@ -1,7 +1,7 @@
 import { add, dist, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { ceilingOutline } from '@hestia/engine';
-import { formatQuantity, isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, unitsOf, type Id, type Project } from '@hestia/model';
+import { formatQuantity, isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, unitsOf, type Command, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, MIN_WALL_LENGTH, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
@@ -18,6 +18,7 @@ import { stairGripAt, stairHold } from './stairGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
 import { gridGripProvider } from './gridGripHold.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 
 /** Vértice de contorno em foco (clicado com a alça): o Delete o remove. */
 export interface GripFocus {
@@ -165,10 +166,13 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
           return;
         }
       }
-      env.transaction('Ajustar parede', () => {
-        env.exec({ type: 'setWallEnds', id: g.wallId, [g.end]: pt });
-        for (const c of follow) env.exec({ type: 'setWallEnds', id: c.wallId, [c.end]: pt });
-      });
+      const commands: Command[] = [
+        { type: 'setWallEnds', id: g.wallId, [g.end]: pt },
+        ...follow.map((c): Command => ({ type: 'setWallEnds', id: c.wallId, [c.end]: pt })),
+      ];
+      const result = execWithHostedLoss(env, 'Ajustar parede', commands);
+      if (result.status === 'cancelled') env.say('Nada foi alterado.');
+      else if (result.status === 'pending') env.say('Confirme o diálogo para aplicar.');
     },
   };
 }

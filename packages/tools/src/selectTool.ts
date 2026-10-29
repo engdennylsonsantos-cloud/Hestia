@@ -15,6 +15,7 @@ import { commitRoofPatch } from './roofCheck.ts';
 import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
 import { annotationAt, detailItemAt, dimGripAt, dimTextGripAt, signedOffset } from './annotationPick.ts';
@@ -181,9 +182,12 @@ export class SelectTool extends ToolBase {
       this.env.say(r.error);
       return false;
     }
-    this.env.transaction('Alterar comprimento', () => {
-      for (const c of r.commands) this.env.exec(c);
-    });
+    const result = execWithHostedLoss(this.env, 'Alterar comprimento', r.commands);
+    if (result.status === 'cancelled') return true;
+    if (result.status === 'pending') {
+      this.env.say('Confirme o diálogo para aplicar o novo comprimento.');
+      return true;
+    }
     this.env.say(`Comprimento alterado para ${fmtLen(unitsOf(this.env.project()), v)}. Ctrl+Z desfaz.`);
     return true;
   }

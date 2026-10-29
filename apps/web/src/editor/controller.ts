@@ -8,17 +8,19 @@ import {
   migrateProject,
   newId,
   sectionPoints,
+  type Command,
   type Id,
   type Project,
   type SectionView,
   type TemplateId,
 } from '@hestia/model';
-import { DEFAULT_SNAP, createTool, isStairTool, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
+import { DEFAULT_SNAP, createTool, execWithHostedLoss, isStairTool, type HostedApplyResult, type PointerInfo, type Tool, type ToolEnv, type ToolId } from '@hestia/tools';
 import { transfer } from './transfer.ts';
 import { desfazerOuRefazer } from './historyStatus.ts';
 import { keptFloorType } from './typeActions.ts'; import { keptSlabType } from './slabTypeActions.ts'; import { PerimeterMode } from './perimeterMode.ts';
 import { AUTOSAVE_KEY, safeGet, safeSet } from './storage.ts';
 import { useI18n } from './i18n.ts';
+import { pedirConfirmacaoHostedLoss } from './hostedLossPrompt.ts';
 import { fitBox, levelFrameBox, panBy, planViewOf, sectionBox, underlayIdOf, effectiveGridStep, zoomAt, type Viewport } from '@hestia/render';
 import { key3d, setSnap, useUi } from './state.ts';
 import { defaultOpenViews, type PlanKind } from './openViews.ts';
@@ -81,7 +83,7 @@ export class Editor {
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),
     gridStep: () => effectiveGridStep(this.viewport()?.zoom ?? 60, useUi.getState().gridStep),
-    say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang,
+    say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang, confirmHostedLoss: (losses, message) => pedirConfirmacaoHostedLoss(losses, message),
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
@@ -166,6 +168,9 @@ export class Editor {
 
   // ---------- ferramentas ----------
   get activeTool(): Tool { return this.tool; }
+
+  /** Aplica comandos pela mesma regra das aberturas hospedadas usada pelas ferramentas (cotas temporárias). */
+  applyCommands(label: string, commands: readonly Command[]): HostedApplyResult { return execWithHostedLoss(this.env, label, commands); }
 
   private activate(id: ToolId, tool: Tool = createTool(id, this.env)): void {
     this.tool = tool;
@@ -448,10 +453,6 @@ export class Editor {
     this.setTool('select');
   }
 
-  serialize(): string {
-    return JSON.stringify(this.project, null, 1);
-  }
-
   openFromText(text: string, name: string): { ok: true } | { ok: false; error: string } {
     try {
       this.load(migrateProject(JSON.parse(text)), name);
@@ -466,7 +467,7 @@ export class Editor {
    * capacidade `downloads` (o viewer confirma). Fora dele, baixa o arquivo; em último caso copia o JSON.
    */
   async save(): Promise<void> {
-    const text = this.serialize();
+    const text = JSON.stringify(this.project, null, 1);
     const name = safeFilename(`${this.project.name.trim() || 'projeto'}.hestia.json`);
     safeSet(AUTOSAVE_KEY, text);
     const entrega = await entregarArquivo({ nome: name, conteudo: text });
@@ -491,7 +492,7 @@ export class Editor {
 
   private scheduleAutosave(): void {
     if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
-    this.autosaveTimer = setTimeout(() => safeSet(AUTOSAVE_KEY, this.serialize()), 800);
+    this.autosaveTimer = setTimeout(() => safeSet(AUTOSAVE_KEY, JSON.stringify(this.project, null, 1)), 800);
   }
 
   restoreAutosave(): boolean {

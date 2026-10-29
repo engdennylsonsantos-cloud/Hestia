@@ -4,6 +4,7 @@ import { vizinhaCurta } from './alignNeighbors.ts';
 import type { AlignSolution } from './alignSolve.ts';
 import { transformWalls } from './edit.ts';
 import { commitRingEdit } from './ringTarget.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Ganchos para quem tem um esboço aberto (perímetro): aplica a linha alinhada no rascunho. */
@@ -48,8 +49,8 @@ export function applyAlign(env: ToolEnv, sol: AlignSolution, hooks: AlignApplyHo
   }
 
   if (sol.kind === 'ponta') {
-    env.exec({ type: 'setWallEnds', id: sol.wallId, ...(sol.end === 'a' ? { a: sol.to } : { b: sol.to }) });
-    return true;
+    const result = execWithHostedLoss(env, 'Alinhar ponta', [{ type: 'setWallEnds', id: sol.wallId, ...(sol.end === 'a' ? { a: sol.to } : { b: sol.to }) }]);
+    return result.status !== 'cancelled';
   }
 
   if (sol.kind === 'abertura') {

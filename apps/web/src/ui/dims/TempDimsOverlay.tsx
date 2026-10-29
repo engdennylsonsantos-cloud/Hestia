@@ -105,7 +105,12 @@ export function TempDimsOverlay(): ReactElement | null {
       return;
     }
     if (r.commands.length === 0) return;
-    editor.store.transaction('Alterar cota', () => r.commands.forEach((c) => editor.store.exec(c)));
+    const applied = editor.applyCommands('Alterar cota', r.commands);
+    if (applied.status === 'cancelled') return;
+    if (applied.status === 'pending') {
+      useUi.setState({ status: 'Confirme o diálogo para aplicar a cota.' });
+      return;
+    }
     useUi.setState({ status: r.note ?? 'Cota atualizada.' });
   };
 

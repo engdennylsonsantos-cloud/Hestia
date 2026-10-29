@@ -24,6 +24,7 @@ import { AutoCotaDialog } from './ui/dialogs/AutoCotaDialog.tsx';
 import { MaterialsDialog } from './ui/dialogs/MaterialsDialog.tsx';
 import { LevelsDialog, OpeningTypeDialog, ShortcutsDialog, StartDialog } from './ui/dialogs/OtherDialogs.tsx';
 import { UnitsDialog } from './ui/dialogs/UnitsDialog.tsx';
+import { HostedLossDialog } from './ui/dialogs/HostedLossDialog.tsx';
 import { DimensionSettingsDialog } from './ui/dialogs/DimensionSettingsDialog.tsx';
 import { ShortcutsConfigDialog } from './ui/dialogs/ShortcutsConfigDialog.tsx';
 import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
@@ -85,6 +86,8 @@ function Dialogs(): ReactElement | null {
       return <LevelsDialog />;
     case 'units':
       return <UnitsDialog />;
+    case 'hostedLoss':
+      return <HostedLossDialog />;
     case 'dimensions':
       return <DimensionSettingsDialog />;
     case 'start':

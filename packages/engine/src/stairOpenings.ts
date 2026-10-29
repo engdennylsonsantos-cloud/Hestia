@@ -76,7 +76,7 @@ const WELL_MIN_AREA = 1e-4;
  * Fecha os vãos estreitos entre lances (U): o furo cresce e encolhe `MAX_WELL_GAP ÷ 2`, o que preenche o que for mais fino
  * que o vão e mantém o resto. Sem vão a fechar, devolve a própria região (o recorte arredonda e não deve mexer à toa).
  */
-function closeWells(region: MultiPolygon): MultiPolygon {
+export function closeWells(region: MultiPolygon): MultiPolygon {
   const c = MAX_WELL_GAP / 2 + 1e-3;
   const closed = offsetMulti(offsetMulti(region, c), -c);
   return multiArea(closed) - multiArea(region) > WELL_MIN_AREA ? closed : region;
@@ -86,7 +86,7 @@ function closeWells(region: MultiPolygon): MultiPolygon {
  * Tira do furo a faixa da folga que passa do último espelho: dali em diante é o piso de cima, e o vão deixaria à mostra a
  * chegada da escada, um degrau abaixo do piso. Só corta o que a folga (`depth`) acrescentou; o contorno dos degraus não passa dali.
  */
-function trimBeyondTop(region: MultiPolygon, frame: StairArrivalFrame, depth: number): MultiPolygon {
+export function trimBeyondTop(region: MultiPolygon, frame: StairArrivalFrame, depth: number): MultiPolygon {
   const side = mul(sub(frame.b, frame.a), depth / dist(frame.a, frame.b));
   const ahead = mul(frame.u, depth);
   const a = sub(frame.a, side);

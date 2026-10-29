@@ -5,7 +5,8 @@ import { layerCoreFlags } from './junctionPlanar.ts';
 import { layerOutlines, memoCut } from './layerOutline.ts';
 import { adjacentLevelIds } from './terminoBlock.ts';
 import type { FloorResolveOptions } from './floors.ts';
-import { coverUnderside, cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
+import { coverUnderside, cutStairOpenings } from './stairOpenings.ts';
+import { holesFor, openingsOnLevel } from './levelOpenings.ts';
 
 /** Cota da face superior da inclinação: definida no modelo (a validação também a usa). */
 export { slabRiseAt } from '@hestia/model';
@@ -48,7 +49,7 @@ export interface ResolvedSlab {
  * derivado (`resolveBoundary`): circuito aberto mantém o último contorno e devolve `problem`.
  */
 export function resolveSlabs(p: Project, levelId: Id, opts: FloorResolveOptions = {}): ResolvedSlab[] {
-  const openings = stairOpeningsOnLevel(p, levelId);
+  const openings = openingsOnLevel(p, levelId);
   const out: ResolvedSlab[] = [];
   for (const s of slabsOnLevel(p, levelId)) {
     const type = p.slabTypes[s.typeId];
@@ -76,7 +77,7 @@ export function resolveSlabs(p: Project, levelId: Id, opts: FloorResolveOptions 
     const core = layerCoreFlags(type.layers);
     const base: MultiPolygon = [[boundary, ...holes]];
     const underside = coverUnderside(bottomZ, s.slope, [boundary, ...holes]);
-    const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, underside)));
+    const cut = memoCut((m) => cutStairOpenings(m, holesFor(openings, underside)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
     // Faixa de cota de cada camada (decisão 0025, revista): a parede só recorta as camadas com que se cruza de fato.

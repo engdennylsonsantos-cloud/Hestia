@@ -1,4 +1,4 @@
-import { junctionLevel, resolveFloors, resolveRooms, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab, type ResolvedStair } from '@hestia/engine';
+import { junctionLevel, resolveFloors, resolveRampsOnLevel, resolveRooms, resolveRoofs, resolveSlabs, resolveStairsOnLevel, type ResolvedFloor, type ResolvedRamp, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab, type ResolvedStair } from '@hestia/engine';
 import { isOpening, wallsOnLevel, type Id, type Opening, type Project, type Wall } from '@hestia/model';
 import { projetoDaJuncao } from './viewContext.ts';
 
@@ -28,6 +28,7 @@ export const lajesDoNivel = (p: Project, levelId: Id): ResolvedSlab[] => memoDoP
 export const telhadosDoNivel = (p: Project, levelId: Id): ResolvedRoof[] => memoDoProjeto(p, `telhados|${levelId}`, () => resolveRoofs(p, levelId));
 export const ambientesDoNivel = (p: Project, levelId: Id): ResolvedRoom[] => memoDoProjeto(p, `ambientes|${levelId}`, () => resolveRooms(p, levelId));
 export const escadasDoNivel = (p: Project, levelId: Id): ResolvedStair[] => memoDoProjeto(p, `escadas|${levelId}`, () => resolveStairsOnLevel(p, levelId));
+export const rampasDoNivel = (p: Project, levelId: Id): ResolvedRamp[] => memoDoProjeto(p, `rampas|${levelId}`, () => resolveRampsOnLevel(p, levelId));
 export const juncaoDoNivel = (p: Project, levelId: Id): ReturnType<typeof junctionLevel> => memoDoProjeto(p, `juncao|${levelId}`, () => junctionLevel(projetoDaJuncao(p, levelId), levelId));
 export const paredesDoNivel = (p: Project, levelId: Id): Wall[] => memoDoProjeto(p, `paredes|${levelId}`, () => wallsOnLevel(p, levelId));
 

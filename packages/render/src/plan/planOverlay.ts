@@ -8,6 +8,7 @@ import { roomSelectionOps } from './rooms.ts';
 import { ceilingSelectionOps } from './ceilings.ts';
 import { roofSelectionOps } from './roofs.ts';
 import { stairSelectionOps } from './stairs.ts';
+import { rampSelectionOps } from './ramps.ts';
 import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { hiddenSelectionOps, planViewOf, type PlanView } from './view.ts';
 import { planContext } from './planContext.ts';
@@ -49,7 +50,7 @@ function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: stri
  */
 export function buildPlanOverlay(input: PlanInput): PlanOps {
   const { project: p, viewport: v, theme } = input;
-  const { geo, hidden, up, roofHidden, style, stairs, view } = planContext(input);
+  const { geo, hidden, up, roofHidden, style, stairs, ramps, view } = planContext(input);
   const fills: FillOp[] = [];
   const strokes: StrokeOp[] = [];
   const labels: LabelOp[] = [];
@@ -68,6 +69,7 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   if (up) add(ceilingSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden));
   add(roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, roofHidden, style.paint.roof));
   add(stairSelectionOps(p, stairs, input.selection, input.hover, theme, v));
+  add(rampSelectionOps(p, ramps, input.selection, input.hover, theme, v));
   if (input.hover && !input.selection.includes(input.hover)) {
     fills.push(...elementHighlight(p, geo, [input.hover], theme.select, 0.16, view));
   }

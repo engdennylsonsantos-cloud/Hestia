@@ -188,7 +188,7 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
 }
 
 /** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px (marcador em pixels) no último espelho, na espessura dada. */
-function climbArrow(pts: Vec2[], color: string, espessura: Espessura): StrokeOp[] {
+export function climbArrow(pts: Vec2[], color: string, espessura: Espessura): StrokeOp[] {
   if (pts.length < 2) return [];
   const tip = pts[pts.length - 1]!;
   const back = mul(norm(sub(tip, pts[pts.length - 2]!)), -1);

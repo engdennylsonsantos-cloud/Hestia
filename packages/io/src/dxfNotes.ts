@@ -1,4 +1,4 @@
-import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, wallHeight, wallType, type Id, type Project } from '@hestia/model';
+import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, unitsOf, wallHeight, wallType, type Id, type Project } from '@hestia/model';
 import type { DxfPoint } from './dxf.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
@@ -55,7 +55,7 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     lines.push(g.line, ...g.extensions, ...dimensionMarks(g.line[0], g.line[1], g.ticks, d.tickStyle, mPerMm));
     if (d.textAt && Math.hypot(d.textAt.x - g.textAt.x, d.textAt.y - g.textAt.y) > 0.002) otherLines.push({ a: { x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, b: d.textAt, layer: DXF_LAYER_COTAS });
-    texts.push({ at: d.textAt ?? g.textAt, text: dimensionText(p, d), height: (d.textHeight ?? DIM_TEXT_MM) * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
+    texts.push({ at: d.textAt ?? g.textAt, text: dimensionText(p, d, unitsOf(p)), height: (d.textHeight ?? DIM_TEXT_MM) * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
   }
   for (const t of levelTexts(p, levelId)) {
     if (t.leader) for (let i = 1; i < t.leader.length; i++) otherLines.push({ a: t.leader[i - 1]!, b: t.leader[i]!, layer: DXF_LAYER_TEXTOS });

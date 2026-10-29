@@ -1,6 +1,6 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { isWall, type Dimension, type DimensionRef, type Project } from './types.ts';
-import { defaultUnits } from './units.ts';
+import { defaultUnits, type ResolvedUnits } from './units.ts';
 import { formatQuantity } from './unitsFormat.ts';
 
 /** Espaçamentos da cota em mm de papel (multiplicados pela escala da vista no render e no DXF). */
@@ -57,7 +57,7 @@ export function formatDimension(d: Dimension, meters: number, units = defaultUni
 }
 
 /** Texto mostrado na cota: o texto fixo, se houver algum (sem espaços nas pontas); senão, o valor medido com a formatação da cota. */
-export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension, units = defaultUnits()): string {
+export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension, units: ResolvedUnits): string {
   const fixed = d.text?.trim();
   return fixed ? fixed : formatDimension(d, dimensionValue(p, d), units);
 }

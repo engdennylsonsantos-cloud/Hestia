@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, type Id, type Project } from '@hestia/model';
+import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, levelDimensions, levelRoomSeparators, levelTexts, unitsOf, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { noteLabel } from './tags.ts';
 import { dimensionLabelOps } from './dimLabels.ts';
@@ -61,7 +61,7 @@ export function noteOps(p: Project, levelId: Id, pt: PlanPaint, look: NoteLook, 
     for (const seg of [g.line, ...g.extensions]) out.strokes.push({ pts: [...seg], closed: false, ...corte, color: c, alpha: 1 });
     out.strokes.push(...dimensionMarkStrokes(g, d.tickStyle ?? 'slash', mPerMm, c, corte));
     if (d.textAt && Math.hypot(d.textAt.x - base.textAt.x, d.textAt.y - base.textAt.y) > 0.002) out.strokes.push({ pts: [{ x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, d.textAt], closed: false, ...projecao, color: c, alpha: 1 });
-    const lab = dimensionLabelOps(g, d.offset, dimensionText(p, d), textMm, scale, mPerMm, lane, c, corte, v);
+    const lab = dimensionLabelOps(g, d.offset, dimensionText(p, d, unitsOf(p)), textMm, scale, mPerMm, lane, c, corte, v);
     if (lab.short) lane++;
     out.labels.push(...lab.labels);
     out.strokes.push(...lab.strokes);

@@ -1,4 +1,5 @@
 import type { Vec2 } from '@hestia/geom';
+import { pointInPolygon } from '@hestia/geom';
 import type { ResolvedRoom } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
 import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
@@ -42,15 +43,23 @@ export function roomOps(
   scale: number,
   hidden: ReadonlySet<Id> | undefined,
   paint: PlanPaint,
+  hideLabelRoomId?: Id,
 ): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   for (const r of ambientesDoNivel(p, levelId)) {
     if (!r.polygon || hidden?.has(r.roomId)) continue;
-    const color = surfaceColor(r.color ?? ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
+    const color = surfaceColor(ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
     out.fills.push({ polygons: [r.polygon], color, alpha: 0.7 });
-    const at = roomLabelAt(r);
-    if (at) out.labels.push({ at, text: roomLabelText(r, detail), papel: { escala: scale, fontMm: ROOM_TEXT_MM }, tone: 'info' });
+    if (r.roomId === hideLabelRoomId) continue;
+    const room = p.elements[r.roomId];
+    const at = room?.kind === 'room' && room.labelPosition ? room.labelPosition : roomLabelAt(r);
+    if (at) out.labels.push({ at, text: roomLabelText(r, detail), ...(room?.kind === 'room' && room.labelRotation ? { rotation: room.labelRotation } : {}), papel: { escala: scale, fontMm: ROOM_TEXT_MM }, tone: 'info' });
+    // Rótulo fora do ambiente: chamada reta até o ponto de referência (o rótulo é compartilhado por todas as vistas).
+    if (room?.kind === 'room' && room.labelPosition && r.polygon && !pointInPolygon(room.labelPosition, r.polygon)) {
+      const anchor = room.referencePoint ?? roomLabelAt(r);
+      if (anchor) out.strokes.push({ pts: [room.labelPosition, anchor], closed: false, widthPx: 1, papel: { mm: 0.13, escala: scale }, color: theme.ink, alpha: 0.95 });
+    }
   }
   return out;
 }

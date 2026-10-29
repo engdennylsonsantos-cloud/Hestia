@@ -1,0 +1,386 @@
+import { pointInPolygon, type Vec2 } from '@hestia/geom';
+import type { ResolvedRoom } from '@hestia/engine';
+import { areaLegendRows, areaTableRows, referenceDiagonals, resolveRooms, roomReferencePoint, schemeColor, schemeOf } from '@hestia/engine';
+import { categoryById, type AreaPlan, type Id, type Project, type Room, type RoomTag } from '@hestia/model';
+import { fmtArea, type FloorOps } from './floors.ts';
+import type { PlanPaint } from './style.ts';
+import type { PlanTheme } from './types.ts';
+
+/** Medidas de papel (mm) da etiqueta e das linhas de referência. */
+const NAME_MM = 3.5;
+const INFO_MM = 2.5;
+const TAG_PAD_MM = 0.9;
+const TAG_GAP_MM = 0.8;
+const REF_MM = 0.13;
+const REF_COLOR = '#4b5563';
+const LEADER_MM = 0.13;
+const SHOULDER_MM = 4;
+const LEGEND_W_MM = 62;
+const LEGEND_ROW_MM = 5.2;
+const TABLE_W_MM = 88;
+const TABLE_ROW_MM = 4.6;
+const TABLE_FONT_MM = 2.0;
+
+const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
+const mm = (v: number, scale: number): number => (v * scale) / 1000;
+const fmt = (v: number, d = 2): string => v.toFixed(d).replace('.', ',');
+
+/** Ponto de referência do ambiente: override do modelo ou o centroide/polo do polígono resolvido. */
+export function referenceAt(room: Room, resolved: ResolvedRoom): Vec2 {
+  if (room.referencePoint) return room.referencePoint;
+  return (resolved.polygon && roomReferencePoint(resolved.polygon)) || resolved.point;
+}
+
+/** Diagonais de referência do ambiente, recortadas pelo polígono. */
+export function referenceSegments(room: Room, resolved: ResolvedRoom): Array<{ a: Vec2; b: Vec2 }> {
+  if (!resolved.polygon) return [];
+  return referenceDiagonals(resolved.polygon, referenceAt(room, resolved));
+}
+
+/** Linhas de texto da etiqueta: nome na primeira, o resto na segunda (ou o que os campos pedirem). */
+export function roomTagLines(p: Project, room: Room, r: ResolvedRoom, tag: RoomTag): string[] {
+  const head: string[] = [];
+  const tail: string[] = [];
+  for (const f of tag.fields) {
+    switch (f) {
+      case 'name':
+        if (room.name) head.push(room.name);
+        break;
+      case 'number':
+        if (room.number) tail.push(room.number);
+        break;
+      case 'area':
+        tail.push(fmtArea(r.area, 2));
+        break;
+      case 'category': {
+        const c = categoryById(p, room.categoryId);
+        if (c) head.push(c.name);
+        break;
+      }
+      case 'level':
+        tail.push(p.levels.find((l) => l.id === room.levelId)?.name ?? '');
+        break;
+      case 'perimeter':
+        tail.push(`${fmt(r.perimeter)} m`);
+        break;
+      case 'volume':
+        tail.push(`${fmt(r.volume, 3)} m³`);
+        break;
+      case 'custom':
+        if (tag.custom) head.push(tag.custom);
+        break;
+    }
+  }
+  const a = head.filter(Boolean).join(' · ');
+  const b = tail.filter(Boolean).join(' · ');
+  return [a, b].filter(Boolean);
+}
+
+/** Caixa do bloco de texto em metros (para o halo e para o posicionamento automático). */
+export function tagBoxModel(lines: readonly string[], scale: number): { w: number; h: number } {
+  const wMm = Math.max(8, ...lines.map((l, i) => l.length * (i === 0 ? NAME_MM : INFO_MM) * 0.6)) + 2 * TAG_PAD_MM;
+  const hMm = (lines.length > 1 ? NAME_MM + TAG_GAP_MM + INFO_MM : NAME_MM) + 2 * TAG_PAD_MM;
+  return { w: mm(wMm, scale), h: mm(hMm, scale) };
+}
+
+/** Retângulo do halo (coordenadas de modelo, eixo-alinhado). */
+function tagMaskRect(at: Vec2, box: { w: number; h: number }): Vec2[] {
+  const x0 = at.x - box.w / 2;
+  const x1 = at.x + box.w / 2;
+  const y0 = at.y - box.h / 2;
+  const y1 = at.y + box.h / 2;
+  return [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+}
+
+/** Linha de chamada: reta ou com ombro horizontal (Revit: Leader com cotovelo). */
+function leaderLines(at: Vec2, anchor: Vec2, box: { w: number; h: number }, style: string, scale: number): Vec2[][] {
+  const dx = anchor.x - at.x;
+  const dy = anchor.y - at.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const d = { x: dx / len, y: dy / len };
+  const n = { x: -d.y, y: d.x };
+  // Saída pela borda da caixa que encara o ponto de referência.
+  const tx = Math.abs(dx) > 1e-9 ? box.w / 2 / Math.abs(d.x) : Infinity;
+  const ty = Math.abs(dy) > 1e-9 ? box.h / 2 / Math.abs(d.y) : Infinity;
+  const t = Math.min(tx, ty, len);
+  const start = { x: at.x + d.x * t, y: at.y + d.y * t };
+  if (style === 'crossed') {
+    const off = mm(2.5, scale);
+    const A = { x: anchor.x + n.x * off, y: anchor.y + n.y * off };
+    const B = { x: anchor.x - n.x * off, y: anchor.y - n.y * off };
+    // Cada linha passa pelo CENTRO do texto e continua 2 mm além da caixa: o cruzamento fica no centro do rótulo.
+    const through = (p: Vec2): Vec2 => {
+      const vx = at.x - p.x;
+      const vy = at.y - p.y;
+      const len = Math.hypot(vx, vy) || 1;
+      const u = { x: vx / len, y: vy / len };
+      const tx = Math.abs(u.x) > 1e-9 ? box.w / 2 / Math.abs(u.x) : Infinity;
+      const ty = Math.abs(u.y) > 1e-9 ? box.h / 2 / Math.abs(u.y) : Infinity;
+      const edge = Math.min(tx, ty);
+      const out = Math.min(edge + mm(2, scale), len);
+      return { x: at.x + u.x * out, y: at.y + u.y * out };
+    };
+    return [[A, through(A)], [B, through(B)]];
+  }
+  if (style === 'kinked') {
+    const sx = Math.sign(dx) || 1;
+    const elbow = { x: start.x + sx * mm(SHOULDER_MM, scale), y: start.y };
+    return [[start, elbow], [elbow, anchor]];
+  }
+  if (style === 'none') return [];
+  return [[start, anchor]];
+}
+
+/**
+ * Preenchimento, contorno e linhas de referência dos ambientes. Sem esquema de cores não há preenchimento
+ * (a planta nasce em preto e branco); as diagonais atravessam o ambiente e se cruzam no ponto de referência.
+ */
+export function areaPlanRoomOps(p: Project, plan: AreaPlan, theme: PlanTheme, dark: boolean, scale: number, hidden: ReadonlySet<Id> | undefined, paint: PlanPaint, resolved: readonly ResolvedRoom[], selected?: ReadonlySet<Id>): FloorOps {
+  const out = empty();
+  if (!paint.visible) return out;
+  const rooms = new Map(Object.values(p.elements).filter((e): e is Room => e.kind === 'room' && e.levelId === plan.levelId).map((r) => [r.id, r] as const));
+  const scheme = schemeOf(p, plan);
+  for (const r of resolved) {
+    const room = rooms.get(r.roomId);
+    if (!room || !r.polygon || hidden?.has(room.id)) continue;
+    const color = scheme ? schemeColor(p, plan, room, r) : (room.color ?? null);
+    if (color && plan.graphics.fill !== 'none') {
+      const cat = categoryById(p, room.categoryId);
+      const hatch = plan.graphics.fill === 'hatch' && cat?.hatch && cat.hatch !== 'none' ? { kind: cat.hatch, color: dark ? '#ffffff' : '#111827', alpha: 0.75 } : undefined;
+      out.fills.push({ polygons: [r.polygon], color, alpha: plan.graphics.fillOpacity, hatch });
+    }
+    if (plan.graphics.outline !== 'none') {
+      for (const ring of r.polygon) {
+        out.strokes.push({
+          pts: ring,
+          closed: true,
+          widthPx: 1,
+          papel: { mm: 0.13, escala: scale },
+          color: dark ? '#9ca3af' : '#6b7280',
+          alpha: 1,
+          ...(plan.graphics.outline === 'dashed' ? { dash: [4, 2] as [number, number] } : {}),
+        });
+      }
+    }
+    if (plan.graphics.referenceLines === 'always' || (plan.graphics.referenceLines === 'selected' && selected?.has(room.id))) {
+      // O cruzamento das diagonais fica no centro do rótulo quando ele está dentro do ambiente; fora, volta ao
+      // ponto de referência do ambiente (o rótulo passa a ter chamada).
+      const ref = room.labelPosition && pointInPolygon(room.labelPosition, r.polygon) ? room.labelPosition : referenceAt(room, r);
+      for (const s of referenceDiagonals(r.polygon, ref)) {
+        out.strokes.push({ pts: [s.a, s.b], closed: false, widthPx: 1, papel: { mm: REF_MM, escala: scale }, color: dark ? '#9ca3af' : REF_COLOR, alpha: 0.9 });
+      }
+    }
+  }
+  void theme;
+  return out;
+}
+
+/** Etiquetas da planta (texto em duas linhas, halo e chamada). Desenhadas por cima das paredes. */
+export function areaPlanTagOps(p: Project, plan: AreaPlan, scale: number, hidden: ReadonlySet<Id> | undefined, resolved: readonly ResolvedRoom[], hideRoomId?: Id, dark = false): FloorOps {
+  const out = empty();
+  const ink = dark ? '#f3f4f6' : '#111827';
+  const rooms = new Map(Object.values(p.elements).filter((e): e is Room => e.kind === 'room').map((r) => [r.id, r] as const));
+  const placed: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  for (const r of resolved) {
+    const room = rooms.get(r.roomId);
+    if (!room || !r.polygon || hidden?.has(room.id) || room.id === hideRoomId) continue;
+    const tag = plan.tags.find((t) => t.roomId === room.id);
+    if (tag && !tag.visible) continue;
+    let at = room.labelPosition ?? tag?.at ?? referenceAt(room, r);
+    const rotation = room.labelRotation ?? (tag?.orientation === 'vertical' ? 90 : 0);
+    const draft: RoomTag = tag ?? {
+      id: `auto:${room.id}`,
+      planId: plan.id,
+      roomId: room.id,
+      at,
+      orientation: 'horizontal',
+      leader: plan.graphics.tagDefault.leader,
+      fields: [...plan.graphics.tagDefault.fields],
+      visible: true,
+    };
+    const lines = roomTagLines(p, room, r, draft);
+    if (lines.length === 0) continue;
+    const box = tagBoxModel(lines, scale);
+    // Etiqueta automática: se a caixa encostar em outra já colocada, sobe em degraus (o usuário pode arrastar depois).
+    if (!room.labelPosition && !tag) {
+      for (let k = 0; k < 12; k++) {
+        const b = { x0: at.x - box.w / 2 - 0.1, y0: at.y - box.h / 2 - 0.1, x1: at.x + box.w / 2 + 0.1, y1: at.y + box.h / 2 + 0.1 };
+        if (!placed.some((q) => b.x0 < q.x1 && q.x0 < b.x1 && b.y0 < q.y1 && q.y0 < b.y1)) break;
+        at = { x: at.x, y: at.y + box.h + 0.25 };
+      }
+    }
+    placed.push({ x0: at.x - box.w / 2, y0: at.y - box.h / 2, x1: at.x + box.w / 2, y1: at.y + box.h / 2 });
+    const anchor = referenceAt(room, r);
+    const inside = pointInPolygon(at, r.polygon);
+    const explicit = room.labelLeader && room.labelLeader !== 'auto' ? room.labelLeader : null;
+    const style = explicit ?? (room.labelPosition ? (inside ? 'none' : 'crossed') : tag ? tag.leader : inside ? 'none' : 'crossed');
+    for (const pts of leaderLines(at, anchor, box, style, scale)) {
+      out.strokes.push({ pts, closed: false, widthPx: 1, papel: { mm: LEADER_MM, escala: scale }, color: ink, alpha: 0.95 });
+    }
+    const gap = lines.length > 1 ? (NAME_MM + TAG_GAP_MM) / 2 : 0;
+    const firstDy = lines.length > 1 ? -gap : 0;
+    const secondDy = lines.length > 1 ? (INFO_MM + TAG_GAP_MM) / 2 : 0;
+    out.labels.push({ at, text: lines[0]!, center: true, rotation, bold: true, color: ink, papel: { escala: scale, fontMm: NAME_MM, desvio: { mm: Math.abs(firstDy), uy: Math.sign(firstDy) || -1 } } });
+    if (lines[1]) out.labels.push({ at, text: lines[1], center: true, rotation, color: ink, papel: { escala: scale, fontMm: INFO_MM, desvio: { mm: secondDy, uy: 1 } } });
+  }
+  return out;
+}
+
+/**
+ * Fantasma do rótulo em arraste (planta de piso ou de área): desenha o bloco na posição do cursor, com
+ * caixa tracejada e chamada. É uma camada leve, refeita a cada quadro sem refazer a geometria do nível.
+ */
+export function labelGhostOps(p: Project, levelId: Id, ghost: { roomId: Id; at: Vec2 }, scale: number, fields?: readonly RoomTag['fields'][number][], dark = false): FloorOps {
+  const out = empty();
+  const ink = dark ? '#f3f4f6' : '#111827';
+  const accent = dark ? '#93c5fd' : '#1d4ed8';
+  const room = p.elements[ghost.roomId];
+  const r = resolveRooms(p, levelId).find((x) => x.roomId === ghost.roomId);
+  if (!room || room.kind !== 'room' || !r || !r.polygon) return out;
+  const draft: RoomTag = {
+    id: `ghost:${room.id}`,
+    planId: '',
+    roomId: room.id,
+    at: ghost.at,
+    orientation: 'horizontal',
+    leader: 'none',
+    fields: [...(fields ?? ['name', 'number', 'area'])],
+    visible: true,
+  };
+  const lines = roomTagLines(p, room, r, draft);
+  if (lines.length === 0) return out;
+  const box = tagBoxModel(lines, scale);
+  const at = ghost.at;
+  const inside = pointInPolygon(at, r.polygon);
+  for (const pts of leaderLines(at, referenceAt(room, r), box, inside ? 'none' : 'crossed', scale)) {
+    out.strokes.push({ pts, closed: false, widthPx: 1, papel: { mm: LEADER_MM, escala: scale }, color: accent, alpha: 0.9, dash: [4, 2] });
+  }
+  out.strokes.push({ pts: tagMaskRect(at, box), closed: true, widthPx: 1, papel: { mm: 0.1, escala: scale }, color: accent, alpha: 0.9, dash: [3, 2] });
+  const gap = lines.length > 1 ? (NAME_MM + TAG_GAP_MM) / 2 : 0;
+  const firstDy = lines.length > 1 ? -gap : 0;
+  const secondDy = lines.length > 1 ? (INFO_MM + TAG_GAP_MM) / 2 : 0;
+  const rotation = room.labelRotation ?? 0;
+  out.labels.push({ at, text: lines[0]!, center: true, rotation, bold: true, color: ink, papel: { escala: scale, fontMm: NAME_MM, desvio: { mm: Math.abs(firstDy), uy: Math.sign(firstDy) || -1 } } });
+  if (lines[1]) out.labels.push({ at, text: lines[1], center: true, rotation, color: ink, papel: { escala: scale, fontMm: INFO_MM, desvio: { mm: secondDy, uy: 1 } } });
+  return out;
+}
+
+/** Destaque de seleção e hover dos ambientes na planta de área (camada de sobreposição). */
+export function areaPlanHighlightOps(p: Project, plan: AreaPlan, selection: readonly Id[], hover: Id | null, theme: PlanTheme, scale: number): FloorOps {
+  const out = empty();
+  const sel = new Set(selection);
+  for (const r of resolveRooms(p, plan.levelId)) {
+    if (!r.polygon) continue;
+    const isSel = sel.has(r.roomId);
+    const isHover = !isSel && hover === r.roomId;
+    if (!isSel && !isHover) continue;
+    out.fills.push({ polygons: [r.polygon], color: theme.select, alpha: isSel ? 0.22 : 0.12 });
+    if (!isSel) continue;
+    for (const ring of r.polygon) out.strokes.push({ pts: ring, closed: true, widthPx: 2, papel: { mm: 0.35, escala: scale }, color: theme.select, alpha: 1 });
+  }
+  return out;
+}
+
+/** Legenda de cores (só existe com esquema aplicado). */
+export function areaPlanLegendOps(p: Project, plan: AreaPlan, scale: number, theme: PlanTheme, dark = false): FloorOps {
+  const out = empty();
+  const ink = dark ? '#f3f4f6' : '#111827';
+  const mask = dark ? '#111827' : '#ffffff';
+  const border = dark ? '#4b5563' : '#9ca3af';
+  const legend = plan.legend;
+  if (!legend) return out;
+  const rows = areaLegendRows(p, plan);
+  if (rows.length === 0) return out;
+  const w = mm(LEGEND_W_MM, scale);
+  const rowH = mm(LEGEND_ROW_MM, scale);
+  const h = rowH * (rows.length + 2);
+  const x0 = legend.at.x;
+  const y1 = legend.at.y;
+  const y0 = y1 - h;
+  out.fills.push({ polygons: [[[{ x: x0, y: y0 }, { x: x0 + w, y: y0 }, { x: x0 + w, y: y1 }, { x: x0, y: y1 }]]], color: mask, alpha: 0.94 });
+  out.strokes.push({ pts: [{ x: x0, y: y0 }, { x: x0 + w, y: y0 }, { x: x0 + w, y: y1 }, { x: x0, y: y1 }], closed: true, widthPx: 1, papel: { mm: 0.13, escala: scale }, color: border, alpha: 1 });
+  out.labels.push({ at: { x: x0 + mm(2, scale), y: y1 - rowH * 0.5 }, text: legend.title, center: false, bold: true, color: ink, papel: { escala: scale, fontMm: 2.8 } });
+  rows.forEach((row, i) => {
+    const y = y1 - rowH * (i + 1.5);
+    const sw = mm(4, scale);
+    out.fills.push({ polygons: [[[{ x: x0 + mm(2, scale), y: y - sw / 2 }, { x: x0 + mm(2, scale) + sw, y: y - sw / 2 }, { x: x0 + mm(2, scale) + sw, y: y + sw / 2 }, { x: x0 + mm(2, scale), y: y + sw / 2 }]]], color: row.color, alpha: 1 });
+    out.strokes.push({ pts: [{ x: x0 + mm(2, scale), y: y - sw / 2 }, { x: x0 + mm(2, scale) + sw, y: y - sw / 2 }, { x: x0 + mm(2, scale) + sw, y: y + sw / 2 }, { x: x0 + mm(2, scale), y: y + sw / 2 }], closed: true, widthPx: 1, papel: { mm: 0.1, escala: scale }, color: border, alpha: 1 });
+    out.labels.push({ at: { x: x0 + mm(8, scale), y }, text: row.label, center: false, color: ink, papel: { escala: scale, fontMm: 2.1 } });
+    const parts: string[] = [];
+    if (legend.showArea) parts.push(fmt(row.area));
+    if (legend.showCount) parts.push(`${row.count}`);
+    if (legend.showPercent) parts.push(`${fmt(row.percent, 1)}%`);
+    if (parts.length) out.labels.push({ at: { x: x0 + w - mm(2, scale), y }, text: parts.join(' · '), center: false, align: 'right', color: ink, papel: { escala: scale, fontMm: 2.0 } });
+  });
+  out.labels.push({ at: { x: x0 + mm(2, scale), y: y0 + rowH * 0.55 }, text: schemeOf(p, plan)?.name ?? '', center: false, color: ink, papel: { escala: scale, fontMm: 1.8 } });
+  void theme;
+  return out;
+}
+
+/** Quadro de áreas da planta (número, nome, nível, categoria, área, %, perímetro, volume). */
+export function areaPlanTableOps(p: Project, plan: AreaPlan, scale: number, dark = false): FloorOps {
+  const out = empty();
+  const ink = dark ? '#f3f4f6' : '#111827';
+  const mask = dark ? '#111827' : '#ffffff';
+  const border = dark ? '#4b5563' : '#6b7280';
+  const table = plan.table;
+  if (!table) return out;
+  const rows = areaTableRows(p, plan);
+  const w = mm(TABLE_W_MM, scale);
+  const rowH = mm(TABLE_ROW_MM, scale);
+  const headerH = mm(6, scale);
+  const h = headerH + rowH * rows.length;
+  const x0 = table.at.x;
+  const y1 = table.at.y;
+  const y0 = y1 - h;
+  const line = (pts: Vec2[]): void => {
+    out.strokes.push({ pts, closed: false, widthPx: 1, papel: { mm: 0.1, escala: scale }, color: border, alpha: 1 });
+  };
+  out.fills.push({ polygons: [[[{ x: x0, y: y0 }, { x: x0 + w, y: y0 }, { x: x0 + w, y: y1 }, { x: x0, y: y1 }]]], color: mask, alpha: 0.94 });
+  out.strokes.push({ pts: [{ x: x0, y: y0 }, { x: x0 + w, y: y0 }, { x: x0 + w, y: y1 }, { x: x0, y: y1 }], closed: true, widthPx: 1, papel: { mm: 0.13, escala: scale }, color: border, alpha: 1 });
+  out.labels.push({ at: { x: x0 + mm(2, scale), y: y1 - headerH * 0.55 }, text: table.title, center: false, bold: true, color: ink, papel: { escala: scale, fontMm: 2.8 } });
+  line([{ x: x0, y: y1 - headerH }, { x: x0 + w, y: y1 - headerH }]);
+  const cols = table.columns;
+  const colW = w / Math.max(1, cols.length);
+  const cell = (i: number, y: number, text: string, bold = false, align: 'left' | 'right' = 'left'): void => {
+    const x = align === 'right' ? x0 + colW * (i + 1) - mm(1.5, scale) : x0 + colW * i + mm(1.5, scale);
+    out.labels.push({ at: { x, y }, text, center: false, bold, align, color: ink, papel: { escala: scale, fontMm: TABLE_FONT_MM } });
+  };
+  cols.forEach((c, i) => {
+    const label = c === 'number' ? 'Nº' : c === 'name' ? 'AMBIENTE' : c === 'level' ? 'NÍVEL' : c === 'category' ? 'CATEGORIA' : c === 'area' ? 'ÁREA' : c === 'percent' ? '%' : c === 'perimeter' ? 'PERÍM.' : 'VOLUME';
+    cell(i, y1 - headerH * 0.55, label, true, c === 'area' || c === 'percent' || c === 'perimeter' || c === 'volume' ? 'right' : 'left');
+  });
+  rows.forEach((r, i) => {
+    const y = y1 - headerH - rowH * (i + 0.5);
+    const bold = r.kind !== 'room';
+    cols.forEach((c, j) => {
+      const text = c === 'number' ? r.number : c === 'name' ? r.name : c === 'level' ? r.levelName : c === 'category' ? r.category : c === 'area' ? fmt(r.area) : c === 'percent' ? `${fmt(r.percent, 1)}%` : c === 'perimeter' ? fmt(r.perimeter) : fmt(r.volume, 3);
+      cell(j, y, text, bold, c === 'area' || c === 'percent' || c === 'perimeter' || c === 'volume' ? 'right' : 'left');
+    });
+    if (r.kind !== 'room') line([{ x: x0, y: y1 - headerH - rowH * i }, { x: x0 + w, y: y1 - headerH - rowH * i }]);
+  });
+  return out;
+}
+
+/** Todas as operações da planta de área: ambientes, referências, etiquetas, legenda e quadro. */
+export function areaPlanOps(p: Project, plan: AreaPlan, theme: PlanTheme, dark: boolean, scale: number, hidden: ReadonlySet<Id> | undefined, paint: PlanPaint, resolved: readonly ResolvedRoom[], withFurniture = false): FloorOps {
+  const out = empty();
+  const rooms = areaPlanRoomOps(p, plan, theme, dark, scale, hidden, paint, resolved);
+  out.fills.push(...rooms.fills);
+  out.strokes.push(...rooms.strokes);
+  out.labels.push(...rooms.labels);
+  const tags = areaPlanTagOps(p, plan, scale, hidden, resolved);
+  out.strokes.push(...tags.strokes);
+  out.labels.push(...tags.labels);
+  if (withFurniture) {
+    const legend = areaPlanLegendOps(p, plan, scale, theme);
+    out.fills.push(...legend.fills);
+    out.strokes.push(...legend.strokes);
+    out.labels.push(...legend.labels);
+    const table = areaPlanTableOps(p, plan, scale);
+    out.fills.push(...table.fills);
+    out.strokes.push(...table.strokes);
+    out.labels.push(...table.labels);
+  }
+  return out;
+}

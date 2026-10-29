@@ -1,4 +1,5 @@
 import type { Id, Project } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
 import type { ResolvedLevel, ResolvedRoof } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { SketchDraft, SketchResult } from '@hestia/geom';
@@ -6,6 +7,8 @@ import type { Viewport } from '../viewport.ts';
 import { effectiveGridStep, gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
+import { areaPlanHighlightOps, labelGhostOps } from './areaPlan.ts';
+import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
@@ -51,6 +54,10 @@ export interface PlanViewState {
    * os níveis abaixo. As chaves incluem o modo, então trocar entre piso e cobertura refaz as camadas.
    */
   roofPlanMode?: boolean;
+  /** Planta de área ativa (ausente = planta normal). */
+  areaPlan?: import('@hestia/model').AreaPlan;
+  /** Rótulo em arraste (fantasma). */
+  tagGhost?: { roomId: Id; at: Vec2 };
 }
 
 /** Resolução vazia do nível atual: a planta normal não a lê (ver `planFrameUpdateOf`). */
@@ -65,11 +72,19 @@ export function resolucaoVazia(levelId: Id): ResolvedLevel {
 export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   const { project: p, levelId, v, theme, dark } = s;
   const rp = s.roofPlanMode === true;
-  const geoSel = planGeometrySelection(p, levelId, s.selection);
+  const geoSel = planGeometrySelection(p, levelId, s.selection, s.areaPlan);
   // A planta normal não usa a resolução do nível atual: `planViewOf` refaz a geometria com o corte (ver `planContext`).
   // Só a planta de cobertura lê `resolved`: o nível atual é resolvido só quando ela é desenhada, nunca na planta de piso.
   // O nível de baixo continua resolvido apenas quando a geometria é refeita (ver `planBelowOf`).
-  const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp };
+  const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp, areaPlan: s.areaPlan, tagGhost: s.tagGhost };
+  const area = s.areaPlan !== undefined;
+  const areaKey = area ? `${JSON.stringify(s.areaPlan)}|${s.tagGhost?.roomId ?? ''}` : '';
+  // Planta de área: o destaque de seleção/hover das anotações (textos e cotas) entra nas camadas de sobreposição, com a
+  // seleção do quadro. As anotações são resolvidas uma vez por atualização, como o resto do estado da vista.
+  const escalaAnotacoes = s.areaPlan && s.areaPlan.scale > 0 ? s.areaPlan.scale : 50;
+  const anotacoes = area ? drawnAnnotations(p, levelId, s.areaPlan) : null;
+  const destaqueAnotacoes = (selection: readonly Id[], hover: Id | null): PlanOps =>
+    anotacoes ? annotationHighlightOps(p, levelId, escalaAnotacoes, { select: theme.select, paper: theme.bg, hoverColor: theme.selectHover }, { selection, hover }, anotacoes) : EMPTY;
   // Uma resolução por atualização, mesmo com as camadas de sobreposição sendo refeitas na mesma passagem.
   let resolvida: ResolvedLevel | null = null;
   const resolvido = (): ResolvedLevel => (rp ? (resolvida ??= s.resolve(levelId)) : resolucaoVazia(levelId));
@@ -80,24 +95,28 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     theme,
     gpu: s.gpu,
     showGrid: s.showGrid,
-    geometryKey: `${s.version}|${levelId}|${modo}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}`,
+    geometryKey: `${s.version}|${levelId}|${modo}|${dark}|${s.showUnderlay}|${s.underlayLevel ?? ''}|${s.showRoofProjection}|${s.sketch ? 'dim' : ''}|${geoSel.join(',')}|${s.tagGhost?.roomId ?? ''}|${areaKey}`,
     // Três chaves de sobreposição: a seleção, o alvo do cursor e a camada viva (prévia, guias e captura). Cursor e
     // pré-visualização não refazem os destaques da seleção, e o hover não refaz a geometria do nível.
-    overlayKey: `${s.version}|${levelId}|${modo}|${dark}|${s.selection.join(',')}`,
-    hoverKey: `${s.version}|${levelId}|${modo}|${dark}|${s.selection.join(',')}|${s.hover ?? ''}`,
-    liveKey: `${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}`,
+    overlayKey: `${s.version}|${levelId}|${modo}|${dark}|${s.selection.join(',')}|${areaKey}`,
+    hoverKey: `${s.version}|${levelId}|${modo}|${dark}|${s.selection.join(',')}|${s.hover ?? ''}|${areaKey}`,
+    liveKey: `${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}|${JSON.stringify(s.tagGhost ?? null)}|${areaKey}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => {
       const abaixo = planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel);
       // Cobertura: os telhados de todos os níveis abaixo (`planBelowOf` só dá os do pavimento de referência).
       const telhados = rp ? { belowRoofs: telhadosDosNiveisAbaixo(p, levelId) } : {};
-      const g = buildPlanGeometry({ ...base, resolved: resolvido(), ...abaixo, ...telhados, selection: geoSel, hover: null, preview: [], inference: null });
+      const g = buildPlanGeometry({ ...base, hideLabelRoomId: s.tagGhost?.roomId, resolved: resolvido(), ...abaixo, ...telhados, selection: geoSel, hover: null, preview: [], inference: null });
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null }),
-    hover: () => buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null }),
-    live: () => comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
+    overlay: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, null, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, null)) : buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null })),
+    hover: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, s.hover, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, s.hover)) : buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null })),
+    live: () => area
+      ? s.tagGhost
+        ? labelGhostOps(p, levelId, s.tagGhost, s.areaPlan?.scale ?? 50, s.areaPlan?.graphics.tagDefault.fields, s.dark)
+        : EMPTY
+      : comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
   };
 }
 
@@ -110,6 +129,12 @@ function telhadosDosNiveisAbaixo(p: Project, levelId: Id): ResolvedRoof[] {
 /** Chave do esboço na sobreposição: conteúdo e zoom (as linhas dos arcos e o balão dependem do zoom); vazia fora do modo. */
 function sketchKey(sk: PlanSketch | null | undefined, zoom: number): string {
   return sk ? `${zoom}|${JSON.stringify(sk)}` : '';
+}
+
+/** Junta duas listas de operações na ordem de desenho (preenchimentos, traços, rótulos). */
+function juntarOps(a: PlanOps, b: PlanOps): PlanOps {
+  if (b.fills.length === 0 && b.strokes.length === 0 && b.labels.length === 0) return a as PlanOps;
+  return { ...a, fills: [...a.fills, ...b.fills], strokes: [...a.strokes, ...b.strokes], labels: [...a.labels, ...b.labels] };
 }
 
 /** Junta as operações do esboço à sobreposição da planta (sem esboço, a sobreposição sai como está). */
@@ -170,9 +195,10 @@ export function sameLabels(a: readonly LabelOp[], b: readonly LabelOp[]): boolea
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!;
     const y = b[i]!;
-    if (x.at.x !== y.at.x || x.at.y !== y.at.y || x.text !== y.text || x.dx !== y.dx || x.dy !== y.dy) return false;
+    if (x.at.x !== y.at.x || x.at.y !== y.at.y || x.text !== y.text || x.dx !== y.dx || x.dy !== y.dy || x.color !== y.color) return false;
     if (x.tone !== y.tone || x.fontPx !== y.fontPx || x.rotation !== y.rotation || x.center !== y.center || !samePapel(x.papel, y.papel)) return false;
     if (x.widthPx !== y.widthPx || x.bold !== y.bold || x.italic !== y.italic || x.underline !== y.underline || x.align !== y.align) return false;
+    if (x.whiteSpace !== y.whiteSpace) return false;
     if (x.maskColor !== y.maskColor || x.maskBorderColor !== y.maskBorderColor || x.maskBoundary?.length !== y.maskBoundary?.length) return false;
     if (x.maskBoundary && y.maskBoundary && x.maskBoundary.some((p, j) => p.x !== y.maskBoundary![j]!.x || p.y !== y.maskBoundary![j]!.y)) return false;
   }

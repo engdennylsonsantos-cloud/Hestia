@@ -68,12 +68,12 @@ describe('ambiente na planta (D1, E3)', () => {
     expect(roomOps(aberto, 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills).toHaveLength(0);
   });
 
-  it('cor própria do ambiente substitui o padrão; no tema escuro o preenchimento muda', () => {
+  it('cor própria do ambiente só vale na planta de área; a planta de piso usa o padrão; no tema escuro o preenchimento muda', () => {
     const paint = defaultPaint('room', 100);
     const claro = roomOps(sala('Sala', '101', { color: '#ff0000' }), 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills[0]!.color;
     const escuro = roomOps(sala(), 'lv_0', DARK, true, 'fine', 100, undefined, paint).fills[0]!.color;
     expect(claro).toMatch(/^#/);
-    expect(claro).not.toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills[0]!.color);
+    expect(claro).toBe(roomOps(sala(), 'lv_0', LIGHT, false, 'fine', 100, undefined, paint).fills[0]!.color);
     expect(escuro).not.toBe(claro);
   });
 

@@ -4,6 +4,7 @@ export * from './gpu.ts';
 export * from './perf/index.ts';
 export * from './plan/types.ts';
 export * from './plan/build.ts';
+export * from './plan/zoomOps.ts';
 export * from './plan/grid.ts';
 export * from './plan/cpuPlan.ts';
 export * from './plan/gpuPlan.ts';
@@ -40,4 +41,7 @@ export * from './sheet/build.ts';
 export { STAMP_H, STAMP_W } from './sheet/frame.ts';
 // Ambientes (decisão 0018): rótulo e centro de cada ambiente, o mesmo texto da planta e do DXF.
 export { roomLabelAt, roomLabelText } from './plan/rooms.ts';
+export { areaPlanHighlightOps, areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps, labelGhostOps, referenceAt, referenceSegments, roomTagLines, tagBoxModel } from './plan/areaPlan.ts';
 export * from './plan/sketch.ts';
+// Anotações (textos e cotas): desenho, caixa do texto, moldura e destaque de seleção/hover.
+export { annotationHighlightOps, annotationsOfLevel, blocoEm, drawnAnnotations, linhasDoTexto, noteOps, roomSeparatorStrokes, textBlockModel, type NoteLook, type NoteOps, type NoteTarget, type TextBlockModel } from './plan/notes.ts';

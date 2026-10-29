@@ -1,12 +1,17 @@
 import { boxOf, closestOnSegment, dist, intersectSegments, pointInRing, type Box, type Ring, type Vec2 } from '@hestia/geom';
-import { isStair, stairsOnLevel, type Id, type Project, type Stair, type StairCurve } from '@hestia/model';
+import { isStair, stairsOnLevel, type Id, type Project, type StairCurve, type StairLanding, type StairRun } from '@hestia/model';
 import { sampleChain, sampleCurve } from '@hestia/engine';
 
 /** Escadas entre os selecionados. */
 export const selectedStairs = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isStair(p.elements[id]));
 
-/** Polilinhas amostradas de uma escada: cada limite, cada espelho, a caminhada e o contorno de cada patamar. */
-export function stairPolylines(s: Stair): Vec2[][] {
+/** Elemento com croqui de lances e patamares: a escada e a rampa usam os mesmos componentes. */
+export interface ComponentSketchHolder {
+  components: Array<StairRun | StairLanding>;
+}
+
+/** Polilinhas amostradas de uma escada (ou rampa): cada limite, cada espelho, a caminhada e o contorno de cada patamar. */
+export function stairPolylines(s: ComponentSketchHolder): Vec2[][] {
   const out: Vec2[][] = [];
   for (const c of s.components) {
     if (c.kind === 'landing') {
@@ -22,7 +27,7 @@ export function stairPolylines(s: Stair): Vec2[][] {
 }
 
 /** Contorno de cada lance (limite esquerdo, depois o direito de volta) e de cada patamar. Vazio se o lance está incompleto. */
-export function stairRings(s: Stair): Ring[] {
+export function stairRings(s: ComponentSketchHolder): Ring[] {
   const out: Ring[] = [];
   for (const c of s.components) {
     if (c.kind === 'landing') {
@@ -96,8 +101,8 @@ export function stairSnapPoints(p: Project, levelId: Id): Vec2[] {
   return out;
 }
 
-/** Extremidades de cada curva da escada (limites, espelhos, caminhada e contornos de patamar). */
-export function stairEndpoints(s: Stair): Vec2[] {
+/** Extremidades de cada curva da escada (ou rampa): limites, espelhos, caminhada e contornos de patamar. */
+export function stairEndpoints(s: ComponentSketchHolder): Vec2[] {
   const curves: StairCurve[] = [];
   for (const c of s.components) {
     if (c.kind === 'landing') curves.push(...c.boundary);

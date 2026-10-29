@@ -15,7 +15,7 @@ export type ShortcutMap = Partial<Record<ShortcutCommand, string>>;
  */
 export const PERFIL_REVIT: ShortcutMap = {
   wall: 'WA', door: 'DR', window: 'WN', floor: 'SB', slab: 'LJ', ceiling: 'FR', slope: 'IN', roof: 'TL', roofarrow: 'SI', roofextrusion: 'TE',
-  attachroof: 'AT', detachroof: 'DT', stair: 'ES', stairrun: 'LE', room: 'RM', roomsep: 'RS', dimension: 'DI', text: 'TX',
+  attachroof: 'AT', detachroof: 'DT', stair: 'ES', stairrun: 'LE', ramp: 'RA', room: 'RM', roomsep: 'RS', dimension: 'DI', text: 'TX',
   move: 'MV', copy: 'CO', rotate: 'RO', mirror: 'MM', array: 'AR', offset: 'OF', parallel: 'PP', trim: 'TR', align: 'AL', joins: 'UG',
   split: 'SL', measure: 'ME', section: 'CT', rehost: 'TH', atalhos: 'KS',
   detailLine: 'DL', filledRegion: 'RP', tag: 'TG',

@@ -1,6 +1,6 @@
 import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
-import { isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
+import { isCeiling, isFloor, isOpening, isRamp, isRoof, isSlab, isStair, isWall, type Id } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { idsInBox, pickAt } from './pick.ts';
@@ -17,6 +17,7 @@ import { parseNumber } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
+import { pickRampAt, rampEndpoints, rampIdsInBox } from './rampPick.ts';
 import { annotationAt, detailItemAt, dimGripAt, dimTextGripAt, signedOffset } from './annotationPick.ts';
 import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
@@ -29,7 +30,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'roomSeparator' | 'room' | 'annotation' | 'view';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'ramp' | 'roomSeparator' | 'room' | 'annotation' | 'view';
 }
 
 const fmtLen = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
@@ -106,6 +107,8 @@ export class SelectTool extends ToolBase {
     if (rs) return { id: rs.id, kind: 'roomSeparator' };
     const st = pickStairAt(pr, lv, at, mpp);
     if (st) return { id: st, kind: 'stair' };
+    const rp = pickRampAt(pr, lv, at, mpp);
+    if (rp) return { id: rp, kind: 'ramp' };
     const f = pickFloorAt(pr, lv, at, mpp);
     if (f) return { id: f, kind: 'floor' };
     const sl = pickSlabAt(pr, lv, at, mpp);
@@ -333,6 +336,7 @@ export class SelectTool extends ToolBase {
           ...slabIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...rampIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
         ];
@@ -365,6 +369,7 @@ export class SelectTool extends ToolBase {
       const e = pr.elements[id];
       if (isWall(e)) pts.push(e.a, e.b);
       else if (isStair(e)) pts.push(...stairEndpoints(e));
+      else if (isRamp(e)) pts.push(...rampEndpoints(e));
       else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
       else {
         const v = pr.views.find((x) => x.id === id);

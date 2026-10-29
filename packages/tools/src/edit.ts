@@ -1,9 +1,11 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
 import { followingEnds, MIN_WALL_LENGTH } from './pick.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
+import { selectedRamps } from './rampPick.ts';
+import { ghostRampItems } from './rampPreview.ts';
 import { selectedFloors } from './floorPick.ts';
 import { selectedSlabs } from './slabPick.ts';
 import { selectedRoofs } from './roofPick.ts';
@@ -14,7 +16,7 @@ import type { PreviewItem, ToolEnv } from './types.ts';
 export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isWall(p.elements[id]));
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
 /** Paredes, pisos, lajes e telhados: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
-export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRooms(p, ids)];
+export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRamps(p, ids), ...selectedRooms(p, ids)];
 
 /** Vistas de corte/elevação dentro da seleção. Elas transformam junto com os elementos. */
 export const selectedViews = (p: Project, ids: Id[]): Id[] => viewIdsIn(p, ids);
@@ -52,6 +54,7 @@ export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
     else if (isSlab(e)) map[id] = newId('l');
     else if (isRoof(e)) map[id] = newId('t');
     else if (isStair(e)) map[id] = newId('st');
+    else if (isRamp(e)) map[id] = newId('rp');
     else if (isRoom(e)) map[id] = newId('rm');
   }
   for (const e of Object.values(p.elements)) {
@@ -67,6 +70,10 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
     const st = p.elements[id];
     if (isStair(st)) {
       out.push(...ghostStairItems(st, t));
+      continue;
+    }
+    if (isRamp(st)) {
+      out.push(...ghostRampItems(st, t));
       continue;
     }
     const fl = p.elements[id];

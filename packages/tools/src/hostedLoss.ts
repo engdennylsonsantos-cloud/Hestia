@@ -2,6 +2,7 @@ import { arcFromSagitta, dist, type Vec2 } from '@hestia/geom';
 import { frameOfWall, openingExtents } from '@hestia/engine';
 import {
   isWall,
+  openingOffsetAfterEnds,
   openingTypeById,
   openingsOfWall,
   type Command,
@@ -70,8 +71,8 @@ function nextLength(wall: Wall, patch: EndsPatch): number {
 }
 
 /**
- * Aberturas que sairiam da parede com as pontas propostas. Só conta quando a parede ENCURTA (translação e giro
- * levam a abertura junto) e usa a extensão real da esquadria: uma abertura parcialmente fora também entra.
+ * Aberturas que sairiam da parede com as pontas propostas. Usa a mesma compensação de `offset` dos comandos (a
+ * abertura não anda ao esticar/encurtar) e a extensão real da esquadria: uma abertura parcialmente fora também entra.
  */
 export function hostedLoss(project: Project, patches: ReadonlyMap<Id, EndsPatch>): HostedLoss[] {
   const lost: HostedLoss[] = [];
@@ -81,10 +82,10 @@ export function hostedLoss(project: Project, patches: ReadonlyMap<Id, EndsPatch>
     const frame = frameOfWall(project, wallId);
     if (!frame) continue;
     const length = nextLength(wall, patch);
-    if (!(length < frame.length - EPS)) continue;
     for (const opening of openingsOfWall(project, wallId)) {
       const half = openingExtents(project, opening, frame, 1).frame;
-      if (opening.offset - half < -EPS || opening.offset + half > length + EPS) {
+      const offset = openingOffsetAfterEnds(wall, opening.offset, patch);
+      if (offset - half < -EPS || offset + half > length + EPS) {
         lost.push({ id: opening.id, wallId, kind: opening.kind, label: openingLabel(project, opening) });
       }
     }

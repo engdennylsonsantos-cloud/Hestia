@@ -1,6 +1,4 @@
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
-import { wallLength } from './queries.ts';
-import { openingTypeById } from './openingNominal.ts';
 import {
   isOpening,
   isCeiling,
@@ -35,6 +33,7 @@ import {
 } from './types.ts';
 import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
+import { changesWallEnds, clampOffset, rehostOpenings, wallEndsPatchOf, type WallEndsPatch } from './hostedOffset.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
 import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
@@ -132,14 +131,6 @@ function transformWall(w: Wall, t: Transform): Wall {
   // Espelhar inverte o lado externo: sem trocar `flipped` a pilha de camadas sairia do lado errado.
   // Espelhar também inverte o lado para o qual o arco abaulava.
   return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
-}
-
-/** Garante que a abertura continue dentro da parede depois de qualquer edição. */
-export function clampOffset(p: Project, o: Opening, wall: Wall): number {
-  const t = openingTypeById(p, o.typeId);
-  const half = (t?.width ?? 0.8) / 2;
-  const l = wallLength(wall);
-  return Math.max(Math.min(half, l / 2), Math.min(o.offset, l - Math.min(half, l / 2)));
 }
 
 function removeIds(p: Project, ids: Id[]): void {
@@ -266,10 +257,19 @@ export function applyCommand(p: Project, c: Command): void {
       p.elements[c.opening.id] = { ...c.opening, offset: clampOffset(p, c.opening, host) };
       break;
     }
-    case 'updateElements':
+    case 'updateElements': {
+      const ends = wallEndsPatchOf(c.patch as Partial<Wall>);
+      const movesEnds = changesWallEnds(c.patch as Partial<Wall>);
       for (const id of c.ids) {
         const e = p.elements[id];
-        if (e) p.elements[id] = { ...e, ...c.patch } as Element;
+        if (!e) continue;
+        if (movesEnds && isWall(e)) {
+          const next = { ...e, ...c.patch } as Wall;
+          rehostOpenings(p, e, next, ends);
+          p.elements[id] = next;
+          continue;
+        }
+        p.elements[id] = { ...e, ...c.patch } as Element;
       }
       for (const id of c.ids) {
         const e = p.elements[id];
@@ -279,14 +279,17 @@ export function applyCommand(p: Project, c: Command): void {
         }
       }
       break;
+    }
     case 'setWallEnds': {
       const w = p.elements[c.id];
       if (!isWall(w)) break;
-      if (c.a) w.a = c.a;
-      if (c.b) w.b = c.b;
-      for (const o of Object.values(p.elements).filter(isOpening)) {
-        if (o.hostId === w.id) o.offset = clampOffset(p, o, w);
-      }
+      const patch: WallEndsPatch = {};
+      if (c.a) patch.a = c.a;
+      if (c.b) patch.b = c.b;
+      const next = { ...w, ...patch };
+      rehostOpenings(p, w, next, patch);
+      w.a = next.a;
+      w.b = next.b;
       break;
     }
     case 'setJoin':

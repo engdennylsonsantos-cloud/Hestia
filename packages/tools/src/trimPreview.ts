@@ -16,14 +16,16 @@ export interface TrimPatch {
   patch: EndPatch;
 }
 
-/** Comandos do ajuste: pontas e, nas paredes curvas, a flecha nova (um passo único de desfazer). */
+/**
+ * Comandos do ajuste: pontas e flecha no MESMO comando (`updateElements`), para a compensação de `offset` ver a
+ * circunferência final de uma vez e a abertura manter a posição no mundo. Um passo único de desfazer.
+ */
 export function patchCommands(patches: readonly TrimPatch[]): Command[] {
-  const commands: Command[] = [];
-  for (const { id, patch } of patches) {
-    commands.push({ type: 'setWallEnds', id, ...(patch.a ? { a: patch.a } : {}), ...(patch.b ? { b: patch.b } : {}) });
-    if (patch.sag !== undefined) commands.push({ type: 'updateElements', ids: [id], patch: { sag: patch.sag } });
-  }
-  return commands;
+  return patches.map(({ id, patch }): Command => ({
+    type: 'updateElements',
+    ids: [id],
+    patch: { ...(patch.a ? { a: patch.a } : {}), ...(patch.b ? { b: patch.b } : {}), ...(patch.sag !== undefined ? { sag: patch.sag } : {}) },
+  }));
 }
 
 /**

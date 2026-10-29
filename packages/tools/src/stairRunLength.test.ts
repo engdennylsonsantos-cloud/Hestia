@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { stairsOnLevel, type Stair, type StairRun } from '@hestia/model';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 import { regenStraightComponents } from './stairRunEdit.ts';
-import { risersForLength } from './stairRunPlan.ts';
+import { fitRunToLength } from './stairRunPlan.ts';
 import type { Tool } from './types.ts';
 
 /** Reta de 1,20 m com H = 2,80 m (padrão de `stairRunTool.test.ts`), mensagens capturadas. */
@@ -25,7 +25,7 @@ const stairsOf = (store: { project: Parameters<typeof stairsOnLevel>[0] }): Stai
 const runOf = (s: Stair): StairRun => s.components[0] as StairRun;
 const centerOf = (r: StairRun, i: number) => ({ x: (r.risers[i]!.a.x + r.risers[i]!.b.x) / 2, y: (r.risers[i]!.a.y + r.risers[i]!.b.y) / 2 });
 
-describe('escada reta: o 2º clique define o comprimento e o nº de espelhos (frente D)', () => {
+describe('escada reta: a altura define o nº de espelhos e o 2º clique limita o comprimento', () => {
   it('2º clique a 4,20 m: 16 espelhos de 17,5 cm e piso de 28 cm (o ideal 63 − 2h), e o último espelho cai no clique', () => {
     const ctx = setup();
     drawTo(tool('stairrun', ctx.env), [0, 4.2]);
@@ -39,20 +39,15 @@ describe('escada reta: o 2º clique define o comprimento e o nº de espelhos (fr
     expect(ctx.last()).toMatch(/^Escada criada: 16 espelhos de 17,5 cm, piso 28,0 cm/);
   });
 
-  it('2º clique a 5 m: o comprimento pede 17 espelhos (piso mais perto do ideal), e a altura do espelho acompanha', () => {
-    const ctx = setup();
-    drawTo(tool('stairrun', ctx.env), [0, 5]);
-    expect(runOf(stairsOf(ctx.store)[0]!).risers).toHaveLength(17);
-    expect(ctx.last()).toMatch(/^Escada criada: 17 espelhos de 16,5 cm/);
-  });
-
-  it('D3: 5,10 m dá 17 espelhos (piso mais perto do ideal) e a mensagem explica o ideal pela altura (16) sem "difere"', () => {
-    const ctx = setup();
-    drawTo(tool('stairrun', ctx.env), [0, 5.1]);
-    expect(runOf(stairsOf(ctx.store)[0]!).risers).toHaveLength(17);
-    expect(ctx.last()).toMatch(/^Escada criada: 17 espelhos de 16,5 cm, piso 31,9 cm\. \(o comprimento de 5,10 m permite 17; o ideal pela altura é 16: ajuste o comprimento para 4,20 m ou edite o nº de espelhos\)\. /);
-    expect(ctx.last()).toMatch(/ Ctrl\+Z desfaz\.$/);
-    expect(ctx.last()).not.toMatch(/difere do nº desejado/);
+  it('2º clique além do que a altura pede (5 m e 5,10 m): continua 16 espelhos de 17,5 cm, termina antes do clique e avisa', () => {
+    for (const len of [5, 5.1]) {
+      const ctx = setup();
+      drawTo(tool('stairrun', ctx.env), [0, len]);
+      const r = runOf(stairsOf(ctx.store)[0]!);
+      expect(r.risers).toHaveLength(16);
+      expect(centerOf(r, 15).y).toBeCloseTo(4.2, 6);
+      expect(ctx.last()).toMatch(/^Escada criada: 16 espelhos de 17,5 cm, piso 28,0 cm\. \(a altura pede 16 espelhos: a escada termina a 4,20 m, antes do clique de /);
+    }
   });
 
   it('comprimento curto demais para o nº mínimo de espelhos: erro claro e nada criado', () => {
@@ -62,10 +57,11 @@ describe('escada reta: o 2º clique define o comprimento e o nº de espelhos (fr
     expect(ctx.last()).toMatch(/^O comprimento \(50 cm\) é curto para 16 espelhos/);
   });
 
-  it('risersForLength: o piso não cai abaixo do mínimo e o N escolhido não passa do espelho máximo', () => {
-    const r = risersForLength(2.8, 0.175, 0.25, 4.2);
-    expect(r).toEqual({ risers: 16, tread: 4.2 / 15 });
-    expect('error' in risersForLength(2.8, 0.175, 0.25, 0.5)).toBe(true);
+  it('fitRunToLength: N só pela altura; o piso é o ideal, encolhe com o comprimento e erra abaixo do mínimo', () => {
+    expect(fitRunToLength(2.8, 0.175, 0.25, 4.2)).toEqual({ risers: 16, tread: 0.28 });
+    expect(fitRunToLength(2.8, 0.175, 0.25, 40)).toEqual({ risers: 16, tread: 0.28 });
+    expect(fitRunToLength(2.8, 0.175, 0.25, 3.9)).toEqual({ risers: 16, tread: 3.9 / 15 });
+    expect('error' in fitRunToLength(2.8, 0.175, 0.25, 3.6)).toBe(true);
   });
 });
 

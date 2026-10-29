@@ -1,6 +1,6 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
 import { formatRampPercent, formatRampSlope, rampTopLevel, type RampInputMode } from '@hestia/model';
-import { planRamp, rampIssueList, type RampPlan } from '@hestia/engine';
+import { planRamp, rampIssuesOf, type RampPlan } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { createRampFromPlan, draftRamp, rampRise, rampTypeId, type RampCommandResult } from './rampCommands.ts';
@@ -200,7 +200,7 @@ export class RampTool extends ToolBase {
       this.env.say(`Não é possível criar a rampa: ${r?.error ?? 'falha ao gravar.'}`);
       return false;
     }
-    const aviso = rampIssueList(this.env.project()).find((i) => i.rampId === r.id && i.severity === 'warning');
+    const aviso = rampIssuesOf(this.env.project(), r.id).find((i) => i.severity === 'warning');
     const nota = plan.note ? ` ${plan.note}` : '';
     const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Rampa criada: ${flightsText(plan.flights)}, inclinação ${formatRampSlope(plan.slope)}, ${mText(plan.pathLength)} m.${nota}${avisoText} Ctrl+Z desfaz.`);

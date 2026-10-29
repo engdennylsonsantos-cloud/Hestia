@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeLevel, makeRamp, type StairLanding, type StairRun } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeRamp, type Project, type StairLanding, type StairRun } from '@hestia/model';
 import { planRamp, type RampPlan } from './rampPlan.ts';
 import { resolveRamps, type ResolvedRamp } from './ramps.ts';
-import { rampNormIssues } from './rampIssues.ts';
+import { rampIssueList, rampIssuesOf, rampNormIssues } from './rampIssues.ts';
 
 const type = { ...createEmptyProject().rampTypes.rmt_nbr9050! };
 const okPlan = (r: ReturnType<typeof planRamp>): RampPlan => {
@@ -148,5 +148,40 @@ describe('rampNormIssues — sufixo e tabela', () => {
 
   it('tabela vazia não gera avisos de norma', () => {
     expect(rampNormIssues({ ...rr, type: { ...rr.type, normTable: [] } })).toEqual([]);
+  });
+});
+
+/** Projeto com 3 rampas do lv_0 ao lv_top (H = 1,2 m), em faixas separadas; a 2ª é íngreme demais para a norma. */
+function projectWithThreeRamps(): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_top', name: 'Topo', elevation: 1.2 }) });
+  const specs: Array<[string, number]> = [
+    ['rp1', 1 / 12],
+    ['rp2', 1 / 4],
+    ['rp3', 1 / 12],
+  ];
+  specs.forEach(([id, slope], k) => {
+    const plan = okPlan(planRamp({ start: { x: k * 10, y: 0 }, dir: { x: 1, y: 0 }, H: 1.2, type, shape: 'straight', turn: 'left', width: 1.5, mode: 'slope', slope }));
+    s.exec({
+      type: 'addRamp',
+      ramp: makeRamp({ id, typeId: type.id, levelId: 'lv_0', topLevelId: 'lv_top', components: componentsOf(plan), inputMode: 'slope', slopeTarget: slope }),
+    });
+  });
+  return s.project;
+}
+
+describe('rampIssuesOf — uma rampa sem resolver as outras', () => {
+  it('é igual a rampIssueList filtrada pela rampa, em cada rampa de um projeto com 3 (algumas com aviso)', () => {
+    const p = projectWithThreeRamps();
+    const todos = rampIssueList(p);
+    expect(todos.some((i) => i.severity === 'warning')).toBe(true);
+    expect(rampIssuesOf(p, 'rp2').length).toBeGreaterThan(0);
+    for (const id of ['rp1', 'rp2', 'rp3']) {
+      expect(rampIssuesOf(p, id)).toEqual(todos.filter((i) => i.rampId === id));
+    }
+  });
+
+  it('id que não é rampa devolve lista vazia', () => {
+    expect(rampIssuesOf(projectWithThreeRamps(), 'nao_existe')).toEqual([]);
   });
 });

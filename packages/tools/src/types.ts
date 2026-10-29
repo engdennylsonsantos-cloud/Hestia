@@ -1,4 +1,5 @@
 import type { DimRef, TempDim } from './dims/types.ts';
+import type { HostedLoss } from './hostedLoss.ts';
 import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
@@ -52,6 +53,11 @@ export interface ToolEnv {
   gridStep(): number;
   /** Mensagem da barra de status. */
   say(msg: string): void;
+  /**
+   * Confirma uma operação que deixaria aberturas fora da parede. Ausente = não pergunta (aplica e exclui).
+   * Síncrono nos testes; na interface abre o diálogo e resolve quando o usuário escolhe.
+   */
+  confirmHostedLoss?(losses: readonly HostedLoss[], message: string): boolean | Promise<boolean>;
   /** Pede à interface para voltar à ferramenta de seleção. */
   done(): void;
   /** Abre uma vista de corte/elevação na área de desenho. Ausente = a interface não abre a vista sozinha. */

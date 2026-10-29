@@ -14,6 +14,8 @@ export { ToolBase } from './base.ts';
 export * from './wallGeom.ts';
 export * from './clipboard.ts';
 export * from './lengthEdit.ts';
+export * from './hostedLoss.ts';
+export * from './hostedGuard.ts';
 export * from './selectionFilters.ts';
 export * from './enclosed.ts';
 export * from './roomPick.ts';

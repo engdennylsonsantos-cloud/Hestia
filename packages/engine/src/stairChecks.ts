@@ -12,7 +12,7 @@ import { stairWallOverlapIssues } from './stairWallOverlap.ts';
  * pode entrar na resolução da escada sem ciclo.
  */
 
-/** Tolerância (m) nas comparações de folga, e área mínima (m²) para contar sobreposição entre degrau e laje. */
+/** Tolerância (m) nas comparações de folga, e área mínima (metros quadrados) para contar sobreposição entre degrau e laje. */
 const EPS = 1e-9;
 const EPS_AREA = 1e-6;
 

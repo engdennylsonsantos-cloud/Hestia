@@ -140,6 +140,6 @@ export interface StairType {
   /** Pé-direito livre mínimo sob o lance (m). */
   minHeadroom: number;
   materialId: Id;
-  /** Custo informativo (R$). 0 quando não informado. */
+  /** Custo informativo (em reais). 0 quando não informado. */
   cost: number;
 }

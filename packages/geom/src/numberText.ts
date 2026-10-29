@@ -8,6 +8,7 @@ export function machineNumber(v: number, digits = 3): string {
   const fator = 10 ** casas;
   const arredondado = Math.round(v * fator + Number.EPSILON * Math.abs(v * fator)) / fator;
   if (Object.is(arredondado, -0) || arredondado === 0) return '0';
+  // units-ok: implementação do formato de máquina (ponto decimal, sem símbolo)
   let texto = arredondado.toFixed(casas);
   if (texto.includes('.')) texto = texto.replace(/\.?0+$/, '');
   return texto;

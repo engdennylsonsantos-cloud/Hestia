@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeRoof, type Project, type Roof } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeRoof, type Project, type Roof } from '@hestia/model';
 import { quantifyRoofs, roofScheduleToCsv, buildRoofSchedule, filterRoofRows, type RoofLayerQuantity } from './index.ts';
 
 const R86: Vec2[] = [
@@ -143,7 +143,7 @@ describe('quantitativos sob transformação e tabela', () => {
     expect(sch.totals.volume).toBeCloseTo(9.12, 9);
     expect(filterRoofRows(sch.rows, { levelId: 'lv_1' })).toHaveLength(1);
     expect(filterRoofRows(sch.rows, { shape: 'hip' }).map((r) => r.roofId)).toEqual(['r1']);
-    const csv = roofScheduleToCsv(sch.rows, sch.totals);
+    const csv = roofScheduleToCsv(sch.rows, sch.totals, defaultUnits());
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(csv).toContain('Marca;Tipo;Código;Nível;Forma;Inclinação (%);');
     expect(csv).toContain('Quatro águas;30,00;48,00;50,11;');

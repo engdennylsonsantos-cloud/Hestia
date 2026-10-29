@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
+import { defaultUnits,
   createEmptyProject,
   leafSizeOf,
   makeWall,
@@ -109,7 +109,7 @@ describe('quadro de esquadrias', () => {
     expect(row.leafHeight).toBeCloseTo(2.1, 9);
     expect(row.unitArea).toBeCloseTo(0.88 * 2.15, 9);
     const s = buildOpeningSchedule(p);
-    expect(openingScheduleToCsv(s.rows, s.totals)).toContain('0,80;2,10');
+    expect(openingScheduleToCsv(s.rows, s.totals, defaultUnits())).toContain('0,80;2,10');
   });
 });
 

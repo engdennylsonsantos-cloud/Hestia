@@ -8,11 +8,11 @@ export interface LayerQuantity {
   wallId: Id;
   layerIndex: number;
   materialId: Id;
-  /** Área da camada em planta (m²). */
+  /** Área da camada em planta (metros quadrados). */
   planArea: number;
-  /** Volume líquido (m³): planta × altura, mais as peças acima/abaixo dos vãos, menos o que piso e laje ocupam. */
+  /** Volume líquido (metros cúbicos): planta × altura, mais as peças acima/abaixo dos vãos, menos o que piso e laje ocupam. */
   volume: number;
-  /** Volume bruto (m³), antes do desconto de piso e laje. */
+  /** Volume bruto (metros cúbicos), antes do desconto de piso e laje. */
   grossVolume: number;
 }
 
@@ -23,9 +23,9 @@ export interface WallQuantity {
   grossFaceArea: number;
   openingsArea: number;
   netFaceArea: number;
-  /** Volume líquido (m³): sem o que piso e laje do mesmo nível ocupam (decisão 0023 §4). */
+  /** Volume líquido (metros cúbicos): sem o que piso e laje do mesmo nível ocupam (decisão 0023 §4). */
   volume: number;
-  /** Volume bruto (m³), antes do desconto de piso e laje. Igual a `volume` quando não há corte. */
+  /** Volume bruto (metros cúbicos), antes do desconto de piso e laje. Igual a `volume` quando não há corte. */
   grossVolume: number;
 }
 

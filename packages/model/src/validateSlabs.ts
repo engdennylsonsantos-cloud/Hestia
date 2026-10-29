@@ -51,12 +51,12 @@ function slabIssuesOf(p: Project, s: Slab): ValidationIssue[] {
   return out;
 }
 
-/** Sobreposição (m²) acima de 1 cm² entre duas formas do mesmo nível; 0 quando as caixas nem se tocam. */
+/** Sobreposição (metros quadrados) acima de 1 cm quadrado entre duas formas do mesmo nível; 0 quando as caixas nem se tocam. */
 function commonArea(a: MultiPolygon, boxA: Box, b: MultiPolygon, boxB: Box): number {
   return boxesOverlap(boxA, boxB) ? multiArea(intersection(a, b)) : 0;
 }
 
-/** Lajes do mesmo nível com área em comum acima de 1 cm² (warning). Só lajes com contorno válido. */
+/** Lajes do mesmo nível com área em comum acima de 1 cm quadrado (warning). Só lajes com contorno válido. */
 function slabOverlaps(slabs: Slab[], units: ReturnType<typeof unitsOf>): ValidationIssue[] {
   const shapes = slabs
     .filter((s) => s.boundary.length >= 3 && !selfIntersects(s.boundary))
@@ -99,7 +99,7 @@ function verticalOverlap(piece: Polygon, slope: Slab['slope'], slabTop: number, 
 }
 
 /**
- * Laje e piso do mesmo nível que se sobrepõem em volume (warning): interseção em planta acima de 1 cm² e faixas de
+ * Laje e piso do mesmo nível que se sobrepõem em volume (warning): interseção em planta acima de 1 cm quadrado e faixas de
  * cota que se cruzam. O piso sobre a laje, encostado na face superior, não avisa. Pares com tipo ausente não entram.
  */
 function slabFloorOverlaps(p: Project, slabs: Slab[], floors: Floor[]): ValidationIssue[] {

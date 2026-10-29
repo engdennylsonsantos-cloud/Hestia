@@ -55,7 +55,7 @@ export const openingClearWidth = (t: Pick<OpeningType, 'width' | 'frameWidth'>):
 export const openingClearHeight = (t: Pick<OpeningType, 'height' | 'frameWidth'>): number =>
   t.height - (t.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth);
 
-/** Área útil de ventilação (m²) da janela, pela fração da família; 0 para porta. */
+/** Área útil de ventilação (metros quadrados) da janela, pela fração da família; 0 para porta. */
 export function openingVentilationArea(raw: OpeningType): number {
   const t = spanTypeOf(raw);
   const factor = ventilationFactor(t);

@@ -75,7 +75,7 @@ export function RoomScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-ambientes.csv`, roomScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-ambientes.csv`, roomScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };

@@ -172,7 +172,7 @@ function clippedLinearArea(x0: number, x1: number, y0: number, y1: number): numb
 }
 
 /**
- * Área dos frontões de um telhado por extrusão (m²): para cada aresta de empena, a integral ao longo dela da altura da
+ * Área dos frontões de um telhado por extrusão (metros quadrados): para cada aresta de empena, a integral ao longo dela da altura da
  * seção acima do beiral. Como a altura só depende de t, a integral é feita em t e escalada pelo comprimento da aresta.
  */
 export function extrusionGableArea(r: Roof): number {

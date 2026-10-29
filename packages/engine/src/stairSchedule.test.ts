@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Vec2 } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeStair, type StairCurve, type StairRun } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeStair, type StairCurve, type StairRun } from '@hestia/model';
 import { buildStairSchedule, filterStairRows, stairScheduleToCsv, sumStairRows } from './index.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
@@ -69,7 +69,7 @@ describe('tabela de escadas', () => {
 });
 
 describe('CSV da tabela de escadas', () => {
-  const text = stairScheduleToCsv(schedule.rows, schedule.totals);
+  const text = stairScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('BOM UTF-8, separador ";", cabeçalho, uma linha por escada e total', () => {

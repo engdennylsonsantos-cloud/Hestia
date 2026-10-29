@@ -13,11 +13,11 @@ export interface SlabLayerQuantity {
   materialId: Id;
   /** Espessura vertical da camada (m). */
   thickness: number;
-  /** Área em planta da camada (m²): com o contorno da camada (P8), que pode ir ao núcleo da parede. */
+  /** Área em planta da camada (metros quadrados): com o contorno da camada (P8), que pode ir ao núcleo da parede. */
   planArea: number;
-  /** Área real da face da camada sobre a inclinação (m²); igual à área em planta sem inclinação. */
+  /** Área real da face da camada sobre a inclinação (metros quadrados); igual à área em planta sem inclinação. */
   faceArea: number;
-  /** Volume da camada (m³) = área em planta × espessura vertical; zero na membrana (decisão 0023 §5). */
+  /** Volume da camada (metros cúbicos) = área em planta × espessura vertical; zero na membrana (decisão 0023 §5). */
   volume: number;
   /** Membrana: aparece com área de face e volume zero. */
   membrane: boolean;
@@ -27,9 +27,9 @@ export interface SlabQuantity {
   slabId: Id;
   typeId: Id;
   levelId: Id;
-  /** Área líquida em planta: contorno menos furos (m²). */
+  /** Área líquida em planta: contorno menos furos (metros quadrados). */
   planArea: number;
-  /** Área real da face superior (m²) = área em planta / cos(atan(percentual / 100)). */
+  /** Área real da face superior (metros quadrados) = área em planta / cos(atan(percentual / 100)). */
   faceArea: number;
   /** Comprimento do contorno externo, em planta (m). */
   perimeter: number;
@@ -39,7 +39,7 @@ export interface SlabQuantity {
   thickness: number;
   /** Inclinação da face superior em % (0 sem inclinação). */
   slopePercent: number;
-  /** Volume total (m³) = soma das camadas. */
+  /** Volume total (metros cúbicos) = soma das camadas. */
   volume: number;
   layers: SlabLayerQuantity[];
 }
@@ -47,15 +47,15 @@ export interface SlabQuantity {
 export interface SlabQuantities {
   slabs: SlabQuantity[];
   layers: SlabLayerQuantity[];
-  /** Soma das áreas em planta das lajes do nível (m²). */
+  /** Soma das áreas em planta das lajes do nível (metros quadrados). */
   totalPlanArea: number;
-  /** Soma das áreas reais das faces superiores (m²). */
+  /** Soma das áreas reais das faces superiores (metros quadrados). */
   totalFaceArea: number;
-  /** Volume total do nível (m³). */
+  /** Volume total do nível (metros cúbicos). */
   totalVolume: number;
-  /** Volume (m³) por material. */
+  /** Volume (metros cúbicos) por material. */
   volumeByMaterial: Record<Id, number>;
-  /** Área real (m²) por material: soma das áreas reais das camadas daquele material. */
+  /** Área real (metros quadrados) por material: soma das áreas reais das camadas daquele material. */
   faceAreaByMaterial: Record<Id, number>;
 }
 

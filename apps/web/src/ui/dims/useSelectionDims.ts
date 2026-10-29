@@ -16,8 +16,9 @@ export function useDimContext(): DimContext {
 }
 
 /**
- * Cotas dinâmicas do que está selecionado (um elemento com provedor registrado). Recalcula quando o projeto, a
- * seleção, as trocas de referência ou a configuração mudam.
+ * Cotas dinâmicas do que está selecionado: um elemento de `project.elements` com provedor registrado, ou um sujeito
+ * fora dele (`'detailLine'`, `'perimeterLine'`, `'grid'`). Recalcula quando o projeto, a seleção, as trocas de
+ * referência ou a configuração mudam.
  */
 export function useSelectionDims(): TempDim[] {
   const ctx = useDimContext();

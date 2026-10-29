@@ -1,3 +1,4 @@
+import { defaultUnits, type ResolvedUnits } from '@hestia/model';
 import { dist, SLOPE_GAP_PX, SLOPE_HALF_PX, type SketchDraft, type SketchLoop, type SketchSeg, type Vec2 } from '@hestia/geom';
 import { worldToScreen, type Viewport } from '../viewport.ts';
 import { fmtPercent } from './roofs.ts';
@@ -73,14 +74,14 @@ export interface SlopeOps {
 }
 
 /** Preenchimento ou contorno de cada triângulo, e o texto da inclinação nas arestas que a definem. */
-export function slopeOps(marks: SlopeMark[], theme: PlanTheme): SlopeOps {
+export function slopeOps(marks: SlopeMark[], theme: PlanTheme, units: ResolvedUnits = defaultUnits()): SlopeOps {
   const out: SlopeOps = { fills: [], strokes: [], labels: [] };
   for (const m of marks) {
     const offs = slopeOffsets(m.n);
     if (m.defines) {
       out.fills.push({ ...poligonoEm(m.at, offs), color: theme.roofFootprint, alpha: 1 });
       const beside = SLOPE_GAP_PX + LABEL_GAP_PX;
-      out.labels.push({ at: m.at, text: fmtPercent(m.pct), dx: m.n.x * beside, dy: -m.n.y * beside, align: alignOf(m.n) });
+      out.labels.push({ at: m.at, text: fmtPercent(units, m.pct), dx: m.n.x * beside, dy: -m.n.y * beside, align: alignOf(m.n) });
     } else {
       out.strokes.push({ ...tracoEm(m.at, offs, true), widthPx: 1.5, color: theme.roofFootprint, alpha: 1 });
     }

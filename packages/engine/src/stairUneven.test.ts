@@ -46,7 +46,7 @@ describe('degraus iguais (stair-uneven)', () => {
     const list = unevenOf([run(UNEVEN)]);
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ severity: 'warning', componentIndex: 0 });
-    expect(list[0]!.message).toContain('20 mm');
+    expect(list[0]!.message).toContain('2,0 cm');
   });
 
   it('variação de 4 mm fica dentro da tolerância de 5 mm: sem aviso', () => {

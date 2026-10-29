@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeSlab, type Project, type Slab } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeSlab, type Project, type Slab } from '@hestia/model';
 import { buildSlabSchedule, filterSlabRows, slabScheduleToCsv, sumSlabRows } from './index.ts';
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [
@@ -62,18 +62,18 @@ describe('E2 · tabela de lajes', () => {
 });
 
 describe('CSV da tabela de lajes', () => {
-  const text = slabScheduleToCsv(schedule.rows, schedule.totals);
+  const text = slabScheduleToCsv(schedule.rows, schedule.totals, defaultUnits());
   const lines = text.replace(/^\uFEFF/, '').split('\r\n').filter((l) => l.length > 0);
 
   it('BOM UTF-8, separador ";", uma linha por laje mais cabeçalho e total', () => {
     expect(text.startsWith('\uFEFF')).toBe(true);
     expect(lines).toHaveLength(schedule.rows.length + 2);
-    expect(lines[0]).toBe('Marca;Tipo;Código;Nível;Área em planta (m²);Área real (m²);Perímetro (m);Espessura (m);Volume (m³);Inclinação (%);Deslocamento (m)');
+    expect(lines[0]).toBe('Marca;Tipo;Código;Nível;Área em planta (m²);Área real (m²);Perímetro (m);Espessura (cm);Volume (m³);Inclinação (%);Deslocamento (m)');
     expect(lines.at(-1)!.startsWith('Total;')).toBe(true);
   });
 
   it('decimal com vírgula; texto com ";" entre aspas; inclinação e deslocamento na linha', () => {
-    expect(lines[1]).toBe('L1;Laje maciça 12;LJ-12;Térreo;12,00;12,00;14,00;0,120;1,440;0,00;0,000');
+    expect(lines[1]).toBe('L1;Laje maciça 12;LJ-12;Térreo;12,00;12,00;14,00;12,000;1,440;0,00;0,000');
     expect(lines[2]!.startsWith('"L;2";')).toBe(true);
     expect(lines[2]!.endsWith(';2,00;0,050')).toBe(true);
   });

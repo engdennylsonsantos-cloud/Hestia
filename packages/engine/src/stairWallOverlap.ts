@@ -11,7 +11,7 @@ import { resolveStairs, type ResolvedStair } from './stairs.ts';
  * (inclusive as anexadas ao topo ou à base, quando não há sobreposição vertical) não geram aviso.
  */
 
-/** Área mínima (m²) de interseção para contar como invasão; abaixo disso é ruído de junção. */
+/** Área mínima (metros quadrados) de interseção para contar como invasão; abaixo disso é ruído de junção. */
 export const STAIR_WALL_OVERLAP_MIN = 0.005;
 /** Tolerância (m) para a sobreposição vertical entre a escada e a parede. */
 const EPS_Z = 1e-6;

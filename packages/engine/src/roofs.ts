@@ -43,7 +43,7 @@ export interface ResolvedRoof {
   layers: ResolvedRoofLayer[];
   /** Cota absoluta do beiral (nível + deslocamento). */
   eaveZ: number;
-  /** Área em planta (m²) cortada das águas pela junção com outro telhado do nível; sai da planta e do volume. */
+  /** Área em planta (metros quadrados) cortada das águas pela junção com outro telhado do nível; sai da planta e do volume. */
   joinedArea: number;
   /** Motivo de o telhado não ter águas (contorno que o cálculo não fecha); ausente quando há águas. */
   problem?: string;

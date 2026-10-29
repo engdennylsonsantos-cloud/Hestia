@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, makeFloor, makeSlab, makeWall, type Floor, type Project, type Slab, type Wall, type WallType } from '@hestia/model';
+import { defaultUnits, ProjectStore, createEmptyProject, makeFloor, makeSlab, makeWall, type Floor, type Project, type Slab, type Wall, type WallType } from '@hestia/model';
 import { buildFloorSchedule, buildWallSchedule, floorScheduleToCsv, quantifyFloors, quantifyLevel, quantifySlabs, resolveLevel, scheduleToCsv } from './index.ts';
 
 type Pt = { x: number; y: number };
@@ -158,7 +158,7 @@ describe('tabelas: bruto e líquido só aparecem quando diferem', () => {
   it('tabela de pisos sem corte mantém o CSV de antes (sem colunas extras)', () => {
     const p = build(0.23, { walls: [], floors: [{ boundary: rect(0, 0, 4, 3) }] });
     const sch = buildFloorSchedule(p);
-    const csv = floorScheduleToCsv(sch.rows, sch.totals);
+    const csv = floorScheduleToCsv(sch.rows, sch.totals, defaultUnits());
     expect(linesOf(csv)[0]).toMatch(/Deslocamento \(m\)$/);
     expect(csv).not.toContain('Volume bruto');
     expect(csv).not.toContain('Área líquida');
@@ -167,7 +167,7 @@ describe('tabelas: bruto e líquido só aparecem quando diferem', () => {
   it('tabela de pisos com corte ganha no fim as colunas de área líquida e de volume bruto', () => {
     const p = build(0.23, { walls: [], floors: [{ boundary: rect(0, 0, 4, 3), heightOffset: 0.5 }], slabs: [{ boundary: rect(0, 0, 4, 3), heightOffset: 0.5 }] });
     const sch = buildFloorSchedule(p);
-    const lines = linesOf(floorScheduleToCsv(sch.rows, sch.totals));
+    const lines = linesOf(floorScheduleToCsv(sch.rows, sch.totals, defaultUnits()));
     expect(lines[0]).toMatch(/Deslocamento \(m\);Área líquida \(m²\);Volume bruto \(m³\)$/);
     expect(lines[1]).toMatch(/;0,00;2,280$/);
     expect(lines[2]).toBe('Total;;;;12,00;14,00;;0,840;;0,00;2,280');
@@ -178,7 +178,7 @@ describe('tabelas: bruto e líquido só aparecem quando diferem', () => {
   it('tabela de paredes com parede embutida em piso ganha a coluna de volume bruto', () => {
     const p = build(0.23, { walls: [{}], floors: [{ heightOffset: 0.16 }] });
     const sch = buildWallSchedule(p);
-    const lines = linesOf(scheduleToCsv(sch.rows, sch.totals));
+    const lines = linesOf(scheduleToCsv(sch.rows, sch.totals, defaultUnits()));
     expect(lines[0]).toMatch(/Camadas \(cm\);Volume bruto \(m³\)$/);
     expect(lines[1]).toContain(';0,623;');
     expect(lines[1]).toMatch(/;0,644$/);

@@ -59,8 +59,8 @@ export function cantosLogicos(ring: Ring): boolean[] {
 /** Área real de todas as águas: a área em planta de cada água vezes √(1 + i²), com 1 = percent/100. */
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
 
-/** Percentual com vírgula decimal, como nas demais cotas da planta: "30 %", "27,5 %". */
-export const fmtPercent = (p: number): string => `${String(Math.round(p * 10) / 10).replace('.', ',')} %`;
+/** Inclinação na unidade do projeto, como nas demais cotas da planta: "30 %", "27,5 %" (ou graus). */
+export const fmtPercent = (u: ResolvedUnits, p: number): string => formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true });
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
 export const fmtElevation = (u: ResolvedUnits, z: number): string => `+${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;
@@ -158,7 +158,7 @@ function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura):
  * marcador em pixels (4,5 px de meia base, 8 px de altura): tem o mesmo tamanho na tela para qualquer zoom. O percentual
  * vem de `edgeSlopesOf`, a mesma leitura do motor (forma e direção), e não da lista guardada: só vale o positivo.
  */
-function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorOps {
+function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura, u: ResolvedUnits): FloorOps {
   const out = empty();
   const b = r.boundary;
   const ccw = ringArea(b) > 0;
@@ -180,7 +180,7 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorO
       return;
     }
     out.fills.push({ ...poligonoEm(m, tri), color: theme.accent, alpha: 1 });
-    out.labels.push({ at: m, text: fmtPercent(slope), ...screenOffset(scale(inward, -1), 14) });
+    out.labels.push({ at: m, text: fmtPercent(u, slope), ...screenOffset(scale(inward, -1), 14) });
   });
   return out;
 }
@@ -339,7 +339,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
         // Seta de caimento em verde (tinta própria do caimento), na espessura de projeção.
         out.strokes.push(...slopeArrow(down, at, v, { ...theme, ink: theme.roofSlope }, esp.projecao));
         // Deslocamento lateral em mm de papel: 2 mm garantem que a etiqueta não cruze a haste da seta.
-        out.labels.push({ at, text: fmtPercent(pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
+        out.labels.push({ at, text: fmtPercent(unitsOf(p), pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
       }
     }
     if (planMode || p.settings.showTags) {
@@ -414,7 +414,7 @@ export function roofSelectionOps(
     const roof = p.elements[r.roofId];
     if (!sel.has(r.roofId) || !isRoof(roof)) continue;
     out.strokes.push(...selectedRingOps(r, roof, theme));
-    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao);
+    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao, unitsOf(p));
     out.fills.push(...sym.fills);
     out.strokes.push(...sym.strokes);
     out.labels.push(...sym.labels);

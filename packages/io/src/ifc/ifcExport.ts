@@ -150,6 +150,7 @@ function addOpenings(c: IfcCtx, openings: IfcOpeningGeo[]): void {
         en('NOTDEFINED'),
         OMIT,
         OMIT,
+        OMIT,
       ]);
       c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`winpanelrel:${g.openingId}`), OMIT, OMIT, OMIT, list([ref(fillId)]), ref(panel)]);
     }

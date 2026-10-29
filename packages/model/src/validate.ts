@@ -52,7 +52,7 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
     out.push({
       severity: 'error',
       code: 'wall-zero-length',
-      message: `Parede ${name} tem comprimento de ${formatQuantity(unitsOf(p), 'smallLength', len)}; o mínimo é 1 mm.`,
+      message: `Parede ${name} tem comprimento de ${formatQuantity(unitsOf(p), 'smallLength', len)}; o mínimo é ${formatQuantity(unitsOf(p), 'smallLength', 0.001)}.`,
       elementId: w.id,
     });
   }

@@ -49,6 +49,15 @@ describe('validação: paredes', () => {
     expect(validateProject(build([wall('a', 0, 0, 0.002, 0)]))).toEqual([]);
   });
 
+  it('a mensagem do comprimento mínimo segue as unidades do projeto', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'setSettings', patch: { units: { smallLength: { unit: 'mm', decimals: 1 } } } });
+    s.exec({ type: 'addWall', wall: wall('a', 0, 0, 0.0005, 0) });
+    const issues = validateProject(s.project);
+    expect(issues[0]!.message).toContain('0,5 mm');
+    expect(issues[0]!.message).toContain('1,0 mm');
+  });
+
   it('tipo de parede inexistente é erro', () => {
     const issues = validateProject(build([wall('a', 0, 0, 4, 0, { typeId: 'wt_nao_existe' })]));
     expect(codes(issues)).toEqual(['wall-type-missing']);

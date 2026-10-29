@@ -1,5 +1,6 @@
 import type { CeilingType, FloorType, Id, OpeningType, Project, SlabType, WallType } from '@hestia/model';
 import type { IfcFile } from './ifc.ts';
+import { colorOf } from './psets.ts';
 import type { StepEntity } from './step.ts';
 
 /** Nome curto e estável para compor ids de tipo. */
@@ -109,4 +110,21 @@ export function openingType(
   ctx.p.openingTypes[id] = type;
   ctx.types.set(key, id);
   return id;
+}
+
+/** Material do IFC para uma cor `#rrggbb` (um por cor, reaproveitado): é o que pinta o genérico no 3D. */
+export function colorMaterialId(ctx: { p: Project }, color: string | undefined): Id | undefined {
+  if (!color) return undefined;
+  const id = `im_${color.replace('#', '').toLowerCase()}`;
+  if (!ctx.p.materials[id]) {
+    ctx.p.materials[id] = { id, name: `IFC ${color}`, color, hatch: 'none', gloss: 0.1, opacity: 1, cost: 0, unit: 'm2' };
+  }
+  return id;
+}
+
+/** Cor do produto IFC, criando o material correspondente no projeto (o 3D do genérico usa esse material). */
+export function colorOfWithMaterial(ctx: TypeCtx, f: IfcFile, e: StepEntity): string | undefined {
+  const color = colorOf(f, e, ctx.typeOf.get(e.id));
+  colorMaterialId(ctx, color);
+  return color;
 }

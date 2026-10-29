@@ -14,7 +14,8 @@ import { bodyOf, cleanLoop, hull2, prismFromMesh, rectangleAxis, segment, type B
 import { openingType, operationOf, slabLikeType, wallType } from './elementTypes.ts';
 import { IfcFile, projectName, type Pt2 } from './ifc.ts';
 import { readLevels, type LevelRef } from './levels.ts';
-import { colorOf, propertiesOf } from './psets.ts';
+import { propertiesOf } from './psets.ts';
+import { colorOfWithMaterial } from './elementTypes.ts';
 import type { StepEntity } from './step.ts';
 
 /** O que a importação trouxe. Sempre preenchido, mesmo quando o arquivo é ruim. */
@@ -135,7 +136,7 @@ function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
       objectType: file.text(e, 4) || undefined,
       mesh: { positions, indices },
       outline: outline.length >= 3 ? outline : undefined,
-      color: colorOf(file, e, ctx.typeOf.get(e.id)),
+      color: colorOfWithMaterial(ctx, file, e),
       order: ctx.order++,
       ...psetOf(ctx, e),
     };

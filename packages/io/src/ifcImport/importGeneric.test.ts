@@ -31,4 +31,13 @@ describe('objetos importados (elemento genérico)', () => {
     expect(g.id.startsWith('g_')).toBe(true);
     expect(report.skipped.IFCBEAM ?? 0).toBe(0);
   });
+
+  it('a cor do IFC vira material do projeto (im_<hex>) para pintar o 3D', () => {
+    const colored = Object.values(project.elements).filter(isGeneric).filter((g) => g.color);
+    expect(colored.length).toBeGreaterThan(0);
+    for (const g of colored.slice(0, 10)) {
+      const id = `im_${g.color!.replace('#', '').toLowerCase()}`;
+      expect(project.materials[id]?.color).toBe(g.color);
+    }
+  });
 });

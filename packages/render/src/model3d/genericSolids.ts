@@ -1,25 +1,29 @@
-import { isGeneric, type Id, type Project } from '@hestia/model';
+import { isGeneric, type Generic, type Id, type Project } from '@hestia/model';
 import { ofElement, type SolidBatch } from './solids.ts';
 
 /**
  * Malha dos objetos importados (viga, pilar, mobiliário, MEP...) de um nível. Cada triângulo entra com a normal da própria
  * face (sombreamento chapado, como as demais peças) e com a faixa de índices do elemento, para o picking do 3D continuar
- * funcionando do mesmo jeito que nas paredes.
+ * funcionando do mesmo jeito que nas paredes. A cor do IFC vira um lote por material (`im_<hex>`, criado na importação).
  */
 export function buildGenericSolids(p: Project, levelId: Id): SolidBatch[] {
-  const batch: SolidBatch = {
-    materialId: 'mat_concreto',
-    category: 'generic',
-    positions: [],
-    normals: [],
-    indices: [],
-    ids: [],
-  };
+  const batches = new Map<string, SolidBatch>();
   for (const e of Object.values(p.elements)) {
     if (!isGeneric(e) || e.levelId !== levelId) continue;
-    ofElement(batch, e.id, () => pushMesh(batch, e.mesh.positions, e.mesh.indices));
+    const materialId = materialOf(e);
+    let batch = batches.get(materialId);
+    if (!batch) {
+      batch = { materialId, category: 'generic', positions: [], normals: [], indices: [], ids: [] };
+      batches.set(materialId, batch);
+    }
+    ofElement(batch, e.id, () => pushMesh(batch!, e.mesh.positions, e.mesh.indices));
   }
-  return batch.indices.length ? [batch] : [];
+  return [...batches.entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).map(([, b]) => b).filter((b) => b.indices.length > 0);
+}
+
+/** Material do genérico: o da cor do IFC quando existir; senão o concreto padrão. */
+function materialOf(e: Generic): string {
+  return e.color ? `im_${e.color.replace('#', '').toLowerCase()}` : 'mat_concreto';
 }
 
 /** Triângulos com vértices próprios e normal plana por face. */

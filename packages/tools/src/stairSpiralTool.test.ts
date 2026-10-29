@@ -182,6 +182,21 @@ describe('ferramenta Escada: forma caracol (3 cliques)', () => {
     expect(stairsOf(ctx)).toHaveLength(1);
   });
 
+  it('varredura e limites de ângulo seguem a unidade do projeto (rad)', () => {
+    const ctx = setup();
+    ctx.store.exec({ type: 'setSettings', patch: { units: { angle: { unit: 'rad', decimals: 2 } } } });
+    const t = tool('stairrun', ctx.env);
+    t.move(at(0, 0));
+    t.click(at(0, 0));
+    t.move(at(1, 0));
+    t.click(at(1, 0));
+    expect(ctx.last()).toBe('Varredura 0 rad: gire o mouse para pelo menos 0,52 rad.');
+    sweepTo(t, 1, 0, 20);
+    t.click(at(1, 20));
+    expect(stairsOf(ctx)).toHaveLength(0);
+    expect(ctx.last()).toBe('A varredura mínima do caracol é de 0,52 rad.');
+  });
+
   it('Enter confirma a varredura atual, sem o 3º clique', () => {
     const ctx = setup();
     const t = tool('stairrun', ctx.env);

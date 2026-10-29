@@ -7,7 +7,7 @@ import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
 import { RampLevelsFields, rampLevelsValue, rampRiseFromLevels, rampRiseText } from './RampLevelsFields.tsx';
 
-const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U' };
+const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U', free: 'Livre' };
 
 /** Campo da barra: o rótulo envolve o controle, como os demais campos desta barra. */
 function BarField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }): ReactElement {
@@ -40,7 +40,7 @@ export function RampOptionsBar(): ReactElement {
       <label>
         Forma
         <select id="opt-rampshape" className="select" value={o.shape} onChange={(e) => set({ shape: e.target.value as RampShape })}>
-          {(Object.keys(SHAPE_LABEL) as RampShape[]).map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
+          {(Object.keys(SHAPE_LABEL) as RampShape[]).filter((s) => s !== 'free').map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
         </select>
       </label>
       <label>

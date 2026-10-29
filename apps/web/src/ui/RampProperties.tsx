@@ -14,7 +14,7 @@ import { rampOptions } from './typeOptions.ts';
 import { rampSummaryLines } from './rampFormat.ts';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
-const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U' };
+const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U', free: 'Livre' };
 const TURN_LABEL: Record<'left' | 'right', string> = { left: 'À esquerda', right: 'À direita' };
 
 /** Avisos e erros de uma rampa: os de norma e de croqui (engine) e os de referência do modelo (tipo, nível, topo). */

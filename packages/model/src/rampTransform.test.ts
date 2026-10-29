@@ -60,4 +60,20 @@ describe('transformRamp', () => {
     expect(r.turn).toBe('left');
     expect((r.components[0] as StairRun).boundaryLeft[0]!.sag).toBe(0.2);
   });
+  it('forma livre: freePath acompanha mover e espelhar; round-trip por JSON', () => {
+    const path = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 6 }];
+    const s = store({ freePath: path, manualLandings: [1] }, 'left', 'free');
+    s.exec({ type: 'transform', ids: ['rp1'], transform: { kind: 'translate', d: { x: 1, y: 2 } } });
+    expect(rampOf(s).freePath).toEqual([{ x: 1, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 8 }]);
+    expect(rampOf(s).manualLandings).toEqual([1]);
+    const back = JSON.parse(JSON.stringify(rampOf(s))) as Ramp;
+    expect(back.shape).toBe('free');
+    expect(back.freePath).toEqual(rampOf(s).freePath);
+  });
+
+  it('rampa sem freePath continua sem o campo (projetos antigos)', () => {
+    const s = store();
+    s.exec({ type: 'transform', ids: ['rp1'], transform: { kind: 'translate', d: { x: 1, y: 2 } } });
+    expect('freePath' in rampOf(s)).toBe(false);
+  });
 });

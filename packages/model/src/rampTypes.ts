@@ -1,8 +1,9 @@
+import type { Vec2 } from '@hestia/geom';
 import type { Id } from './types.ts';
 import type { StairLanding, StairOpeningMode, StairRun } from './stairTypes.ts';
 
-/** Forma: reta (n lances em linha, patamares no meio), em L (2 lances, giro de 90°) ou em U (2 lances, giro de 180°). */
-export type RampShape = 'straight' | 'lshape' | 'ushape';
+/** Forma: reta (n lances em linha, patamares no meio), em L (2 lances, giro de 90°), em U (2 lances, giro de 180°) ou livre (trajeto de vértices, `freePath`). */
+export type RampShape = 'straight' | 'lshape' | 'ushape' | 'free';
 /** Modo de entrada usado na criação: 'length' = o comprimento manda e a inclinação sai; 'slope' = a inclinação manda e o comprimento sai. */
 export type RampInputMode = 'length' | 'slope';
 export type RampNormProfile = 'nbr9050' | 'ada' | 'custom';
@@ -57,6 +58,10 @@ export interface Ramp {
   /** Lance, patamar, lance... Cada lance tem EXATAMENTE 2 linhas de espelho (borda de início e de fim). */
   components: Array<StairRun | StairLanding>;
   shape: RampShape;
+  /** Forma 'free': vértices do trajeto (centro da rampa), do início ao fim. Ausente nas demais formas e em projetos antigos. */
+  freePath?: Vec2[];
+  /** Forma 'free': índices dos vértices do `freePath` marcados como patamar manual (mesmo se colineares). */
+  manualLandings?: number[];
   /** Lado do giro (L e U), visto de quem sobe. Espelhar a rampa inverte este campo. */
   turn: 'left' | 'right';
   /** Profundidade do patamar de giro (L e U), em m. Em 'straight' é ignorado. */

@@ -111,7 +111,9 @@ export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, 
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [quantity]);
-  const unitLabel = quantity ? unitSymbol(units, quantity) : suffix;
+  const unitLabel = quantity
+    ? quantity !== 'currency' && units[quantity].unit === 'ft-in' ? '' : unitSymbol(units, quantity)
+    : suffix;
   return (
     <span className="numwrap">
       <input

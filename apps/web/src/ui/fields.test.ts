@@ -63,6 +63,12 @@ describe('NumField com quantity', () => {
     expect(html).toContain('class="unit">cm<');
   });
 
+  it('em pés e polegadas o valor já traz a unidade, sem sufixo solto', () => {
+    editor.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'ft-in', decimals: 2 } } } });
+    const html = campo(1.6764, 'length');
+    expect(html).not.toContain('class="unit"');
+  });
+
   it('sem quantity mostra número puro com casas e sufixo técnico', () => {
     const html = renderToStaticMarkup(
       createElement(NumField, { value: 1.2, onCommit: () => undefined, suffix: 'cm', decimals: 1 }),

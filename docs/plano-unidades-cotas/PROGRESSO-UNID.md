@@ -45,6 +45,7 @@ Fecho (C7): `npm run check` verde — 560 arquivos, 6458 testes, lint (com `chec
 - Para zerar a trava sem linha de base, os usos restantes em `dialogs/openingType/**` (propriedade ESQ) e `PlacementProperties` foram migrados no mesmo passo, preservando o comportamento; `openingTypeActions`, `cmTexto`/`metrosTexto` e o rótulo de inclinação do `render` passaram a usar as unidades do projeto.
 - `scripts/units-baseline.json` apagado; `node scripts/check-units.mjs` em **0 ocorrências** (só isenções `units-ok` de máquina/depuração/unidade técnica).
 - `docs/decisoes/0038-unidades-do-projeto.md` escrita.
+- `dimensionText` continua com `units` opcional (padrão `defaultUnits()`): `packages/io/src/dxfNotes.ts:58` e `packages/render/src/plan/notes.ts:64` (propriedade ESQ/C6) ainda chamam sem as unidades. Obrigatório fica para quando esses dois chamadores passarem as unidades; registrado aqui em vez de forçar.
 - Testes atualizados por mudança intencional de formato: espessuras de CSV em `smallLength` (cm), ferragens em cm, inclinação/rótulos em `formatQuantity`, ângulos em radianos no `NumField`.
 
 ## Bloqueios e pedidos a outros agentes

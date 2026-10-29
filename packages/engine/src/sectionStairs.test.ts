@@ -71,7 +71,6 @@ const COS = P / Math.hypot(P, H);
 /** Espessura vertical equivalente de uma profundidade estrutural perpendicular à rampa: T = d / cosθ. */
 const vertical = (structuralDepth: number): number => structuralDepth / COS;
 /** Laje de cima (m): o espelho de chegada termina nesta distância abaixo do nível de topo. */
-const SLAB = 0.15;
 const CONCRETE = 'mat_concreto';
 
 /** Intervalos de z (cota) em que o corte do material cobre a vertical de abscissa t (t = distância ao longo da linha). */
@@ -148,14 +147,14 @@ describe('escada monolítica no corte longitudinal (liso, 16 espelhos, h 0,175, 
     expect(cutShape(r, CONCRETE)).toEqual({ parts: 1, holes: [0] });
   });
 
-  it('a peça de chegada fecha o último espelho até a laje de cima (0,15 m abaixo do topo)', () => {
+  it('a peça de chegada fecha o último espelho até o piso de cima (sem laje sobre ela, termina no topo da escada)', () => {
     const r = computeSection(p, LONG);
     const topZ = 2.8;
-    // arrival: faixa de x = 4,20 a 4,48 (t = 5,20 a 5,48), termina em topZ − laje
-    expect(coveredAt(r, CONCRETE, 5.34, topZ - SLAB - 0.01)).toBe(true);
-    expect(coveredAt(r, CONCRETE, 5.34, topZ - SLAB + 0.01)).toBe(false);
+    // arrival: faixa de x = 4,20 a 4,48 (t = 5,20 a 5,48), termina em topZ
+    expect(coveredAt(r, CONCRETE, 5.34, topZ - 0.01)).toBe(true);
+    expect(coveredAt(r, CONCRETE, 5.34, topZ + 0.01)).toBe(false);
     const top = Math.max(...zIntervalsAt(r, CONCRETE, 5.34).map(([, z1]) => z1));
-    expect(top).toBeCloseTo(topZ - SLAB, 6);
+    expect(top).toBeCloseTo(topZ, 6);
   });
 });
 
@@ -245,7 +244,7 @@ describe('elevação (monolítico)', () => {
     const tops = beyond.map((b) => Math.max(...b.polygons.flat(2).map((q) => q.y)));
     const hasTop = (z: number): boolean => tops.some((t) => Math.abs(t - z) < 1e-6);
     for (let k = 1; k <= 15; k++) expect(hasTop(k * H)).toBe(true);
-    expect(hasTop(2.8 - SLAB)).toBe(true);
+    expect(hasTop(2.8)).toBe(true);
   });
 });
 

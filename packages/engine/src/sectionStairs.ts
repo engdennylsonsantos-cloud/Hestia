@@ -98,7 +98,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
     // zFundo a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças
     // convexas). O poste (peça `post`) sai com o material do poste.
     if (s.type.runStyle === 'monolithic' || s.type.runStyle === 'post') {
-      const arrivalTopZ = stairArrivalTopZ(p, s) ?? undefined;
+      const arrivalTopZ = stairArrivalTopZ(p, s) ?? s.topZ;
       for (const piece of stairBody(s, { arrivalTopZ }).pieces) {
         const pieceMaterial = piece.kind === 'post' ? s.type.postMaterialId : materialId;
         for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {

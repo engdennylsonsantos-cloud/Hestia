@@ -321,7 +321,7 @@ export class ModelScene {
       ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
       ...buildRoofSolids(roofs),
       ...eave.batches,
-      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
+      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s) ?? s.topZ) : []),
     ];
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];
     // Caminho de referência (`instanciar: false`): cada nível tem as suas malhas. Caminho padrão: os sólidos vão para os

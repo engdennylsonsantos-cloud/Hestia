@@ -1,6 +1,8 @@
 # Progresso da composição de esquadrias (F1 a F9)
 
-Atualizado a cada fase. Branch de trabalho: `claude/fervent-newton-rfgz3y`. NÃO mesclar na `main` nem em `esquadrias/*` sem confirmação do dono.
+Atualizado a cada fase. **Estado em 2026-10-29: a frente foi mesclada no `main` (`adb416ef`)**; a branch
+`claude/fervent-newton-rfgz3y` está arquivada. Relatório final:
+[`docs/integracao/cotas-2026-10-29.md`](../integracao/cotas-2026-10-29.md).
 Spec: [F1-spec-composicao.md](F1-spec-composicao.md). Contrato de tipos: `packages/model/src/openingComposition.ts`.
 Decisões aprovadas pelo dono: recomendações das perguntas 1 a 6 da spec §10 (quadro único com montantes de perfil certo, travessa-base sob vidro no piso, folha efetiva 0,902, divisor 0,05, baguete interior e folga 0,005 sem perfil, mão da dobradiça global com `mirror` por célula). O dono autorizou ir até o fim sem pedir aprovação.
 
@@ -43,3 +45,13 @@ Como retomar: `git fetch origin && git checkout claude/fervent-newton-rfgz3y`, l
 - Alizar x folha: na face em que a folha abre, o alizar começa fora do envelope da folha de 0 a 90 graus (recuo simétrico, 14 mm no `ot_p90`, igual à aresta externa do rebaixo); a outra face segue com a aresta interna na luz. Nenhuma fonte oficial do Revit/ArchiCAD documenta isso (R6); regra derivada da geometria, a validar pelo dono.
 - Maçanetas: plano `tz` em PartProfile; alavanca (roseta Ø52, haste Ø16, braço Ø19 x 125), bola (5 discos), puxador tubular, placa da fechadura 30 x 75 x 4; módulo `openingModelHandles.ts`.
 - Batente: padrão = espessura acabada (2026-10-28)
+
+## Fecho do plano de unidades e cotas — S1 a S5 (2026-10-29)
+
+As cinco correções de esquadrias do plano foram feitas e mescladas no `main`: **S1** `0047375d` (batente na
+espessura acabada, com opção de núcleo), **S2** `2369a314` (prévia de colocação com o modelo real e cache),
+**S3** `8cb2aca6` (Espaço/Tab redesenham), **S4** `134bddf5` (alças de inversão; não reproduzido no navegador) e
+**S5** `2a72d477` (planta do modal com batente/folha; não reproduzido; `data-role` nos traços). D10.2/D10.3
+(`dffc4982`) ligaram as cotas de linha/perímetro/eixo. O que resta desta frente: validar o **batente no 3D** e
+`ft-in` no fluxo completo, decidir F8 (bay/bow/canto) e o IFC com peças — ver
+[`docs/integracao/cotas-2026-10-29.md`](../integracao/cotas-2026-10-29.md).

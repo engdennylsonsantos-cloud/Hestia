@@ -1,7 +1,8 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveRooms, type ResolvedRoom } from '@hestia/engine';
-import { roomCeilingHeight, type Id, type Project, type Room } from '@hestia/model';
+import { DEFAULT_ROOM_CATEGORIES, roomCeilingHeight, type Id, type Project, type Room } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
+import { useUi } from '../editor/state.ts';
 import { Group, NumField, Row, TextField } from './fields.tsx';
 
 const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
@@ -37,6 +38,8 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
   const wallFin = common(rooms, (r) => r.wallFinish ?? '');
   const ceilFin = common(rooms, (r) => r.ceilingFinish ?? '');
   const color = common(rooms, (r) => r.color ?? '');
+  const category = common(rooms, (r) => r.categoryId ?? '');
+  const cats = p.roomCategories ?? DEFAULT_ROOM_CATEGORIES;
   const single = rooms.length === 1 ? rooms[0]! : null;
   const resolved = useMemo(() => {
     const levels = [...new Set(rooms.map((r) => r.levelId))];
@@ -52,6 +55,15 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
       <Group title="Dados de identidade">
         <Row label="Nome" htmlFor="p-rname"><TextField id="p-rname" value={name.value} mixed={name.mixed} onCommit={(v) => patch(ids, { name: v })} /></Row>
         <Row label="Número" htmlFor="p-rnum"><TextField id="p-rnum" value={number.value} mixed={number.mixed} onCommit={(v) => patch(ids, { number: v })} /></Row>
+        <Row label="Categoria" htmlFor="p-rcat">
+          <select id="p-rcat" className="select" value={category.value} onChange={(e) => patch(ids, { categoryId: e.target.value || undefined })}>
+            <option value="">Sem categoria</option>
+            {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Row>
+        <div className="btn-row">
+          <button type="button" className="btn small" onClick={() => useUi.setState({ dialog: 'roomCategories' })}>Gerenciar categorias…</button>
+        </div>
         {single && (
           <Row label="Ponto interior (m)">
             <span className="val" title="Ponto usado para achar o circuito de paredes (somente leitura)">
@@ -76,6 +88,32 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
         <Row label="Parede" htmlFor="p-rwall"><TextField id="p-rwall" value={wallFin.value} mixed={wallFin.mixed} onCommit={(v) => patch(ids, { wallFinish: v })} /></Row>
         <Row label="Forro" htmlFor="p-rceilf"><TextField id="p-rceilf" value={ceilFin.value} mixed={ceilFin.mixed} onCommit={(v) => patch(ids, { ceilingFinish: v })} /></Row>
       </Group>
+      {single && (
+        <Group title="Rótulo (todas as vistas)">
+          <Row label="Posição X" htmlFor="p-lx">
+            <NumField id="p-lx" value={(single.labelPosition ?? single.referencePoint ?? single.point).x} unit="m" onCommit={(v) => editor.store.exec({ type: 'setRoomLabel', id: single.id, position: { x: v, y: (single.labelPosition ?? single.referencePoint ?? single.point).y } }, 'Mover rótulo')} />
+          </Row>
+          <Row label="Posição Y" htmlFor="p-ly">
+            <NumField id="p-ly" value={(single.labelPosition ?? single.referencePoint ?? single.point).y} unit="m" onCommit={(v) => editor.store.exec({ type: 'setRoomLabel', id: single.id, position: { x: (single.labelPosition ?? single.referencePoint ?? single.point).x, y: v } }, 'Mover rótulo')} />
+          </Row>
+          <Row label="Rotação" htmlFor="p-lrot">
+            <NumField id="p-lrot" value={single.labelRotation ?? 0} unit="°" onCommit={(v) => editor.store.exec({ type: 'setRoomLabel', id: single.id, position: single.labelPosition ?? null, rotation: v }, 'Girar rótulo')} />
+          </Row>
+          <Row label="Chamada" htmlFor="p-llead">
+            <select id="p-llead" className="select" value={single.labelLeader ?? 'auto'} onChange={(e) => editor.store.exec({ type: 'setRoomLabel', id: single.id, position: single.labelPosition ?? null, leader: e.target.value as 'auto' | 'none' | 'straight' | 'kinked' | 'crossed' }, 'Alterar chamada do rótulo')}>
+              <option value="auto">Automática (liga ao sair)</option>
+              <option value="none">Sem chamada</option>
+              <option value="straight">Reta</option>
+              <option value="kinked">Com cotovelo</option>
+              <option value="crossed">Duas linhas cruzadas</option>
+            </select>
+          </Row>
+          <div className="btn-row">
+            <button type="button" className="btn small" onClick={() => editor.store.exec({ type: 'setRoomLabel', id: single.id, position: null, leader: 'auto' }, 'Recentralizar rótulo')}>Recentralizar rótulo</button>
+          </div>
+          <div className="hint">A posição vale na planta de piso, na planta de área e em qualquer vista onde o rótulo aparecer.</div>
+        </Group>
+      )}
       <Group title="Vista" open={false}>
         <Row label="Cor" htmlFor="p-rcolor">
           <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -83,6 +121,7 @@ export function RoomProperties({ rooms }: { rooms: Room[] }): ReactElement {
             <button type="button" className="btn small" disabled={!color.value} onClick={() => patch(ids, { color: undefined })} title="Volta à cor padrão do tema">Padrão</button>
           </span>
         </Row>
+        <div className="hint">A cor do ambiente aparece só na planta de área; a planta de piso usa o preenchimento padrão do tema.</div>
       </Group>
     </>
   );

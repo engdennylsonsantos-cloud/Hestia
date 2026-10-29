@@ -1,5 +1,5 @@
 import { useRef, type ReactElement } from 'react';
-import { sheetOf, type Project } from '@hestia/model';
+import { areaPlanOf, sheetOf, type Project } from '@hestia/model';
 import { editor, useProject, useProjectVersion } from '../editor/controller.ts';
 import { openProjectFile } from '../editor/fileActions.ts';
 import { useI18n } from '../editor/i18n.ts';
@@ -15,7 +15,7 @@ import { useRibbonCtx } from './ribbon/useCtx.ts';
 const QUICK: RibbonItem[] = [tool('measure', 'small'), tool('dimension', 'small'), tool('text', 'small'), act('view3d', 'small'), tool('section', 'small'), act('thinLines', 'small')];
 
 /** "Planta de piso: Térreo", "Planta de cobertura: Cobertura", "Vista 3D: Modelo 3D"… como o Revit mostra na barra de título. */
-function viewTitle(p: Project, view: string, levelId: string, sectionId: string | null, sheetId: string | null, pt: boolean, planKind: PlanKind): string {
+function viewTitle(p: Project, view: string, levelId: string, sectionId: string | null, sheetId: string | null, pt: boolean, planKind: PlanKind, areaPlanId: string | null): string {
   if (view === '3d') return pt ? 'Vista 3D: Modelo 3D' : '3D View: 3D Model';
   if (view === 'section') {
     const v = p.views.find((x) => x.id === sectionId);
@@ -24,6 +24,10 @@ function viewTitle(p: Project, view: string, levelId: string, sectionId: string 
   if (view === 'sheet') {
     const sh = sheetId ? sheetOf(p, sheetId) : undefined;
     return `${pt ? 'Prancha' : 'Sheet'}: ${sh ? `${sh.number} ${sh.name}` : ''}`;
+  }
+  if (planKind === 'area') {
+    const ap = areaPlanId ? areaPlanOf(p, areaPlanId) : undefined;
+    return `${pt ? 'Planta de área' : 'Area Plan'}: ${ap?.name ?? ''}`;
   }
   const tipo = planKind === 'roof' ? (pt ? 'Planta de cobertura' : 'Roof Plan') : pt ? 'Planta de piso' : 'Floor Plan';
   return `${tipo}: ${p.levels.find((l) => l.id === levelId)?.name ?? ''}`;
@@ -38,9 +42,10 @@ export function TitleBar(): ReactElement {
   const sectionId = useUi((s) => s.sectionId);
   const sheetId = useUi((s) => s.sheetId);
   const planKind = useUi((s) => s.planKind);
+  const areaPlanId = useUi((s) => s.areaPlanId);
   const fileRef = useRef<HTMLInputElement>(null);
   const store = editor.store;
-  const title = `Hestia - [${project.name}${store.dirty ? ' *' : ''}] - ${viewTitle(project, ctx.view, ctx.levelId, sectionId, sheetId, pt, planKind)}`;
+  const title = `Hestia - [${project.name}${store.dirty ? ' *' : ''}] - ${viewTitle(project, ctx.view, ctx.levelId, sectionId, sheetId, pt, planKind, areaPlanId)}`;
   const open = pt ? 'Abrir' : 'Open';
   const save = pt ? 'Salvar' : 'Save';
   const undo = pt ? 'Desfazer' : 'Undo';

@@ -1,10 +1,11 @@
 import type { ReactElement } from 'react';
-import type { LocationLine } from '@hestia/model';
+import { areaPlanOf, type LocationLine } from '@hestia/model';
 import { roofAutoOffset, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
+import { abrirCaixaDeTexto } from './dialogs/TextDialog.tsx';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -16,6 +17,11 @@ export function hasPlacementProperties(tool: ToolId): boolean {
 export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const p = useProject();
   const levelId = useUi((s) => s.levelId);
+  const planKind = useUi((s) => s.planKind);
+  const areaPlanId = useUi((s) => s.areaPlanId);
+  const areaPlan = planKind === 'area' && areaPlanId ? areaPlanOf(p, areaPlanId) : undefined;
+  // Na planta de área, as anotações ficam na vista; a frase abaixo já reflete o destino real.
+  const targetName = areaPlan ? `planta de área “${areaPlan.name}”` : `nível ativo (${p.levels.find((l) => l.id === levelId)?.name ?? 'Nível atual'})`;
   const o = useUi((s) => s.options);
   const set = (patch: Partial<typeof o>): void => useUi.setState((s) => ({ options: { ...s.options, ...patch } }));
   const setStairRun = (patch: Partial<NonNullable<typeof o.stairRun>>): void => set({ stairRun: { ...(o.stairRun ?? { shape: 'straight', width: 1.2, turn: 'left' }), ...patch } });
@@ -110,12 +116,13 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
         <Group title="Colocação · Texto">
           <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={o.textHeight ?? 2.5} unit="mm" min={0.1} onCommit={(v) => set({ textHeight: v })} /></Row>
           <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={o.textRotation ?? 0} unit="°" onCommit={(v) => set({ textRotation: v })} /></Row>
-          <div className="hint">Clique na planta e digite o conteúdo do texto.</div>
+          <div className="prow"><span /><button type="button" className="btn small" onClick={abrirCaixaDeTexto}>Caixa de texto…</button></div>
+          <div className="hint">Clique na planta e digite o texto, ou use a caixa de texto para largura, moldura e quebra de linha.</div>
         </Group>
       )}
       {['room', 'roomsep', 'dimension', 'text', 'section'].includes(tool) && (
         <Group title={`Colocação · ${tool === 'room' ? 'Ambiente' : tool === 'roomsep' ? 'Separador de ambiente' : tool === 'dimension' ? 'Cota' : tool === 'text' ? 'Texto' : 'Corte'}`}>
-          <div className="hint">As opções geométricas e o conteúdo são definidos durante o desenho. O elemento será criado no nível ativo ({p.levels.find((l) => l.id === levelId)?.name ?? 'Nível atual'}).</div>
+          <div className="hint">As opções geométricas e o conteúdo são definidos durante o desenho. A anotação será criada na {targetName}.</div>
         </Group>
       )}
       {!['room', 'roomsep', 'dimension', 'text', 'section'].includes(tool) && (

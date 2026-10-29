@@ -1,5 +1,5 @@
 import { editor } from './controller.ts';
-import { savePlanDxf, saveSectionDxf } from './dxfExport.ts';
+import { saveAreaPlanDxf, savePlanDxf, saveSectionDxf } from './dxfExport.ts';
 import { saveProjectIfc } from './ifcExport.ts';
 import { savePdf } from './savePdf.ts';
 import { pranchaDaPlantaAtual, sheetsPdfOf } from './sheetActions.ts';
@@ -21,6 +21,7 @@ export async function exportDxf(): Promise<void> {
   // A planta de cobertura não tem DXF próprio: sairia a planta de piso do nível, como se fosse a que está na tela.
   if (ui.view === 'plan' && ui.planKind === 'roof') return say('A planta de cobertura ainda não exporta DXF: abra a planta de piso do nível.');
   try {
+    if (ui.view === 'plan' && ui.planKind === 'area' && ui.areaPlanId) return say(`DXF salvo: ${await saveAreaPlanDxf(editor.project, ui.areaPlanId)}`);
     say(ui.view === 'section' && ui.sectionId ? await saveSectionDxf(editor.project, ui.sectionId) : await savePlanDxf(editor.project, ui.levelId, ui.showRoofProjection));
   } catch (e) {
     say(`Não foi possível exportar o DXF: ${why(e)}`);

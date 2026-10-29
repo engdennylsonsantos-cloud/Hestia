@@ -53,6 +53,12 @@ export function arrivalRing(s: ResolvedStair): Ring | null {
   return [f.a, f.b, add(f.b, d), add(f.a, d)];
 }
 
+/** Pegada da escada em planta: a dos degraus mais a chegada (o último degrau), como no 3D. A seleção e o fantasma usam esta. */
+export function planFootprint(s: ResolvedStair): MultiPolygon {
+  const last = arrivalRing(s);
+  return last ? union(s.footprint, [[last]]) : s.footprint;
+}
+
 /** Ponto a meio comprimento da polilinha (ponto médio do espelho). */
 export function polyMid(pts: Vec2[]): Vec2 {
   let total = 0;
@@ -292,6 +298,7 @@ export function stairFills(
   for (const s of stairs) {
     const cutZ = view?.cutZ ?? s.baseZ + STAIR_CUT_HEIGHT;
     // Escada que começa abaixo do topo da vista sai inteira, até o próprio topo: cortar no topo da vista (2,30 m) tirava o fim do lance.
+    // O que passa do topo da vista fica só no contorno, sem preenchimento (fora da faixa de vista).
     const viewTop = view?.topZ ?? Infinity;
     if (s.baseZ > viewTop + 1e-9) continue;
     const topZ = Math.max(viewTop, s.topZ);
@@ -300,10 +307,12 @@ export function stairFills(
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
     const spirals = spiralByComponent(p, s);
     const post = postOps(p, s, spirals, cutZ, fillBase, dark, lineColor, paint);
+    const inView = (z: number): boolean => z <= viewTop + 1e-9;
     if (detail === 'coarse') {
-      if (steps.length === 0 && s.steps.length > 0) continue;
-      const footprint = steps.length === s.steps.length ? s.footprint : union(...steps.map((st) => [[st.polygon]]));
-      const last = arrivalRing(s);
+      const seen = steps.filter((st) => inView(st.z));
+      if (seen.length === 0 && s.steps.length > 0) continue;
+      const footprint = seen.length === s.steps.length ? s.footprint : union(...seen.map((st) => [[st.polygon]]));
+      const last = inView(s.topZ) ? arrivalRing(s) : null;
       out.fills.push({ polygons: last ? union(footprint, [[last]]) : footprint, color, alpha: 1 });
       out.fills.push(...post.fills);
       continue;
@@ -311,13 +320,13 @@ export function stairFills(
     // Só o caracol tem voltas sobrepostas em planta: o recorte pela volta de baixo é feito só nele.
     const cover = spirals.size > 0 ? lowerCover(s, cutZ) : [];
     for (const st of steps) {
-      const fill = st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
+      const fill = !inView(st.z) ? null : st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
       out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, projecao));
     }
     const last = arrivalRing(s);
     if (last) {
-      out.fills.push({ polygons: [[last]], color, alpha: 1 });
+      if (inView(s.topZ)) out.fills.push({ polygons: [[last]], color, alpha: 1 });
       out.strokes.push(outlineOps(last, s.topZ, lineColor, cutZ, projecao));
     }
     out.fills.push(...post.fills);
@@ -332,17 +341,15 @@ export function stairFills(
     }
     const cut = stairCutBase(s, risers, cutZ);
     if (cut) out.strokes.push(cutSymbol(cut, theme.ink, corte));
-    if (detail === 'fine') {
-      // Só os degraus dentro do topo da vista: os de cima não saem, nem o rótulo (decisão 0013 §4).
-      for (const st of steps) {
-        if (st.kind !== 'tread') continue;
-        const at = treadLabelAt(st, steps, spirals);
-        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
-      }
-      if (last) out.labels.push({ at: polyMid([...last, last[0]!]), text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
+    // Numeração dos degraus no médio e no fino (o grosseiro só preenche a pegada, e saiu acima).
+    for (const st of steps) {
+      if (st.kind !== 'tread') continue;
+      const at = treadLabelAt(st, steps, spirals);
+      if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     }
+    if (last) out.labels.push({ at: polyMid([...last, last[0]!]), text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     if (p.settings.showTags) {
-      const at = labelPoint(s.footprint);
+      const at = labelPoint(planFootprint(s));
       if (at) out.labels.push({ at, text: s.type.code, papel: { escala: scale, fontMm: STAIR_TAG_MM } });
     }
   }
@@ -361,6 +368,6 @@ export function belowStairOps(stairs: ResolvedStair[], theme: PlanTheme): FloorO
 
 /** Destaque de seleção e de hover das escadas, no padrão dos pisos e lajes (contorno da pegada). */
 export function stairSelectionOps(p: Project, stairs: ResolvedStair[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
-  const parts = stairs.map((s) => ({ id: s.id, polygon: s.footprint }));
+  const parts = stairs.map((s) => ({ id: s.id, polygon: planFootprint(s) }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
 }

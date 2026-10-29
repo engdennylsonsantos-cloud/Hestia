@@ -3,7 +3,8 @@ import { resolverZoom } from './zoomOps.ts';
 import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import type { ResolvedStairStep } from '@hestia/engine';
-import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
+import { multiArea } from '@hestia/geom';
+import { belowStairOps, planFootprint, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
 import { defaultPaint } from './style.ts';
 
 /** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
@@ -80,13 +81,26 @@ describe('escada na planta (decisão 0011 §1)', () => {
     expect(shaft.pts[N - 1]!.y).toBeCloseTo(N * P, 9);
   });
 
-  it('nível de detalhe: grosseiro só preenche a pegada; fino numera os degraus', () => {
+  it('nível de detalhe: grosseiro só preenche a pegada; médio e fino numeram os degraus', () => {
     const coarse = ops('coarse');
     expect(coarse.fills).toHaveLength(1);
     expect(coarse.strokes).toHaveLength(0);
     expect(coarse.labels).toHaveLength(0);
-    expect(ops('medium').labels.map((l) => l.text)).toEqual(['SOBE']);
-    expect(ops('fine').labels.map((l) => l.text)).toEqual(['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+    const numbered = ['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    expect(ops('medium').labels.map((l) => l.text)).toEqual(numbered);
+    expect(ops('fine').labels.map((l) => l.text)).toEqual(numbered);
+  });
+
+  it('fora da faixa de vista (acima do topo) a escada sai só no contorno: sem preenchimento nos degraus de cima', () => {
+    const all = resolverZoom(stairFills(PROJECT, [stair()], LIGHT, false, 'medium', VIEW, { cutZ: 0.5, topZ: 1.0 }), VIEW.zoom);
+    // Topo em 1,00 m: degraus k = 1..5 (até 0,875 m) têm preenchimento; os 5 de cima (e a chegada) só o contorno.
+    expect(all.fills).toHaveLength(5);
+    expect(all.strokes.filter((t) => t.closed)).toHaveLength(N);
+  });
+
+  it('a pegada da planta (seleção) inclui o último degrau: passa da linha do último espelho', () => {
+    const s = stair();
+    expect(multiArea(planFootprint(s))).toBeGreaterThan(multiArea(s.footprint) + 1e-9);
   });
 
   it('subpavimento: só a pegada e os contornos, esmaecidos, sem seta nem corte', () => {

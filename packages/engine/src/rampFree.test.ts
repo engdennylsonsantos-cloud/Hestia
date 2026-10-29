@@ -20,7 +20,7 @@ const sum = (a: number[]): number => a.reduce((x, y) => x + y, 0);
 /** Polígono de um componente: lance = retângulo dos 2 espelhos; patamar = contorno. */
 function ringOf(p: StairComponentSketch): Ring {
   if (p.kind === 'landing') return stairLandingPolygon(p.landing).polygon!;
-  const [r0, r1] = p.run.risers as [{ a: Vec2; b: Vec2 }, { a: Vec2; b: Vec2 }];
+  const [r0, r1] = p.run.risers as unknown as [{ a: Vec2; b: Vec2 }, { a: Vec2; b: Vec2 }];
   return [r0.a, r0.b, r1.b, r1.a];
 }
 const area = (r: Ring): number => Math.abs(ringArea(r));

@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import { openingFamilies, openingFamilyOf, type OpeningType } from '@hestia/model';
+import { DEFAULT_RAMP_OPTIONS } from '@hestia/tools';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { TypeRow } from '../TypeRow.tsx';
@@ -30,7 +31,7 @@ export function FamiliesTree(): ReactElement {
   const p = useProject();
   const o = useUi((s) => s.options);
   const set = (patch: Partial<typeof o>): void => useUi.setState((st) => ({ options: { ...st.options, ...patch } }));
-  const dialog = (d: 'wallType' | 'floorType' | 'slabType' | 'ceilingType' | 'roofType' | 'stairType' | 'openingType', id: string): void => useUi.setState({ dialog: d, dialogArg: id });
+  const dialog = (d: 'wallType' | 'floorType' | 'slabType' | 'ceilingType' | 'roofType' | 'stairType' | 'rampType' | 'openingType', id: string): void => useUi.setState({ dialog: d, dialogArg: id });
   const doors = Object.values(p.openingTypes).filter((t) => t.kind === 'door');
   const windows = Object.values(p.openingTypes).filter((t) => t.kind === 'window');
 
@@ -49,6 +50,13 @@ export function FamiliesTree(): ReactElement {
         <Node id="fam:stair" label={FAMILY.stair} group>
           {Object.values(p.stairTypes).map((t) => (
             <TypeRow key={t.id} kind="stair" typeId={t.id} name={t.name} icon="stair" active={o.stair?.typeId === t.id} onUse={() => set({ stair: { ...o.stair, typeId: t.id } })} onEdit={() => dialog('stairType', t.id)} />
+          ))}
+        </Node>
+      </Category>
+      <Category id="ramp" name="Rampas">
+        <Node id="fam:ramp" label={FAMILY.stair} group>
+          {Object.values(p.rampTypes).map((t) => (
+            <TypeRow key={t.id} kind="ramp" typeId={t.id} name={t.name} icon="ramp" active={o.ramp?.typeId === t.id} onUse={() => set({ ramp: { ...(o.ramp ?? DEFAULT_RAMP_OPTIONS), typeId: t.id } })} onEdit={() => dialog('rampType', t.id)} />
           ))}
         </Node>
       </Category>

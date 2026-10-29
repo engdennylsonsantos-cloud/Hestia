@@ -99,6 +99,7 @@ export function SchedulesTree(): ReactElement {
   const rows: Array<{ label: string; dialog: DialogKind; n: number }> = [
     { label: 'Tabela de ambientes', dialog: 'roomSchedule', n: count('room') },
     { label: 'Tabela de escadas', dialog: 'stairSchedule', n: count('stair') },
+    { label: 'Tabela de rampas', dialog: 'rampSchedule', n: count('ramp') },
     { label: 'Tabela de forros', dialog: 'ceilingSchedule', n: count('ceiling') },
     { label: 'Tabela de lajes', dialog: 'slabSchedule', n: count('slab') },
     { label: 'Tabela de paredes', dialog: 'schedule', n: count('wall') },

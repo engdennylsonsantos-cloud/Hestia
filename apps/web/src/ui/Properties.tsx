@@ -4,6 +4,7 @@ import {
   FUNCTION_LABEL,
   isFloor,
   isOpening,
+  isRamp,
   isRoof,
   isRoom,
   isSlab,
@@ -41,6 +42,7 @@ import { RoofProperties } from './RoofProperties.tsx';
 import { SlabProperties } from './SlabProperties.tsx';
 import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
+import { RampProperties } from './RampProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
 import { LabelScroll } from './LabelScroll.tsx';
 import { PanelHead } from './PanelHead.tsx';
@@ -378,10 +380,11 @@ export function Properties(): ReactElement {
   const ceilings = els.filter(isCeiling);
   const roofs = els.filter(isRoof);
   const stairs = els.filter(isStair);
+  const ramps = els.filter(isRamp);
   const rooms = els.filter(isRoom);
-  const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + rooms.length;
-  const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, rooms].filter((g) => g.length > 0).length;
-  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
+  const count = walls.length + ops.length + floors.length + slabs.length + ceilings.length + roofs.length + stairs.length + ramps.length + rooms.length;
+  const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, ramps, rooms].filter((g) => g.length > 0).length;
+  const label = walls.length ? `${walls.length} parede${walls.length > 1 ? 's' : ''}` : ops.length ? `${ops.length} abertura${ops.length > 1 ? 's' : ''}` : floors.length ? `${floors.length} piso${floors.length > 1 ? 's' : ''}` : slabs.length ? `${slabs.length} laje${slabs.length > 1 ? 's' : ''}` : ceilings.length ? `${ceilings.length} forro${ceilings.length > 1 ? 's' : ''}` : roofs.length ? `${roofs.length} telhado${roofs.length > 1 ? 's' : ''}` : stairs.length ? `${stairs.length} escada${stairs.length > 1 ? 's' : ''}` : ramps.length ? `${ramps.length} rampa${ramps.length > 1 ? 's' : ''}` : rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''}` : view ? `${view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${view.name}` : 'Vista';
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
   const perim = usePerimeter();
@@ -400,11 +403,12 @@ export function Properties(): ReactElement {
           : kinds === 1 && ceilings.length > 0 ? <CeilingProperties ceilings={ceilings} />
           : kinds === 1 && roofs.length > 0 ? <RoofProperties roofs={roofs} />
           : kinds === 1 && stairs.length > 0 ? <StairProperties stairs={stairs} />
+          : kinds === 1 && ramps.length > 0 ? <RampProperties ramps={ramps} />
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
           : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} />
           : view ? <SectionViewProps view={view} />
           : count > 0 ? (
-          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada ou ambiente) para editar propriedades.</div>
+          <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada, rampa ou ambiente) para editar propriedades.</div>
         ) : (
           <>
             {isToolTypeKind(tool) && <ToolTypeProps tool={tool} />}

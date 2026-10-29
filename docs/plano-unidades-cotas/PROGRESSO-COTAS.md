@@ -1,6 +1,8 @@
 # Progresso do agente COTAS (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
 Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, paridade, densidade) verde com 2 avisos de hooks em OpeningTempDims/ViewportOverlays; typecheck e testes rodados por pasta a cada passo.
 
+**Estado em 2026-10-29: F1/F2 interrompidas, ver RETOMADA.md.**
+
 - [x] D0 mapa (`04`)
 - [x] D1 configuração no modelo
 - [x] D2 wallPlanes e openingExtents
@@ -14,7 +16,7 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - [x] D11 documentação de reaproveitamento e decisão
 - [ ] F1 suíte e build (`06`; só quando UNID e ESQ terminarem)
 - [ ] F2 navegador
-- [ ] F3 revisão cruzada (revise os diffs de UNID e ESQ)
+- [x] F3 revisão cruzada (feita pelo REVISOR; REVISAO CONCLUIDA 4ae611f9)
 - [ ] F4 documentação
 - [ ] F5 entrega
 

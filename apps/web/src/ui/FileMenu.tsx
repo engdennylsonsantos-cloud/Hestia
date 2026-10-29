@@ -7,7 +7,7 @@ import { useUi } from '../editor/state.ts';
 type Section = 'export' | 'info' | 'options';
 
 /**
- * Menu Arquivo (aba azul da faixa e botão "R" da barra de título): Novo, Abrir, Salvar, Exportar, Informações e Opções.
+ * Menu Arquivo (aba azul da faixa e botão "H" da barra de título): Novo, Abrir, Salvar, Exportar, Informações e Opções.
  * Abre por cima da área de trabalho, do lado esquerdo; Esc, clique fora ou Fechar voltam ao desenho.
  */
 export function FileMenu(): ReactElement | null {

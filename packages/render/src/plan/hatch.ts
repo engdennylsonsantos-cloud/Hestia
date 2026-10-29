@@ -7,7 +7,7 @@ export const HATCH_SPACING = 0.05;
 export const HATCH_PX = 1;
 /** Espessura e comprimento do ponto do padrão `dots`. */
 export const DOT_PX = 2;
-const DOT_LEN = 0.0125;
+export const DOT_LEN = 0.0125;
 /** Trecho pintado do tracejado `gesso` (10 px de 16 px do padrão anterior, em metros). */
 const GESSO_ON = (10 / 16) * HATCH_SPACING;
 

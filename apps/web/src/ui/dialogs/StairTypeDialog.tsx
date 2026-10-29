@@ -130,7 +130,7 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
           )}
           <div className="field-row"><label htmlFor="stt-nosing">Nariz</label><NumField id="stt-nosing" value={draft.nosing} quantity="smallLength" min={0} onCommit={(v) => set({ nosing: v })} /></div>
           <div className="field-row"><label htmlFor="stt-land">Espessura do patamar</label><NumField id="stt-land" value={draft.landingThickness} quantity="smallLength" min={0.01} onCommit={(v) => set({ landingThickness: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-head">Folga de cabeça mínima (m)</label><NumField id="stt-head" value={draft.minHeadroom} decimals={2} min={0.01} onCommit={(v) => set({ minHeadroom: v })} /></div>
+          <div className="field-row"><label htmlFor="stt-head">Folga de cabeça mínima (m)</label><NumField id="stt-head" value={draft.minHeadroom} quantity="length" min={0.01} onCommit={(v) => set({ minHeadroom: v })} /></div>
           <div className="field-row">
             <label htmlFor="stt-mat">Material</label>
             <select id="stt-mat" className="select" value={draft.materialId} onChange={(e) => set({ materialId: e.target.value })}>

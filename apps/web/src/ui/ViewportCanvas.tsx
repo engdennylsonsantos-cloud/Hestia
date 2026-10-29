@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PlanFrame, PlanScene, contadores, createGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, sameView, screenToWorld, type GpuContext, type LabelOp, type PlanDrawList, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, criarControladorGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
@@ -31,6 +31,8 @@ export function ViewportCanvas(): ReactElement {
   const labelLayer = useRef<PlanLabelsHandle>(null);
   const gpuRef = useRef<{ gpu: GpuContext; canvas: HTMLCanvasElement } | null>(null);
   const cpuRef = useRef<HTMLCanvasElement | null>(null);
+  const pickGpu = useRef<PickGpu3d | null>(null);
+  const pickSize = useRef({ w: 0, h: 0 });
   const plan = useRef(new PlanScene());
   const model = useRef(new ModelScene());
   // Ganchos de depuração (?debug=1): câmera orbital do 3D e a cena 3D (o e2e conta as peças do modelo).
@@ -55,6 +57,7 @@ export function ViewportCanvas(): ReactElement {
   const frame = useRef(0);
   const dprRef = useRef(1);
   const planFrame = useRef<PlanFrame | null>(null);
+  const secDl = useRef<PlanDrawList | null>(null); // R4: última lista de corte escrita na cena
   const quadroRef = useRef<QuadroPlanta | null>(null); // provisório na hora, exato depois da pintura (quadroPlanta.ts)
   const shownLabels = useRef<LabelOp[]>(NO_LABELS);
   const shownView = useRef<Viewport | null>(null);
@@ -65,72 +68,61 @@ export function ViewportCanvas(): ReactElement {
   useContarCommitPerf();
 
   // ---- inicialização: GPU primeiro, CPU só sem suporte ----
-  const bootRef = useRef<(prefer: 'auto' | 'webgl2' | 'cpu') => Promise<void>>(async () => {});
+  const controlador = useRef<ControladorGpu | null>(null);
   useEffect(() => {
-    let cancelled = false;
     const el = host.current!;
     const qs = new URLSearchParams(location.search);
-    const teardown = (): void => {
-      gpuRef.current?.gpu.dispose();
-      gpuRef.current?.canvas.remove();
-      cpuRef.current?.remove();
+    // WebGPU só quando pedido (?gpu=webgpu) até ser validado em GPU real; o padrão é WebGL2 (docs/decisoes/0003).
+    const preferencia: PreferenciaGpu = qs.get('cpu') === '1' ? 'cpu' : qs.get('gpu') === 'webgpu' ? 'auto' : 'webgl2';
+    reiniciarEstadoGpu(preferencia);
+    // Troca de backend ou restauração do contexto: os recursos de GPU sumiram, então a cena e o picking são refeitos.
+    const limpar = (): void => {
+      pickGpu.current?.dispose();
+      pickGpu.current = null;
+      pickSize.current = { w: 0, h: 0 };
       gpuRef.current = null;
       cpuRef.current = null;
-    };
-    const boot = async (prefer: 'auto' | 'webgl2' | 'cpu'): Promise<void> => {
-      teardown();
-      const res = prefer === 'cpu' ? null : await createGpu(() => document.createElement('canvas'), prefer);
-      if (cancelled) return;
-      const rect = el.getBoundingClientRect();
-      if (res) {
-        res.canvas.setAttribute('aria-label', 'Área de desenho');
-        el.prepend(res.canvas);
-        res.gpu.renderer.shadowMap.enabled = true;
-        gpuRef.current = res;
-        res.gpu.onLost((reason) => {
-          useUi.setState({ status: `GPU reiniciada (${reason}). Trocando para WebGL2.` });
-          void boot(res.gpu.backend === 'webgpu' ? 'webgl2' : 'cpu');
-        });
-        useUi.setState({ gpu: res.gpu.backend });
-      } else {
-        const c = document.createElement('canvas');
-        c.setAttribute('aria-label', 'Área de desenho');
-        el.prepend(c);
-        cpuRef.current = c;
-        useUi.setState({ gpu: 'cpu' });
-        contadores.definirBackend('cpu');
-        contadores.marcarTimerGpu('sem-gpu');
-      }
       modelKey.current = '';
-      // Troca de dispositivo (GPU ou CPU): a cena da planta começa do zero.
-      planFrame.current?.reset(); quadroRef.current?.invalidar();
-      setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
-      setReady(true);
-      useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+      planFrame.current?.reset();
+      quadroRef.current?.invalidar();
+      secDl.current = null;
     };
-    bootRef.current = boot;
-    // WebGPU só quando pedido (?gpu=webgpu) até ser validado em GPU real; o padrão é WebGL2 (docs/decisoes/0003).
-    const prefer = qs.get('cpu') === '1' ? 'cpu' : qs.get('gpu') === 'webgpu' ? 'auto' : 'webgl2';
-    void boot(prefer);
+    const c = criarControladorGpu({
+      host: el,
+      preferencia,
+      aoLimpar: limpar,
+      aoStatus: (status) => useUi.setState({ status }),
+      aoMontar: ({ gpu, canvas }) => {
+        if (gpu) {
+          gpu.gpu.renderer.shadowMap.enabled = true;
+          gpuRef.current = gpu;
+          useUi.setState({ gpu: gpu.gpu.backend });
+        } else {
+          cpuRef.current = canvas;
+          useUi.setState({ gpu: 'cpu' });
+        }
+        setSize({ w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) });
+        setReady(true);
+        useUi.setState((s) => ({ previewTick: s.previewTick + 1 }));
+      },
+    });
+    controlador.current = c;
+    void c.iniciar();
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
       setSize({ w: Math.round(r.width), h: Math.round(r.height) });
     });
     ro.observe(el);
     return () => {
-      cancelled = true;
       montagem.current?.cancelar();
       ro.disconnect();
-      teardown();
+      c.dispose();
+      controlador.current = null;
     };
   }, []);
 
   const safeRender = (g: { gpu: GpuContext }, scene: Parameters<GpuContext['render']>[0], camera: Parameters<GpuContext['render']>[1]): void => {
-    try {
-      g.gpu.render(scene, camera);
-    } catch {
-      if (g.gpu.backend === 'webgpu') void bootRef.current('webgl2');
-    }
+    try { g.gpu.render(scene, camera); } catch { controlador.current?.falhouRender(); }
   };
 
   /** Publica os rótulos e a vista só quando mudam: a planta não re-renderiza a cada quadro (`null`: sem planta). */
@@ -150,8 +142,24 @@ export function ViewportCanvas(): ReactElement {
     const p = editor.project;
     const theme = dark ? DARK : LIGHT;
     if (st.view === '3d') {
+      secDl.current = null;
       if (!g) return;
       const m = model.current;
+      // Picking por ID buffer na GPU (R3): WebGL2 com MRT. No WebGPU (ou sem suporte) o BVH continua respondendo.
+      const picker =
+        g.gpu.backend === 'webgl2'
+          ? (pickGpu.current ??= new PickGpu3d({
+              renderer: g.gpu.renderer,
+              raiz: m.scene,
+              aoResolver: () => useUi.setState((x) => ({ previewTick: x.previewTick + 1 })),
+            }))
+          : null;
+      const pw = Math.round(w * dpr);
+      const ph = Math.round(h * dpr);
+      if (picker && (pickSize.current.w !== pw || pickSize.current.h !== ph)) {
+        picker.redimensionar(pw, ph);
+        pickSize.current = { w: pw, h: ph };
+      }
       // Sombras e arestas são da vista 3D no projeto (decisão 0015 §1): a chave inclui a versão do projeto.
       const v3 = view3dOf(p);
       const key = `${editor.store.version}|${dark}|${v3.shadows}|${v3.edges}|${v3.openOpenings === true}`;
@@ -160,6 +168,7 @@ export function ViewportCanvas(): ReactElement {
         // Os níveis entram em fatias (ver montagem3dProgressiva.ts): a tela não espera o projeto inteiro.
         montagem.current ??= criarMontagemVista3d(m, (id) => editor.resolved(id), (id) => editor.resolucaoPronta(id));
         montagem.current.iniciar(p, { edges: v3.edges, shadows: v3.shadows, dark }, st.levelId);
+        picker?.invalidar();
       }
       // Realce da seleção e do elemento sob o cursor: só a sobreposição muda, o modelo não é refeito (decisão 0016 §4).
       m.highlight(st.selection, st.hover);
@@ -179,12 +188,15 @@ export function ViewportCanvas(): ReactElement {
     if (st.view === 'section') {
       pf.reset(); quadroRef.current?.invalidar();
       const dl: PlanDrawList = buildSectionFrame(v, dark) ?? { background: theme.bg, fills: [], strokes: [], labels: [] };
-      if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); plan.current.setDrawList(dl, v); safeRender(g, plan.current.scene, plan.current.camera); }
+      // R4: a lista do corte é cacheada por projeto/vista/tema/seleção — pan e zoom não geram geometria nova. Só reenvia
+      // quando a referência muda (o `SectionFrame` devolve a mesma lista nos quadros seguintes).
+      if (g) { g.gpu.setSize(w, h, dpr); plan.current.setViewport(v); if (dl !== secDl.current) { plan.current.setDrawList(dl, v); secDl.current = dl; } safeRender(g, plan.current.scene, plan.current.camera); }
       else if (cpuRef.current) drawPlanOnCanvas(cpuRef.current, dl, v, dpr);
       publish(dl.labels, v);
       labelLayer.current?.syncView(v);
       return;
     }
+    secDl.current = null;
     // Planta: pan e zoom mudam a câmera; geometria, sobreposição e grade só são refeitas quando a chave muda (PlanFrame).
     const quadro = (quadroRef.current ??= new QuadroPlanta({ provisorios: editor.provisorios, resolverReferencia: (id) => editor.resolved(id, false), pendente: (id) => editor.fluxo.pendente(id), pedirQuadro: () => useUi.setState((x) => ({ previewTick: x.previewTick + 1 })) }));
     // Grade visível quando o botão de grade está ligado ou quando a captura por grade está ativa (o que se captura, se vê).
@@ -245,12 +257,12 @@ export function ViewportCanvas(): ReactElement {
   /** Ponto do plano (m) da superfície 3D sob o cursor; null se o raio não atinge o modelo. */
   const pick3dAt = (s: Pt): Pt | null => {
     const r = host.current!.getBoundingClientRect();
-    return pickModelPoint(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
+    return pickModelPoint(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 }, pickGpu.current ?? undefined);
   };
   /** Elemento (parede, abertura, piso, laje, telhado, escada) sob o cursor na vista 3D; null no vazio (decisão 0016). */
   const elementAt3d = (s: Pt) => {
     const r = host.current!.getBoundingClientRect();
-    return pickElement(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 });
+    return pickElement(model.current.scene, model.current.orbit.camera, { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 }, pickGpu.current ?? undefined);
   };
   /**
    * Realce ao passar o cursor sobre o 3D. Um raio por quadro (não por evento de ponteiro): o último ponto ganha.
@@ -432,7 +444,7 @@ export function ViewportCanvas(): ReactElement {
         const s = local(e);
         const r = host.current!.getBoundingClientRect();
         const ndc = { x: (s.x / r.width) * 2 - 1, y: 1 - (s.y / r.height) * 2 };
-        const hit = pickModelPoint(model.current.scene, model.current.orbit.camera, ndc);
+        const hit = pickModelPoint(model.current.scene, model.current.orbit.camera, ndc, pickGpu.current ?? undefined);
         if (hit) {
           // Quanto mais rola o scroll, mais o target se move em direção ao ponto sob o cursor.
           // Factor pequeno: movimento suave e sem saltos; acumula com vários scrolls.

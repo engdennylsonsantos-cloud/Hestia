@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- a cena 3D reúne o port GPU (faixas/sombras) e o alizar/esquadrias do plano; extrair depois. */
 import * as THREE from 'three';
 import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
@@ -8,7 +9,9 @@ import { firstSurfaceDistance } from './pick3d.ts';
 import { caixasEPrismasDaAbertura, montarAbertura } from './aberturas3d.ts';
 import { arestasDaSilhuetaDeCaixas } from './silhuetaCaixas3d.ts';
 import { arestasDosLotes, geometriaDoLote, juntarLotes, loteDeGeometria } from './lotesMalha3d.ts';
-import { SombraSobDemanda } from './sombras3d.ts';
+import { SombrasDaCena, SOMBRA_MAX_TRIANGULOS, prepararSombraDoQuadro, type FaixaDeSombra } from './sombras3d.ts';
+import { LotesPorFaixa, type Faixa3D } from './faixas3d.ts';
+import { BITS_PROFUNDIDADE, diagnosticarOrigem, diagnosticarProfundidade, type DiagnosticoOrigem, type DiagnosticoProfundidade } from './precisao3d.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
@@ -20,7 +23,13 @@ import { Materiais3D } from './materiais3d.ts';
 import { CacheMalhas, bytesDeNivel, disposeNivel, type EntradaNivel, type PickSource } from './cacheMalhas3d.ts';
 import { chavesDeNivel } from './chaveNivel3d.ts';
 import { caixaDaSelecao } from './selecao3d.ts';
-import { GestorRecursosGpu } from '../gpu/gestorRecursos.ts';
+
+/** O mínimo do renderer que o gancho de quadro da cena lê (o three chama `scene.onBeforeRender` com o renderer real). */
+export interface RendererDeQuadro {
+  shadowMap: { autoUpdate: boolean; needsUpdate: boolean; enabled?: boolean };
+  /** Tamanho da área de desenho em px CSS (o three fornece; sem ele a sombra fica no tamanho configurado). */
+  getSize?(alvo: THREE.Vector2): THREE.Vector2;
+}
 
 /**
  * Opções herdadas. A vista 3D lê arestas e sombras de `view3dOf(p)` (decisão 0015 §2.2): `edges` e `shadows` são
@@ -75,8 +84,14 @@ export class ModelScene {
   private caixaUnitaria = criarCaixaUnitaria();
   /** Paredes retas e esquadrias como caixas instanciadas (padrão); falso: tudo como geometria, o caminho de referência. */
   private readonly instanciar: boolean;
-  /** Gestor dos buffers globais por categoria/material (só no caminho instanciado). */
-  private gerente: GestorRecursosGpu;
+  /** Lotes globais por categoria/material, divididos em faixas verticais de níveis (culling por frustum, Fase 2.3). */
+  private lotes: LotesPorFaixa;
+  /** Faixas que podem projetar sombra (o orçamento liga/desliga `castShadow` por faixa). */
+  private faixasDeSombra: FaixaDeSombra[] = [];
+  /** Direção do sol no mundo (do alvo para a luz), guardada para o enquadramento da câmera do sol. */
+  private direcaoSol = new THREE.Vector3(0, 0, 1);
+  /** Teto de triângulos do passe de sombra (ver `sombras3d.ts`). */
+  readonly sombraMaxTriangulos: number;
   /** Projeto da atualização corrente (o gestor resolve os materiais por id). */
   private projeto: Project | null = null;
   /** Materiais por chave (ver `Materiais3D`). */
@@ -90,8 +105,14 @@ export class ModelScene {
   private ground: THREE.Mesh;
   private grid: THREE.GridHelper;
   private boxCache = new THREE.Box3();
-  /** Sombra sob demanda: o mapa é refeito só quando `update` muda o modelo ou o sol (ver `sombras3d.ts`). */
-  readonly sombra = new SombraSobDemanda();
+  /** Reuso do tamanho da tela no gancho de quadro (evita alocar por quadro). */
+  private readonly tamanhoTela = new THREE.Vector2();
+  /** Sombra sob demanda + orçamento e enquadramento do passe de sombra (ver `sombras3d.ts`). */
+  readonly sombras = new SombrasDaCena();
+  /** Sombra sob demanda (atalho do app: `sombra.aplicar(renderer)` antes de desenhar). */
+  get sombra(): SombrasDaCena['sobDemanda'] {
+    return this.sombras.sobDemanda;
+  }
 
   /** Junção sobre os níveis que tocam a faixa de cada nível (`projetoDaJuncao`), como a planta. Falso: projeto inteiro (referência). */
   private readonly reduzirJuncao: boolean;
@@ -100,21 +121,38 @@ export class ModelScene {
    * `tetoMalhasBytes`: teto do cache de malhas por nível (padrão `TETO_MALHAS_BYTES`). `reduzirJuncao` (padrão verdadeiro):
    * a junção de cada nível usa o conjunto reduzido da planta; falso usa o projeto inteiro (referência para testes).
    * `instanciar` (padrão verdadeiro): paredes retas e esquadrias viram caixas instanciadas; falso mantém a geometria de sempre.
+   * `faixas`: níveis por faixa vertical (culling por frustum) e o teto de faixas; `sombraMaxTriangulos`: orçamento do passe
+   * de sombra.
    */
-  constructor(opcoes: { tetoMalhasBytes?: number; reduzirJuncao?: boolean; instanciar?: boolean } = {}) {
+  constructor(
+    opcoes: {
+      tetoMalhasBytes?: number;
+      reduzirJuncao?: boolean;
+      instanciar?: boolean;
+      niveisPorFaixa?: number;
+      faixasMax?: number;
+      sombraMaxTriangulos?: number;
+    } = {},
+  ) {
     this.cache = new CacheMalhas(opcoes.tetoMalhasBytes);
     this.reduzirJuncao = opcoes.reduzirJuncao ?? true;
     this.instanciar = opcoes.instanciar ?? true;
-    this.gerente = new GestorRecursosGpu({
+    this.sombraMaxTriangulos = opcoes.sombraMaxTriangulos ?? SOMBRA_MAX_TRIANGULOS;
+    this.lotes = new LotesPorFaixa({
       caixaUnitaria: this.caixaUnitaria,
       material: (categoria, materialId, extras) => this.mats.face(extras ?? this.projeto?.materials[materialId], categoria),
       materialArestas: () => this.mats.edge(),
+      niveisPorFaixa: opcoes.niveisPorFaixa,
+      faixasMax: opcoes.faixasMax,
     });
     // O zoom da órbita não atravessa as paredes do modelo (a cena fornece a primeira superfície sobre o eixo de visão).
     this.orbit.obstacle = (origin, dir) => firstSurfaceDistance(this.model, origin, dir);
     this.scene.add(this.model);
     this.scene.add(this.pickLayer);
     this.scene.add(this.realces.camada);
+    // Gancho de quadro do three (antes da lista de desenho e antes do passe de sombra): é onde o orçamento de sombra e o
+    // enquadramento do sol acontecem, com a câmera do quadro. Sem ele, a vista teria de chamar a cena a cada rAF.
+    this.scene.onBeforeRender = (renderer) => this.antesDeDesenhar(renderer as unknown as RendererDeQuadro);
     const hemi = new THREE.HemisphereLight(0xf4f7fb, 0xb9b2a4, 1.25);
     hemi.position.set(0, 0, 1);
     this.scene.add(hemi);
@@ -235,7 +273,7 @@ export class ModelScene {
     for (const e of atuais) this.model.add(e.grupo);
     if (this.instanciar) {
       const wireframe = view.style === 'wireframe';
-      const res = this.gerente.atualizar(
+      const res = this.lotes.atualizar(
         atuais,
         { instanciar: !wireframe, arestas: this.frame.edges, sombras: this.frame.shadows },
         levels.length === p.levels.length,
@@ -249,7 +287,12 @@ export class ModelScene {
         for (const m of res.solidas) this.model.add(m);
         for (const m of res.instanciadas) this.model.add(m);
       }
-      if (res.arestas) this.model.add(res.arestas);
+      for (const l of res.arestas) this.model.add(l);
+      this.faixasDeSombra = res.faixas.map((f) => ({
+        caixa: f.caixa.isEmpty() ? null : f.caixa.clone(),
+        triangulos: f.triangulos,
+        alvos: [...f.solidas, ...f.instanciadas],
+      }));
     }
     this.buildPickLayer();
     // Níveis que saíram da cena e não estão mais no cache: liberados (os que ficaram no cache seguem para o reuso).
@@ -266,11 +309,14 @@ export class ModelScene {
     this.scene.background = bg;
     this.scene.fog = new THREE.Fog(bg, 60, 170);
     this.sun.castShadow = this.frame.shadows;
+    this.direcaoSol.copy(sunDirection(view.sunAzimuth, view.sunElevation));
     if (!this.boxCache.isEmpty()) {
       const c = this.boxCache.getCenter(new THREE.Vector3());
       const r = Math.max(8, this.boxCache.getSize(new THREE.Vector3()).length());
       this.sun.target.position.copy(c);
-      this.sun.position.copy(c).addScaledVector(sunDirection(view.sunAzimuth, view.sunElevation), r * SUN_DISTANCE);
+      this.sun.position.copy(c).addScaledVector(this.direcaoSol, r * SUN_DISTANCE);
+      // Enquadramento de partida (cobre o modelo inteiro). O enquadramento justo, com o orçamento de sombra, é feito em
+      // `antesDeDesenhar`, quando o mapa vai mesmo ser refeito (é lá que a caixa das faixas escolhidas é conhecida).
       const cam = this.sun.shadow.camera;
       cam.left = -r;
       cam.right = r;
@@ -282,6 +328,52 @@ export class ModelScene {
     }
     // Materiais que esta atualização não usou (outro estilo, outra substituição) saem da memória.
     this.mats.descartarNaoUsados();
+  }
+
+  /**
+   * Gancho de quadro (`scene.onBeforeRender`, chamado pelo three antes da lista de desenho e antes do passe de sombra):
+   * quando o mapa de sombra vai ser refeito, aplica o orçamento de triângulos por faixa e enquadra a câmera do sol na
+   * caixa das faixas escolhidas. Fora disso é só uma leitura de dois campos — nada muda com a câmera ou o realce.
+   */
+  private antesDeDesenhar(renderer: RendererDeQuadro): void {
+    if (!this.frame.shadows) return;
+    prepararSombraDoQuadro({
+      renderer,
+      sombras: this.sombras,
+      faixas: this.faixasDeSombra,
+      sol: this.sun,
+      alvo: this.orbit.target,
+      direcao: this.direcaoSol,
+      camera: this.orbit.camera,
+      distancia: this.orbit.distance,
+      teto: this.sombraMaxTriangulos,
+      tamanhoTela: this.tamanhoTela,
+    });
+  }
+
+  /** Faixas verticais da cena (culling por frustum) e quantas existem agora. */
+  get faixas(): readonly Faixa3D[] {
+    return this.lotes.faixas;
+  }
+
+  /** Último orçamento de sombra aplicado (null antes do primeiro passe de sombra). */
+  get orcamentoDeSombra() {
+    return this.sombras.ultima;
+  }
+
+  /** Enquadramento atual da câmera do sol (nitidez da sombra: metros por texel). */
+  get enquadramentoSombra() {
+    return this.sombras.enquadramento;
+  }
+
+  /** Diagnóstico de precisão da câmera ativa: planos, resolução de profundidade e profundidade reversa. */
+  get precisao(): DiagnosticoProfundidade {
+    return diagnosticarProfundidade(this.orbit.camera, BITS_PROFUNDIDADE);
+  }
+
+  /** Diagnóstico de rebase de origem (RTC) para o modelo atual. */
+  get origem(): DiagnosticoOrigem {
+    return diagnosticarOrigem(this.boxCache.isEmpty() ? null : this.boxCache);
   }
 
   /**
@@ -443,14 +535,14 @@ export class ModelScene {
     return this.cache.total;
   }
 
-  /** Bytes estimados dos buffers globais na GPU (lotes, instâncias e arestas). */
+  /** Bytes estimados dos buffers globais na GPU (lotes, instâncias e arestas das faixas). */
   get memoriaGpu(): number {
-    return this.gerente.bytes;
+    return this.lotes.bytes;
   }
 
-  /** Orçamento de VRAM contábil da cena (teto e usado). */
+  /** Orçamento de VRAM contábil da cena (teto e usado; um só para todas as faixas). */
   get orcamentoVram(): { usado: number; teto: number; excedido: boolean } {
-    return { usado: this.gerente.orcamento.usado, teto: this.gerente.orcamento.teto, excedido: this.gerente.orcamento.excedido };
+    return { usado: this.lotes.orcamento.usado, teto: this.lotes.orcamento.teto, excedido: this.lotes.orcamento.excedido };
   }
 
   /** Caixa delimitadora (mundo) dos elementos dados (seleção), ou null se vazia/não encontrada. */
@@ -468,7 +560,8 @@ export class ModelScene {
 
   dispose(): void {
     this.detach();
-    this.gerente.dispose();
+    this.faixasDeSombra = [];
+    this.lotes.dispose();
     this.caixaUnitaria.dispose();
     this.realces.soltarTodos();
     const todas = new Set([...this.cenaNiveis, ...this.cache.limpar()]);

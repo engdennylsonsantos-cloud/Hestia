@@ -37,7 +37,7 @@ describe('troca de tipo de abertura (Propriedades)', () => {
     const nova = store.project.elements[porta.id] as Opening;
     expect(nova.typeId).toBe('ot_larga');
     expect(nova.offset).toBeCloseTo(1.5, 6);
-    expect(msgs.at(-1)).toBe('A abertura foi deslocada para caber: 0,50 → 1,50 m. Ctrl+Z desfaz.');
+    expect(msgs.at(-1)).toBe('A abertura foi deslocada para caber: 0,50 m → 1,50 m. Ctrl+Z desfaz.');
   });
 
   it('recusa quando a abertura nova sobrepõe outra da mesma parede, sem gravar nada', () => {

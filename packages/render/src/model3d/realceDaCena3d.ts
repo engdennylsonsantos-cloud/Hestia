@@ -7,13 +7,20 @@ export type RanhuraDoRealce = 'sel' | 'hov';
 
 /** Sobreposição de realce (seleção ou elemento sob o cursor) e a chave que a identifica, para não refazê-la à toa. */
 interface Realce {
-  key: string;
+  ids: readonly Id[];
+  color: THREE.ColorRepresentation;
+  fill: number;
+  edges: number;
   obj: THREE.Object3D;
 }
 
 /**
  * Realces da cena (decisão 0016 §4): uma sobreposição por ranhura, num objeto à parte (`camada`), fora do modelo, para não
  * entrar nas malhas do modelo nem no picking por faixas. Só refaz a sobreposição cuja chave mudou.
+ *
+ * A comparação é feita sem montar string: a seleção chega com a mesma referência de array enquanto não muda (o estado do
+ * app troca o array, nunca o altera no lugar), e o cursor chega como um array de um elemento novo a cada quadro —
+ * comparar 1 id custa menos que juntar todos os ids em texto a 60 quadros por segundo.
  */
 export class RealcesDaCena {
   /** Onde as sobreposições ficam; a cena a põe como filha. */
@@ -25,14 +32,13 @@ export class RealcesDaCena {
 
   /** Troca a sobreposição da ranhura pelos elementos `ids`, se a cor ou os ids mudaram. */
   definir(slot: RanhuraDoRealce, ids: readonly Id[], style: HighlightStyle): void {
-    const key = `${String(style.color)}|${ids.join(',')}`;
     const cur = this.slots[slot];
-    if (cur?.key === key) return;
+    if (cur && this.mesmo(cur, ids, style)) return;
     if (cur) this.soltar(slot);
     if (!ids.length) return;
     const obj = highlightOf(this.raiz, ids, style);
     this.camada.add(obj);
-    this.slots[slot] = { key, obj };
+    this.slots[slot] = { ids, color: style.color, fill: style.fill, edges: style.edges, obj };
   }
 
   soltar(slot: RanhuraDoRealce): void {
@@ -47,5 +53,13 @@ export class RealcesDaCena {
   soltarTodos(): void {
     this.soltar('sel');
     this.soltar('hov');
+  }
+
+  private mesmo(cur: Realce, ids: readonly Id[], style: HighlightStyle): boolean {
+    if (cur.color !== style.color || cur.fill !== style.fill || cur.edges !== style.edges) return false;
+    if (cur.ids === ids) return true;
+    if (cur.ids.length !== ids.length) return false;
+    for (let i = 0; i < ids.length; i++) if (cur.ids[i] !== ids[i]) return false;
+    return true;
   }
 }

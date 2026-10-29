@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { LevelResolveCache, type ResolvedLevel } from '@hestia/engine';
+import { ClienteResolucao, type WorkerLike } from '@hestia/engine/src/worker/cliente.ts';
 import { projetoComPavimentos } from '@hestia/engine/src/worker/fixturePavimentos.ts';
 import type { Id, Project } from '@hestia/model';
 import { ModelScene, type Scene3DOptions } from '@hestia/render';
-import { Montagem3dProgressiva, ordemDeMontagem, proximoLote, type CenaMontagem, type FonteNiveis } from './montagem3dProgressiva.ts';
+import { criarFonteNiveisWorker } from './montagem3dNiveis.ts';
+import { Montagem3dProgressiva, ordemDeMontagem, proximoLote, type CenaMontagem, type FonteNiveis, type FonteWorker } from './montagem3dProgressiva.ts';
 
 /** Projeto mínimo só com os ids dos níveis (a montagem não lê mais nada além deles nos testes de fila). */
 const projetoDeIds = (ids: Id[]): Project => ({ levels: ids.map((id) => ({ id })) }) as unknown as Project;
@@ -247,4 +249,241 @@ describe('Montagem3dProgressiva: resultado igual à montagem completa', () => {
 
     expect(assinatura(comPronto)).toEqual(assinatura(cheia));
   }, 120_000);
+});
+
+/** Worker simulado: guarda os pedidos e entrega o nível quando o teste manda (`entregar`), um de cada vez. */
+class WorkerFalso implements FonteWorker {
+  readonly iniciados: Project[] = [];
+  readonly pedidos: Id[] = [];
+  /** Pedidos ainda sem resposta, na ordem em que foram feitos. */
+  private emCurso = new Map<Id, { resolver: (n: ResolvedLevel) => void; rejeitar: (e: unknown) => void }>();
+  /** Falha todo pedido novo (teste da rede de segurança). */
+  falhar = false;
+
+  iniciar(projeto: Project): void {
+    this.iniciados.push(projeto);
+  }
+
+  pedir(id: Id): Promise<ResolvedLevel> {
+    this.pedidos.push(id);
+    if (this.falhar) return Promise.reject(new Error('worker falhou'));
+    return new Promise((resolver, rejeitar) => this.emCurso.set(id, { resolver, rejeitar }));
+  }
+
+  /** Responde o pedido do nível. */
+  entregar(id: Id): void {
+    const p = this.emCurso.get(id);
+    if (!p) return;
+    this.emCurso.delete(id);
+    p.resolver(nivelFalso(id));
+  }
+
+  cancelar(): void {
+    for (const p of this.emCurso.values()) p.rejeitar(new Error('cancelado'));
+    this.emCurso.clear();
+  }
+
+  encerrar(): void {
+    this.cancelar();
+  }
+
+  get abertos(): number {
+    return this.emCurso.size;
+  }
+}
+
+/** Deixa as promessas do worker assentarem (o `.then` da montagem roda em microtarefa). */
+const assentar = (): Promise<void> => new Promise((res) => setTimeout(res, 0));
+
+describe('Montagem3dProgressiva: níveis no worker', () => {
+  it('a primeira fatia traz só o visível; o resto vem do worker, um pedido de cada vez e na ordem da montagem', async () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({
+      cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined,
+    });
+    m.iniciar(projetoDeIds(ids), OPT, 'c');
+    // Primeira fatia na hora: só o visível, para o primeiro quadro ter o que mostrar. O worker já está com a fila cheia
+    // (dois pedidos: a resolução de um nível corre enquanto a cena monta o outro).
+    expect(cena.chamadas.map((c) => c.ids)).toEqual([['c']]);
+    expect(fonte.calculados).toEqual(['c']);
+    expect(worker.pedidos).toEqual(['b', 'd']);
+    expect(worker.abertos).toBe(2);
+    expect(worker.iniciados).toHaveLength(1);
+
+    for (const id of ['b', 'd', 'a', 'e']) {
+      worker.entregar(id);
+      await assentar();
+      expect(worker.pedidos.filter((x) => x === id)).toHaveLength(1);
+    }
+    expect(fonte.calculados).toEqual(['c']);
+    expect(cena.chamadas.map((c) => c.ids)).toEqual([['c'], ['b', 'c'], ['b', 'c', 'd'], ['a', 'b', 'c', 'd'], ids]);
+    expect(m.montados).toBe(5);
+    expect(m.usandoWorker).toBe(false);
+  });
+
+  it('cancelar cancela os pedidos: resposta que chega depois não mexe na cena', async () => {
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({ cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined });
+    m.iniciar(projetoDeIds(['a', 'b', 'c']), OPT, 'a');
+    m.cancelar();
+    expect(worker.abertos).toBe(0);
+    await assentar();
+    expect(cena.chamadas).toHaveLength(1);
+  });
+
+  it('iniciar de novo cancela os pedidos da montagem anterior', async () => {
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({ cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined });
+    const antigo = projetoDeIds(['a', 'b', 'c', 'd']);
+    m.iniciar(antigo, OPT, 'a');
+    m.iniciar(projetoDeIds(['x', 'y']), OPT, 'x');
+    await assentar();
+    // Os pedidos da montagem anterior ("b" e "c") são cancelados; o novo projeto já enche a fila com o "y".
+    expect(worker.pedidos).toEqual(['b', 'c', 'y']);
+    expect(cena.chamadas.filter((c) => c.projeto === antigo)).toHaveLength(1);
+    worker.entregar('y');
+    await assentar();
+    expect(cena.chamadas.at(-1)!.ids).toEqual(['x', 'y']);
+  });
+
+  it('falha do worker cai na resolução da thread da interface e tenta de novo; duas falhas, desiste do worker', async () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({ cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined });
+    m.iniciar(projetoDeIds(ids), OPT, 'a');
+    // O worker quebra: o pedido em curso é rejeitado e os próximos falham na hora.
+    worker.falhar = true;
+    worker.cancelar();
+    await assentar();
+    // A falha do pedido em curso calcula o nível aqui; a do pedido seguinte faz a montagem desistir do worker.
+    expect(fonte.calculados).toContain('b');
+    expect(m.usandoWorker).toBe(false);
+    await assentar();
+    await assentar();
+    expect(cena.chamadas.at(-1)!.ids).toEqual(ids);
+  });
+
+  it('worker que não responde não trava a montagem: o prazo calcula o nível na thread da interface', async () => {
+    const ids = ['a', 'b', 'c'];
+    const cena = new CenaAnotada();
+    const fonte = fonteContada();
+    const worker = new WorkerFalso();
+    const m = new Montagem3dProgressiva({
+      cena, fonte, worker, aoAtualizar: () => undefined, aoConcluir: () => undefined, prazoWorkerMs: 15,
+    });
+    m.iniciar(projetoDeIds(ids), OPT, 'a');
+    expect(worker.pedidos).toEqual(['b', 'c']);
+    await new Promise((res) => setTimeout(res, 40));
+    // O prazo venceu: 'b' foi calculado aqui e a montagem pediu o próximo; o segundo prazo desiste do worker.
+    expect(fonte.calculados).toContain('b');
+    await new Promise((res) => setTimeout(res, 40));
+    expect(m.usandoWorker).toBe(false);
+    expect(cena.chamadas.at(-1)!.ids).toEqual(ids);
+  });
+
+  it('caminho do worker dá a mesma cena final que a montagem de uma vez', async () => {
+    const p = projetoComPavimentos(20);
+    const ids = p.levels.map((l) => l.id);
+    const cache = new LevelResolveCache();
+    const niveis = new Map(ids.map((id) => [id, cache.get(p, id)] as const));
+
+    const cheia = new ModelScene();
+    cheia.update(p, ids.map((id) => niveis.get(id)!), OPT);
+
+    const parcial = new ModelScene();
+    const worker: FonteWorker = {
+      iniciar: () => undefined,
+      pedir: (id) => Promise.resolve(niveis.get(id)!),
+      cancelar: () => undefined,
+      encerrar: () => undefined,
+    };
+    const m = new Montagem3dProgressiva({
+      cena: { update: (proj, lv, o) => parcial.update(proj, lv, o) },
+      fonte: { pronto: (id) => niveis.get(id) ?? null, resolver: () => { throw new Error('não devia calcular: o nível está no worker'); } },
+      worker,
+      aoAtualizar: () => undefined,
+      aoConcluir: () => undefined,
+    });
+    m.iniciar(p, OPT, 'pav_10');
+    for (let i = 0; i < ids.length * 2 && m.montados < ids.length; i++) await assentar();
+    expect(m.montados).toBe(ids.length);
+    expect(assinatura(parcial)).toEqual(assinatura(cheia));
+  }, 120_000);
+});
+
+/** Worker simulado do protocolo: responde cada pedido de nível com o nível falso e anota o que atravessou. */
+class WorkerQueResponde implements WorkerLike {
+  onmessage: ((evento: { data: unknown }) => void) | null = null;
+  onerror: ((evento: unknown) => void) | null = null;
+  readonly recebidos: Array<{ id: number; tipo: string; nivel: Id; projeto: { versao: number; estrutura?: Project } }> = [];
+  /** Falso: guarda os pedidos sem responder (para o teste de cancelamento). */
+  mudo = false;
+
+  postMessage(mensagem: unknown): void {
+    const m = mensagem as { id: number; tipo: string; nivel: Id; projeto: { versao: number; estrutura?: Project } };
+    if (m.tipo === 'cancelar') return;
+    this.recebidos.push(m);
+    if (this.mudo) return;
+    queueMicrotask(() => this.onmessage?.({ data: { id: m.id, resultado: nivelFalso(m.nivel), erro: null } }));
+  }
+
+  terminate(): void {
+    // Nada a encerrar num substituto.
+  }
+}
+
+describe('criarFonteNiveisWorker', () => {
+  it('sem worker de verdade devolve null (a montagem fica no caminho síncrono)', () => {
+    expect(criarFonteNiveisWorker({ cliente: new ClienteResolucao({ usarWorker: false }) })).toBeNull();
+  });
+
+  it('pede o nível ao worker e devolve o mesmo resultado da resolução local', async () => {
+    const worker = new WorkerQueResponde();
+    const fonte = criarFonteNiveisWorker({ cliente: new ClienteResolucao({ usarWorker: true, criarWorker: () => worker }) })!;
+    const p = projetoDeIds(['a', 'b']);
+    fonte.iniciar(p);
+    const nivel = await fonte.pedir('a', p);
+    expect((nivel as unknown as { levelId: Id }).levelId).toBe('a');
+    expect(worker.recebidos.map((m) => [m.tipo, m.nivel])).toEqual([['nivel', 'a']]);
+    fonte.encerrar();
+  });
+
+  it('a estrutura do projeto atravessa uma vez só (versão por projeto) e outro projeto ganha outra versão', async () => {
+    const worker = new WorkerQueResponde();
+    const fonte = criarFonteNiveisWorker({ cliente: new ClienteResolucao({ usarWorker: true, criarWorker: () => worker }) })!;
+    const p = projetoDeIds(['a', 'b']);
+    const outro = projetoDeIds(['c']);
+    fonte.iniciar(p);
+    await fonte.pedir('a', p);
+    await fonte.pedir('b', p);
+    await fonte.pedir('c', outro);
+    const [primeiro, segundo, terceiro] = worker.recebidos;
+    expect(primeiro!.projeto.estrutura).toBe(p);
+    expect(segundo!.projeto.estrutura).toBeUndefined();
+    expect(segundo!.projeto.versao).toBe(primeiro!.projeto.versao);
+    expect(terceiro!.projeto.estrutura).toBe(outro);
+    expect(terceiro!.projeto.versao).not.toBe(primeiro!.projeto.versao);
+    fonte.encerrar();
+  });
+
+  it('cancelar rejeita o pedido em curso (a montagem trata como cancelamento)', async () => {
+    const worker = new WorkerQueResponde();
+    worker.mudo = true;
+    const fonte = criarFonteNiveisWorker({ cliente: new ClienteResolucao({ usarWorker: true, criarWorker: () => worker }) })!;
+    const p = projetoDeIds(['a']);
+    fonte.iniciar(p);
+    const promessa = fonte.pedir('a', p);
+    fonte.cancelar();
+    await expect(promessa).rejects.toThrow(/cancelad/i);
+    fonte.encerrar();
+  });
 });

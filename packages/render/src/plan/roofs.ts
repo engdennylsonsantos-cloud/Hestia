@@ -1,12 +1,11 @@
 import { add, closestOnSegment, cross, dist, dot, len, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer, type ViewClass } from '@hestia/engine';
 import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
-import { formatQuantity, isRoof, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, unitSymbol, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
 import { ARC_TURN_DEG } from '@hestia/tools/src/roofGeom.ts';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
-import { zoomAtinge } from './limiares.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
 import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
@@ -61,7 +60,8 @@ export function cantosLogicos(ring: Ring): boolean[] {
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
 
 /** Inclinação na unidade do projeto, como nas demais cotas da planta: "30 %", "27,5 %" (ou graus). */
-export const fmtPercent = (u: ResolvedUnits, p: number): string => formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true });
+export const fmtPercent = (u: ResolvedUnits, p: number): string =>
+  `${formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true, withUnit: false })} ${unitSymbol(u, 'slope')}`;
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
 export const fmtElevation = (u: ResolvedUnits, z: number): string => `+${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;
@@ -297,8 +297,9 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
     const base = roofFillBase(p, r, theme, dark, paint);
-    // Hachura discreta, mas visível: o tom por água continua sendo o que diferencia as superfícies.
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.35), alpha: 0.26 } : undefined;
+    // Hachura discreta, mas visível: o tom por água continua sendo o que diferencia as superfícies. O zoom mínimo vai
+    // para o shader (`zoomMin`) e a geometria não muda com o zoom (o `resolverZoom` faz o mesmo no caminho CPU).
+    const hatch = m && m.hatch !== 'none' && !coarse ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.35), alpha: 0.26, ...(fine ? {} : { zoomMin: 40 }) } : undefined;
     const aresta = corDaAresta(base);
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: tomDaAgua(base, pl.up, pl.percent, sunAzimuth), alpha, hatch });
     const model = p.elements[r.roofId];

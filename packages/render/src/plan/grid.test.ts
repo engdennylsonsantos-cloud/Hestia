@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type * as THREE from 'three';
 import { visibleBounds, type Viewport } from '../viewport.ts';
 import { PlanScene } from './gpuPlan.ts';
-import { gridStrokes } from './grid.ts';
+import { gridDotFills, gridStrokes } from './grid.ts';
 import { rasterizarCena } from './rasterSoftware.ts';
 import { DARK, LIGHT, type PlanTheme, type StrokeOp } from './types.ts';
+import { resolverZoom } from './zoomOps.ts';
 
 const W = 320;
 const H = 240;
@@ -75,5 +76,42 @@ describe('grade (grid): mesma imagem e menos malhas', () => {
     expect(malhasDaGrade(scene).length).toBeLessThan(malhasDaGrade(antiga).length);
     scene.dispose();
     antiga.dispose();
+  });
+});
+
+describe('pontinhos da grade (marcadores em pixels)', () => {
+  const vista = (zoom: number): Viewport => ({ cx: 0, cy: 0, zoom, width: W, height: H });
+
+  it('cada ponto é uma âncora repetida; a forma vem em deslocamentoPx, com cantos de 1,6 px', () => {
+    const fills = gridDotFills(vista(60), LIGHT);
+    expect(fills.length).toBeGreaterThan(0);
+    for (const f of fills) {
+      expect(f.deslocamentoPx).toBeDefined();
+      expect(f.deslocamentoPx).toHaveLength(f.polygons.length);
+      for (const [i, poly] of f.polygons.entries()) {
+        // A âncora repetida: o polígono não tem área própria (o shader aplica a forma em pixels).
+        const unicos = new Set(poly[0]!.map((p) => `${p.x},${p.y}`));
+        expect(unicos.size).toBe(1);
+        for (const canto of f.deslocamentoPx![i]![0]!) {
+          expect(Math.abs(canto.x)).toBeCloseTo(1.6, 9);
+          expect(Math.abs(canto.y)).toBeCloseTo(1.6, 9);
+        }
+      }
+    }
+  });
+
+  it('o pontinho tem o mesmo tamanho em pixels em qualquer zoom', () => {
+    const tamanho = (zoom: number): { w: number; h: number } => {
+      const r = resolverZoom({ fills: gridDotFills(vista(zoom), LIGHT), strokes: [], labels: [] }, zoom);
+      const ring = r.fills[0]!.polygons[0]![0]!;
+      const xs = ring.map((p) => p.x);
+      const ys = ring.map((p) => p.y);
+      return { w: (Math.max(...xs) - Math.min(...xs)) * zoom, h: (Math.max(...ys) - Math.min(...ys)) * zoom };
+    };
+    // 2 × 1,6 px de meio-lado = 3,2 px de lado, do zoom 60 ao 220.
+    for (const zoom of [60, 220]) {
+      expect(tamanho(zoom).w).toBeCloseTo(3.2, 9);
+      expect(tamanho(zoom).h).toBeCloseTo(3.2, 9);
+    }
   });
 });

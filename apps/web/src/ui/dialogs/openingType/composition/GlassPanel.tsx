@@ -58,7 +58,7 @@ export function GlassPanel({ d, onChange }: PanelProps): ReactElement {
       </div>
       <div className="field-row">
         <label htmlFor="op-gl-t">Espessura do vidro</label>
-        <NumField id="op-gl-t" value={vidro.thickness} scale={100} decimals={1} unit="cm" min={0.001} onCommit={(v) => grava(comVidro(c, cel.id, { thickness: v }))} />
+        <NumField id="op-gl-t" value={vidro.thickness} quantity="smallLength" min={0.001} onCommit={(v) => grava(comVidro(c, cel.id, { thickness: v }))} />
       </div>
       <div className="field-row">
         <label htmlFor="op-gl-mount" title="Com rebaixo: o vidro entra no perfil do batente. Sem perfil: vidro temperado colado por folga">Montagem</label>
@@ -70,19 +70,19 @@ export function GlassPanel({ d, onChange }: PanelProps): ReactElement {
       <h4 className="op-subtitle">Rebaixo do perfil (batente)</h4>
       <div className="field-row">
         <label htmlFor="op-gl-rd" title="Quanto do vidro entra no perfil, no plano da folha">Profundidade do rebaixo<Validar on={aValidar(batente, perfis, 'glassRebate')} /></label>
-        <NumField id="op-gl-rd" value={rebaixo.depth} scale={100} decimals={1} unit="cm" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ depth: v })} />
+        <NumField id="op-gl-rd" value={rebaixo.depth} quantity="smallLength" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ depth: v })} />
       </div>
       <div className="field-row">
         <label htmlFor="op-gl-rc" title="Folga entre o vidro e o fundo do rebaixo">Folga do rebaixo<Validar on={aValidar(batente, perfis, 'glassRebate')} /></label>
-        <NumField id="op-gl-rc" value={rebaixo.clearance} scale={1000} decimals={1} unit="mm" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ clearance: v })} />
+        <NumField id="op-gl-rc" value={rebaixo.clearance} quantity="smallLength" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ clearance: v })} />
       </div>
       <div className="field-row">
         <label htmlFor="op-gl-bead" title="Largura visível do baguete (peça de fixação); 0 = sem baguete">Baguete<Validar on={aValidar(batente, perfis, 'glassRebate')} /></label>
-        <NumField id="op-gl-bead" value={rebaixo.bead} scale={100} decimals={1} unit="cm" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ bead: v })} />
+        <NumField id="op-gl-bead" value={rebaixo.bead} quantity="smallLength" min={0} disabled={semPerfil} onCommit={(v) => comRebaixo({ bead: v })} />
       </div>
       <div className="field-row">
         <label htmlFor="op-gl-free" title="Folga do vidro temperado sem perfil ao redor e à ferragem de canto">Folga do vidro sem perfil</label>
-        <NumField id="op-gl-free" value={FRAMELESS_CLEARANCE_DEFAULT} scale={1000} decimals={0} unit="mm" disabled onCommit={() => undefined} />
+        <NumField id="op-gl-free" value={FRAMELESS_CLEARANCE_DEFAULT} quantity="smallLength" disabled onCommit={() => undefined} />
       </div>
       <p className="hint">Rebaixo, folga e baguete são a validar (R2 não confirma). A folga sem perfil é o padrão do modelo.</p>
       {erro ? <p className="error" role="alert">{erro}</p> : null}

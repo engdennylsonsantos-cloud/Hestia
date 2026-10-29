@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
-import { dividerWidth, type CellSize, type CompositionNode, type OpeningComposition } from '@hestia/model';
+import { dividerWidth, type CellSize, type CompositionNode, type OpeningComposition, type ResolvedUnits } from '@hestia/model';
+import { useUnits } from '../../../useUnits.ts';
 import { medidasCelulas, metrosTexto, ROTULO_CONTEUDO } from './compositionControls.ts';
 
 /*
@@ -20,17 +21,18 @@ interface NodoProps extends Omit<Props, 'c'> {
   /** Eixo da divisão pai (ausente na raiz). */
   eixo?: 'cols' | 'rows';
   medidas: ReturnType<typeof medidasCelulas>;
+  units: ResolvedUnits;
 }
 
-function Nodo({ node, size, eixo, selected, onSelect, medidas }: NodoProps): ReactElement {
+function Nodo({ node, size, eixo, selected, onSelect, medidas, units }: NodoProps): ReactElement {
   if (node.kind === 'split') {
     const titulo = node.axis === 'cols' ? 'Colunas' : 'Linhas';
     return (
       <li>
-        <span className="hint">{titulo} · divisor {metrosTexto(dividerWidth(node))} m</span>
+        <span className="hint">{titulo} · divisor {metrosTexto(units, dividerWidth(node))}</span>
         <ul className="op-tree">
           {node.children.map((ch) => (
-            <Nodo key={ch.node.id} node={ch.node} size={ch.size} eixo={node.axis} selected={selected} onSelect={onSelect} medidas={medidas} />
+            <Nodo key={ch.node.id} node={ch.node} size={ch.size} eixo={node.axis} selected={selected} onSelect={onSelect} medidas={medidas} units={units} />
           ))}
         </ul>
       </li>
@@ -41,9 +43,9 @@ function Nodo({ node, size, eixo, selected, onSelect, medidas }: NodoProps): Rea
   let medida: string;
   if (m) {
     const luz = m.luz;
-    medida = eixo === 'rows' ? `${metrosTexto(luz.z1 - luz.z0)} m` : eixo === 'cols' ? `${metrosTexto(luz.t1 - luz.t0)} m` : `${metrosTexto(luz.t1 - luz.t0)} × ${metrosTexto(luz.z1 - luz.z0)} m`;
+    medida = eixo === 'rows' ? `${metrosTexto(units, luz.z1 - luz.z0)}` : eixo === 'cols' ? `${metrosTexto(units, luz.t1 - luz.t0)}` : `${metrosTexto(units, luz.t1 - luz.t0)} × ${metrosTexto(units, luz.z1 - luz.z0)}`;
   } else {
-    medida = size?.mode === 'fixed' ? `${metrosTexto(size.value)} m` : '';
+    medida = size?.mode === 'fixed' ? `${metrosTexto(units, size.value)}` : '';
   }
   const preenche = size?.mode === 'fill' ? ' (preenche)' : '';
   const ativo = selected === node.id;
@@ -58,10 +60,11 @@ function Nodo({ node, size, eixo, selected, onSelect, medidas }: NodoProps): Rea
 }
 
 export function LayoutTree({ c, selected, onSelect }: Props): ReactElement {
+  const units = useUnits();
   const medidas = medidasCelulas(c);
   return (
     <ul className="op-tree">
-      <Nodo node={c.layout} selected={selected} onSelect={onSelect} medidas={medidas} />
+      <Nodo node={c.layout} selected={selected} onSelect={onSelect} medidas={medidas} units={units} />
     </ul>
   );
 }

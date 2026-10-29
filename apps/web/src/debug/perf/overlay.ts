@@ -13,12 +13,15 @@ const CSS =
   'font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;' +
   'white-space:pre;box-shadow:0 1px 4px rgba(0,0,0,0.35)';
 
+// units-ok: milissegundos do painel de desempenho (depuração)
 const ms = (x: number | null | undefined): string => (x === null || x === undefined ? '—' : x.toFixed(1));
 
 /** 1234 → 1.2k, 1234567 → 1.2M: o overlay é estreito. */
 export function compacto(n: number): string {
   if (!Number.isFinite(n)) return '—';
+  // units-ok: contagem abreviada do painel de desempenho (depuração)
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  // units-ok: contagem abreviada do painel de desempenho (depuração)
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(Math.round(n));
 }
@@ -26,6 +29,7 @@ export function compacto(n: number): string {
 /** Texto do overlay a partir de um snapshot. Puro (testável sem DOM). */
 export function formatarSnapshot(s: SnapshotPerf): string {
   const q = s.quadro;
+  // units-ok: fps do painel de desempenho (depuração)
   const fps = s.ocioso ? 'ocioso' : s.fps === null ? '—' : `${s.fps.toFixed(1)} fps`;
   const gpu = s.gpu.timer === 'disponivel' ? `${ms(s.gpu.ms)} ms` : '—';
   return [

@@ -29,21 +29,22 @@ function estado(levelId: Id, sketch: PlanSketch | null): PlanViewState {
   };
 }
 
-describe('esboço do perímetro na sobreposição da planta', () => {
+describe('esboço do perímetro na camada viva da planta', () => {
   const levelId = Object.keys(createEmptyProject('vazio').levels)[0]!;
   const result = validateSketch(draft.segs);
 
-  it('sem esboço, a sobreposição não muda; com esboço, leva as operações de sketchOps', () => {
-    const sem = planFrameUpdateOf(estado(levelId, null)).overlay();
-    const com = planFrameUpdateOf(estado(levelId, { draft, result, hover: null })).overlay();
+  it('sem esboço, a camada viva não muda; com esboço, leva as operações de sketchOps', () => {
+    const sem = planFrameUpdateOf(estado(levelId, null)).live!();
+    const com = planFrameUpdateOf(estado(levelId, { draft, result, hover: null })).live!();
     const k = sketchOps(draft, result, LIGHT, V, null);
     expect(com.strokes.length).toBe(sem.strokes.length + k.strokes.length);
     expect(com.fills.length).toBe(sem.fills.length + k.fills.length);
   });
 
-  it('a chave da sobreposição muda com o cursor sobre uma linha e com o zoom', () => {
-    const base = planFrameUpdateOf(estado(levelId, { draft, result, hover: null })).overlayKey;
-    expect(planFrameUpdateOf(estado(levelId, { draft, result, hover: 's2' })).overlayKey).not.toBe(base);
-    expect(planFrameUpdateOf({ ...estado(levelId, { draft, result, hover: null }), v: { ...V, zoom: 80 } }).overlayKey).not.toBe(base);
+  it('a chave da camada viva muda com o cursor sobre uma linha e com o zoom; a da seleção não', () => {
+    const u = planFrameUpdateOf(estado(levelId, { draft, result, hover: null }));
+    expect(planFrameUpdateOf(estado(levelId, { draft, result, hover: 's2' })).liveKey).not.toBe(u.liveKey);
+    expect(planFrameUpdateOf({ ...estado(levelId, { draft, result, hover: null }), v: { ...V, zoom: 80 } }).liveKey).not.toBe(u.liveKey);
+    expect(planFrameUpdateOf({ ...estado(levelId, { draft, result, hover: null }), v: { ...V, zoom: 80 } }).overlayKey).toBe(u.overlayKey);
   });
 });

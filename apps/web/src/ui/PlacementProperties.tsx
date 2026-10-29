@@ -98,7 +98,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           <Row label="Largura" htmlFor="place-run-width"><NumField id="place-run-width" value={o.stairRun?.width ?? 1.2} quantity="length" min={0.4} onCommit={(v) => setStairRun({ width: v })} /></Row>
           {o.stairRun?.shape !== 'straight' && <Row label="Giro" htmlFor="place-run-turn"><select id="place-run-turn" className="select" value={o.stairRun?.turn ?? 'left'} onChange={(e) => setStairRun({ turn: e.target.value as 'left' | 'right' })}><option value="left">Esquerda</option><option value="right">Direita</option></select></Row>}
           {/* units-ok: varredura da escada em graus (valor gravado em graus) */}
-          {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={o.stairRun?.spiralSweep ?? 360} unit="°" min={30} max={720} onCommit={(v) => setStairRun({ spiralSweep: v })} /></Row></>}
+          {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={((o.stairRun?.spiralSweep ?? 360) * Math.PI) / 180} quantity="angle" min={(30 * Math.PI) / 180} max={(720 * Math.PI) / 180} onCommit={(v) => setStairRun({ spiralSweep: (v * 180) / Math.PI })} /></Row></>}
         </Group>
       )}
       {tool === 'room' && (
@@ -117,9 +117,9 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       {tool === 'text' && (
         <Group title="Colocação · Texto">
           {/* units-ok: altura de texto em mm de papel, não é medida do modelo */}
-          <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={o.textHeight ?? 2.5} unit="mm" min={0.1} onCommit={(v) => set({ textHeight: v })} /></Row>
+          <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={(o.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0001} onCommit={(v) => set({ textHeight: v * 1000 })} /></Row>
           {/* units-ok: rotação em graus de papel, valor do campo é o próprio grau */}
-          <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={o.textRotation ?? 0} unit="°" onCommit={(v) => set({ textRotation: v })} /></Row>
+          <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={((o.textRotation ?? 0) * Math.PI) / 180} quantity="angle" onCommit={(v) => set({ textRotation: (v * 180) / Math.PI })} /></Row>
           <div className="hint">Clique na planta e digite o conteúdo do texto.</div>
         </Group>
       )}

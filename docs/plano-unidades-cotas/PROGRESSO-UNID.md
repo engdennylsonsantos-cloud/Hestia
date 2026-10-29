@@ -1,6 +1,8 @@
 # Progresso do agente UNID (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
 Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste, 6163 testes, lint/typecheck/test ok (executado em 2026-10-28 antes de qualquer alteração).
 
+Fecho (C7): `npm run check` verde — 560 arquivos, 6458 testes, lint (com `check-units` em 0) e typecheck ok.
+
 - [x] U0 inventário (`01`)
 - [x] U1 tipos, padrões e formatação
 - [x] U2 leitura de texto digitado
@@ -19,7 +21,7 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C2 diálogos
 - [x] C3 barras e chrome
 - [x] C5 model e engine (`Dimension.unit 'project'`) — `dimension.ts`, avisos de `model`/`engine`, áreas, `stairIssues`/`stairSketchValidate` e CSV dos quadros; só comentários/`units-ok` restantes para o C7
-- [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
+- [x] C7 fecho (props deprecadas removidas, `check-units` em 0, decisão 0038)
 - [x] `npm run check` verde, integrado
 
 ## Desvios
@@ -37,6 +39,14 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 ## Estado ao encerrar este turno
 - Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3), C1, B5, C2 e C3. C5 está parcial (dimension + avisos); C7 só depois de ESQ C4/C6.
 - `npm run check` completo verde em 2026-10-28: 555 arquivos, 6439 testes, lint (inclui `check-units`) e typecheck ok.
+
+## C7 — fecho
+- `NumField` perdeu `unit` e `scale`; `decimals` ficou para **número puro** (contagem, razão, escala) e entrou `suffix` para unidade técnica fixa (%, dB, min, W/m²K). Ângulos de esquadria/texto/serpentina convertem graus↔radianos na borda; `textHeight` (mm no modelo) converte para metros no campo.
+- Para zerar a trava sem linha de base, os usos restantes em `dialogs/openingType/**` (propriedade ESQ) e `PlacementProperties` foram migrados no mesmo passo, preservando o comportamento; `openingTypeActions`, `cmTexto`/`metrosTexto` e o rótulo de inclinação do `render` passaram a usar as unidades do projeto.
+- `scripts/units-baseline.json` apagado; `node scripts/check-units.mjs` em **0 ocorrências** (só isenções `units-ok` de máquina/depuração/unidade técnica).
+- `docs/decisoes/0038-unidades-do-projeto.md` escrita.
+- `dimensionText` continua com `units` opcional (padrão `defaultUnits()`): `packages/io/src/dxfNotes.ts:58` e `packages/render/src/plan/notes.ts:64` (propriedade ESQ/C6) ainda chamam sem as unidades. Obrigatório fica para quando esses dois chamadores passarem as unidades; registrado aqui em vez de forçar.
+- Testes atualizados por mudança intencional de formato: espessuras de CSV em `smallLength` (cm), ferragens em cm, inclinação/rótulos em `formatQuantity`, ângulos em radianos no `NumField`.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

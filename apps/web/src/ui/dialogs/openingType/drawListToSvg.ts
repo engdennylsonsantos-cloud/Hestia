@@ -1,4 +1,4 @@
-import type { Vec2 } from '@hestia/geom';
+import { machineNumber, type Vec2 } from '@hestia/geom';
 import { DARK, LIGHT, type PlanDrawList, type StrokeOp } from '@hestia/render';
 
 /** Caixa em coordenadas do modelo (metros): o enquadramento da prévia. */
@@ -87,10 +87,8 @@ export function fillColor(color: string): string {
   return THEME_VARS.get(color.toLowerCase()) ?? color;
 }
 
-const fmt = (n: number): string => {
-  const s = n.toFixed(2);
-  return s.replace(/\.?0+$/, '') || '0';
-};
+// units-ok: coordenadas/opacidades do SVG (formato de máquina)
+const fmt = (n: number): string => machineNumber(n, 2);
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

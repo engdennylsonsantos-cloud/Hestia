@@ -3,6 +3,7 @@ import { compositionCells, compositionLeafSize, compositionSpan, openingComposit
 import type { PanelProps } from '../panels/panelKit.tsx';
 import { CellEditor } from './CellEditor.tsx';
 import { LayoutTree } from './LayoutTree.tsx';
+import { useUnits } from '../../../useUnits.ts';
 import { ACOES_JANELA, ACOES_PORTA, aplicaAcao, issueDe, metrosTexto, podeRemover, removeModulo, type Acao } from './compositionControls.ts';
 
 /**
@@ -10,6 +11,7 @@ import { ACOES_JANELA, ACOES_PORTA, aplicaAcao, issueDe, metrosTexto, podeRemove
  * O erro de `compositionIssue` aparece logo abaixo; o modelo confere de novo ao salvar.
  */
 export function CompositionPanel({ d, onChange }: PanelProps): ReactElement {
+  const units = useUnits();
   const c = openingCompositionOf(d);
   const cells = compositionCells(c);
   const [escolhida, setEscolhida] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export function CompositionPanel({ d, onChange }: PanelProps): ReactElement {
   return (
     <>
       <p className="hint" style={{ padding: '0 0 8px' }}>
-        Vão total {metrosTexto(span.width)} × {metrosTexto(span.height)} m · folha nominal {metrosTexto(folha.width)} × {metrosTexto(folha.height)} m
+        Vão total {metrosTexto(units, span.width)} × {metrosTexto(units, span.height)} · folha nominal {metrosTexto(units, folha.width)} × {metrosTexto(units, folha.height)}
       </p>
       <div className="op-choices" style={{ flexWrap: 'wrap', marginBottom: 8 }}>
         {acoes.map(([acao, rotulo]) => (

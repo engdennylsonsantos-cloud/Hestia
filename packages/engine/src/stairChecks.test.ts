@@ -11,7 +11,7 @@ import {
   type StairCurve,
   type StairRun,
 } from '@hestia/model';
-import { stairIssueList, stairValidationIssues } from './stairChecks.ts';
+import { stairIssueList, stairIssuesOf, stairValidationIssues } from './stairChecks.ts';
 
 const v = (x: number, y: number): Vec2 => ({ x, y });
 const ln = (ax: number, ay: number, bx: number, by: number): StairCurve => ({ a: v(ax, ay), b: v(bx, by), sag: 0 });
@@ -78,5 +78,43 @@ describe('folga de cabeça sob a laje do nível de topo (stair-headroom)', () =>
   it('o aviso sai na lista do painel com o id da escada', () => {
     const list = stairValidationIssues(project({ openingMode: 'none' }));
     expect(list.find((i) => i.code === 'stair-headroom')).toMatchObject({ severity: 'warning', elementId: 'st1' });
+  });
+});
+
+/** Mesma escada deslocada em `dy` na planta (para ficar fora da faixa da laje). */
+function movedBy(r: StairRun, dy: number): StairRun {
+  const m = (c: StairCurve): StairCurve => ({ ...c, a: v(c.a.x, c.a.y + dy), b: v(c.b.x, c.b.y + dy) });
+  return { ...r, boundaryLeft: r.boundaryLeft.map(m), boundaryRight: r.boundaryRight.map(m), risers: r.risers.map(m) };
+}
+
+/**
+ * Três escadas no térreo: `st1` sob a laje do pavimento 2 sem abertura (folga de cabeça); `st2` com 14 espelhos (avisos de
+ * contagem e de espelho) e `st3` sem aviso. `st2` e `st3` ficam fora da faixa da laje, para não recortarem a laje de `st1`.
+ */
+function projectWithThreeStairs(): Project {
+  const base = createEmptyProject();
+  const store = new ProjectStore({ ...base, levels: base.levels.map((l) => (l.id === 'lv_1' ? { ...l, elevation: 2.8 } : l)) });
+  const fourteen: StairRun = { ...sixteen(), risers: sixteen().risers.slice(0, 14) };
+  store.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [sixteen()], openingMode: 'none' }) });
+  store.exec({ type: 'addStair', stair: makeStair({ id: 'st2', typeId: defaultStairTypeId, levelId: 'lv_0', components: [movedBy(fourteen, -4)], openingMode: 'headroom' }) });
+  store.exec({ type: 'addStair', stair: makeStair({ id: 'st3', typeId: defaultStairTypeId, levelId: 'lv_0', components: [movedBy(sixteen(), 4)], openingMode: 'headroom' }) });
+  store.exec({ type: 'addSlab', slab: makeSlab({ id: 'sl', typeId: 'ls_mac15', levelId: 'lv_1', boundary: box(-1, -1, 5, 1) }) });
+  return store.project;
+}
+
+describe('stairIssuesOf — uma escada sem resolver as outras', () => {
+  it('é igual a stairIssueList filtrada pela escada, em cada escada de um projeto com 3 (algumas com aviso)', () => {
+    const p = projectWithThreeStairs();
+    const todos = stairIssueList(p);
+    expect(todos.some((i) => i.severity === 'warning')).toBe(true);
+    expect(stairIssuesOf(p, 'st1').map((i) => i.code)).toContain('stair-headroom');
+    expect(stairIssuesOf(p, 'st2').length).toBeGreaterThan(0);
+    for (const id of ['st1', 'st2', 'st3']) {
+      expect(stairIssuesOf(p, id)).toEqual(todos.filter((i) => i.stairId === id));
+    }
+  });
+
+  it('id que não é escada devolve lista vazia', () => {
+    expect(stairIssuesOf(projectWithThreeStairs(), 'nao_existe')).toEqual([]);
   });
 });

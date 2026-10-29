@@ -251,9 +251,9 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   it('corte baixo (0,50 m) e topo (1,00 m): a escada sai inteira (o topo da vista não corta o lance); acima do corte, tracejados', () => {
     const o = ops({ cutZ: 0.5, topZ: 1.0 });
     // Degraus com topo em k·H: k = 1..9 saem todos, mesmo os de 1,05 a 1,575 m acima do topo da vista.
-    expect(treads(o)).toHaveLength(N - 1);
-    // Acima do corte (0,50 m): k = 3..9 tracejados; k = 1 e 2 contínuos.
-    expect(dashed(treads(o))).toHaveLength(7);
+    expect(treads(o)).toHaveLength(N);
+    // Acima do corte (0,50 m): k = 3..10 (o 10 é a chegada) tracejados; k = 1 e 2 contínuos.
+    expect(dashed(treads(o))).toHaveLength(8);
     expect(solid(treads(o))).toHaveLength(2);
     // Todos os espelhos (k = 1..10).
     expect(risers(o)).toHaveLength(N);
@@ -263,7 +263,7 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
 
   it('corte alto (3,00 m, acima de toda a escada): sem símbolo de corte e todos os degraus contínuos', () => {
     const o = ops({ cutZ: 3.0, topZ: 3.5 });
-    expect(treads(o)).toHaveLength(N - 1);
+    expect(treads(o)).toHaveLength(N);
     expect(dashed(treads(o))).toHaveLength(0);
     expect(o.strokes.some((s) => !s.closed && s.pts.length === 9)).toBe(false);
   });
@@ -271,7 +271,7 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   it('sem vista: a cota de corte é 1,20 m acima da base (como antes), e não há topo', () => {
     const o = ops();
     expect(risers(o)).toHaveLength(N);
-    expect(dashed(treads(o))).toHaveLength(3);
+    expect(dashed(treads(o))).toHaveLength(4);
   });
 });
 

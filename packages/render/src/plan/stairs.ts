@@ -1,5 +1,5 @@
 import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { sampleChain, spiralParamsOf, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
+import { sampleChain, spiralParamsOf, stairArrivalFrame, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
 import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -40,6 +40,17 @@ const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 export function treadNumber(s: ResolvedStair, st: ResolvedStairStep): number {
   if (!(s.riserHeight > 0)) return st.index;
   return Math.round((st.z - s.baseZ) / s.riserHeight);
+}
+
+/**
+ * Último degrau da escada monolítica: a chegada, a faixa atrás do último espelho (a mesma peça que o 3D desenha, com o
+ * mesmo comprimento), na cota do topo. Sem chegada (outro estilo de lance, ou o último espelho não fecha), null.
+ */
+export function arrivalRing(s: ResolvedStair): Ring | null {
+  const f = stairArrivalFrame(s);
+  if (!f) return null;
+  const d = mul(f.u, f.length);
+  return [f.a, f.b, add(f.b, d), add(f.a, d)];
 }
 
 /** Ponto a meio comprimento da polilinha (ponto médio do espelho). */
@@ -292,7 +303,8 @@ export function stairFills(
     if (detail === 'coarse') {
       if (steps.length === 0 && s.steps.length > 0) continue;
       const footprint = steps.length === s.steps.length ? s.footprint : union(...steps.map((st) => [[st.polygon]]));
-      out.fills.push({ polygons: footprint, color, alpha: 1 });
+      const last = arrivalRing(s);
+      out.fills.push({ polygons: last ? union(footprint, [[last]]) : footprint, color, alpha: 1 });
       out.fills.push(...post.fills);
       continue;
     }
@@ -302,6 +314,11 @@ export function stairFills(
       const fill = st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
       out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, projecao));
+    }
+    const last = arrivalRing(s);
+    if (last) {
+      out.fills.push({ polygons: [[last]], color, alpha: 1 });
+      out.strokes.push(outlineOps(last, s.topZ, lineColor, cutZ, projecao));
     }
     out.fills.push(...post.fills);
     out.strokes.push(...post.strokes);
@@ -322,6 +339,7 @@ export function stairFills(
         const at = treadLabelAt(st, steps, spirals);
         if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
       }
+      if (last) out.labels.push({ at: polyMid([...last, last[0]!]), text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     }
     if (p.settings.showTags) {
       const at = labelPoint(s.footprint);

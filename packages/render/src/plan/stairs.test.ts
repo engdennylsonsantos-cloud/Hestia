@@ -31,8 +31,8 @@ describe('escada na planta (decisão 0011 §1)', () => {
 
   it('degraus com topo acima da cota de corte (1,20 m) saem tracejados; os de baixo, contínuos', () => {
     const outlines = ops().strokes.filter((s) => s.closed);
-    // Degrau k tem topo em k·h: k = 7, 8 e 9 passam de 1,20 m (1,225; 1,400; 1,575).
-    expect(outlines.filter((s) => s.dash)).toHaveLength(3);
+    // Degrau k tem topo em k·h: k = 7, 8 e 9 passam de 1,20 m (1,225; 1,400; 1,575); o 10º é a chegada (1,75 m).
+    expect(outlines.filter((s) => s.dash)).toHaveLength(4);
     expect(outlines.filter((s) => !s.dash)).toHaveLength(6);
     expect(STAIR_CUT_HEIGHT).toBe(1.2);
   });
@@ -86,7 +86,7 @@ describe('escada na planta (decisão 0011 §1)', () => {
     expect(coarse.strokes).toHaveLength(0);
     expect(coarse.labels).toHaveLength(0);
     expect(ops('medium').labels.map((l) => l.text)).toEqual(['SOBE']);
-    expect(ops('fine').labels.map((l) => l.text)).toEqual(['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    expect(ops('fine').labels.map((l) => l.text)).toEqual(['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
   });
 
   it('subpavimento: só a pegada e os contornos, esmaecidos, sem seta nem corte', () => {
@@ -111,7 +111,7 @@ describe('numeração contínua dos degraus (decisão 0011 §1 item 6)', () => {
 
   it('escada reta de 16 espelhos: rótulos 1..15 (degrau k alcança o espelho k+1)', () => {
     const s = straightStair({ risers: 16, tread: P, riserH: H, width: 1 });
-    expect(numbers(ops('fine', s).labels)).toEqual(Array.from({ length: 15 }, (_, i) => String(i + 1)));
+    expect(numbers(ops('fine', s).labels)).toEqual(Array.from({ length: 16 }, (_, i) => String(i + 1)));
   });
 
   it('o número é a cota: com a base em 0,30 m, o 1º degrau ainda é o 1 e o 9º é o 9', () => {

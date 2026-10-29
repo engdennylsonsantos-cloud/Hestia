@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RAMP_TYPES } from '@hestia/model';
-import { layoutSegment, layoutUntilRise, liveRemaining } from './rampLive.ts';
+import { layoutSegment, layoutUntilRise, liveRemaining, optimizeRamp } from './rampLive.ts';
 
 const type = DEFAULT_RAMP_TYPES.find((t) => t.id === 'rmt_nbr9050')!;
 const S = 1 / 12;
@@ -81,5 +81,16 @@ describe('liveRemaining', () => {
     const r = liveRemaining({ H: 0.6, mode: 'length', type, pathLength: 8 });
     expect(r.mode === 'length' && r.withinNorm).toBe(true);
     expect(r.mode === 'length' && r.faltaLength).toBe(0);
+  });
+});
+
+describe('inclinação zero (barra de opções)', () => {
+  const finito = (o: unknown): boolean => JSON.stringify(o, (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? '__NF__' : v)).indexOf('__NF__') < 0;
+  it('liveRemaining e optimizeRamp com slope = 0 não devolvem Infinity/NaN', () => {
+    expect(finito(liveRemaining({ H: 1, type, mode: 'slope', slope: 0, pathLength: 5 }))).toBe(true);
+    expect(finito(liveRemaining({ H: 1, type, mode: 'length', slope: 0, pathLength: 5 }))).toBe(true);
+    for (const mode of ['slope', 'length', 'auto'] as const) {
+      expect(finito(optimizeRamp({ H: 1, type, segments: [8, 4], mode, slope: 0 }))).toBe(true);
+    }
   });
 });

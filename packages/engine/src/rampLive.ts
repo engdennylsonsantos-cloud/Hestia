@@ -131,6 +131,9 @@ export type LiveRemaining =
       faltaLength: number;
     };
 
+/** Inclinação mínima de trabalho (fração): evita H / 0 = Infinity quando a barra de opções chega com 0. */
+export const MIN_LIVE_SLOPE = 1e-3;
+
 /** Falta/sobra de desnível (modo 'slope') ou de comprimento (modo 'length') para o cursor atual. */
 export function liveRemaining(i: LiveInput): LiveRemaining {
   const { H, type } = i;
@@ -138,11 +141,11 @@ export function liveRemaining(i: LiveInput): LiveRemaining {
   if (i.mode === 'length') {
     const lf = Math.max(1e-9, i.pathLength - (i.landingsLength ?? 0));
     const slope = H / lf;
-    const target = i.slope ?? rampMaxSlope(type) ?? type.defaultSlope;
+    const target = Math.max(MIN_LIVE_SLOPE, i.slope ?? rampMaxSlope(type) ?? type.defaultSlope);
     const withinNorm = slope <= target + 1e-6;
     return { mode: 'length', slope, target, withinNorm, faltaLength: withinNorm ? 0 : Math.max(0, H / target - lf) };
   }
-  const s = i.slope ?? type.defaultSlope;
+  const s = Math.max(MIN_LIVE_SLOPE, i.slope ?? type.defaultSlope);
   const total = H - (i.riseDone ?? 0);
   const maxRise = maxRiseFor(type, s) ?? 0;
   const lay = layoutSegment(i.pathLength, i.carry ?? 0, s, maxRise, P);
@@ -302,7 +305,7 @@ export function optimizeRamp(i: OptimizeInput): OptimizeResult {
   const drawn = i.segments.reduce((a, b) => a + b, 0);
   const turns = Math.max(0, i.segments.length - 1);
   const D = i.turnLanding ?? type.landingMinLength;
-  const bar = i.slope ?? type.defaultSlope;
+  const bar = Math.max(MIN_LIVE_SLOPE, i.slope ?? type.defaultSlope);
 
   const cands: OptimizeCandidate[] = [];
   if (i.mode === 'slope') {

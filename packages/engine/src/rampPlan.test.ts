@@ -12,7 +12,7 @@ const ok = (r: ReturnType<typeof planRamp>): RampPlan => {
 };
 
 /** Comprimento horizontal do lance: distância entre os pontos médios dos 2 espelhos. */
-const runLength = (run: StairRun): number => dist(mid(run.risers[0]!.a, run.risers[0]!.b), mid(run.risers[1]!.a, run.risers[1]!.b));
+const runLength = (run: { risers: Array<{ a: Vec2; b: Vec2 }> }): number => dist(mid(run.risers[0]!.a, run.risers[0]!.b), mid(run.risers[1]!.a, run.risers[1]!.b));
 
 describe('planRamp — exemplos da tabela', () => {
   it('1: reta, modo slope, H=0,80, 1/12', () => {
@@ -94,7 +94,7 @@ describe('planRamp — casos extras', () => {
     expect(p.parts.map((x) => x.kind)).toEqual(['run', 'landing', 'run']);
     const runs = p.parts.filter((x) => x.kind === 'run').map((x) => x.run);
     for (const run of runs) expect(run.risers).toHaveLength(2);
-    const dirOf = (run: StairRun): Vec2 => {
+    const dirOf = (run: { risers: Array<{ a: Vec2; b: Vec2 }> }): Vec2 => {
       const a = mid(run.risers[0]!.a, run.risers[0]!.b);
       const b = mid(run.risers[1]!.a, run.risers[1]!.b);
       return mul({ x: b.x - a.x, y: b.y - a.y }, 1 / Math.max(1e-12, Math.hypot(b.x - a.x, b.y - a.y)));

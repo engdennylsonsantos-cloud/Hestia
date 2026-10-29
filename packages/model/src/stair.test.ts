@@ -238,6 +238,42 @@ describe('transformação de escada', () => {
     expect((stairOf(s.project, 'st1').components[0] as StairRun).boundaryRight[0]!.a).toEqual({ x: 1, y: 0 });
     expect((stairOf(s.project, 'st2').components[0] as StairRun).boundaryRight[0]!.a).toEqual({ x: 3, y: 2 });
   });
+
+  it('escada livre: freePath acompanha mover e espelhar; round-trip por JSON', () => {
+    const path = [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 6 }];
+    const s = projectWithLevels();
+    addStair(s, { freePath: path, manualLandings: [1], components: [{ ...run('r1'), generatedBy: 'free' }] });
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'translate', d: { x: 1, y: 2 } } });
+    expect(stairOf(s.project).freePath).toEqual([{ x: 1, y: 2 }, { x: 6, y: 2 }, { x: 6, y: 8 }]);
+    expect(stairOf(s.project).manualLandings).toEqual([1]);
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'mirror', a: { x: 0, y: 0 }, b: { x: 0, y: 1 } } });
+    expect(stairOf(s.project).freePath).toEqual([{ x: -1, y: 2 }, { x: -6, y: 2 }, { x: -6, y: 8 }]);
+    const back = JSON.parse(JSON.stringify(stairOf(s.project))) as Stair;
+    expect(back.freePath).toEqual(stairOf(s.project).freePath);
+    expect(back.manualLandings).toEqual([1]);
+    expect((back.components[0] as StairRun).generatedBy).toBe('free');
+  });
+
+  it('escada sem freePath continua sem o campo (projetos antigos)', () => {
+    const s = projectWithLevels();
+    addStair(s);
+    s.exec({ type: 'transform', ids: ['st1'], transform: { kind: 'translate', d: { x: 1, y: 2 } } });
+    expect('freePath' in stairOf(s.project)).toBe(false);
+  });
+});
+
+describe('escada livre: migração e esquema', () => {
+  it('projeto com escada livre e sem freePath passa pela migração e pela validação', () => {
+    const semPath = projectWithLevels();
+    addStair(semPath);
+    const livre = projectWithLevels();
+    addStair(livre, { freePath: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 6 }], manualLandings: [1] });
+    for (const p of [semPath.project, livre.project]) {
+      const back = migrateProject(JSON.parse(JSON.stringify(p)));
+      expect(back).toEqual(p);
+      expect(validateProject(back).filter((i) => i.code.startsWith('stair-'))).toEqual([]);
+    }
+  });
 });
 
 describe('níveis e cotas da escada', () => {

@@ -36,7 +36,12 @@ export function mapStairComponent(t: Transform, c: StairRun | StairLanding): Sta
   };
 }
 
-/** Move, gira ou espelha uma escada: todos os croquis de todos os componentes. */
+/** Move, gira ou espelha uma escada: todos os croquis de todos os componentes e o trajeto da escada livre. */
 export function transformStair(s: Stair, t: Transform): Stair {
-  return { ...s, components: s.components.map((c) => mapStairComponent(t, c)) };
+  return {
+    ...s,
+    components: s.components.map((c) => mapStairComponent(t, c)),
+    // Escada livre: o trajeto acompanha a transformação, senão a regeneração desfaria o movimento.
+    ...(s.freePath ? { freePath: s.freePath.map((v) => applyTransform(t, v)) } : {}),
+  };
 }

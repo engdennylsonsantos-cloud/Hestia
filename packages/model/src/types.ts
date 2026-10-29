@@ -278,6 +278,8 @@ export interface Wall {
   comments: string;
   /** Ordem de criação: desempata junções (docs/05 §1, ordem de junção). */
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de piso: camadas do topo para baixo (acabamento, contrapiso, estrutura). `wraps` não é usado. */
@@ -327,6 +329,8 @@ export interface Floor {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de laje: camadas do topo para baixo (regularização, estrutura). */
@@ -364,6 +368,8 @@ export interface Slab {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de forro: camadas do topo para baixo (estrutura, placa, acabamento visível). Mesmo papel do tipo de piso. */
@@ -400,6 +406,8 @@ export interface Ceiling {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de telhado: camadas do topo para baixo (telha, ripamento, estrutura), espessura medida na vertical. */
@@ -539,9 +547,48 @@ export interface Room {
   color?: string;
   /** Ordem de criação (desempate e ordenação nas tabelas). */
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
-export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room;
+/**
+ * Propriedade importada de um arquivo IFC (pset ou quantitativo). `name` é o nome da propriedade no arquivo; `value` já
+ * vem convertido para texto, número ou booleano. Sempre opcional no modelo (arquivos antigos não têm).
+ */
+export interface IfcProperty {
+  name: string;
+  value: string | number | boolean;
+  /** Conjunto de origem no IFC (`Pset_WallCommon`, `Qto_BeamBaseQuantities`...); ausente = conjunto do importador. */
+  pset?: string;
+}
+
+/**
+ * Objeto importado de outro programa (IFC) sem equivalente nativo: viga, pilar, escada, mobiliário, MEP, curtain wall...
+ * Guarda a classe de origem, a malha triangular em coordenadas de mundo (m), o contorno em planta e as propriedades do IFC.
+ * Entra no 3D, no DXF e nos quantitativos (volume/área por triângulos) e volta no IFC como `IfcBuildingElementProxy`.
+ */
+export interface Generic {
+  id: Id;
+  kind: 'generic';
+  levelId: Id;
+  name: string;
+  /** Classe IFC de origem (`IFCBEAM`, `IFCSTAIR`...). */
+  sourceClass: string;
+  predefinedType?: string;
+  objectType?: string;
+  /** Malha triangular em coordenadas de mundo: `positions` = x, y, z...; `indices` = triplas. */
+  mesh: { positions: number[]; indices: number[] };
+  /** Contorno em planta (hull da malha) para as vistas 2D; ausente = sem desenho em planta. */
+  outline?: Vec2[];
+  color?: string;
+  /** Opacidade 0..1 vinda do `IfcSurfaceStyleRendering` (vidro); ausente = 1. */
+  opacity?: number;
+  order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente quando o objeto não tem pset. */
+  ifcProperties?: IfcProperty[];
+}
+
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room | Generic;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -672,3 +719,4 @@ export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
 export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';
 export const isRoom = (e: Element | undefined): e is Room => e?.kind === 'room';
+export const isGeneric = (e: Element | undefined): e is Generic => e?.kind === 'generic';

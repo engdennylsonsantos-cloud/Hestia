@@ -2,6 +2,7 @@ import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveSlabs, resolveStairsOnLevel, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
 import {
+  dxfGenericRecords,
   dxfLayersOf,
   dxfLineRoleOf,
   DXF_LAYER_ROOM_TEXT,
@@ -260,9 +261,27 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
 /** Altura (m de desenho) do texto do ambiente no DXF. */
 const ROOM_TEXT_HEIGHT_M = 0.2;
 
-/** Texto DXF da planta do nível, na vista do intervalo. */
+/** Fim do arquivo que `exportDxf` devolve: o `ENDSEC` da seção ENTITIES seguido do `EOF`. */
+const DXF_END = '\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n';
+
+/**
+ * Põe registros no fim da seção ENTITIES, antes do `ENDSEC` (sem abrir outra `SECTION`). Sem registros, devolve o arquivo
+ * como veio: o DXF sem objetos importados é byte a byte o de antes.
+ */
+function withEntityRecords(dxf: string, records: string[]): string {
+  if (records.length === 0) return dxf;
+  if (!dxf.endsWith(DXF_END)) throw new Error('DXF sem o fim esperado (ENDSEC/EOF)');
+  return `${dxf.slice(0, -DXF_END.length)}\r\n${records.join('\r\n')}${DXF_END}`;
+}
+
+/**
+ * Texto DXF da planta do nível, na vista do intervalo. Os objetos importados (`Generic`) entram como o contorno em planta
+ * de cada um, na camada `IMPORTADO`; a categoria `generic` oculta na vista não sai, como as demais.
+ */
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
-  return exportDxf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
+  const dxf = exportDxf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
+  const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;
+  return withEntityRecords(dxf, shown ? dxfGenericRecords(p, levelId) : []);
 }
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */

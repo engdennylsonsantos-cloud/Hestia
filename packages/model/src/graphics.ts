@@ -6,8 +6,8 @@ import type { DetailLevel, Id, Project } from './types.ts';
  */
 
 /** Categorias com estilo gráfico próprio (Revit: Object Styles; ArchiCAD: regras de substituição). */
-export type GraphicsCategory = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'room' | 'annotation';
-export const GRAPHICS_CATEGORIES: readonly GraphicsCategory[] = ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'room', 'annotation'];
+export type GraphicsCategory = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'roof' | 'stair' | 'room' | 'annotation' | 'generic';
+export const GRAPHICS_CATEGORIES: readonly GraphicsCategory[] = ['wall', 'door', 'window', 'floor', 'slab', 'roof', 'stair', 'room', 'annotation', 'generic'];
 /** Nome da categoria nas mensagens de validação (pt-BR). */
 export const GRAPHICS_CATEGORY_LABELS: Record<GraphicsCategory, string> = {
   wall: 'parede',
@@ -19,6 +19,7 @@ export const GRAPHICS_CATEGORY_LABELS: Record<GraphicsCategory, string> = {
   stair: 'escada',
   room: 'ambiente',
   annotation: 'anotação',
+  generic: 'objeto importado',
 };
 
 /** Estilo visual (Revit: Visual Styles). Planta aceita wireframe, hiddenLine e shaded; o 3D aceita todos. */
@@ -136,6 +137,7 @@ export const DEFAULT_CATEGORY_STYLES: Record<GraphicsCategory, CategoryLineStyle
   stair: { cutWeight: 4, projectionWeight: 2 },
   room: { cutWeight: 1, projectionWeight: 1 },
   annotation: { cutWeight: 1, projectionWeight: 1 },
+  generic: { cutWeight: 2, projectionWeight: 1 },
 };
 
 export const DEFAULT_PROJECT_GRAPHICS: ProjectGraphics = {
@@ -155,6 +157,7 @@ export const defaultOverrides = (): Record<GraphicsCategory, CategoryOverride> =
   stair: defaultOverride(),
   room: defaultOverride(),
   annotation: defaultOverride(),
+  generic: defaultOverride(),
 });
 
 export const DEFAULT_VIEW_GRAPHICS: ViewGraphics = {

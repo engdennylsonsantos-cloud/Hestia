@@ -1,4 +1,4 @@
-import type { Id, WrapMode } from './types.ts';
+import type { Id, IfcProperty, WrapMode } from './types.ts';
 import type { OpeningComposition } from './openingComposition.ts';
 
 /**
@@ -163,4 +163,6 @@ export interface Opening {
   flipFacing: boolean;
   sillOverride: number | null;
   mark: string;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }

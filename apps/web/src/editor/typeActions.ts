@@ -1,5 +1,5 @@
 import { fitBox, type Viewport } from '@hestia/render';
-import { ProjectStore, isFloor, isOpening, isRoof, isSlab, isStair, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
+import { ProjectStore, isFloor, isGeneric, isOpening, isRoof, isSlab, isStair, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
 import { stairPoints } from './stairActions.ts';
 
 /** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje e telhado. */
@@ -15,7 +15,7 @@ const otherLevels = (n: number): string => (n === 1 ? '1 em outro nível' : `${n
 
 /** Nível de um elemento: a parede tem o seu; a abertura herda o da parede anfitriã. */
 export function levelOfElement(p: Project, e: Element): Id | undefined {
-  if (isWall(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'ceiling' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
+  if (isWall(e) || isGeneric(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'ceiling' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
   const host = p.elements[e.hostId];
   return isWall(host) ? host.levelId : undefined;
 }

@@ -1,9 +1,11 @@
 import { union, type MultiPolygon } from '@hestia/geom';
 import {
+  buildOpeningModel,
   frameOfWall,
   junctionLevel,
   openingGeometry,
   resolveFloors,
+  resolveCeilings,
   resolveLevel,
   resolveRoofs,
   resolveSlabs,
@@ -11,10 +13,12 @@ import {
   roofThickness,
   stairArrivalTopZ,
   stairBody,
+  type OpeningGeometry,
+  type PartMaterial,
   type ResolvedStair,
 } from '@hestia/engine';
-import { exportIfc, type IfcGeometry, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcStairGeo } from '@hestia/io';
-import { isOpening, openingSill, openingType, wallBaseElevation, type Id, type Project, type Wall } from '@hestia/model';
+import { exportIfc, type IfcGeometry, type IfcOpeningPartGeo, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcStairGeo } from '@hestia/io';
+import { isOpening, openingSill, openingType, wallBaseElevation, wallHeight, type Id, type Opening, type OpeningType, type Project, type Wall } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /** Cota constante (sem inclinação). */
@@ -47,6 +51,40 @@ function wallsOfLevel(p: Project, levelId: Id): IfcGeometry['walls'] {
   });
 }
 
+/** Material do projeto para o papel lógico da peça, o mesmo mapeamento do 3D (`openingParts.ts`). */
+function partMaterialId(p: Project, t: OpeningType, material: PartMaterial): Id {
+  if (material === 'glass') return t.glassMaterialId;
+  if (material === 'concrete') return p.materials['mat_concreto'] ? 'mat_concreto' : t.frameMaterialId;
+  if (material === 'metal') {
+    if (p.materials['mat_aco']) return 'mat_aco';
+    if (p.materials['mat_perfil']) return 'mat_perfil';
+    return t.frameMaterialId;
+  }
+  // 'frame', 'leaf' e 'casing' usam o material do batente do tipo.
+  return t.frameMaterialId;
+}
+
+/**
+ * Peças da esquadria pelo modelo único do engine: batente, folha, vidro, montantes, maçaneta, alizar, peitoril e verga.
+ * A cavidade de embutir (`pocket`) é um vazio dentro da parede, não um sólido: fica de fora. Peças degeneradas também.
+ * O estado é sempre o fechado: o IFC guarda a esquadria montada, não a pose da vista 3D.
+ */
+function openingPartsOf(p: Project, o: Opening, g: OpeningGeometry, t: OpeningType, frame: NonNullable<ReturnType<typeof frameOfWall>>): IfcOpeningPartGeo[] {
+  const maxHeight = wallHeight(p, p.elements[o.hostId] as Wall) - g.sill;
+  const geom = maxHeight > 0 && g.height > maxHeight ? { ...g, height: maxHeight } : g;
+  const model = buildOpeningModel(p, o, geom, frame);
+  const out: IfcOpeningPartGeo[] = [];
+  for (const part of model.parts) {
+    // `pocket` é a cavidade dentro da parede; `dashed` é anotação (trilho do portão projetado para dentro da garagem);
+    // `lintel`/`sillBeam` ficam embutidos no núcleo da parede e não têm face visível. Nada disso é sólido do corpo.
+    if (part.role === 'pocket' || part.dashed || part.role === 'lintel' || part.role === 'sillBeam') continue;
+    const b = part.box;
+    if (!(b.t1 - b.t0 > 1e-6 && b.s1 - b.s0 > 1e-6 && b.z1 - b.z0 > 1e-6)) continue;
+    out.push({ ...b, materialId: partMaterialId(p, t, part.material), role: part.role });
+  }
+  return out;
+}
+
 /** Vãos do projeto: centro, eixo e esquadria no plano da parede hospedeira (vão bruto e peitoril em cota absoluta). */
 function openingsOf(p: Project): IfcGeometry['openings'] {
   const out: IfcGeometry['openings'] = [];
@@ -70,6 +108,7 @@ function openingsOf(p: Project): IfcGeometry['openings'] {
       roughBottomZ: sillZ - (g.roughHeight - g.height) / 2,
       sillZ,
       thickness: g.thickness,
+      parts: openingPartsOf(p, o, g, t, frame),
     });
   }
   return out;
@@ -151,7 +190,11 @@ export function ifcGeometryOf(p: Project): IfcGeometry {
     return { roofId: r.roofId, planes };
   });
   const stairs = resolveStairs(p).map((s) => stairOf(p, s));
-  return { walls, openings: openingsOf(p), floors, slabs, roofs, stairs };
+  const ceilings = levels
+    .flatMap((id) => resolveCeilings(p, id))
+    .map((c) => ({ ceilingId: c.ceilingId, prisms: prismsOf(c.polygon, flatPlane(c.topZ), flatPlane(c.bottomZ)) }))
+    .filter((c) => c.prisms.length > 0);
+  return { walls, openings: openingsOf(p), floors, slabs, ceilings, roofs, stairs };
 }
 
 /** Texto IFC4 (STEP) do projeto inteiro, com a data atual no cabeçalho. */

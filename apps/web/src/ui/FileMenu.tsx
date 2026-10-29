@@ -1,14 +1,15 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { editor, useProject } from '../editor/controller.ts';
 import { exportDxf, exportIfc, exportPdf, nextTheme } from '../editor/fileActions.ts';
 import { useI18n } from '../editor/i18n.ts';
+import { importIfcFile, resumoImportacao, type ResumoImportacao } from '../editor/ifcImport.ts';
 import { useUi } from '../editor/state.ts';
 
 type Section = 'export' | 'info' | 'options';
 
 /**
- * Menu Arquivo (aba azul da faixa e botão "H" da barra de título): Novo, Abrir, Salvar, Exportar, Informações e Opções.
- * Abre por cima da área de trabalho, do lado esquerdo; Esc, clique fora ou Fechar voltam ao desenho.
+ * Menu Arquivo (aba azul da faixa e botão "R" da barra de título): Novo, Abrir, Importar IFC, Salvar, Exportar,
+ * Informações e Opções. Abre por cima da área de trabalho, do lado esquerdo; Esc, clique fora ou Fechar voltam ao desenho.
  */
 export function FileMenu(): ReactElement | null {
   const open = useUi((s) => s.fileMenu);
@@ -18,6 +19,9 @@ export function FileMenu(): ReactElement | null {
   const setLang = useI18n((s) => s.setLang);
   const project = useProject();
   const [section, setSection] = useState<Section>('export');
+  const ifcRef = useRef<HTMLInputElement>(null);
+  const [resumo, setResumo] = useState<(ResumoImportacao & { nome: string }) | null>(null);
+  const [erroIfc, setErroIfc] = useState<string | null>(null);
   const pt = lang === 'pt';
   const close = (): void => useUi.setState({ fileMenu: false });
 
@@ -52,13 +56,33 @@ export function FileMenu(): ReactElement | null {
   );
   const themeName = theme === 'system' ? (pt ? 'sistema' : 'system') : theme === 'light' ? (pt ? 'claro' : 'light') : pt ? 'escuro' : 'dark';
   const engine = gpu === 'pending' ? (pt ? 'iniciando…' : 'starting…') : gpu === 'cpu' ? 'CPU' : gpu === 'webgpu' ? 'GPU · WebGPU' : 'GPU · WebGL2';
+  // Importar IFC: o arquivo vira um projeto aberto e o menu continua aberto para mostrar o resumo da leitura.
+  const importarIfc = async (f: File | undefined): Promise<void> => {
+    if (!f) return;
+    setResumo(null);
+    setErroIfc(null);
+    try {
+      const { name, report } = await importIfcFile(f);
+      const r = resumoImportacao(report, pt ? 'pt' : 'en');
+      console.info(`IFC importado: ${name}`, report);
+      setResumo({ nome: name, ...r });
+      useUi.setState({ status: `IFC importado: ${name} · ${r.texto}` });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : pt ? 'falha desconhecida' : 'unknown failure';
+      console.info('Falha ao importar o IFC', e);
+      setErroIfc(msg);
+      useUi.setState({ status: `${pt ? 'Não foi possível importar o IFC' : 'Could not import the IFC'}: ${msg}` });
+    }
+  };
 
   return (
     <div className="fm-back" onPointerDown={(e) => { if (e.target === e.currentTarget) close(); }}>
       <div className="fm" role="dialog" aria-label={pt ? 'Menu Arquivo' : 'File menu'}>
+        <input ref={ifcRef} id="file-ifc" type="file" accept=".ifc" hidden onChange={(e) => { void importarIfc(e.target.files?.[0]); e.target.value = ''; }} />
         <nav className="fm-list">
           {item(pt ? 'Novo' : 'New', () => go(() => useUi.setState({ dialog: 'start' })))}
           {item(pt ? 'Abrir' : 'Open', () => go(() => document.getElementById('file-open')?.click()))}
+          {item(pt ? 'Importar IFC…' : 'Import IFC…', () => ifcRef.current?.click(), { title: pt ? 'Abre um arquivo .ifc do Revit ou de outro programa BIM.' : 'Open a .ifc from Revit or another BIM program.' })}
           {item(pt ? 'Salvar' : 'Save', () => go(() => void editor.save()), { title: 'Ctrl+S' })}
           <hr />
           {item(pt ? 'Exportar' : 'Export', () => setSection('export'), { on: section === 'export', arrow: true })}
@@ -68,6 +92,15 @@ export function FileMenu(): ReactElement | null {
           {item(pt ? 'Fechar menu' : 'Close menu', close)}
         </nav>
         <div className="fm-pane">
+          {resumo && (
+            <div className="fm-hint" role="status">
+              <p><b>{resumo.nome}</b> — {resumo.texto}</p>
+              {resumo.ignorados.length > 0 && <p>{pt ? 'Ignorados' : 'Skipped'}: {resumo.ignorados.join(' · ')}</p>}
+              {resumo.avisos.slice(0, 3).map((a, i) => <p key={i}>{a}</p>)}
+              {resumo.avisos.length > 3 && <p>+{resumo.avisos.length - 3} {pt ? 'aviso(s)' : 'warning(s)'}</p>}
+            </div>
+          )}
+          {erroIfc && <p className="fm-hint" role="status">{pt ? 'Não foi possível importar o IFC' : 'Could not import the IFC'}: {erroIfc}</p>}
           {section === 'export' && (
             <>
               <h3>{pt ? 'Exportar' : 'Export'}</h3>

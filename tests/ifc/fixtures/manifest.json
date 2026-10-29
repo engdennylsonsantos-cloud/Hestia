@@ -1,0 +1,34 @@
+[
+  {
+    "arquivo": "parede-janela.ifc",
+    "url": "https://raw.githubusercontent.com/buildingSMART/Certification-datasets/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/wall-with-opening-and-window.ifc",
+    "bytes": 12492,
+    "sha256": "73b0e45d931d5dc13bfee5fdc7bd80f796526445458b2de74c4168d209097832",
+    "licenca": "buildingSMART — uso livre para teste",
+    "fonte": "buildingSMART/Certification-datasets · ISO Spec ReferenceView V1.2"
+  },
+  {
+    "arquivo": "predio-simples.ifc",
+    "url": "https://raw.githubusercontent.com/buildingSMART/Certification-datasets/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/Simple-Scene/Building-Architecture.ifc",
+    "bytes": 142325,
+    "sha256": "8790a1e193e82b8e7e7f337ec2633cd40f2120590317a1443503a25b079e2e80",
+    "licenca": "buildingSMART — uso livre para teste",
+    "fonte": "buildingSMART/Certification-datasets · Simple-Scene"
+  },
+  {
+    "arquivo": "casa-pequena.ifc",
+    "url": "https://raw.githubusercontent.com/IfcOpenShell/files/master/tests/ISSUE_005_haus_60012.ifc",
+    "bytes": 56974,
+    "sha256": "0c9a21e14f7551f850f799c483381036ce723cc3874538cf088eacf5d501919e",
+    "licenca": "IfcOpenShell — repositório sem licença declarada (uso local)",
+    "fonte": "IfcOpenShell/files · tests/ISSUE_005_haus_60012.ifc"
+  },
+  {
+    "arquivo": "fzk-haus.ifc",
+    "url": "https://raw.githubusercontent.com/opensourceBIM/TestFiles/master/TestData/data/AC11-FZK-Haus-IFC.ifc",
+    "bytes": 4148151,
+    "sha256": "c89069da241e149166e0551128aaf088def582a48c267e67a08ca88c3f1319a0",
+    "licenca": "KIT — CC BY 4.0 (atribuição obrigatória)",
+    "fonte": "opensourceBIM/TestFiles · AC11-FZK-Haus-IFC.ifc"
+  }
+]

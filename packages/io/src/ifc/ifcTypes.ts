@@ -35,8 +35,27 @@ export interface IfcWallGeo {
 }
 
 /**
+ * Peça da esquadria no sistema local do vão: `t` ao longo da parede (0 no centro), `s` na espessura (0 no eixo da
+ * parede, positivo para o lado de `z × u`, a normal esquerda de `u`) e `z` acima do peitoril. É a mesma caixa do modelo
+ * único do engine (`OpeningPart.box`), já resolvida em material do projeto.
+ */
+export interface IfcOpeningPartGeo {
+  t0: number;
+  t1: number;
+  s0: number;
+  s1: number;
+  z0: number;
+  z1: number;
+  /** Material do projeto que dá cor/transparência à peça (batente, vidro, metal, concreto...). */
+  materialId: Id;
+  /** Papel no modelo único (`jamb`, `leaf`, `glass`, `muntin`, `handle`...), para diagnóstico e testes. */
+  role?: string;
+}
+
+/**
  * Vão resolvido: eixo `u` ao longo da parede, centro em planta, esquadria (`width` × `height`), vão bruto (`roughWidth` ×
  * `roughHeight`, com `roughBottomZ` na cota absoluta) e cota absoluta do peitoril (`sillZ`). `thickness` é a espessura da parede.
+ * `parts` é a esquadria detalhada do modelo único; quando ausente, o exportador mantém o corpo único de compatibilidade.
  */
 export interface IfcOpeningGeo {
   openingId: Id;
@@ -49,6 +68,7 @@ export interface IfcOpeningGeo {
   roughBottomZ: number;
   sillZ: number;
   thickness: number;
+  parts?: IfcOpeningPartGeo[];
 }
 
 /** Lance de escada resolvido: peças do corpo (degraus, chegada, poste) e contagens. */
@@ -78,6 +98,7 @@ export interface IfcGeometry {
   openings: IfcOpeningGeo[];
   floors: Array<{ floorId: Id; prisms: IfcPrism[] }>;
   slabs: Array<{ slabId: Id; prisms: IfcPrism[] }>;
+  ceilings?: Array<{ ceilingId: Id; prisms: IfcPrism[] }>;
   roofs: Array<{ roofId: Id; planes: IfcPrism[] }>;
   stairs: IfcStairGeo[];
 }

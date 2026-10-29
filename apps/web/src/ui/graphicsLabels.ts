@@ -12,6 +12,7 @@ export const CATEGORY_LABEL: Record<GraphicsCategory, string> = {
   stair: 'Escada',
   room: 'Ambiente',
   annotation: 'Anotação',
+  generic: 'Objeto importado',
 };
 
 export const VISUAL_STYLE_LABEL: Record<VisualStyle, string> = {

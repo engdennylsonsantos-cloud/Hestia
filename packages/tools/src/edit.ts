@@ -1,7 +1,7 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
-import { followingEnds, MIN_WALL_LENGTH } from './pick.ts';
+import { followerCommands, planWallFollowers } from './wallFollow.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
 import { selectedFloors } from './floorPick.ts';
@@ -104,37 +104,12 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
  */
 export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();
-  const exclude = new Set(wallIds);
-  const followers = new Map<Id, { a?: Vec2; b?: Vec2 }>();
-  const released = new Set<Id>();
-  if (follow) {
-    for (const id of wallIds) {
-      const w = p.elements[id];
-      if (!isWall(w)) continue;
-      for (const pt of [w.a, w.b]) {
-        // Novo ponto da extremidade movida: é onde a parede vizinha tem de terminar.
-        const to = applyTransform(t, pt);
-        for (const c of followingEnds(p, env.levelId(), pt, exclude, invert)) {
-          const other = p.elements[c.wallId];
-          if (!isWall(other)) continue;
-          const far = c.end === 'a' ? other.b : other.a;
-          // Vizinha degenerada (girar/mover até a outra ponta): solta a ponta em vez de sumir com a parede.
-          if (dist(far, to) < MIN_WALL_LENGTH) {
-            released.add(c.wallId);
-            continue;
-          }
-          const cur = followers.get(c.wallId) ?? {};
-          cur[c.end] = to;
-          followers.set(c.wallId, cur);
-        }
-      }
-    }
-  }
+  const plan = follow ? planWallFollowers(p, env.levelId(), wallIds, t, invert) : null;
   env.transaction(label, () => {
     env.exec({ type: 'transform', ids: wallIds, transform: t });
-    for (const [id, ends] of followers) env.exec({ type: 'setWallEnds', id, ...ends });
+    if (plan) for (const c of followerCommands(plan)) env.exec(c);
   });
-  if (released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
+  if (plan?.released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
 }
 
 /** Desliza aberturas ao longo da parede anfitriã. */

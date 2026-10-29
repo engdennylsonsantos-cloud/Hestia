@@ -5,6 +5,7 @@ import type { Sheet } from './sheet.ts';
 import type { Grid, GridType } from './grid.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
+import type { AreaPlan, ColorScheme, RoomCategory } from './areaPlan.ts';
 
 export type Id = string;
 export const SCHEMA_VERSION = 19;
@@ -202,6 +203,8 @@ export interface TextNote {
   rotation: number;
   /** Largura da caixa em mm de papel; ausente mantém texto sem quebra. */
   width?: number;
+  /** Desenha a caixa (moldura) em volta do texto; ausente = só texto. */
+  frame?: boolean;
   /** Pontos de chamada em coordenadas de modelo, do elemento até a caixa. */
   leader?: Vec2[];
   bold?: boolean;
@@ -532,6 +535,22 @@ export interface Room {
   number: string;
   /** Ponto interior em planta (m) usado para achar o circuito de paredes que define o ambiente. */
   point: Vec2;
+  /**
+   * Cruzamento das linhas de referência (Revit: Reference). Ausente = centroide do polígono resolvido.
+   * Arrastar a referência NÃO muda `point` nem a área; só o desenho e a etiqueta.
+   */
+  referencePoint?: Vec2;
+  /**
+   * Posição do rótulo do ambiente, compartilhada por TODAS as vistas (planta de piso, planta de área, cortes).
+   * Ausente = centro do ambiente. Arrastar o rótulo em qualquer vista grava aqui.
+   */
+  labelPosition?: Vec2;
+  /** Rotação do rótulo em graus (sentido anti-horário). Ausente = 0. */
+  labelRotation?: number;
+  /** Chamada do rótulo: automática (liga ao sair do ambiente), nenhuma, reta, cotovelo ou cruzada. Ausente = automática. */
+  labelLeader?: 'auto' | 'none' | 'straight' | 'kinked' | 'crossed';
+  /** Categoria do ambiente (Sala, Banho, Circulação…). Ausente = sem categoria. */
+  categoryId?: Id;
   /** Deslocamento da base em relação ao nível (m). Ausente = 0. */
   heightOffset?: number;
   /** Pé-direito (m). Ausente = `defaults.wallHeight` (leitura). */
@@ -699,6 +718,12 @@ export interface Project {
   grids?: Grid[];
   /** Tipos de grade gravados; os padrão (`DEFAULT_GRID_TYPES`) valem sem estar aqui. */
   gridTypes?: Record<Id, GridType>;
+  /** Plantas de área (uma por pavimento); ausente = nenhuma. */
+  areaPlans?: AreaPlan[];
+  /** Categorias de ambiente; ausente = as padrão (`DEFAULT_ROOM_CATEGORIES`). */
+  roomCategories?: RoomCategory[];
+  /** Esquemas de cores das plantas de área; ausente = nenhum. */
+  colorSchemes?: ColorScheme[];
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';

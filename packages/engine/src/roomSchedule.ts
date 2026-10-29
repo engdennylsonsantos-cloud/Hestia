@@ -56,6 +56,8 @@ export function buildRoomSchedule(p: Project): RoomSchedule {
   const rows: RoomScheduleRow[] = [];
   for (const level of p.levels) {
     for (const r of resolveRooms(p, level.id)) {
+      // Duplicata no mesmo circuito não entra na tabela (senão a área do nível soma duas vezes).
+      if (r.duplicateOf !== undefined) continue;
       rows.push({
         roomId: r.roomId,
         number: r.number,

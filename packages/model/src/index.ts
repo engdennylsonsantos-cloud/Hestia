@@ -36,4 +36,6 @@ export * from './sectionView.ts';
 export * from './annotations.ts';
 export * from './sheet.ts';
 export * from './sheetCommands.ts';
+export * from './areaPlan.ts';
+export * from './areaPlanCommands.ts';
 export * from './grid.ts';

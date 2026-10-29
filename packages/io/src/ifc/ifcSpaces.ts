@@ -1,10 +1,10 @@
 // NOTA (lane C): este módulo lê o contorno e os quantitativos do MOTOR. O `docs/01 §1` proíbe `io → engine`; a chamada
 // foi pedida assim para os números não virem da malha. Se a fronteira tiver de ser mantida, mover o cálculo para
 // `apps/web` e passar o contorno/quantitativos já resolvidos.
-import { roomsOnLevel, type Id } from '@hestia/model';
+import { roomsOnLevel, categoryById, type Id } from '@hestia/model';
 import { resolveRooms } from '@hestia/engine';
 import { gid, optStr, storeyOf, type IfcCtx } from './ifcCtx.ts';
-import { bodyShape, extrudeSolid, localPlacement } from './ifcSolids.ts';
+import { addPropertySet } from './ifcProperties.ts';import { bodyShape, extrudeSolid, localPlacement } from './ifcSolids.ts';
 import { en, list, num, OMIT, ref, stepString } from './ifcStep.ts';
 import type { IfcPoint, IfcPolygon } from './ifcTypes.ts';
 
@@ -44,8 +44,19 @@ function ringArea(ring: readonly IfcPoint[]): number {
   return Math.abs(s) / 2;
 }
 
+/** Perímetro de um anel fechado (m). */
+function ringLength(ring: readonly IfcPoint[]): number {
+  let s = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    s += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return s;
+}
+
 /** Quantitativos do ambiente (`Qto_SpaceBaseQuantities`) ligados ao IFCSPACE por `IFCRELDEFINESBYPROPERTIES`. */
-function addSpaceQuantities(c: IfcCtx, roomId: Id, spaceId: number, values: { netArea: number; grossArea: number; height: number; perimeter: number }): void {
+function addSpaceQuantities(c: IfcCtx, roomId: Id, spaceId: number, values: { netArea: number; grossArea: number; height: number; perimeter: number; grossPerimeter: number; volume: number }): void {
   const quantities: number[] = [];
   const quantity = (type: string, name: string, value: number): void => {
     if (!Number.isFinite(value)) return;
@@ -54,7 +65,9 @@ function addSpaceQuantities(c: IfcCtx, roomId: Id, spaceId: number, values: { ne
   quantity('IFCQUANTITYAREA', 'NetFloorArea', values.netArea);
   quantity('IFCQUANTITYAREA', 'GrossFloorArea', values.grossArea);
   quantity('IFCQUANTITYLENGTH', 'Height', values.height);
-  quantity('IFCQUANTITYLENGTH', 'Perimeter', values.perimeter);
+  quantity('IFCQUANTITYLENGTH', 'NetPerimeter', values.perimeter);
+  quantity('IFCQUANTITYLENGTH', 'GrossPerimeter', values.grossPerimeter);
+  quantity('IFCQUANTITYVOLUME', 'NetVolume', values.volume);
   if (quantities.length === 0) return;
   const set = c.w.add('IFCELEMENTQUANTITY', [gid(`qto:space:${roomId}`), OMIT, stepString(SPACE_QTO), OMIT, OMIT, list(quantities.map(ref))]);
   c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`qto:space:${roomId}:rel`), OMIT, OMIT, OMIT, list([ref(spaceId)]), ref(set)]);
@@ -82,26 +95,34 @@ export function addSpaces(c: IfcCtx): void {
       const solid = extrudeSolid(c.w, polygon, baseZ, height);
       const shape = bodyShape(c.w, c.ctx, 'SweptSolid', [solid]);
       const place = localPlacement(c.w, st.place, [0, 0, 0]);
-      const longName = room.number ? (room.name ? `${room.number} - ${room.name}` : room.number) : room.name;
+      const cat = categoryById(c.p, room.categoryId)?.name ?? '';
       const id = c.w.add('IFCSPACE', [
         gid(`space:${room.id}`),
         OMIT,
-        stepString(room.name),
+        // Name = número/designação da planta; LongName = nome descritivo (IFC4).
+        stepString(room.number || room.name),
         OMIT,
-        OMIT,
+        cat ? stepString(cat) : OMIT,
         ref(place),
         ref(shape),
-        optStr(longName),
+        optStr(room.name),
         en('ELEMENT'),
-        en('INTERNAL'),
-        num(baseZ),
+        en('SPACE'),
+        // Elevação do piso acabado, absoluta no projeto (nível + deslocamento da base).
+        num(level.elevation + baseZ),
       ]);
       st.contained.push(id);
+      const props: Array<[string, string | number | boolean]> = [['IsExternal', false]];
+      if (cat) props.push(['Category', cat]);
+      if (room.number) props.push(['Reference', room.number]);
+      addPropertySet(c, `pset:space:${room.id}`, 'Pset_SpaceCommon', props, id);
       addSpaceQuantities(c, room.id, id, {
         netArea: r.area,
         grossArea: ringArea(polygon[0]!),
         height,
         perimeter: r.perimeter,
+        grossPerimeter: ringLength(polygon[0]!),
+        volume: r.area * height,
       });
     }
   }

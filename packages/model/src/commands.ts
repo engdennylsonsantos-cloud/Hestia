@@ -59,6 +59,8 @@ import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
 import { applyRoomCommand } from './roomCommands.ts';
 import { applyOutlineCommand } from './outlineCommands.ts';
+import { applyAreaPlanCommand, dropAreaPlansOfLevel, dropRoomTags, prunePlanElementTags } from './areaPlanCommands.ts';
+import type { AreaPlan, ColorScheme, RoomCategory, RoomTag } from './areaPlan.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -122,6 +124,18 @@ export type Command =
   | { type: 'deleteView'; id: Id }
   | { type: 'batch'; commands: Command[] }
   | { type: 'setOpeningHost'; id: Id; hostId: Id; offset: number }
+  | { type: 'addAreaPlan'; plan: AreaPlan }
+  | { type: 'updateAreaPlan'; id: Id; patch: Partial<Omit<AreaPlan, 'id' | 'tags'>> }
+  | { type: 'removeAreaPlan'; id: Id }
+  | { type: 'addRoomTag'; planId: Id; tag: RoomTag }
+  | { type: 'updateRoomTag'; planId: Id; id: Id; patch: Partial<Omit<RoomTag, 'id' | 'planId' | 'roomId'>> }
+  | { type: 'removeRoomTag'; planId: Id; id: Id }
+  | { type: 'setRoomReference'; id: Id; point: Vec2 | null }
+  | { type: 'setRoomLabel'; id: Id; position: Vec2 | null; rotation?: number; leader?: 'auto' | 'none' | 'straight' | 'kinked' | 'crossed' }
+  | { type: 'upsertRoomCategory'; category: RoomCategory }
+  | { type: 'removeRoomCategory'; id: Id }
+  | { type: 'upsertColorScheme'; scheme: ColorScheme }
+  | { type: 'removeColorScheme'; id: Id }
   | ({ type: 'setElementLevel' } & SetElementLevel);
 
 function transformWall(w: Wall, t: Transform): Wall {
@@ -167,7 +181,15 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
   transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
   transformEach(p, c, isCeiling, (f, t) => transformCeiling(f, t, !!c.copy?.idMap));
-  transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
+  transformEach(p, c, isRoom, (r, t) => ({
+    ...r,
+    point: applyTransform(t, r.point),
+    ...(r.referencePoint ? { referencePoint: applyTransform(t, r.referencePoint) } : {}),
+    ...(r.labelPosition ? { labelPosition: applyTransform(t, r.labelPosition) } : {}),
+    ...(r.labelRotation !== undefined || t.kind === 'rotate' || t.kind === 'mirror'
+      ? { labelRotation: t.kind === 'mirror' ? -(r.labelRotation ?? 0) : (r.labelRotation ?? 0) + (t.kind === 'rotate' ? (t.angle * 180) / Math.PI : 0) }
+      : {}),
+  }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {
     const next = transformWall(w, c.transform);
@@ -195,7 +217,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
 }
 
 export function applyCommand(p: Project, c: Command): void {
-  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c) || applyOutlineCommand(p, c)) return;
+  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c) || applyAreaPlanCommand(p, c) || applyOutlineCommand(p, c)) return;
   switch (c.type) {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };
@@ -301,10 +323,13 @@ export function applyCommand(p: Project, c: Command): void {
     case 'splitWall':
       splitWall(p, c);
       for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => Boolean(p.elements[tag.hostId]));
+      prunePlanElementTags(p);
       break;
     case 'deleteElements':
       removeIds(p, c.ids);
+      dropRoomTags(p, c.ids);
       for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => !c.ids.includes(tag.hostId));
+      prunePlanElementTags(p);
       break;
     case 'upsertWallType':
       p.wallTypes[c.wallType.id] = c.wallType;
@@ -336,6 +361,7 @@ export function applyCommand(p: Project, c: Command): void {
       // Escada também conta pelo nível de topo explícito; o topo automático segue o nível acima e não prende o nível.
       if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
+      dropAreaPlansOfLevel(p, c.id);
       break;
     }
     case 'addDimension':

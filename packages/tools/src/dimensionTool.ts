@@ -1,6 +1,6 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionValue, formatDimension, newId, roundMm, type Dimension, type DimensionRef } from '@hestia/model';
-import { ToolBase } from './base.ts';
+import { ToolBase, viewPlanId } from './base.ts';
 import { endRefAt, signedOffset } from './annotationPick.ts';
 import { parseNumber } from './numeric.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
@@ -203,7 +203,7 @@ export class DimensionTool extends ToolBase {
     this.env.transaction('Criar sequência de cotas', () => {
       for (const d of pairs) {
         const refs = { ...(d.ra ? { a: d.ra } : {}), ...(d.rb ? { b: d.rb } : {}) };
-        this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension: { id: newId('dim'), a: d.a, b: d.b, offset: d.offset, mode: opts.dimensionMode ?? 'aligned', unit: opts.dimensionUnit ?? 'm', precision: opts.dimensionPrecision ?? 2, textHeight: opts.dimensionTextHeight ?? 2.5, tickStyle: opts.dimensionTickStyle ?? 'slash', ...(opts.dimensionPrefix ? { prefix: opts.dimensionPrefix } : {}), ...(opts.dimensionSuffix ? { suffix: opts.dimensionSuffix } : {}), ...(Object.keys(refs).length ? { refs } : {}) } });
+        this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), planId: viewPlanId(this.env), dimension: { id: newId('dim'), a: d.a, b: d.b, offset: d.offset, mode: opts.dimensionMode ?? 'aligned', unit: opts.dimensionUnit ?? 'm', precision: opts.dimensionPrecision ?? 2, textHeight: opts.dimensionTextHeight ?? 2.5, tickStyle: opts.dimensionTickStyle ?? 'slash', ...(opts.dimensionPrefix ? { prefix: opts.dimensionPrefix } : {}), ...(opts.dimensionSuffix ? { suffix: opts.dimensionSuffix } : {}), ...(Object.keys(refs).length ? { refs } : {}) } });
       }
     });
     this.reset();
@@ -220,7 +220,7 @@ export class DimensionTool extends ToolBase {
     const refs = { ...(this.refA ? { a: this.refA } : {}), ...(this.refB ? { b: this.refB } : {}) };
     const o = this.env.options();
     const dimension = { id: newId('dim'), a, b, offset, mode: o.dimensionMode ?? 'aligned', unit: o.dimensionUnit ?? 'm', precision: o.dimensionPrecision ?? 2, prefix: o.dimensionPrefix ?? '', suffix: o.dimensionSuffix ?? '', textHeight: o.dimensionTextHeight ?? 2.5, tickStyle: o.dimensionTickStyle ?? 'slash', ...(Object.keys(refs).length ? { refs } : {}) };
-    this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension });
+    this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), planId: viewPlanId(this.env), dimension });
     this.reset();
     this.env.say(this.hint);
   }

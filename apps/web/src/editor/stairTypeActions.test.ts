@@ -43,6 +43,13 @@ describe('tipos de escada: uso, substituição e exclusão', () => {
     expect(renameStairType(store, copy, '   ').ok).toBe(false);
   });
 
+  it('duplicar copia todos os campos de cálculo do tipo', () => {
+    const store = withStair();
+    store.exec({ type: 'upsertStairType', stairType: { ...monolithic(), id: 'stt_calc', calcRiserFactor: 2.5, calcTreadFactor: 1.5, calcTarget: 0.64, calcMin: 0.62, calcMax: 0.66, maxTread: 0.31 } });
+    const copy = duplicateStairType(store, 'stt_calc')!;
+    expect(store.project.stairTypes[copy]).toMatchObject({ calcRiserFactor: 2.5, calcTreadFactor: 1.5, calcTarget: 0.64, calcMin: 0.62, calcMax: 0.66, maxTread: 0.31 });
+  });
+
   it('duplicar para as escadas selecionadas é um só passo de desfazer', () => {
     const store = withStair();
     const copy = duplicateStairTypeFor(store, ['st1'], 'stt_monolitica')!;

@@ -1,152 +1,276 @@
-import { useState, type ReactElement } from 'react';
-import { stairTypeIssue, stairTypeUsage, type StairRunStyle, type StairType, type StairUndersideStyle } from '@hestia/model';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { DEFAULT_STAIR_CALC_RULE, stairTypeUsage, type StairRunStyle, type StairType } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { keptStairType } from '../../editor/stairActions.ts';
-import { duplicateStairType, stairTypeDeleteBlock, stairTypeError, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
-import { NumField, TextField } from '../fields.tsx';
+import { duplicateStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
+import { I18N, useI18n } from '../../editor/i18n.ts';
+import { safeGet, safeSet } from '../../editor/storage.ts';
+import { TextField } from '../fields.tsx';
 import { Dialog } from './Dialog.tsx';
 import { TypeDialogHeader } from './TypeDialogHeader.tsx';
 import { FAMILY } from '../typeFamilies.ts';
 import { StairSectionPreview } from './StairSectionPreview.tsx';
+import { StairCalculatorPanel } from './StairCalculatorPanel.tsx';
+import { StairTypeSections, stairIssueText } from './StairTypeSections.tsx';
+import { computeStairCalc } from './stairTypeCalc.ts';
+import { finalizeForSave, preserveOnStyleChange, validateStairType } from './stairTypeForm.ts';
 
-const STYLE_LABEL: Record<StairRunStyle, string> = { monolithic: 'Monolítico (concreto)', assembled: 'Piso e espelho (montado)', post: 'Poste central' };
-const UNDERSIDE_LABEL: Record<StairUndersideStyle, string> = { smooth: 'Lisa', stepped: 'Escalonada' };
+const CALC_H_KEY = 'hestia.stt.calcH';
+
+const fill = (s: string, params: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => params[k] ?? '');
+
+/** Completa tipos antigos com a regra padrão (a migração pode não ter passado por todos os campos). */
+function normalize(t: StairType): StairType {
+  return {
+    ...t,
+    calcRiserFactor: t.calcRiserFactor ?? DEFAULT_STAIR_CALC_RULE.calcRiserFactor,
+    calcTreadFactor: t.calcTreadFactor ?? DEFAULT_STAIR_CALC_RULE.calcTreadFactor,
+    calcTarget: t.calcTarget ?? DEFAULT_STAIR_CALC_RULE.calcTarget,
+    calcMin: t.calcMin ?? DEFAULT_STAIR_CALC_RULE.calcMin,
+    calcMax: t.calcMax ?? DEFAULT_STAIR_CALC_RULE.calcMax,
+    maxTread: t.maxTread ?? DEFAULT_STAIR_CALC_RULE.maxTread,
+    treadOverlap: t.treadOverlap ?? 0,
+  };
+}
+
+function initialHeight(): number {
+  const raw = safeGet(CALC_H_KEY);
+  const n = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 300;
+}
+
+/** Foca o primeiro campo da seção (abre a seção de identificação, que começa fechada). */
+function focusSection(n: number): void {
+  const box = document.getElementById(`stt-sec-${n}`);
+  const details = box instanceof HTMLDetailsElement ? box : box?.closest('details');
+  if (details) details.open = true;
+  const el = box?.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+  el?.focus();
+}
+
+/** Só grava o valor digitado no NumField ao sair do campo: desfoca e executa a ação no próximo passo. */
+function runAction(action: () => void): void {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+  window.setTimeout(action, 0);
+}
 
 /**
- * Editor de tipo de escada (campos do `StairType`, decisão 0011 §1 item 8). O estilo decide a espessura: monolítico usa
- * a espessura estrutural (perpendicular à rampa) e a face inferior (decisão 0012); montado usa a espessura do piso e do
- * espelho; poste central (decisão 0014 §8) usa a espessura do degrau, a sobreposição e o material do poste, sem espelho.
+ * Modal do tipo de escada: nome no topo, seções 1 a 5 à esquerda e calculadora + prévia à direita. Os atalhos são
+ * tratados em captura porque o NumField para a propagação do keydown (Ctrl+Enter no Dialog; Ctrl+S e Alt+1..5 aqui).
  */
 export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
+  const selection = useUi((s) => s.selection);
+  const lang = useI18n((s) => s.lang);
+  const t = I18N[lang];
   const src = p.stairTypes[typeId];
-  const [draft, setDraft] = useState<StairType | null>(src ? structuredClone(src) : null);
+  const base = src ? normalize(structuredClone(src)) : null;
+  const [draft, setDraftState] = useState<StairType | null>(() => (src ? normalize(structuredClone(src)) : null));
+  const draftRef = useRef<StairType | null>(draft);
   const [current, setCurrent] = useState(typeId);
+  const styleStore = useRef<Partial<StairType>>({});
+  const [calcHeight, setCalcHeightState] = useState<number>(initialHeight);
+  draftRef.current = draft;
   if (current !== typeId) {
     setCurrent(typeId);
-    setDraft(p.stairTypes[typeId] ? structuredClone(p.stairTypes[typeId]!) : null);
+    const next = p.stairTypes[typeId] ? normalize(structuredClone(p.stairTypes[typeId]!)) : null;
+    draftRef.current = next;
+    styleStore.current = {};
+    setDraftState(next);
   }
-  if (!draft) return null;
-  const usage = stairTypeUsage(p, draft.id);
-  const error = stairTypeError(draft) ?? stairTypeIssue(draft);
-  const mono = draft.runStyle === 'monolithic';
-  const post = draft.runStyle === 'post';
-  const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
-  const set = (patch: Partial<StairType>): void => setDraft({ ...draft, ...patch });
-  const setStyle = (runStyle: StairRunStyle): void =>
-    set(
-      runStyle === 'monolithic'
-        ? { runStyle, structuralDepth: draft.structuralDepth || 0.2, treadThickness: 0, riserThickness: 0 }
-        : runStyle === 'post'
-          ? { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.05, riserThickness: 0, treadOverlap: draft.treadOverlap || 0.025 }
-          : { runStyle, structuralDepth: 0, treadThickness: draft.treadThickness || 0.03, riserThickness: draft.riserThickness || 0.02 },
-    );
-  /** Grava como o OK, mas o diálogo segue aberto com o rascunho. */
+
+  const set = (patch: Partial<StairType>): void => {
+    const cur = draftRef.current;
+    if (!cur) return;
+    const next = { ...cur, ...patch };
+    draftRef.current = next;
+    setDraftState(next);
+  };
+  const changeStyle = (style: StairRunStyle): void => {
+    const cur = draftRef.current;
+    if (!cur) return;
+    const next = preserveOnStyleChange(cur, style, styleStore);
+    draftRef.current = next;
+    setDraftState(next);
+  };
+  const setCalcHeight = (v: number): void => {
+    setCalcHeightState(v);
+    safeSet(CALC_H_KEY, String(v));
+  };
+
+  const materialIds = Object.keys(p.materials);
+  const issues = draft ? validateStairType(draft, materialIds) : [];
+  const errors = issues.filter((i) => i.severity === 'error');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const canSave = errors.length === 0;
+  const usage = draft ? stairTypeUsage(p, draft.id) : 0;
+  const dirty = Boolean(draft && base && JSON.stringify(draft) !== JSON.stringify(base));
+  const impact = Boolean(
+    draft && base && usage > 0 &&
+    (['maxRiser', 'minTread', 'calcRiserFactor', 'calcTreadFactor'] as const).some((f) => draft[f] !== base[f]),
+  );
+  const calc = draft ? computeStairCalc(draft, calcHeight / 100) : null;
+  const nameIssue = issues.find((i) => i.field === 'name' && i.severity === 'error') ?? issues.find((i) => i.field === 'name');
+  const nameMsg = nameIssue ? stairIssueText(nameIssue, t) : undefined;
+
+  const closeNow = (): void => useUi.setState({ dialog: null, dialogArg: null });
+  const requestClose = (): void => {
+    if (dirty && !window.confirm(t.stt_discard)) return;
+    closeNow();
+  };
+  const persist = (): boolean => {
+    const cur = draftRef.current;
+    if (!cur) return false;
+    if (validateStairType(cur, materialIds).some((i) => i.severity === 'error')) return false;
+    const saved = finalizeForSave(cur);
+    editor.store.exec({ type: 'upsertStairType', stairType: saved }, 'Editar tipo de escada');
+    draftRef.current = saved;
+    setDraftState(saved);
+    return true;
+  };
   const apply = (): void => {
-    if (error) return;
-    editor.store.exec({ type: 'upsertStairType', stairType: draft }, 'Editar tipo de escada');
+    persist();
   };
   const ok = (): void => {
-    if (error) return;
-    editor.store.exec({ type: 'upsertStairType', stairType: draft }, 'Editar tipo de escada');
-    close();
+    if (persist()) closeNow();
   };
+  const okRef = useRef(ok);
+  const applyRef = useRef(apply);
+  okRef.current = ok;
+  applyRef.current = apply;
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        e.stopPropagation();
+        runAction(() => applyRef.current());
+        return;
+      }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-5]$/.test(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        focusSection(Number(e.key));
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, []);
+
   const duplicate = (): void => {
-    const id = duplicateStairType(editor.store, draft.id);
+    if (!draftRef.current) return;
+    const id = duplicateStairType(editor.store, draftRef.current.id);
     if (id) useUi.setState({ dialogArg: id });
   };
   const del = (): void => {
-    const r = tryDeleteStairType(editor.store, draft.id);
+    if (!draftRef.current) return;
+    const r = tryDeleteStairType(editor.store, draftRef.current.id);
     if (!r.ok) {
       useUi.setState({ status: `Não foi possível excluir: ${r.error}` });
       return;
     }
     const ui = useUi.getState();
-    if (ui.options.stair?.typeId === draft.id) {
+    if (ui.options.stair?.typeId === draftRef.current.id) {
       useUi.setState({ options: { ...ui.options, stair: { ...ui.options.stair, typeId: keptStairType(editor.project, undefined) } } });
     }
-    close();
+    closeNow();
   };
+
+  if (!draft) {
+    return (
+      <Dialog title={t.stt_title} onClose={closeNow} size="mid" footer={<button className="btn" onClick={closeNow}>{t.stt_close}</button>}>
+        <p className="hint">{t.stt_missing}</p>
+      </Dialog>
+    );
+  }
+
   const blocked = stairTypeDeleteBlock(p, draft.id);
+  const target = selection.map((id) => p.elements[id]).find((e) => e?.kind === 'stair');
+  const goProps = (): void => {
+    if (!target) return;
+    if (dirty && !window.confirm(t.stt_discard)) return;
+    useUi.setState({ selection: [target.id], dialog: null, dialogArg: null });
+  };
+  const focusFirstError = (): void => {
+    const field = errors[0]?.field;
+    if (!field) return;
+    const el = document.getElementById(`stt-${field}`);
+    if (el instanceof HTMLElement) {
+      const details = el.closest('details');
+      if (details) details.open = true;
+      el.focus();
+    }
+  };
+  const errorWord = errors.length === 1 ? t.stt_err_word_one : t.stt_err_word_many;
+  const warnWord = warnings.length === 1 ? t.stt_warn_word_one : t.stt_warn_word_many;
+  const count = `${errors.length} ${errorWord}, ${warnings.length} ${warnWord}`;
+  const sub = fill(usage === 1 ? t.stt_sub_one : t.stt_sub_many, { n: String(usage) });
+  const post = draft.runStyle === 'post';
+  const disabledReason = errors.length > 0 ? stairIssueText(errors[0]!, t) : undefined;
+
   return (
     <Dialog
-      title="Propriedades do tipo de escada"
-      sub={`Escada · usada em ${usage} ${usage === 1 ? 'escada' : 'escadas'}`}
-      onClose={close}
-      size="mid"
+      title={t.stt_title}
+      sub={sub}
+      onClose={requestClose}
+      onSubmit={() => runAction(() => okRef.current())}
+      size="wide"
       footer={
         <>
-          <button className="btn danger" disabled={blocked !== null} title={blocked ?? 'Excluir tipo'} onClick={del}>Excluir</button>
+          <button className="btn danger" disabled={blocked !== null} title={blocked ?? t.stt_delete_type_tip} onClick={del}>{t.stt_delete}</button>
+          {blocked ? <span className="stt-ref">{fill(t.stt_delete_blocked, { reason: blocked })}</span> : null}
           <span style={{ flex: 1 }} />
-          <button className="btn" onClick={close}>Cancelar</button>
-          <button className="btn" onClick={apply} disabled={error !== null}>Aplicar</button>
-          <button className="btn primary" onClick={ok} disabled={error !== null} title={error ?? undefined}>OK</button>
+          {errors.length > 0 ? (
+            <button className="btn small" onClick={focusFirstError} title={disabledReason}>{count}</button>
+          ) : (
+            <span className="stt-ref">{count}</span>
+          )}
+          {disabledReason ? <span className="stt-ref" style={{ maxWidth: 230, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{disabledReason}</span> : null}
+          <button className="btn" onClick={requestClose}>{t.stt_cancel}</button>
+          <button className="btn" onClick={apply} disabled={!canSave} aria-disabled={!canSave} title={disabledReason}>{t.stt_apply}</button>
+          <button className="btn primary" onClick={ok} disabled={!canSave} aria-disabled={!canSave} title={disabledReason}>{t.stt_ok}</button>
+          <span className="stt-ref">{t.stt_kbd_hint}</span>
         </>
       }
     >
       <TypeDialogHeader family={FAMILY.stair} types={Object.values(p.stairTypes)} currentId={draft.id} nameFieldId="stt-name" onDuplicate={duplicate} />
       <div className="field-row">
-        <label htmlFor="stt-name">Nome do tipo</label>
-        <TextField id="stt-name" value={draft.name} onCommit={(v) => set({ name: v })} />
+        <label htmlFor="stt-name">{t.stt_f_name}</label>
+        <TextField
+          id="stt-name"
+          value={draft.name}
+          onCommit={(v) => set({ name: v })}
+          invalid={Boolean(nameMsg)}
+          describedBy={nameMsg ? 'stt-name-err' : undefined}
+          dataAutofocus
+        />
       </div>
-      <div className="split">
-        <div style={{ minWidth: 0 }}>
-          <div className="field-row">
-            <label htmlFor="stt-style">Estilo</label>
-            <select id="stt-style" className="select" value={draft.runStyle} onChange={(e) => setStyle(e.target.value as StairRunStyle)}>
-              {(Object.keys(STYLE_LABEL) as StairRunStyle[]).map((k) => <option key={k} value={k}>{STYLE_LABEL[k]}</option>)}
-            </select>
-          </div>
-          <div className="field-row"><label htmlFor="stt-riser">Espelho máximo (cm)</label><NumField id="stt-riser" value={draft.maxRiser} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ maxRiser: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-tread">Piso mínimo (cm)</label><NumField id="stt-tread" value={draft.minTread} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minTread: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-width">Largura mínima do lance (cm)</label><NumField id="stt-width" value={draft.minRunWidth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ minRunWidth: v })} /></div>
-          {mono ? (
-            <>
-              <div className="field-row"><label htmlFor="stt-depth">Espessura estrutural (perpendicular à rampa) (cm)</label><NumField id="stt-depth" value={draft.structuralDepth} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ structuralDepth: v })} /></div>
-              <div className="field-row">
-                <label htmlFor="stt-underside">Face inferior</label>
-                <select id="stt-underside" className="select" value={draft.undersideStyle} onChange={(e) => set({ undersideStyle: e.target.value as StairUndersideStyle })}>
-                  {(Object.keys(UNDERSIDE_LABEL) as StairUndersideStyle[]).map((k) => <option key={k} value={k}>{UNDERSIDE_LABEL[k]}</option>)}
-                </select>
-              </div>
-            </>
-          ) : post ? (
-            <>
-              <div className="field-row"><label htmlFor="stt-tt">Espessura do degrau (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
-              <div className="field-row"><label htmlFor="stt-overlap">Sobreposição dos degraus (cm)</label><NumField id="stt-overlap" value={draft.treadOverlap} scale={100} decimals={1} min={0} onCommit={(v) => set({ treadOverlap: v })} /></div>
-              <div className="field-row">
-                <label htmlFor="stt-post-mat">Material do poste</label>
-                <select id="stt-post-mat" className="select" value={draft.postMaterialId} onChange={(e) => set({ postMaterialId: e.target.value })}>
-                  {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="field-row"><label htmlFor="stt-tt">Espessura do piso (cm)</label><NumField id="stt-tt" value={draft.treadThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ treadThickness: v })} /></div>
-              <div className="field-row"><label htmlFor="stt-rt">Espessura do espelho (cm)</label><NumField id="stt-rt" value={draft.riserThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ riserThickness: v })} /></div>
-            </>
-          )}
-          <div className="field-row"><label htmlFor="stt-nosing">Nariz (cm)</label><NumField id="stt-nosing" value={draft.nosing} scale={100} decimals={1} min={0} onCommit={(v) => set({ nosing: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-land">Espessura do patamar (cm)</label><NumField id="stt-land" value={draft.landingThickness} scale={100} decimals={1} min={0.01} onCommit={(v) => set({ landingThickness: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-head">Folga de cabeça mínima (m)</label><NumField id="stt-head" value={draft.minHeadroom} decimals={2} min={0.01} onCommit={(v) => set({ minHeadroom: v })} /></div>
-          <div className="field-row">
-            <label htmlFor="stt-mat">Material</label>
-            <select id="stt-mat" className="select" value={draft.materialId} onChange={(e) => set({ materialId: e.target.value })}>
-              {Object.values(p.materials).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
-          <div className="field-row"><label htmlFor="stt-code">Código</label><TextField id="stt-code" value={draft.code} onCommit={(v) => set({ code: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-desc">Descrição</label><TextField id="stt-desc" value={draft.description} onCommit={(v) => set({ description: v })} /></div>
-          <div className="field-row"><label htmlFor="stt-cost" title="Custo informativo do tipo (R$)">Custo (R$)</label><NumField id="stt-cost" value={draft.cost} decimals={2} min={0} onCommit={(v) => set({ cost: v })} /></div>
-          {error && <p className="hint" role="alert" style={{ color: 'var(--danger, #b42318)', marginTop: 8 }}>{error}</p>}
+      {nameMsg ? <div className="vr-error" id="stt-name-err">{nameMsg}</div> : null}
+      {impact ? <p className="hint" role="status" style={{ color: 'var(--warn)' }}>{fill(t.stt_impact, { n: String(usage) })}</p> : null}
+      <div className="stt-grid">
+        <div className="stt-main">
+          <StairTypeSections
+            draft={draft}
+            set={set}
+            onStyle={changeStyle}
+            materials={p.materials}
+            issues={issues}
+            canGoProps={Boolean(target)}
+            onGoProps={goProps}
+          />
         </div>
-        <div>
-          <StairSectionPreview type={draft} />
-          <p className="hint" style={{ padding: '8px 2px' }}>
-            Regras de espelho e piso valem para o lance calculado pela forma (reta, L, U). No croqui livre elas não bloqueiam, mas a altura real do espelho continua limitada pelo máximo.
-          </p>
+        <div className="stt-side">
+          <StairCalculatorPanel type={draft} heightCm={calcHeight} onHeight={setCalcHeight} />
+          <div>
+            <div className="stt-ref" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{t.stt_preview_title}</div>
+            <StairSectionPreview
+              type={draft}
+              riser={calc?.valid && !post ? calc.riser : undefined}
+              tread={calc?.valid && !post ? calc.tread : undefined}
+            />
+          </div>
         </div>
       </div>
     </Dialog>

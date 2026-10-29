@@ -18,6 +18,7 @@ import {
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useUnits } from './useUnits.ts';
 
 /** Cota, texto, detalhe ou etiqueta selecionado (decisão 0019); null se a seleção não é uma anotação. */
 export interface NotaSelecionada {
@@ -112,20 +113,21 @@ function TextAreaField({ id, value, onCommit }: { id?: string; value: string; on
 /** Propriedades da cota (valor só leitura, deslocamento da linha) e do texto (caixa, moldura, posição e estilo). */
 export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSelecionada & { planId?: Id | null }): ReactElement {
   const p = useProject();
+  const units = useUnits();
   const levelId = useUi((s) => s.levelId);
   const nota = (c: AnnotationCommand): void => editor.store.exec(comPlanoDaVista(c, planId));
   if (dim) {
     return (
       <Group title="Cota">
-        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim))}</span></Row>
+        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim), units)}</span></Row>
         <Row label="Texto" htmlFor="p-dtext">
-          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim))} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
+          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim), units)} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
         </Row>
         <Row label="Deslocamento" htmlFor="p-doff">
-          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} unit="m" />
+          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} quantity="length" />
         </Row>
         <Row label="Direção"><select className="select" value={dim.mode ?? 'aligned'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { mode: e.target.value as Dimension['mode'] } }))}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row>
-        <Row label="Unidade"><select className="select" value={dim.unit ?? 'm'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
+        <Row label="Unidade"><select className="select" value={dim.unit ?? 'project'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="project">Projeto</option><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
         <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
         <Row label="Prefixo" htmlFor="p-dprefix"><TextField id="p-dprefix" value={dim.prefix ?? ''} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { prefix: v } }))} /></Row>
         <Row label="Sufixo" htmlFor="p-dsuffix"><TextField id="p-dsuffix" value={dim.suffix ?? ''} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { suffix: v } }))} /></Row>

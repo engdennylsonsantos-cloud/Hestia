@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUnits } from '@hestia/model';
+import { defaultUnits, resolveUnits } from '@hestia/model';
 import type { TempDim } from '@hestia/tools';
 import { resolveDimEdit } from './dimsActions.ts';
 
@@ -29,8 +29,17 @@ describe('resolveDimEdit', () => {
   });
 
   it('valor inválido não grava', () => {
-    expect(resolveDimEdit(editavel, 'abc', metros)).toEqual({ kind: 'error', message: 'Medida inválida: digite uma distância, como 1,20.' });
+    expect(resolveDimEdit(editavel, 'abc', metros)).toEqual({ kind: 'error', message: 'Medida inválida: digite uma distância, como 1,2 m.' });
     expect(resolveDimEdit(editavel, '', metros).kind).toBe('error');
+  });
+
+  it('o exemplo da medida inválida segue a unidade do projeto', () => {
+    const cm = resolveUnits({ length: { unit: 'cm', decimals: 2 } });
+    expect(resolveDimEdit(editavel, 'abc', cm)).toEqual({ kind: 'error', message: 'Medida inválida: digite uma distância, como 120 cm.' });
+    const ftIn = resolveUnits({ length: { unit: 'ft-in', decimals: 2 } });
+    const r = resolveDimEdit(editavel, 'abc', ftIn);
+    expect(r.kind).toBe('error');
+    if (r.kind === 'error') expect(r.message).toContain(`'`);
   });
 
   it('erro do provedor vira alerta e nenhum comando', () => {

@@ -1,5 +1,5 @@
-import { rampMaxSlope, type RampType } from '@hestia/model';
-import { maxRiseFor } from './rampPlan.ts';
+import { rampMaxSlope, rampNormRowFor, type RampType } from '@hestia/model';
+import { flightsFor, maxRiseFor } from './rampPlan.ts';
 
 /**
  * Cálculo numérico do modo "livre" da rampa (prévia em tempo real e otimizador). Tudo puro e O(nº de lances):
@@ -161,4 +161,171 @@ export function liveRemaining(i: LiveInput): LiveRemaining {
 /** Distância (do início do trecho) em que o desnível `total` fecha. */
 function closeAt(total: number, c: number, s: number, maxRise: number, P: number): number {
   return layoutUntilRise(total, c, s, maxRise, P).length;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Otimizador ("Ajustar")
+// ---------------------------------------------------------------------------------------------------------------
+
+export interface OptimizeInput {
+  /** Desnível total (m). */
+  H: number;
+  type: RampType;
+  /**
+   * Comprimentos desenhados dos trechos (m), de eixo a eixo do percurso (lances + patamares). Entre dois trechos
+   * há um patamar de giro de `turnLanding`.
+   */
+  segments: number[];
+  /**
+   * 'slope': só o candidato da barra; 'length': a inclinação exata do croqui se a norma aceita, senão o de menor
+   * ajuste; 'auto': a barra e cada linha da tabela de norma (inclinação livre dentro da tabela).
+   */
+  mode: 'slope' | 'length' | 'auto';
+  /** Inclinação da barra (fração); ausente = padrão do tipo. */
+  slope?: number;
+  /** Profundidade do patamar de giro (m); padrão = patamar mínimo do tipo. */
+  turnLanding?: number;
+}
+
+export interface OptimizeCandidate {
+  slope: number;
+  flights: number;
+  /** Comprimento horizontal de cada lance (iguais). */
+  flightLength: number;
+  /** Comprimento do percurso necessário (lances + patamares). */
+  pathLength: number;
+  /** Necessário - desenhado (m): positivo estica o último trecho; negativo trunca. */
+  delta: number;
+  /** Soma das violações de norma (0 = respeita a norma). */
+  violation: number;
+  messages: string[];
+}
+
+export interface OptimizeResult extends OptimizeCandidate {
+  /** Trechos ajustados (último esticado ou truncado a partir do fim; nunca some o 1º). */
+  segments: number[];
+  /** Resumo em pt-BR. */
+  note: string;
+}
+
+const SEG_MIN = 0.01;
+
+function fmt(n: number, d = 2): string {
+  return n.toFixed(d).replace('.', ',');
+}
+
+/** Candidato à inclinação `s` fixa. */
+function candidateAt(i: OptimizeInput, s: number, drawn: number, turns: number, D: number): OptimizeCandidate {
+  const { H, type } = i;
+  const mr = maxRiseFor(type, s);
+  const n = Math.max(turns + 1, mr ? flightsFor(H, mr) : 1);
+  return build(i, s, n, H / s, drawn, turns, D);
+}
+
+function landingsLength(n: number, turns: number, D: number, P: number): number {
+  return turns * D + Math.max(0, n - 1 - turns) * P;
+}
+
+function build(i: OptimizeInput, s: number, n: number, lf: number, drawn: number, turns: number, D: number): OptimizeCandidate {
+  const { H, type } = i;
+  const P = type.landingMinLength;
+  const pathLength = lf + landingsLength(n, turns, D, P);
+  const messages: string[] = [];
+  let violation = 0;
+  if (type.normTable.length > 0) {
+    const smax = rampMaxSlope(type)!;
+    if (s > smax + 1e-6) {
+      violation += s - smax;
+      messages.push(`Inclinação ${fmt(s * 100)} % acima do máximo de ${fmt(smax * 100)} %.`);
+    }
+    const row = rampNormRowFor(type, s);
+    const mr = maxRiseFor(type, s);
+    if (mr && H / n > mr + 1e-9) {
+      violation += H / n - mr;
+      messages.push(`Cada lance vence ${fmt(H / n)} m: acima do máximo de ${fmt(mr)} m.`);
+    }
+    if (row && row.maxFlights !== null && n > row.maxFlights) {
+      violation += n - row.maxFlights;
+      messages.push(`${n} lances: acima do máximo de ${row.maxFlights}.`);
+    }
+  }
+  return { slope: s, flights: n, flightLength: lf / n, pathLength, delta: pathLength - drawn, violation, messages };
+}
+
+/** Inclinação do croqui: menor nº de lances `n` que torna coerente `s = H / (percurso - patamares)`. */
+function fitCandidate(i: OptimizeInput, drawn: number, turns: number, D: number): OptimizeCandidate | null {
+  const P = i.type.landingMinLength;
+  for (let n = turns + 1; n <= 40; n++) {
+    const lf = drawn - landingsLength(n, turns, D, P);
+    if (!(lf > 0)) continue;
+    const s = i.H / lf;
+    const mr = maxRiseFor(i.type, s);
+    if (!mr || i.H / n <= mr + 1e-9) return build(i, s, n, lf, drawn, turns, D);
+  }
+  return null;
+}
+
+const better = (a: OptimizeCandidate, b: OptimizeCandidate): boolean => {
+  if (Math.abs(a.violation - b.violation) > 1e-9) return a.violation < b.violation;
+  if (Math.abs(Math.abs(a.delta) - Math.abs(b.delta)) > 1e-9) return Math.abs(a.delta) < Math.abs(b.delta);
+  if (Math.abs(a.slope - b.slope) > 1e-9) return a.slope < b.slope;
+  return a.flights < b.flights;
+};
+
+/** Ajusta o último trecho (estica ou trunca a partir do fim, sem eliminar o 1º). */
+function adjustSegments(segments: number[], delta: number): number[] {
+  const out = segments.slice();
+  if (delta >= 0) {
+    out[out.length - 1] = out[out.length - 1]! + delta;
+    return out;
+  }
+  let cut = -delta;
+  while (cut > 1e-12) {
+    const k = out.length - 1;
+    const room = out[k]! - SEG_MIN;
+    if (room >= cut || k === 0) {
+      out[k] = Math.max(SEG_MIN, out[k]! - cut);
+      break;
+    }
+    cut -= out[k]!;
+    out.pop();
+  }
+  return out;
+}
+
+/**
+ * Ajusta o croqui à norma do tipo (tabela editável, sem valores fixos). Custo lexicográfico: violações de norma,
+ * menor desvio do croqui, menor inclinação, menos lances. Sem candidato válido devolve o de menor violação.
+ */
+export function optimizeRamp(i: OptimizeInput): OptimizeResult {
+  const { type } = i;
+  const drawn = i.segments.reduce((a, b) => a + b, 0);
+  const turns = Math.max(0, i.segments.length - 1);
+  const D = i.turnLanding ?? type.landingMinLength;
+  const bar = i.slope ?? type.defaultSlope;
+
+  const cands: OptimizeCandidate[] = [];
+  if (i.mode === 'slope') {
+    cands.push(candidateAt(i, bar, drawn, turns, D));
+  } else if (i.mode === 'length') {
+    const fit = fitCandidate(i, drawn, turns, D);
+    if (fit && fit.violation === 0) cands.push(fit);
+    else {
+      if (fit) cands.push(fit);
+      for (const s of [bar, ...type.normTable.map((r) => r.maxSlope)]) cands.push(candidateAt(i, s, drawn, turns, D));
+    }
+  } else {
+    for (const s of [bar, ...type.normTable.map((r) => r.maxSlope)]) cands.push(candidateAt(i, s, drawn, turns, D));
+  }
+  let best = cands[0]!;
+  for (const c of cands) if (better(c, best)) best = c;
+
+  const segments = adjustSegments(i.segments, best.delta);
+  const mudou = Math.abs(best.delta) > 1e-9;
+  const sinal = best.delta >= 0 ? '+' : '-';
+  const note =
+    `Ajustado: ${fmt(best.slope * 100)} %, ${best.flights} ${best.flights === 1 ? 'lance' : 'lances'}` +
+    (mudou ? `, ${sinal}${fmt(Math.abs(best.delta), 1)} m no último trecho.` : '.') +
+    (best.violation > 0 ? ` Sem opção dentro da norma: ${best.messages.join(' ')}` : '');
+  return { ...best, segments, note };
 }

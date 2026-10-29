@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactEle
 import { worldToScreen } from '@hestia/render';
 import { toPermanent, type TempDim } from '@hestia/tools';
 import { editor } from '../../editor/controller.ts';
-import { setDimOverride, useUi } from '../../editor/state.ts';
+import { setDimOverride, suspendSelectionDims, useUi } from '../../editor/state.ts';
 import { currentUnits, useFormat } from '../useUnits.ts';
-import { INVALID_FLASH_MS, resolveDimEdit } from './dimsActions.ts';
+import { INVALID_FLASH_MS, resolveDimEdit, suspensionAfterConversion } from './dimsActions.ts';
 import { larguraDoCampo } from './dimsBox.ts';
 import { capturesPointer, holdsLastPreview, rectAround, swallowsPointerButton, type ScreenRect } from './dimsHit.ts';
 import { placeConvertButton, valueRect } from './dimsLayout.ts';
@@ -116,7 +116,16 @@ export function TempDimsOverlay(): ReactElement | null {
 
   const makePermanent = (): void => {
     const cmds = toPermanent(ctx.levelId, dims);
+    const before = editor.store.version;
     editor.store.transaction('Converter em cotas permanentes', () => cmds.forEach((c) => editor.store.exec(c)));
+    const suspended = suspensionAfterConversion(before, editor.store.version);
+    if (suspended === null) {
+      useUi.setState({ status: 'Nada a converter.' });
+      return;
+    }
+    // As temporárias da seleção somem junto: as pretas nascem no mesmo lugar e não podem se sobrepor. O undo muda a
+    // versão e devolve as temporárias (ver `selectionDimsSuspended`).
+    suspendSelectionDims(suspended);
     useUi.setState({ status: 'Cotas criadas.' });
   };
 

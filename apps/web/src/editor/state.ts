@@ -55,6 +55,11 @@ export interface UiState {
   previewTick: number;
   /** Referências de cota escolhidas na sessão (`${provedor}:${ponta}` → referência); somem ao trocar de ferramenta ou seleção. */
   dimOverrides: Record<string, WallDimRef | OpeningDimRef>;
+  /**
+   * Versão do projeto em que a seleção virou cotas permanentes (botão "I"): enquanto o projeto estiver nela, as cotas
+   * temporárias da seleção ficam suspensas para não se sobrepor às pretas. Some na próxima seleção ou alteração.
+   */
+  dimsSuspendedVersion: number | null;
   cursor: { x: number; y: number } | null;
   snapKind: string;
   seen3d: boolean;
@@ -248,6 +253,7 @@ export const useUi = create<UiState>(() => ({
   tutorial: false,
   previewTick: 0,
   dimOverrides: {},
+  dimsSuspendedVersion: null,
   cursor: null,
   snapKind: '',
   seen3d: false,
@@ -298,7 +304,22 @@ export function clearDimOverrides(): void {
   if (Object.keys(useUi.getState().dimOverrides).length > 0) useUi.setState({ dimOverrides: {} });
 }
 
-// As trocas rápidas valem para a ferramenta e a seleção em que foram feitas.
+/**
+ * Suspende as cotas temporárias da seleção depois de ela virar cotas permanentes (botão "I"). A suspensão vale só
+ * enquanto o projeto estiver na `version` da conversão: a próxima seleção ou alteração (inclusive o desfazer) a desfaz.
+ */
+export function suspendSelectionDims(version: number): void {
+  useUi.setState({ dimsSuspendedVersion: version });
+}
+
+/** Devolve as cotas temporárias da seleção (fim da suspensão). */
+export function clearDimsSuspension(): void {
+  if (useUi.getState().dimsSuspendedVersion !== null) useUi.setState({ dimsSuspendedVersion: null });
+}
+
+// As trocas rápidas e a suspensão valem para a ferramenta e a seleção em que foram feitas.
 useUi.subscribe((s, prev) => {
-  if (s.tool !== prev.tool || s.selection !== prev.selection) clearDimOverrides();
+  if (s.tool === prev.tool && s.selection === prev.selection) return;
+  clearDimOverrides();
+  clearDimsSuspension();
 });

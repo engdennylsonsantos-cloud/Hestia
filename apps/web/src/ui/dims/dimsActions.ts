@@ -18,3 +18,19 @@ export function resolveDimEdit(dim: TempDim, text: string, units: ResolvedUnits)
   if ('error' in r) return { kind: 'error', message: r.error };
   return { kind: 'done', commands: r.commands, ...(r.note ? { note: r.note } : {}) };
 }
+
+/**
+ * Versão em que as cotas temporárias da seleção devem ficar suspensas depois do botão "I": a versão em que a
+ * conversão realmente gravou algo. Sem alteração (lista vazia ou comando recusado), não há suspensão.
+ */
+export function suspensionAfterConversion(versionBefore: number, versionAfter: number): number | null {
+  return versionAfter === versionBefore ? null : versionAfter;
+}
+
+/**
+ * As cotas da seleção estão suspensas? Só na mesma versão da conversão: desfazer ou qualquer alteração posterior
+ * muda a versão e devolve as temporárias; trocar de seleção limpa a suspensão no estado.
+ */
+export function selectionDimsSuspended(suspendedVersion: number | null, projectVersion: number): boolean {
+  return suspendedVersion !== null && suspendedVersion === projectVersion;
+}

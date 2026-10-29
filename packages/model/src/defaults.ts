@@ -1,3 +1,4 @@
+import { DEFAULT_ROOM_CATEGORIES } from './areaPlan.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
@@ -188,6 +189,9 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     nextOrder: 1,
     settings: { joinTolerance: 0.02, showTags: false, debugJoins: false, detail: 'medium' },
     views: [],
+    areaPlans: [],
+    roomCategories: DEFAULT_ROOM_CATEGORIES,
+    colorSchemes: [],
     defaults: { wallTypeId: 'wt_alv14', doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', wallHeight: 2.8 },
   };
 }

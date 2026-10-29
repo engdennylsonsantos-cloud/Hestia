@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
-import { editor } from '../../editor/controller.ts';
+import { areaPlanToolAllowed, editor } from '../../editor/controller.ts';
 import { useAtalhos } from '../../editor/shortcutConfig.ts';
 import { toolLabel, type Lang } from '../../editor/i18n.ts';
 import { useUi } from '../../editor/state.ts';
@@ -45,7 +45,13 @@ function faceBase(item: RibbonItem, ctx: RibbonCtx, lang: Lang, active: boolean,
   switch (item.kind) {
     case 'tool': {
       const label = item.label ? txt(item.label, lang) : toolLabel(item.tool, lang);
-      return { icon: item.icon ?? item.tool, label, title: sc ? `${label} (${sc})` : label, on: active, soon: false, disabled: false, onClick: () => editor.setTool(item.tool) };
+      // Planta de área: só anotação (o controlador também recusa, inclusive por atalho).
+      const blocked = ctx.planKind === 'area' && ctx.view !== '3d' && !areaPlanToolAllowed(item.tool);
+      const why = blocked ? (lang === 'pt' ? 'Na planta de área, use as ferramentas de anotação.' : 'In an area plan, use the annotation tools.') : '';
+      return {
+        icon: item.icon ?? item.tool, label, title: `${sc ? `${label} (${sc})` : label}${why ? `\n— ${why}` : ''}`,
+        on: active, soon: false, disabled: blocked, onClick: () => editor.setTool(item.tool),
+      };
     }
     case 'action': {
       const def = ACTIONS[item.action];

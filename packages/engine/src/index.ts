@@ -74,6 +74,8 @@ export * from './rampEdit.ts';
 export * from './openingSchedule.ts';
 export * from './openingChecks.ts';
 export * from './rooms.ts';
+export * from './roomReference.ts';
+export * from './areaPlan.ts';
 export * from './roomSchedule.ts';
 export * from './viewClass.ts';
 export * from './viewWarnings.ts';

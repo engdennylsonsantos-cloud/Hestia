@@ -1,8 +1,8 @@
-import { lineIntervals } from '@hestia/engine';
+import { lineIntervals, roomReferencePoint } from '@hestia/engine';
 import { pointInPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { makeRoom, roomsOnLevel, type Id, type Project, type Room } from '@hestia/model';
 import { makeId } from './base.ts';
-import { enclosedRooms } from './enclosed.ts';
+import { roomRegions } from '@hestia/engine';
 
 /** Próximo número sequencial do nível: a contagem de ambientes do nível + 1, pulando números já usados. */
 export function nextRoomNumber(p: Project, levelId: Id): number {
@@ -40,9 +40,9 @@ export function roomsForEnclosedCircuits(p: Project, levelId: Id): Omit<Room, 'o
   const existing = roomsOnLevel(p, levelId);
   const out: Omit<Room, 'order'>[] = [];
   const numbers = new Set(existing.map((r) => r.number));
-  for (const poly of enclosedRooms(p, levelId, 'finish')) {
+  for (const poly of roomRegions(p, levelId)) {
     const covered = [...existing, ...out].some((r) => pointInPolygon(r.point, poly));
-    const at = interiorPoint(poly);
+    const at = roomReferencePoint(poly) ?? interiorPoint(poly);
     if (covered || !at) continue;
     let n = existing.length + out.length + 1;
     while (numbers.has(String(n))) n += 1;

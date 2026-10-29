@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { climbWalk, openingPlanWorldPaths, ownerOf, planViewOf, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanView, type StairCut } from '@hestia/render';
+import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
+import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
 import {
   dxfGenericRecords,
   dxfLayersOf,
@@ -22,7 +22,7 @@ import {
   type DxfSymbolPath,
   type DxfViewState,
 } from '@hestia/io';
-import { openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, sectionGraphicsOf, sectionPoints, sectionTitleOf, type GraphicsCategory, type Id, type Project } from '@hestia/model';
+import { areaPlanOf, DIM_TEXT_MM, dimensionGeometry, dimensionPoints, dimensionText, openingTypeById, unitsOf, GRAPHICS_CATEGORIES, formatRampSlope, graphicsOf, levelGraphicsOf, lineWeightMm, openingAngle2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, openingsOfWall, planAnnotationsOf, sectionGraphicsOf, sectionPoints, sectionTitleOf, type AreaPlan, type GraphicsCategory, type Id, type Project } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /**
@@ -328,6 +328,127 @@ function withEntityRecords(dxf: string, records: string[]): string {
  * Texto DXF da planta do nível, na vista do intervalo. Os objetos importados (`Generic`) entram como o contorno em planta
  * de cada um, na camada `IMPORTADO`; a categoria `generic` oculta na vista não sai, como as demais.
  */
+/** Layer de um traço da planta de área: referência, chamada ou contorno. */
+const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
+
+/** DXF mínimo (HEADER + TABLES + ENTITIES) a partir das operações da planta de área. */
+function opsToDxf(ops: PlanOps, zoom: number): string {
+  const out: string[] = [];
+  const rec = (code: number, value: string | number): void => { out.push(String(code), String(value)); };
+  const layers = new Map<string, number>();
+  for (const s of ops.strokes) layers.set(areaLayerOf(s.color, s.pts.length), s.color === '#4b5563' ? 13 : s.color === '#111827' ? 18 : 25);
+  layers.set('AMBIENTES_TEXTO', 13);
+  rec(0, 'SECTION'); rec(2, 'HEADER'); rec(9, '$ACADVER'); rec(1, 'AC1015'); rec(9, '$INSUNITS'); rec(70, 6); rec(0, 'ENDSEC');
+  rec(0, 'SECTION'); rec(2, 'TABLES'); rec(0, 'TABLE'); rec(2, 'LAYER'); rec(70, layers.size);
+  for (const [name, weight] of layers) { rec(0, 'LAYER'); rec(2, name); rec(70, 0); rec(62, 7); rec(6, 'CONTINUOUS'); rec(370, weight); }
+  rec(0, 'ENDTAB'); rec(0, 'ENDSEC');
+  rec(0, 'SECTION'); rec(2, 'ENTITIES');
+  for (const s of ops.strokes) {
+    const layer = areaLayerOf(s.color, s.pts.length);
+    const pts = s.closed && s.pts.length > 2 ? [...s.pts, s.pts[0]!] : s.pts;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      rec(0, 'LINE'); rec(8, layer); rec(10, a.x); rec(20, a.y); rec(30, 0); rec(11, b.x); rec(21, b.y); rec(31, 0);
+    }
+  }
+  for (const l of ops.labels) {
+    if (l.maskBoundary || !l.text) continue;
+    const h = (l.fontPx ?? 12) / zoom;
+    rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, l.text); rec(50, l.rotation ?? 0);
+  }
+  rec(0, 'ENDSEC'); rec(0, 'EOF');
+  return out.join('\r\n');
+}
+
+/** Põe registros no fim da seção ENTITIES do DXF mínimo de `opsToDxf` (antes do `ENDSEC`). */
+function appendAreaRecords(dxf: string, records: string[]): string {
+  if (records.length === 0) return dxf;
+  const marker = '\r\n0\r\nENDSEC\r\n0\r\nEOF';
+  const i = dxf.lastIndexOf(marker);
+  if (i < 0) return dxf;
+  return `${dxf.slice(0, i)}\r\n${records.join('\r\n')}${marker}`;
+}
+
+const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
+
+/**
+ * Registros DXF das anotações da planta de área (cotas, textos e detalhes). A geometria da planta já as desenha
+ * quando o render da área passou a incluí-las; o que ainda não estiver nas operações é escrito aqui, sem duplicar.
+ */
+function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string[] {
+  const a = planAnnotationsOf(plan);
+  if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
+  const out: string[] = [];
+  const rec = (code: number, value: string | number): void => { out.push(String(code), String(value)); };
+  const line = (layer: string, start: Vec2, end: Vec2): void => {
+    rec(0, 'LINE'); rec(8, layer); rec(10, start.x); rec(20, start.y); rec(30, 0); rec(11, end.x); rec(21, end.y); rec(31, 0);
+  };
+  const text = (layer: string, at: Vec2, height: number, value: string, rotation = 0): void => {
+    rec(0, 'TEXT'); rec(8, layer); rec(10, at.x); rec(20, at.y); rec(30, 0); rec(40, height); rec(1, value); rec(50, rotation);
+  };
+  const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
+  const mPerMm = plan.scale / 1000;
+  for (const d of a.dimensions) {
+    const value = dimensionText(p, d, unitsOf(p));
+    if (rendered.has(value)) continue;
+    const { a: pa, b: pb } = dimensionPoints(p, d);
+    const textMm = d.textHeight ?? DIM_TEXT_MM;
+    const g = dimensionGeometry(pa, pb, d.offset, mPerMm, textMm, d.textAt);
+    for (const seg of [g.line, ...g.extensions, ...g.ticks]) line('ANOTACOES', seg[0], seg[1]);
+    text('ANOTACOES_TEXTO', g.textAt, (textMm * plan.scale) / 1000, value, g.textRotation);
+  }
+  for (const t of a.texts) {
+    if (rendered.has(t.text)) continue;
+    text('ANOTACOES_TEXTO', t.at, (t.height * plan.scale) / 1000, t.text, t.rotation);
+  }
+  const hasSegment = (start: Vec2, end: Vec2): boolean =>
+    ops.strokes.some((s) => s.pts.length === 2 && samePoint(s.pts[0]!, start) && samePoint(s.pts[1]!, end));
+  for (const x of a.detailLines) if (!hasSegment(x.a, x.b)) line('ANOTACOES_DETALHE', x.a, x.b);
+  for (const x of a.detailRegions) {
+    const drawn = ops.strokes.some((s) => s.pts.length === x.boundary.length && x.boundary.every((q, i) => samePoint(s.pts[i]!, q)));
+    if (drawn) continue;
+    for (let i = 0; i < x.boundary.length; i++) line('ANOTACOES_DETALHE', x.boundary[i]!, x.boundary[(i + 1) % x.boundary.length]!);
+  }
+  return out;
+}
+
+/** DXF da planta de área, com as camadas AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
+export function areaPlanDxf(p: Project, planId: Id): string {
+  const plan = areaPlanOf(p, planId);
+  if (!plan) throw new Error('Planta de área inexistente');
+  const box = levelBox(p, plan.levelId) ?? { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+  const zoom = 100;
+  const width = Math.max(400, (box.maxX - box.minX) * zoom + 200);
+  const height = Math.max(300, (box.maxY - box.minY) * zoom + 200);
+  const ops = buildPlanGeometry({
+    project: p,
+    levelId: plan.levelId,
+    resolved: resolveLevel(p, plan.levelId),
+    below: null,
+    areaPlan: plan,
+    viewport: { cx: (box.minX + box.maxX) / 2, cy: (box.minY + box.maxY) / 2, zoom, width, height },
+    theme: LIGHT,
+    dark: false,
+    selection: [],
+    hover: null,
+    preview: [],
+    inference: null,
+    showGrid: false,
+  });
+  // Cotas/textos/detalhes de `plan.annotations`: o render da área pode já desenhá-los; o que faltar entra aqui.
+  return appendAreaRecords(opsToDxf(resolverZoom(ops, zoom), zoom), areaAnnotationRecords(p, plan, ops));
+}
+
+/** Exporta a planta de área atual e devolve o nome do arquivo salvo. */
+export async function saveAreaPlanDxf(p: Project, planId: Id): Promise<string> {
+  const plan = areaPlanOf(p, planId);
+  if (!plan) throw new Error('Planta de área inexistente');
+  const name = `${p.name || 'projeto'}-${plan.name}.dxf`;
+  await saveText(name, areaPlanDxf(p, planId));
+  return name;
+}
+
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
   const dxf = exportDxf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
   const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;

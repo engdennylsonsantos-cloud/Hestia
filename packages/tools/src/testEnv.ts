@@ -5,6 +5,7 @@ import { createTool, DEFAULT_DISJOIN, type PointerInfo, type Tool, type ToolEnv,
 export function makeEnv(store = new ProjectStore(createEmptyProject())) {
   let selection: Id[] = [];
   let finished = 0;
+  let areaPlan: Id | null = null;
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
@@ -20,12 +21,13 @@ export function makeEnv(store = new ProjectStore(createEmptyProject())) {
     exec: (c) => store.exec(c),
     transaction: (l, fn, session) => store.transaction(l, fn, session),
     metersPerPixel: () => 0.01,
+    areaPlanId: () => areaPlan,
     gridStep: () => 0.1,
     say: () => {},
     done: () => { finished += 1; },
     options: () => options,
   };
-  return { store, env, options, done: () => finished, sel: () => selection };
+  return { store, env, options, done: () => finished, sel: () => selection, areaPlanId: () => areaPlan, setAreaPlanId: (id: Id | null) => { areaPlan = id; } };
 }
 
 export const P = (x: number, y: number, extra: Partial<PointerInfo> = {}): PointerInfo => ({ raw: { x, y }, shift: false, ctrl: false, alt: false, ...extra });

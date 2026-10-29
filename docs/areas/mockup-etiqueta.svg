@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="560" viewBox="0 0 1000 560">
+  <rect width="1000" height="560" fill="#ffffff"/>
+  <text x="24" y="34" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#111827">Rótulo do ambiente: diagonais de referência e chamada</text>
+  <text x="24" y="58" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#6b7280">Sem cor por padrão. As diagonais atravessam o ambiente; a chamada acompanha o rótulo e a posição vale em todas as vistas.</text>
+
+  <!-- ============ PAINEL A ============ -->
+  <g>
+    <rect x="24" y="86" width="300" height="390" fill="#fafafa" stroke="#e5e7eb"/>
+    <text x="40" y="112" font-family="Arial" font-size="13" font-weight="700" fill="#374151">A · rótulo no cruzamento</text>
+
+    <rect x="60" y="160" width="228" height="248" fill="#e5e7eb"/>
+    <rect x="74" y="174" width="200" height="220" fill="#ffffff"/>
+    <!-- diagonais de referência -->
+    <line x1="74" y1="174" x2="274" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <line x1="274" y1="174" x2="74" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <!-- etiqueta no cruzamento, com halo -->
+    <rect x="112" y="262" width="124" height="44" fill="#ffffff"/>
+    <text x="174" y="280" font-family="Arial" font-size="11" font-weight="700" fill="#111827" text-anchor="middle">Sala</text>
+    <text x="174" y="296" font-family="Arial" font-size="10" fill="#374151" text-anchor="middle">101 · 21,34 m²</text>
+    <text x="174" y="438" font-family="Arial" font-size="11" fill="#6b7280" text-anchor="middle">sem chamada; o texto cobre o cruzamento</text>
+  </g>
+
+  <!-- ============ PAINEL B ============ -->
+  <g>
+    <rect x="344" y="86" width="312" height="390" fill="#fafafa" stroke="#e5e7eb"/>
+    <text x="360" y="112" font-family="Arial" font-size="13" font-weight="700" fill="#374151">B · fora, duas linhas cruzadas</text>
+
+    <rect x="380" y="190" width="228" height="218" fill="#e5e7eb"/>
+    <rect x="394" y="204" width="200" height="190" fill="#ffffff"/>
+    <line x1="394" y1="204" x2="594" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <line x1="594" y1="204" x2="394" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <!-- etiqueta fora -->
+    <rect x="432" y="120" width="124" height="44" fill="#ffffff" stroke="#9ca3af"/>
+    <text x="494" y="138" font-family="Arial" font-size="11" font-weight="700" fill="#111827" text-anchor="middle">Sala</text>
+    <text x="494" y="154" font-family="Arial" font-size="10" fill="#374151" text-anchor="middle">101 · 21,34 m²</text>
+    <!-- duas linhas que se cruzam, seguindo a etiqueta -->
+    <line x1="452" y1="164" x2="510" y2="299" stroke="#111827" stroke-width="1.2"/>
+    <line x1="536" y1="164" x2="478" y2="299" stroke="#111827" stroke-width="1.2"/>
+    <text x="494" y="438" font-family="Arial" font-size="11" fill="#6b7280" text-anchor="middle">as duas linhas cruzam e acompanham o rótulo</text>
+  </g>
+
+  <!-- ============ PAINEL C ============ -->
+  <g>
+    <rect x="676" y="86" width="300" height="390" fill="#f4f8ff" stroke="#bfdbfe" stroke-width="1.5"/>
+    <text x="692" y="112" font-family="Arial" font-size="13" font-weight="700" fill="#1d4ed8">C · rótulo girado</text>
+
+    <rect x="712" y="190" width="228" height="218" fill="#e5e7eb"/>
+    <rect x="726" y="204" width="200" height="190" fill="#ffffff"/>
+    <line x1="726" y1="204" x2="926" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <line x1="926" y1="204" x2="726" y2="394" stroke="#6b7280" stroke-width="1.1"/>
+    <!-- etiqueta girada fora -->
+    <g transform="rotate(-25 826 142)">
+      <rect x="764" y="120" width="124" height="44" fill="#ffffff" stroke="#1d4ed8"/>
+      <text x="826" y="138" font-family="Arial" font-size="11" font-weight="700" fill="#111827" text-anchor="middle">Sala</text>
+      <text x="826" y="154" font-family="Arial" font-size="10" fill="#374151" text-anchor="middle">101 · 21,34 m²</text>
+    </g>
+    <line x1="790" y1="160" x2="806" y2="299" stroke="#111827" stroke-width="1.2"/>
+    <line x1="862" y1="160" x2="846" y2="299" stroke="#111827" stroke-width="1.2"/>
+    <text x="826" y="438" font-family="Arial" font-size="11" fill="#1d4ed8" text-anchor="middle">rotação por ambiente, no painel de propriedades</text>
+  </g>
+
+  <g>
+    <text x="24" y="510" font-family="Arial" font-size="12" fill="#374151">As diagonais pertencem ao ambiente (não ao rótulo). A chamada é que segue o rótulo, em tempo real, enquanto ele é arrastado.</text>
+    <text x="24" y="530" font-family="Arial" font-size="12" fill="#374151">A posição do rótulo é gravada no ambiente e vale na planta de piso, na planta de área e em qualquer outra vista.</text>
+  </g>
+</svg>

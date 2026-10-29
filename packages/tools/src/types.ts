@@ -49,6 +49,8 @@ export interface ToolEnv {
   metersPerPixel(): number;
   /** Elementos ocultos na planta atual (fora do intervalo de vista ou categoria oculta): não são alvo de captura (S-07). Ausente = nenhum. */
   hiddenInView?(): ReadonlySet<Id>;
+  /** Planta de área aberta na vista, quando a planta ativa é uma planta de área; null/ausente na planta de piso. */
+  areaPlanId?(): Id | null;
   /** Pavimento de referência visível na planta (o de baixo, com Subpavimento ligado), ou null. A captura usa o que se vê. */
   underlayLevelId?(): Id | null;
   gridStep(): number;

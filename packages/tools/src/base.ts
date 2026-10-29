@@ -1,4 +1,4 @@
-import { newId, type Wall } from '@hestia/model';
+import { newId, type Id, type Wall } from '@hestia/model';
 import type { Inference, PointerInfo, PreviewItem, Tool, ToolEnv } from './types.ts';
 import { infer, type InferContext } from './infer.ts';
 import { floorEdges, floorVertices } from './floorPick.ts';
@@ -96,3 +96,9 @@ export abstract class ToolBase implements Tool {
 }
 
 export const makeId = newId;
+
+/**
+ * Planta de área aberta na vista, quando há uma. As ferramentas de anotação passam este id no comando para
+ * gravar a anotação na planta (vista) e não no nível; `undefined` mantém a anotação na planta de piso.
+ */
+export const viewPlanId = (env: ToolEnv): Id | undefined => env.areaPlanId?.() ?? undefined;

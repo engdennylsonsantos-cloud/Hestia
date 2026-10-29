@@ -34,8 +34,8 @@ export interface TitleBlock {
   scaleNote?: string;
 }
 
-/** O que a vista mostra: planta de um nível, corte/elevação de uma seção do projeto ou o 3D (só quadro no PDF). */
-export type SheetViewSource = { kind: 'plan'; levelId: Id } | { kind: 'section'; sectionId: Id } | { kind: '3d' };
+/** O que a vista mostra: planta de um nível, planta de área, corte/elevação de uma seção do projeto ou o 3D (só quadro no PDF). */
+export type SheetViewSource = { kind: 'plan'; levelId: Id } | { kind: 'areaPlan'; planId: Id } | { kind: 'areaTable' } | { kind: 'section'; sectionId: Id } | { kind: '3d' };
 
 /** Vista colocada numa prancha. `at` é o canto inferior esquerdo e `size` a caixa, ambos em mm de papel. */
 export interface SheetViewport {

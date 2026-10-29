@@ -1,5 +1,5 @@
-import { newSheetId, newViewportId, projectSheets, sheetInnerBox, sheetIssue, sheetOf, viewportIssue, type Command, type Id, type Project, type ProjectStore, type Sheet, type SheetViewport, type SheetViewSource } from '@hestia/model';
-import { buildSheetDrawList, STAMP_H, STAMP_W, type SheetDrawList } from '@hestia/render';
+import { newSheetId, newViewportId, areaPlanOf, projectSheets, sheetInnerBox, sheetIssue, sheetOf, viewportIssue, type Command, type Id, type Project, type ProjectStore, type Sheet, type SheetViewport, type SheetViewSource } from '@hestia/model';
+import { buildSheetDrawList, levelBox, STAMP_H, STAMP_W, type SheetDrawList } from '@hestia/render';
 import { exportSheetsPdf } from '@hestia/io';
 
 /**
@@ -10,7 +10,7 @@ import { exportSheetsPdf } from '@hestia/io';
 /** Passo da grade para procurar lugar livre (mm). */
 const SPOT_STEP = 10;
 /** Tamanho padrão de uma vista nova (mm de papel); encolhe se não couber na área de desenho. */
-const DEFAULT_SIZE: Record<SheetViewSource['kind'], { w: number; h: number }> = { plan: { w: 180, h: 130 }, section: { w: 180, h: 100 }, '3d': { w: 180, h: 130 } };
+const DEFAULT_SIZE: Record<SheetViewSource['kind'], { w: number; h: number }> = { plan: { w: 180, h: 130 }, areaPlan: { w: 180, h: 130 }, areaTable: { w: 120, h: 120 }, section: { w: 180, h: 100 }, '3d': { w: 180, h: 130 } };
 export const SCALE_OPTIONS = [20, 25, 50, 100, 200, 500] as const;
 
 /** Número seguinte da prancha: A-101, A-102, … a partir do que já existe. */
@@ -92,13 +92,31 @@ export const addSheetAction = (store: ProjectStore): Id => {
   return s.id;
 };
 
-/** Adiciona uma vista (planta, corte ou 3D) na escala dada, no primeiro lugar livre. Erro em pt-BR se recusar. */
+/** Tamanho de uma planta de área na prancha: o conteúdo do nível na escala, com 30 mm de folga. */
+export function areaPlanSheetSize(p: Project, planId: Id, scale: number): { w: number; h: number } {
+  const plan = areaPlanOf(p, planId);
+  const box = plan ? levelBox(p, plan.levelId) : null;
+  if (!box) return { w: 180, h: 130 };
+  return { w: (box.maxX - box.minX) * (scale / 1000) + 30, h: (box.maxY - box.minY) * (scale / 1000) + 30 };
+}
+
+/**
+ * Adiciona uma vista (planta, planta de área, corte ou 3D) na escala dada, no primeiro lugar livre. Para planta de
+ * área, o tamanho sai do conteúdo do nível e a escala desce se não couber na folha. Erro em pt-BR se recusar.
+ */
 export function addViewAction(store: ProjectStore, sheetId: Id, view: SheetViewSource, scale: number): Id {
   const s = sheetOf(store.project, sheetId);
   if (!s) throw new Error('Prancha inexistente');
-  const size = defaultViewSize(s, view);
+  const inner = sheetInnerBox(s);
+  let vpScale = scale;
+  let size = view.kind === 'areaPlan' ? areaPlanSheetSize(store.project, view.planId, vpScale) : defaultViewSize(s, view);
+  if (view.kind === 'areaPlan' && (size.w > inner.x1 - inner.x0 || size.h > inner.y1 - inner.y0)) {
+    const k = Math.min((inner.x1 - inner.x0) / size.w, (inner.y1 - inner.y0) / size.h);
+    vpScale = Math.max(10, Math.round(scale * k));
+    size = areaPlanSheetSize(store.project, view.planId, vpScale);
+  }
   const at = freeSpot(s, size);
-  const vp: SheetViewport = { id: newViewportId(), view, at, size, scale };
+  const vp: SheetViewport = { id: newViewportId(), view, at, size, scale: vpScale };
   store.exec({ type: 'addViewport', sheetId, viewport: vp }, 'Adicionar vista à prancha');
   return vp.id;
 }

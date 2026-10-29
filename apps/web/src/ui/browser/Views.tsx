@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactElement } from 'react';
-import { formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
+import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
+import { createAreaPlansForLevels, createGeneralAreaSheetAction, openAreaPlan } from '../../editor/areaPlanActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { Node, type MenuItem } from './Tree.tsx';
@@ -60,6 +61,8 @@ export function ViewsTree(): ReactElement {
   const view = useUi((s) => s.view);
   const levelId = useUi((s) => s.levelId);
   const planKind = useUi((s) => s.planKind);
+  const areaPlanId = useUi((s) => s.areaPlanId);
+  const areaPlans = areaPlansOf(p);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   const genMenu: MenuItem[] = [{ label: 'Gerar elevações (Norte, Sul, Leste, Oeste)', run: () => editor.generateElevations(), hint: 'Cria as quatro em volta das paredes do nível ativo; substitui as de mesmo nome.' }];
@@ -95,6 +98,34 @@ export function ViewsTree(): ReactElement {
         ))}
       </Node>
       <Node id="g:ceilings" label="Plantas de forro (Planta de forro)" group empty="Ainda não disponível: o forro aparece na planta de piso." />
+      <Node
+        id="g:area"
+        label="Plantas de área (Área)"
+        icon="plan"
+        group
+        open
+        menu={[
+          { label: 'Criar para todos os níveis', run: () => { const ids = createAreaPlansForLevels(editor.store, p.levels.map((l) => l.id), { scale: 50 }); if (ids[0]) openAreaPlan(editor.store, ids[0]); say(ids.length ? `${ids.length} planta(s) de área criada(s).` : 'Todos os níveis já têm planta de área.'); } },
+          { label: 'Criar prancha geral', run: () => { try { const id = createGeneralAreaSheetAction(editor.store, areaPlans.map((x) => x.id)); activateView({ kind: 'sheet', sheetId: id }); say('Prancha geral de áreas criada.'); } catch (e) { say(e instanceof Error ? e.message : 'Não foi possível criar a prancha.'); } }, sep: true },
+        ]}
+        empty="Nenhuma planta de área. Botão direito: criar para todos os níveis."
+      >
+        {areaPlans.map((ap) => (
+          <Node
+            key={ap.id}
+            id={`area:${ap.id}`}
+            label={ap.name}
+            icon="plan"
+            bold={view === 'plan' && planKind === 'area' && areaPlanId === ap.id}
+            title="Planta de área: linhas de referência, etiquetas e quadro. Duplo clique abre."
+            onOpen={() => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id })}
+            menu={[
+              { label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id }) },
+              { label: 'Excluir', run: () => editor.store.exec({ type: 'removeAreaPlan', id: ap.id }, 'Excluir planta de área'), danger: true, sep: true },
+            ]}
+          />
+        ))}
+      </Node>
       <Node id="g:3d" label="Vistas 3D (3D View)" group open>
         <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }]} />
       </Node>

@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="880" viewBox="0 0 1280 880">
+  <rect width="1280" height="880" fill="#ffffff"/>
+
+  <text x="40" y="44" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#111827">Planta de área — antes e depois de configurar o esquema de cores</text>
+  <text x="40" y="66" font-family="Arial" font-size="12" fill="#6b7280">Padrão: sem preenchimento, só linhas de referência e etiquetas. A cor entra quando o esquema é configurado.</text>
+
+  <!-- ================= ESQUERDA: PADRÃO ================= -->
+  <g>
+    <text x="60" y="104" font-family="Arial" font-size="14" font-weight="700" fill="#374151">1 · Padrão — sem cor</text>
+
+    <!-- pisos -->
+    <rect x="60" y="120" width="420" height="420" fill="#ffffff"/>
+    <!-- ambientes -->
+    <rect x="60" y="120" width="210" height="210" fill="#f7f9fc"/>
+    <rect x="270" y="120" width="210" height="210" fill="#f7f9fc"/>
+    <rect x="60" y="330" width="210" height="210" fill="#f7f9fc"/>
+    <rect x="270" y="330" width="210" height="210" fill="#f7f9fc"/>
+
+    <!-- paredes -->
+    <rect x="55" y="115" width="430" height="430" fill="none" stroke="#374151" stroke-width="10"/>
+    <line x1="270" y1="120" x2="270" y2="540" stroke="#374151" stroke-width="8"/>
+    <line x1="60" y1="330" x2="480" y2="330" stroke="#374151" stroke-width="8"/>
+    <line x1="270" y1="220" x2="270" y2="260" stroke="#ffffff" stroke-width="10"/>
+    <line x1="160" y1="330" x2="200" y2="330" stroke="#ffffff" stroke-width="10"/>
+
+    <!-- reference lines -->
+    <g stroke="#6b7280" stroke-width="1.1">
+      <line x1="60" y1="120" x2="270" y2="330"/><line x1="270" y1="120" x2="60" y2="330"/>
+      <line x1="270" y1="120" x2="480" y2="330"/><line x1="480" y1="120" x2="270" y2="330"/>
+      <line x1="60" y1="330" x2="270" y2="540"/><line x1="270" y1="330" x2="60" y2="540"/>
+      <line x1="270" y1="330" x2="480" y2="540"/><line x1="480" y1="330" x2="270" y2="540"/>
+    </g>
+
+    <!-- etiquetas com halo -->
+    <g font-family="Arial" text-anchor="middle">
+      <rect x="103" y="205" width="124" height="40" fill="#ffffff"/>
+      <text x="165" y="222" font-size="11" font-weight="700" fill="#111827">Sala</text>
+      <text x="165" y="238" font-size="10" fill="#374151">101 · 21,34 m²</text>
+
+      <rect x="313" y="205" width="124" height="40" fill="#ffffff"/>
+      <text x="375" y="222" font-size="11" font-weight="700" fill="#111827">Cozinha</text>
+      <text x="375" y="238" font-size="10" fill="#374151">102 · 12,80 m²</text>
+
+      <rect x="103" y="415" width="124" height="40" fill="#ffffff"/>
+      <text x="165" y="432" font-size="11" font-weight="700" fill="#111827">Suíte</text>
+      <text x="165" y="448" font-size="10" fill="#374151">103 · 14,10 m²</text>
+
+      <rect x="313" y="415" width="124" height="40" fill="#ffffff"/>
+      <text x="375" y="432" font-size="11" font-weight="700" fill="#111827">Circulação</text>
+      <text x="375" y="448" font-size="10" fill="#374151">104 · 6,20 m²</text>
+    </g>
+
+    <text x="60" y="580" font-family="Arial" font-size="11" fill="#6b7280">Nenhum preenchimento, nenhuma legenda, nenhuma cor.</text>
+    <text x="60" y="598" font-family="Arial" font-size="11" fill="#6b7280">A área é lida pelo cruzamento + etiqueta.</text>
+  </g>
+
+  <!-- ================= DIREITA: COM ESQUEMA ================= -->
+  <g>
+    <text x="700" y="104" font-family="Arial" font-size="14" font-weight="700" fill="#1d4ed8">2 · Depois de configurar o esquema de cores</text>
+
+    <rect x="700" y="120" width="520" height="420" fill="#ffffff"/>
+    <rect x="700" y="120" width="260" height="210" fill="#dbe7f3"/>
+    <rect x="960" y="120" width="260" height="210" fill="#f6e3c8"/>
+    <rect x="700" y="330" width="260" height="210" fill="#e2f0dc"/>
+    <rect x="960" y="330" width="260" height="210" fill="#eee9f7"/>
+
+    <rect x="695" y="115" width="530" height="430" fill="none" stroke="#374151" stroke-width="10"/>
+    <line x1="960" y1="120" x2="960" y2="540" stroke="#374151" stroke-width="8"/>
+    <line x1="700" y1="330" x2="1220" y2="330" stroke="#374151" stroke-width="8"/>
+    <line x1="960" y1="220" x2="960" y2="260" stroke="#dbe7f3" stroke-width="10"/>
+    <line x1="820" y1="330" x2="860" y2="330" stroke="#e2f0dc" stroke-width="10"/>
+
+    <g stroke="#6b7280" stroke-width="1.1">
+      <line x1="700" y1="120" x2="960" y2="330"/><line x1="960" y1="120" x2="700" y2="330"/>
+      <line x1="960" y1="120" x2="1220" y2="330"/><line x1="1220" y1="120" x2="960" y2="330"/>
+      <line x1="700" y1="330" x2="960" y2="540"/><line x1="960" y1="330" x2="700" y2="540"/>
+      <line x1="960" y1="330" x2="1220" y2="540"/><line x1="1220" y1="330" x2="960" y2="540"/>
+    </g>
+
+    <g font-family="Arial" text-anchor="middle">
+      <rect x="768" y="205" width="124" height="40" fill="#dbe7f3"/>
+      <text x="830" y="222" font-size="11" font-weight="700" fill="#111827">Sala</text>
+      <text x="830" y="238" font-size="10" fill="#374151">101 · 21,34 m²</text>
+
+      <rect x="1028" y="205" width="124" height="40" fill="#f6e3c8"/>
+      <text x="1090" y="222" font-size="11" font-weight="700" fill="#111827">Cozinha</text>
+      <text x="1090" y="238" font-size="10" fill="#374151">102 · 12,80 m²</text>
+
+      <rect x="768" y="415" width="124" height="40" fill="#e2f0dc"/>
+      <text x="830" y="432" font-size="11" font-weight="700" fill="#111827">Suíte</text>
+      <text x="830" y="448" font-size="10" fill="#374151">103 · 14,10 m²</text>
+
+      <rect x="1028" y="415" width="124" height="40" fill="#eee9f7"/>
+      <text x="1090" y="432" font-size="11" font-weight="700" fill="#111827">Circulação</text>
+      <text x="1090" y="448" font-size="10" fill="#374151">104 · 6,20 m²</text>
+    </g>
+  </g>
+
+  <!-- ================= LEGENDA ================= -->
+  <g>
+    <rect x="700" y="620" width="250" height="210" fill="#fafafa" stroke="#d1d5db"/>
+    <text x="716" y="646" font-family="Arial" font-size="13" font-weight="700" fill="#111827">Legenda de áreas</text>
+
+    <rect x="716" y="662" width="18" height="12" fill="#dbe7f3" stroke="#9ca3af"/>
+    <text x="742" y="673" font-family="Arial" font-size="11" fill="#111827">Sala</text>
+    <text x="934" y="673" font-family="Arial" font-size="11" fill="#374151" text-anchor="end">21,34 m²</text>
+
+    <rect x="716" y="686" width="18" height="12" fill="#f6e3c8" stroke="#9ca3af"/>
+    <text x="742" y="697" font-family="Arial" font-size="11" fill="#111827">Cozinha</text>
+    <text x="934" y="697" font-family="Arial" font-size="11" fill="#374151" text-anchor="end">12,80 m²</text>
+
+    <rect x="716" y="710" width="18" height="12" fill="#e2f0dc" stroke="#9ca3af"/>
+    <text x="742" y="721" font-family="Arial" font-size="11" fill="#111827">Suíte</text>
+    <text x="934" y="721" font-family="Arial" font-size="11" fill="#374151" text-anchor="end">14,10 m²</text>
+
+    <rect x="716" y="734" width="18" height="12" fill="#eee9f7" stroke="#9ca3af"/>
+    <text x="742" y="745" font-family="Arial" font-size="11" fill="#111827">Circulação</text>
+    <text x="934" y="745" font-family="Arial" font-size="11" fill="#374151" text-anchor="end">6,20 m²</text>
+
+    <line x1="716" y1="760" x2="934" y2="760" stroke="#d1d5db"/>
+    <text x="716" y="780" font-family="Arial" font-size="11" font-weight="700" fill="#111827">Total</text>
+    <text x="934" y="780" font-family="Arial" font-size="12" font-weight="700" fill="#111827" text-anchor="end">54,44 m²</text>
+    <text x="716" y="800" font-family="Arial" font-size="10" fill="#6b7280">método: IPMS 4.2</text>
+  </g>
+
+  <!-- ================= QUADRO ================= -->
+  <g>
+    <rect x="970" y="620" width="250" height="210" fill="#ffffff" stroke="#d1d5db"/>
+    <rect x="970" y="620" width="250" height="26" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="986" y="638" font-family="Arial" font-size="12" font-weight="700" fill="#111827">Quadro geral</text>
+
+    <text x="986" y="668" font-family="Arial" font-size="10" font-weight="700" fill="#6b7280">Nº</text>
+    <text x="1016" y="668" font-family="Arial" font-size="10" font-weight="700" fill="#6b7280">AMBIENTE</text>
+    <text x="1204" y="668" font-family="Arial" font-size="10" font-weight="700" fill="#6b7280" text-anchor="end">ÁREA</text>
+    <line x1="986" y1="676" x2="1204" y2="676" stroke="#e5e7eb"/>
+
+    <g font-family="Arial" font-size="10" fill="#111827">
+      <text x="986" y="694">101</text><text x="1016" y="694">Sala</text><text x="1204" y="694" text-anchor="end">21,34</text>
+      <text x="986" y="712">102</text><text x="1016" y="712">Cozinha</text><text x="1204" y="712" text-anchor="end">12,80</text>
+      <text x="986" y="730">103</text><text x="1016" y="730">Suíte</text><text x="1204" y="730" text-anchor="end">14,10</text>
+      <text x="986" y="748">104</text><text x="1016" y="748">Circulação</text><text x="1204" y="748" text-anchor="end">6,20</text>
+    </g>
+    <line x1="986" y1="760" x2="1204" y2="760" stroke="#e5e7eb"/>
+    <text x="986" y="778" font-family="Arial" font-size="10" font-weight="700" fill="#111827">Subtotal Térreo</text>
+    <text x="1204" y="778" font-family="Arial" font-size="10" font-weight="700" fill="#111827" text-anchor="end">54,44</text>
+    <text x="986" y="800" font-family="Arial" font-size="10" fill="#6b7280">prancha geral soma os níveis</text>
+  </g>
+
+  <!-- nota -->
+  <g>
+    <rect x="40" y="720" width="620" height="110" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="56" y="744" font-family="Arial" font-size="12" font-weight="700" fill="#374151">Regra de cor</text>
+    <text x="56" y="766" font-family="Arial" font-size="11" fill="#374151">• A planta nasce sem preenchimento: só reference lines, etiquetas e paredes claras.</text>
+    <text x="56" y="784" font-family="Arial" font-size="11" fill="#374151">• O preenchimento e a legenda só aparecem quando um esquema de cores é aplicado à planta.</text>
+    <text x="56" y="802" font-family="Arial" font-size="11" fill="#374151">• O esquema pode ser por categoria, por nível ou por faixa de área; e imprime (diferente do Interior Fill do Revit).</text>
+    <text x="56" y="820" font-family="Arial" font-size="11" fill="#374151">• Modo P&amp;B: hachura por categoria, para nada se perder sem cor.</text>
+  </g>
+</svg>

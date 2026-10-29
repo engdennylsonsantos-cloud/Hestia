@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Id, LocationLine, OpeningDimRef, WallDimRef } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
 import type { Backend } from '@hestia/render';
 import { DEFAULT_DISJOIN, DEFAULT_RAMP_OPTIONS, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
@@ -10,7 +11,7 @@ import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -20,8 +21,12 @@ export interface UiState {
   sectionId: Id | null;
   /** Prancha aberta quando `view` é 'sheet' (decisão 0022). */
   sheetId: Id | null;
-  /** Planta de piso ou de cobertura quando `view` é 'plan' (sessão; a cobertura liga o modo `roofPlanMode`). */
+  /** Planta de piso, de cobertura ou de área quando `view` é 'plan' (sessão; a cobertura liga `roofPlanMode`). */
   planKind: PlanKind;
+  /** Planta de área ativa quando `planKind` é 'area'. */
+  areaPlanId: Id | null;
+  /** Rótulo em arraste (fantasma), compartilhado por qualquer planta. */
+  tagDrag: { planId: Id; roomId: Id; at: Vec2 } | null;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -217,6 +222,8 @@ export const useUi = create<UiState>(() => ({
   view: 'plan',
   levelId: 'lv_0',
   planKind: 'floor',
+  areaPlanId: null,
+  tagDrag: null,
   sectionId: null,
   sheetId: null,
   selection: [],
@@ -266,7 +273,7 @@ export function toggleFileMenu(): void {
 }
 
 useUi.subscribe((s, prev) => {
-  if (s.view === prev.view && s.levelId === prev.levelId && s.planKind === prev.planKind && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
+  if (s.view === prev.view && s.levelId === prev.levelId && s.planKind === prev.planKind && s.areaPlanId === prev.areaPlanId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
   const active = activeViewOf(s);
   if (!active) return;
   const next = addView(s.openViews, active);

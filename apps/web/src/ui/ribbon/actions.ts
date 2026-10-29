@@ -1,6 +1,7 @@
 import { isCeiling, isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project, type Ramp } from '@hestia/model';
 import type { PerimeterModifyKind, ToolOptions } from '@hestia/tools';
 import { tagAllNotTagged } from '../../editor/tagActions.ts';
+import { addMissingTagsAction } from '../../editor/areaPlanActions.ts';
 import { editor } from '../../editor/controller.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
 import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
@@ -26,6 +27,8 @@ export interface RibbonCtx {
   tool: UiState['tool'];
   selection: Id[];
   view: UiState['view'];
+  planKind: UiState['planKind'];
+  areaPlanId: Id | null;
   levelId: Id;
   showGrid: boolean;
   showUnderlay: boolean;
@@ -141,7 +144,16 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     label: t('Etiquetar todos', 'Tag All'),
     icon: 'tag',
     hint: t('Etiqueta todos os elementos sem etiqueta desta vista.', 'Tag every untagged element in this view.'),
-    run: () => { tagAllNotTagged(); },
+    run: () => {
+      // Na planta de área, "Etiquetar todos" completa as etiquetas de AMBIENTE (Room Tag) da vista.
+      const s = useUi.getState();
+      if (s.view === 'plan' && s.planKind === 'area' && s.areaPlanId) {
+        const n = addMissingTagsAction(editor.store, s.areaPlanId);
+        useUi.setState({ status: n ? `${n} ambiente(s) etiquetado(s).` : 'Todos os ambientes desta planta já têm etiqueta.' });
+        return;
+      }
+      tagAllNotTagged();
+    },
   },
   wallTags: {
     label: t('Códigos de parede', 'Wall Type Codes'),
@@ -300,7 +312,8 @@ export function ctxNow(): RibbonCtx {
   const s = useUi.getState();
   const perim = editor.perimetro.view();
   return {
-    tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
+    tool: s.tool, selection: s.selection, view: s.view, planKind: s.planKind, areaPlanId: s.areaPlanId, levelId: s.levelId,
+    showGrid: s.showGrid, showUnderlay: s.showUnderlay,
     showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options, p: editor.project,
     perimetro: perim.active ? { modify: perim.modify, selecting: perim.selecting === true } : null,
   };

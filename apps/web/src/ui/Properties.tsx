@@ -46,6 +46,7 @@ import { CeilingProperties } from './CeilingProperties.tsx';
 import { StairProperties } from './StairProperties.tsx';
 import { RampProperties } from './RampProperties.tsx';
 import { RoomProperties } from './RoomProperties.tsx';
+import { AreaPlanProperties, activeAreaPlan } from './AreaPlanProperties.tsx';
 import { GenericProps, selectionLabel } from './GenericProps.tsx';
 import { GridProperties } from './GridProperties.tsx';
 import { gradeDaSelecao } from './gridUi.ts';
@@ -387,7 +388,9 @@ const GRID_STEPS = [0.05, 0.1, 0.25, 0.5, 1, 2, 5];
 export function Properties(): ReactElement {
   const p = useProject();
   const sel = useUi((s) => s.selection);
-  const note = selectedNote(p, useUi((s) => s.levelId), sel);
+  // Na planta de área, cotas/textos vivem em `plan.annotations`: a seleção precisa procurar lá, não no nível.
+  const planId = useUi((s) => (s.planKind === 'area' ? s.areaPlanId : null));
+  const note = selectedNote(p, useUi((s) => s.levelId), sel, planId);
   const view = selectedView(p, sel);
   const els = sel.map((id) => p.elements[id]).filter((e) => !!e);
   const walls = els.filter(isWall);
@@ -405,6 +408,7 @@ export function Properties(): ReactElement {
   const kinds = [walls, ops, floors, slabs, ceilings, roofs, stairs, ramps, rooms, generics].filter((g) => g.length > 0).length;
   const tool = useUi((s) => s.tool);
   const placing = count === 0 && hasPlacementProperties(tool);
+  const areaPlan = count === 0 && !placing && planId ? activeAreaPlan(p, planId) : undefined;
   const perim = usePerimeter();
   const panelLabel = perim.active ? PERIMETER_TITLE[perim.target] : placing ? `Colocar ${TOOL_LABEL[tool]}` : selectionLabel({ walls: walls.length, ops: ops.length, floors: floors.length, slabs: slabs.length, ceilings: ceilings.length, roofs: roofs.length, stairs: stairs.length, ramps: ramps.length, rooms: rooms.length, generics: generics.length, grade, view });
   return (
@@ -425,8 +429,9 @@ export function Properties(): ReactElement {
           : kinds === 1 && rooms.length > 0 ? <RoomProperties rooms={rooms} />
           : kinds === 1 && generics.length > 0 ? <GenericProps items={generics} />
           : grade ? <GridProperties grid={grade} />
-          : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} />
+          : note ? <AnnotationProps dim={note.dim} text={note.text} line={note.line} region={note.region} tag={note.tag} planId={planId} />
           : view ? <SectionViewProps view={view} />
+          : areaPlan ? <AreaPlanProperties plan={areaPlan} />
           : count > 0 ? (
           <div className="hint">Seleção mista de elementos. Selecione apenas um tipo de elemento (parede, abertura, piso, laje, telhado, escada, rampa ou ambiente) para editar propriedades.</div>
         ) : (

@@ -1,6 +1,6 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { newId } from '@hestia/model';
-import { ToolBase } from './base.ts';
+import { ToolBase, viewPlanId } from './base.ts';
 import { detailLinePreviewDim } from './dims/providers/line.ts';
 import type { DimRef, TempDim } from './dims/types.ts';
 import type { PointerInfo } from './types.ts';
@@ -27,7 +27,7 @@ export class DetailLineTool extends ToolBase {
     const q = this.snap(p).point;
     if (!this.a) { this.a = q; this.env.say('Clique no fim da linha de detalhe.'); return; }
     if (dist(this.a, q) < 0.01) { this.env.say('Escolha um ponto final mais distante.'); return; }
-    this.env.exec({ type: 'addDetailLine', levelId: this.env.levelId(), item: { id: newId('dl'), a: this.a, b: q, style: this.env.options().detailLineStyle ?? 'solid' } });
+    this.env.exec({ type: 'addDetailLine', levelId: this.env.levelId(), planId: viewPlanId(this.env), item: { id: newId('dl'), a: this.a, b: q, style: this.env.options().detailLineStyle ?? 'solid' } });
     this.reset();
     this.env.say(this.hint);
   }

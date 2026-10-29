@@ -13,6 +13,7 @@ import { graphicsIssues, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dO
 import { sectionRefIssues, sectionViewIssue } from './sectionView.ts';
 import { projectSheets } from './sheet.ts';
 import { viewSourceIssue } from './sheetCommands.ts';
+import { planAnnotationsOf } from './areaPlan.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
 import { openingTypeById } from './openingNominal.ts';
 import { formatQuantity } from './unitsFormat.ts';
@@ -272,6 +273,23 @@ function sheetProblems(p: Project): ValidationIssue[] {
   return out;
 }
 
+/** Plantas de área: etiqueta de elemento apontando para elemento que não existe mais (aviso, não erro). */
+function areaPlanProblems(p: Project): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  for (const plan of p.areaPlans ?? []) {
+    for (const tag of planAnnotationsOf(plan).tags) {
+      if (p.elements[tag.hostId]) continue;
+      out.push({
+        severity: 'warning',
+        code: 'area-plan-tag-host-missing',
+        message: `Planta de área "${plan.name}": a etiqueta "${tag.id}" aponta para o elemento "${tag.hostId}", que não existe.`,
+        elementId: tag.id,
+      });
+    }
+  }
+  return out;
+}
+
 /** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
 export function validateProject(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
@@ -281,6 +299,7 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...graphicsProblems(p),
     ...viewProblems(p),
     ...sheetProblems(p),
+    ...areaPlanProblems(p),
     ...p.levels.flatMap((l) => levelIssues(l)),
     ...walls.flatMap((w) => wallIssues(p, w)),
     ...openings.flatMap((o) => openingIssues(p, o)),

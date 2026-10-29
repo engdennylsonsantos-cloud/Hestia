@@ -32,7 +32,9 @@ function caixaDoRotulo(l: LabelOp, v: Viewport): { x0: number; y0: number; x1: n
   const y = s.y + (l.dy ?? 0);
   if (l.fontPx !== undefined) {
     const w = l.widthPx ?? Math.max(8, l.text.length * l.fontPx * 0.62);
-    const h = l.fontPx * 1.5;
+    // Texto com quebra de linha ocupa mais de uma linha na caixa do culling.
+    const linhas = l.text.split('\n').length;
+    const h = l.fontPx * 1.5 * linhas;
     return l.center ? { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 } : { x0: x, y0: y - h / 2, x1: x + w, y1: y + h / 2 };
   }
   const w = Math.max(8, l.text.length * 7.2);
@@ -100,22 +102,40 @@ export const PlanLabels = forwardRef<PlanLabelsHandle, { labels: LabelOp[]; v: V
             if (l.maskBoundary) return null;
             const sp = worldToScreen(v, l.at);
             // Anotação (cota ou texto, decisão 0019): fonte e rotação do papel, centrada no ponto.
-            if (l.fontPx !== undefined && l.center)
+            if (l.fontPx !== undefined && l.center) {
               return (
-                <span key={i} ref={(node) => { nodes.current[i] = node; }} className="plan-note" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), fontSize: l.fontPx, width: l.widthPx, whiteSpace: l.widthPx ? 'normal' : 'nowrap', textAlign: l.align, fontWeight: l.bold ? 700 : undefined, fontStyle: l.italic ? 'italic' : undefined, textDecoration: l.underline ? 'underline' : undefined, transform: `translate(-50%, -50%) rotate(${-(l.rotation ?? 0)}deg)` }}>
+                <span
+                  key={i}
+                  ref={(node) => { nodes.current[i] = node; }}
+                  className="plan-note"
+                  style={{
+                    left: sp.x + (l.dx ?? 0),
+                    top: sp.y + (l.dy ?? 0),
+                    fontSize: l.fontPx,
+                    width: l.widthPx,
+                    whiteSpace: l.whiteSpace ?? 'pre-wrap',
+                    textAlign: l.align,
+                    fontWeight: l.bold ? 700 : undefined,
+                    fontStyle: l.italic ? 'italic' : undefined,
+                    textDecoration: l.underline ? 'underline' : undefined,
+                    color: l.color,
+                    transform: `translate(-50%, -50%) rotate(${-(l.rotation ?? 0)}deg)`,
+                  }}
+                >
                   {l.text}
                 </span>
               );
+            }
             // Rótulo com fonte em mm de papel, mas não centrado (etiqueta de parede, ambiente, escada): usa plan-note
             // sem centralizar em X, só em Y (para o ponto de ancoragem ficar no centro vertical do texto).
             if (l.fontPx !== undefined)
               return (
-                <span key={i} ref={(node) => { nodes.current[i] = node; }} className="plan-note" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), fontSize: l.fontPx, transform: 'translate(0, -50%)' }}>
+                <span key={i} ref={(node) => { nodes.current[i] = node; }} className="plan-note" style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), fontSize: l.fontPx, textAlign: l.align, color: l.color, transform: `translate(${l.align === 'right' ? '-100%' : l.align === 'center' ? '-50%' : '0'}, -50%)` }}>
                   {l.text}
                 </span>
               );
             return (
-              <span key={i} ref={(node) => { nodes.current[i] = node; }} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0) }}>
+              <span key={i} ref={(node) => { nodes.current[i] = node; }} className={l.tone === 'soft' ? 'dim-label dim-label--soft' : 'dim-label'} style={{ left: sp.x + (l.dx ?? 0), top: sp.y + (l.dy ?? 0), color: l.color }}>
                 {l.text}
               </span>
             );

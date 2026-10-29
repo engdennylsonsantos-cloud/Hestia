@@ -12,6 +12,8 @@ import { rampSelectionOps } from './ramps.ts';
 import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { hiddenSelectionOps, planViewOf, type PlanView } from './view.ts';
 import { planContext } from './planContext.ts';
+import { labelGhostOps } from './areaPlan.ts';
+import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
 import type { PlanInput } from './build.ts';
 import type { FillOp, PlanOps } from './types.ts';
 
@@ -45,6 +47,20 @@ function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: stri
 
 /** Operações de uma sobreposição: uma lista neutra com preenchimentos, traços e rótulos. */
 const vazio = (): PlanOps => ({ fills: [], strokes: [], labels: [] });
+
+/** Anotações que a vista desenha (as da vista, ou as do nível) e a escala de papel em que o bloco do texto é medido. */
+function anotacoesDaVista(input: PlanInput, escala: number): { annotations: ReturnType<typeof drawnAnnotations>; scale: number } {
+  return { annotations: drawnAnnotations(input.project, input.levelId, input.areaPlan), scale: input.areaPlan && input.areaPlan.scale > 0 ? input.areaPlan.scale : escala };
+}
+
+/** Junta o destaque das anotações (caixa, alça do texto e realce do hover) à sobreposição. */
+function comAnotacoes(out: PlanOps, input: PlanInput, escala: number, target: { selection: readonly Id[]; hover: Id | null }): void {
+  const { annotations, scale } = anotacoesDaVista(input, escala);
+  const h = annotationHighlightOps(input.project, input.levelId, scale, { select: input.theme.select, paper: input.theme.bg, hoverColor: input.theme.selectHover }, target, annotations);
+  out.fills.push(...h.fills);
+  out.strokes.push(...h.strokes);
+  out.labels.push(...h.labels);
+}
 
 /**
  * Sobreposição de seleção e hover. Não depende do cursor, da pré-visualização nem da captura: mudar o cursor refaz só a
@@ -86,6 +102,8 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
       }
     }
   }
+  // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover em camada própria.
+  comAnotacoes(out, input, style.scale, { selection, hover: null });
   return out;
 }
 
@@ -111,13 +129,14 @@ export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
   add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
   add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
   out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
+  comAnotacoes(out, input, style.scale, { selection: [], hover });
   return out;
 }
 
 /** Sobreposição viva da ferramenta: pré-visualização, guias, marcador de captura e o balão de inferência. */
 export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
-  const { geo, view } = planContext(input);
+  const { geo, view, style } = planContext(input);
   const out = vazio();
   const previa = previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view));
   out.fills.push(...previa.fills);
@@ -128,6 +147,12 @@ export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
     out.strokes.push(...snapMarker(input.inference, theme));
     const tip = snapTooltipLabel(input.inference, p);
     if (tip) out.labels.push(tip);
+  }
+  if (input.tagGhost) {
+    const ghost = labelGhostOps(p, input.levelId, input.tagGhost, input.areaPlan?.scale ?? style.scale, input.areaPlan?.graphics.tagDefault.fields, input.dark);
+    out.fills.push(...ghost.fills);
+    out.strokes.push(...ghost.strokes);
+    out.labels.push(...ghost.labels);
   }
   return out;
 }
@@ -173,6 +198,9 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
       }
     }
   }
+
+  // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover.
+  comAnotacoes(out, input, style.scale, { selection, hover });
 
   // Pré-visualização, guias e marcador de captura.
   add(previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));

@@ -1,5 +1,5 @@
-import { dist, dot, len, sub, type Vec2 } from '@hestia/geom';
-import { dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, wallsOnLevel, type DimensionRef, type Id, type Project, type TextNote } from '@hestia/model';
+import { boxOf, boxesOverlap, dist, dot, intersectSegments, len, sub, type Vec2 } from '@hestia/geom';
+import { areaPlanOf, dimensionGeometry, dimensionPoints, levelDimensions, levelGraphicsOf, levelTexts, planAnnotationsOf, wallsOnLevel, type DetailLine, type DetailRegion, type Dimension, type DimensionRef, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
 
 /** Tolerância (m) para dizer que um ponto é a extremidade de uma parede. */
 const END_TOL = 1e-4;
@@ -46,9 +46,9 @@ const TEXT_CHAR_EM = 0.6;
  * Corpo (m de modelo) = altura em mm de papel × escala ÷ 1000; largura = caracteres × 0,6 do corpo.
  */
 export function textHit(t: TextNote, scale: number, at: Vec2, tol: number): boolean {
-  const body = (t.height * scale) / 1000;
-  const hw = (Math.max(1, [...t.text].length) * TEXT_CHAR_EM * body) / 2 + tol;
-  const hh = body / 2 + tol;
+  const { w, h } = textBlockSize(t, scale);
+  const hw = w / 2 + tol;
+  const hh = h / 2 + tol;
   // Coordenadas do cursor no referencial do texto (girado por `rotation` graus, anti-horário, como na planta).
   const r = (t.rotation * Math.PI) / 180;
   const dx = at.x - t.at.x, dy = at.y - t.at.y;
@@ -57,40 +57,72 @@ export function textHit(t: TextNote, scale: number, at: Vec2, tol: number): bool
   return Math.abs(u) <= hw && Math.abs(v) <= hh;
 }
 
-/** Detalhes desenhados por cima do modelo têm prioridade de seleção quando suas áreas se sobrepõem. */
-export function detailItemAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
+/** Anotações que a vista mostra, com a escala dela: as do nível (planta de piso) ou as da planta de área. */
+export interface ViewAnnotations {
+  /** Escala da vista (1:N), usada no tamanho de papel dos textos e das cotas. */
+  scale: number;
+  dimensions: Dimension[];
+  texts: TextNote[];
+  detailLines: DetailLine[];
+  detailRegions: DetailRegion[];
+  tags: ElementTag[];
+}
+
+/**
+ * Anotações da vista: sem `planId`, as do nível (planta de piso); com `planId`, só as da planta de área
+ * (`plan.annotations`) — as do nível não vazam para a planta. Uma planta sem anotações devolve listas vazias.
+ */
+export function viewAnnotationsOf(p: Project, levelId: Id, planId?: Id): ViewAnnotations {
+  const plan = planId ? areaPlanOf(p, planId) : undefined;
+  if (plan) {
+    const a = planAnnotationsOf(plan);
+    const scale = Number.isFinite(plan.scale) && plan.scale > 0 ? plan.scale : levelGraphicsOf(p, levelId).scale;
+    return { scale, ...a };
+  }
   const level = p.levels.find((l) => l.id === levelId);
-  for (const region of [...(level?.detailRegions ?? [])].reverse()) {
+  return {
+    scale: levelGraphicsOf(p, levelId).scale,
+    dimensions: levelDimensions(p, levelId),
+    texts: levelTexts(p, levelId),
+    detailLines: level?.detailLines ?? [],
+    detailRegions: level?.detailRegions ?? [],
+    tags: level?.tags ?? [],
+  };
+}
+
+/** Detalhes desenhados por cima do modelo têm prioridade de seleção quando suas áreas se sobrepõem. */
+export function detailItemAt(p: Project, levelId: Id, at: Vec2, mpp: number, planId?: Id): Id | null {
+  const a = viewAnnotationsOf(p, levelId, planId);
+  for (const region of [...a.detailRegions].reverse()) {
     let inside = false;
     for (let i = 0, j = region.boundary.length - 1; i < region.boundary.length; j = i++) {
-      const a = region.boundary[i]!; const b = region.boundary[j]!;
-      if ((a.y > at.y) !== (b.y > at.y) && at.x < ((b.x - a.x) * (at.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+      const q = region.boundary[i]!; const r = region.boundary[j]!;
+      if ((q.y > at.y) !== (r.y > at.y) && at.x < ((r.x - q.x) * (at.y - q.y)) / (r.y - q.y) + q.x) inside = !inside;
     }
     if (inside) return region.id;
   }
-  for (const line of [...(level?.detailLines ?? [])].reverse()) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return line.id;
+  for (const line of [...a.detailLines].reverse()) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return line.id;
   return null;
 }
 
 /** Cota, etiqueta, texto ou detalhe sob o cursor (tolerância de 6 px; o texto vale pelo retângulo, não só pela âncora). */
-export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number): { id: Id; kind: 'dimension' | 'text' } | null {
-  const scale = levelGraphicsOf(p, levelId).scale;
-  const level = p.levels.find((l) => l.id === levelId);
-  for (const tag of level?.tags ?? []) if (dist(at, tag.at) <= 14 * mpp) return { id: tag.id, kind: 'text' };
-  for (const t of levelTexts(p, levelId)) {
-    if (textHit(t, scale, at, 6 * mpp)) return { id: t.id, kind: 'text' };
+export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number, planId?: Id): { id: Id; kind: 'dimension' | 'text' } | null {
+  const a = viewAnnotationsOf(p, levelId, planId);
+  for (const tag of a.tags) if (dist(at, tag.at) <= 14 * mpp) return { id: tag.id, kind: 'text' };
+  for (const t of a.texts) {
+    if (textHit(t, a.scale, at, 6 * mpp)) return { id: t.id, kind: 'text' };
     if (t.leader?.some((q, i) => i > 0 && distToSegment(at, t.leader![i - 1]!, q) <= 6 * mpp)) return { id: t.id, kind: 'text' };
   }
-  for (const line of level?.detailLines ?? []) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return { id: line.id, kind: 'text' };
-  for (const region of level?.detailRegions ?? []) {
+  for (const line of a.detailLines) if (distToSegment(at, line.a, line.b) <= 6 * mpp) return { id: line.id, kind: 'text' };
+  for (const region of a.detailRegions) {
     let inside = false;
     for (let i = 0, j = region.boundary.length - 1; i < region.boundary.length; j = i++) {
-      const a = region.boundary[i]!; const b = region.boundary[j]!;
-      if ((a.y > at.y) !== (b.y > at.y) && at.x < ((b.x - a.x) * (at.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+      const q = region.boundary[i]!; const r = region.boundary[j]!;
+      if ((q.y > at.y) !== (r.y > at.y) && at.x < ((r.x - q.x) * (at.y - q.y)) / (r.y - q.y) + q.x) inside = !inside;
     }
     if (inside) return { id: region.id, kind: 'text' };
   }
-  for (const d of levelDimensions(p, levelId)) {
+  for (const d of a.dimensions) {
     const pts = dimensionPoints(p, d);
     const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
     if (dist(at, g.textAt) <= 10 * mpp) return { id: d.id, kind: 'dimension' };
@@ -99,10 +131,47 @@ export function annotationAt(p: Project, levelId: Id, at: Vec2, mpp: number): { 
   return null;
 }
 
+/** Anotações da vista dentro da janela de seleção (esquerda→direita contém; direita→esquerda cruza). */
+export function annotationIdsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2, mpp: number, planId?: Id): Id[] {
+  const a0 = viewAnnotationsOf(p, levelId, planId);
+  const box = boxOf([a, b]);
+  const crossing = b.x < a.x;
+  const dentro = (q: Vec2): boolean => q.x >= box.minX && q.x <= box.maxX && q.y >= box.minY && q.y <= box.maxY;
+  const segmento = (s: Vec2, e: Vec2): boolean => {
+    if (dentro(s) || dentro(e)) return true;
+    if (!crossing || !boxesOverlap(boxOf([s, e]), box)) return false;
+    const cantos = [
+      { x: box.minX, y: box.minY }, { x: box.maxX, y: box.minY },
+      { x: box.maxX, y: box.maxY }, { x: box.minX, y: box.maxY },
+    ];
+    return cantos.some((c, i) => intersectSegments(s, e, c, cantos[(i + 1) % 4]!) !== null);
+  };
+  const ids: Id[] = [];
+  for (const d of a0.dimensions) {
+    const pts = dimensionPoints(p, d);
+    const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
+    const pontos = [g.line[0], g.line[1], ...g.extensions.flat(), ...(d.textAt ? [d.textAt] : [])];
+    if (pontos.every(dentro) || [g.line, ...g.extensions].some(([s, e]) => segmento(s!, e!))) ids.push(d.id);
+  }
+  for (const t of a0.texts) {
+    const cantos = textBlockCorners(t, a0.scale);
+    if (cantos.every(dentro) || (crossing && boxesOverlap(boxOf(cantos), box))) ids.push(t.id);
+  }
+  for (const l of a0.detailLines) if (dentro(l.a) && dentro(l.b) || segmento(l.a, l.b)) ids.push(l.id);
+  for (const r of a0.detailRegions) {
+    const cantos = r.boundary;
+    const contida = cantos.length > 0 && cantos.every(dentro);
+    const cruza = crossing && (boxesOverlap(boxOf(cantos), box) || cantos.some(dentro));
+    if (contida || cruza) ids.push(r.id);
+  }
+  for (const t of a0.tags) if (dentro(t.at)) ids.push(t.id);
+  return ids;
+}
+
 /** Alça da cota selecionada: o ponto médio da linha de cota. Arrastá-la muda o deslocamento. */
-export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number): Id | null {
+export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number, planId?: Id): Id | null {
   if (sel.length !== 1) return null;
-  const d = levelDimensions(p, levelId).find((x) => x.id === sel[0]);
+  const d = viewAnnotationsOf(p, levelId, planId).dimensions.find((x) => x.id === sel[0]);
   if (!d) return null;
   const pts = dimensionPoints(p, d);
   const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4);
@@ -110,13 +179,82 @@ export function dimGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: num
 }
 
 /** Alça do texto da cota, que pode ser deslocado sem alterar os pontos medidos nem o afastamento da linha. */
-export function dimTextGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number): Id | null {
+export function dimTextGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number, planId?: Id): Id | null {
   if (sel.length !== 1) return null;
-  const d = levelDimensions(p, levelId).find((x) => x.id === sel[0]);
+  const d = viewAnnotationsOf(p, levelId, planId).dimensions.find((x) => x.id === sel[0]);
   if (!d) return null;
   const pts = dimensionPoints(p, d);
   const g = dimensionGeometry(pts.a, pts.b, d.offset, mpp * 4, d.textHeight, d.textAt);
   return dist(at, g.textAt) <= 9 * mpp ? d.id : null;
+}
+
+/**
+ * Canto inferior esquerdo da caixa de seleção do texto, onde o render desenha o quadradinho. A conta acompanha
+ * `textBlockModel`/`alcaDoTextoEm` do render (largura por `width`, quebra por `\\n`, entrelinha e folga da seleção).
+ */
+function textBlockSize(t: Pick<TextNote, 'text' | 'height' | 'width'>, scale: number): { w: number; h: number } {
+  const fontMm = t.height > 0 ? t.height : 2.5;
+  const paragrafos = t.text.split('\n');
+  const linhas: string[] = [];
+  if (t.width && t.width > 0) {
+    const porLinha = Math.max(1, Math.floor(t.width / (fontMm * TEXT_CHAR_EM)));
+    for (const paragrafo of paragrafos) {
+      let atual = '';
+      for (const palavra of paragrafo.split(' ')) {
+        let resto = palavra;
+        while (resto.length > porLinha) {
+          if (atual) { linhas.push(atual); atual = ''; }
+          linhas.push(resto.slice(0, porLinha));
+          resto = resto.slice(porLinha);
+        }
+        const candidata = atual ? `${atual} ${resto}` : resto;
+        if (candidata.length <= porLinha) atual = candidata;
+        else { linhas.push(atual); atual = resto; }
+      }
+      linhas.push(atual);
+    }
+  } else linhas.push(...paragrafos);
+  const w = (t.width && t.width > 0 ? t.width : Math.max(1, ...linhas.map((l) => l.length)) * fontMm * TEXT_CHAR_EM) * scale / 1000;
+  const h = Math.max(1, linhas.length) * fontMm * 1.25 * scale / 1000;
+  return { w, h };
+}
+
+export function textHandleAt(t: Pick<TextNote, 'at' | 'text' | 'height' | 'width' | 'rotation'>, scale: number): Vec2 {
+  const { w, h } = textBlockSize(t, scale);
+  const folga = 1.15 * scale / 1000;
+  const hw = w / 2 + folga;
+  const hh = h / 2 + folga;
+  const r = (t.rotation * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return { x: t.at.x + -hw * c - -hh * s, y: t.at.y + -hw * s + -hh * c };
+}
+
+/** Os quatro cantos do bloco do texto (sem a folga), no mundo, para a seleção por janela. */
+function textBlockCorners(t: Pick<TextNote, 'at' | 'text' | 'height' | 'width' | 'rotation'>, scale: number): Vec2[] {
+  const { w, h } = textBlockSize(t, scale);
+  const hw = w / 2;
+  const hh = h / 2;
+  const r = (t.rotation * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => ({
+    x: t.at.x + x! * c - y! * s,
+    y: t.at.y + x! * s + y! * c,
+  }));
+}
+
+/**
+ * Alça do texto selecionado: o quadradinho no canto inferior esquerdo, fora do texto (o mesmo ponto desenhado pelo
+ * render). Arrastá-la move o texto (a posição só é gravada ao soltar). Devolve o id do texto, ou null.
+ */
+export function textGripAt(p: Project, levelId: Id, sel: Id[], at: Vec2, mpp: number, planId?: Id): Id | null {
+  if (sel.length !== 1) return null;
+  const a = viewAnnotationsOf(p, levelId, planId);
+  const t = a.texts.find((x) => x.id === sel[0]);
+  if (!t) return null;
+  // O quadradinho fica no canto inferior esquerdo; a âncora também vale (é o centro do texto e o alvo natural do clique).
+  return dist(at, textHandleAt(t, a.scale)) <= 8 * mpp || dist(at, t.at) <= 6 * mpp ? t.id : null;
 }
 
 /** Ponto médio de um segmento. */

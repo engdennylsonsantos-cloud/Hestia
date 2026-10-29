@@ -94,6 +94,7 @@ export function OptionsBar(): ReactElement {
   const o = useUi((s) => s.options);
   const units = useUnits();
   const sel = useUi((s) => s.selection);
+  const areaPlan = useUi((s) => s.view === 'plan' && s.planKind === 'area' && !!s.areaPlanId);
   const set = (patch: Partial<typeof o>): void => useUi.setState({ options: { ...o, ...patch } });
   if (perim.active) return <PerimeterOptionsBar target={perim.target} modify={perim.modify} options={perim.options} onChange={perimeterActions.setOptions} />;
   // A paleta Propriedades é a fonte de configuração antes da colocação; a barra superior fica como indicação da ferramenta.
@@ -103,6 +104,8 @@ export function OptionsBar(): ReactElement {
   return (
     <div className="optbar" role="group" aria-label="Opções da ferramenta">
       <span className="tool-name">{TOOL_LABEL[tool]}</span>
+      {areaPlan && <span style={{ color: 'var(--fg-soft)' }}>Planta de área — anotação</span>}
+      {areaPlan && <button className="btn small" onClick={() => useUi.setState({ dialog: 'cotasAuto' })} title="Cotas automáticas da planta de área ativa">Cotas automáticas…</button>}
       {tool === 'wall' && (
         <>
           <label>

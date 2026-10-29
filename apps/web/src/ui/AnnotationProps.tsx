@@ -1,24 +1,82 @@
-import type { ReactElement } from 'react';
-import { formatDimension, dimensionValue, levelDimensions, levelTexts, type DetailLine, type DetailRegion, type Dimension, type ElementTag, type Id, type Project, type TextNote } from '@hestia/model';
+import { useEffect, useState, type ReactElement } from 'react';
+import {
+  areaPlanOf,
+  formatDimension,
+  dimensionValue,
+  levelDimensions,
+  levelTexts,
+  planAnnotationsOf,
+  type AnnotationCommand,
+  type DetailLine,
+  type DetailRegion,
+  type Dimension,
+  type ElementTag,
+  type Id,
+  type Project,
+  type TextNote,
+} from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
-import { useUnits } from './useUnits.ts';
 
-/** Cota ou texto de anotação selecionado (decisão 0019), pelo id no nível ativo; null se a seleção não é uma anotação. */
-export function selectedNote(p: Project, levelId: Id, ids: Id[]): { dim?: Dimension; text?: TextNote; line?: DetailLine; region?: DetailRegion; tag?: ElementTag } | null {
+/** Cota, texto, detalhe ou etiqueta selecionado (decisão 0019); null se a seleção não é uma anotação. */
+export interface NotaSelecionada {
+  dim?: Dimension;
+  text?: TextNote;
+  line?: DetailLine;
+  region?: DetailRegion;
+  tag?: ElementTag;
+}
+
+/**
+ * Anotação selecionada na vista. Com `planId` procura só nas anotações da planta de área (cotas, textos, linhas/regiões
+ * de detalhe e etiquetas); sem ele, no nível (planta de piso). Um id de elemento nunca vira anotação.
+ */
+export function selectedNote(p: Project, levelId: Id, ids: Id[], planId?: Id | null): NotaSelecionada | null {
   if (ids.length !== 1) return null;
-  const dim = levelDimensions(p, levelId).find((d) => d.id === ids[0]);
+  const id = ids[0]!;
+  if (planId) {
+    const plan = areaPlanOf(p, planId);
+    if (!plan) return null;
+    const a = planAnnotationsOf(plan);
+    const dim = a.dimensions.find((d) => d.id === id);
+    if (dim) return { dim };
+    const text = a.texts.find((t) => t.id === id);
+    if (text) return { text };
+    const line = a.detailLines.find((x) => x.id === id);
+    if (line) return { line };
+    const region = a.detailRegions.find((x) => x.id === id);
+    if (region) return { region };
+    const tag = a.tags.find((x) => x.id === id);
+    return tag ? { tag } : null;
+  }
+  const dim = levelDimensions(p, levelId).find((d) => d.id === id);
   if (dim) return { dim };
-  const text = levelTexts(p, levelId).find((t) => t.id === ids[0]);
+  const text = levelTexts(p, levelId).find((t) => t.id === id);
   if (text) return { text };
   const level = p.levels.find((l) => l.id === levelId);
-  const line = level?.detailLines?.find((x) => x.id === ids[0]);
+  const line = level?.detailLines?.find((x) => x.id === id);
   if (line) return { line };
-  const region = level?.detailRegions?.find((x) => x.id === ids[0]);
+  const region = level?.detailRegions?.find((x) => x.id === id);
   if (region) return { region };
-  const tag = level?.tags?.find((x) => x.id === ids[0]);
+  const tag = level?.tags?.find((x) => x.id === id);
   return tag ? { tag } : null;
+}
+
+/**
+ * Comando de anotação da vista: com `planId` a anotação mora em `plan.annotations`; sem ele, no nível.
+ * Exportado para os testes conferirem o destino sem depender do DOM.
+ */
+export function comPlanoDaVista<T extends AnnotationCommand>(c: T, planId?: Id | null): T {
+  return planId ? ({ ...c, planId } as T) : c;
+}
+
+/**
+ * Grava a mudança de um texto na vista. `planId` presente = planta de área; ausente = nível (planta de piso).
+ * Devolve nada e lança o erro do modelo (a UI o mostra na barra de estado).
+ */
+export function updateTextIn(store: { exec(c: AnnotationCommand, label?: string): void }, levelId: Id, id: Id, patch: Partial<Omit<TextNote, 'id'>>, planId?: Id | null): void {
+  store.exec(comPlanoDaVista({ type: 'updateText', levelId, id, patch }, planId));
 }
 
 /** Grava a mudança de uma anotação; recusa do modelo vai para a barra de estado. */
@@ -30,52 +88,94 @@ function edit(run: () => void): void {
   }
 }
 
-/** Propriedades da cota (valor só leitura, deslocamento da linha) e do texto (conteúdo, altura em mm e rotação). */
-export function AnnotationProps({ dim, text, line, region, tag }: { dim?: Dimension; text?: TextNote; line?: DetailLine; region?: DetailRegion; tag?: ElementTag }): ReactElement {
+/** Área de texto que aceita `\n` (o Enter quebra a linha; Ctrl+Enter ou sair do campo grava). */
+function TextAreaField({ id, value, onCommit }: { id?: string; value: string; onCommit: (v: string) => void }): ReactElement {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  return (
+    <textarea
+      id={id}
+      className="input wide"
+      rows={3}
+      value={text}
+      style={{ resize: 'vertical', minHeight: 52, fontFamily: 'inherit', whiteSpace: 'pre-wrap' }}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => text !== value && onCommit(text)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) (e.target as HTMLTextAreaElement).blur();
+        e.stopPropagation();
+      }}
+    />
+  );
+}
+
+/** Propriedades da cota (valor só leitura, deslocamento da linha) e do texto (caixa, moldura, posição e estilo). */
+export function AnnotationProps({ dim, text, line, region, tag, planId }: NotaSelecionada & { planId?: Id | null }): ReactElement {
   const p = useProject();
-  const units = useUnits();
   const levelId = useUi((s) => s.levelId);
+  const nota = (c: AnnotationCommand): void => editor.store.exec(comPlanoDaVista(c, planId));
   if (dim) {
     return (
       <Group title="Cota">
-        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim), units)}</span></Row>
+        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim))}</span></Row>
         <Row label="Texto" htmlFor="p-dtext">
-          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim), units)} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
+          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim))} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
         </Row>
         <Row label="Deslocamento" htmlFor="p-doff">
-          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} quantity="length" />
+          <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} unit="m" />
         </Row>
-        <Row label="Direção"><select className="select" value={dim.mode ?? 'aligned'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { mode: e.target.value as Dimension['mode'] } }))}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row>
-        <Row label="Unidade"><select className="select" value={dim.unit ?? 'project'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="project">Projeto</option><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
-        <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
-        <Row label="Prefixo" htmlFor="p-dprefix"><TextField id="p-dprefix" value={dim.prefix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { prefix: v } }))} /></Row>
-        <Row label="Sufixo" htmlFor="p-dsuffix"><TextField id="p-dsuffix" value={dim.suffix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { suffix: v } }))} /></Row>
-        <Row label="Altura do texto" htmlFor="p-dheight"><NumField id="p-dheight" value={(dim.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>
-        <Row label="Marca"><select className="select" value={dim.tickStyle ?? 'slash'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { tickStyle: e.target.value as Dimension['tickStyle'] } }))}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></Row>
+        <Row label="Direção"><select className="select" value={dim.mode ?? 'aligned'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { mode: e.target.value as Dimension['mode'] } }))}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row>
+        <Row label="Unidade"><select className="select" value={dim.unit ?? 'm'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
+        <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
+        <Row label="Prefixo" htmlFor="p-dprefix"><TextField id="p-dprefix" value={dim.prefix ?? ''} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { prefix: v } }))} /></Row>
+        <Row label="Sufixo" htmlFor="p-dsuffix"><TextField id="p-dsuffix" value={dim.suffix ?? ''} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { suffix: v } }))} /></Row>
+        <Row label="Altura do texto" htmlFor="p-dheight"><NumField id="p-dheight" value={dim.textHeight ?? 2.5} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { textHeight: v } }))} /></Row>
+        <Row label="Marca"><select className="select" value={dim.tickStyle ?? 'slash'} onChange={(e) => edit(() => nota({ type: 'updateDimension', levelId, id: dim.id, patch: { tickStyle: e.target.value as Dimension['tickStyle'] } }))}><option value="slash">Traço</option><option value="arrow">Seta</option><option value="dot">Ponto</option></select></Row>
         <div className="prow"><span className="soft">Acompanha a parede quando a extremidade está presa a uma parede. Texto vazio mostra o valor medido.</span></div>
       </Group>
     );
   }
-  if (line) return <Group title="Linha de detalhe"><Row label="Traço"><select className="select" value={line.style ?? 'solid'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDetailLine', levelId, id: line.id, patch: { style: e.target.value as DetailLine['style'] } }))}><option value="solid">Contínuo</option><option value="dashed">Tracejado</option><option value="dotted">Pontilhado</option></select></Row></Group>;
-  if (region) return <Group title="Região de detalhe"><Row label="Preenchimento"><input className="input" type="color" value={region.color ?? '#f5d782'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDetailRegion', levelId, id: region.id, patch: { color: e.target.value, mask: false } }))} /></Row><Check id="p-region-mask" checked={region.mask === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateDetailRegion', levelId, id: region.id, patch: { mask: v } }))}>Mascarar elementos</Check></Group>;
-  if (tag) return <Group title="Etiqueta"><Row label="Informação"><select className="select" value={tag.property} onChange={(e) => edit(() => editor.store.exec({ type: 'updateTag', levelId, id: tag.id, patch: { property: e.target.value as ElementTag['property'] } }))}><option value="type">Tipo</option><option value="name">Nome</option><option value="mark">Marca</option><option value="level">Nível</option><option value="width">Largura</option><option value="height">Altura</option></select></Row><Row label="Orientação"><select className="select" value={tag.orientation ?? 'horizontal'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateTag', levelId, id: tag.id, patch: { orientation: e.target.value as ElementTag['orientation'] } }))}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row><Check id="p-tag-leader" checked={tag.leader === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateTag', levelId, id: tag.id, patch: { leader: v } }))}>Mostrar líder</Check></Group>;
+  if (line) return <Group title="Linha de detalhe"><Row label="Traço"><select className="select" value={line.style ?? 'solid'} onChange={(e) => edit(() => nota({ type: 'updateDetailLine', levelId, id: line.id, patch: { style: e.target.value as DetailLine['style'] } }))}><option value="solid">Contínuo</option><option value="dashed">Tracejado</option><option value="dotted">Pontilhado</option></select></Row></Group>;
+  if (region) return <Group title="Região de detalhe"><Row label="Preenchimento"><input className="input" type="color" value={region.color ?? '#f5d782'} onChange={(e) => edit(() => nota({ type: 'updateDetailRegion', levelId, id: region.id, patch: { color: e.target.value, mask: false } }))} /></Row><Check id="p-region-mask" checked={region.mask === true} onChange={(v) => edit(() => nota({ type: 'updateDetailRegion', levelId, id: region.id, patch: { mask: v } }))}>Mascarar elementos</Check></Group>;
+  if (tag) return <Group title="Etiqueta"><Row label="Informação"><select className="select" value={tag.property} onChange={(e) => edit(() => nota({ type: 'updateTag', levelId, id: tag.id, patch: { property: e.target.value as ElementTag['property'] } }))}><option value="type">Tipo</option><option value="name">Nome</option><option value="mark">Marca</option><option value="level">Nível</option><option value="width">Largura</option><option value="height">Altura</option></select></Row><Row label="Orientação"><select className="select" value={tag.orientation ?? 'horizontal'} onChange={(e) => edit(() => nota({ type: 'updateTag', levelId, id: tag.id, patch: { orientation: e.target.value as ElementTag['orientation'] } }))}><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row><Check id="p-tag-leader" checked={tag.leader === true} onChange={(v) => edit(() => nota({ type: 'updateTag', levelId, id: tag.id, patch: { leader: v } }))}>Mostrar líder</Check></Group>;
   if (!text) return <></>;
+  /** Centro da vista ativa: o texto passa a ser desenhado no ponto central do que está à vista. */
+  const centralizar = (): void => {
+    const v = editor.viewport();
+    if (!v) {
+      useUi.setState({ status: 'Abra a planta para centralizar o texto na vista.' });
+      return;
+    }
+    edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { at: { x: v.cx, y: v.cy } } }, planId)));
+  };
   return (
     <Group title="Texto">
-      <Row label="Texto" htmlFor="p-ttext">
-        <TextField id="p-ttext" value={text.text} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { text: v } }))} />
+      <Row label="Conteúdo" htmlFor="p-ttext">
+        <TextAreaField id="p-ttext" value={text.text} onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { text: v } }, planId)))} />
       </Row>
       <Row label="Altura" htmlFor="p-theight">
-        <NumField id="p-theight" value={text.height / 1000} quantity="smallLength" min={0.0005} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { height: v } }))} />
+        <NumField id="p-theight" value={text.height} decimals={1} unit="mm" min={0.5} onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { height: v } }, planId)))} />
+      </Row>
+      <Row label="Largura da caixa" htmlFor="p-twidth">
+        <NumField id="p-twidth" value={text.width ?? null} decimals={1} unit="mm" min={0.5} placeholder="Sem quebra" onClear={() => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { width: undefined } }, planId)))} onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { width: v } }, planId)))} />
       </Row>
       <Row label="Rotação" htmlFor="p-trot">
-        <NumField id="p-trot" value={(text.rotation * Math.PI) / 180} quantity="angle" onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { rotation: (v * 180) / Math.PI } }))} />
+        <NumField id="p-trot" value={text.rotation} decimals={0} unit="°" onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { rotation: v } }, planId)))} />
       </Row>
-      <Row label="Largura" htmlFor="p-twidth"><NumField id="p-twidth" value={(text.width ?? 0) / 1000} quantity="smallLength" min={0} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { width: v ? v * 1000 : undefined } }))} /></Row>
-      <Row label="Alinhamento"><select className="select" value={text.align ?? 'left'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { align: e.target.value as TextNote['align'] } }))}><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></Row>
-      <Check id="p-tbold" checked={text.bold === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { bold: v } }))}>Negrito</Check>
-      <Check id="p-titalic" checked={text.italic === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { italic: v } }))}>Itálico</Check>
-      <Check id="p-tunderline" checked={text.underline === true} onChange={(v) => edit(() => editor.store.exec({ type: 'updateText', levelId, id: text.id, patch: { underline: v } }))}>Sublinhado</Check>
+      <Row label="Moldura" htmlFor="p-tframe">
+        <Check id="p-tframe" checked={text.frame === true} onChange={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { frame: v } }, planId)))} />
+      </Row>
+      <Row label="Alinhamento"><select className="select" value={text.align ?? 'left'} onChange={(e) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { align: e.target.value as TextNote['align'] } }, planId)))}><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></Row>
+      <Check id="p-tbold" checked={text.bold === true} onChange={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { bold: v } }, planId)))}>Negrito</Check>
+      <Check id="p-titalic" checked={text.italic === true} onChange={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { italic: v } }, planId)))}>Itálico</Check>
+      <Check id="p-tunderline" checked={text.underline === true} onChange={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { underline: v } }, planId)))}>Sublinhado</Check>
+      <Row label="Posição X" htmlFor="p-tx">
+        <NumField id="p-tx" value={text.at.x} decimals={2} unit="m" onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { at: { ...text.at, x: v } } }, planId)))} />
+      </Row>
+      <Row label="Posição Y" htmlFor="p-ty">
+        <NumField id="p-ty" value={text.at.y} decimals={2} unit="m" onCommit={(v) => edit(() => editor.store.exec(comPlanoDaVista({ type: 'updateText', levelId, id: text.id, patch: { at: { ...text.at, y: v } } }, planId)))} />
+      </Row>
+      <div className="prow"><span /><button type="button" className="btn small" title="Move a caixa para o centro da vista ativa" onClick={centralizar}>Centralizar no ponto</button></div>
     </Group>
   );
 }

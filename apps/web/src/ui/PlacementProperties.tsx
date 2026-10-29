@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
+import { areaPlanOf, isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
 import { DEFAULT_RAMP_OPTIONS, roofAutoOffset, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { clearDimOverride, setDimOverride, useUi } from '../editor/state.ts';
@@ -8,6 +8,7 @@ import { useFormat } from './useUnits.ts';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { OPENING_OPTIONS, WALL_OPTIONS, sessionChoice } from './dialogs/dimensionSettingsModel.ts';
 import { RampLevelsFields, rampLevelsValue } from './RampLevelsFields.tsx';
+import { abrirCaixaDeTexto } from './dialogs/TextDialog.tsx';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'ramp', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -20,6 +21,11 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const p = useProject();
   const format = useFormat();
   const levelId = useUi((s) => s.levelId);
+  const planKind = useUi((s) => s.planKind);
+  const areaPlanId = useUi((s) => s.areaPlanId);
+  const areaPlan = planKind === 'area' && areaPlanId ? areaPlanOf(p, areaPlanId) : undefined;
+  // Na planta de área, as anotações ficam na vista; a frase abaixo já reflete o destino real.
+  const targetName = areaPlan ? `planta de área “${areaPlan.name}”` : `nível ativo (${p.levels.find((l) => l.id === levelId)?.name ?? 'Nível atual'})`;
   const o = useUi((s) => s.options);
   const dimOverrides = useUi((s) => s.dimOverrides);
   // Troca rápida das cotas: vale só para a sessão ('' volta ao padrão do projeto).
@@ -123,16 +129,15 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {tool === 'text' && (
         <Group title="Colocação · Texto">
-          {/* units-ok: altura de texto em mm de papel, não é medida do modelo */}
-          <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={(o.textHeight ?? 2.5) / 1000} quantity="smallLength" min={0.0001} onCommit={(v) => set({ textHeight: v * 1000 })} /></Row>
-          {/* units-ok: rotação em graus de papel, valor do campo é o próprio grau */}
-          <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={((o.textRotation ?? 0) * Math.PI) / 180} quantity="angle" onCommit={(v) => set({ textRotation: (v * 180) / Math.PI })} /></Row>
-          <div className="hint">Clique na planta e digite o conteúdo do texto.</div>
+          <Row label="Altura do texto" htmlFor="place-text-height"><NumField id="place-text-height" value={o.textHeight ?? 2.5} unit="mm" min={0.1} onCommit={(v) => set({ textHeight: v })} /></Row>
+          <Row label="Rotação" htmlFor="place-text-rotation"><NumField id="place-text-rotation" value={o.textRotation ?? 0} unit="°" onCommit={(v) => set({ textRotation: v })} /></Row>
+          <div className="prow"><span /><button type="button" className="btn small" onClick={abrirCaixaDeTexto}>Caixa de texto…</button></div>
+          <div className="hint">Clique na planta e digite o texto, ou use a caixa de texto para largura, moldura e quebra de linha.</div>
         </Group>
       )}
       {['room', 'roomsep', 'dimension', 'text', 'section'].includes(tool) && (
         <Group title={`Colocação · ${tool === 'room' ? 'Ambiente' : tool === 'roomsep' ? 'Separador de ambiente' : tool === 'dimension' ? 'Cota' : tool === 'text' ? 'Texto' : 'Corte'}`}>
-          <div className="hint">As opções geométricas e o conteúdo são definidos durante o desenho. O elemento será criado no nível ativo ({p.levels.find((l) => l.id === levelId)?.name ?? 'Nível atual'}).</div>
+          <div className="hint">As opções geométricas e o conteúdo são definidos durante o desenho. A anotação será criada na {targetName}.</div>
         </Group>
       )}
       {!['room', 'roomsep', 'dimension', 'text', 'section'].includes(tool) && (

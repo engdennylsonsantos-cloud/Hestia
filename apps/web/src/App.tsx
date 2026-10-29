@@ -31,6 +31,7 @@ import { WallScheduleDialog } from './ui/dialogs/WallScheduleDialog.tsx';
 import { FloorTypeDialog } from './ui/dialogs/FloorTypeDialog.tsx';
 import { FloorScheduleDialog } from './ui/dialogs/FloorScheduleDialog.tsx';
 import { RoomScheduleDialog } from './ui/dialogs/RoomScheduleDialog.tsx';
+import { RoomCategoriesDialog } from './ui/dialogs/RoomCategoriesDialog.tsx';
 import { SlabTypeDialog } from './ui/dialogs/SlabTypeDialog.tsx';
 import { SlabScheduleDialog } from './ui/dialogs/SlabScheduleDialog.tsx';
 import { CeilingScheduleDialog } from './ui/dialogs/CeilingScheduleDialog.tsx';
@@ -47,6 +48,7 @@ import { GraphicsVisibilityDialog } from './ui/dialogs/GraphicsVisibilityDialog.
 import { LineWeightsDialog } from './ui/dialogs/LineWeightsDialog.tsx';
 import { MoveLevelDialog } from './ui/MoveLevel.tsx';
 import { GridTypeDialog } from './ui/dialogs/GridTypeDialog.tsx';
+import { TextDialog, useCaixaDeTextoAberta } from './ui/dialogs/TextDialog.tsx';
 
 function Dialogs(): ReactElement | null {
   const d = useUi((s) => s.dialog);
@@ -60,6 +62,8 @@ function Dialogs(): ReactElement | null {
       return <FloorScheduleDialog />;
     case 'roomSchedule':
       return <RoomScheduleDialog />;
+    case 'roomCategories':
+      return <RoomCategoriesDialog />;
     case 'slabType':
       return arg ? <SlabTypeDialog typeId={arg} /> : null;
     case 'slabSchedule':
@@ -153,6 +157,8 @@ export function App(): ReactElement {
   const widths = dockWidths(propsOpen, browserOpen, dock);
   const theme = useUi((s) => s.theme);
   const dialog = useUi((s) => s.dialog);
+  // A caixa de texto não entra em `dialog` (DialogKind); as teclas ficam presas a ela enquanto estiver aberta.
+  const caixaTextoAberta = useCaixaDeTextoAberta();
 
   // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
   const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
@@ -175,12 +181,12 @@ export function App(): ReactElement {
     const onKey = (e: KeyboardEvent): void => {
       const t = e.target as HTMLElement | null;
       const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
-      if (dialog || typing) return;
+      if (dialog || caixaTextoAberta || typing) return;
       if (editor.key(e)) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dialog]);
+  }, [dialog, caixaTextoAberta]);
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent): void => {
@@ -203,6 +209,8 @@ export function App(): ReactElement {
       </div>
       <StatusBar />
       <Dialogs />
+      {/* A caixa de texto tem store próprio (não entra no DialogKind): aberta pela aba Anotar/painel do Texto. */}
+      <TextDialog />
       <FileMenu />
     </div>
   );

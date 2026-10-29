@@ -147,6 +147,7 @@ const KEYS: Array<[string, string]> = [
 const DESCRICAO_COMANDO: Partial<Record<ShortcutCommand, string>> = {
   stair: 'Escada (croqui: limites, espelhos, caminhada, patamar)',
   stairrun: 'Escada reta, em L, em U ou com leque',
+  ramp: 'Rampa reta, em L ou em U',
   trim: 'Aparar/Estender',
   joins: 'Junção de canto',
   split: 'Dividir parede',

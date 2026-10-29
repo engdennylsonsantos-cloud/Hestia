@@ -4,6 +4,7 @@ import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_STAIR_CALC_RULE } from './stairTypes.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
 
@@ -205,6 +206,13 @@ const migrations: Record<number, Migration> = {
   // v18 → v19: contorno associativo de piso e laje (decisão 0023 §8.2). Pisos e lajes existentes não têm `outlineSource`,
   // o que significa estáticos (o contorno gravado continua valendo). A migração só avança a versão.
   18: (raw) => ({ ...raw }),
+  // v19 → v20: regra de cálculo configurável por tipo de escada (estilo Revit). Tipos existentes ganham os padrões
+  // (2·R + T entre 0,63 e 0,65 m, alvo 0,63 m e piso máximo 0,32 m), preservando o piso calculado de antes.
+  19: (raw) => {
+    const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { ...DEFAULT_STAIR_CALC_RULE, ...t };
+    return { ...raw, stairTypes };
+  },
 };
 
 export class SchemaError extends Error {}

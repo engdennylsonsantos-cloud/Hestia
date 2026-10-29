@@ -1,3 +1,4 @@
+import { DEFAULT_STAIR_CALC_RULE, type StairCalcRule } from './stairTypes.ts';
 import type { Id, Stair, StairRunStyle, StairType } from './types.ts';
 
 /** Estilos de lance aceitos (decisão 0014 §8). */
@@ -37,6 +38,7 @@ export function makeStair(s: StairInput): Omit<Stair, 'order'> {
 const COMMON = {
   maxRiser: 0.18,
   minTread: 0.28,
+  ...DEFAULT_STAIR_CALC_RULE,
   minRunWidth: 0.8,
   nosing: 0.015,
   landingThickness: 0.15,
@@ -107,16 +109,31 @@ export const DEFAULT_STAIR_TYPES: StairType[] = [
   },
 ];
 
+/** Entrada da validação do tipo: os campos de regra são opcionais para aceitar chamadas antigas. */
+export type StairTypeIssueInput = Pick<StairType, 'runStyle' | 'treadThickness' | 'treadOverlap'> &
+  Partial<Pick<StairType, 'minTread' | keyof StairCalcRule>>;
+
 /**
- * Regras do tipo que o modelo confere ao salvar (`upsertStairType`): estilo conhecido; sobreposição não negativa; e, no
- * estilo poste, espessura do degrau positiva e sobreposição menor que ela. Devolve a 1ª mensagem, ou null.
+ * Regras do tipo que o modelo confere ao salvar (`upsertStairType`): estilo conhecido; sobreposição não negativa; no
+ * estilo poste, espessura do degrau positiva e sobreposição menor que ela; e a regra de cálculo (fatores > 0,
+ * calcMin ≤ calcTarget ≤ calcMax e maxTread ≥ minTread). Devolve a 1ª mensagem, ou null.
  */
-export function stairTypeIssue(t: Pick<StairType, 'runStyle' | 'treadThickness' | 'treadOverlap'>): string | null {
+export function stairTypeIssue(t: StairTypeIssueInput): string | null {
   if (!STAIR_RUN_STYLES.includes(t.runStyle)) return 'Estilo de escada desconhecido.';
   if (!(t.treadOverlap >= 0)) return 'A sobreposição dos degraus não pode ser negativa.';
   if (t.runStyle === 'post') {
     if (!(t.treadThickness > 0)) return 'Escada com poste central: a espessura do degrau precisa ser maior que zero.';
     if (!(t.treadOverlap < t.treadThickness)) return 'A sobreposição dos degraus precisa ser menor que a espessura do degrau.';
+  }
+  if (t.calcRiserFactor !== undefined && !(t.calcRiserFactor > 0)) return 'O fator do espelho na regra de cálculo precisa ser maior que zero.';
+  if (t.calcTreadFactor !== undefined && !(t.calcTreadFactor > 0)) return 'O fator do piso na regra de cálculo precisa ser maior que zero.';
+  if (t.calcMin !== undefined && t.calcTarget !== undefined && t.calcMax !== undefined) {
+    if (!(t.calcMin <= t.calcTarget && t.calcTarget <= t.calcMax)) {
+      return 'O alvo da regra de cálculo precisa ficar entre o mínimo e o máximo da faixa.';
+    }
+  }
+  if (t.maxTread !== undefined && t.minTread !== undefined && !(t.maxTread >= t.minTread)) {
+    return 'O piso máximo precisa ser maior ou igual ao piso mínimo.';
   }
   return null;
 }

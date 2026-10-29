@@ -1,6 +1,6 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { stairTopLevel } from '@hestia/model';
-import { SPIRAL_MAX_SWEEP, stairIssueList } from '@hestia/engine';
+import { SPIRAL_MAX_SWEEP, stairIssueList, treadRuleOf, type TreadRule } from '@hestia/engine';
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
@@ -230,8 +230,8 @@ export class StairRunTool extends ToolBase {
     };
   }
 
-  /** H (nível ativo e nível acima), espelho máximo e piso mínimo do tipo da criação; erro com a mensagem de status. */
-  private limitsNow(): { H: number; maxRiser: number; minTread: number } | { error: string } {
+  /** H (nível ativo e nível acima), espelho máximo, piso mínimo e regra de cálculo do tipo da criação. */
+  private limitsNow(): { H: number; maxRiser: number; minTread: number; rule: TreadRule } | { error: string } {
     const p = this.env.project();
     const ref = draftStair(p, this.creation(), this.env.levelId());
     const limits = ref ? stairLimits(p, ref) : null;
@@ -244,7 +244,7 @@ export class StairRunTool extends ToolBase {
           : 'Sem nível de topo: escolha o nível de cima na barra de escada (ou informe uma altura positiva).',
       };
     }
-    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };
+    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread, rule: treadRuleOf(type) };
   }
 
   /**
@@ -255,7 +255,7 @@ export class StairRunTool extends ToolBase {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
     const options = length !== undefined ? { ...this.opts, length } : this.opts;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options });
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, rule: lim.rule, options });
   }
 
   /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */

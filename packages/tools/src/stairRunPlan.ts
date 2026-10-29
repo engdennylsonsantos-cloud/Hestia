@@ -8,8 +8,9 @@ import {
   treadFor,
   type StairComponentSketch,
   type StairRunSketch,
+  type TreadRule,
 } from '@hestia/engine';
-import type { Id, StairGenerator } from '@hestia/model';
+import { DEFAULT_STAIR_CALC_RULE, type Id, type StairGenerator } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
 /**
@@ -62,15 +63,32 @@ export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 
 export const WINDER_FIRST_RISERS = 2;
 export const WINDER_FAN_RISERS = 3;
 
+/** Regra padrão quando o tipo ainda não é conhecido (mesmos números de `DEFAULT_STAIR_CALC_RULE`). */
+export function defaultTreadRule(minTread: number): TreadRule {
+  return {
+    minTread,
+    maxTread: DEFAULT_STAIR_CALC_RULE.maxTread,
+    a: DEFAULT_STAIR_CALC_RULE.calcRiserFactor,
+    b: DEFAULT_STAIR_CALC_RULE.calcTreadFactor,
+    target: DEFAULT_STAIR_CALC_RULE.calcTarget,
+  };
+}
+
 /**
  * Piso de um lance reto de comprimento `length` (m, do 1º ao último espelho). A altura manda: N = ceil(H ÷ espelho máximo)
- * e o piso ideal é `treadFor` (Blondel), como no Revit. O comprimento só limita: mais longo que (N − 1) × ideal, a escada
- * termina antes do clique; mais curto, o piso encolhe até o mínimo do tipo. Erro se nem o piso mínimo cabe.
+ * e o piso ideal é `treadFor` (regra do tipo), como no Revit. O comprimento só limita: mais longo que (N − 1) × ideal, a
+ * escada termina antes do clique; mais curto, o piso encolhe até o mínimo do tipo. Erro se nem o piso mínimo cabe.
  */
-export function fitRunToLength(H: number, maxRiser: number, minTread: number, length: number): { risers: number; tread: number } | { error: string } {
+export function fitRunToLength(
+  H: number,
+  maxRiser: number,
+  minTread: number,
+  length: number,
+  rule: TreadRule = defaultTreadRule(minTread),
+): { risers: number; tread: number } | { error: string } {
   const N = Math.max(2, riserCountFor(H, maxRiser));
-  const tread = Math.min(treadFor(H / N, minTread), length / (N - 1));
-  if (tread < minTread - 1e-9) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${N} espelhos: o piso ficaria abaixo do mínimo (${(minTread * 100).toFixed(0)} cm).` };
+  const tread = Math.min(treadFor(H / N, rule), length / (N - 1));
+  if (tread < rule.minTread - 1e-9) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${N} espelhos: o piso ficaria abaixo do mínimo (${(rule.minTread * 100).toFixed(0)} cm).` };
   return { risers: N, tread };
 }
 
@@ -85,6 +103,8 @@ export interface StairRunPlanInput {
   maxRiser: number;
   /** Piso mínimo do tipo (m). */
   minTread: number;
+  /** Regra de cálculo do tipo; ausente = a padrão (Blondel 0,63 − 2h, piso máximo 0,32). */
+  rule?: TreadRule;
   options: StairRunToolOptions;
 }
 
@@ -107,7 +127,7 @@ function lengthNote(length: number, N: number, tread: number): string {
 export type StairRunPlanResult = StairRunPlan | { error: string };
 
 /**
- * Calcula a escada pronta: N = ceil(H ÷ espelho máximo), h = H ÷ N, piso = treadFor(h, piso mínimo) e os componentes do
+ * Calcula a escada pronta: N = ceil(H ÷ espelho máximo), h = H ÷ N, piso = treadFor(h, regra do tipo) e os componentes do
  * gerador da forma. L e U dividem N com `risersFirst = ceil(N/2)`. O winder é fundido em um lance só (ver `mergeWinder`).
  * Sem efeito no modelo: só devolve o plano ou a mensagem de status em pt-BR.
  */
@@ -126,17 +146,18 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   }
   if (N < 2) return { error: 'A altura é menor que um espelho: nada a gerar.' };
   if (N < MIN_RISERS[shape]) return { error: `Esta forma precisa de ao menos ${MIN_RISERS[shape]} espelhos; a altura dá ${N}.` };
+  const rule = i.rule ?? defaultTreadRule(i.minTread);
   // Reta com comprimento (2º clique): N vem só da altura; o comprimento limita o piso (a escada termina antes do clique).
   const byLength = shape === 'straight' && i.options.length !== undefined;
   let sizedTread: number | undefined;
   if (byLength) {
-    const sized = fitRunToLength(i.H, i.maxRiser, i.minTread, i.options.length!);
+    const sized = fitRunToLength(i.H, i.maxRiser, i.minTread, i.options.length!, rule);
     if ('error' in sized) return sized;
     N = sized.risers;
     sizedTread = sized.tread;
   }
   const riserHeight = i.H / N;
-  const tread = sizedTread ?? treadFor(riserHeight, i.minTread);
+  const tread = sizedTread ?? treadFor(riserHeight, rule);
   const note = byLength && i.options.length! > (N - 1) * tread + 0.005 ? lengthNote(i.options.length!, N, tread) : undefined;
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];

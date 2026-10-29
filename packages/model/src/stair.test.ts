@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STAIR_TYPES,
   ProjectStore,
+  STAIR_CALC_PRESETS,
   createEmptyProject,
   defaultStairTypeId,
   elementLevelId,
@@ -9,6 +10,7 @@ import {
   makeLevel,
   makeStair,
   migrateProject,
+  stairCalcRuleOf,
   stairTypeIssue,
   stairBaseZ,
   stairTopLevel,
@@ -431,5 +433,46 @@ describe('escada caracol: tipos, poste e metadado do croqui', () => {
     const pFirst = { x: espelhado.center.x + espelhado.rOuter * Math.cos(espelhado.startAngle), y: espelhado.center.y + espelhado.rOuter * Math.sin(espelhado.startAngle) };
     expect(pFirst.x).toBeCloseTo(-3, 9);
     expect(pFirst.y).toBeCloseTo(0, 9);
+  });
+});
+
+describe('regra de cálculo do tipo de escada', () => {
+  it('os tipos iniciais usam a regra padrão 2R + T (0,63 a 0,65 m), alvo 0,63 e piso máximo 0,32', () => {
+    for (const t of DEFAULT_STAIR_TYPES) {
+      expect(stairCalcRuleOf(t)).toEqual({
+        calcRiserFactor: 2,
+        calcTreadFactor: 1,
+        calcTarget: 0.63,
+        calcMin: 0.63,
+        calcMax: 0.65,
+        maxTread: 0.32,
+      });
+    }
+  });
+
+  it('as predefinições trazem as faixas da NBR 9050, da NBR 9077 e do IBC', () => {
+    expect(STAIR_CALC_PRESETS.map((p) => p.id)).toEqual(['nbr9050', 'nbr9077', 'ibc']);
+    const [nbr9050, nbr9077, ibc] = STAIR_CALC_PRESETS;
+    expect(nbr9050!.rule).toMatchObject({ calcRiserFactor: 2, calcTreadFactor: 1, calcTarget: 0.63, calcMin: 0.63, calcMax: 0.65, maxTread: 0.32 });
+    expect(nbr9077!.rule).toMatchObject({ calcMin: 0.63, calcMax: 0.64, calcTarget: 0.63, maxTread: 0.32 });
+    expect(ibc!.rule).toMatchObject({ calcMin: 0.6, calcMax: 0.65, calcTarget: 0.63, maxTread: 0.32 });
+  });
+
+  it('a validação do tipo exige fatores positivos, alvo na faixa e piso máximo ≥ mínimo', () => {
+    const base = { ...DEFAULT_STAIR_TYPES[0]! };
+    expect(stairTypeIssue(base)).toBeNull();
+    expect(stairTypeIssue({ ...base, calcRiserFactor: 0 })).toMatch(/fator do espelho/);
+    expect(stairTypeIssue({ ...base, calcTreadFactor: -1 })).toMatch(/fator do piso/);
+    expect(stairTypeIssue({ ...base, calcMin: 0.7 })).toMatch(/alvo/);
+    expect(stairTypeIssue({ ...base, calcMax: 0.6 })).toMatch(/alvo/);
+    expect(stairTypeIssue({ ...base, maxTread: 0.2 })).toMatch(/piso máximo/);
+  });
+
+  it('upsertStairType rejeita uma regra de cálculo inválida e não guarda o tipo', () => {
+    const s = projectWithLevels();
+    const base = { ...DEFAULT_STAIR_TYPES[0]!, id: 'stt_calc_ruim' };
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, calcTarget: 0.8 } })).toThrow(/alvo/);
+    expect(() => s.exec({ type: 'upsertStairType', stairType: { ...base, maxTread: 0.1 } })).toThrow(/piso máximo/);
+    expect(s.project.stairTypes.stt_calc_ruim).toBeUndefined();
   });
 });

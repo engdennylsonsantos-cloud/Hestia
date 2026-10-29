@@ -151,7 +151,7 @@ describe('migração 12 → 13 (face inferior da escada)', () => {
   it('todo tipo de escada existente ganha face lisa', () => {
     const m = migrateProject(legacyV12());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(19);
+    expect(SCHEMA_VERSION).toBe(20);
     for (const t of Object.values(m.stairTypes)) expect(t.undersideStyle).toBe('smooth');
   });
 
@@ -252,7 +252,7 @@ describe('migração 15 → 16 (escada caracol)', () => {
   it('todo tipo existente ganha sobreposição e material do poste padrão', () => {
     const m = migrateProject(legacyV15());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(19);
+    expect(SCHEMA_VERSION).toBe(20);
     for (const id of ['stt_monolitica', 'stt_piso_espelho']) {
       expect(m.stairTypes[id]).toMatchObject({ treadOverlap: 0.025, postMaterialId: 'mat_aco' });
     }
@@ -293,6 +293,44 @@ describe('migração 15 → 16 (escada caracol)', () => {
 
   it('ida e volta depois da migração preserva o projeto', () => {
     const m = migrateProject(legacyV15());
+    expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+});
+
+describe('migração 19 → 20 (regra de cálculo por tipo)', () => {
+  /** Projeto no formato da versão 19: tipos de escada sem a regra de cálculo. */
+  function legacyV19(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown> & {
+      stairTypes: Record<string, Record<string, unknown>>;
+    };
+    p.schemaVersion = 19;
+    for (const t of Object.values(p.stairTypes)) {
+      delete t.calcRiserFactor;
+      delete t.calcTreadFactor;
+      delete t.calcTarget;
+      delete t.calcMin;
+      delete t.calcMax;
+      delete t.maxTread;
+    }
+    return p;
+  }
+
+  it('todo tipo existente ganha a regra padrão (2R + T de 0,63 a 0,65 m, alvo 0,63 e piso máximo 0,32)', () => {
+    const m = migrateProject(legacyV19());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    for (const t of Object.values(m.stairTypes)) {
+      expect(t).toMatchObject({ calcRiserFactor: 2, calcTreadFactor: 1, calcTarget: 0.63, calcMin: 0.63, calcMax: 0.65, maxTread: 0.32 });
+    }
+  });
+
+  it('regra já salva no arquivo é preservada', () => {
+    const custom = { ...DEFAULT_STAIR_TYPES[0]!, calcRiserFactor: 3, calcTreadFactor: 2, calcTarget: 0.7 };
+    const m = migrateProject({ ...legacyV19(), stairTypes: { [custom.id]: custom } });
+    expect(m.stairTypes[custom.id]).toMatchObject({ calcRiserFactor: 3, calcTreadFactor: 2, calcTarget: 0.7 });
+  });
+
+  it('ida e volta depois da migração preserva o projeto', () => {
+    const m = migrateProject(legacyV19());
     expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
   });
 });

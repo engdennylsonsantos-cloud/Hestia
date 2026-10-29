@@ -1,4 +1,5 @@
 import { add, dot, len, mul, norm, perp, sub, type Vec2 } from '@hestia/geom';
+import { stairCalcRuleOf, type StairType } from '@hestia/model';
 import type { StairCurve, StairLandingSketch, StairRunSketch } from './stairSketch.ts';
 
 /** Componente do croqui de escada, em ordem (lance, patamar, lance...). Decisão 0011 §1 e §5. */
@@ -53,7 +54,15 @@ export interface WinderOptions extends Omit<TurnOptions, 'landingDepth'> {
 const PI_2 = Math.PI / 2;
 /** Espelho radial passa do limite e é aparado (decisão 0011 §5): evita cair entre as cordas do arco amostrado. */
 const OVERSHOOT = 0.01;
-const MAX_TREAD = 0.32;
+
+/** Regra de piso usada no cálculo: a·R + b·T = alvo, com o piso limitado a [minTread, maxTread]. */
+export interface TreadRule {
+  minTread: number;
+  maxTread: number;
+  a: number;
+  b: number;
+  target: number;
+}
 
 /** Nº de espelhos N = ceil(H ÷ espelho máximo), mínimo 1 (decisão 0011 §4). */
 export function riserCountFor(height: number, maxRiser: number): number {
@@ -62,9 +71,24 @@ export function riserCountFor(height: number, maxRiser: number): number {
   return Math.max(1, Math.ceil(height / maxRiser - 1e-9));
 }
 
-/** Piso calculado: clamp(0,63 − 2·h; piso mínimo; 0,32) (decisão 0011 §5). */
-export function treadFor(riserHeight: number, minTread: number): number {
-  return Math.min(MAX_TREAD, Math.max(minTread, 0.63 - 2 * riserHeight));
+/** Regra de piso do tipo de escada (estilo Revit "Stair Calculator"). */
+export function treadRuleOf(type: StairType): TreadRule {
+  const rule = stairCalcRuleOf(type);
+  return {
+    minTread: type.minTread,
+    maxTread: rule.maxTread,
+    a: rule.calcRiserFactor,
+    b: rule.calcTreadFactor,
+    target: rule.calcTarget,
+  };
+}
+
+/**
+ * Piso calculado pela regra do tipo: (alvo − a·h) ÷ b, limitado a [piso mínimo, piso máximo] (decisão 0011 §5).
+ * Com a regra padrão (a = 2, b = 1, alvo = 0,63), é o antigo clamp(0,63 − 2·h; minTread; 0,32).
+ */
+export function treadFor(riserHeight: number, rule: TreadRule): number {
+  return Math.min(rule.maxTread, Math.max(rule.minTread, (rule.target - rule.a * riserHeight) / rule.b));
 }
 
 /** Lance reto: espelhos perpendiculares a `dir`, limites paralelos do 1º ao último espelho. */

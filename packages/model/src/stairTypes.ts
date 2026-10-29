@@ -100,6 +100,75 @@ export type StairRunStyle = 'monolithic' | 'assembled' | 'post';
 export type StairUndersideStyle = 'smooth' | 'stepped';
 
 /**
+ * Regra de cálculo do piso (estilo Revit "Stair Calculator"): a relação a·R + b·T fica dentro de [calcMin, calcMax] e
+ * o piso calculado é (calcTarget − a·R) ÷ b, limitado a [minTread, maxTread]. Só gera avisos, nunca bloqueia.
+ */
+export interface StairCalcRule {
+  /** Fator do espelho (a). */
+  calcRiserFactor: number;
+  /** Fator do piso (b). */
+  calcTreadFactor: number;
+  /** Alvo de a·R + b·T (m). */
+  calcTarget: number;
+  /** Faixa aceitável de a·R + b·T (m). */
+  calcMin: number;
+  calcMax: number;
+  /** Piso máximo (m). */
+  maxTread: number;
+}
+
+/** Regra padrão: 2·R + T entre 0,63 e 0,65 m, alvo 0,63 m e piso máximo 0,32 m. */
+export const DEFAULT_STAIR_CALC_RULE: StairCalcRule = {
+  calcRiserFactor: 2,
+  calcTreadFactor: 1,
+  calcTarget: 0.63,
+  calcMin: 0.63,
+  calcMax: 0.65,
+  maxTread: 0.32,
+};
+
+/** Predefinição de regra de cálculo oferecida ao tipo de escada. */
+export interface StairCalcPreset {
+  id: 'nbr9050' | 'nbr9077' | 'ibc';
+  label: string;
+  rule: StairCalcRule;
+}
+
+/**
+ * Predefinições de norma: NBR 9050 (2R + T entre 0,63 e 0,65 m), NBR 9077 (entre 0,63 e 0,64 m) e IBC.
+ * O IBC é uma aproximação do "Stair Calculator" do Revit: 2R + T entre 0,60 e 0,65 m, alvo 0,63 m.
+ */
+export const STAIR_CALC_PRESETS: readonly StairCalcPreset[] = [
+  {
+    id: 'nbr9050',
+    label: 'NBR 9050 (2R + T de 63 a 65 cm)',
+    rule: { ...DEFAULT_STAIR_CALC_RULE },
+  },
+  {
+    id: 'nbr9077',
+    label: 'NBR 9077 (2R + T de 63 a 64 cm)',
+    rule: { ...DEFAULT_STAIR_CALC_RULE, calcMax: 0.64 },
+  },
+  {
+    id: 'ibc',
+    label: 'IBC (2R + T de 60 a 65 cm, aproximação do Revit)',
+    rule: { ...DEFAULT_STAIR_CALC_RULE, calcMin: 0.6 },
+  },
+];
+
+/** Regra de cálculo do tipo de escada (com os seis campos já preenchidos). */
+export function stairCalcRuleOf(t: Pick<StairType, keyof StairCalcRule>): StairCalcRule {
+  return {
+    calcRiserFactor: t.calcRiserFactor,
+    calcTreadFactor: t.calcTreadFactor,
+    calcTarget: t.calcTarget,
+    calcMin: t.calcMin,
+    calcMax: t.calcMax,
+    maxTread: t.maxTread,
+  };
+}
+
+/**
  * Tipo de escada (Revit: Stair Type). Regras de espelho/piso valem para o lance calculado; no croqui livre elas não
  * bloqueiam. Campos de estilo que não se aplicam ao estilo escolhido ficam em 0 (ex.: `treadThickness` no monolítico).
  */
@@ -112,6 +181,17 @@ export interface StairType {
   maxRiser: number;
   /** Piso mínimo (m). */
   minTread: number;
+  /** Fator do espelho (a) na regra a·R + b·T. */
+  calcRiserFactor: number;
+  /** Fator do piso (b) na regra a·R + b·T. */
+  calcTreadFactor: number;
+  /** Alvo de a·R + b·T (m): define o piso calculado. */
+  calcTarget: number;
+  /** Faixa aceitável de a·R + b·T (m); fora dela, aviso de norma. */
+  calcMin: number;
+  calcMax: number;
+  /** Piso máximo (m). */
+  maxTread: number;
   /** Largura mínima do lance (m). */
   minRunWidth: number;
   runStyle: StairRunStyle;

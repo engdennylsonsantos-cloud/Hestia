@@ -63,6 +63,14 @@ describe('escada reta: a altura define o nº de espelhos e o 2º clique limita o
     expect(fitRunToLength(2.8, 0.175, 0.25, 3.9)).toEqual({ risers: 16, tread: 3.9 / 15 });
     expect('error' in fitRunToLength(2.8, 0.175, 0.25, 3.6)).toBe(true);
   });
+
+  it('fitRunToLength usa a regra do tipo: alvo e piso máximo personalizados', () => {
+    const rule = { minTread: 0.25, maxTread: 0.32, a: 2, b: 1, target: 0.64 };
+    const a = fitRunToLength(2.8, 0.175, 0.25, 40, rule);
+    expect('error' in a ? 0 : a.tread).toBeCloseTo(0.29, 12);
+    const b = fitRunToLength(2.8, 0.175, 0.25, 40, { ...rule, maxTread: 0.285 });
+    expect('error' in b ? 0 : b.tread).toBeCloseTo(0.285, 12);
+  });
 });
 
 describe('escada reta: "Nº de espelhos" editado nas Propriedades', () => {

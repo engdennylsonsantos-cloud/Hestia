@@ -1,4 +1,5 @@
 import { cross, dist, lerp, norm, sub, type Vec2 } from '@hestia/geom';
+import { stairCalcRuleOf } from '@hestia/model';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import { DEFAULT_STAIR_NORMS, type StairNorms } from './stairNorms.ts';
 import { stairQuantities } from './stairQuantities.ts';
@@ -211,8 +212,16 @@ function winderTreadCheck(rs: ResolvedStair, ci: number, risers: ResolvedStairRi
   }
 }
 
-/** Lance a lance: largura, piso médio, Blondel, desnível sem patamar, degraus iguais e piso do leque. */
-function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {  const h = rs.riserHeight;
+/** Rótulo da relação de cálculo: "2h + p" para a regra padrão e os fatores explícitos nas demais. */
+function relationLabel(a: number, b: number): string {
+  const f = (v: number): string => (Number.isInteger(v) ? String(v) : num(v, 2));
+  return `${f(a)}h + ${b === 1 ? '' : `${f(b)}`}p`;
+}
+
+/** Lance a lance: largura, piso médio, regra de cálculo, desnível sem patamar, degraus iguais e piso do leque. */
+function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]): void {
+  const h = rs.riserHeight;
+  const calc = stairCalcRuleOf(rs.type);
   const quant = stairQuantities(rs);
   for (const [ci, risers] of risersByRun(rs.risers)) {
     const width = Math.min(...risers.map((r) => polyLength(r.points)));
@@ -245,14 +254,14 @@ function runChecks(rs: ResolvedStair, norms: StairNorms, out: StairIssueItem[]):
           ),
         );
       }
-      const blondel = 2 * h + tread;
-      if (blondel < norms.blondelMin - EPS || blondel > norms.blondelMax + EPS) {
+      const relation = calc.calcRiserFactor * h + calc.calcTreadFactor * tread;
+      if (relation < calc.calcMin - EPS || relation > calc.calcMax + EPS) {
         out.push(
           makeStairIssue(
             rs.id,
             'stair-blondel',
             'warning',
-            `A relação 2h + p (${num(blondel, 3)} m) está fora da faixa de norma (${num(norms.blondelMin, 2)} a ${num(norms.blondelMax, 2)} m).`,
+            `A relação ${relationLabel(calc.calcRiserFactor, calc.calcTreadFactor)} (${num(relation, 3)} m) está fora da faixa de norma (${num(calc.calcMin, 2)} a ${num(calc.calcMax, 2)} m).`,
             ci,
           ),
         );

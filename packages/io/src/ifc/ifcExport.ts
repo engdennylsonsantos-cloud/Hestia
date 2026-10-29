@@ -1,5 +1,5 @@
 import { isOpening, isWall, levelElevation, openingFamilyName, type OpeningType, type Project } from '@hestia/model';
-import { addPlates, addRoofs, addStairs } from './ifcElements.ts';
+import { addPlates, addRamps, addRoofs, addStairs } from './ifcElements.ts';
 import { gid, materialOf, optStr, storeyOf, type IfcCtx } from './ifcCtx.ts';
 import { axis3, bodyShape, extrudeSolid, localPlacement } from './ifcSolids.ts';
 import { en, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
@@ -184,6 +184,7 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
   addPlates(c, geo);
   addRoofs(c, geo);
   addStairs(c, geo);
+  addRamps(c, geo);
   for (const lv of p.levels) {
     const st = c.storeys.get(lv.id);
     if (st && st.contained.length > 0) {

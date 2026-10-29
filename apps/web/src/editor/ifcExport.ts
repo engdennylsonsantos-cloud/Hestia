@@ -4,6 +4,7 @@ import {
   junctionLevel,
   openingGeometry,
   resolveFloors,
+  resolveCeilings,
   resolveLevel,
   resolveRoofs,
   resolveSlabs,
@@ -151,7 +152,11 @@ export function ifcGeometryOf(p: Project): IfcGeometry {
     return { roofId: r.roofId, planes };
   });
   const stairs = resolveStairs(p).map((s) => stairOf(p, s));
-  return { walls, openings: openingsOf(p), floors, slabs, roofs, stairs };
+  const ceilings = levels
+    .flatMap((id) => resolveCeilings(p, id))
+    .map((c) => ({ ceilingId: c.ceilingId, prisms: prismsOf(c.polygon, flatPlane(c.topZ), flatPlane(c.bottomZ)) }))
+    .filter((c) => c.prisms.length > 0);
+  return { walls, openings: openingsOf(p), floors, slabs, ceilings, roofs, stairs };
 }
 
 /** Texto IFC4 (STEP) do projeto inteiro, com a data atual no cabeçalho. */

@@ -4,7 +4,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createEmptyProject, makeRoom, makeWall, ProjectStore, type Project } from '../../packages/model/src/index.ts';
+import { createEmptyProject, makeCeiling, makeRoom, makeWall, ProjectStore, type Project } from '../../packages/model/src/index.ts';
 import { buildTemplate, type TemplateId } from '../../packages/model/src/templates.ts';
 import { projectIfc } from '../../apps/web/src/editor/ifcExport.ts';
 
@@ -36,6 +36,17 @@ function casaComAmbientes(): Project {
     });
   });
   store.exec({ type: 'addRoom', room: makeRoom({ id: 'qr1', levelId: 'lv_0', name: 'Sala', number: '101', point: { x: 2, y: 2.5 } }) });
+  const ceilingTypeId = Object.keys(store.project.ceilingTypes)[0]!;
+  store.exec({
+    type: 'addCeiling',
+    ceiling: makeCeiling({
+      id: 'qc1',
+      typeId: ceilingTypeId,
+      levelId: 'lv_0',
+      boundary: anel.map(([x, y]) => ({ x, y })),
+      heightOffset: 2.6,
+    }),
+  });
   store.exec({ type: 'addGrid', grid: { id: 'qgA', name: 'A', typeId: 'gt_6mm', points: [{ x: 0, y: 0 }, { x: 0, y: 5 }], sag: 0, bubbleStart: true, bubbleEnd: true } });
   store.exec({ type: 'addGrid', grid: { id: 'qg1', name: '1', typeId: 'gt_6mm', points: [{ x: 0, y: 0 }, { x: 4, y: 0 }], sag: 0, bubbleStart: true, bubbleEnd: true } });
   return store.project;

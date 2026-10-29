@@ -79,7 +79,11 @@ por onda. Integração: o integrador liga as chamadas no `ifcExport.ts`.
 **Onda 2 — feita**
 F: cores/opacidade/brilho por material (`IfcMaterialDefinitionRepresentation` + `IfcSurfaceStyle`), incluindo vidro das
 esquadrias. G: comparação N2 motor × IfcOpenShell (`scripts/ifc-quality/compare.mts`, `npm run ifc:compare [-- --strict]`).
-H (georreferência) e I (matriz visual/CI) ficam para a onda 3.
+
+**Onda 3 — parcial (2026-10-29)**
+Unidades completas (`m`, `m²`, `m³`, `rad`) e **norte verdadeiro** no contexto; **forros** exportados como
+`IFCCOVERING .CEILING.` (com camadas e `Qto_CeilingBaseQuantities`). Pendentes: corrigir o quantificador de piso do
+`predio10` no motor, decidir o retorno de acabamento do vão, georreferência por CRS e matriz visual externa.
 
 ### N2 — divergências conhecidas (relatório, ainda sem gate estrito)
 

@@ -428,10 +428,15 @@ export { externalWalls } from './ifcExterior.ts';
 
 export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions = {}): string {
   const w = new StepWriter();
-  const unit = w.add('IFCSIUNIT', ['*', en('LENGTHUNIT'), OMIT, en('METRE')]);
-  const units = w.add('IFCUNITASSIGNMENT', [list([ref(unit)])]);
+  const lengthUnit = w.add('IFCSIUNIT', ['*', en('LENGTHUNIT'), OMIT, en('METRE')]);
+  const areaUnit = w.add('IFCSIUNIT', ['*', en('AREAUNIT'), OMIT, en('SQUARE_METRE')]);
+  const volumeUnit = w.add('IFCSIUNIT', ['*', en('VOLUMEUNIT'), OMIT, en('CUBIC_METRE')]);
+  const angleUnit = w.add('IFCSIUNIT', ['*', en('PLANEANGLEUNIT'), OMIT, en('RADIAN')]);
+  const units = w.add('IFCUNITASSIGNMENT', [list([lengthUnit, areaUnit, volumeUnit, angleUnit].map(ref))]);
   const world = axis3(w, [0, 0, 0]);
-  const context = w.add('IFCGEOMETRICREPRESENTATIONCONTEXT', [OMIT, "'Model'", '3', num(1e-5), ref(world), OMIT]);
+  // Norte verdadeiro: o modelo ainda não tem georreferência, então (0, 1) é o norte do mundo.
+  const trueNorth = w.add('IFCDIRECTION', [list([num(0), num(1)])]);
+  const context = w.add('IFCGEOMETRICREPRESENTATIONCONTEXT', [OMIT, "'Model'", '3', num(1e-5), ref(world), ref(trueNorth)]);
   const project = w.add('IFCPROJECT', [gid('project'), OMIT, stepString(p.name), OMIT, OMIT, OMIT, OMIT, list([ref(context)]), ref(units)]);
   const sitePlace = localPlacement(w, null, [0, 0, 0]);
   const site = w.add('IFCSITE', [gid('site'), OMIT, stepString(p.name), OMIT, OMIT, ref(sitePlace), OMIT, OMIT, en('ELEMENT'), OMIT, OMIT, OMIT, OMIT, OMIT]);

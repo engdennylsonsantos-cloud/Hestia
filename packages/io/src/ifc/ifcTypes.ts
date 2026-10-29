@@ -78,6 +78,7 @@ export interface IfcGeometry {
   openings: IfcOpeningGeo[];
   floors: Array<{ floorId: Id; prisms: IfcPrism[] }>;
   slabs: Array<{ slabId: Id; prisms: IfcPrism[] }>;
+  ceilings?: Array<{ ceilingId: Id; prisms: IfcPrism[] }>;
   roofs: Array<{ roofId: Id; planes: IfcPrism[] }>;
   stairs: IfcStairGeo[];
 }

@@ -1,6 +1,6 @@
 import { dist, boxesOverlap, boxOf, intersectSegments, type Vec2 } from '@hestia/geom';
 import { wallMid } from './wallGeom.ts';
-import { wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { isGeneric, wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { toLocal, wallEndCorners } from '@hestia/engine';
 import { candidatesAt, wallIndexOf } from './pickIndex.ts';
 
@@ -118,5 +118,49 @@ export function idsInBox(p: Project, levelId: Id, a: Vec2, b: Vec2): Id[] {
     if (hit) ids.push(w.id);
   }
   return ids;
+}
+
+/**
+ * Objeto importado sob o ponto: o contorno em planta (hull) guardado no genérico. Aceita o clique na borda com a mesma
+ * tolerância do resto da seleção; entre dois objetos sobrepostos vence o de menor área (o mais específico).
+ */
+export function genericAt(p: Project, levelId: Id, at: Vec2, mpp: number): Id | null {
+  const tol = 4 * mpp;
+  let best: { id: Id; area: number } | null = null;
+  for (const e of Object.values(p.elements)) {
+    if (!isGeneric(e) || e.levelId !== levelId) continue;
+    const ring = e.outline;
+    if (!ring || ring.length < 3) continue;
+    if (!insideOrNear(ring, at, tol)) continue;
+    const area = Math.abs(ringArea(ring));
+    if (!best || area < best.area) best = { id: e.id, area };
+  }
+  return best?.id ?? null;
+}
+
+/** Ray casting + distância às arestas (para o clique na borda contar). */
+function insideOrNear(ring: readonly Vec2[], at: Vec2, tol: number): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]!;
+    const b = ring[j]!;
+    if (a.y > at.y !== b.y > at.y && at.x < ((b.x - a.x) * (at.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / len2));
+    if (Math.hypot(at.x - (a.x + t * dx), at.y - (a.y + t * dy)) <= tol) return true;
+  }
+  return inside;
+}
+
+function ringArea(ring: readonly Vec2[]): number {
+  let s = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    s += a.x * b.y - b.x * a.y;
+  }
+  return s / 2;
 }
 

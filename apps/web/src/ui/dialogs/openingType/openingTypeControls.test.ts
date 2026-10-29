@@ -227,8 +227,8 @@ describe('controles novos: o seletor mostra o valor efetivo', () => {
     expect(tem(render(d, family, 'overview'), 'op-span-derived')).toBe(false);
     // Sem tags entre os textos (React separa nós de texto com comentários no HTML estático).
     const folha = render({ ...d, nominalRef: 'leaf' }, family, 'overview').replace(/<!--.*?-->/g, '');
-    expect(folha).toContain('88 × 215 cm');
-    expect(folha).toContain('80 × 210 cm');
+    expect(folha).toContain('88,0 cm × 215,0 cm');
+    expect(folha).toContain('80,0 cm × 210,0 cm');
   });
 
   it('tipo de vidro e material da folha', () => {

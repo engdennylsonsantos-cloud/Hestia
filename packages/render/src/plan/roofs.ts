@@ -1,7 +1,7 @@
 import { add, closestOnSegment, cross, dist, dot, len, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer, type ViewClass } from '@hestia/engine';
 import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
-import { formatQuantity, isRoof, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, unitSymbol, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
 import { ARC_TURN_DEG } from '@hestia/tools/src/roofGeom.ts';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -60,7 +60,8 @@ export function cantosLogicos(ring: Ring): boolean[] {
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
 
 /** Inclinação na unidade do projeto, como nas demais cotas da planta: "30 %", "27,5 %" (ou graus). */
-export const fmtPercent = (u: ResolvedUnits, p: number): string => formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true });
+export const fmtPercent = (u: ResolvedUnits, p: number): string =>
+  `${formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true, withUnit: false })} ${unitSymbol(u, 'slope')}`;
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
 export const fmtElevation = (u: ResolvedUnits, z: number): string => `+${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;

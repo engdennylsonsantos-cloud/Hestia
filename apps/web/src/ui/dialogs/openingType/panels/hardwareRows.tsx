@@ -18,18 +18,18 @@ export function LeafHardwareRows({ d, onChange, support }: PanelProps): ReactEle
       {support.leafUndercut ? (
         <div className="field-row">
           <label htmlFor="op-undercut" title="Folga entre a folha e o piso (ou a soleira): 0,7 cm piso seco, 1,7 cm úmido, 2,7 cm com ventilação (NBR 15930-2)">Folga inferior</label>
-          <NumField id="op-undercut" value={openingLeafUndercut(d)} scale={100} decimals={1} unit="cm" min={HARDWARE_LIMITS.leafUndercut.min} max={HARDWARE_LIMITS.leafUndercut.max} onCommit={(v) => onChange(setLeafUndercut(d, v))} />
+          <NumField id="op-undercut" value={openingLeafUndercut(d)} quantity="smallLength" min={HARDWARE_LIMITS.leafUndercut.min} max={HARDWARE_LIMITS.leafUndercut.max} onCommit={(v) => onChange(setLeafUndercut(d, v))} />
         </div>
       ) : null}
       {support.handle ? (
         <>
           <div className="field-row">
             <label htmlFor="op-handle-h" title="Altura do eixo da maçaneta, medida do piso (NBR 9050: 0,80 a 1,10 m)">Maçaneta: altura</label>
-            <NumField id="op-handle-h" value={openingHandleHeight(d)} scale={100} decimals={0} unit="cm" min={HARDWARE_LIMITS.handleHeight.min} max={HARDWARE_LIMITS.handleHeight.max} onCommit={(v) => onChange(setHandleHeight(d, v))} />
+            <NumField id="op-handle-h" value={openingHandleHeight(d)} quantity="smallLength" min={HARDWARE_LIMITS.handleHeight.min} max={HARDWARE_LIMITS.handleHeight.max} onCommit={(v) => onChange(setHandleHeight(d, v))} />
           </div>
           <div className="field-row">
             <label htmlFor="op-handle-i" title="Distância da borda livre da folha ao eixo da maçaneta">Maçaneta: recuo</label>
-            <NumField id="op-handle-i" value={openingHandleInset(d)} scale={100} decimals={1} unit="cm" min={HARDWARE_LIMITS.handleInset.min} max={HARDWARE_LIMITS.handleInset.max} onCommit={(v) => onChange(setHandleInset(d, v))} />
+            <NumField id="op-handle-i" value={openingHandleInset(d)} quantity="smallLength" min={HARDWARE_LIMITS.handleInset.min} max={HARDWARE_LIMITS.handleInset.max} onCommit={(v) => onChange(setHandleInset(d, v))} />
           </div>
         </>
       ) : null}

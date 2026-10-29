@@ -54,7 +54,7 @@ export function CellEditor({ d, onChange, cellId }: Props): ReactElement | null 
           {medida.mode === 'fixed' ? (
             <div className="field-row">
               <label htmlFor="cel-luz">Luz</label>
-              <NumField id="cel-luz" value={medida.value} scale={100} decimals={1} unit="cm" min={0.01} onCommit={(v) => onChange(defineLuz(d, cell.id, { mode: 'fixed', value: v }))} />
+              <NumField id="cel-luz" value={medida.value} quantity="smallLength" min={0.01} onCommit={(v) => onChange(defineLuz(d, cell.id, { mode: 'fixed', value: v }))} />
             </div>
           ) : null}
         </>
@@ -76,7 +76,7 @@ export function CellEditor({ d, onChange, cellId }: Props): ReactElement | null 
       {conteudo.kind === 'panel' ? (
         <div className="field-row">
           <label htmlFor="cel-painel">Espessura do painel</label>
-          <NumField id="cel-painel" value={conteudo.thickness} scale={100} decimals={1} unit="cm" min={0.001} onCommit={(v) => onChange(defineConteudo(d, cell.id, { ...conteudo, thickness: v }))} />
+          <NumField id="cel-painel" value={conteudo.thickness} quantity="smallLength" min={0.001} onCommit={(v) => onChange(defineConteudo(d, cell.id, { ...conteudo, thickness: v }))} />
         </div>
       ) : null}
     </>

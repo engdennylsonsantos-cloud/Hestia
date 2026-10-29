@@ -101,7 +101,7 @@ describe('ferramenta Parede paralela: Tab depois da base continua medindo pelo c
     pt.tab();
     pt.move(P(2, 1.6));
     const ultima = said[said.length - 1]!;
-    expect(ultima).toContain('1,508 m');
+    expect(ultima).toContain('1,51 m');
     expect(ultima).not.toContain('Afaste');
     clickAt(pt, 2, 1.6);
     const nova = walls(store)[1]!;

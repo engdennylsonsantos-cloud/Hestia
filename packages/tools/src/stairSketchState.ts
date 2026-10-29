@@ -1,5 +1,5 @@
 import { dist } from '@hestia/geom';
-import { newId, type Id, type StairCurve, type StairGenerator, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
+import { defaultUnits, formatQuantity, newId, type Id, type ResolvedUnits, type StairCurve, type StairGenerator, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
 import { stairLandingPolygon, trimRisers, validateRunSketch, type StairRunSketch, type StairSketchIssue } from '@hestia/engine';
 
 /** Sub-modos do croqui (Revit: Boundary, Riser, Stair Path, Landing, Finish). A ordem é a dos botões da barra. */
@@ -149,7 +149,7 @@ export function desiredRisers(H: number, maxRiser: number): number {
   return Math.max(1, Math.ceil(H / maxRiser - 1e-9));
 }
 
-const fmtM = (v: number): string => v.toFixed(3).replace('.', ',');
+const fmtM = (u: ResolvedUnits, v: number): string => formatQuantity(u, 'length', v);
 
 function issue(code: string, severity: 'error' | 'warning', message: string, riserIndex?: number): StairSketchIssue {
   const out: StairSketchIssue = { code, severity, message };
@@ -161,7 +161,7 @@ function issue(code: string, severity: 'error' | 'warning', message: string, ris
  * Analisa o croqui inteiro (decisão 0011 §3): erros de geometria e de completude (bloqueiam Concluir) e avisos de
  * norma e tipo (não bloqueiam). Com `limits` nulo (sem tipo), só a geometria é avaliada.
  */
-export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): DraftReport {
+export function analyzeDraft(parts: StairPart[], limits: StairLimits | null, u: ResolvedUnits = defaultUnits()): DraftReport {
   const issues: StairSketchIssue[] = [];
   const runs = parts.filter((p): p is { kind: 'run'; run: RunDraft } => p.kind === 'run').map((p) => p.run);
   const created = runs.reduce((n, r) => n + r.risers.length, 0);
@@ -173,7 +173,7 @@ export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): Dr
       if (r.risers.length === 0) issues.push(issue('stair-no-risers', 'error', 'Desenhe os espelhos.'));
       const geo = validateRunSketch(runSketch(r));
       issues.push(...geo);
-      if (geo.every((i) => i.severity !== 'error') && r.risers.length > 0 && limits) issues.push(...widthWarning(r, limits));
+      if (geo.every((i) => i.severity !== 'error') && r.risers.length > 0 && limits) issues.push(...widthWarning(r, limits, u));
     }
   }
   for (const p of parts) {
@@ -184,7 +184,7 @@ export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): Dr
   const desired = desiredRisers(H, maxRiser);
   const riserHeight = H > 0 && created > 0 ? H / created : null;
   if (riserHeight !== null && maxRiser > 0 && riserHeight > maxRiser + 1e-9) {
-    issues.push(issue('stair-riser-too-high', 'warning', `A altura real do espelho (${fmtM(riserHeight)} m) excede a máxima do tipo (${fmtM(maxRiser)} m).`));
+    issues.push(issue('stair-riser-too-high', 'warning', `A altura real do espelho (${fmtM(u, riserHeight)}) excede a máxima do tipo (${fmtM(u, maxRiser)}).`));
   }
   if (created > 0 && desired > 0 && created !== desired) {
     issues.push(issue('stair-risers-count', 'warning', `O nº de espelhos (${created}) difere do nº desejado (${desired}): adicione/remova espelhos ou ajuste a altura.`));
@@ -205,12 +205,12 @@ export function analyzeDraft(parts: StairPart[], limits: StairLimits | null): Dr
 }
 
 /** Aviso de largura: o menor espelho aparado (que liga os dois limites) é a largura útil do lance. */
-function widthWarning(r: RunDraft, limits: StairLimits): StairSketchIssue[] {
+function widthWarning(r: RunDraft, limits: StairLimits, u: ResolvedUnits): StairSketchIssue[] {
   const trimmed = trimRisers(runSketch(r));
   if (trimmed.length === 0) return [];
   const width = Math.min(...trimmed.map((t) => dist(t.points[0]!, t.points[t.points.length - 1]!)));
   if (!(limits.minRunWidth > 0) || width >= limits.minRunWidth - 1e-9) return [];
-  return [issue('stair-width-min', 'warning', `A largura do lance (${fmtM(width)} m) é menor que a mínima do tipo (${fmtM(limits.minRunWidth)} m).`)];
+  return [issue('stair-width-min', 'warning', `A largura do lance (${fmtM(u, width)}) é menor que a mínima do tipo (${fmtM(u, limits.minRunWidth)}).`)];
 }
 
 /** Espelhos que faltam para o nº desejado, com a conta: "Faltam 3 espelhos para concluir (de 17)"; null se não faltam. */

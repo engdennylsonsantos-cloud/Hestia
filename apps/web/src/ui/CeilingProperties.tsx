@@ -6,11 +6,12 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { CeilingOutlineGroup } from './CeilingOutlineGroup.tsx';
 import { Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { LevelField } from './LevelField.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { ceilingOptions } from './typeOptions.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 
 /** Valor comum a todos os selecionados, ou `mixed` quando divergem. */
 function common<T, K>(items: T[], get: (t: T) => K): { value: K; mixed: boolean } {
@@ -30,6 +31,7 @@ function roomLabel(p: Project, c: Ceiling): string {
 
 /** Propriedades de um ou mais forros selecionados (tipo, cota do topo, ambiente, construção, dimensões e marca). */
 export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactElement {
+  const fmt = useFormat();
   const p = useProject();
   const ids = ceilings.map((c) => c.id);
   const typeId = common(ceilings, (c) => c.typeId);
@@ -58,19 +60,19 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
       <Group title="Restrições">
         <LevelField ids={ids} />
         <Row label="Cota do topo" htmlFor="p-ctop">
-          <NumField id="p-ctop" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} unit="m" />
+          <NumField id="p-ctop" value={offset.value} mixed={offset.mixed} onCommit={(v) => patch(ids, { heightOffset: v })} quantity="length" />
         </Row>
-        {single ? <Row label="Face inferior"><span className="val">{fmt(single.heightOffset - (p.ceilingTypes[single.typeId] ? ceilingTypeThickness(p.ceilingTypes[single.typeId]!) : 0))} m</span></Row> : null}
+        {single ? <Row label="Face inferior"><span className="val">{fmt('length', single.heightOffset - (p.ceilingTypes[single.typeId] ? ceilingTypeThickness(p.ceilingTypes[single.typeId]!) : 0))}</span></Row> : null}
       </Group>
       <CeilingOutlineGroup ceilings={ceilings} />
       <Group title="Construção" open={false}>
         {type ? (
           <>
-            <Row label="Espessura total" readOnly fromType><span className="val">{fmt(ceilingTypeThickness(type) * 100, 1)} cm</span></Row>
+            <Row label="Espessura total" readOnly fromType><span className="val">{fmt('smallLength', ceilingTypeThickness(type))}</span></Row>
             {type.layers.map((l, i) => (
               <div className="prow ro" key={i}>
                 <span className="lbl" title={FUNCTION_LABEL[l.function]}>{FUNCTION_LABEL[l.function]}</span>
-                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt(l.thickness * 100, 1)} cm</span>
+                <span className="val soft" title={p.materials[l.materialId]?.name}>{fmt('smallLength', l.thickness)}</span>
               </div>
             ))}
           </>
@@ -81,15 +83,15 @@ export function CeilingProperties({ ceilings }: { ceilings: Ceiling[] }): ReactE
       <Group title="Dimensões">
         {single ? (
           <>
-            <Row label="Área"><span className="val">{fmt(ceilingArea(eff(single)))} m²</span></Row>
-            <Row label="Perímetro"><span className="val">{fmt(ringPerimeter(eff(single).boundary))} m</span></Row>
+            <Row label="Área"><span className="val">{fmt('area', ceilingArea(eff(single)))}</span></Row>
+            <Row label="Perímetro"><span className="val">{fmt('length', ringPerimeter(eff(single).boundary))}</span></Row>
             <Row label="Furos"><span className="val">{eff(single).holes.length}</span></Row>
             {roomLabel(p, single) ? <Row label="Ambiente"><span className="val">{roomLabel(p, single)}</span></Row> : null}
           </>
         ) : (
           <>
-            <Row label="Área total"><span className="val">{fmt(area)} m²</span></Row>
-            <Row label="Perímetro total"><span className="val">{fmt(perimeter)} m</span></Row>
+            <Row label="Área total"><span className="val">{fmt('area', area)}</span></Row>
+            <Row label="Perímetro total"><span className="val">{fmt('length', perimeter)}</span></Row>
           </>
         )}
       </Group>

@@ -1,15 +1,15 @@
 import { pointsText, type SkeletonStep } from '@hestia/geom';
 import { resolveRoofs, roofProfileError } from '@hestia/engine';
-import { isRoof, type Id, type Project, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, mansardProblems, unitsOf, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
+import { hasRoofArcs, roofEaveArcsProblem } from './perimeterRoofArcs.ts';
 import { eaveProblem } from './roofGeom.ts';
 import type { ToolEnv } from './types.ts';
 
 /** Chaves que mudam a geometria das águas. Só uma alteração delas é conferida pelo motor. */
-const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
+const GEOMETRY_KEYS: Array<keyof Roof> = ['boundary', 'holes', 'shape', 'edgeSlopes', 'edgeOverhangs', 'edgeSag', 'mansard', 'slopePercent', 'dir', 'planes', 'profile', 'levelId', 'heightOffset'];
 
 /** Motivo para um telhado com forma que não produz água, em português. */
 function noWaterReason(r: Roof): string {
-  if (r.shape === 'edges' && r.edgeSlopes.every((v) => v === null)) return 'nenhuma aresta define inclinação; marque ao menos uma aresta';
   if (r.shape === 'free') return 'nenhuma água fica sobre o beiral';
   if (r.shape === 'edges') return 'as arestas que definem inclinação não formam águas';
   if (r.shape === 'extrusion') return roofProfileError(r.profile) ?? 'o perfil não cobre o contorno';
@@ -53,7 +53,7 @@ function gableEdgesAt(step: SkeletonStep, roof: Roof): number[] {
  * a causa e a saída. Cita as arestas sem inclinação que chegam ali, quando o motor as identifica. Recusa a criação ou a
  * alteração em vez de deixar um aviso: o usuário vê onde corrigir e o que fazer.
  */
-function stepsReason(steps: SkeletonStep[], roof: Roof): string {
+function stepsReason(steps: SkeletonStep[], roof: Roof, u: ResolvedUnits): string {
   const points = pointsText(steps);
   const corners = steps.every((s) => cornerAt(s, roof) !== null);
   const where =
@@ -62,7 +62,7 @@ function stepsReason(steps: SkeletonStep[], roof: Roof): string {
       : corners
         ? `nos cantos reentrantes em ${points} m`
         : `em ${points} m`;
-  const degraus = steps.map((s) => s.dz.toFixed(2).replace('.', ','));
+  const degraus = steps.map((s) => formatQuantity(u, 'length', s.dz, { withUnit: false }));
   const cause =
     steps.length === 1
       ? `as águas que chegam ali ficam com um degrau de ${degraus[0]} m`
@@ -93,14 +93,14 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
     if (r.boundary.length < 3) return 'o contorno tem menos de 3 pontos';
     // Antes do motor: um beiral que se corta faz o esqueleto falhar com uma mensagem genérica.
     if (r.footprint && r.shape !== 'free' && r.shape !== 'extrusion') {
-      const eave = eaveProblem(r.footprint, r.boundary, r.edgeOverhangs);
+      const eave = hasRoofArcs(r) ? roofEaveArcsProblem(r) : eaveProblem(r.footprint, r.boundary, r.edgeOverhangs);
       if (eave) return eave;
     }
     const res = resolveRoofs(q, r.levelId).find((x) => x.roofId === r.id);
     if (!res) return 'o telhado não pôde ser resolvido';
     if (res.problem) return res.problem;
     if (res.planes.length === 0) return noWaterReason(r);
-    if (res.steps?.length) return stepsReason(res.steps, r);
+    if (res.steps?.length) return stepsReason(res.steps, r, unitsOf(p));
   }
   return null;
 }
@@ -112,7 +112,9 @@ export function roofProblem(p: Project, roofs: Roof[]): string | null {
 export function roofPatchProblem(p: Project, ids: Id[], patch: Partial<Roof>): string | null {
   if (!Object.keys(patch).some((k) => GEOMETRY_KEYS.includes(k as keyof Roof))) return null;
   const roofs = ids.map((id) => p.elements[id]).filter(isRoof).map((r) => ({ ...r, ...patch }));
-  return roofProblem(p, roofs);
+  // Mansarda com número inválido ou larga demais: recusa com a mensagem da validação do modelo.
+  const mansard = roofs.flatMap((r) => mansardProblems(r, `"${r.mark || r.id}"`, unitsOf(p)))[0];
+  return mansard ? mansard.message : roofProblem(p, roofs);
 }
 
 /** Aplica a alteração de telhados pelo ambiente da ferramenta, se o motor ainda gerar águas; senão não aplica e avisa. */

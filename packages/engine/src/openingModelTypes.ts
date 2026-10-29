@@ -20,8 +20,12 @@ export type PartRole =
   | 'leafPanel' // almofada/aleta/grelha (detalhe da folha)
   | 'glass'
   | 'muntin' // montante/travessa de divisão do vidro
+  | 'mullion' // divisor de colunas do quadro (composição)
+  | 'transom' // divisor de linhas do quadro (composição)
+  | 'bead' // baguete do vidro (composição)
   | 'handle'
   | 'casing' // alizar
+  | 'hinge' // dobradiça (ferragem)
   | 'sillBoard' // peitoril saliente
   | 'lintel' // verga
   | 'sillBeam' // contraverga
@@ -60,12 +64,29 @@ export type PartMotion =
    */
   | { kind: 'fold'; tAnchor: number; dir: 1 | -1; s: number; sign: 1 | -1; index: number; panelWidth: number };
 
+/**
+ * Seção da peça, para peças que não são caixas (batente com rebaixo). `plane 'ts'`: `pts` são (t, s) e a peça é extrudada em z entre
+ * `box.z0` e `box.z1` (ombreira); `plane 'sz'`: `pts` são (s, z), extrudada em t entre `box.t0` e `box.t1` (travessa). `box` é sempre a caixa
+ * envolvente exata do prisma. Uma peça com `profile` é UMA peça física (não duas caixas coladas).
+ *
+ * `plane 'tz'`: `pts` são (t, z) e a peça é extrudada em s entre `box.s0` e `box.s1` (disco ou cilindro com eixo perpendicular
+ * à folha: roseta, haste, bola).
+ */
+export interface PartProfile {
+  plane: 'ts' | 'sz' | 'tz';
+  pts: Array<[number, number]>;
+}
+
 export interface OpeningPart {
   /** Estável entre chamadas (ex.: 'jamb-left', 'leaf-0', 'glass-0-1'). */
   id: string;
   role: PartRole;
   material: PartMaterial;
   box: PartBox;
+  /** Seção não retangular (batente). Ausente = a peça é a própria caixa. */
+  profile?: PartProfile;
+  /** Peças com o mesmo `group` formam UMA peça física: o desenho une os contornos (ex.: alizar de 3 lados). */
+  group?: string;
   /** Ausente = peça fixa. */
   motion?: PartMotion;
   /** Índice da folha a que pertence (folha, vidro, divisões e maçaneta dela se movem juntos). */
@@ -77,7 +98,9 @@ export interface OpeningPart {
 /** Como a folha se abre, para as linhas de abertura (V) e o arco de giro. */
 export interface LeafOpening {
   leaf: number;
-  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'louver' | 'fixed';
+  kind: 'side' | 'top' | 'bottom' | 'pivot' | 'slide' | 'fold' | 'overhead' | 'louver' | 'tilt' | 'fixed';
+  /** Altura (z local) do eixo horizontal da janela basculante (`kind 'tilt'`). */
+  axisZ?: number;
   /** Abre para os dois lados (porta vai-e-vem): `side` é o lado principal. */
   both?: boolean;
   /** Eixo do deslizamento: 't' (horizontal, padrão) ou 'z' (vertical: guilhotina, portão seccionado). */

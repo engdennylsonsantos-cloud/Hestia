@@ -26,7 +26,7 @@ const NOUNS: Record<ViewCategory, readonly [string, string]> = {
   slab: ['laje', 'lajes'],
   ceiling: ['forro', 'forros'],
   roof: ['telhado', 'telhados'],
-  stair: ['escada', 'escadas'],
+  stair: ['escada ou rampa', 'escadas e rampas'],
 };
 
 const TAIL: Record<ViewWarningKind, string> = {

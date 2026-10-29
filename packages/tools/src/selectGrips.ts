@@ -1,12 +1,13 @@
 import { add, dist, sagFromThreePoints, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
 import { ceilingOutline } from '@hestia/engine';
-import { isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, type Id, type Project } from '@hestia/model';
+import { formatQuantity, isCeiling, isFloor, isRoof, isSlab, isWall, levelRoomSeparators, roomSeparatorIssue, unitsOf, type Command, type Id, type Project } from '@hestia/model';
 import type { InferContext } from './infer.ts';
 import { followingEnds, gripAt, MIN_WALL_LENGTH, type Grip } from './pick.ts';
 import { floorGripAt, ringInsertAfter, ringMoveVertex } from './floorPick.ts';
 import { slabGripAt } from './slabPick.ts';
-import { roofGripAt } from './roofPick.ts';
+import { edgeGripPoint, roofGripAt } from './roofPick.ts';
+import { roofSagHold } from './roofSagGrip.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { ceilingGripAt } from './ceilingPick.ts';
@@ -14,8 +15,11 @@ import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { moveRoomSeparatorEnd, roomSeparatorGripAt, type RoomSeparatorGrip } from './roomSeparatorPick.ts';
 import { stairGripAt, stairHold } from './stairGrips.ts';
+import { rampGripAt, rampHold } from './rampGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
+import { gridGripProvider } from './gridGripHold.ts';
 import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 
 /** Vértice de contorno em foco (clicado com a alça): o Delete o remove. */
 export interface GripFocus {
@@ -126,7 +130,7 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
         // Cota temporária: comprimento e Δx/Δy do eixo, como no Revit ao arrastar uma ponta.
         const dx = pt.x - other.x;
         const dy = pt.y - other.y;
-        items.push({ kind: 'label', at: { x: (pt.x + other.x) / 2, y: (pt.y + other.y) / 2 }, text: `${Math.hypot(dx, dy).toFixed(3).replace('.', ',')} m  Δx ${dx.toFixed(3).replace('.', ',')}  Δy ${dy.toFixed(3).replace('.', ',')}` });
+        items.push({ kind: 'label', at: { x: (pt.x + other.x) / 2, y: (pt.y + other.y) / 2 }, text: `${formatQuantity(unitsOf(pr), 'length', Math.hypot(dx, dy))}  Δx ${formatQuantity(unitsOf(pr), 'length', dx, { withUnit: false })}  Δy ${formatQuantity(unitsOf(pr), 'length', dy, { withUnit: false })}` });
       }
       // Vizinhas que vão acompanhar: aparecem na prévia para não haver surpresa.
       for (const c of follow) {
@@ -163,10 +167,13 @@ function wallHold(env: ToolEnv, g: Grip): GripHold {
           return;
         }
       }
-      env.transaction('Ajustar parede', () => {
-        env.exec({ type: 'setWallEnds', id: g.wallId, [g.end]: pt });
-        for (const c of follow) env.exec({ type: 'setWallEnds', id: c.wallId, [c.end]: pt });
-      });
+      const commands: Command[] = [
+        { type: 'setWallEnds', id: g.wallId, [g.end]: pt },
+        ...follow.map((c): Command => ({ type: 'setWallEnds', id: c.wallId, [c.end]: pt })),
+      ];
+      const result = execWithHostedLoss(env, 'Ajustar parede', commands);
+      if (result.status === 'cancelled') env.say('Nada foi alterado.');
+      else if (result.status === 'pending') env.say('Confirme o diálogo para aplicar.');
     },
   };
 }
@@ -262,7 +269,8 @@ const ceilingGrip: GripProvider = (env, at) => {
 
 const roofGrip: GripProvider = (env, at) => {
   const g = roofGripAt(env.project(), env.selection(), at, env.metersPerPixel());
-  return g ? ringHold(env, ROOF_OWNER, g.roofId, g) : null;
+  if (g?.kind === 'sag') return roofSagHold(env, g);
+  return g ? ringHold(env, ROOF_OWNER, g.roofId, g as typeof g & { kind: 'vertex' | 'edge' }) : null;
 };
 
 /** Alça de caracol (centro, raios, ângulos inicial e final) de escada selecionada (`stairSpiralGrips.ts`). Vem antes da comum. */
@@ -277,8 +285,14 @@ const stairGrip: GripProvider = (env, at) => {
   return g ? stairHold(env, g) : null;
 };
 
+/** Alça de vértice de rampa livre selecionada (`rampGrips.ts`). */
+const rampGrip: GripProvider = (env, at) => {
+  const g = rampGripAt(env.project(), env.selection(), at, env.metersPerPixel());
+  return g ? rampHold(env, g) : null;
+};
+
 /** Registro de provedores de alça, em ordem de prioridade (o primeiro que acerta vence). */
-export const gripProviders: GripProvider[] = [roomSeparatorGrip, wallGrip, spiralGrip, stairGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
+export const gripProviders: GripProvider[] = [roomSeparatorGrip, gridGripProvider, wallGrip, spiralGrip, stairGrip, rampGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
 
 /** Alça sob o cursor entre os elementos selecionados, por ordem de `gripProviders`. */
 export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {
@@ -304,10 +318,11 @@ export function ringHandlePreview(p: Project, sel: Id[], focus: GripFocus | null
   for (let i = 0; i < n; i++) {
     const a = f.boundary[i]!;
     const b = f.boundary[(i + 1) % n]!;
-    items.push({ kind: 'point', at: a }, { kind: 'point', at: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
+    // Telhado com arco: a alça do meio fica no meio do arco, não no meio da corda.
+    items.push({ kind: 'point', at: a }, { kind: 'point', at: isRoof(f) ? edgeGripPoint(f, i) : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } });
   }
   if (focus?.id === f.id && f.boundary[focus.index]) items.push({ kind: 'highlight', ids: [f.id] });
   // Laje com inclinação: a seta do caimento fica visível enquanto ela está selecionada.
-  if (isSlab(f) && f.slope) items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary)));
+  if (isSlab(f) && f.slope) items.push(...slopePreview(f.slope, slopeArrowLength(f.boundary), unitsOf(p)));
   return items;
 }

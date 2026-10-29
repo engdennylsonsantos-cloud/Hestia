@@ -15,7 +15,7 @@ export const degToPercent = (deg: number): number => Math.tan((deg * Math.PI) / 
  * nesse caso a inclinação atual em % fica como estava, senão o arredondamento trocaria 45 % por 44,94 %.
  */
 export function roofSlopeFromDegField(typedDeg: number, currentDeg: number, currentPercent: number): number {
-  const shownDeg = Number(currentDeg.toFixed(1));
+  const shownDeg = Math.round(currentDeg * 10) / 10;
   return Math.abs(typedDeg - shownDeg) < 1e-9 ? currentPercent : degToPercent(typedDeg);
 }
 

@@ -19,7 +19,7 @@ export const floorTypeThickness = (t: FloorType): number => t.layers.reduce((s, 
 /** Polígono do piso (contorno + furos) para as operações de geometria. */
 export const floorPolygon = (f: Floor): Polygon => [f.boundary, ...f.holes];
 
-/** Área líquida em planta (contorno menos furos), m². */
+/** Área líquida em planta (contorno menos furos), metros quadrados. */
 export function floorArea(f: Floor): number {
   return multiArea([floorPolygon(f)]);
 }

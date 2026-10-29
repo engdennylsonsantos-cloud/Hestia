@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, type CSSProperties, type ReactElement } from 'react';
 import { frameOfWall } from '@hestia/engine';
-import { isOpening, type Id } from '@hestia/model';
+import { openingTypeById, isOpening, type Id } from '@hestia/model';
 import { worldToScreen } from '@hestia/render';
 import { nextOpeningFlip, openingGripPlacements, openingHasHinge, type OpeningFlipKind } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
@@ -56,7 +56,7 @@ export function OpeningFlipGrips({ openingId }: { openingId: Id }): ReactElement
       const current = editor.project.elements[openingId];
       if (!current || !isOpening(current)) return;
       if (isHand) {
-        const type = editor.project.openingTypes[current.typeId];
+        const type = openingTypeById(editor.project, current.typeId);
         if (!type || !openingHasHinge(type)) return;
       }
       e.preventDefault();
@@ -71,7 +71,7 @@ export function OpeningFlipGrips({ openingId }: { openingId: Id }): ReactElement
   const opening = p.elements[openingId];
   if (!opening || !isOpening(opening) || !viewport) return null;
   const frame = frameOfWall(p, opening.hostId);
-  const type = p.openingTypes[opening.typeId];
+  const type = openingTypeById(p, opening.typeId);
   if (!frame || !type) return null;
   const grips = openingGripPlacements(frame, opening, type);
   const facing = worldToScreen(viewport, grips.facing);

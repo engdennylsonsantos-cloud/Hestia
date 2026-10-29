@@ -56,4 +56,16 @@ describe('exportação IFC do projeto (web)', () => {
     expect(count(text, 'IFCROOF')).toBe(roofs);
     expect(count(text, 'IFCSTAIRFLIGHT')).toBeGreaterThan(0);
   });
+
+  it('as esquadrias da casa premium saem em peças, com o vidro no material translúcido', () => {
+    const p = buildTemplate('house-premium');
+    const g = ifcGeometryOf(p);
+    const janela = g.openings.find((o) => p.elements[o.openingId]?.kind === 'window');
+    expect(janela?.parts?.length ?? 0).toBeGreaterThan(3);
+    expect(janela!.parts!.some((part) => part.materialId === 'mat_vidro')).toBe(true);
+    expect(janela!.parts!.every((part) => part.role !== 'pocket')).toBe(true);
+    // Cada peça tem o seu IFCSTYLEDITEM; sem isso o web-ifc pinta a janela inteira de branco.
+    const text = projectIfc(p, NOW);
+    expect(count(text, 'IFCSTYLEDITEM')).toBeGreaterThan(count(text, 'IFCSURFACESTYLE'));
+  });
 });

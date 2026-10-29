@@ -1,9 +1,12 @@
 import { applyTransform, dist, dot, type Transform, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Id, type Project } from '@hestia/model';
-import { followingEnds, MIN_WALL_LENGTH } from './pick.ts';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, sectionLabelOf, sectionPoints, viewIdsIn, viewTransformCommands, type Command, type Id, type Project } from '@hestia/model';
+import { followerCommands, planWallFollowers } from './wallFollow.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
 import { selectedStairs } from './stairPick.ts';
 import { ghostStairItems } from './stairPreview.ts';
+import { selectedRamps } from './rampPick.ts';
+import { ghostRampItems } from './rampPreview.ts';
 import { selectedFloors } from './floorPick.ts';
 import { selectedSlabs } from './slabPick.ts';
 import { selectedRoofs } from './roofPick.ts';
@@ -14,7 +17,7 @@ import type { PreviewItem, ToolEnv } from './types.ts';
 export const selectedWalls = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isWall(p.elements[id]));
 export const selectedOpenings = (p: Project, ids: Id[]): Id[] => ids.filter((id) => isOpening(p.elements[id]));
 /** Paredes, pisos, lajes e telhados: o que o comando 'transform' move, gira, espelha e copia (aberturas seguem o anfitrião). */
-export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRooms(p, ids)];
+export const selectedMovables = (p: Project, ids: Id[]): Id[] => [...selectedWalls(p, ids), ...selectedFloors(p, ids), ...selectedSlabs(p, ids), ...selectedRoofs(p, ids), ...selectedStairs(p, ids), ...selectedRamps(p, ids), ...selectedRooms(p, ids)];
 
 /** Vistas de corte/elevação dentro da seleção. Elas transformam junto com os elementos. */
 export const selectedViews = (p: Project, ids: Id[]): Id[] => viewIdsIn(p, ids);
@@ -52,6 +55,7 @@ export function makeIdMap(p: Project, ids: Id[]): Record<Id, Id> {
     else if (isSlab(e)) map[id] = newId('l');
     else if (isRoof(e)) map[id] = newId('t');
     else if (isStair(e)) map[id] = newId('st');
+    else if (isRamp(e)) map[id] = newId('rp');
     else if (isRoom(e)) map[id] = newId('rm');
   }
   for (const e of Object.values(p.elements)) {
@@ -67,6 +71,10 @@ export function ghostBands(p: Project, wallIds: Id[], t: Transform): PreviewItem
     const st = p.elements[id];
     if (isStair(st)) {
       out.push(...ghostStairItems(st, t));
+      continue;
+    }
+    if (isRamp(st)) {
+      out.push(...ghostRampItems(st, t));
       continue;
     }
     const fl = p.elements[id];
@@ -104,37 +112,12 @@ export function moveWalls(env: ToolEnv, wallIds: Id[], d: Vec2, follow = true, i
  */
 export function transformWalls(env: ToolEnv, wallIds: Id[], t: Transform, label: string, follow = true, invert = false): void {
   const p = env.project();
-  const exclude = new Set(wallIds);
-  const followers = new Map<Id, { a?: Vec2; b?: Vec2 }>();
-  const released = new Set<Id>();
-  if (follow) {
-    for (const id of wallIds) {
-      const w = p.elements[id];
-      if (!isWall(w)) continue;
-      for (const pt of [w.a, w.b]) {
-        // Novo ponto da extremidade movida: é onde a parede vizinha tem de terminar.
-        const to = applyTransform(t, pt);
-        for (const c of followingEnds(p, env.levelId(), pt, exclude, invert)) {
-          const other = p.elements[c.wallId];
-          if (!isWall(other)) continue;
-          const far = c.end === 'a' ? other.b : other.a;
-          // Vizinha degenerada (girar/mover até a outra ponta): solta a ponta em vez de sumir com a parede.
-          if (dist(far, to) < MIN_WALL_LENGTH) {
-            released.add(c.wallId);
-            continue;
-          }
-          const cur = followers.get(c.wallId) ?? {};
-          cur[c.end] = to;
-          followers.set(c.wallId, cur);
-        }
-      }
-    }
-  }
-  env.transaction(label, () => {
-    env.exec({ type: 'transform', ids: wallIds, transform: t });
-    for (const [id, ends] of followers) env.exec({ type: 'setWallEnds', id, ...ends });
-  });
-  if (released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
+  const plan = follow ? planWallFollowers(p, env.levelId(), wallIds, t, invert) : null;
+  const commands: Command[] = [{ type: 'transform', ids: wallIds, transform: t }, ...(plan ? followerCommands(plan) : [])];
+  const result = execWithHostedLoss(env, label, commands);
+  if (plan?.released.size) env.say(`${label}: uma parede ligada ficaria com comprimento zero; a ponta foi solta em vez de esticá-la.`);
+  else if (result.status === 'cancelled') env.say('Nada foi alterado.');
+  else if (result.status === 'pending') env.say('Confirme o diálogo para aplicar.');
 }
 
 /** Desliza aberturas ao longo da parede anfitriã. */

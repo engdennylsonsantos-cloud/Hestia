@@ -1,4 +1,5 @@
 import type { SketchIssue, SketchIssueCode, SketchResult, SketchTarget } from '@hestia/geom';
+import { defaultUnits, formatQuantity, type ResolvedUnits } from '@hestia/model';
 
 /** Textos do perímetro (pt-BR): títulos dos grupos, rótulos de ferramenta, barra de status e lista de problemas. */
 
@@ -42,12 +43,6 @@ const ISSUE_TEXT: Record<SketchIssueCode, string> = {
   'multi-outer': 'Há dois contornos externos separados.',
   empty: 'Não há linhas para formar um contorno.',
 };
-
-/** Número com vírgula decimal, como no resto da interface. */
-export const fmtPt = (n: number, decimals = 2): string => n.toFixed(decimals).replace('.', ',');
-
-/** Porcentagem sem casas quando é inteira: "30 %", "12,5 %". */
-export const fmtPct = (p: number): string => `${Number.isInteger(p) ? String(p) : fmtPt(p)} %`;
 
 /** Texto de um código de problema do contorno. */
 export const issueText = (code: SketchIssueCode): string => ISSUE_TEXT[code];
@@ -94,9 +89,9 @@ export interface EdgeStatusInput {
 }
 
 /** Mensagem ao selecionar uma aresta: comprimento, e no telhado se define inclinação. */
-export function edgeStatus(e: EdgeStatusInput): string {
+export function edgeStatus(e: EdgeStatusInput, units: ResolvedUnits = defaultUnits()): string {
   const head = `Aresta ${e.index + 1}`;
-  if (e.definesSlope === undefined) return `${head}: ${fmtPt(e.lengthM)} m.`;
+  if (e.definesSlope === undefined) return `${head}: ${formatQuantity(units, 'length', e.lengthM)}.`;
   if (!e.definesSlope) return `${head}: não define inclinação.`;
-  return `${head}: define inclinação (${fmtPct(e.slopePct ?? 0)}).`;
+  return `${head}: define inclinação (${formatQuantity(units, 'slope', (e.slopePct ?? 0) / 100)}).`;
 }

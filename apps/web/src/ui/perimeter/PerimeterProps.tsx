@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react';
 import type { SketchTarget } from '@hestia/geom';
 import { degToPercent, percentToDeg } from '@hestia/tools';
+import { formatQuantity } from '@hestia/model';
 import { Check, Group, NumField, Row } from '../fields.tsx';
-import { fmtPt, PERIMETER_TITLE } from './PerimeterStatus.ts';
+import { PERIMETER_TITLE } from './PerimeterStatus.ts';
+import { useUnits } from '../useUnits.ts';
 
 /** Aresta selecionada do rascunho, já resolvida pelo chamador (valores próprios ou padrões do rascunho). */
 export interface PerimeterEdgeInfo {
@@ -32,6 +34,7 @@ export interface PerimeterPropsProps {
  * (liga/desliga, % e °) e balanço da aresta, com rótulos de até 22 caracteres.
  */
 export function PerimeterProps({ target, edge, onDefinesSlope, onSlopePct, onOverhang }: PerimeterPropsProps): ReactElement {
+  const units = useUnits();
   const roof = target === 'roof';
   const defines = edge?.definesSlope === true;
   const pct = edge?.slopePct ?? null;
@@ -41,7 +44,7 @@ export function PerimeterProps({ target, edge, onDefinesSlope, onSlopePct, onOve
         <span className="val">{edge ? `${edge.index + 1} de ${edge.count}` : '—'}</span>
       </Row>
       <Row label="Comprimento">
-        <span className="val">{edge ? `${fmtPt(edge.lengthM)} m` : '—'}</span>
+        <span className="val">{edge ? formatQuantity(units, 'length', edge.lengthM) : '—'}</span>
       </Row>
       {roof && (
         <>
@@ -51,21 +54,21 @@ export function PerimeterProps({ target, edge, onDefinesSlope, onSlopePct, onOve
             </Check>
           </Row>
           <Row label="Inclinação" htmlFor="p-pm-slope">
-            <NumField id="p-pm-slope" value={pct} onCommit={onSlopePct} unit="%" min={0.1} max={200} disabled={!defines} />
+            <NumField id="p-pm-slope" value={pct === null ? null : pct / 100} onCommit={(v) => onSlopePct(v * 100)} quantity="slope" min={0.001} max={2} disabled={!defines} />
           </Row>
-          <Row label="Inclinação (°)" htmlFor="p-pm-deg">
+          <Row label="Inclinação (ângulo)" htmlFor="p-pm-deg">
             <NumField
               id="p-pm-deg"
-              value={pct === null ? null : percentToDeg(pct)}
-              unit="°"
-              min={0.1}
-              max={63.4}
+              value={pct === null ? null : (percentToDeg(pct) * Math.PI) / 180}
+              quantity="angle"
+              min={(0.1 * Math.PI) / 180}
+              max={(63.4 * Math.PI) / 180}
               disabled={!defines}
-              onCommit={(v) => onSlopePct(degToPercent(v))}
+              onCommit={(v) => onSlopePct(degToPercent((v * 180) / Math.PI))}
             />
           </Row>
           <Row label="Balanço da aresta" htmlFor="p-pm-over">
-            <NumField id="p-pm-over" value={edge?.overhangM ?? null} onCommit={onOverhang} unit="m" disabled={!edge} />
+            <NumField id="p-pm-over" value={edge?.overhangM ?? null} onCommit={onOverhang} quantity="length" disabled={!edge} />
           </Row>
         </>
       )}

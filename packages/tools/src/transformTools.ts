@@ -1,18 +1,20 @@
 import { angleOf, dist, len, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall } from '@hestia/engine';
-import { annotationIdsIn, annotationMoveCommands, isOpening, isWall, type Id } from '@hestia/model';
+import { annotationIdsIn, annotationMoveCommands, dimensionSettingsOf, formatQuantity, isOpening, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { gridGhosts, moveGrids, selectedGrids } from './gridGeom.ts';
 import { copyWalls, ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews, transformWalls } from './edit.ts';
 import { pickAt } from './pick.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
 import { moveRoomSeparators, movableSeparatorIds, separatorGhostItems } from './roomSeparatorPick.ts';
 import type { EdgePick } from './ringEdge.ts';
 import { DEFAULT_DISJOIN, type PointerInfo, type ToolEnv } from './types.ts';
+import { displacementDimProvider } from './dims/providers/displacement.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 
-const deg = (r: number): number => (r * 180) / Math.PI;
-export const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+export const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Base das ferramentas que exigem seleção prévia. */
 export abstract class SelectionTool extends ToolBase {
@@ -28,7 +30,7 @@ export abstract class SelectionTool extends ToolBase {
     return selectedViews(this.env.project(), this.env.selection());
   }
   protected hasSelection(): boolean {
-    return this.movables().length + this.openings().length + this.views().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length > 0;
+    return this.movables().length + this.openings().length + this.views().length + annotationIdsIn(this.env.project(), this.env.levelId(), this.env.selection()).length + selectedGrids(this.env.project(), this.env.selection()).length > 0;
   }
   override start(): void {
     this.reset();
@@ -50,6 +52,8 @@ export class MoveTool extends SelectionTool {
   /** Dica quando não há seleção: a ferramenta espera um clique numa aresta de anel. */
   readonly edgeHint: string;
   private base: Vec2 | null = null;
+  /** Última posição capturada do cursor (cota do deslocamento). */
+  private cursor: Vec2 | null = null;
   /** Aresta escolhida no primeiro clique (só sem seleção). */
   private edgePick: EdgePick | null = null;
   /** Chave da sessão: todas as cópias de um mesmo Copiar entram num só passo de desfazer. */
@@ -96,6 +100,7 @@ export class MoveTool extends SelectionTool {
 
   protected reset(): void {
     this.base = null;
+    this.cursor = null;
     this.edgePick = null;
     this.items = [];
     this.inf = null;
@@ -116,6 +121,7 @@ export class MoveTool extends SelectionTool {
       return;
     }
     const inf = this.snap(p, { from: this.base });
+    this.cursor = inf.point;
     const d = sub(inf.point, this.base);
     const ring = ringOfRef(this.env.project(), this.edgePick.ref);
     if (!ring) return;
@@ -123,7 +129,7 @@ export class MoveTool extends SelectionTool {
     const i = this.edgePick.ref.index;
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     this.items.push({ kind: 'line', a: moved[i]!, b: moved[(i + 1) % ring.length]!, dashed: true });
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
   }
 
   /** Move só a aresta pelo vetor d (Mover aresta). Copiar aresta não existe nesta versão. */
@@ -169,6 +175,7 @@ export class MoveTool extends SelectionTool {
     }
     const els = this.movables();
     const inf = this.snap(p, { from: this.base ?? undefined, ignore: new Set(els) });
+    this.cursor = inf.point;
     if (!this.base) {
       this.items.push({ kind: 'point', at: inf.point });
       return;
@@ -176,9 +183,19 @@ export class MoveTool extends SelectionTool {
     const d = sub(inf.point, this.base);
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     const t = { kind: 'translate' as const, d };
-    this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t));
+    this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t), ...gridGhosts(this.env.project(), selectedGrids(this.env.project(), this.env.selection()), d));
     if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
+  }
+
+  /** Cota do deslocamento (ponto-base → cursor), pelo provedor do sistema único. */
+  tempDims(overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    if (!this.base || !this.cursor) return [];
+    const project = this.env.project();
+    return displacementDimProvider.compute(
+      { project, levelId: this.env.levelId(), settings: dimensionSettingsOf(project), overrides },
+      { from: this.base, to: this.cursor },
+    );
   }
 
   private apply(d: Vec2): void {
@@ -203,6 +220,8 @@ export class MoveTool extends SelectionTool {
         if (seps.length) moveRoomSeparators(this.env, seps, d);
       }
       for (const c of notes) this.env.exec(c);
+      // Grades são do projeto: movem ou copiam (nome automático novo) junto.
+      moveGrids(this.env, selectedGrids(this.env.project(), this.env.selection()), d, this.copy);
     }, this.copy ? this.session : undefined);
     if (this.copy && (els.length || views.length)) this.copies += 1;
   }
@@ -226,7 +245,7 @@ export class MoveTool extends SelectionTool {
 
   override type(text: string): boolean {
     if (!this.base) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) return false;
     const dir = norm(sub(this.inf?.point ?? this.raw, this.base));
     if (!this.hasSelection()) {
@@ -288,7 +307,7 @@ export class RotateTool extends SelectionTool {
       const ang = this.angleTo(p.raw);
       const t = { kind: 'rotate', about: this.center, angle: ang } as const;
       this.items.push(...ghostBands(this.env.project(), this.movables(), t), ...ghostViews(this.env.project(), this.env.selection(), t));
-      this.items.push({ kind: 'label', at: p.raw, text: `${deg(ang).toFixed(1).replace('.', ',')}°` });
+      this.items.push({ kind: 'label', at: p.raw, text: formatQuantity(unitsOf(this.env.project()), 'angle', ang) });
     }
   }
 
@@ -323,9 +342,9 @@ export class RotateTool extends SelectionTool {
 
   override type(text: string): boolean {
     if (!this.center) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'angle');
     if (v === null) return false;
-    this.commit((v * Math.PI) / 180);
+    this.commit(v);
     return true;
   }
 }

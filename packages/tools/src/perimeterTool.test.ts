@@ -4,6 +4,7 @@ import { makeFloor, makeWall } from '@hestia/model';
 import { editDraft } from './perimeterSession.ts';
 import { PerimeterTool } from './perimeterTool.ts';
 import { P, clickAt, makeEnv } from './testEnv.ts';
+import { registerBuiltinDimProviders } from './dims/registry.ts';
 
 function setup(target: 'roof' | 'floor' = 'roof') {
   const ctx = makeEnv();
@@ -237,5 +238,18 @@ describe('PerimeterTool: API para a interface', () => {
     t.setShape(null);
     t.move(P(2, 0));
     expect(t.hoverId()).not.toBeNull();
+  });
+
+  it('tempDims cota o lado em desenho e cada linha selecionada', () => {
+    registerBuiltinDimProviders();
+    const { t } = setup();
+    t.setShape('line');
+    clickAt(t, 0, 0);
+    t.move(P(3, 0));
+    expect(t.tempDims!().map((d) => d.value)).toEqual([expect.closeTo(3, 9)]);
+    t.cancel();
+    drawRect(t);
+    t.selectAll();
+    expect(t.tempDims!().map((d) => d.value)).toEqual([4, 3, 4, 3].map((v) => expect.closeTo(v, 9)));
   });
 });

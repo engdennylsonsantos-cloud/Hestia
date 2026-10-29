@@ -1,8 +1,8 @@
-import { openingSymbolPaths, type Vec2 } from '@hestia/geom';
-import { frameOfWall, openingGeometry, toLocal, type WallFrame } from '@hestia/engine';
-import { wallsOnLevel, type Id, type Opening, type Project } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
+import { frameOfWall, pointAt, tangentAt, toLocal, type WallFrame } from '@hestia/engine';
+import { wallsOnLevel, type Id, type Project } from '@hestia/model';
 import { wallCrossings } from './infer.ts';
-import type { PreviewItem, PreviewTone, ToolOptions } from './types.ts';
+import type { ToolOptions } from './types.ts';
 
 /** Parede perpendicular que encosta na hospedeira, com o eixo e as faces medidos em `t` da hospedeira. */
 export interface PerpendicularWall {
@@ -12,6 +12,10 @@ export interface PerpendicularWall {
   /** Faces da perpendicular, em `t` da hospedeira: a abertura não pode invadir esta faixa. */
   faceLo: number;
   faceHi: number;
+  /** Sistema de coordenadas da perpendicular: dele saem os planos (eixo, faces, núcleo) para as cotas. */
+  frame: WallFrame;
+  /** Ponto do mundo em que ela encosta na hospedeira (cruzamento dos eixos ou o topo que toca a face). */
+  point: Vec2;
 }
 
 /** Trecho livre da hospedeira entre as faces das paredes perpendiculares (ou as pontas da parede). */
@@ -42,27 +46,35 @@ export function perpendicularNeighbors(p: Project, hostId: Id, levelId: Id): Per
     if (wall.id === hostId) continue;
     const other = frameOfWall(p, wall.id);
     if (!other) continue;
-    const parallel = host.u.x * other.u.x + host.u.y * other.u.y;
-    if (Math.abs(parallel) > PERP_TOL) continue;
     const ts: number[] = [];
+    const points = new Map<number, Vec2>();
     for (const pt of wallCrossings(host.wall, wall)) {
       const loc = toLocal(host, pt);
-      if (loc.t >= -PERP_TOL && loc.t <= host.length + PERP_TOL) ts.push(clamp(loc.t, 0, host.length));
+      if (loc.t >= -PERP_TOL && loc.t <= host.length + PERP_TOL) {
+        ts.push(clamp(loc.t, 0, host.length));
+        points.set(clamp(loc.t, 0, host.length), pt);
+      }
     }
     // Parede que termina na face da hospedeira (sem cruzar o eixo): o topo é o ponto de encosto.
     if (ts.length === 0) {
       for (const end of [wall.a, wall.b]) {
         const loc = toLocal(host, end);
         if (loc.t < -PERP_TOL || loc.t > host.length + PERP_TOL) continue;
-        if (Math.abs(loc.s) <= host.thickness / 2 + other.thickness / 2 + 0.02) ts.push(clamp(loc.t, 0, host.length));
+        if (Math.abs(loc.s) <= host.thickness / 2 + other.thickness / 2 + 0.02) {
+          ts.push(clamp(loc.t, 0, host.length));
+          points.set(clamp(loc.t, 0, host.length), end);
+        }
       }
     }
-    // Projeção da normal da perpendicular sobre o eixo da hospedeira: converte s em t (paredes perpendiculares).
-    const k = host.u.x * other.n.x + host.u.y * other.n.y;
     for (const t of unique(ts)) {
+      // Perpendicular à tangente da hospedeira NO ponto de encosto (na curva a tangente inicial não serve).
+      const hu = tangentAt(host, t);
+      if (Math.abs(hu.x * other.u.x + hu.y * other.u.y) > PERP_TOL) continue;
+      // Projeção da normal da perpendicular sobre o eixo da hospedeira: converte s em t (paredes perpendiculares).
+      const k = hu.x * other.n.x + hu.y * other.n.y;
       const a = other.sHi * k;
       const b = other.sLo * k;
-      out.push({ wallId: wall.id, axisT: t, faceLo: t + Math.min(a, b), faceHi: t + Math.max(a, b) });
+      out.push({ wallId: wall.id, axisT: t, faceLo: t + Math.min(a, b), faceHi: t + Math.max(a, b), frame: other, point: points.get(t) ?? pointAt(host, t, 0) });
     }
   }
   return out;
@@ -131,100 +143,4 @@ export function clampOpeningCenter(offset: number, width: number, length: number
   const half = width / 2;
   if (length < width + 0.02) return fallback;
   return clamp(offset, half + 0.01, length - half - 0.01);
-}
-
-/** Cota temporária: traço `a → b` e o rótulo no meio. `value` já em metros. */
-export interface TemporaryDimension {
-  a: Vec2;
-  b: Vec2;
-  at: Vec2;
-  value: number;
-}
-
-/**
- * Referências das duas cotas de uma abertura já colocada: o `t` do alvo fixo (eixo da perpendicular no modo `axis` ou
- * face dela no modo `face`) e a medida até a abertura. É a conta que a prévia da colocação e as cotas editáveis usam;
- * fica aqui para não haver duas regras de cota.
- */
-export interface DimensionRefs {
-  leftEdge: number;
-  rightEdge: number;
-  leftT: number;
-  rightT: number;
-  leftValue: number;
-  rightValue: number;
-}
-
-/** Referências das cotas laterais da abertura (ver `DimensionRefs`). */
-export function dimensionRefs(
-  center: number,
-  width: number,
-  length: number,
-  neighbors: PerpendicularWall[],
-  mode: NonNullable<ToolOptions['openingDimMode']>,
-): DimensionRefs {
-  const leftEdge = center - width / 2;
-  const rightEdge = center + width / 2;
-  if (mode === 'face') {
-    const leftT = Math.max(0, ...neighbors.filter((n) => n.faceHi <= leftEdge + EPS).map((n) => n.faceHi));
-    const rightT = Math.min(length, ...neighbors.filter((n) => n.faceLo >= rightEdge - EPS).map((n) => n.faceLo));
-    return { leftEdge, rightEdge, leftT, rightT, leftValue: Math.max(0, leftEdge - leftT), rightValue: Math.max(0, rightT - rightEdge) };
-  }
-  const leftT = Math.max(0, ...neighbors.filter((n) => n.axisT < center - EPS).map((n) => n.axisT));
-  const rightT = Math.min(length, ...neighbors.filter((n) => n.axisT > center + EPS).map((n) => n.axisT));
-  return { leftEdge, rightEdge, leftT, rightT, leftValue: Math.max(0, center - leftT), rightValue: Math.max(0, rightT - center) };
-}
-
-/**
- * Duas cotas da abertura para as paredes perpendiculares vizinhas (ou as pontas da parede, se não houver):
- * do eixo da abertura ao eixo da perpendicular (`axis`) ou da borda da abertura à face (`face`). O traço fica
- * deslocado para o lado do cursor (`side`).
- */
-export function temporaryDimensions(
-  frame: WallFrame,
-  center: number,
-  width: number,
-  neighbors: PerpendicularWall[],
-  mode: NonNullable<ToolOptions['openingDimMode']>,
-  side: 1 | -1,
-): TemporaryDimension[] {
-  const length = frame.length;
-  const sDim = side * (frame.thickness / 2 + 0.25);
-  const point = (t: number): Vec2 => ({ x: frame.a.x + frame.u.x * t + frame.n.x * sDim, y: frame.a.y + frame.u.y * t + frame.n.y * sDim });
-  const refs = dimensionRefs(center, width, length, neighbors, mode);
-  const leftA = point(refs.leftT);
-  const leftB = point(mode === 'face' ? refs.leftEdge : center);
-  const rightA = point(mode === 'face' ? refs.rightEdge : center);
-  const rightB = point(refs.rightT);
-  return [
-    { a: leftA, b: leftB, at: point((refs.leftT + (mode === 'face' ? refs.leftEdge : center)) / 2), value: refs.leftValue },
-    { a: rightA, b: rightB, at: point(((mode === 'face' ? refs.rightEdge : center) + refs.rightT) / 2), value: refs.rightValue },
-  ];
-}
-
-/** Valor de cota em metros com vírgula e duas casas (ex.: `2,26`). */
-export function formatMeters(v: number): string {
-  return v.toFixed(2).replace('.', ',');
-}
-
-/**
- * Símbolo real da esquadria na prévia, como itens `line` (tracejado quando o símbolo pede). Usa a mesma
- * `openingSymbolPaths` da planta, com uma abertura temporária montada por `openingGeometry`.
- */
-export function symbolPreviewItems(
-  p: Project,
-  frame: WallFrame,
-  opening: Opening,
-  tone: PreviewTone | undefined,
-): PreviewItem[] {
-  const g = openingGeometry(p, opening, frame);
-  const out: PreviewItem[] = [];
-  for (const stroke of openingSymbolPaths(g)) {
-    const pts = stroke.pts;
-    const count = stroke.closed ? pts.length : pts.length - 1;
-    for (let i = 0; i < count; i++) {
-      out.push({ kind: 'line', a: pts[i]!, b: pts[(i + 1) % pts.length]!, dashed: stroke.dash !== undefined, tone });
-    }
-  }
-  return out;
 }

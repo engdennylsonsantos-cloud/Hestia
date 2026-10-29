@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolverZoom } from './zoomOps.ts';
-import { generateFanRun, generateLShape, resolveStairsOnLevel, type StairComponentSketch } from '@hestia/engine';
+import { generateFanRun, generateLShape, generateUShape, resolveStairsOnLevel, type StairComponentSketch } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type Project, type StairLanding, type StairRun } from '@hestia/model';
 import { riserPoints, risersInClimbOrder } from '../stairRisers.ts';
 import { polyMid, stairFills } from './stairs.ts';
@@ -10,7 +10,7 @@ import { defaultPaint } from './style.ts';
 const RISER_PX = defaultPaint('stair', 100).cutPx;
 import { LIGHT } from './types.ts';
 import type { Viewport } from '../viewport.ts';
-import type { Vec2 } from '@hestia/geom';
+import { pointInMulti, type Vec2 } from '@hestia/geom';
 
 const VIEW: Viewport = { cx: 0, cy: 0, zoom: 100, width: 800, height: 600 };
 const P = 0.28;
@@ -55,16 +55,37 @@ function arrowOf(p: Project) {
 const dist = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y);
 
 describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => {
-  it('escada em L: um vértice por espelho, nos pontos médios em ordem de subida, com a ponta no último', () => {
+  it('escada em L: um vértice por espelho, nos pontos médios em ordem de subida, o canto do eixo no patamar e a ponta no último degrau', () => {
     const comps = toModel(generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1, risersFirst: 8, risersSecond: 9, tread: P, turn: 'left' }));
     const p = projectWith(comps);
     const { st, shaft, head } = arrowOf(p);
     expect(st.riserCount).toBe(17);
-    expect(shaft.pts).toHaveLength(17);
+    // 17 espelhos + o canto do patamar + o último degrau.
+    expect(shaft.pts).toHaveLength(19);
     const mids = risersInClimbOrder(st).map((r) => polyMid(riserPoints(r)));
-    shaft.pts.forEach((q, k) => expect(dist(q, mids[k]!)).toBeLessThan(1e-9));
+    shaft.pts.slice(0, 8).forEach((q, k) => expect(dist(q, mids[k]!)).toBeLessThan(1e-9));
+    shaft.pts.slice(9, 18).forEach((q, k) => expect(dist(q, mids[8 + k]!)).toBeLessThan(1e-9));
+    // O canto é onde o eixo do 1º lance (x do espelho 8) cruza o do 2º (y do espelho 9): a seta passa pelo eixo, não em diagonal.
+    expect(shaft.pts[8]!.x).toBeCloseTo(mids[7]!.x, 9);
+    expect(shaft.pts[8]!.y).toBeCloseTo(mids[8]!.y, 9);
     expect(head.pts).toHaveLength(3);
-    expect(head.pts[1]).toEqual(shaft.pts[16]);
+    expect(head.pts[1]).toEqual(shaft.pts[18]);
+  });
+
+  it('escada em U: a seta atravessa o patamar pelo meio, pelos eixos dos dois lances, e chega ao último degrau', () => {
+    const comps = toModel(generateUShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1, risersFirst: 9, risersSecond: 9, tread: P, turn: 'left' }));
+    const { st, shaft } = arrowOf(projectWith(comps));
+    expect(st.riserCount).toBe(18);
+    // 18 espelhos + dois pontos da travessia do patamar + o último degrau.
+    expect(shaft.pts).toHaveLength(21);
+    const mids = risersInClimbOrder(st).map((r) => polyMid(riserPoints(r)));
+    const landing = st.steps.find((x) => x.kind === 'landing')!.polygon;
+    const [c1, c2] = [shaft.pts[9]!, shaft.pts[10]!];
+    expect(pointInMulti(c1, [[landing]])).toBe(true);
+    expect(pointInMulti(c2, [[landing]])).toBe(true);
+    expect(c1.x).toBeCloseTo(mids[8]!.x, 9);
+    expect(c2.x).toBeCloseTo(mids[9]!.x, 9);
+    expect(c1.y).toBeCloseTo(c2.y, 9);
   });
 
   it('escada em L: a seta acompanha a curva (não é a reta do 1º ao último espelho)', () => {
@@ -85,10 +106,10 @@ describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => 
     const p = projectWith(toModel([{ kind: 'run', run: fan }]));
     const { st, shaft, head } = arrowOf(p);
     expect(st.riserCount).toBe(17);
-    expect(shaft.pts).toHaveLength(17);
+    expect(shaft.pts).toHaveLength(18);
     const mids = risersInClimbOrder(st).map((r) => polyMid(riserPoints(r)));
-    shaft.pts.forEach((q, k) => expect(dist(q, mids[k]!)).toBeLessThan(1e-9));
-    expect(head.pts[1]).toEqual(shaft.pts[16]);
+    shaft.pts.slice(0, 17).forEach((q, k) => expect(dist(q, mids[k]!)).toBeLessThan(1e-9));
+    expect(head.pts[1]).toEqual(shaft.pts[17]);
   });
 
   it('caminhada explícita válida: a seta segue a caminhada do lance (com os pontos da curva), do 1º ao último espelho', () => {
@@ -97,7 +118,8 @@ describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => 
     const { shaft, head } = arrowOf(p);
     expect(shaft.pts.length).toBeGreaterThan(N);
     expect(dist(shaft.pts[0]!, { x: P, y: 0 })).toBeLessThan(1e-9);
-    expect(dist(shaft.pts[shaft.pts.length - 1]!, { x: N * P, y: 0 })).toBeLessThan(1e-9);
+    // Termina no centro do último degrau (a chegada), depois do último espelho.
+    expect(dist(shaft.pts[shaft.pts.length - 1]!, { x: N * P + P / 2, y: 0 })).toBeLessThan(1e-9);
     expect(Math.max(...shaft.pts.map((q) => Math.abs(q.y)))).toBeGreaterThan(0.1);
     expect(head.pts[1]).toEqual(shaft.pts[shaft.pts.length - 1]);
   });
@@ -105,7 +127,7 @@ describe('seta de subida segue a caminhada (decisão 0011 · interface)', () => 
   it('sem caminhada explícita: a seta é reta entre os pontos médios (um vértice por espelho)', () => {
     const N = 17;
     const { shaft } = arrowOf(projectWith([straightWithPath(N, null)]));
-    expect(shaft.pts).toHaveLength(N);
+    expect(shaft.pts).toHaveLength(N + 1);
     expect(shaft.pts.every((q) => Math.abs(q.y) < 1e-9)).toBe(true);
   });
 

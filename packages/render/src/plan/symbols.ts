@@ -1,4 +1,4 @@
-import { openingPlanPaths, type OpeningGeometry, type OpeningModel, type OpeningPlanOptions, type OpeningPlanRole } from '@hestia/engine';
+import { openingPlanWorldPaths as openingPlanWorldPathsEngine, type OpeningGeometry, type OpeningModel, type OpeningPlanOptions, type OpeningPlanRole } from '@hestia/engine';
 import type { Vec2 } from '@hestia/geom';
 import { espessuraVezes } from './espessura.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
@@ -42,25 +42,9 @@ export function openingPlanDetail(detail: 'scale' | OpeningSymbolDetail, zoom: n
   return detail === 'scale' ? openingDetailByZoom(zoom, limiares) : detail;
 }
 
-const at = (c: Vec2, u: Vec2, n: Vec2, t: number, s: number): Vec2 => ({
-  x: c.x + u.x * t + n.x * s,
-  y: c.y + u.y * t + n.y * s,
-});
-
-/**
- * Traços da planta da esquadria em coordenadas do mundo: a geometria local do vão (`openingPlanPaths`, do engine) posta
- * no lugar pela geometria da abertura. A planta e o DXF usam esta função, então o desenho é o mesmo nos dois.
- */
 export function openingPlanWorldPaths(g: OpeningGeometry, model: OpeningModel, opts: OpeningSymbolOptions): OpeningPlanWorldPath[] {
   if (opts.detail === 'off') return [];
-  return openingPlanPaths(model, { ...opts, detail: opts.detail }).map((p) => ({
-    pts: p.pts.map((q) => at(g.center, g.u, g.n, q.t, q.s)),
-    closed: p.closed,
-    weight: p.weight,
-    tone: p.tone,
-    ...(p.dash ? { dash: p.dash } : {}),
-    role: p.role,
-  }));
+  return openingPlanWorldPathsEngine(g, model, opts);
 }
 
 /**
@@ -82,5 +66,6 @@ export function openingSymbol(g: OpeningGeometry, model: OpeningModel, theme: Pl
     color: s.tone === 'soft' ? theme.inkSoft : theme.ink,
     alpha: 1,
     ...(s.dash ? { dash: s.dash } : {}),
+    role: s.role,
   }));
 }

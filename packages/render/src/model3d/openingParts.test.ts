@@ -37,13 +37,15 @@ function pecas(c: { p: Project; o: Opening }, open = false): OpeningPiece[] {
 describe('peças 3D do vão: acabamento, peitoril e vergas', () => {
   it('sem campos novos, a porta de giro fechada traz o modelo inteiro: batente com rebaixo, folha e maçaneta', () => {
     const pc = pecas(cena('ot_p80'));
-    // 2 ombreiras + 3 batedores (2 laterais + cabeça) + travessa + folha + 4 peças da maçaneta lever.
-    expect(pc).toHaveLength(11);
+    // Batente em L em peça única por lado: 2 ombreiras + cabeça (os batedores saíram das peças, batente em L da v3);
+    // folha; 8 peças de ferragem (maçaneta: roseta, pescoço e braço nas duas faces, e placa da fechadura, E2b); 3 dobradiças de batente (padrão da família de giro, E2b).
+    expect(pc).toHaveLength(15);
     expect(pc.filter((x) => x.role === 'jamb')).toHaveLength(2);
-    expect(pc.filter((x) => x.role === 'stop')).toHaveLength(3);
+    expect(pc.filter((x) => x.role === 'head')).toHaveLength(1);
+    expect(pc.filter((x) => x.role === 'stop')).toHaveLength(0);
     expect(pc.filter((x) => x.role === 'leaf')).toHaveLength(1);
-    expect(pc.filter((x) => x.role === 'handle')).toHaveLength(4);
-    expect(pc.some((x) => x.hinge)).toBe(false);
+    expect(pc.filter((x) => x.role === 'handle')).toHaveLength(8);
+    expect(pc.filter((x) => x.role === 'hinge')).toHaveLength(3);
   });
 
   it('alizar: quatro peças por lado na porta e cinco na janela (inclui a peça de baixo do vão)', () => {
@@ -134,8 +136,8 @@ describe('regressão do 3D aberto', () => {
     return Math.sign((folha.x - folha.hinge.at) * Math.sin(folha.hinge.angle));
   }
 
-  it('dimensões das peças iguais fechado × aberto nos 23 tipos padrão', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(23);
+  it('dimensões das peças iguais fechado × aberto nos tipos padrão', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(130);
     for (const t of DEFAULT_OPENING_TYPES) {
       const c = cena(t.id);
       expect(dimensoes(pecas(c, true)), t.id).toEqual(dimensoes(pecas(c, false)));
@@ -143,7 +145,8 @@ describe('regressão do 3D aberto', () => {
   });
 
   it('vidro e moldura de folha ficam dentro do vão interno do caixilho (jamb…h−jamb)', () => {
-    for (const t of DEFAULT_OPENING_TYPES.filter((x) => x.kind === 'window' && x.leaves > 0)) {
+    // Composições de várias células têm o vidro no rebaixo do perfil (placa = luz + 2 × (rebaixo − folga)): valem os testes do motor.
+    for (const t of DEFAULT_OPENING_TYPES.filter((x) => x.kind === 'window' && x.leaves > 0 && x.composition?.layout.kind !== 'split')) {
       const c = cena(t.id);
       const jamb = jambDe(c);
       const h = alturaDe(c);
@@ -406,18 +409,20 @@ describe('porta pivotante aberta', () => {
   });
 
   it('fechada: folha no centro de t, apoiada no batente (sem dobradiça)', () => {
-    const c = cena('ot_pp80');
+    const c = cena('ot_pp80', { frameDepthMode: 'core' });
     const fechada = pecas(c, false);
     expect(fechada.some((x) => x.hinge)).toBe(false);
     const folha = fechada.find((x) => x.role === 'leaf')!;
     const f = frameOfWall(c.p, 'w')!;
     const core = coreSpan(f.type);
     const fr = openingFrame(c.p.openingTypes[c.o.typeId]!, core.to - core.from);
-    const jamb = fr.frameWidth;
-    const lh = c.g.width / 2 - jamb + 0.015 - 0.004;
-    expect(folha.w).toBeCloseTo(2 * lh, 9);
+    // Batente no núcleo (modo core): a folha fica 4 mm da face do núcleo (y = início do núcleo + folga + meia espessura).
+    // A folha ocupa quase todo o vão: metade da largura = eixo + braço sem varrer a ombreira, √((face − eixo − 0,5 mm)² − L²).
+    const eixo = c.g.width / 4;
+    const face = c.g.width / 2 - 0.05;
+    expect(folha.w).toBeCloseTo(2 * (eixo + Math.sqrt((face - eixo - 0.0005) ** 2 - fr.leafThickness ** 2)), 9);
     expect(folha.x).toBeCloseTo(0, 9);
-    expect(folha.y).toBeCloseTo(fr.frameDepth / 2 - 0.004 - fr.leafThickness / 2, 9);
+    expect(folha.y).toBeCloseTo(core.from + 0.004 + fr.leafThickness / 2, 9);
   });
 });
 
@@ -494,7 +499,7 @@ describe('modelo único no 3D: todos os campos do tipo mudam a malha', () => {
     { nome: 'lintel', base: 'ot_p90', extra: { lintel: {} } },
     { nome: 'sillBeam', base: 'ot_p90', extra: { sillBeam: {} } },
     { nome: 'frameStyle', base: 'ot_p90', extra: { frameStyle: 'simple' } },
-    { nome: 'frameDepth', base: 'ot_p90', extra: { frameDepth: 0.14 } },
+    { nome: 'frameDepth', base: 'ot_p90', extra: { frameDepthMode: 'fixed', frameDepth: 0.09 } },
     { nome: 'frameWidth', base: 'ot_p90', extra: { frameWidth: 0.08 } },
     { nome: 'leafThickness', base: 'ot_p90', extra: { leafThickness: 0.06 } },
     { nome: 'glassThickness', base: 'ot_j120', extra: { glassThickness: 0.02 } },
@@ -523,8 +528,9 @@ describe('movimento do modelo único no 3D', () => {
         expect(Math.abs(h.angle), caso).toBeCloseTo(Math.PI / 2, 9);
         const atS = h.atS ?? 0;
         const centro = transformar({ x: folha.x, y: folha.y, z: folha.z }, folha);
-        // Gira em torno da dobradiça: o centro vai para o plano perpendicular, a meia largura do eixo.
-        expect(centro.x, caso).toBeCloseTo(h.at, 9);
+        // Gira em torno da dobradiça: o centro vai para o plano perpendicular, a meia largura do eixo. O eixo fica na face
+        // da folha (não no centro da espessura), então o centro está a meia espessura (0,02 m) do eixo, do lado da folha.
+        expect(centro.x, caso).toBeCloseTo(h.at + (flipHand ? -1 : 1) * folha.d / 2, 9);
         expect(Math.sign(centro.y - atS), caso).toBe(flipFacing ? -1 : 1);
         expect(Math.abs(centro.y - atS), caso).toBeCloseTo(folha.w / 2, 9);
         // A aresta da dobradiça continua no eixo.
@@ -594,7 +600,7 @@ describe('movimento do modelo único no 3D', () => {
         const hw = c.g.width / 2;
         const H = Math.min(c.g.height, 2.8 - c.g.sill);
         for (const p of pecas(c, open)) {
-          if (fora.has(p.role)) continue;
+          if (fora.has(p.role) || (open && p.role === 'handle')) continue; // aberta, a maçaneta sai da face da folha e passa o vão em t
           const b = caixaDaPeca(p);
           const caso = `${familia.base}${open ? ' aberta' : ' fechada'} ${p.role}`;
           expect(b.x0, caso).toBeGreaterThanOrEqual(-hw - 1e-9);

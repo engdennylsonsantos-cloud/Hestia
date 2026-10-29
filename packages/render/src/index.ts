@@ -4,6 +4,7 @@ export * from './gpu.ts';
 export * from './perf/index.ts';
 export * from './plan/types.ts';
 export * from './plan/build.ts';
+export * from './plan/zoomOps.ts';
 export * from './plan/grid.ts';
 export * from './plan/cpuPlan.ts';
 export * from './plan/gpuPlan.ts';
@@ -11,6 +12,8 @@ export * from './model3d/solids.ts';
 export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
+// Picking por ID buffer (R3): tabela de códigos, geometria do passe e o leitor da GPU (`PickGpu3d`).
+export * from './model3d/pickIdBuffer3d.ts';
 export * from './model3d/openingParts.ts';
 // Recursos de GPU da cena 3D (Fase 2.1/2.2): orçamento contábil, lotes por categoria/material e instâncias.
 export { OrcamentoVram, TETO_VRAM_PADRAO } from './gpu/orcamento.ts';
@@ -19,6 +22,8 @@ export { caixaDePosicoes, LoteGeometriaGpu, mesclarLotes, unirCaixas, type Caixa
 export { LoteLinhasGpu } from './gpu/loteLinhas.ts';
 export { caixaDeMatrizes, InstanciasGpu } from './gpu/instanciasGpu.ts';
 export * from './section/build.ts';
+export * from './section/clip.ts';
+export * from './section/frame.ts';
 export * from './section/pick.ts';
 export { sectionStyleOf, type SectionStyle } from './section/style.ts';
 // Vista da planta (decisão 0013) e o que a exportação DXF reaproveita dela: a mesma geometria, o mesmo corte e a mesma pegada.
@@ -36,4 +41,7 @@ export * from './sheet/build.ts';
 export { STAMP_H, STAMP_W } from './sheet/frame.ts';
 // Ambientes (decisão 0018): rótulo e centro de cada ambiente, o mesmo texto da planta e do DXF.
 export { roomLabelAt, roomLabelText } from './plan/rooms.ts';
+export { areaPlanHighlightOps, areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps, labelGhostOps, referenceAt, referenceSegments, roomTagLines, tagBoxModel } from './plan/areaPlan.ts';
 export * from './plan/sketch.ts';
+// Anotações (textos e cotas): desenho, caixa do texto, moldura e destaque de seleção/hover.
+export { annotationHighlightOps, annotationsOfLevel, blocoEm, drawnAnnotations, linhasDoTexto, noteOps, roomSeparatorStrokes, textBlockModel, type NoteLook, type NoteOps, type NoteTarget, type TextBlockModel } from './plan/notes.ts';

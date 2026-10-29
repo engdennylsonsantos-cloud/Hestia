@@ -4,6 +4,7 @@ import type {
   OpenState,
   PartBox,
   PartMotion,
+  PartProfile,
 } from './openingModelTypes.ts';
 
 /** Ponto no sistema local do vão. */
@@ -190,10 +191,51 @@ function crossSection(corners: ModelPoint[], z: number): Array<{ t: number; s: n
   return Math.abs(polygonArea(pts)) > 1e-12 ? pts : [];
 }
 
+/** Primeiras coordenadas em que o contorno (a, v) cruza a cota `v = z` (vértice na cota entra uma vez). */
+function cruzamentosEm(pts: Array<[number, number]>, z: number): number[] {
+  const xs: number[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const [sa, za] = pts[i]!;
+    const [sb, zb] = pts[(i + 1) % pts.length]!;
+    if (Math.abs(za - z) <= 1e-9) xs.push(sa);
+    if (Math.abs(zb - z) <= 1e-9) xs.push(sb);
+    if ((za - z) * (zb - z) < 0) xs.push(sa + ((sb - sa) * (z - za)) / (zb - za));
+  }
+  return xs;
+}
+
+/**
+ * Anel horizontal (t, s) do perfil na cota `z`. No plano `ts` a seção é o próprio polígono (extrudado em z); no plano
+ * `sz` o corte horizontal é o intervalo em `s` entre as interseções do polígono com a cota, ao longo de toda a extrusão
+ * em `t` (spec E3 §2); no plano `tz` é o intervalo em `t`, ao longo da extrusão em `s`.
+ */
+function profileRingAtZ(part: OpeningPart, profile: PartProfile, z: number): Array<{ t: number; s: number }> {
+  const { box: b } = part;
+  if (z < b.z0 - 1e-9 || z > b.z1 + 1e-9) return [];
+  if (profile.plane === 'ts') return profile.pts.map(([t, s]) => ({ t, s }));
+  const xs = cruzamentosEm(profile.pts, z);
+  if (xs.length < 2) return [];
+  const x0 = Math.min(...xs);
+  const x1 = Math.max(...xs);
+  if (x1 - x0 < 1e-9) return [];
+  const [u0, u1, v0, v1] = profile.plane === 'sz' ? [b.t0, b.t1, x0, x1] : [x0, x1, b.s0, b.s1];
+  return [
+    { t: u0, s: v0 },
+    { t: u1, s: v0 },
+    { t: u1, s: v1 },
+    { t: u0, s: v1 },
+  ];
+}
+
 /** Corte horizontal do modelo na altura `z`, no estado pedido: as peças que o plano atravessa com o anel (t, s). */
 export function slicePartsAtZ(m: OpeningModel, z: number, state: OpenState): SliceRing[] {
   const out: SliceRing[] = [];
   for (const part of m.parts) {
+    if (part.profile && !part.motion) {
+      const ring = profileRingAtZ(part, part.profile, z);
+      if (ring.length) out.push({ part, ring });
+      continue;
+    }
     const ob = partTransformed(part, state);
     if (z < ob.bounds.z0 - 1e-9 || z > ob.bounds.z1 + 1e-9) continue;
     const ring = crossSection(ob.corners, z);
@@ -235,6 +277,37 @@ function convexHull(points: Array<{ u: number; z: number }>): Array<{ u: number;
 export function projectParts(m: OpeningModel, axis: 's' | 't', state: OpenState): ProjectedRing[] {
   const out: ProjectedRing[] = [];
   for (const part of m.parts) {
+    if (part.profile?.plane === 'tz' && axis === 's') {
+      // Elevação de disco/cilindro com eixo em s: a seção (t, z) real, com o movimento aplicado no meio da espessura.
+      const sMid = (part.box.s0 + part.box.s1) / 2;
+      const moved = part.profile.pts.map(([t, z]) => movePoint({ t, s: sMid, z }, part.motion, state));
+      const depth = moved.reduce((acc, p) => acc + p.s, 0) / moved.length;
+      out.push({ part, ring: moved.map((p) => ({ u: p.t, z: p.z })), depth });
+      continue;
+    }
+    if (part.profile && !part.motion) {
+      const b = part.box;
+      const depth = axis === 's' ? (b.s0 + b.s1) / 2 : (b.t0 + b.t1) / 2;
+      // Elevação: retângulo envolvente. Corte transversal: a travessa mostra o L em (s, z); a ombreira, o retângulo.
+      const ring: Array<{ u: number; z: number }> =
+        axis === 't' && part.profile.plane === 'sz'
+          ? part.profile.pts.map(([s, z]) => ({ u: s, z }))
+          : axis === 's'
+            ? [
+                { u: b.t0, z: b.z0 },
+                { u: b.t1, z: b.z0 },
+                { u: b.t1, z: b.z1 },
+                { u: b.t0, z: b.z1 },
+              ]
+            : [
+                { u: b.s0, z: b.z0 },
+                { u: b.s1, z: b.z0 },
+                { u: b.s1, z: b.z1 },
+                { u: b.s0, z: b.z1 },
+              ];
+      out.push({ part, ring, depth });
+      continue;
+    }
     const ob = partTransformed(part, state);
     let depth = 0;
     const projected = ob.corners.map((p) => {

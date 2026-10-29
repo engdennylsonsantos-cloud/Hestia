@@ -73,6 +73,15 @@ describe('configuração de atalhos', () => {
     expect(m.useAtalhos.getState().mapa.wall).toBe('WA');
   });
 
+  it('o diálogo de unidades começa em UN e o usuário pode reatribuir e restaurar', async () => {
+    const m = await carrega(memoria());
+    expect(m.useAtalhos.getState().mapa.unidades).toBe('UN');
+    expect(m.atribuirAtalho('unidades', 'PU').ok).toBe(true);
+    expect(m.useAtalhos.getState().mapa.unidades).toBe('PU');
+    m.restaurarAtalho('unidades');
+    expect(m.useAtalhos.getState().mapa.unidades).toBe('UN');
+  });
+
   it('trocar para o perfil simples usa as letras de uma tecla', async () => {
     const m = await carrega(memoria());
     m.trocarPerfil('simples');

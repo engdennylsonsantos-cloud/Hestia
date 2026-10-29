@@ -1,4 +1,4 @@
-import type { RoofProfilePoint } from '@hestia/model';
+import { defaultUnits, formatQuantity, type RoofProfilePoint } from '@hestia/model';
 
 /**
  * Presets e validação do perfil de telhado por extrusão (A9). Puros: o perfil tem t de 0 a `largura`, medido a partir
@@ -24,13 +24,13 @@ export function roofProfileError(pts: RoofProfilePoint[]): string | null {
 export const roofProfileOk = (pts: RoofProfilePoint[]): boolean => roofProfileError(pts) === null;
 
 /** Trecho mais inclinado que o limite, ou null. Só faz sentido com o perfil estrutural válido (t crescente). */
-export function roofProfileSlopeError(pts: RoofProfilePoint[]): string | null {
+export function roofProfileSlopeError(pts: RoofProfilePoint[], units = defaultUnits()): string | null {
   for (let i = 0; i + 1 < pts.length; i++) {
     const a = pts[i]!;
     const b = pts[i + 1]!;
     if (!(b.t > a.t)) continue;
     const pct = (100 * Math.abs(b.z - a.z)) / (b.t - a.t);
-    if (pct > PROFILE_SLOPE_LIMIT) return `o trecho ${i + 1} tem inclinação de ${pct.toFixed(0)} %; o limite é ${PROFILE_SLOPE_LIMIT} %`;
+    if (pct > PROFILE_SLOPE_LIMIT) return `o trecho ${i + 1} tem inclinação de ${formatQuantity(units, 'slope', pct / 100)}; o limite é ${formatQuantity(units, 'slope', PROFILE_SLOPE_LIMIT / 100)}`;
   }
   return null;
 }

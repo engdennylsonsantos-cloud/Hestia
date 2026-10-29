@@ -24,7 +24,7 @@ import { buildSectionDrawList, type SectionInput } from './section/build.ts';
 import { openingSymbol } from './plan/symbols.ts';
 import { LIGHT } from './plan/types.ts';
 import { openingPieces, type OpeningPiece } from './model3d/openingParts.ts';
-import { caixasDaAbertura, montarAbertura } from './model3d/aberturas3d.ts';
+import { caixasEPrismasDaAbertura, montarAbertura } from './model3d/aberturas3d.ts';
 
 const p = (): Project => buildTemplate('esquadrias');
 const aberturas = (proj: Project): Opening[] => Object.values(proj.elements).filter(isOpening);
@@ -50,8 +50,11 @@ describe('catálogo completo: corte e elevação', () => {
     const proj = p();
     const portas = aberturas(proj).filter((o) => o.kind === 'door');
     const janelas = aberturas(proj).filter((o) => o.kind === 'window');
-    const elevPortas = secao(proj, { x: 0, y: -2 }, { x: 40, y: -2 }, 8);
-    const elevJanelas = secao(proj, { x: 0, y: 6 }, { x: 40, y: 6 }, 4);
+    // O corte percorre cada parede inteira (o mostruário tem o comprimento do catálogo, não 40 m fixos).
+    const fimPortas = (proj.elements['eq_w_portas'] as Wall).b.x;
+    const fimJanelas = (proj.elements['eq_w_janelas'] as Wall).b.x;
+    const elevPortas = secao(proj, { x: 0, y: -2 }, { x: fimPortas, y: -2 }, 8);
+    const elevJanelas = secao(proj, { x: 0, y: 6 }, { x: fimJanelas, y: 6 }, 4);
     expect(elevPortas.section.openings.map((o) => o.openingId).sort()).toEqual(portas.map((o) => o.id).sort());
     expect(elevJanelas.section.openings.map((o) => o.openingId).sort()).toEqual(janelas.map((o) => o.id).sort());
     for (const entrada of [elevPortas, elevJanelas]) {
@@ -63,7 +66,7 @@ describe('catálogo completo: corte e elevação', () => {
         else expect(o.model.parts.length, o.openingId).toBeGreaterThan(0);
       }
     }
-  });
+  }, 30_000);
 
   it('o corte transversal de cada vão desenha sem exceção e mostra o vão na seção', () => {
     const proj = p();
@@ -103,8 +106,9 @@ describe('catálogo completo: corte e elevação', () => {
           expect(Math.abs(v!.pts[1]!.u + oo.hingeT), o.id).toBeLessThan(1e-9);
         }
         if ((oo.kind === 'side' || oo.kind === 'pivot' || oo.kind === 'top' || oo.kind === 'bottom') && oo.side === 1) {
-          const linha = linhas.find((l) => l.pts.length === 3);
-          expect(linha?.dashed, `${o.id} abre para o observador`).toBe(true);
+          // Vai-e-vem (dblact) tem uma linha em V por sentido de abertura: basta que uma delas seja tracejada.
+          const vs = linhas.filter((l) => l.pts.length === 3);
+          expect(vs.some((l) => l.dashed), `${o.id} abre para o observador`).toBe(true);
         }
       }
     }
@@ -217,7 +221,8 @@ describe('catálogo completo: 3D', () => {
       for (const open of [false, true]) {
         const pecas = openingPieces(proj, o, g, f, 2.8, open);
         const montada = montarAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open }, false, desenhar);
-        const caixas = caixasDaAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open });
+        const em = caixasEPrismasDaAbertura(proj, o, f, 0, 2.8, { ...view, openOpenings: open });
+        const caixas = em?.caixas ?? null;
         if (vazio) {
           expect(pecas).toHaveLength(0);
           expect(montada).toBeNull();
@@ -226,9 +231,14 @@ describe('catálogo completo: 3D', () => {
         }
         expect(montada, o.id).not.toBeNull();
         expect(caixas, o.id).not.toBeNull();
-        expect(caixas!.length, `${o.id} ${open ? 'aberta' : 'fechada'}`).toBe(pecas.length);
-        for (let i = 0; i < pecas.length; i++) {
-          const esperado = centroEsperado(pecas[i]!, g, 0);
+        // Peças com perfil (batente em L, alizar em silhueta) viram prismas; as demais, caixas unitárias. A cena
+        // equivalente tem uma caixa por peça sem perfil e um prisma por peça com perfil.
+        const emCaixa = pecas.filter((x) => !x.profile);
+        const emPrisma = pecas.filter((x) => x.profile);
+        expect(caixas!.length, `${o.id} ${open ? 'aberta' : 'fechada'} caixas`).toBe(emCaixa.length);
+        expect(em!.prismas.length, `${o.id} ${open ? 'aberta' : 'fechada'} prismas`).toBe(emPrisma.length);
+        for (let i = 0; i < emCaixa.length; i++) {
+          const esperado = centroEsperado(emCaixa[i]!, g, 0);
           const pos = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().fromArray(caixas![i]!.matriz));
           expect(pos.x, `${o.id} peça ${i}`).toBeCloseTo(esperado.x, 9);
           expect(pos.y, `${o.id} peça ${i}`).toBeCloseTo(esperado.y, 9);
@@ -287,7 +297,9 @@ describe('catálogo completo: 3D', () => {
           const foraPorProjeto =
             open &&
             ((family === 'door_garage' && (peca.role === 'leaf' || peca.role === 'leafPanel' || peca.role === 'track')) ||
-              (family === 'door_pocket' && peca.role === 'leaf'));
+              (family === 'door_pocket' && peca.role === 'leaf') ||
+              // A maçaneta sai da face da folha: com a folha aberta a 90° ela fica fora do vão em t (passa a ombreira no ar da sala).
+              peca.role === 'handle');
           if (foraPorProjeto) continue;
           const b = caixaDaPeca(peca);
           const caso = `${o.id} ${open ? 'aberta' : 'fechada'} ${peca.role}`;

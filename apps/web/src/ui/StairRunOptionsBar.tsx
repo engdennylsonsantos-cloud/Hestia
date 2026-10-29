@@ -11,6 +11,7 @@ const HINT: Record<StairRunShape, string> = {
   ushape: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   winder: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   spiral: 'Caracol: clique o centro, o raio externo e o ângulo inicial; gire para a varredura (ou digite os valores). Enter confirma.',
+  free: 'Escada livre: o trajeto é definido por cliques.',
 };
 
 /** Raio interno padrão (m) do caracol, como em `SPIRAL_DEFAULT_INNER`. */
@@ -57,7 +58,7 @@ export function StairRunOptionsBar(): ReactElement {
       {!spiral && (
         <label>
           Largura
-          <NumField id="opt-stairwidth" value={o.width} onCommit={(v) => set({ width: Math.max(0.1, v) })} unit="m" min={0.1} />
+          <NumField id="opt-stairwidth" value={o.width} onCommit={(v) => set({ width: Math.max(0.1, v) })} quantity="length" min={0.1} />
         </label>
       )}
       {turnable && (
@@ -73,7 +74,7 @@ export function StairRunOptionsBar(): ReactElement {
         <>
           <label>
             Raio interno (m)
-            <NumField id="opt-spiralinner" value={o.spiralInner ?? INNER_DEFAULT} min={0.05} onCommit={(v) => set({ spiralInner: v })} unit="m" />
+            <NumField id="opt-spiralinner" value={o.spiralInner ?? INNER_DEFAULT} min={0.05} onCommit={(v) => set({ spiralInner: v })} quantity="length" />
           </label>
           <label>
             Raio externo (m)
@@ -84,7 +85,7 @@ export function StairRunOptionsBar(): ReactElement {
               min={0.05}
               onCommit={(v) => set({ spiralOuter: v })}
               onClear={() => set({ spiralOuter: undefined })}
-              unit="m"
+              quantity="length"
             />
           </label>
           <label>

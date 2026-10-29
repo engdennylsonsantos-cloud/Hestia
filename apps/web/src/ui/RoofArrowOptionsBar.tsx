@@ -1,13 +1,12 @@
 import type { ReactElement } from 'react';
 import { isRoof } from '@hestia/model';
-import { roofShapePatch } from '@hestia/tools';
+import { roofToFreePatch } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 
 /**
- * Barra da seta de inclinação: a seta só vale em telhado de águas livres. Com um telhado selecionado que não é de
- * águas livres, oferece convertê-lo com um clique (mesma troca de Propriedades > Forma) e reinicia a ferramenta,
- * para que a barra de status diga o próximo passo.
+ * Barra da seta de inclinação: a primeira seta já converte o telhado em águas livres, então o botão é só um atalho para
+ * converter antes (as águas atuais viram planos) e reinicia a ferramenta, para a barra de status dizer o próximo passo.
  */
 export function RoofArrowOptionsBar(): ReactElement | null {
   const p = useProject();
@@ -16,7 +15,7 @@ export function RoofArrowOptionsBar(): ReactElement | null {
   const roof = el && isRoof(el) ? el : null;
   if (!roof || roof.shape === 'free') return null;
   const convert = (): void => {
-    editor.store.exec({ type: 'updateElements', ids: [roof.id], patch: roofShapePatch(roof, 'free', roof.slopePercent) });
+    editor.store.exec({ type: 'updateElements', ids: [roof.id], patch: roofToFreePatch(roof) });
     editor.setTool('roofarrow');
   };
   return (

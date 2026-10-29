@@ -1,5 +1,8 @@
 import type { Id, OpeningLeaves, OpeningType, PlanSymbol, Project } from './types.ts';
-import { acabamentoIssue, type OpeningAcabamento } from './openingExtras.ts';
+import { OPENING_SPAN_GAP_MAX } from './openingNominal.ts';
+import { acabamentoIssue, openingCasing, type OpeningAcabamento } from './openingExtras.ts';
+import { openingHardwareIssue, openingHardwareWarning } from './openingHardware.ts';
+import { openingOptionSupport } from './openingSupport.ts';
 
 /** Campos v2 do tipo conferidos ao salvar (todos opcionais: ausente vale o padrão por leitura). */
 type OpeningTypeRuleFields = Partial<
@@ -20,7 +23,16 @@ type OpeningTypeRuleFields = Partial<
     | 'detail3d'
     | 'showSwing'
     | 'swingStyle'
+    | 'leafPlan'
     | 'leafSide'
+    | 'nominalRef'
+    | 'spanGap'
+    | 'reveal'
+    | 'leafUndercut'
+    | 'handleHeight'
+    | 'handleInset'
+    | 'hinges'
+    | 'threshold'
   >
 >;
 
@@ -33,7 +45,10 @@ const PLAN_DISPLAYS = ['symbolic', 'projected'] as const;
 const DETAIL_2D = ['scale', 'low', 'mid', 'high', 'off'] as const;
 const DETAIL_3D = ['view', 'schematic', 'simple', 'full', 'off'] as const;
 const SWING_STYLES = ['arc', 'dash', 'line'] as const;
+const LEAF_PLANS = ['open', 'closed', 'both'] as const;
 const LEAF_SIDES = ['swing', 'opposite'] as const;
+const NOMINAL_REFS = ['opening', 'leaf'] as const;
+const REVEAL_MAX = 0.5;
 
 const inSet = (v: unknown, valid: readonly string[]): boolean => typeof v === 'string' && valid.includes(v);
 
@@ -72,7 +87,18 @@ function openingStyleIssue(t: OpeningTypeRules): string | null {
   if (t.detail3d !== undefined && !inSet(t.detail3d, DETAIL_3D)) return 'Nível de detalhe 3D desconhecido.';
   if (t.showSwing !== undefined && typeof t.showSwing !== 'boolean') return 'Arco de giro em planta: valor inválido.';
   if (t.swingStyle !== undefined && !inSet(t.swingStyle, SWING_STYLES)) return 'Estilo do arco de giro desconhecido.';
+  if (t.leafPlan !== undefined && !inSet(t.leafPlan, LEAF_PLANS)) return 'Folha em planta desconhecida (aberta, fechada ou ambas).';
   if (t.leafSide !== undefined && !inSet(t.leafSide, LEAF_SIDES)) return 'Posição da folha desconhecida.';
+  if (t.nominalRef !== undefined && !inSet(t.nominalRef, NOMINAL_REFS)) return 'Referência nominal desconhecida (vão ou folha).';
+  if (t.spanGap !== undefined) {
+    const { w, h } = t.spanGap;
+    const ok = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= OPENING_SPAN_GAP_MAX;
+    if (!ok(w) || !ok(h)) return `Folga do vão sobre a folha: use valores de 0 a ${Math.round(OPENING_SPAN_GAP_MAX * 100)} cm.`;
+  }
+  if (t.reveal !== undefined) {
+    const d = t.reveal.depth;
+    if (typeof d !== 'number' || !Number.isFinite(d) || d < 0 || d > REVEAL_MAX) return `Recuo do batente: use um valor de 0 a ${Math.round(REVEAL_MAX * 100)} cm.`;
+  }
   return null;
 }
 
@@ -188,7 +214,20 @@ export function openingTypeIssue(t: OpeningTypeRules): string | null {
     const leaves = t.leaves === 0 ? 'sem folha (vão livre)' : `${t.leaves} folha${t.leaves > 1 ? 's' : ''}`;
     return `Combinação inválida: ${kind} com o símbolo "${t.plan}" e ${leaves}.`;
   }
-  return acabamentoIssue(t) ?? openingStyleIssue(t);
+  return acabamentoIssue(t) ?? openingStyleIssue(t) ?? openingHardwareIssue(t, openingOptionSupport(openingFamilyOf(t)?.id));
+}
+
+/**
+ * Aviso (não erro) do tipo: alizar e retorno do acabamento são exclusivos (como no ArchiCAD); com alizar, o
+ * `closure` explícito é ignorado e o vão não ganha retorno. A interface pode mostrar o texto.
+ */
+export function openingTypeWarning(t: Pick<OpeningType, 'closure' | 'casing'> & Partial<Pick<OpeningType, 'kind' | 'plan' | 'leaves' | 'handleHeight'>>): string | null {
+  if (t.closure !== undefined && t.closure !== 'inherit' && openingCasing(t)) {
+    return 'Com alizar, o retorno do acabamento no vão não é gerado (os dois são exclusivos).';
+  }
+  // Sem a família (tipo parcial), não há como saber se a maçaneta vale: o aviso da altura só sai com o tipo completo.
+  if (t.kind === undefined || t.plan === undefined || t.leaves === undefined) return null;
+  return openingHardwareWarning(t, openingOptionSupport(openingFamilyOf({ kind: t.kind, plan: t.plan, leaves: t.leaves })?.id));
 }
 
 /** Tipos favoritos do projeto, na ordem gravada (vazio quando não há nenhum). */

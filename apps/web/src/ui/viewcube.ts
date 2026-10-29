@@ -2,7 +2,7 @@ import { POLE_ELEVATION, cameraBasis } from '@hestia/render';
 
 /**
  * Lógica do ViewCube (cubo de navegação da vista 3D), sem DOM. Convenção dos eixos do app: x leste, y norte, z para
- * cima. FRENTE é a face sul (a câmera olha de sul para norte); DIREITA é a face leste; TRASEIRA, a norte; ESQUERDA, a oeste.
+ * cima. FRONTAL é a face sul (a câmera olha de sul para norte); DIREITA é a face leste; POSTERIOR, a norte; ESQUERDA, a oeste.
  */
 
 /** Sinais de uma zona nos eixos (x, y, z), cada um em {−1, 0, 1}. Zero = a zona não está nesse eixo. */
@@ -24,19 +24,21 @@ export interface CubeZone {
 /** Ordem das faces no cubo. */
 export const CUBE_FACES: readonly Face[] = ['top', 'bottom', 'front', 'back', 'right', 'left'];
 
+/** Adjetivo de cada face no nome da vista ("Vista superior", "Vista frontal"…). Os rótulos visíveis ficam em `FACE_LABEL`. */
 const FACE_NAME: Record<Face, string> = {
-  top: 'topo',
-  bottom: 'base',
-  front: 'frente',
-  back: 'traseira',
+  top: 'superior',
+  bottom: 'inferior',
+  front: 'frontal',
+  back: 'posterior',
   right: 'direita',
   left: 'esquerda',
 };
+/** Rótulos visíveis das faces, iguais aos do Revit em pt-BR. Para trocar o texto, mude só aqui. */
 const FACE_LABEL: Record<Face, string> = {
-  top: 'TOPO',
-  bottom: 'BASE',
-  front: 'FRENTE',
-  back: 'TRASEIRA',
+  top: 'SUPERIOR',
+  bottom: 'INFERIOR',
+  front: 'FRONTAL',
+  back: 'POSTERIOR',
   right: 'DIREITA',
   left: 'ESQUERDA',
 };
@@ -72,7 +74,7 @@ function zoneOf(sign: Sign3): CubeZone {
     kind,
     sign,
     label: face ? FACE_LABEL[face] : '',
-    name: `Vista de ${joined}`,
+    name: `Vista ${joined}`,
   };
 }
 
@@ -245,6 +247,7 @@ export function cubeMatrixValues(azimuth: number, elevation: number): number[] {
 
 /** Valor CSS `matrix3d(...)` da orientação do cubo. */
 export function cubeMatrix(azimuth: number, elevation: number): string {
+// units-ok: formato de máquina (matriz CSS)
   return `matrix3d(${cubeMatrixValues(azimuth, elevation).map((x) => (Math.abs(x) < 1e-12 ? 0 : x).toFixed(6)).join(',')})`;
 }
 

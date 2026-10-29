@@ -1,15 +1,17 @@
-import { isCeiling, isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project } from '@hestia/model';
+import { isCeiling, isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, type Element, type Id, type Project, type Ramp } from '@hestia/model';
 import type { PerimeterModifyKind, ToolOptions } from '@hestia/tools';
 import { tagAllNotTagged } from '../../editor/tagActions.ts';
+import { addMissingTagsAction } from '../../editor/areaPlanActions.ts';
 import { editor } from '../../editor/controller.ts';
 import { resetDock, setDock } from '../../editor/dockActions.ts';
 import type { DockLayout, DockPanel, DockSide } from '../../editor/dockLayout.ts';
 import { editThinLines, thinLinesOn } from '../../editor/graphicsActions.ts';
 import { perimeterActions } from '../../editor/perimeter.ts';
 import { addSheetAction } from '../../editor/sheetActions.ts';
-import { toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
+import { setSnap, toggleRoofProjection, useUi, type DialogKind, type UiState } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { applyDrop } from '../dockDrag.ts';
+import { gridToolOf } from '../gridUi.ts';
 import { idPerimetroEditavel } from '../perimeter/perimeterEditavel.ts';
 import { t, type ActionId, type Txt } from './model.ts';
 
@@ -25,6 +27,8 @@ export interface RibbonCtx {
   tool: UiState['tool'];
   selection: Id[];
   view: UiState['view'];
+  planKind: UiState['planKind'];
+  areaPlanId: Id | null;
   levelId: Id;
   showGrid: boolean;
   showUnderlay: boolean;
@@ -65,6 +69,11 @@ function typeDialogFor(c: RibbonCtx): { dialog: DialogKind; arg: string } | null
       case 'ceiling': return o.ceilingTypeId ? { dialog: 'ceilingType', arg: o.ceilingTypeId } : null;
       case 'roof': case 'roofextrusion': case 'roofarrow': return o.roofTypeId ? { dialog: 'roofType', arg: o.roofTypeId } : null;
       case 'stair': case 'stairrun': return o.stair?.typeId ? { dialog: 'stairType', arg: o.stair.typeId } : null;
+      case 'grid': return { dialog: 'gridType', arg: gridToolOf(o, c.p).typeId };
+      case 'ramp': {
+        const id = o.ramp?.typeId ?? Object.keys(c.p.rampTypes)[0];
+        return id ? { dialog: 'rampType', arg: id } : null;
+      }
       default: return null;
     }
   }
@@ -77,12 +86,14 @@ function typeDialogFor(c: RibbonCtx): { dialog: DialogKind; arg: string } | null
   if (isCeiling(e)) return { dialog: 'ceilingType', arg: e.typeId };
   if (isRoof(e)) return { dialog: 'roofType', arg: e.typeId };
   if (isStair(e)) return { dialog: 'stairType', arg: e.typeId };
+  if (isRamp(e)) return { dialog: 'rampType', arg: e.typeId };
   return null;
 }
 
 const planOrSection = (c: RibbonCtx): boolean => c.view === 'plan' || c.view === 'section';
 const noSel = (c: RibbonCtx): Txt | false => (c.selection.length === 0 ? t('Selecione elementos primeiro.', 'Select elements first.') : false);
 const stairsIn = (c: RibbonCtx): Array<{ typeId: Id }> => c.selection.map((id) => c.p.elements[id]).filter(isStair);
+const rampsIn = (c: RibbonCtx): Ramp[] => c.selection.map((id) => c.p.elements[id]).filter(isRamp);
 
 function thinTarget(): { levelId: Id } | 'section' {
   const ui = useUi.getState();
@@ -133,7 +144,16 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     label: t('Etiquetar todos', 'Tag All'),
     icon: 'tag',
     hint: t('Etiqueta todos os elementos sem etiqueta desta vista.', 'Tag every untagged element in this view.'),
-    run: () => { tagAllNotTagged(); },
+    run: () => {
+      // Na planta de área, "Etiquetar todos" completa as etiquetas de AMBIENTE (Room Tag) da vista.
+      const s = useUi.getState();
+      if (s.view === 'plan' && s.planKind === 'area' && s.areaPlanId) {
+        const n = addMissingTagsAction(editor.store, s.areaPlanId);
+        useUi.setState({ status: n ? `${n} ambiente(s) etiquetado(s).` : 'Todos os ambientes desta planta já têm etiqueta.' });
+        return;
+      }
+      tagAllNotTagged();
+    },
   },
   wallTags: {
     label: t('Códigos de parede', 'Wall Type Codes'),
@@ -214,7 +234,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     pressed: (c) => planOrSection(c) && thinLinesOn(c.p, c.view === 'section' ? 'section' : { levelId: c.levelId }),
     disabled: (c) => (planOrSection(c) ? false : t('Só em planta ou corte.', 'Plan or section views only.')),
   },
-  grid: { label: t('Grade', 'Grid'), icon: 'grid', hint: t('Grade de desenho na planta.', 'Drawing grid in plan.'), run: () => useUi.setState((s) => ({ showGrid: !s.showGrid })), pressed: (c) => c.showGrid },
+  grid: { label: t('Grade', 'Grid'), icon: 'grid', hint: t('Grade de pontos na planta: mostra os pontos e o cursor os captura.', 'Dot grid in plan: shows the dots and the cursor snaps to them.'), run: () => setSnap({ grid: !useUi.getState().showGrid }), pressed: (c) => c.showGrid },
   underlay: { label: t('Subpavimento', 'Underlay'), icon: 'layers', hint: t('Mostra o pavimento abaixo, apagado.', 'Show the level below, faded.'), run: () => useUi.setState((s) => ({ showUnderlay: !s.showUnderlay })), pressed: (c) => c.showUnderlay },
   roofProjection: { label: t('Projeção da cobertura', 'Roof Projection'), icon: 'roof', run: toggleRoofProjection, pressed: (c) => c.showRoofProjection },
   graphicsVisibility: {
@@ -257,6 +277,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   schedCeilings: sched(t('Tabela de forros', 'Ceiling Schedule'), 'ceilingSchedule'),
   schedRoofs: sched(t('Tabela de telhados', 'Roof Schedule'), 'roofSchedule'),
   schedStairs: sched(t('Tabela de escadas', 'Stair Schedule'), 'stairSchedule'),
+  schedRamps: sched(t('Tabela de rampas', 'Ramp Schedule'), 'rampSchedule'),
   schedRooms: sched(t('Tabela de ambientes', 'Room Schedule'), 'roomSchedule'),
   schedOpenings: sched(t('Tabela de portas e janelas', 'Door/Window Schedule'), 'openingSchedule'),
   stairSketch: {
@@ -275,6 +296,15 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     },
     disabled: (c) => (stairsIn(c).length > 0 ? false : t('Selecione uma escada.', 'Select a stair.')),
   },
+  rampTypes: {
+    label: t('Tipos de rampa', 'Ramp Types'),
+    icon: 'type',
+    run: () => {
+      const r = rampsIn(ctxNow())[0];
+      if (r) useUi.setState({ dialog: 'rampType', dialogArg: r.typeId });
+    },
+    disabled: (c) => (rampsIn(c).length > 0 ? false : t('Selecione uma rampa.', 'Select a ramp.')),
+  },
 };
 
 /** Contexto lido na hora do clique (os `run` nunca usam o valor de um render antigo). */
@@ -282,7 +312,8 @@ export function ctxNow(): RibbonCtx {
   const s = useUi.getState();
   const perim = editor.perimetro.view();
   return {
-    tool: s.tool, selection: s.selection, view: s.view, levelId: s.levelId, showGrid: s.showGrid, showUnderlay: s.showUnderlay,
+    tool: s.tool, selection: s.selection, view: s.view, planKind: s.planKind, areaPlanId: s.areaPlanId, levelId: s.levelId,
+    showGrid: s.showGrid, showUnderlay: s.showUnderlay,
     showRoofProjection: s.showRoofProjection, propsOpen: s.propsOpen, browserOpen: s.browserOpen, sides: s.dock.sides, options: s.options, p: editor.project,
     perimetro: perim.active ? { modify: perim.modify, selecting: perim.selecting === true } : null,
   };

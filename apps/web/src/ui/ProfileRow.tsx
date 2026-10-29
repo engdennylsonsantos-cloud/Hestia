@@ -1,8 +1,9 @@
 import { useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
-import { profileMax, type Wall } from '@hestia/model';
+import { formatQuantity, profileMax, type Wall } from '@hestia/model';
 import { ProfileDialog } from './dialogs/ProfileDialog.tsx';
 import { Row } from './fields.tsx';
+import { useUnits } from './useUnits.ts';
 
 const CURVED = 'Perfil superior só em parede reta';
 
@@ -11,6 +12,7 @@ const CURVED = 'Perfil superior só em parede reta';
  * Montada com `key` pela seleção (Properties), então o diálogo fecha sozinho ao mudar a seleção.
  */
 export function ProfileRow({ walls }: { walls: Wall[] }): ReactElement {
+  const units = useUnits();
   const [open, setOpen] = useState(false);
   const single = walls.length === 1 ? walls[0]! : null;
   const curved = !!single && single.sag !== 0;
@@ -18,7 +20,7 @@ export function ProfileRow({ walls }: { walls: Wall[] }): ReactElement {
   const value = !single
     ? 'selecione uma parede'
     : single.topProfile
-      ? `Poligonal · máx ${profileMax(single.topProfile).toFixed(2).replace('.', ',')} m`
+      ? `Poligonal · máx ${formatQuantity(units, 'length', profileMax(single.topProfile))}`
       : 'Reto';
   return (
     <>

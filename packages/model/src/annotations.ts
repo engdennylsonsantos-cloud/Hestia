@@ -1,31 +1,43 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
+import { areaPlanOf, planAnnotationsOf, planAnnotationIds, type AreaPlan, type AreaPlanAnnotations } from './areaPlan.ts';
 import { DIM_MIN_LENGTH } from './dimension.ts';
 import { newId } from './ids.ts';
-import { type Dimension, type DetailLine, type DetailRegion, type ElementTag, type Id, type Project, type RoomSeparator, type TextNote } from './types.ts';
+import { type Dimension, type DetailLine, type DetailRegion, type ElementTag, type Id, type Level, type Project, type RoomSeparator, type TextNote } from './types.ts';
+
+/**
+ * Onde a anotação mora: sempre no nível e, quando `planId` existe, na planta de área (vista).
+ * Sem `planId` a anotação continua na planta de piso do nível, como sempre foi.
+ */
+interface AnnotationView {
+  levelId: Id;
+  /** Planta de área dona da anotação; ausente = anotação do nível (planta de piso). */
+  planId?: Id;
+}
 
 /**
  * Anotações da planta (decisão 0019): cotas e textos ficam em cada nível. Os comandos recusam com mensagem pt-BR
  * e não alteram o projeto; remover o nível leva as anotações junto (elas moram no próprio nível).
+ * Com `planId`, a anotação mora na planta de área e não vaza para a planta de piso.
  */
 export type AnnotationCommand =
-  | { type: 'addDimension'; levelId: Id; dimension: Dimension }
-  | { type: 'updateDimension'; levelId: Id; id: Id; patch: Partial<Omit<Dimension, 'id'>> }
-  | { type: 'removeDimension'; levelId: Id; id: Id }
-  | { type: 'addText'; levelId: Id; text: TextNote }
-  | { type: 'updateText'; levelId: Id; id: Id; patch: Partial<Omit<TextNote, 'id'>> }
-  | { type: 'removeText'; levelId: Id; id: Id }
+  | ({ type: 'addDimension'; dimension: Dimension } & AnnotationView)
+  | ({ type: 'updateDimension'; id: Id; patch: Partial<Omit<Dimension, 'id'>> } & AnnotationView)
+  | ({ type: 'removeDimension'; id: Id } & AnnotationView)
+  | ({ type: 'addText'; text: TextNote } & AnnotationView)
+  | ({ type: 'updateText'; id: Id; patch: Partial<Omit<TextNote, 'id'>> } & AnnotationView)
+  | ({ type: 'removeText'; id: Id } & AnnotationView)
   | { type: 'addRoomSeparator'; levelId: Id; separator: RoomSeparator }
   | { type: 'removeRoomSeparator'; levelId: Id; id: Id }
   | { type: 'updateRoomSeparator'; levelId: Id; id: Id; patch: Partial<Omit<RoomSeparator, 'id'>> }
-  | { type: 'addDetailLine'; levelId: Id; item: DetailLine }
-  | { type: 'updateDetailLine'; levelId: Id; id: Id; patch: Partial<Omit<DetailLine, 'id'>> }
-  | { type: 'removeDetailLine'; levelId: Id; id: Id }
-  | { type: 'addDetailRegion'; levelId: Id; item: DetailRegion }
-  | { type: 'updateDetailRegion'; levelId: Id; id: Id; patch: Partial<Omit<DetailRegion, 'id'>> }
-  | { type: 'removeDetailRegion'; levelId: Id; id: Id }
-  | { type: 'addTag'; levelId: Id; item: ElementTag }
-  | { type: 'updateTag'; levelId: Id; id: Id; patch: Partial<Omit<ElementTag, 'id'>> }
-  | { type: 'removeTag'; levelId: Id; id: Id };
+  | ({ type: 'addDetailLine'; item: DetailLine } & AnnotationView)
+  | ({ type: 'updateDetailLine'; id: Id; patch: Partial<Omit<DetailLine, 'id'>> } & AnnotationView)
+  | ({ type: 'removeDetailLine'; id: Id } & AnnotationView)
+  | ({ type: 'addDetailRegion'; item: DetailRegion } & AnnotationView)
+  | ({ type: 'updateDetailRegion'; id: Id; patch: Partial<Omit<DetailRegion, 'id'>> } & AnnotationView)
+  | ({ type: 'removeDetailRegion'; id: Id } & AnnotationView)
+  | ({ type: 'addTag'; item: ElementTag } & AnnotationView)
+  | ({ type: 'updateTag'; id: Id; patch: Partial<Omit<ElementTag, 'id'>> } & AnnotationView)
+  | ({ type: 'removeTag'; id: Id } & AnnotationView);
 
 const finite = (v: Vec2): boolean => Number.isFinite(v.x) && Number.isFinite(v.y);
 
@@ -70,48 +82,95 @@ export const levelRoomSeparators = (p: Pick<Project, 'levels'>, levelId: Id): Ro
 export const levelTexts = (p: Pick<Project, 'levels'>, levelId: Id): TextNote[] =>
   p.levels.find((l) => l.id === levelId)?.texts ?? [];
 
+/** Leitura e escrita de uma família de anotações na vista (nível ou planta de área). */
+interface AnnotationList<T> {
+  get(): T[];
+  set(next: T[]): void;
+}
+
+interface AnnotationScope {
+  dimensions: AnnotationList<Dimension>;
+  texts: AnnotationList<TextNote>;
+  detailLines: AnnotationList<DetailLine>;
+  detailRegions: AnnotationList<DetailRegion>;
+  tags: AnnotationList<ElementTag>;
+}
+
+/** Anotações do nível (planta de piso). */
+const levelScope = (level: Level): AnnotationScope => ({
+  dimensions: { get: () => level.dimensions ?? [], set: (next) => { level.dimensions = next; } },
+  texts: { get: () => level.texts ?? [], set: (next) => { level.texts = next; } },
+  detailLines: { get: () => level.detailLines ?? [], set: (next) => { level.detailLines = next; } },
+  detailRegions: { get: () => level.detailRegions ?? [], set: (next) => { level.detailRegions = next; } },
+  tags: { get: () => level.tags ?? [], set: (next) => { level.tags = next; } },
+});
+
+/** Anotações da planta de área: cada escrita reatribui o conjunto, sem mutar o array atual. */
+const planScope = (plan: AreaPlan): AnnotationScope => {
+  const write = (patch: Partial<AreaPlanAnnotations>): void => {
+    plan.annotations = { ...planAnnotationsOf(plan), ...patch };
+  };
+  return {
+    dimensions: { get: () => planAnnotationsOf(plan).dimensions, set: (dimensions) => write({ dimensions }) },
+    texts: { get: () => planAnnotationsOf(plan).texts, set: (texts) => write({ texts }) },
+    detailLines: { get: () => planAnnotationsOf(plan).detailLines, set: (detailLines) => write({ detailLines }) },
+    detailRegions: { get: () => planAnnotationsOf(plan).detailRegions, set: (detailRegions) => write({ detailRegions }) },
+    tags: { get: () => planAnnotationsOf(plan).tags, set: (tags) => write({ tags }) },
+  };
+};
+
+/** Planta de área da vista: precisa existir e ser do mesmo nível da anotação. */
+function viewPlan(p: Project, planId: Id, levelId: Id): AreaPlan {
+  const plan = areaPlanOf(p, planId);
+  if (!plan) throw new Error('Planta de área inexistente');
+  if (plan.levelId !== levelId) throw new Error('A planta de área não pertence ao nível da anotação');
+  return plan;
+}
+
 /** Aplica um comando de anotação sobre o rascunho do projeto. Lança Error em texto pt-BR se recusar. */
 export function applyAnnotationCommand(p: Project, c: AnnotationCommand): void {
   const level = p.levels.find((l) => l.id === c.levelId);
   if (!level) throw new Error('Nível inexistente');
+  const planId = 'planId' in c ? c.planId : undefined;
+  const scope = planId ? planScope(viewPlan(p, planId, c.levelId)) : levelScope(level);
   switch (c.type) {
     case 'addDimension': {
       const issue = dimensionIssue(c.dimension);
       if (issue) throw new Error(issue);
-      level.dimensions = [...(level.dimensions ?? []), c.dimension];
+      scope.dimensions.set([...scope.dimensions.get(), c.dimension]);
       break;
     }
     case 'updateDimension': {
-      const old = level.dimensions?.find((d) => d.id === c.id);
+      const old = scope.dimensions.get().find((d) => d.id === c.id);
       if (!old) throw new Error('Cota inexistente');
       const next: Dimension = { ...old, ...c.patch, id: old.id };
       const issue = dimensionIssue(next);
       if (issue) throw new Error(issue);
-      level.dimensions = level.dimensions!.map((d) => (d.id === c.id ? next : d));
+      scope.dimensions.set(scope.dimensions.get().map((d) => (d.id === c.id ? next : d)));
       break;
     }
     case 'removeDimension':
-      if (!level.dimensions?.some((d) => d.id === c.id)) throw new Error('Cota inexistente');
-      level.dimensions = level.dimensions.filter((d) => d.id !== c.id);
+      if (!scope.dimensions.get().some((d) => d.id === c.id)) throw new Error('Cota inexistente');
+      scope.dimensions.set(scope.dimensions.get().filter((d) => d.id !== c.id));
       break;
     case 'addText': {
       const issue = textIssue(c.text);
       if (issue) throw new Error(issue);
-      level.texts = [...(level.texts ?? []), c.text];
+      scope.texts.set([...scope.texts.get(), c.text]);
       break;
     }
     case 'updateText': {
-      const old = level.texts?.find((t) => t.id === c.id);
+      const old = scope.texts.get().find((t) => t.id === c.id);
       if (!old) throw new Error('Texto inexistente');
       const next: TextNote = { ...old, ...c.patch, id: old.id };
       const issue = textIssue(next);
       if (issue) throw new Error(issue);
-      level.texts = level.texts!.map((t) => (t.id === c.id ? next : t));
+      scope.texts.set(scope.texts.get().map((t) => (t.id === c.id ? next : t)));
       break;
     }
     case 'removeText':
-      if (!level.texts?.some((t) => t.id === c.id)) throw new Error('Texto inexistente');
-      level.texts = level.texts.filter((t) => t.id !== c.id);
+      if (!scope.texts.get().some((t) => t.id === c.id)) throw new Error('Texto inexistente');
+      scope.texts.set(scope.texts.get().filter((t) => t.id !== c.id));
       break;
     case 'addRoomSeparator': {
       const issue = roomSeparatorIssue(c.separator);
@@ -134,59 +193,62 @@ export function applyAnnotationCommand(p: Project, c: AnnotationCommand): void {
     }
     case 'addDetailLine':
       if (!finite(c.item.a) || !finite(c.item.b) || len(sub(c.item.b, c.item.a)) < ROOM_SEPARATOR_MIN_LENGTH) throw new Error('A linha de detalhe precisa de dois pontos distintos.');
-      level.detailLines = [...(level.detailLines ?? []), c.item];
+      scope.detailLines.set([...scope.detailLines.get(), c.item]);
       break;
     case 'updateDetailLine': {
-      const old = level.detailLines?.find((x) => x.id === c.id);
+      const old = scope.detailLines.get().find((x) => x.id === c.id);
       if (!old) throw new Error('Linha de detalhe inexistente');
       const next = { ...old, ...c.patch, id: old.id };
       if (!finite(next.a) || !finite(next.b) || len(sub(next.b, next.a)) < ROOM_SEPARATOR_MIN_LENGTH) throw new Error('A linha de detalhe precisa de dois pontos distintos.');
-      level.detailLines = level.detailLines!.map((x) => x.id === c.id ? next : x);
+      scope.detailLines.set(scope.detailLines.get().map((x) => x.id === c.id ? next : x));
       break;
     }
     case 'removeDetailLine':
-      if (!level.detailLines?.some((x) => x.id === c.id)) throw new Error('Linha de detalhe inexistente');
-      level.detailLines = level.detailLines.filter((x) => x.id !== c.id);
+      if (!scope.detailLines.get().some((x) => x.id === c.id)) throw new Error('Linha de detalhe inexistente');
+      scope.detailLines.set(scope.detailLines.get().filter((x) => x.id !== c.id));
       break;
     case 'addDetailRegion':
       if (c.item.boundary.length < 3 || c.item.boundary.some((p) => !finite(p))) throw new Error('A região precisa de pelo menos três pontos válidos.');
-      level.detailRegions = [...(level.detailRegions ?? []), c.item];
+      scope.detailRegions.set([...scope.detailRegions.get(), c.item]);
       break;
     case 'updateDetailRegion': {
-      const old = level.detailRegions?.find((x) => x.id === c.id);
+      const old = scope.detailRegions.get().find((x) => x.id === c.id);
       if (!old) throw new Error('Região de detalhe inexistente');
       const next = { ...old, ...c.patch, id: old.id };
       if (next.boundary.length < 3 || next.boundary.some((p) => !finite(p))) throw new Error('A região precisa de pelo menos três pontos válidos.');
-      level.detailRegions = level.detailRegions!.map((x) => x.id === c.id ? next : x);
+      scope.detailRegions.set(scope.detailRegions.get().map((x) => x.id === c.id ? next : x));
       break;
     }
     case 'removeDetailRegion':
-      if (!level.detailRegions?.some((x) => x.id === c.id)) throw new Error('Região de detalhe inexistente');
-      level.detailRegions = level.detailRegions.filter((x) => x.id !== c.id);
+      if (!scope.detailRegions.get().some((x) => x.id === c.id)) throw new Error('Região de detalhe inexistente');
+      scope.detailRegions.set(scope.detailRegions.get().filter((x) => x.id !== c.id));
       break;
     case 'addTag':
       if (!finite(c.item.at) || !p.elements[c.item.hostId]) throw new Error('A etiqueta precisa estar ligada a um elemento existente.');
-      level.tags = [...(level.tags ?? []), c.item];
+      scope.tags.set([...scope.tags.get(), c.item]);
       break;
     case 'updateTag': {
-      const old = level.tags?.find((x) => x.id === c.id);
+      const old = scope.tags.get().find((x) => x.id === c.id);
       if (!old) throw new Error('Etiqueta inexistente');
       const next = { ...old, ...c.patch, id: old.id };
       if (!finite(next.at) || !p.elements[next.hostId]) throw new Error('A etiqueta precisa estar ligada a um elemento existente.');
-      level.tags = level.tags!.map((x) => x.id === c.id ? next : x);
+      scope.tags.set(scope.tags.get().map((x) => x.id === c.id ? next : x));
       break;
     }
     case 'removeTag':
-      if (!level.tags?.some((x) => x.id === c.id)) throw new Error('Etiqueta inexistente');
-      level.tags = level.tags.filter((x) => x.id !== c.id);
+      if (!scope.tags.get().some((x) => x.id === c.id)) throw new Error('Etiqueta inexistente');
+      scope.tags.set(scope.tags.get().filter((x) => x.id !== c.id));
       break;
   }
 }
 
 export type RemoveAnnotation = Extract<AnnotationCommand, { type: 'removeDimension' | 'removeText' | 'removeRoomSeparator' | 'removeDetailLine' | 'removeDetailRegion' | 'removeTag' }>;
 
-/** Comandos de exclusão para as cotas e os textos do nível cujos ids estão em `ids` (o resto são elementos). */
-export function annotationRemovals(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[]): RemoveAnnotation[] {
+/**
+ * Comandos de exclusão para as cotas e os textos da vista cujos ids estão em `ids` (o resto são elementos).
+ * Com `planId`, as anotações da planta de área entram junto; sem ele, só as do nível.
+ */
+export function annotationRemovals(p: Pick<Project, 'levels' | 'areaPlans'>, levelId: Id, ids: Id[], planId?: Id): RemoveAnnotation[] {
   const want = new Set(ids);
   const out: RemoveAnnotation[] = [];
   for (const d of levelDimensions(p, levelId)) if (want.has(d.id)) out.push({ type: 'removeDimension', levelId, id: d.id });
@@ -195,14 +257,40 @@ export function annotationRemovals(p: Pick<Project, 'levels'>, levelId: Id, ids:
   for (const x of level?.detailLines ?? []) if (want.has(x.id)) out.push({ type: 'removeDetailLine', levelId, id: x.id });
   for (const x of level?.detailRegions ?? []) if (want.has(x.id)) out.push({ type: 'removeDetailRegion', levelId, id: x.id });
   for (const x of level?.tags ?? []) if (want.has(x.id)) out.push({ type: 'removeTag', levelId, id: x.id });
+  const plan = planId ? areaPlanOf(p, planId) : undefined;
+  if (plan) {
+    const a = planAnnotationsOf(plan);
+    for (const x of a.dimensions) if (want.has(x.id)) out.push({ type: 'removeDimension', levelId, planId, id: x.id });
+    for (const x of a.texts) if (want.has(x.id)) out.push({ type: 'removeText', levelId, planId, id: x.id });
+    for (const x of a.detailLines) if (want.has(x.id)) out.push({ type: 'removeDetailLine', levelId, planId, id: x.id });
+    for (const x of a.detailRegions) if (want.has(x.id)) out.push({ type: 'removeDetailRegion', levelId, planId, id: x.id });
+    for (const x of a.tags) if (want.has(x.id)) out.push({ type: 'removeTag', levelId, planId, id: x.id });
+  }
   return out;
 }
 
-/** Ids das cotas e textos do nível que estão em `ids`. */
+/** Ids das anotações do nível que estão em `ids`. */
 export function annotationIdsIn(p: Pick<Project, 'levels'>, levelId: Id, ids: Id[]): Id[] {
-  const level = p.levels.find((l) => l.id === levelId);
-  const have = new Set([...levelDimensions(p, levelId), ...levelTexts(p, levelId), ...(level?.detailLines ?? []), ...(level?.detailRegions ?? []), ...(level?.tags ?? [])].map((a) => a.id));
+  const have = new Set(annotationIdsInView(p, levelId));
   return ids.filter((id) => have.has(id));
+}
+
+/**
+ * Ids de todas as anotações da vista: sempre as do nível e, com `planId`, também as da planta de área
+ * (cotas, textos, detalhes e etiquetas que moram na própria planta).
+ */
+export function annotationIdsInView(p: Pick<Project, 'levels' | 'areaPlans'>, levelId: Id, planId?: Id): Id[] {
+  const level = p.levels.find((l) => l.id === levelId);
+  const ids = [
+    ...(level?.dimensions ?? []),
+    ...(level?.texts ?? []),
+    ...(level?.detailLines ?? []),
+    ...(level?.detailRegions ?? []),
+    ...(level?.tags ?? []),
+  ].map((a) => a.id);
+  if (!planId) return ids;
+  const plan = areaPlanOf(p, planId);
+  return plan ? [...ids, ...planAnnotationIds(plan)] : ids;
 }
 
 /**

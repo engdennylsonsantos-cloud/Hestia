@@ -89,6 +89,11 @@ type DrawList = ReturnType<typeof draw>;
 
 /** Há preenchimento de parede (ou de qualquer outro elemento) cobrindo o ponto? */
 const filled = (dl: DrawList, x: number, y: number): boolean => dl.fills.some((f) => pointInMulti({ x, y }, f.polygons));
+/** Só o preenchimento leve da projeção da cobertura cobre o ponto: translúcido e sem hachura (nunca o telhado opaco do corte). */
+const soProjecaoLeve = (dl: DrawList, x: number, y: number): boolean => {
+  const fs = dl.fills.filter((f) => pointInMulti({ x, y }, f.polygons));
+  return fs.length > 0 && fs.every((f) => f.alpha <= 0.35 && !f.hatch);
+};
 
 /** Traços abertos de um símbolo de abertura: todos dentro de 0,7 m do centro (anéis fechados são outra coisa). */
 const symbolAt = (dl: DrawList, x: number, y: number): StrokeOp[] => dl.strokes.filter((s) => !s.closed && s.pts.every((q) => Math.hypot(q.x - x, q.y - y) <= 0.7));
@@ -198,10 +203,10 @@ describe('paredes fora do corte: contorno, sem preenchimento (decisão 0013 §4)
 });
 
 describe('telhado, laje e piso no intervalo de vista', () => {
-  it('telhado com beiral acima do topo: sai da planta; a projeção tracejada da cobertura fica', () => {
+  it('telhado com beiral acima do topo: sai da planta (sem corte); a projeção tracejada e o preenchimento leve da cobertura ficam', () => {
     const p = scene();
     const dl = draw(p);
-    expect(filled(dl, 12, 2)).toBe(false);
+    expect(soProjecaoLeve(dl, 12, 2)).toBe(true);
     const proj = dl.strokes.filter((s) => s.closed && s.dash && s.pts.every((q) => q.x > 9.9 && q.x < 14.1 && q.y > -0.1 && q.y < 4.1));
     expect(proj.length).toBeGreaterThan(0);
   });
@@ -248,22 +253,22 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   const risers = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => !s.closed && s.pts.length === 2 && !s.dash && s.widthPx === RISER_PX);
   const treads = (o: ReturnType<typeof ops>) => o.strokes.filter((s) => s.closed);
 
-  it('corte baixo (0,50 m) e topo (1,00 m): degraus acima do topo saem; acima do corte, tracejados; espelhos acima do topo saem', () => {
+  it('corte baixo (0,50 m) e topo (1,00 m): a escada sai inteira (o topo da vista não corta o lance); acima do corte, tracejados', () => {
     const o = ops({ cutZ: 0.5, topZ: 1.0 });
-    // Degraus com topo em k·H: k = 1..5 (até 0,875 m) estão na vista; k = 6..9 (1,05 a 1,575 m) saem.
-    expect(treads(o)).toHaveLength(5);
-    // Acima do corte (0,50 m): k = 3, 4, 5 (0,525; 0,70; 0,875 m) tracejados; k = 1 e 2 contínuos.
-    expect(dashed(treads(o))).toHaveLength(3);
+    // Degraus com topo em k·H: k = 1..9 saem todos, mesmo os de 1,05 a 1,575 m acima do topo da vista.
+    expect(treads(o)).toHaveLength(N);
+    // Acima do corte (0,50 m): k = 3..10 (o 10 é a chegada) tracejados; k = 1 e 2 contínuos.
+    expect(dashed(treads(o))).toHaveLength(8);
     expect(solid(treads(o))).toHaveLength(2);
-    // Espelhos com topo até 1,00 m: k = 1..5.
-    expect(risers(o)).toHaveLength(5);
+    // Todos os espelhos (k = 1..10).
+    expect(risers(o)).toHaveLength(N);
     // O plano de corte (0,50 m) cruza a escada: símbolo de corte presente.
     expect(o.strokes.some((s) => !s.closed && s.pts.length === 9)).toBe(true);
   });
 
   it('corte alto (3,00 m, acima de toda a escada): sem símbolo de corte e todos os degraus contínuos', () => {
     const o = ops({ cutZ: 3.0, topZ: 3.5 });
-    expect(treads(o)).toHaveLength(N - 1);
+    expect(treads(o)).toHaveLength(N);
     expect(dashed(treads(o))).toHaveLength(0);
     expect(o.strokes.some((s) => !s.closed && s.pts.length === 9)).toBe(false);
   });
@@ -271,7 +276,7 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
   it('sem vista: a cota de corte é 1,20 m acima da base (como antes), e não há topo', () => {
     const o = ops();
     expect(risers(o)).toHaveLength(N);
-    expect(dashed(treads(o))).toHaveLength(3);
+    expect(dashed(treads(o))).toHaveLength(4);
   });
 });
 
@@ -326,11 +331,11 @@ describe('seleção de elemento oculto: contorno fantasma (decisão 0013 §4)', 
     expect(filled(dl, 1.5, 4)).toBe(true);
   });
 
-  it('telhado oculto selecionado: pegada tracejada, sem preenchimento sobre o telhado', () => {
+  it('telhado oculto selecionado: pegada tracejada, só com o preenchimento leve da projeção sobre o telhado', () => {
     const dl = drawSel(scene(), ['r']);
     const g = near(ghosts(dl), 12, 2, 3);
     expect(g).toHaveLength(1);
-    expect(filled(dl, 12, 2)).toBe(false);
+    expect(soProjecaoLeve(dl, 12, 2)).toBe(true);
   });
 
   it('laje oculta selecionada: contorno tracejado da laje', () => {

@@ -108,31 +108,3 @@ describe('ferramenta Telhado por extrusão (A9): dois cliques', () => {
     expect(ctx.msgs.at(-1)).toMatch(/^Telhado não criado: /);
   });
 });
-
-describe('telhado por extrusão pela ferramenta Telhado (forma "Por extrusão" da barra)', () => {
-  it('modo retângulo com a forma extrusion cria o telhado com o arco padrão', () => {
-    const ctx = ctxWithMessages();
-    ctx.options.roofMode = 'rect';
-    ctx.options.roofShape = 'extrusion';
-    const t = tool('roof', ctx.env);
-    clickAt(t, 0, 0);
-    clickAt(t, 10, 8);
-    const r = roofs(ctx.store.project)[0]!;
-    expect(r.shape).toBe('extrusion');
-    expect(r.profile).toHaveLength(13);
-    expect(ctx.msgs.at(-1)).toMatch(/^Telhado em arco: 12 trechos/);
-  });
-
-  it('o modo "extrusao" na ferramenta Telhado cai no contorno por pontos e não cria telhado por extrusão', () => {
-    const ctx = ctxWithMessages();
-    ctx.options.roofMode = 'extrusao';
-    const t = tool('roof', ctx.env);
-    expect(ctx.msgs[0]).toMatch(/clique nos vértices da pegada/);
-    clickAt(t, 0, 0);
-    clickAt(t, 6, 0);
-    clickAt(t, 6, 4);
-    clickAt(t, 0, 4);
-    clickAt(t, 0, 0);
-    expect(roofs(ctx.store.project).some((r) => r.shape === 'extrusion')).toBe(false);
-  });
-});

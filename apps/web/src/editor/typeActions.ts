@@ -1,9 +1,10 @@
 import { fitBox, type Viewport } from '@hestia/render';
-import { ProjectStore, isFloor, isOpening, isRoof, isSlab, isStair, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
+import { ProjectStore, isFloor, isGeneric, isOpening, isRamp, isRoof, isSlab, isStair, isWall, newId, openingType, wallTypeUsage, type Element, type FloorType, type Id, type Project } from '@hestia/model';
+import { rampPoints } from './rampActions.ts';
 import { stairPoints } from './stairActions.ts';
 
-/** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje e telhado. */
-export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair';
+/** Tipos que o navegador de projeto lista: parede, porta, janela, piso, laje, forro, telhado, escada e rampa. */
+export type TypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'ramp';
 
 export interface TypeChoice {
   id: Id;
@@ -15,7 +16,7 @@ const otherLevels = (n: number): string => (n === 1 ? '1 em outro nível' : `${n
 
 /** Nível de um elemento: a parede tem o seu; a abertura herda o da parede anfitriã. */
 export function levelOfElement(p: Project, e: Element): Id | undefined {
-  if (isWall(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'ceiling' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
+  if (isWall(e) || isGeneric(e) || isRamp(e) || e.kind === 'floor' || e.kind === 'slab' || e.kind === 'ceiling' || e.kind === 'roof' || e.kind === 'stair' || e.kind === 'room') return e.levelId;
   const host = p.elements[e.hostId];
   return isWall(host) ? host.levelId : undefined;
 }
@@ -27,6 +28,7 @@ function usesType(e: Element, kind: TypeKind, typeId: Id): boolean {
   if (kind === 'ceiling') return e.kind === 'ceiling' && e.typeId === typeId;
   if (kind === 'roof') return isRoof(e) && e.typeId === typeId;
   if (kind === 'stair') return isStair(e) && e.typeId === typeId;
+  if (kind === 'ramp') return isRamp(e) && e.typeId === typeId;
   return isOpening(e) && e.kind === kind && e.typeId === typeId;
 }
 
@@ -76,7 +78,9 @@ export function compatibleTypes(p: Project, kind: TypeKind, typeId: Id): TypeCho
             ? Object.values(p.roofTypes).filter((t) => t.id !== typeId)
             : kind === 'stair'
               ? Object.values(p.stairTypes).filter((t) => t.id !== typeId)
-              : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
+              : kind === 'ramp'
+                ? Object.values(p.rampTypes).filter((t) => t.id !== typeId)
+                : Object.values(p.openingTypes).filter((t) => t.kind === kind && t.id !== typeId);
   return list.map((t) => ({ id: t.id, name: t.name }));
 }
 
@@ -132,6 +136,7 @@ export function boxOfElements(p: Project, ids: Id[]): Box | null {
     if (isWall(e)) pts.push(...wallPoints(e));
     else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
     else if (isStair(e)) pts.push(...stairPoints(e));
+    else if (isRamp(e)) pts.push(...rampPoints(e));
     else if (e && isOpening(e)) {
       const host = p.elements[e.hostId];
       if (!isWall(host)) continue;

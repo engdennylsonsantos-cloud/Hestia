@@ -1,4 +1,5 @@
 import type { Command } from './commands.ts';
+import { dropRoomTags } from './areaPlanCommands.ts';
 import { isRoom, type Project } from './types.ts';
 
 /** Comando de ambiente, fora do `switch` de `commands.ts` (aquele arquivo passa do limite de linhas). */
@@ -19,6 +20,7 @@ export function applyRoomCommand(p: Project, c: Command): boolean {
     }
     case 'removeRoom':
       delete p.elements[c.id];
+      dropRoomTags(p, [c.id]);
       return true;
     default:
       return false;

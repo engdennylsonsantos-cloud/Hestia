@@ -57,7 +57,7 @@ export function riserBoards(risers: ResolvedStairRiser[], rt: number): StairBloc
 }
 
 /** Envoltória convexa (cadeia monótona), anel anti-horário; com menos de 3 vértices, pontos colineares. */
-function convexHull(pts: Vec2[]): Ring {
+export function convexHull(pts: Vec2[]): Ring {
   const s = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
   const cross = (o: Vec2, a: Vec2, b: Vec2): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
   const chain = (seq: Vec2[]): Vec2[] => {
@@ -98,7 +98,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
     // zFundo a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças
     // convexas). O poste (peça `post`) sai com o material do poste.
     if (s.type.runStyle === 'monolithic' || s.type.runStyle === 'post') {
-      const arrivalTopZ = stairArrivalTopZ(p, s) ?? undefined;
+      const arrivalTopZ = stairArrivalTopZ(p, s) ?? s.topZ;
       for (const piece of stairBody(s, { arrivalTopZ }).pieces) {
         const pieceMaterial = piece.kind === 'post' ? s.type.postMaterialId : materialId;
         for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {

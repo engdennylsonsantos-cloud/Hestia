@@ -151,7 +151,7 @@ describe('migração 12 → 13 (face inferior da escada)', () => {
   it('todo tipo de escada existente ganha face lisa', () => {
     const m = migrateProject(legacyV12());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(19);
+    expect(SCHEMA_VERSION).toBe(21);
     for (const t of Object.values(m.stairTypes)) expect(t.undersideStyle).toBe('smooth');
   });
 
@@ -252,7 +252,7 @@ describe('migração 15 → 16 (escada caracol)', () => {
   it('todo tipo existente ganha sobreposição e material do poste padrão', () => {
     const m = migrateProject(legacyV15());
     expect(m.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(SCHEMA_VERSION).toBe(19);
+    expect(SCHEMA_VERSION).toBe(21);
     for (const id of ['stt_monolitica', 'stt_piso_espelho']) {
       expect(m.stairTypes[id]).toMatchObject({ treadOverlap: 0.025, postMaterialId: 'mat_aco' });
     }
@@ -294,5 +294,87 @@ describe('migração 15 → 16 (escada caracol)', () => {
   it('ida e volta depois da migração preserva o projeto', () => {
     const m = migrateProject(legacyV15());
     expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+});
+
+describe('migração 19 → 20 (regra de cálculo por tipo)', () => {
+  /** Projeto no formato da versão 19: tipos de escada sem a regra de cálculo. */
+  function legacyV19(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown> & {
+      stairTypes: Record<string, Record<string, unknown>>;
+    };
+    p.schemaVersion = 19;
+    for (const t of Object.values(p.stairTypes)) {
+      delete t.calcRiserFactor;
+      delete t.calcTreadFactor;
+      delete t.calcTarget;
+      delete t.calcMin;
+      delete t.calcMax;
+      delete t.maxTread;
+    }
+    return p;
+  }
+
+  it('todo tipo existente ganha a regra padrão (2R + T de 0,63 a 0,65 m, alvo 0,63 e piso máximo 0,32)', () => {
+    const m = migrateProject(legacyV19());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    for (const t of Object.values(m.stairTypes)) {
+      expect(t).toMatchObject({ calcRiserFactor: 2, calcTreadFactor: 1, calcTarget: 0.63, calcMin: 0.63, calcMax: 0.65, maxTread: 0.32 });
+    }
+  });
+
+  it('regra já salva no arquivo é preservada', () => {
+    const custom = { ...DEFAULT_STAIR_TYPES[0]!, calcRiserFactor: 3, calcTreadFactor: 2, calcTarget: 0.7 };
+    const m = migrateProject({ ...legacyV19(), stairTypes: { [custom.id]: custom } });
+    expect(m.stairTypes[custom.id]).toMatchObject({ calcRiserFactor: 3, calcTreadFactor: 2, calcTarget: 0.7 });
+  });
+
+  it('ida e volta depois da migração preserva o projeto', () => {
+    const m = migrateProject(legacyV19());
+    expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
+  });
+
+  it('tipo antigo com piso mínimo maior que 0,32 ganha piso máximo igual ao mínimo e continua válido ao salvar', () => {
+    const antigo = { ...DEFAULT_STAIR_TYPES[0]!, minTread: 0.35 };
+    delete (antigo as Partial<typeof antigo>).maxTread;
+    const raw = { ...legacyV19(), stairTypes: { [antigo.id]: antigo } };
+    const m = migrateProject(raw);
+    expect(m.stairTypes[antigo.id]).toMatchObject({ minTread: 0.35, maxTread: 0.35 });
+    const s = new ProjectStore(m);
+    expect(() => s.exec({ type: 'upsertStairType', stairType: m.stairTypes[antigo.id]! })).not.toThrow();
+  });
+
+  it('tipo antigo com piso mínimo de 0,25 mantém piso máximo de 0,32', () => {
+    const antigo = { ...DEFAULT_STAIR_TYPES[0]!, minTread: 0.25 };
+    delete (antigo as Partial<typeof antigo>).maxTread;
+    const m = migrateProject({ ...legacyV19(), stairTypes: { [antigo.id]: antigo } });
+    expect(m.stairTypes[antigo.id]).toMatchObject({ minTread: 0.25, maxTread: 0.32 });
+  });
+});
+
+describe('migração 20 → 21 (rampas)', () => {
+  /** Projeto v20: sem tipo de rampa (as rampas só nascem nesta versão). */
+  function legacyV20(): Record<string, unknown> {
+    const p = JSON.parse(JSON.stringify(createEmptyProject())) as Record<string, unknown>;
+    p.schemaVersion = 20;
+    delete p.rampTypes;
+    return p;
+  }
+
+  it('projeto antigo ganha os 2 tipos de rampa padrão e nenhuma rampa', () => {
+    const m = migrateProject(legacyV20());
+    expect(m.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(Object.keys(m.rampTypes).sort()).toEqual(['rmt_ada', 'rmt_nbr9050']);
+    expect(m.rampTypes.rmt_nbr9050).toMatchObject({ defaultWidth: 1.5, minWidth: 1.2, normChecked: false });
+    expect(m.rampTypes.rmt_ada).toMatchObject({ defaultWidth: 1.2, minWidth: 0.915, landingMinLength: 1.525, normChecked: true });
+    expect(Object.values(m.elements).filter((e) => e.kind === 'ramp')).toHaveLength(0);
+  });
+
+  it('tipo de rampa já salvo no arquivo não é sobrescrito', () => {
+    const custom = { id: 'rmt_nbr9050', name: 'Custom', normTable: [] };
+    const m = migrateProject({ ...legacyV20(), rampTypes: { rmt_nbr9050: custom, rmt_extra: { id: 'rmt_extra' } } });
+    expect(m.rampTypes.rmt_nbr9050!.name).toBe('Custom');
+    expect(m.rampTypes.rmt_extra).toBeDefined();
+    expect(m.rampTypes.rmt_ada).toBeDefined();
   });
 });

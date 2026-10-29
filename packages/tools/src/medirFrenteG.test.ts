@@ -19,13 +19,23 @@ describe('Medir: cota fica no desenho até Esc ou novo clique', () => {
     clickAt(m, 3, 2);
     const cota = m.preview();
     expect(cota.some((i) => i.kind === 'line')).toBe(true);
-    expect(cota).toContainEqual(expect.objectContaining({ kind: 'label', text: '3,000 m' }));
+    expect(cota).toContainEqual(expect.objectContaining({ kind: 'label', text: '3,00 m' }));
     // A mensagem de status continua trazendo a distância e os deltas.
-    expect(msgs.at(-1)).toMatch(/Distância 3,000 m · ΔX 3,000 · ΔY 0,000/);
+    expect(msgs.at(-1)).toMatch(/Distância 3,00 m · ΔX 3,00 · ΔY 0,00/);
     // O mouse parado (sem novo clique) não apaga a cota.
     m.move(P(1, 1));
-    expect(m.preview().some((i) => i.kind === 'label' && i.text === '3,000 m')).toBe(true);
+    expect(m.preview().some((i) => i.kind === 'label' && i.text === '3,00 m')).toBe(true);
     expect(Object.keys(store.project.elements).length).toBe(elementos);
+  });
+
+  it('unidades do projeto (cm) acompanham a cota e a mensagem', () => {
+    const { store, env, msgs } = cena();
+    store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const m = tool('measure', env);
+    clickAt(m, 0, 2);
+    clickAt(m, 3, 2);
+    expect(m.preview()).toContainEqual(expect.objectContaining({ kind: 'label', text: '300,0 cm' }));
+    expect(msgs.at(-1)).toContain('Distância 300,0 cm');
   });
 
   it('Esc remove a cota (sem sair da ferramenta); o segundo Esc sai', () => {
@@ -46,9 +56,9 @@ describe('Medir: cota fica no desenho até Esc ou novo clique', () => {
     clickAt(m, 0, 2);
     clickAt(m, 3, 2);
     clickAt(m, 0, 4);
-    expect(m.preview().some((i) => i.kind === 'label' && i.text === '3,000 m')).toBe(false);
+    expect(m.preview().some((i) => i.kind === 'label' && i.text === '3,00 m')).toBe(false);
     clickAt(m, 0, 6);
-    expect(m.preview()).toContainEqual(expect.objectContaining({ kind: 'label', text: '2,000 m' }));
+    expect(m.preview()).toContainEqual(expect.objectContaining({ kind: 'label', text: '2,00 m' }));
   });
 });
 
@@ -68,7 +78,7 @@ describe('Parede paralela: modo mostrado antes do clique', () => {
     clickAt(pt, 2, 0.092);
     pt.move(P(2, 3.092));
     expect(msgs.at(-1)).toContain('face a face');
-    expect(msgs.at(-1)).toMatch(/a \d,\d{3} m \(face a face\)/);
+    expect(msgs.at(-1)).toMatch(/a \d,\d{2} m \(face a face\)/);
   });
 });
 

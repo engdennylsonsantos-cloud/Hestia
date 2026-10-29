@@ -92,7 +92,8 @@ export function GraphicsVisibilityDialog({ target }: { target: string }): ReactE
                 <td>{CATEGORY_LABEL[c]}</td>
                 <td><Check id={`${id}-vis`} checked={o.visible} onChange={(v) => run(c, { visible: v })} /></td>
                 <td>
-                  <NumField id={`${id}-tr`} value={o.transparency} scale={100} decimals={0} unit="%" min={0} max={1} width={64} onCommit={(v) => run(c, { transparency: v })} />
+                  {/* units-ok: porcentagem de transparência */}
+                  <NumField id={`${id}-tr`} value={o.transparency * 100} decimals={0} suffix="%" min={0} max={100} width={64} onCommit={(v) => run(c, { transparency: v / 100 })} />
                 </td>
                 <td><Check id={`${id}-half`} checked={o.halftone} onChange={(v) => run(c, { halftone: v })} /></td>
                 <td>{weightOptions('cutWeight')}</td>

@@ -1,4 +1,4 @@
-import { dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, wallHeight, wallType, type Id, type Project } from '@hestia/model';
+import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, unitsOf, wallHeight, wallType, type Id, type Project } from '@hestia/model';
 import type { DxfPoint } from './dxf.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
@@ -55,7 +55,7 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
     const g = dimensionGeometry(a, b, d.offset, mPerMm);
     lines.push(g.line, ...g.extensions, ...dimensionMarks(g.line[0], g.line[1], g.ticks, d.tickStyle, mPerMm));
     if (d.textAt && Math.hypot(d.textAt.x - g.textAt.x, d.textAt.y - g.textAt.y) > 0.002) otherLines.push({ a: { x: (g.line[0].x + g.line[1].x) / 2, y: (g.line[0].y + g.line[1].y) / 2 }, b: d.textAt, layer: DXF_LAYER_COTAS });
-    texts.push({ at: d.textAt ?? g.textAt, text: dimensionText(p, d), height: (d.textHeight ?? DIM_TEXT_MM) * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
+    texts.push({ at: d.textAt ?? g.textAt, text: dimensionText(p, d, unitsOf(p)), height: (d.textHeight ?? DIM_TEXT_MM) * mPerMm, rotation: g.textRotation, layer: DXF_LAYER_COTAS });
   }
   for (const t of levelTexts(p, levelId)) {
     if (t.leader) for (let i = 1; i < t.leader.length; i++) otherLines.push({ a: t.leader[i - 1]!, b: t.leader[i]!, layer: DXF_LAYER_TEXTOS });
@@ -67,7 +67,7 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
     const e = p.elements[tag.hostId];
     if (!e) continue;
     const type = e.kind === 'wall' ? p.wallTypes[e.typeId]
-      : e.kind === 'door' || e.kind === 'window' ? p.openingTypes[e.typeId]
+      : e.kind === 'door' || e.kind === 'window' ? openingTypeById(p, e.typeId)
       : e.kind === 'floor' ? p.floorTypes[e.typeId]
       : e.kind === 'slab' ? p.slabTypes[e.typeId]
       : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]
@@ -79,8 +79,8 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
       : tag.property === 'name' ? e.kind === 'room' ? e.name : type && 'name' in type ? type.name : e.kind
       : tag.property === 'mark' ? ('mark' in e ? e.mark : '')
       : tag.property === 'level' ? p.levels.find((l) => l.id === tagLevelId)?.name ?? ''
-      : tag.property === 'width' ? isOpening(e) ? `${(p.openingTypes[e.typeId]?.width ?? 0) * 100} cm` : isWall(e) ? `${wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100} cm` : ''
-      : isOpening(e) ? `${p.openingTypes[e.typeId]?.height ?? 0} m` : isWall(e) ? `${wallHeight(p, e)} m` : '';
+      : tag.property === 'width' ? isOpening(e) ? `${(openingTypeById(p, e.typeId)?.width ?? 0) * 100} cm` : isWall(e) ? `${wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100} cm` : ''
+      : isOpening(e) ? `${openingTypeById(p, e.typeId)?.height ?? 0} m` : isWall(e) ? `${wallHeight(p, e)} m` : '';
     if (tag.leader) {
       const host = isOpening(e) ? p.elements[e.hostId] : e;
       const anchor = host ? isWall(host) ? { x: (host.a.x + host.b.x) / 2, y: (host.a.y + host.b.y) / 2 } : 'point' in host ? host.point : 'boundary' in host && host.boundary.length ? { x: host.boundary.reduce((s, q) => s + q.x, 0) / host.boundary.length, y: host.boundary.reduce((s, q) => s + q.y, 0) / host.boundary.length } : null : null;
@@ -93,7 +93,9 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
 
 /** Registros do TEXT (centrado no ponto de alinhamento, código 72=1 e 73=2) como pares [código, valor]. */
 export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]> {
+  // units-ok: coordenada DXF (formato de máquina)
   const x = t.at.x.toFixed(6);
+  // units-ok: coordenada DXF (formato de máquina)
   const y = t.at.y.toFixed(6);
   return [
     [0, 'TEXT'],
@@ -101,8 +103,10 @@ export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]>
     [10, x],
     [20, y],
     [30, '0.000000'],
+    // units-ok: altura de texto DXF (formato de máquina)
     [40, t.height.toFixed(6)],
     [1, t.text],
+    // units-ok: ângulo DXF (formato de máquina)
     [50, t.rotation.toFixed(6)],
     [72, 1],
     [73, 2],

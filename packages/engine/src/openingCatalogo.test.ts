@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { intersection, multiArea } from '@hestia/geom';
 import {
   DEFAULT_OPENING_TYPES,
   buildTemplate,
@@ -15,7 +16,7 @@ import {
 } from '@hestia/model';
 import { frameOfWall, openingGeometry } from './resolve.ts';
 import type { OpeningGeometry } from './types.ts';
-import { buildOpeningModel, partTransformed } from './openingModel.ts';
+import { buildOpeningModel, partTransformed, slicePartsAtZ } from './openingModel.ts';
 import { CLOSED, type OpeningModel, type OpeningPart, type PartBox } from './openingModelTypes.ts';
 import { openingPlanPaths, type OpeningPlanOptions, type OpeningPlanPath } from './openingPlan.ts';
 import { buildOpeningSchedule } from './openingSchedule.ts';
@@ -90,18 +91,138 @@ const familia = (id: string): string => {
       ['ot_jg90', 'window_hung'],
       ['ot_jp80', 'window_pivot'],
       ['ot_jv80', 'window_louver'],
+      ['ot_jb80', 'window_tilt'],
+      // Catálogo brasileiro (catalogoPortas.ts e catalogoJanelas.ts).
+      ['ot_pgiro60', 'door_swing'],
+      ['ot_pgiro70', 'door_swing'],
+      ['ot_pgiro80', 'door_swing'],
+      ['ot_pgiro90', 'door_swing'],
+      ['ot_pgiro100', 'door_swing'],
+      ['ot_pgiro2_120', 'door_double'],
+      ['ot_pgiro2_140', 'door_double'],
+      ['ot_pgiro2_160', 'door_double'],
+      ['ot_pgiro2_180', 'door_double'],
+      ['ot_pbalcao120', 'door_double'],
+      ['ot_pbalcao150', 'door_double'],
+      ['ot_pbalcao200', 'door_double'],
+      ['ot_pcorrer160', 'door_sliding'],
+      ['ot_pcorrer180', 'door_sliding'],
+      ['ot_pembutir80', 'door_pocket'],
+      ['ot_pembutir90', 'door_pocket'],
+      ['ot_ppiv100', 'door_pivot'],
+      ['ot_ppiv120', 'door_pivot'],
+      ['ot_pcamarao2_160', 'door_bifold'],
+      ['ot_pcamarao4_240', 'door_bifold'],
+      ['ot_pvai80', 'door_dblact'],
+      ['ot_pvai90', 'door_dblact'],
+      ['ot_pvai100', 'door_dblact'],
+      ['ot_psanf60', 'door_accordion'],
+      ['ot_psanf70', 'door_accordion'],
+      ['ot_psanf80', 'door_accordion'],
+      ['ot_psanf90', 'door_accordion'],
+      ['ot_pvid72_8', 'door_swing'],
+      ['ot_pvid72_10', 'door_swing'],
+      ['ot_pvid82_8', 'door_swing'],
+      ['ot_pvid82_10', 'door_swing'],
+      ['ot_pvid92_8', 'door_swing'],
+      ['ot_pvid92_10', 'door_swing'],
+      ['ot_pf30_80', 'door_swing'],
+      ['ot_pf30_90', 'door_swing'],
+      ['ot_pf60_80', 'door_swing'],
+      ['ot_pf60_90', 'door_swing'],
+      ['ot_pf90_80', 'door_swing'],
+      ['ot_pf90_90', 'door_swing'],
+      ['ot_pf120_80', 'door_swing'],
+      ['ot_pf120_90', 'door_swing'],
+      ['ot_pbasc250', 'door_garage'],
+      ['ot_penrol280', 'door_garage'],
+      ['ot_jc2_120x100', 'window_sliding'],
+      ['ot_jc2_150x120', 'window_sliding'],
+      ['ot_jc2_120x150', 'window_sliding'],
+      ['ot_jc3_150x100', 'window_sliding'],
+      ['ot_jc3_200x120', 'window_sliding'],
+      ['ot_jc4_200x100', 'window_sliding'],
+      ['ot_jc4_200x120', 'window_sliding'],
+      ['ot_jc4_240x120', 'window_sliding'],
+      ['ot_jm_40x40', 'window_casement'],
+      ['ot_jm_50x50', 'window_casement'],
+      ['ot_jm_80x60', 'window_casement'],
+      ['ot_jm_80x80', 'window_casement'],
+      ['ot_jm_100x100', 'window_casement'],
+      ['ot_jb_40x40', 'window_tilt'],
+      ['ot_jb_60x40', 'window_tilt'],
+      ['ot_jb_80x40', 'window_tilt'],
+      ['ot_jb_100x40', 'window_tilt'],
+      ['ot_jb_60x60', 'window_tilt'],
+      ['ot_jb_80x60', 'window_tilt'],
+      ['ot_jb_100x60', 'window_tilt'],
+      ['ot_jb_100x100', 'window_tilt'],
+      ['ot_jpv_60x60', 'window_pivot'],
+      ['ot_jpv_80x80', 'window_pivot'],
+      ['ot_jpv_100x100', 'window_pivot'],
+      ['ot_jpv_120x120', 'window_pivot'],
+      ['ot_jg_60x120', 'window_hung'],
+      ['ot_jg_80x120', 'window_hung'],
+      ['ot_jg_100x150', 'window_hung'],
+      ['ot_jab_60x60', 'window_hinged'],
+      ['ot_jab_80x80', 'window_hinged'],
+      ['ot_jab_100x100', 'window_hinged'],
+      ['ot_jab2_150x120', 'window_hinged'],
+      ['ot_jf_80x60', 'window_fixed'],
+      ['ot_jf_120x120', 'window_fixed'],
+      ['ot_jven_120x100', 'window_louver'],
+      ['ot_jven_150x100', 'window_louver'],
+      ['ot_jban_90x40', 'window_fixed'],
+      ['ot_jban_90x60', 'window_fixed'],
+      ['ot_jbanh_100x50', 'window_casement'],
+      // Composições (catalogoComposicoes.ts).
+      ['ot_pband40_90', 'door_swing'],
+      ['ot_pband60_90', 'door_swing'],
+      ['ot_plat40e_80', 'door_swing'],
+      ['ot_plat40d_80', 'door_swing'],
+      ['ot_plat40e_90', 'door_swing'],
+      ['ot_plat40d_90', 'door_swing'],
+      ['ot_plat2_80', 'door_swing'],
+      ['ot_plat2_90', 'door_swing'],
+      ['ot_pband_lat2_90', 'door_swing'],
+      ['ot_ppainel_90', 'door_swing'],
+      ['ot_pbalcao_band120', 'door_double'],
+      ['ot_pcorrer_band160', 'door_sliding'],
+      ['ot_pband40_alu_90', 'door_swing'],
+      ['ot_pband40_pvc_90', 'door_swing'],
+      ['ot_plat2_alu_90', 'door_swing'],
+      ['ot_jcomb_fa150x120', 'window_hinged'],
+      ['ot_jcomb_fc180x120', 'window_sliding'],
+      ['ot_jabr_fa160x120', 'window_hinged'],
+      ['ot_jband_100x150', 'window_hinged'],
+      ['ot_jcorrer_band200x150', 'window_sliding'],
+      ['ot_jalta_80x210', 'window_hinged'],
+      ['ot_jcomb_madeira_150x120', 'window_hinged'],
+      ['ot_jcomb_pvc_150x120', 'window_hinged'],
+      ['ot_jalta_madeira_80x210', 'window_hinged'],
     ]);
   }
   return expectedFamily.get(id)!;
 };
 
-function volumeComum(a: PartBox, b: PartBox): boolean {
-  const e = 1e-9;
-  return (
-    Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0) > e &&
-    Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0) > e &&
-    Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > e
-  );
+const multi = (ring: Array<{ t: number; s: number }>): Array<Array<Array<{ x: number; y: number }>>> => [
+  [ring.map((p) => ({ x: p.t, y: p.s }))],
+];
+
+/** Interseção real (perfil em L incluído) na faixa de z comum às duas peças. */
+function temIntersecao(m: OpeningModel, a: OpeningPart, b: OpeningPart): boolean {
+  const z0 = Math.max(a.box.z0, b.box.z0);
+  const z1 = Math.min(a.box.z1, b.box.z1);
+  if (z1 - z0 <= 1e-9) return false;
+  const passos = Math.max(2, Math.min(60, Math.ceil((z1 - z0) / 0.01)));
+  for (let i = 0; i <= passos; i++) {
+    const z = z0 + ((z1 - z0) * i) / passos;
+    const corte = slicePartsAtZ(m, z, CLOSED);
+    const ra = corte.find((x) => x.part.id === a.id)?.ring;
+    const rb = corte.find((x) => x.part.id === b.id)?.ring;
+    if (ra && rb && multiArea(intersection(multi(ra), multi(rb))) > 1e-7) return true;
+  }
+  return false;
 }
 
 /** As 12 arestas da caixa orientada continuam com as três medidas originais (movimento é isometria). */
@@ -173,9 +294,9 @@ const areaComum = (a: PartBox, b: PartBox): number =>
   Math.max(0, Math.min(a.t1, b.t1) - Math.max(a.t0, b.t0)) * Math.max(0, Math.min(a.s1, b.s1) - Math.max(a.s0, b.s0));
 
 describe('catálogo completo: padrões do tipo', () => {
-  it('são 23 tipos, cada um na família esperada e sem problema de tipo', () => {
-    expect(DEFAULT_OPENING_TYPES).toHaveLength(23);
-    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(23);
+  it('são 130 tipos, cada um na família esperada e sem problema de tipo', () => {
+    expect(DEFAULT_OPENING_TYPES).toHaveLength(130);
+    expect(new Set(DEFAULT_OPENING_TYPES.map((t) => t.id)).size).toBe(130);
     for (const t of DEFAULT_OPENING_TYPES) {
       expect(openingFamilyOf(t)?.id, t.id).toBe(familia(t.id));
       expect(openingTypeIssue(t), t.id).toBeNull();
@@ -215,11 +336,11 @@ describe('catálogo completo: modelo único', () => {
         const caso = `${base} hand=${flips.flipHand} facing=${flips.flipFacing}`;
         const fixos = m.parts.filter((p) => p.role === 'jamb' || p.role === 'stop' || p.role === 'head' || p.role === 'sillFrame');
         for (const folha of m.parts.filter((p) => p.role === 'leaf' || p.role === 'leafPanel')) {
-          for (const fixo of fixos) expect(volumeComum(folha.box, fixo.box), `${caso} ${folha.id} × ${fixo.id}`).toBe(false);
+          for (const fixo of fixos) expect(temIntersecao(m, folha, fixo), `${caso} ${folha.id} × ${fixo.id}`).toBe(false);
         }
       }
     }
-  });
+  }, 60_000); // Com o catálogo brasileiro (130 tipos × 4 combinações): ~10 s isolado; sob carga da suíte passa dos 30 s.
 
   it('movimento aberto preserva o tamanho de cada peça e a folha lateral fica no lado side', () => {
     for (const base of DEFAULT_OPENING_TYPES.map((t) => t.id)) {
@@ -242,7 +363,7 @@ describe('catálogo completo: modelo único', () => {
         }
       }
     }
-  });
+  }, 30_000); // Com o catálogo brasileiro (130 tipos) passa dos 5 s padrão sob carga da suíte.
 
   it('correr, guilhotina e dobrável continuam no vão; embutir fica na cavidade; seccionada sobe H', () => {
     for (const base of DEFAULT_OPENING_TYPES.map((t) => t.id)) {
@@ -279,7 +400,7 @@ describe('catálogo completo: modelo único', () => {
         }
       }
     }
-  });
+  }, 30_000); // Com o catálogo brasileiro (130 tipos) passa dos 5 s padrão sob carga da suíte.
 });
 
 describe('catálogo completo: planta', () => {

@@ -1,6 +1,6 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { stairTopLevel } from '@hestia/model';
-import { SPIRAL_MAX_SWEEP, stairIssueList } from '@hestia/engine';
+import { SPIRAL_MAX_SWEEP, stairIssuesOf, treadRuleOf, type TreadRule } from '@hestia/engine';
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
@@ -230,8 +230,8 @@ export class StairRunTool extends ToolBase {
     };
   }
 
-  /** H (nível ativo e nível acima), espelho máximo e piso mínimo do tipo da criação; erro com a mensagem de status. */
-  private limitsNow(): { H: number; maxRiser: number; minTread: number } | { error: string } {
+  /** H (nível ativo e nível acima), espelho máximo, piso mínimo e regra de cálculo do tipo da criação. */
+  private limitsNow(): { H: number; maxRiser: number; minTread: number; rule: TreadRule } | { error: string } {
     const p = this.env.project();
     const ref = draftStair(p, this.creation(), this.env.levelId());
     const limits = ref ? stairLimits(p, ref) : null;
@@ -244,7 +244,7 @@ export class StairRunTool extends ToolBase {
           : 'Sem nível de topo: escolha o nível de cima na barra de escada (ou informe uma altura positiva).',
       };
     }
-    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };
+    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread, rule: treadRuleOf(type) };
   }
 
   /**
@@ -255,7 +255,7 @@ export class StairRunTool extends ToolBase {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
     const options = length !== undefined ? { ...this.opts, length } : this.opts;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options });
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, rule: lim.rule, options });
   }
 
   /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */
@@ -276,7 +276,7 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // Com comprimento que dá outro nº (`note`), a explicação substitui o aviso "difere do nº desejado", que contradiria o criado.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
     const extra = b.note ? ` ${b.note}` : '';
     const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
@@ -387,7 +387,7 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // O aviso fixo de saída de emergência vem em todo caracol: a mensagem traz só o aviso que muda o projeto.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
     const extra = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Escada caracol criada: ${plan.risers} espelhos, varredura ${degText(plan.run.spiral.sweep)}.${extra} Ctrl+Z desfaz.`);
     this.reset();

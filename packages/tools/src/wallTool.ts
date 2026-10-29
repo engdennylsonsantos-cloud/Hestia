@@ -1,12 +1,14 @@
 import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
 import { exteriorOffset } from '@hestia/engine';
-import { makeWall, totalThickness, type Wall } from '@hestia/model';
+import { formatQuantity, makeWall, totalThickness, unitsOf, type ResolvedUnits, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
+import { segmentLengthDim } from './dims/providers/wall.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { InferContext } from './infer.ts';
-import { parseNumber } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /**
  * Parede reta (dois pontos), em arco (início, fim e um ponto do arco) ou retângulo (dois cantos opostos:
@@ -24,6 +26,7 @@ export class WallTool extends ToolBase {
   private flip = false;
   private alignmentCycle = 0;
   private lastPointer: PointerInfo | null = null;
+  private lastPoint: Vec2 | null = null;
 
   protected reset(): void {
     this.startPt = null;
@@ -34,6 +37,7 @@ export class WallTool extends ToolBase {
     this.inf = null;
     this.alignmentCycle = 0;
     this.lastPointer = null;
+    this.lastPoint = null;
   }
 
   protected busy(): boolean {
@@ -110,7 +114,7 @@ export class WallTool extends ToolBase {
     const pts = this.rectCorners(c);
     const { thickness, sMid } = this.band();
     for (let i = 0; i < 4; i++) this.items.push({ kind: 'wallBand', a: pts[i]!, b: pts[(i + 1) % 4]!, thickness, sMid });
-    this.items.push({ kind: 'label', at: c, text: `${fmt(Math.abs(c.x - a.x))} × ${fmt(Math.abs(c.y - a.y))}` });
+    this.items.push({ kind: 'label', at: c, text: `${fmt(unitsOf(this.env.project()), Math.abs(c.x - a.x))} × ${fmt(unitsOf(this.env.project()), Math.abs(c.y - a.y))}` });
     this.env.say('Clique no canto oposto do retângulo.');
   }
 
@@ -136,6 +140,11 @@ export class WallTool extends ToolBase {
     this.env.say('Retângulo criado. Clique em outro canto para desenhar outro, ou Esc para sair.');
   }
 
+  tempDims(_overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    if (!this.startPt || !this.lastPoint || this.isRect()) return [];
+    return [segmentLengthDim(this.startPt, this.lastPoint)];
+  }
+
   override move(p: PointerInfo): void {
     this.lastPointer = p;
     if (this.isRect()) {
@@ -143,6 +152,7 @@ export class WallTool extends ToolBase {
       return;
     }
     const inf = this.snapWall(p, { from: this.chordEnd ?? this.startPt ?? undefined });
+    this.lastPoint = inf.point;
     this.items = [];
     if (!this.startPt) {
       this.items.push({ kind: 'point', at: inf.point });
@@ -156,7 +166,7 @@ export class WallTool extends ToolBase {
       const sag = sagFromThreePoints(a, inf.point, this.chordEnd);
       this.items.push({ kind: 'wallBand', a, b: this.chordEnd, thickness, sMid, sag });
       const arc = arcFromSagitta(a, this.chordEnd, sag);
-      this.items.push({ kind: 'label', at: inf.point, text: arc ? `R ${fmt(arc.radius)}  arco ${fmt(arc.length)}` : 'reta' });
+      this.items.push({ kind: 'label', at: inf.point, text: arc ? `R ${fmt(unitsOf(this.env.project()), arc.radius)}  arco ${fmt(unitsOf(this.env.project()), arc.length)}` : 'reta' });
       this.env.say('Clique no ponto do arco, ou digite a flecha e Enter.');
       return;
     }
@@ -165,7 +175,7 @@ export class WallTool extends ToolBase {
     if (l < 1e-6) return;
     this.items.push({ kind: 'wallBand', a, b, thickness, sMid });
     const ang = (angleOf(sub(b, a)) * 180) / Math.PI;
-    this.items.push({ kind: 'label', at: add(a, mul(sub(b, a), 0.5)), text: `${fmt(l)}  ${((ang + 360) % 360).toFixed(1).replace('.', ',')}°` });
+    this.items.push({ kind: 'label', at: add(a, mul(sub(b, a), 0.5)), text: `${fmt(unitsOf(this.env.project()), l)}  ${formatQuantity(unitsOf(this.env.project()), 'angle', ang)}` });
     this.env.say(this.isArc() ? 'Clique no ponto final da corda.' : 'Clique para terminar a parede, ou digite o comprimento e Enter.');
   }
 
@@ -236,9 +246,9 @@ export class WallTool extends ToolBase {
 
   override type(text: string): boolean {
     if (this.isRect() || !this.startPt) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     if (this.chordEnd) {
@@ -252,7 +262,7 @@ export class WallTool extends ToolBase {
       return true;
     }
     if (v <= 0) {
-      this.env.say('Valor inválido. Digite o comprimento em metros.');
+      this.env.say(`Valor inválido. Digite o comprimento em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     const dir = norm(sub(this.inf?.point ?? this.raw, this.startPt));

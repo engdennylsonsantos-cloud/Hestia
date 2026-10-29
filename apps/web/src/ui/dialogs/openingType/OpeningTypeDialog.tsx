@@ -7,6 +7,8 @@ import {
   openingFamilyOf,
   openingFavorites,
   openingLineConvention,
+  openingProfilesOf,
+  unitsOf,
   type Id,
   type Opening,
   type OpeningType,
@@ -19,17 +21,21 @@ import { openingFamilyName } from '../../typeFamilies.ts';
 import {
   applyFamily,
   applyVariant,
+  bridgeDraft,
   familyOptionsFor,
+  hasAuthoredComposition,
   leavesChoicesFor,
   leavesLabel,
   newOpeningTypeFromFamily,
   openingVariants,
+  syncFamilyInComposition,
 } from '../openingTypeForm.ts';
 import { DialogXL } from './DialogXL.tsx';
 import { OpeningTypeHeader } from './OpeningTypeHeader.tsx';
 import { OpeningTypeLibrary } from './OpeningTypeLibrary.tsx';
 import { OpeningTypePreview, type PreviewTab } from './OpeningTypePreview.tsx';
 import { OpeningTypeSections } from './OpeningTypeSections.tsx';
+import { componentToShow, rememberComponent, type OpeningComponentId } from './components.ts';
 
 const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
 
@@ -60,8 +66,8 @@ function familyCounts(p: Project, kind: OpeningType['kind']): Record<string, num
 }
 
 /**
- * "Propriedades do tipo" da porta/janela no padrão da decisão 0034: biblioteca à esquerda, seções recolhíveis no
- * centro e prévia com verificações à direita. O cabeçalho troca família/tipo, duplica, renomeia e favorita.
+ * "Propriedades do tipo" da porta/janela no padrão da decisão 0034: biblioteca à esquerda, no centro a lista de
+ * componentes (estilo ArchiCAD) com o painel do escolhido, e a prévia com verificações à direita. O cabeçalho troca família/tipo, duplica, renomeia e favorita.
  */
 export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
   const p = useProject();
@@ -73,6 +79,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const [tab, setTab] = useState<PreviewTab>('elevation');
   const [flipHand, setFlipHand] = useState(false);
   const [flipFacing, setFlipFacing] = useState(false);
+  const [active, setActive] = useState<OpeningComponentId | undefined>(undefined);
   const [previewAngle, setPreviewAngle] = useState(() => (src ? openingAngle2d(src) : 90));
   if (current !== typeId) {
     setCurrent(typeId);
@@ -91,7 +98,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const favorite = openingFavorites(p).includes(d.id);
   const counts = familyCounts(p, d.kind);
   const variants = openingVariants(d.kind);
-  const checks = openingChecks(d, coreThicknessFor(p, d.id));
+  const checks = openingChecks(d, coreThicknessFor(p, d.id), unitsOf(p));
   /** Grava pelo comando; a mensagem de erro do modelo aparece no diálogo, que continua aberto. */
   const run = (fn: () => void): boolean => {
     try {
@@ -124,9 +131,20 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
     useUi.setState({ dialogArg: created.id });
     setD(created);
   };
+  /**
+   * Toda edição do rascunho passa pela ponte da composição: campos antigos (família, bandeira, medidas) regeneram a composição
+   * derivada, e a editada nos módulos é preservada. Sem isso o modelo e a prévia seguiam a composição velha.
+   */
+  const change = (next: OpeningType): void => {
+    const r = bridgeDraft(next, d, openingProfilesOf(p));
+    setD(r.type);
+    setErr(r.error ?? '');
+  };
   const changeFamily = (id: string): void => {
     const fam = families.find((f) => f.id === id);
-    if (fam) setD(applyFamily(d, fam));
+    if (!fam) return;
+    const next = applyFamily(d, fam);
+    change(hasAuthoredComposition(d) ? syncFamilyInComposition(next, fam) : next);
   };
   const toggleFavorite = (): void => {
     run(() =>
@@ -163,6 +181,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
           onType={(id) => useUi.setState({ dialogArg: id })}
           onDuplicate={dup}
           onFavorite={toggleFavorite}
+          onBeforeRename={() => { rememberComponent('overview'); setActive('overview'); }}
         />
         <div className={`op-main${libOpen ? '' : ' lib-off'}`}>
           <OpeningTypeLibrary
@@ -174,10 +193,10 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
             open={libOpen}
             onToggle={() => setLibOpen((v) => !v)}
             onFamily={changeFamily}
-            onVariant={(v) => setD(applyVariant(d, v))}
+            onVariant={(v) => change(applyVariant(d, v))}
           />
           <div className="op-center">
-            <OpeningTypeSections d={d} onChange={setD} families={families} family={family} leaves={leaves} materials={p.materials} />
+            <OpeningTypeSections d={d} onChange={change} family={family} leaves={leaves} materials={p.materials} active={componentToShow(d.kind, family?.id ?? null, active)} onActive={setActive} />
             {err ? <p className="error" role="alert">{err}</p> : null}
           </div>
           <OpeningTypePreview

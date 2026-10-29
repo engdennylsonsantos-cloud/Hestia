@@ -13,14 +13,16 @@ import {
   roofProfileSlopeError,
   shiftProfile,
 } from '@hestia/engine';
-import { isRoof, type Id, type RoofProfilePoint } from '@hestia/model';
+import { formatQuantity, isRoof, type Id, type RoofProfilePoint } from '@hestia/model';
+import { machineNumber } from '@hestia/geom';
 import { editor, useProject } from '../../editor/controller.ts';
 import { applyRoofPatch } from '../../editor/roofEdgeActions.ts';
 import { NumField } from '../fields.tsx';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { useUnits } from '../useUnits.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+const pt = (n: number): string => machineNumber(n, 1);
 
 const W = 340;
 const H = 170;
@@ -33,6 +35,7 @@ const PAD_BOT = 26;
  * cota 0. Escala única nos dois eixos para a inclinação aparecer como é. As extensões planas além do perfil saem reta.
  */
 function SectionChart({ pts, width }: { pts: RoofProfilePoint[]; width: number }): ReactElement {
+  const units = useUnits();
   const tLo = Math.min(0, ...pts.map((q) => q.t));
   const tHi = Math.max(width, ...pts.map((q) => q.t));
   const zTop = Math.max(0.1, ...pts.map((q) => q.z));
@@ -46,20 +49,20 @@ function SectionChart({ pts, width }: { pts: RoofProfilePoint[]; width: number }
   const first = pts[0];
   const last = pts[pts.length - 1];
   const outline: RoofProfilePoint[] = first && last ? [{ t: tLo, z: first.z }, ...pts, { t: tHi, z: last.z }] : [];
-  const shape = [`${x(tLo).toFixed(1)},${y(0).toFixed(1)}`, ...outline.map((q) => `${x(q.t).toFixed(1)},${y(q.z).toFixed(1)}`), `${x(tHi).toFixed(1)},${y(0).toFixed(1)}`].join(' ');
+  const shape = [`${pt(x(tLo))},${pt(y(0))}`, ...outline.map((q) => `${pt(x(q.t))},${pt(y(q.z))}`), `${pt(x(tHi))},${pt(y(0))}`].join(' ');
   const maxZ = Math.max(0, ...pts.map((q) => q.z));
   return (
-    <svg className="profile-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Seção do telhado: altura máxima ${fmt(maxZ)} metros`}>
-      <line x1={x(0).toFixed(1)} x2={x(0).toFixed(1)} y1={y(zTop).toFixed(1)} y2={y(zBot).toFixed(1)} className="profile-straight" />
-      <line x1={x(width).toFixed(1)} x2={x(width).toFixed(1)} y1={y(zTop).toFixed(1)} y2={y(zBot).toFixed(1)} className="profile-straight" />
+    <svg className="profile-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Seção do telhado: altura máxima ${formatQuantity(units, 'length', maxZ)}`}>
+      <line x1={pt(x(0))} x2={pt(x(0))} y1={pt(y(zTop))} y2={pt(y(zBot))} className="profile-straight" />
+      <line x1={pt(x(width))} x2={pt(x(width))} y1={pt(y(zTop))} y2={pt(y(zBot))} className="profile-straight" />
       <polygon points={shape} className="profile-fill" />
       {pts.map((q, i) => (
-        <circle key={i} cx={x(q.t).toFixed(1)} cy={y(q.z).toFixed(1)} r={2.6} className="profile-dot" />
+        <circle key={i} cx={pt(x(q.t))} cy={pt(y(q.z))} r={2.6} className="profile-dot" />
       ))}
-      <line x1={(x(tLo) - 8).toFixed(1)} x2={(x(tHi) + 8).toFixed(1)} y1={y(0).toFixed(1)} y2={y(0).toFixed(1)} className="profile-ground" />
-      <text x={x(0).toFixed(1)} y={(base + 14).toFixed(1)} className="profile-tick" textAnchor="start">0</text>
-      <text x={x(width).toFixed(1)} y={(base + 14).toFixed(1)} className="profile-tick" textAnchor="end">{fmt(width)} m</text>
-      <text x={PAD_X} y={12} className="profile-tick">altura máx. {fmt(maxZ)} m</text>
+      <line x1={pt(x(tLo) - 8)} x2={pt(x(tHi) + 8)} y1={pt(y(0))} y2={pt(y(0))} className="profile-ground" />
+      <text x={pt(x(0))} y={pt(base + 14)} className="profile-tick" textAnchor="start">0</text>
+      <text x={pt(x(width))} y={pt(base + 14)} className="profile-tick" textAnchor="end">{formatQuantity(units, 'length', width)}</text>
+      <text x={PAD_X} y={12} className="profile-tick">altura máx. {formatQuantity(units, 'length', maxZ)}</text>
     </svg>
   );
 }
@@ -70,6 +73,7 @@ function SectionChart({ pts, width }: { pts: RoofProfilePoint[]; width: number }
  * A tabela mostra t a partir da borda do contorno; o perfil guardado usa a mesma origem do referencial da extrusão.
  */
 export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: () => void }): ReactElement | null {
+  const units = useUnits();
   const p = useProject();
   const roof = p.elements[roofId];
   const [draft, setDraft] = useState<RoofProfilePoint[]>(() => {
@@ -84,7 +88,7 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
   const base = frame.tMin;
   const width = frame.tMax - frame.tMin;
   const rel = draft.map((q) => ({ t: q.t - base, z: q.z }));
-  const err = roofProfileError(draft) ?? roofProfileSlopeError(draft);
+  const err = roofProfileError(draft) ?? roofProfileSlopeError(draft, units);
   const setPts = (next: RoofProfilePoint[]): void => setDraft(next.map((q) => ({ t: q.t, z: q.z })));
   const applyPreset = (pts: RoofProfilePoint[]): void => setDraft(shiftProfile(pts, base));
   const edit = (i: number, change: Partial<RoofProfilePoint>): void => setPts(draft.map((q, k) => (k === i ? { ...q, ...change } : q)));
@@ -99,7 +103,7 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
   return (
     <Dialog
       title="Perfil do telhado"
-      sub={`Largura ${fmt(width)} m na transversal`}
+      sub={`Largura ${formatQuantity(units, 'length', width)} na transversal`}
       size="mid"
       onClose={onClose}
       footer={
@@ -120,7 +124,7 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
       </div>
       <div className="profile-actions">
         <span className="hint">Altura</span>
-        <NumField id="rp-h" value={h} onCommit={(v) => setH(Math.max(0, v))} unit="m" min={0} />
+        <NumField id="rp-h" value={h} onCommit={(v) => setH(Math.max(0, v))} quantity="length" min={0} />
         <span className="hint">Dentes</span>
         <NumField id="rp-dentes" value={dentes} decimals={0} onCommit={(v) => setDentes(Math.max(1, Math.round(v)))} min={1} />
       </div>
@@ -134,8 +138,8 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
               {rel.map((q, i) => (
                 <tr key={i}>
                   <td className="mono">{i + 1}</td>
-                  <td><NumField id={`rp-t-${i}`} value={q.t} unit="m" onCommit={(v) => edit(i, { t: v + base })} /></td>
-                  <td><NumField id={`rp-z-${i}`} value={q.z} unit="m" onCommit={(v) => edit(i, { z: v })} /></td>
+                  <td><NumField id={`rp-t-${i}`} value={q.t} quantity="length" onCommit={(v) => edit(i, { t: v + base })} /></td>
+                  <td><NumField id={`rp-z-${i}`} value={q.z} quantity="length" onCommit={(v) => edit(i, { z: v })} /></td>
                   <td>
                     <button id={`rp-del-${i}`} className="ibtn" onClick={() => removeAt(i)} disabled={draft.length <= 2} aria-label={`Excluir ponto ${i + 1}`} title={draft.length <= 2 ? 'O perfil precisa de ao menos 2 pontos' : 'Excluir ponto'}>
                       <Icon name="close" size={14} />
@@ -154,9 +158,9 @@ export function RoofProfileDialog({ roofId, onClose }: { roofId: Id; onClose: ()
         <div>
           <SectionChart pts={rel} width={width} />
           <dl className="profile-stats">
-            <div><dt>Altura máxima</dt><dd>{fmt(maxZ)} m</dd></div>
+            <div><dt>Altura máxima</dt><dd>{formatQuantity(units, 'length', maxZ)}</dd></div>
             <div><dt>Trechos</dt><dd>{Math.max(0, draft.length - 1)}</dd></div>
-            <div><dt>Largura</dt><dd>{fmt(width)} m</dd></div>
+            <div><dt>Largura</dt><dd>{formatQuantity(units, 'length', width)}</dd></div>
           </dl>
         </div>
       </div>

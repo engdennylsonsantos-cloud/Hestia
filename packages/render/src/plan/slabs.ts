@@ -1,12 +1,11 @@
 import { multiArea, type Vec2 } from '@hestia/geom';
 import { fillRegionOf, type ElementJunction, type ResolvedSlab, type ResolvedSlabLayer } from '@hestia/engine';
-import type { DetailLevel, Id, Project } from '@hestia/model';
+import { formatQuantity, unitsOf, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { juncaoDoNivel, lajesDoNivel } from './resolucao.ts';
 import { concatOps, fmtArea, labelPoint, membraneLineOps, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
 import { holeMarkOps } from './holeMarks.ts';
-import { zoomAtinge } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { defaultPaint, espessuraDeCorte, surfaceColor, type PlanPaint } from './style.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
@@ -82,7 +81,7 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
   const layer = structuralLayer(p, s);
   const m = layer ? p.materials[layer.materialId] : undefined;
   const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.38 : 0.6, paint);
-  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45) } : undefined;
+  const hatch = m && m.hatch !== 'none' && detail !== 'coarse' ? { kind: m.hatch, color: mix(paint.color ?? m.color, dark ? '#ffffff' : '#000000', 0.45), ...(fine ? {} : { zoomMin: 40 }) } : undefined;
   out.fills.push({ polygons: region, color, alpha: 1, hatch });
   out.strokes.push(...holeMarkOps(s.polygon, theme, paint, detail));
   const at = labelPoint(s.polygon);
@@ -93,12 +92,12 @@ export function slabOpsOf(p: Project, s: ResolvedSlab, theme: PlanTheme, dark: b
     if (s.slope && at) {
       // Deslocamento vertical da etiqueta de percentual: equivalente a 12 px de tela no zoom/escala padrão (1,2 mm de papel).
       out.strokes.push(...slopeArrow(s.slope.dir, at, v, theme, espessuraDeCorte(paint)));
-      out.labels.push({ at, text: `${s.slope.percent.toFixed(1).replace('.', ',')} %`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 1.2, uy: 1 } } });
+      out.labels.push({ at, text: formatQuantity(unitsOf(p), 'slope', s.slope.percent / 100), papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 1.2, uy: 1 } } });
     }
   }
   if (p.settings.showTags && at) {
     const code = p.slabTypes[s.typeId]?.code;
-    const text = [code, fmtArea(multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
+    const text = [code, fmtArea(unitsOf(p), multiArea(s.polygon), 1)].filter(Boolean).join(' · ');
     // Quando há inclinação, a seta de caimento ocupa espaço abaixo do ponto: desloca a etiqueta para cima (1,0 mm de papel).
     out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, ...(s.slope ? { desvio: { mm: 1.0, uy: -1 } } : {}) } });
   }
@@ -110,5 +109,5 @@ export function slabSelectionOps(p: Project, levelId: Id, selection: Id[], hover
   const parts = lajesDoNivel(p, levelId)
     .filter((s) => !hidden?.has(s.slabId))
     .map((s) => ({ id: s.slabId, polygon: s.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
 }

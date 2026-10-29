@@ -260,41 +260,15 @@ export function previewSectionSvg(type: OpeningType, options: PreviewViewOptions
  * Assinatura visual do tipo: só os campos que mudam o desenho (nome, código, custo e dados BIM ficam de fora). É a
  * chave do cache das miniaturas.
  */
+/** Campos que não mudam o desenho (identificação e custo): todo o resto entra na assinatura, inclusive campos novos do esquema. */
+const NAO_VISUAIS = new Set<string>(['id', 'name', 'code', 'description', 'cost']);
+
 export function previewTypeSignature(type: OpeningType): string {
-  return JSON.stringify([
-    type.kind,
-    type.plan,
-    type.leaves,
-    type.width,
-    type.height,
-    type.sill,
-    type.frameMaterialId,
-    type.glassMaterialId,
-    type.closure,
-    type.frameWidth,
-    type.frameDepth,
-    type.leafThickness,
-    type.glassThickness,
-    type.roughOversize,
-    type.casing,
-    type.sillBoard,
-    type.lintel,
-    type.sillBeam,
-    type.leafStyle,
-    type.handle,
-    type.frameStyle,
-    type.grid,
-    type.transom,
-    type.sidelights,
-    type.angle2d,
-    type.angle3d,
-    type.planDisplay,
-    type.detail2d,
-    type.detail3d,
-    type.showSwing,
-    type.swingStyle,
-    type.leafSide,
-  ]);
+  // Regra de exclusão, não lista: um campo novo do tipo (composição, recuo do batente, ferragens...) sempre refaz a prévia.
+  const visuais = Object.entries(type)
+    .filter(([k, v]) => !NAO_VISUAIS.has(k) && v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return JSON.stringify(visuais);
 }
 
 const miniCache = new Map<string, string>();

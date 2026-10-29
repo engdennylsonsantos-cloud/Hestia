@@ -42,12 +42,12 @@ export type RoomExtend = 'finish' | 'core';
  */
 export function wallsSignature(p: Project, levelId: Id): string {
   const r = (n: number): number => Math.round(n * 1e6) / 1e6;
-  return levelFrames(p, levelId)
+  return `v2|${levelFrames(p, levelId)
     .map((f) => {
       const w = f.wall;
-      return `${w.id}:${w.typeId}:${r(f.a.x)},${r(f.a.y)}:${r(f.b.x)},${r(f.b.y)}:${r(f.sHi)},${r(f.sLo)}:${w.noJoinStart ? 1 : 0}:${w.noJoinEnd ? 1 : 0}:${w.joinStart.kind}:${w.joinStart.flip ? 1 : 0}:${w.joinEnd.kind}:${w.joinEnd.flip ? 1 : 0}`;
+      return `${w.id}:${w.typeId}:${r(f.a.x)},${r(f.a.y)}:${r(f.b.x)},${r(f.b.y)}:${r(f.sHi)},${r(f.sLo)}:${r(w.sag ?? 0)}:${w.noJoinStart ? 1 : 0}:${w.noJoinEnd ? 1 : 0}:${w.joinStart.kind}:${w.joinStart.flip ? 1 : 0}:${w.joinEnd.kind}:${w.joinEnd.flip ? 1 : 0}`;
     })
-    .join('|');
+    .join('|')}`;
 }
 
 /** Contador de recálculos reais de circuito (cache perdido). Usado pelos testes de desempenho (decisão 0023 §8.2c). */

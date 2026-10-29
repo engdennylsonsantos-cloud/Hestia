@@ -47,10 +47,11 @@ const antes = await tris();
 check('cena 3D construída antes da mudança', antes > 1000, `(${antes} triângulos)`);
 await abrirTipo();
 
-// 2. seção Acabamento: folga inválida mostra a mensagem do modelo e o diálogo continua aberto
-await page.getByText('Acabamento', { exact: true }).click();
+// 2. folga do vão fica em "Parede e vão"; alizar fica em "Lado externo". Folga inválida mostra a mensagem do modelo e o diálogo continua aberto
+await page.getByRole('button', { name: 'Parede e vão', exact: true }).click();
 await page.getByLabel('Folga: largura').fill('-1');
 await page.getByLabel('Folga: largura').press('Enter');
+await page.getByRole('button', { name: 'Lado externo', exact: true }).click();
 await page.getByLabel('Alizar', { exact: true }).check();
 await page.getByRole('button', { name: 'OK', exact: true }).click();
 const msg = page.getByText('Folga do vão, largura: use um valor de 0 a 20 cm.');
@@ -58,7 +59,8 @@ await msg.waitFor({ timeout: 5000 }).catch(() => {});
 check('folga negativa mostra a mensagem do modelo', await msg.isVisible());
 check('o diálogo continua aberto com erro', await page.getByText('Propriedades do tipo').isVisible());
 
-// 3. corrige a folga, OK grava o alizar e o 3D ganha peças
+// 3. corrige a folga (em "Parede e vão"), OK grava o alizar e o 3D ganha peças
+await page.getByRole('button', { name: 'Parede e vão', exact: true }).click();
 await page.getByLabel('Folga: largura').fill('1');
 await page.getByLabel('Folga: largura').press('Enter');
 await page.getByRole('button', { name: 'OK', exact: true }).click();
@@ -67,9 +69,9 @@ await esperaMudar(antes);
 const comAlizar = await tris();
 check('alizar ligado: o 3D ganha peças', comAlizar > antes, `(${antes} -> ${comAlizar} triângulos)`);
 
-// 4. reabre: o alizar aparece ligado; desligar tira as peças
+// 4. reabre: o alizar aparece ligado em "Lado externo"; desligar tira as peças
 await abrirTipo();
-await page.getByText('Acabamento', { exact: true }).click();
+await page.getByRole('button', { name: 'Lado externo', exact: true }).click();
 check('reabre com o alizar ligado', await page.getByLabel('Alizar', { exact: true }).isChecked());
 await page.getByLabel('Alizar', { exact: true }).uncheck();
 await page.getByRole('button', { name: 'OK', exact: true }).click();

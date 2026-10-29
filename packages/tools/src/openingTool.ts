@@ -1,23 +1,45 @@
 import { orientedRect } from '@hestia/geom';
-import { frameOfWall, pointAt, toLocal } from '@hestia/engine';
-import { openingType, openingsOfWall, type Opening } from '@hestia/model';
+import {
+  frameOfWall,
+  openingGeometry,
+  openingPlanPathsAt,
+  openingPreviewLocalPaths,
+  pointAt,
+  toLocal,
+  type OpeningPlanPath,
+} from '@hestia/engine';
+import { dimensionSettingsOf, openingTypeById, openingType, openingsOfWall, unitsOf, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import {
   anchorCenter,
   clampOpeningCenter,
   facingForCursor,
-  formatMeters,
   freeSpans,
   overlapsPerpendicular,
   perpendicularNeighbors,
   sideWithHysteresis,
-  symbolPreviewItems,
-  temporaryDimensions,
   type PerpendicularWall,
 } from './openingPlacement.ts';
+import { openingDimProvider, type OpeningDimSubject } from './dims/providers/opening.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { PointerInfo } from './types.ts';
+
+/**
+ * Cache da prévia: os traços LOCAIS do vão (não dependem do `offset`) valem enquanto o tipo, a parede, as inversões e o
+ * detalhe não mudarem de identidade. A cada movimento só se converte para o mundo, que é a translação ao longo da parede.
+ */
+interface PreviewCache {
+  type: OpeningType;
+  wall: Wall;
+  wallType: WallType;
+  thickness: number;
+  flipHand: boolean;
+  flipFacing: boolean;
+  detail: DetailLevel;
+  paths: OpeningPlanPath[];
+}
 
 /** Porta e janela: hospedadas na parede sob o cursor (docs/02 §5). */
 export class OpeningTool extends ToolBase {
@@ -28,6 +50,10 @@ export class OpeningTool extends ToolBase {
   private flipFacing = false;
   private lastSide: 1 | -1 = 1;
   private current: { wallId: string; offset: number } | null = null;
+  private lastPointer: PointerInfo | null = null;
+  private previewCache: PreviewCache | null = null;
+  /** Esquadria da prévia para as cotas dinâmicas; null sem parede sob o cursor. */
+  private dimSubject: OpeningDimSubject | null = null;
 
   constructor(env: ConstructorParameters<typeof ToolBase>[0], kind: 'door' | 'window') {
     super(env);
@@ -38,8 +64,10 @@ export class OpeningTool extends ToolBase {
 
   protected reset(): void {
     this.items = [];
+    this.dimSubject = null;
     this.current = null;
     this.lastSide = 1;
+    this.lastPointer = null;
   }
 
   protected busy(): boolean {
@@ -51,12 +79,19 @@ export class OpeningTool extends ToolBase {
     return this.id === 'door' ? o.doorTypeId : o.windowTypeId;
   }
 
+  /** Redesenha a prévia na hora: reexecuta o cálculo na última posição do ponteiro, sem esperar o próximo movimento. */
+  private refreshPreview(): void {
+    if (this.lastPointer) this.move(this.lastPointer);
+  }
+
   override tab(): void {
     this.flipFacing = !this.flipFacing;
+    this.refreshPreview();
   }
 
   flipHandToggle(): void {
     this.flipHand = !this.flipHand;
+    this.refreshPreview();
   }
 
   override space(): void {
@@ -78,7 +113,7 @@ export class OpeningTool extends ToolBase {
 
   private resolve(offset: number, wallId: string, neighbors = perpendicularNeighbors(this.env.project(), wallId, this.env.levelId())): number | null {
     const p = this.env.project();
-    const t = p.openingTypes[this.typeId()];
+    const t = openingTypeById(p, this.typeId());
     const f = frameOfWall(p, wallId);
     if (!t || !f) return null;
     const half = t.width / 2;
@@ -121,7 +156,7 @@ export class OpeningTool extends ToolBase {
       }
     }
     for (const o of openingsOfWall(pr, wallId)) {
-      const ot = pr.openingTypes[o.typeId];
+      const ot = openingTypeById(pr, o.typeId);
       const ow = (ot?.width ?? 0.8) / 2;
       targets.push(
         { c: o.offset - ow - h, note: 'encosto na abertura' },
@@ -141,7 +176,9 @@ export class OpeningTool extends ToolBase {
 
   override move(p: PointerInfo): void {
     this.items = [];
+    this.dimSubject = null;
     this.raw = p.raw;
+    this.lastPointer = p;
     const pr = this.env.project();
     const mpp = this.env.metersPerPixel();
     const options = this.env.options();
@@ -155,7 +192,7 @@ export class OpeningTool extends ToolBase {
       return;
     }
     const f = frameOfWall(pr, host.wallId);
-    const t = pr.openingTypes[this.typeId()];
+    const t = openingTypeById(pr, this.typeId());
     if (!f || !t) return;
     const neighbors = perpendicularNeighbors(pr, host.wallId, this.env.levelId());
     // O lado do cursor define o sentido, com histerese de 3 px perto do eixo.
@@ -166,7 +203,7 @@ export class OpeningTool extends ToolBase {
     const off = this.resolve(aligned.offset, host.wallId, neighbors);
     const preview = off ?? clampOpeningCenter(aligned.offset, t.width, f.length, host.offset);
     this.items.push({ kind: 'highlight', ids: [host.wallId] });
-    this.drawPreview(host.wallId, f, t.width, preview, flipHand, flipFacing, off !== null, neighbors);
+    this.drawPreview(host.wallId, f, t.width, preview, flipHand, flipFacing, off !== null);
     if (off === null) {
       this.env.say('Sem espaço livre neste ponto da parede.');
       return;
@@ -180,6 +217,38 @@ export class OpeningTool extends ToolBase {
     );
   }
 
+  /** Traços locais da prévia (cache): não dependem do `offset`, só do tipo, da parede, das inversões e do detalhe. */
+  private previewPaths(p: Project, temp: Opening, f: NonNullable<ReturnType<typeof frameOfWall>>): OpeningPlanPath[] {
+    const raw = p.openingTypes[temp.typeId];
+    if (!raw) return [];
+    const detail = p.settings.detail;
+    const c = this.previewCache;
+    if (
+      c &&
+      c.type === raw &&
+      c.wall === f.wall &&
+      c.wallType === f.type &&
+      c.thickness === f.thickness &&
+      c.flipHand === temp.flipHand &&
+      c.flipFacing === temp.flipFacing &&
+      c.detail === detail
+    ) {
+      return c.paths;
+    }
+    const paths = openingPreviewLocalPaths(p, temp, f, detail);
+    this.previewCache = {
+      type: raw,
+      wall: f.wall,
+      wallType: f.type,
+      thickness: f.thickness,
+      flipHand: temp.flipHand,
+      flipFacing: temp.flipFacing,
+      detail,
+      paths,
+    };
+    return paths;
+  }
+
   /** Prévia: símbolo real da esquadria + retângulo do vão + duas cotas temporárias. Inválida em vermelho. */
   private drawPreview(
     wallId: string,
@@ -189,7 +258,6 @@ export class OpeningTool extends ToolBase {
     flipHand: boolean,
     flipFacing: boolean,
     valid: boolean,
-    neighbors: PerpendicularWall[],
   ): void {
     const options = this.env.options();
     const tone = valid ? undefined : ('invalid' as const);
@@ -205,13 +273,24 @@ export class OpeningTool extends ToolBase {
       mark: '',
     };
     const pr = this.env.project();
-    this.items.push(...symbolPreviewItems(pr, f, temp, tone));
+    const g = openingGeometry(pr, temp, f);
+    for (const s of openingPlanPathsAt(g, this.previewPaths(pr, temp, f))) {
+      const count = s.closed ? s.pts.length : s.pts.length - 1;
+      for (let i = 0; i < count; i++) {
+        this.items.push({ kind: 'line', a: s.pts[i]!, b: s.pts[(i + 1) % s.pts.length]!, dashed: s.dash !== undefined, tone });
+      }
+    }
     const c = pointAt(f, offset, f.sMid);
     this.items.push({ kind: 'polygon', ring: orientedRect(c.x, c.y, f.u.x, f.u.y, width / 2, f.thickness / 2 + 0.02), tone });
-    for (const d of temporaryDimensions(f, offset, width, neighbors, options.openingDimMode ?? 'axis', this.lastSide)) {
-      this.items.push({ kind: 'line', a: d.a, b: d.b, tone });
-      this.items.push({ kind: 'label', at: d.at, text: formatMeters(d.value) });
-    }
+    this.dimSubject = { hostId: wallId, offset, typeId: this.typeId(), flipFacing, flipHand, side: this.lastSide };
+  }
+
+  /** Cotas dinâmicas da prévia (duas, só de leitura): o sistema único de cotas cuida do desenho. */
+  tempDims(overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    const subject = this.dimSubject;
+    if (!subject) return [];
+    const project = this.env.project();
+    return openingDimProvider.compute({ project, levelId: this.env.levelId(), settings: dimensionSettingsOf(project), overrides }, subject);
   }
 
   private place(wallId: string, offset: number): void {
@@ -244,7 +323,7 @@ export class OpeningTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.current) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) return false;
     const off = this.resolve(v, this.current.wallId);
     if (off === null) {

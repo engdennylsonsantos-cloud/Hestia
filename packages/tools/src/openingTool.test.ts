@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { openingSymbolPaths } from '@hestia/geom';
-import { frameOfWall, openingGeometry } from '@hestia/engine';
-import { openingsOfWall, type Opening, type Wall } from '@hestia/model';
+import { frameOfWall, openingPreviewStrokes } from '@hestia/engine';
+import { openingsOfWall, openingTypeById, type Opening, type Wall } from '@hestia/model';
 import type { ToolEnv } from './types.ts';
 import { drawWall, makeEnv, P, tool, walls } from './testEnv.ts';
 
@@ -137,7 +136,7 @@ describe('colocação da abertura: capturas novas', () => {
 });
 
 describe('colocação da abertura: prévia e cotas', () => {
-  it('mostra o símbolo real e duas cotas do eixo às perpendiculares', () => {
+  it('mostra o símbolo real e expõe duas cotas dinâmicas', () => {
     const ctx = makeEnv();
     withSnapOff(ctx);
     makeWall(ctx, [0, 0], [4.5, 0]);
@@ -157,26 +156,90 @@ describe('colocação da abertura: prévia e cotas', () => {
       sillOverride: null,
       mark: '',
     };
-    const symbolLines = openingSymbolPaths(openingGeometry(ctx.store.project, temp, frameOfWall(ctx.store.project, temp.hostId)!)).reduce(
-      (n, s) => n + (s.closed ? s.pts.length : s.pts.length - 1),
-      0,
-    );
-    expect(items.filter((i) => i.kind === 'line')).toHaveLength(symbolLines + 2);
-    const labels = items.filter((i) => i.kind === 'label').map((i) => i.text);
-    expect(labels).toEqual(['2,26', '2,24']);
+    const symbolLines = openingPreviewStrokes(
+      ctx.store.project,
+      temp,
+      frameOfWall(ctx.store.project, temp.hostId)!,
+      ctx.store.project.settings.detail,
+    ).reduce((n, s) => n + (s.closed ? s.pts.length : s.pts.length - 1), 0);
+    // As cotas saem pelo sistema único (`tempDims`): a prévia tem só o símbolo, sem linhas nem rótulos de cota.
+    expect(items.filter((i) => i.kind === 'line')).toHaveLength(symbolLines);
+    expect(items.filter((i) => i.kind === 'label')).toEqual([]);
+    expect(t.tempDims!()).toHaveLength(2);
   });
 
-  it('openingDimMode face cota da borda da abertura à face da perpendicular', () => {
+  it('prévia da porta de duas folhas com bandeira tem mais traços e mostra o batente em volta do vão', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [5, 0]);
+    const simples = tool('door', ctx.env);
+    simples.move!(P(2.5, 0.05));
+    const linhasSimples = simples.preview().filter((i) => i.kind === 'line').length;
+
+    ctx.options.doorTypeId = 'ot_pbalcao_band120';
+    const composta = tool('door', ctx.env);
+    composta.move!(P(2.5, 0.05));
+    const linhas = composta.preview().filter((i) => i.kind === 'line');
+    expect(linhas.length).toBeGreaterThan(linhasSimples);
+
+    const largura = openingTypeById(ctx.store.project, 'ot_pbalcao_band120')!.width;
+    const ombreiras = linhas.filter((l) => {
+      if (l.kind !== 'line') return false;
+      const dy = Math.abs(l.b.y - l.a.y);
+      return dy > 0.1 && Math.abs(l.a.x - (2.5 - largura / 2)) < 0.02 && Math.abs(l.b.x - (2.5 - largura / 2)) < 0.02;
+    });
+    expect(ombreiras.length).toBeGreaterThan(0);
+  });
+
+  it('Espaço e Tab redesenham a prévia sem novo movimento do mouse', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [5, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(2.5, 0.05));
+    const inicial = JSON.stringify(t.preview());
+    expect(t.preview().length).toBeGreaterThan(0);
+
+    t.tab!();
+    const aposTab = JSON.stringify(t.preview());
+    expect(aposTab).not.toBe(inicial);
+    expect(t.preview().length).toBeGreaterThan(0);
+
+    t.space!();
+    expect(JSON.stringify(t.preview())).not.toBe(aposTab);
+    expect(t.preview().filter((i) => i.kind === 'line').length).toBeGreaterThan(0);
+  });
+
+  it('sem ponteiro, Espaço e Tab não quebram e não desenham nada', () => {
+    const ctx = makeEnv();
+    makeWall(ctx, [0, 0], [5, 0]);
+    const t = tool('door', ctx.env);
+    expect(() => {
+      t.tab!();
+      t.space!();
+    }).not.toThrow();
+    expect(t.preview()).toEqual([]);
+  });
+
+  it('tempDims: duas cotas de leitura da prévia, pelo provedor e com as referências da sessão', () => {
     const ctx = makeEnv();
     withSnapOff(ctx);
     makeWall(ctx, [0, 0], [4.5, 0]);
     makeWall(ctx, [0, -1], [0, 1]);
     makeWall(ctx, [4.5, -1], [4.5, 1]);
-    ctx.options.openingDimMode = 'face';
     const t = tool('door', ctx.env);
+    expect(t.tempDims!()).toEqual([]);
     t.move!(P(2.26, 0.05));
-    const labels = t.preview().filter((i) => i.kind === 'label').map((i) => i.text);
-    expect(labels).toEqual(['1,77', '1,75']);
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(2);
+    expect(dims.every((d) => d.edit === undefined && d.key.startsWith('opening:preview:'))).toBe(true);
+    // A prévia não desenha mais cotas em itens: só o sistema único de cotas as mostra.
+    expect(t.preview().filter((i) => i.kind === 'label')).toEqual([]);
+    const eixo = t.tempDims!({ 'opening:wall': 'axis', 'opening:opening': 'center' });
+    expect(eixo[0]!.value + eixo[1]!.value).toBeCloseTo(4.5, 6);
+    expect(dims[0]!.value + dims[1]!.value).toBeLessThan(eixo[0]!.value + eixo[1]!.value);
+    t.move!(P(2.26, 5));
+    expect(t.tempDims!()).toEqual([]);
   });
 
   it('posição inválida (sobre outra abertura) fica vermelha e não insere ao clicar', () => {
@@ -203,6 +266,25 @@ describe('colocação da abertura: prévia e cotas', () => {
     expect(openings(ctx)[0]!.offset).toBeCloseTo(2.7, 6);
     expect(t.type!('2.75')).toBe(false);
     expect(openings(ctx)).toHaveLength(1);
+  });
+
+  it('a distância digitada respeita a unidade de comprimento do projeto', () => {
+    const ctx = makeEnv();
+    ctx.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    makeWall(ctx, [0, 0], [6, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(3, 0.1));
+    expect(t.type!('100')).toBe(true);
+    expect(openings(ctx)[0]!.offset).toBeCloseTo(1, 6);
+  });
+
+  it('o sufixo explícito vale mesmo com o projeto em metros', () => {
+    const ctx = makeEnv();
+    makeWall(ctx, [0, 0], [6, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(3, 0.1));
+    expect(t.type!('150cm')).toBe(true);
+    expect(openings(ctx)[0]!.offset).toBeCloseTo(1.5, 6);
   });
 });
 

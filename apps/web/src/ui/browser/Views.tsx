@@ -1,10 +1,12 @@
 import { useRef, useState, type ReactElement } from 'react';
-import { projectSheets, type Element, type SectionView } from '@hestia/model';
+import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
+import { createAreaPlansForLevels, createGeneralAreaSheetAction, openAreaPlan } from '../../editor/areaPlanActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { Node, type MenuItem } from './Tree.tsx';
+import { useUnits } from '../useUnits.ts';
 
 /** Seções "Vistas (todas)", "Tabelas/Quantidades (todas)" e "Pranchas (todas)" do navegador, no padrão Revit. */
 
@@ -55,8 +57,12 @@ function SectionNode({ view }: { view: SectionView }): ReactElement {
 
 export function ViewsTree(): ReactElement {
   const p = useProject();
+  const units = useUnits();
   const view = useUi((s) => s.view);
   const levelId = useUi((s) => s.levelId);
+  const planKind = useUi((s) => s.planKind);
+  const areaPlanId = useUi((s) => s.areaPlanId);
+  const areaPlans = areaPlansOf(p);
   const sections = p.views.filter((v) => v.kind === 'section');
   const elevations = p.views.filter((v) => v.kind === 'elevation');
   const genMenu: MenuItem[] = [{ label: 'Gerar elevações (Norte, Sul, Leste, Oeste)', run: () => editor.generateElevations(), hint: 'Cria as quatro em volta das paredes do nível ativo; substitui as de mesmo nome.' }];
@@ -69,14 +75,57 @@ export function ViewsTree(): ReactElement {
             id={`plan:${l.id}`}
             label={l.name}
             icon="plan"
-            bold={view === 'plan' && levelId === l.id}
-            title={`Elevação ${l.elevation.toFixed(2).replace('.', ',')} m. Duplo clique abre a planta.`}
+            bold={view === 'plan' && planKind === 'floor' && levelId === l.id}
+            title={`Elevação ${formatQuantity(units, 'length', l.elevation)}. Duplo clique abre a planta.`}
             onOpen={() => activateView({ kind: 'plan', levelId: l.id })}
             menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
           />
         ))}
       </Node>
+      {/* Cobertura: a planta do nível com o telhado completo e opaco (ver `roofPlanMode`); mesmos níveis do projeto. */}
+      <Node id="g:roofs" label="Plantas de cobertura (Planta de cobertura)" group open menu={[{ label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }) }]}>
+        {p.levels.map((l) => (
+          <Node
+            key={`roof:${l.id}`}
+            id={`roof:${l.id}`}
+            label={l.name}
+            icon="roof"
+            bold={view === 'plan' && planKind === 'roof' && levelId === l.id}
+            title={`Planta de cobertura do nível ${l.name}. Duplo clique abre.`}
+            onOpen={() => activateView({ kind: 'plan', levelId: l.id, planKind: 'roof' })}
+            menu={[{ label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: l.id, planKind: 'roof' }) }, { label: 'Níveis…', run: () => useUi.setState({ dialog: 'levels' }), sep: true }]}
+          />
+        ))}
+      </Node>
       <Node id="g:ceilings" label="Plantas de forro (Planta de forro)" group empty="Ainda não disponível: o forro aparece na planta de piso." />
+      <Node
+        id="g:area"
+        label="Plantas de área (Área)"
+        icon="plan"
+        group
+        open
+        menu={[
+          { label: 'Criar para todos os níveis', run: () => { const ids = createAreaPlansForLevels(editor.store, p.levels.map((l) => l.id), { scale: 50 }); if (ids[0]) openAreaPlan(editor.store, ids[0]); say(ids.length ? `${ids.length} planta(s) de área criada(s).` : 'Todos os níveis já têm planta de área.'); } },
+          { label: 'Criar prancha geral', run: () => { try { const id = createGeneralAreaSheetAction(editor.store, areaPlans.map((x) => x.id)); activateView({ kind: 'sheet', sheetId: id }); say('Prancha geral de áreas criada.'); } catch (e) { say(e instanceof Error ? e.message : 'Não foi possível criar a prancha.'); } }, sep: true },
+        ]}
+        empty="Nenhuma planta de área. Botão direito: criar para todos os níveis."
+      >
+        {areaPlans.map((ap) => (
+          <Node
+            key={ap.id}
+            id={`area:${ap.id}`}
+            label={ap.name}
+            icon="plan"
+            bold={view === 'plan' && planKind === 'area' && areaPlanId === ap.id}
+            title="Planta de área: linhas de referência, etiquetas e quadro. Duplo clique abre."
+            onOpen={() => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id })}
+            menu={[
+              { label: 'Abrir', run: () => activateView({ kind: 'plan', levelId: ap.levelId, planKind: 'area', areaPlanId: ap.id }) },
+              { label: 'Excluir', run: () => editor.store.exec({ type: 'removeAreaPlan', id: ap.id }, 'Excluir planta de área'), danger: true, sep: true },
+            ]}
+          />
+        ))}
+      </Node>
       <Node id="g:3d" label="Vistas 3D (3D View)" group open>
         <Node id="v:3d" label="Modelo 3D" icon="cube" bold={view === '3d'} onOpen={() => activateView({ kind: '3d' })} menu={[{ label: 'Abrir', run: () => activateView({ kind: '3d' }) }]} />
       </Node>
@@ -99,6 +148,7 @@ export function SchedulesTree(): ReactElement {
   const rows: Array<{ label: string; dialog: DialogKind; n: number }> = [
     { label: 'Tabela de ambientes', dialog: 'roomSchedule', n: count('room') },
     { label: 'Tabela de escadas', dialog: 'stairSchedule', n: count('stair') },
+    { label: 'Tabela de rampas', dialog: 'rampSchedule', n: count('ramp') },
     { label: 'Tabela de forros', dialog: 'ceilingSchedule', n: count('ceiling') },
     { label: 'Tabela de lajes', dialog: 'slabSchedule', n: count('slab') },
     { label: 'Tabela de paredes', dialog: 'schedule', n: count('wall') },

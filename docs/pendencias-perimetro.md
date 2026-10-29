@@ -44,6 +44,8 @@ Plano:
 
 ### 3.2 Telhado pronto em planta: muito "CAD", pouco BIM (prioridade alta, feedback do usuário)
 
+> **Atualização 2026-10-27: resolvido.** Planta como em programa BIM: preenchimento por água na cor do material (`roofTile` quando o material não tem cor) com tom pela luz do sol do 3D; cortado pelo plano = contorno de corte cheio; acima do corte = só o contorno tracejado de sobreposição na cor da aresta (Archicad, "Projetado com sobreposição"); abaixo = contorno de projeção; arestas finas (rincão tracejado, linha de desnível da mansarda); **sem rosa** (o rosa `roofFootprint` ficou só no modo de edição, em `sketch*.ts`). A casa de exemplo ganhou o nível **Cobertura** (5,80 m), cuja planta corta o telhado. O texto abaixo é o histórico do pedido.
+
 Problema: a planta mostra hachura cinza-roxo por água e linhas pretas de cumeeira e espigão. O usuário quer a representação do elemento como no Revit e no Archicad: projeção do 3D no plano de corte e na orientação da vista. As cores propostas quase não aparecem.
 
 Plano (refação de `packages/render/src/plan/roofs*.ts`):
@@ -81,6 +83,8 @@ Observações herdadas: com "linhas finas" ligadas (padrão desde 2026-10-25, de
 - `activateView` em `viewTabActions.ts` adiciona a aba mesmo quando a navegação é recusada com o modo aberto.
 
 ## 4. Plano de remoção dos modos antigos
+
+> **Atualização 2026-10-27: concluído** para `floorMode`, `slabMode`, `ceilingMode` e `roofMode` (opções, seletores e ramos das ferramentas; `git grep` não acha mais nenhum). `FloorTool`, `SlabTool`, `CeilingTool` e `RoofTool` ficaram como cascas mínimas só para o registro (`createTool` é um switch exaustivo sobre `ToolId`; o perímetro intercepta esses ids). Sobras: `roofShape` e `floorCore` não são mais gravados pela interface. Coberturas perdidas: ver o handoff 2026-10-27 (telhados e grades).
 
 Os modos continuam nas classes e nos seletores "Modo do contorno" de `PlacementProperties.tsx` (linhas 49, 57, 65 e 71),
 mas não são alcançáveis pela faixa: `PerimeterMode.intercepta` abre o modo de perímetro para `floor`, `slab`, `ceiling`

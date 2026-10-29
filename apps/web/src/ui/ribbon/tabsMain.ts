@@ -33,7 +33,7 @@ export const TAB_ARQUITETURA: RibbonTab = {
       'circulacao',
       t('Circulação', 'Circulation'),
       soon(t('Guarda-corpo', 'Railing'), 'railing'),
-      soon(t('Rampa', 'Ramp'), 'ramp'),
+      tool('ramp', 'large', { label: t('Rampa', 'Ramp') }),
       split(tool('stairrun', 'large', { label: t('Escada', 'Stair') }), [
         tool('stairrun', 'small', { label: t('Escada por lances', 'Stair by Run') }),
         tool('stair', 'small'),
@@ -49,7 +49,7 @@ export const TAB_ARQUITETURA: RibbonTab = {
       stack(soonS(t('Limite de área', 'Area Boundary'), 'roomsep'), soonS(t('Etiqueta de área', 'Tag Area'), 'tag')),
     ),
     panel('abertura', t('Abertura', 'Opening'), soon(t('Por face', 'By Face'), 'opening'), soon(t('Poço', 'Shaft'), 'opening'), soon(t('Parede', 'Wall'), 'opening'), soon(t('Vertical', 'Vertical'), 'opening'), soon(t('Água-furtada', 'Dormer'), 'opening')),
-    panel('referencia', t('Referência', 'Datum'), act('levels', 'large', t('Nível', 'Level')), soon(t('Grade', 'Grid'), 'grid')),
+    panel('referencia', t('Referência', 'Datum'), act('levels', 'large', t('Nível', 'Level')), tool('grid', 'large', { label: t('Grade', 'Grid'), icon: 'grid' })),
     panel('plano-trabalho', t('Plano de trabalho', 'Work Plane'), soon(t('Definir', 'Set'), 'soon'), stack(soonS(t('Exibir', 'Show'), 'eye'), soonS(t('Plano de referência', 'Ref Plane'), 'soon'), soonS(t('Visualizador', 'Viewer'), 'soon'))),
   ],
 };

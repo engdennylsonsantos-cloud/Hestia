@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactElement } from 'react';
-import { coreRange, FUNCTION_LABEL, type Layer, type LayerFunction, layerPriority, type SlabType, slabTypeThickness, temPrioridadeEmpatada } from '@hestia/model';
+import { coreRange, formatQuantity, FUNCTION_LABEL, type Layer, type LayerFunction, layerPriority, type SlabType, slabTypeThickness, temPrioridadeEmpatada } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { duplicateSlabType, slabTypeDeleteBlock, slabTypeError, slabTypeUsage, tryDeleteSlabType } from '../../editor/slabTypeActions.ts';
@@ -12,12 +12,12 @@ import { FAMILY } from '../typeFamilies.ts';
 import { SlabSectionPreview } from './SlabSectionPreview.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
+import { useUnits } from '../useUnits.ts';
 
 const FUNCTIONS = Object.keys(FUNCTION_LABEL) as LayerFunction[];
-const fmtCm = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
-
 /** Editor de tipo de laje: camadas do topo para baixo (editor de camadas adaptado do tipo de piso). */
 export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
+  const units = useUnits();
   const p = useProject();
   const src = p.slabTypes[typeId];
   const [draft, setDraft] = useState<SlabType | null>(src ? structuredClone(src) : null);
@@ -34,7 +34,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
   const usage = slabTypeUsage(p, draft.id);
   const error = slabTypeError(draft);
   const core = coreRange(draft);
-  const nucleo = coreHint(draft);
+  const nucleo = coreHint(draft, units);
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const setLayer = (i: number, patch: Partial<Layer>): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
   const replaceLayer = (i: number, next: Layer): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? next : l)) });
@@ -134,7 +134,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.name ?? '—'}</span>
                           </button>
                         </td>
-                        <td><NumField value={l.thickness} scale={100} decimals={1} min={l.function === 'membrane' ? 0 : 0.001} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
+                        <td><NumField value={l.thickness} quantity="smallLength" min={l.function === 'membrane' ? 0 : 0.001} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
                         <td>
                           <span className="iconrow">
                             <button id={`lt-layer-${i}-more`} className={`ibtn more${adv === i ? ' open' : ''}${l.priority !== undefined || l.termino !== undefined ? ' changed' : ''}`} aria-expanded={adv === i} aria-controls={adv === i ? `lt-layer-${i}-adv` : undefined} aria-label={`Opções avançadas da camada ${i + 1}`} title="Mais" onClick={() => setAdv(adv === i ? null : i)}><Icon name="chevron" size={14} /></button>
@@ -157,7 +157,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                 <tr><td colSpan={5} style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Face inferior</td></tr>
               </tbody>
             </table>
-            <div className="total"><span>Espessura total</span><strong>{fmtCm(slabTypeThickness(draft))} cm</strong></div>
+            <div className="total"><span>Espessura total</span><strong>{formatQuantity(units, 'smallLength', slabTypeThickness(draft))}</strong></div>
             <p className="hint">{nucleo.text}</p>
             {temPrioridadeEmpatada(draft.layers) && <p className="hint">Há camadas de funções diferentes com a mesma prioridade: elas não se cortam e deixam linha de fronteira.</p>}
             <button className="btn small" onClick={insert}>+ Inserir camada</button>
@@ -170,7 +170,7 @@ export function SlabTypeDialog({ typeId }: { typeId: string }): ReactElement | n
         </div>
         <div className="field-row"><label htmlFor="lt-code">Código</label><TextField id="lt-code" value={draft.code} onCommit={(v) => setDraft({ ...draft, code: v })} /></div>
         <div className="field-row"><label htmlFor="lt-desc">Descrição</label><TextField id="lt-desc" value={draft.description} onCommit={(v) => setDraft({ ...draft, description: v })} /></div>
-        <div className="field-row"><label htmlFor="lt-cost" title="Custo por m² de laje (R$), informativo">Custo (R$/m²)</label><NumField id="lt-cost" value={draft.cost} decimals={2} min={0} onCommit={(v) => setDraft({ ...draft, cost: v })} /></div>
+        <div className="field-row"><label htmlFor="lt-cost" title="Custo informativo do tipo por área">Custo por área</label><NumField id="lt-cost" value={draft.cost} quantity="currency" min={0} onCommit={(v) => setDraft({ ...draft, cost: v })} /></div>
       </Dialog>
       {pick !== null && picked && (
         <MaterialsDialog

@@ -76,9 +76,11 @@ nove elementos estão `concluido` e em 100% (`npm run parity`). Os itens que sob
 - 3D por família; folha aberta com "Abrir vãos" (vidro, giro, correr e pivotante corrigidos, 0017 §11).
 - Instância com lado da dobradiça, sentido de abertura e marca; "Tabela de portas e janelas" com CSV.
 
-**Ambientes** — 24 feitos, 4 fora de escopo, 0 pendentes (`docs/paridade/ambientes.md`; decisão 0018).
+**Ambientes** - 33 feitos, 3 fora de escopo, 0 pendentes (`docs/paridade/ambientes.md`; decisões 0018 e 0037).
 - Contorno derivado do circuito fechado pelas paredes do nível; ferramenta **Ambiente** (**Z**) e "Ambientes em todos os
   circuitos fechados"; área líquida, perímetro e volume; tabela com filtros e CSV; DXF nas camadas `AMBIENTES` e `AMBIENTES_TEXTO`.
+- **Plantas de área** (0037): vista própria por pavimento, diagonais de referência, rótulo compartilhado com todas as vistas
+  (posição, rotação e chamada), sem cor por padrão, esquema de cores com legenda, quadro e prancha geral.
 
 **Forros e planta de forro** — 33 feitos, 0 fora de escopo, 0 pendentes (`docs/paridade/forros.md`; decisão 0021).
 - Forro por contorno, retângulo ou "No ambiente"; botão **"Forro em todos os ambientes"** (um Ctrl+Z); cota do topo
@@ -131,7 +133,7 @@ nível com topos diferentes) e `parede-dentro-da-laje` (parede cruzando camada d
   limite de escopo e não estão feitos.
 - **Símbolo de giro**: em "V" (convenção própria: a NBR 6492:2021 é paga e não foi acessada; 0024 §2).
 - **Junções**: "Inverter corte/Não cortar" por par (P-4, adiada; 0023 §13 e P10).
-- **Ambientes**: sem geometria 3D própria (D2); sem linha separadora (A5); sem piso de acabamento gerado (C3).
+- **Ambientes**: sem geometria 3D própria (D2); sem piso de acabamento gerado (C3). A linha separadora (A5) está implementada.
 - **Forros**: o forro criado a partir de ambiente acompanha o contorno dele (0021 §4; decisão P-5 de 2026-10-22, 0023 §13),
   implementada: soltar (alça, propriedade ou mover) e revincular ao ambiente no painel "Contorno".
 - **Pranchas**: carimbo com logotipo e campos personalizados, modelos (E1); quantitativos na prancha (E2); imagem do 3D (B5);

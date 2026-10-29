@@ -1,20 +1,22 @@
 import { add, closestOnSegment, cross, dist, dot, len, mid, multiArea, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { planeZ, type ResolvedRoof, type ResolvedRoofLayer, type ViewClass } from '@hestia/engine';
 import { boundaryKindsOf, edgeSlopesOf } from '@hestia/engine/src/roofShapes.ts';
-import { isRoof, view3dOf, type DetailLevel, type Id, type Project, type Roof } from '@hestia/model';
+import { formatQuantity, isRoof, unitSymbol, unitsOf, view3dOf, type DetailLevel, type Id, type Project, type ResolvedUnits, type Roof } from '@hestia/model';
 import { ARC_TURN_DEG } from '@hestia/tools/src/roofGeom.ts';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
 import { fmtArea, labelPoint, outlineSelectionOps, SURFACE_TEXT_MM, type FloorOps } from './floors.ts';
-import { zoomAtinge } from './limiares.ts';
 import { poligonoEm, tracoEm } from './marcadores.ts';
 import { slopeArrow } from './slabs.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { defaultPaint, surfaceColor, type PlanPaint } from './style.ts';
 import { arcoDoTelhado, ladosComSimbolo } from './roofsArco.ts';
+import { aplicarCorte, telhadoOriginal } from './roofsCorte.ts';
+import { gripsDoTelhado } from './roofsArcoEdge.ts';
 import { corDaAresta, tomDaAgua } from './roofsAgua.ts';
 import { gableSymbolOps } from './roofsEmpena.ts';
 import { evitarSobreposicao } from './roofsRotulos.ts';
+import { projecaoDoTelhado } from './roofsProjecao.ts';
 import { espessurasDoTelhado } from './roofsTracos.ts';
 import type { Espessura, PapelRotulo, PlanTheme, StrokeOp } from './types.ts';
 
@@ -54,14 +56,15 @@ export function cantosLogicos(ring: Ring): boolean[] {
   return ring.map((_, i) => !(turns[i]! < ARC_TURN_DEG && similar(lens[(i - 1 + n) % n]!, lens[i]!)));
 }
 
-/** Área real de todas as águas (m²): a área em planta de cada água vezes √(1 + i²), com i = percent/100. */
+/** Área real de todas as águas: a área em planta de cada água vezes √(1 + i²), com 1 = percent/100. */
 export const roofRealArea = (r: ResolvedRoof): number => r.planes.reduce((s, pl) => s + multiArea(pl.polygon) * Math.sqrt(1 + (pl.percent / 100) ** 2), 0);
 
-/** Percentual com vírgula decimal, como nas demais cotas da planta: "30 %", "27,5 %". */
-export const fmtPercent = (p: number): string => `${String(Math.round(p * 10) / 10).replace('.', ',')} %`;
+/** Inclinação na unidade do projeto, como nas demais cotas da planta: "30 %", "27,5 %" (ou graus). */
+export const fmtPercent = (u: ResolvedUnits, p: number): string =>
+  `${formatQuantity(u, 'slope', p / 100, { decimals: 1, trim: true, withUnit: false })} ${unitSymbol(u, 'slope')}`;
 
 /** Cota absoluta com vírgula decimal, com sinal: "+5,70" (cota da cumeeira, D6). */
-export const fmtElevation = (z: number): string => `+${z.toFixed(2).replace('.', ',')}`;
+export const fmtElevation = (u: ResolvedUnits, z: number): string => `+${formatQuantity(u, 'length', Math.abs(z), { withUnit: false })}`;
 
 /** Camada de topo: a de menor `below`, a que se vê de cima. */
 function topLayer(r: ResolvedRoof): ResolvedRoofLayer | undefined {
@@ -156,7 +159,7 @@ function gableLineOps(a: Vec2, b: Vec2, theme: PlanTheme, espessura: Espessura):
  * marcador em pixels (4,5 px de meia base, 8 px de altura): tem o mesmo tamanho na tela para qualquer zoom. O percentual
  * vem de `edgeSlopesOf`, a mesma leitura do motor (forma e direção), e não da lista guardada: só vale o positivo.
  */
-function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorOps {
+function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura, u: ResolvedUnits): FloorOps {
   const out = empty();
   const b = r.boundary;
   const ccw = ringArea(b) > 0;
@@ -178,7 +181,7 @@ function defineSlopeOps(r: Roof, theme: PlanTheme, espessura: Espessura): FloorO
       return;
     }
     out.fills.push({ ...poligonoEm(m, tri), color: theme.accent, alpha: 1 });
-    out.labels.push({ at: m, text: fmtPercent(slope), ...screenOffset(scale(inward, -1), 14) });
+    out.labels.push({ at: m, text: fmtPercent(u, slope), ...screenOffset(scale(inward, -1), 14) });
   });
   return out;
 }
@@ -224,18 +227,6 @@ function selectedRingOps(r: ResolvedRoof, roof: Roof, theme: PlanTheme): StrokeO
   return out;
 }
 
-/** Telhado com pegada gravada e algum balanço positivo: só ele tem pegada a mostrar (rosa). */
-const temBalanco = (roof: Roof): boolean => !!roof.footprint && roof.edgeOverhangs.some((o) => o > 0);
-
-/**
- * Pegada tracejada de um telhado com balanço (rosa, mais fina que as demais linhas): o contorno desenhado pelo usuário,
- * sem o beiral. Sem balanço, o beiral já é a pegada e não há o que mostrar.
- */
-function pegadaOps(roof: Roof, theme: PlanTheme, espessura: Espessura): StrokeOp[] {
-  if (!temBalanco(roof)) return [];
-  return [{ pts: roof.footprint!, closed: true, ...espessura, color: theme.roofFootprint, alpha: 1, dash: [6, 3] }];
-}
-
 /**
  * Contorno do beiral (`roofFootprint`) conforme o intervalo de vista:
  * - telhado totalmente acima do plano de corte: traço de projeção tracejado na cor da aresta (sem rosa);
@@ -269,9 +260,11 @@ export interface RoofOpsOptions {
   paint?: PlanPaint;
   /**
    * Estado de cada telhado no intervalo de vista (`PlanView.cls`): decide o contorno do beiral (tracejado acima do
-   * corte, cheio no corte) e a pegada rosa (não aparece acima do corte). Ausente = telhado cortado (comportamento antigo).
+   * corte, cheio no corte). Ausente = telhado cortado (comportamento antigo).
    */
   classes?: ReadonlyMap<Id, ViewClass>;
+  /** Cota do plano de corte da planta (m): o telhado `cut` só aparece abaixo dela. Ausente = sem corte. */
+  cutZ?: number;
   /** Azimute do sol (graus, 0 = leste) para o tom das águas; padrão = o sol da vista 3D do projeto. */
   sunAzimuth?: number;
 }
@@ -283,8 +276,7 @@ export interface RoofOpsOptions {
  * planta de cobertura), para a grade da planta não competir com o tom. Fora do grosseiro: o contorno do beiral segue o
  * intervalo de vista (`beiralOps`): tracejado de projeção na cor da aresta acima do corte, cheio no corte; cumeeira,
  * espigão e rincão como arestas finas (rincão tracejado); empena em traço cheio mais escuro; por água, seta de caimento
- * (da subida para a descida) com o percentual. A pegada rosa (`pegadaOps`) só aparece com balanço e nunca acima do
- * corte. A cumeeira mais alta leva a cota absoluta ("▲ +5,70") afastada da linha, com etiquetas ligadas ou na planta de
+ * (da subida para a descida) com o percentual. Não há rosa na planta pronta (a pegada rosa é só do modo de edição). A cumeeira mais alta leva a cota absoluta ("▲ +5,70") afastada da linha, com etiquetas ligadas ou na planta de
  * cobertura; com etiquetas ligadas, código e área real no centroide da água maior. Os rótulos são posicionados sem
  * sobreposição (`evitarSobreposicao`).
  */
@@ -300,12 +292,14 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
   const paint = opts.paint ?? defaultPaint('roof', v.zoom);
   const esp = espessurasDoTelhado(paint);
   const sunAzimuth = opts.sunAzimuth ?? view3dOf(p).sunAzimuth;
-  for (const r of roofs) {
+  // Telhado atravessado pelo plano de corte: só a parte abaixo do plano é vista (a linha de corte é o contorno dela).
+  for (const r of aplicarCorte(roofs, opts.classes, opts.cutZ, planMode).roofs) {
     const top = topLayer(r);
     const m = top ? p.materials[top.materialId] : undefined;
     const base = roofFillBase(p, r, theme, dark, paint);
-    // Hachura discreta, mas visível: o tom por água continua sendo o que diferencia as superfícies.
-    const hatch = m && m.hatch !== 'none' && !coarse && (fine || zoomAtinge(v, 40)) ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.35), alpha: 0.26 } : undefined;
+    // Hachura discreta, mas visível: o tom por água continua sendo o que diferencia as superfícies. O zoom mínimo vai
+    // para o shader (`zoomMin`) e a geometria não muda com o zoom (o `resolverZoom` faz o mesmo no caminho CPU).
+    const hatch = m && m.hatch !== 'none' && !coarse ? { kind: m.hatch, color: mix(base, dark ? '#ffffff' : '#000000', 0.35), alpha: 0.26, ...(fine ? {} : { zoomMin: 40 }) } : undefined;
     const aresta = corDaAresta(base);
     for (const pl of r.planes) out.fills.push({ polygons: pl.polygon, color: tomDaAgua(base, pl.up, pl.percent, sunAzimuth), alpha, hatch });
     const model = p.elements[r.roofId];
@@ -315,8 +309,6 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       const beiral = beiralOps(foot, cls, theme, fillBase, esp, aresta);
       out.fills.push(...beiral.fills);
       out.strokes.push(...beiral.strokes);
-      // Acima do corte não há rosa: o beiral tracejado já representa a cobertura.
-      if (isRoof(model) && cls !== 'projection-above') out.strokes.push(...pegadaOps(model, theme, esp.pegada));
       // Arestas internas de um arco (geratrizes entre facetas do mesmo trecho curvo) não são cumeeira nem espigão: saem.
       // Um trecho curvo leva uma seta e um percentual só, na faceta do meio (`comSinal`).
       const arco = arcoDoTelhado(p, r);
@@ -343,12 +335,12 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       }
       for (const [k, pl] of r.planes.entries()) {
         const at = labelPoint(pl.polygon);
-        if (!at || !arco.comSinal(k)) continue;
+        if (!at || !arco.comSinal(k) || pl.percent === 0) continue; // telhado plano: sem seta nem "0,0 %"
         const down = { x: -pl.up.x, y: -pl.up.y };
         // Seta de caimento em verde (tinta própria do caimento), na espessura de projeção.
         out.strokes.push(...slopeArrow(down, at, v, { ...theme, ink: theme.roofSlope }, esp.projecao));
         // Deslocamento lateral em mm de papel: 2 mm garantem que a etiqueta não cruze a haste da seta.
-        out.labels.push({ at, text: fmtPercent(pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
+        out.labels.push({ at, text: fmtPercent(unitsOf(p), pl.percent), papel: { ...beside(down, 2.0, scale), fontMm: SURFACE_TEXT_MM } });
       }
     }
     if (planMode || p.settings.showTags) {
@@ -357,7 +349,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       if (rd) {
         const n = perp(norm(sub(rd.b, rd.a)));
         const lado = Math.abs(n.y) > 1e-9 ? (n.y >= 0 ? n : { x: -n.x, y: -n.y }) : n.x >= 0 ? n : { x: -n.x, y: -n.y };
-        out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(rd.z)}`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 3.0, ux: lado.x, uy: -lado.y } } });
+        out.labels.push({ at: rd.at, text: `▲ ${fmtElevation(unitsOf(p), rd.z)}`, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: { mm: 3.0, ux: lado.x, uy: -lado.y } } });
       }
     }
     if (p.settings.showTags) {
@@ -365,7 +357,7 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
       let maior = r.planes[0];
       for (const pl of r.planes) if (maior && multiArea(pl.polygon) > multiArea(maior.polygon)) maior = pl;
       const at = maior ? labelPoint(maior.polygon) : labelPoint(foot);
-      const text = [p.roofTypes[r.typeId]?.code, fmtArea(roofRealArea(r), 1)].filter(Boolean).join(' · ');
+      const text = [p.roofTypes[r.typeId]?.code, fmtArea(unitsOf(p), roofRealArea(telhadoOriginal.get(r) ?? r), 1)].filter(Boolean).join(' · ');
       // Fino/médio: acima e ao lado do eixo da seta de caimento, que sai do mesmo centroide; grosseiro: só acima.
       if (at) out.labels.push({ at, text, papel: { escala: scale, fontMm: SURFACE_TEXT_MM, desvio: areaLabelOffset(maior?.up, coarse) } });
     }
@@ -376,24 +368,24 @@ export function roofOps(roofs: ResolvedRoof[], p: Project, theme: PlanTheme, dar
 
 /**
  * Telhados do nível na planta (D1), antes das etiquetas e depois das paredes e aberturas. Os `hidden` (fora do intervalo
- * de vista) saem; com `showProjection`, cada um deixa o contorno do beiral tracejado (projeção da cobertura).
+ * de vista) saem; com `showProjection`, cada um deixa a sua projeção (`projecaoDoTelhado`): contorno, linhas internas e
+ * preenchimento leve. Na planta de cobertura fica só o contorno.
  */
 export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boolean, detail: DetailLevel, v: Viewport, opts: RoofOpsOptions = {}, scale = 100): FloorOps {
   const all = telhadosDoNivel(p, levelId);
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
   const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
-  // Telhados ocultos: a pegada com balanço aparece também fora do intervalo; a projeção, só com a opção ligada.
-  const esp = espessurasDoTelhado(opts.paint ?? defaultPaint('roof', v.zoom));
+  // Telhados ocultos: a projeção só aparece com a opção ligada (o rosa é só do modo de edição).
+  const paint = opts.paint ?? defaultPaint('roof', v.zoom);
+  const esp = espessurasDoTelhado(paint);
+  const sunAzimuth = opts.sunAzimuth ?? view3dOf(p).sunAzimuth;
   for (const r of all) {
-    if (!hidden?.has(r.roofId) || off?.has(r.roofId)) continue;
-    const model = p.elements[r.roofId];
-    if (isRoof(model)) out.strokes.push(...pegadaOps(model, theme, esp.pegada));
-    if (opts.showProjection === true) {
-      // Projeção da cobertura fora do intervalo de vista: rosa tracejada com balanço (é a pegada projetada); sem balanço, tinta.
-      const cor = isRoof(model) && temBalanco(model) ? theme.roofFootprint : theme.ink;
-      for (const ring of roofFootprint(r).flat()) out.strokes.push({ pts: ring, closed: true, ...esp.projecao, color: cor, alpha: 0.9, dash: [6, 3] });
-    }
+    if (!hidden?.has(r.roofId) || off?.has(r.roofId) || opts.showProjection !== true) continue;
+    const rica = opts.planMode !== true;
+    const pr = projecaoDoTelhado(r, p, roofFootprint(r), roofFillBase(p, r, theme, dark, paint), theme, esp, sunAzimuth, scale, { rica, coarse: detail === 'coarse' });
+    out.fills.push(...pr.fills);
+    out.strokes.push(...pr.strokes);
   }
   return out;
 }
@@ -414,8 +406,8 @@ export function roofSelectionOps(
 ): FloorOps {
   const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
   // Alças só nos cantos lógicos: um arco amostrado não vira uma fileira de quadradinhos.
-  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: cantosLogicos }));
-  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, v);
+  const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: gripsDoTelhado(p.elements[r.roofId], cantosLogicos) }));
+  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).
   const out: FloorOps = { fills: base.fills, strokes: base.strokes.filter((s) => !(s.closed && s.widthPx === 2)), labels: base.labels };
   const sel = new Set(selection);
@@ -423,7 +415,7 @@ export function roofSelectionOps(
     const roof = p.elements[r.roofId];
     if (!sel.has(r.roofId) || !isRoof(roof)) continue;
     out.strokes.push(...selectedRingOps(r, roof, theme));
-    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao);
+    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao, unitsOf(p));
     out.fills.push(...sym.fills);
     out.strokes.push(...sym.strokes);
     out.labels.push(...sym.labels);

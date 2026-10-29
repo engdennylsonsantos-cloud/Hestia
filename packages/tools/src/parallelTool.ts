@@ -1,12 +1,12 @@
 import { mul, offsetArc, v2, type Vec2 } from '@hestia/geom';
 import { frameOfWall, toLocal, type WallFrame } from '@hestia/engine';
-import { isWall, type Id } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands } from './edit.ts';
-import { parseNumber } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
-const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /**
  * Parede paralela. Convenção da distância (ToolOptions.offsetFrom):
@@ -144,8 +144,8 @@ export class ParallelTool extends ToolBase {
     } else {
       this.items.push(...ghostBands(pr, [this.base!], { kind: 'translate', d: plan.d }));
     }
-    this.items.push({ kind: 'label', at, text: fmtM(d) });
-    this.env.say(`Clique para criar a parede paralela a ${fmtM(d)} (${this.modo()}${this.flip ? ', do lado oposto ao cursor' : ''}), ou digite a distância e Enter.`);
+    this.items.push({ kind: 'label', at, text: fmtM(unitsOf(this.env.project()), d) });
+    this.env.say(`Clique para criar a parede paralela a ${fmtM(unitsOf(this.env.project()), d)} (${this.modo()}${this.flip ? ', do lado oposto ao cursor' : ''}), ou digite a distância e Enter.`);
   }
 
   override click(p: PointerInfo): void {
@@ -171,13 +171,13 @@ export class ParallelTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.base) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     if (v <= 0) {
-      this.env.say('Valor inválido. Digite a distância em metros.');
+      this.env.say(`Valor inválido. Digite a distância em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     this.create(v);
@@ -201,6 +201,6 @@ export class ParallelTool extends ToolBase {
       if (plan.arc && nid) this.env.exec({ type: 'updateElements', ids: [nid], patch: { a: plan.arc.a, b: plan.arc.b, sag: plan.arc.sag } });
     });
     this.reset();
-    this.env.say(`Parede paralela criada a ${fmtM(d)} (${this.byFace() ? 'face a face' : 'entre eixos'}). Ctrl+Z desfaz.`);
+    this.env.say(`Parede paralela criada a ${fmtM(unitsOf(this.env.project()), d)} (${this.byFace() ? 'face a face' : 'entre eixos'}). Ctrl+Z desfaz.`);
   }
 }

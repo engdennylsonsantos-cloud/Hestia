@@ -19,6 +19,47 @@ describe('ferramenta Cota', () => {
     expect(t.inputPrompt()).toBeNull();
   });
 
+  it('grava a cota com unidade do projeto e sem precisão fixa', () => {
+    const ctx = makeEnv();
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    clickAt(t, 2, 1);
+    const d = dims(ctx.store)[0]!;
+    expect(d.unit).toBe('project');
+    expect(d.precision).toBeUndefined();
+  });
+
+  it('as opções da barra (unidade e casas) valem na cota criada', () => {
+    const ctx = makeEnv();
+    ctx.options.dimensionUnit = 'cm';
+    ctx.options.dimensionPrecision = 1;
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 4, 0);
+    clickAt(t, 2, 1);
+    const d = dims(ctx.store)[0]!;
+    expect(d.unit).toBe('cm');
+    expect(d.precision).toBe(1);
+  });
+
+  it('a sequência de cotas também usa a unidade do projeto, sem precisão fixa', () => {
+    const ctx = makeEnv();
+    ctx.options.dimensionString = 'continuous';
+    const t = tool('dimension', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 2, 0);
+    clickAt(t, 4, 0);
+    t.confirm();
+    clickAt(t, 2, 1);
+    const created = dims(ctx.store);
+    expect(created).toHaveLength(2);
+    for (const d of created) {
+      expect(d.unit).toBe('project');
+      expect(d.precision).toBeUndefined();
+    }
+  });
+
   it('digitar o deslocamento confirma no lado do cursor', () => {
     const ctx = makeEnv();
     const t = tool('dimension', ctx.env);

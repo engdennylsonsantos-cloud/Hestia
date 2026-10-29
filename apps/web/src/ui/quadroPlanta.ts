@@ -65,6 +65,7 @@ export class QuadroPlanta {
   private agendado = false;
   private liberado = false;
   private readonly referenciasAntigas = new Set<Id>();
+  private provisorioNaCena = false;
   private readonly esperar: (f: () => void) => void;
 
   constructor(private readonly dep: DependenciasQuadro) {
@@ -100,12 +101,19 @@ export class QuadroPlanta {
       const ops = operacoesProvisorias(this.dados(e.nivel), e.tema, e.v.zoom);
       e.cena?.setSlot('fillsOver', ops.fills, [], e.v);
       e.cena?.setSlot('strokesOver', [], ops.strokes, e.v);
+      this.provisorioNaCena = true;
       this.agendarExato();
       return ops;
     }
     // Referência de pavimento que veio do exato antigo e já foi atualizada: a geometria deve ser refeita por inteiro.
     if ([...this.referenciasAntigas].some((id) => !this.dep.pendente(id))) e.quadro.reset();
     this.referenciasAntigas.clear();
+    // O exato assume a cena: a camada provisória (que ficou por cima na última edição) sai uma vez, sem custo por quadro.
+    if (this.provisorioNaCena) {
+      e.cena?.setSlot('fillsOver', [], [], e.v);
+      e.cena?.setSlot('strokesOver', [], [], e.v);
+      this.provisorioNaCena = false;
+    }
     e.quadro.update(e.atualizar());
     this.base = { versao: e.versao, nivel: e.nivel, contexto: e.contexto };
     this.liberado = false;

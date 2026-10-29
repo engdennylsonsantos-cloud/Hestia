@@ -1,6 +1,6 @@
 import { dist, pointInPolygon, polygonArea, type Vec2 } from '@hestia/geom';
 import { roomRegionAt, type RoomProblem } from '@hestia/engine';
-import { roomsOnLevel } from '@hestia/model';
+import { formatQuantity, roomsOnLevel, unitsOf, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { interiorPoint, nextRoomNumber, roomDraft } from './roomCreate.ts';
 import type { PointerInfo } from './types.ts';
@@ -11,7 +11,7 @@ export const ROOM_PROBLEM_TEXT: Record<RoomProblem, string> = {
   aberto: 'Circuito aberto: há um vão entre as paredes, feche-o para criar o ambiente.',
 };
 
-const fmtArea = (a: number): string => `${a.toFixed(2).replace('.', ',')} m²`;
+const fmtArea = (u: ResolvedUnits, a: number): string => formatQuantity(u, 'area', a);
 
 /** Intervalo, em ms, em que um segundo clique no mesmo ponto é tratado como o duplo clique do mouse. */
 const DUPLO_CLIQUE_MS = 600;
@@ -72,7 +72,7 @@ export class RoomTool extends ToolBase {
     };
     this.env.exec({ type: 'addRoom', room });
     this.env.setSelection([room.id]);
-    this.env.say(`Ambiente ${room.number} criado: ${fmtArea(polygonArea(polygon))}.${repeated ? ' Este circuito já tinha ambiente (aviso de duplicado).' : ''} Ctrl+Z desfaz.`);
+    this.env.say(`Ambiente ${room.number} criado: ${fmtArea(unitsOf(this.env.project()), polygonArea(polygon))}.${repeated ? ' Este circuito já tinha ambiente (aviso de duplicado).' : ''} Ctrl+Z desfaz.`);
     this.items = [];
   }
 
@@ -89,7 +89,7 @@ export class RoomTool extends ToolBase {
     for (const h of region.polygon.slice(1)) this.items.push({ kind: 'polygon', ring: h, dashed: true });
     const n = nextRoomNumber(this.env.project(), this.env.levelId());
     const label = interiorPoint(region.polygon) ?? at;
-    this.items.push({ kind: 'label', at: label, text: `Ambiente ${n} · ${fmtArea(polygonArea(region.polygon))}` });
+    this.items.push({ kind: 'label', at: label, text: `Ambiente ${n} · ${fmtArea(unitsOf(this.env.project()), polygonArea(region.polygon))}` });
     this.env.say('Clique para criar o ambiente nesta área.');
   }
 }

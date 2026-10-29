@@ -1,12 +1,14 @@
 import { useState, type ReactElement } from 'react';
-import { type LevelKeep } from '@hestia/model';
+import { formatQuantity, type LevelKeep } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
+import { useUnits } from './useUnits.ts';
 import { LEVEL_KEEP_LABEL, levelBearingIds, moveToLevel, readLevelKeep, writeLevelKeep } from '../editor/levelActions.ts';
 import { Dialog } from './dialogs/Dialog.tsx';
 
 /** Diálogo "Mover para o nível" (aba Modificar ▸ Seleção e nível). */
 export function MoveLevelDialog({ onClose }: { onClose: () => void }): ReactElement {
+  const units = useUnits();
   const p = useProject();
   const sel = useUi((s) => s.selection);
   const movable = levelBearingIds(p, sel);
@@ -36,7 +38,7 @@ export function MoveLevelDialog({ onClose }: { onClose: () => void }): ReactElem
         <label htmlFor="move-level-to">Nível</label>
         <select id="move-level-to" className="select" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
           {p.levels.map((l) => (
-            <option key={l.id} value={l.id}>{`${l.name} · ${l.elevation.toFixed(2).replace('.', ',')} m`}</option>
+            <option key={l.id} value={l.id}>{`${l.name} · ${formatQuantity(units, 'length', l.elevation)}`}</option>
           ))}
         </select>
       </div>

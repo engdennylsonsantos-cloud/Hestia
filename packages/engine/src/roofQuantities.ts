@@ -3,6 +3,7 @@ import { roofPlanArea, type Id, type Project, type Roof, type RoofShape } from '
 import { crossingParams, planeHas } from './roofGeom.ts';
 import { extrusionGableArea } from './roofExtrusion.ts';
 import { planeZ, resolveRoofs, roofThickness, type ResolvedRoof, type ResolvedRoofPlane, type RoofLine } from './roofs.ts';
+import { expandRoofArcs } from './roofArcs.ts';
 import { edgeSlopesOf } from './roofShapes.ts';
 
 /**
@@ -18,9 +19,9 @@ import { edgeSlopesOf } from './roofShapes.ts';
  */
 
 export interface RoofPlaneQuantity {
-  /** Área da água em planta (m²). */
+  /** Área da água em planta (metros quadrados). */
   planArea: number;
-  /** Área real da água sobre a inclinação (m²). */
+  /** Área real da água sobre a inclinação (metros quadrados). */
   faceArea: number;
   percent: number;
 }
@@ -31,9 +32,9 @@ export interface RoofLayerQuantity {
   materialId: Id;
   /** Espessura vertical (m). */
   thickness: number;
-  /** Área em planta do telhado (m²). */
+  /** Área em planta do telhado (metros quadrados). */
   planArea: number;
-  /** Volume da camada (m³) = área em planta × espessura vertical. */
+  /** Volume da camada (metros cúbicos) = área em planta × espessura vertical. */
   volume: number;
 }
 
@@ -43,9 +44,9 @@ export interface RoofQuantity {
   levelId: Id;
   shape: RoofShape;
   mark: string;
-  /** Área líquida em planta: contorno menos furos e menos a parte unida a outro telhado (m²). */
+  /** Área líquida em planta: contorno menos furos e menos a parte unida a outro telhado (metros quadrados). */
   planArea: number;
-  /** Soma das áreas reais das águas (m²). */
+  /** Soma das áreas reais das águas (metros quadrados). */
   faceArea: number;
   planes: RoofPlaneQuantity[];
   /** Perímetro do contorno do beiral, em planta (m). */
@@ -54,7 +55,7 @@ export interface RoofQuantity {
   holesPerimeter: number;
   /** Espessura total vertical (m). */
   thickness: number;
-  /** Volume total (m³) = soma das camadas. */
+  /** Volume total (metros cúbicos) = soma das camadas. */
   volume: number;
   /** Comprimento 3D das cumeeiras (m). */
   ridgeLength: number;
@@ -66,7 +67,7 @@ export interface RoofQuantity {
   eaveLength: number;
   /** Comprimento em planta das empenas, arestas sem inclinação (m). */
   gableLength: number;
-  /** Área das empenas (m²): frontão vertical sob as águas vizinhas, a partir da cota do beiral. */
+  /** Área das empenas (metros quadrados): frontão vertical sob as águas vizinhas, a partir da cota do beiral. */
   gableArea: number;
   /** Arestas que definem inclinação (beirais); null nas águas livres e na extrusão. */
   slopedEdges: number | null;
@@ -79,13 +80,13 @@ export interface RoofQuantity {
 
 export interface RoofQuantities {
   roofs: RoofQuantity[];
-  /** Soma das áreas em planta dos telhados do nível (m²). */
+  /** Soma das áreas em planta dos telhados do nível (metros quadrados). */
   totalPlanArea: number;
-  /** Soma das áreas reais (m²). */
+  /** Soma das áreas reais (metros quadrados). */
   totalFaceArea: number;
-  /** Volume total do nível (m³). */
+  /** Volume total do nível (metros cúbicos). */
   totalVolume: number;
-  /** Volume (m³) por material. */
+  /** Volume (metros cúbicos) por material. */
   volumeByMaterial: Record<Id, number>;
 }
 
@@ -146,7 +147,8 @@ function slopedEdgesOf(r: Roof): number | null {
 
 /** Quantitativos de um telhado; `planes` tem as águas do próprio telhado primeiro, depois as dos outros do nível. */
 function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]): RoofQuantity {
-  const r = p.elements[rr.roofId] as Roof;
+  const orig = p.elements[rr.roofId] as Roof;
+  const r = expandRoofArcs(orig);
   const planArea = roofPlanArea(r) - rr.joinedArea;
   const planesQ: RoofPlaneQuantity[] = rr.planes.map((pl) => {
     const area = multiArea(pl.polygon);
@@ -183,7 +185,7 @@ function quantifyOne(p: Project, rr: ResolvedRoof, planes: ResolvedRoofPlane[]):
     gableLength: rr.lines.filter((l) => l.kind === 'gable').reduce((s, l) => s + dist(l.a, l.b), 0),
     // Extrusão: a empena é a seção do perfil na extremidade (integral exata); as outras formas usam o trapézio por trecho.
     gableArea: r.shape === 'extrusion' ? extrusionGableArea(r) : gableAreaOf(rr),
-    slopedEdges: slopedEdgesOf(r),
+    slopedEdges: slopedEdgesOf(orig),
     ridgeHeight: heights.length ? Math.max(...heights) : null,
     maxHeight: tops.length ? Math.max(...tops) : rr.eaveZ,
     layers,

@@ -14,6 +14,15 @@ import { PlanFrame, planFrameUpdateOf } from './planFrame.ts';
 
 const vista = (zoom: number): Viewport => ({ cx: 5, cy: 3.5, zoom, width: 800, height: 600 });
 const completo = (): Cenario => cenarios().find((c) => c.nome === 'completo')!;
+/**
+ * O cenário completo sem portas/janelas: as aberturas têm limiares de detalhe próprios (esquadrias) e, de propósito,
+ * refazem a geometria ao cruzar esses limiares. Aqui o alvo é a hachura/geometria do nível, que não deve depender do zoom.
+ */
+const semAberturas = (): Cenario => {
+  const base = completo();
+  const elements = Object.fromEntries(Object.entries(base.project.elements).filter(([, e]) => e.kind !== 'door' && e.kind !== 'window'));
+  return { ...base, project: { ...base.project, elements } };
+};
 
 /** Quadro com contadores nas duas funções que refazem as camadas. */
 function quadroContado(c: Cenario) {
@@ -60,11 +69,11 @@ function zoomsDoIntervalo(limiares: number[], zoom: number): number[] {
 }
 
 describe('trocar o zoom não recria geometria nem buffers', () => {
-  const c = completo();
+  const c = semAberturas();
   const limiares = buildPlanGeometry(entradaDe(c, 60)).limiares!;
 
-  it('a geometria guarda os limiares de detalhe que consultou (hachura a 40 px/m e espessuras equivalentes das regiões)', () => {
-    expect(limiares).toContain(40);
+  it('a geometria não registra limiar de hachura (o 40 px/m virou zoom mínimo no shader)', () => {
+    expect(limiares).not.toContain(40);
     expect(limiares).toEqual([...limiares].sort((a, b) => a - b));
     expect(new Set(limiares).size).toBe(limiares.length);
   });
@@ -93,11 +102,8 @@ describe('trocar o zoom não recria geometria nem buffers', () => {
       expect(x.indice).toBe(y.indice);
       if (x.versoes.some((v, k) => v !== y.versoes[k]) || x.versaoIndice !== y.versaoIndice) reescritos++;
     });
-    // Só os lotes dinâmicos foram reescritos; os demais (a maior parte) ficaram como estavam.
-    const dinamicos = scene.lotesDinamicos();
-    expect(dinamicos).toBeGreaterThan(0);
-    expect(reescritos).toBeLessThanOrEqual(dinamicos);
-    expect(reescritos).toBeLessThan(depois.malhas.length / 2);
+    // Nenhum buffer foi reescrito: zoom só muda a câmera e o uniform (não há mais lote dinâmico).
+    expect(reescritos).toBe(0);
     scene.dispose();
   });
 
@@ -116,18 +122,11 @@ describe('trocar o zoom não recria geometria nem buffers', () => {
     scene.dispose();
   });
 
-  it('passar de um limiar refaz a geometria uma vez; voltar ao intervalo anterior refaz de novo, e a imagem é a do zoom (sequência 12, 60, 220)', () => {
+  it('passar por 12, 60 e 220 não refaz a geometria: a hachura some no shader, não na geometria', () => {
     const { scene, contagem, atualizar } = quadroContado(c);
     const sequencia = [12, 60, 220, 60, 12];
-    let esperado = 0;
-    let anterior = -1;
-    for (const z of sequencia) {
-      atualizar(z);
-      const sig = assinaturaDeZoom(limiares, z);
-      if (sig !== anterior) esperado++;
-      anterior = sig;
-      expect(contagem.geometria).toBe(esperado);
-    }
+    for (const z of sequencia) atualizar(z);
+    expect(contagem.geometria).toBe(1);
     // A sobreposição nunca é refeita por causa do zoom.
     expect(contagem.sobreposicao).toBe(1);
     scene.dispose();

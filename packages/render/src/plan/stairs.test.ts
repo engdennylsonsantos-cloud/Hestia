@@ -3,7 +3,8 @@ import { resolverZoom } from './zoomOps.ts';
 import { createEmptyProject, type DetailLevel, type Project } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import type { ResolvedStairStep } from '@hestia/engine';
-import { belowStairOps, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
+import { multiArea } from '@hestia/geom';
+import { belowStairOps, planFootprint, stairFills, stairSelectionOps, STAIR_CUT_HEIGHT, treadNumber } from './stairs.ts';
 import { defaultPaint } from './style.ts';
 
 /** Espessura de corte da escada no zoom dos testes (100 px/m, 1:100): antes, 1,4 px fixos. */
@@ -31,22 +32,23 @@ describe('escada na planta (decisão 0011 §1)', () => {
 
   it('degraus com topo acima da cota de corte (1,20 m) saem tracejados; os de baixo, contínuos', () => {
     const outlines = ops().strokes.filter((s) => s.closed);
-    // Degrau k tem topo em k·h: k = 7, 8 e 9 passam de 1,20 m (1,225; 1,400; 1,575).
-    expect(outlines.filter((s) => s.dash)).toHaveLength(3);
+    // Degrau k tem topo em k·h: k = 7, 8 e 9 passam de 1,20 m (1,225; 1,400; 1,575); o 10º é a chegada (1,75 m).
+    expect(outlines.filter((s) => s.dash)).toHaveLength(4);
     expect(outlines.filter((s) => !s.dash)).toHaveLength(6);
     expect(STAIR_CUT_HEIGHT).toBe(1.2);
   });
 
-  it('seta de subida: caminhada pelos pontos médios dos espelhos, ponta no último', () => {
+  it('seta de subida: caminhada pelos pontos médios dos espelhos, ponta no centro do último degrau (a chegada)', () => {
     const { strokes } = ops();
-    const shaft = strokes.find((s) => !s.closed && s.pts.length === N)!;
+    const shaft = strokes.find((s) => !s.closed && s.pts.length === N + 1)!;
     expect(shaft.pts[0]!.y).toBeCloseTo(P, 9);
     expect(shaft.pts[N - 1]!.y).toBeCloseTo(N * P, 9);
+    expect(shaft.pts[N]!.y).toBeCloseTo(N * P + P / 2, 9);
     const head = strokes.find((s) => !s.closed && s.pts.length === 3)!;
-    expect(head.pts[1]).toEqual(shaft.pts[N - 1]);
+    expect(head.pts[1]).toEqual(shaft.pts[N]);
     // As pontas ficam para trás da ponta (subida em +y).
-    expect(head.pts[0]!.y).toBeLessThan(N * P);
-    expect(head.pts[2]!.y).toBeLessThan(N * P);
+    expect(head.pts[0]!.y).toBeLessThan(N * P + P / 2);
+    expect(head.pts[2]!.y).toBeLessThan(N * P + P / 2);
   });
 
   it('o rótulo SOBE fica junto ao início da seta', () => {
@@ -75,18 +77,38 @@ describe('escada na planta (decisão 0011 §1)', () => {
   it('ordem: espelhos recebidos fora de ordem saem em ordem de subida', () => {
     const s = stair();
     const shuffled = { ...s, risers: [...s.risers].reverse() };
-    const shaft = ops('medium', shuffled).strokes.find((t) => !t.closed && t.pts.length === N)!;
+    const shaft = ops('medium', shuffled).strokes.find((t) => !t.closed && t.pts.length === N + 1)!;
     expect(shaft.pts[0]!.y).toBeCloseTo(P, 9);
     expect(shaft.pts[N - 1]!.y).toBeCloseTo(N * P, 9);
   });
 
-  it('nível de detalhe: grosseiro só preenche a pegada; fino numera os degraus', () => {
+  it('nível de detalhe: grosseiro só preenche a pegada; médio e fino numeram os degraus', () => {
     const coarse = ops('coarse');
     expect(coarse.fills).toHaveLength(1);
     expect(coarse.strokes).toHaveLength(0);
     expect(coarse.labels).toHaveLength(0);
-    expect(ops('medium').labels.map((l) => l.text)).toEqual(['SOBE']);
-    expect(ops('fine').labels.map((l) => l.text)).toEqual(['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    const numbered = ['SOBE', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    expect(ops('medium').labels.map((l) => l.text)).toEqual(numbered);
+    expect(ops('fine').labels.map((l) => l.text)).toEqual(numbered);
+  });
+
+  it('fora da faixa de vista (acima do topo) a escada sai só no contorno: sem preenchimento nos degraus de cima', () => {
+    const all = resolverZoom(stairFills(PROJECT, [stair()], LIGHT, false, 'medium', VIEW, { cutZ: 0.5, topZ: 1.0 }), VIEW.zoom);
+    // Topo em 1,00 m: degraus k = 1..5 (até 0,875 m) têm preenchimento; os 5 de cima (e a chegada) só o contorno.
+    expect(all.fills).toHaveLength(5);
+    expect(all.strokes.filter((t) => t.closed)).toHaveLength(N);
+  });
+
+  it('o número do último degrau fica no centro dele (a faixa depois do último espelho), não na borda', () => {
+    const at = ops('medium').labels.find((l) => l.text === String(N))!.at;
+    // Espelho N em y = N·p; a chegada tem p de comprimento (< 0,30 m) e a largura do lance (1 m, de x = 0 a 1).
+    expect(at.y).toBeCloseTo(N * P + P / 2, 6);
+    expect(at.x).toBeCloseTo(0.5, 6);
+  });
+
+  it('a pegada da planta (seleção) inclui o último degrau: passa da linha do último espelho', () => {
+    const s = stair();
+    expect(multiArea(planFootprint(s))).toBeGreaterThan(multiArea(s.footprint) + 1e-9);
   });
 
   it('subpavimento: só a pegada e os contornos, esmaecidos, sem seta nem corte', () => {
@@ -111,7 +133,7 @@ describe('numeração contínua dos degraus (decisão 0011 §1 item 6)', () => {
 
   it('escada reta de 16 espelhos: rótulos 1..15 (degrau k alcança o espelho k+1)', () => {
     const s = straightStair({ risers: 16, tread: P, riserH: H, width: 1 });
-    expect(numbers(ops('fine', s).labels)).toEqual(Array.from({ length: 15 }, (_, i) => String(i + 1)));
+    expect(numbers(ops('fine', s).labels)).toEqual(Array.from({ length: 16 }, (_, i) => String(i + 1)));
   });
 
   it('o número é a cota: com a base em 0,30 m, o 1º degrau ainda é o 1 e o 9º é o 9', () => {

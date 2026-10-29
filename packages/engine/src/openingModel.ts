@@ -5,8 +5,9 @@ import type { OpeningModel } from './openingModelTypes.ts';
 import { makeCtx, openingCore } from './openingModelContext.ts';
 import { buildDoor } from './openingModelDoors.ts';
 import { buildWindow, buildVoid } from './openingModelWindows.ts';
+import { buildCompositionModel, usesComposition } from './openingModelComposition.ts';
+import { buildCasing } from './openingModelCasing.ts';
 import {
-  buildCasing,
   buildLintelBeams,
   buildSidelights,
   buildSillBoard,
@@ -17,6 +18,8 @@ export * from './openingModelContext.ts';
 export * from './openingModelDoors.ts';
 export * from './openingModelWindows.ts';
 export * from './openingModelDetails.ts';
+export * from './openingModelComposition.ts';
+export * from './openingModelCasing.ts';
 export * from './openingModelTransforms.ts';
 
 export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame): OpeningModel {
@@ -32,6 +35,12 @@ export function buildOpeningModel(p: Project, o: Opening, g: OpeningGeometry, f:
       openings: [],
       void: g.leaves === 0,
     };
+  }
+  // Composição de várias células (bandeira, laterais, combinada): quadro único e células (spec F1 §3).
+  const comp = usesComposition(p.openingTypes[o.typeId] ?? c.t, g); // tipo bruto: `c.t` já vem normalizado para o vão
+  if (comp) {
+    const m = buildCompositionModel(p, o, g, f, comp);
+    if (m) return m;
   }
   if (g.leaves === 0) {
     // Vão livre: sem batente, folha ou vidro; só o acabamento que existir.

@@ -8,7 +8,9 @@ const ALLOWED = {
   engine: ['geom', 'model'],
   tools: ['geom', 'model', 'engine'],
   render: ['geom', 'model', 'engine', 'tools'],
-  io: ['model'],
+  // Exceção consciente (2026-10-29): o exportador IFC precisa dos quantitativos/contornos RESOLVIDOS do motor para
+  // `IfcSpace` e `Qto_*`; o importador e o DXF continuam usando só `model`. Ver docs/ifc/exportacao.md §Arquitetura.
+  io: ['model', 'engine'],
   web: ['geom', 'model', 'engine', 'tools', 'render', 'io'],
 };
 

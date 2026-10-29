@@ -192,7 +192,9 @@ describe('campos de acabamento: cada um muda a peça no 3D e o quadro', () => {
   it('alizar: largura e espessura viram as peças em volta do vão (8 a mais na janela)', () => {
     const c = cenaJanela({ ...alternarAcabamento(base, 'casing', true), casing: { width: 0.08, thickness: 0.02 } });
     expect(c.pecas.length - sem.pecas.length).toBe(8);
-    expect(c.pecas.some((x) => perto(x.w, W + 0.16) && perto(x.d, 0.02))).toBe(true);
+    // A peça da cabeça tem o vão mais 2 × (alizar de 8 cm − batente de 5 cm) = W + 0,06: o alizar sobrepõe 5 cm do batente
+    // (medido em 1,26 m para vão de 1,2 m). Ponto a confirmar com o dono (silhueta única por face).
+    expect(c.pecas.some((x) => perto(x.w, W + 0.06) && perto(x.d, 0.02))).toBe(true);
     expect(sem.pecas.some((x) => perto(x.d, 0.02))).toBe(false);
   });
 

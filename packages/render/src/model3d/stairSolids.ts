@@ -7,7 +7,7 @@ import { extrudeCaps, ofElement, pushWall, type SolidBatch } from './solids.ts';
 /** Tolerância (m) para reconhecer a cota de um degrau igual à de um espelho. */
 const Z_TOL = 1e-9;
 
-/** Tolerância (m, m²) das comparações de cota e de área (sinal de diferenças e sobreposições). */
+/** Tolerância (em comprimento e em área) das comparações de cota e de área (sinal de diferenças e sobreposições). */
 const EPS = 1e-9;
 
 /** Espessura mínima (m) de uma peça monolítica: o fundo nunca alcança o topo (decisão 0012 §2). */

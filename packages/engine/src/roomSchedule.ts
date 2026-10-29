@@ -1,21 +1,22 @@
-import type { Id, Project } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import type { Id, Project, ResolvedUnits } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { resolveRooms } from './rooms.ts';
 
-/** Um ambiente na tabela. Unidades: m, m² e m³. */
+/** Um ambiente na tabela. Valores em metros (SI). */
 export interface RoomScheduleRow {
   roomId: Id;
   number: string;
   name: string;
   levelId: Id;
   levelName: string;
-  /** Área líquida do circuito (m²); 0 quando o ponto não está num circuito fechado. */
+  /** Área líquida do circuito (metros quadrados); 0 quando o ponto não está num circuito fechado. */
   area: number;
   /** Perímetro do contorno externo (m). */
   perimeter: number;
   /** Pé-direito (m). */
   ceilingHeight: number;
-  /** Volume (m³) = área × pé-direito. */
+  /** Volume (metros cúbicos) = área × pé-direito. */
   volume: number;
   floorFinish: string;
   wallFinish: string;
@@ -56,6 +57,8 @@ export function buildRoomSchedule(p: Project): RoomSchedule {
   const rows: RoomScheduleRow[] = [];
   for (const level of p.levels) {
     for (const r of resolveRooms(p, level.id)) {
+      // Duplicata no mesmo circuito não entra na tabela (senão a área do nível soma duas vezes).
+      if (r.duplicateOf !== undefined) continue;
       rows.push({
         roomId: r.roomId,
         number: r.number,
@@ -104,21 +107,32 @@ export function roomLevelTotals(rows: RoomScheduleRow[]): RoomLevelTotals[] {
   return out;
 }
 
-const CSV_HEADER = ['Número', 'Nome', 'Nível', 'Área (m²)', 'Perímetro (m)', 'Pé-direito (m)', 'Volume (m³)', 'Piso', 'Parede', 'Forro'];
+const csvHeader = (u: ResolvedUnits): string[] => [
+  'Número',
+  'Nome',
+  'Nível',
+  scheduleCsvHeader(u, 'Área', 'area'),
+  scheduleCsvHeader(u, 'Perímetro', 'length'),
+  scheduleCsvHeader(u, 'Pé-direito', 'length'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
+  'Piso',
+  'Parede',
+  'Forro',
+];
 
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das tabelas de pisos
  * e lajes). Uma linha por ambiente, uma linha de subtotal por nível e uma linha de total geral.
  */
-export function roomScheduleToCsv(rows: RoomScheduleRow[], totals: RoomScheduleTotals): string {
-  const n = formatDecimal;
-  const lines: string[][] = [CSV_HEADER];
+export function roomScheduleToCsv(rows: RoomScheduleRow[], totals: RoomScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'area' | 'volume', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
+  const lines: string[][] = [csvHeader(units)];
   let levelId: Id | null = null;
   let levelName = '';
   let acc = { area: 0, perimeter: 0, volume: 0 };
   const flush = (): void => {
     if (levelId === null) return;
-    lines.push(['', '', `Subtotal ${levelName}`, n(acc.area, 2), n(acc.perimeter, 2), '', n(acc.volume, 3), '', '', '']);
+    lines.push(['', '', `Subtotal ${levelName}`, n('area', acc.area, 2), n('length', acc.perimeter, 2), '', n('volume', acc.volume, 3), '', '', '']);
   };
   for (const r of rows) {
     if (levelId !== null && r.levelId !== levelId) {
@@ -134,16 +148,16 @@ export function roomScheduleToCsv(rows: RoomScheduleRow[], totals: RoomScheduleT
       csvText(r.number),
       csvText(r.name),
       csvText(r.levelName),
-      n(r.area, 2),
-      n(r.perimeter, 2),
-      n(r.ceilingHeight, 2),
-      n(r.volume, 3),
+      n('area', r.area, 2),
+      n('length', r.perimeter, 2),
+      n('length', r.ceilingHeight, 2),
+      n('volume', r.volume, 3),
       csvText(r.floorFinish),
       csvText(r.wallFinish),
       csvText(r.ceilingFinish),
     ]);
   }
   flush();
-  lines.push(['Total', '', '', n(totals.area, 2), n(totals.perimeter, 2), '', n(totals.volume, 3), '', '', '']);
+  lines.push(['Total', '', '', n('area', totals.area, 2), n('length', totals.perimeter, 2), '', n('volume', totals.volume, 3), '', '', '']);
   return csvDocument(lines);
 }

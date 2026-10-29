@@ -1,4 +1,5 @@
 import { add, angleOf, len, sub, type SketchDraft, type Vec2 } from '@hestia/geom';
+import { unitsOf, type ResolvedUnits } from '@hestia/model';
 import { arraySegs, copySegs, mirrorSegs, offsetLoop, offsetSegs, rotateSegs } from './perimeterModify.ts';
 import { MOD_TOL, curveOf, traceDist } from './perimeterModifyCurve.ts';
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
@@ -24,13 +25,13 @@ export function transformPrompt(kind: PerimeterModifyKind, st: Step): string | n
 }
 
 /** Dica do estágio atual, com o modo de Tab (copiar ou mover) quando o comando tem a opção. */
-export function transformHint(kind: PerimeterModifyKind, st: Step): string {
+export function transformHint(kind: PerimeterModifyKind, st: Step, u: ResolvedUnits): string {
   const mode = st.copy ? 'copiar' : 'mover';
   switch (kind) {
     case 'offset':
       return st.num === null
         ? `Deslocar: digite a distância, ou clique do lado (a distância é a do clique). Tab: ${mode}.`
-        : `Distância ${fmt(st.num)} m: clique do lado. Tab: ${mode}.`;
+        : `Distância ${fmt(u, st.num)} m: clique do lado. Tab: ${mode}.`;
     case 'move':
       return st.stage === 1 ? 'Mover: clique no ponto de base.' : 'Mover: clique no destino, ou digite a distância.';
     case 'copy':
@@ -74,7 +75,7 @@ function offsetAt(h: ModHost, st: Step, at: Vec2): void {
   if (!next) return h.say('Não dá para deslocar: uma linha ficaria degenerada, ou um canto não existe.');
   h.commit(st.copy ? next : removeSegs(next, ids));
   st.num = null;
-  h.say(`Deslocada ${fmt(dist)} m. Clique do lado para outra cópia, ou digite a distância.`);
+  h.say(`Deslocada ${fmt(unitsOf(h.project?.()), dist)} m. Clique do lado para outra cópia, ou digite a distância.`);
 }
 
 /** Ângulo (radianos) de girar até a referência (ponta a da primeira linha) passar pelo cursor, em torno de `c`. */
@@ -92,7 +93,7 @@ function applyRotate(h: ModHost, st: Step, ang: number): boolean {
   if (!next) return refuse(h, 'Ângulo zero: nada a girar.');
   h.commit(next);
   clearData('rotate', st);
-  h.say(`Girada. ${transformHint('rotate', st)}`);
+  h.say(`Girada. ${transformHint('rotate', st, unitsOf(h.project?.()))}`);
   return true;
 }
 
@@ -100,7 +101,7 @@ function rotateClick(h: ModHost, st: Step, at: Vec2): void {
   if (st.stage === 1) {
     st.pts = [at];
     st.stage = 2;
-    return h.say(transformHint('rotate', st));
+    return h.say(transformHint('rotate', st, unitsOf(h.project?.())));
   }
   const ang = rotAngle(h.draft(), st.pts[0]!, at);
   if (ang === null) return h.say('A referência está no centro: digite o ângulo em graus.');
@@ -111,14 +112,14 @@ function mirrorClick(h: ModHost, st: Step, at: Vec2): void {
   if (st.stage === 1) {
     st.pts = [at];
     st.stage = 2;
-    return h.say(transformHint('mirror', st));
+    return h.say(transformHint('mirror', st, unitsOf(h.project?.())));
   }
   const d = h.draft();
   const next = mirrorSegs(d, d.selected, st.pts[0]!, at, st.copy);
   if (!next) return h.say('Eixo de tamanho zero: clique noutro ponto.');
   h.commit(next);
   clearData('mirror', st);
-  h.say(`Espelhada. ${transformHint('mirror', st)}`);
+  h.say(`Espelhada. ${transformHint('mirror', st, unitsOf(h.project?.()))}`);
 }
 
 /**
@@ -129,7 +130,7 @@ function destAt(h: ModHost, kind: PerimeterModifyKind, st: Step, dest: Vec2, ctr
   if (kind === 'array') {
     st.pts = [base, dest];
     st.stage = 3;
-    h.say(transformHint(kind, st));
+    h.say(transformHint(kind, st, unitsOf(h.project?.())));
     return true;
   }
   const delta = sub(dest, base);
@@ -138,7 +139,7 @@ function destAt(h: ModHost, kind: PerimeterModifyKind, st: Step, dest: Vec2, ctr
   if (kind === 'move') {
     h.commit(moveSegs(d, d.selected, delta));
     clearData(kind, st);
-    h.say(`Movida. ${transformHint(kind, st)}`);
+    h.say(`Movida. ${transformHint(kind, st, unitsOf(h.project?.()))}`);
     return true;
   }
   const next = copySegs(d, d.selected, delta);
@@ -149,7 +150,7 @@ function destAt(h: ModHost, kind: PerimeterModifyKind, st: Step, dest: Vec2, ctr
     return true;
   }
   clearData(kind, st);
-  h.say(`Copiada. ${transformHint(kind, st)}`);
+  h.say(`Copiada. ${transformHint(kind, st, unitsOf(h.project?.()))}`);
   return true;
 }
 
@@ -168,7 +169,7 @@ function arrayCount(h: ModHost, st: Step, count: number): boolean {
   if (!next) return refuse(h, 'Passo zero: escolha outro destino.');
   h.commit(next);
   clearData('array', st);
-  h.say(`Matriz de ${count} itens. ${transformHint('array', st)}`);
+  h.say(`Matriz de ${count} itens. ${transformHint('array', st, unitsOf(h.project?.()))}`);
   return true;
 }
 
@@ -180,13 +181,13 @@ export function transformClick(h: ModHost, kind: PerimeterModifyKind, st: Step, 
   if (st.stage === 1) {
     st.pts = [at];
     st.stage = 2;
-    return h.say(transformHint(kind, st));
+    return h.say(transformHint(kind, st, unitsOf(h.project?.())));
   }
   if (st.stage === 2) {
     destAt(h, kind, st, at, p.ctrl);
     return;
   }
-  h.say(transformHint(kind, st));
+  h.say(transformHint(kind, st, unitsOf(h.project?.())));
 }
 
 /**
@@ -197,7 +198,7 @@ export function transformType(h: ModHost, kind: PerimeterModifyKind, st: Step, v
   if (kind === 'offset') {
     if (!(v > MOD_TOL)) return refuse(h, 'Digite uma distância maior que zero, em metros.');
     st.num = v;
-    h.say(transformHint(kind, st));
+    h.say(transformHint(kind, st, unitsOf(h.project?.())));
     return true;
   }
   if (kind === 'rotate') return applyRotate(h, st, (v * Math.PI) / 180);
@@ -215,7 +216,7 @@ export function transformConfirm(h: ModHost, kind: PerimeterModifyKind, st: Step
 export function transformTab(h: ModHost, kind: PerimeterModifyKind, st: Step): boolean {
   if (!COPY_KINDS.has(kind)) return false;
   st.copy = !st.copy;
-  h.say(transformHint(kind, st));
+  h.say(transformHint(kind, st, unitsOf(h.project?.())));
   return true;
 }
 

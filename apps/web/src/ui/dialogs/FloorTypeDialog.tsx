@@ -1,5 +1,5 @@
 import { Fragment, useState, type ReactElement } from 'react';
-import { coreRange, type FloorType, floorTypeThickness, FUNCTION_LABEL, type Layer, type LayerFunction, layerPriority, temPrioridadeEmpatada } from '@hestia/model';
+import { coreRange, type FloorType, floorTypeThickness, formatQuantity, FUNCTION_LABEL, type Layer, type LayerFunction, layerPriority, temPrioridadeEmpatada } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { duplicateFloorType, floorTypeDeleteBlock, floorTypeError, floorTypeUsage, tryDeleteFloorType } from '../../editor/typeActions.ts';
@@ -12,12 +12,12 @@ import { FAMILY } from '../typeFamilies.ts';
 import { FloorSectionPreview } from './FloorSectionPreview.tsx';
 import { LayerAdvanced } from './LayerAdvanced.tsx';
 import { MaterialsDialog } from './MaterialsDialog.tsx';
+import { useUnits } from '../useUnits.ts';
 
 const FUNCTIONS = Object.keys(FUNCTION_LABEL) as LayerFunction[];
-const fmtCm = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
-
 /** Editor de tipo de piso: camadas do topo para baixo (reusa o editor de camadas do tipo de parede). */
 export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
+  const units = useUnits();
   const p = useProject();
   const src = p.floorTypes[typeId];
   const [draft, setDraft] = useState<FloorType | null>(src ? structuredClone(src) : null);
@@ -34,7 +34,7 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   const usage = floorTypeUsage(p, draft.id);
   const error = floorTypeError(draft);
   const core = coreRange(draft);
-  const nucleo = coreHint(draft);
+  const nucleo = coreHint(draft, units);
   const close = (): void => useUi.setState({ dialog: null, dialogArg: null });
   const setLayer = (i: number, patch: Partial<Layer>): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? { ...l, ...patch } : l)) });
   const replaceLayer = (i: number, next: Layer): void => setDraft({ ...draft, layers: draft.layers.map((l, k) => (k === i ? next : l)) });
@@ -134,7 +134,7 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.name ?? '—'}</span>
                           </button>
                         </td>
-                        <td><NumField value={l.thickness} scale={100} decimals={1} min={l.function === 'membrane' ? 0 : 0.001} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
+                        <td><NumField value={l.thickness} quantity="smallLength" min={l.function === 'membrane' ? 0 : 0.001} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
                         <td>
                           <span className="iconrow">
                             <button id={`ft-layer-${i}-more`} className={`ibtn more${adv === i ? ' open' : ''}${l.priority !== undefined || l.termino !== undefined ? ' changed' : ''}`} aria-expanded={adv === i} aria-controls={adv === i ? `ft-layer-${i}-adv` : undefined} aria-label={`Opções avançadas da camada ${i + 1}`} title="Mais" onClick={() => setAdv(adv === i ? null : i)}><Icon name="chevron" size={14} /></button>
@@ -157,7 +157,7 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
                 <tr><td colSpan={5} style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Face inferior</td></tr>
               </tbody>
             </table>
-            <div className="total"><span>Espessura total</span><strong>{fmtCm(floorTypeThickness(draft))} cm</strong></div>
+            <div className="total"><span>Espessura total</span><strong>{formatQuantity(units, 'smallLength', floorTypeThickness(draft))}</strong></div>
             <p className="hint">{nucleo.text}</p>
             {temPrioridadeEmpatada(draft.layers) && <p className="hint">Há camadas de funções diferentes com a mesma prioridade: elas não se cortam e deixam linha de fronteira.</p>}
             <button className="btn small" onClick={insert}>+ Inserir camada</button>
@@ -170,7 +170,7 @@ export function FloorTypeDialog({ typeId }: { typeId: string }): ReactElement | 
         </div>
         <div className="field-row"><label htmlFor="ft-code">Código</label><TextField id="ft-code" value={draft.code} onCommit={(v) => setDraft({ ...draft, code: v })} /></div>
         <div className="field-row"><label htmlFor="ft-desc">Descrição</label><TextField id="ft-desc" value={draft.description} onCommit={(v) => setDraft({ ...draft, description: v })} /></div>
-        <div className="field-row"><label htmlFor="ft-cost" title="Custo por m² de piso (R$), informativo">Custo (R$/m²)</label><NumField id="ft-cost" value={draft.cost} decimals={2} min={0} onCommit={(v) => setDraft({ ...draft, cost: v })} /></div>
+        <div className="field-row"><label htmlFor="ft-cost" title="Custo informativo do tipo por área">Custo por área</label><NumField id="ft-cost" value={draft.cost} quantity="currency" min={0} onCommit={(v) => setDraft({ ...draft, cost: v })} /></div>
       </Dialog>
       {pick !== null && picked && (
         <MaterialsDialog

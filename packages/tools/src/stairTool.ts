@@ -1,9 +1,9 @@
 import type { Vec2 } from '@hestia/geom';
-import { isStair, type Id, type StairCurve } from '@hestia/model';
+import { formatQuantity, isStair, unitsOf, type Id, type StairCurve } from '@hestia/model';
 import { distributeRisers } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import type { InferContext } from './infer.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import { pickStairAt, stairSnapPoints } from './stairPick.ts';
 import { chainItems, curveItems, treadItems } from './stairPreview.ts';
 import {
@@ -238,7 +238,7 @@ export class StairTool extends ToolBase {
     if (this.st.pick) return false;
     const from = this.st.stroke.last;
     if (this.st.stroke.prim !== 'line' || from === null || this.st.submode === 'concluir') return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null || v <= 0) {
       this.env.say('Valor inválido. Digite o comprimento em metros.');
       return false;
@@ -383,7 +383,7 @@ export class StairTool extends ToolBase {
     const picked = this.opts.pickChain ? chainAt(lines, idx) : { curves: [lines[idx]!.curve], closed: false };
     const result = offsetChain(picked.curves, leftSide(lines[idx]!.curve, raw) * off, picked.closed);
     const what = picked.curves.length > 1 ? `${picked.curves.length} segmentos (corrente)` : '1 segmento';
-    const shift = off > 0 ? ` · ${off.toFixed(2).replace('.', ',')} m` : '';
+    const shift = off > 0 ? ` · ${formatQuantity(unitsOf(this.env.project()), 'length', off)}` : '';
     return { sources: picked.curves, result, label: result ? `${what}${shift}` : 'deslocamento impossível' };
   }
 
@@ -473,7 +473,7 @@ export class StairTool extends ToolBase {
    * ou o deslocamento de "Pegar linhas".
    */
   refresh(): void {
-    this.report = analyzeDraft(this.st.parts, this.limits());
+    this.report = analyzeDraft(this.st.parts, this.limits(), unitsOf(this.env.project()));
     this.treads = treadItems(this.st.parts, this.report.riserHeight);
     this.pickItems = this.pickPreview();
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);

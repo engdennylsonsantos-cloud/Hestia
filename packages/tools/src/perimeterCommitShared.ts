@@ -1,6 +1,6 @@
 import { closestOnSegment, dist, equal, len, multiArea, norm, type SketchDraft, type Vec2 } from '@hestia/geom';
 import { resolveRoofs } from '@hestia/engine';
-import { validateProject, type Element, type Id, type Project, type ValidationIssue } from '@hestia/model';
+import { formatQuantity, validateProject, type Element, type Id, type Project, type ResolvedUnits, type ValidationIssue } from '@hestia/model';
 import { setDefaults } from './perimeterSession.ts';
 import type { CommitPerimeterOptions, CommitPerimeterResult } from './perimeterCommitTypes.ts';
 
@@ -71,9 +71,9 @@ export function waterCount(p: Project, levelId: Id, id: Id): number {
   return resolveRoofs(p, levelId).find((x) => x.roofId === id)?.planes.length ?? 0;
 }
 
-/** Área líquida (contorno menos furos) em m², com vírgula decimal. */
-export function areaText(outer: Vec2[], holes: Vec2[][]): string {
-  return `${multiArea([[outer, ...holes]]).toFixed(2).replace('.', ',')} m²`;
+/** Área líquida (contorno menos furos) em metros quadrados, com vírgula decimal. */
+export function areaText(u: ResolvedUnits, outer: Vec2[], holes: Vec2[][]): string {
+  return formatQuantity(u, 'area', multiArea([[outer, ...holes]]));
 }
 
 /** Tolerância (m) para dois contornos serem o mesmo: cada vértice de um fica a até isto do traço do outro. */

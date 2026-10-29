@@ -1,17 +1,17 @@
 import { useState, type ReactElement } from 'react';
-import { elementLevelId, type Id, type LevelKeep } from '@hestia/model';
+import { elementLevelId, formatQuantity, type Id, type LevelKeep } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { moveToLevel, readLevelKeep, writeLevelKeep } from '../editor/levelActions.ts';
 import { Row } from './fields.tsx';
-
-const fmt = (n: number): string => n.toFixed(2).replace('.', ',');
+import { useUnits } from './useUnits.ts';
 
 /**
  * Linha "Nível" de paredes, pisos, lajes e telhados: troca o nível de todos os ids dados num único passo de desfazer.
  * Com seleção mista de níveis mostra "—". O controle "Ao trocar:" escolhe entre manter a cota e levar o deslocamento.
  */
 export function LevelField({ ids, label = 'Nível' }: { ids: Id[]; label?: string }): ReactElement {
+  const units = useUnits();
   const p = useProject();
   const active = useUi((s) => s.levelId);
   const [keep, setKeep] = useState<LevelKeep>(readLevelKeep);
@@ -42,7 +42,7 @@ export function LevelField({ ids, label = 'Nível' }: { ids: Id[]; label?: strin
           )}
           {missing && <option value={first!}>{`Inexistente (${first})`}</option>}
           {p.levels.map((l) => (
-            <option key={l.id} value={l.id}>{`${l.name} · ${fmt(l.elevation)} m`}</option>
+            <option key={l.id} value={l.id}>{`${l.name} · ${formatQuantity(units, 'length', l.elevation)}`}</option>
           ))}
         </select>
       </Row>

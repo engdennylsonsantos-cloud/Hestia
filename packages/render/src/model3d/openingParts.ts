@@ -1,5 +1,16 @@
-import { buildOpeningModel, partTransformed, CLOSED, type OpeningGeometry, type OpeningPart, type PartMaterial, type PartRole, type WallFrame } from '@hestia/engine';
-import { openingAngle3d, openingDetail3d, type Id, type Opening, type Project } from '@hestia/model';
+import {
+  buildOpeningModel,
+  partTransformed,
+  CLOSED,
+  type OpeningGeometry,
+  type OpeningModel,
+  type OpeningPart,
+  type PartMaterial,
+  type PartProfile,
+  type PartRole,
+  type WallFrame,
+} from '@hestia/engine';
+import { openingTypeById, openingAngle3d, openingDetail3d, type Id, type Opening, type OpeningType, type Project } from '@hestia/model';
 
 /**
  * Peça da esquadria no 3D, em coordenadas locais do vão: x ao longo da parede, y na profundidade (0 = eixo da
@@ -24,13 +35,21 @@ export interface OpeningPiece {
   hinge?: { axis: 'x' | 'z'; at: number; atS?: number; angle: number };
   /** Deslocamento do estado aberto (correr), em metros, no sistema local do vão. */
   slide?: { dx: number; dy: number; dz: number };
+  /** Seção do modelo (batente em peça única): a peça vira um prisma extrudado, não uma caixa. */
+  profile?: PartProfile;
+  /** Peças do mesmo `group` formam UMA peça física (alizar): o desenho une os contornos. */
+  group?: string;
 }
 
-/** Papéis que cada nível de detalhe 3D mostra (o modelo é a fonte; o detalhe só filtra o que desenhar). */
+/**
+ * Papéis que cada nível de detalhe 3D mostra (o modelo é a fonte; o detalhe só filtra o que desenhar). Ferragens (maçaneta,
+ * fechadura e dobradiça) só no nível completo; a soleira aparece em todos os níveis.
+ */
 function mostraNoDetalhe(part: OpeningPart, detail: ReturnType<typeof openingDetail3d>): boolean {
   if (detail === 'off') return false;
-  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin';
-  if (detail === 'simple') return part.role !== 'handle' && part.role !== 'leafPanel';
+  // A baguete (`bead`) é divisão do vidro, como o `muntin`: some no esquemático.
+  if (detail === 'schematic') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'muntin' && part.role !== 'bead' && part.role !== 'hinge';
+  if (detail === 'simple') return part.role !== 'handle' && part.role !== 'leafPanel' && part.role !== 'hinge';
   return true;
 }
 
@@ -43,23 +62,32 @@ function materialIdOf(part: OpeningPart, p: Project, frameId: Id, glassId: Id): 
     if (p.materials['mat_perfil']) return 'mat_perfil';
     return frameId;
   }
-  // 'frame', 'leaf' e 'casing' usam o material do batente do tipo.
+  // 'frame' (batente, montantes, travessas, baguetes), 'leaf' e 'casing' usam o material do batente do tipo.
   return frameId;
 }
 
 /**
- * Adaptador fino do modelo único para o 3D: cada `OpeningPart` vira uma caixa centrada no sistema local do vão, com a
- * dobradiça (`hinge`) ou o deslocamento (`slide`) do movimento do modelo. `open` liga o estado aberto com o `angle3d`
+ * Adaptador fino do modelo único para o 3D: cada `OpeningPart` vira uma peça centrada no sistema local do vão (caixa ou,
+ * com `profile`, um prisma extrudado), com a dobradiça (`hinge`) ou o deslocamento (`slide`) do movimento do modelo.
+ * `open` liga o estado aberto com o `angle3d`
  * do tipo (graus → rad) e `partTransformed`; o detalhe 3D (`detail3d`) só filtra os papéis que a vista mostra.
  */
 export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: WallFrame, H: number, open: boolean): OpeningPiece[] {
-  const t = p.openingTypes[o.typeId];
+  const t = openingTypeById(p, o.typeId);
   if (!t) return [];
-  const detail = openingDetail3d(t);
-  if (detail === 'off') return [];
   // A altura das peças é limitada pela parede, como antes (o modelo usa a altura nominal do tipo).
   const geom = g.height > H - g.sill ? { ...g, height: H - g.sill } : g;
-  const model = buildOpeningModel(p, o, geom, f);
+  return pecasDoModelo(p, t, buildOpeningModel(p, o, geom, f), open);
+}
+
+/**
+ * Adaptador do modelo já montado (o mesmo de `buildOpeningModel`): cada `OpeningPart` vira uma `OpeningPiece`, com a
+ * seção (`profile`) e o grupo físico (`group`) copiados. Exposto para os testes validarem o caminho do batente em L
+ * antes de o motor de FR1 ser integrado; a vista usa sempre o modelo real.
+ */
+export function pecasDoModelo(p: Project, t: OpeningType, model: OpeningModel, open: boolean): OpeningPiece[] {
+  const detail = openingDetail3d(t);
+  if (detail === 'off') return [];
   // A veneziana tem limite próprio de 70° (spec E §3.5); o padrão do tipo é 45°.
   const abertura = t.plan === 'louver' ? Math.min(70, openingAngle3d(t)) : openingAngle3d(t);
   const angle = open ? (abertura * Math.PI) / 180 : 0;
@@ -78,6 +106,8 @@ export function openingPieces(p: Project, o: Opening, g: OpeningGeometry, f: Wal
       materialId: materialIdOf(part, p, t.frameMaterialId, t.glassMaterialId),
       material: part.material,
       role: part.role,
+      ...(part.profile ? { profile: part.profile } : {}),
+      ...(part.group ? { group: part.group } : {}),
     };
     if (open && part.motion) {
       if (part.motion.kind === 'rotate') {

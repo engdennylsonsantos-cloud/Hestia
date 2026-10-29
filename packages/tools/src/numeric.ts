@@ -1,3 +1,5 @@
+import { fromDisplay, parseQuantity, type LengthUnit, type Quantity, type ResolvedUnits } from '@hestia/model';
+
 /** Interpreta medidas digitadas: "3,5", "3.50+0,15", "(2+1)*0,5". Sem eval. Devolve null se inválido. */
 export function parseNumber(text: string): number | null {
   const src = text.trim().replace(/,/g, '.').replace(/\s+/g, '');
@@ -51,4 +53,30 @@ export function parseNumber(text: string): number | null {
   };
   const out = expr();
   return out !== null && i === src.length && Number.isFinite(out) ? out : null;
+}
+
+/**
+ * Texto digitado em ferramentas, em metros (SI). Tenta primeiro valor com unidade (`120cm`, `1,2m`);
+ * se não for, interpreta como expressão aritmética sem sufixo (`1,2+0,3`, `(2+1)*0,5`) na unidade de
+ * exibição da grandeza. Sufixo dentro de expressão (`2*60cm`) não é suportado e devolve `null`.
+ */
+export function parseQuantityText(text: string, u: ResolvedUnits, q: Quantity): number | null {
+  const direct = parseQuantity(u, q, text);
+  if (direct !== null) return direct;
+  const value = parseNumber(text);
+  return value === null ? null : fromDisplay(u, q, value);
+}
+
+const LENGTH_NAMES: Record<LengthUnit, string> = {
+  m: 'metros',
+  cm: 'centímetros',
+  mm: 'milímetros',
+  ft: 'pés',
+  in: 'polegadas',
+  'ft-in': 'pés e polegadas',
+};
+
+/** Nome por extenso da unidade de comprimento do projeto, para mensagens de erro das ferramentas. */
+export function lengthUnitName(u: ResolvedUnits): string {
+  return LENGTH_NAMES[u.length.unit];
 }

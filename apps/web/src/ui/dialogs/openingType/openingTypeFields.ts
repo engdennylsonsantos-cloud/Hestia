@@ -14,7 +14,17 @@ export type ReadDefaultField =
   | 'detail2d'
   | 'detail3d'
   | 'planDisplay'
-  | 'swingStyle';
+  | 'swingStyle'
+  | 'leafPlan'
+  | 'nominalRef'
+  | 'tiltAxis'
+  | 'glassKind'
+  | 'leafMaterialId'
+  | 'spanGap'
+  | 'leafUndercut'
+  | 'handleHeight'
+  | 'handleInset'
+  | 'hinges';
 
 const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 

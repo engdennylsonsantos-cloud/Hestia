@@ -9,7 +9,7 @@ function makeEnv(store = new ProjectStore(createEmptyProject())) {
   const options: ToolOptions = {
     wallTypeId: 'wt_alv14', locationLine: 'wallCenter', wallHeight: 2.8, chain: true, wallShape: 'line',
     doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', orthoLock: false, arrayCount: 3, offsetDistance: 1,
-    rotateCopy: false, mirrorCopy: false, offsetCopy: true, floorTypeId: 'ft_ceram', floorOffset: 0, floorMode: 'poly', slabTypeId: 'ls_mac12', slabOffset: 0, slabMode: 'poly', slabSlopePercent: 2,
+    rotateCopy: false, mirrorCopy: false, offsetCopy: true, floorTypeId: 'ft_ceram', floorOffset: 0, slabTypeId: 'ls_mac12', slabOffset: 0, slabSlopePercent: 2,
   };
   const env: ToolEnv = {
     project: () => store.project,
@@ -66,6 +66,16 @@ describe('inferência', () => {
 });
 
 describe('ferramenta de parede', () => {
+  it('a prévia traz a cota do comprimento pelo sistema único', () => {
+    const { env } = makeEnv();
+    const t = tool('wall', env);
+    clickAt(t, 0, 0);
+    t.move(P(3, 4));
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(1);
+    expect(dims[0]!.value).toBeCloseTo(5, 9);
+  });
+
   it('encadeia, fecha o circuito e cria uma parede por lado', () => {
     const { store, env } = makeEnv();
     const t = tool('wall', env);

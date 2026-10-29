@@ -22,6 +22,7 @@ export const list = (items: readonly string[]): string => `(${items.join(',')})`
 export function num(v: number): string {
   if (!Number.isFinite(v)) throw new Error(`Valor não finito no IFC: ${v}`);
   const x = Math.abs(v) < 5e-7 ? 0 : v;
+  // units-ok: coordenada IFC (formato de máquina)
   return x.toFixed(6);
 }
 
@@ -67,12 +68,17 @@ export class StepWriter {
     return id;
   }
 
+  /** Linhas STEP já escritas, na ordem de criação (localizar uma entidade pelo GlobalId depois de criada). */
+  get written(): readonly string[] {
+    return this.lines;
+  }
+
   /** Texto completo do arquivo: cabeçalho, seção DATA com as entidades e o rodapé. */
   text(opts: { fileName: string; timestamp: string }): string {
     const head = [
       'ISO-10303-21;',
       'HEADER;',
-      "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
+      "FILE_DESCRIPTION(('ViewDefinition [ReferenceView_V1.2]'),'2;1');",
       `FILE_NAME(${stepString(opts.fileName)},${stepString(opts.timestamp)},(''),(''),'Hestia','Hestia','');`,
       "FILE_SCHEMA(('IFC4'));",
       'ENDSEC;',

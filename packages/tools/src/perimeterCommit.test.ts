@@ -74,15 +74,19 @@ describe('perímetro: criar telhado', () => {
     expect(resolveRoofs(store.project, 'lv_0')[0]!.planes.length).toBeGreaterThan(0);
   });
 
-  it('telhado cuja geometria não gera águas é recusado, sem comando nem alteração', () => {
+  it('telhado sem nenhuma aresta que define inclinação é aceito: plano, na cota do beiral', () => {
+    // Antes era recusado; como no Revit, sem aresta inclinada o telhado é plano (uma água horizontal).
     const store = new ProjectStore(createEmptyProject());
     let d = draftOf('roof', rectSegs(0, 0, 6, 4));
     for (const s of d.segs) d = setSegSlope(d, s.id, { definesSlope: false });
     const r = commitPerimeter(store.project, d, { typeId: 'rt_ceramica', levelId: 'lv_0' });
-    expect(r.ok).toBe(false);
-    expect(r).not.toHaveProperty('commands');
-    expect(r.ok === false && r.message).toContain('nenhuma aresta define inclinação');
-    expect(roofsOnLevel(store.project, 'lv_0')).toHaveLength(0);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.commands).toHaveLength(1);
+    apply(store, r);
+    const [roof] = resolveRoofs(store.project, 'lv_0');
+    expect(roof!.problem).toBeUndefined();
+    expect(roof!.planes).toHaveLength(1);
+    expect(roof!.planes[0]!.percent).toBe(0);
   });
 
   it('inclinação e balanço por aresta vão para edgeSlopes e edgeOverhangs na ordem do contorno', () => {
@@ -159,14 +163,13 @@ describe('perímetro: roundtrip de edição', () => {
     expect(after.heightOffset).toBe(3.1);
   });
 
-  it('editar telhado que perde as arestas que geram águas é recusado e não altera o elemento', () => {
+  it('editar telhado para nenhuma aresta com inclinação é aceito: vira telhado plano', () => {
     const store = new ProjectStore(createEmptyProject());
     const id = roofInStore(store, rectSegs(0, 0, 6, 4));
     let d = draftFromElement(store.project, id)!;
     for (const s of d.segs) d = setSegSlope(d, s.id, { definesSlope: false });
     const r = commitPerimeter(store.project, d);
-    expect(r.ok).toBe(false);
-    expect(r.ok === false && r.message).toContain('nenhuma aresta define inclinação');
+    expect(r.ok).toBe(true);
   });
 
   it('draftFromElement de id inexistente ou de telhado livre devolve null', () => {

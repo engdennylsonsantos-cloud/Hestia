@@ -48,7 +48,7 @@ export function transformCeiling(c: Ceiling, t: Transform, copy = false): Ceilin
 
 /**
  * Move/gira/espelha um telhado: contorno, pegada, furos, direção e águas livres (origem e direção de subida). No espelho
- * o contorno inverte o sentido, então as listas por aresta (inclinação e balanço) trocam de posição para continuar
+ * o contorno inverte o sentido, então as listas por aresta (inclinação, balanço e flecha do arco) trocam de posição para continuar
  * na mesma aresta: a nova aresta k é a antiga n−2−k (mód. n).
  */
 export function transformRoof(r: Roof, t: Transform): Roof {

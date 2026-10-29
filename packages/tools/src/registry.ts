@@ -25,6 +25,7 @@ import { RoofArrowTool } from './roofArrowTool.ts';
 import { AttachRoofTool, DetachRoofTool } from './attachRoofTool.ts';
 import { StairTool } from './stairTool.ts';
 import { StairRunTool } from './stairRunTool.ts';
+import { RampTool } from './rampTool.ts';
 import { DimensionTool } from './dimensionTool.ts';
 import { TextTool } from './textTool.ts';
 import { RoomTool } from './roomTool.ts';
@@ -32,11 +33,12 @@ import { RoomSeparatorTool } from './roomSeparatorTool.ts';
 import { DetailLineTool } from './detailLineTool.ts';
 import { DetailRegionTool } from './detailRegionTool.ts';
 import { TagTool } from './tagTool.ts';
+import { GridTool } from './gridTool.ts';
 
-export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'dimension' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag' | 'perimeter';
+export type ToolId = 'select' | 'wall' | 'floor' | 'slab' | 'ceiling' | 'slope' | 'door' | 'window' | 'move' | 'copy' | 'rotate' | 'mirror' | 'array' | 'offset' | 'parallel' | 'trim' | 'align' | 'joins' | 'split' | 'measure' | 'section' | 'rehost' | 'roof' | 'roofarrow' | 'roofextrusion' | 'attachroof' | 'detachroof' | 'stair' | 'stairrun' | 'ramp' | 'dimension' | 'grid' | 'text' | 'room' | 'roomsep' | 'detailLine' | 'filledRegion' | 'tag' | 'perimeter';
 
 export const TOOL_GROUPS: Array<{ title: string; tools: ToolId[] }> = [
-  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'room'] },
+  { title: 'Construir', tools: ['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof', 'stair', 'stairrun', 'ramp', 'room'] },
   { title: 'Modificar', tools: ['move', 'copy', 'rotate', 'mirror', 'array', 'offset', 'parallel', 'trim', 'align', 'joins', 'split', 'rehost', 'slope', 'attachroof', 'detachroof'] },
   { title: 'Anotar', tools: ['dimension', 'text', 'detailLine', 'filledRegion', 'tag'] },
   { title: 'Medir', tools: ['measure'] },
@@ -73,8 +75,12 @@ export function createTool(id: ToolId, env: ToolEnv, perimeterTarget: SketchTarg
       return new StairTool(env);
     case 'stairrun':
       return new StairRunTool(env);
+    case 'ramp':
+      return new RampTool(env);
     case 'dimension':
       return new DimensionTool(env);
+    case 'grid':
+      return new GridTool(env);
     case 'text':
       return new TextTool(env);
     case 'room':
@@ -152,7 +158,9 @@ export const TOOL_LABEL: Record<ToolId, string> = {
   detachroof: 'Desanexar topo',
   stair: 'Escada por croqui',
   stairrun: 'Escada (reta/L/U/caracol)',
+  ramp: 'Rampa',
   dimension: 'Cota',
+  grid: 'Grade',
   text: 'Texto',
   room: 'Ambiente',
   roomsep: 'Separador de ambiente',

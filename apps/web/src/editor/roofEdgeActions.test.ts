@@ -22,11 +22,11 @@ describe('alteração de telhado pelas Propriedades (applyRoofPatch)', () => {
     expect(roof().edgeSlopes).toEqual([40, null, 30, null]);
   });
 
-  it('desligar a última aresta que define inclinação não aplica (o telhado ficaria sem águas)', () => {
+  it('desligar a última aresta que define inclinação aplica: o telhado vira plano, como no Revit', () => {
     const { store, roof } = storeWithRoof();
-    expect(applyRoofPatch(store, ['t1'], { edgeSlopes: [null, null, null, null] })).toBe(false);
-    expect(useUi.getState().status).toMatch(/Alteração não aplicada/);
-    expect(roof().edgeSlopes).toEqual([30, null, 30, null]);
+    expect(applyRoofPatch(store, ['t1'], { edgeSlopes: [null, null, null, null] })).toBe(true);
+    expect(useUi.getState().status).not.toMatch(/Alteração não aplicada/);
+    expect(roof().edgeSlopes).toEqual([null, null, null, null]);
   });
 
   it('patch vazio é aceito sem tocar no telhado', () => {

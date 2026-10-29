@@ -16,8 +16,9 @@ import {
   type Vec2,
 } from '@hestia/geom';
 import { frameOfWall, wallFacesCached as facesOf, type WallFaces } from '@hestia/engine';
-import { openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
+import { openingTypeById, openingsOfWall, totalThickness, wallsOnLevel, type Id, type Project, type Wall } from '@hestia/model';
 import { closestOnWall, wallMid } from './wallGeom.ts';
+import { addGridSnaps } from './gridSnapPoints.ts';
 import { addExtraPoints, addExtraSegments, addExtraTracks } from './snapExtras.ts';
 import { DEFAULT_SNAP, type Guide, type Inference, type SnapKind, type SnapOptions } from './types.ts';
 
@@ -243,6 +244,8 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   addExtraPoints(ctx, sn, cursor, tol, add);
   // Arestas de pisos e lajes e ombreiras de aberturas: o pé sobre a aresta é captura de aresta, com o dono para o ignore.
   if (!ctx.onWallsOnly) addExtraSegments(ctx, sn, cursor, tol, add);
+  // Grades de eixos (do projeto): pontas, cruzamentos com grades e paredes e o ponto sobre a linha.
+  if (!ctx.onWallsOnly) addGridSnaps(ctx.project, sn, cursor, tol, walls, ctx.ignore, add);
   // Faces: cantos, pontos médios, arestas e pé da perpendicular nas faces de acabamento e (opcional) do núcleo.
   const addSegs = (segs: Array<[Vec2, Vec2]>, kind: 'face' | 'core', hostId?: Id): void => {
     for (const [a, b] of segs) {
@@ -375,7 +378,14 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
     // (dentro do segmento a captura "nearest" já cobre o ponto).
     const tracks = faceTracks.filter((tr) => {
       const d = sub(tr.b, tr.a);
-      return dot(d, d) >= 1e-12;
+      const dd = dot(d, d);
+      if (dd < 1e-12) return false;
+      // Índice barato: um trecho cuja reta não passa perto do cursor não gera projeção, cruzamento com
+      // eixos nem par de faces perto dele. Sem isso, 200 paredes davam ~400 trechos e ~80 mil pares por
+      // chamada de `infer` (o snap ficava ~10× mais lento a cada movimento do mouse).
+      const t = dot(sub(cursor, tr.a), d) / dd;
+      const projected = v2(tr.a.x + d.x * t, tr.a.y + d.y * t);
+      return dist(cursor, projected) <= tol * Math.SQRT2;
     });
     for (const tr of tracks) {
       const d = sub(tr.b, tr.a);
@@ -495,13 +505,13 @@ export function occupiedRanges(p: Project, wallId: Id, ignoreId?: Id, vertical?:
     .filter((o) => o.id !== ignoreId)
     .filter((o) => {
       if (!vertical) return true;
-      const t = p.openingTypes[o.typeId];
+      const t = openingTypeById(p, o.typeId);
       const sill = o.sillOverride ?? t?.sill ?? 0;
       const top = sill + (t?.height ?? 2.1);
       return sill < vertical[1] - 1e-6 && top > vertical[0] + 1e-6;
     })
     .map((o) => {
-      const t = p.openingTypes[o.typeId];
+      const t = openingTypeById(p, o.typeId);
       const h = (t?.width ?? 0.8) / 2;
       return [o.offset - h, o.offset + h] as [number, number];
     });

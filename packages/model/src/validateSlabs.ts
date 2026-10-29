@@ -1,10 +1,11 @@
-import { boxOf, boxesOverlap, intersection, multiArea, type Box, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
+import { machineNumber, boxOf, boxesOverlap, intersection, multiArea, type Box, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { floorPolygon, floorTypeThickness } from './floor.ts';
 import { levelElevation } from './queries.ts';
 import { slabArea, slabPolygon, slabRiseAt, slabTypeThickness } from './slab.ts';
 import { isFloor, isSlab, type Floor, type Project, type Slab } from './types.ts';
 import type { ValidationIssue } from './validate.ts';
 import { OVERLAP_MIN, ZERO_AREA, fmtArea, holeOutside, selfIntersects } from './validateFloors.ts';
+import { unitsOf } from './units.ts';
 
 /** Erro de módulo do vetor de direção da inclinação (a direção tem que ser unitária). */
 const DIR_TOLERANCE = 1e-3;
@@ -19,7 +20,7 @@ function slopeProblem(s: Slab): string | null {
   if (!sl) return null;
   if (![sl.origin.x, sl.origin.y, sl.dir.x, sl.dir.y].every(Number.isFinite)) return 'origem ou direção não são números finitos';
   const len = Math.hypot(sl.dir.x, sl.dir.y);
-  if (Math.abs(len - 1) > DIR_TOLERANCE) return `a direção não é unitária (comprimento ${len.toFixed(3).replace('.', ',')})`;
+  if (Math.abs(len - 1) > DIR_TOLERANCE) return `a direção não é unitária (comprimento ${machineNumber(len, 3)})`;
   if (!Number.isFinite(sl.percent) || Math.abs(sl.percent) > MAX_PERCENT) return `o percentual ${sl.percent} está fora de -100 a 100`;
   return null;
 }
@@ -43,20 +44,20 @@ function slabIssuesOf(p: Project, s: Slab): ValidationIssue[] {
     if (h.length >= 3 && selfIntersects(h)) push('slab-self-intersect', `O furo ${k + 1} da laje ${name} se cruza consigo mesmo.`);
   });
   const area = slabArea(s);
-  if (area <= ZERO_AREA) push('slab-zero-area', `Laje ${name} tem área líquida de ${fmtArea(area)}; precisa ser maior que zero.`);
+  if (area <= ZERO_AREA) push('slab-zero-area', `Laje ${name} tem área líquida de ${fmtArea(area, unitsOf(p))}; precisa ser maior que zero.`);
   s.holes.forEach((h, k) => {
     if (h.length >= 3 && holeOutside(s.boundary, h)) push('slab-hole-outside', `O furo ${k + 1} da laje ${name} está fora do contorno.`);
   });
   return out;
 }
 
-/** Sobreposição (m²) acima de 1 cm² entre duas formas do mesmo nível; 0 quando as caixas nem se tocam. */
+/** Sobreposição (metros quadrados) acima de 1 cm quadrado entre duas formas do mesmo nível; 0 quando as caixas nem se tocam. */
 function commonArea(a: MultiPolygon, boxA: Box, b: MultiPolygon, boxB: Box): number {
   return boxesOverlap(boxA, boxB) ? multiArea(intersection(a, b)) : 0;
 }
 
-/** Lajes do mesmo nível com área em comum acima de 1 cm² (warning). Só lajes com contorno válido. */
-function slabOverlaps(slabs: Slab[]): ValidationIssue[] {
+/** Lajes do mesmo nível com área em comum acima de 1 cm quadrado (warning). Só lajes com contorno válido. */
+function slabOverlaps(slabs: Slab[], units: ReturnType<typeof unitsOf>): ValidationIssue[] {
   const shapes = slabs
     .filter((s) => s.boundary.length >= 3 && !selfIntersects(s.boundary))
     .map((s) => ({ s, poly: [slabPolygon(s)], box: boxOf(slabPolygon(s).flat()) }));
@@ -71,7 +72,7 @@ function slabOverlaps(slabs: Slab[]): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'slab-overlap',
-        message: `Lajes ${label(a.s)} e ${label(b.s)} se sobrepõem no mesmo nível: ${fmtArea(common)} em comum.`,
+        message: `Lajes ${label(a.s)} e ${label(b.s)} se sobrepõem no mesmo nível: ${fmtArea(common, units)} em comum.`,
         elementId: a.s.id,
       });
     }
@@ -98,7 +99,7 @@ function verticalOverlap(piece: Polygon, slope: Slab['slope'], slabTop: number, 
 }
 
 /**
- * Laje e piso do mesmo nível que se sobrepõem em volume (warning): interseção em planta acima de 1 cm² e faixas de
+ * Laje e piso do mesmo nível que se sobrepõem em volume (warning): interseção em planta acima de 1 cm quadrado e faixas de
  * cota que se cruzam. O piso sobre a laje, encostado na face superior, não avisa. Pares com tipo ausente não entram.
  */
 function slabFloorOverlaps(p: Project, slabs: Slab[], floors: Floor[]): ValidationIssue[] {
@@ -125,7 +126,7 @@ function slabFloorOverlaps(p: Project, slabs: Slab[], floors: Floor[]): Validati
         severity: 'warning',
         code: 'slab-floor-overlap',
         message:
-          `Laje ${label(a.s)} e piso ${label(b.f)} se sobrepõem no mesmo nível: ${fmtArea(area)} em comum. ` +
+          `Laje ${label(a.s)} e piso ${label(b.f)} se sobrepõem no mesmo nível: ${fmtArea(area, unitsOf(p))} em comum. ` +
           'Se o piso é o acabamento sobre a laje, ajuste o deslocamento do piso para que a face inferior dele fique sobre a face superior da laje.',
         elementId: a.s.id,
       });
@@ -171,7 +172,7 @@ function floorStructureOverSlab(p: Project, slabs: Slab[], floors: Floor[]): Val
         severity: 'warning',
         code: 'piso-estrutura-sobre-laje',
         message:
-          `Piso ${label(f)} tem camada estrutural e a face inferior dele está sobre a laje ${label(a.s)} (${fmtArea(area)} em comum): ` +
+          `Piso ${label(f)} tem camada estrutural e a face inferior dele está sobre a laje ${label(a.s)} (${fmtArea(area, unitsOf(p))} em comum): ` +
           'o concreto está contado duas vezes (piso e laje); use um tipo de piso de acabamento.',
         elementId: f.id,
       });
@@ -187,7 +188,7 @@ export function slabIssues(p: Project): ValidationIssue[] {
   const floors = elements.filter(isFloor);
   return [
     ...slabs.flatMap((s) => slabIssuesOf(p, s)),
-    ...slabOverlaps(slabs),
+    ...slabOverlaps(slabs, unitsOf(p)),
     ...slabFloorOverlaps(p, slabs, floors),
     ...floorStructureOverSlab(p, slabs, floors),
   ];

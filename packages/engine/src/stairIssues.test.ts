@@ -9,6 +9,7 @@ import {
   type StairCurve,
   type StairLanding,
   type StairRun,
+  type StairType,
 } from '@hestia/model';
 import { DEFAULT_STAIR_NORMS } from './stairNorms.ts';
 import { minWidth, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
@@ -56,6 +57,17 @@ function projectWith(components: Array<StairRun | StairLanding>, topOffset = -0.
   s.exec({
     type: 'addStair',
     stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', topOffset, components }),
+  });
+  return s.project;
+}
+
+/** Mesmo projeto, mas com a regra de cálculo do tipo padrão alterada. */
+function projectWithCalc(components: Array<StairRun | StairLanding>, calc: Partial<StairType>): Project {
+  const s = new ProjectStore(createEmptyProject());
+  s.exec({ type: 'upsertStairType', stairType: { ...s.project.stairTypes[defaultStairTypeId]!, ...calc } });
+  s.exec({
+    type: 'addStair',
+    stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', topOffset: -0.2, components }),
   });
   return s.project;
 }
@@ -135,14 +147,31 @@ describe('avisos de norma por código', () => {
     expect(codes(list)).toContain('stair-blondel');
   });
 
-  it('stair-blondel (aviso): 2h + p = 0,65 m com h = 0,175 m e piso 0,30 m (só este aviso)', () => {
-    const list = stairIssueList(projectWith([straight(16, 0.3)]));
+  it('stair-blondel (aviso): 2h + p = 0,66 m com h = 0,175 m e piso 0,31 m (só este aviso)', () => {
+    const list = stairIssueList(projectWith([straight(16, 0.31)]));
     expect(list).toHaveLength(1);
     expect(find(list, 'stair-blondel')).toMatchObject({
       severity: 'warning',
       componentIndex: 0,
-      message: 'A relação 2h + p (0,650 m) está fora da faixa de norma (0,63 a 0,64 m).',
+      message: 'A relação 2h + p (0,660 m) está fora da faixa de norma (0,63 a 0,65 m).',
     });
+  });
+
+  it('stair-blondel usa a faixa e os fatores do TIPO: aviso derivado da regra personalizada', () => {
+    const list = stairIssueList(projectWithCalc([straight(16, 0.28)], { calcTarget: 0.75, calcMin: 0.7, calcMax: 0.8 }));
+    expect(find(list, 'stair-blondel')).toMatchObject({
+      severity: 'warning',
+      componentIndex: 0,
+      message: 'A relação 2h + p (0,630 m) está fora da faixa de norma (0,70 a 0,80 m).',
+    });
+    // a = 1, b = 1: 0,175 + 0,28 = 0,455 m, abaixo da faixa padrão, e o rótulo mostra os fatores.
+    const custom = stairIssueList(projectWithCalc([straight(16, 0.28)], { calcRiserFactor: 1, calcTreadFactor: 1 }));
+    expect(find(custom, 'stair-blondel').message).toBe(
+      'A relação 1h + p (0,455 m) está fora da faixa de norma (0,63 a 0,65 m).',
+    );
+    // Dentro da faixa personalizada não avisa.
+    const ok = stairIssueList(projectWithCalc([straight(16, 0.28)], { calcMin: 0.6, calcMax: 0.7 }));
+    expect(codes(ok)).not.toContain('stair-blondel');
   });
 
   it('stair-landing-rise (aviso): lance de 20 espelhos sobe 3,60 m, acima de 3,20 m (só este aviso)', () => {

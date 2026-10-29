@@ -28,6 +28,8 @@ export function sharedKind(A: ResolvedRoofPlane, B: ResolvedRoofPlane, p: Vec2, 
   const gB = gradientOf(B);
   const dA = dot(gA, nA);
   const dB = dot(gB, { x: -nA.x, y: -nA.y });
+  // Mesma direção de subida e inclinações diferentes: não é pico nem vale, é um desnível (mansarda).
+  if (Math.hypot(A.up.x - B.up.x, A.up.y - B.up.y) < 1e-9 && Math.abs(A.percent - B.percent) > 1e-9 && ((dA < -FLAT && dB > FLAT) || (dA > FLAT && dB < -FLAT))) return 'break';
   const horizontal = Math.abs(dot(gA, l)) < FLAT && Math.abs(dot(gB, l)) < FLAT;
   if (dA <= FLAT && dB <= FLAT) return horizontal ? 'ridge' : 'hip';
   if (dA >= -FLAT && dB >= -FLAT) return 'valley';

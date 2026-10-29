@@ -74,21 +74,22 @@ describe('motor com arco: águas e tempo', () => {
   });
 });
 
-describe('motor: esqueleto que não fecha diz onde', () => {
-  it('L com a empena interna: o problema traz o ponto da falha, em coordenadas do beiral (m)', () => {
+describe('motor: esqueleto que não fecha cai na envoltória (Revit: aceita)', () => {
+  it('L com a empena interna: o esqueleto não fecha, a envoltória fecha a superfície e o telhado tem águas', () => {
     // Base, braço de baixo e topo definem; a interna é empena. Contorno é o beiral (L com 0,5 m de balanço em volta).
     const eave = [P(-0.5, -0.5), P(10.5, -0.5), P(10.5, 4.5), P(5.5, 4.5), P(5.5, 8.5), P(-0.5, 8.5)];
     const r = one(build(eave, [30, 30, null, null, 30, null]));
-    expect(r.problem).toMatch(/^o esqueleto não fecha em \(\d+,\d\d; \d+,\d\d\) m \(/);
-    expect(r.planes).toHaveLength(0);
+    expect(r.problem).toBeUndefined();
+    expect(r.planes.length).toBeGreaterThan(0);
+    expect(r.steps).toBeUndefined();
   });
 
-  it('L com degrau entre água e empena: o motor não falha, devolve os degraus com a altura de cada um', () => {
-    // A interna definindo: a água da interna encontra o beiral do braço de baixo no canto reentrante (5,5; 4,5).
+  it('L com degrau entre água e empena: a envoltória fecha a superfície, sem degrau', () => {
+    // A interna definindo: antes o esqueleto deixava degrau de 1,5 m no canto reentrante (5,5; 4,5); agora não há degrau.
     const L = [P(0, 0), P(10, 0), P(10, 4), P(5, 4), P(5, 8), P(0, 8)];
     const r = one(build(L, [30, 30, null, 30, null, null]));
     expect(r.problem).toBeUndefined();
-    expect(r.steps?.length).toBeGreaterThan(0);
-    expect(r.steps![0]!.dz).toBeGreaterThan(1);
+    expect(r.steps).toBeUndefined();
+    expect(r.planes.length).toBeGreaterThan(0);
   });
 });

@@ -9,6 +9,7 @@ import {
   resolveFloors,
   resolveLevel,
   resolveRoofs,
+  resolveRampsOnLevel,
   resolveRooms,
   resolveSlabs,
   resolveStairsOnLevel,
@@ -33,6 +34,8 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
+import { planFootprint } from './stairs.ts';
+import { rampFootprint } from './ramps.ts';
 import { openingSymbol, type OpeningSymbolOptions } from './symbols.ts';
 import { contextoDaVista, projetoDaJuncao } from './viewContext.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
@@ -99,6 +102,7 @@ function categoryHiddenIds(p: Project, levelId: Id, hiddenCats: HiddenCats): Set
   for (const s of resolveSlabs(p, levelId)) add('slab', s.slabId);
   for (const r of resolveRoofs(p, levelId)) add('roof', r.roofId);
   for (const s of resolveStairsOnLevel(p, levelId)) add('stair', s.id);
+  for (const r of resolveRampsOnLevel(p, levelId)) add('stair', r.id);
   for (const r of resolveRooms(p, levelId)) add('room', r.roomId);
   return out;
 }
@@ -255,7 +259,8 @@ function ghostOps(p: Project, levelId: Id, view: PlanView, ids: Id[], theme: Pla
   for (const f of resolveFloors(p, levelId)) footprints.set(f.floorId, f.polygon);
   for (const s of resolveSlabs(p, levelId)) footprints.set(s.slabId, s.polygon);
   for (const r of resolveRoofs(p, levelId)) footprints.set(r.roofId, roofFootprint(r));
-  for (const s of resolveStairsOnLevel(p, levelId)) footprints.set(s.id, s.footprint);
+  for (const s of resolveStairsOnLevel(p, levelId)) footprints.set(s.id, planFootprint(s));
+  for (const r of resolveRampsOnLevel(p, levelId)) footprints.set(r.id, rampFootprint(r));
   for (const id of ids) {
     const e = p.elements[id];
     if (isOpening(e)) {

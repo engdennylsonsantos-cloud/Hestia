@@ -1,14 +1,22 @@
+/* eslint-disable max-lines */
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
+import type { Ramp, RampType } from './rampTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 import type { Sheet } from './sheet.ts';
+import type { Grid, GridType } from './grid.ts';
 import type { ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
 import type { Opening, OpeningLineConvention, OpeningType } from './openingTypes.ts';
+import type { ProfilePreset } from './openingComposition.ts';
+import type { DimensionSettings } from './dimensionSettings.ts';
+import type { UnitsSettings } from './units.ts';
+import type { AreaPlan, ColorScheme, RoomCategory } from './areaPlan.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 21;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
+export type { Ramp, RampInputMode, RampNormProfile, RampNormRow, RampShape, RampType } from './rampTypes.ts';
 export type * from './openingTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
@@ -97,9 +105,9 @@ export interface WallType {
   /** Retorno dos acabamentos nas extremidades livres. */
   wrapEnds: WrapMode;
   strips: WallStrip[];
-  /** Custo por m² de face de parede (R$/m²). 0 quando não informado. */
+  /** Custo por metro quadrado de face de parede (em reais por metro quadrado). 0 quando não informado. */
   cost: number;
-  /** Transmitância térmica U (W/m²K). null quando não informada. */
+  /** Transmitância térmica U (W por metro quadrado kelvin). null quando não informada. */
   thermalU: number | null;
   /** Isolamento acústico aéreo Rw (dB). null quando não informado. */
   acousticRw: number | null;
@@ -181,7 +189,8 @@ export interface Dimension {
   /** Direção de medida. Ausente mantém compatibilidade com cotas alinhadas antigas. */
   mode?: 'aligned' | 'horizontal' | 'vertical';
   /** Formatação opcional da leitura, em metros por padrão. */
-  unit?: 'm' | 'cm' | 'mm';
+  /** Unidade da cota: 'project' (ou ausente) segue as unidades do projeto; valores antigos m/cm/mm são mantidos. */
+  unit?: 'm' | 'cm' | 'mm' | 'project';
   precision?: 0 | 1 | 2 | 3;
   prefix?: string;
   suffix?: string;
@@ -201,6 +210,8 @@ export interface TextNote {
   rotation: number;
   /** Largura da caixa em mm de papel; ausente mantém texto sem quebra. */
   width?: number;
+  /** Desenha a caixa (moldura) em volta do texto; ausente = só texto. */
+  frame?: boolean;
   /** Pontos de chamada em coordenadas de modelo, do elemento até a caixa. */
   leader?: Vec2[];
   bold?: boolean;
@@ -273,6 +284,8 @@ export interface Wall {
   comments: string;
   /** Ordem de criação: desempata junções (docs/05 §1, ordem de junção). */
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de piso: camadas do topo para baixo (acabamento, contrapiso, estrutura). `wraps` não é usado. */
@@ -282,7 +295,7 @@ export interface FloorType {
   code: string;
   description: string;
   layers: Layer[];
-  /** Custo por m² (R$), informativo. */
+  /** Custo por metro quadrado (em reais), informativo. */
   cost: number;
 }
 
@@ -322,6 +335,8 @@ export interface Floor {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de laje: camadas do topo para baixo (regularização, estrutura). */
@@ -359,6 +374,8 @@ export interface Slab {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de forro: camadas do topo para baixo (estrutura, placa, acabamento visível). Mesmo papel do tipo de piso. */
@@ -368,7 +385,7 @@ export interface CeilingType {
   code: string;
   description: string;
   layers: Layer[];
-  /** Custo por m² (R$), informativo. */
+  /** Custo por metro quadrado (em reais), informativo. */
   cost: number;
   /** Hachura do corte e da elevação (D3). Sem valor, usa a hachura do material da camada. */
   hatch?: HatchKind;
@@ -395,6 +412,8 @@ export interface Ceiling {
   mark: string;
   comments: string;
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
 /** Tipo de telhado: camadas do topo para baixo (telha, ripamento, estrutura), espessura medida na vertical. */
@@ -440,6 +459,16 @@ export interface RoofPlaneDef {
   z0: number;
 }
 
+/** Mansarda automática do telhado por contorno: duas faixas por água (ver `Roof.mansard`). */
+export interface RoofMansard {
+  /** Inclinação da faixa de baixo, junto ao beiral (% , em (0, 300]). */
+  lowerPercent: number;
+  /** Inclinação da faixa de cima (% , em (0, 300]). */
+  upperPercent: number;
+  /** Largura em planta da faixa de baixo (m), medida do beiral para dentro; > 0. */
+  run: number;
+}
+
 /**
  * Telhado (Revit: Roof by footprint; ArchiCAD: Roof). `boundary` é o contorno do beiral em planta (já com o balanço);
  * a cota do beiral é o nível + `heightOffset`. As águas vêm da forma: 'shed' (uma água subindo na direção `dir`),
@@ -468,6 +497,19 @@ export interface Roof {
   edgeSlopes: Array<number | null>;
   /** Balanço do beiral por aresta (m); mesmo comprimento de `boundary`. Com `footprint`, o beiral se refaz dele. */
   edgeOverhangs: number[];
+  /**
+   * Flecha do arco por aresta (m), como `Wall.sag`: distância do meio do arco à corda, positiva à esquerda de i → i+1.
+   * Ausente ou 0 = aresta reta. O motor divide a aresta em trechos só por dentro, antes do esqueleto; o contorno gravado
+   * em `boundary` continua sendo os vértices (cantos lógicos). Mesmo comprimento de `boundary` quando presente.
+   */
+  edgeSag?: number[];
+  /**
+   * Mansarda automática (só formas por contorno: 'edges', 'hip', 'gable', 'shed'): cada água se divide em duas faixas, a de
+   * baixo, junto ao beiral, com `lowerPercent` até a distância `run` (m, em planta) do beiral, e a de cima com
+   * `upperPercent`. Ausente = sem mansarda (sem migração). Com ela, as inclinações por aresta só dizem quais arestas têm
+   * água (as sem inclinação continuam empenas); o percentual vem de `lowerPercent` e `upperPercent`.
+   */
+  mansard?: RoofMansard;
   /**
    * Pegada: contorno desenhado, sem balanço, de onde o beiral saiu (modos de contorno, retângulo e paredes). Com ela,
    * `boundary = eaveOutlinePerEdge(footprint, edgeOverhangs)`. Ausente em telhados antigos e depois de editar vértices
@@ -500,6 +542,22 @@ export interface Room {
   number: string;
   /** Ponto interior em planta (m) usado para achar o circuito de paredes que define o ambiente. */
   point: Vec2;
+  /**
+   * Cruzamento das linhas de referência (Revit: Reference). Ausente = centroide do polígono resolvido.
+   * Arrastar a referência NÃO muda `point` nem a área; só o desenho e a etiqueta.
+   */
+  referencePoint?: Vec2;
+  /**
+   * Posição do rótulo do ambiente, compartilhada por TODAS as vistas (planta de piso, planta de área, cortes).
+   * Ausente = centro do ambiente. Arrastar o rótulo em qualquer vista grava aqui.
+   */
+  labelPosition?: Vec2;
+  /** Rotação do rótulo em graus (sentido anti-horário). Ausente = 0. */
+  labelRotation?: number;
+  /** Chamada do rótulo: automática (liga ao sair do ambiente), nenhuma, reta, cotovelo ou cruzada. Ausente = automática. */
+  labelLeader?: 'auto' | 'none' | 'straight' | 'kinked' | 'crossed';
+  /** Categoria do ambiente (Sala, Banho, Circulação…). Ausente = sem categoria. */
+  categoryId?: Id;
   /** Deslocamento da base em relação ao nível (m). Ausente = 0. */
   heightOffset?: number;
   /** Pé-direito (m). Ausente = `defaults.wallHeight` (leitura). */
@@ -511,9 +569,48 @@ export interface Room {
   color?: string;
   /** Ordem de criação (desempate e ordenação nas tabelas). */
   order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }
 
-export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room;
+/**
+ * Propriedade importada de um arquivo IFC (pset ou quantitativo). `name` é o nome da propriedade no arquivo; `value` já
+ * vem convertido para texto, número ou booleano. Sempre opcional no modelo (arquivos antigos não têm).
+ */
+export interface IfcProperty {
+  name: string;
+  value: string | number | boolean;
+  /** Conjunto de origem no IFC (`Pset_WallCommon`, `Qto_BeamBaseQuantities`...); ausente = conjunto do importador. */
+  pset?: string;
+}
+
+/**
+ * Objeto importado de outro programa (IFC) sem equivalente nativo: viga, pilar, escada, mobiliário, MEP, curtain wall...
+ * Guarda a classe de origem, a malha triangular em coordenadas de mundo (m), o contorno em planta e as propriedades do IFC.
+ * Entra no 3D, no DXF e nos quantitativos (volume/área por triângulos) e volta no IFC como `IfcBuildingElementProxy`.
+ */
+export interface Generic {
+  id: Id;
+  kind: 'generic';
+  levelId: Id;
+  name: string;
+  /** Classe IFC de origem (`IFCBEAM`, `IFCSTAIR`...). */
+  sourceClass: string;
+  predefinedType?: string;
+  objectType?: string;
+  /** Malha triangular em coordenadas de mundo: `positions` = x, y, z...; `indices` = triplas. */
+  mesh: { positions: number[]; indices: number[] };
+  /** Contorno em planta (hull da malha) para as vistas 2D; ausente = sem desenho em planta. */
+  outline?: Vec2[];
+  color?: string;
+  /** Opacidade 0..1 vinda do `IfcSurfaceStyleRendering` (vidro); ausente = 1. */
+  opacity?: number;
+  order: number;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente quando o objeto não tem pset. */
+  ifcProperties?: IfcProperty[];
+}
+
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Ramp | Room | Generic;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -539,6 +636,10 @@ export interface ProjectSettings {
   openingLine?: OpeningLineConvention;
   /** Mostra o código do tipo de cada porta e janela na planta (Revit: Tag on Placement). Ausente = não mostra. */
   showOpeningTags?: boolean;
+  /** Referências das cotas dinâmicas (ausente = padrões de `dimensionSettingsOf`). */
+  dimensions?: DimensionSettings;
+  /** Unidades do projeto (ausente = padrões de `defaultUnits()`). */
+  units?: UnitsSettings;
 }
 
 /** Direção de uma elevação gerada automaticamente. A identidade fica no papel, não no nome editável. */
@@ -609,7 +710,11 @@ export interface Project {
   roofTypes: Record<Id, RoofType>;
   /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
   stairTypes: Record<Id, StairType>;
+  /** Tipos de rampa (Revit: Ramp Type). Mesmo papel dos demais mapas de tipos. */
+  rampTypes: Record<Id, RampType>;
   openingTypes: Record<Id, OpeningType>;
+  /** Presets de perfil das esquadrias (editáveis); a migração 19 → 20 semeia os iniciais. Ausente = os iniciais por leitura. */
+  openingProfiles?: Record<Id, ProfilePreset>;
   elements: Record<Id, Element>;
   nextOrder: number;
   defaults: ProjectDefaults;
@@ -624,6 +729,16 @@ export interface Project {
   sectionGraphics?: ViewGraphics;
   /** Pranchas (decisão 0022); ausente = nenhuma. */
   sheets?: Sheet[];
+  /** Grades de eixos (Revit: Grid); ausente = nenhuma. Ver `grid.ts`. */
+  grids?: Grid[];
+  /** Tipos de grade gravados; os padrão (`DEFAULT_GRID_TYPES`) valem sem estar aqui. */
+  gridTypes?: Record<Id, GridType>;
+  /** Plantas de área (uma por pavimento); ausente = nenhuma. */
+  areaPlans?: AreaPlan[];
+  /** Categorias de ambiente; ausente = as padrão (`DEFAULT_ROOM_CATEGORIES`). */
+  roomCategories?: RoomCategory[];
+  /** Esquemas de cores das plantas de área; ausente = nenhum. */
+  colorSchemes?: ColorScheme[];
 }
 
 export const isRoof = (e: Element | undefined): e is Roof => e?.kind === 'roof';
@@ -633,4 +748,6 @@ export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floo
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
 export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';
+export const isRamp = (e: Element | undefined): e is Ramp => e?.kind === 'ramp';
 export const isRoom = (e: Element | undefined): e is Room => e?.kind === 'room';
+export const isGeneric = (e: Element | undefined): e is Generic => e?.kind === 'generic';

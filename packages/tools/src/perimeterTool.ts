@@ -1,7 +1,8 @@
 import type { PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { add, angleOf, dist, len, mul, norm, sub, type SketchDraft, type SketchResult, type SketchTarget, type Vec2 } from '@hestia/geom';
 import { ToolBase } from './base.ts';
-import { parseNumber } from './numeric.ts';
+import { unitsOf } from '@hestia/model';
+import { parseNumber, parseQuantityText } from './numeric.ts';
 import { SKETCH_DEFAULTS, addSegs, closeAnalysis, finish as finishSketch, newDraft, removeSegs, selectAllSegs, type FinishResult, type SketchOrigin } from './perimeterSession.ts';
 import { anchorOf, buildShape, kindOf, promptOf, stepPreview, stepsOf, type ShapeStep } from './perimeterToolShape.ts';
 import { SELECT_PX, boxRing, hitSeg, roomClick, roomHover, segLines } from './perimeterToolPick.ts';
@@ -12,6 +13,8 @@ import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 import { DraftHistory } from './perimeterToolModifyHistory.ts';
 import { ModifyFlow } from './perimeterToolModify.ts';
 import { BoxSelection, type SelectionBox } from './perimeterToolSelect.ts';
+import { perimeterDraftDims } from './perimeterToolDims.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 
 /** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
 export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter' | 'pickRoom';
@@ -88,13 +91,9 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Forma escolhida na barra, ou null (modo de seleção). */
-  activeShape(): PerimeterShape | null {
-    return this.shape;
-  }
+  activeShape(): PerimeterShape | null { return this.shape; }
 
-  lineKind(): LineKind {
-    return this.line;
-  }
+  lineKind(): LineKind { return this.line; }
 
   /** Validação corrente do rascunho, para a barra de status e o botão Concluir. */
   closeInfo(): SketchResult {
@@ -121,6 +120,8 @@ export class PerimeterTool extends ToolBase {
   override preview(): PreviewItem[] {
     return this.mod.active() ? this.mod.preview() : this.items;
   }
+
+  tempDims = (overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] => perimeterDraftDims(this.env.project(), this.env.levelId(), this.d, this.step, this.raw, overrides);
 
   /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento e desliga o comando de Modificar. */
   setShape(kind: PerimeterShape | null): void {
@@ -368,12 +369,13 @@ export class PerimeterTool extends ToolBase {
     const st = this.step;
     const input = st ? stepsOf(st.shape)[st.idx] : undefined;
     if (!st || !input) return false;
-    const v = parseNumber(text);
+    const q = input.kind === 'length' ? 'length' : input.kind === 'angle' ? 'angle' : null;
+    const v = q ? parseQuantityText(text, unitsOf(this.env.project()), q) : parseNumber(text);
     if (input.kind === 'length' || input.kind === 'angle' || input.kind === 'count') {
       if (v === null) return refuse(this.env, 'Valor inválido. Digite um número.');
       if (input.kind === 'length' && v <= 0) return refuse(this.env, 'Digite um comprimento maior que zero, em metros.');
       if (input.kind === 'count' && (!Number.isInteger(v) || v < 3)) return refuse(this.env, 'Lados: um inteiro de 3 para cima.');
-      this.setInput(st, input.key, input.kind === 'angle' ? (v * Math.PI) / 180 : v);
+      this.setInput(st, input.key, v);
       return true;
     }
     const anchor = anchorOf(st);
@@ -397,9 +399,7 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Muda o rascunho como passo de desfazer (geometria). Seleção só troca o corrente, sem passo. */
-  private commit(next: SketchDraft): void {
-    this.draftHistory.push(next);
-  }
+  private commit(next: SketchDraft): void { this.draftHistory.push(next); }
 
   /** "Por ambiente": o contorno do ambiente entra no esboço e o id do ambiente vai para a origem. */
   private roomStep(r: ReturnType<typeof roomClick>): void {

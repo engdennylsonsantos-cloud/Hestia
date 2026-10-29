@@ -1,5 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
-import { parseNumber } from './numeric.ts';
+import { unitsOf } from '@hestia/model';
+import { parseNumber, parseQuantityText } from './numeric.ts';
 import { PERIMETER_MODIFY_LABEL, type PerimeterModifyKind } from './perimeterModifyKind.ts';
 import { deleteSegs } from './perimeterModify.ts';
 import { selectSegsMode } from './perimeterSession.ts';
@@ -90,7 +91,7 @@ export class ModifyFlow {
     }
     if (!SOURCED.has(kind) || this.st.stage !== 0) return;
     this.st.stage = 1;
-    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st)}`);
+    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st, unitsOf(this.h.project?.()))}`);
   }
 
   /**
@@ -156,11 +157,14 @@ export class ModifyFlow {
     if (!kind || this.needsSource() || transformPrompt(kind, this.st) === null) return false;
     // Mover/Copiar no destino: aceita também o deslocamento digitado "dx,dy" (ou "dx;dy"), em metros.
     if ((kind === 'move' || kind === 'copy') && this.st.stage === 2) {
-      const delta = parseDelta(text);
+      const delta = parseDelta(text, unitsOf(this.h.project?.()));
       if (delta) return transformDelta(this.h, kind, this.st, delta);
     }
-    const v = parseNumber(text);
-    if (v === null) return this.refuse('Valor inválido. Digite um número.');
+    const prompt = transformPrompt(kind, this.st);
+    const q = prompt === 'Ângulo (graus)' ? 'angle' : prompt && prompt !== 'Quantidade' ? 'length' : null;
+    const lido = q ? parseQuantityText(text, unitsOf(this.h.project?.()), q) : parseNumber(text);
+    if (lido === null) return this.refuse('Valor inválido. Digite um número.');
+    const v = q === 'angle' ? (lido * 180) / Math.PI : lido;
     return transformType(this.h, kind, this.st, v, this.raw);
   }
 
@@ -273,7 +277,7 @@ export class ModifyFlow {
       return;
     }
     this.st.stage = 1;
-    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st)}`);
+    this.h.say(`${PERIMETER_MODIFY_LABEL[kind]}. ${transformHint(kind, this.st, unitsOf(this.h.project?.()))}`);
   }
 
   /**
@@ -286,7 +290,7 @@ export class ModifyFlow {
     if (!id) return;
     const next = selectSegsMode(d, [id], 'add');
     this.h.replace(next);
-    this.h.say(`${next.selected.length} linha(s) na origem. ${transformHint('offset', this.st)}`);
+    this.h.say(`${next.selected.length} linha(s) na origem. ${transformHint('offset', this.st, unitsOf(this.h.project?.()))}`);
   }
 
   /** Dica da etapa de escolher o alvo, com o estado do Tab (só a linha ou o laço conectado). */
@@ -301,7 +305,7 @@ export class ModifyFlow {
     const kind = this.cmd!;
     if (this.needsSource()) return this.targetHint(kind);
     if (EDGE.has(kind)) return edgeHint(kind, this.st);
-    return transformHint(kind, this.st);
+    return transformHint(kind, this.st, unitsOf(this.h.project?.()));
   }
 
   private refuse(msg: string): false {

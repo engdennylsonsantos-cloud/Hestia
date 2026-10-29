@@ -1,6 +1,6 @@
 import { sheetDimsMm, sheetOf, type Id, type Project, type SheetViewport } from '@hestia/model';
 import { furnitureParts } from './frame.ts';
-import { planPartsOf, sectionPartsOf } from './viewports.ts';
+import { areaTablePartsOf, areaPlanPartsOf, planPartsOf, sectionPartsOf } from './viewports.ts';
 import { emptyParts, type SheetDrawList, type ViewportParts } from './types.ts';
 
 /** Vista 3D não vai para o papel (sem imagem raster): o quadro traz o aviso. Decisão 0022. */
@@ -21,6 +21,10 @@ function partsOfViewport(p: Project, v: SheetViewport): ViewportParts {
   switch (v.view.kind) {
     case 'plan':
       return planPartsOf(p, v.view.levelId, v);
+    case 'areaPlan':
+      return areaPlanPartsOf(p, v.view.planId, v);
+    case 'areaTable':
+      return areaTablePartsOf(p, v);
     case 'section':
       return sectionPartsOf(p, v.view.sectionId, v);
     case '3d':

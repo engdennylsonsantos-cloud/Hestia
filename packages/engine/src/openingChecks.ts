@@ -1,7 +1,10 @@
 import {
+  defaultUnits,
+  formatQuantity,
   OPENING_FRAME_DEFAULTS,
   openingFamilyOf,
   openingLintel,
+  spanTypeOf,
   type OpeningType,
 } from '@hestia/model';
 
@@ -15,7 +18,6 @@ export interface OpeningCheck {
   text: string;
 }
 
-const fmt = (v: number): string => v.toFixed(2).replace('.', ',');
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
 
 /** Fração da área nominal que conta como ventilação, por família de janela. */
@@ -53,8 +55,9 @@ export const openingClearWidth = (t: Pick<OpeningType, 'width' | 'frameWidth'>):
 export const openingClearHeight = (t: Pick<OpeningType, 'height' | 'frameWidth'>): number =>
   t.height - (t.frameWidth ?? OPENING_FRAME_DEFAULTS.frameWidth);
 
-/** Área útil de ventilação (m²) da janela, pela fração da família; 0 para porta. */
-export function openingVentilationArea(t: OpeningType): number {
+/** Área útil de ventilação (metros quadrados) da janela, pela fração da família; 0 para porta. */
+export function openingVentilationArea(raw: OpeningType): number {
+  const t = spanTypeOf(raw);
   const factor = ventilationFactor(t);
   return factor === null ? 0 : t.width * t.height * factor;
 }
@@ -63,20 +66,21 @@ export function openingVentilationArea(t: OpeningType): number {
  * Lista de verificações do tipo, na ordem: largura livre (NBR 9050), altura livre, ventilação (janela), profundidade
  * do batente contra o núcleo da parede e presença de verga. `coreThickness` é a espessura do núcleo (DEC-1).
  */
-export function openingChecks(t: OpeningType, coreThickness: number): OpeningCheck[] {
+export function openingChecks(raw: OpeningType, coreThickness: number, units = defaultUnits()): OpeningCheck[] {
+  const t = spanTypeOf(raw); // as larguras e alturas abaixo são do VÃO (com `nominalRef` 'leaf' a folha ganha a folga)
   const out: OpeningCheck[] = [];
   const freeW = openingClearWidth(t);
   out.push(
     freeW >= 0.8
-      ? { level: 'ok', text: `Largura livre ${fmt(freeW)} m atende à NBR 9050 (mínimo 0,80 m).` }
-      : { level: 'warn', text: `Largura livre ${fmt(freeW)} m abaixo de 0,80 m (NBR 9050, acessibilidade).` },
+      ? { level: 'ok', text: `Largura livre ${formatQuantity(units, 'length', freeW)} atende à NBR 9050 (mínimo ${formatQuantity(units, 'length', 0.8)}).` }
+      : { level: 'warn', text: `Largura livre ${formatQuantity(units, 'length', freeW)} abaixo de ${formatQuantity(units, 'length', 0.8)} (NBR 9050, acessibilidade).` },
   );
 
   const freeH = openingClearHeight(t);
   out.push(
     freeH >= 2.1
-      ? { level: 'ok', text: `Altura livre ${fmt(freeH)} m atende ao mínimo de 2,10 m.` }
-      : { level: 'warn', text: `Altura livre ${fmt(freeH)} m abaixo de 2,10 m.` },
+      ? { level: 'ok', text: `Altura livre ${formatQuantity(units, 'length', freeH)} atende ao mínimo de ${formatQuantity(units, 'length', 2.1)}.` }
+      : { level: 'warn', text: `Altura livre ${formatQuantity(units, 'length', freeH)} abaixo de ${formatQuantity(units, 'length', 2.1)}.` },
   );
 
   const factor = ventilationFactor(t);
@@ -84,11 +88,11 @@ export function openingChecks(t: OpeningType, coreThickness: number): OpeningChe
     const area = openingVentilationArea(t);
     if (factor === 0) {
       const nome = openingFamilyOf(t)?.id === 'window_void' ? 'Vão livre de janela' : 'Janela fixa';
-      out.push({ level: 'warn', text: `${nome} não conta como ventilação (área útil 0,00 m²).` });
+      out.push({ level: 'warn', text: `${nome} não conta como ventilação (área útil ${formatQuantity(units, 'area', 0)}).` });
     } else {
       out.push({
         level: 'ok',
-        text: `Área útil de ventilação ${fmt(area)} m² (${pct(factor)} de ${fmt(t.width)} × ${fmt(t.height)} m).`,
+        text: `Área útil de ventilação ${formatQuantity(units, 'area', area)} (${pct(factor)} de ${formatQuantity(units, 'length', t.width)} × ${formatQuantity(units, 'length', t.height)}).`,
       });
     }
   }
@@ -97,8 +101,8 @@ export function openingChecks(t: OpeningType, coreThickness: number): OpeningChe
   const depth = t.frameDepth ?? OPENING_FRAME_DEFAULTS.frameDepth;
   out.push(
     depth <= core
-      ? { level: 'ok', text: `Profundidade do batente ${fmt(depth)} m cabe no núcleo de ${fmt(core)} m.` }
-      : { level: 'warn', text: `Profundidade do batente ${fmt(depth)} m maior que o núcleo de ${fmt(core)} m.` },
+      ? { level: 'ok', text: `Profundidade do batente ${formatQuantity(units, 'length', depth)} cabe no núcleo de ${formatQuantity(units, 'length', core)}.` }
+      : { level: 'warn', text: `Profundidade do batente ${formatQuantity(units, 'length', depth)} maior que o núcleo de ${formatQuantity(units, 'length', core)}.` },
   );
 
   out.push(

@@ -36,6 +36,13 @@ describe('anotações no DXF da planta', () => {
     expect(texts[0]!.height).toBeCloseTo(0.25, 9);
   });
 
+  it('o valor da cota segue as unidades do projeto', () => {
+    const s = comAnotacoes();
+    s.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const texts = notesDxfOf(s.project, LV0, 100).texts.filter((t) => t.layer === DXF_LAYER_COTAS);
+    expect(texts.map((t) => t.text)).toEqual(['400,0 cm']);
+  });
+
   it('texto livre vai para TEXTOS, com a altura e a rotação do próprio texto', () => {
     const notes = notesDxfOf(comAnotacoes().project, LV0, 100);
     expect(notes.texts.find((t) => t.layer === DXF_LAYER_TEXTOS)).toMatchObject({ text: 'Sala', rotation: 90, at: { x: 2, y: 2 } });

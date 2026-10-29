@@ -4,6 +4,7 @@ import { floorIssues } from './validateFloors.ts';
 import { slabIssues } from './validateSlabs.ts';
 import { roofIssues } from './validateRoofs.ts';
 import { stairIssues } from './validateStairs.ts';
+import { rampIssues } from './validateRamps.ts';
 import { roomIssues } from './validateRooms.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
@@ -12,7 +13,11 @@ import { graphicsIssues, graphicsOf, levelGraphicsOf, sectionGraphicsOf, view3dO
 import { sectionRefIssues, sectionViewIssue } from './sectionView.ts';
 import { projectSheets } from './sheet.ts';
 import { viewSourceIssue } from './sheetCommands.ts';
+import { planAnnotationsOf } from './areaPlan.ts';
 import { isOpening, isWall, type Element, type Id, type Level, type Opening, type Project, type Wall } from './types.ts';
+import { openingTypeById } from './openingNominal.ts';
+import { formatQuantity } from './unitsFormat.ts';
+import { unitsOf } from './units.ts';
 
 /** `info`: aviso informativo (não é problema; ex.: parede anexada só em parte ao piso). */
 export type ValidationSeverity = 'error' | 'warning' | 'info';
@@ -40,7 +45,6 @@ const COLLINEAR_ANGLE = (1 * Math.PI) / 180;
 const COLLINEAR_OFFSET = 0.01;
 
 const label = (e: Element): string => ('mark' in e && e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
-const fmt = (n: number): string => (Number.isFinite(n) ? n.toFixed(3) : String(n));
 
 function wallIssues(p: Project, w: Wall): ValidationIssue[] {
   const out: ValidationIssue[] = [];
@@ -50,7 +54,7 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
     out.push({
       severity: 'error',
       code: 'wall-zero-length',
-      message: `Parede ${name} tem comprimento de ${fmt(len * 1000)} mm; o mínimo é 1 mm.`,
+      message: `Parede ${name} tem comprimento de ${formatQuantity(unitsOf(p), 'smallLength', len)}; o mínimo é ${formatQuantity(unitsOf(p), 'smallLength', 0.001)}.`,
       elementId: w.id,
     });
   }
@@ -92,7 +96,7 @@ function wallIssues(p: Project, w: Wall): ValidationIssue[] {
       out.push({
         severity: 'error',
         code: 'wall-height-invalid',
-        message: `Altura da parede ${name} é ${fmt(h)} m; precisa ser maior que zero.`,
+        message: `Altura da parede ${name} é ${formatQuantity(unitsOf(p), 'length', h)}; precisa ser maior que zero.`,
         elementId: w.id,
       });
     }
@@ -104,7 +108,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
   const out: ValidationIssue[] = [];
   const name = label(o);
   const host = p.elements[o.hostId];
-  const type = p.openingTypes[o.typeId];
+  const type = openingTypeById(p, o.typeId);
   if (!isWall(host)) {
     out.push({
       severity: 'error',
@@ -130,7 +134,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'opening-out-of-wall',
-        message: `Abertura ${name} não cabe na parede ${label(host)}: vão de ${fmt(start)} m a ${fmt(end)} m, parede com ${fmt(L)} m.`,
+        message: `Abertura ${name} não cabe na parede ${label(host)}: vão de ${formatQuantity(unitsOf(p), 'length', start)} a ${formatQuantity(unitsOf(p), 'length', end)}, parede com ${formatQuantity(unitsOf(p), 'length', L)}.`,
         elementId: o.id,
       });
     }
@@ -142,7 +146,7 @@ function openingIssues(p: Project, o: Opening): ValidationIssue[] {
 function openingOverlaps(p: Project, openings: Opening[]): ValidationIssue[] {
   const byHost = new Map<Id, Array<{ o: Opening; lo: number; hi: number }>>();
   for (const o of openings) {
-    const type = p.openingTypes[o.typeId];
+    const type = openingTypeById(p, o.typeId);
     if (!type || !isWall(p.elements[o.hostId])) continue;
     const list = byHost.get(o.hostId) ?? [];
     list.push({ o, lo: o.offset - type.width / 2, hi: o.offset + type.width / 2 });
@@ -269,6 +273,23 @@ function sheetProblems(p: Project): ValidationIssue[] {
   return out;
 }
 
+/** Plantas de área: etiqueta de elemento apontando para elemento que não existe mais (aviso, não erro). */
+function areaPlanProblems(p: Project): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  for (const plan of p.areaPlans ?? []) {
+    for (const tag of planAnnotationsOf(plan).tags) {
+      if (p.elements[tag.hostId]) continue;
+      out.push({
+        severity: 'warning',
+        code: 'area-plan-tag-host-missing',
+        message: `Planta de área "${plan.name}": a etiqueta "${tag.id}" aponta para o elemento "${tag.hostId}", que não existe.`,
+        elementId: tag.id,
+      });
+    }
+  }
+  return out;
+}
+
 /** Verificação do modelo: devolve todos os problemas, sem alterar o projeto. */
 export function validateProject(p: Project): ValidationIssue[] {
   const elements = Object.values(p.elements);
@@ -278,6 +299,7 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...graphicsProblems(p),
     ...viewProblems(p),
     ...sheetProblems(p),
+    ...areaPlanProblems(p),
     ...p.levels.flatMap((l) => levelIssues(l)),
     ...walls.flatMap((w) => wallIssues(p, w)),
     ...openings.flatMap((o) => openingIssues(p, o)),
@@ -290,6 +312,7 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...slabIssues(p),
     ...roofIssues(p),
     ...stairIssues(p),
+    ...rampIssues(p),
     ...roomIssues(p),
   ];
 }

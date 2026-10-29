@@ -52,6 +52,7 @@ export function buildPdf(pages: PdfPageSpec[], title = 'Hestia'): Uint8Array {
 /** Número com até três casas, sem "-0" e sem notação científica. */
 export function num(n: number): string {
   const v = Math.abs(n) < 5e-4 ? 0 : n;
+  // units-ok: coordenada do PDF (formato de máquina)
   return v.toFixed(3);
 }
 

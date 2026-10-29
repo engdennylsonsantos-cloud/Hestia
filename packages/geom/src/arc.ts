@@ -98,7 +98,7 @@ export function sagFromThreePoints(a: Vec2, m: Vec2, b: Vec2): number {
   const tm = (m.x - a.x) * u.x + (m.y - a.y) * u.y;
   if (Math.abs(dm) < 1e-6 || chord < 1e-6) return 0;
   // Círculo por a, b, m: o ponto médio da corda tem t = c/2; usamos a potência do ponto.
-  // Distância ao centro na direção n: h_c = ((tm − 0)(tm − c) + dm²) / (2 dm)  (centro em (c/2, h_c))
+  // Distância ao centro na direção n: h_c = ((tm − 0)(tm − c) + dm·dm) / (2 dm)  (centro em (c/2, h_c))
   const hc = (tm * (tm - chord) + dm * dm) / (2 * dm);
   const r = Math.hypot(chord / 2, hc);
   const apex = hc + Math.sign(dm) * r; // ponto do arco mais afastado da corda, do lado de m

@@ -1,4 +1,4 @@
-import { closestOnSegment, intersection, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
+import { closestOnSegment, intersection, machineNumber, orientedRect, triangulate, union, unionClipper, type MultiPolygon, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import { openingLineConvention, openingType, openingsOfWall, wallsOnLevel, type HatchKind, type Id, type OpeningLineConvention, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fuseBands } from './bandFuse.ts';
@@ -13,6 +13,8 @@ import type { OpeningModel } from './openingModelTypes.ts';
 import { EPS_T, lineIntervals, prismProjection, rect, sectionFrame, slabQuad, type SectionLine } from './sectionGeom.ts';
 import { resolveStairsOnLevel } from './stairs.ts';
 import { sectionOfStairs } from './sectionStairs.ts';
+import { resolveRampsOnLevel } from './ramps.ts';
+import { sectionOfRamps } from './sectionRamps.ts';
 import { OCCLUSION_RANK, visibleParts, type OcclusionItem } from './sectionOcclusion.ts';
 import { uniqueOrigins, type SectionPart } from './sectionParts.ts';
 import { cutPieces, cutRegions, type CutPiece } from './sectionCut.ts';
@@ -44,6 +46,7 @@ export interface SectionOrigin {
   ceilingId?: Id;
   roofId?: Id;
   stairId?: Id;
+  rampId?: Id;
   openingId?: Id;
 }
 
@@ -137,7 +140,7 @@ function groupBeyond(list: SectionBeyond[]): SectionBeyond[] {
   list.forEach((b, i) => {
     // Escadas e telhados ficam peça a peça (cada degrau, espelho e água é um item); paredes, pisos e lajes agrupam.
     const merge = b.wallId !== undefined || b.floorId !== undefined || b.slabId !== undefined || b.ceilingId !== undefined;
-    const key = merge ? [b.wallId, b.floorId, b.slabId, b.ceilingId, b.materialId, b.layerIndex, b.depth.toFixed(6)].join('|') : `#${i}`;
+    const key = merge ? [b.wallId, b.floorId, b.slabId, b.ceilingId, b.materialId, b.layerIndex, machineNumber(b.depth, 6)].join('|') : `#${i}`;
     const group = byKey.get(key);
     if (group) group.push(b);
     else byKey.set(key, [b]);
@@ -268,6 +271,11 @@ export function computeSection(p: Project, line: SectionLine, levelIds: Id[] = p
     for (const c of sk.cut) addCut(c.materialId, c.polygon, { stairId: c.stairId });
     beyond.push(...sk.beyond);
     grow(sk.zMin, sk.zMax);
+    // Rampas da rampa §4.3: mesma leitura das escadas monolíticas, com `rampId` na origem.
+    const rk = sectionOfRamps(resolveRampsOnLevel(p, levelId), line, p);
+    for (const c of rk.cut) addCut(c.materialId, c.polygon, { rampId: c.rampId });
+    beyond.push(...rk.beyond);
+    grow(rk.zMin, rk.zMax);
     for (const w of wallsOnLevel(p, levelId)) {
       const rw = resolved.walls[w.id];
       if (!rw) continue;

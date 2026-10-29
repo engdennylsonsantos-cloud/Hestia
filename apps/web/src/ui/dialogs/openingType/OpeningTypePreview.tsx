@@ -179,7 +179,7 @@ export function OpeningTypePreview({
         <button type="button" className="btn small" aria-pressed={flipHand} onClick={onFlipHand}>Inverter dobradiça</button>
         <button type="button" className="btn small" aria-pressed={flipFacing} onClick={onFlipFacing}>Inverter sentido</button>
         <label htmlFor="op-pv-angle">Ângulo</label>
-        <NumField id="op-pv-angle" value={angle} decimals={0} unit="°" onCommit={onAngle} />
+        <NumField id="op-pv-angle" value={(angle * Math.PI) / 180} quantity="angle" onCommit={(v) => onAngle((v * 180) / Math.PI)} />
       </div>
       <div className="op-pv-state">
         <span>Dobradiça: {flipHand ? 'direita' : 'esquerda'}</span>

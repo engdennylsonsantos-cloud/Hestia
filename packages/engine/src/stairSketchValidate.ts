@@ -33,7 +33,7 @@ export function validateRunSketch(run: StairRunSketch, opts: RunSketchOptions = 
   return validatePrepared(run, prepareRun(run), opts.sweep ?? spiralSweepOf(run));
 }
 
-export function validatePrepared(run: StairRunSketch, P: Prepared, sweep?: number): StairSketchIssue[] {
+export function validatePrepared(run: StairRunSketch, P: Prepared, sweep?: number, skipPairs = false): StairSketchIssue[] {
   const out: StairSketchIssue[] = [];
   if (chainBroken(run.boundaryLeft)) out.push(sketchIssue('stair-boundary-gap'));
   if (chainBroken(run.boundaryRight)) out.push(sketchIssue('stair-boundary-gap'));
@@ -41,7 +41,8 @@ export function validatePrepared(run: StairRunSketch, P: Prepared, sweep?: numbe
     out.push(sketchIssue('stair-boundaries-touch'));
   }
   checkRisers(P, out);
-  checkRiserPairs(P, out, sweep !== undefined ? turnsOf(run, P, sweep) : undefined);
+  // `skipPairs`: pula a checagem O(n²) de pares (fatias de rampa: geradas por construção, uniformes e ordenadas).
+  if (!skipPairs) checkRiserPairs(P, out, sweep !== undefined ? turnsOf(run, P, sweep) : undefined);
   if (run.path.length > 0) checkPath(run, P, out);
   return out;
 }

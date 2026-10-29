@@ -1,4 +1,4 @@
-import type { Vec2 } from '@hestia/geom';
+import { machineNumber, type Vec2 } from '@hestia/geom';
 import { DARK, LIGHT, type PlanDrawList, type StrokeOp } from '@hestia/render';
 
 /** Caixa em coordenadas do modelo (metros): o enquadramento da prévia. */
@@ -87,10 +87,8 @@ export function fillColor(color: string): string {
   return THEME_VARS.get(color.toLowerCase()) ?? color;
 }
 
-const fmt = (n: number): string => {
-  const s = n.toFixed(2);
-  return s.replace(/\.?0+$/, '') || '0';
-};
+// units-ok: coordenadas/opacidades do SVG (formato de máquina)
+const fmt = (n: number): string => machineNumber(n, 2);
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -207,8 +205,9 @@ export function drawListToSvg(list: PlanDrawList, box?: DrawBox | null, options:
     const opacity = s.alpha < 1 ? ` stroke-opacity="${fmt(Math.max(0, s.alpha))}"` : '';
     const dash = s.dash ? ` stroke-dasharray="${fmt(s.dash[0])} ${fmt(s.dash[1])}"` : '';
     const strokeWidth = fmt(Math.max(0.6, Math.min(8, s.widthPx)));
+    const role = s.role ? ` data-role="${esc(s.role)}"` : '';
     strokes.push(
-      `<path data-op="stroke" d="${d}" fill="none" stroke="${esc(color)}" stroke-width="${strokeWidth}"${opacity}${dash} stroke-linecap="round" stroke-linejoin="round"/>`,
+      `<path data-op="stroke"${role} d="${d}" fill="none" stroke="${esc(color)}" stroke-width="${strokeWidth}"${opacity}${dash} stroke-linecap="round" stroke-linejoin="round"/>`,
     );
   }
   const title = options.title ? `<title>${esc(options.title)}</title>` : '';

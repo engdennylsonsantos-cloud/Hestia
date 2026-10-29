@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveBoundary } from '@hestia/engine';
-import { createEmptyProject, makeRoom, makeWall, ProjectStore, type Ceiling, type Command, type Floor } from '@hestia/model';
+import { ceilingsOnLevel, createEmptyProject, makeRoom, makeWall, ProjectStore, type Ceiling, type Command, type Floor } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { addSegs, newDraft, type NewSeg } from './perimeterSession.ts';
 import { commitPerimeter, draftFromElement, perimeterOptionsOf } from './perimeterCommit.ts';
@@ -167,4 +167,45 @@ describe('perímetro: forro acompanha o ambiente (Por ambiente + Acompanhar o am
     const free = ok(commitPerimeter(s.project, draftFromElement(s.project, id)!, { ...opts, followRoom: false }));
     expect(free.commands[0]?.type).toBe('detachCeilingRoom');
   });
+
+  it('segundo forro no mesmo ambiente é recusado com a mensagem antiga, e nada é criado', () => {
+    const s = house();
+    const pick = roomAt(ctxOf(s), { x: 4, y: 2.5 })!;
+    const opts = { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r1' } };
+    apply(s, commitPerimeter(s.project, addSegs(newDraft('ceiling'), pick.segs), opts));
+    const msg = refused(commitPerimeter(s.project, addSegs(newDraft('ceiling'), pick.segs), opts));
+    expect(msg).toContain('Este ambiente já tem forro.');
+    expect(ceilingsOnLevel(s.project, 'lv_0')).toHaveLength(1);
+  });
+
+  it('forro pelo ambiente leva o pé-direito e o número do ambiente (como o "Forro no ambiente")', () => {
+    const s = house();
+    s.exec({ type: 'updateElements', ids: ['r1'], patch: { ceilingHeight: 2.5 } });
+    const pick = roomAt(ctxOf(s), { x: 4, y: 2.5 })!;
+    const r = commitPerimeter(s.project, addSegs(newDraft('ceiling'), pick.segs), { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r1' }, heightOffset: 2.6 });
+    const c = (ok(r).commands[0] as Extract<Command, { type: 'addCeiling' }>).ceiling;
+    expect(c.heightOffset).toBe(2.5);
+    expect(c.mark).toBe('101');
+  });
+
+  it('editar forro para um ambiente que já tem forro é recusado; o próprio forro segue editável', () => {
+    const s = casaDividida();
+    const a = roomAt(ctxOf(s), { x: 2, y: 2.5 })!;
+    const b = roomAt(ctxOf(s), { x: 6, y: 2.5 })!;
+    const id1 = apply(s, commitPerimeter(s.project, addSegs(newDraft('ceiling'), a.segs), { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r1' } }));
+    const id2 = apply(s, commitPerimeter(s.project, addSegs(newDraft('ceiling'), b.segs), { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r2' } }));
+    const paraA = { ...addSegs(newDraft('ceiling'), a.segs), editing: id2 };
+    expect(refused(commitPerimeter(s.project, paraA, { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r1' } }))).toContain('Este ambiente já tem forro.');
+    const proprio = { ...addSegs(newDraft('ceiling'), a.segs), editing: id1 };
+    expect(ok(commitPerimeter(s.project, proprio, { typeId: 'ct_gesso', levelId: 'lv_0', followRoom: true, origin: { roomId: 'r1' } })).commands.length).toBeGreaterThan(0);
+  });
 });
+
+/** Casa de 8 × 5 m dividida por uma parede em x = 4, com um ambiente de cada lado (r1 à esquerda, r2 à direita). */
+function casaDividida(): ProjectStore {
+  const s = house();
+  s.exec({ type: 'addWall', wall: makeWall({ id: 'wm', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 4, y: 0 }, b: { x: 4, y: 5 } }) });
+  s.exec({ type: 'updateElements', ids: ['r1'], patch: { point: { x: 2, y: 2.5 } } });
+  s.exec({ type: 'addRoom', room: makeRoom({ id: 'r2', levelId: 'lv_0', name: 'Copa', number: '102', point: { x: 6, y: 2.5 } }) });
+  return s;
+}

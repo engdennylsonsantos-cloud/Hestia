@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OPENING_TYPES, openingFamilies, type OpeningType } from '@hestia/model';
 import { openingChecks } from '@hestia/engine';
 import { editor } from '../../../editor/controller.ts';
@@ -10,6 +10,7 @@ import { OpeningTypeHeader } from './OpeningTypeHeader.tsx';
 import { OpeningTypeLibrary } from './OpeningTypeLibrary.tsx';
 import { OpeningTypePreview } from './OpeningTypePreview.tsx';
 import { OpeningTypeSections } from './OpeningTypeSections.tsx';
+import type { OpeningComponentId } from './components.ts';
 
 // O diálogo lê o projeto pelo controlador; no teste de render, um projeto vazio em memória basta (sem DOM).
 vi.mock('../../../editor/controller.ts', async () => {
@@ -21,52 +22,54 @@ vi.mock('../../../editor/controller.ts', async () => {
 const tipo = (id: string): OpeningType => DEFAULT_OPENING_TYPES.find((t) => t.id === id)!;
 const vazio = (): void => {};
 
+afterEach(() => {
+  editor.store.exec({ type: 'setSettings', patch: { units: undefined } });
+});
+
 describe('diálogo do tipo de abertura (render)', () => {
-  it('renderiza o diálogo completo com biblioteca, sete seções e verificações', () => {
+  it('renderiza o diálogo completo com biblioteca, lista de componentes e verificações', () => {
     const d = tipo('ot_p90');
     editor.store.exec({ type: 'upsertOpeningType', openingType: { ...d, id: 'ot_smoke', name: 'Porta de teste' } });
     const html = renderToStaticMarkup(createElement(OpeningTypeDialog, { typeId: 'ot_smoke' }));
     expect(html).toContain('Propriedades do tipo');
     expect(html).toContain('Porta de teste');
     expect(html).toContain('Biblioteca');
-    expect((html.match(/class="pgroup op-sec/g) ?? []).length).toBe(7);
+    // Porta de giro: doze componentes visíveis (sem os de janela; com Módulos, Perfis, Alizar e Vidro); a Visão geral aberta traz o nome.
+    expect((html.match(/class="op-nav-item/g) ?? []).length).toBe(12);
+    expect(html).toContain('id="ot-name"');
     expect(html).toContain('Verificações');
     expect(html).toContain('Inverter dobradiça');
     expect(html).toContain('+ Novo tipo');
     expect(html).toContain('Aplicar');
   });
 
-  it('mostra as sete seções recolhíveis, com o nível de detalhe destacado', () => {
+  it('as verificações de abertura seguem as unidades do projeto', () => {
+    editor.store.exec({ type: 'upsertOpeningType', openingType: { ...tipo('ot_p90'), id: 'ot_unid' } });
+    editor.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const html = renderToStaticMarkup(createElement(OpeningTypeDialog, { typeId: 'ot_unid' }));
+    expect(html).toContain('Largura livre 80,0 cm');
+  });
+
+  it('lista os componentes da porta de giro e mostra o painel do escolhido', () => {
     const d = tipo('ot_p90');
     const family = openingFamilies('door').find((f) => f.id === 'door_swing')!;
-    const html = renderToStaticMarkup(
-      createElement(OpeningTypeSections, {
-        d,
-        onChange: vazio,
-        families: openingFamilies('door'),
-        family,
-        leaves: leavesChoicesFor(family),
-        materials: {},
-      }),
-    );
-    expect((html.match(/class="pgroup op-sec/g) ?? []).length).toBe(7);
-    for (const title of [
-      'Pré-visualização e posicionamento',
-      'Definições da folha',
-      'Moldura e vidro',
-      'Planta e corte',
-      'Nível de detalhe',
-      'Acabamento',
-      'Identidade e dados BIM',
-    ]) {
-      expect(html).toContain(title);
+    const render = (active: OpeningComponentId): string =>
+      renderToStaticMarkup(
+        createElement(OpeningTypeSections, { d, onChange: vazio, family, leaves: leavesChoicesFor(family), materials: {}, active }),
+      );
+    const html = render('overview');
+    for (const nome of ['Visão geral', 'Batente', 'Folha', 'Lado externo', 'Lado interno', 'Parede e vão', 'Planta e corte', 'Quadro e dados']) {
+      expect(html).toContain(nome);
     }
-    expect(html).toContain('pgroup op-sec hl');
+    // Componentes de janela não aparecem na lista da porta.
+    expect(html).not.toContain('Folhas e divisões');
+    expect(html).not.toContain('Caixilho e vidro');
     expect(html).toContain('id="ot-name"');
-    expect(html).toContain('Resistência ao fogo');
-    expect(html).not.toContain('Fator solar');
+    expect(html).toContain('aria-current="true"');
+    expect(render('data')).toContain('Resistência ao fogo');
+    expect(render('data')).not.toContain('Fator solar');
     // Estilo da folha (5) e maçaneta (4): cada escolha mostra a elevação em miniatura pelo mesmo caminho.
-    expect((html.match(/<svg/g) ?? []).length).toBeGreaterThanOrEqual(9);
+    expect((render('leaf').match(/<svg/g) ?? []).length).toBeGreaterThanOrEqual(9);
   });
 
   it('a biblioteca lista as famílias de porta com a contagem e as variantes', () => {
@@ -171,15 +174,15 @@ describe('diálogo do tipo de abertura (render)', () => {
 
   it('o seletor de maçaneta mostra o valor efetivo: lever no ot_p90 e none quando o tipo grava none', () => {
     const family = openingFamilies('door').find((f) => f.id === 'door_swing')!;
-    const render = (d: OpeningType): string =>
+    const render = (d: OpeningType, active: OpeningComponentId): string =>
       renderToStaticMarkup(
         createElement(OpeningTypeSections, {
           d,
           onChange: vazio,
-          families: openingFamilies('door'),
           family,
           leaves: leavesChoicesFor(family),
           materials: {},
+          active,
         }),
       );
     const selectedValue = (html: string, id: string): string | null => {
@@ -191,13 +194,13 @@ describe('diálogo do tipo de abertura (render)', () => {
     };
     const padrao = tipo('ot_p90');
     expect(padrao.handle).toBeUndefined();
-    expect(selectedValue(render(padrao), 'op-handle')).toBe('lever');
-    expect(selectedValue(render({ ...padrao, handle: 'none' }), 'op-handle')).toBe('none');
+    expect(selectedValue(render(padrao, 'leaf'), 'op-handle')).toBe('lever');
+    expect(selectedValue(render({ ...padrao, handle: 'none' }, 'leaf'), 'op-handle')).toBe('none');
     // O estilo da folha, o batente e os detalhes também mostram o efetivo (não o campo vazio).
-    expect(selectedValue(render(padrao), 'op-leaf')).toBe('flush');
-    expect(selectedValue(render(padrao), 'op-frame')).toBe('rebate');
-    expect(selectedValue(render(padrao), 'op-d2')).toBe('scale');
-    expect(selectedValue(render(padrao), 'op-d3')).toBe('view');
+    expect(selectedValue(render(padrao, 'leaf'), 'op-leaf')).toBe('flush');
+    expect(selectedValue(render(padrao, 'frame'), 'op-frame')).toBe('rebate');
+    expect(selectedValue(render(padrao, 'plan'), 'op-d2')).toBe('scale');
+    expect(selectedValue(render(padrao, 'plan'), 'op-d3')).toBe('view');
   });
 
   it('os acabamentos de alizar e soleira marcam a caixa só quando a peça existe de fato', () => {
@@ -207,10 +210,10 @@ describe('diálogo do tipo de abertura (render)', () => {
         createElement(OpeningTypeSections, {
           d,
           onChange: vazio,
-          families: openingFamilies('window'),
           family,
           leaves: leavesChoicesFor(family),
           materials: {},
+          active: 'outer',
         }),
       );
     const marcada = (html: string, id: string): boolean => {

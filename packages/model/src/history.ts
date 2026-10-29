@@ -196,6 +196,12 @@ export function labelOf(c: Command): string {
       return 'Editar tipo de escada';
     case 'deleteStairType':
       return 'Excluir tipo de escada';
+    case 'addRamp':
+      return 'Criar rampa';
+    case 'upsertRampType':
+      return 'Editar tipo de rampa';
+    case 'deleteRampType':
+      return 'Excluir tipo de rampa';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':
@@ -314,5 +320,41 @@ export function labelOf(c: Command): string {
       return 'Mover vista da prancha';
     case 'removeViewport':
       return 'Excluir vista da prancha';
+    case 'addGrid':
+      return 'Criar grade';
+    case 'updateGrid':
+      return 'Editar grade';
+    case 'removeGrid':
+      return 'Excluir grade';
+    case 'addGridType':
+      return 'Criar tipo de grade';
+    case 'updateGridType':
+      return 'Editar tipo de grade';
+    case 'removeGridType':
+      return 'Excluir tipo de grade';
+    case 'addAreaPlan':
+      return 'Criar planta de área';
+    case 'updateAreaPlan':
+      return 'Alterar planta de área';
+    case 'removeAreaPlan':
+      return 'Excluir planta de área';
+    case 'addRoomTag':
+      return 'Criar etiqueta de ambiente';
+    case 'updateRoomTag':
+      return 'Alterar etiqueta de ambiente';
+    case 'removeRoomTag':
+      return 'Excluir etiqueta de ambiente';
+    case 'setRoomReference':
+      return 'Mover referência do ambiente';
+    case 'setRoomLabel':
+      return 'Mover rótulo do ambiente';
+    case 'upsertRoomCategory':
+      return 'Editar categoria de ambiente';
+    case 'removeRoomCategory':
+      return 'Excluir categoria de ambiente';
+    case 'upsertColorScheme':
+      return 'Editar esquema de cores';
+    case 'removeColorScheme':
+      return 'Excluir esquema de cores';
   }
 }

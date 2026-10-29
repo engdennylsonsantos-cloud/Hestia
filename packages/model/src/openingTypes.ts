@@ -1,4 +1,5 @@
-import type { Id, WrapMode } from './types.ts';
+import type { Id, IfcProperty, WrapMode } from './types.ts';
+import type { OpeningComposition } from './openingComposition.ts';
 
 /**
  * Família do símbolo de planta. Portas: arco com folha (swing), dupla, correr, pivotante.
@@ -39,6 +40,11 @@ export interface OpeningType {
    */
   frameWidth?: number;
   frameDepth?: number;
+  /**
+   * Como a profundidade do batente se liga à parede (decisão 0035): 'wall' (padrão) = a espessura TOTAL da parede acabada
+   * (batente faceado com os acabamentos); 'core' = só o núcleo estrutural; 'fixed' = o valor de `frameDepth` (limitado à parede).
+   */
+  frameDepthMode?: OpeningFrameDepthMode;
   leafThickness?: number;
   glassThickness?: number;
   /*
@@ -49,7 +55,7 @@ export interface OpeningType {
    * `lintel`/`sillBeam`: verga e contraverga (transpasse para cada lado e altura; padrão do transpasse 0,30 m).
    */
   roughOversize?: { w: number; h: number };
-  casing?: { width: number; thickness: number };
+  casing?: { width: number; thickness: number; sides?: 'both' | 'swing' | 'opposite' };
   sillBoard?: { projection: number; thickness: number };
   lintel?: { over?: number; height?: number };
   sillBeam?: { over?: number; height?: number };
@@ -80,6 +86,8 @@ export interface OpeningType {
   /** Arco de giro em planta: mostrar (padrão sim) e estilo. */
   showSwing?: boolean;
   swingStyle?: 'arc' | 'dash' | 'line';
+  /** Folha em planta: só a aberta (padrão), só a fechada ou as duas (desenho técnico antigo). */
+  leafPlan?: 'open' | 'closed' | 'both';
   /** Posição da folha na profundidade do batente: do lado em que ela abre (padrão) ou do lado oposto. */
   leafSide?: 'swing' | 'opposite';
   /** Dados BIM do tipo (quadro e IFC). */
@@ -89,9 +97,46 @@ export interface OpeningType {
   solarFactor?: number;
   cost?: number;
   manufacturer?: string;
+  /** Material da folha (ausente = o do batente, `frameMaterialId`). */
+  leafMaterialId?: Id;
+  /** Tipo de vidro (ausente = liso). Muda a cor/transparência no 3D e a legenda do quadro. */
+  glassKind?: OpeningGlassKind;
+  /** Janela basculante: altura do eixo horizontal como fração do vão (0,2 a 0,8; padrão 0,5, eixo central). */
+  tiltAxis?: number;
+  /**
+   * A que `width`/`height` se referem (ArchiCAD: Nominal Size Reference; NBR 15930: "80 x 210" é a FOLHA, não o vão): 'opening' (padrão) =
+   * o vão; 'leaf' = a folha nominal, e o vão é derivado (folha + `spanGap`). A fonte única está em `openingNominal.ts`.
+   */
+  nominalRef?: 'opening' | 'leaf';
+  /** Folga do vão sobre a folha com `nominalRef` 'leaf' (m); padrão 0,08 na largura e 0,05 na altura (NBR 15930-2). */
+  spanGap?: { w: number; h: number };
+  /** Porta com vidro: fração da altura da folha ocupada pelo vidro, a partir do topo (0,25 / 0,5 / 0,75; 0,1 a 0,9). */
+  glassRatio?: number;
+  /** Dobradiças: quantidade (0 a 6; padrão 3 em porta de giro, dupla e vai-e-vem) — peças de ferragem na face do batente do lado da folha. */
+  hinges?: number;
+  /** Soleira/limiar da porta: espessura (m) e material (padrão pedra). Ausente = sem soleira. */
+  threshold?: { thickness: number; materialId?: Id };
+  /** Recuo do batente em relação à face da parede (ArchiCAD: Reveal) e a âncora do recuo: na face acabada ou no núcleo. */
+  reveal?: { depth: number; anchor?: 'face' | 'core' };
+  /*
+   * Esquadria v3 (ferragens e folga da porta). Bloco separado, ao fim do tipo: todos opcionais, com padrão por leitura
+   * (`openingHardware.ts`). Janela ignora. Os limites e as famílias que os usam estão em `openingHardware.ts` e `openingSupport.ts`.
+   */
+  /** Folga inferior da folha (m): a face inferior sobe do piso (ou da soleira) por este valor. Padrão 0,007 (piso seco; 0,017 úmido; 0,027 com ventilação, NBR 15930-2). */
+  leafUndercut?: number;
+  /** Altura da maçaneta (m, do piso). Padrão 1,00; NBR 9050 pede 0,80 a 1,10 m (aviso fora da faixa; erro só fora de 0,50 a 1,50). */
+  handleHeight?: number;
+  /** Distância (m) da borda livre da folha ao eixo da maçaneta. Padrão 0,06. */
+  handleInset?: number;
+  /** Composição (células + perfis; docs/aberturas/F1-spec-composicao.md). Ausente = derivada dos campos atuais por `openingCompositionOf`. */
+  composition?: OpeningComposition;
 }
 
-export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille';
+/** Vínculo da profundidade do batente com a espessura da parede. */
+export type OpeningFrameDepthMode = 'wall' | 'core' | 'fixed';
+/** Vidro: liso/cristal, canelado, fumê, verde, bronze, jateado/fosco, aramado, laminado, temperado. */
+export type OpeningGlassKind = 'clear' | 'ribbed' | 'smoke' | 'green' | 'bronze' | 'frosted' | 'wired' | 'laminated' | 'tempered';
+export type OpeningLeafStyle = 'flush' | 'panel' | 'glass' | 'louver' | 'grille' | 'boards' | 'fullglass';
 export type OpeningHandle = 'none' | 'lever' | 'knob' | 'pull';
 export type OpeningFrameStyle = 'rebate' | 'simple' | 'aduela' | 'block';
 
@@ -118,4 +163,6 @@ export interface Opening {
   flipFacing: boolean;
   sillOverride: number | null;
   mark: string;
+  /** Propriedades (psets/quantities) lidas do IFC de origem; ausente em elemento nativo ou sem pset. */
+  ifcProperties?: IfcProperty[];
 }

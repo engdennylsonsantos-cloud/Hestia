@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { buildSectionDrawList, DARK, LIGHT, type PlanDrawList, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, sectionFrame, type PlanDrawList, type Viewport } from '@hestia/render';
 import { editor, useProject } from '../editor/controller.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { useUi } from '../editor/state.ts';
@@ -10,11 +10,42 @@ import { Icon } from './Icon.tsx';
  * Sem ferramentas nesta vista; o cálculo do corte é cacheado pelo controlador por projeto. Seleção e cursor realçam o
  * desenho (decisão 0016).
  */
+
+/**
+ * Lista de desenho do corte/elevação (R4). A lista é montada uma vez por `SectionFrame` e reaproveitada: pan, zoom e
+ * tamanho da vista não geram geometria nova. Com GPU, a lista volta como está (o shader aplica `papel`/`zoomMin` com o
+ * zoom corrente); sem GPU, ela sai resolvida para o zoom do Canvas2D.
+ */
 export function buildSectionFrame(v: Viewport, dark: boolean): PlanDrawList | null {
   const st = useUi.getState();
   const section = editor.sectionOf(st.sectionId);
-  if (!section) return null;
-  return buildSectionDrawList({ project: editor.project, section, viewport: v, theme: dark ? DARK : LIGHT, dark, showGrid: st.showGrid, highlight: { selection: st.selection, hover: st.hover }, thinLines: thinLinesOn(editor.project, 'section') });
+  if (!section || !st.sectionId) return null;
+  const gpu = st.gpu === 'webgl2' || st.gpu === 'webgpu';
+  return sectionFrame.drawList(
+    {
+      project: editor.project,
+      version: editor.store.version,
+      sectionId: st.sectionId,
+      section,
+      theme: dark ? DARK : LIGHT,
+      dark,
+      showGrid: st.showGrid,
+      highlight: { selection: st.selection, hover: st.hover },
+      thinLines: thinLinesOn(editor.project, 'section'),
+    },
+    v,
+    gpu,
+  );
+}
+
+/** Bancada do R4 (`?debug=1`): montagens × reaproveitamentos da lista do corte. */
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug')) {
+  Object.assign(window, {
+    __hestiaSection: {
+      snapshot: () => sectionFrame.stats(),
+      reset: () => sectionFrame.reset(),
+    },
+  });
 }
 
 /** Nome da vista aberta, no canto, com saída para a planta. */

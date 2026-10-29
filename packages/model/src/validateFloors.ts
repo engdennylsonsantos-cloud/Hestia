@@ -2,19 +2,21 @@ import { boxOf, boxesOverlap, closestOnSegment, dist, intersection, intersectSeg
 import { floorArea, floorPolygon } from './floor.ts';
 import { isFloor, type Floor, type Project } from './types.ts';
 import type { ValidationIssue } from './validate.ts';
+import { formatQuantity } from './unitsFormat.ts';
+import { defaultUnits, unitsOf, type ResolvedUnits } from './units.ts';
 
-/** Área líquida abaixo disso é zero (1 mm²). */
+/** Área líquida abaixo disso é zero (1 mm quadrado). */
 export const ZERO_AREA = 1e-6;
-/** Sobreposição mínima entre dois pisos do mesmo nível para avisar (1 cm²). */
+/** Sobreposição mínima entre dois pisos do mesmo nível para avisar (1 cm quadrado). */
 export const OVERLAP_MIN = 1e-4;
 /** Distância (1 mm) para um vértice de furo contar como sobre o contorno. */
 const ON_EDGE = 1e-3;
 
 const label = (f: Floor): string => (f.mark ? `"${f.mark}" (${f.id})` : `"${f.id}"`);
 
-/** Área em m² com vírgula decimal; abaixo de 1 dm² mostra cm². */
-export function fmtArea(m2: number): string {
-  return m2 < 0.01 ? `${Math.round(m2 * 1e4)} cm²` : `${m2.toFixed(2).replace('.', ',')} m²`;
+/** Área na unidade do projeto; abaixo de 1 dm quadrado mostra em centímetros quadrados para não zerar. */
+export function fmtArea(m2: number, units: ResolvedUnits = defaultUnits()): string {
+  return m2 < 0.01 ? formatQuantity(units, 'area', m2, { unit: 'cm2', decimals: 0 }) : formatQuantity(units, 'area', m2);
 }
 
 /** Arestas não vizinhas que se tocam ou cruzam (vértice compartilhado entre arestas não vizinhas também conta). */
@@ -75,15 +77,15 @@ function floorIssuesOf(p: Project, f: Floor): ValidationIssue[] {
     if (h.length >= 3 && selfIntersects(h)) push('error', 'floor-self-intersect', `O furo ${k + 1} do piso ${name} se cruza consigo mesmo.`);
   });
   const area = floorArea(f);
-  if (area <= ZERO_AREA) push('error', 'floor-zero-area', `Piso ${name} tem área líquida de ${fmtArea(area)}; precisa ser maior que zero.`);
+  if (area <= ZERO_AREA) push('error', 'floor-zero-area', `Piso ${name} tem área líquida de ${fmtArea(area, unitsOf(p))}; precisa ser maior que zero.`);
   f.holes.forEach((h, k) => {
     if (h.length >= 3 && holeOutside(f.boundary, h)) push('error', 'floor-hole-outside', `O furo ${k + 1} do piso ${name} está fora do contorno.`);
   });
   return out;
 }
 
-/** Pares de pisos do mesmo nível com área em comum acima de 1 cm² (warning, com a área). Só pisos com contorno válido. */
-function floorOverlaps(floors: Floor[]): ValidationIssue[] {
+/** Pares de pisos do mesmo nível com área em comum acima de 1 cm quadrado (warning, com a área). Só pisos com contorno válido. */
+function floorOverlaps(floors: Floor[], units: ResolvedUnits): ValidationIssue[] {
   const valid = floors.filter((f) => f.boundary.length >= 3 && !selfIntersects(f.boundary));
   const boxes = new Map<Floor, Box>(valid.map((f) => [f, boxOf(floorPolygon(f).flat())]));
   const out: ValidationIssue[] = [];
@@ -97,7 +99,7 @@ function floorOverlaps(floors: Floor[]): ValidationIssue[] {
       out.push({
         severity: 'warning',
         code: 'floor-overlap',
-        message: `Pisos ${label(a)} e ${label(b)} se sobrepõem no mesmo nível: ${fmtArea(common)} em comum.`,
+        message: `Pisos ${label(a)} e ${label(b)} se sobrepõem no mesmo nível: ${fmtArea(common, units)} em comum.`,
         elementId: a.id,
       });
     }
@@ -108,5 +110,5 @@ function floorOverlaps(floors: Floor[]): ValidationIssue[] {
 /** Problemas dos pisos do projeto: geometria, tipo, nível e sobreposição entre pisos do mesmo nível. */
 export function floorIssues(p: Project): ValidationIssue[] {
   const floors = Object.values(p.elements).filter(isFloor);
-  return [...floors.flatMap((f) => floorIssuesOf(p, f)), ...floorOverlaps(floors)];
+  return [...floors.flatMap((f) => floorIssuesOf(p, f)), ...floorOverlaps(floors, unitsOf(p))];
 }

@@ -196,7 +196,7 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
   });
 
   it('C1: no corte transversal, a verga e a soleira têm a profundidade do batente (frameDepth), centradas na parede', () => {
-    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_jfd', frameDepth: 0.12 });
+    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_jfd', frameDepthMode: 'fixed', frameDepth: 0.12 });
     const d = buildSectionDrawList(cross([op('j', 'window', 'ot_jfd', 'w')], tipo));
     const verga = d.fills.filter((f) => Math.abs(largura(f.polygons) - 0.12) < 1e-6 && Math.abs(altura(f.polygons) - 0.05) < 1e-6);
     expect(verga).toHaveLength(2); // verga e soleira
@@ -220,7 +220,7 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
   });
 
   it('espessuras do tipo: frameWidth, frameDepth e glassThickness vêm do tipo', () => {
-    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_esp', width: 0.9, frameWidth: 0.07, frameDepth: 0.1, glassThickness: 0.02 });
+    const tipo = comTipo(createEmptyProject().openingTypes.ot_jfixa60!, { id: 'ot_esp', width: 0.9, frameWidth: 0.07, frameDepthMode: 'fixed', frameDepth: 0.1, glassThickness: 0.02 });
     const face = buildSectionDrawList(facade([op('j', 'window', 'ot_esp', 'frente')], tipo));
     expect(face.fills.map((f) => largura(f.polygons)).filter((w) => Math.abs(w - 0.07) < 1e-6)).toHaveLength(2); // ombreiras
     expect(largura(face.fills.find((f) => f.color === GLASS_T)!.polygons)).toBeCloseTo(0.9 - 2 * 0.07, 6);
@@ -342,15 +342,21 @@ describe('esquadria no corte e na elevação (tipo e família)', () => {
     expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z1, 6);
   });
 
-  it('E1: o basculante tem o vértice em cima e as pontas embaixo', () => {
+  it('E1: o basculante tem dois V com vértice no eixo central e pontas nos cantos de cima e de baixo', () => {
     const tilt = { ...createEmptyProject().openingTypes.ot_j60!, id: 'ot_bas60', plan: 'tilt' as const };
     const input = facade([op('b', 'window', 'ot_bas60', 'frente')], tilt);
     const o = input.section.openings[0]!;
     const a = o.model.openings[0]!;
-    const [v1] = vs(buildSectionDrawList(input));
-    expect(v1!.pts[1]!.y).toBeCloseTo(o.z0 + a.z1, 6);
-    expect(v1!.pts[0]!.y).toBeCloseTo(o.z0 + a.z0, 6);
-    expect(v1!.pts[2]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    const vss = vs(buildSectionDrawList(input));
+    expect(vss).toHaveLength(2);
+    const eixo = o.z0 + a.axisZ!;
+    for (const v1 of vss) expect(v1.pts[1]!.y).toBeCloseTo(eixo, 6);
+    const superior = vss.find((x) => x.pts[0]!.y > eixo)!;
+    const inferior = vss.find((x) => x.pts[0]!.y < eixo)!;
+    expect(superior.pts[0]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(superior.pts[2]!.y).toBeCloseTo(o.z0 + a.z1, 6);
+    expect(inferior.pts[0]!.y).toBeCloseTo(o.z0 + a.z0, 6);
+    expect(inferior.pts[2]!.y).toBeCloseTo(o.z0 + a.z0, 6);
   });
 
   it('E1 (traço): a janela de abrir segue a regra da porta: tracejada se a folha abre para o observador', () => {
@@ -476,8 +482,8 @@ describe('acabamento e vergas da esquadria no corte e na elevação', () => {
     const fechados = (d: ReturnType<typeof buildSectionDrawList>): number => d.strokes.filter((s) => s.closed).length;
     const base = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al0', 'frente')], com('ot_al0', {}))));
     const alizado = fechados(buildSectionDrawList(facade([op('j', 'window', 'ot_al', 'frente')], com('ot_al', { casing: { width: 0.05, thickness: 0.015 } }))));
-    // Quatro peças por face (ombreiras, verga e soleira), nas duas faces da parede: oito contornos a mais.
-    expect(alizado - base).toBe(8);
+    // v3 (decisão 0035 §3): o alizar é uma silhueta única por face (contorno externo e do vão), nas duas faces: 4 contornos.
+    expect(alizado - base).toBe(4);
   });
 });
 
@@ -520,7 +526,7 @@ describe('elevação e corte a partir do modelo único', () => {
     const z = o.z0 + (roseta.box.z0 + roseta.box.z1) / 2;
     expect(z).toBeCloseTo(o.z0 + 1, 6);
     const d = buildSectionDrawList(input);
-    const achou = d.fills.some((f) => Math.abs(centroX(f.polygons) - x) < 1e-6 && Math.abs(centroY(f.polygons) - z) < 1e-6 && Math.abs(largura(f.polygons) - 0.05) < 1e-6);
+    const achou = d.fills.some((f) => Math.abs(centroX(f.polygons) - x) < 1e-6 && Math.abs(centroY(f.polygons) - z) < 1e-6 && Math.abs(largura(f.polygons) - 0.052) < 1e-6);
     expect(achou).toBe(true);
   });
 

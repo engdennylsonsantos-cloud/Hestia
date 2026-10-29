@@ -1,17 +1,18 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
-import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
+import { levelAbove, unitsOf, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
 import { regenSpiralComponents, regenStraightComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useUi } from '../editor/state.ts';
 import { commonOf, patchStairs } from '../editor/stairActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useFormat } from './useUnits.ts';
 import { LevelField } from './LevelField.tsx';
 import { TypeSelector } from './TypeSelector.tsx';
 import { stairOptions } from './typeOptions.ts';
 
-const fmt = (n: number, d = 2): string => n.toFixed(d).replace('.', ',');
+
 /** Um grau em radianos: os ângulos do caracol são guardados em rad e mostrados em graus. */
 const DEG = Math.PI / 180;
 
@@ -25,6 +26,7 @@ function issuesOf(p: Project, id: Id): ValidationIssue[] {
  * (só leitura, de uma escada só) e avisos com "Ir para". Cada alteração é uma transação, com um passo de desfazer.
  */
 export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
+  const fmt = useFormat();
   const p = useProject();
   const ids = stairs.map((s) => s.id);
   const typeId = commonOf(stairs, (s) => s.typeId);
@@ -64,7 +66,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   /** Regenera a reta com outro nº de espelhos, em UM passo de desfazer. Erro vai para a barra de status. */
   const editRisers = (n: number): void => {
     if (!single) return;
-    const r = regenStraightComponents(single, n, p.stairTypes[single.typeId]?.minTread ?? 0);
+    const r = regenStraightComponents(single, n, p.stairTypes[single.typeId]?.minTread ?? 0, unitsOf(p));
     if ('error' in r) {
       useUi.setState({ status: `Escada: ${r.error}` });
       return;
@@ -102,10 +104,10 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
             {p.levels.map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}
           </select>
         </Row>
-        <Row label="Desloc. da base" htmlFor="p-sbase"><NumField id="p-sbase" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} unit="m" /></Row>
-        <Row label="Desloc. do topo" htmlFor="p-stopoff"><NumField id="p-stopoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} unit="m" /></Row>
+        <Row label="Desloc. da base" htmlFor="p-sbase"><NumField id="p-sbase" value={base.value} mixed={base.mixed} onCommit={(v) => patch(ids, { baseOffset: v })} quantity="length" /></Row>
+        <Row label="Desloc. do topo" htmlFor="p-stopoff"><NumField id="p-stopoff" value={topOff.value} mixed={topOff.mixed} onCommit={(v) => patch(ids, { topOffset: v })} quantity="length" /></Row>
         {!top.mixed && top.value === '' && noLevelAbove && (
-          <Row label="Altura" htmlFor="p-sheight"><NumField id="p-sheight" value={height.value} mixed={height.mixed} min={0.1} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} unit="m" /></Row>
+          <Row label="Altura" htmlFor="p-sheight"><NumField id="p-sheight" value={height.value} mixed={height.mixed} min={0.1} onCommit={(v) => patch(ids, { height: Math.max(0.1, v) })} quantity="length" /></Row>
         )}
         <Row label="Abertura da laje" htmlFor="p-sopenmode">
           <select id="p-sopenmode" className="select" value={openingMode.mixed ? '' : openingMode.value} onChange={(e) => e.target.value && patch(ids, { openingMode: e.target.value as StairOpeningMode })}>
@@ -115,47 +117,49 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
             <option value="none">Sem abertura</option>
           </select>
         </Row>
-        <Row label="Pé-direito livre (m)" htmlFor="p-sopenh">
+        <Row label="Pé-direito livre" htmlFor="p-sopenh">
           <NumField
             id="p-sopenh"
             value={openingHeadroom.value}
             mixed={openingHeadroom.mixed}
             disabled={headroomOff}
-            placeholder={type ? fmt(type.minHeadroom) : undefined}
+            quantity="length"
+            placeholder={type ? fmt('length', type.minHeadroom, { withUnit: false }) : undefined}
             min={0}
             onCommit={(v) => patch(ids, { openingHeadroom: v })}
             onClear={() => patch(ids, { openingHeadroom: null })}
           />
         </Row>
-        <Row label="Folga lateral (m)" htmlFor="p-sopenm"><NumField id="p-sopenm" value={openingMargin.value} mixed={openingMargin.mixed} disabled={noOpening} min={0} onCommit={(v) => patch(ids, { openingMargin: v })} /></Row>
+        <Row label="Folga lateral" htmlFor="p-sopenm"><NumField id="p-sopenm" value={openingMargin.value} mixed={openingMargin.mixed} disabled={noOpening} min={0} quantity="length" onCommit={(v) => patch(ids, { openingMargin: v })} /></Row>
         <Row label="Furo retangular" htmlFor="p-sopenrect"><Check id="p-sopenrect" checked={openingRect.value} mixed={openingRect.mixed} disabled={noOpening} onChange={(v) => patch(ids, { openingRect: v })} /></Row>
       </Group>
       {spiral && spiralNums && (
         <Group title="Caracol">
-          <Row label="Raio interno (m)" htmlFor="p-spin">
-            <NumField id="p-spin" value={spiral.sp.rInner} min={0.05} onCommit={(v) => editSpiral({ rInner: v })} unit="m" />
+          <Row label="Raio interno" htmlFor="p-spin">
+            <NumField id="p-spin" value={spiral.sp.rInner} min={0.05} onCommit={(v) => editSpiral({ rInner: v })} quantity="length" />
           </Row>
-          <Row label="Raio externo (m)" htmlFor="p-spout">
-            <NumField id="p-spout" value={spiral.sp.rOuter} min={0.05} onCommit={(v) => editSpiral({ rOuter: v })} unit="m" />
+          <Row label="Raio externo" htmlFor="p-spout">
+            <NumField id="p-spout" value={spiral.sp.rOuter} min={0.05} onCommit={(v) => editSpiral({ rOuter: v })} quantity="length" />
           </Row>
-          <Row label="Ângulo inicial (°)" htmlFor="p-spstart">
-            <NumField id="p-spstart" value={spiral.sp.startAngle / DEG} decimals={1} onCommit={(v) => editSpiral({ startAngle: v * DEG })} />
+          <Row label="Ângulo inicial" htmlFor="p-spstart">
+            <NumField id="p-spstart" value={spiral.sp.startAngle} quantity="angle" onCommit={(v) => editSpiral({ startAngle: v })} />
           </Row>
-          <Row label="Varredura (°)" htmlFor="p-spsweep">
+          <Row label="Varredura" htmlFor="p-spsweep">
             <NumField
               id="p-spsweep"
-              value={Math.abs(spiral.sp.sweep) / DEG}
-              decimals={1}
-              min={30}
-              max={720}
-              onCommit={(v) => editSpiral({ sweep: (spiral.sp.sweep < 0 ? -1 : 1) * v * DEG })}
+              value={Math.abs(spiral.sp.sweep)}
+              quantity="angle"
+              min={30 * DEG}
+              max={720 * DEG}
+              onCommit={(v) => editSpiral({ sweep: (spiral.sp.sweep < 0 ? -1 : 1) * v })}
             />
           </Row>
           <Row label="Sentido"><span className="val">{spiral.sp.sweep < 0 ? 'horário' : 'anti-horário'}</span></Row>
           {Math.abs(spiral.sp.sweep) > 2 * Math.PI && (
             <>
-              <Row label="Espelhos por volta"><span className="val">{fmt(spiralNums.perTurn, 1)}</span></Row>
-              <Row label="Folga entre voltas"><span className="val">{fmt(spiralNums.headroom)} m</span></Row>
+              {/* units-ok: contagem sem unidade */}
+              <Row label="Espelhos por volta"><span className="val">{String(Math.round(spiralNums.perTurn * 10) / 10).replace('.', ',')}</span></Row>
+              <Row label="Folga entre voltas"><span className="val">{fmt('length', spiralNums.headroom)}</span></Row>
             </>
           )}
         </Group>
@@ -170,11 +174,11 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
             ) : (
               <Row label="Nº de espelhos"><span className="val">{quantities.riserCount}</span></Row>
             )}
-            <Row label="Altura do espelho"><span className="val">{fmt(quantities.riserHeight, 3)} m</span></Row>
-            <Row label="Piso médio"><span className="val">{fmt(quantities.treadMean, 3)} m</span></Row>
-            <Row label="Largura"><span className="val">{fmt(quantities.width)} m</span></Row>
-            <Row label="Área em planta"><span className="val">{fmt(quantities.planArea)} m²</span></Row>
-            <Row label="Volume"><span className="val">{fmt(quantities.volume, 3)} m³</span></Row>
+            <Row label="Altura do espelho"><span className="val">{fmt('length', quantities.riserHeight)}</span></Row>
+            <Row label="Piso médio"><span className="val">{fmt('length', quantities.treadMean)}</span></Row>
+            <Row label="Largura"><span className="val">{fmt('length', quantities.width)}</span></Row>
+            <Row label="Área em planta"><span className="val">{fmt('area', quantities.planArea)}</span></Row>
+            <Row label="Volume"><span className="val">{fmt('volume', quantities.volume)}</span></Row>
           </>
         ) : (
           <div className="hint">{single ? 'Escada sem geometria válida: veja os avisos.' : 'Selecione uma escada para ver os quantitativos.'}</div>
@@ -198,7 +202,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
       </Group>
       {type && (
         <div className="hint">
-          {type.runStyle === 'monolithic' ? 'Estilo monolítico.' : type.runStyle === 'post' ? 'Estilo de poste central, sem espelho.' : 'Estilo de piso e espelho.'} Espelho máximo {fmt(type.maxRiser * 100, 0)} cm.
+          {type.runStyle === 'monolithic' ? 'Estilo monolítico.' : type.runStyle === 'post' ? 'Estilo de poste central, sem espelho.' : 'Estilo de piso e espelho.'} Espelho máximo {fmt('length', type.maxRiser)}.
         </div>
       )}
     </>

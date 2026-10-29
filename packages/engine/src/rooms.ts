@@ -33,13 +33,13 @@ export interface ResolvedRoom {
   problem: RoomProblem | null;
   /** Anel externo + furos de pilares/shafts internos; null quando há problema. */
   polygon: Polygon | null;
-  /** Área líquida (m²). */
+  /** Área líquida (metros quadrados). */
   area: number;
   /** Perímetro do contorno externo (m). */
   perimeter: number;
   /** Pé-direito (m). */
   ceilingHeight: number;
-  /** Volume (m³) = área × pé-direito. */
+  /** Volume (metros cúbicos) = área × pé-direito. */
   volume: number;
   floorFinish: string;
   wallFinish: string;
@@ -87,20 +87,39 @@ function regionSet(p: Project, levelId: Id): RegionSet {
   // Linhas de separação (Revit: Room Separation Line) entram como faixas finas que cortam a área livre (decisão 0031 §3).
   const bands = roomSeparatorBands(p, levelId);
   const open = difference(asMulti(frame), walls);
-  const free = bands.length ? dropBandHoles(difference(open, bands), bands) : open;
+  const free = bands.length ? dropBandHoles(difference(open, bands), levelRoomSeparators(p, levelId)) : open;
   return { walls, frame, free, wallBox };
 }
 
 /**
  * Linha que não divide a sala (não chega às paredes) vira um furo fino dentro da área livre: esse furo é descartado,
- * como no Revit, onde uma linha solta não muda a área. Só sai o furo cuja caixa cabe numa faixa; o contorno externo
- * das paredes, que a faixa só corta por fora, fica.
+ * como no Revit, onde uma linha solta não muda a área. A faixa é um retângulo **orientado** (não a caixa alinhada):
+ * um pilar ao lado de uma diagonal continua sendo furo.
  */
-function dropBandHoles(m: MultiPolygon, bands: MultiPolygon): MultiPolygon {
-  const boxes = bands.map((b) => boxOf(b.flat()));
+function dropBandHoles(m: MultiPolygon, seps: ReadonlyArray<{ a: Vec2; b: Vec2 }>): MultiPolygon {
   const inBand = (h: Ring): boolean => {
-    const hb = boxOf(h);
-    return boxes.some((bb) => hb.minX >= bb.minX - EPS && hb.maxX <= bb.maxX + EPS && hb.minY >= bb.minY - EPS && hb.maxY <= bb.maxY + EPS);
+    for (const sep of seps) {
+      const dx = sep.b.x - sep.a.x;
+      const dy = sep.b.y - sep.a.y;
+      const L = Math.hypot(dx, dy);
+      if (L < EPS) continue;
+      const u = { x: dx / L, y: dy / L };
+      const n = { x: -u.y, y: u.x };
+      const half = SEPARATOR_WIDTH / 2 + EPS;
+      let ok = true;
+      for (const q of h) {
+        const vx = q.x - sep.a.x;
+        const vy = q.y - sep.a.y;
+        const t = vx * u.x + vy * u.y;
+        const s = vx * n.x + vy * n.y;
+        if (Math.abs(s) > half || t < -SEPARATOR_EXT - EPS || t > L + SEPARATOR_EXT + EPS) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return true;
+    }
+    return false;
   };
   return m.map(([outer, ...holes]) => [outer!, ...holes.filter((h) => !inBand(h))]);
 }
@@ -143,6 +162,17 @@ function classifyPoint(at: Vec2, set: RegionSet): { problem: RoomProblem | null;
 export function roomRegionAt(p: Project, levelId: Id, at: Vec2): { problem: RoomProblem | null; polygon: Polygon | null } {
   if (frameCount(p, levelId) === 0) return { problem: 'fora', polygon: null };
   return classifyPoint(at, regionSetCached(p, levelId));
+}
+
+/** Circuitos fechados do nível (com separadores e a mesma silhueta de `resolveRooms`), sem o exterior e sem o miolo de pilares. */
+export function roomRegions(p: Project, levelId: Id): Polygon[] {
+  if (frameCount(p, levelId) === 0) return [];
+  const set = regionSetCached(p, levelId);
+  const b = boxOf(set.frame);
+  const onFrame = (v: Vec2): boolean => Math.abs(v.x - b.minX) < EPS || Math.abs(v.x - b.maxX) < EPS || Math.abs(v.y - b.minY) < EPS || Math.abs(v.y - b.maxY) < EPS;
+  const closed = set.free.filter((poly) => poly[0] && !poly[0].some(onFrame));
+  // O miolo de um pilar/ilha é um circuito próprio, mas fica dentro de um furo de outro: não é ambiente.
+  return closed.filter((poly) => !closed.some((other) => other !== poly && other.slice(1).some((hole) => pointInPolygon(poly[0]![0]!, [hole]))));
 }
 
 /** Espaço livre do nível em cache por conteúdo das paredes (decisão 0023 §11): só o nível editado refaz a união. */

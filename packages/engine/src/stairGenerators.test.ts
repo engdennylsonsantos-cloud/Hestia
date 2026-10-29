@@ -90,10 +90,18 @@ describe('riserCountFor e treadFor', () => {
   });
 
   it('piso calculado 0,63 − 2h, limitado entre o piso mínimo e 0,32', () => {
-    expect(treadFor(0.175, 0.28)).toBeCloseTo(0.28, 12);
-    expect(treadFor(0.15, 0.28)).toBeCloseTo(0.32, 12);
-    expect(treadFor(0.165, 0.28)).toBeCloseTo(0.30, 12);
-    expect(treadFor(0.2, 0.28)).toBeCloseTo(0.28, 12);
+    const rule = { minTread: 0.28, maxTread: 0.32, a: 2, b: 1, target: 0.63 };
+    expect(treadFor(0.175, rule)).toBeCloseTo(0.28, 12);
+    expect(treadFor(0.15, rule)).toBeCloseTo(0.32, 12);
+    expect(treadFor(0.165, rule)).toBeCloseTo(0.30, 12);
+    expect(treadFor(0.2, rule)).toBeCloseTo(0.28, 12);
+  });
+
+  it('regra personalizada muda o piso calculado e o piso máximo limita', () => {
+    const rule = { minTread: 0.28, maxTread: 0.32, a: 2, b: 1, target: 0.64 };
+    expect(treadFor(0.175, rule)).toBeCloseTo(0.29, 12);
+    expect(treadFor(0.15, { ...rule, maxTread: 0.30 })).toBeCloseTo(0.30, 12);
+    expect(treadFor(0.175, { minTread: 0.1, maxTread: 0.5, a: 1, b: 2, target: 0.5 })).toBeCloseTo(0.1625, 12);
   });
 
   it('valores inválidos são recusados', () => {

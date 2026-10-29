@@ -1,4 +1,4 @@
-import { isStair, defaultStairTypeId, makeStair, newId, stairBaseZ, stairTopZ, type Id, type Project, type Stair, type StairGenerator, type StairLanding, type StairRun } from '@hestia/model';
+import { isStair, defaultStairTypeId, makeStair, newId, stairBaseZ, stairTopZ, unitsOf, type Id, type Project, type Stair, type StairGenerator, type StairLanding, type StairRun } from '@hestia/model';
 import type { ToolEnv } from './types.ts';
 import { analyzeDraft, partsFromComponents, type DraftReport, type StairLimits } from './stairSketchState.ts';
 
@@ -57,7 +57,7 @@ export function createStairFromComponents(env: ToolEnv, components: Array<StairR
   const levelId = opts.levelId ?? env.levelId();
   const ref = draftStair(p, opts, levelId);
   if (!ref) return { error: 'O projeto não tem tipo de escada.' };
-  const report = analyzeDraft(partsFromComponents(components), stairLimits(p, ref));
+  const report = analyzeDraft(partsFromComponents(components), stairLimits(p, ref), unitsOf(p));
   if (report.errors > 0) return { error: report.firstError ?? 'Croqui inválido.' };
   const id = newId('st');
   const stair = makeStair({
@@ -95,7 +95,7 @@ export function updateStairComponents(env: ToolEnv, stairId: Id, components: Arr
   const p = env.project();
   const s = p.elements[stairId];
   if (!isStair(s)) return { error: 'Escada não encontrada.' };
-  const report = analyzeDraft(partsFromComponents(components), stairLimits(p, s));
+  const report = analyzeDraft(partsFromComponents(components), stairLimits(p, s), unitsOf(p));
   if (report.errors > 0) return { error: report.firstError ?? 'Croqui inválido.' };
   env.transaction('Editar croqui da escada', () => env.exec({ type: 'updateElements', ids: [stairId], patch: { components } }));
   return { report };

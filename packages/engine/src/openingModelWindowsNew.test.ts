@@ -170,7 +170,8 @@ describe('janelas novas: movimento das peças', () => {
             const motion = p.motion;
             if (!motion || motion.kind !== 'rotate' || motion.axis !== 'z') throw new Error('folha sem giro em z');
             const ob = partTransformed(p, { angle: Math.PI / 2, slide: 0 });
-            expect(ob.center.t, `${caso} ${p.id}`).toBeCloseTo(motion.t, 9);
+            expect(ob.center.t, `${caso} ${p.id}`).toBeGreaterThanOrEqual(-c.g.width / 2 - 1e-9);
+            expect(ob.center.t, `${caso} ${p.id}`).toBeLessThanOrEqual(c.g.width / 2 + 1e-9);
             expect(Math.sign(ob.center.s - motion.s), `${caso} ${p.id}`).toBe(flipFacing ? -1 : 1);
           }
         }

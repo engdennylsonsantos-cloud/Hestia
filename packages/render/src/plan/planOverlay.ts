@@ -8,11 +8,14 @@ import { roomSelectionOps } from './rooms.ts';
 import { ceilingSelectionOps } from './ceilings.ts';
 import { roofSelectionOps } from './roofs.ts';
 import { stairSelectionOps } from './stairs.ts';
+import { rampSelectionOps } from './ramps.ts';
 import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { hiddenSelectionOps, planViewOf, type PlanView } from './view.ts';
 import { planContext } from './planContext.ts';
+import { labelGhostOps } from './areaPlan.ts';
+import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
 import type { PlanInput } from './build.ts';
-import type { FillOp, LabelOp, PlanOps, StrokeOp } from './types.ts';
+import type { FillOp, PlanOps } from './types.ts';
 
 const ringsOf = (m: MultiPolygon): Ring[] => m.flatMap((p) => p);
 
@@ -42,65 +45,172 @@ function elementHighlight(p: Project, geo: ResolvedLevel, ids: Id[], color: stri
   return out;
 }
 
+/** Operações de uma sobreposição: uma lista neutra com preenchimentos, traços e rótulos. */
+const vazio = (): PlanOps => ({ fills: [], strokes: [], labels: [] });
+
+/** Anotações que a vista desenha (as da vista, ou as do nível) e a escala de papel em que o bloco do texto é medido. */
+function anotacoesDaVista(input: PlanInput, escala: number): { annotations: ReturnType<typeof drawnAnnotations>; scale: number } {
+  return { annotations: drawnAnnotations(input.project, input.levelId, input.areaPlan), scale: input.areaPlan && input.areaPlan.scale > 0 ? input.areaPlan.scale : escala };
+}
+
+/** Junta o destaque das anotações (caixa, alça do texto e realce do hover) à sobreposição. */
+function comAnotacoes(out: PlanOps, input: PlanInput, escala: number, target: { selection: readonly Id[]; hover: Id | null }): void {
+  const { annotations, scale } = anotacoesDaVista(input, escala);
+  const h = annotationHighlightOps(input.project, input.levelId, scale, { select: input.theme.select, paper: input.theme.bg, hoverColor: input.theme.selectHover }, target, annotations);
+  out.fills.push(...h.fills);
+  out.strokes.push(...h.strokes);
+  out.labels.push(...h.labels);
+}
+
 /**
- * Sobreposição da planta: seleção, cursor, pré-visualização da ferramenta, guias, marcador de captura e o contorno
- * fantasma dos selecionados fora do intervalo de vista (decisão 0013 §4). Depende da seleção, do cursor e da ferramenta,
- * não da geometria: a cena a refaz sem tocar a geometria do nível (ver `PlanFrame`).
+ * Sobreposição de seleção e hover. Não depende do cursor, da pré-visualização nem da captura: mudar o cursor refaz só a
+ * camada viva (`buildPlanLiveOverlay`), e mudar o hover refaz só a camada de hover (`buildPlanHoverOverlay`), sem tocar
+ * nos destaques da seleção nem na geometria do nível.
  */
-export function buildPlanOverlay(input: PlanInput): PlanOps {
-  const { project: p, viewport: v, theme } = input;
-  const { geo, hidden, up, roofHidden, style, stairs, view } = planContext(input);
-  const fills: FillOp[] = [];
-  const strokes: StrokeOp[] = [];
-  const labels: LabelOp[] = [];
+export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
+  const { project: p, theme } = input;
+  const { geo, hidden, up, roofHidden, stairs, view, style } = planContext(input);
+  const selection = input.selection;
+  const out = vazio();
   const add = (o: PlanOps): void => {
-    fills.push(...o.fills);
-    strokes.push(...o.strokes);
-    labels.push(...o.labels);
+    out.fills.push(...o.fills);
+    out.strokes.push(...o.strokes);
+    out.labels.push(...o.labels);
   };
 
-  // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
-  add(floorSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden));
-  const rmsel = roomSelectionOps(p, input.levelId, input.selection, input.hover, theme, hidden);
-  fills.push(...rmsel.fills);
-  strokes.push(...rmsel.strokes);
-  add(slabSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden));
-  if (up) add(ceilingSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, hidden));
-  add(roofSelectionOps(p, input.levelId, input.selection, input.hover, theme, v, roofHidden, style.paint.roof));
-  add(stairSelectionOps(p, stairs, input.selection, input.hover, theme, v));
-  if (input.hover && !input.selection.includes(input.hover)) {
-    fills.push(...elementHighlight(p, geo, [input.hover], theme.select, 0.16, view));
-  }
-  if (input.selection.length) {
-    fills.push(...elementHighlight(p, geo, input.selection, theme.select, 0.26, view));
-    for (const id of input.selection) {
+  // Seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
+  add(floorSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  const rmsel = roomSelectionOps(p, input.levelId, selection, null, theme, hidden);
+  out.fills.push(...rmsel.fills);
+  out.strokes.push(...rmsel.strokes);
+  add(slabSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  if (up) add(ceilingSelectionOps(p, input.levelId, selection, null, theme, input.viewport, hidden));
+  add(roofSelectionOps(p, input.levelId, selection, null, theme, input.viewport, roofHidden, style.paint.roof));
+  add(stairSelectionOps(p, stairs, selection, null, theme, input.viewport));
+  if (selection.length) {
+    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
+    for (const id of selection) {
       const e = p.elements[id];
       if (!isWall(e) || hidden?.has(id)) continue;
-      for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      if (input.selection.length === 1) {
-        // Cota temporária: comprimento do eixo, como no Revit ao selecionar.
-        const len = Math.hypot(e.b.x - e.a.x, e.b.y - e.a.y);
-        labels.push({ at: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, text: `${len.toFixed(3).replace('.', ',')} m`, dy: -12, tone: 'info' });
-      }
+      for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
       // Alças nas pontas do eixo e nos cantos visíveis (a ponta que se vê): é lá que o arrasto pega a parede.
       const corners = wallEndCorners(p, e);
       for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
         const q = quadradoEm(pt, ALCA_PX);
-        fills.push({ ...q.fill, color: '#ffffff', alpha: 1 });
-        strokes.push({ ...q.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
+        out.fills.push({ ...q.fill, color: '#ffffff', alpha: 1 });
+        out.strokes.push({ ...q.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
+      }
+    }
+  }
+  // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover em camada própria.
+  comAnotacoes(out, input, style.scale, { selection, hover: null });
+  return out;
+}
+
+/** Sobreposição do alvo sob o cursor. Só o elemento em hover (o selecionado não se repete). */
+export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
+  const { project: p, theme } = input;
+  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
+  const hover = input.hover;
+  if (!hover || input.selection.includes(hover)) return vazio();
+  const out = vazio();
+  const add = (o: PlanOps): void => {
+    out.fills.push(...o.fills);
+    out.strokes.push(...o.strokes);
+    out.labels.push(...o.labels);
+  };
+  add(floorSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  const rmsel = roomSelectionOps(p, input.levelId, [], hover, theme, hidden);
+  out.fills.push(...rmsel.fills);
+  out.strokes.push(...rmsel.strokes);
+  add(slabSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  if (up) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
+  add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof));
+  add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
+  add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
+  out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
+  comAnotacoes(out, input, style.scale, { selection: [], hover });
+  return out;
+}
+
+/** Sobreposição viva da ferramenta: pré-visualização, guias, marcador de captura e o balão de inferência. */
+export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
+  const { project: p, theme } = input;
+  const { geo, view, style } = planContext(input);
+  const out = vazio();
+  const previa = previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view));
+  out.fills.push(...previa.fills);
+  out.strokes.push(...previa.strokes);
+  out.labels.push(...previa.labels);
+  if (input.inference) {
+    out.strokes.push(...guideStrokes(input.inference.guides, theme));
+    out.strokes.push(...snapMarker(input.inference, theme));
+    const tip = snapTooltipLabel(input.inference, p);
+    if (tip) out.labels.push(tip);
+  }
+  if (input.tagGhost) {
+    const ghost = labelGhostOps(p, input.levelId, input.tagGhost, input.areaPlan?.scale ?? style.scale, input.areaPlan?.graphics.tagDefault.fields, input.dark);
+    out.fills.push(...ghost.fills);
+    out.strokes.push(...ghost.strokes);
+    out.labels.push(...ghost.labels);
+  }
+  return out;
+}
+
+/**
+ * Sobreposição da planta completa (modo CPU, plotagem e testes), na mesma ordem de desenho de sempre: destaques de
+ * seleção e hover, pré-visualização e inferência. Na tela, as três partes são camadas separadas da cena (`PlanFrame`),
+ * para uma não refazer as outras.
+ */
+export function buildPlanOverlay(input: PlanInput): PlanOps {
+  const { project: p, theme, viewport: v } = input;
+  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
+  const { selection, hover } = input;
+  const out = vazio();
+  const add = (o: PlanOps): void => {
+    out.fills.push(...o.fills);
+    out.strokes.push(...o.strokes);
+    out.labels.push(...o.labels);
+  };
+
+  // Hover e seleção (pisos: destaque próprio; paredes e aberturas em elementHighlight).
+  add(floorSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  const rmsel = roomSelectionOps(p, input.levelId, selection, hover, theme, hidden);
+  out.fills.push(...rmsel.fills);
+  out.strokes.push(...rmsel.strokes);
+  add(slabSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  if (up) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
+  add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof));
+  add(stairSelectionOps(p, stairs, selection, hover, theme, v));
+  add(rampSelectionOps(p, ramps, selection, hover, theme, v));
+  if (hover && !selection.includes(hover)) out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
+  if (selection.length) {
+    out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));
+    for (const id of selection) {
+      const e = p.elements[id];
+      if (!isWall(e) || hidden?.has(id)) continue;
+      for (const ring of ringsOf(wallUnion(geo, id, view?.outlineWalls.has(id) === true))) out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
+      const corners = wallEndCorners(p, e);
+      for (const pt of [e.a, e.b, ...corners.a, ...corners.b] as Vec2[]) {
+        const q = quadradoEm(pt, ALCA_PX);
+        out.fills.push({ ...q.fill, color: '#ffffff', alpha: 1 });
+        out.strokes.push({ ...q.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
       }
     }
   }
 
+  // Anotações (textos e cotas): caixa de seleção, alça do texto e realce leve do hover.
+  comAnotacoes(out, input, style.scale, { selection, hover });
+
   // Pré-visualização, guias e marcador de captura.
   add(previewOverlay(input.preview, theme, (ids) => elementHighlight(p, geo, ids, theme.accent, 0.2, view)));
   if (input.inference) {
-    strokes.push(...guideStrokes(input.inference.guides, theme));
-    strokes.push(...snapMarker(input.inference, theme));
+    out.strokes.push(...guideStrokes(input.inference.guides, theme));
+    out.strokes.push(...snapMarker(input.inference, theme));
     const tip = snapTooltipLabel(input.inference, p);
-    if (tip) labels.push(tip);
+    if (tip) out.labels.push(tip);
   }
-  return { fills, strokes, labels };
+  return out;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { dot, sub, type Vec2 } from '@hestia/geom';
-import { isOpening, isRoof, isWall, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
+import { formatQuantity, openingTypeById, isOpening, isRoof, isWall, unitsOf, type Id, type Opening, type Project, type ValidationIssue, type Wall } from '@hestia/model';
 import { buildFrame, type WallFrame } from './frame.ts';
+import { expandRoofArcs } from './roofArcs.ts';
 
 /** Distância (m) do beiral à abertura abaixo da qual se avisa (checagem de proximidade, `roof-eave-opening`). */
 export const EAVE_OPENING_DISTANCE = 0.3;
@@ -25,8 +26,6 @@ interface Body {
 }
 
 const label = (e: { id: Id; mark: string }): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
-const cm = (m: number): string => `${(m * 100).toFixed(1).replace('.', ',')} cm`;
-
 /** Coordenadas locais da parede (isometria: as distâncias não mudam). */
 function local(f: WallFrame, p: Vec2): Vec2 {
   const d = sub(p, f.a);
@@ -110,6 +109,7 @@ function eaveEdges(boundary: Vec2[]): Array<{ p: Vec2; q: Vec2 }> {
  * Paredes curvas não são checadas. A cota do beiral não entra no cálculo (só a planta).
  */
 export function roofEaveIssues(p: Project): ValidationIssue[] {
+  const units = unitsOf(p);
   const roofs = Object.values(p.elements).filter(isRoof);
   if (roofs.length === 0) return [];
   const bodies = bodiesOf(p);
@@ -119,7 +119,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
   for (const roof of roofs) {
     if (roof.boundary.length < 3) continue;
     const onLevel = bodies.filter((b) => b.wall.levelId === roof.levelId);
-    const edges = eaveEdges(roof.boundary);
+    const edges = eaveEdges(expandRoofArcs(roof).boundary);
 
     for (const b of onLevel) {
       const inner: Box = { x0: TOUCH_TOL, x1: b.L - TOUCH_TOL, y0: b.lo + TOUCH_TOL, y1: b.hi - TOUCH_TOL };
@@ -145,7 +145,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
 
     for (const o of openings) {
       const host = bodyById.get(o.hostId);
-      const type = p.openingTypes[o.typeId];
+      const type = openingTypeById(p, o.typeId);
       if (!host || !type || host.wall.levelId !== roof.levelId) continue;
       const box: Box = { x0: o.offset - type.width / 2, x1: o.offset + type.width / 2, y0: host.lo, y1: host.hi };
       let best = Infinity;
@@ -154,7 +154,7 @@ export function roofEaveIssues(p: Project): ValidationIssue[] {
         out.push({
           severity: 'warning',
           code: 'roof-eave-opening',
-          message: `Telhado ${label(roof)}: beiral a ${cm(best)} da abertura ${label(o)} (limite de ${cm(EAVE_OPENING_DISTANCE)}); ajuste o balanço ou a posição da abertura.`,
+          message: `Telhado ${label(roof)}: beiral a ${formatQuantity(units, 'smallLength', best)} da abertura ${label(o)} (limite de ${formatQuantity(units, 'smallLength', EAVE_OPENING_DISTANCE)}); ajuste o balanço ou a posição da abertura.`,
           elementId: roof.id,
           ids: [roof.id, o.id],
         });

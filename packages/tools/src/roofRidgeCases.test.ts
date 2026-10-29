@@ -121,21 +121,22 @@ describe('caso 4: mista = cumeeira do esqueleto das arestas que definem; águas 
     expect(ofKind(roof.lines, 'gable').length).toBeGreaterThan(0);
   });
 
-  it('L com a empena interna: o esqueleto não fecha no canto reentrante, e o commit recusa listando o ponto', () => {
-    // Base, braço de baixo e topo definem; a aresta interna é empena. A água do topo desce até o degrau (5; 4).
-    const r = commitPerimeter(new ProjectStore(createEmptyProject()).project, sketch(L, [30, 30, null, null, 30, null]), { typeId: 'rt_ceramica', levelId: 'lv_0' });
-    expect(r.ok).toBe(false);
-    expect(r.message).toMatch(/Não foi possível criar o telhado: o esqueleto não fecha em \(/);
+  it('L com a empena interna: o esqueleto não fecha, a envoltória fecha e o commit cria o telhado', () => {
+    // Base, braço de baixo e topo definem; a aresta interna é empena. Antes o commit recusava listando o ponto (5; 4).
+    const { roof, msg } = build(L, [30, 30, null, null, 30, null]);
+    expect(roof.problem).toBeUndefined();
+    expect(roof.steps).toBeUndefined();
+    expect(roof.planes.length).toBeGreaterThan(0);
+    expect(msg).toMatch(/^Telhado criado/);
   });
 
-  it('L com degrau entre água e empena: recusa com o ponto e a altura do degrau, sem criar', () => {
-    // Base, braço de baixo e a aresta interna vertical definem: a água da interna encontra o beiral do braço em (5; 4).
-    // O degrau fica no beiral (5,5; 4,5), com 1,50 m de diferença de cota.
-    const r = commitPerimeter(new ProjectStore(createEmptyProject()).project, sketch(L, [30, 30, null, 30, null, null]), { typeId: 'rt_ceramica', levelId: 'lv_0' });
-    expect(r.ok).toBe(false);
-    expect(r.message).toBe(
-      'Não foi possível criar o telhado: não fecha no canto reentrante em (5,50; 4,50) m: as águas que chegam ali ficam com um degrau de 1,50 m. Marque também a aresta 3 como "define inclinação" (triângulo) ou ajuste o contorno.',
-    );
+  it('L com degrau entre água e empena: a envoltória fecha a superfície, sem degrau e sem recusa', () => {
+    // Base, braço de baixo e a aresta interna vertical definem. Antes o esqueleto deixava degrau de 1,50 m em (5,50; 4,50)
+    // e o commit recusava; agora a superfície é contínua (Revit).
+    const { roof } = build(L, [30, 30, null, 30, null, null]);
+    expect(roof.problem).toBeUndefined();
+    expect(roof.steps).toBeUndefined();
+    expect(roof.planes.length).toBeGreaterThan(0);
   });
 });
 

@@ -17,9 +17,13 @@ export const TEMPLATES: Array<{ id: TemplateId; name: string; description: strin
     description: 'Um nível com todos os tipos do catálogo: portas na parede de baixo e janelas na paralela acima.',
     area: '—',
   },
+  // units-ok: área descritiva do modelo de exemplo (não é medida do projeto)
   { id: 'house2', name: 'Casa térrea, 2 quartos', description: 'Sala e cozinha integradas, banheiro e dois quartos.', area: '70 m²' },
+  // units-ok: área descritiva do modelo de exemplo (não é medida do projeto)
   { id: 'house-premium', name: 'Casa de alto padrão, 2 pavimentos', description: 'Garagem, sala em L, cozinha, varanda gourmet, três suítes e home office.', area: '330 m²' },
+  // units-ok: área descritiva do modelo de exemplo (não é medida do projeto)
   { id: 'predio10', name: 'Prédio, 10 pavimentos', description: 'Núcleo de circulação central e quatro unidades por andar; lajes e pisos param no núcleo.', area: '1.900 m²' },
+  // units-ok: área descritiva do modelo de exemplo (não é medida do projeto)
   { id: 'studio', name: 'Quitinete', description: 'Ambiente único com banheiro, para testar rápido.', area: '27 m²' },
 ];
 

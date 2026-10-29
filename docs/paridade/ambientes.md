@@ -9,7 +9,7 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) §6 (Revit: Room; ArchiCAD:
 - [x] A2 Vãos de porta e janela fecham por padrão (a silhueta da parede não recorta os vãos) **(bloqueante)**
 - [x] A3 Pilares/shafts internos (ilhas de parede dentro do circuito) viram furos do polígono e descontam da área líquida **(bloqueante)**
 - [x] A4 Criação por clique dentro do circuito na planta (ferramenta Ambiente, atalho Z); "Ambientes em todos os circuitos fechados" na barra
-- [-] A5 Linha de separação de ambiente (Revit: *room separator*): fora desta etapa; o circuito vem sempre das paredes
+- [x] A5 Linha de separação de ambiente (Revit: *room separator*) implementada como elemento do nível (`level.roomSeparators`) e faixa de 1 mm no motor; não é mais "fora de escopo"
 
 ## B · Dados
 - [x] B1 Ambiente guardado por nível com nome, número, ponto interior, pé-direito e acabamentos (piso, parede, forro) e cor **(bloqueante)**
@@ -47,3 +47,18 @@ Fonte: [docs/05](../05-REFERENCIA-REVIT-ARCHICAD.md) §6 (Revit: Room; ArchiCAD:
 
 ## H · Saída
 - [x] H1 DXF da planta: contorno fechado na camada `AMBIENTES` e nome, número e área na `AMBIENTES_TEXTO`; oculto pela categoria 'ambiente' não sai
+
+## I · Planta de área (decisão 0037)
+- [x] I1 `AreaPlan` por pavimento, no navegador em "Plantas de área", com escala, gráficos e esquema próprios **(bloqueante)**
+- [x] I2 Diagonais de referência atravessando o ambiente e cruzando no ponto de referência (centroide; polo em L/U)
+- [x] I3 Rótulo do modelo: posição, rotação e chamada compartilhadas por planta de piso, planta de área e demais vistas **(bloqueante)**
+- [x] I4 Todo ambiente com circuito fechado já aparece com rótulo, sem "gerar etiqueta"
+- [x] I5 Sem cor por padrão; esquema de cores por categoria/nível/faixa, com legenda e quadro **(bloqueante)**
+- [x] I6 Arrastar o rótulo com prévia em tempo real; a chamada acompanha; clique seleciona para configurar
+- [x] I7 Prancha geral: uma vista por pavimento + quadro geral agregado
+- [x] I8 DXF com `AMBIENTES_REFERENCIA`, `AMBIENTES_CHAMADA` e `AMBIENTES_TEXTO`
+- [x] I9 IFC: `Pset_SpaceCommon`, `Name`/`LongName`, `PredefinedType SPACE`, `NetPerimeter`, `GrossPerimeter`, `NetVolume`
+- [x] I10 Categorias de ambiente editáveis (nome, código, cor, hachura) e categoria por ambiente
+- [x] I11 Perímetro do ambiente desenhado na planta de área (padrão fino)
+- [x] I12 Seleção do ambiente na planta de área com destaque; clique dentro do polígono seleciona
+- [x] I13 Cores de área só na planta de área; a planta de piso usa o preenchimento neutro

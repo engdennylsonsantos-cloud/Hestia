@@ -105,7 +105,7 @@ describe('laje na planta (D1)', () => {
     expect(shaft[0]!.x).toBeCloseTo(2.6, 9);
     expect(shaft[1]!.x).toBeCloseTo(3.4, 9);
     expect(shaft[1]!.y).toBeCloseTo(2, 9);
-    expect(ops.labels).toEqual([expect.objectContaining({ text: '5,0 %' })]);
+    expect(ops.labels).toEqual([expect.objectContaining({ text: '5,0%' })]);
   });
 
   it('sem inclinação não há seta nem percentual', () => {

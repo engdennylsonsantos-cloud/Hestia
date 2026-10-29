@@ -1,5 +1,5 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import type { Id, Project } from '@hestia/model';
+import { openingTypeById, type Id, type Project } from '@hestia/model';
 import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp } from './types.ts';
 import type { PlanPaint } from './style.ts';
@@ -21,7 +21,7 @@ export function openingTagLabels(p: Project, levelId: Id, paint: PlanPaint, scal
     if (hidden?.has(f.wall.id)) continue;
     for (const o of aberturasDaParede(p, f.wall.id)) {
       if (hidden?.has(o.id)) continue;
-      const type = p.openingTypes[o.typeId];
+      const type = openingTypeById(p, o.typeId);
       if (!type) continue;
       const text = type.code?.trim() || type.name;
       if (!text) continue;

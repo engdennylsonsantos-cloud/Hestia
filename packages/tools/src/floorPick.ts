@@ -98,7 +98,7 @@ export function ringRemoveVertex(ring: Vec2[], i: number): Vec2[] | null {
   return ring.filter((_, k) => k !== i);
 }
 
-/** Área do contorno (sem furos), em m². */
+/** Área do contorno (sem furos), em metros quadrados. */
 export const ringAreaAbs = (ring: Vec2[]): number => Math.abs(ringArea(ring));
 
 /** Vértices de contorno e de furo dos pisos do nível: candidatos de captura para alinhar pisos entre si (sem lajes). */

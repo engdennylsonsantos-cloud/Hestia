@@ -1,10 +1,13 @@
 import { cross, dist, dot, pointInMulti, sub, type Vec2 } from '@hestia/geom';
 import {
+  openingTypeById,
   isOpening,
   isSlab,
   isWall,
+  formatQuantity,
   slabRiseAt,
   terminoOf,
+  unitsOf,
   wallBaseElevation,
   wallMaxHeight,
   type Id,
@@ -25,7 +28,6 @@ const COLLINEAR_ANGLE = (1 * Math.PI) / 180;
 /** Distância lateral máxima entre eixos colineares (1 cm). */
 const COLLINEAR_OFFSET = 0.01;
 
-const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
 const label = (e: { id: string; mark: string }): string => (e.mark ? `"${e.mark}" (${e.id})` : `"${e.id}"`);
 
 /**
@@ -54,7 +56,7 @@ function openingOutside(p: Project): ValidationIssue[] {
   for (const e of Object.values(p.elements)) {
     if (!isOpening(e)) continue;
     const host = p.elements[e.hostId];
-    const type = p.openingTypes[e.typeId];
+    const type = openingTypeById(p, e.typeId);
     if (!isWall(host) || !type) continue;
     const L = dist(host.a, host.b);
     const end = e.offset + type.width;
@@ -62,7 +64,7 @@ function openingOutside(p: Project): ValidationIssue[] {
     out.push({
       severity: 'warning',
       code: 'abertura-fora-da-parede',
-      message: `Abertura ${label(e)} está fora da parede ${label(host)}: offset ${fmt(e.offset)} m + largura ${fmt(type.width)} m = ${fmt(end)} m, mas o eixo tem ${fmt(L)} m.`,
+      message: `Abertura ${label(e)} está fora da parede ${label(host)}: offset ${formatQuantity(unitsOf(p), 'length', e.offset)} + largura ${formatQuantity(unitsOf(p), 'length', type.width)} = ${formatQuantity(unitsOf(p), 'length', end)}, mas o eixo tem ${formatQuantity(unitsOf(p), 'length', L)}.`,
       elementId: e.id,
       ids: [e.id, host.id],
     });
@@ -144,7 +146,7 @@ function wallTopIssues(p: Project): ValidationIssue[] {
     out.push({
       severity: 'warning',
       code: 'parede-topo-desnivelado',
-      message: `Paredes ${label(a.wall)} e ${label(b.wall)} estão alinhadas no nível "${levelName}", mas os topos estão desnivelados: ${fmt(topA)} m e ${fmt(topB)} m.`,
+      message: `Paredes ${label(a.wall)} e ${label(b.wall)} estão alinhadas no nível "${levelName}", mas os topos estão desnivelados: ${formatQuantity(unitsOf(p), 'length', topA)} e ${formatQuantity(unitsOf(p), 'length', topB)}.`,
       elementId: a.wall.id,
       ids: [a.wall.id, b.wall.id],
     });
@@ -204,7 +206,7 @@ function wallInsideSlab(p: Project, floors: ReturnType<typeof resolveAllFloors>,
       out.push({
         severity: 'warning',
         code: 'parede-dentro-da-laje',
-        message: `Parede ${label(w)} está dentro da laje ${label(layer.slab)} (camada ${layer.layerIndex + 1}, término "passa"): o trecho comum de ${fmt(overlap)} m pode ser contado duas vezes.`,
+        message: `Parede ${label(w)} está dentro da laje ${label(layer.slab)} (camada ${layer.layerIndex + 1}, término "passa"): o trecho comum de ${formatQuantity(unitsOf(p), 'length', overlap)} pode ser contado duas vezes.`,
         elementId: w.id,
         ids: [w.id, layer.slab.id],
       });

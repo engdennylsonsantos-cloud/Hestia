@@ -31,6 +31,13 @@ describe('anotações na planta', () => {
     expect(cota.at.y).toBeGreaterThan(1);
   });
 
+  it('o texto da cota segue as unidades do projeto', () => {
+    const s = comCota();
+    s.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
+    expect(ops.labels[0]!.text).toBe('400,0 cm');
+  });
+
   it('cota gera linha, duas chamadas e duas marcas: 5 traços com a espessura de corte da categoria', () => {
     const p = comCota().project;
     const pt = defaultPaint('annotation', ZOOM);

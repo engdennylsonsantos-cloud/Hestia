@@ -5,7 +5,6 @@ import {
   difference,
   expandBox,
   multiArea,
-  orientedRect,
   closeGapsSafe,
   unionClipper,
   type Box,
@@ -35,6 +34,7 @@ import { flatEnd } from './joinSides.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { makeReturnClipper } from './clipReturn.ts';
 import { endReturns, insertMode, insertReturns } from './wrap.ts';
+import { cutHalfOf, openingRect } from './openingCut.ts';
 import { attachTargets } from './attachTargets.ts';
 import { resolveAllRoofs } from './roofs.ts';
 import { wallZRange, type WallZ } from './wallZ.ts';
@@ -242,17 +242,13 @@ export function openingGeometry(p: Project, o: Opening, f: WallFrame): OpeningGe
     flipHand: o.flipHand,
     flipFacing: o.flipFacing,
     offset: o.offset,
+    ...(f.arc ? { cutHalf: cutHalfOf(f, rough.width / 2) } : {}),
   };
 }
 
-const openingRect = (g: OpeningGeometry): MultiPolygon => [
-  [orientedRect(g.center.x, g.center.y, g.u.x, g.u.y, g.roughWidth / 2, g.thickness / 2 + 0.02)],
-];
-
-
 function clusterKey(items: Item[], opens: OpeningGeometry[]): string {
   const it = items.map((i) => `${i.wallId}|${i.layerIndex}|${i.materialId}|${i.priority}|${i.order}|${i.through ? 1 : 0}|${round(i.z0)}:${round(i.z1)}:${i.inPlan ? 1 : 0}:${i.outline ? 1 : 0}|${ringsOfShape(i.shape)}`);
-  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.roughWidth)}|${round(g.roughHeight)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}`);
+  const op = opens.map((g) => `${g.openingId}|${g.hostId}|${round(g.center.x)},${round(g.center.y)}|${round(g.width)}|${round(g.height)}|${round(g.roughWidth)}|${round(g.roughHeight)}|${round(g.sill)}|${round(g.u.x)},${round(g.u.y)}|${round(g.thickness)}|${round(g.cutHalf ?? 0)}`);
   return `${it.join('\n')}\n--\n${op.join('\n')}`;
 }
 
@@ -371,8 +367,8 @@ function solveCluster(items: Item[], opens: OpeningGeometry[], zr: Map<Id, ZRang
   }
   const regions: Region[] = [...byMaterial.entries()].map(([materialId, parts]) => ({ materialId, polygons: closeGapsSafe(unionClipper(...parts)) }));
   // Silhueta pela união das regiões por material. Unir todos os cortes numa só operação do Clipper foi tentado (semente 18
-  // dos testes de propriedade: um bolsão fechado de 0,029 m² entre três paredes que se cruzam fica preenchido nesta união),
-  // mas em outras sementes essa união única preencheu ambientes inteiros (até 8,9 m² a mais): o erro de 0,1% é o menor.
+  // dos testes de propriedade: um bolsão fechado de 0,029 metros quadrados entre três paredes que se cruzam fica preenchido nesta união),
+  // mas em outras sementes essa união única preencheu ambientes inteiros (até 8,9 metros quadrados a mais): o erro de 0,1% é o menor.
   const silhouette = closeGapsSafe(unionClipper(...regions.map((r) => r.polygons)));
   for (const arr of layers.values()) arr.sort((a, b) => a.layerIndex - b.layerIndex);
   return { layers, regions, silhouette };
@@ -435,7 +431,8 @@ export function resolveLevel(p: Project, levelId: Id, cache: ResolveCache = shar
     for (const f of group) {
       for (const o of openingsOfWall(p, f.wall.id)) {
         const ot = openingType(p, o);
-        for (const r of insertReturns(f, o.offset, ot.width, insertMode(f.type, ot))) {
+        const mode = insertMode(f.type, ot);
+        for (const r of insertReturns(f, o.offset, ot.width, mode, { ot, side: o.flipFacing ? -1 : 1 })) {
           const key = `${f.wall.id}|${r.layerIndex}`;
           returns.set(key, [...(returns.get(key) ?? []), { openingId: o.id, poly: r.poly }]);
         }

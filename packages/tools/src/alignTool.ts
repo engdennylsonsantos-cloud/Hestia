@@ -1,4 +1,5 @@
 import { add, mul, type Vec2 } from '@hestia/geom';
+import type { Id } from '@hestia/model';
 import { alignFeaturesAt, type AlignFeature } from './alignFeatures.ts';
 import { applyAlignMany } from './alignApply.ts';
 import { solveAlign, type AlignSolution } from './alignSolve.ts';
@@ -6,6 +7,15 @@ import { ToolBase } from './base.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
 const LABEL_HALF = 1.2;
+
+/** Parede que a feição de referência pertence (a própria parede, a da extremidade ou a hospedeira da abertura). */
+function paredeDaFeicao(f: AlignFeature): Id | undefined {
+  const m = f.move;
+  if (m.policy === 'transladar' && m.target === 'parede') return m.id;
+  if (m.policy === 'ponta') return m.wallId;
+  if (m.policy === 'abertura') return m.hostId;
+  return undefined;
+}
 
 /**
  * Alinhar universal (Revit: Align): o primeiro clique define a REFERÊNCIA e o segundo o que se move. Vale para
@@ -107,14 +117,22 @@ export class AlignTool extends ToolBase {
   private applyTargets(targets: AlignFeature[]): void {
     if (!this.ref || !targets.length) return;
     const pr = this.env.project();
-    const results = targets.map((t) => solveAlign(this.ref!.line, t, pr));
+    const refWall = paredeDaFeicao(this.ref);
+    // Alinhar a parede de referência a ela mesma não faz sentido: a referência se moveria junto.
+    const results: AlignSolution[] = targets.map((t) => {
+      const sol = solveAlign(this.ref!.line, t, pr);
+      if (sol.kind === 'transladar' && sol.target === 'parede' && sol.id === refWall) {
+        return { kind: 'erro', mensagem: 'Alinhar não move a própria parede de referência: nada foi alterado.' };
+      }
+      return sol;
+    });
     const valid = results.filter((r): r is Exclude<AlignSolution, { kind: 'nada' } | { kind: 'erro' }> => r.kind !== 'nada' && r.kind !== 'erro');
     if (!valid.length) {
       this.env.say(this.refusal(results, targets));
       return;
     }
     const label = valid.every((r) => r.kind === 'anel') ? 'Alinhar aresta' : 'Alinhar';
-    const { applied } = applyAlignMany(this.env, valid, label);
+    const { applied } = applyAlignMany(this.env, valid, label, { referencia: refWall });
     // Recusas individuais (vizinha curta, anel travado) já foram ditas por `applyAlign`.
     if (!applied) return;
     const ignored = results.filter((r) => r.kind === 'erro').length;

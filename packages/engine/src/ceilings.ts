@@ -1,7 +1,8 @@
 import { pointInMulti, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { ceilingsOnLevel, floorsOnLevel, followsRoom, levelAbove, levelElevation, slabsOnLevel, type Ceiling, type Id, type Project } from '@hestia/model';
 import { resolveRooms, type ResolvedRoom, type RoomProblem } from './rooms.ts';
-import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel, type StairOpening } from './stairOpenings.ts';
+import { cutStairOpenings } from './stairOpenings.ts';
+import { holesFor, openingsOnLevel, type LevelOpenings } from './levelOpenings.ts';
 
 /** Camada resolvida do forro: a mesma área em planta, entre as cotas absolutas z0 e z1. */
 export interface ResolvedCeilingLayer {
@@ -80,9 +81,9 @@ export interface ResolvedCeiling {
   problem: CeilingRoomProblem | null;
 }
 
-/** Vãos do nível de cima que atravessam o forro: escadas que furam o nível de cima e furos próprios de pisos e lajes dele. */
+/** Vãos do nível de cima que atravessam o forro: escadas/rampas que furam o nível de cima e furos próprios de pisos e lajes. */
 interface UpperOpenings {
-  stairs: StairOpening[];
+  openings: LevelOpenings;
   /** Furos das lajes e dos pisos do nível de cima, em planta (independem da cota). */
   shafts: MultiPolygon[];
 }
@@ -90,9 +91,9 @@ interface UpperOpenings {
 /** Vãos do nível acima do forro (decisão 0021, B6). Sem nível acima, nada a recortar. */
 function upperOpenings(p: Project, levelId: Id): UpperOpenings {
   const above = levelAbove(p, levelId);
-  if (!above) return { stairs: [], shafts: [] };
+  if (!above) return { openings: { stairs: [], ramps: [] }, shafts: [] };
   const holes = [...floorsOnLevel(p, above.id), ...slabsOnLevel(p, above.id)].flatMap((e) => e.holes);
-  return { stairs: stairOpeningsOnLevel(p, above.id), shafts: holes.map((h): MultiPolygon => [[h]]) };
+  return { openings: openingsOnLevel(p, above.id), shafts: holes.map((h): MultiPolygon => [[h]]) };
 }
 
 /**
@@ -101,7 +102,7 @@ function upperOpenings(p: Project, levelId: Id): UpperOpenings {
  * pendurado sob essa laje, então a escada e o furo aparecem nele.
  */
 function ceilingVoid(upper: UpperOpenings, bottomZ: number): MultiPolygon {
-  const parts = [stairHolesFor(upper.stairs, bottomZ), ...upper.shafts].filter((region) => region.length > 0);
+  const parts = [holesFor(upper.openings, bottomZ), ...upper.shafts].filter((region) => region.length > 0);
   return parts.length ? union(...parts) : [];
 }
 

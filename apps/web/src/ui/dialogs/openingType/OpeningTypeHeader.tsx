@@ -12,6 +12,8 @@ interface OpeningTypeHeaderProps {
   onType: (id: string) => void;
   onDuplicate: () => void;
   onFavorite: () => void;
+  /** Chamado antes de focar o nome (o diálogo abre o componente que tem o campo). */
+  onBeforeRename?: () => void;
 }
 
 /** Cabeçalho do diálogo: família (seletor), tipo, duplicar, renomear e favorito. */
@@ -26,13 +28,20 @@ export function OpeningTypeHeader({
   onType,
   onDuplicate,
   onFavorite,
+  onBeforeRename,
 }: OpeningTypeHeaderProps): ReactElement {
-  const rename = (): void => {
+  const focusName = (): void => {
     const el = document.getElementById(nameFieldId);
     if (el instanceof HTMLInputElement) {
       el.focus();
       el.select();
     }
+  };
+  const rename = (): void => {
+    if (!onBeforeRename) return focusName();
+    onBeforeRename();
+    // O campo só existe depois de o painel trocar.
+    window.setTimeout(focusName, 0);
   };
   return (
     <div className="tdlg-bar op-head">

@@ -196,9 +196,9 @@ describe('casa de alto padrão: montagem', () => {
     expect(t?.area).toBe('330 m²');
   });
 
-  it('tem 2 níveis, 32 paredes, 38 aberturas (18 no térreo e 20 no pavimento 2), 2 pisos, 1 laje, 1 telhado, 1 escada e 6 vistas', () => {
+  it('tem 3 níveis (o 3º é a Cobertura), 32 paredes, 38 aberturas (18 no térreo e 20 no pavimento 2), 2 pisos, 1 laje, 1 telhado, 1 escada e 6 vistas', () => {
     const p = project();
-    expect(p.levels.map((l) => l.id)).toEqual(['lv_0', 'lv_1']);
+    expect(p.levels.map((l) => l.id)).toEqual(['lv_0', 'lv_1', 'lv_2']);
     const els = Object.values(p.elements);
     expect(els.filter(isWall)).toHaveLength(32);
     expect(els.filter(isOpening)).toHaveLength(38);
@@ -398,7 +398,7 @@ describe('casa de alto padrão: escada, laje e telhado', () => {
 
   it('telhado de 4 águas a 30 %: beiral 5,80 m e cumeeira ≈ 7,78 m, sem aviso bloqueante', () => {
     const p = project();
-    const [telhado] = resolveRoofs(p, 'lv_1');
+    const [telhado] = resolveRoofs(p, 'lv_2');
     expect(telhado).toBeDefined();
     expect(telhado!.planes).toHaveLength(4);
     expect(telhado!.eaveZ).toBeCloseTo(5.8, 6);

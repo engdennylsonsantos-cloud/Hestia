@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, type ReactElement } from 'react';
-import { FUNCTION_LABEL, coreRange, layerPriority, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType, type WrapMode } from '@hestia/model';
+import { formatQuantity, FUNCTION_LABEL, coreRange, layerPriority, newId, totalThickness, wallTypeUsage, type Layer, type LayerFunction, type WallType, type WrapMode } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { NumField, TextField } from '../fields.tsx';
@@ -12,12 +12,14 @@ import { MaterialsDialog } from './MaterialsDialog.tsx';
 import { SectionPreview } from './SectionPreview.tsx';
 import { StripsTab, stripError } from './StripsTab.tsx';
 import { TypeParams } from './TypeParams.tsx';
+import { useUnits } from '../useUnits.ts';
 
 const FUNCTIONS = Object.keys(FUNCTION_LABEL) as LayerFunction[];
 const WRAP_OPTIONS: Array<[WrapMode, string]> = [['none', 'Não envolver'], ['both', 'Dos dois lados'], ['exterior', 'Só lado externo'], ['interior', 'Só lado interno']];
 type Tab = 'estrutura' | 'faixas' | 'graficos' | 'identidade';
 
 export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | null {
+  const units = useUnits();
   const p = useProject();
   const src = p.wallTypes[typeId];
   const [draft, setDraft] = useState<WallType | null>(src ? structuredClone(src) : null);
@@ -142,7 +144,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m?.name ?? '—'}</span>
                           </button>
                         </td>
-                        <td><NumField value={l.thickness} scale={100} decimals={1} min={0} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
+                        <td><NumField value={l.thickness} quantity="smallLength" min={0} onCommit={(v) => setLayer(i, { thickness: v })} /></td>
                         <td><input type="checkbox" aria-label={`Camada ${i + 1} envolve`} checked={l.wraps} onChange={(e) => setLayer(i, { wraps: e.target.checked })} /></td>
                         <td>
                           <span className="iconrow">
@@ -166,7 +168,7 @@ export function WallTypeDialog({ typeId }: { typeId: string }): ReactElement | n
                   <tr><td colSpan={6} style={{ color: 'var(--fg-faint)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Face interna</td></tr>
                 </tbody>
               </table>
-              <div className="total"><span>Espessura total</span><strong>{(totalThickness(draft) * 100).toFixed(1).replace('.', ',')} cm</strong></div>
+              <div className="total"><span>Espessura total</span><strong>{formatQuantity(units, 'smallLength', totalThickness(draft))}</strong></div>
               <button className="btn small" onClick={insert}>+ Inserir camada</button>
               <div className="field-row" style={{ marginTop: 10 }}>
                 <label htmlFor="wt-wrap-ins" title="Camadas marcadas em “Envolve” voltam para dentro do vão, cobrindo a lateral">Retorno nos vãos</label>

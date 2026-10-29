@@ -1,5 +1,7 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { isWall, type Dimension, type DimensionRef, type Project } from './types.ts';
+import { defaultUnits, type ResolvedUnits } from './units.ts';
+import { formatQuantity } from './unitsFormat.ts';
 
 /** Espaçamentos da cota em mm de papel (multiplicados pela escala da vista no render e no DXF). */
 export const DIM_GAP_MM = 1.5;
@@ -41,23 +43,23 @@ export function dimensionValue(p: Pick<Project, 'elements'>, d: Dimension): numb
   return roundMm(len(sub(b, a)));
 }
 
-/** Texto do valor: duas casas decimais em metros, com vírgula ("3,50 m"). */
-export const formatDimensionValue = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+/** Texto do valor na unidade de comprimento do projeto (padrão: metros com duas casas). */
+export const formatDimensionValue = (m: number, units = defaultUnits()): string => formatQuantity(units, 'length', m);
 
-/** Formatação de valor para cotas (m padrão), mantendo casas decimais previsíveis. */
-export function formatDimension(d: Dimension, meters: number): string {
-  const unit = d.unit ?? 'm';
-  const factor = unit === 'mm' ? 1000 : unit === 'cm' ? 100 : 1;
-  const digits = d.precision ?? 2;
-  const value = (meters * factor).toFixed(digits).replace('.', ',');
-  const suffix = d.suffix || (unit === 'm' ? ' m' : ` ${unit}`);
-  return `${d.prefix ?? ''}${value}${suffix}`;
+/**
+ * Formatação de valor para cotas. Sem unidade (ou com a unidade project), usa a unidade e as casas do projeto; a
+ * unidade explícita de arquivos antigos (m, cm ou mm) continua valendo. precision sobrepõe as casas.
+ */
+export function formatDimension(d: Dimension, meters: number, units = defaultUnits()): string {
+  const unit = d.unit && d.unit !== 'project' ? d.unit : undefined;
+  const text = formatQuantity(units, 'length', meters, { unit, decimals: d.precision, withUnit: !d.suffix });
+  return `${d.prefix ?? ''}${text}${d.suffix ?? ''}`;
 }
 
 /** Texto mostrado na cota: o texto fixo, se houver algum (sem espaços nas pontas); senão, o valor medido com a formatação da cota. */
-export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension): string {
+export function dimensionText(p: Pick<Project, 'elements'>, d: Dimension, units: ResolvedUnits): string {
   const fixed = d.text?.trim();
-  return fixed ? fixed : formatDimension(d, dimensionValue(p, d));
+  return fixed ? fixed : formatDimension(d, dimensionValue(p, d), units);
 }
 
 export interface DimensionGeometry {

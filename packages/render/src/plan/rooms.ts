@@ -1,6 +1,8 @@
 import type { Vec2 } from '@hestia/geom';
+import { pointInPolygon } from '@hestia/geom';
 import type { ResolvedRoom } from '@hestia/engine';
 import type { DetailLevel, Id, Project } from '@hestia/model';
+import { unitsOf, type ResolvedUnits } from '@hestia/model';
 import { belowFloorOps, fmtArea, labelPoint, type FloorOps } from './floors.ts';
 import { ambientesDoNivel } from './resolucao.ts';
 import { surfaceColor, type PlanPaint } from './style.ts';
@@ -15,14 +17,14 @@ const ROOM_TEXT_MM = 1.6;
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
 /**
- * Etiqueta do ambiente: nome, número e área (m², 2 casas) no detalhe fino e médio; no grosso, só o nome (decisão
+ * Etiqueta do ambiente: nome, número e área (2 casas) no detalhe fino e médio; no grosso, só o nome (decisão
  * 0018 · D1). Número entre parênteses quando há.
  */
-export function roomLabelText(r: ResolvedRoom, detail: DetailLevel): string {
+export function roomLabelText(r: ResolvedRoom, detail: DetailLevel, u: ResolvedUnits): string {
   const name = r.name || (r.number ? `Ambiente ${r.number}` : 'Ambiente');
   if (detail === 'coarse') return name;
   const num = r.number ? ` (${r.number})` : '';
-  return `${name}${num} · ${fmtArea(r.area, 2)}`;
+  return `${name}${num} · ${fmtArea(u, r.area, 2)}`;
 }
 
 /** Ponto da etiqueta: o centro do maior trecho interno do polígono (vale também para contornos em L). */
@@ -42,15 +44,23 @@ export function roomOps(
   scale: number,
   hidden: ReadonlySet<Id> | undefined,
   paint: PlanPaint,
+  hideLabelRoomId?: Id,
 ): FloorOps {
   const out = empty();
   const fillBase = dark ? theme.bg : '#ffffff';
   for (const r of ambientesDoNivel(p, levelId)) {
     if (!r.polygon || hidden?.has(r.roomId)) continue;
-    const color = surfaceColor(r.color ?? ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
+    const color = surfaceColor(ROOM_DEFAULT, fillBase, dark ? 0.6 : 0.78, paint);
     out.fills.push({ polygons: [r.polygon], color, alpha: 0.7 });
-    const at = roomLabelAt(r);
-    if (at) out.labels.push({ at, text: roomLabelText(r, detail), papel: { escala: scale, fontMm: ROOM_TEXT_MM }, tone: 'info' });
+    if (r.roomId === hideLabelRoomId) continue;
+    const room = p.elements[r.roomId];
+    const at = room?.kind === 'room' && room.labelPosition ? room.labelPosition : roomLabelAt(r);
+    if (at) out.labels.push({ at, text: roomLabelText(r, detail, unitsOf(p)), ...(room?.kind === 'room' && room.labelRotation ? { rotation: room.labelRotation } : {}), papel: { escala: scale, fontMm: ROOM_TEXT_MM }, tone: 'info' });
+    // Rótulo fora do ambiente: chamada reta até o ponto de referência (o rótulo é compartilhado por todas as vistas).
+    if (room?.kind === 'room' && room.labelPosition && r.polygon && !pointInPolygon(room.labelPosition, r.polygon)) {
+      const anchor = room.referencePoint ?? roomLabelAt(r);
+      if (anchor) out.strokes.push({ pts: [room.labelPosition, anchor], closed: false, widthPx: 1, papel: { mm: 0.13, escala: scale }, color: theme.ink, alpha: 0.95 });
+    }
   }
   return out;
 }

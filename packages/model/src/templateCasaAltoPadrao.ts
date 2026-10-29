@@ -1,6 +1,7 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Command } from './commands.ts';
 import { makeFloor } from './floor.ts';
+import { makeLevel } from './level.ts';
 import { makeRoof } from './roof.ts';
 import { makeSlab } from './slab.ts';
 import { makeStair } from './stair.ts';
@@ -14,8 +15,9 @@ import { makeWall } from './wall.ts';
  * Convenções (docs/05 §3): a face externa de cada parede fica à esquerda de a→b; o `offset` da abertura é a distância do
  * centro do vão ao início (a) da parede; `flipFacing = true` gira a folha para a direita de a→b.
  *
- * Níveis: lv_0 (Térreo, 0,00) e lv_1 (Pavimento 2, 3,00), criados por `createEmptyProject`. O telhado fica no lv_1
- * (sem nível de cobertura). A laje do lv_1 tem contorno pela face externa, para o ponto médio das paredes externas do
+ * Níveis: lv_0 (Térreo, 0,00) e lv_1 (Pavimento 2, 3,00), criados por `createEmptyProject`, e lv_2 (Cobertura, 5,80),
+ * criado aqui: o telhado fica no lv_2 (beiral na cota do nível) para a planta de cobertura cortá-lo.
+ * A laje do lv_1 tem contorno pela face externa, para o ponto médio das paredes externas do
  * térreo cair dentro dela e o topo anexar à sua face inferior.
  */
 
@@ -67,6 +69,8 @@ function parede(id: Id, a: [number, number], b: [number, number], typeId: Id, le
 /** Níveis do projeto: térreo (0,00) e pavimento 2 (3,00). */
 const TERREO = 'lv_0';
 const PAV2 = 'lv_1';
+/** Nível da cobertura (beiral a 5,80 m): a planta dele corta o telhado, como a planta de cobertura do Revit. */
+const COBERTURA = 'lv_2';
 
 const PAREDES: Command[] = [
   // Externas do térreo (contorno no sentido horário, face externa à esquerda de a→b).
@@ -245,14 +249,14 @@ const TELHADO: Command = {
   roof: makeRoof({
     id: 'R-01',
     typeId: 'rt_ceramica',
-    levelId: PAV2,
+    levelId: COBERTURA,
     boundary: [
       { x: -0.721, y: -0.721 },
       { x: 12.471, y: -0.721 },
       { x: 12.471, y: 14.721 },
       { x: -0.721, y: 14.721 },
     ],
-    heightOffset: 2.8,
+    heightOffset: 0,
     shape: 'hip',
     slopePercent: 30,
     edgeSlopes: [30, 30, 30, 30],
@@ -346,6 +350,7 @@ export function casaAltoPadrao(cmds: Command[]): void {
   for (const c of aberturas(ABERTURAS_PAV2)) cmds.push(c);
   for (const c of PISOS) cmds.push(c);
   cmds.push(LAJE_PAV2);
+  cmds.push({ type: 'upsertLevel', level: makeLevel({ id: COBERTURA, name: 'Cobertura', elevation: 5.8 }) });
   cmds.push(TELHADO);
   cmds.push(escada());
   for (const v of [...CORTES, ...elevacoes()]) cmds.push({ type: 'addView', view: v });

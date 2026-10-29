@@ -1,5 +1,5 @@
+/* eslint-disable max-lines */
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
-import { wallLength } from './queries.ts';
 import {
   isOpening,
   isCeiling,
@@ -7,6 +7,7 @@ import {
   isSlab,
   isRoof,
   isStair,
+  isRamp,
   isWall,
   isRoom,
   type Ceiling,
@@ -22,6 +23,8 @@ import {
   type Room,
   type Stair,
   type StairType,
+  type Ramp,
+  type RampType,
   type JoinConfig,
   type Level,
   type Material,
@@ -34,11 +37,15 @@ import {
 } from './types.ts';
 import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
+import { changesWallEnds, clampOffset, rehostOpenings, wallEndsPatchOf, type WallEndsPatch } from './hostedOffset.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
+import { transformRamp } from './rampTransform.ts';
 import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
+import { rampTypeIssue } from './ramp.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
+import { withBridgedComposition } from './openingCompositionOf.ts';
 import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
 import type { DeepPartial, ProjectGraphics, View3DSettings, ViewGraphics } from './graphics.ts';
@@ -54,10 +61,13 @@ import {
 
 import { applyAnnotationCommand, type AnnotationCommand } from './annotations.ts';
 import { applySheetCommand, type SheetCommand } from './sheetCommands.ts';
+import { applyGridCommand, type GridCommand } from './grid.ts';
 import { applyViewCommand } from './viewCommands.ts';
 import { applyCeilingCommand } from './ceilingCommands.ts';
 import { applyRoomCommand } from './roomCommands.ts';
 import { applyOutlineCommand } from './outlineCommands.ts';
+import { applyAreaPlanCommand, dropAreaPlansOfLevel, dropRoomTags, prunePlanElementTags } from './areaPlanCommands.ts';
+import type { AreaPlan, ColorScheme, RoomCategory, RoomTag } from './areaPlan.ts';
 
 /** Comando = dados serializáveis. A única forma de escrever no modelo (docs/01 §5). */
 export type Command =
@@ -81,11 +91,12 @@ export type Command =
   | { type: 'addStair'; stair: Omit<Stair, 'order'> }
   | { type: 'upsertStairType'; stairType: StairType }
   | { type: 'deleteStairType'; id: Id }
+  | { type: 'addRamp'; ramp: Omit<Ramp, 'order'> } | { type: 'upsertRampType'; rampType: RampType } | { type: 'deleteRampType'; id: Id }
   | { type: 'upsertSlabType'; slabType: SlabType }
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Room> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Ramp> | Partial<Room> }
   | { type: 'detachOutline'; id: Id }
   | { type: 'relinkOutline'; id: Id }
   | { type: 'detachCeilingRoom'; id: Id }
@@ -102,6 +113,7 @@ export type Command =
   | { type: 'upsertLevel'; level: Level }
   | AnnotationCommand
   | SheetCommand
+  | GridCommand
   | { type: 'deleteLevel'; id: Id }
   | { type: 'setLevelViewRange'; levelId: Id; patch: Partial<ViewRange> }
   | { type: 'setProjectGraphics'; patch: DeepPartial<ProjectGraphics> }
@@ -120,8 +132,19 @@ export type Command =
   | { type: 'deleteView'; id: Id }
   | { type: 'batch'; commands: Command[] }
   | { type: 'setOpeningHost'; id: Id; hostId: Id; offset: number }
+  | { type: 'addAreaPlan'; plan: AreaPlan }
+  | { type: 'updateAreaPlan'; id: Id; patch: Partial<Omit<AreaPlan, 'id' | 'tags'>> }
+  | { type: 'removeAreaPlan'; id: Id }
+  | { type: 'addRoomTag'; planId: Id; tag: RoomTag }
+  | { type: 'updateRoomTag'; planId: Id; id: Id; patch: Partial<Omit<RoomTag, 'id' | 'planId' | 'roomId'>> }
+  | { type: 'removeRoomTag'; planId: Id; id: Id }
+  | { type: 'setRoomReference'; id: Id; point: Vec2 | null }
+  | { type: 'setRoomLabel'; id: Id; position: Vec2 | null; rotation?: number; leader?: 'auto' | 'none' | 'straight' | 'kinked' | 'crossed' }
+  | { type: 'upsertRoomCategory'; category: RoomCategory }
+  | { type: 'removeRoomCategory'; id: Id }
+  | { type: 'upsertColorScheme'; scheme: ColorScheme }
+  | { type: 'removeColorScheme'; id: Id }
   | ({ type: 'setElementLevel' } & SetElementLevel);
-
 function transformWall(w: Wall, t: Transform): Wall {
   const a = applyTransform(t, w.a);
   const b = applyTransform(t, w.b);
@@ -130,20 +153,11 @@ function transformWall(w: Wall, t: Transform): Wall {
   return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
 }
 
-/** Garante que a abertura continue dentro da parede depois de qualquer edição. */
-export function clampOffset(p: Project, o: Opening, wall: Wall): number {
-  const t = p.openingTypes[o.typeId];
-  const half = (t?.width ?? 0.8) / 2;
-  const l = wallLength(wall);
-  return Math.max(Math.min(half, l / 2), Math.min(o.offset, l - Math.min(half, l / 2)));
-}
-
 function removeIds(p: Project, ids: Id[]): void {
   const doomed = new Set(ids);
   for (const e of Object.values(p.elements)) if (isOpening(e) && doomed.has(e.hostId)) doomed.add(e.id);
   for (const id of doomed) delete p.elements[id];
 }
-
 /** Move/gira/espelha cada elemento do tipo pedido (mesmo padrão para piso, laje, telhado, escada e ambiente). */
 function transformEach<E extends Element>(p: Project, c: Extract<Command, { type: 'transform' }>, pred: (e: Element | undefined) => e is E, map: (e: E, t: Transform) => E): void {
   const idMap = c.copy?.idMap;
@@ -162,10 +176,19 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   const idMap = c.copy?.idMap;
   transformEach(p, c, isRoof, transformRoof);
   transformEach(p, c, isStair, transformStair);
+  transformEach(p, c, isRamp, transformRamp);
   transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
   transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
   transformEach(p, c, isCeiling, (f, t) => transformCeiling(f, t, !!c.copy?.idMap));
-  transformEach(p, c, isRoom, (r, t) => ({ ...r, point: applyTransform(t, r.point) }));
+  transformEach(p, c, isRoom, (r, t) => ({
+    ...r,
+    point: applyTransform(t, r.point),
+    ...(r.referencePoint ? { referencePoint: applyTransform(t, r.referencePoint) } : {}),
+    ...(r.labelPosition ? { labelPosition: applyTransform(t, r.labelPosition) } : {}),
+    ...(r.labelRotation !== undefined || t.kind === 'rotate' || t.kind === 'mirror'
+      ? { labelRotation: t.kind === 'mirror' ? -(r.labelRotation ?? 0) : (r.labelRotation ?? 0) + (t.kind === 'rotate' ? (t.angle * 180) / Math.PI : 0) }
+      : {}),
+  }));
   const walls = c.ids.map((id) => p.elements[id]).filter(isWall);
   for (const w of walls) {
     const next = transformWall(w, c.transform);
@@ -193,7 +216,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
 }
 
 export function applyCommand(p: Project, c: Command): void {
-  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c) || applyOutlineCommand(p, c)) return;
+  if (applyCeilingCommand(p, c) || applyRoomCommand(p, c) || applyAreaPlanCommand(p, c) || applyOutlineCommand(p, c)) return;
   switch (c.type) {
     case 'addWall':
       p.elements[c.wall.id] = { ...c.wall, order: p.nextOrder++ };
@@ -256,16 +279,37 @@ export function applyCommand(p: Project, c: Command): void {
       delete p.stairTypes[c.id];
       break;
     }
+    case 'addRamp':
+      if (!p.rampTypes[c.ramp.typeId]) throw new Error('Tipo de rampa inexistente');
+      p.elements[c.ramp.id] = { ...c.ramp, order: p.nextOrder++ }; break;
+    case 'upsertRampType': {
+      const issue = rampTypeIssue(c.rampType);
+      if (issue) throw new Error(issue);
+      p.rampTypes[c.rampType.id] = c.rampType; break;
+    }
+    case 'deleteRampType':
+      if (Object.values(p.elements).some((e) => isRamp(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.rampTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de rampa');
+      delete p.rampTypes[c.id]; break;
     case 'addOpening': {
       const host = p.elements[c.opening.hostId];
       if (!isWall(host)) throw new Error('Abertura precisa de uma parede anfitriã');
       p.elements[c.opening.id] = { ...c.opening, offset: clampOffset(p, c.opening, host) };
       break;
     }
-    case 'updateElements':
+    case 'updateElements': {
+      const ends = wallEndsPatchOf(c.patch as Partial<Wall>);
+      const movesEnds = changesWallEnds(c.patch as Partial<Wall>);
       for (const id of c.ids) {
         const e = p.elements[id];
-        if (e) p.elements[id] = { ...e, ...c.patch } as Element;
+        if (!e) continue;
+        if (movesEnds && isWall(e)) {
+          const next = { ...e, ...c.patch } as Wall;
+          rehostOpenings(p, e, next, ends);
+          p.elements[id] = next;
+          continue;
+        }
+        p.elements[id] = { ...e, ...c.patch } as Element;
       }
       for (const id of c.ids) {
         const e = p.elements[id];
@@ -275,14 +319,17 @@ export function applyCommand(p: Project, c: Command): void {
         }
       }
       break;
+    }
     case 'setWallEnds': {
       const w = p.elements[c.id];
       if (!isWall(w)) break;
-      if (c.a) w.a = c.a;
-      if (c.b) w.b = c.b;
-      for (const o of Object.values(p.elements).filter(isOpening)) {
-        if (o.hostId === w.id) o.offset = clampOffset(p, o, w);
-      }
+      const patch: WallEndsPatch = {};
+      if (c.a) patch.a = c.a;
+      if (c.b) patch.b = c.b;
+      const next = { ...w, ...patch };
+      rehostOpenings(p, w, next, patch);
+      w.a = next.a;
+      w.b = next.b;
       break;
     }
     case 'setJoin':
@@ -299,10 +346,13 @@ export function applyCommand(p: Project, c: Command): void {
     case 'splitWall':
       splitWall(p, c);
       for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => Boolean(p.elements[tag.hostId]));
+      prunePlanElementTags(p);
       break;
     case 'deleteElements':
       removeIds(p, c.ids);
+      dropRoomTags(p, c.ids);
       for (const level of p.levels) if (level.tags?.length) level.tags = level.tags.filter((tag) => !c.ids.includes(tag.hostId));
+      prunePlanElementTags(p);
       break;
     case 'upsertWallType':
       p.wallTypes[c.wallType.id] = c.wallType;
@@ -319,7 +369,8 @@ export function applyCommand(p: Project, c: Command): void {
     case 'upsertOpeningType': {
       const issue = openingTypeIssue(c.openingType);
       if (issue) throw new Error(issue);
-      p.openingTypes[c.openingType.id] = c.openingType;
+      const next = withBridgedComposition(c.openingType, p.openingTypes[c.openingType.id], p.openingProfiles);
+      p.openingTypes[next.id] = next;
       break;
     }
     case 'upsertLevel': {
@@ -332,8 +383,9 @@ export function applyCommand(p: Project, c: Command): void {
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
       // Escada também conta pelo nível de topo explícito; o topo automático segue o nível acima e não prende o nível.
-      if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
+      if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id) || (isRamp(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
+      dropAreaPlansOfLevel(p, c.id);
       break;
     }
     case 'addDimension':
@@ -357,6 +409,14 @@ export function applyCommand(p: Project, c: Command): void {
     case 'updateViewport':
     case 'removeViewport':
       applySheetCommand(p, c);
+      break;
+    case 'addGrid':
+    case 'updateGrid':
+    case 'removeGrid':
+    case 'addGridType':
+    case 'updateGridType':
+    case 'removeGridType':
+      applyGridCommand(p, c);
       break;
     case 'setLevelViewRange': {
       const l = p.levels.find((x) => x.id === c.levelId);

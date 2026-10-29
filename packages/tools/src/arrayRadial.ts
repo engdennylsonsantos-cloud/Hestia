@@ -1,5 +1,5 @@
 import { applyTransform, dist, mul, type Transform, type Vec2 } from '@hestia/geom';
-import { isCeiling, isWall, newId, wallsOnLevel, type Id, type Project } from '@hestia/model';
+import { formatQuantity, isCeiling, isWall, newId, wallsOnLevel, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import { copyWalls, ghostBands, ghostViews, selectedMovables, selectedViews, transformViews } from './edit.ts';
 import type { ArrayAnchor, PreviewItem, ToolEnv } from './types.ts';
 
@@ -34,7 +34,8 @@ export function linearStep(total: Vec2, n: number, anchor: ArrayAnchor): Vec2 {
 }
 
 /** Vem da planta em metros: vírgula decimal, como no resto da barra de status. */
-export const fmtXY = (p: Vec2): string => `${p.x.toFixed(2).replace('.', ',')}; ${p.y.toFixed(2).replace('.', ',')}`;
+export const fmtXY = (u: ResolvedUnits, p: Vec2): string =>
+  `${formatQuantity(u, 'length', p.x, { withUnit: false })}; ${formatQuantity(u, 'length', p.y, { withUnit: false })}`;
 
 /** Transformações de rotação de cada cópia (o original, item 0, não entra). */
 const rotations = (center: Vec2, angles: number[]): Transform[] => angles.slice(1).map((angle) => ({ kind: 'rotate', about: center, angle }));

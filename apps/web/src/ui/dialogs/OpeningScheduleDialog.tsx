@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { formatQuantity, type Quantity, type ResolvedUnits } from '@hestia/model';
 import { buildOpeningSchedule, filterOpeningRows, openingScheduleToCsv, sumOpeningRows, type OpeningScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
@@ -6,6 +7,8 @@ import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { scheduleCell, scheduleHeader } from './scheduleUnits.ts';
+import { useUnits } from '../useUnits.ts';
 
 interface Col {
   key: keyof OpeningScheduleRow;
@@ -13,6 +16,8 @@ interface Col {
   labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
+  /** Grandeza da coluna: converte o valor SI para a unidade do projeto. */
+  quantity?: Quantity;
 }
 
 const COLS: Col[] = [
@@ -20,27 +25,29 @@ const COLS: Col[] = [
   { key: 'typeName', labelKey: 'col_type' },
   { key: 'familyName', labelKey: 'col_family' },
   { key: 'kind', labelKey: 'col_category' },
-  { key: 'width', labelKey: 'col_width', decimals: 2 },
-  { key: 'height', labelKey: 'col_height', decimals: 2 },
-  { key: 'roughWidth', labelKey: 'col_rough_width', decimals: 2 },
-  { key: 'roughHeight', labelKey: 'col_rough_height', decimals: 2 },
-  { key: 'sill', labelKey: 'col_sill', decimals: 2 },
+  { key: 'width', labelKey: 'col_width', decimals: 2, quantity: 'length' },
+  { key: 'height', labelKey: 'col_height', decimals: 2, quantity: 'length' },
+  { key: 'roughWidth', labelKey: 'col_rough_width', decimals: 2, quantity: 'length' },
+  { key: 'roughHeight', labelKey: 'col_rough_height', decimals: 2, quantity: 'length' },
+  { key: 'sill', labelKey: 'col_sill', decimals: 2, quantity: 'length' },
   { key: 'leaves', labelKey: 'col_leaves', decimals: 0 },
-  { key: 'lintelLength', labelKey: 'col_lintel', decimals: 2 },
-  { key: 'sillBeamLength', labelKey: 'col_sill_beam', decimals: 2 },
+  { key: 'lintelLength', labelKey: 'col_lintel', decimals: 2, quantity: 'length' },
+  { key: 'sillBeamLength', labelKey: 'col_sill_beam', decimals: 2, quantity: 'length' },
   { key: 'count', labelKey: 'col_count', decimals: 0 },
-  { key: 'unitArea', labelKey: 'col_unit_area', decimals: 2 },
-  { key: 'totalArea', labelKey: 'col_total_area', decimals: 2 },
+  { key: 'unitArea', labelKey: 'col_unit_area', decimals: 2, quantity: 'area' },
+  { key: 'totalArea', labelKey: 'col_total_area', decimals: 2, quantity: 'area' },
+  { key: 'leafWidth', labelKey: 'col_leaf_width', decimals: 2, quantity: 'length' },
+  { key: 'leafHeight', labelKey: 'col_leaf_height', decimals: 2, quantity: 'length' },
+  { key: 'frameMaterial', labelKey: 'col_frame_material' },
+  { key: 'sense', labelKey: 'col_sense' },
+  { key: 'leafMaterial', labelKey: 'col_leaf_material' },
+  { key: 'hardware', labelKey: 'col_hardware' },
 ];
 
 interface Sort {
   key: keyof OpeningScheduleRow;
   dir: 1 | -1;
 }
-
-/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
-const fmt = (v: number, decimals: number): string =>
-  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: OpeningScheduleRow, b: OpeningScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -50,18 +57,19 @@ const compare = (a: OpeningScheduleRow, b: OpeningScheduleRow, s: Sort): number 
 };
 
 /** Textos das células de categoria e de valores vazios; PT/EN passados pelo diálogo. */
-const cellValue = (r: OpeningScheduleRow, c: Col, kindText: (k: string) => string): ReactNode => {
+const cellValue = (r: OpeningScheduleRow, c: Col, kindText: (k: string) => string, units: ResolvedUnits): ReactNode => {
   if (c.key === 'kind') return kindText(r.kind);
   const v = r[c.key];
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'object') return '—';
-  return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
+  return typeof v === 'number' ? (c.quantity ? scheduleCell(units, c.quantity, v, c.decimals) : String(v)) : v;
 };
 
 /** Tabela de portas e janelas com ordenação, filtro por categoria, totais e exportação CSV (padrão da tabela de escadas). */
 export function OpeningScheduleDialog(): ReactElement {
   const p = useProject();
   const t = I18N[useI18n((s) => s.lang)];
+  const units = useUnits();
   const schedule = useMemo(() => buildOpeningSchedule(p), [p]);
   const [kind, setKind] = useState<'' | 'door' | 'window'>('');
   const [sort, setSort] = useState<Sort | null>(null);
@@ -81,7 +89,7 @@ export function OpeningScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-portas-e-janelas.csv`, openingScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-portas-e-janelas.csv`, openingScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };
@@ -121,7 +129,7 @@ export function OpeningScheduleDialog(): ReactElement {
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                       <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
-                        {t[c.labelKey]}
+                        {c.quantity ? scheduleHeader(units, t[c.labelKey], c.quantity) : t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -133,7 +141,7 @@ export function OpeningScheduleDialog(): ReactElement {
                   <tr key={r.typeId}>
                     {COLS.map((c) => (
                       <td key={c.key} className={c.decimals !== undefined ? 'num' : undefined}>
-                        {cellValue(r, c, (k) => (k === 'door' ? t.sched_kind_door : t.sched_kind_window))}
+                        {cellValue(r, c, (k) => (k === 'door' ? t.sched_kind_door : t.sched_kind_window), units)}
                       </td>
                     ))}
                   </tr>
@@ -145,7 +153,7 @@ export function OpeningScheduleDialog(): ReactElement {
             <span>{totals.count} {totals.count === 1 ? t.sched_noun_opening_one : t.sched_noun_opening}</span>
             <span>{t.sched_total_doors} {totals.doorCount}</span>
             <span>{t.sched_total_windows} {totals.windowCount}</span>
-            <span>{t.sched_total_total_area} {fmt(totals.totalArea, 2)} m²</span>
+            <span>{t.sched_total_total_area} {formatQuantity(units, 'area', totals.totalArea, { decimals: 2 })}</span>
           </div>
         </>
       )}

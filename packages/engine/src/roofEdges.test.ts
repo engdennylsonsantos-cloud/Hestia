@@ -141,11 +141,14 @@ describe('forma por arestas (edges)', () => {
     expect(distinct(ML(r.lines, 'gable').map((l) => l.a.x))).toEqual([0, 8]);
   });
 
-  it('nenhuma aresta define inclinação: sem águas, sem linhas e com o motivo', () => {
+  it('nenhuma aresta define inclinação: telhado plano, uma água horizontal na cota do beiral, sem empena', () => {
+    // Antes a recusa "nenhuma aresta define inclinação"; agora o telhado é plano (como no Revit).
     const r = one({ shape: 'edges', edgeSlopes: [null, null, null, null], edgeOverhangs: [0, 0, 0, 0] });
-    expect(r.planes).toEqual([]);
-    expect(r.lines).toEqual([]);
-    expect(r.problem).toBe('nenhuma aresta define inclinação');
+    expect(r.problem).toBeUndefined();
+    expect(r.planes).toHaveLength(1);
+    expect(r.planes[0]!.percent).toBe(0);
+    expect(roofTopAt(r, { x: 4, y: 3 })).toBe(0);
+    expect(ML(r.lines, 'gable')).toEqual([]);
   });
 
   it('lista de arestas com tamanho errado: sem águas e com o motivo (sem lançar)', () => {
@@ -157,8 +160,8 @@ describe('forma por arestas (edges)', () => {
   });
 });
 
-describe('falha do cálculo vira motivo, e o telhado não some', () => {
-  it('contorno em L com quatro águas no esqueleto de teste: o telhado segue, sem águas, com o motivo', () => {
+describe('falha do cálculo cai na envoltória, e o telhado não some', () => {
+  it('contorno em L com quatro águas no esqueleto de teste (côncavo): a envoltória fecha, com águas e sem motivo', () => {
     const L: Vec2[] = [
       { x: 0, y: 0 },
       { x: 8, y: 0 },
@@ -169,29 +172,52 @@ describe('falha do cálculo vira motivo, e o telhado não some', () => {
     ];
     const rs = resolveRoofs(build({ shape: 'hip', boundary: L }), 'lv_0');
     expect(rs).toHaveLength(1);
-    expect(rs[0]!.planes).toEqual([]);
-    expect(rs[0]!.problem).toBe('stub só convexo');
+    expect(rs[0]!.problem).toBeUndefined();
+    expect(rs[0]!.planes.length).toBeGreaterThan(0);
   });
 
-  it('o motivo do solver chega ao telhado: sem águas, com o texto do solver', () => {
+  it('o solver falha: o telhado segue pela envoltória, com águas e sem o motivo do solver', () => {
     setWeightedSkeleton(() => ({ faces: [], arcs: [], ok: false, reason: 'o cálculo de águas não está disponível' }));
     try {
       const r = one({ shape: 'hip' });
-      expect(r.planes).toEqual([]);
-      expect(r.problem).toContain('não está disponível');
+      expect(r.problem).toBeUndefined();
+      expect(r.planes).toHaveLength(4);
     } finally {
       setWeightedSkeleton(stubSkeleton);
     }
   });
 
-  it('solver que lança exceção não derruba o cálculo: vira motivo', () => {
+  it('solver que lança exceção não derruba o cálculo: a envoltória assume e o telhado tem águas', () => {
     setWeightedSkeleton(() => {
       throw new Error('boom');
     });
     try {
       const rs = resolveRoofs(build({ shape: 'hip' }), 'lv_0');
       expect(rs).toHaveLength(1);
-      expect(rs[0]!.problem).toContain('boom');
+      expect(rs[0]!.problem).toBeUndefined();
+      expect(rs[0]!.planes).toHaveLength(4);
+    } finally {
+      setWeightedSkeleton(stubSkeleton);
+    }
+  });
+
+  it('solver que falha e sobra região sem aresta inclinada que a cubra: o motivo é o da envoltória', () => {
+    // U com só a base interna inclinada: os braços ficam do outro lado dela, sem aresta que os cubra.
+    const U: Vec2[] = [
+      { x: 0, y: 0 },
+      { x: 9, y: 0 },
+      { x: 9, y: 6 },
+      { x: 6, y: 6 },
+      { x: 6, y: 2 },
+      { x: 3, y: 2 },
+      { x: 3, y: 6 },
+      { x: 0, y: 6 },
+    ];
+    setWeightedSkeleton(() => ({ faces: [], arcs: [], ok: false, reason: 'o cálculo de águas não está disponível' }));
+    try {
+      const r = one({ shape: 'edges', boundary: U, edgeSlopes: [null, null, null, null, 30, null, null, null], edgeOverhangs: U.map(() => 0) });
+      expect(r.planes).toEqual([]);
+      expect(r.problem).toBe('o contorno tem uma região sem nenhuma aresta inclinada que a cubra');
     } finally {
       setWeightedSkeleton(stubSkeleton);
     }

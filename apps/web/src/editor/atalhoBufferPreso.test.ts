@@ -18,6 +18,20 @@ describe('buffer numérico não pode prender os atalhos', () => {
     expect(useUi.getState().typed).toBe('3');
   });
 
+  it('aceita sufixo de unidade e aspas no buffer com o campo visível', () => {
+    vi.spyOn(editor.activeTool, 'inputPrompt').mockReturnValue('Comprimento');
+    editor.bump();
+    for (const k of ['5', "'", '6', '"']) editor.key(tecla(k));
+    expect(useUi.getState().typed).toBe(`5'6"`);
+  });
+
+  it('a primeira letra com o campo visível ainda dispara o atalho', () => {
+    vi.spyOn(editor.activeTool, 'inputPrompt').mockReturnValue('Comprimento');
+    editor.bump();
+    expect(editor.key(tecla('W'))).toBe(true);
+    expect(useUi.getState().typed).toBe('');
+  });
+
   it('quando a ferramenta deixa de pedir número, o buffer zera e a letra volta a ser atalho', () => {
     const prompt = vi.spyOn(editor.activeTool, 'inputPrompt').mockReturnValue('Comprimento');
     editor.bump();

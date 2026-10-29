@@ -1,3 +1,4 @@
+import { union, type MultiPolygon } from '@hestia/geom';
 import { partTransformed, slicePartsAtZ } from './openingModel.ts';
 import {
   CLOSED,
@@ -42,11 +43,14 @@ export interface OpeningPlanOptions {
   swingStyle: 'arc' | 'dash' | 'line';
   /** Cota de corte no z local do modelo (0 = soleira do vão). */
   cutZ: number;
+  /** Folha em planta: 'open' (padrão), 'closed' ou 'both'. */
+  leafPlan?: 'open' | 'closed' | 'both';
 }
 
 const EPS = 1e-9;
 const ARC_STEP = Math.PI / 18;
 
+/** Peças do quadro cortadas em planta como o batente; `mullion`/`transom` são os divisores internos da composição. */
 const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
   'jamb',
   'stop',
@@ -55,6 +59,8 @@ const FRAME_ROLES: ReadonlySet<PartRole> = new Set<PartRole>([
   'threshold',
   'track',
   'muntin',
+  'mullion',
+  'transom',
 ]);
 
 export const line = (pts: OpeningPlanPoint[], role: OpeningPlanRole, tone: OpeningPlanTone = 'ink', weight = 1, dash?: [number, number]): OpeningPlanPath => ({
@@ -165,6 +171,18 @@ export function addFrameCut(out: OpeningPlanPath[], m: OpeningModel, z: number):
   }
 }
 
+/**
+ * Soleira em planta (níveis médio e alto): duas linhas da peça entre as ombreiras. A soleira fica abaixo do plano de corte,
+ * então `addFrameCut` não a corta; sem este traço ela não aparece na planta.
+ */
+export function addThresholdPlan(out: OpeningPlanPath[], m: OpeningModel): void {
+  for (const part of m.parts) {
+    if (part.role !== 'threshold') continue;
+    out.push(line([{ t: part.box.t0, s: part.box.s0 }, { t: part.box.t1, s: part.box.s0 }], 'threshold', 'ink', 1));
+    out.push(line([{ t: part.box.t0, s: part.box.s1 }, { t: part.box.t1, s: part.box.s1 }], 'threshold', 'ink', 1));
+  }
+}
+
 /** Pistas dos trilhos: duas linhas por trilho, ao longo do vão. */
 export function addTracks(out: OpeningPlanPath[], m: OpeningModel): void {
   for (const part of m.parts) {
@@ -176,8 +194,20 @@ export function addTracks(out: OpeningPlanPath[], m: OpeningModel): void {
 
 /** Peças fora do corte que o nível alto mostra: alizar, peitoril, verga/contraverga e o vidro duplo. */
 export function addHighExtras(out: OpeningPlanPath[], m: OpeningModel, z: number): void {
+  // Alizar: uma silhueta unida por `group` (uma por face), não retângulos soltos sobrepostos (spec E3 §4).
+  const grupos = new Map<string, MultiPolygon>();
   for (const { part, ring } of slicePartsAtZ(m, z, CLOSED)) {
-    if (part.role === 'casing') out.push(polygon(ring, 'casing', 'ink', 0.8));
+    if (part.role !== 'casing') continue;
+    const chave = part.group ?? part.id;
+    const lista: MultiPolygon = grupos.get(chave) ?? [];
+    lista.push([ring.map((p) => ({ x: p.t, y: p.s }))]);
+    grupos.set(chave, lista);
+  }
+  for (const aneis of grupos.values()) {
+    for (const poly of union(aneis)) {
+      const contorno = poly[0];
+      if (contorno && contorno.length >= 3) out.push(polygon(contorno.map((p) => ({ t: p.x, s: p.y })), 'casing', 'ink', 0.8));
+    }
   }
   for (const part of m.parts) {
     if (part.role === 'sillBoard') {
@@ -246,11 +276,14 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
   const family = newDoorFamily(m);
   if (!family) return false;
   const level = opts.planDisplay === 'projected' ? 'high' : opts.detail;
-  if (level === 'low') {
+  // Vai-e-vem é família de giro e a sanfonada mostra só as folhas dobradas: ambos desenham a folha aberta em todos os
+  // níveis (spec E3 §6). Embutir e garagem não têm "aberta" em planta: o nível baixo é a linha da folha.
+  if (level === 'low' && family !== 'dblact' && family !== 'fold') {
     addNewDoorLow(out, m);
     return true;
   }
   addFrameCut(out, m, opts.cutZ);
+  if (level !== 'low') addThresholdPlan(out, m);
   if (family === 'pocket') {
     for (const part of m.parts.filter((x) => x.role === 'leaf')) out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     for (const part of m.parts.filter((x) => x.role === 'pocket')) out.push(polygon(boxRing(part.box), 'pocket', 'soft', 0.8, [6, 3]));
@@ -270,7 +303,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
       t0 = Math.min(t0, part.box.t0);
       t1 = Math.max(t1, part.box.t1);
       sFolha = (part.box.s0 + part.box.s1) / 2;
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     }
     if (Number.isFinite(t0) && Number.isFinite(t1)) {
       out.push(line([{ t: t0, s: sFolha }, { t: t1, s: sFolha }], 'leaf', 'ink', 1));
@@ -290,7 +322,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
     for (const part of m.parts.filter((x) => x.role === 'leaf')) {
       const motion = part.motion;
       out.push(polygon(transformedRing(part.box, motion, opts.angle), 'leaf', 'cut', 1));
-      if (level === 'high') out.push(polygon(boxRing(part.box), 'leaf', 'cut', 1));
     }
     addTracks(out, m);
     if (level === 'high') addHighExtras(out, m, opts.cutZ);
@@ -304,7 +335,6 @@ export function addNewDoorPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Op
     const sign = openingSign(o, motion);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     out.push(polygon(transformedRing(box, motion, -opts.angle), 'leaf', 'cut', 1));
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;
     const center = { t: o.pivot.t, s: o.pivot.s };
     const closedEnd = { t: o.latchT, s: o.pivot.s };
@@ -337,12 +367,11 @@ export function addLouverPlan(out: OpeningPlanPath[], m: OpeningModel): void {
 }
 
 /** Janela de abrir: folha aberta com espessura no `angle2d` e arco tracejado até a posição fechada. */
-export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   for (const o of m.openings) {
     if (o.kind !== 'side') continue;
     const box = leafBox(m, o.leaf);
     if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     const motion = leafMotion(m, o.leaf);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;
@@ -353,12 +382,11 @@ export function addHingedPlan(out: OpeningPlanPath[], m: OpeningModel, opts: Ope
 }
 
 /** Janela pivotante: folha girada no eixo central e arcos curtos tracejados nas duas pontas. */
-export function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions, level: 'low' | 'mid' | 'high'): void {
+export function addPivotWinPlan(out: OpeningPlanPath[], m: OpeningModel, opts: OpeningPlanOptions): void {
   for (const o of m.openings) {
     if (o.kind !== 'pivot') continue;
     const box = leafBox(m, o.leaf);
     if (!box) continue;
-    if (level === 'high') out.push(polygon(boxRing(box), 'leaf', 'cut', 1));
     const motion = leafMotion(m, o.leaf);
     out.push(polygon(transformedRing(box, motion, opts.angle), 'leaf', 'cut', 1));
     if (!opts.showSwing) continue;

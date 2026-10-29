@@ -33,6 +33,7 @@ export function joinDebugLabels(p: Project, levelId: Id): LabelOp[] {
       const st = joinStatus(frames, f.wall.id, which, tol);
       if (st.kind === 'free') continue;
       const at = which === 'a' ? f.a : f.b;
+      // units-ok: chave de depuração do desenho (coordenadas de máquina)
       const key = `${at.x.toFixed(4)},${at.y.toFixed(4)}`;
       if (seen.has(key)) continue;
       seen.add(key);

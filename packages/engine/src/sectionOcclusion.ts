@@ -19,7 +19,7 @@ import { boxOf, boxesOverlap, differenceClipper, multiArea, multiPoints, type Bo
 /** Ordem de empate na mesma profundidade: o corte antes, depois as aberturas, depois o que está além. */
 export const OCCLUSION_RANK = { cut: 0, opening: 1, beyond: 2 } as const;
 
-/** Área (m²) abaixo da qual uma parte visível é descartada: resíduo numérico de contato, não superfície. */
+/** Área (metros quadrados) abaixo da qual uma parte visível é descartada: resíduo numérico de contato, não superfície. */
 export const MIN_VISIBLE_AREA = 1e-6;
 
 /** Tolerância de cota (m) nas comparações de topo, base e contenção. */

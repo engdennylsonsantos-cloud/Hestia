@@ -1,9 +1,15 @@
+import { DEFAULT_ROOM_CATEGORIES } from './areaPlan.ts';
 import { DEFAULT_FLOOR_TYPES } from './floor.ts';
 import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_RAMP_TYPES } from './ramp.ts';
 import { makeLevel } from './level.ts';
+import { ot } from './catalogoAberturasBase.ts';
+import { CATALOGO_JANELAS_BR } from './catalogoJanelas.ts';
+import { CATALOGO_PORTAS_BR } from './catalogoPortas.ts';
+import { CATALOGO_COMPOSICOES_BR } from './catalogoComposicoes.ts';
 import { SCHEMA_VERSION, type Layer, type Material, type OpeningType, type Project, type WallType } from './types.ts';
 
 const mat = (id: string, name: string, color: string, hatch: Material['hatch'], extra: Partial<Material> = {}): Material => ({
@@ -129,13 +135,6 @@ export function openingFrame(t: OpeningType, maxDepth: number): OpeningFrame {
   };
 }
 
-const ot = (o: Omit<OpeningType, 'frameMaterialId' | 'glassMaterialId' | 'closure'>, frame = 'mat_madeira'): OpeningType => ({
-  ...o,
-  frameMaterialId: frame,
-  glassMaterialId: 'mat_vidro',
-  closure: 'inherit',
-});
-
 export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_p70', kind: 'door', name: 'Porta 70 x 210', code: 'P-01', width: 0.7, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
   ot({ id: 'ot_p80', kind: 'door', name: 'Porta 80 x 210', code: 'P-02', width: 0.8, height: 2.1, sill: 0, leaves: 1, plan: 'swing' }),
@@ -160,6 +159,10 @@ export const DEFAULT_OPENING_TYPES: OpeningType[] = [
   ot({ id: 'ot_jg90', kind: 'window', name: 'Janela guilhotina 90 x 150', code: 'J-08', width: 0.9, height: 1.5, sill: 0.9, leaves: 2, plan: 'hung' }, 'mat_aluminio'),
   ot({ id: 'ot_jp80', kind: 'window', name: 'Janela pivotante 80 x 120', code: 'J-09', width: 0.8, height: 1.2, sill: 1.0, leaves: 1, plan: 'pivotwin' }, 'mat_aluminio'),
   ot({ id: 'ot_jv80', kind: 'window', name: 'Janela veneziana 80 x 60', code: 'J-10', width: 0.8, height: 0.6, sill: 1.5, leaves: 1, plan: 'louver', angle3d: 45 }, 'mat_aluminio'),
+  ot({ id: 'ot_jb80', kind: 'window', name: 'Janela basculante 80 x 50', code: 'J-11', width: 0.8, height: 0.5, sill: 1.7, leaves: 1, plan: 'tilt' }, 'mat_aluminio'),
+  ...CATALOGO_PORTAS_BR,
+  ...CATALOGO_JANELAS_BR,
+  ...CATALOGO_COMPOSICOES_BR,
 ];
 
 const toRecord = <T extends { id: string }>(list: T[]): Record<string, T> =>
@@ -180,11 +183,15 @@ export function createEmptyProject(name = 'Projeto sem título'): Project {
     ceilingTypes: toRecord(DEFAULT_CEILING_TYPES),
     roofTypes: toRecord(DEFAULT_ROOF_TYPES),
     stairTypes: toRecord(DEFAULT_STAIR_TYPES),
+    rampTypes: toRecord(DEFAULT_RAMP_TYPES),
     openingTypes: toRecord(DEFAULT_OPENING_TYPES),
     elements: {},
     nextOrder: 1,
     settings: { joinTolerance: 0.02, showTags: false, debugJoins: false, detail: 'medium' },
     views: [],
+    areaPlans: [],
+    roomCategories: DEFAULT_ROOM_CATEGORIES,
+    colorSchemes: [],
     defaults: { wallTypeId: 'wt_alv14', doorTypeId: 'ot_p80', windowTypeId: 'ot_j120', wallHeight: 2.8 },
   };
 }

@@ -1,6 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import { buildOpeningModel, frameOfWall, openingGeometry, pointAt, type LeafOpening, type OpeningModel, type WallFrame } from '@hestia/engine';
-import { openingAngle2d, openingsOfWall, wallsOnLevel, type Id, type OpeningType, type Project, type Wall } from '@hestia/model';
+import { openingTypeById, openingAngle2d, openingsOfWall, wallsOnLevel, type Id, type OpeningType, type Project, type Wall } from '@hestia/model';
 import type { SnapPoint } from './infer.ts';
 import type { SnapKind } from './types.ts';
 
@@ -80,7 +80,7 @@ function geometryOfLevel(p: Project, levelId: Id): OpeningSnapGeometry {
     const f = frameOfWall(p, w.id);
     if (!f) continue;
     for (const o of openingsOfWall(p, w.id)) {
-      const t = p.openingTypes[o.typeId];
+      const t = openingTypeById(p, o.typeId);
       if (!t) continue;
       const half = t.width / 2;
       const t0 = o.offset - half;

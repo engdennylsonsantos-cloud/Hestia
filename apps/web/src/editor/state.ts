@@ -1,16 +1,17 @@
 import { create } from 'zustand';
-import type { Id, LocationLine } from '@hestia/model';
+import type { Id, LocationLine, OpeningDimRef, WallDimRef } from '@hestia/model';
+import type { Vec2 } from '@hestia/geom';
 import type { Backend } from '@hestia/render';
-import { DEFAULT_DISJOIN, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
+import { DEFAULT_DISJOIN, DEFAULT_RAMP_OPTIONS, DEFAULT_SNAP, DEFAULT_STAIR_RUN_OPTIONS, type SnapOptions, type ToolId, type ToolOptions } from '@hestia/tools';
 import { safeGet, safeSet } from './storage.ts';
 import { selectionAfterClick } from './selectionClick.ts';
-import { activeViewOf, addView, type OpenView } from './openViews.ts';
+import { activeViewOf, addView, type OpenView, type PlanKind } from './openViews.ts';
 import type { RibbonTabId } from '../ui/ribbon/model.ts';
 import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'cotasAuto' | 'moveLevel' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -20,6 +21,12 @@ export interface UiState {
   sectionId: Id | null;
   /** Prancha aberta quando `view` é 'sheet' (decisão 0022). */
   sheetId: Id | null;
+  /** Planta de piso, de cobertura ou de área quando `view` é 'plan' (sessão; a cobertura liga `roofPlanMode`). */
+  planKind: PlanKind;
+  /** Planta de área ativa quando `planKind` é 'area'. */
+  areaPlanId: Id | null;
+  /** Rótulo em arraste (fantasma), compartilhado por qualquer planta. */
+  tagDrag: { planId: Id; roomId: Id; at: Vec2 } | null;
   selection: Id[];
   hover: Id | null;
   options: ToolOptions;
@@ -31,6 +38,8 @@ export interface UiState {
   dialog: DialogKind;
   dialogArg: string | null;
   showGrid: boolean;
+  /** Intervalo da grade de pontos (m); 0 = automático pelo zoom. Vale para o desenho e para a captura. */
+  gridStep: number;
   showUnderlay: boolean;
   /** Pavimento de referência escolhido nas propriedades da vista (null = o de baixo). */
   underlayLevel: string | null;
@@ -44,6 +53,8 @@ export interface UiState {
   tutorial: boolean;
   /** Incrementa quando a pré-visualização da ferramenta muda (força novo desenho). */
   previewTick: number;
+  /** Referências de cota escolhidas na sessão (`${provedor}:${ponta}` → referência); somem ao trocar de ferramenta ou seleção. */
+  dimOverrides: Record<string, WallDimRef | OpeningDimRef>;
   cursor: { x: number; y: number } | null;
   snapKind: string;
   seen3d: boolean;
@@ -80,10 +91,34 @@ function loadSnap(): SnapOptions {
   }
 }
 
+const GRID_STEP_KEY = 'hestia.gridStep';
+
+/** Intervalo da grade guardado no navegador; sem armazenamento ou valor inválido: automático (0). */
+function loadGridStep(): number {
+  try {
+    const n = Number(localStorage.getItem(GRID_STEP_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Define o intervalo da grade (m; 0 = automático) e o guarda no navegador. */
+export function setGridStep(step: number): void {
+  const n = Number.isFinite(step) && step > 0 ? step : 0;
+  useUi.setState({ gridStep: n });
+  try {
+    localStorage.setItem(GRID_STEP_KEY, String(n));
+  } catch {
+    // Armazenamento indisponível: o intervalo vale só nesta sessão.
+  }
+}
+
 /** Altera capturas (em parte ou todas) e guarda no navegador para sobreviver ao recarregamento. */
 export function setSnap(patch: Partial<SnapOptions>): void {
   const snap: SnapOptions = { ...(useUi.getState().options.snap ?? DEFAULT_SNAP), ...patch };
-  useUi.setState((s) => ({ options: { ...s.options, snap } }));
+  // A grade de pontos e a captura por grade são uma chave só: o que se vê é o que se captura.
+  useUi.setState((s) => ({ options: { ...s.options, snap }, ...(patch.grid === undefined ? {} : { showGrid: patch.grid }) }));
   try {
     localStorage.setItem(SNAP_KEY, JSON.stringify(snap));
   } catch {
@@ -146,7 +181,6 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   openingToward: 'cursor',
   openingAnchor: 'center',
   openingClear: 0.1,
-  openingDimMode: 'axis',
   orthoLock: false,
   arrayCount: 3,
   arrayKind: 'linear',
@@ -163,22 +197,18 @@ export const DEFAULT_OPTIONS: ToolOptions = {
   mirrorDisjoin: DEFAULT_DISJOIN.mirror,
   floorTypeId: 'ft_ceram',
   floorOffset: 0,
-  floorMode: 'poly',
   slabTypeId: 'ls_mac12',
   slabOffset: 0,
-  slabMode: 'poly',
   slabSlopePercent: 2,
   ceilingTypeId: 'ct_gesso',
   ceilingOffset: 2.6,
-  ceilingMode: 'poly',
   roofTypeId: 'rt_ceramica',
-  roofMode: 'poly',
-  roofShape: 'edges',
   roofSlope: 30,
   roofOverhang: 0.5,
   roofOffset: null,
   stair: { primitive: 'line', baseOffset: 0, topOffset: 0, height: 2.8, topLevelId: null },
   stairRun: DEFAULT_STAIR_RUN_OPTIONS,
+  ramp: DEFAULT_RAMP_OPTIONS,
 };
 
 /**
@@ -191,6 +221,9 @@ export const useUi = create<UiState>(() => ({
   tool: 'select',
   view: 'plan',
   levelId: 'lv_0',
+  planKind: 'floor',
+  areaPlanId: null,
+  tagDrag: null,
   sectionId: null,
   sheetId: null,
   selection: [],
@@ -203,7 +236,9 @@ export const useUi = create<UiState>(() => ({
   prompt: null,
   dialog: null,
   dialogArg: null,
-  showGrid: true,
+  // Os pontos e a captura por grade são uma chave só: abrem como a captura foi deixada (`setSnap({ grid })` mantém os dois juntos).
+  showGrid: loadSnap().grid,
+  gridStep: loadGridStep(),
   showUnderlay: true,
   underlayLevel: null,
   showRoofProjection: readRoofProjection(),
@@ -212,6 +247,7 @@ export const useUi = create<UiState>(() => ({
   dock: loadDock(),
   tutorial: false,
   previewTick: 0,
+  dimOverrides: {},
   cursor: null,
   snapKind: '',
   seen3d: false,
@@ -226,10 +262,43 @@ export const useUi = create<UiState>(() => ({
  * Assim, qualquer caminho que muda a vista (árvore, ribbon, corte, prancha, ferramenta de planta) abre a aba sem
  * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em ui/ViewTabs.tsx).
  */
+/** Botão do aplicativo ("H"): o menu Arquivo fechado abre e o aberto fecha. */
+export function alternaFileMenu(aberto: boolean): boolean {
+  return !aberto;
+}
+
+/** Alterna o menu Arquivo pelo botão da barra de título. */
+export function toggleFileMenu(): void {
+  useUi.setState((s) => ({ fileMenu: alternaFileMenu(s.fileMenu) }));
+}
+
 useUi.subscribe((s, prev) => {
-  if (s.view === prev.view && s.levelId === prev.levelId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
+  if (s.view === prev.view && s.levelId === prev.levelId && s.planKind === prev.planKind && s.areaPlanId === prev.areaPlanId && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
   const active = activeViewOf(s);
   if (!active) return;
   const next = addView(s.openViews, active);
   if (next !== s.openViews) useUi.setState({ openViews: next });
+});
+
+/** Escolhe, só para a sessão, a referência de uma ponta de cota (alça ou troca rápida). */
+export function setDimOverride(key: string, ref: WallDimRef | OpeningDimRef): void {
+  useUi.setState((s) => ({ dimOverrides: { ...s.dimOverrides, [key]: ref } }));
+}
+
+/** Remove a troca de uma ponta (volta ao padrão do projeto). */
+export function clearDimOverride(key: string): void {
+  useUi.setState((s) => {
+    const { [key]: _removida, ...resto } = s.dimOverrides;
+    return { dimOverrides: resto };
+  });
+}
+
+/** Limpa as referências de sessão (volta ao padrão do projeto). */
+export function clearDimOverrides(): void {
+  if (Object.keys(useUi.getState().dimOverrides).length > 0) useUi.setState({ dimOverrides: {} });
+}
+
+// As trocas rápidas valem para a ferramenta e a seleção em que foram feitas.
+useUi.subscribe((s, prev) => {
+  if (s.tool !== prev.tool || s.selection !== prev.selection) clearDimOverrides();
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimensionValue, makeWall, type Dimension } from './index.ts';
+import { ProjectStore, createEmptyProject, dimensionGeometry, dimensionPoints, dimensionText, dimensionValue, formatDimension, formatDimensionValue, makeWall, resolveUnits, unitsOf, type Dimension } from './index.ts';
 
 const LV0 = 'lv_0';
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
@@ -18,13 +18,13 @@ const dim = (over: Partial<Dimension> = {}): Dimension => ({ id: 'd1', a: { x: 0
 describe('texto da cota', () => {
   it('sem texto fixo, mostra o valor medido', () => {
     const s = new ProjectStore(createEmptyProject());
-    expect(dimensionText(s.project, dim())).toBe('4,00 m');
+    expect(dimensionText(s.project, dim(), unitsOf(s.project))).toBe('4,00 m');
   });
 
   it('texto fixo substitui o valor medido; vazio ou só espaços voltam ao valor medido', () => {
     const s = new ProjectStore(createEmptyProject());
-    expect(dimensionText(s.project, dim({ text: 'Vão 3,60' }))).toBe('Vão 3,60');
-    expect(dimensionText(s.project, dim({ text: '   ' }))).toBe('4,00 m');
+    expect(dimensionText(s.project, dim({ text: 'Vão 3,60' }), unitsOf(s.project))).toBe('Vão 3,60');
+    expect(dimensionText(s.project, dim({ text: '   ' }), unitsOf(s.project))).toBe('4,00 m');
   });
 });
 
@@ -32,6 +32,18 @@ describe('valor da cota', () => {
   it('é a distância a–b arredondada a 1 mm', () => {
     const s = new ProjectStore(createEmptyProject());
     expect(dimensionValue(s.project, dim({ b: { x: 3.4564, y: 0 } }))).toBe(3.456);
+  });
+
+  it('segue as unidades do projeto quando a cota não fixa unidade', () => {
+    const s = new ProjectStore(createEmptyProject());
+    expect(dimensionText(s.project, dim(), resolveUnits({ length: { unit: 'cm', decimals: 1 } }))).toBe('400,0 cm');
+    expect(dimensionText(s.project, dim({ unit: 'project' }), resolveUnits({ length: { unit: 'mm', decimals: 0 } }))).toBe('4000 mm');
+  });
+
+  it('mantém a unidade explícita de arquivos antigos e a precisão da cota', () => {
+    expect(formatDimension(dim({ unit: 'mm' }), 4)).toBe('4000,00 mm');
+    expect(formatDimension(dim({ precision: 1 }), 4)).toBe('4,0 m');
+    expect(formatDimension(dim({ suffix: ' cm', precision: 0 }), 4)).toBe('4 cm');
   });
 
   it('formata com duas casas e vírgula, em metros', () => {

@@ -3,6 +3,8 @@ import { frameOfWall, pointAt, toLocal, type WallFrame } from '@hestia/engine';
 import { isWall, type Id, type Project } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { algumMudou, NADA_A_APARAR } from './trimChange.ts';
+import { execWithHostedLoss } from './hostedGuard.ts';
+import { patchCommands, trimPreviewItems, type EndPatch, type TrimPatch } from './trimPreview.ts';
 import type { EdgePick, EdgeRef } from './ringEdge.ts';
 import { commitRingEdit, pickLineTarget, ringOfRef } from './ringTarget.ts';
 import { ringOps } from './ringOps.ts';
@@ -43,13 +45,6 @@ function cornerBetween(fa: WallFrame, fb: WallFrame, clickA: Vec2, clickB: Vec2)
     }
   }
   return best;
-}
-
-/** Ajuste de uma extremidade ao canto; em arco, o `sag` é recalculado sobre a mesma circunferência. */
-export interface EndPatch {
-  a?: Vec2;
-  b?: Vec2;
-  sag?: number;
 }
 
 /** Qual extremidade fica é a do lado do clique; no arco o novo trecho continua na circunferência original. */
@@ -187,15 +182,46 @@ export class TrimTool extends ToolBase {
       ...this.group.map((g) => g.id),
     ];
     if (held.length) this.items.push({ kind: 'highlight', ids: held });
-    // No modo um elemento, com a referência escolhida, a prévia mostra o eixo novo da parede a mudar.
-    if (this.mode() === 'unico' && this.first && target?.kind === 'wall' && target.id !== this.first.id) {
-      const fr = frameOfWall(pr, this.first.id);
-      const ft = frameOfWall(pr, target.id);
-      if (!fr || !ft || ft.arc) return;
-      const corner = cornerBetween(fr, ft, this.first.at, p.raw);
-      const patch = corner ? cornerPatch(ft, corner, p.raw) : null;
-      if (patch) this.items.push({ kind: 'line', a: patch.a ?? ft.wall.a, b: patch.b ?? ft.wall.b, dashed: true });
+    const preview = this.mode() === 'unico' ? this.unicoPreview(pr, target, p.raw) : this.multiPreview(pr, target, p.raw);
+    if (preview) this.items.push(...trimPreviewItems(pr, preview));
+  }
+
+  /** Prévia do modo um elemento: só a parede clicada muda, até o canto com a referência. */
+  private unicoPreview(pr: Project, target: ReturnType<typeof pickLineTarget>, at: Vec2): TrimPatch[] | null {
+    if (!this.first || target?.kind !== 'wall' || target.id === this.first.id) return null;
+    const ref = frameOfWall(pr, this.first.id);
+    const frame = frameOfWall(pr, target.id);
+    if (!ref || !frame || frame.arc) return null;
+    const corner = cornerBetween(ref, frame, this.first.at, at);
+    const patch = corner ? cornerPatch(frame, corner, at) : null;
+    return patch ? [{ id: target.id, patch }] : null;
+  }
+
+  /** Prévia dos modos canto e vários: as duas paredes do canto ou só as paredes da lista, com a referência. */
+  private multiPreview(pr: Project, target: ReturnType<typeof pickLineTarget>, at: Vec2): TrimPatch[] | null {
+    if (target?.kind !== 'wall') return null;
+    if (this.mode() === 'varios' && this.group.length) {
+      if (this.group.some((g) => g.id === target.id)) return null;
+      const ref = frameOfWall(pr, target.id);
+      if (!ref) return null;
+      const patches: TrimPatch[] = [];
+      for (const g of this.group) {
+        const frame = frameOfWall(pr, g.id);
+        const corner = frame ? cornerBetween(frame, ref, g.at, at) : null;
+        const patch = frame && corner ? cornerPatch(frame, corner, g.at) : null;
+        if (patch) patches.push({ id: g.id, patch });
+      }
+      return patches.length ? patches : null;
     }
+    if (!this.first || this.first.id === target.id) return null;
+    const fa = frameOfWall(pr, this.first.id);
+    const fb = frameOfWall(pr, target.id);
+    if (!fa || !fb || fa.arc || fb.arc) return null;
+    const corner = cornerBetween(fa, fb, this.first.at, at);
+    if (!corner) return null;
+    const pa = cornerPatch(fa, corner, this.first.at);
+    const pb = cornerPatch(fb, corner, at);
+    return pa && pb ? [{ id: fa.wall.id, patch: pa }, { id: fb.wall.id, patch: pb }] : null;
   }
 
   /** Shift+clique: inclui ou tira a parede da lista a aparar. */
@@ -208,12 +234,6 @@ export class TrimTool extends ToolBase {
     if (i >= 0) this.group.splice(i, 1);
     else this.group.push({ id, at });
     this.env.say(this.prompt());
-  }
-
-  /** Aplica o ajuste de uma extremidade; em arco, o `sag` novo mantém a mesma circunferência. */
-  private applyPatch(id: Id, patch: EndPatch): void {
-    this.env.exec({ type: 'setWallEnds', id, a: patch.a, b: patch.b });
-    if (patch.sag !== undefined) this.env.exec({ type: 'updateElements', ids: [id], patch: { sag: patch.sag } });
   }
 
   /** Clique na referência: aparar cada parede da lista ao canto com ela, em um único passo. */
@@ -243,11 +263,11 @@ export class TrimTool extends ToolBase {
       return;
     }
     const frase = confirmaCanto(pr, patches);
-    this.env.transaction('Aparar ao canto', () => {
-      for (const { id, patch } of patches) this.applyPatch(id, patch);
-    });
+    const result = execWithHostedLoss(this.env, 'Aparar ao canto', patchCommands(patches));
     this.reset();
-    this.env.say(`${frase}${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''} ${this.prompt()}`);
+    if (result.status === 'cancelled') return;
+    const aviso = result.status === 'pending' ? ' Confirme o diálogo para aplicar.' : '';
+    this.env.say(`${frase}${skipped ? ` ${skipped} ignorada(s): sem canto possível.` : ''}${aviso} ${this.prompt()}`);
   }
 
   /**
@@ -288,9 +308,10 @@ export class TrimTool extends ToolBase {
       return;
     }
     const frase = confirmaCanto(pr, patches);
-    this.env.transaction('Aparar/Estender parede', () => this.applyPatch(hitId, patch));
+    const result = execWithHostedLoss(this.env, 'Aparar/Estender parede', patchCommands(patches));
     this.reset();
-    this.env.say(`${frase} ${this.prompt()}`);
+    if (result.status === 'cancelled') return;
+    this.env.say(`${frase}${result.status === 'pending' ? ' Confirme o diálogo para aplicar.' : ''} ${this.prompt()}`);
   }
 
   /** Mistura de parede e aresta (ou várias com uma só): desfaz a escolha e pede de novo. */
@@ -414,10 +435,9 @@ export class TrimTool extends ToolBase {
       return;
     }
     const frase = confirmaCanto(pr, patches);
-    this.env.transaction('Aparar ao canto', () => {
-      for (const { id, patch } of patches) this.applyPatch(id, patch);
-    });
+    const result = execWithHostedLoss(this.env, 'Aparar ao canto', patchCommands(patches));
     this.reset();
-    this.env.say(`${frase} ${this.prompt()}`);
+    if (result.status === 'cancelled') return;
+    this.env.say(`${frase}${result.status === 'pending' ? ' Confirme o diálogo para aplicar.' : ''} ${this.prompt()}`);
   }
 }

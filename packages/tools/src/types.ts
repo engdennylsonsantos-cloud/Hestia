@@ -1,7 +1,10 @@
+import type { DimRef, TempDim } from './dims/types.ts';
+import type { HostedLoss } from './hostedLoss.ts';
 import type { Vec2 } from '@hestia/geom';
-import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
+import type { Command, Id, LocationLine, Project } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
 import type { StairRunToolOptions } from './stairRunPlan.ts';
+import type { RampToolOptions } from './rampOptions.ts';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'center' | 'tangent' | 'none';
 
@@ -46,26 +49,29 @@ export interface ToolEnv {
   metersPerPixel(): number;
   /** Elementos ocultos na planta atual (fora do intervalo de vista ou categoria oculta): não são alvo de captura (S-07). Ausente = nenhum. */
   hiddenInView?(): ReadonlySet<Id>;
+  /** Planta de área aberta na vista, quando a planta ativa é uma planta de área; null/ausente na planta de piso. */
+  areaPlanId?(): Id | null;
   /** Pavimento de referência visível na planta (o de baixo, com Subpavimento ligado), ou null. A captura usa o que se vê. */
   underlayLevelId?(): Id | null;
   gridStep(): number;
   /** Mensagem da barra de status. */
   say(msg: string): void;
+  /**
+   * Confirma uma operação que deixaria aberturas fora da parede. Ausente = não pergunta (aplica e exclui).
+   * Síncrono nos testes; na interface abre o diálogo e resolve quando o usuário escolhe.
+   */
+  confirmHostedLoss?(losses: readonly HostedLoss[], message: string): boolean | Promise<boolean>;
   /** Pede à interface para voltar à ferramenta de seleção. */
   done(): void;
   /** Abre uma vista de corte/elevação na área de desenho. Ausente = a interface não abre a vista sozinha. */
   openView?(id: Id): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
+  /** Altera opções da barra a partir da ferramenta (ex.: inclinação depois do Ajustar). Ausente = a ferramenta grava no objeto de `options()`. */
+  setOptions?(patch: Partial<ToolOptions>): void;
   /** Idioma da interface: as mensagens traduzíveis das ferramentas (ex.: Matriz) saem nele. Ausente = português. */
   lang?(): 'pt' | 'en';
 }
-
-/** Modo da ferramenta Piso: contorno por cliques, retângulo, área fechada por paredes, ou perímetro externo da edificação. */
-export type FloorMode = 'poly' | 'rect' | 'walls' | 'perimetro';
-
-/** Modo da ferramenta Laje: contorno por cliques, retângulo ou perímetro externo das paredes. */
-export type SlabMode = 'poly' | 'rect' | 'perimetro';
 
 /** Tipo da ferramenta Matriz: linear (repete pelo espaçamento) ou radial (gira em torno de um centro). */
 export type ArrayKind = 'linear' | 'radial';
@@ -78,12 +84,6 @@ export type ArrayAnchor = 'second' | 'last';
  * segunda parede; 'varios' acumula paredes com Shift e aplica todas na referência.
  */
 export type TrimMode = 'canto' | 'unico' | 'varios';
-
-/** Modo da ferramenta Forro (decisão 0021): contorno por cliques, retângulo, ou "Forro no ambiente" (clique num ambiente). */
-export type CeilingMode = 'poly' | 'rect' | 'room';
-
-/** Modo da ferramenta Telhado: contorno do beiral por cliques, retângulo ou pelo perímetro externo das paredes (com balanço). 'extrusao' troca para a ferramenta própria de telhado por extrusão. */
-export type RoofMode = 'poly' | 'rect' | 'paredes' | 'extrusao';
 
 /** Quais capturas estão ligadas (AutoCAD / Revit Snaps). */
 export interface SnapOptions {
@@ -152,8 +152,6 @@ export interface ToolOptions {
   openingAnchor?: 'center' | 'hinge' | 'latch';
   /** Folga (m) da borda da abertura até a face da parede perpendicular. Ausente = 0,10 m. */
   openingClear?: number;
-  /** Cotas temporárias: do eixo da abertura ao eixo da perpendicular (padrão) ou da borda à face. */
-  openingDimMode?: 'axis' | 'face';
   /** Etiquetar ao inserir (Revit: Tag on Placement): liga `settings.showOpeningTags` ao colocar. Ausente = ligado. */
   openingTagOnPlace?: boolean;
   openingSillOverride?: number | null;
@@ -210,32 +208,31 @@ export interface ToolOptions {
   floorTypeId: Id;
   /** Deslocamento do topo do piso em relação ao nível (m). */
   floorOffset: number;
-  floorMode: FloorMode;
-  /** Modo paredes: o piso avança por baixo do reboco até a face do núcleo. Ausente = falso. */
+  /** Estender até o núcleo (perímetro do piso): o contorno avança por baixo do reboco até a face do núcleo. Ausente = falso. */
   floorCore?: boolean;
   /** Parede paralela: distância medida entre faces (padrão) ou entre eixos. */
   offsetFrom?: 'axis' | 'face';
-  /** Tipo, deslocamento do topo (m), modo e inclinação (%) da ferramenta Laje e de "Definir inclinação". */
+  /** Tipo, deslocamento do topo (m) e inclinação (%) da ferramenta Laje e de "Definir inclinação". */
   slabTypeId: Id;
   slabOffset: number;
-  slabMode: SlabMode;
   slabSlopePercent: number;
-  /** Forro: tipo, cota do topo (m, relativa ao nível) e modo. Ausentes = padrão (primeiro tipo, 2,60 m, contorno). */
+  /** Forro: tipo e cota do topo (m, relativa ao nível). Ausentes = padrão (primeiro tipo, 2,60 m). */
   ceilingTypeId?: Id;
   ceilingOffset?: number;
-  ceilingMode?: CeilingMode;
-  /** Telhado: tipo, modo, forma, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
+  /** Telhado: tipo, inclinação (%), balanço do beiral (m) e cota do beiral (m, relativa ao nível). Ausentes = padrão. */
   roofTypeId?: Id;
-  roofMode?: RoofMode;
-  roofShape?: RoofShape;
   roofSlope?: number;
   roofOverhang?: number;
   /** Deslocamento do beiral (m). `null` = automático: altura da parede mais alta do nível, ou 2,8 m sem paredes. */
   roofOffset?: number | null;
+  /** Grade (ferramenta `grid`): modo de desenho e tipo. Ausente = linha, primeiro tipo padrão. */
+  grid?: GridToolOptions;
   /** Escada por croqui: tipo, sub-modo, primitiva, N para distribuir e cotas da criação. Ausente = padrão. */
   stair?: StairToolOptions;
   /** Escada reta, em L, em U ou com leque, criada pronta por cliques (ferramenta `stairrun`). Ausente = reta, 1,20 m, giro à esquerda. */
   stairRun?: StairRunToolOptions;
+  /** Rampa (ferramenta `ramp`). Ausente = reta, modo comprimento e padrões do tipo. */
+  ramp?: RampToolOptions;
 }
 
 export interface PointerInfo {
@@ -252,6 +249,14 @@ export interface PointerInfo {
 }
 
 /** Contrato único de ferramenta (docs/01 §7). A ferramenta nunca altera o modelo: ela emite comandos. */
+/** Como a Grade é desenhada: linha (2 cliques), arco (início, fim e flecha), escolher linhas (paredes) ou multissegmento. */
+export type GridMode = 'line' | 'arc' | 'pick' | 'multi';
+
+export interface GridToolOptions {
+  mode: GridMode;
+  typeId: Id;
+}
+
 export interface Tool {
   readonly id: string;
   readonly label: string;
@@ -279,10 +284,14 @@ export interface Tool {
   drag?(p: PointerInfo): void;
   up?(p: PointerInfo): void;
   preview(): PreviewItem[];
+  /** Cotas dinâmicas da prévia (sistema único de cotas); ausente = a ferramenta não mostra cotas ao desenhar. */
+  tempDims?(overrides?: Readonly<Record<string, DimRef>>): TempDim[];
   /** Inferência corrente, para o desenho de guias e marcadores. */
   inference(): Inference | null;
   /** Delete com um vértice de piso em foco: remove o vértice e devolve true; false deixa o Delete excluir a seleção. */
   deleteKey?(): boolean;
+  /** Tecla A: ajusta o desenho em andamento à norma (rampa livre). Devolve false se não há o que ajustar. */
+  adjust?(): boolean;
   /** Rótulo do campo numérico pendente (ex.: "Comprimento"), ou null se a ferramenta não espera valor. */
   inputPrompt(): string | null;
 }

@@ -152,18 +152,18 @@ const range = (a: number, b: number): number[] => Array.from({ length: b - a + 1
 describe('numeração contínua dos degraus na planta (decisão 0011 §1 item 6)', () => {
   const P = 0.28;
 
-  it('L com patamar, 8 + 8 espelhos: lance 1 = 1..7, o patamar não recebe rótulo, lance 2 = 9..15', () => {
+  it('L com patamar, 8 + 8 espelhos: lance 1 = 1..7, o patamar é o degrau 8 (com número, como no Revit), lance 2 = 9..15 e a chegada 16', () => {
     const comps = generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
     const p = stairProject(toModel(comps));
     expect(resolveStairsOnLevel(p, 'lv_0')[0]!.issues.filter((i) => i.severity === 'error')).toEqual([]);
-    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+    expect(treadLabels(p)).toEqual(range(1, 16));
   });
 
-  it('U com patamar, 8 + 8 espelhos: mesma regra (1..7 e 9..15)', () => {
+  it('U com patamar, 8 + 8 espelhos: mesma regra (1..16 contínuo, o patamar é o 8)', () => {
     const comps = generateUShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
     const p = stairProject(toModel(comps));
     expect(resolveStairsOnLevel(p, 'lv_0')[0]!.issues.filter((i) => i.severity === 'error')).toEqual([]);
-    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+    expect(treadLabels(p)).toEqual(range(1, 16));
   });
 
   it('L com a base do lance em 0,30 m (baseOffset): a numeração segue a cota, igual à da base no piso', () => {
@@ -171,10 +171,10 @@ describe('numeração contínua dos degraus na planta (decisão 0011 §1 item 6)
     const p = stairProject(toModel(comps), 0.3);
     const [st] = resolveStairsOnLevel(p, 'lv_0');
     expect(st!.baseZ).toBeCloseTo(0.3, 9);
-    expect(treadLabels(p)).toEqual([...range(1, 7), ...range(9, 15)]);
+    expect(treadLabels(p)).toEqual(range(1, 16));
   });
 
-  it('lance 1 com erro de croqui (espelho repetido): sem degraus nele, mas o 2º lance segue em 9 pela cota, não em 1', () => {
+  it('lance 1 com erro de croqui (espelho repetido): sem degraus nele, mas o patamar (8) e o 2º lance (9..) seguem pela cota, não em 1', () => {
     const comps = generateLShape({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risersFirst: 8, risersSecond: 8, tread: P, turn: 'left' });
     const first = comps[0]!;
     if (first.kind !== 'run') throw new Error('o 1º componente do L é um lance');
@@ -183,12 +183,12 @@ describe('numeração contínua dos degraus na planta (decisão 0011 §1 item 6)
     const [st] = resolveStairsOnLevel(p, 'lv_0');
     expect(st!.issues).toContainEqual(expect.objectContaining({ severity: 'error', componentIndex: 0 }));
     expect(st!.riserCount).toBe(16);
-    expect(treadLabels(p)).toEqual(range(9, 15));
+    expect(treadLabels(p)).toEqual(range(8, 16));
   });
 
   it('reta de 16 espelhos pelo gerador (como no app): rótulos 1..15', () => {
     const sk = generateStraightRun({ start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, width: 1.2, risers: 16, tread: P });
     const p = stairProject([{ id: 'run', kind: 'run', ...sk }]);
-    expect(treadLabels(p)).toEqual(range(1, 15));
+    expect(treadLabels(p)).toEqual(range(1, 16));
   });
 });

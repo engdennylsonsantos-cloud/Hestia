@@ -1,6 +1,6 @@
 import { cross, mul, offsetArc, sub, type Vec2 } from '@hestia/geom';
 import { frameOfWall, normalAt, toLocal } from '@hestia/engine';
-import { isWall, type Id } from '@hestia/model';
+import { formatQuantity, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands, moveWalls } from './edit.ts';
 import { commitRingEdit, edgeAtCursor, ringOfRef } from './ringTarget.ts';
@@ -8,7 +8,7 @@ import { ringOps } from './ringOps.ts';
 import type { EdgePick } from './ringEdge.ts';
 import type { PointerInfo } from './types.ts';
 
-const fmtM = (m: number): string => `${m.toFixed(3).replace('.', ',')} m`;
+const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Deslocar: copia ou move uma parede paralelamente, para o lado do cursor (concêntrico nas curvas). */
 export class OffsetTool extends ToolBase {
@@ -68,7 +68,7 @@ export class OffsetTool extends ToolBase {
       this.items.push({ kind: 'highlight', ids: [edge.ref.elementId] });
       this.items.push({ kind: 'line', a: edge.a, b: edge.b });
       this.items.push({ kind: 'line', a: off.a, b: off.b, dashed: true });
-      this.items.push({ kind: 'label', at: { x: (off.a.x + off.b.x) / 2, y: (off.a.y + off.b.y) / 2 }, text: fmtM(Math.abs(off.signed)) });
+      this.items.push({ kind: 'label', at: { x: (off.a.x + off.b.x) / 2, y: (off.a.y + off.b.y) / 2 }, text: fmtM(unitsOf(this.env.project()), Math.abs(off.signed)) });
       return;
     }
     const t = this.target(p.raw);

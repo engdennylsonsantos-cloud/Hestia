@@ -150,6 +150,31 @@ export function openingLinePaths(
       out.push({ pts: [{ u: u(opening.hingeT), z: opening.z1 }, { u: u(opening.hingeT), z: opening.z0 }], dashed: false });
       continue;
     }
+    if (opening.kind === 'tilt') {
+      const span = leafSpan(m, opening);
+      const center = u((span.t0 + span.t1) / 2);
+      const left = u(span.t0);
+      const right = u(span.t1);
+      const axisZ = opening.axisZ ?? (opening.z0 + opening.z1) / 2;
+      // A metade superior abre para `side`; a inferior vai para o lado oposto e usa o traço contrário.
+      out.push({
+        pts: [
+          { u: left, z: opening.z1 },
+          { u: center, z: axisZ },
+          { u: right, z: opening.z1 },
+        ],
+        dashed,
+      });
+      out.push({
+        pts: [
+          { u: left, z: opening.z0 },
+          { u: center, z: axisZ },
+          { u: right, z: opening.z0 },
+        ],
+        dashed: !dashed,
+      });
+      continue;
+    }
     if (opening.kind === 'top' || opening.kind === 'bottom') {
       const span = leafSpan(m, opening);
       const center = u((span.t0 + span.t1) / 2);

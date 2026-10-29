@@ -12,8 +12,10 @@ import {
   type StairType,
 } from '@hestia/model';
 import { makeStairIssue, spiralNormIssues, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
+import { DEFAULT_STAIR_NORMS } from './stairNorms.ts';
 import { orderRisers, stairLandingPolygon, stairRunSteps, trimRisers, type StairRunSketch } from './stairSketch.ts';
 import { isSpiralRun, spiralParamsOf } from './stairSpiral.ts';
+import { memoDoProjetoMotor } from './memoProjeto.ts';
 
 /** Degrau (kind 'tread', index 1..N−1 no lance) ou patamar (kind 'landing', index sequencial na escada, a partir de 1). */
 export interface ResolvedStairStep {
@@ -163,21 +165,26 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
     footprint,
     issues,
   };
-  rs.issues.push(...stairNormIssues(rs));
+  rs.issues.push(...stairNormIssues(rs, DEFAULT_STAIR_NORMS));
   const spiralIndex = s.components.findIndex((c) => c.kind === 'run' && spiralParamsOf(c) !== undefined);
   const sp = spiralIndex >= 0 ? spiralParamsOf(s.components[spiralIndex]!) : undefined;
   if (sp) rs.spiral = { componentIndex: spiralIndex, center: sp.center, rInner: sp.rInner, rOuter: sp.rOuter };
   s.components.forEach((c, ci) => {
     if (c.kind !== 'run' || !isSpiralRun(c)) return;
     const sp = spiralParamsOf(c);
-    rs.issues.push(...spiralNormIssues(rs, ci, sp && { sweep: sp.sweep, rInner: sp.rInner, rOuter: sp.rOuter, risers: c.risers.length }));
+    rs.issues.push(...spiralNormIssues(rs, ci, sp && { sweep: sp.sweep, rInner: sp.rInner, rOuter: sp.rOuter, risers: c.risers.length }, DEFAULT_STAIR_NORMS));
   });
   return rs;
 }
 
+/** Uma escada resolvida, memorizada por projeto (o projeto é imutável: cada edição cria outro objeto). */
+export function resolveStairOne(p: Project, s: Stair): ResolvedStair | null {
+  return memoDoProjetoMotor(p, `escada|${s.id}`, () => resolveOne(p, s));
+}
+
 const resolveList = (p: Project, list: Stair[]): ResolvedStair[] =>
   list.flatMap((s) => {
-    const r = resolveOne(p, s);
+    const r = resolveStairOne(p, s);
     return r ? [r] : [];
   });
 

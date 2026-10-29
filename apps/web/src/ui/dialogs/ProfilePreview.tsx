@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
-import { profileHeightAt, profileMax, type ProfilePoint } from '@hestia/model';
+import { formatQuantity, profileHeightAt, profileMax, type ProfilePoint } from '@hestia/model';
+import { machineNumber } from '@hestia/geom';
+import { useUnits } from '../useUnits.ts';
 
 const W = 340;
 const H = 170;
@@ -7,8 +9,7 @@ const PAD_X = 18;
 const PAD_TOP = 22;
 const PAD_BOT = 26;
 
-const fmt = (n: number): string => n.toFixed(2).replace('.', ',');
-const pt = (n: number): string => n.toFixed(1);
+const pt = (n: number): string => machineNumber(n, 1);
 
 /** Contorno de cima dentro de [0, L]: as bordas recebem a altura do perfil nesses pontos. */
 function outline(pts: ProfilePoint[], length: number): ProfilePoint[] {
@@ -17,6 +18,7 @@ function outline(pts: ProfilePoint[], length: number): ProfilePoint[] {
 
 /** Elevação da parede: eixo em metros, topo reto tracejado e o perfil preenchido. Escala adaptada a L e à altura máxima. */
 export function ProfilePreview({ pts, length, height }: { pts: ProfilePoint[]; length: number; height: number }): ReactElement {
+  const units = useUnits();
   const L = Math.max(length, 1e-3);
   const top = Math.max(profileMax(pts), height, 0.1);
   const k = Math.min((W - PAD_X * 2) / L, (H - PAD_TOP - PAD_BOT) / top);
@@ -28,7 +30,7 @@ export function ProfilePreview({ pts, length, height }: { pts: ProfilePoint[]; l
   const shape = [`${pt(x(0))},${pt(base)}`, ...poly.map((q) => `${pt(x(q.t))},${pt(y(q.h))}`), `${pt(x(L))},${pt(base)}`].join(' ');
   const maxH = Math.max(0, profileMax(pts));
   return (
-    <svg className="profile-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Elevação do topo da parede: altura máxima ${fmt(maxH)} metros`}>
+    <svg className="profile-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Elevação do topo da parede: altura máxima ${formatQuantity(units, 'length', maxH)}`}>
       <rect x={x(0)} y={y(height)} width={L * k} height={Math.max(0, height * k)} className="profile-straight" />
       <polygon points={shape} className="profile-fill" />
       {pts.map((q, i) => (
@@ -36,9 +38,9 @@ export function ProfilePreview({ pts, length, height }: { pts: ProfilePoint[]; l
       ))}
       <line x1={pt(x(0) - 8)} x2={pt(x(L) + 8)} y1={pt(base)} y2={pt(base)} className="profile-ground" />
       <text x={pt(x(0))} y={pt(base + 14)} className="profile-tick" textAnchor="start">0</text>
-      <text x={pt(x(L / 2))} y={pt(base + 14)} className="profile-tick" textAnchor="middle">{fmt(L / 2)} m</text>
-      <text x={pt(x(L))} y={pt(base + 14)} className="profile-tick" textAnchor="end">{fmt(L)} m</text>
-      <text x={pt(PAD_X)} y={12} className="profile-tick">topo máx. {fmt(maxH)} m</text>
+      <text x={pt(x(L / 2))} y={pt(base + 14)} className="profile-tick" textAnchor="middle">{formatQuantity(units, 'length', L / 2)}</text>
+      <text x={pt(x(L))} y={pt(base + 14)} className="profile-tick" textAnchor="end">{formatQuantity(units, 'length', L)}</text>
+      <text x={pt(PAD_X)} y={12} className="profile-tick">topo máx. {formatQuantity(units, 'length', maxH)}</text>
     </svg>
   );
 }

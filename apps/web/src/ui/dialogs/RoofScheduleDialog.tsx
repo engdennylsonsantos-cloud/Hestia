@@ -1,12 +1,14 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { buildRoofSchedule, filterRoofRows, roofScheduleToCsv, ROOF_SHAPE_LABEL, sumRoofRows, type RoofScheduleRow } from '@hestia/engine';
-import type { RoofShape } from '@hestia/model';
+import { formatQuantity, type Quantity, type ResolvedUnits, type RoofShape } from '@hestia/model';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { scheduleCell, scheduleHeader } from './scheduleUnits.ts';
+import { useUnits } from '../useUnits.ts';
 
 interface Col {
   key: keyof RoofScheduleRow;
@@ -14,6 +16,10 @@ interface Col {
   labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
+  /** Grandeza da coluna: converte o valor SI para a unidade do projeto. */
+  quantity?: Quantity;
+  /** Multiplicador antes da conversão (percentual → razão). */
+  factor?: number;
 }
 
 const COLS: Col[] = [
@@ -22,22 +28,18 @@ const COLS: Col[] = [
   { key: 'typeCode', labelKey: 'col_code' },
   { key: 'levelName', labelKey: 'col_level' },
   { key: 'shapeLabel', labelKey: 'col_shape' },
-  { key: 'slopePercent', labelKey: 'col_slope', decimals: 1 },
-  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2 },
-  { key: 'faceArea', labelKey: 'col_real_area', decimals: 2 },
-  { key: 'ridgeLength', labelKey: 'col_ridge', decimals: 2 },
-  { key: 'eaveLength', labelKey: 'col_eave', decimals: 2 },
-  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'slopePercent', labelKey: 'col_slope', decimals: 1, quantity: 'slope', factor: 0.01 },
+  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2, quantity: 'area' },
+  { key: 'faceArea', labelKey: 'col_real_area', decimals: 2, quantity: 'area' },
+  { key: 'ridgeLength', labelKey: 'col_ridge', decimals: 2, quantity: 'length' },
+  { key: 'eaveLength', labelKey: 'col_eave', decimals: 2, quantity: 'length' },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3, quantity: 'volume' },
 ];
 
 interface Sort {
   key: keyof RoofScheduleRow;
   dir: 1 | -1;
 }
-
-/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
-const fmt = (v: number, decimals: number): string =>
-  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: RoofScheduleRow, b: RoofScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -46,11 +48,11 @@ const compare = (a: RoofScheduleRow, b: RoofScheduleRow, s: Sort): number => {
   return r * s.dir;
 };
 
-const cellValue = (r: RoofScheduleRow, c: Col, shapeName: (s: RoofShape) => string): ReactNode => {
+const cellValue = (r: RoofScheduleRow, c: Col, shapeName: (s: RoofShape) => string, units: ResolvedUnits): ReactNode => {
   if (c.key === 'shapeLabel') return shapeName(r.shape);
   const v = r[c.key];
   if (v === null) return '—';
-  return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
+  return typeof v === 'number' ? (c.quantity ? scheduleCell(units, c.quantity, v * (c.factor ?? 1), c.decimals) : String(v)) : v;
 };
 
 const SHAPES = Object.keys(ROOF_SHAPE_LABEL) as RoofShape[];
@@ -59,6 +61,7 @@ const SHAPES = Object.keys(ROOF_SHAPE_LABEL) as RoofShape[];
 export function RoofScheduleDialog(): ReactElement {
   const p = useProject();
   const t = I18N[useI18n((s) => s.lang)];
+  const units = useUnits();
   /** Nome da forma no idioma ativo (o rótulo do engine é só PT). */
   const shapeName = (s: RoofShape): string => t[`roof_shape_${s}` as keyof typeof I18N.pt];
   const schedule = useMemo(() => buildRoofSchedule(p), [p]);
@@ -87,7 +90,7 @@ export function RoofScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-telhados.csv`, roofScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-telhados.csv`, roofScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };
@@ -136,7 +139,7 @@ export function RoofScheduleDialog(): ReactElement {
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                       <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
-                        {t[c.labelKey]}
+                        {c.quantity ? scheduleHeader(units, t[c.labelKey], c.quantity) : t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -148,7 +151,7 @@ export function RoofScheduleDialog(): ReactElement {
                   <tr key={r.roofId}>
                     {COLS.map((c) => (
                       <td key={c.key} className={c.decimals !== undefined ? 'num' : undefined}>
-                        {cellValue(r, c, shapeName)}
+                        {cellValue(r, c, shapeName, units)}
                       </td>
                     ))}
                   </tr>
@@ -158,11 +161,11 @@ export function RoofScheduleDialog(): ReactElement {
           </div>
           <div className="total">
             <span>{totals.count} {totals.count === 1 ? t.sched_noun_roof_one : t.sched_noun_roof}</span>
-            <span>{t.sched_total_plan_area} {fmt(totals.planArea, 2)} m²</span>
-            <span>{t.sched_total_face_area} {fmt(totals.faceArea, 2)} m²</span>
-            <span>{t.sched_total_ridge} {fmt(totals.ridgeLength, 2)} m</span>
-            <span>{t.sched_total_eave} {fmt(totals.eaveLength, 2)} m</span>
-            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
+            <span>{t.sched_total_plan_area} {formatQuantity(units, 'area', totals.planArea, { decimals: 2 })}</span>
+            <span>{t.sched_total_face_area} {formatQuantity(units, 'area', totals.faceArea, { decimals: 2 })}</span>
+            <span>{t.sched_total_ridge} {formatQuantity(units, 'length', totals.ridgeLength, { decimals: 2 })}</span>
+            <span>{t.sched_total_eave} {formatQuantity(units, 'length', totals.eaveLength, { decimals: 2 })}</span>
+            <span>{t.sched_total_volume} {formatQuantity(units, 'volume', totals.volume, { decimals: 3 })}</span>
           </div>
         </>
       )}

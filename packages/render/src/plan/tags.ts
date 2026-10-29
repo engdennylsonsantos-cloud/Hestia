@@ -1,5 +1,5 @@
 import { levelFrames, pointAt } from '@hestia/engine';
-import { openingType, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
+import { formatQuantity, openingTypeById, openingType, unitsOf, wallHeight, wallType, type ElementTag, type Id, type Project } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { aberturasDaParede } from './resolucao.ts';
 import type { LabelOp, StrokeOp } from './types.ts';
@@ -45,7 +45,7 @@ export function wallTagLabels(p: Project, levelId: Id, paint: PlanPaint, scale: 
     if (!code) continue;
     const halfText = (code.length * chW) / 2 + halfPad;
     const blocked = aberturasDaParede(p, f.wall.id).map((o): [number, number] => {
-      const half = (p.openingTypes[o.typeId]?.width ?? 0) / 2;
+      const half = (openingTypeById(p, o.typeId)?.width ?? 0) / 2;
       return [o.offset - half - halfText, o.offset + half + halfText];
     });
     const span = longestFree(0, f.length, blocked);
@@ -65,25 +65,26 @@ export function elementTagText(p: Project, tag: ElementTag): string {
   if (!e) return '';
   const levelId = 'levelId' in e ? e.levelId : e.kind === 'door' || e.kind === 'window' ? (() => { const host = p.elements[e.hostId]; return host && 'levelId' in host ? host.levelId : null; })() : null;
   const type = e.kind === 'wall' ? p.wallTypes[e.typeId]
-    : e.kind === 'door' || e.kind === 'window' ? p.openingTypes[e.typeId]
+    : e.kind === 'door' || e.kind === 'window' ? openingTypeById(p, e.typeId)
     : e.kind === 'floor' ? p.floorTypes[e.typeId]
     : e.kind === 'slab' ? p.slabTypes[e.typeId]
     : e.kind === 'ceiling' ? p.ceilingTypes[e.typeId]
     : e.kind === 'roof' ? p.roofTypes[e.typeId]
-    : e.kind === 'stair' ? p.stairTypes[e.typeId] : undefined;
+    : e.kind === 'stair' ? p.stairTypes[e.typeId]
+    : e.kind === 'ramp' ? p.rampTypes[e.typeId] : undefined;
   switch (tag.property) {
     case 'type': return (type && 'code' in type ? type.code : '') || (type && 'name' in type ? type.name : '') || e.kind;
     case 'name': return e.kind === 'room' ? e.name : type && 'name' in type ? type.name : e.kind;
     case 'mark': return 'mark' in e ? e.mark : '';
     case 'level': return p.levels.find((l) => l.id === levelId)?.name ?? '';
     case 'width':
-      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).width * 100).toFixed(0)} cm`;
-      if (e.kind === 'wall') return `${(wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0) * 100).toFixed(0)} cm`;
+      if (e.kind === 'door' || e.kind === 'window') return formatQuantity(unitsOf(p), 'length', openingType(p, e).width);
+      if (e.kind === 'wall') return formatQuantity(unitsOf(p), 'smallLength', wallType(p, e).layers.reduce((s, l) => s + l.thickness, 0));
       return '';
     case 'height':
-      if (e.kind === 'door' || e.kind === 'window') return `${(openingType(p, e).height * 100).toFixed(0)} cm`;
-      if (e.kind === 'wall') return `${wallHeight(p, e).toFixed(2)} m`;
-      if (e.kind === 'room') return `${(e.ceilingHeight ?? p.defaults.wallHeight).toFixed(2)} m`;
+      if (e.kind === 'door' || e.kind === 'window') return formatQuantity(unitsOf(p), 'length', openingType(p, e).height);
+      if (e.kind === 'wall') return formatQuantity(unitsOf(p), 'length', wallHeight(p, e));
+      if (e.kind === 'room') return formatQuantity(unitsOf(p), 'length', e.ceilingHeight ?? p.defaults.wallHeight);
       return '';
   }
 }

@@ -1,14 +1,21 @@
 import { sheetOf, type Id, type Project } from '@hestia/model';
+import { openAreaPlan } from './areaPlanActions.ts';
 import { editor } from './controller.ts';
-import { activeViewOf, addView, closeView, levelToRelease, removeView, type OpenView } from './openViews.ts';
+import { activeViewOf, addView, closeView, levelToRelease, planKindOf, removeView, type OpenView } from './openViews.ts';
 import { useUi } from './state.ts';
 
 /** Rótulo e ícone de uma aba; null quando a vista não existe mais no projeto (nível, corte ou prancha excluídos). */
-export function tabOf(p: Project, v: OpenView): { icon: 'plan' | 'cube' | 'section' | 'elevation'; label: string } | null {
+export function tabOf(p: Project, v: OpenView): { icon: 'plan' | 'roof' | 'cube' | 'section' | 'elevation'; label: string } | null {
   switch (v.kind) {
     case 'plan': {
       const l = p.levels.find((x) => x.id === v.levelId);
-      return l ? { icon: 'plan', label: l.name } : null;
+      if (!l) return null;
+      if (planKindOf(v) === 'area') {
+        const ap = v.areaPlanId ? (p.areaPlans ?? []).find((x) => x.id === v.areaPlanId) : undefined;
+        return ap ? { icon: 'plan', label: ap.name } : null;
+      }
+      // A aba de cobertura leva o nome do tipo, para não confundir com a planta de piso do mesmo nível.
+      return planKindOf(v) === 'roof' ? { icon: 'roof', label: `Planta de cobertura: ${l.name}` } : { icon: 'plan', label: l.name };
     }
     case '3d':
       return { icon: 'cube', label: 'Modelo 3D' };
@@ -38,9 +45,15 @@ function releaseLevel(levelId: Id): void {
  */
 function navega(v: OpenView): boolean {
   switch (v.kind) {
-    case 'plan':
-      editor.selectLevel(v.levelId);
-      return useUi.getState().view === 'plan' && useUi.getState().levelId === v.levelId;
+    case 'plan': {
+      const kind = planKindOf(v);
+      // Abrir pela aba/árvore também semeia as anotações de plantas antigas; sem isso o render mostra as do nível,
+      // mas as ferramentas com `planId` não encontram nada para selecionar.
+      if (kind === 'area' && v.areaPlanId) openAreaPlan(editor.store, v.areaPlanId);
+      else editor.selectLevel(v.levelId, kind, null);
+      const s = useUi.getState();
+      return s.view === 'plan' && s.levelId === v.levelId && s.planKind === kind && (kind !== 'area' || s.areaPlanId === v.areaPlanId);
+    }
     case '3d':
       editor.setView('3d');
       return useUi.getState().view === '3d';

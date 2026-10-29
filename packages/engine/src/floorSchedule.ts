@@ -1,8 +1,9 @@
-import { isFloor, type Id, type Project } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { isFloor, type Id, type Project, type ResolvedUnits } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { quantifyFloors } from './floorQuantities.ts';
 
-/** Um piso na tabela. Unidades: m, m² e m³. */
+/** Um piso na tabela. Valores em metros (SI). */
 export interface FloorScheduleRow {
   floorId: Id;
   mark: string;
@@ -11,15 +12,15 @@ export interface FloorScheduleRow {
   typeCode: string;
   levelId: Id;
   levelName: string;
-  /** Área em planta do contorno, bruta (m²). */
+  /** Área em planta do contorno, bruta (metros quadrados). */
   area: number;
-  /** Área líquida da face superior, sem o que a laje ocupa (m²). */
+  /** Área líquida da face superior, sem o que a laje ocupa (metros quadrados). */
   netArea: number;
   perimeter: number;
   thickness: number;
-  /** Volume líquido (m³): sem o que a laje ocupa. */
+  /** Volume líquido (metros cúbicos): sem o que a laje ocupa. */
   volume: number;
-  /** Volume bruto (m³), antes do desconto da laje. Igual a `volume` sem corte. */
+  /** Volume bruto (metros cúbicos), antes do desconto da laje. Igual a `volume` sem corte. */
   grossVolume: number;
   /** Deslocamento do topo em relação ao nível (m). */
   heightOffset: number;
@@ -92,7 +93,17 @@ export function sumFloorRows(rows: FloorScheduleRow[]): FloorScheduleTotals {
   );
 }
 
-const CSV_HEADER = ['Marca', 'Tipo', 'Código', 'Nível', 'Área (m²)', 'Perímetro (m)', 'Espessura (m)', 'Volume (m³)', 'Deslocamento (m)'];
+const csvHeader = (u: ResolvedUnits): string[] => [
+  'Marca',
+  'Tipo',
+  'Código',
+  'Nível',
+  scheduleCsvHeader(u, 'Área', 'area'),
+  scheduleCsvHeader(u, 'Perímetro', 'length'),
+  scheduleCsvHeader(u, 'Espessura', 'smallLength'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
+  scheduleCsvHeader(u, 'Deslocamento', 'length'),
+];
 
 /** Colunas extras do fim da tabela, só quando algum piso tem corte (líquido diferente do bruto). */
 const EPS = 1e-9;
@@ -102,36 +113,40 @@ const EPS = 1e-9;
  * paredes). Uma linha por piso, seguida de uma linha de total. Com corte, acrescenta no fim as colunas de área líquida
  * e de volume bruto; sem corte o CSV fica igual ao de antes.
  */
-export function floorScheduleToCsv(rows: FloorScheduleRow[], totals: FloorScheduleTotals): string {
-  const n = formatDecimal;
+export function floorScheduleToCsv(rows: FloorScheduleRow[], totals: FloorScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'smallLength' | 'area' | 'volume', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const netAreaCut = rows.some((r) => Math.abs(r.netArea - r.area) > EPS);
   const grossCut = rows.some((r) => Math.abs(r.grossVolume - r.volume) > EPS);
-  const header = [...CSV_HEADER, ...(netAreaCut ? ['Área líquida (m²)'] : []), ...(grossCut ? ['Volume bruto (m³)'] : [])];
+  const header = [
+    ...csvHeader(units),
+    ...(netAreaCut ? [scheduleCsvHeader(units, 'Área líquida', 'area')] : []),
+    ...(grossCut ? [scheduleCsvHeader(units, 'Volume bruto', 'volume')] : []),
+  ];
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
     csvText(r.typeCode),
     csvText(r.levelName),
-    n(r.area, 2),
-    n(r.perimeter, 2),
-    n(r.thickness, 3),
-    n(r.volume, 3),
-    n(r.heightOffset, 3),
-    ...(netAreaCut ? [n(r.netArea, 2)] : []),
-    ...(grossCut ? [n(r.grossVolume, 3)] : []),
+    n('area', r.area, 2),
+    n('length', r.perimeter, 2),
+    n('smallLength', r.thickness, 3),
+    n('volume', r.volume, 3),
+    n('length', r.heightOffset, 3),
+    ...(netAreaCut ? [n('area', r.netArea, 2)] : []),
+    ...(grossCut ? [n('volume', r.grossVolume, 3)] : []),
   ]);
   const total = [
     'Total',
     '',
     '',
     '',
-    n(totals.area, 2),
-    n(totals.perimeter, 2),
+    n('area', totals.area, 2),
+    n('length', totals.perimeter, 2),
     '',
-    n(totals.volume, 3),
+    n('volume', totals.volume, 3),
     '',
-    ...(netAreaCut ? [n(totals.netArea, 2)] : []),
-    ...(grossCut ? [n(totals.grossVolume, 3)] : []),
+    ...(netAreaCut ? [n('area', totals.netArea, 2)] : []),
+    ...(grossCut ? [n('volume', totals.grossVolume, 3)] : []),
   ];
   return csvDocument([header, ...body, total]);
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type * as THREE from 'three';
 import { resolveLevel } from '@hestia/engine';
-import { ProjectStore, createEmptyProject, makeWall, type Project } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeRoof, makeWall, type Project } from '@hestia/model';
 import { buildPlanGeometry, buildPlanOverlay, planGeometrySelection, type PlanInput } from './build.ts';
 import { PlanFrame, planFrameUpdateOf, sameLabels, type PlanViewState } from './planFrame.ts';
 import { PlanScene } from './gpuPlan.ts';
@@ -29,7 +29,7 @@ function ops(count: { g: number; o: number }) {
   return { geometry, overlay };
 }
 
-/** Malhas de cada camada da cena, na ordem (grid, fillsBase, fillsOver, strokesBase, strokesOver). */
+/** Malhas de cada camada da cena, na ordem (grade, base, seleção, hover, viva, provisória e os traços). */
 const slotMeshes = (scene: PlanScene): unknown[][] => scene.scene.children.map((g) => [...g.children]);
 /** Mesmas malhas, na mesma ordem (identidade, não igualdade estrutural). */
 const sameMeshes = (a: unknown[], b: unknown[]): boolean => a.length === b.length && a.every((m, i) => m === b[i]);
@@ -50,8 +50,8 @@ describe('quadro da planta (PlanFrame)', () => {
     upd({ ...V, cx: -0.3, cy: 0.1 });
     expect(count).toEqual({ g: 1, o: 1 });
     const after = slotMeshes(scene);
-    // Geometria (fillsBase, strokesBase) e sobreposição (fillsOver, strokesOver): mesmas malhas. A grade pode ser refeita.
-    for (const i of [1, 2, 3, 4]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
+    // Geometria (fillsBase, strokesBase) e seleção (fillsSel, strokesSel): mesmas malhas. A grade pode ser refeita.
+    for (const i of [1, 2, 6, 7]) expect(sameMeshes(after[i]!, before[i]!)).toBe(true);
     scene.dispose();
   });
 
@@ -67,13 +67,47 @@ describe('quadro da planta (PlanFrame)', () => {
     expect(count).toEqual({ g: 1, o: 2 });
     const after = slotMeshes(scene);
     expect(sameMeshes(after[1]!, before[1]!)).toBe(true);
-    expect(sameMeshes(after[3]!, before[3]!)).toBe(true);
-    // A sobreposição é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
-    expect(sameMeshes(after[4]!, before[4]!)).toBe(true);
+    expect(sameMeshes(after[6]!, before[6]!)).toBe(true);
+    // A seleção é reescrita no mesmo buffer (malha reaproveitada); as outras camadas não são reescritas.
+    expect(sameMeshes(after[7]!, before[7]!)).toBe(true);
     const versoesDepois = versoesDasPosicoes(scene);
     expect(versoesDepois[1]).toEqual(versoesAntes[1]);
-    expect(versoesDepois[3]).toEqual(versoesAntes[3]);
-    expect(versoesDepois[4]![0]).not.toBe(versoesAntes[4]![0]);
+    expect(versoesDepois[6]).toEqual(versoesAntes[6]);
+    expect(versoesDepois[7]![0]).not.toBe(versoesAntes[7]![0]);
+    scene.dispose();
+  });
+
+  it('mudança só do hover refaz só a camada de hover; a da camada viva, só a viva', () => {
+    const scene = new PlanScene();
+    const frame = new PlanFrame(scene);
+    const count = { g: 0, o: 0, h: 0, l: 0 };
+    const { geometry, overlay } = ops(count);
+    const stroke = (x: number): StrokeOp => ({ pts: [{ x, y: 0 }, { x, y: 5 }], closed: false, widthPx: 2, color: '#000', alpha: 1 });
+    const hover = (): PlanOps => {
+      count.h++;
+      return { fills: [], strokes: [stroke(3)], labels: [] };
+    };
+    const live = (): PlanOps => {
+      count.l++;
+      return { fills: [], strokes: [stroke(4)], labels: [] };
+    };
+    const upd = (overlayKey: string, hoverKey: string, liveKey: string): void =>
+      frame.update({ v: V, theme: LIGHT, gpu: true, showGrid: false, geometryKey: 'g', overlayKey, hoverKey, liveKey, geometry, overlay, hover, live });
+    upd('o', 'h1', 'l1');
+    const antes = versoesDasPosicoes(scene);
+    upd('o', 'h2', 'l1');
+    expect(count).toEqual({ g: 1, o: 1, h: 2, l: 1 });
+    const depoisHover = versoesDasPosicoes(scene);
+    // Seleção (fillsSel, strokesSel) e camada viva ficam como estavam; só o traço do hover é reescrito.
+    expect(depoisHover[2]).toEqual(antes[2]);
+    expect(depoisHover[7]).toEqual(antes[7]);
+    expect(depoisHover[9]).toEqual(antes[9]);
+    expect(depoisHover[8]![0]).not.toBe(antes[8]![0]);
+    upd('o', 'h2', 'l2');
+    expect(count).toEqual({ g: 1, o: 1, h: 2, l: 2 });
+    const depoisViva = versoesDasPosicoes(scene);
+    expect(depoisViva[8]).toEqual(depoisHover[8]);
+    expect(depoisViva[9]![0]).not.toBe(depoisHover[9]![0]);
     scene.dispose();
   });
 
@@ -152,6 +186,8 @@ describe('geometria e sobreposição separadas (build)', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
     s.exec({ type: 'addDimension', levelId: 'lv_0', dimension: { id: 'd1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1 } });
+    s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'dl1', a: { x: 0, y: 2 }, b: { x: 4, y: 2 }, style: 'dashed' } });
+    s.exec({ type: 'addDetailRegion', levelId: 'lv_0', item: { id: 'dr1', boundary: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }] } });
     return s.project;
   }
   const input = (p: Project, selection: string[], hover: string | null = null): PlanInput => ({
@@ -169,13 +205,22 @@ describe('geometria e sobreposição separadas (build)', () => {
     showGrid: false,
   });
 
-  it('a seleção só entra na geometria pelas cotas do nível', () => {
+  it('a seleção entra na geometria pelas cotas e pelas linhas de detalhe do nível (achado A2)', () => {
     const p = proj();
     expect(planGeometrySelection(p, 'lv_0', ['w1', 'd1', 'x'])).toEqual(['d1']);
     expect(planGeometrySelection(p, 'lv_0', ['w1'])).toEqual([]);
+    expect(planGeometrySelection(p, 'lv_0', ['dl1', 'w1'])).toEqual(['dl1']);
+    expect(planGeometrySelection(p, 'lv_0', ['dr1', 'w1'])).toEqual(['dr1']);
     const semSel = buildPlanGeometry(input(p, []));
     expect(buildPlanGeometry(input(p, ['w1'])).strokes).toEqual(semSel.strokes);
     expect(buildPlanGeometry(input(p, ['d1'])).strokes).not.toEqual(semSel.strokes);
+    const linhaSel = buildPlanGeometry(input(p, ['dl1'])).strokes.find((s) => s.pts[0]!.y === 2)!;
+    const linhaSem = semSel.strokes.find((s) => s.pts[0]!.y === 2)!;
+    expect(linhaSel.color).not.toBe(linhaSem.color);
+    expect(linhaSel.widthPx).toBeGreaterThan(linhaSem.widthPx);
+    const regiaoSel = buildPlanGeometry(input(p, ['dr1'])).strokes.find((s) => s.pts.length === 4 && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
+    const regiaoSem = semSel.strokes.find((s) => s.pts.length === 4 && s.pts[0]!.x === 0 && s.pts[0]!.y === 0)!;
+    expect(regiaoSel.color).not.toBe(regiaoSem.color);
   });
 
   it('a sobreposição depende da seleção e do cursor, e a geometria não', () => {
@@ -185,6 +230,12 @@ describe('geometria e sobreposição separadas (build)', () => {
     expect(sel.fills.length).toBeGreaterThan(base.fills.length);
     expect(buildPlanOverlay(input(p, [], 'w1')).fills.length).toBeGreaterThan(0);
     expect(base.fills).toHaveLength(0);
+  });
+
+  it('a parede selecionada não ganha rótulo com o próprio comprimento (a cota é até a vizinha)', () => {
+    const p = proj();
+    expect(buildPlanOverlay(input(p, ['w1'])).labels).toEqual([]);
+    expect(buildPlanOverlay(input(p, ['w1'], 'w1')).labels).toEqual([]);
   });
 });
 
@@ -215,7 +266,7 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     ...over,
   });
 
-  it('a geometria só muda pelo que ela lê (versão, cotas selecionadas); zoom, seleção de parede e cursor não', () => {
+  it('a geometria só muda pelo que ela lê (versão, cotas e linhas de detalhe selecionadas); zoom, seleção de parede e cursor não', () => {
     const base = planFrameUpdateOf(state());
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).geometryKey).toBe(base.geometryKey);
     expect(planFrameUpdateOf(state({ hover: 'w1' })).geometryKey).toBe(base.geometryKey);
@@ -237,11 +288,88 @@ describe('estado da planta para o quadro (planFrameUpdateOf)', () => {
     expect(chamadas).toEqual([]);
   });
 
-  it('a sobreposição muda com a seleção e o cursor, mas não com o pan', () => {
+  it('a seleção, o hover e a camada viva têm chaves próprias; nenhuma delas depende do pan ou do zoom', () => {
     const base = planFrameUpdateOf(state());
-    expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).not.toBe(base.overlayKey);
     expect(planFrameUpdateOf(state({ selection: ['w1'] })).overlayKey).not.toBe(base.overlayKey);
-    expect(planFrameUpdateOf(state({ v: { ...V, cx: 9 } })).overlayKey).toBe(base.overlayKey);
-    expect(planFrameUpdateOf(state({ v: { ...V, zoom: 220 } })).overlayKey).toBe(base.overlayKey);
+    expect(planFrameUpdateOf(state({ hover: 'w1' })).overlayKey).toBe(base.overlayKey);
+    expect(planFrameUpdateOf(state({ hover: 'w1' })).hoverKey).not.toBe(base.hoverKey);
+    const previa = planFrameUpdateOf(state({ preview: [{ kind: 'point', at: { x: 0, y: 0 } }] }));
+    expect(previa.liveKey).not.toBe(base.liveKey);
+    expect(previa.hoverKey).toBe(base.hoverKey);
+    for (const v of [{ ...V, cx: 9 }, { ...V, zoom: 220 }]) {
+      const u = planFrameUpdateOf(state({ v }));
+      expect(u.overlayKey).toBe(base.overlayKey);
+      expect(u.hoverKey).toBe(base.hoverKey);
+      expect(u.liveKey).toBe(base.liveKey);
+    }
+  });
+
+  it('planta de cobertura tem chaves próprias: a geometria de piso do mesmo nível não é reaproveitada', () => {
+    const piso = planFrameUpdateOf(state());
+    const cob = planFrameUpdateOf(state({ roofPlanMode: true }));
+    expect(cob.geometryKey).not.toBe(piso.geometryKey);
+    expect(cob.overlayKey).not.toBe(piso.overlayKey);
+    expect(cob.hoverKey).not.toBe(piso.hoverKey);
+    expect(planFrameUpdateOf(state({ roofPlanMode: false })).geometryKey).toBe(piso.geometryKey);
+  });
+
+  it('planta de cobertura resolve o nível atual; a de piso não o resolve (só o de baixo, se houver)', () => {
+    const chamadas: string[] = [];
+    const resolve = (id: string) => {
+      chamadas.push(id);
+      return resolveLevel(p, id, new Map());
+    };
+    planFrameUpdateOf(state({ roofPlanMode: true, resolve })).geometry();
+    expect(chamadas).toContain('lv_0');
+  });
+
+  it('cobertura: o nível atual é resolvido uma vez por atualização, mesmo com as quatro camadas', () => {
+    const chamadas: string[] = [];
+    const resolve = (id: string) => {
+      chamadas.push(id);
+      return resolveLevel(p, id, new Map());
+    };
+    const u = planFrameUpdateOf(state({ roofPlanMode: true, resolve }));
+    u.geometry();
+    u.overlay();
+    u.hover!();
+    u.live!();
+    expect(chamadas).toEqual(['lv_0']);
+  });
+
+  it('alternar piso e cobertura do mesmo nível não deixa resíduo: voltar ao piso reproduz o desenho de piso', () => {
+    const quadro = new PlanFrame(NULL_SINK);
+    const atualiza = (over: Partial<PlanViewState>): void => quadro.update({ ...planFrameUpdateOf(state(over)), gpu: false });
+    atualiza({});
+    const piso = JSON.stringify(quadro.drawList(LIGHT));
+    atualiza({ roofPlanMode: true });
+    expect(JSON.stringify(quadro.drawList(LIGHT))).not.toBe(piso);
+    atualiza({});
+    expect(JSON.stringify(quadro.drawList(LIGHT))).toBe(piso);
+  });
+
+  it('cobertura: o telhado do nível abaixo entra na planta, só com a referência de baixo ligada', () => {
+    const comTelhadoBaixo = (): Project => {
+      const s = new ProjectStore(createEmptyProject());
+      s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r0', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [{ x: -0.3, y: -0.3 }, { x: 8.3, y: -0.3 }, { x: 8.3, y: 6.3 }, { x: -0.3, y: 6.3 }], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 } }) });
+      return s.project;
+    };
+    const semTelhadoBaixo = createEmptyProject();
+    const fills = (proj: Project, showUnderlay: boolean): number =>
+      planFrameUpdateOf(state({ project: proj, levelId: 'lv_1', roofPlanMode: true, showUnderlay, resolve: (id) => resolveLevel(proj, id, new Map()) })).geometry().fills.length;
+    expect(fills(comTelhadoBaixo(), true)).toBeGreaterThan(fills(semTelhadoBaixo, true));
+    expect(fills(comTelhadoBaixo(), false)).toBe(fills(semTelhadoBaixo, false));
+  });
+
+  it('cobertura: o telhado de um nível mais abaixo (não o de referência) também entra', () => {
+    const tres = (com: boolean): Project => {
+      const s = new ProjectStore(createEmptyProject());
+      s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_2', name: 'Cobertura', elevation: 6 }) });
+      if (com) s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r0', typeId: 'rt_ceramica', levelId: 'lv_0', boundary: [{ x: -0.3, y: -0.3 }, { x: 8.3, y: -0.3 }, { x: 8.3, y: 6.3 }, { x: -0.3, y: 6.3 }], heightOffset: 2.8, shape: 'gable', slopePercent: 30, dir: { x: 1, y: 0 } }) });
+      return s.project;
+    };
+    const fills = (proj: Project): number =>
+      planFrameUpdateOf(state({ project: proj, levelId: 'lv_2', roofPlanMode: true, showUnderlay: true, resolve: (id) => resolveLevel(proj, id, new Map()) })).geometry().fills.length;
+    expect(fills(tres(true))).toBeGreaterThan(fills(tres(false)));
   });
 });

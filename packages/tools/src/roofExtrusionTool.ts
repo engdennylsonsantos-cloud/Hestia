@@ -1,17 +1,17 @@
 import { add, mul, type Vec2 } from '@hestia/geom';
-import { makeRoof, newId, type RoofProfilePoint } from '@hestia/model';
+import { formatQuantity, makeRoof, newId, unitsOf, type ResolvedUnits, type RoofProfilePoint } from '@hestia/model';
 import { defaultExtrusionProfile } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { roofDirFor, defaultRoofDir, rectRing, roofAutoOffset, roofSlopeError } from './roofGeom.ts';
 import { roofProblem } from './roofCheck.ts';
 import type { PointerInfo } from './types.ts';
 
-const fmt = (m: number): string => `${m.toFixed(2).replace('.', ',')} m`;
+const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
 /** Mensagem de criação de um telhado por extrusão: número de trechos e flecha (a maior cota do perfil). */
-export function extrusionCreatedMessage(profile: RoofProfilePoint[]): string {
+export function extrusionCreatedMessage(profile: RoofProfilePoint[], u: ResolvedUnits): string {
   const flecha = Math.max(...profile.map((q) => q.z));
-  return `Telhado em arco: ${profile.length - 1} trechos, flecha ${fmt(flecha)}. Ctrl+Z desfaz.`;
+  return `Telhado em arco: ${profile.length - 1} trechos, flecha ${fmt(u, flecha)}. Ctrl+Z desfaz.`;
 }
 
 const HINT = 'Telhado por extrusão: clique no primeiro canto e depois no canto oposto. O eixo da extrusão é o lado maior (Tab troca).';
@@ -72,7 +72,7 @@ export class RoofExtrusionTool extends ToolBase {
     const mid = mul(add(a, c), 0.5);
     const half = Math.max(Math.abs(c.x - a.x), Math.abs(c.y - a.y)) / 2;
     this.items.push({ kind: 'polygon', ring }, { kind: 'line', a: add(mid, mul(dir, -half)), b: add(mid, mul(dir, half)), dashed: true });
-    this.items.push({ kind: 'label', at: c, text: `${fmt(Math.abs(c.x - a.x))} × ${fmt(Math.abs(c.y - a.y))}` });
+    this.items.push({ kind: 'label', at: c, text: `${fmt(unitsOf(this.env.project()), Math.abs(c.x - a.x))} × ${fmt(unitsOf(this.env.project()), Math.abs(c.y - a.y))}` });
   }
 
   override click(p: PointerInfo): void {
@@ -133,6 +133,6 @@ export class RoofExtrusionTool extends ToolBase {
     }
     this.env.exec({ type: 'addRoof', roof });
     this.env.setSelection([id]);
-    this.env.say(extrusionCreatedMessage(roof.profile));
+    this.env.say(extrusionCreatedMessage(roof.profile, unitsOf(this.env.project())));
   }
 }

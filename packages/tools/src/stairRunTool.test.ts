@@ -203,6 +203,14 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
     expect(r.riserCount).toBe(16);
   });
 
+  it('a ferramenta usa a regra de cálculo do TIPO: alvo 0,64 dá piso de 29 cm', () => {
+    const ctx = setup();
+    const type = ctx.store.project.stairTypes.stt_monolitica!;
+    ctx.store.exec({ type: 'upsertStairType', stairType: { ...type, calcTarget: 0.64 } });
+    draw(tool('stairrun', ctx.env), [0, 0], [0, 5]);
+    expect(ctx.last()).toMatch(/^Escada criada: 16 espelhos de 17,5 cm, piso 29,0 cm/);
+  });
+
   it('o cálculo de planStairRun: N, h e piso com H, espelho máximo e piso mínimo do tipo', () => {
     const base = { start: { x: 0, y: 0 }, dir: { x: 0, y: 1 }, maxRiser: 0.18, minTread: 0.28, options: { shape: 'straight' as const, width: 1.2, turn: 'left' as const } };
     const a = planStairRun({ ...base, H: 2.8 });
@@ -216,6 +224,8 @@ describe('ferramenta Escada reta/L/U: criação por cliques', () => {
       expect(b.risers).toBe(14);
       expect(b.tread).toBeCloseTo(0.63 - 2 * (2.4 / 14), 9);
     }
+    const custom = planStairRun({ ...base, H: 2.8, rule: { minTread: 0.28, maxTread: 0.32, a: 2, b: 1, target: 0.64 } });
+    if (!('error' in custom)) expect(custom.tread).toBeCloseTo(0.29, 9);
     expect(planStairRun({ ...base, H: 0.1 })).toEqual({ error: 'A altura é menor que um espelho: nada a gerar.' });
     expect(planStairRun({ ...base, options: { ...base.options, width: 0 }, H: 2.8 })).toEqual({ error: 'A largura do lance deve ser positiva.' });
   });

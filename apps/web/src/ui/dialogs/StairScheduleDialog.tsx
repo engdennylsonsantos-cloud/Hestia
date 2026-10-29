@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { formatQuantity, type Quantity, type ResolvedUnits } from '@hestia/model';
 import { buildStairSchedule, filterStairRows, stairScheduleToCsv, sumStairRows, type StairScheduleRow } from '@hestia/engine';
 import { useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
@@ -6,6 +7,8 @@ import { useI18n, I18N } from '../../editor/i18n.ts';
 import { saveText } from '../../editor/saveText.ts';
 import { Icon } from '../Icon.tsx';
 import { Dialog } from './Dialog.tsx';
+import { scheduleCell, scheduleHeader } from './scheduleUnits.ts';
+import { useUnits } from '../useUnits.ts';
 
 interface Col {
   key: keyof StairScheduleRow;
@@ -13,6 +16,8 @@ interface Col {
   labelKey: keyof typeof I18N.pt;
   /** Presente nas colunas numéricas: casas decimais e alinhamento à direita. */
   decimals?: number;
+  /** Grandeza da coluna: converte o valor SI para a unidade do projeto. */
+  quantity?: Quantity;
 }
 
 const COLS: Col[] = [
@@ -22,21 +27,17 @@ const COLS: Col[] = [
   { key: 'baseLevelName', labelKey: 'col_base_level' },
   { key: 'topLevelName', labelKey: 'col_top_level' },
   { key: 'riserCount', labelKey: 'col_risers', decimals: 0 },
-  { key: 'riserHeight', labelKey: 'col_riser_height', decimals: 3 },
-  { key: 'treadMean', labelKey: 'col_tread', decimals: 3 },
-  { key: 'width', labelKey: 'col_width', decimals: 2 },
-  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2 },
-  { key: 'volume', labelKey: 'col_volume', decimals: 3 },
+  { key: 'riserHeight', labelKey: 'col_riser_height', decimals: 3, quantity: 'length' },
+  { key: 'treadMean', labelKey: 'col_tread', decimals: 3, quantity: 'length' },
+  { key: 'width', labelKey: 'col_width', decimals: 2, quantity: 'length' },
+  { key: 'planArea', labelKey: 'col_plan_area', decimals: 2, quantity: 'area' },
+  { key: 'volume', labelKey: 'col_volume', decimals: 3, quantity: 'volume' },
 ];
 
 interface Sort {
   key: keyof StairScheduleRow;
   dir: 1 | -1;
 }
-
-/** Números seguem o idioma ativo (vírgula decimal em PT, ponto em EN). */
-const fmt = (v: number, decimals: number): string =>
-  v.toLocaleString(useI18n.getState().lang === 'en' ? 'en-US' : 'pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const compare = (a: StairScheduleRow, b: StairScheduleRow, s: Sort): number => {
   const x = a[s.key];
@@ -45,16 +46,17 @@ const compare = (a: StairScheduleRow, b: StairScheduleRow, s: Sort): number => {
   return r * s.dir;
 };
 
-const cellValue = (r: StairScheduleRow, c: Col): ReactNode => {
+const cellValue = (r: StairScheduleRow, c: Col, units: ResolvedUnits): ReactNode => {
   const v = r[c.key];
   if (v === null || v === undefined || v === '') return '—';
-  return typeof v === 'number' ? fmt(v, c.decimals ?? 2) : v;
+  return typeof v === 'number' ? (c.quantity ? scheduleCell(units, c.quantity, v, c.decimals) : String(v)) : v;
 };
 
 /** Tabela de escadas com ordenação, filtros por tipo e nível de base, totais e exportação CSV (padrão da tabela de telhados). */
 export function StairScheduleDialog(): ReactElement {
   const p = useProject();
   const t = I18N[useI18n((s) => s.lang)];
+  const units = useUnits();
   const schedule = useMemo(() => buildStairSchedule(p), [p]);
   const [levelId, setLevelId] = useState('');
   const [typeId, setTypeId] = useState('');
@@ -80,7 +82,7 @@ export function StairScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-escadas.csv`, stairScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-escadas.csv`, stairScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };
@@ -124,7 +126,7 @@ export function StairScheduleDialog(): ReactElement {
                   {COLS.map((c) => (
                     <th key={c.key} className={c.decimals !== undefined ? 'num' : undefined} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined}>
                       <button type="button" className="sortbtn" onClick={() => toggleSort(c.key)} title={t.sched_sort_col}>
-                        {t[c.labelKey]}
+                        {c.quantity ? scheduleHeader(units, t[c.labelKey], c.quantity) : t[c.labelKey]}
                         {sort?.key === c.key ? <Icon name={sort.dir === 1 ? 'up' : 'down'} size={11} /> : null}
                       </button>
                     </th>
@@ -136,7 +138,7 @@ export function StairScheduleDialog(): ReactElement {
                   <tr key={r.stairId}>
                     {COLS.map((c) => (
                       <td key={c.key} className={c.decimals !== undefined ? 'num' : undefined}>
-                        {cellValue(r, c)}
+                        {cellValue(r, c, units)}
                       </td>
                     ))}
                   </tr>
@@ -146,8 +148,8 @@ export function StairScheduleDialog(): ReactElement {
           </div>
           <div className="total">
             <span>{totals.count} {totals.count === 1 ? t.sched_noun_stair_one : t.sched_noun_stair}</span>
-            <span>{t.sched_total_plan_area} {fmt(totals.planArea, 2)} m²</span>
-            <span>{t.sched_total_volume} {fmt(totals.volume, 3)} m³</span>
+            <span>{t.sched_total_plan_area} {formatQuantity(units, 'area', totals.planArea, { decimals: 2 })}</span>
+            <span>{t.sched_total_volume} {formatQuantity(units, 'volume', totals.volume, { decimals: 3 })}</span>
           </div>
         </>
       )}

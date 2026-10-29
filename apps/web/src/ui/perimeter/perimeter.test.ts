@@ -103,15 +103,15 @@ describe('grupo Perímetro nas propriedades', () => {
   const grupo = (target: SketchTarget, edge: PerimeterEdgeInfo | null): string =>
     renderToStaticMarkup(createElement(PerimeterProps, { target, edge, onDefinesSlope: noop, onSlopePct: noop, onOverhang: noop }));
 
-  it('telhado: aresta, comprimento, inclinação em % e °, balanço', () => {
+  it('telhado: aresta, comprimento, inclinação em % e ângulo, balanço', () => {
     const m = grupo('roof', aresta);
     expect(m).toContain('Perímetro do telhado');
     expect(m).toContain('2 de 4');
     expect(m).toContain('10,50 m');
     expect(m).toContain('Define inclinação');
-    expect(m).toContain('Inclinação (°)');
+    expect(m).toContain('Inclinação (ângulo)');
     expect(m).toContain('Balanço da aresta');
-    expect(m).toContain('16,70');
+    expect(m).toContain('16,6992');
   });
 
   it('piso: só aresta e comprimento', () => {
@@ -147,7 +147,7 @@ describe('barra de status e problemas (pt-BR)', () => {
   });
 
   it('mensagem de aresta no telhado e no piso', () => {
-    expect(edgeStatus({ index: 0, lengthM: 4, definesSlope: true, slopePct: 30 })).toBe('Aresta 1: define inclinação (30 %).');
+    expect(edgeStatus({ index: 0, lengthM: 4, definesSlope: true, slopePct: 30 })).toBe('Aresta 1: define inclinação (30,0%).');
     expect(edgeStatus({ index: 1, lengthM: 4, definesSlope: false })).toBe('Aresta 2: não define inclinação.');
     expect(edgeStatus({ index: 2, lengthM: 3.5 })).toBe('Aresta 3: 3,50 m.');
   });

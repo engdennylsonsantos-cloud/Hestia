@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { frameOfWall, openingGeometry } from '@hestia/engine';
-import type { GraphicsCategory, Id, Material, Opening, Project, View3DSettings } from '@hestia/model';
-import { openingPieces } from './openingParts.ts';
+import { buildOpeningModel, frameOfWall, openingGeometry, type OpeningGeometry, type OpeningModel } from '@hestia/engine';
+import { openingTypeById, type GraphicsCategory, type Id, type Material, type Opening, type Project, type View3DSettings } from '@hestia/model';
+import { pecasDoModelo } from './openingParts.ts';
+import { deslocamentoDaPeca, geometriaDaPeca, geometriaRelativaAoPivo } from './geometriaPeca3d.ts';
+import { arestasDaUniaoDeCaixas, type CaixaAlinhada } from './silhuetaCaixas3d.ts';
 import { loteDeGeometria } from './lotesMalha3d.ts';
 import type { ElementRange, SolidBatch } from './solids.ts';
 
@@ -15,6 +17,8 @@ export type DesenhoPeca = (parent: THREE.Object3D, geo: THREE.BufferGeometry, m:
 export interface AberturaMontada {
   grupo: THREE.Group;
   lotes: SolidBatch[];
+  /** Silhueta dos grupos físicos (alizar): arestas já sem as juntas internas, em coordenadas do vão. */
+  arestasGrupos: number[];
 }
 
 /**
@@ -37,52 +41,98 @@ export function montarAbertura(
   const g = openingGeometry(p, o, f);
   // Vão livre de porta: só o recorte da parede; sem folha nem caixilho.
   if (g.kind === 'door' && g.leaves === 0) return null;
+  const geom = g.height > H - g.sill ? { ...g, height: H - g.sill } : g;
+  const model = buildOpeningModel(p, o, geom, f);
+  return montarAberturaDoModelo(p, o, g, baseZ, model, view, linhas, desenhar);
+}
+
+/**
+ * Monta o vão a partir do modelo já calculado (o mesmo `buildOpeningModel`). `montarAbertura` é o atalho do projeto;
+ * esta forma é o que permite validar o batente em L por fixture enquanto o motor de FR1 não está integrado.
+ */
+export function montarAberturaDoModelo(
+  p: Project,
+  o: Opening,
+  g: OpeningGeometry,
+  baseZ: number,
+  model: OpeningModel,
+  view: View3DSettings,
+  linhas: boolean,
+  desenhar: DesenhoPeca,
+): AberturaMontada | null {
+  const cat: GraphicsCategory = o.kind;
+  if (!view.overrides[cat].visible || (model.kind === 'door' && model.void)) return null;
+  const t = openingTypeById(p, o.typeId);
+  if (!t) return null;
   const grupo = new THREE.Group();
   grupo.rotation.z = Math.atan2(g.u.y, g.u.x);
   grupo.position.set(g.center.x, g.center.y, baseZ + g.sill);
   const lotes: SolidBatch[] = [];
+  const grupos = new Map<string, CaixaAlinhada[]>();
   // Cada peça da esquadria é um elemento inteiro: a faixa cobre a geometria toda (decisão 0016).
   const range = (count: number): ElementRange[] => [{ id: o.id, start: 0, count }];
-  for (const piece of openingPieces(p, o, g, f, H, view.openOpenings === true)) {
-    // Folha aberta: a caixa é desenhada num grupo na dobradiça, que gira a peça inteira.
+  for (const piece of pecasDoModelo(p, t, model, view.openOpenings === true)) {
+    const d = deslocamentoDaPeca(piece);
+    // Folha aberta: a peça é desenhada num grupo na dobradiça, que gira a peça inteira.
     if (piece.hinge) {
       const pivot = new THREE.Group();
-      let dx = 0;
-      let dy = 0;
       const atS = piece.hinge.atS ?? 0;
       if (piece.hinge.axis === 'z') {
         // Eixo vertical em (t, s) = (at, atS).
         pivot.position.x = piece.hinge.at;
         pivot.position.y = atS;
         pivot.rotation.z = piece.hinge.angle;
-        dx = piece.hinge.at;
-        dy = atS;
       } else {
         // Eixo horizontal paralelo a `t` (maxim-ar/basculante): passa por (s, z) = (atS, at).
         pivot.position.y = atS;
         pivot.position.z = piece.hinge.at;
         pivot.rotation.x = piece.hinge.angle;
-        dy = atS;
       }
-      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x - dx, piece.y - dy, piece.z - (piece.hinge.axis === 'x' ? piece.hinge.at : 0));
-      desenhar(pivot, box, p.materials[piece.materialId], cat, linhas, range(box.index?.count ?? 0));
+      const geo = geometriaRelativaAoPivo(piece).translate(d.dx, d.dy, d.dz);
+      const count = geo.index?.count ?? geo.getAttribute('position').count;
+      desenhar(pivot, geo, p.materials[piece.materialId], cat, linhas, range(count));
       grupo.add(pivot);
     } else {
-      // Peça fixa (ou folha de correr): a caixa em coordenadas do vão (o grupo leva a transformação), como lote da
-      // esquadria. O deslocamento do estado aberto entra na posição da caixa.
-      const s = piece.slide;
-      const box = new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x + (s?.dx ?? 0), piece.y + (s?.dy ?? 0), piece.z + (s?.dz ?? 0));
-      lotes.push(loteDeGeometria(box, piece.materialId, cat, o.id));
+      // Peça fixa (ou folha de correr): a geometria em coordenadas do vão (o grupo leva a transformação), como lote da
+      // esquadria. O deslocamento do estado aberto entra na posição da peça.
+      const geo = (piece.profile ? geometriaDaPeca(piece) : new THREE.BoxGeometry(piece.w, piece.d, piece.h).translate(piece.x, piece.y, piece.z)).translate(d.dx, d.dy, d.dz);
+      const lote: SolidBatch = loteDeGeometria(geo, piece.materialId, cat, o.id);
+      if (piece.group) {
+        lotes.push({ ...lote, group: piece.group });
+        // A silhueta unida é feita das caixas do grupo; uma peça com seção já é um sólido único.
+        if (!piece.profile) {
+          const cs = grupos.get(piece.group) ?? [];
+          cs.push({ x0: piece.x + d.dx - piece.w / 2, x1: piece.x + d.dx + piece.w / 2, y0: piece.y + d.dy - piece.d / 2, y1: piece.y + d.dy + piece.d / 2, z0: piece.z + d.dz - piece.h / 2, z1: piece.z + d.dz + piece.h / 2 });
+          grupos.set(piece.group, cs);
+        }
+      } else lotes.push(lote);
     }
   }
+  const arestasGrupos: number[] = [];
+  for (const cs of grupos.values()) arestasGrupos.push(...arestasDaUniaoDeCaixas(cs));
   grupo.userData.elementId = o.id;
-  return { grupo, lotes };
+  return { grupo, lotes, arestasGrupos };
 }
 
 /** Uma peça de esquadria como caixa: o material e a matriz que leva a caixa unitária ao mundo. */
 export interface CaixaDeAbertura {
   materialId: Id;
   matriz: number[];
+  /** Peças do mesmo grupo formam uma peça física (alizar): as arestas internas do grupo não entram. */
+  group?: string;
+}
+
+/** Peça com seção (batente em L) no caminho instanciado: não é caixa, então vai como prisma à parte. */
+export interface PrismaDeAbertura {
+  materialId: Id;
+  /** Geometria já no mundo, no referencial do vão e com a dobradiça/deslocamento aplicados. */
+  geometry: THREE.BufferGeometry;
+}
+
+/** Saída do caminho instanciado: caixas unitárias e os prismas que não cabem em instância. */
+export interface AberturaEmCaixas {
+  caixas: CaixaDeAbertura[];
+  prismas: PrismaDeAbertura[];
 }
 
 /**
@@ -98,12 +148,46 @@ export function caixasDaAbertura(
   H: number,
   view: View3DSettings,
 ): CaixaDeAbertura[] | null {
+  return caixasEPrismasDaAbertura(p, o, f, baseZ, H, view)?.caixas ?? null;
+}
+
+/**
+ * Caminho instanciado completo: as peças em caixa viram matrizes de caixa unitária e as peças com `profile` viram
+ * prismas com a geometria já no mundo. As duas saídas desenham juntas; a cena agrupa as caixas por material e desenha os
+ * prismas nos lotes de geometria. Mesmas saídas nulas de `montarAbertura`.
+ */
+export function caixasEPrismasDaAbertura(
+  p: Project,
+  o: Opening,
+  f: NonNullable<ReturnType<typeof frameOfWall>>,
+  baseZ: number,
+  H: number,
+  view: View3DSettings,
+): AberturaEmCaixas | null {
   if (!view.overrides[o.kind].visible) return null;
   const g = openingGeometry(p, o, f);
   if (g.kind === 'door' && g.leaves === 0) return null;
+  const geom = g.height > H - g.sill ? { ...g, height: H - g.sill } : g;
+  const model = buildOpeningModel(p, o, geom, f);
+  return caixasEPrismasDoModelo(p, o, g, baseZ, model, view);
+}
+
+/** Caminho instanciado a partir do modelo já calculado (ver `montarAberturaDoModelo`). */
+export function caixasEPrismasDoModelo(
+  p: Project,
+  o: Opening,
+  g: OpeningGeometry,
+  baseZ: number,
+  model: OpeningModel,
+  view: View3DSettings,
+): AberturaEmCaixas | null {
+  if (!view.overrides[o.kind].visible || (model.kind === 'door' && model.void)) return null;
+  const t = openingTypeById(p, o.typeId);
+  if (!t) return null;
   const vao = new THREE.Matrix4().makeRotationZ(Math.atan2(g.u.y, g.u.x)).setPosition(g.center.x, g.center.y, baseZ + g.sill);
-  const out: CaixaDeAbertura[] = [];
-  for (const piece of openingPieces(p, o, g, f, H, view.openOpenings === true)) {
+  const out: AberturaEmCaixas = { caixas: [], prismas: [] };
+  for (const piece of pecasDoModelo(p, t, model, view.openOpenings === true)) {
+    const d = deslocamentoDaPeca(piece);
     const m = vao.clone();
     let dx = 0;
     let dy = 0;
@@ -122,9 +206,14 @@ export function caixasDaAbertura(
       }
       m.multiply(pivo);
     }
-    const s = piece.slide;
-    m.multiply(new THREE.Matrix4().makeTranslation(piece.x - dx + (s?.dx ?? 0), piece.y - dy + (s?.dy ?? 0), piece.z - dz + (s?.dz ?? 0))).multiply(new THREE.Matrix4().makeScale(piece.w, piece.d, piece.h));
-    out.push({ materialId: piece.materialId, matriz: m.toArray() });
+    if (piece.profile) {
+      const geo = (piece.hinge ? geometriaRelativaAoPivo(piece) : geometriaDaPeca(piece)).translate(d.dx, d.dy, d.dz);
+      geo.applyMatrix4(m);
+      out.prismas.push({ materialId: piece.materialId, geometry: geo });
+      continue;
+    }
+    m.multiply(new THREE.Matrix4().makeTranslation(piece.x - dx + d.dx, piece.y - dy + d.dy, piece.z - dz + d.dz)).multiply(new THREE.Matrix4().makeScale(piece.w, piece.d, piece.h));
+    out.caixas.push({ materialId: piece.materialId, matriz: m.toArray(), ...(piece.group ? { group: piece.group } : {}) });
   }
   return out;
 }

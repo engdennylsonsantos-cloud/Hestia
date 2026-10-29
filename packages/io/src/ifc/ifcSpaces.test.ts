@@ -76,23 +76,26 @@ describe('addSpaces', () => {
     expect(text).toContain(ifcGuidOf('space:r1'));
   });
 
-  it('leva nome, número no LongName, composição e tipo interno, com corpo extrudado', () => {
+  it('leva número no Name, nome no LongName, composição, tipo SPACE e categoria no ObjectType', () => {
     expect(text).toContain("IFCSPACE(");
     expect(text).toContain("'Sala'");
-    expect(text).toContain("'101 - Sala'");
-    expect(text).toContain(',.ELEMENT.,.INTERNAL.,');
+    expect(text).toContain("'101'");
+    expect(text).toContain("'Pset_SpaceCommon'");
+    expect(text).toContain(',.ELEMENT.,.SPACE.,');
     expect(count(text, 'IFCEXTRUDEDAREASOLID')).toBe(1);
     expect(count(text, 'IFCPRODUCTDEFINITIONSHAPE')).toBe(1);
   });
 
-  it('emite Qto_SpaceBaseQuantities com área líquida, área bruta, pé-direito e perímetro do motor', () => {
+  it('emite Qto_SpaceBaseQuantities com área líquida, área bruta, altura, perímetros e volume', () => {
     expect(count(text, 'IFCELEMENTQUANTITY')).toBe(1);
     expect(text).toContain("'Qto_SpaceBaseQuantities'");
     expect(text).toContain("IFCQUANTITYAREA('NetFloorArea',$,$,20.000000,$)");
     expect(text).toContain("IFCQUANTITYAREA('GrossFloorArea',$,$,20.000000,$)");
     expect(text).toContain("IFCQUANTITYLENGTH('Height',$,$,2.800000,$)");
-    expect(text).toContain("IFCQUANTITYLENGTH('Perimeter',$,$,18.000000,$)");
-    expect(count(text, 'IFCRELDEFINESBYPROPERTIES')).toBe(1);
+    expect(text).toContain("IFCQUANTITYLENGTH('NetPerimeter',$,$,18.000000,$)");
+    expect(text).toContain("IFCQUANTITYLENGTH('GrossPerimeter',$,$,18.000000,$)");
+    expect(text).toContain("IFCQUANTITYVOLUME('NetVolume',$,$,56.000000,$)");
+    expect(count(text, 'IFCRELDEFINESBYPROPERTIES')).toBe(2);
   });
 
   it('referências íntegras e determinismo', () => {
@@ -107,8 +110,8 @@ describe('addSpaces', () => {
     const cq = ctxOf(q);
     addSpaces(cq);
     const out = cq.w.text({ fileName: 'espacos.ifc', timestamp: TS });
-    // Extrusão começa em 0,10 (local) e sobe 3,00; a cota do ambiente é 0,10.
-    expect(out).toContain(',.ELEMENT.,.INTERNAL.,0.100000)');
+    // Extrusão começa em 0,10 (local) e sobe 3,00; a cota do piso acabado é a do nível + 0,10.
+    expect(out).toContain(',.ELEMENT.,.SPACE.,0.100000)');
     expect(out).toContain("IFCQUANTITYLENGTH('Height',$,$,3.000000,$)");
     expect(danglingRefs(out)).toEqual([]);
   });

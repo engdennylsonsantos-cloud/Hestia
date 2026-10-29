@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearDimOverride, clearDimOverrides, setDimOverride, useUi } from './state.ts';
+import { clearDimOverride, clearDimOverrides, setDimOverride, suspendSelectionDims, useUi } from './state.ts';
 
 describe('dimOverrides (referências de cota da sessão)', () => {
   beforeEach(() => {
-    useUi.setState({ dimOverrides: {}, selection: [], tool: 'select' });
+    useUi.setState({ dimOverrides: {}, dimsSuspendedVersion: null, selection: [], tool: 'select' });
   });
 
   it('setDimOverride grava por chave e preserva as outras', () => {
@@ -34,5 +34,16 @@ describe('dimOverrides (referências de cota da sessão)', () => {
     setDimOverride('opening:wallLeft', 'axis');
     useUi.setState({ selection: ['a'] });
     expect(useUi.getState().dimOverrides).toEqual({});
+  });
+
+  it('a suspensão das cotas temporárias some na próxima ferramenta ou seleção', () => {
+    suspendSelectionDims(3);
+    expect(useUi.getState().dimsSuspendedVersion).toBe(3);
+    useUi.setState({ selection: ['a'] });
+    expect(useUi.getState().dimsSuspendedVersion).toBeNull();
+
+    suspendSelectionDims(4);
+    useUi.setState({ tool: 'wall' });
+    expect(useUi.getState().dimsSuspendedVersion).toBeNull();
   });
 });

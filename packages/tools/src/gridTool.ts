@@ -1,6 +1,8 @@
 import { add, dist, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { DEFAULT_GRID_TYPE_ID, GRID_MIN_SEGMENT, formatQuantity, isWall, nextGridName, newId, unitsOf, type Grid, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { gridPreviewDim } from './dims/providers/grid.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import { clampSag, gridPreviewItems } from './gridGeom.ts';
 import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import { pickAt } from './pick.ts';
@@ -25,6 +27,8 @@ export class GridTool extends ToolBase {
   readonly hint = HINTS.line;
   /** Pontos já fixados (linha: 1; arco: 1 ou 2; multi: quantos clicados). */
   private pts: Vec2[] = [];
+  /** Último ponto da prévia (cursor), para a cota unificada do eixo em desenho. */
+  private last: Vec2 | null = null;
 
   private mode(): GridMode {
     return this.env.options().grid?.mode ?? 'line';
@@ -41,6 +45,7 @@ export class GridTool extends ToolBase {
 
   protected reset(): void {
     this.pts = [];
+    this.last = null;
     this.items = [];
     this.inf = null;
   }
@@ -88,12 +93,14 @@ export class GridTool extends ToolBase {
     if (mode === 'pick') {
       const w = this.wallAt(p.raw);
       this.inf = null;
+      this.last = null;
       if (w) this.items.push({ kind: 'highlight', ids: [w.id] });
       return;
     }
     const last = this.pts[this.pts.length - 1];
     const inf = this.snap(p, last ? { from: last } : {});
     const at = inf.point;
+    this.last = at;
     if (!last) {
       this.items.push({ kind: 'point', at });
       return;
@@ -106,7 +113,19 @@ export class GridTool extends ToolBase {
     if (dist(last, at) < 1e-6) return;
     const fixed = mode === 'multi' ? this.pts : [last];
     this.items.push(...gridPreviewItems({ points: [...fixed, at], sag: 0 }));
-    this.items.push({ kind: 'label', at: add(last, mul(sub(at, last), 0.5)), text: fmt(unitsOf(this.env.project()), dist(last, at)) });
+  }
+
+  /**
+   * Comprimento do eixo em desenho pelo sistema único de cotas: o trecho do cursor (linha e multissegmento) ou o arco
+   * com a flecha corrente. Sem ponto inicial ou no modo escolher linhas, não há cota.
+   */
+  tempDims(_overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    const at = this.last;
+    if (!at || this.pts.length === 0) return [];
+    if (this.mode() === 'arc' && this.pts.length === 2) return [gridPreviewDim(this.pts[0]!, this.pts[1]!, this.sagFor(at))];
+    const last = this.pts[this.pts.length - 1]!;
+    if (dist(last, at) < 1e-6) return [];
+    return [gridPreviewDim(last, at)];
   }
 
   override click(p: PointerInfo): void {

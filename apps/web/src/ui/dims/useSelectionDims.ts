@@ -3,6 +3,7 @@ import { dimensionSettingsOf } from '@hestia/model';
 import { registerBuiltinDimProviders, selectionDims, type DimContext, type TempDim } from '@hestia/tools';
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
+import { selectionDimsSuspended } from './dimsActions.ts';
 
 // Inicialização do editor: liga os provedores que acompanham o Hestia (idempotente).
 registerBuiltinDimProviders();
@@ -23,7 +24,13 @@ export function useDimContext(): DimContext {
 export function useSelectionDims(): TempDim[] {
   const ctx = useDimContext();
   const selection = useUi((s) => s.selection);
-  return useMemo(() => selectionDims(ctx, selection), [ctx, selection]);
+  const suspendedVersion = useUi((s) => s.dimsSuspendedVersion);
+  // `useDimContext` assina a versão do projeto; ler aqui mantém a memo coerente com o desfazer/alteração.
+  const version = editor.store.version;
+  return useMemo(
+    () => (selectionDimsSuspended(suspendedVersion, version) ? [] : selectionDims(ctx, selection)),
+    [ctx, selection, suspendedVersion, version],
+  );
 }
 
 /** Cotas da prévia da ferramenta ativa (vazio para Selecionar ou ferramenta sem `tempDims`). */

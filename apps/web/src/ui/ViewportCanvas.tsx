@@ -182,7 +182,10 @@ export function ViewportCanvas(): ReactElement {
       publish(NO_LABELS, null);
       return;
     }
+    const antes = editor.viewport();
     const v = editor.ensureViewport(w, h);
+    // O tamanho do canvas mudou: as cotas (HTML) recalculam a posição com a vista nova (C07).
+    if (antes && antes !== v) useUi.setState((x) => ({ previewTick: x.previewTick + 1 }));
     const pf = (planFrame.current ??= new PlanFrame(plan.current));
     // Vista de corte: a cena é refeita por inteiro (ver `PlanFrame`).
     if (st.view === 'section') {

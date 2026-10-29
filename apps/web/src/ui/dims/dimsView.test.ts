@@ -62,4 +62,11 @@ describe('dimsView', () => {
     expect(viewOfDim(dim(), toScreen, 0.01, null).editable).toBe(false);
     expect(viewOfDim(dim({ tone: 'invalid' }), toScreen, 0.01, null).invalid).toBe(true);
   });
+
+  it('ponta com uma só referência não ganha alça (C03: cobria as alças de vértice do contorno)', () => {
+    const d = dim({ ends: [end('wallLeft', 'axis', ['axis']), end('openLeft', 'frame', ['center', 'clear', 'frame', 'casing'], 2)] });
+    expect(viewOfDim(d, toScreen, 0.01, null).grips.map((g) => g.slot)).toEqual(['openLeft']);
+    const only = dim({ ends: [end('a', 'axis', ['axis']), end('b', 'axis', ['axis'], 2)] });
+    expect(viewOfDim(only, toScreen, 0.01, null).grips).toEqual([]);
+  });
 });

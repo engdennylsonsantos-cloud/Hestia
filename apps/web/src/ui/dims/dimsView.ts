@@ -66,6 +66,7 @@ export function viewOfDim(dim: TempDim, toScreen: (p: Vec2) => Vec2, metersPerPi
     textRotation: g.textRotation,
     editable: dim.edit !== undefined,
     invalid: dim.tone === 'invalid' || invalidKey === dim.key,
-    grips: dim.ends.map((e) => gripOf(dim, e, toScreen)),
+    // Ponta com uma só referência não tem o que alternar: sem alça (ela só cobriria as alças de vértice do elemento).
+    grips: dim.ends.filter((e) => e.options.length >= 2).map((e) => gripOf(dim, e, toScreen)),
   };
 }

@@ -1,9 +1,9 @@
-import { add, dist, dot, mul, norm, perp, sub, type Vec2 } from '@hestia/geom';
+import { add, dist, dot, intersection, mul, norm, perp, ringArea, sub, type Ring, type Vec2 } from '@hestia/geom';
 import type { RampInputMode, RampType } from '@hestia/model';
 import { layoutSegment, layoutUntilRise, LIVE_RISE_TOL, type LayoutPiece } from './rampLive.ts';
 import { inlineLanding, maxRiseFor, planRamp, tagRuns, type RampPlan, type RampPlanResult } from './rampPlan.ts';
 import { generateStraightRun, type StairComponentSketch } from './stairGenerators.ts';
-import type { StairCurve, StairLandingSketch } from './stairSketch.ts';
+import { stairLandingPolygon, type StairCurve, type StairLandingSketch } from './stairSketch.ts';
 
 /** Ângulo (rad) abaixo do qual um vértice é colinear (só patamar em linha da norma). */
 export const FREE_COLLINEAR_ANGLE = (3 * Math.PI) / 180;
@@ -13,6 +13,8 @@ export const FREE_MAX_TURN_ANGLE = (150 * Math.PI) / 180;
 const MIN_FLIGHT = 0.05;
 /** Distância mínima entre vértices consecutivos (m): menor que isso, o vértice é ignorado. */
 const MIN_SEGMENT = 0.01;
+/** Área (m²) de interseção acima da qual dois componentes não adjacentes contam como sobrepostos. */
+const OVERLAP_AREA = 1e-3;
 
 export interface RampFreeOptions {
   /** Largura do lance (m). */
@@ -69,6 +71,45 @@ function turnLanding(tr: Turn, w: number): StairComponentSketch {
   const ring = [aIn, inner, bIn, bOut, outer, aOut];
   const landing: StairLandingSketch = { boundary: ring.map((p, i) => line(p, ring[(i + 1) % ring.length]!)) };
   return { kind: 'landing', landing };
+}
+
+/** Polígono de um componente (lance = retângulo dos dois espelhos; patamar = contorno). */
+function partRing(p: StairComponentSketch): Ring | null {
+  if (p.kind === 'landing') return stairLandingPolygon(p.landing).polygon;
+  const r = p.run.risers;
+  if (r.length < 2) return null;
+  const r0 = r[0]!;
+  const r1 = r[r.length - 1]!;
+  return [r0.a, r0.b, r1.b, r1.a];
+}
+
+/**
+ * Primeiro par de componentes NÃO adjacentes (de trechos diferentes) que se sobrepõe, ou null. Barato: a caixa
+ * envolvente descarta quase todos os pares antes da interseção; o contato de borda (área ~0) é tolerado.
+ */
+function findSelfOverlap(parts: StairComponentSketch[], segOf: number[]): { a: number; b: number } | null {
+  const rings = parts.map(partRing);
+  const boxes = rings.map((r) => {
+    if (!r) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const q of r) {
+      x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y);
+    }
+    return { x0, y0, x1, y1 };
+  });
+  for (let j = 2; j < parts.length; j++) {
+    const bj = boxes[j];
+    if (!bj) continue;
+    for (let i = 0; i + 1 < j; i++) {
+      const bi = boxes[i];
+      if (!bi || segOf[i] === segOf[j]) continue;
+      if (bi.x1 <= bj.x0 || bj.x1 <= bi.x0 || bi.y1 <= bj.y0 || bj.y1 <= bi.y0) continue;
+      const inter = intersection([[rings[i]!]], [[rings[j]!]]);
+      const area = inter.reduce((s, poly) => s + poly.reduce((t, ring, k) => t + (k === 0 ? 1 : -1) * Math.abs(ringArea(ring)), 0), 0);
+      if (area > OVERLAP_AREA) return { a: i, b: j };
+    }
+  }
+  return null;
 }
 
 /**
@@ -230,6 +271,7 @@ export function planRampFree(path: Vec2[], H: number, type: RampType, o: RampFre
 
   // Monta os componentes na ordem do trajeto.
   const parts: StairComponentSketch[] = [];
+  const segOf: number[] = [];
   const flightLengths: number[] = [];
   const rawRises: number[] = [];
   let pathLength = 0;
@@ -244,19 +286,25 @@ export function planRampFree(path: Vec2[], H: number, type: RampType, o: RampFre
       pathLength += piece.length;
       if (piece.kind === 'flight') {
         parts.push({ kind: 'run', run: generateStraightRun({ start: at(u0, 0), dir: sg.d, width: w, risers: 2, tread: piece.length }) });
+        segOf.push(k);
         flightLengths.push(piece.length);
         rawRises.push(piece.rise);
       } else {
         parts.push(inlineLanding(at, u0, u0 + piece.length, -w / 2, w / 2));
+        segOf.push(k);
       }
     }
     if (turnsUsed.includes(k)) {
       parts.push(turnLanding(turns[k]!, w));
+      segOf.push(k);
       pathLength += 2 * turns[k]!.t;
     }
   });
 
   if (flightLengths.length === 0) return { error: 'O trajeto é curto demais para gerar um lance.' };
+  // Só na criação/regeneração (a prévia da sessão não passa por aqui): trechos não adjacentes não podem se sobrepor.
+  const clash = findSelfOverlap(parts, segOf);
+  if (clash) return { error: `O trajeto se sobrepõe ao trecho ${segOf[clash.a]! + 1}: afaste o ponto.` };
   const sumL = flightLengths.reduce((x, y) => x + y, 0);
   const sumR = rawRises.reduce((x, y) => x + y, 0);
   // Soma das elevações = H exatamente (distribui o resíduo proporcionalmente ao comprimento).

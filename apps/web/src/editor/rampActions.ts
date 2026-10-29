@@ -51,6 +51,7 @@ export function applyRegen(store: ProjectStore, id: Id, r: RampRegenResult, labe
         inputMode: r.inputMode,
         slopeTarget: r.slopeTarget,
         landingDepth: r.landingDepth,
+        ...(r.freePath ? { freePath: r.freePath } : {}),
       },
     });
   });

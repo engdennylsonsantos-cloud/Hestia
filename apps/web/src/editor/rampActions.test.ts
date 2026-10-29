@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
-import { planRamp, planRampFree, rampIssueList, type RampPlan } from '@hestia/engine';
+import { planRamp, planRampFree, rampIssueList, regenRamp, type RampPlan } from '@hestia/engine';
 import { ProjectStore, createEmptyProject, makeLevel, makeRamp, type Ramp, type StairLanding, type StairRun } from '@hestia/model';
-import { adjustRamp } from './rampActions.ts';
+import { adjustRamp, applyRegen } from './rampActions.ts';
 
 const type = createEmptyProject().rampTypes.rmt_nbr9050!;
 const comps = (plan: RampPlan): Array<StairRun | StairLanding> =>
@@ -49,13 +49,46 @@ describe('adjustRamp (botão Ajustar)', () => {
     const r = adjustRamp(store, id);
     expect('message' in r && r.message).toMatch(/^Ajustado: /);
     expect(rampOf(store).components).not.toEqual(before);
+    expect(rampOf(store).freePath![2]!.y).not.toBeCloseTo(5, 3);
     expect(problems(store)).toEqual([]);
     store.undo();
     expect(rampOf(store).components).toEqual(before);
+    expect(rampOf(store).freePath).toEqual(path);
   });
 
   it('rampa inexistente devolve erro', () => {
     const { store } = setup(1.2);
     expect(adjustRamp(store, 'nope')).toEqual({ error: 'Rampa inexistente.' });
+  });
+});
+
+describe('applyRegen (painel de propriedades)', () => {
+  it('rampa livre: mudar a inclinação grava o freePath novo junto dos componentes, em 1 transação', () => {
+    const path: Vec2[] = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 5 }];
+    const { store, id } = setup(1.0, path);
+    const r = regenRamp(rampOf(store), store.project, { mode: 'slope', slope: 0.05 });
+    if ('error' in r) throw new Error(r.error);
+    expect(r.freePath![2]!.y).not.toBeCloseTo(5, 3);
+    applyRegen(store, id, r);
+    expect(rampOf(store).freePath).toEqual(r.freePath);
+    store.undo();
+    expect(rampOf(store).freePath).toEqual(path);
+  });
+
+  it('rampa livre: mudar a largura mantém o freePath coerente com os componentes', () => {
+    const path: Vec2[] = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 7.2 }];
+    const { store, id } = setup(1.0, path);
+    const r = regenRamp(rampOf(store), store.project, { width: 2 });
+    if ('error' in r) throw new Error(r.error);
+    applyRegen(store, id, r);
+    expect(rampOf(store).freePath).toEqual(r.freePath);
+  });
+
+  it('rampa reta não ganha freePath', () => {
+    const { store, id } = setup(1.2);
+    const r = regenRamp(rampOf(store), store.project, { width: 2 });
+    if ('error' in r) throw new Error(r.error);
+    applyRegen(store, id, r);
+    expect(rampOf(store).freePath).toBeUndefined();
   });
 });

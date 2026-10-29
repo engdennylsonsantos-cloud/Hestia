@@ -164,3 +164,31 @@ describe('ferramenta Rampa', () => {
     expect(ctx.last()).toBe('O nível de topo não fica acima da base: nada a gerar.');
   });
 });
+
+describe('ferramenta Rampa: falta/sobra no rótulo da prévia', () => {
+  const labelAt = (opts: Partial<RampToolOptions>, x: number): string => {
+    const ctx = setup(opts, 'lv_1');
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    t.move(P(x, 0));
+    const l = t.preview().find((i) => i.kind === 'label');
+    return l && l.kind === 'label' ? l.text : '';
+  };
+
+  it('modo inclinação, H = 0,80: clique a 5,0 m mostra "faltam"', () => {
+    expect(labelAt({ mode: 'slope', slope: 1 / 12, height: 0.8 }, 5)).toMatch(/faltam 0,38 m de desnível/);
+  });
+
+  it('modo inclinação, H = 0,80: clique a 11 m mostra "passou"', () => {
+    expect(labelAt({ mode: 'slope', slope: 1 / 12, height: 0.8 }, 11)).toMatch(/passou 0,12 m/);
+  });
+
+  it('modo inclinação: clique no ponto de fechamento (9,6 m) mostra "alcançado"', () => {
+    expect(labelAt({ mode: 'slope', slope: 1 / 12, height: 0.8 }, 9.6)).toContain('nível de topo alcançado');
+  });
+
+  it('modo comprimento: "Resulta" e "dentro da norma" ou "acima do máximo"', () => {
+    expect(labelAt({ mode: 'length', height: 0.8 }, 11)).toMatch(/Resulta .*dentro da norma/);
+    expect(labelAt({ mode: 'length', height: 0.6 }, 5)).toMatch(/Resulta 12,00 %.*acima do máximo 8,33 %/);
+  });
+});

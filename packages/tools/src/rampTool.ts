@@ -1,9 +1,10 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
-import { formatRampPercent, formatRampSlope, rampTopLevel, type RampInputMode } from '@hestia/model';
-import { planRamp, rampIssuesOf, type RampPlan } from '@hestia/engine';
+import { formatRampPercent, formatRampSlope, rampMaxSlope, rampTopLevel, type RampInputMode, type RampType } from '@hestia/model';
+import { liveRemaining, planRamp, rampIssuesOf, type RampPlan } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { createRampFromPlan, draftRamp, rampRise, rampTypeId, type RampCommandResult } from './rampCommands.ts';
+import { rotuloInclinacao, textoResultaInclinacao } from './rampLiveMessages.ts';
 import { DEFAULT_RAMP_OPTIONS, type RampToolOptions } from './rampOptions.ts';
 import { rampPartsPreview } from './rampPreview.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
@@ -33,6 +34,8 @@ export class RampTool extends ToolBase {
   readonly label = 'Rampa';
   readonly hint = START_HINT;
   private origin: Vec2 | null = null;
+  /** Dados da última chamada de `build` para o rótulo ao vivo (falta/sobra); evita recalcular o desnível. */
+  private live: { H: number; type: RampType; mode: RampInputMode; slope: number | undefined } | null = null;
 
   private get opts(): RampToolOptions {
     return this.env.options().ramp ?? DEFAULT_RAMP_OPTIONS;
@@ -78,9 +81,30 @@ export class RampTool extends ToolBase {
     const label: PreviewItem = {
       kind: 'label',
       at: inf.point,
-      text: `${formatRampSlope(plan.slope)} · ${flightsText(plan.flights)} · ${mText(plan.pathLength)} m`,
+      text: this.labelText(plan, len(dir)),
     };
     this.items = [...rampPartsPreview(plan), label];
+  }
+
+  /**
+   * Rótulo da prévia. Modo 'slope': inclinação de trabalho e falta/sobra de desnível até o cursor (faltam / alcançado /
+   * passou). Modo 'length': a inclinação que resulta do comprimento e se fica dentro da norma.
+   */
+  private labelText(plan: RampPlan, clickLength: number): string {
+    const base = `${flightsText(plan.flights)} · ${mText(plan.pathLength)} m`;
+    const lv = this.live;
+    if (!lv) return `${formatRampSlope(plan.slope)} · ${base}`;
+    if (lv.mode === 'slope') {
+      const r = liveRemaining({ H: lv.H, mode: 'slope', type: lv.type, ...(lv.slope !== undefined ? { slope: lv.slope } : {}), pathLength: clickLength });
+      if (r.mode !== 'slope') return base;
+      const falta = r.status === 'falta' ? r.falta : r.status === 'passou' ? -r.excess : 0;
+      return `${rotuloInclinacao(r.slope, falta)} · ${base}`;
+    }
+    const landings = plan.pathLength - plan.flightLengths.reduce((a, b) => a + b, 0);
+    const r = liveRemaining({ H: lv.H, mode: 'length', type: lv.type, ...(lv.slope !== undefined ? { slope: lv.slope } : {}), pathLength: plan.pathLength, landingsLength: landings });
+    if (r.mode !== 'length') return base;
+    const max = lv.slope ?? rampMaxSlope(lv.type) ?? null;
+    return `${formatRampSlope(plan.slope)} · ${base} · ${textoResultaInclinacao(r.slope, max, r.faltaLength)}`;
   }
 
   override click(p: PointerInfo): void {
@@ -134,6 +158,7 @@ export class RampTool extends ToolBase {
     const noClick = clickLength === undefined;
     const mode: RampInputMode = noClick ? 'slope' : o.mode;
     const slope = o.slope ?? type.defaultSlope;
+    this.live = { H, type, mode, slope: mode === 'slope' ? slope : o.slope };
     const plan = planRamp({
       start: this.origin!,
       dir,

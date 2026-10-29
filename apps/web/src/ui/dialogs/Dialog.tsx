@@ -63,7 +63,10 @@ export function Dialog({ title, sub, onClose, children, footer, size = '', z, on
         const first = items[0]!;
         const last = items[items.length - 1]!;
         const active = document.activeElement;
-        if (e.shiftKey && (active === first || !box.contains(active))) {
+        if (!box.contains(active)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && active === first) {
           e.preventDefault();
           last.focus();
         } else if (!e.shiftKey && active === last) {

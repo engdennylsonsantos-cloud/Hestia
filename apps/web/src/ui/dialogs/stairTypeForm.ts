@@ -66,6 +66,7 @@ export function validateStairType(t: StairValidationInput, materialIds?: Iterabl
   if (!positive(t.landingThickness)) out.push(err('landingThickness', 'stt-landing'));
   if (!(t.nosing >= 0)) out.push(err('nosing', 'stt-nosing-negative'));
   if (t.cost !== undefined && !(t.cost >= 0)) out.push(err('cost', 'stt-cost'));
+  if (t.treadOverlap !== undefined && !(t.treadOverlap >= 0)) out.push(err('treadOverlap', 'stt-overlap-negative'));
 
   if (t.runStyle === 'monolithic' && !positive(t.structuralDepth)) out.push(err('structuralDepth', 'stt-mono-depth'));
   if (t.runStyle === 'assembled' && !(positive(t.treadThickness) && positive(t.riserThickness))) out.push(err('treadThickness', 'stt-assembled'));

@@ -103,7 +103,7 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
   );
 }
 
-export function TextField({ id, value, onCommit, placeholder, mixed, disabled }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; mixed?: boolean; disabled?: boolean }): ReactElement {
+export function TextField({ id, value, onCommit, placeholder, mixed, disabled, invalid, describedBy, dataAutofocus }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; mixed?: boolean; disabled?: boolean; invalid?: boolean; describedBy?: string; dataAutofocus?: boolean }): ReactElement {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   return (
@@ -113,6 +113,9 @@ export function TextField({ id, value, onCommit, placeholder, mixed, disabled }:
       value={mixed ? '' : text}
       placeholder={mixed ? 'variados' : placeholder}
       disabled={disabled}
+      aria-invalid={invalid ? true : undefined}
+      aria-describedby={describedBy}
+      data-autofocus={dataAutofocus ? '' : undefined}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => text !== value && onCommit(text)}
       onKeyDown={(e) => {

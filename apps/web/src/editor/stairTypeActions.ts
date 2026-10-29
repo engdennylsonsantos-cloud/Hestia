@@ -62,6 +62,7 @@ function stairIssueMessage(i: StairTypeIssue): string {
       ? 'O fator do espelho na regra de cálculo precisa ser maior que zero.'
       : 'O fator do piso na regra de cálculo precisa ser maior que zero.';
     case 'stt-overlap': return 'A sobreposição dos degraus precisa ser menor que a espessura do degrau.';
+    case 'stt-overlap-negative': return 'A sobreposição dos degraus não pode ser negativa.';
     case 'stt-material': return 'Escolha um material existente para o tipo.';
     default: return 'Tipo de escada inválido.';
   }

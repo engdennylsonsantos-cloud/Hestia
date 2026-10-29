@@ -158,7 +158,7 @@ export class DimensionTool extends ToolBase {
     ];
     const opts = this.env.options();
     const project = this.env.project();
-    const dim: Dimension = { id: 'preview', a, b, offset, mode: opts.dimensionMode, unit: 'project', prefix: opts.dimensionPrefix, suffix: opts.dimensionSuffix };
+    const dim: Dimension = { id: 'preview', a, b, offset, mode: opts.dimensionMode, unit: opts.dimensionUnit ?? 'project', precision: opts.dimensionPrecision, prefix: opts.dimensionPrefix, suffix: opts.dimensionSuffix };
     out.push({ kind: 'label', at: g.textAt, text: formatDimension(dim, dimensionValue(project, dim), unitsOf(project)) });
     return out;
   }
@@ -204,7 +204,7 @@ export class DimensionTool extends ToolBase {
     this.env.transaction('Criar sequência de cotas', () => {
       for (const d of pairs) {
         const refs = { ...(d.ra ? { a: d.ra } : {}), ...(d.rb ? { b: d.rb } : {}) };
-        this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension: { id: newId('dim'), a: d.a, b: d.b, offset: d.offset, mode: opts.dimensionMode ?? 'aligned', unit: 'project', textHeight: opts.dimensionTextHeight ?? 2.5, tickStyle: opts.dimensionTickStyle ?? 'slash', ...(opts.dimensionPrefix ? { prefix: opts.dimensionPrefix } : {}), ...(opts.dimensionSuffix ? { suffix: opts.dimensionSuffix } : {}), ...(Object.keys(refs).length ? { refs } : {}) } });
+        this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension: { id: newId('dim'), a: d.a, b: d.b, offset: d.offset, mode: opts.dimensionMode ?? 'aligned', unit: opts.dimensionUnit ?? 'project', ...(opts.dimensionPrecision !== undefined ? { precision: opts.dimensionPrecision } : {}), textHeight: opts.dimensionTextHeight ?? 2.5, tickStyle: opts.dimensionTickStyle ?? 'slash', ...(opts.dimensionPrefix ? { prefix: opts.dimensionPrefix } : {}), ...(opts.dimensionSuffix ? { suffix: opts.dimensionSuffix } : {}), ...(Object.keys(refs).length ? { refs } : {}) } });
       }
     });
     this.reset();
@@ -220,7 +220,7 @@ export class DimensionTool extends ToolBase {
     }
     const refs = { ...(this.refA ? { a: this.refA } : {}), ...(this.refB ? { b: this.refB } : {}) };
     const o = this.env.options();
-    const dimension = { id: newId('dim'), a, b, offset, mode: o.dimensionMode ?? 'aligned', unit: 'project' as const, prefix: o.dimensionPrefix ?? '', suffix: o.dimensionSuffix ?? '', textHeight: o.dimensionTextHeight ?? 2.5, tickStyle: o.dimensionTickStyle ?? 'slash', ...(Object.keys(refs).length ? { refs } : {}) };
+    const dimension: Dimension = { id: newId('dim'), a, b, offset, mode: o.dimensionMode ?? 'aligned', unit: o.dimensionUnit ?? 'project', ...(o.dimensionPrecision !== undefined ? { precision: o.dimensionPrecision } : {}), prefix: o.dimensionPrefix ?? '', suffix: o.dimensionSuffix ?? '', textHeight: o.dimensionTextHeight ?? 2.5, tickStyle: o.dimensionTickStyle ?? 'slash', ...(Object.keys(refs).length ? { refs } : {}) };
     this.env.exec({ type: 'addDimension', levelId: this.env.levelId(), dimension });
     this.reset();
     this.env.say(this.hint);

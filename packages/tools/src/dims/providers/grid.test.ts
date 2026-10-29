@@ -30,7 +30,7 @@ describe('provedor de cotas da grade', () => {
     expect(dims.find((d) => d.key.endsWith(':left'))!.value).toBeCloseTo(1.5, 9);
   });
 
-  it('editar translada a grade inteira na normal', () => {
+  it('editar translada a grade inteira na normal, afastando-a quando o valor cresce', () => {
     const s = projectWithGrids();
     const dim = gridDimProvider.compute(ctxOf(s), { gridId: 'g1' }).find((d) => d.key.endsWith(':right'))!;
     const r = dim.edit!(3);
@@ -38,7 +38,7 @@ describe('provedor de cotas da grade', () => {
     if (!('commands' in r)) return;
     const c = r.commands[0]!;
     if (c.type !== 'updateGrid') throw new Error('esperava updateGrid');
-    expect(c.patch.points).toEqual([{ x: 0, y: 1 }, { x: 6, y: 1 }]);
+    expect(c.patch.points).toEqual([{ x: 0, y: -1 }, { x: 6, y: -1 }]);
     expect(dim.edit!(-1)).toEqual({ error: expect.stringContaining('maior que zero') });
   });
 
@@ -48,5 +48,25 @@ describe('provedor de cotas da grade', () => {
     expect(gridDimProvider.selectionSubject!(s.project, 'nada')).toBeNull();
     s.exec({ type: 'addGrid', grid: { id: 'ga', name: 'A', typeId: DEFAULT_GRID_TYPE_ID, points: [{ x: 0, y: 5 }, { x: 6, y: 5 }], sag: 1, bubbleStart: false, bubbleEnd: true } });
     expect(gridDimProvider.compute(ctxOf(s), { gridId: 'ga' })).toEqual([]);
+  });
+});
+
+describe('grade: ida e volta da edição', () => {
+  it('duas grades a 1,64: digitar 3 deixa exatamente 3, digitar 0,5 deixa 0,5, nos dois lados', () => {
+    for (const [other, key] of [[1.64, 'right'], [-1.64, 'left']] as const) {
+      for (const v of [3, 0.5, 1.64]) {
+        const s = new ProjectStore(createEmptyProject());
+        const add = (id: string, y: number) =>
+          s.exec({ type: 'addGrid', grid: { id, name: id, typeId: DEFAULT_GRID_TYPE_ID, points: [{ x: 0, y }, { x: 6, y }], sag: 0, bubbleStart: false, bubbleEnd: true } });
+        add('a', 0);
+        add('b', other);
+        const dim = gridDimProvider.compute(ctxOf(s), { gridId: 'a' }).find((d) => d.key.endsWith(`:${key}`))!;
+        expect(dim.value).toBeCloseTo(1.64, 9);
+        const r = dim.edit!(v);
+        if (!('commands' in r)) throw new Error('esperava comandos');
+        s.exec(r.commands[0]!);
+        expect(gridDimProvider.compute(ctxOf(s), { gridId: 'a' }).find((d) => d.key.endsWith(`:${key}`))!.value).toBeCloseTo(v, 9);
+      }
+    }
   });
 });

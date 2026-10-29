@@ -1,6 +1,7 @@
 import { add, arcFromSagitta, dist, mul, norm, sub, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
-import type { DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
+import { NON_POSITIVE_MSG, gapTranslation, segFrame, segPoint, segmentGaps, type ParallelGap, type SegFrame } from '../parallel.ts';
+import type { DimContext, DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
 
 /** Linha de detalhe a cotar (mora no nível, em `level.detailLines`). */
 export interface DetailLineDimSubject {
@@ -52,7 +53,31 @@ function findLine(project: Project, levelId: Id, id: Id) {
   return project.levels.find((l) => l.id === levelId)?.detailLines?.find((x) => x.id === id) ?? null;
 }
 
-/** Cota do comprimento de uma linha de detalhe selecionada; editar move o fim na direção atual. */
+/** Cota lateral até a linha de detalhe paralela vizinha: editar translada a linha inteira na normal. */
+function lateralDim(ctx: DimContext, lineId: Id, f: SegFrame, a: Vec2, b: Vec2, gap: ParallelGap): TempDim {
+  const p = segPoint(f, gap.t, 0);
+  const q = segPoint(f, gap.t, gap.s);
+  const slot = gap.side > 0 ? 'right' : 'left';
+  const edit = (value: number): DimEditResult => {
+    if (!(value > 0)) return { error: NON_POSITIVE_MSG };
+    const d = gapTranslation(f.n, gap, value);
+    return { commands: [{ type: 'updateDetailLine', levelId: ctx.levelId, id: lineId, patch: { a: add(a, d), b: add(b, d) } }] };
+  };
+  return {
+    key: `${DETAIL_ID}:${lineId}:${slot}`,
+    a: p,
+    b: q,
+    offset: DIM_OFFSET * gap.side,
+    value: gap.distance,
+    ends: [end(p, `${slot}A`), end(q, `${slot}B`)],
+    edit,
+  };
+}
+
+/**
+ * Linha de detalhe selecionada: distância perpendicular até a linha de detalhe paralela mais próxima de cada lado
+ * (editar translada a linha). Sem nenhuma paralela vizinha, cai no comprimento da própria linha (editar move o fim).
+ */
 export const detailLineDimProvider: DimProvider<DetailLineDimSubject> = {
   id: DETAIL_ID,
   compute(ctx, { lineId }) {
@@ -60,6 +85,10 @@ export const detailLineDimProvider: DimProvider<DetailLineDimSubject> = {
     if (!line) return [];
     const length = dist(line.a, line.b);
     if (length < MIN_LENGTH) return [];
+    const f = segFrame(line.a, line.b);
+    const others = (ctx.project.levels.find((l) => l.id === ctx.levelId)?.detailLines ?? []).filter((x) => x.id !== lineId);
+    const gaps = f ? segmentGaps(f, others) : [];
+    if (f && gaps.length > 0) return gaps.map((g) => lateralDim(ctx, lineId, f, line.a, line.b, g));
     const edit = (value: number): DimEditResult => {
       if (!(value > 0)) return { error: 'Digite um comprimento maior que zero.' };
       const u = norm(sub(line.b, line.a));

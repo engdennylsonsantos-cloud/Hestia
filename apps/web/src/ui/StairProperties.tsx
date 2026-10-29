@@ -1,6 +1,6 @@
 import { useMemo, type ReactElement } from 'react';
 import { resolveStairsOnLevel, stairQuantities, stairValidationIssues } from '@hestia/engine';
-import { levelAbove, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
+import { levelAbove, unitsOf, validateProject, type Id, type Project, type Stair, type StairOpeningMode, type StairSpiralParams, type ValidationIssue } from '@hestia/model';
 import { regenSpiralComponents, regenStraightComponents, spiralInfo, spiralOfStair } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
@@ -66,7 +66,7 @@ export function StairProperties({ stairs }: { stairs: Stair[] }): ReactElement {
   /** Regenera a reta com outro nº de espelhos, em UM passo de desfazer. Erro vai para a barra de status. */
   const editRisers = (n: number): void => {
     if (!single) return;
-    const r = regenStraightComponents(single, n, p.stairTypes[single.typeId]?.minTread ?? 0);
+    const r = regenStraightComponents(single, n, p.stairTypes[single.typeId]?.minTread ?? 0, unitsOf(p));
     if ('error' in r) {
       useUi.setState({ status: `Escada: ${r.error}` });
       return;

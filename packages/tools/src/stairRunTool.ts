@@ -361,6 +361,7 @@ export class StairRunTool extends ToolBase {
       sweep: this.sp.sweep,
       H: lim.H,
       maxRiser: lim.maxRiser,
+      units: unitsOf(this.env.project()),
     });
   }
 
@@ -446,7 +447,7 @@ export class StairRunTool extends ToolBase {
     if (sw !== null && r > this.innerR) {
       const lim = this.limitsNow();
       if (!('error' in lim)) {
-        const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: r, startAngle: th, sweep: sw, H: lim.H, maxRiser: lim.maxRiser });
+        const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: r, startAngle: th, sweep: sw, H: lim.H, maxRiser: lim.maxRiser, units: unitsOf(this.env.project()) });
         if (!('error' in plan)) items.push(...caracolItems(plan, cur, unitsOf(this.env.project())));
       }
     }
@@ -466,7 +467,7 @@ export class StairRunTool extends ToolBase {
     }
     const outer = this.sp.outer;
     const start = this.sp.start;
-    const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: outer, startAngle: start, sweep: sw, H: lim.H, maxRiser: lim.maxRiser });
+    const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: outer, startAngle: start, sweep: sw, H: lim.H, maxRiser: lim.maxRiser, units: unitsOf(this.env.project()) });
     if ('error' in plan) {
       // Abaixo de 30° (ou fora dos limites) não há caracol: mostra o raio e o ângulo inicial, com o motivo na barra.
       const short = Math.abs(sw) < SPIRAL_MIN_SWEEP;

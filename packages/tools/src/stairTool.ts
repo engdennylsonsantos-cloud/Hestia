@@ -473,7 +473,7 @@ export class StairTool extends ToolBase {
    * ou o deslocamento de "Pegar linhas".
    */
   refresh(): void {
-    this.report = analyzeDraft(this.st.parts, this.limits());
+    this.report = analyzeDraft(this.st.parts, this.limits(), unitsOf(this.env.project()));
     this.treads = treadItems(this.st.parts, this.report.riserHeight);
     this.pickItems = this.pickPreview();
     this.items = buildItems(this.st, this.cursor, this.treads, this.report, this.pickItems);

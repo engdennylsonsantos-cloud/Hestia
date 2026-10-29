@@ -1,5 +1,5 @@
 import { generateSpiralRun, riserCountFor, SPIRAL_MAX_SWEEP, SPIRAL_MIN_INNER, type SpiralParams, type SpiralRunSketch } from '@hestia/engine';
-import { defaultUnits, formatQuantity, type Id, type Project, type ResolvedUnits, type Stair, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
+import { defaultUnits, formatQuantity, unitsOf, type Id, type Project, type ResolvedUnits, type Stair, type StairLanding, type StairRun, type StairSpiralParams } from '@hestia/model';
 import type { Vec2 } from '@hestia/geom';
 import { stairLimits } from './stairCommands.ts';
 
@@ -84,7 +84,7 @@ export function regenSpiralComponents(p: Project, s: Stair, part: number, next: 
   const limits = stairLimits(p, s);
   if (!limits) return { error: 'O tipo da escada não existe no projeto.' };
   if (!(limits.H > 0)) return { error: 'A escada não tem altura positiva.' };
-  const plan = planSpiralRun({ ...next, H: limits.H, maxRiser: limits.maxRiser });
+  const plan = planSpiralRun({ ...next, H: limits.H, maxRiser: limits.maxRiser, units: unitsOf(p) });
   if ('error' in plan) return plan;
   const run: StairRun = {
     ...old,

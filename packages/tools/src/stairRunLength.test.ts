@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stairsOnLevel, type Stair, type StairRun } from '@hestia/model';
+import { resolveUnits, stairsOnLevel, type Stair, type StairRun } from '@hestia/model';
 import { clickAt, makeEnv, tool } from './testEnv.ts';
 import { regenStraightComponents } from './stairRunEdit.ts';
 import { risersForLength } from './stairRunPlan.ts';
@@ -89,6 +89,13 @@ describe('escada reta: "Nº de espelhos" editado nas Propriedades', () => {
     drawTo(tool('stairrun', ctx.env), [0, 4.2]);
     const r = regenStraightComponents(stairsOf(ctx.store)[0]!, 30, 0.2);
     expect(r).toEqual({ error: 'com 30 espelhos o piso ficaria em 14,5 cm, abaixo do mínimo do tipo (20,0 cm).' });
+  });
+
+  it('a conta da recusa usa as unidades do projeto', () => {
+    const ctx = setup();
+    drawTo(tool('stairrun', ctx.env), [0, 4.2]);
+    const r = regenStraightComponents(stairsOf(ctx.store)[0]!, 30, 0.2, resolveUnits({ smallLength: { unit: 'mm', decimals: 0 } }));
+    expect(r).toEqual({ error: 'com 30 espelhos o piso ficaria em 145 mm, abaixo do mínimo do tipo (200 mm).' });
   });
 
   it('escada que não é reta gerada não tem o nº de espelhos editável', () => {

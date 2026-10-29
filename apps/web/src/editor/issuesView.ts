@@ -1,4 +1,5 @@
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project, type ValidationIssue, type ValidationSeverity } from '@hestia/model';
+import { rampBox, rampPoints } from './rampActions.ts';
 import { stairBox, stairPoints } from './stairActions.ts';
 
 export interface IssueGroup {
@@ -72,9 +73,9 @@ export function issueTarget(p: Project, issue: ValidationIssue): IssueTarget | n
   if (isRoom(el)) {
     return { elementId: id, levelId: p.levels.some((l) => l.id === el.levelId) ? el.levelId : null, center: el.point };
   }
-  if (isStair(el)) {
-    const box = stairBox(el);
-    const pts = stairPoints(el);
+  if (isStair(el) || isRamp(el)) {
+    const box = isStair(el) ? stairBox(el) : rampBox(el);
+    const pts = isStair(el) ? stairPoints(el) : rampPoints(el);
     const center = box ? { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 } : null;
     return {
       elementId: id,

@@ -83,8 +83,8 @@ type Chave = keyof typeof TEXTOS;
 
 /** Tipos de elemento que têm ferramenta de criação (Criar semelhante e Selecionar todas as instâncias). */
 const TIPOS_COM_FERRAMENTA = new Set(['wall', 'door', 'window', 'floor', 'slab', 'ceiling', 'roof']);
-/** Tipos que o menu mostra mas o Hestia ainda não cria por "semelhante" (Escada e Ambiente). */
-const TIPOS_EM_BREVE = new Set(['stair', 'room']);
+/** Tipos que o menu mostra mas o Hestia ainda não cria por "semelhante" (Escada, Rampa e Ambiente). */
+const TIPOS_EM_BREVE = new Set(['stair', 'ramp', 'room']);
 
 /** Monta o menu de contexto para o estado dado. As entradas vêm em grupos separados por linha. */
 export function buildContextMenu(ctx: ContextMenuCtx): MenuEntry[] {

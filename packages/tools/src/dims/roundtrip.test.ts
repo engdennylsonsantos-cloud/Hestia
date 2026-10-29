@@ -122,7 +122,6 @@ function openingScene(kind: 'door' | 'window', angle: number, wallRef: WallDimRe
 }
 
 const cases: EditableCase[] = [];
-const pending: EditableCase[] = [];
 
 for (const angle of ANGLES) {
   for (const ref of WALL_DIM_REFS) {
@@ -134,7 +133,7 @@ for (const angle of ANGLES) {
       build: () => wallAxis(angle, ref),
       keys: ['wall:h:axisB'],
     });
-    pending.push({
+    cases.push({
       provider: 'parede',
       variant: 'distância até paralela',
       angle,
@@ -168,19 +167,6 @@ describe('ida e volta das cotas editáveis', () => {
   it.each(cases)(label, (c) => {
     roundtrip(c);
   });
-});
-
-/*
- * Defeitos reais encontrados por esta rede (não corrigir código de produção aqui): a edição das cotas de distância
- * entre paralelas move o elemento NO SENTIDO do outro, então a medida final é `2·d − v` em vez de `v`.
- * Ao consertar, troque estes `it.fails` por `it` e remova o describe.
- */
-describe('pendentes de correção (PARALELAS)', () => {
-  for (const c of pending) {
-    it.fails(`${c.provider} — ${c.variant} — ${c.angle}° — ${c.ref}`, () => {
-      roundtrip(c);
-    });
-  }
 });
 
 describe('sanidade das cenas', () => {

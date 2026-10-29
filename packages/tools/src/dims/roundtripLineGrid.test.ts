@@ -28,14 +28,36 @@ function lineScene(angle: number): Fixture {
   const s = store();
   const u = dirOf(angle);
   const n = normalOf(u);
+  const control = along(along(ORIGIN, u, 3), n, 2);
   s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'dl', a: ORIGIN, b: along(ORIGIN, u, 6) } });
-  s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'ctrl', a: along(ORIGIN, n, 2), b: along(along(ORIGIN, n, 2), u, 6) } });
+  s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'ctrl', a: control, b: along(control, n, 6) } });
   const line = (p: Project) => p.levels.find((l) => l.id === 'lv_0')?.detailLines?.find((x) => x.id === 'dl');
   return {
     store: s,
     dims: () => detailLineDimProvider.compute(ctxOf(s.project), { lineId: 'dl' }),
     targetId: 'dl',
     translation: false,
+    ownLength: (p) => {
+      const l = line(p);
+      return l ? dist(l.a, l.b) : Number.NaN;
+    },
+    rest: (p) => JSON.stringify({ elements: p.elements, lines: p.levels.find((l) => l.id === 'lv_0')?.detailLines?.filter((x) => x.id !== 'dl') }),
+  };
+}
+
+/** Linha `dl` com uma paralela isolada a 2 m no lado +n: a cota lateral editável translada a linha inteira. */
+function lateralLineScene(angle: number): Fixture {
+  const s = store();
+  const u = dirOf(angle);
+  const n = normalOf(u);
+  s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'dl', a: ORIGIN, b: along(ORIGIN, u, 6) } });
+  s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id: 'ctrl', a: along(along(ORIGIN, n, 2), u, -2), b: along(along(ORIGIN, n, 2), u, 8) } });
+  const line = (p: Project) => p.levels.find((l) => l.id === 'lv_0')?.detailLines?.find((x) => x.id === 'dl');
+  return {
+    store: s,
+    dims: () => detailLineDimProvider.compute(ctxOf(s.project), { lineId: 'dl' }),
+    targetId: 'dl',
+    translation: true,
     ownLength: (p) => {
       const l = line(p);
       return l ? dist(l.a, l.b) : Number.NaN;
@@ -77,12 +99,16 @@ for (const angle of ANGLES) {
     build: () => lineScene(angle),
     keys: ['line:dl:length'],
   });
-}
-
-const pending: EditableCase[] = [];
-for (const angle of ANGLES) {
+  cases.push({
+    provider: 'linha de detalhe',
+    variant: 'distância até paralela',
+    angle,
+    ref: 'eixo',
+    build: () => lateralLineScene(angle),
+    keys: ['line:dl:right'],
+  });
   for (const side of [1, -1] as const) {
-    pending.push({
+    cases.push({
       provider: 'grade',
       variant: side > 0 ? 'paralela à direita' : 'paralela à esquerda',
       angle,
@@ -97,19 +123,6 @@ describe('ida e volta das cotas editáveis (linha e grade)', () => {
   it.each(cases)('$provider — $variant — $angle° — $ref', (c) => {
     roundtrip(c);
   });
-});
-
-/*
- * Mesmo defeito do provedor de parede na distância entre paralelas: a translação vai no sentido da outra grade.
- * Com d = 1,64 m e v = 3,00 m a medida remedida fica em 2·d − v = 0,28 m (o relato do dono).
- * Ao consertar, troque estes `it.fails` por `it` e remova o describe.
- */
-describe('pendentes de correção (PARALELAS)', () => {
-  for (const c of pending) {
-    it.fails(`${c.provider} — ${c.variant} — ${c.angle}° — ${c.ref}`, () => {
-      roundtrip(c);
-    });
-  }
 });
 
 interface ReadOnlyCase {

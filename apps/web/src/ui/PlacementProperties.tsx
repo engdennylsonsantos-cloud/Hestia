@@ -5,6 +5,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
+import { RampLevelsFields, rampLevelsValue } from './RampLevelsFields.tsx';
 
 const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'ramp', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
@@ -102,12 +103,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
       )}
       {tool === 'ramp' && (
         <Group title="Colocação · Rampa">
-          <Row label="Nível de topo" htmlFor="place-ramp-top"><select id="place-ramp-top" className="select" value={o.ramp?.topLevelId ?? ''} onChange={(e) => setRamp({ topLevelId: e.target.value || null })}><option value="">Automático (nível acima)</option>{p.levels.filter((l) => l.id !== levelId).map((l) => <option key={l.id} value={l.id}>Até {l.name}</option>)}</select></Row>
-          <Row label="Desloc. da base" htmlFor="place-ramp-base"><NumField id="place-ramp-base" value={o.ramp?.baseOffset ?? 0} unit="m" onCommit={(v) => setRamp({ baseOffset: v })} /></Row>
-          <Row label="Desloc. do topo" htmlFor="place-ramp-topoff"><NumField id="place-ramp-topoff" value={o.ramp?.topOffset ?? 0} unit="m" onCommit={(v) => setRamp({ topOffset: v })} /></Row>
-          {!o.ramp?.topLevelId && !p.levels.some((l) => l.elevation > (p.levels.find((x) => x.id === levelId)?.elevation ?? 0)) && (
-            <Row label="Altura" htmlFor="place-ramp-height"><NumField id="place-ramp-height" value={o.ramp?.height ?? 0.8} unit="m" min={0.1} onCommit={(v) => setRamp({ height: v })} /></Row>
-          )}
+          <RampLevelsFields project={p} levelId={levelId} idPrefix="place-ramp" value={rampLevelsValue(o.ramp ?? DEFAULT_RAMP_OPTIONS)} onChange={setRamp} Field={Row} />
         </Group>
       )}
       {tool === 'room' && (

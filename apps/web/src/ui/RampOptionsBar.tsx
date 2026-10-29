@@ -1,20 +1,29 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { DEFAULT_RAMP_OPTIONS, type RampToolOptions } from '@hestia/tools';
 import { formatRampRatio, type RampInputMode, type RampShape } from '@hestia/model';
 import { useProject } from '../editor/controller.ts';
 import { useI18n, I18N } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
+import { RampLevelsFields, rampLevelsValue, rampRiseFromLevels, rampRiseText } from './RampLevelsFields.tsx';
 
 const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U' };
 
+/** Campo da barra: o rótulo envolve o controle, como os demais campos desta barra. */
+function BarField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }): ReactElement {
+  return <label htmlFor={htmlFor}>{label}{children}</label>;
+}
+
 /**
  * Barra da ferramenta Rampa: forma (reta, L, U), largura, giro e profundidade do patamar (L/U), modo de entrada e, no
- * modo inclinação, o valor em % com a razão `1:X` ao lado. Campos vazios usam o padrão do tipo.
+ * modo inclinação, o valor em % com a razão `1:X` ao lado. Campos vazios usam o padrão do tipo. Depois do tipo, os níveis
+ * (base, topo e deslocamentos; altura sem nível acima) e o desnível calculado por eles.
  */
 export function RampOptionsBar(): ReactElement {
   const p = useProject();
-  const t = I18N[useI18n((s) => s.lang)];
+  const levelId = useUi((s) => s.levelId);
+  const lang = useI18n((s) => s.lang);
+  const t = I18N[lang];
   const options = useUi((s) => s.options);
   const o: RampToolOptions = options.ramp ?? DEFAULT_RAMP_OPTIONS;
   const set = (patch: Partial<RampToolOptions>): void => {
@@ -25,6 +34,7 @@ export function RampOptionsBar(): ReactElement {
   const type = p.rampTypes[typeId];
   const turnable = o.shape !== 'straight';
   const slope = o.slope ?? type?.defaultSlope ?? 0;
+  const levels = rampLevelsValue(o);
   return (
     <>
       <label>
@@ -88,6 +98,8 @@ export function RampOptionsBar(): ReactElement {
           {Object.values(p.rampTypes).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
         </select>
       </label>
+      <RampLevelsFields project={p} levelId={levelId} idPrefix="opt-ramp" value={levels} onChange={set} Field={BarField} />
+      <span className="hint" id="opt-ramprise">{rampRiseText(rampRiseFromLevels(p, levelId, levels), lang)}</span>
     </>
   );
 }

@@ -10,7 +10,7 @@ export interface StairCurve {
 }
 
 /** Origem do lance gerado (preenchida pelo gerador; sem vínculo paramétrico depois da edição manual). */
-export type StairGenerator = 'straight' | 'lshape' | 'ushape' | 'winder' | 'spiral';
+export type StairGenerator = 'straight' | 'lshape' | 'ushape' | 'winder' | 'spiral' | 'free';
 
 /**
  * Parâmetros do croqui caracol (decisão 0014 §2). Metadado opcional do lance: as alças (centro, raios, ângulo inicial e
@@ -73,6 +73,10 @@ export interface Stair {
   /** Altura usada só quando não há nível acima e o topo não é explícito. */
   height: number;
   components: Array<StairRun | StairLanding>;
+  /** Trajeto da escada livre: vértices em metros, do início ao fim; o 1º ponto é o início da escada. Ausente nas demais formas e em projetos antigos. */
+  freePath?: Vec2[];
+  /** Escada livre: índices dos vértices do `freePath` marcados como patamar manual (mesmo se colineares). */
+  manualLandings?: number[];
   /**
    * Abertura da laje do nível de topo (decisão 0011 §6): 'headroom' = o furo tira os degraus que não deixam o pé-direito
    * livre (`openingHeadroom`); 'full' = o furo é a projeção inteira da escada (degraus e patamares); 'none' = sem furo.

@@ -28,6 +28,10 @@ export function stairOptions(p: Project): TypeOption[] {
   return Object.values(p.stairTypes).map((t) => ({ id: t.id, name: t.name, code: t.code, family: FAMILY.stair, subject: { kind: 'stair', type: t } }));
 }
 
+export function rampOptions(p: Project): TypeOption[] {
+  return Object.values(p.rampTypes).map((t) => ({ id: t.id, name: t.name, code: t.code, family: FAMILY.stair, subject: { kind: 'ramp', type: t } }));
+}
+
 /** Portas (kind `door`) ou janelas (`window`), com a família do símbolo de planta (Porta de giro, Janela de correr…). */
 export function openingOptions(p: Project, kind: 'door' | 'window'): TypeOption[] {
   return Object.values(p.openingTypes)

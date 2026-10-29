@@ -9,12 +9,14 @@ import {
   type FloorType,
   type Material,
   type OpeningType,
+  type RampType,
   type RoofType,
   type SlabType,
   type StairType,
   type WallType,
 } from '@hestia/model';
 import { FloorSectionPreview } from './dialogs/FloorSectionPreview.tsx';
+import { RampSectionPreview } from './dialogs/RampSectionPreview.tsx';
 import { RoofSectionPreview } from './dialogs/RoofSectionPreview.tsx';
 import { SectionPreview } from './dialogs/SectionPreview.tsx';
 import { SlabSectionPreview } from './dialogs/SlabSectionPreview.tsx';
@@ -28,6 +30,7 @@ export type PreviewSubject =
   | { kind: 'ceiling'; type: CeilingType; materials: Record<string, Material> }
   | { kind: 'roof'; type: RoofType; materials: Record<string, Material> }
   | { kind: 'stair'; type: StairType }
+  | { kind: 'ramp'; type: RampType }
   | { kind: 'door' | 'window'; type: OpeningType };
 
 const fmt = (n: number, d: number): string => n.toFixed(d).replace('.', ',');
@@ -55,6 +58,7 @@ function dimsOf(s: PreviewSubject): string | null {
     case 'roof':
       return `${fmt(roofTypeThickness(s.type) * 100, 1)} cm`;
     case 'stair':
+    case 'ramp':
       return null;
   }
 }
@@ -76,6 +80,8 @@ function Drawing({ subject }: { subject: PreviewSubject }): ReactElement {
       return <RoofSectionPreview type={subject.type} materials={subject.materials} />;
     case 'stair':
       return <StairSectionPreview type={subject.type} />;
+    case 'ramp':
+      return <RampSectionPreview type={subject.type} />;
     case 'door':
       return <DoorDrawing t={subject.type} uid={uid} />;
     case 'window':

@@ -1,6 +1,6 @@
-import { len, sub, type Vec2 } from '@hestia/geom';
+import { dist, len, sub, type Vec2 } from '@hestia/geom';
 import { formatRampPercent, formatRampSlope, rampMaxSlope, rampTopLevel, type RampInputMode, type RampType } from '@hestia/model';
-import { liveRemaining, planRamp, planRampFree, rampIssuesOf, type RampPlan } from '@hestia/engine';
+import { liveRemaining, optimizeRamp, planRamp, planRampFree, rampIssuesOf, rebuildPathFromSegments, type RampPlan } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { createRampFromPlan, draftRamp, rampRise, rampTypeId, type RampCommandResult } from './rampCommands.ts';
@@ -99,6 +99,43 @@ export class RampTool extends ToolBase {
       this.env.say(this.session.hint());
     }
     return ok;
+  }
+
+  /**
+   * Tecla A no desenho livre: ajusta os trechos desenhados e a inclinação à norma do tipo (`optimizeRamp`), troca o
+   * rascunho pelo resultado e diz o que mudou. Não usa `resolveRamps` nem booleanas.
+   */
+  adjust(): boolean {
+    const s = this.session;
+    if (!this.free || !s || s.points.length < 2) return false;
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return true;
+    }
+    const pts = s.points;
+    const segments = pts.slice(1).map((p, i) => dist(pts[i]!, p));
+    const D = Math.max(cfg.landingDepth ?? Math.max(cfg.width, cfg.type.landingMinLength), cfg.width);
+    const res = optimizeRamp({ H: cfg.H, type: cfg.type, segments, mode: 'auto', ...(cfg.slope !== undefined ? { slope: cfg.slope } : {}), turnLanding: D });
+    const slopeAntes = this.opts.slope;
+    if (cfg.mode === 'slope') this.setOptions({ slope: res.slope });
+    const novo = this.liveSession();
+    if (!novo || !novo.load(rebuildPathFromSegments(pts, res.segments))) {
+      if (cfg.mode === 'slope') this.setOptions({ slope: slopeAntes });
+      this.liveSession()?.load(pts);
+      this.items = novo?.move(pts[pts.length - 1]!, 0) ?? [];
+      this.env.say('Não foi possível ajustar: o trajeto ajustado fica curto demais ou faz retorno agudo.');
+      return true;
+    }
+    this.items = novo.move(novo.points[novo.points.length - 1]!, 0);
+    this.env.say(res.note);
+    return true;
+  }
+
+  private setOptions(patch: Partial<RampToolOptions>): void {
+    const next = { ...this.opts, ...patch };
+    if (this.env.setOptions) this.env.setOptions({ ramp: next });
+    else this.env.options().ramp = next;
   }
 
   override move(p: PointerInfo): void {

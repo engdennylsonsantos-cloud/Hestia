@@ -279,4 +279,30 @@ describe('ferramenta Rampa: forma livre', () => {
     const l = t.preview().find((i) => i.kind === 'label');
     expect(l && l.kind === 'label' && l.text).toMatch(/faltam 0,58 m de desnível/);
   });
+  it('tecla A (Ajustar): troca trechos e inclinação pelo resultado do otimizador e depois cria dentro da norma', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    expect(t.adjust?.()).toBe(false);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 6, 5);
+    expect(t.adjust?.()).toBe(true);
+    expect(ctx.last()).toMatch(/^Ajustado: \d+,\d\d %, \d lances?/);
+    t.confirm();
+    expect(ctx.last()).toMatch(/^Rampa criada/);
+    const [ramp] = rampsOf(ctx, 'lv_1');
+    expect(ramp).toBeDefined();
+    const issues = rampIssueList(ctx.store.project).filter((i) => i.severity === 'error' || i.severity === 'warning');
+    expect(issues).toEqual([]);
+  });
+
+  it('Ajustar não cria a rampa nem mexe no projeto até concluir', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    t.adjust?.();
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+    expect(t.deleteKey?.()).toBe(true);
+  });
 });

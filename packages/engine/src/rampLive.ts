@@ -1,3 +1,4 @@
+import { add, dist, mul, norm, sub, type Vec2 } from '@hestia/geom';
 import { rampMaxSlope, rampNormRowFor, type RampType } from '@hestia/model';
 import { flightsFor, maxRiseFor } from './rampPlan.ts';
 
@@ -328,4 +329,20 @@ export function optimizeRamp(i: OptimizeInput): OptimizeResult {
     (mudou ? `, ${sinal}${fmt(Math.abs(best.delta), 1)} m no último trecho.` : '.') +
     (best.violation > 0 ? ` Sem opção dentro da norma: ${best.messages.join(' ')}` : '');
   return { ...best, segments, note };
+}
+
+/**
+ * Trajeto (vértices) depois do "Ajustar": mantém a direção de cada trecho e usa os comprimentos de `segments`
+ * (`OptimizeResult.segments`: último esticado ou truncado, nunca some o 1º). Trechos a mais são descartados.
+ */
+export function rebuildPathFromSegments(path: Vec2[], segments: number[]): Vec2[] {
+  const out: Vec2[] = [{ ...path[0]! }];
+  const n = Math.min(segments.length, path.length - 1);
+  for (let i = 0; i < n; i++) {
+    const a = path[i]!;
+    const b = path[i + 1]!;
+    const dir = dist(a, b) > 1e-12 ? norm(sub(b, a)) : { x: 1, y: 0 };
+    out.push(add(out[i]!, mul(dir, segments[i]!)));
+  }
+  return out;
 }

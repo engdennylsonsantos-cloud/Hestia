@@ -181,9 +181,9 @@ export class RampLiveSession {
       case 'ORIGIN':
         return 'Rampa livre: clique o próximo ponto (ou digite o comprimento). Enter conclui, Backspace volta, Esc descarta.';
       case 'DRAWING':
-        return 'Rampa livre: clique o próximo ponto (ou digite o comprimento). Enter ou clique no último ponto conclui, Backspace volta, Esc descarta.';
+        return 'Rampa livre: clique o próximo ponto (ou digite o comprimento). Enter ou clique no último ponto conclui, A ajusta à norma, Backspace volta, Esc descarta.';
       case 'REACHED':
-        return 'Nível de topo alcançado. Enter ou clique conclui; Backspace volta.';
+        return 'Nível de topo alcançado. Enter ou clique conclui; A ajusta; Backspace volta.';
     }
   }
 
@@ -289,6 +289,30 @@ export class RampLiveSession {
     const path = this.pts.slice();
     this.cancel();
     return { kind: 'done', path, falta: falta > LIVE_RISE_TOL ? falta : 0 };
+  }
+
+  /**
+   * Substitui o rascunho pelos vértices `path` (refaz cada trecho pelos mesmos cliques). Devolve false, mantendo o
+   * rascunho anterior, se algum vértice não é aceito (trecho curto demais, retorno agudo).
+   */
+  load(path: Vec2[]): boolean {
+    const antes = this.pts.slice();
+    this.cancel();
+    for (const p of path) {
+      const ev = this.click(p);
+      if (ev.kind !== 'added') {
+        this.restoreTo(antes);
+        return false;
+      }
+    }
+    this.warned = false;
+    return this.pts.length === path.length;
+  }
+
+  private restoreTo(pts: Vec2[]): void {
+    this.cancel();
+    for (const p of pts) this.click(p);
+    this.warned = false;
   }
 
   /** Esc: descarta o rascunho inteiro. */

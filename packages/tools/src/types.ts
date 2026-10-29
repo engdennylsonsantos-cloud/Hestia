@@ -58,6 +58,8 @@ export interface ToolEnv {
   openView?(id: Id): void;
   /** Opções vindas da barra de opções. */
   options(): ToolOptions;
+  /** Altera opções da barra a partir da ferramenta (ex.: inclinação depois do Ajustar). Ausente = a ferramenta grava no objeto de `options()`. */
+  setOptions?(patch: Partial<ToolOptions>): void;
   /** Idioma da interface: as mensagens traduzíveis das ferramentas (ex.: Matriz) saem nele. Ausente = português. */
   lang?(): 'pt' | 'en';
 }
@@ -286,6 +288,8 @@ export interface Tool {
   inference(): Inference | null;
   /** Delete com um vértice de piso em foco: remove o vértice e devolve true; false deixa o Delete excluir a seleção. */
   deleteKey?(): boolean;
+  /** Tecla A: ajusta o desenho em andamento à norma (rampa livre). Devolve false se não há o que ajustar. */
+  adjust?(): boolean;
   /** Rótulo do campo numérico pendente (ex.: "Comprimento"), ou null se a ferramenta não espera valor. */
   inputPrompt(): string | null;
 }

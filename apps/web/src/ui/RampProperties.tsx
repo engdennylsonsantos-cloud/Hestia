@@ -5,7 +5,7 @@ import { editor, useProject } from '../editor/controller.ts';
 import { goToIssue } from '../editor/goToIssue.ts';
 import { useI18n, I18N } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
-import { patchRamps } from '../editor/rampActions.ts';
+import { adjustRamp, applyRegen, patchRamps } from '../editor/rampActions.ts';
 import { commonOf } from '../editor/stairActions.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { LevelField } from './LevelField.tsx';
@@ -47,6 +47,7 @@ export function RampProperties({ ramps }: { ramps: Ramp[] }): ReactElement {
   const noOpening = !openingMode.mixed && openingMode.value === 'none';
   const headroomOff = !openingMode.mixed && openingMode.value !== 'headroom';
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [adjustMsg, setAdjustMsg] = useState('');
 
   const quantities = useMemo(() => {
     if (!single) return null;
@@ -71,13 +72,14 @@ export function RampProperties({ ramps }: { ramps: Ramp[] }): ReactElement {
       delete next[field];
       return next;
     });
-    editor.store.transaction('Editar rampa', () => {
-      editor.store.exec({
-        type: 'updateElements',
-        ids: [single.id],
-        patch: { components: r.components, inputMode: r.inputMode, slopeTarget: r.slopeTarget, landingDepth: r.landingDepth },
-      });
-    });
+    applyRegen(editor.store, single.id, r);
+  };
+
+  /** Botão "Ajustar": otimiza a rampa selecionada à norma do tipo em UMA transação "Ajustar rampa". */
+  const adjust = (): void => {
+    if (!single) return;
+    const r = adjustRamp(editor.store, single.id);
+    setAdjustMsg('error' in r ? r.error : r.message);
   };
 
   const fieldError = (field: string): ReactElement | null => {
@@ -167,6 +169,10 @@ export function RampProperties({ ramps }: { ramps: Ramp[] }): ReactElement {
             )}
             <Row label="Forma"><span className="val">{SHAPE_LABEL[single.shape]}</span></Row>
             <Row label="Giro"><span className="val">{TURN_LABEL[single.turn]}</span></Row>
+            <Row label={t.ramp_adjust}>
+              <button id="p-radjust" className="chiplink" title={t.ramp_adjust_title} onClick={adjust}>{t.ramp_adjust}</button>
+            </Row>
+            {adjustMsg && <div className="hint" role="status">{adjustMsg}</div>}
           </>
         ) : (
           <div className="hint">Selecione uma rampa para editar largura, inclinação e comprimento.</div>

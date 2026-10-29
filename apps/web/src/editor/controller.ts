@@ -84,6 +84,7 @@ export class Editor {
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),
     options: () => useUi.getState().options,
+    setOptions: (patch) => useUi.setState({ options: { ...useUi.getState().options, ...patch } }),
   };
 
   get project(): Project { return this.store.project; }
@@ -293,6 +294,11 @@ export class Editor {
         return true;
       }
       if (ui.selection.length && !this.perimetro.ativo) { this.deleteSelection(); return true; }
+    }
+    // A: ajusta o desenho em andamento da rampa livre à norma (não vira atalho de sequência quando a ferramenta o trata).
+    if (/^a$/i.test(k) && !ui.typed && this.tool.adjust?.()) {
+      this.bump();
+      return true;
     }
     if (k === 'Tab') {
       this.tool.tab();

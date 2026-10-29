@@ -1,15 +1,17 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
 import { formatRampPercent, formatRampSlope, rampMaxSlope, rampTopLevel, type RampInputMode, type RampType } from '@hestia/model';
-import { liveRemaining, planRamp, rampIssuesOf, type RampPlan } from '@hestia/engine';
+import { liveRemaining, planRamp, planRampFree, rampIssuesOf, type RampPlan } from '@hestia/engine';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
 import { createRampFromPlan, draftRamp, rampRise, rampTypeId, type RampCommandResult } from './rampCommands.ts';
 import { rotuloInclinacao, textoResultaInclinacao } from './rampLiveMessages.ts';
 import { DEFAULT_RAMP_OPTIONS, type RampToolOptions } from './rampOptions.ts';
+import { RampLiveSession, type LiveEvent, type RampLiveConfig } from './rampLiveSession.ts';
 import { rampPartsPreview } from './rampPreview.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
 const START_HINT = 'Rampa: clique no centro da borda de início. Esc cancela.';
+const FREE_START_HINT = 'Rampa livre: clique o ponto inicial. Esc cancela.';
 const DIRECTION_HINT = 'Rampa: clique para dar a direção e o comprimento, ou digite o ângulo em graus (0 = eixo X). Esc cancela o ponto.';
 /** Distância mínima (m) entre o ponto inicial e o cursor para definir a direção. */
 const MIN_DIRECTION = 0.01;
@@ -34,6 +36,8 @@ export class RampTool extends ToolBase {
   readonly label = 'Rampa';
   readonly hint = START_HINT;
   private origin: Vec2 | null = null;
+  /** Sessão do desenho livre (forma 'free'); criada na primeira necessidade. */
+  private session: RampLiveSession | null = null;
   /** Dados da última chamada de `build` para o rótulo ao vivo (falta/sobra); evita recalcular o desnível. */
   private live: { H: number; type: RampType; mode: RampInputMode; slope: number | undefined } | null = null;
 
@@ -41,26 +45,67 @@ export class RampTool extends ToolBase {
     return this.env.options().ramp ?? DEFAULT_RAMP_OPTIONS;
   }
 
+  private get free(): boolean {
+    return this.opts.shape === 'free';
+  }
+
   protected reset(): void {
     this.origin = null;
+    this.session?.cancel();
     this.items = [];
     this.inf = null;
   }
 
   protected busy(): boolean {
-    return this.origin !== null;
+    return this.origin !== null || (this.session?.state ?? 'IDLE') !== 'IDLE';
   }
 
   override start(): void {
     this.reset();
-    this.env.say(START_HINT);
+    this.env.say(this.free ? FREE_START_HINT : START_HINT);
   }
 
   override inputPrompt(): string | null {
+    if (this.free) return this.session?.state === 'ORIGIN' || this.session?.state === 'DRAWING' ? 'Comprimento (m)' : null;
     return this.origin !== null ? 'Ângulo (°)' : null;
   }
 
+  /** Enter: no desenho livre conclui (com aviso se falta desnível); nos demais, o padrão da base. */
+  override confirm(): void {
+    if (this.free && this.session && this.session.state !== 'IDLE') {
+      this.handleLive(this.session.finish());
+      return;
+    }
+    super.confirm();
+  }
+
+  /** Esc: descarta o rascunho; um 2º Esc sai da ferramenta (como nas demais). */
+  override cancel(): void {
+    if (this.free && this.busy()) {
+      this.reset();
+      this.items = [];
+      this.env.say(FREE_START_HINT);
+      return;
+    }
+    super.cancel();
+  }
+
+  /** Backspace no desenho livre volta um ponto; sem rascunho devolve false (o Delete segue para a seleção). */
+  deleteKey(): boolean {
+    if (!this.free || !this.session) return false;
+    const ok = this.session.back();
+    if (ok) {
+      this.items = this.session.preview();
+      this.env.say(this.session.hint());
+    }
+    return ok;
+  }
+
   override move(p: PointerInfo): void {
+    if (this.free) {
+      this.liveMove(p);
+      return;
+    }
     const inf = this.snap(p, { from: this.origin ?? undefined });
     if (this.origin === null) {
       this.items = [{ kind: 'point', at: inf.point }];
@@ -108,6 +153,10 @@ export class RampTool extends ToolBase {
   }
 
   override click(p: PointerInfo): void {
+    if (this.free) {
+      this.liveClick(p);
+      return;
+    }
     const inf = this.snap(p, { from: this.origin ?? undefined });
     if (this.origin === null) {
       this.origin = inf.point;
@@ -123,6 +172,7 @@ export class RampTool extends ToolBase {
   }
 
   override type(text: string): boolean {
+    if (this.free) return this.liveType(text);
     if (this.origin === null) return false;
     const v = parseNumber(text);
     if (v === null) {
@@ -193,6 +243,11 @@ export class RampTool extends ToolBase {
       this.env.say(plan.error);
       return false;
     }
+    return this.commit(plan, length === undefined ? 'slope' : this.opts.mode);
+  }
+
+  /** Grava o plano em UMA transação "Criar rampa" e avisa. `freePath` só na forma livre. */
+  private commit(plan: RampPlan, inputMode: RampInputMode, freePath?: Vec2[]): boolean {
     const p = this.env.project();
     const o = this.opts;
     const typeId = rampTypeId(p, o.typeId);
@@ -201,7 +256,6 @@ export class RampTool extends ToolBase {
       this.env.say('O projeto não tem tipo de rampa.');
       return false;
     }
-    const inputMode: RampInputMode = length === undefined ? 'slope' : o.mode;
     const slopeTarget = inputMode === 'slope' ? (o.slope ?? type.defaultSlope) : null;
     const out: { r?: RampCommandResult } = {};
     this.env.transaction('Criar rampa', () => {
@@ -218,6 +272,7 @@ export class RampTool extends ToolBase {
         height: o.height,
         mark: this.env.options().placementMark ?? '',
         comments: this.env.options().placementComments ?? '',
+        ...(freePath ? { freePath } : {}),
       });
     });
     const r = out.r;
@@ -230,6 +285,119 @@ export class RampTool extends ToolBase {
     const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Rampa criada: ${flightsText(plan.flights)}, inclinação ${formatRampSlope(plan.slope)}, ${mText(plan.pathLength)} m.${nota}${avisoText} Ctrl+Z desfaz.`);
     this.reset();
+    this.items = [];
     return true;
+  }
+
+  // ---- desenho livre -----------------------------------------------------------------------------------------
+
+  /** Dados do cálculo ao vivo a partir das opções e do nível; `error` pelos mesmos motivos do `build`. */
+  private liveConfig(): RampLiveConfig | { error: string } {
+    const p = this.env.project();
+    const o = this.opts;
+    const typeId = rampTypeId(p, o.typeId);
+    const type = typeId ? p.rampTypes[typeId] : undefined;
+    const draft = draftRamp(p, o, this.env.levelId());
+    if (!typeId || !type || !draft) return { error: 'O projeto não tem tipo de rampa.' };
+    const H = rampRise(p, draft);
+    if (!(H > 0)) {
+      return {
+        error: rampTopLevel(p, draft)
+          ? 'O nível de topo não fica acima da base: nada a gerar.'
+          : 'Sem nível de topo: escolha o nível de cima na barra de colocação (ou informe uma altura positiva).',
+      };
+    }
+    return {
+      H,
+      type,
+      mode: o.mode,
+      ...(o.mode === 'slope' ? { slope: o.slope ?? type.defaultSlope } : o.slope !== undefined ? { slope: o.slope } : {}),
+      width: o.width ?? type.defaultWidth,
+      ...(o.landingDepth !== undefined ? { landingDepth: o.landingDepth } : {}),
+    };
+  }
+
+  /** Sessão configurada com as opções atuais, ou null (com a mensagem dita) se faltam dados. */
+  private liveSession(): RampLiveSession | null {
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return null;
+    }
+    if (!this.session) this.session = new RampLiveSession(cfg);
+    else this.session.configure(cfg);
+    return this.session;
+  }
+
+  private liveFrom(): Vec2 | undefined {
+    const pts = this.session?.points ?? [];
+    return pts[pts.length - 1];
+  }
+
+  private liveMove(p: PointerInfo): void {
+    const inf = this.snap(p, { from: this.liveFrom() });
+    const s = this.liveSession();
+    if (!s) {
+      this.items = [{ kind: 'point', at: inf.point }];
+      return;
+    }
+    this.items = s.move(inf.point, this.env.metersPerPixel());
+  }
+
+  private liveClick(p: PointerInfo): void {
+    const inf = this.snap(p, { from: this.liveFrom() });
+    const s = this.liveSession();
+    if (!s) return;
+    this.handleLive(s.click(inf.point), inf.point);
+  }
+
+  private liveType(text: string): boolean {
+    const s = this.liveSession();
+    if (!s) return false;
+    const v = parseNumber(text);
+    if (v === null) {
+      this.env.say('Valor inválido. Digite o comprimento em metros.');
+      return false;
+    }
+    const ev = s.typeLength(v);
+    this.handleLive(ev);
+    return ev.kind === 'added' || ev.kind === 'done';
+  }
+
+  /** Reage ao resultado de um clique, Enter ou comprimento digitado. */
+  private handleLive(ev: LiveEvent, at?: Vec2): void {
+    const s = this.session;
+    if (!s) return;
+    if (ev.kind === 'ignored' || ev.kind === 'warn') {
+      this.env.say(ev.message);
+      return;
+    }
+    if (ev.kind === 'added') {
+      this.items = s.move(at ?? s.points[s.points.length - 1]!, 0);
+      this.env.say(ev.message ? `${ev.message} Enter ou clique conclui; Backspace volta.` : s.hint());
+      return;
+    }
+    this.createFree(ev.path);
+  }
+
+  /** Cria a rampa do trajeto livre em UMA transação "Criar rampa" (Ctrl+Z desfaz). */
+  private createFree(path: Vec2[]): void {
+    const cfg = this.liveConfig();
+    if ('error' in cfg) {
+      this.env.say(cfg.error);
+      return;
+    }
+    const plan = planRampFree(path, cfg.H, cfg.type, {
+      width: cfg.width,
+      mode: cfg.mode,
+      ...(cfg.slope !== undefined ? { slope: cfg.slope } : {}),
+      ...(cfg.landingDepth !== undefined ? { landingDepth: cfg.landingDepth } : {}),
+    });
+    this.items = [];
+    if ('error' in plan) {
+      this.env.say(`Não é possível criar a rampa: ${plan.error}`);
+      return;
+    }
+    this.commit(plan, cfg.mode, path);
   }
 }

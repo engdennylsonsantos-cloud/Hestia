@@ -192,3 +192,91 @@ describe('ferramenta Rampa: falta/sobra no rótulo da prévia', () => {
     expect(labelAt({ mode: 'length', height: 0.6 }, 5)).toMatch(/Resulta 12,00 %.*acima do máximo 8,33 %/);
   });
 });
+
+describe('ferramenta Rampa: forma livre', () => {
+  const freeSetup = () => setup({ shape: 'free', mode: 'slope', slope: 1 / 12, height: 1.0 }, 'lv_1');
+
+  it('rampa livre de 2 trechos cria 1 elemento (forma free, freePath) com 2 lances e 1 patamar de giro', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    expect(ctx.last()).toBe('Rampa livre: clique o ponto inicial. Esc cancela.');
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 6, 10); // passa do topo: o trecho é truncado onde o desnível fecha e o Enter conclui
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+    t.confirm();
+    const rs = rampsOf(ctx, 'lv_1');
+    expect(rs).toHaveLength(1);
+    expect(rs[0]!.shape).toBe('free');
+    expect(rs[0]!.freePath).toHaveLength(3);
+    expect(rs[0]!.freePath![2]!.y).toBeCloseTo(7.5, 6);
+    const r = resolveRamps(ctx.store.project)[0]!;
+    expect(r.flights).toHaveLength(2);
+    expect(r.landings).toHaveLength(1);
+    expect(ctx.last()).toMatch(/^Rampa criada: 2 lances/);
+    expect(ctx.sel()).toEqual([rs[0]!.id]);
+  });
+
+  it('é UMA transação: Ctrl+Z remove a rampa inteira', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 6, 10);
+    t.confirm();
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(1);
+    ctx.store.undo();
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+  });
+
+  it('clique repetido no último vértice conclui; com falta de desnível o 1º pedido só avisa', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    clickAt(t, 6, 0);
+    expect(ctx.last()).toMatch(/^Faltam 0,50 m de desnível. Enter de novo cria assim.$/);
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+    clickAt(t, 6, 0);
+    const [ramp] = rampsOf(ctx, 'lv_1');
+    expect(ramp).toBeDefined();
+    expect(ramp!.freePath).toHaveLength(2);
+  });
+
+  it('Backspace volta um ponto, Esc descarta e o 2º Esc sai da ferramenta', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    expect(t.deleteKey?.()).toBe(false);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    expect(t.inputPrompt()).toBe('Comprimento (m)');
+    expect(t.deleteKey?.()).toBe(true);
+    expect(t.deleteKey?.()).toBe(true);
+    expect(t.deleteKey?.()).toBe(false);
+    clickAt(t, 0, 0);
+    t.cancel();
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+    expect(ctx.done()).toBe(0);
+    t.cancel();
+    expect(ctx.done()).toBe(1);
+  });
+
+  it('número digitado é o comprimento do próximo trecho', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    t.move(P(0, 5));
+    expect(t.type('4')).toBe(true);
+    clickAt(t, 0, 4);
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+  });
+
+  it('a prévia mostra a falta no rótulo', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    t.move(P(5, 0));
+    const l = t.preview().find((i) => i.kind === 'label');
+    expect(l && l.kind === 'label' && l.text).toMatch(/faltam 0,58 m de desnível/);
+  });
+});

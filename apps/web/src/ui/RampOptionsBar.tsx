@@ -32,7 +32,8 @@ export function RampOptionsBar(): ReactElement {
   };
   const typeId = o.typeId && p.rampTypes[o.typeId] ? o.typeId : (Object.keys(p.rampTypes)[0] ?? '');
   const type = p.rampTypes[typeId];
-  const turnable = o.shape !== 'straight';
+  const turnable = o.shape === 'lshape' || o.shape === 'ushape';
+  const hasLanding = turnable || o.shape === 'free';
   const slope = o.slope ?? type?.defaultSlope ?? 0;
   const levels = rampLevelsValue(o);
   return (
@@ -40,7 +41,7 @@ export function RampOptionsBar(): ReactElement {
       <label>
         Forma
         <select id="opt-rampshape" className="select" value={o.shape} onChange={(e) => set({ shape: e.target.value as RampShape })}>
-          {(Object.keys(SHAPE_LABEL) as RampShape[]).filter((s) => s !== 'free').map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
+          {(Object.keys(SHAPE_LABEL) as RampShape[]).map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
         </select>
       </label>
       <label>
@@ -64,7 +65,7 @@ export function RampOptionsBar(): ReactElement {
           </select>
         </label>
       )}
-      {turnable && (
+      {hasLanding && (
         <label>
           Profundidade do patamar
           <NumField

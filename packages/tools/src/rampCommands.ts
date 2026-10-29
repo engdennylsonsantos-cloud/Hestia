@@ -1,3 +1,4 @@
+import type { Vec2 } from '@hestia/geom';
 import {
   defaultRampTypeId,
   makeRamp,
@@ -63,6 +64,10 @@ export interface RampCreateInput {
   height?: number;
   mark?: string;
   comments?: string;
+  /** Forma 'free': vértices do trajeto clicado (a regeneração e os grips partem dele). */
+  freePath?: Vec2[];
+  /** Forma 'free': índices dos vértices marcados como patamar manual. */
+  manualLandings?: number[];
 }
 
 export type RampCommandResult = { id: Id } | { error: string };
@@ -91,6 +96,8 @@ export function createRampFromPlan(env: ToolEnv, plan: RampPlan, input: RampCrea
     slopeTarget: input.slopeTarget,
     mark: input.mark ?? '',
     comments: input.comments ?? '',
+    ...(input.freePath ? { freePath: input.freePath.map((v) => ({ x: v.x, y: v.y })) } : {}),
+    ...(input.manualLandings && input.manualLandings.length > 0 ? { manualLandings: input.manualLandings.slice() } : {}),
   });
   env.exec({ type: 'addRamp', ramp });
   env.setSelection([id]);

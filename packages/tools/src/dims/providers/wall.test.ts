@@ -97,14 +97,18 @@ describe('cota temporária da parede: ponta até a perpendicular mais próxima',
   });
 });
 
-describe('cota temporária da parede: sem perpendicular, a paralela mais próxima', () => {
-  it('mede só até a paralela mais próxima, entre faces acabadas', () => {
-    const { ctx } = cena([['viz', [0, 2], [4, 2]], ['longe', [0, -5], [4, -5]]]);
+describe('cota temporária da parede: distância lateral até as paralelas', () => {
+  it('mede até a paralela mais próxima de CADA lado, entre faces acabadas', () => {
+    const { ctx } = cena([['viz', [0, 2], [4, 2]], ['longe', [0, -5], [4, -5]], ['mais', [0, 6], [4, 6]]]);
     const dims = dimsOf(ctx);
-    expect(dims).toHaveLength(1);
-    // 2 m entre eixos − 0,092 − 0,092.
-    expect(dims[0]!.value).toBeCloseTo(1.816, 9);
-    expect(Math.abs(dims[0]!.a.y - dims[0]!.b.y)).toBeCloseTo(1.816, 9);
+    expect(dims).toHaveLength(2);
+    const dir = dims.find((d) => d.key.endsWith(':right'))!;
+    const esq = dims.find((d) => d.key.endsWith(':left'))!;
+    // 2 m entre eixos − 0,092 − 0,092; do outro lado 5 − 0,184.
+    expect(dir.value).toBeCloseTo(1.816, 9);
+    expect(esq.value).toBeCloseTo(4.816, 9);
+    expect(Math.abs(dir.a.y - dir.b.y)).toBeCloseTo(1.816, 9);
+    expect(dir.a.x).toBeCloseTo(dir.b.x, 9);
   });
 
   it('a paralela do lado esquerdo é medida pela face voltada para ela', () => {
@@ -112,18 +116,57 @@ describe('cota temporária da parede: sem perpendicular, a paralela mais próxim
     expect(dimsOf(ctx)[0]!.value).toBeCloseTo(1.816, 9);
   });
 
-  it('a perpendicular tem preferência sobre a paralela', () => {
+  it('a lateral tem preferência sobre o vão axial até a perpendicular', () => {
     const { ctx } = cena([['viz', [0, 2], [4, 2]], ['p', [5, -2], [5, 2]]]);
     const dims = dimsOf(ctx);
     expect(dims).toHaveLength(1);
-    expect(dims[0]!.value).toBeCloseTo(0.908, 9);
+    expect(dims[0]!.key.endsWith(':right')).toBe(true);
+    expect(dims[0]!.value).toBeCloseTo(1.816, 9);
   });
 
-  it('editar a distância translada a parede na normal', () => {
+  it('paralela que não se sobrepõe ao longo do eixo não conta', () => {
+    const { ctx } = cena([['fora', [6, 2], [9, 2]]]);
+    expect(dimsOf(ctx)).toEqual([]);
+  });
+
+  it('parede vertical selecionada: cotas laterais até as paralelas vizinhas (e não até o fim da parede)', () => {
+    const s: Seg[] = [['esq', [-3, -2], [-3, 6]], ['dir', [2, -1], [2, 5]], ['topo', [-3, 8], [2, 8]]];
+    const { ctx } = cena(s, ['host', [0, 0], [0, 4]]);
+    const dims = dimsOf(ctx);
+    expect(dims.map((d) => d.key.split(':')[2]).sort()).toEqual(['left', 'right']);
+    for (const d of dims) expect(Math.abs(d.a.y - d.b.y)).toBeCloseTo(0, 9);
+    expect(dims.map((d) => d.value).sort()).toEqual([expect.closeTo(1.816, 9), expect.closeTo(2.816, 9)]);
+  });
+
+  it('ida e volta: digitar v deixa exatamente v, nos dois lados e em ângulo qualquer', () => {
+    const ang = Math.PI / 6;
+    const c = Math.cos(ang);
+    const sn = Math.sin(ang);
+    const rot = (x: number, y: number): [number, number] => [x * c - y * sn, x * sn + y * c];
+    for (const v of [0.4, 1.816, 3]) {
+      const outras: Seg[] = [['up', rot(0, 2), rot(4, 2)], ['dn', rot(0, -3), rot(4, -3)]];
+      const { ctx } = cena(outras, ['host', rot(0, 0), rot(4, 0)]);
+      for (const sufixo of ['right', 'left']) {
+        const dim = dimsOf(ctx).find((d) => d.key.endsWith(`:${sufixo}`))!;
+        const d = translate(dim, v);
+        const mov = cena(outras, ['host', [rot(0, 0)[0] + d.x, rot(0, 0)[1] + d.y], [rot(4, 0)[0] + d.x, rot(4, 0)[1] + d.y]]);
+        expect(dimsOf(mov.ctx).find((x) => x.key.endsWith(`:${sufixo}`))!.value).toBeCloseTo(v, 6);
+      }
+    }
+  });
+
+  it('editar aproxima a parede quando o valor diminui e afasta quando aumenta', () => {
     const { ctx } = cena([['viz', [0, 2], [4, 2]]]);
-    const t = translate(dimsOf(ctx)[0]!, 1.5);
-    expect(t.x).toBeCloseTo(0, 9);
-    expect(t.y).toBeCloseTo(-0.316, 9);
+    const aproxima = translate(dimsOf(ctx)[0]!, 1.5);
+    expect(aproxima.x).toBeCloseTo(0, 9);
+    expect(aproxima.y).toBeCloseTo(0.316, 9);
+    expect(translate(dimsOf(ctx)[0]!, 3).y).toBeCloseTo(-1.184, 9);
+  });
+
+  it('valor não positivo é recusado', () => {
+    const { ctx } = cena([['viz', [0, 2], [4, 2]]]);
+    expect(dimsOf(ctx)[0]!.edit!(0)).toEqual({ error: expect.stringContaining('maior que zero') });
+    expect(dimsOf(ctx)[0]!.edit!(Number.NaN)).toEqual({ error: expect.stringContaining('maior que zero') });
   });
 });
 

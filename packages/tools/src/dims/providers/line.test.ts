@@ -62,3 +62,33 @@ describe('provedor de cotas do trecho do Perímetro', () => {
     expect(perimeterLineDimProvider.compute(ctxOf(s), { segs: [{ id: 'z', a: { x: 1, y: 1 }, b: { x: 1, y: 1 } }] })).toEqual([]);
   });
 });
+
+describe('linha de detalhe: distância lateral até a paralela', () => {
+  const add = (s: ProjectStore, id: string, ay: number, by = ay) =>
+    s.exec({ type: 'addDetailLine', levelId: 'lv_0', item: { id, a: { x: 0, y: ay }, b: { x: 5, y: by } } });
+
+  it('mede até a paralela mais próxima de cada lado e ignora a transversal', () => {
+    const s = new ProjectStore(createEmptyProject());
+    add(s, 'dl', 0);
+    add(s, 'up', 2);
+    add(s, 'up2', 6);
+    add(s, 'dn', -1.5);
+    add(s, 'x', 1, 4);
+    const dims = detailLineDimProvider.compute(ctxOf(s), { lineId: 'dl' });
+    expect(dims.map((d) => [d.key.split(':')[2], d.value])).toEqual([['left', 1.5], ['right', 2]]);
+  });
+
+  it('ida e volta: digitar v deixa exatamente v', () => {
+    for (const v of [0.3, 2, 7]) {
+      const s = new ProjectStore(createEmptyProject());
+      add(s, 'dl', 0);
+      add(s, 'up', 2);
+      const dim = detailLineDimProvider.compute(ctxOf(s), { lineId: 'dl' })[0]!;
+      const r = dim.edit!(v);
+      if (!('commands' in r)) throw new Error('esperava comandos');
+      s.exec(r.commands[0]!);
+      expect(detailLineDimProvider.compute(ctxOf(s), { lineId: 'dl' })[0]!.value).toBeCloseTo(v, 9);
+      expect(dim.edit!(0)).toEqual({ error: expect.stringContaining('maior que zero') });
+    }
+  });
+});

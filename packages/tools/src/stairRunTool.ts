@@ -1,6 +1,6 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
 import { stairTopLevel } from '@hestia/model';
-import { SPIRAL_MAX_SWEEP, stairIssueList, treadRuleOf, type TreadRule } from '@hestia/engine';
+import { SPIRAL_MAX_SWEEP, stairIssuesOf, treadRuleOf, type TreadRule } from '@hestia/engine';
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
@@ -276,7 +276,7 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // Com comprimento que dá outro nº (`note`), a explicação substitui o aviso "difere do nº desejado", que contradiria o criado.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
     const extra = b.note ? ` ${b.note}` : '';
     const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
@@ -387,7 +387,7 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // O aviso fixo de saída de emergência vem em todo caracol: a mensagem traz só o aviso que muda o projeto.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
     const extra = aviso ? ` Aviso: ${aviso.message}` : '';
     this.env.say(`Escada caracol criada: ${plan.risers} espelhos, varredura ${degText(plan.run.spiral.sweep)}.${extra} Ctrl+Z desfaz.`);
     this.reset();

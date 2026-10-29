@@ -1,5 +1,5 @@
 import { intersection, multiArea, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import type { Id, Project, ValidationIssue } from '@hestia/model';
+import { isStair, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveFloors } from './floors.ts';
 import { makeStairIssue, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
@@ -82,6 +82,25 @@ export function stairIssueList(p: Project): StairIssueItem[] {
   });
   out.push(...stairWallOverlapIssues(p, resolved));
   return out;
+}
+
+/**
+ * Avisos de uma só escada: o mesmo que `stairIssueList(p).filter((i) => i.stairId === id)`, sem resolver as outras. A criação
+ * usa isto para não resolver todas as escadas do projeto só para achar o aviso da nova. A invasão de parede é conferida só
+ * contra esta escada; as paredes continuam vindo do projeto inteiro, como na lista.
+ */
+export function stairIssuesOf(p: Project, id: Id): StairIssueItem[] {
+  const e = p.elements[id];
+  if (!isStair(e)) return [];
+  const [r] = resolveStairs({ ...p, elements: { [id]: e } });
+  if (!r) return [];
+  const list = [...r.issues];
+  if (r.topLevelId) {
+    const h = stairHeadroomIssue(r, topCovers(p, r.topLevelId));
+    if (h) list.push(h);
+  }
+  list.push(...stairWallOverlapIssues(p, [r]));
+  return list;
 }
 
 /** Aviso no formato do painel, com os ids da relação (quando houver) além do `elementId`. */

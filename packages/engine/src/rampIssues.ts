@@ -1,5 +1,5 @@
 import { intersection } from '@hestia/geom';
-import { formatRampPercent, formatRampRatio, rampMaxSlope, rampNormRowFor, type Project, type ValidationIssue } from '@hestia/model';
+import { formatRampPercent, formatRampRatio, isRamp, rampMaxSlope, rampNormRowFor, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveRamps, type ResolvedRamp } from './ramps.ts';
 import { topCovers, type TopCover } from './stairChecks.ts';
 
@@ -137,6 +137,24 @@ export function rampIssueList(p: Project): RampIssueItem[] {
     }
     return list;
   });
+}
+
+/**
+ * Avisos de uma só rampa: o mesmo que `rampIssueList(p).filter((i) => i.rampId === id)`, sem resolver as outras. A criação
+ * usa isto para não resolver todas as rampas do projeto só para achar o aviso da nova. O projeto de um elemento basta para
+ * resolver a rampa (ela lê o próprio elemento e os níveis); a folga de cabeça usa as lajes e pisos do nível de topo, como na lista.
+ */
+export function rampIssuesOf(p: Project, id: Id): RampIssueItem[] {
+  const e = p.elements[id];
+  if (!isRamp(e)) return [];
+  const [rr] = resolveRamps({ ...p, elements: { [id]: e } });
+  if (!rr) return [];
+  const list = [...rr.issues];
+  if (rr.topLevelId) {
+    const h = rampHeadroomIssue(rr, topCovers(p, rr.topLevelId));
+    if (h) list.push(h);
+  }
+  return list;
 }
 
 /** Aviso no formato do painel, com os ids da relação (quando houver) além do `elementId`. */

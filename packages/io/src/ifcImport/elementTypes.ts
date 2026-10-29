@@ -123,7 +123,11 @@ export function colorMaterialId(ctx: { p: Project }, color: string | undefined):
 }
 
 /** Cor do produto IFC, criando o material correspondente no projeto (o 3D do genérico usa esse material). */
-export function colorOfWithMaterial(ctx: TypeCtx, f: IfcFile, e: StepEntity): string | undefined {
+export function colorOfWithMaterial(
+  ctx: { p: Project; typeOf: Map<number, StepEntity> },
+  f: IfcFile,
+  e: StepEntity,
+): string | undefined {
   const color = colorOf(f, e, ctx.typeOf.get(e.id));
   colorMaterialId(ctx, color);
   return color;

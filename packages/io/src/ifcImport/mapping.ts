@@ -10,12 +10,13 @@ import {
   type Opening,
   type Project,
 } from '@hestia/model';
-import { bodyOf, cleanLoop, hull2, prismFromMesh, rectangleAxis, segment, type Body, type Prism } from './geometry.ts';
+import { bodyOf, cleanLoop, interiorPoint, prismFromMesh, rectangleAxis, segment, type Body, type Prism } from './geometry.ts';
+import { makeGeneric, minZOf } from './genericElement.ts';
 import { openingType, operationOf, slabLikeType, wallType } from './elementTypes.ts';
 import { IfcFile, projectName, type Pt2 } from './ifc.ts';
 import { readLevels, type LevelRef } from './levels.ts';
 import { propertiesOf } from './psets.ts';
-import { colorOfWithMaterial } from './elementTypes.ts';
+import { readRelations } from './relations.ts';
 import type { StepEntity } from './step.ts';
 
 /** O que a importação trouxe. Sempre preenchido, mesmo quando o arquivo é ruim. */
@@ -54,6 +55,10 @@ interface Ctx {
   approximate: Record<string, number>;
   /** Assinaturas de piso/laje/forro já importados (evita duplicata sobreposta do mesmo arquivo). */
   slabs: Set<string>;
+  /** Entidades IFC que já viraram elemento nativo (ou genérico): o resto com geometria vira genérico. */
+  handled: Set<number>;
+  /** Corpo já lido por produto (evita reprocessar a geometria na inferência de níveis e no mapeamento). */
+  bodies: Map<number, Body>;
   order: number;
   warn(msg: string): void;
   skip(ifcClass: string): void;
@@ -94,66 +99,47 @@ function noteGeometry(ctx: Ctx, body: Body | null): void {
   for (const motivo of body.unsupported) ctx.report.geometry[motivo] = (ctx.report.geometry[motivo] ?? 0) + 1;
 }
 
-/**
- * Classes que o importador já trata por outro caminho. As famílias com variantes (`IFCWALLSTANDARDCASE`...) casam por
- * prefixo; os demais nomes são exatos — `IFCBUILDINGELEMENTPROXY` não pode casar com `IFCBUILDING`.
- */
-function isHandledClass(type: string): boolean {
-  if (/^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|OPENINGELEMENT)/.test(type)) return true;
-  return type === 'IFCSPACE' || type === 'IFCGRID' || type === 'IFCANNOTATION' || type === 'IFCSITE' || type === 'IFCBUILDING' || type === 'IFCPROJECT' || type === 'IFCBUILDINGSTOREY';
+/** Entidades que nunca viram objeto: vazios, anotações e a estrutura espacial. */
+function isSpatialOrVoid(type: string): boolean {
+  return type === 'IFCOPENINGELEMENT' || type === 'IFCANNOTATION' || type === 'IFCPROJECT' || type === 'IFCSITE' || type === 'IFCBUILDING' || type === 'IFCBUILDINGSTOREY' || type === 'IFCGRID';
 }
 
-/**
- * Produtos que o importador não representa como elemento nativo viram **objeto genérico** com a malha e a classe IFC de
- * origem. O que não tiver malha fica de fora e entra em `skipped` (via `countUnhandledProducts`).
- */
-function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
-  const converted = new Set<number>();
+/** Corpo do produto, lido uma vez (a inferência de níveis e o mapeamento reaproveitam). */
+function bodyFor(ctx: Ctx, e: StepEntity): Body {
+  const hit = ctx.bodies.get(e.id);
+  if (hit) return hit;
+  const body = bodyOf(ctx.f, e);
+  ctx.bodies.set(e.id, body);
+  return body;
+}
+
+/** Converte o produto em objeto genérico: é o fallback de tudo que não virou elemento nativo. */
+function toGeneric(ctx: Ctx, e: StepEntity, body: Body): boolean {
+  if (ctx.handled.has(e.id)) return false;
+  const g = makeGeneric(ctx, e, body, levelAt(ctx, minZOf(body)).id);
+  if (!g) return false;
+  ctx.p.elements[g.id] = { ...g, order: ctx.order++ };
+  ctx.handled.add(e.id);
+  ctx.report.generic[e.type] = (ctx.report.generic[e.type] ?? 0) + 1;
+  ctx.count('objetos');
+  return true;
+}
+
+/** Produtos que sobraram (sem corpo) entram no relatório em vez de sumirem calados. */
+function addGenericObjects(file: IfcFile, ctx: Ctx): void {
   for (const e of file.step.entities.values()) {
-    if (isHandledClass(e.type)) continue;
+    if (ctx.handled.has(e.id) || isSpatialOrVoid(e.type)) continue;
     if (!file.ref(e, 5) || file.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
-    const body = bodyOf(file, e);
-    if (!body.tris.length) continue;
-    const positions: number[] = [], indices: number[] = [];
-    let minZ = Infinity;
-    for (const tri of body.tris) {
-      for (const p of tri) {
-        indices.push(positions.length / 3);
-        positions.push(p.x, p.y, p.z);
-        minZ = Math.min(minZ, p.z);
-      }
-    }
-    if (!positions.length) continue;
-    const outline = hull2(body.points.map((p) => ({ x: p.x, y: p.y })));
-    const id = `g_${guid(file, e)}`;
-    ctx.p.elements[id] = {
-      id,
-      kind: 'generic',
-      levelId: levelAt(ctx, minZ).id,
-      name: file.text(e, 2).trim() || file.text(ctx.typeOf.get(e.id), 2).trim() || e.type,
-      sourceClass: e.type,
-      predefinedType: file.enum(e, 8) || undefined,
-      objectType: file.text(e, 4) || undefined,
-      mesh: { positions, indices },
-      outline: outline.length >= 3 ? outline : undefined,
-      color: colorOfWithMaterial(ctx, file, e),
-      order: ctx.order++,
-      ...psetOf(ctx, e),
-    };
-    converted.add(e.id);
-    ctx.report.generic[e.type] = (ctx.report.generic[e.type] ?? 0) + 1;
-    ctx.count('objetos');
+    toGeneric(ctx, e, bodyFor(ctx, e));
   }
-  return converted;
 }
 
 /**
- * Produtos que o importador não visita nem converteu em genérico entram no relatório em vez de sumirem calados: o
- * relatório não pode dizer "0 ignorados" com 51 vigas no arquivo.
+ * Produtos que não entraram nem como genérico (sem triângulo) entram no relatório por classe, em vez de sumirem calados.
  */
-function countUnhandledProducts(f: IfcFile, report: ImportReport, converted: Set<number>): void {
+function countUnhandledProducts(f: IfcFile, report: ImportReport, handled: Set<number>): void {
   for (const e of f.step.entities.values()) {
-    if (converted.has(e.id) || isHandledClass(e.type)) continue;
+    if (handled.has(e.id) || isSpatialOrVoid(e.type)) continue;
     if (!f.ref(e, 5) || f.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
     report.skipped[e.type] = (report.skipped[e.type] ?? 0) + 1;
   }
@@ -166,103 +152,75 @@ function levelAt(ctx: Ctx, z: number): LevelRef {
   return best;
 }
 
-function indexRelations(f: IfcFile, ctx: Ctx): void {
-  for (const rel of f.byType('IFCRELDEFINESBYTYPE')) {
-    const type = f.ent(rel, 5);
-    if (!type) continue;
-    for (const obj of f.list(rel, 4)) ctx.typeOf.set(obj.id, type);
-  }
-  for (const rel of f.byType('IFCRELVOIDSELEMENT')) {
-    const host = f.ref(rel, 4);
-    const opening = f.ref(rel, 5);
-    if (host != null && opening != null) ctx.hostOf.set(opening, host);
-  }
-  for (const rel of f.byType('IFCRELFILLSELEMENT')) {
-    const opening = f.ref(rel, 4);
-    const fill = f.ref(rel, 5);
-    if (opening != null && fill != null) ctx.fillerOf.set(opening, fill);
-  }
-}
-
-/** Ponto interior de um anel (centroide; para anéis côncavos o hull garante um ponto plausível). */
-function interiorPoint(loop: Pt2[]): Pt2 {
-  let area = 0;
-  let cx = 0;
-  let cy = 0;
-  for (let i = 0; i < loop.length; i++) {
-    const a = loop[i]!;
-    const b = loop[(i + 1) % loop.length]!;
-    const cross = a.x * b.y - b.x * a.y;
-    area += cross;
-    cx += (a.x + b.x) * cross;
-    cy += (a.y + b.y) * cross;
-  }
-  if (Math.abs(area) > 1e-9) return { x: cx / (3 * area), y: cy / (3 * area) };
-  const hull = hull2(loop);
-  const n = hull.length || 1;
-  return { x: hull.reduce((s, p) => s + p.x, 0) / n, y: hull.reduce((s, p) => s + p.y, 0) / n };
-}
-
 function addWall(ctx: Ctx, e: StepEntity, body: Body): void {
   noteGeometry(ctx, body);
-  let prism: Prism | null = body.prisms[0] ?? null;
-  if (!prism) {
-    // Malha sem extrusão: contorno aproximado pela projeção (entra como "aproximado").
-    prism = body.points.length ? prismFromMesh(body.points) : null;
-    if (!prism) return ctx.skip(e.type);
-    ctx.approximate.paredes = (ctx.approximate.paredes ?? 0) + 1;
+  const prism = body.prisms[0] ?? null;
+  if (prism) {
+    const rect = rectangleAxis(prism.loops[0] ?? []);
+    // Forma livre ou mais de um sólido (o nativo guardaria só o primeiro): preserva tudo no genérico.
+    if (rect && body.prisms.length === 1) {
+      placeWall(ctx, e, prism, rect);
+      return;
+    }
+    if (toGeneric(ctx, e, body)) return;
   }
-  placeWall(ctx, e, prism);
+  // Malha sem extrusão: mantém o caminho aproximado (hull) para não perder a parede nativa.
+  if (!prism && body.points.length) {
+    const approx = prismFromMesh(body.points);
+    const rect = approx ? rectangleAxis(approx.loops[0] ?? []) : null;
+    if (approx && rect) {
+      ctx.approximate.paredes = (ctx.approximate.paredes ?? 0) + 1;
+      placeWall(ctx, e, approx, rect);
+      return;
+    }
+  }
+  if (toGeneric(ctx, e, body)) return;
+  ctx.skip('parede-forma-livre');
 }
 
-function placeWall(ctx: Ctx, e: StepEntity, prism: Prism): void {
+function placeWall(ctx: Ctx, e: StepEntity, prism: Prism, rect: { a: Pt2; b: Pt2; thickness: number }): void {
   const f = ctx.f;
-  const rect = rectangleAxis(prism.loops[0] ?? []);
-  const axis = rect ? { a: rect.a, b: rect.b } : null;
-  if (!axis) return ctx.skip('parede-forma-livre');
-  const thickness = rect?.thickness ?? 0.15;
   const level = levelAt(ctx, prism.z0);
   const name = f.text(ctx.typeOf.get(e.id), 2).trim() || f.text(e, 2).trim();
-  const typeId = wallType(ctx, name, thickness);
+  const typeId = wallType(ctx, name, rect.thickness);
   const height = Math.max(0.05, prism.z1 - prism.z0);
   const id = `w_${guid(f, e)}`;
   ctx.p.elements[id] = {
-    ...makeWall({ id, typeId, levelId: level.id, a: axis.a, b: axis.b }),
+    ...makeWall({ id, typeId, levelId: level.id, a: rect.a, b: rect.b }),
     baseOffset: prism.z0 - level.elevation,
     height,
     order: ctx.order++,
     ...psetOf(ctx, e),
   };
   ctx.walls.set(e.id, id);
+  ctx.handled.add(e.id);
   ctx.count('paredes');
+}
+
+/** Porta/janela que não coube no modelo nativo: vira objeto genérico; só fica de fora se não tiver corpo. */
+function fallbackOpening(ctx: Ctx, filler: StepEntity, reason: string): void {
+  if (toGeneric(ctx, filler, bodyFor(ctx, filler))) return;
+  ctx.warn(reason);
+  ctx.skip(filler.type);
 }
 
 function addOpening(ctx: Ctx, filler: StepEntity, kind: 'door' | 'window'): void {
   const f = ctx.f;
   const openingId = [...ctx.fillerOf.entries()].find(([, fill]) => fill === filler.id)?.[0];
-  if (openingId == null) {
-    ctx.warn('Porta/janela sem IfcRelFillsElement (sem vão associado): ficou de fora.');
-    return ctx.skip(filler.type);
-  }
+  if (openingId == null) return fallbackOpening(ctx, filler, 'Porta/janela sem IfcRelFillsElement e sem corpo: ficou de fora.');
   const hostIfc = ctx.hostOf.get(openingId);
   const hostId = hostIfc == null ? undefined : ctx.walls.get(hostIfc);
-  if (!hostId) {
-    ctx.warn('Abertura cuja parede não foi importada (forma não retangular): ficou de fora.');
-    return ctx.skip(filler.type);
-  }
+  if (!hostId) return fallbackOpening(ctx, filler, 'Abertura sem parede hospedeira importada e sem corpo: ficou de fora.');
   const wall = ctx.p.elements[hostId];
-  if (!wall || wall.kind !== 'wall') return ctx.skip(filler.type);
+  if (!wall || wall.kind !== 'wall') return fallbackOpening(ctx, filler, 'Abertura sem parede hospedeira importada e sem corpo: ficou de fora.');
   const opening = f.entity(openingId);
-  const body = opening ? bodyOf(f, opening) : null;
+  const body = opening ? bodyFor(ctx, opening) : null;
   noteGeometry(ctx, body);
-  if (!body) {
-    ctx.warn('Abertura sem geometria de vão: ficou de fora.');
-    return ctx.skip(filler.type);
-  }
+  if (!body) return fallbackOpening(ctx, filler, 'Abertura sem geometria de vão e sem corpo: ficou de fora.');
   const prism = body.prisms[0];
   const loop = prism?.loops[0] ?? [];
   const cloud = prism ? loop.map((p) => ({ x: p.x, y: p.y, z: prism.z0 })) : body.points;
-  if (cloud.length < 3) return ctx.skip(filler.type);
+  if (cloud.length < 3) return fallbackOpening(ctx, filler, 'Abertura sem pontos suficientes e sem corpo: ficou de fora.');
   const { dir, len } = segment([wall.a, wall.b]);
   let min = Infinity;
   let max = -Infinity;
@@ -296,6 +254,7 @@ function addOpening(ctx: Ctx, filler: StepEntity, kind: 'door' | 'window'): void
     ...psetOf(ctx, filler),
   };
   ctx.p.elements[id] = op;
+  ctx.handled.add(filler.id);
   ctx.count(kind === 'door' ? 'portas' : 'janelas');
 }
 
@@ -311,14 +270,23 @@ function slabKind(f: IfcFile, e: StepEntity): 'floor' | 'slab' | 'ceiling' | nul
 function addSlab(ctx: Ctx, e: StepEntity): void {
   const f = ctx.f;
   const kind = slabKind(f, e);
-  if (!kind) return ctx.skip(e.type);
-  const body = bodyOf(f, e);
+  const body = bodyFor(ctx, e);
   noteGeometry(ctx, body);
+  if (!kind) {
+    if (toGeneric(ctx, e, body)) return;
+    return ctx.skip(e.type);
+  }
   const prism = body.prisms[0] ?? (body.points.length ? prismFromMesh(body.points) : null);
-  if (!prism) return ctx.skip(e.type);
+  if (!prism) {
+    if (toGeneric(ctx, e, body)) return;
+    return ctx.skip(e.type);
+  }
   if (prism.approx) ctx.approximate[kind === 'floor' ? 'pisos' : kind === 'slab' ? 'lajes' : 'forros'] = (ctx.approximate[kind === 'floor' ? 'pisos' : kind === 'slab' ? 'lajes' : 'forros'] ?? 0) + 1;
   const boundary = cleanLoop(prism.loops[0] ?? []);
-  if (boundary.length < 3) return ctx.skip(e.type);
+  if (boundary.length < 3) {
+    if (toGeneric(ctx, e, body)) return;
+    return ctx.skip(e.type);
+  }
   const holes = prism.loops.slice(1).map(cleanLoop).filter((l) => l.length >= 3);
   const thickness = Math.max(0.05, prism.z1 - prism.z0);
   const xs = boundary.map((p) => p.x);
@@ -332,6 +300,7 @@ function addSlab(ctx: Ctx, e: StepEntity): void {
     Math.round(Math.max(...ys) * 100),
   ].join('|');
   if (ctx.slabs.has(key)) {
+    ctx.handled.add(e.id);
     ctx.skip('duplicado');
     return;
   }
@@ -344,18 +313,25 @@ function addSlab(ctx: Ctx, e: StepEntity): void {
   if (kind === 'floor') ctx.p.elements[id] = { ...makeFloor(base), order: ctx.order++ };
   else if (kind === 'slab') ctx.p.elements[id] = { ...makeSlab(base), order: ctx.order++ };
   else ctx.p.elements[id] = { ...makeCeiling(base), order: ctx.order++ };
+  ctx.handled.add(e.id);
   ctx.count(kind === 'floor' ? 'pisos' : kind === 'slab' ? 'lajes' : 'forros');
 }
 
 function addRoom(ctx: Ctx, e: StepEntity): void {
   const f = ctx.f;
-  const body = bodyOf(f, e);
+  const body = bodyFor(ctx, e);
   noteGeometry(ctx, body);
   const prism = body.prisms[0] ?? (body.points.length ? prismFromMesh(body.points) : null);
-  if (!prism) return ctx.skip(e.type);
+  if (!prism) {
+    if (toGeneric(ctx, e, body)) return;
+    return ctx.skip(e.type);
+  }
   if (prism.approx) ctx.approximate.ambientes = (ctx.approximate.ambientes ?? 0) + 1;
   const loop = cleanLoop(prism.loops[0] ?? []);
-  if (loop.length < 3) return ctx.skip(e.type);
+  if (loop.length < 3) {
+    if (toGeneric(ctx, e, body)) return;
+    return ctx.skip(e.type);
+  }
   const point = interiorPoint(loop);
   const level = levelAt(ctx, prism.z0);
   const id = `r_${guid(f, e)}`;
@@ -368,6 +344,7 @@ function addRoom(ctx: Ctx, e: StepEntity): void {
     ...psetOf(ctx, e),
   });
   ctx.p.elements[id] = { ...room, order: ctx.order++ };
+  ctx.handled.add(e.id);
   ctx.count('ambientes');
 }
 
@@ -406,6 +383,28 @@ function addGrids(ctx: Ctx): void {
   if (n) ctx.count('grades');
 }
 
+/** Classes que dão a cota de piso quando o arquivo não traz `IfcBuildingStorey`. */
+const LEVEL_CLASSES = /^IFC(WALL|SLAB|COVERING|ROOF|STAIR)/;
+
+/** Cotas dos corpos de parede/laje (ou de todos os produtos, se não houver nenhum) para inferir os níveis. */
+function levelCandidates(ctx: Ctx): number[] {
+  const zs: number[] = [];
+  for (const e of ctx.f.step.entities.values()) {
+    if (!LEVEL_CLASSES.test(e.type)) continue;
+    if (!ctx.f.ref(e, 5) || ctx.f.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
+    const z = minZOf(bodyFor(ctx, e));
+    if (Number.isFinite(z) && z > -1000) zs.push(z);
+  }
+  if (zs.length) return zs;
+  for (const e of ctx.f.step.entities.values()) {
+    if (!ctx.f.ref(e, 5) || ctx.f.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
+    if (isSpatialOrVoid(e.type)) continue;
+    const z = minZOf(bodyFor(ctx, e));
+    if (Number.isFinite(z) && z > -1000) zs.push(z);
+  }
+  return zs;
+}
+
 /** Importa o texto IFC em um projeto novo (os tipos padrão do Hestia ficam como base). */
 export function importIfc(text: string, base?: Project): ImportResult {
   const file = new IfcFile(text);
@@ -421,7 +420,7 @@ export function importIfc(text: string, base?: Project): ImportResult {
     f: file,
     p,
     report,
-    levels: readLevels(file, p, report),
+    levels: [],
     typeOf: new Map(),
     hostOf: new Map(),
     fillerOf: new Map(),
@@ -429,6 +428,8 @@ export function importIfc(text: string, base?: Project): ImportResult {
     types: new Map(),
     approximate: {},
     slabs: new Set(),
+    handled: new Set(),
+    bodies: new Map(),
     order: 1,
     warn: (msg) => {
       if (report.warnings.length < 200 && !report.warnings.includes(msg)) report.warnings.push(msg);
@@ -441,15 +442,21 @@ export function importIfc(text: string, base?: Project): ImportResult {
     },
   };
   if (file.broken) ctx.warn(`${file.broken} entidade(s) STEP ilegíveis foram ignoradas.`);
-  indexRelations(file, ctx);
-  for (const e of products(file, 'IFCWALL')) addWall(ctx, e, bodyOf(file, e));
+  const rel = readRelations(file);
+  ctx.typeOf = rel.typeOf;
+  ctx.hostOf = rel.hostOf;
+  ctx.fillerOf = rel.fillerOf;
+  const zs = file.byType('IFCBUILDINGSTOREY').length ? [] : levelCandidates(ctx);
+  ctx.levels = readLevels(file, p, report, zs);
+  for (const e of products(file, 'IFCWALL')) addWall(ctx, e, bodyFor(ctx, e));
   for (const e of products(file, 'IFCDOOR')) addOpening(ctx, e, 'door');
   for (const e of products(file, 'IFCWINDOW')) addOpening(ctx, e, 'window');
   for (const e of products(file, 'IFCSLAB')) addSlab(ctx, e);
   for (const e of products(file, 'IFCCOVERING')) addSlab(ctx, e);
   for (const e of file.byType('IFCSPACE')) addRoom(ctx, e);
   addGrids(ctx);
-  countUnhandledProducts(file, report, addGenericObjects(file, ctx));
+  addGenericObjects(file, ctx);
+  countUnhandledProducts(file, report, ctx.handled);
   p.name = projectName(file, p);
   p.nextOrder = ctx.order;
   return { project: p, report };

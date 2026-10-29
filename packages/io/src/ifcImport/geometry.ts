@@ -247,6 +247,25 @@ export function cleanLoop(loop: Pt2[]): Pt2[] {
   return out;
 }
 
+/** Ponto interior de um anel (centroide; para anéis côncavos o hull garante um ponto plausível). */
+export function interiorPoint(loop: Pt2[]): Pt2 {
+  let area = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const a = loop[i]!;
+    const b = loop[(i + 1) % loop.length]!;
+    const cross = a.x * b.y - b.x * a.y;
+    area += cross;
+    cx += (a.x + b.x) * cross;
+    cy += (a.y + b.y) * cross;
+  }
+  if (Math.abs(area) > 1e-9) return { x: cx / (3 * area), y: cy / (3 * area) };
+  const hull = hull2(loop);
+  const n = hull.length || 1;
+  return { x: hull.reduce((s, p) => s + p.x, 0) / n, y: hull.reduce((s, p) => s + p.y, 0) / n };
+}
+
 /** Hull convexo em planta (monotone chain), usado quando só há malha. */
 export function hull2(points: Pt2[]): Pt2[] {
   const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);

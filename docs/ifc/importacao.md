@@ -111,6 +111,14 @@ planta (hull), a cor lida do estilo (`color`) e as propriedades (`ifcProperties`
 Entram assim: `IfcRoof`, `IfcStair`, `IfcRailing`, `IfcColumn`, `IfcBeam`, `IfcMember`, `IfcPlate`, `IfcFooting`,
 mobiliário, MEP (terminais, tubos, dutos), `IfcCurtainWall` e `IfcBuildingElementProxy` quando têm corpo.
 
+O fallback também vale para **falha do mapeamento nativo**, não só para classes sem equivalente: parede de forma livre
+(contorno em L, mureta, revestimento), parede com mais de um sólido, porta/janela sem `IfcRelFillsElement` ou sem parede
+hospedeira, laje/forro sem contorno e ambiente sem corpo viram genérico em vez de serem descartados. `skipped` fica só
+com o produto que não tem nenhum triângulo — a omissão deixa de ser silenciosa.
+
+Quando o arquivo **não tem `IfcBuildingStorey`**, os níveis são inferidos pelas cotas de parede/laje: cotas separadas por
+mais de 1,5 m viram níveis distintos ("Térreo", "Nível 2"...).
+
 No 3D o genérico é uma malha com sombreamento chapado, na categoria gráfica `generic` e selecionável como os demais
 elementos; na planta é um contorno tracejado fino. Ele **entra** no DXF da planta, nos quantitativos geométricos
 (seção 8) e no IFC de exportação (seção 6). Fica fora de tabelas; as propriedades são somente leitura (seção 10).

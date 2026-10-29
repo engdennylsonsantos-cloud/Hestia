@@ -13,6 +13,12 @@ está descrito aqui está commitado no branch **`feat/ifc-import`** (7 commits s
 > Elas **não** fazem parte deste trabalho: não commitar junto, não reverter. O teste `ouroZoom.test.ts` falha enquanto o
 > `ouroZoom.json` estiver no meio da mudança da outra sessão.
 
+> **Atualização 2026-10-29 (fallback e níveis):** todo produto que falha no mapeamento nativo agora vira **genérico**
+> (parede de forma livre, parede com mais de um sólido, porta/janela sem vão ou sem parede hospedeira, laje/forro sem
+> contorno, ambiente sem corpo). Arquivos sem `IfcBuildingStorey` têm os níveis inferidos pelas cotas de parede/laje
+> (salto > 1,5 m). Efeito medido no `modelo 01.ifc` (20 MB, fornecido pelo usuário): 245 → **264 elementos** e 1 → **2
+> níveis**, com `skipped` vazio. O `sala.ifc` continua 93/93.
+
 ---
 
 ## 1. O que foi entregue

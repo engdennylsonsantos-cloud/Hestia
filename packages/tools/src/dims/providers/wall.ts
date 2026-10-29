@@ -7,11 +7,10 @@ import {
   type Id,
   type WallDimRef,
 } from '@hestia/model';
-import { resizeWallCommands } from '../../lengthEdit.ts';
-import { hostedConflicts } from '../validate.ts';
+import { axisGaps, type AxisGap } from './wallAxisGaps.ts';
 import type { DimContext, DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
 
-/** Parede a cotar: comprimento e distância às paralelas vizinhas. */
+/** Parede a cotar: vão até a perpendicular mais próxima (ou, sem ela, até a paralela mais próxima). */
 export interface WallDimSubject {
   wallId: Id;
 }
@@ -52,8 +51,7 @@ interface ParallelGap {
 
 function nearestParallel(ctx: DimContext, host: WallFrame, ref: WallDimRef): ParallelGap[] {
   const planes = wallPlanes(host);
-  let left: ParallelGap | null = null;
-  let right: ParallelGap | null = null;
+  let nearest: ParallelGap | null = null;
   for (const e of Object.values(ctx.project.elements)) {
     if (!isWall(e) || e.id === host.wall.id || e.levelId !== ctx.levelId) continue;
     const other = frameOfWall(ctx.project, e.id);
@@ -72,31 +70,34 @@ function nearestParallel(ctx: DimContext, host: WallFrame, ref: WallDimRef): Par
     if (distance < EPS) continue;
     const t = Math.max(0, Math.min(host.length, loc.t));
     const gap: ParallelGap = { side, otherS: loc.s, distance, t };
-    if (side > 0) {
-      if (!right || distance < right.distance) right = gap;
-    } else if (!left || distance < left.distance) left = gap;
+    if (!nearest || distance < nearest.distance) nearest = gap;
   }
-  return [left, right].filter((g): g is ParallelGap => g !== null);
+  return nearest ? [nearest] : [];
 }
 
-/** Cota do comprimento da parede (edita a extremidade `b`, mantendo `a`, e valida as esquadrias). */
-function lengthDim(ctx: DimContext, frame: WallFrame): TempDim {
-  const a = pointAt(frame, 0, frame.sMid);
-  const b = pointAt(frame, frame.length, frame.sMid);
+/** Cota da ponta da parede até a perpendicular mais próxima: editar translada a parede ao longo do eixo (hospedados acompanham). */
+function axisDim(frame: WallFrame, gap: AxisGap, ref: WallDimRef): TempDim {
+  const atEnd = gap.end === 'b' ? frame.length : 0;
+  const a = pointAt(frame, atEnd, frame.sMid);
+  const b = pointAt(frame, gap.targetT, frame.sMid);
   const edit = (value: number): DimEditResult => {
-    if (!(value > 0)) return { error: 'Digite um comprimento maior que zero.' };
-    const why = hostedConflicts(ctx.project, frame.wall.id, { length: value });
-    if (why) return { error: why };
-    const r = resizeWallCommands(ctx.project, ctx.levelId, frame.wall.id, value);
-    return 'error' in r ? r : { commands: r.commands };
+    if (!(value > 0)) return { error: 'Digite uma distância maior que zero.' };
+    // A ponta b se afasta do alvo recuando para −u; a ponta a, avançando para +u.
+    const shift = (gap.end === 'b' ? 1 : -1) * (gap.distance - value);
+    return { commands: [{ type: 'transform', ids: [frame.wall.id], transform: { kind: 'translate', d: mul(frame.u, shift) } }] };
   };
+  const slot = gap.end === 'b' ? 'axisB' : 'axisA';
   return {
-    key: `${PROVIDER_ID}:${frame.wall.id}:length`,
+    key: `${PROVIDER_ID}:${frame.wall.id}:${slot}`,
     a,
     b,
     offset: DIM_OFFSET,
-    value: frame.length,
-    ends: [lengthEnd(a, 'lengthA'), lengthEnd(b, 'lengthB')],
+    value: gap.distance,
+    // A ponta da parede cotada não depende da referência: só o plano da perpendicular a usa.
+    ends: [
+      { at: a, slot: `${slot}Self`, kind: 'wall', current: ref, options: [ref] },
+      { at: b, slot, kind: 'wall', current: ref, options: WALL_DIM_REFS },
+    ],
     edit,
   };
 }
@@ -126,14 +127,19 @@ function gapDim(frame: WallFrame, gap: ParallelGap, ref: WallDimRef): TempDim {
   };
 }
 
-/** Comprimento e distâncias perpendiculares às paralelas vizinhas de uma parede. */
+/**
+ * Cotas de uma parede: da ponta até a perpendicular mais próxima (por ponta) e, só se não houver perpendicular, até a
+ * paralela mais próxima. O comprimento da própria parede nunca é cota temporária.
+ */
 export const wallDimProvider: DimProvider<WallDimSubject> = {
   id: PROVIDER_ID,
   compute(ctx, subject) {
     const frame = frameOfWall(ctx.project, subject.wallId);
     if (!frame) return [];
     const ref = wallRefFor(ctx, 'wall');
-    return [lengthDim(ctx, frame), ...nearestParallel(ctx, frame, ref).map((g) => gapDim(frame, g, ref))];
+    const axis = axisGaps(ctx.project, frame, ref);
+    if (axis.length > 0) return axis.map((g) => axisDim(frame, g, ref));
+    return nearestParallel(ctx, frame, ref).map((g) => gapDim(frame, g, ref));
   },
   selectionSubject(project, id) {
     const w = project.elements[id];

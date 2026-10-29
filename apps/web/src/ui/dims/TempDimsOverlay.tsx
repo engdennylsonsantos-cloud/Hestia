@@ -5,6 +5,7 @@ import { editor } from '../../editor/controller.ts';
 import { setDimOverride, useUi } from '../../editor/state.ts';
 import { currentUnits, useFormat } from '../useUnits.ts';
 import { INVALID_FLASH_MS, resolveDimEdit } from './dimsActions.ts';
+import { larguraDoCampo } from './dimsBox.ts';
 import { capturesPointer, rectAround, swallowsPointerButton } from './dimsHit.ts';
 import { viewOfDim } from './dimsView.ts';
 import { toolDims, useDimContext, useSelectionDims } from './useSelectionDims.ts';
@@ -100,6 +101,7 @@ export function TempDimsOverlay(): ReactElement | null {
   const cursorPx = cursor ? toScreen(cursor) : null;
   const captures = (rect: ReturnType<typeof rectAround>): 'auto' | 'none' => auto(capturesPointer(rect, cursorPx, previewing));
   const first = views[0]!.view.textAt;
+  const firstWidth = larguraDoCampo(editing?.key === views[0]!.dim.key ? editing.text : format('length', views[0]!.dim.value, { withUnit: false, trim: true }));
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 12, pointerEvents: 'none' }}>
       <svg width={viewport.width} height={viewport.height} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} aria-hidden="true">
@@ -116,8 +118,9 @@ export function TempDimsOverlay(): ReactElement | null {
         ))}
       </svg>
       {views.map(({ dim, view }) => {
-        const active = editing?.key === dim.key;
         const shown = format('length', dim.value, { withUnit: false, trim: true });
+        const texto = editing?.key === dim.key ? editing.text : shown;
+        const width = larguraDoCampo(texto);
         return (
           <div key={view.key}>
             <input
@@ -125,8 +128,8 @@ export function TempDimsOverlay(): ReactElement | null {
               aria-label={`Cota: ${dim.key.split(':').pop()}`}
               title={view.editable ? 'Digite a medida e pressione Enter' : 'Cota de leitura'}
               readOnly={!view.editable}
-              style={{ ...BOX, left: view.textAt.x - 31, top: view.textAt.y - 11, pointerEvents: view.editable ? 'auto' : captures({ x: view.textAt.x - 31, y: view.textAt.y - 11, w: 62, h: 22 }), ...(view.invalid ? { borderColor: DANGER, color: DANGER } : {}) }}
-              value={active ? editing.text : shown}
+              style={{ ...BOX, width, left: view.textAt.x - width / 2, top: view.textAt.y - 11, pointerEvents: view.editable ? 'auto' : captures({ x: view.textAt.x - width / 2, y: view.textAt.y - 11, w: width, h: 22 }), ...(view.invalid ? { borderColor: DANGER, color: DANGER } : {}) }}
+              value={texto}
               onPointerDown={stop}
               onPointerUp={stop}
               onClick={stop}
@@ -170,7 +173,7 @@ export function TempDimsOverlay(): ReactElement | null {
         className="btn"
         aria-label="Converter em cotas permanentes"
         title="Converter em cotas permanentes"
-        style={{ position: 'absolute', left: first.x + 40, top: first.y - 11, width: 22, height: 22, padding: 0, pointerEvents: captures({ x: first.x + 40, y: first.y - 11, w: 22, h: 22 }), zIndex: 13 }}
+        style={{ position: 'absolute', left: first.x + firstWidth / 2 + 9, top: first.y - 11, width: 22, height: 22, padding: 0, pointerEvents: captures({ x: first.x + firstWidth / 2 + 9, y: first.y - 11, w: 22, h: 22 }), zIndex: 13 }}
         onPointerDown={stop}
         onPointerUp={stop}
         onClick={(e) => {

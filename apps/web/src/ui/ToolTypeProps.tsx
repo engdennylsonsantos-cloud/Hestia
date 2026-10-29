@@ -1,13 +1,13 @@
 import { useUi, type DialogKind } from '../editor/state.ts';
 import { useProject } from '../editor/controller.ts';
-import { DEFAULT_STAIR_RUN_OPTIONS, stairTypeForShape, stairTypeId, stairTypesForShape } from '@hestia/tools';
+import { DEFAULT_RAMP_OPTIONS, DEFAULT_STAIR_RUN_OPTIONS, stairTypeForShape, stairTypeId, stairTypesForShape } from '@hestia/tools';
 import type { ReactElement } from 'react';
 import { TypeSelector } from './TypeSelector.tsx';
-import { floorOptions, ceilingOptions, openingOptions, roofOptions, slabOptions, stairOptions, wallOptions } from './typeOptions.ts';
+import { floorOptions, ceilingOptions, openingOptions, rampOptions, roofOptions, slabOptions, stairOptions, wallOptions } from './typeOptions.ts';
 import { setStairOpt } from './StairOptionsBar.tsx';
 
 /** Ferramentas de colocação com tipo: a paleta mostra o tipo escolhido antes de desenhar (o mesmo valor da barra de opções). */
-export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'roofextrusion' | 'stair' | 'stairrun';
+export type ToolTypeKind = 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'roofextrusion' | 'stair' | 'stairrun' | 'ramp';
 const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   wall: 'Colocar Parede',
   door: 'Colocar Porta',
@@ -19,6 +19,7 @@ const TOOL_TYPE_LABEL: Record<ToolTypeKind, string> = {
   roofextrusion: 'Colocar Telhado por extrusão',
   stair: 'Colocar Escada (croqui)',
   stairrun: 'Colocar Escada',
+  ramp: 'Colocar Rampa',
 };
 
 export function isToolTypeKind(tool: string): tool is ToolTypeKind {
@@ -86,6 +87,14 @@ export function ToolTypeProps({ tool }: { tool: ToolTypeKind }): ReactElement {
       return (
         <TypeSelector categoryLabel={categoryLabel} triggerId="prop-stairruntype" label="Tipo de escada" options={stairOptions(p).filter((t) => allowed.has(t.id))} selectedId={sid || null}
           onSelect={(id) => setOpt({ stairRun: { ...(useUi.getState().options.stairRun ?? DEFAULT_STAIR_RUN_OPTIONS), typeId: id } })} onEdit={() => edit('stairType', sid)} />
+      );
+    }
+    case 'ramp': {
+      const current = o.ramp ?? DEFAULT_RAMP_OPTIONS;
+      const rid = current.typeId && p.rampTypes[current.typeId] ? current.typeId : (Object.keys(p.rampTypes)[0] ?? '');
+      return (
+        <TypeSelector categoryLabel={categoryLabel} triggerId="prop-ramptype" label="Tipo de rampa" options={rampOptions(p)} selectedId={rid || null}
+          onSelect={(id) => setOpt({ ramp: { ...current, typeId: id } })} onEdit={() => edit('rampType', rid)} />
       );
     }
   }

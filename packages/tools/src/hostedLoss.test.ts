@@ -44,6 +44,14 @@ describe('hostedLoss', () => {
     expect(hostedLossOfCommands(cena(), [{ type: 'transform', ids: ['h'], transform: { kind: 'translate', d: { x: 3, y: 0 } } }])).toEqual([]);
   });
 
+  it('encurtar pela ponta a usa a posição preservada para achar a abertura que sai', () => {
+    expect(hostedLoss(cena(), ends({ a: { x: 5, y: 0 } })).map((l) => l.id)).toEqual(['j1']);
+  });
+
+  it('estender pela ponta a não perde abertura', () => {
+    expect(hostedLoss(cena(), ends({ a: { x: -2, y: 0 } }))).toEqual([]);
+  });
+
   it('parede curva: encurtar o arco tira a abertura perto do fim', () => {
     const s = new ProjectStore(createEmptyProject());
     s.exec({ type: 'addWall', wall: makeWall({ id: 'c', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 6, y: 0 }, sag: 0.6 }) });

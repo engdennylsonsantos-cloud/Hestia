@@ -75,8 +75,8 @@ export function circuitRecalcCount(): number {
   return recalcCount;
 }
 
-let roomsCache = new Map<string, { sig: string; value: Polygon[] }>();
-let perimeterCache = new Map<string, { sig: string; value: Ring[] }>();
+const roomsCache = new Map<string, { sig: string; value: Polygon[] }>();
+const perimeterCache = new Map<string, { sig: string; value: Ring[] }>();
 
 /**
  * Espaços livres fechados pelas paredes do nível (face interna das paredes, como o "Pick Walls" do Revit).

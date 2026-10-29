@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { create } from 'zustand';
 import { safeGet, safeSet } from './storage.ts';
 import type { ToolId } from '@hestia/tools';

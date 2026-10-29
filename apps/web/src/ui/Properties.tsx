@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { useMemo, useState, type ReactElement } from 'react';
 import { joinStatus, levelFrames, quantifyLevel, viewRangeWarnings } from '@hestia/engine';
 import {

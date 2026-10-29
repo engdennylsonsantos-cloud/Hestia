@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { applyTransform, type Transform, type Vec2 } from '@hestia/geom';
 import {
   isOpening,

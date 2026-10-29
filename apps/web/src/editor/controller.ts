@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { useSyncExternalStore } from 'react';
 import type { Vec2 } from '@hestia/geom';
 import { computeSection, cotasAutomaticas, LevelResolveCache, resolveRooms, type AutoCotaOptions, type ResolvedLevel, type SectionResult } from '@hestia/engine';

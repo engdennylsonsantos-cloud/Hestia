@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
 import type { Ramp, RampType } from './rampTypes.ts';

@@ -176,7 +176,7 @@ export function roomRegions(p: Project, levelId: Id): Polygon[] {
 }
 
 /** Espaço livre do nível em cache por conteúdo das paredes (decisão 0023 §11): só o nível editado refaz a união. */
-let regionCache = new Map<Id, { sig: string; set: RegionSet }>();
+const regionCache = new Map<Id, { sig: string; set: RegionSet }>();
 
 /** Zera o cache do espaço livre (isolamento entre suítes de teste; o cache de circuitos é `resetCircuitCache`). */
 export function resetRegionCache(): void {

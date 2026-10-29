@@ -8,10 +8,10 @@ import {
   toLocal,
   type OpeningPlanPath,
 } from '@hestia/engine';
-import { dimensionSettingsOf, openingTypeById, openingType, openingsOfWall, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
+import { dimensionSettingsOf, openingTypeById, openingType, openingsOfWall, unitsOf, type DetailLevel, type Opening, type OpeningType, type Project, type Wall, type WallType } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
 import { hostUnder, occupiedRanges } from './infer.ts';
-import { parseNumber } from './numeric.ts';
+import { parseQuantityText } from './numeric.ts';
 import {
   anchorCenter,
   clampOpeningCenter,
@@ -323,7 +323,7 @@ export class OpeningTool extends ToolBase {
 
   override type(text: string): boolean {
     if (!this.current) return false;
-    const v = parseNumber(text);
+    const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) return false;
     const off = this.resolve(v, this.current.wallId);
     if (off === null) {

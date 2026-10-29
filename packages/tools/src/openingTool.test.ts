@@ -267,6 +267,25 @@ describe('colocação da abertura: prévia e cotas', () => {
     expect(t.type!('2.75')).toBe(false);
     expect(openings(ctx)).toHaveLength(1);
   });
+
+  it('a distância digitada respeita a unidade de comprimento do projeto', () => {
+    const ctx = makeEnv();
+    ctx.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    makeWall(ctx, [0, 0], [6, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(3, 0.1));
+    expect(t.type!('100')).toBe(true);
+    expect(openings(ctx)[0]!.offset).toBeCloseTo(1, 6);
+  });
+
+  it('o sufixo explícito vale mesmo com o projeto em metros', () => {
+    const ctx = makeEnv();
+    makeWall(ctx, [0, 0], [6, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(3, 0.1));
+    expect(t.type!('150cm')).toBe(true);
+    expect(openings(ctx)[0]!.offset).toBeCloseTo(1.5, 6);
+  });
 });
 
 describe('colocação da abertura: etiquetar ao inserir', () => {

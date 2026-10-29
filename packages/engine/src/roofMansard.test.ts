@@ -68,6 +68,14 @@ describe('mansarda automática', () => {
     expect(r.problem).toMatch(/não cabe/);
   });
 
+  it('a mensagem de recusa segue as unidades do projeto', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    s.exec({ type: 'addRoof', roof: makeRoof({ id: 'r1', typeId: 'rt_ceramica', levelId: 'lv_0', slopePercent: 30, shape: 'hip', boundary: rect(10, 8), mansard: { ...MANSARD, run: 4 } }) });
+    const r = resolveRoofs(s.project, 'lv_0')[0]!;
+    expect(r.problem).toContain('400,0 cm');
+  });
+
   it('convive com o arco real (edgeSag)', () => {
     const r = one({ boundary: rect(10, 8), edgeSag: [0.5, 0, 0, 0], mansard: MANSARD });
     expect(r.problem).toBeUndefined();

@@ -113,7 +113,7 @@ export function roofPatchProblem(p: Project, ids: Id[], patch: Partial<Roof>): s
   if (!Object.keys(patch).some((k) => GEOMETRY_KEYS.includes(k as keyof Roof))) return null;
   const roofs = ids.map((id) => p.elements[id]).filter(isRoof).map((r) => ({ ...r, ...patch }));
   // Mansarda com número inválido ou larga demais: recusa com a mensagem da validação do modelo.
-  const mansard = roofs.flatMap((r) => mansardProblems(r, `"${r.mark || r.id}"`))[0];
+  const mansard = roofs.flatMap((r) => mansardProblems(r, `"${r.mark || r.id}"`, unitsOf(p)))[0];
   return mansard ? mansard.message : roofProblem(p, roofs);
 }
 

@@ -8,6 +8,7 @@ import {
   openingFavorites,
   openingLineConvention,
   openingProfilesOf,
+  unitsOf,
   type Id,
   type Opening,
   type OpeningType,
@@ -97,7 +98,7 @@ export function OpeningTypeDialog({ typeId }: { typeId: string }): ReactElement 
   const favorite = openingFavorites(p).includes(d.id);
   const counts = familyCounts(p, d.kind);
   const variants = openingVariants(d.kind);
-  const checks = openingChecks(d, coreThicknessFor(p, d.id));
+  const checks = openingChecks(d, coreThicknessFor(p, d.id), unitsOf(p));
   /** Grava pelo comando; a mensagem de erro do modelo aparece no diálogo, que continua aberto. */
   const run = (fn: () => void): boolean => {
     try {

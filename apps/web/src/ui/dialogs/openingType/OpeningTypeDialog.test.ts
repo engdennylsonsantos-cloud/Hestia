@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_OPENING_TYPES, openingFamilies, type OpeningType } from '@hestia/model';
 import { openingChecks } from '@hestia/engine';
 import { editor } from '../../../editor/controller.ts';
@@ -22,6 +22,10 @@ vi.mock('../../../editor/controller.ts', async () => {
 const tipo = (id: string): OpeningType => DEFAULT_OPENING_TYPES.find((t) => t.id === id)!;
 const vazio = (): void => {};
 
+afterEach(() => {
+  editor.store.exec({ type: 'setSettings', patch: { units: undefined } });
+});
+
 describe('diálogo do tipo de abertura (render)', () => {
   it('renderiza o diálogo completo com biblioteca, lista de componentes e verificações', () => {
     const d = tipo('ot_p90');
@@ -37,6 +41,13 @@ describe('diálogo do tipo de abertura (render)', () => {
     expect(html).toContain('Inverter dobradiça');
     expect(html).toContain('+ Novo tipo');
     expect(html).toContain('Aplicar');
+  });
+
+  it('as verificações de abertura seguem as unidades do projeto', () => {
+    editor.store.exec({ type: 'upsertOpeningType', openingType: { ...tipo('ot_p90'), id: 'ot_unid' } });
+    editor.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const html = renderToStaticMarkup(createElement(OpeningTypeDialog, { typeId: 'ot_unid' }));
+    expect(html).toContain('Largura livre 80,0 cm');
   });
 
   it('lista os componentes da porta de giro e mostra o painel do escolhido', () => {

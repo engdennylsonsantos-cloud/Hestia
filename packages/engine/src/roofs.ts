@@ -1,5 +1,5 @@
 import { asMulti, difference, dot, multiArea, sub, type MultiPolygon, type SkeletonStep, type Vec2 } from '@hestia/geom';
-import { levelElevation, roofsOnLevel, type Id, type Project, type RafterCut, type Roof, type RoofEave, type RoofType } from '@hestia/model';
+import { levelElevation, roofsOnLevel, unitsOf, type Id, type Project, type RafterCut, type Roof, type RoofEave, type RoofType } from '@hestia/model';
 import { planeHas, WATER_MIN_AREA } from './roofGeom.ts';
 import { expandRoofArcs } from './roofArcs.ts';
 import { joinRoofs, type JoinItem } from './roofJoin.ts';
@@ -87,7 +87,7 @@ function baseOf(p: Project, raw: Roof): Base | null {
   // Nunca lança: um telhado malformado (arquivo antigo ou campo ausente) vira `problem`, não uma tela em branco.
   let water: ReturnType<typeof waterPlanesOf>;
   try {
-    water = waterPlanesOf(r, eaveZ);
+    water = waterPlanesOf(r, eaveZ, unitsOf(p));
   } catch (e) {
     water = { planes: [], problem: `telhado inválido: ${e instanceof Error ? e.message : 'erro desconhecido'}` };
   }

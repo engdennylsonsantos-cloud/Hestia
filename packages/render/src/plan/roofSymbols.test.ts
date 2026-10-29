@@ -48,7 +48,7 @@ describe('símbolo "define inclinação" coerente com o motor', () => {
     expect(o.strokes.filter((s) => s.closed && s.pts.length === 3 && s.color === LIGHT.inkSoft)).toHaveLength(2);
 
     // Os percentuais saem no meio das arestas de beiral (0 e 2), e não nas empenas.
-    const at = o.labels.filter((l) => l.text === '30 %').map((l) => l.at);
+    const at = o.labels.filter((l) => l.text === '30%').map((l) => l.at);
     expect(at).toHaveLength(2);
     expect(at[0]!.x).toBeCloseTo(4, 9);
     expect(at[0]!.y).toBeCloseTo(-0.3, 9);

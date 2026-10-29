@@ -1,6 +1,8 @@
 import { dist, type Vec2 } from '@hestia/geom';
 import { newId } from '@hestia/model';
 import { ToolBase } from './base.ts';
+import { detailLinePreviewDim } from './dims/providers/line.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 import type { PointerInfo } from './types.ts';
 
 /** Linha de detalhe: traço 2D independente da geometria do modelo, restrito ao nível ativo. */
@@ -9,11 +11,17 @@ export class DetailLineTool extends ToolBase {
   readonly label = 'Linha de detalhe';
   readonly hint = 'Linha de detalhe: clique no início e no fim.';
   private a: Vec2 | null = null;
-  protected reset(): void { this.a = null; this.items = []; this.inf = null; }
+  private last: Vec2 | null = null;
+  protected reset(): void { this.a = null; this.last = null; this.items = []; this.inf = null; }
   protected busy(): boolean { return this.a !== null; }
   override move(p: PointerInfo): void {
     const q = this.snap(p).point;
+    this.last = q;
     this.items = this.a ? [{ kind: 'line', a: this.a, b: q, dashed: true }] : [];
+  }
+  /** Comprimento do traço em desenho, pelo sistema único de cotas. */
+  tempDims(_overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] {
+    return this.a && this.last ? [detailLinePreviewDim(this.a, this.last)] : [];
   }
   override click(p: PointerInfo): void {
     const q = this.snap(p).point;

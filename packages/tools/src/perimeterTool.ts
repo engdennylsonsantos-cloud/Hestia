@@ -13,6 +13,8 @@ import type { PointerInfo, PreviewItem, ToolEnv } from './types.ts';
 import { DraftHistory } from './perimeterToolModifyHistory.ts';
 import { ModifyFlow } from './perimeterToolModify.ts';
 import { BoxSelection, type SelectionBox } from './perimeterToolSelect.ts';
+import { perimeterDraftDims } from './perimeterToolDims.ts';
+import type { DimRef, TempDim } from './dims/types.ts';
 
 /** Forma escolhida na barra: uma forma de SHAPE_KINDS, ou um dos dois modos de contorno por referência. */
 export type PerimeterShape = ShapeKindId | 'pickFace' | 'byPerimeter' | 'pickRoom';
@@ -89,13 +91,9 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Forma escolhida na barra, ou null (modo de seleção). */
-  activeShape(): PerimeterShape | null {
-    return this.shape;
-  }
+  activeShape(): PerimeterShape | null { return this.shape; }
 
-  lineKind(): LineKind {
-    return this.line;
-  }
+  lineKind(): LineKind { return this.line; }
 
   /** Validação corrente do rascunho, para a barra de status e o botão Concluir. */
   closeInfo(): SketchResult {
@@ -122,6 +120,8 @@ export class PerimeterTool extends ToolBase {
   override preview(): PreviewItem[] {
     return this.mod.active() ? this.mod.preview() : this.items;
   }
+
+  tempDims = (overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] => perimeterDraftDims(this.env.project(), this.env.levelId(), this.d, this.step, this.raw, overrides);
 
   /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento e desliga o comando de Modificar. */
   setShape(kind: PerimeterShape | null): void {
@@ -399,9 +399,7 @@ export class PerimeterTool extends ToolBase {
   }
 
   /** Muda o rascunho como passo de desfazer (geometria). Seleção só troca o corrente, sem passo. */
-  private commit(next: SketchDraft): void {
-    this.draftHistory.push(next);
-  }
+  private commit(next: SketchDraft): void { this.draftHistory.push(next); }
 
   /** "Por ambiente": o contorno do ambiente entra no esboço e o id do ambiente vai para a origem. */
   private roomStep(r: ReturnType<typeof roomClick>): void {

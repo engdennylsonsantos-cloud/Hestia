@@ -10,11 +10,11 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [x] C4 `packages/tools` (`03`; só depois do marco M2; respeite os arquivos reservados)
 - [x] C6 `packages/render` e `packages/io`
 - [x] D10.1 parede (`04`; só depois do marco M5)
-- [ ] D10.2 linha e perímetro
-- [ ] D10.3 eixos
+- [x] D10.2 linha e perímetro
+- [x] D10.3 eixos
 - [x] D10.4 piso/laje/telhado/forro (cotas de leitura)
 - [x] D10.5 mover/copiar
-- [x] `npm run check` verde: 558 arquivos, 6447 testes (pendentes funcionais D10.2/D10.3)
+- [x] `npm run check`: lint/tsc/fronteiras/unidades ok; 558 arquivos, 6466/6467 testes. Única falha: snapshot `packages/render/src/plan/__snapshots__/sketch.test.ts.snap` (espera "30 %" e o formato canônico agora é "30%"); NÃO atualizei/commitei o snapshot por instrução do orquestrador — o COTAS regrava na F1.
 
 ## S1 — o que cada modo calcula (3 linhas)
 - `wall` (padrão): `D` = espessura TOTAL do tipo de parede (`totalThickness`, todas as camadas com revestimentos) e `Cd` = 0, o plano médio da parede.
@@ -63,7 +63,15 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - D10.1 parede: `dims/providers/wall.ts` mede o comprimento (edita a extremidade b via `resizeWallCommands` + `hostedConflicts`) e a distância perpendicular às paralelas vizinhas entre os planos de `wallRef` (edita transladando a parede; hospedados acompanham). Registrado para a seleção; `wallTool.tempDims()` mostra o comprimento do segmento em desenho. Falta só a distância à paralela na PRÉVIA da ferramenta (a seleção já a mostra).
 - D10.4 contorno: `dims/providers/outline.ts` cota cada lado de piso/laje/forro/telhado (somente leitura, porque `outlineEdit.ts` não tem operação pura de comprimento); registrado para os quatro tipos.
 - D10.5 deslocamento: `dims/providers/displacement.ts` mede ponto-base→cursor; `MoveTool.tempDims()` usa o provedor (Copiar herda).
-- PENDENTES: D10.2 (linhas de detalhe/perímetro) e D10.3 (grades) — as linhas/grades não são elementos de `project.elements`, então o `selectionDims` do registro (arquivo do COTAS) não as alcança; integrar exige ampliar o registro/overlay (PEDIDO COTAS) ou um caminho próprio de seleção. Não implementei para não invadir o arquivo do outro agente.
+- D10.2 linha/perímetro: `dims/providers/line.ts` traz a linha de detalhe (cota do nível, editável por `updateDetailLine`) e o trecho do rascunho do Perímetro (só leitura; a digitação segue no fluxo de `PerimeterTool.type`). `DetailLineTool.tempDims()` cota o traço em desenho; `PerimeterTool.tempDims()` cota as linhas selecionadas ou o lado em desenho (via `subjectDims` em `perimeterToolDims.ts`). Registrado para `'detailLine'` e `'perimeterLine'` (M6 do COTAS).
+- D10.3 eixos: `dims/providers/grid.ts` mede a distância às grades paralelas retas mais próximas de cada lado (eixos) e translada a grade editando os pontos por `updateGrid`. Grades em arco ficam sem cota (a corda não é o eixo); o registro usa `selectionSubject` do sujeito `'grid'` do M6.
+- Verificação no navegador (dev server 5199 + Chromium via `playwright-core`, `?debug=1`): linha de detalhe criada/selecionada mostrou "3" e, ao digitar 5, o fim foi para x=5; grade g1 entre g2/g3 mostrou "2" e "1,5"; rascunho de perímetro com 2 linhas selecionadas mostrou "4" e "3". Sem erros de página (só o 404 do favicon).
+- PENDENTES: escadas, ambientes e seções (decisão do dono, como o plano pede). O PEDIDO do `dimensionTool.ts` foi atendido pelo COTAS no M6; restou só o registro dos três tipos acima no `dims/registry.ts` (linhas de registro acrescentadas).
+
+## Ajustes de integração (fora do D10, causados pelo merge das unidades)
+- `fmtPercent` da planta (C6, feito) passou a usar `formatQuantity`: o formato canônico é "30%" (sem espaço), como em `unitsFormat.test`. Atualizei as expectativas inline de `roofs.test.ts`, `roofSymbols.test.ts` e `sketch.test.ts` e regravei `ouroZoom.json` (87 entradas, CRLF preservado).
+- `OpeningScheduleDialog.test.ts` (arquivo da UNID, ajuste mínimo de expectativa): a folga inferior agora sai na unidade pequena do projeto ("0,7 cm", não "7 mm"). Registro como desvio para a UNID revisar.
+- Snapshot `sketch.test.ts.snap`: não atualizado/commitado por instrução; a divergência é só o espaço de "30 %" → "30%".
 - PEDIDO COTAS: `dims/registry.ts` recebeu só as linhas de registro dos provedores ESQ (wall/floor/slab/ceiling/roof); se o COTAS preferir registrar em outro lugar, é só mover essas linhas.
 - Escadas, ambientes e seções: não implementados (pendente de decisão do dono, como o plano pede).
 

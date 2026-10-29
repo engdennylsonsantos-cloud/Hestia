@@ -30,7 +30,7 @@ describe('quadro de portas e janelas (diálogo)', () => {
 
   it('a linha mostra o sentido da instância e as ferragens da porta de giro', () => {
     expect(html).toContain('dobradiça invertida, abre à esquerda de a→b');
-    expect(html).toContain('maçaneta a 1,00 m; 3 dobradiças; folga inferior 7 mm');
+    expect(html).toContain('maçaneta a 1,00 m; 3 dobradiças; folga inferior 0,7 cm');
     expect(html).toContain('Madeira');
   });
 });

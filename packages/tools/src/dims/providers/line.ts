@@ -1,0 +1,103 @@
+import { add, arcFromSagitta, dist, mul, norm, sub, type Vec2 } from '@hestia/geom';
+import type { Id, Project } from '@hestia/model';
+import type { DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
+
+/** Linha de detalhe a cotar (mora no nível, em `level.detailLines`). */
+export interface DetailLineDimSubject {
+  lineId: Id;
+}
+
+/** Um trecho do rascunho do Perímetro, montado pela ferramenta (não tem id no projeto). */
+export interface PerimeterDraftSeg {
+  id: string;
+  a: Vec2;
+  b: Vec2;
+  sag?: number;
+}
+
+/** Trechos do Perímetro a cotar: o lado em desenho ou as linhas selecionadas no rascunho. */
+export interface PerimeterLineDimSubject {
+  segs: ReadonlyArray<PerimeterDraftSeg>;
+}
+
+const DETAIL_ID = 'line';
+const PERIMETER_ID = 'perimeter';
+const DIM_OFFSET = 0.2;
+const MIN_LENGTH = 1e-6;
+
+const end = (at: Vec2, slot: string): DimEnd => ({ at, slot, kind: 'wall', current: 'axis', options: ['axis'] });
+
+/** Comprimento do trecho: a corda ou o arco, quando o trecho tem flecha. */
+export function segLength(a: Vec2, b: Vec2, sag?: number): number {
+  if (sag) {
+    const arc = arcFromSagitta(a, b, sag);
+    if (arc) return arc.length;
+  }
+  return dist(a, b);
+}
+
+/** Comprimento da linha de detalhe em desenho (prévia da ferramenta). */
+export function detailLinePreviewDim(a: Vec2, b: Vec2): TempDim {
+  return {
+    key: `${DETAIL_ID}:draft:length`,
+    a,
+    b,
+    offset: DIM_OFFSET,
+    value: dist(a, b),
+    ends: [end(a, 'draftA'), end(b, 'draftB')],
+  };
+}
+
+function findLine(project: Project, levelId: Id, id: Id) {
+  return project.levels.find((l) => l.id === levelId)?.detailLines?.find((x) => x.id === id) ?? null;
+}
+
+/** Cota do comprimento de uma linha de detalhe selecionada; editar move o fim na direção atual. */
+export const detailLineDimProvider: DimProvider<DetailLineDimSubject> = {
+  id: DETAIL_ID,
+  compute(ctx, { lineId }) {
+    const line = findLine(ctx.project, ctx.levelId, lineId);
+    if (!line) return [];
+    const length = dist(line.a, line.b);
+    if (length < MIN_LENGTH) return [];
+    const edit = (value: number): DimEditResult => {
+      if (!(value > 0)) return { error: 'Digite um comprimento maior que zero.' };
+      const u = norm(sub(line.b, line.a));
+      return { commands: [{ type: 'updateDetailLine', levelId: ctx.levelId, id: lineId, patch: { b: add(line.a, mul(u, value)) } }] };
+    };
+    return [{
+      key: `${DETAIL_ID}:${lineId}:length`,
+      a: line.a,
+      b: line.b,
+      offset: DIM_OFFSET,
+      value: length,
+      ends: [end(line.a, 'lengthA'), end(line.b, 'lengthB')],
+      edit,
+    }];
+  },
+  selectionSubject(project, id, levelId) {
+    return levelId && findLine(project, levelId, id) ? { lineId: id } : null;
+  },
+};
+
+/**
+ * Cotas de leitura dos trechos do Perímetro: o lado em desenho ou as linhas selecionadas. A digitação do comprimento
+ * continua no fluxo da própria sessão (`perimeterToolInput.ts`/`PerimeterTool.type`), então aqui não há `edit`.
+ */
+export const perimeterLineDimProvider: DimProvider<PerimeterLineDimSubject> = {
+  id: PERIMETER_ID,
+  compute(_ctx, { segs }) {
+    return segs.flatMap((s): TempDim[] => {
+      const value = segLength(s.a, s.b, s.sag);
+      if (value < MIN_LENGTH) return [];
+      return [{
+        key: `${PERIMETER_ID}:${s.id}`,
+        a: s.a,
+        b: s.b,
+        offset: DIM_OFFSET,
+        value,
+        ends: [end(s.a, `${s.id}A`), end(s.b, `${s.id}B`)],
+      }];
+    });
+  },
+};

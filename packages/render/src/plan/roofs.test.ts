@@ -164,12 +164,12 @@ describe('telhado na planta (D1)', () => {
     expect(shaft[1]!.y).toBeLessThan(1.5);
     expect(shaft[1]!.x).toBeCloseTo(4, 9);
     const labels = o.labels.map((l) => l.text);
-    expect(labels).toEqual(['30 %', '30 %']);
+    expect(labels).toEqual(['30%', '30%']);
   });
 
   it('percentual com vírgula quando não é inteiro', () => {
     const r = gable({ planes: [{ ...gable().planes[0]!, percent: 27.5 }] });
-    expect(ops([r]).labels.map((l) => l.text)).toEqual(['27,5 %']);
+    expect(ops([r]).labels.map((l) => l.text)).toEqual(['27,5%']);
   });
 
   it('coarse: só preenchimento, sem contorno, linhas, setas nem etiqueta de percentual', () => {
@@ -197,7 +197,7 @@ describe('seleção e hover de telhado (D1)', () => {
     expect(ops1.fills[0]).toMatchObject({ color: LIGHT.select, alpha: 0.26 });
     expect(ops1.strokes.some((s) => s.widthPx === 2)).toBe(true);
     // área real e, com o telhado selecionado, o percentual de cada aresta que define inclinação (A11): forma gable, só as 2 beiradas
-    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`, '30 %', '30 %']);
+    expect(ops1.labels.map((l) => l.text)).toEqual([`${(roofRealArea(real[0]!)).toFixed(2).replace('.', ',')} m²`, '30%', '30%']);
   });
 
   it('hover: só o azul translúcido', () => {
@@ -216,7 +216,7 @@ describe('integração com o motor (resolveRoofs real)', () => {
     expect(r!.planes).toHaveLength(2);
     expect(r!.lines.some((l) => l.kind === 'ridge')).toBe(true);
     const fills = roofFills(p, 'lv_0', LIGHT, false, 'medium', VIEW(100));
-    expect(fills.labels.map((l) => l.text)).toEqual(['30 %', '30 %']);
+    expect(fills.labels.map((l) => l.text)).toEqual(['30%', '30%']);
   });
 
   it('a lista completa desenha o telhado depois das paredes e pisos, e o subpavimento apagado vem antes', () => {
@@ -274,7 +274,7 @@ describe('aresta de empena e símbolo "define inclinação" (A10/A11)', () => {
     const filled = o.fills.filter((f) => f.color === LIGHT.accent);
     expect(filled).toHaveLength(6);
     for (const f of filled) expect(f.polygons[0]![0]!).toHaveLength(3);
-    expect(o.labels.filter((l) => l.text === '30 %')).toHaveLength(6);
+    expect(o.labels.filter((l) => l.text === '30%')).toHaveLength(6);
   });
 
   it('aresta sem inclinação (null): triângulo vazado e cinza, sem triângulo cheio; a empena fica tracejada no contorno', () => {
@@ -289,7 +289,7 @@ describe('aresta de empena e símbolo "define inclinação" (A10/A11)', () => {
     const p = edgesProject(L_BOUNDARY, [30, 30, 30, 30, 30, 30]);
     const o = roofSelectionOps(p, 'lv_0', [], null, LIGHT, VIEW(100));
     expect(o.fills.some((f) => f.color === LIGHT.accent)).toBe(false);
-    expect(o.labels.some((l) => l.text === '30 %')).toBe(false);
+    expect(o.labels.some((l) => l.text === '30%')).toBe(false);
   });
 });
 

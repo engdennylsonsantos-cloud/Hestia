@@ -24,7 +24,7 @@ if (exportacao.status !== 0) {
   process.exit(exportacao.status ?? 1);
 }
 
-const arquivos = ['house2', 'studio', 'house-premium', 'predio10', 'esquadrias'];
+const arquivos = ['house2', 'studio', 'house-premium', 'predio10', 'esquadrias', 'casa-ambientes'];
 const linhas: string[] = [];
 const relatorio: Record<string, unknown> = {};
 

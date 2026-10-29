@@ -41,6 +41,18 @@ intercâmbio: cada programa reconstrói tipos, juntas e pranchas à sua maneira.
 10. **Georreferência**: `IfcSite`/`TrueNorth`; `IfcMapConversion` quando houver CRS; origem local pequena.
 11. **Anotações/pranchas**: `IfcAnnotation` quando fizer sentido; prancha não tem padrão IFC — PDF ao lado e metadados.
 
+> **Exceção de camada (2026-10-29):** `packages/io` pode importar `@hestia/engine` **apenas no exportador IFC**, para
+> usar os contornos de ambiente e os quantitativos resolvidos (`IfcSpace`, `Qto_*`). O importador e o DXF continuam
+> dependendo só de `model`. A regra está em `scripts/check-boundaries.mjs` e em `packages/io/package.json`.
+
+### Resultado da onda 1
+
+- 5 templates + `casa-ambientes` exportam com **0 erros** no IfcOpenShell.
+- `IfcSpace` e `IfcGrid` saem (o template sintético `casa-ambientes` comprova 1 ambiente e 1 eixo).
+- Pisos/lajes/forros com `PredefinedType`, camadas completas e furos; telhado com águas e escada com lances.
+- `Pset_Hestia_*` faz o round-trip exato dos 6 templates (JSON canônico idêntico).
+- `ifc:quality` e `roundtrip --strict` são os gates; `test:ifc-export` tem 100 testes.
+
 ## O que não é possível prometer
 
 - Que o Revit mantenha as juntas, o intervalo de vista, a prancha e o texto exatamente como no Hestia.

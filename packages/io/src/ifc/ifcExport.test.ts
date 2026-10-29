@@ -4,6 +4,7 @@ import {
   isOpening,
   isWall,
   levelElevation,
+  makeWall,
   openingSill,
   openingType,
   wallBaseElevation,
@@ -18,6 +19,7 @@ import {
 } from '@hestia/model';
 import { doorOperation, exportIfc, windowOperation } from './ifcExport.ts';
 import { ifcGuid } from './ifcGuid.ts';
+import { num, stepString } from './ifcStep.ts';
 import type { IfcGeometry, IfcOpeningGeo, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
 
 const TS = '2026-01-01T00:00:00';
@@ -74,6 +76,67 @@ function wallRect(w: Wall, th: number): Array<{ x: number; y: number }> {
 
 const count = (text: string, type: string): number => (text.match(new RegExp(`=${type}\\(`, 'g')) ?? []).length;
 
+/** Linhas `#n=TIPO(...);` do texto, em ordem. */
+const entityLines = (text: string, type: string): string[] =>
+  [...text.matchAll(new RegExp(`^#\\d+=${type}\\(.*\\);$`, 'gm'))].map((m) => m[0]);
+
+/** Mapa id STEP → corpo da entidade (`TIPO(...)`), para resolver referências nos testes. */
+function entitiesById(text: string): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const m of text.matchAll(/^#(\d+)=(.*);$/gm)) out.set(Number(m[1]), m[2]!);
+  return out;
+}
+
+/** Atributos de uma linha STEP, separados por vírgula no nível de fora (respeita texto e listas). */
+function attrsOf(line: string): string[] {
+  const body = line.slice(line.indexOf('(') + 1, line.lastIndexOf(')'));
+  const out: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]!;
+    if (quoted) {
+      current += ch;
+      if (ch === "'") {
+        if (body[i + 1] === "'") {
+          current += "'";
+          i++;
+        } else quoted = false;
+      }
+      continue;
+    }
+    if (ch === "'") {
+      quoted = true;
+      current += ch;
+    } else if (ch === '(') {
+      depth++;
+      current += ch;
+    } else if (ch === ')') {
+      depth--;
+      current += ch;
+    } else if (ch === ',' && depth === 0) {
+      out.push(current.trim());
+      current = '';
+    } else current += ch;
+  }
+  out.push(current.trim());
+  return out;
+}
+
+/** Ids `#n` citados em um atributo (referência simples ou lista). */
+const refsIn = (value: string): number[] => [...value.matchAll(/#(\d+)/g)].map((m) => Number(m[1]));
+
+/** Propriedades (`IFCPROPERTYSINGLEVALUE`) de um `IFCPROPERTYSET`, por nome. */
+function propsOfPset(line: string, byId: Map<number, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const id of refsIn(attrsOf(line)[4] ?? '')) {
+    const a = attrsOf(byId.get(id) ?? '');
+    if (a.length >= 3) out.set(a[0]!.replace(/^'|'$/g, ''), a[2]!);
+  }
+  return out;
+}
+
 /** Todo `#n` referenciado tem de existir como entidade definida. */
 function danglingRefs(text: string): number[] {
   const defined = new Set([...text.matchAll(/^#(\d+)=/gm)].map((m) => Number(m[1])));
@@ -90,8 +153,8 @@ describe('doorOperation: famílias novas', () => {
     expect(doorOperation({ plan: 'bifold' }, true)).toBe('FOLDING_TO_RIGHT');
     expect(doorOperation({ plan: 'accordion' }, false)).toBe('FOLDING_TO_LEFT');
     expect(doorOperation({ plan: 'accordion' }, true)).toBe('FOLDING_TO_RIGHT');
-    expect(doorOperation({ plan: 'garage' }, false)).toBe('SECTIONAL_OVERHEAD');
-    expect(doorOperation({ plan: 'garage' }, true)).toBe('SECTIONAL_OVERHEAD');
+    expect(doorOperation({ plan: 'garage' }, false)).toBe('ROLLINGUP');
+    expect(doorOperation({ plan: 'garage' }, true)).toBe('ROLLINGUP');
   });
 });
 
@@ -125,8 +188,33 @@ describe('exportIfc: catálogo completo no mostruário', () => {
       const t = p.openingTypes[o.typeId]!;
       expect(windowOperation(t, o.flipHand), `${o.id} ${t.plan}`).not.toBe('NOTDEFINED');
     }
-    expect(count(text, 'IFCWINDOWPANELPROPERTIES')).toBe(janelas.length);
+    expect(count(text, 'IFCWINDOWPANELPROPERTIES')).toBe(janelas.length + new Set(janelas.map((o) => o.typeId)).size);
     expect(text.includes("'NOTDEFINED'")).toBe(false);
+  });
+
+  it('cada tipo de porta/janela sai como IFCDOORTYPE/IFCWINDOWTYPE com operação e divisão', () => {
+    const byId = entitiesById(text);
+    const doorTypes = entityLines(text, 'IFCDOORTYPE');
+    expect(doorTypes).toHaveLength(new Set(portas.map((o) => o.typeId)).size);
+    for (const line of doorTypes) {
+      const a = attrsOf(line);
+      expect(a[9]).toBe('.DOOR.');
+      expect(a[10], line).toMatch(/^\.[A-Z_]+\.$/);
+      expect(a[10], line).not.toBe('.NOTDEFINED.');
+      expect(a[0]!.replace(/^'|'$/g, '')).toMatch(/^[0-9A-Za-z_$]{22}$/);
+    }
+    const windowTypes = entityLines(text, 'IFCWINDOWTYPE');
+    expect(windowTypes).toHaveLength(new Set(janelas.map((o) => o.typeId)).size);
+    for (const line of windowTypes) {
+      const a = attrsOf(line);
+      expect(a[9]).toBe('.WINDOW.');
+      expect(a[10], line).toMatch(/^\.[A-Z_]+\.$/);
+      // O IFC4 não tem Operation no IFCWINDOWTYPE: a operação vai nas panel properties do tipo (HasPropertySets).
+      const panel = attrsOf(byId.get(refsIn(a[5]!)[0]!)!);
+      expect(panel[4], line).toMatch(/^\.[A-Z_]+\.$/);
+      expect(panel[4], line).not.toBe('.NOTDEFINED.');
+    }
+    expect(count(text, 'IFCRELDEFINESBYTYPE')).toBe(new Set(portas.map((o) => o.typeId)).size + new Set(janelas.map((o) => o.typeId)).size);
   });
 });
 
@@ -161,6 +249,101 @@ describe('exportIfc', () => {
   it('cada parede com camadas positivas tem um IFCMATERIALLAYERSETUSAGE', () => {
     const withLayers = Object.values(p.elements).filter((e) => isWall(e) && wallType(p, e).layers.some((l) => l.thickness > 0)).length;
     expect(count(text, 'IFCMATERIALLAYERSETUSAGE')).toBe(withLayers);
+  });
+
+  it('as camadas saem na ordem externa→interna, com material, espessura e nome, um conjunto por tipo', () => {
+    const byId = entitiesById(text);
+    const usedTypes = new Map<string, ReturnType<typeof wallType>>();
+    for (const e of Object.values(p.elements)) {
+      if (!isWall(e)) continue;
+      const t = wallType(p, e);
+      if (t.layers.some((l) => l.thickness > 0)) usedTypes.set(t.id, t);
+    }
+    const sequenceOf = (line: string): string =>
+      refsIn(attrsOf(line)[0]!)
+        .map((id) => {
+          const layer = attrsOf(byId.get(id)!);
+          const material = attrsOf(byId.get(Number(layer[0]!.slice(1)))!)[0]!;
+          return `${material}|${layer[1]!}`;
+        })
+        .join(';');
+    const expected = [...usedTypes.values()].map((t) =>
+      t.layers
+        .filter((l) => l.thickness > 0)
+        .map((l) => `${stepString(p.materials[l.materialId]!.name)}|${num(l.thickness)}`)
+        .join(';'),
+    );
+    const sets = entityLines(text, 'IFCMATERIALLAYERSET');
+    expect(sets).toHaveLength(usedTypes.size);
+    expect(sets.map(sequenceOf).sort()).toEqual(expected.sort());
+  });
+
+  it('Pset_WallCommon traz IsExternal booleano, LoadBearing e Reference em cada parede', () => {
+    const byId = entitiesById(text);
+    const psets = entityLines(text, 'IFCPROPERTYSET').filter((l) => attrsOf(l)[2] === "'Pset_WallCommon'");
+    expect(psets).toHaveLength(walls);
+    const externals: string[] = [];
+    for (const line of psets) {
+      const props = propsOfPset(line, byId);
+      expect(props.get('IsExternal'), line).toMatch(/^IFCBOOLEAN\(\.(T|F)\.\)$/);
+      expect(props.get('LoadBearing'), line).toBe('IFCBOOLEAN(.F.)');
+      expect(props.get('Reference'), line).toMatch(/^IFCLABEL\('.*'\)$/);
+      externals.push(props.get('IsExternal')!);
+    }
+    // A casa de teste tem o perímetro externo e quatro divisórias: a fachada é a que dá para fora.
+    expect(externals.filter((v) => v === 'IFCBOOLEAN(.T.)')).toHaveLength(4);
+  });
+
+  it('FireRating, ThermalTransmittance e AcousticRating do tipo de parede saem quando informados', () => {
+    const t = p.wallTypes.wt_ext19!;
+    const q: Project = { ...p, wallTypes: { ...p.wallTypes, wt_ext19: { ...t, fireRating: 30, thermalU: 0.45, acousticRw: 42 } } };
+    const out = exportIfc(q, geo, { timestamp: TS });
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('FireRating',$,IFCLABEL('30 min'),$)");
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('ThermalTransmittance',$,IFCREAL(0.450000),$)");
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('AcousticRating',$,IFCLABEL('42 dB'),$)");
+  });
+
+  it('portas e janelas têm OverallHeight/OverallWidth do tipo e Pset comum com IsExternal', () => {
+    const byId = entitiesById(text);
+    const opens = Object.values(p.elements).filter(isOpening);
+    const byGid = new Map(opens.map((o) => [ifcGuid(`${o.kind}:${o.id}`), o]));
+    for (const type of ['IFCDOOR', 'IFCWINDOW'] as const) {
+      for (const line of entityLines(text, type)) {
+        const a = attrsOf(line);
+        const o = byGid.get(a[0]!.replace(/^'|'$/g, ''));
+        expect(o, line).toBeDefined();
+        const t = openingType(p, o!);
+        expect(Number(a[8]), line).toBeCloseTo(t.height, 6);
+        expect(Number(a[9]), line).toBeCloseTo(t.width, 6);
+      }
+    }
+    const doors = entityLines(text, 'IFCDOOR').length;
+    const windows = entityLines(text, 'IFCWINDOW').length;
+    const doorCommon = entityLines(text, 'IFCPROPERTYSET').filter((l) => attrsOf(l)[2] === "'Pset_DoorCommon'");
+    const windowCommon = entityLines(text, 'IFCPROPERTYSET').filter((l) => attrsOf(l)[2] === "'Pset_WindowCommon'");
+    expect(doorCommon).toHaveLength(doors);
+    expect(windowCommon).toHaveLength(windows);
+    for (const line of [...doorCommon, ...windowCommon]) {
+      const props = propsOfPset(line, byId);
+      expect(props.get('IsExternal'), line).toMatch(/^IFCBOOLEAN\(\.(T|F)\.\)$/);
+      expect(props.get('Reference'), line).toMatch(/^IFCLABEL\('.*'\)$/);
+    }
+    for (const line of windowCommon) expect(propsOfPset(line, byId).get('GlazingAreaFraction'), line).toMatch(/^IFCREAL\(/);
+  });
+
+  it('Pset da abertura traz FireRating/uValue do tipo e Reference = mark do vão', () => {
+    const t = p.openingTypes.ot_p90!;
+    const opening = Object.values(p.elements).find((e): e is Opening => isOpening(e) && e.typeId === 'ot_p90')!;
+    const q: Project = {
+      ...p,
+      openingTypes: { ...p.openingTypes, ot_p90: { ...t, fireRating: 'EI 30', uValue: 2.1, acousticRw: 32 } },
+      elements: { ...p.elements, [opening.id]: { ...opening, mark: 'D-99' } },
+    };
+    const out = exportIfc(q, geo, { timestamp: TS });
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('FireRating',$,IFCLABEL('EI 30'),$)");
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('ThermalTransmittance',$,IFCREAL(2.100000),$)");
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('AcousticRating',$,IFCLABEL('32 dB'),$)");
+    expect(out).toContain("IFCPROPERTYSINGLEVALUE('Reference',$,IFCLABEL('D-99'),$)");
   });
 
   it('GlobalIds das entidades com raiz são de 22 caracteres e únicos', () => {
@@ -211,5 +394,48 @@ describe('exportIfc', () => {
     expect(count(out, 'IFCSTAIRFLIGHT')).toBe(1);
     expect(out).toContain("'Brep'");
     expect(out).toContain('.SHED_ROOF.');
+  });
+});
+
+describe('exportIfc: perfil superior da parede', () => {
+  it('vira IFCARBITRARYCLOSEDPROFILEDEF extrudado na espessura, com o degrau do perfil', () => {
+    const base = buildTemplate('blank');
+    const wall: Wall = {
+      ...makeWall({ id: 'wp', typeId: 'wt_alv9', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }),
+      order: 1,
+      topProfile: [
+        { t: 0, h: 3 },
+        { t: 2, h: 3 },
+        { t: 2, h: 2 },
+        { t: 4, h: 2 },
+      ],
+    };
+    const p: Project = { ...base, elements: { wp: wall } };
+    const footprint: IfcPolygon = [[
+      { x: 0, y: -0.062 },
+      { x: 4, y: -0.062 },
+      { x: 4, y: 0.062 },
+      { x: 0, y: 0.062 },
+    ]];
+    const geo: IfcGeometry = {
+      walls: [{ wallId: 'wp', footprints: [footprint], baseZ: 0, height: 3 }],
+      openings: [],
+      floors: [],
+      slabs: [],
+      roofs: [],
+      stairs: [],
+    };
+    const out = exportIfc(p, geo, { timestamp: TS });
+    expect(danglingRefs(out)).toEqual([]);
+    // O perfil longitudinal usa um placement com eixo Z na normal da parede (as extrusões comuns deixam Axis = `$`).
+    const tilted = entityLines(out, 'IFCAXIS2PLACEMENT3D').filter((l) => attrsOf(l)[1] !== '$');
+    expect(tilted).toHaveLength(1);
+    for (const point of ['(0.000000,3.000000)', '(2.000000,3.000000)', '(2.000000,2.000000)', '(4.000000,2.000000)']) {
+      expect(out).toContain(`IFCCARTESIANPOINT(${point})`);
+    }
+    expect(entityLines(out, 'IFCEXTRUDEDAREASOLID').map((l) => Number(attrsOf(l)[3]))).toContain(0.124);
+
+    const flat = exportIfc({ ...p, elements: { wp: { ...wall, topProfile: null } } }, geo, { timestamp: TS });
+    expect(entityLines(flat, 'IFCAXIS2PLACEMENT3D').every((l) => attrsOf(l)[1] === '$')).toBe(true);
   });
 });

@@ -95,9 +95,9 @@ describe('exportIfc: objeto genérico (IFCBUILDINGELEMENTPROXY)', () => {
       ],
     };
     const out = exportIfc(projectWith(g), EMPTY, { timestamp: TS });
-    expect(count(out, 'IFCPROPERTYSET')).toBe(1);
-    expect(count(out, 'IFCPROPERTYSINGLEVALUE')).toBe(4);
-    expect(count(out, 'IFCRELDEFINESBYPROPERTIES')).toBe(1);
+    // O exportador também escreve os psets privados do Hestia (`Pset_Hestia_Element`/`_Project`); aqui interessa o
+    // pset do usuário, que mantém o nome curto `Pset_Hestia`.
+    expect((out.match(/'Pset_Hestia'/g) ?? []).length).toBe(1);
     expect(out).toContain("'Pset_Hestia'");
     expect(out).toContain("IFCLABEL('V1')");
     expect(out).toContain('IFCREAL(12.500000)');
@@ -106,11 +106,10 @@ describe('exportIfc: objeto genérico (IFCBUILDINGELEMENTPROXY)', () => {
     expect(danglingRefs(out)).toEqual([]);
   });
 
-  it('objeto sem propriedades não ganha property set', () => {
+  it('objeto sem propriedades não ganha property set do usuário', () => {
     const g: Generic = { ...cube('g_viga', 'lv_0', 0), ifcProperties: [] };
     const out = exportIfc(projectWith(g), EMPTY, { timestamp: TS });
-    expect(count(out, 'IFCPROPERTYSET')).toBe(0);
-    expect(count(out, 'IFCRELDEFINESBYPROPERTIES')).toBe(0);
+    expect(out).not.toContain("'Pset_Hestia'");
   });
 
   it('genérico sem malha válida ainda sai, sem representação', () => {

@@ -28,6 +28,42 @@ export function cleanRing(ring: IfcRing): IfcRing {
   return out.length >= 3 ? out : [];
 }
 
+/** Área absoluta do anel (m²). */
+export const ringArea = (ring: IfcRing): number => Math.abs(signedArea(ring));
+
+/** Centro do anel (média dos vértices), em planta. */
+export function ringCentroid(ring: IfcRing): IfcPoint {
+  const n = Math.max(1, ring.length);
+  return {
+    x: ring.reduce((s, p) => s + p.x, 0) / n,
+    y: ring.reduce((s, p) => s + p.y, 0) / n,
+  };
+}
+
+/** Direção unitária do centro do primeiro ao do último anel da cadeia; null quando os centros coincidem. */
+export function ringChainDirection(rings: readonly IfcRing[]): IfcPoint | null {
+  if (rings.length < 2) return null;
+  const a = ringCentroid(rings[0]!);
+  const b = ringCentroid(rings[rings.length - 1]!);
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  return len > EPS ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : null;
+}
+
+/** Passo mediano entre os centros de anéis consecutivos (m); null quando não há dois passos. */
+export function ringChainStep(rings: readonly IfcRing[]): number | null {
+  if (rings.length < 2) return null;
+  const steps: number[] = [];
+  for (let i = 1; i < rings.length; i++) {
+    const a = ringCentroid(rings[i - 1]!);
+    const b = ringCentroid(rings[i]!);
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    if (d > EPS) steps.push(d);
+  }
+  if (steps.length === 0) return null;
+  steps.sort((x, y) => x - y);
+  return steps[Math.floor(steps.length / 2)]!;
+}
+
 /** Anel orientado: `ccw` = sentido anti-horário (contorno externo); senão horário (furo). */
 function oriented(ring: IfcRing, ccw: boolean): IfcRing {
   const positive = signedArea(ring) > 0;

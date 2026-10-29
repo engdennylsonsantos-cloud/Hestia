@@ -18,6 +18,21 @@ export interface IfcCtx {
   storeys: Map<Id, IfcStorey>;
   materials: Map<Id, number>;
   walls: Map<Id, number>;
+  /** `IFCMATERIALLAYERSET` por tipo de parede (um conjunto de camadas serve a todas as paredes do tipo). */
+  layerSets: Map<Id, number>;
+  /** Tipo de abertura já escrito (`IFCDOORTYPE`/`IFCWINDOWTYPE` por tipo do projeto). */
+  openingTypes: Map<Id, number>;
+  /** Instâncias de cada tipo de abertura, para o `IFCRELDEFINESBYTYPE` no fim dos vãos. */
+  openingTypeMembers: Map<Id, number[]>;
+  /** Paredes cuja face externa dá para fora da edificação (calculadas antes de escrever paredes e vãos). */
+  external: Set<Id>;
+  /**
+   * Id STEP do produto de cada elemento do projeto, por id do elemento (preenchido por quem cria o produto). É a fonte
+   * preferida do `addHestiaPsets`; sem ele, o pset acha o produto pelo GlobalId determinístico (`wall:<id>`, `door:<id>`…).
+   */
+  products?: Map<Id, number>;
+  /** Id STEP do `IFCPROJECT`, alvo do `Pset_Hestia_Project`. Sem ele, o pset acha o projeto pelo GlobalId. */
+  project?: number;
 }
 
 /** Pavimento do nível, ou `undefined` quando o nível não existe no projeto (o elemento não sai). */

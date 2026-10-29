@@ -1,15 +1,61 @@
-import { isOpening, isWall, levelElevation, openingFamilyName, type OpeningType, type Project } from '@hestia/model';
+import {
+  isOpening,
+  isWall,
+  levelElevation,
+  openingFamilyName,
+  profileHeightAt,
+  OPENING_FRAME_DEFAULTS,
+  type Opening,
+  type OpeningType,
+  type Project,
+  type Wall,
+  type WallType,
+} from '@hestia/model';
 import { addPlates, addRoofs, addStairs } from './ifcElements.ts';
 import { addGenerics } from './ifcGeneric.ts';
-import { gid, materialOf, optStr, storeyOf, type IfcCtx } from './ifcCtx.ts';
-import { axis3, bodyShape, extrudeSolid, localPlacement } from './ifcSolids.ts';
-import { en, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
+import { addHestiaPsets } from './ifcHestia.ts';
+import { externalWalls, outwardNormal, wallAxis } from './ifcExterior.ts';
+import { addGrids } from './ifcGrids.ts';
+import { addQuantities } from './ifcQuantities.ts';
+import { addSpaces } from './ifcSpaces.ts';
+import { gid, materialOf, optStr, storeyOf, type IfcCtx, type IfcStorey } from './ifcCtx.ts';
+import { axis3, bodyShape, direction, extrudeSolid, localPlacement } from './ifcSolids.ts';
+import { en, int, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
 import type { IfcGeometry, IfcOpeningGeo, IfcPoint, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
+
+const EPS = 1e-9;
 
 /** Opções da exportação. A data do cabeçalho entra como texto: com a mesma data o arquivo sai igual (determinismo). */
 export interface IfcExportOptions {
   /** Data e hora do cabeçalho STEP (ISO 8601). Padrão: 1970-01-01T00:00:00. */
   timestamp?: string;
+}
+
+/** Valor de uma propriedade no `IfcValue`: booleano, inteiro, real ou texto. */
+type PropValue = string | number | boolean;
+
+/** `IFCPROPERTYSINGLEVALUE` com o valor no tipo IFC mais próximo (`IFCBOOLEAN`, `IFCINTEGER`, `IFCREAL` ou `IFCLABEL`). */
+function singleValue(w: StepWriter, name: string, value: PropValue): number {
+  const nominal =
+    typeof value === 'boolean'
+      ? `IFCBOOLEAN(${value ? '.T.' : '.F.'})`
+      : typeof value === 'number'
+        ? Number.isInteger(value)
+          ? `IFCINTEGER(${int(value)})`
+          : `IFCREAL(${num(value)})`
+        : `IFCLABEL(${stepString(value)})`;
+  return w.add('IFCPROPERTYSINGLEVALUE', [stepString(name), OMIT, nominal, OMIT]);
+}
+
+/**
+ * `IFCPROPERTYSET` com as propriedades na ordem dada e `IFCRELDEFINESBYPROPERTIES` ligando o conjunto ao objeto. O
+ * GlobalId é determinístico pela `key` (`pset:wall:<id>`, `pset:door:<id>`...), então o mesmo projeto gera o mesmo texto.
+ */
+function addPropertySet(c: IfcCtx, key: string, name: string, props: ReadonlyArray<readonly [string, PropValue]>, object: number): void {
+  if (props.length === 0) return;
+  const singles = props.map(([n, v]) => ref(singleValue(c.w, n, v)));
+  const set = c.w.add('IFCPROPERTYSET', [gid(key), OMIT, stepString(name), OMIT, list(singles)]);
+  c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`${key}:rel`), OMIT, OMIT, OMIT, list([ref(object)]), ref(set)]);
 }
 
 /** Retângulo `width` × `thickness` centrado na origem do sistema local (x ao longo do eixo do vão, y na espessura). */
@@ -24,28 +70,133 @@ function rectOf(width: number, thickness: number): IfcPolygon {
   ]];
 }
 
-/** Paredes: IFCWALL com contorno extrudado e IFCMATERIALLAYERSETUSAGE pelas camadas do tipo (sem as de espessura zero). */
-function addWalls(c: IfcCtx, walls: IfcWallGeo[]): void {
+/** Direção unitária do eixo da parede (a→b); comprimento zero devolve `null`. */
+function layerSetOf(c: IfcCtx, type: WallType): number | null {
+  const known = c.layerSets.get(type.id);
+  if (known !== undefined) return known;
+  const layers = type.layers.filter((l) => l.thickness > 0);
+  if (layers.length === 0) return null;
+  const layerIds = layers.map((l) => {
+    const name = c.p.materials[l.materialId]?.name ?? 'Material não definido';
+    return ref(c.w.add('IFCMATERIALLAYER', [ref(materialOf(c, l.materialId)), num(l.thickness), OMIT, stepString(name), OMIT, OMIT, OMIT]));
+  });
+  const set = c.w.add('IFCMATERIALLAYERSET', [list(layerIds), stepString(type.name), OMIT]);
+  c.layerSets.set(type.id, set);
+  return set;
+}
+
+/** `IFCMATERIALLAYERSETUSAGE` (.AXIS2./.POSITIVE., deslocamento 0) da parede + `IFCRELASSOCIATESMATERIAL` com ela. */
+function associateLayers(c: IfcCtx, wall: Wall, type: WallType | undefined, wallId: number): void {
+  if (!type) return;
+  const set = layerSetOf(c, type);
+  if (set === null) return;
+  const usage = c.w.add('IFCMATERIALLAYERSETUSAGE', [ref(set), en('AXIS2'), en('POSITIVE'), num(0), OMIT]);
+  c.w.add('IFCRELASSOCIATESMATERIAL', [gid(`matuse:${wall.id}`), OMIT, OMIT, OMIT, list([ref(wallId)]), ref(usage)]);
+}
+
+/**
+ * `Pset_WallCommon` da parede: `Reference` (código ou nome do tipo), `IsExternal`, `LoadBearing` (o modelo não tem
+ * flag estrutural: sempre `.F.`) e, quando o tipo informa, `FireRating`, `ThermalTransmittance` e `AcousticRating`.
+ */
+function wallCommonProps(c: IfcCtx, wall: Wall, type: WallType | undefined): Array<[string, PropValue]> {
+  const reference = type?.code.trim() || type?.name || wall.mark;
+  const props: Array<[string, PropValue]> = [];
+  if (reference) props.push(['Reference', reference]);
+  props.push(['IsExternal', c.external.has(wall.id)], ['LoadBearing', false]);
+  if (type?.fireRating != null) props.push(['FireRating', `${type.fireRating} min`]);
+  if (type?.thermalU != null) props.push(['ThermalTransmittance', type.thermalU]);
+  if (type?.acousticRw != null) props.push(['AcousticRating', `${type.acousticRw} dB`]);
+  return props;
+}
+
+/** Pontos `(t, h)` do topo entre `tMin` e `tMax`: os vértices do perfil dentro do trecho e as pontas já na altura dele. */
+function topProfileWithin(profile: NonNullable<Wall['topProfile']>, tMin: number, tMax: number): Array<{ t: number; h: number }> {
+  const inner = profile.filter((q) => q.t > tMin + EPS && q.t < tMax - EPS);
+  return [{ t: tMin, h: profileHeightAt(profile, tMin) }, ...inner, { t: tMax, h: profileHeightAt(profile, tMax) }];
+}
+
+/** Remove pontos 2D consecutivos repetidos (e o de fechamento) da polilinha do perfil. */
+function clean2d(points: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const q of points) {
+    const last = out[out.length - 1];
+    if (last && Math.abs(last[0] - q[0]) < EPS && Math.abs(last[1] - q[1]) < EPS) continue;
+    out.push([q[0], q[1]]);
+  }
+  return out;
+}
+
+/**
+ * Corpo da parede com perfil superior editado (`Wall.topProfile`): `IFCARBITRARYCLOSEDPROFILEDEF` no plano longitudinal
+ * (x ao longo do eixo, y altura acima da base) extrudado na espessura do footprint. É o perfil do topo (empena, degrau)
+ * que a extrusão de altura constante não representa. O trecho longitudinal é o do footprint (as pontas já vêm cortadas
+ * pela junção); entre as pontas o plano vira o retângulo espessura × comprimento, então só parede reta usa este caminho.
+ */
+function topProfileSolid(c: IfcCtx, st: IfcStorey, wall: Wall, g: IfcWallGeo, footprint: IfcPolygon): number | null {
+  const u = wallAxis(wall);
+  const profile = wall.topProfile;
+  const ring = footprint[0];
+  if (!u || !profile || profile.length < 2 || !ring || ring.length < 3) return null;
+  const n = outwardNormal(wall, u);
+  let tMin = Infinity;
+  let tMax = -Infinity;
+  let dMin = Infinity;
+  let dMax = -Infinity;
+  for (const ringPoints of footprint) {
+    for (const v of ringPoints) {
+      const t = (v.x - wall.a.x) * u.x + (v.y - wall.a.y) * u.y;
+      const d = (v.x - wall.a.x) * n.x + (v.y - wall.a.y) * n.y;
+      tMin = Math.min(tMin, t);
+      tMax = Math.max(tMax, t);
+      dMin = Math.min(dMin, d);
+      dMax = Math.max(dMax, d);
+    }
+  }
+  const length = tMax - tMin;
+  const depth = dMax - dMin;
+  if (length <= EPS || depth <= EPS) return null;
+  const top = topProfileWithin(profile, tMin, tMax);
+  // Contorno no sentido anti-horário: pé esquerdo, pé direito, topo da direita para a esquerda.
+  const poly = clean2d([[0, 0], [length, 0], ...[...top].reverse().map((q): [number, number] => [q.t - tMin, q.h])]);
+  if (poly.length < 3) return null;
+  const points = poly.map(([x, y]) => ref(c.w.add('IFCCARTESIANPOINT', [list([num(x), num(y)])])));
+  const curve = c.w.add('IFCPOLYLINE', [list([...points, points[0]!])]);
+  const area = c.w.add('IFCARBITRARYCLOSEDPROFILEDEF', [en('AREA'), OMIT, ref(curve)]);
+  // Origem na face externa, X ao longo da parede e Z para dentro (o perfil cresce no sentido da espessura).
+  const origin = c.w.add('IFCCARTESIANPOINT', [
+    list([num(wall.a.x + u.x * tMin + n.x * dMax), num(wall.a.y + u.y * tMin + n.y * dMax), num(g.baseZ - st.elev)]),
+  ]);
+  const place = c.w.add('IFCAXIS2PLACEMENT3D', [ref(origin), ref(direction(c.w, -n.x, -n.y, 0)), ref(direction(c.w, u.x, u.y, 0))]);
+  return c.w.add('IFCEXTRUDEDAREASOLID', [ref(area), ref(place), ref(direction(c.w, 0, 0, 1)), num(depth)]);
+}
+
+/** Corpo da parede: perfil superior quando há `topProfile` em parede reta; senão a extrusão de altura constante. */
+function wallSolids(c: IfcCtx, st: IfcStorey, wall: Wall, g: IfcWallGeo): number[] {
+  if (wall.topProfile && wall.sag === 0) {
+    const profiled = g.footprints.map((f) => topProfileSolid(c, st, wall, g, f)).filter((s): s is number => s !== null);
+    if (profiled.length > 0) return profiled;
+  }
+  return g.footprints.map((f) => extrudeSolid(c.w, f, g.baseZ - st.elev, g.height));
+}
+
+/** Paredes: IFCWALL com contorno extrudado, camadas do tipo (`IFCMATERIALLAYERSETUSAGE`) e `Pset_WallCommon`. */
+function addWalls(c: IfcCtx, walls: readonly IfcWallGeo[]): void {
   for (const g of walls) {
     const wall = c.p.elements[g.wallId];
     if (!isWall(wall)) continue;
     const st = storeyOf(c, wall.levelId);
-    if (!st) continue;
+    if (!st || g.footprints.length === 0) continue;
     const type = c.p.wallTypes[wall.typeId];
     const name = stepString(type?.name ?? 'Parede');
-    if (g.footprints.length === 0) continue;
-    const solids = g.footprints.map((f) => extrudeSolid(c.w, f, g.baseZ - st.elev, g.height));
+    const solids = wallSolids(c, st, wall, g);
+    if (solids.length === 0) continue;
     const shape = bodyShape(c.w, c.ctx, 'SweptSolid', solids);
     const place = localPlacement(c.w, st.place, [0, 0, 0]);
     const id = c.w.add('IFCWALL', [gid(`wall:${g.wallId}`), OMIT, name, OMIT, name, ref(place), ref(shape), optStr(wall.mark), en('STANDARD')]);
     c.walls.set(g.wallId, id);
     st.contained.push(id);
-    const layers = (type?.layers ?? []).filter((l) => l.thickness > 0);
-    if (layers.length === 0) continue;
-    const layerIds = layers.map((l) => ref(c.w.add('IFCMATERIALLAYER', [ref(materialOf(c, l.materialId)), num(l.thickness), OMIT, OMIT, OMIT, OMIT, OMIT])));
-    const set = c.w.add('IFCMATERIALLAYERSET', [list(layerIds), name, OMIT]);
-    const usage = c.w.add('IFCMATERIALLAYERSETUSAGE', [ref(set), en('AXIS2'), en('POSITIVE'), num(0), OMIT]);
-    c.w.add('IFCRELASSOCIATESMATERIAL', [gid(`matuse:${g.wallId}`), OMIT, OMIT, OMIT, list([ref(id)]), ref(usage)]);
+    associateLayers(c, wall, type, id);
+    addPropertySet(c, `pset:wall:${g.wallId}`, 'Pset_WallCommon', wallCommonProps(c, wall, type), id);
   }
 }
 
@@ -68,7 +219,8 @@ export function doorOperation(t: Pick<OpeningType, 'plan'>, flipHand: boolean): 
     case 'accordion':
       return flipHand ? 'FOLDING_TO_RIGHT' : 'FOLDING_TO_LEFT';
     case 'garage':
-      return 'SECTIONAL_OVERHEAD';
+      // IfcDoorTypeOperationEnum não tem SECTIONAL_OVERHEAD (isso é operação de painel): o portão seccionado sai ROLLINGUP.
+      return 'ROLLINGUP';
     default:
       return 'NOTDEFINED';
   }
@@ -110,11 +262,99 @@ export function windowPartition(leaves: number): string {
 }
 
 /**
+ * Fração vidrada estimada do tipo de janela: área do vidro (descontando o caixilho no perímetro e as divisões do `grid`)
+ * sobre a área total do vão. É uma estimativa do tipo — o `OpeningType` não guarda a área de vidro medida — e vão livre
+ * (sem folha) não tem vidro.
+ */
+export function glazingAreaFraction(t: OpeningType): number | null {
+  if (t.kind !== 'window' || t.leaves === 0 || !(t.width > 0) || !(t.height > 0)) return null;
+  const frame = t.frameWidth && t.frameWidth > 0 ? t.frameWidth : OPENING_FRAME_DEFAULTS.frameWidth;
+  const cols = Math.max(1, Math.trunc(t.grid?.cols ?? 1));
+  const rows = Math.max(1, Math.trunc(t.grid?.rows ?? 1));
+  const glassW = t.width - 2 * frame - (cols - 1) * frame;
+  const glassH = t.height - 2 * frame - (rows - 1) * frame;
+  if (!(glassW > 0) || !(glassH > 0)) return null;
+  return Math.min(1, Math.max(0, (glassW * glassH) / (t.width * t.height)));
+}
+
+/**
+ * Tipo da abertura (`IFCDOORTYPE`/`IFCWINDOWTYPE`), um por tipo do projeto: `OperationType` para a porta e
+ * `PartitioningType` para a janela. O IFC4 não tem `Operation` no `IFCWINDOWTYPE`; a operação da janela vai nas
+ * `IFCWINDOWPANELPROPERTIES` do tipo (`HasPropertySets`), como o Revit exporta.
+ */
+function openingTypeEntity(c: IfcCtx, t: OpeningType): number {
+  const known = c.openingTypes.get(t.id);
+  if (known !== undefined) return known;
+  const properties: number[] = [];
+  if (t.kind === 'window') {
+    properties.push(
+      c.w.add('IFCWINDOWPANELPROPERTIES', [
+        gid(`wintypepanel:${t.id}`),
+        OMIT,
+        stepString(t.name),
+        OMIT,
+        en(windowOperation(t, false)),
+        en('NOTDEFINED'),
+        OMIT,
+        OMIT,
+        OMIT,
+      ]),
+    );
+  }
+  const id = c.w.add(t.kind === 'door' ? 'IFCDOORTYPE' : 'IFCWINDOWTYPE', [
+    gid(`type:${t.id}`),
+    OMIT,
+    stepString(t.name),
+    optStr(t.description?.trim() || undefined),
+    OMIT,
+    properties.length > 0 ? list(properties.map(ref)) : OMIT,
+    OMIT,
+    optStr(t.code?.trim() || undefined),
+    OMIT,
+    en(t.kind === 'door' ? 'DOOR' : 'WINDOW'),
+    en(t.kind === 'door' ? doorOperation(t, false) : windowPartition(t.leaves)),
+    OMIT,
+    OMIT,
+  ]);
+  c.openingTypes.set(t.id, id);
+  return id;
+}
+
+/** `IFCRELDEFINESBYTYPE` de cada tipo de abertura com as instâncias escritas. */
+function addTypeRelations(c: IfcCtx): void {
+  for (const [typeId, members] of c.openingTypeMembers) {
+    const type = c.openingTypes.get(typeId);
+    if (type === undefined || members.length === 0) continue;
+    c.w.add('IFCRELDEFINESBYTYPE', [gid(`rtype:${typeId}`), OMIT, OMIT, OMIT, list(members.map(ref)), ref(type)]);
+  }
+}
+
+/**
+ * `Pset_DoorCommon`/`Pset_WindowCommon`: `Reference` (mark do vão), `IsExternal` (parede hospedeira externa) e, quando
+ * o tipo informa, `FireRating`, `ThermalTransmittance`, `AcousticRating` e `GlazingAreaFraction` (janela).
+ */
+function openingCommonProps(o: Opening, t: OpeningType, external: boolean): Array<[string, PropValue]> {
+  const props: Array<[string, PropValue]> = [
+    ['Reference', o.mark.trim() || t.code?.trim() || t.name],
+    ['IsExternal', external],
+  ];
+  if (t.fireRating?.trim()) props.push(['FireRating', t.fireRating.trim()]);
+  if (typeof t.uValue === 'number' && Number.isFinite(t.uValue)) props.push(['ThermalTransmittance', t.uValue]);
+  if (typeof t.acousticRw === 'number' && Number.isFinite(t.acousticRw)) props.push(['AcousticRating', `${t.acousticRw} dB`]);
+  if (t.kind === 'window') {
+    const fraction = glazingAreaFraction(t);
+    if (fraction !== null) props.push(['GlazingAreaFraction', fraction]);
+  }
+  return props;
+}
+
+/**
  * Vãos: IFCOPENINGELEMENT (furo do vão bruto, ligado à parede por IFCRELVOIDSELEMENT) e a porta ou janela que o preenche
  * (IFCDOOR/IFCWINDOW por IFCRELFILLSELEMENT). Porta e janela têm placement no vão (eixo X = direção da parede) e um
- * corpo de caixa com a espessura da parede; o furo tem a cota do vão bruto.
+ * corpo de caixa com a espessura da parede; o furo tem a cota do vão bruto. Cada abertura recebe o tipo do projeto
+ * (`IFCDOORTYPE`/`IFCWINDOWTYPE`) e o pset comum.
  */
-function addOpenings(c: IfcCtx, openings: IfcOpeningGeo[]): void {
+function addOpenings(c: IfcCtx, openings: readonly IfcOpeningGeo[]): void {
   for (const g of openings) {
     const o = c.p.elements[g.openingId];
     if (!isOpening(o)) continue;
@@ -154,10 +394,19 @@ function addOpenings(c: IfcCtx, openings: IfcOpeningGeo[]): void {
       ]);
       c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`winpanelrel:${g.openingId}`), OMIT, OMIT, OMIT, list([ref(fillId)]), ref(panel)]);
     }
+    openingTypeEntity(c, t);
+    const members = c.openingTypeMembers.get(t.id);
+    if (members) members.push(fillId);
+    else c.openingTypeMembers.set(t.id, [fillId]);
+    const external = isWall(host) && c.external.has(host.id);
+    addPropertySet(c, `pset:${o.kind}:${g.openingId}`, o.kind === 'door' ? 'Pset_DoorCommon' : 'Pset_WindowCommon', openingCommonProps(o, t, external), fillId);
   }
+  addTypeRelations(c);
 }
 
 /** Exporta o projeto como IFC4 (texto STEP): IfcProject > IfcSite > IfcBuilding > IfcBuildingStorey (um por nível) e os elementos. */
+export { externalWalls } from './ifcExterior.ts';
+
 export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions = {}): string {
   const w = new StepWriter();
   const unit = w.add('IFCSIUNIT', ['*', en('LENGTHUNIT'), OMIT, en('METRE')]);
@@ -169,7 +418,18 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
   const site = w.add('IFCSITE', [gid('site'), OMIT, stepString(p.name), OMIT, OMIT, ref(sitePlace), OMIT, OMIT, en('ELEMENT'), OMIT, OMIT, OMIT, OMIT, OMIT]);
   const buildingPlace = localPlacement(w, sitePlace, [0, 0, 0]);
   const building = w.add('IFCBUILDING', [gid('building'), OMIT, stepString(p.name), OMIT, OMIT, ref(buildingPlace), OMIT, OMIT, en('ELEMENT'), OMIT, OMIT, OMIT]);
-  const c: IfcCtx = { p, w, ctx: context, storeys: new Map(), materials: new Map(), walls: new Map() };
+  const c: IfcCtx = {
+    p,
+    w,
+    ctx: context,
+    storeys: new Map(),
+    materials: new Map(),
+    walls: new Map(),
+    layerSets: new Map(),
+    openingTypes: new Map(),
+    openingTypeMembers: new Map(),
+    external: externalWalls(p, geo.walls),
+  };
   const storeyIds: number[] = [];
   for (const lv of p.levels) {
     const elev = levelElevation(p, lv.id);
@@ -187,6 +447,10 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
   addRoofs(c, geo);
   addStairs(c, geo);
   addGenerics(c);
+  addSpaces(c);
+  addGrids(c);
+  addQuantities(c, geo);
+  addHestiaPsets(c);
   for (const lv of p.levels) {
     const st = c.storeys.get(lv.id);
     if (st && st.contained.length > 0) {

@@ -67,6 +67,11 @@ export class StepWriter {
     return id;
   }
 
+  /** Linhas STEP já escritas, na ordem de criação (localizar uma entidade pelo GlobalId depois de criada). */
+  get written(): readonly string[] {
+    return this.lines;
+  }
+
   /** Texto completo do arquivo: cabeçalho, seção DATA com as entidades e o rodapé. */
   text(opts: { fileName: string; timestamp: string }): string {
     const head = [

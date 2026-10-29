@@ -45,6 +45,8 @@ export * from './stairPick.ts';
 export * from './stairCommands.ts';
 export { StairTool, isStairTool, type StairStatus } from './stairTool.ts';
 export * from './stairRunPlan.ts';
+export * from './rampOptions.ts';
+export { RampTool } from './rampTool.ts';
 export { StairRunTool } from './stairRunTool.ts';
 export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';
 export * from './stairRunTypes.ts';

@@ -2,6 +2,7 @@ import type { Vec2 } from '@hestia/geom';
 import type { Command, Id, LocationLine, Project, RoofShape } from '@hestia/model';
 import type { StairToolOptions, StairTone } from './stairSketchState.ts';
 import type { StairRunToolOptions } from './stairRunPlan.ts';
+import type { RampToolOptions } from './rampOptions.ts';
 
 export type SnapKind = 'endpoint' | 'face' | 'core' | 'midpoint' | 'intersection' | 'perpendicular' | 'nearest' | 'alignment' | 'ortho' | 'grid' | 'center' | 'tangent' | 'none';
 
@@ -236,6 +237,8 @@ export interface ToolOptions {
   stair?: StairToolOptions;
   /** Escada reta, em L, em U ou com leque, criada pronta por cliques (ferramenta `stairrun`). Ausente = reta, 1,20 m, giro à esquerda. */
   stairRun?: StairRunToolOptions;
+  /** Rampa (ferramenta `ramp`). Ausente = reta, modo comprimento e padrões do tipo. */
+  ramp?: RampToolOptions;
 }
 
 export interface PointerInfo {

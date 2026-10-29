@@ -10,9 +10,9 @@ import {
   dxfLineRoleOf,
   exportDxf,
   type DxfLevelGeometry,
-  type DxfNoteText,
   type DxfPoint,
 } from './dxf.ts';
+import type { DxfNoteText } from './dxfNotes.ts';
 
 const p = createEmptyProject('Teste');
 const base: DxfLevelGeometry = { clusters: [], openings: [] };

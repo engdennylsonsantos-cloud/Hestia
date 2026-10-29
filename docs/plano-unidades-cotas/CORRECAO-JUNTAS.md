@@ -15,3 +15,10 @@ Editar a cota lateral de uma parede (ex.: afastá-la da paralela) transladava s�
 
 ## Capturas
 `capturas/fix-juntas-antes-{1,2}-*.png` e `fix-juntas-depois-{1,2}-*.png` (parede de baixo de 3,82 para 5: antes os cantos abrem 1,184 m; depois os lados esticam).
+
+## Verificação no navegador de C01 e C02 (feitas por outro agente sem checagem)
+Playwright, app desta pasta, unidades trocadas pelo atalho UN (script `tests/e2e/tmp-c01c02.mjs`, não commitado).
+- C01 (a): projeto em ft-in, ferramenta Parede, `5'6"` + Enter: parede de 1,6764 m (5 ft 6 in = 1,68 m). OK.
+- C01 (b): projeto em m, `120cm` + Enter: parede de 1,20 m. OK.
+- C02: projeto em cm, parede de 6 m, ferramenta Porta, `100` + Enter: `offset` = 1,00 m. OK.
+Nenhuma falha: nada a corrigir. Capturas: `capturas/fix-juntas-c01-*.png`, `fix-juntas-c02-digitando.png`.

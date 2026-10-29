@@ -430,11 +430,16 @@ export class RampTool extends ToolBase {
       ...(cfg.slope !== undefined ? { slope: cfg.slope } : {}),
       ...(cfg.landingDepth !== undefined ? { landingDepth: cfg.landingDepth } : {}),
     });
-    this.items = [];
     if ('error' in plan) {
-      this.env.say(`Não é possível criar a rampa: ${plan.error}`);
+      // Mantém o rascunho (volta a DRAWING com os pontos) para o usuário corrigir com Backspace ou mexendo o último ponto.
+      const s = this.session;
+      s?.load(path);
+      this.items = s ? s.move(path[path.length - 1]!, 0) : [];
+      this.env.say(`Não é possível criar a rampa: ${plan.error} Backspace volta um ponto.`);
       return;
     }
+    this.items = [];
+    this.items = [];
     this.commit(plan, cfg.mode, path);
   }
 }

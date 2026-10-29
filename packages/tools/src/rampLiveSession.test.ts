@@ -193,3 +193,20 @@ describe('sessão da rampa livre: desempenho da prévia', () => {
     expect(performance.now() - t0).toBeLessThan(200);
   });
 });
+
+describe('sessão da rampa livre: load', () => {
+  it('recarrega os vértices (volta a DRAWING) e mantém o rascunho anterior se um vértice não é aceito', () => {
+    const s = new RampLiveSession(cfg({ H: 1.5 }));
+    s.click(v(0, 0));
+    s.click(v(6, 0));
+    s.click(v(6, 4));
+    const pts = s.points;
+    s.cancel();
+    expect(s.state).toBe('IDLE');
+    expect(s.load(pts)).toBe(true);
+    expect(s.state).toBe('DRAWING');
+    expect(s.points).toEqual(pts);
+    expect(s.load([v(0, 0), v(0.001, 0)])).toBe(false);
+    expect(s.points).toEqual(pts);
+  });
+});

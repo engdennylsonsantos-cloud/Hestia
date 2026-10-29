@@ -296,6 +296,26 @@ describe('ferramenta Rampa: forma livre', () => {
     expect(issues).toEqual([]);
   });
 
+  it('plano recusado ao concluir: o rascunho é mantido (DRAWING) e a mensagem de erro aparece', () => {
+    const ctx = freeSetup();
+    const t = tool('ramp', ctx.env);
+    clickAt(t, 0, 0);
+    clickAt(t, 3, 0);
+    clickAt(t, 3, 3);
+    ctx.options.ramp!.width = 8; // largura maior que os trechos: o patamar de giro não cabe e o plano recusa
+    t.confirm();
+    t.confirm(); // o 1º Enter só avisa a falta de desnível
+    expect(ctx.last()).toMatch(/^Não é possível criar a rampa: .*Backspace volta um ponto\.$/);
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(0);
+    expect(t.preview().length).toBeGreaterThan(0);
+    expect(t.deleteKey?.()).toBe(true); // ainda há rascunho para corrigir
+    ctx.options.ramp!.width = undefined;
+    clickAt(t, 3, 9);
+    t.confirm();
+    t.confirm();
+    expect(rampsOf(ctx, 'lv_1')).toHaveLength(1);
+  });
+
   it('Ajustar não cria a rampa nem mexe no projeto até concluir', () => {
     const ctx = freeSetup();
     const t = tool('ramp', ctx.env);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { editor } from './editor/controller.ts';
 import { useProjetoDerivado } from './editor/projetoDerivado.ts';
 import { useUi } from './editor/state.ts';
@@ -145,18 +145,15 @@ export function App(): ReactElement {
   const theme = useUi((s) => s.theme);
   const dialog = useUi((s) => s.dialog);
 
-  // O host (artefato) pode ter definido data-theme: guardamos o valor original e o devolvemos em "sistema".
-  const hostTheme = useRef<string | null>(document.documentElement.getAttribute('data-theme'));
+  // O app começa no tema claro; "sistema" remove o atributo e volta a seguir o SO.
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'system') {
-      if (hostTheme.current) root.setAttribute('data-theme', hostTheme.current);
-      else root.removeAttribute('data-theme');
-    } else root.setAttribute('data-theme', theme);
+    if (theme === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', theme);
   }, [theme]);
 
   useEffect(() => {
-    if (!editor.restoreAutosave()) editor.newProject('house2');
+    if (!editor.restoreAutosave()) editor.newProject('blank');
     // A dica usa a sequência atual da parede (depende do perfil e da personalização); sem tecla, não cita letra.
     const parede = atalhoAtual('wall');
     useUi.setState({ status: parede ? `Pronto. Pressione ${parede} para desenhar paredes, ou selecione para editar.` : 'Pronto. Escolha uma ferramenta, ou selecione para editar.' });

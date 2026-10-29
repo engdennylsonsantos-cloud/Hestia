@@ -221,7 +221,7 @@ export const useUi = create<UiState>(() => ({
   selection: [],
   hover: null,
   options: DEFAULT_OPTIONS,
-  theme: 'system',
+  theme: 'light',
   gpu: 'pending',
   status: 'Pronto.',
   typed: '',

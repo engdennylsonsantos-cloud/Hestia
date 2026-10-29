@@ -87,7 +87,7 @@ export function StartDialog(): ReactElement {
   // Cada exemplo é montado uma vez: a miniatura usa as mesmas paredes que a contagem mostra.
   const cards = useMemo(
     () =>
-      TEMPLATES.map((t) => {
+      TEMPLATES.filter((t) => t.id === 'blank').map((t) => {
         const p = buildTemplate(t.id);
         const els = Object.values(p.elements);
         return { ...t, walls: els.filter(isWall), levels: p.levels.length, horizontal: els.filter((e) => e.kind === 'floor' || e.kind === 'slab').length };
@@ -100,7 +100,7 @@ export function StartDialog(): ReactElement {
     if (id === 'blank') useUi.setState({ tutorial: true });
   };
   return (
-    <Dialog title="Novo projeto" sub="Escolha um ponto de partida" onClose={close} footer={
+    <Dialog title="Novo projeto" sub="Comece em branco ou retome o último projeto salvo." onClose={close} footer={
       <>
         {has && <button className="btn" onClick={() => { editor.restoreAutosave(); close(); }}>Voltar ao último projeto salvo neste navegador</button>}
         <span style={{ flex: 1 }} />

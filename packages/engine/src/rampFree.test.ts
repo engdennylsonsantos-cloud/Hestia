@@ -128,6 +128,12 @@ describe('planRampFree', () => {
     expect('error' in planRampFree([v(0, 0), v(5, 0)], 0.8, type, { width: 0, mode: 'slope' })).toBe(true);
   });
 
+  it('U que volta sobre o primeiro lance é recusado; com afastamento razoável passa', () => {
+    const volta = free([v(0, 0), v(10, 0), v(10, 2), v(0, 2), v(0, 0.3)], 2.2);
+    expect('error' in volta && /sobrep/.test(volta.error)).toBe(true);
+    ok(free([v(0, 0), v(10, 0), v(10, 4), v(0, 4)], 2.2));
+  });
+
   it('propriedade: trajetos aleatórios nunca geram polígono autointerceptante e fecham H', () => {
     let seed = 12345;
     const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);

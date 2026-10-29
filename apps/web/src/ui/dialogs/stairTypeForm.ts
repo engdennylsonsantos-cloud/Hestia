@@ -1,4 +1,4 @@
-import type { StairCalcRule, StairRunStyle, StairType } from '@hestia/model';
+import { newId, type StairCalcRule, type StairRunStyle, type StairType } from '@hestia/model';
 
 /** Limites de um campo numérico do diálogo: metros internos, exibição em `scale` e casas decimais. */
 export interface StairFieldLimit {
@@ -143,4 +143,14 @@ export function finalizeForSave(draft: StairType): StairType {
     next.riserThickness = 0;
   }
   return next;
+}
+
+/** O rascunho difere do tipo salvo? (alterações ainda não aplicadas.) */
+export function hasUnsavedChanges(draft: StairType | null, saved: StairType | null): boolean {
+  return Boolean(draft && saved && JSON.stringify(draft) !== JSON.stringify(saved));
+}
+
+/** Cópia do rascunho atual (com as alterações não salvas), com id novo e nome "(cópia)". */
+export function duplicateDraft(draft: StairType, id: string = newId('stt')): StairType {
+  return { ...structuredClone(draft), id, name: `${draft.name} (cópia)` };
 }

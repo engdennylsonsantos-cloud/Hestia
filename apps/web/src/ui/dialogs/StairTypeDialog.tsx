@@ -3,7 +3,7 @@ import { DEFAULT_STAIR_CALC_RULE, stairTypeUsage, type StairRunStyle, type Stair
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { keptStairType } from '../../editor/stairActions.ts';
-import { duplicateStairType, saveStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
+import { saveStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
 import { I18N, useI18n } from '../../editor/i18n.ts';
 import { safeGet, safeSet } from '../../editor/storage.ts';
 import { TextField } from '../fields.tsx';
@@ -14,7 +14,7 @@ import { StairSectionPreview } from './StairSectionPreview.tsx';
 import { StairCalculatorPanel } from './StairCalculatorPanel.tsx';
 import { StairTypeSections, stairIssueText } from './StairTypeSections.tsx';
 import { computeStairCalc } from './stairTypeCalc.ts';
-import { finalizeForSave, preserveOnStyleChange, validateStairType } from './stairTypeForm.ts';
+import { duplicateDraft, finalizeForSave, hasUnsavedChanges, preserveOnStyleChange, validateStairType } from './stairTypeForm.ts';
 
 const CALC_H_KEY = 'hestia.stt.calcH';
 
@@ -108,7 +108,7 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   const warnings = issues.filter((i) => i.severity === 'warning');
   const canSave = errors.length === 0;
   const usage = draft ? stairTypeUsage(p, draft.id) : 0;
-  const dirty = Boolean(draft && base && JSON.stringify(draft) !== JSON.stringify(base));
+  const dirty = hasUnsavedChanges(draft, base);
   const impact = Boolean(
     draft && base && usage > 0 &&
     (['maxRiser', 'minTread', 'calcRiserFactor', 'calcTreadFactor'] as const).some((f) => draft[f] !== base[f]),
@@ -168,9 +168,21 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   }, []);
 
   const duplicate = (): void => {
-    if (!draftRef.current) return;
-    const id = duplicateStairType(editor.store, draftRef.current.id);
-    if (id) useUi.setState({ dialogArg: id });
+    const cur = draftRef.current;
+    if (!cur) return;
+    // Parte do rascunho atual (com as alterações não salvas), não do tipo salvo.
+    if (validateStairType(cur, materialIds).some((i) => i.severity === 'error')) {
+      useUi.setState({ status: 'Corrija os erros do tipo antes de duplicar.' });
+      return;
+    }
+    const copy = duplicateDraft(finalizeForSave(cur));
+    editor.store.exec({ type: 'upsertStairType', stairType: copy }, 'Duplicar tipo de escada');
+    useUi.setState({ dialogArg: copy.id });
+  };
+  const selectType = (id: string): void => {
+    if (id === typeId) return;
+    if (dirty && !window.confirm(t.stt_discard)) return;
+    useUi.setState({ dialogArg: id });
   };
   const del = (): void => {
     if (!draftRef.current) return;
@@ -243,7 +255,7 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
         </>
       }
     >
-      <TypeDialogHeader family={FAMILY.stair} types={Object.values(p.stairTypes)} currentId={draft.id} nameFieldId="stt-name" onDuplicate={duplicate} />
+      <TypeDialogHeader family={FAMILY.stair} types={Object.values(p.stairTypes)} currentId={draft.id} nameFieldId="stt-name" onDuplicate={duplicate} onSelect={selectType} />
       <div className="field-row">
         <label htmlFor="stt-name">{t.stt_f_name}</label>
         <TextField

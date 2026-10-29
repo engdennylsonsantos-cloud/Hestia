@@ -255,7 +255,7 @@ export class StairRunTool extends ToolBase {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
     const options = length !== undefined ? { ...this.opts, length } : this.opts;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options });
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options, units: unitsOf(this.env.project()) });
   }
 
   /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */

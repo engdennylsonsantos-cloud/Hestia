@@ -62,6 +62,13 @@ describe('escada reta: o 2º clique define o comprimento e o nº de espelhos (fr
     expect(ctx.last()).toMatch(/^O comprimento \(50 cm\) é curto para 16 espelhos/);
   });
 
+  it('a mensagem de comprimento curto segue as unidades do projeto', () => {
+    const ctx = setup();
+    ctx.store.exec({ type: 'setSettings', patch: { units: { smallLength: { unit: 'mm', decimals: 0 } } } });
+    drawTo(tool('stairrun', ctx.env), [0, 0.5]);
+    expect(ctx.last()).toMatch(/^O comprimento \(500 mm\) é curto para 16 espelhos/);
+  });
+
   it('risersForLength: o piso não cai abaixo do mínimo e o N escolhido não passa do espelho máximo', () => {
     const r = risersForLength(2.8, 0.175, 0.25, 4.2);
     expect(r).toEqual({ risers: 16, tread: 4.2 / 15 });

@@ -23,6 +23,7 @@ import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
+import { rampHandlePreview } from './rampGrips.ts';
 import type { PointerInfo } from './types.ts';
 
 type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'dimgrip' | 'dimtext';
@@ -137,7 +138,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });

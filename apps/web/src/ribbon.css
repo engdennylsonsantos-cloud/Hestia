@@ -70,8 +70,8 @@
 
 /* ---- barra de título: botão R (Arquivo), acesso rápido e centro de informações ---- */
 .titlebar { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px; background: var(--chrome); border-bottom: 1px solid var(--line); }
-.app-r { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border: 0; border-radius: 4px; background: var(--accent); color: var(--accent-fg); font: 600 12px var(--font-mono); }
-.app-r:hover { filter: brightness(1.12); }
+.app-h { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border: 0; border-radius: 4px; background: var(--accent); color: var(--accent-fg); font: 600 12px var(--font-mono); }
+.app-h:hover { filter: brightness(1.12); }
 .qat { display: flex; align-items: center; gap: 1px; }
 .qbtn { width: 26px; height: 26px; flex: none; display: grid; place-items: center; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 2px; color: var(--fg); }
 .qbtn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--line-strong); }

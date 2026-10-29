@@ -254,6 +254,16 @@ export const useUi = create<UiState>(() => ({
  * Assim, qualquer caminho que muda a vista (árvore, ribbon, corte, prancha, ferramenta de planta) abre a aba sem
  * precisar de cada chamador. O fechamento é feito por `closeView` (ver ViewTabs em ui/ViewTabs.tsx).
  */
+/** Botão do aplicativo ("H"): o menu Arquivo fechado abre e o aberto fecha. */
+export function alternaFileMenu(aberto: boolean): boolean {
+  return !aberto;
+}
+
+/** Alterna o menu Arquivo pelo botão da barra de título. */
+export function toggleFileMenu(): void {
+  useUi.setState((s) => ({ fileMenu: alternaFileMenu(s.fileMenu) }));
+}
+
 useUi.subscribe((s, prev) => {
   if (s.view === prev.view && s.levelId === prev.levelId && s.planKind === prev.planKind && s.sectionId === prev.sectionId && s.sheetId === prev.sheetId) return;
   const active = activeViewOf(s);

@@ -14,6 +14,7 @@
     "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-parity.mjs && node scripts/check-props-density.mjs",
     "test": "vitest run",
     "test:ifc-export": "node scripts/test-ifc-export.mjs",
+    "ifc:quality": "npx vite-node scripts/ifc-quality/quality.mts",
     "check": "npm run lint && npm run typecheck && npm run test",
     "e2e": "node tests/e2e/flow.mjs",
     "test:visual": "node tests/e2e/escadas.mjs && node tests/e2e/vista-planta.mjs && node tests/e2e/escadas-closeup.mjs",

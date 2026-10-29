@@ -333,6 +333,23 @@ describe('migração 19 → 20 (regra de cálculo por tipo)', () => {
     const m = migrateProject(legacyV19());
     expect(migrateProject(JSON.parse(JSON.stringify(m)))).toEqual(m);
   });
+
+  it('tipo antigo com piso mínimo maior que 0,32 ganha piso máximo igual ao mínimo e continua válido ao salvar', () => {
+    const antigo = { ...DEFAULT_STAIR_TYPES[0]!, minTread: 0.35 };
+    delete (antigo as Partial<typeof antigo>).maxTread;
+    const raw = { ...legacyV19(), stairTypes: { [antigo.id]: antigo } };
+    const m = migrateProject(raw);
+    expect(m.stairTypes[antigo.id]).toMatchObject({ minTread: 0.35, maxTread: 0.35 });
+    const s = new ProjectStore(m);
+    expect(() => s.exec({ type: 'upsertStairType', stairType: m.stairTypes[antigo.id]! })).not.toThrow();
+  });
+
+  it('tipo antigo com piso mínimo de 0,25 mantém piso máximo de 0,32', () => {
+    const antigo = { ...DEFAULT_STAIR_TYPES[0]!, minTread: 0.25 };
+    delete (antigo as Partial<typeof antigo>).maxTread;
+    const m = migrateProject({ ...legacyV19(), stairTypes: { [antigo.id]: antigo } });
+    expect(m.stairTypes[antigo.id]).toMatchObject({ minTread: 0.25, maxTread: 0.32 });
+  });
 });
 
 describe('migração 20 → 21 (rampas)', () => {

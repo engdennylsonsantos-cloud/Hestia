@@ -22,6 +22,16 @@ export function tryDeleteStairType(store: ProjectStore, typeId: Id): DeleteResul
   }
 }
 
+/** Grava o tipo de escada (o modelo confere as regras ao salvar), devolvendo o erro em vez de lançá-lo. */
+export function saveStairType(store: ProjectStore, stairType: StairType, label = 'Editar tipo de escada'): DeleteResult {
+  try {
+    store.exec({ type: 'upsertStairType', stairType }, label);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Falha desconhecida.' };
+  }
+}
+
 /** Cópia do tipo de escada com id novo e nome "(cópia)". Devolve o id criado, ou null se o tipo não existe. */
 export function duplicateStairType(store: ProjectStore, typeId: Id): Id | null {
   const src = store.project.stairTypes[typeId];

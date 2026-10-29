@@ -1,4 +1,4 @@
-import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { boxOf, boxesOverlap, intersection, multiArea, multiPoints, triangulate, union, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { levelAbove, type Id, type Project } from '@hestia/model';
 import { bandTopAt } from './profile.ts';
 import { fontesDoCortador } from './junctionIndex.ts';
@@ -57,6 +57,8 @@ export interface CutterSolid {
 
 /** Tolerância (m) para a face de espessura zero (membrana) estar dentro da faixa de um cortador. */
 const Z_EPS = 1e-6;
+/** Tolerância (m²) para considerar que um cortador cobre a forma inteira em planta. */
+const AREA_EPS = 1e-6;
 
 /**
  * `c` (com a peça `cp`) corta a peça `piece`? Com atributos de camada, vale a prioridade (0023 §1, P7) e o outro elemento
@@ -135,10 +137,14 @@ export function overlapVolume(a: SolidPiece, b: SolidPiece): number {
   return integrate(common, height);
 }
 
-/** Volume (m³) de um pedaço de tipo `kind` que cai dentro dos elementos que o cortam (padrão por tipo). */
-export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {
+/**
+ * Volume (m³) de um pedaço de tipo `kind` que cai dentro dos elementos que o cortam (padrão por tipo). `skip` são
+ * cortadores que não entram na conta (piso embutido na laje, ver `slabCoversFloor`).
+ */
+export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[], skip?: ReadonlySet<CutterSolid>): number {
   let cut = 0;
   for (const c of cutters) {
+    if (skip?.has(c)) continue;
     for (const cp of c.pieces) if (cuts(c, cp, piece, kind)) cut += overlapVolume(piece, cp);
   }
   return cut;
@@ -146,11 +152,12 @@ export function cutVolume(piece: SolidPiece, kind: JunctionKind, cutters: readon
 
 /**
  * Área (m²) de uma face de espessura zero (membrana) em `piece` que está numa faixa de cortador na cota `z`: a face
- * some onde o cortador a engloba. Sem sobreposição de cota vale zero.
+ * some onde o cortador a engloba. Sem sobreposição de cota vale zero. `skip`: idem `cutVolume`.
  */
-export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[]): number {
+export function coveredFaceArea(piece: SolidPiece, kind: JunctionKind, cutters: readonly CutterSolid[], skip?: ReadonlySet<CutterSolid>): number {
   let area = 0;
   for (const c of cutters) {
+    if (skip?.has(c)) continue;
     for (const cp of c.pieces) {
       if (!cuts(c, cp, piece, kind)) continue;
       const common = intersection(piece.poly, cp.poly);
@@ -180,6 +187,44 @@ export function floorLayerPiece(rf: ResolvedFloor, l: ResolvedFloorLayer): Solid
     ...flatPiece(l.polygon, l.z0, l.z1),
     meta: { kind: 'floor', priority: l.priority, core: l.core, owner: rf.floorId, layerIndex: l.layerIndex, explicit: l.explicit },
   };
+}
+
+/** União em planta das camadas de um cortador (cacheada: o cortador não muda depois de montado). */
+const cutterPlanCache = new WeakMap<CutterSolid, MultiPolygon>();
+function cutterPlan(c: CutterSolid): MultiPolygon {
+  const hit = cutterPlanCache.get(c);
+  if (hit !== undefined) return hit;
+  const plan = union(...c.pieces.map((p) => p.poly));
+  cutterPlanCache.set(c, plan);
+  return plan;
+}
+
+/**
+ * A laje cobre o piso inteiro e tem a mesma face superior (piso embutido na laje).
+ *
+ * É o piso de acabamento modelado no mesmo nível da laje: as duas faces superiores coincidem e todas as camadas do piso
+ * ficam dentro do volume da laje. Não é uma junta entre construções diferentes — o piso é a mesma construção da laje,
+ * só que repetida no modelo. Descontar a laje apagaria o piso do quantitativo; a duplicidade é apontada pelos avisos
+ * `slab-floor-overlap` e `piso-estrutura-sobre-laje` (`validateSlabs.ts`). A decisão 0023 §4 continua valendo para
+ * volumes que se cruzam de fato (laje mais fina que o piso, laje que só cobre parte do piso, ou piso abaixo do topo da
+ * laje). Só vale para laje plana, do próprio nível e que cobre todas as camadas do piso em planta.
+ */
+export function slabCoversFloor(c: CutterSolid, rf: ResolvedFloor): boolean {
+  if (c.kind !== 'slab' || c.pieces.length === 0) return false;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (const p of c.pieces) {
+    // Laje inclinada, ou de outro nível, não é a mesma construção: o corte por faixa continua.
+    if (!p.flat || p.external) return false;
+    const r = spanRange(p);
+    if (!r) return false;
+    z0 = Math.min(z0, r[0]);
+    z1 = Math.max(z1, r[1]);
+  }
+  // Mesma face superior e a laje contém toda a faixa de cota do piso.
+  if (Math.abs(z1 - rf.topZ) > Z_EPS || z0 > rf.bottomZ + Z_EPS) return false;
+  const plan = cutterPlan(c);
+  return rf.layers.every((l) => Math.abs(multiArea(intersection(plan, l.polygon)) - multiArea(l.polygon)) <= AREA_EPS);
 }
 
 /**

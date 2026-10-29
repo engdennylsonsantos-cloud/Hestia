@@ -1,7 +1,7 @@
 import { dist, multiArea, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
 import { resolveFloors, type ResolvedFloor } from './floors.ts';
-import { coveredFaceArea, cutVolume, floorCutters, floorLayerPiece, slabCutters, wallCutters, type CutterSolid } from './junctionNet.ts';
+import { coveredFaceArea, cutVolume, floorCutters, floorLayerPiece, slabCoversFloor, slabCutters, wallCutters, type CutterSolid } from './junctionNet.ts';
 
 /** Uma camada de um piso. A área é a da face superior da camada, líquida: sem o que a laje ocupa (decisão 0023 §4). */
 export interface FloorLayerQuantity {
@@ -56,8 +56,11 @@ export interface FloorQuantities {
 /** Comprimento de um anel fechado (o último ponto liga-se ao primeiro). */
 const ringLength = (r: Vec2[]): number => r.reduce((s, p, i) => s + dist(p, r[(i + 1) % r.length]!), 0);
 
-function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: FloorQuantity; layers: FloorLayerQuantity[] } {
+function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[], slabs: readonly CutterSolid[]): { floor: FloorQuantity; layers: FloorLayerQuantity[] } {
   const area = multiArea(rf.polygon);
+  // Laje que cobre o piso inteiro no mesmo nível: o piso é a mesma construção (acabamento embutido na laje), não uma
+  // junta. Descontá-la apagaria o piso; a duplicidade fica para os avisos de sobreposição.
+  const skip = new Set(slabs.filter((c) => slabCoversFloor(c, rf)));
   const layers = rf.layers.map<FloorLayerQuantity>((l) => {
     const thickness = l.z1 - l.z0;
     const piece = floorLayerPiece(rf, l);
@@ -65,8 +68,8 @@ function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: Floo
     // (padrão por tipo, §1.3). A membrana não tem volume a descontar.
     const layerArea = multiArea(l.polygon);
     const grossVolume = l.membrane ? 0 : layerArea * thickness;
-    const volume = l.membrane ? 0 : Math.max(0, grossVolume - cutVolume(piece, 'floor', cutters));
-    const faceArea = l.membrane ? Math.max(0, layerArea - coveredFaceArea(piece, 'floor', cutters)) : thickness > 0 ? volume / thickness : layerArea;
+    const volume = l.membrane ? 0 : Math.max(0, grossVolume - cutVolume(piece, 'floor', cutters, skip));
+    const faceArea = l.membrane ? Math.max(0, layerArea - coveredFaceArea(piece, 'floor', cutters, skip)) : thickness > 0 ? volume / thickness : layerArea;
     return {
       floorId: rf.floorId,
       layerIndex: l.layerIndex,
@@ -99,17 +102,20 @@ function quantifyFloor(rf: ResolvedFloor, cutters: CutterSolid[]): { floor: Floo
 /**
  * Quantitativos dos pisos de um nível. A geometria vem de `resolveFloors`, então área e volume são os mesmos do
  * 3D e da planta. O volume e a área de face são líquidos: descontam a interseção com as lajes do nível (decisão 0023
- * §4). A área em planta (`area`) continua sendo a do contorno. Pisos sem tipo válido ou com contorno de menos de 3
- * pontos não entram (a validação aponta).
+ * §4), salvo quando a laje cobre o piso inteiro no mesmo nível (`slabCoversFloor`): aí o piso é a mesma construção da
+ * laje e o desconto apagaria o piso; a duplicidade fica para os avisos de sobreposição. A área em planta (`area`)
+ * continua sendo a do contorno. Pisos sem tipo válido ou com contorno de menos de 3 pontos não entram (a validação
+ * aponta).
  */
 export function quantifyFloors(p: Project, levelId: Id): FloorQuantities {
   const floors: FloorQuantity[] = [];
   const layers: FloorLayerQuantity[] = [];
   const volumeByMaterial: Record<Id, number> = {};
   const faceAreaByMaterial: Record<Id, number> = {};
-  const cutters = [...slabCutters(p, levelId), ...floorCutters(p, levelId), ...wallCutters(p, levelId)];
+  const slabs = slabCutters(p, levelId);
+  const cutters = [...slabs, ...floorCutters(p, levelId), ...wallCutters(p, levelId)];
   for (const rf of resolveFloors(p, levelId)) {
-    const q = quantifyFloor(rf, cutters);
+    const q = quantifyFloor(rf, cutters, slabs);
     floors.push(q.floor);
     for (const l of q.layers) {
       layers.push(l);

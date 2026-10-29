@@ -17,8 +17,8 @@ intercâmbio: cada programa reconstrói tipos, juntas e pranchas à sua maneira.
 |---|---|---|
 | N0 válido | `ifcopenshell.validate` sem erro; refs íntegras; IFC4; metros | `scripts/ifc-quality/validate.py` |
 | N1 semântico | elemento no pavimento/tipo certos; vão ligado ao host; material layer set | contagens + psets |
-| N2 geométrico | volume/área contra o motor; sem faltar/sobrar elemento | `ifcopenshell.geom` |
-| N3 visual | cor/opacidade e 3D equivalentes | Bonsai/Blender + captura |
+| N2 geométrico | volume/área da geometria exportada; sem faltar/sobrar elemento | `ifcopenshell.geom` |
+| N3 visual | cor/opacidade, camadas, espaços e eixos no 3D | [matriz visual](matriz-visual.md) — Any3D + Bonsai, manual |
 | N4 round-trip | JSON canônico idêntico (exceto timestamp) | `roundtrip.mts --strict` |
 | N5 interop | Revit, ArchiCAD, Bonsai, Solibri abrem e medem igual | matriz manual + CI |
 
@@ -78,33 +78,58 @@ por onda. Integração: o integrador liga as chamadas no `ifcExport.ts`.
 
 **Onda 2 — feita**
 F: cores/opacidade/brilho por material (`IfcMaterialDefinitionRepresentation` + `IfcSurfaceStyle`), incluindo vidro das
-esquadrias. G: comparação N2 motor × IfcOpenShell (`scripts/ifc-quality/compare.mts`, `npm run ifc:compare [-- --strict]`).
+esquadrias. G: comparação N2 geometria exportada × IfcOpenShell (`scripts/ifc-quality/compare.mts`,
+`npm run ifc:compare [-- --strict]`).
 
 **Onda 3 — parcial (2026-10-29)**
 Unidades completas (`m`, `m²`, `m³`, `rad`) e **norte verdadeiro** no contexto; **forros** exportados como
 `IFCCOVERING .CEILING.` (com camadas e `Qto_CeilingBaseQuantities`). Pendentes: corrigir o quantificador de piso do
-`predio10` no motor, decidir o retorno de acabamento do vão, georreferência por CRS e matriz visual externa.
+`predio10` no motor, decidir o retorno de acabamento do vão, georreferência por CRS e executar a
+[matriz visual](matriz-visual.md).
 
-### N2 — divergências conhecidas (relatório, ainda sem gate estrito)
+### N2 — geometria exportada × IFC
 
-`ifc:compare` mede 16 totais; 8 ficam fora da tolerância de 0,5% (volume). Causas verificadas:
+`ifc:compare` compara a **geometria entregue ao exportador** (`ifcGeometryOf`) com o que o IfcOpenShell mede no
+arquivo. Em 2026-10-29: 16 totais, **0 fora da tolerância** (volume 0,5 %, área 1 %); o maior desvio relativo é
+0,007 % (`predio10`/paredes) e o resto fica na ordem de 1e-13. O gate estrito (`-- --strict`) pode ser ligado.
 
-- **Paredes −0,4% a −0,9%**: o IFC desconta o vão bruto; o motor desconta vão + retorno de acabamento. Paredes sem vão
-  batem exato (0,000%).
-- **Escadas +3,1%**: a peça de chegada entra no `IFCSTAIRFLIGHT` e fica fora do `stairQuantities` (decisão 0012 §2).
-- **`predio10` pisos +45%**: o IFC tem a laje de piso inteira (90 m² × 0,15 m); o motor devolve 0,13 m³ nos pavimentos
-  superiores porque o quantificador desconta o volume coberto pela laje. É divergência do **motor**, não do exportador —
-  o piso exportado coincide com o desenho. Vira tarefa de engine.
-- **`predio10` lajes +2,3%**: a região exportada avança até o núcleo da parede (P8); o quantitativo não desconta.
-- **Telhados e ambientes**: 0,000%. **Forros**: ainda não exportados (sem `ceilings` no `IfcGeometry`).
+Os quantitativos **semânticos** do motor (`quantifyLevel`, `quantifyFloors`, `quantifySlabs`, `quantifyCeilings`,
+`quantifyRoofs`, `stairQuantities`) continuam no JSON só como informação (`motor`), porque divergem da geometria
+por decisões do motor e não do arquivo:
+
+- **Paredes −0,4 % a −0,9 %**: o motor desconta vão + retorno de acabamento; o IFC desconta só o vão bruto.
+- **Escadas +3,1 %**: a peça de chegada entra no `IFCSTAIRFLIGHT` e fica fora do `stairQuantities` (decisão 0012 §2).
+- **`predio10` pisos +45 %**: o motor devolve 0,13 m³ nos pavimentos superiores porque o quantificador desconta o
+  volume coberto pela laje; o piso exportado coincide com o desenho.
+- **`predio10` lajes +2,3 %**: a região exportada avança até o núcleo da parede (P8); o quantitativo não desconta.
+
+Telhados, forros e ambientes batem. Essas diferenças são tarefa de **engine**, não do exportador.
+
+## N3 — matriz visual
+
+O N3 é manual: o arquivo precisa ser aberto num programa de fora e conferido a olho. O procedimento completo
+(geração, passos no Any3D/Bonsai/ConstructCAD, checklist, contagens por modelo e formato da captura) está em
+[`matriz-visual.md`](matriz-visual.md).
+
+Já validado por script, antes do olho:
+
+- **0 erros** de `ifcopenshell.validate` nos 6 modelos e **round-trip exato** (`roundtripOk: true`);
+- **N2 fechado** (16/16 totais dentro da tolerância, geometria exportada × IFC);
+- **estilos** por material (`IfcSurfaceStyle` + `IfcMaterialDefinitionRepresentation`, vidro com
+  `Transparency = 0,65`), **forros** (`IfcCovering .CEILING.`), **espaços** e **eixos** (`IfcSpace`/`IfcGrid` no
+  `casa-ambientes`), telhado de 4 águas e escadas com lances.
+
+Falta o que só o olho fecha: cores/camadas, transparência do vidro, posição dos vãos e árvore espacial em cada
+visualizador. As capturas vão para `test-results/ifc-quality/capturas/`.
 
 ## Comandos
 
 ```powershell
+npm run ifc:quality             # exporta + valida + round-trip + N2 (report.json/compare.json)
 npx vite-node scripts/ifc-quality/export-fixtures.mts
 python scripts/ifc-quality/validate.py test-results/ifc-quality/house2.ifc --geometry
 npx vite-node scripts/ifc-quality/roundtrip.mts --strict
-npm run ifc:compare            # relatório N2
-npm run ifc:compare -- --strict # gate quando as divergências forem resolvidas
+npm run ifc:compare             # relatório N2 (geometria exportada × IFC)
+npm run ifc:compare -- --strict # gate estrito
 npm run test:ifc-export
 ```

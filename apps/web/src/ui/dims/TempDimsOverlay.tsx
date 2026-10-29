@@ -5,6 +5,7 @@ import { editor } from '../../editor/controller.ts';
 import { setDimOverride, useUi } from '../../editor/state.ts';
 import { currentUnits, useFormat } from '../useUnits.ts';
 import { INVALID_FLASH_MS, resolveDimEdit } from './dimsActions.ts';
+import { capturesPointer, rectAround, swallowsPointerButton } from './dimsHit.ts';
 import { viewOfDim } from './dimsView.ts';
 import { toolDims, useDimContext, useSelectionDims } from './useSelectionDims.ts';
 
@@ -39,7 +40,11 @@ const GRIP: CSSProperties = {
   cursor: 'pointer',
 };
 
-const stop = (e: { stopPropagation(): void }): void => e.stopPropagation();
+/** Engole só o clique principal; botão do meio e direito seguem para o canvas (pan e menu sobre uma cota). */
+const stop = (e: { stopPropagation(): void; button?: number }): void => {
+  if (swallowsPointerButton(e.button ?? 0)) e.stopPropagation();
+};
+const auto = (captures: boolean): 'auto' | 'none' => (captures ? 'auto' : 'none');
 
 /**
  * Cotas dinâmicas (temporárias) de qualquer ferramenta ou seleção: um componente só. Desenha as linhas, o texto azul
@@ -51,6 +56,7 @@ export function TempDimsOverlay(): ReactElement | null {
   const selDims = useSelectionDims();
   const tick = useUi((s) => s.previewTick);
   const tool = useUi((s) => s.tool);
+  const cursor = useUi((s) => s.cursor);
   const format = useFormat();
   const [editing, setEditing] = useState<{ key: string; text: string } | null>(null);
   const [invalidKey, setInvalidKey] = useState<string | null>(null);
@@ -91,6 +97,8 @@ export function TempDimsOverlay(): ReactElement | null {
     useUi.setState({ status: 'Cotas criadas.' });
   };
 
+  const cursorPx = cursor ? toScreen(cursor) : null;
+  const captures = (rect: ReturnType<typeof rectAround>): 'auto' | 'none' => auto(capturesPointer(rect, cursorPx, previewing));
   const first = views[0]!.view.textAt;
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 12, pointerEvents: 'none' }}>
@@ -117,7 +125,7 @@ export function TempDimsOverlay(): ReactElement | null {
               aria-label={`Cota: ${dim.key.split(':').pop()}`}
               title={view.editable ? 'Digite a medida e pressione Enter' : 'Cota de leitura'}
               readOnly={!view.editable}
-              style={{ ...BOX, left: view.textAt.x - 31, top: view.textAt.y - 11, ...(view.invalid ? { borderColor: DANGER, color: DANGER } : {}) }}
+              style={{ ...BOX, left: view.textAt.x - 31, top: view.textAt.y - 11, pointerEvents: view.editable ? 'auto' : captures({ x: view.textAt.x - 31, y: view.textAt.y - 11, w: 62, h: 22 }), ...(view.invalid ? { borderColor: DANGER, color: DANGER } : {}) }}
               value={active ? editing.text : shown}
               onPointerDown={stop}
               onPointerUp={stop}
@@ -145,7 +153,7 @@ export function TempDimsOverlay(): ReactElement | null {
                 type="button"
                 aria-label={g.title}
                 title={g.title}
-                style={{ ...GRIP, left: g.at.x, top: g.at.y }}
+                style={{ ...GRIP, left: g.at.x, top: g.at.y, pointerEvents: captures(rectAround(g.at, 10)) }}
                 onPointerDown={stop}
                 onPointerUp={stop}
                 onClick={(e) => {
@@ -162,7 +170,7 @@ export function TempDimsOverlay(): ReactElement | null {
         className="btn"
         aria-label="Converter em cotas permanentes"
         title="Converter em cotas permanentes"
-        style={{ position: 'absolute', left: first.x + 40, top: first.y - 11, width: 22, height: 22, padding: 0, pointerEvents: 'auto', zIndex: 13 }}
+        style={{ position: 'absolute', left: first.x + 40, top: first.y - 11, width: 22, height: 22, padding: 0, pointerEvents: captures({ x: first.x + 40, y: first.y - 11, w: 22, h: 22 }), zIndex: 13 }}
         onPointerDown={stop}
         onPointerUp={stop}
         onClick={(e) => {

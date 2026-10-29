@@ -2,17 +2,19 @@ import {
   createEmptyProject,
   makeCeiling,
   makeFloor,
-  makeLevel,
   makeRoom,
   makeSlab,
   makeWall,
   type Id,
+  type IfcProperty,
   type Opening,
   type Project,
 } from '@hestia/model';
 import { bodyOf, cleanLoop, hull2, prismFromMesh, rectangleAxis, segment, type Body, type Prism } from './geometry.ts';
-import { openingType, operationOf, slabLikeType, slug, wallType } from './elementTypes.ts';
+import { openingType, operationOf, slabLikeType, wallType } from './elementTypes.ts';
 import { IfcFile, projectName, type Pt2 } from './ifc.ts';
+import { readLevels, type LevelRef } from './levels.ts';
+import { colorOf, propertiesOf } from './psets.ts';
 import type { StepEntity } from './step.ts';
 
 /** O que a importação trouxe. Sempre preenchido, mesmo quando o arquivo é ruim. */
@@ -36,12 +38,6 @@ export interface ImportReport {
 export interface ImportResult {
   project: Project;
   report: ImportReport;
-}
-
-interface LevelRef {
-  id: Id;
-  elevation: number;
-  storey: number;
 }
 
 interface Ctx {
@@ -77,6 +73,12 @@ const emptyReport = (f: IfcFile): ImportReport => ({
 
 const guid = (f: IfcFile, e: StepEntity | undefined): string => f.text(e, 0) || `#${e?.id ?? 0}`;
 
+/** Campo opcional `ifcProperties`: só entra no elemento quando há propriedade lida (instância + tipo). */
+function psetOf(ctx: Ctx, e: StepEntity): { ifcProperties?: IfcProperty[] } {
+  const props = propertiesOf(ctx.f, e, ctx.typeOf.get(e.id));
+  return props.length ? { ifcProperties: props } : {};
+}
+
 /** Produtos de uma família (`IFCWALL` inclui StandardCase/ElementedCase), sem os tipos/estilos. */
 function products(f: IfcFile, prefix: string): StepEntity[] {
   return f
@@ -92,14 +94,22 @@ function noteGeometry(ctx: Ctx, body: Body | null): void {
 }
 
 /**
+ * Classes que o importador já trata por outro caminho. As famílias com variantes (`IFCWALLSTANDARDCASE`...) casam por
+ * prefixo; os demais nomes são exatos — `IFCBUILDINGELEMENTPROXY` não pode casar com `IFCBUILDING`.
+ */
+function isHandledClass(type: string): boolean {
+  if (/^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|OPENINGELEMENT)/.test(type)) return true;
+  return type === 'IFCSPACE' || type === 'IFCGRID' || type === 'IFCANNOTATION' || type === 'IFCSITE' || type === 'IFCBUILDING' || type === 'IFCPROJECT' || type === 'IFCBUILDINGSTOREY';
+}
+
+/**
  * Produtos que o importador não representa como elemento nativo viram **objeto genérico** com a malha e a classe IFC de
  * origem. O que não tiver malha fica de fora e entra em `skipped` (via `countUnhandledProducts`).
  */
 function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
   const converted = new Set<number>();
-  const handled = /^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|SPACE|GRID|OPENINGELEMENT|ANNOTATION|SITE|BUILDING|PROJECT|BUILDINGSTOREY)/;
   for (const e of file.step.entities.values()) {
-    if (handled.test(e.type)) continue;
+    if (isHandledClass(e.type)) continue;
     if (!file.ref(e, 5) || file.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
     const body = bodyOf(file, e);
     if (!body.tris.length) continue;
@@ -125,7 +135,9 @@ function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
       objectType: file.text(e, 4) || undefined,
       mesh: { positions, indices },
       outline: outline.length >= 3 ? outline : undefined,
+      color: colorOf(file, e, ctx.typeOf.get(e.id)),
       order: ctx.order++,
+      ...psetOf(ctx, e),
     };
     converted.add(e.id);
     ctx.report.generic[e.type] = (ctx.report.generic[e.type] ?? 0) + 1;
@@ -139,36 +151,11 @@ function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
  * relatório não pode dizer "0 ignorados" com 51 vigas no arquivo.
  */
 function countUnhandledProducts(f: IfcFile, report: ImportReport, converted: Set<number>): void {
-  const handled = /^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|SPACE|GRID|OPENINGELEMENT|ANNOTATION|SITE|BUILDING|PROJECT|BUILDINGSTOREY)/;
   for (const e of f.step.entities.values()) {
-    if (converted.has(e.id) || handled.test(e.type)) continue;
+    if (converted.has(e.id) || isHandledClass(e.type)) continue;
     if (!f.ref(e, 5) || f.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
     report.skipped[e.type] = (report.skipped[e.type] ?? 0) + 1;
   }
-}
-
-/** Cota de um pavimento: `Elevation` (atributo 9) ou a origem do placement. */
-function storeyElevation(f: IfcFile, e: StepEntity): number {
-  const explicit = f.num(e, 9);
-  if (explicit != null) return explicit * f.units.length;
-  return f.productPlacement(e).o.z;
-}
-
-function readLevels(f: IfcFile, p: Project, report: ImportReport): LevelRef[] {
-  const storeys = f.byType('IFCBUILDINGSTOREY').map((e) => ({ e, z: storeyElevation(f, e) }));
-  storeys.sort((a, b) => a.z - b.z);
-  if (!storeys.length) {
-    const level = makeLevel({ id: 'lv_0', name: 'Térreo', elevation: 0 });
-    p.levels = [level];
-    report.levels = 1;
-    return [{ id: level.id, elevation: 0, storey: 0 }];
-  }
-  p.levels = storeys.map((s, i) => {
-    const name = f.text(s.e, 2).trim() || `Nível ${i + 1}`;
-    return makeLevel({ id: `lv_${i}_${slug(name) || i}`, name, elevation: s.z });
-  });
-  report.levels = p.levels.length;
-  return storeys.map((s, i) => ({ id: p.levels[i]!.id, elevation: s.z, storey: s.e.id }));
 }
 
 /** Nível mais próximo abaixo de uma cota `z` (1 cm de folga). */
@@ -243,6 +230,7 @@ function placeWall(ctx: Ctx, e: StepEntity, prism: Prism): void {
     baseOffset: prism.z0 - level.elevation,
     height,
     order: ctx.order++,
+    ...psetOf(ctx, e),
   };
   ctx.walls.set(e.id, id);
   ctx.count('paredes');
@@ -304,6 +292,7 @@ function addOpening(ctx: Ctx, filler: StepEntity, kind: 'door' | 'window'): void
     flipFacing: false,
     sillOverride: null,
     mark: f.text(filler, 7),
+    ...psetOf(ctx, filler),
   };
   ctx.p.elements[id] = op;
   ctx.count(kind === 'door' ? 'portas' : 'janelas');
@@ -350,7 +339,7 @@ function addSlab(ctx: Ctx, e: StepEntity): void {
   const name = f.text(ctx.typeOf.get(e.id), 2).trim() || f.text(e, 2).trim();
   const typeId = slabLikeType(ctx, kind, name, thickness);
   const id = `${kind === 'floor' ? 'f' : kind === 'slab' ? 's' : 'c'}_${guid(f, e)}`;
-  const base = { id, typeId, levelId: level.id, boundary, holes, heightOffset: prism.z1 - level.elevation, mark: f.text(e, 7), comments: '' };
+  const base = { id, typeId, levelId: level.id, boundary, holes, heightOffset: prism.z1 - level.elevation, mark: f.text(e, 7), comments: '', ...psetOf(ctx, e) };
   if (kind === 'floor') ctx.p.elements[id] = { ...makeFloor(base), order: ctx.order++ };
   else if (kind === 'slab') ctx.p.elements[id] = { ...makeSlab(base), order: ctx.order++ };
   else ctx.p.elements[id] = { ...makeCeiling(base), order: ctx.order++ };
@@ -375,6 +364,7 @@ function addRoom(ctx: Ctx, e: StepEntity): void {
     name: f.text(e, 2).trim() || 'Ambiente',
     number: f.text(e, 7).trim(),
     point,
+    ...psetOf(ctx, e),
   });
   ctx.p.elements[id] = { ...room, order: ctx.order++ };
   ctx.count('ambientes');

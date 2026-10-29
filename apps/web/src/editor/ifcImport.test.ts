@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ImportReport } from '@hestia/io';
-import { resumoImportacao } from './ifcImport.ts';
+import { importIfc, type ImportReport } from '@hestia/io';
+import paredeJanela from '../../../../tests/ifc/fixtures/parede-janela.ifc?raw';
+import { importIfcText, nomeDoProjeto, resumoImportacao } from './ifcImport.ts';
 
 /** Relatório como o importador entrega, com os campos que o teste quer mudar. */
 const relatorio = (patch: Partial<ImportReport> = {}): ImportReport => ({
@@ -14,6 +15,20 @@ const relatorio = (patch: Partial<ImportReport> = {}): ImportReport => ({
   generic: {},
   warnings: [],
   ...patch,
+});
+
+describe('importação IFC fora da thread principal', () => {
+  it('sem Worker (Node), o importIfcText cai no importIfc síncrono e devolve o mesmo projeto', async () => {
+    expect(typeof Worker).toBe('undefined');
+    const sincrono = importIfc(paredeJanela);
+    const semWorker = await importIfcText(paredeJanela);
+    expect(semWorker.project).toEqual(sincrono.project);
+    expect(semWorker.report).toEqual(sincrono.report);
+  });
+
+  it('mantém o nome do projeto como x.hestia.json', () => {
+    expect(nomeDoProjeto('x.ifc')).toBe('x.hestia.json');
+  });
 });
 
 describe('resumo da importação IFC', () => {

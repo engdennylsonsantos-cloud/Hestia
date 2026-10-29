@@ -1,4 +1,4 @@
-import { importIfc, type ImportReport } from '@hestia/io';
+import { importIfc, type ImportReport, type ImportResult } from '@hestia/io';
 import { editor } from './controller.ts';
 import type { Lang } from './i18n.ts';
 
@@ -7,10 +7,88 @@ import type { Lang } from './i18n.ts';
  * novo; aqui ele entra no editor como um arquivo aberto, para as próximas edições e o Salvar valerem para o Hestia.
  */
 export async function importIfcFile(file: File): Promise<{ name: string; report: ImportReport }> {
-  const { project, report } = importIfc(await file.text());
+  const { project, report } = await importIfcText(await file.text());
   const name = nomeDoProjeto(file.name);
   editor.load(project, name);
   return { name, report };
+}
+
+/**
+ * Tempo máximo que a janela espera pelo worker. Um IFC de 25 MB leva segundos; 2 minutos cobrem uma máquina
+ * lenta, e o teto evita uma promessa que nunca resolve se o worker travar.
+ */
+const LIMITE_WORKER_MS = 120_000;
+
+/** O que o `ifcWorker` devolve: o mesmo par do `importIfc` ou a mensagem do erro que ele lançou. */
+type RespostaIfcWorker = ImportResult | { error: string };
+
+/** O worker não pôde ser criado nem carregado: vale repetir na thread principal (o resultado é o mesmo). */
+class WorkerIndisponivel extends Error {}
+
+/** O importador falhou dentro do worker: repetir na thread principal daria o mesmo erro. */
+class FalhaImportacao extends Error {}
+
+/** O worker estourou o tempo: repetir na thread principal travaria a janela pelo mesmo tempo. */
+class TempoEsgotado extends Error {}
+
+/**
+ * Roda o `importIfc` num worker dedicado (`ifcWorker.ts`) para o arquivo grande não congelar a interface.
+ * Rejeita com `WorkerIndisponivel`, `FalhaImportacao` ou `TempoEsgotado`; `importIfcText` decide o fallback.
+ */
+function importarNoWorker(text: string): Promise<ImportResult> {
+  return new Promise<ImportResult>((resolve, reject) => {
+    let worker: Worker;
+    try {
+      // O Vite (dev e build) reconhece o `new URL(..., import.meta.url)` e empacota o worker à parte.
+      worker = new Worker(new URL('./ifcWorker.ts', import.meta.url), { type: 'module' });
+    } catch (erro) {
+      reject(new WorkerIndisponivel(erro instanceof Error ? erro.message : String(erro)));
+      return;
+    }
+
+    let encerrado = false;
+    /** Termina o worker uma única vez, qualquer que seja o desfecho. */
+    const encerrar = (): boolean => {
+      if (encerrado) return false;
+      encerrado = true;
+      clearTimeout(timer);
+      worker.terminate();
+      return true;
+    };
+
+    // Só é chamado depois desta linha (pelo estouro do tempo ou por uma resposta), então o `const` abaixo já existe.
+    const timer = setTimeout(() => {
+      if (encerrar()) reject(new TempoEsgotado(`A importação IFC passou de ${LIMITE_WORKER_MS / 1000} s e foi cancelada.`));
+    }, LIMITE_WORKER_MS);
+
+    worker.onmessage = (evento: MessageEvent<RespostaIfcWorker>) => {
+      if (!encerrar()) return;
+      const resposta = evento.data;
+      if ('error' in resposta) reject(new FalhaImportacao(resposta.error));
+      else resolve(resposta);
+    };
+
+    // Script do worker que não carrega (ou worker que morre): a janela ainda pode importar na thread principal.
+    worker.onerror = (evento) => {
+      if (encerrar()) reject(new WorkerIndisponivel(evento.message || 'O worker de importação IFC não carregou.'));
+    };
+
+    worker.postMessage({ text });
+  });
+}
+
+/**
+ * Importa o texto de um IFC. Com `Worker` (navegador), o trabalho pesado sai da thread principal; sem ele
+ * (Node, testes) ou se o worker não puder ser criado/carregado, cai no `importIfc` síncrono — mesmo resultado.
+ */
+export async function importIfcText(text: string): Promise<ImportResult> {
+  if (typeof Worker === 'undefined') return importIfc(text);
+  try {
+    return await importarNoWorker(text);
+  } catch (erro) {
+    if (erro instanceof WorkerIndisponivel) return importIfc(text);
+    throw erro;
+  }
 }
 
 /** "casa.ifc" vira "casa.hestia.json": o IFC original não é sobrescrito pelo Salvar. */

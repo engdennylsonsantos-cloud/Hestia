@@ -8,8 +8,8 @@ const GAP = 4;
 
 const overlaps = (a: ScreenRect, b: ScreenRect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-/** Retângulo do campo do valor centrado em `textAt`. */
-export const valueRect = (textAt: Vec2): ScreenRect => ({ x: textAt.x - VALUE_BOX.w / 2, y: textAt.y - VALUE_BOX.h / 2, w: VALUE_BOX.w, h: VALUE_BOX.h });
+/** Retângulo do campo do valor centrado em `textAt`; a largura cresce com o texto (`larguraDoCampo`). */
+export const valueRect = (textAt: Vec2, width: number = VALUE_BOX.w): ScreenRect => ({ x: textAt.x - width / 2, y: textAt.y - VALUE_BOX.h / 2, w: width, h: VALUE_BOX.h });
 
 /**
  * Posição do botão "I" ao lado do primeiro valor, fora de qualquer outro campo ou alça: tenta à direita, à esquerda,

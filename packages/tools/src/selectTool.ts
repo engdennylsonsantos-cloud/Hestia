@@ -13,7 +13,7 @@ import { pickRoofAt, roofIdsInBox } from './roofPick.ts';
 import { roofRingPatch } from './roofEdges.ts';
 import { commitRoofPatch } from './roofCheck.ts';
 import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
-import { parseQuantityText } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import { resizeWallCommands } from './lengthEdit.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
@@ -161,7 +161,7 @@ export class SelectTool extends ToolBase {
   /** Enter sem valor digitado: abre o campo de cota (a mensagem indica como digitar). */
   override confirm(): void {
     if (this.mode === 'idle' && this.singleWall()) {
-      this.env.say('Comprimento: digite o valor em metros (aceita expressões) e Enter.');
+      this.env.say(`Comprimento: digite o valor em ${lengthUnitName(unitsOf(this.env.project()))} (aceita expressões) e Enter.`);
       return;
     }
     super.confirm();
@@ -173,7 +173,7 @@ export class SelectTool extends ToolBase {
     if (!w) return false;
     const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     const r = resizeWallCommands(this.env.project(), this.env.levelId(), w.id, v);

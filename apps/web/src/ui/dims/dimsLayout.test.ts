@@ -8,6 +8,9 @@ describe('valueRect', () => {
   it('centra o campo no texto', () => {
     expect(valueRect({ x: 100, y: 50 })).toEqual({ x: 69, y: 39, w: 62, h: 22 });
   });
+  it('campo mais largo (pés e polegadas) continua centrado', () => {
+    expect(valueRect({ x: 100, y: 50 }, 100)).toEqual({ x: 50, y: 39, w: 100, h: 22 });
+  });
 });
 
 describe('placeConvertButton', () => {

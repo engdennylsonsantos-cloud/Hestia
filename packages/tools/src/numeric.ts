@@ -1,4 +1,4 @@
-import { fromDisplay, parseQuantity, type Quantity, type ResolvedUnits } from '@hestia/model';
+import { fromDisplay, parseQuantity, type LengthUnit, type Quantity, type ResolvedUnits } from '@hestia/model';
 
 /** Interpreta medidas digitadas: "3,5", "3.50+0,15", "(2+1)*0,5". Sem eval. Devolve null se inválido. */
 export function parseNumber(text: string): number | null {
@@ -65,4 +65,18 @@ export function parseQuantityText(text: string, u: ResolvedUnits, q: Quantity): 
   if (direct !== null) return direct;
   const value = parseNumber(text);
   return value === null ? null : fromDisplay(u, q, value);
+}
+
+const LENGTH_NAMES: Record<LengthUnit, string> = {
+  m: 'metros',
+  cm: 'centímetros',
+  mm: 'milímetros',
+  ft: 'pés',
+  in: 'polegadas',
+  'ft-in': 'pés e polegadas',
+};
+
+/** Nome por extenso da unidade de comprimento do projeto, para mensagens de erro das ferramentas. */
+export function lengthUnitName(u: ResolvedUnits): string {
+  return LENGTH_NAMES[u.length.unit];
 }

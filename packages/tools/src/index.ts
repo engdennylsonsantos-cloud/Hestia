@@ -50,6 +50,7 @@ export * from './rampCommands.ts';
 export * from './rampPick.ts';
 export * from './rampPreview.ts';
 export * from './rampLiveMessages.ts';
+export * from './rampLiveSession.ts';
 export { RampTool } from './rampTool.ts';
 export { StairRunTool } from './stairRunTool.ts';
 export { applyStairGrip, arcApex, stairGripAt, stairHandlePreview, stairHold, type StairChainKey, type StairGrip } from './stairGrips.ts';

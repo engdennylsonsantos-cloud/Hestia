@@ -27,6 +27,19 @@ describe('provedor de cotas da parede', () => {
     expect(gap.ends.every((e) => e.kind === 'wall')).toBe(true);
   });
 
+  it('mede a paralela do lado esquerdo pela face voltada para ela, não pela face oposta', () => {
+    const { ctx, hostId } = cena();
+    const s2 = new ProjectStore(createEmptyProject());
+    s2.exec({ type: 'addWall', wall: makeWall({ id: 'host', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    s2.exec({ type: 'addWall', wall: makeWall({ id: 'viz', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: -2 }, b: { x: 4, y: -2 } }) });
+    const p = s2.project;
+    const dims = wallDimProvider.compute({ ...ctx, project: p }, { wallId: hostId });
+    const gap = dims.find((d) => d.key.endsWith(':left'))!;
+    // Entre faces acabadas: 2 m entre eixos − 0,092 (cada face) = 1,816 m.
+    expect(gap.value).toBeCloseTo(1.816, 9);
+    expect(Math.abs(gap.a.y - gap.b.y)).toBeCloseTo(1.816, 9);
+  });
+
   it('editar o comprimento move a extremidade b e recusa quando a porta sairia da parede', () => {
     const { ctx, hostId } = cena();
     const comp = wallDimProvider.compute(ctx, { wallId: hostId }).find((d) => d.key.endsWith(':length'))!;

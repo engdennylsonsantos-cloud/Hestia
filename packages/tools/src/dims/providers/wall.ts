@@ -51,7 +51,7 @@ interface ParallelGap {
 }
 
 function nearestParallel(ctx: DimContext, host: WallFrame, ref: WallDimRef): ParallelGap[] {
-  const hostPlane = wallPlaneAt(wallPlanes(host), ref, 1);
+  const planes = wallPlanes(host);
   let left: ParallelGap | null = null;
   let right: ParallelGap | null = null;
   for (const e of Object.values(ctx.project.elements)) {
@@ -65,9 +65,11 @@ function nearestParallel(ctx: DimContext, host: WallFrame, ref: WallDimRef): Par
     const otherPlane = wallPlaneAt(wallPlanes(other), ref, towardHost);
     const probe = pointAt(other, other.length / 2, otherPlane);
     const loc = toLocal(host, probe);
+    // O lado define qual face da hospedeira está voltada para a vizinha (eixo e eixo do núcleo não dependem dele).
+    const side: 1 | -1 = loc.s >= host.sMid ? 1 : -1;
+    const hostPlane = wallPlaneAt(planes, ref, side);
     const distance = Math.abs(loc.s - hostPlane);
     if (distance < EPS) continue;
-    const side: 1 | -1 = loc.s > hostPlane ? 1 : -1;
     const t = Math.max(0, Math.min(host.length, loc.t));
     const gap: ParallelGap = { side, otherS: loc.s, distance, t };
     if (side > 0) {

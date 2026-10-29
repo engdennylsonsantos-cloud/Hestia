@@ -1,5 +1,14 @@
 import { useState, type ReactElement } from 'react';
-import type { AutoCotaOptions, LadoCota, ReferenciaParede } from '@hestia/engine';
+import type { AutoCotaOptions, LadoCota } from '@hestia/engine';
+import {
+  OPENING_DIM_REFS,
+  OPENING_DIM_REF_LABELS,
+  WALL_DIM_REFS,
+  WALL_DIM_REF_LABELS,
+  dimensionSettingsOf,
+  type OpeningDimRef,
+  type WallDimRef,
+} from '@hestia/model';
 import { editor } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { Check, NumField, Row } from '../fields.tsx';
@@ -11,8 +20,9 @@ export function AutoCotaDialog(): ReactElement {
   const [geometria, setGeometria] = useState(true);
   const [paredes, setParedes] = useState(true);
   const [aberturas, setAberturas] = useState(true);
-  const [modo, setModo] = useState<'arestas' | 'centro'>('arestas');
-  const [referencia, setReferencia] = useState<ReferenciaParede>('externa');
+  const padroes = dimensionSettingsOf(editor.project);
+  const [modo, setModo] = useState<OpeningDimRef>(padroes.openingRef);
+  const [referencia, setReferencia] = useState<WallDimRef>(padroes.wallRef);
   const [lados, setLados] = useState<'todos' | LadoCota>('todos');
   const [somenteExternas, setSomenteExternas] = useState(true);
   const [offset, setOffset] = useState(0.6);
@@ -25,8 +35,8 @@ export function AutoCotaDialog(): ReactElement {
       geometria,
       paredes,
       aberturas,
-      modoAberturas: modo,
-      referencia,
+      openingRef: modo,
+      wallRef: referencia,
       somenteExternas,
       offset,
       espacamento,
@@ -56,18 +66,15 @@ export function AutoCotaDialog(): ReactElement {
       </div>
 
       <Row label="Aberturas por" htmlFor="ac-modo">
-        <select id="ac-modo" className="select" value={modo} onChange={(e) => setModo(e.target.value as 'arestas' | 'centro')} disabled={!aberturas}>
-          <option value="arestas">Arestas do vão</option>
-          <option value="centro">Centro da abertura</option>
+        <select id="ac-modo" className="select" value={modo} onChange={(e) => setModo(e.target.value as OpeningDimRef)} disabled={!aberturas}>
+          {OPENING_DIM_REFS.map((r) => <option key={r} value={r}>{OPENING_DIM_REF_LABELS[r]}</option>)}
         </select>
       </Row>
 
       <h3 style={{ fontSize: 12, margin: '12px 0 6px' }}>Referência da parede</h3>
       <Row label="Medir pelas" htmlFor="ac-referencia">
-        <select id="ac-referencia" className="select" value={referencia} onChange={(e) => setReferencia(e.target.value as ReferenciaParede)}>
-          <option value="externa">Faces externas</option>
-          <option value="nucleo">Faces do núcleo</option>
-          <option value="eixo">Eixos das paredes</option>
+        <select id="ac-referencia" className="select" value={referencia} onChange={(e) => setReferencia(e.target.value as WallDimRef)}>
+          {WALL_DIM_REFS.map((r) => <option key={r} value={r}>{WALL_DIM_REF_LABELS[r]}</option>)}
         </select>
       </Row>
 

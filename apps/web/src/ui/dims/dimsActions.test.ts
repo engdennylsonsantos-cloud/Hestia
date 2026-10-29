@@ -42,6 +42,12 @@ describe('resolveDimEdit', () => {
     if (r.kind === 'error') expect(r.message).toContain(`'`);
   });
 
+  it('cota de ângulo lê o texto em graus e usa a grandeza certa', () => {
+    const angular: TempDim = { ...editavel, quantity: 'angle', value: Math.PI / 4, edit: (v) => ({ commands: [{ type: 'updateElements', ids: ['e'], patch: { offset: v } }] }) };
+    expect(resolveDimEdit(angular, '90', metros)).toEqual({ kind: 'done', commands: [{ type: 'updateElements', ids: ['e'], patch: { offset: Math.PI / 2 } }] });
+    expect(resolveDimEdit(angular, 'abc', metros)).toEqual({ kind: 'error', message: 'Medida inválida: digite um ângulo, como 45°.' });
+  });
+
   it('erro do provedor vira alerta e nenhum comando', () => {
     expect(resolveDimEdit(editavel, '9', metros)).toEqual({ kind: 'error', message: 'Sairia da parede.' });
   });

@@ -8,7 +8,7 @@ import { INVALID_FLASH_MS, resolveDimEdit } from './dimsActions.ts';
 import { larguraDoCampo } from './dimsBox.ts';
 import { capturesPointer, holdsLastPreview, rectAround, swallowsPointerButton, type ScreenRect } from './dimsHit.ts';
 import { placeConvertButton, valueRect } from './dimsLayout.ts';
-import { viewOfDim } from './dimsView.ts';
+import { dimText, viewOfDim } from './dimsView.ts';
 import { toolDims, useDimContext, useSelectionDims } from './useSelectionDims.ts';
 
 const DANGER = 'var(--danger, #d33)';
@@ -124,7 +124,7 @@ export function TempDimsOverlay(): ReactElement | null {
   const liveEnds = dims.flatMap((d) => d.ends.map((e) => toScreen(e.at)));
   // Alça: folga para o imã (o cursor fica ao lado do ponto). Valor e "I": só passam ao canvas se cobrem o cursor (trecho curto).
   const captures = (rect: ScreenRect, clearance?: number): 'auto' | 'none' => auto(capturesPointer(rect, cursorPx, previewing, liveEnds, clearance));
-  const widthOf = (d: TempDim): number => larguraDoCampo(editing?.key === d.key ? editing.text : format('length', d.value, { withUnit: false, trim: true }));
+  const widthOf = (d: TempDim): number => larguraDoCampo(editing?.key === d.key ? editing.text : dimText(d, format));
   const valueRects = views.map(({ dim, view }) => valueRect(view.textAt, widthOf(dim)));
   const gripRects = views.flatMap(({ view }) => view.grips.map((g) => rectAround(g.at, 10)));
   const convert = placeConvertButton(valueRects[0]!, [...valueRects, ...gripRects]);
@@ -144,7 +144,7 @@ export function TempDimsOverlay(): ReactElement | null {
         ))}
       </svg>
       {views.map(({ dim, view }) => {
-        const shown = format('length', dim.value, { withUnit: false, trim: true });
+        const shown = dimText(dim, format);
         const texto = editing?.key === dim.key ? editing.text : shown;
         const width = larguraDoCampo(texto);
         return (

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { defaultUnits, formatQuantity } from '@hestia/model';
 import type { DimEnd, TempDim } from '@hestia/tools';
-import { gripOf, nextRef, providerOf, refLabel, viewOfDim } from './dimsView.ts';
+import { dimText, gripOf, nextRef, providerOf, refLabel, viewOfDim } from './dimsView.ts';
 
 const end = (slot: string, current: DimEnd['current'], options: DimEnd['options'], x = 0): DimEnd => ({ at: { x, y: 0 }, slot, kind: 'wall', current, options });
 const dim = (over: Partial<TempDim> = {}): TempDim => ({
@@ -13,6 +14,7 @@ const dim = (over: Partial<TempDim> = {}): TempDim => ({
   ...over,
 });
 const toScreen = (p: { x: number; y: number }) => ({ x: p.x * 100, y: -p.y * 100 });
+const fmt = (q: Parameters<typeof formatQuantity>[1], si: number, o?: Parameters<typeof formatQuantity>[3]): string => formatQuantity(defaultUnits(), q, si, o);
 
 describe('dimsView', () => {
   it('clicar 4 vezes volta à referência original', () => {
@@ -61,6 +63,14 @@ describe('dimsView', () => {
     expect(v.grips).toHaveLength(2);
     expect(viewOfDim(dim(), toScreen, 0.01, null).editable).toBe(false);
     expect(viewOfDim(dim({ tone: 'invalid' }), toScreen, 0.01, null).invalid).toBe(true);
+  });
+
+  it('texto da cota: valor principal sem unidade e medida informativa com unidade', () => {
+    expect(dimText(dim(), fmt)).toBe('2');
+    const comAngulo = dim({ secondary: { quantity: 'angle', value: Math.PI / 6 } });
+    expect(dimText(comAngulo, fmt)).toBe('2 · 30°');
+    // Uma cota de ângulo (principal) leva o símbolo para não se confundir com comprimento.
+    expect(dimText(dim({ quantity: 'angle', value: Math.PI / 2 }), fmt)).toBe('90°');
   });
 
   it('ponta com uma só referência não ganha alça (C03: cobria as alças de vértice do contorno)', () => {

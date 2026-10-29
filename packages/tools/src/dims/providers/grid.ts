@@ -1,4 +1,4 @@
-import { add, dot, mul, sub, type Vec2 } from '@hestia/geom';
+import { add, arcFromSagitta, dist, dot, mul, sub, type Vec2 } from '@hestia/geom';
 import { gridOf, projectGrids, type Grid, type Id, type Project } from '@hestia/model';
 import { NON_POSITIVE_MSG, gapTranslation, nearestParallelGaps, segFrame, segPoint, PARALLEL_TOL, type LocalPlane, type ParallelGap, type SegFrame } from '../parallel.ts';
 import type { DimContext, DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
@@ -18,6 +18,22 @@ function axisOf(g: Grid): SegFrame | null {
 }
 
 const end = (at: Vec2, slot: string): DimEnd => ({ at, slot, kind: 'wall', current: 'axis', options: ['axis'] });
+
+/**
+ * Comprimento do eixo em desenho (prévia da ferramenta): a corda ou o arco, quando há flecha. Usa o mesmo sistema
+ * único de cotas das demais ferramentas, em vez de um rótulo solto na prévia.
+ */
+export function gridPreviewDim(a: Vec2, b: Vec2, sag = 0): TempDim {
+  const arc = sag ? arcFromSagitta(a, b, sag) : null;
+  return {
+    key: `${PROVIDER_ID}:draft:length`,
+    a,
+    b,
+    offset: DIM_OFFSET,
+    value: arc ? arc.length : dist(a, b),
+    ends: [end(a, 'draftA'), end(b, 'draftB')],
+  };
+}
 
 /** Grades paralelas vizinhas, a mais próxima de cada lado (retas ilimitadas: não exigem sobreposição). */
 function nearestParallel(ctx: DimContext, host: SegFrame, hostId: Id): ParallelGap[] {

@@ -211,7 +211,11 @@ const migrations: Record<number, Migration> = {
   // (2·R + T entre 0,63 e 0,65 m, alvo 0,63 m e piso máximo 0,32 m), preservando o piso calculado de antes.
   19: (raw) => {
     const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
-    for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { ...DEFAULT_STAIR_CALC_RULE, ...t };
+    for (const [id, t] of Object.entries(stairTypes)) {
+      // O piso máximo padrão não pode ficar abaixo do piso mínimo do tipo antigo (senão o tipo nasceria inválido).
+      const minTread = Number.isFinite(t.minTread) ? (t.minTread as number) : 0;
+      stairTypes[id] = { ...DEFAULT_STAIR_CALC_RULE, maxTread: Math.max(DEFAULT_STAIR_CALC_RULE.maxTread, minTread), ...t };
+    }
     return { ...raw, stairTypes };
   },
   // v20 → v21: rampas. Projetos antigos ganham os 2 tipos de rampa padrão (sem sobrescrever os do arquivo) e nenhuma

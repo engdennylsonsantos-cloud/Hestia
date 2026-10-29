@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dist, mid, type Vec2 } from '@hestia/geom';
-import { ProjectStore, createEmptyProject, makeLevel, makeRamp, type Project, type Ramp, type StairLanding, type StairRun } from '@hestia/model';
+import { ProjectStore, createEmptyProject, makeLevel, makeRamp, type Project, type Ramp, type StairLanding, type StairRun, type Command } from '@hestia/model';
 import { planRamp, type RampPlan } from './rampPlan.ts';
 import { planRampFree } from './rampFree.ts';
 import { regenRamp } from './rampEdit.ts';
@@ -144,9 +144,9 @@ describe('regenRamp: rampa livre', () => {
     const lens = (c: Ramp['components']): number[] => runs(c).map(runLength);
     for (const transform of [
       { kind: 'translate', d: { x: 5, y: -3 } },
-      { kind: 'rotate', center: { x: 1, y: 1 }, angle: Math.PI / 3 },
+      { kind: 'rotate', about: { x: 1, y: 1 }, angle: Math.PI / 3 },
       { kind: 'mirror', a: { x: 0, y: 0 }, b: { x: 0, y: 1 } },
-    ] as const) {
+    ] as Array<Extract<Command, { type: 'transform' }>['transform']>) {
       const t = freeProject('length');
       t.s.exec({ type: 'transform', ids: ['rp1'], transform });
       const moved = t.s.project.elements.rp1 as Ramp;

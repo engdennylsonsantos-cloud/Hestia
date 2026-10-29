@@ -123,7 +123,7 @@ function rampOf(p: Project, rr: ResolvedRamp): IfcRampGeo {
   return {
     rampId: rr.id,
     levelId: rr.levelId,
-    shape: isRamp(el) ? el.shape : 'straight',
+    shape: isRamp(el) && el.shape !== 'free' ? el.shape : 'straight',
     slope: rr.slope,
     flights,
     landings: pieces.filter((pc) => pc.kind === 'landing').map(prismOf),

@@ -6,7 +6,7 @@ import { useI18n, I18N } from '../editor/i18n.ts';
 import { useUi } from '../editor/state.ts';
 import { NumField } from './fields.tsx';
 
-const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U' };
+const SHAPE_LABEL: Record<RampShape, string> = { straight: 'Reta', lshape: 'Em L', ushape: 'Em U', free: 'Livre' };
 
 /**
  * Barra da ferramenta Rampa: forma (reta, L, U), largura, giro e profundidade do patamar (L/U), modo de entrada e, no
@@ -30,7 +30,7 @@ export function RampOptionsBar(): ReactElement {
       <label>
         Forma
         <select id="opt-rampshape" className="select" value={o.shape} onChange={(e) => set({ shape: e.target.value as RampShape })}>
-          {(Object.keys(SHAPE_LABEL) as RampShape[]).map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
+          {(Object.keys(SHAPE_LABEL) as RampShape[]).filter((s) => s !== 'free').map((s) => <option key={s} value={s}>{SHAPE_LABEL[s]}</option>)}
         </select>
       </label>
       <label>

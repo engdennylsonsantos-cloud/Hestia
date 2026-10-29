@@ -1,8 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, levelDimensions, levelTexts } from '@hestia/model';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { ProjectStore, createEmptyProject, levelDimensions, levelTexts, type Dimension } from '@hestia/model';
+import { editor } from '../editor/controller.ts';
 import { deleteSelectionIn } from '../editor/deleteIds.ts';
 import { useUi } from '../editor/state.ts';
-import { selectedNote } from './AnnotationProps.tsx';
+import { AnnotationProps, selectedNote } from './AnnotationProps.tsx';
+
+// O painel real assina o projeto pelo editor; no teste basta o projeto atual (sem `getServerSnapshot` no render de servidor).
+vi.mock('../editor/controller.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../editor/controller.ts')>();
+  return { ...actual, useProject: () => actual.editor.project };
+});
+
+afterEach(() => {
+  editor.store.exec({ type: 'setSettings', patch: { units: undefined } });
+});
 
 const LV0 = 'lv_0';
 
@@ -27,6 +40,14 @@ describe('seleção de anotação no painel de propriedades', () => {
     expect(useUi.getState().selection).toEqual([]);
     s.undo();
     expect(levelDimensions(s.project, LV0)).toHaveLength(1);
+  });
+
+  it('o valor da cota e a unidade seguem as unidades do projeto', () => {
+    editor.store.exec({ type: 'setSettings', patch: { units: { length: { unit: 'cm', decimals: 1 } } } });
+    const dim: Dimension = { id: 'd1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 }, offset: 1 };
+    const html = renderToStaticMarkup(createElement(AnnotationProps, { dim }));
+    expect(html).toContain('400,0 cm');
+    expect(html).toContain('value="project" selected=""');
   });
 
   it('excluir texto e nada mais: a seleção sem elementos não quebra', () => {

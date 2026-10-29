@@ -3,6 +3,7 @@ import { formatDimension, dimensionValue, levelDimensions, levelTexts, type Deta
 import { editor, useProject } from '../editor/controller.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
+import { useUnits } from './useUnits.ts';
 
 /** Cota ou texto de anotação selecionado (decisão 0019), pelo id no nível ativo; null se a seleção não é uma anotação. */
 export function selectedNote(p: Project, levelId: Id, ids: Id[]): { dim?: Dimension; text?: TextNote; line?: DetailLine; region?: DetailRegion; tag?: ElementTag } | null {
@@ -32,19 +33,20 @@ function edit(run: () => void): void {
 /** Propriedades da cota (valor só leitura, deslocamento da linha) e do texto (conteúdo, altura em mm e rotação). */
 export function AnnotationProps({ dim, text, line, region, tag }: { dim?: Dimension; text?: TextNote; line?: DetailLine; region?: DetailRegion; tag?: ElementTag }): ReactElement {
   const p = useProject();
+  const units = useUnits();
   const levelId = useUi((s) => s.levelId);
   if (dim) {
     return (
       <Group title="Cota">
-        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim))}</span></Row>
+        <Row label="Valor"><span className="val">{formatDimension(dim, dimensionValue(p, dim), units)}</span></Row>
         <Row label="Texto" htmlFor="p-dtext">
-          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim))} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
+          <TextField id="p-dtext" value={dim.text ?? ''} placeholder={formatDimension(dim, dimensionValue(p, dim), units)} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { text: v.trim() === '' ? undefined : v } }))} />
         </Row>
         <Row label="Deslocamento" htmlFor="p-doff">
           <NumField id="p-doff" value={dim.offset} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { offset: v } }))} quantity="length" />
         </Row>
         <Row label="Direção"><select className="select" value={dim.mode ?? 'aligned'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { mode: e.target.value as Dimension['mode'] } }))}><option value="aligned">Alinhada</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></Row>
-        <Row label="Unidade"><select className="select" value={dim.unit ?? 'm'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
+        <Row label="Unidade"><select className="select" value={dim.unit ?? 'project'} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { unit: e.target.value as Dimension['unit'] } }))}><option value="project">Projeto</option><option value="m">Metros</option><option value="cm">Centímetros</option><option value="mm">Milímetros</option></select></Row>
         <Row label="Casas decimais"><select className="select" value={dim.precision ?? 2} onChange={(e) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { precision: Number(e.target.value) as 0 | 1 | 2 | 3 } }))}><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></Row>
         <Row label="Prefixo" htmlFor="p-dprefix"><TextField id="p-dprefix" value={dim.prefix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { prefix: v } }))} /></Row>
         <Row label="Sufixo" htmlFor="p-dsuffix"><TextField id="p-dsuffix" value={dim.suffix ?? ''} onCommit={(v) => edit(() => editor.store.exec({ type: 'updateDimension', levelId, id: dim.id, patch: { suffix: v } }))} /></Row>

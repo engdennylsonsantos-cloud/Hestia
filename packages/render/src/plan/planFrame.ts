@@ -1,4 +1,4 @@
-import type { Id, Project } from '@hestia/model';
+import { unitsOf, type Id, type Project, type ResolvedUnits } from '@hestia/model';
 import type { ResolvedLevel, ResolvedRoof } from '@hestia/engine';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { SketchDraft, SketchResult } from '@hestia/geom';
@@ -89,7 +89,7 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v),
+    overlay: () => comEsboco(buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: s.preview, inference: s.inference }), s.sketch, theme, v, unitsOf(p)),
   };
 }
 
@@ -105,9 +105,9 @@ function sketchKey(sk: PlanSketch | null | undefined, zoom: number): string {
 }
 
 /** Junta as operações do esboço à sobreposição da planta (sem esboço, a sobreposição sai como está). */
-function comEsboco(o: PlanOps, sk: PlanSketch | null | undefined, theme: PlanTheme, v: Viewport): PlanOps {
+function comEsboco(o: PlanOps, sk: PlanSketch | null | undefined, theme: PlanTheme, v: Viewport, units: ResolvedUnits): PlanOps {
   if (!sk) return o;
-  const k = sketchOps(sk.draft, sk.result, theme, v, sk.hover, sk.box ?? null);
+  const k = sketchOps(sk.draft, sk.result, theme, v, sk.hover, sk.box ?? null, units);
   return { fills: [...o.fills, ...k.fills], strokes: [...o.strokes, ...k.strokes], labels: [...o.labels, ...k.labels] };
 }
 

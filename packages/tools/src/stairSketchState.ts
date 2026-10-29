@@ -171,7 +171,7 @@ export function analyzeDraft(parts: StairPart[], limits: StairLimits | null, u: 
     else if (r.boundaryRight.length === 0) issues.push(issue('stair-boundary-missing', 'error', 'Desenhe o limite direito do lance.'));
     else {
       if (r.risers.length === 0) issues.push(issue('stair-no-risers', 'error', 'Desenhe os espelhos.'));
-      const geo = validateRunSketch(runSketch(r));
+      const geo = validateRunSketch(runSketch(r), { units: u });
       issues.push(...geo);
       if (geo.every((i) => i.severity !== 'error') && r.risers.length > 0 && limits) issues.push(...widthWarning(r, limits, u));
     }

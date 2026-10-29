@@ -37,7 +37,7 @@ export function SashesPanel(props: PanelProps): ReactElement {
             </select>
           </div>
           {openingTiltAxis(d) !== 0.5 ? (
-            <div className="field-row"><label htmlFor="op-tilt-axis-value">Eixo: altura</label><NumField id="op-tilt-axis-value" value={openingTiltAxis(d) * 100} decimals={0} unit="%" min={20} max={80} onCommit={(v) => onChange(setTiltAxis(d, v / 100))} /></div>
+            <div className="field-row"><label htmlFor="op-tilt-axis-value">Eixo: altura</label><NumField id="op-tilt-axis-value" value={openingTiltAxis(d) * 100} decimals={0} suffix="%" min={20} max={80} onCommit={(v) => onChange(setTiltAxis(d, v / 100))} /></div>
           ) : null}
         </>
       ) : null}

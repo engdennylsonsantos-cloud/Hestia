@@ -101,9 +101,9 @@ export interface WallType {
   /** Retorno dos acabamentos nas extremidades livres. */
   wrapEnds: WrapMode;
   strips: WallStrip[];
-  /** Custo por m² de face de parede (R$/m²). 0 quando não informado. */
+  /** Custo por metro quadrado de face de parede (em reais por metro quadrado). 0 quando não informado. */
   cost: number;
-  /** Transmitância térmica U (W/m²K). null quando não informada. */
+  /** Transmitância térmica U (W por metro quadrado kelvin). null quando não informada. */
   thermalU: number | null;
   /** Isolamento acústico aéreo Rw (dB). null quando não informado. */
   acousticRw: number | null;
@@ -287,7 +287,7 @@ export interface FloorType {
   code: string;
   description: string;
   layers: Layer[];
-  /** Custo por m² (R$), informativo. */
+  /** Custo por metro quadrado (em reais), informativo. */
   cost: number;
 }
 
@@ -373,7 +373,7 @@ export interface CeilingType {
   code: string;
   description: string;
   layers: Layer[];
-  /** Custo por m² (R$), informativo. */
+  /** Custo por metro quadrado (em reais), informativo. */
   cost: number;
   /** Hachura do corte e da elevação (D3). Sem valor, usa a hachura do material da camada. */
   hatch?: HatchKind;

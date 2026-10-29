@@ -24,7 +24,7 @@ export function slabRiseAt(slope: SlabSlope | null, p: Vec2): number {
   return (slope.percent / 100) * ((p.x - slope.origin.x) * slope.dir.x + (p.y - slope.origin.y) * slope.dir.y);
 }
 
-/** Área líquida em planta (contorno menos furos), m². */
+/** Área líquida em planta (contorno menos furos), metros quadrados. */
 export const slabArea = (s: Slab): number => multiArea([slabPolygon(s)]);
 
 const L = (fn: Layer['function'], materialId: string, thickness: number): Layer => ({ function: fn, materialId, thickness, wraps: false });

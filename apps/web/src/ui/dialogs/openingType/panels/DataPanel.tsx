@@ -20,11 +20,12 @@ export function DataPanel({ d, onChange }: PanelProps): ReactElement {
       <div className="field-row"><label htmlFor="op-rw">Rw (dB)</label><NumField id="op-rw" value={d.acousticRw ?? null} decimals={0} onCommit={(v) => set({ acousticRw: v })} onClear={() => limpar('acousticRw')} /></div>
       {janela ? (
         <>
+          {/* units-ok: unidade técnica fixa de transmitância (não é medida do projeto) */}
           <div className="field-row"><label htmlFor="op-u">U (W/m²K)</label><NumField id="op-u" value={d.uValue ?? null} decimals={2} onCommit={(v) => set({ uValue: v })} onClear={() => limpar('uValue')} /></div>
           <div className="field-row"><label htmlFor="op-solar">Fator solar</label><NumField id="op-solar" value={d.solarFactor ?? null} decimals={2} onCommit={(v) => set({ solarFactor: v })} onClear={() => limpar('solarFactor')} /></div>
         </>
       ) : null}
-      <div className="field-row"><label htmlFor="op-cost">Custo (R$)</label><NumField id="op-cost" value={d.cost ?? null} decimals={2} onCommit={(v) => set({ cost: v })} onClear={() => limpar('cost')} /></div>
+      <div className="field-row"><label htmlFor="op-cost">Custo</label><NumField id="op-cost" value={d.cost ?? null} quantity="currency" onCommit={(v) => set({ cost: v })} onClear={() => limpar('cost')} /></div>
     </>
   );
 }

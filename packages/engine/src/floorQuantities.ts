@@ -9,11 +9,11 @@ export interface FloorLayerQuantity {
   layerIndex: number;
   materialId: Id;
   thickness: number;
-  /** Área líquida da face superior da camada (m²), com o contorno da camada (P8). Sem corte, igual à da camada. Membrana também tem área. */
+  /** Área líquida da face superior da camada (metros quadrados), com o contorno da camada (P8). Sem corte, igual à da camada. Membrana também tem área. */
   area: number;
-  /** Volume líquido da camada (m³) = área bruta × espessura menos o que a laje ocupa; zero na membrana (decisão 0023 §5). */
+  /** Volume líquido da camada (metros cúbicos) = área bruta × espessura menos o que a laje ocupa; zero na membrana (decisão 0023 §5). */
   volume: number;
-  /** Volume bruto da camada (m³), antes do desconto da laje. */
+  /** Volume bruto da camada (metros cúbicos), antes do desconto da laje. */
   grossVolume: number;
   /** Membrana: aparece com área de face e volume zero. */
   membrane: boolean;
@@ -23,7 +23,7 @@ export interface FloorQuantity {
   floorId: Id;
   typeId: Id;
   levelId: Id;
-  /** Área líquida em planta: contorno menos furos (m²). */
+  /** Área líquida em planta: contorno menos furos (metros quadrados). */
   area: number;
   /** Comprimento do contorno externo (m). */
   perimeter: number;
@@ -31,11 +31,11 @@ export interface FloorQuantity {
   holesPerimeter: number;
   /** Espessura total do piso (m). */
   thickness: number;
-  /** Volume líquido total (m³) = soma das camadas. */
+  /** Volume líquido total (metros cúbicos) = soma das camadas. */
   volume: number;
-  /** Volume bruto (m³), sem o desconto da laje. Igual a `volume` quando não há corte. */
+  /** Volume bruto (metros cúbicos), sem o desconto da laje. Igual a `volume` quando não há corte. */
   grossVolume: number;
-  /** Área líquida da face superior (m²): a área da primeira camada, sem o que a laje ocupa. */
+  /** Área líquida da face superior (metros quadrados): a área da primeira camada, sem o que a laje ocupa. */
   netArea: number;
   layers: FloorLayerQuantity[];
 }
@@ -43,13 +43,13 @@ export interface FloorQuantity {
 export interface FloorQuantities {
   floors: FloorQuantity[];
   layers: FloorLayerQuantity[];
-  /** Área líquida somada de todos os pisos do nível (m²). */
+  /** Área líquida somada de todos os pisos do nível (metros quadrados). */
   totalArea: number;
-  /** Volume líquido total do nível (m³). */
+  /** Volume líquido total do nível (metros cúbicos). */
   totalVolume: number;
-  /** Volume (m³) por material. */
+  /** Volume (metros cúbicos) por material. */
   volumeByMaterial: Record<Id, number>;
-  /** Área de face superior (m²) por material: soma das áreas das camadas daquele material. */
+  /** Área de face superior (metros quadrados) por material: soma das áreas das camadas daquele material. */
   faceAreaByMaterial: Record<Id, number>;
 }
 

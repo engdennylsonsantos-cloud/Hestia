@@ -41,7 +41,7 @@ export const roofEdgeSag = (r: Roof, i: number): number => r.edgeSag?.[i] ?? 0;
 
 export const roofPolygon = (r: Roof): Polygon => [r.boundary, ...r.holes];
 
-/** Área em planta (contorno menos furos), m². */
+/** Área em planta (contorno menos furos), metros quadrados. */
 export const roofPlanArea = (r: Roof): number => multiArea([roofPolygon(r)]);
 
 const L = (fn: Layer['function'], materialId: string, thickness: number): Layer => ({ function: fn, materialId, thickness, wraps: false });

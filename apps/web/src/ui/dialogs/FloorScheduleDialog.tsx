@@ -79,7 +79,7 @@ export function FloorScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-pisos.csv`, floorScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-pisos.csv`, floorScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };

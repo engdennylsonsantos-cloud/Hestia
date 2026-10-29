@@ -19,9 +19,9 @@ import { edgeSlopesOf } from './roofShapes.ts';
  */
 
 export interface RoofPlaneQuantity {
-  /** Área da água em planta (m²). */
+  /** Área da água em planta (metros quadrados). */
   planArea: number;
-  /** Área real da água sobre a inclinação (m²). */
+  /** Área real da água sobre a inclinação (metros quadrados). */
   faceArea: number;
   percent: number;
 }
@@ -32,9 +32,9 @@ export interface RoofLayerQuantity {
   materialId: Id;
   /** Espessura vertical (m). */
   thickness: number;
-  /** Área em planta do telhado (m²). */
+  /** Área em planta do telhado (metros quadrados). */
   planArea: number;
-  /** Volume da camada (m³) = área em planta × espessura vertical. */
+  /** Volume da camada (metros cúbicos) = área em planta × espessura vertical. */
   volume: number;
 }
 
@@ -44,9 +44,9 @@ export interface RoofQuantity {
   levelId: Id;
   shape: RoofShape;
   mark: string;
-  /** Área líquida em planta: contorno menos furos e menos a parte unida a outro telhado (m²). */
+  /** Área líquida em planta: contorno menos furos e menos a parte unida a outro telhado (metros quadrados). */
   planArea: number;
-  /** Soma das áreas reais das águas (m²). */
+  /** Soma das áreas reais das águas (metros quadrados). */
   faceArea: number;
   planes: RoofPlaneQuantity[];
   /** Perímetro do contorno do beiral, em planta (m). */
@@ -55,7 +55,7 @@ export interface RoofQuantity {
   holesPerimeter: number;
   /** Espessura total vertical (m). */
   thickness: number;
-  /** Volume total (m³) = soma das camadas. */
+  /** Volume total (metros cúbicos) = soma das camadas. */
   volume: number;
   /** Comprimento 3D das cumeeiras (m). */
   ridgeLength: number;
@@ -67,7 +67,7 @@ export interface RoofQuantity {
   eaveLength: number;
   /** Comprimento em planta das empenas, arestas sem inclinação (m). */
   gableLength: number;
-  /** Área das empenas (m²): frontão vertical sob as águas vizinhas, a partir da cota do beiral. */
+  /** Área das empenas (metros quadrados): frontão vertical sob as águas vizinhas, a partir da cota do beiral. */
   gableArea: number;
   /** Arestas que definem inclinação (beirais); null nas águas livres e na extrusão. */
   slopedEdges: number | null;
@@ -80,13 +80,13 @@ export interface RoofQuantity {
 
 export interface RoofQuantities {
   roofs: RoofQuantity[];
-  /** Soma das áreas em planta dos telhados do nível (m²). */
+  /** Soma das áreas em planta dos telhados do nível (metros quadrados). */
   totalPlanArea: number;
-  /** Soma das áreas reais (m²). */
+  /** Soma das áreas reais (metros quadrados). */
   totalFaceArea: number;
-  /** Volume total do nível (m³). */
+  /** Volume total do nível (metros cúbicos). */
   totalVolume: number;
-  /** Volume (m³) por material. */
+  /** Volume (metros cúbicos) por material. */
   volumeByMaterial: Record<Id, number>;
 }
 

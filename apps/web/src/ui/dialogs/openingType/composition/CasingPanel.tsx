@@ -26,15 +26,15 @@ export function CasingPanel({ d, onChange }: PanelProps): ReactElement {
       </div>
       <div className="field-row">
         <label htmlFor="op-cas-w" title="Largura do alizar visto de frente">Largura</label>
-        <NumField id="op-cas-w" value={k?.width ?? CASING_RULES.defaultWidth} scale={100} decimals={1} unit="cm" min={0.001} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { width: v }))} />
+        <NumField id="op-cas-w" value={k?.width ?? CASING_RULES.defaultWidth} quantity="smallLength" min={0.001} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { width: v }))} />
       </div>
       <div className="field-row">
         <label htmlFor="op-cas-t" title="Espessura saliente do alizar sobre a face acabada da parede">Espessura</label>
-        <NumField id="op-cas-t" value={k?.thickness ?? CASING_RULES.defaultThickness} scale={100} decimals={1} unit="cm" min={0.001} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { thickness: v }))} />
+        <NumField id="op-cas-t" value={k?.thickness ?? CASING_RULES.defaultThickness} quantity="smallLength" min={0.001} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { thickness: v }))} />
       </div>
       <div className="field-row">
         <label htmlFor="op-cas-sb" title="Recuo da aresta interna do alizar em relação à face do batente (0 = alinhada ao batente)">Recuo</label>
-        <NumField id="op-cas-sb" value={k?.setback ?? CASING_RULES.defaultSetback} scale={1000} decimals={0} unit="mm" min={0} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { setback: v }))} />
+        <NumField id="op-cas-sb" value={k?.setback ?? CASING_RULES.defaultSetback} quantity="smallLength" min={0} disabled={!ligado} onCommit={(v) => grava(comAlizar(c, { setback: v }))} />
       </div>
       {ligado ? (
         <>

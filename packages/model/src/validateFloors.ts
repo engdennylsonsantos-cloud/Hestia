@@ -5,16 +5,16 @@ import type { ValidationIssue } from './validate.ts';
 import { formatQuantity } from './unitsFormat.ts';
 import { defaultUnits, unitsOf, type ResolvedUnits } from './units.ts';
 
-/** Área líquida abaixo disso é zero (1 mm²). */
+/** Área líquida abaixo disso é zero (1 mm quadrado). */
 export const ZERO_AREA = 1e-6;
-/** Sobreposição mínima entre dois pisos do mesmo nível para avisar (1 cm²). */
+/** Sobreposição mínima entre dois pisos do mesmo nível para avisar (1 cm quadrado). */
 export const OVERLAP_MIN = 1e-4;
 /** Distância (1 mm) para um vértice de furo contar como sobre o contorno. */
 const ON_EDGE = 1e-3;
 
 const label = (f: Floor): string => (f.mark ? `"${f.mark}" (${f.id})` : `"${f.id}"`);
 
-/** Área na unidade do projeto; abaixo de 1 dm² mostra em cm² para não zerar. */
+/** Área na unidade do projeto; abaixo de 1 dm quadrado mostra em centímetros quadrados para não zerar. */
 export function fmtArea(m2: number, units: ResolvedUnits = defaultUnits()): string {
   return m2 < 0.01 ? formatQuantity(units, 'area', m2, { unit: 'cm2', decimals: 0 }) : formatQuantity(units, 'area', m2);
 }
@@ -84,7 +84,7 @@ function floorIssuesOf(p: Project, f: Floor): ValidationIssue[] {
   return out;
 }
 
-/** Pares de pisos do mesmo nível com área em comum acima de 1 cm² (warning, com a área). Só pisos com contorno válido. */
+/** Pares de pisos do mesmo nível com área em comum acima de 1 cm quadrado (warning, com a área). Só pisos com contorno válido. */
 function floorOverlaps(floors: Floor[], units: ResolvedUnits): ValidationIssue[] {
   const valid = floors.filter((f) => f.boundary.length >= 3 && !selfIntersects(f.boundary));
   const boxes = new Map<Floor, Box>(valid.map((f) => [f, boxOf(floorPolygon(f).flat())]));

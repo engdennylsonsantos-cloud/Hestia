@@ -1,9 +1,10 @@
-import { stairTopLevel, stairsOnLevel, type Id, type Level, type Project, type Stair } from '@hestia/model';
-import { csvDocument, csvText, formatDecimal } from './csv.ts';
+import { stairTopLevel, stairsOnLevel, type Id, type Level, type Project, type ResolvedUnits, type Stair } from '@hestia/model';
+import { csvDocument, csvText } from './csv.ts';
+import { scheduleCsvCell, scheduleCsvHeader } from './scheduleCsv.ts';
 import { stairQuantities, type StairQuantities } from './stairQuantities.ts';
 import { resolveStairs } from './stairs.ts';
 
-/** Uma escada na tabela. Unidades: m, m² e m³. */
+/** Uma escada na tabela. Valores em metros (SI). */
 export interface StairScheduleRow {
   stairId: Id;
   mark: string;
@@ -20,7 +21,7 @@ export interface StairScheduleRow {
   riserHeight: number;
   treadMean: number;
   width: number;
-  /** Área em planta (m²). */
+  /** Área em planta (metros quadrados). */
   planArea: number;
   volume: number;
 }
@@ -94,26 +95,26 @@ export function sumStairRows(rows: StairScheduleRow[]): StairScheduleTotals {
   );
 }
 
-const CSV_HEADER = [
+const csvHeader = (u: ResolvedUnits): string[] => [
   'Marca',
   'Tipo',
   'Código',
   'Nível de base',
   'Nível de topo',
   'Espelhos',
-  'Altura do espelho (m)',
-  'Piso médio (m)',
-  'Largura (m)',
-  'Área em planta (m²)',
-  'Volume (m³)',
+  scheduleCsvHeader(u, 'Altura do espelho', 'length'),
+  scheduleCsvHeader(u, 'Piso médio', 'length'),
+  scheduleCsvHeader(u, 'Largura', 'length'),
+  scheduleCsvHeader(u, 'Área em planta', 'area'),
+  scheduleCsvHeader(u, 'Volume', 'volume'),
 ];
 
 /**
  * CSV com separador ';', decimal com vírgula, cabeçalho em português e BOM UTF-8 (o mesmo formato das tabelas de lajes
  * e telhados). Uma linha por escada, seguida de uma linha de total.
  */
-export function stairScheduleToCsv(rows: StairScheduleRow[], totals: StairScheduleTotals): string {
-  const n = formatDecimal;
+export function stairScheduleToCsv(rows: StairScheduleRow[], totals: StairScheduleTotals, units: ResolvedUnits): string {
+  const n = (q: 'length' | 'area' | 'volume', v: number, d: number): string => scheduleCsvCell(units, q, v, d);
   const body = rows.map((r) => [
     csvText(r.mark),
     csvText(r.typeName),
@@ -121,12 +122,12 @@ export function stairScheduleToCsv(rows: StairScheduleRow[], totals: StairSchedu
     csvText(r.baseLevelName),
     csvText(r.topLevelName),
     String(r.riserCount),
-    n(r.riserHeight, 3),
-    n(r.treadMean, 3),
-    n(r.width, 2),
-    n(r.planArea, 2),
-    n(r.volume, 3),
+    n('length', r.riserHeight, 3),
+    n('length', r.treadMean, 3),
+    n('length', r.width, 2),
+    n('area', r.planArea, 2),
+    n('volume', r.volume, 3),
   ]);
-  const total = ['Total', '', '', '', '', '', '', '', '', n(totals.planArea, 2), n(totals.volume, 3)];
-  return csvDocument([CSV_HEADER, ...body, total]);
+  const total = ['Total', '', '', '', '', '', '', '', '', n('area', totals.planArea, 2), n('volume', totals.volume, 3)];
+  return csvDocument([csvHeader(units), ...body, total]);
 }

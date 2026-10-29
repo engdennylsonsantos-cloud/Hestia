@@ -17,7 +17,7 @@ export function TransomRows({ d, onChange, support }: PanelProps): ReactElement 
         <>
           <div className="field-row"><label htmlFor="op-transom" title="Vidro fixo acima da folha">Bandeira superior</label><Check id="op-transom" checked={d.transom !== undefined} onChange={(v) => onChange(alternarTransom(d, v))} /></div>
           {d.transom !== undefined ? (
-            <div className="field-row"><label htmlFor="op-transom-h">Bandeira: altura</label><NumField id="op-transom-h" value={d.transom.height} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ transom: { height: v, fixed: d.transom?.fixed !== false } })} /></div>
+            <div className="field-row"><label htmlFor="op-transom-h">Bandeira: altura</label><NumField id="op-transom-h" value={d.transom.height} quantity="smallLength" onCommit={(v) => set({ transom: { height: v, fixed: d.transom?.fixed !== false } })} /></div>
           ) : null}
         </>
       ) : null}
@@ -26,7 +26,7 @@ export function TransomRows({ d, onChange, support }: PanelProps): ReactElement 
           <div className="field-row"><label htmlFor="op-side-left" title="Vidro fixo à esquerda da folha">Bandeira esquerda</label><Check id="op-side-left" checked={d.sidelights?.left === true} onChange={(v) => onChange(alternarSidelight(d, 'left', v))} /></div>
           <div className="field-row"><label htmlFor="op-side-right" title="Vidro fixo à direita da folha">Bandeira direita</label><Check id="op-side-right" checked={d.sidelights?.right === true} onChange={(v) => onChange(alternarSidelight(d, 'right', v))} /></div>
           {d.sidelights !== undefined ? (
-            <div className="field-row"><label htmlFor="op-side-w">Bandeira: largura</label><NumField id="op-side-w" value={d.sidelights.width} scale={100} decimals={0} unit="cm" onCommit={(v) => set({ sidelights: { left: d.sidelights?.left, right: d.sidelights?.right, width: v } })} /></div>
+            <div className="field-row"><label htmlFor="op-side-w">Bandeira: largura</label><NumField id="op-side-w" value={d.sidelights.width} quantity="smallLength" onCommit={(v) => set({ sidelights: { left: d.sidelights?.left, right: d.sidelights?.right, width: v } })} /></div>
           ) : null}
         </>
       ) : null}
@@ -40,8 +40,8 @@ export function AngleRows({ d, onChange, support }: PanelProps): ReactElement | 
   if (!support.angle) return null;
   return (
     <>
-      <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={k.angle2d} decimals={0} unit="°" onCommit={(v) => k.setField('angle2d', v, k.angle2dFallback)} /></div>
-      <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={k.angle3d} decimals={0} unit="°" onCommit={(v) => k.setField('angle3d', v, k.angle3dFallback)} /></div>
+      <div className="field-row"><label htmlFor="op-a2">Ângulo 2D</label><NumField id="op-a2" value={(k.angle2d * Math.PI) / 180} quantity="angle" onCommit={(v) => k.setField('angle2d', (v * 180) / Math.PI, k.angle2dFallback)} /></div>
+      <div className="field-row"><label htmlFor="op-a3">Ângulo 3D</label><NumField id="op-a3" value={(k.angle3d * Math.PI) / 180} quantity="angle" onCommit={(v) => k.setField('angle3d', (v * 180) / Math.PI, k.angle3dFallback)} /></div>
     </>
   );
 }
@@ -56,8 +56,8 @@ export function CasingRows({ d, onChange, support }: PanelProps): ReactElement |
       <div className="field-row"><label htmlFor="ot-ac-al" title="Alizar em volta do vão, nas duas faces da parede">Alizar</label><Check id="ot-ac-al" checked={cas !== null} onChange={(v) => onChange(alternarAcabamento(d, 'casing', v))} /></div>
       {cas ? (
         <>
-          <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
-          <div className="field-row"><label htmlFor="ot-ac-ale">Alizar: espessura</label><NumField id="ot-ac-ale" value={cas.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ casing: { ...cas, thickness: v } })} /></div>
+          <div className="field-row"><label htmlFor="ot-ac-alw">Alizar: largura</label><NumField id="ot-ac-alw" value={cas.width} quantity="smallLength" onCommit={(v) => set({ casing: { ...cas, width: v } })} /></div>
+          <div className="field-row"><label htmlFor="ot-ac-ale">Alizar: espessura</label><NumField id="ot-ac-ale" value={cas.thickness} quantity="smallLength" onCommit={(v) => set({ casing: { ...cas, thickness: v } })} /></div>
         </>
       ) : null}
     </>

@@ -1,6 +1,8 @@
 # Progresso do agente UNID (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
 Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste, 6163 testes, lint/typecheck/test ok (executado em 2026-10-28 antes de qualquer alteração).
 
+Fecho (C7): `npm run check` verde — 560 arquivos, 6458 testes, lint (com `check-units` em 0) e typecheck ok.
+
 - [x] U0 inventário (`01`)
 - [x] U1 tipos, padrões e formatação
 - [x] U2 leitura de texto digitado
@@ -18,15 +20,14 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 - [x] C1 painel de propriedades
 - [x] C2 diálogos
 - [x] C3 barras e chrome
-- [ ] C5 model e engine (`Dimension.unit 'project'`) — PARCIAL: `dimension.ts`, avisos de `model`/`engine` e áreas; faltam quadros/CSV (C6/ESQ) e `stairIssues`/`stairSketchValidate`
-- [ ] C7 fecho (só depois que a ESQ integrar C4 e C6)
+- [x] C5 model e engine (`Dimension.unit 'project'`) — `dimension.ts`, avisos de `model`/`engine`, áreas, `stairIssues`/`stairSketchValidate` e CSV dos quadros; só comentários/`units-ok` restantes para o C7
+- [x] C7 fecho (props deprecadas removidas, `check-units` em 0, decisão 0038)
 - [x] `npm run check` verde, integrado
 
 ## Desvios
-- C5 (parcial): `dimensionText`/`formatDimension` recebem `units` opcional (padrão `defaultUnits()`); `Dimension.unit` ganhou `'project'`; `formatDimensionValue` idem. Avisos de `validate*` e de `engine/*Issues` usam `unitsOf(p)`; helpers sem projeto recebem `units` opcional. Áreas minúsculas (`fmtArea`) continuam em cm² para não zerar.
-- C5: CSV (`csv.ts`, `*ScheduleToCsv`, cabeçalhos `(m²)/(m³)`) e os quantitativos que só têm comentários com unidade ficam para o C6 (ESQ) / C7, conforme a divisão do 03.
+- C5: `dimensionText`/`formatDimension` recebem `units` opcional (padrão `defaultUnits()`); `Dimension.unit` ganhou `'project'`; `formatDimensionValue` idem. Avisos de `validate*` e de `engine/*Issues` usam `unitsOf(p)`; helpers sem projeto recebem `units` opcional. Áreas minúsculas (`fmtArea`) continuam em cm² para não zerar. `stairNormIssues`/`spiralNormIssues` e `validateRunSketch` recebem as unidades (mensagens seguem o projeto; teste em cm).
+- C5: os `*ScheduleToCsv` (engine) passaram a receber `ResolvedUnits` e usam `scheduleCsvCell`/`scheduleCsvHeader` (novo `scheduleCsv.ts` + teste); os diálogos passam `units`. Comentários com `m²/m³` foram reescritos em palavras (sem mudar dados SI); espessuras nos CSV ficam em `smallLength` (cm por padrão) e a inclinação em `slope`.
 - PEDIDO ESQ: `packages/tools/src/dimensionTool.ts` ainda grava `unit`/`precision` fixos ao criar cota (linhas ~161/207/223); remover em C4/C6 para a cota seguir o projeto.
-- PEDIDO ESQ: `packages/engine/src/stairIssues.ts` e `stairSketchValidate.ts` ainda usam `toFixed` em mensagens de norma do croqui; migrar com `units` ao passar pelo C6.
 - C3: inclui também `*Props`/`*Row` vizinhos (AnnotationProps, GraphicsProps, RoofPlanesProps, RoofMansardProps, ProfileRow, RoofProfileRow, GridProperties, LevelField); ângulos convertem graus↔radianos na borda, medidas em mm do modelo convertem para metros no campo. Coordenadas de `viewcube*` e a matriz CSS receberam `units-ok` (formato de máquina).
 - C2: quadros usam o helper `scheduleUnits.ts` (cabeçalho com o símbolo do projeto e célula convertida); os rótulos de `i18nTabelas.ts` perderam o sufixo fixo `(m)/(m²)/(m³)/(%)`. Campos cuja unidade nativa não é SI (grade em mm, margem de folha em mm, inclinação em %) passaram a converter na borda. Unidades técnicas fixas (W/m²K) e transparência (%) ficaram com `units-ok`.
 - U0: o inventário existente estava com células vazias (padrões e caminhos apagados); regenerado com script temporário (não commitado) e removido do repositório.
@@ -38,6 +39,14 @@ Linha de base antes de mexer (`npm run check`): verde — 525 arquivos de teste,
 ## Estado ao encerrar este turno
 - Concluídos e integrados: U0–U7, C0 (M2), B1–B4 (M3), C1, B5, C2 e C3. C5 está parcial (dimension + avisos); C7 só depois de ESQ C4/C6.
 - `npm run check` completo verde em 2026-10-28: 555 arquivos, 6439 testes, lint (inclui `check-units`) e typecheck ok.
+
+## C7 — fecho
+- `NumField` perdeu `unit` e `scale`; `decimals` ficou para **número puro** (contagem, razão, escala) e entrou `suffix` para unidade técnica fixa (%, dB, min, W/m²K). Ângulos de esquadria/texto/serpentina convertem graus↔radianos na borda; `textHeight` (mm no modelo) converte para metros no campo.
+- Para zerar a trava sem linha de base, os usos restantes em `dialogs/openingType/**` (propriedade ESQ) e `PlacementProperties` foram migrados no mesmo passo, preservando o comportamento; `openingTypeActions`, `cmTexto`/`metrosTexto` e o rótulo de inclinação do `render` passaram a usar as unidades do projeto.
+- `scripts/units-baseline.json` apagado; `node scripts/check-units.mjs` em **0 ocorrências** (só isenções `units-ok` de máquina/depuração/unidade técnica).
+- `docs/decisoes/0038-unidades-do-projeto.md` escrita.
+- `dimensionText` continua com `units` opcional (padrão `defaultUnits()`): `packages/io/src/dxfNotes.ts:58` e `packages/render/src/plan/notes.ts:64` (propriedade ESQ/C6) ainda chamam sem as unidades. Obrigatório fica para quando esses dois chamadores passarem as unidades; registrado aqui em vez de forçar.
+- Testes atualizados por mudança intencional de formato: espessuras de CSV em `smallLength` (cm), ferragens em cm, inclinação/rótulos em `formatQuantity`, ângulos em radianos no `NumField`.
 
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_

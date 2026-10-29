@@ -81,7 +81,7 @@ export function CeilingScheduleDialog(): ReactElement {
 
   const exportCsv = async (): Promise<void> => {
     const base = p.name.trim() || 'projeto';
-    const status = await saveText(`${base}-forros.csv`, ceilingScheduleToCsv(visible, totals));
+    const status = await saveText(`${base}-forros.csv`, ceilingScheduleToCsv(visible, totals, units));
     setMsg(status);
     useUi.setState({ status });
   };

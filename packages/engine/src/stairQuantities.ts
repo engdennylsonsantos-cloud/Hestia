@@ -11,12 +11,12 @@ export interface StairRunQuantity {
   width: number;
   /** Piso médio do lance (m) = área dos degraus ÷ (largura × nº de degraus). Exato no lance reto. */
   treadMean: number;
-  /** Área em planta dos degraus do lance (m²). */
+  /** Área em planta dos degraus do lance (metros quadrados). */
   treadArea: number;
 }
 
 /**
- * Quantitativos de uma escada, a partir da geometria resolvida. Unidades: m, m² e m³. O volume segue o estilo do tipo:
+ * Quantitativos de uma escada, a partir da geometria resolvida. Valores em metros (SI). O volume segue o estilo do tipo:
  * - monolítico: soma dos volumes das peças de `stairBody` (decisão 0012 §2): degraus e patamares, com o fundo liso ou
  *   escalonado e o corte pelo piso base. A chegada (`arrival`) fica sob a laje de cima e não entra no volume da escada.
  *   Escada com erro de croqui tem volume zero no monolítico;
@@ -41,27 +41,27 @@ export interface StairQuantities {
   treadMean: number;
   /** Largura da escada: menor espelho aparado (m). */
   width: number;
-  /** Área em planta da escada (m²). */
+  /** Área em planta da escada (metros quadrados). */
   planArea: number;
-  /** Área em planta dos degraus (m²). */
+  /** Área em planta dos degraus (metros quadrados). */
   treadArea: number;
-  /** Área em planta dos patamares (m²). */
+  /** Área em planta dos patamares (metros quadrados). */
   landingArea: number;
   /** Comprimento total dos espelhos, em planta (m). */
   riserLength: number;
-  /** Volume do lance: monolítico = estrutura (m³); piso e espelho = pisos (m³). */
+  /** Volume do lance: monolítico = estrutura (metros cúbicos); piso e espelho = pisos (metros cúbicos). */
   volumeRun: number;
-  /** Volume dos espelhos, só no estilo piso e espelho (m³). */
+  /** Volume dos espelhos, só no estilo piso e espelho (metros cúbicos). */
   volumeRisers: number;
-  /** Volume dos patamares (m³). */
+  /** Volume dos patamares (metros cúbicos). */
   volumeLandings: number;
-  /** Volume do poste central (m³), só no estilo poste; 0 nos demais. */
+  /** Volume do poste central (metros cúbicos), só no estilo poste; 0 nos demais. */
   volumePost: number;
-  /** Área em planta do poste central (m²), só no estilo poste; 0 nos demais. */
+  /** Área em planta do poste central (metros quadrados), só no estilo poste; 0 nos demais. */
   postPlanArea: number;
-  /** Volume total (m³): degraus + espelhos + patamares + poste. */
+  /** Volume total (metros cúbicos): degraus + espelhos + patamares + poste. */
   volume: number;
-  /** Volume por material (m³). Degraus, patamares e espelhos no material do tipo; poste no `postMaterialId`. */
+  /** Volume por material (metros cúbicos). Degraus, patamares e espelhos no material do tipo; poste no `postMaterialId`. */
   volumeByMaterial: Record<Id, number>;
   runs: StairRunQuantity[];
 }

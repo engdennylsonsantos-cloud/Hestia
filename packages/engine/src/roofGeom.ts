@@ -2,7 +2,7 @@ import { closestOnSegment, cross, dist, dot, intersectSegments, pointInMulti, ri
 
 /** Distância (1e-7 m) para um ponto contar como sobre a borda de uma água (divisa, beiral, furo). */
 export const EDGE_TOL = 1e-7;
-/** Área abaixo disso (1 mm²) não forma água. */
+/** Área abaixo disso (1 mm quadrado) não forma água. */
 export const WATER_MIN_AREA = 1e-6;
 
 export const unitOf = (v: Vec2): Vec2 | null => {

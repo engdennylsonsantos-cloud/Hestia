@@ -14,10 +14,15 @@ basta **um provedor pequeno e uma linha de registro**. Nada no overlay muda (o t
 3. **Referências.** Leia a referência em `ctx.overrides[...]` e, se faltar, em `ctx.settings` (`wallRef`/`openingRef`).
    Os planos vêm de `wallPlanes`/`wallPlaneAt` (engine) e `hostTargets` (`dims/refs.ts`); as esquadrias, de `openingExtents`.
 4. **Registro.** Uma linha em `registerBuiltinDimProviders()` (`dims/registry.ts`): `registerDimProvider('wall', meuProvedor)`.
+   Para um sujeito que **não é elemento** (`project.elements`), registre pelo tipo dele: `'detailLine'` (linha de
+   detalhe), `'perimeterLine'` (trecho do rascunho do Perímetro) ou `'grid'` (grade/eixo). O `selectionSubject(project,
+   id, levelId)` recebe o id selecionado e o nível ativo; devolva `null` quando o id não for seu.
 5. **Prévia na ferramenta.** Para cotar durante o desenho, a ferramenta implementa `tempDims(): TempDim[]` chamando
    `meuProvedor.compute(...)` com o sujeito da prévia (cotas sem `edit` aparecem só como leitura).
 6. **Validação.** Se a edição mexe em paredes, chame `hostedConflicts` (`dims/validate.ts`): esquadria hospedada não sai da parede.
 7. **Teste.** Valor do `compute`, `edit` válido e inválido, e a seleção pelo registro (veja o exemplo).
+8. **Sujeito próprio da ferramenta.** Se o sujeito só existe no rascunho (ex.: trecho do Perímetro, sem id no
+   projeto), a ferramenta monta o sujeito e chama `subjectDims(ctx, 'perimeterLine', sujeito)`; nada de registro extra.
 
 ## Exemplo mínimo (comprimento de uma parede)
 ```ts

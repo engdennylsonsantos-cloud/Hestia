@@ -93,11 +93,11 @@ const projectLevelCache = new WeakMap<Project, Map<Id, JunctionLevel>>();
 /** Conteúdo de cortadores compartilhado entre snapshots também compartilha a junção e sua assinatura. */
 const cutterSetResultCache = new WeakMap<LevelCutters, JunctionLevel>();
 
-/** Volume (m³) das partes de uma camada: área em planta vezes a altura de cada parte. */
+/** Volume (metros cúbicos) das partes de uma camada: área em planta vezes a altura de cada parte. */
 const volumeOfParts = (parts: readonly ResolvedPrism[]): number => parts.reduce((s, x) => s + multiArea(x.poly) * (x.z1 - x.z0), 0);
 
 /**
- * A camada perdeu volume? Compara o volume antes e depois (tolerância 1e-9 m³), não a identidade do polígono: o
+ * A camada perdeu volume? Compara o volume antes e depois (tolerância 1e-9 metros cúbicos), não a identidade do polígono: o
  * `difference` que não tira nada devolve geometria nova com a mesma área, e isso não é corte (P7c, `cut` falso).
  */
 const lostVolume = (t: PlanarPiece, parts: readonly ResolvedPrism[]): boolean =>

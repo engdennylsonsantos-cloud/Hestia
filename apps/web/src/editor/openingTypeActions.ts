@@ -1,6 +1,4 @@
-import { openingTypeById, clampOffset, isOpening, isWall, type Id, type Opening, type Project, type ProjectStore, wallLength } from '@hestia/model';
-
-const fmt = (m: number): string => m.toFixed(2).replace('.', ',');
+import { formatQuantity, openingTypeById, clampOffset, isOpening, isWall, unitsOf, type Id, type Opening, type Project, type ProjectStore, wallLength } from '@hestia/model';
 
 /** Resultado de trocar o tipo de abertura: o que gravar (posição por abertura) ou o motivo da recusa. */
 export type OpeningTypePlan =
@@ -52,6 +50,6 @@ export function changeOpeningType(store: ProjectStore, ids: Id[], typeId: Id, se
     for (const u of plan.updates) store.exec({ type: 'updateElements', ids: [u.id], patch: { offset: u.offset } });
   });
   const moved = plan.updates.filter((u) => Math.abs(u.offset - u.from) > 1e-6);
-  if (moved.length === 1) setStatus(`A abertura foi deslocada para caber: ${fmt(moved[0]!.from)} → ${fmt(moved[0]!.offset)} m. Ctrl+Z desfaz.`);
+  if (moved.length === 1) setStatus(`A abertura foi deslocada para caber: ${formatQuantity(unitsOf(store.project), 'length', moved[0]!.from)} → ${formatQuantity(unitsOf(store.project), 'length', moved[0]!.offset)}. Ctrl+Z desfaz.`);
   else if (moved.length > 1) setStatus(`${moved.length} aberturas foram deslocadas para caber. Ctrl+Z desfaz.`);
 }

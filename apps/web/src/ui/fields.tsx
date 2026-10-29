@@ -4,6 +4,7 @@ import { parseNumber, parseQuantityText } from '@hestia/tools';
 import { safeGet, safeSet } from '../editor/storage.ts';
 import { useUnits } from './useUnits.ts';
 
+// units-ok: número puro (contagem, razão, escala) — não é medida do projeto
 const fmt = (v: number, decimals: number): string => v.toFixed(decimals).replace('.', ',');
 
 /** Texto exibido de um campo por grandeza: até 4 casas, sem zeros à direita; vazio se nulo ou variado. */
@@ -27,12 +28,10 @@ interface NumProps {
   id?: string;
   value: number | null;
   onCommit: (v: number) => void;
-  /** @deprecated use `quantity` */
+  /** Casas decimais de um número puro (sem grandeza do projeto). */
   decimals?: number;
-  /** @deprecated use `quantity` */
-  unit?: string;
-  /** Multiplicador de exibição (ex.: 100 para metros → cm). @deprecated use `quantity` */
-  scale?: number;
+  /** Sufixo de unidade técnica fixa (porcentagem, decibéis, minutos, transmitância) de um número puro. */
+  suffix?: string;
   /** Grandeza: exibe e lê na unidade configurada do projeto (SI por dentro). */
   quantity?: Quantity;
   min?: number;
@@ -54,17 +53,17 @@ interface NumProps {
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, quantity, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange }: NumProps): ReactElement {
   const units = useUnits();
   const ref = useRef<HTMLInputElement>(null);
   const show = (v: number | null): string =>
-    quantity ? formatQuantityField(units, quantity, v, !!mixed) : v === null || mixed ? '' : fmt(v * scale, decimals);
+    quantity ? formatQuantityField(units, quantity, v, !!mixed) : v === null || mixed ? '' : fmt(v, decimals);
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
   useEffect(() => {
     if (!focus) setText(show(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, focus, mixed, scale, decimals, quantity, units]);
+  }, [value, focus, mixed, decimals, quantity, units]);
   const commit = (): void => {
     if (onClear && text.trim() === '') {
       if (text !== show(value)) onClear();
@@ -76,7 +75,7 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, q
       setText(show(value));
       return;
     }
-    const si = quantity ? lido : lido / scale;
+    const si = lido;
     if (strictRange && ((min !== undefined && si < min) || (max !== undefined && si > max))) {
       onInvalid?.(text);
       setText(show(value));
@@ -112,7 +111,7 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, q
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [quantity]);
-  const unitLabel = quantity ? unitSymbol(units, quantity) : unit;
+  const unitLabel = quantity ? unitSymbol(units, quantity) : suffix;
   return (
     <span className="numwrap">
       <input

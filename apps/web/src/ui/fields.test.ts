@@ -63,11 +63,11 @@ describe('NumField com quantity', () => {
     expect(html).toContain('class="unit">cm<');
   });
 
-  it('sem quantity mantém o comportamento antigo de unit/scale', () => {
+  it('sem quantity mostra número puro com casas e sufixo técnico', () => {
     const html = renderToStaticMarkup(
-      createElement(NumField, { value: 1.2, onCommit: () => undefined, unit: 'cm', scale: 100, decimals: 1 }),
+      createElement(NumField, { value: 1.2, onCommit: () => undefined, suffix: 'cm', decimals: 1 }),
     );
-    expect(html).toContain('value="120,0"');
+    expect(html).toContain('value="1,2"');
     expect(html).toContain('class="unit">cm<');
   });
 });

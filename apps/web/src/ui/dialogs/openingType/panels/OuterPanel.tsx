@@ -24,7 +24,7 @@ export function OuterPanel(props: PanelProps): ReactElement {
             </select>
           </div>
           {d.threshold ? (
-            <div className="field-row"><label htmlFor="op-threshold-h">Soleira: altura</label><NumField id="op-threshold-h" value={d.threshold.thickness} scale={100} decimals={1} unit="cm" min={0.005} max={0.08} onCommit={(v) => onChange(setThresholdThickness(d, v))} /></div>
+            <div className="field-row"><label htmlFor="op-threshold-h">Soleira: altura</label><NumField id="op-threshold-h" value={d.threshold.thickness} quantity="smallLength" min={0.005} max={0.08} onCommit={(v) => onChange(setThresholdThickness(d, v))} /></div>
           ) : null}
         </>
       ) : null}
@@ -33,8 +33,8 @@ export function OuterPanel(props: PanelProps): ReactElement {
           <div className="field-row"><label htmlFor="ot-ac-sb" title="Peitoril saliente, só de janela: projeção além de cada face da parede">Soleira saliente</label><Check id="ot-ac-sb" checked={sb !== null} onChange={(v) => onChange(alternarAcabamento(d, 'sillBoard', v))} /></div>
           {sb ? (
             <>
-              <div className="field-row"><label htmlFor="ot-ac-sbp">Soleira: projeção</label><NumField id="ot-ac-sbp" value={sb.projection} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBoard: { ...sb, projection: v } })} /></div>
-              <div className="field-row"><label htmlFor="ot-ac-sbe">Soleira: espessura</label><NumField id="ot-ac-sbe" value={sb.thickness} scale={100} decimals={1} unit="cm" onCommit={(v) => set({ sillBoard: { ...sb, thickness: v } })} /></div>
+              <div className="field-row"><label htmlFor="ot-ac-sbp">Soleira: projeção</label><NumField id="ot-ac-sbp" value={sb.projection} quantity="smallLength" onCommit={(v) => set({ sillBoard: { ...sb, projection: v } })} /></div>
+              <div className="field-row"><label htmlFor="ot-ac-sbe">Soleira: espessura</label><NumField id="ot-ac-sbe" value={sb.thickness} quantity="smallLength" onCommit={(v) => set({ sillBoard: { ...sb, thickness: v } })} /></div>
             </>
           ) : null}
         </>

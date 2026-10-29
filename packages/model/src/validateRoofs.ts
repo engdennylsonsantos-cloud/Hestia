@@ -140,12 +140,12 @@ function roofIssuesOf(p: Project, r: Roof): ValidationIssue[] {
   return out;
 }
 
-/** Área comum (m²) de duas áreas; 0 quando as caixas nem se tocam. */
+/** Área comum (metros quadrados) de duas áreas; 0 quando as caixas nem se tocam. */
 function commonArea(a: MultiPolygon, boxA: Box, b: MultiPolygon, boxB: Box): number {
   return boxesOverlap(boxA, boxB) ? multiArea(intersection(a, b)) : 0;
 }
 
-/** Telhados do mesmo nível com área em planta em comum acima de 1 cm² (warning). Só contornos válidos. */
+/** Telhados do mesmo nível com área em planta em comum acima de 1 cm quadrado (warning). Só contornos válidos. */
 function roofOverlaps(roofs: Roof[], units: ReturnType<typeof unitsOf>): ValidationIssue[] {
   const shapes = roofs
     .filter((r) => r.boundary.length >= 3 && !selfIntersects(r.boundary))

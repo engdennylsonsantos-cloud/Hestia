@@ -6,9 +6,9 @@ import { perpendicularNeighbors, type PerpendicularWall } from '../openingPlacem
 export interface HostTarget {
   /** Posição ao longo do hospedeiro (comprimento de arco nas paredes curvas). */
   t: number;
-  /** Parede vizinha dona do plano; `null` quando é a extremidade do hospedeiro. */
+  /** Parede (ou esquadria) dona do plano; `null` quando é a extremidade do hospedeiro. */
   ownerId: Id | null;
-  kind: 'wall' | 'end';
+  kind: 'wall' | 'end' | 'opening';
 }
 
 const TOL = 0.05;

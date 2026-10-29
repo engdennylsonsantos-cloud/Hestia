@@ -16,6 +16,7 @@ import {
 import { occupiedRanges } from '../../infer.ts';
 import { overlapsPerpendicular, perpendicularNeighbors } from '../../openingPlacement.ts';
 import { hostTargets, type HostTarget } from '../refs.ts';
+import { neighborOpeningTargets } from './openingNeighbors.ts';
 import type { DimContext, DimEditResult, DimEnd, DimProvider, TempDim } from '../types.ts';
 
 /** Esquadria a cotar: a já colocada (com `id`) ou a prévia da colocação (sem `id`, cotas só de leitura). */
@@ -99,14 +100,16 @@ interface SideCtx {
   faceS: number;
 }
 
-function buildDim(c: SideCtx, side: 'left' | 'right', target: HostTarget, wallRef: WallDimRef, selfRef: OpeningDimRef): TempDim {
+function buildDim(c: SideCtx, side: 'left' | 'right', target: HostTarget, wallRef: WallDimRef, selfRef: OpeningDimRef, neighborRef: OpeningDimRef): TempDim {
   const { subject, frame, ext } = c;
   const edge = openingEdge(ext, selfRef);
   const edgeT = side === 'left' ? subject.offset - edge : subject.offset + edge;
   const wallPt = pointAt(frame, target.t, c.faceS);
   const selfPt = pointAt(frame, edgeT, c.faceS);
   const value = Math.max(0, side === 'left' ? edgeT - target.t : target.t - edgeT);
-  const wallEnd: DimEnd = { at: wallPt, slot: side === 'left' ? 'wallLeft' : 'wallRight', kind: 'wall', current: wallRef, options: WALL_DIM_REFS };
+  const wallEnd: DimEnd = target.kind === 'opening'
+    ? { at: wallPt, slot: side === 'left' ? 'neighLeft' : 'neighRight', kind: 'opening', current: neighborRef, options: OPENING_DIM_REFS }
+    : { at: wallPt, slot: side === 'left' ? 'wallLeft' : 'wallRight', kind: 'wall', current: wallRef, options: WALL_DIM_REFS };
   const selfEnd: DimEnd = { at: selfPt, slot: side === 'left' ? 'openLeft' : 'openRight', kind: 'opening', current: selfRef, options: OPENING_DIM_REFS };
   const edit = subject.id
     ? (v: number): DimEditResult => {
@@ -142,11 +145,18 @@ export const openingDimProvider: DimProvider<OpeningDimSubject> = {
     const leftRef = wallRefFor(ctx, 'wallLeft');
     const rightRef = wallRefFor(ctx, 'wallRight');
     // Os alvos de cada lado usam a referência daquela ponta: cada lado pode ser trocado sozinho.
-    const left = hostTargets(ctx.project, frame, subject.offset, leftRef).left;
-    const right = hostTargets(ctx.project, frame, subject.offset, rightRef).right;
+    const wallLeft = hostTargets(ctx.project, frame, subject.offset, leftRef).left;
+    const wallRight = hostTargets(ctx.project, frame, subject.offset, rightRef).right;
+    // Em cada lado vale o alvo mais próximo: a parede (ou a ponta) ou a borda da esquadria vizinha da mesma parede.
+    const leftNeighRef = selfRefFor(ctx, 'neighLeft');
+    const rightNeighRef = selfRefFor(ctx, 'neighRight');
+    const neighLeft = neighborOpeningTargets(ctx.project, frame, subject.offset, subject.id, leftNeighRef, subject.side).left;
+    const neighRight = neighborOpeningTargets(ctx.project, frame, subject.offset, subject.id, rightNeighRef, subject.side).right;
+    const left = neighLeft && neighLeft.t > wallLeft.t ? neighLeft : wallLeft;
+    const right = neighRight && neighRight.t < wallRight.t ? neighRight : wallRight;
     return [
-      buildDim(c, 'left', left, leftRef, selfRefFor(ctx, 'openLeft')),
-      buildDim(c, 'right', right, rightRef, selfRefFor(ctx, 'openRight')),
+      buildDim(c, 'left', left, leftRef, selfRefFor(ctx, 'openLeft'), leftNeighRef),
+      buildDim(c, 'right', right, rightRef, selfRefFor(ctx, 'openRight'), rightNeighRef),
     ];
   },
   selectionSubject(project, id) {

@@ -251,6 +251,37 @@ describe('exportIfc', () => {
     expect(count(text, 'IFCMATERIALLAYERSETUSAGE')).toBe(withLayers);
   });
 
+  it('as peças da esquadria viram sólidos com IFCSTYLEDITEM próprio (vidro translúcido)', () => {
+    const projeto = buildTemplate('house2');
+    const geo2 = geometryFromModel(projeto);
+    const janela = geo2.openings.find((o) => projeto.elements[o.openingId]?.kind === 'window');
+    expect(janela).toBeDefined();
+    janela!.parts = [
+      { t0: -0.4, t1: 0.4, s0: -0.03, s1: 0.03, z0: 0, z1: 1, materialId: 'mat_aluminio', role: 'jamb' },
+      { t0: -0.35, t1: 0.35, s0: -0.006, s1: 0.006, z0: 0.05, z1: 0.95, materialId: 'mat_vidro', role: 'glass' },
+    ];
+    const saida = exportIfc(projeto, geo2, { timestamp: TS });
+    const byId = entitiesById(saida);
+    const linhaJanela = entityLines(saida, 'IFCWINDOW').find((l) => attrsOf(l)[0] === stepString(ifcGuid(`window:${janela!.openingId}`)));
+    expect(linhaJanela).toBeDefined();
+    // IfcWindow.Representation → IfcProductDefinitionShape.Representations → IfcShapeRepresentation.Items.
+    const pds = byId.get(refsIn(attrsOf(linhaJanela!)[6]!)[0]!)!;
+    const rep = byId.get(refsIn(attrsOf(pds)[2]!)[0]!)!;
+    const itens = refsIn(attrsOf(rep)[3]!);
+    expect(itens).toHaveLength(2);
+    const estilos = itens.map((item) => {
+      const styled = entityLines(saida, 'IFCSTYLEDITEM').find((l) => attrsOf(l)[0] === `#${item}`);
+      expect(styled, `item #${item} sem IFCSTYLEDITEM`).toBeDefined();
+      return refsIn(attrsOf(styled!)[1]!)[0]!;
+    });
+    expect(estilos[0]).not.toBe(estilos[1]);
+    const estiloVidro = byId.get(estilos[1]!)!;
+    expect(estiloVidro).toContain(stepString('Vidro'));
+    const rendering = byId.get(refsIn(attrsOf(estiloVidro)[2]!)[0]!)!;
+    // opacity 0.35 no modelo → Transparency 1 − 0.35 = 0.65 no IFC.
+    expect(Number(attrsOf(rendering)[1])).toBeCloseTo(0.65, 6);
+  });
+
   it('as camadas saem na ordem externa→interna, com material, espessura e nome, um conjunto por tipo', () => {
     const byId = entitiesById(text);
     const usedTypes = new Map<string, ReturnType<typeof wallType>>();

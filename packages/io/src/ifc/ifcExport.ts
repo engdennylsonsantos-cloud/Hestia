@@ -19,11 +19,11 @@ import { externalWalls, outwardNormal, wallAxis } from './ifcExterior.ts';
 import { addGrids } from './ifcGrids.ts';
 import { addQuantities } from './ifcQuantities.ts';
 import { addSpaces } from './ifcSpaces.ts';
-import { addStyles } from './ifcStyles.ts';
+import { addItemStyles, addStyles } from './ifcStyles.ts';
 import { gid, materialOf, optStr, storeyOf, type IfcCtx, type IfcStorey } from './ifcCtx.ts';
 import { axis3, bodyShape, direction, extrudeSolid, localPlacement, rectOf } from './ifcSolids.ts';
 import { en, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
-import type { IfcGeometry, IfcOpeningGeo, IfcPoint, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
+import type { IfcGeometry, IfcOpeningGeo, IfcOpeningPartGeo, IfcPoint, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
 
 const EPS = 1e-9;
 
@@ -34,6 +34,18 @@ export interface IfcExportOptions {
 }
 
 /** Retângulo `width` × `thickness` centrado na origem do sistema local (x ao longo do eixo do vão, y na espessura). */
+
+/** Retângulo da peça no plano local do vão (x = `t`, y = `s`), pronto para a extrusão vertical. */
+function rectOfPart(part: IfcOpeningPartGeo): IfcPolygon {
+  return [
+    [
+      { x: part.t0, y: part.s0 },
+      { x: part.t1, y: part.s0 },
+      { x: part.t1, y: part.s1 },
+      { x: part.t0, y: part.s1 },
+    ],
+  ];
+}
 
 /** Direção unitária do eixo da parede (a→b); comprimento zero devolve `null`. */
 function layerSetOf(c: IfcCtx, type: WallType): number | null {
@@ -282,6 +294,10 @@ function openingTypeEntity(c: IfcCtx, t: OpeningType): number {
     OMIT,
   ]);
   c.openingTypes.set(t.id, id);
+  // Material de fallback do tipo: leitores que propagam IFCRELDEFINESBYTYPE (IfcOpenShell, web-ifc 0.0.79+) usam
+  // quando a ocorrência não tem material próprio. O web-ifc 0.0.78 (base do Any3D) ainda não propaga, por isso
+  // `addOpenings` também associa o material à ocorrência. As peças com IFCSTYLEDITEM mantêm a cor específica.
+  c.w.add('IFCRELASSOCIATESMATERIAL', [gid(`typemat:${t.id}`), OMIT, OMIT, OMIT, list([ref(id)]), ref(materialOf(c, t.frameMaterialId))]);
   return id;
 }
 
@@ -330,20 +346,42 @@ function addOpenings(c: IfcCtx, openings: readonly IfcOpeningGeo[]): void {
     if (wallId === undefined || !st || !t) continue;
     const axis: IfcPoint = g.u;
     const atZ = (z: number): ReturnType<typeof localPlacement> => localPlacement(c.w, st.place, [g.center.x, g.center.y, z], axis);
-    const voidSolid = extrudeSolid(c.w, rectOf(g.roughWidth, g.thickness), 0, g.roughHeight);
+    // O cortador atravessa a parede 1 cm para cada lado: as faces laterais não ficam coplanares com as faces da parede,
+    // que é o caso clássico de CSG com arestas soltas no web-ifc. O furo na face continua com o vão bruto.
+    const voidSolid = extrudeSolid(c.w, rectOf(g.roughWidth, g.thickness + 0.02), 0, g.roughHeight);
     const voidShape = bodyShape(c.w, c.ctx, 'SweptSolid', [voidSolid]);
     const voidId = c.w.add('IFCOPENINGELEMENT', [gid(`void:${g.openingId}`), OMIT, stepString(t.name), OMIT, OMIT, ref(atZ(g.roughBottomZ - st.elev)), ref(voidShape), OMIT, en('OPENING')]);
     c.w.add('IFCRELVOIDSELEMENT', [gid(`rvoid:${g.openingId}`), OMIT, OMIT, OMIT, ref(wallId), ref(voidId)]);
-    const body = extrudeSolid(c.w, rectOf(g.width, g.thickness), 0, g.height);
-    const shape = bodyShape(c.w, c.ctx, 'SweptSolid', [body]);
+    // Esquadria detalhada do modelo único (batente, folha, vidro, montante, maçaneta...). Cada peça é um sólido com o
+    // seu `IFCSTYLEDITEM`; o vidro usa o material transparente do projeto. Sem `parts` (contrato antigo), mantém o corpo
+    // único de compatibilidade. `parts: []` (vão livre sem folha) não escreve corpo: o furo da parede já é o vão.
+    const items: number[] = [];
+    if (g.parts !== undefined) {
+      for (const part of g.parts) {
+        if (!(part.t1 - part.t0 > EPS && part.s1 - part.s0 > EPS && part.z1 - part.z0 > EPS)) continue;
+        materialOf(c, part.materialId);
+        const solid = extrudeSolid(c.w, rectOfPart(part), part.z0, part.z1 - part.z0);
+        c.itemStyles?.push({ item: solid, materialId: part.materialId });
+        items.push(solid);
+      }
+    } else {
+      materialOf(c, t.frameMaterialId);
+      const body = extrudeSolid(c.w, rectOf(g.width, g.thickness), 0, g.height);
+      c.itemStyles?.push({ item: body, materialId: t.frameMaterialId });
+      items.push(body);
+    }
+    const shape = items.length > 0 ? bodyShape(c.w, c.ctx, 'SweptSolid', items) : null;
     const family = stepString(openingFamilyName(t) ?? t.name);
     const name = stepString(t.name);
     const fillId =
       o.kind === 'door'
-        ? c.w.add('IFCDOOR', [gid(`door:${g.openingId}`), OMIT, name, OMIT, family, ref(atZ(g.sillZ - st.elev)), ref(shape), optStr(o.mark), num(g.height), num(g.width), en('DOOR'), en(doorOperation(t, o.flipHand)), OMIT])
-        : c.w.add('IFCWINDOW', [gid(`window:${g.openingId}`), OMIT, name, OMIT, family, ref(atZ(g.sillZ - st.elev)), ref(shape), optStr(o.mark), num(g.height), num(g.width), en('WINDOW'), en(windowPartition(t.leaves)), OMIT]);
+        ? c.w.add('IFCDOOR', [gid(`door:${g.openingId}`), OMIT, name, OMIT, family, ref(atZ(g.sillZ - st.elev)), shape === null ? OMIT : ref(shape), optStr(o.mark), num(g.height), num(g.width), en('DOOR'), en(doorOperation(t, o.flipHand)), OMIT])
+        : c.w.add('IFCWINDOW', [gid(`window:${g.openingId}`), OMIT, name, OMIT, family, ref(atZ(g.sillZ - st.elev)), shape === null ? OMIT : ref(shape), optStr(o.mark), num(g.height), num(g.width), en('WINDOW'), en(windowPartition(t.leaves)), OMIT]);
     st.contained.push(fillId);
     c.w.add('IFCRELFILLSELEMENT', [gid(`rfill:${g.openingId}`), OMIT, OMIT, OMIT, ref(voidId), ref(fillId)]);
+    // Material de fallback na instância: o web-ifc 0.0.78 ainda não propaga a associação do tipo para a ocorrência.
+    // As peças com IFCSTYLEDITEM continuam com a cor específica; sem elas, a esquadria sai no material do batente.
+    c.w.add('IFCRELASSOCIATESMATERIAL', [gid(`mat:${o.kind}:${g.openingId}`), OMIT, OMIT, OMIT, list([ref(fillId)]), ref(materialOf(c, t.frameMaterialId))]);
     if (o.kind === 'window') {
       // O atributo Operation do IFC4 fica no IFCWINDOWPANELPROPERTIES, não no IFCWINDOW: um painel por janela.
       const panel = c.w.add('IFCWINDOWPANELPROPERTIES', [
@@ -417,6 +455,8 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
     openingTypes: new Map(),
     openingTypeMembers: new Map(),
     external: externalWalls(p, geo.walls),
+    styles: new Map(),
+    itemStyles: [],
   };
   const storeyIds: number[] = [];
   for (const lv of p.levels) {
@@ -448,5 +488,6 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
   // Estilos por último: os materiais das esquadrias e dos tipos sem geometria própria entram só para receber cor.
   registerTypeMaterials(c);
   addStyles(c);
+  addItemStyles(c);
   return w.text({ fileName: `${p.name}.ifc`, timestamp: opts.timestamp ?? '1970-01-01T00:00:00' });
 }

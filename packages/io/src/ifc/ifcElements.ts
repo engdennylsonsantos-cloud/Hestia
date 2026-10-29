@@ -265,11 +265,12 @@ export function addStairs(c: IfcCtx, geo: IfcGeometry): void {
     const stair = c.w.add('IFCSTAIR', [gid(`stair:${s.stairId}`), OMIT, stepString(name), OMIT, OMIT, ref(place), OMIT, OMIT, en(stairKindOf(s))]);
     c.products?.set(s.stairId, stair);
     st.contained.push(stair);
+    const flightMaterial = type?.materialId || (c.p.materials['mat_concreto'] ? 'mat_concreto' : '');
     const flights = s.flights.map((f) => {
       const fPlace = localPlacement(c.w, st.place, [0, 0, 0]);
       const shape = prismsShape(c.w, c.ctx, f.pieces, st.elev);
       const treadLength = flightTreadLength(f);
-      return c.w.add('IFCSTAIRFLIGHT', [
+      const flight = c.w.add('IFCSTAIRFLIGHT', [
         gid(`flight:${s.stairId}:${f.componentIndex}`),
         OMIT,
         stepString(`${name} - lance ${f.componentIndex}`),
@@ -284,6 +285,9 @@ export function addStairs(c: IfcCtx, geo: IfcGeometry): void {
         treadLength !== null && treadLength > 0 ? num(treadLength) : OMIT,
         en(s.spiral ? 'SPIRAL' : 'STRAIGHT'),
       ]);
+      // O lance não tem camadas próprias: o material do tipo (concreto/aço) evita o branco padrão do visualizador.
+      if (flightMaterial) c.w.add('IFCRELASSOCIATESMATERIAL', [gid(`mat:flight:${s.stairId}:${f.componentIndex}`), OMIT, OMIT, OMIT, list([ref(flight)]), ref(materialOf(c, flightMaterial))]);
+      return flight;
     });
     if (flights.length > 0) c.w.add('IFCRELAGGREGATES', [gid(`stairagg:${s.stairId}`), OMIT, OMIT, OMIT, ref(stair), list(flights.map(ref))]);
     s.landings.forEach((pr, i) => {

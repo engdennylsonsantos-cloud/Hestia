@@ -147,13 +147,20 @@ describe('addStyles: estilos de superfície dos materiais', () => {
   const geo = geometryFromModel(p);
   const text = exportIfc(p, geo, { timestamp: TS });
 
-  it('emite IFCSURFACESTYLE, IFCSTYLEDITEM e IFCMATERIALDEFINITIONREPRESENTATION, um de cada por material', () => {
+  it('emite IFCSURFACESTYLE e IFCSTYLEDITEM por material, mais um IFCSTYLEDITEM por corpo de esquadria', () => {
     expect(count(text, 'IFCSURFACESTYLE')).toBeGreaterThan(0);
-    expect(count(text, 'IFCSTYLEDITEM')).toBe(count(text, 'IFCSURFACESTYLE'));
     expect(count(text, 'IFCSTYLEDREPRESENTATION')).toBe(count(text, 'IFCSURFACESTYLE'));
     expect(count(text, 'IFCSURFACESTYLERENDERING')).toBe(count(text, 'IFCSURFACESTYLE'));
     expect(count(text, 'IFCMATERIALDEFINITIONREPRESENTATION')).toBe(count(text, 'IFCSURFACESTYLE'));
     expect(count(text, 'IFCCOLOURRGB')).toBe(count(text, 'IFCSURFACESTYLE') * 2);
+    // Um IFCSTYLEDITEM com Item=$ por material (definição do material) e um com Item=#n por corpo de esquadria.
+    const itemStyles = entityLines(text, 'IFCSTYLEDITEM').filter((l) => attrsOf(l)[0] !== '$');
+    expect(itemStyles).toHaveLength(geo.openings.length);
+    expect(count(text, 'IFCSTYLEDITEM')).toBe(count(text, 'IFCSURFACESTYLE') + itemStyles.length);
+    for (const line of itemStyles) {
+      const item = entitiesById(text).get(refsIn(attrsOf(line)[0]!)[0]!);
+      expect(item, line).toMatch(/^IFCEXTRUDEDAREASOLID\(/);
+    }
   });
 
   it('o vidro (mat_vidro) sai translúcido com a cor do projeto', () => {

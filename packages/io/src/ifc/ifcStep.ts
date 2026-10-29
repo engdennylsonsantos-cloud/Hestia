@@ -77,7 +77,7 @@ export class StepWriter {
     const head = [
       'ISO-10303-21;',
       'HEADER;',
-      "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
+      "FILE_DESCRIPTION(('ViewDefinition [ReferenceView_V1.2]'),'2;1');",
       `FILE_NAME(${stepString(opts.fileName)},${stepString(opts.timestamp)},(''),(''),'Hestia','Hestia','');`,
       "FILE_SCHEMA(('IFC4'));",
       'ENDSEC;',

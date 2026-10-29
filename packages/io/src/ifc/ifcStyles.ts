@@ -36,7 +36,7 @@ const ratio = (v: number, fallback: number): number => (Number.isFinite(v) ? Mat
  *   (fosco tem expoente baixo e reflexo largo; espelhado tem expoente alto e reflexo estreito). `ReflectanceMethod`
  *   fica `.NOTDEFINED.`: o Hestia não modela o método de reflectância.
  */
-function addMaterialStyle(c: IfcCtx, m: Material, material: number): void {
+function addMaterialStyle(c: IfcCtx, m: Material, material: number): number {
   const [r, g, b] = rgbOf(m.color);
   const opacity = ratio(m.opacity, 1);
   const gloss = ratio(m.gloss, 0);
@@ -58,6 +58,7 @@ function addMaterialStyle(c: IfcCtx, m: Material, material: number): void {
   const item = c.w.add('IFCSTYLEDITEM', [OMIT, list([ref(style)]), OMIT]);
   const representation = c.w.add('IFCSTYLEDREPRESENTATION', [ref(c.ctx), stepString('Style'), stepString('Style'), list([ref(item)])]);
   c.w.add('IFCMATERIALDEFINITIONREPRESENTATION', [stepString(m.name), OMIT, list([ref(representation)]), ref(material)]);
+  return style;
 }
 
 /**
@@ -65,10 +66,27 @@ function addMaterialStyle(c: IfcCtx, m: Material, material: number): void {
  * projeto ausente (id órfão, que `materialOf` escreveu como "Material não definido") fica sem estilo, como antes.
  */
 export function addStyles(c: IfcCtx): void {
+  c.styles ??= new Map();
   for (const id of [...c.materials.keys()].sort()) {
     const material = c.materials.get(id);
     const m = c.p.materials[id];
     if (material === undefined || m === undefined) continue;
-    addMaterialStyle(c, m, material);
+    c.styles.set(id, addMaterialStyle(c, m, material));
+  }
+}
+
+/**
+ * `IFCSTYLEDITEM` das peças de esquadria: cada `IfcExtrudedAreaSolid` (batente, folha, vidro, montante...) recebe o
+ * estilo do seu material. É o caminho que o web-ifc lê primeiro (`GetStyleItemFromExpressId` consulta o `Item` antes da
+ * associação de material do produto), então uma janela com vários materiais não vira uma caixa branca de material único.
+ * Emitido depois de `addStyles`, quando o `IFCSURFACESTYLE` de cada material já existe.
+ */
+export function addItemStyles(c: IfcCtx): void {
+  if (!c.itemStyles || !c.styles) return;
+  for (const { item, materialId } of c.itemStyles) {
+    const style = c.styles.get(materialId);
+    if (style === undefined) continue;
+    // IFC4: IfcStyledItem(Item, Styles, Name) — o Item vem primeiro, seguido da lista de estilos.
+    c.w.add('IFCSTYLEDITEM', [ref(item), list([ref(style)]), OMIT]);
   }
 }

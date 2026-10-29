@@ -38,11 +38,11 @@ Saída em `test-results/ifc-quality/`, com data fixa (`2026-10-29T00:00:00Z`) �
 
 | Arquivo | Níveis | Elementos do projeto | Tamanho |
 |---|---:|---:|---:|
-| `house2.ifc` | 2 | 20 | 100 kB |
-| `studio.ifc` | 2 | 11 | 69 kB |
-| `house-premium.ifc` | 3 | 75 | 339 kB |
-| `predio10.ifc` | 10 | 600 | 2.579 kB |
-| `esquadrias.ifc` | 1 | 25 | 110 kB |
+| `house2.ifc` | 2 | 20 | 189 kB |
+| `studio.ifc` | 2 | 11 | 102 kB |
+| `house-premium.ifc` | 3 | 75 | 559 kB |
+| `predio10.ifc` | 10 | 600 | 4.785 kB |
+| `esquadrias.ifc` | 1 | 25 | 236 kB |
 | `casa-ambientes.ifc` | 2 | 6 | 49 kB |
 
 "Elementos do projeto" é a contagem do `ProjectStore` (paredes, aberturas, pisos, lajes, forros, telhados,
@@ -76,6 +76,7 @@ O que conferir:
 - a construção aparece **na escala certa** (porta ~2,10 m de altura contra a parede), sem espelhar o Norte;
 - os pavimentos empilham na ordem certa (`predio10`: 10 volumes iguais; `house-premium`: 3);
 - aberturas são **buracos de verdade** — dá para ver o interior pela janela, não uma chapa pintada na parede;
+- portas e janelas mostram **batente, folha, vidro e montantes** como peças separadas, não uma caixa branca única;
 - contagem visual bate com a tabela do §5 (ex.: 8 janelas na `house2`);
 - o painel de propriedades mostra o tipo IFC (`IfcWall`, `IfcDoor`, `IfcWindow`…), não "mesh".
 
@@ -117,7 +118,7 @@ O que conferir (é aqui que o N3 é julgado):
 - cores: face acabada **branca/bege** (`Tinta branca #f4f1ea` no interior, `Revestimento cerâmico #e9e4da` no
   exterior do `wt_ext19`), estrutura **terracota** (`Bloco cerâmico 9/14/19`, `#c9784c` / `#c0693f` / `#b45f38`),
   telha **terracota** (`#b5522d`), escada **concreto** (`#8f9296`), portas **madeira** (`#a9794a`), esquadrias
-  **alumínio** (`#b8bdc2`);
+  **alumínio** (`#b8bdc2`) e **vidro translúcido** (`#a9d6e5`, opacidade 35%);
 - vidro **transparente** (`Vidro #a9d6e5`, opacidade 0,35 → `Transparency = 0,65`): vê-se o interior através dele;
 - material layer set na ordem e com as espessuras do tipo. Exemplos de `DEFAULT_WALL_TYPES`: `wt_ext19`
   ("Externa 19 + cerâmica") = cerâmica 10 mm + argamassa 20 mm + bloco 19 (190 mm) + reboco 20 mm + tinta 2 mm;

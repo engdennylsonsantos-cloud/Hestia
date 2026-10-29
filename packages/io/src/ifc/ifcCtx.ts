@@ -26,6 +26,10 @@ export interface IfcCtx {
   openingTypeMembers: Map<Id, number[]>;
   /** Paredes cuja face externa dá para fora da edificação (calculadas antes de escrever paredes e vãos). */
   external: Set<Id>;
+  /** `IFCSURFACESTYLE` de cada material (preenchido por `addStyles`), reutilizado nos `IFCSTYLEDITEM` das peças. */
+  styles?: Map<Id, number>;
+  /** Itens de geometria que recebem estilo por peça (esquadrias), emitidos depois de `addStyles`. */
+  itemStyles?: Array<{ item: number; materialId: Id }>;
   /**
    * Id STEP do produto de cada elemento do projeto, por id do elemento (preenchido por quem cria o produto). É a fonte
    * preferida do `addHestiaPsets`; sem ele, o pset acha o produto pelo GlobalId determinístico (`wall:<id>`, `door:<id>`…).

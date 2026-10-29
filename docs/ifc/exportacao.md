@@ -30,7 +30,10 @@ intercâmbio: cada programa reconstrói tipos, juntas e pranchas à sua maneira.
 3. **Tipos e camadas**: `IfcMaterialLayerSet` + `IfcMaterialLayerSetUsage` (offset da linha de locação) para parede,
    piso, laje, forro e telhado; `IfcSurfaceStyle` com cor e `Transparency`.
 4. **Vãos**: `IfcOpeningElement` + `RelVoidsElement`; `IfcDoor`/`IfcWindow` + `RelFillsElement`, com tipo,
-   `OverallWidth/Height`, `OperationType`, `PartitioningType`.
+   `OverallWidth/Height`, `OperationType`, `PartitioningType`. O corpo da esquadria é o **modelo único do engine**
+   (`buildOpeningModel`): batente, folha, vidro, montantes e maçaneta viram um `IfcExtrudedAreaSolid` cada, e cada peça
+   recebe um `IfcStyledItem` com o `IfcSurfaceStyle` do seu material (o vidro mantém a `Transparency` do projeto). O vão
+   livre (`leaves: 0`) sai sem corpo (`Representation = $`), porque o furo da parede já é o vão.
 5. **Superfícies**: `IfcSlab` com `PredefinedType` correto, furos por `IfcOpeningElement`, telhado como `IfcRoof`
    com águas; escada como `IfcStair` com lances/patamares.
 6. **Ambientes e eixos**: `IfcSpace` (extrusão, nome/número, `Qto_SpaceBaseQuantities`); `IfcGrid`/`IfcGridAxis`.
@@ -83,9 +86,11 @@ esquadrias. G: comparação N2 geometria exportada × IfcOpenShell (`scripts/ifc
 
 **Onda 3 — parcial (2026-10-29)**
 Unidades completas (`m`, `m²`, `m³`, `rad`) e **norte verdadeiro** no contexto; **forros** exportados como
-`IFCCOVERING .CEILING.` (com camadas e `Qto_CeilingBaseQuantities`). Pendentes: corrigir o quantificador de piso do
-`predio10` no motor, decidir o retorno de acabamento do vão, georreferência por CRS e executar a
-[matriz visual](matriz-visual.md).
+`IFCCOVERING .CEILING.` (com camadas e `Qto_CeilingBaseQuantities`); **esquadrias detalhadas** (batente, folha, vidro,
+montante, maçaneta) com `IfcStyledItem` por peça e material de fallback na ocorrência — o web-ifc/Any3D deixa de pintar
+porta e janela de branco e o vidro fica translúcido; lances de escada recebem o material do tipo. Pendentes: corrigir o
+quantificador de piso do `predio10` no motor, decidir o retorno de acabamento do vão, georreferência por CRS, beirais e
+espelhos de escada como geometria própria e executar a [matriz visual](matriz-visual.md).
 
 ### N2 — geometria exportada × IFC
 

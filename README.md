@@ -36,3 +36,11 @@ npm run check
 ```
 
 Veja [docs/07-STATUS-V1.md](docs/07-STATUS-V1.md) para o estado atual e o roteiro de teste.
+
+## Licença e contribuições
+
+MIT. Veja [LICENSE](LICENSE).
+
+O aplicativo é gratuito e o código é MIT. As regras de contribuição e marca estão
+em [LICENSING.md](LICENSING.md), [CONTRIBUTING.md](CONTRIBUTING.md) e
+[NOTICE](NOTICE).

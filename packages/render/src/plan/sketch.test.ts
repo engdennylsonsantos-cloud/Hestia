@@ -116,7 +116,7 @@ describe('sketchOps: triângulo de inclinação (só telhado)', () => {
     const segs = segsOf(SQUARE);
     const ops = sketchOps(draftOf('roof', segs), outerOf(segs, SQUARE), LIGHT, VIEW);
     expect(triangles(ops.fills)).toHaveLength(4);
-    expect(ops.labels.filter((l) => l.text === '30%')).toHaveLength(4);
+    expect(ops.labels.filter((l) => l.text === '30 %')).toHaveLength(4);
   });
 
   it('a aresta de baixo fica para fora do laço, a 38 px, com os vértices em (-9,-29) (-9,-47) (9,-47)', () => {
@@ -158,14 +158,14 @@ describe('sketchOps: triângulo de inclinação (só telhado)', () => {
     expect(triangles(ops.fills)).toHaveLength(3);
     const outlines = ops.strokes.filter((s: StrokeOp) => s.closed && s.pts.length === 3 && s.color === LIGHT.roofFootprint);
     expect(outlines).toHaveLength(1);
-    expect(ops.labels.filter((l) => l.text === '30%')).toHaveLength(3);
+    expect(ops.labels.filter((l) => l.text === '30 %')).toHaveLength(3);
   });
 
   it('a aresta própria do rascunho vale sobre o padrão: slopePct 12 vira "12 %"', () => {
     const segs = segsOf(SQUARE);
     segs[1] = { ...segs[1]!, slopePct: 12 };
     const ops = sketchOps(draftOf('roof', segs), outerOf(segs, SQUARE), LIGHT, VIEW);
-    expect(ops.labels.map((l) => l.text).sort()).toEqual(['12%', '30%', '30%', '30%']);
+    expect(ops.labels.map((l) => l.text).sort()).toEqual(['12 %', '30 %', '30 %', '30 %']);
   });
 
   it.each<SketchTarget>(['floor', 'slab', 'ceiling'])('%s: nenhum triângulo nem texto de inclinação', (target) => {

@@ -14,7 +14,7 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - [x] D10.3 eixos
 - [x] D10.4 piso/laje/telhado/forro (cotas de leitura)
 - [x] D10.5 mover/copiar
-- [x] `npm run check`: lint/tsc/fronteiras/unidades ok; 558 arquivos, 6466/6467 testes. Única falha: snapshot `packages/render/src/plan/__snapshots__/sketch.test.ts.snap` (espera "30 %" e o formato canônico agora é "30%"); NÃO atualizei/commitei o snapshot por instrução do orquestrador — o COTAS regrava na F1.
+- [x] `npm run check`: lint/tsc/fronteiras/unidades ok; 571 arquivos, 6598/6599 testes. Única falha é o timeout conhecido do ambiente em `openingCatalogo` (low/mid/high), o mesmo da linha de base.
 
 ## S1 — o que cada modo calcula (3 linhas)
 - `wall` (padrão): `D` = espessura TOTAL do tipo de parede (`totalThickness`, todas as camadas com revestimentos) e `Cd` = 0, o plano médio da parede.
@@ -68,10 +68,9 @@ Linha de base antes de mexer (`npm run check`): 5 testes falham só por timeout 
 - Verificação no navegador (dev server 5199 + Chromium via `playwright-core`, `?debug=1`): linha de detalhe criada/selecionada mostrou "3" e, ao digitar 5, o fim foi para x=5; grade g1 entre g2/g3 mostrou "2" e "1,5"; rascunho de perímetro com 2 linhas selecionadas mostrou "4" e "3". Sem erros de página (só o 404 do favicon).
 - PENDENTES: escadas, ambientes e seções (decisão do dono, como o plano pede). O PEDIDO do `dimensionTool.ts` foi atendido pelo COTAS no M6; restou só o registro dos três tipos acima no `dims/registry.ts` (linhas de registro acrescentadas).
 
-## Ajustes de integração (fora do D10, causados pelo merge das unidades)
-- `fmtPercent` da planta (C6, feito) passou a usar `formatQuantity`: o formato canônico é "30%" (sem espaço), como em `unitsFormat.test`. Atualizei as expectativas inline de `roofs.test.ts`, `roofSymbols.test.ts` e `sketch.test.ts` e regravei `ouroZoom.json` (87 entradas, CRLF preservado).
-- `OpeningScheduleDialog.test.ts` (arquivo da UNID, ajuste mínimo de expectativa): a folga inferior agora sai na unidade pequena do projeto ("0,7 cm", não "7 mm"). Registro como desvio para a UNID revisar.
-- Snapshot `sketch.test.ts.snap`: não atualizado/commitado por instrução; a divergência é só o espaço de "30 %" → "30%".
+## Ajustes de integração (fora do D10)
+- O merge de `origin/claude/fervent-newton-rfgz3y` (GPU/UI/C5) já trouxe `fmtPercent` da planta com espaço ("30 %") e os testes/`ouroZoom.json` correspondentes. Alinhei `roofs.test.ts`, `roofSymbols.test.ts`, `sketch.test.ts`, `ouroZoom.json` e `OpeningScheduleDialog.test.ts` à versão de origin, sem duplicar a correção.
+- `npm run check`: lint/tsc/fronteiras/unidades ok; 571 arquivos, 6598/6599 testes. A única falha é o timeout conhecido do ambiente em `openingCatalogo` (low/mid/high), igual à linha de base.
 - PEDIDO COTAS: `dims/registry.ts` recebeu só as linhas de registro dos provedores ESQ (wall/floor/slab/ceiling/roof); se o COTAS preferir registrar em outro lugar, é só mover essas linhas.
 - Escadas, ambientes e seções: não implementados (pendente de decisão do dono, como o plano pede).
 

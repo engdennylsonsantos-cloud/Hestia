@@ -52,10 +52,10 @@ export interface RampPlan {
 export type RampPlanResult = RampPlan | { error: string };
 
 /** Menor nº de lances: vence o desnível total com o máximo por lance. */
-const flightsFor = (H: number, maxRise: number): number => Math.max(1, Math.ceil(H / maxRise - 1e-9));
+export const flightsFor = (H: number, maxRise: number): number => Math.max(1, Math.ceil(H / maxRise - 1e-9));
 
 /** Desnível máximo por lance para a inclinação: a linha da tabela; sem linha, a última (tabela vazia → null). */
-function maxRiseFor(type: RampType, slope: number): number | null {
+export function maxRiseFor(type: RampType, slope: number): number | null {
   const row = rampNormRowFor(type, slope);
   if (row) return row.maxRise;
   const last = type.normTable[type.normTable.length - 1];
@@ -63,7 +63,7 @@ function maxRiseFor(type: RampType, slope: number): number | null {
 }
 
 /** Patamar retangular em coordenadas locais, no mesmo formato do `landing()` privado de `stairGenerators.ts`. */
-function inlineLanding(
+export function inlineLanding(
   at: (u: number, v: number) => Vec2,
   u0: number,
   u1: number,
@@ -83,7 +83,7 @@ function inlineLanding(
 }
 
 /** Marca cada lance com o gerador que o produziu. */
-const tagRuns = (parts: StairComponentSketch[], shape: RampShape): StairComponentSketch[] =>
+export const tagRuns = (parts: StairComponentSketch[], shape: RampShape): StairComponentSketch[] =>
   parts.map((p) => (p.kind === 'run' ? { kind: 'run', run: { ...p.run, generatedBy: shape } } : p));
 
 /** Planeja uma rampa reta, em L ou em U; devolve `{ error }` com entrada inválida. */

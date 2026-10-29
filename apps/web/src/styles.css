@@ -374,6 +374,30 @@ svg { display: block; }
 .dtab { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 5px 12px; color: var(--fg-soft); margin-bottom: -1px; }
 .dtab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
 .split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 14px; }
+/* Modal do tipo de escada: duas colunas (seções roláveis + calculadora/prévia fixas). */
+.dialog.wide { width: min(940px, 100%); }
+.stt-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
+.stt-main { min-width: 0; max-height: min(430px, 58vh); overflow: auto; padding-right: 4px; }
+.stt-side { position: sticky; top: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.dsec { min-width: 0; margin: 0 0 10px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 2px; }
+.dsec > legend, .dsec > summary { padding: 0 4px; color: var(--fg-soft); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.dsec > summary { cursor: pointer; }
+.dsec > summary:hover { color: var(--accent); }
+.calc-badge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid currentColor; border-radius: 2px; padding: 2px 8px; font-size: 11.5px; line-height: 1.5; }
+.calc-badge.ok { color: var(--ok); }
+.calc-badge.warn { color: var(--warn); }
+.calc-badge.bad { color: var(--danger); }
+.stt-ref { color: var(--fg-faint); font-size: 11px; }
+.stt-preview { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 2px; background: var(--sheet); }
+.stt-preview svg { display: block; width: 100%; }
+.stt-dim { position: absolute; transform: translate(-50%, -50%); padding: 0 2px; border-radius: 2px; background: var(--panel); color: var(--fg-soft); font-family: var(--font-mono); font-size: 10.5px; line-height: 1.25; white-space: nowrap; pointer-events: none; }
+.stt-dim.danger { color: var(--danger); }
+.stt-preview-empty { margin: 0; padding: 18px 10px; color: var(--fg-soft); font-size: 11.5px; text-align: center; }
+@media (max-width: 760px) {
+  .stt-grid { grid-template-columns: minmax(0, 1fr); }
+  .stt-main { max-height: none; overflow: visible; padding-right: 0; }
+  .stt-side { position: static; }
+}
 /* "Propriedades do tipo" (Editar tipo): barra Família/Tipo no topo e, no diálogo do vão, prévia ao lado dos parâmetros. */
 .tdlg-bar { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; margin: -12px -14px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .tdlg-bar > label { color: var(--fg-soft); }

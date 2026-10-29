@@ -1,20 +1,86 @@
-import { useEffect, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import { Icon } from '../Icon.tsx';
 
-export function Dialog({ title, sub, onClose, children, footer, size = '', z }: { title: string; sub?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; size?: '' | 'narrow' | 'mid'; z?: number }): ReactElement {
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Elementos focáveis visíveis dentro do diálogo, na ordem do documento. */
+function focusable(root: HTMLElement): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
+interface DialogProps {
+  title: string;
+  sub?: string;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: '' | 'narrow' | 'mid' | 'wide';
+  z?: number;
+  /** Ctrl+Enter dentro do diálogo (tratado em captura; os campos numéricos param a propagação). */
+  onSubmit?: () => void;
+  /**
+   * Trap de foco e devolução ao elemento que abriu. `true` por padrão nos diálogos largos ou com `onSubmit`; os demais
+   * seguem sem mudança de comportamento.
+   */
+  trapFocus?: boolean;
+}
+
+export function Dialog({ title, sub, onClose, children, footer, size = '', z, onSubmit, trapFocus }: DialogProps): ReactElement {
+  const root = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const submitRef = useRef(onSubmit);
+  closeRef.current = onClose;
+  submitRef.current = onSubmit;
+  const manage = trapFocus ?? (size === 'wide' || onSubmit !== undefined);
   useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const box = root.current;
+    if (manage && box) {
+      const target = box.querySelector<HTMLElement>('[data-autofocus]') ?? focusable(box)[0];
+      target?.focus();
+    }
     const h = (e: KeyboardEvent): void => {
+      const target = e.target;
+      const inSelect = target instanceof HTMLSelectElement;
       if (e.key === 'Escape') {
+        if (inSelect) return;
         e.stopPropagation();
-        onClose();
+        closeRef.current();
+        return;
+      }
+      if (!manage) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const submit = submitRef.current;
+        if (!submit || inSelect) return;
+        e.preventDefault();
+        e.stopPropagation();
+        submit();
+        return;
+      }
+      if (e.key === 'Tab' && box) {
+        const items = focusable(box);
+        if (!items.length) return;
+        const first = items[0]!;
+        const last = items[items.length - 1]!;
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !box.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener('keydown', h, true);
-    return () => window.removeEventListener('keydown', h, true);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener('keydown', h, true);
+      if (manage && opener && document.contains(opener)) opener.focus();
+    };
+  }, [manage]);
   return (
     <div className="overlay" style={z ? { zIndex: z } : undefined} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`dialog ${size}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={root} className={`dialog ${size}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="dhead">
           <h2>{title}</h2>
           {sub ? <span className="sub">{sub}</span> : null}

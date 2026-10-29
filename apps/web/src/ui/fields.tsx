@@ -28,10 +28,14 @@ interface NumProps {
   onValid?: () => void;
   /** Com `strictRange`, valor fora de min/max é recusado (volta o último valor válido) em vez de ser limitado. */
   strictRange?: boolean;
+  /** Marca o campo como inválido para leitores de tela (`aria-invalid`). */
+  invalid?: boolean;
+  /** Id da mensagem de erro ligada ao campo (`aria-describedby`). */
+  describedBy?: string;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange, invalid, describedBy }: NumProps): ReactElement {
   const show = (v: number | null): string => (v === null || mixed ? '' : fmt(v * scale, decimals));
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
@@ -74,6 +78,8 @@ export function NumField({ id, value, onCommit, decimals = 2, unit, scale = 1, m
         disabled={disabled}
         readOnly={readOnly}
         inputMode="decimal"
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
         onFocus={(e) => {
           setFocus(true);
           e.target.select();

@@ -31,6 +31,7 @@ import { safeFilename } from './nomeArquivo.ts';
 import { FluxoEdicao } from './fluxoEdicao.ts';
 import { CacheGeometria } from './geometryCache.ts';
 import { abrirComCache, TETO_GEOMETRIA_BYTES, type PortasAbertura } from './geometriaAbertura.ts';
+import { aceitaCaractereNumerico } from './entradaNumerica.ts';
 
 
 /**
@@ -264,8 +265,7 @@ export class Editor {
     // Na 3D, Esc segue o da planta (cancela a operação, senão volta à Selecionar; decisão 0016 §5). Ferramenta de escolha (Anexar topo): Enter e Tab seguem para a planta, senão a etapa não avança.
     if (ui.view === '3d' && k !== 'Escape' && !(this.tool.pick3d && (k === 'Enter' || k === 'Tab'))) return key3d(k, ui.selection, () => this.deleteSelection());
     if (k === 'Escape') {
-      casador.limpar();
-      if (ui.typed) useUi.setState({ typed: '' });
+      casador.limpar(); if (ui.typed) useUi.setState({ typed: '' });
       // Ferramenta de texto: Esc com texto digitado também cancela o ponto, senão a próxima tecla vira texto.
       if (!ui.typed || this.tool.freeText) { if (!this.perimetro.esc()) this.tool.cancel(); }
       this.bump();
@@ -304,8 +304,8 @@ export class Editor {
       this.bump();
       return true;
     }
-    // Campo numérico: dígitos e operadores; ferramenta de texto (freeText): qualquer tecla digitável.
-    if (this.tool.inputPrompt() && (this.tool.freeText ? k.length === 1 : /^[0-9.,+\-*/()]$/.test(k))) {
+    // Campo numérico: dígitos, operadores e sufixo de unidade (`120cm`, `5'6"`); ferramenta de texto (freeText): qualquer tecla digitável.
+    if (this.tool.inputPrompt() && (this.tool.freeText ? k.length === 1 : aceitaCaractereNumerico(k, ui.typed))) {
       useUi.setState({ typed: ui.typed + k });
       return true;
     }

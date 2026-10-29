@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUnits, resolveUnits } from '@hestia/model';
-import type { TempDim } from '@hestia/tools';
+import { createEmptyProject, defaultUnits, ProjectStore, resolveUnits } from '@hestia/model';
+import { toPermanent, type TempDim } from '@hestia/tools';
 import { resolveDimEdit, selectionDimsSuspended, suspensionAfterConversion } from './dimsActions.ts';
 
 const base: TempDim = {
@@ -63,5 +63,15 @@ describe('suspensão das cotas temporárias depois do botão "I"', () => {
     // Desfazer (ou qualquer alteração posterior) muda a versão: as temporárias voltam.
     expect(selectionDimsSuspended(suspended, 14)).toBe(false);
     expect(selectionDimsSuspended(null, 13)).toBe(false);
+  });
+
+  it('converter em permanentes e desfazer devolve as temporárias', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const before = store.version;
+    store.transaction('Converter em cotas permanentes', () => toPermanent('lv_0', [base]).forEach((c) => store.exec(c)));
+    const suspended = suspensionAfterConversion(before, store.version);
+    expect(selectionDimsSuspended(suspended, store.version)).toBe(true);
+    store.undo();
+    expect(selectionDimsSuspended(suspended, store.version)).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { DEFAULT_STAIR_CALC_RULE, stairTypeUsage, type StairRunStyle, type Stair
 import { editor, useProject } from '../../editor/controller.ts';
 import { useUi } from '../../editor/state.ts';
 import { keptStairType } from '../../editor/stairActions.ts';
-import { duplicateStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
+import { duplicateStairType, saveStairType, stairTypeDeleteBlock, tryDeleteStairType } from '../../editor/stairTypeActions.ts';
 import { I18N, useI18n } from '../../editor/i18n.ts';
 import { safeGet, safeSet } from '../../editor/storage.ts';
 import { TextField } from '../fields.tsx';
@@ -72,9 +72,11 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   const [current, setCurrent] = useState(typeId);
   const styleStore = useRef<Partial<StairType>>({});
   const [calcHeight, setCalcHeightState] = useState<number>(initialHeight);
+  const [saveError, setSaveError] = useState<string | null>(null);
   draftRef.current = draft;
   if (current !== typeId) {
     setCurrent(typeId);
+    setSaveError(null);
     const next = p.stairTypes[typeId] ? normalize(structuredClone(p.stairTypes[typeId]!)) : null;
     draftRef.current = next;
     styleStore.current = {};
@@ -125,7 +127,13 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
     if (!cur) return false;
     if (validateStairType(cur, materialIds).some((i) => i.severity === 'error')) return false;
     const saved = finalizeForSave(cur);
-    editor.store.exec({ type: 'upsertStairType', stairType: saved }, 'Editar tipo de escada');
+    const r = saveStairType(editor.store, saved);
+    if (!r.ok) {
+      // O modelo recusou (regras mais estritas que as do modal): o diálogo continua aberto com o rascunho.
+      setSaveError(`Não foi possível salvar: ${r.error}`);
+      return false;
+    }
+    setSaveError(null);
     draftRef.current = saved;
     setDraftState(saved);
     return true;
@@ -248,6 +256,7 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
         />
       </div>
       {nameMsg ? <div className="vr-error" id="stt-name-err">{nameMsg}</div> : null}
+      {saveError ? <div className="vr-error" role="alert">{saveError}</div> : null}
       {impact ? <p className="hint" role="status" style={{ color: 'var(--warn)' }}>{fill(t.stt_impact, { n: String(usage) })}</p> : null}
       <div className="stt-grid">
         <div className="stt-main">

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, buildTemplate, makeStair, DEFAULT_STAIR_TYPES, type StairType } from '@hestia/model';
 import { instancesOfType, compatibleTypes } from './typeActions.ts';
-import { duplicateStairType, duplicateStairTypeFor, renameStairType, stairTypeDeleteBlock, stairTypeError, tryDeleteStairType } from './stairTypeActions.ts';
+import { duplicateStairType, duplicateStairTypeFor, renameStairType, saveStairType, stairTypeDeleteBlock, stairTypeError, tryDeleteStairType } from './stairTypeActions.ts';
 
 /** Casa-modelo com uma escada monolítica no térreo (usa o tipo stt_monolitica). */
 function withStair(): ProjectStore {
@@ -57,6 +57,22 @@ describe('tipos de escada: uso, substituição e exclusão', () => {
     store.undo();
     expect(store.project.elements.st1).toMatchObject({ typeId: 'stt_monolitica' });
     expect(store.project.stairTypes[copy]).toBeUndefined();
+  });
+});
+
+describe('gravação do tipo de escada sem lançar', () => {
+  it('grava um tipo válido e devolve ok', () => {
+    const store = withStair();
+    const r = saveStairType(store, { ...monolithic(), id: 'stt_ok', name: 'Lance C' });
+    expect(r).toEqual({ ok: true });
+    expect(store.project.stairTypes.stt_ok!.name).toBe('Lance C');
+  });
+
+  it('devolve a mensagem do modelo quando recusa o tipo, sem lançar e sem gravar', () => {
+    const store = withStair();
+    const r = saveStairType(store, { ...monolithic(), id: 'stt_bad', minTread: 0.35, maxTread: 0.32 });
+    expect(r).toEqual({ ok: false, error: 'O piso máximo precisa ser maior ou igual ao piso mínimo.' });
+    expect(store.project.stairTypes.stt_bad).toBeUndefined();
   });
 });
 

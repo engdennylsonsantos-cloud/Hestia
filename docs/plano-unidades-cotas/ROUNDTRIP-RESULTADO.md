@@ -8,7 +8,7 @@
 também confere que nenhum outro elemento mudou e, nas translações, que o comprimento do elemento
 não mudou. Ângulos: 0°, 45°, 90°, 180° e 270°.
 
-Durante a integração, esta rede apontou o defeito do relato do dono (11 casos de parede e grade com
+Durante a integração, esta rede apontou o defeito do relato do dono (30 casos de parede e grade com
 `it.fails`). O PARALELAS corrigiu em `8aacd1e` e os `it.fails` foram trocados por `it` normais.
 
 ## Passam

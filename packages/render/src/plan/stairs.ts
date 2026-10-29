@@ -1,5 +1,5 @@
-import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
-import { sampleChain, spiralParamsOf, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
+import { add, difference, dist, dot, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { sampleChain, spiralParamsOf, stairArrivalFrame, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
 import { isStair, unitsOf, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -33,13 +33,30 @@ const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
 /**
  * Número visível do degrau na planta (decisão 0011 §1 item 6): o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`.
- * É contínuo na escada: o `index` do motor reinicia em cada lance, e o 1º degrau depois de um patamar segue o último
- * espelho anterior (o patamar não recebe rótulo, mas ocupa esse número). Usa a cota, não a contagem, então um lance
+ * O patamar conta como degrau, como no Revit, e recebe o seu número (L com 8 + 8 espelhos: 1..7, patamar 8, 9..15 e a
+ * chegada 16). É contínuo na escada: o `index` do motor reinicia em cada lance. Usa a cota, não a contagem, então um lance
  * com erro de croqui ainda conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
  */
 export function treadNumber(s: ResolvedStair, st: ResolvedStairStep): number {
   if (!(s.riserHeight > 0)) return st.index;
   return Math.round((st.z - s.baseZ) / s.riserHeight);
+}
+
+/**
+ * Último degrau da escada monolítica: a chegada, a faixa atrás do último espelho (a mesma peça que o 3D desenha, com o
+ * mesmo comprimento), na cota do topo. Sem chegada (outro estilo de lance, ou o último espelho não fecha), null.
+ */
+export function arrivalRing(s: ResolvedStair): Ring | null {
+  const f = stairArrivalFrame(s);
+  if (!f) return null;
+  const d = mul(f.u, f.length);
+  return [f.a, f.b, add(f.b, d), add(f.a, d)];
+}
+
+/** Pegada da escada em planta: a dos degraus mais a chegada (o último degrau), como no 3D. A seleção e o fantasma usam esta. */
+export function planFootprint(s: ResolvedStair): MultiPolygon {
+  const last = arrivalRing(s);
+  return last ? union(s.footprint, [[last]]) : s.footprint;
 }
 
 /** Ponto a meio comprimento da polilinha (ponto médio do espelho). */
@@ -121,6 +138,28 @@ function cutSymbol(c: StairCut, color: string, espessura: Espessura): StrokeOp {
 }
 
 /**
+ * Pontos que levam a seta pelo eixo do patamar entre dois lances. L: o canto onde os eixos dos lances se cruzam. U: eixos
+ * paralelos, então atravessa o patamar pela metade da profundidade. Sem patamar entre eles, nada (a ligação reta vale).
+ */
+function landingConnector(s: ResolvedStair, ciA: number, ciB: number, prev: Vec2[], next: Vec2[]): Vec2[] {
+  const landing = s.steps.find((x) => x.kind === 'landing' && x.componentIndex > ciA && x.componentIndex < ciB);
+  if (!landing || prev.length < 2 || next.length < 2) return [];
+  const a = prev[prev.length - 1]!;
+  const u1 = norm(sub(a, prev[prev.length - 2]!));
+  const b = next[0]!;
+  const u2 = norm(sub(next[1]!, b));
+  const d = sub(b, a);
+  const cross = u1.x * u2.y - u1.y * u2.x;
+  if (Math.abs(cross) > 1e-6) {
+    const t = (d.x * u2.y - d.y * u2.x) / cross;
+    return t > -EPS ? [add(a, mul(u1, t))] : [];
+  }
+  const half = Math.max(0, ...landing.polygon.map((q) => dot(sub(q, a), u1))) / 2;
+  const p1 = add(a, mul(u1, half));
+  return [p1, add(p1, sub(d, mul(u1, dot(d, u1))))];
+}
+
+/**
  * Caminhada da seta de subida, do primeiro ao último espelho, por lance: a caminhada explícita do lance (quando tem)
  * ou os pontos médios dos espelhos em ordem de subida. Um lance só tem espelhos resolvidos quando o croqui é válido
  * (o motor valida a caminhada), então a explícita usada aqui já foi aceita. Lances sem espelho resolvido não entram.
@@ -131,17 +170,25 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
   const byComponent = new Map<number, ResolvedStairRiser[]>();
   for (const r of risers) byComponent.set(r.componentIndex, [...(byComponent.get(r.componentIndex) ?? []), r]);
   const out: Vec2[] = [];
+  let prev: { ci: number; walk: Vec2[] } | null = null;
   for (const [ci, rs] of [...byComponent].sort((x, y) => x[0] - y[0])) {
     const c = components[ci];
     const explicit = c?.kind === 'run' && c.path.length > 0 ? sampleChain(c.path) : [];
     const walk = explicit.length >= 2 ? explicit : rs.map((r) => polyMid(riserPoints(r)));
+    // A seta passa pelo eixo do patamar: o canto do L, ou a travessia do U, em vez de cortar em diagonal.
+    if (prev) out.push(...landingConnector(s, prev.ci, ci, prev.walk, walk));
     out.push(...walk);
+    prev = { ci, walk };
   }
+  // E termina no último degrau (a chegada), que a planta desenha depois do último espelho.
+  const last = arrivalRing(s);
+  const lastAt = last && out.length > 0 ? labelPoint([[last]]) : null;
+  if (lastAt) out.push(lastAt);
   return out;
 }
 
 /** Seta de subida: a caminhada (explícita ou pelos pontos médios) com ponta de 7 px (marcador em pixels) no último espelho, na espessura dada. */
-function climbArrow(pts: Vec2[], color: string, espessura: Espessura): StrokeOp[] {
+export function climbArrow(pts: Vec2[], color: string, espessura: Espessura): StrokeOp[] {
   if (pts.length < 2) return [];
   const tip = pts[pts.length - 1]!;
   const back = mul(norm(sub(tip, pts[pts.length - 2]!)), -1);
@@ -167,7 +214,7 @@ export const SPIRAL_POST_SIDES = 48;
 /** Fração do vão radial (de `rInner` a `rOuter`) em que o rótulo de uma volta de cima se põe quando coincide com a de baixo. */
 const SPIRAL_LABEL_FRACTION = 0.3;
 const EPS = 1e-9;
-/** Área abaixo da qual uma sobreposição é um traço, não uma região (ruído do recorte). */
+/** Área (m²) abaixo da qual uma sobreposição é um traço, não uma região (ruído do recorte). */
 const SLIVER = 1e-7;
 
 /** Anel do poste de caracol: círculo de raio `r` em `c`, com `SPIRAL_POST_SIDES` vértices. */
@@ -255,8 +302,8 @@ function postOps(p: Project, s: ResolvedStair, spirals: ReadonlyMap<number, Spir
  * de corte e seta de subida "SOBE" pela caminhada (explícita, se válida, senão automática). No grosseiro, só o preenchimento do contorno. No fino,
  * número de cada degrau (`treadNumber`: contínuo na escada, o espelho que o degrau alcança). Com etiquetas ligadas, o código do tipo no centroide.
  *
- * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e o que está acima do topo não sai:
- * degrau ou espelho com topo acima de `view.topZ` é omitido. Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
+ * Com `view` (intervalo de vista, decisão 0013 §4), a cota de corte é a da vista e a escada que começa acima de `view.topZ`
+ * não sai; a que começa abaixo sai inteira, até o seu próprio topo (o fim do lance não some por passar do topo da vista). Sem `view`, vale a cota de 1,20 m de cada escada e não há topo.
  *
  * Caracol (decisão 0014 §1 item 9): as voltas sobrepõem-se em planta. Degrau acima do corte não pinta sobre a volta de
  * baixo (`aboveFill`); o rótulo de cima sai para dentro do setor (`treadLabelAt`) e, acima do corte, em tom claro
@@ -280,26 +327,37 @@ export function stairFills(
   const lineColor = mix(theme.ink, fillBase, 0.35);
   for (const s of stairs) {
     const cutZ = view?.cutZ ?? s.baseZ + STAIR_CUT_HEIGHT;
-    const topZ = view?.topZ ?? Infinity;
-    if (s.baseZ > topZ + 1e-9) continue;
+    // Escada que começa abaixo do topo da vista sai inteira, até o próprio topo: cortar no topo da vista (2,30 m) tirava o fim do lance.
+    // O que passa do topo da vista fica só no contorno, sem preenchimento (fora da faixa de vista).
+    const viewTop = view?.topZ ?? Infinity;
+    if (s.baseZ > viewTop + 1e-9) continue;
+    const topZ = Math.max(viewTop, s.topZ);
     const steps = s.steps.filter((st) => st.z <= topZ + 1e-9);
     const m = p.materials[s.type.materialId];
     const color = surfaceColor(m?.color ?? '#999999', fillBase, dark ? 0.42 : 0.74, paint);
     const spirals = spiralByComponent(p, s);
     const post = postOps(p, s, spirals, cutZ, fillBase, dark, lineColor, paint);
+    const inView = (z: number): boolean => z <= viewTop + 1e-9;
     if (detail === 'coarse') {
-      if (steps.length === 0 && s.steps.length > 0) continue;
-      const footprint = steps.length === s.steps.length ? s.footprint : union(...steps.map((st) => [[st.polygon]]));
-      out.fills.push({ polygons: footprint, color, alpha: 1 });
+      const seen = steps.filter((st) => inView(st.z));
+      if (seen.length === 0 && s.steps.length > 0) continue;
+      const footprint = seen.length === s.steps.length ? s.footprint : union(...seen.map((st) => [[st.polygon]]));
+      const last = inView(s.topZ) ? arrivalRing(s) : null;
+      out.fills.push({ polygons: last ? union(footprint, [[last]]) : footprint, color, alpha: 1 });
       out.fills.push(...post.fills);
       continue;
     }
     // Só o caracol tem voltas sobrepostas em planta: o recorte pela volta de baixo é feito só nele.
     const cover = spirals.size > 0 ? lowerCover(s, cutZ) : [];
     for (const st of steps) {
-      const fill = st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
+      const fill = !inView(st.z) ? null : st.z > cutZ + EPS ? aboveFill(st.polygon, cover) : [[st.polygon]];
       if (fill) out.fills.push({ polygons: fill, color, alpha: 1 });
       out.strokes.push(outlineOps(st.polygon, st.z, lineColor, cutZ, projecao));
+    }
+    const last = arrivalRing(s);
+    if (last) {
+      if (inView(s.topZ)) out.fills.push({ polygons: [[last]], color, alpha: 1 });
+      out.strokes.push(outlineOps(last, s.topZ, lineColor, cutZ, projecao));
     }
     out.fills.push(...post.fills);
     out.strokes.push(...post.strokes);
@@ -313,16 +371,15 @@ export function stairFills(
     }
     const cut = stairCutBase(s, risers, cutZ);
     if (cut) out.strokes.push(cutSymbol(cut, theme.ink, corte));
-    if (detail === 'fine') {
-      // Só os degraus dentro do topo da vista: os de cima não saem, nem o rótulo (decisão 0013 §4).
-      for (const st of steps) {
-        if (st.kind !== 'tread') continue;
-        const at = treadLabelAt(st, steps, spirals);
-        if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
-      }
+    // Numeração dos degraus no médio e no fino (o grosseiro só preenche a pegada, e saiu acima). O patamar é um degrau.
+    for (const st of steps) {
+      const at = treadLabelAt(st, steps, spirals);
+      if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     }
+    const lastAt = last ? labelPoint([[last]]) : null;
+    if (last && lastAt) out.labels.push({ at: lastAt, text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     if (p.settings.showTags) {
-      const at = labelPoint(s.footprint);
+      const at = labelPoint(planFootprint(s));
       if (at) out.labels.push({ at, text: s.type.code, papel: { escala: scale, fontMm: STAIR_TAG_MM } });
     }
   }
@@ -341,6 +398,6 @@ export function belowStairOps(stairs: ResolvedStair[], theme: PlanTheme): FloorO
 
 /** Destaque de seleção e de hover das escadas, no padrão dos pisos e lajes (contorno da pegada). */
 export function stairSelectionOps(p: Project, stairs: ResolvedStair[], selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport): FloorOps {
-  const parts = stairs.map((s) => ({ id: s.id, polygon: s.footprint }));
+  const parts = stairs.map((s) => ({ id: s.id, polygon: planFootprint(s) }));
   return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
 }

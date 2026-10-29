@@ -32,6 +32,15 @@ describe('dicionário PT/EN', () => {
     const en = Object.keys(I18N.en).sort();
     expect(en).toEqual(pt);
   });
+
+  it('toda chave stt_* do modal de escada existe nos dois idiomas', () => {
+    const keys = Object.keys(I18N.pt).filter((k) => k.startsWith('stt_'));
+    expect(keys.length).toBeGreaterThan(60);
+    for (const k of keys) {
+      expect(I18N.pt[k as keyof typeof I18N.pt], `pt ${k}`).toBeTruthy();
+      expect(I18N.en[k as keyof typeof I18N.en], `en ${k}`).toBeTruthy();
+    }
+  });
 });
 
 describe('nome de comando de atalho (diálogos de atalhos)', () => {
@@ -48,5 +57,14 @@ describe('nome de comando de atalho (diálogos de atalhos)', () => {
   it('o diálogo de unidades tem nome nos dois idiomas', () => {
     expect(nomeComandoLang('unidades', 'pt')).toBe('Unidades do projeto');
     expect(nomeComandoLang('unidades', 'en')).toBe('Project Units');
+  });
+
+  it('os textos novos da rampa (Livre, Ajustar) existem nos dois idiomas', () => {
+    for (const k of ['ramp_shape_free', 'ramp_adjust', 'ramp_adjust_title'] as const) {
+      expect(I18N.pt[k]).toBeTruthy();
+      expect(I18N.en[k]).toBeTruthy();
+    }
+    expect(I18N.pt.ramp_shape_free).toBe('Livre');
+    expect(I18N.en.ramp_shape_free).toBe('Free');
   });
 });

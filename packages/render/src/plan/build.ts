@@ -1,7 +1,7 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
 import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
-import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
+import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
 import { mix } from './color.ts';
@@ -15,6 +15,7 @@ import { belowRoomOps, roomOps } from './rooms.ts';
 import { ceilingFills } from './ceilings.ts';
 import { roofEdgeColor, roofFills, roofFootprint, roofOps } from './roofs.ts';
 import { belowStairOps, stairFills } from './stairs.ts';
+import { belowRampOps, rampFills } from './ramps.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import { openingTagLabels } from './openingTags.ts';
@@ -148,7 +149,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   const fillT = input.dark ? 0.5 : 0.58;
 
   // Contexto do nível e da vista (o mesmo que a sobreposição usa): estilo, vista, geometria e ocultos.
-  const { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs } = planContext(input);
+  const { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs, ramps } = planContext(input);
   const { detail, paint } = style;
   // Arame: só contornos. Os preenchimentos de modelo somem (as faixas de contorno ficam); referências também.
   const wire = style.visual === 'wireframe';
@@ -214,6 +215,9 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
     const bst = belowStairOps(escadasDoNivel(p, below.levelId), theme);
     fills.push(...surfaces(bst.fills));
     if (!rp) strokes.push(...bst.strokes);
+    const brp = belowRampOps(rampasDoNivel(p, below.levelId), theme);
+    fills.push(...surfaces(brp.fills));
+    if (!rp) strokes.push(...brp.strokes);
   }
   if (below && input.belowRoofs) {
     if (rp) {
@@ -235,6 +239,8 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   addOps(roomOps(p, input.levelId, theme, input.dark, detail, style.scale, hidden, paint.room), paint.room, !rp);
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
   addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
+  // Rampas do nível: junto das escadas, com o mesmo estilo da categoria.
+  addOps(rampFills(p, ramps, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
   // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
   if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor, style.scale), paint.floor, true);
 

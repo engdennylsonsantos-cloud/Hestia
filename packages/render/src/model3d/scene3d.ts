@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- a cena 3D reúne o port GPU (faixas/sombras) e o alizar/esquadrias do plano; extrair depois. */
 import * as THREE from 'three';
-import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
+import { applyPartialStructure, frameOfWall, resolveCeilings, junctionLevel, resolveFloors, resolveRamps, resolveRoofs, resolveSlabs, resolveStairs, stairArrivalTopZ, type ResolvedLevel } from '@hestia/engine';
 import { openingsOfWall, view3dOf, wallBaseElevation, wallHeight, wallsOnLevel, type GraphicsCategory, type Id, type Material, type Project, type View3DSettings, type VisualStyle } from '@hestia/model';
 import { DARK, LIGHT } from '../plan/types.ts';
 import { projetoDaJuncao } from '../plan/viewContext.ts';
@@ -15,6 +15,7 @@ import { BITS_PROFUNDIDADE, diagnosticarOrigem, diagnosticarProfundidade, type D
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
 import { buildGenericSolids } from './genericSolids.ts';
+import { buildRampSolids } from './rampSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
 import { CaixasDoNivel } from './caixasDoNivel3d.ts';
@@ -70,6 +71,7 @@ interface Frame3D {
 }
 
 type Escadas = ReturnType<typeof resolveStairs>;
+type Rampas = ReturnType<typeof resolveRamps>;
 
 /** Cena 3D do modelo: paredes e pisos por camada com material, esquadrias, luz e chão. */
 export class ModelScene {
@@ -253,6 +255,7 @@ export class ModelScene {
     const atuais: EntradaNivel[] = [];
     const sobras: EntradaNivel[] = [];
     let escadas: Escadas | null = null;
+    let rampas: Rampas | null = null;
     for (const lv of levels) {
       const chave = chaves.get(lv.levelId) ?? `sem-chave:${++this.sequencia}`;
       const reuso = this.cache.buscar(lv.levelId, chave);
@@ -262,7 +265,8 @@ export class ModelScene {
         continue;
       }
       escadas ??= resolveStairs(p);
-      const nova = this.montarNivel(p, lv, chave, escadas);
+      rampas ??= resolveRamps(p);
+      const nova = this.montarNivel(p, lv, chave, escadas, rampas);
       const velha = this.cache.guardar(nova);
       if (velha) sobras.push(velha);
       atuais.push(nova);
@@ -381,7 +385,7 @@ export class ModelScene {
    * Monta as malhas de um nível: pisos, lajes, telhados, beirais, paredes, escadas e esquadrias. O grupo e as peças de
    * picking ficam na entrada, com as chaves de material que o nível usou (para o reuso as marcar de novo).
    */
-  private montarNivel(p: Project, lv0: ResolvedLevel, chave: string, escadas: Escadas): EntradaNivel {
+  private montarNivel(p: Project, lv0: ResolvedLevel, chave: string, escadas: Escadas, rampas: Rampas): EntradaNivel {
     const view = this.frame.view;
     const shown = (c: GraphicsCategory): boolean => view.overrides[c].visible;
     const grupo = new THREE.Group();
@@ -415,7 +419,8 @@ export class ModelScene {
       ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
       ...buildRoofSolids(roofs),
       ...eave.batches,
-      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
+      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s) ?? s.topZ) : []),
+      ...(shown('stair') ? buildRampSolids(rampas.filter((r) => r.levelId === lv.levelId)) : []),
       ...(shown('generic') ? buildGenericSolids(p, lv.levelId) : []),
     ];
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];

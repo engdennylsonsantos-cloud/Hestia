@@ -11,6 +11,7 @@ const HINT: Record<StairRunShape, string> = {
   ushape: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   winder: 'Clique o centro do 1º espelho, depois a direção de subida (ou digite o ângulo em graus).',
   spiral: 'Caracol: clique o centro, o raio externo e o ângulo inicial; gire para a varredura (ou digite os valores). Enter confirma.',
+  free: 'Escada livre: o trajeto é definido por cliques.',
 };
 
 /** Raio interno padrão (m) do caracol, como em `SPIRAL_DEFAULT_INNER`. */

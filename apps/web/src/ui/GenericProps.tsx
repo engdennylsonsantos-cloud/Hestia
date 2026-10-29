@@ -58,6 +58,7 @@ export interface SelectionLabelInput {
   ceilings: number;
   roofs: number;
   stairs: number;
+  ramps: number;
   rooms: number;
   generics: number;
   grade: { name: string } | null | undefined;
@@ -76,6 +77,7 @@ export function selectionLabel(c: SelectionLabelInput): string {
   if (c.ceilings) return plural(c.ceilings, 'forro', 'forros');
   if (c.roofs) return plural(c.roofs, 'telhado', 'telhados');
   if (c.stairs) return plural(c.stairs, 'escada', 'escadas');
+  if (c.ramps) return plural(c.ramps, 'rampa', 'rampas');
   if (c.rooms) return plural(c.rooms, 'ambiente', 'ambientes');
   if (c.generics) return plural(c.generics, 'objeto', 'objetos');
   if (c.view) return `${c.view.kind === 'elevation' ? 'Elevação' : 'Corte'} ${c.view.name}`;

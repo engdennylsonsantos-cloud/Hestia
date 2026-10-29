@@ -8,6 +8,7 @@ import { roomSelectionOps } from './rooms.ts';
 import { ceilingSelectionOps } from './ceilings.ts';
 import { roofSelectionOps } from './roofs.ts';
 import { stairSelectionOps } from './stairs.ts';
+import { rampSelectionOps } from './ramps.ts';
 import { guideStrokes, previewOverlay, snapMarker, snapTooltipLabel } from './overlay.ts';
 import { hiddenSelectionOps, planViewOf, type PlanView } from './view.ts';
 import { planContext } from './planContext.ts';
@@ -91,7 +92,7 @@ export function buildPlanSelectionOverlay(input: PlanInput): PlanOps {
 /** Sobreposição do alvo sob o cursor. Só o elemento em hover (o selecionado não se repete). */
 export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
   const { project: p, theme } = input;
-  const { geo, hidden, up, roofHidden, stairs, view, style } = planContext(input);
+  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
   const hover = input.hover;
   if (!hover || input.selection.includes(hover)) return vazio();
   const out = vazio();
@@ -108,6 +109,7 @@ export function buildPlanHoverOverlay(input: PlanInput): PlanOps {
   if (up) add(ceilingSelectionOps(p, input.levelId, [], hover, theme, input.viewport, hidden));
   add(roofSelectionOps(p, input.levelId, [], hover, theme, input.viewport, roofHidden, style.paint.roof));
   add(stairSelectionOps(p, stairs, [], hover, theme, input.viewport));
+  add(rampSelectionOps(p, ramps, [], hover, theme, input.viewport));
   out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
   return out;
 }
@@ -137,7 +139,7 @@ export function buildPlanLiveOverlay(input: PlanInput): PlanOps {
  */
 export function buildPlanOverlay(input: PlanInput): PlanOps {
   const { project: p, theme, viewport: v } = input;
-  const { geo, hidden, up, roofHidden, stairs, view, style } = planContext(input);
+  const { geo, hidden, up, roofHidden, stairs, ramps, view, style } = planContext(input);
   const { selection, hover } = input;
   const out = vazio();
   const add = (o: PlanOps): void => {
@@ -155,6 +157,7 @@ export function buildPlanOverlay(input: PlanInput): PlanOps {
   if (up) add(ceilingSelectionOps(p, input.levelId, selection, hover, theme, v, hidden));
   add(roofSelectionOps(p, input.levelId, selection, hover, theme, v, roofHidden, style.paint.roof));
   add(stairSelectionOps(p, stairs, selection, hover, theme, v));
+  add(rampSelectionOps(p, ramps, selection, hover, theme, v));
   if (hover && !selection.includes(hover)) out.fills.push(...elementHighlight(p, geo, [hover], theme.select, 0.16, view));
   if (selection.length) {
     out.fills.push(...elementHighlight(p, geo, selection, theme.select, 0.26, view));

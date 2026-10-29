@@ -168,8 +168,32 @@ export function segmentHit(
  */
 export function crossingsAll(A: Poly, B: Poly): Hit[] {
   const out: Hit[] = [];
+  const nB = segCount(B);
+  // Caixa de cada segmento de B, folgada pela tolerância de `segmentHit`: descarta barato os pares distantes (mesmo
+  // resultado, só sem chamar `segmentHit` em O(n·m) pares que não têm como se cruzar).
+  const bx0: number[] = [];
+  const bx1: number[] = [];
+  const by0: number[] = [];
+  const by1: number[] = [];
+  for (let j = 0; j < nB; j++) {
+    const q1 = B.pts[j]!;
+    const q2 = B.pts[j + 1]!;
+    const m = 2 * SEG_TOL * (Math.abs(q2.x - q1.x) + Math.abs(q2.y - q1.y)) + 1e-12;
+    bx0.push(Math.min(q1.x, q2.x) - m);
+    bx1.push(Math.max(q1.x, q2.x) + m);
+    by0.push(Math.min(q1.y, q2.y) - m);
+    by1.push(Math.max(q1.y, q2.y) + m);
+  }
   for (let i = 0; i < segCount(A); i++) {
-    for (let j = 0; j < segCount(B); j++) {
+    const p1 = A.pts[i]!;
+    const p2 = A.pts[i + 1]!;
+    const ma = 2 * SEG_TOL * (Math.abs(p2.x - p1.x) + Math.abs(p2.y - p1.y)) + 1e-12;
+    const ax0 = Math.min(p1.x, p2.x) - ma;
+    const ax1 = Math.max(p1.x, p2.x) + ma;
+    const ay0 = Math.min(p1.y, p2.y) - ma;
+    const ay1 = Math.max(p1.y, p2.y) + ma;
+    for (let j = 0; j < nB; j++) {
+      if (ax1 < bx0[j]! || ax0 > bx1[j]! || ay1 < by0[j]! || ay0 > by1[j]!) continue;
       const h = segmentHit(A.pts[i]!, A.pts[i + 1]!, B.pts[j]!, B.pts[j + 1]!);
       if (!h) continue;
       out.push({ p: h.point, s: A.cum[i]! + h.t * segLen(A, i), sb: B.cum[j]! + h.u * segLen(B, j) });

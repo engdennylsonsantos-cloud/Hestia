@@ -80,12 +80,46 @@ export interface IfcFlightGeo {
 }
 
 /** Escada resolvida: lances (IfcStairFlight), patamares (IfcSlab LANDING) e altura real do espelho. */
+/** Lance da rampa resolvido: prisma do corpo (topo inclinado) e comprimento horizontal. */
+export interface IfcRampFlightGeo {
+  componentIndex: number;
+  prism: IfcPrism;
+  length: number;
+}
+
+/** Rampa resolvida: lances (IfcRampFlight), patamares (IfcSlab LANDING) e forma do percurso. */
+export interface IfcRampGeo {
+  rampId: Id;
+  levelId: Id;
+  shape: 'straight' | 'lshape' | 'ushape';
+  slope: number;
+  flights: IfcRampFlightGeo[];
+  landings: IfcPrism[];
+}
+
 export interface IfcStairGeo {
   stairId: Id;
   levelId: Id;
   spiral: boolean;
   riserHeight: number;
   flights: IfcFlightGeo[];
+  landings: IfcPrism[];
+}
+
+/** Lance da rampa resolvido: prisma do corpo (topo inclinado) e comprimento horizontal. */
+export interface IfcRampFlightGeo {
+  componentIndex: number;
+  prism: IfcPrism;
+  length: number;
+}
+
+/** Rampa resolvida: lances (IfcRampFlight), patamares (IfcSlab LANDING) e forma do percurso. */
+export interface IfcRampGeo {
+  rampId: Id;
+  levelId: Id;
+  shape: 'straight' | 'lshape' | 'ushape';
+  slope: number;
+  flights: IfcRampFlightGeo[];
   landings: IfcPrism[];
 }
 
@@ -101,4 +135,6 @@ export interface IfcGeometry {
   ceilings?: Array<{ ceilingId: Id; prisms: IfcPrism[] }>;
   roofs: Array<{ roofId: Id; planes: IfcPrism[] }>;
   stairs: IfcStairGeo[];
+  /** Rampas resolvidas. Ausente = nenhuma (mantém os montadores antigos de geometria válidos). */
+  ramps?: IfcRampGeo[];
 }

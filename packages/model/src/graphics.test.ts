@@ -256,7 +256,7 @@ describe('recusas: mensagem pt-BR, sem alterar o projeto nem entrar no históric
   it.each<[string, Command, string]>([
     ['peso de corte 0', pg({ categories: { wall: { cutWeight: 0 } } }), 'Peso de corte de "parede" deve ser um número inteiro de 1 a 16.'],
     ['peso de projeção 17', pg({ categories: { door: { projectionWeight: 17 } } }), PESO_PROJ],
-    ['peso fracionário', pg({ categories: { stair: { cutWeight: 2.5 } } }), 'Peso de corte de "escada" deve ser um número inteiro de 1 a 16.'],
+    ['peso fracionário', pg({ categories: { stair: { cutWeight: 2.5 } } }), 'Peso de corte de "escada e rampa" deve ser um número inteiro de 1 a 16.'],
     ['espessura zero na tabela', pg(comTabela((t) => (t[2] = [0, 0.25, 0.18]))), 'Peso 3 da tabela de pesos: a espessura deve ser um número maior que zero, em mm de papel.'],
     ['espessura NaN na tabela', pg(comTabela((t) => (t[0] = [Number.NaN, 0.1, 0.1]))), 'Peso 1 da tabela de pesos: a espessura deve ser um número maior que zero, em mm de papel.'],
     ['linha com 2 colunas', pg(comTabela((t) => (t[4] = bad<[number, number, number]>([0.7, 0.5])))), 'Peso 5 da tabela de pesos deve ter 3 colunas (1:50, 1:100 e 1:200).'],

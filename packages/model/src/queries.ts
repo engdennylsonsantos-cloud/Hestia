@@ -2,7 +2,7 @@ import { arcFromSagitta, dist } from '@hestia/geom';
 import { spanTypeOf } from './openingNominal.ts';
 import { profileMax } from './profile.ts';
 import { DEFAULT_VIEW_RANGE, type ViewRange } from './viewRange.ts';
-import { isOpening, isStair, isWall, type Id, type Level, type Opening, type OpeningType, type Project, type Stair, type Wall, type WallType } from './types.ts';
+import { isOpening, isRamp, isStair, isWall, type Id, type Level, type Opening, type OpeningType, type Project, type Ramp, type Stair, type Wall, type WallType } from './types.ts';
 
 export const getWall = (p: Project, id: Id): Wall | undefined => {
   const e = p.elements[id];
@@ -122,3 +122,25 @@ export const stairsOnLevel = (p: Project, levelId: Id): Stair[] => stairs(p).fil
 
 /** Quantas escadas usam o tipo de escada. */
 export const stairTypeUsage = (p: Project, typeId: Id): number => stairs(p).filter((s) => s.typeId === typeId).length;
+
+/** Nível de topo efetivo da rampa: o explícito (topLevelId) ou o imediatamente acima; null se não houver. */
+export function rampTopLevel(p: Project, r: Ramp): Level | null {
+  if (r.topLevelId !== null) return p.levels.find((l) => l.id === r.topLevelId) ?? null;
+  return levelAbove(p, r.levelId);
+}
+
+/** Cota absoluta da base da rampa: elevação do nível + baseOffset. */
+export const rampBaseZ = (p: Project, r: Ramp): number => levelElevation(p, r.levelId) + r.baseOffset;
+
+/** Cota absoluta do topo: elevação do nível de topo + topOffset; sem nível de topo, base + height. */
+export function rampTopZ(p: Project, r: Ramp): number {
+  const top = rampTopLevel(p, r);
+  return top ? top.elevation + r.topOffset : rampBaseZ(p, r) + r.height;
+}
+
+export const ramps = (p: Project): Ramp[] => Object.values(p.elements).filter(isRamp).sort((a, b) => a.order - b.order);
+
+export const rampsOnLevel = (p: Project, levelId: Id): Ramp[] => ramps(p).filter((r) => r.levelId === levelId);
+
+/** Quantas rampas usam o tipo de rampa. */
+export const rampTypeUsage = (p: Project, typeId: Id): number => ramps(p).filter((r) => r.typeId === typeId).length;

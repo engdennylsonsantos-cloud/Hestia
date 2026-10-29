@@ -61,6 +61,7 @@ const PRODUCT_PREFIXES: Record<Element['kind'], readonly string[]> = {
   ceiling: ['ceiling', 'ceil'],
   roof: ['roof'],
   stair: ['stair'],
+  ramp: ['ramp'],
   room: ['space', 'room', 'ifcspace'],
   generic: ['generic'],
 };

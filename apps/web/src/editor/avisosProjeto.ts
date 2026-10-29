@@ -1,8 +1,8 @@
-import { ceilingIssues, outlineIssues, projectIssues, roofEaveIssues, roofSurfaceIssues, roofWallIssues, roomValidationIssues, stairValidationIssues, wallFloorIssues } from '@hestia/engine';
+import { ceilingIssues, outlineIssues, projectIssues, rampValidationIssues, roofEaveIssues, roofSurfaceIssues, roofWallIssues, roomValidationIssues, stairValidationIssues, wallFloorIssues } from '@hestia/engine';
 import { validateProject, type Project, type ValidationIssue } from '@hestia/model';
 
-/** Avisos do projeto: os de validação, os de parede que ultrapassa ou fica fora do telhado (C2), os degraus da superfície, os de beiral sobre parede ou abertura, os do croqui e de norma das escadas, os de ambiente, os do contorno associativo de piso e laje e os de abertura/parede do projeto. */
-export const avisosDoProjeto = (p: Project): ValidationIssue[] => [...validateProject(p), ...roofWallIssues(p), ...roofSurfaceIssues(p), ...roofEaveIssues(p), ...stairValidationIssues(p), ...roomValidationIssues(p), ...ceilingIssues(p), ...outlineIssues(p), ...wallFloorIssues(p), ...projectIssues(p)];
+/** Avisos do projeto: os de validação, os de parede que ultrapassa ou fica fora do telhado (C2), os degraus da superfície, os de beiral sobre parede ou abertura, os do croqui e de norma das escadas e das rampas, os de ambiente, os do contorno associativo de piso e laje e os de abertura/parede do projeto. */
+export const avisosDoProjeto = (p: Project): ValidationIssue[] => [...validateProject(p), ...roofWallIssues(p), ...roofSurfaceIssues(p), ...roofEaveIssues(p), ...stairValidationIssues(p), ...rampValidationIssues(p), ...roomValidationIssues(p), ...ceilingIssues(p), ...outlineIssues(p), ...wallFloorIssues(p), ...projectIssues(p)];
 
 /** Tempo de silêncio, em ms, antes de calcular os avisos de um projeto. Vale para qualquer tamanho de modelo. */
 export const SETTLE_MS = 300;

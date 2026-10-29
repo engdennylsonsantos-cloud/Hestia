@@ -1,4 +1,4 @@
-import { floorsOnLevel, isFloor, isRoof, isSlab, isStair, openingsOfWall, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Element, type Id, type Project, type Wall } from '@hestia/model';
+import { floorsOnLevel, isFloor, isRamp, isRoof, isSlab, isStair, openingsOfWall, rampsOnLevel, roofsOnLevel, slabsOnLevel, stairsOnLevel, wallsOnLevel, type Element, type Id, type Project, type Wall } from '@hestia/model';
 
 /**
  * Horizontais do projeto (pisos, lajes, escadas e telhados) por conjunto de elementos, montados numa única passagem sobre
@@ -15,7 +15,7 @@ const horizontaisPorElementos = new WeakMap<object, readonly Element[]>();
 export function horizontaisDoProjeto(p: Project): readonly Element[] {
   const hit = horizontaisPorElementos.get(p.elements);
   if (hit) return hit;
-  const lista = Object.values(p.elements).filter((e) => isFloor(e) || isSlab(e) || isStair(e) || isRoof(e));
+  const lista = Object.values(p.elements).filter((e) => isFloor(e) || isSlab(e) || isStair(e) || isRamp(e) || isRoof(e));
   horizontaisPorElementos.set(p.elements, lista);
   return lista;
 }
@@ -59,6 +59,7 @@ function elementosDoNivel(p: Project, levelId: Id): ElementosDoNivel {
     ...floorsOnLevel(p, levelId),
     ...slabsOnLevel(p, levelId),
     ...stairsOnLevel(p, levelId),
+    ...rampsOnLevel(p, levelId),
     ...roofsOnLevel(p, levelId),
     // Alturas anexadas e contornos com dependências verticais também leem estes elementos de outros níveis.
     ...horizontaisDoProjeto(p),
@@ -76,5 +77,5 @@ function elementosDoNivel(p: Project, levelId: Id): ElementosDoNivel {
 export function fontesDoCortador(p: Project, levelId: Id): unknown[] {
   const { walls, lista } = elementosDoNivel(p, levelId);
   const niveis = walls.some(fixadaAOutroNivel) ? [p.levels] : niveisLidos(p, levelId, walls);
-  return [...niveis, p.settings, p.defaults, p.wallTypes, p.openingTypes, p.floorTypes, p.slabTypes, p.roofTypes, p.stairTypes, ...lista];
+  return [...niveis, p.settings, p.defaults, p.wallTypes, p.openingTypes, p.floorTypes, p.slabTypes, p.roofTypes, p.stairTypes, p.rampTypes, ...lista];
 }

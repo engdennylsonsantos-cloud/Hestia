@@ -1,6 +1,6 @@
-import type { ResolvedLevel, ResolvedStair } from '@hestia/engine';
+import type { ResolvedLevel, ResolvedRamp, ResolvedStair } from '@hestia/engine';
 import type { Id, Project } from '@hestia/model';
-import { ambientesDoNivel, escadasDoNivel, lajesDoNivel, pisosDoNivel, telhadosDoNivel } from './resolucao.ts';
+import { ambientesDoNivel, escadasDoNivel, lajesDoNivel, pisosDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
 import { planStyleOf, type PlanStyle } from './style.ts';
 import { planViewOf, type PlanView } from './view.ts';
 import type { PlanInput } from './build.ts';
@@ -47,6 +47,8 @@ export interface PlanContext {
   roofHidden: ReadonlySet<Id> | undefined;
   /** Escadas do nível que a planta mostra (sem as ocultas pela vista). */
   stairs: ResolvedStair[];
+  /** Rampas do nível que a planta mostra (sem as ocultas pela vista). */
+  ramps: ResolvedRamp[];
 }
 
 export function planContext(input: PlanInput): PlanContext {
@@ -61,5 +63,6 @@ export function planContext(input: PlanInput): PlanContext {
   const roofOff: ReadonlySet<Id> | undefined = view ? view.categoryHidden : paint.roof.visible ? undefined : new Set(telhadosDoNivel(p, input.levelId).map((r) => r.roofId));
   const roofHidden = view ? hidden : roofOff;
   const stairs = escadasDoNivel(p, input.levelId).filter((s) => !hidden?.has(s.id));
-  return { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs };
+  const ramps = rampasDoNivel(p, input.levelId).filter((r) => !hidden?.has(r.id));
+  return { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs, ramps };
 }

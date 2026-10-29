@@ -1,12 +1,12 @@
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project } from '@hestia/model';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, type Id, type Project } from '@hestia/model';
 
-/** Categorias de filtro: paredes, portas, janelas, pisos, lajes, telhados, escadas e ambientes ('rooms', categoria 'room'). */
-export type ElementCategory = 'walls' | 'doors' | 'windows' | 'floors' | 'slabs' | 'roofs' | 'stairs' | 'rooms';
+/** Categorias de filtro: paredes, portas, janelas, pisos, lajes, telhados, escadas, rampas e ambientes ('rooms', categoria 'room'). */
+export type ElementCategory = 'walls' | 'doors' | 'windows' | 'floors' | 'slabs' | 'roofs' | 'stairs' | 'ramps' | 'rooms';
 
 /** Parede ou abertura pertence ao nível? Abertura pertence ao nível da parede que a hospeda. */
 function onLevel(p: Project, id: Id, levelId: Id): boolean {
   const e = p.elements[id];
-  if (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRoom(e)) return e.levelId === levelId;
+  if (isWall(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRamp(e) || isRoom(e)) return e.levelId === levelId;
   if (isOpening(e)) {
     const host = p.elements[e.hostId];
     return isWall(host) && host.levelId === levelId;
@@ -17,7 +17,7 @@ function onLevel(p: Project, id: Id, levelId: Id): boolean {
 /** Todas as paredes, aberturas e pisos do nível que usam o tipo `typeId`. */
 export function idsOfType(p: Project, levelId: Id, typeId: Id): Id[] {
   return Object.values(p.elements)
-    .filter((e) => (isWall(e) || isOpening(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e)) && e.typeId === typeId && onLevel(p, e.id, levelId))
+    .filter((e) => (isWall(e) || isOpening(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRamp(e)) && e.typeId === typeId && onLevel(p, e.id, levelId))
     .map((e) => e.id);
 }
 
@@ -30,6 +30,7 @@ export function idsOfCategory(p: Project, levelId: Id, category: ElementCategory
       if (category === 'slabs') return isSlab(e) && onLevel(p, e.id, levelId);
       if (category === 'roofs') return isRoof(e) && onLevel(p, e.id, levelId);
       if (category === 'stairs') return isStair(e) && onLevel(p, e.id, levelId);
+      if (category === 'ramps') return isRamp(e) && onLevel(p, e.id, levelId);
       if (category === 'rooms') return isRoom(e) && onLevel(p, e.id, levelId);
       if (category === 'doors') return isOpening(e) && e.kind === 'door' && onLevel(p, e.id, levelId);
       return isOpening(e) && e.kind === 'window' && onLevel(p, e.id, levelId);
@@ -45,7 +46,7 @@ export function selectedTypeId(p: Project, ids: Id[]): { typeId: Id } | { error:
   const types = new Set<Id>();
   for (const id of ids) {
     const e = p.elements[id];
-    if (isWall(e) || isOpening(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e)) types.add(e.typeId);
+    if (isWall(e) || isOpening(e) || isFloor(e) || isSlab(e) || isRoof(e) || isStair(e) || isRamp(e)) types.add(e.typeId);
   }
   if (types.size === 0) return { error: 'Selecione uma parede, abertura ou piso primeiro.' };
   if (types.size > 1) return { error: 'A seleção tem mais de um tipo. Selecione elementos de um só tipo.' };

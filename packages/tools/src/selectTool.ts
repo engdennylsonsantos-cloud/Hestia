@@ -1,6 +1,6 @@
 import { boxOf, dist, dot, sub, type Vec2 } from '@hestia/geom';
 import { ceilingOutline, frameOfWall } from '@hestia/engine';
-import { formatQuantity, isCeiling, isFloor, isOpening, isRoof, isSlab, isStair, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
+import { formatQuantity, isCeiling, isFloor, isOpening, isRamp, isRoof, isSlab, isStair, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { ghostBands, ghostViews, moveWalls, selectedMovables, selectedOpenings, selectedViews, slideOpenings, transformViews } from './edit.ts';
 import { genericAt, idsInBox, pickAt } from './pick.ts';
@@ -18,12 +18,14 @@ import { resizeWallCommands } from './lengthEdit.ts';
 import { execWithHostedLoss } from './hostedGuard.ts';
 import { gripHoldAt, ringHandlePreview, type GripFocus, type GripHold } from './selectGrips.ts';
 import { pickStairAt, stairEndpoints, stairIdsInBox } from './stairPick.ts';
+import { pickRampAt, rampEndpoints, rampIdsInBox } from './rampPick.ts';
 import { annotationAt, detailItemAt, dimGripAt, dimTextGripAt, signedOffset } from './annotationPick.ts';
 import { sectionMarkAt, sectionMarkIdsInBox } from './sectionMarkPick.ts';
 import { DIM_MIN_LENGTH, dimensionGeometry, dimensionPoints, levelDimensions, sectionPoints } from '@hestia/model';
 import { gridGhosts, gridHandlePreview, gridIdsInBox, moveGrids, pickGridAt, selectedGrids } from './gridGeom.ts';
 import { stairHandlePreview } from './stairGrips.ts';
 import { spiralHandlePreview } from './stairSpiralGrips.ts';
+import { rampHandlePreview } from './rampGrips.ts';
 import type { PointerInfo } from './types.ts';
 
 type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'opening' | 'dimgrip' | 'dimtext';
@@ -31,7 +33,7 @@ type Mode = 'idle' | 'pending' | 'window' | 'grip' | 'dragwait' | 'moving' | 'op
 /** Elemento sob o cursor: parede, abertura ou piso. */
 interface AnyHit {
   id: Id;
-  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'generic' | 'roomSeparator' | 'room' | 'annotation' | 'view' | 'grid';
+  kind: 'wall' | 'door' | 'window' | 'floor' | 'slab' | 'ceiling' | 'roof' | 'stair' | 'ramp' | 'generic' | 'roomSeparator' | 'room' | 'annotation' | 'view' | 'grid';
 }
 
 const fmtLen = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
@@ -111,6 +113,8 @@ export class SelectTool extends ToolBase {
     if (gr) return { id: gr, kind: 'grid' };
     const st = pickStairAt(pr, lv, at, mpp);
     if (st) return { id: st, kind: 'stair' };
+    const rp = pickRampAt(pr, lv, at, mpp);
+    if (rp) return { id: rp, kind: 'ramp' };
     const f = pickFloorAt(pr, lv, at, mpp);
     if (f) return { id: f, kind: 'floor' };
     const sl = pickSlabAt(pr, lv, at, mpp);
@@ -142,7 +146,7 @@ export class SelectTool extends ToolBase {
     const grip = gripHoldAt(this.env, p.raw);
     this.inf = grip ? { point: grip.at, kind: 'endpoint', guides: [] } : null;
     // Alças do piso, laje ou telhado selecionado: vértices, meio das arestas, foco e seta do caimento.
-    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()));
+    if (this.mode === 'idle') this.items.push(...ringHandlePreview(pr, this.env.selection(), this.focus), ...stairHandlePreview(pr, this.env.selection()), ...spiralHandlePreview(pr, this.env.selection()), ...gridHandlePreview(pr, this.env.selection()), ...rampHandlePreview(pr, this.env.selection()));
     // Alça da cota selecionada: sob o cursor, a cota destaca-se (arrastar muda o deslocamento).
     const dgHover = this.mode === 'idle' ? dimGripAt(pr, this.env.levelId(), this.env.selection(), p.raw, this.env.metersPerPixel()) : null;
     if (dgHover) this.items.push({ kind: 'highlight', ids: [dgHover] });
@@ -340,6 +344,7 @@ export class SelectTool extends ToolBase {
           ...slabIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roofIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...stairIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
+          ...rampIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...roomIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
           ...gridIdsInBox(pr, this.downPt, p.raw),
           ...sectionMarkIdsInBox(pr, this.env.levelId(), this.downPt, p.raw),
@@ -373,6 +378,7 @@ export class SelectTool extends ToolBase {
       const e = pr.elements[id];
       if (isWall(e)) pts.push(e.a, e.b);
       else if (isStair(e)) pts.push(...stairEndpoints(e));
+      else if (isRamp(e)) pts.push(...rampEndpoints(e));
       else if (isFloor(e) || isSlab(e) || isRoof(e)) pts.push(...e.boundary);
       else {
         const v = pr.views.find((x) => x.id === id);

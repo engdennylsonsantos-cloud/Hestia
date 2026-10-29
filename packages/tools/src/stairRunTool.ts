@@ -1,9 +1,9 @@
 import { add, len, mul, sub, type Vec2 } from '@hestia/geom';
-import { formatQuantity, stairTopLevel, unitsOf, type ResolvedUnits } from '@hestia/model';
-import { SPIRAL_MAX_SWEEP, stairIssueList } from '@hestia/engine';
+import { stairTopLevel } from '@hestia/model';
+import { SPIRAL_MAX_SWEEP, stairIssuesOf, treadRuleOf, type TreadRule } from '@hestia/engine';
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
-import { parseQuantityText } from './numeric.ts';
+import { parseNumber } from './numeric.ts';
 import { partsPreview, treadItems } from './stairPreview.ts';
 import { componentsFromParts, type StairPart } from './stairSketchState.ts';
 import { DEFAULT_STAIR_RUN_OPTIONS, planStairRun, type StairRunPlan, type StairRunToolOptions } from './stairRunPlan.ts';
@@ -23,11 +23,11 @@ const CIRCLE_SEGMENTS = 96;
 const DEG = Math.PI / 180;
 
 /** Centímetros com vírgula, como nas outras mensagens (0,175 m → "17,5"). */
-const cm = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'smallLength', m);
+const cm = (m: number): string => (m * 100).toFixed(1).replace('.', ',');
 /** Metros com vírgula e duas casas (1 → "1,00"). */
-const mText = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
+const mText = (m: number): string => m.toFixed(2).replace('.', ',');
 /** Graus com uma casa, em módulo (540 → "540°"; 275,25 → "275,3°"). */
-const degText = (u: ResolvedUnits, rad: number): string => formatQuantity(u, 'angle', Math.abs(rad), { trim: true });
+const degText = (rad: number): string => `${(Math.round(Math.abs(rad) / DEG * 10) / 10).toString().replace('.', ',')}°`;
 
 const circleRing = (c: Vec2, r: number): Vec2[] =>
   Array.from({ length: CIRCLE_SEGMENTS }, (_, i) => {
@@ -53,12 +53,12 @@ interface SpiralDraw {
 const emptySpiral = (cursor: Vec2 = { x: 0, y: 0 }): SpiralDraw => ({ outer: null, start: null, sweep: 0, last: null, cursor });
 
 /** Prévia de um caracol: o croqui do gerador, os degraus e o rótulo "Varredura: X° · N espelhos" no cursor. */
-function caracolItems(plan: SpiralPlan, cur: Vec2, u: ResolvedUnits): PreviewItem[] {
+function caracolItems(plan: SpiralPlan, cur: Vec2): PreviewItem[] {
   const parts: StairPart[] = [{ kind: 'run', run: plan.run }];
   return [
     ...partsPreview(parts),
     ...treadItems(parts, plan.riserHeight),
-    { kind: 'label', at: cur, text: `Varredura: ${degText(u, plan.run.spiral.sweep)} · ${plan.risers} espelhos` },
+    { kind: 'label', at: cur, text: `Varredura: ${degText(plan.run.spiral.sweep)} · ${plan.risers} espelhos` },
   ];
 }
 
@@ -187,12 +187,12 @@ export class StairRunTool extends ToolBase {
   override type(text: string): boolean {
     if (this.spiralOn) return this.spiralType(text);
     if (this.origin === null) return false;
-    const v = parseQuantityText(text, unitsOf(this.env.project()), 'angle');
+    const v = parseNumber(text);
     if (v === null) {
       this.env.say('Valor inválido. Digite o ângulo em graus.');
       return false;
     }
-    const a = v;
+    const a = (v * Math.PI) / 180;
     return this.create({ x: Math.cos(a), y: Math.sin(a) });
   }
 
@@ -211,7 +211,7 @@ export class StairRunTool extends ToolBase {
     return [
       ...partsPreview(plan.parts),
       ...treadItems(plan.parts, plan.riserHeight),
-      { kind: 'label', at: cursor, text: `${plan.risers} espelhos · ${cm(unitsOf(this.env.project()), plan.riserHeight)} · piso ${cm(unitsOf(this.env.project()), plan.tread)}` },
+      { kind: 'label', at: cursor, text: `${plan.risers} espelhos · ${cm(plan.riserHeight)} cm · piso ${cm(plan.tread)} cm` },
     ];
   }
 
@@ -230,8 +230,8 @@ export class StairRunTool extends ToolBase {
     };
   }
 
-  /** H (nível ativo e nível acima), espelho máximo e piso mínimo do tipo da criação; erro com a mensagem de status. */
-  private limitsNow(): { H: number; maxRiser: number; minTread: number } | { error: string } {
+  /** H (nível ativo e nível acima), espelho máximo, piso mínimo e regra de cálculo do tipo da criação. */
+  private limitsNow(): { H: number; maxRiser: number; minTread: number; rule: TreadRule } | { error: string } {
     const p = this.env.project();
     const ref = draftStair(p, this.creation(), this.env.levelId());
     const limits = ref ? stairLimits(p, ref) : null;
@@ -244,7 +244,7 @@ export class StairRunTool extends ToolBase {
           : 'Sem nível de topo: escolha o nível de cima na barra de escada (ou informe uma altura positiva).',
       };
     }
-    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread };
+    return { H: limits.H, maxRiser: limits.maxRiser, minTread: type.minTread, rule: treadRuleOf(type) };
   }
 
   /**
@@ -255,7 +255,7 @@ export class StairRunTool extends ToolBase {
     const lim = this.limitsNow();
     if ('error' in lim) return lim;
     const options = length !== undefined ? { ...this.opts, length } : this.opts;
-    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, options, units: unitsOf(this.env.project()) });
+    return planStairRun({ start: this.origin!, dir, H: lim.H, maxRiser: lim.maxRiser, minTread: lim.minTread, rule: lim.rule, options });
   }
 
   /** Cria a escada com a direção dada (e o comprimento, na reta), em um passo de desfazer. Mantém a ferramenta pronta. */
@@ -276,10 +276,10 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // Com comprimento que dá outro nº (`note`), a explicação substitui o aviso "difere do nº desejado", que contradiria o criado.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && !(b.note && i.code === 'stair-risers-count'));
     const extra = b.note ? ` ${b.note}` : '';
     const avisoText = aviso ? ` Aviso: ${aviso.message}` : '';
-    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(unitsOf(this.env.project()), b.riserHeight)}, piso ${cm(unitsOf(this.env.project()), b.tread)}.${extra}${avisoText} Ctrl+Z desfaz.`);
+    this.env.say(`Escada criada: ${b.risers} espelhos de ${cm(b.riserHeight)} cm, piso ${cm(b.tread)} cm.${extra}${avisoText} Ctrl+Z desfaz.`);
     this.reset();
     return true;
   }
@@ -314,7 +314,7 @@ export class StairRunTool extends ToolBase {
       return;
     }
     if (!(r > this.innerR)) {
-      this.env.say(`O raio externo (${mText(unitsOf(this.env.project()), r)}) deve ser maior que o interno (${mText(unitsOf(this.env.project()), this.innerR)}).`);
+      this.env.say(`O raio externo (${mText(r)} m) deve ser maior que o interno (${mText(this.innerR)} m).`);
       return;
     }
     this.sp = { outer: r, start: Math.atan2(d.y, d.x), sweep: 0, last: null, cursor: raw };
@@ -361,7 +361,6 @@ export class StairRunTool extends ToolBase {
       sweep: this.sp.sweep,
       H: lim.H,
       maxRiser: lim.maxRiser,
-      units: unitsOf(this.env.project()),
     });
   }
 
@@ -388,9 +387,9 @@ export class StairRunTool extends ToolBase {
       return false;
     }
     // O aviso fixo de saída de emergência vem em todo caracol: a mensagem traz só o aviso que muda o projeto.
-    const aviso = stairIssueList(this.env.project()).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
+    const aviso = stairIssuesOf(this.env.project(), r.id).find((i) => i.stairId === r.id && i.severity === 'warning' && i.code !== 'stair-spiral-exit');
     const extra = aviso ? ` Aviso: ${aviso.message}` : '';
-    this.env.say(`Escada caracol criada: ${plan.risers} espelhos, varredura ${degText(unitsOf(this.env.project()), plan.run.spiral.sweep)}.${extra} Ctrl+Z desfaz.`);
+    this.env.say(`Escada caracol criada: ${plan.risers} espelhos, varredura ${degText(plan.run.spiral.sweep)}.${extra} Ctrl+Z desfaz.`);
     this.reset();
     return true;
   }
@@ -398,16 +397,14 @@ export class StairRunTool extends ToolBase {
   /** Digitação no caracol: raio externo (m) no 2º passo, depois a varredura (graus). */
   private spiralType(text: string): boolean {
     if (this.origin === null) return false;
-    const comprimento = this.sp.start === null;
-    const lido = parseQuantityText(text, unitsOf(this.env.project()), comprimento ? 'length' : 'angle');
-    const v = lido === null ? null : comprimento ? lido : lido / DEG;
+    const v = parseNumber(text);
     if (v === null || !(v > 0)) {
       this.env.say(this.sp.start === null ? 'Valor inválido. Digite o raio externo em metros.' : 'Valor inválido. Digite a varredura em graus.');
       return false;
     }
     if (this.sp.start === null) {
       if (!(v > this.innerR)) {
-        this.env.say(`O raio externo (${mText(unitsOf(this.env.project()), v)}) deve ser maior que o interno (${mText(unitsOf(this.env.project()), this.innerR)}).`);
+        this.env.say(`O raio externo (${mText(v)} m) deve ser maior que o interno (${mText(this.innerR)} m).`);
         return false;
       }
       const d = sub(this.sp.cursor, this.origin);
@@ -447,12 +444,12 @@ export class StairRunTool extends ToolBase {
     if (sw !== null && r > this.innerR) {
       const lim = this.limitsNow();
       if (!('error' in lim)) {
-        const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: r, startAngle: th, sweep: sw, H: lim.H, maxRiser: lim.maxRiser, units: unitsOf(this.env.project()) });
-        if (!('error' in plan)) items.push(...caracolItems(plan, cur, unitsOf(this.env.project())));
+        const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: r, startAngle: th, sweep: sw, H: lim.H, maxRiser: lim.maxRiser });
+        if (!('error' in plan)) items.push(...caracolItems(plan, cur));
       }
     }
-    items.push({ kind: 'label', at: cur, text: `Raio externo ${mText(unitsOf(this.env.project()), r)}` });
-    if (sw === null) this.env.say(`Raio externo ${mText(unitsOf(this.env.project()), r)}: clique para fixar o raio e o ângulo inicial.`);
+    items.push({ kind: 'label', at: cur, text: `Raio externo ${mText(r)} m` });
+    if (sw === null) this.env.say(`Raio externo ${mText(r)} m: clique para fixar o raio e o ângulo inicial.`);
     return items;
   }
 
@@ -460,18 +457,18 @@ export class StairRunTool extends ToolBase {
   private sweepItems(c: Vec2, cur: Vec2): PreviewItem[] {
     const lim = this.limitsNow();
     const sw = this.sp.sweep;
-    const label: PreviewItem = { kind: 'label', at: cur, text: `Varredura: ${degText(unitsOf(this.env.project()), sw)}` };
+    const label: PreviewItem = { kind: 'label', at: cur, text: `Varredura: ${degText(sw)}` };
     if ('error' in lim || this.sp.outer === null || this.sp.start === null) {
       this.env.say('error' in lim ? lim.error : 'Caracol: falta o raio ou o ângulo inicial.');
       return [label];
     }
     const outer = this.sp.outer;
     const start = this.sp.start;
-    const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: outer, startAngle: start, sweep: sw, H: lim.H, maxRiser: lim.maxRiser, units: unitsOf(this.env.project()) });
+    const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: outer, startAngle: start, sweep: sw, H: lim.H, maxRiser: lim.maxRiser });
     if ('error' in plan) {
       // Abaixo de 30° (ou fora dos limites) não há caracol: mostra o raio e o ângulo inicial, com o motivo na barra.
       const short = Math.abs(sw) < SPIRAL_MIN_SWEEP;
-      this.env.say(short ? `Varredura ${degText(unitsOf(this.env.project()), sw)}: gire o mouse para pelo menos 30°.` : plan.error);
+      this.env.say(short ? `Varredura ${degText(sw)}: gire o mouse para pelo menos 30°.` : plan.error);
       const u = { x: Math.cos(start), y: Math.sin(start) };
       return [
         { kind: 'polygon', ring: circleRing(c, outer), dashed: true },
@@ -479,7 +476,7 @@ export class StairRunTool extends ToolBase {
         label,
       ];
     }
-    this.env.say(`Varredura ${degText(unitsOf(this.env.project()), sw)}: clique ou Enter confirma; Backspace volta.`);
-    return caracolItems(plan, cur, unitsOf(this.env.project()));
+    this.env.say(`Varredura ${degText(sw)}: clique ou Enter confirma; Backspace volta.`);
+    return caracolItems(plan, cur);
   }
 }

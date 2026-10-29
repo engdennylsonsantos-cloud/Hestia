@@ -3,7 +3,8 @@ import { floorsOnLevel, isMembraneLayer, layerPriority, levelElevation, terminoE
 import { layerOutlines, memoCut } from './layerOutline.ts';
 import { layerCoreFlags } from './junctionPlanar.ts';
 import { resolveBoundary, type OutlineProblem } from './outlineBound.ts';
-import { cutStairOpenings, stairHolesFor, stairOpeningsOnLevel } from './stairOpenings.ts';
+import { cutStairOpenings } from './stairOpenings.ts';
+import { holesFor, openingsOnLevel } from './levelOpenings.ts';
 
 /** Camada resolvida do piso: o mesmo polígono em planta, entre as cotas absolutas z0 e z1. */
 export interface ResolvedFloorLayer {
@@ -57,7 +58,7 @@ export const resolveAllFloors = (p: Project, opts: FloorResolveOptions = {}): Re
  * 3 pontos são ignorados: a validação do modelo é quem avisa.
  */
 export function resolveFloors(p: Project, levelId: Id, opts: FloorResolveOptions = {}): ResolvedFloor[] {
-  const openings = stairOpeningsOnLevel(p, levelId);
+  const openings = openingsOnLevel(p, levelId);
   const out: ResolvedFloor[] = [];
   for (const f of floorsOnLevel(p, levelId)) {
     const type = p.floorTypes[f.typeId];
@@ -84,7 +85,7 @@ export function resolveFloors(p: Project, levelId: Id, opts: FloorResolveOptions
     const bottomZ = z;
     const core = layerCoreFlags(type.layers);
     const base: MultiPolygon = [[boundary, ...holes]];
-    const cut = memoCut((m) => cutStairOpenings(m, stairHolesFor(openings, bottomZ)));
+    const cut = memoCut((m) => cutStairOpenings(m, holesFor(openings, bottomZ)));
     const polygon = cut(base);
     if (polygon.length === 0) continue;
     // Faixa de cota de cada camada (decisão 0025, revista): a parede só recorta as camadas com que se cruza de fato.

@@ -1,5 +1,6 @@
-import { isFloor, isOpening, isRoof, isRoom, isSlab, isStair, isWall, newId, type Command, type Floor, type Id, type Opening, type Project, type Room, type Roof, type Slab, type Stair, type Wall } from '@hestia/model';
+import { isFloor, isOpening, isRamp, isRoof, isRoom, isSlab, isStair, isWall, newId, type Command, type Floor, type Id, type Opening, type Project, type Ramp, type Room, type Roof, type Slab, type Stair, type Wall } from '@hestia/model';
 import { stairTypeId } from './stairCommands.ts';
+import { rampTypeId } from './rampCommands.ts';
 
 /** Buffer de copiar/colar: paredes e as aberturas hospedadas nelas, e os pisos, lajes e telhados, como estavam ao copiar. */
 export interface ClipBuffer {
@@ -10,6 +11,8 @@ export interface ClipBuffer {
   roofs: Roof[];
   /** Escadas (ausente em buffers antigos = nenhuma). */
   stairs?: Stair[];
+  /** Rampas (ausente em buffers antigos = nenhuma). */
+  ramps?: Ramp[];
   /** Ambientes (ausente em buffers antigos = nenhum). Colados nas mesmas coordenadas do ponto interior. */
   rooms?: Room[];
 }
@@ -27,14 +30,15 @@ export function clipboardFrom(p: Project, ids: Id[]): ClipBuffer | null {
   const slabs = ids.map((id) => p.elements[id]).filter(isSlab).map((s) => structuredClone(s));
   const roofs = ids.map((id) => p.elements[id]).filter(isRoof).map((r) => structuredClone(r));
   const stairs = ids.map((id) => p.elements[id]).filter(isStair).map((s) => structuredClone(s));
+  const ramps = ids.map((id) => p.elements[id]).filter(isRamp).map((r) => structuredClone(r));
   const rooms = ids.map((id) => p.elements[id]).filter(isRoom).map((r) => structuredClone(r));
-  if (hostIds.size === 0 && floors.length === 0 && slabs.length === 0 && roofs.length === 0 && stairs.length === 0 && rooms.length === 0) return null;
+  if (hostIds.size === 0 && floors.length === 0 && slabs.length === 0 && roofs.length === 0 && stairs.length === 0 && ramps.length === 0 && rooms.length === 0) return null;
   const walls = [...hostIds].map((id) => structuredClone(p.elements[id] as Wall));
   const openings = Object.values(p.elements)
     .filter(isOpening)
     .filter((o) => hostIds.has(o.hostId))
     .map((o) => structuredClone(o));
-  return { walls, openings, floors, slabs, roofs, stairs, rooms };
+  return { walls, openings, floors, slabs, roofs, stairs, ramps, rooms };
 }
 
 /**
@@ -47,10 +51,11 @@ export function pasteAlignedCommand(
   clip: ClipBuffer,
   levelId: Id,
   mint: MintId = (prefix) => newId(prefix),
-): { command: Command; wallIds: Id[]; openingIds: Id[]; floorIds: Id[]; slabIds: Id[]; roofIds: Id[]; stairIds: Id[]; roomIds: Id[] } | null {
+): { command: Command; wallIds: Id[]; openingIds: Id[]; floorIds: Id[]; slabIds: Id[]; roofIds: Id[]; stairIds: Id[]; rampIds: Id[]; roomIds: Id[] } | null {
   const stairs = clip.stairs ?? [];
+  const ramps = clip.ramps ?? [];
   const rooms = clip.rooms ?? [];
-  if (!p.levels.some((l) => l.id === levelId) || (clip.walls.length === 0 && clip.floors.length === 0 && clip.slabs.length === 0 && clip.roofs.length === 0 && stairs.length === 0 && rooms.length === 0)) return null;
+  if (!p.levels.some((l) => l.id === levelId) || (clip.walls.length === 0 && clip.floors.length === 0 && clip.slabs.length === 0 && clip.roofs.length === 0 && stairs.length === 0 && ramps.length === 0 && rooms.length === 0)) return null;
   const commands: Command[] = [];
   const roomIds: Id[] = [];
   for (const r of rooms) {
@@ -70,6 +75,15 @@ export function pasteAlignedCommand(
     const typeId = p.stairTypes[s.typeId] ? s.typeId : stairTypeId(p);
     const components = rest.components.map((c) => ({ ...c, id: mint(c.kind === 'run' ? 'r' : 'p') }));
     commands.push({ type: 'addStair', stair: { ...rest, id, levelId, typeId: typeId ?? s.typeId, components } });
+  }
+  const rampIds: Id[] = [];
+  for (const r of ramps) {
+    const id = mint('rp');
+    rampIds.push(id);
+    const { order: _order, ...rest } = r;
+    const typeId = p.rampTypes[r.typeId] ? r.typeId : rampTypeId(p);
+    const components = rest.components.map((c) => ({ ...c, id: mint('rc') }));
+    commands.push({ type: 'addRamp', ramp: { ...rest, id, levelId, typeId: typeId ?? r.typeId, components } });
   }
   for (const r of clip.roofs) {
     const id = mint('t');
@@ -109,5 +123,5 @@ export function pasteAlignedCommand(
     openingIds.push(id);
     commands.push({ type: 'addOpening', opening: { ...o, id, hostId } });
   }
-  return { command: { type: 'batch', commands }, wallIds, openingIds, floorIds, slabIds, roofIds, stairIds, roomIds };
+  return { command: { type: 'batch', commands }, wallIds, openingIds, floorIds, slabIds, roofIds, stairIds, rampIds, roomIds };
 }

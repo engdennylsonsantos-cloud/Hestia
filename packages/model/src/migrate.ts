@@ -4,6 +4,8 @@ import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_RAMP_TYPES } from './ramp.ts';
+import { DEFAULT_STAIR_CALC_RULE } from './stairTypes.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
 import { compositionOfType } from './openingCompositionOf.ts';
@@ -208,9 +210,8 @@ const migrations: Record<number, Migration> = {
   // v18 → v19: contorno associativo de piso e laje (decisão 0023 §8.2). Pisos e lajes existentes não têm `outlineSource`,
   // o que significa estáticos (o contorno gravado continua valendo). A migração só avança a versão.
   18: (raw) => ({ ...raw }),
-  // v19 → v20: composição das esquadrias (docs/aberturas/F1-spec-composicao.md §7). Cada tipo ganha `composition` (de uma
-  // célula, ou o layout da §7 se tinha bandeira/laterais) e o projeto recebe os presets de perfil. Instâncias não mudam.
-  // Idempotente: composição já gravada e presets editados do projeto são mantidos.
+  // v19 → v20: regra de cálculo configurável por tipo de escada (estilo Revit). Tipos existentes ganham os padrões
+  // (2·R + T entre 0,63 e 0,65 m, alvo 0,63 m e piso máximo 0,32 m), preservando o piso calculado de antes.
   19: (raw) => {
     const own = (raw.openingTypes as Record<string, OpeningType>) ?? {};
     const types: Record<string, OpeningType> = {};
@@ -222,11 +223,28 @@ const migrations: Record<number, Migration> = {
       try {
         types[id] = { ...t, composition: compositionOfType(t) };
       } catch {
-        types[id] = t; // tipo malformado: sem composição, o leitor deriva dos campos atuais
+        types[id] = t;
       }
     }
-    return { ...raw, openingTypes: types, openingProfiles: { ...defaultOpeningProfiles(), ...((raw.openingProfiles as object) ?? {}) } };
+    const stairTypes = { ...((raw.stairTypes as Record<string, Record<string, unknown>>) ?? {}) };
+    for (const [id, t] of Object.entries(stairTypes)) {
+      // O piso máximo padrão não pode ficar abaixo do piso mínimo do tipo antigo (senão o tipo nasceria inválido).
+      const minTread = Number.isFinite(t.minTread) ? (t.minTread as number) : 0;
+      stairTypes[id] = { ...DEFAULT_STAIR_CALC_RULE, maxTread: Math.max(DEFAULT_STAIR_CALC_RULE.maxTread, minTread), ...t };
+    }
+    return {
+      ...raw,
+      openingTypes: types,
+      openingProfiles: { ...defaultOpeningProfiles(), ...((raw.openingProfiles as object) ?? {}) },
+      stairTypes,
+    };
   },
+  // v20 → v21: rampas. Projetos antigos ganham os 2 tipos de rampa padrão (sem sobrescrever os do arquivo) e nenhuma
+  // rampa; as rampas são elementos de `elements`, então nada precisa ser convertido.
+  20: (raw) => ({
+    ...raw,
+    rampTypes: { ...Object.fromEntries(DEFAULT_RAMP_TYPES.map((t) => [t.id, t])), ...((raw.rampTypes as object) ?? {}) },
+  }),
 };
 
 export class SchemaError extends Error {}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STAIR_TYPES, type StairType } from '@hestia/model';
-import { stairPostTreads, stairSectionProfile } from './stairSectionProfile.ts';
+import { stairPostTreads, stairSectionAnchors, stairSectionProfile } from './stairSectionProfile.ts';
 
 const mono = (over: Partial<StairType> = {}): StairType => ({ ...DEFAULT_STAIR_TYPES[0]!, ...over });
 /** Distância perpendicular de um ponto à reta que passa por a e b. */
@@ -53,6 +53,46 @@ describe('perfil de corte da prévia', () => {
 
   it('estilo poste não tem contorno único: o perfil contínuo fica vazio e a prévia usa os degraus soltos', () => {
     expect(stairSectionProfile(DEFAULT_STAIR_TYPES[3]!)).toEqual([]);
+  });
+});
+
+describe('corte com espelho e piso calculados e cotas', () => {
+  const r = 3 / 17;
+  const t = 0.28;
+
+  it('usa o espelho e o piso calculados (e não o máximo/mínimo do tipo)', () => {
+    const type = mono({ maxRiser: 0.25, minTread: 0.4, structuralDepth: 0.15 });
+    const pts = stairSectionProfile({ type, riser: r, tread: t });
+    expect(pts[1]).toEqual([0, r]);
+    expect(pts[2]).toEqual([t, r]);
+    expect(pts.at(-1)).toEqual([0, -(0.15 / (t / Math.hypot(t, r)))]);
+  });
+
+  it('devolve as âncoras de cota do espelho, piso, nariz, espessura e pé-direito', () => {
+    const type = mono({ structuralDepth: 0.2, nosing: 0.015, minHeadroom: 2.1 });
+    const a = stairSectionAnchors({ type, riser: r, tread: t });
+    expect(a.riser.value).toBeCloseTo(r, 9);
+    expect(a.tread.value).toBeCloseTo(t, 9);
+    expect(a.nosing.value).toBeCloseTo(0.015, 9);
+    expect(a.nosing.x0).toBeCloseTo(t, 9);
+    expect(a.nosing.x1).toBeCloseTo(t + 0.015, 9);
+    expect(a.thickness.value).toBeCloseTo(0.2, 9);
+    expect(a.thicknessKind).toBe('structural');
+    expect(a.headroom.value).toBeCloseTo(2.1, 9);
+    expect(a.headroom.y0).toBeCloseTo(3 * r, 9);
+    expect(a.floorY).toBe(0);
+  });
+
+  it('no estilo montado a cota de espessura é a do piso', () => {
+    const type = { ...DEFAULT_STAIR_TYPES[1]!, treadThickness: 0.03, nosing: 0.01, minHeadroom: 2.0 };
+    const a = stairSectionAnchors({ type, riser: r, tread: t });
+    expect(a.thickness.value).toBeCloseTo(0.03, 9);
+    expect(a.thicknessKind).toBe('tread');
+  });
+
+  it('espelho ou piso inválidos deixam a prévia vazia', () => {
+    const type = mono();
+    expect(stairSectionProfile({ type, riser: 0, tread: 0.28 })).toEqual([]);
   });
 });
 

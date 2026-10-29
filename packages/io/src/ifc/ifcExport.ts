@@ -12,7 +12,7 @@ import {
   type Wall,
   type WallType,
 } from '@hestia/model';
-import { addPlates, addRoofs, addStairs } from './ifcElements.ts';
+import { addPlates, addRamps, addRoofs, addStairs } from './ifcElements.ts';
 import { addGenerics } from './ifcGeneric.ts';
 import { addHestiaPsets } from './ifcHestia.ts';
 import { addPropertySet, type PropValue } from './ifcProperties.ts';
@@ -475,6 +475,7 @@ export function exportIfc(p: Project, geo: IfcGeometry, opts: IfcExportOptions =
   addPlates(c, geo);
   addRoofs(c, geo);
   addStairs(c, geo);
+  addRamps(c, geo);
   addGenerics(c);
   addSpaces(c);
   addGrids(c);

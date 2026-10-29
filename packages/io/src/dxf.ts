@@ -102,6 +102,19 @@ export interface DxfLevelGeometry {
     posts?: Array<{ pts: DxfPoint[]; above: boolean }>;
   }>;
   /**
+   * Rampas do nível: contornos de lances e patamares até a cota de corte (POLYLINE fechada em `RAMPA`), os que estão
+   * acima dela e até o topo do intervalo (`outlinesAbove`, camada `RAMPA_ACIMA`, tracejada), seta de subida por lance
+   * (LINE em `RAMPA_SETA`), linha de corte transversal quando o plano cruza o lance (LINE em `RAMPA_CORTE`) e o texto
+   * da inclinação (`texts`, camada `RAMPA_TEXTO`). Quem monta a geometria é o web.
+   */
+  ramps?: Array<{
+    outlines: DxfPoint[][];
+    outlinesAbove?: DxfPoint[][];
+    arrow: Array<[DxfPoint, DxfPoint]>;
+    cut: Array<[DxfPoint, DxfPoint]>;
+    texts: DxfNoteText[];
+  }>;
+  /**
    * Largura de linha de cada camada, em centésimos de mm (código 370 da tabela LAYER; arredondada ao valor DXF válido).
    * Ausente: a tabela não leva 370 e o arquivo é o de antes. Presente: a camada sem entrada sai com -3 (padrão).
    * Quem monta a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
@@ -157,6 +170,13 @@ export const DXF_LAYER_ROOM = 'AMBIENTES';
 /** Textos de ambiente (nome, número e área), no centro de cada ambiente. */
 export const DXF_LAYER_ROOM_TEXT = 'AMBIENTES_TEXTO';
 export const DXF_LAYER_STAIR_POST = 'ESCADA_POSTE';
+/** Rampas: contorno de lances e patamares até a cota de corte (POLYLINE), seta, linha de corte e texto da inclinação. */
+export const DXF_LAYER_RAMP = 'RAMPA';
+/** Lances e patamares acima da cota de corte e até o topo: contorno tracejado (POLYLINE). */
+export const DXF_LAYER_RAMP_ABOVE = 'RAMPA_ACIMA';
+export const DXF_LAYER_RAMP_ARROW = 'RAMPA_SETA';
+export const DXF_LAYER_RAMP_CUT = 'RAMPA_CORTE';
+export const DXF_LAYER_RAMP_TEXT = 'RAMPA_TEXTO';
 /** Marcas de corte e elevação em planta (linha, setas e rótulo), separadas por tipo. */
 export const DXF_LAYER_CORTES = 'CORTES';
 export const DXF_LAYER_ELEVACOES = 'ELEVACOES';
@@ -262,6 +282,7 @@ const LAYER_STYLE: Record<string, LayerStyle> = {
   [DXF_LAYER_WALL_BEYOND]: { linetype: 'CONTINUOUS', color: 8 },
   [DXF_LAYER_ROOF_PROJECTION]: { linetype: 'DASHED', color: 7 },
   [DXF_LAYER_STAIR_ABOVE]: { linetype: 'DASHED', color: 7 },
+  [DXF_LAYER_RAMP_ABOVE]: { linetype: 'DASHED', color: 7 },
 };
 const styleOf = (layer: string): LayerStyle => LAYER_STYLE[layer] ?? { linetype: 'CONTINUOUS', color: 7 };
 
@@ -311,6 +332,11 @@ const FIXED_LINE_ROLE = new Map<string, DxfLineRole>([
   [DXF_LAYER_ROOM_TEXT, 'annotation'],
   [DXF_LAYER_STAIR_ARROW, 'annotation'],
   [DXF_LAYER_STAIR_CUT, 'annotation'],
+  [DXF_LAYER_RAMP, cut('stair')],
+  [DXF_LAYER_RAMP_ABOVE, projection('stair')],
+  [DXF_LAYER_RAMP_ARROW, 'annotation'],
+  [DXF_LAYER_RAMP_CUT, 'annotation'],
+  [DXF_LAYER_RAMP_TEXT, 'annotation'],
   [DXF_LAYER_COTAS, 'annotation'],
   [DXF_LAYER_TEXTOS, 'annotation'],
   [DXF_LAYER_DETALHE, 'annotation'],
@@ -344,8 +370,12 @@ function linesOf(geo: DxfLevelGeometry): Line[] {
     ...s.risers.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_RISER, a, b })),
     ...s.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_STAIR_ARROW, a, b })),
   ]);
+  const ramp = (geo.ramps ?? []).flatMap((r) => [
+    ...r.arrow.map(([a, b]): Line => ({ layer: DXF_LAYER_RAMP_ARROW, a, b })),
+    ...r.cut.map(([a, b]): Line => ({ layer: DXF_LAYER_RAMP_CUT, a, b })),
+  ]);
   const marks = (geo.sectionMarks?.lines ?? []).map((l): Line => ({ layer: l.layer, a: l.a, b: l.b }));
-  return [...roof, ...stair, ...marks, ...notes, ...noteLeaders];
+  return [...roof, ...stair, ...ramp, ...marks, ...notes, ...noteLeaders];
 }
 
 /**
@@ -382,6 +412,10 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
     for (const post of s.posts ?? []) out.push({ layer: post.above ? DXF_LAYER_STAIR_ABOVE : DXF_LAYER_STAIR_POST, pts: post.pts });
     if (s.cut && s.cut.length >= 2) out.push({ layer: DXF_LAYER_STAIR_CUT, pts: s.cut, closed: false });
   }
+  for (const r of geo.ramps ?? []) {
+    for (const o of r.outlines) push(DXF_LAYER_RAMP, [[o]]);
+    for (const o of r.outlinesAbove ?? []) push(DXF_LAYER_RAMP_ABOVE, [[o]]);
+  }
   for (const o of geo.openings) {
     const state = o.state ?? 'cut';
     // Decisão X1 (docs/aberturas/A-pesquisa.md §5): o símbolo de planta vale em todas as camadas de vãos, corte
@@ -399,7 +433,12 @@ function shapesOf(project: Project, geo: DxfLevelGeometry): Shape[] {
 }
 
 /** Textos da planta: os de anotação (cotas e textos do usuário) e os dos ambientes. */
-const textsOf = (geo: DxfLevelGeometry): DxfNoteText[] => [...(geo.notes?.texts ?? []), ...(geo.sectionMarks?.texts ?? []), ...(geo.roomTexts ?? [])];
+const textsOf = (geo: DxfLevelGeometry): DxfNoteText[] => [
+  ...(geo.notes?.texts ?? []),
+  ...(geo.sectionMarks?.texts ?? []),
+  ...(geo.roomTexts ?? []),
+  ...(geo.ramps ?? []).flatMap((r) => r.texts),
+];
 
 /** Camadas da tabela LAYER: `0` e as das polilinhas e das linhas, sem repetição e em ordem. */
 function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): string[] {

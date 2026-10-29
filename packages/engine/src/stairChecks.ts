@@ -1,5 +1,5 @@
 import { intersection, multiArea, type MultiPolygon, type Vec2 } from '@hestia/geom';
-import { defaultUnits, formatQuantity, unitsOf, type Id, type Project, type ValidationIssue } from '@hestia/model';
+import { isStair, type Id, type Project, type ValidationIssue } from '@hestia/model';
 import { resolveFloors } from './floors.ts';
 import { makeStairIssue, type StairIssueItem } from './stairIssues.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
@@ -12,10 +12,11 @@ import { stairWallOverlapIssues } from './stairWallOverlap.ts';
  * pode entrar na resolução da escada sem ciclo.
  */
 
-/** Tolerância (m) nas comparações de folga, e área mínima (metros quadrados) para contar sobreposição entre degrau e laje. */
+/** Tolerância (m) nas comparações de folga, e área mínima (m²) para contar sobreposição entre degrau e laje. */
 const EPS = 1e-9;
 const EPS_AREA = 1e-6;
 
+const num = (n: number, digits: number): string => n.toFixed(digits).replace('.', ',');
 
 /** Elemento do nível de topo: contorno resolvido (já com os furos das escadas) e cota da face inferior em cada ponto. */
 export interface TopCover {
@@ -38,7 +39,7 @@ export function topCovers(p: Project, levelId: Id): TopCover[] {
  * do modo (`openingHeadroom`, ou o mínimo do tipo): o que sobra tem folga maior, então sem aviso. Com `openingHeadroom`
  * abaixo do mínimo do tipo, os degraus entre os dois valores ficam sob a laje e avisam.
  */
-export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[], units = defaultUnits()): StairIssueItem | null {
+export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[]): StairIssueItem | null {
   let worst: { h: number; ci: number } | null = null;
   for (const st of rs.steps) {
     for (const c of covers) {
@@ -57,7 +58,7 @@ export function stairHeadroomIssue(rs: ResolvedStair, covers: TopCover[], units 
     rs.id,
     'stair-headroom',
     'warning',
-    `Folga de cabeça de ${formatQuantity(units, 'length', worst.h)} menor que a mínima do tipo (${formatQuantity(units, 'length', rs.type.minHeadroom)}) sob a laje.`,
+    `Folga de cabeça de ${num(worst.h, 2)} m menor que a mínima do tipo (${num(rs.type.minHeadroom, 2)} m) sob a laje.`,
     worst.ci,
   );
 }
@@ -74,13 +75,32 @@ export function stairIssueList(p: Project): StairIssueItem[] {
         coversOnLevel = topCovers(p, r.topLevelId);
         covers.set(r.topLevelId, coversOnLevel);
       }
-      const h = stairHeadroomIssue(r, coversOnLevel, unitsOf(p));
+      const h = stairHeadroomIssue(r, coversOnLevel);
       if (h) list.push(h);
     }
     return list;
   });
   out.push(...stairWallOverlapIssues(p, resolved));
   return out;
+}
+
+/**
+ * Avisos de uma só escada: o mesmo que `stairIssueList(p).filter((i) => i.stairId === id)`, sem resolver as outras. A criação
+ * usa isto para não resolver todas as escadas do projeto só para achar o aviso da nova. A invasão de parede é conferida só
+ * contra esta escada; as paredes continuam vindo do projeto inteiro, como na lista.
+ */
+export function stairIssuesOf(p: Project, id: Id): StairIssueItem[] {
+  const e = p.elements[id];
+  if (!isStair(e)) return [];
+  const [r] = resolveStairs({ ...p, elements: { [id]: e } });
+  if (!r) return [];
+  const list = [...r.issues];
+  if (r.topLevelId) {
+    const h = stairHeadroomIssue(r, topCovers(p, r.topLevelId));
+    if (h) list.push(h);
+  }
+  list.push(...stairWallOverlapIssues(p, [r]));
+  return list;
 }
 
 /** Aviso no formato do painel, com os ids da relação (quando houver) além do `elementId`. */

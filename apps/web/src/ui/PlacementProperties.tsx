@@ -1,14 +1,15 @@
 import type { ReactElement } from 'react';
 import { isOpeningDimRef, isWallDimRef, type LocationLine } from '@hestia/model';
-import { roofAutoOffset, type ToolId } from '@hestia/tools';
+import { DEFAULT_RAMP_OPTIONS, roofAutoOffset, type ToolId } from '@hestia/tools';
 import { editor, useProject } from '../editor/controller.ts';
 import { clearDimOverride, setDimOverride, useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 import { useFormat } from './useUnits.ts';
 import { LOCATION_LABEL } from './OptionsBar.tsx';
 import { OPENING_OPTIONS, WALL_OPTIONS, sessionChoice } from './dialogs/dimensionSettingsModel.ts';
+import { RampLevelsFields, rampLevelsValue } from './RampLevelsFields.tsx';
 
-const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'room', 'roomsep', 'dimension', 'text', 'section']);
+const PLACE_TOOLS = new Set<ToolId>(['wall', 'door', 'window', 'floor', 'slab', 'slope', 'ceiling', 'roof', 'roofextrusion', 'stair', 'stairrun', 'ramp', 'room', 'roomsep', 'dimension', 'text', 'section']);
 
 export function hasPlacementProperties(tool: ToolId): boolean {
   return PLACE_TOOLS.has(tool);
@@ -26,6 +27,7 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
   const set = (patch: Partial<typeof o>): void => useUi.setState((s) => ({ options: { ...s.options, ...patch } }));
   const setStairRun = (patch: Partial<NonNullable<typeof o.stairRun>>): void => set({ stairRun: { ...(o.stairRun ?? { shape: 'straight', width: 1.2, turn: 'left' }), ...patch } });
   const setStair = (patch: Partial<NonNullable<typeof o.stair>>): void => set({ stair: { ...(o.stair ?? {}), ...patch } });
+  const setRamp = (patch: Partial<NonNullable<typeof o.ramp>>): void => set({ ramp: { ...(o.ramp ?? DEFAULT_RAMP_OPTIONS), ...patch } });
 
   return (
     <>
@@ -99,6 +101,11 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           {o.stairRun?.shape !== 'straight' && <Row label="Giro" htmlFor="place-run-turn"><select id="place-run-turn" className="select" value={o.stairRun?.turn ?? 'left'} onChange={(e) => setStairRun({ turn: e.target.value as 'left' | 'right' })}><option value="left">Esquerda</option><option value="right">Direita</option></select></Row>}
           {/* units-ok: varredura da escada em graus (valor gravado em graus) */}
           {o.stairRun?.shape === 'spiral' && <><Row label="Raio interno" htmlFor="place-run-inner"><NumField id="place-run-inner" value={o.stairRun?.spiralInner ?? 0.1} quantity="length" min={0.05} onCommit={(v) => setStairRun({ spiralInner: v })} /></Row><Row label="Raio externo" htmlFor="place-run-outer"><NumField id="place-run-outer" value={o.stairRun?.spiralOuter ?? 1} quantity="length" min={0.2} onCommit={(v) => setStairRun({ spiralOuter: v })} /></Row><Row label="Varredura" htmlFor="place-run-sweep"><NumField id="place-run-sweep" value={((o.stairRun?.spiralSweep ?? 360) * Math.PI) / 180} quantity="angle" min={(30 * Math.PI) / 180} max={(720 * Math.PI) / 180} onCommit={(v) => setStairRun({ spiralSweep: (v * 180) / Math.PI })} /></Row></>}
+        </Group>
+      )}
+      {tool === 'ramp' && (
+        <Group title="Colocação · Rampa">
+          <RampLevelsFields project={p} levelId={levelId} idPrefix="place-ramp" value={rampLevelsValue(o.ramp ?? DEFAULT_RAMP_OPTIONS)} onChange={setRamp} Field={Row} />
         </Group>
       )}
       {tool === 'room' && (

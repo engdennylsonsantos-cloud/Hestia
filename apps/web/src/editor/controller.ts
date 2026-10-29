@@ -86,7 +86,7 @@ export class Editor {
     say: (m) => useUi.setState({ status: m }), lang: () => useI18n.getState().lang, confirmHostedLoss: (losses, message) => pedirConfirmacaoHostedLoss(losses, message),
     done: () => this.setTool('select'),
     openView: (id) => this.openSection(id),
-    options: () => useUi.getState().options,
+    options: () => useUi.getState().options, setOptions: (patch) => useUi.setState({ options: { ...useUi.getState().options, ...patch } }),
   };
 
   get project(): Project { return this.store.project; }
@@ -299,6 +299,7 @@ export class Editor {
       }
       if (ui.selection.length && !this.perimetro.ativo) { this.deleteSelection(); return true; }
     }
+    if (/^a$/i.test(k) && !ui.typed && this.tool.adjust?.()) { this.bump(); return true; } // A ajusta a rampa livre em andamento
     if (k === 'Tab') {
       this.tool.tab();
       this.bump();

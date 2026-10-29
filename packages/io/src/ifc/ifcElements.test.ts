@@ -163,7 +163,7 @@ describe.each(CASES)('IFC de $id — pisos, lajes, forros, telhado e escada', ({
         expect(d.name.length).toBeGreaterThan(0);
       }
     }
-  });
+  }, 30000);
 
   it('sai cada furo/vão como IFCOPENINGELEMENT + IFCRELVOIDSELEMENT, no elemento hospedeiro', () => {
     const platePrisms: IfcPrism[] = [

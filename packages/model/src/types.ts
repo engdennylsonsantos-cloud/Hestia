@@ -1,5 +1,6 @@
 import type { Vec2 } from '@hestia/geom';
 import type { Stair, StairType } from './stairTypes.ts';
+import type { Ramp, RampType } from './rampTypes.ts';
 import type { ViewRange } from './viewRange.ts';
 import type { Sheet } from './sheet.ts';
 import type { Grid, GridType } from './grid.ts';
@@ -10,9 +11,10 @@ import type { DimensionSettings } from './dimensionSettings.ts';
 import type { UnitsSettings } from './units.ts';
 
 export type Id = string;
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 export type { Stair, StairCurve, StairGenerator, StairLanding, StairRun, StairRunStyle, StairSpiralParams, StairType, StairUndersideStyle } from './stairTypes.ts';
+export type { Ramp, RampInputMode, RampNormProfile, RampNormRow, RampShape, RampType } from './rampTypes.ts';
 export type * from './openingTypes.ts';
 
 /** Funções de camada, no modelo do Revit (docs/05 §1). */
@@ -588,7 +590,7 @@ export interface Generic {
   ifcProperties?: IfcProperty[];
 }
 
-export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room | Generic;
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Ramp | Room | Generic;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -688,6 +690,8 @@ export interface Project {
   roofTypes: Record<Id, RoofType>;
   /** Tipos de escada (Revit: Stair Type). Mesmo papel dos demais mapas de tipos. */
   stairTypes: Record<Id, StairType>;
+  /** Tipos de rampa (Revit: Ramp Type). Mesmo papel dos demais mapas de tipos. */
+  rampTypes: Record<Id, RampType>;
   openingTypes: Record<Id, OpeningType>;
   /** Presets de perfil das esquadrias (editáveis); a migração 19 → 20 semeia os iniciais. Ausente = os iniciais por leitura. */
   openingProfiles?: Record<Id, ProfilePreset>;
@@ -718,5 +722,6 @@ export const isFloor = (e: Element | undefined): e is Floor => e?.kind === 'floo
 export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
 export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';
+export const isRamp = (e: Element | undefined): e is Ramp => e?.kind === 'ramp';
 export const isRoom = (e: Element | undefined): e is Room => e?.kind === 'room';
 export const isGeneric = (e: Element | undefined): e is Generic => e?.kind === 'generic';

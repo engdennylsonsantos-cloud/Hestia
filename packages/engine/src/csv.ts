@@ -8,3 +8,7 @@ export const csvText = (s: string): string => {
 export function csvDocument(lines: string[][]): string {
   return `\uFEFF${lines.map((cells) => cells.join(';')).join('\r\n')}\r\n`;
 }
+
+/** Número decimal com vírgula (CSV pt-BR); não finito vira célula vazia. */
+export const formatDecimal = (v: number, decimals = 2): string =>
+  Number.isFinite(v) ? v.toFixed(decimals).replace('.', ',') : '';

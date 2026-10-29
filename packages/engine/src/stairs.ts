@@ -5,7 +5,6 @@ import {
   stairs,
   stairsOnLevel,
   stairTopLevel,
-  unitsOf,
   stairTopZ,
   type Id,
   type Project,
@@ -16,6 +15,7 @@ import { makeStairIssue, spiralNormIssues, stairNormIssues, type StairIssueItem 
 import { DEFAULT_STAIR_NORMS } from './stairNorms.ts';
 import { orderRisers, stairLandingPolygon, stairRunSteps, trimRisers, type StairRunSketch } from './stairSketch.ts';
 import { isSpiralRun, spiralParamsOf } from './stairSpiral.ts';
+import { memoDoProjetoMotor } from './memoProjeto.ts';
 
 /** Degrau (kind 'tread', index 1..N−1 no lance) ou patamar (kind 'landing', index sequencial na escada, a partir de 1). */
 export interface ResolvedStairStep {
@@ -131,7 +131,7 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
       if (h <= 0) return;
       const z = baseZ + g0 * h;
       // Erro de croqui: o lance não gera degraus, mas conta nos espelhos e os demais componentes continuam.
-      const res = stairRunSteps(c, { baseZ: z, riserHeight: h, units: unitsOf(p) });
+      const res = stairRunSteps(c, { baseZ: z, riserHeight: h });
       issues.push(...sketchIssues(s, ci, res.issues));
       for (const t of res.treads) steps.push({ componentIndex: ci, kind: 'tread', index: t.index, polygon: t.polygon, z: t.z });
       for (const r of res.risers) {
@@ -165,21 +165,26 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
     footprint,
     issues,
   };
-  rs.issues.push(...stairNormIssues(rs, DEFAULT_STAIR_NORMS, unitsOf(p)));
+  rs.issues.push(...stairNormIssues(rs, DEFAULT_STAIR_NORMS));
   const spiralIndex = s.components.findIndex((c) => c.kind === 'run' && spiralParamsOf(c) !== undefined);
   const sp = spiralIndex >= 0 ? spiralParamsOf(s.components[spiralIndex]!) : undefined;
   if (sp) rs.spiral = { componentIndex: spiralIndex, center: sp.center, rInner: sp.rInner, rOuter: sp.rOuter };
   s.components.forEach((c, ci) => {
     if (c.kind !== 'run' || !isSpiralRun(c)) return;
     const sp = spiralParamsOf(c);
-    rs.issues.push(...spiralNormIssues(rs, ci, sp && { sweep: sp.sweep, rInner: sp.rInner, rOuter: sp.rOuter, risers: c.risers.length }, DEFAULT_STAIR_NORMS, unitsOf(p)));
+    rs.issues.push(...spiralNormIssues(rs, ci, sp && { sweep: sp.sweep, rInner: sp.rInner, rOuter: sp.rOuter, risers: c.risers.length }, DEFAULT_STAIR_NORMS));
   });
   return rs;
 }
 
+/** Uma escada resolvida, memorizada por projeto (o projeto é imutável: cada edição cria outro objeto). */
+export function resolveStairOne(p: Project, s: Stair): ResolvedStair | null {
+  return memoDoProjetoMotor(p, `escada|${s.id}`, () => resolveOne(p, s));
+}
+
 const resolveList = (p: Project, list: Stair[]): ResolvedStair[] =>
   list.flatMap((s) => {
-    const r = resolveOne(p, s);
+    const r = resolveStairOne(p, s);
     return r ? [r] : [];
   });
 

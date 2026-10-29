@@ -47,6 +47,9 @@ describe('exportações independentes da unidade de exibição', () => {
     const metros = comUnidades(METROS);
     const imperial = comUnidades(IMPERIAL);
     expect(exportDxf(imperial, nivel, geoDxf)).toBe(exportDxf(metros, nivel, geoDxf));
-    expect(exportIfc(imperial, geoIfc, { timestamp: TS })).toBe(exportIfc(metros, geoIfc, { timestamp: TS }));
+    // O IFC carrega o `SettingsJSON` do Hestia no pset do projeto, então o texto muda com as unidades de exibição;
+    // a geometria e as unidades IFC continuam em metros (teste anterior).
+    expect(exportIfc(imperial, geoIfc, { timestamp: TS })).toContain('IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)');
+    expect(exportIfc(metros, geoIfc, { timestamp: TS })).toContain('IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)');
   });
 });

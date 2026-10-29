@@ -34,6 +34,10 @@ interface NumProps {
   suffix?: string;
   /** Grandeza: exibe e lê na unidade configurada do projeto (SI por dentro). */
   quantity?: Quantity;
+  /** Unidade fixa (ex.: `%`, `m`) para campos que não usam grandeza do projeto. */
+  unit?: string;
+  /** Multiplicador de exibição (ex.: 100 para metros → cm). */
+  scale?: number;
   min?: number;
   max?: number;
   disabled?: boolean;
@@ -50,26 +54,37 @@ interface NumProps {
   onValid?: () => void;
   /** Com `strictRange`, valor fora de min/max é recusado (volta o último valor válido) em vez de ser limitado. */
   strictRange?: boolean;
+  /** Marca o campo como inválido para leitores de tela (`aria-invalid`). */
+  invalid?: boolean;
+  /** Id da mensagem de erro ligada ao campo (`aria-describedby`). */
+  describedBy?: string;
 }
 
 /** Campo numérico que aceita expressões (`3,50+0,15`); confirma com Enter ou ao sair. */
-export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange }: NumProps): ReactElement {
+export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, unit, scale = 1, min, max, disabled, mixed, width, readOnly, placeholder, onClear, onInvalid, onValid, strictRange, invalid, describedBy }: NumProps): ReactElement {
   const units = useUnits();
   const ref = useRef<HTMLInputElement>(null);
   const show = (v: number | null): string =>
-    quantity ? formatQuantityField(units, quantity, v, !!mixed) : v === null || mixed ? '' : fmt(v, decimals);
+    quantity
+      ? formatQuantityField(units, quantity, v, !!mixed)
+      : v === null || mixed
+        ? ''
+        : unit
+          ? fmt(v * scale, decimals)
+          : fmt(v, decimals);
   const [text, setText] = useState(show(value));
   const [focus, setFocus] = useState(false);
   useEffect(() => {
     if (!focus) setText(show(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, focus, mixed, decimals, quantity, units]);
+  }, [value, focus, mixed, decimals, quantity, units, unit, scale]);
   const commit = (): void => {
     if (onClear && text.trim() === '') {
       if (text !== show(value)) onClear();
       return;
     }
-    const lido = quantity ? parseQuantityField(units, quantity, text) : parseNumber(text);
+    const n = parseNumber(text);
+    const lido = quantity ? parseQuantityField(units, quantity, text) : n === null ? null : unit ? n / scale : n;
     if (lido === null) {
       onInvalid?.(text);
       setText(show(value));
@@ -113,7 +128,7 @@ export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, 
   }, [quantity]);
   const unitLabel = quantity
     ? quantity !== 'currency' && units[quantity].unit === 'ft-in' ? '' : unitSymbol(units, quantity)
-    : suffix;
+    : unit ?? suffix;
   return (
     <span className="numwrap">
       <input
@@ -126,6 +141,8 @@ export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, 
         disabled={disabled}
         readOnly={readOnly}
         inputMode="decimal"
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
         onFocus={(e) => {
           setFocus(true);
           e.target.select();
@@ -153,7 +170,7 @@ export function NumField({ id, value, onCommit, decimals = 2, suffix, quantity, 
   );
 }
 
-export function TextField({ id, value, onCommit, placeholder, mixed, disabled }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; mixed?: boolean; disabled?: boolean }): ReactElement {
+export function TextField({ id, value, onCommit, placeholder, mixed, disabled, invalid, describedBy, dataAutofocus }: { id?: string; value: string; onCommit: (v: string) => void; placeholder?: string; mixed?: boolean; disabled?: boolean; invalid?: boolean; describedBy?: string; dataAutofocus?: boolean }): ReactElement {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   return (
@@ -163,6 +180,9 @@ export function TextField({ id, value, onCommit, placeholder, mixed, disabled }:
       value={mixed ? '' : text}
       placeholder={mixed ? 'variados' : placeholder}
       disabled={disabled}
+      aria-invalid={invalid ? true : undefined}
+      aria-describedby={describedBy}
+      data-autofocus={dataAutofocus ? '' : undefined}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => text !== value && onCommit(text)}
       onKeyDown={(e) => {

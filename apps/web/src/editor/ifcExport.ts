@@ -7,18 +7,21 @@ import {
   resolveFloors,
   resolveCeilings,
   resolveLevel,
+  resolveRamps,
   resolveRoofs,
   resolveSlabs,
   resolveStairs,
   roofThickness,
+  rampBody,
   stairArrivalTopZ,
   stairBody,
   type OpeningGeometry,
   type PartMaterial,
+  type ResolvedRamp,
   type ResolvedStair,
 } from '@hestia/engine';
-import { exportIfc, type IfcGeometry, type IfcOpeningPartGeo, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcStairGeo } from '@hestia/io';
-import { isOpening, openingSill, openingType, wallBaseElevation, wallHeight, type Id, type Opening, type OpeningType, type Project, type Wall } from '@hestia/model';
+import { exportIfc, type IfcGeometry, type IfcOpeningPartGeo, type IfcPlane, type IfcPolygon, type IfcPrism, type IfcRampGeo, type IfcStairGeo } from '@hestia/io';
+import { isOpening, isRamp, openingSill, openingType, wallBaseElevation, wallHeight, type Id, type Opening, type OpeningType, type Project, type Wall } from '@hestia/model';
 import { saveText } from './saveText.ts';
 
 /** Cota constante (sem inclinação). */
@@ -166,6 +169,29 @@ function resolveSlabsWithJunction(p: Project, levelId: Id) {
  * Geometria RESOLVIDA do projeto para o IFC (decisão 0020): paredes, vãos, pisos, lajes, telhados e escadas pelo mesmo
  * motor da planta e do DXF. O io não importa o engine, então a montagem fica aqui, no web.
  */
+/** Rampa resolvida em lances (prismas de topo inclinado) e patamares, com o comprimento horizontal de cada lance. */
+function rampOf(p: Project, rr: ResolvedRamp): IfcRampGeo {
+  const { pieces } = rampBody(rr);
+  const prismOf = (pc: (typeof pieces)[number]): IfcPrism => ({
+    polygon: [pc.polygon],
+    top: { a: pc.top.a, b: pc.top.b, c: pc.top.c },
+    bottom: { a: pc.bottom.a, b: pc.bottom.b, c: pc.bottom.c },
+  });
+  const el = p.elements[rr.id];
+  const flights = rr.flights.flatMap((f) => {
+    const piece = pieces.find((pc) => pc.kind === 'flight' && pc.componentIndex === f.componentIndex);
+    return piece ? [{ componentIndex: f.componentIndex, prism: prismOf(piece), length: f.length }] : [];
+  });
+  return {
+    rampId: rr.id,
+    levelId: rr.levelId,
+    shape: isRamp(el) && el.shape !== 'free' ? el.shape : 'straight',
+    slope: rr.slope,
+    flights,
+    landings: pieces.filter((pc) => pc.kind === 'landing').map(prismOf),
+  };
+}
+
 export function ifcGeometryOf(p: Project): IfcGeometry {
   const levels = p.levels.map((l) => l.id);
   const walls = levels.flatMap((id) => wallsOfLevel(p, id));
@@ -194,7 +220,8 @@ export function ifcGeometryOf(p: Project): IfcGeometry {
     .flatMap((id) => resolveCeilings(p, id))
     .map((c) => ({ ceilingId: c.ceilingId, prisms: prismsOf(c.polygon, flatPlane(c.topZ), flatPlane(c.bottomZ)) }))
     .filter((c) => c.prisms.length > 0);
-  return { walls, openings: openingsOf(p), floors, slabs, ceilings, roofs, stairs };
+  const ramps = resolveRamps(p).map((r) => rampOf(p, r));
+  return { walls, openings: openingsOf(p), floors, slabs, ceilings, roofs, stairs, ramps };
 }
 
 /** Texto IFC4 (STEP) do projeto inteiro, com a data atual no cabeçalho. */

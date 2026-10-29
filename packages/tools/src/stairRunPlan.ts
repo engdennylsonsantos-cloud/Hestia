@@ -8,24 +8,30 @@ import {
   treadFor,
   type StairComponentSketch,
   type StairRunSketch,
+  type TreadRule,
 } from '@hestia/engine';
-import { defaultUnits, formatQuantity, type Id, type ResolvedUnits, type StairGenerator } from '@hestia/model';
+import { DEFAULT_STAIR_CALC_RULE, type Id, type StairGenerator } from '@hestia/model';
 import type { StairPart } from './stairSketchState.ts';
 
 /**
  * Formas da ferramenta Escada por cliques (decisão 0011 §5; caracol, decisão 0014 §1 item 12). Os valores de reta, L, U e
  * leque são os nomes dos geradores do modelo; `spiral` é o caracol (gerador `generateSpiralRun`, `stairSpiralRun.ts`).
+ * `free` é a escada livre: já é um valor do modelo (`generatedBy`), mas a ferramenta ainda não a desenha, então fica fora
+ * de `STAIR_RUN_SHAPES` (o seletor não a mostra) até a ferramenta existir.
  */
 export const STAIR_RUN_SHAPES = ['straight', 'lshape', 'ushape', 'winder', 'spiral'] as const;
-export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number];
+export type StairRunShape = (typeof STAIR_RUN_SHAPES)[number] | 'free';
 
-export const STAIR_RUN_SHAPE_LABEL: Record<StairRunShape, string> = {
+/** Rótulos das formas que a ferramenta oferece; a livre fica de fora até a ferramenta existir. */
+export const STAIR_RUN_SHAPE_LABEL: Record<Exclude<StairRunShape, 'free'>, string> = {
   straight: 'Reta',
   lshape: 'Em L',
   ushape: 'Em U',
   winder: 'Com leque',
   spiral: 'Caracol',
 };
+/** Rótulo da escada livre, ainda oculta no seletor da ferramenta. */
+export const STAIR_RUN_SHAPE_FREE_LABEL = 'Livre';
 
 /** Opções da ferramenta Escada reta/L/U/leque/caracol (`ToolOptions.stairRun`). */
 export interface StairRunToolOptions {
@@ -56,29 +62,39 @@ export const DEFAULT_STAIR_RUN_OPTIONS: StairRunToolOptions = { shape: 'straight
  * Espelhos mínimos por forma: L e U têm dois lances de 2; o leque precisa de 5 (ver `planStairRun`); o caracol, 2 (um
  * degrau; a forma é validada pelo gerador de caracol).
  */
-export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5, spiral: 2 };
+export const MIN_RISERS: Record<StairRunShape, number> = { straight: 2, lshape: 4, ushape: 4, winder: 5, spiral: 2, free: 2 };
 
 /** Winder: espelhos do 1º lance reto; espelhos radiais do leque (padrão do gerador); o resto vai ao último lance. */
 export const WINDER_FIRST_RISERS = 2;
 export const WINDER_FAN_RISERS = 3;
 
+/** Regra padrão quando o tipo ainda não é conhecido (mesmos números de `DEFAULT_STAIR_CALC_RULE`). */
+export function defaultTreadRule(minTread: number): TreadRule {
+  return {
+    minTread,
+    maxTread: DEFAULT_STAIR_CALC_RULE.maxTread,
+    a: DEFAULT_STAIR_CALC_RULE.calcRiserFactor,
+    b: DEFAULT_STAIR_CALC_RULE.calcTreadFactor,
+    target: DEFAULT_STAIR_CALC_RULE.calcTarget,
+  };
+}
+
 /**
- * Espelhos e piso de um lance reto de comprimento `length` (m, do 1º ao último espelho). Entre os N que a altura permite
- * (N ≥ ceil(H ÷ espelho máximo)), fica o de piso mais perto do piso ideal do tipo (`treadFor`, 0,63 − 2·h); o piso não
- * pode ficar abaixo do mínimo. Erro se nem o menor N dá piso mínimo: o lance é curto demais.
+ * Piso de um lance reto de comprimento `length` (m, do 1º ao último espelho). A altura manda: N = ceil(H ÷ espelho máximo)
+ * e o piso ideal é `treadFor` (regra do tipo), como no Revit. O comprimento só limita: mais longo que (N − 1) × ideal, a
+ * escada termina antes do clique; mais curto, o piso encolhe até o mínimo do tipo. Erro se nem o piso mínimo cabe.
  */
-export function risersForLength(H: number, maxRiser: number, minTread: number, length: number, u: ResolvedUnits = defaultUnits()): { risers: number; tread: number } | { error: string } {
-  const N0 = riserCountFor(H, maxRiser);
-  let best: { risers: number; tread: number; score: number } | null = null;
-  for (let N = Math.max(2, N0); N <= N0 + 400; N++) {
-    const tread = length / (N - 1);
-    // Mais espelhos, piso menor: a partir daqui todo N seguinte também fica abaixo do mínimo.
-    if (tread < minTread - 1e-9) break;
-    const score = Math.abs(tread - treadFor(H / N, minTread));
-    if (!best || score < best.score) best = { risers: N, tread, score };
-  }
-  if (!best) return { error: `O comprimento (${formatQuantity(u, 'smallLength', length, { decimals: 0 })}) é curto para ${Math.max(2, N0)} espelhos: o piso ficaria abaixo do mínimo (${formatQuantity(u, 'smallLength', minTread, { decimals: 0 })}).` };
-  return { risers: best.risers, tread: best.tread };
+export function fitRunToLength(
+  H: number,
+  maxRiser: number,
+  minTread: number,
+  length: number,
+  rule: TreadRule = defaultTreadRule(minTread),
+): { risers: number; tread: number } | { error: string } {
+  const N = Math.max(2, riserCountFor(H, maxRiser));
+  const tread = Math.min(treadFor(H / N, rule), length / (N - 1));
+  if (tread < rule.minTread - 1e-9) return { error: `O comprimento (${(length * 100).toFixed(0)} cm) é curto para ${N} espelhos: o piso ficaria abaixo do mínimo (${(rule.minTread * 100).toFixed(0)} cm).` };
+  return { risers: N, tread };
 }
 
 export interface StairRunPlanInput {
@@ -92,9 +108,9 @@ export interface StairRunPlanInput {
   maxRiser: number;
   /** Piso mínimo do tipo (m). */
   minTread: number;
+  /** Regra de cálculo do tipo; ausente = a padrão (Blondel 0,63 − 2h, piso máximo 0,32). */
+  rule?: TreadRule;
   options: StairRunToolOptions;
-  /** Unidades do projeto para as mensagens (ausente usa o padrão, para testes e chamadas antigas). */
-  units?: ResolvedUnits;
 }
 
 /** Plano calculado: componentes em ordem (como croqui), nº de espelhos N, altura real h e piso. */
@@ -103,30 +119,27 @@ export interface StairRunPlan {
   risers: number;
   riserHeight: number;
   tread: number;
-  /** Reta com comprimento que dá N diferente do nº desejado pela altura: a explicação em pt-BR (ausente se bate). */
+  /** Reta com clique além do fim da escada: a explicação em pt-BR (ausente se o comprimento é usado inteiro). */
   note?: string;
 }
 
-/**
- * Explicação de uma reta cujo comprimento dá N ≠ N0 (nº desejado pela altura). Regra anunciada: o comprimento escolhe N
- * entre os que a altura permite (N ≥ N0), no piso mais perto do ideal (`treadFor`); para N0, o comprimento que dá o piso
- * ideal é (N0 − 1) × treadFor(H ÷ N0).
- */
-function lengthNote(H: number, minTread: number, length: number, N: number, N0: number, u: ResolvedUnits): string {
-  const L0 = (N0 - 1) * treadFor(H / N0, minTread);
-  return `(o comprimento de ${formatQuantity(u, 'length', length)} permite ${N}; o ideal pela altura é ${N0}: ajuste o comprimento para ${formatQuantity(u, 'length', L0)} ou edite o nº de espelhos).`;
+/** Aviso de uma reta cujo comprimento clicado passa do que a altura pede: a escada termina antes do clique. */
+function lengthNote(length: number, N: number, tread: number): string {
+  const m = (v: number): string => v.toFixed(2).replace('.', ',');
+  return `(a altura pede ${N} espelhos: a escada termina a ${m((N - 1) * tread)} m, antes do clique de ${m(length)} m).`;
 }
 
 export type StairRunPlanResult = StairRunPlan | { error: string };
 
 /**
- * Calcula a escada pronta: N = ceil(H ÷ espelho máximo), h = H ÷ N, piso = treadFor(h, piso mínimo) e os componentes do
+ * Calcula a escada pronta: N = ceil(H ÷ espelho máximo), h = H ÷ N, piso = treadFor(h, regra do tipo) e os componentes do
  * gerador da forma. L e U dividem N com `risersFirst = ceil(N/2)`. O winder é fundido em um lance só (ver `mergeWinder`).
  * Sem efeito no modelo: só devolve o plano ou a mensagem de status em pt-BR.
  */
 export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   const { shape, width, turn } = i.options;
   if (shape === 'spiral') return { error: 'O caracol é planejado por planSpiralRun (3 cliques).' };
+  if (shape === 'free') return { error: 'A escada livre é planejada pelo trajeto de cliques.' };
   const landingDepth = i.options.landingDepth ?? width;
   if (!(width > 0)) return { error: 'A largura do lance deve ser positiva.' };
   if (shape === 'lshape' && !(landingDepth >= width)) return { error: 'O patamar da escada em L deve ter profundidade ≥ largura do lance.' };
@@ -139,17 +152,19 @@ export function planStairRun(i: StairRunPlanInput): StairRunPlanResult {
   }
   if (N < 2) return { error: 'A altura é menor que um espelho: nada a gerar.' };
   if (N < MIN_RISERS[shape]) return { error: `Esta forma precisa de ao menos ${MIN_RISERS[shape]} espelhos; a altura dá ${N}.` };
-  // Reta com comprimento (2º clique): o comprimento escolhe N e o piso (a altura do espelho é H ÷ N).
-  const N0 = N;
+  const rule = i.rule ?? defaultTreadRule(i.minTread);
+  // Reta com comprimento (2º clique): N vem só da altura; o comprimento limita o piso (a escada termina antes do clique).
   const byLength = shape === 'straight' && i.options.length !== undefined;
+  let sizedTread: number | undefined;
   if (byLength) {
-    const sized = risersForLength(i.H, i.maxRiser, i.minTread, i.options.length!, i.units);
+    const sized = fitRunToLength(i.H, i.maxRiser, i.minTread, i.options.length!, rule);
     if ('error' in sized) return sized;
     N = sized.risers;
+    sizedTread = sized.tread;
   }
   const riserHeight = i.H / N;
-  const tread = byLength ? (i.options.length! / (N - 1)) : treadFor(riserHeight, i.minTread);
-  const note = byLength && N !== N0 ? lengthNote(i.H, i.minTread, i.options.length!, N, N0, i.units ?? defaultUnits()) : undefined;
+  const tread = sizedTread ?? treadFor(riserHeight, rule);
+  const note = byLength && i.options.length! > (N - 1) * tread + 0.005 ? lengthNote(i.options.length!, N, tread) : undefined;
   const base = { start: i.start, dir: i.dir, width, tread };
   let parts: StairPart[];
   try {

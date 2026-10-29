@@ -14,6 +14,7 @@ import { RoofOptionsBar } from './RoofOptionsBar.tsx';
 import { RoofArrowOptionsBar } from './RoofArrowOptionsBar.tsx';
 import { StairOptionsBar } from './StairOptionsBar.tsx';
 import { StairRunOptionsBar } from './StairRunOptionsBar.tsx';
+import { RampOptionsBar } from './RampOptionsBar.tsx';
 import { ArrayOptionsBar } from './ArrayOptionsBar.tsx';
 import { GridOptionsBar } from './GridOptionsBar.tsx';
 import { formatQuantity, openingFamilies, openingFamilyOf, type LocationLine } from '@hestia/model';
@@ -190,6 +191,7 @@ export function OptionsBar(): ReactElement {
       {tool === 'roofarrow' && <RoofArrowOptionsBar />}
       {tool === 'stair' && <StairOptionsBar />}
       {tool === 'stairrun' && <StairRunOptionsBar />}
+      {tool === 'ramp' && <RampOptionsBar />}
       {(tool === 'door' || tool === 'window') && (
         <OpeningTypePicker
           kind={tool}

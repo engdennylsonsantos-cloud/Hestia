@@ -3,7 +3,7 @@ import { sheetOf, type Project } from '@hestia/model';
 import { editor, useProject, useProjectVersion } from '../editor/controller.ts';
 import { openProjectFile } from '../editor/fileActions.ts';
 import { useI18n } from '../editor/i18n.ts';
-import { useUi } from '../editor/state.ts';
+import { toggleFileMenu, useUi } from '../editor/state.ts';
 import type { PlanKind } from '../editor/openViews.ts';
 import { Icon } from './Icon.tsx';
 import { InfoCenter } from './InfoCenter.tsx';
@@ -47,7 +47,7 @@ export function TitleBar(): ReactElement {
   const redo = pt ? 'Refazer' : 'Redo';
   return (
     <header className="titlebar">
-      <button className="app-r" onClick={() => useUi.setState({ fileMenu: true })} title={pt ? 'Menu Arquivo' : 'File menu'} aria-label={pt ? 'Menu Arquivo' : 'File menu'}>R</button>
+      <button className="app-h" onClick={toggleFileMenu} title={pt ? 'Menu Arquivo' : 'File menu'} aria-label={pt ? 'Menu Arquivo' : 'File menu'}>H</button>
       <div className="qat" role="toolbar" aria-label={pt ? 'Barra de acesso rápido' : 'Quick access toolbar'}>
         <button className="qbtn" onClick={() => fileRef.current?.click()} title={open} aria-label={open}><Icon name="qopen" size={18} /></button>
         <input ref={fileRef} id="file-open" type="file" accept=".json,.hestia,application/json" hidden onChange={(e) => { void openProjectFile(e.target.files?.[0]); e.target.value = ''; }} />

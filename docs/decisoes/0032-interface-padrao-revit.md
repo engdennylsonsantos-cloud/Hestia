@@ -24,7 +24,7 @@ na lista do painel certo, em `tabsMain.ts` (abas com ferramentas) ou `tabsSoon.t
 
 ## Barras e painéis
 
-- **Barra de título**: botão R e aba Arquivo abrem o menu Arquivo (Novo, Abrir, Salvar, Exportar DXF/PDF/IFC, Informações do projeto,
+- **Barra de título**: botão H e aba Arquivo abrem o menu Arquivo (Novo, Abrir, Salvar, Exportar DXF/PDF/IFC, Informações do projeto,
   Opções com idioma, tema e motor gráfico); Barra de Acesso Rápido só de ícones; título "Hestia - [Projeto] - Planta de piso: Térreo";
   Centro de informações com **pesquisa de comandos** (acha e executa o que está na faixa) e menu de ajuda.
 - **Docks** (`Dock.tsx`, `editor/dockLayout.ts`): Propriedades e Navegador empilhados à esquerda, com divisórias arrastáveis (largura, altura)

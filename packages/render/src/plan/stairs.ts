@@ -1,4 +1,4 @@
-import { add, difference, dist, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
+import { add, difference, dist, dot, intersection, lerp, mul, multiArea, norm, perp, pointInMulti, rotate, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { sampleChain, spiralParamsOf, stairArrivalFrame, type ResolvedStair, type ResolvedStairRiser, type ResolvedStairStep, type SpiralParams } from '@hestia/engine';
 import { isStair, type DetailLevel, type Id, type Project } from '@hestia/model';
 import type { Viewport } from '../viewport.ts';
@@ -31,15 +31,18 @@ const STAIR_SOBE_OFFSET_MM = 2.35;
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
+/** Patamares abaixo da cota `z`: cada um ocupa um espelho, mas não é degrau. */
+const landingsBelow = (s: ResolvedStair, z: number): number => s.steps.filter((x) => x.kind === 'landing' && x.z < z - EPS).length;
+
 /**
- * Número visível do degrau na planta (decisão 0011 §1 item 6): o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`.
- * É contínuo na escada: o `index` do motor reinicia em cada lance, e o 1º degrau depois de um patamar segue o último
- * espelho anterior (o patamar não recebe rótulo, mas ocupa esse número). Usa a cota, não a contagem, então um lance
- * com erro de croqui ainda conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
+ * Número visível do degrau na planta: o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`, menos os patamares
+ * abaixo dele. O patamar não é degrau: não recebe número nem ocupa um (L com 8 + 8 espelhos: 1..7 e 8..14). É contínuo na
+ * escada: o `index` do motor reinicia em cada lance. Usa a cota, não a contagem, então um lance com erro de croqui ainda
+ * conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
  */
 export function treadNumber(s: ResolvedStair, st: ResolvedStairStep): number {
   if (!(s.riserHeight > 0)) return st.index;
-  return Math.round((st.z - s.baseZ) / s.riserHeight);
+  return Math.round((st.z - s.baseZ) / s.riserHeight) - landingsBelow(s, st.z);
 }
 
 /**
@@ -138,6 +141,28 @@ function cutSymbol(c: StairCut, color: string, espessura: Espessura): StrokeOp {
 }
 
 /**
+ * Pontos que levam a seta pelo eixo do patamar entre dois lances. L: o canto onde os eixos dos lances se cruzam. U: eixos
+ * paralelos, então atravessa o patamar pela metade da profundidade. Sem patamar entre eles, nada (a ligação reta vale).
+ */
+function landingConnector(s: ResolvedStair, ciA: number, ciB: number, prev: Vec2[], next: Vec2[]): Vec2[] {
+  const landing = s.steps.find((x) => x.kind === 'landing' && x.componentIndex > ciA && x.componentIndex < ciB);
+  if (!landing || prev.length < 2 || next.length < 2) return [];
+  const a = prev[prev.length - 1]!;
+  const u1 = norm(sub(a, prev[prev.length - 2]!));
+  const b = next[0]!;
+  const u2 = norm(sub(next[1]!, b));
+  const d = sub(b, a);
+  const cross = u1.x * u2.y - u1.y * u2.x;
+  if (Math.abs(cross) > 1e-6) {
+    const t = (d.x * u2.y - d.y * u2.x) / cross;
+    return t > -EPS ? [add(a, mul(u1, t))] : [];
+  }
+  const half = Math.max(0, ...landing.polygon.map((q) => dot(sub(q, a), u1))) / 2;
+  const p1 = add(a, mul(u1, half));
+  return [p1, add(p1, sub(d, mul(u1, dot(d, u1))))];
+}
+
+/**
  * Caminhada da seta de subida, do primeiro ao último espelho, por lance: a caminhada explícita do lance (quando tem)
  * ou os pontos médios dos espelhos em ordem de subida. Um lance só tem espelhos resolvidos quando o croqui é válido
  * (o motor valida a caminhada), então a explícita usada aqui já foi aceita. Lances sem espelho resolvido não entram.
@@ -148,12 +173,20 @@ export function climbWalk(p: Project, s: ResolvedStair, risers: ResolvedStairRis
   const byComponent = new Map<number, ResolvedStairRiser[]>();
   for (const r of risers) byComponent.set(r.componentIndex, [...(byComponent.get(r.componentIndex) ?? []), r]);
   const out: Vec2[] = [];
+  let prev: { ci: number; walk: Vec2[] } | null = null;
   for (const [ci, rs] of [...byComponent].sort((x, y) => x[0] - y[0])) {
     const c = components[ci];
     const explicit = c?.kind === 'run' && c.path.length > 0 ? sampleChain(c.path) : [];
     const walk = explicit.length >= 2 ? explicit : rs.map((r) => polyMid(riserPoints(r)));
+    // A seta passa pelo eixo do patamar: o canto do L, ou a travessia do U, em vez de cortar em diagonal.
+    if (prev) out.push(...landingConnector(s, prev.ci, ci, prev.walk, walk));
     out.push(...walk);
+    prev = { ci, walk };
   }
+  // E termina no último degrau (a chegada), que a planta desenha depois do último espelho.
+  const last = arrivalRing(s);
+  const lastAt = last && out.length > 0 ? labelPoint([[last]]) : null;
+  if (lastAt) out.push(lastAt);
   return out;
 }
 
@@ -347,7 +380,8 @@ export function stairFills(
       const at = treadLabelAt(st, steps, spirals);
       if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     }
-    if (last) out.labels.push({ at: polyMid([...last, last[0]!]), text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
+    const lastAt = last ? labelPoint([[last]]) : null;
+    if (last && lastAt) out.labels.push({ at: lastAt, text: String(s.riserCount - landingsBelow(s, s.topZ + EPS)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     if (p.settings.showTags) {
       const at = labelPoint(planFootprint(s));
       if (at) out.labels.push({ at, text: s.type.code, papel: { escala: scale, fontMm: STAIR_TAG_MM } });

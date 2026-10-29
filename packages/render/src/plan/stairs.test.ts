@@ -38,16 +38,17 @@ describe('escada na planta (decisão 0011 §1)', () => {
     expect(STAIR_CUT_HEIGHT).toBe(1.2);
   });
 
-  it('seta de subida: caminhada pelos pontos médios dos espelhos, ponta no último', () => {
+  it('seta de subida: caminhada pelos pontos médios dos espelhos, ponta no centro do último degrau (a chegada)', () => {
     const { strokes } = ops();
-    const shaft = strokes.find((s) => !s.closed && s.pts.length === N)!;
+    const shaft = strokes.find((s) => !s.closed && s.pts.length === N + 1)!;
     expect(shaft.pts[0]!.y).toBeCloseTo(P, 9);
     expect(shaft.pts[N - 1]!.y).toBeCloseTo(N * P, 9);
+    expect(shaft.pts[N]!.y).toBeCloseTo(N * P + P / 2, 9);
     const head = strokes.find((s) => !s.closed && s.pts.length === 3)!;
-    expect(head.pts[1]).toEqual(shaft.pts[N - 1]);
+    expect(head.pts[1]).toEqual(shaft.pts[N]);
     // As pontas ficam para trás da ponta (subida em +y).
-    expect(head.pts[0]!.y).toBeLessThan(N * P);
-    expect(head.pts[2]!.y).toBeLessThan(N * P);
+    expect(head.pts[0]!.y).toBeLessThan(N * P + P / 2);
+    expect(head.pts[2]!.y).toBeLessThan(N * P + P / 2);
   });
 
   it('o rótulo SOBE fica junto ao início da seta', () => {
@@ -76,7 +77,7 @@ describe('escada na planta (decisão 0011 §1)', () => {
   it('ordem: espelhos recebidos fora de ordem saem em ordem de subida', () => {
     const s = stair();
     const shuffled = { ...s, risers: [...s.risers].reverse() };
-    const shaft = ops('medium', shuffled).strokes.find((t) => !t.closed && t.pts.length === N)!;
+    const shaft = ops('medium', shuffled).strokes.find((t) => !t.closed && t.pts.length === N + 1)!;
     expect(shaft.pts[0]!.y).toBeCloseTo(P, 9);
     expect(shaft.pts[N - 1]!.y).toBeCloseTo(N * P, 9);
   });
@@ -96,6 +97,13 @@ describe('escada na planta (decisão 0011 §1)', () => {
     // Topo em 1,00 m: degraus k = 1..5 (até 0,875 m) têm preenchimento; os 5 de cima (e a chegada) só o contorno.
     expect(all.fills).toHaveLength(5);
     expect(all.strokes.filter((t) => t.closed)).toHaveLength(N);
+  });
+
+  it('o número do último degrau fica no centro dele (a faixa depois do último espelho), não na borda', () => {
+    const at = ops('medium').labels.find((l) => l.text === String(N))!.at;
+    // Espelho N em y = N·p; a chegada tem p de comprimento (< 0,30 m) e a largura do lance (1 m, de x = 0 a 1).
+    expect(at.y).toBeCloseTo(N * P + P / 2, 6);
+    expect(at.x).toBeCloseTo(0.5, 6);
   });
 
   it('a pegada da planta (seleção) inclui o último degrau: passa da linha do último espelho', () => {

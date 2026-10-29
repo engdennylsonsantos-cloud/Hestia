@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { difference, intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
+import { boxOf, difference, intersection, multiArea, pointInMulti, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import {
   DEFAULT_SLAB_TYPES,
   ProjectStore,
@@ -26,7 +26,9 @@ import {
   resolveStairs,
   stairHoleRegion,
   coverUnderside,
+  generateUShape,
   stairHolesFor,
+  stairOpeningRegion,
   stairOpeningsOnLevel,
   type ResolvedStair,
 } from './index.ts';
@@ -461,5 +463,24 @@ describe('furo por elemento: modos, inclinação e cotas extremas (decisão 0011
     expect(coverUnderside(2.65, { origin: v(-1, 0), dir: v(1, 0), percent: 5 }, [ring])).toBeCloseTo(2.65, 12);
     expect(coverUnderside(2.65, { origin: v(-1, 0), dir: v(1, 0), percent: -5 }, [ring])).toBeCloseTo(2.65 - 0.35, 12);
     expect(coverUnderside(2.65, { origin: v(6, 0), dir: v(-1, 0), percent: 5 }, [ring])).toBeCloseTo(2.65, 12);
+  });
+});
+
+describe('escada em U: o vão entre os lances não deixa filete de laje', () => {
+  it('com vão de 0,20 m, o furo do contorno completo é o retângulo inteiro (sem fenda entre os lances), com folga 0 e 0,05 m', () => {
+    const comps = generateUShape({ start: v(0, 0), dir: v(0, 1), width: 1.2, risersFirst: 8, risersSecond: 8, tread: 0.28, turn: 'left', gap: 0.2 });
+    const components = comps.map((c, i): StairRun | StairLanding => (c.kind === 'run' ? { id: `r_${i}`, kind: 'run', ...c.run } : { id: `p_${i}`, kind: 'landing', boundary: c.landing.boundary }));
+    for (const margin of [0, 0.05]) {
+      const p = build({ components, stair: { openingMode: 'full', openingMargin: margin }, slabs: [{ id: 's1', boundary: box(-6, -6, 6, 6) }] }).project;
+      const [o] = stairOpeningsOnLevel(p, 'lv_1');
+      const region = stairOpeningRegion(o!.stair, o!.resolved, UPPER - 0.17);
+      const b = boxOf(region.flat(2));
+      // O meio do vão entre os lances (lance 1 em x ∈ [−0,6; 0,6], lance 2 em [−2,0; −0,8]) fica dentro do furo, e o furo é um só.
+      expect(pointInMulti(v(-0.7, 1.5), region)).toBe(true);
+      expect(region).toHaveLength(1);
+      expect(region[0]).toHaveLength(1);
+      // Sem folga o furo é o retângulo que envolve os dois lances (a fenda de 0,20 m ficaria de laje).
+      if (margin === 0) expect(multiArea(region)).toBeCloseTo((b.maxX - b.minX) * (b.maxY - b.minY), 4);
+    }
   });
 });

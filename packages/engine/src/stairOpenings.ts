@@ -1,4 +1,4 @@
-import { add, asMulti, boxOf, boxesOverlap, difference, dist, minAreaRect, mul, multiPoints, offsetMulti, ringArea, sub, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
+import { add, asMulti, boxOf, boxesOverlap, difference, dist, minAreaRect, mul, multiArea, multiPoints, offsetMulti, ringArea, sub, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
 import { stairArrivalFrame, type StairArrivalFrame } from './stairBody.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
@@ -67,6 +67,21 @@ export function spiralDiskRegion(center: Vec2, rOuter: number): MultiPolygon {
   return [[ring]];
 }
 
+/** Vão máximo (m) entre lances que a laje não deixa de filete: o furo o fecha (o vão do U mede 0,10 m por padrão). */
+const MAX_WELL_GAP = 0.3;
+/** Área (m²) mínima que o fechamento precisa acrescentar para valer; abaixo é só o arredondamento do recorte. */
+const WELL_MIN_AREA = 1e-4;
+
+/**
+ * Fecha os vãos estreitos entre lances (U): o furo cresce e encolhe `MAX_WELL_GAP ÷ 2`, o que preenche o que for mais fino
+ * que o vão e mantém o resto. Sem vão a fechar, devolve a própria região (o recorte arredonda e não deve mexer à toa).
+ */
+function closeWells(region: MultiPolygon): MultiPolygon {
+  const c = MAX_WELL_GAP / 2 + 1e-3;
+  const closed = offsetMulti(offsetMulti(region, c), -c);
+  return multiArea(closed) - multiArea(region) > WELL_MIN_AREA ? closed : region;
+}
+
 /**
  * Tira do furo a faixa da folga que passa do último espelho: dali em diante é o piso de cima, e o vão deixaria à mostra a
  * chegada da escada, um degrau abaixo do piso. Só corta o que a folga (`depth`) acrescentou; o contorno dos degraus não passa dali.
@@ -91,6 +106,7 @@ export function stairOpeningRegion(s: Stair, r: ResolvedStair, undersideZ: numbe
   const full: MultiPolygon = r.spiral ? spiralDiskRegion(r.spiral.center, r.spiral.rOuter) : r.footprint;
   let region: MultiPolygon = s.openingMode === 'full' ? full : stairHoleRegion(r, undersideZ, s.openingHeadroom ?? r.type.minHeadroom);
   if (region.length === 0) return [];
+  if (!r.spiral) region = closeWells(region);
   if (s.openingMargin > 0) {
     region = offsetMulti(region, s.openingMargin);
     const top = r.spiral ? null : stairArrivalFrame(r);

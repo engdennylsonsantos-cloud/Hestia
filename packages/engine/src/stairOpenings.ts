@@ -1,7 +1,7 @@
 import { add, asMulti, boxOf, boxesOverlap, difference, dist, minAreaRect, mul, multiArea, multiPoints, offsetMulti, ringArea, sub, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
 import { stairArrivalFrame, type StairArrivalFrame } from './stairBody.ts';
-import { resolveStairs, type ResolvedStair } from './stairs.ts';
+import { resolveStairOne, type ResolvedStair } from './stairs.ts';
 
 /** Tolerância de cota e de área (m, m²) nas comparações do furo. */
 const EPS = 1e-9;
@@ -45,9 +45,9 @@ export interface StairOpening {
 export function stairOpeningsOnLevel(p: Project, levelId: Id): StairOpening[] {
   const candidates = stairs(p).filter((s) => s.openingMode !== 'none' && stairTopLevel(p, s)?.id === levelId);
   if (candidates.length === 0) return [];
-  const resolved = new Map(resolveStairs(p).map((r) => [r.id, r] as const));
+  // Só as candidatas do nível de topo são resolvidas (cada uma uma vez por projeto, pelo memo de `resolveStairOne`).
   return candidates.flatMap((stair): StairOpening[] => {
-    const r = resolved.get(stair.id);
+    const r = resolveStairOne(p, stair);
     return r ? [{ stair, resolved: r }] : [];
   });
 }

@@ -2,7 +2,7 @@ import { asMulti, minAreaRect, multiPoints, offsetMulti, union, type MultiPolygo
 import { rampTopLevel, ramps, type Id, type Project, type Ramp } from '@hestia/model';
 import type { StairArrivalFrame } from './stairBody.ts';
 import { closeWells, trimBeyondTop } from './stairOpenings.ts';
-import { resolveRamps, type ResolvedRamp } from './ramps.ts';
+import { resolveRampOne, type ResolvedRamp } from './ramps.ts';
 
 const EPS = 1e-9;
 
@@ -49,9 +49,9 @@ export interface RampOpening {
 export function rampOpeningsOnLevel(p: Project, levelId: Id): RampOpening[] {
   const candidates = ramps(p).filter((r) => r.openingMode !== 'none' && rampTopLevel(p, r)?.id === levelId);
   if (candidates.length === 0) return [];
-  const resolved = new Map(resolveRamps(p).map((r) => [r.id, r] as const));
+  // Só as candidatas do nível de topo são resolvidas (e cada uma uma vez por projeto, pelo memo de `resolveRampOne`).
   return candidates.flatMap((ramp): RampOpening[] => {
-    const resolvedRamp = resolved.get(ramp.id);
+    const resolvedRamp = resolveRampOne(p, ramp);
     return resolvedRamp ? [{ ramp, resolved: resolvedRamp }] : [];
   });
 }

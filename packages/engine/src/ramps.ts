@@ -14,6 +14,7 @@ import {
 import { makeRampIssue, rampNormIssues, type RampIssueItem } from './rampIssues.ts';
 import { distributeRisers, stairLandingPolygon, stairRunSteps } from './stairSketch.ts';
 import { minWidth } from './stairIssues.ts';
+import { memoDoProjetoMotor } from './memoProjeto.ts';
 
 /** Comprimento de cada fatia de lance (m). */
 export const RAMP_SLICE_LENGTH = 0.1;
@@ -227,9 +228,14 @@ function resolveOne(p: Project, r: Ramp): ResolvedRamp | null {
 
 const pct = (s: number): string => `${(s * 100).toFixed(2).replace('.', ',')} %`;
 
+/** Uma rampa resolvida, memorizada por projeto (a resolução é ~100 ms por rampa; o projeto é imutável). */
+export function resolveRampOne(p: Project, r: Ramp): ResolvedRamp | null {
+  return memoDoProjetoMotor(p, `rampa|${r.id}`, () => resolveOne(p, r));
+}
+
 const resolveList = (p: Project, list: Ramp[]): ResolvedRamp[] =>
   list.flatMap((r) => {
-    const rr = resolveOne(p, r);
+    const rr = resolveRampOne(p, r);
     return rr ? [rr] : [];
   });
 

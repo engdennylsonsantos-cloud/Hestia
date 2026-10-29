@@ -14,6 +14,7 @@ import {
 import { makeStairIssue, spiralNormIssues, stairNormIssues, type StairIssueItem } from './stairIssues.ts';
 import { orderRisers, stairLandingPolygon, stairRunSteps, trimRisers, type StairRunSketch } from './stairSketch.ts';
 import { isSpiralRun, spiralParamsOf } from './stairSpiral.ts';
+import { memoDoProjetoMotor } from './memoProjeto.ts';
 
 /** Degrau (kind 'tread', index 1..N−1 no lance) ou patamar (kind 'landing', index sequencial na escada, a partir de 1). */
 export interface ResolvedStairStep {
@@ -175,9 +176,14 @@ function resolveOne(p: Project, s: Stair): ResolvedStair | null {
   return rs;
 }
 
+/** Uma escada resolvida, memorizada por projeto (o projeto é imutável: cada edição cria outro objeto). */
+export function resolveStairOne(p: Project, s: Stair): ResolvedStair | null {
+  return memoDoProjetoMotor(p, `escada|${s.id}`, () => resolveOne(p, s));
+}
+
 const resolveList = (p: Project, list: Stair[]): ResolvedStair[] =>
   list.flatMap((s) => {
-    const r = resolveOne(p, s);
+    const r = resolveStairOne(p, s);
     return r ? [r] : [];
   });
 

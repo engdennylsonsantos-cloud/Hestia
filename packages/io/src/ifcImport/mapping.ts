@@ -28,6 +28,8 @@ export interface ImportReport {
   approximate: Record<string, number>;
   /** Geometria que o leitor não representou (corte booleano, extrusão inclinada...), por motivo. */
   geometry: Record<string, number>;
+  /** Objetos importados como elemento genérico, por classe IFC. */
+  generic: Record<string, number>;
   warnings: string[];
 }
 
@@ -53,7 +55,7 @@ interface Ctx {
   walls: Map<number, Id>;
   types: Map<string, Id>;
   approximate: Record<string, number>;
-  /** Assinaturas de piso/laje/forro j� importados (evita duplicata sobreposta do mesmo arquivo). */
+  /** Assinaturas de piso/laje/forro já importados (evita duplicata sobreposta do mesmo arquivo). */
   slabs: Set<string>;
   order: number;
   warn(msg: string): void;
@@ -69,6 +71,7 @@ const emptyReport = (f: IfcFile): ImportReport => ({
   skipped: {},
   approximate: {},
   geometry: {},
+  generic: {},
   warnings: [],
 });
 
@@ -89,13 +92,56 @@ function noteGeometry(ctx: Ctx, body: Body | null): void {
 }
 
 /**
- * Produtos que o importador não visita (viga, pilar, escada, telhado, mobiliário...) entram no relatório
- * em vez de sumirem calados: o relatório não pode dizer "0 ignorados" com 51 vigas no arquivo.
+ * Produtos que o importador não representa como elemento nativo viram **objeto genérico** com a malha e a classe IFC de
+ * origem. O que não tiver malha fica de fora e entra em `skipped` (via `countUnhandledProducts`).
  */
-function countUnhandledProducts(f: IfcFile, report: ImportReport): void {
+function addGenericObjects(file: IfcFile, ctx: Ctx): Set<number> {
+  const converted = new Set<number>();
+  const handled = /^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|SPACE|GRID|OPENINGELEMENT|ANNOTATION|SITE|BUILDING|PROJECT|BUILDINGSTOREY)/;
+  for (const e of file.step.entities.values()) {
+    if (handled.test(e.type)) continue;
+    if (!file.ref(e, 5) || file.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
+    const body = bodyOf(file, e);
+    if (!body.tris.length) continue;
+    const positions: number[] = [], indices: number[] = [];
+    let minZ = Infinity;
+    for (const tri of body.tris) {
+      for (const p of tri) {
+        indices.push(positions.length / 3);
+        positions.push(p.x, p.y, p.z);
+        minZ = Math.min(minZ, p.z);
+      }
+    }
+    if (!positions.length) continue;
+    const outline = hull2(body.points.map((p) => ({ x: p.x, y: p.y })));
+    const id = `g_${guid(file, e)}`;
+    ctx.p.elements[id] = {
+      id,
+      kind: 'generic',
+      levelId: levelAt(ctx, minZ).id,
+      name: file.text(e, 2).trim() || file.text(ctx.typeOf.get(e.id), 2).trim() || e.type,
+      sourceClass: e.type,
+      predefinedType: file.enum(e, 8) || undefined,
+      objectType: file.text(e, 4) || undefined,
+      mesh: { positions, indices },
+      outline: outline.length >= 3 ? outline : undefined,
+      order: ctx.order++,
+    };
+    converted.add(e.id);
+    ctx.report.generic[e.type] = (ctx.report.generic[e.type] ?? 0) + 1;
+    ctx.count('objetos');
+  }
+  return converted;
+}
+
+/**
+ * Produtos que o importador não visita nem converteu em genérico entram no relatório em vez de sumirem calados: o
+ * relatório não pode dizer "0 ignorados" com 51 vigas no arquivo.
+ */
+function countUnhandledProducts(f: IfcFile, report: ImportReport, converted: Set<number>): void {
   const handled = /^IFC(WALL|SLAB|COVERING|DOOR|WINDOW|SPACE|GRID|OPENINGELEMENT|ANNOTATION|SITE|BUILDING|PROJECT|BUILDINGSTOREY)/;
   for (const e of f.step.entities.values()) {
-    if (handled.test(e.type)) continue;
+    if (converted.has(e.id) || handled.test(e.type)) continue;
     if (!f.ref(e, 5) || f.ent(e, 6)?.type !== 'IFCPRODUCTDEFINITIONSHAPE') continue;
     report.skipped[e.type] = (report.skipped[e.type] ?? 0) + 1;
   }
@@ -412,7 +458,7 @@ export function importIfc(text: string, base?: Project): ImportResult {
   for (const e of products(file, 'IFCCOVERING')) addSlab(ctx, e);
   for (const e of file.byType('IFCSPACE')) addRoom(ctx, e);
   addGrids(ctx);
-  countUnhandledProducts(file, report);
+  countUnhandledProducts(file, report, addGenericObjects(file, ctx));
   p.name = projectName(file, p);
   p.nextOrder = ctx.order;
   return { project: p, report };

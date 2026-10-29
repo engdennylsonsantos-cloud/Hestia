@@ -11,6 +11,7 @@ const relatorio = (patch: Partial<ImportReport> = {}): ImportReport => ({
   skipped: {},
   approximate: {},
   geometry: {},
+  generic: {},
   warnings: [],
   ...patch,
 });

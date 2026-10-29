@@ -12,6 +12,7 @@ import { LotesPorFaixa, type Faixa3D } from './faixas3d.ts';
 import { BITS_PROFUNDIDADE, diagnosticarOrigem, diagnosticarProfundidade, type DiagnosticoOrigem, type DiagnosticoProfundidade } from './precisao3d.ts';
 import { buildEaveSolids } from './eaveSolids.ts';
 import { buildStairSolids } from './stairSolids.ts';
+import { buildGenericSolids } from './genericSolids.ts';
 import { RealcesDaCena } from './realceDaCena3d.ts';
 import { buildLevelSolidsComCaixas } from './paredesInstanciadas3d.ts';
 import { CaixasDoNivel } from './caixasDoNivel3d.ts';
@@ -413,6 +414,7 @@ export class ModelScene {
       ...buildRoofSolids(roofs),
       ...eave.batches,
       ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
+      ...(shown('generic') ? buildGenericSolids(p, lv.levelId) : []),
     ];
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];
     // Caminho de referência (`instanciar: false`): cada nível tem as suas malhas. Caminho padrão: os sólidos vão para os

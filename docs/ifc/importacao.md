@@ -39,17 +39,17 @@ O formato do relatório:
   "skipped": {},
   "approximate": {},
   "geometry": {},
+  "generic": {},
   "warnings": []
 }
 ```
 
 - `broken`: entidades STEP que o tokenizador não conseguiu ler (o resto do arquivo continua).
-- `imported`: contagem por categoria que virou elemento nativo.
-- `skipped`: contagem por **classe IFC** de produto que não entrou — inclusive as classes que o importador não
-  representa (viga, pilar, escada, telhado, mobiliário), para o relatório não dizer "0 ignorados" com 51 vigas no
-  arquivo.
+- `imported`: contagem por categoria que virou elemento nativo (`objetos` = genéricos).
+- `skipped`: contagem por **classe IFC** de produto que ficou de fora — sem malha legível ou tipo sem corpo.
 - `approximate`: formas aproximadas (hull de malha) por categoria.
 - `geometry`: geometria que o leitor não representou, por motivo (`corte-booleano-ignorado`, `extrusao-inclinada`).
+- `generic`: objetos importados como `kind: 'generic'`, por classe IFC de origem.
 - `warnings`: avisos em texto, no máximo 200 e sem repetição.
 
 ## 2 · O que o importador aceita
@@ -97,26 +97,28 @@ Os **tipos** são criados na hora, com nome + espessura (e, para portas e janela
   plano `sliding` quando contém `SLIDING`/`POCKET`, `fixed` para janela e `swing` para porta nos demais casos,
   materiais `mat_aluminio` (batente) e `mat_vidro` (vidro).
 
-## 4 · O que é ignorado ou apenas contado
+## 4 · Objetos genéricos e o que fica de fora
 
-Produto com colocação e forma que o importador não representa entra em `skipped`, por classe:
+Produto que não tem equivalente nativo entra como **elemento genérico** (`kind: 'generic'`): guarda a classe IFC de
+origem, o `PredefinedType`/`ObjectType`, a malha triangular em coordenadas de mundo e o contorno em planta (hull).
+Entram assim: `IfcRoof`, `IfcStair`, `IfcRailing`, `IfcColumn`, `IfcBeam`, `IfcMember`, `IfcPlate`, `IfcFooting`,
+mobiliário, MEP (terminais, tubos, dutos), `IfcCurtainWall` e `IfcBuildingElementProxy` quando têm corpo.
 
-- `IfcRoof` e `IfcStair` (telhado e escada não são nativos na importação);
-- `IfcColumn`, `IfcBeam`, `IfcMember`, `IfcPlate`, `IfcRailing`, `IfcRamp`, `IfcFooting`, `IfcPile`;
-- `IfcFurnishingElement`, `IfcBuildingElementProxy`, `IfcElementAssembly`, `IfcCurtainWall`;
-- `IfcSite`/`IfcBuilding` (só os pavimentos viram níveis), `IfcAnnotation`, grupos e sistemas;
-- MEP (`IfcFlowTerminal`, `IfcDistributionFlowElement`...).
+No 3D o genérico é uma malha com sombreamento chapado, selecionável como os demais elementos; na planta é um contorno
+tracejado fino. Ele **não** entra em quantitativo, tabela, DXF, prancha nem no IFC de exportação (v1), e não tem
+propriedades editáveis.
 
-Entidades que **não são produto** (`IfcPropertySet`, `IfcElementQuantity`, `IfcMaterial*`, estilos, cores, camadas de
-desenho) não entram na conta: não são objeto do modelo.
+`skipped` recebe só o que não deu para representar:
 
-`skipped` também recebe os casos em que o importador tentou mapear e recusou:
-
-- parede cujo contorno não cabe no retângulo (chave `parede-forma-livre`);
+- produto sem malha legível (por exemplo, mobiliário só com `IfcBoundingBox`);
+- parede cujo contorno não cabe no retângulo (chave `parede-forma-livre`) — o corpo dela não vira genérico;
 - `IfcCovering` que não é `CEILING`;
 - porta/janela sem vão, sem parede hospedeira, sem corpo ou com menos de 3 pontos;
 - piso, laje, forro ou ambiente sem corpo legível;
 - `duplicado`: piso/laje/forro com o mesmo contorno e a mesma cota de um já importado.
+
+Entidades que **não são produto** (`IfcPropertySet`, `IfcElementQuantity`, `IfcMaterial*`, estilos, cores, camadas de
+desenho) não entram na conta: não são objeto do modelo.
 
 `approximate` registra a parede que veio de malha (hull da projeção), o piso/laje/forro aproximado e o ambiente
 aproximado. `geometry` conta o que foi descartado dentro de um corpo que entrou: `corte-booleano-ignorado` (só o
@@ -207,11 +209,11 @@ Resultado medido em 2026-10-28 (tempos de uma máquina; contagens são as do rel
 | Fixture | Schema | Níveis | Importado | Ignorado |
 |---|---|---|---|---|
 | `parede-janela.ifc` | IFC4 | 1 | 1 parede, 1 janela | — |
-| `predio-simples.ifc` | IFC4 | 1 | 4 paredes, 3 pisos, 2 ambientes | 1 `IfcFurniture`, 1 `IfcSpatialZone` |
+| `predio-simples.ifc` | IFC4 | 1 | 4 paredes, 3 pisos, 2 ambientes, 1 objeto | 1 `IfcFurniture`, 1 `IfcSpatialZone` |
 | `casa-pequena.ifc` | IFC4 | 1 | 1 parede | — |
-| `fzk-haus.ifc` | IFC2X3 | 2 | 13 paredes, 5 portas, 11 janelas, 3 lajes, 1 piso, 7 ambientes | 51 `IfcBeam`, 1 `IfcColumn`, 1 `IfcStair`, 2 `IfcRailing`, 15 `IfcFurnishingElement`, 7 MEP |
+| `fzk-haus.ifc` | IFC2X3 | 2 | 13 paredes, 5 portas, 11 janelas, 3 lajes, 1 piso, 7 ambientes, **57 objetos** | 12 `IfcFurnishingElement` sem malha, 7 MEP, 1 `IfcStair` |
 
 O `fzk-haus.ifc` também traz 9 cortes booleanos e 16 extrusões não verticais, que aparecem em `geometry`; os três
 `IfcSlab` entram como piso/laje. O `sample` do Revit (25 MB) importa 48 paredes, 9 portas, 15 janelas, 10 pisos,
-2 lajes, 2 forros e 14 ambientes em ~1,9 s, e relata 296 produtos não representados (vigas, chapas, mobiliário,
-fundações, escada) — é o caso que mostra por que `skipped` precisa contar as classes não visitadas.
+2 lajes, 2 forros, 14 ambientes e **279 objetos genéricos** em ~2,9 s — vigas, chapas, mobiliário, fundações e escada
+aparecem no 3D; só as 10 portas/janelas sem vão e o `IfcCovering` de revestimento ficam de fora.

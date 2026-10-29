@@ -28,14 +28,16 @@ export interface Prism {
 export interface Body {
   prisms: Prism[];
   meshes: Pt3[][];
-  /** V�rtices de tudo que n�o virou prisma (aberturas extrudadas na horizontal, B-reps, malhas). */
+  /** Vértices de tudo que não virou prisma (aberturas extrudadas na horizontal, B-reps, malhas). */
   points: Pt3[];
+  /** Triângulos em coordenadas de mundo, para o elemento genérico. */
+  tris: Pt3[][];
   axis: [Pt2, Pt2] | null;
   /** Itens que o leitor não entendeu (contagem para o relatório). */
   unsupported: string[];
 }
 
-const zero = (): Body => ({ prisms: [], meshes: [], points: [], axis: null, unsupported: [] });
+const zero = (): Body => ({ prisms: [], meshes: [], points: [], tris: [], axis: null, unsupported: [] });
 
 /** Corpo de um `IfcProduct` (atributo 6), com a colocação do produto já aplicada. */
 export function bodyOf(f: IfcFile, product: StepEntity): Body {
@@ -93,19 +95,21 @@ function readItem(f: IfcFile, item: StepEntity, mat: Mat, out: Body, depth: numb
     case 'IFCFACETEDBREP':
     case 'IFCSHELLBASEDSURFACEMODEL':
     case 'IFCFACEBASEDSURFACEMODEL': {
-      const mesh = facesOf(f, item).map((p) => applyMat(mat, p));
-      if (mesh.length) {
-        out.meshes.push(mesh);
-        out.points.push(...mesh);
+      const tris = facesOf(f, item).map((t) => t.map((p) => applyMat(mat, p)));
+      if (tris.length) {
+        out.tris.push(...tris);
+        out.meshes.push(tris.flat());
+        out.points.push(...tris.flat());
       }
       return;
     }
     case 'IFCTRIANGULATEDFACESET':
     case 'IFCPOLYGONALFACESET': {
-      const mesh = tessellationOf(f, item).map((p) => applyMat(mat, p));
-      if (mesh.length) {
-        out.meshes.push(mesh);
-        out.points.push(...mesh);
+      const tris = tessellationOf(f, item).map((t) => t.map((p) => applyMat(mat, p)));
+      if (tris.length) {
+        out.tris.push(...tris);
+        out.meshes.push(tris.flat());
+        out.points.push(...tris.flat());
       }
       return;
     }
@@ -131,20 +135,14 @@ function readExtrusion(f: IfcFile, item: StepEntity, mat: Mat, out: Body): void 
   const depth = (f.num(item, 3) ?? 0) * f.units.length;
   if (depth <= 0) return;
   const lift = applyMat({ o: pt3(0, 0, 0), x: local.x, y: local.y, z: local.z }, mul3(dir, depth));
-  const loops = prof.loops.map((loop) =>
-    loop.map((p) => {
-      const w = applyMat(local, pt3(p.x, p.y, 0));
-      return { x: w.x, y: w.y };
-    }),
-  );
+  const base3 = prof.loops.map((loop) => loop.map((p) => applyMat(local, pt3(p.x, p.y, 0))));
+  const top3 = base3.map((loop) => loop.map((p) => pt3(p.x + lift.x, p.y + lift.y, p.z + lift.z)));
+  addPrismTriangles(out, base3, top3);
+  const loops = base3.map((loop) => loop.map((p) => ({ x: p.x, y: p.y })));
   if (Math.abs(lift.x) > 1e-6 || Math.abs(lift.y) > 1e-6) {
     // Extrusão não vertical (abertura atravessando a parede, por exemplo): guarda os vértices.
-    for (const loop of prof.loops) {
-      for (const p of loop) {
-        const base = applyMat(local, pt3(p.x, p.y, 0));
-        out.points.push(base, pt3(base.x + lift.x, base.y + lift.y, base.z + lift.z));
-      }
-    }
+    for (const loop of base3) for (const p of loop) out.points.push(p);
+    for (const loop of top3) for (const p of loop) out.points.push(p);
     out.unsupported.push('extrusao-inclinada');
     return;
   }
@@ -153,6 +151,21 @@ function readExtrusion(f: IfcFile, item: StepEntity, mat: Mat, out: Body): void 
   const z1 = zBase + Math.max(0, lift.z);
   for (const loop of loops) for (const p of loop) out.points.push(pt3(p.x, p.y, z0), pt3(p.x, p.y, z1));
   out.prisms.push({ loops, z0, z1, approx: false });
+}
+
+/** Fecha um prisma (laterais e tampas) em triângulos; furos não são recortados nas tampas (v1). */
+function addPrismTriangles(out: Body, base: Pt3[][], top: Pt3[][]): void {
+  for (let k = 0; k < base.length; k++) {
+    const b = base[k]!;
+    const t = top[k]!;
+    if (b.length < 3) continue;
+    for (let i = 0; i < b.length; i++) {
+      const j = (i + 1) % b.length;
+      out.tris.push([b[i]!, b[j]!, t[j]!], [b[i]!, t[j]!, t[i]!]);
+    }
+    if (k > 0) continue;
+    for (let i = 1; i < b.length - 1; i++) out.tris.push([b[0]!, b[i + 1]!, b[i]!], [t[0]!, t[i]!, t[i + 1]!]);
+  }
 }
 
 /** `IfcMappedItem`: representação compartilhada (portas, janelas, mobiliário) com transformação. */
@@ -178,28 +191,27 @@ function transformation(f: IfcFile, e: StepEntity | undefined): Mat {
   return { o, x: mul3(unit3(a1), scale), y: mul3(unit3(a2), scale), z: mul3(unit3(a3), scale) };
 }
 
-/** Faces de um B-rep/shell, achatadas em triângulos para o contorno aproximado. */
-function facesOf(f: IfcFile, e: StepEntity): Pt3[] {
-  const points: Pt3[] = [];
-  const shells = e.type === 'IFCFACETEDBREP' ? [f.ent(e, 0)] : [f.ent(e, 0)];
-  for (const shell of shells) {
-    if (!shell) continue;
-    for (const face of f.list(shell, 0)) {
-      for (const bound of f.list(face, 0)) {
-        const loop = f.ent(bound, 0);
-        if (!loop) continue;
-        for (const p of f.list(loop, 0)) {
-          const q = f.point(p ? { k: 'ref', id: p.id } : undefined);
-          if (q) points.push(q);
-        }
-      }
+/** Faces de um B-rep/shell em triângulos (leque por face; buracos de face não são recortados). */
+function facesOf(f: IfcFile, e: StepEntity): Pt3[][] {
+  const tris: Pt3[][] = [];
+  const shell = f.ent(e, 0);
+  if (!shell) return tris;
+  for (const face of f.list(shell, 0)) {
+    for (const bound of f.list(face, 0)) {
+      const loop = f.ent(bound, 0);
+      if (!loop) continue;
+      const pts = f
+        .list(loop, 0)
+        .map((p) => f.point(p ? { k: 'ref', id: p.id } : undefined))
+        .filter((p): p is Pt3 => !!p);
+      for (let i = 1; i + 1 < pts.length; i++) tris.push([pts[0]!, pts[i]!, pts[i + 1]!]);
     }
   }
-  return points;
+  return tris;
 }
 
-/** `IfcTriangulatedFaceSet`/`IfcPolygonalFaceSet`: vértices de todas as faces. */
-function tessellationOf(f: IfcFile, e: StepEntity): Pt3[] {
+/** `IfcTriangulatedFaceSet`/`IfcPolygonalFaceSet`: triângulos pelos índices de `CoordIndex`. */
+function tessellationOf(f: IfcFile, e: StepEntity): Pt3[][] {
   const coords = f.ent(e, 0);
   if (!coords) return [];
   const verts: Pt3[] = [];
@@ -207,7 +219,18 @@ function tessellationOf(f: IfcFile, e: StepEntity): Pt3[] {
     const n = listOf(item).map((x) => numOf(x) ?? 0);
     if (n.length >= 3) verts.push(pt3((n[0] ?? 0) * f.units.length, (n[1] ?? 0) * f.units.length, (n[2] ?? 0) * f.units.length));
   }
-  return verts;
+  const tris: Pt3[][] = [];
+  for (const face of listOf(e.args[3])) {
+    const idx = listOf(face).map((x) => Math.round(numOf(x) ?? 0) - 1);
+    for (let i = 1; i + 1 < idx.length; i++) {
+      const a = verts[idx[0] ?? -1];
+      const b = verts[idx[i] ?? -1];
+      const c = verts[idx[i + 1] ?? -1];
+      if (a && b && c) tris.push([a, b, c]);
+    }
+  }
+  if (!tris.length) for (let i = 1; i + 1 < verts.length; i++) tris.push([verts[0]!, verts[i]!, verts[i + 1]!]);
+  return tris;
 }
 
 /** Remove pontos repetidos (inclusive o de fechamento): o validador do Hestia trata aresta de comprimento zero como cruzamento. */

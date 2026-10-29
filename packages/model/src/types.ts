@@ -537,7 +537,29 @@ export interface Room {
   order: number;
 }
 
-export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room;
+/**
+ * Objeto importado de outro programa (IFC) sem equivalente nativo: viga, pilar, escada, mobiliário, MEP, curtain wall...
+ * Guarda a classe de origem e a malha triangular em coordenadas de mundo (m). Entra no 3D; não entra em quantitativo,
+ * DXF nem no IFC de exportação (v1).
+ */
+export interface Generic {
+  id: Id;
+  kind: 'generic';
+  levelId: Id;
+  name: string;
+  /** Classe IFC de origem (`IFCBEAM`, `IFCSTAIR`...). */
+  sourceClass: string;
+  predefinedType?: string;
+  objectType?: string;
+  /** Malha triangular em coordenadas de mundo: `positions` = x, y, z...; `indices` = triplas. */
+  mesh: { positions: number[]; indices: number[] };
+  /** Contorno em planta (hull da malha) para as vistas 2D; ausente = sem desenho em planta. */
+  outline?: Vec2[];
+  color?: string;
+  order: number;
+}
+
+export type Element = Wall | Opening | Floor | Slab | Ceiling | Roof | Stair | Room | Generic;
 
 export interface ProjectDefaults {
   wallTypeId: Id;
@@ -662,3 +684,4 @@ export const isWall = (e: Element | undefined): e is Wall => e?.kind === 'wall';
 export const isOpening = (e: Element | undefined): e is Opening => e?.kind === 'door' || e?.kind === 'window';
 export const isStair = (e: Element | undefined): e is Stair => e?.kind === 'stair';
 export const isRoom = (e: Element | undefined): e is Room => e?.kind === 'room';
+export const isGeneric = (e: Element | undefined): e is Generic => e?.kind === 'generic';

@@ -43,6 +43,7 @@ const CATEGORY_LAYER: Record<GraphicsCategory, string> = {
   stair: 'CORTE_ESCADA',
   room: 'CORTE_AMBIENTE',
   annotation: 'CORTE_ANOTACAO',
+  generic: 'CORTE_IMPORTADO',
 };
 
 /** Contorno externo do corte/elevação (união das regiões visíveis). */

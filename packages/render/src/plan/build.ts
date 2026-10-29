@@ -1,6 +1,6 @@
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { dimensionPoints, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
+import { dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingPlanDisplay, openingShowSwing, openingSwingStyle, projectGrids, wallsOnLevel, type Id, type Material, type Project } from '@hestia/model';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, telhadosDoNivel } from './resolucao.ts';
 import type { Inference, PreviewItem } from '@hestia/tools';
 import type { Viewport } from '../viewport.ts';
@@ -380,6 +380,14 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Etiquetas de portas e janelas (Tag on Placement): desligadas por padrão, ligadas ao inserir.
   if (p.settings.showOpeningTags) labels.push(...openingTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
   if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
+
+  // Objetos importados (viga, pilar, mobiliário...): na v1 só o contorno aproximado em planta, tracejado e fino.
+  if (paint.generic.visible) {
+    for (const e of Object.values(p.elements)) {
+      if (!isGeneric(e) || e.levelId !== input.levelId || !e.outline?.length) continue;
+      strokes.push({ pts: e.outline, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8, dash: [5, 3] });
+    }
+  }
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,
   // pré-visualização e guias) mantém a largura própria.

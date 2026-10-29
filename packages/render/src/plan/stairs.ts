@@ -31,18 +31,15 @@ const STAIR_SOBE_OFFSET_MM = 2.35;
 
 const empty = (): FloorOps => ({ fills: [], strokes: [], labels: [] });
 
-/** Patamares abaixo da cota `z`: cada um ocupa um espelho, mas não é degrau. */
-const landingsBelow = (s: ResolvedStair, z: number): number => s.steps.filter((x) => x.kind === 'landing' && x.z < z - EPS).length;
-
 /**
- * Número visível do degrau na planta: o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`, menos os patamares
- * abaixo dele. O patamar não é degrau: não recebe número nem ocupa um (L com 8 + 8 espelhos: 1..7 e 8..14). É contínuo na
- * escada: o `index` do motor reinicia em cada lance. Usa a cota, não a contagem, então um lance com erro de croqui ainda
- * conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
+ * Número visível do degrau na planta (decisão 0011 §1 item 6): o espelho que ele alcança, `k = round((zTopo − baseZ) / h)`.
+ * O patamar conta como degrau, como no Revit, e recebe o seu número (L com 8 + 8 espelhos: 1..7, patamar 8, 9..15 e a
+ * chegada 16). É contínuo na escada: o `index` do motor reinicia em cada lance. Usa a cota, não a contagem, então um lance
+ * com erro de croqui ainda conta os seus espelhos. Sem altura real do espelho, vale o índice do lance.
  */
 export function treadNumber(s: ResolvedStair, st: ResolvedStairStep): number {
   if (!(s.riserHeight > 0)) return st.index;
-  return Math.round((st.z - s.baseZ) / s.riserHeight) - landingsBelow(s, st.z);
+  return Math.round((st.z - s.baseZ) / s.riserHeight);
 }
 
 /**
@@ -374,14 +371,13 @@ export function stairFills(
     }
     const cut = stairCutBase(s, risers, cutZ);
     if (cut) out.strokes.push(cutSymbol(cut, theme.ink, corte));
-    // Numeração dos degraus no médio e no fino (o grosseiro só preenche a pegada, e saiu acima).
+    // Numeração dos degraus no médio e no fino (o grosseiro só preenche a pegada, e saiu acima). O patamar é um degrau.
     for (const st of steps) {
-      if (st.kind !== 'tread') continue;
       const at = treadLabelAt(st, steps, spirals);
       if (at) out.labels.push({ at, text: String(treadNumber(s, st)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(st.z > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     }
     const lastAt = last ? labelPoint([[last]]) : null;
-    if (last && lastAt) out.labels.push({ at: lastAt, text: String(s.riserCount - landingsBelow(s, s.topZ + EPS)), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
+    if (last && lastAt) out.labels.push({ at: lastAt, text: String(s.riserCount), papel: { escala: scale, fontMm: STAIR_TEXT_MM }, ...(s.topZ > cutZ + EPS ? { tone: 'soft' as const } : {}) });
     if (p.settings.showTags) {
       const at = labelPoint(planFootprint(s));
       if (at) out.labels.push({ at, text: s.type.code, papel: { escala: scale, fontMm: STAIR_TAG_MM } });

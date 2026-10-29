@@ -2,7 +2,7 @@ import { add, dist, mul, norm, sub, v2, type Vec2 } from '@hestia/geom';
 import { DEFAULT_GRID_TYPE_ID, GRID_MIN_SEGMENT, formatQuantity, isWall, nextGridName, newId, unitsOf, type Grid, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { clampSag, gridPreviewItems } from './gridGeom.ts';
-import { parseQuantityText } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import { pickAt } from './pick.ts';
 import type { GridMode, PointerInfo } from './types.ts';
 
@@ -161,7 +161,7 @@ export class GridTool extends ToolBase {
     if (!this.pts.length || this.mode() === 'pick') return false;
     const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     if (this.mode() === 'arc' && this.pts.length === 2) {
@@ -171,7 +171,7 @@ export class GridTool extends ToolBase {
       return true;
     }
     if (v <= 0) {
-      this.env.say('Digite o comprimento em metros, maior que zero.');
+      this.env.say(`Digite o comprimento em ${lengthUnitName(unitsOf(this.env.project()))}, maior que zero.`);
       return false;
     }
     const last = this.pts[this.pts.length - 1]!;

@@ -5,7 +5,7 @@ import { ToolBase, makeId } from './base.ts';
 import { segmentLengthDim } from './dims/providers/wall.ts';
 import type { DimRef, TempDim } from './dims/types.ts';
 import type { InferContext } from './infer.ts';
-import { parseQuantityText } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import type { PointerInfo } from './types.ts';
 
 const fmt = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
@@ -248,7 +248,7 @@ export class WallTool extends ToolBase {
     if (this.isRect() || !this.startPt) return false;
     const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     if (this.chordEnd) {
@@ -262,7 +262,7 @@ export class WallTool extends ToolBase {
       return true;
     }
     if (v <= 0) {
-      this.env.say('Valor inválido. Digite o comprimento em metros.');
+      this.env.say(`Valor inválido. Digite o comprimento em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     const dir = norm(sub(this.inf?.point ?? this.raw, this.startPt));

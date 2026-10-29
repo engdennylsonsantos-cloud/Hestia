@@ -3,7 +3,7 @@ import { frameOfWall, toLocal, type WallFrame } from '@hestia/engine';
 import { formatQuantity, isWall, unitsOf, type Id, type ResolvedUnits } from '@hestia/model';
 import { ToolBase } from './base.ts';
 import { copyWalls, ghostBands } from './edit.ts';
-import { parseQuantityText } from './numeric.ts';
+import { lengthUnitName, parseQuantityText } from './numeric.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
 const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
@@ -173,11 +173,11 @@ export class ParallelTool extends ToolBase {
     if (!this.base) return false;
     const v = parseQuantityText(text, unitsOf(this.env.project()), 'length');
     if (v === null) {
-      this.env.say('Valor inválido. Digite um número em metros.');
+      this.env.say(`Valor inválido. Digite um número em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     if (v <= 0) {
-      this.env.say('Valor inválido. Digite a distância em metros.');
+      this.env.say(`Valor inválido. Digite a distância em ${lengthUnitName(unitsOf(this.env.project()))}.`);
       return false;
     }
     this.create(v);

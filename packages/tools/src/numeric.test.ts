@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultUnits, resolveUnits } from '@hestia/model';
-import { parseQuantityText } from './numeric.ts';
+import { parseQuantityText, lengthUnitName } from './numeric.ts';
 
 const m = defaultUnits();
 const cm = resolveUnits({ length: { unit: 'cm', decimals: 2 }, smallLength: { unit: 'cm', decimals: 2 } });
@@ -36,5 +36,16 @@ describe('parseQuantityText', () => {
   it('não altera o comportamento de parseNumber', () => {
     expect(parseQuantityText('3,5', m, 'length')).toBeCloseTo(3.5, 12);
     expect(parseQuantityText('-2', m, 'length')).toBeCloseTo(-2, 12);
+  });
+});
+
+describe('lengthUnitName', () => {
+  it('nomeia a unidade de comprimento do projeto por extenso', () => {
+    expect(lengthUnitName(m)).toBe('metros');
+    expect(lengthUnitName(cm)).toBe('centímetros');
+    expect(lengthUnitName(resolveUnits({ length: { unit: 'mm', decimals: 0 } }))).toBe('milímetros');
+    expect(lengthUnitName(resolveUnits({ length: { unit: 'ft', decimals: 2 } }))).toBe('pés');
+    expect(lengthUnitName(resolveUnits({ length: { unit: 'in', decimals: 2 } }))).toBe('polegadas');
+    expect(lengthUnitName(resolveUnits({ length: { unit: 'ft-in', decimals: 2 } }))).toBe('pés e polegadas');
   });
 });

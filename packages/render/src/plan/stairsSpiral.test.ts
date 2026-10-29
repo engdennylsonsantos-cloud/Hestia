@@ -136,12 +136,12 @@ describe('caracol de 720° (duas voltas completas) e limites do intervalo', () =
     expect(numbers(ops.labels).map(Number).sort((a, b) => a - b)).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
   });
 
-  it('topo da vista em 2,30 m: degraus e rótulos acima do topo não saem (rótulos 1..14)', () => {
+  it('topo da vista em 2,30 m: a escada sai inteira, até o próprio topo (rótulos 1..18)', () => {
     const p = spiralProject(540, 19);
     const st = resolved(p);
     const ops = stairFills(p, [st], LIGHT, false, 'fine', VIEW, { cutZ: CUT, topZ: 2.3 });
-    expect(numbers(ops.labels).map(Number).sort((a, b) => a - b)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
-    expect(closedStrokes(ops.strokes).filter((s) => !isPost(s.pts))).toHaveLength(14);
+    expect(numbers(ops.labels).map(Number).sort((a, b) => a - b)).toEqual(Array.from({ length: 18 }, (_, i) => i + 1));
+    expect(closedStrokes(ops.strokes).filter((s) => !isPost(s.pts))).toHaveLength(18);
   });
 
   it('caracol com a base acima do corte: o poste sai tracejado e sem preenchimento', () => {

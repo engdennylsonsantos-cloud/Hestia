@@ -413,7 +413,7 @@ export class ModelScene {
       ...(shown('slab') ? buildSlabSolids(resolveSlabs(p, lv.levelId), juncao) : []),
       ...buildRoofSolids(roofs),
       ...eave.batches,
-      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s)) : []),
+      ...(shown('stair') ? buildStairSolids(escadas.filter((s) => s.levelId === lv.levelId), (s) => stairArrivalTopZ(p, s) ?? s.topZ) : []),
       ...(shown('generic') ? buildGenericSolids(p, lv.levelId) : []),
     ];
     const materialOf = (id: Id): Material | undefined => p.materials[id] ?? eave.materials[id];

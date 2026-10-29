@@ -1,5 +1,6 @@
-import { asMulti, boxOf, boxesOverlap, difference, minAreaRect, multiPoints, offsetMulti, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
+import { add, asMulti, boxOf, boxesOverlap, difference, dist, minAreaRect, mul, multiArea, multiPoints, offsetMulti, ringArea, sub, union, type MultiPolygon, type Polygon, type Vec2 } from '@hestia/geom';
 import { slabRiseAt, stairs, stairTopLevel, type Id, type Project, type SlabSlope, type Stair } from '@hestia/model';
+import { stairArrivalFrame, type StairArrivalFrame } from './stairBody.ts';
 import { resolveStairs, type ResolvedStair } from './stairs.ts';
 
 /** Tolerância de cota e de área (m, m²) nas comparações do furo. */
@@ -66,9 +67,37 @@ export function spiralDiskRegion(center: Vec2, rOuter: number): MultiPolygon {
   return [[ring]];
 }
 
+/** Vão máximo (m) entre lances que a laje não deixa de filete: o furo o fecha (o vão do U mede 0,10 m por padrão). */
+const MAX_WELL_GAP = 0.3;
+/** Área (m²) mínima que o fechamento precisa acrescentar para valer; abaixo é só o arredondamento do recorte. */
+const WELL_MIN_AREA = 1e-4;
+
+/**
+ * Fecha os vãos estreitos entre lances (U): o furo cresce e encolhe `MAX_WELL_GAP ÷ 2`, o que preenche o que for mais fino
+ * que o vão e mantém o resto. Sem vão a fechar, devolve a própria região (o recorte arredonda e não deve mexer à toa).
+ */
+function closeWells(region: MultiPolygon): MultiPolygon {
+  const c = MAX_WELL_GAP / 2 + 1e-3;
+  const closed = offsetMulti(offsetMulti(region, c), -c);
+  return multiArea(closed) - multiArea(region) > WELL_MIN_AREA ? closed : region;
+}
+
+/**
+ * Tira do furo a faixa da folga que passa do último espelho: dali em diante é o piso de cima, e o vão deixaria à mostra a
+ * chegada da escada, um degrau abaixo do piso. Só corta o que a folga (`depth`) acrescentou; o contorno dos degraus não passa dali.
+ */
+function trimBeyondTop(region: MultiPolygon, frame: StairArrivalFrame, depth: number): MultiPolygon {
+  const side = mul(sub(frame.b, frame.a), depth / dist(frame.a, frame.b));
+  const ahead = mul(frame.u, depth);
+  const a = sub(frame.a, side);
+  const b = add(frame.b, side);
+  const ring = [a, b, add(b, ahead), add(a, ahead)];
+  return difference(region, [[ringArea(ring) < 0 ? ring.reverse() : ring]]);
+}
+
 /**
  * Região do furo de uma escada numa laje ou piso com face inferior em `undersideZ` (decisão 0011 §6): o modo escolhido
- * (`openingMode`), depois a folga lateral (`openingMargin`, offset positivo) e, se `openingRect`, o retângulo de menor área
+ * (`openingMode`), depois a folga (`openingMargin`, offset positivo, sem passar do último espelho) e, se `openingRect`, o retângulo de menor área
  * que envolve tudo. Vazia com o modo 'none' ou sem degraus que peçam furo. O modo 'full' não depende da cota: é a projeção
  * da escada, e no caracol (decisão 0014 §11) é o disco de raio externo.
  */
@@ -77,7 +106,12 @@ export function stairOpeningRegion(s: Stair, r: ResolvedStair, undersideZ: numbe
   const full: MultiPolygon = r.spiral ? spiralDiskRegion(r.spiral.center, r.spiral.rOuter) : r.footprint;
   let region: MultiPolygon = s.openingMode === 'full' ? full : stairHoleRegion(r, undersideZ, s.openingHeadroom ?? r.type.minHeadroom);
   if (region.length === 0) return [];
-  if (s.openingMargin > 0) region = offsetMulti(region, s.openingMargin);
+  if (!r.spiral) region = closeWells(region);
+  if (s.openingMargin > 0) {
+    region = offsetMulti(region, s.openingMargin);
+    const top = r.spiral ? null : stairArrivalFrame(r);
+    if (top) region = trimBeyondTop(region, top, s.openingMargin + 0.01);
+  }
   if (s.openingRect) region = asMulti(minAreaRect(multiPoints(region)));
   return region;
 }

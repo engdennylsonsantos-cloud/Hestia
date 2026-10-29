@@ -33,6 +33,7 @@ import {
   type ViewRange,
 } from '@hestia/model';
 import { roofFootprint } from './roofs.ts';
+import { planFootprint } from './stairs.ts';
 import { openingSymbol, type OpeningSymbolOptions } from './symbols.ts';
 import { contextoDaVista, projetoDaJuncao } from './viewContext.ts';
 import type { Espessura, PlanTheme, StrokeOp } from './types.ts';
@@ -255,7 +256,7 @@ function ghostOps(p: Project, levelId: Id, view: PlanView, ids: Id[], theme: Pla
   for (const f of resolveFloors(p, levelId)) footprints.set(f.floorId, f.polygon);
   for (const s of resolveSlabs(p, levelId)) footprints.set(s.slabId, s.polygon);
   for (const r of resolveRoofs(p, levelId)) footprints.set(r.roofId, roofFootprint(r));
-  for (const s of resolveStairsOnLevel(p, levelId)) footprints.set(s.id, s.footprint);
+  for (const s of resolveStairsOnLevel(p, levelId)) footprints.set(s.id, planFootprint(s));
   for (const id of ids) {
     const e = p.elements[id];
     if (isOpening(e)) {

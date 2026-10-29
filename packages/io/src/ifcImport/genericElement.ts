@@ -1,6 +1,6 @@
 import type { Generic, Id, Project } from '@hestia/model';
 import { hull2, type Body } from './geometry.ts';
-import { colorOfWithMaterial } from './elementTypes.ts';
+import { styleOfWithMaterial } from './elementTypes.ts';
 import type { IfcFile } from './ifc.ts';
 import { propertiesOf } from './psets.ts';
 import type { StepEntity } from './step.ts';
@@ -38,6 +38,7 @@ export function makeGeneric(src: GenericSource, e: StepEntity, body: Body, level
   if (!positions.length) return null;
   const outline = hull2(body.points.map((p) => ({ x: p.x, y: p.y })));
   const props = propertiesOf(src.f, e, src.typeOf.get(e.id));
+  const style = styleOfWithMaterial(src, src.f, e);
   return {
     id: `g_${src.f.text(e, 0) || `#${e.id}`}`,
     kind: 'generic',
@@ -48,7 +49,8 @@ export function makeGeneric(src: GenericSource, e: StepEntity, body: Body, level
     objectType: src.f.text(e, 4) || undefined,
     mesh: { positions, indices },
     outline: outline.length >= 3 ? outline : undefined,
-    color: colorOfWithMaterial(src, src.f, e),
+    color: style?.color,
+    ...(style && style.opacity < 0.999 ? { opacity: Math.round(style.opacity * 100) / 100 } : {}),
     ...(props.length ? { ifcProperties: props } : {}),
   };
 }

@@ -23,7 +23,9 @@ export function buildGenericSolids(p: Project, levelId: Id): SolidBatch[] {
 
 /** Material do genérico: o da cor do IFC quando existir; senão o concreto padrão. */
 function materialOf(e: Generic): string {
-  return e.color ? `im_${e.color.replace('#', '').toLowerCase()}` : 'mat_concreto';
+  if (!e.color) return 'mat_concreto';
+  const hex = e.color.replace('#', '').toLowerCase();
+  return e.opacity != null && e.opacity < 0.999 ? `im_${hex}_${String(Math.round(e.opacity * 100)).padStart(3, '0')}` : `im_${hex}`;
 }
 
 /** Triângulos com vértices próprios e normal plana por face. */

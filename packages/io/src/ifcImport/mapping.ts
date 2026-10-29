@@ -12,7 +12,7 @@ import {
 } from '@hestia/model';
 import { bodyOf, cleanLoop, interiorPoint, prismFromMesh, rectangleAxis, segment, type Body, type Prism } from './geometry.ts';
 import { makeGeneric, minZOf } from './genericElement.ts';
-import { openingType, operationOf, slabLikeType, wallType } from './elementTypes.ts';
+import { materialIdOfStyle, openingType, operationOf, slabLikeType, styleOfWithMaterial, wallType } from './elementTypes.ts';
 import { IfcFile, projectName, type Pt2 } from './ifc.ts';
 import { readLevels, type LevelRef } from './levels.ts';
 import { propertiesOf } from './psets.ts';
@@ -182,7 +182,7 @@ function placeWall(ctx: Ctx, e: StepEntity, prism: Prism, rect: { a: Pt2; b: Pt2
   const f = ctx.f;
   const level = levelAt(ctx, prism.z0);
   const name = f.text(ctx.typeOf.get(e.id), 2).trim() || f.text(e, 2).trim();
-  const typeId = wallType(ctx, name, rect.thickness);
+  const typeId = wallType(ctx, name, rect.thickness, materialIdOfStyle(ctx, styleOfWithMaterial(ctx, f, e)));
   const height = Math.max(0.05, prism.z1 - prism.z0);
   const id = `w_${guid(f, e)}`;
   ctx.p.elements[id] = {
@@ -307,7 +307,7 @@ function addSlab(ctx: Ctx, e: StepEntity): void {
   ctx.slabs.add(key);
   const level = levelAt(ctx, prism.z1);
   const name = f.text(ctx.typeOf.get(e.id), 2).trim() || f.text(e, 2).trim();
-  const typeId = slabLikeType(ctx, kind, name, thickness);
+  const typeId = slabLikeType(ctx, kind, name, thickness, materialIdOfStyle(ctx, styleOfWithMaterial(ctx, f, e)));
   const id = `${kind === 'floor' ? 'f' : kind === 'slab' ? 's' : 'c'}_${guid(f, e)}`;
   const base = { id, typeId, levelId: level.id, boundary, holes, heightOffset: prism.z1 - level.elevation, mark: f.text(e, 7), comments: '', ...psetOf(ctx, e) };
   if (kind === 'floor') ctx.p.elements[id] = { ...makeFloor(base), order: ctx.order++ };

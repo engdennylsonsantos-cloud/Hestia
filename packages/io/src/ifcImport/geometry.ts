@@ -337,16 +337,20 @@ export function rectangleAxis(loop: Pt2[]): { a: Pt2; b: Pt2; thickness: number;
     if (!best || area < best.area) best = { dir, perp, umin, umax, vmin, vmax, area };
   }
   if (!best || best.area <= 1e-9) return null;
-  const thickness = best.vmax - best.vmin;
-  const length = best.umax - best.umin;
+  // O menor retângulo tem duas orientações de área igual: o comprimento é sempre o lado maior. Sem esta troca, uma
+  // fachada de 16,8 m × 0,10 m podia sair como "parede" de 0,10 m de comprimento e 16,8 m de espessura.
+  let { dir, perp, umin, umax, vmin, vmax } = best;
+  if (vmax - vmin > umax - umin) {
+    [dir, perp] = [perp, dir];
+    [umin, umax, vmin, vmax] = [vmin, vmax, umin, umax];
+  }
+  const thickness = vmax - vmin;
+  const length = umax - umin;
   if (thickness < 0.005 || length < 0.01) return null;
   if (polyArea / best.area < 0.8) return null;
-  const vMid = (best.vmin + best.vmax) / 2;
-  const at = (u: number): Pt2 => ({
-    x: best!.dir.x * u + best!.perp.x * vMid,
-    y: best!.dir.y * u + best!.perp.y * vMid,
-  });
-  return { a: at(best.umin), b: at(best.umax), thickness, length };
+  const vMid = (vmin + vmax) / 2;
+  const at = (u: number): Pt2 => ({ x: dir.x * u + perp.x * vMid, y: dir.y * u + perp.y * vMid });
+  return { a: at(umin), b: at(umax), thickness, length };
 }
 
 /** Direção e comprimento de um segmento em planta. */

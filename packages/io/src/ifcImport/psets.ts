@@ -14,6 +14,12 @@ import { listOf, numOf, type StepEntity, type StepValue } from './step.ts';
 
 type Scalar = string | number | boolean;
 
+/** Cor e opacidade de um estilo de superfície (`opacity` = 1 - Transparency do IFC). */
+export interface IfcStyle {
+  color: string;
+  opacity: number;
+}
+
 /** Teto de propriedades gravadas por elemento. */
 const MAX_PROPERTIES = 200;
 
@@ -26,8 +32,8 @@ const READABLE = /^IFC(PROPERTYSINGLEVALUE|PROPERTYENUMERATEDVALUE|PROPERTYLISTV
 interface PsetIndex {
   /** Definições de propriedade por id de objeto (elemento ou tipo). */
   byObject: Map<number, StepEntity[]>;
-  /** Cor `#rrggbb` por id de item de representação. */
-  colorByItem: Map<number, string>;
+  /** Estilo (cor + opacidade) por id de item de representação. */
+  styleByItem: Map<number, IfcStyle>;
 }
 
 const cache = new WeakMap<IfcFile, PsetIndex>();
@@ -36,7 +42,7 @@ const cache = new WeakMap<IfcFile, PsetIndex>();
 function indexOf(f: IfcFile): PsetIndex {
   const hit = cache.get(f);
   if (hit) return hit;
-  const index: PsetIndex = { byObject: new Map(), colorByItem: colorIndex(f) };
+  const index: PsetIndex = { byObject: new Map(), styleByItem: styleIndex(f) };
   for (const rel of f.byType('IFCRELDEFINESBYPROPERTIES')) {
     const def = f.ent(rel, 5);
     if (!def) continue;
@@ -135,17 +141,23 @@ function joined(items: StepValue[]): Scalar | null {
 }
 
 /** Cor do elemento; sem estilo próprio, tenta a do tipo (a do item vence). */
-export function colorOf(f: IfcFile, product: StepEntity, type?: StepEntity): string | undefined {
-  const own = colorOfProduct(f, product);
+/** Estilo do elemento; sem estilo próprio, tenta a do tipo (a do item vence). */
+export function styleOf(f: IfcFile, product: StepEntity, type?: StepEntity): IfcStyle | undefined {
+  const own = styleOfProduct(f, product);
   if (own) return own;
-  return type ? colorOfProduct(f, type) : undefined;
+  return type ? styleOfProduct(f, type) : undefined;
 }
 
-function colorOfProduct(f: IfcFile, product: StepEntity): string | undefined {
+/** Cor do elemento (sem opacidade), para compatibilidade com quem só precisa do `#rrggbb`. */
+export function colorOf(f: IfcFile, product: StepEntity, type?: StepEntity): string | undefined {
+  return styleOf(f, product, type)?.color;
+}
+
+function styleOfProduct(f: IfcFile, product: StepEntity): IfcStyle | undefined {
   const index = indexOf(f);
   for (const id of shapeItems(f, product)) {
-    const color = index.colorByItem.get(id);
-    if (color) return color;
+    const style = index.styleByItem.get(id);
+    if (style) return style;
   }
   return undefined;
 }
@@ -170,37 +182,37 @@ function shapeItems(f: IfcFile, product: StepEntity): number[] {
   return ids;
 }
 
-/** `IfcStyledItem` → cor do item, aceitando `IfcPresentationStyleAssignment` (IFC2X3) e `IfcSurfaceStyle` direto. */
-function colorIndex(f: IfcFile): Map<number, string> {
-  const out = new Map<number, string>();
+/** `IfcStyledItem` → estilo do item, aceitando `IfcPresentationStyleAssignment` (IFC2X3) e `IfcSurfaceStyle` direto. */
+function styleIndex(f: IfcFile): Map<number, IfcStyle> {
+  const out = new Map<number, IfcStyle>();
   for (const styled of f.byType('IFCSTYLEDITEM')) {
     const item = f.ref(styled, 0);
     if (item == null || out.has(item)) continue;
-    const color = colorOfStyles(f, listOf(styled.args[1]));
-    if (color) out.set(item, color);
+    const style = styleOfStyles(f, listOf(styled.args[1]));
+    if (style) out.set(item, style);
   }
   return out;
 }
 
-function colorOfStyles(f: IfcFile, styles: StepValue[]): string | undefined {
+function styleOfStyles(f: IfcFile, styles: StepValue[]): IfcStyle | undefined {
   for (const value of styles) {
     const style = f.deref(value);
     if (!style) continue;
     if (style.type === 'IFCPRESENTATIONSTYLEASSIGNMENT') {
-      const nested = colorOfStyles(f, listOf(style.args[0]));
+      const nested = styleOfStyles(f, listOf(style.args[0]));
       if (nested) return nested;
       continue;
     }
     if (style.type !== 'IFCSURFACESTYLE') continue;
     for (const surface of f.list(style, 2)) {
-      const color = colorOfSurface(f, surface);
-      if (color) return color;
+      const result = styleOfSurface(f, surface);
+      if (result) return result;
     }
   }
   return undefined;
 }
 
-function colorOfSurface(f: IfcFile, style: StepEntity): string | undefined {
+function styleOfSurface(f: IfcFile, style: StepEntity): IfcStyle | undefined {
   if (style.type !== 'IFCSURFACESTYLERENDERING' && style.type !== 'IFCSURFACESTYLESHADING') return undefined;
   const rgb = f.ent(style, 0);
   if (!rgb || rgb.type !== 'IFCCOLOURRGB') return undefined;
@@ -208,5 +220,9 @@ function colorOfSurface(f: IfcFile, style: StepEntity): string | undefined {
     Math.max(0, Math.min(255, Math.round((v ?? 0) * 255)))
       .toString(16)
       .padStart(2, '0');
-  return `#${channel(f.num(rgb, 1))}${channel(f.num(rgb, 2))}${channel(f.num(rgb, 3))}`;
+  const transparency = style.type === 'IFCSURFACESTYLERENDERING' ? (f.num(style, 1) ?? 0) : 0;
+  return {
+    color: `#${channel(f.num(rgb, 1))}${channel(f.num(rgb, 2))}${channel(f.num(rgb, 3))}`,
+    opacity: Math.max(0, Math.min(1, 1 - transparency)),
+  };
 }

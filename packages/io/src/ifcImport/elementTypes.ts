@@ -1,6 +1,6 @@
 import type { CeilingType, FloorType, Id, OpeningType, Project, SlabType, WallType } from '@hestia/model';
 import type { IfcFile } from './ifc.ts';
-import { colorOf } from './psets.ts';
+import { styleOf, type IfcStyle } from './psets.ts';
 import type { StepEntity } from './step.ts';
 
 /** Nome curto e estável para compor ids de tipo. */
@@ -18,18 +18,18 @@ export interface TypeCtx {
  * Tipo de parede por nome + espessura, com uma camada de estrutura. O IFC traz a espessura (e, quando há
  * `IfcMaterialLayerSet`, as camadas); o desenho de camadas do Hestia não é reconstruído na v1.
  */
-export function wallType(ctx: TypeCtx, name: string, thickness: number): Id {
+export function wallType(ctx: TypeCtx, name: string, thickness: number, materialId?: Id): Id {
   const mm = Math.round(thickness * 1000);
-  const key = `wall|${name}|${mm}`;
+  const key = `wall|${name}|${mm}|${materialId ?? ''}`;
   const hit = ctx.types.get(key);
   if (hit) return hit;
-  const id = `iwt_${slug(name) || 'parede'}_${mm}`;
+  const id = `iwt_${slug(name) || 'parede'}_${mm}${materialId ? `_${materialId}` : ''}`;
   const type: WallType = {
     id,
     name: name || `Parede ${mm} mm`,
     description: '',
     code: '',
-    layers: [{ function: 'structure', materialId: 'mat_bloco14', thickness, wraps: true }],
+    layers: [{ function: 'structure', materialId: materialId ?? 'mat_bloco14', thickness, wraps: true }],
     wrapInserts: 'none',
     wrapEnds: 'none',
     strips: [],
@@ -45,13 +45,13 @@ export function wallType(ctx: TypeCtx, name: string, thickness: number): Id {
 }
 
 /** Tipo de piso, laje ou forro com uma camada de estrutura da espessura importada. */
-export function slabLikeType(ctx: TypeCtx, kind: 'floor' | 'slab' | 'ceiling', name: string, thickness: number): Id {
+export function slabLikeType(ctx: TypeCtx, kind: 'floor' | 'slab' | 'ceiling', name: string, thickness: number, materialId?: Id): Id {
   const mm = Math.max(1, Math.round(thickness * 1000));
-  const key = `${kind}|${name}|${mm}`;
+  const key = `${kind}|${name}|${mm}|${materialId ?? ''}`;
   const hit = ctx.types.get(key);
   if (hit) return hit;
-  const id = `i${kind === 'floor' ? 'ft' : kind === 'slab' ? 'st' : 'ct'}_${slug(name) || 'tipo'}_${mm}`;
-  const layers = [{ function: 'structure' as const, materialId: 'mat_concreto', thickness, wraps: false }];
+  const id = `i${kind === 'floor' ? 'ft' : kind === 'slab' ? 'st' : 'ct'}_${slug(name) || 'tipo'}_${mm}${materialId ? `_${materialId}` : ''}`;
+  const layers = [{ function: 'structure' as const, materialId: materialId ?? 'mat_concreto', thickness, wraps: false }];
   if (kind === 'floor') {
     const t: FloorType = { id, name: name || `Piso ${mm} mm`, code: '', description: '', layers, cost: 0 };
     ctx.p.floorTypes[id] = t;
@@ -113,22 +113,43 @@ export function openingType(
 }
 
 /** Material do IFC para uma cor `#rrggbb` (um por cor, reaproveitado): é o que pinta o genérico no 3D. */
-export function colorMaterialId(ctx: { p: Project }, color: string | undefined): Id | undefined {
-  if (!color) return undefined;
-  const id = `im_${color.replace('#', '').toLowerCase()}`;
+/** Material do IFC para um estilo `#rrggbb` + opacidade (um por combinação, reaproveitado): pinta nativo e genérico. */
+export function materialIdOfStyle(ctx: { p: Project }, style: IfcStyle | undefined): Id | undefined {
+  if (!style) return undefined;
+  const hex = style.color.replace('#', '').toLowerCase();
+  const pct = Math.round(Math.max(0, Math.min(1, style.opacity)) * 100);
+  const id = pct >= 100 ? `im_${hex}` : `im_${hex}_${String(pct).padStart(3, '0')}`;
   if (!ctx.p.materials[id]) {
-    ctx.p.materials[id] = { id, name: `IFC ${color}`, color, hatch: 'none', gloss: 0.1, opacity: 1, cost: 0, unit: 'm2' };
+    ctx.p.materials[id] = {
+      id,
+      name: `IFC ${style.color}${pct >= 100 ? '' : ` (${pct}%)`}`,
+      color: style.color,
+      hatch: 'none',
+      gloss: 0.1,
+      opacity: pct / 100,
+      cost: 0,
+      unit: 'm2',
+    };
   }
   return id;
 }
 
-/** Cor do produto IFC, criando o material correspondente no projeto (o 3D do genérico usa esse material). */
+/** Estilo do produto IFC, criando o material correspondente no projeto. */
+export function styleOfWithMaterial(
+  ctx: { p: Project; typeOf: Map<number, StepEntity> },
+  f: IfcFile,
+  e: StepEntity,
+): IfcStyle | undefined {
+  const style = styleOf(f, e, ctx.typeOf.get(e.id));
+  materialIdOfStyle(ctx, style);
+  return style;
+}
+
+/** Cor do produto IFC, criando o material correspondente no projeto (o 3D do genérica usa esse material). */
 export function colorOfWithMaterial(
   ctx: { p: Project; typeOf: Map<number, StepEntity> },
   f: IfcFile,
   e: StepEntity,
 ): string | undefined {
-  const color = colorOf(f, e, ctx.typeOf.get(e.id));
-  colorMaterialId(ctx, color);
-  return color;
+  return styleOfWithMaterial(ctx, f, e)?.color;
 }

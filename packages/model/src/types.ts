@@ -577,6 +577,8 @@ export interface Generic {
   /** Contorno em planta (hull da malha) para as vistas 2D; ausente = sem desenho em planta. */
   outline?: Vec2[];
   color?: string;
+  /** Opacidade 0..1 vinda do `IfcSurfaceStyleRendering` (vidro); ausente = 1. */
+  opacity?: number;
   order: number;
   /** Propriedades (psets/quantities) lidas do IFC de origem; ausente quando o objeto não tem pset. */
   ifcProperties?: IfcProperty[];

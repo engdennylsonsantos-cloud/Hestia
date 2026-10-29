@@ -22,7 +22,7 @@ function mapSpiral(t: Transform, sp: StairSpiralParams): StairSpiralParams {
   return { ...sp, center, startAngle: 2 * axis - sp.startAngle, sweep: -sp.sweep };
 }
 
-function mapComponent(t: Transform, c: StairRun | StairLanding): StairRun | StairLanding {
+export function mapStairComponent(t: Transform, c: StairRun | StairLanding): StairRun | StairLanding {
   if (c.kind === 'landing') return { ...c, boundary: mapChain(t, c.boundary) };
   // Espelhar troca os limites: o esquerdo no sentido de subida passa a ser o direito do sentido refletido.
   const mirror = t.kind === 'mirror';
@@ -38,5 +38,5 @@ function mapComponent(t: Transform, c: StairRun | StairLanding): StairRun | Stai
 
 /** Move, gira ou espelha uma escada: todos os croquis de todos os componentes. */
 export function transformStair(s: Stair, t: Transform): Stair {
-  return { ...s, components: s.components.map((c) => mapComponent(t, c)) };
+  return { ...s, components: s.components.map((c) => mapStairComponent(t, c)) };
 }

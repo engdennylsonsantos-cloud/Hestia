@@ -4,6 +4,7 @@ import { DEFAULT_CEILING_TYPES } from './ceiling.ts';
 import { DEFAULT_SLAB_TYPES } from './slab.ts';
 import { DEFAULT_ROOF_TYPES } from './roof.ts';
 import { DEFAULT_STAIR_OPENING_MARGIN, DEFAULT_STAIR_POST_MATERIAL_ID, DEFAULT_STAIR_TREAD_OVERLAP, DEFAULT_STAIR_TYPES } from './stair.ts';
+import { DEFAULT_RAMP_TYPES } from './ramp.ts';
 import { DEFAULT_STAIR_CALC_RULE } from './stairTypes.ts';
 import { SCHEMA_VERSION, type PlanSymbol, type Project } from './types.ts';
 import { DEFAULT_VIEW_RANGE } from './viewRange.ts';
@@ -213,6 +214,12 @@ const migrations: Record<number, Migration> = {
     for (const [id, t] of Object.entries(stairTypes)) stairTypes[id] = { ...DEFAULT_STAIR_CALC_RULE, ...t };
     return { ...raw, stairTypes };
   },
+  // v20 → v21: rampas. Projetos antigos ganham os 2 tipos de rampa padrão (sem sobrescrever os do arquivo) e nenhuma
+  // rampa; as rampas são elementos de `elements`, então nada precisa ser convertido.
+  20: (raw) => ({
+    ...raw,
+    rampTypes: { ...Object.fromEntries(DEFAULT_RAMP_TYPES.map((t) => [t.id, t])), ...((raw.rampTypes as object) ?? {}) },
+  }),
 };
 
 export class SchemaError extends Error {}

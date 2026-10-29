@@ -196,6 +196,12 @@ export function labelOf(c: Command): string {
       return 'Editar tipo de escada';
     case 'deleteStairType':
       return 'Excluir tipo de escada';
+    case 'addRamp':
+      return 'Criar rampa';
+    case 'upsertRampType':
+      return 'Editar tipo de rampa';
+    case 'deleteRampType':
+      return 'Excluir tipo de rampa';
     case 'addOpening':
       return c.opening.kind === 'door' ? 'Inserir porta' : 'Inserir janela';
     case 'updateElements':

@@ -7,6 +7,7 @@ import {
   isSlab,
   isRoof,
   isStair,
+  isRamp,
   isWall,
   isRoom,
   type Ceiling,
@@ -22,6 +23,8 @@ import {
   type Room,
   type Stair,
   type StairType,
+  type Ramp,
+  type RampType,
   type JoinConfig,
   type Level,
   type Material,
@@ -36,8 +39,10 @@ import { splitWall } from './splitWall.ts';
 import { setOpeningHost } from './openingHost.ts';
 import { applyElementLevel, hasLevel, type SetElementLevel } from './elementLevel.ts';
 import { transformStair } from './stairTransform.ts';
+import { transformRamp } from './rampTransform.ts';
 import { transformCeiling, transformFloor, transformRoof, transformSlab } from './transformPlanar.ts';
 import { stairTypeIssue } from './stair.ts';
+import { rampTypeIssue } from './ramp.ts';
 import { openingTypeIssue, toggleFavoriteIn } from './opening.ts';
 import { comTerminoValido } from './termino.ts';
 import { viewRangeIssues, type ViewRange } from './viewRange.ts';
@@ -81,11 +86,12 @@ export type Command =
   | { type: 'addStair'; stair: Omit<Stair, 'order'> }
   | { type: 'upsertStairType'; stairType: StairType }
   | { type: 'deleteStairType'; id: Id }
+  | { type: 'addRamp'; ramp: Omit<Ramp, 'order'> } | { type: 'upsertRampType'; rampType: RampType } | { type: 'deleteRampType'; id: Id }
   | { type: 'upsertSlabType'; slabType: SlabType }
   | { type: 'deleteSlabType'; id: Id }
   | { type: 'upsertFloorType'; floorType: FloorType }
   | { type: 'deleteFloorType'; id: Id }
-  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Room> }
+  | { type: 'updateElements'; ids: Id[]; patch: Partial<Wall> | Partial<Opening> | Partial<Floor> | Partial<Slab> | Partial<Ceiling> | Partial<Roof> | Partial<Stair> | Partial<Ramp> | Partial<Room> }
   | { type: 'detachOutline'; id: Id }
   | { type: 'relinkOutline'; id: Id }
   | { type: 'detachCeilingRoom'; id: Id }
@@ -121,7 +127,6 @@ export type Command =
   | { type: 'batch'; commands: Command[] }
   | { type: 'setOpeningHost'; id: Id; hostId: Id; offset: number }
   | ({ type: 'setElementLevel' } & SetElementLevel);
-
 function transformWall(w: Wall, t: Transform): Wall {
   const a = applyTransform(t, w.a);
   const b = applyTransform(t, w.b);
@@ -129,7 +134,6 @@ function transformWall(w: Wall, t: Transform): Wall {
   // Espelhar também inverte o lado para o qual o arco abaulava.
   return { ...w, a, b, flipped: t.kind === 'mirror' ? !w.flipped : w.flipped, sag: t.kind === 'mirror' ? -w.sag : w.sag };
 }
-
 /** Garante que a abertura continue dentro da parede depois de qualquer edição. */
 export function clampOffset(p: Project, o: Opening, wall: Wall): number {
   const t = p.openingTypes[o.typeId];
@@ -137,13 +141,11 @@ export function clampOffset(p: Project, o: Opening, wall: Wall): number {
   const l = wallLength(wall);
   return Math.max(Math.min(half, l / 2), Math.min(o.offset, l - Math.min(half, l / 2)));
 }
-
 function removeIds(p: Project, ids: Id[]): void {
   const doomed = new Set(ids);
   for (const e of Object.values(p.elements)) if (isOpening(e) && doomed.has(e.hostId)) doomed.add(e.id);
   for (const id of doomed) delete p.elements[id];
 }
-
 /** Move/gira/espelha cada elemento do tipo pedido (mesmo padrão para piso, laje, telhado, escada e ambiente). */
 function transformEach<E extends Element>(p: Project, c: Extract<Command, { type: 'transform' }>, pred: (e: Element | undefined) => e is E, map: (e: E, t: Transform) => E): void {
   const idMap = c.copy?.idMap;
@@ -162,6 +164,7 @@ function applyTransformCmd(p: Project, c: Extract<Command, { type: 'transform' }
   const idMap = c.copy?.idMap;
   transformEach(p, c, isRoof, transformRoof);
   transformEach(p, c, isStair, transformStair);
+  transformEach(p, c, isRamp, transformRamp);
   transformEach(p, c, isSlab, (s, t) => transformSlab(s, t, !!c.copy?.idMap));
   transformEach(p, c, isFloor, (f, t) => transformFloor(f, t, !!c.copy?.idMap));
   transformEach(p, c, isCeiling, (f, t) => transformCeiling(f, t, !!c.copy?.idMap));
@@ -256,6 +259,18 @@ export function applyCommand(p: Project, c: Command): void {
       delete p.stairTypes[c.id];
       break;
     }
+    case 'addRamp':
+      if (!p.rampTypes[c.ramp.typeId]) throw new Error('Tipo de rampa inexistente');
+      p.elements[c.ramp.id] = { ...c.ramp, order: p.nextOrder++ }; break;
+    case 'upsertRampType': {
+      const issue = rampTypeIssue(c.rampType);
+      if (issue) throw new Error(issue);
+      p.rampTypes[c.rampType.id] = c.rampType; break;
+    }
+    case 'deleteRampType':
+      if (Object.values(p.elements).some((e) => isRamp(e) && e.typeId === c.id)) throw new Error('Tipo em uso');
+      if (Object.keys(p.rampTypes).length <= 1) throw new Error('O projeto precisa de ao menos um tipo de rampa');
+      delete p.rampTypes[c.id]; break;
     case 'addOpening': {
       const host = p.elements[c.opening.hostId];
       if (!isWall(host)) throw new Error('Abertura precisa de uma parede anfitriã');
@@ -332,7 +347,7 @@ export function applyCommand(p: Project, c: Command): void {
     case 'deleteLevel': {
       if (p.levels.length <= 1) throw new Error('O projeto precisa de ao menos um nível');
       // Escada também conta pelo nível de topo explícito; o topo automático segue o nível acima e não prende o nível.
-      if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
+      if (Object.values(p.elements).some((e) => (hasLevel(e) && e.levelId === c.id) || (isStair(e) && e.topLevelId === c.id) || (isRamp(e) && e.topLevelId === c.id))) throw new Error('Nível em uso');
       p.levels = p.levels.filter((l) => l.id !== c.id);
       break;
     }

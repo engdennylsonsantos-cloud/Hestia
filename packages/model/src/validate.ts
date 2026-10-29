@@ -4,6 +4,7 @@ import { floorIssues } from './validateFloors.ts';
 import { slabIssues } from './validateSlabs.ts';
 import { roofIssues } from './validateRoofs.ts';
 import { stairIssues } from './validateStairs.ts';
+import { rampIssues } from './validateRamps.ts';
 import { roomIssues } from './validateRooms.ts';
 import { profileError } from './profile.ts';
 import { wallBaseElevation, wallTopElevation } from './queries.ts';
@@ -290,6 +291,7 @@ export function validateProject(p: Project): ValidationIssue[] {
     ...slabIssues(p),
     ...roofIssues(p),
     ...stairIssues(p),
+    ...rampIssues(p),
     ...roomIssues(p),
   ];
 }

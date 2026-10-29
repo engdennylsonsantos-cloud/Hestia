@@ -229,11 +229,14 @@ describe('abertura da laje por modo (decisão 0011, §6)', () => {
     expect(multiArea(slabOf(p))).toBeCloseTo(14, 9);
   });
 
-  it('folga lateral de 0,05 m: a área cresce perímetro × folga + 4 × folga² (retângulo 3,36 × 1,20 m)', () => {
+  it('folga de 0,05 m: cresce nos outros três lados, mas não passa do último espelho (o piso de cima começa ali)', () => {
     const p = build({ stair: { openingMargin: 0.05 }, slabs: [{ id: 's1', boundary: SLAB_RING }] }).project;
     const perimeter = 2 * (3.36 + 1.2);
-    expect(multiArea(holeOf(p))).toBeCloseTo(HOLE_AREA + perimeter * 0.05 + 4 * 0.05 * 0.05, 6);
-    expect(multiArea(holeOf(p))).toBeCloseTo(4.498, 6);
+    const noTopo = (1.2 + 2 * 0.05) * 0.05;
+    expect(multiArea(holeOf(p))).toBeCloseTo(HOLE_AREA + perimeter * 0.05 + 4 * 0.05 * 0.05 - noTopo, 6);
+    // Lance em +x, 16 espelhos de 0,28 m a partir de x = 0: o último espelho está em x = 15 × 0,28 = 4,20 m.
+    const xs = holeOf(p).flat(2).map((q) => q.x);
+    expect(Math.max(...xs)).toBeCloseTo(4.2, 6);
   });
 });
 

@@ -77,6 +77,19 @@ describe('ferramenta Rampa', () => {
     expect(ctx.last()).toContain('A inclinação de 8,33 % pede 9,60 m: a rampa passa do clique de 5,00 m.');
   });
 
+  it('sem opções da rampa, o padrão é inclinação → comprimento: 1/12 e comprimento H/s', () => {
+    const ctx = setup({}, 'lv_1');
+    delete ctx.options.ramp;
+    draw(tool('ramp', ctx.env), [0, 0], [12, 0]);
+    const ramp = rampsOf(ctx, 'lv_1')[0]!;
+    expect(ramp.inputMode).toBe('slope');
+    expect(ramp.slopeTarget).toBeCloseTo(1 / 12, 9);
+    const r = resolved(ctx);
+    expect(r.slope).toBeCloseTo(1 / 12, 6);
+    expect(r.flights).toHaveLength(1);
+    expect(r.flights[0]!.length).toBeCloseTo(0.8 / (1 / 12), 6);
+  });
+
   it('digitar 90° após o 1º clique cria a rampa na direção +Y e avisa que usou a inclinação', () => {
     const ctx = setup();
     const t = tool('ramp', ctx.env);

@@ -16,4 +16,5 @@ export interface RampToolOptions {
   height?: number;
 }
 
-export const DEFAULT_RAMP_OPTIONS: RampToolOptions = { shape: 'straight', turn: 'left', mode: 'length' };
+/** Padrão: inclinação → comprimento (a inclinação vem do tipo e o clique define o comprimento). */
+export const DEFAULT_RAMP_OPTIONS: RampToolOptions = { shape: 'straight', turn: 'left', mode: 'slope' };

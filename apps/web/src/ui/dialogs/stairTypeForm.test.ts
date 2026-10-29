@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_STAIR_TYPES, type StairType } from '@hestia/model';
-import { finalizeForSave, preserveOnStyleChange, validateStairType, STAIR_FIELD_LIMITS } from './stairTypeForm.ts';
+import { duplicateDraft, finalizeForSave, hasUnsavedChanges, preserveOnStyleChange, validateStairType, STAIR_FIELD_LIMITS } from './stairTypeForm.ts';
 
 const mono = (over: Partial<StairType> = {}): StairType => ({ ...structuredClone(DEFAULT_STAIR_TYPES[0]!), ...over });
 const errors = (t: StairType): string[] => validateStairType(t).filter((i) => i.severity === 'error').map((i) => i.code);
@@ -73,5 +73,26 @@ describe('troca de estilo e gravação', () => {
     const monoBack = finalizeForSave({ ...mono({ structuralDepth: 0.22 }), treadThickness: 0.04, riserThickness: 0.02 });
     expect(monoBack.treadThickness).toBe(0);
     expect(monoBack.riserThickness).toBe(0);
+  });
+});
+
+describe('rascunho do tipo de escada', () => {
+  it('hasUnsavedChanges detecta alteração e ignora rascunho igual ao salvo', () => {
+    const saved = mono();
+    expect(hasUnsavedChanges(structuredClone(saved), saved)).toBe(false);
+    expect(hasUnsavedChanges({ ...saved, name: 'Outro' }, saved)).toBe(true);
+    expect(hasUnsavedChanges(null, saved)).toBe(false);
+  });
+
+  it('duplicateDraft parte do rascunho (não do salvo), com id novo e sem alias', () => {
+    const saved = mono({ name: 'Base' });
+    const draft = { ...structuredClone(saved), maxRiser: 0.17 };
+    const copy = duplicateDraft(draft, 'stt_novo');
+    expect(copy.id).toBe('stt_novo');
+    expect(copy.name).toBe('Base (cópia)');
+    expect(copy.maxRiser).toBe(0.17);
+    expect(copy.maxRiser).not.toBe(saved.maxRiser);
+    expect(draft.id).toBe(saved.id);
+    expect(duplicateDraft(draft).id).not.toBe(draft.id);
   });
 });

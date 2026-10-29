@@ -12,6 +12,7 @@ import { TypeDialogHeader } from './TypeDialogHeader.tsx';
 import { FAMILY } from '../typeFamilies.ts';
 import { StairSectionPreview } from './StairSectionPreview.tsx';
 import { StairCalculatorPanel } from './StairCalculatorPanel.tsx';
+import { StairBlondelCard } from './StairBlondelCard.tsx';
 import { StairTypeSections, stairIssueText } from './StairTypeSections.tsx';
 import { computeStairCalc } from './stairTypeCalc.ts';
 import { duplicateDraft, finalizeForSave, hasUnsavedChanges, preserveOnStyleChange, validateStairType } from './stairTypeForm.ts';
@@ -227,7 +228,6 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
   const warnWord = warnings.length === 1 ? t.stt_warn_word_one : t.stt_warn_word_many;
   const count = `${errors.length} ${errorWord}, ${warnings.length} ${warnWord}`;
   const sub = fill(usage === 1 ? t.stt_sub_one : t.stt_sub_many, { n: String(usage) });
-  const post = draft.runStyle === 'post';
   const disabledReason = errors.length > 0 ? stairIssueText(errors[0]!, t) : undefined;
 
   return (
@@ -283,15 +283,16 @@ export function StairTypeDialog({ typeId }: { typeId: string }): ReactElement | 
           />
         </div>
         <div className="stt-side">
-          <StairCalculatorPanel type={draft} heightCm={calcHeight} onHeight={setCalcHeight} />
           <div>
             <div className="stt-ref" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{t.stt_preview_title}</div>
             <StairSectionPreview
               type={draft}
-              riser={calc?.valid && !post ? calc.riser : undefined}
-              tread={calc?.valid && !post ? calc.tread : undefined}
+              riser={calc?.valid ? calc.riser : undefined}
+              tread={calc?.valid ? calc.tread : undefined}
             />
           </div>
+          <StairCalculatorPanel type={draft} heightCm={calcHeight} onHeight={setCalcHeight} />
+          <StairBlondelCard type={draft} heightCm={calcHeight} />
         </div>
       </div>
     </Dialog>

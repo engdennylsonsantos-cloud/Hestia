@@ -354,7 +354,7 @@ describe('hachura sólida (decisão 0015 §2.8)', () => {
     }
   });
 
-  it('GPU: o padrão sólido é malha na cor da hachura, sem textura (vetorial)', () => {
+  it('GPU: o padrão sólido é uma malha na cor da hachura (uKind 0), sem textura', () => {
     const createCanvas = vi.fn(() => ({ width: 0, height: 0, getContext: () => ({}) }));
     vi.stubGlobal('document', { createElement: createCanvas });
     try {
@@ -362,8 +362,11 @@ describe('hachura sólida (decisão 0015 §2.8)', () => {
       const hatchColor = dl.fills.find((x) => x.hatch?.kind === 'solid')!.hatch!.color;
       const scenePlan = new PlanScene();
       scenePlan.setDrawList(dl, VIEW);
-      const meshes = scenePlan.scene.children.flatMap((c) => c.children) as unknown as Array<{ material: { color: { getHexString: () => string }; map: unknown } }>;
-      expect(meshes.some((m) => m.material.color.getHexString() === hatchColor!.slice(1))).toBe(true);
+      type Mat = { color?: { getHexString: () => string }; map?: unknown; uniforms?: Record<string, { value: unknown }> };
+      const meshes = scenePlan.scene.children.flatMap((c) => c.children) as unknown as Array<{ material: Mat }>;
+      const solido = meshes.find((m) => (m.material.uniforms?.uCor?.value as { getHexString: () => string } | undefined)?.getHexString() === hatchColor!.slice(1));
+      expect(solido).toBeDefined();
+      expect(solido!.material.uniforms!.uKind!.value).toBe(0);
       expect(meshes.every((m) => m.material.map === null || m.material.map === undefined)).toBe(true);
       expect(createCanvas).not.toHaveBeenCalled();
     } finally {

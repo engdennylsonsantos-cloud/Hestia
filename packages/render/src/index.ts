@@ -11,6 +11,8 @@ export * from './model3d/solids.ts';
 export * from './model3d/orbit.ts';
 export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
+// Picking por ID buffer (R3): tabela de códigos, geometria do passe e o leitor da GPU (`PickGpu3d`).
+export * from './model3d/pickIdBuffer3d.ts';
 export * from './model3d/openingParts.ts';
 // Recursos de GPU da cena 3D (Fase 2.1/2.2): orçamento contábil, lotes por categoria/material e instâncias.
 export { OrcamentoVram, TETO_VRAM_PADRAO } from './gpu/orcamento.ts';
@@ -19,6 +21,8 @@ export { caixaDePosicoes, LoteGeometriaGpu, mesclarLotes, unirCaixas, type Caixa
 export { LoteLinhasGpu } from './gpu/loteLinhas.ts';
 export { caixaDeMatrizes, InstanciasGpu } from './gpu/instanciasGpu.ts';
 export * from './section/build.ts';
+export * from './section/clip.ts';
+export * from './section/frame.ts';
 export * from './section/pick.ts';
 export { sectionStyleOf, type SectionStyle } from './section/style.ts';
 // Vista da planta (decisão 0013) e o que a exportação DXF reaproveita dela: a mesma geometria, o mesmo corte e a mesma pegada.

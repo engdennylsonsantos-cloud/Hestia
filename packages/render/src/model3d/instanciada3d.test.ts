@@ -7,6 +7,7 @@ import { clearWallLayerCache, wallLayerCacheStats } from './solids.ts';
 import { firstSurfaceDistance, pickElement, pickModelPoint } from './pick3d.ts';
 import { caixaPorCategoria, comprimentoDescoberto, cruzamentos, sorteio, verticesSemPar, volumePorCategoria } from './metricasInstanciada3d.ts';
 import { chamadasDeDesenho, contarObjetos, montar, predio, segmentos, triangulos } from './fixturesInstanciada3d.ts';
+import { contarFaixas } from './faixas3d.ts';
 
 /**
  * Cena com caixas instanciadas (paredes retas e esquadrias) contra a cena de geometria (`instanciar: false`): mesma silhueta,
@@ -189,8 +190,18 @@ describe('picking: o mesmo elemento, a mesma categoria e o mesmo ponto', () => {
     nova.scene.traverse((o) => {
       if (o instanceof THREE.Mesh && o.renderOrder === 5) sobrepostos.push(o);
     });
-    expect(sobrepostos).toHaveLength(2);
-    expect(sobrepostos.every((m) => (m as THREE.Mesh).geometry.getAttribute('position').count > 0)).toBe(true);
+    expect(sobrepostos.length).toBeGreaterThanOrEqual(2);
+    // O realce reusa os buffers do modelo: o `position` é a mesma instância da geometria de origem, não uma cópia.
+    const origens = new Set<THREE.BufferAttribute>();
+    nova.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m.userData.ranges) origens.add(m.geometry.getAttribute('position') as THREE.BufferAttribute);
+    });
+    for (const m of sobrepostos) {
+      const mesh = m as THREE.Mesh;
+      expect(mesh.geometry.getAttribute('position').count).toBeGreaterThan(0);
+      expect(origens.has(mesh.geometry.getAttribute('position') as THREE.BufferAttribute)).toBe(true);
+    }
   });
 });
 
@@ -210,14 +221,18 @@ describe('desempenho: menos chamadas de desenho e menos malhas', () => {
     });
   }
 
-  it('o número de malhas instanciadas não cresce com o número de pavimentos', () => {
-    const a = contarObjetos(montar(predio(5, { aberturas: true }), true)).instanciadas;
-    const b = contarObjetos(montar(predio(20, { aberturas: true }), true)).instanciadas;
-    expect(a).toBe(b);
-    expect(a).toBeLessThan(12);
+  it('as malhas instanciadas crescem por faixa (culling), não por pavimento', () => {
+    const porFaixa = (n: number): number => {
+      const ms = montar(predio(n, { aberturas: true }), true);
+      return contarObjetos(ms).instanciadas / contarFaixas(n);
+    };
+    // O lote de cada faixa é o mesmo: 5, 20 e 40 pavimentos dão o mesmo número de malhas por faixa.
+    expect(porFaixa(20)).toBe(porFaixa(5));
+    expect(porFaixa(40)).toBe(porFaixa(5));
+    expect(porFaixa(20)).toBeLessThan(12);
   });
 
-  it('pisos e lajes viram um lote global por categoria/material, e a cena não ganha malhas com pavimentos', () => {
+  it('pisos e lajes viram um lote global por categoria/material em cada faixa', () => {
     const porKind = (n: number): Map<string, number> => {
       const ms = montar(predio(n, { aberturas: true }), true);
       const out = new Map<string, number>();
@@ -233,14 +248,14 @@ describe('desempenho: menos chamadas de desenho e menos malhas', () => {
     };
     const a = porKind(6);
     const b = porKind(20);
-    // Um lote de piso e um de laje para todos os níveis, não um por nível.
-    expect(a.get('floor')).toBe(1);
-    expect(a.get('slab')).toBe(1);
-    expect(b.get('floor')).toBe(1);
-    expect(b.get('slab')).toBe(1);
-    // O número de malhas de face não cresce com os pavimentos (as caixas são instâncias; os sólidos são lotes globais).
+    // Um lote de piso e um de laje por faixa (não um por nível).
+    expect(a.get('floor')).toBe(contarFaixas(6));
+    expect(a.get('slab')).toBe(contarFaixas(6));
+    expect(b.get('floor')).toBe(contarFaixas(20));
+    expect(b.get('slab')).toBe(contarFaixas(20));
+    // O número de malhas de face por faixa não cresce com os pavimentos (caixas viram instâncias; sólidos são lotes).
     const faces = (m: Map<string, number>): number => [...m.values()].reduce((s, x) => s + x, 0);
-    expect(faces(b)).toBe(faces(a));
+    expect(faces(b) / contarFaixas(20)).toBe(faces(a) / contarFaixas(6));
   });
 
   it('as paredes retas não passam pela extrusão: sem aberturas, nenhum sólido de parede entra no cache de camadas', () => {

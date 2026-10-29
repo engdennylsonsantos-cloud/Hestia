@@ -119,6 +119,11 @@ describe('telhado na planta (D1)', () => {
   it('hachura do material só com zoom a partir de 40 px/m (médio), discreta mas visível; no grosseiro, nunca', () => {
     // rt_ceramica: telha com hachura diagonal
     expect(ops([gable()], 'medium', 10).fills[0]!.hatch).toBeUndefined();
+    // O zoom mínimo vai na hachura (o shader e o `resolverZoom` escondem abaixo dele): a geometria não muda com o zoom.
+    const media = roofOps([gable()], createEmptyProject(), LIGHT, false, 'medium', VIEW(10));
+    expect(media.fills[0]!.hatch?.zoomMin).toBe(40);
+    const fina = roofOps([gable()], createEmptyProject(), LIGHT, false, 'fine', VIEW(10));
+    expect(fina.fills[0]!.hatch?.zoomMin).toBeUndefined();
     expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.kind).toBe('diagonal');
     expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeGreaterThanOrEqual(0.22);
     expect(ops([gable()], 'medium', 100).fills[0]!.hatch?.alpha).toBeLessThanOrEqual(0.3);

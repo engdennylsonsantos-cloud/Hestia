@@ -34,9 +34,10 @@ const RETANGULO: FillOp = {
   hatch: { kind: 'diagonal', color: '#777777' },
 };
 
-/** Lista de desenho do teste: um preenchimento com hachura e três traços (um tracejado fechado, um tracejado diagonal). */
+/** Lista de desenho do teste: um preenchimento e três traços (um tracejado fechado, um tracejado diagonal). A hachura tem
+ * teste de cobertura próprio (o padrão procedural não é pixel a pixel igual ao vetorial antigo nas bordas). */
 function listaDeTeste(): PlanDrawList {
-  return { background: '#ffffff', fills: [RETANGULO], strokes: TRACOS, labels: [] };
+  return { background: '#ffffff', fills: [{ ...RETANGULO, hatch: undefined }], strokes: TRACOS, labels: [] };
 }
 
 /** Quad de traço na geometria antiga (espessura em metros, calculada com o zoom no build). Referência do que era gravado. */
@@ -82,8 +83,15 @@ function tracosAntigos(strokes: readonly StrokeOp[], zoom: number, ordemBase: nu
   });
 }
 
-/** Referência completa da lista de teste no zoom dado: preenchimento, hachura antiga (espessura em metros) e traços antigos. */
+/** Referência completa da lista de teste no zoom dado: preenchimento e traços antigos. */
 function referenciaAntiga(zoom: number): THREE.Mesh[] {
+  const fundo = montarLotesCamada([{ ...RETANGULO, hatch: undefined }], []);
+  const malhas: THREE.Mesh[] = fundo.map((l, i) => malhaReferencia(l.pos, l.idx, l.color, l.alpha, i));
+  return [...malhas, ...tracosAntigos(TRACOS, zoom, 3_000_000)];
+}
+
+/** Referência da hachura antiga (segmentos vetoriais em metros) sobre o preenchimento, no zoom dado. */
+function referenciaHachura(zoom: number): THREE.Mesh[] {
   const fundo = montarLotesCamada([{ ...RETANGULO, hatch: undefined }], []);
   const malhas: THREE.Mesh[] = fundo.map((l, i) => malhaReferencia(l.pos, l.idx, l.color, l.alpha, i));
   const pos: number[] = [];
@@ -91,10 +99,17 @@ function referenciaAntiga(zoom: number): THREE.Mesh[] {
   const w = HATCH_PX / zoom;
   const wp = DOT_PX / zoom;
   for (const poly of RETANGULO.polygons) {
-    for (const s of hatchSegments(poly, 'diagonal')) quadAntigo(pos, idx, s.a, s.b, s.dot ? wp : w);
+    for (const s of hatchSegments(poly, RETANGULO.hatch!.kind)) quadAntigo(pos, idx, s.a, s.b, s.dot ? wp : w);
   }
   malhas.push(malhaReferencia(pos, idx, RETANGULO.hatch!.color, 1, 1));
-  return [...malhas, ...tracosAntigos(TRACOS, zoom, 3_000_000)];
+  return malhas;
+}
+
+/** Quantos pixels têm a cor da hachura (mais escura que a base e que o fundo). */
+function coberturaEscura(img: Float64Array): number {
+  let n = 0;
+  for (let i = 0; i < img.length; i += 3) if (img[i]! < 0.6 && img[i + 1]! < 0.6 && img[i + 2]! < 0.6) n++;
+  return n;
 }
 
 /** Câmera da vista dada (a da cena de referência, montada pelo mesmo caminho da cena). */
@@ -190,6 +205,20 @@ describe('imagem igual à da geometria antiga, em vários zooms', () => {
       const referencia = rasterizarMalhas(referenciaAntiga(zoom), camaraDe(vista(zoom)), zoom, W, H);
       imagensIguaisExceto(imagem, referencia, 40);
     }
+    cena.dispose();
+  });
+});
+
+describe('hachura procedural: mesma cobertura do padrão vetorial antigo', () => {
+  it.each([12, 60, 220])('zoom %s: a área pintada da hachura fica dentro de 6%% da antiga', (zoom) => {
+    const cena = new PlanScene();
+    cena.setSlot('fillsBase', [RETANGULO], [], vista(zoom));
+    const imagem = rasterizarCena(cena, vista(zoom), W, H);
+    const referencia = rasterizarMalhas(referenciaHachura(zoom), camaraDe(vista(zoom)), zoom, W, H);
+    const nova = coberturaEscura(imagem);
+    const antiga = coberturaEscura(referencia);
+    expect(antiga).toBeGreaterThan(0);
+    expect(Math.abs(nova - antiga)).toBeLessThanOrEqual(Math.max(40, antiga * 0.06));
     cena.dispose();
   });
 });

@@ -4,9 +4,9 @@ import { difference, multiArea, offsetMulti, type MultiPolygon, type Vec2 } from
 import { paperMmToPx } from '@hestia/model';
 import { espessuraDePapel, espessuraVezes, larguraEmPx } from './espessura.ts';
 import { Limiares, assinaturaDeZoom, espessuraAtinge, zoomAtinge } from './limiares.ts';
-import { montarLotesCamada, reexpandirLote, SEM_TETO, type LoteGpu } from './lotesGpu.ts';
+import { HACHURA_GPU, montarLotesCamada, SEM_TETO, type LoteGpu } from './lotesGpu.ts';
 import { cantosDoQuadrado, formaEm, quadradoEm } from './marcadores.ts';
-import { verticeEmulado } from './rasterSoftware.ts';
+import { hachuraCobre, verticeEmulado } from './rasterSoftware.ts';
 import { thinStrokes } from './thin.ts';
 import { resolverPreenchimento, resolverRotulo, resolverRotulos, resolverTraco, resolverZoom, tracoVisivel } from './zoomOps.ts';
 import type { FillOp, LabelOp, StrokeOp } from './types.ts';
@@ -182,7 +182,7 @@ describe('peso de papel com fator e teto (largura do símbolo, linhas finas)', (
   });
 });
 
-describe('lotes dinâmicos e zoom mínimo no lote de traço', () => {
+describe('faixa, marcador e hachura resolvidos no shader (sem lote dinâmico)', () => {
   const FAIXAS: FillOp[] = [
     { polygons: RETANGULO, color: '#eee', alpha: 1 },
     FILL_FAIXA,
@@ -191,57 +191,58 @@ describe('lotes dinâmicos e zoom mínimo no lote de traço', () => {
   ];
   const triangulos = (l: LoteGpu): number => l.idx.length / 3;
 
-  it('a faixa é um lote próprio entre os preenchimentos, na ordem; os estáticos não dependem do zoom', () => {
-    const a = montarLotesCamada(FAIXAS, [], 60);
-    const b = montarLotesCamada(FAIXAS, [], 220);
-    expect(a.map((l) => !!l.fonte)).toEqual([false, true, false, true]);
-    expect(a.map((l) => l.material ?? l.key)).toEqual(['f|#eee|1', 'f|#222|1', 'f|#eee|1', 'f|#222|1']);
-    expect(a[0]!.pos).toEqual(b[0]!.pos);
-    expect(a[2]!.pos).toEqual(b[2]!.pos);
+  it('a faixa é um lote de traço próprio, entre os preenchimentos, com o fator 2 e o lado da região', () => {
+    const lotes = montarLotesCamada(FAIXAS, []);
+    expect(lotes.map((l) => l.key)).toEqual(['f|#eee|1', 'b|#222|1|p', 'f|#eee|1', 'b|#222|1|p']);
+    const banda = lotes[1]!;
+    expect(banda.banda).toBe(true);
+    expect(banda.traco?.banda).toHaveLength(banda.pos.length / 3);
+    // O traço tem o dobro da largura de papel (o fragmento descarta a metade externa).
+    expect(banda.traco!.ext.filter((_, i) => i % 4 === 3).every((f) => f === 2)).toBe(true);
+    // Nenhum lote guarda a fonte do zoom: a geometria é a mesma em qualquer zoom.
+    expect(lotes.every((l) => !('fonte' in l))).toBe(true);
   });
 
-  it('reexpandirLote refaz só a geometria da faixa no zoom novo: igual a montar direto nesse zoom', () => {
-    const lotes = montarLotesCamada(FAIXAS, [], 220);
-    const antes = lotes[1]!.pos.slice();
-    reexpandirLote(lotes[1]!, 12);
-    const direto = montarLotesCamada(FAIXAS, [], 12);
-    expect(lotes[1]!.pos).toEqual(direto[1]!.pos);
-    expect(lotes[1]!.idx).toEqual(direto[1]!.idx);
-    expect(lotes[1]!.pos).not.toEqual(antes);
-  });
-
-  it('o lote dinâmico fica na lista mesmo vazio (a posição dos demais não muda)', () => {
+  it('faixa vazia não vira lote nem muda a ordem dos outros (não há mais lote vazio de posição)', () => {
     const vazio: FillOp = { ...FILL_FAIXA, polygons: [] };
-    const lotes = montarLotesCamada([FAIXAS[0]!, vazio, FAIXAS[2]!], [], 60);
-    expect(lotes).toHaveLength(3);
-    expect(triangulos(lotes[1]!)).toBe(0);
+    const lotes = montarLotesCamada([FAIXAS[0]!, vazio, { ...FAIXAS[2]!, color: '#ddd' }], []);
+    expect(lotes).toHaveLength(2);
+    expect(lotes.every((l) => triangulos(l) > 0)).toBe(true);
   });
 
-  it('sem zoom (lista já resolvida) não há lote dinâmico; marcador de traço também é dinâmico com zoom', () => {
-    expect(montarLotesCamada(FAIXAS, [], null).some((l) => l.fonte)).toBe(false);
+  it('marcador de traço guarda o deslocamento em px no vértice e a direção vem do próprio deslocamento', () => {
     const marcador: StrokeOp = { ...formaEm(P(1, 1), cantosDoQuadrado(5), true), widthPx: 2, color: '#00f', alpha: 1 };
-    const [m] = montarLotesCamada([], [marcador], 60);
-    expect(m!.fonte).toBeDefined();
-    expect(m!.material).toBe('s|#00f|1');
-    const lote220 = montarLotesCamada([], [marcador], 220)[0]!;
-    expect(m!.pos).not.toEqual(lote220.pos);
+    const [m] = montarLotesCamada([], [marcador]);
+    expect(m!.key).toBe('sd|#00f|1');
+    expect(m!.traco?.desl).toHaveLength(m!.pos.length / 3 * 2);
+    expect(m!.traco?.desl?.some((x) => x !== 0)).toBe(true);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(m!.pos, 3));
+    g.setAttribute('aExt', new THREE.Float32BufferAttribute(m!.traco!.ext, 4));
+    g.setAttribute('aDir', new THREE.Float32BufferAttribute(m!.traco!.dir, 3));
+    g.setAttribute('aPadrao', new THREE.Float32BufferAttribute(m!.traco!.padrao, 3));
+    g.setAttribute('aDesl', new THREE.Float32BufferAttribute(m!.traco!.desl!, 2));
+    // O marcador tem o mesmo tamanho em tela: em zoom maior o deslocamento em metros é menor.
+    const a = verticeEmulado(g, 0, 60);
+    const b = verticeEmulado(g, 0, 220);
+    expect(Math.hypot(a.x - 1, a.y - 1)).toBeGreaterThan(Math.hypot(b.x - 1, b.y - 1));
   });
 
-  it('zoom mínimo da hachura e do traço vai ao vértice (aPadrao.z) e o emulador esconde abaixo dele', () => {
+  it('hachura é um preenchimento triangulado + padrão no shader (sem segmentos) e respeita o zoom mínimo', () => {
     const f: FillOp = { polygons: RETANGULO, color: '#fff', alpha: 1, hatch: { kind: 'diagonal', color: '#777', zoomMin: 90 } };
-    const s: StrokeOp = { pts: [P(0, 0), P(2, 0)], closed: false, widthPx: 1, color: '#000', alpha: 1, zoomMin: 30 };
-    const lotes = montarLotesCamada([f], [s]);
+    const lotes = montarLotesCamada([f], []);
     const hachura = lotes.find((l) => l.key.startsWith('h|'))!;
-    const linha = lotes.find((l) => l.key.startsWith('s|'))!;
-    expect(hachura.traco!.padrao.filter((_, i) => i % 3 === 2).every((z) => z === 90)).toBe(true);
-    expect(linha.traco!.padrao.filter((_, i) => i % 3 === 2).every((z) => z === 30)).toBe(true);
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(linha.pos, 3));
-    g.setAttribute('aExt', new THREE.Float32BufferAttribute(linha.traco!.ext, 4));
-    g.setAttribute('aDir', new THREE.Float32BufferAttribute(linha.traco!.dir, 3));
-    g.setAttribute('aPadrao', new THREE.Float32BufferAttribute(linha.traco!.padrao, 3));
-    expect(verticeEmulado(g, 0, 12).visivel).toBe(false);
-    expect(verticeEmulado(g, 0, 30).visivel).toBe(true);
-    expect(verticeEmulado(g, 0, 220).visivel).toBe(true);
+    expect(hachura.hatch).toEqual({ kind: 'diagonal' });
+    expect(hachura.traco).toBeUndefined();
+    // O zoom mínimo vai por vértice em z; a geometria não muda com o zoom.
+    expect(hachura.pos.filter((_, i) => i % 3 === 2)).toEqual([90, 90, 90, 90]);
+    // 4 vértices (um por canto) e 2 triângulos: a hachura não tem mais um quad por trecho.
+    expect(hachura.pos.length / 3).toBe(4);
+    expect(hachura.idx).toHaveLength(6);
+    // Abaixo do zoom mínimo o fragmento descarta; acima, um ponto sobre a linha a 45° é pintado.
+    const z = HACHURA_GPU.espaco * Math.SQRT2;
+    const y = HACHURA_GPU.espaco * Math.SQRT2;
+    expect(hachuraCobre(1, 0, 0, 60, 90, HACHURA_GPU.espaco, HACHURA_GPU.linhaPx, HACHURA_GPU.pontoPx, HACHURA_GPU.pontoM)).toBe(false);
+    expect(hachuraCobre(1, z, y, 220, 90, HACHURA_GPU.espaco, HACHURA_GPU.linhaPx, HACHURA_GPU.pontoPx, HACHURA_GPU.pontoM)).toBe(true);
   });
 });

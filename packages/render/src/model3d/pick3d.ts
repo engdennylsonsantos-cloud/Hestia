@@ -16,12 +16,44 @@ interface SurfaceHit {
 }
 
 /**
+ * Elemento sob o cursor: o id, o ponto (m) da face atingida e a categoria gráfica (parede, porta, janela, piso, ...).
+ */
+export interface ElementHit {
+  id: Id;
+  point: { x: number; y: number; z: number };
+  kind: GraphicsCategory;
+}
+
+/**
+ * Picking na GPU (ID buffer). `ler` devolve um resultado **já lido** para este pixel e câmera (cache do leitor); `pedir`
+ * agenda a leitura assíncrona do pixel para o próximo quadro. Enquanto a leitura não chega, `pickElement` responde pelo
+ * BVH: o resultado na tela nunca fica sem resposta e a primeira leitura do pixel paga o caminho da CPU uma vez só.
+ *
+ * Ver `pickIdBuffer3d.ts` (implementação WebGL2 com MRT e leitura assíncrona).
+ */
+export interface LeitorDeIdsGpu {
+  ler(ndc: { x: number; y: number }, camera: THREE.Camera): ElementHit | null;
+  pedir(ndc: { x: number; y: number }, camera: THREE.Camera): void;
+}
+
+/**
  * Picking na vista 3D: raio do cursor (coordenadas normalizadas, −1..1) contra as malhas da cena. Devolve só o ponto (x, y)
  * da primeira superfície atingida, em metros: a ferramenta acha o elemento pela planta (telhado sob o ponto, parede sob o
  * ponto), sem precisar de id por malha (as malhas são agrupadas por material). Ignora linhas (arestas, grade) e o chão,
  * que é um plano de 400 m (`PlaneGeometry`); as malhas do modelo são `BufferGeometry`.
+ *
+ * Com `gpu` (ID buffer), o resultado lido na GPU vale primeiro; sem ele, o BVH. Os dois devolvem o mesmo ponto (dentro da
+ * tolerância de ¼ de pixel da leitura por GPU).
  */
-export function pickModelPoint(root: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): { x: number; y: number } | null {
+export function pickModelPoint(
+  root: THREE.Object3D,
+  camera: THREE.Camera,
+  ndc: { x: number; y: number },
+  gpu?: LeitorDeIdsGpu | null,
+): { x: number; y: number } | null {
+  const naGpu = gpu?.ler(ndc, camera);
+  if (naGpu) return { x: naGpu.point.x, y: naGpu.point.y };
+  gpu?.pedir(ndc, camera);
   rc.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
   const hit = firstSurface(root, rc);
   return hit ? { x: hit.point.x, y: hit.point.y } : null;
@@ -67,19 +99,30 @@ function firstSurface(root: THREE.Object3D, ray: THREE.Raycaster): SurfaceHit | 
   return best;
 }
 
-/** Elemento sob o cursor: o id, o ponto (m) da face atingida e a categoria gráfica (parede, porta, janela, piso, ...). */
-export interface ElementHit {
-  id: Id;
-  point: { x: number; y: number; z: number };
-  kind: GraphicsCategory;
-}
-
 /**
  * Elemento da face atingida pelo raio do cursor (decisão 0016). Só as malhas do modelo entram: as que têm
  * `userData.ranges` (chão, grade, arestas e realce não têm). O triângulo atingido (`faceIndex`) cai numa faixa, e a faixa
  * dá o id; as esquadrias têm uma faixa com o id da abertura. Sem nada atingido, null.
+ *
+ * Com `gpu` (ID buffer), o resultado lido na GPU vale primeiro e o BVH é o fallback (leitura ainda não pronta, GPU sem
+ * MRT, elemento sem código). Sem `gpu`, o caminho é o de sempre.
  */
-export function pickElement(root: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): ElementHit | null {
+export function pickElement(
+  root: THREE.Object3D,
+  camera: THREE.Camera,
+  ndc: { x: number; y: number },
+  gpu?: LeitorDeIdsGpu | null,
+): ElementHit | null {
+  if (gpu) {
+    const naGpu = gpu.ler(ndc, camera);
+    if (naGpu) return naGpu;
+    gpu.pedir(ndc, camera);
+  }
+  return pickElementNoBvh(root, camera, ndc);
+}
+
+/** O caminho de sempre: BVH por malha, faixa do triângulo atingido → id. */
+function pickElementNoBvh(root: THREE.Object3D, camera: THREE.Camera, ndc: { x: number; y: number }): ElementHit | null {
   root.updateMatrixWorld(true);
   const targets: THREE.Mesh[] = [];
   root.traverse((o) => {

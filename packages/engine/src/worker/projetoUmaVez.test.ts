@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Project } from '@hestia/model';
 import { ClienteResolucao, type WorkerLike } from './cliente.ts';
 import { executarResolucao } from './executor.ts';
@@ -67,7 +67,6 @@ describe('servidor: projeto omitido', () => {
     const respostas: RespostaResolucao[] = [];
     return { respostas, onmessage: null, postMessage: (m: unknown) => void respostas.push(m as RespostaResolucao) };
   };
-  const esperar = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
   it('pedido sem estrutura usa o projeto da mesma versão que chegou antes, mesmo que outro chegue enquanto ele espera na fila', async () => {
     const escopo = escopoFalso();
@@ -78,8 +77,8 @@ describe('servidor: projeto omitido', () => {
     escopo.onmessage?.({ data: { id: 1, tipo: 'nivel', nivel: 'a', projeto: { versao: 1, estrutura: p1 } } });
     escopo.onmessage?.({ data: { id: 2, tipo: 'juncoes', nivel: 'a', projeto: { versao: 1 } } });
     escopo.onmessage?.({ data: { id: 3, tipo: 'nivel', nivel: 'b', projeto: { versao: 2, estrutura: p2 } } });
-    await esperar();
-    expect(escopo.respostas.map((r) => r.id)).toEqual([1, 2, 3]);
+    // A fila processa uma tarefa por vez; sob carga o prazo fixo de 60 ms podia vencer antes da 3ª resposta.
+    await vi.waitFor(() => expect(escopo.respostas.map((r) => r.id)).toEqual([1, 2, 3]), { timeout: 5_000 });
     expect(vistos).toEqual([p1, p1, p2]);
   });
 

@@ -473,7 +473,15 @@ async function itemEtiquetas(page) {
   await enquadrar(page, { x0: -1.5, y0: -3.2, x1: 9.5, y1: 7.2 });
 
   await page.locator('.rtab:visible', { hasText: /Anotar|Annotate/ }).click();
-  const botao = page.locator('button[aria-label="Etiquetar todos"], button[aria-label="Tag All"]');
+  const botao = page.locator('button[aria-label="Etiquetar todos"]:visible, button[aria-label="Tag All"]:visible');
+  // A faixa compacta do Hestia recolhe painéis no botão "mais" quando não cabem. Abre o overflow até o
+  // comando aparecer; em 1440 px ele fica no popup, não na linha principal.
+  for (let i = 0; i < 4 && !(await botao.first().isVisible().catch(() => false)); i++) {
+    const mais = page.locator('.fit-more:visible');
+    if ((await mais.count()) === 0) break;
+    await mais.first().click();
+    await page.waitForTimeout(150);
+  }
   await botao.first().waitFor({ state: 'visible' });
   await botao.first().click();
   await assentar(page);

@@ -1,4 +1,4 @@
-import type { MultiPolygon, Ring } from '@hestia/geom';
+import type { MultiPolygon, Ring, Vec2 } from '@hestia/geom';
 import type { Viewport } from '../viewport.ts';
 import { visibleBounds } from '../viewport.ts';
 import type { FillOp, PlanTheme, StrokeOp } from './types.ts';
@@ -89,7 +89,8 @@ export function gridLayer(v: Viewport, theme: PlanTheme): GridLayer {
 
 /**
  * Pontinhos nas interseções da grade visível (a mesma da captura por grade): marcam os pontos em que o cursor pega.
- * O tamanho é fixo em pixels; o maior pontinho é o de interseção de eixo múltiplo de cinco (a mesma régua da grade).
+ * O tamanho é fixo em pixels (marcador com deslocamento em px, aplicado no shader), então o zoom não refaz a grade. O
+ * maior pontinho é o de interseção de eixo múltiplo de cinco (a mesma régua da grade).
  */
 export function gridDotFills(v: Viewport, theme: PlanTheme): FillOp[] {
   const step = effectiveGridStep(v.zoom, v.gridStep);
@@ -97,25 +98,33 @@ export function gridDotFills(v: Viewport, theme: PlanTheme): FillOp[] {
   const nx = Math.floor((b.maxX - b.minX) / step) + 2;
   const ny = Math.floor((b.maxY - b.minY) / step) + 2;
   if (nx * ny > 4000) return [];
-  const d = 1.6 / v.zoom;
+  const d = 1.6;
   const major = step * 5;
   const x0 = Math.floor(b.minX / step) * step;
   const y0 = Math.floor(b.minY / step) * step;
   const menores: MultiPolygon = [];
+  const menoresPx: Vec2[][][] = [];
   const maiores: MultiPolygon = [];
+  const maioresPx: Vec2[][][] = [];
+  const cantos = (): Vec2[] => [{ x: -d, y: -d }, { x: d, y: -d }, { x: d, y: d }, { x: -d, y: d }];
   for (let i = 0; i < nx; i++) {
     const x = x0 + i * step;
     const xMaior = Math.abs(x / major - Math.round(x / major)) < 1e-6;
     for (let j = 0; j < ny; j++) {
       const y = y0 + j * step;
       const yMaior = Math.abs(y / major - Math.round(y / major)) < 1e-6;
-      const quadro: Ring = [{ x: x - d, y: y - d }, { x: x + d, y: y - d }, { x: x + d, y: y + d }, { x: x - d, y: y + d }];
-      (xMaior && yMaior ? maiores : menores).push([quadro]);
+      // O polígono guarda a âncora repetida; a forma em pixels vem em `deslocamentoPx` (o shader a aplica com o zoom).
+      const ancora = { x, y };
+      const ring: Ring = [ancora, ancora, ancora, ancora];
+      const px = cantos();
+      const maior = xMaior && yMaior;
+      (maior ? maiores : menores).push([ring]);
+      (maior ? maioresPx : menoresPx).push([px]);
     }
   }
   const out: FillOp[] = [];
-  if (menores.length) out.push({ polygons: menores, color: theme.gridMinor, alpha: 1 });
-  if (maiores.length) out.push({ polygons: maiores, color: theme.gridMajor, alpha: 1 });
+  if (menores.length) out.push({ polygons: menores, deslocamentoPx: menoresPx, color: theme.gridMinor, alpha: 1 });
+  if (maiores.length) out.push({ polygons: maiores, deslocamentoPx: maioresPx, color: theme.gridMajor, alpha: 1 });
   return out;
 }
 

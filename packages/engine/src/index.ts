@@ -72,6 +72,7 @@ export * from './rampQuantities.ts';
 export * from './rampSchedule.ts';
 export * from './rampEdit.ts';
 export * from './stairLive.ts';
+export * from './stairFree.ts';
 export * from './openingSchedule.ts';
 export * from './openingChecks.ts';
 export * from './rooms.ts';

@@ -1,4 +1,5 @@
 import { newId, stairTypeUsage, type Id, type Project, type ProjectStore, type StairType } from '@hestia/model';
+import { validateStairType, type StairValidationInput, type StairTypeIssue } from '../ui/dialogs/stairTypeForm.ts';
 import type { DeleteResult } from './typeActions.ts';
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
@@ -40,21 +41,39 @@ export function renameStairType(store: ProjectStore, typeId: Id, name: string): 
   return { ok: true };
 }
 
+/** Texto antigo (pt-BR) de um problema estruturado, para manter `stairTypeError` compatível. */
+function stairIssueMessage(i: StairTypeIssue): string {
+  switch (i.code) {
+    case 'stt-name-empty': return 'Dê um nome ao tipo.';
+    case 'stt-riser': return 'O espelho máximo precisa ser maior que zero.';
+    case 'stt-tread': return 'O piso mínimo precisa ser maior que zero.';
+    case 'stt-width': return 'A largura mínima do lance precisa ser maior que zero.';
+    case 'stt-headroom': return 'A folga de cabeça precisa ser maior que zero.';
+    case 'stt-landing': return 'A espessura do patamar precisa ser maior que zero.';
+    case 'stt-nosing-negative': return 'O nariz não pode ser negativo.';
+    case 'stt-nosing': return 'O nariz precisa ser menor que o piso mínimo.';
+    case 'stt-cost': return 'O custo não pode ser negativo.';
+    case 'stt-mono-depth': return 'Escada monolítica: a profundidade estrutural precisa ser maior que zero.';
+    case 'stt-assembled': return 'Escada montada: a espessura do piso e do espelho precisa ser maior que zero.';
+    case 'stt-post-tread': return 'Escada com poste central: a espessura do degrau precisa ser maior que zero.';
+    case 'stt-tread-range': return 'O piso máximo precisa ser maior ou igual ao piso mínimo.';
+    case 'stt-calc-range': return 'O alvo da regra de cálculo precisa ficar entre o mínimo e o máximo da faixa.';
+    case 'stt-factor': return i.params.factor === 'a'
+      ? 'O fator do espelho na regra de cálculo precisa ser maior que zero.'
+      : 'O fator do piso na regra de cálculo precisa ser maior que zero.';
+    case 'stt-overlap': return 'A sobreposição dos degraus precisa ser menor que a espessura do degrau.';
+    case 'stt-material': return 'Escolha um material existente para o tipo.';
+    default: return 'Tipo de escada inválido.';
+  }
+}
+
 /**
- * Validação do tipo antes de salvar: nome; medidas positivas (espelho, piso, largura, patamar, folga); e a espessura do
- * estilo escolhido (monolítico: profundidade estrutural; montado: piso e espelho). Devolve a 1ª mensagem, ou null.
+ * Validação do tipo antes de salvar: usa a validação estruturada (`validateStairType`) e devolve a 1ª mensagem de erro em
+ * pt-BR, ou null. Mantida como wrapper para os chamadores antigos.
  */
-export function stairTypeError(t: Pick<StairType, 'name' | 'maxRiser' | 'minTread' | 'minRunWidth' | 'runStyle' | 'structuralDepth' | 'treadThickness' | 'riserThickness' | 'landingThickness' | 'minHeadroom' | 'nosing'>): string | null {
-  if (!t.name.trim()) return 'Dê um nome ao tipo.';
-  if (!(t.maxRiser > 0)) return 'O espelho máximo precisa ser maior que zero.';
-  if (!(t.minTread > 0)) return 'O piso mínimo precisa ser maior que zero.';
-  if (!(t.minRunWidth > 0)) return 'A largura mínima do lance precisa ser maior que zero.';
-  if (!(t.minHeadroom > 0)) return 'A folga de cabeça precisa ser maior que zero.';
-  if (!(t.landingThickness > 0)) return 'A espessura do patamar precisa ser maior que zero.';
-  if (t.nosing < 0) return 'O nariz não pode ser negativo.';
-  if (t.runStyle === 'monolithic' && !(t.structuralDepth > 0)) return 'Escada monolítica: a profundidade estrutural precisa ser maior que zero.';
-  if (t.runStyle === 'assembled' && !(t.treadThickness > 0 && t.riserThickness > 0)) return 'Escada montada: a espessura do piso e do espelho precisa ser maior que zero.';
-  return null;
+export function stairTypeError(t: StairValidationInput): string | null {
+  const first = validateStairType(t).find((i) => i.severity === 'error');
+  return first ? stairIssueMessage(first) : null;
 }
 
 /**

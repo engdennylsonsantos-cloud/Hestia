@@ -14,14 +14,15 @@ import {
 import { addPlates, addRoofs, addStairs } from './ifcElements.ts';
 import { addGenerics } from './ifcGeneric.ts';
 import { addHestiaPsets } from './ifcHestia.ts';
+import { addPropertySet, type PropValue } from './ifcProperties.ts';
 import { externalWalls, outwardNormal, wallAxis } from './ifcExterior.ts';
 import { addGrids } from './ifcGrids.ts';
 import { addQuantities } from './ifcQuantities.ts';
 import { addSpaces } from './ifcSpaces.ts';
 import { addStyles } from './ifcStyles.ts';
 import { gid, materialOf, optStr, storeyOf, type IfcCtx, type IfcStorey } from './ifcCtx.ts';
-import { axis3, bodyShape, direction, extrudeSolid, localPlacement } from './ifcSolids.ts';
-import { en, int, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
+import { axis3, bodyShape, direction, extrudeSolid, localPlacement, rectOf } from './ifcSolids.ts';
+import { en, list, num, OMIT, ref, StepWriter, stepString } from './ifcStep.ts';
 import type { IfcGeometry, IfcOpeningGeo, IfcPoint, IfcPolygon, IfcWallGeo } from './ifcTypes.ts';
 
 const EPS = 1e-9;
@@ -32,44 +33,7 @@ export interface IfcExportOptions {
   timestamp?: string;
 }
 
-/** Valor de uma propriedade no `IfcValue`: booleano, inteiro, real ou texto. */
-type PropValue = string | number | boolean;
-
-/** `IFCPROPERTYSINGLEVALUE` com o valor no tipo IFC mais próximo (`IFCBOOLEAN`, `IFCINTEGER`, `IFCREAL` ou `IFCLABEL`). */
-function singleValue(w: StepWriter, name: string, value: PropValue): number {
-  const nominal =
-    typeof value === 'boolean'
-      ? `IFCBOOLEAN(${value ? '.T.' : '.F.'})`
-      : typeof value === 'number'
-        ? Number.isInteger(value)
-          ? `IFCINTEGER(${int(value)})`
-          : `IFCREAL(${num(value)})`
-        : `IFCLABEL(${stepString(value)})`;
-  return w.add('IFCPROPERTYSINGLEVALUE', [stepString(name), OMIT, nominal, OMIT]);
-}
-
-/**
- * `IFCPROPERTYSET` com as propriedades na ordem dada e `IFCRELDEFINESBYPROPERTIES` ligando o conjunto ao objeto. O
- * GlobalId é determinístico pela `key` (`pset:wall:<id>`, `pset:door:<id>`...), então o mesmo projeto gera o mesmo texto.
- */
-function addPropertySet(c: IfcCtx, key: string, name: string, props: ReadonlyArray<readonly [string, PropValue]>, object: number): void {
-  if (props.length === 0) return;
-  const singles = props.map(([n, v]) => ref(singleValue(c.w, n, v)));
-  const set = c.w.add('IFCPROPERTYSET', [gid(key), OMIT, stepString(name), OMIT, list(singles)]);
-  c.w.add('IFCRELDEFINESBYPROPERTIES', [gid(`${key}:rel`), OMIT, OMIT, OMIT, list([ref(object)]), ref(set)]);
-}
-
 /** Retângulo `width` × `thickness` centrado na origem do sistema local (x ao longo do eixo do vão, y na espessura). */
-function rectOf(width: number, thickness: number): IfcPolygon {
-  const hw = width / 2;
-  const ht = thickness / 2;
-  return [[
-    { x: -hw, y: -ht },
-    { x: hw, y: -ht },
-    { x: hw, y: ht },
-    { x: -hw, y: ht },
-  ]];
-}
 
 /** Direção unitária do eixo da parede (a→b); comprimento zero devolve `null`. */
 function layerSetOf(c: IfcCtx, type: WallType): number | null {

@@ -3,6 +3,18 @@ import type { IfcPlane, IfcPoint, IfcPolygon, IfcPrism, IfcRing } from './ifcTyp
 
 const EPS = 1e-9;
 
+/** Retângulo `width` × `thickness` centrado na origem do sistema local (x ao longo do eixo do vão, y na espessura). */
+export function rectOf(width: number, thickness: number): IfcPolygon {
+  const hw = width / 2;
+  const ht = thickness / 2;
+  return [[
+    { x: -hw, y: -ht },
+    { x: hw, y: -ht },
+    { x: hw, y: ht },
+    { x: -hw, y: ht },
+  ]];
+}
+
 /** Área com sinal (positiva no sentido anti-horário, em planta). */
 function signedArea(ring: IfcRing): number {
   let s = 0;

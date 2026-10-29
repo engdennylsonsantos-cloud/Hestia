@@ -61,6 +61,8 @@ export interface StairRunStepsOptions {
   riserHeight: number;
   /** Varredura (rad, com sinal) de um caracol. Sem ela, vale a do metadado `spiral` do lance, se houver. */
   sweep?: number;
+  /** Pula a validação quadrática de pares de espelhos: só para fatias geradas por construção (rampa). */
+  skipPairCheck?: boolean;
 }
 
 export interface StairRunStepsResult {
@@ -76,7 +78,7 @@ export interface StairRunStepsResult {
 /** Degraus e espelhos do lance (decisão 0011 §4). Com erro de validação, devolve listas vazias e os erros. */
 export function stairRunSteps(run: StairRunSketch, opts: StairRunStepsOptions): StairRunStepsResult {
   const P = prepareRun(run);
-  const issues = validatePrepared(run, P, opts.sweep ?? spiralSweepOf(run));
+  const issues = validatePrepared(run, P, opts.sweep ?? spiralSweepOf(run), opts.skipPairCheck === true);
   if (issues.some((i) => i.severity === 'error')) return { treads: [], risers: [], footprint: [], issues };
   const walk = walkOf(P, run, true);
   const ordered = walk.order.map((i) => P.risers[i]!);

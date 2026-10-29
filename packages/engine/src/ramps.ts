@@ -165,7 +165,7 @@ function resolveOne(p: Project, r: Ramp): ResolvedRamp | null {
       // Fatias de ~10 cm: k linhas (≥ 2) viram k−1 degraus; o passo cresce acima do teto.
       const lines = Math.min(MAX_SLICES + 1, Math.max(2, Math.ceil(Li / RAMP_SLICE_LENGTH) + 1));
       const sliced = { ...c, risers: distributeRisers(c, lines) };
-      const step = res.treads.length > 0 ? stairRunSteps(sliced, { baseZ: z, riserHeight: rise / (lines - 1) }) : null;
+      const step = res.treads.length > 0 ? stairRunSteps(sliced, { baseZ: z, riserHeight: rise / (lines - 1), skipPairCheck: true }) : null;
       if (step) {
         for (const t of step.treads) slices.push({ componentIndex: ci, kind: 'flight', polygon: t.polygon, z: t.z });
       }

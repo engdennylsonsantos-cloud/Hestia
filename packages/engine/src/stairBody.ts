@@ -20,7 +20,7 @@ export interface StairBodyPiece {
 
 /** Comprimento máximo da chegada, atrás do último espelho (m). */
 export const STAIR_ARRIVAL_MAX_LENGTH = 0.3;
-/** Espessura da laje de cima usada quando nenhuma laje ou piso cobre o último espelho (m): topo = topZ − este valor. */
+/** Espessura da laje de cima usada quando `stairBody` é chamado sem `arrivalTopZ` (m): topo = topZ − este valor. O 3D/corte sempre passam a cota. */
 export const STAIR_ARRIVAL_SLAB_DEFAULT = 0.15;
 
 const EPS = 1e-9;
@@ -54,9 +54,10 @@ export function pieceVolume(piece: StairBodyPiece): number {
  * do tipo (padrão liso); nenhuma peça desce abaixo do piso base. Piso e espelho: degraus com espessura `treadThickness`
  * e patamares com `landingThickness`, sem chegada. Escada com erro: sem peças.
  *
- * Chegada (monolítico): o topo é `opts.arrivalTopZ` (cota absoluta, em geral a face inferior da laje que cobre o último
- * espelho, `stairArrivalTopZ`). Sem ele, vale `topZ − opts.slabThickness` (padrão 0,15 m). Com `arrivalTopZ`, a parte da
- * chegada cujo fundo fica acima desse topo é cortada, então a peça nunca tem espessura negativa.
+ * Chegada (monolítico): o topo é `opts.arrivalTopZ` (cota absoluta). O 3D e o corte passam `stairArrivalTop(...).top`: a
+ * face inferior da laje/piso que cobre o último espelho ou, sem cobertura, o próprio `topZ` (chegada flush com o nível).
+ * Sem `arrivalTopZ`, vale o recuo antigo `topZ − opts.slabThickness` (padrão 0,15 m), só para chamadas isoladas. Com
+ * `arrivalTopZ`, a parte da chegada cujo fundo fica acima desse topo é cortada, então a peça nunca tem espessura negativa.
  */
 export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; arrivalTopZ?: number } = {}): { pieces: StairBodyPiece[] } {
   if (stair.issues.some((i) => i.severity === 'error')) return { pieces: [] };

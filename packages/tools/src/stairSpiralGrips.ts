@@ -142,7 +142,12 @@ export function spiralHold(env: ToolEnv, g: SpiralGrip): GripHold {
       if ('error' in reg) return items;
       items.push(...componentsPreview(reg.components));
       const h = riserHeightOf(env.project(), s, reg.components, g.part);
-      if (h !== null) items.push(...treadItems(partsFromComponents(reg.components), h));
+      if (h !== null) {
+        const p = env.project();
+        // Caracol é estilo poste (sem chegada); o contexto mantém a prévia igual à escada gravada se o tipo for outro.
+        const risers = reg.components.reduce((n, c) => n + (c.kind === 'run' ? c.risers.length : 0), 0);
+        items.push(...treadItems(partsFromComponents(reg.components), { project: p, type: p.stairTypes[s.typeId] ?? null, topLevelId: s.topLevelId, risers, riserHeight: h }));
+      }
       return items;
     },
     release(): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { generateLShape, generateStraightRun, pieceVolume, resolveStairsOnLevel, stairArrivalTopZ, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
+import { generateLShape, generateStraightRun, pieceVolume, resolveStairsOnLevel, stairArrivalTop, stairArrivalTopZ, stairBody, type ResolvedStair, type ResolvedStairStep, type StairComponentSketch } from '@hestia/engine';
 import { DEFAULT_STAIR_TYPES, ProjectStore, createEmptyProject, defaultStairTypeId, makeStair, type StairLanding, type StairRun } from '@hestia/model';
 import { straightStair } from '../stairFixture.helper.ts';
 import { buildStairSolids, riserSlab } from './stairSolids.ts';
@@ -153,13 +153,24 @@ describe('sólidos de escada (3D, decisões 0011 §1 e 0012)', () => {
     expect(batches.map((b) => b.materialId)).toEqual([ASSEMBLED.materialId]);
   });
 
-  it('o topo da chegada vem do callback (padrão: sem laje sobre a escada, topo − 0,15 m; stairArrivalTopZ dá null)', () => {
+  it('o topo da chegada vem do callback; sem callback vale o recuo antigo (topo − 0,15 m; `stairArrivalTopZ` dá null)', () => {
     const s = straightStair({ risers: N, tread: P, riserH: H, width: W, type: MONO });
     const withDefault = total(buildStairSolids([s]));
     const withSame = total(buildStairSolids([s], () => s.topZ - 0.15));
     expect(Math.abs(withDefault - withSame)).toBeLessThan(1e-12);
     const ph = new ProjectStore(createEmptyProject()).project;
     expect(stairArrivalTopZ(ph, s)).toBeNull();
+  });
+
+  it('sem laje (cena passa `stairArrivalTop(...).top` = topZ): a chegada é flush no nível, sem recuo de 0,15 m', () => {
+    const s = straightStair({ risers: N, tread: P, riserH: H, width: W, type: MONO });
+    const ph = new ProjectStore(createEmptyProject()).project;
+    const batches = buildStairSolids([s], (st) => stairArrivalTop(ph, st).top);
+    const zs = batches.flatMap((b) => b.positions.filter((_, i) => i % 3 === 2));
+    expect(Math.max(...zs)).toBeCloseTo(s.topZ, 9);
+    const expected = stairBody(s, { arrivalTopZ: s.topZ }).pieces.reduce((acc, p) => acc + pieceVolume(p), 0);
+    expect(Math.abs(total(batches) - expected)).toBeLessThan(1e-4);
+    expect(unmatchedEdges(batches[0]!)).toBe(0);
   });
 
   it('um topo de chegada mais baixo (laje mais baixa) entra na malha: a chegada perde volume, igual às peças com essa cota', () => {

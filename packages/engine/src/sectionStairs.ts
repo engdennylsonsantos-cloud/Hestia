@@ -1,6 +1,6 @@
 import { add, dot, intersection, mul, norm, perp, sub, type Polygon, type Ring, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from '@hestia/model';
-import { stairArrivalTopZ } from './stairArrival.ts';
+import { stairArrivalTop } from './stairArrival.ts';
 import { stairBody, type StairBodyPiece } from './stairBody.ts';
 import type { ResolvedStair, ResolvedStairRiser } from './stairs.ts';
 import type { SectionBeyond } from './section.ts';
@@ -77,7 +77,8 @@ const bottomAt = (piece: StairBodyPiece, v: Vec2): number => piece.bottom.a * v.
 
 /**
  * Corte e projeção das escadas do nível para a linha de corte (ou de elevação, com `depth` grande). `p` dá a cota do topo
- * da chegada monolítica (a face inferior da laje que cobre o último espelho, `stairArrivalTopZ`).
+ * da chegada monolítica (`stairArrivalTop`): a face inferior da laje que cobre o último espelho ou, sem laje nem piso, o
+ * próprio nível de topo (`topZ`), com a chegada flush.
  */
 export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: Project): StairSection {
   const out: StairSection = { cut: [], beyond: [], zMin: Infinity, zMax: -Infinity };
@@ -98,7 +99,7 @@ export function sectionOfStairs(stairs: ResolvedStair[], line: SectionLine, p: P
     // zFundo a zTop em cada intervalo que a linha atravessa; na vista, a projeção convexa dos vértices (exata para peças
     // convexas). O poste (peça `post`) sai com o material do poste.
     if (s.type.runStyle === 'monolithic' || s.type.runStyle === 'post') {
-      const arrivalTopZ = stairArrivalTopZ(p, s) ?? s.topZ;
+      const arrivalTopZ = stairArrivalTop(p, s).top;
       for (const piece of stairBody(s, { arrivalTopZ }).pieces) {
         const pieceMaterial = piece.kind === 'post' ? s.type.postMaterialId : materialId;
         for (const [t0, t1] of lineIntervals([piece.polygon], line.a, d, n)) {

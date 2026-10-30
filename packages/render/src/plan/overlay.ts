@@ -165,7 +165,8 @@ export function previewOverlay(items: PreviewItem[], theme: PlanTheme, highlight
         break;
       }
       case 'label':
-        o.labels.push({ at: it.at, text: it.text, dx: 10, dy: -14, tone: 'accent' });
+        if (it.dimensionStyle) o.labels.push({ at: it.at, text: it.text, fontPx: 11, center: true, rotation: it.rotation, color: theme.accent, appearance: 'dimension-preview' });
+        else o.labels.push({ at: it.at, text: it.text, dx: 10, dy: -14, tone: 'accent' });
         break;
       case 'point':
         o.strokes.push({ ...tracoEm(it.at, cantosDoQuadrado(3), true), widthPx: 1.5, color: theme.accent, alpha: 1 });

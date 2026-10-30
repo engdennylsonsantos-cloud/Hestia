@@ -31,7 +31,7 @@ export type PreviewItem =
   | { kind: 'line'; a: Vec2; b: Vec2; dashed?: boolean; tone?: PreviewTone; halo?: boolean }
   | { kind: 'polygon'; ring: Vec2[]; dashed?: boolean; tone?: PreviewTone }
   | { kind: 'wallBand'; a: Vec2; b: Vec2; thickness: number; sMid: number; sag?: number }
-  | { kind: 'label'; at: Vec2; text: string }
+  | { kind: 'label'; at: Vec2; text: string; dimensionStyle?: boolean; rotation?: number }
   | { kind: 'point'; at: Vec2 }
   | { kind: 'highlight'; ids: Id[] }
   /** Linha de corte ou elevação com a seta do lado de visão (a pré-visualização usa `dashed`). */

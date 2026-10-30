@@ -88,6 +88,8 @@ export interface LabelOp {
   dy?: number;
   /** 'soft': rótulo mais claro (degrau acima do corte, decisão 0014 §1 item 9). */
   tone?: 'info' | 'accent' | 'soft';
+  /** Estilo do valor da cota durante o desenho: tipografia monoespaçada e sem caixa. */
+  appearance?: 'dimension-preview';
   /** Texto de anotação (decisão 0019): tamanho da fonte em px de tela, rotação em graus, centrado em `at`. */
   fontPx?: number;
   rotation?: number;

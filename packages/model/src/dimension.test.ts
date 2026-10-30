@@ -148,7 +148,7 @@ describe('cota angular', () => {
     expect(g.arc).toHaveLength(9);
     expect(g.start.x).toBeCloseTo(1.5, 9);
     expect(g.start.y).toBeCloseTo(0, 9);
-    expect(g.extensions).toHaveLength(2);
+    expect(g.extensions).toHaveLength(0);
     expect(g.ticks).toHaveLength(2);
     expect(g.textAt.x).toBeGreaterThan(0);
     expect(g.textAt.y).toBeGreaterThan(0.5);

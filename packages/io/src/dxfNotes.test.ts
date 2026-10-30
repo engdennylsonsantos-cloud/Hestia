@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProjectStore, createEmptyProject, angularDimensionData } from '@hestia/model';
+import { ProjectStore, createEmptyProject, angularDimensionData, makeWall } from '@hestia/model';
 import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextRecords, notesDxfOf } from './dxfNotes.ts';
 import { exportDxf, type DxfLevelGeometry } from './dxf.ts';
 
@@ -82,12 +82,12 @@ describe('anotações no DXF da planta', () => {
     expect(rec[73]).toBe(2);
   });
 
-  it('cota angular sai como arco segmentado, chamadas e texto em COTAS', () => {
+  it('cota angular sai como arco segmentado, marcas e texto em COTAS', () => {
     const s = new ProjectStore(createEmptyProject());
     const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b');
     s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: 0, y: 2 }, offset: 0, angular, precision: 1 } });
     const notes = notesDxfOf(s.project, LV0, 100);
-    expect(notes.lines.length).toBeGreaterThanOrEqual(28);
+    expect(notes.lines.length).toBeGreaterThanOrEqual(26);
     expect(notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS).map((t) => t.text)[0]).toContain('90');
   });
 
@@ -98,8 +98,8 @@ describe('anotações no DXF da planta', () => {
     const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, to, 2, 'reflex', 'a', 'b', 'major');
     s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: angular.to.x * 2, y: angular.to.y * 2 }, offset: 0, angular, precision: 1 } });
     const notes = notesDxfOf(s.project, LV0, 100);
-    // 34 segmentos de arco + 2 chamadas + 2 marcas.
-    expect(notes.lines.length).toBeGreaterThanOrEqual(38);
+    // 34 segmentos de arco + 2 marcas.
+    expect(notes.lines.length).toBeGreaterThanOrEqual(36);
     const at = notes.texts.filter((t) => t.layer === DXF_LAYER_COTAS)[0]!;
     expect(at.text).toContain('252,7');
     expect(at.rotation).toBeGreaterThan(-90);
@@ -108,5 +108,19 @@ describe('anotações no DXF da planta', () => {
     const first = notes.lines[0]!;
     expect(first[0].y).toBeCloseTo(0, 9);
     expect(first[1].y).toBeGreaterThan(0);
+  });
+
+  it('DXF: extremos da cota angular ficam nos eixos de parede referenciados', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const angle = 30 * Math.PI / 180;
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: LV0, a: { x: -4, y: 0 }, b: { x: 4, y: 0 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: LV0, a: { x: -4 * Math.cos(angle), y: -4 * Math.sin(angle) }, b: { x: 4 * Math.cos(angle), y: 4 * Math.sin(angle) } }) });
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: Math.cos(angle), y: Math.sin(angle) }, 1.5, 'reflex', 'wa:eixo', 'wb:eixo', 'minor');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang-ref', a: { x: 0, y: 0 }, b: { x: angular.to.x * angular.radius, y: angular.to.y * angular.radius }, offset: 0, angular } });
+    const notes = notesDxfOf(s.project, LV0, 100);
+    const start = notes.lines[0]![0];
+    const end = notes.lines.at(-3)![1];
+    expect(start.y).toBeCloseTo(0, 8);
+    expect(end.x * Math.sin(angle) - end.y * Math.cos(angle)).toBeCloseTo(0, 8);
   });
 });

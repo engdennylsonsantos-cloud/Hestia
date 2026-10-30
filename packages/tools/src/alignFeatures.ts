@@ -319,7 +319,7 @@ function referenceLineFeatures(p: Project, levelId: Id, at: Vec2, mpp: number, p
       if (degenerate(a, b)) continue;
       const d = segmentDistance(at, a, b);
       if (d > tol) continue;
-      out.push(feature(`${g.id}:grade:${i - 1}`, 'linhaGrade', `grade ${g.name}`, g.id, line(a, sub(b, a)), { policy: 'nenhum' }, d, { a, b }));
+      out.push(feature(`${g.id}:grade:${i - 1}`, 'linhaGrade', `grade ${g.name}`, g.id, line(closestOnSegment(at, a, b), sub(b, a)), { policy: 'nenhum' }, d, { a, b }));
     }
   }
   const level = p.levels.find((l) => l.id === levelId);
@@ -328,12 +328,12 @@ function referenceLineFeatures(p: Project, levelId: Id, at: Vec2, mpp: number, p
   for (const l of details) {
     const d = segmentDistance(at, l.a, l.b);
     if (d > tol) continue;
-    out.push(feature(`${l.id}:detalhe`, 'linhaDetalhe', 'linha de detalhe', l.id, line(l.a, sub(l.b, l.a)), { policy: 'nenhum' }, d, { a: l.a, b: l.b }));
+    out.push(feature(`${l.id}:detalhe`, 'linhaDetalhe', 'linha de detalhe', l.id, line(closestOnSegment(at, l.a, l.b), sub(l.b, l.a)), { policy: 'nenhum' }, d, { a: l.a, b: l.b }));
   }
   for (const r of levelRoomSeparators(p, levelId)) {
     const d = segmentDistance(at, r.a, r.b);
     if (d > tol) continue;
-    out.push(feature(`${r.id}:separador`, 'separador', 'separador de ambiente', r.id, line(r.a, sub(r.b, r.a)), { policy: 'nenhum' }, d, { a: r.a, b: r.b }));
+    out.push(feature(`${r.id}:separador`, 'separador', 'separador de ambiente', r.id, line(closestOnSegment(at, r.a, r.b), sub(r.b, r.a)), { policy: 'nenhum' }, d, { a: r.a, b: r.b }));
   }
   return out;
 }

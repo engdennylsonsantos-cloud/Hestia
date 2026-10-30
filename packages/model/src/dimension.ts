@@ -89,7 +89,7 @@ export interface AngularDimensionGeometry {
   start: Vec2;
   end: Vec2;
   arc: Vec2[];
-  extensions: [[Vec2, Vec2], [Vec2, Vec2]];
+  extensions: Array<[Vec2, Vec2]>;
   ticks: [[Vec2, Vec2], [Vec2, Vec2]];
   textAt: Vec2;
   textRotation: number;
@@ -114,7 +114,6 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
   for (let i = 0; i <= steps; i++) arc.push(pointAt(angleA + (delta * i) / steps, a.radius));
   const start = arc[0]!;
   const end = arc[arc.length - 1]!;
-  const over = Math.max(0.08, a.radius * 0.08);
   const tick = Math.max(0.04, a.radius * 0.05);
   const tickAt = (angle: number, point: Vec2): [Vec2, Vec2] => {
     const p = { x: -Math.sin(angle), y: Math.cos(angle) };
@@ -131,10 +130,9 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
     start,
     end,
     arc,
-    extensions: [
-      [a.center, pointAt(angleA, a.radius + over)],
-      [a.center, pointAt(angleB, a.radius + over)],
-    ],
+    // A cota angular não desenha chamadas radiais: elas formavam um V entre as
+    // paredes e sugeriam um retorno para fora das referências escolhidas.
+    extensions: [],
     ticks: [tickAt(angleA, start), tickAt(angleB, end)],
     textAt,
     textRotation,

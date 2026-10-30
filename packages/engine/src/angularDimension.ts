@@ -6,7 +6,7 @@ import { pointAt, tangentAt } from './frame.ts';
 interface WallRefLine {
   p: Vec2;
   d: Vec2;
-  anchor: Vec2;
+  segment?: [Vec2, Vec2];
 }
 
 const WALL_REF = /^(.+):(face:hi|face:lo|eixo|nucleo:a|nucleo:b)$/;
@@ -26,15 +26,25 @@ function wallRefLine(p: Project, key: string): WallRefLine | null {
   return {
     p: pointAt(f, t, s),
     d: tangentAt(f, t),
-    anchor: pointAt(f, t, 0),
+    ...(!f.arc ? { segment: [pointAt(f, 0, s), pointAt(f, f.length, s)] as [Vec2, Vec2] } : {}),
   };
 }
 
 const segmentRef = (a: Vec2, b: Vec2): WallRefLine | null => {
   const d = sub(b, a);
   if (Math.hypot(d.x, d.y) < 1e-9) return null;
-  return { p: a, d: norm(d), anchor: mul(add(a, b), 0.5) };
+  return { p: a, d: norm(d), segment: [a, b] };
 };
+
+/** Maior raio ainda contido nos trechos finitos das referências, quando disponível. */
+function clampToReferences(center: Vec2, from: Vec2, to: Vec2, a: WallRefLine, b: WallRefLine, radius: number): number {
+  const extent = (line: WallRefLine, direction: Vec2): number | null => {
+    if (!line.segment) return null;
+    return Math.max(0, dot(sub(line.segment[0], center), direction), dot(sub(line.segment[1], center), direction));
+  };
+  const limits = [extent(a, from), extent(b, to)].filter((x): x is number => x !== null && x > 0.05);
+  return limits.length ? Math.min(radius, ...limits.map((x) => x * 0.92)) : radius;
+}
 
 /** Resolve também grades, linhas de detalhe e separadores; desconhecidas mantêm a geometria gravada. */
 function refLine(p: Project, levelId: Id, key: string): WallRefLine | null {
@@ -67,8 +77,9 @@ function intersection(a: Vec2, da: Vec2, b: Vec2, db: Vec2): Vec2 | null {
   return { x: a.x + da.x * t, y: a.y + da.y * t };
 }
 
-const orient = (line: WallRefLine, center: Vec2): Vec2 =>
-  dot(line.d, sub(line.anchor, center)) >= 0 ? line.d : { x: -line.d.x, y: -line.d.y };
+const orient = (line: WallRefLine, preferred: Vec2): Vec2 => {
+  return dot(line.d, preferred) >= 0 ? line.d : { x: -line.d.x, y: -line.d.y };
+};
 
 /**
  * Recalcula a cota angular a partir das chaves do Alinhar. Assim as faces/eixos/núcleos continuam valendo depois que a
@@ -82,8 +93,9 @@ export function resolveAngularDimension(p: Project, levelId: Id, d: Dimension): 
   if (!ra || !rb) return d;
   const center = intersection(ra.p, ra.d, rb.p, rb.d);
   if (!center) return d;
-  const from = orient(ra, center);
-  const to = orient(rb, center);
-  const data = angularDimensionData(center, from, to, a.radius, a.side, a.refA, a.refB, a.base);
-  return { ...d, a: center, b: add(center, mul(data.to, a.radius)), angular: { ...a, ...data } };
+  const from = orient(ra, a.from);
+  const to = orient(rb, a.to);
+  const radius = a.side === 'reflex' ? a.radius : clampToReferences(center, from, to, ra, rb, a.radius);
+  const data = angularDimensionData(center, from, to, radius, a.side, a.refA, a.refB, a.base);
+  return { ...d, a: center, b: add(center, mul(data.to, radius)), angular: { ...a, ...data } };
 }

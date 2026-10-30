@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolverRotulo } from './zoomOps.ts';
-import { ProjectStore, createEmptyProject, angularDimensionData, paperMmToPx } from '@hestia/model';
+import { ProjectStore, createEmptyProject, angularDimensionData, makeWall, paperMmToPx } from '@hestia/model';
 import { noteOps } from './notes.ts';
 import { defaultPaint } from './style.ts';
 import { Limiares, type VistaComLimiares } from './limiares.ts';
@@ -113,14 +113,14 @@ describe('anotações na planta', () => {
     expect(resolverRotulo(t, ZOOM).widthPx).toBeCloseTo(paperMmToPx(40, ZOOM, SCALE), 9);
   });
 
-  it('cota angular: arco, chamadas, marcas e valor em graus', () => {
+  it('cota angular: arco, marcas e valor em graus', () => {
     const s = new ProjectStore(createEmptyProject());
     const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, 2, 'minor', 'a', 'b');
     s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang', a: { x: 0, y: 0 }, b: { x: 0, y: 2 }, offset: 0, angular, precision: 1 } });
     const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
     expect(ops.labels).toHaveLength(1);
     expect(ops.labels[0]!.text).toContain('90');
-    expect(ops.strokes.length).toBeGreaterThanOrEqual(5);
+    expect(ops.strokes.length).toBeGreaterThanOrEqual(3);
   });
 
   it('cota angular reflexa: arco > 180° segmentado e texto no meio do arco longo', () => {
@@ -147,5 +147,20 @@ describe('anotações na planta', () => {
     expect(Math.abs(sweep)).toBeCloseTo(252.7 * deg, 6);
     const mid = ops.labels[0]!.at;
     expect((Math.atan2(mid.y, mid.x) * 180) / Math.PI).toBeCloseTo(126.35, 6);
+  });
+
+  it('planta: as pontas da cota angular reflexa ficam nos eixos de parede referenciados', () => {
+    const s = new ProjectStore(createEmptyProject());
+    const angle = 30 * Math.PI / 180;
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: LV0, a: { x: -4, y: 0 }, b: { x: 4, y: 0 } }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: LV0, a: { x: -4 * Math.cos(angle), y: -4 * Math.sin(angle) }, b: { x: 4 * Math.cos(angle), y: 4 * Math.sin(angle) } }) });
+    const angular = angularDimensionData({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: Math.cos(angle), y: Math.sin(angle) }, 1.5, 'reflex', 'wa:eixo', 'wb:eixo', 'minor');
+    s.exec({ type: 'addDimension', levelId: LV0, dimension: { id: 'ang-ref', a: { x: 0, y: 0 }, b: { x: angular.to.x * angular.radius, y: angular.to.y * angular.radius }, offset: 0, angular } });
+    const ops = noteOps(s.project, LV0, defaultPaint('annotation', ZOOM), LOOK, SCALE);
+    const arc = ops.strokes.reduce((best, stroke) => stroke.pts.length > best.pts.length ? stroke : best);
+    const start = arc.pts[0]!;
+    const end = arc.pts.at(-1)!;
+    expect(start.y).toBeCloseTo(0, 8);
+    expect(end.x * Math.sin(angle) - end.y * Math.cos(angle)).toBeCloseTo(0, 8);
   });
 });

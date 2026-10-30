@@ -294,6 +294,7 @@ svg { display: block; }
 .dim-label--soft { color: var(--fg-soft); opacity: 0.8; }
 /* Cota e texto de anotação (decisão 0019): sem caixa, na cor da tinta da planta. */
 .plan-note { position: absolute; z-index: 2; font-family: var(--font-ui); color: var(--fg); white-space: nowrap; line-height: 1.15; pointer-events: none; }
+.plan-note--dimension-preview { font-family: var(--font-mono); color: var(--accent); text-shadow: 0 0 2px var(--panel), 0 0 3px var(--panel); }
 .dim-label { z-index: 2; }
 .typebox { position: absolute; left: 14px; bottom: 44px; z-index: 11; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; padding: 5px 9px; box-shadow: var(--shadow); font-family: var(--font-mono); }
 .typebox .cap { font-family: var(--font-ui); color: var(--fg-soft); }

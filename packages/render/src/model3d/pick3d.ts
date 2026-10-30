@@ -152,10 +152,11 @@ export function pickLevel(scene: THREE.Object3D, camera: THREE.Camera, ndc: { x:
   scene.traverse((o) => {
     if (o.userData.levels === true) {
       o.traverse((c) => {
-        if (c.userData.levelId) alvos.add(c);
+        // O plano azul é só realce de seleção: não entra no picking, senão bloqueia paredes/telhados atrás dele.
+        if (c.userData.levelId && c.userData.levelsPlane !== true) alvos.add(c);
       });
-    } else if (o.userData.levelId && (o.userData.levelsPlane === true || (o as THREE.Line).isLine || (o as THREE.Sprite).isSprite || (o as THREE.Mesh).isMesh)) {
-      // Plano de seleção (e datum fora do grupo): a malha também é alvo, para o clique manter o nível selecionado.
+    } else if (o.userData.levelId && o.userData.levelsPlane !== true && ((o as THREE.Line).isLine || (o as THREE.Sprite).isSprite || (o as THREE.Mesh).isMesh)) {
+      // Datum fora do grupo: a linha/bolha/texto também é alvo (o plano não).
       alvos.add(o);
     }
   });

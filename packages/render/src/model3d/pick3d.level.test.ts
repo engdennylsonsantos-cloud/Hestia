@@ -36,15 +36,12 @@ describe('pickLevel: datum de nível na vista 3D', () => {
     expect(hit!.point.z).toBeCloseTo(0, 6);
   });
 
-  it('o plano do nível selecionado (`levelsPlane`) também é atingido', () => {
+  it('o plano do nível selecionado não bloqueia o picking dos elementos (não é alvo)', () => {
     const scene = new THREE.Scene();
     const plano = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
     plano.userData = { levelsPlane: true, levelId: 'lv_1' };
     scene.add(plano);
-    const hit = pickLevel(scene, cameraDeCima(), { x: 0, y: 0 });
-    expect(hit).not.toBeNull();
-    expect(hit!.levelId).toBe('lv_1');
-    expect(hit!.point.z).toBeCloseTo(0, 6);
+    expect(pickLevel(scene, cameraDeCima(), { x: 0, y: 0 })).toBeNull();
   });
 
   it('sem datum na cena devolve null', () => {

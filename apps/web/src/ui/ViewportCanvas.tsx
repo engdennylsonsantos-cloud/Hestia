@@ -450,8 +450,9 @@ export function ViewportCanvas(): ReactElement {
           useUi.setState({ status: 'Modo de seleção ativado.' });
         }
       } else {
-        // Clique no datum do nível (linha/bolha/texto/plano) seleciona o nível, sem diálogo; no resto, seleciona o elemento.
-        if (!selecionarNivelNoClique(model.current, host.current!.getBoundingClientRect(), s)) clickSelect3d(el?.id ?? null, e.shiftKey || e.ctrlKey || e.metaKey);
+        // Um elemento sob o cursor tem prioridade: a anotação do nível (texto/bolha) não pode bloquear parede/telhado.
+        if (el) clickSelect3d(el.id, e.shiftKey || e.ctrlKey || e.metaKey);
+        else if (!selecionarNivelNoClique(model.current, host.current!.getBoundingClientRect(), s)) clickSelect3d(null, e.shiftKey || e.ctrlKey || e.metaKey);
       }
     }
     // Clique sem arrasto no corte ou na elevação: o mesmo caminho da 3D (clickSelect3d, que usa selectionAfterClick).

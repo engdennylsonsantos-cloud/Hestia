@@ -134,7 +134,7 @@ export class Editor {
     hiddenInView: () => planViewOf(this.store.project, useUi.getState().levelId).hidden,
     underlayLevelId: () => { const st = useUi.getState(); return underlayIdOf(this.store.project, st.levelId, st.showUnderlay, st.underlayLevel); },
     selection: () => useUi.getState().selection,
-    setSelection: (ids) => useUi.setState({ selection: ids }),
+    setSelection: (ids) => useUi.setState({ selection: ids, ...(ids.length ? { selectedLevel: null } : {}) }),
     exec: (c) => this.exec(c),
     transaction: (l, fn, session) => this.store.transaction(l, fn, session),
     metersPerPixel: () => 1 / (this.viewport()?.zoom ?? 60),

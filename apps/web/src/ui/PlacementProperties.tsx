@@ -47,7 +47,6 @@ export function PlacementProperties({ tool }: { tool: ToolId }): ReactElement {
           <Row label="Linha de localização" htmlFor="place-wall-location"><select id="place-wall-location" className="select" value={o.locationLine} onChange={(e) => set({ locationLine: e.target.value as LocationLine })}>{Object.entries(LOCATION_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Row>
           <Row label="Inverter lado externo"><Check id="place-wall-flipped" checked={o.wallFlipped ?? false} onChange={(v) => set({ wallFlipped: v })} /></Row>
           <Row label="Encadear"><Check id="place-wall-chain" checked={o.chain} onChange={(v) => set({ chain: v })} /></Row>
-          <Row label="Travar em 0°/90°"><Check id="place-wall-ortho" checked={o.orthoLock} onChange={(v) => set({ orthoLock: v })} /></Row>
         </Group>
       )}
       {(tool === 'door' || tool === 'window') && (

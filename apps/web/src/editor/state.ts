@@ -11,7 +11,7 @@ import { loadDock, type DockLayout } from './dockLayout.ts';
 
 export type ViewKind = 'plan' | '3d' | 'section' | 'sheet';
 export type ThemePref = 'system' | 'light' | 'dark';
-export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | null;
+export type DialogKind = 'wallType' | 'floorType' | 'materials' | 'levels' | 'openingType' | 'start' | 'shortcuts' | 'shortcutsConfig' | 'about' | 'schedule' | 'floorSchedule' | 'slabType' | 'slabSchedule' | 'ceilingType' | 'ceilingSchedule' | 'roofType' | 'roofSchedule' | 'stairType' | 'stairSchedule' | 'rampType' | 'rampSchedule' | 'openingSchedule' | 'graphicsVisibility' | 'lineWeights' | 'sheet' | 'addView' | 'roomSchedule' | 'roomCategories' | 'cotasAuto' | 'moveLevel' | 'gridType' | 'units' | 'dimensions' | 'hostedLoss' | 'areaMerge' | null;
 
 export interface UiState {
   tool: ToolId;
@@ -129,6 +129,16 @@ export function setSnap(patch: Partial<SnapOptions>): void {
   } catch {
     // Armazenamento indisponível (janela privada, dados bloqueados): a captura vale só nesta sessão.
   }
+}
+
+/** Liga/desliga o modo ortogonal global (F8): só a projeção nos eixos 0°/90° enquanto ativo. */
+export function toggleOrtho(): boolean {
+  const next = !useUi.getState().options.orthoLock;
+  useUi.setState((s) => ({
+    options: { ...s.options, orthoLock: next },
+    status: next ? 'Modo ortogonal ativado (F8): apenas 0°/90°.' : 'Modo ortogonal desativado (F8).',
+  }));
+  return next;
 }
 
 /**

@@ -196,7 +196,7 @@ function crossAxis(p: Vec2, d: Vec2, axis: 'x' | 'y', v: number): Vec2 | null {
  */
 export function infer(cursor: Vec2, ctx: InferContext): Inference {
   const sn = { ...DEFAULT_SNAP, ...ctx.snap };
-  if (sn.enabled === false) {
+  if (sn.enabled === false && !ctx.orthoLock) {
     return { point: cursor, kind: 'none', guides: [] };
   }
 
@@ -204,6 +204,14 @@ export function infer(cursor: Vec2, ctx: InferContext): Inference {
   // Grade só quantiza quando está ligada e a ferramenta não a dispensou (S-03).
   const g = ctx.noGrid || !sn.grid ? 0 : ctx.gridStep;
   const free = (v: number): number => (g > 0 ? Math.round(v / g) * g : v);
+  // Modo ortogonal travado (F8): só a projeção no eixo mais próximo, sem disputar com endpoint/alinhamento.
+  if (ctx.orthoLock && ctx.from) {
+    const d = sub(cursor, ctx.from);
+    if (len(d) <= 1e-6) return { point: cursor, kind: 'none', guides: [] };
+    const horiz = Math.abs(d.y) <= Math.abs(d.x);
+    const snapped = horiz ? v2(free(cursor.x), ctx.from.y) : v2(ctx.from.x, free(cursor.y));
+    return { point: snapped, kind: 'ortho', guides: [{ from: ctx.from, to: snapped, kind: 'ortho' }] };
+  }
   // Pavimento atual e, se visível como referência, o de baixo: o que se vê na planta é o que se captura.
   const levels: Id[] = ctx.underlayLevelId ? [ctx.levelId, ctx.underlayLevelId] : [ctx.levelId];
   const facesIn = (): WallFaces[] => levels.flatMap((l) => facesOf(ctx.project, l));

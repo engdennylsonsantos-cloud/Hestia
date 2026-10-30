@@ -7,6 +7,7 @@ import { usePerimeter } from '../editor/perimeter.ts';
 import { Icon } from './Icon.tsx';
 import { IssuesButton } from './IssuesButton.tsx';
 import { SnapButton } from './SnapButton.tsx';
+import { OrthoButton } from './OrthoButton.tsx';
 import { useUnits } from './useUnits.ts';
 
 const SNAP: Record<string, string> = {
@@ -42,6 +43,7 @@ export function StatusBar(): ReactElement {
       {view === 'plan' && cursor ? <span className="mono sb-coords">x {formatQuantity(units, 'length', cursor.x)}  y {formatQuantity(units, 'length', cursor.y)}</span> : null}
       <span className="mono sb-snap">{view === 'plan' && snap && SNAP[snap] ? SNAP[snap] : ''}</span>
       <SnapButton />
+      <OrthoButton />
       <span className="sb-filter" title={pt ? `Filtro de seleção: ${nSel} elemento${nSel === 1 ? '' : 's'} selecionado${nSel === 1 ? '' : 's'}` : `Selection filter: ${nSel} selected`}>
         <Icon name="funnel" size={12} />
         <span className="mono">:{nSel}</span>

@@ -7,8 +7,6 @@ import type { Viewport } from '../viewport.ts';
 import { effectiveGridStep, gridCovers, gridLayer, type GridLayer } from './grid.ts';
 import type { PlanSlot, PlanScene } from './gpuPlan.ts';
 import { buildPlanGeometry, buildPlanHoverOverlay, buildPlanLiveOverlay, buildPlanScreenOverlay, planBelowOf, planGeometrySelection } from './build.ts';
-import { areaPlanHighlightOps, labelGhostOps } from './areaPlan.ts';
-import { annotationHighlightOps, drawnAnnotations } from './notes.ts';
 import { telhadosDoNivel } from './resolucao.ts';
 import { assinaturaDeZoom } from './limiares.ts';
 import { resolverRotulos, resolverZoom } from './zoomOps.ts';
@@ -76,15 +74,12 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
   // A planta normal não usa a resolução do nível atual: `planViewOf` refaz a geometria com o corte (ver `planContext`).
   // Só a planta de cobertura lê `resolved`: o nível atual é resolvido só quando ela é desenhada, nunca na planta de piso.
   // O nível de baixo continua resolvido apenas quando a geometria é refeita (ver `planBelowOf`).
-  const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp, areaPlan: s.areaPlan, tagGhost: s.tagGhost };
   const area = s.areaPlan !== undefined;
   const areaKey = area ? `${JSON.stringify(s.areaPlan)}|${s.tagGhost?.roomId ?? ''}` : '';
-  // Planta de área: o destaque de seleção/hover das anotações (textos e cotas) entra nas camadas de sobreposição, com a
-  // seleção do quadro. As anotações são resolvidas uma vez por atualização, como o resto do estado da vista.
-  const escalaAnotacoes = s.areaPlan && s.areaPlan.scale > 0 ? s.areaPlan.scale : 50;
-  const anotacoes = area ? drawnAnnotations(p, levelId, s.areaPlan) : null;
-  const destaqueAnotacoes = (selection: readonly Id[], hover: Id | null): PlanOps =>
-    anotacoes ? annotationHighlightOps(p, levelId, escalaAnotacoes, { select: theme.select, paper: theme.bg, hoverColor: theme.selectHover }, { selection, hover }, anotacoes) : EMPTY;
+  // A planta de área usa as MESMAS sobreposições da planta de piso. Ela bloqueia as ferramentas de modelo
+  // (`AREA_PLAN_TOOLS`), mas o `select` ainda move o elemento selecionado; por isso mantém destaque, alças e fantasmas
+  // iguais aos do piso. Se o select virar somente leitura, suprimir as alças de modelo aqui.
+  const base = { project: p, levelId, viewport: v, theme, dark, showGrid: s.showGrid, thinLines: s.thinLines, showRoofProjection: s.showRoofProjection, roofPlanMode: rp, areaPlan: s.areaPlan, tagGhost: s.tagGhost };
   // Uma resolução por atualização, mesmo com as camadas de sobreposição sendo refeitas na mesma passagem.
   let resolvida: ResolvedLevel | null = null;
   const resolvido = (): ResolvedLevel => (rp ? (resolvida ??= s.resolve(levelId)) : resolucaoVazia(levelId));
@@ -110,13 +105,9 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
       // Com o esboço de perímetro aberto, o resto do desenho fica em cinza bem claro e as linhas do esboço se destacam.
       return s.sketch ? dimPlanOps(g, theme.bg) : g;
     },
-    overlay: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, null, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, null)) : buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null })),
-    hover: () => (area ? juntarOps(areaPlanHighlightOps(p, s.areaPlan!, s.selection, s.hover, theme, s.areaPlan?.scale ?? 50), destaqueAnotacoes(s.selection, s.hover)) : buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null })),
-    live: () => area
-      ? s.tagGhost
-        ? labelGhostOps(p, levelId, s.tagGhost, s.areaPlan?.scale ?? 50, s.areaPlan?.graphics.tagDefault.fields, s.dark)
-        : EMPTY
-      : comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v, unitsOf(p)),
+    overlay: () => buildPlanScreenOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: [], inference: null }),
+    hover: () => buildPlanHoverOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: s.hover, preview: [], inference: null }),
+    live: () => comEsboco(buildPlanLiveOverlay({ ...base, resolved: resolvido(), below: null, selection: s.selection, hover: null, preview: s.preview, inference: s.inference }), s.sketch, theme, v, unitsOf(p)),
   };
 }
 
@@ -129,12 +120,6 @@ function telhadosDosNiveisAbaixo(p: Project, levelId: Id): ResolvedRoof[] {
 /** Chave do esboço na sobreposição: conteúdo e zoom (as linhas dos arcos e o balão dependem do zoom); vazia fora do modo. */
 function sketchKey(sk: PlanSketch | null | undefined, zoom: number): string {
   return sk ? `${zoom}|${JSON.stringify(sk)}` : '';
-}
-
-/** Junta duas listas de operações na ordem de desenho (preenchimentos, traços, rótulos). */
-function juntarOps(a: PlanOps, b: PlanOps): PlanOps {
-  if (b.fills.length === 0 && b.strokes.length === 0 && b.labels.length === 0) return a as PlanOps;
-  return { ...a, fills: [...a.fills, ...b.fills], strokes: [...a.strokes, ...b.strokes], labels: [...a.labels, ...b.labels] };
 }
 
 /** Junta as operações do esboço à sobreposição da planta (sem esboço, a sobreposição sai como está). */

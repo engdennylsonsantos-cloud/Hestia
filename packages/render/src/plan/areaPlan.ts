@@ -350,22 +350,6 @@ export function labelGhostOps(p: Project, levelId: Id, ghost: { roomId: Id; at: 
   return out;
 }
 
-/** Destaque de seleção e hover dos ambientes na planta de área (camada de sobreposição). */
-export function areaPlanHighlightOps(p: Project, plan: AreaPlan, selection: readonly Id[], hover: Id | null, theme: PlanTheme, scale: number): FloorOps {
-  const out = empty();
-  const sel = new Set(selection);
-  for (const r of resolveRooms(p, plan.levelId)) {
-    if (!r.polygon) continue;
-    const isSel = sel.has(r.roomId);
-    const isHover = !isSel && hover === r.roomId;
-    if (!isSel && !isHover) continue;
-    out.fills.push({ polygons: [r.polygon], color: theme.select, alpha: isSel ? 0.22 : 0.12 });
-    if (!isSel) continue;
-    for (const ring of r.polygon) out.strokes.push({ pts: ring, closed: true, widthPx: 2, papel: { mm: 0.35, escala: scale }, color: theme.select, alpha: 1 });
-  }
-  return out;
-}
-
 /** Legenda de cores (só existe com esquema aplicado). */
 export function areaPlanLegendOps(p: Project, plan: AreaPlan, scale: number, theme: PlanTheme, dark = false): FloorOps {
   const out = empty();

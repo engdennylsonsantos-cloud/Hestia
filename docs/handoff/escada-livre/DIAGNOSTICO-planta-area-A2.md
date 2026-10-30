@@ -53,7 +53,7 @@ Antes, `opsToDxf` mandava **todo** traço para `AMBIENTES` por heurística de co
 - `ouroZoom.test.ts`: 88 testes, **sem diff de hash** — a planta de piso não mudou.
 - `npx tsc --noEmit`: limpo.
 - `npx eslint packages apps/web/src`: 0 erros; 1 warning pré-existente em `OpeningFlipGrips.tsx:70`.
-- Suíte completa: **691 arquivos, 7.867 testes, todos passando** (242,09 s), incluindo `ouroZoom.test.ts` (88).
+- Suíte completa: **691 arquivos, 7.867 testes, todos passando** (416,67 s), incluindo `ouroZoom.test.ts` (88).
 
 ## Limitações conhecidas
 

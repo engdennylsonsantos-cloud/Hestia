@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- a vista reúne planta, 3D, corte e o editor da cota; extrair depois. */
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, criarControladorGpu, drawPlanOnCanvas, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
+import { DARK, LIGHT, ModelScene, PickGpu3d, PlanFrame, PlanScene, criarControladorGpu, drawPlanOnCanvas, pickDimension, pickElement, pickModelPoint, planFrameUpdateOf, reiniciarEstadoGpu, sameView, screenToWorld, type ControladorGpu, type GpuContext, type LabelOp, type PlanDrawList, type PreferenciaGpu, type Viewport } from '@hestia/render';
 import { view3dOf } from '@hestia/model';
 import { useShallow } from 'zustand/react/shallow';
 import { editor } from '../editor/controller.ts';
@@ -9,6 +10,7 @@ import { clickSelect3d, useUi } from '../editor/state.ts';
 import { thinLinesOn } from '../editor/graphicsActions.ts';
 import { buildSectionFrame } from './SectionCanvas.tsx';
 import { selecionarNivelNoClique } from './nivelPick3d.ts';
+import { NivelCotaEditor, type NivelCotaEditorHandle } from './NivelCotaEditor.tsx';
 import { PlanLabels, type PlanLabelsHandle } from './PlanLabels';
 import { ViewportOverlays } from './ViewportOverlays.tsx';
 import { abrirMenuDeContexto, viewDoMenu } from './useCanvasContextMenu.ts';
@@ -45,6 +47,7 @@ export function ViewportCanvas(): ReactElement {
   const [labels, setLabels] = useState<LabelOp[]>(NO_LABELS);
   const [labelView, setLabelView] = useState<Viewport | null>(null);
   const [ready, setReady] = useState(false);
+  const cotaRef = useRef<NivelCotaEditorHandle>(null);
   const dark = useDark();
   // Esboço do perímetro em edição: só a planta o desenha; o quadro refaz a sobreposição quando ele muda.
   const perim = usePerimeter();
@@ -261,6 +264,7 @@ export function ViewportCanvas(): ReactElement {
     const r = host.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+
   /** Ponto do plano (m) da superfície 3D sob o cursor; null se o raio não atinge o modelo. */
   const pick3dAt = (s: Pt): Pt | null => {
     const r = host.current!.getBoundingClientRect();
@@ -296,6 +300,8 @@ export function ViewportCanvas(): ReactElement {
     const s = local(e);
     pointers.current.set(e.pointerId, s);
     const view = useUi.getState().view;
+    // Com a cota aberta, um clique fora do input aplica e fecha (o input não propaga o pointerdown).
+    if (cotaRef.current?.fecharSeAberto()) return;
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()] as [Pt, Pt];
       gesture.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
@@ -315,6 +321,19 @@ export function ViewportCanvas(): ReactElement {
     // Botão direito: o menu abre ao soltar sem arrasto (onUp). Não cancela a ferramenta: "Cancelar" está no menu.
     if (e.button === 2) { rightPress.current = { start: s, moved: false }; return; }
     if (view === '3d') {
+      // Clique na etiqueta/linha de cota: abre o editor ali mesmo, sem começar a órbita.
+      if (e.button === 0 && !spaceDown.current && !e.altKey) {
+        const r = host.current!.getBoundingClientRect();
+        const dim = pickDimension(model.current.scene, model.current.orbit.camera, {
+          x: (s.x / r.width) * 2 - 1,
+          y: 1 - (s.y / r.height) * 2,
+        });
+        if (dim) {
+          cotaRef.current?.abrir(dim, { width: r.width, height: r.height });
+          drag.current = { mode: 'none', start: s, last: s, moved: false, pick: false };
+          return;
+        }
+      }
       const mode = isOrbitReq ? 'orbit' : isPanReq ? 'pan' : (e.button === 0 ? 'orbit' : 'none');
       drag.current = { mode, start: s, last: s, moved: false, pick: e.button === 0 && !spaceDown.current && !e.altKey };
       // Ao pressionar, o realce some: enquanto arrasta, o cursor orbita e não destaca.
@@ -500,6 +519,7 @@ export function ViewportCanvas(): ReactElement {
     >
       <PlanLabels ref={labelLayer} labels={ui.view !== '3d' && labelView ? labels : NO_LABELS} v={labelView} />
       <ViewportOverlays host={host} model={model.current} selection={selection} ui={ui} />
+      <NivelCotaEditor ref={cotaRef} />
     </div>
   );
 }

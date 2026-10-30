@@ -404,7 +404,7 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
       planMode: rp,
       hidden: roofHidden,
       categoryHidden: roofOff,
-      showProjection: input.showRoofProjection !== false,
+      showProjection: profile.roofs === 'projection' ? true : input.showRoofProjection !== false,
       projectionOnly: profile.roofs === 'projection',
       paint: paint.roof,
       classes: view?.cls,

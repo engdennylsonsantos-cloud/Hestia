@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
-import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, ProjectStore, createEmptyProject, defaultStairTypeId, makeRoom, makeRoof, makeStair, makeWall, type AreaPlan, type Project, type StairRun } from '@hestia/model';
+import { DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, ProjectStore, createEmptyProject, defaultStairTypeId, makeFloor, makeLevel, makeRoom, makeRoof, makeStair, makeWall, type AreaPlan, type Project, type StairRun } from '@hestia/model';
 import { resolveLevel } from '@hestia/engine';
 import { buildPlanGeometry, type PlanInput } from './build.ts';
+import { planFrameUpdateOf, type PlanViewState } from './planFrame.ts';
 import { LIGHT } from './types.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
@@ -104,6 +105,26 @@ describe('planta de área · geometria do motor único (A2)', () => {
     s.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [run()] }) });
     const com = buildPlanGeometry(entrada(s.project, plan()));
     const sem = buildPlanGeometry(entrada(s.project, plan({ graphics: { ...DEFAULT_AREA_GRAPHICS, showStairs: false } })));
+    expect(com.fills.length + com.strokes.length).toBeGreaterThan(sem.fills.length + sem.strokes.length);
+  });
+
+  it('subpavimento da área usa showBelowLevel, não a opção global', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'upsertLevel', level: makeLevel({ id: 'lv_1', name: 'Pavimento 2', elevation: 3 }) });
+    s.exec({ type: 'addFloor', floor: makeFloor({ id: 'f0', typeId: 'ft_ceram', levelId: 'lv_0', boundary: ring([[0, 0], [4, 0], [4, 5], [0, 5]]) }) });
+    s.exec({ type: 'addWall', wall: makeWall({ id: 'w1', typeId: 'wt_alv14', levelId: 'lv_1', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
+    const p = s.project;
+    const estado = (showBelowLevel: boolean): PlanViewState => ({
+      project: p, version: 1, levelId: 'lv_1',
+      v: { cx: 2, cy: 2.5, zoom: 100, width: 600, height: 400 },
+      theme: LIGHT, dark: false, gpu: false, showGrid: false,
+      showUnderlay: false, showRoofProjection: true, thinLines: false,
+      selection: [], hover: null, preview: [], inference: null,
+      resolve: (id) => resolveLevel(p, id),
+      areaPlan: plan({ levelId: 'lv_1', graphics: { ...DEFAULT_AREA_GRAPHICS, showBelowLevel } }),
+    });
+    const com = planFrameUpdateOf(estado(true)).geometry();
+    const sem = planFrameUpdateOf(estado(false)).geometry();
     expect(com.fills.length + com.strokes.length).toBeGreaterThan(sem.fills.length + sem.strokes.length);
   });
 });

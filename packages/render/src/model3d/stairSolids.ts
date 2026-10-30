@@ -252,7 +252,9 @@ function splitTJunctions(b: SolidBatch): void {
  * Poste (decisão 0014 §8): degraus soltos (sem espelho) no material do tipo, e o poste central (cilindro de 24 faces) no
  * `postMaterialId`; cada material vai ao seu lote, e cada peça fecha as próprias paredes onde expostas.
  * Escada com erro (issue `error`) ou sem degraus não gera malha. `arrivalTopOf` dá a cota do topo da chegada de cada
- * escada (`stairArrivalTopZ`, a face inferior da laje que cobre o último espelho); `null` ou sem callback: topo − 0,15 m.
+ * escada (`stairArrivalTop`, a face inferior da laje que cobre o último espelho ou o próprio `topZ` quando não há
+ * cobertura — a cena sempre passa essa cota). `null` ou sem callback é o recuo padrão antigo (topo − 0,15 m), mantido só
+ * para chamadas fora da cena (testes e ferramentas que montam a malha isolada).
  */
 export function buildStairSolids(stairs: ResolvedStair[], arrivalTopOf: (s: ResolvedStair) => number | null = () => null): SolidBatch[] {
   const byMat = new Map<Id, SolidBatch>();

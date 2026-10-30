@@ -5,7 +5,7 @@ import { SPIRAL_MAX_SWEEP, optimizeStair, stairIssuesOf, treadRuleOf, type Stair
 import { draftStair, stairFromGenerator, stairLimits, type StairCommandResult, type StairCreateOptions } from './stairCommands.ts';
 import { ToolBase } from './base.ts';
 import { parseNumber } from './numeric.ts';
-import { partsPreview, treadItems } from './stairPreview.ts';
+import { partsPreview, treadItems, type TreadPreviewContext } from './stairPreview.ts';
 import { componentsFromParts, type StairPart } from './stairSketchState.ts';
 import { DEFAULT_STAIR_RUN_OPTIONS, planStairRun, planStairRunFree, type StairRunPlan, type StairRunToolOptions } from './stairRunPlan.ts';
 import { planSpiralRun, SPIRAL_DEFAULT_INNER, SPIRAL_MIN_SWEEP, wrapAngle, type SpiralPlan } from './stairSpiralRun.ts';
@@ -58,11 +58,11 @@ interface SpiralDraw {
 const emptySpiral = (cursor: Vec2 = { x: 0, y: 0 }): SpiralDraw => ({ outer: null, start: null, sweep: 0, last: null, cursor });
 
 /** Prévia de um caracol: o croqui do gerador, os degraus e o rótulo "Varredura: X° · N espelhos" no cursor. */
-function caracolItems(plan: SpiralPlan, cur: Vec2, units: ResolvedUnits): PreviewItem[] {
+function caracolItems(plan: SpiralPlan, cur: Vec2, units: ResolvedUnits, ctx: TreadPreviewContext): PreviewItem[] {
   const parts: StairPart[] = [{ kind: 'run', run: plan.run }];
   return [
     ...partsPreview(parts),
-    ...treadItems(parts, plan.riserHeight),
+    ...treadItems(parts, ctx),
     { kind: 'label', at: cur, text: `Varredura: ${angleText(units, plan.run.spiral.sweep)} · ${plan.risers} espelhos` },
   ];
 }
@@ -300,9 +300,21 @@ export class StairRunTool extends ToolBase {
     const plan = b;
     return [
       ...partsPreview(plan.parts),
-      ...treadItems(plan.parts, plan.riserHeight),
+      ...treadItems(plan.parts, this.treadContext(plan.risers, plan.riserHeight)),
       { kind: 'label', at: cursor, text: `${plan.risers} espelhos · ${cm(plan.riserHeight)} cm · piso ${cm(plan.tread)} cm` },
     ];
+  }
+
+  /**
+   * Contexto da prévia dos degraus: o tipo compatível com a forma (o mesmo da criação) e o nível de topo das opções da
+   * barra. `topLevelId` ausente vale como "sem cobertura", como no modelo: a escada criada também fica com
+   * `topLevelId: null` e a chegada fecha no nível (`stairArrivalTop`).
+   */
+  private treadContext(risers: number, riserHeight: number | null): TreadPreviewContext {
+    const p = this.env.project();
+    const typeId = stairTypeForShape(p, this.opts.shape, this.opts.typeId);
+    const type = typeId ? p.stairTypes[typeId] ?? null : null;
+    return { project: p, type, topLevelId: this.env.options().stair?.topLevelId ?? null, risers, riserHeight };
   }
 
   /** Opções da criação: tipo (compatível com a forma), e cotas da barra de escada (base, topo e altura sem nível acima). */
@@ -657,7 +669,7 @@ export class StairRunTool extends ToolBase {
       if (!('error' in lim)) {
         const units = unitsOf(this.env.project());
         const plan = planSpiralRun({ center: c, rInner: this.innerR, rOuter: r, startAngle: th, sweep: sw, H: lim.H, maxRiser: lim.maxRiser, units });
-        if (!('error' in plan)) items.push(...caracolItems(plan, cur, units));
+        if (!('error' in plan)) items.push(...caracolItems(plan, cur, units, this.treadContext(plan.risers, plan.riserHeight)));
       }
     }
     items.push({ kind: 'label', at: cur, text: `Raio externo ${mText(r)} m` });
@@ -691,6 +703,6 @@ export class StairRunTool extends ToolBase {
       ];
     }
     this.env.say(`Varredura ${angleText(units, sw)}: clique ou Enter confirma; Backspace volta.`);
-    return caracolItems(plan, cur, units);
+    return caracolItems(plan, cur, units, this.treadContext(plan.risers, plan.riserHeight));
   }
 }

@@ -1,4 +1,4 @@
-import type { Drawing, Rect } from './drawing.ts';
+import { MIN_FONT_RATIO, type Drawing, type Rect } from './drawing.ts';
 
 export type Side = 'left' | 'right' | 'top' | 'bottom';
 
@@ -28,15 +28,22 @@ export class LaneStack {
   }
 }
 
+/**
+ * Escolhe o `em` construindo o desenho com tamanhos crescentes até a fonte ficar legível (razão mínima).
+ * O ponto fixo literal da fórmula `0.034·largura` diverge quando as caixas de texto dominam a largura;
+ * por isso o passo cresce de 5% em 5% a partir de `em0` e para no primeiro tamanho aceitável.
+ */
 export function solveEm(build: (em: number) => Drawing, em0: number, iterations = 6): Drawing {
   let em = em0;
   let last = build(em);
-  for (let i = 0; i < iterations; i++) {
-    const w = last.frame.x1 - last.frame.x0;
-    const next = 0.034 * w;
-    if (Math.abs(next - em) / em < 0.01) break;
-    em = next;
+  const ratio = (): number => em / (last.frame.x1 - last.frame.x0);
+  if (ratio() >= MIN_FONT_RATIO) return last;
+  const maxSteps = Math.max(400, iterations);
+  for (let i = 0; i < maxSteps; i++) {
+    em *= 1.05;
     last = build(em);
+    if (ratio() >= MIN_FONT_RATIO) return last;
+    if (em > 1e6) break;
   }
   return last;
 }

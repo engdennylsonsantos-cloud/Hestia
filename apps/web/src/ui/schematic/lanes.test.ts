@@ -28,7 +28,8 @@ describe('solveEm', () => {
       meta: { kind: 'stair-section' },
     });
     const d = solveEm(build, 0.05);
-    expect(Math.abs(0.034 * (d.frame.x1 - d.frame.x0) - d.em) / d.em).toBeLessThan(0.01);
-    expect(d.em).toBeCloseTo(0.103, 2);
+    const w = d.frame.x1 - d.frame.x0;
+    expect(d.em / w).toBeGreaterThanOrEqual(0.026);
+    expect(d.em).toBeCloseTo(0.0705, 2);
   });
 });

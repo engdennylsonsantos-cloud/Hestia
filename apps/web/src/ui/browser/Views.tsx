@@ -2,7 +2,7 @@ import { useRef, useState, type ReactElement } from 'react';
 import { areaPlansOf, formatQuantity, projectSheets, type Element, type SectionView } from '@hestia/model';
 import { editor, useProject } from '../../editor/controller.ts';
 import { duplicateSheetCommand, addSheetAction } from '../../editor/sheetActions.ts';
-import { createAreaPlansForLevels, createGeneralAreaSheetAction, openAreaPlan } from '../../editor/areaPlanActions.ts';
+import { createAreaPlansForLevels, openAreaPlan } from '../../editor/areaPlanActions.ts';
 import { useUi, type DialogKind } from '../../editor/state.ts';
 import { activateView } from '../../editor/viewTabActions.ts';
 import { Node, type MenuItem } from './Tree.tsx';
@@ -106,7 +106,6 @@ export function ViewsTree(): ReactElement {
         open
         menu={[
           { label: 'Criar para todos os níveis', run: () => { const ids = createAreaPlansForLevels(editor.store, p.levels.map((l) => l.id), { scale: 50 }); if (ids[0]) openAreaPlan(editor.store, ids[0]); say(ids.length ? `${ids.length} planta(s) de área criada(s).` : 'Todos os níveis já têm planta de área.'); } },
-          { label: 'Criar prancha geral', run: () => { try { const id = createGeneralAreaSheetAction(editor.store, areaPlans.map((x) => x.id)); activateView({ kind: 'sheet', sheetId: id }); say('Prancha geral de áreas criada.'); } catch (e) { say(e instanceof Error ? e.message : 'Não foi possível criar a prancha.'); } }, sep: true },
         ]}
         empty="Nenhuma planta de área. Botão direito: criar para todos os níveis."
       >

@@ -19,7 +19,6 @@ import {
   type ProjectStore,
 } from '@hestia/model';
 import { roomTagLines, tagBoxModel } from '@hestia/render';
-import { addSheetAction, addViewAction } from './sheetActions.ts';
 import { editor } from './controller.ts';
 import { useUi } from './state.ts';
 
@@ -317,20 +316,6 @@ export function planBounds(p: Project, levelId: Id): { minX: number; minY: numbe
     maxX: Math.max(...pts.map((q) => q.x)),
     maxY: Math.max(...pts.map((q) => q.y)),
   };
-}
-
-/** Cria a prancha geral com uma vista por planta de área. */
-export function createGeneralAreaSheetAction(store: ProjectStore, planIds: readonly Id[]): Id {
-  const plans = planIds.map((id) => areaPlanOf(store.project, id)).filter((x): x is AreaPlan => !!x);
-  if (plans.length === 0) throw new Error('Nenhuma planta de área para a prancha');
-  let sheetId = '';
-  store.transaction('Criar prancha geral de áreas', () => {
-    sheetId = addSheetAction(store);
-    store.exec({ type: 'updateSheet', id: sheetId, patch: { name: 'Plantas de área', size: plans.length > 2 ? 'A2' : 'A3' } }, 'Nomear prancha geral');
-    for (const plan of plans) addViewAction(store, sheetId, { kind: 'areaPlan', planId: plan.id }, plan.scale);
-    addViewAction(store, sheetId, { kind: 'areaTable' }, 50);
-  });
-  return sheetId;
 }
 
 /** Todas as plantas de área do projeto, na ordem dos níveis. */

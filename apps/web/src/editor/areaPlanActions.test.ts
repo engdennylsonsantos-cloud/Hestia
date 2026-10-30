@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
 import { areaPlanOf, createEmptyProject, DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, makeRoom, makeWall, ProjectStore, type AreaPlan } from '@hestia/model';
-import { addMissingTagsAction, applyColorSchemeAction, createAreaPlanAction, createGeneralAreaSheetAction, ensureRoomTagAction, moveRoomLabelAction, openAreaPlan, recenterTagsAction, removeRoomTagAction, setPlanGraphicsAction, updateRoomTagAction } from './areaPlanActions.ts';
+import { addMissingTagsAction, applyColorSchemeAction, createAreaPlanAction, ensureRoomTagAction, moveRoomLabelAction, openAreaPlan, recenterTagsAction, removeRoomTagAction, setPlanGraphicsAction, updateRoomTagAction } from './areaPlanActions.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
 
@@ -64,16 +64,6 @@ describe('ações da planta de área', () => {
     setPlanGraphicsAction(s, id, { showWalls: 'hidden', referenceLines: 'never' });
     expect(areaPlanOf(s.project, id)!.graphics.showWalls).toBe('hidden');
     expect((s.project.elements.r1 as { point: { x: number; y: number } }).point).toEqual({ x: 2, y: 2.5 });
-  });
-
-  it('prancha geral recebe a vista da planta e o quadro geral', () => {
-    const s = store();
-    const id = createAreaPlanAction(s, 'lv_0');
-    const sheetId = createGeneralAreaSheetAction(s, [id]);
-    const sheet = s.project.sheets?.find((x) => x.id === sheetId);
-    expect(sheet?.viewports.map((v) => v.view.kind)).toEqual(['areaPlan', 'areaTable']);
-    expect(sheet?.viewports[0]!.view).toEqual({ kind: 'areaPlan', planId: id });
-    expect(sheet?.name).toBe('Plantas de área');
   });
 
   it('nasce com as anotações do nível copiadas, com ids novos', () => {

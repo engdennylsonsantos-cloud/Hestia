@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
-import { areaPlanOf, areaPlansOf, planAnnotationsOf, type AreaPlan, type Project } from '@hestia/model';
+import { areaPlanOf, planAnnotationsOf, type AreaPlan, type Project } from '@hestia/model';
 import { editor, useProject } from '../editor/controller.ts';
-import { activateView } from '../editor/viewTabActions.ts';
-import { applyColorSchemeAction, clearColorSchemeAction, createGeneralAreaSheetAction, recenterTagsAction, seedPlanAnnotationsAction, setPlanGraphicsAction } from '../editor/areaPlanActions.ts';
+import { applyColorSchemeAction, clearColorSchemeAction, recenterTagsAction, seedPlanAnnotationsAction, setPlanGraphicsAction } from '../editor/areaPlanActions.ts';
 import { useUi } from '../editor/state.ts';
 import { Check, Group, NumField, Row, TextField } from './fields.tsx';
 
@@ -126,10 +125,6 @@ export function AreaPlanProperties({ plan }: { plan: AreaPlan }): ReactElement {
           <button type="button" className="btn small" onClick={() => { const n = recenterTagsAction(editor.store, plan.id); say(n ? `${n} rótulo(s) recentralizado(s).` : 'Nenhum rótulo para recentralizar.'); }}>Recentralizar rótulos</button>
         </div>
         <div className="hint">Todo ambiente com circuito fechado já aparece com rótulo, sem precisar gerar. Arraste o rótulo e a chamada acompanha; a posição vale em todas as vistas.</div>
-      </Group>
-
-      <Group title="Prancha" open={false}>
-        <button type="button" className="btn small" onClick={() => { try { const id = createGeneralAreaSheetAction(editor.store, areaPlansOf(p).map((x) => x.id)); activateView({ kind: 'sheet', sheetId: id }); say('Prancha geral de áreas criada.'); } catch (e) { say(e instanceof Error ? e.message : 'Não foi possível criar a prancha.'); } }}>Criar prancha geral</button>
       </Group>
     </>
   );

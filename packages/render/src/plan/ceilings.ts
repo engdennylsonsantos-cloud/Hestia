@@ -56,9 +56,9 @@ export function ceilingFills(
 }
 
 /** Destaque de seleção e de hover dos forros na planta de forro, no mesmo padrão das lajes. */
-export function ceilingSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+export function ceilingSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>, grips = true): FloorOps {
   const parts = resolveCeilings(p, levelId)
     .filter((c) => !hidden?.has(c.ceilingId))
     .map((c) => ({ id: c.ceilingId, polygon: c.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
 }

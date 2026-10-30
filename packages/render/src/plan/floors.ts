@@ -150,9 +150,10 @@ export interface OutlinedPart {
 /**
  * Destaque de seleção e de hover de peças (pisos e lajes): azul translúcido; selecionado ganha contorno de 2 px,
  * quadradinhos nos vértices e, quando `areaLabel` está ligado, a área no centroide (a etiqueta de tipo já a mostra
- * com as etiquetas ligadas).
+ * com as etiquetas ligadas). `grips` desliga só os quadradinhos: a planta de área mantém o destaque e o contorno, mas
+ * não oferece alça de elemento de modelo.
  */
-export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hover: Id | null, areaLabel: boolean, theme: PlanTheme, u: ResolvedUnits, _v?: Viewport): FloorOps {
+export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hover: Id | null, areaLabel: boolean, theme: PlanTheme, u: ResolvedUnits, _v?: Viewport, grips = true): FloorOps {
   const out = empty();
   const sel = new Set(selection);
   for (const f of parts) {
@@ -163,9 +164,10 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
     if (!isSel) continue;
     for (const ring of f.polygon.flat()) {
       out.strokes.push({ pts: ring, closed: true, widthPx: 2, color: theme.select, alpha: 1 });
-      const grips = f.grips?.(ring);
+      if (!grips) continue;
+      const gripsDoAnel = f.grips?.(ring);
       ring.forEach((pt, i) => {
-        if (grips && !grips[i]) return;
+        if (gripsDoAnel && !gripsDoAnel[i]) return;
         const quadrado = quadradoEm(pt, ALCA_PX);
         out.fills.push({ ...quadrado.fill, color: '#ffffff', alpha: 1 });
         out.strokes.push({ ...quadrado.traco, widthPx: 1.6, color: theme.select, alpha: 1 });
@@ -180,11 +182,11 @@ export function outlineSelectionOps(parts: OutlinedPart[], selection: Id[], hove
 }
 
 /** Destaque dos pisos do nível (D1). */
-export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>): FloorOps {
+export function floorSelectionOps(p: Project, levelId: Id, selection: Id[], hover: Id | null, theme: PlanTheme, v: Viewport, hidden?: ReadonlySet<Id>, grips = true): FloorOps {
   const parts = pisosDoNivel(p, levelId)
     .filter((f) => !hidden?.has(f.floorId))
     .map((f) => ({ id: f.floorId, polygon: f.polygon }));
-  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  return outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
 }
 
 /** Pisos do nível abaixo, como referência apagada (D4): mesma linguagem do subpavimento das paredes. */

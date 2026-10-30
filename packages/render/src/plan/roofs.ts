@@ -392,7 +392,8 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
 
 /**
  * Destaque de seleção e de hover dos telhados (D1), no padrão das lajes; a área é a real. Telhado selecionado: contorno
- * sólido nas arestas com inclinação, tracejado nas empenas, e o símbolo "define inclinação" de cada aresta (A11).
+ * sólido nas arestas com inclinação, tracejado nas empenas, e o símbolo "define inclinação" de cada aresta (A11). Sem
+ * `grips`, o contorno de seleção fica e o símbolo de edição de caimento sai (planta de área somente leitura).
  */
 export function roofSelectionOps(
   p: Project,
@@ -403,11 +404,12 @@ export function roofSelectionOps(
   v: Viewport,
   hidden?: ReadonlySet<Id>,
   paint: PlanPaint = defaultPaint('roof', v.zoom),
+  grips = true,
 ): FloorOps {
   const roofs = telhadosDoNivel(p, levelId).filter((r) => !hidden?.has(r.roofId));
   // Alças só nos cantos lógicos: um arco amostrado não vira uma fileira de quadradinhos.
   const parts = roofs.map((r) => ({ id: r.roofId, polygon: roofFootprint(r), area: roofRealArea(r), grips: gripsDoTelhado(p.elements[r.roofId], cantosLogicos) }));
-  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v);
+  const base = outlineSelectionOps(parts, selection, hover, !p.settings.showTags, theme, unitsOf(p), v, grips);
   // O contorno de 2 px do destaque padrão é trocado pelo de `selectedRingOps` (sólido ou tracejado por aresta).
   const out: FloorOps = { fills: base.fills, strokes: base.strokes.filter((s) => !(s.closed && s.widthPx === 2)), labels: base.labels };
   const sel = new Set(selection);
@@ -415,10 +417,12 @@ export function roofSelectionOps(
     const roof = p.elements[r.roofId];
     if (!sel.has(r.roofId) || !isRoof(roof)) continue;
     out.strokes.push(...selectedRingOps(r, roof, theme));
-    const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao, unitsOf(p));
-    out.fills.push(...sym.fills);
-    out.strokes.push(...sym.strokes);
-    out.labels.push(...sym.labels);
+    if (grips) {
+      const sym = defineSlopeOps(roof, theme, espessurasDoTelhado(paint).projecao, unitsOf(p));
+      out.fills.push(...sym.fills);
+      out.strokes.push(...sym.strokes);
+      out.labels.push(...sym.labels);
+    }
   }
   return out;
 }

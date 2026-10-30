@@ -32,9 +32,10 @@ describe('DXF da planta de área', () => {
     expect(dxf).toContain('AMBIENTES_TEXTO');
     expect(dxf).toContain('AMBIENTES');
     expect(dxf).toContain('Sala');
-    expect(dxf).toContain('101 · 20,00 m²');
+    // Fora do ASCII o R12 leva \U+XXXX (ver dxfEscapeText): "·" é \U+00B7 e "²" é \U+00B2.
+    expect(dxf).toContain('101 \\U+00B7 20,00 m\\U+00B2');
     expect(dxf.startsWith('0\r\nSECTION')).toBe(true);
-    expect(dxf.endsWith('EOF')).toBe(true);
+    expect(dxf.endsWith('0\r\nEOF\r\n')).toBe(true);
   });
 
   it('planta inexistente recusa', () => {
@@ -58,6 +59,6 @@ describe('DXF da planta de área', () => {
     });
     const dxf = areaPlanDxf(s.project, 'ap1');
     expect(dxf).toContain('4,00 m');
-    expect(dxf).toContain('Observação');
+    expect(dxf).toContain('Observa\\U+00E7\\U+00E3o');
   });
 });

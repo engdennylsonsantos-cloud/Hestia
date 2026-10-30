@@ -2,9 +2,13 @@ import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomLabelText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
 import {
+  DXF_BLOCKS_SECTION,
+  DXF_STYLE_TABLE,
+  dxfEscapeText,
   dxfGenericRecords,
   dxfLayersOf,
   dxfLineRoleOf,
+  dxfRecorder,
   DXF_LAYER_RAMP_TEXT,
   DXF_LAYER_ROOM_TEXT,
   dxfLineWeight,
@@ -331,17 +335,25 @@ function withEntityRecords(dxf: string, records: string[]): string {
 /** Layer de um traço da planta de área: referência, chamada ou contorno. */
 const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
 
-/** DXF mínimo (HEADER + TABLES + ENTITIES) a partir das operações da planta de área. */
+/**
+ * DXF R12 (AC1009) da planta de área, no mesmo formato de `exportDxf`: HEADER, TABLES (LTYPE, LAYER, STYLE), BLOCKS vazia
+ * e ENTITIES com LINE e TEXT. Antes declarava AC1015 sem a estrutura do R2000 (handles, BLOCK_RECORD…) e o AutoCAD o
+ * recusava ("DXF read error"); o 370 das camadas também não existe no R12.
+ */
 function opsToDxf(ops: PlanOps, zoom: number): string {
   const out: string[] = [];
-  const rec = (code: number, value: string | number): void => { out.push(String(code), String(value)); };
-  const layers = new Map<string, number>();
-  for (const s of ops.strokes) layers.set(areaLayerOf(s.color, s.pts.length), s.color === '#4b5563' ? 13 : s.color === '#111827' ? 18 : 25);
-  layers.set('AMBIENTES_TEXTO', 13);
-  rec(0, 'SECTION'); rec(2, 'HEADER'); rec(9, '$ACADVER'); rec(1, 'AC1015'); rec(9, '$INSUNITS'); rec(70, 6); rec(0, 'ENDSEC');
-  rec(0, 'SECTION'); rec(2, 'TABLES'); rec(0, 'TABLE'); rec(2, 'LAYER'); rec(70, layers.size);
-  for (const [name, weight] of layers) { rec(0, 'LAYER'); rec(2, name); rec(70, 0); rec(62, 7); rec(6, 'CONTINUOUS'); rec(370, weight); }
-  rec(0, 'ENDTAB'); rec(0, 'ENDSEC');
+  const rec = dxfRecorder(out);
+  const layers = new Set<string>(['AMBIENTES_TEXTO']);
+  for (const s of ops.strokes) layers.add(areaLayerOf(s.color, s.pts.length));
+  rec(0, 'SECTION'); rec(2, 'HEADER'); rec(9, '$ACADVER'); rec(1, 'AC1009'); rec(9, '$INSUNITS'); rec(70, 6); rec(9, '$MEASUREMENT'); rec(70, 1); rec(0, 'ENDSEC');
+  rec(0, 'SECTION'); rec(2, 'TABLES');
+  rec(0, 'TABLE'); rec(2, 'LTYPE'); rec(70, 1); rec(0, 'LTYPE'); rec(2, 'CONTINUOUS'); rec(70, 0); rec(3, 'Solid line'); rec(72, 65); rec(73, 0); rec(40, 0); rec(0, 'ENDTAB');
+  rec(0, 'TABLE'); rec(2, 'LAYER'); rec(70, layers.size);
+  for (const name of layers) { rec(0, 'LAYER'); rec(2, name); rec(70, 0); rec(62, 7); rec(6, 'CONTINUOUS'); }
+  rec(0, 'ENDTAB');
+  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
+  rec(0, 'ENDSEC');
+  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
   rec(0, 'SECTION'); rec(2, 'ENTITIES');
   for (const s of ops.strokes) {
     const layer = areaLayerOf(s.color, s.pts.length);
@@ -355,19 +367,17 @@ function opsToDxf(ops: PlanOps, zoom: number): string {
   for (const l of ops.labels) {
     if (l.maskBoundary || !l.text) continue;
     const h = (l.fontPx ?? 12) / zoom;
-    rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, l.text); rec(50, l.rotation ?? 0);
+    rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, dxfEscapeText(l.text)); rec(50, l.rotation ?? 0);
   }
   rec(0, 'ENDSEC'); rec(0, 'EOF');
-  return out.join('\r\n');
+  return `${out.join('\r\n')}\r\n`;
 }
 
 /** Põe registros no fim da seção ENTITIES do DXF mínimo de `opsToDxf` (antes do `ENDSEC`). */
 function appendAreaRecords(dxf: string, records: string[]): string {
   if (records.length === 0) return dxf;
-  const marker = '\r\n0\r\nENDSEC\r\n0\r\nEOF';
-  const i = dxf.lastIndexOf(marker);
-  if (i < 0) return dxf;
-  return `${dxf.slice(0, i)}\r\n${records.join('\r\n')}${marker}`;
+  if (!dxf.endsWith(DXF_END)) throw new Error('DXF sem o fim esperado (ENDSEC/EOF)');
+  return `${dxf.slice(0, -DXF_END.length)}\r\n${records.join('\r\n')}${DXF_END}`;
 }
 
 const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
@@ -380,12 +390,12 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
   const a = planAnnotationsOf(plan);
   if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
   const out: string[] = [];
-  const rec = (code: number, value: string | number): void => { out.push(String(code), String(value)); };
+  const rec = dxfRecorder(out);
   const line = (layer: string, start: Vec2, end: Vec2): void => {
     rec(0, 'LINE'); rec(8, layer); rec(10, start.x); rec(20, start.y); rec(30, 0); rec(11, end.x); rec(21, end.y); rec(31, 0);
   };
   const text = (layer: string, at: Vec2, height: number, value: string, rotation = 0): void => {
-    rec(0, 'TEXT'); rec(8, layer); rec(10, at.x); rec(20, at.y); rec(30, 0); rec(40, height); rec(1, value); rec(50, rotation);
+    rec(0, 'TEXT'); rec(8, layer); rec(10, at.x); rec(20, at.y); rec(30, 0); rec(40, height); rec(1, dxfEscapeText(value)); rec(50, rotation);
   };
   const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
   const mPerMm = plan.scale / 1000;

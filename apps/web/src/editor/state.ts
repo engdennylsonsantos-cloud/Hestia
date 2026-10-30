@@ -28,6 +28,8 @@ export interface UiState {
   /** Rótulo em arraste (fantasma), compartilhado por qualquer planta. */
   tagDrag: { planId: Id; roomId: Id; at: Vec2 } | null;
   selection: Id[];
+  /** Nível selecionado no 3D (a seleção de elementos fica vazia quando há um). */
+  selectedLevel: Id | null;
   hover: Id | null;
   options: ToolOptions;
   theme: ThemePref;
@@ -160,7 +162,12 @@ export function toggleRoofProjection(): void {
 export function clickSelect3d(hit: Id | null, additive: boolean): void {
   const ui = useUi.getState();
   const next = selectionAfterClick(ui.selection, hit, additive);
-  useUi.setState({ selection: next });
+  useUi.setState({ selection: next, selectedLevel: null });
+}
+
+/** Seleciona um nível no 3D (ou limpa); a seleção de elementos fica vazia quando há um nível. */
+export function selectLevel(id: Id | null): void {
+  useUi.setState({ selectedLevel: id, ...(id ? { selection: [] } : {}) });
 }
 
 /**
@@ -232,6 +239,7 @@ export const useUi = create<UiState>(() => ({
   sectionId: null,
   sheetId: null,
   selection: [],
+  selectedLevel: null,
   hover: null,
   options: DEFAULT_OPTIONS,
   theme: 'system',

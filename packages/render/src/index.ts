@@ -14,6 +14,7 @@ export * from './model3d/scene3d.ts';
 export * from './model3d/pick3d.ts';
 export * from './model3d/cad3d.ts';
 export * from './model3d/levels3d.ts';
+export * from './model3d/levelsData.ts';
 // Picking por ID buffer (R3): tabela de códigos, geometria do passe e o leitor da GPU (`PickGpu3d`).
 export * from './model3d/pickIdBuffer3d.ts';
 export * from './model3d/openingParts.ts';

@@ -116,3 +116,27 @@ export function buildLevelLines(p: Project): THREE.Group | null {
   }
   return grupo;
 }
+
+/**
+ * Grupo do datum de nível (fase 6): linha tracejada, bolha e texto de cada nível, mais o plano azul do nível
+ * selecionado. Esta é a assinatura congelada para a cena; a implementação visual nova entra no lugar do stub.
+ */
+export function buildLevels(p: Project, selected: Id | null): THREE.Group {
+  void p;
+  void selected;
+  return new THREE.Group();
+}
+
+/** Libera geometrias, materiais e texturas do grupo de níveis. */
+export function disposeLevels(group: THREE.Group): void {
+  group.traverse((o) => {
+    const geo = (o as THREE.Mesh).geometry;
+    geo?.dispose();
+    const mat = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    for (const m of Array.isArray(mat) ? mat : mat ? [mat] : []) {
+      (m as THREE.MeshBasicMaterial).map?.dispose();
+      m.dispose();
+    }
+  });
+  group.clear();
+}

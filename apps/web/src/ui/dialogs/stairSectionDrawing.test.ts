@@ -63,12 +63,12 @@ describe('buildStairSectionDrawing monolítica lisa', () => {
   });
 
   it('textos das cotas e rótulos', () => {
-    expect(dim(d, 'dim.riser').text).toBe('Espelho 18,0 cm');
+    expect(dim(d, 'dim.riser').text).toBe('Espelho\n18,0 cm');
     expect(dim(d, 'dim.tread').text).toBe('Piso 28,0 cm');
     expect(label(d, 'lbl.theta').text).toBe('θ = 32,7°');
     expect(label(d, 'lbl.nosing').text).toBe('Nariz 1,5 cm');
-    expect(dim(d, 'dim.thick').text).toBe('Espessura estrutural\n12,0 cm ⟂ à rampa');
-    expect(dim(d, 'dim.headroom').text).toBe('Pé-direito\nmín. 2,10 m');
+    expect(dim(d, 'dim.thick').text).toBe('Espessura\nestrutural\n12,0 cm ⟂\nà rampa');
+    expect(dim(d, 'dim.headroom').text).toBe('Pé-direito\nlivre mín.\n2,10 m');
     expect(dim(d, 'dim.headroom').broken).toBe(true);
     expect(dim(d, 'dim.headroom').p2[1] - dim(d, 'dim.headroom').p1[1]).toBeCloseTo(3 * d.em, 4);
   });
@@ -128,8 +128,8 @@ describe('buildStairSectionDrawing montada', () => {
   });
 
   it('cotas de espessura', () => {
-    expect(dim(d, 'dim.treadThick').text).toBe('Piso (espessura)\n3,0 cm');
-    expect(dim(d, 'dim.riserThick').text).toBe('Espelho (espessura) 2,0 cm');
+    expect(dim(d, 'dim.treadThick').text).toBe('Piso\n(espessura)\n3,0 cm');
+    expect(dim(d, 'dim.riserThick').text).toBe('Espelho\n(espessura)\n2,0 cm');
     expect(checkDrawing(d)).toEqual([]);
   });
 });
@@ -153,7 +153,7 @@ describe('buildStairSectionDrawing poste', () => {
 describe('buildStairSectionDrawing casos gerais', () => {
   it('traduz para ingles', () => {
     const d = buildStairSectionDrawing(mono, { riser: 0.18, tread: 0.28, lang: 'en', fmt: (n, dec) => n.toFixed(dec) });
-    expect(dim(d, 'dim.riser').text).toBe('Riser 18.0 cm');
+    expect(dim(d, 'dim.riser').text).toBe('Riser\n18.0 cm');
   });
 
   it('rejeita entradas invalidas', () => {
@@ -171,7 +171,7 @@ describe('buildStairSectionDrawing casos gerais', () => {
   });
 
   it('expoe os textos nos dois idiomas', () => {
-    expect(STAIR_DRAWING_TEXT.pt.floor).toBe('Piso inferior');
-    expect(STAIR_DRAWING_TEXT.en.floor).toBe('Lower floor');
+    expect(STAIR_DRAWING_TEXT.pt.floor).toBe('Piso\ninferior');
+    expect(STAIR_DRAWING_TEXT.en.floor).toBe('Lower\nfloor');
   });
 });

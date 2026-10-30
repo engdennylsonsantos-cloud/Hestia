@@ -399,6 +399,16 @@ svg { display: block; }
   .stt-main { padding-right: 0; }
   .stt-side { position: static; }
 }
+/* Modal do tipo de rampa: mesma janela do de escada. Campos à esquerda; prévia no topo da coluna direita (sticky) e a
+   tabela de norma abaixo, ocupando a largura toda. Em tela estreita, uma coluna só. */
+.rtt-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); gap: 14px; align-items: start; }
+.rtt-main { min-width: 0; }
+.rtt-side { position: sticky; top: 0; align-self: start; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.rtt-norm { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+@media (max-width: 820px) {
+  .rtt-grid { grid-template-columns: minmax(0, 1fr); }
+  .rtt-side { position: static; }
+}
 /* "Propriedades do tipo" (Editar tipo): barra Família/Tipo no topo e, no diálogo do vão, prévia ao lado dos parâmetros. */
 .tdlg-bar { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; margin: -12px -14px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .tdlg-bar > label { color: var(--fg-soft); }

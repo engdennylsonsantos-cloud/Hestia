@@ -30,6 +30,8 @@ export const TONE_VAR: Record<Tone, string> = {
 };
 
 const WEIGHT: Record<Weight, number> = { thin: 1, normal: 1.5, heavy: 2.2 };
+/** Tamanho mínimo do texto na prévia (px): abaixo disso a largura mínima do SVG provoca rolagem horizontal. */
+const MIN_FONT_PX = 9;
 const DASH: Record<LineStyle, string | undefined> = { solid: undefined, dashed: '6 4', dotted: '1.5 3' };
 const SHEET = 'var(--sheet)';
 const FAINT = 'var(--fg-faint)';
@@ -243,8 +245,10 @@ function TextBlock({
       textAnchor={anchor}
       dominantBaseline="central"
     >
+      {/* Cada linha com `y` absoluto: `dy` num tspan com `y` é somado ao mesmo `y` em todas as linhas, e as linhas 2+
+          caíam todas no mesmo lugar (o corte da escada perdia "estrutural"/"12,0 cm ⟂"). */}
       {lines.map((line, i) => (
-        <tspan key={i} x={at[0]} y={baseY} dy={i === 0 ? 0 : LINE_H * em}>
+        <tspan key={i} x={at[0]} y={baseY + i * LINE_H * em}>
           {line}
         </tspan>
       ))}
@@ -274,11 +278,13 @@ export function SchematicDrawing({ drawing, ariaLabel }: { drawing: Drawing; ari
         <svg
           viewBox={`${frame.x0} ${-frame.y1} ${w} ${h}`}
           width="100%"
-          height="auto"
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label={ariaLabel}
-          style={{ display: 'block', minWidth: Math.ceil((10 * w) / em) }}
+          // Texto com pelo menos MIN_FONT_PX: a largura mínima é a que dá esse tamanho de fonte. O fator era 10 px e a
+          // prévia dos modais (~360 px) ficava sempre um pouco mais estreita que o mínimo, cortando a direita do desenho
+          // (a rampa perdia "h = 0,80 m"/"máx. 0,8…"); com 9 px a prévia cabe inteira e o texto continua legível.
+          style={{ display: 'block', height: 'auto', minWidth: Math.ceil((MIN_FONT_PX * w) / em) }}
         >
           <title>{ariaLabel}</title>
           <defs>

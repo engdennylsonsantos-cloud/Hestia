@@ -50,10 +50,10 @@ describe('buildRampSectionDrawing corte', () => {
     expect(dim(d, 'dim.run.1').text).toBe('c = 4,80 m');
     expect(dim(d, 'dim.landing').text).toBe('Patamar ≥ 1,20 m');
     expect(dim(d, 'dim.total').text).toBe('L = 15,60 m');
-    expect(dim(d, 'dim.rise.0').text).toBe('h = 0,80 m\nmáx. 0,80 m ✓ · a conferir');
+    expect(dim(d, 'dim.rise.0').text).toBe('h = 0,80 m\nmáx. 0,80 m ✓\na conferir');
     expect(dim(d, 'dim.rise.0').tone).toBe('ok');
     expect(label(d, 'lbl.slope').text).toBe('i = h ÷ c = 8,33 % (1:12)');
-    expect(dim(d, 'dim.headroom').text).toBe('Pé-direito livre\nmín. 2,10 m');
+    expect(dim(d, 'dim.headroom').text).toBe('Pé-direito\nlivre mín.\n2,10 m');
     expect(dim(d, 'dim.headroom').broken).toBe(true);
   });
 

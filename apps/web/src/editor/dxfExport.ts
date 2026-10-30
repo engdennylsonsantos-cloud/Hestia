@@ -1,6 +1,6 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
+import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomFullText, roomLabelAt, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
 import {
   DXF_BLOCKS_SECTION,
   DXF_STYLE_TABLE,
@@ -249,13 +249,13 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
   );
   const roofs = resolveRoofs(p, levelId);
   const jl = junctionLevel(p, levelId);
-  // Ambientes (decisão 0018, 0037): contorno em AMBIENTES e só o nome em AMBIENTES_TEXTO; sem circuito, nada sai.
+  // Ambientes (decisão 0018, 0037): contorno em AMBIENTES e rótulo completo (nome, número, área) em AMBIENTES_TEXTO; sem circuito, nada sai.
   const rooms = shown('room') ? resolveRooms(p, levelId).filter((r) => r.polygon && !hidden.has(r.roomId)) : [];
   const geo: DxfLevelGeometry = {
     rooms: rooms.map((r) => ({ outline: r.polygon![0] ?? [], holes: r.polygon!.slice(1) })),
     roomTexts: rooms.flatMap((r) => {
       const at = roomLabelAt(r);
-      return at ? [{ at, text: roomNameText(r), height: ROOM_TEXT_HEIGHT_M, rotation: 0, layer: DXF_LAYER_ROOM_TEXT }] : [];
+      return at ? [{ at, text: roomFullText(r, unitsOf(p)), height: ROOM_TEXT_HEIGHT_M, rotation: 0, layer: DXF_LAYER_ROOM_TEXT }] : [];
     }),
     clusters: shown('wall') ? view.geo.clusters : [],
     openings,

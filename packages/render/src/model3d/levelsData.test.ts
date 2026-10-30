@@ -28,7 +28,7 @@ describe('datum de nível no 3D (dados)', () => {
       expect(d.line.a).toMatchObject({ x: box.minX, y: box.minY, z: d.elevation });
       expect(d.line.b).toMatchObject({ x: box.maxX, y: box.minY, z: d.elevation });
       expect(d.headAt.x).toBeCloseTo(box.maxX + LEVEL_HEAD_GAP, 6);
-      expect(d.textAt.x).toBeLessThan(d.headAt.x);
+      expect(d.textAt.x).toBeGreaterThan(d.headAt.x);
       expect(d.plane).toMatchObject({ ...box, z: d.elevation });
     }
   });

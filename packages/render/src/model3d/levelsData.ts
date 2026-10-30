@@ -47,8 +47,9 @@ export interface LevelDatum {
 /** Margem padrão da linha além da obra (m). */
 export const LEVEL_MARGIN = 1;
 
-/** Folga entre o fim da linha e o centro da bolha (m); a bolha tem ~0,5 m de raio. */
+/** Folga entre o fim da linha e o centro da bolha (m); a bolha tem 0,6 m de raio. */
 export const LEVEL_HEAD_GAP = 0.9;
+export const LEVEL_HEAD_RADIUS = 0.6;
 
 /** Cota com sinal e duas casas, vírgula decimal (`+0,00`, `-1,20`). */
 export function levelElevationLabel(elevation: number): string {
@@ -90,7 +91,8 @@ export function levelDataOf(p: Project, margin = LEVEL_MARGIN): LevelDatum[] {
       ...(above === undefined ? {} : { deltaAbove: above.elevation - l.elevation }),
       line: { a: { x: box.minX, y: box.minY, z }, b: { x: box.maxX, y: box.minY, z } },
       headAt: { x: box.maxX + LEVEL_HEAD_GAP, y: box.minY, z },
-      textAt: { x: box.maxX - 0.2, y: box.minY, z },
+      // O texto fica à direita da bolha, na mesma direção da linha, fora da silhueta da obra.
+      textAt: { x: box.maxX + LEVEL_HEAD_GAP + LEVEL_HEAD_RADIUS + 0.3, y: box.minY, z },
       plane: { ...box, z },
     };
   });

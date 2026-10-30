@@ -68,6 +68,18 @@ export function stairBody(stair: ResolvedStair, opts: { slabThickness?: number; 
 }
 
 /**
+ * Frente da chegada a partir dos dois últimos espelhos, na ordem de subida (`last` = espelho N, `prev` = N − 1): a linha
+ * do último espelho, o sentido da subida e o comprimento até a próxima linha (limitado a `STAIR_ARRIVAL_MAX_LENGTH`).
+ * Função pura: serve ao corpo (3D/corte) e à prévia da ferramenta, que ainda não tem uma escada resolvida.
+ */
+export function arrivalFrameFrom(last: { a: Vec2; b: Vec2 }, prev: { a: Vec2; b: Vec2 }): StairArrivalFrame | null {
+  const dv = sub(mid(last.a, last.b), mid(prev.a, prev.b));
+  const pl = Math.hypot(dv.x, dv.y);
+  if (!(pl > EPS)) return null;
+  return { a: last.a, b: last.b, u: mul(dv, 1 / pl), length: Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH) };
+}
+
+/**
  * Frente da chegada (decisão 0012 §2): o último espelho e o sentido de subida. Só existe quando o último degrau é de um
  * lance monolítico que sobe até o espelho de topo (nº N) e o espelho N − 1 também existe; caso contrário, null.
  */
@@ -81,10 +93,7 @@ export function stairArrivalFrame(stair: ResolvedStair): StairArrivalFrame | nul
   const top = byNumber.get(N);
   const prevTop = byNumber.get(N - 1);
   if (!top || !prevTop) return null;
-  const dv = sub(mid(top.a, top.b), mid(prevTop.a, prevTop.b));
-  const pl = Math.hypot(dv.x, dv.y);
-  if (!(pl > EPS)) return null;
-  return { a: top.a, b: top.b, u: mul(dv, 1 / pl), length: Math.min(pl, STAIR_ARRIVAL_MAX_LENGTH) };
+  return arrivalFrameFrom(top, prevTop);
 }
 
 /** Espelhos pelo nº global, derivado da cota da base do espelho (z0 = base + (nº − 1)·h): cada linha de emenda existe uma vez. */

@@ -15,9 +15,11 @@ import {
   type StairRun,
 } from '@hestia/model';
 import {
+  arrivalFrameFrom,
   pieceBottomZ,
   resolveStairs,
   sectionOfStairs,
+  stairArrivalTop,
   stairArrivalTopZ,
   stairBody,
   type ResolvedStair,
@@ -159,5 +161,33 @@ describe('chegada pela face inferior da laje ou do piso que cobre o último espe
     const sk = sectionOfStairs([s], LONG, p);
     const cutTops = sk.cut.map((c) => Math.max(...c.polygon.flat().map((q) => q.y)));
     expect(cutTops.some((t) => Math.abs(t - 2.55) < 1e-9)).toBe(true);
+  });
+});
+
+describe('chegada como degrau da própria escada quando o nível não é fechado', () => {
+  it('sem laje nem piso: a chegada fecha no próprio nível (topZ), não 0,15 m abaixo', () => {
+    const p = build();
+    expect(stairArrivalTop(p, stairOf(p))).toEqual({ top: UPPER, covered: false });
+  });
+
+  it('com laje: a chegada termina na face inferior da laje e o degrau de chegada é o piso do nível', () => {
+    const p = build({ slabs: [{ id: 'laje', boundary: SLAB_RING }] });
+    const r = stairArrivalTop(p, stairOf(p));
+    expect(r.covered).toBe(true);
+    expect(r.top).toBeCloseTo(UPPER - 0.15, 9);
+  });
+
+  it('a frente da chegada sai dos dois últimos espelhos e não passa de 0,30 m', () => {
+    const s = stairOf(build());
+    const last = s.risers.find((r) => r.index === 16)!;
+    const prev = s.risers.find((r) => r.index === 15)!;
+    const f = arrivalFrameFrom(last, prev)!;
+    expect(f.a).toEqual(last.a);
+    expect(f.length).toBeCloseTo(0.28, 9);
+    expect(f.u.x).toBeCloseTo(1, 9);
+    expect(f.u.y).toBeCloseTo(0, 9);
+    // Espelhos muito afastados: o comprimento fica limitado ao máximo.
+    const far = arrivalFrameFrom({ a: v(0, 0), b: v(0, 1) }, { a: v(-2, 0), b: v(-2, 1) })!;
+    expect(far.length).toBeCloseTo(0.3, 9);
   });
 });

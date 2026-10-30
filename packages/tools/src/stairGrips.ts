@@ -47,7 +47,8 @@ export function arcApex(c: StairCurve): Vec2 {
 /** Alça sob o cursor entre as escadas selecionadas: extremidades primeiro, depois o meio dos arcos. */
 export function stairGripAt(p: Project, ids: Id[], at: Vec2, mpp: number): StairGrip | null {
   const tol = 9 * mpp;
-  const stairs = ids.map((id) => p.elements[id]).filter(isStair);
+  // Escada livre edita pelos vértices do `freePath`: as alças do croqui mexeriam nos componentes sem o trajeto.
+  const stairs = ids.map((id) => p.elements[id]).filter(isStair).filter((s) => !s.freePath);
   for (const s of stairs) {
     for (let part = 0; part < s.components.length; part++) {
       const comp = s.components[part]!;
@@ -150,7 +151,7 @@ export function stairHandlePreview(p: Project, ids: Id[]): PreviewItem[] {
   const out: PreviewItem[] = [];
   for (const id of ids) {
     const s = p.elements[id];
-    if (!isStair(s)) continue;
+    if (!isStair(s) || s.freePath) continue;
     for (const q of stairEndpoints(s)) out.push({ kind: 'point', at: q });
     for (const comp of s.components) {
       for (const key of keysOf(comp)) {

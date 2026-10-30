@@ -319,6 +319,12 @@ export const I18N = {
     ramp_shape_free: 'Livre',
     ramp_adjust: 'Ajustar',
     ramp_adjust_title: 'Ajusta a inclinação e o comprimento da rampa à norma do tipo',
+    stair_shape_free: 'Livre',
+    stair_adjust: 'Ajustar',
+    stair_adjust_title: 'Ajusta o nº de espelhos, a altura e o piso da escada à regra de Blondel do tipo',
+    stair_free_group: 'Escada livre',
+    stair_free_path_info: 'Trajeto: {n} pontos · {r} lances · {l} patamares',
+    stair_free_width: 'Largura do lance',
   },
   en: {
     // Ribbon Tabs
@@ -611,6 +617,12 @@ export const I18N = {
     ramp_shape_free: 'Free',
     ramp_adjust: 'Adjust',
     ramp_adjust_title: 'Adjusts the ramp slope and length to the type norm',
+    stair_shape_free: 'Free',
+    stair_adjust: 'Adjust',
+    stair_adjust_title: 'Adjusts the riser count, riser height and tread to the type Blondel rule',
+    stair_free_group: 'Free stair',
+    stair_free_path_info: 'Path: {n} points · {r} runs · {l} landings',
+    stair_free_width: 'Run width',
   },
 } as const;
 

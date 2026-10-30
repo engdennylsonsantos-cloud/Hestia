@@ -15,6 +15,7 @@ import { commitCeilingBoundary, commitOutlineBoundary } from './outlineEdit.ts';
 import { slopeArrowLength, slopePreview } from './slabSlope.ts';
 import { moveRoomSeparatorEnd, roomSeparatorGripAt, type RoomSeparatorGrip } from './roomSeparatorPick.ts';
 import { stairGripAt, stairHold } from './stairGrips.ts';
+import { stairFreeGripAt, stairFreeHold } from './stairFreeGrips.ts';
 import { rampGripAt, rampHold } from './rampGrips.ts';
 import { spiralGripAt, spiralHold } from './stairSpiralGrips.ts';
 import { gridGripProvider } from './gridGripHold.ts';
@@ -285,6 +286,12 @@ const stairGrip: GripProvider = (env, at) => {
   return g ? stairHold(env, g) : null;
 };
 
+/** Alça de vértice de escada livre selecionada (`stairFreeGrips.ts`). Vem antes da comum. */
+const stairFreeGrip: GripProvider = (env, at) => {
+  const g = stairFreeGripAt(env.project(), env.selection(), at, env.metersPerPixel());
+  return g ? stairFreeHold(env, g) : null;
+};
+
 /** Alça de vértice de rampa livre selecionada (`rampGrips.ts`). */
 const rampGrip: GripProvider = (env, at) => {
   const g = rampGripAt(env.project(), env.selection(), at, env.metersPerPixel());
@@ -292,7 +299,7 @@ const rampGrip: GripProvider = (env, at) => {
 };
 
 /** Registro de provedores de alça, em ordem de prioridade (o primeiro que acerta vence). */
-export const gripProviders: GripProvider[] = [roomSeparatorGrip, gridGripProvider, wallGrip, spiralGrip, stairGrip, rampGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
+export const gripProviders: GripProvider[] = [roomSeparatorGrip, gridGripProvider, wallGrip, spiralGrip, stairFreeGrip, stairGrip, rampGrip, floorGrip, slabGrip, roofGrip, ceilingGrip];
 
 /** Alça sob o cursor entre os elementos selecionados, por ordem de `gripProviders`. */
 export function gripHoldAt(env: ToolEnv, at: Vec2): GripHold | null {

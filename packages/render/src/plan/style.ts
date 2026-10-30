@@ -79,15 +79,16 @@ function paintOf(gp: ProjectGraphics, c: GraphicsCategory, ov: CategoryOverride,
  * larguras em px de tela no `zoom` corrente. Sem `Level.graphics` salvo, o detalhe é o do projeto (`settings.detail`),
  * como antes da decisão 0015; com ele, vale `detailOf` (pela escala).
  */
-export function planStyleOf(p: Project, levelId: Id, zoom: number): PlanStyle {
+export function planStyleOf(p: Project, levelId: Id, zoom: number, scaleOverride?: number): PlanStyle {
   const g = levelGraphicsOf(p, levelId);
   const gp = graphicsOf(p);
   const visual: PlanVisual = isPlanVisual(g.style) ? g.style : 'hiddenLine';
   const saved = p.levels.find((l) => l.id === levelId)?.graphics !== undefined;
   const detail: DetailLevel = saved ? detailOf(g, gp) : (p.settings.detail ?? 'medium');
+  const escala = scaleOverride && scaleOverride > 0 ? scaleOverride : g.scale;
   const paint = {} as Record<GraphicsCategory, PlanPaint>;
-  for (const c of GRAPHICS_CATEGORIES) paint[c] = paintOf(gp, c, g.overrides[c], zoom, g.scale, visual);
-  return { scale: g.scale, detail, visual, partial: g.partialStructure, paint };
+  for (const c of GRAPHICS_CATEGORIES) paint[c] = paintOf(gp, c, g.overrides[c], zoom, escala, visual);
+  return { scale: escala, detail, visual, partial: g.partialStructure, paint };
 }
 
 /**

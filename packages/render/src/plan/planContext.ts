@@ -53,7 +53,7 @@ export interface PlanContext {
 
 export function planContext(input: PlanInput): PlanContext {
   const { project: p, viewport: v } = input;
-  const style = planStyleOf(p, input.levelId, v.zoom);
+  const style = planStyleOf(p, input.levelId, v.zoom, input.areaPlan?.scale);
   const paint = style.paint;
   const rp = input.roofPlanMode === true;
   const view = rp ? null : planViewOf(p, input.levelId);

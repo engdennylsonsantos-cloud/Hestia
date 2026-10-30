@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 import { add, boxOf, mul, norm, perp, pointInMulti, ringArea, sub, union, type MultiPolygon, type Ring, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, cutLevelByJunction, frameOfWall, openingGeometry, type ResolvedFloor, type ResolvedLevel, type ResolvedRoof, type ResolvedRoom, type ResolvedSlab } from '@hestia/engine';
-import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, planAnnotationsOf, projectGrids, wallsOnLevel, type AreaPlan, type AreaPlanAnnotations, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
+import { openingTypeById, dimensionPoints, isGeneric, levelDimensions, levelRoomSeparators, openingAngle2d, openingDetail2d, openingLeafPlan, openingPlanDisplay, openingShowSwing, openingSwingStyle, planAnnotationIds, projectGrids, wallsOnLevel, type AreaPlan, type DetailLevel, type Id, type Material, type Project } from '@hestia/model';
 import { resolveRooms } from '@hestia/engine';
 import { areaPlanLegendOps, areaPlanRoomOps, areaPlanTableOps, areaPlanTagOps } from './areaPlan.ts';
 import { aberturasDaParede, escadasDoNivel, juncaoDoNivel, paredesDoNivel, rampasDoNivel, telhadosDoNivel } from './resolucao.ts';
@@ -22,7 +22,7 @@ import { belowRampOps, rampFills } from './ramps.ts';
 import { joinDebugLabels } from './joinDebug.ts';
 import { wallTagLabels } from './tags.ts';
 import { openingTagLabels } from './openingTags.ts';
-import { annotationsOfLevel, noteOps, roomSeparatorStrokes } from './notes.ts';
+import { drawnAnnotations, noteOps, roomSeparatorStrokes } from './notes.ts';
 import { elementTagOps } from './tags.ts';
 import { openingViewOps, wallOutlineOps, type PlanView } from './view.ts';
 import { openingPlanDetail } from './symbols.ts';
@@ -31,7 +31,7 @@ import { Limiares, type VistaComLimiares } from './limiares.ts';
 import { tracoEm } from './marcadores.ts';
 import { resolverZoom } from './zoomOps.ts';
 import { planContext } from './planContext.ts';
-import { areaPlanProfile, type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanTheme, type StrokeOp } from './types.ts';
+import { areaPlanProfile, FLOOR_PLAN_PROFILE, type FillOp, type LabelOp, type PlanDrawList, type PlanOps, type PlanProfile, type PlanTheme, type StrokeOp } from './types.ts';
 
 import { buildPlanOverlay } from './planOverlay.ts';
 
@@ -61,8 +61,10 @@ export interface PlanInput {
    * liga o modo (ex.: uma vista "Cobertura"); sem ele a planta é a de sempre. Não usa o intervalo de vista.
    */
   roofPlanMode?: boolean;
-  /** Planta de área: quando presente, o desenho é o da planta de área (sem pisos, cotas, aberturas ou cor por padrão). */
+  /** Planta de área: quando presente, o desenho usa o perfil da vista de área. */
   areaPlan?: import('@hestia/model').AreaPlan;
+  /** Perfil de desenho; sem ele, a vista de área usa `areaPlanProfile` e a planta de piso usa `FLOOR_PLAN_PROFILE`. */
+  profile?: PlanProfile;
   /** Rótulo em arraste (fantasma) da planta de área: segue o cursor em tempo real. */
   tagGhost?: { roomId: Id; at: Vec2 };
   /** Ambiente cujo rótulo está sendo arrastado: a geometria não o desenha (o fantasma desenha). */
@@ -125,7 +127,7 @@ function hachuraDaRegiao(m: Material | undefined, espessura: number, fine: boole
  * Parte da seleção que a geometria do nível usa: as cotas do nível (decisão 0019), as linhas e regiões de detalhe, as
  * grades de eixos e as marcas de corte e elevação selecionadas mudam de cor (e espessura) com a seleção. A geometria
  * depende só desse subconjunto; o resto é da sobreposição. As linhas e regiões de detalhe ficam aqui porque o desenho
- * delas (com o realce 1,7×) é feito por `notes.ts` na geometria — sem elas, a seleção não chegava ao desenho (achado A2).
+ * delas (com o realce 1,7--) é feito por `notes.ts` na geometria -- sem elas, a seleção não chegava ao desenho (achado A2).
  */
 export function planGeometrySelection(p: Project, levelId: Id, selection: readonly Id[], areaPlan?: Pick<AreaPlan, 'annotations'>): Id[] {
   if (selection.length === 0) return [];
@@ -196,14 +198,15 @@ function openingSymbolStrokes(
 }
 
 /**
- * Geometria do nível (decisão 0013, D1–D6): pisos, lajes, ambientes, escadas, paredes, aberturas, telhados, forros,
+ * Geometria do nível (decisão 0013, D1--D6): pisos, lajes, ambientes, escadas, paredes, aberturas, telhados, forros,
  * cotas e etiquetas. Não depende de pan, de seleção (exceto as cotas), de cursor, de ferramenta nem da grade. O zoom só
  * entra nas decisões de detalhe (interface entre materiais), registradas em `limiares`; faixas, marcadores e
  * rótulos saem em papel e em pixels, e `resolverZoom` os converte (ver `zoomOps.ts`). A sobreposição fica em `buildPlanOverlay`.
  */
 export function buildPlanGeometry(input: PlanInput): PlanOps {
-  if (input.areaPlan) return buildAreaPlanGeometry(input, input.areaPlan);
   const { project: p, theme } = input;
+  const areaPlan = input.areaPlan;
+  const profile: PlanProfile = input.profile ?? (areaPlan ? areaPlanProfile(areaPlan) : FLOOR_PLAN_PROFILE);
   const limiares = new Limiares();
   const v: VistaComLimiares = { ...input.viewport, limiares };
   const fills: FillOp[] = [];
@@ -215,6 +218,8 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   // Contexto do nível e da vista (o mesmo que a sobreposição usa): estilo, vista, geometria e ocultos.
   const { style, rp, view, up, geo, hidden, roofOff, roofHidden, stairs, ramps } = planContext(input);
   const { detail, paint } = style;
+  // A escala da vista de área manda no papel das etiquetas e dos contornos claros.
+  const scale = areaPlan && areaPlan.scale > 0 ? areaPlan.scale : style.scale;
   // Arame: só contornos. Os preenchimentos de modelo somem (as faixas de contorno ficam); referências também.
   const wire = style.visual === 'wireframe';
   const surfaces = (fs: FillOp[]): FillOp[] => (wire ? [] : fs);
@@ -233,11 +238,11 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   const fine = detail === 'fine';
   // Planta de forro (decisão 0021): vista para cima. Sem o que está embaixo do nível (referências apagadas) e com forros.
   // Pavimento de baixo (referência) com as paredes cortadas pela junção dele, como a planta do nível.
-  const below = up || !input.below ? null : cutLevelByJunction(input.below, juncaoDoNivel(p, input.below.levelId));
+  const below = !profile.underlay || up || !input.below ? null : cutLevelByJunction(input.below, juncaoDoNivel(p, input.below.levelId));
 
   // Telhados visíveis acima do plano de corte: a cobertura esconde as paredes por baixo. Elas voltam no fim, só como
   // contorno esmaecido; as linhas e os símbolos das paredes sob a cobertura não sobem por cima do telhado.
-  const telhadosAcima = rp || !view ? [] : telhadosDoNivel(p, input.levelId).filter((r) => !roofHidden?.has(r.roofId) && view.cls.get(r.roofId) === 'projection-above');
+  const telhadosAcima = areaPlan ? [] : rp || !view ? [] : telhadosDoNivel(p, input.levelId).filter((r) => !roofHidden?.has(r.roofId) && view.cls.get(r.roofId) === 'projection-above');
   const coberturaAcima: MultiPolygon = telhadosAcima.length > 0 ? union(...telhadosAcima.map((r) => roofFootprint(r))) : [];
   const sobCobertura = (q: Vec2): boolean => coberturaAcima.length > 0 && pointInMulti(q, coberturaAcima);
   const meioDoTraco = (s: StrokeOp): Vec2 => {
@@ -276,14 +281,18 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   }
   // Escadas do nível abaixo (decisão 0011 §1): apagadas, como as lajes de referência. As do nível, fora do intervalo, saem.
   if (below) {
-    const bst = belowStairOps(escadasDoNivel(p, below.levelId), theme);
-    fills.push(...surfaces(bst.fills));
-    if (!rp) strokes.push(...bst.strokes);
-    const brp = belowRampOps(rampasDoNivel(p, below.levelId), theme);
-    fills.push(...surfaces(brp.fills));
-    if (!rp) strokes.push(...brp.strokes);
+    if (profile.stairs) {
+      const bst = belowStairOps(escadasDoNivel(p, below.levelId), theme);
+      fills.push(...surfaces(bst.fills));
+      if (!rp) strokes.push(...bst.strokes);
+    }
+    if (profile.ramps) {
+      const brp = belowRampOps(rampasDoNivel(p, below.levelId), theme);
+      fills.push(...surfaces(brp.fills));
+      if (!rp) strokes.push(...brp.strokes);
+    }
   }
-  if (below && input.belowRoofs) {
+  if (below && input.belowRoofs && profile.roofs !== 'hidden') {
     if (rp) {
       // Telhados de baixo opacos: só o preenchimento; as linhas e cotas do nível de baixo não aparecem por cima.
       fills.push(...surfaces(roofOps(input.belowRoofs, p, theme, input.dark, detail, v, { planMode: true }).fills));
@@ -298,56 +307,83 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   }
 
   // Lajes e pisos pela cota da face superior (decisão 0023 §3): o mais alto desenha por último; pisos antes das paredes.
-  for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint, style.scale)) addOps(sf.ops, sf.paint, !rp);
+  if (profile.floors) {
+    for (const sf of floorAndSlabOps(p, input.levelId, theme, input.dark, detail, v, hidden, paint, scale)) addOps(sf.ops, sf.paint, !rp);
+  }
   // Ambientes sobre os pisos (preenchimento leve e etiqueta com nome, número e área) e sob as paredes (decisão 0018).
-  addOps(roomOps(p, input.levelId, theme, input.dark, detail, style.scale, hidden, paint.room, input.hideLabelRoomId), paint.room, !rp);
+  if (profile.rooms) {
+    if (areaPlan) {
+      const roomPlan: AreaPlan = profile.referenceLines ? areaPlan : { ...areaPlan, graphics: { ...areaPlan.graphics, referenceLines: 'never' } };
+      const room = areaPlanRoomOps(p, roomPlan, theme, input.dark, scale, hidden, paint.room, resolveRooms(p, input.levelId), new Set(input.selection));
+      fills.push(...room.fills);
+      strokes.push(...room.strokes);
+      labels.push(...room.labels);
+    } else {
+      addOps(roomOps(p, input.levelId, theme, input.dark, detail, style.scale, hidden, paint.room, input.hideLabelRoomId), paint.room, !rp);
+    }
+  }
   // Escadas do nível: depois dos pisos e lajes, antes das paredes (o degrau não cobre parede).
-  addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
+  if (profile.stairs) addOps(stairFills(p, stairs, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, scale), paint.stair, !rp);
   // Rampas do nível: junto das escadas, com o mesmo estilo da categoria.
-  addOps(rampFills(p, ramps, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, style.scale), paint.stair, !rp);
+  if (profile.ramps) addOps(rampFills(p, ramps, theme, input.dark, detail, v, view ? { cutZ: view.cutZ, topZ: view.topZ } : undefined, paint.stair, scale), paint.stair, !rp);
   // Forros: só na planta de forro (na planta baixa eles estão acima do topo e não saem).
-  if (up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor, style.scale), paint.floor, true);
+  if (profile.ceilings && up) addOps(ceilingFills(p, input.levelId, theme, input.dark, detail, v, hidden, paint.floor, style.scale), paint.floor, true);
 
   // Paredes: conjuntos (silhueta e regiões por material) e contornos fora do corte, com o estilo da categoria parede.
   // Parede oculta pela categoria: a geometria do nível já sai vazia (ver `planViewOf`), e os conjuntos não entram.
   const wallOps: FloorOps = { fills: [], strokes: [], labels: [] };
-  const clusters = rp || !paint.wall.visible ? [] : geo.clusters;
-  for (const c of clusters) {
-    if (detail === 'coarse') wallOps.fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
-    const regions = detail === 'coarse' ? [] : c.regions;
-    for (const r of regions) {
-      const m = p.materials[r.materialId];
-      const color = surfaceColor(m?.color ?? '#999999', fillBase, fillT, paint.wall);
-      const polys = r.polygons;
-      const thick = Math.max(0, ...polys.map((poly) => espessuraEquivalente(poly)));
-      const hatch = hachuraDaRegiao(m, thick, fine, mix(paint.wall.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45));
-      wallOps.fills.push({ polygons: polys, color, alpha: 1, hatch });
-      // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre). Linhas finas: peso de projeção.
-      // O traço leva o zoom a partir do qual cabe (`zoomMin`) e o shader o esconde abaixo dele: a geometria não muda com o zoom.
-      for (const poly of polys) {
-        const zoomMin = fine ? undefined : zoomDaEspessura(espessuraEquivalente(poly), 1.6);
-        if (zoomMin !== undefined && zoomMin > ZOOM_MAXIMO) continue;
-        for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: mix(theme.ink, fillBase, 0.35), alpha: 1, ...(zoomMin !== undefined ? { zoomMin } : {}) });
+  if (profile.walls !== 'hidden' && !rp && paint.wall.visible) {
+    if (profile.walls === 'light') {
+      // Planta de área: silhueta clara, mas ainda sujeita às sobrescritas da categoria (cor, arame, meio-tom, transparência).
+      const wallFill = mix(paint.wall.color ?? theme.inkSoft, fillBase, 0.88);
+      const wallLine = paint.wall.color ?? theme.inkSoft;
+      for (const c of geo.clusters) {
+        wallOps.fills.push({ polygons: c.silhouette, color: wallFill, alpha: 1 });
+        for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, widthPx: 1, papel: { mm: 0.25, escala: scale }, color: wallLine, alpha: 1 });
       }
-    }
-    for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.cut, color: theme.ink, alpha: 1 });
-  }
-  // Paredes fora do corte (decisão 0013 §4): contorno; projeção acima tracejada, abaixo e "além" em linha clara.
-  if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, espessuraDeProjecao(paint.wall)));
+      // Paredes fora do corte: a área também mostra a projeção (decisão 0013 §4).
+      if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, espessuraDeProjecao(paint.wall)));
+      if (coberturaAcima.length > 0) wallOps.strokes = wallOps.strokes.filter((s) => !sobCobertura(meioDoTraco(s)));
+      addOps(wallOps, paint.wall, true);
+    } else {
+      for (const c of geo.clusters) {
+        if (detail === 'coarse') wallOps.fills.push({ polygons: c.silhouette, color: mix(theme.inkSoft, fillBase, 0.5), alpha: 1 });
+        const regions = detail === 'coarse' ? [] : c.regions;
+        for (const r of regions) {
+          const m = p.materials[r.materialId];
+          const color = surfaceColor(m?.color ?? '#999999', fillBase, fillT, paint.wall);
+          const polys = r.polygons;
+          const thick = Math.max(0, ...polys.map((poly) => espessuraEquivalente(poly)));
+          const hatch = hachuraDaRegiao(m, thick, fine, mix(paint.wall.color ?? m?.color ?? '#999999', input.dark ? '#ffffff' : '#000000', 0.45));
+          wallOps.fills.push({ polygons: polys, color, alpha: 1, hatch });
+          // Linhas de interface entre materiais: só onde cabem sem virar mancha (fino: sempre). Linhas finas: peso de projeção.
+          // O traço leva o zoom a partir do qual cabe (`zoomMin`) e o shader o esconde abaixo dele: a geometria não muda com o zoom.
+          for (const poly of polys) {
+            const zoomMin = fine ? undefined : zoomDaEspessura(espessuraEquivalente(poly), 1.6);
+            if (zoomMin !== undefined && zoomMin > ZOOM_MAXIMO) continue;
+            for (const ring of poly) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: mix(theme.ink, fillBase, 0.35), alpha: 1, ...(zoomMin !== undefined ? { zoomMin } : {}) });
+          }
+        }
+        for (const ring of ringsOf(c.silhouette)) wallOps.strokes.push({ pts: ring, closed: true, ...paint.wall.cut, color: theme.ink, alpha: 1 });
+      }
+      // Paredes fora do corte (decisão 0013 §4): contorno; projeção acima tracejada, abaixo e "além" em linha clara.
+      if (view) wallOps.strokes.push(...wallOutlineOps(view, theme, espessuraDeProjecao(paint.wall)));
 
-  // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino, paredes cortadas).
-  if (fine && !rp) {
-    for (const [id, rw] of Object.entries(geo.walls)) {
-      if (view?.cls.get(id) !== 'cut') continue;
-      for (const m of rw.membranes) wallOps.strokes.push({ pts: m.pts, closed: false, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+      // Membranas (camadas de espessura zero): linha fina tracejada no limite entre camadas (só no fino, paredes cortadas).
+      if (fine && !rp) {
+        for (const [id, rw] of Object.entries(geo.walls)) {
+          if (view?.cls.get(id) !== 'cut') continue;
+          for (const m of rw.membranes) wallOps.strokes.push({ pts: m.pts, closed: false, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.9, dash: [6, 3] });
+        }
+      }
+      // Paredes sob um telhado acima do corte: o telhado cobre as linhas e os símbolos; o contorno esmaecido entra no fim.
+      if (coberturaAcima.length > 0) wallOps.strokes = wallOps.strokes.filter((s) => !sobCobertura(meioDoTraco(s)));
+      addOps(wallOps, paint.wall, true);
     }
   }
-  // Paredes sob um telhado acima do corte: o telhado cobre as linhas e os símbolos; o contorno esmaecido entra no fim.
-  if (coberturaAcima.length > 0) wallOps.strokes = wallOps.strokes.filter((s) => !sobCobertura(meioDoTraco(s)));
-  addOps(wallOps, paint.wall, true);
 
   // Pontas com "não unir": marcador laranja discreto, para a junção esquecida desligada não passar despercebida.
-  for (const w of rp ? [] : paredesDoNivel(p, input.levelId)) {
+  for (const w of profile.walls === 'normal' && !rp ? paredesDoNivel(p, input.levelId) : []) {
     if (hidden?.has(w.id)) continue;
     for (const [off, pt] of [[w.noJoinStart, w.a], [w.noJoinEnd, w.b]] as const) {
       if (!off || sobCobertura(pt)) continue;
@@ -361,19 +397,22 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
 
   // Símbolos das aberturas (fora do grosseiro): cortadas, tracejadas acima do corte, leves abaixo; as ocultas saem.
   // Cada um com o estilo da sua categoria (porta ou janela) e a espessura de corte ou de projeção.
-  if (!rp) strokes.push(...openingSymbolStrokes(p, input.levelId, paint, theme, fillBase, detail, input.viewport.zoom, limiares, view, sobCobertura));
+  if (profile.openings && !rp) strokes.push(...openingSymbolStrokes(p, input.levelId, paint, theme, fillBase, detail, input.viewport.zoom, limiares, view, sobCobertura));
 
   // Telhados (D1): por cima das paredes e dos pisos (semitransparentes); as linhas notáveis saem por último.
-  const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, {
-    planMode: rp,
-    hidden: roofHidden,
-    categoryHidden: roofOff,
-    showProjection: input.showRoofProjection !== false,
-    paint: paint.roof,
-    classes: view?.cls,
-    cutZ: view?.cutZ,
-  }, style.scale);
-  addOps(rf, paint.roof, true);
+  if (profile.roofs !== 'hidden') {
+    const rf = roofFills(p, input.levelId, theme, input.dark, detail, v, {
+      planMode: rp,
+      hidden: roofHidden,
+      categoryHidden: roofOff,
+      showProjection: input.showRoofProjection !== false,
+      projectionOnly: profile.roofs === 'projection',
+      paint: paint.roof,
+      classes: view?.cls,
+      cutZ: view?.cutZ,
+    }, scale);
+    addOps(rf, paint.roof, true);
+  }
   // Planta de cobertura: as paredes voltam por cima dos telhados só como contorno fino.
   if (rp && paint.wall.visible) {
     for (const c of geo.clusters) for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, ...paint.wall.proj, color: theme.inkSoft, alpha: 0.8 });
@@ -394,39 +433,65 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   }
 
   // Grades de eixos: por cima do modelo e por baixo das anotações; valem em todos os níveis (ver `grids.ts`).
-  const grades = gridOps(p, style.scale, input.viewport.zoom, theme, input.selection);
-  strokes.push(...grades.strokes);
-  labels.push(...grades.labels);
+  if (profile.grids) {
+    const grades = gridOps(p, scale, input.viewport.zoom, theme, input.selection);
+    strokes.push(...grades.strokes);
+    labels.push(...grades.labels);
+  }
 
   // Linhas de corte e elevação: aparecem em todas as plantas, porque o corte atravessa os níveis. Seguem a categoria
   // 'anotação' (visibilidade, cor e peso) e a escala da vista, com geometria em mm de papel.
-  const marks = sectionMarksOf(p, theme, paint.annotation, style.scale, input.selection);
-  fills.push(...marks.fills);
-  strokes.push(...marks.strokes);
-  labels.push(...marks.labels);
+  if (profile.sectionMarks) {
+    const marks = sectionMarksOf(p, theme, paint.annotation, scale, input.selection);
+    fills.push(...marks.fills);
+    strokes.push(...marks.strokes);
+    labels.push(...marks.labels);
+  }
 
-  // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'.
-  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, style.scale, v);
+  // Cotas e textos do nível (decisão 0019), com o estilo da categoria 'anotação'. Na planta de área valem as
+  // anotações da própria vista (ou o fallback do nível, já filtrado por `drawnAnnotations`).
+  const annotations = areaPlan ? drawnAnnotations(p, input.levelId, areaPlan) : undefined;
+  const notes = noteOps(p, input.levelId, paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, scale, v, annotations);
   fills.push(...notes.fills);
   strokes.push(...notes.strokes);
   labels.push(...notes.labels);
 
-  const tagged = elementTagOps(p, input.levelId, paint.annotation, style.scale);
-  strokes.push(...tagged.strokes);
-  labels.push(...tagged.labels);
+  if (profile.elementTags) {
+    const tagged = elementTagOps(p, input.levelId, paint.annotation, scale);
+    strokes.push(...tagged.strokes);
+    labels.push(...tagged.labels);
+  }
 
   // Etiquetas de tipo (G4) seguem a categoria 'anotação' (visibilidade e mm de papel).
-  if (p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
+  if (profile.tags && p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, paint.annotation, scale, hidden));
   // Etiquetas de portas e janelas (Tag on Placement): desligadas por padrão, ligadas ao inserir.
-  if (p.settings.showOpeningTags) labels.push(...openingTagLabels(p, input.levelId, paint.annotation, style.scale, hidden));
-  if (p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
+  if (profile.tags && p.settings.showOpeningTags) labels.push(...openingTagLabels(p, input.levelId, paint.annotation, scale, hidden));
+  if (!areaPlan && p.settings.debugJoins) labels.push(...joinDebugLabels(p, input.levelId));
 
   // Objetos importados (viga, pilar, mobiliário...): na v1 só o contorno aproximado em planta, tracejado e fino.
-  if (paint.generic.visible) {
+  if (profile.generic && paint.generic.visible) {
     for (const e of Object.values(p.elements)) {
       if (!isGeneric(e) || e.levelId !== input.levelId || !e.outline?.length) continue;
       strokes.push({ pts: e.outline, closed: true, widthPx: 1, color: theme.inkSoft, alpha: 0.8, dash: [5, 3] });
     }
+  }
+
+  // Planta de área: separador, etiquetas de ambiente, legenda e quadro por cima de tudo.
+  if (areaPlan) {
+    if (profile.rooms) {
+      strokes.push(...roomSeparatorStrokes(p, input.levelId, paint.annotation, input.dark ? '#9ca3af' : theme.inkSoft, new Set(input.selection), theme.select));
+      const roomTags = areaPlanTagOps(p, areaPlan, scale, hidden, resolveRooms(p, input.levelId), input.hideLabelRoomId, input.dark);
+      strokes.push(...roomTags.strokes);
+      labels.push(...roomTags.labels);
+    }
+    const legend = areaPlanLegendOps(p, areaPlan, scale, theme, input.dark);
+    fills.push(...legend.fills);
+    strokes.push(...legend.strokes);
+    labels.push(...legend.labels);
+    const table = areaPlanTableOps(p, areaPlan, scale, input.dark);
+    fills.push(...table.fills);
+    strokes.push(...table.strokes);
+    labels.push(...table.labels);
   }
 
   // Linhas finas (só na tela): os traços do modelo ficam com 1 px; o que vem depois (seleção, cursor, cotas temporárias,
@@ -435,143 +500,6 @@ export function buildPlanGeometry(input: PlanInput): PlanOps {
   return { fills, strokes, labels, limiares: limiares.lista() };
 }
 
-/**
- * Planta de área (F) pelo MESMO motor da planta de piso, com o perfil `areaPlanProfile`: pisos, aberturas, cotas,
- * textos, detalhes, etiquetas, eixos e marcas de corte entram conforme os gráficos da vista. O padrão continua o de
- * sempre — paredes claras, diagonais de referência, etiquetas de ambiente, legenda e quadro, sem preenchimento quando não
- * há esquema de cores. As anotações são as da vista (`plan.annotations`) e, sem elas, as do nível.
- */
-function buildAreaPlanGeometry(input: PlanInput, plan: AreaPlan): PlanOps {
-  const { project: p, theme } = input;
-  const { style, geo, hidden } = planContext(input);
-  const profile = areaPlanProfile(plan);
-  const scale = plan.scale > 0 ? plan.scale : style.scale;
-  const fillBase = input.dark ? theme.bg : '#ffffff';
-  const limiares = new Limiares();
-  const v: VistaComLimiares = { ...input.viewport, limiares };
-  const fills: FillOp[] = [];
-  const strokes: StrokeOp[] = [];
-  const labels: LabelOp[] = [];
-  const resolved = resolveRooms(p, input.levelId);
-
-  // Pavimento de referência (opção "mostrar o nível de baixo"): apagado, como na planta de piso.
-  if (profile.underlay && input.below) {
-    for (const c of input.below.clusters) {
-      fills.push({ polygons: c.silhouette, color: theme.underlay, alpha: 0.22 });
-      for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 1, color: theme.underlay, alpha: 0.7 });
-    }
-    if (input.belowFloors) {
-      const bf = belowFloorOps(input.belowFloors, theme);
-      fills.push(...bf.fills);
-      strokes.push(...bf.strokes);
-    }
-    if (input.belowSlabs) {
-      const bs = belowFloorOps(input.belowSlabs, theme);
-      fills.push(...bs.fills);
-      strokes.push(...bs.strokes);
-    }
-    if (input.belowRooms) {
-      const brm = belowRoomOps(input.belowRooms, theme);
-      fills.push(...brm.fills);
-      strokes.push(...brm.strokes);
-    }
-  }
-
-  // Pisos e lajes, quando o perfil pede (a planta de área nasce sem eles).
-  if (profile.floors) {
-    const fs = floorAndSlabOps(p, input.levelId, theme, input.dark, style.detail, v, hidden, style.paint, scale);
-    for (const s of fs) {
-      fills.push(...s.ops.fills);
-      strokes.push(...s.ops.strokes);
-    }
-  }
-
-  // Ambientes: preenchimento (só com esquema), contorno e diagonais de referência.
-  if (profile.rooms) {
-    const roomPlan: AreaPlan = profile.referenceLines ? plan : { ...plan, graphics: { ...plan.graphics, referenceLines: 'never' } };
-    const room = areaPlanRoomOps(p, roomPlan, theme, input.dark, scale, hidden, style.paint.room, resolved, new Set(input.selection));
-    fills.push(...room.fills);
-    strokes.push(...room.strokes);
-  }
-
-  // Paredes claras (padrão) ou normais, conforme o perfil.
-  if (profile.walls !== 'hidden') {
-    const light = profile.walls === 'light';
-    const wallFill = mix(theme.inkSoft, fillBase, light ? 0.88 : 0.62);
-    const wallLine = light ? theme.inkSoft : theme.ink;
-    for (const c of geo.clusters) {
-      fills.push({ polygons: c.silhouette, color: wallFill, alpha: 1 });
-      for (const ring of ringsOf(c.silhouette)) strokes.push({ pts: ring, closed: true, widthPx: 1, papel: { mm: light ? 0.25 : 0.35, escala: scale }, color: wallLine, alpha: 1 });
-    }
-  }
-
-  // Símbolos das aberturas, quando o perfil pede (mesma função da planta de piso).
-  if (profile.openings) strokes.push(...openingSymbolStrokes(p, input.levelId, style.paint, theme, fillBase, style.detail, input.viewport.zoom, limiares, null));
-
-  // Projeção da cobertura (desligada no perfil padrão de área).
-  if (profile.roofProjection) {
-    const rf = roofFills(p, input.levelId, theme, input.dark, style.detail, v, {
-      hidden: undefined,
-      showProjection: input.showRoofProjection !== false,
-      paint: style.paint.roof,
-    }, scale);
-    fills.push(...rf.fills);
-    strokes.push(...rf.strokes);
-    labels.push(...rf.labels);
-  }
-
-  // Grades de eixos: por cima do modelo e por baixo das anotações (mesma função da planta de piso).
-  if (profile.grids) {
-    const grades = gridOps(p, scale, input.viewport.zoom, theme, input.selection);
-    strokes.push(...grades.strokes);
-    labels.push(...grades.labels);
-  }
-
-  // Linhas de corte e elevação (mesma função da planta de piso).
-  if (profile.sectionMarks) {
-    const marks = sectionMarksOf(p, theme, style.paint.annotation, scale, input.selection);
-    fills.push(...marks.fills);
-    strokes.push(...marks.strokes);
-    labels.push(...marks.labels);
-  }
-
-  // Anotações da vista: as próprias da planta de área ou, sem elas, as do nível (sem somar as duas). O perfil filtra o
-  // que entra; as linhas de separação de ambiente não são anotação de vista e saem abaixo, no desenho de sempre.
-  const annotations: AreaPlanAnnotations = plan.annotations ? planAnnotationsOf(plan) : annotationsOfLevel(p, input.levelId);
-  const visiveis: AreaPlanAnnotations = {
-    dimensions: profile.dimensions ? annotations.dimensions : [],
-    texts: profile.texts ? annotations.texts : [],
-    detailLines: profile.detail ? annotations.detailLines : [],
-    detailRegions: profile.detail ? annotations.detailRegions : [],
-    tags: profile.tags ? annotations.tags : [],
-  };
-  const notes = noteOps(p, input.levelId, style.paint.annotation, { ink: theme.ink, select: theme.select, paper: theme.bg, selection: input.selection }, scale, v, visiveis);
-  fills.push(...notes.fills);
-  strokes.push(...notes.strokes);
-  labels.push(...notes.labels);
-
-  // Etiquetas de tipo de parede e de abertura (as de elemento já saíram em `noteOps`, com as anotações da vista).
-  if (profile.tags && p.settings.showTags) labels.push(...wallTagLabels(p, input.levelId, style.paint.annotation, scale, hidden));
-  if (profile.tags && p.settings.showOpeningTags) labels.push(...openingTagLabels(p, input.levelId, style.paint.annotation, scale, hidden));
-
-  // Separador de ambiente e etiquetas de ambiente (por cima das paredes), legenda e quadro.
-  strokes.push(...roomSeparatorStrokes(p, input.levelId, style.paint.annotation, input.dark ? '#9ca3af' : theme.inkSoft, new Set(input.selection), theme.select));
-  const roomTags = areaPlanTagOps(p, plan, scale, hidden, resolved, input.hideLabelRoomId, input.dark);
-  strokes.push(...roomTags.strokes);
-  labels.push(...roomTags.labels);
-
-  const legend = areaPlanLegendOps(p, plan, scale, theme, input.dark);
-  fills.push(...legend.fills);
-  strokes.push(...legend.strokes);
-  labels.push(...legend.labels);
-
-  const table = areaPlanTableOps(p, plan, scale, input.dark);
-  fills.push(...table.fills);
-  strokes.push(...table.strokes);
-  labels.push(...table.labels);
-
-  return { fills, strokes, labels, limiares: limiares.lista() };
-}
 
 /**
  * Lista de desenho completa (geometria, sobreposição e grade), na ordem de desenho de sempre. A planta de tela não a

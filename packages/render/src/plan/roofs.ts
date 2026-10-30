@@ -267,6 +267,8 @@ export interface RoofOpsOptions {
   cutZ?: number;
   /** Azimute do sol (graus, 0 = leste) para o tom das águas; padrão = o sol da vista 3D do projeto. */
   sunAzimuth?: number;
+  /** Só a projeção de todos os telhados (planta de área): nenhuma água cheia é desenhada. */
+  projectionOnly?: boolean;
 }
 
 /**
@@ -375,11 +377,24 @@ export function roofFills(p: Project, levelId: Id, theme: PlanTheme, dark: boole
   const all = telhadosDoNivel(p, levelId);
   const hidden = opts.hidden;
   const off = opts.categoryHidden;
-  const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
-  // Telhados ocultos: a projeção só aparece com a opção ligada (o rosa é só do modo de edição).
   const paint = opts.paint ?? defaultPaint('roof', v.zoom);
   const esp = espessurasDoTelhado(paint);
   const sunAzimuth = opts.sunAzimuth ?? view3dOf(p).sunAzimuth;
+  // Planta de área: só a projeção, sem água cheia (o telhado cheio esconderia paredes e ambientes).
+  if (opts.projectionOnly) {
+    const out = empty();
+    if (opts.showProjection !== true) return out;
+    for (const r of all) {
+      if (off?.has(r.roofId)) continue;
+      const rica = opts.planMode !== true;
+      const pr = projecaoDoTelhado(r, p, roofFootprint(r), roofFillBase(p, r, theme, dark, paint), theme, esp, sunAzimuth, scale, { rica, coarse: detail === 'coarse' });
+      out.fills.push(...pr.fills);
+      out.strokes.push(...pr.strokes);
+    }
+    return out;
+  }
+  const out = roofOps(all.filter((r) => !hidden?.has(r.roofId)), p, theme, dark, detail, v, opts, scale);
+  // Telhados ocultos: a projeção só aparece com a opção ligada (o rosa é só do modo de edição).
   for (const r of all) {
     if (!hidden?.has(r.roofId) || off?.has(r.roofId) || opts.showProjection !== true) continue;
     const rica = opts.planMode !== true;

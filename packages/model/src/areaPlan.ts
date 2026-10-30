@@ -100,6 +100,12 @@ export interface AreaPlanGraphics {
   showGrids?: boolean;
   /** Marcas de corte e elevação (opcional; padrão desligado). */
   showSectionMarks?: boolean;
+  /** Escadas e rampas do nível (opcional; padrão ligado). */
+  showStairs?: boolean;
+  /** Telhados em projeção (opcional; padrão ligado). */
+  showRoofs?: boolean;
+  /** Objetos importados (opcional; padrão desligado). */
+  showGeneric?: boolean;
   showBelowLevel: boolean;
   tagDefault: Pick<RoomTag, 'leader' | 'fields' | 'orientation'>;
 }
@@ -135,6 +141,9 @@ export const DEFAULT_AREA_GRAPHICS: AreaPlanGraphics = {
   showFloors: false,
   showGrids: false,
   showSectionMarks: false,
+  showStairs: true,
+  showRoofs: true,
+  showGeneric: false,
   showBelowLevel: false,
   tagDefault: { leader: 'straight', fields: DEFAULT_TAG_FIELDS, orientation: 'horizontal' },
 };

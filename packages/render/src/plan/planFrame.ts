@@ -98,7 +98,9 @@ export function planFrameUpdateOf(s: PlanViewState): PlanFrameUpdate {
     liveKey: `${JSON.stringify(s.preview)}|${JSON.stringify(s.inference)}|${sketchKey(s.sketch, v.zoom)}|${JSON.stringify(s.tagGhost ?? null)}|${areaKey}`,
     // Só a geometria lê o nível de baixo: as referências são resolvidas apenas quando ela é refeita.
     geometry: () => {
-      const abaixo = planBelowOf(p, levelId, s.resolve, s.showUnderlay, s.underlayLevel);
+      // A planta de área tem a sua própria opção de subpavimento; a planta de piso usa a opção global da vista.
+      const showUnderlay = s.areaPlan ? s.areaPlan.graphics.showBelowLevel : s.showUnderlay;
+      const abaixo = planBelowOf(p, levelId, s.resolve, showUnderlay, s.underlayLevel);
       // Cobertura: os telhados de todos os níveis abaixo (`planBelowOf` só dá os do pavimento de referência).
       const telhados = rp ? { belowRoofs: telhadosDosNiveisAbaixo(p, levelId) } : {};
       const g = buildPlanGeometry({ ...base, hideLabelRoomId: s.tagGhost?.roomId, resolved: resolvido(), ...abaixo, ...telhados, selection: geoSel, hover: null, preview: [], inference: null });

@@ -167,6 +167,18 @@ export interface PlanProfile {
   underlay: boolean;
   /** Projeção da cobertura (contorno tracejado dos telhados fora do intervalo de vista). */
   roofProjection: boolean;
+  /** Escadas do nível (e do nível de baixo quando há subpavimento). */
+  stairs: boolean;
+  /** Rampas do nível (e do nível de baixo quando há subpavimento). */
+  ramps: boolean;
+  /** Telhados: cheios (planta de piso), só projeção (planta de área) ou ocultos. */
+  roofs: 'full' | 'projection' | 'hidden';
+  /** Etiquetas persistentes do nível (`Level.tags`), além das etiquetas de parede/abertura. */
+  elementTags: boolean;
+  /** Objetos importados (viga, pilar, mobiliário...). */
+  generic: boolean;
+  /** Forros (só a vista para cima os desenha de qualquer forma). */
+  ceilings: boolean;
 }
 
 /** Perfil da planta de piso: tudo o que a planta de nível desenha, com as paredes normais. */
@@ -184,6 +196,12 @@ export const FLOOR_PLAN_PROFILE: PlanProfile = {
   referenceLines: false,
   underlay: true,
   roofProjection: true,
+  stairs: true,
+  ramps: true,
+  roofs: 'full',
+  elementTags: true,
+  generic: true,
+  ceilings: true,
 };
 
 /** Perfil da planta de área: paredes claras, diagonais e etiquetas; o resto só quando a vista pedir. */
@@ -201,6 +219,12 @@ export const AREA_PLAN_PROFILE: PlanProfile = {
   referenceLines: true,
   underlay: false,
   roofProjection: false,
+  stairs: true,
+  ramps: true,
+  roofs: 'projection',
+  elementTags: false,
+  generic: false,
+  ceilings: false,
 };
 
 /**
@@ -224,6 +248,12 @@ export function areaPlanProfile(plan: Pick<AreaPlan, 'graphics' | 'annotations'>
     referenceLines: g.referenceLines !== 'never',
     underlay: g.showBelowLevel,
     roofProjection: false,
+    stairs: g.showStairs !== false,
+    ramps: g.showStairs !== false,
+    roofs: g.showRoofs === false ? 'hidden' : 'projection',
+    elementTags: g.showAnnotations,
+    generic: g.showGeneric === true,
+    ceilings: false,
   };
 }
 

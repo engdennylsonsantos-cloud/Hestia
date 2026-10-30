@@ -132,7 +132,7 @@ export function angularDimensionGeometry(d: Dimension, segments = 24): AngularDi
     arc,
     // A cota angular não desenha chamadas radiais: elas formavam um V entre as
     // paredes e sugeriam um retorno para fora das referências escolhidas.
-    extensions: [],
+    extensions: a.links ?? [],
     ticks: [tickAt(angleA, start), tickAt(angleB, end)],
     textAt,
     textRotation,

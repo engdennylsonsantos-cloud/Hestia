@@ -36,42 +36,6 @@ const segmentRef = (a: Vec2, b: Vec2): WallRefLine | null => {
   return { p: a, d: norm(d), segment: [a, b] };
 };
 
-/**
- * Intervalo de raios em que a semirreta a partir do centro encontra o trecho finito da referência; null se não encontra.
- * O trecho está sobre a reta que passa pelo centro, então a distância ao longo da semirreta é a projeção dos extremos.
- */
-export function rayRadiusRange(center: Vec2, dir: Vec2, seg: [Vec2, Vec2]): [number, number] | null {
-  const t0 = dot(sub(seg[0], center), dir);
-  const t1 = dot(sub(seg[1], center), dir);
-  const hi = Math.max(t0, t1);
-  if (hi <= 1e-6) return null;
-  return [Math.max(0, Math.min(t0, t1)), hi];
-}
-
-/** Raios em que o arco toca as duas referências ao mesmo tempo; null se nenhum raio serve às duas. */
-export function commonRadiusRange(center: Vec2, from: Vec2, to: Vec2, segA?: [Vec2, Vec2], segB?: [Vec2, Vec2]): [number, number] | null {
-  const ia: [number, number] | null = segA ? rayRadiusRange(center, from, segA) : [0, Infinity];
-  const ib: [number, number] | null = segB ? rayRadiusRange(center, to, segB) : [0, Infinity];
-  if (!ia || !ib) return null;
-  const lo = Math.max(ia[0], ib[0]);
-  const hi = Math.min(ia[1], ib[1]);
-  return hi >= lo ? [lo, hi] : null;
-}
-
-/** Usa a semirreta oposta quando a escolhida não encontra o trecho da referência (o trecho fica do outro lado do encontro). */
-export function orientTowardReference(center: Vec2, dir: Vec2, seg?: [Vec2, Vec2]): Vec2 {
-  if (!seg || rayRadiusRange(center, dir, seg)) return dir;
-  const flipped = { x: -dir.x, y: -dir.y };
-  return rayRadiusRange(center, flipped, seg) ? flipped : dir;
-}
-
-/** Raio do arco limitado ao intervalo comum: as duas pontas caem sempre dentro dos trechos selecionados. */
-function clampToReferences(center: Vec2, from: Vec2, to: Vec2, a: WallRefLine, b: WallRefLine, radius: number): number {
-  const range = commonRadiusRange(center, from, to, a.segment, b.segment);
-  if (!range) return radius;
-  return Math.min(Math.max(radius, range[0]), range[1]);
-}
-
 /** Resolve também grades, linhas de detalhe e separadores; desconhecidas mantêm a geometria gravada. */
 function refLine(p: Project, levelId: Id, key: string): WallRefLine | null {
   const wall = wallRefLine(p, key);
@@ -108,6 +72,22 @@ const orient = (line: WallRefLine, preferred: Vec2): Vec2 => {
 };
 
 /**
+ * Linhas de chamada da cota angular, como no Revit: quando a ponta do arco passa da extremidade do trecho de uma
+ * referência, liga essa extremidade à ponta. O arco segue as retas prolongadas; sem trecho além, não há linha.
+ */
+export function angularReachLinks(center: Vec2, dirA: Vec2, dirB: Vec2, radius: number, segA?: [Vec2, Vec2], segB?: [Vec2, Vec2]): Array<[Vec2, Vec2]> {
+  const link = (dir: Vec2, seg?: [Vec2, Vec2]): [Vec2, Vec2] | null => {
+    if (!seg) return null;
+    const t0 = dot(sub(seg[0], center), dir);
+    const t1 = dot(sub(seg[1], center), dir);
+    const reach = Math.min(Math.max(radius, Math.min(t0, t1)), Math.max(t0, t1));
+    if (Math.abs(reach - radius) < 1e-6) return null;
+    return [add(center, mul(dir, reach)), add(center, mul(dir, radius))];
+  };
+  return [link(dirA, segA), link(dirB, segB)].filter((x): x is [Vec2, Vec2] => x !== null);
+}
+
+/**
  * Recalcula a cota angular a partir das chaves do Alinhar. Assim as faces/eixos/núcleos continuam valendo depois que a
  * parede se move; referências que não são paredes (ou chaves antigas) mantêm a geometria gravada.
  */
@@ -119,9 +99,7 @@ export function resolveAngularDimension(p: Project, levelId: Id, d: Dimension): 
   if (!ra || !rb) return d;
   const center = intersection(ra.p, ra.d, rb.p, rb.d);
   if (!center) return d;
-  const from = orientTowardReference(center, orient(ra, a.from), ra.segment);
-  const to = orientTowardReference(center, orient(rb, a.to), rb.segment);
-  const radius = clampToReferences(center, from, to, ra, rb, a.radius);
-  const data = angularDimensionData(center, from, to, radius, a.side, a.refA, a.refB, a.base);
-  return { ...d, a: center, b: add(center, mul(data.to, radius)), angular: { ...a, ...data } };
+  const data = angularDimensionData(center, orient(ra, a.from), orient(rb, a.to), a.radius, a.side, a.refA, a.refB, a.base);
+  const links = angularReachLinks(center, data.from, data.to, a.radius, ra.segment, rb.segment);
+  return { ...d, a: center, b: add(center, mul(data.to, a.radius)), angular: { ...a, ...data, links } };
 }

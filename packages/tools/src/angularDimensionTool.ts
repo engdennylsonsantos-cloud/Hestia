@@ -11,7 +11,7 @@ import {
   type Dimension,
 } from '@hestia/model';
 import { alignFeaturesAt, type AlignFeature } from './alignFeatures.ts';
-import { commonRadiusRange, frameOfWall, orientTowardReference, pointAt } from '@hestia/engine';
+import { angularReachLinks, frameOfWall, pointAt } from '@hestia/engine';
 import { ToolBase, viewPlanId } from './base.ts';
 import type { PointerInfo, PreviewItem } from './types.ts';
 
@@ -151,8 +151,7 @@ export class AngularDimensionTool extends ToolBase {
       const byClick = len(click) > 1e-3 ? click : null;
       const byFallback = r.fallback ? sub(r.fallback, center) : null;
       const toward = byClick && len(byClick) > 1e-6 ? byClick : byFallback && len(byFallback) > 1e-6 ? byFallback : r.from;
-      const d = dot(r.from, toward) >= 0 ? r.from : { x: -r.from.x, y: -r.from.y };
-      return orientTowardReference(center, d, r.segment);
+      return dot(r.from, toward) >= 0 ? r.from : { x: -r.from.x, y: -r.from.y };
     };
     return { center, a: { ...a, to: orient(a) }, b: { ...b, to: orient(b) } };
   }
@@ -167,12 +166,9 @@ export class AngularDimensionTool extends ToolBase {
     return inside ? 'minor' : 'major';
   }
 
-  /** Raio pelo cursor, limitado ao intervalo em que o arco toca as duas referências; null se não há tal raio. */
-  private radiusAt(g: { center: Vec2; a: RefLine; b: RefLine }, cursor: Vec2): number | null {
-    const range = commonRadiusRange(g.center, g.a.to, g.b.to, g.a.segment, g.b.segment);
-    if (!range) return null;
-    const wanted = Math.max(MIN_RADIUS, dist(cursor, g.center));
-    return Math.min(Math.max(wanted, range[0]), range[1]);
+  /** Raio pelo cursor: o arco segue as retas prolongadas, como no Revit. */
+  private radiusAt(g: { center: Vec2; a: RefLine; b: RefLine }, cursor: Vec2): number {
+    return Math.max(MIN_RADIUS, dist(cursor, g.center));
   }
 
   /** Dados da cota no lado escolhido pelo cursor: interno = menor; externo = volta >180°. */
@@ -181,13 +177,14 @@ export class AngularDimensionTool extends ToolBase {
     const side: AngularDimensionSide = selected === 'major' ? 'reflex' : 'minor';
     // No lado externo, completar o ângulo menor produz a volta externa (ex.: 30° → 330°).
     const base = selected === 'major' ? 'minor' : undefined;
-    return angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key, base);
+    const data = angularDimensionData(g.center, g.a.to, g.b.to, radius, side, this.refA!.key, this.refB!.key, base);
+    return { ...data, links: angularReachLinks(g.center, data.from, data.to, radius, g.a.segment, g.b.segment) };
   }
 
   private makePreview(cursor: Vec2): void {
     const g = this.geometry();
-    const radius = g ? this.radiusAt(g, cursor) : null;
-    if (!g || radius === null) { this.previewDim = null; return; }
+    if (!g) { this.previewDim = null; return; }
+    const radius = this.radiusAt(g, cursor);
     const angular = this.angularData(g, radius, cursor);
     const o = this.env.options();
     const dim: Dimension = {
@@ -249,8 +246,8 @@ export class AngularDimensionTool extends ToolBase {
     this.raw = p.raw;
     if (this.placing) {
       const g = this.geometry();
-      const radius = g ? this.radiusAt(g, p.raw) : null;
-      if (!g || radius === null || !this.previewDim?.angular) { this.env.say('Sem raio que toque as duas referências: escolha linhas que se encontrem.'); return; }
+      if (!g || !this.previewDim?.angular) { this.env.say('As referências não formam um ângulo.'); return; }
+      const radius = this.radiusAt(g, p.raw);
       const angular = this.angularData(g, radius, p.raw);
       const o = this.env.options();
       const dimension: Dimension = {
@@ -287,10 +284,6 @@ export class AngularDimensionTool extends ToolBase {
     const trial = this.pairGeometry(this.refA, cand);
     if (!trial) {
       this.env.say('As duas referências são paralelas: escolha linhas que se cruzam.');
-      return;
-    }
-    if (!commonRadiusRange(trial.center, trial.a.to, trial.b.to, trial.a.segment, trial.b.segment)) {
-      this.env.say('Esses trechos não se tocam em nenhum raio: escolha outra referência.');
       return;
     }
     this.refB = cand;

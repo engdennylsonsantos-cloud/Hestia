@@ -198,6 +198,11 @@ export interface AngularDimension {
   base?: 'minor' | 'major';
   /** Ângulo em radianos; em `reflex`, fica em (π, 2π]. */
   value: number;
+  /**
+   * Linhas de chamada: quando a ponta do arco passa do trecho da referência, liga a extremidade do trecho à ponta
+   * (como no Revit). O arco fica sobre as retas prolongadas; estas linhas mostram de onde ele vem.
+   */
+  links?: Array<[Vec2, Vec2]>;
   /** Texto fixo que substitui o valor medido. */
   text?: string;
   textHeight?: number;

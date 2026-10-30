@@ -12,32 +12,26 @@ const clickAt = (tool: ReturnType<typeof createTool>, x: number, y: number): voi
   tool.click(P(x, y));
 };
 
-/** Trecho finito de uma referência de parede (face ou eixo) no projeto atual. */
-function wallSegment(project: Project, key: string): [Vec2Like, Vec2Like] {
+/** Reta de referência de parede (face ou eixo) no projeto atual: ponto e direção. */
+function wallLine(project: Project, key: string): { p: Vec2Like; d: Vec2Like } {
   const separator = key.indexOf(':');
   const frame = frameOfWall(project, key.slice(0, separator))!;
   const ref = key.slice(separator + 1);
   const s = ref === 'face:hi' ? frame.sHi : ref === 'face:lo' ? frame.sLo : 0;
-  return [pointAt(frame, 0, s), pointAt(frame, frame.length, s)];
+  return { p: pointAt(frame, frame.length / 2, s), d: tangentAt(frame, frame.length / 2) };
 }
 
-/** Confere que o ponto está sobre o trecho e entre as suas extremidades (não no prolongamento). */
-function expectWithinSegment(seg: [Vec2Like, Vec2Like], p: Vec2Like): void {
-  const d = { x: seg[1].x - seg[0].x, y: seg[1].y - seg[0].y };
-  const l2 = d.x * d.x + d.y * d.y;
-  const rel = { x: p.x - seg[0].x, y: p.y - seg[0].y };
-  const cross = (rel.x * d.y - rel.y * d.x) / Math.sqrt(l2);
-  const t = (rel.x * d.x + rel.y * d.y) / l2;
-  expect(Math.abs(cross)).toBeLessThan(1e-6);
-  expect(t).toBeGreaterThanOrEqual(-1e-6);
-  expect(t).toBeLessThanOrEqual(1 + 1e-6);
+/** Confere que o ponto está sobre a reta (prolongada), sem limite de trecho. */
+function expectOnLine(line: { p: Vec2Like; d: Vec2Like }, point: Vec2Like): void {
+  const rel = { x: point.x - line.p.x, y: point.y - line.p.y };
+  expect(Math.abs(rel.x * line.d.y - rel.y * line.d.x)).toBeLessThan(1e-6);
 }
 
-describe('Cota angular: o arco nunca passa das referências', () => {
+describe('Cota angular: arco sobre as retas de referência (modelo Revit)', () => {
   it.each([
-    { side: 'interno', cursor: { x: 1, y: 1 } },
-    { side: 'externo', cursor: { x: -1, y: -1 } },
-  ])('referências curtas que não se encontram: pontas dentro dos trechos ($side)', ({ cursor }) => {
+    { side: 'interno', cursor: { x: 6, y: 6 } },
+    { side: 'externo', cursor: { x: -6, y: -6 } },
+  ])('referências curtas: pontas sobre as retas e linha de chamada até a ponta ($side)', ({ cursor }) => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 1, y: 0 }, b: { x: 4, y: 0 } }) });
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 0, y: 4 } }) });
@@ -49,12 +43,17 @@ describe('Cota angular: o arco nunca passa das referências', () => {
     clickAt(tool, cursor.x, cursor.y);
     const dims = levelDimensions(store.project, 'lv_0');
     expect(dims).toHaveLength(1);
-    const g = angularDimensionGeometry(dims[0]!)!;
-    expectWithinSegment(wallSegment(store.project, dims[0]!.angular!.refA), g.start);
-    expectWithinSegment(wallSegment(store.project, dims[0]!.angular!.refB), g.end);
+    const dim = dims[0]!;
+    const g = angularDimensionGeometry(dim)!;
+    expectOnLine(wallLine(store.project, dim.angular!.refA), g.start);
+    expectOnLine(wallLine(store.project, dim.angular!.refB), g.end);
+    expect(dim.angular!.links?.length ?? 0).toBeGreaterThan(0);
+    for (const [, tip] of dim.angular!.links!) {
+      expect(Math.hypot(tip.x - g.start.x, tip.y - g.start.y) < 1e-6 || Math.hypot(tip.x - g.end.x, tip.y - g.end.y) < 1e-6).toBe(true);
+    }
   });
 
-  it('referências sem nenhum raio comum não criam cota', () => {
+  it('referências que não se encontram no trecho ainda criam a cota', () => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 1, y: 0 }, b: { x: 4, y: 0 } }) });
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 5 }, b: { x: 0, y: 9 } }) });
@@ -64,13 +63,17 @@ describe('Cota angular: o arco nunca passa das referências', () => {
     clickAt(tool, 2.5, 0.01);
     clickAt(tool, 0.01, 7);
     clickAt(tool, 1, 1);
-    expect(levelDimensions(store.project, 'lv_0')).toHaveLength(0);
+    const dims = levelDimensions(store.project, 'lv_0');
+    expect(dims).toHaveLength(1);
+    const g = angularDimensionGeometry(dims[0]!)!;
+    expectOnLine(wallLine(store.project, dims[0]!.angular!.refA), g.start);
+    expectOnLine(wallLine(store.project, dims[0]!.angular!.refB), g.end);
   });
 
   it.each([
     { side: 'interno', cursorAngle: 195 * deg },
     { side: 'externo', cursorAngle: 15 * deg },
-  ])('faces em 30° continuam dentro dos trechos depois que a parede se move ($side)', ({ cursorAngle }) => {
+  ])('faces em 30° continuam sobre as retas depois que a parede se move ($side)', ({ cursorAngle }) => {
     const store = new ProjectStore(createEmptyProject());
     const angle = 30 * deg;
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: -4, y: 0 }, b: { x: 4, y: 0 } }) });
@@ -90,11 +93,11 @@ describe('Cota angular: o arco nunca passa das referências', () => {
     const moved: Project = { ...store.project, elements: { ...store.project.elements, wb: { ...w2, a: { x: -4 * Math.cos(angle) + 1, y: -4 * Math.sin(angle) }, b: { x: 4 * Math.cos(angle) + 1, y: 4 * Math.sin(angle) } } } };
     const resolved = resolveAngularDimension(moved, 'lv_0', dim);
     const g = angularDimensionGeometry(resolved)!;
-    expectWithinSegment(wallSegment(moved, resolved.angular!.refA), g.start);
-    expectWithinSegment(wallSegment(moved, resolved.angular!.refB), g.end);
+    expectOnLine(wallLine(moved, resolved.angular!.refA), g.start);
+    expectOnLine(wallLine(moved, resolved.angular!.refB), g.end);
   });
 
-  it('grades: pontas dentro dos trechos das grades', () => {
+  it('grades: pontas sobre as retas das grades', () => {
     const store = new ProjectStore(createEmptyProject());
     store.exec({ type: 'addGrid', grid: { id: 'g1', name: '1', typeId: 'gt_6mm', points: [{ x: 1, y: 0 }, { x: 6, y: 0 }], sag: 0, bubbleStart: true, bubbleEnd: true } });
     store.exec({ type: 'addGrid', grid: { id: 'g2', name: '2', typeId: 'gt_6mm', points: [{ x: 0, y: 1 }, { x: 0, y: 6 }], sag: 0, bubbleStart: true, bubbleEnd: true } });
@@ -107,17 +110,13 @@ describe('Cota angular: o arco nunca passa das referências', () => {
     const dims = levelDimensions(store.project, 'lv_0');
     expect(dims).toHaveLength(1);
     const g = angularDimensionGeometry(dims[0]!)!;
-    expectWithinSegment([{ x: 1, y: 0 }, { x: 6, y: 0 }], g.start);
-    expectWithinSegment([{ x: 0, y: 1 }, { x: 0, y: 6 }], g.end);
+    expectOnLine({ p: { x: 0, y: 0 }, d: { x: 1, y: 0 } }, g.start);
+    expectOnLine({ p: { x: 0, y: 0 }, d: { x: 0, y: 1 } }, g.end);
   });
 
-  it.each([
-    { label: 'perto', radius: 1.5 },
-    { label: 'longe', radius: 6 },
-  ])('lado externo: o arco não entra no corpo das paredes de referência ($label)', ({ radius }) => {
+  it('lado externo com raio maior que o trecho: arco sobre as retas e linhas de chamada até as pontas', () => {
     const store = new ProjectStore(createEmptyProject());
     const angle = 30 * deg;
-    // Paredes que começam no encontro (L): o lado externo não passa pelas direções das paredes.
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wa', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4, y: 0 } }) });
     store.exec({ type: 'addWall', wall: makeWall({ id: 'wb', typeId: 'wt_alv14', levelId: 'lv_0', a: { x: 0, y: 0 }, b: { x: 4 * Math.cos(angle), y: 4 * Math.sin(angle) } }) });
     const { env } = makeEnv(store);
@@ -127,26 +126,14 @@ describe('Cota angular: o arco nunca passa das referências', () => {
     const fb = frameOfWall(store.project, 'wb')!;
     clickAt(tool, pointAt(fa, 2, fa.sLo).x, pointAt(fa, 2, fa.sLo).y);
     clickAt(tool, pointAt(fb, 2, fb.sLo).x, pointAt(fb, 2, fb.sLo).y);
-    clickAt(tool, Math.cos(200 * deg) * radius, Math.sin(200 * deg) * radius);
-    const dims = levelDimensions(store.project, 'lv_0');
-    expect(dims).toHaveLength(1);
-    const g = angularDimensionGeometry(dims[0]!)!;
-    expect(dims[0]!.angular!.side).toBe('reflex');
-    for (const p of g.arc) {
-      expect(insideWallBody(store.project, 'wa', p)).toBe(false);
-      expect(insideWallBody(store.project, 'wb', p)).toBe(false);
-    }
+    clickAt(tool, Math.cos(200 * deg) * 6, Math.sin(200 * deg) * 6);
+    const dim = levelDimensions(store.project, 'lv_0')[0]!;
+    expect(dim.angular!.side).toBe('reflex');
+    const g = angularDimensionGeometry(dim)!;
+    expect(g.arc.length).toBeGreaterThan(2);
+    expect(dim.angular!.links).toHaveLength(2);
+    expect(g.extensions).toHaveLength(2);
+    expectOnLine(wallLine(store.project, dim.angular!.refA), g.start);
+    expectOnLine(wallLine(store.project, dim.angular!.refB), g.end);
   });
 });
-
-/** Ponto dentro do corpo da parede (entre as faces e entre as extremidades). */
-function insideWallBody(project: Project, wallId: string, p: Vec2Like): boolean {
-  const f = frameOfWall(project, wallId)!;
-  const o = pointAt(f, 0, 0);
-  const t = tangentAt(f, f.length / 2);
-  const rel = { x: p.x - o.x, y: p.y - o.y };
-  const across = Math.abs(rel.x * t.y - rel.y * t.x);
-  const along = rel.x * t.x + rel.y * t.y;
-  const half = Math.abs(f.sHi - f.sLo) / 2;
-  return across < half - 1e-6 && along > 1e-6 && along < f.length - 1e-6;
-}

@@ -278,6 +278,17 @@ describe('escada na vista (decisão 0013 §4): cota de corte e topo da vista', (
     expect(risers(o)).toHaveLength(N);
     expect(dashed(treads(o))).toHaveLength(4);
   });
+
+  it('laje no nível de topo cobrindo o último espelho: a chegada não é degrau e não entra na planta', () => {
+    const s = new ProjectStore(createEmptyProject());
+    s.exec({ type: 'addSlab', slab: makeSlab({ id: 'laje', typeId: 'ls_mac15', levelId: 'lv_1', boundary: [P(-1, -1), P(2, -1), P(2, 5), P(-1, 5)] }) });
+    const o = stairFills(s.project, [stair()], LIGHT, false, 'medium', VZ, { cutZ: 0.5, topZ: 1.0 });
+    // Só os N−1 degraus da escada (a chegada é o piso do nível): k = 3..9 acima do corte, k = 1 e 2 abaixo.
+    expect(treads(o)).toHaveLength(N - 1);
+    expect(dashed(treads(o))).toHaveLength(N - 3);
+    expect(solid(treads(o))).toHaveLength(2);
+    expect(risers(o)).toHaveLength(N);
+  });
 });
 
 describe('seleção de elemento oculto: contorno fantasma (decisão 0013 §4)', () => {

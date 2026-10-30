@@ -121,7 +121,8 @@ export class PerimeterTool extends ToolBase {
     return this.mod.active() ? this.mod.preview() : this.items;
   }
 
-  tempDims = (overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] => perimeterDraftDims(this.env.project(), this.env.levelId(), this.d, this.step, this.raw, overrides);
+  /** Cotas do lado em desenho: o ponto capturado (com o modo ortogonal), não o cursor cru. */
+  tempDims = (overrides: Readonly<Record<string, DimRef>> = {}): TempDim[] => perimeterDraftDims(this.env.project(), this.env.levelId(), this.d, this.step, this.inf?.point ?? this.raw, overrides);
 
   /** Escolhe a forma da barra. Null volta à seleção. Troca o passo em andamento e desliga o comando de Modificar. */
   setShape(kind: PerimeterShape | null): void {
@@ -424,6 +425,8 @@ export class PerimeterTool extends ToolBase {
     let cursor: Vec2 = p.raw;
     if (input.kind === 'point') {
       const inf = this.snap(p, snapExtraOf(this.d, st));
+      // O `snap` já grava em `this.inf`: a prévia e as cotas do lado em desenho usam o ponto capturado (ortogonal).
+      this.inf = inf;
       value = inf.point;
       cursor = inf.point;
     } else if (input.kind === 'length' && anchor) {

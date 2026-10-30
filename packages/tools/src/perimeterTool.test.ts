@@ -232,6 +232,22 @@ describe('PerimeterTool: API para a interface', () => {
     expect(t.draft().segs).toHaveLength(1);
   });
 
+  it('tempDims segue o modo ortogonal (F8): a cota acaba no ponto travado', () => {
+    registerBuiltinDimProviders();
+    const ctx = makeEnv();
+    ctx.options.orthoLock = true;
+    const t = new PerimeterTool(ctx.env);
+    t.start();
+    t.setShape('line');
+    clickAt(t, 0, 0);
+    t.move(P(3, 1));
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(1);
+    // Cursor cru (3,1), mas o ponto capturado no modo ortogonal é (3,0): a cota mede 3, não √10.
+    expect(near(dims[0]!.b, 3, 0)).toBe(true);
+    expect(dims[0]!.value).toBeCloseTo(3, 9);
+  });
+
   it('hoverId aponta a linha sob o cursor no modo de seleção', () => {
     const { t } = setup();
     drawRect(t);

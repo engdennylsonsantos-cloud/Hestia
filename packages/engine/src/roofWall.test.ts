@@ -106,9 +106,19 @@ describe('C1 · quando o topo não se ajusta', () => {
     expect(z.height).toBeCloseTo(4.105, 6);
   });
 
-  it('telhado de outro nível não conta quando a parede não sobe até ele', () => {
+  it('telhado de outro nível que cobre o eixo conta: a cobertura pode estar desenhada no nível de cima', () => {
+    // Mesmo telhado do caso anterior, mas em lv_1 (cota 3): toda a face sobe 3 m. A cumeeira (x = 3) fica em
+    // 3 + 3 + 0,3 × 4 = 7,20 m, face inferior 7,105 m. O nível do telhado não decide o anexo (decisão 0008, item 14).
     const p = build([wall({})], [{ dir: { x: 0, y: 1 }, levelId: 'lv_1' }]);
-    expect(zOf(p)).toEqual({ z0: 0, height: 3 });
+    const z = zOf(p);
+    expect(z.height).toBeCloseTo(4.2 + 3 - T_ROOF, 9);
+    expect(z.profile).toBeDefined();
+  });
+
+  it('face de telhado abaixo da base da parede não anexa (a parede não pode ficar sem altura)', () => {
+    // Parede em lv_1 (base 3 m) sob um telhado de lv_0 com beiral em 0,5 m: a face fica abaixo da base.
+    const p = build([wall({ levelId: 'lv_1', height: 2.8, attachTopToRoof: true })], [{ dir: { x: 0, y: 1 }, levelId: 'lv_0', heightOffset: 0.5 }]);
+    expect(zOf(p)).toEqual({ z0: 3, height: 2.8 });
   });
 
   it('com topLevelId no nível do telhado, a face inferior desse telhado conta', () => {

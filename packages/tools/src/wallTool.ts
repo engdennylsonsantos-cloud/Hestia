@@ -1,4 +1,4 @@
-import { add, angleOf, arcFromSagitta, cross, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
+import { add, arcFromSagitta, cross, dist, len, mul, norm, sagFromThreePoints, sub, v2, type Vec2 } from '@hestia/geom';
 import { exteriorOffset } from '@hestia/engine';
 import { formatQuantity, makeWall, totalThickness, unitsOf, type ResolvedUnits, type Wall } from '@hestia/model';
 import { ToolBase, makeId } from './base.ts';
@@ -174,8 +174,7 @@ export class WallTool extends ToolBase {
     const l = dist(a, b);
     if (l < 1e-6) return;
     this.items.push({ kind: 'wallBand', a, b, thickness, sMid });
-    const ang = (angleOf(sub(b, a)) * 180) / Math.PI;
-    this.items.push({ kind: 'label', at: add(a, mul(sub(b, a), 0.5)), text: `${fmt(unitsOf(this.env.project()), l)}  ${formatQuantity(unitsOf(this.env.project()), 'angle', ang)}` });
+    // Trecho reto: a cota dinâmica (`tempDims`) é a única leitura, só comprimento — sem rótulo duplicado nem ângulo.
     this.env.say(this.isArc() ? 'Clique no ponto final da corda.' : 'Clique para terminar a parede, ou digite o comprimento e Enter.');
   }
 

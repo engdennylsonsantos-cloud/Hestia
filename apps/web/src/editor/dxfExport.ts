@@ -1,9 +1,7 @@
 import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
-import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
+import { areaPlanProfile, buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanProfile, type PlanView, type StairCut } from '@hestia/render';
 import {
-  DXF_BLOCKS_SECTION,
-  DXF_STYLE_TABLE,
   dxfEscapeText,
   dxfGenericRecords,
   dxfLayersOf,
@@ -340,21 +338,15 @@ const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563'
  * e ENTITIES com LINE e TEXT. Antes declarava AC1015 sem a estrutura do R2000 (handles, BLOCK_RECORD…) e o AutoCAD o
  * recusava ("DXF read error"); o 370 das camadas também não existe no R12.
  */
-function opsToDxf(ops: PlanOps, zoom: number): string {
+/**
+ * Registros das entidades próprias da planta de área (ambientes, referência, chamada, textos, legenda e quadro).
+ * As camadas ficam separadas do modelo, que entra pelo `exportDxf` nas camadas da planta.
+ */
+function areaOpsToRecords(ops: PlanOps, zoom: number): { records: string[]; layers: string[] } {
   const out: string[] = [];
   const rec = dxfRecorder(out);
   const layers = new Set<string>(['AMBIENTES_TEXTO']);
   for (const s of ops.strokes) layers.add(areaLayerOf(s.color, s.pts.length));
-  rec(0, 'SECTION'); rec(2, 'HEADER'); rec(9, '$ACADVER'); rec(1, 'AC1009'); rec(9, '$INSUNITS'); rec(70, 6); rec(9, '$MEASUREMENT'); rec(70, 1); rec(0, 'ENDSEC');
-  rec(0, 'SECTION'); rec(2, 'TABLES');
-  rec(0, 'TABLE'); rec(2, 'LTYPE'); rec(70, 1); rec(0, 'LTYPE'); rec(2, 'CONTINUOUS'); rec(70, 0); rec(3, 'Solid line'); rec(72, 65); rec(73, 0); rec(40, 0); rec(0, 'ENDTAB');
-  rec(0, 'TABLE'); rec(2, 'LAYER'); rec(70, layers.size);
-  for (const name of layers) { rec(0, 'LAYER'); rec(2, name); rec(70, 0); rec(62, 7); rec(6, 'CONTINUOUS'); }
-  rec(0, 'ENDTAB');
-  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
-  rec(0, 'ENDSEC');
-  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
-  rec(0, 'SECTION'); rec(2, 'ENTITIES');
   for (const s of ops.strokes) {
     const layer = areaLayerOf(s.color, s.pts.length);
     const pts = s.closed && s.pts.length > 2 ? [...s.pts, s.pts[0]!] : s.pts;
@@ -369,15 +361,7 @@ function opsToDxf(ops: PlanOps, zoom: number): string {
     const h = (l.fontPx ?? 12) / zoom;
     rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, dxfEscapeText(l.text)); rec(50, l.rotation ?? 0);
   }
-  rec(0, 'ENDSEC'); rec(0, 'EOF');
-  return `${out.join('\r\n')}\r\n`;
-}
-
-/** Põe registros no fim da seção ENTITIES do DXF mínimo de `opsToDxf` (antes do `ENDSEC`). */
-function appendAreaRecords(dxf: string, records: string[]): string {
-  if (records.length === 0) return dxf;
-  if (!dxf.endsWith(DXF_END)) throw new Error('DXF sem o fim esperado (ENDSEC/EOF)');
-  return `${dxf.slice(0, -DXF_END.length)}\r\n${records.join('\r\n')}${DXF_END}`;
+  return { records: out, layers: [...layers] };
 }
 
 const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
@@ -431,13 +415,51 @@ export function areaPlanDxf(p: Project, planId: Id): string {
   const zoom = 100;
   const width = Math.max(400, (box.maxX - box.minX) * zoom + 200);
   const height = Math.max(300, (box.maxY - box.minY) * zoom + 200);
-  const ops = buildPlanGeometry({
+  const viewport = { cx: (box.minX + box.maxX) / 2, cy: (box.minY + box.maxY) / 2, zoom, width, height };
+  const g = plan.graphics;
+  // Modelo: as mesmas categorias/intervalo da planta de piso, filtradas pelos gráficos da área. As anotações do nível
+  // não entram aqui: a área usa as anotações da própria vista (abaixo).
+  const base = dxfGeometryOf(p, plan.levelId, g.showRoofs !== false);
+  const modelGeo: DxfLevelGeometry = {
+    ...base,
+    rooms: [],
+    roomTexts: [],
+    clusters: g.showWalls === 'hidden' ? [] : base.clusters,
+    wallOutlines: g.showWalls === 'hidden' ? [] : base.wallOutlines,
+    openings: g.showOpenings ? base.openings : [],
+    floors: g.showFloors ? base.floors : [],
+    slabs: g.showFloors ? base.slabs : [],
+    stairs: g.showStairs !== false ? base.stairs : [],
+    ramps: g.showStairs !== false ? base.ramps : [],
+    // A área mostra o telhado só como projeção, como na tela (não a água cheia).
+    roofs: [],
+    roofProjections: g.showRoofs !== false ? resolveRoofs(p, plan.levelId).flatMap((r) => roofFootprint(r)) : [],
+    notes: undefined,
+    sectionMarks: undefined,
+  };
+  // Só o que é da área: ambientes, referenciais, chamadas, textos, legenda e quadro. O perfil desliga o modelo para
+  // não duplicar o que já veio no DXF da planta.
+  const profile: PlanProfile = {
+    ...areaPlanProfile(plan),
+    walls: 'hidden',
+    openings: false,
+    floors: false,
+    stairs: false,
+    ramps: false,
+    roofs: 'hidden',
+    underlay: false,
+    elementTags: false,
+    generic: false,
+    ceilings: false,
+  };
+  const ops = resolverZoom(buildPlanGeometry({
     project: p,
     levelId: plan.levelId,
     resolved: resolveLevel(p, plan.levelId),
     below: null,
     areaPlan: plan,
-    viewport: { cx: (box.minX + box.maxX) / 2, cy: (box.minY + box.maxY) / 2, zoom, width, height },
+    profile,
+    viewport,
     theme: LIGHT,
     dark: false,
     selection: [],
@@ -445,9 +467,11 @@ export function areaPlanDxf(p: Project, planId: Id): string {
     preview: [],
     inference: null,
     showGrid: false,
-  });
+  }), zoom);
+  const area = areaOpsToRecords(ops, zoom);
+  const dxf = exportDxf(p, plan.levelId, { ...modelGeo, extraLayers: area.layers });
   // Cotas/textos/detalhes de `plan.annotations`: o render da área pode já desenhá-los; o que faltar entra aqui.
-  return appendAreaRecords(opsToDxf(resolverZoom(ops, zoom), zoom), areaAnnotationRecords(p, plan, ops));
+  return withEntityRecords(dxf, [...area.records, ...areaAnnotationRecords(p, plan, ops)]);
 }
 
 /** Exporta a planta de área atual e devolve o nome do arquivo salvo. */

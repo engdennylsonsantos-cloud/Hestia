@@ -129,6 +129,8 @@ export interface DxfLevelGeometry {
   rooms?: Array<{ outline: DxfPoint[]; holes: DxfPoint[][] }>;
   /** Textos dos ambientes (nome, número e área) na camada `AMBIENTES_TEXTO`. Ausente = nenhum. */
   roomTexts?: DxfNoteText[];
+  /** Camadas extras que o arquivo declara na tabela LAYER (ex.: camadas de área acrescentadas fora do exportador). */
+  extraLayers?: string[];
 }
 
 export const DXF_LAYER_CONTOUR = 'PAREDE_CONTORNO';
@@ -471,7 +473,7 @@ function layerNamesOf(shapes: Shape[], lines: Line[], texts: DxfNoteText[]): str
 
 /** Nomes das camadas que `exportDxf` põe na tabela LAYER para esta geometria (a base de `lineWeights`). */
 export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
-  return layerNamesOf(shapesOf(project, geo), linesOf(geo), textsOf(geo));
+  return [...new Set([...layerNamesOf(shapesOf(project, geo), linesOf(geo), textsOf(geo)), ...(geo.extraLayers ?? [])])].sort();
 }
 
 /**
@@ -489,7 +491,7 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
   const shapes = shapesOf(project, geo);
   const lines = linesOf(geo);
   const texts = textsOf(geo);
-  const layers = layerNamesOf(shapes, lines, texts);
+  const layers = [...new Set([...layerNamesOf(shapes, lines, texts), ...(geo.extraLayers ?? [])])].sort();
   // Tipo DASHED na tabela se alguma camada o usa ou se algum traço o põe sozinho (símbolo de vão em camada contínua).
   const dashed = layers.some((name) => styleOf(name).linetype === 'DASHED') || shapes.some((s) => s.dashed === true);
   const all = [...shapes.flatMap((s) => s.pts), ...lines.flatMap((l) => [l.a, l.b]), ...texts.map((t) => t.at)];

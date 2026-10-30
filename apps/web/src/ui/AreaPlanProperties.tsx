@@ -76,6 +76,9 @@ export function AreaPlanProperties({ plan }: { plan: AreaPlan }): ReactElement {
         <Row label="Mostrar cotas"><Check id="ap-dims" checked={g.showDimensions} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showDimensions: v })} /></Row>
         <Row label="Mostrar anotações do nível"><Check id="ap-annotations" checked={g.showAnnotations} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showAnnotations: v })} /></Row>
         <Row label="Mostrar piso/laje"><Check id="ap-floors" checked={g.showFloors} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showFloors: v })} /></Row>
+        <Row label="Mostrar escadas e rampas"><Check id="ap-stairs" checked={g.showStairs ?? true} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showStairs: v })} /></Row>
+        <Row label="Mostrar telhados (projeção)"><Check id="ap-roofs" checked={g.showRoofs ?? true} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showRoofs: v })} /></Row>
+        <Row label="Mostrar objetos importados"><Check id="ap-generic" checked={g.showGeneric ?? false} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showGeneric: v })} /></Row>
         <Row label="Subpavimento"><Check id="ap-below" checked={g.showBelowLevel} onChange={(v) => setPlanGraphicsAction(editor.store, plan.id, { showBelowLevel: v })} /></Row>
         <div className="btn-row">
           <button type="button" className="btn small" onClick={() => useUi.setState({ dialog: 'cotasAuto' })}>Cotas automáticas…</button>

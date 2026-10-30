@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vec2 } from '@hestia/geom';
-import { createEmptyProject, DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, makeRoom, makeWall, ProjectStore, type AreaPlan } from '@hestia/model';
+import { createEmptyProject, DEFAULT_AREA_GRAPHICS, DEFAULT_TAG_FIELDS, defaultStairTypeId, makeRoom, makeStair, makeWall, ProjectStore, type AreaPlan, type StairRun } from '@hestia/model';
+import { generateStraightRun } from '@hestia/engine';
 import { areaPlanDxf } from './dxfExport.ts';
 
 const ring = (pts: Array<[number, number]>): Vec2[] => pts.map(([x, y]) => ({ x, y }));
@@ -36,6 +37,16 @@ describe('DXF da planta de área', () => {
     expect(dxf).toContain('101 \\U+00B7 20,00 m\\U+00B2');
     expect(dxf.startsWith('0\r\nSECTION')).toBe(true);
     expect(dxf.endsWith('0\r\nEOF\r\n')).toBe(true);
+  });
+
+  it('inclui o modelo nas camadas da planta e a escada em ESCADA', () => {
+    const s = project();
+    const run = generateStraightRun({ start: { x: 6, y: 1 }, dir: { x: 1, y: 0 }, width: 1, risers: 16, tread: 0.28 });
+    s.exec({ type: 'addStair', stair: makeStair({ id: 'st1', typeId: defaultStairTypeId, levelId: 'lv_0', components: [{ id: 'r1', kind: 'run', ...run } as StairRun] }) });
+    const dxf = areaPlanDxf(s.project, 'ap1');
+    expect(dxf).toContain('PAREDE');
+    expect(dxf).toContain('ESCADA');
+    expect(dxf).toContain('AMBIENTES');
   });
 
   it('planta inexistente recusa', () => {

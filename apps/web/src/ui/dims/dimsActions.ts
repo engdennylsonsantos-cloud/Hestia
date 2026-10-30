@@ -12,9 +12,30 @@ export const INVALID_FLASH_MS = 4000;
  */
 export function resolveDimEdit(dim: TempDim, text: string, units: ResolvedUnits): DimEditOutcome {
   if (!dim.edit) return { kind: 'error', message: 'Esta cota é só de leitura.' };
-  const si = parseQuantityText(text, units, 'length');
-  if (si === null) return { kind: 'error', message: `Medida inválida: digite uma distância, como ${formatQuantity(units, 'length', 1.2, { trim: true })}.` };
+  const q = dim.quantity ?? 'length';
+  const si = parseQuantityText(text, units, q);
+  if (si === null) {
+    const exemplo = formatQuantity(units, q, q === 'angle' ? Math.PI / 4 : 1.2, { trim: true });
+    const nome = q === 'angle' ? 'um ângulo' : 'uma distância';
+    return { kind: 'error', message: `Medida inválida: digite ${nome}, como ${exemplo}.` };
+  }
   const r = dim.edit(si);
   if ('error' in r) return { kind: 'error', message: r.error };
   return { kind: 'done', commands: r.commands, ...(r.note ? { note: r.note } : {}) };
+}
+
+/**
+ * Versão em que as cotas temporárias da seleção devem ficar suspensas depois do botão "I": a versão em que a
+ * conversão realmente gravou algo. Sem alteração (lista vazia ou comando recusado), não há suspensão.
+ */
+export function suspensionAfterConversion(versionBefore: number, versionAfter: number): number | null {
+  return versionAfter === versionBefore ? null : versionAfter;
+}
+
+/**
+ * As cotas da seleção estão suspensas? Só na mesma versão da conversão: desfazer ou qualquer alteração posterior
+ * muda a versão e devolve as temporárias; trocar de seleção limpa a suspensão no estado.
+ */
+export function selectionDimsSuspended(suspendedVersion: number | null, projectVersion: number): boolean {
+  return suspendedVersion !== null && suspendedVersion === projectVersion;
 }

@@ -1,6 +1,9 @@
 import type { Vec2 } from '@hestia/geom';
-import { OPENING_DIM_REF_LABELS, WALL_DIM_REF_LABELS, dimensionGeometry, isWallDimRef, type OpeningDimRef, type WallDimRef } from '@hestia/model';
+import { OPENING_DIM_REF_LABELS, WALL_DIM_REF_LABELS, dimensionGeometry, isWallDimRef, type FormatOptions, type OpeningDimRef, type Quantity, type WallDimRef } from '@hestia/model';
 import type { DimEnd, DimRef, TempDim } from '@hestia/tools';
+
+/** Formata uma grandeza em SI na unidade do projeto (o mesmo `useFormat()` do overlay). */
+export type DimFormatter = (q: Quantity, si: number, o?: FormatOptions) => string;
 
 /** Tamanho de tela fixo da cota: milímetros de papel por pixel (independe do zoom). */
 export const PX_PER_MM = 3.78;
@@ -41,6 +44,17 @@ export function refLabel(ref: DimRef): string {
 
 /** O provedor é o primeiro trecho da chave da cota (`${provedor}:${sujeito}:${ponta}`). */
 export const providerOf = (dim: TempDim): string => dim.key.split(':')[0] ?? '';
+
+/**
+ * Texto mostrado no campo da cota: valor principal e, quando houver, a medida informativa (ex.: "5,00 · 53,1°").
+ * Comprimentos vão sem unidade (o campo já pertence à grandeza); ângulos levam o símbolo, que os distingue do número.
+ */
+export function dimText(dim: TempDim, format: DimFormatter): string {
+  const q = dim.quantity ?? 'length';
+  const main = format(q, dim.value, q === 'angle' ? { trim: true } : { withUnit: false, trim: true });
+  if (!dim.secondary) return main;
+  return `${main} · ${format(dim.secondary.quantity, dim.secondary.value, { trim: true })}`;
+}
 
 export function gripOf(dim: TempDim, end: DimEnd, toScreen: (p: Vec2) => Vec2): GripView {
   return {

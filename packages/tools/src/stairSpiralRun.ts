@@ -42,8 +42,8 @@ export function planSpiralRun(i: SpiralPlanInput): SpiralPlan | { error: string 
   if (!(i.rInner >= SPIRAL_MIN_INNER)) return { error: `O raio interno deve ser de ao menos ${formatQuantity(u, 'length', SPIRAL_MIN_INNER)}.` };
   if (!(i.rOuter > i.rInner)) return { error: 'O raio externo deve ser maior que o interno.' };
   const sw = Math.abs(i.sweep);
-  if (!(sw >= SPIRAL_MIN_SWEEP - 1e-9)) return { error: 'A varredura mínima do caracol é de 30°.' };
-  if (!(sw <= SPIRAL_MAX_SWEEP + 1e-9)) return { error: 'A varredura máxima do caracol é de 720° (duas voltas).' };
+  if (!(sw >= SPIRAL_MIN_SWEEP - 1e-9)) return { error: `A varredura mínima do caracol é de ${formatQuantity(u, 'angle', SPIRAL_MIN_SWEEP, { trim: true })}.` };
+  if (!(sw <= SPIRAL_MAX_SWEEP + 1e-9)) return { error: `A varredura máxima do caracol é de ${formatQuantity(u, 'angle', SPIRAL_MAX_SWEEP, { trim: true })} (duas voltas).` };
   let N: number;
   try {
     N = riserCountFor(i.H, i.maxRiser);

@@ -1,7 +1,9 @@
 # Progresso do agente COTAS (marque `[x]` no mesmo commit do passo; anote desvios e bloqueios)
 Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, paridade, densidade) verde com 2 avisos de hooks em OpeningTempDims/ViewportOverlays; typecheck e testes rodados por pasta a cada passo.
 
-**Estado em 2026-10-29: F1/F2 interrompidas, ver RETOMADA.md.**
+**Estado em 2026-10-29: frente concluída e integrada ao `main` (`adb416ef`).** F1 e F2 fechadas com
+ressalvas/defeitos registrados abaixo; F4 e F5 fechadas na branch de documentação. O relatório final está em
+[`docs/integracao/cotas-2026-10-29.md`](../integracao/cotas-2026-10-29.md).
 
 - [x] D0 mapa (`04`)
 - [x] D1 configuração no modelo
@@ -14,11 +16,11 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - [x] D8 permanentes + autoCotas  → **D4–D8 integrados = marco M5**
 - [x] D9 diálogo Cotas… + troca rápida (só depois do marco M3)
 - [x] D11 documentação de reaproveitamento e decisão
-- [ ] F1 suíte e build (`06`; só quando UNID e ESQ terminarem)
-- [ ] F2 navegador
+- [x] F1 suíte e build (`06`; só quando UNID e ESQ terminarem) — **com ressalvas** (ver fechamento)
+- [x] F2 navegador — **com defeitos registrados** (ver fechamento)
 - [x] F3 revisão cruzada (feita pelo REVISOR; REVISAO CONCLUIDA 4ae611f9)
-- [ ] F4 documentação
-- [ ] F5 entrega
+- [x] F4 documentação (este commit; seções A/B/C das pendências e nota S1–S5)
+- [x] F5 entrega (branch publicada; merge no `main` feito pelo dono em `cab2d5fd`/`adb416ef`)
 
 ## Desvios
 - D2: `axis` = centro da espessura total (`sMid`), como o 04 manda; o `autoCotas` antigo usava `[0,0]` (linha de localização) para 'eixo': coincidem só com `wallCenter` (padrão). Ao migrar o autoCotas (D8) o 'eixo' passa a `sMid`.
@@ -39,8 +41,45 @@ Linha de base antes de mexer (`npm run check`): lint (eslint, fronteiras, parida
 - `COMO-ADICIONAR-COTA.md`: ponto de extensão dos três tipos e `subjectDims` documentados.
 - PEDIDO UNID atendido: `dimensionTool.ts` grava `Dimension.unit: 'project'` (sem `precision` fixa) nas cotas simples e em sequência; a prévia usa as unidades do projeto. Testes em `dimensionTool.test.ts`.
 **MARCO M6 LIBERADO 3913e67a** (registro de sujeitos fora de `project.elements`; a ESQ já pode fazer D10.2 e D10.3).
+## Fechamento da Fase F (2026-10-29)
+
+Integração no `main`: merge `cab2d5fd`, gates `9e46c3ba`, registro `181b75f5`; R03 corrigido em `65fd6bc2` e
+mergeado em `adb416ef`. Relatório final: [`docs/integracao/cotas-2026-10-29.md`](../integracao/cotas-2026-10-29.md).
+
+**F1 — suíte e build (ok, com ressalvas).** `typecheck` ok, `lint` ok (1 aviso de hook em
+`OpeningFlipGrips.tsx`), **7.606 testes** em 667 arquivos, `build` ok, IFC ok (123 testes; `ifc:quality` 0 erros,
+round-trip ok, N2 16/16). `check-units` por linha de base: **104 ocorrências herdadas** em 43 arquivos — nenhuma
+nova. A01 aberto: `scene3d.ts` com 438 linhas efetivas (> 420, exceção `eslint-disable max-lines`).
+
+**F2 — navegador (ok na maioria, com defeitos).** Passaram unidades (cm/ft²/rad), diálogo "Cotas…", cotas ao
+selecionar/editar, parede com porta na ponta, linha/perímetro/eixo/piso, mover/copiar, "I" gerando permanentes,
+batente na espessura acabada e prévia de colocação. Defeitos: (1) desfazer de colocação não atômico; (2) cotas
+temporárias sobrepostas às permanentes após "I"; (3) `hostedConflicts` sem chamador; (4) criação de eixo sem cota
+unificada. Não validados: build na porta 8080, batente no 3D e `ft-in` no fluxo completo.
+
+**Desvios resolvidos.** D4 integrado (prévia e seleção usam o provedor; `AutoCotaDialog` migrado no R04
+`e86fbdf7`, sem os apelidos `referencia`/`modoAberturas` obsoletos); D9 fechado (o diálogo "Cotas…" e a troca
+rápida valem; `ToolOptions.openingDimMode` removido junto com o D4 passo 3); `tempDims` é o caminho único (não há
+mais `OpeningTempDims`/`temporaryDimensions`/`formatMeters` em `packages`/`apps`); D11 revisado após D5/D9.
+
+**Decisão do dono sobre `hostedConflicts`.** O helper de validação continua sem chamador; **mantém-se a
+confirmação "Excluir elementos e continuar"** das operações de aparar/redimensionar. O desvio fica documentado e
+**não é regressão** (é o comportamento anterior).
+
+**Aberturas.** A01 aberto (decidir divisão ou exceção); A02 aberto (teste de GPU real); A03 pendente e por ora
+somente leitura (cotas de piso/laje/telhado/forro); A04/A05 concluídos em `7414c321`/`41678265`.
+
+**Correções da F2 integradas.** Undo atômico da esquadria (`1846adb1`), temporárias suspensas após o "I" (`b8e63122`, `179faad5`) e cota unificada na criação de eixo (`f32bd49a`). A linha de base de unidades foi reduzida de 104 para 102 ocorrências.
+
+**Fora do escopo.** D10.6 (escadas, ambientes e seções) — não implementado por decisão do dono.
+
 ## Bloqueios e pedidos a outros agentes
 _(nenhum)_
 
 ## Ações pendentes do dono
-- Regravar baselines de imagem (`tests/e2e/baseline*`) se a regressão visual indicar diferença esperada.
+- Decidir A01: dividir `scene3d.ts` ou aceitar a exceção documentada.
+- Validar visualmente o que faltou na F2: batente no 3D, `ft-in` e o build na porta 8080.
+- Regravar baselines de imagem (`tests/e2e/baseline*`) se a regressão visual indicar diferença esperada — conferir
+  antes a etiqueta de nível ausente no corte (`capturas/LEIAME.md`).
+- Validar em GPU real (capturas/e2e usam SwiftShader).
+- Decidir A03 (edição por lado ou manter leitura).

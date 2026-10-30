@@ -1,5 +1,7 @@
 import { len, sub, type Vec2 } from '@hestia/geom';
 import type { Id, Project } from './types.ts';
+import { defaultUnits, unitsOf, type ResolvedUnits } from './units.ts';
+import { formatQuantity } from './unitsFormat.ts';
 
 /**
  * Grades de eixos (Revit: Grid). Pertencem ao projeto, não a um nível: aparecem na planta de todos os níveis, com bolha
@@ -145,13 +147,15 @@ function successorLetters(s: string): string {
 
 const finite = (v: Vec2): boolean => Number.isFinite(v.x) && Number.isFinite(v.y);
 
-/** Motivo de recusa de uma grade, ou null. */
-export function gridIssue(g: Omit<Grid, 'order'>): string | null {
+/** Motivo de recusa de uma grade, ou null. `units` formata o trecho mínimo na unidade do projeto. */
+export function gridIssue(g: Omit<Grid, 'order'>, units: ResolvedUnits = defaultUnits()): string | null {
   if (g.name.trim() === '') return 'A grade precisa de um nome.';
   if (g.points.length < 2) return 'A grade precisa de pelo menos dois pontos.';
   if (g.points.some((q) => !finite(q))) return 'Os pontos da grade devem ser números finitos.';
   for (let i = 1; i < g.points.length; i++) {
-    if (len(sub(g.points[i]!, g.points[i - 1]!)) < GRID_MIN_SEGMENT) return 'Cada trecho da grade precisa ter pelo menos 5 cm.';
+    if (len(sub(g.points[i]!, g.points[i - 1]!)) < GRID_MIN_SEGMENT) {
+      return `Cada trecho da grade precisa ter pelo menos ${formatQuantity(units, 'smallLength', GRID_MIN_SEGMENT, { trim: true })}.`;
+    }
   }
   if (!Number.isFinite(g.sag)) return 'A flecha do arco deve ser um número finito.';
   if (g.sag !== 0 && g.points.length !== 2) return 'Só uma grade de dois pontos pode ser um arco.';
@@ -179,7 +183,7 @@ const refuse = (issue: string | null): void => {
 export function applyGridCommand(p: Project, c: GridCommand): void {
   switch (c.type) {
     case 'addGrid': {
-      refuse(gridIssue(c.grid));
+      refuse(gridIssue(c.grid, unitsOf(p)));
       if (!gridTypeOf(p, c.grid.typeId)) throw new Error('Tipo de grade inexistente');
       if (gridOf(p, c.grid.id)) throw new Error('Grade já existe');
       if (projectGrids(p).some((g) => g.name === c.grid.name)) throw new Error(`Já existe uma grade chamada "${c.grid.name}".`);
@@ -191,7 +195,7 @@ export function applyGridCommand(p: Project, c: GridCommand): void {
       const old = gridOf(p, c.id);
       if (!old) throw new Error('Grade inexistente');
       const next: Grid = { ...old, ...c.patch, id: old.id, order: old.order };
-      refuse(gridIssue(next));
+      refuse(gridIssue(next, unitsOf(p)));
       if (!gridTypeOf(p, next.typeId)) throw new Error('Tipo de grade inexistente');
       if (projectGrids(p).some((g) => g.id !== old.id && g.name === next.name)) throw new Error(`Já existe uma grade chamada "${next.name}".`);
       p.grids = projectGrids(p).map((g) => (g.id === c.id ? next : g));

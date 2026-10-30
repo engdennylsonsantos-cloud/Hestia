@@ -14,4 +14,19 @@ describe('provedor de cotas do deslocamento', () => {
     expect(dims[0]!.edit).toBeUndefined();
     expect(displacementDimProvider.compute({ project: p, levelId: 'lv_0', settings: dimensionSettingsOf(p), overrides: {} }, { from: { x: 1, y: 1 }, to: { x: 1, y: 1 } })).toEqual([]);
   });
+
+  it('mostra também o ângulo da direção do deslocamento, em radianos (SI)', () => {
+    const p = createEmptyProject();
+    const dims = displacementDimProvider.compute(
+      { project: p, levelId: 'lv_0', settings: dimensionSettingsOf(p), overrides: {} },
+      { from: { x: 0, y: 0 }, to: { x: 3, y: 4 } },
+    );
+    expect(dims[0]!.secondary).toEqual({ quantity: 'angle', value: expect.closeTo(Math.atan2(4, 3), 9) });
+    // Sentido negativo também é informado (o valor não é módulo).
+    const baixo = displacementDimProvider.compute(
+      { project: p, levelId: 'lv_0', settings: dimensionSettingsOf(p), overrides: {} },
+      { from: { x: 0, y: 0 }, to: { x: 0, y: -2 } },
+    );
+    expect(baixo[0]!.secondary!.value).toBeCloseTo(-Math.PI / 2, 9);
+  });
 });

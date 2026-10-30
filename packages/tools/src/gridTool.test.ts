@@ -34,13 +34,33 @@ describe('ferramenta Grade: criação', () => {
     expect(grids().map((g) => g.name)).toEqual(['1', '2', '3']);
   });
 
-  it('prévia da linha mostra o eixo tracejado e o comprimento', () => {
+  it('prévia da linha mostra o eixo tracejado e o comprimento pela cota unificada', () => {
     const { env } = setup();
     const t = tool('grid', env);
+    expect(t.tempDims!()).toEqual([]);
     clickAt(t, 0, 0);
     t.move(P(4, 0));
     expect(t.preview().some((i) => i.kind === 'line' && i.dashed)).toBe(true);
-    expect(t.preview()).toContainEqual(expect.objectContaining({ kind: 'label', text: '4,00 m' }));
+    // O comprimento sai pelo sistema único de cotas (nada de rótulo solto duplicando a medida).
+    expect(t.preview().filter((i) => i.kind === 'label')).toEqual([]);
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(1);
+    expect(dims[0]!.key).toBe('grid:draft:length');
+    expect(dims[0]!.value).toBeCloseTo(4, 6);
+    expect(dims[0]!.edit).toBeUndefined();
+  });
+
+  it('arco: a cota unificada mede o comprimento do arco com a flecha do cursor', () => {
+    const { env } = setup('arc');
+    const t = tool('grid', env);
+    clickAt(t, 0, 0);
+    clickAt(t, 6, 0);
+    t.move(P(3, 1));
+    const dims = t.tempDims!();
+    expect(dims).toHaveLength(1);
+    expect(dims[0]!.value).toBeGreaterThan(6);
+    expect(dims[0]!.a).toEqual({ x: 0, y: 0 });
+    expect(dims[0]!.b).toEqual({ x: 6, y: 0 });
   });
 
   it('linha: comprimento digitado + Enter segue a direção do cursor', () => {
@@ -157,7 +177,7 @@ describe('ferramenta Grade: recusas e histórico', () => {
     clickAt(t, 0, 0);
     clickAt(t, 0.02, 0);
     expect(grids()).toHaveLength(0);
-    expect(messages.at(-1)).toMatch(/5,0 cm/);
+    expect(messages.at(-1)).toMatch(/5 cm/);
   });
 
   it('nome repetido: sucessor livre quando a letra já existe', () => {

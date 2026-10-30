@@ -1,4 +1,4 @@
-import { dist, type Vec2 } from '@hestia/geom';
+import { angleOf, dist, sub, type Vec2 } from '@hestia/geom';
 import type { DimProvider, TempDim } from '../types.ts';
 
 /** Deslocamento em gesto (mover/copiar): do ponto-base ao cursor. */
@@ -13,8 +13,9 @@ const DIM_OFFSET = 0.15;
 const end = (at: Vec2, slot: string) => ({ at, slot, kind: 'wall' as const, current: 'axis' as const, options: ['axis'] as const });
 
 /**
- * Cota do deslocamento durante o gesto de mover/copiar (só leitura: a digitação já existe nas ferramentas). O overlay
- * desenha a mesma linha de cota e o mesmo campo de todas as cotas; o valor segue as unidades do projeto.
+ * Cota do deslocamento durante o gesto de mover/copiar (só leitura: a digitação já existe nas ferramentas). Mostra a
+ * distância e, como medida informativa, o ângulo da direção do deslocamento em relação ao eixo X. O overlay desenha a
+ * mesma linha de cota e o mesmo campo de todas as cotas; os valores seguem as unidades do projeto.
  */
 export const displacementDimProvider: DimProvider<DisplacementSubject> = {
   id: PROVIDER_ID,
@@ -28,6 +29,7 @@ export const displacementDimProvider: DimProvider<DisplacementSubject> = {
         b: subject.to,
         offset: DIM_OFFSET,
         value,
+        secondary: { quantity: 'angle', value: angleOf(sub(subject.to, subject.from)) },
         ends: [end(subject.from, 'from'), end(subject.to, 'to')],
       },
     ];

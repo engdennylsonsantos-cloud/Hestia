@@ -307,11 +307,14 @@ export class OpeningTool extends ToolBase {
       sillOverride: options.openingSillOverride ?? null,
       mark: options.placementMark ?? '',
     };
-    this.env.exec({ type: 'addOpening', opening: o });
-    // Revit "Tag on Placement": a etiqueta do tipo nasce junto com a esquadria (a opção desliga só esta ligação).
-    if (options.openingTagOnPlace !== false && !this.env.project().settings.showOpeningTags) {
-      this.env.exec({ type: 'setSettings', patch: { showOpeningTags: true } });
-    }
+    // A esquadria e a etiqueta ao inserir formam UM passo de desfazer: o primeiro Ctrl+Z remove a porta e o flag juntos.
+    this.env.transaction(this.id === 'door' ? 'Inserir porta' : 'Inserir janela', () => {
+      this.env.exec({ type: 'addOpening', opening: o });
+      // Revit "Tag on Placement": a etiqueta do tipo nasce junto com a esquadria (a opção desliga só esta ligação).
+      if (options.openingTagOnPlace !== false && !this.env.project().settings.showOpeningTags) {
+        this.env.exec({ type: 'setSettings', patch: { showOpeningTags: true } });
+      }
+    });
     const pr = this.env.project();
     this.env.say(`${openingType(pr, o).name} inserida.`);
   }

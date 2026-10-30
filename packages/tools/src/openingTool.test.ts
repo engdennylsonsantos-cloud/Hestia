@@ -304,6 +304,41 @@ describe('colocação da abertura: etiquetar ao inserir', () => {
     moveAndClick(ctx, 2, 0.1);
     expect(ctx.store.project.settings.showOpeningTags).not.toBe(true);
   });
+
+  it('o primeiro Ctrl+Z remove a porta e o flag de etiqueta no mesmo passo', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [4, 0]);
+    const t = tool('door', ctx.env);
+    t.move!(P(2, 0.05));
+    t.click!(P(2, 0.05));
+    expect(openings(ctx)).toHaveLength(1);
+    expect(ctx.store.project.settings.showOpeningTags).toBe(true);
+    ctx.store.undo();
+    expect(openings(ctx)).toHaveLength(0);
+    // O flag volta ao estado anterior (ausente no projeto vazio), no mesmo passo da porta.
+    expect(ctx.store.project.settings.showOpeningTags).not.toBe(true);
+  });
+
+  it('cinco portas são cinco passos de desfazer: um Ctrl+Z volta a quatro', () => {
+    const ctx = makeEnv();
+    withSnapOff(ctx);
+    makeWall(ctx, [0, 0], [10, 0]);
+    const t = tool('door', ctx.env);
+    for (const x of [1, 3, 5, 7, 9]) {
+      t.move!(P(x, 0.05));
+      t.click!(P(x, 0.05));
+    }
+    expect(openings(ctx)).toHaveLength(5);
+    ctx.store.undo();
+    expect(openings(ctx)).toHaveLength(4);
+    // A etiqueta já estava ligada desde a primeira porta: o undo da última não mexe nela.
+    expect(ctx.store.project.settings.showOpeningTags).toBe(true);
+    // Cinco desfazer no total removem as cinco portas; sem o passo extra do flag sobraria uma.
+    for (let i = 0; i < 4; i++) ctx.store.undo();
+    expect(openings(ctx)).toHaveLength(0);
+    expect(walls(ctx.store)).toHaveLength(1);
+  });
 });
 
 describe('colocação da abertura: zona de captura da parede', () => {

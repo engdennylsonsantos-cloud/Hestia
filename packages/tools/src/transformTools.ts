@@ -16,6 +16,10 @@ import type { DimRef, TempDim } from './dims/types.ts';
 
 export const fmtM = (u: ResolvedUnits, m: number): string => formatQuantity(u, 'length', m);
 
+/** Rótulo do gesto de mover/copiar: distância e ângulo (direção do deslocamento em relação ao eixo X). */
+export const fmtDisplacement = (u: ResolvedUnits, d: Vec2): string =>
+  `${fmtM(u, len(d))} · ${formatQuantity(u, 'angle', angleOf(d))}`;
+
 /** Base das ferramentas que exigem seleção prévia. */
 export abstract class SelectionTool extends ToolBase {
   /** Paredes e pisos selecionados: entram em mover, copiar, girar, espelhar e matriz. */
@@ -129,7 +133,7 @@ export class MoveTool extends SelectionTool {
     const i = this.edgePick.ref.index;
     this.items.push({ kind: 'line', a: this.base, b: inf.point, dashed: true });
     this.items.push({ kind: 'line', a: moved[i]!, b: moved[(i + 1) % ring.length]!, dashed: true });
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtDisplacement(unitsOf(this.env.project()), d) });
   }
 
   /** Move só a aresta pelo vetor d (Mover aresta). Copiar aresta não existe nesta versão. */
@@ -185,7 +189,7 @@ export class MoveTool extends SelectionTool {
     const t = { kind: 'translate' as const, d };
     this.items.push(...ghostBands(this.env.project(), els, t), ...ghostViews(this.env.project(), this.env.selection(), t), ...gridGhosts(this.env.project(), selectedGrids(this.env.project(), this.env.selection()), d));
     if (!this.copy) this.items.push(...separatorGhostItems(this.env.project(), this.env.levelId(), movableSeparatorIds(this.env, this.copy), d));
-    this.items.push({ kind: 'label', at: inf.point, text: fmtM(unitsOf(this.env.project()), len(d)) });
+    this.items.push({ kind: 'label', at: inf.point, text: fmtDisplacement(unitsOf(this.env.project()), d) });
   }
 
   /** Cota do deslocamento (ponto-base → cursor), pelo provedor do sistema único. */

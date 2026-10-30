@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { defaultUnits, resolveUnits } from '@hestia/model';
-import type { TempDim } from '@hestia/tools';
-import { resolveDimEdit } from './dimsActions.ts';
+import { createEmptyProject, defaultUnits, ProjectStore, resolveUnits } from '@hestia/model';
+import { toPermanent, type TempDim } from '@hestia/tools';
+import { resolveDimEdit, selectionDimsSuspended, suspensionAfterConversion } from './dimsActions.ts';
 
 const base: TempDim = {
   key: 'x:1:a',
@@ -42,11 +42,42 @@ describe('resolveDimEdit', () => {
     if (r.kind === 'error') expect(r.message).toContain(`'`);
   });
 
+  it('cota de ângulo lê o texto em graus e usa a grandeza certa', () => {
+    const angular: TempDim = { ...editavel, quantity: 'angle', value: Math.PI / 4, edit: (v) => ({ commands: [{ type: 'updateElements', ids: ['e'], patch: { offset: v } }] }) };
+    expect(resolveDimEdit(angular, '90', metros)).toEqual({ kind: 'done', commands: [{ type: 'updateElements', ids: ['e'], patch: { offset: Math.PI / 2 } }] });
+    expect(resolveDimEdit(angular, 'abc', metros)).toEqual({ kind: 'error', message: 'Medida inválida: digite um ângulo, como 45°.' });
+  });
+
   it('erro do provedor vira alerta e nenhum comando', () => {
     expect(resolveDimEdit(editavel, '9', metros)).toEqual({ kind: 'error', message: 'Sairia da parede.' });
   });
 
   it('cota só de leitura recusa', () => {
     expect(resolveDimEdit(base, '1', metros).kind).toBe('error');
+  });
+});
+
+describe('suspensão das cotas temporárias depois do botão "I"', () => {
+  it('só suspende quando a conversão gravou algo', () => {
+    expect(suspensionAfterConversion(10, 10)).toBeNull();
+    expect(suspensionAfterConversion(10, 13)).toBe(13);
+  });
+
+  it('suspende na versão da conversão e volta no desfazer/alteração', () => {
+    const suspended = suspensionAfterConversion(10, 13);
+    expect(selectionDimsSuspended(suspended, 13)).toBe(true);
+    // Desfazer (ou qualquer alteração posterior) muda a versão: as temporárias voltam.
+    expect(selectionDimsSuspended(suspended, 14)).toBe(false);
+    expect(selectionDimsSuspended(null, 13)).toBe(false);
+  });
+
+  it('converter em permanentes e desfazer devolve as temporárias', () => {
+    const store = new ProjectStore(createEmptyProject());
+    const before = store.version;
+    store.transaction('Converter em cotas permanentes', () => toPermanent('lv_0', [base]).forEach((c) => store.exec(c)));
+    const suspended = suspensionAfterConversion(before, store.version);
+    expect(selectionDimsSuspended(suspended, store.version)).toBe(true);
+    store.undo();
+    expect(selectionDimsSuspended(suspended, store.version)).toBe(false);
   });
 });

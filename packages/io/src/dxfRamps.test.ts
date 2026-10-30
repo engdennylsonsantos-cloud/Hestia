@@ -43,6 +43,22 @@ const geo: DxfLevelGeometry = {
   ],
 };
 
+/** Registros do DXF (cada código 0 abre um; os pares seguintes ficam nele). */
+function records(text: string): Array<{ type: string; pairs: Array<[number, string]> }> {
+  const out: Array<{ type: string; pairs: Array<[number, string]> }> = [];
+  const lines = text.split('\r\n');
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number(lines[i]);
+    if (code === 0) out.push({ type: lines[i + 1]!, pairs: [] });
+    else out.at(-1)?.pairs.push([code, lines[i + 1]!]);
+  }
+  return out;
+}
+
+/** Existe uma entidade do tipo na camada pedida? */
+const entityOn = (text: string, type: string, layer: string): boolean =>
+  records(text).some((r) => r.type === type && r.pairs.some(([c, v]) => c === 8 && v === layer));
+
 describe('DXF: camadas da rampa', () => {
   it('registra as cinco camadas e o papel de largura de linha', () => {
     const layers = dxfLayersOf(p, geo);
@@ -63,10 +79,10 @@ describe('DXF: camadas da rampa', () => {
 
   it('os contornos, as linhas e o texto da inclinação saem no arquivo', () => {
     const out = exportDxf(p, 'lv_0', geo);
-    expect(out).toContain('\r\nPOLYLINE\r\n8\r\nRAMPA\r\n');
-    expect(out).toContain('\r\nPOLYLINE\r\n8\r\nRAMPA_ACIMA\r\n');
-    expect(out).toContain('\r\nLINE\r\n8\r\nRAMPA_SETA\r\n');
-    expect(out).toContain('\r\nLINE\r\n8\r\nRAMPA_CORTE\r\n');
+    expect(entityOn(out, 'POLYLINE', DXF_LAYER_RAMP)).toBe(true);
+    expect(entityOn(out, 'POLYLINE', DXF_LAYER_RAMP_ABOVE)).toBe(true);
+    expect(entityOn(out, 'LINE', DXF_LAYER_RAMP_ARROW)).toBe(true);
+    expect(entityOn(out, 'LINE', DXF_LAYER_RAMP_CUT)).toBe(true);
     expect(out).toContain('8,33 % (1:12)');
     expect(out).toContain('\r\nRAMPA_TEXTO\r\n');
   });

@@ -73,7 +73,7 @@ describe('writeDxf2000', () => {
     expect(varOf('$ACADVER')).toEqual({ code: 1, value: 'AC1015' });
     expect(varOf('$INSUNITS')).toEqual({ code: 70, value: '6' });
     expect(varOf('$MEASUREMENT')).toEqual({ code: 70, value: '1' });
-    expect(varOf('$LWDISPLAY')).toEqual({ code: 70, value: '1' });
+    expect(varOf('$LWDISPLAY')).toEqual({ code: 290, value: '1' });
   });
 
   it('grava a cor (62) e a espessura (370) de cada camada', () => {

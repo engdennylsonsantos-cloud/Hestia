@@ -55,11 +55,28 @@ function withGraphics(p: Project, overrides: Partial<Record<GraphicsCategory, Pa
   return q;
 }
 
+/** Existe entidade do tipo na camada pedida? (O R2000 põe handle e dono entre o tipo e a camada.) */
+function hasEntity(text: string, type: string, layer: string): boolean {
+  const lines = text.split('\r\n');
+  let cur: { type: string; layer?: string } | null = null;
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = Number(lines[i]);
+    const value = lines[i + 1]!;
+    if (code === 0) {
+      if (cur && cur.type === type && cur.layer === layer) return true;
+      cur = { type: value };
+    } else if (code === 8 && cur) {
+      cur.layer = value;
+    }
+  }
+  return false;
+}
+
 describe('DXF da rampa reta (H=0,80, 9,60 m)', () => {
   it('acima do topo: camadas RAMPA, RAMPA_SETA e RAMPA_TEXTO com o texto 8,33 % (1:12)', () => {
     const out = planDxf(straightRamp(), 'lv_0');
-    expect(out).toContain('\r\nPOLYLINE\r\n8\r\nRAMPA\r\n');
-    expect(out).toContain('\r\nLINE\r\n8\r\nRAMPA_SETA\r\n');
+    expect(hasEntity(out, 'POLYLINE', 'RAMPA')).toBe(true);
+    expect(hasEntity(out, 'LINE', 'RAMPA_SETA')).toBe(true);
     expect(out).toContain('\r\nRAMPA_TEXTO\r\n');
     expect(out).toContain('8,33 % (1:12)');
     expect(out).not.toContain('RAMPA_ACIMA');
@@ -68,8 +85,8 @@ describe('DXF da rampa reta (H=0,80, 9,60 m)', () => {
 
   it('com a cota de corte em 0,40: aparece RAMPA_ACIMA (tracejada) e a linha RAMPA_CORTE', () => {
     const out = planDxf(withRange(straightRamp(), { cut: 0.4 }), 'lv_0');
-    expect(out).toContain('\r\nPOLYLINE\r\n8\r\nRAMPA_ACIMA\r\n');
-    expect(out).toContain('\r\nLINE\r\n8\r\nRAMPA_CORTE\r\n');
+    expect(hasEntity(out, 'POLYLINE', 'RAMPA_ACIMA')).toBe(true);
+    expect(hasEntity(out, 'LINE', 'RAMPA_CORTE')).toBe(true);
   });
 
   it('com a categoria stair oculta: nenhuma camada de rampa', () => {

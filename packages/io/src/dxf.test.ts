@@ -111,9 +111,9 @@ describe('exportDxf', () => {
     openings: [{ center: { x: 3, y: 0.5 }, u: { x: 1, y: 0 }, width: 0.8, thickness: 0.14 }],
   };
 
-  it('cabeçalho R12 em metros, com fim de arquivo', () => {
+  it('cabeçalho R2000 em metros, com fim de arquivo', () => {
     const text = exportDxf(project, 'lv_0', geo);
-    expect(headerVar(text, '$ACADVER')).toBe('AC1009');
+    expect(headerVar(text, '$ACADVER')).toBe('AC1015');
     expect(headerVar(text, '$INSUNITS')).toBe('6');
     expect(text.startsWith('0\r\nSECTION\r\n2\r\nHEADER')).toBe(true);
     expect(text.endsWith('0\r\nEOF\r\n')).toBe(true);
@@ -228,7 +228,7 @@ describe('vista da planta no DXF (camadas de projeção, decisão 0013 §4)', ()
 
   it('sem projeções, a tabela de tipos de linha só tem CONTINUOUS (o arquivo é o de antes)', () => {
     const text = exportDxf(project, 'lv_0', base);
-    expect(ltypeNames(text)).toEqual(['CONTINUOUS']);
+    expect(ltypeNames(text)).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS']);
     expect(linetypeOf(text, DXF_LAYER_OPENINGS)).toBeUndefined();
   });
 
@@ -242,7 +242,7 @@ describe('vista da planta no DXF (camadas de projeção, decisão 0013 §4)', ()
       ],
     };
     const text = exportDxf(project, 'lv_0', geo);
-    expect(ltypeNames(text)).toEqual(['CONTINUOUS', 'DASHED']);
+    expect(ltypeNames(text)).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS', 'DASHED']);
     expect(linetypeOf(text, DXF_LAYER_WALL_ABOVE)).toBe('DASHED');
     expect(linetypeOf(text, DXF_LAYER_WALL_BELOW)).toBe('CONTINUOUS');
     expect(linetypeOf(text, DXF_LAYER_WALL_BEYOND)).toBe('CONTINUOUS');
@@ -308,7 +308,7 @@ describe('vista da planta no DXF (camadas de projeção, decisão 0013 §4)', ()
 
   it('o tipo DASHED só aparece na tabela quando alguma camada o usa', () => {
     const above = exportDxf(project, 'lv_0', { ...base, wallOutlines: [{ state: 'projection-below', polygons: [[square]] }] });
-    expect(ltypeNames(above)).toEqual(['CONTINUOUS']);
+    expect(ltypeNames(above)).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS']);
   });
 });
 
@@ -360,7 +360,7 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     const polys = polylines(text);
     expect(polys.map((p) => p.layer)).toEqual([DXF_LAYER_OPENING_SYMBOL]);
     expect(linetypeOf(text, DXF_LAYER_OPENING_SYMBOL)).toBe('CONTINUOUS');
-    expect(ltypeNames(text)).toEqual(['CONTINUOUS']);
+    expect(ltypeNames(text)).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS']);
   });
 
   it('vão de corte sem símbolo continua retângulo fechado em ABERTURAS (compatibilidade)', () => {
@@ -374,12 +374,12 @@ describe('símbolo dos vãos de projeção no DXF (o mesmo da planta)', () => {
     const dashedArc: DxfSymbolPath = { ...arc, dashed: true };
     const text = exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, dashedArc])] });
     expect(linetypeOf(text, DXF_LAYER_OPENING_BELOW)).toBe('CONTINUOUS');
-    expect(ltypeNames(text)).toEqual(['CONTINUOUS', 'DASHED']);
+    expect(ltypeNames(text)).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS', 'DASHED']);
     const entities = records(text).filter((r) => r.type === 'POLYLINE');
     const types = entities.map((r) => r.fields.some(([c, v]) => c === 6 && v === 'DASHED'));
     expect(types).toEqual([false, true]);
     // sem traço tracejado, o arquivo não ganha tipo DASHED
-    expect(ltypeNames(exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, arc])] }))).toEqual(['CONTINUOUS']);
+    expect(ltypeNames(exportDxf(project, 'lv_0', { ...base, openings: [at('projection-below', [leaf, arc])] }))).toEqual(['ByBlock', 'ByLayer', 'CONTINUOUS']);
   });
 });
 

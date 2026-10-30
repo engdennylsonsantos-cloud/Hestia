@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ProjectStore, createEmptyProject } from '@hestia/model';
-import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextRecords, notesDxfOf } from './dxfNotes.ts';
+import { DXF_LAYER_COTAS, DXF_LAYER_TEXTOS, dxfTextEntity, notesDxfOf } from './dxfNotes.ts';
 import { exportDxf, type DxfLevelGeometry } from './dxf.ts';
 
 const LV0 = 'lv_0';
@@ -74,11 +74,15 @@ describe('anotações no DXF da planta', () => {
     expect(dxf).not.toMatch(/COTAS|TEXTOS/);
   });
 
-  it('registros do TEXT: centrado, com altura e rotação', () => {
-    const rec = Object.fromEntries(dxfTextRecords({ at: { x: 1, y: 2 }, text: 'A', height: 0.25, rotation: 90, layer: DXF_LAYER_TEXTOS }).map(([c, v]) => [c, v]));
-    expect(rec[40]).toBe('0.250000');
-    expect(rec[50]).toBe('90.000000');
-    expect(rec[72]).toBe(1);
-    expect(rec[73]).toBe(2);
+  it('entidade TEXT do R2000: centrada, com altura e rotação', () => {
+    expect(dxfTextEntity({ at: { x: 1, y: 2 }, text: 'A', height: 0.25, rotation: 90, layer: DXF_LAYER_TEXTOS })).toEqual({
+      kind: 'text',
+      layer: DXF_LAYER_TEXTOS,
+      at: { x: 1, y: 2 },
+      height: 0.25,
+      text: 'A',
+      rotation: 90,
+      centered: true,
+    });
   });
 });

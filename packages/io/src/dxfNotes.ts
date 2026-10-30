@@ -1,5 +1,6 @@
 import { openingTypeById, dimensionGeometry, dimensionPoints, dimensionText, DIM_TEXT_MM, isOpening, isWall, levelDimensions, levelTexts, unitsOf, wallHeight, wallType, type Id, type Project } from '@hestia/model';
 import type { DxfPoint } from './dxf.ts';
+import type { DxfTextEntity } from './dxfDoc.ts';
 
 /** Camadas das anotações da planta (decisão 0019): cotas em LINE e TEXT; textos livres em TEXT. */
 export const DXF_LAYER_COTAS = 'COTAS';
@@ -92,35 +93,15 @@ export function notesDxfOf(p: Project, levelId: Id, scale: number): DxfNotes {
 }
 
 /**
- * Texto para o grupo 1 do R12: o que não é ASCII visível vira `\U+XXXX`. O AutoCAD lê o R12 em ANSI (sem
- * `$DWGCODEPAGE`), então o UTF-8 cru sairia como dois caracteres por acento; e uma quebra de linha no valor partiria o
- * par código/valor do arquivo. O `\U+XXXX` é lido por todas as versões do AutoCAD.
+ * Texto para o grupo 1 do DXF: o que não é ASCII visível vira `\U+XXXX`. O AutoCAD lê o R2000 (AC1015) em ANSI (com
+ * `$DWGCODEPAGE` ANSI_1252), então o UTF-8 cru sairia como dois caracteres por acento; e uma quebra de linha no valor
+ * partiria o par código/valor do arquivo. O `\U+XXXX` é lido por todas as versões do AutoCAD.
  */
 export function dxfEscapeText(text: string): string {
   return text.replace(/[^\x20-\x7e]/g, (ch) => `\\U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
 }
 
-/** Registros do TEXT (centrado no ponto de alinhamento, código 72=1 e 73=2) como pares [código, valor]. */
-export function dxfTextRecords(t: DxfNoteText): Array<[number, string | number]> {
-  // units-ok: coordenada DXF (formato de máquina)
-  const x = t.at.x.toFixed(6);
-  // units-ok: coordenada DXF (formato de máquina)
-  const y = t.at.y.toFixed(6);
-  return [
-    [0, 'TEXT'],
-    [8, t.layer],
-    [10, x],
-    [20, y],
-    [30, '0.000000'],
-    // units-ok: altura de texto DXF (formato de máquina)
-    [40, t.height.toFixed(6)],
-    [1, dxfEscapeText(t.text)],
-    // units-ok: ângulo DXF (formato de máquina)
-    [50, t.rotation.toFixed(6)],
-    [72, 1],
-    [73, 2],
-    [11, x],
-    [21, y],
-    [31, '0.000000'],
-  ];
+/** Entidade TEXT do documento R2000 para uma anotação: centrada no ponto (72 = 1 e 73 = 2), o escritor escapa o texto. */
+export function dxfTextEntity(t: DxfNoteText): DxfTextEntity {
+  return { kind: 'text', layer: t.layer, at: t.at, height: t.height, text: t.text, rotation: t.rotation, centered: true };
 }

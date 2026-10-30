@@ -2,22 +2,23 @@ import { openingSymbolPaths, type MultiPolygon, type Vec2 } from '@hestia/geom';
 import { buildOpeningModel, computeSection, junctionLevel, resolveCeilings, resolveLevel, levelFrames, openingGeometry, resolveFloors, resolveRoofs, resolveRooms, resolveRampsOnLevel, resolveSlabs, resolveStairsOnLevel, type ResolvedRamp, type ResolvedStair, type JunctionLevel, type SectionOrigin, type ViewClass } from '@hestia/engine';
 import { buildPlanGeometry, climbWalk, levelBox, LIGHT, openingPlanWorldPaths, ownerOf, planViewOf, resolverZoom, risersInClimbOrder, roofFootprint, roomLabelAt, roomNameText, spiralByComponent, spiralPostRing, stairCut, type PlanOps, type PlanView, type StairCut } from '@hestia/render';
 import {
-  DXF_BLOCKS_SECTION,
-  DXF_STYLE_TABLE,
-  dxfEscapeText,
-  dxfGenericRecords,
+  dxfDocOf,
+  dxfGenericEntities,
   dxfLayersOf,
   dxfLineRoleOf,
-  dxfRecorder,
   DXF_LAYER_RAMP_TEXT,
   DXF_LAYER_ROOM_TEXT,
   dxfLineWeight,
   dxfSectionLayersOf,
   dxfSectionLineRoleOf,
-  exportDxf,
   exportSectionDxf,
   notesDxfOf,
   sectionMarksDxfOf,
+  writeDxf2000,
+  type DxfDoc,
+  type DxfDocEntity,
+  type DxfDocLayer,
+  type DxfLineType,
   type DxfLevelGeometry,
   type DxfOpening,
   type DxfPoint,
@@ -315,87 +316,60 @@ export function dxfGeometryOf(p: Project, levelId: Id, showRoofProjection = true
 /** Altura (m de desenho) do texto do ambiente no DXF. */
 const ROOM_TEXT_HEIGHT_M = 0.2;
 
-/** Fim do arquivo que `exportDxf` devolve: o `ENDSEC` da seção ENTITIES seguido do `EOF`. */
-const DXF_END = '\r\n0\r\nENDSEC\r\n0\r\nEOF\r\n';
+/** Camada de um traço da planta de área: referência, chamada ou contorno. */
+const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
 
-/**
- * Põe registros no fim da seção ENTITIES, antes do `ENDSEC` (sem abrir outra `SECTION`). Sem registros, devolve o arquivo
- * como veio: o DXF sem objetos importados é byte a byte o de antes.
- */
-function withEntityRecords(dxf: string, records: string[]): string {
-  if (records.length === 0) return dxf;
-  if (!dxf.endsWith(DXF_END)) throw new Error('DXF sem o fim esperado (ENDSEC/EOF)');
-  return `${dxf.slice(0, -DXF_END.length)}\r\n${records.join('\r\n')}${DXF_END}`;
+/** Estilo padrão de uma camada da planta de área (a tabela editável de camadas entra na fase 3). */
+const AREA_LAYER_STYLE: Record<string, { color: number; linetype: DxfLineType }> = {
+  AMBIENTES: { color: 7, linetype: 'CONTINUOUS' },
+  AMBIENTES_REFERENCIA: { color: 8, linetype: 'CONTINUOUS' },
+  AMBIENTES_CHAMADA: { color: 7, linetype: 'CONTINUOUS' },
+  AMBIENTES_TEXTO: { color: 7, linetype: 'CONTINUOUS' },
+  ANOTACOES: { color: 7, linetype: 'CONTINUOUS' },
+  ANOTACOES_TEXTO: { color: 7, linetype: 'CONTINUOUS' },
+  ANOTACOES_DETALHE: { color: 7, linetype: 'CONTINUOUS' },
+};
+
+/** Camadas de uma lista de entidades: `0` e as usadas, em ordem, com o estilo do mapa (ou o padrão do escritor). */
+function layersOfEntities(entities: DxfDocEntity[], styles: Record<string, { color: number; linetype: DxfLineType }>): DxfDocLayer[] {
+  const names = new Set(['0', ...entities.map((e) => e.layer)]);
+  return [...names].sort().map((name) => ({ name, ...(styles[name] ?? { color: 7, linetype: 'CONTINUOUS' }) }));
 }
 
 /**
- * Texto DXF da planta do nível, na vista do intervalo. Os objetos importados (`Generic`) entram como o contorno em planta
- * de cada um, na camada `IMPORTADO`; a categoria `generic` oculta na vista não sai, como as demais.
+ * Documento R2000 da planta de área a partir das operações do render: cada traço vira LINE e cada rótulo TEXT, nas camadas
+ * AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO (como no R12 anterior; antes o arquivo declarava
+ * AC1015 sem a estrutura do R2000 e o AutoCAD o recusava com "DXF read error").
  */
-/** Layer de um traço da planta de área: referência, chamada ou contorno. */
-const areaLayerOf = (color: string, pts: number): string => (color === '#4b5563' ? 'AMBIENTES_REFERENCIA' : color === '#111827' && pts === 2 ? 'AMBIENTES_CHAMADA' : 'AMBIENTES');
-
-/**
- * DXF R12 (AC1009) da planta de área, no mesmo formato de `exportDxf`: HEADER, TABLES (LTYPE, LAYER, STYLE), BLOCKS vazia
- * e ENTITIES com LINE e TEXT. Antes declarava AC1015 sem a estrutura do R2000 (handles, BLOCK_RECORD…) e o AutoCAD o
- * recusava ("DXF read error"); o 370 das camadas também não existe no R12.
- */
-function opsToDxf(ops: PlanOps, zoom: number): string {
-  const out: string[] = [];
-  const rec = dxfRecorder(out);
-  const layers = new Set<string>(['AMBIENTES_TEXTO']);
-  for (const s of ops.strokes) layers.add(areaLayerOf(s.color, s.pts.length));
-  rec(0, 'SECTION'); rec(2, 'HEADER'); rec(9, '$ACADVER'); rec(1, 'AC1009'); rec(9, '$INSUNITS'); rec(70, 6); rec(9, '$MEASUREMENT'); rec(70, 1); rec(0, 'ENDSEC');
-  rec(0, 'SECTION'); rec(2, 'TABLES');
-  rec(0, 'TABLE'); rec(2, 'LTYPE'); rec(70, 1); rec(0, 'LTYPE'); rec(2, 'CONTINUOUS'); rec(70, 0); rec(3, 'Solid line'); rec(72, 65); rec(73, 0); rec(40, 0); rec(0, 'ENDTAB');
-  rec(0, 'TABLE'); rec(2, 'LAYER'); rec(70, layers.size);
-  for (const name of layers) { rec(0, 'LAYER'); rec(2, name); rec(70, 0); rec(62, 7); rec(6, 'CONTINUOUS'); }
-  rec(0, 'ENDTAB');
-  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
-  rec(0, 'ENDSEC');
-  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
-  rec(0, 'SECTION'); rec(2, 'ENTITIES');
+function opsDocOf(ops: PlanOps, zoom: number): DxfDoc {
+  const entities: DxfDocEntity[] = [];
   for (const s of ops.strokes) {
     const layer = areaLayerOf(s.color, s.pts.length);
     const pts = s.closed && s.pts.length > 2 ? [...s.pts, s.pts[0]!] : s.pts;
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i]!;
-      const b = pts[i + 1]!;
-      rec(0, 'LINE'); rec(8, layer); rec(10, a.x); rec(20, a.y); rec(30, 0); rec(11, b.x); rec(21, b.y); rec(31, 0);
-    }
+    for (let i = 0; i + 1 < pts.length; i++) entities.push({ kind: 'line', layer, a: pts[i]!, b: pts[i + 1]! });
   }
   for (const l of ops.labels) {
     if (l.maskBoundary || !l.text) continue;
-    const h = (l.fontPx ?? 12) / zoom;
-    rec(0, 'TEXT'); rec(8, 'AMBIENTES_TEXTO'); rec(10, l.at.x); rec(20, l.at.y); rec(30, 0); rec(40, h); rec(1, dxfEscapeText(l.text)); rec(50, l.rotation ?? 0);
+    entities.push({ kind: 'text', layer: 'AMBIENTES_TEXTO', at: l.at, height: (l.fontPx ?? 12) / zoom, text: l.text, rotation: l.rotation ?? 0 });
   }
-  rec(0, 'ENDSEC'); rec(0, 'EOF');
-  return `${out.join('\r\n')}\r\n`;
-}
-
-/** Põe registros no fim da seção ENTITIES do DXF mínimo de `opsToDxf` (antes do `ENDSEC`). */
-function appendAreaRecords(dxf: string, records: string[]): string {
-  if (records.length === 0) return dxf;
-  if (!dxf.endsWith(DXF_END)) throw new Error('DXF sem o fim esperado (ENDSEC/EOF)');
-  return `${dxf.slice(0, -DXF_END.length)}\r\n${records.join('\r\n')}${DXF_END}`;
+  return { layers: layersOfEntities(entities, AREA_LAYER_STYLE), entities };
 }
 
 const samePoint = (a: Vec2, b: Vec2): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
 
 /**
- * Registros DXF das anotações da planta de área (cotas, textos e detalhes). A geometria da planta já as desenha
- * quando o render da área passou a incluí-las; o que ainda não estiver nas operações é escrito aqui, sem duplicar.
+ * Entidades R2000 das anotações da planta de área (cotas, textos e detalhes). A geometria da planta já as desenha quando o
+ * render da área passou a incluí-las; o que ainda não estiver nas operações entra aqui, sem duplicar.
  */
-function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string[] {
+function areaAnnotationEntities(p: Project, plan: AreaPlan, ops: PlanOps): DxfDocEntity[] {
   const a = planAnnotationsOf(plan);
   if (a.dimensions.length + a.texts.length + a.detailLines.length + a.detailRegions.length === 0) return [];
-  const out: string[] = [];
-  const rec = dxfRecorder(out);
+  const out: DxfDocEntity[] = [];
   const line = (layer: string, start: Vec2, end: Vec2): void => {
-    rec(0, 'LINE'); rec(8, layer); rec(10, start.x); rec(20, start.y); rec(30, 0); rec(11, end.x); rec(21, end.y); rec(31, 0);
+    out.push({ kind: 'line', layer, a: start, b: end });
   };
   const text = (layer: string, at: Vec2, height: number, value: string, rotation = 0): void => {
-    rec(0, 'TEXT'); rec(8, layer); rec(10, at.x); rec(20, at.y); rec(30, 0); rec(40, height); rec(1, dxfEscapeText(value)); rec(50, rotation);
+    out.push({ kind: 'text', layer, at, height, text: value, rotation });
   };
   const rendered = new Set(ops.labels.map((l) => l.text).filter((x): x is string => !!x));
   const mPerMm = plan.scale / 1000;
@@ -422,7 +396,6 @@ function areaAnnotationRecords(p: Project, plan: AreaPlan, ops: PlanOps): string
   }
   return out;
 }
-
 /** DXF da planta de área, com as camadas AMBIENTES, AMBIENTES_REFERENCIA, AMBIENTES_CHAMADA e AMBIENTES_TEXTO. */
 export function areaPlanDxf(p: Project, planId: Id): string {
   const plan = areaPlanOf(p, planId);
@@ -447,7 +420,9 @@ export function areaPlanDxf(p: Project, planId: Id): string {
     showGrid: false,
   });
   // Cotas/textos/detalhes de `plan.annotations`: o render da área pode já desenhá-los; o que faltar entra aqui.
-  return appendAreaRecords(opsToDxf(resolverZoom(ops, zoom), zoom), areaAnnotationRecords(p, plan, ops));
+  const doc = opsDocOf(resolverZoom(ops, zoom), zoom);
+  const entities = [...doc.entities, ...areaAnnotationEntities(p, plan, ops)];
+  return writeDxf2000({ ...doc, layers: layersOfEntities(entities, AREA_LAYER_STYLE), entities });
 }
 
 /** Exporta a planta de área atual e devolve o nome do arquivo salvo. */
@@ -460,9 +435,10 @@ export async function saveAreaPlanDxf(p: Project, planId: Id): Promise<string> {
 }
 
 export function planDxf(p: Project, levelId: Id, showRoofProjection = true): string {
-  const dxf = exportDxf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
+  const doc = dxfDocOf(p, levelId, dxfGeometryOf(p, levelId, showRoofProjection));
   const shown = levelGraphicsOf(p, levelId).overrides.generic.visible !== false;
-  return withEntityRecords(dxf, shown ? dxfGenericRecords(p, levelId) : []);
+  const entities = [...doc.entities, ...(shown ? dxfGenericEntities(p, levelId) : [])];
+  return writeDxf2000({ ...doc, entities });
 }
 
 /** Entrega o DXF pelo mesmo caminho do CSV (`saveText`) e devolve a frase de status. */

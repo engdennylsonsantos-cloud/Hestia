@@ -278,15 +278,13 @@ describe('escadas no DXF (camadas ESCADA, ESCADA_ESPELHO e ESCADA_SETA)', () => 
     // Conta registros de entidade (0/POLYLINE ou 0/LINE seguido da camada), não ocorrências do nome da camada.
     // Degraus em 0,60 / 1,20 / 1,80 / 2,40 m. Até o topo do intervalo (2,30 m) ficam 3: 2 cheios (até a cota de corte,
     // 1,20 m, inclusive) e 1 tracejado (acima dela). O de 2,40 m sai. Espelhos: os 3 com topo até 2,30 m.
-    const polylines = text.match(/\r\n0\r\nPOLYLINE\r\n8\r\nESCADA\r\n/g) ?? [];
+    const polylines = polylinesOf(text).filter((x) => x.layer === 'ESCADA');
     expect(polylines).toHaveLength(2);
-    const above = text.match(/\r\n0\r\nPOLYLINE\r\n8\r\nESCADA_ACIMA\r\n/g) ?? [];
+    const above = polylinesOf(text).filter((x) => x.layer === 'ESCADA_ACIMA');
     expect(above).toHaveLength(1);
-    const risers = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_ESPELHO\r\n/g) ?? [];
-    expect(risers).toHaveLength(3);
+    expect(linesIn(text, 'ESCADA_ESPELHO')).toHaveLength(3);
     // seta: haste e duas pontas
-    const arrow = text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? [];
-    expect(arrow).toHaveLength(3);
+    expect(linesIn(text, 'ESCADA_SETA')).toHaveLength(3);
     expect(text.endsWith('\r\n0\r\nEOF\r\n')).toBe(true);
   });
 
@@ -451,7 +449,7 @@ describe('caracol no DXF (decisão 0014 §1 item 10)', () => {
 
   it('a seta segue a caminhada em arcos (muitos trechos de haste), com as duas pontas; o corte sai na cota de 1,20 m', () => {
     const text = planDxf(spiralStore().project, 'lv_0');
-    expect((text.match(/\r\n0\r\nLINE\r\n8\r\nESCADA_SETA\r\n/g) ?? []).length).toBeGreaterThan(19);
+    expect(linesIn(text, 'ESCADA_SETA').length).toBeGreaterThan(19);
     expect(polylinesOf(text).filter((x) => x.layer === 'ESCADA_CORTE')).toHaveLength(1);
   });
 });

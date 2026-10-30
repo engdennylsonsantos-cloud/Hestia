@@ -359,6 +359,9 @@ export function writeDxf2000(doc: DxfDoc): string {
         rec(330, modelSpace);
         rec(100, 'AcDbEntity');
         rec(8, layer);
+        // A VERTEX herda cor e tipo de linha do dono: sem isso o AUDIT corrige cada uma ("!= owner's").
+        if (e.color !== undefined) rec(62, e.color);
+        if (e.dashed === true) rec(6, 'DASHED');
         rec(100, 'AcDbVertex');
         rec(100, 'AcDb2dVertex');
         rec(10, fmt(p.x));
@@ -397,9 +400,10 @@ export function writeDxf2000(doc: DxfDoc): string {
         rec(11, fmt(e.at.x));
         rec(21, fmt(e.at.y));
         rec(31, fmt(0));
-        rec(100, 'AcDbText');
-        rec(73, 2);
       }
+      // O segundo marcador AcDbText fecha o bloco do texto; sem ele o AutoCAD recusa ("Class separator ... expected").
+      rec(100, 'AcDbText');
+      if (e.centered === true) rec(73, 2);
     }
   }
   rec(0, 'ENDSEC');

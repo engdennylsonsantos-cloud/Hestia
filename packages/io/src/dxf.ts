@@ -115,9 +115,10 @@ export interface DxfLevelGeometry {
     texts: DxfNoteText[];
   }>;
   /**
-   * Largura de linha de cada camada, em centésimos de mm (código 370 da tabela LAYER; arredondada ao valor DXF válido).
-   * Ausente: a tabela não leva 370 e o arquivo é o de antes. Presente: a camada sem entrada sai com -3 (padrão).
-   * Quem monta a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
+   * Largura de linha de cada camada, em centésimos de mm (arredondada ao valor DXF válido por `dxfLineWeight`). Quem monta
+   * a geometria preenche com `lineWeightsOf` (apps/web), a partir de `dxfLayersOf` e `dxfLineRoleOf`.
+   * O `exportDxf` NÃO a escreve: o arquivo é R12 e o código 370 da tabela LAYER só existe a partir do R2000; o AutoCAD
+   * recusa o desenho inteiro ("Unknown group 370 for table"). Fica para um exportador R2000.
    */
   lineWeights?: Partial<Record<string, number>>;
   /** Cotas e textos de anotação do nível (decisão 0019): ver `notesDxfOf`. Ausente = nenhum. */
@@ -228,6 +229,29 @@ const EPS = 1e-9;
 /** Coordenadas com 6 casas (1 µm); zero negativo vira zero. */
 // units-ok: coordenada DXF (formato de máquina)
 const fmt = (v: number): string => (Math.abs(v) < 5e-7 ? 0 : v).toFixed(6);
+
+/** Par código/valor de um registro DXF. */
+export type DxfPair = readonly [number, string | number];
+
+/**
+ * Gravador de pares código/valor em `out`. Os números de coordenada, altura e ângulo (códigos 10 a 59) saem com 6 casas,
+ * como `exportDxf` (`String(1e-7)` seria "1e-7"); os demais (70, 66…) são inteiros e saem como vieram.
+ */
+export function dxfRecorder(out: string[]): (code: number, value: string | number) => void {
+  return (code, value) => {
+    out.push(String(code), typeof value === 'number' && code >= 10 && code < 60 ? fmt(value) : String(value));
+  };
+}
+
+/** Tabela STYLE com o estilo STANDARD, que o TEXT sem estilo usa (o R12 clássico a espera quando há TEXT). */
+export const DXF_STYLE_TABLE: readonly DxfPair[] = [
+  [0, 'TABLE'], [2, 'STYLE'], [70, 1],
+  [0, 'STYLE'], [2, 'STANDARD'], [70, 0], [40, '0.0'], [41, '1.0'], [50, '0.0'], [71, 0], [42, '0.2'], [3, 'txt'], [4, ''],
+  [0, 'ENDTAB'],
+];
+
+/** Seção BLOCKS vazia: o formato clássico é HEADER, TABLES, BLOCKS, ENTITIES e EOF, e o Hestia não usa blocos. */
+export const DXF_BLOCKS_SECTION: readonly DxfPair[] = [[0, 'SECTION'], [2, 'BLOCKS'], [0, 'ENDSEC']];
 
 /** Anel sem o vértice de fechamento repetido. Com menos de 3 vértices não há área: devolve null. */
 function openRing(ring: DxfPoint[]): DxfPoint[] | null {
@@ -451,13 +475,14 @@ export function dxfLayersOf(project: Project, geo: DxfLevelGeometry): string[] {
 }
 
 /**
- * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6), uma camada por material
+ * Planta de um nível em DXF ASCII (AC1009, o R12): unidades em metros ($INSUNITS 6, que o AutoCAD lê mesmo no R12), uma camada por material
  * (`PAREDE_<material>`), `PAREDE_CONTORNO` para o contorno externo e `ABERTURAS` para os vãos de corte. Elementos fora do
  * corte entram nas camadas de projeção (`PAREDE_PROJECAO_*`, `ABERTURA_*`, `ESCADA_ACIMA`, `TELHADO_PROJECAO`), com tipo de
  * linha tracejado quando estão acima do corte; os vãos de projeção saem com o símbolo de planta (`DxfOpening.symbol`). Cada anel é uma POLYLINE fechada (flag 1): LWPOLYLINE só existe a partir do
  * AutoCAD R14. A tabela de tipos de linha só leva `DASHED` quando alguma camada o usa, então o arquivo sem projeções é o mesmo.
- * Com `geo.lineWeights`, cada camada leva o código 370 (largura arredondada ao valor DXF válido; sem entrada, -3); sem ele, a
- * tabela não tem 370.
+ * R12 estrito: só grupos e entidades do R12 (sem 370, 100, 330), com as seções HEADER, TABLES (LTYPE, LAYER, STYLE), BLOCKS
+ * (vazia) e ENTITIES. Textos fora do ASCII saem como \U+XXXX (`dxfEscapeText`). A largura de linha de `geo.lineWeights` não
+ * vai ao arquivo: o 370 da tabela LAYER é do R2000 e o AutoCAD recusa o desenho inteiro com ele.
  */
 export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry): string {
   if (!project.levels.some((l) => l.id === levelId)) throw new Error(`Nível ausente: ${levelId}`);
@@ -529,13 +554,12 @@ export function exportDxf(project: Project, levelId: Id, geo: DxfLevelGeometry):
     rec(70, 0);
     rec(62, style.color);
     rec(6, style.linetype);
-    if (geo.lineWeights) {
-      const w = geo.lineWeights[name];
-      rec(370, w === undefined ? DXF_LINE_WEIGHT_DEFAULT : dxfLineWeight(w));
-    }
   }
   rec(0, 'ENDTAB');
+  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
   rec(0, 'ENDSEC');
+
+  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
 
   rec(0, 'SECTION');
   rec(2, 'ENTITIES');

@@ -1,10 +1,10 @@
 import type { GraphicsCategory, Id, Project } from '@hestia/model';
-import { DXF_LINE_WEIGHT_DEFAULT, dxfLineWeight, type DxfPoint, type DxfPolygons } from './dxf.ts';
+import { DXF_BLOCKS_SECTION, DXF_STYLE_TABLE, type DxfPoint, type DxfPolygons } from './dxf.ts';
 
 /**
- * DXF do corte e da elevação (decisão 0015 §2.7). O desenho é (t, z), com z para cima; cada camada leva a largura do
- * peso da categoria na escala da vista (código 370), como a planta. O io não conhece o motor: quem monta a geometria é
- * o app, que entrega os polígonos já visíveis e a categoria de cada um.
+ * DXF do corte e da elevação (decisão 0015 §2.7). O desenho é (t, z), com z para cima; o peso da categoria na escala da
+ * vista fica em `lineWeights`, que o R12 não escreve (como a planta: ver `DxfLevelGeometry.lineWeights`). O io não conhece
+ * o motor: quem monta a geometria é o app, que entrega os polígonos já visíveis e a categoria de cada um.
  */
 
 /** Categoria de uma camada do corte/elevação e se o peso é o de corte ou o de projeção. */
@@ -27,8 +27,9 @@ export interface DxfSectionGeometry {
   /** Contorno externo do desenho (peso de corte da parede). */
   silhouette?: DxfPolygons;
   /**
-   * Largura de linha de cada camada, em centésimos de mm (código 370; arredondada ao valor DXF válido). Ausente: a
-   * tabela não leva 370. Quem monta preenche com `sectionLineWeightsOf` (apps/web), na escala da vista.
+   * Largura de linha de cada camada, em centésimos de mm (arredondada ao valor DXF válido). Quem monta preenche com
+   * `sectionLineWeightsOf` (apps/web), na escala da vista. O `exportSectionDxf` não a escreve: o 370 é do R2000 e o
+   * AutoCAD recusa o arquivo R12 que o leva.
    */
   lineWeights?: Partial<Record<string, number>>;
 }
@@ -111,7 +112,7 @@ export function dxfSectionLayersOf(geo: DxfSectionGeometry): string[] {
 /**
  * Corte ou elevação em DXF ASCII (AC1009, R12), unidades em metros, z para cima. As camadas seguem a categoria
  * (`CORTE_PAREDE`, `CORTE_PISO`, …, `_PROJECAO` para o que está além) e o contorno externo vai em `CORTE_CONTORNO`.
- * Com `geo.lineWeights`, cada camada leva o código 370; sem ele, a tabela é a de antes.
+ * R12 estrito, como a planta: sem 370, com STYLE e BLOCKS (vazia).
  */
 export function exportSectionDxf(project: Project, viewId: Id, geo: DxfSectionGeometry): string {
   if (!project.views.some((v) => v.id === viewId)) throw new Error(`Vista ausente: ${viewId}`);
@@ -165,13 +166,12 @@ export function exportSectionDxf(project: Project, viewId: Id, geo: DxfSectionGe
     rec(70, 0);
     rec(62, 7);
     rec(6, 'CONTINUOUS');
-    if (geo.lineWeights) {
-      const w = geo.lineWeights[name];
-      rec(370, w === undefined ? DXF_LINE_WEIGHT_DEFAULT : dxfLineWeight(w));
-    }
   }
   rec(0, 'ENDTAB');
+  for (const [c, v] of DXF_STYLE_TABLE) rec(c, v);
   rec(0, 'ENDSEC');
+
+  for (const [c, v] of DXF_BLOCKS_SECTION) rec(c, v);
 
   rec(0, 'SECTION');
   rec(2, 'ENTITIES');
